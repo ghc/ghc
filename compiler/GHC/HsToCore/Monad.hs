@@ -266,9 +266,12 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
              -- re-use existing next_wrapper_num to ensure uniqueness
              next_wrapper_num_var = tcg_next_wrapper_num tcg_env
+             tcg_comp_env = tcg_complete_match_env tcg_env
 
        ; ds_complete_matches <-
            liftIO $ unsafeInterleaveIO $
+             -- Note [Lazily loading COMPLETE pragmas]
+             -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
              -- This call to 'unsafeInterleaveIO' ensures we only do this work
              -- when we need to look at the COMPLETE pragmas, avoiding doing work
              -- when we don't need them.
@@ -276,7 +279,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              -- Relevant test case: MultiLayerModulesTH_Make, which regresses
              -- in allocations by ~5% if we don't do this.
            traverse (lookupCompleteMatch type_env hsc_env) =<<
-             localAndImportedCompleteMatches (tcg_complete_matches tcg_env) (hsc_unit_env hsc_env) eps
+             localAndImportedCompleteMatches tcg_comp_env eps
        ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env ptc
                            msg_var cc_st_var next_wrapper_num_var ds_complete_matches
        }
@@ -334,7 +337,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
              bindsToIds (Rec    binds) = map fst binds
              ids = concatMap bindsToIds binds
        ; ds_complete_matches <- traverse (lookupCompleteMatch type_env hsc_env) =<<
-            localAndImportedCompleteMatches local_complete_matches (hsc_unit_env hsc_env) eps
+            localAndImportedCompleteMatches local_complete_matches eps
        ; let
              envs  = mkDsEnvs unit_env this_mod rdr_env type_env
                               fam_inst_env ptc msg_var cc_st_var

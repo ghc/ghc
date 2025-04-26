@@ -51,6 +51,7 @@ import GHC.Driver.Env
 import GHC.Driver.Plugins
 import GHC.Driver.DynFlags
 import GHC.Driver.Config.Diagnostic
+import GHC.IO.Unsafe ( unsafeInterleaveIO )
 
 import GHC.Tc.Errors.Hole.Plugin ( HoleFitPluginR (..) )
 import GHC.Tc.Errors.Types
@@ -483,6 +484,12 @@ tcRnImports hsc_env import_decls
               ; (home_insts, home_fam_insts) <- liftIO $
                     hugInstancesBelow hsc_env unitId mnwib
 
+                -- We use 'unsafeInterleaveIO' to avoid redundant memory allocations
+                -- See Note [Lazily loading COMPLETE pragmas] from GHC.HsToCore.Monad
+                -- and see https://gitlab.haskell.org/ghc/ghc/-/merge_requests/14274#note_620545
+              ; completeSigsBelow <- liftIO $ unsafeInterleaveIO $
+                    hugCompleteSigsBelow hsc_env unitId mnwib
+
                 -- Record boot-file info in the EPS, so that it's
                 -- visible to loadHiBootInterface in tcRnSrcDecls,
                 -- and any other incrementally-performed imports
@@ -495,6 +502,8 @@ tcRnImports hsc_env import_decls
             gbl {
               tcg_rdr_env      = tcg_rdr_env gbl `plusGlobalRdrEnv` rdr_env,
               tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
+              tcg_complete_match_env = tcg_complete_match_env gbl ++
+                                       completeSigsBelow,
               tcg_import_decls = imp_user_spec,
               tcg_rn_imports   = rn_imports,
               tcg_default      = foldMap subsume tc_defaults,

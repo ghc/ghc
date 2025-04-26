@@ -222,7 +222,8 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    last_tcg_env0 <- getGblEnv ;
    let { last_tcg_env =
             last_tcg_env0
-              { tcg_complete_matches = tcg_complete_matches last_tcg_env0 ++ localCompletePragmas sigs' }
+              { tcg_complete_matches = tcg_complete_matches last_tcg_env0 ++ localCompletePragmas sigs'
+                                      , tcg_complete_match_env = tcg_complete_match_env last_tcg_env0 ++ localCompletePragmas sigs'}
        } ;
    -- (I) Compute the results and return
    let {rn_group = HsGroup { hs_ext     = noExtField,

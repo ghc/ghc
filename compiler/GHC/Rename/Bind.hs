@@ -338,7 +338,8 @@ rnValBindsRHS ctxt (ValBinds _ mbinds sigs)
        -- Update the TcGblEnv with renamed COMPLETE pragmas from the current
        -- module, for pattern irrefutability checking in do notation.
        ; let localCompletePrags = localCompletePragmas sigs'
-       ; updGblEnv (\gblEnv -> gblEnv { tcg_complete_matches = tcg_complete_matches gblEnv ++ localCompletePrags}) $
+       ; updGblEnv (\gblEnv -> gblEnv { tcg_complete_matches = tcg_complete_matches gblEnv ++ localCompletePrags
+                                      , tcg_complete_match_env = tcg_complete_match_env gblEnv ++ localCompletePrags }) $
     do { binds_w_dus <- mapM (rnLBind (mkScopedTvFn sigs')) mbinds
        ; let !(anal_binds, anal_dus) = depAnalBinds binds_w_dus
 
@@ -956,7 +957,8 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
 
        -- Update the TcGblEnv with renamed COMPLETE pragmas from the current
        -- module, for pattern irrefutability checking in do notation.
-       ; updGblEnv (\gblEnv -> gblEnv { tcg_complete_matches = tcg_complete_matches gblEnv ++ localCompletePrags}) $
+       ; updGblEnv (\gblEnv -> gblEnv { tcg_complete_matches = tcg_complete_matches gblEnv ++ localCompletePrags
+                                      , tcg_complete_match_env = tcg_complete_match_env gblEnv ++ localCompletePrags}) $
     do {
        -- Rename the bindings RHSs.  Again there's an issue about whether the
        -- type variables from the class/instance head are in scope.

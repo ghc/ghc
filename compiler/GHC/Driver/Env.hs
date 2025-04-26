@@ -33,6 +33,7 @@ module GHC.Driver.Env
    , hugRulesBelow
    , hugInstancesBelow
    , hugAnnsBelow
+   , hugCompleteSigsBelow
 
     -- * Legacy API
    , hscUpdateHPT
@@ -79,6 +80,7 @@ import GHC.Utils.Logger
 
 import GHC.Core.Rules
 import GHC.Types.Annotations
+import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Builtin.Names
@@ -227,6 +229,12 @@ hugRulesBelow hsc uid mn = foldr (flip extendRuleBaseList) emptyRuleBase <$>
 hugAnnsBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO AnnEnv
 hugAnnsBelow hsc uid mn = foldr (flip extendAnnEnvList) emptyAnnEnv <$>
   hugSomeThingsBelowUs (md_anns . hm_details) False hsc uid mn
+
+-- | Find all COMPLETE pragmas in modules that are in the transitive closure of the
+-- given module.
+hugCompleteSigsBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO CompleteMatches
+hugCompleteSigsBelow hsc uid mn = foldr (++) [] <$>
+  hugSomeThingsBelowUs (md_complete_matches . hm_details) False hsc uid mn
 
 -- | Find instances visible from the given set of imports
 hugInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [FamInst])

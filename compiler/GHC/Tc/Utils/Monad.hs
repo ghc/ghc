@@ -328,6 +328,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_inst_env       = emptyInstEnv,
                 tcg_fam_inst_env   = emptyFamInstEnv,
                 tcg_ann_env        = emptyAnnEnv,
+                tcg_complete_match_env = [],
                 tcg_th_used        = th_var,
                 tcg_th_needed_deps = th_needed_deps_var,
                 tcg_exports        = [],
@@ -2425,15 +2426,14 @@ liftZonkM (ZonkM f) =
 getCompleteMatchesTcM :: TcM CompleteMatches
 getCompleteMatchesTcM
   = do { hsc_env <- getTopEnv
-       ; tcg_env <- getGblEnv
        ; eps <- liftIO $ hscEPS hsc_env
-       ; liftIO $ localAndImportedCompleteMatches (tcg_complete_matches tcg_env) (hsc_unit_env hsc_env) eps
+       ; tcg_env <- getGblEnv
+       ; let tcg_comps = tcg_complete_match_env tcg_env
+       ; liftIO $ localAndImportedCompleteMatches tcg_comps eps
        }
 
-localAndImportedCompleteMatches :: CompleteMatches -> UnitEnv -> ExternalPackageState -> IO CompleteMatches
-localAndImportedCompleteMatches tcg_comps unit_env eps = do
-  hugCSigs <- hugCompleteSigs unit_env
+localAndImportedCompleteMatches :: CompleteMatches -> ExternalPackageState -> IO CompleteMatches
+localAndImportedCompleteMatches tcg_comps eps = do
   return $
-       tcg_comps                -- from the current module
-    ++ hugCSigs                 -- from the home package
-    ++ eps_complete_matches eps -- from imports
+       tcg_comps                -- from the current modulea and from the home package
+    ++ eps_complete_matches eps -- from external packages

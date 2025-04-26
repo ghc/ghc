@@ -507,6 +507,9 @@ data TcGblEnv
         tcg_fam_inst_env :: !FamInstEnv, -- ^ Ditto for family instances
           -- NB. BangPattern is to fix a leak, see #15111
         tcg_ann_env      :: AnnEnv,     -- ^ And for annotations
+        tcg_complete_match_env :: CompleteMatches,
+        -- ^ The complete matches for all /home-package/ modules;
+        -- Includes the complete matches in tcg_complete_matches
 
                 -- Now a bunch of things about this module that are simply
                 -- accumulated, but never consulted until the end.
@@ -689,9 +692,10 @@ data TcGblEnv
           -- ^ Wanted constraints of static forms.
         -- See Note [Constraints in static forms].
         tcg_complete_matches :: !CompleteMatches,
+        -- ^ Complete matches defined in this module.
 
-        -- ^ Tracking indices for cost centre annotations
         tcg_cc_st   :: TcRef CostCentreState,
+        -- ^ Tracking indices for cost centre annotations
 
         tcg_next_wrapper_num :: TcRef (ModuleEnv Int)
         -- ^ See Note [Generating fresh names for FFI wrappers]
