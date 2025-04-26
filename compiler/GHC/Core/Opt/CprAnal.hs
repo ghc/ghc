@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 
 -- | Constructed Product Result analysis. Identifies functions that surely
 -- return heap-allocated records on every code path, so that we can eliminate
@@ -22,12 +23,15 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unique.MemoFun
 
+import GHC.Core
 import GHC.Core.FamInstEnv
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Utils
-import GHC.Core
+import GHC.Core.Coercion
+import GHC.Core.Reduction
 import GHC.Core.Seq
+import GHC.Core.TyCon
 import GHC.Core.Opt.WorkWrap.Utils
 
 import GHC.Data.Graph.UnVar -- for UnVarSet
@@ -216,9 +220,13 @@ cprAnal' _ (Type ty)     = (topCprType, Type ty)      -- Doesn't happen, in fact
 cprAnal' _ (Coercion co) = (topCprType, Coercion co)
 
 cprAnal' env (Cast e co)
-  = (cpr_ty, Cast e' co)
+  = (cpr_ty', Cast e' co)
   where
     (cpr_ty, e') = cprAnal env e
+    cpr_ty'
+      | cpr_ty == topCprType                    = topCprType -- cheap case first
+      | isRecNewTyConApp env (coercionRKind co) = topCprType -- See Note [CPR for recursive data constructors]
+      | otherwise                               = cpr_ty
 
 cprAnal' env (Tick t e)
   = (cpr_ty, Tick t e')
@@ -391,6 +399,19 @@ cprTransformDataConWork env con args
 mAX_CPR_SIZE :: Arity
 mAX_CPR_SIZE = 10
 
+isRecNewTyConApp :: AnalEnv -> Type -> Bool
+-- See Note [CPR for recursive newtype constructors]
+isRecNewTyConApp env ty
+  --- | pprTrace "isRecNewTyConApp" (ppr ty) False = undefined
+  | Just (tc, tc_args) <- splitTyConApp_maybe ty =
+      if | Just (HetReduction (Reduction _ rhs) _) <- topReduceTyFamApp_maybe (ae_fam_envs env) tc tc_args
+         -> isRecNewTyConApp env rhs
+         | Just dc <- newTyConDataCon_maybe tc
+         -> ae_rec_dc env dc == DefinitelyRecursive
+         | otherwise
+         -> False
+  | otherwise = False
+
 --
 -- * Bindings
 --
@@ -414,12 +435,18 @@ cprFix orig_env orig_pairs
                | otherwise    = orig_pairs
     init_env = extendSigEnvFromIds orig_env (map fst init_pairs)
 
+    -- If fixed-point iteration does not yield a result we use this instead
+    -- See Note [Safe abortion in the fixed-point iteration]
+    abort :: (AnalEnv, [(Id,CoreExpr)])
+    abort = step (nonVirgin orig_env) [(setIdCprSig id topCprSig, rhs) | (id, rhs) <- orig_pairs ]
+
     -- The fixed-point varies the idCprSig field of the binders and and their
     -- entries in the AnalEnv, and terminates if that annotation does not change
     -- any more.
     loop :: Int -> AnalEnv -> [(Id,CoreExpr)] -> (AnalEnv, [(Id,CoreExpr)])
     loop n env pairs
       | found_fixpoint = (reset_env', pairs')
+      | n == 10        = pprTraceUserWarning (text "cprFix aborts. This is not terrible, but worth reporting a GHC issue." <+> ppr (map fst pairs)) $ abort
       | otherwise      = loop (n+1) env' pairs'
       where
         -- In all but the first iteration, delete the virgin flag
@@ -519,8 +546,9 @@ cprAnalBind env id rhs
     -- possibly trim thunk CPR info
     rhs_ty'
       -- See Note [CPR for thunks]
-      | stays_thunk = trimCprTy rhs_ty
-      | otherwise   = rhs_ty
+      | rhs_ty == topCprType = topCprType -- cheap case first
+      | stays_thunk          = trimCprTy rhs_ty
+      | otherwise            = rhs_ty
     -- See Note [Arity trimming for CPR signatures]
     sig  = mkCprSigForArity (idArity id) rhs_ty'
     -- See Note [OPAQUE pragma]
@@ -639,7 +667,7 @@ data AnalEnv
   , ae_fam_envs :: FamInstEnvs
   -- ^ Needed when expanding type families and synonyms of product types.
   , ae_rec_dc :: DataCon -> IsRecDataConResult
-  -- ^ Memoised result of 'GHC.Core.Opt.WorkWrap.Utils.isRecDataCon'
+  -- ^ Memoised result of 'GHC.Core.Opt.WorkWrap.Utils.isRecDataType
   }
 
 instance Outputable AnalEnv where
@@ -1042,10 +1070,11 @@ Eliminating the shared 'c' binding in the process. And then
 
 What can we do about it?
 
- A. Don't CPR functions that return a *recursive data type* (the list in this
-    case). This is the solution we adopt. Rationale: the benefit of CPR on
-    recursive data structures is slight, because it only affects the outer layer
-    of a potentially massive data structure.
+ A. Don't give recursive data constructors or casts representing recursive newtype constructors
+    the CPR property (the list in this case). This is the solution we adopt.
+    Rationale: the benefit of CPR on recursive data structures is slight,
+    because it only affects the outer layer of a potentially massive data
+    structure.
  B. Don't CPR any *recursive function*. That would be quite conservative, as it
     would also affect e.g. the factorial function.
  C. Flat CPR only for recursive functions. This prevents the asymptotic
@@ -1055,10 +1084,15 @@ What can we do about it?
     `c` in the second eqn of `replicateC`). But we'd need to know which paths
     were hot. We want such static branch frequency estimates in #20378.
 
-We adopt solution (A) It is ad-hoc, but appears to work reasonably well.
-Deciding what a "recursive data constructor" is is quite tricky and ad-hoc, too:
-See Note [Detecting recursive data constructors]. We don't have to be perfect
-and can simply keep on unboxing if unsure.
+We adopt solution (A). It is ad-hoc, but appears to work reasonably well.
+Specifically:
+
+* For data constructors, in `cprTransformDataConWork` we check for a recursive
+  data constructor by calling `ae_rec_dc env`, which is just a memoised version
+  of `isRecDataCon`.  See Note [Detecting recursive data constructors]
+* For newtypes, in the `Cast` case of `cprAnal`, we check for a recursive newtype
+  by calling `isRecNewTyConApp`, which in turn calls `ae_rec_dc env`.
+  See Note [CPR for recursive newtype constructors]
 
 Note [Detecting recursive data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1075,12 +1109,15 @@ looks inside the following class of types, represented by `ty` (and responds
     types of its data constructors and check `tc_args` for recursion.
  C. If `ty = F tc_args`, `F` is a `FamTyCon` and we can reduce `F tc_args` to
     `rhs`, look into the `rhs` type.
+ D. If `ty = f a`, then look into `f` and `a`
+ E. If `ty = ty' |> co`, then look into `ty'`
 
 A few perhaps surprising points:
 
   1. It deems any function type as non-recursive, because it's unlikely that
      a recursion through a function type builds up a recursive data structure.
-  2. It doesn't look into kinds or coercion types because there's nothing to unbox.
+  2. It doesn't look into kinds, literals or coercion types because we are
+     ultimately looking for value-level recursion.
      Same for promoted data constructors.
   3. We don't care whether an AlgTyCon app `T tc_args` is fully saturated or not;
      we simply look at its definition/DataCons and its field tys and look for
@@ -1152,6 +1189,22 @@ These examples are tested by the testcase RecDataConCPR.
 I've played with the idea to make points (1) through (3) of 'isRecDataCon'
 configurable like (4) to enable more re-use throughout the compiler, but haven't
 found a killer app for that yet, so ultimately didn't do that.
+
+Note [CPR for recursive newtype constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A newtype constructor is considered recursive iff the data constructor of the
+equivalent datatype definition is recursive.
+See Note [CPR for recursive data constructors].
+Detection is a bit complicated by the fact that newtype constructor applications
+reflect as Casts in Core:
+
+  newtype List a = C (Maybe (a, List a))
+  xs = C (Just (0, C Nothing))
+  ==> {desugar to Core}
+  xs = Just (0, Nothing |> sym N:List) |> sym N:List
+
+So the check for `isRecNewTyConApp` is in the Cast case of `cprAnal` rather than
+in `cprTransformDataConWork` as for data constructors.
 
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~

@@ -63,6 +63,7 @@ import Data.List ( unzip4 )
 
 import GHC.Types.RepType
 import GHC.Unit.Types
+import GHC.Core.TyCo.Rep
 
 {-
 ************************************************************************
@@ -1426,23 +1427,29 @@ isRecDataCon fam_envs fuel orig_dc
                     | arg_ty <- map scaledThing (dataConRepArgTys dc) ]
 
     go_arg_ty :: IntWithInf -> TyConSet -> Type -> IsRecDataConResult
-    go_arg_ty fuel visited_tcs ty
-      --- | pprTrace "arg_ty" (ppr ty) False = undefined
+    go_arg_ty fuel visited_tcs ty = -- pprTrace "arg_ty" (ppr ty) $
+      case coreFullView ty of
+        TyConApp tc tc_args -> go_tc_app fuel visited_tcs tc tc_args
+          -- See Note [Detecting recursive data constructors], points (B) and (C)
 
-      | Just (_tcv, ty') <- splitForAllTyCoVar_maybe ty
-      = go_arg_ty fuel visited_tcs ty'
+        ForAllTy _ ty' -> go_arg_ty fuel visited_tcs ty'
           -- See Note [Detecting recursive data constructors], point (A)
 
-      | Just (tc, tc_args) <- splitTyConApp_maybe ty
-      = go_tc_app fuel visited_tcs tc tc_args
+        CastTy ty' _ -> go_arg_ty fuel visited_tcs ty'
 
-      | otherwise
-      = NonRecursiveOrUnsure
+        AppTy f a -> go_arg_ty fuel visited_tcs f `combineIRDCR` go_arg_ty fuel visited_tcs a
+          -- See Note [Detecting recursive data constructors], point (D)
+
+        FunTy{} -> NonRecursiveOrUnsure
+          -- See Note [Detecting recursive data constructors], point (1)
+
+        -- (TyVarTy{} | LitTy{} | CastTy{})
+        _ -> NonRecursiveOrUnsure
 
     go_tc_app :: IntWithInf -> TyConSet -> TyCon -> [Type] -> IsRecDataConResult
     go_tc_app fuel visited_tcs tc tc_args =
       case tyConDataCons_maybe tc of
-      --- | pprTrace "tc_app" (vcat [ppr tc, ppr tc_args]) False = undefined
+        ---_ | pprTrace "tc_app" (vcat [ppr tc, ppr tc_args]) False -> undefined
         _ | Just (HetReduction (Reduction _ rhs) _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
           -- This is the only place where we look at tc_args, which might have
           -- See Note [Detecting recursive data constructors], point (C) and (5)
