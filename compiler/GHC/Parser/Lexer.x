@@ -327,8 +327,8 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 -- with {-#, then we'll assume it's a pragma we know about and go for do_bol.
 <bol> {
   \n                                    ;
-  -- Ghc CPP symbols
-  ^\# \ * @cppkeyword  .* \n / { ifExtensionGhcCppNotComment } { cppToken cpp_prag }
+  -- Ghc CPP symbols, see https://timsong-cpp.github.io/cppwp/n4140/cpp#1
+  ^\ * \# \ * @cppkeyword  .* \n / { ifExtensionGhcCppNotComment } { cppToken cpp_prag }
 
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
@@ -345,8 +345,8 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 -- GhcCppBit is set.
 <skipping> {
   -- Ghc CPP symbols
-  ^\# \ * @cppkeyword  .* \n  { cppToken cpp_prag }
-  ^.*\n                       { cppSkip }
+  ^\ * \# \ * @cppkeyword  .* \n  { cppToken cpp_prag }
+  ^.*\n                           { cppSkip }
 }
 
 -- after a layout keyword (let, where, do, of), we begin a new layout
@@ -356,7 +356,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \{ / { notFollowedBy '-' }            { hopefully_open_brace }
         -- we might encounter {-# here, but {- has been handled already
   \n                                    ;
-  ^\# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
+  ^\ * \# \ * @cppkeyword  .* \n / { ifExtension GhcCppBit } { cppToken cpp_prag }
 
   ^\# (line)?                           { begin line_prag1 }
   ^\#.*\n                      / { ifExtension GhcCppBit } { cppSkip }
@@ -431,7 +431,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
   -- This one does not check for GhcCpp being set, we use it to
   -- terminate normal pragma processing
-  ^\# \ * @cppkeyword  .* \n { cppToken cpp_prag }
+  ^\ * \# \ * @cppkeyword  .* \n   { cppToken cpp_prag }
   -- ^\# .*\n                      { cppSkip }
 }
 

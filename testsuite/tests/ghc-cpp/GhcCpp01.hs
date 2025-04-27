@@ -2,7 +2,8 @@
 -- {-# OPTIONS -ddump-ghc-cpp -dkeep-comments #-}
 module GhcCpp01 where
 
-#define FOO(A,B) A + B
+-- Check leading whitespace on a directive
+   # define FOO(A,B) A + B
 #define FOO(A,B,C) A + B + C
 #if FOO(1,FOO(3,4)) == 8
 
