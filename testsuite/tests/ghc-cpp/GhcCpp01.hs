@@ -18,3 +18,18 @@ x = 5
 #if defined(BAR) || defined FOO
 y = 1
 #endif
+
+#undef FOO
+#ifdef FOO
+complete junk!
+#endif
+
+-- nested undef
+#define AA
+#if 0
+#undef AA
+#endif
+
+#ifdef AA
+aa = 1
+#endif

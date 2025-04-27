@@ -29,6 +29,7 @@ parseDirective s =
         Right toks ->
             case toks of
                 (THash "#" : TIdentifier "define" : ts) -> cppDefine ts
+                (THash "#" : TIdentifier "undef" : ts) -> Right $ cppUndef (map t_str ts)
                 (THash "#" : TIdentifier "include" : ts) -> Right $ cppInclude (map t_str ts)
                 (THash "#" : TIdentifier "if" : ts) -> Right $ cppIf (map t_str ts)
                 (THash "#" : TIdentifier "ifndef" : ts) -> Right $ cppIfndef (map t_str ts)
@@ -53,6 +54,9 @@ cppDefine (TIdentifierLParen n : ts) = Right $ CppDefine (init n) args def
     (args, def) = getArgs ts
 cppDefine (TIdentifier n : ts) = Right $ CppDefine n Nothing ts
 cppDefine (t : _) = Left $ "#define: expecting an identifier, got :" ++ show t
+
+cppUndef :: [String] -> CppDirective
+cppUndef ts = CppUndef (combineToks ts)
 
 cppInclude :: [String] -> CppDirective
 cppInclude ts = CppInclude (combineToks ts)

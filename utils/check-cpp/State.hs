@@ -27,6 +27,7 @@ module State (
     popContinuation,
     ppDefine,
     ppIsDefined,
+    ppUndef,
     getCppState,
     ghcCppEnabled,
     setInLinePragma,
@@ -99,6 +100,7 @@ data CppDirective
     = CppInclude String
     | -- | name, optional args, replacement
       CppDefine String (Maybe [String]) MacroDef
+    | CppUndef String
     | CppIfdef String
     | CppIfndef String
     | CppIf String
@@ -333,8 +335,24 @@ addDefine' :: PpState -> MacroName -> MacroDef -> PpState
 addDefine' s name def =
     s{pp_defines = insertMacroDef name def (pp_defines s)}
 
+removeDefine :: String -> PP ()
+removeDefine name = do
+    accepting <- getAccepting
+    when accepting $ do
+        s <- getPpState
+        setPpState $ removeDefine' s name
+
+removeDefine' :: PpState -> String -> PpState
+removeDefine' s name =
+    s{pp_defines = Map.delete name (pp_defines s)}
+
+-- -------------------------------------
+
 ppDefine :: MacroName -> MacroDef -> PP ()
 ppDefine name val = addDefine name val
+
+ppUndef :: String -> PP ()
+ppUndef name = removeDefine name
 
 ppIsDefined :: MacroName -> PP Bool
 ppIsDefined name = do

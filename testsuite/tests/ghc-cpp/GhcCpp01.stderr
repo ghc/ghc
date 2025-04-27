@@ -4,8 +4,7 @@
 ------------------------------
 
 
-#define FOO(A,B) A + B
-#define FOO(A,B,C) A + B + C
+#define AA 
 
 
 #define MIN_VERSION_Cabal(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 14 || ( major1 ) == 3 && ( major2 ) == 14 && ( minor ) <= 1 )
@@ -216,6 +215,29 @@
   |
   
 - |#if de
+
+- |#endif
+
+- |
+
+- |#undef FOO
+
+- |#ifdef
+
+- |#endif
+
+- |
+
+- |-- ne
+- |#define A
+- |#if 0
+
+
+- |#endif
+
+  |
+  
+- |#ifdef
   |
 ------------------------------
 
