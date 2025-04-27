@@ -5,7 +5,7 @@ module Example1 where
 -- A comment
 y = 3
 
-#define FOO
+    #define FOO
 
 x =
 #ifndef FOO

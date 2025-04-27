@@ -1314,7 +1314,7 @@ checkImportDecl mPre mPost preLevel postLevel = do
 -- 'Nothing'). This is called from "GHC.Parser".
 importDeclQualifiedStyle :: Maybe (EpToken "qualified")
                          -> Maybe (EpToken "qualified")
-                         -> P (Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
+                         -> P p (Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
 importDeclQualifiedStyle mPre mPost =
   case (mPre, mPost) of
     (Just {}, Just post) -> failImportQualifiedTwice (getEpTokenSrcSpan post)
@@ -1325,7 +1325,7 @@ importDeclQualifiedStyle mPre mPost =
 
 importDeclLevelStyle :: (Maybe EpAnnLevel)
                      -> (Maybe EpAnnLevel)
-                     -> P (Maybe EpAnnLevel, ImportDeclLevelStyle)
+                     -> P p (Maybe EpAnnLevel, ImportDeclLevelStyle)
 importDeclLevelStyle preImportLevel postImportLevel =
   case (preImportLevel, postImportLevel) of
     (Just {}, Just tok) -> failSpliceOrQuoteTwice tok
