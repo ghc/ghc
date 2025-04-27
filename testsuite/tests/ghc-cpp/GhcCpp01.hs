@@ -33,3 +33,15 @@ complete junk!
 #ifdef AA
 aa = 1
 #endif
+
+-- undef and rewrite base name only
+#define MIN_VERSION_Cabal(a,b,c) 1
+
+#ifdef MIN_VERSION_Cabal
+#undef CH_MIN_VERSION_Cabal
+#define CH_MIN_VERSION_Cabal MIN_VERSION_Cabal
+#endif
+
+#if CH_MIN_VERSION_Cabal(1,22,0)
+x = 1
+#endif

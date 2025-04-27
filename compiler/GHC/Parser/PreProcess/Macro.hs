@@ -65,15 +65,19 @@ expand s str = expanded
     toks = case cppLex False str of
         Left err -> error $ "expand:" ++ show (err, str)
         Right tks -> tks
-    expanded = combineToks $ map t_str $ expandToks s toks
+    expanded = combineToks $ map t_str $ expandToks maxExpansions s toks
 
-expandToks :: MacroDefines -> [Token] -> [Token]
-expandToks s ts =
+maxExpansions :: Int
+maxExpansions = 15
+
+expandToks :: Int -> MacroDefines -> [Token] -> [Token]
+expandToks 0 _ ts = error $ "macro_expansion limit (" ++ show maxExpansions ++ ") hit, aborting. ts=" ++ show ts
+expandToks cnt s ts =
     let
-        (expansionDone, r) = doExpandToks False s ts
+        (!expansionDone, !r) = doExpandToks False s ts
     in
         if expansionDone
-            then expandToks s r
+            then expandToks (cnt -1) s r
             else r
 
 doExpandToks :: Bool -> MacroDefines -> [Token] -> (Bool, [Token])
@@ -100,13 +104,14 @@ doExpandToks ed s (TIdentifier n : ts) = (ed'', expanded ++ rest)
   where
     (ed', expanded, ts') = case Map.lookup n s of
         Nothing -> (ed, [TIdentifier n], ts)
-        Just defs -> (ed0, r, rest0)
+        Just defs -> (ed0, r, rest1)
           where
             (args, rest0) = getExpandArgs ts
-            (m_args, rhs) = fromMaybe (Nothing, [TIdentifier n]) (Map.lookup (arg_arity args) defs)
-            (ed0, r) = case m_args of
-                Nothing -> (True, rhs)
-                Just _ -> (True, replace_args args m_args rhs)
+            fallbackArgs = fromMaybe (Nothing, [TIdentifier n]) (Map.lookup Nothing defs)
+            (m_args, rhs) = fromMaybe fallbackArgs (Map.lookup (arg_arity args) defs)
+            (ed0, r, rest1) = case m_args of
+                Nothing -> (True, rhs, ts)
+                Just _ -> (True, replace_args args m_args rhs, rest0)
     (ed'', rest) = doExpandToks ed' s ts'
 doExpandToks ed s (t : ts) = (ed', t : r)
   where
