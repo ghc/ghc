@@ -293,6 +293,8 @@ processCpp ss = do
                     ppInclude filename
                 Right (CppDefine name args def) -> do
                     ppDefine (MacroName name args) def
+                Right (CppUndef name) -> do
+                    ppUndef name
                 Right (CppIf cond) -> do
                     val <- cppCond cond
                     ar <- pushAccepting val
