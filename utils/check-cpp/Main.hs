@@ -820,3 +820,21 @@ t35 = do
         , "#endif"
         , ""
         ]
+
+t36 :: IO ()
+t36 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example15 where"
+        , "#define MIN_VERSION_Cabal(a,b,c) 1"
+        , ""
+        , "#ifdef MIN_VERSION_Cabal"
+        , "#undef CH_MIN_VERSION_Cabal"
+        , "#define CH_MIN_VERSION_Cabal MIN_VERSION_Cabal"
+        , "#endif"
+        , ""
+        , "#if CH_MIN_VERSION_Cabal(1,22,0)"
+        , "x = 1"
+        , "#endif"
+        , ""
+        ]
