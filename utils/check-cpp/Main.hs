@@ -783,6 +783,7 @@ t33 = do
 t34 :: IO ()
 t34 = do
     dump
+
         [ "{-# LANGUAGE GHC_CPP #-}"
         , "module Example4 where"
         , ""
@@ -796,6 +797,26 @@ t34 = do
         , "import qualified        Text.ParserCombinators.Poly.Plain       as Poly"
         , "#else"
         , "#       error \"USE_POLYPARSE invalid\""
+        , "#endif"
+        , ""
+        ]
+
+t35 :: IO ()
+t35 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example14 where"
+
+        , "#define FOO"
+        , "#define FOO(X) X"
+        , ""
+        , "#undef FOO"
+        , ""
+        , "foo ="
+        , "#ifdef FOO"
+        , "  'a'"
+        , "#else"
+        , "  'b'"
         , "#endif"
         , ""
         ]
