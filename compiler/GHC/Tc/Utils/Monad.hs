@@ -1728,27 +1728,41 @@ mkErrCtxt env ctxts
 --       if dbg                -- In -dppr-debug style the output
 --          then return empty  -- just becomes too voluminous
 --          else go dbg 0 env ctxts
- = go False 0 env ctxts
+ = do appDo <- xoptM LangExt.ApplicativeDo
+      if appDo
+      then go False 0 env ctxts -- regular error ctx
+      else go1 False 0 env ctxts -- skip the ErrCtx that comes right before HsDoStmt
 
  where
-   go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
-   go _ _ _   [] = return []
-   go dbg n env ((is_landmark1, ctxt1) : (is_landmark2, ctxt2) : ctxts)
+   go1, go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
+   go1 _ _ _   [] = return []
+   go1 dbg n env ((is_landmark1, ctxt1) : (is_landmark2, ctxt2) : ctxts)
      | is_landmark1 || n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg1) <- liftZonkM $ ctxt1 env
           ; (_, msg2) <- liftZonkM $ ctxt2 env'
           ; case (msg1, msg2) of
               (ExprCtxt{}, StmtErrCtxt (HsDoStmt (DoExpr{})) _)
                 -> do { let n' = if is_landmark2 then n else n+1
-                      ; rest <- go dbg n' env' ctxts
+                      ; rest <- go1 dbg n' env' ctxts
                       ; return (msg2 : rest) }
               _
                 -> do { let n' = if is_landmark1 then n else n+1
-                      ; rest <- go dbg n' env' ((is_landmark2, ctxt2) : ctxts)
+                      ; rest <- go1 dbg n' env' ((is_landmark2, ctxt2) : ctxts)
                       ; return (msg1 : rest) }
           }
      | otherwise
-     = go dbg n env ((is_landmark2, ctxt2) : ctxts)
+     = go1 dbg n env ((is_landmark2, ctxt2) : ctxts)
+   go1 dbg n env ((is_landmark, ctxt) : ctxts)
+     | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
+     = do { (env', msg) <- liftZonkM $ ctxt env
+          ; let n' = if is_landmark then n else n+1
+          ; rest <- go1 dbg n' env' ctxts
+          ; return (msg : rest) }
+     | otherwise
+     = go1 dbg n env ctxts
+
+   -- Applicative do doesn't use expansion yet
+   go _ _ _   [] = return []
    go dbg n env ((is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg) <- liftZonkM $ ctxt env
@@ -1758,13 +1772,6 @@ mkErrCtxt env ctxts
      | otherwise
      = go dbg n env ctxts
 
-   -- filter_stmt_adj :: [ErrCtxtMsg] -> [ErrCtxtMsg]
-   -- filter_stmt_adj = concat . map stmtAdj . tails
-
-   -- stmtAdj :: [ErrCtxtMsg] -> [ErrCtxtMsg]
-   -- stmtAdj (ExprCtxt{} : StmtErrCtxt{} : _ ) = []
-   -- stmtAdj (s : _ )  = [s]
-   -- stmtAdj xs = xs
 
 mAX_CONTEXTS :: Int     -- No more than this number of non-landmark contexts
 mAX_CONTEXTS = 3
