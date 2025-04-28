@@ -17,7 +17,7 @@ module GHC.Tc.Types.Constraint (
         isUnsatisfiableCt_maybe,
         ctEvidence, updCtEvidence,
         ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
-        ctRewriters,
+        ctRewriters, ctHasNoRewriters,
         ctEvId, wantedEvId_maybe, mkTcEqPredLikeEv,
         mkNonCanonical, mkGivens,
         tyCoVarsOfCt, tyCoVarsOfCts,
@@ -2228,6 +2228,12 @@ ctEvTerm ev = EvExpr (ctEvExpr ev)
 ctEvRewriters :: CtEvidence -> RewriterSet
 ctEvRewriters (CtWanted (WantedCt { ctev_rewriters = rws })) = rws
 ctEvRewriters (CtGiven {})  = emptyRewriterSet
+
+ctHasNoRewriters :: Ct -> Bool
+ctHasNoRewriters (CtWanted (WantedCt { ctev_rewriters = rws }))
+  = isEmptyRewriterSet rws
+ctHasNoRewriters (CtGiven {})
+  = True
 
 -- | Set the rewriter set of a Wanted constraint.
 setWantedCtEvRewriters :: WantedCtEvidence -> RewriterSet -> WantedCtEvidence

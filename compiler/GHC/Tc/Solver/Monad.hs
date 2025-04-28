@@ -1419,62 +1419,6 @@ getInertSet = getInertSetRef >>= readTcRef
 setInertSet :: InertSet -> TcS ()
 setInertSet is = do { r <- getInertSetRef; writeTcRef r is }
 
-getTcSWorkListRef :: TcS (IORef WorkList)
-getTcSWorkListRef = TcS (return . tcs_worklist)
-
-getWorkListImplics :: TcS (Bag Implication)
-getWorkListImplics
-  = do { wl_var <- getTcSWorkListRef
-       ; wl_curr <- readTcRef wl_var
-       ; return (wl_implics wl_curr) }
-
-pushLevelNoWorkList :: SDoc -> TcS a -> TcS (TcLevel, a)
--- Push the level and run thing_inside
--- However, thing_inside should not generate any work items
-#if defined(DEBUG)
-pushLevelNoWorkList err_doc (TcS thing_inside)
-  = TcS (\env -> TcM.pushTcLevelM $
-                 thing_inside (env { tcs_worklist = wl_panic })
-        )
-  where
-    wl_panic  = pprPanic "GHC.Tc.Solver.Monad.buildImplication" err_doc
-                         -- This panic checks that the thing-inside
-                         -- does not emit any work-list constraints
-#else
-pushLevelNoWorkList _ (TcS thing_inside)
-  = TcS (\env -> TcM.pushTcLevelM (thing_inside env))  -- Don't check
-#endif
-
-updWorkListTcS :: (WorkList -> WorkList) -> TcS ()
-updWorkListTcS f
-  = do { wl_var <- getTcSWorkListRef
-       ; updTcRef wl_var f }
-
-emitWorkNC :: [CtEvidence] -> TcS ()
-emitWorkNC evs
-  | null evs
-  = return ()
-  | otherwise
-  = emitWork (listToBag (map mkNonCanonical evs))
-
-emitWork :: Cts -> TcS ()
-emitWork cts
-  | isEmptyBag cts    -- Avoid printing, among other work
-  = return ()
-  | otherwise
-  = do { traceTcS "Emitting fresh work" (pprBag cts)
-         -- Zonk the rewriter set of Wanteds, because that affects
-         -- the prioritisation of the work-list. Suppose a constraint
-         -- c1 is rewritten by another, c2.  When c2 gets solved,
-         -- c1 has no rewriters, and can be prioritised; see
-         -- Note [Prioritise Wanteds with empty RewriterSet]
-         -- in GHC.Tc.Types.Constraint wrinkle (PER1)
-       ; cts <- liftZonkTcS $ mapBagM TcM.zonkCtRewriterSet cts
-       ; updWorkListTcS (extendWorkListCts cts) }
-
-emitImplication :: Implication -> TcS ()
-emitImplication implic
-  = updWorkListTcS (extendWorkListImplic implic)
 
 newTcRef :: a -> TcS (TcRef a)
 newTcRef x = wrapTcS (TcM.newTcRef x)
@@ -1533,23 +1477,6 @@ reportUnifications (TcS thing_inside)
 getDefaultInfo ::  TcS (DefaultEnv, Bool)
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
 
-getWorkList :: TcS WorkList
-getWorkList = do { wl_var <- getTcSWorkListRef
-                 ; wrapTcS (TcM.readTcRef wl_var) }
-
-selectNextWorkItem :: TcS (Maybe Ct)
--- Pick which work item to do next
--- See Note [Prioritise equalities]
-selectNextWorkItem
-  = do { wl_var <- getTcSWorkListRef
-       ; wl <- readTcRef wl_var
-       ; case selectWorkItem wl of {
-           Nothing -> return Nothing ;
-           Just (ct, new_wl) ->
-    do { -- checkReductionDepth (ctLoc ct) (ctPred ct)
-         -- This is done by GHC.Tc.Solver.Dict.chooseInstance
-       ; writeTcRef wl_var new_wl
-       ; return (Just ct) } } }
 
 -- Just get some environments needed for instance looking up and matching
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1805,6 +1732,112 @@ zonkTyCoVarKind tv = liftZonkTcS (TcM.zonkTyCoVarKind tv)
 pprKicked :: Int -> SDoc
 pprKicked 0 = empty
 pprKicked n = parens (int n <+> text "kicked out")
+
+
+{- *********************************************************************
+*                                                                      *
+*              The work list
+*                                                                      *
+********************************************************************* -}
+
+
+getTcSWorkListRef :: TcS (IORef WorkList)
+getTcSWorkListRef = TcS (return . tcs_worklist)
+
+getWorkList :: TcS WorkList
+getWorkList = do { wl_var <- getTcSWorkListRef
+                 ; readTcRef wl_var }
+
+getWorkListImplics :: TcS (Bag Implication)
+getWorkListImplics
+  = do { wl_var <- getTcSWorkListRef
+       ; wl_curr <- readTcRef wl_var
+       ; return (wl_implics wl_curr) }
+
+updWorkListTcS :: (WorkList -> WorkList) -> TcS ()
+updWorkListTcS f
+  = do { wl_var <- getTcSWorkListRef
+       ; updTcRef wl_var f }
+
+emitWorkNC :: [CtEvidence] -> TcS ()
+emitWorkNC evs
+  | null evs
+  = return ()
+  | otherwise
+  = emitWork (listToBag (map mkNonCanonical evs))
+
+emitWork :: Cts -> TcS ()
+emitWork cts
+  | isEmptyBag cts    -- Avoid printing, among other work
+  = return ()
+  | otherwise
+  = do { traceTcS "Emitting fresh work" (pprBag cts)
+       ; updWorkListTcS (extendWorkListCts cts) }
+
+emitImplication :: Implication -> TcS ()
+emitImplication implic
+  = updWorkListTcS (extendWorkListImplic implic)
+
+selectNextWorkItem :: TcS (Maybe Ct)
+-- Pick which work item to do next
+-- See Note [Prioritise equalities]
+         -- Zonk the rewriter set of Wanteds, because that affects
+         -- the prioritisation of the work-list. Suppose a constraint
+         -- c1 is rewritten by another, c2.  When c2 gets solved,
+         -- c1 has no rewriters, and can be prioritised; see
+         -- Note [Prioritise Wanteds with empty RewriterSet]
+         -- in GHC.Tc.Types.Constraint wrinkle (PER1)
+selectNextWorkItem
+  = do { wl_var <- getTcSWorkListRef
+       ; wl     <- readTcRef wl_var
+
+       ; case wl of { WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
+                         , wl_rw_eqs = rw_eqs, wl_rest = rest }
+           | ct:cts <- eqs_N  -> pick_me ct (wl { wl_eqs_N  = cts })
+           | ct:cts <- eqs_X  -> pick_me ct (wl { wl_eqs_X  = cts })
+           | otherwise        -> try_rws [] rw_eqs
+           where
+             pick_me :: Ct -> WorkList -> TcS (Maybe Ct)
+             pick_me ct new_wl
+               = do { writeTcRef wl_var new_wl
+                    ; return (Just (ct, new_wl)) }
+                 -- NB: no need for checkReductionDepth (ctLoc ct) (ctPred ct)
+                 -- This is done by GHC.Tc.Solver.Dict.chooseInstance
+
+             try_rws acc (ct:cts)
+                = do { ct' <- liftZonkTcS (TcM.zonkCtRewriterSet ct)
+                     ; if noRewriters ct'
+                       then pick_me ct' (wl { wl_rw_eqs = cts ++ acc })
+                       else try (ct':acc) cts }
+
+             try_rws acc [] | null acc  = try_rest wl
+                            | otherwise = try_rest (wl { wl_rw_eqs = acc })
+
+
+             try_rest zonked_wl
+               | ct:cts <- rest = pick_me ct (zonked_wl { wl_rest = cts })
+               | otherwise      = do { writeTcRef wl_var zonked_wl
+                                     ; return Nothing } }
+     }
+
+
+pushLevelNoWorkList :: SDoc -> TcS a -> TcS (TcLevel, a)
+-- Push the level and run thing_inside
+-- However, thing_inside should not generate any work items
+#if defined(DEBUG)
+pushLevelNoWorkList err_doc (TcS thing_inside)
+  = TcS (\env -> TcM.pushTcLevelM $
+                 thing_inside (env { tcs_worklist = wl_panic })
+        )
+  where
+    wl_panic  = pprPanic "GHC.Tc.Solver.Monad.buildImplication" err_doc
+                         -- This panic checks that the thing-inside
+                         -- does not emit any work-list constraints
+#else
+pushLevelNoWorkList _ (TcS thing_inside)
+  = TcS (\env -> TcM.pushTcLevelM (thing_inside env))  -- Don't check
+#endif
+
 
 {- *********************************************************************
 *                                                                      *

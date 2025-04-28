@@ -11,7 +11,6 @@ module GHC.Tc.Solver.InertSet (
     extendWorkListEq, extendWorkListEqs,
     appendWorkList, extendWorkListImplic,
     workListSize,
-    selectWorkItem,
 
     -- * The inert set
     InertSet(..),
@@ -172,6 +171,7 @@ See GHC.Tc.Solver.Monad.deferTcSForAllEq
 data WorkList
   = WL { wl_eqs_N :: [Ct]  -- /Nominal/ equalities (s ~#N t), (s ~ t), (s ~~ t)
                            -- with empty rewriter set
+
        , wl_eqs_X :: [Ct]  -- CEqCan, CDictCan, CIrredCan
                            -- with empty rewriter set
            -- All other equalities: contains both equality constraints and
@@ -179,9 +179,8 @@ data WorkList
            -- See Note [Prioritise equalities]
            -- See Note [Prioritise class equalities]
 
-       , wl_rw_eqs  :: [Ct]  -- Like wl_eqs, but ones that have a non-empty
-                             -- rewriter set; or, more precisely, did when
-                             -- added to the WorkList
+       , wl_rw_eqs  :: [Ct]  -- Like wl_eqs, but ones that may have a non-empty
+                             -- rewriter set
          -- We prioritise wl_eqs over wl_rw_eqs;
          -- see Note [Prioritise Wanteds with empty RewriterSet]
          -- in GHC.Tc.Types.Constraint for more details.
@@ -295,16 +294,6 @@ isEmptyWorkList (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs
 emptyWorkList :: WorkList
 emptyWorkList = WL { wl_eqs_N = [], wl_eqs_X = []
                    , wl_rw_eqs = [], wl_rest = [], wl_implics = emptyBag }
-
-selectWorkItem :: WorkList -> Maybe (Ct, WorkList)
--- See Note [Prioritise equalities]
-selectWorkItem wl@(WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
-                      , wl_rw_eqs = rw_eqs, wl_rest = rest })
-  | ct:cts <- eqs_N  = Just (ct, wl { wl_eqs_N  = cts })
-  | ct:cts <- eqs_X  = Just (ct, wl { wl_eqs_X  = cts })
-  | ct:cts <- rw_eqs = Just (ct, wl { wl_rw_eqs = cts })
-  | ct:cts <- rest   = Just (ct, wl { wl_rest   = cts })
-  | otherwise        = Nothing
 
 -- Pretty printing
 instance Outputable WorkList where
