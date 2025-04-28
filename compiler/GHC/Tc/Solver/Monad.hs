@@ -478,16 +478,12 @@ kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
 -- It's possible that this could just go ahead and unify, but could there be occurs-check
 -- problems? Seems simpler just to kick out.
 kickOutAfterFillingCoercionHole hole
-  | not (isHeteroKindCoHole hole)
-  = return ()  -- Only hetero-kind coercion holes provoke kick-out;
-               -- see (EIK2b) in Note [Equalities with incompatible kinds]
-  | otherwise
   = do { ics <- getInertCans
        ; let (kicked_out, ics') = kick_out ics
-             n_kicked           = lengthBag kicked_out
+             n_kicked           = length kicked_out
 
        ; unless (n_kicked == 0) $
-         do { updWorkListTcS (extendWorkListCts (fmap CIrredCan kicked_out))
+         do { updWorkListTcS (extendWorkListRewrittenEqs kicked_out)
             ; csTraceTcS $
               hang (text "Kick out, hole =" <+> ppr hole)
                  2 (vcat [ text "n-kicked =" <+> int n_kicked
@@ -496,24 +492,18 @@ kickOutAfterFillingCoercionHole hole
 
        ; setInertCans ics' }
   where
-    kick_out :: InertCans -> (Bag IrredCt, InertCans)
-    kick_out ics@(IC { inert_irreds = irreds })
-      = -- We only care about irreds here, because any constraint blocked
-        -- by a coercion hole is an irred.  See wrinkle (EIK2a) in
-        -- Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality
-        (irreds_to_kick, ics { inert_irreds = irreds_to_keep })
+    kick_out :: InertCans -> ([EqCt], InertCans)
+    kick_out ics@(IC { inert_eqs = eqs })
+      = (eqs_to_kick, ics { inert_eqs = eqs_to_keep })
       where
-        (irreds_to_kick, irreds_to_keep) = partitionBag kick_ct irreds
+        (eqs_to_kick, eqs_to_keep) = partitionInertEqs kick_out_eq eqs
 
-    kick_ct :: IrredCt -> Bool    -- True: kick out; False: keep.
-    kick_ct ct  -- See (EIK2) in Note [Equalities with incompatible kinds]
-                -- for this very specific kick-ot stuff
-      | IrredCt { ir_ev = ev, ir_reason = reason } <- ct
-      , CtWanted (WantedCt { ctev_rewriters = RewriterSet rewriters }) <- ev
-      , NonCanonicalReason ctyeq <- reason
-      , ctyeq `cterHasProblem` cteCoercionHole
-      , hole `elementOfUniqSet` rewriters
-      = True
+    kick_out_eq :: EqCt -> Bool    -- True: kick out; False: keep.
+    kick_out_eq (EqCt { eq_ev = ev ,eq_lhs = lhs })
+      | CtWanted (WantedCt { ctev_rewriters = RewriterSet rewriters }) <- ev
+      , TyVarLHS tv <- lhs
+      , isMetaTyVar tv
+      = hole `elementOfUniqSet` rewriters
       | otherwise
       = False
 
@@ -1435,62 +1425,6 @@ getInertSet = getInertSetRef >>= readTcRef
 setInertSet :: InertSet -> TcS ()
 setInertSet is = do { r <- getInertSetRef; writeTcRef r is }
 
-getTcSWorkListRef :: TcS (IORef WorkList)
-getTcSWorkListRef = TcS (return . tcs_worklist)
-
-getWorkListImplics :: TcS (Bag Implication)
-getWorkListImplics
-  = do { wl_var <- getTcSWorkListRef
-       ; wl_curr <- readTcRef wl_var
-       ; return (wl_implics wl_curr) }
-
-pushLevelNoWorkList :: SDoc -> TcS a -> TcS (TcLevel, a)
--- Push the level and run thing_inside
--- However, thing_inside should not generate any work items
-#if defined(DEBUG)
-pushLevelNoWorkList err_doc (TcS thing_inside)
-  = TcS (\env -> TcM.pushTcLevelM $
-                 thing_inside (env { tcs_worklist = wl_panic })
-        )
-  where
-    wl_panic  = pprPanic "GHC.Tc.Solver.Monad.buildImplication" err_doc
-                         -- This panic checks that the thing-inside
-                         -- does not emit any work-list constraints
-#else
-pushLevelNoWorkList _ (TcS thing_inside)
-  = TcS (\env -> TcM.pushTcLevelM (thing_inside env))  -- Don't check
-#endif
-
-updWorkListTcS :: (WorkList -> WorkList) -> TcS ()
-updWorkListTcS f
-  = do { wl_var <- getTcSWorkListRef
-       ; updTcRef wl_var f }
-
-emitWorkNC :: [CtEvidence] -> TcS ()
-emitWorkNC evs
-  | null evs
-  = return ()
-  | otherwise
-  = emitWork (listToBag (map mkNonCanonical evs))
-
-emitWork :: Cts -> TcS ()
-emitWork cts
-  | isEmptyBag cts    -- Avoid printing, among other work
-  = return ()
-  | otherwise
-  = do { traceTcS "Emitting fresh work" (pprBag cts)
-         -- Zonk the rewriter set of Wanteds, because that affects
-         -- the prioritisation of the work-list. Suppose a constraint
-         -- c1 is rewritten by another, c2.  When c2 gets solved,
-         -- c1 has no rewriters, and can be prioritised; see
-         -- Note [Prioritise Wanteds with empty RewriterSet]
-         -- in GHC.Tc.Types.Constraint wrinkle (PER1)
-       ; cts <- liftZonkTcS $ mapBagM TcM.zonkCtRewriterSet cts
-       ; updWorkListTcS (extendWorkListCts cts) }
-
-emitImplication :: Implication -> TcS ()
-emitImplication implic
-  = updWorkListTcS (extendWorkListImplic implic)
 
 newTcRef :: a -> TcS (TcRef a)
 newTcRef x = wrapTcS (TcM.newTcRef x)
@@ -1549,23 +1483,6 @@ reportUnifications (TcS thing_inside)
 getDefaultInfo ::  TcS (DefaultEnv, Bool)
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
 
-getWorkList :: TcS WorkList
-getWorkList = do { wl_var <- getTcSWorkListRef
-                 ; wrapTcS (TcM.readTcRef wl_var) }
-
-selectNextWorkItem :: TcS (Maybe Ct)
--- Pick which work item to do next
--- See Note [Prioritise equalities]
-selectNextWorkItem
-  = do { wl_var <- getTcSWorkListRef
-       ; wl <- readTcRef wl_var
-       ; case selectWorkItem wl of {
-           Nothing -> return Nothing ;
-           Just (ct, new_wl) ->
-    do { -- checkReductionDepth (ctLoc ct) (ctPred ct)
-         -- This is done by GHC.Tc.Solver.Dict.chooseInstance
-       ; writeTcRef wl_var new_wl
-       ; return (Just ct) } } }
 
 -- Just get some environments needed for instance looking up and matching
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1821,6 +1738,116 @@ zonkTyCoVarKind tv = liftZonkTcS (TcM.zonkTyCoVarKind tv)
 pprKicked :: Int -> SDoc
 pprKicked 0 = empty
 pprKicked n = parens (int n <+> text "kicked out")
+
+
+{- *********************************************************************
+*                                                                      *
+*              The work list
+*                                                                      *
+********************************************************************* -}
+
+
+getTcSWorkListRef :: TcS (IORef WorkList)
+getTcSWorkListRef = TcS (return . tcs_worklist)
+
+getWorkList :: TcS WorkList
+getWorkList = do { wl_var <- getTcSWorkListRef
+                 ; readTcRef wl_var }
+
+getWorkListImplics :: TcS (Bag Implication)
+getWorkListImplics
+  = do { wl_var <- getTcSWorkListRef
+       ; wl_curr <- readTcRef wl_var
+       ; return (wl_implics wl_curr) }
+
+updWorkListTcS :: (WorkList -> WorkList) -> TcS ()
+updWorkListTcS f
+  = do { wl_var <- getTcSWorkListRef
+       ; updTcRef wl_var f }
+
+emitWorkNC :: [CtEvidence] -> TcS ()
+emitWorkNC evs
+  | null evs
+  = return ()
+  | otherwise
+  = emitWork (listToBag (map mkNonCanonical evs))
+
+emitWork :: Cts -> TcS ()
+emitWork cts
+  | isEmptyBag cts    -- Avoid printing, among other work
+  = return ()
+  | otherwise
+  = do { traceTcS "Emitting fresh work" (pprBag cts)
+       ; updWorkListTcS (extendWorkListCts cts) }
+
+emitImplication :: Implication -> TcS ()
+emitImplication implic
+  = updWorkListTcS (extendWorkListImplic implic)
+
+selectNextWorkItem :: TcS (Maybe Ct)
+-- Pick which work item to do next
+-- See Note [Prioritise equalities]
+--
+-- Postcondition: if the returned item is a Wanted equality,
+--                then its rewriter set is fully zonked.
+--
+-- Suppose a constraint c1 is rewritten by another, c2.  When c2
+-- gets solved, c1 has no rewriters, and can be prioritised; see
+-- Note [Prioritise Wanteds with empty RewriterSet] in
+-- GHC.Tc.Types.Constraint wrinkle (PER1)
+
+-- ToDo: if wl_rw_eqs is long, we'll re-zonk it each time we pick
+--       a new item from wl_rest.  Bad.
+selectNextWorkItem
+  = do { wl_var <- getTcSWorkListRef
+       ; wl     <- readTcRef wl_var
+
+       ; case wl of { WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
+                         , wl_rw_eqs = rw_eqs, wl_rest = rest }
+           | ct:cts <- eqs_N  -> pick_me ct (wl { wl_eqs_N  = cts })
+           | ct:cts <- eqs_X  -> pick_me ct (wl { wl_eqs_X  = cts })
+           | otherwise        -> try_rws [] rw_eqs
+           where
+             pick_me :: Ct -> WorkList -> TcS (Maybe Ct)
+             pick_me ct new_wl
+               = do { writeTcRef wl_var new_wl
+                    ; return (Just ct) }
+                 -- NB: no need for checkReductionDepth (ctLoc ct) (ctPred ct)
+                 -- This is done by GHC.Tc.Solver.Dict.chooseInstance
+
+             -- try_rws looks through rw_eqs to find one that has an empty
+             -- rewriter set, after zonking.  If none such, call try_rest.
+             try_rws acc (ct:cts)
+                = do { ct' <- liftZonkTcS (TcM.zonkCtRewriterSet ct)
+                     ; if ctHasNoRewriters ct'
+                       then pick_me ct' (wl { wl_rw_eqs = cts ++ acc })
+                       else try_rws (ct':acc) cts }
+             try_rws acc [] = try_rest acc
+
+             try_rest zonked_rws
+               | ct:cts <- rest       = pick_me ct (wl { wl_rw_eqs = zonked_rws, wl_rest = cts })
+               | ct:cts <- zonked_rws = pick_me ct (wl { wl_rw_eqs = cts })
+               | otherwise            = return Nothing
+     } }
+
+
+pushLevelNoWorkList :: SDoc -> TcS a -> TcS (TcLevel, a)
+-- Push the level and run thing_inside
+-- However, thing_inside should not generate any work items
+#if defined(DEBUG)
+pushLevelNoWorkList err_doc (TcS thing_inside)
+  = TcS (\env -> TcM.pushTcLevelM $
+                 thing_inside (env { tcs_worklist = wl_panic })
+        )
+  where
+    wl_panic  = pprPanic "GHC.Tc.Solver.Monad.buildImplication" err_doc
+                         -- This panic checks that the thing-inside
+                         -- does not emit any work-list constraints
+#else
+pushLevelNoWorkList _ (TcS thing_inside)
+  = TcS (\env -> TcM.pushTcLevelM (thing_inside env))  -- Don't check
+#endif
+
 
 {- *********************************************************************
 *                                                                      *

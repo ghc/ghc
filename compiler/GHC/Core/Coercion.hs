@@ -121,7 +121,6 @@ module GHC.Core.Coercion (
         multToCo, mkRuntimeRepCo,
 
         hasHeteroKindCoercionHoleTy, hasHeteroKindCoercionHoleCo,
-        hasThisCoercionHoleTy,
 
         setCoHoleType
        ) where
@@ -2802,18 +2801,6 @@ hasHeteroKindCoercionHoleTy = Monoid.getAny . has_co_hole_ty
 -- | Is there a hetero-kind coercion hole in this coercion?
 hasHeteroKindCoercionHoleCo :: Coercion -> Bool
 hasHeteroKindCoercionHoleCo = Monoid.getAny . has_co_hole_co
-
-hasThisCoercionHoleTy :: Type -> CoercionHole -> Bool
-hasThisCoercionHoleTy ty hole = Monoid.getAny (f ty)
-  where
-    (f, _, _, _) = foldTyCo folder ()
-
-    folder = TyCoFolder { tcf_view  = noView
-                        , tcf_tyvar = const2 (Monoid.Any False)
-                        , tcf_covar = const2 (Monoid.Any False)
-                        , tcf_hole  = \ _ h -> Monoid.Any (getUnique h == getUnique hole)
-                        , tcf_tycobinder = const2
-                        }
 
 -- | Set the type of a 'CoercionHole'
 setCoHoleType :: CoercionHole -> Type -> CoercionHole

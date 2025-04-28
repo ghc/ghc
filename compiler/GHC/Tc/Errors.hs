@@ -1817,11 +1817,13 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
         -- to be helpful since this is just an unimplemented feature.
     return main_msg
 
+{-
   -- Incompatible kinds
   -- This is wrinkle (EIK2) in Note [Equalities with incompatible kinds]
   -- in GHC.Tc.Solver.Equality
   | hasHeteroKindCoercionHoleCo co1 || hasHeteroKindCoercionHoleTy ty2
   = return $ mkBlockedEqErr item
+-}
 
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Equality.canEqTyVarHomo

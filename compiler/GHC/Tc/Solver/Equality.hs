@@ -1627,11 +1627,7 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
                     kind_loc = mkKindEqLoc xi1 xi2 loc
               ; kind_ev <- newGivenEvVar kind_loc (pred_ty, evCoercion kind_co)
               ; emitWorkNC [CtGiven kind_ev]
-              ; let kind_co = givenCtEvCoercion kind_ev
-                    new_xi2 = mkCastTy ps_xi2 (mk_sym_co kind_co)
-              ; new_ev <- do_rewrite emptyRewriterSet kind_co
-                -- In the Given case, `new_ev` is canonical, so carry on
-              ; canEqCanLHSHomo new_ev eq_rel NotSwapped lhs1 ps_xi1 new_xi2 new_xi2 }
+              ; finish emptyRewriterSet (givenCtEvCoercion kind_ev) }
 
       CtWanted {}
          -> do { (kind_co, cts, unifs) <- wrapUnifierTcS ev Nominal $ \uenv ->
@@ -1646,28 +1642,28 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
             assertPpr (not (isEmptyCts cts)) (ppr ev $$ ppr ki1 $$ ppr ki2) $
               -- The constraints won't be empty because the two kinds differ, and there
               -- are no unifications, so we must have emitted one or more constraints
-            do { new_ev <- do_rewrite (rewriterSetFromCts cts) kind_co
-                 -- The rewritten equality `new_ev` is non-canonical,
-                 -- so put it straight in the Irreds
-               ; finishCanWithIrred (NonCanonicalReason (cteProblem cteCoercionHole)) new_ev } }
+            finish (rewriterSetFromCts cts) kind_co }
   where
     xi1  = canEqLHSType lhs1
     role = eqRelRole eq_rel
 
-    -- Apply mkSymCo when /not/ swapped
-    mk_sym_co co = case swapped of
-                      NotSwapped -> mkSymCo co
-                      IsSwapped  -> co
-
-    do_rewrite rewriters kind_co
+    finish rewriters kind_co
       = do { traceTcS "Hetero equality gives rise to kind equality"
                  (ppr swapped $$
                   ppr kind_co <+> dcolon <+> sep [ ppr ki1, text "~#", ppr ki2 ])
-           ; rewriteEqEvidence rewriters ev swapped lhs_redn rhs_redn }
+           ; new_ev <- rewriteEqEvidence rewriters ev swapped lhs_redn rhs_redn
+           ; canEqCanLHSHomo new_ev eq_rel NotSwapped lhs1 ps_xi1 new_xi2 new_xi2 }
+
       where
         -- kind_co :: ki1 ~N ki2
         lhs_redn    = mkReflRedn role ps_xi1
-        rhs_redn    = mkGReflRightRedn role xi2 (mk_sym_co kind_co)
+        rhs_redn    = mkGReflRightRedn role xi2 sym_kind_co
+        new_xi2     = mkCastTy ps_xi2 sym_kind_co
+
+        -- Apply mkSymCo when /not/ swapped
+        sym_kind_co = case swapped of
+                         NotSwapped -> mkSymCo kind_co
+                         IsSwapped  -> kind_co
 
 
 canEqCanLHSHomo :: CtEvidence          -- lhs ~ rhs
@@ -1872,9 +1868,10 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
 -----------------------
 canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
   -- Try unification; for Wanted, Nominal equalities with a meta-tyvar on the LHS
-  | isWanted ev      -- See Note [Do not unify Givens]
-  , NomEq <- eq_rel  -- See Note [Do not unify representational equalities]
+  | CtWanted wev <- ev   -- See Note [Do not unify Givens]
+  , NomEq <- eq_rel      -- See Note [Do not unify representational equalities]
   , TyVarLHS tv <- lhs
+  , isEmptyRewriterSet (ctev_rewriters wev)  -- Only unify if the rewriter set is empty
   = do { given_eq_lvl <- getInnermostGivenEqLevel
        ; if not (touchabilityAndShapeTest given_eq_lvl tv rhs)
          then if | Just can_rhs <- canTyFamEqLHS_maybe rhs

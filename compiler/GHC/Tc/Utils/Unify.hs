@@ -3547,11 +3547,13 @@ checkCo flags co =
         | case conc of { CC_None -> False; _ -> True }
         -> return $ PuFail (cteProblem cteConcrete)
 
+{-  Trying NOT doing this -- #
         -- Check for coercion holes, if unifying.
         -- See (COERCION-HOLE) in Note [Unification preconditions]
         | case lc of { LC_None {} -> False; _ -> True } -- equivalent to "we are unifying"; see Note [TyEqFlags]
         , hasHeteroKindCoercionHoleCo co
         -> return $ PuFail (cteProblem cteCoercionHole)
+-}
 
         -- Occurs check (can promote)
         | OC_Check lhs_tv occ_prob <- occ
