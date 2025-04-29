@@ -1,8 +1,5 @@
-
-T7453.hs:9:15: error: [GHC-25897]
-    • Couldn't match type ‘t’ with ‘p’
-      Expected: Id t
-        Actual: Id p
+T7453.hs:10:30: error: [GHC-25897]
+    • Couldn't match expected type ‘t’ with actual type ‘p’
       ‘t’ is a rigid type variable bound by
         the type signature for:
           z :: forall t. Id t
@@ -10,29 +7,17 @@ T7453.hs:9:15: error: [GHC-25897]
       ‘p’ is a rigid type variable bound by
         the inferred type of cast1 :: p -> a
         at T7453.hs:(7,1)-(10,30)
-    • In the expression: aux
-      In an equation for ‘z’:
-          z = aux
-            where
-                aux = Id v
-      In an equation for ‘cast1’:
-          cast1 v
-            = runId z
-            where
-                z :: Id t
-                z = aux
-                  where
-                      aux = Id v
+    • In the first argument of ‘Id’, namely ‘v’
+      In the expression: Id v
+      In an equation for ‘aux’: aux = Id v
     • Relevant bindings include
-        aux :: Id p (bound at T7453.hs:10:21)
+        aux :: Id t (bound at T7453.hs:10:21)
         z :: Id t (bound at T7453.hs:9:11)
         v :: p (bound at T7453.hs:7:7)
         cast1 :: p -> a (bound at T7453.hs:7:1)
 
-T7453.hs:15:15: error: [GHC-25897]
-    • Couldn't match type ‘t1’ with ‘p’
-      Expected: () -> t1
-        Actual: () -> p
+T7453.hs:16:33: error: [GHC-25897]
+    • Couldn't match expected type ‘t1’ with actual type ‘p’
       ‘t1’ is a rigid type variable bound by
         the type signature for:
           z :: forall t1. () -> t1
@@ -40,21 +25,11 @@ T7453.hs:15:15: error: [GHC-25897]
       ‘p’ is a rigid type variable bound by
         the inferred type of cast2 :: p -> t
         at T7453.hs:(13,1)-(16,33)
-    • In the expression: aux
-      In an equation for ‘z’:
-          z = aux
-            where
-                aux = const v
-      In an equation for ‘cast2’:
-          cast2 v
-            = z ()
-            where
-                z :: () -> t
-                z = aux
-                  where
-                      aux = const v
+    • In the first argument of ‘const’, namely ‘v’
+      In the expression: const v
+      In an equation for ‘aux’: aux = const v
     • Relevant bindings include
-        aux :: forall {b}. b -> p (bound at T7453.hs:16:21)
+        aux :: b -> t1 (bound at T7453.hs:16:21)
         z :: () -> t1 (bound at T7453.hs:15:11)
         v :: p (bound at T7453.hs:13:7)
         cast2 :: p -> t (bound at T7453.hs:13:1)
@@ -86,3 +61,4 @@ T7453.hs:21:15: error: [GHC-25897]
         z :: t1 (bound at T7453.hs:21:11)
         v :: p (bound at T7453.hs:19:7)
         cast3 :: p -> t (bound at T7453.hs:19:1)
+
