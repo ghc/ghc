@@ -1850,14 +1850,14 @@ ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
   | Just (t1,t2) <- splitAppTy_maybe ty
   = do { e1  <- getRep ev1 t1
        ; e2  <- getRep ev2 t2
-       ; mkTrApp <- dsLookupGlobalId mkTrAppName
-                    -- mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
-                    --            TypeRep a -> TypeRep b -> TypeRep (a b)
+       ; mkTrAppChecked <- dsLookupGlobalId mkTrAppCheckedName
+                    -- mkTrAppChecked :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
+                    --                   TypeRep a -> TypeRep b -> TypeRep (a b)
        ; let (_, k1, k2) = splitFunTy (typeKind t1)  -- drop the multiplicity,
                                                      -- since it's a kind
-       ; let expr =  mkApps (mkTyApps (Var mkTrApp) [ k1, k2, t1, t2 ])
+       ; let expr =  mkApps (mkTyApps (Var mkTrAppChecked) [ k1, k2, t1, t2 ])
                             [ e1, e2 ]
-       -- ; pprRuntimeTrace "Trace mkTrApp" (ppr expr) expr
+       -- ; pprRuntimeTrace "Trace mkTrAppChecked" (ppr expr) expr
        ; return expr
        }
 

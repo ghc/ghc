@@ -245,7 +245,7 @@ basicKnownKeyNames
         typeRepIdName,
         mkTrTypeName,
         mkTrConName,
-        mkTrAppName,
+        mkTrAppCheckedName,
         mkTrFunName,
         typeSymbolTypeRepName, typeNatTypeRepName, typeCharTypeRepName,
         trGhcPrimModuleName,
@@ -1356,7 +1356,7 @@ typeableClassName
   , someTypeRepDataConName
   , mkTrTypeName
   , mkTrConName
-  , mkTrAppName
+  , mkTrAppCheckedName
   , mkTrFunName
   , typeRepIdName
   , typeNatTypeRepName
@@ -1371,7 +1371,7 @@ someTypeRepDataConName = dcQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "SomeTypeR
 typeRepIdName         = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeRep#")       typeRepIdKey
 mkTrTypeName          = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrType")       mkTrTypeKey
 mkTrConName           = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrCon")        mkTrConKey
-mkTrAppName           = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrApp")        mkTrAppKey
+mkTrAppCheckedName    = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrAppChecked") mkTrAppCheckedKey
 mkTrFunName           = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrFun")        mkTrFunKey
 typeNatTypeRepName    = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
 typeSymbolTypeRepName = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") typeSymbolTypeRepKey
@@ -2499,7 +2499,7 @@ proxyHashKey = mkPreludeMiscIdUnique 502
 mkTyConKey
   , mkTrTypeKey
   , mkTrConKey
-  , mkTrAppKey
+  , mkTrAppCheckedKey
   , mkTrFunKey
   , typeNatTypeRepKey
   , typeSymbolTypeRepKey
@@ -2509,7 +2509,7 @@ mkTyConKey
 mkTyConKey            = mkPreludeMiscIdUnique 503
 mkTrTypeKey           = mkPreludeMiscIdUnique 504
 mkTrConKey            = mkPreludeMiscIdUnique 505
-mkTrAppKey            = mkPreludeMiscIdUnique 506
+mkTrAppCheckedKey     = mkPreludeMiscIdUnique 506
 typeNatTypeRepKey     = mkPreludeMiscIdUnique 507
 typeSymbolTypeRepKey  = mkPreludeMiscIdUnique 508
 typeCharTypeRepKey    = mkPreludeMiscIdUnique 509
