@@ -79,8 +79,8 @@ maybe :: b -> (a -> b) -> Maybe a -> b
 maybe n _ Nothing  = n
 maybe _ f (Just x) = f x
 
--- | The 'isJust' function returns 'True' iff its argument is of the
--- form @Just _@.
+-- | 'isJust' @x@ returns 'True' when @x@ is of the form @Just _@ and 'False'
+-- otherwise.
 --
 -- ==== __Examples__
 --
@@ -104,7 +104,7 @@ isJust         :: Maybe a -> Bool
 isJust Nothing = False
 isJust _       = True
 
--- | The 'isNothing' function returns 'True' iff its argument is 'Nothing'.
+-- | 'isNothing' @x@ returns 'True' when @x@ is 'Nothing' and 'False' otherwise.
 --
 -- ==== __Examples__
 --
