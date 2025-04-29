@@ -27,7 +27,7 @@ flag threaded
 -- See also #21913
 flag selftest
      manual:             True
-     default:            True
+     default:            False
      description:        Enables the hadrian selftest rules which require
                          QuickCheck. Disabling it thus saves on a few dependencies
                          which can be problematic when bootstrapping.
