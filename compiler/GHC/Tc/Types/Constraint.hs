@@ -1743,24 +1743,21 @@ will be able to report a more informative error:
 ************************************************************************
 -}
 
-type ApproxWC = ( Bag Ct    -- Free quantifiable constraints
-                , Bag Ct )  -- Free non-quantifiable constraints
-                            -- due to shape, or enclosing equality
+type ApproxWC = ( Bag Ct          -- Free quantifiable constraints
+                , TcTyCoVarSet )  -- Free vars of non-quantifiable constraints
+                                  -- due to shape, or enclosing equality
 
 approximateWC :: Bool -> WantedConstraints -> Bag Ct
 approximateWC include_non_quantifiable cts
-  | include_non_quantifiable = quant `unionBags` no_quant
-  | otherwise                = quant
-  where
-    (quant, no_quant) = approximateWCX cts
+  = fst (approximateWCX include_non_quantifiable cts)
 
-approximateWCX :: WantedConstraints -> ApproxWC
+approximateWCX :: Bool -> WantedConstraints -> ApproxWC
 -- The "X" means "extended";
 --    we return both quantifiable and non-quantifiable constraints
 -- See Note [ApproximateWC]
 -- See Note [floatKindEqualities vs approximateWC]
-approximateWCX wc
-  = float_wc False emptyVarSet wc (emptyBag, emptyBag)
+approximateWCX include_non_quantifiable wc
+  = float_wc False emptyVarSet wc (emptyBag, emptyVarSet)
   where
     float_wc :: Bool           -- True <=> there are enclosing equalities
              -> TcTyCoVarSet   -- Enclosing skolem binders
@@ -1786,17 +1783,23 @@ approximateWCX wc
            -- There can be (insoluble) Given constraints in wc_simple,
            -- there so that we get error reports for unreachable code
            -- See `given_insols` in GHC.Tc.Solver.Solve.solveImplication
-       | insolubleCt ct                              = acc
-       | tyCoVarsOfCt ct `intersectsVarSet` skol_tvs = acc
-       | otherwise
-       = case classifyPredType (ctPred ct) of
+       | insolubleCt ct                       = acc
+       | pred_tvs `intersectsVarSet` skol_tvs = acc
+       | include_non_quantifiable             = add_to_quant
+       | is_quantifiable encl_eqs (ctPred ct) = add_to_quant
+       | otherwise                            = add_to_no_quant
+       where
+         pred     = ctPred ct
+         pred_tvs = tyCoVarsOfType pred
+         add_to_quant    = (ct `consBag` quant, no_quant)
+         add_to_no_quant = (quant, no_quant `unionVarSet` pred_tvs)
+
+    is_quantifiable encl_eqs pred
+       = case classifyPredType pred of
            -- See the classification in Note [ApproximateWC]
            EqPred eq_rel ty1 ty2
-             | not encl_eqs      -- See Wrinkle (W1)
-             , quantify_equality eq_rel ty1 ty2
-             -> add_to_quant
-             | otherwise
-             -> add_to_no_quant
+             | encl_eqs  -> False  -- encl_eqs: See Wrinkle (W1)
+             | otherwise -> quantify_equality eq_rel ty1 ty2
 
            ClassPred cls tys
              | Just {} <- isCallStackPred cls tys
@@ -1804,17 +1807,14 @@ approximateWCX wc
                -- the constraints bubble up to be solved from the outer
                -- context, or be defaulted when we reach the top-level.
                -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-             -> add_to_no_quant
+             -> False
 
              | otherwise
-             -> add_to_quant  -- See Wrinkle (W2)
+             -> True  -- See Wrinkle (W2)
 
-           IrredPred {}  -> add_to_quant  -- See Wrinkle (W2)
+           IrredPred {}  -> True  -- See Wrinkle (W2)
 
-           ForAllPred {} -> add_to_no_quant  -- Never quantify these
-       where
-         add_to_quant    = (ct `consBag` quant, no_quant)
-         add_to_no_quant = (quant, ct `consBag` no_quant)
+           ForAllPred {} -> False  -- Never quantify these
 
     -- See Note [Quantifying over equality constraints]
     quantify_equality NomEq  ty1 ty2 = quant_fun ty1 || quant_fun ty2
@@ -1852,7 +1852,7 @@ We proceed by classifying the constraint:
 
 Wrinkle (W1)
   When inferring most-general types (in simplifyInfer), we
-  do *not* float an equality constraint if the implication binds
+  do *not* quantify over equality constraint if the implication binds
   equality constraints, because that defeats the OutsideIn story.
   Consider data T a where { TInt :: T Int; MkT :: T a }
          f TInt = 3::Int

@@ -374,20 +374,20 @@ instance Outputable InertSet where
          where
            dicts = bagToList (dictsToBag solved_dicts)
 
-emptyInertCans :: InertCans
-emptyInertCans
+emptyInertCans :: TcLevel -> InertCans
+emptyInertCans given_eq_lvl
   = IC { inert_eqs          = emptyTyEqs
        , inert_funeqs       = emptyFunEqs
-       , inert_given_eq_lvl = topTcLevel
+       , inert_given_eq_lvl = given_eq_lvl
        , inert_given_eqs    = False
        , inert_dicts        = emptyDictMap
        , inert_safehask     = emptyDictMap
        , inert_insts        = []
        , inert_irreds       = emptyBag }
 
-emptyInert :: InertSet
-emptyInert
-  = IS { inert_cans           = emptyInertCans
+emptyInert :: TcLevel -> InertSet
+emptyInert given_eq_lvl
+  = IS { inert_cans           = emptyInertCans given_eq_lvl
        , inert_cycle_breakers = emptyBag :| []
        , inert_famapp_cache   = emptyFunEqs
        , inert_solved_dicts   = emptyDictMap }
@@ -677,6 +677,23 @@ should update inert_given_eq_lvl?
    representational), because representational equalities can still
    imply nominal ones. For example, if (G a ~R G b) and G's argument's
    role is nominal, then we can deduce a ~N b.
+
+(TGE6) A subtle point is this: when initialising the solver, giving it
+   an empty InertSet, we must conservatively initialise `inert_given_lvl`
+   to the /current/ TcLevel.  This matters when doing let-generalisation.
+   Consider #26004:
+      f w e = case e of
+                  T1 -> let y = not w in False   -- T1 is a GADT
+                  T2 -> True
+   When let-generalising `y`, we will have (w :: alpha[1]) in the type
+   envt; and we are under GADT pattern match.  So when we solve the
+   constraints from y's RHS, in simplifyInfer, we must NOT unify
+       alpha[1] := Bool
+   Since we don't know what enclosing equalities there are, we just
+   conservatively assume that there are some.
+
+   This initialisation in done in `runTcSWithEvBinds`, which passes
+   the current TcLevl to `emptyInert`.
 
 Historical note: prior to #24938 we also ignored Given equalities that
 did not mention an "outer" type variable.  But that is wrong, as #24938

@@ -915,21 +915,22 @@ simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
        ; let psig_theta = concatMap sig_inst_theta partial_sigs
 
        -- First do full-blown solving
-       -- NB: we must gather up all the bindings from doing
-       -- this solving; hence (runTcSWithEvBinds ev_binds_var).
-       -- And note that since there are nested implications,
-       -- calling solveWanteds will side-effect their evidence
-       -- bindings, so we can't just revert to the input
-       -- constraint.
-
+       -- NB: we must gather up all the bindings from doing this solving; hence
+       -- (runTcSWithEvBinds ev_binds_var).  And note that since there are
+       -- nested implications, calling solveWanteds will side-effect their
+       -- evidence bindings, so we can't just revert to the input constraint.
+       --
+       -- See also Note [Inferring principal types]
        ; ev_binds_var <- TcM.newTcEvBinds
        ; psig_evs     <- newWanteds AnnOrigin psig_theta
        ; wanted_transformed
-            <- setTcLevel rhs_tclvl $
-               runTcSWithEvBinds ev_binds_var $
+            <- runTcSWithEvBinds ev_binds_var $
+               setTcLevelTcS rhs_tclvl        $
                solveWanteds (mkSimpleWC psig_evs `andWC` wanteds)
+               -- setLevelTcS: we do setLevel /inside/ the runTcS, so that
+               --              we initialise the InertSet inert_given_eq_lvl as far
+               --              out as possible, maximising oppportunities to unify
                -- psig_evs : see Note [Add signature contexts as wanteds]
-               -- See Note [Inferring principal types]
 
        -- Find quant_pred_candidates, the predicates that
        -- we'll consider quantifying over
@@ -1430,13 +1431,15 @@ decideAndPromoteTyVars top_lvl rhs_tclvl infer_mode name_taus psigs wanted
 
              -- Step 1 of Note [decideAndPromoteTyVars]
              -- Get candidate constraints, decide which we can potentially quantify
-             (can_quant_cts, no_quant_cts) = approximateWCX wanted
+             -- The `no_quant_tvs` are free in constraints we can't quantify.
+             (can_quant_cts, no_quant_tvs) = approximateWCX False wanted
              can_quant = ctsPreds can_quant_cts
-             no_quant  = ctsPreds no_quant_cts
+             can_quant_tvs = tyCoVarsOfTypes can_quant
 
              -- Step 2 of Note [decideAndPromoteTyVars]
              -- Apply the monomorphism restriction
              (post_mr_quant, mr_no_quant) = applyMR dflags infer_mode can_quant
+             mr_no_quant_tvs              = tyCoVarsOfTypes mr_no_quant
 
              -- The co_var_tvs are tvs mentioned in the types of covars or
              -- coercion holes. We can't quantify over these covars, so we
@@ -1448,30 +1451,33 @@ decideAndPromoteTyVars top_lvl rhs_tclvl infer_mode name_taus psigs wanted
                                          ++ tau_tys ++ post_mr_quant)
              co_var_tvs = closeOverKinds co_vars
 
-             -- outer_tvs are mentioned in `wanted, and belong to some outer level.
+             -- outer_tvs are mentioned in `wanted`, and belong to some outer level.
              -- We definitely can't quantify over them
              outer_tvs = outerLevelTyVars rhs_tclvl $
-                         tyCoVarsOfTypes can_quant `unionVarSet` tyCoVarsOfTypes no_quant
+                         can_quant_tvs `unionVarSet` no_quant_tvs
 
-             -- Step 3 of Note [decideAndPromoteTyVars]
+             -- Step 3 of Note [decideAndPromoteTyVars], (a-c)
              -- Identify mono_tvs: the type variables that we must not quantify over
+             -- At top level we are much less keen to create mono tyvars, to avoid
+             -- spooky action at a distance.
              mono_tvs_without_mr
-               | is_top_level = outer_tvs
-               | otherwise    = outer_tvs                                 -- (a)
-                                `unionVarSet` tyCoVarsOfTypes no_quant    -- (b)
-                                `unionVarSet` co_var_tvs                  -- (c)
+               | is_top_level = outer_tvs    -- See (DP2)
+               | otherwise    = outer_tvs                    -- (a)
+                                `unionVarSet` no_quant_tvs   -- (b)
+                                `unionVarSet` co_var_tvs     -- (c)
 
+             -- Step 3 of Note [decideAndPromoteTyVars], (d)
              mono_tvs_with_mr
                = -- Even at top level, we don't quantify over type variables
                  -- mentioned in constraints that the MR tells us not to quantify
                  -- See Note [decideAndPromoteTyVars] (DP2)
-                 mono_tvs_without_mr `unionVarSet` tyCoVarsOfTypes mr_no_quant
+                 mono_tvs_without_mr `unionVarSet` mr_no_quant_tvs
 
              --------------------------------------------------------------------
              -- Step 4 of Note [decideAndPromoteTyVars]
              -- Use closeWrtFunDeps to find any other variables that are determined by mono_tvs
-             add_determined tvs = closeWrtFunDeps post_mr_quant tvs
-                                  `delVarSetList` psig_qtvs
+             add_determined tvs preds = closeWrtFunDeps preds tvs
+                                        `delVarSetList` psig_qtvs
                  -- Why delVarSetList psig_qtvs?
                  -- If the user has explicitly asked for quantification, then that
                  -- request "wins" over the MR.
@@ -1480,8 +1486,8 @@ decideAndPromoteTyVars top_lvl rhs_tclvl infer_mode name_taus psigs wanted
                  -- (i.e. says "no" to isQuantifiableTv)? That's OK: explanation
                  -- in Step 2 of Note [Deciding quantification].
 
-             mono_tvs_with_mr_det    = add_determined mono_tvs_with_mr
-             mono_tvs_without_mr_det = add_determined mono_tvs_without_mr
+             mono_tvs_with_mr_det    = add_determined mono_tvs_with_mr    post_mr_quant
+             mono_tvs_without_mr_det = add_determined mono_tvs_without_mr can_quant
 
              --------------------------------------------------------------------
              -- Step 5 of Note [decideAndPromoteTyVars]
@@ -1518,7 +1524,7 @@ decideAndPromoteTyVars top_lvl rhs_tclvl infer_mode name_taus psigs wanted
            , text "newly_mono_tvs =" <+> ppr newly_mono_tvs
            , text "can_quant =" <+> ppr can_quant
            , text "post_mr_quant =" <+> ppr post_mr_quant
-           , text "no_quant =" <+> ppr no_quant
+           , text "no_quant_tvs =" <+> ppr no_quant_tvs
            , text "mr_no_quant =" <+> ppr mr_no_quant
            , text "final_quant =" <+> ppr final_quant
            , text "co_vars =" <+> ppr co_vars ]
@@ -1605,8 +1611,8 @@ The plan
   The body of z tries to unify the type of x (call it alpha[1]) with
   (beta[2] -> gamma[2]). This unification fails because alpha is untouchable, leaving
        [W] alpha[1] ~ (beta[2] -> gamma[2])
-  We need to know not to quantify over beta or gamma, because they are in the
-  equality constraint with alpha. Actual test case:   typecheck/should_compile/tc213
+  We don't want to quantify over beta or gamma because they are fixed by alpha,
+  which is monomorphic. Actual test case:   typecheck/should_compile/tc213
 
   Another example. Suppose we have
       class C a b | a -> b
@@ -1643,9 +1649,22 @@ Wrinkles
   promote type variables.  But for bindings affected by the MR we have no choice
   but to promote.
 
+  An example is in #26004.
+      f w e = case e of
+        T1 -> let y = not w in False
+        T2 -> True
+  When generalising `f` we have a constraint
+      forall. (a ~ Bool) => alpha ~ Bool
+  where our provisional type for `f` is `f :: T alpha -> blah`.
+  In a /nested/ setting, we might simply not-generalise `f`, hoping to learn
+  about `alpha` from f's call sites (test T5266b is an example).  But at top
+  level, to avoid spooky action at a distance.
+
 Note [The top-level Any principle]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Key principle: we never want to show the programmer a type with `Any` in it.
+Key principles:
+  * we never want to show the programmer a type with `Any` in it.
+  * avoid "spooky action at a distance" and silent defaulting
 
 Most /top level/ bindings have a type signature, so none of this arises.  But
 where a top-level binding lacks a signature, we don't want to infer a type like
@@ -1654,11 +1673,18 @@ and then subsequently default alpha[0]:=Any.  Exposing `Any` to the user is bad
 bad bad.  Better to report an error, which is what may well happen if we
 quantify over alpha instead.
 
+Moreover,
+ * If (elsewhere in this module) we add a call to `f`, say (f True), then
+   `f` will get the type `Bool -> Int`
+ * If we add /another/ call, say (f 'x'), we will then get a type error.
+ * If we have no calls, the final exported type of `f` may get set by
+   defaulting, and might not be principal (#26004).
+
 For /nested/ bindings, a monomorphic type like `f :: alpha[0] -> Int` is fine,
 because we can see all the call sites of `f`, and they will probably fix
 `alpha`.  In contrast, we can't see all of (or perhaps any of) the calls of
 top-level (exported) functions, reducing the worries about "spooky action at a
-distance".
+distance".  This also moves in the direction of `MonoLocalBinds`, which we like.
 
 Note [Do not quantify over constraints that determine a variable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

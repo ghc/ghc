@@ -20,7 +20,7 @@ module GHC.Tc.Solver.Monad (
     runTcSSpecPrag,
     failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     runTcSEqualities,
-    nestTcS, nestImplicTcS, setEvBindsTcS,
+    nestTcS, nestImplicTcS, setEvBindsTcS, setTcLevelTcS,
     emitImplicationTcS, emitTvImplicationTcS,
     emitImplication,
     emitFunDepWanteds,
@@ -947,8 +947,9 @@ added.  This is initialised from the innermost implication constraint.
 -- | See Note [TcSMode]
 data TcSMode
   = TcSVanilla    -- ^ Normal constraint solving
+  | TcSPMCheck    -- ^ Used when doing patterm match overlap checks
   | TcSEarlyAbort -- ^ Abort early on insoluble constraints
-  | TcSSpecPrag -- ^ Fully solve all constraints
+  | TcSSpecPrag   -- ^ Fully solve all constraints
   deriving (Eq)
 
 {- Note [TcSMode]
@@ -956,6 +957,11 @@ data TcSMode
 The constraint solver can operate in different modes:
 
 * TcSVanilla: Normal constraint solving mode. This is the default.
+
+* TcSPMCheck: Used by the pattern match overlap checker.
+      Like TcSVanilla, but the idea is that the returned InertSet will
+      later be resumed, so we do not want to restore type-equality cycles
+      See also Note [Type equality cycles] in GHC.Tc.Solver.Equality
 
 * TcSEarlyAbort: Abort (fail in the monad) as soon as we come across an
   insoluble constraint. This is used to fail-fast when checking for hole-fits.
@@ -1135,7 +1141,7 @@ runTcS tcs
 runTcSEarlyAbort :: TcS a -> TcM a
 runTcSEarlyAbort tcs
   = do { ev_binds_var <- TcM.newTcEvBinds
-       ; runTcSWithEvBinds' True TcSEarlyAbort ev_binds_var tcs }
+       ; runTcSWithEvBinds' TcSEarlyAbort ev_binds_var tcs }
 
 -- | Run the 'TcS' monad in 'TcSSpecPrag' mode, which either fully solves
 -- individual Wanted quantified constraints or leaves them alone.
@@ -1143,7 +1149,7 @@ runTcSEarlyAbort tcs
 -- See Note [TcSSpecPrag].
 runTcSSpecPrag :: EvBindsVar -> TcS a -> TcM a
 runTcSSpecPrag ev_binds_var tcs
-  = runTcSWithEvBinds' True TcSSpecPrag ev_binds_var tcs
+  = runTcSWithEvBinds' TcSSpecPrag ev_binds_var tcs
 
 {- Note [TcSSpecPrag]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1200,7 +1206,7 @@ runTcSEqualities thing_inside
 runTcSInerts :: InertSet -> TcS a -> TcM (a, InertSet)
 runTcSInerts inerts tcs = do
   ev_binds_var <- TcM.newTcEvBinds
-  runTcSWithEvBinds' False TcSVanilla ev_binds_var $ do
+  runTcSWithEvBinds' TcSPMCheck ev_binds_var $ do
     setInertSet inerts
     a <- tcs
     new_inerts <- getInertSet
@@ -1209,21 +1215,23 @@ runTcSInerts inerts tcs = do
 runTcSWithEvBinds :: EvBindsVar
                   -> TcS a
                   -> TcM a
-runTcSWithEvBinds = runTcSWithEvBinds' True TcSVanilla
+runTcSWithEvBinds = runTcSWithEvBinds' TcSVanilla
 
-runTcSWithEvBinds' :: Bool  -- True <=> restore type equality cycles
-                           -- Don't if you want to reuse the InertSet.
-                           -- See also Note [Type equality cycles]
-                           -- in GHC.Tc.Solver.Equality
-                   -> TcSMode
+runTcSWithEvBinds' :: TcSMode
                    -> EvBindsVar
                    -> TcS a
                    -> TcM a
-runTcSWithEvBinds' restore_cycles mode ev_binds_var tcs
+runTcSWithEvBinds' mode ev_binds_var tcs
   = do { unified_var <- TcM.newTcRef 0
-       ; step_count <- TcM.newTcRef 0
-       ; inert_var <- TcM.newTcRef emptyInert
-       ; wl_var <- TcM.newTcRef emptyWorkList
+       ; step_count  <- TcM.newTcRef 0
+
+       -- Make a fresh, empty inert set
+       -- Subtle point: see (TGE6) in Note [Tracking Given equalities]
+       --               in GHC.Tc.Solver.InertSet
+       ; tc_lvl      <- TcM.getTcLevel
+       ; inert_var   <- TcM.newTcRef (emptyInert tc_lvl)
+
+       ; wl_var      <- TcM.newTcRef emptyWorkList
        ; unif_lvl_var <- TcM.newTcRef Nothing
        ; let env = TcSEnv { tcs_ev_binds           = ev_binds_var
                           , tcs_unified            = unified_var
@@ -1240,9 +1248,13 @@ runTcSWithEvBinds' restore_cycles mode ev_binds_var tcs
        ; when (count > 0) $
          csTraceTcM $ return (text "Constraint solver steps =" <+> int count)
 
-       ; when restore_cycles $
-         do { inert_set <- TcM.readTcRef inert_var
-            ; restoreTyVarCycles inert_set }
+       -- Restore tyvar cycles: see Note [Type equality cycles] in
+       --                       GHC.Tc.Solver.Equality
+       -- But /not/ in TCsPMCheck mode: see Note [TcSMode]
+       ; case mode of
+            TcSPMCheck -> return ()
+            _ -> do { inert_set <- TcM.readTcRef inert_var
+                    ; restoreTyVarCycles inert_set }
 
 #if defined(DEBUG)
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
@@ -1283,6 +1295,10 @@ checkForCyclicBinds ev_binds_map
 setEvBindsTcS :: EvBindsVar -> TcS a -> TcS a
 setEvBindsTcS ref (TcS thing_inside)
  = TcS $ \ env -> thing_inside (env { tcs_ev_binds = ref })
+
+setTcLevelTcS :: TcLevel -> TcS a -> TcS a
+setTcLevelTcS lvl (TcS thing_inside)
+ = TcS $ \ env -> TcM.setTcLevel lvl (thing_inside env)
 
 nestImplicTcS :: EvBindsVar
               -> TcLevel -> TcS a
