@@ -172,6 +172,7 @@ test('T21973b', normal, compile_and_run, [''])
 test('T23761', normal, compile_and_run, [''])
 test('T23761b', normal, compile_and_run, [''])
 test('T17594e', normal, compile_and_run, [''])
+test('T25998', normal, compile_and_run, [''])
 
 # Tests for expanding do before typechecking (Impredicative + RebindableSyntax)
 test('T18324', normal, compile_and_run, [''])
