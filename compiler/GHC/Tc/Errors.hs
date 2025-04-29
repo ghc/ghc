@@ -1787,7 +1787,8 @@ mkTyVarEqErr ctxt item casted_tv1 ty2
 
 mkTyVarEqErr' :: SolverReportErrCtxt -> ErrorItem
               -> (TcTyVar, TcCoercionN) -> TcType -> TcM TcSolverReportMsg
-mkTyVarEqErr' ctxt item (tv1, co1) ty2
+mkTyVarEqErr' ctxt item (tv1, _co1) ty2
+ -- ToDo: eliminate _co1???
 
   -- Is this a representation-polymorphism error, e.g.
   -- alpha[conc] ~# rr[sk] ? If so, handle that first.
@@ -2008,6 +2009,7 @@ misMatchOrCND ctxt item ty1 ty2
               -- Keep only UserGivens that have some equalities.
               -- See Note [Suppress redundant givens during error reporting]
 
+{-
 -- These are for the "blocked" equalities, as described in GHC.Tc.Solver.Equality
 -- Note [Equalities with incompatible kinds], wrinkle (EIK2). There should
 -- always be another unsolved wanted around, which will ordinarily suppress
@@ -2015,6 +2017,7 @@ misMatchOrCND ctxt item ty1 ty2
 -- (sigh), so we must produce a message.
 mkBlockedEqErr :: ErrorItem -> TcSolverReportMsg
 mkBlockedEqErr item = BlockedEquality item
+-}
 
 {-
 Note [Suppress redundant givens during error reporting]
