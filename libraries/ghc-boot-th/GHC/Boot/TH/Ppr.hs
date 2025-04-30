@@ -250,9 +250,13 @@ pprExp i (ForallE tvars body) =
 pprExp i (ConstrainedE ctx body) =
   parensIf (i >= funPrec) $ sep [pprCtxWith pprExp ctx, pprExp qualPrec body]
 
-pprExp _ (InterStringE parts) =
-  text "s\""<> hcat (map pprInterStringPart parts) <> text "\""
+pprExp _ (InterStringE mQualMod parts) =
+  prefix <> char '"' <> hcat (map pprInterStringPart parts) <> char '"'
   where
+    prefix =
+      case mQualMod of
+        Nothing -> char 's'
+        Just qualMod -> text (modString qualMod) <> char '.'
     pprInterStringPart = \case
       InterStringRaw s -> text s
       InterStringExp e -> text "${" <> pprExp noPrec e <> text "}"

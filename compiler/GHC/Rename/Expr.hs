@@ -385,9 +385,9 @@ rnExpr (HsLit x lit)
 rnExpr (HsOverLit x lit)
   = rnOverLit x lit
 
-rnExpr (HsInterString _ strType parts) = do
+rnExpr (HsInterString _ mQualMod strType parts) = do
   (parts', fvs1) <- unzip <$> mapM rnInterStringPart parts
-  (expr, fvs2) <- rewriteInterString strType parts'
+  (expr, fvs2) <- rewriteInterString mQualMod strType parts'
   pure (expr, plusFVs fvs1 `plusFV` fvs2)
   where
     rnInterStringPart = \case

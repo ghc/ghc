@@ -286,7 +286,7 @@ basicKnownKeyNames
         fromStringName,
 
         -- Interpolated strings
-        fromBuilderName, toBuilderName, interpolateName,
+        interpolateName,
 
         -- Enum stuff
         enumFromName, enumFromThenName,
@@ -1123,9 +1123,7 @@ minusName         = varQual gHC_INTERNAL_NUM (fsLit "-")           minusClassOpK
 negateName        = varQual gHC_INTERNAL_NUM (fsLit "negate")      negateClassOpKey
 
 -- Module GHC.Internal.Data.String.Interpolate
-toBuilderName, fromBuilderName, interpolateName :: Name
-toBuilderName   = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "toBuilder") toBuilderKey
-fromBuilderName = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "fromBuilder") fromBuilderKey
+interpolateName :: Name
 interpolateName = varQual gHC_INTERNAL_DATA_STRING_INTERPOLATE (fsLit "interpolate") interpolateKey
 
 ---------------------------------
@@ -2502,9 +2500,7 @@ proxyHashKey :: Unique
 proxyHashKey = mkPreludeMiscIdUnique 502
 
 -- String interpolation
-toBuilderKey, fromBuilderKey, interpolateKey :: Unique
-toBuilderKey   = mkPreludeMiscIdUnique 574
-fromBuilderKey = mkPreludeMiscIdUnique 575
+interpolateKey :: Unique
 interpolateKey = mkPreludeMiscIdUnique 576
 
 ---------------- Template Haskell -------------------

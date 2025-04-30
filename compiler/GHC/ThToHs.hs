@@ -1226,11 +1226,12 @@ cvtl e = wrapLA (cvt e)
          ; let tele = setTelescopeBndrsNameSpace varName $
                       mkHsForAllVisTele noAnn tvs'
          ; return $ HsForAll noExtField tele body' }
-    cvt (InterStringE parts) = do
+    cvt (InterStringE mQualMod parts) = do
+      let mQualMod' = mk_mod <$> mQualMod
       parts' <- forM parts $ \case
         InterStringRaw s -> pure $ HsInterStringRaw (SourceText $ fsLit s) (fsLit s)
         InterStringExp e -> HsInterStringExpr noExtField <$> cvtl e
-      return $ HsInterString noExtField HsStringTypeSingle parts'
+      return $ HsInterString noExtField mQualMod' HsStringTypeSingle parts'
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:

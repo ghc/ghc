@@ -736,9 +736,9 @@ are the most common patterns, rewritten as regular expressions for clarity:
  CHAR           { L _ (ITchar   _ _) }
  STRING         { L _ (ITstring _ StringTypeSingle _) }
  STRING_MULTI   { L _ (ITstring _ StringTypeMulti _) }
- STRING_INTER_BEGIN       { L _ (ITstringInterBegin StringTypeSingle) }
+ STRING_INTER_BEGIN       { L _ (ITstringInterBegin _ StringTypeSingle) }
  STRING_INTER_END         { L _ (ITstringInterEnd   StringTypeSingle) }
- STRING_INTER_MULTI_BEGIN { L _ (ITstringInterBegin StringTypeMulti) }
+ STRING_INTER_MULTI_BEGIN { L _ (ITstringInterBegin _ StringTypeMulti) }
  STRING_INTER_MULTI_END   { L _ (ITstringInterEnd   StringTypeMulti) }
  STRING_INTER_RAW         { L _ (ITstringInterRaw _ _) }
  STRING_INTER_EXP_OPEN    { L _ ITstringInterExpOpen }
@@ -4365,7 +4365,7 @@ processStringInter ::
 processStringInter strType tokBegin parts tokEnd = do
   parts' <- mapM mkInterStringPartPV $ processRawLexedStrings parts
   ams1 (L (comb2 tokBegin tokEnd) ()) $
-    HsInterString noExtField strType parts'
+    HsInterString noExtField mQualMod strType parts'
   where
     processRawLexedStrings ::
       [Either (SourceText, RawLexedString) ECP] ->
@@ -4378,6 +4378,10 @@ processStringInter strType tokBegin parts tokEnd = do
     mkInterStringPartPV = \case
       Left (src, s) -> pure $ HsInterStringRaw src (fsLit s)
       Right (ECP e) -> HsInterStringExpr noExtField <$> runPV e
+
+    mQualMod =
+      let L _ (ITstringInterBegin mMod _) = tokBegin
+       in mkModuleNameFS <$> mMod
 
 -- Utilities for combining source spans
 comb2 :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan

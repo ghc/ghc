@@ -632,6 +632,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 -- See Note [Parsing interpolated strings] and Note [Lexing interpolated strings]
 <0,string_inter> {
   s \" / { ifExtension StringInterpolationBit } { string_inter_begin }
+  @qual \" / { ifExtension QualifiedLiteralsBit } { string_inter_begin }
   -- TODO(bchinn): interpolated multiline strings
 }
 
@@ -930,7 +931,9 @@ data Token
   | ITstring SourceText StringType FastString -- Note [Literal source text] in "GHC.Types.SourceText"
 
   -- See Note [Parsing interpolated strings]
-  | ITstringInterBegin    StringType
+  | ITstringInterBegin
+      (Maybe FastString) -- Module name, if using QualifiedLiterals
+      StringType         -- Single-line or multiline interpolated string?
   | ITstringInterRaw      SourceText RawLexedString -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITstringInterExpOpen
   | ITstringInterExpClose
@@ -2196,9 +2199,14 @@ tok_string span buf len _buf2 = do
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
 
 string_inter_begin :: Action
-string_inter_begin span _ _ _ = do
+string_inter_begin span buf len _ = do
   pushLexState string_inter_content
-  pure $ L span (ITstringInterBegin StringTypeSingle)
+  let mQualMod
+        | len == 2 = Nothing
+        | otherwise =
+            let (qualMod, _) = splitQualName buf len False
+            in Just qualMod
+  pure $ L span (ITstringInterBegin mQualMod StringTypeSingle)
 
 string_inter_content_action :: Action
 string_inter_content_action span_init buf_init _ _ = go $ AI (psSpanStart span_init) buf_init
@@ -2835,6 +2843,7 @@ data ExtBits
   | RequiredTypeArgumentsBit
   | MultilineStringsBit
   | StringInterpolationBit
+  | QualifiedLiteralsBit
   | LevelImportsBit
 
   -- Flags that are updated once parsing starts
@@ -2920,6 +2929,7 @@ mkParserOpts extensionFlags diag_opts
       .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
       .|. StringInterpolationBit      `xoptBit` LangExt.StringInterpolation
+      .|. QualifiedLiteralsBit      `xoptBit` LangExt.QualifiedLiterals
       .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
     optBits =
           HaddockBit        `setBitIf` isHaddock

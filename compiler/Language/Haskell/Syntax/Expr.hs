@@ -349,6 +349,7 @@ data HsExpr p
   | -- | See Note [Parsing interpolated strings]
     HsInterString
       (XInterString p)
+      (Maybe ModuleName) -- ^ Module, if using QualifiedLiterals
       HsStringType
       [HsInterStringPart p]
 

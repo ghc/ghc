@@ -1903,7 +1903,9 @@ data Exp
   | ForallE [TyVarBndr Specificity] Exp -- ^ @forall \<vars\>. \<expr\>@
   | ForallVisE [TyVarBndr ()] Exp      -- ^ @forall \<vars\> -> \<expr\>@
   | ConstrainedE [Exp] Exp             -- ^ @\<ctxt\> => \<expr\>@
-  | InterStringE [InterStringPart]     -- ^ @{ s"Name: ${personName}" }@
+  | InterStringE                       -- ^ @{ s"Name: ${personName}" }@ or @{ Mod."A ${x}" }@
+      (Maybe ModName)
+      [InterStringPart]
   deriving( Show, Eq, Ord, Data, Generic )
 
 -- | A (field name, expression) pair. See 'RecConE' and 'RecUpdE'.

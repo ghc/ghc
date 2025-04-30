@@ -1,4 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module GHC.Rename.String (
   rewriteInterString,
@@ -7,23 +9,23 @@ module GHC.Rename.String (
 import GHC.Prelude
 
 import GHC.Builtin.Names (
-  fromBuilderName,
   interpolateName,
-  mappendName,
-  memptyName,
-  toBuilderName,
+  mconcatName,
  )
 import GHC.Builtin.Types (stringTyConName)
 import GHC.Data.FastString (fsLit, unpackFS)
 import GHC.Hs
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Rename.Env (lookupOccRn)
 import GHC.Rename.Pat (rnOverLit)
+import GHC.Tc.Errors.Types (WhatLooking (WL_None))
 import GHC.Tc.Utils.Monad
+import GHC.Types.Name (Name)
+import GHC.Types.Name.Occurrence (mkVarOcc)
+import GHC.Types.Name.Reader (mkRdrQual)
 import GHC.Types.Name.Set (FreeVars, emptyFVs, plusFVs)
 import GHC.Types.SourceText (SourceText (..))
 import GHC.Types.SrcLoc (unLoc)
-
-import qualified Data.List.NonEmpty as NE
 
 {- Note [Desugaring interpolated strings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -34,7 +36,7 @@ Cross-references:
 
 Interpolated strings are represented with the following HsExpr tree:
 
-    HsInterString ext
+    HsInterString ext mQualMod strType
       [ HsInterStringRaw ext "Hello "
       , HsInterStringExp ext $
           HsApp ext
@@ -45,12 +47,19 @@ Interpolated strings are represented with the following HsExpr tree:
 
 We'll expand this during the renamer phase into the equivalent of:
 
-    import GHC.Internal.Data.String.Interpolate
+    mconcat
+      [ fromString "Hello "
+      , interpolate (Text.toUpper name)
+      , fromString "!"
+      ]
 
-    fromBuilder $
-         toBuilder "Hello "
-      <> interpolate (Text.toUpper name)
-      <> toBuilder "!"
+If using QualifiedLiterals (mQualMod is Just), expand to:
+
+    ModName.fromParts
+      [ ModName.fromString "Hello "
+      , ModName.interpolate (Text.toUpper name)
+      , ModName.fromString "!"
+      ]
 
 We're doing this in the renamer phase so that the expanded expression
 can be typechecked as usual, without any additional work.
@@ -61,42 +70,77 @@ can be typechecked as usual, without any additional work.
 -- necessary.
 --
 -- TODO(bchinn): allow -XRebindableSyntax -- lookupSyntaxName
-rewriteInterString :: HsStringType -> [HsInterStringPart GhcRn] -> RnM (HsExpr GhcRn, FreeVars)
-rewriteInterString strType parts = do
+rewriteInterString ::
+  Maybe ModuleName
+  -> HsStringType
+  -> [HsInterStringPart GhcRn]
+  -> RnM (HsExpr GhcRn, FreeVars)
+rewriteInterString mQualMod strType parts = do
   overloaded <- xoptM LangExt.OverloadedStrings
-  (parts', fvs) <- unzip <$> mapM (rewritePart overloaded) parts
+  mQualNames <- traverse lookupQualifiedLiteralStringsNames mQualMod
+  rewriteInterStringImpl overloaded mQualNames strType parts
+
+rewriteInterStringImpl ::
+  Bool
+  -> Maybe QualifiedLiteralStringsNames
+  -> HsStringType
+  -> [HsInterStringPart GhcRn]
+  -> RnM (HsExpr GhcRn, FreeVars)
+rewriteInterStringImpl overloaded mQualNames strType parts = do
+  (parts', fvs) <- unzip <$> mapM rewritePart parts
   let expr =
-        (if overloaded then id else addSig) . nlHsApp (nlHsVar fromBuilderName) $
-          maybe (nlHsVar memptyName) (foldr1 appendParts) (NE.nonEmpty parts')
+        addSig
+        . (nlHsApp $ nlHsVar $ maybe mconcatName qualFromParts mQualNames)
+        $ noLocA (ExplicitList noExtField parts')
   pure (unLoc expr, plusFVs fvs)
   where
-    appendParts l r = nlHsApps mappendName [l, r]
-    rewritePart overloaded = \case
-      HsInterStringRaw _ s -> do
-        (lit, fvs) <- mkStringLit overloaded s
-        pure (nlHsApps toBuilderName [lit], fvs)
-      HsInterStringExpr _ e ->
-        pure (nlHsApps interpolateName [e], emptyFVs)
+    rewritePart = \case
+      HsInterStringRaw _ s -> mkStringLit s
+      HsInterStringExpr _ e -> do
+        let interpolateName' = maybe interpolateName qualInterpolate mQualNames
+        pure (nlHsApp (nlHsVar interpolateName') e, emptyFVs)
 
-    -- Add ":: String" to the given expression
-    addSig e =
-      noLocA . ExprWithTySig noExtField e $
-        HsWC
-          { hswc_ext = []
-          , hswc_body =
-              noLocA
-                HsSig
-                  { sig_ext   = noExtField
-                  , sig_bndrs = HsOuterImplicit []
-                  , sig_body  = nlHsTyVar NotPromoted stringTyConName
-                  }
-          }
+    addSig e
+      | Just _ <- mQualNames = e
+      | overloaded = e
+      | otherwise =
+          -- explicitly add ":: String" if not overloaded
+          noLocA . ExprWithTySig noExtField e $
+            HsWC
+              { hswc_ext = []
+              , hswc_body =
+                  noLocA
+                    HsSig
+                      { sig_ext   = noExtField
+                      , sig_bndrs = HsOuterImplicit []
+                      , sig_body  = nlHsTyVar NotPromoted stringTyConName
+                      }
+              }
 
-    mkStringLit overloaded s = do
+    mkStringLit s = do
       let src = SourceText $ fsLit $ "\"" ++ unpackFS s ++ "\""
-      if overloaded
-        then do
-          (expr, fvs) <- rnOverLit noExtField $ OverLit noExtField (HsIsString src s)
-          pure (noLocA expr, fvs)
-        else
-          pure (nlHsLit $ HsString src strType s, emptyFVs)
+      let lit = nlHsLit $ HsString src strType s
+      if
+        | Just qualNames <- mQualNames -> do
+            pure (nlHsApp (nlHsVar $ qualFromString qualNames) lit, emptyFVs)
+        | overloaded -> do
+            (expr, fvs) <- rnOverLit noExtField $ OverLit noExtField (HsIsString src s)
+            pure (noLocA expr, fvs)
+        | otherwise -> do
+            pure (lit, emptyFVs)
+
+data QualifiedLiteralStringsNames = QualifiedLiteralStringsNames
+  { qualFromString :: Name
+  , qualInterpolate :: Name
+  , qualFromParts :: Name
+  }
+
+lookupQualifiedLiteralStringsNames ::
+  ModuleName -> RnM QualifiedLiteralStringsNames
+lookupQualifiedLiteralStringsNames modName = do
+  qualFromString <- lookup "fromString"
+  qualInterpolate <- lookup "interpolate"
+  qualFromParts <- lookup "fromParts"
+  pure QualifiedLiteralStringsNames{..}
+  where
+    lookup = lookupOccRn WL_None . mkRdrQual modName . mkVarOcc

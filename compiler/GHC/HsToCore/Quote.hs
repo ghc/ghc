@@ -1576,11 +1576,11 @@ repE (HsOverLabel _ s) = repOverLabel s
         -- HsOverlit can definitely occur
 repE (HsOverLit _ l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit _ l)     = do { a <- repLiteral l;           repLit a }
-repE (HsInterString _ _ parts) = do
+repE (HsInterString _ mQualMod _ parts) = do
   parts' <- forM parts $ \case
     HsInterStringRaw _ s -> repInterStringRaw =<< coreStringLit s
     HsInterStringExpr _ e -> repInterStringExp =<< repLE e
-  repInterString =<< coreListM interStringPartName parts'
+  repInterString mQualMod =<< coreListM interStringPartName parts'
 repE (HsLam _ LamSingle (MG { mg_alts = L _ [m] })) = repLambda m
 repE e@(HsLam _ LamSingle (MG { mg_alts = L _ _ })) = pprPanic "repE: HsLam with multiple alternatives" (ppr e)
 repE (HsLam _ LamCase (MG { mg_alts = L _ ms }))
@@ -2565,16 +2565,17 @@ repMDoE = repDoBlock mdoEName
 
 repDoBlock :: Name -> Maybe ModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repDoBlock doName maybeModName (MkC ss) = do
-    MkC coreModName <- coreModNameM
-    rep2 doName [coreModName, ss]
-  where
-    coreModNameM :: MetaM (Core (Maybe TH.ModName))
-    coreModNameM = case maybeModName of
-      Just m -> do
-        MkC s <- coreStringLit (moduleNameFS m)
-        mName <- rep2_nw mkModNameName [s]
-        coreJust modNameTyConName mName
-      _ -> coreNothing modNameTyConName
+    MkC mCoreModName <- repMaybeModName maybeModName
+    rep2 doName [mCoreModName, ss]
+
+repMaybeModName :: Maybe ModuleName -> MetaM (Core (Maybe TH.ModName))
+repMaybeModName = \case
+  Just m -> do
+    MkC s <- coreStringLit (moduleNameFS m)
+    mName <- rep2_nw mkModNameName [s]
+    coreJust modNameTyConName mName
+  Nothing ->
+    coreNothing modNameTyConName
 
 repComp :: Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repComp (MkC ss) = rep2 compEName [ss]
@@ -2663,8 +2664,10 @@ repClause :: Core [(M TH.Pat)] -> Core (M TH.Body) -> Core [(M TH.Dec)] -> MetaM
 repClause (MkC ps) (MkC bod) (MkC ds) = rep2 clauseName [ps, bod, ds]
 
 -------------- Interpolated strings -----------------------------
-repInterString :: Core [M TH.InterStringPart] -> MetaM (Core (M TH.Exp))
-repInterString (MkC parts) = rep2 interStringEName [parts]
+repInterString :: Maybe ModuleName -> Core [M TH.InterStringPart] -> MetaM (Core (M TH.Exp))
+repInterString mQualMod (MkC parts) = do
+  MkC mCoreModName <- repMaybeModName mQualMod
+  rep2 interStringEName [mCoreModName, parts]
 
 repInterStringRaw :: Core String -> MetaM (Core (M TH.InterStringPart))
 repInterStringRaw (MkC s) = rep2 interStringRawName [s]

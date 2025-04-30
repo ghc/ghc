@@ -1,5 +1,3 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE MultilineStrings #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -77,17 +75,9 @@ data SqlValue
   | SqlInt Int
   deriving (Show)
 
-newtype SqlQueryBuilder = SqlQueryBuilder (Endo SqlQuery)
-  deriving newtype (Semigroup, Monoid)
-
-instance Buildable SqlQuery where
-  type Builder SqlQuery = SqlQueryBuilder
-  toBuilder q = SqlQueryBuilder (Endo (q <>))
-  fromBuilder (SqlQueryBuilder (Endo f)) = f mempty
-
 instance Interpolate SqlQuery SqlQuery where
-  interpolate = toBuilder
+  interpolate = id
 instance Interpolate String SqlQuery where
-  interpolate s = toBuilder SqlQuery{sqlText = "?", sqlValues = [SqlString s]}
+  interpolate s = SqlQuery{sqlText = "?", sqlValues = [SqlString s]}
 instance Interpolate Int SqlQuery where
-  interpolate x = toBuilder SqlQuery{sqlText = "?", sqlValues = [SqlInt x]}
+  interpolate x = SqlQuery{sqlText = "?", sqlValues = [SqlInt x]}

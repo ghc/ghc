@@ -1,0 +1,9 @@
+****************************************
+Input:
+    let
+      name = "'Robert'; DROP TABLE Students;--"
+      age = 10 :: Int
+    in
+      SQL."SELECT * FROM tab WHERE name ILIKE ${name} and age = ${age}"
+====>
+    SqlQuery {sqlText = "SELECT * FROM tab WHERE name ILIKE ? and age = ?", sqlValues = [SqlString "'Robert'; DROP TABLE Students;--",SqlInt 10]}

@@ -339,19 +339,19 @@ Interpolated strings are parsed in the following manner:
 
   and outputs the following tokens:
 
-    [ ITstringInterBegin    src StringTypeSingle
+    [ ITstringInterBegin    Nothing StringTypeSingle
     , ITstringInterRaw      src "Hello "
-    , ITstringInterExpOpen  src
+    , ITstringInterExpOpen
     , ITqvarid                  ("Text.toUpper", "name")
     , ITvarid                   "name"
-    , ITstringInterExpClose src
+    , ITstringInterExpClose
     , ITstringInterRaw      src "!"
-    , ITstringInterEnd      src StringTypeSingle
+    , ITstringInterEnd          StringTypeSingle
     ]
 
 2. The parser will then parse the tokens into the following HsExpr:
 
-    HsInterString ext
+    HsInterString ext Nothing StringTypeSingle
       [ HsInterStringRaw ext "Hello "
       , HsInterStringExp ext $
           HsApp ext

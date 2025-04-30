@@ -15,11 +15,7 @@ See the proposal for motivation and explanations:
 https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0570-string-interpolation.rst
 -}
 module Data.String.Interpolate.Experimental (
-  Buildable (..),
   Interpolate (..),
-
-  -- * Built-in builders
-  StringBuilder (..),
 ) where
 
 import GHC.Internal.Data.String.Interpolate

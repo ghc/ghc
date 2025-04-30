@@ -260,6 +260,7 @@ extensionName = \case
   LangExt.ListTuplePuns -> "ListTuplePuns"
   LangExt.MultilineStrings -> "MultilineStrings"
   LangExt.StringInterpolation -> "StringInterpolation"
+  LangExt.QualifiedLiterals -> "QualifiedLiterals"
   LangExt.ExplicitLevelImports -> "ExplicitLevelImports"
   LangExt.ImplicitStagePersistence -> "ImplicitStagePersistence"
 

@@ -477,11 +477,12 @@ addTickHsExpr e@(HsIPVar {})            = return e
 addTickHsExpr e@(HsOverLit {})          = return e
 addTickHsExpr e@(HsOverLabel{})         = return e
 addTickHsExpr e@(HsLit {})              = return e
-addTickHsExpr (HsInterString x ty parts) = do
+addTickHsExpr (HsInterString x mQualMod ty parts) = do
+  -- TODO: should we add ticks for qualified literals?
   parts' <- forM parts $ \case
     part@(HsInterStringRaw {}) -> return part
     HsInterStringExpr x e -> HsInterStringExpr x <$> addTickLHsExpr e
-  return $ HsInterString x ty parts'
+  return $ HsInterString x mQualMod ty parts'
 addTickHsExpr e@(HsEmbTy {})            = return e
 addTickHsExpr e@(HsHole {})             = return e
 addTickHsExpr e@(HsQual {})             = return e

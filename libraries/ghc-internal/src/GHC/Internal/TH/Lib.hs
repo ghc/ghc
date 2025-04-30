@@ -450,8 +450,8 @@ forallVisE tvars body = ForallVisE <$> sequenceA tvars <*> body
 constrainedE :: Quote m => [m Exp] -> m Exp -> m Exp
 constrainedE ctx body = ConstrainedE <$> sequenceA ctx <*> body
 
-interStringE :: Quote m => [m InterStringPart] -> m Exp
-interStringE parts = InterStringE <$> sequenceA parts
+interStringE :: Quote m => Maybe ModName -> [m InterStringPart] -> m Exp
+interStringE mQualMod parts = InterStringE mQualMod <$> sequenceA parts
 
 -------------------------------------------------------------------------------
 -- *   Dec

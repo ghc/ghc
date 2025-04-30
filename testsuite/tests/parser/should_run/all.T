@@ -38,3 +38,4 @@ test('T25784', normal, compile_and_run, [''])
 # String interpolation
 test('StringInterpolation', normal, compile_and_run, [''])
 test('StringInterpolationOverloaded', normal, compile_and_run, [''])
+test('StringInterpolationQualified', [extra_files(['StringInterpolationQualified_SQL.hs'])], multimod_compile_and_run, ['StringInterpolationQualified', ''])

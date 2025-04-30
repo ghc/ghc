@@ -868,8 +868,8 @@ ppr_expr (HsOverLabel s l) = case ghcPass @p of
 ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
 
-ppr_expr (HsInterString _ strType parts) =
-  char 's' <> delim <> hcat (map pprInterPart parts) <> delim
+ppr_expr (HsInterString _ mQualMod strType parts) =
+  prefix <> delim <> hcat (map pprInterPart parts) <> delim
   where
     pprInterPart = \case
       HsInterStringRaw st s ->
@@ -879,6 +879,11 @@ ppr_expr (HsInterString _ strType parts) =
           (HsStringTypeMulti, SourceText src) -> vcat $ map text $ split '\n' (unpackFS src)
           (HsStringTypeMulti, NoSourceText) -> pprHsStringMulti' (unpackFS s)
       HsInterStringExpr _ expr -> text "${" <> ppr_lexpr expr <> text "}"
+
+    prefix =
+      case mQualMod of
+        Nothing -> char 's'
+        Just qualMod -> ppr qualMod <> char '.'
 
     delim =
       case strType of
