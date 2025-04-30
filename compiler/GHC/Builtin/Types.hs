@@ -510,6 +510,17 @@ Wrinkles:
 
     See examples in ghc-prim:GHC.Types
 
+(Any8) Warning about unused bindings of type `Any` and `ZonkAny` are suppressed,
+    following the same rationale of supressing warning about the unit type.
+
+    For example, consider (#25895):
+
+     do { forever (return ()); blah }
+
+    where forever :: forall a b. IO a -> IO b
+    Nothing constrains `b`, so it will be instantiates with `Any` or `ZonkAny`.
+    But we certainly don't want to complain about a discarded do-binding.
+
 The Any tycon used to be quite magic, but we have since been able to
 implement it merely with an empty kind polymorphic type family. See #10886 for a
 bit of history.

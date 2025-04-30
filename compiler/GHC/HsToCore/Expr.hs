@@ -1243,9 +1243,13 @@ warnDiscardedDoBindings rhs m_ty elt_ty
        ; when (warn_unused || warn_wrong) $
     do { fam_inst_envs <- dsGetFamInstEnvs
        ; let norm_elt_ty = topNormaliseType fam_inst_envs elt_ty
-
-           -- Warn about discarding non-() things in 'monadic' binding
-       ; if warn_unused && not (isUnitTy norm_elt_ty)
+             supressible_ty =
+               isUnitTy norm_elt_ty || isAnyTy norm_elt_ty || isZonkAnyTy norm_elt_ty
+         -- Warn about discarding things in 'monadic' binding,
+         -- however few types are excluded:
+         --   * Unit type `()`
+         --   * `ZonkAny` or `Any` type see (Any8) of Note [Any types]
+       ; if warn_unused && not supressible_ty
          then diagnosticDs (DsUnusedDoBind rhs elt_ty)
          else
 
