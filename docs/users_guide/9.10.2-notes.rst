@@ -149,7 +149,7 @@ Runtime system
 - Reduce fragmentation incurred by the non-moving GC's segment allocator. In one application this reduced resident
   set size by 26%. See :ghc-ticket:`24150`.
 
-- Emit warning when :ghc-flag:`-M` is less than :ghc-flag:`-H`.
+- Emit warning when :rts-flag:`-M ⟨size⟩` is less than :rts-flag:`-H [⟨size⟩]`.
 
 - Fix a bug ((:ghc-ticket:`24672`)) causing programms on FreeBSD to occasionally terminate with the error:
   ``internal error: Ticker: read(timerfd) failed with Operation not supported and returned -1``
@@ -178,7 +178,7 @@ Build system and packaging
   (From https://git.savannah.gnu.org/cgit/config.git/)
 
 - GHC now distinguishes more between the Cmm and C preprocessor. The new flags
-  :ghc-flag:`-pgmCmmP` and :ghc-flag:`-optCmmP` can be used to control
+  :ghc-flag:`-pgmCmmP ⟨cmd⟩` and :ghc-flag:`-optCmmP ⟨option⟩` can be used to control
   the Cmm preprocessor. C preprocessor flags will still be passed to the Cmm
   preprocessor, expect for :ghc-flag:`-g` flags which have special handling. Fixes (:ghc-ticket:`24474`)
 
