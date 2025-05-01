@@ -17,9 +17,7 @@ _exception = SomeException
                   Nothing GHC.Internal.IO.Exception.UserError [] "error" Nothing
                   Nothing)
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeException
-                    (GHC.Internal.IO.Exception.IOError
-                       Nothing GHC.Internal.IO.Exception.UserError ....)
+_exception :: e = _
 Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 _exception = SomeException
