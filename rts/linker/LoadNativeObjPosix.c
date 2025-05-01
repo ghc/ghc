@@ -88,6 +88,27 @@ void freeNativeCode_POSIX (ObjectCode *nc) {
   }
 }
 
+/*
+ * Note [Don't fail due to RTLD_NOW]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * If possible we want to load dynamic objects immediately (e.g. using
+ * RTLD_NOW) so that we can query their mappings and therefore be able to
+ * safely unload them. However, there are some cases where an object cannot be
+ * successfully eagerly loaded yet execution can nevertheless succeed with lazy
+ * binding.
+ *
+ * One such instance was found in #25943, where a library referenced undefined
+ * symbols. While this pattern is quite dodgy (really, these symbol references
+ * should be weakly bound in the library), previous GHC versions accepted such
+ * programs. Moreover, it is important that we are able to load such libraries
+ * since GHC insists on loading all package dependencies when, e.g., evaluating
+ * TemplateHaskell splices.
+ *
+ * To ensure that we don't fail to load such programs, we first attempt loading
+ * with RTLD_NOW and, if this fails, attempt to load again with lazy binding
+ * (taking care to mark the object as not unloadable in this case).
+ */
+
 void * loadNativeObj_POSIX (pathchar *path, char **errmsg)
 {
    ObjectCode* nc;
@@ -98,7 +119,6 @@ void * loadNativeObj_POSIX (pathchar *path, char **errmsg)
    IF_DEBUG(linker, debugBelch("loadNativeObj_POSIX %" PATH_FMT "\n", path));
 
    retval = NULL;
-
 
    /* If we load the same object multiple times, just return the
     * already-loaded handle. Note that this is broken if unloadNativeObj
@@ -116,6 +136,23 @@ void * loadNativeObj_POSIX (pathchar *path, char **errmsg)
 
    nc = mkOc(DYNAMIC_OBJECT, path, NULL, 0, false, NULL, 0);
 
+   // If we HAVE_DLINFO, we use RTLD_NOW rather than RTLD_LAZY because we want
+   // to learn eagerly about all external functions. Otherwise, there is no
+   // additional advantage to being eager, so it is better to be lazy and only
+   // bind functions when needed for better performance.
+   //
+   // Moreover, it is possible that loading will fail (e.g. if the library
+   // being loaded depends upon symbols from a library which is not available);
+   // in this case we will retry loading with load_now=false. See
+   // Note [Don't fail due to RTLD_NOW]..
+   bool load_now;
+#if defined(HAVE_DLINFO)
+   load_now = true;
+#else
+   load_now = false;
+#endif
+
+try_again:
    foreignExportsLoadingObject(nc);
 
    // When dlopen() loads a profiled dynamic library, it calls the ctors which
@@ -129,17 +166,7 @@ void * loadNativeObj_POSIX (pathchar *path, char **errmsg)
    ACQUIRE_LOCK(&ccs_mutex);
 #endif
 
-   // If we HAVE_DLINFO, we use RTLD_NOW rather than RTLD_LAZY because we want
-   // to learn eagerly about all external functions. Otherwise, there is no
-   // additional advantage to being eager, so it is better to be lazy and only bind
-   // functions when needed for better performance.
-   int dlopen_mode;
-#if defined(HAVE_DLINFO)
-   dlopen_mode = RTLD_NOW;
-#else
-   dlopen_mode = RTLD_LAZY;
-#endif
-
+   const int dlopen_mode = load_now ? RTLD_NOW : RTLD_LAZY;
    hdl = dlopen(path, dlopen_mode|RTLD_LOCAL); /* see Note [RTLD_LOCAL] */
    nc->dlopen_handle = hdl;
    nc->status = OBJECT_READY;
@@ -151,31 +178,42 @@ void * loadNativeObj_POSIX (pathchar *path, char **errmsg)
    foreignExportsFinishedLoadingObject();
 
    if (hdl == NULL) {
-     /* dlopen failed; save the message in errmsg */
-     copyErrmsg(errmsg, dlerror());
-     goto dlopen_fail;
+     if (load_now) {
+       // See Note [Don't fail due to RTLD_NOW]
+       load_now = false;
+       goto try_again;
+     } else {
+       /* dlopen failed; save the message in errmsg */
+       copyErrmsg(errmsg, dlerror());
+       goto dlopen_fail;
+     }
    }
 
 #if defined(HAVE_DLINFO)
-   struct link_map *map;
-   if (dlinfo(hdl, RTLD_DI_LINKMAP, &map) == -1) {
-     /* dlinfo failed; save the message in errmsg */
-     copyErrmsg(errmsg, dlerror());
-     goto dlinfo_fail;
-   }
+   if (load_now) {
+     struct link_map *map;
+     if (dlinfo(hdl, RTLD_DI_LINKMAP, &map) == -1) {
+       /* dlinfo failed; save the message in errmsg */
+       copyErrmsg(errmsg, dlerror());
+       goto dlinfo_fail;
+     }
 
-   hdl = NULL; // pass handle ownership to nc
+     hdl = NULL; // pass handle ownership to nc
 
-   struct piterate_cb_info piterate_info = {
-     .nc = nc,
-     .l_addr = (void *) map->l_addr
-   };
-   dl_iterate_phdr(loadNativeObjCb_, &piterate_info);
-   if (!nc->nc_ranges) {
-     copyErrmsg(errmsg, "dl_iterate_phdr failed to find obj");
-     goto dl_iterate_phdr_fail;
+     struct piterate_cb_info piterate_info = {
+       .nc = nc,
+       .l_addr = (void *) map->l_addr
+     };
+     dl_iterate_phdr(loadNativeObjCb_, &piterate_info);
+     if (!nc->nc_ranges) {
+       copyErrmsg(errmsg, "dl_iterate_phdr failed to find obj");
+       goto dl_iterate_phdr_fail;
+     }
+     nc->unloadable = true;
+   } else {
+     nc->nc_ranges = NULL;
+     nc->unloadable = false;
    }
-   nc->unloadable = true;
 #else
    nc->nc_ranges = NULL;
    nc->unloadable = false;
