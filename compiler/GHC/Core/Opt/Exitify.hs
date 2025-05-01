@@ -1,9 +1,7 @@
 module GHC.Core.Opt.Exitify ( exitifyProgram ) where
 
-{-
-Note [Exitification]
-~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Exitification]
+~~~~~~~~~~~~~~~~~~~~~~~
 This module implements Exitification. The goal is to pull as much code out of
 recursive functions as possible, as the simplifier is better at inlining into
 call-sites that are not in recursive functions.
@@ -33,6 +31,9 @@ Example result:
   in …
 
 Now `t` is no longer in a recursive function, and good things happen!
+
+There is also a tricky connectionn with occurrence analysis:
+see (JP2) in Note [Occurrence analysis for join points] in GHC.Core.Opt.OccurAnal.
 -}
 
 import GHC.Prelude
