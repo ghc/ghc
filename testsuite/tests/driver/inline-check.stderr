@@ -17,7 +17,6 @@ Inactive unfolding: foo1
 Inactive unfolding: foo1
 Inactive unfolding: foo1
 Inactive unfolding: foo1
-Inactive unfolding: foo1
 Considering inlining: foo
   arg infos []
   interesting continuation RhsCtxt(NonRecursive)
