@@ -619,7 +619,7 @@ notice that `v` occurs at most once in any case branch; the occurrence analyser
 spots this and returns a OneOcc{ occ_n_br = 3 } for `v`.  Then the code in
 GHC.Core.Opt.Simplify.Utils.postInlineUnconditionally inlines `v` at its three
 use sites, and discards the let-binding.  That way, we avoid allocating `v` in
-the A,B,C branches (though we still compute it of course), and branch D
+*the A,B,C branches (though we still compute it of course), and branch D
 doesn't involve <small thunk> at all.  This sometimes makes a Really Big
 Difference.
 
@@ -687,9 +687,39 @@ Here are the consequences
   These are `andUDs` together in `addOccInfo`, and hence
   `v` gets ManyOccs, just as it should.  Clever!
 
-There are a couple of tricky wrinkles
+There are some tricky wrinkles
 
-(W1) Consider this example which shadows `j`:
+(JP1) What if the join point binding has a stable unfolding, or RULES?
+     They are just alternative right-hand sides, and at each call site we
+     will use only one of them. So again, we can use `orUDs` to combine
+     usage info from all these alternatives RHSs.
+
+(JP2) Consider this (test T21128):
+         joinrec jr x ys = case ys of
+                             []     -> v+1
+                             (x:xs) -> jr x xs
+   The exitification pass will carefully float out the exit path, thus:
+         join j x = v + 1 in
+         joinrec jr x ys = case ys of
+                             []     -> j x
+                             (x:xs) -> jr x xs
+   The idea is that now `v` may occur once, not under a lambda, and so may
+   be inlined.  See Note [Exitification] in GHC.Core.Opt.Exitify.
+
+   BUT if we "virtually inline" `j` at its occurrence side in `jr`, it'll
+   look as if `v` occurs under a lambda. Boo!  That defeats the entire
+   purpose of exitification!
+
+   Fortunately it is easy to fix.  In `lookupOccInfo` we can see if `n_br=0`.
+   If so, all the ocurrences of this Id came from non-recursive join points
+   (via the mechanism above) and so can't be involved in a loop.  So we do
+   not need to mark them as IsInsideLam.
+
+   This is a pretty subtle point!
+
+There are some other wrinkles to do with shadowing:
+
+(SW1) Consider this example which shadows `j`:
           join j = rhs in
           in case x of { K j -> ..j..; ... }
      Clearly when we come to the pattern `K j` we must drop the `j`
@@ -697,7 +727,7 @@ There are a couple of tricky wrinkles
 
      This is done by `drop_shadowed_joins` in `addInScope`.
 
-(W2) Consider this example which shadows `v`:
+(SW2) Consider this example which shadows `v`:
           join j = ...v...
           in case x of { K v -> ..j..; ... }
 
@@ -717,13 +747,13 @@ There are a couple of tricky wrinkles
      * In `postprcess_uds`, we add the chucked-out join points to the
        returned UsageDetails, with `andUDs`.
 
-(W3) Consider this example, which shadows `j`, but this time in an argument
+(SW3) Consider this example, which shadows `j`, but this time in an argument
               join j = rhs
               in f (case x of { K j -> ...; ... })
      We can zap the entire occ_join_points when looking at the argument,
      because `j` can't posibly occur -- it's a join point!  And the smaller
      occ_join_points is, the better.  Smaller to look up in mkOneOcc, and
-     more important, less looking-up when checking (W2).
+     more important, less looking-up when checking (SW2).
 
      This is done in setNonTailCtxt.  It's important /not/ to do this for
      join-point RHS's because of course `j` can occur there!
@@ -731,12 +761,7 @@ There are a couple of tricky wrinkles
      NB: this is just about efficiency: it is always safe /not/ to zap the
      occ_join_points.
 
-(W4) What if the join point binding has a stable unfolding, or RULES?
-     They are just alternative right-hand sides, and at each call site we
-     will use only one of them. So again, we can use `orUDs` to combine
-     usage info from all these alternatives RHSs.
-
-Wrinkles (W1) and (W2) are very similar to Note [Binder swap] (BS3).
+Wrinkles (SW1) and (SW2) are very similar to Note [Binder swap] (BS3).
 
 Note [Finding join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -985,7 +1010,7 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   = -- Analyse the RHS and /then/ the body
     let -- Analyse the rhs first, generating rhs_uds
         !(rhs_uds_s, bndr', rhs') = occAnalNonRecRhs env lvl ire mb_join bndr rhs
-        rhs_uds = foldr1 orUDs rhs_uds_s   -- NB: orUDs.  See (W4) of
+        rhs_uds = foldr1 orUDs rhs_uds_s   -- NB: orUDs.  See (JP1) of
                                            -- Note [Occurrence analysis for join points]
 
         -- Now analyse the body, adding the join point
@@ -2984,7 +3009,7 @@ mkRhsOccEnv env@(OccEnv { occ_one_shots = ctxt_one_shots, occ_join_points = ctxt
 
 zapJoinPointInfo :: JoinPointInfo -> JoinPointInfo
 -- (zapJoinPointInfo jp_info) basically just returns emptyVarEnv (hence zapped).
--- See (W3) of Note [Occurrence analysis for join points]
+-- See (SW3) of Note [Occurrence analysis for join points]
 --
 -- Zapping improves efficiency, slightly, if you accidentally introduce a bug,
 -- in which you zap [jx :-> uds] and then find an occurrence of jx anyway, you
@@ -3091,7 +3116,7 @@ preprocess_env env@(OccEnv { occ_join_points = join_points
       = env { occ_bs_env = swap_env `minusUFM` bndr_fm }
 
     drop_shadowed_joins :: OccEnv -> OccEnv
-    -- See Note [Occurrence analysis for join points] wrinkle2 (W1) and (W2)
+    -- See Note [Occurrence analysis for join points] wrinkles (SW1) and (SW2)
     drop_shadowed_joins env = env { occ_join_points = emptyVarEnv }
 
     -- bad_joins is true if it would be wrong to push occ_join_points inwards
@@ -3116,7 +3141,7 @@ postprocess_uds bndrs bad_joins uds
     add_bad_joins :: UsageDetails -> UsageDetails
     -- Add usage info for occ_join_points that we cannot push inwards
     -- because of shadowing
-    -- See Note [Occurrence analysis for join points] wrinkle (W2)
+    -- See Note [Occurrence analysis for join points] wrinkle (SW2)
     add_bad_joins uds
        | isEmptyVarEnv bad_joins = uds
        | otherwise               = modifyUDEnv extend_with_bad_joins uds
@@ -3797,16 +3822,17 @@ lookupOccInfoByUnique (UD { ud_env       = env
                     , occ_int_cxt = int_cxt
                     , occ_tail    = mk_tail_info tail_info }
          where
-           in_lam | uniq `elemVarEnvByKey` z_in_lam = IsInsideLam
-                  | otherwise                       = NotInsideLam
+           in_lam | uniq `elemVarEnvByKey` z_in_lam
+                  , n_br > 0     -- n_br>0: see (JP2) in
+                  = IsInsideLam  -- Note [Occurrence analysis for join points]
+                  | otherwise
+                  = NotInsideLam
 
       Just (ManyOccL tail_info) -> ManyOccs { occ_tail = mk_tail_info tail_info }
   where
     mk_tail_info ti
         | uniq `elemVarEnvByKey` z_tail = NoTailCallInfo
         | otherwise                     = ti
-
-
 
 -------------------
 -- See Note [Adjusting right-hand sides]
