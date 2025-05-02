@@ -10,7 +10,7 @@
 :type f
 :type g
 
-:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c A.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -this-unit-id interactive-session -c A.hs
 
 :load A
 -- we can now see only f
@@ -24,8 +24,8 @@
 :type f
 :type g
 
-:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c B.hs
-:load B
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -this-unit-id interactive-session -c B.hs
+:load A B
 
 -- this will tell us we need to load A interpreted
 :module *A
