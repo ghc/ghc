@@ -864,6 +864,29 @@ spec = do
       it "accepts unicode in examples" $ do
         ">>> 灼眼\nシャナ" `shouldParseTo` DocExamples [Example "灼眼" ["シャナ"]]
 
+      it "preserves indentation in consecutive example lines" $ do
+        unlines
+          [ ">>> line 1"
+          , ">>>   line 2"
+          , ">>> line 3"
+          ]
+          `shouldParseTo` DocExamples
+            [ Example "line 1" []
+            , Example "  line 2" []
+            , Example "line 3" []
+            ]
+
+      it "resets indentation after results" $ do
+        unlines
+          [ ">>> line 1"
+          , "result"
+          , ">>>   line 2"
+          ]
+          `shouldParseTo` DocExamples
+            [ Example "line 1" ["result"]
+            , Example "line 2" []
+            ]
+
       context "when prompt is prefixed by whitespace" $ do
         it "strips the exact same amount of whitespace from result lines" $ do
           unlines
