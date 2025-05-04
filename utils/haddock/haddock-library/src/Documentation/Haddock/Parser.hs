@@ -795,31 +795,33 @@ stripSpace = fromMaybe <*> mapM strip'
 -- | Parses examples. Examples are a paragraph level entity (separated by an empty line).
 -- Consecutive examples are accepted.
 examples :: Parser (DocH mod a)
-examples = DocExamples <$> (many (try (skipHorizontalSpace *> "\n")) *> go)
+examples = DocExamples <$> (many (try (skipHorizontalSpace *> "\n")) *> go Nothing)
   where
-    go :: Parser [Example]
-    go = do
+    go :: Maybe Text -> Parser [Example]
+    go mbInitialIndent = do
       prefix <- takeHorizontalSpace <* ">>>"
+      initialIndent <- maybe takeHorizontalSpace pure mbInitialIndent
       expr <- takeLine
-      (rs, es) <- resultAndMoreExamples
-      return (makeExample prefix expr rs : es)
+      (rs, es) <- resultAndMoreExamples (Just initialIndent)
+      return (makeExample prefix initialIndent expr rs : es)
+
+    resultAndMoreExamples :: Maybe Text -> Parser ([Text], [Example])
+    resultAndMoreExamples mbInitialIndent = choice' [moreExamples, result, pure ([], [])]
       where
-        resultAndMoreExamples :: Parser ([Text], [Example])
-        resultAndMoreExamples = choice' [moreExamples, result, pure ([], [])]
-          where
-            moreExamples :: Parser ([Text], [Example])
-            moreExamples = (,) [] <$> go
+        moreExamples :: Parser ([Text], [Example])
+        moreExamples = (,) [] <$> go mbInitialIndent
 
-            result :: Parser ([Text], [Example])
-            result = first . (:) <$> nonEmptyLine <*> resultAndMoreExamples
+        result :: Parser ([Text], [Example])
+        result = first . (:) <$> nonEmptyLine <*> resultAndMoreExamples Nothing
 
-    makeExample :: Text -> Text -> [Text] -> Example
-    makeExample prefix expression res =
-      Example (T.unpack (T.strip expression)) result
+    makeExample :: Text -> Text -> Text -> [Text] -> Example
+    makeExample prefix indent expression res =
+      Example (T.unpack (tryStripIndent (T.stripEnd expression))) result
       where
         result = map (T.unpack . substituteBlankLine . tryStripPrefix) res
 
         tryStripPrefix xs = fromMaybe xs (T.stripPrefix prefix xs)
+        tryStripIndent = liftA2 fromMaybe T.stripStart (T.stripPrefix indent)
 
         substituteBlankLine "<BLANKLINE>" = ""
         substituteBlankLine xs = xs
