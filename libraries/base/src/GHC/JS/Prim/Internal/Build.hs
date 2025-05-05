@@ -1,12 +1,12 @@
 {-# LANGUAGE CPP #-}
 
-#if !defined(javascript_HOST_ARCH)
-
-module GHC.JS.Prim.Internal.Build () where
-
-#else
-
 module GHC.JS.Prim.Internal.Build
+  {-# DEPRECATED "Use ghc-internal:GHC.Internal.JS.Prim.Internal.Build instead" #-}
+  -- deprecated for now. To be fully removed in GHC 9.16
+  -- see https://github.com/haskell/core-libraries-committee/issues/329 and #23432
+#if !defined(javascript_HOST_ARCH)
+  () where
+#else
   ( buildArrayI
   , buildArrayM
   , buildObjectI

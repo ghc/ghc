@@ -21,6 +21,7 @@
       * `GHC.TypeLits.Internal`
       * `GHC.TypeNats.Internal`
       * `GHC.ExecutionStack.Internal`.
+  * Deprecate `GHC.JS.Prim.Internal.Build`, as per [CLC #329](https://github.com/haskell/core-libraries-committee/issues/329)
 
 ## 4.21.0.0 *TBA*
   * Change `SrcLoc` to be a strict and unboxed (finishing [CLC proposal #55](https://github.com/haskell/core-libraries-committee/issues/55))
