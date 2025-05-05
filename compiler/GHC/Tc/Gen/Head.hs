@@ -28,7 +28,7 @@ module GHC.Tc.Gen.Head
        , nonBidirectionalErr
 
        , pprArgInst
-       , addHeadCtxt, addThingCtxt, addExprCtxt, addStmtCtxt, addFunResCtxt ) where
+       , addHeadCtxt, addExprCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
@@ -535,7 +535,7 @@ tcInferAppHead_maybe fun
   = case fun of
       HsVar _ nm                  -> Just <$> tcInferId nm
       XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
-      XExpr (ExpandedThingRn _ e) -> Just <$> tcExprSigma False e -- We do not want to instantiate e c.f. T19167
+      XExpr (ExpandedThingRn _ e) -> Just <$> (setInGeneratedCode $ tcExprSigma False e) -- We do not want to instantiate e c.f. T19167
       XExpr (PopErrCtxt e)        -> tcInferAppHead_maybe e
       ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit             -> Just <$> tcInferOverLit lit -- TODO: Do we need this?
@@ -1172,20 +1172,6 @@ mis-match in the number of value arguments.
 *                                                                      *
 ********************************************************************* -}
 
-
-addStmtCtxt :: ExprStmt GhcRn -> HsDoFlavour -> TcRn a -> TcRn a
-addStmtCtxt stmt flav =
-  addErrCtxt (StmtErrCtxt (HsDoStmt flav) stmt)
-
-addThingCtxt :: HsThingRn -> TcRn a -> TcRn a
-addThingCtxt (OrigStmt (L loc stmt) flav) thing_inside =
-  setSrcSpanA loc $
-    addStmtCtxt stmt flav $
-    setInGeneratedCode thing_inside
-addThingCtxt (OrigExpr e) thing_inside =
-  addExprCtxt e $
-      setInGeneratedCode thing_inside
-
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
@@ -1194,5 +1180,4 @@ addExprCtxt e thing_inside
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
-      XExpr (ExpandedThingRn o _) -> addThingCtxt o thing_inside
       _ -> addErrCtxt (ExprCtxt e) thing_inside -- no op in generated code
