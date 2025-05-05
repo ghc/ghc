@@ -1,12 +1,12 @@
-
 T13311.hs:9:3: error: [GHC-83865]
     • Couldn't match expected type: IO a0
                   with actual type: Maybe a1 -> Maybe b0
     • Probable cause: ‘f’ is applied to too few arguments
-      In a stmt of a 'do' block: f
+      In the expression: f
       In the expression:
         do f
            putChar 'a'
       In an equation for ‘g’:
           g = do f
                  putChar 'a'
+

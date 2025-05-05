@@ -1,17 +1,16 @@
-
 T10971d.hs:4:14: error: [GHC-83865]
     • Couldn't match expected type: [a0]
                   with actual type: Maybe a3
     • In the first argument of ‘f’, namely ‘(Just 1)’
       In the second argument of ‘($)’, namely ‘f (Just 1)’
-      In a stmt of a 'do' block: print $ f (Just 1)
+      In the expression: print $ f (Just 1)
 
 T10971d.hs:5:19: error: [GHC-83865]
     • Couldn't match expected type: [b0]
                   with actual type: Maybe a4
     • In the second argument of ‘g’, namely ‘(Just 5)’
       In the second argument of ‘($)’, namely ‘g (+ 1) (Just 5)’
-      In a stmt of a 'do' block: print $ g (+ 1) (Just 5)
+      In the expression: print $ g (+ 1) (Just 5)
 
 T10971d.hs:6:23: error: [GHC-83865]
     • Couldn't match expected type: [a2]
@@ -19,3 +18,4 @@ T10971d.hs:6:23: error: [GHC-83865]
     • In the second argument of ‘h’, namely ‘Nothing’
       In the second argument of ‘($)’, namely ‘h (const 5) Nothing’
       In a stmt of a 'do' block: print $ h (const 5) Nothing
+

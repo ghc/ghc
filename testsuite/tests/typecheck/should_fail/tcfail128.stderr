@@ -1,4 +1,3 @@
-
 tcfail128.hs:18:16: error: [GHC-39999]
     • Ambiguous type variable ‘b0’ arising from a use of ‘thaw’
       prevents the constraint ‘(Data.Array.Base.MArray
@@ -6,7 +5,7 @@ tcfail128.hs:18:16: error: [GHC-39999]
       Probable fix: use a type annotation to specify what ‘b0’ should be.
       one instance involving out-of-scope types
       (use -fprint-potential-instances to see them all)
-    • In a stmt of a 'do' block: v <- thaw tmp
+    • In the expression: thaw tmp
       In the expression:
         do let sL = ...
                dim = length sL
@@ -19,3 +18,4 @@ tcfail128.hs:18:16: error: [GHC-39999]
                      ....
                  v <- thaw tmp
                  return ()
+
