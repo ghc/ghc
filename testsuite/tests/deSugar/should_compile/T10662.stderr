@@ -1,6 +1,6 @@
-
-T10662.hs:3:3: warning: [GHC-81995] [-Wunused-do-bind (in -Wall)]
+T10662.hs:2:8: warning: [GHC-81995] [-Wunused-do-bind (in -Wall)]
     A do-notation statement discarded a result of type ‘String’
     Suggested fix:
       Suppress this warning by saying
         ‘_ <- return $ let a = "hello" in a’
+

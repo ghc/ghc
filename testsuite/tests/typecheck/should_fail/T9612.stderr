@@ -1,4 +1,3 @@
-
 T9612.hs:16:9: error: [GHC-18872]
     • Couldn't match type: [(Int, a)]
                      with: (Int, a)
@@ -6,7 +5,7 @@ T9612.hs:16:9: error: [GHC-18872]
           constraint ‘MonadWriter (Int, a) (WriterT [(Int, a)] Identity)’
             arising from a use of ‘tell’
           instance ‘MonadWriter w (WriterT w m)’ at T9612.hs:20:10-59
-    • In a stmt of a 'do' block: tell (n, x)
+    • In the expression: tell (n, x)
       In the expression:
         do tell (n, x)
            return (1, y)
@@ -19,3 +18,4 @@ T9612.hs:16:9: error: [GHC-18872]
         y :: a (bound at T9612.hs:14:3)
         f :: a -> (Int, a) -> Writer [(Int, a)] (Int, a)
           (bound at T9612.hs:14:1)
+
