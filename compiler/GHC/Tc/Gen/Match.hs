@@ -40,7 +40,7 @@ where
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
-                                       , tcMonoExprNC, tcExpr
+                                       , tcMonoExprNC, tcMonoExpr, tcExpr
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr, tcPolyLExpr )
 
@@ -50,7 +50,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Pat
 import GHC.Tc.Gen.Do
-import GHC.Tc.Gen.Head( tcCheckId, addExprCtxt )
+import GHC.Tc.Gen.Head( tcCheckId )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Bind
@@ -404,15 +404,17 @@ tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
                   ; return (HsDo res_ty doExpr (L l stmts')) }
           else do { expanded_expr <- expandDoStmts doExpr stmts -- Do expansion on the fly
                   ; let orig = HsDo noExtField doExpr ss
-                  ; addExprCtxt expanded_expr $
-                      mkExpandedExprTc orig <$> tcExpr expanded_expr res_ty }
+                  ; e' <- tcMonoExpr expanded_expr res_ty
+                  ; return (mkExpandedExprTc orig (unLoc e'))
+                  }
         }
 
 tcDoStmts mDoExpr ss@(L _ stmts) res_ty
   = do  { expanded_expr <- expandDoStmts mDoExpr stmts -- Do expansion on the fly
         ; let orig = HsDo noExtField mDoExpr ss
-        ; addExprCtxt expanded_expr $
-            mkExpandedExprTc orig <$> tcExpr expanded_expr res_ty  }
+        ; e' <- tcMonoExpr expanded_expr res_ty
+        ; return (mkExpandedExprTc orig (unLoc e'))
+        }
 
 tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
 tcBody body res_ty

@@ -51,12 +51,12 @@ import Data.List ((\\))
 --   so that they can be typechecked.
 --   See Note [Expanding HsDo with XXExprGhcRn] below for `HsDo` specific commentary
 --   and Note [Handling overloaded and rebindable constructs] for high level commentary
-expandDoStmts :: HsDoFlavour -> [ExprLStmt GhcRn] -> TcM (HsExpr GhcRn)
+expandDoStmts :: HsDoFlavour -> [ExprLStmt GhcRn] -> TcM (LHsExpr GhcRn)
 expandDoStmts doFlav stmts = expand_do_stmts doFlav stmts
 
 -- | The main work horse for expanding do block statements into applications of binds and thens
 --   See Note [Expanding HsDo with XXExprGhcRn]
-expand_do_stmts :: HsDoFlavour -> [ExprLStmt GhcRn] -> TcM (HsExpr GhcRn)
+expand_do_stmts :: HsDoFlavour -> [ExprLStmt GhcRn] -> TcM (LHsExpr GhcRn)
 
 expand_do_stmts ListComp _ =
   pprPanic "expand_do_stmts: impossible happened. ListComp" empty
@@ -82,25 +82,25 @@ expand_do_stmts flav [stmt@(L _loc (LastStmt _ (L body_loc body) _ ret_expr))]
 -- See `checkLastStmt` and `Syntax.Expr.StmtLR.LastStmt`
    | NoSyntaxExprRn <- ret_expr
    -- Last statement is just body if we are not in ListComp context. See Syntax.Expr.LastStmt
-   = return $ mkExpandedStmt stmt flav (HsPar noExtField (L body_loc body))
+   = return $ L body_loc (mkExpandedStmt stmt flav (HsPar noExtField (L body_loc body)))
    | SyntaxExprRn ret <- ret_expr
    --
    --    ------------------------------------------------
    --               return e  ~~> return e
    -- to make T18324 work
    = do let expansion = genHsApp ret (L body_loc body)
-        return $ mkExpandedStmt stmt flav (HsPar noExtField (L body_loc expansion))
+        return $ L body_loc (mkExpandedStmt stmt flav (HsPar noExtField (L body_loc expansion)))
 
-expand_do_stmts doFlavour (stmt@(L _ (LetStmt _ bs)) : lstmts) =
+expand_do_stmts doFlavour (stmt@(L loc (LetStmt _ bs)) : lstmts) =
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (3) below
 --                      stmts ~~> stmts'
 --    ------------------------------------------------
 --       let x = e ; stmts ~~> let x = e in stmts'
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      let expansion = genHsLet bs (genPopErrCtxtExpr expand_stmts_expr)
-     return $ mkExpandedStmt stmt doFlavour expansion
+     return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 
-expand_do_stmts doFlavour (stmt@(L _loc (BindStmt xbsrn pat e)): lstmts)
+expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
   | SyntaxExprRn bind_op <- xbsrn_bindOp xbsrn
   , fail_op              <- xbsrn_failOp xbsrn
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (2) below
@@ -114,11 +114,11 @@ expand_do_stmts doFlavour (stmt@(L _loc (BindStmt xbsrn pat e)): lstmts)
        let expansion = genHsExpApps bind_op  -- (>>=)
                        [ e
                        , failable_expr ]
-       return $ mkExpandedStmt stmt doFlavour expansion
+       return $ L loc (mkExpandedStmt stmt doFlavour expansion)
   | otherwise
   = pprPanic "expand_do_stmts: The impossible happened, missing bind operator from renamer" (text "stmt" <+> ppr  stmt)
 
-expand_do_stmts doFlavour (stmt@(L _loc (BodyStmt _ e (SyntaxExprRn then_op) _)) : lstmts) =
+expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ e (SyntaxExprRn then_op) _)) : lstmts) =
 -- See Note [BodyStmt] in Language.Haskell.Syntax.Expr
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (1) below
 --              stmts ~~> stmts'
@@ -128,7 +128,7 @@ expand_do_stmts doFlavour (stmt@(L _loc (BodyStmt _ e (SyntaxExprRn then_op) _))
      let expansion = genHsExpApps then_op  -- (>>)
                      [ e
                      , genPopErrCtxtExpr $ expand_stmts_expr ]
-     return $ mkExpandedStmt stmt doFlavour expansion
+     return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 
 expand_do_stmts doFlavour
        ((L loc (RecStmt { recS_stmts = L stmts_loc rec_stmts
@@ -153,10 +153,10 @@ expand_do_stmts doFlavour
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      -- NB: No need to wrap the expansion with an ExpandedStmt
      -- as we want to flatten the rec block statements into its parent do block anyway
-     return $ unLoc (mkHsApps (wrapGenSpan bind_fun)                                           -- (>>=)
+     return $ (mkHsApps (wrapGenSpan bind_fun)                                          -- (>>=)
                       [ (wrapGenSpan mfix_fun) `mkHsApp` mfix_expr                      -- (mfix (do block))
                       , genHsLamDoExp doFlavour [ mkBigLHsVarPatTup all_ids ]           --        (\ x ->
-                                       (wrapGenSpan expand_stmts_expr)     --  stmts')
+                                       expand_stmts_expr                                --  stmts')
                       ])
   where
     local_only_ids = local_ids \\ later_ids -- get unique local rec ids;
@@ -487,5 +487,5 @@ It stores the original statement (with location) and the expanded expression
 mkPopErrCtxtExpr :: HsExpr GhcRn -> HsExpr GhcRn
 mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
 
-genPopErrCtxtExpr :: HsExpr GhcRn -> LHsExpr GhcRn
-genPopErrCtxtExpr a = wrapGenSpan $ mkPopErrCtxtExpr a
+genPopErrCtxtExpr :: LHsExpr GhcRn -> LHsExpr GhcRn
+genPopErrCtxtExpr (L loc a) = L loc (mkPopErrCtxtExpr a)
