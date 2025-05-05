@@ -11,7 +11,7 @@ valid_hole_fits.hs:9:6: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables 
 
 valid_hole_fits.hs:17:17: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> IO Int
-    • In a stmt of a 'do' block: y <- _ x
+    • In the expression: _ x
       In the expression:
         do x <- a 0
            y <- _ x
