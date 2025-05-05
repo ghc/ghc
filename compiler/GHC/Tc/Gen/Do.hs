@@ -112,7 +112,7 @@ expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
   = do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
        failable_expr <- mk_failable_expr doFlavour pat (genPopErrCtxtExpr expand_stmts_expr) fail_op
        let expansion = genHsExpApps bind_op  -- (>>=)
-                       [ e
+                       [ genPopErrCtxtExpr e
                        , failable_expr ]
        return $ L loc (mkExpandedStmt stmt doFlavour expansion)
   | otherwise
@@ -126,7 +126,7 @@ expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ e (SyntaxExprRn then_op) _)) 
 --      e ; stmts ~~> (>>) e stmts'
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      let expansion = genHsExpApps then_op  -- (>>)
-                     [ e
+                     [ genPopErrCtxtExpr e
                      , genPopErrCtxtExpr $ expand_stmts_expr ]
      return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 
