@@ -2649,13 +2649,14 @@ There are five reasons not to unify:
     we can fill beta[tau] := beta[conc]. This is why we call
     'makeTypeConcrete' in startSolvingByUnification.
 
-5. (COERCION-HOLE) rhs does not mention any coercion holes that resulted from
-    fixing up a hetero-kinded equality.  This is the same as (TyEq:CH) in
-    Note [Canonical equalities].  Suppose our equality is
-     (alpha :: k) ~ (Int |> {co})
+5. (REWRITERS) the equality does not have any unsolved equalities in its rewriter
+   set. If those other equalities have not been solved, unifying this equality
+   will propagate strange-looking errors elswhere.  That is the whole point of
+   rewriter sets.  Suppose our equality is
+     [W] co1 {rew = {cok}}   (alpha :: k) ~ (Int |> {cok})
    where co :: Type ~ k is an unsolved wanted. Note that this equality
-   is homogeneous; both sides have kind k. We refrain from unifying here, because
-   of the coercion hole in the RHS -- see Wrinkle (EIK2) in
+   is homogeneous; both sides have kind k. We refrain from unifying
+   here, because of `cok` in its rewriter set.  See (CEK2) in
    Note [Equalities with incompatible kinds] in GHC.Solver.Equality.
 
 Needless to say, all there are wrinkles:
@@ -3585,9 +3586,10 @@ But there are several cases we need to be wary of:
 (2) We must still make sure that no variable in a coercion is at too
     high a level. But, when unifying, we can promote any variables we encounter.
 
+{-  Don't do this
 (3) We do not unify variables with a type with a free coercion hole.
     See (COERCION-HOLE) in Note [Unification preconditions].
-
+-}
 
 Note [Promotion and level-checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

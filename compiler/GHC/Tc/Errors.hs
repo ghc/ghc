@@ -1901,8 +1901,10 @@ mkTyVarEqErr' ctxt item (tv1, _co1) ty2
   -- See Note [Error messages for untouchables]
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_tclvl = lvl } <- implic
-  = assertPpr (not (isTouchableMetaTyVar lvl tv1))
+  = assertPpr (not (isTouchableMetaTyVar lvl tv1) || hasCoercionHole ty2)
               (ppr tv1 $$ ppr lvl) $ do -- See Note [Error messages for untouchables]
+         -- We can still get touchable meta-tyvars on the LHS if there is an
+         -- unsolved coercion hole, e.g.   (alpha::Type) ~ Int# |> co_hole
     tv_extra <- extraTyVarEqInfo (tv1, Just implic) ty2
     let tv_extra' = tv_extra { thisTyVarIsUntouchable = Just implic }
         msg = Mismatch
