@@ -1,9 +1,8 @@
-
 tcfail168.hs:7:11: error: [GHC-83865]
     • Couldn't match expected type: IO a0
                   with actual type: Char -> IO ()
     • Probable cause: ‘putChar’ is applied to too few arguments
-      In a stmt of a 'do' block: putChar
+      In the expression: putChar
       In the expression:
         do putChar
            putChar 'a'
@@ -16,3 +15,4 @@ tcfail168.hs:7:11: error: [GHC-83865]
                  putChar 'a'
                  putChar 'a'
                  ....
+
