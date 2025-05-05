@@ -1,7 +1,6 @@
-T14590.hs:4:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+T14590.hs:4:13: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> Int -> Int
-    • In the expression: x `_`
-      In the expression: (x `_`) y
+    • In the expression: (x `_`) y
       In an equation for ‘f1’: f1 x y = (x `_`) y
     • Relevant bindings include
         y :: Int (bound at T14590.hs:4:6)
@@ -85,11 +84,10 @@ T14590.hs:4:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at T14590.hs:1:8-13
            (and originally defined in ‘GHC.Internal.Base’))
 
-T14590.hs:5:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+T14590.hs:5:13: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Int -> Int -> Int
       Or perhaps ‘_a’ is mis-spelled, or not in scope
-    • In the expression: x `_a`
-      In the expression: (x `_a`) y
+    • In the expression: (x `_a`) y
       In an equation for ‘f2’: f2 x y = (x `_a`) y
     • Relevant bindings include
         y :: Int (bound at T14590.hs:5:6)
