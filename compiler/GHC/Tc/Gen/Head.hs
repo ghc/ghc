@@ -1180,4 +1180,5 @@ addExprCtxt e thing_inside
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
+      XExpr (PopErrCtxt _) -> thing_inside -- popErrCtxt shouldn't push ctxt. see typechecking let stmts
       _ -> addErrCtxt (ExprCtxt e) thing_inside -- no op in generated code
