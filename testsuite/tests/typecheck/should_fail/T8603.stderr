@@ -9,8 +9,20 @@ T8603.hs:33:17: error: [GHC-18872]
         but its type ‘(Control.Monad.Trans.Class.MonadTrans t, Monad m) =>
                       m a -> t m a’
         has only one
-      In a stmt of a 'do' block: prize <- lift uniform [1, 2, 3]
+      In the expression: lift uniform [1, 2, 3]
       In the expression:
         do prize <- lift uniform [1, 2, ....]
            return False
 
+T8603.hs:33:22: error: [GHC-83865]
+    • Couldn't match type: RV a1
+                     with: StateT s RV a0
+      Expected: [a1] -> StateT s RV a0
+        Actual: [a1] -> RV a1
+    • In the first argument of ‘lift’, namely ‘uniform’
+      In the expression: lift uniform [1, 2, 3]
+      In the expression:
+        do prize <- lift uniform [1, 2, ....]
+           return False
+    • Relevant bindings include
+        testRVState1 :: RVState s Bool (bound at T8603.hs:32:1)
