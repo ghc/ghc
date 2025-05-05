@@ -1,4 +1,3 @@
-
 DoExpansion1.hs:7:19: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
     • No instance for ‘Num String’ arising from the literal ‘1’
     • In the first argument of ‘putStrLn’, namely ‘1’
@@ -23,7 +22,7 @@ DoExpansion1.hs:15:54: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefaul
 DoExpansion1.hs:19:21: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
     • No instance for ‘Num String’ arising from the literal ‘1’
     • In the first argument of ‘putStrLn’, namely ‘1’
-      In a stmt of a 'do' block: putStrLn 1
+      In the expression: putStrLn 1
       In the expression:
         do putStrLn 1
            putStrLn "r2"
@@ -32,7 +31,7 @@ DoExpansion1.hs:19:21: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefaul
 DoExpansion1.hs:25:21: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
     • No instance for ‘Num String’ arising from the literal ‘2’
     • In the first argument of ‘putStrLn’, namely ‘2’
-      In a stmt of a 'do' block: putStrLn 2
+      In the expression: putStrLn 2
       In the expression:
         do putStrLn "r1"
            putStrLn 2
@@ -46,3 +45,4 @@ DoExpansion1.hs:32:21: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefaul
         do putStrLn "r1"
            putStrLn "r2"
            putStrLn 3
+
