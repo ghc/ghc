@@ -1181,9 +1181,12 @@ dropMisleading (WC { wc_simple = simples, wc_impl = implics, wc_errors = errors 
            , wc_impl   = mapBag drop_implic implics
            , wc_errors  = filterBag keep_delayed_error errors }
 
-    keep_ct ct = case classifyPredType (ctPred ct) of
-                    ClassPred {} -> False
-                    _ -> True
+    keep_ct ct
+      = case classifyPredType (ctPred ct) of
+           ClassPred cls _ -> isEqualityClass cls
+             -- isEqualityClass: see (CERR2) in Note [Constraints and errors]
+             --                  in GHC.Tc.Utils.Monad
+           _ -> True
 
     keep_delayed_error (DE_Hole hole) = isOutOfScopeHole hole
     keep_delayed_error (DE_NotConcrete {}) = True
