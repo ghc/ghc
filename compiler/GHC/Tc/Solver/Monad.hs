@@ -474,9 +474,11 @@ kickOutAfterUnification tv_list = case nonEmpty tv_list of
        ; return n_kicked }
 
 kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
--- See Wrinkle (EIK2) in Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality
--- It's possible that this could just go ahead and unify, but could there be occurs-check
--- problems? Seems simpler just to kick out.
+-- See Wrinkle (URW2) in Note [Unify only if the rewriter set is empty]
+-- in GHC.Tc.Solver.Equality
+--
+-- It's possible that this could just go ahead and unify, but could there
+-- be occurs-check problems? Seems simpler just to kick out.
 kickOutAfterFillingCoercionHole hole
   = do { ics <- getInertCans
        ; let (kicked_out, ics') = kick_out ics
@@ -2118,7 +2120,7 @@ emitNewWantedEq loc rewriters role ty1 ty2
 newWantedEq :: CtLoc -> RewriterSet -> Role -> TcType -> TcType
             -> TcS (WantedCtEvidence, Coercion)
 newWantedEq loc rewriters role ty1 ty2
-  = do { hole <- wrapTcS $ TcM.newCoercionHole loc pty
+  = do { hole <- wrapTcS $ TcM.newCoercionHole pty
        ; let wtd = WantedCt { ctev_pred      = pty
                             , ctev_dest      = HoleDest hole
                             , ctev_loc       = loc
@@ -2337,7 +2339,7 @@ unifyForAllBody :: CtEvidence -> Role -> (UnifyEnv -> TcM a)
 -- rather than emitting them into the monad.
 -- See See (SF5) in Note [Solving forall equalities] in GHC.Tc.Solver.Equality
 unifyForAllBody ev role unify_body
-  = do { (res, cts, unified, _rewriters) <- wrapUnifierX ev role unify_body
+  = do { (res, cts, unified) <- wrapUnifierX ev role unify_body
          -- Ignore the rewriters. They are used in wrapUnifierTcS only
          -- as an optimistion to prioritise the work list; but they are
          -- /also/ stored in each individual constraint we return.
@@ -2360,16 +2362,16 @@ wrapUnifierTcS :: CtEvidence -> Role
 -- unified the process; the (Bag Ct) are the deferred constraints.
 
 wrapUnifierTcS ev role do_unifications
-  = do { (res, cts, unified, rewriters) <- wrapUnifierX ev role do_unifications
+  = do { (res, cts, unified) <- wrapUnifierX ev role do_unifications
 
        -- Emit the deferred constraints
        -- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
        --
        -- All the constraints in `cts` share the same rewriter set so,
        -- rather than looking at it one by one, we pass it to
-       -- extendWorkListEqs; just a small optimisation.
+       -- extendWorkListChildEqs; just a small optimisation.
        ; unless (isEmptyBag cts) $
-         updWorkListTcS (extendWorkListEqs rewriters cts)
+         updWorkListTcS (extendWorkListChildEqs ev cts)
 
        -- And kick out any inert constraint that we have unified
        ; _ <- kickOutAfterUnification unified
@@ -2378,18 +2380,20 @@ wrapUnifierTcS ev role do_unifications
 
 wrapUnifierX :: CtEvidence -> Role
              -> (UnifyEnv -> TcM a)  -- Some calls to uType
-             -> TcS (a, Bag Ct, [TcTyVar], RewriterSet)
+             -> TcS (a, Bag Ct, [TcTyVar])
 wrapUnifierX ev role do_unifications
   = do { unif_count_ref <- getUnifiedRef
        ; wrapTcS $
          do { defer_ref   <- TcM.newTcRef emptyBag
             ; unified_ref <- TcM.newTcRef []
-            ; rewriters   <- TcM.liftZonkM (TcM.zonkRewriterSet (ctEvRewriters ev))
             ; let env = UE { u_role      = role
-                           , u_rewriters = rewriters
+                           , u_rewriters = ctEvRewriters ev
                            , u_loc       = ctEvLoc ev
                            , u_defer     = defer_ref
                            , u_unified   = Just unified_ref}
+              -- u_rewriters: the rewriter set and location from
+              -- the parent constraint `ev` are inherited in any
+              -- new constraints spat out by the unifier
 
             ; res <- do_unifications env
 
@@ -2401,7 +2405,7 @@ wrapUnifierX ev role do_unifications
             ; unless (null unified) $
               TcM.updTcRef unif_count_ref (+ (length unified))
 
-            ; return (res, cts, unified, rewriters) } }
+            ; return (res, cts, unified) } }
 
 
 {-

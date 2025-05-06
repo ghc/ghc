@@ -4,14 +4,14 @@ T14846.hs:38:8: error: [GHC-25897]
         Actual: Hom riki a a
       ‘ríki’ is a rigid type variable bound by
         the type signature for:
-          i :: forall {k4} {k5} {cls1 :: k5 -> Constraint} (xx :: k4)
-                      (a :: Struct cls1) (ríki :: Struct cls1 -> Struct cls1 -> *).
+          i :: forall {k5} {k6} {cls2 :: k6 -> Constraint} (xx :: k5)
+                      (a :: Struct cls2) (ríki :: Struct cls2 -> Struct cls2 -> *).
                StructI xx a =>
                ríki a a
         at T14846.hs:38:8-48
     • When checking that instance signature for ‘i’
         is more general than its signature in the class
-        Instance sig: forall {k1} {k3} {cls :: k3 -> Constraint} (xx :: k1)
+        Instance sig: forall {k1} {k2} {cls :: k2 -> Constraint} (xx :: k1)
                              (a :: Struct cls).
                       StructI xx a =>
                       Hom riki a a
@@ -22,10 +22,10 @@ T14846.hs:38:8: error: [GHC-25897]
       In the instance declaration for ‘Category (Hom riki)’
 
 T14846.hs:39:44: error: [GHC-25897]
-    • Couldn't match kind ‘k3’ with ‘Struct cls1’
-      Expected kind ‘Struct cls1 -> Constraint’,
-        but ‘cls’ has kind ‘k3 -> Constraint’
-      ‘k3’ is a rigid type variable bound by
+    • Couldn't match kind ‘k4’ with ‘Struct cls2’
+      Expected kind ‘Struct cls2 -> Constraint’,
+        but ‘cls’ has kind ‘k4 -> Constraint’
+      ‘k4’ is a rigid type variable bound by
         the instance declaration
         at T14846.hs:37:10-65
     • In the second argument of ‘Structured’, namely ‘cls’

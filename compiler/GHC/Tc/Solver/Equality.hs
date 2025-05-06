@@ -1029,10 +1029,10 @@ up in the complexities of canEqLHSHetero.  To do this:
   left-to-right order.  See the use of `snocBag` in `uType_defer`.
 
 * `wrapUnifierTcS` adds the bag of deferred constraints from
-  `do_unifications` to the work-list using `extendWorkListEqs`.
+  `do_unifications` to the work-list using `extendWorkListChildEqs`.
 
-* `extendWorkListEqs` and `selectWorkItem` together arrange that the
-  list of constraints given to `extendWorkListEqs` is processed in
+* `extendWorkListChildEqs` and `selectWorkItem` together arrange that the
+  list of constraints given to `extendWorkListChildEqs` is processed in
   left-to-right order.
 
 This is not a very big deal.  It reduces the number of solver steps
@@ -1652,6 +1652,11 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
                  (ppr swapped $$
                   ppr kind_co <+> dcolon <+> sep [ ppr ki1, text "~#", ppr ki2 ])
            ; new_ev <- rewriteEqEvidence rewriters ev swapped lhs_redn rhs_redn
+                -- rewriteEqEvidence adds any as-yet-unsolved equalities
+                -- from the kind equality (namely `rewriters`) to the
+                -- rewriter set for `new_ev`.  See (EIK2).
+
+           -- Now `new_ev` is homogenous: carry on!
            ; canEqCanLHSHomo new_ev eq_rel NotSwapped lhs1 ps_xi1 new_xi2 new_xi2 }
 
       where
@@ -1868,10 +1873,10 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
 -----------------------
 canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
   -- Try unification; for Wanted, Nominal equalities with a meta-tyvar on the LHS
-  | CtWanted wev <- ev   -- See Note [Do not unify Givens]
-  , NomEq <- eq_rel      -- See Note [Do not unify representational equalities]
+  | CtWanted wev <- ev         -- See Note [Do not unify Givens]
+  , NomEq <- eq_rel            -- See Note [Do not unify representational equalities]
+  , wantedCtHasNoRewriters wev -- See Note [Unify only if the rewriter set is empty]
   , TyVarLHS tv <- lhs
-  , isEmptyRewriterSet (ctev_rewriters wev)  -- Only unify if the rewriter set is empty
   = do { given_eq_lvl <- getInnermostGivenEqLevel
        ; if not (touchabilityAndShapeTest given_eq_lvl tv rhs)
          then if | Just can_rhs <- canTyFamEqLHS_maybe rhs
@@ -2066,89 +2071,53 @@ Wrinkles:
      GHC.Tc.Types.Constraint.  This is done in canEqCanLHSHetero.
 
 (EIK2) Suppose we have [W] (a::Type) ~ (b::Type->Type). The above rewrite will produce
-        [W] w  : a ~ (b |> kw)
-        [W] kw : Type ~ (Type->Type)
+        [W] w (rewriters: {kw}) : a ~ (b |> kw)
+        [W] kw                  : Type ~ (Type->Type)
 
-     But we do /not/ want to regard `w` as canonical, and use it for rewriting
-     other constraints: `kw` is insoluble, and replacing something of kind
-     `Type` with something of kind `Type->Type` (even wrapped in an insouluble
-     cast) does not help, and doing so turns out to lead to much worse error
-     messages.  (In particular, if 'a' is a unification variable, we might
-     unify, losing the tracking info that it depends on solving `kw`.)
+     We track `w` as having `kw` in its rewriter set.  That will stop us unifying `w`
+     (see Note [Unify only if the rewriter set is empty] in GHC.Tc.Solver.Equality).
 
-     Conclusion: if a RHS contains a coercion hole arising from fixing a hetero-kinded
-     equality, treat the equality (`w` in this case) as non-canonical, so that
-       * It will not be used for unification
-       * It will not be used for rewriting
-     Instead, it lands in the inert_irreds in the inert set, awaiting solution of
-     that `kw`.
-
-  (EIK2a) We must later indeed unify if/when the kind-level wanted, `kw` gets
-     solved. This is done in `kickOutAfterFillingCoercionHole`, which kicks out
-     all equalities whose RHS mentions the filled-in coercion hole.  Note that
-     it looks for type family equalities, too, because of the use of unifyTest
-     in canEqTyVarFunEq.
-
-     To do this, we slightly-hackily use the `ctev_rewriters` field of the inert,
-     which records that `w` has been rewritten by `kw`.
-     See (WRW3) in Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
-
-  (EIK2b) What if the RHS mentions /other/ coercion holes?  How can that happen?  The
-     main way is like this. Assume F :: forall k. k -> Type
+    But `w` is still /canonical/, and used for rewriting other constraints.
+    See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint. That's important
+    in general. Consider:
         [W] kw : k  ~ Type
         [W] w  : a ~ F k t
      We can rewrite `w` with `kw` like this:
-        [W] w' : a ~ F Type (t |> kw)
+        [W] w' (rewriters: {kw}) : a ~ F Type (t |> kw)
      The cast on the second argument of `F` is necessary to keep the appliation well-kinded.
      There is nothing special here; no reason not treat w' as canonical, and use it for
-     rewriting. Indeed tests JuanLopez only typechecks if we do.  So we'd like to treat
-     this kind of equality as canonical.
+     rewriting. Indeed tests JuanLopez only typechecks if we do.
 
   So here is our implementation:
-     * The `ch_hetero_kind` field in CoercionHole identifies a coercion hole created
-       by `canEqCanLHSHetero` to fix up hetero-kinded equalities.
+     * When doing the kind unification, any equality constraints we can't solve
+       immediately get an origin that tells that the constraint arises from
+       the kind of the parent type-equality.  See the calls to `mkKindEqLoc`
+       in `canEqCanLHSHetero`.
 
-     * An equality constraint is non-canonical if it mentions a /hetero-kind/
-       CoercionHole on the RHS.  This (and only this) is the (TyEq:CH) invariant
-       for canonical equalities (see Note [Canonical equalities])
+     * We /also/ these unsolved kind equalities to the `RewriterSet` of the
+       parent constraint; see `do_rewrite` in `canEqCanLHSHetero`.
 
-     * The invariant is checked by the `hasHeterKindCoercionHoleCo` test in
-       GHC.Tc.Utils.Unify.checkCo; and not satisfying this invariant is what
-       `cteCoercionHole` in `CheckTyEqResult` means.
+     * When filling a coercion hole we kick out any equality constraints whose
+       rewriter set mentions this hole.  See `kickOutAfterFillingCoercionHole`
 
-     * These special hetero-kind CoercionHoles are created by the `uType` unifier when
-       the parent's CtOrigin is KindEqOrigin: see GHC.Tc.Utils.TcMType.newCoercionHole
-       and friends.
-
-       We set this origin, via `updUEnvLoc`, in `mk_kind_eq` in `canEqCanLHSHetero`.
-
-     * We /also/ add the coercion hole to the `RewriterSet` of the constraint,
-       in `canEqCanLHSHetero`
-
-     * When filling one of these special hetero-kind coercion holes, we kick out
-       any IrredCt's that mention this hole; maybe it is now canonical.
-       See `kickOutAfterFillingCoercionHole`.
-
-     Gah!  This is bizarrely complicated.
-
-(EIK3) Suppose we have [W] (a :: k1) ~ (rhs :: k2). We duly follow the
-     algorithm detailed here, producing [W] co :: k1 ~ k2, and adding
-     [W] (a :: k1) ~ ((rhs |> sym co) :: k1) to the irreducibles. Some time
-     later, we solve co, and fill in co's coercion hole. This kicks out
-     the irreducible as described in (2).
+(EIK3) Suppose we have [W] co1 : (a :: k1) ~ (rhs :: k2). We duly follow the
+     algorithm detailed here, producing [W] kco :: k1 ~ k2, and adding
+     [W] co2 : (a :: k1) ~ ((rhs |> sym kco) :: k1) to the inert set.
+     Some time later, we solve `kco`, and fill in kco's coercion hole.
+     This kicks out the inert equality.
 
      But now, during canonicalization, we see the cast and remove it, in
-     canEqCast. By the time we get into canEqCanLHS, the equality is
-     heterogeneous again, and the process repeats.
+     `canEqCast`. By the time we get into `canEqCanLHS`, the equality is
+     heterogeneous again, and the process repeats!
 
      To avoid this, we don't strip casts off a type if the other type in the
-     equality is a CanEqLHS (the scenario above can happen with a type
-     family, too. testcase: typecheck/should_compile/T13822).
+     equality is a CanEqLHS.  See the `CastTy` case of `can_eq_nc`.
+     (The scenario above can happen with a type family, too.
+      testcase: typecheck/should_compile/T13822).
 
      And this is an improvement regardless: because tyvars can, generally,
      unify with casted types, there's no reason to go through the work of
-     stripping off the cast when the cast appears opposite a tyvar. This is
-     implemented in the cast case of can_eq_nc.
+     stripping off the cast when the cast appears opposite a tyvar.
 
 Historical note:
 
@@ -2762,6 +2731,30 @@ equality.
 Note that it does however make sense to perform such unifications, as a last
 resort, when doing top-level defaulting.
 See Note [Defaulting representational equalities].
+
+Note [Unify only if the rewriter set is empty]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    co (rewriters = {co1,co2}) :: alpha ~# blah
+If we unify before solving `co1` and `co2` (which might well be insoluble)
+we destroy the careful tracking of Note [Wanteds rewrite Wanteds] in
+GHC.Tc.Types.Constraint.  So we decline to unify any equality with a
+non-empty rewriter set: see (REWRITERS) in Note [Unification preconditions]
+in GHC.Tc.Utils.
+
+Wrinkles:
+
+(URW1) We may, however, be willing to /default/ such an equality; see
+   (DE6) in Note [Defaulting equalities] in GHC.Tc.Solver.Default.
+
+(URW2) If we have `co` in the inert set, and we solve `co1` and `co2`,
+   we should kick out `co` so that we can now unify it, which might
+   unlock other stuff.  See `kickOutAfterFillingCoercionHole` in
+   GHC.Tc.Solver.Monad.
+
+   However the solver prioritises equalities with an empty rewriter
+   set, to try to avoid unnecessary kick-out.  See GHC.Tc.Types.Constraint
+   Note [Prioritise Wanteds with empty RewriterSet] esp (PER1)
 
 Note [Solve by unification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

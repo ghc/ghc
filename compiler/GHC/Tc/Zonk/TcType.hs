@@ -366,8 +366,9 @@ zonkCoVar = zonkId
 ************************************************************************
 -}
 
--- | Check that a coercion is appropriate for filling a hole. (The hole
--- itself is needed only for printing.)
+-- | Debugging-only!  Check that a coercion is appropriate for filling a
+--   hole. (The hole itself is needed only for printing.)
+--
 -- Always returns the checked coercion, but this return value is necessary
 -- so that the input coercion is forced only when the output is forced.
 checkCoercionHole :: CoVar -> Coercion -> ZonkM Coercion

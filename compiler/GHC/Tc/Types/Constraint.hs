@@ -17,7 +17,7 @@ module GHC.Tc.Types.Constraint (
         isUnsatisfiableCt_maybe,
         ctEvidence, updCtEvidence,
         ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
-        ctRewriters, ctHasNoRewriters,
+        ctRewriters, ctHasNoRewriters, wantedCtHasNoRewriters,
         ctEvId, wantedEvId_maybe, mkTcEqPredLikeEv,
         mkNonCanonical, mkGivens,
         tyCoVarsOfCt, tyCoVarsOfCts,
@@ -38,7 +38,7 @@ module GHC.Tc.Types.Constraint (
         CtIrredReason(..), isInsolubleReason,
 
         CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
-        cteOK, cteImpredicative, cteTypeFamily, cteCoercionHole,
+        cteOK, cteImpredicative, cteTypeFamily,
         cteInsolubleOccurs, cteSolubleOccurs, cterSetOccursCheckSoluble,
         cteConcrete, cteSkolemEscape,
         impredicativeProblem, insolubleOccursProblem, solubleOccursProblem,
@@ -528,7 +528,7 @@ cterHasNoProblem _        = False
 newtype CheckTyEqProblem = CTEP Word8
 
 cteImpredicative, cteTypeFamily, cteInsolubleOccurs,
-  cteSolubleOccurs, cteCoercionHole, cteConcrete,
+  cteSolubleOccurs, cteConcrete,
   cteSkolemEscape :: CheckTyEqProblem
 cteImpredicative   = CTEP (bit 0)   -- Forall or (=>) encountered
 cteTypeFamily      = CTEP (bit 1)   -- Type family encountered
@@ -540,8 +540,7 @@ cteSolubleOccurs   = CTEP (bit 3)   -- Occurs-check under a type function, or in
    -- cteSolubleOccurs must be one bit to the left of cteInsolubleOccurs
    -- See also Note [Insoluble mis-match] in GHC.Tc.Errors
 
-cteCoercionHole    = CTEP (bit 4)   -- Kind-equality coercion hole encountered
-                                    -- See (EIK2) in Note [Equalities with incompatible kinds]
+-- NB:  CTEP (bit 4) currently unused
 
 cteConcrete        = CTEP (bit 5)   -- Type variable that can't be made concrete
                                     --    e.g. alpha[conc] ~ Maybe beta[tv]
@@ -632,8 +631,7 @@ allBits = [ (cteImpredicative,   "cteImpredicative")
           , (cteInsolubleOccurs, "cteInsolubleOccurs")
           , (cteSolubleOccurs,   "cteSolubleOccurs")
           , (cteConcrete,        "cteConcrete")
-          , (cteSkolemEscape,    "cteSkolemEscape")
-          , (cteCoercionHole,    "cteCoercionHole") ]
+          , (cteSkolemEscape,    "cteSkolemEscape") ]
 
 {- Note [CIrredCan constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2230,10 +2228,14 @@ ctEvRewriters (CtWanted (WantedCt { ctev_rewriters = rws })) = rws
 ctEvRewriters (CtGiven {})  = emptyRewriterSet
 
 ctHasNoRewriters :: Ct -> Bool
-ctHasNoRewriters ct
-  = case ctEvidence ct of
-      CtWanted (WantedCt { ctev_rewriters = rws }) -> isEmptyRewriterSet rws
-      CtGiven {}                                    -> True
+ctHasNoRewriters ev
+  = case ctEvidence ev of
+      CtWanted wev -> wantedCtHasNoRewriters wev
+      CtGiven {}   -> True
+
+wantedCtHasNoRewriters :: WantedCtEvidence -> Bool
+wantedCtHasNoRewriters (WantedCt { ctev_rewriters = rws })
+  = isEmptyRewriterSet rws
 
 -- | Set the rewriter set of a Wanted constraint.
 setWantedCtEvRewriters :: WantedCtEvidence -> RewriterSet -> WantedCtEvidence
@@ -2557,15 +2559,15 @@ in our simplify_loop iteration, we happened to start with co_aym. All would have
 been well if we'd started with the (not-rewritten) co_ayb and gotten it into the
 inert set.
 
-With that in mind, we /prioritise/ the work-list to put constraints
-with no rewriters first.  This prioritisation is done in
-GHC.Tc.Solver.InertSet.extendWorkListEq, and extendWorkListEqs.
+With that in mind, we /prioritise/ the work-list to put
+constraints with no rewriters first.  This prioritisation
+is done in `GHC.Tc.Solver.Monad.selectNextWorkItem`.
 
 Wrinkles
 
-(PER1) Before checking for an empty RewriterSet, we zonk the RewriterSet,
-  because some of those CoercionHoles may have been filled in since we last
-  looked: see GHC.Tc.Solver.Monad.emitWork.
+(PER1) When picking the next work item, before checking for an empty RewriterSet
+  in GHC.Tc.Solver.Monad.selectNextWorkItem, we zonk the RewriterSet, because
+  some of those CoercionHoles may have been filled in since we last looked.
 
 (PER2) Despite the prioritisation, it is hard to be /certain/ that we can't end up
   in a situation where all of the Wanteds have rewritten each other. In

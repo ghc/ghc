@@ -2144,7 +2144,7 @@ uType_defer (UE { u_loc = loc, u_defer = ref
                 , u_role = role, u_rewriters = rewriters })
             ty1 ty2  -- ty1 is "actual", ty2 is "expected"
   = do { let pred_ty = mkEqPredRole role ty1 ty2
-       ; hole <- newCoercionHole loc pred_ty
+       ; hole <- newCoercionHole pred_ty
        ; let ct = mkNonCanonical $ CtWanted $
                     WantedCt { ctev_pred      = pred_ty
                              , ctev_dest      = HoleDest hole
@@ -2656,8 +2656,8 @@ There are five reasons not to unify:
      [W] co1 {rew = {cok}}   (alpha :: k) ~ (Int |> {cok})
    where co :: Type ~ k is an unsolved wanted. Note that this equality
    is homogeneous; both sides have kind k. We refrain from unifying
-   here, because of `cok` in its rewriter set.  See (CEK2) in
-   Note [Equalities with incompatible kinds] in GHC.Solver.Equality.
+   here, because of `cok` in its rewriter set.  See
+   Note [Unify only if the rewriter set is empty] in GHC.Solver.Equality.
 
 Needless to say, all there are wrinkles:
 
@@ -3406,7 +3406,7 @@ famAppBreaker (BreakWanted ev lhs_tv) fam_app
             _ -> TcM.newMetaTyVarTyAtLevel lhs_tv_lvl fam_app_kind
 
        ; let pty = mkNomEqPred fam_app new_tv_ty
-       ; hole <- TcM.newVanillaCoercionHole pty
+       ; hole <- TcM.newCoercionHole pty
        ; let new_ev = WantedCt { ctev_pred      = pty
                                , ctev_dest      = HoleDest hole
                                , ctev_loc       = cb_loc
@@ -3547,14 +3547,6 @@ checkCo flags co =
         -- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
         | case conc of { CC_None -> False; _ -> True }
         -> return $ PuFail (cteProblem cteConcrete)
-
-{-  Trying NOT doing this -- #
-        -- Check for coercion holes, if unifying.
-        -- See (COERCION-HOLE) in Note [Unification preconditions]
-        | case lc of { LC_None {} -> False; _ -> True } -- equivalent to "we are unifying"; see Note [TyEqFlags]
-        , hasHeteroKindCoercionHoleCo co
-        -> return $ PuFail (cteProblem cteCoercionHole)
--}
 
         -- Occurs check (can promote)
         | OC_Check lhs_tv occ_prob <- occ
@@ -4142,7 +4134,7 @@ makeTypeConcrete occ_fs conc_orig ty =
                 ; conc_tv <- newConcreteTyVar conc_orig occ_fs (coercionRKind kind_co)
                 ; let conc_ty = mkTyVarTy conc_tv
                       pty = mkEqPredRole Nominal ty' conc_ty
-                ; hole <- newCoercionHoleO orig pty
+                ; hole <- newCoercionHole pty
                 ; loc <- getCtLocM orig (Just KindLevel)
                 ; let ct = mkNonCanonical $ CtWanted
                          $ WantedCt { ctev_pred      = pty

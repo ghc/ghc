@@ -8,7 +8,7 @@ module GHC.Tc.Solver.InertSet (
     WorkList(..), isEmptyWorkList, emptyWorkList,
     extendWorkListNonEq, extendWorkListCt,
     extendWorkListCts, extendWorkListCtList,
-    extendWorkListEq, extendWorkListEqs,
+    extendWorkListEq, extendWorkListChildEqs,
     extendWorkListRewrittenEqs,
     appendWorkList, extendWorkListImplic,
     workListSize,
@@ -230,16 +230,17 @@ extendWorkListEq rewriters ct
   | otherwise
   = wl { wl_rw_eqs = ct : rw_eqs }
 
-extendWorkListEqs :: RewriterSet -> Bag Ct -> WorkList -> WorkList
+extendWorkListChildEqs :: CtEvidence -> Bag Ct -> WorkList -> WorkList
 -- Add [eq1,...,eqn] to the work-list
--- They all have the same rewriter set
 -- The constraints will be solved in left-to-right order:
 --   see Note [Work-list ordering] in GHC.Tc.Solver.Equality
 --
+-- Precondition: if the parent constraint has an empty
+--               rewriter set, so will the new equalities
 -- Precondition: new_eqs is non-empty
-extendWorkListEqs rewriters new_eqs
+extendWorkListChildEqs parent_ev new_eqs
     wl@(WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs })
-  | isEmptyRewriterSet rewriters
+  | isEmptyRewriterSet (ctEvRewriters parent_ev)
     -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
     --                         in GHC.Tc.Types.Constraint
   = case partitionBag isNominalEqualityCt new_eqs of
