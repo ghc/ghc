@@ -21,6 +21,8 @@ words :-
     <0> $white+             ;
 ---------------------------------------
 
+    <0>         "//" .*              { mkTv TComment }
+    <0>         "/*" .* "*/"         { mkTv TComment }
     <0>         "{"                  { mkTv TOpenBrace }
     <0>         "}"                  { mkTv TCloseBrace }
     <0>         "["                  { mkTv TOpenBracket }
