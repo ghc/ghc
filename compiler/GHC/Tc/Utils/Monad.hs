@@ -1385,11 +1385,13 @@ tryCaptureConstraints thing_inside
                           tcTryM thing_inside
 
        -- See Note [Constraints and errors]
-       ; let lie_to_keep = case mb_res of
-                             Nothing -> dropMisleading lie
-                             Just {} -> lie
-
-       ; return (mb_res, lie_to_keep) }
+       ; case mb_res of
+            Just {} -> return (mb_res, lie)
+            Nothing -> do { let pruned_lie = dropMisleading lie
+                          ; traceTc "tryCaptureConstraints" $
+                            vcat [ text "lie:" <+> ppr lie
+                                 , text "dropMisleading lie:" <+> ppr pruned_lie ]
+                          ; return (Nothing, pruned_lie) } }
 
 captureConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- (captureConstraints m) runs m, and returns the type constraints it generates
@@ -2066,28 +2068,51 @@ It's distressingly delicate though:
   emitted some constraints with skolem-escape problems.
 
 * If we discard too /few/ constraints, we may get the misleading
-  class constraints mentioned above.  But we may /also/ end up taking
-  constraints built at some inner level, and emitting them at some
-  outer level, and then breaking the TcLevel invariants
-  See Note [TcLevel invariants] in GHC.Tc.Utils.TcType
+  class constraints mentioned above.
 
-So dropMisleading has a horridly ad-hoc structure.  It keeps only
-/insoluble/ flat constraints (which are unlikely to very visibly trip
-up on the TcLevel invariant, but all /implication/ constraints (except
-the class constraints inside them).  The implication constraints are
-OK because they set the ambient level before attempting to solve any
-inner constraints.  Ugh! I hate this. But it seems to work.
+  We may /also/ end up taking constraints built at some inner level, and
+  emitting them (via the exception catching in `tryCaptureConstraints` at some
+  outer level, and then breaking the TcLevel invariants See Note [TcLevel
+  invariants] in GHC.Tc.Utils.TcType
 
-However note that freshly-generated constraints like (Int ~ Bool), or
-((a -> b) ~ Int) are all CNonCanonical, and hence won't be flagged as
-insoluble.  The constraint solver does that.  So they'll be discarded.
-That's probably ok; but see th/5358 as a not-so-good example:
-   t1 :: Int
-   t1 x = x   -- Manifestly wrong
+So `dropMisleading` has a horridly ad-hoc structure:
 
-   foo = $(...raises exception...)
-We report the exception, but not the bug in t1.  Oh well.  Possible
-solution: make GHC.Tc.Utils.Unify.uType spot manifestly-insoluble constraints.
+* It keeps only /insoluble/ flat constraints (which are unlikely to very visibly
+  trip up on the TcLevel invariant
+
+* But it keeps all /implication/ constraints (except the class constraints
+  inside them).  The implication constraints are OK because they set the ambient
+  level before attempting to solve any inner constraints.
+
+Ugh! I hate this. But it seems to work.
+
+Other wrinkles
+
+(CERR1) Note that freshly-generated constraints like (Int ~ Bool), or
+    ((a -> b) ~ Int) are all CNonCanonical, and hence won't be flagged as
+    insoluble.  The constraint solver does that.  So they'll be discarded.
+    That's probably ok; but see th/5358 as a not-so-good example:
+       t1 :: Int
+       t1 x = x   -- Manifestly wrong
+
+       foo = $(...raises exception...)
+    We report the exception, but not the bug in t1.  Oh well.  Possible
+    solution: make GHC.Tc.Utils.Unify.uType spot manifestly-insoluble constraints.
+
+(CERR2) In #26015 I found that from the constraints
+           [W] alpha ~ Int      -- A class constraint
+           [W] F alpha ~# Bool  -- An equality constraint
+  we were dropping the first (becuase it's a class constraint) but not the
+  second, and then getting a misleading error message from the second.  As
+  #25607 shows, we can get not just one but a zillion bogus messages, which
+  conceal the one genuine error.  Boo.
+
+  For now I have added an even more ad-hoc "drop class constraints except
+  equality classes (~) and (~~)"; see `dropMisleading`.  That just kicks the can
+  down the road; but this problem seems somewhat rare anyway.  The code in
+  `dropMisleading` hasn't changed for years.
+
+It would be great to have a more systematic solution to this entire mess.
 
 
 ************************************************************************

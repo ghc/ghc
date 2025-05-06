@@ -1,0 +1,9 @@
+T26015.hs:17:10: error: [GHC-27346]
+    • The data constructor ‘T2’ should have 1 argument, but has been given none
+    • In the pattern: T2
+      In a case alternative: T2 -> True
+      In the expression:
+        case x of
+          T1 y -> not (woo 3)
+          T2 -> True
+
