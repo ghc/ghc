@@ -91,6 +91,8 @@ init_state =
 
 data Token
     = TEOF {t_str :: String}
+    | -- https://timsong-cpp.github.io/cppwp/n4140/lex.comment
+      TComment {t_str :: String}
     | TIdentifier {t_str :: String}
     | TIdentifierLParen {t_str :: String}
     | TInteger {t_str :: String}

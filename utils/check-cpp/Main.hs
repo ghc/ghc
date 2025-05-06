@@ -838,3 +838,18 @@ t36 = do
         , "#endif"
         , ""
         ]
+
+t37 :: IO ()
+t37 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module Example14 where"
+        , ""
+        , "foo ="
+        , "#if 1 /* and a comment */"
+        , "  'a'"
+        , "#else"
+        , "  'b'"
+        , "#endif"
+        , ""
+        ]

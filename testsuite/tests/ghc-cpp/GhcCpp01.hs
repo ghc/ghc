@@ -18,13 +18,13 @@ y = 1
 #endif
 
 #undef FOO
-#ifdef FOO
+#ifdef FOO /* Check for FOO */
 complete junk!
 #endif
 
 -- nested undef
 #define AA
-#if 0
+#if /* hard code for now */ 0
 #undef AA
 #endif
 

@@ -27,7 +27,7 @@ parseDirective s =
     case cppLex True s of
         Left e -> Left e
         Right toks ->
-            case toks of
+            case map deComment toks of
                 (THash "#" : TIdentifier "define" : ts) -> cppDefine ts
                 (THash "#" : TIdentifier "undef" : ts) -> Right $ cppUndef (map t_str ts)
                 (THash "#" : TIdentifier "include" : ts) -> Right $ cppInclude (map t_str ts)
@@ -111,6 +111,13 @@ cppLex :: Bool -> String -> Either String [Token]
 cppLex sd s = case lexCppTokenStream s (init_state {scanning_directive = sd}) of
     Left err -> Left err
     Right (_inp, _st, toks) -> Right toks
+
+-- Each comment is replaced with a space
+-- https://timsong-cpp.github.io/cppwp/n4140/lex#phases-1.3
+deComment :: Token -> Token
+deComment (TComment _) = TComment " "
+deComment t = t
+
 
 -- ---------------------------------------------------------------------
 
