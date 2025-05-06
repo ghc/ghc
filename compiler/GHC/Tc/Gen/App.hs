@@ -413,11 +413,13 @@ tcApp rn_expr exp_res_ty
        -- Step 2: Infer the type of `fun`, the head of the application
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; let tc_head = (tc_fun, fun_ctxt)
-       ; traceTc "tcApp:inferAppHead" $
-         vcat [ text "tc_fun:" <+> ppr tc_fun
-              , text "fun_sigma:" <+> ppr fun_sigma]
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
+       ; traceTc "tcApp:inferAppHead" $
+         vcat [ text "tc_fun:" <+> ppr tc_fun
+              , text "fun_sigma:" <+> ppr fun_sigma
+              , text "do_ql:" <+> ppr do_ql]
+
        ; (inst_args, app_res_rho)
               <- tcInstFun do_ql True (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
 
