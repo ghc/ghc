@@ -13,8 +13,6 @@ x = 1
 x = 5
 #endif
 
-{-# LINE 15 "GhcCpp01.hs" #-}
-
 #if defined(BAR) || defined FOO
 y = 1
 #endif
@@ -43,5 +41,5 @@ aa = 1
 #endif
 
 #if CH_MIN_VERSION_Cabal(1,22,0)
-x = 1
+z = 1
 #endif
