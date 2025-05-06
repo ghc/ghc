@@ -6,12 +6,14 @@
 
 #define AA 
 
+#define CH_MIN_VERSION_Cabal MIN_VERSION_Cabal
 
-#define MIN_VERSION_Cabal(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 14 || ( major1 ) == 3 && ( major2 ) == 14 && ( minor ) <= 1 )
 
-#define MIN_VERSION_Cabal_syntax(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 14 || ( major1 ) == 3 && ( major2 ) == 14 && ( minor ) <= 1 )
+#define MIN_VERSION_Cabal(a,b,c) 1
 
-#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250427 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250427 && ( pl2 ) <= 0 )
+#define MIN_VERSION_Cabal_syntax(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 15 || ( major1 ) == 3 && ( major2 ) == 15 && ( minor ) <= 0 )
+
+#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250506 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250506 && ( pl2 ) <= 0 )
 
 #define MIN_VERSION_array(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 5 || ( major1 ) == 0 && ( major2 ) == 5 && ( minor ) <= 8 )
 
@@ -97,9 +99,9 @@
 
 #define MIN_VERSION_xhtml(major1,major2,minor) ( ( major1 ) < 3000 || ( major1 ) == 3000 && ( major2 ) < 2 || ( major1 ) == 3000 && ( major2 ) == 2 && ( minor ) <= 2 )
 
-#define VERSION_Cabal 3.14.1.0
+#define VERSION_Cabal 3.15.0.0
 
-#define VERSION_Cabal_syntax 3.14.1.0
+#define VERSION_Cabal_syntax 3.15.0.0
 
 #define VERSION_array 0.5.8.0
 
@@ -186,9 +188,9 @@
 #define VERSION_xhtml 3000.2.2.1
 
 
-#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250427
+#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250506
 
-#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250427
+#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250506
 
 #define __GLASGOW_HASKELL_PATCHLEVEL2__ 0
 
@@ -210,34 +212,36 @@
 - |x = 5
 - |#endif
 
-- |{-# LINE 15 "GhcCpp01.hs" #-}
-
-  |
-  
-- |#if de
-
+- |#if defined(BAR) || defined FOO
+  |y = 1
 - |#endif
-
-- |
 
 - |#undef FOO
-
-- |#ifdef
-
+- |#ifdef FOO
+- |complete junk!
 - |#endif
 
-- |
-
-- |-- ne
-- |#define A
+- |-- nested undef
+- |#define AA
 - |#if 0
-
-
+- |#undef AA
 - |#endif
 
-  |
-  
-- |#ifdef
+- |#ifdef AA
+  |aa = 1
+- |#endif
+
+- |-- undef and rewrite base name only
+- |#define MIN_VERSION_Cabal(a,b,c) 1
+
+- |#ifdef MIN_VERSION_Cabal
+- |#undef CH_MIN_VERSION_Cabal
+- |#define CH_MIN_VERSION_Cabal MIN_VERSION_Cabal
+- |#endif
+
+- |#if CH_MIN_VERSION_Cabal(1,22,0)
+  |z = 1
+- |#endif
   |
 ------------------------------
 
