@@ -296,6 +296,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
     top_ctxt n (HsPragE _ _ fun)    = top_lctxt n fun
     top_ctxt n (HsAppType _ fun _)  = top_lctxt (n+1) fun
     top_ctxt n (HsApp _ fun _)      = top_lctxt (n+1) fun
+    top_ctxt n (XExpr (PopErrCtxt fun)) = top_ctxt n fun
     top_ctxt n other_fun            = VACall other_fun n noSrcSpan
 
     top_lctxt :: Int -> LHsExpr GhcRn -> AppCtxt
@@ -329,6 +330,9 @@ splitHsApps e = go e (top_ctxt 0 e) []
                     -- and its hard to say exactly what that is
                : EWrap (EExpand e)
                : args )
+    go (XExpr (PopErrCtxt fun)) ctxt args = go fun ctxt args
+      -- look through PopErrCtxt (cf. T17594f) we do not want to lose the opportunity of calling tcEValArgQL
+      -- unlike HsPar, it is okay to forget about the PopErrCtxts as it does not persist over in GhcTc land
 
     go e ctxt args = pure ((e,ctxt), args)
 
