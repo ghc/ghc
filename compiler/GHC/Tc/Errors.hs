@@ -399,13 +399,6 @@ warnRedundantConstraints ctxt env info redundant_evs
  | null redundant_evs
  = return ()
 
- -- Do not report redundant constraints for quantified constraints
- -- See (RC4) in Note [Tracking redundant constraints]
- -- Fortunately it is easy to spot implications constraints that arise
- -- from quantified constraints, from their SkolInfo
- | InstSkol (IsQC {}) _ <- info
- = return ()
-
  | SigSkol user_ctxt _ _ <- info
  -- When dealing with a user-written type signature,
  -- we want to add "In the type signature for f".
