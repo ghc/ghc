@@ -7,8 +7,8 @@ tcfail097.hs:5:6: error: [GHC-39999]
       The type variable ‘a0’ is ambiguous
       Potentially matching instances:
         instance Eq Ordering -- Defined in ‘GHC.Internal.Classes’
-        instance Eq a => Eq (Solo a) -- Defined in ‘GHC.Internal.Classes’
-        ...plus 22 others
+        instance Eq Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
+        ...plus 23 others
         ...plus five instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the ambiguity check for ‘f’

@@ -15,7 +15,7 @@ module GHC.Tc.Types.Origin (
 
   -- * SkolemInfo
   SkolemInfo(..), SkolemInfoAnon(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo,
-  unkSkol, unkSkolAnon, mkClsInstSkol,
+  unkSkol, unkSkolAnon,
 
   -- * CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -58,7 +58,6 @@ import GHC.Hs
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
-import GHC.Core.Class
 import GHC.Core.InstEnv
 import GHC.Core.PatSyn
 import GHC.Core.Multiplicity ( scaledThing )
@@ -288,6 +287,10 @@ data SkolemInfoAnon
        ClsInstOrQC      -- Whether class instance or quantified constraint
        PatersonSize     -- Head has the given PatersonSize
 
+  | MethSkol Name Bool  -- Bound by the type of class method op
+                        -- True  <=> it's a default method
+                        -- False <=> it's a user-written method
+
   | FamInstSkol         -- Bound at a family instance decl
   | PatSkol             -- An existential type variable bound by a pattern for
       ConLike           -- a data constructor with an existential type.
@@ -348,9 +351,6 @@ mkSkolemInfo sk_anon = do
 getSkolemInfo :: SkolemInfo -> SkolemInfoAnon
 getSkolemInfo (SkolemInfo _ skol_anon) = skol_anon
 
-mkClsInstSkol :: Class -> [Type] -> SkolemInfoAnon
-mkClsInstSkol cls tys = InstSkol IsClsInst (pSizeClassPred cls tys)
-
 instance Outputable SkolemInfo where
   ppr (SkolemInfo _ sk_info ) = ppr sk_info
 
@@ -369,6 +369,8 @@ pprSkolInfo (InstSkol IsClsInst sz) = vcat [ text "the instance declaration"
                                            , whenPprDebug (braces (ppr sz)) ]
 pprSkolInfo (InstSkol (IsQC {}) sz) = vcat [ text "a quantified context"
                                            , whenPprDebug (braces (ppr sz)) ]
+pprSkolInfo (MethSkol name d) = text "the" <+> ppWhen d (text "default")
+                                           <+> text "method declaration for" <+> ppr name
 pprSkolInfo FamInstSkol       = text "a family instance declaration"
 pprSkolInfo BracketSkol       = text "a Template Haskell bracket"
 pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name

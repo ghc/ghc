@@ -2089,18 +2089,8 @@ solveOneFromTheOther.
        (a) If both are GivenSCOrigin, choose the one that is unblocked if possible
            according to Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
 
-       (b) Prefer constraints that are not superclass selections. Example:
-
-             f :: (Eq a, Ord a) => a -> Bool
-             f x = x == x
-
-           Eager superclass expansion gives us two [G] Eq a constraints. We
-           want to keep the one from the user-written Eq a, not the superclass
-           selection. This means we report the Ord a as redundant with
-           -Wredundant-constraints, not the Eq a.
-
-           Getting this wrong was #20602. See also
-           Note [Tracking redundant constraints] in GHC.Tc.Solver.
+       (b) Prefer constraints that are not superclass selections. See
+           (TRC3) in Note [Tracking redundant constraints] in GHC.Tc.Solver.
 
        (c) If both are GivenSCOrigin, chooose the one with the shallower
            superclass-selection depth, in the hope of identifying more correct

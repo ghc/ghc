@@ -247,11 +247,11 @@ tryUnsatisfiableGivens wc =
      ; solveAgainIf did_work final_wc }
   where
     go_wc (WC { wc_simple = wtds, wc_impl = impls, wc_errors = errs })
-      = do impls' <- mapMaybeBagM go_impl impls
+      = do impls' <- mapBagM go_impl impls
            return $ WC { wc_simple = wtds, wc_impl = impls', wc_errors = errs }
     go_impl impl
       | isSolvedStatus (ic_status impl)
-      = return $ Just impl
+      = return impl
       -- Is there a Given with type "Unsatisfiable msg"?
       -- If so, use it to solve all other Wanteds.
       | unsat_given:_ <- mapMaybe unsatisfiableEv_maybe (ic_given impl)
@@ -271,24 +271,26 @@ unsatisfiableEv_maybe v = (v,) <$> isUnsatisfiableCt_maybe (idType v)
 -- | We have an implication with an 'Unsatisfiable' Given; use that Given to
 -- solve all the other Wanted constraints, including those nested within
 -- deeper implications.
-solveImplicationUsingUnsatGiven :: (EvVar, Type) -> Implication -> TcS (Maybe Implication)
+solveImplicationUsingUnsatGiven :: (EvVar, Type) -> Implication -> TcS Implication
 solveImplicationUsingUnsatGiven
   unsat_given@(given_ev,_)
-  impl@(Implic { ic_wanted = wtd, ic_tclvl = tclvl, ic_binds = ev_binds_var, ic_need_inner = inner })
+  impl@(Implic { ic_wanted = wtd, ic_tclvl = tclvl, ic_binds = ev_binds_var
+               , ic_need_implic = inner })
   | isCoEvBindsVar ev_binds_var
   -- We can't use Unsatisfiable evidence in kinds.
   -- See Note [Coercion evidence only] in GHC.Tc.Types.Evidence.
-  = return $ Just impl
+  = return impl
   | otherwise
   = do { wcs <- nestImplicTcS ev_binds_var tclvl $ go_wc wtd
        ; setImplicationStatus $
          impl { ic_wanted = wcs
-              , ic_need_inner = inner `extendVarSet` given_ev } }
+              , ic_need_implic = inner `extendEvNeedSet` given_ev } }
+                -- Record that the Given is needed; I'm not certain why
   where
     go_wc :: WantedConstraints -> TcS WantedConstraints
     go_wc wc@(WC { wc_simple = wtds, wc_impl = impls })
       = do { mapBagM_ go_simple wtds
-           ; impls <- mapMaybeBagM (solveImplicationUsingUnsatGiven unsat_given) impls
+           ; impls <- mapBagM (solveImplicationUsingUnsatGiven unsat_given) impls
            ; return $ wc { wc_simple = emptyBag, wc_impl = impls } }
     go_simple :: Ct -> TcS ()
     go_simple ct = case ctEvidence ct of
@@ -399,21 +401,21 @@ tryConstraintDefaulting wc
   where
     go_wc :: WantedConstraints -> TcS WantedConstraints
     go_wc wc@(WC { wc_simple = simples, wc_impl = implics })
-      = do { simples'   <- mapMaybeBagM go_simple simples
-           ; mb_implics <- mapMaybeBagM go_implic implics
-           ; return (wc { wc_simple = simples', wc_impl = mb_implics }) }
+      = do { simples' <- mapMaybeBagM go_simple simples
+           ; implics' <- mapBagM go_implic implics
+           ; return (wc { wc_simple = simples', wc_impl = implics' }) }
 
     go_simple :: Ct -> TcS (Maybe Ct)
     go_simple ct = do { solved <- tryCtDefaultingStrategy ct
                       ; if solved then return Nothing
                                   else return (Just ct) }
 
-    go_implic :: Implication -> TcS (Maybe Implication)
+    go_implic :: Implication -> TcS Implication
     -- The Maybe is because solving the CallStack constraint
     -- may well allow us to discard the implication entirely
     go_implic implic
       | isSolvedStatus (ic_status implic)
-      = return (Just implic)  -- Nothing to solve inside here
+      = return implic  -- Nothing to solve inside here
       | otherwise
       = do { wanteds <- setEvBindsTcS (ic_binds implic) $
                         -- defaultCallStack sets a binding, so
