@@ -574,7 +574,11 @@ neededEvVars implic@(Implic { ic_given = givens
       ; return (implic { ic_need_inner = need_inner
                        , ic_need_outer = need_outer }) }
  where
-   add_implic_seeds (Implic { ic_need_outer = needs }) acc
+   add_implic_seeds (Implic { ic_need_outer = needs, ic_info = skol_info }) acc
+      | MethSkol _ is_dm <- skol_info
+      , is_dm  -- See Note [Ignore 'needs' from default methods]
+      = acc
+      | otherwise
       = needs `unionVarSet` acc
 
    needed_ev_bind needed (EvBind { eb_lhs = ev_var
@@ -785,6 +789,22 @@ others).
     forall a. Eq a =>  [W] ds : Show (T a)
   and because of the degnerate instance for `Show (T a)`, we don't need the `Eq a`
   constraint.  But we don't want to report it as redundant!
+
+(RC5) Consider this (#25992), where `op2` has a default method
+        class C a where { op1, op2 :: a -> a
+                        ; op2 = op1 . op1 }
+        instance C a => C [a] where
+          op1 x = x
+
+  Plainly the (C a) constraint is unused; but the expanded decl will
+  look like
+        $dmop2 :: C a => a -> a
+        $dmop2 = op1 . op2
+
+        instance C a = C [a] b
+
+*** INCOMPLETE TODO ***
+
 
 * Examples:
 

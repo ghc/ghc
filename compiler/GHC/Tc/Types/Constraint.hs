@@ -2012,6 +2012,7 @@ checkSkolInfoAnon sk1 sk2 = go sk1 sk2
     go (TyConSkol f1 n1)    (TyConSkol f2 n2)    = f1==f2 && n1==n2
     go (DataConSkol n1)     (DataConSkol n2)     = n1==n2
     go (InstSkol {})        (InstSkol {})        = True
+    go (MethSkol n1 d1)     (MethSkol n2 d2)     = n1==n2 && d1==d2
     go FamInstSkol          FamInstSkol          = True
     go BracketSkol          BracketSkol          = True
     go (RuleSkol n1)        (RuleSkol n2)        = n1==n2
