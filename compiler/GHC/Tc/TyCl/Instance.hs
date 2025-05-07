@@ -495,7 +495,8 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
     do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
              -- NB: tcHsClsInstType does checkValidInstance
-        ; skol_info <- mkSkolemInfo (mkClsInstSkol clas inst_tys)
+        ; skol_info <- mkSkolemInfo (InstSkol IsClsInst pSizeZero)
+                       -- pSizeZero: here the size part of InstSkol is irrelevant
         ; (subst, skol_tvs) <- tcInstSkolTyVars skol_info tyvars
         ; let tv_skol_prs = [ (tyVarName tv, skol_tv)
                             | (tv, skol_tv) <- tyvars `zip` skol_tvs ]
@@ -1816,7 +1817,7 @@ tcMethods :: SkolemInfoAnon -> DFunId -> Class
           -> TcM ([Id], LHsBinds GhcTc, Bag Implication)
         -- The returned inst_meth_ids all have types starting
         --      forall tvs. theta => ...
-tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
+tcMethods _skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
                   dfun_ev_binds (spec_inst_prags, prag_fn) op_items
                   (InstBindings { ib_binds      = binds
                                 , ib_tyvars     = lexical_tvs
@@ -1852,7 +1853,7 @@ tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
     tc_item :: ClassOpItem -> TcM (Id, LHsBind GhcTc, Maybe Implication)
     tc_item (sel_id, dm_info)
       | Just (user_bind, bndr_loc, prags) <- findMethodBind (idName sel_id) binds prag_fn
-      = tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
+      = tcMethodBody False clas tyvars dfun_ev_vars inst_tys
                      dfun_ev_binds is_derived hs_sig_fn
                      spec_inst_prags prags
                      sel_id user_bind bndr_loc
@@ -1888,7 +1889,7 @@ tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
 
       Just (dm_name, dm_spec) ->
         do { (meth_bind, inline_prags) <- mkDefMethBind inst_loc dfun_id clas sel_id dm_name dm_spec
-           ; tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
+           ; tcMethodBody True clas tyvars dfun_ev_vars inst_tys
                           dfun_ev_binds is_derived hs_sig_fn
                           spec_inst_prags inline_prags
                           sel_id meth_bind inst_loc }
@@ -2013,25 +2014,26 @@ Instead, we take the following approach:
 -}
 
 ------------------------
-tcMethodBody :: SkolemInfoAnon
+tcMethodBody :: Bool
              -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
              -> TcEvBinds -> Bool
              -> HsSigFun
              -> [LTcSpecPrag] -> [LSig GhcRn]
              -> Id -> LHsBind GhcRn -> SrcSpan
              -> TcM (TcId, LHsBind GhcTc, Maybe Implication)
-tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
+tcMethodBody is_def_meth clas tyvars dfun_ev_vars inst_tys
                      dfun_ev_binds is_derived
                      sig_fn spec_inst_prags prags
                      sel_id (L bind_loc meth_bind) bndr_loc
   = add_meth_ctxt $
     do { traceTc "tcMethodBody" (ppr sel_id <+> ppr (idType sel_id) $$ ppr bndr_loc)
+       ; let skol_info = MethSkol meth_name is_def_meth
        ; (global_meth_id, local_meth_id) <- setSrcSpan bndr_loc $
                                             mkMethIds clas tyvars dfun_ev_vars
                                                       inst_tys sel_id
 
        ; let lm_bind = meth_bind { fun_id = L (noAnnSrcSpan bndr_loc)
-                                                        (idName local_meth_id) }
+                                              (idName local_meth_id) }
                        -- Substitute the local_meth_name for the binder
                        -- NB: the binding is always a FunBind
 
@@ -2042,7 +2044,7 @@ tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
                 tcMethodBodyHelp sig_fn sel_id local_meth_id (L bind_loc lm_bind)
 
        ; global_meth_id <- addInlinePrags global_meth_id prags
-       ; spec_prags     <- tcExtendIdEnv1 (idName sel_id) global_meth_id $
+       ; spec_prags     <- tcExtendIdEnv1 meth_name global_meth_id $
                            -- tcExtendIdEnv1: tricky point: a SPECIALISE pragma in prags
                            -- mentions sel_name but the pragma is really for global_meth_id.
                            -- So we bind sel_name to global_meth_id, just in the pragmas.
@@ -2071,6 +2073,8 @@ tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
 
         ; return (global_meth_id, L bind_loc full_bind, Just meth_implic) }
   where
+    meth_name = idName sel_id
+
         -- For instance decls that come from deriving clauses
         -- we want to print out the full source code if there's an error
         -- because otherwise the user won't see the code at all
