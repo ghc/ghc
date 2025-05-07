@@ -110,9 +110,19 @@ data Opsys
   | FreeBSD14
   | Windows deriving (Eq)
 
+data WineMode
+  = OnlyTest
+  -- ^ Wine will be used only to test binaries after cross-compile
+  -- which means we do cross-compile from Linux to Windows
+  | FullBuild
+  -- ^ Wine will be used for full process of compilation
+  -- which means compilation itself will be executed under Wine.
+  -- It makes possible to run compilation for Windows environment at Linux machines.
+  deriving (Eq)
+
 data LinuxDistro
   = Debian12
-  | Debian12Wine
+  | Debian12Wine WineMode
   | Debian12Riscv
   | Debian11
   | Debian11Js
@@ -317,7 +327,7 @@ distroName Debian12      = "deb12"
 distroName Debian11      = "deb11"
 distroName Debian11Js    = "deb11-emsdk-closure"
 distroName Debian12Riscv = "deb12-riscv"
-distroName Debian12Wine  = "deb12-wine"
+distroName (Debian12Wine _) = "deb12-wine"
 distroName Debian10      = "deb10"
 distroName Debian9       = "deb9"
 distroName Fedora33      = "fedora33"
@@ -362,6 +372,7 @@ testEnv arch opsys bc =
     , ["no_tntc"  | not (tablesNextToCode bc) ]
     , ["cross_"++triple  | Just triple <- pure $ crossTarget bc ]
     , [flavourString (mkJobFlavour bc)]
+    , if opsys == Linux (Debian12Wine FullBuild) then ["_wine_full_build"] else []
     ]
 
 -- | The hadrian flavour string we are going to use for this build
@@ -730,6 +741,7 @@ data ValidateRule
   | I386Backend  -- ^ Run this job when the "i386" label is set
   | WinArm64     -- ^ Run this job when the "aarch64" and "Windows" labels are set together without "LLVM backend"
   | WinArm64LLVM -- ^ Run this job when the "aarch64" and "Windows" labels are set together with "LLVM backend"
+  | WineArm64    -- ^ Run this job when the "aarch64" and "Wine" labels are set
   | LoongArch64  -- ^ Run this job when the "LoongArch64" labal is present
   deriving (Show, Ord, Eq)
 
@@ -783,6 +795,10 @@ validateRuleString WinArm64LLVM = and_all
                                     [ labelString "aarch64"
                                     , labelString "Windows"
                                     , validateRuleString LLVMBackend
+                                    ]
+validateRuleString WineArm64     = and_all
+                                    [ labelString "aarch64"
+                                    , labelString "Wine"
                                     ]
 validateRuleString LoongArch64  = labelString "loongarch"
 
@@ -851,6 +867,16 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
         , "bash .gitlab/ci.sh build_hadrian"
         , "bash .gitlab/ci.sh test_hadrian"
         ]
+      | Linux (Debian12Wine FullBuild) <- opsys
+      = [ "sudo chown ghc:ghc -R ."
+        , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh setup"
+        , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh configure"
+        -- We have to trigger cabal build in an independent way to mitigate Wine hangs at MSYS2/Arm64EC
+        , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l -c './hadrian/build-cabal clean'"
+        , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh build_hadrian"
+        -- It builds, it is already a huge win at the moment of this commit
+        -- TODO: , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh test_hadrian"
+        ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
         [ "sudo chown ghc:ghc -R ." | Linux {} <- [opsys]] ++
@@ -901,6 +927,10 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
                 ]
         in "RUNTEST_ARGS" =: unwords runtestArgs
       , if testsuiteUsePerf buildConfig then "RUNTEST_ARGS" =: "--config perf_path=perf" else mempty
+      -- TODO: move me to an appropriate way
+      , if crossTarget buildConfig == Just "aarch64-unknown-mingw32" && opsys == Linux (Debian12Wine FullBuild)
+          then "CONFIGURE_ARGS" =: "--build=x86_64-unknown-mingw32 --host=x86_64-unknown-mingw32"
+          else mempty
       ]
 
     jobArtifacts = Artifacts
@@ -1284,50 +1314,72 @@ cross_jobs = [
     -- Linux Aarch64 (Wine + FEX + MSYS64) => Windows Aarch64
   , makeWinArmJobs
       $ addValidateRule WinArm64
-        (validateBuilds AArch64 (Linux Debian12Wine) winAarch64Config)
+        (validateBuilds AArch64 (Linux (Debian12Wine OnlyTest)) winAarch64Config)
   , makeWinArmJobs
       $ addValidateRule WinArm64LLVM
-        (validateBuilds AArch64 (Linux Debian12Wine) (winAarch64Config {llvmBootstrap = True}))
+        (validateBuilds AArch64 (Linux (Debian12Wine OnlyTest)) (winAarch64Config {llvmBootstrap = True}))
+  , makeWineArmJobs
+      $ addValidateRule WineArm64
+        (validateBuilds AArch64 (Linux (Debian12Wine FullBuild)) winAarch64Config)
   ]
   where
     javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
                          { bignumBackend = Native }
 
-    makeWinArmJobs = modifyJobs
-        ( -- Cross compiler validate does not need any docs
-          setVariable "HADRIAN_ARGS" "--docs=none"
-        . setVariable "AR" (llvm_prefix ++ "llvm-ar")
-        . setVariable "CC" (llvm_prefix ++ "clang")
-        . setVariable "CXX" (llvm_prefix ++ "clang++")
-        . setVariable "NM" (llvm_prefix ++ "nm")
-        . setVariable "OBJCOPY" (llvm_prefix ++ "objcopy")
-        . setVariable "OBJDUMP" (llvm_prefix ++ "objdump")
-        . setVariable "RANLIB" (llvm_prefix ++ "llvm-ranlib")
-        . setVariable "SIZE" (llvm_prefix ++ "size")
-        . setVariable "STRINGS" (llvm_prefix ++ "strings")
-        . setVariable "STRIP" (llvm_prefix ++ "strip")
-        . setVariable "WindresCmd" (llvm_prefix ++ "windres")
-        . setVariable "LLVMAS" (llvm_prefix ++ "clang")
-        . setVariable "LD" (llvm_prefix ++ "ld")
-          -- See Note [Empty MergeObjsCmd]
-          -- Windows target require to make linker merge feature check disabled.
-        . setVariable "MergeObjsCmd" ""
-          -- Note [Wide Triple Windows]
-          -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-          -- LLVM MinGW Linux Toolchain expects to recieve "aarch64-w64-mingw32"
-          -- as a triple but we use more common "aarch64-unknown-mingw32".
-          -- Due of this we need configure ld manually for clang because
-          -- it will use system's ld otherwise when --target will be specified to
-          -- unexpected triple.
-        . setVariable "CFLAGS" cflags
-        . setVariable "CONF_CC_OPTS_STAGE2" cflags
-        ) where
-            llvm_prefix = "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-"
-            -- See Note [Windows Toolchain Standard Library Options]
-            cflags = "-fuse-ld=" ++ llvm_prefix ++ "ld --rtlib=compiler-rt"
+    addWindowsCrossArmVars llvm_prefix exe_suffix cflags = modifyJobs
+      ( -- Cross compiler validate does not need any docs
+        setVariable "HADRIAN_ARGS" "--docs=none"
+      . setVariable "AR" (llvm_prefix ++ "llvm-ar" ++ exe_suffix)
+      . setVariable "CC" (llvm_prefix ++ "clang")
+      . setVariable "CXX" (llvm_prefix ++ "clang++")
+      . setVariable "NM" (llvm_prefix ++ "nm" ++ exe_suffix)
+      . setVariable "OBJCOPY" (llvm_prefix ++ "objcopy")
+      . setVariable "OBJDUMP" (llvm_prefix ++ "objdump")
+      . setVariable "RANLIB" (llvm_prefix ++ "llvm-ranlib" ++ exe_suffix)
+      . setVariable "SIZE" (llvm_prefix ++ "size")
+      . setVariable "STRINGS" (llvm_prefix ++ "strings")
+      . setVariable "STRIP" (llvm_prefix ++ "strip")
+      . setVariable "WindresCmd" (llvm_prefix ++ "windres")
+      . setVariable "LLVMAS" (llvm_prefix ++ "clang")
+      . setVariable "LD" (llvm_prefix ++ "ld")
+        -- See Note [Empty MergeObjsCmd]
+        -- Windows target require to make linker merge feature check disabled.
+      . setVariable "MergeObjsCmd" ""
+        -- Note [Wide Triple Windows]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        -- LLVM MinGW Linux Toolchain expects to recieve "aarch64-w64-mingw32"
+        -- as a triple but we use more common "aarch64-unknown-mingw32".
+        -- Due of this we need configure ld manually for clang because
+        -- it will use system's ld otherwise when --target will be specified to
+        -- unexpected triple.
+      . setVariable "CFLAGS" cflags
+      . setVariable "CONF_CC_OPTS_STAGE2" cflags
+      )
+
+    makeWinArmJobs =
+      let
+        llvm_prefix = "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-"
+        -- See Note [Windows Toolchain Standard Library Options]
+        cflags = "-fuse-ld=" ++ llvm_prefix ++ "ld --rtlib=compiler-rt"
+      in addWindowsCrossArmVars llvm_prefix "" cflags
 
     winAarch64Config = (crossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing)
                          { bignumBackend = Native }
+
+    makeWineArmJobs =
+      let
+        llvm_path = "C:/msys64/opt/llvm-mingw-windows/bin"
+        llvm_prefix = llvm_path ++ "/aarch64-w64-mingw32-"
+        exe_suffix = ".exe"
+        -- See Note [Windows Toolchain Standard Library Options]
+        cflags = "-fuse-ld=" ++ llvm_path ++ "/ld.lld --rtlib=compiler-rt -D_UCRT"
+      in modifyJobs
+        ( setVariable "TOOLCHAIN_SOURCE" "env"
+        . setVariable "DLLTOOL" (llvm_path ++ "/dlltool" ++ exe_suffix)
+        . setVariable "CC_STAGE0" (llvm_path ++ "/x86_64-w64-mingw32-clang")
+        . setVariable "CONF_CC_OPTS_STAGE0" ("--target=x86_64-unknown-mingw32 " ++ cflags)
+        . setVariable "CONF_CC_OPTS_STAGE1" cflags
+        ) . (addWindowsCrossArmVars llvm_prefix exe_suffix cflags)
 
     make_wasm_jobs cfg =
       modifyJobs
@@ -1388,6 +1440,7 @@ platform_mapping = Map.map go combined_result
                 , "x86_64-windows-validate"
                 , "aarch64-linux-deb12-validate"
                 , "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
+                , "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate-_wine_full_build"
                 , "nightly-x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
                 , "nightly-x86_64-linux-deb11-validate"
                 , "nightly-x86_64-linux-deb12-validate"
@@ -1396,6 +1449,7 @@ platform_mapping = Map.map go combined_result
                 , "nightly-aarch64-linux-deb10-validate"
                 , "nightly-aarch64-linux-deb12-validate"
                 , "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
+                , "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate-_wine_full_build"
                 , "nightly-x86_64-linux-alpine3_12-validate"
                 , "nightly-x86_64-linux-deb10-validate"
                 , "nightly-x86_64-linux-fedora33-release"
