@@ -127,18 +127,32 @@ main = do
         mbMinusB | null minusB_args = Nothing
                  | otherwise = Just (drop 2 (last minusB_args))
 
+    let (list_targets_args, argv1'') = partition (== "--list-targets") argv1'
+        list_targets = not (null list_targets_args)
+
     -- find top directory for the given target. Or default to usual topdir.
     targettopdir <- Just <$> do
       topdir <- findTopDir mbMinusB
+      let targets_dir = topdir </> "targets"
+      -- list targets when asked
+      when list_targets $ do
+        putStrLn "Installed extra targets:"
+        doesDirectoryExist targets_dir >>= \case
+          True -> do
+                    ds <- listDirectory targets_dir
+                    forM_ ds (\d -> putStrLn $ "  - " ++ d)
+          False -> pure ()
+        exitSuccess
+      -- otherwise select the appropriate target
       case mbTarget of
         Nothing -> pure topdir
         Just target -> do
-          let r = topdir </> "targets" </> target </> "lib"
+          let r = targets_dir </> target </> "lib"
           doesDirectoryExist r >>= \case
             True -> pure r
             False -> throwGhcException (UsageError $ "Couldn't find specific target `" ++ target ++ "' in `" ++ r ++ "'")
 
-    let argv2 = map (mkGeneralLocated "on the commandline") argv1'
+    let argv2 = map (mkGeneralLocated "on the commandline") argv1''
 
     -- 2. Parse the "mode" flags (--make, --interactive etc.)
     (mode, units, argv3, flagWarnings) <- parseModeFlags argv2
