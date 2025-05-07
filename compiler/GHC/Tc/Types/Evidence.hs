@@ -28,7 +28,7 @@ module GHC.Tc.Types.Evidence (
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
-  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
+  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable,
 
   evTermCoercion, evTermCoercion_maybe,
   EvCallStack(..),
@@ -50,27 +50,30 @@ module GHC.Tc.Types.Evidence (
 
 import GHC.Prelude
 
-import GHC.Types.Unique.DFM
-import GHC.Types.Unique.FM
-import GHC.Types.Var
-import GHC.Types.Id( idScaledType )
+import GHC.Tc.Utils.TcType
+
+import GHC.Core
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
-import GHC.Tc.Utils.TcType
+import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon ( DataCon, dataConWrapId )
-import GHC.Builtin.Names
-import GHC.Types.Var.Env
-import GHC.Types.Var.Set
-import GHC.Core.Predicate
-import GHC.Types.Basic
-
-import GHC.Core
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
+
+import GHC.Types.Unique.DFM
+import GHC.Types.Unique.FM
+import GHC.Types.Var
+import GHC.Types.Name( isInternalName )
+import GHC.Types.Id( idScaledType )
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Basic
+
+import GHC.Builtin.Names
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -865,27 +868,13 @@ evTermCoercion tm = case evTermCoercion_maybe tm of
 *                                                                      *
 ********************************************************************* -}
 
-findNeededEvVars :: EvBindMap -> VarSet -> VarSet
--- Find all the Given evidence needed by seeds,
--- looking transitively through binds
-findNeededEvVars ev_binds seeds
-  = transCloVarSet also_needs seeds
-  where
-   also_needs :: VarSet -> VarSet
-   also_needs needs = nonDetStrictFoldUniqSet add emptyVarSet needs
-     -- It's OK to use a non-deterministic fold here because we immediately
-     -- forget about the ordering by creating a set
-
-   add :: Var -> VarSet -> VarSet
-   add v needs
-     | Just ev_bind <- lookupEvBind ev_binds v
-     , EvBind { eb_info = EvBindGiven, eb_rhs = rhs } <- ev_bind
-     = evVarsOfTerm rhs `unionVarSet` needs
-     | otherwise
-     = needs
+relevantEvVar :: Var -> Bool
+-- Just returns /local/ free evidence variables; i.e ones with Internal Names
+-- Top-level ones (DFuns, dictionary selectors and the like) don't count
+relevantEvVar v = isInternalName (varName v)
 
 evVarsOfTerm :: EvTerm -> VarSet
-evVarsOfTerm (EvExpr e)         = exprSomeFreeVars isEvVar e
+evVarsOfTerm (EvExpr e)         = exprSomeFreeVars relevantEvVar e
 evVarsOfTerm (EvTypeable _ ev)  = evVarsOfTypeable ev
 evVarsOfTerm (EvFun {})         = emptyVarSet -- See Note [Free vars of EvFun]
 

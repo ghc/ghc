@@ -1,0 +1,4 @@
+T25992.hs:7:10: warning: [GHC-30606] [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+    • In the instance declaration for ‘Semigroup (P a)’
+
