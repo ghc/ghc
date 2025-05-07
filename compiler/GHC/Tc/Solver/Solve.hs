@@ -51,9 +51,10 @@ import GHC.Utils.Misc
 
 import GHC.Driver.Session
 
-import Data.List( deleteFirstsBy )
 
 import Control.Monad
+
+import Data.List( deleteFirstsBy )
 import Data.Foldable ( traverse_ )
 import Data.Maybe ( mapMaybe )
 import qualified Data.Semigroup as S
@@ -551,14 +552,18 @@ neededEvVars implic@(Implic { ic_given = givens
  = do { ev_binds <- TcS.getTcEvBindsMap ev_binds_var
       ; tcvs     <- TcS.getTcEvTyCoVars ev_binds_var
 
-      ; let seeds1        = foldr add_implic_seeds old_needs implics
-            seeds2        = nonDetStrictFoldEvBindMap add_wanted seeds1 ev_binds
-                            -- It's OK to use a non-deterministic fold here
-                            -- because add_wanted is commutative
-            seeds3        = seeds2 `unionVarSet` tcvs
-            need_inner    = findNeededEvVars ev_binds seeds3
-            live_ev_binds = filterEvBindMap (needed_ev_bind need_inner) ev_binds
-            need_outer    = varSetMinusEvBindMap need_inner live_ev_binds
+      ; let seeds_i   = get_implic_needs normal_implics
+            seeds_w   = nonDetStrictFoldEvBindMap add_wanted emptyVarSet ev_binds
+                        -- It's OK to use a non-deterministic fold here
+                        -- because add_wanted is commutative
+            all_seeds = old_needs `unionVarSet` seeds_i `unionVarSet` seeds_w `unionVarSet` tcvs
+
+            need_inner_ignoring_dms = findNeededEvVars ev_binds all_seeds
+            need_inner_from_dms     = findNeededEvVars ev_binds (get_implic_needs dm_implics)
+            need_inner_full         = need_inner_ignoring_dms `unionVarSet` need_inner_from_dms
+            live_ev_binds = filterEvBindMap (needed_ev_bind need_inner_full) ev_binds
+
+            need_outer    = varSetMinusEvBindMap need_inner_full live_ev_binds
                             `delVarSetList` givens
 
       ; TcS.setTcEvBindsMap ev_binds_var live_ev_binds
@@ -566,23 +571,26 @@ neededEvVars implic@(Implic { ic_given = givens
 
       ; traceTcS "neededEvVars" $
         vcat [ text "old_needs:" <+> ppr old_needs
-             , text "seeds3:" <+> ppr seeds3
+             , text "all_seeds:" <+> ppr all_seeds
              , text "tcvs:" <+> ppr tcvs
              , text "ev_binds:" <+> ppr ev_binds
              , text "live_ev_binds:" <+> ppr live_ev_binds ]
 
-      ; return (implic { ic_need_inner = need_inner
+      ; return (implic { ic_need_inner = need_inner_ignoring_dms
                        , ic_need_outer = need_outer }) }
  where
-   add_implic_seeds (Implic { ic_need_outer = needs, ic_info = skol_info }) acc
-      | MethSkol _ is_dm <- skol_info
-      , is_dm  -- See Note [Ignore 'needs' from default methods]
-      = acc
-      | otherwise
+   (dm_implics, normal_implics) = partitionBag is_dm_implic implics
+      -- dm_implics is usually empty
+
+   is_dm_implic (Implic { ic_info = skol_info })
+      | MethSkol _ is_dm <- skol_info = is_dm
+      | otherwise                     = False
+
+   get_implic_needs = foldr add_implic_seeds emptyVarSet
+   add_implic_seeds (Implic { ic_need_outer = needs }) acc
       = needs `unionVarSet` acc
 
-   needed_ev_bind needed (EvBind { eb_lhs = ev_var
-                                 , eb_info = info })
+   needed_ev_bind needed (EvBind { eb_lhs = ev_var, eb_info = info })
      | EvBindGiven{} <- info = ev_var `elemVarSet` needed
      | otherwise = True   -- Keep all wanted bindings
 
