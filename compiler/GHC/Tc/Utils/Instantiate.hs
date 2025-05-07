@@ -582,8 +582,11 @@ tcSkolDFunType dfun_ty
                      -- We instantiate the dfun_tyd with superSkolems.
                      -- See Note [Subtle interaction of recursion and overlap]
                      -- and Note [Super skolems: binding when looking up instances]
-             ; let inst_tys = substTys subst tys
-                   skol_info_anon = mkClsInstSkol cls inst_tys }
+             ; let inst_tys       = substTys subst tys
+                   skol_info_anon = InstSkol IsClsInst (pSizeClassPred cls inst_tys)
+                     -- We need to take the size of `inst_tys` (not `tys`) because
+                     -- Paterson sizes mention the free type variables
+             }
 
        ; let inst_theta = substTheta subst theta
        ; return (skol_info_anon, inst_tvs, inst_theta, cls, inst_tys) }
