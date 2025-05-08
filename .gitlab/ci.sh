@@ -351,6 +351,7 @@ function fetch_cabal() {
 # here. For Docker platforms this is done in the Docker image
 # build.
 function setup_toolchain() {
+  start_section setup-toolchain "Setup toolchain"
   fetch_ghc
   fetch_cabal
   cabal_update
@@ -373,6 +374,7 @@ function setup_toolchain() {
 
   info "Building alex..."
   $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
+  end_section setup-toolchain
 }
 
 function cleanup_submodules() {
@@ -488,6 +490,8 @@ function check_release_build() {
 }
 
 function build_hadrian() {
+  start_section build-hadrian "Build via Hadrian"
+
   if [ -z "${BIN_DIST_NAME:-}" ]; then
     fail "BIN_DIST_NAME not set"
   fi
@@ -521,7 +525,7 @@ function build_hadrian() {
           ;;
     esac
   fi
-
+  end_section build-hadrian
 }
 
 # run's `make DESTDIR=$1 install` and then
@@ -547,6 +551,7 @@ function make_install_destdir() {
 
 # install the binary distribution in directory $1 to $2.
 function install_bindist() {
+  start_section install-bindist "Install bindist"
   case "${CONFIGURE_WRAPPER:-}" in
     emconfigure) source "$EMSDK/emsdk_env.sh" ;;
     *) ;;
@@ -586,9 +591,11 @@ function install_bindist() {
       ;;
   esac
   popd
+  end_section install-bindist
 }
 
 function test_hadrian() {
+  start_section test-hadrian "Test via Hadrian"
   check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
 
@@ -710,6 +717,7 @@ function test_hadrian() {
     info "STAGE2_TEST=$?"
 
   fi
+  end_section test-hadrian
 }
 
 function summarise_hi_files() {
