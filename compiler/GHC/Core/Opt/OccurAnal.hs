@@ -35,8 +35,8 @@ import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Core
 import GHC.Core.FVs
-import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
-                          mkCastMCo, mkTicks, BinderSwapDecision(..), scrutOkForBinderSwap )
+import GHC.Core.Utils   ( exprIsTrivial, isExpandableApp,
+                          mkCastMCo, mkTicks, BinderSwapDecision(..), scrutOkForBinderSwap ) )
 import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Type
@@ -2713,9 +2713,9 @@ occAnalArgs env fun args one_shots
 
     -- Make bottoming functions interesting
     -- See Note [Bottoming function calls]
---    encl | Var f <- fun, isDeadEndSig (idDmdSig f) = OccScrut
---         | otherwise                               = OccVanilla
-    encl = OccVanilla
+    encl | Var f <- fun, isDeadEndId f = OccBot
+         | otherwise                   = OccVanilla
+--    encl = OccVanilla
 
     go uds fun [] _ = WUD uds fun
     go uds fun (arg:args) one_shots
@@ -2801,7 +2801,7 @@ occAnalApp env (Var fun_id, args, ticks)
   = let app_out = mkTicks ticks app'
     in WUD all_uds app_out
   where
-    -- Lots of banged bindings: this is a very heavily bit of code,
+    -- Lots of banged bindings: this is a very heavily-used bit of code,
     -- so it pays not to make lots of thunks here, all of which
     -- will ultimately be forced.
     !(fun', fun_id')  = lookupBndrSwap env fun_id
@@ -2830,7 +2830,7 @@ occAnalApp env (Var fun_id, args, ticks)
     !n_val_args = valArgCount args
     !n_args     = length args
     !int_cxt    = case occ_encl env of
-                   OccScrut -> IsInteresting
+                   OccBot                    -> IsInteresting
                    _other   | n_val_args > 0 -> IsInteresting
                             | otherwise      -> NotInteresting
 
@@ -3020,13 +3020,19 @@ OccEncl is used to control whether to inline into constructor arguments.
 
 data OccEncl -- See Note [OccEncl]
   = OccRhs         -- RHS of let(rec), albeit perhaps inside a type lambda
-  | OccScrut       -- Scrutintee of a case
+  | OccBot         -- We are in a bottoming expression
   | OccVanilla     -- Everything else
 
 instance Outputable OccEncl where
   ppr OccRhs     = text "occRhs"
-  ppr OccScrut   = text "occScrut"
+  ppr OccBot     = text "occBot"
   ppr OccVanilla = text "occVanilla"
+
+setOccEncl :: OccEncl -> OccEncl -> OccEncl
+-- (outer_encl `setOccEncl` inner_encl)
+-- If we are in a bottoming context, don't forget it!
+setOccEncl OccBot _          = OccBot
+setOccEncl _      inner_encl = inner_encl
 
 -- See Note [OneShots]
 type OneShots = [OneShotInfo]
@@ -3050,16 +3056,17 @@ noBinderSwaps :: OccEnv -> Bool
 noBinderSwaps (OccEnv { occ_bs_env = bs_env }) = isEmptyVarEnv bs_env
 
 setScrutCtxt :: OccEnv -> [CoreAlt] -> OccEnv
-setScrutCtxt !env alts
+setScrutCtxt !env _alts
   = setNonTailCtxt encl env
   where
-    encl | interesting_alts = OccScrut
-         | otherwise        = OccVanilla
+    encl = OccVanilla
+--    encl | interesting_alts = OccScrut
+--         | otherwise        = OccVanilla
 
-    interesting_alts = case alts of
-                         []    -> False
-                         [alt] -> not (isDefaultAlt alt)
-                         _     -> True
+--    interesting_alts = case alts of
+--                         []    -> False
+--                         [alt] -> not (isDefaultAlt alt)
+--                         _     -> True
      -- 'interesting_alts' is True if the case has at least one
      -- non-default alternative.  That in turn influences
      -- pre/postInlineUnconditionally.  Grep for "occ_int_cxt"!
@@ -3102,13 +3109,14 @@ For a join point binding,  j x = rhs
 -}
 
 setNonTailCtxt :: OccEncl -> OccEnv -> OccEnv
-setNonTailCtxt ctxt !env
-  = env { occ_encl        = ctxt
+setNonTailCtxt inner_encl env@(OccEnv { occ_encl = outer_encl })
+  = env { occ_encl        = outer_encl `setOccEncl` inner_encl
         , occ_one_shots   = []
         , occ_join_points = zapJoinPointInfo (occ_join_points env) }
 
 setTailCtxt :: OccEnv -> OccEnv
-setTailCtxt !env = env { occ_encl = OccVanilla }
+setTailCtxt env@(OccEnv { occ_encl = outer_encl })
+  = env { occ_encl = outer_encl `setOccEncl` OccVanilla }
     -- Preserve occ_one_shots, occ_join points
     -- Do not use OccRhs for the RHS of a join point (which is a tail ctxt):
 
@@ -3740,7 +3748,7 @@ data LocalOcc  -- See Note [LocalOcc]
                , lo_tail  :: !TailCallInfo
                    -- Combining (AlwaysTailCalled 2) and (AlwaysTailCalled 3)
                    -- gives NoTailCallInfo
-              , lo_int_cxt :: !InterestingCxt }
+              , lo_int_cxt :: !OccCtxt }
 
     | ManyOccL !TailCallInfo
        -- Why do we need TailCallInfo on ManyOccL?
@@ -3816,7 +3824,7 @@ combineJoinPointUDs (OccEnv { occ_nested_lets = nested_lets }) uds1 uds2
       | uniq `elemVarSetByKey` nested_lets = orLocalOcc  occ1 occ2
       | otherwise                          = andLocalOcc occ1 occ2
 
-mkOneOcc :: OccEnv -> Id -> InterestingCxt -> JoinArity -> UsageDetails
+mkOneOcc :: OccEnv -> Id -> OccCtxt -> JoinArity -> UsageDetails
 mkOneOcc !env id int_cxt arity
   | not (isLocalId id)
   = emptyDetails
@@ -4224,7 +4232,7 @@ orLocalOcc :: LocalOcc -> LocalOcc -> LocalOcc
 orLocalOcc (OneOccL { lo_n_br = nbr1, lo_int_cxt = int_cxt1, lo_tail = tci1 })
            (OneOccL { lo_n_br = nbr2, lo_int_cxt = int_cxt2, lo_tail = tci2 })
   = OneOccL { lo_n_br    = nbr1 + nbr2
-            , lo_int_cxt = int_cxt1 `mappend` int_cxt2
+            , lo_int_cxt = int_cxt1 `orOccCtxt` int_cxt2
             , lo_tail    = tci1 `andTailCallInfo` tci2 }
 orLocalOcc occ1 occ2 = andLocalOcc occ1 occ2
 

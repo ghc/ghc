@@ -3948,6 +3948,8 @@ mkDupableContWithDmds env _
        ; (floats, join_rhs) <- rebuildCall env' (addValArgTo fun (Var arg_bndr) fun_ty) cont
        ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }
   where
+    thumbsUpPlanA _ = False
+    {-
     thumbsUpPlanA (StrictArg {})               = False
     thumbsUpPlanA (StrictBind {})              = True
     thumbsUpPlanA (Stop {})                    = True
@@ -3956,6 +3958,7 @@ mkDupableContWithDmds env _
     thumbsUpPlanA (TickIt _ k)                 = thumbsUpPlanA k
     thumbsUpPlanA (ApplyToVal { sc_cont = k }) = thumbsUpPlanA k
     thumbsUpPlanA (ApplyToTy  { sc_cont = k }) = thumbsUpPlanA k
+    -}
 
 mkDupableContWithDmds env dmds
     (ApplyToTy { sc_cont = cont, sc_arg_ty = arg_ty, sc_hole_ty = hole_ty })

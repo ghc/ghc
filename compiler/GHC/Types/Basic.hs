@@ -72,7 +72,7 @@ module GHC.Types.Basic (
 
         InsideLam(..),
         BranchCount, oneBranch,
-        InterestingCxt(..),
+        OccCtxt(..), orOccCtxt,
         TailCallInfo(..), tailCallInfo, zapOccTailCallInfo,
         isAlwaysTailCalled,
 
@@ -847,7 +847,7 @@ data OccInfo -- See Note [OccInfo]
 
   | OneOcc          { occ_in_lam  :: !InsideLam
                     , occ_n_br    :: {-# UNPACK #-} !BranchCount
-                    , occ_int_cxt :: !InterestingCxt
+                    , occ_int_cxt :: !OccCtxt
                     , occ_tail    :: !TailCallInfo }
                         -- ^ Occurs exactly once (per branch), not inside a rule
 
@@ -898,22 +898,15 @@ seqOccInfo occ = occ `seq` ()
 
 -----------------
 -- | Interesting Context
-data InterestingCxt
-  = IsInteresting
-    -- ^ Function: is applied
-    --   Data value: scrutinised by a case with at least one non-DEFAULT branch
-  | NotInteresting
+data OccCtxt
+  = IsInteresting   -- ^ All occurrences are in a bottoming context
+                    -- or are applied to a value argument
+  | NotInteresting  -- ^ Neither of the above
   deriving (Eq)
 
--- | If there is any 'interesting' identifier occurrence, then the
--- aggregated occurrence info of that identifier is considered interesting.
-instance Semi.Semigroup InterestingCxt where
-  NotInteresting <> x = x
-  IsInteresting  <> _ = IsInteresting
-
-instance Monoid InterestingCxt where
-  mempty = NotInteresting
-  mappend = (Semi.<>)
+orOccCtxt :: OccCtxt -> OccCtxt -> OccCtxt
+orOccCtxt IsInteresting IsInteresting = IsInteresting
+orOccCtxt _             _             = NotInteresting
 
 -----------------
 -- | Inside Lambda
@@ -997,11 +990,11 @@ instance Outputable OccInfo where
   ppr (OneOcc inside_lam one_branch int_cxt tail_info)
         = text "Once" <> pp_lam inside_lam <> ppr one_branch <> pp_args int_cxt <> pp_tail
         where
-          pp_lam IsInsideLam     = char 'L'
-          pp_lam NotInsideLam    = empty
-          pp_args IsInteresting  = char '!'
-          pp_args NotInteresting = empty
-          pp_tail                = pprShortTailCallInfo tail_info
+          pp_lam IsInsideLam  = char 'L'
+          pp_lam NotInsideLam = empty
+          pp_args NotInteresting  = empty
+          pp_args IsInteresting   = char '!'
+          pp_tail = pprShortTailCallInfo tail_info
 
 pprShortTailCallInfo :: TailCallInfo -> SDoc
 pprShortTailCallInfo (AlwaysTailCalled ar) = char 'T' <> brackets (int ar)

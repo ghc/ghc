@@ -1743,8 +1743,8 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
     is_demanded = isStrUsedDmd (idDemandInfo bndr)
     occ_info    = idOccInfo old_bndr
     unfolding   = idUnfolding bndr
-    arity       = idArity bndr
---    is_cheap    = isCheapUnfolding unfolding
+--    arity       = idArity bndr
+    is_cheap    = isCheapUnfolding unfolding
     uf_opts     = seUnfoldingOpts env
     phase       = sePhase env
     active      = isActive phase (idInlineActivation bndr)
@@ -1762,7 +1762,7 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
     check_one_occ NotInsideLam NotInteresting n_br = not is_top_lvl && code_dup_ok n_br
     check_one_occ NotInsideLam IsInteresting  n_br = code_dup_ok n_br
     check_one_occ IsInsideLam  NotInteresting _    = False
-    check_one_occ IsInsideLam  IsInteresting  n_br = arity > 0 && code_dup_ok n_br
+    check_one_occ IsInsideLam  IsInteresting  n_br = is_cheap && code_dup_ok n_br
       -- IsInteresting: inlining inside a lambda only with good reason
       --    See the notes on int_cxt in preInlineUnconditionally
       -- arity>0: do not inline data strutures under lambdas, only functions
