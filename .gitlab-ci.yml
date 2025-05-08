@@ -367,7 +367,7 @@ lint-submods-branch:
     - .gitlab/ci.sh setup
   after_script:
     - .gitlab/ci.sh save_cache
-    - cat ci-timings
+    - cat ci_timings.txt
   variables:
     GHC_FLAGS: -Werror
   cache:
@@ -419,7 +419,7 @@ hadrian-ghc-in-ghci:
     - echo ":q" | HADRIAN_ARGS=-j$CORES hadrian/ghci -j$CORES | tail -n2 | grep "Ok,"
   after_script:
     - .gitlab/ci.sh save_cache
-    - cat ci-timings
+    - cat ci_timings.txt
   cache:
     key: hadrian-ghci-$CACHE_REV
     paths:
