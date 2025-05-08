@@ -91,7 +91,6 @@ data GHCiState = GHCiState
         prompt_cont    :: PromptFunction,
         editor         :: String,
         stop           :: String,
-        multiMode      :: Bool,
         localConfig    :: LocalConfigBehaviour,
         options        :: [GHCiOption],
         line_number    :: !Int,         -- ^ input line

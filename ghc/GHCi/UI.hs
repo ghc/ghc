@@ -204,65 +204,65 @@ ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
 ghciCommands :: [Command]
 ghciCommands = map mkCmd [
   -- Hugs users are accustomed to :e, so make sure it doesn't overlap
-  ("?",         keepGoingMulti help,            noCompletion),
+  ("?",         keepGoing help,                 noCompletion),
   ("add",       keepGoingPaths addModule,       completeFilename),
-  ("abandon",   keepGoingMulti' abandonCmd,     noCompletion),
-  ("break",     keepGoingMulti' breakCmd,       completeBreakpoint),
-  ("back",      keepGoingMulti' backCmd,              noCompletion),
-  ("browse",    keepGoingMulti' (browseCmd False),   completeModule),
-  ("browse!",   keepGoingMulti' (browseCmd True),    completeModule),
-  ("cd",        keepGoingMulti' changeDirectory,     completeFilename),
-  ("continue",  keepGoingMulti' continueCmd,          noCompletion),
-  ("cmd",       keepGoingMulti cmdCmd,          completeExpression),
-  ("def",       keepGoingMulti (defineMacro False),  completeExpression),
-  ("def!",      keepGoingMulti (defineMacro True),   completeExpression),
-  ("delete",    keepGoingMulti' deleteCmd,            noCompletion),
-  ("disable",   keepGoingMulti' disableCmd,           noCompletion),
-  ("doc",       keepGoingMulti docCmd,              completeIdentifier),
-  ("edit",      keepGoingMulti' editFile,            completeFilename),
-  ("enable",    keepGoingMulti' enableCmd,            noCompletion),
-  ("force",     keepGoingMulti' forceCmd,             completeExpression),
-  ("forward",   keepGoingMulti' forwardCmd,           noCompletion),
-  ("help",      keepGoingMulti help,                 noCompletion),
-  ("history",   keepGoingMulti historyCmd,           noCompletion),
-  ("info",      keepGoingMulti' (info False),        completeIdentifier),
-  ("info!",     keepGoingMulti' (info True),         completeIdentifier),
-  ("issafe",    keepGoingMulti' isSafeCmd,           completeModule),
-  ("ignore",    keepGoingMulti' ignoreCmd,            noCompletion),
-  ("kind",      keepGoingMulti' (kindOfType False),  completeIdentifier),
-  ("kind!",     keepGoingMulti' (kindOfType True),   completeIdentifier),
-  ("load",      keepGoingPathsMulti loadModule_,     completeHomeModuleOrFile),
-  ("load!",     keepGoingPathsMulti loadModuleDefer, completeHomeModuleOrFile),
-  ("list",      keepGoingMulti' listCmd,             noCompletion),
-  ("module",    keepGoingMulti' moduleCmd,            completeSetModule),
+  ("abandon",   keepGoing  abandonCmd,          noCompletion),
+  ("break",     keepGoing  breakCmd,            completeBreakpoint),
+  ("back",      keepGoing  backCmd,             noCompletion),
+  ("browse",    keepGoing' (browseCmd False),   completeModule),
+  ("browse!",   keepGoing' (browseCmd True),    completeModule),
+  ("cd",        keepGoing' changeDirectory,     completeFilename),
+  ("continue",  keepGoing' continueCmd,         noCompletion),
+  ("cmd",       keepGoing cmdCmd,               completeExpression),
+  ("def",       keepGoing (defineMacro False),  completeExpression),
+  ("def!",      keepGoing (defineMacro True),   completeExpression),
+  ("delete",    keepGoing deleteCmd,            noCompletion),
+  ("disable",   keepGoing disableCmd,           noCompletion),
+  ("doc",       keepGoing' docCmd,              completeIdentifier),
+  ("edit",      keepGoing' editFile,            completeFilename),
+  ("enable",    keepGoing enableCmd,            noCompletion),
+  ("force",     keepGoing forceCmd,             completeExpression),
+  ("forward",   keepGoing forwardCmd,           noCompletion),
+  ("help",      keepGoing help,                 noCompletion),
+  ("history",   keepGoing historyCmd,           noCompletion),
+  ("info",      keepGoing' (info False),        completeIdentifier),
+  ("info!",     keepGoing' (info True),         completeIdentifier),
+  ("issafe",    keepGoing' isSafeCmd,           completeModule),
+  ("ignore",    keepGoing ignoreCmd,            noCompletion),
+  ("kind",      keepGoing' (kindOfType False),  completeIdentifier),
+  ("kind!",     keepGoing' (kindOfType True),   completeIdentifier),
+  ("load",      keepGoingPaths loadModule_,     completeHomeModuleOrFile),
+  ("load!",     keepGoingPaths loadModuleDefer, completeHomeModuleOrFile),
+  ("list",      keepGoing' listCmd,             noCompletion),
+  ("module",    keepGoing moduleCmd,            completeSetModule),
   ("main",      keepGoing runMain,              completeFilename),
-  ("print",     keepGoingMulti' printCmd,             completeExpression),
+  ("print",     keepGoing printCmd,             completeExpression),
   ("quit",      quit,                           noCompletion),
-  ("reload",    keepGoingMulti' reloadModule,   noCompletion),
-  ("reload!",   keepGoingMulti' reloadModuleDefer,   noCompletion),
-  ("run",       keepGoingMulti' runRun,               completeFilename),
-  ("script",    keepGoingMulti' scriptCmd,           completeFilename),
-  ("set",       keepGoingMulti setCmd,          completeSetOptions),
-  ("seti",      keepGoingMulti setiCmd,         completeSeti),
-  ("show",      keepGoingMulti' showCmd,        completeShowOptions),
-  ("showi",     keepGoingMulti showiCmd,             completeShowiOptions),
-  ("sprint",    keepGoingMulti' sprintCmd,            completeExpression),
-  ("step",      keepGoingMulti' stepCmd,              completeIdentifier),
-  ("steplocal", keepGoingMulti' stepLocalCmd,         completeIdentifier),
-  ("stepmodule",keepGoingMulti' stepModuleCmd,        completeIdentifier),
-  ("type",      keepGoingMulti' typeOfExpr,          completeExpression),
-  ("trace",     keepGoingMulti' traceCmd,             completeExpression),
+  ("reload",    keepGoing' reloadModule,        noCompletion),
+  ("reload!",   keepGoing' reloadModuleDefer,   noCompletion),
+  ("run",       keepGoing' runRun,              completeFilename),
+  ("script",    keepGoing' scriptCmd,           completeFilename),
+  ("set",       keepGoing setCmd,               completeSetOptions),
+  ("seti",      keepGoing setiCmd,              completeSeti),
+  ("show",      keepGoing' showCmd,             completeShowOptions),
+  ("showi",     keepGoing  showiCmd,            completeShowiOptions),
+  ("sprint",    keepGoing sprintCmd,            completeExpression),
+  ("step",      keepGoing stepCmd,              completeIdentifier),
+  ("steplocal", keepGoing stepLocalCmd,         completeIdentifier),
+  ("stepmodule",keepGoing stepModuleCmd,        completeIdentifier),
+  ("type",      keepGoing' typeOfExpr,          completeExpression),
+  ("trace",     keepGoing traceCmd,             completeExpression),
   ("unadd",     keepGoingPaths unAddModule,     completeFilename),
-  ("undef",     keepGoingMulti' undefineMacro,        completeMacro),
-  ("unset",     keepGoingMulti' unsetOptions,         completeSetOptions),
-  ("where",     keepGoingMulti' whereCmd,             noCompletion),
-  ("instances", keepGoingMulti' instancesCmd,   completeExpression)
+  ("undef",     keepGoing undefineMacro,        completeMacro),
+  ("unset",     keepGoing unsetOptions,         completeSetOptions),
+  ("where",     keepGoing whereCmd,             noCompletion),
+  ("instances", keepGoing' instancesCmd,        completeExpression)
   ] ++ map mkCmdHidden [ -- hidden commands
-  ("all-types", keepGoingMulti' allTypesCmd),
-  ("complete",  keepGoingMulti completeCmd),
-  ("loc-at",    keepGoingMulti' locAtCmd),
-  ("type-at",   keepGoingMulti' typeAtCmd),
-  ("uses",      keepGoingMulti' usesCmd)
+  ("all-types", keepGoing' allTypesCmd),
+  ("complete",  keepGoing completeCmd),
+  ("loc-at",    keepGoing' locAtCmd),
+  ("type-at",   keepGoing' typeAtCmd),
+  ("uses",      keepGoing' usesCmd)
   ]
  where
   mkCmd (n,a,c) = Command { cmdName = n
@@ -318,35 +318,16 @@ showSDocForUserQualify doc = do
 keepGoing :: (String -> GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
 keepGoing a str = keepGoing' (lift . a) str
 
-keepGoingMulti :: (String -> GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
-keepGoingMulti a str = keepGoingMulti' (lift . a) str
-
 keepGoing' :: GhciMonad m => (a -> m ()) -> a -> m CmdExecOutcome
 keepGoing' a str = do
-  in_multi <- inMultiMode
-  if in_multi
-    then reportError GhciCommandNotSupportedInMultiMode
-    else a str
+  a str
   return CmdSuccess
-
--- For commands which are actually support in multi-mode, initially just :reload
-keepGoingMulti' :: GhciMonad m => (a -> m ()) -> a -> m CmdExecOutcome
-keepGoingMulti' a str = a str >> return CmdSuccess
-
-inMultiMode :: GhciMonad m => m Bool
-inMultiMode = multiMode <$> getGHCiState
 
 keepGoingPaths :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
 keepGoingPaths a str
  = do case toArgsNoLoc str of
           Left err -> reportError (GhciInvalidArgumentString err) >> return CmdSuccess
           Right args -> keepGoing' a args
-
-keepGoingPathsMulti :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
-keepGoingPathsMulti a str
- = do case toArgsNoLoc str of
-          Left err -> reportError (GhciInvalidArgumentString err) >> return CmdSuccess
-          Right args -> keepGoingMulti' a args
 
 defFullHelpText :: String
 defFullHelpText =
@@ -544,12 +525,6 @@ interactiveUI config srcs maybe_exprs = do
          case simpleImportDecl preludeModuleName of
            -- Set to True because Prelude is implicitly imported.
            impDecl@ImportDecl{ideclExt=ext} -> impDecl{ideclExt = ext{ideclImplicit=True}}
-   hsc_env <- GHC.getSession
-   let !in_multi = length (hsc_all_home_unit_ids hsc_env) > 3
-        -- We force this to make sure we don't retain the hsc_env when reloading
-        -- The check is `> 3`, since we now always have at least two home units.
-        -- TODO: if everything goes well, this check should be deleted once
-        -- this PR has lifted the multiple home unit restrictions
    empty_cache <- liftIO newIfaceCache
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,
@@ -560,7 +535,6 @@ interactiveUI config srcs maybe_exprs = do
                    stop               = default_stop,
                    editor             = default_editor,
                    options            = [],
-                   multiMode          = in_multi,
                    localConfig        = SourceLocalConfig,
                    -- We initialize line number as 0, not 1, because we use
                    -- current line number while reporting errors which is
@@ -3220,7 +3194,7 @@ setCmd str
     Right ("stop",    rest) -> setStop    $ dropWhile isSpace rest
     Right ("local-config", rest) ->
         setLocalConfigBehaviour $ dropWhile isSpace rest
-    _ -> toArgsNoLocWithErrorHandler str $ \wds -> () <$ keepGoingMulti' setOptions wds
+    _ -> toArgsNoLocWithErrorHandler str $ \wds -> () <$ keepGoing' setOptions wds
 
 setiCmd :: GhciMonad m => String -> m ()
 setiCmd ""   = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags False
