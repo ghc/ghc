@@ -20,15 +20,18 @@ WHITE="1;37"
 LT_GRAY="0;37"
 
 # GitLab Pipelines log section delimiters
-# https://gitlab.com/gitlab-org/gitlab-foss/issues/14664
-start_section() {
-  name="$1"
-  echo -e "section_start:$(date +%s):$name\015\033[0K"
+# https://docs.gitlab.com/ci/jobs/job_logs/#custom-collapsible-sections
+function start_section () {
+  local section_title="${1}"
+  local section_description="${2:-$section_title}"
+
+  echo -e "section_start:$(date +%s):${section_title}[collapsed=true]\r\e[0K${section_description}"
 }
 
-end_section() {
-  name="$1"
-  echo -e "section_end:$(date +%s):$name\015\033[0K"
+function end_section () {
+  local section_title="${1}"
+
+  echo -e "section_end:$(date +%s):${section_title}\r\e[0K"
 }
 
 echo_color() {
