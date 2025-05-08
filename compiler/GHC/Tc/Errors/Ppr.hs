@@ -4060,10 +4060,6 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
           = quotes (text "Levity")
           | otherwise
           = text "type"
-pprTcSolverReportMsg _ (BlockedEquality item) =
-  vcat [ hang (text "Cannot use equality for substitution:")
-           2 (ppr (errorItemPred item))
-       , text "Doing so would be ill-kinded." ]
 pprTcSolverReportMsg _ (ExpectingMoreArguments n thing) =
   text "Expecting" <+> speakN (abs n) <+>
     more <+> quotes (ppr thing)
@@ -5070,8 +5066,6 @@ tcSolverReportMsgHints ctxt = \case
   Mismatch { mismatchMsg = mismatch_msg }
     -> mismatchMsgHints ctxt mismatch_msg
   FixedRuntimeRepError {}
-    -> noHints
-  BlockedEquality {}
     -> noHints
   ExpectingMoreArguments {}
     -> noHints

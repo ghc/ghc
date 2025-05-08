@@ -411,7 +411,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "UnsatisfiableError"                            = 22250
   GhcDiagnosticCode "ReportHoleError"                               = 88464
   GhcDiagnosticCode "FixedRuntimeRepError"                          = 55287
-  GhcDiagnosticCode "BlockedEquality"                               = 06200
   GhcDiagnosticCode "ExpectingMoreArguments"                        = 81325
   GhcDiagnosticCode "UnboundImplicitParams"                         = 91416
   GhcDiagnosticCode "AmbiguityPreventsSolvingCt"                    = 78125

@@ -14,7 +14,7 @@ module GHC.Core.Predicate (
   EqRel(..), eqRelRole,
   isEqPred, isReprEqPred, isEqClassPred, isCoVarType,
   getEqPredTys, getEqPredTys_maybe, getEqPredRole,
-  predTypeEqRel,
+  predTypeEqRel, pprPredType,
   mkNomEqPred, mkReprEqPred, mkEqPred, mkEqPredRole,
 
   -- Class predicates
@@ -50,6 +50,7 @@ import GHC.Core.TyCo.Compare( tcEqTyConApps )
 import GHC.Core.TyCo.FVs( tyCoVarsOfTypeList, tyCoVarsOfTypesList )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
+import GHC.Types.Name( getOccName )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Core.Multiplicity ( scaledThing )
@@ -246,6 +247,16 @@ predTypeEqRel ty
   | isReprEqPred ty = ReprEq
   | otherwise       = NomEq
 
+pprPredType :: PredType -> SDoc
+-- Special case for (t1 ~# t2) and (t1 ~R# t2)
+pprPredType pred
+  = case classifyPredType pred of
+      EqPred eq_rel t1 t2 -> sep [ ppr t1, ppr (getOccName eq_tc) <+> ppr t2 ]
+         where
+           eq_tc = case eq_rel of
+                     NomEq  -> eqPrimTyCon
+                     ReprEq -> eqReprPrimTyCon
+      _ -> ppr pred
 
 {- *********************************************************************
 *                                                                      *

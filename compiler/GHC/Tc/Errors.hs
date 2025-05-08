@@ -1741,12 +1741,12 @@ mkEqErr_help :: SolverReportErrCtxt
              -> ErrorItem
              -> TcType -> TcType -> TcM TcSolverReportMsg
 mkEqErr_help ctxt item ty1 ty2
-  | Just casted_tv1 <- getCastedTyVar_maybe ty1
-  = mkTyVarEqErr ctxt item casted_tv1 ty2
+  | Just (tv1, _co) <- getCastedTyVar_maybe ty1
+  = mkTyVarEqErr ctxt item tv1 ty2
 
   -- ToDo: explain..  Cf T2627b   Dual (Dual a) ~ a
-  | Just casted_tv2 <- getCastedTyVar_maybe ty2
-  = mkTyVarEqErr ctxt item casted_tv2 ty1
+  | Just (tv2, _co) <- getCastedTyVar_maybe ty2
+  = mkTyVarEqErr ctxt item tv2 ty1
 
   | otherwise
   = reportEqErr ctxt item ty1 ty2
@@ -1779,16 +1779,15 @@ coercible_msg ty1 ty2
     return $ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
 
 mkTyVarEqErr :: SolverReportErrCtxt -> ErrorItem
-             -> (TcTyVar, TcCoercionN) -> TcType -> TcM TcSolverReportMsg
+             -> TcTyVar -> TcType -> TcM TcSolverReportMsg
 -- tv1 and ty2 are already tidied
-mkTyVarEqErr ctxt item casted_tv1 ty2
-  = do { traceTc "mkTyVarEqErr" (ppr item $$ ppr casted_tv1 $$ ppr ty2)
-       ; mkTyVarEqErr' ctxt item casted_tv1 ty2 }
+mkTyVarEqErr ctxt item tv1 ty2
+  = do { traceTc "mkTyVarEqErr" (ppr item $$ ppr tv1 $$ ppr ty2)
+       ; mkTyVarEqErr' ctxt item tv1 ty2 }
 
 mkTyVarEqErr' :: SolverReportErrCtxt -> ErrorItem
-              -> (TcTyVar, TcCoercionN) -> TcType -> TcM TcSolverReportMsg
-mkTyVarEqErr' ctxt item (tv1, _co1) ty2
- -- ToDo: eliminate _co1???
+              -> TcTyVar -> TcType -> TcM TcSolverReportMsg
+mkTyVarEqErr' ctxt item tv1 ty2
 
   -- Is this a representation-polymorphism error, e.g.
   -- alpha[conc] ~# rr[sk] ? If so, handle that first.
@@ -2002,16 +2001,6 @@ misMatchOrCND ctxt item ty1 ty2
     givens  = [ given | given <- getUserGivens ctxt, ic_given_eqs given /= NoGivenEqs ]
               -- Keep only UserGivens that have some equalities.
               -- See Note [Suppress redundant givens during error reporting]
-
-{-
--- These are for the "blocked" equalities, as described in GHC.Tc.Solver.Equality
--- Note [Equalities with incompatible kinds], wrinkle (EIK2). There should
--- always be another unsolved wanted around, which will ordinarily suppress
--- this message. But this can still be printed out with -fdefer-type-errors
--- (sigh), so we must produce a message.
-mkBlockedEqErr :: ErrorItem -> TcSolverReportMsg
-mkBlockedEqErr item = BlockedEquality item
--}
 
 {-
 Note [Suppress redundant givens during error reporting]

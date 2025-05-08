@@ -1328,6 +1328,7 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
              -- guaranteed that cos has the same length as tys1 and tys2
              -- See Note [Fast path when decomposing TyConApps]
              -> do { (co, _, _) <- wrapUnifierTcS ev role $ \uenv ->
+--                        do { cos <- zipWith4M (u_arg uenv) new_locs tc_roles (reverse tys1) (reverse tys2)
                         do { cos <- zipWith4M (u_arg uenv) new_locs tc_roles tys1 tys2
                                     -- zipWith4M: see Note [Work-list ordering]
                                     -- in GHC.Tc.Solved.Equality
@@ -2094,7 +2095,7 @@ Wrinkles:
        the kind of the parent type-equality.  See the calls to `mkKindEqLoc`
        in `canEqCanLHSHetero`.
 
-     * We /also/ these unsolved kind equalities to the `RewriterSet` of the
+     * We /also/ add these unsolved kind equalities to the `RewriterSet` of the
        parent constraint; see `do_rewrite` in `canEqCanLHSHetero`.
 
      * When filling a coercion hole we kick out any equality constraints whose

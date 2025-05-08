@@ -2314,9 +2314,9 @@ instance Outputable WantedCtEvidence where
 
 instance Outputable CtEvidence where
   ppr ev = ppr (ctEvFlavour ev)
-           <+> pp_ev <+> braces (ppr (ctl_depth (ctEvLoc ev)) <> pp_rewriters)
+           <+> hang (pp_ev <+> braces (ppr (ctl_depth (ctEvLoc ev)) <> pp_rewriters))
                          -- Show the sub-goal depth too
-               <> dcolon <+> ppr (ctEvPred ev)
+                  2 (dcolon <+> pprPredType (ctEvPred ev))
     where
       pp_ev = case ev of
              CtGiven ev -> ppr (ctev_evar ev)

@@ -3578,11 +3578,6 @@ But there are several cases we need to be wary of:
 (2) We must still make sure that no variable in a coercion is at too
     high a level. But, when unifying, we can promote any variables we encounter.
 
-{-  Don't do this
-(3) We do not unify variables with a type with a free coercion hole.
-    See (COERCION-HOLE) in Note [Unification preconditions].
--}
-
 Note [Promotion and level-checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 "Promotion" happens when we have this:
