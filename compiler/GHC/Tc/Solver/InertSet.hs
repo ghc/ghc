@@ -70,7 +70,7 @@ import GHC.Core.Predicate
 import qualified GHC.Core.TyCo.Rep as Rep
 import GHC.Core.TyCon
 import GHC.Core.Class( classTyCon )
-import GHC.Builtin.Names( eqPrimTyConKey, heqTyConKey, eqTyConKey )
+import GHC.Builtin.Names( eqPrimTyConKey, heqTyConKey, eqTyConKey, coercibleTyConKey )
 import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1862,21 +1862,34 @@ isOuterTyVar tclvl tv
   | otherwise  = False  -- Coercion variables; doesn't much matter
 
 noGivenNewtypeReprEqs :: TyCon -> InertSet -> Bool
--- True <=> there is no Irred looking like (N tys1 ~ N tys2)
--- See Note [Decomposing newtype equalities] (EX2) in GHC.Tc.Solver.Equality
---     This is the only call site.
-noGivenNewtypeReprEqs tc inerts
-  = not (anyBag might_help (inert_irreds (inert_cans inerts)))
+-- True <=> there is no Given looking like (N tys1 ~ N tys2)
+-- See Note [Decomposing newtype equalities] (EX3) in GHC.Tc.Solver.Equality
+noGivenNewtypeReprEqs tc (IS { inert_cans = inerts })
+  | IC { inert_irreds = irreds, inert_insts = quant_cts } <- inerts
+  = not (anyBag might_help_irred irreds || any might_help_qc quant_cts)
+    -- Look in both inert_irreds /and/ inert_insts (#26020)
   where
-    might_help irred
-      = case classifyPredType (ctEvPred (irredCtEvidence irred)) of
-          EqPred ReprEq t1 t2
-             | Just (tc1,_) <- tcSplitTyConApp_maybe t1
-             , tc == tc1
-             , Just (tc2,_) <- tcSplitTyConApp_maybe t2
-             , tc == tc2
-             -> True
-          _  -> False
+    might_help_irred (IrredCt { ir_ev = ev })
+      | EqPred ReprEq t1 t2 <- classifyPredType (ctEvPred ev)
+      = headed_by_tc t1 t2
+      | otherwise
+      = False
+
+    might_help_qc (QCI { qci_body = pred })
+      | ClassPred cls [_, t1, t2] <- classifyPredType pred
+      , cls `hasKey` coercibleTyConKey
+      = headed_by_tc t1 t2
+      | otherwise
+      = False
+
+    headed_by_tc t1 t2
+      | Just (tc1,_) <- tcSplitTyConApp_maybe t1
+      , tc == tc1
+      , Just (tc2,_) <- tcSplitTyConApp_maybe t2
+      , tc == tc2
+      = True
+      | otherwise
+      = False
 
 -- | Is it (potentially) loopy to use the first @ct1@ to solve @ct2@?
 --

@@ -1098,7 +1098,7 @@ There are two ways in which decomposing (N ty1) ~r (N ty2) could be incomplete:
   them.  This is done in can_eq_nc.  Of course, we can't unwrap if the data
   constructor isn't in scope.  See Note [Unwrap newtypes first].
 
-* Incompleteness example (EX2): see #24887
+* Incompleteness example (EX2): prioritise Nominal equalities. See #24887
       data family D a
       data instance D Int  = MkD1 (D Char)
       data instance D Bool = MkD2 (D Char)
@@ -1116,7 +1116,7 @@ There are two ways in which decomposing (N ty1) ~r (N ty2) could be incomplete:
   CONCLUSION: prioritise nominal equalites in the work list.
   See Note [Prioritise equalities] in GHC.Tc.Solver.InertSet.
 
-* Incompleteness example (EX3): available Givens
+* Incompleteness example (EX3): check available Givens
       newtype Nt a = Mk Bool         -- NB: a is not used in the RHS,
       type role Nt representational  -- but the user gives it an R role anyway
 
@@ -1134,36 +1134,41 @@ There are two ways in which decomposing (N ty1) ~r (N ty2) could be incomplete:
   equalities that could later solve it.
 
   But what precisely does it mean to say "any Given equalities that could
-  later solve it"?
+  later solve it"?  It's tricky!
 
-  In #22924 we had
-     [G] f a ~R# a     [W] Const (f a) a ~R# Const a a
-  where Const is an abstract newtype.  If we decomposed the newtype, we
-  could solve.  Not-decomposing on the grounds that (f a ~R# a) might turn
-  into (Const (f a) a ~R# Const a a) seems a bit silly.
+  * In #22924 we had
+       [G] f a ~R# a     [W] Const (f a) a ~R# Const a a
+    where Const is an abstract newtype.  If we decomposed the newtype, we
+    could solve.  Not-decomposing on the grounds that (f a ~R# a) might turn
+    into (Const (f a) a ~R# Const a a) seems a bit silly.
 
-  In #22331 we had
-     [G] N a ~R# N b   [W] N b ~R# N a
-  (where N is abstract so we can't unwrap). Here we really /don't/ want to
-  decompose, because the /only/ way to solve the Wanted is from that Given
-  (with a Sym).
+  * In #22331 we had
+       [G] N a ~R# N b   [W] N b ~R# N a
+    (where N is abstract so we can't unwrap). Here we really /don't/ want to
+    decompose, because the /only/ way to solve the Wanted is from that Given
+    (with a Sym).
 
-  In #22519 we had
-     [G] a <= b     [W] IO Age ~R# IO Int
+  * In #22519 we had
+       [G] a <= b     [W] IO Age ~R# IO Int
 
-  (where IO is abstract so we can't unwrap, and newtype Age = Int; and (<=)
-  is a type-level comparison on Nats).  Here we /must/ decompose, despite the
-  existence of an Irred Given, or we will simply be stuck.  (Side note: We
-  flirted with deep-rewriting of newtypes (see discussion on #22519 and
-  !9623) but that turned out not to solve #22924, and also makes type
-  inference loop more often on recursive newtypes.)
+    (where IO is abstract so we can't unwrap, and newtype Age = Int; and (<=)
+    is a type-level comparison on Nats).  Here we /must/ decompose, despite the
+    existence of an Irred Given, or we will simply be stuck.  (Side note: We
+    flirted with deep-rewriting of newtypes (see discussion on #22519 and
+    !9623) but that turned out not to solve #22924, and also makes type
+    inference loop more often on recursive newtypes.)
+
+  * In #26020 we had a /quantified/ constraint
+        forall x. Coercible (N t1) (N t2)
+    and (roughly) [W] N t1 ~R# N t2
+    That quantified constraint can solve the Wanted, so don't decompose!
 
   The currently-implemented compromise is this:
-
-    we decompose [W] N s ~R# N t unless there is a [G] N s' ~ N t'
-
-  that is, a Given Irred equality with both sides headed with N.
-  See the call to noGivenNewtypeReprEqs in canTyConApp.
+       We decompose [W] N s ~R# N t unless there is
+       - an Irred [G] N s' ~ N t'
+       - a quantified [G] forall ... => N s' ~ N t'
+       that is, a Given equality with both sides headed with N.
+  See the call to `noGivenNewtypeReprEqs` in `canTyConApp`.
 
   This is not perfect.  In principle a Given like [G] (a b) ~ (c d), or
   even just [G] c, could later turn into N s ~ N t.  But since the free
@@ -1174,7 +1179,7 @@ There are two ways in which decomposing (N ty1) ~r (N ty2) could be incomplete:
   un-expanded equality superclasses; but only in some very obscure
   recursive-superclass situations.
 
-   Yet another approach (!) is desribed in
+   Yet another approach (!) is described in
    Note [Decomposing newtypes a bit more aggressively].
 
 Remember: decomposing Wanteds is always /sound/. This Note is
