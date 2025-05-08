@@ -281,7 +281,7 @@ function fetch_ghc() {
           fail "neither GHC nor GHC_VERSION are not set"
       fi
 
-      start_section "fetch GHC"
+      start_section fetch-ghc "Fetch GHC"
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
       curl "$url" > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
@@ -298,7 +298,7 @@ function fetch_ghc() {
           ;;
       esac
       rm -Rf "ghc-${GHC_VERSION}" ghc.tar.xz
-      end_section "fetch GHC"
+      end_section fetch-ghc
   fi
 
 }
@@ -310,7 +310,7 @@ function fetch_cabal() {
           fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
       fi
 
-      start_section "fetch cabal"
+      start_section fetch-cabal "Fetch Cabal"
       case "$(uname)" in
         # N.B. Windows uses zip whereas all others use .tar.xz
         MSYS_*|MINGW*)
@@ -343,7 +343,7 @@ function fetch_cabal() {
           fi
           ;;
       esac
-      end_section "fetch cabal"
+      end_section fetch-cabal
   fi
 }
 
@@ -376,7 +376,7 @@ function setup_toolchain() {
 }
 
 function cleanup_submodules() {
-  start_section "clean submodules"
+  start_section clean-submodules "Clean submodules"
   if [ -d .git ]; then
     info "Cleaning submodules..."
     # On Windows submodules can inexplicably get into funky states where git
@@ -388,7 +388,7 @@ function cleanup_submodules() {
   else
     info "Not cleaning submodules, not in a git repo"
   fi;
-  end_section "clean submodules"
+  end_section clean-submodules
 }
 
 function configure() {
@@ -744,7 +744,7 @@ function cabal_abi_test() {
   pushd $DIR
   echo $PWD
 
-  start_section "Cabal test: $OUT"
+  start_section cabal-abi-test "Cabal ABI test: $OUT"
   mkdir -p "$OUT"
   "$HC" \
     -hidir tmp -odir tmp -fforce-recomp -haddock \
@@ -754,7 +754,7 @@ function cabal_abi_test() {
   summarise_hi_files
   summarise_o_files
   popd
-  end_section "Cabal test: $OUT"
+  end_section cabal-abi-test
 }
 
 function cabal_test() {
@@ -762,7 +762,7 @@ function cabal_test() {
     fail "OUT not set"
   fi
 
-  start_section "Cabal test: $OUT"
+  start_section cabal-test "Cabal test: $OUT"
   mkdir -p "$OUT"
   run "$HC" \
     -hidir tmp -odir tmp -fforce-recomp \
@@ -771,7 +771,7 @@ function cabal_test() {
     -ilibraries/Cabal/Cabal/src -XNoPolyKinds Distribution.Simple \
     "$@" 2>&1 | tee $OUT/log
   rm -Rf tmp
-  end_section "Cabal test: $OUT"
+  end_section cabal-test
 }
 
 function run_perf_test() {
