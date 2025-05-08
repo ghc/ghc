@@ -34,7 +34,11 @@ function time_it() {
   local delta=$(expr $end - $start)
 
   echo "$name took $delta seconds"
-  printf "%15s | $delta" > ci-timings
+  if [[ ! -e ci_timings.txt ]]; then
+    echo "=== TIMINGS ===" > ci_timings.txt
+  fi
+
+  printf "%15s | $delta\n" $name >> ci_timings.txt
   return $res
 }
 
@@ -239,8 +243,6 @@ function cabal_update() {
 
 # Extract GHC toolchain
 function setup() {
-  echo "=== TIMINGS ===" > ci-timings
-
   if [ -d "$CABAL_CACHE" ]; then
       info "Extracting cabal cache from $CABAL_CACHE to $CABAL_DIR..."
       mkdir -p "$CABAL_DIR"
