@@ -6077,6 +6077,10 @@ data FixedRuntimeRepErrorInfo
   , frr_info_not_concrete :: Maybe (TcTyVar, TcType)
       -- ^ Which non-concrete type did we try to
       -- unify this concrete type variable with?
+  , frr_info_other_origin :: Maybe CtOrigin
+      -- ^ Did the representation polymorphism check arise
+      -- from another constraint? If so, record that 'CtOrigin' here
+      -- (it will never be a 'FRROrigin').
   }
 
 {-

@@ -4,6 +4,9 @@ RepPolyMcGuard.hs:30:16: error: [GHC-55287]
       does not have a fixed runtime representation.
       Its type is:
         ma0 :: TYPE rep0
+      When unifying:
+        • mc0
+        • ma
       Cannot unify ‘rep’ with the type variable ‘rep0’
       because the former is not a concrete ‘RuntimeRep’.
     • In a stmt of a monad comprehension: undefined

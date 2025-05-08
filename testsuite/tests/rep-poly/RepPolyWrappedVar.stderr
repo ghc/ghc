@@ -1,11 +1,14 @@
-
 RepPolyWrappedVar.hs:15:19: error: [GHC-55287]
     • The first argument of the primop ‘mkWeak#’
       does not have a fixed runtime representation.
       Its type is:
         a1 :: TYPE (BoxedRep l0)
+      When unifying:
+        • TYPE (BoxedRep l)
+        • *
       Cannot unify ‘l’ with the type variable ‘l0’
       because the former is not a concrete ‘Levity’.
     • In the type ‘a’
       In the expression: mkWeak# @a @Int @Bool
       In an equation for ‘primop’: primop = mkWeak# @a @Int @Bool
+

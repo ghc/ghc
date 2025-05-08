@@ -1,4 +1,3 @@
-
 RepPolyBinder.hs:11:1: error: [GHC-55287]
     • The first pattern in the equation for ‘foo’
       does not have a fixed runtime representation.
@@ -15,7 +14,11 @@ RepPolyBinder.hs:11:17: error: [GHC-55287]
       does not have a fixed runtime representation.
       Its type is:
         x0 :: TYPE rep0
+      When unifying:
+        • x0
+        • b
       Cannot unify ‘rep2’ with the type variable ‘rep0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the pattern: myId -> bndr_b
       In an equation for ‘foo’: foo bndr_a pat@(myId -> bndr_b) = ()
+

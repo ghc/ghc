@@ -1,10 +1,21 @@
-
 T17817.hs:16:10: error: [GHC-55287]
     • The first argument of the primop ‘mkWeak#’
       does not have a fixed runtime representation.
       Its type is:
         a0 :: TYPE (BoxedRep l0)
+      When unifying:
+        • a0
+          -> b
+          -> (State# RealWorld -> (# State# RealWorld, c #))
+          -> State# RealWorld
+          -> (# State# RealWorld, Weak# b #)
+        • a
+          -> b
+          -> (State# RealWorld -> (# State# RealWorld, c #))
+          -> State# RealWorld
+          -> (# State# RealWorld, Weak# b #)
       Cannot unify ‘l’ with the type variable ‘l0’
       because the former is not a concrete ‘Levity’.
     • In the expression: mkWeak#
       In an equation for ‘primop’: primop = mkWeak#
+

@@ -1,10 +1,13 @@
-
 RepPolyLeftSection2.hs:14:11: error: [GHC-55287]
     • The argument ‘undefined’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:
         a0 :: TYPE r0
+      When unifying:
+        • a0 -> a0
+        • a -> a
       Cannot unify ‘r’ with the type variable ‘r0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: undefined `f`
       In an equation for ‘test1’: test1 = (undefined `f`)
+

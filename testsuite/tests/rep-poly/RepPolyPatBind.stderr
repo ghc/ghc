@@ -1,8 +1,10 @@
-
 RepPolyPatBind.hs:18:5: error: [GHC-55287]
     • The pattern binding does not have a fixed runtime representation.
       Its type is:
         p0 :: TYPE c0
+      When unifying:
+        • (# a, a #)
+        • p0
       Cannot unify ‘TupleRep [rep, rep]’ with the type variable ‘c0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the pattern: (# x, y #)
@@ -31,3 +33,4 @@ RepPolyPatBind.hs:18:5: error: [GHC-55287]
                 x, y :: a
                 (# x, y #) = undefined
               in x
+

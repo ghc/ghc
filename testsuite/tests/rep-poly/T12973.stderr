@@ -1,10 +1,13 @@
-
 T12973.hs:13:7: error: [GHC-55287]
     • The argument ‘3’ of ‘(+)’
       does not have a fixed runtime representation.
       Its type is:
         a0 :: TYPE r0
+      When unifying:
+        • a0
+        • a
       Cannot unify ‘r’ with the type variable ‘r0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: 3 + 4
       In an equation for ‘foo’: foo = 3 + 4
+

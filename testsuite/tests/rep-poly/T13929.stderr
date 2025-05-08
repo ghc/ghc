@@ -3,12 +3,18 @@ T13929.hs:29:24: error: [GHC-55287]
         does not have a fixed runtime representation.
         Its type is:
           a0 :: TYPE k00
+        When unifying:
+          • (# a0, b0 #)
+          • GUnboxed (f :*: g) (TupleRep [rf, rg])
         Cannot unify ‘rf’ with the type variable ‘k00’
         because the former is not a concrete ‘RuntimeRep’.
       • The second component of the unboxed tuple
         does not have a fixed runtime representation.
         Its type is:
           b0 :: TYPE k10
+        When unifying:
+          • (# a0, b0 #)
+          • GUnboxed (f :*: g) (TupleRep [rf, rg])
         Cannot unify ‘rg’ with the type variable ‘k10’
         because the former is not a concrete ‘RuntimeRep’.
     • In the expression: (# gunbox x, gunbox y #)

@@ -1,10 +1,12 @@
-
 RepPolyDoBody1.hs:24:3: error: [GHC-55287]
     • The first argument of the rebindable syntax operator ‘(>>)’
         arising from a do statement
       does not have a fixed runtime representation.
       Its type is:
         ma0 :: TYPE rep0
+      When unifying:
+        • mc0
+        • ma
       Cannot unify ‘rep’ with the type variable ‘rep0’
       because the former is not a concrete ‘RuntimeRep’.
     • In a stmt of a 'do' block: undefined :: ma
@@ -15,3 +17,4 @@ RepPolyDoBody1.hs:24:3: error: [GHC-55287]
           foo _
             = do undefined :: ma
                return ()
+

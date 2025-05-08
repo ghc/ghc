@@ -3,12 +3,18 @@ T13233.hs:14:11: error: [GHC-55287]
         does not have a fixed runtime representation.
         Its type is:
           a1 :: TYPE k2
+        When unifying:
+          • a1 -> b1 -> (# a1, b1 #)
+          • a -> a -> (# a, a #)
         Cannot unify ‘rep’ with the type variable ‘k2’
         because the former is not a concrete ‘RuntimeRep’.
       • The second component of the unboxed tuple
         does not have a fixed runtime representation.
         Its type is:
           b1 :: TYPE k1
+        When unifying:
+          • a1 -> b1 -> (# a1, b1 #)
+          • a -> a -> (# a, a #)
         Cannot unify ‘rep’ with the type variable ‘k1’
         because the former is not a concrete ‘RuntimeRep’.
     • In the first argument of ‘bar’, namely ‘(#,#)’
@@ -20,12 +26,18 @@ T13233.hs:22:16: error: [GHC-55287]
         does not have a fixed runtime representation.
         Its type is:
           a0 :: TYPE k00
+        When unifying:
+          • a0 -> b0 -> (# a0, b0 #)
+          • a -> b -> (# a, b #)
         Cannot unify ‘rep1’ with the type variable ‘k00’
         because the former is not a concrete ‘RuntimeRep’.
       • The second component of the unboxed tuple
         does not have a fixed runtime representation.
         Its type is:
           b0 :: TYPE k10
+        When unifying:
+          • a0 -> b0 -> (# a0, b0 #)
+          • a -> b -> (# a, b #)
         Cannot unify ‘rep2’ with the type variable ‘k10’
         because the former is not a concrete ‘RuntimeRep’.
     • In the first argument of ‘obscure’, namely ‘(#,#)’

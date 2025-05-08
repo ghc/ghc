@@ -1,9 +1,11 @@
-
 RepPolyArgument.hs:10:18: error: [GHC-55287]
     • The argument ‘(undefined @(R @RuntimeRep))’ of ‘undefined’
       does not have a fixed runtime representation.
       Its type is:
         t0 :: TYPE cx0
+      When unifying:
+        • a0
+        • t0
       Cannot unify ‘R’ with the type variable ‘cx0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the first argument of ‘undefined’, namely
@@ -11,3 +13,4 @@ RepPolyArgument.hs:10:18: error: [GHC-55287]
       In the expression: undefined (undefined @(R @RuntimeRep))
       In an equation for ‘foo’:
           foo = undefined (undefined @(R @RuntimeRep))
+

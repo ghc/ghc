@@ -1050,7 +1050,8 @@ reportNotConcreteErrs ctxt errs@(err0:_)
                 { nce_frr_origin = frr_orig } ->
                 FRR_Info
                   { frr_info_origin       = frr_orig
-                  , frr_info_not_concrete = Nothing }
+                  , frr_info_not_concrete = Nothing
+                  , frr_info_other_origin = Nothing }
                 : frr_errs
 
 reportMultiplicityCoercionErrs :: SolverReportErrCtxt -> [(TcCoercion, CtLoc)] -> TcM ()
@@ -1603,21 +1604,25 @@ mkFRRErr ctxt items
 fixedRuntimeRepOrigin_maybe :: HasDebugCallStack => ErrorItem -> Maybe FixedRuntimeRepErrorInfo
 fixedRuntimeRepOrigin_maybe item
   -- An error that arose directly from a representation-polymorphism check.
-  | FRROrigin frr_orig <- errorItemOrigin item
+  | FRROrigin frr_orig <- orig
   = Just $ FRR_Info { frr_info_origin = frr_orig
-                    , frr_info_not_concrete = Nothing }
+                    , frr_info_not_concrete = Nothing
+                    , frr_info_other_origin = Nothing
+                    }
   -- A nominal equality involving a concrete type variable,
   -- such as @alpha[conc] ~# rr[sk]@ or @beta[conc] ~# RR@ for a
   -- type family application @RR@.
   | EqPred NomEq ty1 ty2 <- classifyPredType (errorItemPred item)
   = if | Just (tv1, ConcreteFRR frr1) <- isConcreteTyVarTy_maybe ty1
-       -> Just $ FRR_Info frr1 (Just (tv1, ty2))
+       -> Just $ FRR_Info frr1 (Just (tv1, ty2)) (Just orig)
        | Just (tv2, ConcreteFRR frr2) <- isConcreteTyVarTy_maybe ty2
-       -> Just $ FRR_Info frr2 (Just (tv2, ty1))
+       -> Just $ FRR_Info frr2 (Just (tv2, ty1)) (Just orig)
        | otherwise
        -> Nothing
   | otherwise
   = Nothing
+  where
+    orig = errorItemOrigin item
 
 {-
 Note [Constraints include ...]
@@ -1931,7 +1936,8 @@ mkTyVarEqErr' ctxt item tv1 ty2
       = Nothing
     frr_reason (ConcreteFRR frr_orig) conc_tv not_conc
       = FRR_Info { frr_info_origin = frr_orig
-                 , frr_info_not_concrete = Just (conc_tv, not_conc) }
+                 , frr_info_not_concrete = Just (conc_tv, not_conc)
+                 , frr_info_other_origin = Just (errorItemOrigin item) }
 
     ty1 = mkTyVarTy tv1
 
