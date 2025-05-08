@@ -465,7 +465,7 @@ instance DiagnosticCodeNameSpace GHCi where
 
 type GhciDiagnosticCode :: Symbol -> Nat
 type family GhciDiagnosticCode c = n | n -> c where
-  GhciDiagnosticCode "GhciCommandNotSupportedInMultiMode" = 83514
+  GhciDiagnosticCode "GhciCommandNotSupportedInMultiMode" = Outdated 83514
   GhciDiagnosticCode "GhciInvalidArgumentString"          = 68894
   GhciDiagnosticCode "GhciCommandSyntaxError"             = 72682
   GhciDiagnosticCode "GhciInvalidPromptString"            = 50882
