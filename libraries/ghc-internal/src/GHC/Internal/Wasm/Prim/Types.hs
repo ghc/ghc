@@ -184,15 +184,16 @@ newtype JSString
 -- eagerly once the resulting 'String' is forced, and the argument
 -- 'JSString' may be explicitly freed if no longer used.
 fromJSString :: JSString -> String
-fromJSString s = unsafeDupablePerformIO $ do
-  l <- js_stringLength s
-  fp <- mallocPlainForeignPtrBytes $ l * 3
-  withForeignPtr fp $ \buf -> do
-    l' <- js_encodeInto s buf $ l * 3
-    peekCStringLen utf8 (buf, l')
+fromJSString s = case js_stringLength s * 3 of
+  0 -> ""
+  max_len -> unsafePerformIO $ do
+    fptr <- mallocPlainForeignPtrBytes max_len
+    withForeignPtr fptr $ \ptr -> do
+      len <- js_encodeInto s ptr max_len
+      peekCStringLen utf8 (ptr, len)
 
 foreign import javascript unsafe "$1.length"
-  js_stringLength :: JSString -> IO Int
+  js_stringLength :: JSString -> Int
 
 foreign import javascript unsafe "(new TextEncoder()).encodeInto($1, new Uint8Array(__exports.memory.buffer, $2, $3)).written"
   js_encodeInto :: JSString -> Ptr a -> Int -> IO Int
