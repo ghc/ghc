@@ -80,6 +80,7 @@ module GHC.Parser.PostProcess (
         ImpExpQcSpec(..),
         mkModuleImpExp,
         mkTypeImpExp,
+        mkDataImpExp,
         mkImpExpSubSpec,
         checkImportSpec,
 
@@ -3240,6 +3241,7 @@ data ImpExpSubSpec = ImpExpAbs
 
 data ImpExpQcSpec = ImpExpQcName (LocatedN RdrName)
                   | ImpExpQcType (EpToken "type") (LocatedN RdrName)
+                  | ImpExpQcData (EpToken "data") (LocatedN RdrName)
                   | ImpExpQcWildcard (EpToken "..") (EpToken ",")
 
 mkModuleImpExp :: Maybe (LWarningTxt GhcPs) -> (EpToken "(", EpToken ")") -> LocatedA ImpExpQcSpec
@@ -3285,11 +3287,13 @@ mkModuleImpExp warning (top, tcp) (L l specname) subs = do
 
     ieNameVal (ImpExpQcName ln)   = unLoc ln
     ieNameVal (ImpExpQcType _ ln) = unLoc ln
+    ieNameVal (ImpExpQcData _ ln) = unLoc ln
     ieNameVal ImpExpQcWildcard{}  = panic "ieNameVal got wildcard"
 
     ieNameFromSpec :: ImpExpQcSpec -> IEWrappedName GhcPs
     ieNameFromSpec (ImpExpQcName   (L l n)) = IEName noExtField (L l n)
     ieNameFromSpec (ImpExpQcType r (L l n)) = IEType r (L l n)
+    ieNameFromSpec (ImpExpQcData r (L l n)) = IEData r (L l n)
     ieNameFromSpec ImpExpQcWildcard{}       = panic "ieName got wildcard"
 
     wrapped = map (fmap ieNameFromSpec)
@@ -3299,6 +3303,12 @@ mkTypeImpExp :: LocatedN RdrName   -- TcCls or Var name space
 mkTypeImpExp name =
   do requireExplicitNamespaces (getLocA name)
      return (fmap (`setRdrNameSpace` tcClsName) name)
+
+mkDataImpExp :: LocatedN RdrName
+             -> P (LocatedN RdrName)
+mkDataImpExp name =
+  do requireExplicitNamespaces (getLocA name)
+     return name
 
 checkImportSpec :: LocatedLI [LIE GhcPs] -> P (LocatedLI [LIE GhcPs])
 checkImportSpec ie@(L _ specs) =

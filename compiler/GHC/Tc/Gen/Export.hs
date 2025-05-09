@@ -703,6 +703,7 @@ ieWrappedNameWhatLooking = \case
   IEName {}    -> WL_TyCon_or_TermVar
   IEDefault {} -> WL_TyCon
   IEType {}    -> WL_Type
+  IEData {}    -> WL_Term
   IEPattern {} -> WL_ConLike
 
 ieLWrappedNameWhatLooking :: LIEWrappedName GhcPs -> WhatLooking

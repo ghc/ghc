@@ -2994,7 +2994,7 @@ instance Diagnostic TcRnMessage where
              -> let tc_nm = tyConName tc
                     dc = dataConName $ head $ tyConDataCons tc
                 in [ ImportSuggestion (occName dc)
-                   $ ImportDataCon Nothing (nameOccName tc_nm) ]
+                   $ ImportDataCon Nothing False False (nameOccName tc_nm) ]
              | UnliftedFFITypesNeeded <- why
              -> [suggestExtension LangExt.UnliftedFFITypes]
            _ -> noHints
@@ -3291,18 +3291,51 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnRedundantSourceImport{}
       -> noHints
-    TcRnImportLookup (ImportLookupBad k _ is ie patsyns_enabled) ->
+    TcRnImportLookup (ImportLookupBad k _ is ie exts) ->
       let mod_name = moduleName $ is_mod is
           occ = rdrNameOcc $ ieName ie
+          could_change_item item_suggestion =
+            [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | suggest_ext] ++
+            [ ImportSuggestion occ $
+              CouldChangeImportItem mod_name item_suggestion ]
+            where
+              suggest_ext
+                | ile_explicit_namespaces exts = False  -- extension already on
+                | otherwise =
+                    case item_suggestion of
+                      -- ImportItemRemove* -> False
+                      ImportItemRemoveType{}            -> False
+                      ImportItemRemoveData{}            -> False
+                      ImportItemRemovePattern{}         -> False
+                      ImportItemRemoveSubordinateType{} -> False
+                      ImportItemRemoveSubordinateData{} -> False
+                      -- ImportItemAdd* -> True
+                      ImportItemAddType{} -> True
       in case k of
-        BadImportAvailVar          -> [ImportSuggestion occ $ CouldRemoveTypeKeyword mod_name]
+        BadImportAvailVar -> could_change_item ImportItemRemoveType
         BadImportNotExported suggs -> suggs
-        BadImportAvailTyCon ex_ns  ->
-          [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | not ex_ns]
-          ++ [ImportSuggestion occ $ CouldAddTypeKeyword mod_name]
-        BadImportAvailDataCon par  -> [ImportSuggestion occ $ ImportDataCon (Just (mod_name, patsyns_enabled)) par]
+        BadImportAvailTyCon
+          -- The three cases (TyOp, DataKw, PatternKw) are laid out
+          -- in Note [Reasons for BadImportAvailTyCon] in GHC.Tc.Errors.Types
+          | isSymOcc occ    -> could_change_item ImportItemAddType        -- Case (TyOp)
+          | otherwise       ->  -- Non-operator cases
+              case unLoc (ieLIEWrappedName ie) of
+                IEData{}    -> could_change_item ImportItemRemoveData     -- Case (DataKw)
+                IEPattern{} -> could_change_item ImportItemRemovePattern  -- Case (PatternKw)
+                _           -> panic "diagnosticHints: unexpected BadImportAvailTyCon"
+
+        BadImportAvailDataCon par  ->
+          [ ImportSuggestion occ $
+            ImportDataCon { ies_suggest_import_from = Just mod_name
+                          , ies_suggest_pattern_keyword = ile_pattern_synonyms exts
+                              && not (ile_explicit_namespaces exts) -- do not suggest 'pattern' when we can suggest 'data'
+                          , ies_suggest_data_keyword    = ile_explicit_namespaces exts
+                          , ies_parent = par } ]
         BadImportNotExportedSubordinates{} -> noHints
-        BadImportNonTypeSubordinates{} -> noHints
+        BadImportNonTypeSubordinates _ nontype1 ->
+          could_change_item (ImportItemRemoveSubordinateType (nameOccName . greName <$> nontype1))
+        BadImportNonDataSubordinates _ nondata1 ->
+          could_change_item (ImportItemRemoveSubordinateData (nameOccName . greName <$> nondata1))
     TcRnImportLookup{}
       -> noHints
     TcRnUnusedImport{}
@@ -5855,7 +5888,7 @@ pprDisabledClassExtension cls = \case
 
 pprImportLookup :: ImportLookupReason -> SDoc
 pprImportLookup = \case
-  ImportLookupBad k iface decl_spec ie _ps ->
+  ImportLookupBad k iface decl_spec ie _exts ->
     let
       pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
       pprImpDeclSpec iface decl_spec =
@@ -5918,6 +5951,19 @@ pprImportLookup = \case
             nontype = NE.toList nontype1
             parent_name = (quotes . pprPrefixOcc . nameOccName . gre_name) gre
             nontype_names = pprWithCommas (quotes . pprPrefixOcc . nameOccName . gre_name) nontype
+            what = case greInfo gre of
+              IAmTyCon ClassFlavour -> text "a class"
+              IAmTyCon _            -> text "a data type"
+              _                     -> text "an item"
+      BadImportNonDataSubordinates gre nondata1 ->
+        withContext
+          [ what <+> text "called" <+> parent_name <+> text "is exported,"
+          , sep [ text "but its subordinate item" <> plural nondata <+> nondata_names
+                , isOrAre nondata <+> "not in the data namespace." ] ]
+          where
+            nondata = NE.toList nondata1
+            parent_name = (quotes . pprPrefixOcc . nameOccName . gre_name) gre
+            nondata_names = pprWithCommas (quotes . pprPrefixOcc . nameOccName . gre_name) nondata
             what = case greInfo gre of
               IAmTyCon ClassFlavour -> text "a class"
               IAmTyCon _            -> text "a data type"

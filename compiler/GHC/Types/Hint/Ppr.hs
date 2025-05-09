@@ -340,43 +340,66 @@ pprImportSuggestion occ_name (CouldUnhideFrom mods)
         [ quotes (ppr mod) <+> parens (text "at" <+> ppr (imv_span imv))
         | (mod,imv) <- NE.toList mods
         ])
-pprImportSuggestion occ_name (CouldAddTypeKeyword mod)
-  = vcat [ text "Add the" <+> quotes (text "type")
-          <+> text "keyword to the import statement:"
-         , nest 2 $ text "import"
-            <+> ppr mod
-            <+> parens_sp (text "type" <+> pprPrefixOcc occ_name)
-         ]
+pprImportSuggestion occ_name (CouldChangeImportItem mod kw)
+  = case kw of
+      ImportItemRemoveType    -> remove "type"
+      ImportItemRemoveData    -> remove "data"
+      ImportItemRemovePattern -> remove "pattern"
+      ImportItemRemoveSubordinateType nontype1 -> remove_subordinate "type" (NE.toList nontype1)
+      ImportItemRemoveSubordinateData nondata1 -> remove_subordinate "data" (NE.toList nondata1)
+      ImportItemAddType       -> add "type"
   where
     parens_sp d = parens (space <> d <> space)
-pprImportSuggestion occ_name (CouldRemoveTypeKeyword mod)
-  = vcat [ text "Remove the" <+> quotes (text "type")
-             <+> text "keyword from the import statement:"
-         , nest 2 $ text "import"
-             <+> ppr mod
-             <+> parens_sp (pprPrefixOcc occ_name) ]
-  where
-    parens_sp d = parens (space <> d <> space)
-pprImportSuggestion dc_occ (ImportDataCon Nothing parent_occ)
+    remove kw =
+      vcat [ text "Remove the" <+> quotes (text kw)
+              <+> text "keyword from the import statement:"
+          , nest 2 $ text "import" <+> ppr mod <+> import_list ]
+      where
+        import_list = parens_sp (pprPrefixOcc occ_name)
+    add kw =
+      vcat [ text "Add the" <+> quotes (text kw)
+              <+> text "keyword to the import statement:"
+          , nest 2 $ text "import" <+> ppr mod <+> import_list ]
+      where
+        import_list = parens_sp (text kw <+> pprPrefixOcc occ_name)
+    remove_subordinate kw sub_occs =
+      vcat [ text "Remove the" <+> quotes (text kw)
+              <+> text "keyword" <> plural sub_occs
+              <+> text "from the subordinate import item" <> plural sub_occs <> colon
+          , nest 2 $ text "import" <+> ppr mod <+> import_list ]
+      where
+        parent_item
+          | isSymOcc occ_name = text "type" <+> pprPrefixOcc occ_name
+          | otherwise         = pprPrefixOcc occ_name
+        import_list = parens_sp (parent_item <+> sub_import_list)
+        sub_import_list = parens_sp (hsep (punctuate comma (map pprPrefixOcc sub_occs)))
+pprImportSuggestion dc_occ (ImportDataCon { ies_suggest_import_from = Nothing
+                                          , ies_parent = parent_occ} )
   = text "Import the data constructor" <+> quotes (ppr dc_occ) <+>
     text "of" <+> quotes (ppr parent_occ)
-pprImportSuggestion dc_occ (ImportDataCon (Just (mod, patsyns_enabled)) parent_occ)
-  = vcat $ [ text "Use"
-           , nest 2 $ text "import"
-               <+> ppr mod
-               <+> parens_sp (pprPrefixOcc parent_occ <> parens_sp (pprPrefixOcc dc_occ))
-           , text "or"
-           , nest 2 $ text "import"
-               <+> ppr mod
-               <+> parens_sp (pprPrefixOcc parent_occ <> text "(..)")
-           ] ++ if patsyns_enabled
-                then [ text "or"
-                     , nest 2 $ text "import"
-                         <+> ppr mod
-                         <+> parens_sp (text "pattern" <+> pprPrefixOcc dc_occ)
-                     ]
-                else []
+pprImportSuggestion dc_occ (ImportDataCon { ies_suggest_import_from = Just mod
+                                          , ies_suggest_pattern_keyword = suggest_pattern
+                                          , ies_suggest_data_keyword = suggest_data
+                                          , ies_parent = parent_occ })
+  = vcat $ basic_suggestion
+            ++ (if suggest_pattern then pattern_suggestion else [])
+            ++ (if suggest_data    then data_suggestion    else [])
   where
+    basic_suggestion =
+      [ text "Use"
+      , nest 2 $ import_stmt (pprPrefixOcc parent_occ <> parens_sp (pprPrefixOcc dc_occ))
+      , text "or"
+      , nest 2 $ import_stmt (pprPrefixOcc parent_occ <> text "(..)")
+      ]
+    pattern_suggestion =
+      [ text "or"
+      , nest 2 $ import_stmt (text "pattern" <+> pprPrefixOcc dc_occ)
+      ]
+    data_suggestion =
+      [ text "or"
+      , nest 2 $ import_stmt (text "data" <+> pprPrefixOcc dc_occ)
+      ]
+    import_stmt sub = text "import" <+> ppr mod <+> parens_sp sub
     parens_sp d = parens (space <> d <> space)
 
 -- | Pretty-print a 'SimilarName'.

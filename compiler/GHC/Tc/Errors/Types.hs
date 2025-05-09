@@ -115,6 +115,7 @@ module GHC.Tc.Errors.Types (
   , TySynCycleTyCons
   , BadImportKind(..)
   , DodgyImportsReason (..)
+  , ImportLookupExtensions (..)
   , ImportLookupReason (..)
   , UnusedImportReason (..)
   , UnusedImportName (..)
@@ -5832,7 +5833,7 @@ data BadImportKind
   -- | Missing @type@ keyword when importing a type.
   -- e.g.  `import TypeLits( (+) )`, where TypeLits exports a /type/ (+), not a /term/ (+)
   -- Then we want to suggest using `import TypeLits( type (+) )`
-  | BadImportAvailTyCon Bool -- ^ is ExplicitNamespaces enabled?
+  | BadImportAvailTyCon
   -- | Trying to import a data constructor directly, e.g.
   -- @import Data.Maybe (Just)@ instead of @import Data.Maybe (Maybe(Just))@
   | BadImportAvailDataCon OccName
@@ -5840,9 +5841,31 @@ data BadImportKind
   | BadImportNotExportedSubordinates !GlobalRdrElt (NonEmpty FastString)
   -- | Incorrect @type@ keyword when importing subordinates that aren't types.
   | BadImportNonTypeSubordinates !GlobalRdrElt (NonEmpty GlobalRdrElt)
+  -- | Incorrect @data@ keyword when importing something which isn't a term.
+  | BadImportNonDataSubordinates !GlobalRdrElt (NonEmpty GlobalRdrElt)
   -- | Incorrect @type@ keyword when importing something which isn't a type.
   | BadImportAvailVar
   deriving Generic
+
+{- Note [Reasons for BadImportAvailTyCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BadImportAvailTyCon means a name is available in the TcCls namespace
+but name resolution could not use it. Possible reasons for that:
+
+- Case (TyOp) `import M ((#))` or `import M (data (#))`
+    The user tried to import a type operator without using the `type` keyword,
+    or using a different keyword. Suggested fix: add 'type'.
+
+- Case (DataKw) `import M (data T)`
+    The user tried to import a non-operator type constructor, but mistakenly
+    used the `data` keyword, which restricted the lookup to the value namespace.
+    Suggested fix: remove 'data'; no need to add 'type' for non-operators.
+
+- Case (PatternKw) `import M (pattern T)`
+    Same as the (DataKw) case, mutatis mutandis.
+
+Any other case would not have resulted in BadImportAvailTyCon.
+-}
 
 -- | Describes what category of subordinate we are dealing with, e.g.
 -- a method of a class, a field of a record, etc.
@@ -6389,6 +6412,14 @@ data DodgyImportsReason =
   DodgyImportsHiding !ImportLookupReason
   deriving (Generic)
 
+-- | What extensions were enabled at import site.
+data ImportLookupExtensions =
+  ImportLookupExtensions
+    { ile_pattern_synonyms    :: !Bool
+    , ile_explicit_namespaces :: !Bool
+    }
+  deriving (Generic)
+
 -- | Different types of errors for import lookup.
 data ImportLookupReason where
   {-| An item in an import statement is not exported by the corresponding
@@ -6402,7 +6433,7 @@ data ImportLookupReason where
                   -> ModIface
                   -> ImpDeclSpec
                   -> IE GhcPs
-                  -> Bool -- ^ whether @-XPatternSynonyms@ was enabled
+                  -> ImportLookupExtensions
                   -> ImportLookupReason
   {-| A name is specified with a qualifying module.
 

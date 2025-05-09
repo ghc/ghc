@@ -1,0 +1,4 @@
+T25899e2.hs:5:5: error: [GHC-76037]
+    • Not in scope: data constructor ‘MkT’
+    • In the export: type T(data MkT)
+

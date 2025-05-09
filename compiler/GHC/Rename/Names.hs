@@ -1435,20 +1435,23 @@ data IELookupWarning
 data IsSubordinateError
   = IsSubordinateError { subordinate_err_parent      :: !GlobalRdrElt
                        , subordinate_err_unavailable :: [FastString]
-                       , subordinate_err_nontype     :: [GlobalRdrElt] }
+                       , subordinate_err_nontype     :: [GlobalRdrElt]
+                       , subordinate_err_nondata     :: [GlobalRdrElt] }
   | IsNotSubordinate
 
 mkSubordinateError :: GlobalRdrElt -> [LookupChildError] -> IsSubordinateError
 mkSubordinateError gre children_errs = foldr add init_acc children_errs
   where
     init_acc :: IsSubordinateError
-    init_acc = IsSubordinateError gre [] []
+    init_acc = IsSubordinateError gre [] [] []
 
     add :: LookupChildError -> IsSubordinateError -> IsSubordinateError
     add children_err sub@IsSubordinateError{} =
       case children_err of
         LookupChildNonType{lce_nontype_item = g} ->
           sub { subordinate_err_nontype = g : subordinate_err_nontype sub }
+        LookupChildNonData{lce_nondata_item = g} ->
+          sub { subordinate_err_nondata = g : subordinate_err_nondata sub }
         LookupChildNotFound (L _ wname) ->
           let fs = (occNameFS . rdrNameOcc . ieWrappedName) wname
           in sub { subordinate_err_unavailable = fs : subordinate_err_unavailable sub }
@@ -1643,6 +1646,8 @@ data LookupChildError
   = LookupChildNotFound { lce_wrapped_name :: !(LIEWrappedName GhcPs) }
   | LookupChildNonType  { lce_wrapped_name :: !(LIEWrappedName GhcPs)
                         , lce_nontype_item :: !GlobalRdrElt }
+  | LookupChildNonData  { lce_wrapped_name :: !(LIEWrappedName GhcPs)
+                        , lce_nondata_item :: !GlobalRdrElt }
 
 lookupChildren :: [GlobalRdrElt]
                -> [LIEWrappedName GhcPs]
@@ -1679,6 +1684,14 @@ lookupChildren all_kids rdr_items = (fails, successes)
           -- `val_gres` to produce a more helpful error message.
           | (gre:gres) <- typ_gres -> Succeeded $ fmap (L l) (gre:|gres)
           | (gre:_)    <- val_gres -> Failed $ LookupChildNonType item gre
+          | otherwise              -> Failed $ LookupChildNotFound item
+
+        IEData{}
+          -- IEData ('data' namespace specifier) restricts the lookup to the
+          -- data namespace, i.e. to `val_gres`. In case of failure, we check
+          -- `typ_gres` to produce a more helpful error message.
+          | (gre:gres) <- val_gres -> Succeeded $ fmap (L l) (gre:|gres)
+          | (gre:_)    <- typ_gres -> Failed $ LookupChildNonData item gre
           | otherwise              -> Failed $ LookupChildNotFound item
 
         IEPattern{} -> panic "lookupChildren: IEPattern"  -- Never happens (invalid syntax)
@@ -2386,26 +2399,27 @@ badImportItemErr
   -> [AvailInfo]
   -> TcRn (NonEmpty ImportLookupReason)
 badImportItemErr iface decl_spec ie sub avails = do
-  patsyns_enabled <- xoptM LangExt.PatternSynonyms
-  expl_ns_enabled <- xoptM LangExt.ExplicitNamespaces
+  exts <- importLookupExtensions
   let import_lookup_bad :: BadImportKind -> ImportLookupReason
-      import_lookup_bad k = ImportLookupBad k iface decl_spec ie patsyns_enabled
+      import_lookup_bad k = ImportLookupBad k iface decl_spec ie exts
   dflags <- getDynFlags
   hsc_env <- getTopEnv
   let rdr_env = mkGlobalRdrEnv
               $ gresFromAvails hsc_env (Just imp_spec) all_avails
-  pure $ fmap import_lookup_bad (importErrorKind dflags rdr_env expl_ns_enabled)
+  pure $ fmap import_lookup_bad (importErrorKind dflags rdr_env)
   where
-    importErrorKind :: DynFlags -> GlobalRdrEnv -> Bool -> NonEmpty BadImportKind
-    importErrorKind dflags rdr_env expl_ns_enabled
+    importErrorKind :: DynFlags -> GlobalRdrEnv -> NonEmpty BadImportKind
+    importErrorKind dflags rdr_env
       | any checkIfTyCon avails = case sub of
-          IsNotSubordinate -> NE.singleton (BadImportAvailTyCon expl_ns_enabled)
+          IsNotSubordinate -> NE.singleton BadImportAvailTyCon
           IsSubordinateError { subordinate_err_parent = gre
                              , subordinate_err_unavailable = unavailable
-                             , subordinate_err_nontype = nontype }
+                             , subordinate_err_nontype = nontype
+                             , subordinate_err_nondata = nondata }
             -> NE.fromList $ catMaybes $
                 [ fmap (BadImportNotExportedSubordinates gre) (NE.nonEmpty unavailable)
-                , fmap (BadImportNonTypeSubordinates gre) (NE.nonEmpty nontype) ]
+                , fmap (BadImportNonTypeSubordinates gre) (NE.nonEmpty nontype)
+                , fmap (BadImportNonDataSubordinates gre) (NE.nonEmpty nondata) ]
       | any checkIfVarName avails = NE.singleton BadImportAvailVar
       | Just con <- find checkIfDataCon avails = NE.singleton (BadImportAvailDataCon (availOccName con))
       | otherwise = NE.singleton (BadImportNotExported suggs)
@@ -2452,6 +2466,12 @@ badImportItemErr iface decl_spec ie sub avails = do
     importedFS = occNameFS $ rdrNameOcc rdr
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
     all_avails = mi_exports iface
+
+importLookupExtensions :: TcRn ImportLookupExtensions
+importLookupExtensions = do
+  ile_pattern_synonyms    <- xoptM LangExt.PatternSynonyms
+  ile_explicit_namespaces <- xoptM LangExt.ExplicitNamespaces
+  return ImportLookupExtensions{ile_pattern_synonyms, ile_explicit_namespaces}
 
 addDupDeclErr :: NonEmpty GlobalRdrElt -> TcRn ()
 addDupDeclErr gres@(gre :| _)

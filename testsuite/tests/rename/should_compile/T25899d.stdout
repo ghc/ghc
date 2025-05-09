@@ -1,0 +1,36 @@
+<interactive>:2:22: error: [GHC-46557]
+    In the import of ‘GHC.Generics’:
+      a class called ‘Generic’ is exported,
+      but its subordinate item ‘Rep’ is not in the data namespace.
+    Suggested fix:
+      Remove the ‘data’ keyword from the subordinate import item:
+        import GHC.Generics ( Generic ( Rep ) )
+
+<interactive>:3:22: error: [GHC-56449]
+    In the import of ‘GHC.Generics’:
+      an item called ‘Generic’ is exported, but it is a type.
+    Suggested fix:
+      Remove the ‘data’ keyword from the import statement:
+        import GHC.Generics ( Generic )
+
+<interactive>:4:22: error: [GHC-56449]
+    In the import of ‘Data.Functor’:
+      an item called ‘Functor’ is exported, but it is a type.
+    Suggested fix:
+      Remove the ‘data’ keyword from the import statement:
+        import Data.Functor ( Functor )
+
+<interactive>:5:22: error: [GHC-56449]
+    In the import of ‘GHC.TypeNats’:
+      an item called ‘(+)’ is exported, but it is a type.
+    Suggested fix:
+      Add the ‘type’ keyword to the import statement:
+        import GHC.TypeNats ( type (+) )
+
+<interactive>:6:22: error: [GHC-56449]
+    In the import of ‘GHC.TypeNats’:
+      an item called ‘(+)’ is exported, but it is a type.
+    Suggested fix:
+      Add the ‘type’ keyword to the import statement:
+        import GHC.TypeNats ( type (+) )
+

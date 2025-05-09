@@ -174,11 +174,8 @@ data IEWrappedName p
   = IEName    (XIEName p)    (LIdP p)  -- ^ unadorned name, e.g @myFun@
   | IEDefault (XIEDefault p) (LIdP p)  -- ^ @default X ()@, see Note [Named default declarations] in GHC.Tc.Gen.Default
   | IEPattern (XIEPattern p) (LIdP p)  -- ^ @pattern X@
-                                       --
-                                       -- exactprint: the location of @pattern@ keyword is captured via 'GHC.Parser.Annotation.EpaLocation'
   | IEType    (XIEType p)    (LIdP p)  -- ^ @type (:+:)@
-                                       --
-                                       -- exactprint: the location of @type@ keyword is captured via 'GHC.Parser.Annotation.EpaLocation'
+  | IEData    (XIEData p)    (LIdP p)  -- ^ @data (:+:)@
   | XIEWrappedName !(XXIEWrappedName p)
 
 -- | Located name with possible adornment

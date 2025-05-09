@@ -2,4 +2,7 @@
     In the import of ‘Data.Functor.Product’:
       a data type called ‘Product’ is exported,
       but its subordinate item ‘Pair’ is not in the type namespace.
+    Suggested fix:
+      Remove the ‘type’ keyword from the subordinate import item:
+        import Data.Functor.Product ( Product ( Pair ) )
 

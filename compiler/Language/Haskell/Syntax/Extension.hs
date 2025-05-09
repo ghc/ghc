@@ -760,6 +760,7 @@ type family XIEName p
 type family XIEDefault p
 type family XIEPattern p
 type family XIEType p
+type family XIEData p
 type family XXIEWrappedName p
 
 
