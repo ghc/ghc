@@ -354,11 +354,15 @@ library
       ghcautoconf.h
       ghcplatform.h
       DerivedConstants.h
+      rts/EventLogConstants.h
+      rts/EventTypes.h
 
     install-includes:
       ghcautoconf.h
       ghcplatform.h
       DerivedConstants.h
+      rts/EventLogConstants.h
+      rts/EventTypes.h
 
     if arch(javascript)
 
@@ -509,12 +513,8 @@ library
       -- TODO: move internal headers into include/private?
       include-dirs: .
       includes: Rts.h
-      autogen-includes: ghcautoconf.h ghcplatform.h
       install-includes: Cmm.h HsFFI.h MachDeps.h Jumps.h Rts.h RtsAPI.h RtsSymbols.h Stg.h
-                        ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
-                        -- ^ from include
-                        rts/EventLogConstants.h
-                        rts/EventTypes.h
+                        ghcconfig.h ghcversion.h
                         -- ^ generated
                         rts/ghc_ffi.h
                         rts/Adjustor.h

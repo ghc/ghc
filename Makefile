@@ -35,9 +35,6 @@ CONFIGURED_FILES := \
 	libraries/base/base.cabal \
 	rts/include/ghcversion.h
 
-EVENT_LOG_CONSTANTS_H := rts/include/rts/EventLogConstants.h
-EVENT_TYPES_H := rts/include/rts/EventTypes.h
-
 # --- Main Targets ---
 all: _build/booted # booted will depend on prepare-sources
 	@echo ">>> Building with GHC: $(GHC_FOR_BUILDER) and Cabal: $(CABAL)"
@@ -55,7 +52,7 @@ _build/booted: _build/prepare-sources
 
 # --- Prepare Sources Target (replaces Haskell's prepareGhcSources) ---
 # --- FIXME: This is nonsense and needs to die.
-_build/prepare-sources: $(CONFIGURED_FILES) $(EVENT_LOG_CONSTANTS_H) $(EVENT_TYPES_H)
+_build/prepare-sources: $(CONFIGURED_FILES)
 	@echo ">>> Preparing sources (copying files)..."
 	mkdir -p compiler/MachRegs
 	mkdir -p libraries/ghc-internal/include
@@ -78,20 +75,6 @@ _build/prepare-sources: $(CONFIGURED_FILES) $(EVENT_LOG_CONSTANTS_H) $(EVENT_TYP
 	mkdir -p _build
 	touch $@
 
-# -- FIXME: THIS needs to die. And should be part of the `rts`.
-# Python script generated files
-$(EVENT_LOG_CONSTANTS_H): rts/gen_event_types.py
-	@echo ">>> Generating $(EVENT_LOG_CONSTANTS_H) using $(PYTHON)..."
-	$(PYTHON) rts/gen_event_types.py \
-		--event-types-defines \
-		$@
-
-$(EVENT_TYPES_H): rts/gen_event_types.py
-	@echo ">>> Generating $(EVENT_TYPES_H) using $(PYTHON)..."
-	$(PYTHON) rts/gen_event_types.py \
-		--event-types-array \
-		$@
-
 # --- Clean Targets ---
 clean:
 	@echo ">>> Cleaning build artifacts..."
@@ -105,7 +88,6 @@ distclean: clean
 	rm -rf build-aux/config.guess build-aux/config.sub build-aux/install-sh build-aux/missing build-aux/compile depcomp
 	find . -name 'Makefile.in' -delete
 	rm -f $(CONFIGURED_FILES)
-	rm -f $(EVENT_LOG_CONSTANTS_H) $(EVENT_TYPES_H)
 	@echo ">>> All generated files cleaned."
 
 

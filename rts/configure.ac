@@ -539,9 +539,14 @@ fi
 
 AC_ARG_VAR([DERIVE_CONSTANTS], [Path to the deriveConstants program])
 AC_PATH_PROG([DERIVE_CONSTANTS], deriveConstants)
-if test -z "$DERIVE_CONSTANTS"; then
-	AC_MSG_ERROR([Cannot find deriveConstants])
-fi
+AS_IF([test "x$DERIVE_CONSTANTS" = x], [AC_MSG_ERROR([deriveConstants executable not found. Please install deriveConstantsor set DERIVE_CONSTANTS environment variable.])])
+
+AC_ARG_VAR([GENAPPLY], [Path to the genapply program])
+AC_PATH_PROG([GENAPPLY], genapply)
+AS_IF([test "x$GENAPPLY" = x], [AC_MSG_ERROR([genapply executable not found. Please install genapply or set GENAPPLY environment variable.])])
+
+AC_CHECK_PROGS([PYTHON], [python3 python python2])
+AS_IF([test "x$PYTHON" = x], [AC_MSG_ERROR([Python interpreter not found. Please install Python or set PYTHON environment variable.])])
 
 AC_MSG_CHECKING([for DerivedConstants.h])
 dnl NOTE:  dnl pass `-fcommon` to force symbols into the common section. If they end
@@ -566,12 +571,6 @@ if $DERIVE_CONSTANTS \
 else
   AC_MSG_RESULT([failed to create])
   AC_MSG_ERROR([Failed to run $DERIVE_CONSTANTS --gen-header ...])
-fi
-
-AC_ARG_VAR([GENAPPLY], [Path to the genapply program])
-AC_PATH_PROG([GENAPPLY], genapply)
-if test -z "$GENAPPLY"; then
-	AC_MSG_ERROR([Cannot find genapply])
 fi
 
 AC_MSG_CHECKING([for AutoApply.cmm])
@@ -605,6 +604,23 @@ else
   AC_MSG_RESULT([failed to create])
   AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h -V64 > AutoApply_V64.cmm])
 fi
+
+AC_MSG_CHECKING([for include/rts/EventLogConstants.h])
+if mkdir -p include/rts && $PYTHON $srcdir/gen_event_types.py --event-types-defines include/rts/EventLogConstants.h; then
+  AC_MSG_RESULT([created])
+else
+  AC_MSG_RESULT([failed to create])
+  AC_MSG_ERROR([Failed to run $PYTHON gen_event_types.py])
+fi
+
+AC_MSG_CHECKING([for include/rts/EventTypes.h])
+if mkdir -p include/rts && $PYTHON $srcdir/gen_event_types.py --event-types-array include/rts/EventTypes.h; then
+  AC_MSG_RESULT([created])
+else
+  AC_MSG_RESULT([failed to create])
+  AC_MSG_ERROR([Failed to run $PYTHON gen_event_types.py])
+fi
+
 
 dnl --------------------------------------------------------------
 dnl ** Write config files
