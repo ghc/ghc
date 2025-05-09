@@ -1,3 +1,9 @@
 DsMonadCompFailMsg: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
 
 user error (Pattern match failure in monad comprehension at DsMonadCompFailMsg.hs:2:14-19)
+
+HasCallStack backtrace:
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/Control/Monad/Fail.hs:66:12 in ghc-internal:GHC.Internal.Control.Monad.Fail
+  a type signature in an instance, called at libraries/ghc-internal/src/GHC/Internal/Control/Monad/Fail.hs:65:13 in ghc-internal:GHC.Internal.Control.Monad.Fail
+  a monad comprehension pattern, called at DsMonadCompFailMsg.hs:2:14 in main:Main
+

@@ -1,3 +1,9 @@
 withBinaryFile002: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
 
 user error (test)
+
+HasCallStack backtrace:
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/Control/Monad/Fail.hs:66:12 in ghc-internal:GHC.Internal.Control.Monad.Fail
+  a type signature in an instance, called at libraries/ghc-internal/src/GHC/Internal/Control/Monad/Fail.hs:65:13 in ghc-internal:GHC.Internal.Control.Monad.Fail
+  fail, called at withBinaryFile002.hs:8:5 in main:Main
+
