@@ -1,4 +1,3 @@
-
 subsumption_sort_hole_fits.hs:2:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: String -> [String]
     • In the expression: _ "hello, world"
@@ -24,7 +23,9 @@ subsumption_sort_hole_fits.hs:2:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdef
           with mempty @(String -> [String])
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
            (and originally defined in ‘GHC.Internal.Base’))
-        fail :: forall (m :: * -> *) a. MonadFail m => String -> m a
+        fail :: forall (m :: * -> *) a.
+                (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
+                String -> m a
           with fail @[] @String
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
            (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))
@@ -36,3 +37,4 @@ subsumption_sort_hole_fits.hs:2:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdef
           with pure @[] @String
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
            (and originally defined in ‘GHC.Internal.Base’))
+

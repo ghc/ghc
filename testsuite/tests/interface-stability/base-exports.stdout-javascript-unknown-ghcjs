@@ -452,7 +452,7 @@ module Control.Monad where
     {-# MINIMAL (>>=) #-}
   type MonadFail :: (* -> *) -> Constraint
   class Monad m => MonadFail m where
-    fail :: forall a. GHC.Internal.Base.String -> m a
+    fail :: forall a. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Base.String -> m a
     {-# MINIMAL fail #-}
   type MonadPlus :: (* -> *) -> Constraint
   class (GHC.Internal.Base.Alternative m, Monad m) => MonadPlus m where
@@ -492,7 +492,7 @@ module Control.Monad.Fail where
   -- Safety: Safe
   type MonadFail :: (* -> *) -> Constraint
   class GHC.Internal.Base.Monad m => MonadFail m where
-    fail :: forall a. GHC.Internal.Base.String -> m a
+    fail :: forall a. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Base.String -> m a
     {-# MINIMAL fail #-}
 
 module Control.Monad.Fix where
@@ -13037,7 +13037,7 @@ module Prelude where
     {-# MINIMAL (>>=) #-}
   type MonadFail :: (* -> *) -> Constraint
   class Monad m => MonadFail m where
-    fail :: forall a. String -> m a
+    fail :: forall a. GHC.Internal.Stack.Types.HasCallStack => String -> m a
     {-# MINIMAL fail #-}
   type Monoid :: * -> Constraint
   class Semigroup a => Monoid a where

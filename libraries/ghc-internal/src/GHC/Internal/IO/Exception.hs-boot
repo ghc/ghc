@@ -4,7 +4,7 @@
 module GHC.Internal.IO.Exception where
 
 import GHC.Internal.Base
-import GHC.Internal.Exception
+import {-# SOURCE #-} GHC.Internal.Exception.Type
 
 data IOException
 instance Exception IOException

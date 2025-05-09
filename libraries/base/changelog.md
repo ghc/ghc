@@ -9,6 +9,7 @@
   * `Data.List.NonEmpty.{init,last,tails1}` are now defined using only total functions (rather than partial ones). ([CLC proposal #293](https://github.com/haskell/core-libraries-committee/issues/293))
   * `Data.List.NonEmpty` functions now have the same laziness as their `Data.List` counterparts (i.e. make them more strict than they currently are) ([CLC proposal #107](https://github.com/haskell/core-libraries-committee/issues/107))
   * `instance Functor NonEmpty` is now specified using `map` (rather than duplicating code). ([CLC proposal #300](https://github.com/haskell/core-libraries-committee/issues/300))
+  * `fail` from `MonadFail` now carries `HasCallStack` constraint. ([CLC proposal #327](https://github.com/haskell/core-libraries-committee/issues/327))
   * The `Data.Enum.enumerate` function was introduced ([CLC #306](https://github.com/haskell/core-libraries-committee/issues/306))
   * Worker threads used by various `base` facilities are now labelled with descriptive thread labels ([CLC proposal #305](https://github.com/haskell/core-libraries-committee/issues/305), [GHC #25452](https://gitlab.haskell.org/ghc/ghc/-/issues/25452)). Specifically, these include:
     * `Control.Concurrent.threadWaitRead`

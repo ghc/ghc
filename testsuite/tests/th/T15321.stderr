@@ -3,7 +3,9 @@ T15321.hs:9:9: error: [GHC-88464]
     • In the expression: _ "baz"
       In the untyped splice: $(_ "baz")
     • Valid hole fits include
-        fail :: forall (m :: * -> *) a. MonadFail m => String -> m a
+        fail :: forall (m :: * -> *) a.
+                (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
+                String -> m a
           with fail @GHC.Internal.TH.Syntax.Q @GHC.Internal.TH.Syntax.Exp
           (imported from ‘Prelude’ at T15321.hs:3:8-13
            (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))

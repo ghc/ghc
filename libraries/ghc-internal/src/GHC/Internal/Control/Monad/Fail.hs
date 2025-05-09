@@ -1,3 +1,4 @@
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -13,7 +14,10 @@
 --
 module GHC.Internal.Control.Monad.Fail ( MonadFail(fail) ) where
 
-import GHC.Internal.Base (String, Monad(), Maybe(Nothing), IO(), failIO)
+import GHC.Internal.Base (String, Monad(), Maybe(Nothing), IO(), (.))
+import {-# SOURCE #-} GHC.Internal.IO (throwIO)
+import {-# SOURCE #-} GHC.Internal.IO.Exception (userError)
+import GHC.Internal.Stack.Types (HasCallStack)
 
 -- | When a value is bound in @do@-notation, the pattern on the left
 -- hand side of @<-@ might not match. In this case, this class
@@ -42,18 +46,21 @@ import GHC.Internal.Base (String, Monad(), Maybe(Nothing), IO(), failIO)
 --
 -- @since base-4.9.0.0
 class Monad m => MonadFail m where
-    fail :: String -> m a
+    fail :: HasCallStack => String -> m a
 
 
 -- | @since base-4.9.0.0
 instance MonadFail Maybe where
+    fail :: HasCallStack => String -> Maybe a
     fail _ = Nothing
 
 -- | @since base-4.9.0.0
 instance MonadFail [] where
     {-# INLINE fail #-}
+    fail :: HasCallStack => String -> [a]
     fail _ = []
 
 -- | @since base-4.9.0.0
 instance MonadFail IO where
-    fail = failIO
+    fail :: HasCallStack => String -> IO a
+    fail = throwIO . userError
