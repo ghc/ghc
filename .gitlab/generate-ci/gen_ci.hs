@@ -874,8 +874,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
         -- We have to trigger cabal build in an independent way to mitigate Wine hangs at MSYS2/Arm64EC
         , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l -c './hadrian/build-cabal clean'"
         , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh build_hadrian"
-        -- It builds, it is already a huge win at the moment of this commit
-        -- TODO: , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh test_hadrian"
+        , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh test_hadrian"
         ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
