@@ -61,9 +61,6 @@ _build/prepare-sources: $(CONFIGURED_FILES) $(EVENT_LOG_CONSTANTS_H) $(EVENT_TYP
 	mkdir -p libraries/ghc-internal/include
 	mkdir -p libraries/ghc-internal/cbits
 
-	cp -fp ./config.sub rts/
-	cp -fp ./config.guess rts/
-
 	cp -fp rts/include/rts/Bytecodes.h compiler/
 	cp -fp rts/include/rts/storage/ClosureTypes.h compiler/
 	cp -fp rts/include/rts/storage/FunTypes.h compiler/
