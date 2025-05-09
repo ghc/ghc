@@ -46,6 +46,7 @@ packages:
   libraries/time
   libraries/transformers
   libraries/unix/
+  libraries/xhtml/
   libraries/Win32/
   libraries/Cabal/Cabal-syntax
   libraries/Cabal/Cabal

@@ -2335,7 +2335,6 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnMisplacedPragmas -> warnSpec x
   Opt_WarnUnsafe -> warnSpec' x setWarnUnsafe
   Opt_WarnUnsupportedCallingConventions -> warnSpec x
-  Opt_WarnUnsupportedLlvmVersion -> warnSpec x
   Opt_WarnMissedExtraSharedLib -> warnSpec x
   Opt_WarnUntickedPromotedConstructors -> warnSpec x
   Opt_WarnUnusedDoBind -> warnSpec x

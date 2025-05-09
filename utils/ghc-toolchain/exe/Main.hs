@@ -55,6 +55,8 @@ data Opts = Opts
     , optReadelf   :: ProgOpt
     , optMergeObjs :: ProgOpt
     , optWindres   :: ProgOpt
+    , optOtool     :: ProgOpt
+    , optInstallNameTool :: ProgOpt
     -- Note we don't actually configure LD into anything but
     -- see #23857 and #22550 for the very unfortunate story.
     , optLd        :: ProgOpt
@@ -103,6 +105,8 @@ emptyOpts = Opts
     , optReadelf   = po0
     , optMergeObjs = po0
     , optWindres   = po0
+    , optOtool     = po0
+    , optInstallNameTool = po0
     , optLd        = po0
     , optUnregisterised = Nothing
     , optTablesNextToCode = Nothing
@@ -131,6 +135,8 @@ _optNm      = Lens optNm      (\x o -> o {optNm=x})
 _optReadelf = Lens optReadelf (\x o -> o {optReadelf=x})
 _optMergeObjs = Lens optMergeObjs (\x o -> o {optMergeObjs=x})
 _optWindres = Lens optWindres (\x o -> o {optWindres=x})
+_optOtool = Lens optOtool (\x o -> o {optOtool =x})
+_optInstallNameTool = Lens optInstallNameTool (\x o -> o {optInstallNameTool=x})
 _optLd = Lens optLd (\x o -> o {optLd= x})
 
 _optTriple :: Lens Opts (Maybe String)
@@ -192,6 +198,8 @@ options =
     , progOpts "readelf" "readelf utility" _optReadelf
     , progOpts "merge-objs" "linker for merging objects" _optMergeObjs
     , progOpts "windres" "windres utility" _optWindres
+    , progOpts "otool" "otool utility" _optOtool
+    , progOpts "install-name-tool" "install_name_tool utility" _optInstallNameTool
     , progOpts "ld" "linker" _optLd
     ]
   where
@@ -458,6 +466,20 @@ mkTarget opts = do
             return (Just windres)
           _ -> return Nothing
 
+    otool <-
+        case archOS_OS archOs of
+          OSDarwin -> do
+            otool <- findProgram "otool" (optOtool opts) ["otool"]
+            return (Just otool)
+          _ -> return Nothing
+
+    install_name_tool <-
+        case archOS_OS archOs of
+          OSDarwin -> do
+            install_name_tool <- findProgram "install_name_tool" (optInstallNameTool opts) ["install_name_tool"]
+            return (Just install_name_tool)
+          _ -> return Nothing
+
     -- various other properties of the platform
     tgtWordSize <- checkWordSize cc
     tgtEndianness <- checkEndianness cc
@@ -495,6 +517,8 @@ mkTarget opts = do
                    , tgtNm = nm
                    , tgtMergeObjs = mergeObjs
                    , tgtWindres = windres
+                   , tgtOtool = otool
+                   , tgtInstallNameTool = install_name_tool
                    , tgtWordSize
                    , tgtEndianness
                    , tgtUnregisterised
@@ -540,9 +564,9 @@ targetToSettings tgt@Target{..} =
   , ("ar supports at file", arSupportsAtFile')
   , ("ar supports -L",      arSupportsDashL')
   , ("ranlib command", ranlibPath)
-  , ("otool command", otool_cmd)
-  , ("install_name_tool command", install_name_cmd)
-  , ("windres command", (maybe "/bin/false" prgPath tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
+  , ("otool command", maybe "otool" prgPath tgtOtool)
+  , ("install_name_tool command", maybe "install_name_tool" prgPath tgtInstallNameTool)
+  , ("windres command", maybe "/bin/false" prgPath tgtWindres) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
   , ("unlit command", "$topdir/../bin/unlit") -- FIXME
   , ("cross compiling", yesNo False) -- FIXME: why do we need this settings at all?
   , ("target platform string", targetPlatformTriple tgt)
@@ -563,12 +587,12 @@ targetToSettings tgt@Target{..} =
   , ("target RTS linker only supports shared libraries", yesNo (targetRTSLinkerOnlySupportsSharedLibs tgt))
   , ("Use interpreter", yesNo (targetSupportsInterpreter tgt))
   , ("Support SMP", yesNo (targetSupportsSMP tgt))
-  , ("RTS ways", "") -- FIXME: should be a property of the RTS, not of the target
+  , ("RTS ways", "v") -- FIXME: should be a property of the RTS, not of the target
   , ("Tables next to code", (yesNo tgtTablesNextToCode))
   , ("Leading underscore",  (yesNo tgtSymbolsHaveLeadingUnderscore))
   , ("Use LibFFI", yesNo tgtUseLibffiForAdjustors)
   , ("RTS expects libdw", yesNo False) -- FIXME
-  , ("Relative Global Package DB", "")
+  , ("Relative Global Package DB", "package.conf.d") -- FIXME
   , ("base unit-id", "")
   ]
   where
@@ -578,8 +602,6 @@ targetToSettings tgt@Target{..} =
     wordSize = show (wordSize2Bytes tgtWordSize)
     isBigEndian = yesNo $ (\case BigEndian -> True; LittleEndian -> False) tgtEndianness
 
-    otool_cmd = "" -- FIXME
-    install_name_cmd = "" -- FIXME
     has_libm = "NO" -- FIXME
     llc_cmd = "llc" -- FIXME
     llvm_opt_cmd = "opt" -- FIXME

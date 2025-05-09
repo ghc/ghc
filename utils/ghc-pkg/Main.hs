@@ -44,6 +44,7 @@ import Distribution.Text
 import Distribution.Version
 import Distribution.Backpack
 import Distribution.Pretty (Pretty (..))
+import Distribution.Types.Flag (showFlagValue, unFlagAssignment)
 import Distribution.Types.UnqualComponentName
 import Distribution.Types.LibraryName
 import Distribution.Types.MungedPackageName
@@ -268,6 +269,10 @@ usageHeader prog = substProg prog $
   "    for input for the graphviz tools.  For example, to generate a PDF\n" ++
   "    of the dependency graph: ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf\n" ++
   "\n" ++
+  "  $p mermaid\n" ++
+  "    Generate a graph of the package dependencies in Mermaid format\n" ++
+  "    suitable for embedding in Markdown files.\n" ++
+  "\n" ++
   "  $p find-module {module}\n" ++
   "    List registered packages exposing module {module} in the global\n" ++
   "    database, and also the user database if --user is given.\n" ++
@@ -464,6 +469,8 @@ runit verbosity cli nonopts = do
                                  (Just (Substring pkgarg_str m)) Nothing
     ["dot"] -> do
         showPackageDot verbosity cli
+    ["mermaid"] -> do
+        showPackageMermaid verbosity cli
     ["find-module", mod_name] -> do
         let match = maybe (==mod_name) id (substringCheck mod_name)
         listPackages verbosity cli Nothing (Just match)
@@ -1428,6 +1435,7 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.unitDepends        = depends pkg,
        GhcPkg.unitAbiDepends     = map (\(AbiDependency k v) -> (k,ST.pack $ unAbiHash v)) (abiDepends pkg),
        GhcPkg.unitAbiHash        = ST.pack $ unAbiHash (abiHash pkg),
+       GhcPkg.unitFlags          = map (ST.pack . showFlagValue) . unFlagAssignment $ Cabal.unitFlags pkg,
        GhcPkg.unitImportDirs     = map ST.pack $ importDirs pkg,
        GhcPkg.unitLibraries      = map ST.pack $ hsLibraries pkg,
        GhcPkg.unitExtDepLibsSys  = map ST.pack $ extraLibraries pkg,
@@ -1575,7 +1583,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                    | installedUnitId p `elem` broken = printf "{%s}" doc
                    | exposed p = doc
                    | otherwise = printf "(%s)" doc
-                   where doc | verbosity >= Verbose = printf "%s (%s)" pkg (display (installedUnitId p))
+                   where doc | verbosity >= Verbose = printf "%s (%s) [%s]" pkg (display (installedUnitId p)) (display (Cabal.unitFlags p))
                              | otherwise            = pkg
                           where
                           pkg = display (mungedId p)
@@ -1602,7 +1610,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                    | installedUnitId p `elem` broken = printf "\ESC[31m%s\ESC[0m" doc -- red color
                    | exposed p = doc
                    | otherwise = printf "\ESC[34m%s\ESC[0m" doc -- blue color
-                   where doc | verbosity >= Verbose = printf "%s (%s)" pkg (display (installedUnitId p))
+                   where doc | verbosity >= Verbose = printf "%s (%s) [%s]" pkg (display (installedUnitId p)) (display (Cabal.unitFlags p))
                              | otherwise            = pkg
                           where
                           pkg = display (mungedId p)
@@ -1642,6 +1650,27 @@ showPackageDot verbosity myflags = do
                    let to = display (mungedId dep)
                  ]
   putStrLn "}"
+
+showPackageMermaid :: Verbosity -> [Flag] -> IO ()
+showPackageMermaid verbosity myflags = do
+  (_, GhcPkg.DbOpenReadOnly, flag_db_stack) <-
+    getPkgDatabases verbosity GhcPkg.DbOpenReadOnly
+      False{-use user-} True{-use cache-} False{-expand vars-} myflags
+
+  let all_pkgs = allPackagesInStack flag_db_stack
+      ipix  = PackageIndex.fromList all_pkgs
+
+  putStrLn "```mermaid"
+  putStrLn "graph TD"
+  mapM_ putStrLn [ "  " ++ from ++ " --> " ++ to
+                 | p <- all_pkgs,
+                   let from = display (mungedId p),
+                   key <- depends p,
+                   Just dep <- [PackageIndex.lookupUnitId ipix key],
+                   let to = display (mungedId dep)
+                 ]
+  putStrLn "```"
+
 
 -- -----------------------------------------------------------------------------
 -- Prints the highest (hidden or exposed) version of a package

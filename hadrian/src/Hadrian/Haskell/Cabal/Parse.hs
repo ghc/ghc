@@ -126,8 +126,9 @@ biModules pd = go [ comp | comp@(bi,_,_,_) <-
 --
 -- Put another way, while Hadrian knows these are generated, Cabal
 -- should just think they are regular source files.
+-- TODO: Review if this is necessary
 extraPreConfigureDeps :: [String]
-extraPreConfigureDeps = ["compiler/GHC/CmmToLlvm/Version/Bounds.hs"]
+extraPreConfigureDeps = []
 
 -- TODO: Track command line arguments and package configuration flags.
 -- | Configure a package using the Cabal library by collecting all the command
