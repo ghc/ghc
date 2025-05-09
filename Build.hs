@@ -16,12 +16,10 @@
 module Main where
 
 import Data.Maybe
-import Data.List qualified as List
 import Data.Map qualified as Map
 import Data.Map (Map)
 import Data.Text (Text)
 import Data.Text qualified as Text
-import Data.Text.IO qualified as Text
 import Control.Monad
 import Control.Exception (bracket)
 import System.Environment
@@ -86,7 +84,7 @@ main = do
   generateSettings ghcToolchain stage1_settings "_build/stage1/"
 
   msg "Building boot libraries with stage1 compiler..."
-  buildBootLibraries cabal ghc1 ghcPkg1 deriveConstants genapply genprimop defaultGhcBuildOptions "_build/stage1/"
+  buildBootLibraries cabal ghc1 ghcPkg1 deriveConstants genapply genprimop "_build/stage1/"
 
   msg "Building stage2 GHC program"
   createDirectoryIfMissing True "_build/stage2"
@@ -129,9 +127,6 @@ buildGhcStage2 = buildGhcStage False
 -- | Build GHC program
 buildGhcStage :: Bool -> GhcBuildOptions -> Cabal -> Ghc -> FilePath -> IO ()
 buildGhcStage booting opts cabal ghc0 dst = do
-  let src = dst </> "src"
-  prepareGhcSources opts src
-
   msg "  - Building GHC and utility programs..."
 
   let builddir = dst </> "cabal"
@@ -160,8 +155,6 @@ buildGhcStage booting opts cabal ghc0 dst = do
 
   let cabal_project_path = "cabal.project.stage" ++ (if booting then "1" else "2")
 
-  -- makeCabalProject cabal_project_path (if booting then stage1_project else stage2_project)
-
   -- the targets
   let targets
         | booting =
@@ -186,7 +179,17 @@ buildGhcStage booting opts cabal ghc0 dst = do
            , "hpc-bin:hpc"
            , "iserv:iserv"
            , "runghc:runghc"
+           -- All these libraries are somehow needed by some tests :rolleyes:
+           -- this seems to be needed occationally.
            , "ghc-bignum:ghc-bignum"
+           -- this package is utterly retarded.
+           , "system-cxx-std-lib:system-cxx-std-lib"
+           , "ghc-compact:ghc-compact"
+           , "ghc-experimental:ghc-experimental"
+           , "ghc-toolchain:ghc-toolchain"
+           , "integer-gmp:integer-gmp"
+           , "xhtml:xhtml"
+           , "terminfo:terminfo"
            ]
 
   let build_cmd = (runCabal cabal $
@@ -254,180 +257,13 @@ buildGhcStage booting opts cabal ghc0 dst = do
   when booting $ do
     copy_bin "ghc-toolchain-bin:ghc-toolchain-bin" "ghc-toolchain"
 
-  -- initialize empty global package database
-  -- pkgdb <- makeAbsolute (dst </> "pkgs")
-  -- ghcpkg <- GhcPkg <$> makeAbsolute (dst </> "bin/ghc-pkg")
-  -- initEmptyDB ghcpkg pkgdb
-
-
--- | Prepare GHC sources in the given directory
-prepareGhcSources :: GhcBuildOptions -> FilePath -> IO ()
-prepareGhcSources opts dst = do
-  msg $ "  - Preparing sources in " ++ dst ++ "..."
-  createDirectoryIfMissing True dst
-  createDirectoryIfMissing True ("compiler/MachRegs")
-
-  -- cp "./libraries"    dst
-  -- cp "./compiler/*"   (dst </> "libraries/ghc/")
-  -- cp "./rts"          (dst </> "libraries/")
-  -- cp "./ghc"          (dst </> "ghc-bin")
-  -- cp "./utils"        dst
-
-  cp "./config.sub"   ("rts/")
-  cp "./config.guess" ("rts/")
-
-  -- These needs to shared
-  cp "rts/include/rts/Bytecodes.h"            "compiler/"
-  cp "rts/include/rts/storage/ClosureTypes.h" "compiler/"
-  cp "rts/include/rts/storage/FunTypes.h"     "compiler/"
-  cp "rts/include/stg/MachRegs.h"             "compiler/"
-  cp "rts/include/stg/MachRegs/*.h"           "compiler/MachRegs/"
-
-  -- shared among ghc-internal rts and unlit
-  cp "utils/fs/fs.h" "libraries/ghc-internal/include"
-  cp "utils/fs/fs.c" "libraries/ghc-internal/cbits"
-  cp "utils/fs/fs.*" "rts/"
-  cp "utils/fs/fs.*" "utils/unlit/"
-
-  python <- findExecutable "python" >>= \case
-    Nothing -> error "Couldn't find 'python'"
-    Just r -> pure r
-
-  void $ readCreateProcess (proc python
-    [ "rts/gen_event_types.py"
-    , "--event-types-defines"
-    , "rts/include/rts/EventLogConstants.h"
-    ]) ""
-
-  void $ readCreateProcess (proc python
-    [ "rts/gen_event_types.py"
-    , "--event-types-array"
-    , "rts/include/rts/EventTypes.h"
-    ]) ""
-
-  -- substitute variables in files
-  let subst fin fout rs = do
-        t <- Text.readFile fin
-        Text.writeFile fout (List.foldl' (\v (needle,rep) -> Text.replace needle rep v) t rs)
-  let subst_in f = subst (f <.> "in") f
-  let common_substs =
-        [ (,) "@ProjectVersion@"       (gboVersion opts)
-        , (,) "@ProjectVersionMunged@" (gboVersionMunged opts)
-        , (,) "@ProjectVersionForLib@" (gboVersionForLib opts)
-        , (,) "@ProjectPatchLevel1@"   (gboVersionPatchLevel1 opts)
-        , (,) "@ProjectPatchLevel2@"   (gboVersionPatchLevel2 opts)
-        , (,) "@ProjectVersionInt@"    (gboVersionInt opts)
-        ]
-      llvm_substs =
-        [ (,) "@LlvmMinVersion@" (gboLlvmMinVersion opts)
-        , (,) "@LlvmMaxVersion@" (gboLlvmMaxVersion opts)
-        ]
-      boot_th_substs =
-        [ (,) "@Suffix@"     ""
-        , (,) "@SourceRoot@" "."
-        ]
-
-  subst_in ("ghc/ghc-bin.cabal") common_substs
-  subst_in ("compiler/ghc.cabal") common_substs
-  subst_in ("libraries/ghc-boot/ghc-boot.cabal") common_substs
-  subst_in ("libraries/ghc-boot-th/ghc-boot-th.cabal") (common_substs ++ boot_th_substs)
-  subst_in ("libraries/ghc-heap/ghc-heap.cabal") common_substs
-  subst_in ("libraries/template-haskell/template-haskell.cabal") common_substs
-  subst_in ("libraries/ghci/ghci.cabal") common_substs
-
-  -- This is only used for a warning message. Nuke the check!
-  subst_in ("compiler/GHC/CmmToLlvm/Version/Bounds.hs") llvm_substs
-
-  subst_in ("utils/ghc-pkg/ghc-pkg.cabal") common_substs
-  subst_in ("utils/iserv/iserv.cabal") common_substs
-  subst_in ("utils/runghc/runghc.cabal") common_substs
-
-  subst_in ("libraries/ghc-internal/ghc-internal.cabal") common_substs
-  subst_in ("libraries/ghc-experimental/ghc-experimental.cabal") common_substs
-  subst_in ("libraries/base/base.cabal") common_substs
-  subst_in ("rts/include/ghcversion.h") common_substs
-
-
-buildBootLibraries :: Cabal -> Ghc -> GhcPkg -> DeriveConstants -> GenApply -> GenPrimop -> GhcBuildOptions -> FilePath -> IO ()
-buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst = do
-  src <- makeAbsolute (dst </> "src")
-  prepareGhcSources opts src
+buildBootLibraries :: Cabal -> Ghc -> GhcPkg -> DeriveConstants -> GenApply -> GenPrimop -> FilePath -> IO ()
+buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop dst = do
 
   -- Build the RTS
   src_rts <- makeAbsolute "rts"
   build_dir <- makeAbsolute (dst </> "cabal")
-  ghcversionh <- makeAbsolute (src_rts </> "include/ghcversion.h")
-
-  -- FIXME: could we build a cross compiler, simply by not reading this from the boot compiler, but passing it in?
-  -- target_triple <- ghcTargetTriple ghc
-  -- let to_triple = \case
-  --       [arch,vendor,os] -> (arch,vendor,os)
-  --       t -> error $ "Triple expected but got: " ++ show t
-  -- let (arch,vendor,os) = to_triple $ words $ map (\c -> if c == '-' then ' ' else c) target_triple
-
-  -- let cabal_project_rts_path = dst </> "cabal.project-rts"
-  --     -- cabal's code handling escaping is bonkers. We need to wrap the whole
-  --     -- option into \" otherwise it does weird things (like keeping only the
-  --     -- last double-quote).
-  -- let def_string k v = "  ghc-options: \"-optc-D" ++ k ++ "=\\\"" ++ v ++ "\\\"\""
-  -- let def        k v = "  ghc-options: \"-optc-D" ++ k ++ "=" ++ v ++ "\""
-  -- let rts_options =
-  --       [ "package rts"
-  --       , def_string "ProjectVersion" (Text.unpack (gboVersionInt opts))
-  --       , def_string "RtsWay"            "v"
-  --       , def_string "HostPlatform"      target_triple
-  --       , def_string "HostArch"          arch
-  --       , def_string "HostOS"            os
-  --       , def_string "HostVendor"        vendor
-  --       , def_string "BuildPlatform"     "FIXME"
-  --       , def_string "BuildArch"         "FIXME"
-  --       , def_string "BuildOS"           "FIXME"
-  --       , def_string "BuildVendor"       "FIXME"
-  --       , def_string "GhcUnregisterised" "FIXME"
-  --       , def_string "TablesNextToCode"  "FIXME"
-  --         -- Set the namespace for the rts fs functions
-  --       , def "FS_NAMESPACE" "rts"
-  --         -- This is stupid, I can't seem to figure out how to set this in cabal
-  --         -- this needs to be fixed in cabal.
-  --       , if os == "darwin"
-  --         then "  flags: +tables-next-to-code +leading-underscore"
-  --         else "  flags: +tables-next-to-code"
-  --         -- FIXME: we should
-  --         -- FIXME: deal with libffi (add package?)
-  --         --
-  --         -- FIXME: we should make tables-next-to-code  optional here and in the
-  --         -- compiler settings. Ideally, GHC should even look into the rts's
-  --         -- ghcautoconf.h to check whether TABLES_NEXT_TO_CODE is defined or
-  --         -- not. It would be cleaner than duplicating this information into the
-  --         -- settings (similar to what we do with platform constants).
-
-  --         -- FIXME: Cabal doesn't like when flags are on separate lines like
-  --         -- this:
-  --         --  flags: +use-system-libffi
-  --         --  flags: +tables-next-to-code
-  --         -- Apparently it makes it ignore the first set of flags...
-  --         -- See https://github.com/haskell/cabal/issues/10767
-  --       ]
-
-  -- makeCabalProject cabal_project_rts_path $
-  --       [ "package-dbs: clear, global"
-  --       , ""
-  --       , "packages:"
-  --       , "  " ++ src </> "libraries/rts"
-  --       , ""
-  --       , "benchmarks: False"
-  --       , "tests: False"
-  --       , "allow-boot-library-installs: True"
-  --       , "active-repositories: :none"
-  --       , ""
-  --       , "package *"
-  --       , "  library-vanilla: True"
-  --       , "  shared: False"
-  --       , "  executable-profiling: False"
-  --       , "  executable-dynamic: False"
-  --       , "  executable-static: False"
-  --       , ""
-  --       ] ++ rts_options
+  ghcversionh <- makeAbsolute "rts/include/ghcversion.h"
 
   let build_rts_cmd = runCabal cabal
         [ "build"
@@ -500,116 +336,6 @@ buildBootLibraries cabal ghc ghcpkg derive_constants genapply genprimop opts dst
   writeFile primops_txt primops
   writeFile ("libraries/ghc-internal/src/GHC/Internal/Prim.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-source"]) primops
   writeFile ("libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs") =<< readCreateProcess (runGenPrimop genprimop ["--make-haskell-wrappers"]) primops
-
-  -- build boot libraries: ghc-internal, base...
-
-  -- let boot_libs_env = dst </> "boot-libs.env"
-  -- let build_boot_cmd = runCabal cabal
-  --       [ "install"
-  --       , "--lib"
-  --       , "--package-env=" ++ boot_libs_env
-  --       , "--force-reinstalls"
-  --       , "--project-file=" ++ cabal_project_bootlibs_path
-  --       , "--with-compiler=" ++ ghcPath ghc
-  --       , "--with-hc-pkg=" ++ ghcPkgPath ghcpkg
-  --       , "--ghc-options=\"-ghcversion-file=" ++ ghcversionh ++ "\""
-  --       , "--builddir=" ++ build_dir
-  --       , "-j"
-
-  --         -- targets
-  --       -- , "rts"
-  --       -- , "ghc-internal"
-  --       -- , "ghc-experimental"
-  --       -- , "ghc-compact"
-  --       -- , "base"
-  --       -- , "stm"
-  --       -- , "system-cxx-std-lib"
-  --       --   -- shallow compat packages over ghc-internal
-  --       -- , "ghc-prim"
-  --       -- , "ghc-bignum"
-  --       -- , "integer-gmp"
-  --       -- , "template-haskell"
-  --       --   -- target dependencies
-  --       -- , "ghc-boot-th" -- dependency of template-haskell
-  --       -- , "pretty"      -- dependency of ghc-boot-th
-  --       --   -- other boot libraries used by tests
-  --       -- , "array"
-  --       -- , "binary"
-  --       -- , "bytestring"
-  --       -- , "Cabal"
-  --       -- , "Cabal-syntax"
-  --       -- , "containers"
-  --       -- , "deepseq"
-  --       -- , "directory"
-  --       -- , "exceptions"
-  --       -- , "file-io"
-  --       -- , "filepath"
-  --       -- , "hpc"
-  --       -- , "mtl"
-  --       -- , "os-string"
-  --       -- , "parsec"
-  --       -- , "process"
-  --       -- , "semaphore-compat"
-  --       -- , "text"
-  --       -- , "time"
-  --       -- , "transformers"
-  --       -- , "unix" -- FIXME: we'd have to install Win32 for Windows target. Maybe --libs could install dependencies too..
-  --       --   -- ghc related
-  --       -- , "ghc-boot"
-  --       -- , "ghc-heap"
-  --       -- , "ghc-platform"
-  --       -- , "ghc-toolchain" -- some test requires this
-  --       -- , "ghci"
-  --       , "ghc:ghc"
-  --       ]
-
-  -- msg "  - Building boot libraries..."
-  -- (boot_exit_code, boot_stdout, boot_stderr) <- readCreateProcessWithExitCode build_boot_cmd ""
-  -- writeFile (dst </> "boot-libs.stdout") boot_stdout
-  -- writeFile (dst </> "boot-libs.stderr") boot_stderr
-  -- case boot_exit_code of
-  --   ExitSuccess -> pure ()
-  --   ExitFailure r -> do
-  --     putStrLn $ "Failed to build boot libraries with error code " ++ show r
-  --     putStrLn boot_stdout
-  --     putStrLn boot_stderr
-  --     putStrLn $ "Logs can be found in " ++ dst ++ "boot-libs.{stdout,stderr}"
-  --     exitFailure
-
-  -- -- The libraries have been installed globally.
-  -- boot_libs_env_lines <- lines <$> readFile boot_libs_env
-  -- -- FIXME: Sometimes the package environment contains the path to the global db,
-  -- -- sometimes not... I don't know why yet.
-  -- (global_db,pkg_ids) <- case drop 2 boot_libs_env_lines of
-  --   [] -> error "Unexpected empty package environment"
-  --   (x:xs)
-  --     | not ("package-db" `List.isPrefixOf` x)
-  --     -> do
-  --       putStrLn "For some reason cabal-install didn't generate a valid package environment (package-db is missing)."
-  --       putStrLn "It happens sometimes for unknown reasons... Rerun 'make' to workaround this..."
-  --       exitFailure
-  --     | otherwise -> pure (drop 11 x, map (drop 11) xs)
-  -- putStrLn $ "We've built boot libraries in " ++ global_db ++ ":"
-  -- mapM_ (putStrLn . ("  - " ++)) pkg_ids
-
-  -- copy the libs in another db
-  -- createDirectoryIfMissing True (dst </> "pkgs")
-  -- void $ readCreateProcess (shell $ "ln -s _build/stage2/cabal/packagedb/ghc-9.13 _build/stage2/pkgs") ""
-
-  -- initEmptyDB ghcpkg (dst </> "pkgs")
-  -- let pkg_root = takeDirectory global_db
-  -- forM_ pkg_ids $ \pid -> do
-  --   conf <- Text.readFile (global_db </> pid <.> "conf")
-  --   -- replace full path with ${pkgroot}
-  --   -- NOTE: GHC assumes that pkgroot is just one directory above the directory
-  --   -- containing the package db. In our case where everything is at the same
-  --   -- level in "pkgs" we need to re-add "/pkgs"
-  --   Text.writeFile (dst </> "pkgs" </> pid <.> "conf")
-  --                  (Text.replace (Text.pack pkg_root) "${pkgroot}/pkgs" conf)
-  --   cp (pkg_root </> pid) (dst </> "pkgs")
-
-  -- void $ readCreateProcess (runGhcPkg ghcpkg ["recache", "--package-db=" ++ (dst </> "pkgs")]) ""
-
 
 
 ---------------------------
@@ -703,17 +429,6 @@ runGenPrimop (GenPrimop f) = proc f
 cp :: String -> String -> IO ()
 cp src dst = void (readCreateProcess (shell $ "cp -rfp " ++ src ++ " " ++ dst) "")
 
-
-makeCabalProject :: FilePath -> [String] -> IO ()
-makeCabalProject path xs = writeFile path $ unlines (xs ++ common)
-  where
-    common =
-        [ ""
-        , "program-options"
-        , "  ghc-options: -fhide-source-paths -j"
-        ]
-
-
 withSystemTempDirectory :: String -> (String -> IO a) -> IO a
 withSystemTempDirectory prefix = do
     bracket
@@ -724,12 +439,6 @@ withSystemTempDirectory prefix = do
             return dir
         )
         removeDirectoryRecursive
-
-initEmptyDB :: GhcPkg -> FilePath -> IO ()
-initEmptyDB ghcpkg pkgdb = do
-  -- don't try to recreate the DB if it already exist as it would fail
-  exists <- doesDirectoryExist pkgdb
-  unless exists $ void $ readCreateProcess (runGhcPkg ghcpkg ["init", pkgdb]) ""
 
 -- | Retrieve GHC's target arch/os from ghc --info
 ghcTargetArchOS :: Ghc -> IO (String,String)
