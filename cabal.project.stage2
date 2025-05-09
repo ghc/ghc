@@ -1,0 +1,189 @@
+package-dbs: clear, global
+
+packages:
+  rts
+
+  libraries/ghc-prim
+  libraries/ghc-internal
+  libraries/ghc-experimental
+  libraries/base
+  compiler
+  libraries/ghc-platform/
+  libraries/ghc-compact/
+  libraries/ghc-bignum/
+  libraries/integer-gmp/
+  libraries/ghc-boot/
+  libraries/ghc-boot-th/
+  libraries/ghc-heap
+  libraries/ghci
+  libraries/stm
+  libraries/template-haskell
+  libraries/hpc
+  libraries/system-cxx-std-lib
+  ghc/
+  utils/ghc-pkg
+  utils/hsc2hs
+  utils/unlit
+  utils/genprimopcode
+  utils/deriveConstants
+  utils/ghc-toolchain/
+  libraries/array
+  libraries/binary
+  libraries/bytestring
+  libraries/containers/containers
+  libraries/deepseq
+  libraries/directory/
+  libraries/exceptions
+  libraries/file-io/
+  libraries/filepath/
+  libraries/mtl
+  libraries/os-string/
+  libraries/parsec
+  libraries/pretty/
+  libraries/process/
+  libraries/semaphore-compat
+  libraries/text
+  libraries/time
+  libraries/transformers
+  libraries/unix/
+  libraries/Win32/
+  libraries/Cabal/Cabal-syntax
+  libraries/Cabal/Cabal
+  https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz
+  https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
+  https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
+
+  ghc/
+  libraries/haskeline/
+  libraries/terminfo/
+  utils/ghc-pkg
+  utils/hsc2hs
+  utils/hp2ps
+  utils/hpc
+  utils/unlit
+  utils/iserv
+  utils/genprimopcode/
+  utils/genapply/
+  utils/deriveConstants/
+  utils/runghc/
+
+
+-- project-rts
+benchmarks: False
+tests: False
+allow-boot-library-installs: True
+active-repositories: :none
+
+package *
+  library-vanilla: True
+  shared: False
+  executable-profiling: False
+  executable-dynamic: False
+  executable-static: False
+
+-- Maybe we should fix this with some import
+if os(linux)
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"913\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
+    ghc-options: "-optc-DHostArch=\"x86_64\""
+    ghc-options: "-optc-DHostOS=\"linux\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    flags: +tables-next-to-code
+
+if os(darwin)
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"913\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"aarch64-apple-darwin\""
+    ghc-options: "-optc-DHostArch=\"aarch64\""
+    ghc-options: "-optc-DHostOS=\"darwin\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    flags: +tables-next-to-code +leading-underscore
+
+
+program-options
+  ghc-options: -fhide-source-paths -j
+
+-- project-boot-libs
+benchmarks: False
+tests: False
+allow-boot-library-installs: True
+active-repositories: :none
+
+package *
+  library-vanilla: True
+  shared: False
+  executable-profiling: False
+  executable-dynamic: False
+  executable-static: False
+
+package ghc
+  flags: +build-tool-depends +internal-interpreter
+
+package ghci
+  flags: +internal-interpreter
+
+package ghc-internal
+  flags: +bignum-native
+
+package text
+  flags: -simdutf
+
+package rts
+  ghc-options: "-optc-DProjectVersion=\"913\""
+  ghc-options: "-optc-DRtsWay=\"v\""
+  ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
+  ghc-options: "-optc-DHostArch=\"x86_64\""
+  ghc-options: "-optc-DHostOS=\"linux\""
+  ghc-options: "-optc-DHostVendor=\"unknown\""
+  ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+  ghc-options: "-optc-DBuildArch=\"FIXME\""
+  ghc-options: "-optc-DBuildOS=\"FIXME\""
+  ghc-options: "-optc-DBuildVendor=\"FIXME\""
+  ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+  ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+  ghc-options: "-optc-DFS_NAMESPACE=rts"
+  flags: +tables-next-to-code
+
+program-options
+  ghc-options: -fhide-source-paths -j
+
+-- project-ghc
+benchmarks: False
+tests: False
+
+package *
+  library-vanilla: True
+  shared: False
+  executable-profiling: False
+  executable-dynamic: False
+  executable-static: False
+
+package ghc-bin
+  flags: +internal-interpreter -threaded
+
+package hsc2hs
+  flags: +in-ghc-tree
+
+package haskeline
+  flags: -terminfo
+
+
+program-options
+  ghc-options: -fhide-source-paths -j
