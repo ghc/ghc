@@ -758,6 +758,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "BadImportAvailDataCon"                         = 35373
   GhcDiagnosticCode "BadImportNotExportedSubordinates"              = 10237
   GhcDiagnosticCode "BadImportNonTypeSubordinates"                  = 51433
+  GhcDiagnosticCode "BadImportNonDataSubordinates"                  = 46557
   GhcDiagnosticCode "BadImportAvailTyCon"                           = 56449
   GhcDiagnosticCode "BadImportAvailVar"                             = 12112
 

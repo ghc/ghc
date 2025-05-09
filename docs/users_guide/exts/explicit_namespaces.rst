@@ -51,10 +51,9 @@ import and export lists:
 The extension :extension:`ExplicitNamespaces` is implied by
 :extension:`TypeOperators` and (for some reason) by :extension:`TypeFamilies`.
 
-In addition, with :extension:`PatternSynonyms` you can prefix the name of a
-data constructor in an import or export list with the keyword
-``pattern``, to allow the import or export of a data constructor without
-its parent type constructor (see :ref:`patsyn-impexp`).
+In addition, you can prefix the name of a data constructor in an import or
+export list with the keyword ``data``, to allow the import or export of a data
+constructor without its parent type constructor (see :ref:`patsyn-impexp`).
 
 Furthermore, :extension:`ExplicitNamespaces` permits the use of the ``type``
 keyword in patterns and expressions::

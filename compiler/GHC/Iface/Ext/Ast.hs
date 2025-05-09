@@ -2270,6 +2270,9 @@ instance ToHie (IEContext (LocatedA (IEWrappedName GhcRn))) where
       IEType _ (L l n) ->
         [ toHie $ C (IEThing c) (L l n)
         ]
+      IEData _ (L l n) ->
+        [ toHie $ C (IEThing c) (L l n)
+        ]
 
 instance ToHie (IEContext (Located RecFieldInfo)) where
   toHie (IEC c (L span info)) = concatM

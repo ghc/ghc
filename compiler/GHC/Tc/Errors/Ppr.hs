@@ -2994,7 +2994,7 @@ instance Diagnostic TcRnMessage where
              -> let tc_nm = tyConName tc
                     dc = dataConName $ head $ tyConDataCons tc
                 in [ ImportSuggestion (occName dc)
-                   $ ImportDataCon Nothing (nameOccName tc_nm) ]
+                   $ ImportDataCon Nothing False False (nameOccName tc_nm) ]
              | UnliftedFFITypesNeeded <- why
              -> [suggestExtension LangExt.UnliftedFFITypes]
            _ -> noHints
@@ -3291,18 +3291,32 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnRedundantSourceImport{}
       -> noHints
-    TcRnImportLookup (ImportLookupBad k _ is ie patsyns_enabled) ->
+    TcRnImportLookup (ImportLookupBad k _ is ie exts) ->
       let mod_name = moduleName $ is_mod is
           occ = rdrNameOcc $ ieName ie
+          could_remove kw = [ImportSuggestion occ $ CouldRemoveImportItemKeyword mod_name kw]
       in case k of
-        BadImportAvailVar          -> [ImportSuggestion occ $ CouldRemoveTypeKeyword mod_name]
+        BadImportAvailVar -> could_remove ImportItemUnwantedKeywordType
         BadImportNotExported suggs -> suggs
-        BadImportAvailTyCon ex_ns  ->
-          [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | not ex_ns]
-          ++ [ImportSuggestion occ $ CouldAddTypeKeyword mod_name]
-        BadImportAvailDataCon par  -> [ImportSuggestion occ $ ImportDataCon (Just (mod_name, patsyns_enabled)) par]
+        BadImportAvailTyCon
+          | isSymOcc occ -> -- type operators always require the 'type' keyword
+              [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | not (ile_explicit_namespaces exts) ]
+              ++ [ ImportSuggestion occ $ CouldAddTypeKeyword mod_name ]
+          | otherwise    ->
+              case unLoc (ieNameWrapper ie) of
+                IEData{}    -> could_remove ImportItemUnwantedKeywordData
+                IEPattern{} -> could_remove ImportItemUnwantedKeywordPattern
+                _           -> noHints
+        BadImportAvailDataCon par  ->
+          [ ImportSuggestion occ $
+            ImportDataCon { ies_suggest_import_from = Just mod_name
+                          , ies_suggest_pattern_keyword = ile_pattern_synonyms exts
+                              && not (ile_explicit_namespaces exts) -- do not suggest 'pattern' when we can suggest 'data'
+                          , ies_suggest_data_keyword    = ile_explicit_namespaces exts
+                          , ies_parent = par } ]
         BadImportNotExportedSubordinates{} -> noHints
         BadImportNonTypeSubordinates{} -> noHints
+        BadImportNonDataSubordinates{} -> noHints
     TcRnImportLookup{}
       -> noHints
     TcRnUnusedImport{}
@@ -5855,7 +5869,7 @@ pprDisabledClassExtension cls = \case
 
 pprImportLookup :: ImportLookupReason -> SDoc
 pprImportLookup = \case
-  ImportLookupBad k iface decl_spec ie _ps ->
+  ImportLookupBad k iface decl_spec ie _exts ->
     let
       pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
       pprImpDeclSpec iface decl_spec =
@@ -5918,6 +5932,19 @@ pprImportLookup = \case
             nontype = NE.toList nontype1
             parent_name = (quotes . pprPrefixOcc . nameOccName . gre_name) gre
             nontype_names = pprWithCommas (quotes . pprPrefixOcc . nameOccName . gre_name) nontype
+            what = case greInfo gre of
+              IAmTyCon ClassFlavour -> text "a class"
+              IAmTyCon _            -> text "a data type"
+              _                     -> text "an item"
+      BadImportNonDataSubordinates gre nondata1 ->
+        withContext
+          [ what <+> text "called" <+> parent_name <+> text "is exported,"
+          , sep [ text "but its subordinate item" <> plural nondata <+> nondata_names
+                , isOrAre nondata <+> "not in the data namespace." ] ]
+          where
+            nondata = NE.toList nondata1
+            parent_name = (quotes . pprPrefixOcc . nameOccName . gre_name) gre
+            nondata_names = pprWithCommas (quotes . pprPrefixOcc . nameOccName . gre_name) nondata
             what = case greInfo gre of
               IAmTyCon ClassFlavour -> text "a class"
               IAmTyCon _            -> text "a data type"

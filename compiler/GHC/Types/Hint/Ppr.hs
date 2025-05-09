@@ -349,34 +349,45 @@ pprImportSuggestion occ_name (CouldAddTypeKeyword mod)
          ]
   where
     parens_sp d = parens (space <> d <> space)
-pprImportSuggestion occ_name (CouldRemoveTypeKeyword mod)
-  = vcat [ text "Remove the" <+> quotes (text "type")
+pprImportSuggestion occ_name (CouldRemoveImportItemKeyword mod kw)
+  = vcat [ text "Remove the" <+> quotes (text kw_str)
              <+> text "keyword from the import statement:"
          , nest 2 $ text "import"
              <+> ppr mod
              <+> parens_sp (pprPrefixOcc occ_name) ]
   where
     parens_sp d = parens (space <> d <> space)
-pprImportSuggestion dc_occ (ImportDataCon Nothing parent_occ)
+    kw_str = case kw of
+      ImportItemUnwantedKeywordType    -> "type"
+      ImportItemUnwantedKeywordData    -> "data"
+      ImportItemUnwantedKeywordPattern -> "pattern"
+pprImportSuggestion dc_occ (ImportDataCon { ies_suggest_import_from = Nothing
+                                          , ies_parent = parent_occ} )
   = text "Import the data constructor" <+> quotes (ppr dc_occ) <+>
     text "of" <+> quotes (ppr parent_occ)
-pprImportSuggestion dc_occ (ImportDataCon (Just (mod, patsyns_enabled)) parent_occ)
-  = vcat $ [ text "Use"
-           , nest 2 $ text "import"
-               <+> ppr mod
-               <+> parens_sp (pprPrefixOcc parent_occ <> parens_sp (pprPrefixOcc dc_occ))
-           , text "or"
-           , nest 2 $ text "import"
-               <+> ppr mod
-               <+> parens_sp (pprPrefixOcc parent_occ <> text "(..)")
-           ] ++ if patsyns_enabled
-                then [ text "or"
-                     , nest 2 $ text "import"
-                         <+> ppr mod
-                         <+> parens_sp (text "pattern" <+> pprPrefixOcc dc_occ)
-                     ]
-                else []
+pprImportSuggestion dc_occ (ImportDataCon { ies_suggest_import_from = Just mod
+                                          , ies_suggest_pattern_keyword = suggest_pattern
+                                          , ies_suggest_data_keyword = suggest_data
+                                          , ies_parent = parent_occ })
+  = vcat $ basic_suggestion
+            ++ (if suggest_pattern then pattern_suggestion else [])
+            ++ (if suggest_data    then data_suggestion    else [])
   where
+    basic_suggestion =
+      [ text "Use"
+      , nest 2 $ import_stmt (pprPrefixOcc parent_occ <> parens_sp (pprPrefixOcc dc_occ))
+      , text "or"
+      , nest 2 $ import_stmt (pprPrefixOcc parent_occ <> text "(..)")
+      ]
+    pattern_suggestion =
+      [ text "or"
+      , nest 2 $ import_stmt (text "pattern" <+> pprPrefixOcc dc_occ)
+      ]
+    data_suggestion =
+      [ text "or"
+      , nest 2 $ import_stmt (text "data" <+> pprPrefixOcc dc_occ)
+      ]
+    import_stmt sub = text "import" <+> ppr mod <+> parens_sp sub
     parens_sp d = parens (space <> d <> space)
 
 -- | Pretty-print a 'SimilarName'.

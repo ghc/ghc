@@ -1,0 +1,6 @@
+:set -XExplicitNamespaces
+import GHC.Generics (Generic(data Rep))
+import GHC.Generics (data Generic)
+import Data.Functor (data Functor)
+import GHC.TypeNats (data (+))
+import GHC.TypeNats ((+))

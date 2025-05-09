@@ -1,0 +1,7 @@
+T25899e3.hs:5:24: error: [GHC-56449]
+    In the import of ‘T25899e_helper’:
+      an item called ‘MkT’ is exported, but it is a type.
+    Suggested fix:
+      Remove the ‘data’ keyword from the import statement:
+        import T25899e_helper ( MkT )
+

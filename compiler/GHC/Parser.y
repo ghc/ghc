@@ -1080,6 +1080,8 @@ qcname_ext :: { LocatedA ImpExpQcSpec }
         :  qcname                   { sL1a $1 (ImpExpQcName $1) }
         |  'type' oqtycon           {% do { n <- mkTypeImpExp $2
                                           ; return $ sLLa $1 $> (ImpExpQcType (epTok $1) n) }}
+        |  'data' qvarcon           {% do { n <- mkDataImpExp $2
+                                          ; return $ sLLa $1 $> (ImpExpQcData (epTok $1) n) }}
 
 qcname  :: { LocatedN RdrName }  -- Variable or type constructor
         :  qvar                 { $1 } -- Things which look like functions

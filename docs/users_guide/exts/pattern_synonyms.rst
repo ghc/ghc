@@ -277,23 +277,27 @@ constructors. Like normal data constructors, pattern synonyms can be imported
 and exported through association with a type constructor or independently.
 
 To export them on their own, in an export or import specification, you must
-prefix pattern names with the ``pattern`` keyword, e.g.: ::
+prefix pattern names with either the ``data`` or the ``pattern`` keyword, e.g.: ::
 
-      module Example (pattern Zero) where
+      module Example (data Zero) where
+        -- alternatively: pattern Zero
 
       data MyNum = MkNum Int
 
       pattern Zero :: MyNum
       pattern Zero = MkNum 0
 
-Without the ``pattern`` prefix, ``Zero`` would be interpreted as a
+Without the ``data`` namespace specifier, ``Zero`` would be interpreted as a
 type constructor in the export list.
 
-You may also use the ``pattern`` keyword in an import/export
-specification to import or export an ordinary data constructor. For
-example: ::
+The use of the ``data`` keyword in import/export lists requires
+:extension:`ExplicitNamespaces` and GHC ≥9.14, and is preferred over
+``pattern`` unless there is a need to support older GHC versions.
 
-      import Data.Maybe( pattern Just )
+You may also use the ``data`` (or ``pattern``) keyword in an import/export
+specification to import or export an ordinary data constructor. For example: ::
+
+      import Data.Maybe( data Just )
 
 would bring into scope the data constructor ``Just`` from the ``Maybe``
 type, without also bringing the type constructor ``Maybe`` into scope.

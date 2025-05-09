@@ -115,6 +115,7 @@ module GHC.Tc.Errors.Types (
   , TySynCycleTyCons
   , BadImportKind(..)
   , DodgyImportsReason (..)
+  , ImportLookupExtensions (..)
   , ImportLookupReason (..)
   , UnusedImportReason (..)
   , UnusedImportName (..)
@@ -5832,7 +5833,7 @@ data BadImportKind
   -- | Missing @type@ keyword when importing a type.
   -- e.g.  `import TypeLits( (+) )`, where TypeLits exports a /type/ (+), not a /term/ (+)
   -- Then we want to suggest using `import TypeLits( type (+) )`
-  | BadImportAvailTyCon Bool -- ^ is ExplicitNamespaces enabled?
+  | BadImportAvailTyCon
   -- | Trying to import a data constructor directly, e.g.
   -- @import Data.Maybe (Just)@ instead of @import Data.Maybe (Maybe(Just))@
   | BadImportAvailDataCon OccName
@@ -5841,6 +5842,8 @@ data BadImportKind
   -- | Incorrect @type@ keyword when importing subordinates that aren't types.
   | BadImportNonTypeSubordinates !GlobalRdrElt (NonEmpty GlobalRdrElt)
   -- | Incorrect @type@ keyword when importing something which isn't a type.
+  | BadImportNonDataSubordinates !GlobalRdrElt (NonEmpty GlobalRdrElt)
+  -- | Incorrect @data@ keyword when importing something which isn't a term.
   | BadImportAvailVar
   deriving Generic
 
@@ -6389,6 +6392,14 @@ data DodgyImportsReason =
   DodgyImportsHiding !ImportLookupReason
   deriving (Generic)
 
+-- | What extensions were enabled at import site.
+data ImportLookupExtensions =
+  ImportLookupExtensions
+    { ile_pattern_synonyms    :: !Bool
+    , ile_explicit_namespaces :: !Bool
+    }
+  deriving (Generic)
+
 -- | Different types of errors for import lookup.
 data ImportLookupReason where
   {-| An item in an import statement is not exported by the corresponding
@@ -6402,7 +6413,7 @@ data ImportLookupReason where
                   -> ModIface
                   -> ImpDeclSpec
                   -> IE GhcPs
-                  -> Bool -- ^ whether @-XPatternSynonyms@ was enabled
+                  -> ImportLookupExtensions
                   -> ImportLookupReason
   {-| A name is specified with a qualifying module.
 
