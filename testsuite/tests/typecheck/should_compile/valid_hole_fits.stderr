@@ -247,7 +247,9 @@ valid_hole_fits.hs:41:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with print @String
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.System.IO’))
-        fail :: forall (m :: * -> *) a. MonadFail m => String -> m a
+        fail :: forall (m :: * -> *) a.
+                (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
+                String -> m a
           with fail @IO @()
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))

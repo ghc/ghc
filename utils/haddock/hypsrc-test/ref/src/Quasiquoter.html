@@ -405,8 +405,10 @@ forall a. String -&gt; Q a
       ><span class="annot"
       ><span class="annottext"
 	>String -&gt; Q a
-forall a. String -&gt; Q a
-forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+forall a. HasCallStack =&gt; String -&gt; Q a
+forall (m :: * -&gt; *) a.
+(MonadFail m, HasCallStack) =&gt;
+String -&gt; m a
 </span
 	><span class="hs-identifier hs-var"
 	>fail</span
