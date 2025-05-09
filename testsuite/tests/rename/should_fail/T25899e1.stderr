@@ -1,0 +1,3 @@
+T25899e1.hs:5:5: error: [GHC-76037]
+    Not in scope: data constructor ‘MkT’
+

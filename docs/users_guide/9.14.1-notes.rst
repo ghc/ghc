@@ -67,6 +67,9 @@ Language
 
   This causes the constructor to have type ``Rec :: Int %'Many -> Char %1 -> Record``.
 
+* The :extension:`ExplicitNamespaces` extension now allows the ``data``
+  namespace specifier in import and export lists.
+
 * The :extension:`MonadComprehensions` extension now implies :extension:`ParallelListComp` as was originally intended (see `Monad Comprehensions <https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/monad_comprehensions.html>`_).
 
 Compiler

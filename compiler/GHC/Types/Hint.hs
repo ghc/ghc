@@ -5,6 +5,7 @@ module GHC.Types.Hint (
   , AvailableBindings(..)
   , InstantiationSuggestion(..)
   , LanguageExtensionHint(..)
+  , ImportItemSuggestion(..)
   , ImportSuggestion(..)
   , HowInScope(..)
   , SimilarName(..)
@@ -537,24 +538,32 @@ instance Outputable AssumedDerivingStrategy where
 --      replacing <MyStr> as necessary.)
 data InstantiationSuggestion = InstantiationSuggestion !ModuleName !Module
 
+data ImportItemSuggestion =
+    ImportItemRemoveType
+  | ImportItemRemoveData
+  | ImportItemRemovePattern
+  | ImportItemRemoveSubordinateType (NE.NonEmpty OccName)
+  | ImportItemRemoveSubordinateData (NE.NonEmpty OccName)
+  | ImportItemAddType
+    -- Why no 'ImportItemAddData'?  Because the suggestion to add 'data' is
+    -- represented by the 'ImportDataCon' constructor of 'ImportSuggestion'.
+
 -- | Suggest how to fix an import.
 data ImportSuggestion
   -- | Some module exports what we want, but we aren't explicitly importing it.
   = CouldImportFrom (NE.NonEmpty (Module, ImportedModsVal))
   -- | Some module exports what we want, but we are explicitly hiding it.
   | CouldUnhideFrom (NE.NonEmpty (Module, ImportedModsVal))
-  -- | The module exports what we want, but it isn't a type.
-  | CouldRemoveTypeKeyword ModuleName
-  -- | The module exports what we want, but it's a type and we have @ExplicitNamespaces@ on.
-  | CouldAddTypeKeyword ModuleName
+  -- | The module exports what we want, but the import item requires modification.
+  | CouldChangeImportItem ModuleName ImportItemSuggestion
   -- | Suggest importing a data constructor to bring it into scope
   | ImportDataCon
       -- | Where to suggest importing the 'DataCon' from.
-      --
-      -- The 'Bool' tracks whether to suggest using an import of the form
-      -- @import (pattern Foo)@, depending on whether @-XPatternSynonyms@
-      -- was enabled.
-      { ies_suggest_import_from :: Maybe (ModuleName, Bool)
+      { ies_suggest_import_from :: Maybe ModuleName
+        -- | Whether to suggest the use of the 'pattern' keyword.
+      , ies_suggest_pattern_keyword :: Bool
+        -- | Whether to suggest the use of the 'data' keyword.
+      , ies_suggest_data_keyword :: Bool
         -- | The 'OccName' of the parent of the data constructor.
       , ies_parent :: OccName }
 

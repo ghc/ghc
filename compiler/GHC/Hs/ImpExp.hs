@@ -204,6 +204,7 @@ type instance XIEName    (GhcPass _) = NoExtField
 type instance XIEDefault (GhcPass _) = EpToken "default"
 type instance XIEPattern (GhcPass _) = EpToken "pattern"
 type instance XIEType    (GhcPass _) = EpToken "type"
+type instance XIEData    (GhcPass _) = EpToken "data"
 type instance XXIEWrappedName (GhcPass _) = DataConCantHappen
 
 type instance Anno (IEWrappedName (GhcPass _)) = SrcSpanAnnA
@@ -254,12 +255,15 @@ type instance XXIE               (GhcPass _) = DataConCantHappen
 
 type instance Anno (LocatedA (IE (GhcPass p))) = SrcSpanAnnA
 
+ieLIEWrappedName :: IE (GhcPass p) -> LIEWrappedName (GhcPass p)
+ieLIEWrappedName (IEVar _ n _)           = n
+ieLIEWrappedName (IEThingAbs  _ n _)     = n
+ieLIEWrappedName (IEThingWith _ n _ _ _) = n
+ieLIEWrappedName (IEThingAll  _ n _)     = n
+ieLIEWrappedName _ = panic "ieLIEWrappedName failed pattern match!"
+
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)
-ieName (IEVar _ (L _ n) _)           = ieWrappedName n
-ieName (IEThingAbs  _ (L _ n) _)     = ieWrappedName n
-ieName (IEThingWith _ (L _ n) _ _ _) = ieWrappedName n
-ieName (IEThingAll  _ (L _ n) _)     = ieWrappedName n
-ieName _ = panic "ieName failed pattern match!"
+ieName = lieWrappedName . ieLIEWrappedName
 
 ieNames :: IE (GhcPass p) -> [IdP (GhcPass p)]
 ieNames (IEVar       _ (L _ n) _)      = [ieWrappedName n]
@@ -292,6 +296,7 @@ ieWrappedLName (IEDefault _ (L l n)) = L l n
 ieWrappedLName (IEName    _ (L l n)) = L l n
 ieWrappedLName (IEPattern _ (L l n)) = L l n
 ieWrappedLName (IEType    _ (L l n)) = L l n
+ieWrappedLName (IEData    _ (L l n)) = L l n
 
 ieWrappedName :: IEWrappedName (GhcPass p) -> IdP (GhcPass p)
 ieWrappedName = unLoc . ieWrappedLName
@@ -308,6 +313,7 @@ replaceWrappedName (IEDefault r (L l _)) n = IEDefault r (L l n)
 replaceWrappedName (IEName    x (L l _)) n = IEName    x (L l n)
 replaceWrappedName (IEPattern r (L l _)) n = IEPattern r (L l n)
 replaceWrappedName (IEType    r (L l _)) n = IEType    r (L l n)
+replaceWrappedName (IEData    r (L l _)) n = IEData    r (L l n)
 
 replaceLWrappedName :: LIEWrappedName GhcPs -> IdP GhcRn -> LIEWrappedName GhcRn
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
@@ -364,6 +370,7 @@ instance OutputableBndrId p => Outputable (IEWrappedName (GhcPass p)) where
   ppr (IEName    _ (L _ n)) = pprPrefixOcc n
   ppr (IEPattern _ (L _ n)) = text "pattern" <+> pprPrefixOcc n
   ppr (IEType    _ (L _ n)) = text "type"    <+> pprPrefixOcc n
+  ppr (IEData    _ (L _ n)) = text "data"    <+> pprPrefixOcc n
 
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name

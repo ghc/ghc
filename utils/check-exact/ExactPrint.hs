@@ -4592,6 +4592,10 @@ instance ExactPrint (IEWrappedName GhcPs) where
     r' <- markEpToken r
     n' <- markAnnotated n
     return (IEType r' n')
+  exact (IEData r n) = do
+    r' <- markEpToken r
+    n' <- markAnnotated n
+    return (IEData r' n')
 
 -- ---------------------------------------------------------------------
 

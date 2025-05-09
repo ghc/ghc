@@ -16,7 +16,7 @@ T21826.hs:4:21: error: [GHC-35373]
       or
         import Data.Maybe ( Maybe(..) )
       or
-        import Data.Maybe ( pattern Just )
+        import Data.Maybe ( data Just )
 
 T21826.hs:5:21: error: [GHC-61689]
     Module ‘Data.Maybe’ does not export ‘Some’.
@@ -52,6 +52,6 @@ T21826.hs:13:21: error: [GHC-56449]
     In the import of ‘Data.Maybe’:
       an item called ‘Maybe’ is exported, but it is a type.
     Suggested fix:
-      Add the ‘type’ keyword to the import statement:
-        import Data.Maybe ( type Maybe )
+      Remove the ‘pattern’ keyword from the import statement:
+        import Data.Maybe ( Maybe )
 
