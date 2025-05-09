@@ -147,6 +147,7 @@ data JSVal
 -- the same 'JSVal', subsequent invocations are no-ops. You are
 -- strongly recommended to call 'freeJSVal' on short-lived
 -- intermediate 'JSVal' values for timely release of resources!
+{-# INLINE freeJSVal #-}
 freeJSVal :: JSVal -> IO ()
 freeJSVal v@(JSVal p) = do
   js_callback_unregister v
