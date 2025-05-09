@@ -1368,7 +1368,7 @@ cross_jobs = [
 
     makeWineArmJobs =
       let
-        llvm_path = "C:/msys64/opt/llvm-mingw-windows/bin"
+        llvm_path = "C:/msys64/opt/ghc-bootstrap/mingw/bin"
         llvm_prefix = llvm_path ++ "/aarch64-w64-mingw32-"
         exe_suffix = ".exe"
         -- See Note [Windows Toolchain Standard Library Options]
