@@ -1233,6 +1233,99 @@ getRegister' config plat expr =
                 -- vmv.x.s a0, v8
                 VMV (OpReg format dst) (OpReg format_v tmp)
 
+          genericVectorShuffle :: (Int -> Width -> Format) -> Int -> Width -> [Int] -> NatM Register
+          genericVectorShuffle toDstFormat length w idxs = do
+            -- Our strategy:
+            --   - Gather elemens of v1 on the right positions
+            --   - Gather elemenrs of v2 of the right positions
+            --   - Merge v1 and v2 with an adequate bitmask (v0)
+            lbl_selVec_v1 <- getNewLabelNat
+            lbl_selVec_v2 <- getNewLabelNat
+            lbl_mask <- getNewLabelNat
+
+            (reg_x, format_x, code_x) <- getSomeReg x
+            (reg_y, format_y, code_y) <- getSomeReg y
+
+            let (idxs_v1, idxs_v2) =
+                  mapTuple reverse
+                    $ foldl'
+                      ( \(acc1, acc2) i ->
+                          if i < length then (Just i : acc1, Nothing : acc2) else (Nothing : acc1, Just (i - length) : acc2)
+                      )
+                      ([], [])
+                      idxs
+                selVecData_v1 = selVecData w idxs_v1
+                selVecData_v2 = selVecData w idxs_v2
+                -- Finally, the mask must be 0 where v1 should be taken and 1 for v2.
+                -- That's why we do an implicit negation here by focussing on v2.
+                maskVecData = maskData idxs_v2
+                -- Longest vector length is 64, so 8bit (0 - 255) is sufficient
+                selVecFormat = intVecFormat length w
+                dstFormat = toDstFormat length w
+                addrFormat = intFormat W64
+                -- This could be one bit, but our smallest Width is W8
+                maskFormat = intVecFormat length W8
+            sel_v1 <- getNewRegNat selVecFormat
+            sel_v2 <- getNewRegNat selVecFormat
+            sel_mask <- getNewRegNat selVecFormat
+            sel_v1_addr <- getNewRegNat addrFormat
+            sel_v2_addr <- getNewRegNat addrFormat
+            mask_addr <- getNewRegNat addrFormat
+            gathered_x <- getNewRegNat format_x
+            gathered_y <- getNewRegNat format_y
+            pure $ Any dstFormat $ \dst ->
+              toOL
+                [ LDATA (Section ReadOnlyData lbl_selVec_v1) (CmmStaticsRaw lbl_selVec_v1 selVecData_v1),
+                  LDATA (Section ReadOnlyData lbl_selVec_v2) (CmmStaticsRaw lbl_selVec_v2 selVecData_v2),
+                  LDATA (Section ReadOnlyData lbl_mask) (CmmStaticsRaw lbl_mask maskVecData)
+                ]
+                `appOL` code_x
+                `appOL` code_y
+                `appOL` toOL
+                  [ COMMENT (text ("idxs_v1 : " ++ show idxs_v1)),
+                    COMMENT (text ("idxs_v2 : " ++ show idxs_v2)),
+                    COMMENT (text "Select elements from vectors"),
+                    annExpr
+                      expr
+                      (LDR addrFormat (OpReg addrFormat sel_v1_addr) (OpImm (ImmCLbl lbl_selVec_v1))),
+                    LDR addrFormat (OpReg addrFormat sel_v2_addr) (OpImm (ImmCLbl lbl_selVec_v2)),
+                    LDRU selVecFormat (OpReg dstFormat sel_v1) (OpAddr (AddrReg sel_v1_addr)),
+                    LDRU selVecFormat (OpReg dstFormat sel_v2) (OpAddr (AddrReg sel_v2_addr)),
+                    VRGATHER (OpReg format_x gathered_x) (OpReg format_x reg_x) (OpReg dstFormat sel_v1),
+                    VRGATHER (OpReg format_y gathered_y) (OpReg format_y reg_y) (OpReg dstFormat sel_v2),
+                    COMMENT (text "Prepare merge mask"),
+                    LDR addrFormat (OpReg addrFormat mask_addr) (OpImm (ImmCLbl lbl_mask)),
+                    LDRU maskFormat (OpReg maskFormat sel_mask) (OpAddr (AddrReg mask_addr)),
+                    VMSEQ (OpReg maskFormat v0Reg) (OpReg selVecFormat sel_mask) (OpImm (ImmInt (1))),
+                    COMMENT (text "Merge the vector selections"),
+                    VMERGE (OpReg dstFormat dst) (OpReg format_x gathered_x) (OpReg format_y gathered_y) (OpReg maskFormat v0Reg)
+                  ]
+
+          mapTuple :: (a -> b) -> (a, a) -> (b, b)
+          mapTuple f (x, y) = (f x, f y)
+
+          selVecData :: Width -> [Maybe Int] -> [CmmStatic]
+          selVecData w idxs =
+            -- Using the width `w` here is a bit wasteful. But, it saves
+            -- later conversion of the loaded vector.
+            (CmmStaticLit . (flip CmmInt) w . fromIntegral)
+              `map` ( map
+                        ( \i -> case i of
+                            Just i' -> i'
+                            Nothing -> 0
+                        )
+                        idxs
+                    )
+          maskData idxs =
+            (CmmStaticLit . (flip CmmInt) W8)
+              `map` ( map
+                        ( \i -> case i of
+                            Just _i' -> 1
+                            Nothing -> 0
+                        )
+                        idxs
+                    )
+
       case op of
         -- Integer operations
         -- Add/Sub should only be Integer Options.
@@ -1305,96 +1398,8 @@ getRegister' config plat expr =
         -- TODO: This is the general implementation of MO_V_Shuffle. There's a
         -- lot of room for optimizations left for special cases. See the X86
         -- NCG for examples.
-        MO_V_Shuffle length w idxs -> do
-          -- Our strategy:
-          --   - Gather elemens of v1 on the right positions
-          --   - Gather elemenrs of v2 of the right positions
-          --   - Merge v1 and v2 with an adequate bitmask (v0)
-          lbl_selVec_v1 <- getNewLabelNat
-          lbl_selVec_v2 <- getNewLabelNat
-          lbl_mask <- getNewLabelNat
-
-          (reg_x, format_x, code_x) <- getSomeReg x
-          (reg_y, format_y, code_y) <- getSomeReg y
-
-          let (idxs_v1, idxs_v2) =
-                mapTuple reverse
-                  $ foldl'
-                    ( \(acc1, acc2) i ->
-                        if i < length then (Just i : acc1, Nothing : acc2) else (Nothing : acc1, Just (i - length) : acc2)
-                    )
-                    ([], [])
-                    idxs
-              selVecData_v1 = selVecData idxs_v1
-              selVecData_v2 = selVecData idxs_v2
-              -- Finally, the mask must be 0 where v1 should be taken and 1 for v2.
-              -- That's why we do an implicit negation here by focussing on v2.
-              maskVecData = maskData idxs_v2
-              -- Longest vector length is 64, so 8bit (0 - 255) is sufficient
-              selVecFormat = intVecFormat length w
-              dstFormat = intVecFormat length w
-              addrFormat = intFormat W64
-              -- This could be one bit, but our smallest Width is W8
-              maskFormat = intVecFormat length W8
-          sel_v1 <- getNewRegNat selVecFormat 
-          sel_v2 <- getNewRegNat selVecFormat 
-          sel_mask <- getNewRegNat selVecFormat 
-          sel_v1_addr <- getNewRegNat addrFormat 
-          sel_v2_addr <- getNewRegNat addrFormat 
-          mask_addr <- getNewRegNat addrFormat 
-          gathered_x <- getNewRegNat format_x
-          gathered_y <- getNewRegNat format_y 
-          pure $ Any dstFormat $ \dst ->
-            toOL
-              [ LDATA (Section ReadOnlyData lbl_selVec_v1) (CmmStaticsRaw lbl_selVec_v1 selVecData_v1),
-                LDATA (Section ReadOnlyData lbl_selVec_v2) (CmmStaticsRaw lbl_selVec_v2 selVecData_v2),
-                LDATA (Section ReadOnlyData lbl_mask) (CmmStaticsRaw lbl_mask maskVecData)
-              ]
-              `appOL` code_x
-              `appOL` code_y
-              `appOL` toOL
-                [ 
-                  COMMENT (text ("idxs_v1 : " ++ show idxs_v1)),
-                  COMMENT (text ("idxs_v2 : " ++ show idxs_v2)),
-                  COMMENT (text "Select elements from vectors"),
-                  annExpr expr 
-                    (LDR addrFormat (OpReg addrFormat sel_v1_addr) (OpImm (ImmCLbl lbl_selVec_v1))),
-                  LDR addrFormat (OpReg addrFormat sel_v2_addr) (OpImm (ImmCLbl lbl_selVec_v2)),
-                  LDRU selVecFormat (OpReg dstFormat sel_v1) (OpAddr (AddrReg sel_v1_addr)),
-                  LDRU selVecFormat (OpReg dstFormat sel_v2) (OpAddr (AddrReg sel_v2_addr)),
-                  VRGATHER (OpReg format_x gathered_x) (OpReg format_x reg_x) (OpReg dstFormat sel_v1),
-                  VRGATHER (OpReg format_y gathered_y) (OpReg format_y reg_y) (OpReg dstFormat sel_v2),
-                  COMMENT (text "Prepare merge mask"),
-                  LDR addrFormat (OpReg addrFormat mask_addr) (OpImm (ImmCLbl lbl_mask)),
-                  LDRU maskFormat (OpReg maskFormat sel_mask ) (OpAddr (AddrReg mask_addr)),
-                  VMSEQ (OpReg maskFormat v0Reg) (OpReg selVecFormat sel_mask) (OpImm (ImmInt (1))),
-                  COMMENT (text "Merge the vector selections"),
-                  VMERGE (OpReg dstFormat dst)(OpReg format_x gathered_x)(OpReg format_y gathered_y) (OpReg maskFormat v0Reg)
-                ]
-          where
-            mapTuple :: (a -> b) -> (a, a) -> (b, b)
-            mapTuple f (x, y) = (f x, f y)
-            selVecData :: [Maybe Int] -> [CmmStatic]
-            selVecData idxs =
-                -- Using the width `w` here is a bit wasteful. But, it saves
-                -- later conversion of the loaded vector.
-                (CmmStaticLit . (flip CmmInt) w . fromIntegral)
-                  `map` ( map
-                            ( \i -> case i of
-                                Just i' -> i'
-                                Nothing -> 0
-                            )
-                            idxs
-                        )
-            maskData idxs =
-                (CmmStaticLit . (flip CmmInt) W8)
-                  `map` ( map
-                            ( \i -> case i of
-                                Just _i' -> 1
-                                Nothing -> 0
-                            )
-                            idxs
-                        )
+        MO_V_Shuffle length w idxs -> genericVectorShuffle intVecFormat length w idxs 
+        MO_VF_Shuffle length w idxs-> genericVectorShuffle floatVecFormat length w idxs
         _e -> panic $ "Missing operation " ++ show expr
 
     -- Generic ternary case.
@@ -1581,10 +1586,6 @@ getRegister' config plat expr =
                       -- Do not handle this unlikely case. Just tell that it may overflow.
                       unitOL $ annExpr expr (ADD (OpReg format dst) zero (OpImm (ImmInt 1)))
                   )
-
--- TODO: Missing MachOps:
--- - MO_V_Shuffle
--- - MO_VF_Shuffle
 
 -- | Instructions to sign-extend the value in the given register from width @w@
 -- up to width @w'@.
