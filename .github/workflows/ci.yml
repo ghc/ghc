@@ -9,6 +9,8 @@ on:
   push:
     branches: [master]
 
+  workflow_dispatch:
+
 jobs:
   cabal:
     name: ${{ matrix.os }} / ghc ${{ matrix.ghc }}
@@ -17,31 +19,30 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        ghc: ['9.8.4'] # bootstrapping compiler
+        ghc: ['98'] # bootstrapping compiler
 
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: "recursive"
 
-    - uses: haskell-actions/setup@v2
-      id: setup
-      name: Setup Haskell tools
+    - uses: input-output-hk/actions/devx@latest
       with:
-        ghc-version: ${{ matrix.ghc }}
-        cabal-version: "latest"
-        cabal-update: true
+        platform: 'x86_64-linux'
+        compiler-nix-name: 'ghc98'
+        minimal: true
+        ghc: true
+
+    - name: Update hackage
+      shell: devx {0}
+      run: cabal update
 
     - name: Configure the build
-      run: ./boot
-
-    - name: Build patched cabal
-      run: make cabal
+      shell: devx {0}
+      run: ./configure
 
     - name: Build the bindist
-      env:
-        CC: gcc
-        CXX: g++
+      shell: devx {0}
       run: make
 
     - name: Upload artifacts
@@ -51,6 +52,7 @@ jobs:
         path: _build/bindist
 
     - name: Run the testsuite
+      shell: devx {0}
       run: make test
 
     - name: Upload test results
