@@ -587,12 +587,12 @@ targetToSettings tgt@Target{..} =
   , ("target RTS linker only supports shared libraries", yesNo (targetRTSLinkerOnlySupportsSharedLibs tgt))
   , ("Use interpreter", yesNo (targetSupportsInterpreter tgt))
   , ("Support SMP", yesNo (targetSupportsSMP tgt))
-  , ("RTS ways", "") -- FIXME: should be a property of the RTS, not of the target
+  , ("RTS ways", "v") -- FIXME: should be a property of the RTS, not of the target
   , ("Tables next to code", (yesNo tgtTablesNextToCode))
   , ("Leading underscore",  (yesNo tgtSymbolsHaveLeadingUnderscore))
   , ("Use LibFFI", yesNo tgtUseLibffiForAdjustors)
   , ("RTS expects libdw", yesNo False) -- FIXME
-  , ("Relative Global Package DB", "")
+  , ("Relative Global Package DB", "package.conf.d") -- FIXME
   , ("base unit-id", "")
   ]
   where
