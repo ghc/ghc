@@ -95,7 +95,7 @@ regUsageOfInstr platform instr = case instr of
   -- ORI's third operand is always an immediate
   ORI dst src1 _ -> usage (regOp src1, regOp dst)
   XORI dst src1 _ -> usage (regOp src1, regOp dst)
-  J_TBL _ _ t -> usage ([t], [])
+  J_TBL _ _ t -> usage ([(t, II64)], [])
   J t -> usage (regTarget t, [])
   B t -> usage (regTarget t, [])
   BCOND _ l r t -> usage (regTarget t ++ regOp l ++ regOp r, [])
