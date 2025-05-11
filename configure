@@ -614,8 +614,6 @@ LIBOBJS
 PYTHON
 SourceRoot
 Suffix
-LlvmMaxVersion
-LlvmMinVersion
 ProjectPatchLevel2
 ProjectPatchLevel1
 ProjectPatchLevel
@@ -672,8 +670,6 @@ with_project_version_for_lib
 with_project_patch_level
 with_project_patch_level1
 with_project_patch_level2
-with_llvm_min_version
-with_llvm_max_version
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1309,10 +1305,6 @@ Optional Packages:
                           GHC patchlevel1 version (default: 0)
   --with-project-patch-level2=VER
                           GHC patchlevel2 version (default: 0)
-  --with-llvm-min-version=VER
-                          Min LLVM version supported (default: 13)
-  --with-llvm-max-version=VER
-                          Max LLVM version supported (default: 20)
 
 Report bugs to <your-email@example.com>.
 _ACEOF
@@ -1833,29 +1825,7 @@ esac
 fi
 
 
-# Check whether --with-llvm-min-version was given.
-if test ${with_llvm_min_version+y}
-then :
-  withval=$with_llvm_min_version; LlvmMinVersion="$withval"
-else case e in #(
-  e) LlvmMinVersion="13" ;;
-esac
-fi
-
-
-# Check whether --with-llvm-max-version was given.
-if test ${with_llvm_max_version+y}
-then :
-  withval=$with_llvm_max_version; LlvmMaxVersion="$withval"
-else case e in #(
-  e) LlvmMaxVersion="20" ;;
-esac
-fi
-
-
 # Export these variables for substitution by AC_SUBST
-
-
 
 
 
@@ -1930,7 +1900,7 @@ fi
 
 # --- Files to generate ---
 # config.status will create these files by substituting @VAR@ placeholders.
-ac_config_files="$ac_config_files ghc/ghc-bin.cabal:ghc/ghc-bin.cabal.in compiler/ghc.cabal:compiler/ghc.cabal.in libraries/ghc-boot/ghc-boot.cabal:libraries/ghc-boot/ghc-boot.cabal.in libraries/ghc-boot-th/ghc-boot-th.cabal:libraries/ghc-boot-th/ghc-boot-th.cabal.in libraries/ghc-heap/ghc-heap.cabal:libraries/ghc-heap/ghc-heap.cabal.in libraries/template-haskell/template-haskell.cabal:libraries/template-haskell/template-haskell.cabal.in libraries/ghci/ghci.cabal:libraries/ghci/ghci.cabal.in compiler/GHC/CmmToLlvm/Version/Bounds.hs:compiler/GHC/CmmToLlvm/Version/Bounds.hs.in utils/ghc-pkg/ghc-pkg.cabal:utils/ghc-pkg/ghc-pkg.cabal.in utils/iserv/iserv.cabal:utils/iserv/iserv.cabal.in utils/runghc/runghc.cabal:utils/runghc/runghc.cabal.in libraries/ghc-internal/ghc-internal.cabal:libraries/ghc-internal/ghc-internal.cabal.in libraries/ghc-experimental/ghc-experimental.cabal:libraries/ghc-experimental/ghc-experimental.cabal.in libraries/base/base.cabal:libraries/base/base.cabal.in rts/include/ghcversion.h:rts/include/ghcversion.h.in"
+ac_config_files="$ac_config_files ghc/ghc-bin.cabal:ghc/ghc-bin.cabal.in compiler/ghc.cabal:compiler/ghc.cabal.in libraries/ghc-boot/ghc-boot.cabal:libraries/ghc-boot/ghc-boot.cabal.in libraries/ghc-boot-th/ghc-boot-th.cabal:libraries/ghc-boot-th/ghc-boot-th.cabal.in libraries/ghc-heap/ghc-heap.cabal:libraries/ghc-heap/ghc-heap.cabal.in libraries/template-haskell/template-haskell.cabal:libraries/template-haskell/template-haskell.cabal.in libraries/ghci/ghci.cabal:libraries/ghci/ghci.cabal.in utils/ghc-pkg/ghc-pkg.cabal:utils/ghc-pkg/ghc-pkg.cabal.in utils/iserv/iserv.cabal:utils/iserv/iserv.cabal.in utils/runghc/runghc.cabal:utils/runghc/runghc.cabal.in libraries/ghc-internal/ghc-internal.cabal:libraries/ghc-internal/ghc-internal.cabal.in libraries/ghc-experimental/ghc-experimental.cabal:libraries/ghc-experimental/ghc-experimental.cabal.in libraries/base/base.cabal:libraries/base/base.cabal.in rts/include/ghcversion.h:rts/include/ghcversion.h.in"
 
 
 cat >confcache <<\_ACEOF
@@ -2641,7 +2611,6 @@ do
     "libraries/ghc-heap/ghc-heap.cabal") CONFIG_FILES="$CONFIG_FILES libraries/ghc-heap/ghc-heap.cabal:libraries/ghc-heap/ghc-heap.cabal.in" ;;
     "libraries/template-haskell/template-haskell.cabal") CONFIG_FILES="$CONFIG_FILES libraries/template-haskell/template-haskell.cabal:libraries/template-haskell/template-haskell.cabal.in" ;;
     "libraries/ghci/ghci.cabal") CONFIG_FILES="$CONFIG_FILES libraries/ghci/ghci.cabal:libraries/ghci/ghci.cabal.in" ;;
-    "compiler/GHC/CmmToLlvm/Version/Bounds.hs") CONFIG_FILES="$CONFIG_FILES compiler/GHC/CmmToLlvm/Version/Bounds.hs:compiler/GHC/CmmToLlvm/Version/Bounds.hs.in" ;;
     "utils/ghc-pkg/ghc-pkg.cabal") CONFIG_FILES="$CONFIG_FILES utils/ghc-pkg/ghc-pkg.cabal:utils/ghc-pkg/ghc-pkg.cabal.in" ;;
     "utils/iserv/iserv.cabal") CONFIG_FILES="$CONFIG_FILES utils/iserv/iserv.cabal:utils/iserv/iserv.cabal.in" ;;
     "utils/runghc/runghc.cabal") CONFIG_FILES="$CONFIG_FILES utils/runghc/runghc.cabal:utils/runghc/runghc.cabal.in" ;;
