@@ -37,6 +37,8 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Platform
 import GHC.Platform.Host
 
+import GHC.Builtin.PrimOps (primOpPrimModule, primOpWrappersModule)
+
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
@@ -138,6 +140,8 @@ main = do
                    ShowVersion               -> showVersion
                    ShowNumVersion            -> putStrLn cProjectVersion
                    ShowOptions isInteractive -> showOptions isInteractive
+                   PrintPrimModule           -> liftIO $ putStrLn primOpPrimModule
+                   PrintPrimWrappersModule   -> liftIO $ putStrLn primOpWrappersModule
         Right postStartupMode ->
             -- start our GHC session
             GHC.runGhc mbMinusB $ do

@@ -1,0 +1,31 @@
+cabal-version: 3.4
+name: rts-headers
+version: 1.0.3
+synopsis: The GHC runtime system
+description:
+    The GHC runtime system.
+
+    Code produced by GHC links this library to provide missing functionality
+    that cannot be written in Haskell itself.
+license: BSD-3-Clause
+maintainer: glasgow-haskell-users@haskell.org
+build-type: Simple
+
+
+library
+  include-dirs:
+    include
+  
+  install-includes:
+    rts/Bytecodes.h
+    rts/storage/ClosureTypes.h
+    rts/storage/FunTypes.h
+    stg/MachRegs.h
+    stg/MachRegs/arm32.h
+    stg/MachRegs/arm64.h
+    stg/MachRegs/loongarch64.h
+    stg/MachRegs/ppc.h
+    stg/MachRegs/riscv64.h
+    stg/MachRegs/s390x.h
+    stg/MachRegs/wasm32.h
+    stg/MachRegs/x86.h

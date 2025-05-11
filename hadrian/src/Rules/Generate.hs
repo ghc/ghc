@@ -98,6 +98,8 @@ compilerDependencies = do
                   , "primop-vector-uniques.hs-incl"
                   , "primop-docs.hs-incl"
                   , "primop-deprecations.hs-incl"
+                  , "primop-prim-module.hs-incl"
+                  , "primop-wrappers-module.hs-incl"
                   , "GHC/Platform/Constants.hs"
                   , "GHC/Settings/Config.hs"
                   ]

@@ -392,6 +392,7 @@ buildUnit session cid insts lunit = do
                                  TcSession -> True
                                  _ -> False,
             -- nope
+            unitFlags = [],
             unitLibraries = [],
             unitExtDepLibsSys = [],
             unitExtDepLibsGhc = [],

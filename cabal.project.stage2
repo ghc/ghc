@@ -1,6 +1,8 @@
 package-dbs: clear, global
 
 packages:
+  rts-headers
+  rts-fs
   rts
 
   libraries/ghc-prim
@@ -54,18 +56,12 @@ packages:
   https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
   https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
 
-  ghc/
   libraries/haskeline/
   libraries/terminfo/
-  utils/ghc-pkg
-  utils/hsc2hs
   utils/hp2ps
   utils/hpc
-  utils/unlit
   utils/iserv
-  utils/genprimopcode/
   utils/genapply/
-  utils/deriveConstants/
   utils/runghc/
 
 
@@ -74,6 +70,10 @@ benchmarks: False
 tests: False
 allow-boot-library-installs: True
 active-repositories: :none
+
+constraints:
+  -- we do not want to use the rts-headers from stage1
+  rts-headers source, rts-fs source
 
 package *
   library-vanilla: True
@@ -145,22 +145,6 @@ package ghc-internal
 
 package text
   flags: -simdutf
-
-package rts
-  ghc-options: "-optc-DProjectVersion=\"913\""
-  ghc-options: "-optc-DRtsWay=\"v\""
-  ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
-  ghc-options: "-optc-DHostArch=\"x86_64\""
-  ghc-options: "-optc-DHostOS=\"linux\""
-  ghc-options: "-optc-DHostVendor=\"unknown\""
-  ghc-options: "-optc-DBuildPlatform=\"FIXME\""
-  ghc-options: "-optc-DBuildArch=\"FIXME\""
-  ghc-options: "-optc-DBuildOS=\"FIXME\""
-  ghc-options: "-optc-DBuildVendor=\"FIXME\""
-  ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
-  ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
-  ghc-options: "-optc-DFS_NAMESPACE=rts"
-  flags: +tables-next-to-code
 
 program-options
   ghc-options: -fhide-source-paths -j

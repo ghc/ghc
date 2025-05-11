@@ -363,7 +363,7 @@ int main(int argc,char **argv)
         file    = "stdin";
     }
     else
-        if ((istream=__hs_fopen(argv[0], "r")) == NULL) {
+        if ((istream=__rts_fopen(argv[0], "r")) == NULL) {
             fprintf(stderr, CANNOTOPEN, argv[0]);
             exit(1);
         }
@@ -372,7 +372,7 @@ int main(int argc,char **argv)
     if (strcmp(argv[1], "-")==0)
         ostream = stdout;
     else
-        if ((ostream=__hs_fopen(argv[1], "w")) == NULL)  {
+        if ((ostream=__rts_fopen(argv[1], "w")) == NULL)  {
             fprintf(stderr, CANNOTOPEN, argv[1]);
             exit(1);
         }

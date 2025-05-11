@@ -57,6 +57,8 @@ primopIncls =
     , ("primop-vector-tycons.hs-incl"     , "--primop-vector-tycons")
     , ("primop-docs.hs-incl"              , "--wired-in-docs")
     , ("primop-deprecations.hs-incl"      , "--wired-in-deprecations")
+    , ("primop-prim-module.hs-incl"       , "--prim-module")
+    , ("primop-wrappers-module.hs-incl"   , "--wrappers-module")
     ]
 
 ghcAutogen :: Verbosity -> LocalBuildInfo -> IO ()
