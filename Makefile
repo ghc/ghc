@@ -26,7 +26,6 @@ CONFIGURED_FILES := \
 	libraries/ghc-heap/ghc-heap.cabal \
 	libraries/template-haskell/template-haskell.cabal \
 	libraries/ghci/ghci.cabal \
-	compiler/GHC/CmmToLlvm/Version/Bounds.hs \
 	utils/ghc-pkg/ghc-pkg.cabal \
 	utils/iserv/iserv.cabal \
 	utils/runghc/runghc.cabal \
