@@ -14,7 +14,7 @@ on:
 jobs:
   cabal:
     name: ${{ matrix.plat }} / ghc ${{ matrix.ghc }}
-    runs-on: "${{ fromJSON('{\"x86_64-linux\": \"ubuntu-latest\", \"aarch64-linux\": \"ubuntu-latest-arm\", \"x86_64-darwin\": \"macos-latest\", \"aarch64-darwin\": \"macos-latest\"}')[matrix.plat] }}"
+    runs-on: "${{ fromJSON('{\"x86_64-linux\": \"ubuntu-24.04\", \"aarch64-linux\": \"ubuntu-24.04-arm\", \"x86_64-darwin\": \"macos-latest\", \"aarch64-darwin\": \"macos-latest\"}')[matrix.plat] }}"
 
     strategy:
       fail-fast: false
