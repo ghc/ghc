@@ -1986,10 +1986,18 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
             DELTA (-16)
           ]
       moveStackDown i | odd i = moveStackDown (i + 1)
+      moveStackDown i
+        | fitsIn12bitImm (8 * i) =
+            toOL
+              [ PUSH_STACK_FRAME,
+                SUB (OpReg II64 spMachReg) (OpReg II64 spMachReg) (OpImm (ImmInt (8 * i))),
+                DELTA (-8 * i - 16)
+              ]
       moveStackDown i =
         toOL
           [ PUSH_STACK_FRAME,
-            SUB (OpReg II64 spMachReg) (OpReg II64 spMachReg) (OpImm (ImmInt (8 * i))),
+            MOV tmp (OpImm (ImmInt (8 * i))),
+            SUB (OpReg II64 spMachReg) (OpReg II64 spMachReg) tmp,
             DELTA (-8 * i - 16)
           ]
       moveStackUp 0 =
@@ -1998,9 +2006,17 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
             DELTA 0
           ]
       moveStackUp i | odd i = moveStackUp (i + 1)
+      moveStackUp i
+        | fitsIn12bitImm (8 * i) =
+            toOL
+              [ ADD (OpReg II64 spMachReg) (OpReg II64 spMachReg) (OpImm (ImmInt (8 * i))),
+                POP_STACK_FRAME,
+                DELTA 0
+              ]
       moveStackUp i =
         toOL
-          [ ADD (OpReg II64 spMachReg) (OpReg II64 spMachReg) (OpImm (ImmInt (8 * i))),
+          [ MOV tmp (OpImm (ImmInt (8 * i))),
+            ADD (OpReg II64 spMachReg) (OpReg II64 spMachReg) tmp,
             POP_STACK_FRAME,
             DELTA 0
           ]
@@ -2099,10 +2115,45 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
       passArguments gpRegs fpRegs vRegs args stackSpaceWords (vReg : accumRegs) accumCode'
 
     -- No more vector regs, and we want to pass a vector argument.
-    passArguments _gpRegs _fpRegs (_vReg : _vRegs) ((_r, format, _hint, _code_r) : _args) _stackSpaceWords _accumRegs _accumCode
-      | isVecFormat format =
-          pprPanic "passArguments" (text "TODO: Implement and test vector argument passing on the stack.")
+    passArguments gpRegs fpRegs [] ((r, format, _hint, code_r) : args) stackSpaceWords accumRegs accumCode
+      | isVecFormat format = do
+      let (stackSpaceWords', stackPass_code) = mkStackPass format r stackSpaceWords
+          stackCode = code_r `appOL` toOL stackPass_code 
+      passArguments gpRegs fpRegs [] args stackSpaceWords' accumRegs (stackCode `appOL` accumCode)
+
     passArguments _ _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
+
+    mkStackPass :: Format -> Reg ->  Int -> (Int, [Instr])
+    mkStackPass fmt reg stackSpaceWords =
+      case spOffet of
+        imm | fitsIn12bitImm imm && not (isVecFormat fmt) -> (stackSpaceWords', [mkStrSpImm imm])
+        imm ->
+          ( stackSpaceWords',
+            [ movImmToTmp imm,
+              addSpToTmp,
+              mkStrTmp
+            ]
+          )
+      where
+        fmt'
+          | isVecFormat fmt =
+              fmt
+          | otherwise =
+              scalarMoveFormat fmt
+        mkStrSpImm imm =
+          ANN (text "Pass arg SP@" <> int spOffet)
+            $ (STR fmt' (OpReg fmt reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm))))
+        movImmToTmp imm =
+          ANN (text "Pass arg: TMP <- " <> int imm)
+            $ MOV tmp (OpImm (ImmInt imm))
+        addSpToTmp =
+          ANN (text "Pass arg: TMP <- SP + TMP ")
+            $ ADD tmp tmp sp
+        mkStrTmp =
+          ANN (text "Pass arg SP@" <> int spOffet)
+            $ (STR fmt' (OpReg fmt reg) (OpAddr (AddrReg tmpReg)))
+        stackSpaceWords' = stackSpaceWords + (formatInBytes fmt * 8)
+        spOffet = 8 * stackSpaceWords
 
     readResults :: [Reg] -> [Reg] -> [Reg] -> [LocalReg] -> [Reg] -> InstrBlock -> NatM InstrBlock
     readResults _ _ _ [] _ accumCode = return accumCode
