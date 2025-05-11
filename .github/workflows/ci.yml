@@ -14,12 +14,12 @@ on:
 jobs:
   cabal:
     name: ${{ matrix.plat }} / ghc ${{ matrix.ghc }}
-    runs-on: "${{ fromJSON('{\"x86_64-linux\": \"ubuntu-latest\", \"aarch64-linux\": \"ubuntu-latest-arm\", \"x86_64-macos\": \"macos-latest\", \"aarch64-macos\": \"macos-latest\"}')[matrix.plat] }}"
+    runs-on: "${{ fromJSON('{\"x86_64-linux\": \"ubuntu-latest\", \"aarch64-linux\": \"ubuntu-latest-arm\", \"x86_64-darwin\": \"macos-latest\", \"aarch64-darwin\": \"macos-latest\"}')[matrix.plat] }}"
 
     strategy:
       fail-fast: false
       matrix:
-        plat: [x86_64-linux, x86_64-macos, aarch64-macos]
+        plat: [x86_64-linux, aarch64-linux, x86_64-darwin, aarch64-darwin]
         ghc: ['98'] # bootstrapping compiler
 
     steps:
