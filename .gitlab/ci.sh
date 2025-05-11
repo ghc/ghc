@@ -670,7 +670,7 @@ function install_bindist() {
 }
 
 function test_hadrian() {
-  check_msys2_deps _build/stage1/bin/ghc --version
+  check_msys2_deps "_build/stage1/bin/${cross_prefix}ghc$exe" --version
   check_release_build
 
   # Ensure that statically-linked builds are actually static
