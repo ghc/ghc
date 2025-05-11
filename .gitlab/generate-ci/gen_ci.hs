@@ -1323,7 +1323,7 @@ cross_jobs = [
         (validateBuilds AArch64 (Linux (Debian12Wine OnlyTest)) (winAarch64Config {llvmBootstrap = True}))
   , makeWineArmJobs
       $ addValidateRule WineArm64
-        (validateBuilds AArch64 (Linux (Debian12Wine FullBuild)) winAarch64Config)
+        (validateBuilds AArch64 (Linux (Debian12Wine FullBuild)) wineAarch64Config)
   ]
   where
     javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
@@ -1367,6 +1367,9 @@ cross_jobs = [
       in addWindowsCrossArmVars llvm_prefix "" cflags
 
     winAarch64Config = (crossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing)
+                         { bignumBackend = Native }
+
+    wineAarch64Config = (crossConfig "aarch64-unknown-mingw32" NoEmulatorNeeded Nothing)
                          { bignumBackend = Native }
 
     makeWineArmJobs =
