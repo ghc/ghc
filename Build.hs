@@ -74,6 +74,8 @@ main = do
                           }
 
   void $ readCreateProcess' (shell $ "rm -fR _build/stage1/lib/package.conf.d; ln -s $(pwd)/_build/stage0/cabal/packagedb/ghc-* _build/stage1/lib/package.conf.d") ""
+  -- ensure we re-cache... with the newly built ghc-pkg.
+  void $ readCreateProcess' (shell $ "_build/stage1/bin/ghc-pkg recache") ""
   generateSettings ghcToolchain stage1_settings "_build/stage1/"
 
   msg "Building boot libraries with stage1 compiler..."
@@ -144,6 +146,7 @@ buildGhcStage booting opts cabal ghc0 dst = do
   current_env <- getEnvironment
   genapply_path <- makeAbsolute "_build/stage1/bin/genapply"
   deriveConstants_path <- makeAbsolute "_build/stage1/bin/deriveConstants"
+  ghcPkg <- makeAbsolute "_build/stage1/bin/ghc-pkg"
   let stage1_env = ("HADRIAN_SETTINGS", stage1_ghc_boot_settings)
                  -- This is a very stupid hack :-/
                  -- We can't really have `rts` depend on genapply and deriveConstants
@@ -168,7 +171,8 @@ buildGhcStage booting opts cabal ghc0 dst = do
            , "hsc2hs:hsc2hs"
            ]
         | otherwise =
-           [ "ghc-bin:ghc"
+           [ "--with-ghc-pkg=" ++ ghcPkg
+           , "ghc-bin:ghc"
            , "ghc-pkg:ghc-pkg"
            , "genprimopcode:genprimopcode"
            , "deriveConstants:deriveConstants"
