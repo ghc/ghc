@@ -718,8 +718,10 @@ function test_hadrian() {
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
     install_bindist _build/bindist/ghc-*/ "$instdir"
+    echo "test_compiler ($test_compiler) settings:"
+    cat "$instdir/lib/settings"
     echo 'main = putStrLn "hello world"' > expected
-    run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
+    run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -v -o hello
 
     if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
       ${CROSS_EMULATOR:-} ./hello.exe > actual
