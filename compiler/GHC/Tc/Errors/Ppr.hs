@@ -3299,14 +3299,27 @@ instance Diagnostic TcRnMessage where
         BadImportAvailVar -> could_remove ImportItemUnwantedKeywordType
         BadImportNotExported suggs -> suggs
         BadImportAvailTyCon
-          | isSymOcc occ -> -- type operators always require the 'type' keyword
-              [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | not (ile_explicit_namespaces exts) ]
-              ++ [ ImportSuggestion occ $ CouldAddTypeKeyword mod_name ]
-          | otherwise    ->
+          -- BadImportAvailTyCon means a name is available in the TcCls namespace
+          -- but name resolution could not use it. Possible reasons for that:
+          --   1. Case (TyOp) `import M ((#))` or `import M (data (#))`
+          --        The user tried to import a type operator without using the `type` keyword,
+          --        or using a different keyword. Suggested fix: add 'type'.
+          --   2. Case (DataKw) `import M (data T)`
+          --        The user tried to import a non-operator type constructor, but mistakenly
+          --        used the `data` keyword, which restricted the lookup to the value namespace.
+          --        Suggested fix: remove 'data'; no need to add 'type' for non-operators.
+          --   3. Case (PatternKw) `import M (pattern T)`
+          --        Same as the (DataKw) case, mutatis mutandis.
+          -- Any other case would not have resulted in BadImportAvailTyCon.
+          | isSymOcc occ              -- Case (TyOp)
+              -> [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | not (ile_explicit_namespaces exts) ]
+                 ++ [ ImportSuggestion occ $ CouldAddTypeKeyword mod_name ]
+          | otherwise ->              -- Non-operator cases
               case unLoc (ieLIEWrappedName ie) of
-                IEData{}    -> could_remove ImportItemUnwantedKeywordData
-                IEPattern{} -> could_remove ImportItemUnwantedKeywordPattern
-                _           -> noHints
+                IEData{}    -> could_remove ImportItemUnwantedKeywordData     -- Case (DataKw)
+                IEPattern{} -> could_remove ImportItemUnwantedKeywordPattern  -- Case (PatternKw)
+                _           -> panic "diagnosticHints: unexpected BadImportAvailTyCon"
+
         BadImportAvailDataCon par  ->
           [ ImportSuggestion occ $
             ImportDataCon { ies_suggest_import_from = Just mod_name
