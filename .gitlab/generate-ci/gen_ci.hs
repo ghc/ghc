@@ -1329,7 +1329,6 @@ cross_jobs = [
       modifyJobs
         ( -- See Note [Testing wasm ghci browser mode]
           setVariable "FIREFOX_LAUNCH_OPTS" "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}"
-            . setVariable "CHROME_LAUNCH_OPTS" "{\"browser\":\"chrome\",\"protocol\":\"webDriverBiDi\",\"executablePath\":\"/usr/bin/chromium\",\"args\":[\"--no-sandbox\"]}"
             . setVariable "HADRIAN_ARGS" "--docs=no-sphinx-pdfs --docs=no-sphinx-man"
             . delVariable "INSTALL_CONFIGURE_ARGS"
         )
