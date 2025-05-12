@@ -9,6 +9,8 @@ extra-doc-files:    README
 extra-source-files: fs.h
 
 library
+    cc-options:       -DFS_NAMESPACE=rts -DCOMPILING_RTS
+    cpp-options:      -DFS_NAMESPACE=rts -DCOMPILING_RTS
     c-sources:        fs.c
     include-dirs:     .
     install-includes: fs.h
