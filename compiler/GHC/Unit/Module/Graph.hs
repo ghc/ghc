@@ -154,7 +154,7 @@ import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 import GHC.Unit.Module.ModIface
-import GHC.Utils.Misc ( partitionWith, HasCallStack )
+import GHC.Utils.Misc ( partitionWith )
 
 import System.FilePath
 import qualified Data.Map as Map
@@ -554,13 +554,13 @@ mgReachableLoop mg nk = map summaryNodeSummary modules_below where
 
 -- | @'mgQueryZero' g root b@ answers the question: can we reach @b@ from @root@
 -- in the module graph @g@, only using normal (level 0) imports?
-mgQueryZero :: HasCallStack => ModuleGraph
+mgQueryZero :: ModuleGraph
             -> ZeroScopeKey
             -> ZeroScopeKey
             -> Bool
-mgQueryZero mg nka nkb = pprTrace "mgQueryZero" (ppr nka <+> ppr nkb) $ isReachable td_map na nb where
+mgQueryZero mg nka nkb = isReachable td_map na nb where
   (td_map, lookup_node) = mg_zero_graph mg
-  na = expectJust $ pprTrace "lookup_node nka" (ppr (reachabilityIndexMembers td_map) <+> ppr nka) $ lookup_node nka
+  na = expectJust $ lookup_node nka
   nb = expectJust $ lookup_node nkb
 
 
