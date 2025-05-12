@@ -9,6 +9,27 @@ GHC_FOR_BUILDER ?= ghc-9.8.4
 PYTHON ?= python3
 CABAL ?= cabal
 
+define GHC_INFO
+$(shell $(GHC_FOR_BUILDER) --info | $(GHC_FOR_BUILDER) -e 'getContents >>= foldMap putStrLn . lookup "$1" . read')
+endef
+
+TARGET_PLATFORM := $(call GHC_INFO,target platform string)
+TARGET_ARCH     := $(call GHC_INFO,target arch)
+TARGET_OS       := $(call GHC_INFO,target os)
+GIT_COMMIT_ID   := $(shell git rev-parse HEAD)
+
+define HADRIAN_SETTINGS
+[ ("hostPlatformArch",    "$(TARGET_ARCH)")
+, ("hostPlatformOS",      "$(TARGET_OS)")
+, ("cProjectGitCommitId", "$(GIT_COMMIT_ID)")
+, ("cProjectVersion",     "9.13")
+, ("cProjectVersionInt",  "913")
+, ("cProjectPatchLevel",  "0")
+, ("cProjectPatchLevel1", "0")
+, ("cProjectPatchLevel2", "0")
+]
+endef
+
 # Handle CPUS and THREADS
 CPUS_DETECT_SCRIPT := ./mk/detect-cpu-count.sh
 CPUS := $(shell if [ -x $(CPUS_DETECT_SCRIPT) ]; then $(CPUS_DETECT_SCRIPT); else echo 2; fi)
