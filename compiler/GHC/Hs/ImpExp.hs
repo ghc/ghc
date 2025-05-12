@@ -255,15 +255,15 @@ type instance XXIE               (GhcPass _) = DataConCantHappen
 
 type instance Anno (LocatedA (IE (GhcPass p))) = SrcSpanAnnA
 
-ieNameWrapper :: IE (GhcPass p) -> LIEWrappedName (GhcPass p)
-ieNameWrapper (IEVar _ n _)           = n
-ieNameWrapper (IEThingAbs  _ n _)     = n
-ieNameWrapper (IEThingWith _ n _ _ _) = n
-ieNameWrapper (IEThingAll  _ n _)     = n
-ieNameWrapper _ = panic "ieNameWrapper failed pattern match!"
+ieLIEWrappedName :: IE (GhcPass p) -> LIEWrappedName (GhcPass p)
+ieLIEWrappedName (IEVar _ n _)           = n
+ieLIEWrappedName (IEThingAbs  _ n _)     = n
+ieLIEWrappedName (IEThingWith _ n _ _ _) = n
+ieLIEWrappedName (IEThingAll  _ n _)     = n
+ieLIEWrappedName _ = panic "ieLIEWrappedName failed pattern match!"
 
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)
-ieName = lieWrappedName . ieNameWrapper
+ieName = lieWrappedName . ieLIEWrappedName
 
 ieNames :: IE (GhcPass p) -> [IdP (GhcPass p)]
 ieNames (IEVar       _ (L _ n) _)      = [ieWrappedName n]

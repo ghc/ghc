@@ -3303,7 +3303,7 @@ instance Diagnostic TcRnMessage where
               [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | not (ile_explicit_namespaces exts) ]
               ++ [ ImportSuggestion occ $ CouldAddTypeKeyword mod_name ]
           | otherwise    ->
-              case unLoc (ieNameWrapper ie) of
+              case unLoc (ieLIEWrappedName ie) of
                 IEData{}    -> could_remove ImportItemUnwantedKeywordData
                 IEPattern{} -> could_remove ImportItemUnwantedKeywordPattern
                 _           -> noHints
