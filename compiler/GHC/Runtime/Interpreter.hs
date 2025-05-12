@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | Interacting with the iserv interpreter, whether it is running on an
 -- external process or in the current process.
@@ -22,7 +21,6 @@ module GHC.Runtime.Interpreter
   , mkCostCentres
   , costCentreStackInfo
   , newBreakArray
-  , newModule
   , storeBreakpoint
   , breakpointStatus
   , getBreakpointVar
@@ -376,14 +374,6 @@ newBreakArray :: Interp -> Int -> IO (ForeignRef BreakArray)
 newBreakArray interp size = do
   breakArray <- interpCmd interp (NewBreakArray size)
   mkFinalizedHValue interp breakArray
-
-newModule :: Interp -> Module -> IO (RemotePtr ModuleName, RemotePtr UnitId)
-newModule interp mod = do
-  let
-    mod_name = moduleNameFS $ moduleName mod
-    mod_id = unitIdFS $ toUnitId $ moduleUnit mod
-  [mod_ptr, mod_id_ptr] <- interpCmd interp $ MallocStrings $ map bytesFS [mod_name, mod_id]
-  pure (castRemotePtr mod_ptr, castRemotePtr mod_id_ptr)
 
 storeBreakpoint :: Interp -> ForeignRef BreakArray -> Int -> Int -> IO ()
 storeBreakpoint interp ref ix cnt = do                               -- #19157
