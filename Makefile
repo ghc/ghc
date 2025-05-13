@@ -5,12 +5,19 @@
 # The whole version replacement therapy is utterly ridiculous. It should be done
 # in the respective packages.
 
-GHC_FOR_BUILDER ?= ghc-9.8.4
+GHC0 ?= ghc-9.8.4
 PYTHON ?= python3
 CABAL ?= cabal
 
+GHC1 = _build/stage1/bin/ghc
+GHC2 = _build/stage2/bin/ghc
+
 define GHC_INFO
-$(shell $(GHC_FOR_BUILDER) --info | $(GHC_FOR_BUILDER) -e 'getContents >>= foldMap putStrLn . lookup "$1" . read')
+$(shell $(GHC0) --info | $(GHC0) -e 'getContents >>= foldMap putStrLn . lookup "$1" . read')
+endef
+
+define COPY_BIN # $1: cabal, $2: ghc, $3: stage, $4: target, $5: name
+cp -rfp $(shell $1 list-bin --project-file=cabal.project.$3 -w $2 --builddir=_build/$3/cabal $4 -v0) _build/$3/bin/$5
 endef
 
 TARGET_PLATFORM := $(call GHC_INFO,target platform string)
@@ -68,48 +75,61 @@ STAGE2_TARGETS += ghc-bignum:ghc-bignum ghc-compact:ghc-compact ghc-experimental
 # This package is just utterly retarded
 # STAGE2_TARGETS += system-cxx-std-lib:system-cxx-std-lib
 
-_build/stage1/bin/ghc: _build/booted
-	@echo ">>> Building with GHC: $(GHC_FOR_BUILDER) and Cabal: $(CABAL)"
+$(GHC1): _build/booted
+	@echo ">>> Building with GHC: $(GHC0) and Cabal: $(CABAL)"
 	@echo ">>> Using $(THREADS) threads"
+	@mkdir -p _build/logs
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
-	$(CABAL) build --project-file=cabal.project.stage1 \
-		--builddir=_build/stage1/cabal -j -w $(GHC_FOR_BUILDER) $(STAGE1_TARGETS)
+		$(CABAL) build --project-file=cabal.project.stage1 --builddir=_build/stage1/cabal -j -w $(GHC0) \
+		$(STAGE1_TARGETS) \
+		> _build/logs/stage1.log 2> _build/logs/stage1.err
+
+_build/stage1.done: $(GHC1)
 	mkdir -p _build/stage1/{bin,lib}
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage1 -w $(GHC_FOR_BUILDER) --builddir=_build/stage1/cabal ghc-bin:ghc -v0) _build/stage1/bin/ghc
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage1 -w $(GHC_FOR_BUILDER) --builddir=_build/stage1/cabal ghc-pkg:ghc-pkg -v0) _build/stage1/bin/ghc-pkg
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage1 -w $(GHC_FOR_BUILDER) --builddir=_build/stage1/cabal unlit:unlit -v0) _build/stage1/bin/unlit
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage1 -w $(GHC_FOR_BUILDER) --builddir=_build/stage1/cabal hsc2hs:hsc2hs -v0) _build/stage1/bin/hsc2hs
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage1 -w $(GHC_FOR_BUILDER) --builddir=_build/stage1/cabal deriveConstants:deriveConstants -v0) _build/stage1/bin/deriveConstants
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage1 -w $(GHC_FOR_BUILDER) --builddir=_build/stage1/cabal genprimopcode:genprimopcode -v0) _build/stage1/bin/genprimopcode
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage1 -w $(GHC_FOR_BUILDER) --builddir=_build/stage1/cabal genapply:genapply -v0) _build/stage1/bin/genapply
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage1 -w $(GHC_FOR_BUILDER) --builddir=_build/stage1/cabal ghc-toolchain-bin:ghc-toolchain-bin -v0) _build/stage1/bin/ghc-toolchain
+	$(call COPY_BIN,$(CABAL),$(GHC0),stage1,ghc-bin:ghc,ghc)
+	$(call COPY_BIN,$(CABAL),$(GHC0),stage1,ghc-pkg:ghc-pkg,ghc-pkg)
+	$(call COPY_BIN,$(CABAL),$(GHC0),stage1,unlit:unlit,unlit)
+	$(call COPY_BIN,$(CABAL),$(GHC0),stage1,hsc2hs:hsc2hs,hsc2hs)
+	$(call COPY_BIN,$(CABAL),$(GHC0),stage1,deriveConstants:deriveConstants,deriveConstants)
+	$(call COPY_BIN,$(CABAL),$(GHC0),stage1,genprimopcode:genprimopcode,genprimopcode)
+	$(call COPY_BIN,$(CABAL),$(GHC0),stage1,genapply:genapply,genapply)
+	$(call COPY_BIN,$(CABAL),$(GHC0),stage1,ghc-toolchain-bin:ghc-toolchain-bin,ghc-toolchain)
 
 	cp -rfp utils/hsc2hs/data/template-hsc.h _build/stage1/lib/template-hsc.h
 
-	_build/stage1/bin/ghc-toolchain --triple $(TARGET_TRIPLE) --output-settings -o _build/stage1/lib/settings --cc $(CC) --cxx $(CXX)
+	_build/stage1/bin/ghc-toolchain --triple $(TARGET_TRIPLE) --output-settings -o _build/stage1/lib/settings --cc $(CC) --cxx $(CXX) > _build/logs/ghc-toolchain.log 2> _build/logs/ghc-toolchain.err
 
 	rm -fR _build/stage1/lib/package.conf.d; ln -s $(abspath $(wildcard ./_build/stage1/cabal/packagedb/ghc-*)) _build/stage1/lib/package.conf.d
 	_build/stage1/bin/ghc-pkg recache
 
-_build/stage2/bin/ghc: _build/stage1/bin/ghc
-	@echo ">>> Building with GHC: _build/stage1/bin/ghc and Cabal: $(CABAL)"
+# We use PATH=... here to ensure all the build-tool-depends (deriveConstants, genapply, genprimopcode, ...) are
+# available in PATH while cabal evaluates configure files. Cabal sadly does not support build-tool-depends or
+# handle build-depends properly prior to building the package.  Thus Configure/Setup/... do not have build-tool-depends
+# available in PATH.  This is a workaround for that.  I consider this a defect in cabal.
+$(GHC2): _build/stage1.done
+	@$(LIB)
+	@echo ">>> Building with GHC: $(GHC1) and Cabal: $(CABAL)"
 	@echo ">>> Using $(THREADS) threads"
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
-	PATH=$(PWD)/_build/stage1/bin:$(PATH) \
-	$(CABAL) build --project-file=cabal.project.stage2 \
-		--builddir=_build/stage2/cabal -j -w ghc $(STAGE2_TARGETS)
+		PATH=$(PWD)/_build/stage1/bin:$(PATH) \
+		$(CABAL) build --project-file=cabal.project.stage2 --builddir=_build/stage2/cabal -j -w ghc \
+		--ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" \
+		$(STAGE2_TARGETS) \
+		> _build/logs/stage2.log 2> _build/logs/stage2.err
+
+_build/stage2.done: $(GHC2)
 	mkdir -p _build/stage2/{bin,lib}
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal ghc-bin:ghc -v0) _build/stage2/bin/ghc
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal ghc-pkg:ghc-pkg -v0) _build/stage2/bin/ghc-pkg
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal unlit:unlit -v0) _build/stage2/bin/unlit
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal hsc2hs:hsc2hs -v0) _build/stage2/bin/hsc2hs
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal deriveConstants:deriveConstants -v0) _build/stage2/bin/deriveConstants
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal genprimopcode:genprimopcode -v0) _build/stage2/bin/genprimopcode
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal genapply:genapply -v0) _build/stage2/bin/genapply
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal hp2ps:hp2ps -v0) _build/stage2/bin/hp2ps
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal hpc-bin:hpc -v0) _build/stage2/bin/hpc
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal runghc:runghc -v0) _build/stage2/bin/runghc
-	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal iserv:iserv -v0) _build/stage2/bin/ghc-iserv
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,ghc-bin:ghc,ghc)
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,ghc-pkg:ghc-pkg,ghc-pkg)
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,unlit:unlit,unlit)
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,hsc2hs:hsc2hs,hsc2hs)
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,deriveConstants:deriveConstants,deriveConstants)
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,genprimopcode:genprimopcode,genprimopcode)
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,genapply:genapply,genapply)
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,hp2ps:hp2ps,hp2ps)
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,hpc-bin:hpc,hpc)
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,runghc:runghc,runghc)
+	$(call COPY_BIN,$(CABAL),$(GHC1),stage2,iserv:iserv,ghc-iserv)
 
 	cp -rfp utils/hsc2hs/data/template-hsc.h _build/stage2/lib/template-hsc.h
 
@@ -119,7 +139,7 @@ _build/stage2/bin/ghc: _build/stage1/bin/ghc
 	_build/stage2/bin/ghc-pkg recache
 
 # Target for creating the final binary distribution directory
-_build/bindist: _build/stage2/bin/ghc driver/ghc-usage.txt driver/ghci-usage.txt
+_build/bindist: _build/stage2.done driver/ghc-usage.txt driver/ghci-usage.txt
 	@echo "Creating binary distribution in _build/bindist"
 	@mkdir -p _build/bindist/bin
 	@mkdir -p _build/bindist/lib
@@ -138,8 +158,8 @@ _build/bindist: _build/stage2/bin/ghc driver/ghc-usage.txt driver/ghci-usage.txt
 # booted depends on successful source preparation
 _build/booted:
 	@echo ">>> Running ./boot script..."
-	./boot
-	mkdir -p _build
+	@mkdir -p _build/logs
+	./boot > _build/logs/boot.log 2> _build/logs/boot.err
 	touch $@
 
 # --- Clean Targets ---
