@@ -330,7 +330,11 @@ library
     -- rts is a wired in package and
     -- expects the unit-id to be
     -- set without version
-    ghc-options: -this-unit-id rts
+    --
+    -- When building the rts package, we want to pass the ghcversion.h. As we
+    -- don't have one during the rts bootstrap process. It's part of the rts
+    -- and looked up from the rts.  Thus without an rts there is no ghcversion.h
+    ghc-options: -this-unit-id rts -ghcversion-file=include/ghcversion.h -optc-DFS_NAMESPACE=rts
     cmm-options: -this-unit-id rts
 
     exposed: True
@@ -483,12 +487,15 @@ library
       if !flag(smp)
          cpp-options: -DNOSMP
 
-      include-dirs: include
-      -- TODO: move internal headers into include/private?
-      include-dirs: .
+      include-dirs: include .
       includes: Rts.h
       install-includes: Cmm.h HsFFI.h MachDeps.h Jumps.h Rts.h RtsAPI.h RtsSymbols.h Stg.h
                         ghcconfig.h ghcversion.h
+                        ghcautoconf.h
+                        ghcplatform.h
+                        DerivedConstants.h
+                        rts/EventLogConstants.h
+                        rts/EventTypes.h
                         -- ^ generated
                         rts/ghc_ffi.h
                         rts/Adjustor.h
