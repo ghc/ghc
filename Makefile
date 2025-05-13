@@ -91,7 +91,7 @@ _build/stage1/bin/ghc: _build/booted
 	rm -fR _build/stage1/lib/package.conf.d; ln -s $(abspath $(wildcard ./_build/stage1/cabal/packagedb/ghc-*)) _build/stage1/lib/package.conf.d
 	_build/stage1/bin/ghc-pkg recache
 
-_build/stage2/bin/ghc: _build/stage1/bin/ghc compiler/GHC/Builtin/primops.txt
+_build/stage2/bin/ghc: _build/stage1/bin/ghc
 	@echo ">>> Building with GHC: _build/stage1/bin/ghc and Cabal: $(CABAL)"
 	@echo ">>> Using $(THREADS) threads"
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
@@ -117,10 +117,6 @@ _build/stage2/bin/ghc: _build/stage1/bin/ghc compiler/GHC/Builtin/primops.txt
 
 	rm -fR _build/stage2/lib/package.conf.d; ln -s $(abspath $(wildcard ./_build/stage2/cabal/packagedb/ghc-*)) _build/stage2/lib/package.conf.d
 	_build/stage2/bin/ghc-pkg recache
-
-compiler/GHC/Builtin/primops.txt:
-	@echo ">>> Generating primops.txt..."
-	cc -E -undef -traditional -P -x c compiler/GHC/Builtin/primops.txt.pp > compiler/GHC/Builtin/primops.txt
 
 # Target for creating the final binary distribution directory
 _build/bindist: _build/stage2/bin/ghc driver/ghc-usage.txt driver/ghci-usage.txt
