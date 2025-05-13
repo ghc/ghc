@@ -19,14 +19,14 @@ TARGET_OS       := $(call GHC_INFO,target os)
 GIT_COMMIT_ID   := $(shell git rev-parse HEAD)
 
 define HADRIAN_SETTINGS
-[ ("hostPlatformArch",    "$(TARGET_ARCH)")
-, ("hostPlatformOS",      "$(TARGET_OS)")
-, ("cProjectGitCommitId", "$(GIT_COMMIT_ID)")
-, ("cProjectVersion",     "9.13")
-, ("cProjectVersionInt",  "913")
-, ("cProjectPatchLevel",  "0")
-, ("cProjectPatchLevel1", "0")
-, ("cProjectPatchLevel2", "0")
+[ ("hostPlatformArch",    "$(TARGET_ARCH)") \
+, ("hostPlatformOS",      "$(TARGET_OS)") \
+, ("cProjectGitCommitId", "$(GIT_COMMIT_ID)") \
+, ("cProjectVersion",     "9.13") \
+, ("cProjectVersionInt",  "913") \
+, ("cProjectPatchLevel",  "0") \
+, ("cProjectPatchLevel1", "0") \
+, ("cProjectPatchLevel2", "0") \
 ]
 endef
 
