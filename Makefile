@@ -71,8 +71,9 @@ STAGE1_TARGETS := $(STAGE_TARGETS) ghc-toolchain-bin:ghc-toolchain-bin
 STAGE2_TARGETS := $(STAGE_TARGETS) hp2ps:hp2ps hpc-bin:hpc iserv:iserv runghc:runghc
 
 # All these libraries are somehow needed by some tests :rolleyes: this seems to be needed occationally.
-STAGE2_TARGETS += ghc-bignum:ghc-bignum ghc-compact:ghc-compact ghc-experimental:ghc-experimental integer-gmp:integer-gmp xhtml:xhtml terminfo:terminfo ghc-toolchain:ghc-toolchain
+STAGE2_TARGETS += ghc-bignum:ghc-bignum ghc-compact:ghc-compact ghc-experimental:ghc-experimental integer-gmp:integer-gmp xhtml:xhtml terminfo:terminfo ghc-toolchain:ghc-toolchain system-cxx-std-lib:system-cxx-std-lib
 # This package is just utterly retarded
+# I don't understand why this following line somehow breaks the build...
 # STAGE2_TARGETS += system-cxx-std-lib:system-cxx-std-lib
 
 $(GHC1): _build/booted
