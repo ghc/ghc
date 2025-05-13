@@ -146,22 +146,6 @@ package ghc-internal
 package text
   flags: -simdutf
 
-package rts
-  ghc-options: "-optc-DProjectVersion=\"913\""
-  ghc-options: "-optc-DRtsWay=\"v\""
-  ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
-  ghc-options: "-optc-DHostArch=\"x86_64\""
-  ghc-options: "-optc-DHostOS=\"linux\""
-  ghc-options: "-optc-DHostVendor=\"unknown\""
-  ghc-options: "-optc-DBuildPlatform=\"FIXME\""
-  ghc-options: "-optc-DBuildArch=\"FIXME\""
-  ghc-options: "-optc-DBuildOS=\"FIXME\""
-  ghc-options: "-optc-DBuildVendor=\"FIXME\""
-  ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
-  ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
-  ghc-options: "-optc-DFS_NAMESPACE=rts"
-  flags: +tables-next-to-code
-
 program-options
   ghc-options: -fhide-source-paths -j
 
