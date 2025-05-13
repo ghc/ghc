@@ -1,9 +1,9 @@
 # Top-level Makefile
 #
-# This file is still _TOO_ large. There are too many moving _global_ parts,
-# most of this should be relegated to the respective packages. The whole
-# version replacement therapy is utterly ridiculous. It should be done in the
-# respective packages.
+# This file is still _TOO_ large (should be < 100L). There are too many moving
+# _global_ parts, most of this should be relegated to the respective packages.
+# The whole version replacement therapy is utterly ridiculous. It should be done
+# in the respective packages.
 
 GHC_FOR_BUILDER ?= ghc-9.8.4
 PYTHON ?= python3
@@ -128,7 +128,7 @@ libraries/ghc-internal/src/GHC/Internal/Prim.hs: _build/stage1/bin/ghc compiler/
 
 libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs: _build/stage1/bin/ghc compiler/GHC/Builtin/primops.txt
 	@echo ">>> Generating GHC.Internal.PrimopWrappers module..."
-	/home/angerman/ghc/_build/stage1/bin/genprimopcode --make-haskell-wrappers < compiler/GHC/Builtin/primops.txt > libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs
+	_build/stage1/bin/genprimopcode --make-haskell-wrappers < compiler/GHC/Builtin/primops.txt > libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs
 
 
 # Target for creating the final binary distribution directory
