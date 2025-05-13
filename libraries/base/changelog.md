@@ -1,6 +1,6 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.21.0.0 December 2024
+## 4.21.0.0 *December 2024*
   * Shipped with GHC 9.12.1
   * Introduce `Data.Bounded` module exporting the `Bounded` typeclass (finishing [CLC proposal #208](https://github.com/haskell/core-libraries-committee/issues/208))
   * Deprecate export of `Bounded` class from `Data.Enum` ([CLC proposal #208](https://github.com/haskell/core-libraries-committee/issues/208))
