@@ -60,7 +60,7 @@ import GHC.Types.Var    ( isTyCoVar )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey, seqHashKey )
 
-import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
+import GHC.Data.Maybe   ( isJust, orElse, mapMaybe )
 import GHC.Data.FastString
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
@@ -2121,7 +2121,7 @@ wrapJoinCont env cont thing_inside
 trimJoinCont :: Id         -- Used only in error message
              -> JoinPointHood
              -> SimplCont -> SimplCont
--- Drop outer context from join point invocation (jump)
+-- Discard outer context from join point invocation (jump)
 -- See Note [Join points and case-of-case]
 
 trimJoinCont _ NotJoinPoint cont
@@ -2165,7 +2165,9 @@ evaluation context E):
 As is evident from the example, there are two components to this behavior:
 
   1. When entering the RHS of a join point, copy the context inside.
+
   2. When a join point is invoked, discard the outer context.
+     See `trimJoinCont`
 
 We need to be very careful here to remain consistent---neither part is
 optional!
@@ -3917,13 +3919,49 @@ mkDupableContWithDmds env _
        ; mkDupableStrictBind env bndr' join_body res_ty }
 
 mkDupableContWithDmds env _
-    (StrictArg { sc_fun = fun, sc_cont = cont
-               , sc_fun_ty = fun_ty })
+    (StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty })
+  -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
+  | isJust (isDataConId_maybe (ai_fun fun))
+         -- isDataConId: see point (DJ4) of Note [Duplicating join points]
+  = -- Use Plan B of Note [Duplicating StrictArg]
+    --   K[ f a b <> ]   -->   join j x = K[ f a b x ]
+    --                         j <>
+    do { let rhs_ty       = contResultType cont
+             (m,arg_ty,_) = splitFunTy fun_ty
+       ; arg_bndr <- newId (fsLit "arg") m arg_ty
+       ; let env' = env `addNewInScopeIds` [arg_bndr]
+       ; (floats, join_rhs) <- rebuildCall env' (addValArgTo fun (Var arg_bndr) fun_ty) cont
+       ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }
+
+  | otherwise
+  = -- Use Plan C of Note [Duplicating StrictArg]
+    --   K[ f a b <> ]   -->   join j x = K[ x ]
+    --                         K1[ f a b <> ]
+    --  where K1 = j <>
+    do { let rhs_ty       = contResultType cont
+             (m,_,res_ty) = splitFunTy fun_ty
+       ; (floats, cont') <-
+           if contIsTrivial cont
+           then return (emptyFloats env, cont)
+           else do { arg_bndr <- newId (fsLit "arg") m res_ty
+                   ; let env' = env `addNewInScopeIds` [arg_bndr]
+                   ; rhs' <- simplExprC env' (Var arg_bndr) cont
+                   ; mkDupableStrictBind env' arg_bndr rhs' rhs_ty }
+
+       ; (floats_s, args') <- mapAndUnzipM (makeTrivialArg env) (ai_args fun)
+
+       ; return ( foldl' addLetFloats floats floats_s
+                , StrictArg { sc_fun = fun { ai_args = args' }
+                            , sc_cont = cont', sc_dup = OkToDup, sc_fun_ty = fun_ty }) }
+
+{-
   -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
   | isNothing (isDataConId_maybe (ai_fun fun))
          -- isDataConId: see point (DJ4) of Note [Duplicating join points]
   , thumbsUpPlanA cont
   = -- Use Plan A of Note [Duplicating StrictArg]
+    --   K[ f a b <> ]  -->    let xa = a; xb = b
+    --                         K[ f xa xb <> ]
 --    pprTrace "Using plan A" (ppr (ai_fun fun) $$ text "args" <+> ppr (ai_args fun) $$ text "cont" <+> ppr cont) $
     do { let _ :| dmds = expectNonEmpty $ ai_dmds fun
        ; (floats1, cont')  <- mkDupableContWithDmds env dmds cont
@@ -3959,6 +3997,7 @@ mkDupableContWithDmds env _
     thumbsUpPlanA (ApplyToVal { sc_cont = k }) = thumbsUpPlanA k
     thumbsUpPlanA (ApplyToTy  { sc_cont = k }) = thumbsUpPlanA k
     -}
+-}
 
 mkDupableContWithDmds env dmds
     (ApplyToTy { sc_cont = cont, sc_arg_ty = arg_ty, sc_hole_ty = hole_ty })
@@ -4045,7 +4084,10 @@ mkDupableContWithDmds env _
 
 mkDupableStrictBind :: SimplEnv -> OutId -> OutExpr -> OutType
                     -> SimplM (SimplFloats, SimplCont)
-mkDupableStrictBind env arg_bndr join_rhs res_ty
+-- mkDupableStrictBind env arg body rhs_ty
+-- generates join-floats   join j arg = body
+--                  cont   StrictArg (jump j <>) : Stop
+mkDupableStrictBind env arg_bndr join_rhs join_rhs_ty
   | uncondInlineJoin [arg_bndr] join_rhs
      -- See point (DJ2) of Note [Duplicating join points]
   = return (emptyFloats env
@@ -4055,9 +4097,9 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
                         , sc_from = FromLet
                           -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                         , sc_dup  = OkToDup
-                        , sc_cont = mkBoringStop res_ty } )
+                        , sc_cont = mkBoringStop join_rhs_ty } )
   | otherwise
-  = do { join_bndr <- newJoinId [arg_bndr] res_ty
+  = do { join_bndr <- newJoinId [arg_bndr] join_rhs_ty
        ; let arg_info = ArgInfo { ai_fun   = join_bndr
                                 , ai_rules = [], ai_args  = []
                                 , ai_encl  = False, ai_dmds  = repeat topDmd
@@ -4069,7 +4111,7 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
                 , StrictArg { sc_dup    = OkToDup
                             , sc_fun    = arg_info
                             , sc_fun_ty = idType join_bndr
-                            , sc_cont   = mkBoringStop res_ty
+                            , sc_cont   = mkBoringStop join_rhs_ty
                             } ) }
 
 mkDupableAlt :: SimplEnv -> OutId
