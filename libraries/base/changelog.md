@@ -431,6 +431,13 @@
 
     - `oneBits :: FiniteBits a => a`, `oneBits = complement zeroBits`.
 
+  * Various folding operations in `GHC.List` are now implemented via strict
+    folds:
+    - `sum`
+    - `product`
+    - `maximum`
+    - `minimum`
+
 ## 4.15.0.0 *Feb 2021*
 
   * Shipped with GHC 9.0.1
