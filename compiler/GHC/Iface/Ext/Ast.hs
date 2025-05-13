@@ -2027,6 +2027,7 @@ instance ToHie (HsQuote GhcRn) where
 
 instance ToHie PendingRnSplice where
   toHie (PendingRnSplice _ _ e) = toHie e
+  toHie (PendingImplicitLift _bound _used _gre l) = toHie @(LHsExpr GhcRn) (L (l2l (getLoc l)) (HsVar noExtField l))
 
 instance ToHie PendingTcSplice where
   toHie (PendingTcSplice _ e) = toHie e

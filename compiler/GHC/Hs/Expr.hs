@@ -55,6 +55,7 @@ import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish (CoreTickish)
 import GHC.Types.Unique.Set (UniqSet)
+import GHC.Types.ThLevelIndex
 import GHC.Core.ConLike ( conLikeName, ConLike )
 import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Misc
@@ -78,7 +79,7 @@ import Data.Foldable ( toList )
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Void (Void)
-
+import qualified Data.Set as S
 {- *********************************************************************
 *                                                                      *
                 Expressions proper
@@ -2252,8 +2253,12 @@ data UntypedSpliceFlavour
   deriving Data
 
 -- | Pending Renamer Splice
+-- There are two types of pending splices:
+-- 1. A splice explicitly written by the user, e.g. `[| $(foo) |]`
+-- 2. A cross-stage reference which we will attempt to fix by using Lift.
 data PendingRnSplice
   = PendingRnSplice UntypedSpliceFlavour SplicePointName (LHsExpr GhcRn)
+  | PendingImplicitLift (S.Set ThLevelIndex) ThLevelIndex (Maybe GlobalRdrElt) (LIdOccP GhcRn)
 
 -- | Pending Type-checker Splice
 data PendingTcSplice
@@ -2346,6 +2351,7 @@ thTyBrackets pp_body = text "[||" <+> pp_body <+> text "||]"
 
 instance Outputable PendingRnSplice where
   ppr (PendingRnSplice _ n e) = pprPendingSplice n e
+  ppr (PendingImplicitLift _bound _used _gre n) = text "implicit lift:" <+> ppr n
 
 instance Outputable PendingTcSplice where
   ppr (PendingTcSplice n e) = pprPendingSplice n e

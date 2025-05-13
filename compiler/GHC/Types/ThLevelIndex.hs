@@ -3,9 +3,10 @@ module GHC.Types.ThLevelIndex where
 import GHC.Prelude
 import GHC.Utils.Outputable
 import GHC.Types.Basic ( ImportLevel(..) )
-
+import Data.Data (Data)
+import qualified Data.Set as Set
 -- | The integer which represents the level
-newtype ThLevelIndex = ThLevelIndex Int deriving (Eq, Ord)
+newtype ThLevelIndex = ThLevelIndex Int deriving (Eq, Ord, Data)
     -- NB: see Note [Template Haskell levels] in GHC.Tc.Gen.Splice
     -- Incremented when going inside a bracket,
     -- decremented when going inside a splice
@@ -33,3 +34,6 @@ thLevelIndexFromImportLevel :: ImportLevel -> ThLevelIndex
 thLevelIndexFromImportLevel NormalLevel = topLevelIndex
 thLevelIndexFromImportLevel SpliceLevel = spliceLevelIndex
 thLevelIndexFromImportLevel QuoteLevel  = quoteLevelIndex
+
+pprThBindLevel :: Set.Set ThLevelIndex -> SDoc
+pprThBindLevel levels_set = text "level" <> pluralSet levels_set <+> pprUnquotedSet levels_set

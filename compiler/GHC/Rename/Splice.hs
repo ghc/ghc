@@ -51,7 +51,7 @@ import GHC.Data.FastString
 import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Driver.Hooks
-import GHC.Builtin.Names.TH ( decsQTyConName, expQTyConName, liftName
+import GHC.Builtin.Names.TH ( decsQTyConName, expQTyConName
                             , patQTyConName, quoteDecName, quoteExpName
                             , quotePatName, quoteTypeName, typeQTyConName)
 
@@ -184,7 +184,8 @@ rnUntypedBracket e br_body
 rn_utbracket :: HsQuote GhcPs -> RnM (HsQuote GhcRn, FreeVars)
 rn_utbracket (VarBr _ flg rdr_name)
   = do { name <- lookupOccRn (if flg then WL_Term else WL_Type) (unLoc rdr_name)
-       ; if flg then checkThLocalNameNoLift name else checkThLocalTyName name
+       ; let res_name = L (l2l (locA rdr_name)) (WithUserRdr (unLoc rdr_name) name)
+       ; if flg then checkThLocalNameNoLift res_name else checkThLocalTyName name
        ; check_namespace flg name
        ; return (VarBr noExtField flg (noLocA name), unitFV name) }
 
@@ -423,9 +424,10 @@ rnUntypedSplice (HsUntypedSpliceExpr annCo expr)
 rnUntypedSplice (HsQuasiQuote ext quoter quote)
   = do  { -- Rename the quoter; akin to the HsVar case of rnExpr
         ; quoter' <- lookupOccRn WL_TermVariable quoter
+        ; let res_name = noLocA (WithUserRdr quoter quoter')
         ; this_mod <- getModule
         ; when (nameIsLocalOrFrom this_mod quoter') $
-          checkThLocalNameNoLift quoter'
+          checkThLocalNameNoLift res_name
 
         ; return (HsQuasiQuote ext quoter' quote, unitFV quoter') }
 
@@ -932,17 +934,17 @@ checkThLocalTyName name
 -- | Check whether we are allowed to use a Name in this context (for TH purposes)
 -- In the case of a level incorrect program, attempt to fix it by using
 -- a Lift constraint.
-checkThLocalNameWithLift :: Name -> RnM ()
+checkThLocalNameWithLift :: LIdOccP GhcRn -> RnM ()
 checkThLocalNameWithLift = checkThLocalName True
 
 -- | Check whether we are allowed to use a Name in this context (for TH purposes)
 -- In the case of a level incorrect program, do not attempt to fix it by using
 -- a Lift constraint.
-checkThLocalNameNoLift :: Name -> RnM ()
+checkThLocalNameNoLift :: LIdOccP GhcRn -> RnM ()
 checkThLocalNameNoLift = checkThLocalName False
 
-checkThLocalName :: Bool -> Name -> RnM ()
-checkThLocalName allow_lifting name
+checkThLocalName :: Bool -> LIdOccP GhcRn -> RnM ()
+checkThLocalName allow_lifting name_var
   | isUnboundName name   -- Do not report two errors for
   = return ()            --   $(not_in_scope args)
 
@@ -964,7 +966,9 @@ checkThLocalName allow_lifting name
         ; dflags <- getDynFlags
         ; env <- getGlobalRdrEnv
         ; let mgre = lookupGRE_Name env name
-        ; checkCrossLevelLifting dflags (LevelCheckSplice name mgre) top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name } } }
+        ; checkCrossLevelLifting dflags (LevelCheckSplice name mgre) top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name_var } } }
+  where
+    name = getName name_var
 
 --------------------------------------
 checkCrossLevelLifting :: DynFlags
@@ -975,8 +979,8 @@ checkCrossLevelLifting :: DynFlags
                        -> Set.Set ThLevelIndex
                        -> ThLevel
                        -> ThLevelIndex
-                       -> Name -> TcM ()
-checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name
+                       -> LIdOccP GhcRn -> TcM ()
+checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name_var
   -- 1. If name is in-scope, at the correct level.
   | use_lvl_idx `Set.member` bind_lvl = return ()
   -- 2. Name is imported with -XImplicitStagePersistence
@@ -993,52 +997,26 @@ checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use
   , any (use_lvl_idx >=) (Set.toList bind_lvl)
   , allow_lifting
   = do
-      dflags <- getDynFlags
-      check_cross_level_lifting dflags top_lvl name ps_var
+      let mgre = case reason of
+                  LevelCheckSplice _ gre -> gre
+                  _ -> Nothing
+      let pend_splice = PendingImplicitLift bind_lvl use_lvl_idx mgre name_var
+       -- Warning for implicit lift (#17804)
+      addDetailedDiagnostic (TcRnImplicitLift name)
+
+       -- Update the pending splices
+      ps <- readMutVar ps_var
+      writeMutVar ps_var (pend_splice : ps)
   -- 5. For a typed bracket, these checks happen again later on (checkThLocalId)
   -- In the future we should do all the level checks here.
   | Brack _ RnPendingTyped <- use_lvl  -- Lift for typed brackets is inserted later.
   , any (use_lvl_idx >=) (Set.toList bind_lvl)
     = return ()
   -- Otherwise, we have a level error, report.
-  | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx)
+  | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx Nothing ErrorWithoutFlag)
+  where
+    name = getName name_var
 
-check_cross_level_lifting :: DynFlags -> TopLevelFlag -> Name -> TcRef [PendingRnSplice] -> TcM ()
-check_cross_level_lifting dflags top_lvl name ps_var
-  | isTopLevel top_lvl
-  , xopt LangExt.ImplicitStagePersistence dflags
-        -- Top-level identifiers in this module,
-        -- (which have External Names)
-        -- are just like the imported case:
-        -- no need for the 'lifting' treatment
-        -- E.g.  this is fine:
-        --   f x = x
-        --   g y = [| f 3 |]
-  = when (isExternalName name) (keepAlive name)
-    -- See Note [Keeping things alive for Template Haskell]
-
-  | otherwise
-  =     -- Nested identifiers, such as 'x' in
-        -- E.g. \x -> [| h x |]
-        -- We must behave as if the reference to x was
-        --      h $(lift x)
-        -- We use 'x' itself as the SplicePointName, used by
-        -- the desugarer to stitch it all back together.
-        -- If 'x' occurs many times we may get many identical
-        -- bindings of the same SplicePointName, but that doesn't
-        -- matter, although it's a mite untidy.
-    do  { traceRn "checkCrossLevelLifting" (ppr name)
-
-          -- Construct the (lift x) expression
-        ; let lift_expr   = nlHsApp (nlHsVar liftName) (nlHsVar name)
-              pend_splice = PendingRnSplice UntypedExpSplice name lift_expr
-
-          -- Warning for implicit lift (#17804)
-        ; addDetailedDiagnostic (TcRnImplicitLift name)
-
-          -- Update the pending splices
-        ; ps <- readMutVar ps_var
-        ; writeMutVar ps_var (pend_splice : ps) }
 
 checkCrossLevelLiftingTy :: DynFlags -> TopLevelFlag -> Set.Set ThLevelIndex -> ThLevel -> ThLevelIndex -> Name -> TcM ()
 checkCrossLevelLiftingTy dflags top_lvl bind_lvl _use_lvl use_lvl_idx name

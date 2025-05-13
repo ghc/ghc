@@ -328,7 +328,7 @@ rnExpr (HsVar _ (L l v))
             -- matching GRE and add a name clash error
             -- (see lookupGlobalOccRn_overloaded, called by lookupExprOccRn).
             -> do { let sel_name = flSelector $ recFieldLabel fld_info
-                  ; unless (isExact v || isOrig v) $ checkThLocalNameWithLift sel_name
+                  ; unless (isExact v || isOrig v) $ checkThLocalNameWithLift (L (l2l l) (WithUserRdr v sel_name))
                   ; return (XExpr (HsRecSelRn (FieldOcc v  (L l sel_name))), unitFV sel_name)
                   }
             | nm == nilDataConName
@@ -339,8 +339,9 @@ rnExpr (HsVar _ (L l v))
             -> rnExpr (ExplicitList noAnn [])
 
             | otherwise
-            -> do { unless (isExact v || isOrig v) (checkThLocalNameWithLift nm)
-                  ; return (HsVar noExtField (L (l2l l) (WithUserRdr v nm)), unitFV nm) }
+            -> do { let res_name = L (l2l l) (WithUserRdr v nm)
+                  ; unless (isExact v || isOrig v) (checkThLocalNameWithLift res_name)
+                  ; return (HsVar noExtField res_name, unitFV nm) }
         }}}
 
 

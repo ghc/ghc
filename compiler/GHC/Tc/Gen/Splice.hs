@@ -54,6 +54,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Expr
+import GHC.Tc.Gen.Head
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
@@ -720,8 +721,8 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- Match the expected type with the type of all the internal
        -- splices. They might have further constrained types and if they do
        -- we want to reflect that in the overall type of the bracket.
-       ; ps' <- case quoteWrapperTyVarTy <$> brack_info of
-                  Just m_var -> mapM (tcPendingSplice m_var) ps
+       ; ps' <- case brack_info of
+                  Just q -> mapM (tcPendingSplice q) ps
                   Nothing -> assert (null ps) $ return []
 
        -- Notice that we don't attempt to typecheck the body
@@ -781,11 +782,11 @@ brackTy b =
 
 ---------------
 -- | Typechecking a pending splice from a untyped bracket
-tcPendingSplice :: TcType -- Metavariable for the expected overall type of the
+tcPendingSplice :: QuoteWrapper -- Metavariable for the expected overall type of the
                           -- quotation.
                 -> PendingRnSplice
                 -> TcM PendingTcSplice
-tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
+tcPendingSplice (QuoteWrapper _ m_var) (PendingRnSplice flavour splice_name expr)
   -- See Note [Typechecking Overloaded Quotes]
   = do { meta_ty <- tcMetaTy meta_ty_name
          -- Expected type of splice, e.g. m Exp
@@ -799,6 +800,26 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
                        UntypedPatSplice  -> patTyConName
                        UntypedTypeSplice -> typeTyConName
                        UntypedDeclSplice -> decsTyConName
+  -- Identifiers that are lifted implicitly, such as 'x' in
+  -- E.g. \x -> [| h x |]
+  -- We must behave as if the reference to x was
+  --      h $(lift x)
+  -- We use 'x' itself as the SplicePointName, used by
+  -- the desugarer to stitch it all back together.
+  -- If 'x' occurs many times we may get many identical
+  -- bindings of the same SplicePointName, but that doesn't
+  -- matter, although it's a mite untidy.
+tcPendingSplice q (PendingImplicitLift bound used gre id_name)
+  = do { (id_expr, id_ty) <- tcInferId id_name
+         -- lift :: Quote m' => a -> m' Exp
+         ; lift <- setSrcSpan (getLocA id_name) $
+                    newMethodFromName (ImplicitLiftOrigin bound used gre (getName id_name))
+                                       GHC.Builtin.Names.TH.liftName
+                                       [getRuntimeRep id_ty, id_ty]
+         ; let res = nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLocA lift)) (noLocA id_expr)
+
+         ; return (PendingTcSplice (getName id_name) res) }
+
 
 ---------------
 -- Takes a m and tau and returns the type m (TExp tau)
