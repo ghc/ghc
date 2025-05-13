@@ -60,7 +60,7 @@ import GHC.Types.Var    ( isTyCoVar )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey, seqHashKey )
 
-import GHC.Data.Maybe   ( isJust, orElse, mapMaybe )
+import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
@@ -3868,19 +3868,23 @@ altsWouldDup (alt:alts)
     is_bot_alt (Alt _ _ rhs) = exprIsDeadEnd rhs
 
 -------------------------
+data DupContFlag = DupAppsOnly
+                 | DupSelectToo
+
 mkDupableCont :: SimplEnv
               -> SimplCont
               -> SimplM ( SimplFloats  -- Incoming SimplEnv augmented with
                                        --   extra let/join-floats and in-scope variables
                         , SimplCont)   -- dup_cont: duplicable continuation
 mkDupableCont env cont
-  = mkDupableContWithDmds (zapSubstEnv env) (repeat topDmd) cont
+  = mkDupableContWithDmds (zapSubstEnv env) DupSelectToo (repeat topDmd) cont
 
 mkDupableContWithDmds
-   :: SimplEnvIS  -> [Demand]  -- Demands on arguments; always infinite
+   :: SimplEnvIS -> DupContFlag
+   -> [Demand]  -- Demands on arguments; always infinite
    -> SimplCont -> SimplM ( SimplFloats, SimplCont)
 
-mkDupableContWithDmds env _ cont
+mkDupableContWithDmds env _ _ cont
   -- Check the invariant
   | assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env) False
   = pprPanic "mkDupableContWithDmds" empty
@@ -3888,20 +3892,63 @@ mkDupableContWithDmds env _ cont
   | contIsDupable cont
   = return (emptyFloats env, cont)
 
-mkDupableContWithDmds _ _ (Stop {}) = panic "mkDupableCont"     -- Handled by previous eqn
+mkDupableContWithDmds _ _ _ (Stop {})
+  = panic "mkDupableCont"     -- Handled by previous contIsDupable eqn
 
-mkDupableContWithDmds env dmds (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
-  = do  { (floats, cont') <- mkDupableContWithDmds env dmds cont
+mkDupableContWithDmds env df dmds
+    (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
+  = do  { (floats, cont') <- mkDupableContWithDmds env df dmds cont
         ; return (floats, CastIt { sc_co = optOutCoercion env co opt
                                  , sc_opt = True, sc_cont = cont' }) }
                  -- optOutCoercion: see Note [Avoid re-simplifying coercions]
 
 -- Duplicating ticks for now, not sure if this is good or not
-mkDupableContWithDmds env dmds (TickIt t cont)
-  = do  { (floats, cont') <- mkDupableContWithDmds env dmds cont
+mkDupableContWithDmds env df dmds
+    (TickIt t cont)
+  = do  { (floats, cont') <- mkDupableContWithDmds env df dmds cont
         ; return (floats, TickIt t cont') }
 
-mkDupableContWithDmds env _
+mkDupableContWithDmds env df dmds
+    (ApplyToTy { sc_cont = cont, sc_arg_ty = arg_ty, sc_hole_ty = hole_ty })
+  = do  { (floats, cont') <- mkDupableContWithDmds env df dmds cont
+        ; return (floats, ApplyToTy { sc_cont = cont'
+                                    , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty }) }
+
+mkDupableContWithDmds env df dmds
+    (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_env = se
+                , sc_cont = cont, sc_hole_ty = hole_ty })
+  =     -- e.g.         [...hole...] (...arg...)
+        --      ==>
+        --              let a = ...arg...
+        --              in [...hole...] a
+        -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
+    do  { let dmd:|cont_dmds = expectNonEmpty dmds
+        ; (floats1, cont') <- mkDupableContWithDmds env df cont_dmds cont
+        ; let env' = env `setInScopeFromF` floats1
+        ; (_, se', arg') <- simplLazyArg env' dup hole_ty Nothing se arg
+
+        -- Make the argument duplicable. Danger: if arg is small and we let-bind
+        -- it, then postInlineUnconditionally will just inline it again, perhaps
+        -- taking an extra Simplifier iteration (e.g. in test T21839c). So make
+        -- a `let` only if `couldBeSmallEnoughToInline` says that it is big enough
+        ; let uf_opts = seUnfoldingOpts env
+        ; (let_floats2, arg'')
+              <- if couldBeSmallEnoughToInline uf_opts (unfoldingUseThreshold uf_opts) arg'
+                 then return (emptyLetFloats, arg')
+                 else makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
+
+        ; let all_floats = floats1 `addLetFloats` let_floats2
+        ; return ( all_floats
+                 , ApplyToVal { sc_arg = arg''
+                              , sc_env = se' `setInScopeFromF` all_floats
+                                         -- Ensure that sc_env includes the free vars of
+                                         -- arg'' in its in-scope set, even if makeTrivial
+                                         -- has turned arg'' into a fresh variable
+                                         -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
+                              , sc_dup = OkToDup, sc_cont = cont'
+                              , sc_hole_ty = hole_ty }) }
+
+mkDupableContWithDmds env _ _
      (StrictBind { sc_bndr = bndr, sc_body = body, sc_from = from_what
                  , sc_env = se, sc_cont = cont})
 -- See Note [Duplicating StrictBind]
@@ -3918,41 +3965,29 @@ mkDupableContWithDmds env _
 
        ; mkDupableStrictBind env bndr' join_body res_ty }
 
-mkDupableContWithDmds env _
+mkDupableContWithDmds env DupSelectToo _
     (StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty })
   -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-  | isJust (isDataConId_maybe (ai_fun fun))
+  | isNothing (isDataConId_maybe (ai_fun fun))
          -- isDataConId: see point (DJ4) of Note [Duplicating join points]
-  = -- Use Plan B of Note [Duplicating StrictArg]
-    --   K[ f a b <> ]   -->   join j x = K[ f a b x ]
-    --                         j <>
-    do { let rhs_ty       = contResultType cont
-             (m,arg_ty,_) = splitFunTy fun_ty
-       ; arg_bndr <- newId (fsLit "arg") m arg_ty
-       ; let env' = env `addNewInScopeIds` [arg_bndr]
-       ; (floats, join_rhs) <- rebuildCall env' (addValArgTo fun (Var arg_bndr) fun_ty) cont
-       ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }
-
-  | otherwise
   = -- Use Plan C of Note [Duplicating StrictArg]
-    --   K[ f a b <> ]   -->   join j x = K[ x ]
-    --                         K1[ f a b <> ]
+    --   StrictArg (f a b <>) : ApplyTo e1 : ApplyTo e2: K
+    --    -->   join j x = rebuild x K
+    --          let x1 = e2; x2 = e2
+    --          StrictArg (f a b <>) : ApplyTo x1 : ApplyTo x2 : StrictArg (j <>) : Stop
     --  where K1 = j <>
-    do { let rhs_ty       = contResultType cont
-             (m,_,res_ty) = splitFunTy fun_ty
-       ; (floats, cont') <-
-           if contIsTrivial cont
-           then return (emptyFloats env, cont)
-           else do { arg_bndr <- newId (fsLit "arg") m res_ty
-                   ; let env' = env `addNewInScopeIds` [arg_bndr]
-                   ; rhs' <- simplExprC env' (Var arg_bndr) cont
-                   ; mkDupableStrictBind env' arg_bndr rhs' rhs_ty }
+    do { let _ :| dmds = expectNonEmpty $ ai_dmds fun
 
        ; (floats_s, args') <- mapAndUnzipM (makeTrivialArg env) (ai_args fun)
+
+       ; (floats, cont') <- mkDupableContWithDmds env DupAppsOnly dmds cont
+                 -- Use the demands from the function to add the right
+                 -- demand info on any bindings we make for further args
 
        ; return ( foldl' addLetFloats floats floats_s
                 , StrictArg { sc_fun = fun { ai_args = args' }
                             , sc_cont = cont', sc_dup = OkToDup, sc_fun_ty = fun_ty }) }
+
 
 {-
   -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
@@ -3999,47 +4034,7 @@ mkDupableContWithDmds env _
     -}
 -}
 
-mkDupableContWithDmds env dmds
-    (ApplyToTy { sc_cont = cont, sc_arg_ty = arg_ty, sc_hole_ty = hole_ty })
-  = do  { (floats, cont') <- mkDupableContWithDmds env dmds cont
-        ; return (floats, ApplyToTy { sc_cont = cont'
-                                    , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty }) }
-
-mkDupableContWithDmds env dmds
-    (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_env = se
-                , sc_cont = cont, sc_hole_ty = hole_ty })
-  =     -- e.g.         [...hole...] (...arg...)
-        --      ==>
-        --              let a = ...arg...
-        --              in [...hole...] a
-        -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-    do  { let dmd:|cont_dmds = expectNonEmpty dmds
-        ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
-        ; let env' = env `setInScopeFromF` floats1
-        ; (_, se', arg') <- simplLazyArg env' dup hole_ty Nothing se arg
-
-        -- Make the argument duplicable. Danger: if arg is small and we let-bind
-        -- it, then postInlineUnconditionally will just inline it again, perhaps
-        -- taking an extra Simplifier iteration (e.g. in test T21839c). So make
-        -- a `let` only if `couldBeSmallEnoughToInline` says that it is big enough
-        ; let uf_opts = seUnfoldingOpts env
-        ; (let_floats2, arg'')
-              <- if couldBeSmallEnoughToInline uf_opts (unfoldingUseThreshold uf_opts) arg'
-                 then return (emptyLetFloats, arg')
-                 else makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
-
-        ; let all_floats = floats1 `addLetFloats` let_floats2
-        ; return ( all_floats
-                 , ApplyToVal { sc_arg = arg''
-                              , sc_env = se' `setInScopeFromF` all_floats
-                                         -- Ensure that sc_env includes the free vars of
-                                         -- arg'' in its in-scope set, even if makeTrivial
-                                         -- has turned arg'' into a fresh variable
-                                         -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
-                              , sc_dup = OkToDup, sc_cont = cont'
-                              , sc_hole_ty = hole_ty }) }
-
-mkDupableContWithDmds env _
+mkDupableContWithDmds env _ _
     (Select { sc_bndr = case_bndr, sc_alts = alts, sc_env = se, sc_cont = cont })
   =     -- e.g.         (case [...hole...] of { pi -> ei })
         --      ===>
@@ -4081,6 +4076,17 @@ mkDupableContWithDmds env _
                           , sc_env  = zapSubstEnv se `setInScopeFromF` all_floats
                                       -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                           , sc_cont = mkBoringStop (contResultType cont) } ) }
+
+mkDupableContWithDmds env _ _ cont
+  = -- Use Plan B of Note [Duplicating StrictArg]
+    --   K  -->   join j x = K[ x ]
+    --            j <>
+    do { let arg_ty = contHoleType cont
+             rhs_ty = contResultType cont
+       ; arg_bndr <- newId (fsLit "arg") ManyTy arg_ty
+       ; let env' = env `addNewInScopeIds` [arg_bndr]
+       ; (floats, join_rhs) <- simplOutId env' arg_bndr cont
+       ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }
 
 mkDupableStrictBind :: SimplEnv -> OutId -> OutExpr -> OutType
                     -> SimplM (SimplFloats, SimplCont)
