@@ -66,7 +66,7 @@ STAGE2_TARGETS := $(STAGE_TARGETS) hp2ps:hp2ps hpc-bin:hpc iserv:iserv runghc:ru
 # All these libraries are somehow needed by some tests :rolleyes: this seems to be needed occationally.
 STAGE2_TARGETS += ghc-bignum:ghc-bignum ghc-compact:ghc-compact ghc-experimental:ghc-experimental integer-gmp:integer-gmp xhtml:xhtml terminfo:terminfo ghc-toolchain:ghc-toolchain
 # This package is just utterly retarded
-STAGE2_TARGETS += system-cxx-std-lib:system-cxx-std-lib
+# STAGE2_TARGETS += system-cxx-std-lib:system-cxx-std-lib
 
 _build/stage1/bin/ghc: _build/booted
 	@echo ">>> Building with GHC: $(GHC_FOR_BUILDER) and Cabal: $(CABAL)"
@@ -88,16 +88,16 @@ _build/stage1/bin/ghc: _build/booted
 
 	_build/stage1/bin/ghc-toolchain --triple $(TARGET_TRIPLE) --output-settings -o _build/stage1/lib/settings --cc $(CC) --cxx $(CXX)
 
-	rm -fR _build/stage1/lib/package.conf.d; ln -s $(PWD)/$(wildcard _build/stage1/cabal/packagedb/ghc-*) _build/stage1/lib/package.conf.d
+	rm -fR _build/stage1/lib/package.conf.d; ln -s $(abspath $(wildcard ./_build/stage1/cabal/packagedb/ghc-*)) _build/stage1/lib/package.conf.d
 	_build/stage1/bin/ghc-pkg recache
 
-_build/stage2/bin/ghc: _build/stage1/bin/ghc libraries/ghc-internal/src/GHC/Internal/Prim.hs libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs
+_build/stage2/bin/ghc: _build/stage1/bin/ghc compiler/GHC/Builtin/primops.txt
 	@echo ">>> Building with GHC: _build/stage1/bin/ghc and Cabal: $(CABAL)"
 	@echo ">>> Using $(THREADS) threads"
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
 	PATH=$(PWD)/_build/stage1/bin:$(PATH) \
 	$(CABAL) build --project-file=cabal.project.stage2 \
-		--builddir=_build/stage2/cabal -j -W $(GHC_FOR_BUILDER) $(STAGE2_TARGETS)
+		--builddir=_build/stage2/cabal -j -w ghc $(STAGE2_TARGETS)
 	mkdir -p _build/stage2/{bin,lib}
 	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal ghc-bin:ghc -v0) _build/stage2/bin/ghc
 	cp -rfp $(shell $(CABAL) list-bin --project-file=cabal.project.stage2 -w _build/stage1/bin/ghc --builddir=_build/stage2/cabal ghc-pkg:ghc-pkg -v0) _build/stage2/bin/ghc-pkg
@@ -115,21 +115,12 @@ _build/stage2/bin/ghc: _build/stage1/bin/ghc libraries/ghc-internal/src/GHC/Inte
 
 	cp -rfp _build/stage1/lib/settings _build/stage2/lib/settings
 
-	rm -fR _build/stage2/lib/package.conf.d; ln -s $(PWD)/$(wildcard _build/stage2/cabal/packagedb/ghc-*) _build/stage2/lib/package.conf.d
+	rm -fR _build/stage2/lib/package.conf.d; ln -s $(abspath $(wildcard ./_build/stage2/cabal/packagedb/ghc-*)) _build/stage2/lib/package.conf.d
 	_build/stage2/bin/ghc-pkg recache
 
 compiler/GHC/Builtin/primops.txt:
 	@echo ">>> Generating primops.txt..."
 	cc -E -undef -traditional -P -x c compiler/GHC/Builtin/primops.txt.pp > compiler/GHC/Builtin/primops.txt
-
-libraries/ghc-internal/src/GHC/Internal/Prim.hs: _build/stage1/bin/ghc compiler/GHC/Builtin/primops.txt
-	@echo ">>> Generating GHC.Internal.Prim module..."
-	_build/stage1/bin/genprimopcode --make-haskell-source < compiler/GHC/Builtin/primops.txt > libraries/ghc-internal/src/GHC/Internal/Prim.hs
-
-libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs: _build/stage1/bin/ghc compiler/GHC/Builtin/primops.txt
-	@echo ">>> Generating GHC.Internal.PrimopWrappers module..."
-	_build/stage1/bin/genprimopcode --make-haskell-wrappers < compiler/GHC/Builtin/primops.txt > libraries/ghc-internal/src/GHC/Internal/PrimopWrappers.hs
-
 
 # Target for creating the final binary distribution directory
 _build/bindist: _build/stage2/bin/ghc driver/ghc-usage.txt driver/ghci-usage.txt
@@ -143,6 +134,8 @@ _build/bindist: _build/stage2/bin/ghc driver/ghc-usage.txt driver/ghci-usage.txt
 	# Copy driver usage files
 	@cp -rfp driver/ghc-usage.txt _build/bindist/lib/
 	@cp -rfp driver/ghci-usage.txt _build/bindist/lib/
+	@echo "FIXME: swpaaing Support SMP from YES to NO in settings file"
+	@sed 's/("Support SMP","YES")/("Support SMP","NO")/' -i.bck _build/bindist/lib/settings
 	@echo "Binary distribution created."
 # --- Configuration ---
 

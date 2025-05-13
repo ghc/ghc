@@ -409,6 +409,28 @@ AS_IF([test "$ac_cv_sizeof_struct_MD5Context" -eq 0],[
   AC_MSG_ERROR([cannot determine sizeof(struct MD5Context)])
 ])
 
+AC_ARG_VAR([GHC], [Path to the ghc program])
+AC_PATH_PROG([GHC], ghc)
+if test -z "$GHC"; then
+	AC_MSG_ERROR([Cannot find ghc])
+fi
+
+AC_MSG_CHECKING([for GHC/Internal/Prim.hs])
+if mkdir -p GHC/Internal && $GHC --print-prim-module > GHC/Internal/Prim.hs; then
+  AC_MSG_RESULT([created])
+else
+  AC_MSG_RESULT([failed to create])
+  AC_MSG_ERROR([Failed to run $GHC --print-prim-module > GHC/Internal/Prim.hs])
+fi
+
+AC_MSG_CHECKING([for GHC/Internal/PrimopWrappers.hs])
+if mkdir -p GHC/Internal && $GHC --print-prim-wrappers-module > GHC/Internal/PrimopWrappers.hs; then
+  AC_MSG_RESULT([created])
+else
+  AC_MSG_RESULT([failed to create])
+  AC_MSG_ERROR([Failed to run $GHC --print-prim-wrappers-module > GHC/Internal/PrimopWrappers.hs])
+fi
+
 AC_SUBST(EXTRA_LIBS)
 AC_CONFIG_FILES([ghc-internal.buildinfo include/HsIntegerGmp.h])
 
