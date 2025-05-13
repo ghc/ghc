@@ -35,7 +35,7 @@ getExtraArgs :: Args
 getExtraArgs = expr flavour >>= extraArgs
 
 getArgs :: Args
-getArgs = mconcat [ defaultBuilderArgs, getExtraArgs, defaultPackageArgs ]
+getArgs = mconcat [ defaultBuilderArgs, defaultPackageArgs, getExtraArgs ]
 
 getLibraryWays :: Ways
 getLibraryWays = expr flavour >>= libraryWays
