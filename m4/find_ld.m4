@@ -21,14 +21,7 @@ AC_DEFUN([FIND_LD],[
             return
         fi
 
-        case $CPU in
-        i386)
-            # We refuse to use ld.gold on i386 due to #23579, which we don't
-            # have a good autoconf check for.
-            linkers="ld.lld ld" ;;
-        *)
-            linkers="ld.lld ld.gold ld" ;;
-        esac
+        linkers="ld.lld ld"
 
         # Manually iterate over possible names since we want to ensure that, e.g.,
         # if ld.lld is installed but gcc doesn't support -fuse-ld=lld, that we
