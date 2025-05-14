@@ -210,6 +210,7 @@ evalOptsSeq :: EvalOpts
 evalOptsSeq = EvalOpts
               { useSandboxThread = True
               , singleStep = False
+              , stepOut    = False
               , breakOnException = False
               , breakOnError = False
               }
@@ -333,6 +334,7 @@ withBreakAction opts breakMVar statusMVar act
      poke breakPointIOAction stablePtr
      when (breakOnException opts) $ poke exceptionFlag 1
      when (singleStep opts) $ setStepFlag
+     when (stepOut opts) $ poke stepOutFlag 1
      return stablePtr
         -- Breaking on exceptions is not enabled by default, since it
         -- might be a bit surprising.  The exception flag is turned off
@@ -363,6 +365,7 @@ withBreakAction opts breakMVar statusMVar act
    resetBreakAction stablePtr = do
      poke breakPointIOAction noBreakStablePtr
      poke exceptionFlag 0
+     poke stepOutFlag 0
      resetStepFlag
      freeStablePtr stablePtr
 
@@ -398,6 +401,7 @@ abandonStmt hvref = do
 
 foreign import ccall "&rts_stop_next_breakpoint" stepFlag      :: Ptr CInt
 foreign import ccall "&rts_stop_on_exception"    exceptionFlag :: Ptr CInt
+foreign import ccall "&rts_stop_after_return"    stepOutFlag   :: Ptr CInt
 
 setStepFlag :: IO ()
 setStepFlag = poke stepFlag 1

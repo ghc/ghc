@@ -194,6 +194,24 @@ See also Note [Width of parameters] for some more motivation.
 #define WITHIN_CHUNK_BOUNDS(n, s)  \
   (RTS_LIKELY((StgWord*)(Sp_plusW(n)) < ((s)->stack + (s)->stack_size - sizeofW(StgUnderflowFrame))))
 
+// Note [Debugger Step-out]
+// ~~~~~~~~~~~~~~~~~~~~~~~~
+// When the global debugger step-out flag is set (`rts_stop_after_return`),
+// the interpreter must yield execution right after the first RETURN.
+//
+// When stepping-out, we simply enable `rts_stop_next_breakpoint` when we hit a
+// return instruction (in `do_return_pointer` and `do_return_nonpointer`).
+// The step-out flag is cleared and must be re-enabled explicitly to step-out again.
+//
+// A limitation of this approach is that stepping-out of a function that was
+// tail-called will skip its caller since no stack frame is pushed for a tail
+// call (i.e. a tail call returns directly to its caller's first non-tail caller).
+#define CHECK_BRK_AFTER_RET()               \
+    if (rts_stop_after_return)              \
+    {                                       \
+      rts_stop_next_breakpoint = true;      \
+      rts_stop_after_return = false;        \
+    }                                       \
 
 /* Note [PUSH_L underflow]
    ~~~~~~~~~~~~~~~~~~~~~~~
@@ -245,6 +263,7 @@ allocate_NONUPD (Capability *cap, int n_words)
 
 int rts_stop_next_breakpoint = 0;
 int rts_stop_on_exception = 0;
+int rts_stop_after_return = 0;
 
 #if defined(INTERP_STATS)
 
@@ -734,6 +753,8 @@ do_return_pointer:
 
     IF_DEBUG(sanity,checkStackChunk(Sp, cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size));
 
+    CHECK_BRK_AFTER_RET();
+
     switch (get_itbl((StgClosure *)Sp)->type) {
 
     case RET_SMALL: {
@@ -882,6 +903,8 @@ do_return_nonpointer:
 
         // get the offset of the header of the next stack frame
         offset = stack_frame_sizeW((StgClosure *)Sp);
+
+        CHECK_BRK_AFTER_RET();
 
         switch (get_itbl((StgClosure*)(Sp_plusW(offset)))->type) {
 

@@ -1,0 +1,30 @@
+Breakpoint 0 activated at T26042b.hs:9:15-22
+Stopped in Main.foo, T26042b.hs:9:15-22
+_result :: IO Int = _
+i :: Int = _
+8  foo :: Bool -> Int -> IO Int
+9  foo True  i = return i
+                 ^^^^^^^^
+10  foo False _ = do
+Stopped in Main.bar, T26042b.hs:20:3-10
+_result :: IO Int = _
+y :: Int = _
+19    y <- foo True t
+20    return y
+      ^^^^^^^^
+21  
+Stopped in Main.foo, T26042b.hs:14:3-10
+_result :: IO Int = _
+n :: Int = _
+13    n <- bar (x + y)
+14    return n
+      ^^^^^^^^
+15  
+Stopped in Main.main, T26042b.hs:6:3-9
+_result :: IO () = _
+a :: Int = _
+5    a <- foo False undefined
+6    print a
+     ^^^^^^^
+7  
+14

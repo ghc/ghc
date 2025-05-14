@@ -619,6 +619,7 @@ RTS_FUN_DECL(stg_castFloatToWord32zh);
 // Interpreter.c
 extern StgWord rts_stop_next_breakpoint[];
 extern StgWord rts_stop_on_exception[];
+extern StgWord rts_stop_after_return[];
 extern StgWord rts_breakpoint_io_action[];
 
 // Schedule.c
