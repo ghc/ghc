@@ -9,7 +9,19 @@ AC_DEFUN([FP_INSTALL_WINDOWS_TOOLCHAIN],[
     fi
 
     set_up_tarballs() {
-        AC_MSG_NOTICE([Checking for Windows toolchain tarballs...])
+        AC_MSG_CHECKING([for Windows toolchain tarballs...])
+
+        # We are leaving an option to substitute the toolchain with manually prepared one at the CI due of cross-compile targets.
+        # Builtin toolchain does not support cross-compile nor we have other reasons why it should.
+        # Probably we shouldn't ship GHC with a built-in toolchain for all cross-compile options.
+        # Cross-compile support is a relatively new and experimental option for Windows target but
+        # important to support AArch64. Same as Darwin.
+        if test -d inplace/mingw
+        then
+            AC_MSG_RESULT([skipping, inplace/mingw exists])
+            return 0
+        fi
+
         local action
         if test "$TarballsAutodownload" = "NO"
         then
@@ -17,6 +29,9 @@ AC_DEFUN([FP_INSTALL_WINDOWS_TOOLCHAIN],[
         else
             action="download"
         fi
+        readonly action
+        AC_MSG_RESULT([$action...])
+
         $PYTHON mk/get-win32-tarballs.py $action $mingw_arch
         case $? in
             0)
@@ -45,22 +60,19 @@ AC_DEFUN([FP_INSTALL_WINDOWS_TOOLCHAIN],[
         esac
 
         # Extract all the tarballs in one go
-        if ! test -d inplace/mingw
-        then
-            AC_MSG_NOTICE([Extracting Windows toolchain from archives (may take a while)...])
-            rm -rf inplace/mingw
-            local base_dir="../ghc-tarballs/${tarball_dest_dir}"
-            ( cd inplace &&
-            find "${base_dir}" -name "*.tar.xz" -exec tar --xz -xf {} \; &&
-            find "${base_dir}" -name "*.tar.zst" -exec tar --zstd -xf {} \; &&
-            rm ".MTREE" &&
-            rm ".PKGINFO" &&
-            cd .. ) || AC_MSG_ERROR([Could not extract Windows toolchains.])
+        AC_MSG_NOTICE([Extracting Windows toolchain from archives (may take a while)...])
+        rm -rf inplace/mingw
+        local base_dir="../ghc-tarballs/${tarball_dest_dir}"
+        ( cd inplace &&
+        find "${base_dir}" -name "*.tar.xz" -exec tar --xz -xf {} \; &&
+        find "${base_dir}" -name "*.tar.zst" -exec tar --zstd -xf {} \; &&
+        rm ".MTREE" &&
+        rm ".PKGINFO" &&
+        cd .. ) || AC_MSG_ERROR([Could not extract Windows toolchains.])
 
-            mv "inplace/${tarball_mingw_dir}" inplace/mingw &&
-            touch inplace/mingw
-            AC_MSG_NOTICE([In-tree MingW-w64 tree created])
-        fi
+        mv "inplace/${tarball_mingw_dir}" inplace/mingw &&
+        touch inplace/mingw
+        AC_MSG_NOTICE([In-tree MingW-w64 tree created])
     }
 
     # See Note [How we configure the bundled windows toolchain]
