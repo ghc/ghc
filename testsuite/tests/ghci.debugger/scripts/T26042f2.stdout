@@ -1,0 +1,25 @@
+Breakpoint 0 activated at T26042f.hs:(20,7)-(21,14)
+Stopped in T8.t, T26042f.hs:(20,7)-(21,14)
+_result :: Int = _
+x :: Int = 450
+19  t :: Int -> Identity Int
+        vv
+20  t x = do
+21    pure (x + 3)
+                  ^^
+22  {-# OPAQUE t #-}
+Stopped in T8.g, T26042f.hs:15:3-17
+_result :: Identity Int = _
+a :: Int = 453
+14    a <- t (x*2)
+15    n <- pure (a+a)
+      ^^^^^^^^^^^^^^^
+16    return (n+n)
+Stopped in T8.f, T26042f.hs:9:3-17
+_result :: Identity Int = _
+b :: Int = 1812
+8    b <- g (x*x)
+9    y <- pure (b+b)
+     ^^^^^^^^^^^^^^^
+10    return (y+y)
+7248

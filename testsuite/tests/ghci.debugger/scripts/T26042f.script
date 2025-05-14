@@ -1,0 +1,20 @@
+:load T26042f.hs
+:break t
+top
+:list
+-- out of t
+:stepout
+:list
+-- out of g
+:stepout
+:list
+-- out of f
+:stepout
+
+-- this test shows a limitiation of not using optimised code because the definition
+-- of >> for the identity monad is in object code -- it means we never have a BCO
+-- to return to as the statements are all evaluated as arguments to >>...
+
+-- thus, this test is run twice. once with optimisations and once without
+-- note: we test this twice, once with optimisations and once without (see T26042f1 vs T26042f2)
+

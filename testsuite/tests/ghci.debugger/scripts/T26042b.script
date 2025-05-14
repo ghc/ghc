@@ -1,0 +1,18 @@
+-- Basic step-out functionality test
+:load T26042b.hs
+-- break on the True branch of foo
+:break 10
+main
+:list
+-- stepout of foo True to caller (ie bar)
+:stepout
+:list
+-- stepout of bar (to branch of foo False, where bar was called)
+:stepout
+:list
+-- stepout to right after the call to foo False in main
+:stepout
+:list
+
+-- done
+:continue
