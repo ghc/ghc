@@ -320,6 +320,36 @@ void rts_disableStopNextBreakpoint(StgPtr tso)
     ((StgTSO *)tso)->flags &= ~TSO_STOP_NEXT_BREAKPOINT;
 }
 
+/* ---------------------------------------------------------------------------
+ * Enabling and disabling per-thread step-out mode
+ * ------------------------------------------------------------------------ */
+
+void rts_enableStopAfterReturn(StgPtr tso)
+{
+  ((StgTSO *)tso)->flags |= TSO_STOP_AFTER_RETURN;
+}
+
+void rts_disableStopAfterReturn(StgPtr tso)
+{
+  ((StgTSO *)tso)->flags &= ~TSO_STOP_AFTER_RETURN;
+}
+
+/*
+Note [Debugger Step-out]
+~~~~~~~~~~~~~~~~~~~~~~~~
+TODO: ALL WRONG!
+When the global debugger step-out flag is set (`rts_stop_after_return`),
+the interpreter must yield execution right after the first RETURN.
+
+When stepping-out, we simply enable `rts_stop_next_breakpoint` when we hit a
+return instruction
+The step-out flag is cleared and must be re-enabled explicitly to step-out again.
+
+A limitation of this approach is that stepping-out of a function that was
+tail-called will skip its caller since no stack frame is pushed for a tail
+call (i.e. a tail call returns directly to its caller's first non-tail caller).
+TODO: UPDATE!
+*/
 /* -------------------------------------------------------------------------- */
 
 #if defined(INTERP_STATS)
@@ -560,6 +590,45 @@ interpretBCO (Capability* cap)
              printStackChunk(Sp,cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
              debugBelch("\n\n");
             );
+
+    // On entering interpretBCO, check if the step-out flag is set for this
+    // thread. If yes, push a step-out frame between the first frame and second
+    // frame.
+    //
+    // This frame will be responsible for enabling the first breakpoint that
+    // comes after it is evaluated (i.e. for breaking right after evaluation of
+    // this bco returns).
+    //
+    // See Note [Debugger: Step-out] for details
+    if (cap->r.rCurrentTSO->flags & TSO_STOP_AFTER_RETURN) {
+
+      StgPtr frame;
+      frame = cap->r.rCurrentTSO->stackobj->sp;
+
+      // Insert the stg_stop_after_ret_frame after the first frame that is NOT a
+      // case continuation BCO.
+      //
+      // Do /not/ insert a step-out frame between case continuation
+      // frames and their parent BCO frame. Case continuation BCOs may have
+      // non-local stack references. See Note [Case continuation BCOs].
+      while (*frame == (W_)&stg_CASE_CONT_BCO_info) {
+        frame += stack_frame_sizeW((StgClosure *)frame);
+      }
+      // New frame goes right after the first non-case-cont frame
+      frame += stack_frame_sizeW((StgClosure *)frame);
+
+      // TODO: Handle stack bottom edge case!? if frame == STACK BOTTOM...
+
+      // Make space for the new frame
+      Sp_subW(sizeofW(StgStopAfterRetFrame));
+      memmove(frame-sizeof(StgStopAfterRetFrame), frame, (uint8_t*)cap->r.rCurrentTSO->stackobj->sp - (uint8_t*)frame);
+
+      // Then write it.
+      ((StgStopAfterRetFrame*)frame)->header.info = &stg_stop_after_ret_frame_info;
+
+      // Frame was pushed, mark as done to not do it again
+      cap->r.rCurrentTSO->flags &= ~TSO_STOP_AFTER_RETURN;
+    }
 
     // ------------------------------------------------------------------------
     // Case 1:

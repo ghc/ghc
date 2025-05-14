@@ -229,6 +229,7 @@ A primary reason why we need to distinguish these two cases is to know where we
 can insert a debugger step-out frame (`stg_stop_after_ret_frame`). In
 particular, because case cont BCOs may refer to the parent frame, we must not
 insert step-out frames between a case cont BCO and its parent.
+See Note [Debugger: Step-out] for further details.
 
 As an example, consider the following, where `y` is free in the case alternatives:
 

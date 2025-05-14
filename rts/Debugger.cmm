@@ -1,0 +1,46 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 2025
+ *
+ * Debugger support
+ *
+ * This file is written in a subset of C--, extended with various
+ * features specific to GHC.  It is compiled by GHC directly.  For the
+ * syntax of .cmm files, see the parser in ghc/compiler/GHC/Cmm/Parser.y.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "Cmm.h"
+
+#if !defined(UnregisteredCompiler)
+import CLOSURE stg_stop_after_ret_frame_info;
+#endif
+
+/* --------------------------------------------------------------------------
+                         Step out / Stop after return
+   -------------------------------------------------------------------------- */
+
+/* The info table for an `stg_stop_after_ret_frame`.
+ * This frame will be introduced before the parent's return frame to intercept
+ * a return to the parent. Since its type is `RET_SMALL`, it will be entered
+ * and the following code run. The entry code will enable single-step mode and
+ * return to the parent frame, thus stopping at the immediate next breakpoint
+ * following a return.
+ *
+ * See Note [Debugger: Step-out] for details.
+ */
+INFO_TABLE_RET (stg_stop_after_ret_frame, RET_SMALL)
+    return (/* no return values */)
+{
+
+    /* We've entered a stg_stop_after_ret_frame, thus we want to stop at the next
+     * immediate breakpoint in this thread. Toggle TSO_STOP_NEXT_BREAKPOINT for
+     * this thread exclusively. */
+
+    StgTSO_flags(CurrentTSO) =
+       %lobits32( TO_W_(StgTSO_flags(CurrentTSO)) | TSO_STOP_NEXT_BREAKPOINT );
+
+
+    /* After enabling the single step mode, execution is resumed by returning
+     * to the frame this one intercepted. */
+}

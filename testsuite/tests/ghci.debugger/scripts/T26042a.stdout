@@ -1,0 +1,50 @@
+Breakpoint 0 activated at T26042a.hs:16:9-22
+Stopped in Main.bar, T26042a.hs:16:9-22
+_result :: IO Int = _
+z :: Int = _
+15  bar :: Int -> IO Int
+16  bar z = return (z * 2)
+            ^^^^^^^^^^^^^^
+17  
+Stopped in Main.foo, T26042a.hs:13:3-10
+_result :: IO Int = _
+b :: Int = _
+12    b <- bar (x + y)
+13    return b
+      ^^^^^^^^
+14  
+Stopped in Main.main, T26042a.hs:6:3-9
+_result :: IO () = _
+a :: Int = _
+5    a <- foo
+6    print a
+     ^^^^^^^
+7  
+Stopped in Main.bar, T26042a.hs:16:17-21
+_result :: Int = _
+z :: Int = _
+15  bar :: Int -> IO Int
+16  bar z = return (z * 2)
+                    ^^^^^
+17  
+Stopped in Main.foo, T26042a.hs:12:13-17
+_result :: Int = _
+x :: Int = _
+y :: Int = _
+11        y = 4
+12    b <- bar (x + y)
+                ^^^^^
+13    return b
+Stopped in Main.foo.x, T26042a.hs:10:11
+_result :: Int = _
+9  foo = do
+10    let x = 3
+              ^
+11        y = 4
+Stopped in Main.foo.y, T26042a.hs:11:11
+_result :: Int = _
+10    let x = 3
+11        y = 4
+              ^
+12    b <- bar (x + y)
+14

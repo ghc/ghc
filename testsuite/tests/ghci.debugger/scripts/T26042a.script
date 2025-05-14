@@ -1,0 +1,20 @@
+:load T26042a.hs
+-- simple use of stepout
+:break bar
+main
+:list
+:stepout
+:list
+:stepout
+:list
+-- from here on we're going to evaluate the thunks for `a` in `print a`
+:stepout
+:list
+:stepout
+:list
+:stepout
+:list
+:stepout
+:list
+-- finish execution
+:stepout

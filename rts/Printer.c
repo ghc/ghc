@@ -638,6 +638,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("stg_ret_l_info\n" );
             } else if (c == (StgWord)&stg_prompt_frame_info) {
                 debugBelch("stg_prompt_frame_info\n");
+            } else if (c == (StgWord)&stg_stop_after_ret_frame_info) {
+                debugBelch("stg_stop_after_ret_frame_info\n");
 #if defined(PROFILING)
             } else if (c == (StgWord)&stg_restore_cccs_d_info) {
                 debugBelch("stg_restore_cccs_d_info\n" );
