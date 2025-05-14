@@ -320,6 +320,51 @@ void rts_disableStopNextBreakpoint(StgPtr tso)
     ((StgTSO *)tso)->flags &= ~TSO_STOP_NEXT_BREAKPOINT;
 }
 
+/* ---------------------------------------------------------------------------
+ * Enabling and disabling per-thread step-out mode
+ * ------------------------------------------------------------------------ */
+
+void rts_enableStopAfterReturn(StgPtr tso)
+{
+  ((StgTSO *)tso)->flags |= TSO_STOP_AFTER_RETURN;
+}
+
+void rts_disableStopAfterReturn(StgPtr tso)
+{
+  ((StgTSO *)tso)->flags &= ~TSO_STOP_AFTER_RETURN;
+}
+
+/*
+Note [Debugger: Step-out]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+When the per-thread debugger step-out flag is set (`TSO_STOP_AFTER_RETURN`),
+the interpreter must guarantee we stop when the current BCO returns to the
+continuation (represented by the first RET_BCO frame after the current frame on
+the stack). Those are the interpreter step-out semantics: stop after returning
+to the continuation.
+
+To achieve this, when the flag is set as the interpreter is re-entered:
+  (1) Traverse the stack until a RET_BCO frame is found or we otherwise hit the
+      bottom (STOP_FRAME).
+  (2) Look for a breakpoint instruction heading the BCO instructions (a
+      breakpoint, when present, is always the first instruction in a BCO)
+
+      (2a) For PUSH_ALT BCOs, the breakpoint instruction will be BRK_ALTS
+          (as explained in Note [Debugger: BRK_ALTS]) and it can be enabled by
+          overriding its first argument to 1.
+
+      (2b) Otherwise, the instruction will be BRK_FUN and the breakpoint can be
+           enabled by setting the associated BreakArray at the associated tick
+           index to 0.
+
+By simply enabling the breakpoint heading the continuation we can ensure that
+when it is returned to we will stop there without additional work -- it
+leverages the existing break point insertion process and stopping mechanisms.
+
+A limitation of this approach is that stepping-out of a function that was
+tail-called will skip its caller since no stack frame is pushed for a tail
+call (i.e. a tail call returns directly to its caller's first non-tail caller).
+*/
 /* -------------------------------------------------------------------------- */
 
 #if defined(INTERP_STATS)
@@ -560,6 +605,71 @@ interpretBCO (Capability* cap)
              printStackChunk(Sp,cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
              debugBelch("\n\n");
             );
+
+    /* If the "step-out" flag is set for this thread, find the *continuation*
+     * BCO on the stack and activate its breakpoint specifically. Be careful to
+     * use SafeSp macros to handle stack underflows.
+     *
+     * See Note [Debugger: Step-out]
+     */
+    if (cap->r.rCurrentTSO->flags & TSO_STOP_AFTER_RETURN) {
+
+      StgBCO* bco;
+      StgWord16* bco_instrs;
+      StgHalfWord type;
+
+      /* Store the entry Sp; traverse the stack modifying Sp (using Sp macros);
+       * restore Sp afterwards. */
+      StgPtr restoreStackPointer = Sp;
+
+      /* The first BCO on the stack is the one we are already stopped at.
+       * Skip it. */
+      Sp = SafeSpWP(stack_frame_sizeW((StgClosure *)Sp));
+
+      /* Traverse upwards until continuation BCO, or the end */
+      while ((type = get_itbl((StgClosure*)Sp)->type) != RET_BCO
+                                             && type  != STOP_FRAME) {
+        Sp = SafeSpWP(stack_frame_sizeW((StgClosure *)Sp));
+      }
+
+      ASSERT(type == RET_BCO || type == STOP_FRAME);
+      if (type == RET_BCO) {
+
+        bco = (StgBCO*)(SpW(1)); // BCO is first arg of a RET_BCO
+        ASSERT(get_itbl((StgClosure*)bco)->type == BCO);
+        bco_instrs = (StgWord16*)(bco->instrs->payload);
+
+        /* A breakpoint instruction (BRK_FUN or BRK_ALTS) is always the first
+         * instruction in a BCO */
+        if ((bco_instrs[0] & 0xFF) == bci_BRK_FUN) {
+            int brk_array, tick_index;
+            StgArrBytes *breakPoints;
+            StgPtr* ptrs;
+
+            ptrs = (StgPtr*)(&bco->ptrs->payload[0]);
+            brk_array  = bco_instrs[1];
+            tick_index = bco_instrs[6];
+
+            breakPoints = (StgArrBytes *) BCO_PTR(brk_array);
+            // ACTIVATE the breakpoint by tick index
+            ((StgInt*)breakPoints->payload)[tick_index] = 0;
+        }
+        else if ((bco_instrs[0] & 0xFF) == bci_BRK_ALTS) {
+            // ACTIVATE BRK_ALTS by setting its only argument to ON
+            bco_instrs[1] = 1;
+        }
+        // else: if there is no BRK instruction perhaps we should keep
+        // traversing; that said, the continuation should always have a BRK
+      }
+      else /* type == STOP_FRAME */ {
+        /* No continuation frame to further stop at: Nothing to do */
+      }
+
+      // Mark as done to not do it again
+      cap->r.rCurrentTSO->flags &= ~TSO_STOP_AFTER_RETURN;
+
+      Sp = restoreStackPointer;
+    }
 
     // ------------------------------------------------------------------------
     // Case 1:
@@ -1483,6 +1593,17 @@ run_BCO:
 
             // continue normal execution of the byte code instructions
             goto nextInsn;
+        }
+
+        /* See Note [Debugger: BRK_ALTS] */
+        case bci_BRK_ALTS:
+        {
+          StgWord16 active = BCO_NEXT;
+          if (active) {
+            cap->r.rCurrentTSO->flags |= TSO_STOP_NEXT_BREAKPOINT;
+          }
+
+          goto nextInsn;
         }
 
         case bci_STKCHECK: {

@@ -342,7 +342,11 @@ handleRunStatus step expr bindings final_ids status history0 = do
       setSession hsc_env2
       return (ExecBreak names Nothing)
 
-    -- Just case: we stopped at a breakpoint
+    -- EvalBreak (Just ...) case: the interpreter stopped at a breakpoint
+    --
+    -- The interpreter yields on a breakpoint if:
+    --  - the breakpoint was explicitly enabled (in @BreakArray@)
+    --  - or one of the stepping options in @EvalOpts@ caused us to stop at one
     EvalBreak apStack_ref (Just eval_break) resume_ctxt ccs -> do
       let ibi = evalBreakpointToId eval_break
       tick_brks <- liftIO $ readModBreaks hsc_env (ibi_tick_mod ibi)
@@ -350,13 +354,14 @@ handleRunStatus step expr bindings final_ids status history0 = do
         span      = modBreaks_locs tick_brks ! ibi_tick_index ibi
         decl      = intercalate "." $ modBreaks_decls tick_brks ! ibi_tick_index ibi
 
+      -- Was this breakpoint explicitly enabled (ie. in @BreakArray@)?
       b <- liftIO $ breakpointStatus interp (modBreaks_flags tick_brks) (ibi_tick_index ibi)
 
       apStack_fhv <- liftIO $ mkFinalizedHValue interp apStack_ref
       resume_ctxt_fhv   <- liftIO $ mkFinalizedHValue interp resume_ctxt
 
-      -- This breakpoint is explicitly enabled; we want to stop
-      -- instead of just logging it.
+      -- This breakpoint is enabled or we mean to break here;
+      -- we want to stop instead of just logging it.
       if b || breakHere step span then do
         -- This function only returns control to ghci with 'ExecBreak' when it is really meant to break.
         -- Specifically, for :steplocal or :stepmodule, don't return control
@@ -1244,7 +1249,7 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
         _ -> panic "compileParsedExprRemote"
 
   updateFixityEnv fix_env
-  let eval_opts = initEvalOpts dflags False
+  let eval_opts = initEvalOpts dflags EvalStepNone
   status <- liftIO $ evalStmt interp eval_opts (EvalThis hvals_io)
   case status of
     EvalComplete _ (EvalSuccess [hval]) -> return hval

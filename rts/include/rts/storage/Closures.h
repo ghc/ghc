@@ -699,3 +699,4 @@ typedef struct {
       // Number of words of captured stack
     StgWord stack[];
 } StgContinuation;
+

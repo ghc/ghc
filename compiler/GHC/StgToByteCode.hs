@@ -789,7 +789,10 @@ doTailCall
     -> BcM BCInstrList
 doTailCall init_d s p fn args = do
    platform <- profilePlatform <$> getProfile
+
+   -- Do tail call only after
    do_pushes init_d args (map (atomRep platform) args)
+
   where
   do_pushes !d [] reps = do
         assert (null reps) return ()
@@ -1368,9 +1371,14 @@ doCase d s p scrut bndr alts
      alt_stuff <- mapM codeAlt alts
      alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
 
-     let alt_final
+     let alt_final1
            | ubx_tuple_frame    = SLIDE 0 2 `consOL` alt_final0
            | otherwise          = alt_final0
+         alt_final
+           | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
+                                -- See Note [Debugger: BRK_ALTS]
+                                = BRK_ALTS 0 `consOL` alt_final1
+           | otherwise          = alt_final1
 
      add_bco_name <- shouldAddBcoName
      let
@@ -1390,6 +1398,37 @@ doCase d s p scrut bndr alts
                   _     -> panic "schemeE(StgCase).push_alts"
             in return (PUSH_ALTS alt_bco scrut_rep `consOL` scrut_code)
 
+{-
+Note [Debugger: BRK_ALTS]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+As described in Note [Debugger: Step-out] in rts/Interpreter.c, to implement
+the stepping-out debugger feature we traverse the heap at runtime, identify
+the continuation BCO, and explicitly enable that BCO's breakpoint thus ensuring
+we stop exactly when we return to the continuation.
+
+However, a case continuation BCO (pushed by PUSH_ALTS), which computes what
+case alternative BCO to take, never gets a user-facing breakpoint tick (BRK_FUN):
+
+  1) It's not useful to a user stepping through the program to always have a
+  breakpoint after the scrutinee is evaluated but before the case alternative
+  is selected. The associated source span would also be slightly awkward to choose.
+
+  2) It's not easy to add a source-tick before the case alternatives because in
+  essentially all internal representations they are given as a list of Alts
+  rather than an expression.
+
+To provide the debugger a way to enable at runtime the case continuation
+breakpoints regardless, we introduce at the start of every PUSH_ALTS BCO a
+BRK_ALTS instruction.
+
+The BRK_ALTS instruction, if enabled (by its single arg), ensures we stop at
+the breakpoint heading the case alternative we take. Under the hood, this means
+that when BRK_ALTS is enabled we set TSO_STOP_NEXT_BREAKPOINT just before
+selecting the alternative.
+
+It's important that BRK_ALTS (just like BRK_FUN) is the first instruction of
+the BCO, since that's where the debugger will look to enable it at runtime.
+-}
 
 -- -----------------------------------------------------------------------------
 -- Deal with tuples

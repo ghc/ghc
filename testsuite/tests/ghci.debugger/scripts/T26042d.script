@@ -1,0 +1,10 @@
+:load T26042d.hs
+
+:break 6
+main
+:list
+:stepout
+
+-- should exit! we compile this test case with -O1 to make sure the monad >> are inlined
+-- and thus the test relies on the filtering behavior based on SrcSpans for stepout
+

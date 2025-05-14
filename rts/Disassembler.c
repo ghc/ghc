@@ -94,6 +94,9 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("\n");
          pc += 6;
          break;
+      case bci_BRK_ALTS:
+         debugBelch ("BRK_ALTS %d\n", BCO_NEXT);
+         break;
       case bci_SWIZZLE: {
          W_     stkoff = BCO_GET_LARGE_ARG;
          StgInt by     = BCO_GET_LARGE_ARG;

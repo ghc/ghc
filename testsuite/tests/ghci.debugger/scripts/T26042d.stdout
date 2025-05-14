@@ -1,0 +1,17 @@
+Breakpoint 0 activated at T26042d.hs:6:3-19
+hello1
+Stopped in Main.main, T26042d.hs:6:3-19
+_result ::
+  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+        () #) = _
+5    putStrLn "hello1"
+6    putStrLn "hello2"
+     ^^^^^^^^^^^^^^^^^
+7    putStrLn "hello3"
+hello2
+Stopped in Main.main, T26042d.hs:7:3-19
+_result ::
+  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+        () #) = _
