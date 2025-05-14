@@ -873,10 +873,6 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
         , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh configure"
         -- We have to trigger cabal build in an independent way to mitigate Wine hangs at MSYS2/Arm64EC
         , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l -c './hadrian/build-cabal clean'"
-        -- We use "--enable-distro-toolchain" due of TOOLCHAIN_SOURCE="env", so we have to manually copy
-        -- bootstrap's compiler mingw into `_build` because binary-dist-dir requires it at Windows.
-        -- After './hadrian/build-cabal clean' we have to recreate the build root directory.
-        , "mkdir ./_build && cp -r ~/.wine/drive_c/msys64/opt/ghc-bootstrap/mingw ./_build/"
         , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh build_hadrian"
         , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh test_hadrian"
         ]
