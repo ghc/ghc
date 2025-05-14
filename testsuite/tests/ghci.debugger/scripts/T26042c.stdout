@@ -1,0 +1,24 @@
+Breakpoint 0 activated at T26042c.hs:10:15-22
+Stopped in Main.foo, T26042c.hs:10:15-22
+_result ::
+  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+        Int #) = _
+9  foo :: Bool -> Int -> IO Int
+10  foo True  i = return i
+                  ^^^^^^^^
+11  foo False _ = do
+Stopped in Main.main, T26042c.hs:6:3-9
+_result ::
+  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+        () #) = _
+a :: Int = _
+5    a <- foo False undefined
+6    print a
+     ^^^^^^^
+7    print a
+14
+14
+not stopped at a breakpoint
+not stopped at a breakpoint

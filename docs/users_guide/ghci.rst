@@ -3002,6 +3002,37 @@ commonly used commands.
     hit by an error (:ghc-flag:`-fbreak-on-error`) or an
     exception (:ghc-flag:`-fbreak-on-exception`).
 
+.. ghci-cmd:: :stepout
+
+    :since: 9.14.1
+
+    Stop at the first breakpoint immediately after returning from the current
+    function scope.
+
+    Known limitations: because a function tail-call does not push a stack
+    frame, if step-out is used inside of a function that was tail-called,
+    execution will not be returned to its caller, but rather its caller's
+    first non-tail caller. On the other hand, it means the debugger
+    follows the more realistic execution of the program.
+    In the following example:
+
+    .. code-block:: none
+
+    f = do
+       a
+       b <--- (1) set breakpoint then step in here
+       c
+    b = do
+       ...
+       d <--- (2) step-into this tail call
+    d = do
+       ...
+       something <--- (3) step-out here
+       ...
+
+    Stepping-out will stop execution at the `c` invokation in `f`, rather than
+    stopping at `b`.
+
 .. ghci-cmd:: :stepmodule
 
     Enable only breakpoints in the current module and resume evaluation
