@@ -1,18 +1,12 @@
 annfail09.hs:6:16: error: [GHC-28914]
     • Level error: ‘g’ is bound at level 0 but used at level -1
-      Hint: quoting [| g |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
     • In the annotation: {-# ANN module g #-}
 
 annfail09.hs:8:18: error: [GHC-28914]
     • Level error: ‘g’ is bound at level 0 but used at level -1
-      Hint: quoting [| g |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
     • In the annotation: {-# ANN type Foo g #-}
 
 annfail09.hs:11:11: error: [GHC-28914]
     • Level error: ‘g’ is bound at level 0 but used at level -1
-      Hint: quoting [| g |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
     • In the annotation: {-# ANN f g #-}
 

@@ -1,28 +1,16 @@
-TH_localname.hs:3:11: error: [GHC-39999]
-    • Ambiguous type variable ‘t0’ arising from a use of ‘GHC.Internal.TH.Lift.lift’
-      prevents the constraint ‘(GHC.Internal.TH.Lift.Lift
-                                  t0)’ from being solved.
-      Relevant bindings include
-        y :: t0 (bound at TH_localname.hs:3:6)
-        x :: t0 -> m0 GHC.Internal.TH.Syntax.Exp
-          (bound at TH_localname.hs:3:1)
-      Probable fix: use a type annotation to specify what ‘t0’ should be.
-      Potentially matching instances:
-        instance (GHC.Internal.TH.Lift.Lift a,
-                  GHC.Internal.TH.Lift.Lift b) =>
-                 GHC.Internal.TH.Lift.Lift (Either a b)
-          -- Defined in ‘GHC.Internal.TH.Lift’
-        instance GHC.Internal.TH.Lift.Lift Integer
-          -- Defined in ‘GHC.Internal.TH.Lift’
-        ...plus 15 others
-        ...plus 71 instances involving out-of-scope types
-        (use -fprint-potential-instances to see them all)
-    • In the expression: GHC.Internal.TH.Lift.lift y
-      In the expression:
+TH_localname.hs:3:14: error: [GHC-28914]
+    • Level error: ‘y’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘GHC.Internal.TH.Lift.Lift p0’
+    • In the expression:
         [| y |]
-        pending(rn) [<y, GHC.Internal.TH.Lift.lift y>]
+        pending(rn) [implicit lift: y]
       In the expression:
         \ y
           -> [| y |]
-             pending(rn) [<y, GHC.Internal.TH.Lift.lift y>]
+             pending(rn) [implicit lift: y]
+      In an equation for ‘x’:
+          x = \ y
+                -> [| y |]
+                   pending(rn) [implicit lift: y]
 
