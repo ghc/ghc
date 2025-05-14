@@ -625,6 +625,7 @@ data TsoFlags
   | TsoSqueezed
   | TsoAllocLimit
   | TsoStopNextBreakpoint
+  | TsoStopAfterReturn
   | TsoFlagsUnknownValue Word32 -- ^ Please report this as a bug
   deriving (Eq, Show, Generic, Ord)
 

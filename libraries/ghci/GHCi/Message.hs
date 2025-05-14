@@ -378,6 +378,7 @@ putTHMessage m = case m of
 data EvalOpts = EvalOpts
   { useSandboxThread :: Bool
   , singleStep :: Bool
+  , stepOut :: Bool
   , breakOnException :: Bool
   , breakOnError :: Bool
   }

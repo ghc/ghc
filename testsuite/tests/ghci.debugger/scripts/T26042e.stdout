@@ -1,0 +1,22 @@
+Breakpoint 0 activated at T26042e.hs:11:3-14
+Stopped in T7.a, T26042e.hs:11:3-14
+_result :: (Int, Int) = _
+x :: [Char] = "abc"
+y :: [a1] -> Int = _
+10    let !x = ['a', 'b', 'c']
+11    let !z = y x
+      ^^^^^^^^^^^^
+12    let !t = y ['b']
+Stopped in T7.main, T26042e.hs:19:3-11
+_result :: IO () = _
+x :: Int = _
+y :: Int = _
+18    let !(x, y) = a
+19    print '1'
+      ^^^^^^^^^
+20    print '2'
+'1'
+'2'
+'3'
+3
+1

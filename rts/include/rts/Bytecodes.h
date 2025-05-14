@@ -214,6 +214,8 @@
 #define bci_OP_INDEX_ADDR_32           242
 #define bci_OP_INDEX_ADDR_64           243
 
+#define bci_BRK_ALTS                   244
+
 
 /* If you need to go past 255 then you will run into the flags */
 

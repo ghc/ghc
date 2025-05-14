@@ -1,0 +1,9 @@
+-- another simple test showing you can step out as you expect e.g. from a strict binding in a pure function
+:load T26042e.hs
+
+:break 11
+main
+:list
+:stepout
+:list
+:stepout
