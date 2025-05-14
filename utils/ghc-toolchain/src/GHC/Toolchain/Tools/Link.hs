@@ -91,7 +91,7 @@ findLinkFlags enableOverride cc ccLink
           -- executable exists before trying cc.
           do _ <- findProgram (linker ++ " linker") emptyProgOpt ["ld."++linker]
              prog <$ checkLinkWorks cc prog
-        | linker <- ["lld", "gold", "bfd"]
+        | linker <- ["lld", "bfd"]
         , let prog = over _prgFlags (++["-fuse-ld="++linker]) ccLink
         ]
         <|> (ccLink <$ checkLinkWorks cc ccLink)
