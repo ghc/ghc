@@ -1,0 +1,13 @@
+Breakpoint 0 activated at T26042f.hs:(20,7)-(21,14)
+Stopped in T8.t, T26042f.hs:(20,7)-(21,14)
+_result :: Identity Int = _
+x :: Int = _
+19  t :: Int -> Identity Int
+        vv
+20  t x = do
+21    pure (x + 3)
+                  ^^
+22  {-# OPAQUE t #-}
+7248
+Not stopped at a breakpoint; nothing to list
+Not stopped at a breakpoint; nothing to list

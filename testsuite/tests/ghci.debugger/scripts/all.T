@@ -144,3 +144,12 @@ test('T24306', normal, ghci_script, ['T24306.script'])
 test('T24712', normal, ghci_script, ['T24712.script'])
 test('T25109', normal, ghci_script, ['T25109.script'])
 test('T25932', extra_files(['T25932.hs']), ghci_script, ['T25932.script'])
+
+# Step out tests
+test('T26042b', [extra_hc_opts('-O -fno-unoptimized-core-for-interpreter'), extra_files(['T26042b.hs'])], ghci_script, ['T26042b.script'])
+test('T26042c', [extra_hc_opts('-O -fno-unoptimized-core-for-interpreter'), extra_files(['T26042c.hs'])], ghci_script, ['T26042c.script'])
+test('T26042d', [extra_hc_opts('-O -fno-unoptimized-core-for-interpreter'), extra_files(['T26042d.hs'])], ghci_script, ['T26042d.script'])
+test('T26042e', extra_files(['T26042e.hs']), ghci_script, ['T26042e.script'])
+test('T26042f1', extra_files(['T26042f.hs', 'T26042f.script']), ghci_script, ['T26042f.script']) # >> is not inlined, so stepout has nowhere to stop
+test('T26042f2', [extra_hc_opts('-O -fno-unoptimized-core-for-interpreter'), extra_files(['T26042f.hs', 'T26042f.script'])], ghci_script, ['T26042f.script'])
+test('T26042g', extra_files(['T26042g.hs']), ghci_script, ['T26042g.script'])
