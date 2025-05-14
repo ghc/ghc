@@ -72,6 +72,7 @@ RTS_RET(stg_restore_cccs_v32);
 RTS_RET(stg_restore_cccs_v64);
 RTS_RET(stg_restore_cccs_eval);
 RTS_RET(stg_prompt_frame);
+RTS_RET(stg_stop_after_ret_frame);
 
 // RTS_FUN(stg_interp_constr1_entry);
 // RTS_FUN(stg_interp_constr2_entry);

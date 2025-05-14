@@ -1,0 +1,24 @@
+:load T26042c.hs
+-- similar to T26042b, but uses tail calls
+-- recall: for step-out, we skip the caller of tail calls
+-- (because we don't push a stack frame for tail calls, so
+-- there's no RET instruction to stop after)
+
+-- break on foo True branch
+:break 9
+main
+:list
+-- step out of foo True and observe that we have skipped its call in bar,
+-- and the call of bar in foo False.
+-- we go straight to `main`.
+:stepout
+:list
+-- stepping out from here will jump into the thunk because it's where we'll
+-- go after returning.
+:stepout
+:list
+-- and so on
+:stepout
+:list
+-- finish
+:continue

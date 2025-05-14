@@ -8,6 +8,10 @@ module GHCi.Debugger
   , rts_disableStopNextBreakpoint
   , rts_disableStopNextBreakpointAll
 
+  -- * Step out mode
+  , rts_enableStopAfterReturn
+  , rts_disableStopAfterReturn
+
   -- * Stop on exception
   , exceptionFlag
 
@@ -44,6 +48,15 @@ foreign import ccall unsafe "rts_enableStopNextBreakpointAll"
 -- | Disables the single step mode for all threads
 foreign import ccall unsafe "rts_disableStopNextBreakpointAll"
   rts_disableStopNextBreakpointAll :: IO ()
+
+--------------------------------------------------------------------------------
+-- Step out mode
+
+foreign import ccall unsafe "rts_enableStopAfterReturn"
+  rts_enableStopAfterReturn :: ThreadId# -> IO ()
+
+foreign import ccall unsafe "rts_disableStopAfterReturn"
+  rts_disableStopAfterReturn :: ThreadId# -> IO ()
 
 --------------------------------------------------------------------------------
 

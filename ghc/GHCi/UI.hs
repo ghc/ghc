@@ -247,6 +247,7 @@ ghciCommands = map mkCmd [
   ("sprint",    keepGoing sprintCmd,            completeExpression),
   ("step",      keepGoing stepCmd,              completeIdentifier),
   ("steplocal", keepGoing stepLocalCmd,         completeIdentifier),
+  ("stepout",   keepGoing stepOutCmd,           completeIdentifier),
   ("stepmodule",keepGoing stepModuleCmd,        completeIdentifier),
   ("type",      keepGoingMulti' typeOfExpr,          completeExpression),
   ("trace",     keepGoing traceCmd,             completeExpression),
@@ -407,6 +408,7 @@ defFullHelpText =
   "   :step                       single-step after stopping at a breakpoint\n"++
   "   :step <expr>                single-step into <expr>\n"++
   "   :steplocal                  single-step within the current top-level binding\n"++
+  "   :stepout                    stop at the first breakpoint after returning from the current scope\n"++
   "   :stepmodule                 single-step restricted to the current module\n"++
   "   :trace                      trace after stopping at a breakpoint\n"++
   "   :trace <expr>               evaluate <expr> with tracing on (see :history)\n"++
@@ -3792,6 +3794,12 @@ stepCmd arg = withSandboxOnly ":step" $ step arg
   where
   step []         = doContinue GHC.SingleStep
   step expression = runStmt expression GHC.SingleStep >> return ()
+
+stepOutCmd :: GhciMonad m => String -> m ()
+stepOutCmd arg = withSandboxOnly ":stepout" $ step arg
+  where
+  step []         = doContinue GHC.StepOut
+  step expression = stepCmd expression
 
 stepLocalCmd :: GhciMonad m => String -> m ()
 stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg

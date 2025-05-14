@@ -335,6 +335,13 @@
 #define TSO_STOP_NEXT_BREAKPOINT 512
 
 /*
+ * Enables step-out mode for this thread -- it will push a stack frame which
+ * causes the interpreter to stop at the immediate next breakpoint right after
+ * it is evaluated (i.e. stop right after returning from the function step-out was set in).
+ */
+#define TSO_STOP_AFTER_RETURN 1024
+
+/*
  * The number of times we spin in a spin lock before yielding (see
  * #3758).  To tune this value, use the benchmark in #3758: run the
  * server with -N2 and the client both on a dual-core.  Also make sure

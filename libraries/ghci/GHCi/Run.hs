@@ -211,6 +211,7 @@ evalOptsSeq :: EvalOpts
 evalOptsSeq = EvalOpts
               { useSandboxThread = True
               , singleStep = False
+              , stepOut    = False
               , breakOnException = False
               , breakOnError = False
               }
@@ -334,6 +335,9 @@ withBreakAction opts breakMVar statusMVar act
      poke breakPointIOAction stablePtr
      when (breakOnException opts) $ poke exceptionFlag 1
      when (singleStep opts) rts_enableStopNextBreakpointAll
+     when (stepOut opts) $ do
+      ThreadId tid <- myThreadId
+      rts_enableStopAfterReturn tid
      return stablePtr
         -- Breaking on exceptions is not enabled by default, since it
         -- might be a bit surprising.  The exception flag is turned off
@@ -365,6 +369,10 @@ withBreakAction opts breakMVar statusMVar act
      poke breakPointIOAction noBreakStablePtr
      poke exceptionFlag 0
      rts_disableStopNextBreakpointAll
+
+     ThreadId tid <- myThreadId
+     rts_disableStopAfterReturn tid
+
      freeStablePtr stablePtr
 
 resumeStmt
