@@ -1,0 +1,15 @@
+Breakpoint 0 activated at T26042g.hs:11:10-28
+Stopped in T9.succ, T26042g.hs:11:10-28
+_result :: Int = _
+x :: Int = 14
+10  succ :: Int -> Int
+11  succ x = (-) (x - 2) (x + 1)
+             ^^^^^^^^^^^^^^^^^^^
+12  
+Stopped in T9.top, T26042g.hs:8:10-21
+_result :: Int = _
+7      5 -> 5
+8      _ -> 6 + other 55
+            ^^^^^^^^^^^^
+9  
+171

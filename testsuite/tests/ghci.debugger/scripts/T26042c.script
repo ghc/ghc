@@ -1,0 +1,28 @@
+:load T26042c.hs
+-- Similar to base T26042b test, but uses tail calls.
+-- Recall: for step-out, we skip the caller of tail calls
+-- (because we don't push a stack frame for tail calls, so
+-- there's no frame to trigger the breakpoint of)
+-- This test observes that
+
+-- break on foo True branch
+:break 10
+main
+:list
+-- step out of foo True and observe that we have skipped its call in bar,
+-- and the call of bar in foo False.
+-- we go straight to `main`.
+:stepout
+:list
+-- stepping out from here will stop in the thunk (TODO: WHY?)
+:stepout
+:list
+
+-- bring us back to main from the thunk (why were we stopped there?...)
+:stepout
+:list
+
+-- and finally out
+:stepout
+
+-- this test is also run with optimisation to make sure the IO bindings inline and we can stop at them

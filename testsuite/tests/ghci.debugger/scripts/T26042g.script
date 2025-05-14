@@ -1,0 +1,10 @@
+-- basic step-out functionality test in pure code
+:load T26042g.hs
+:break succ
+top
+:list
+-- out of succ
+:stepout
+:list
+-- out of top
+:stepout

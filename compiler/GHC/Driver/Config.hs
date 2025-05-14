@@ -3,6 +3,7 @@ module GHC.Driver.Config
    ( initOptCoercionOpts
    , initSimpleOpts
    , initEvalOpts
+   , EvalStep(..)
    )
 where
 
@@ -28,13 +29,29 @@ initSimpleOpts dflags = SimpleOpts
    , so_inline  = True
    }
 
+-- | Instruct the interpreter evaluation to break...
+data EvalStep
+  -- | ... at every breakpoint tick
+  = EvalStepSingle
+  -- | ... after any evaluation to WHNF
+  -- (See Note [Debugger: Step-out])
+  | EvalStepOut
+  -- | ... only on explicit breakpoints
+  | EvalStepNone
+
 -- | Extract GHCi options from DynFlags and step
-initEvalOpts :: DynFlags -> Bool -> EvalOpts
+initEvalOpts :: DynFlags -> EvalStep -> EvalOpts
 initEvalOpts dflags step =
   EvalOpts
     { useSandboxThread = gopt Opt_GhciSandbox dflags
-    , singleStep       = step
+    , singleStep       = singleStep
+    , stepOut          = stepOut
     , breakOnException = gopt Opt_BreakOnException dflags
     , breakOnError     = gopt Opt_BreakOnError dflags
     }
+  where
+    (singleStep, stepOut) = case step of
+      EvalStepSingle -> (True,  False)
+      EvalStepOut    -> (False, True)
+      EvalStepNone   -> (False, False)
 
