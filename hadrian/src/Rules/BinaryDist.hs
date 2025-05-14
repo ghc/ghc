@@ -256,7 +256,10 @@ bindistRules = do
           copyFile ("libraries" -/- "prologue.txt") (bindistFilesDir -/- "docs-utils" -/- "prologue.txt")
           copyFile ("libraries" -/- "gen_contents_index") (bindistFilesDir -/- "docs-utils" -/- "gen_contents_index" )
 
-        when windowsHost $ do
+        win_host <- isWinHost
+        win_target <- isWinTarget
+        distro_mingw <- settingsFileSetting ToolchainSetting_DistroMinGW
+        when (win_host && win_target && distro_mingw == "NO") $ do
           copyDirectory (root -/- "mingw") bindistFilesDir
           -- we use that opportunity to delete the .stamp file that we use
           -- as a proxy for the whole mingw toolchain, there's no point in

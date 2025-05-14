@@ -523,7 +523,6 @@
       "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh setup",
       "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh configure",
       "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l -c './hadrian/build-cabal clean'",
-      "mkdir ./_build && cp -r ~/.wine/drive_c/msys64/opt/ghc-bootstrap/mingw ./_build/",
       "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh build_hadrian",
       "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh test_hadrian"
     ],
@@ -1281,7 +1280,6 @@
       "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh setup",
       "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh configure",
       "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l -c './hadrian/build-cabal clean'",
-      "mkdir ./_build && cp -r ~/.wine/drive_c/msys64/opt/ghc-bootstrap/mingw ./_build/",
       "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh build_hadrian",
       "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh test_hadrian"
     ],

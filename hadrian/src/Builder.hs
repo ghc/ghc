@@ -26,7 +26,7 @@ import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
-import Oracles.Setting (bashPath, targetStage, isWinHost)
+import Oracles.Setting (bashPath, targetStage, isWinHost, isWinTarget)
 import System.Exit
 import System.IO (stderr)
 
@@ -240,12 +240,14 @@ instance H.Builder Builder where
         Ghc _ st -> do
             root <- buildRoot
             unlitPath  <- builderPath Unlit
+            win_target <- isWinTarget
+            win_host <- isWinHost
             distro_mingw <- settingsFileSetting ToolchainSetting_DistroMinGW
             libffi_adjustors <- useLibffiForAdjustors
             use_system_ffi <- flag UseSystemFfi
 
             return $ [ unlitPath ]
-                  ++ [ root -/- mingwStamp | windowsHost, distro_mingw == "NO" ]
+                  ++ [ root -/- mingwStamp | win_target, win_host, distro_mingw == "NO" ]
                      -- proxy for the entire mingw toolchain that
                      -- we have in inplace/mingw initially, and then at
                      -- root -/- mingw.
