@@ -1196,7 +1196,7 @@ occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
 
 mkNonRecRhsCtxt :: TopLevelFlag -> Id -> Unfolding -> OccEncl
 -- Precondition: Id is not a join point
-mkNonRecRhsCtxt lvl bndr unf
+mkNonRecRhsCtxt _lvl bndr unf
   | certainly_inline = OccVanilla -- See Note [Cascading inlines]
   | otherwise        = OccRhs
   where
