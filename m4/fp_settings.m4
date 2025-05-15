@@ -79,10 +79,13 @@ AC_DEFUN([FP_SETTINGS],
       [AC_MSG_ERROR(Unknown CPPSupportsG0 value $CmmCPPSupportsG0)]
     )
 
+    AC_MSG_CHECKING([whether $WindresCmd exists])
     if test -z "$WindresCmd"; then
         SettingsWindresCommand="/bin/false"
+        AC_MSG_RESULT([no, use $SettingsWindresCommand])
     else
         SettingsWindresCommand="$WindresCmd"
+        AC_MSG_RESULT([yes])
     fi
 
     # LLVM backend tools
@@ -92,6 +95,7 @@ AC_DEFUN([FP_SETTINGS],
     SettingsLlvmAsFlags="$LlvmAsFlags"
 
     if test "$EnableDistroToolchain" = "YES"; then
+        AC_MSG_NOTICE([--enable-distro-toolchain is specified, applying basename])
         # If the user specified --enable-distro-toolchain then we just use the
         # executable names, not paths.
         SettingsCCompilerCommand="$(basename $SettingsCCompilerCommand)"
@@ -108,6 +112,7 @@ AC_DEFUN([FP_SETTINGS],
     fi
 
     if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"; then
+        AC_MSG_NOTICE([--enable-distro-toolchain is not specified at Windows])
         # Handle the Windows toolchain installed in FP_SETUP_WINDOWS_TOOLCHAIN.
         # We need to issue a substitution to use $tooldir,
         # See Note [tooldir: How GHC finds mingw on Windows]
