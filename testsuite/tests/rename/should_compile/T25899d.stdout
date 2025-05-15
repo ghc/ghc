@@ -2,6 +2,9 @@
     In the import of ‘GHC.Generics’:
       a class called ‘Generic’ is exported,
       but its subordinate item ‘Rep’ is not in the data namespace.
+    Suggested fix:
+      Remove the ‘data’ keyword from the subordinate import item:
+        import GHC.Generics ( Generic ( Rep ) )
 
 <interactive>:3:22: error: [GHC-56449]
     In the import of ‘GHC.Generics’:

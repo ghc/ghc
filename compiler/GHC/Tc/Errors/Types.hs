@@ -5841,9 +5841,9 @@ data BadImportKind
   | BadImportNotExportedSubordinates !GlobalRdrElt (NonEmpty FastString)
   -- | Incorrect @type@ keyword when importing subordinates that aren't types.
   | BadImportNonTypeSubordinates !GlobalRdrElt (NonEmpty GlobalRdrElt)
-  -- | Incorrect @type@ keyword when importing something which isn't a type.
-  | BadImportNonDataSubordinates !GlobalRdrElt (NonEmpty GlobalRdrElt)
   -- | Incorrect @data@ keyword when importing something which isn't a term.
+  | BadImportNonDataSubordinates !GlobalRdrElt (NonEmpty GlobalRdrElt)
+  -- | Incorrect @type@ keyword when importing something which isn't a type.
   | BadImportAvailVar
   deriving Generic
 

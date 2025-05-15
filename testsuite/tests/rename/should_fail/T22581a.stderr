@@ -2,4 +2,7 @@ T22581a.hs:5:24: error: [GHC-51433]
     In the import of ‘T22581a_helper’:
       a data type called ‘T’ is exported,
       but its subordinate item ‘MkT’ is not in the type namespace.
+    Suggested fix:
+      Remove the ‘type’ keyword from the subordinate import item:
+        import T22581a_helper ( T ( MkT ) )
 

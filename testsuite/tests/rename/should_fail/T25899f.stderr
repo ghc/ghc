@@ -1,0 +1,16 @@
+T25899f.hs:6:5: error: [GHC-51433]
+    In the import of ‘T25899f_helper’:
+      a data type called ‘T’ is exported,
+      but its subordinate items ‘X’, ‘Z’ are not in the type namespace.
+    Suggested fix:
+      Remove the ‘type’ keywords from the subordinate import items:
+        import T25899f_helper ( T ( X, Z ) )
+
+T25899f.hs:7:5: error: [GHC-46557]
+    In the import of ‘T25899f_helper’:
+      a class called ‘(#)’ is exported,
+      but its subordinate items ‘F’, ‘H’ are not in the data namespace.
+    Suggested fix:
+      Remove the ‘data’ keywords from the subordinate import items:
+        import T25899f_helper ( type (#) ( F, H ) )
+

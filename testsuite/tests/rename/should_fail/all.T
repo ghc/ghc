@@ -245,3 +245,4 @@ test('T25991b2', [extra_files(['T25991b_helper.hs'])], multimod_compile_fail, ['
 test('T25899e1', normal, compile_fail, [''])
 test('T25899e2', normal, compile_fail, [''])
 test('T25899e3', [extra_files(['T25899e_helper.hs'])], multimod_compile_fail, ['T25899e3', '-v0'])
+test('T25899f',  [extra_files(['T25899f_helper.hs'])], multimod_compile_fail, ['T25899f', '-v0'])

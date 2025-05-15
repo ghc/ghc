@@ -340,27 +340,39 @@ pprImportSuggestion occ_name (CouldUnhideFrom mods)
         [ quotes (ppr mod) <+> parens (text "at" <+> ppr (imv_span imv))
         | (mod,imv) <- NE.toList mods
         ])
-pprImportSuggestion occ_name (CouldAddTypeKeyword mod)
-  = vcat [ text "Add the" <+> quotes (text "type")
-          <+> text "keyword to the import statement:"
-         , nest 2 $ text "import"
-            <+> ppr mod
-            <+> parens_sp (text "type" <+> pprPrefixOcc occ_name)
-         ]
+pprImportSuggestion occ_name (CouldChangeImportItem mod kw)
+  = case kw of
+      ImportItemRemoveType    -> remove "type"
+      ImportItemRemoveData    -> remove "data"
+      ImportItemRemovePattern -> remove "pattern"
+      ImportItemRemoveSubordinateType nontype1 -> remove_subordinate "type" (NE.toList nontype1)
+      ImportItemRemoveSubordinateData nondata1 -> remove_subordinate "data" (NE.toList nondata1)
+      ImportItemAddType       -> add "type"
   where
     parens_sp d = parens (space <> d <> space)
-pprImportSuggestion occ_name (CouldRemoveImportItemKeyword mod kw)
-  = vcat [ text "Remove the" <+> quotes (text kw_str)
-             <+> text "keyword from the import statement:"
-         , nest 2 $ text "import"
-             <+> ppr mod
-             <+> parens_sp (pprPrefixOcc occ_name) ]
-  where
-    parens_sp d = parens (space <> d <> space)
-    kw_str = case kw of
-      ImportItemUnwantedKeywordType    -> "type"
-      ImportItemUnwantedKeywordData    -> "data"
-      ImportItemUnwantedKeywordPattern -> "pattern"
+    remove kw =
+      vcat [ text "Remove the" <+> quotes (text kw)
+              <+> text "keyword from the import statement:"
+          , nest 2 $ text "import" <+> ppr mod <+> import_list ]
+      where
+        import_list = parens_sp (pprPrefixOcc occ_name)
+    add kw =
+      vcat [ text "Add the" <+> quotes (text kw)
+              <+> text "keyword to the import statement:"
+          , nest 2 $ text "import" <+> ppr mod <+> import_list ]
+      where
+        import_list = parens_sp (text kw <+> pprPrefixOcc occ_name)
+    remove_subordinate kw sub_occs =
+      vcat [ text "Remove the" <+> quotes (text kw)
+              <+> text "keyword" <> plural sub_occs
+              <+> text "from the subordinate import item" <> plural sub_occs <> colon
+          , nest 2 $ text "import" <+> ppr mod <+> import_list ]
+      where
+        parent_item
+          | isSymOcc occ_name = text "type" <+> pprPrefixOcc occ_name
+          | otherwise         = pprPrefixOcc occ_name
+        import_list = parens_sp (parent_item <+> sub_import_list)
+        sub_import_list = parens_sp (hsep (punctuate comma (map pprPrefixOcc sub_occs)))
 pprImportSuggestion dc_occ (ImportDataCon { ies_suggest_import_from = Nothing
                                           , ies_parent = parent_occ} )
   = text "Import the data constructor" <+> quotes (ppr dc_occ) <+>

@@ -5,7 +5,7 @@ module GHC.Types.Hint (
   , AvailableBindings(..)
   , InstantiationSuggestion(..)
   , LanguageExtensionHint(..)
-  , ImportItemUnwantedKeyword(..)
+  , ImportItemSuggestion(..)
   , ImportSuggestion(..)
   , HowInScope(..)
   , SimilarName(..)
@@ -538,10 +538,13 @@ instance Outputable AssumedDerivingStrategy where
 --      replacing <MyStr> as necessary.)
 data InstantiationSuggestion = InstantiationSuggestion !ModuleName !Module
 
-data ImportItemUnwantedKeyword =
-    ImportItemUnwantedKeywordType
-  | ImportItemUnwantedKeywordData
-  | ImportItemUnwantedKeywordPattern
+data ImportItemSuggestion =
+    ImportItemRemoveType
+  | ImportItemRemoveData
+  | ImportItemRemovePattern
+  | ImportItemRemoveSubordinateType (NE.NonEmpty OccName)
+  | ImportItemRemoveSubordinateData (NE.NonEmpty OccName)
+  | ImportItemAddType
 
 -- | Suggest how to fix an import.
 data ImportSuggestion
@@ -549,10 +552,8 @@ data ImportSuggestion
   = CouldImportFrom (NE.NonEmpty (Module, ImportedModsVal))
   -- | Some module exports what we want, but we are explicitly hiding it.
   | CouldUnhideFrom (NE.NonEmpty (Module, ImportedModsVal))
-  -- | The module exports what we want, but it isn't in the requested namespace.
-  | CouldRemoveImportItemKeyword ModuleName ImportItemUnwantedKeyword
-  -- | The module exports what we want, but it's a type and we have @ExplicitNamespaces@ on.
-  | CouldAddTypeKeyword ModuleName
+  -- | The module exports what we want, but the import item requires modification.
+  | CouldChangeImportItem ModuleName ImportItemSuggestion
   -- | Suggest importing a data constructor to bring it into scope
   | ImportDataCon
       -- | Where to suggest importing the 'DataCon' from.

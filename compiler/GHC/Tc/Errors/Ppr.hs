@@ -3294,9 +3294,25 @@ instance Diagnostic TcRnMessage where
     TcRnImportLookup (ImportLookupBad k _ is ie exts) ->
       let mod_name = moduleName $ is_mod is
           occ = rdrNameOcc $ ieName ie
-          could_remove kw = [ImportSuggestion occ $ CouldRemoveImportItemKeyword mod_name kw]
+          could_change_item item_suggestion =
+            [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | suggest_ext] ++
+            [ ImportSuggestion occ $
+              CouldChangeImportItem mod_name item_suggestion ]
+            where
+              suggest_ext
+                | ile_explicit_namespaces exts = False  -- extension already on
+                | otherwise =
+                    case item_suggestion of
+                      -- ImportItemRemove* -> False
+                      ImportItemRemoveType{}            -> False
+                      ImportItemRemoveData{}            -> False
+                      ImportItemRemovePattern{}         -> False
+                      ImportItemRemoveSubordinateType{} -> False
+                      ImportItemRemoveSubordinateData{} -> False
+                      -- ImportItemAdd* -> True
+                      ImportItemAddType{} -> True
       in case k of
-        BadImportAvailVar -> could_remove ImportItemUnwantedKeywordType
+        BadImportAvailVar -> could_change_item ImportItemRemoveType
         BadImportNotExported suggs -> suggs
         BadImportAvailTyCon
           -- BadImportAvailTyCon means a name is available in the TcCls namespace
@@ -3311,13 +3327,11 @@ instance Diagnostic TcRnMessage where
           --   3. Case (PatternKw) `import M (pattern T)`
           --        Same as the (DataKw) case, mutatis mutandis.
           -- Any other case would not have resulted in BadImportAvailTyCon.
-          | isSymOcc occ              -- Case (TyOp)
-              -> [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | not (ile_explicit_namespaces exts) ]
-                 ++ [ ImportSuggestion occ $ CouldAddTypeKeyword mod_name ]
-          | otherwise ->              -- Non-operator cases
+          | isSymOcc occ    -> could_change_item ImportItemAddType        -- Case (TyOp)
+          | otherwise       ->  -- Non-operator cases
               case unLoc (ieLIEWrappedName ie) of
-                IEData{}    -> could_remove ImportItemUnwantedKeywordData     -- Case (DataKw)
-                IEPattern{} -> could_remove ImportItemUnwantedKeywordPattern  -- Case (PatternKw)
+                IEData{}    -> could_change_item ImportItemRemoveData     -- Case (DataKw)
+                IEPattern{} -> could_change_item ImportItemRemovePattern  -- Case (PatternKw)
                 _           -> panic "diagnosticHints: unexpected BadImportAvailTyCon"
 
         BadImportAvailDataCon par  ->
@@ -3328,8 +3342,10 @@ instance Diagnostic TcRnMessage where
                           , ies_suggest_data_keyword    = ile_explicit_namespaces exts
                           , ies_parent = par } ]
         BadImportNotExportedSubordinates{} -> noHints
-        BadImportNonTypeSubordinates{} -> noHints
-        BadImportNonDataSubordinates{} -> noHints
+        BadImportNonTypeSubordinates _ nontype1 ->
+          could_change_item (ImportItemRemoveSubordinateType (nameOccName . greName <$> nontype1))
+        BadImportNonDataSubordinates _ nondata1 ->
+          could_change_item (ImportItemRemoveSubordinateData (nameOccName . greName <$> nondata1))
     TcRnImportLookup{}
       -> noHints
     TcRnUnusedImport{}
