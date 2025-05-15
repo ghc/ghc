@@ -4043,9 +4043,13 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
                  Nothing -> empty
                  Just o -> other_context o
              , case mb_not_conc of
-                Nothing -> empty
-                Just (conc_tv, not_conc) ->
-                  unsolved_concrete_eq_explanation conc_tv not_conc ]
+                Just (conc_tv, not_conc)
+                  | conc_tv `elemVarSet` tyCoVarsOfType ty
+                  -- Only show this message if 'conc_tv' appears somewhere
+                  -- in the type, otherwise it's not helpful.
+                  -> unsolved_concrete_eq_explanation conc_tv not_conc
+                _ -> empty
+            ]
 
     -- Don't print out the type (only the kind), if the type includes
     -- a confusing cast, unless the user passed -fprint-explicit-coercions.
