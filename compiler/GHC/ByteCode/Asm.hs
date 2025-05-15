@@ -281,6 +281,7 @@ assembleBCO platform
 
   return ul_bco
 
+-- | Construct a word-array containing an @StgLargeBitmap@.
 mkBitmapArray :: Word -> [StgWord] -> UArray Int Word
 -- Here the return type must be an array of Words, not StgWords,
 -- because the underlying ByteArray# will end up as a component

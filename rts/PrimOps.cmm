@@ -2440,6 +2440,7 @@ stg_newBCOzh ( P_ instrs,
                W_ arity,
                P_ bitmap_arr )
 {
+    // N.B. bitmap_arr contains a full StgLargeBitmap object.
     W_ bco, bytes, words;
 
     words = BYTES_TO_WDS(SIZEOF_StgBCO) + BYTE_ARR_WDS(bitmap_arr);

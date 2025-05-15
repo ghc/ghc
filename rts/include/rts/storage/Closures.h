@@ -427,7 +427,7 @@ typedef struct {
     StgArrBytes   *literals; // literals used by the instructions
     StgMutArrPtrs *ptrs; // free variables
     StgHalfWord   arity; // arity of this BCO
-    StgHalfWord   size;  // size of the bitmap
+    StgHalfWord   size;  // size of the closure and bitmap
     StgWord       bitmap[]; // an StgLargeBitmap
 } StgBCO;
 
