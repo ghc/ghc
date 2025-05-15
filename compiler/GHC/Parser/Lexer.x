@@ -1637,6 +1637,7 @@ ghcCppSet = do
 ifExtensionGhcCppNotComment :: AlexAccPred ExtsBitmap
 ifExtensionGhcCppNotComment bits _ _ _
   = GhcCppBit `xtest` bits && not (InNestedCommentBit `xtest` bits)
+                           && not (InRulePragBit `xtest` bits)
 
 -- See Note [Nested comment line pragmas]
 parseNestedPragma :: AlexInput -> P p (String,AlexInput)
