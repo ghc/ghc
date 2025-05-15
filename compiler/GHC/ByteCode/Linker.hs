@@ -65,11 +65,13 @@ linkBCO interp pkgs_loaded le bco_ix
   (lits :: [Word]) <- mapM (fmap fromIntegral . lookupLiteral interp pkgs_loaded le) (elemsFlatBag lits0)
   ptrs <- mapM (resolvePtr interp pkgs_loaded le bco_ix) (elemsFlatBag ptrs0)
   let lits' = listArray (0 :: Int, fromIntegral (sizeFlatBag lits0)-1) lits
-  return (ResolvedBCO isLittleEndian arity
-              insns
-              bitmap
-              (mkBCOByteArray lits')
-              (addListToSS emptySS ptrs))
+  return $ ResolvedBCO { resolvedBCOIsLE   = isLittleEndian
+                       , resolvedBCOArity  = arity
+                       , resolvedBCOInstrs = insns
+                       , resolvedBCOBitmap = bitmap
+                       , resolvedBCOLits   = mkBCOByteArray lits'
+                       , resolvedBCOPtrs   = addListToSS emptySS ptrs
+                       }
 
 lookupLiteral :: Interp -> PkgsLoaded -> LinkerEnv -> BCONPtr -> IO Word
 lookupLiteral interp pkgs_loaded le ptr = case ptr of

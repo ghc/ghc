@@ -266,7 +266,13 @@ assembleBCO platform
 
   let !insns_arr =  mkBCOByteArray $ final_isn_array
       !bitmap_arr = mkBCOByteArray $ mkBitmapArray bsize bitmap
-      ul_bco = UnlinkedBCO nm arity insns_arr bitmap_arr (fromSmallArray final_lit_array) (fromSmallArray final_ptr_array)
+      ul_bco = UnlinkedBCO { unlinkedBCOName = nm
+                           , unlinkedBCOArity = arity
+                           , unlinkedBCOInstrs = insns_arr
+                           , unlinkedBCOBitmap = bitmap_arr
+                           , unlinkedBCOLits = fromSmallArray final_lit_array
+                           , unlinkedBCOPtrs = fromSmallArray final_ptr_array
+                           }
 
   -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
   -- objects, since they might get run too early.  Disable this until
