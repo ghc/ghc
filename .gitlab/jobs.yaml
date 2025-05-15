@@ -560,7 +560,7 @@
       "STRIP": "C:/msys64/opt/ghc-bootstrap/mingw/bin/aarch64-w64-mingw32-strip",
       "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate-_wine_full_build",
       "TOOLCHAIN_SOURCE": "env",
-      "WindresCmd": "C:/msys64/opt/ghc-bootstrap/mingw/bin/aarch64-w64-mingw32-windres"
+      "WindresCmd": "C:/msys64/opt/ghc-bootstrap/mingw/bin/aarch64-w64-mingw32-windres.exe"
     }
   },
   "i386-linux-alpine3_20-validate": {
@@ -1317,7 +1317,7 @@
       "STRIP": "C:/msys64/opt/ghc-bootstrap/mingw/bin/aarch64-w64-mingw32-strip",
       "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate-_wine_full_build",
       "TOOLCHAIN_SOURCE": "env",
-      "WindresCmd": "C:/msys64/opt/ghc-bootstrap/mingw/bin/aarch64-w64-mingw32-windres",
+      "WindresCmd": "C:/msys64/opt/ghc-bootstrap/mingw/bin/aarch64-w64-mingw32-windres.exe",
       "XZ_OPT": "-9"
     }
   },

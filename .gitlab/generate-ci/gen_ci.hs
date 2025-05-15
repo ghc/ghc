@@ -1338,7 +1338,7 @@ cross_jobs = [
       . setVariable "SIZE" (llvm_prefix ++ "size")
       . setVariable "STRINGS" (llvm_prefix ++ "strings")
       . setVariable "STRIP" (llvm_prefix ++ "strip")
-      . setVariable "WindresCmd" (llvm_prefix ++ "windres")
+      . setVariable "WindresCmd" (llvm_prefix ++ "windres" ++ exe_suffix)
       . setVariable "LLVMAS" (llvm_prefix ++ "clang")
       . setVariable "LD" (llvm_prefix ++ "ld")
         -- See Note [Empty MergeObjsCmd]
