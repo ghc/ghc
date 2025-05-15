@@ -1577,7 +1577,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
                   , occ_in_lam  = NotInsideLam
                   , occ_int_cxt = int_cxt }
       =  isNotTopLevel top_lvl      -- Get rid of allocation
-      || (int_cxt==IsInteresting)   -- Function is applied
+      || (int_cxt==IsInteresting && idArity bndr > 0)   -- Function is applied
    --   || (early_phase && not (isConLikeUnfolding unf))  -- See early_phase
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = IsInsideLam
@@ -1745,6 +1745,7 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
     unfolding   = idUnfolding bndr
 --    arity       = idArity bndr
     is_cheap    = isCheapUnfolding unfolding
+    is_exp      = isExpandableUnfolding unfolding
     uf_opts     = seUnfoldingOpts env
     phase       = sePhase env
     active      = isActive phase (idInlineActivation bndr)
@@ -1752,6 +1753,8 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
 
     -- Check for code-size blow-up from inlining in multiple places
     code_dup_ok n_br
+      | is_top_lvl          -- Don't inline top-level datacons, ever; no advantage,
+      , is_exp      = False -- and float-out may have carefully created them
       | n_br == 1   = True  -- No duplication
       | n_br >= 100 = False -- See #23627
       | is_demanded = False -- Demanded => no allocation (it'll be a case expression

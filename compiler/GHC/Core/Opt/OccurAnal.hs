@@ -1206,7 +1206,7 @@ mkNonRecRhsCtxt lvl bndr unf
         -- Distressing delicacy ... has to line up with preInlineUnconditionally
         case idOccInfo bndr of
           OneOcc { occ_in_lam = NotInsideLam, occ_n_br = 1 }
-            -> active && not (isTopLevel lvl) && not stable_unf
+            -> active && not stable_unf
           _ -> False
 
     active     = isAlwaysActive (idInlineActivation bndr)
