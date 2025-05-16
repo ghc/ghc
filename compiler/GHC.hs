@@ -625,7 +625,9 @@ setUnitDynFlagsNoCheck uid dflags1 = do
 
   let old_hue = ue_findHomeUnitEnv uid (hsc_unit_env hsc_env)
   let cached_unit_dbs = homeUnitEnv_unit_dbs old_hue
-  (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 cached_unit_dbs (hsc_all_home_unit_ids hsc_env)
+      !all_ids = hsc_all_home_unit_ids hsc_env
+      !all_ids' = seq (ppr all_ids) all_ids
+  (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 cached_unit_dbs all_ids'
   updated_dflags <- liftIO $ updatePlatformConstants dflags1 mconstants
 
   let upd hue =
