@@ -151,7 +151,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                 && logHasDumpFlag logger Opt_D_dump_simpl_stats) $
           logDumpMsg logger
                   "Simplifier statistics for following pass"
-                  (vcat [text termination_msg <+> text "after" <+> ppr it_count
+                  (vcat [text termination_msg <+> text "after" <+> ppr (it_count-1)
                                               <+> text "iterations",
                          blankLine,
                          pprSimplCount counts_out])
@@ -235,7 +235,8 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                 ; read_rule_env = updExternalPackageRules base_rule_env <$> read_eps_rules
 
                 ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
-                ; simpl_env = mkSimplEnv mode fam_envs } ;
+                ; iter_mode = mode { sm_first_iter = iteration_no ==1 }
+                ; simpl_env = mkSimplEnv iter_mode fam_envs } ;
 
                 -- Simplify the program
            ((binds1, rules1), counts1) <-

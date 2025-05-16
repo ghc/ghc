@@ -60,6 +60,7 @@ initSimplMode :: DynFlags -> CompilerPhase -> String -> SimplMode
 initSimplMode dflags phase name = SimplMode
   { sm_names = [name]
   , sm_phase = SimplPhase phase
+  , sm_first_iter = True
   , sm_rules = gopt Opt_EnableRewriteRules dflags
   , sm_eta_expand = gopt Opt_DoLambdaEtaExpansion dflags
   , sm_cast_swizzle = True
