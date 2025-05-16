@@ -1,11 +1,11 @@
 {-# OPTIONS_GHC -Wincomplete-patterns -fforce-recomp #-}
 {-# LANGUAGE OverloadedLists #-}
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 
 module T11822 where
 
-import Data.Sequence (Seq, pattern (:<|))
+import Data.Sequence (Seq, data (:<|))
 import Data.Set (Set)
 
 newtype SiblingDependencies = SiblingDependencies Int

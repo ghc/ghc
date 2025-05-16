@@ -1,9 +1,9 @@
-{-# LANGUAGE TupleSections, PatternSynonyms #-}
+{-# LANGUAGE TupleSections, ExplicitNamespaces #-}
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Core.Type
-import GHC.Core.Multiplicity ( pattern ManyTy )
+import GHC.Core.Multiplicity ( data ManyTy )
 import GHC.Core.Make
 import GHC.Core.Opt.CallArity (callArityRHS)
 import GHC.Types.Id.Make

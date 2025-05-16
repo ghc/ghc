@@ -1,6 +1,6 @@
-
-T14794a.hs:8:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
+T14794a.hs:9:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
     Top-level binding with no type signature: testExported :: Bool
 
-T14794a.hs:10:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
+T14794a.hs:11:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
     Top-level binding with no type signature: testUnexported :: Bool
+

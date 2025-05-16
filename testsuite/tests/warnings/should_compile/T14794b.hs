@@ -1,7 +1,8 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 {-# OPTIONS_GHC -Wmissing-exported-signatures #-}
 
-module T14794b (testExported, pattern TestExported) where
+module T14794b (testExported, data TestExported) where
 
 -- These should generate warnings:
 

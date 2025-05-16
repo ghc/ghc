@@ -1,5 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
-module Boolean (Boolean, pattern F, pattern T) where
+{-# LANGUAGE ExplicitNamespaces #-}
+module Boolean (Boolean, data F, data T) where
 
 newtype Boolean = Boolean Int
 

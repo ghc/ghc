@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
-module ShouldCompile (pattern Single) where
+{-# LANGUAGE ExplicitNamespaces #-}
+module ShouldCompile (data Single) where
 
 pattern Single x <- [x]

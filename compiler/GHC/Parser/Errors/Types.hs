@@ -510,6 +510,11 @@ data PsMessage
    -- This constructor is deprecated and will be removed in GHC 9.18.
    | PsWarnSpecMultipleTypeAscription
 
+   -- | The deprecated ``pattern`` namespace specifier was used in an import or
+   -- export list. Suggested fix: use the ``data`` keyword instead.
+   | PsWarnPatternNamespaceSpecifier
+      !Bool -- ^ Is ExplicitNamespaces on?
+
    deriving Generic
 
 -- | Extra details about a parse error, which helps

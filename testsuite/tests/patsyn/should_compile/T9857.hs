@@ -1,5 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -21,17 +22,17 @@ module T9857
   , isZero
   , fromHalf
   , toHalf
-  , pattern POS_INF
-  , pattern NEG_INF
-  , pattern QNaN
-  , pattern SNaN
-  , pattern HALF_MIN
-  , pattern HALF_NRM_MIN
-  , pattern HALF_MAX
-  , pattern HALF_EPSILON
-  , pattern HALF_DIG
-  , pattern HALF_MIN_10_EXP
-  , pattern HALF_MAX_10_EXP
+  , data POS_INF
+  , data NEG_INF
+  , data QNaN
+  , data SNaN
+  , data HALF_MIN
+  , data HALF_NRM_MIN
+  , data HALF_MAX
+  , data HALF_EPSILON
+  , data HALF_DIG
+  , data HALF_MIN_10_EXP
+  , data HALF_MAX_10_EXP
   ) where
 
 import Data.Bits

@@ -16,6 +16,7 @@ other dynamic, non-language, flag settings:
   -fprefer-byte-code
   -fbreak-points
 warning settings:
+  -Wpattern-namespace-specifier
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
 base language is: GHC2021

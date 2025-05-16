@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -37,9 +37,9 @@ module GHC.Internal.Type.Reflection
       -- * Type representations
       -- ** Type-Indexed
     , I.TypeRep
-    , pattern I.TypeRep
+    , data I.TypeRep
     , I.typeOf
-    , pattern I.App, pattern I.Con, pattern I.Con', pattern I.Fun
+    , data I.App, data I.Con, data I.Con', data I.Fun
     , I.typeRepTyCon
     , I.rnfTypeRep
     , I.eqTypeRep

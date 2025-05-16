@@ -291,6 +291,8 @@ instance Outputable GhcHint where
       -> text "Parenthesize the RHS of the view pattern"
     SuggestSplittingIntoSeveralSpecialisePragmas
       -> text "Split the SPECIALISE pragma into multiple pragmas, one for each type signature"
+    SuggestDataKeyword
+      -> text "Use the" <+> quotes (text "data") <+> "keyword instead."
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

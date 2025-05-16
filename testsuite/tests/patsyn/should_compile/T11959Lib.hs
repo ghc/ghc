@@ -1,6 +1,6 @@
-{-# LANGUAGE PatternSynonyms, ViewPatterns #-}
+{-# LANGUAGE PatternSynonyms, ExplicitNamespaces, ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-x-partial #-}
-module T11959Lib (Vec2(Nil,(:>)), pattern (:>)) where
+module T11959Lib (Vec2(Nil,(:>)), data (:>)) where
 
 newtype Vec2 a = Vec2 {unvec2 :: [a]}
 

@@ -1,9 +1,9 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 
 module TypeRepCon1 where
 
 import Type.Reflection
-  ( TypeRep, pattern Con )
+  ( TypeRep, data Con )
 
 -- Simple test of the 'NotApplication' custom type error
 -- in Data.Typeable.Internal.
