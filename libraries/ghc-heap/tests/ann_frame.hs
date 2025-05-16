@@ -20,17 +20,36 @@ annotateStack ann =
   annotateStack# (StackAnnotation ann)
 
 hello :: Int -> Int -> Int
-hello x y = annotateStack (x,y) $ unsafePerformIO $ do
-  stack <- GHC.Stack.CloneStack.cloneMyStack
-  decoded <- GHC.Exts.Stack.Decode.decodeStack stack
-  print [ show x
-        | Closures.AnnFrame _ (Box ann) <- Closures.ssc_stack decoded
-        , StackAnnotation x <- pure $ unsafeCoerce ann
-        ]
-  return $ x + y + 42
+hello x y = annotateStack (x,y) $
+  decodeAndPrintAnnotationFrames $
+    x + y + 42
 {-# OPAQUE hello #-}
 
+{-# NOINLINE decodeAndPrintAnnotationFrames #-}
+decodeAndPrintAnnotationFrames :: a -> a
+decodeAndPrintAnnotationFrames a = unsafePerformIO $ do
+  stack <- GHC.Stack.CloneStack.cloneMyStack
+  decoded <- GHC.Exts.Stack.Decode.decodeStack stack
+  print [ show a
+        | Closures.AnnFrame _ (Box ann) <- Closures.ssc_stack decoded
+        , StackAnnotation a <- pure $ unsafeCoerce ann
+        ]
+  pure a
+
 main :: IO ()
-main =
+main = do
   print $ hello 2 3
+  print $ tailCallEx 4 5
+
+{-# INLINE tailCallEx #-}
+tailCallEx :: Int -> Int -> Int
+tailCallEx a b = annotateStack "tailCallEx" $ foo a b
+
+{-# INLINE foo #-}
+foo :: Int -> Int -> Int
+foo a b = annotateStack "foo" $ bar $ a * b
+
+bar c = annotateStack "bar" $
+  decodeAndPrintAnnotationFrames $
+    c + c
 
