@@ -57,7 +57,7 @@ module GHC.Internal.TypeLits
   , SChar (UnsafeSChar)
       -- We export a pattern synonym instead of the real constructor:
       -- See Note [Preventing unsafe coercions for singleton types].
-  , pattern N.SNat, pattern SSymbol, pattern SChar
+  , data N.SNat, data SSymbol, data SChar
   , fromSNat, fromSSymbol, fromSChar
   , withSomeSNat, withSomeSSymbol, withSomeSChar
   , N.withKnownNat, withKnownSymbol, withKnownChar

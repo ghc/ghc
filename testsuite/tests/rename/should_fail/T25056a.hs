@@ -1,8 +1,9 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 module T25056a
   ( T
   , T_(unT)
-  , pattern T
+  , data T
   ) where
 
 type T = T_ ()

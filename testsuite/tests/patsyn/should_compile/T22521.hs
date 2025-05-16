@@ -1,6 +1,7 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE ViewPatterns #-}
-module Bug (pattern P) where
+module Bug (data P) where
 
 pattern P :: C a => a
 pattern P <- (m -> True)

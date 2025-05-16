@@ -511,6 +511,9 @@ data GhcHint
   -}
   | SuggestSplittingIntoSeveralSpecialisePragmas
 
+  {-| Suggest using the `data` keyword -}
+  | SuggestDataKeyword
+
 -- | The deriving strategy that was assumed when not explicitly listed in the
 --   source. This is used solely by the missing-deriving-strategies warning.
 --   There's no `Via` case because we never assume that.

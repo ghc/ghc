@@ -137,6 +137,7 @@ werror =
         ? notStage0
         ? mconcat
           [ arg "-Werror"
+          , arg "-Wno-error=pattern-namespace-specifier"   -- not until the boot compiler is >=9.14
             -- unix has many unused imports
           , package unix
               ? mconcat [arg "-Wwarn=unused-imports", arg "-Wwarn=unused-top-binds"]

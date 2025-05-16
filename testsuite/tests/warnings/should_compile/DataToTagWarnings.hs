@@ -1,11 +1,11 @@
-{-# LANGUAGE MagicHash, PatternSynonyms #-}
+{-# LANGUAGE MagicHash, ExplicitNamespaces #-}
 module DataToTagWarnings (X(X2, X3), f, g) where
 
 import GHC.Exts (dataToTag#, (+#), Int#)
 
 -- The constructor imports should not produce unused-imports warnings.
 -- They are required by dataToTag# in f.
-import qualified GHC.Int (pattern I#)
+import qualified GHC.Int (data I#)
 import Prelude (Int, Maybe(Nothing, Just))
 
 f :: (Int, Maybe t) -> Int#

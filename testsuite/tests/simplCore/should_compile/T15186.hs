@@ -2,7 +2,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE PatternSynonyms #-}
-module Bar (pattern PointerExpr) where
+{-# LANGUAGE ExplicitNamespaces #-}
+module Bar (data PointerExpr) where
 
 import Data.Kind (Type)
 import T15186A

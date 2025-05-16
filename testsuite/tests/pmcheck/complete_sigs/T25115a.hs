@@ -1,6 +1,7 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 
-module T25115a ( pattern Foo, ABC ) where
+module T25115a ( data Foo, ABC ) where
 
 pattern Foo :: a
 pattern Foo <- _unused

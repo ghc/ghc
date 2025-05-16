@@ -58,8 +58,8 @@ module GHC.Internal.Data.Typeable.Internal (
 
     -- * TypeRep
     TypeRep,
-    pattern TypeRep,
-    pattern App, pattern Con, pattern Con', pattern Fun,
+    data TypeRep,
+    data App, data Con, data Con', data Fun,
     typeRep,
     typeOf,
     typeRepTyCon,

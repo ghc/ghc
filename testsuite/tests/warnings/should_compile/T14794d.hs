@@ -1,7 +1,8 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 {-# OPTIONS_GHC -Wmissing-pattern-synonym-signatures #-}
 
-module T14794d (testExported, pattern TestExported) where
+module T14794d (testExported, data TestExported) where
 
 -- These should generate warnings:
 

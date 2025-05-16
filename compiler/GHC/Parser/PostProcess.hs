@@ -83,6 +83,7 @@ module GHC.Parser.PostProcess (
         mkDataImpExp,
         mkImpExpSubSpec,
         checkImportSpec,
+        warnPatternNamespaceSpecifier,
 
         -- Token symbols
         starSym,
@@ -3371,6 +3372,11 @@ requireExplicitNamespaces l = do
   allowed <- getBit ExplicitNamespacesBit
   unless allowed $
     addError $ mkPlainErrorMsgEnvelope l PsErrIllegalExplicitNamespace
+
+warnPatternNamespaceSpecifier :: MonadP m => SrcSpan -> m ()
+warnPatternNamespaceSpecifier l = do
+  explicit_namespaces <- getBit ExplicitNamespacesBit
+  addPsMessage l (PsWarnPatternNamespaceSpecifier explicit_namespaces)
 
 -----------------------------------------------------------------------------
 -- Misc utils

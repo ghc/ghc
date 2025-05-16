@@ -1,4 +1,4 @@
-
-T14794e.hs:8:1: warning: [GHC-38417] [-Wmissing-exported-pattern-synonym-signatures]
+T14794e.hs:9:1: warning: [GHC-38417] [-Wmissing-exported-pattern-synonym-signatures]
     Pattern synonym with no type signature:
       pattern TestExported :: Bool
+

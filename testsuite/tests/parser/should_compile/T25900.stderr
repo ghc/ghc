@@ -1,0 +1,16 @@
+T25900.hs:4:17: warning: [GHC-68383] [-Wpattern-namespace-specifier (in -Wcompat)]
+    The ‘pattern’ namespace specifier is deprecated.
+    Suggested fix: Use the ‘data’ keyword instead.
+
+T25900.hs:5:17: warning: [GHC-68383] [-Wpattern-namespace-specifier (in -Wcompat)]
+    The ‘pattern’ namespace specifier is deprecated.
+    Suggested fix: Use the ‘data’ keyword instead.
+
+T25900.hs:6:17: warning: [GHC-68383] [-Wpattern-namespace-specifier (in -Wcompat)]
+    The ‘pattern’ namespace specifier is deprecated.
+    Suggested fix: Use the ‘data’ keyword instead.
+
+T25900.hs:9:28: warning: [GHC-68383] [-Wpattern-namespace-specifier (in -Wcompat)]
+    The ‘pattern’ namespace specifier is deprecated.
+    Suggested fix: Use the ‘data’ keyword instead.
+

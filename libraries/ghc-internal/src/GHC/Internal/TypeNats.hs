@@ -40,7 +40,7 @@ module GHC.Internal.TypeNats
   , SNat (UnsafeSNat)
       -- We export a pattern synonym instead of the real constructor:
       -- See Note [Preventing unsafe coercions for singleton types].
-  , pattern SNat
+  , data SNat
   , fromSNat
   , withSomeSNat
   , withKnownNat
