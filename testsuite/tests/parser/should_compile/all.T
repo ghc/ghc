@@ -206,3 +206,4 @@ test('T22155', normal, compile, ['-dsuppress-uniques -ddump-simpl -dsuppress-all
 test('T25132', normal, compile, [''])
 test('T25258', normal, compile, [''])
 test('T17045b', extra_files(["T17045"]), multimod_compile, ['-iT17045 Test', '-v0'])
+test('T25900', normal, compile, [''])

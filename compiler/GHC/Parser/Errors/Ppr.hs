@@ -569,6 +569,10 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
            text "SPECIALISE pragmas with multiple type ascriptions are deprecated, and will be removed in GHC 9.18"
 
+    PsWarnPatternNamespaceSpecifier
+      -> mkSimpleDecorated $
+          text "The" <+> quotes (text "pattern") <+> "namespace specifier is deprecated."
+
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
@@ -690,6 +694,7 @@ instance Diagnostic PsMessage where
     PsErrTypeSyntaxInPat{}                        -> ErrorWithoutFlag
     PsErrSpecExprMultipleTypeAscription{}         -> ErrorWithoutFlag
     PsWarnSpecMultipleTypeAscription{}            -> WarningWithFlag Opt_WarnDeprecatedPragmas
+    PsWarnPatternNamespaceSpecifier{}             -> WarningWithFlag Opt_WarnPatternNamespaceSpecifier
 
   diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -862,6 +867,7 @@ instance Diagnostic PsMessage where
     PsErrTypeSyntaxInPat{}                        -> noHints
     PsErrSpecExprMultipleTypeAscription {}        -> [SuggestSplittingIntoSeveralSpecialisePragmas]
     PsWarnSpecMultipleTypeAscription{}            -> [SuggestSplittingIntoSeveralSpecialisePragmas]
+    PsWarnPatternNamespaceSpecifier{}             -> [SuggestDataKeyword]
 
   diagnosticCode = constructorCode @GHC
 

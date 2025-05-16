@@ -1103,6 +1103,7 @@ data WarningFlag =
        --
        -- See Note [Quantifying over equalities in RULES] in GHC.Tc.Gen.Sig
    | Opt_WarnUnusableUnpackPragmas                   -- Since 9.14
+   | Opt_WarnPatternNamespaceSpecifier               -- Since 9.14
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1223,6 +1224,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnDeprecatedPragmas                       -> "deprecated-pragmas" :| []
   Opt_WarnRuleLhsEqualities                       -> "rule-lhs-equalities" :| []
   Opt_WarnUnusableUnpackPragmas                   -> "unusable-unpack-pragmas" :| []
+  Opt_WarnPatternNamespaceSpecifier               -> "pattern-namespace-specifier" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -1420,7 +1422,8 @@ minusWeverythingOpts = [ toEnum 0 .. ]
 -- code future compatible to fix issues before they even generate warnings.
 minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
-    = []
+    = [ Opt_WarnPatternNamespaceSpecifier
+      ]
 
 -- | Things you get with @-Wunused-binds@.
 unusedBindsFlags :: [WarningFlag]

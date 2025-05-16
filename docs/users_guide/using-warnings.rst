@@ -166,7 +166,12 @@ as ``-Wno-...`` for every individual warning in the group.
     eager to make their code future compatible to adapt to new features before
     they even generate warnings.
 
-    This warning group does not currently include any warnings.
+    This currently enables:
+
+    .. hlist::
+        :columns: 3
+
+        * :ghc-flag:`-Wpattern-namespace-specifier`
 
 .. ghc-flag:: -w
     :shortdesc: disable all warnings
@@ -2688,6 +2693,24 @@ of ``-W(no-)*``.
 
       * the failure occurs in an indefinite package in Backpack
       * the pragma is usable, but unpacking is disabled by :ghc-flag:`-O0`
+
+.. ghc-flag:: -Wpattern-namespace-specifier
+    :shortdesc: warn on uses of the ``pattern`` namespace specifier
+    :type: dynamic
+    :reverse: -Wno-pattern-namespace-specifier
+
+    :since: 9.14.1
+    :default: off
+
+    Warn when the deprecated ``pattern`` namespace specifier is used in
+    import/export lists, e.g. ::
+
+        import Data.List.NonEmpty (pattern (:|))
+
+    To silence the warning, use the ``data`` keyword instead:
+    ::
+
+        import Data.List.NonEmpty (data (:|))
 
 ----
 
