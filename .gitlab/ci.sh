@@ -349,47 +349,45 @@ function fetch_ghc() {
 }
 
 function fetch_cabal() {
-  if [ ! -e "$CABAL" ]; then
-      local v="$CABAL_INSTALL_VERSION"
-      if [[ -z "$v" ]]; then
-          fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
-      fi
-
-      start_section "fetch cabal"
-      case "$(uname)" in
-        # N.B. Windows uses zip whereas all others use .tar.xz
-        MSYS_*|MINGW*)
-          case "$MSYSTEM" in
-            CLANG64) cabal_arch="x86_64" ;;
-            *) fail "unknown MSYSTEM $MSYSTEM" ;;
-          esac
-          url="https://downloads.haskell.org/~cabal/cabal-install-$v/cabal-install-$v-$cabal_arch-windows.zip"
-          info "Fetching cabal binary distribution from $url..."
-          curl "$url" > "$TMP/cabal.zip"
-          unzip "$TMP/cabal.zip"
-          mv cabal.exe "$CABAL"
-          ;;
-        *)
-          local base_url="https://downloads.haskell.org/~cabal/cabal-install-$v/"
-          case "$(uname)" in
-            Darwin) cabal_url="$base_url/cabal-install-$v-x86_64-apple-darwin17.7.0.tar.xz" ;;
-            FreeBSD) cabal_url="$base_url/cabal-install-$v-x86_64-freebsd14.tar.xz" ;;
-            *) fail "don't know where to fetch cabal-install for $(uname)"
-          esac
-          echo "Fetching cabal-install from $cabal_url"
-          curl "$cabal_url" > cabal.tar.xz
-          tmp="$(tar -tJf cabal.tar.xz | head -n1)"
-          $TAR -xJf cabal.tar.xz
-          # Check if the bindist has directory structure
-          if [[ "$tmp" = "cabal" ]]; then
-              mv cabal "$toolchain/bin"
-          else
-              mv "$tmp/cabal" "$toolchain/bin"
-          fi
-          ;;
-      esac
-      end_section "fetch cabal"
+  local v="$CABAL_INSTALL_VERSION"
+  if [[ -z "$v" ]]; then
+      fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
   fi
+
+  start_section "fetch cabal"
+  case "$(uname)" in
+    # N.B. Windows uses zip whereas all others use .tar.xz
+    MSYS_*|MINGW*)
+      case "$MSYSTEM" in
+        CLANG64) cabal_arch="x86_64" ;;
+        *) fail "unknown MSYSTEM $MSYSTEM" ;;
+      esac
+      url="https://downloads.haskell.org/~cabal/cabal-install-$v/cabal-install-$v-$cabal_arch-windows.zip"
+      info "Fetching cabal binary distribution from $url..."
+      curl "$url" > "$TMP/cabal.zip"
+      unzip "$TMP/cabal.zip"
+      mv cabal.exe "$CABAL"
+      ;;
+    *)
+      local base_url="https://downloads.haskell.org/~cabal/cabal-install-$v/"
+      case "$(uname)" in
+        Darwin) cabal_url="$base_url/cabal-install-$v-x86_64-apple-darwin17.7.0.tar.xz" ;;
+        FreeBSD) cabal_url="$base_url/cabal-install-$v-x86_64-freebsd14.tar.xz" ;;
+        *) fail "don't know where to fetch cabal-install for $(uname)"
+      esac
+      echo "Fetching cabal-install from $cabal_url"
+      curl "$cabal_url" > cabal.tar.xz
+      tmp="$(tar -tJf cabal.tar.xz | head -n1)"
+      $TAR -xJf cabal.tar.xz
+      # Check if the bindist has directory structure
+      if [[ "$tmp" = "cabal" ]]; then
+          mv cabal "$toolchain/bin"
+      else
+          mv "$tmp/cabal" "$toolchain/bin"
+      fi
+      ;;
+  esac
+  end_section "fetch cabal"
 }
 
 # For non-Docker platforms we prepare the bootstrap toolchain
@@ -397,10 +395,13 @@ function fetch_cabal() {
 # build.
 function setup_toolchain() {
   if [ ! -e "$GHC" ]; then
-  fetch_ghc
+    fetch_ghc
   fi
 
-  fetch_cabal
+  if [ ! -e "$CABAL" ]; then
+    fetch_cabal
+  fi
+
   cabal_update
 
   local cabal_install="$CABAL v2-install \
@@ -723,11 +724,14 @@ function test_hadrian() {
     echo 'main = putStrLn "hello world"' > expected
     run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -v -o hello
 
+    # If build is targeted to Windows/MinGW we should use .exe suffix to test cross compiler output
+    local cross_target_exe=""
     if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
-      ${CROSS_EMULATOR:-} ./hello.exe > actual
-    else
-      ${CROSS_EMULATOR:-} ./hello > actual
+      cross_target_exe=".exe"
     fi
+    readonly cross_target_exe
+
+    ${CROSS_EMULATOR:-} ./hello${cross_target_exe} > actual
 
     # We have to use `-w` to make the test more stable across supported
     # platforms, i.e. Windows:
