@@ -1,32 +1,32 @@
 
-T17139.hs:15:16: error: [GHC-88464]
+T17139.hs:16:16: error: [GHC-88464]
     • Found hole: _ :: (a -> b0) -> (a -> a) -> TypeFam ((->) a) b0
       Where: ‘b0’ is an ambiguous type variable
              ‘a’ is a rigid type variable bound by
                the type signature for:
                  lift :: forall a b (f :: * -> *). (a -> b) -> TypeFam f (a -> b)
-               at T17139.hs:14:1-38
+               at T17139.hs:15:1-38
     • In the expression: _ (f <*> x)
       The lambda expression ‘\ x -> ...’ has one visible argument,
         but its type ‘TypeFam f (a -> b)’ has none
       In the expression: \ x -> _ (f <*> x)
     • Relevant bindings include
-        x :: a -> a (bound at T17139.hs:15:11)
-        f :: a -> b (bound at T17139.hs:15:6)
-        lift :: (a -> b) -> TypeFam f (a -> b) (bound at T17139.hs:15:1)
+        x :: a -> a (bound at T17139.hs:16:11)
+        f :: a -> b (bound at T17139.hs:16:6)
+        lift :: (a -> b) -> TypeFam f (a -> b) (bound at T17139.hs:16:1)
 
-T17139.hs:15:19: error: [GHC-25897]
+T17139.hs:16:19: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘a -> b0’
       Expected: a -> a -> b0
         Actual: a -> b
       ‘b’ is a rigid type variable bound by
         the type signature for:
           lift :: forall a b (f :: * -> *). (a -> b) -> TypeFam f (a -> b)
-        at T17139.hs:14:1-38
+        at T17139.hs:15:1-38
     • In the first argument of ‘(<*>)’, namely ‘f’
       In the first argument of ‘_’, namely ‘(f <*> x)’
       In the expression: _ (f <*> x)
     • Relevant bindings include
-        x :: a -> a (bound at T17139.hs:15:11)
-        f :: a -> b (bound at T17139.hs:15:6)
-        lift :: (a -> b) -> TypeFam f (a -> b) (bound at T17139.hs:15:1)
+        x :: a -> a (bound at T17139.hs:16:11)
+        f :: a -> b (bound at T17139.hs:16:6)
+        lift :: (a -> b) -> TypeFam f (a -> b) (bound at T17139.hs:16:1)

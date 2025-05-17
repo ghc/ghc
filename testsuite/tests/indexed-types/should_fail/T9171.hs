@@ -5,6 +5,6 @@ data Base
 
 type family GetParam (p::k1) (t::k2) :: k3
 
-type instance GetParam Base t = t
+type instance GetParam @_ @k @k Base t = t
 
 foo = undefined :: GetParam Base (GetParam Base Int)

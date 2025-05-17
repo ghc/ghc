@@ -1,6 +1,6 @@
 
-T6018th.hs:98:2: error: [GHC-05175]
+T6018th.hs:102:2: error: [GHC-05175]
     Type family equation right-hand sides overlap; this violates
     the family's injectivity annotation:
-      H Int Int Int = Bool -- Defined at T6018th.hs:98:2
-      H Int Char Bool = Bool -- Defined at T6018th.hs:98:2
+      H Int Int Int = Bool -- Defined at T6018th.hs:102:2
+      H Int Char Bool = Bool -- Defined at T6018th.hs:102:2

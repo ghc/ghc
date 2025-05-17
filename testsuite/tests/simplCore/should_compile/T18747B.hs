@@ -40,7 +40,7 @@ data Foo (a :: Type) where MkFoo :: Foo Bool
 
 data SFoo :: forall a. Foo a -> Type where
   SMkFoo :: SFoo MkFoo
-type instance Sing = SFoo
+type instance Sing @(Foo _) = SFoo
 
 type instance Demote (Foo a) = Foo (DemoteX a)
 type instance Promote (Foo a) = Foo (PromoteX a)

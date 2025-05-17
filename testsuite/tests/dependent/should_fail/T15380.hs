@@ -15,7 +15,7 @@ class PGeneric a where
 
 type MDefault :: a -> a
 type family MDefault x where
-  MDefault x = To (M x)
+  MDefault @Type x = To (M x)
 
 class C a where
   type M (x :: a) :: a

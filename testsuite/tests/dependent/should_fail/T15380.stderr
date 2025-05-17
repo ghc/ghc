@@ -1,6 +1,5 @@
 
-T15380.hs:18:16: error: [GHC-83865]
+T15380.hs:18:22: error: [GHC-83865]
     • Expecting one more argument to ‘To (M x)’
       Expected a type, but ‘To (M x)’ has kind ‘Rep (M x) -> M x’
-    • In the type ‘To (M x)’
       In the type family declaration for ‘MDefault’

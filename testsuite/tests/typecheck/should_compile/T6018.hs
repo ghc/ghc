@@ -9,6 +9,8 @@
 
 module T6018 where
 
+import GHC.TypeLits (Nat)
+
 {-
 barapp2 :: Int
 barapp2 = bar 1
@@ -45,9 +47,9 @@ import Data.Kind (Type)
 import T6018a -- defines G, identical to F
 
 type family F a b c = (result :: k) | result -> a b c
-type instance F Int  Char Bool = Bool
-type instance F Char Bool Int  = Int
-type instance F Bool Int  Char = Char
+type instance F @Type Int  Char Bool = Bool
+type instance F @Type Char Bool Int  = Int
+type instance F @Type Bool Int  Char = Char
 
 
 type instance G Bool Int  Char = Char
@@ -202,10 +204,10 @@ class Kcl a b where
 -- determines the LHS kind but not the type.
 type L :: k1 -> k2
 type family L @k1 a = r | r -> k1 where
-    L 'True  = Int
-    L 'False = Int
-    L Maybe  = 3
-    L IO     = 3
+    L @_ @Type 'True  = Int
+    L @_ @Type 'False = Int
+    L @_ @Nat Maybe   = 3
+    L @_ @Nat IO      = 3
 
 data KProxy (a :: Type) = KProxy
 type family KP (kproxy :: KProxy k) = r | r -> k
@@ -254,17 +256,17 @@ type instance Id a = a
 -- This makes sure that over-saturated type family applications at the top-level
 -- are accepted.
 type family IdProxy (a :: k) b = r | r -> a
-type instance IdProxy a b = (Id a) b
+type instance IdProxy (a :: Type -> Type) b = (Id a) b
 
 -- make sure we look through type synonyms properly
 type IdSyn a = Id a
 type family IdProxySyn (a :: k) b = r | r -> a
-type instance IdProxySyn a b = (IdSyn a) b
+type instance IdProxySyn (a :: Type -> Type) b = (IdSyn a) b
 
 -- this has bare variable in the RHS but all LHS variables are also bare so it
 -- should be accepted
 type family Fa (a :: k) (b :: k) = (r :: k2) | r -> k
-type instance Fa a b = a
+type instance Fa @k @k a b = a
 
 -- Taken from #9587. This exposed a bug in the solver.
 type family Arr (repr :: Type -> Type) (a :: Type) (b :: Type)

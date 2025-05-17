@@ -3,6 +3,7 @@
 
 module Test where
 
+import Data.Kind
 
 data Vector a = Vector a
 data Matrix a = Matrix a
@@ -17,8 +18,8 @@ type family BoundsOf x where
     BoundsOf (a->a)    = Int
 
 type family ContainerOf x where
-    ContainerOf (a->a)    = Vector a
-    ContainerOf (a->a->a) = Matrix a
+    ContainerOf ((a::Type)->a)    = Vector a
+    ContainerOf ((a::Type)->a->a) = Matrix a
 
 
 

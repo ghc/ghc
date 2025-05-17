@@ -1,5 +1,5 @@
 
-T2627b.hs:20:24: error: [GHC-27958]
+T2627b.hs:22:24: error: [GHC-27958]
     • Could not deduce ‘Dual (Dual a0) ~ a0’
         arising from a use of ‘conn’
       from the context: (Dual a ~ b, Dual b ~ a)
@@ -7,17 +7,17 @@ T2627b.hs:20:24: error: [GHC-27958]
                    conn :: forall a b.
                            (Dual a ~ b, Dual b ~ a) =>
                            Comm a -> Comm b -> (Int, Int)
-        at T2627b.hs:19:1-66
+        at T2627b.hs:21:1-66
       or from: a ~ R c d
         bound by a pattern with constructor:
                    Rd :: forall c d. (c -> Comm d) -> Comm (R c d),
                  in an equation for ‘conn’
-        at T2627b.hs:20:7-10
+        at T2627b.hs:22:7-10
       or from: b ~ W e f
         bound by a pattern with constructor:
                    Wr :: forall e f. e -> Comm f -> Comm (W e f),
                  in an equation for ‘conn’
-        at T2627b.hs:20:14-19
+        at T2627b.hs:22:14-19
       The type variable ‘a0’ is ambiguous
     • In the expression: conn undefined undefined
       In an equation for ‘conn’:

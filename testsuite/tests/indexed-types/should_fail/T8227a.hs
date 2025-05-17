@@ -5,5 +5,5 @@ import Data.Kind (Type)
 
 type family V a :: Type
 
-type instance V Double    = Double
-type instance V (a -> b)   = V b
+type instance V Double             = Double
+type instance V (a -> (b :: Type)) = V b

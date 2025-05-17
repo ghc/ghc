@@ -58,10 +58,10 @@ class PolyKindVarsC a where
     type PolyKindVarsF a = (r :: k) | r -> a
 
 instance PolyKindVarsC '[] where
-    type PolyKindVarsF '[] = '[]
+    type PolyKindVarsF @[_] '[] = '[]
 
 type family PolyKindVars (a :: k0) = (r :: k1) | r -> a
-type instance PolyKindVars '[] = '[]
+type instance PolyKindVars @_ @[_] '[] = '[]
 
 -- This should fail because there is no way to determine k from the RHS
 type family Fc (a :: k) (b :: k) = r | r -> k

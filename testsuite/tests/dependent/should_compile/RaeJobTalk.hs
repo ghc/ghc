@@ -65,7 +65,7 @@ data Schema :: forall k. [k] -> Type where
   Nil :: Schema '[]
   (:>>) :: Sing h -> Schema t -> Schema (h ': t)
 infixr 5 :>>
-type instance Sing = Schema
+type instance Sing @[k] = Schema
 
 -- Append singleton lists
 (%:++) :: Schema a -> Schema b -> Schema (a ++ b)
@@ -269,11 +269,11 @@ instance TestEquality TypeRep where
 -- More singletons
 
 -- a TypeRep really is a singleton
-type instance Sing = (TypeRep :: Type -> Type)
+type instance Sing @Type = (TypeRep :: Type -> Type)
 
 data SSymbol :: Symbol -> Type where
   SSym :: KnownSymbol s => SSymbol s
-type instance Sing = SSymbol
+type instance Sing @Symbol = SSymbol
 
 instance TestEquality SSymbol where
   testEquality :: forall s1 s2. SSymbol s1 -> SSymbol s2 -> Maybe (s1 :~: s2)
@@ -307,7 +307,7 @@ type Col = 'Attr
 -- Singleton for columns
 data SColumn :: Column -> Type where
   Col :: Sing s -> TypeRep ty -> SColumn (Col s ty)
-type instance Sing = SColumn
+type instance Sing @Column = SColumn
 
 -- Extract the type of a column
 type family ColType col where

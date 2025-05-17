@@ -5,7 +5,7 @@ module T20356 where
 import GHC.Types
 
 type family Id (a :: k -> Constraint) :: l -> Constraint
-type instance Id f = f
+type instance Id @k @k f = f
 
 type T :: Constraint -> Constraint
 type T = Id Eq

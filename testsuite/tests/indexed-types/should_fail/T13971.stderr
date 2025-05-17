@@ -1,4 +1,4 @@
-T13971.hs:7:3: error: [GHC-41522]
+T13971.hs:9:3: error: [GHC-41522]
     • Illegal argument ‘*’ in:
         ‘type T @{k} @(*) a = ...’
         The arguments to ‘T’ must all be distinct type variables.

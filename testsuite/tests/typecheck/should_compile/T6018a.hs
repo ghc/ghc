@@ -9,4 +9,4 @@ type family G a b c = (result :: Type) | result -> a b c
 type instance G Int  Char Bool = Bool
 type instance G Char Bool Int  = Int
 
-type instance F Bool Int  Char = Char
+type instance F @Type Bool Int  Char = Char

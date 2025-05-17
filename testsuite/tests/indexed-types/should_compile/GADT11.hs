@@ -2,8 +2,10 @@
 
 module ShouldCompile where
 
+import Data.Kind
+
 data Z
-data S a
+data S (a :: Type)
 
 type family Sum n m
 type instance Sum n Z = n

@@ -179,7 +179,7 @@ data Sub where
 
 type ReplaceArg :: k -> Nat -> j -> k
 type family ReplaceArg t pos to where
-  ReplaceArg (t a) 0 to = t to
+  ReplaceArg @_ @j (t (a :: j)) 0 to = t to
   ReplaceArg (t a) pos to = ReplaceArg t (pos - 1) to a
   ReplaceArg t _ _ = t
 
@@ -190,13 +190,13 @@ type family ReplaceArgs t subs where
 
 type ArgAt :: k -> Nat -> j
 type family ArgAt t n where
-  ArgAt (t a) 0 = a
+  ArgAt @_ @j (t (a :: j)) 0 = a
   ArgAt (t a) n = ArgAt t (n - 1)
 
 type Unify :: k -> k -> [Sub]
 type family Unify a b where
-  Unify (p n _ 'PTag) a' = '[ 'Sub n a']
-  Unify (a x) (b y) = Unify x y ++ Unify a b
+  Unify (p (n :: Nat) _ 'PTag) a' = '[ 'Sub n a']
+  Unify (a (x :: k)) (b (y :: k)) = Unify x y ++ Unify a b
   Unify a a = '[]
 
 type family (xs :: [k]) ++ (ys :: [k]) :: [k] where

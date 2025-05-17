@@ -5,9 +5,11 @@
 
 module T12522 where
 
+import Data.Kind (Type)
+
 foo = f (Just 'c')
 
-data D1 x
+data D1 (x :: Type)
 data D2
 
 type family TF x = t | t -> x

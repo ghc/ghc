@@ -24,11 +24,11 @@ type family Apply (f :: a ~> b) (x :: a) :: b
 data Sym4 a
 data Sym3 a
 
-type instance Apply Sym3 _ = Sym4
+type instance Apply (Sym3 :: _ ~> (_ -> Type)) _ = Sym4
 
 newtype SLambda (f :: k1 ~> k2) =
   SLambda { applySing :: forall t. Sing t -> Sing (Apply f t) }
-type instance Sing = SLambda
+type instance Sing @(_ ~> _) = SLambda
 
 und :: a
 und = undefined

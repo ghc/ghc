@@ -37,7 +37,7 @@ pattern Sing <- (singInstance -> SingInstance)
 data SBool :: Bool -> Type where
   SFalse :: SBool False
   STrue  :: SBool True
-type instance Sing = SBool
+type instance Sing @Bool = SBool
 
 f :: SBool b -> ()
 f Sing = ()

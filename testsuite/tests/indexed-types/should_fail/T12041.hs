@@ -9,4 +9,4 @@ class Category (p :: i -> i -> Type) where
 
 data I a b
 instance Category I where
-  type Ob I = (~) Int
+  type Ob @Type I = (~) Int

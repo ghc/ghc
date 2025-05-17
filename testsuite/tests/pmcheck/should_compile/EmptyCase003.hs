@@ -49,7 +49,7 @@ f5 = \case
 -- f6 = \case
 
 data Zero
-data Succ n
+data Succ (n :: Type)
 
 type TenC n = Succ (Succ (Succ (Succ (Succ
              (Succ (Succ (Succ (Succ (Succ n)))))))))

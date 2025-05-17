@@ -1,5 +1,5 @@
 :set -XTypeFamilies -XPolyKinds
 type family Id (a :: k)
-type instance Id a = a
+type instance Id @Data.Kind.Type a = a
 type Foo x = Maybe
 :kind! Id Foo

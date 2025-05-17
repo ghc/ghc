@@ -17,7 +17,7 @@ data SomeSing :: Type -> Type where
 data SList :: forall a. [a] -> Type where
   SNil  :: SList '[]
   SCons :: Sing x -> Sing xs -> SList (x:xs)
-type instance Sing = SList
+type instance Sing @[_] = SList
 
 data Univ = U1 | K1 Type | Sum Univ Univ | Product Univ Univ
 
@@ -26,7 +26,7 @@ data SUniv :: Univ -> Type where
   SK1      :: Sing c           -> SUniv (K1 c)
   SSum     :: Sing a -> Sing b -> SUniv (Sum a b)
   SProduct :: Sing a -> Sing b -> SUniv (Product a b)
-type instance Sing = SUniv
+type instance Sing @Univ = SUniv
 
 data In :: Univ -> Type where
   MkU1      ::                 In U1
@@ -41,7 +41,7 @@ data SIn :: forall u. In u -> Type where
   SL1        :: Sing a           -> SIn (L1 a)
   SR1        ::           Sing b -> SIn (R1 b)
   SMkProduct :: Sing a -> Sing b -> SIn (MkProduct a b)
-type instance Sing = SIn
+type instance Sing @(In _) = SIn
 
 class Generic (a :: Type) where
   type Rep a :: Univ

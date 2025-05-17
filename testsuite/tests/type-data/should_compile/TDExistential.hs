@@ -10,4 +10,4 @@ type data Ex :: Type where
   MkEx :: forall a. a -> Ex
 
 type family UnEx (ex :: Ex) :: k
-type instance UnEx (MkEx x) = x
+type instance UnEx @k (MkEx @k x) = x

@@ -18,7 +18,7 @@ import Data.Kind (Type)
 -- The natural numbers:
 --  o first the phantom types
 
-data Z; data S n
+data Z; data S (n :: Type)
 
 -- o the using the above the singleton type Nat'
 

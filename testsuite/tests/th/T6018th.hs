@@ -3,6 +3,7 @@
 module T6018th where
 
 import Language.Haskell.TH
+import qualified Data.Kind as K
 
 -- Test that injectivity works correct with TH. This test is not as exhaustive
 -- as the original T6018 test.
@@ -19,16 +20,19 @@ $( return
        (Just $ InjectivityAnn (mkName "result")
                              [(mkName "a"), (mkName "b"), (mkName "c") ]))
    , TySynInstD
-       (TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "F")) (ConT (mkName "Int")))
+       (TySynEqn Nothing (AppT (AppT (AppT (AppKindT (ConT (mkName "F"))
+                       (ConT (mkName "K.Type"))) (ConT (mkName "Int")))
                        (ConT (mkName "Char"))) (ConT (mkName "Bool")))
                  (ConT (mkName "Bool")))
 
    , TySynInstD
-       (TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "F")) (ConT (mkName "Char")))
+       (TySynEqn Nothing (AppT (AppT (AppT (AppKindT (ConT (mkName "F"))
+                       (ConT (mkName "K.Type"))) (ConT (mkName "Char")))
                        (ConT (mkName "Bool"))) (ConT (mkName "Int")))
                  (ConT (mkName "Int")))
    , TySynInstD
-       (TySynEqn Nothing (AppT (AppT (AppT (ConT (mkName "F")) (ConT (mkName "Bool")))
+       (TySynEqn Nothing (AppT (AppT (AppT (AppKindT (ConT (mkName "F"))
+                       (ConT (mkName "K.Type"))) (ConT (mkName "Bool")))
                        (ConT (mkName "Int"))) (ConT (mkName "Char")))
                  (ConT (mkName "Char")))
    ] )

@@ -7,8 +7,8 @@ module Numerals where
 
 import Data.Kind
 
-data Z          -- empty data type
-data S a        -- empty data type
+data Z             -- empty data type
+data S (a :: Type) -- empty data type
 
 data SNat n where  -- natural numbers as singleton type
   Zero :: SNat Z

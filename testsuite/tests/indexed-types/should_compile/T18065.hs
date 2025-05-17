@@ -28,16 +28,16 @@ singFun2 f = SLambda (\x -> singFun1 (f x))
 
 newtype SLambda (f :: a ~> b) =
   SLambda { applySing :: forall t. Sing t -> Sing (f `Apply` t) }
-type instance Sing = SLambda
+type instance Sing @(_ ~> _) = SLambda
 
 data SList :: forall a. [a] -> Type where
   SNil  :: SList '[]
   SCons :: Sing x -> Sing xs -> SList (x:xs)
-type instance Sing = SList
+type instance Sing @[a] = SList
 
 data SNonEmpty :: forall a. NonEmpty a -> Type where
   (:%|) :: Sing x -> Sing xs -> SNonEmpty (x:|xs)
-type instance Sing = SNonEmpty
+type instance Sing @(NonEmpty a) = SNonEmpty
 
 type family Id (x :: a) :: a where
   Id x = x

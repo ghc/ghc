@@ -4,6 +4,7 @@
 
 module Bug where
 
+import Data.Kind
 
 -- This nasty example fails with quick-look
 -- (which here is switched on by ($))
@@ -45,11 +46,11 @@ foo = error "urk"
 inj :: Int -> (HNth l, [l])
 inj = error "urk"
 
-data HSingle a
+data HSingle (a :: Type)
 type family HHead l
 type instance HHead (HSingle h) = h
 
-data WaitOps rs
+data WaitOps (rs :: Type)
 type family WaitOpResult op
 type instance WaitOpResult (WaitOps rs) = [rs]
 

@@ -10,7 +10,7 @@ import Data.Kind ( Constraint )
 
 type Id :: ( k -> Constraint ) -> l -> Constraint
 type family   Id a
-type instance Id f = f
+type instance Id @k @k f = f
 
 type T = Id Eq (Eq Bool)
 -- this should remain stuck, instead of

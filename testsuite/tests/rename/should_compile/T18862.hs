@@ -6,7 +6,8 @@ import Prelude (Bool)
 import Data.Kind (Constraint)
 import qualified Data.Type.Equality as E
 
-type family (a :: k) ~ (b :: k) :: result_kind
+type (~) :: forall r k. k -> k -> r
+type family a ~ b
 
-type instance a ~ b = (a E.~ b :: Constraint)
-type instance a ~ b = (a E.== b :: Bool)
+type instance (~) @Constraint a b = a E.~ b
+type instance (~) @Bool a b = a E.== b

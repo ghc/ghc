@@ -455,6 +455,11 @@ Here are some examples of admissible and illegal type instances: ::
     type instance G Int            = (,)     -- WRONG: must be two type parameters
     type instance G Int Char Float = Double  -- WRONG: must be two type parameters
 
+    type family J a :: k
+    type instance J @(Type -> Type) Int = Maybe -- OK!
+    type instance J Int = Bool                  -- WRONG: ‘Type’ doesn't match ‘k’,
+                                                -- ‘k’ must be specified via @Type
+
 .. _type-family-overlap:
 
 Compatibility and apartness of type family equations
@@ -499,11 +504,10 @@ For a polykinded type family, the kinds are checked for apartness just
 like types. For example, the following is accepted: ::
 
     type family J a :: k
-    type instance J Int = Bool
-    type instance J Int = Maybe
+    type instance J @Type Int = Bool
+    type instance J @(Type -> Type) Int = Maybe
 
-These instances are compatible because they differ in their implicit kind
-parameter; the first uses ``Type`` while the second uses ``Type -> Type``.
+These instances are compatible because they differ in their kind parameter.
 
 The definition for "compatible" uses a notion of "apart", whose
 definition in turn relies on type family reduction. This condition of

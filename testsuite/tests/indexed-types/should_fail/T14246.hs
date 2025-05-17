@@ -22,5 +22,5 @@ type family KLN n where
 
 type Reveal :: forall k. forall (n :: k) -> Vect (KLN n) L -> Type
 type family Reveal n l where
-    Reveal (f :: v -> k) (Cons (Label (t :: v)) l) = Reveal (f t) l
+    Reveal (f :: v -> k) (Cons @Type @(KLN (f t)) (Label (t :: v)) l) = Reveal (f t) l
     Reveal (a :: Type) Nil = a
