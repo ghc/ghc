@@ -1,0 +1,16 @@
+/home/user/haskell/ghc3/ghc/issue23515_examples/Example2.hs:10:21: error: [GHC-25897]
+    • Couldn't match kind ‘k3’ with ‘k1’
+      Expected kind ‘k1 -> k2’, but ‘g’ has kind ‘k3 -> k2’
+      ‘k3’ is a rigid type variable bound by
+        a family instance declaration
+        at /home/user/haskell/ghc3/ghc/issue23515_examples/Example2.hs:10:3-31
+      ‘k1’ is a rigid type variable bound by
+        a family instance declaration
+        at /home/user/haskell/ghc3/ghc/issue23515_examples/Example2.hs:10:3-31
+    • In the second argument of ‘(==)’, namely ‘g’
+      In the first argument of ‘(&&)’, namely ‘f == g’
+      In the type ‘f == g && a == b’
+   |
+10 |   f a == g b = f == g && a == b
+   |                     ^
+
