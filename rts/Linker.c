@@ -1194,7 +1194,7 @@ void freeObjectCode (ObjectCode *oc)
         stgFree(oc->sections);
     }
 
-    freeProddableBlocks(oc);
+    freeProddableBlocks(&oc->proddables);
     freeSegments(oc);
 
     /* Free symbol_extras.  On x86_64 Windows, symbol_extras are allocated
@@ -1279,7 +1279,7 @@ mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
    oc->sections          = NULL;
    oc->n_segments        = 0;
    oc->segments          = NULL;
-   oc->proddables        = NULL;
+   initProddableBlockSet(&oc->proddables);
    oc->foreign_exports   = NULL;
 #if defined(NEED_SYMBOL_EXTRAS)
    oc->symbol_extras     = NULL;
@@ -1832,50 +1832,6 @@ OStatus getObjectLoadStatus (pathchar *path)
     OStatus r = getObjectLoadStatus_(path);
     RELEASE_LOCK(&linker_mutex);
     return r;
-}
-
-/* -----------------------------------------------------------------------------
- * Sanity checking.  For each ObjectCode, maintain a list of address ranges
- * which may be prodded during relocation, and abort if we try and write
- * outside any of these.
- */
-void
-addProddableBlock ( ObjectCode* oc, void* start, int size )
-{
-   ProddableBlock* pb
-      = stgMallocBytes(sizeof(ProddableBlock), "addProddableBlock");
-
-   IF_DEBUG(linker, debugBelch("addProddableBlock: %p %p %d\n", oc, start, size));
-   ASSERT(size > 0);
-   pb->start      = start;
-   pb->size       = size;
-   pb->next       = oc->proddables;
-   oc->proddables = pb;
-}
-
-void
-checkProddableBlock (ObjectCode *oc, void *addr, size_t size )
-{
-   ProddableBlock* pb;
-
-   for (pb = oc->proddables; pb != NULL; pb = pb->next) {
-      char* s = (char*)(pb->start);
-      char* e = s + pb->size;
-      char* a = (char*)addr;
-      if (a >= s && (a+size) <= e) return;
-   }
-   barf("checkProddableBlock: invalid fixup in runtime linker: %p", addr);
-}
-
-void freeProddableBlocks (ObjectCode *oc)
-{
-    ProddableBlock *pb, *next;
-
-    for (pb = oc->proddables; pb != NULL; pb = next) {
-        next = pb->next;
-        stgFree(pb);
-    }
-    oc->proddables = NULL;
 }
 
 /* -----------------------------------------------------------------------------
