@@ -12,6 +12,7 @@
 #include "RtsSymbols.h"
 #include "Hash.h"
 #include "linker/M32Alloc.h"
+#include "linker/ProddableBlocks.h"
 
 #if RTS_LINKER_USE_MMAP
 #include <sys/mman.h>
@@ -175,14 +176,6 @@ struct _Section {
   struct SectionFormatInfo* info;
 };
 
-typedef
-   struct _ProddableBlock {
-      void* start;
-      int   size;
-      struct _ProddableBlock* next;
-   }
-   ProddableBlock;
-
 typedef struct _Segment {
     void *start;                /* page aligned start address of a segment */
     size_t size;                /* page rounded size of a segment */
@@ -328,7 +321,7 @@ struct _ObjectCode {
     /* SANITY CHECK ONLY: a list of the only memory regions which may
        safely be prodded during relocation.  Any attempt to prod
        outside one of these is an error in the linker. */
-    ProddableBlock* proddables;
+    ProddableBlockSet proddables;
 
 #if defined(NEED_SYMBOL_EXTRAS)
     SymbolExtra    *symbol_extras;
@@ -433,10 +426,6 @@ void exitLinker( void );
 
 void freeObjectCode (ObjectCode *oc);
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo);
-
-void addProddableBlock ( ObjectCode* oc, void* start, int size );
-void checkProddableBlock (ObjectCode *oc, void *addr, size_t size );
-void freeProddableBlocks (ObjectCode *oc);
 
 void addSection (Section *s, SectionKind kind, SectionAlloc alloc,
                  void* start, StgWord size, StgWord mapped_offset,
