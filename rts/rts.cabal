@@ -469,6 +469,7 @@ library
                  linker/MachO.c
                  linker/macho/plt.c
                  linker/macho/plt_aarch64.c
+                 linker/ProddableBlocks.c
                  linker/PEi386.c
                  linker/SymbolExtras.c
                  linker/elf_got.c
