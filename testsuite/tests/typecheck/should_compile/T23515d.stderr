@@ -1,0 +1,12 @@
+T23515d.hs:8:25: warning: [GHC-38886] [-Wtype-family-rhs-instantiation]
+    • Expected kind 'k', but 'Bool' has kind '*'
+      'k' is a rigid type variable bound by
+        a family instance declaration
+        at T23515d.hs:8:15-17
+    • A type family result requires instantiation based
+      on an expected kind from the context
+      Consider providing a kind application: Foo @Type Int = Bool
+    • In the type family instance declaration for 'Foo'
+  |
+8 | type instance Foo Int = Bool
+  |                         ^^^^

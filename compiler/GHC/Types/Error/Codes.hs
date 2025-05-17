@@ -455,6 +455,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalFieldPunning"                       = 44287
   GhcDiagnosticCode "TcRnIllegalWildcardsInRecord"                  = 37132
   GhcDiagnosticCode "TcRnIllegalWildcardInType"                     = 65507
+  GhcDiagnosticCode "TcRnTypeFamInstRHSInst"                        = 38886
   GhcDiagnosticCode "TcRnIllegalNamedWildcardInTypeArgument"        = 93411
   GhcDiagnosticCode "TcRnIllegalImplicitTyVarInTypeArgument"        = 80557
   GhcDiagnosticCode "TcRnIllegalPunnedVarOccInTypeArgument"         = 09591

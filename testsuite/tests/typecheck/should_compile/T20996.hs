@@ -107,5 +107,5 @@ type MakeRep1Field :: forall j k. (k -> Type) -> (j -> Type) -> j -> k -> Type
 type family MakeRep1Field fk acc c where
   MakeRep1Field fk (_ :: b -> Type) (OtherPar _) = fk
   MakeRep1Field fk (acc :: b -> Type) ((f :: a -> b) (x :: a)) = MakeRep1Field fk (acc :.: Unmark f) x
-  MakeRep1Field fk (acc :: k -> Type) (LastPar :: k) = acc
+  MakeRep1Field @_ @k fk (acc :: k -> Type) (LastPar :: k) = acc
   MakeRep1Field fk _ _ = fk

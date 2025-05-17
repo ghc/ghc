@@ -2,14 +2,16 @@
 
 module T2627 where
 
+import Data.Kind
+
 data R a b
 data W a b
 data Z
 
 type family Dual a
 type instance Dual Z = Z
-type instance Dual (R a b) = W a (Dual b)
-type instance Dual (W a b) = R a (Dual b)
+type instance Dual (R a (b :: Type)) = W a (Dual b)
+type instance Dual (W a (b :: Type)) = R a (Dual b)
 
 data Comm a where
     Rd :: (a -> Comm b) -> Comm (R a b)

@@ -32,4 +32,4 @@ type a ~> b = TyFun a b -> Type
 infixr 0 ~>
 
 type instance Demote  (a ~> b) = DemoteX  a -> DemoteX  b
-type instance Promote (a -> b) = PromoteX a ~> PromoteX b
+type instance Promote ((a :: Type) -> (b :: Type)) = PromoteX a ~> PromoteX b

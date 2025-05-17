@@ -2,10 +2,10 @@
 [2 of 3] Compiling T6018a           ( T6018a.hs, T6018a.o )
 [3 of 3] Compiling T6018            ( T6018.hs, T6018.o )
 
-T6018.hs:109:5: warning: [GHC-28129] [-Winaccessible-code (in -Wdefault)]
+T6018.hs:111:5: warning: [GHC-28129] [-Winaccessible-code (in -Wdefault)]
     Type family instance equation is overlapped:
-      Foo Bool = Bool -- Defined at T6018.hs:109:5
+      Foo Bool = Bool -- Defined at T6018.hs:111:5
 
-T6018.hs:116:5: warning: [GHC-28129] [-Winaccessible-code (in -Wdefault)]
+T6018.hs:118:5: warning: [GHC-28129] [-Winaccessible-code (in -Wdefault)]
     Type family instance equation is overlapped:
-      Bar Bool = Char -- Defined at T6018.hs:116:5
+      Bar Bool = Char -- Defined at T6018.hs:118:5

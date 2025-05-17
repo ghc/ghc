@@ -13,8 +13,8 @@ type instance Poly (x :: Bool) = Int
 type instance Poly (x :: Maybe k) = Double
 
 type family Silly :: k -> Type
-type instance Silly = (Proxy :: Type -> Type)
-type instance Silly = (Proxy :: (Type -> Type) -> Type)
+type instance Silly @Type = Proxy
+type instance Silly @(Type -> Type) = Proxy
 
 a :: Proxy (Proxy :: Type -> Type)
 b :: Proxy (Proxy :: (Type -> Type) -> Type)

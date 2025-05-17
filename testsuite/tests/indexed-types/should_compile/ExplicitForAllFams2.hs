@@ -31,9 +31,9 @@ instance forall a. Cl (Maybe a) where
 -- Should produce warnings
 
 type family N a where
-  forall t a. N (t a) = [a]
-  forall a.   N a     = ()
+  forall t (a :: Type). N (t a) = [a]
+  forall a.             N a     = ()
 
 type family N' a where
-  N' (t a) = [a]
-  N' a     = ()
+  N' (t (a :: Type)) = [a]
+  N' a               = ()

@@ -1,0 +1,13 @@
+T23515e.hs:8:22: warning: [GHC-38886] [-Wtype-family-rhs-instantiation]
+    • Couldn't match kind 't1' with 'GHC.Internal.Types.LiftedRep'
+      Expected kind '*', but 'a' has kind 'TYPE t1'
+      't1' is a rigid type variable bound by
+        a family instance declaration
+        at T23515e.hs:8:3-22
+    • A type family requires additional information that could be derived from pattern matching on kinds
+      Consider adding an explicit kind annotation: F ((a :: Type) -> _) = Maybe a
+    • In the first argument of 'Maybe', namely 'a'
+      In the type family declaration for 'F'
+  |
+8 |   F (a -> _) = Maybe a
+  |                      ^

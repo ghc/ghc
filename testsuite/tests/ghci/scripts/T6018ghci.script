@@ -4,10 +4,10 @@
 :set -XPolyKinds
 
 type family F a b c = (result :: k) | result -> a b c
-type instance F Int  Char Bool = Bool
-type instance F Char Bool Int  = Int
-type instance F Bool Int  Char = Char
-type instance F Bool Int  Char = Char
+type instance F @Data.Kind.Type Int  Char Bool = Bool
+type instance F @Data.Kind.Type Char Bool Int  = Int
+type instance F @Data.Kind.Type Bool Int  Char = Char
+type instance F @Data.Kind.Type Bool Int  Char = Char
 
 type family I (a :: k) b (c :: k) = r | r -> a b
 type instance I Int  Char Bool = Bool

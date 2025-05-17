@@ -152,6 +152,12 @@ instance Diagnostic TcRnMessage where
   diagnosticMessage opts = \case
     TcRnUnknownMessage (UnknownDiagnostic f _ m)
       -> diagnosticMessage (f opts) m
+    TcRnTypeFamInstRHSInst orig_msg
+      -> let orig_doc = diagnosticMessage opts orig_msg
+             wrap_msg = mkSimpleDecorated $
+                text "Type family instance requires information from the right-hand side for instantiation." $$
+                text "This can make the code less clear. Consider using an explicit kind application:"
+         in wrap_msg `unionDecoratedSDoc` orig_doc
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed err_info msg
@@ -2048,6 +2054,8 @@ instance Diagnostic TcRnMessage where
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
+    TcRnTypeFamInstRHSInst _
+      -> WarningWithFlag Opt_WarnTypeFamInstRHSInst
     TcRnMessageWithInfo _ msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed _ m -> diagnosticReason m
@@ -2698,6 +2706,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
+    TcRnTypeFamInstRHSInst msg
+      -> diagnosticHints msg
     TcRnUnknownMessage m
       -> diagnosticHints m
     TcRnMessageWithInfo _ msg_with_info

@@ -6,8 +6,8 @@ import Data.Kind
 data NP (f :: Type -> Type) (xs :: [Type])
 
 type family Curry (f :: Type -> Type) (xs :: [Type]) (r :: Type) (a :: Type) :: Constraint where
-  Curry f xs r (f x -> a) = (xs ~ (x : Tail xs), Curry f (Tail xs) r a)
-  Curry f xs r a          = (xs ~ '[], r ~ a)
+  Curry f xs r (f x -> (a :: Type)) = (xs ~ (x : Tail xs), Curry f (Tail xs) r a)
+  Curry f xs r a                    = (xs ~ '[], r ~ a)
 
 type family Tail (a :: [Type]) :: [Type] where
   Tail (_ : xs) = xs

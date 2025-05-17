@@ -16,11 +16,11 @@ $( return [ KiSigD (mkName "Equals")
                 ( TyVarSig (KindedTV (mkName "r") () (VarT (mkName "k"))))
                 Nothing)
               [ TySynEqn Nothing
-                         (AppT (AppT (ConT (mkName "Equals")) (VarT (mkName "a")))
+                         (AppT (AppT (AppKindT (ConT (mkName "Equals")) StarT) (VarT (mkName "a")))
                                (VarT (mkName "a")))
                          (ConT (mkName "Int"))
               , TySynEqn Nothing
-                         (AppT (AppT (ConT (mkName "Equals")) (VarT (mkName "a")))
+                         (AppT (AppT (AppKindT (ConT (mkName "Equals")) StarT) (VarT (mkName "a")))
                                (VarT (mkName "b")))
                          (ConT (mkName "Bool")) ] ])
 

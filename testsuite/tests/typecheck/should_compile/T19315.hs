@@ -15,7 +15,7 @@ view = undefined
 data TickLabels b n = TickLabels
 
 type family N a :: Type
-type instance N (TickLabels b n) = n
+type instance N (TickLabels b (n :: Type)) = n
 
 tickLabelTextFunction ::  Lens f a (QDiagram b (N a))
 tickLabelTextFunction = undefined

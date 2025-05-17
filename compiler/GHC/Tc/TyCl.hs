@@ -35,6 +35,7 @@ import GHC.Driver.Config.HsToCore
 
 import GHC.Hs
 
+import GHC.Tc.Errors( warnAllUnsolved )
 import GHC.Tc.Errors.Types
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
@@ -96,6 +97,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps( minusList, equivClasses )
 import GHC.Data.OrdList
+import GHC.Data.Bag (mapBagM_)
 
 import GHC.Unit
 import GHC.Unit.Module.ModDetails
@@ -3734,11 +3736,27 @@ tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
                        -- (tyvars, non_user_tvs, pats, rhs)
 -- Used only for type families, not data families
 tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
-  = do { traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc $$ ppr outer_hs_bndrs $$ ppr hs_pats)
+  = do
+    -- Common initial steps
+    traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc $$ ppr outer_hs_bndrs $$ ppr hs_pats)
+    
+    -- By now, for type families (but not data families) we should
+    -- have checked that the number of patterns matches tyConArity
+    skol_info <- mkSkolemInfo FamInstSkol
+    
+    res <- tc_ty_fam_inst_eqn_guts skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+    tc_ty_fam_inst_eqn_warn_rhs_inst skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+    return res
 
-       -- By now, for type families (but not data families) we should
-       -- have checked that the number of patterns matches tyConArity
-       ; skol_info <- mkSkolemInfo FamInstSkol
+tc_ty_fam_inst_eqn_guts :: SkolemInfo -> TyCon -> AssocInstInfo
+                   -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
+                   -> HsFamEqnPats GhcRn                -- Patterns
+                   -> LHsType GhcRn                     -- RHS
+                   -> TcM ([TyVar], TyVarSet, [TcType], TcType)
+                       -- (tyvars, non_user_tvs, pats, rhs)
+-- Used only for type families, not data families
+tc_ty_fam_inst_eqn_guts skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+  = do {
 
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
@@ -3802,6 +3820,90 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
                  -- a knot-tied type constructor, so we get a black hole
 
        ; return (final_tvs, mkVarSet non_user_tvs, pats, rhs_ty) }
+
+-- | Warn if there are instantiations of bindings that require information from the right-hand side of the equation.
+-- The motivation for this is that it can make the code less clear.
+tc_ty_fam_inst_eqn_warn_rhs_inst :: SkolemInfo -> TyCon -> AssocInstInfo
+                   -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
+                   -> HsFamEqnPats GhcRn                -- Patterns
+                   -> LHsType GhcRn                     -- RHS
+                   -> TcM ()
+-- Used only for type families, not data families
+tc_ty_fam_inst_eqn_warn_rhs_inst skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+  = do {
+       -- grab current error messages and clear, reportUnsolvedEqualities will
+       -- update error messages which we'll grab and then restore saved
+       -- messages.
+       ; errs_var  <- getErrsVar
+       ; saved_msg <- readTcRef errs_var
+       ; writeTcRef errs_var emptyMessages
+
+       -- This code is closely related to the code
+       -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
+       ; (tclvl, wanted, (outer_bndrs, (lhs_ty, rhs_kind)))
+               <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
+                  bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
+                  do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
+                       -- Ensure that the instance is consistent with its
+                       -- parent class (#16008)
+                     ; addConsistencyConstraints mb_clsinfo lhs_ty
+                     ; return (lhs_ty, rhs_kind) }
+
+       ; outer_bndrs <- scopedSortOuter outer_bndrs
+       ; let outer_tvs = outerTyVars outer_bndrs
+       ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
+
+       ; traceTc "tcTyFamInstEqnGuts 1" (pprTyVars outer_tvs $$ ppr skol_info)
+
+       -- This code (and the stuff immediately above) is very similar
+       -- to that in tcDataFamInstHeader.  Maybe we should abstract the
+       -- common code; but for the moment I concluded that it's
+       -- clearer to duplicate it.  Still, if you fix a bug here,
+       -- check there too!
+
+       -- See Note [Generalising in tcTyFamInstEqnGuts]
+       ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
+       ; qtvs <- quantifyTyVars skol_info TryNotToDefaultNonStandardTyVars dvs
+       ; let final_tvs = scopedSort (qtvs ++ outer_tvs)
+             -- This scopedSort is important: the qtvs may be /interleaved/ with
+             -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
+      -- TODO do we have to use reportUnsolvedEqualities here?
+      --  ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
+       ; warnAllUnsolved wanted
+
+       ; traceTc "tcTyFamInstEqnGuts 2" $
+         vcat [ ppr fam_tc
+              , text "lhs_ty:"    <+> ppr lhs_ty
+              , text "final_tvs:" <+> pprTyVars final_tvs ]
+
+       ; (_tclvl_rhs, wanted_rhs, _) <-
+                pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
+                tcExtendTyVarEnv final_tvs $
+                tcCheckLHsType hs_rhs_ty rhs_kind
+
+      --  ; reportUnsolvedEqualities skol_info final_tvs tclvl_rhs wanted_rhs
+       ; warnAllUnsolved wanted_rhs
+
+       ; whyBad <- readTcRef errs_var
+       ; writeTcRef errs_var saved_msg
+       
+       -- If we found any warnings while checking the RHS instantiation,
+       -- wrap each in a TcRnTypeFamInstRHSInst constructor and report them.
+       -- We preserve the original location of each warning.
+       ; let warnings = getWarningMessages whyBad
+       ; mapBagM_ (addWrappedWarning) warnings
+       
+       ; recordUnsafeInfer whyBad
+       }
+  where
+    -- Add a wrapped warning, preserving the original source location
+    addWrappedWarning :: MsgEnvelope TcRnMessage -> TcM ()
+    addWrappedWarning msg_env = 
+      let loc = errMsgSpan msg_env
+          original_msg = errMsgDiagnostic msg_env
+          wrapped_msg = TcRnTypeFamInstRHSInst original_msg
+      in addErrAt loc wrapped_msg
+    
 
 checkFamTelescope :: TcLevel
                   -> HsOuterFamEqnTyVarBndrs GhcRn

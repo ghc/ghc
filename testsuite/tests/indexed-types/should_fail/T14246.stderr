@@ -7,17 +7,10 @@ T14246.hs:20:5: error: [GHC-91510]
 T14246.hs:25:27: error: [GHC-83865]
     • Couldn't match kind ‘*’ with ‘L’
       Expected kind ‘Vect (KLN f) L’,
-        but ‘Cons (Label (t :: v)) l’ has kind ‘Vect (S (KLN (f t))) (*)’
+        but ‘Cons @Type @(KLN (f t)) (Label (t :: v)) l’ has kind ‘Vect
+                                                                     (S (KLN (f t))) (*)’
     • In the second argument of ‘Reveal’, namely
-        ‘(Cons (Label (t :: v)) l)’
-      In the type family declaration for ‘Reveal’
-
-T14246.hs:25:67: error: [GHC-83865]
-    • Couldn't match kind ‘*’ with ‘L’
-      Expected kind ‘Vect (KLN (f t)) L’,
-        but ‘l’ has kind ‘Vect (KLN (f t)) (*)’
-    • In the second argument of ‘Reveal’, namely ‘l’
-      In the type ‘Reveal (f t) l’
+        ‘(Cons @Type @(KLN (f t)) (Label (t :: v)) l)’
       In the type family declaration for ‘Reveal’
 
 T14246.hs:26:24: error: [GHC-83865]

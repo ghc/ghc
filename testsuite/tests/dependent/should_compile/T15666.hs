@@ -18,12 +18,13 @@ type Unwrap pt = (GetType pt :: GetKind pt)
 type family GetKind (pt :: Type) :: Type where
   GetKind (PolyType k t) = k
 
+type GetType :: Type -> k
 type family GetType (pt :: Type) :: k where
-  GetType (PolyType k t) = t
+  GetType @k (PolyType k t) = t
 
 data Composite :: a -> b -> Type
 
 type family RecursiveWrap expr where
-  RecursiveWrap (Composite a b) =
+  RecursiveWrap (Composite @Type @Type a b) =
     Wrap (Composite (Unwrap (RecursiveWrap a)) (Unwrap (RecursiveWrap b)))
   RecursiveWrap x = Wrap x

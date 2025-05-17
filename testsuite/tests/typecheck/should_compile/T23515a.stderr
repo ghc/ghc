@@ -1,0 +1,26 @@
+T23515a.hs:7:23: warning: [GHC-38886] [-Wtype-family-rhs-instantiation]
+    • Expected kind 'k', but 'Char' has kind '*'
+      'k' is a rigid type variable bound by
+        a family instance declaration
+        at T23515a.hs:7:15
+    • A type family result requires instantiation based
+      on an expected kind from the context
+      Consider providing a kind application: F @Type Int = Char
+    • In the type family instance declaration for 'F'
+  |
+7 | type instance F Int = Char
+  |                       ^^^^
+
+T23515a.hs:8:23: warning: [GHC-38886] [-Wtype-family-rhs-instantiation]
+    • Expecting one more argument to 'Maybe'
+      Expected kind 'k', but 'Maybe' has kind '* -> *'
+      'k' is a rigid type variable bound by
+        a family instance declaration
+        at T23515a.hs:8:15
+    • A type family result requires instantiation based
+      on an expected kind from the context
+      Consider providing a kind application: F @(Type -> Type) Int = Maybe
+    • In the type family instance declaration for 'F'
+  |
+8 | type instance F Int = Maybe
+  |                       ^^^^^

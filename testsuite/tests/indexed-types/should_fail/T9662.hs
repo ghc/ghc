@@ -10,7 +10,7 @@ data Exp a = Exp
 data (a:.b) = a:.b
 
 type family Plain e :: Type
-type instance Plain (Exp a) = a
+type instance Plain (Exp (a :: Type)) = a
 type instance Plain (a:.b) = Plain a :. Plain b
 
 class (Plain (Unlifted pattern) ~ Tuple pattern) => Unlift pattern where

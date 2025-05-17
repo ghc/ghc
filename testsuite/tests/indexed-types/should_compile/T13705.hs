@@ -3,7 +3,9 @@
 
 module T13705 where
 
-data D x
+import Data.Kind (Type)
+
+data D (x :: Type)
 
 type family F t = s | s -> t
 type instance F (D t) = D (F t)

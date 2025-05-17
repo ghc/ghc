@@ -746,6 +746,23 @@ data TcRnMessage where
     -> !BadAnonWildcardContext
     -> TcRnMessage
 
+  {-| TcRnTypeFamInstRHSInst is a warning that occurs when a type family instance
+      instantiation requires information from the right-hand side of the equation.
+      This makes the code less clear and potentially harder to understand.
+
+      Example:
+        type family F a :: k
+        type instance F Int = Char    -- Warning: Instantiation of 'k' requires information from RHS
+        type instance F Int = Maybe   -- Warning: Instantiation of 'k' requires information from RHS
+
+        -- Better with explicit kind application:
+        type instance F @Type Int = Char
+        type instance F @(Type->Type) Int = Maybe
+
+      Test cases: T23515a, T23515b, T23515c, T23515d, T23515e
+  -}
+  TcRnTypeFamInstRHSInst :: !TcRnMessage -> TcRnMessage
+
   {-| TcRnIllegalNamedWildcardInTypeArgument is an error that occurs
       when a named wildcard is used in a required type argument.
 

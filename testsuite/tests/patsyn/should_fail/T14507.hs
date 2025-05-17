@@ -13,7 +13,7 @@ foo rep = error "urk"
 
 type SING :: k -> Type
 type family SING @k where
-  SING = (TypeRep :: Bool -> Type)
+  SING @Bool = TypeRep
 
 pattern RepN :: forall kk (a::kk). () => Bool~kk => SING a -> TypeRep (a::kk)
 pattern RepN tr <- (foo -> ( HRefl :: Bool:~~:kk

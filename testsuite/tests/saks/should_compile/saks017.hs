@@ -7,7 +7,7 @@ import Data.Kind (Type)
 
 type family F a where
   F Bool = Type
-  F (f a) = F a
+  F (f (a :: Type)) = F a
 
 type family G a where
   G Int = Type

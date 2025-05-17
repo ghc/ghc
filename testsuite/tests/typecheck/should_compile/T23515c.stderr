@@ -1,0 +1,11 @@
+T23515c.hs:8:15: warning: [GHC-38886] [-Wtype-family-rhs-instantiation]
+    • Expected a type, but 'a' has kind 'k1'
+      'k1' is a rigid type variable bound by
+        a family instance declaration
+        at T23515c.hs:8:3-16
+    • A type family requires additional information that could be derived from pattern matching on kinds
+      Consider adding an explicit kind annotation: N' (t (a :: Type)) = [a]
+    • In the type family declaration for 'N''
+  |
+8 |   N' (t a) = [a]
+  |               ^

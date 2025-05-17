@@ -6,8 +6,10 @@
 
 module GADT1 where
 
+import Data.Kind
+
 data ZERO
-data SUCC n
+data SUCC (n :: Type)
 
 data Nat n where
   Zero :: Nat ZERO

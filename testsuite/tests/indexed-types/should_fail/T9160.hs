@@ -16,4 +16,4 @@ $( do { cls_nm <- newName "C"
 --       type F :: k
 
 instance C (a :: *) where
-  type F = Maybe   -- Should be illegal
+  type F @(* -> *) = Maybe   -- Should be illegal

@@ -5,10 +5,10 @@ module Test where
 import Data.Kind (Type)
 
 data Zero
-data Succ a
+data Succ (a :: Type)
 
 data FZ
-data FS fn
+data FS (fn :: Type)
 
 data Fin n fn where
   FZ :: Fin (Succ n) FZ
@@ -18,8 +18,8 @@ data Nil
 data a ::: b
 
 type family Lookup ts fn :: Type
-type instance Lookup (t ::: ts) FZ = t
-type instance Lookup (t ::: ts) (FS fn) = Lookup ts fn
+type instance Lookup ((t :: Type) ::: ts) FZ = t
+type instance Lookup (t ::: (ts :: Type)) (FS fn) = Lookup ts fn
 
 data Tuple n ts where
   Nil   :: Tuple Zero Nil

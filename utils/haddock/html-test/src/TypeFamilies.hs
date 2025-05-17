@@ -32,9 +32,9 @@ instance Test Y
 type family Foo a :: k
 
 -- | Doc for: type instance Foo X = Y
-type instance Foo X = Y
+type instance Foo @Type X = Y
 -- | Doc for: type instance Foo Y = X
-type instance Foo Y = X
+type instance Foo @Type Y = X
 
 -- | Doc for: data family Bat a
 data family Bat (a :: k) :: Type

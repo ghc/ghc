@@ -41,18 +41,16 @@
 
 <interactive>:55:41: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.
-    Type/kind variable ‘a1’
-    cannot be inferred from the right-hand side.
+    Type/kind variable ‘a’ cannot be inferred from the right-hand side.
     In the type family equation:
-      PolyKindVarsF @{[a1]} @[a2] ('[] @a1) = '[] @a2
+      PolyKindVarsF @{[a]} @[w] ('[] @a) = '[] @w
         -- Defined at <interactive>:55:41
 
 <interactive>:60:15: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.
-    Type/kind variable ‘a1’
-    cannot be inferred from the right-hand side.
+    Type/kind variable ‘a’ cannot be inferred from the right-hand side.
     In the type family equation:
-      PolyKindVars @[a1] @[a2] ('[] @a1) = '[] @a2
+      PolyKindVars @[a] @[w] ('[] @a) = '[] @w
         -- Defined at <interactive>:60:15
 
 <interactive>:64:15: error: [GHC-05175]

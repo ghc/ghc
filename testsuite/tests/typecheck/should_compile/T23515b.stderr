@@ -1,0 +1,17 @@
+T23515b.hs:10:21: warning: [GHC-38886] [-Wtype-family-rhs-instantiation]
+    • Couldn't match kind 'k3' with 'k1'
+      Expected kind 'k1 -> k2', but 'g' has kind 'k3 -> k2'
+      'k3' is a rigid type variable bound by
+        a family instance declaration
+        at T23515b.hs:10:3-31
+      'k1' is a rigid type variable bound by
+        a family instance declaration
+        at T23515b.hs:10:3-31
+    • A type family requires additional information that could be derived from pattern matching on kinds
+      Consider adding an explicit kind annotation: f (a::k) == g (b::k)
+    • In the second argument of '(==)', namely 'g'
+      In the first argument of '(&&)', namely 'f == g'
+      In the type family declaration for '=='
+   |
+10 |   f a == g b = f == g && a == b
+   |                     ^

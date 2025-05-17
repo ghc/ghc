@@ -2,11 +2,13 @@
 
 module T19682b where
 
+import Data.Kind
+
 type family Arg x where
-  Arg (a -> b) = a
+  Arg ((a :: Type) -> b) = a
 
 type family Res x where
-  Res (a -> b) = b
+  Res (a -> (b :: Type)) = b
 
 class C a
 instance C (a -> b)

@@ -15,7 +15,7 @@ type instance V (a -> b)   = V b
 -}
 
 type family Scalar a :: Type
-type instance Scalar (a -> v) = a -> Scalar v
+type instance Scalar (a -> (v :: Type)) = a -> Scalar v
 
 arcLengthToParam :: Scalar (V p) -> p -> Scalar (V p) -> Scalar (V p)
 arcLengthToParam = undefined
