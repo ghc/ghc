@@ -924,7 +924,7 @@ ocGetNames_ELF ( ObjectCode* oc )
           oc->sections[i].info->stubs = NULL;
 #endif
 
-          addProddableBlock(oc, start, size);
+          addProddableBlock(&oc->proddables, start, size);
       } else {
           addSection(&oc->sections[i], kind, alloc, oc->image+offset, size,
                      0, 0, 0);
@@ -1272,7 +1272,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                 debugBelch("Reloc: P = %p   S = %p   A = %p   type=%d\n",
                            (void*)P, (void*)S, (void*)A, reloc_type ));
 #if defined(DEBUG)
-       checkProddableBlock ( oc, pP, sizeof(Elf_Word) );
+       checkProddableBlock ( &oc->proddables, pP, sizeof(Elf_Word) );
 #else
        (void) pP; /* suppress unused varialbe warning in non-debug build */
 #endif
@@ -1684,7 +1684,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #if defined(DEBUG)
       IF_DEBUG(linker_verbose,debugBelch("Reloc: P = %p   S = %p   A = %p\n",
                                          (void*)P, (void*)S, (void*)A ));
-      checkProddableBlock(oc, (void*)P, sizeof(Elf_Word));
+      checkProddableBlock(&oc->proddables, (void*)P, sizeof(Elf_Word));
 #endif
 
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
