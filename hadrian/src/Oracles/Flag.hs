@@ -165,7 +165,7 @@ ghcWithInterpreter stage = do
                 anyTargetArch [ ArchX86, ArchX86_64, ArchPPC
                               , ArchAArch64, ArchS390X
                               , ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2
-                              , ArchRISCV64
+                              , ArchRISCV64, ArchLoongArch64
                               , ArchWasm32 ]
                               <*> isArmTarget
     -- Maybe this should just be false for cross compilers. But for now
