@@ -9,6 +9,8 @@ GHC_PATH="$DIR/../_build/stage1/bin/ghc"
 # Colors for output
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Make sure the script is executable
@@ -48,6 +50,50 @@ function check_compiles {
     fi
 }
 
+# Function to do a side-by-side comparison of error lines
+function highlight_diff {
+    local expected=$1
+    local actual=$2
+    
+    local expected_lines=()
+    local actual_lines=()
+    
+    # Split into arrays of lines
+    readarray -t expected_lines <<< "$expected"
+    readarray -t actual_lines <<< "$actual"
+    
+    # Determine which has more lines
+    local max_lines=${#expected_lines[@]}
+    if [ ${#actual_lines[@]} -gt $max_lines ]; then
+        max_lines=${#actual_lines[@]}
+    fi
+    
+    echo -e "${YELLOW}LINE | EXPECTED${NC} | ${BLUE}ACTUAL${NC}"
+    echo "----------------------------------------------------"
+    
+    # Loop through lines and show difference side by side
+    for ((i=0; i<max_lines; i++)); do
+        local expected_line=""
+        local actual_line=""
+        
+        if [ $i -lt ${#expected_lines[@]} ]; then
+            expected_line="${expected_lines[$i]}"
+        fi
+        
+        if [ $i -lt ${#actual_lines[@]} ]; then
+            actual_line="${actual_lines[$i]}"
+        fi
+        
+        # Highlight if lines differ
+        if [ "$expected_line" != "$actual_line" ]; then
+            printf "%4d | ${YELLOW}%s${NC} | ${BLUE}%s${NC}\n" $((i+1)) "$expected_line" "$actual_line"
+        else
+            printf "%4d | %s | %s\n" $((i+1)) "$expected_line" "$actual_line"
+        fi
+    done
+    echo
+}
+
 # Function to check if error output matches expected error
 function check_error_match {
     local source_file=$1
@@ -75,17 +121,56 @@ function check_error_match {
         return 0
     else
         echo -e "${RED}FAIL${NC} (error message differs)"
-        echo "Expected error:"
-        echo "$expected_error"
-        echo "Actual error (normalized):"
-        echo "$normalized_actual"
+        echo "Detailed comparison (expected vs actual):"
+        highlight_diff "$expected_error" "$normalized_actual"
         return 1
+    fi
+}
+
+# Mock failure function for testing
+function simulate_failure {
+    if [ "$1" == "true" ]; then
+        # Create a temporary file with slightly different content
+        echo "Example1.hs:7:23: error: [GHC-25897]
+    • Expected kind 'k', but 'Char' has kind 'Type'
+      'k' is a rigid type variable bound by
+        a family instance declaration
+        at Example1.hs:7:15
+    • In the type family instance declaration for 'F'
+  |
+7 | type instance F Int = Char
+  |                       ^^^^" > /tmp/mock_expected.txt
+        
+        echo "Example1.hs:7:23: error: [GHC-25897]
+    • Expected kind 'k', but 'Char' has kind '*'
+      'k' is a rigid type variable bound by
+        a family instance declaration
+        at Example1.hs:7:15
+    • In the type family instance declaration for 'F'
+  |
+7 | type instance F Int = Char
+  |                       ^^^^" > /tmp/mock_actual.txt
+        
+        echo -e "${RED}SIMULATED FAILURE${NC} (for testing error display)"
+        echo "Detailed comparison (expected vs actual):"
+        highlight_diff "$(cat /tmp/mock_expected.txt)" "$(cat /tmp/mock_actual.txt)"
+        rm /tmp/mock_expected.txt /tmp/mock_actual.txt
     fi
 }
 
 # Main testing logic
 echo "=== Testing Example Files ==="
 echo
+
+# Check if we should simulate a failure (for testing diff display)
+SIMULATE_FAIL=false
+if [ "$1" == "--simulate-fail" ]; then
+    SIMULATE_FAIL=true
+    echo "Simulation mode: Will show a mocked failure for demonstration"
+    echo
+    simulate_failure $SIMULATE_FAIL
+    echo
+fi
 
 total_tests=0
 passed_tests=0
