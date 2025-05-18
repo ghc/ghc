@@ -3744,7 +3744,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
     
     -- Call the specific implementations
     res <- tcTyFamInstEqnGuts_old skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
-    _ <- tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+    tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
     return res
 
 tcTyFamInstEqnGuts_old :: SkolemInfo -> TyCon -> AssocInstInfo
@@ -3824,8 +3824,7 @@ tcTyFamInstEqnGuts_error :: SkolemInfo -> TyCon -> AssocInstInfo
                    -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
                    -> HsFamEqnPats GhcRn                -- Patterns
                    -> LHsType GhcRn                     -- RHS
-                   -> TcM ([TyVar], TyVarSet, [TcType], TcType)
-                       -- (tyvars, non_user_tvs, pats, rhs)
+                   -> TcM ()
 -- Used only for type families, not data families
 tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
   = do {
@@ -3901,7 +3900,7 @@ tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_r
                  -- Don't try to print 'pats' here, because lhs_ty involves
                  -- a knot-tied type constructor, so we get a black hole
 
-       ; return (final_tvs, mkVarSet non_user_tvs, pats, rhs_ty) }
+       ; return () }
 
 checkFamTelescope :: TcLevel
                   -> HsOuterFamEqnTyVarBndrs GhcRn
