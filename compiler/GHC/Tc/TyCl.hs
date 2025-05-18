@@ -3735,23 +3735,27 @@ tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
 -- Used only for type families, not data families
 tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
   = do
-    res <- tcTyFamInstEqnGuts_old fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
-    _ <- tcTyFamInstEqnGuts_error fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+    -- Common initial steps
+    traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc $$ ppr outer_hs_bndrs $$ ppr hs_pats)
+    
+    -- By now, for type families (but not data families) we should
+    -- have checked that the number of patterns matches tyConArity
+    skol_info <- mkSkolemInfo FamInstSkol
+    
+    -- Call the specific implementations
+    res <- tcTyFamInstEqnGuts_old skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+    _ <- tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
     return res
 
-tcTyFamInstEqnGuts_old :: TyCon -> AssocInstInfo
+tcTyFamInstEqnGuts_old :: SkolemInfo -> TyCon -> AssocInstInfo
                    -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
                    -> HsFamEqnPats GhcRn                -- Patterns
                    -> LHsType GhcRn                     -- RHS
                    -> TcM ([TyVar], TyVarSet, [TcType], TcType)
                        -- (tyvars, non_user_tvs, pats, rhs)
 -- Used only for type families, not data families
-tcTyFamInstEqnGuts_old fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
-  = do { traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc $$ ppr outer_hs_bndrs $$ ppr hs_pats)
-
-       -- By now, for type families (but not data families) we should
-       -- have checked that the number of patterns matches tyConArity
-       ; skol_info <- mkSkolemInfo FamInstSkol
+tcTyFamInstEqnGuts_old skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+  = do {
 
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
@@ -3816,19 +3820,15 @@ tcTyFamInstEqnGuts_old fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
 
        ; return (final_tvs, mkVarSet non_user_tvs, pats, rhs_ty) }
 
-tcTyFamInstEqnGuts_error :: TyCon -> AssocInstInfo
+tcTyFamInstEqnGuts_error :: SkolemInfo -> TyCon -> AssocInstInfo
                    -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
                    -> HsFamEqnPats GhcRn                -- Patterns
                    -> LHsType GhcRn                     -- RHS
                    -> TcM ([TyVar], TyVarSet, [TcType], TcType)
                        -- (tyvars, non_user_tvs, pats, rhs)
 -- Used only for type families, not data families
-tcTyFamInstEqnGuts_error fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
-  = do { traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc $$ ppr outer_hs_bndrs $$ ppr hs_pats)
-
-       -- By now, for type families (but not data families) we should
-       -- have checked that the number of patterns matches tyConArity
-       ; skol_info <- mkSkolemInfo FamInstSkol
+tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+  = do {
 
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
