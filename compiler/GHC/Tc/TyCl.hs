@@ -3865,40 +3865,12 @@ tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_r
               , text "lhs_ty:"    <+> ppr lhs_ty
               , text "final_tvs:" <+> pprTyVars final_tvs ]
 
-       ; (tclvl_rhs, wanted_rhs, rhs_ty) <-
+       ; (tclvl_rhs, wanted_rhs, _) <-
                 pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
                 tcExtendTyVarEnv final_tvs $
                 tcCheckLHsType hs_rhs_ty rhs_kind
 
        ; reportUnsolvedEqualities skol_info final_tvs tclvl_rhs wanted_rhs
-
-       ; (final_tvs, non_user_tvs, lhs_ty) <- initZonkEnv NoFlexi $
-         runZonkBndrT (zonkTyBndrsX final_tvs) $ \ final_tvs ->
-           do { lhs_ty       <- zonkTcTypeToTypeX lhs_ty
-              ; non_user_tvs <- traverse lookupTyVarX qtvs
-              ; return (final_tvs, non_user_tvs, lhs_ty) }
-
-       ; let pats = unravelFamInstPats lhs_ty
-             -- Note that we do this after solveEqualities
-             -- so that any strange coercions inside lhs_ty
-             -- have been solved before we attempt to unravel it
-
-       -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
-       -- Example: typecheck/should_fail/T17301
-       ; dvs_rhs <- candidateQTyVarsOfType rhs_ty
-       ; let err_ctx tidy_env
-               = do { (tidy_env2, rhs_ty) <- zonkTidyTcType tidy_env rhs_ty
-                    ; return (tidy_env2, UninfTyCtx_TyFamRhs rhs_ty) }
-       ; doNotQuantifyTyVars dvs_rhs err_ctx
-
-       ; (rhs_ty) <- initZonkEnv NoFlexi $
-         runZonkBndrT (zonkTyBndrsX final_tvs) $ \ _ ->
-           do { rhs_ty    <- zonkTcTypeToTypeX rhs_ty
-              ; return (rhs_ty) }
-
-       ; traceTc "tcTyFamInstEqnGuts }" (vcat [ ppr fam_tc, pprTyVars final_tvs ])
-                 -- Don't try to print 'pats' here, because lhs_ty involves
-                 -- a knot-tied type constructor, so we get a black hole
 
        ; return () }
 
