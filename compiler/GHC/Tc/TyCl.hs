@@ -3726,6 +3726,83 @@ generalising over the type of a rewrite rule.
 
 --------------------------
 
+tcTyFamInstEqnGuts2 :: TyCon -> AssocInstInfo
+                   -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
+                   -> HsFamEqnPats GhcRn                -- Patterns
+                   -> LHsType GhcRn                     -- RHS
+                   -> TcM ([TyVar], TyVarSet, [TcType], TcType)
+                       -- (tyvars, non_user_tvs, pats, rhs)
+-- Used only for type families, not data families
+tcTyFamInstEqnGuts2 fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+  = do { traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc $$ ppr outer_hs_bndrs $$ ppr hs_pats)
+
+       -- By now, for type families (but not data families) we should
+       -- have checked that the number of patterns matches tyConArity
+       ; skol_info <- mkSkolemInfo FamInstSkol
+
+       -- This code is closely related to the code
+       -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
+       ; (tclvl, wanted, (outer_bndrs, (lhs_ty, rhs_ty)))
+               <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
+                  bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
+                  do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
+                       -- Ensure that the instance is consistent with its
+                       -- parent class (#16008)
+                     ; addConsistencyConstraints mb_clsinfo lhs_ty
+                     ; rhs_ty <- tcCheckLHsTypeInContext hs_rhs_ty (TheKind rhs_kind)
+                     ; return (lhs_ty, rhs_ty) }
+
+       ; outer_bndrs <- scopedSortOuter outer_bndrs
+       ; let outer_tvs = outerTyVars outer_bndrs
+       ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
+
+       ; traceTc "tcTyFamInstEqnGuts 1" (pprTyVars outer_tvs $$ ppr skol_info)
+
+       -- This code (and the stuff immediately above) is very similar
+       -- to that in tcDataFamInstHeader.  Maybe we should abstract the
+       -- common code; but for the moment I concluded that it's
+       -- clearer to duplicate it.  Still, if you fix a bug here,
+       -- check there too!
+
+       -- See Note [Generalising in tcTyFamInstEqnGuts]
+       ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
+       ; qtvs <- quantifyTyVars skol_info TryNotToDefaultNonStandardTyVars dvs
+       ; let final_tvs = scopedSort (qtvs ++ outer_tvs)
+             -- This scopedSort is important: the qtvs may be /interleaved/ with
+             -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
+       ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
+
+       ; traceTc "tcTyFamInstEqnGuts 2" $
+         vcat [ ppr fam_tc
+              , text "lhs_ty:"    <+> ppr lhs_ty
+              , text "final_tvs:" <+> pprTyVars final_tvs ]
+
+       -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
+       -- Example: typecheck/should_fail/T17301
+       ; dvs_rhs <- candidateQTyVarsOfType rhs_ty
+       ; let err_ctx tidy_env
+               = do { (tidy_env2, rhs_ty) <- zonkTidyTcType tidy_env rhs_ty
+                    ; return (tidy_env2, UninfTyCtx_TyFamRhs rhs_ty) }
+       ; doNotQuantifyTyVars dvs_rhs err_ctx
+
+       ; (final_tvs, non_user_tvs, lhs_ty, rhs_ty) <- initZonkEnv NoFlexi $
+         runZonkBndrT (zonkTyBndrsX final_tvs) $ \ final_tvs ->
+           do { lhs_ty       <- zonkTcTypeToTypeX lhs_ty
+              ; rhs_ty       <- zonkTcTypeToTypeX rhs_ty
+              ; non_user_tvs <- traverse lookupTyVarX qtvs
+              ; return (final_tvs, non_user_tvs, lhs_ty, rhs_ty) }
+
+       ; let pats = unravelFamInstPats lhs_ty
+             -- Note that we do this after solveEqualities
+             -- so that any strange coercions inside lhs_ty
+             -- have been solved before we attempt to unravel it
+
+       ; traceTc "tcTyFamInstEqnGuts }" (vcat [ ppr fam_tc, pprTyVars final_tvs ])
+                 -- Don't try to print 'pats' here, because lhs_ty involves
+                 -- a knot-tied type constructor, so we get a black hole
+
+       ; return (final_tvs, mkVarSet non_user_tvs, pats, rhs_ty) }
+
 tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
                    -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
                    -> HsFamEqnPats GhcRn                -- Patterns
