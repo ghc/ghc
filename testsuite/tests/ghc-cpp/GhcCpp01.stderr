@@ -13,7 +13,7 @@
 
 #define MIN_VERSION_Cabal_syntax(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 15 || ( major1 ) == 3 && ( major2 ) == 15 && ( minor ) <= 0 )
 
-#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250506 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250506 && ( pl2 ) <= 0 )
+#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250517 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250517 && ( pl2 ) <= 0 )
 
 #define MIN_VERSION_array(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 5 || ( major1 ) == 0 && ( major2 ) == 5 && ( minor ) <= 8 )
 
@@ -188,9 +188,9 @@
 #define VERSION_xhtml 3000.2.2.1
 
 
-#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250506
+#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250517
 
-#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250506
+#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250517
 
 #define __GLASGOW_HASKELL_PATCHLEVEL2__ 0
 
@@ -242,6 +242,11 @@
 - |#if CH_MIN_VERSION_Cabal(1,22,0)
   |z = 1
 - |#endif
+
+- |/* multi-line
+   cpp-style comment */
+- |{- Haskell comment
+   /* ignores cpp comments, so unclosed is fine -}
   |
 ------------------------------
 

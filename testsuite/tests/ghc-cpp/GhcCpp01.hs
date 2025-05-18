@@ -43,3 +43,8 @@ aa = 1
 #if CH_MIN_VERSION_Cabal(1,22,0)
 z = 1
 #endif
+
+/* multi-line
+   cpp-style comment */
+{- Haskell comment
+   /* ignores cpp comments, so unclosed is fine -}
