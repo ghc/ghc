@@ -273,7 +273,7 @@ $tab          { warnTab }
 -- set.
 
 "{-" / { isNormalComment }       { nested_comment }
--- "/*" / { ifExtension GhcCppBit } { nested_comment }
+"/*" / { ifExtension GhcCppBit } { cpp_comment }
 
 -- Single-line comments are a bit tricky.  Haskell 98 says that two or
 -- more dashes followed by a symbol should be parsed as a varsym, so we
@@ -1587,15 +1587,14 @@ nested_doc_comment span buf _len _buf2 = {-# SCC "nested_doc_comment" #-} withLe
         dropTrailingDec "-}" = ""
         dropTrailingDec (x:xs) = x:dropTrailingDec xs
 
--- TODO:AZ delete this
-nested_cpp_comment :: Action p
-nested_cpp_comment span buf len _buf2 = {-# SCC "nested_comment" #-} do
+cpp_comment :: Action p
+cpp_comment span buf len _buf2 = {-# SCC "cpp_comment" #-} do
   l <- getLastLocIncludingComments
   let endComment input (L _ comment) = commentEnd lexToken input (Nothing, ITblockComment comment l) buf span
   input <- getInput
   -- Include decorator in comment
   let start_decorator = reverse $ lexemeToString buf len
-  nested_cpp_comment_logic endComment start_decorator input span
+  cpp_comment_logic endComment start_decorator input span
 
 {-# INLINE nested_comment_logic #-}
 -- | Includes the trailing '-}' decorators
@@ -1613,7 +1612,7 @@ nested_comment_logic endComment commentAcc input span = go commentAcc (1::Int) i
           cspan = mkSrcSpanPs $ mkPsSpan (psSpanStart span) end_loc
           lcomment = L cspan comment
       endComment input lcomment
-    go commentAcc n input = ghcCppSet >>= \ghcCppSet -> case alexGetChar' input of
+    go commentAcc n input = case alexGetChar' input of
       Nothing -> errBrace input (psRealSpan span)
       Just ('-',input) -> case alexGetChar' input of
         Nothing  -> errBrace input (psRealSpan span)
@@ -1631,48 +1630,29 @@ nested_comment_logic endComment commentAcc input span = go commentAcc (1::Int) i
         Just (_,_)   -> go ('\n':commentAcc) n input
       Just (c,input) -> go (c:commentAcc) n input
 
--- TODO:AZ delete this
-{-# INLINE nested_cpp_comment_logic #-}
+{-# INLINE cpp_comment_logic #-}
 -- | Includes the trailing '*/' decorators
 -- drop the last two elements with the callback if you don't want them to be included
-nested_cpp_comment_logic
+cpp_comment_logic
   :: (AlexInput -> Located String -> P p (PsLocated Token))  -- ^ Continuation that gets the rest of the input and the lexed comment
   -> String -- ^ starting value for accumulator (reversed) - When we want to include a decorator '/*' in the comment
   -> AlexInput
   -> PsSpan
   -> P p (PsLocated Token)
-nested_cpp_comment_logic endComment commentAcc input span = go commentAcc (1::Int) input
+cpp_comment_logic endComment commentAcc input span = go commentAcc (1::Int) input
   where
     go commentAcc 0 input@(AI end_loc _) = do
       let comment = reverse commentAcc
           cspan = mkSrcSpanPs $ mkPsSpan (psSpanStart span) end_loc
           lcomment = L cspan comment
       endComment input lcomment
-    go commentAcc n input = ghcCppSet >>= \ghcCppSet -> case (ghcCppSet, alexGetChar' input) of
-      (_, Nothing) -> errBrace input (psRealSpan span)
-      (_, Just ('-',input)) -> case alexGetChar' input of
-        Nothing  -> errBrace input (psRealSpan span)
-        Just ('\125',input) -> go ('\125':'-':commentAcc) (n-1) input -- '}'
-        Just (_,_)          -> go ('-':commentAcc) n input
-      (_, Just ('\123',input)) -> case alexGetChar' input of  -- '{' char
-        Nothing  -> errBrace input (psRealSpan span)
-        Just ('-',input) -> go ('-':'\123':commentAcc) (n+1) input
-        Just (_,_)       -> go ('\123':commentAcc) n input
-      (True, Just ('*',input)) -> case alexGetChar' input of
+    go commentAcc n input = case alexGetChar' input of
+      Nothing -> errBrace input (psRealSpan span)
+      Just ('*',input) -> case alexGetChar' input of
         Nothing  -> errBrace input (psRealSpan span)
         Just ('/',input) -> go ('/':'*':commentAcc) (n-1) input -- '/'
         Just (_,_)          -> go ('*':commentAcc) n input
-      (True, Just ('/',input)) -> case alexGetChar' input of  -- '/' char
-        Nothing  -> errBrace input (psRealSpan span)
-        Just ('*',input) -> go ('*':'/':commentAcc) (n+1) input
-        Just (_,_)       -> go ('/':commentAcc) n input
-      -- See Note [Nested comment line pragmas]
-      (_, Just ('\n',input)) -> case alexGetChar' input of
-        Nothing  -> errBrace input (psRealSpan span)
-        Just ('#',_) -> do (parsedAcc,input) <- parseNestedPragma input
-                           go (parsedAcc ++ '\n':commentAcc) n input
-        Just (_,_)   -> go ('\n':commentAcc) n input
-      (_, Just (c,input)) -> go (c:commentAcc) n input
+      Just (c,input) -> go (c:commentAcc) n input
 
 
 ghcCppSet :: P p Bool
