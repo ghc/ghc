@@ -3726,6 +3726,10 @@ generalising over the type of a rewrite rule.
 
 --------------------------
 
+-- | Controls how the RHS type is checked in tcTyFamInstEqnGutsImpl
+data RhsCheckingStrategy = CheckRhsWithLhs  -- ^ Check RHS with LHS in the same operation
+                         | CheckRhsSeparately -- ^ Check RHS separately after LHS
+
 tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
                    -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
                    -> HsFamEqnPats GhcRn                -- Patterns
@@ -3744,30 +3748,43 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
     
     -- Call the specific implementations
     res <- tcTyFamInstEqnGuts_old skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
-    tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+    _ <- tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
     return res
 
-tcTyFamInstEqnGuts_old :: SkolemInfo -> TyCon -> AssocInstInfo
-                   -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
-                   -> HsFamEqnPats GhcRn                -- Patterns
-                   -> LHsType GhcRn                     -- RHS
-                   -> TcM ([TyVar], TyVarSet, [TcType], TcType)
-                       -- (tyvars, non_user_tvs, pats, rhs)
+-- | Implementation of tcTyFamInstEqnGuts with different strategies for RHS checking
+-- Used by both tcTyFamInstEqnGuts_old and tcTyFamInstEqnGuts_error
+tcTyFamInstEqnGutsImpl :: RhsCheckingStrategy  -- ^ How to check the RHS type
+                       -> SkolemInfo
+                       -> TyCon -> AssocInstInfo
+                       -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
+                       -> HsFamEqnPats GhcRn                -- Patterns
+                       -> LHsType GhcRn                     -- RHS
+                       -> TcM ([TyVar], TyVarSet, [TcType], TcType)
+                           -- (tyvars, non_user_tvs, pats, rhs)
 -- Used only for type families, not data families
-tcTyFamInstEqnGuts_old skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+tcTyFamInstEqnGutsImpl strategy skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
   = do {
-
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
-       ; (tclvl, wanted, (outer_bndrs, (lhs_ty, rhs_ty)))
-               <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
+       ; (tclvl, wanted, (outer_bndrs, (lhs_ty, rhs_kind_or_ty))) <-
+            case strategy of
+              CheckRhsWithLhs ->
+                pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
                   bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
                   do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
                      ; addConsistencyConstraints mb_clsinfo lhs_ty
                      ; rhs_ty <- tcCheckLHsTypeInContext hs_rhs_ty (TheKind rhs_kind)
-                     ; return (lhs_ty, rhs_ty) }
+                     ; return (lhs_ty, Right rhs_ty) }
+              CheckRhsSeparately ->
+                pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
+                  bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
+                  do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
+                       -- Ensure that the instance is consistent with its
+                       -- parent class (#16008)
+                     ; addConsistencyConstraints mb_clsinfo lhs_ty
+                     ; return (lhs_ty, Left rhs_kind) }
 
        ; outer_bndrs <- scopedSortOuter outer_bndrs
        ; let outer_tvs = outerTyVars outer_bndrs
@@ -3794,20 +3811,58 @@ tcTyFamInstEqnGuts_old skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs
               , text "lhs_ty:"    <+> ppr lhs_ty
               , text "final_tvs:" <+> pprTyVars final_tvs ]
 
-       -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
-       -- Example: typecheck/should_fail/T17301
-       ; dvs_rhs <- candidateQTyVarsOfType rhs_ty
-       ; let err_ctx tidy_env
-               = do { (tidy_env2, rhs_ty) <- zonkTidyTcType tidy_env rhs_ty
-                    ; return (tidy_env2, UninfTyCtx_TyFamRhs rhs_ty) }
-       ; doNotQuantifyTyVars dvs_rhs err_ctx
+       -- Get the rhs_ty based on the strategy
+       ; rhs_ty <- case rhs_kind_or_ty of
+                      Right rhs_ty -> return rhs_ty
+                      Left rhs_kind -> do 
+                         (tclvl_rhs, wanted_rhs, rhs_ty) <-
+                           pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
+                           tcExtendTyVarEnv final_tvs $
+                           tcCheckLHsType hs_rhs_ty rhs_kind
+                         reportUnsolvedEqualities skol_info final_tvs tclvl_rhs wanted_rhs
+                         return rhs_ty
 
-       ; (final_tvs, non_user_tvs, lhs_ty, rhs_ty) <- initZonkEnv NoFlexi $
-         runZonkBndrT (zonkTyBndrsX final_tvs) $ \ final_tvs ->
-           do { lhs_ty       <- zonkTcTypeToTypeX lhs_ty
-              ; rhs_ty       <- zonkTcTypeToTypeX rhs_ty
-              ; non_user_tvs <- traverse lookupTyVarX qtvs
-              ; return (final_tvs, non_user_tvs, lhs_ty, rhs_ty) }
+       -- Different zonking strategy based on the RHS checking strategy
+       ; (final_tvs, non_user_tvs, lhs_ty, rhs_ty) <- case strategy of
+           CheckRhsWithLhs -> do
+             -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
+             -- Example: typecheck/should_fail/T17301
+             dvs_rhs <- candidateQTyVarsOfType rhs_ty
+             let err_ctx tidy_env
+                     = do { (tidy_env2, rhs_ty) <- zonkTidyTcType tidy_env rhs_ty
+                          ; return (tidy_env2, UninfTyCtx_TyFamRhs rhs_ty) }
+             doNotQuantifyTyVars dvs_rhs err_ctx
+
+             -- Zonk everything at once
+             initZonkEnv NoFlexi $
+               runZonkBndrT (zonkTyBndrsX final_tvs) $ \ final_tvs ->
+                 do { lhs_ty       <- zonkTcTypeToTypeX lhs_ty
+                    ; rhs_ty       <- zonkTcTypeToTypeX rhs_ty
+                    ; non_user_tvs <- traverse lookupTyVarX qtvs
+                    ; return (final_tvs, non_user_tvs, lhs_ty, rhs_ty) }
+           
+           CheckRhsSeparately -> do
+             -- Zonk in two steps
+             (final_tvs, non_user_tvs, lhs_ty) <- initZonkEnv NoFlexi $
+               runZonkBndrT (zonkTyBndrsX final_tvs) $ \ final_tvs ->
+                 do { lhs_ty       <- zonkTcTypeToTypeX lhs_ty
+                    ; non_user_tvs <- traverse lookupTyVarX qtvs
+                    ; return (final_tvs, non_user_tvs, lhs_ty) }
+
+             -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
+             -- Example: typecheck/should_fail/T17301
+             dvs_rhs <- candidateQTyVarsOfType rhs_ty
+             let err_ctx tidy_env
+                     = do { (tidy_env2, rhs_ty) <- zonkTidyTcType tidy_env rhs_ty
+                          ; return (tidy_env2, UninfTyCtx_TyFamRhs rhs_ty) }
+             doNotQuantifyTyVars dvs_rhs err_ctx
+
+             -- Zonk the rhs separately
+             rhs_ty_zonked <- initZonkEnv NoFlexi $
+               runZonkBndrT (zonkTyBndrsX final_tvs) $ \ _ ->
+                 zonkTcTypeToTypeX rhs_ty
+             
+             return (final_tvs, non_user_tvs, lhs_ty, rhs_ty_zonked)
 
        ; let pats = unravelFamInstPats lhs_ty
              -- Note that we do this after solveEqualities
@@ -3820,59 +3875,24 @@ tcTyFamInstEqnGuts_old skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs
 
        ; return (final_tvs, mkVarSet non_user_tvs, pats, rhs_ty) }
 
+tcTyFamInstEqnGuts_old :: SkolemInfo -> TyCon -> AssocInstInfo
+                   -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
+                   -> HsFamEqnPats GhcRn                -- Patterns
+                   -> LHsType GhcRn                     -- RHS
+                   -> TcM ([TyVar], TyVarSet, [TcType], TcType)
+                       -- (tyvars, non_user_tvs, pats, rhs)
+-- Used only for type families, not data families
+tcTyFamInstEqnGuts_old = tcTyFamInstEqnGutsImpl CheckRhsWithLhs
+
 tcTyFamInstEqnGuts_error :: SkolemInfo -> TyCon -> AssocInstInfo
                    -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
                    -> HsFamEqnPats GhcRn                -- Patterns
                    -> LHsType GhcRn                     -- RHS
                    -> TcM ()
 -- Used only for type families, not data families
-tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
-  = do {
-
-       -- This code is closely related to the code
-       -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
-       ; (tclvl, wanted, (outer_bndrs, (lhs_ty, rhs_kind)))
-               <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
-                  bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs   $
-                  do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
-                       -- Ensure that the instance is consistent with its
-                       -- parent class (#16008)
-                     ; addConsistencyConstraints mb_clsinfo lhs_ty
-                     ; return (lhs_ty, rhs_kind) }
-
-       ; outer_bndrs <- scopedSortOuter outer_bndrs
-       ; let outer_tvs = outerTyVars outer_bndrs
-       ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
-
-       ; traceTc "tcTyFamInstEqnGuts 1" (pprTyVars outer_tvs $$ ppr skol_info)
-
-       -- This code (and the stuff immediately above) is very similar
-       -- to that in tcDataFamInstHeader.  Maybe we should abstract the
-       -- common code; but for the moment I concluded that it's
-       -- clearer to duplicate it.  Still, if you fix a bug here,
-       -- check there too!
-
-       -- See Note [Generalising in tcTyFamInstEqnGuts]
-       ; dvs  <- candidateQTyVarsWithBinders outer_tvs lhs_ty
-       ; qtvs <- quantifyTyVars skol_info TryNotToDefaultNonStandardTyVars dvs
-       ; let final_tvs = scopedSort (qtvs ++ outer_tvs)
-             -- This scopedSort is important: the qtvs may be /interleaved/ with
-             -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
-       ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
-
-       ; traceTc "tcTyFamInstEqnGuts 2" $
-         vcat [ ppr fam_tc
-              , text "lhs_ty:"    <+> ppr lhs_ty
-              , text "final_tvs:" <+> pprTyVars final_tvs ]
-
-       ; (tclvl_rhs, wanted_rhs, _) <-
-                pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
-                tcExtendTyVarEnv final_tvs $
-                tcCheckLHsType hs_rhs_ty rhs_kind
-
-       ; reportUnsolvedEqualities skol_info final_tvs tclvl_rhs wanted_rhs
-
-       ; return () }
+tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty =
+  do { _ <- tcTyFamInstEqnGutsImpl CheckRhsSeparately skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+     ; return () }
 
 checkFamTelescope :: TcLevel
                   -> HsOuterFamEqnTyVarBndrs GhcRn
