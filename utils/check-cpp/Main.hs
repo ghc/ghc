@@ -878,3 +878,16 @@ t39 = do
         , "x='a'"
         , ""
         ]
+
+t40 :: IO ()
+t40 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "/* multi-line"
+        , "   cpp-style comment */"
+        , "module Example16 where"
+        , "{- Haskell comment"
+        , "   /* ignores cpp comments, so unclosed is fine -}"
+        , "x='a'"
+        , ""
+        ]
