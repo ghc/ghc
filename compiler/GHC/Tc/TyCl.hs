@@ -3746,9 +3746,9 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
     -- have checked that the number of patterns matches tyConArity
     skol_info <- mkSkolemInfo FamInstSkol
     
-    -- Call the specific implementations
-    res <- tcTyFamInstEqnGuts_old skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
-    _ <- tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+    -- Call the implementation with both strategies
+    res <- tcTyFamInstEqnGutsImpl CheckRhsWithLhs skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+    _ <- tcTyFamInstEqnGutsImpl CheckRhsSeparately skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
     return res
 
 -- | Implementation of tcTyFamInstEqnGuts with different strategies for RHS checking
@@ -3761,7 +3761,6 @@ tcTyFamInstEqnGutsImpl :: RhsCheckingStrategy  -- ^ How to check the RHS type
                        -> LHsType GhcRn                     -- RHS
                        -> TcM ([TyVar], TyVarSet, [TcType], TcType)
                            -- (tyvars, non_user_tvs, pats, rhs)
--- Used only for type families, not data families
 tcTyFamInstEqnGutsImpl strategy skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
   = do {
        -- This code is closely related to the code
@@ -3875,24 +3874,7 @@ tcTyFamInstEqnGutsImpl strategy skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pa
 
        ; return (final_tvs, mkVarSet non_user_tvs, pats, rhs_ty) }
 
-tcTyFamInstEqnGuts_old :: SkolemInfo -> TyCon -> AssocInstInfo
-                   -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
-                   -> HsFamEqnPats GhcRn                -- Patterns
-                   -> LHsType GhcRn                     -- RHS
-                   -> TcM ([TyVar], TyVarSet, [TcType], TcType)
-                       -- (tyvars, non_user_tvs, pats, rhs)
--- Used only for type families, not data families
-tcTyFamInstEqnGuts_old = tcTyFamInstEqnGutsImpl CheckRhsWithLhs
 
-tcTyFamInstEqnGuts_error :: SkolemInfo -> TyCon -> AssocInstInfo
-                   -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
-                   -> HsFamEqnPats GhcRn                -- Patterns
-                   -> LHsType GhcRn                     -- RHS
-                   -> TcM ()
--- Used only for type families, not data families
-tcTyFamInstEqnGuts_error skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty =
-  do { _ <- tcTyFamInstEqnGutsImpl CheckRhsSeparately skol_info fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
-     ; return () }
 
 checkFamTelescope :: TcLevel
                   -> HsOuterFamEqnTyVarBndrs GhcRn
