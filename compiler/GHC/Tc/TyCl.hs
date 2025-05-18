@@ -3726,14 +3726,27 @@ generalising over the type of a rewrite rule.
 
 --------------------------
 
-tcTyFamInstEqnGuts2 :: TyCon -> AssocInstInfo
+tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
                    -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
                    -> HsFamEqnPats GhcRn                -- Patterns
                    -> LHsType GhcRn                     -- RHS
                    -> TcM ([TyVar], TyVarSet, [TcType], TcType)
                        -- (tyvars, non_user_tvs, pats, rhs)
 -- Used only for type families, not data families
-tcTyFamInstEqnGuts2 fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+  = do
+    res <- tcTyFamInstEqnGuts_old fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+    _ <- tcTyFamInstEqnGuts_error fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+    return res
+
+tcTyFamInstEqnGuts_old :: TyCon -> AssocInstInfo
+                   -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
+                   -> HsFamEqnPats GhcRn                -- Patterns
+                   -> LHsType GhcRn                     -- RHS
+                   -> TcM ([TyVar], TyVarSet, [TcType], TcType)
+                       -- (tyvars, non_user_tvs, pats, rhs)
+-- Used only for type families, not data families
+tcTyFamInstEqnGuts_old fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
   = do { traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc $$ ppr outer_hs_bndrs $$ ppr hs_pats)
 
        -- By now, for type families (but not data families) we should
@@ -3803,14 +3816,14 @@ tcTyFamInstEqnGuts2 fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
 
        ; return (final_tvs, mkVarSet non_user_tvs, pats, rhs_ty) }
 
-tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
+tcTyFamInstEqnGuts_error :: TyCon -> AssocInstInfo
                    -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
                    -> HsFamEqnPats GhcRn                -- Patterns
                    -> LHsType GhcRn                     -- RHS
                    -> TcM ([TyVar], TyVarSet, [TcType], TcType)
                        -- (tyvars, non_user_tvs, pats, rhs)
 -- Used only for type families, not data families
-tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
+tcTyFamInstEqnGuts_error fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
   = do { traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc $$ ppr outer_hs_bndrs $$ ppr hs_pats)
 
        -- By now, for type families (but not data families) we should
@@ -3856,7 +3869,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        ; (tclvl_rhs, wanted_rhs, rhs_ty) <-
                 pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
                 tcExtendTyVarEnv final_tvs $
-                tcCheckLHsType hs_rhs_ty (TheKind rhs_kind)
+                tcCheckLHsType hs_rhs_ty rhs_kind
 
        ; reportUnsolvedEqualities skol_info final_tvs tclvl_rhs wanted_rhs
 
