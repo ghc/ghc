@@ -410,7 +410,16 @@ deriving instance Data (HsUntypedSplice GhcPs)
 deriving instance Data (HsUntypedSplice GhcRn)
 deriving instance Data (HsUntypedSplice GhcTc)
 
+deriving instance Data (HsTypedSplice GhcPs)
+deriving instance Data (HsTypedSplice GhcRn)
+deriving instance Data (HsTypedSplice GhcTc)
+
+deriving instance Data HsImplicitLiftSplice
+deriving instance Data HsUserSpliceExt
+deriving instance Data HsQuasiQuoteExt
+
 deriving instance Data a => Data (HsUntypedSpliceResult a)
+deriving instance Data HsTypedSpliceResult
 
 -- deriving instance (DataIdLR p p) => Data (HsQuote p)
 deriving instance Data (HsQuote GhcPs)

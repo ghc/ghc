@@ -45,7 +45,7 @@ module GHC.Types.Name.Reader (
         isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
         -- ** Preserving user-written qualification
-        WithUserRdr(..), noUserRdr, unLocWithUserRdr,
+        WithUserRdr(..), noUserRdr, unLocWithUserRdr, userRdrName,
 
         -- * Local mapping of 'RdrName' to 'Name.Name'
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
@@ -2212,6 +2212,9 @@ unLocWithUserRdr (L _ (WithUserRdr _ a)) = a
 
 noUserRdr :: Name -> WithUserRdr Name
 noUserRdr n = WithUserRdr (nameRdrName n) n
+
+userRdrName :: WithUserRdr Name -> RdrName
+userRdrName (WithUserRdr rdr _) = rdr
 
 rdrQual_maybe :: RdrName -> Maybe ModuleName
 rdrQual_maybe = \case

@@ -1,0 +1,12 @@
+QQTopError.hs:4:9: error: [GHC-83865]
+    • Couldn't match expected type ‘GHC.Internal.TH.Quote.QuasiQuoter’
+                  with actual type ‘a0 -> a0’
+    • Probable cause: ‘id’ is applied to too few arguments
+      In the first argument of ‘GHC.Internal.TH.Quote.quoteExp’, namely
+        ‘id’
+      In the expression: GHC.Internal.TH.Quote.quoteExp id "hello"
+      In the quasi-quotation: [id|hello|]
+  |
+4 | main = [id|hello|]
+  |         ^^
+

@@ -489,7 +489,7 @@ data HsExpr p
 
   | HsTypedBracket   (XTypedBracket p)   (LHsExpr p)
   | HsUntypedBracket (XUntypedBracket p) (HsQuote p)
-  | HsTypedSplice    (XTypedSplice p)   (LHsExpr p) -- `$$z` or `$$(f 4)`
+  | HsTypedSplice    (XTypedSplice p)   (HsTypedSplice p) -- `$$z` or `$$(f 4)`
   | HsUntypedSplice  (XUntypedSplice p) (HsUntypedSplice p)
 
   -----------------------------------------------------------
@@ -1319,11 +1319,15 @@ data HsUntypedSplice id
 
    | HsQuasiQuote            -- See Note [Quasi-quote overview]
         (XQuasiQuote id)
-        (IdP id)             -- The quoter (the bit between `[` and `|`)
+        (LIdP id)             -- The quoter (the bit between `[` and `|`)
         (XRec id FastString) -- The enclosed string
 
    | XUntypedSplice !(XXUntypedSplice id) -- Extension point; see Note [Trees That Grow]
                                           -- in Language.Haskell.Syntax.Extension
+
+data HsTypedSplice id
+  = HsTypedSpliceExpr (XTypedSpliceExpr id) (LHsExpr id)
+  | XTypedSplice !(XXTypedSplice id)
 
 -- | Haskell (Untyped) Quote = Expr + Pat + Type + Var
 data HsQuote p

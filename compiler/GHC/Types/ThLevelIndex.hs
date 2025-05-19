@@ -3,9 +3,10 @@ module GHC.Types.ThLevelIndex where
 import GHC.Prelude
 import GHC.Utils.Outputable
 import GHC.Types.Basic ( ImportLevel(..) )
+import Data.Data
 
 -- | The integer which represents the level
-newtype ThLevelIndex = ThLevelIndex Int deriving (Eq, Ord)
+newtype ThLevelIndex = ThLevelIndex Int deriving (Eq, Ord, Data)
     -- NB: see Note [Template Haskell levels] in GHC.Tc.Gen.Splice
     -- Incremented when going inside a bracket,
     -- decremented when going inside a splice

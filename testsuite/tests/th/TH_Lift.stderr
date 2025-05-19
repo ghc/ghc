@@ -1,164 +1,51 @@
 TH_Lift.hs:18:6-39: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Integer)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Integer) ======> 5
 TH_Lift.hs:21:6-35: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Int)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Int) ======> 5
 TH_Lift.hs:24:7-37: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Int8)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Int8) ======> 5
 TH_Lift.hs:27:7-38: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Int16)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Int16) ======> 5
 TH_Lift.hs:30:7-38: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Int32)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Int32) ======> 5
 TH_Lift.hs:33:7-38: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Int64)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Int64) ======> 5
 TH_Lift.hs:36:6-36: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Word)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Word) ======> 5
 TH_Lift.hs:39:6-37: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Word8)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Word8) ======> 5
 TH_Lift.hs:42:6-38: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Word16)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Word16) ======> 5
 TH_Lift.hs:45:6-38: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Word32)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Word32) ======> 5
 TH_Lift.hs:48:6-38: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Word64)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Word64) ======> 5
 TH_Lift.hs:51:7-40: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 :: Natural)
-  ======>
-    5
+    (\ x -> [| x |]) (5 :: Natural) ======> 5
 TH_Lift.hs:54:6-44: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (5 % 3 :: Rational)
-  ======>
-    1.6666666666666667
+    (\ x -> [| x |]) (5 % 3 :: Rational) ======> 1.6666666666666667
 TH_Lift.hs:57:7-39: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (pi :: Float)
-  ======>
-    3.1415927410125732
+    (\ x -> [| x |]) (pi :: Float) ======> 3.1415927410125732
 TH_Lift.hs:60:7-40: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (pi :: Double)
-  ======>
-    3.141592653589793
+    (\ x -> [| x |]) (pi :: Double) ======> 3.141592653589793
 TH_Lift.hs:63:6-28: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      'x'
-  ======>
-    'x'
+    (\ x -> [| x |]) 'x' ======> 'x'
 TH_Lift.hs:66:6-29: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      True
-  ======>
-    True
+    (\ x -> [| x |]) True ======> True
 TH_Lift.hs:69:6-35: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (Just 'x')
-  ======>
-    Just 'x'
+    (\ x -> [| x |]) (Just 'x') ======> Just 'x'
 TH_Lift.hs:72:6-58: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (Right False :: Either Char Bool)
+    (\ x -> [| x |]) (Right False :: Either Char Bool)
   ======>
     Right False
 TH_Lift.hs:75:6-29: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      "hi!"
-  ======>
-    "hi!"
+    (\ x -> [| x |]) "hi!" ======> "hi!"
 TH_Lift.hs:78:6-27: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      ()
-  ======>
-    ()
+    (\ x -> [| x |]) () ======> ()
 TH_Lift.hs:81:6-46: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      (True, 'x', 4 :: Int)
-  ======>
-    (,,) True 'x' 4
+    (\ x -> [| x |]) (True, 'x', 4 :: Int) ======> (,,) True 'x' 4
 TH_Lift.hs:84:6-41: Splicing expression
-    (\ x
-       -> [| x |]
-          pending(rn) [<x, lift x>])
-      ('a' :| "bcde")
-  ======>
-    (:|) 'a' "bcde"
+    (\ x -> [| x |]) ('a' :| "bcde") ======> (:|) 'a' "bcde"
 TH_Lift.hs:87:8-31: Splicing expression
     [| 3 + 4 |] >>= lift
   ======>
