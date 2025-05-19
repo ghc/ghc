@@ -830,16 +830,15 @@ addDLL_PEi386( pathchar *dll_name, HINSTANCE *loaded )
                     goto error;
                 }
             } else {
-                break; /* We're done. DLL has been loaded.  */
+                goto loaded; /* We're done. DLL has been loaded.  */
             }
         }
     }
 
-    /* Check if we managed to load the DLL.  */
-    if (instance == NULL) {
-        goto error;
-    }
+    // We failed to load
+    goto error;
 
+loaded:
     addDLLHandle(buf, instance);
     if (loaded) {
         *loaded = instance;
