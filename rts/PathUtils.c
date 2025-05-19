@@ -13,7 +13,7 @@
 #include <wchar.h>
 #endif
 
-pathchar* pathdup(pathchar *path)
+pathchar* pathdup(const pathchar *path)
 {
     pathchar *ret;
 #if defined(mingw32_HOST_OS)
@@ -26,7 +26,7 @@ pathchar* pathdup(pathchar *path)
     return ret;
 }
 
-pathchar* pathdir(pathchar *path)
+pathchar* pathdir(const pathchar *path)
 {
     pathchar *ret;
 #if defined(mingw32_HOST_OS)
@@ -40,7 +40,8 @@ pathchar* pathdir(pathchar *path)
     stgFree(drive);
     stgFree(dirName);
 #else
-    pathchar* dirName = dirname(path);
+    // N.B. cast is safe as we do not modify dirName
+    const pathchar* dirName = dirname((pathchar *) path);
     size_t memberLen  = pathlen(dirName);
     ret = stgMallocBytes(pathsize * (memberLen + 2), "pathdir(path)");
     strcpy(ret, dirName);
@@ -50,7 +51,7 @@ pathchar* pathdir(pathchar *path)
     return ret;
 }
 
-pathchar* mkPath(char* path)
+pathchar* mkPath(const char* path)
 {
 #if defined(mingw32_HOST_OS)
     size_t required = mbstowcs(NULL, path, 0);
@@ -66,7 +67,7 @@ pathchar* mkPath(char* path)
 #endif
 }
 
-HsBool endsWithPath(pathchar* base, pathchar* str) {
+HsBool endsWithPath(const pathchar* base, const pathchar* str) {
     int blen = pathlen(base);
     int slen = pathlen(str);
     return (blen >= slen) && (0 == pathcmp(base + blen - slen, str));
