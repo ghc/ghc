@@ -37,9 +37,9 @@
 
 #include "BeginPrivate.h"
 
-pathchar* pathdup(pathchar *path);
-pathchar* pathdir(pathchar *path);
-pathchar* mkPath(char* path);
-HsBool endsWithPath(pathchar* base, pathchar* str);
+pathchar* pathdup(const pathchar *path);
+pathchar* pathdir(const pathchar *path);
+pathchar* mkPath(const char* path);
+HsBool endsWithPath(const pathchar* base, const pathchar* str);
 
 #include "EndPrivate.h"
