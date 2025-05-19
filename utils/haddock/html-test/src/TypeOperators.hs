@@ -1,5 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeOperators, GADTs, MultiParamTypeClasses, FlexibleContexts #-}
+-- | This documentation refers to '~', ':-:', ':+:', '<=>', and '|||'.
 module TypeOperators where
 
 data a :-: b
@@ -11,6 +12,8 @@ data a `Op` b
 newtype (g `O` f) a = O { unO :: g (f a) }
 
 class a <=> b
+
+type (|||) = Either
 
 biO :: (g `O` f) a
 biO = undefined
