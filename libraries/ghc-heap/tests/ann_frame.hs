@@ -1,5 +1,6 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 import Data.Typeable
 import GHC.Exts
@@ -16,8 +17,9 @@ annotateStack
   :: forall a r b.
      (Typeable a, Show a)
   => a -> b -> b
-annotateStack ann =
-  annotateStack# (StackAnnotation ann)
+annotateStack ann b =
+  case annotateStack# (StackAnnotation ann) b of
+    (# r #) -> r
 
 hello :: Int -> Int -> Int
 hello x y = annotateStack (x,y) $

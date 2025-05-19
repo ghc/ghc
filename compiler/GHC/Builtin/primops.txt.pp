@@ -3932,7 +3932,7 @@ section "Annotating call stacks"
 ------------------------------------------------------------------------
 
 primop AnnotateStackOp "annotateStack#" GenPrimOp
-   b -> a_reppoly -> a_reppoly
+   b -> a -> (# a #)
    { Pushes an annotation frame to the stack which can be reported by backtraces. }
    with
    out_of_line = True
