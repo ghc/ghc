@@ -1,12 +1,15 @@
-
 RepPolyMcBind.hs:26:16: error: [GHC-55287]
     • The first argument of the rebindable syntax operator ‘(>>=)’
         arising from a statement in a monad comprehension
       does not have a fixed runtime representation.
       Its type is:
         ma0 :: TYPE rep0
+      When unifying:
+        • mc0
+        • ma
       Cannot unify ‘rep’ with the type variable ‘rep0’
       because the former is not a concrete ‘RuntimeRep’.
     • In a stmt of a monad comprehension: x <- undefined :: ma
       In the expression: [() | x <- undefined :: ma]
       In an equation for ‘foo’: foo _ = [() | x <- undefined :: ma]
+

@@ -1,9 +1,6 @@
 T8227.hs:24:27: error: [GHC-83865]
-    • Couldn't match type: Scalar (V a)
-                     with: Scalar (V p0) -> Scalar (V p0)
-      Expected: Scalar (V a)
-        Actual: Scalar (V (Scalar (V p0) -> p0))
-                -> Scalar (V (Scalar (V p0) -> p0))
+    • Couldn't match expected type: Scalar (V a)
+                  with actual type: Scalar (V p0) -> Scalar (V p0)
     • In the expression: arcLengthToParam eps eps
       In an equation for ‘absoluteToParam’:
           absoluteToParam eps seg = arcLengthToParam eps eps

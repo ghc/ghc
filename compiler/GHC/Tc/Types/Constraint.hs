@@ -17,7 +17,7 @@ module GHC.Tc.Types.Constraint (
         isUnsatisfiableCt_maybe,
         ctEvidence, updCtEvidence,
         ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
-        ctRewriters,
+        ctRewriters, ctHasNoRewriters, wantedCtHasNoRewriters,
         ctEvId, wantedEvId_maybe, mkTcEqPredLikeEv,
         mkNonCanonical, mkGivens,
         tyCoVarsOfCt, tyCoVarsOfCts,
@@ -38,7 +38,7 @@ module GHC.Tc.Types.Constraint (
         CtIrredReason(..), isInsolubleReason,
 
         CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
-        cteOK, cteImpredicative, cteTypeFamily, cteCoercionHole,
+        cteOK, cteImpredicative, cteTypeFamily,
         cteInsolubleOccurs, cteSolubleOccurs, cterSetOccursCheckSoluble,
         cteConcrete, cteSkolemEscape,
         impredicativeProblem, insolubleOccursProblem, solubleOccursProblem,
@@ -105,11 +105,14 @@ module GHC.Tc.Types.Constraint (
 
 import GHC.Prelude
 
+import GHC.Core
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Class
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Ppr
+
 import GHC.Types.Name
 import GHC.Types.Var
 
@@ -118,20 +121,19 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.CtLoc
 
-import GHC.Core
-
-import GHC.Core.TyCo.Ppr
-import GHC.Utils.FV
-import GHC.Types.Var.Set
 import GHC.Builtin.Names
-import GHC.Types.Unique.Set
 
+import GHC.Types.Var.Set
+import GHC.Types.Unique.Set
+import GHC.Types.Name.Reader
+
+import GHC.Utils.FV
 import GHC.Utils.Outputable
-import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Types.Name.Reader
+
+import GHC.Data.Bag
 
 import Data.Coerce
 import qualified Data.Semigroup as S
@@ -259,7 +261,7 @@ and that can be used to rewrite other constraints. It satisfies these invariants
     will not form an EqCt (a ~ ty).
 
   * (TyEq:CH) rhs does not mention any coercion holes that resulted from fixing up
-    a hetero-kinded equality.  See Note [Equalities with incompatible kinds] in
+    a hetero-kinded equality.  See Note [Equalities with heterogeneous kinds] in
     GHC.Tc.Solver.Equality, wrinkle (EIK2)
 
 These invariants ensure that the EqCts in inert_eqs constitute a terminating
@@ -528,7 +530,7 @@ cterHasNoProblem _        = False
 newtype CheckTyEqProblem = CTEP Word8
 
 cteImpredicative, cteTypeFamily, cteInsolubleOccurs,
-  cteSolubleOccurs, cteCoercionHole, cteConcrete,
+  cteSolubleOccurs, cteConcrete,
   cteSkolemEscape :: CheckTyEqProblem
 cteImpredicative   = CTEP (bit 0)   -- Forall or (=>) encountered
 cteTypeFamily      = CTEP (bit 1)   -- Type family encountered
@@ -540,8 +542,7 @@ cteSolubleOccurs   = CTEP (bit 3)   -- Occurs-check under a type function, or in
    -- cteSolubleOccurs must be one bit to the left of cteInsolubleOccurs
    -- See also Note [Insoluble mis-match] in GHC.Tc.Errors
 
-cteCoercionHole    = CTEP (bit 4)   -- Kind-equality coercion hole encountered
-                                    -- See (EIK2) in Note [Equalities with incompatible kinds]
+-- NB:  CTEP (bit 4) currently unused
 
 cteConcrete        = CTEP (bit 5)   -- Type variable that can't be made concrete
                                     --    e.g. alpha[conc] ~ Maybe beta[tv]
@@ -632,8 +633,7 @@ allBits = [ (cteImpredicative,   "cteImpredicative")
           , (cteInsolubleOccurs, "cteInsolubleOccurs")
           , (cteSolubleOccurs,   "cteSolubleOccurs")
           , (cteConcrete,        "cteConcrete")
-          , (cteSkolemEscape,    "cteSkolemEscape")
-          , (cteCoercionHole,    "cteCoercionHole") ]
+          , (cteSkolemEscape,    "cteSkolemEscape") ]
 
 {- Note [CIrredCan constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2232,6 +2232,16 @@ ctEvRewriters :: CtEvidence -> RewriterSet
 ctEvRewriters (CtWanted (WantedCt { ctev_rewriters = rws })) = rws
 ctEvRewriters (CtGiven {})  = emptyRewriterSet
 
+ctHasNoRewriters :: Ct -> Bool
+ctHasNoRewriters ev
+  = case ctEvidence ev of
+      CtWanted wev -> wantedCtHasNoRewriters wev
+      CtGiven {}   -> True
+
+wantedCtHasNoRewriters :: WantedCtEvidence -> Bool
+wantedCtHasNoRewriters (WantedCt { ctev_rewriters = rws })
+  = isEmptyRewriterSet rws
+
 -- | Set the rewriter set of a Wanted constraint.
 setWantedCtEvRewriters :: WantedCtEvidence -> RewriterSet -> WantedCtEvidence
 setWantedCtEvRewriters ev rs = ev { ctev_rewriters = rs }
@@ -2309,9 +2319,9 @@ instance Outputable WantedCtEvidence where
 
 instance Outputable CtEvidence where
   ppr ev = ppr (ctEvFlavour ev)
-           <+> pp_ev <+> braces (ppr (ctl_depth (ctEvLoc ev)) <> pp_rewriters)
+           <+> hang (pp_ev <+> braces (ppr (ctl_depth (ctEvLoc ev)) <> pp_rewriters))
                          -- Show the sub-goal depth too
-               <> dcolon <+> ppr (ctEvPred ev)
+                  2 (dcolon <+> pprPredType (ctEvPred ev))
     where
       pp_ev = case ev of
              CtGiven ev -> ppr (ctev_evar ev)
@@ -2472,11 +2482,20 @@ inscrutable error messages. To solve this dilemma:
 * Then GHC.Tc.Solver.Solve.rewriteEvidence and GHC.Tc.Solver.Equality.rewriteEqEvidence
   add this RewriterSet to the rewritten constraint's rewriter set.
 
+* We prevent the unifier from unifying any equality with a non-empty rewriter set;
+  unification effectively turns a Wanted into a Given, and we lose all tracking.
+  See (REWRITERS) in Note [Unification preconditions] in GHC.Tc.Utils.Unify and
+  Note [Unify only if the rewriter set is empty] in GHC.Solver.Equality.
+
 * In error reporting, we simply suppress any errors that have been rewritten
   by /unsolved/ wanteds. This suppression happens in GHC.Tc.Errors.mkErrorItem,
   which uses `GHC.Tc.Zonk.Type.zonkRewriterSet` to look through any filled
   coercion holes. The idea is that we wish to report the "root cause" -- the
   error that rewrote all the others.
+
+* In `selectNextWorkItem`, priorities equalities with no rewiters.  See
+  Note [Prioritise Wanteds with empty RewriterSet] in GHC.Tc.Types.Constraint
+  wrinkle (PER1).
 
 * In error reporting, we prioritise Wanteds that have an empty RewriterSet:
   see Note [Prioritise Wanteds with empty RewriterSet].
@@ -2508,10 +2527,6 @@ Wrinkles:
    the opportunity to zonk its `RewriterSet`, which eliminates solved ones.
    This doesn't guarantee that rewriter sets are always up to date -- see
    (WRW1) -- but it helps, and it de-clutters debug output.
-
-(WRW3) We use the rewriter set for a slightly different purpose, in (EIK2)
-   of Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality.
-   This is a bit of a hack.
 
 Note [Prioritise Wanteds with empty RewriterSet]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2554,15 +2569,15 @@ in our simplify_loop iteration, we happened to start with co_aym. All would have
 been well if we'd started with the (not-rewritten) co_ayb and gotten it into the
 inert set.
 
-With that in mind, we /prioritise/ the work-list to put constraints
-with no rewriters first.  This prioritisation is done in
-GHC.Tc.Solver.InertSet.extendWorkListEq, and extendWorkListEqs.
+With that in mind, we /prioritise/ the work-list to put
+constraints with no rewriters first.  This prioritisation
+is done in `GHC.Tc.Solver.Monad.selectNextWorkItem`.
 
 Wrinkles
 
-(PER1) Before checking for an empty RewriterSet, we zonk the RewriterSet,
-  because some of those CoercionHoles may have been filled in since we last
-  looked: see GHC.Tc.Solver.Monad.emitWork.
+(PER1) When picking the next work item, before checking for an empty RewriterSet
+  in GHC.Tc.Solver.Monad.selectNextWorkItem, we zonk the RewriterSet, because
+  some of those CoercionHoles may have been filled in since we last looked.
 
 (PER2) Despite the prioritisation, it is hard to be /certain/ that we can't end up
   in a situation where all of the Wanteds have rewritten each other. In

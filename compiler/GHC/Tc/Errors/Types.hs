@@ -5583,17 +5583,6 @@ data TcSolverReportMsg
    -- See 'FixedRuntimeRepErrorInfo' and 'FixedRuntimeRepContext' for more information.
   | FixedRuntimeRepError [FixedRuntimeRepErrorInfo]
 
-  -- | An equality between two types is blocked on a kind equality
-  -- between their kinds.
-  --
-  -- Test cases: none.
-  | BlockedEquality ErrorItem
-    -- These are for the "blocked" equalities, as described in
-    -- Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality,
-    -- wrinkle (EIK2). There should always be another unsolved wanted around,
-    -- which will ordinarily suppress this message. But this can still be printed out
-    -- with -fdefer-type-errors (sigh), so we must produce a message.
-
   -- | Something was not applied to sufficiently many arguments.
   --
   --  Example:
@@ -6090,6 +6079,10 @@ data FixedRuntimeRepErrorInfo
   , frr_info_not_concrete :: Maybe (TcTyVar, TcType)
       -- ^ Which non-concrete type did we try to
       -- unify this concrete type variable with?
+  , frr_info_other_origin :: Maybe CtOrigin
+      -- ^ Did the representation polymorphism check arise
+      -- from another constraint? If so, record that 'CtOrigin' here
+      -- (it will never be a 'FRROrigin').
   }
 
 {-

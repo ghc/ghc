@@ -2144,7 +2144,7 @@ uType_defer (UE { u_loc = loc, u_defer = ref
                 , u_role = role, u_rewriters = rewriters })
             ty1 ty2  -- ty1 is "actual", ty2 is "expected"
   = do { let pred_ty = mkEqPredRole role ty1 ty2
-       ; hole <- newCoercionHole loc pred_ty
+       ; hole <- newCoercionHole pred_ty
        ; let ct = mkNonCanonical $ CtWanted $
                     WantedCt { ctev_pred      = pred_ty
                              , ctev_dest      = HoleDest hole
@@ -2649,14 +2649,15 @@ There are five reasons not to unify:
     we can fill beta[tau] := beta[conc]. This is why we call
     'makeTypeConcrete' in startSolvingByUnification.
 
-5. (COERCION-HOLE) rhs does not mention any coercion holes that resulted from
-    fixing up a hetero-kinded equality.  This is the same as (TyEq:CH) in
-    Note [Canonical equalities].  Suppose our equality is
-     (alpha :: k) ~ (Int |> {co})
+5. (REWRITERS) the equality does not have any unsolved equalities in its rewriter
+   set. If those other equalities have not been solved, unifying this equality
+   will propagate strange-looking errors elswhere.  That is the whole point of
+   rewriter sets.  Suppose our equality is
+     [W] co1 {rew = {cok}}   (alpha :: k) ~ (Int |> {cok})
    where co :: Type ~ k is an unsolved wanted. Note that this equality
-   is homogeneous; both sides have kind k. We refrain from unifying here, because
-   of the coercion hole in the RHS -- see Wrinkle (EIK2) in
-   Note [Equalities with incompatible kinds] in GHC.Solver.Equality.
+   is homogeneous; both sides have kind k. We refrain from unifying
+   here, because of `cok` in its rewriter set.  See
+   Note [Unify only if the rewriter set is empty] in GHC.Solver.Equality.
 
 Needless to say, all there are wrinkles:
 
@@ -3405,7 +3406,7 @@ famAppBreaker (BreakWanted ev lhs_tv) fam_app
             _ -> TcM.newMetaTyVarTyAtLevel lhs_tv_lvl fam_app_kind
 
        ; let pty = mkNomEqPred fam_app new_tv_ty
-       ; hole <- TcM.newVanillaCoercionHole pty
+       ; hole <- TcM.newCoercionHole pty
        ; let new_ev = WantedCt { ctev_pred      = pty
                                , ctev_dest      = HoleDest hole
                                , ctev_loc       = cb_loc
@@ -3547,12 +3548,6 @@ checkCo flags co =
         | case conc of { CC_None -> False; _ -> True }
         -> return $ PuFail (cteProblem cteConcrete)
 
-        -- Check for coercion holes, if unifying.
-        -- See (COERCION-HOLE) in Note [Unification preconditions]
-        | case lc of { LC_None {} -> False; _ -> True } -- equivalent to "we are unifying"; see Note [TyEqFlags]
-        , hasHeteroKindCoercionHoleCo co
-        -> return $ PuFail (cteProblem cteCoercionHole)
-
         -- Occurs check (can promote)
         | OC_Check lhs_tv occ_prob <- occ
         , LC_Promote { lc_lvlp = lhs_tv_lvl } <- lc
@@ -3582,10 +3577,6 @@ But there are several cases we need to be wary of:
 
 (2) We must still make sure that no variable in a coercion is at too
     high a level. But, when unifying, we can promote any variables we encounter.
-
-(3) We do not unify variables with a type with a free coercion hole.
-    See (COERCION-HOLE) in Note [Unification preconditions].
-
 
 Note [Promotion and level-checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4138,7 +4129,7 @@ makeTypeConcrete occ_fs conc_orig ty =
                 ; conc_tv <- newConcreteTyVar conc_orig occ_fs (coercionRKind kind_co)
                 ; let conc_ty = mkTyVarTy conc_tv
                       pty = mkEqPredRole Nominal ty' conc_ty
-                ; hole <- newCoercionHoleO orig pty
+                ; hole <- newCoercionHole pty
                 ; loc <- getCtLocM orig (Just KindLevel)
                 ; let ct = mkNonCanonical $ CtWanted
                          $ WantedCt { ctev_pred      = pty

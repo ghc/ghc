@@ -1,9 +1,11 @@
-
 RepPolyRule1.hs:11:51: error: [GHC-55287]
     • The argument ‘x’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:
         a1 :: TYPE rep0
+      When unifying:
+        • a2
+        • a1
       Cannot unify ‘rep’ with the type variable ‘rep0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the first argument of ‘f’, namely ‘x’
@@ -15,7 +17,11 @@ RepPolyRule1.hs:11:55: error: [GHC-55287]
       does not have a fixed runtime representation.
       Its type is:
         a1 :: TYPE rep0
+      When unifying:
+        • a2
+        • a1
       Cannot unify ‘rep’ with the type variable ‘rep0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: x
       When checking the rewrite rule "f_id"
+

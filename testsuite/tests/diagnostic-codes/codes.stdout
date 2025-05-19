@@ -43,7 +43,6 @@
 [GHC-29747] is untested (constructor = DriverMissingSafeHaskellMode)
 [GHC-74284] is untested (constructor = DriverInstantiationNodeInDependencyGeneration)
 [GHC-66599] is untested (constructor = DriverNoConfiguredLLVMToolchain)
-[GHC-06200] is untested (constructor = BlockedEquality)
 [GHC-81325] is untested (constructor = ExpectingMoreArguments)
 [GHC-78125] is untested (constructor = AmbiguityPreventsSolvingCt)
 [GHC-84170] is untested (constructor = TcRnModMissingRealSrcSpan)

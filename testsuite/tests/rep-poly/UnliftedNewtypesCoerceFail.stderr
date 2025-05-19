@@ -2,7 +2,10 @@ UnliftedNewtypesCoerceFail.hs:14:8: error: [GHC-55287]
     • The first argument of ‘coerce’
       does not have a fixed runtime representation.
       Its type is:
-        b0 :: TYPE k0
+        a0 :: TYPE k0
+      When unifying:
+        • a0 -> b0
+        • x -> y
       Cannot unify ‘rep’ with the type variable ‘k0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: coerce

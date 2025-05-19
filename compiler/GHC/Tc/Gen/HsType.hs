@@ -394,7 +394,7 @@ kcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM ()
 --     meth :: forall a (x :: f a). Proxy x -> ()
 -- When instantiating Proxy with kappa, we must unify kappa := f a. But we're
 -- still working out the kind of f, and thus f a will have a coercion in it.
--- Coercions may block unification (Note [Equalities with incompatible kinds] in
+-- Coercions may block unification (Note [Equalities with heterogeneous kinds] in
 -- GHC.Tc.Solver.Equality, wrinkle (EIK2)) and so we fail to unify. If we try to
 -- kind-generalize, we'll end up promoting kappa to the top level (because
 -- kind-generalization is normally done right before adding a binding to the context),

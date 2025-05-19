@@ -1,10 +1,13 @@
-
 T23903.hs:21:1: error: [GHC-55287]
     • The first pattern in the equation for ‘f’
       does not have a fixed runtime representation.
       Its type is:
         t0 :: TYPE cx0
+      When unifying:
+        • t0 -> ()
+        • a #-> ()
       Cannot unify ‘Rep a’ with the type variable ‘cx0’
       because the former is not a concrete ‘RuntimeRep’.
     • The equation for ‘f’ has one visible argument,
         but its type ‘a #-> ()’ has none
+

@@ -47,7 +47,7 @@ module GHC.Tc.Utils.TcMType (
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
   emitNewExprHole,
 
-  newCoercionHole, newCoercionHoleO, newVanillaCoercionHole,
+  newCoercionHole,
   fillCoercionHole, isFilledCoercionHole,
   checkCoercionHole,
 
@@ -110,7 +110,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.Unify( unifyInvisibleType, tcSubMult )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin )
+import GHC.Tc.Types.CtLoc( CtLoc )
 import GHC.Tc.Utils.Monad        -- TcType, amongst others
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
@@ -200,7 +200,7 @@ newEvVar ty = do { name <- newSysName (predTypeOccName ty)
 newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
 newWantedWithLoc loc pty
   = do dst <- case classifyPredType pty of
-                EqPred {} -> HoleDest  <$> newCoercionHole loc pty
+                EqPred {} -> HoleDest  <$> newCoercionHole pty
                 _         -> EvVarDest <$> newEvVar pty
        return $ CtWanted $
          WantedCt { ctev_dest      = dst
@@ -226,9 +226,9 @@ newWanteds orig = mapM (newWanted orig Nothing)
 ----------------------------------------------
 
 cloneWantedCtEv :: CtEvidence -> TcM CtEvidence
-cloneWantedCtEv (CtWanted ctev@(WantedCt { ctev_pred = pty, ctev_dest = HoleDest _, ctev_loc = loc }))
+cloneWantedCtEv (CtWanted ctev@(WantedCt { ctev_pred = pty, ctev_dest = HoleDest _ }))
   | isEqPred pty
-  = do { co_hole <- newCoercionHole loc pty
+  = do { co_hole <- newCoercionHole pty
        ; return $ CtWanted (ctev { ctev_dest = HoleDest co_hole }) }
   | otherwise
   = pprPanic "cloneWantedCtEv" (ppr pty)
@@ -276,7 +276,7 @@ emitWantedEqs origin pairs
 -- | Emits a new equality constraint
 emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coercion
 emitWantedEq origin t_or_k role ty1 ty2
-  = do { hole <- newCoercionHoleO origin pty
+  = do { hole <- newCoercionHole pty
        ; loc  <- getCtLocM origin (Just t_or_k)
        ; emitSimple $ mkNonCanonical $ CtWanted $
            WantedCt { ctev_pred      = pty
@@ -358,24 +358,13 @@ newImplication
 ************************************************************************
 -}
 
-newVanillaCoercionHole :: TcPredType -> TcM CoercionHole
-newVanillaCoercionHole = new_coercion_hole False
-
-newCoercionHole :: CtLoc -> TcPredType -> TcM CoercionHole
-newCoercionHole loc = newCoercionHoleO (ctLocOrigin loc)
-
-newCoercionHoleO :: CtOrigin -> TcPredType -> TcM CoercionHole
-newCoercionHoleO (KindEqOrigin {}) pty = new_coercion_hole True pty
-newCoercionHoleO _ pty                 = new_coercion_hole False pty
-
-new_coercion_hole :: Bool -> TcPredType -> TcM CoercionHole
--- For the Bool, see (EIK2) in Note [Equalities with incompatible kinds]
-new_coercion_hole hetero_kind pred_ty
+newCoercionHole :: TcPredType -> TcM CoercionHole
+-- For the Bool, see (EIK2) in Note [Equalities with heterogeneous kinds]
+newCoercionHole pred_ty
   = do { co_var <- newEvVar pred_ty
        ; traceTc "New coercion hole:" (ppr co_var <+> dcolon <+> ppr pred_ty)
        ; ref <- newMutVar Nothing
-       ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref
-                               , ch_hetero_kind = hetero_kind } }
+       ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
 
 -- | Put a value in a coercion hole
 fillCoercionHole :: CoercionHole -> Coercion -> TcM ()
