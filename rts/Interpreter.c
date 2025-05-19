@@ -284,8 +284,43 @@ allocate_NONUPD (Capability *cap, int n_words)
     return allocate(cap, stg_max(sizeofW(StgHeader)+MIN_PAYLOAD_SIZE, n_words));
 }
 
-int rts_stop_next_breakpoint = 0;
 int rts_stop_on_exception = 0;
+
+/* ---------------------------------------------------------------------------
+ * Enabling and disabling global single step mode
+ * ------------------------------------------------------------------------ */
+
+/* A global toggle for single-step mode.
+ * Unlike `TSO_STOP_NEXT_BREAKPOINT`, which sets single-step mode per-thread,
+ * `rts_stop_next_breakpoint` globally enables single-step mode. If enabled, we
+ * will stop at the immediate next breakpoint regardless of what thread it is in. */
+int rts_stop_next_breakpoint = 0;
+
+void rts_enableStopNextBreakpointAll(void)
+{
+  rts_stop_next_breakpoint = 1;
+}
+
+void rts_disableStopNextBreakpointAll(void)
+{
+  rts_stop_next_breakpoint = 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Enabling and disabling per-thread single step mode
+ * ------------------------------------------------------------------------ */
+
+void rts_enableStopNextBreakpoint(StgTSO* tso)
+{
+    tso->flags |= TSO_STOP_NEXT_BREAKPOINT;
+}
+
+void rts_disableStopNextBreakpoint(StgTSO* tso)
+{
+    tso->flags &= ~TSO_STOP_NEXT_BREAKPOINT;
+}
+
+/* -------------------------------------------------------------------------- */
 
 #if defined(INTERP_STATS)
 
@@ -1290,7 +1325,7 @@ run_BCO:
             int arg8_cc;
 #endif
             StgArrBytes *breakPoints;
-            int returning_from_break;
+            int returning_from_break, stop_next_breakpoint;
 
             // the io action to run at a breakpoint
             StgClosure *ioAction;
@@ -1320,6 +1355,13 @@ run_BCO:
             returning_from_break =
                 cap->r.rCurrentTSO->flags & TSO_STOPPED_ON_BREAKPOINT;
 
+            // check whether this thread is set to stop at the immediate next
+            // breakpoint -- either by the global `rts_stop_next_breakpoint`
+            // flag, or by the local `TSO_STOP_NEXT_BREAKPOINT`
+            stop_next_breakpoint =
+              rts_stop_next_breakpoint ||
+                cap->r.rCurrentTSO->flags & TSO_STOP_NEXT_BREAKPOINT;
+
 #if defined(PROFILING)
             cap->r.rCCCS = pushCostCentre(cap->r.rCCCS,
                                           (CostCentre*)BCO_LIT(arg8_cc));
@@ -1331,20 +1373,20 @@ run_BCO:
             {
                breakPoints = (StgArrBytes *) BCO_PTR(arg1_brk_array);
 
-               // stop the current thread if either the
-               // "rts_stop_next_breakpoint" flag is true OR if the
-               // ignore count for this particular breakpoint is zero
+               // stop the current thread if either `stop_next_breakpoint` is
+               // true OR if the ignore count for this particular breakpoint is zero
                StgInt ignore_count = ((StgInt*)breakPoints->payload)[arg6_tick_index];
-               if (rts_stop_next_breakpoint == false && ignore_count > 0)
+               if (stop_next_breakpoint == false && ignore_count > 0)
                {
                   // decrement and write back ignore count
                   ((StgInt*)breakPoints->payload)[arg6_tick_index] = --ignore_count;
                }
-               else if (rts_stop_next_breakpoint == true || ignore_count == 0)
+               else if (stop_next_breakpoint == true || ignore_count == 0)
                {
                   // make sure we don't automatically stop at the
                   // next breakpoint
-                  rts_stop_next_breakpoint = false;
+                  rts_stop_next_breakpoint = 0;
+                  cap->r.rCurrentTSO->flags &= ~TSO_STOP_NEXT_BREAKPOINT;
 
                   // allocate memory for a new AP_STACK, enough to
                   // store the top stack frame plus an

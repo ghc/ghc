@@ -60,6 +60,7 @@ library
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         exposed-modules:
             GHCi.Run
+            GHCi.Debugger
             GHCi.CreateBCO
             GHCi.ObjLink
             GHCi.Signals
