@@ -7525,7 +7525,7 @@ pprErrCtxtMsg = \case
        2 (pprTypedSplice mb_nm expr)
   TypedSpliceResultCtxt expr ->
     sep [ text "In the result of the splice:"
-        , nest 2 (pprTypedSplice Nothing expr)
+        , nest 2 (pprTypedSplice Nothing (HsTypedSpliceExpr noExtField expr))
         , text "To see what the splice expanded to, use -ddump-splices"]
 
   ReifyInstancesCtxt th_nm th_tys ->

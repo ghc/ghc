@@ -450,7 +450,7 @@ newInferExpTypeFRR frr_orig
        ; if
           -- See [Wrinkle: Typed Template Haskell]
           -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-          | Brack _ (TcPending {}) <- th_lvl
+          | TypedBrack _ <- th_lvl
           -> new_inferExpType Nothing
 
           | otherwise
@@ -792,7 +792,7 @@ newConcreteTyVar reason fs kind
      ; if
         -- See [Wrinkle: Typed Template Haskell]
         -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-        | Brack _ (TcPending {}) <- th_lvl
+        | TypedBrack _ <- th_lvl
         -> newNamedAnonMetaTyVar fs TauTv kind
 
         | otherwise
@@ -976,7 +976,7 @@ newOpenFlexiFRRTyVar :: FixedRuntimeRepContext -> TcM TcTyVar
 newOpenFlexiFRRTyVar frr_ctxt
   = do { th_lvl <- getThLevel
        ; case th_lvl of
-          { Brack _ (TcPending {}) -- See [Wrinkle: Typed Template Haskell]
+          { TypedBrack _ -- See [Wrinkle: Typed Template Haskell]
               -> newOpenFlexiTyVar -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
           ; _ ->
    mdo { let conc_orig = ConcreteFRR $
@@ -1032,7 +1032,7 @@ newConcreteTyVarX conc subst tv
        ; if
           -- See [Wrinkle: Typed Template Haskell]
           -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-          | Brack _ (TcPending {}) <- th_lvl
+          | TypedBrack _  <- th_lvl
           -> new_meta_tv_x TauTv subst tv
           | otherwise
           -> new_meta_tv_x (ConcreteTv conc) subst tv }

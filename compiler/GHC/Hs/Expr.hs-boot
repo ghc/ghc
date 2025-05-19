@@ -18,6 +18,7 @@ import Language.Haskell.Syntax.Expr
   , MatchGroup
   , GRHSs
   , HsUntypedSplice
+  , HsTypedSplice
   )
 import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
 import GHC.Types.Name   ( Name )
@@ -33,7 +34,7 @@ pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
 
 pprExpr :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
 
-pprTypedSplice   :: (OutputableBndrId p) => Maybe SplicePointName -> LHsExpr (GhcPass p) -> SDoc
+pprTypedSplice   :: (OutputableBndrId p) => Maybe SplicePointName -> HsTypedSplice (GhcPass p) -> SDoc
 pprUntypedSplice :: (OutputableBndrId p) => Bool -> Maybe SplicePointName -> HsUntypedSplice (GhcPass p) -> SDoc
 
 pprPatBind :: forall bndr p . (OutputableBndrId bndr,

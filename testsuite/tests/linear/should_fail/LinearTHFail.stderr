@@ -1,13 +1,10 @@
-
 LinearTHFail.hs:8:3: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
         arising from multiplicity of ‘x’
-    • In an equation for ‘f’:
-          f x
-            = [| Just $x |]
-              pending(rn) [<spn, x>]
+    • In an equation for ‘f’: f x = [| Just $x |]
 
 LinearTHFail.hs:11:3: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
         arising from multiplicity of ‘x’
     • In an equation for ‘g’: g x = [|| Just $$x ||]
+

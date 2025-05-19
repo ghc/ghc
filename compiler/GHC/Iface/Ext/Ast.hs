@@ -817,6 +817,7 @@ class ( HiePass (NoGhcTcPass p)
       , Data (HsCmdTop (GhcPass p))
       , Data (GRHS (GhcPass p) (LocatedA (HsCmd (GhcPass p))))
       , Data (HsUntypedSplice (GhcPass p))
+      , Data (HsTypedSplice (GhcPass p))
       , Data (HsLocalBinds (GhcPass p))
       , Data (FieldOcc (GhcPass p))
       , Data (HsTupArg (GhcPass p))
@@ -826,6 +827,7 @@ class ( HiePass (NoGhcTcPass p)
       , Anno (IdGhcP p) ~ SrcSpanAnnN
       , Anno (IdOccGhcP p) ~ SrcSpanAnnN
       , Typeable p
+      , IsPass p
       )
       => HiePass p where
   hiePass :: HiePassEv p
@@ -1332,7 +1334,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
           , toHie p
           ]
       HsTypedSplice _ x ->
-        [ toHie x
+        [ toHie $ L mspan x
         ]
       HsUntypedSplice _ x ->
         [ toHie $ L mspan x
@@ -2025,11 +2027,19 @@ instance ToHie (HsQuote GhcRn) where
   toHie (TypBr _ ty) = toHie ty
   toHie (VarBr {} )  = pure []
 
-instance ToHie PendingRnSplice where
-  toHie (PendingRnSplice _ _ e) = toHie e
+instance forall pass . HiePass pass => ToHie (HsUntypedSplice (GhcPass pass)) where
+  toHie (HsUntypedSpliceExpr _ext e) = toHie e
+  toHie (HsQuasiQuote _ext quoter _ispanFs) = toHie (C Use quoter)
+  toHie (XUntypedSplice ext) =
+    case ghcPass @pass of
+      GhcRn -> case ext of
+        HsImplicitLiftSplice lid -> toHie (C Use lid)
 
 instance ToHie PendingTcSplice where
   toHie (PendingTcSplice _ e) = toHie e
+
+instance ToHie PendingRnSplice where
+  toHie (PendingRnSplice _ e) = toHie e
 
 instance (HiePass p, Data (IdGhcP p))
   => ToHie (GenLocated SrcSpanAnnL (BooleanFormula (GhcPass p))) where
@@ -2050,7 +2060,7 @@ instance (HiePass p, Data (IdGhcP p))
 instance ToHie (LocatedAn NoEpAnns HsIPName) where
   toHie (L span e) = makeNodeA e span
 
-instance HiePass p => ToHie (LocatedA (HsUntypedSplice (GhcPass p))) where
+instance (HiePass p) => ToHie (LocatedA (HsUntypedSplice (GhcPass p))) where
   toHie (L span sp) = concatM $ makeNodeA sp span : case sp of
       HsUntypedSpliceExpr _ expr ->
         [ toHie expr
@@ -2058,6 +2068,27 @@ instance HiePass p => ToHie (LocatedA (HsUntypedSplice (GhcPass p))) where
       HsQuasiQuote _ _ ispanFs ->
         [ locOnly (getLocA ispanFs)
         ]
+      XUntypedSplice x ->
+        case ghcPass @p of
+          GhcRn -> case x of
+            HsImplicitLiftSplice lid ->
+              [ toHie $ C Use lid
+              ]
+
+instance HiePass p => ToHie (LocatedA (HsTypedSplice (GhcPass p))) where
+  toHie (L span sp) =  concatM $ makeNodeA sp span : case sp of
+      HsTypedSpliceExpr _ expr ->
+        [ toHie expr
+        ]
+      XTypedSplice x ->
+        case ghcPass @p of
+          GhcRn -> case x of
+            HsImplicitLiftSplice lid ->
+              [ toHie $ C Use lid
+              ]
+
+
+
 
 instance ToHie (LocatedA (RoleAnnotDecl GhcRn)) where
   toHie (L span annot) = concatM $ makeNodeA annot span : case annot of

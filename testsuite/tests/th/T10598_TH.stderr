@@ -13,17 +13,11 @@ T10598_TH.hs:(27,2)-(42,51): Splicing declarations
              derivClause (Just AnyclassStrategy) [[t| C |]],
              derivClause (Just NewtypeStrategy) [[t| Read |]]],
           standaloneDerivWithStrategyD
-            (Just StockStrategy) (cxt [])
-            [t| Ord $(fooType) |]
-            pending(rn) [<spn, fooType>],
+            (Just StockStrategy) (cxt []) [t| Ord $(fooType) |],
           standaloneDerivWithStrategyD
-            (Just AnyclassStrategy) (cxt [])
-            [t| D $(fooType) |]
-            pending(rn) [<spn, fooType>],
+            (Just AnyclassStrategy) (cxt []) [t| D $(fooType) |],
           standaloneDerivWithStrategyD
-            (Just NewtypeStrategy) (cxt [])
-            [t| Show $(fooType) |]
-            pending(rn) [<spn, fooType>]]
+            (Just NewtypeStrategy) (cxt []) [t| Show $(fooType) |]]
   ======>
     newtype Foo
       = MkFoo Int

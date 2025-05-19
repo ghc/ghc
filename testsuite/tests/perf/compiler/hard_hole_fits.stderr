@@ -18,9 +18,9 @@ hard_hole_fits.hs:14:22: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
            (and originally defined in ‘GHC.Internal.Enum’))
 
 hard_hole_fits.hs:15:21: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
-     Found hole: _ :: Int
-     In an equation for ‘testMe’: testMe (HsHole a) = _
-     Relevant bindings include
+    • Found hole: _ :: Int
+    • In an equation for ‘testMe’: testMe (HsHole a) = _
+    • Relevant bindings include
         a :: Language.Haskell.Syntax.Extension.XHole GhcPs
           (bound at hard_hole_fits.hs:15:16)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
@@ -551,7 +551,7 @@ hard_hole_fits.hs:42:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (HsTypedSplice xs hs) = _
     • Relevant bindings include
-        hs :: LHsExpr GhcPs (bound at hard_hole_fits.hs:42:26)
+        hs :: HsTypedSplice GhcPs (bound at hard_hole_fits.hs:42:26)
         xs :: Language.Haskell.Syntax.Extension.XTypedSplice GhcPs
           (bound at hard_hole_fits.hs:42:23)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
