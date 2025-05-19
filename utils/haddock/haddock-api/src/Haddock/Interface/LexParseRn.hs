@@ -155,6 +155,7 @@ rename sDocContext renamer = rn
               | otherwise = isTermVarOrFieldNameSpace
             typeNsChoices
               | isDataOcc occ = isTcClsNameSpace
+              | isSymOcc occ = isTcClsNameSpace
               | otherwise = isTvNameSpace
         -- Generate the choices for the possible kind of thing this
         -- is. We narrow down the possibilities with the namespace (if
