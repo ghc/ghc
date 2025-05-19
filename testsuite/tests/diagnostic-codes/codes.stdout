@@ -109,6 +109,7 @@
 [GHC-10374] is untested (constructor = LookupInstErrNotFound)
 [GHC-41242] is untested (constructor = EmptyStmtsGroupInParallelComp)
 [GHC-63610] is untested (constructor = MissingBootDefinition)
+[GHC-06568] is untested (constructor = SplicePolymorphicLocalVar)
 [GHC-52886] is untested (constructor = InvalidTopDecl)
 [GHC-77923] is untested (constructor = NonExactName)
 [GHC-86463] is untested (constructor = AddInvalidCorePlugin)
