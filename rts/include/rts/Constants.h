@@ -329,6 +329,12 @@
 #define TSO_ALLOC_LIMIT 256
 
 /*
+ * Enables step-in mode for this thread -- it will stop at the immediate next
+ * breakpoint found in this thread.
+ */
+#define TSO_STOP_NEXT_BREAKPOINT 512
+
+/*
  * The number of times we spin in a spin lock before yielding (see
  * #3758).  To tune this value, use the benchmark in #3758: run the
  * server with -N2 and the client both on a dual-core.  Also make sure

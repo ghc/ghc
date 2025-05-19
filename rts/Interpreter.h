@@ -11,3 +11,8 @@
 RTS_PRIVATE Capability *interpretBCO (Capability* cap);
 void interp_startup ( void );
 void interp_shutdown ( void );
+
+void rts_enableStopNextBreakpointAll  ( void );
+void rts_disableStopNextBreakpointAll ( void );
+void rts_enableStopNextBreakpoint     ( StgPtr );
+void rts_disableStopNextBreakpoint    ( StgPtr );
