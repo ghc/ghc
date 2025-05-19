@@ -22,16 +22,17 @@ CABAL_CACHE="$TOP/${CABAL_CACHE:-cabal-cache}"
 source "$TOP/.gitlab/common.sh"
 
 function time_it() {
-  local name="$1"
+  # We can not make it readonly due of start_section/end_section at common.sh
+  name="$1"
   shift
-  local start=$(date +%s)
+  local -r start=$(date +%s)
   local res=0
   set +e
   ( set -e ; $@ )
   res=$?
   set -e
-  local end=$(date +%s)
-  local delta=$(expr $end - $start)
+  local -r end=$(date +%s)
+  local -r delta=$((end - start))
 
   echo "$name took $delta seconds"
   printf "%15s | $delta" > ci-timings
@@ -83,7 +84,8 @@ Environment variables affecting both build systems:
                     - "extracted":
                              Toolchains will be downloaded and extracted through the
                              CI process. Default for other systems. Windows and FreeBSD
-                             are included.
+                             are included. PATH variable will be extended with a location
+                             to which toolchains will be installed.
 
 Environment variables determining build configuration of Hadrian system:
 
@@ -176,11 +178,6 @@ function mingw_init() {
   esac
 }
 
-# This will contain GHC's local native toolchain
-toolchain="$TOP/toolchain"
-mkdir -p "$toolchain/bin"
-PATH="$toolchain/bin:$PATH"
-
 export METRICS_FILE="$TOP/performance-metrics.tsv"
 
 cores="$(mk/detect-cpu-count.sh)"
@@ -198,6 +195,8 @@ function show_tool() {
 }
 
 function set_toolchain_paths() {
+  local -r toolchain_path="$1"
+
   if [ -z "${TOOLCHAIN_SOURCE:-}" ]
   then
     # Fallback to automatic detection which could not work for cases
@@ -214,11 +213,14 @@ function set_toolchain_paths() {
 
   case "$TOOLCHAIN_SOURCE" in
     extracted)
+      mkdir -p "$toolchain_path/bin"
+      PATH="$toolchain_path/bin:$PATH"
+
       # These are populated by setup_toolchain
-      GHC="$toolchain/bin/ghc$exe"
-      CABAL="$toolchain/bin/cabal$exe"
-      HAPPY="$toolchain/bin/happy$exe"
-      ALEX="$toolchain/bin/alex$exe"
+      GHC="$toolchain_path/bin/ghc$exe"
+      CABAL="$toolchain_path/bin/cabal$exe"
+      HAPPY="$toolchain_path/bin/happy$exe"
+      ALEX="$toolchain_path/bin/alex$exe"
       if [ "$(uname)" = "FreeBSD" ]; then
         GHC=/usr/local/bin/ghc
       fi
@@ -265,6 +267,8 @@ function cabal_update() {
 
 # Extract GHC toolchain
 function setup() {
+  local -r toolchain_path="$1"
+
   echo "=== TIMINGS ===" > ci-timings
 
   if [ -d "$CABAL_CACHE" ]; then
@@ -274,7 +278,7 @@ function setup() {
   fi
 
   case $TOOLCHAIN_SOURCE in
-    extracted) time_it "setup" setup_toolchain ;;
+    extracted) time_it "setup" setup_toolchain "${toolchain_path}" ;;
     *) ;;
   esac
 
@@ -299,6 +303,8 @@ function setup() {
 }
 
 function fetch_ghc() {
+  local -r toolchain_path="$1"
+
   local boot_triple_to_fetch
   case "$(uname)" in
     MSYS_*|MINGW*)
@@ -324,31 +330,33 @@ function fetch_ghc() {
   readonly boot_triple_to_fetch
 
   local -r v="$GHC_VERSION"
-      if [[ -z "$v" ]]; then
-          fail "neither GHC nor GHC_VERSION are not set"
-      fi
+  if [[ -z "$v" ]]; then
+    fail "neither GHC nor GHC_VERSION are not set"
+  fi
 
-      start_section "fetch GHC"
-  url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple_to_fetch}.tar.xz"
-      info "Fetching GHC binary distribution from $url..."
-      curl "$url" > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
-      $TAR -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
-      case "$(uname)" in
-        MSYS_*|MINGW*)
-          cp -r ghc-${GHC_VERSION}*/* "$toolchain"
-          ;;
-        *)
-          pushd ghc-${GHC_VERSION}*
-          ./configure --prefix="$toolchain"
-          "$MAKE" install
-          popd
-          ;;
-      esac
-      rm -Rf "ghc-${GHC_VERSION}" ghc.tar.xz
-      end_section "fetch GHC"
+  start_section "fetch GHC"
+  local -r url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple_to_fetch}.tar.xz"
+  info "Fetching GHC binary distribution from $url..."
+  curl "$url" > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
+  $TAR -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
+  case "$(uname)" in
+    MSYS_*|MINGW*)
+      cp -r ghc-${GHC_VERSION}*/* "$toolchain_path"
+      ;;
+    *)
+      pushd ghc-${GHC_VERSION}*
+      ./configure --prefix="$toolchain_path"
+      "$MAKE" install
+      popd
+      ;;
+  esac
+  rm -Rf "ghc-${GHC_VERSION}" ghc.tar.xz
+  end_section "fetch GHC"
 }
 
 function fetch_cabal() {
+  local -r toolchain_path="$1"
+
   local v="$CABAL_INSTALL_VERSION"
   if [[ -z "$v" ]]; then
       fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
@@ -381,9 +389,9 @@ function fetch_cabal() {
       $TAR -xJf cabal.tar.xz
       # Check if the bindist has directory structure
       if [[ "$tmp" = "cabal" ]]; then
-          mv cabal "$toolchain/bin"
+          mv cabal "${toolchain_path}/bin"
       else
-          mv "$tmp/cabal" "$toolchain/bin"
+          mv "$tmp/cabal" "${toolchain_path}/bin"
       fi
       ;;
   esac
@@ -394,12 +402,14 @@ function fetch_cabal() {
 # here. For Docker platforms this is done in the Docker image
 # build.
 function setup_toolchain() {
+  local -r toolchain_path="$1"
+
   if [ ! -e "$GHC" ]; then
-    fetch_ghc
+    fetch_ghc "${toolchain_path}"
   fi
 
   if [ ! -e "$CABAL" ]; then
-    fetch_cabal
+    fetch_cabal "${toolchain_path}"
   fi
 
   cabal_update
@@ -407,7 +417,7 @@ function setup_toolchain() {
   local cabal_install="$CABAL v2-install \
     --with-compiler=$GHC \
     --index-state=$HACKAGE_INDEX_STATE \
-    --installdir=$toolchain/bin \
+    --installdir=${toolchain_path}/bin \
     --ignore-project \
     --overwrite-policy=always"
 
@@ -722,7 +732,7 @@ function test_hadrian() {
     echo "test_compiler ($test_compiler) settings:"
     cat "$instdir/lib/settings"
     echo 'main = putStrLn "hello world"' > expected
-    run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -v -o hello
+    run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -fforce-recomp -v -o hello
 
     # If build is targeted to Windows/MinGW we should use .exe suffix to test cross compiler output
     local cross_target_exe=""
@@ -1081,11 +1091,13 @@ if [[ -z ${BIGNUM_BACKEND:-} ]]; then BIGNUM_BACKEND=gmp; fi
 
 determine_metric_baseline
 
-set_toolchain_paths
+# This will contain GHC's local native toolchain when TOOLCHAIN_SOURCE=extracted
+toolchain="$TOP/toolchain"
+set_toolchain_paths "${toolchain}"
 
 case ${1:-help} in
   help|usage) usage ;;
-  setup) setup && cleanup_submodules ;;
+  setup) setup "${toolchain}" && cleanup_submodules ;;
   configure) time_it "configure" configure ;;
   build_hadrian) time_it "build" build_hadrian ;;
   # N.B. Always push notes, even if the build fails. This is okay to do as the
