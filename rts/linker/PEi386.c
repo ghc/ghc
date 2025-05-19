@@ -384,7 +384,7 @@ static size_t makeSymbolExtra_PEi386(
 #endif
 
 static void addDLLHandle(
-    pathchar* dll_name,
+    const pathchar* dll_name,
     HINSTANCE instance);
 
 static bool verifyCOFFHeader(
@@ -461,7 +461,7 @@ void exitLinker_PEi386(void)
 static OpenedDLL* opened_dlls = NULL;
 
 /* Adds a DLL instance to the list of DLLs in which to search for symbols. */
-static void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
+static void addDLLHandle(const pathchar* dll_name, HINSTANCE instance) {
 
     /* At this point, we actually know what was loaded.
        So bail out if it's already been loaded.  */
@@ -800,7 +800,7 @@ uint8_t* getSymShortName ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 }
 
 const char *
-addDLL_PEi386( pathchar *dll_name, HINSTANCE *loaded )
+addDLL_PEi386( const pathchar *dll_name, HINSTANCE *loaded )
 {
     /* ------------------- Win32 DLL loader ------------------- */
     IF_DEBUG(linker, debugBelch("addDLL; dll_name = `%" PATH_FMT "'\n", dll_name));
