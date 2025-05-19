@@ -64,7 +64,7 @@ import GHC.Unit.Module.ModGuts
 import GHC.Core.Unfold
 
 import Data.List( partition )
-import Data.List.NonEmpty ( NonEmpty (..) )
+-- import Data.List.NonEmpty ( NonEmpty (..) )
 import GHC.Core.Subst (substTickish)
 
 {-
@@ -1277,67 +1277,8 @@ specCase :: SpecEnv
                   , OutId
                   , [OutAlt]
                   , UsageDetails)
-specCase env scrut' case_bndr [Alt con args rhs]
-  | -- See Note [Floating dictionaries out of cases]
-    interestingDict scrut' (idType case_bndr)
-  , not (isDeadBinder case_bndr && null sc_args')
-  = do { case_bndr_flt :| sc_args_flt <- mapM clone_me (case_bndr' :| sc_args')
-
-       ; let case_bndr_flt' = case_bndr_flt `addDictUnfolding` scrut'
-             scrut_bind     = mkDB (NonRec case_bndr_flt scrut')
-
-             sc_args_flt' = zipWith addDictUnfolding sc_args_flt sc_rhss
-             sc_rhss      = [ Case (Var case_bndr_flt') case_bndr' (idType sc_arg')
-                                   [Alt con args' (Var sc_arg')]
-                            | sc_arg' <- sc_args' ]
-             cb_set       = unitVarSet case_bndr_flt'
-             sc_binds     = [ DB { db_bind = NonRec sc_arg_flt sc_rhs, db_fvs  = cb_set }
-                            | (sc_arg_flt, sc_rhs) <- sc_args_flt' `zip` sc_rhss ]
-
-             flt_binds    = scrut_bind : sc_binds
-
-             -- Extend the substitution for RHS to map the *original* binders
-             -- to their floated versions.
-             mb_sc_flts :: [Maybe DictId]
-             mb_sc_flts = map (lookupVarEnv clone_env) args'
-             clone_env  = zipVarEnv sc_args' sc_args_flt'
-
-             subst_prs  = (case_bndr, Var case_bndr_flt)
-                        : [ (arg, Var sc_flt)
-                          | (arg, Just sc_flt) <- args `zip` mb_sc_flts ]
-             subst'   = se_subst env_rhs
-                        `Core.extendSubstInScopeList` (case_bndr_flt' : sc_args_flt')
-                        `Core.extendIdSubstList`      subst_prs
-             env_rhs' = env_rhs { se_subst = subst' }
-
-       ; (rhs', rhs_uds)   <- specExpr env_rhs' rhs
-       ; let (free_uds, dumped_dbs) = dumpUDs (case_bndr':args') rhs_uds
-             all_uds = flt_binds `consDictBinds` free_uds
-             alt'    = Alt con args' (wrapDictBindsE dumped_dbs rhs')
---       ; pprTrace "specCase" (ppr case_bndr $$ ppr scrut_bind) $
-       ; return (Var case_bndr_flt, case_bndr', [alt'], all_uds) }
-  where
-    (env_rhs, (case_bndr':|args')) = substBndrs env (case_bndr:|args)
-    sc_args' = filter is_flt_sc_arg args'
-
-    clone_me bndr = do { uniq <- getUniqueM
-                       ; return (mkUserLocalOrCoVar occ uniq wght ty loc) }
-       where
-         name = idName bndr
-         wght = idMult bndr
-         ty   = idType bndr
-         occ  = nameOccName name
-         loc  = getSrcSpan name
-
-    arg_set = mkVarSet args'
-    is_flt_sc_arg var =  isId var
-                      && not (isDeadBinder var)
-                      && isDictTy var_ty
-                      && tyCoVarsOfType var_ty `disjointVarSet` arg_set
-       where
-         var_ty = idType var
-
-
+-- We used to float out super class selections here,
+-- but no longer do so. See Historical Note [Floating dictionaries out of cases]
 specCase env scrut case_bndr alts
   = do { (alts', uds_alts) <- mapAndCombineSM spec_alt alts
        ; return (scrut, case_bndr', alts', uds_alts) }
@@ -1414,36 +1355,36 @@ Note [tryRules: plan (BEFORE)] in the Simplifier (partly) redundant.  That is,
 if we run rules in the specialiser, does it matter if we make rules "win" over
 inlining in the Simplifier?  Yes, it does!  See the discussion in #21851.
 
-Note [Floating dictionaries out of cases]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
+Historical Note [Floating dictionaries out of cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Function `specCase` used to give special treatment to a case-expression
+that scrutinised a dictionary, like this:
    g = \d. case d of { MkD sc ... -> ...(f sc)... }
-Naively we can't float d2's binding out of the case expression,
-because 'sc' is bound by the case, and that in turn means we can't
-specialise f, which seems a pity.
+But actually
 
-So we invert the case, by floating out a binding
-for 'sc_flt' thus:
-    sc_flt = case d of { MkD sc ... -> sc }
-Now we can float the call instance for 'f'.  Indeed this is just
-what'll happen if 'sc' was originally bound with a let binding,
-but case is more efficient, and necessary with equalities. So it's
-good to work with both.
+* We never explicitly case-analyse a dictionary; rather the class-op
+  rules select superclasses from it.  (NB: worker/wrapper can unbox
+  tuple dictionaries -- see (DNB1) in Note [Do not unbox class dictionaries];
+  but that's only after worker/wrapper, and specialisation happens before
+  that.)
 
-You might think that this won't make any difference, because the
-call instance will only get nuked by the \d.  BUT if 'g' itself is
-specialised, then transitively we should be able to specialise f.
+* Calling `interestingDict` on every scrutinee is hardly sensible;
+  generally `interestingDict` is called only on Constraint-kinded things.
 
-In general, given
-   case e of cb { MkD sc ... -> ...(f sc)... }
-we transform to
-   let cb_flt = e
-       sc_flt = case cb_flt of { MkD sc ... -> sc }
-   in
-   case cb_flt of bg { MkD sc ... -> ....(f sc_flt)... }
+* It was giving a Lint scope error in !14272
 
-The "_flt" things are the floated binds; we use the current substitution
-to substitute sc -> sc_flt in the RHS
+So now there is no special case. This Note just records the change
+in case we ever want to reinstate it.   The original note was
+added in
+
+   commit c107a00ccf1e641a2d008939cf477c71caa028d5
+   Author: Simon Peyton Jones <simonpj@microsoft.com>
+   Date:   Thu Aug 12 13:11:33 2010 +0000
+
+       Improve the Specialiser, fixing Trac #4203
+
+End of Historical Note
+
 
 ************************************************************************
 *                                                                      *
