@@ -1,7 +1,9 @@
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 module GHC.Tc.Types.TH (
     SpliceType(..)
   , SpliceOrBracket(..)
-  , ThLevel(..)
+  , ThLevel(.., TypedBrack, UntypedBrack)
   , PendingStuff(..)
   , ThLevelIndex
   , topLevel
@@ -14,6 +16,7 @@ module GHC.Tc.Types.TH (
   , thLevelIndexFromImportLevel
   ) where
 
+import GHC.Prelude
 import GHCi.RemoteTypes
 import qualified GHC.Boot.TH.Syntax as TH
 import GHC.Tc.Types.Evidence
@@ -56,11 +59,11 @@ data ThLevel    -- See Note [Template Haskell state diagram]
                 -- Binding level = 0
 
   | Brack                       -- Inside brackets
-      ThLevel                   --   Enclosing level
+      ThLevel                   --  Enclosing level
       PendingStuff
 
 data PendingStuff
-  = RnPendingUntyped              -- Renaming the inside of an *untyped* bracket
+  = RnPending                     -- Renaming the inside of a bracket
       (TcRef [PendingRnSplice])   -- Pending splices in here
 
   | RnPendingTyped                -- Renaming the inside of a *typed* bracket
@@ -75,23 +78,33 @@ data PendingStuff
                                   -- variable is used for desugaring
                                   -- `lift`.
 
+isTypedPending :: PendingStuff -> Bool
+isTypedPending (RnPending _) = False
+isTypedPending (RnPendingTyped) = True
+isTypedPending (TcPending _ _ _) = True
+
+pattern UntypedBrack :: ThLevel -> TcRef [PendingRnSplice] -> ThLevel
+pattern UntypedBrack lvl tc_ref = Brack lvl (RnPending tc_ref)
+pattern TypedBrack :: ThLevel -> ThLevel
+pattern TypedBrack lvl <- Brack lvl (isTypedPending -> True)
 
 topLevel, topAnnLevel, topSpliceLevel :: ThLevel
 topLevel       = Comp
 topAnnLevel    = Splice Untyped Comp
 topSpliceLevel = Splice Untyped Comp
 
+
 instance Outputable ThLevel where
    ppr (Splice _ s)  = text "Splice" <> parens (ppr s)
    ppr (RunSplice _) = text "RunSplice"
    ppr Comp          = text "Comp"
-   ppr (Brack s _)   = text "Brack" <> parens (ppr s)
+   ppr (Brack s _) = text "Brack" <> parens (ppr s)
 
 
 thLevelIndex :: ThLevel -> ThLevelIndex
 thLevelIndex (Splice _ s)  = decThLevelIndex (thLevelIndex s)
 thLevelIndex Comp          = topLevelIndex
-thLevelIndex (Brack s _)   = incThLevelIndex (thLevelIndex s)
+thLevelIndex (Brack s _) = incThLevelIndex (thLevelIndex s)
 thLevelIndex (RunSplice _) = thLevelIndex (Splice Untyped Comp) -- previously: panic "thLevel: called when running a splice"
                         -- See Note [RunSplice ThLevel].
 

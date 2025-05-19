@@ -1,0 +1,20 @@
+QQError.hs:5:12: error: [GHC-83865]
+    • Couldn't match expected type ‘GHC.Internal.TH.Quote.QuasiQuoter’
+                  with actual type ‘a1 -> a1’
+    • Probable cause: ‘id’ is applied to too few arguments
+      In the expression: [| [id|hello|] |]
+      In an equation for ‘main’: main = [| [id|hello|] |]
+  |
+5 | main = [| [id|hello|] |]
+  |            ^^
+
+QQError.hs:7:13: error: [GHC-83865]
+    • Couldn't match expected type ‘GHC.Internal.TH.Quote.QuasiQuoter’
+                  with actual type ‘a0 -> a0’
+    • Probable cause: ‘id’ is applied to too few arguments
+      In the expression: [| [id|hello|] |]
+      In an equation for ‘main2’: main2 = [| [id|hello|] |]
+  |
+7 | main2 = [| [Prelude.id|hello|] |]
+  |             ^^^^^^^^^^
+

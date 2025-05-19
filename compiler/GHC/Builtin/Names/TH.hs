@@ -179,7 +179,7 @@ templateHaskellNames = [
     modNameTyConName,
 
     -- Quasiquoting
-    quoteDecName, quoteTypeName, quoteExpName, quotePatName]
+    quasiQuoterTyConName, quoteDecName, quoteTypeName, quoteExpName, quotePatName]
 
 thSyn, thLib, qqLib, liftLib :: Module
 thSyn = mkTHModule (fsLit "GHC.Internal.TH.Syntax")
@@ -216,7 +216,7 @@ qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
     codeTyConName, injAnnTyConName, overlapTyConName, decsTyConName,
-    modNameTyConName :: Name
+    modNameTyConName, quasiQuoterTyConName :: Name
 qTyConName             = thTc (fsLit "Q")              qTyConKey
 nameTyConName          = thTc (fsLit "Name")           nameTyConKey
 fieldExpTyConName      = thTc (fsLit "FieldExp")       fieldExpTyConKey
@@ -234,6 +234,7 @@ codeTyConName          = thTc (fsLit "Code")           codeTyConKey
 injAnnTyConName        = thTc (fsLit "InjectivityAnn") injAnnTyConKey
 overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
 modNameTyConName       = thTc (fsLit "ModName")        modNameTyConKey
+quasiQuoterTyConName   = mk_known_key_name tcName qqLib (fsLit "QuasiQuoter") quasiQuoterTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_fldName, mkNameG_dName, mkNameG_tcName,
@@ -717,7 +718,7 @@ expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     predQTyConKey, decsQTyConKey, ruleBndrTyConKey, tySynEqnTyConKey,
     roleTyConKey, codeTyConKey, injAnnTyConKey, kindTyConKey,
     overlapTyConKey, derivClauseTyConKey, derivStrategyTyConKey, decsTyConKey,
-    modNameTyConKey  :: Unique
+    modNameTyConKey, quasiQuoterTyConKey :: Unique
 expTyConKey             = mkPreludeTyConUnique 200
 matchTyConKey           = mkPreludeTyConUnique 201
 clauseTyConKey          = mkPreludeTyConUnique 202
@@ -753,6 +754,7 @@ tyVarBndrSpecTyConKey   = mkPreludeTyConUnique 237
 codeTyConKey            = mkPreludeTyConUnique 238
 modNameTyConKey         = mkPreludeTyConUnique 239
 tyVarBndrVisTyConKey    = mkPreludeTyConUnique 240
+quasiQuoterTyConKey     = mkPreludeTyConUnique 241
 
 {- *********************************************************************
 *                                                                      *

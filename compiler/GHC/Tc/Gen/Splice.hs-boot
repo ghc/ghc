@@ -10,11 +10,11 @@ import GHC.Tc.Utils.TcType   ( ExpRhoType )
 import GHC.Types.Annotations ( Annotation, CoreAnnTarget )
 import GHC.Hs.Extension ( GhcRn, GhcPs, GhcTc )
 
-import GHC.Hs ( HsQuote, HsExpr, LHsExpr, LHsType, LPat, LHsDecl, ThModFinalizers, HsUntypedSpliceResult )
+import GHC.Hs ( HsQuote, HsExpr, LHsExpr, LHsType, LPat, LHsDecl, ThModFinalizers, HsUntypedSpliceResult, HsTypedSpliceResult, HsTypedSplice )
 import qualified GHC.Boot.TH.Syntax as TH
 
-tcTypedSplice :: Name
-              -> LHsExpr GhcRn
+tcTypedSplice :: HsTypedSpliceResult
+              -> HsTypedSplice GhcRn
               -> ExpRhoType
               -> TcM (HsExpr GhcTc)
 

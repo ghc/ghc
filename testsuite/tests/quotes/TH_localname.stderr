@@ -1,5 +1,22 @@
 TH_localname.hs:3:11: error: [GHC-39999]
-    • Ambiguous type variable ‘t0’ arising from a use of ‘GHC.Internal.TH.Lift.lift’
+    • Ambiguous type variable ‘m0’ arising from a quotation bracket
+      prevents the constraint ‘(GHC.Internal.TH.Syntax.Quote
+                                  m0)’ from being solved.
+      Relevant bindings include
+        x :: t0 -> m0 GHC.Internal.TH.Syntax.Exp
+          (bound at TH_localname.hs:3:1)
+      Probable fix: use a type annotation to specify what ‘m0’ should be.
+      Potentially matching instance:
+        instance GHC.Internal.TH.Syntax.Quote IO
+          -- Defined in ‘GHC.Internal.TH.Syntax’
+        ...plus one instance involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: [| y |]
+      In the expression: \ y -> [| y |]
+      In an equation for ‘x’: x = \ y -> [| y |]
+
+TH_localname.hs:3:14: error: [GHC-39999]
+    • Ambiguous type variable ‘t0’ arising from a use of ‘y’
       prevents the constraint ‘(GHC.Internal.TH.Lift.Lift
                                   t0)’ from being solved.
       Relevant bindings include
@@ -17,12 +34,7 @@ TH_localname.hs:3:11: error: [GHC-39999]
         ...plus 15 others
         ...plus 71 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
-    • In the expression: GHC.Internal.TH.Lift.lift y
-      In the expression:
-        [| y |]
-        pending(rn) [<y, GHC.Internal.TH.Lift.lift y>]
-      In the expression:
-        \ y
-          -> [| y |]
-             pending(rn) [<y, GHC.Internal.TH.Lift.lift y>]
+    • In the expression: [| y |]
+      In the expression: \ y -> [| y |]
+      In an equation for ‘x’: x = \ y -> [| y |]
 

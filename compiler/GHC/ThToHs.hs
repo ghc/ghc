@@ -1205,7 +1205,7 @@ cvtl e = wrapLA (cvt e)
     cvt (ProjectionE xs) = return $ HsProjection noAnn $ fmap
                                          (DotFieldOcc noAnn . L noSrcSpanA . FieldLabelString  . fsLit) xs
     cvt (TypedSpliceE e) = do { e' <- parenthesizeHsExpr appPrec <$> cvtl e
-                              ; return $ HsTypedSplice noAnn e' }
+                              ; return $ HsTypedSplice noExtField (HsTypedSpliceExpr noAnn e') }
     cvt (TypedBracketE e) = do { e' <- cvtl e
                                ; return $ HsTypedBracket noAnn e' }
     cvt (TypeE t) = do { t' <- cvtType t

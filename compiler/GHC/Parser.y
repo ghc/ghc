@@ -2836,12 +2836,12 @@ explicit_activation :: { (ActivationAnn, Activation) }  -- In brackets
 
 quasiquote :: { Located (HsUntypedSplice GhcPs) }
         : TH_QUASIQUOTE   { let { loc = getLoc $1
-                                ; ITquasiQuote (quoter, quote, quoteSpan) = unLoc $1
-                                ; quoterId = mkUnqual varName quoter }
+                                ; ITquasiQuote (quoter, quoterSpan, quote, quoteSpan) = unLoc $1
+                                ; quoterId = L (noAnnSrcSpan (mkSrcSpanPs quoterSpan)) (mkUnqual varName quoter) }
                             in sL1 $1 (HsQuasiQuote noExtField quoterId (L (noAnnSrcSpan (mkSrcSpanPs quoteSpan)) quote)) }
         | TH_QQUASIQUOTE  { let { loc = getLoc $1
-                                ; ITqQuasiQuote (qual, quoter, quote, quoteSpan) = unLoc $1
-                                ; quoterId = mkQual varName (qual, quoter) }
+                                ; ITqQuasiQuote (qual, quoter, quoterSpan, quote, quoteSpan) = unLoc $1
+                                ; quoterId = L (noAnnSrcSpan (mkSrcSpanPs quoterSpan)) (mkQual varName (qual, quoter)) }
                             in sL1 $1 (HsQuasiQuote noExtField quoterId (L (noAnnSrcSpan (mkSrcSpanPs quoteSpan)) quote)) }
 
 exp  :: { ECP } : exp_gen(infixexp)  { $1 }
@@ -3192,7 +3192,7 @@ aexp2   :: { ECP }
 
         -- Template Haskell Extension
         | splice_untyped { ECP $ mkHsSplicePV $1 }
-        | splice_typed   { ecpFromExp $ fmap (uncurry HsTypedSplice) (reLoc $1) }
+        | splice_typed   { ecpFromExp $ fmap (HsTypedSplice noExtField) (reLoc $1) }
 
         | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket noExtField (VarBr (glR $1) True  $2)) }
         | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket noExtField (VarBr (glR $1) True  $2)) }
@@ -3231,18 +3231,18 @@ projection
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { fmap (HsUntypedSplice noExtField) (reLoc $1) }
-        | splice_typed   { fmap (uncurry HsTypedSplice) (reLoc $1) }
+        | splice_typed   { fmap (HsTypedSplice noExtField) (reLoc $1) }
 
 splice_untyped :: { Located (HsUntypedSplice GhcPs) }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         : PREFIX_DOLLAR aexp2   {% runPV (unECP $2) >>= \ $2 ->
                                    return (sLL $1 $> $ HsUntypedSpliceExpr (epTok $1) $2) }
 
-splice_typed :: { Located (EpToken "$$", LHsExpr GhcPs) }
+splice_typed :: { Located (HsTypedSplice GhcPs) }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         : PREFIX_DOLLAR_DOLLAR aexp2
                                 {% runPV (unECP $2) >>= \ $2 ->
-                                   return (sLL $1 $> $ (epTok $1, $2)) }
+                                   return (sLL $1 $> $ (HsTypedSpliceExpr (epTok $1) $2)) }
 
 cmdargs :: { [LHsCmdTop GhcPs] }
         : cmdargs acmd                  { $2 : $1 }
