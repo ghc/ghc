@@ -427,8 +427,52 @@ const int default_alignment = 8;
    the pointer as a redirect.  Essentially it's a DATA DLL reference.  */
 const void* __rts_iob_func = (void*)&__acrt_iob_func;
 
+/*
+ * Note [Avoiding repeated DLL loading]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * As LoadLibraryEx tends to be expensive and addDLL_PEi386 is called on every
+ * DLL-imported symbol, we use a hash-map to keep track of which DLLs have
+ * already been loaded. This hash-map is keyed on the dll_name passed to
+ * addDLL_PEi386 and is mapped to its HINSTANCE. This serves as a quick check
+ * to avoid repeated calls to LoadLibraryEx for the identical DLL. See #26009.
+ */
+
+typedef struct {
+    HashTable *hash;
+} LoadedDllCache;
+
+LoadedDllCache loaded_dll_cache;
+
+static void initLoadedDllCache(LoadedDllCache *cache) {
+    cache->hash = allocHashTable();
+}
+
+static int hash_path(const HashTable *table, StgWord w)
+{
+    const pathchar *key = (pathchar*) w;
+    return hashBuffer(table, key, sizeof(pathchar) * wcslen(key));
+}
+
+static int compare_path(StgWord key1, StgWord key2)
+{
+    return wcscmp((pathchar*) key1, (pathchar*) key2) == 0;
+}
+
+static void addLoadedDll(LoadedDllCache *cache, const pathchar *dll_name, HINSTANCE instance)
+{
+    insertHashTable_(cache->hash, (StgWord) dll_name, instance, hash_path);
+}
+
+static HINSTANCE isDllLoaded(const LoadedDllCache *cache, const pathchar *dll_name)
+{
+    void *result = lookupHashTable_(cache->hash, (StgWord) dll_name, hash_path, compare_path);
+    return (HINSTANCE) result;
+}
+
 void initLinker_PEi386(void)
 {
+    initLoadedDllCache(&loaded_dll_cache);
+
     if (!ghciInsertSymbolTable(WSTR("(GHCi/Ld special symbols)"),
                                symhash, "__image_base__",
                                GetModuleHandleW (NULL), HS_BOOL_TRUE,
@@ -802,6 +846,15 @@ addDLL_PEi386( const pathchar *dll_name, HINSTANCE *loaded )
     /* ------------------- Win32 DLL loader ------------------- */
     IF_DEBUG(linker, debugBelch("addDLL; dll_name = `%" PATH_FMT "'\n", dll_name));
 
+    // See Note [Avoiding repeated DLL loading]
+    HINSTANCE instance = isDllLoaded(&loaded_dll_cache, dll_name);
+    if (instance) {
+        if (loaded) {
+            *loaded = instance;
+        }
+        return NULL;
+    }
+
     /* The file name has no suffix (yet) so that we can try
        both foo.dll and foo.drv
 
@@ -820,7 +873,6 @@ addDLL_PEi386( const pathchar *dll_name, HINSTANCE *loaded )
     const DWORD flags[] = { LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, 0 };
 
     /* Iterate through the possible flags and formats.  */
-    HINSTANCE instance;
     for (int cFlag = 0; cFlag < 2; cFlag++) {
         for (int cFormat = 0; cFormat < 4; cFormat++) {
             snwprintf(buf, bufsize, formats[cFormat], dll_name);
@@ -839,6 +891,7 @@ addDLL_PEi386( const pathchar *dll_name, HINSTANCE *loaded )
     goto error;
 
 loaded:
+    addLoadedDll(&loaded_dll_cache, dll_name, instance);
     addDLLHandle(buf, instance);
     if (loaded) {
         *loaded = instance;
