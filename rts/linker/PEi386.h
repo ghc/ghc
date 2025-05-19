@@ -45,7 +45,7 @@ typedef struct _COFF_HEADER_INFO {
 
 void initLinker_PEi386( void );
 void exitLinker_PEi386( void );
-const char * addDLL_PEi386( pathchar *dll_name, HINSTANCE *instance  );
+const char * addDLL_PEi386( const pathchar *dll_name, HINSTANCE *instance  );
 void freePreloadObjectFile_PEi386( ObjectCode *oc );
 
 bool checkAndLoadImportLibrary( pathchar* arch_name, char* member_name, FILE* f);
