@@ -89,7 +89,8 @@ sizeStgRetFunFrame :: Int
 sizeStgRetFunFrame = bytesToWords (#const SIZEOF_StgRetFun)
 
 sizeStgAnnFrame :: Int
-sizeStgAnnFrame = bytesToWords (#const SIZEOF_StgAnnFrame)
+sizeStgAnnFrame = bytesToWords $
+  (#const SIZEOF_StgAnnFrame_NoHdr) + (#size StgHeader)
 
 offsetStgAnnFrameAnn :: WordOffset
 offsetStgAnnFrameAnn = byteOffsetToWordOffset $

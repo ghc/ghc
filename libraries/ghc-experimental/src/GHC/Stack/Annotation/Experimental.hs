@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE ImplicitParams #-}
 module GHC.Stack.Annotation.Experimental where
 
@@ -35,8 +36,9 @@ instance Show SrcLocAnno where
       ]
 
 annotateStackWith :: forall a b. (Typeable a, Show a) => a -> b -> b
-annotateStackWith ann =
-  annotateStack# (StackAnnotation ann)
+annotateStackWith ann b =
+  case annotateStack# (StackAnnotation ann) b of
+    (# r #) -> r
 
 annotateCallStack :: HasCallStack => a -> a
 annotateCallStack =

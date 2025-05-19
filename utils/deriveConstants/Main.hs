@@ -443,7 +443,7 @@ wanteds os = concat
           ,closureSize  C    "StgStopFrame"
           ,closureSize  C    "StgDeadThreadFrame"
           ,closureField C    "StgDeadThreadFrame" "result"
-          ,structSize   C    "StgAnnFrame"
+          ,closureSize  Both "StgAnnFrame"
           ,closureField C    "StgAnnFrame" "ann"
 
           ,closureSize  Both "StgMutArrPtrs"
