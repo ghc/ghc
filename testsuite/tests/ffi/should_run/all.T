@@ -188,8 +188,8 @@ test('ffi023', [ omit_ghci,
 test('rts_clearMemory', [
      # We only care about different GC configurations under the
      # single-threaded RTS for the time being.
-     only_ways(['normal', 'optasm' ,'g1', 'nursery_chunks', 'nonmoving', 'compacting_gc']),
-     extra_ways(['g1', 'nursery_chunks', 'nonmoving', 'compacting_gc']),
+     only_ways(['normal', 'optasm' ,'g1', 'nursery_chunks', 'nonmoving', 'compacting_gc', 'sanity']),
+     extra_ways(['g1', 'nursery_chunks', 'nonmoving', 'compacting_gc', 'sanity']),
      # On windows, nonmoving way fails with bad exit code (2816)
      when(opsys('mingw32'), fragile(23091)),
      req_c,
