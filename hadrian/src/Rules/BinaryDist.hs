@@ -9,6 +9,7 @@ import Oracles.Flag
 import Packages
 import Settings
 import Settings.Program (programContext)
+import System.Environment (lookupEnv)
 import Target
 import Utilities
 import qualified System.Directory.Extra as IO
@@ -120,7 +121,14 @@ installTo relocatable prefix = do
     let disabledMerge =
           if win then ["MergeObjsCmd="]
           else []
-    runBuilder (Configure bindistFilesDir) (["--prefix="++prefix] ++ disabledMerge) [] []
+
+    env_windres_cmd_m <- liftIO $ lookupEnv "WindresCmd"
+    runBuilderWithCmdOptions
+      -- By unknown reason when MSYS2 environment is used under Wine it does not
+      -- pass non-CAPS environment variables to child processes, so
+      -- "WINDRESCMD" would be fine, but "WindresCmd" requires manual attention.
+      (maybe mempty (pure . AddEnv "WindresCmd") env_windres_cmd_m)
+      (Configure bindistFilesDir) (["--prefix="++prefix] ++ disabledMerge) [] []
     let env = case relocatable of
                 Relocatable -> [AddEnv "RelocatableBuild" "YES"]
                 NotRelocatable -> []
