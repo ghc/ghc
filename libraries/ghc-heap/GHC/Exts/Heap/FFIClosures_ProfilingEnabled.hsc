@@ -87,6 +87,9 @@ parseTsoFlags w | isSet (#const TSO_LOCKED) w = TsoLocked : parseTsoFlags (unset
                 | isSet (#const TSO_MARKED) w = TsoMarked : parseTsoFlags (unset (#const TSO_MARKED) w)
                 | isSet (#const TSO_SQUEEZED) w = TsoSqueezed : parseTsoFlags (unset (#const TSO_SQUEEZED) w)
                 | isSet (#const TSO_ALLOC_LIMIT) w = TsoAllocLimit : parseTsoFlags (unset (#const TSO_ALLOC_LIMIT) w)
+#if __GLASGOW_HASKELL__ >= 913
+                | isSet (#const TSO_STOP_NEXT_BREAKPOINT) w = TsoStopNextBreakpoint : parseTsoFlags (unset (#const TSO_STOP_NEXT_BREAKPOINT) w)
+#endif
 parseTsoFlags 0 = []
 parseTsoFlags w = [TsoFlagsUnknownValue w]
 
