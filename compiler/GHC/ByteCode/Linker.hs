@@ -89,6 +89,9 @@ lookupLiteral interp pkgs_loaded le ptr = case ptr of
   BCONPtrStr bs -> do
     RemotePtr p <- fmap head $ interpCmd interp $ MallocStrings [bs]
     pure $ fromIntegral p
+  BCONPtrFS fs -> do
+    RemotePtr p <- fmap head $ interpCmd interp $ MallocStrings [bytesFS fs]
+    pure $ fromIntegral p
   BCONPtrFFIInfo (FFIInfo {..}) -> do
     RemotePtr p <- interpCmd interp $ PrepFFI ffiInfoArgs ffiInfoRet
     pure $ fromIntegral p

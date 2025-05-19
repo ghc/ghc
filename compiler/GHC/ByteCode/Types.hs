@@ -201,6 +201,8 @@ data BCONPtr
   -- | A top-level string literal.
   -- Also see Note [Allocating string literals] in GHC.ByteCode.Asm.
   | BCONPtrStr   !ByteString
+  -- | Same as 'BCONPtrStr' but with benefits of 'FastString' interning logic.
+  | BCONPtrFS    !FastString
   -- | A libffi ffi_cif function prototype.
   | BCONPtrFFIInfo !FFIInfo
 
