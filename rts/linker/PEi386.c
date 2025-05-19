@@ -440,10 +440,11 @@ void initLinker_PEi386(void)
     addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
 #endif
 
-  /* Register the cleanup routine as an exit handler,  this gives other exit handlers
-     a chance to run which may need linker information.  Exit handlers are ran in
-     reverse registration order so this needs to be before the linker loads anything.  */
-  atexit (exitLinker_PEi386);
+    /* Register the cleanup routine as an exit handler,  this gives other exit handlers
+     * a chance to run which may need linker information.  Exit handlers are ran in
+     * reverse registration order so this needs to be before the linker loads anything.
+     */
+    atexit (exitLinker_PEi386);
 }
 
 void exitLinker_PEi386(void)
@@ -798,12 +799,8 @@ uint8_t* getSymShortName ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 const char *
 addDLL_PEi386( pathchar *dll_name, HINSTANCE *loaded )
 {
-   /* ------------------- Win32 DLL loader ------------------- */
-
-   pathchar*  buf;
-   HINSTANCE  instance;
-
-   IF_DEBUG(linker, debugBelch("addDLL; dll_name = `%" PATH_FMT "'\n", dll_name));
+    /* ------------------- Win32 DLL loader ------------------- */
+    IF_DEBUG(linker, debugBelch("addDLL; dll_name = `%" PATH_FMT "'\n", dll_name));
 
     /* The file name has no suffix (yet) so that we can try
        both foo.dll and foo.drv
@@ -816,29 +813,23 @@ addDLL_PEi386( pathchar *dll_name, HINSTANCE *loaded )
         extension. */
 
     size_t bufsize = pathlen(dll_name) + 10;
-    buf = stgMallocBytes(bufsize * sizeof(wchar_t), "addDLL");
+    pathchar *buf = stgMallocBytes(bufsize * sizeof(wchar_t), "addDLL");
 
     /* These are ordered by probability of success and order we'd like them.  */
     const wchar_t *formats[] = { L"%ls.DLL", L"%ls.DRV", L"lib%ls.DLL", L"%ls" };
     const DWORD flags[] = { LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, 0 };
 
-    int cFormat, cFlag;
-
     /* Iterate through the possible flags and formats.  */
-    for (cFlag = 0; cFlag < 2; cFlag++)
-    {
-        for (cFormat = 0; cFormat < 4; cFormat++)
-        {
+    HINSTANCE instance;
+    for (int cFlag = 0; cFlag < 2; cFlag++) {
+        for (int cFormat = 0; cFormat < 4; cFormat++) {
             snwprintf(buf, bufsize, formats[cFormat], dll_name);
             instance = LoadLibraryExW(buf, NULL, flags[cFlag]);
             if (instance == NULL) {
-                if (GetLastError() != ERROR_MOD_NOT_FOUND)
-                {
+                if (GetLastError() != ERROR_MOD_NOT_FOUND) {
                     goto error;
                 }
-            }
-            else
-            {
+            } else {
                 break; /* We're done. DLL has been loaded.  */
             }
         }
