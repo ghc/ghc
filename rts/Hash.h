@@ -69,6 +69,10 @@ void *      removeStrHashTable ( StrHashTable *table, const char * key,
  */
 typedef int HashFunction(const HashTable *table, StgWord key);
 typedef int CompareFunction(StgWord key1, StgWord key2);
+
+// Helper for implementing hash functions
+int hashBuffer(const HashTable *table, const void *buf, size_t len);
+
 int hashWord(const HashTable *table, StgWord key);
 int hashStr(const HashTable *table, StgWord w);
 void        insertHashTable_ ( HashTable *table, StgWord key,
@@ -78,6 +82,7 @@ void *      lookupHashTable_ ( const HashTable *table, StgWord key,
 void *      removeHashTable_ ( HashTable *table, StgWord key,
                                const void *data, HashFunction f,
                                CompareFunction cmp );
+
 
 /* Freeing hash tables
  */
