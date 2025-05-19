@@ -1,6 +1,5 @@
-
 RepPolyTuple.hs:11:9: error: [GHC-55287]
-    • The second component of the unboxed tuple
+    • The first component of the unboxed tuple
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE r
@@ -11,3 +10,4 @@ RepPolyTuple.hs:11:9: error: [GHC-55287]
             where
                 bar :: forall (r :: RuntimeRep) (a :: TYPE r). () -> a
                 bar _ = undefined
+

@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 
 module GHC.Tc.Solver.Default(
-   tryDefaulting, tryUnsatisfiableGivens,
+   tryDefaulting, tryDefaultingForAmbiguityCheck,
    isInteractiveClass, isNumClass
    ) where
 
@@ -29,7 +29,7 @@ import GHC.Core.Reduction( Reduction, reductionCoercion )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Core.Make
-import GHC.Core.Coercion( isReflCo, mkReflCo, mkSubCo )
+import GHC.Core.Coercion( isReflCo, mkReflCo, mkSubCo, hasCoercionHole )
 import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -110,6 +110,32 @@ defaulting. Again this is done at the top-level and the plan is:
      - Apply defaulting to their kinds
 
 More details in Note [DefaultTyVar].
+
+Note [Limited defaulting in the ambiguity check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When simplifying constraints for the ambiguity check, we don't want full
+defaulting.  E.g. #11947 was an example:
+   f :: Num a => Int -> Int
+This is ambiguous of course, but we don't want to default the (Num
+alpha) constraint to (Num Int)!  Doing so gives a defaulting warning,
+but no error.
+
+But we still do
+
+* tryConstraintDefaulting.  Example in T10009 where we have this type signature
+    f :: (UnF (F b) ~ b) => F b -> ()
+  We finish up with an equality that is a member of it's
+    [W] hole{co_aF0} {rewriters: {co_aF0}}:: b_aES[tau:1] ~# b_aEP[sk:1]
+  It is not unified because of (REWRITERS) in Note [Unification preconditions]
+  in GHC.Tc.Utils.Unify
+
+  (`tryConstraintDefaulting` defaults call-stack and exception constraint
+  as well as equalities; but in the case of the ambiguity check we will
+  only see equality constraints.  Does not seem worth making a version
+  of `tryConstraintDefaulting` that looks only for equalities.)
+
+* tryUnsatisfiableGivens: see Wrinkle [Ambiguity] under point (C) of
+  Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors.
 -}
 
 
@@ -117,13 +143,22 @@ tryDefaulting :: WantedConstraints -> TcS WantedConstraints
 -- This is the function that pulls all the defaulting strategies together
 tryDefaulting wc
  = do { dflags <- getDynFlags
-      ; traceTcS "tryDefaulting:before" (ppr wc)
+      ; traceTcS "tryDefaulting {" (ppr wc)
       ; wc1 <- tryTyVarDefaulting dflags wc
       ; wc2 <- tryConstraintDefaulting wc1
       ; wc3 <- tryTypeClassDefaulting wc2
       ; wc4 <- tryUnsatisfiableGivens wc3
-      ; traceTcS "tryDefaulting:after" (ppr wc4)
+      ; traceTcS "tryDefaulting }" (ppr wc4)
       ; return wc4 }
+
+tryDefaultingForAmbiguityCheck  :: WantedConstraints -> TcS WantedConstraints
+-- See Note [Limited defaulting in the ambiguity check]
+tryDefaultingForAmbiguityCheck wc
+ = do { traceTcS "tryDefaulting for ambiguity {" (ppr wc)
+      ; wc1 <- tryConstraintDefaulting wc
+      ; wc2 <- tryUnsatisfiableGivens wc1
+      ; traceTcS "tryDefaulting }" (ppr wc2)
+      ; return wc2 }
 
 solveAgainIf :: Bool -> WantedConstraints -> TcS WantedConstraints
 -- If the Bool is true, solve the wanted constraints again
@@ -459,7 +494,7 @@ defaultEquality ct
             -- This handles cases such as @IO alpha[tau] ~R# IO Int@
             -- by defaulting @alpha := Int@, which is useful in practice
             -- (see Note [Defaulting representational equalities]).
-          ; (co, new_eqs, _unifs, _rw) <-
+          ; (co, new_eqs, _unifs) <-
               wrapUnifierX (ctEvidence ct) Nominal $
               -- NB: nominal equality!
                 \ uenv -> uType uenv z_ty1 z_ty2
@@ -481,6 +516,7 @@ defaultEquality ct
       | MetaTv { mtv_info = info } <- tcTyVarDetails lhs_tv
       , tyVarKind lhs_tv `tcEqType` typeKind rhs_ty
       , checkTopShape info rhs_ty
+      , not (hasCoercionHole rhs_ty) -- See (DE6) in Note [Defaulting equalities]
       -- Do not test for touchability of lhs_tv; that is the whole point!
       -- See (DE2) in Note [Defaulting equalities]
       = do { traceTcS "defaultEquality 1" (ppr lhs_tv $$ ppr rhs_ty)
@@ -628,6 +664,22 @@ Wrinkles:
 
   Hence the Bool flag on LC_Promote, and its use in `tef_unifying` in
   `defaultEquality`.
+
+(DE6) /Don't/ unify if the RHS has a free coercion hole in it.  That means
+  that there is an as-yet-unsolved equality constraint (whose evidence
+  will fill that hole); unifying can lead to very confusing type errors.
+  e.g.    [W] co1 :: IntRep ~ LiftedRep
+          [W] co2 {rewritten by co1} :: alpha ~ t2 |> (TYPE co1)
+  Unifying alpha := (t1 |> TYPE co1) is a Bad Idea.
+
+  Note that we /do/ unify even if the constraint has a non-empty rewriter
+  set, which has prevented unification up to now; see
+  Note [Unify only if the rewriter set is empty] in GHC.Tc.Solver.Equality.
+  In obscure situations a constraint can end up in its own rewriter set, but
+  without a coercion hole being in the RHS.
+
+  See #10009, and Note [Limited defaulting in the ambiguity check].
+
 
 Note [Must simplify after defaulting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

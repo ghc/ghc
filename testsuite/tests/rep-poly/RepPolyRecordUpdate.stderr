@@ -16,7 +16,10 @@ RepPolyRecordUpdate.hs:13:9: error: [GHC-55287]
     • The argument ‘fld’ of ‘MkX’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE rep0
+        a0 :: TYPE rep0
+      When unifying:
+        • X a0
+        • X a
       Cannot unify ‘rep’ with the type variable ‘rep0’
       because the former is not a concrete ‘RuntimeRep’.
     • In a record update at field ‘fld’,

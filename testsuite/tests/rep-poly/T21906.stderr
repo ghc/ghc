@@ -2,7 +2,10 @@ T21906.hs:14:17: error: [GHC-55287]
     • The return type of the third argument of the primop ‘keepAlive#’
       does not have a fixed runtime representation.
       Its type is:
-        b0 :: TYPE r1
+        b1 :: TYPE r1
+      When unifying:
+        • b1
+        • b
       Cannot unify ‘r’ with the type variable ‘r1’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: keepAlive# val s f
@@ -12,7 +15,10 @@ T21906.hs:21:25: error: [GHC-55287]
     • The return type of the first argument of the primop ‘catch#’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE q1
+        a1 :: TYPE q1
+      When unifying:
+        • (# State# RealWorld, a1 #)
+        • (# State# RealWorld, a #)
       Cannot unify ‘r’ with the type variable ‘q1’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: catch# action handle s
@@ -23,7 +29,10 @@ T21906.hs:30:17: error: [GHC-55287]
     • The nested return type inside the second argument of the primop ‘control0#’
       does not have a fixed runtime representation.
       Its type is:
-        b :: TYPE r0
+        b0 :: TYPE r0
+      When unifying:
+        • (# State# RealWorld, b0 #)
+        • (# State# RealWorld, b #)
       Cannot unify ‘r’ with the type variable ‘r0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: control0# tag f s
@@ -33,7 +42,10 @@ T21906.hs:35:19: error: [GHC-55287]
     • The return type of the first argument of the primop ‘fork#’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE q0
+        a0 :: TYPE q0
+      When unifying:
+        • State# RealWorld -> (# State# RealWorld, a #)
+        • State# RealWorld -> (# State# RealWorld, a0 #)
       Cannot unify ‘r’ with the type variable ‘q0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the first argument of ‘fork#’, namely ‘f’

@@ -1,7 +1,6 @@
-
 T14040a.hs:26:46: error: [GHC-46956]
-    • Couldn't match kind ‘k1’ with ‘WeirdList z’
-      Expected kind ‘WeirdList k1’,
+    • Couldn't match kind ‘k0’ with ‘WeirdList z’
+      Expected kind ‘WeirdList k0’,
         but ‘xs’ has kind ‘WeirdList (WeirdList z)’
         because kind variable ‘z’ would escape its scope
       This (rigid, skolem) kind variable is bound by
@@ -25,8 +24,8 @@ T14040a.hs:26:46: error: [GHC-46956]
                                                                                            -> p _ wl
 
 T14040a.hs:27:27: error: [GHC-46956]
-    • Couldn't match kind ‘k0’ with ‘z’
-      Expected kind ‘WeirdList k0’,
+    • Couldn't match kind ‘k1’ with ‘z’
+      Expected kind ‘WeirdList k1’,
         but ‘WeirdCons x xs’ has kind ‘WeirdList z’
         because kind variable ‘z’ would escape its scope
       This (rigid, skolem) kind variable is bound by
@@ -48,3 +47,4 @@ T14040a.hs:27:27: error: [GHC-46956]
                                                                                                -> p _ xs
                                                                                                   -> p _ (WeirdCons x xs))
                                                                                            -> p _ wl
+

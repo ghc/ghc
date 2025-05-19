@@ -4032,13 +4032,16 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
                            FixedRuntimeRepOrigin
                              { frr_type    = ty
                              , frr_context = frr_ctxt }
-                       , frr_info_not_concrete =
-                         mb_not_conc }) =
+                       , frr_info_not_concrete = mb_not_conc
+                       , frr_info_other_origin = mb_other_orig }) =
       -- Add bullet points if there is more than one error.
       (if length frr_origs > 1 then (bullet <+>) else id) $
         vcat [ sep [ pprFixedRuntimeRepContext frr_ctxt
                    , text "does not have a fixed runtime representation." ]
              , type_printout ty
+             , case mb_other_orig of
+                 Nothing -> empty
+                 Just o -> other_context o
              , case mb_not_conc of
                 Nothing -> empty
                 Just (conc_tv, not_conc) ->
@@ -4080,6 +4083,18 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
         else vcat [ text "Its type is:"
                   , nest 2 $ ppr ty <+> dcolon <+> pprWithTYPE (typeKind ty) ]
 
+    other_context :: CtOrigin -> SDoc
+    other_context = \case
+      TypeEqOrigin { uo_actual = actual_ty, uo_expected = exp_ty } ->
+        -- TODO: use uo_thing in the error message as well?
+        hang (text "When unifying:") 2 $
+          vcat [ bullet <+> ppr actual_ty
+               , bullet <+> ppr exp_ty
+               ]
+      KindEqOrigin _ _ orig' _
+        -> other_context orig'
+      _ -> empty -- Don't think this ever happens
+
     unsolved_concrete_eq_explanation :: TcTyVar -> Type -> SDoc
     unsolved_concrete_eq_explanation tv not_conc =
           text "Cannot unify" <+> quotes (ppr not_conc)
@@ -4095,10 +4110,6 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
           = quotes (text "Levity")
           | otherwise
           = text "type"
-pprTcSolverReportMsg _ (BlockedEquality item) =
-  vcat [ hang (text "Cannot use equality for substitution:")
-           2 (ppr (errorItemPred item))
-       , text "Doing so would be ill-kinded." ]
 pprTcSolverReportMsg _ (ExpectingMoreArguments n thing) =
   text "Expecting" <+> speakN (abs n) <+>
     more <+> quotes (ppr thing)
@@ -5105,8 +5116,6 @@ tcSolverReportMsgHints ctxt = \case
   Mismatch { mismatchMsg = mismatch_msg }
     -> mismatchMsgHints ctxt mismatch_msg
   FixedRuntimeRepError {}
-    -> noHints
-  BlockedEquality {}
     -> noHints
   ExpectingMoreArguments {}
     -> noHints

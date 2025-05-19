@@ -1,7 +1,10 @@
-
-T7696.hs:9:6: error: [GHC-83865]
-    • Couldn't match type ‘m0 a0’ with ‘()’
+T7696.hs:9:6: error: [GHC-18872]
+    • Couldn't match kind ‘* -> *’ with ‘*’
+      When matching types
+        m0 :: * -> *
+        () :: *
       Expected: ((), w ())
         Actual: (m0 a0, t0 m0)
     • In the expression: f1
       In an equation for ‘f2’: f2 = f1
+

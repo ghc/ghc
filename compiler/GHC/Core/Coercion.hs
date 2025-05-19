@@ -120,9 +120,7 @@ module GHC.Core.Coercion (
 
         multToCo, mkRuntimeRepCo,
 
-        hasHeteroKindCoercionHoleTy, hasHeteroKindCoercionHoleCo,
-        hasThisCoercionHoleTy,
-
+        hasCoercionHole,
         setCoHoleType
        ) where
 
@@ -2782,39 +2780,22 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
 -}
 
 has_co_hole_ty :: Type -> Monoid.Any
-has_co_hole_co :: Coercion -> Monoid.Any
-(has_co_hole_ty, _, has_co_hole_co, _)
+(has_co_hole_ty, _, _, _)
   = foldTyCo folder ()
   where
     folder = TyCoFolder { tcf_view  = noView
                         , tcf_tyvar = const2 (Monoid.Any False)
                         , tcf_covar = const2 (Monoid.Any False)
-                        , tcf_hole  = \_ hole -> Monoid.Any (isHeteroKindCoHole hole)
+                        , tcf_hole  = \_ _ -> Monoid.Any True
                         , tcf_tycobinder = const2
                         }
 
--- | Is there a hetero-kind coercion hole in this type?
---   (That is, a coercion hole with ch_hetero_kind=True.)
--- See wrinkle (EIK2) of Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality
-hasHeteroKindCoercionHoleTy :: Type -> Bool
-hasHeteroKindCoercionHoleTy = Monoid.getAny . has_co_hole_ty
-
--- | Is there a hetero-kind coercion hole in this coercion?
-hasHeteroKindCoercionHoleCo :: Coercion -> Bool
-hasHeteroKindCoercionHoleCo = Monoid.getAny . has_co_hole_co
-
-hasThisCoercionHoleTy :: Type -> CoercionHole -> Bool
-hasThisCoercionHoleTy ty hole = Monoid.getAny (f ty)
-  where
-    (f, _, _, _) = foldTyCo folder ()
-
-    folder = TyCoFolder { tcf_view  = noView
-                        , tcf_tyvar = const2 (Monoid.Any False)
-                        , tcf_covar = const2 (Monoid.Any False)
-                        , tcf_hole  = \ _ h -> Monoid.Any (getUnique h == getUnique hole)
-                        , tcf_tycobinder = const2
-                        }
+-- | Is there a coercion hole in this type?
+-- See wrinkle (DE6) of Note [Defaulting equalities] in GHC.Tc.Solver.Default
+hasCoercionHole :: Type -> Bool
+hasCoercionHole = Monoid.getAny . has_co_hole_ty
 
 -- | Set the type of a 'CoercionHole'
 setCoHoleType :: CoercionHole -> Type -> CoercionHole
 setCoHoleType h t = setCoHoleCoVar h (setVarType (coHoleCoVar h) t)
+

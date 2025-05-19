@@ -1,10 +1,13 @@
-
 T14561.hs:16:9: error: [GHC-55287]
     • The first argument of ‘unsafeCoerce#’
       does not have a fixed runtime representation.
       Its type is:
         a0 :: TYPE q0
+      When unifying:
+        • a0 -> a
+        • a -> a
       Cannot unify ‘r’ with the type variable ‘q0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: unsafeCoerce#
       In an equation for ‘badId’: badId = unsafeCoerce#
+

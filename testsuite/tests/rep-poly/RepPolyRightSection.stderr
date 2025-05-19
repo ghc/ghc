@@ -1,10 +1,13 @@
-
 RepPolyRightSection.hs:14:11: error: [GHC-55287]
     • The third argument of ‘rightSection’
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE q0
+      When unifying:
+        • TYPE r
+        • *
       Cannot unify ‘r’ with the type variable ‘q0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: `g` undefined
       In an equation for ‘test2’: test2 = (`g` undefined)
+

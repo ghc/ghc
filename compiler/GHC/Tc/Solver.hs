@@ -30,7 +30,8 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Solver.Solve   ( solveSimpleGivens, solveSimpleWanteds
                              , solveWanteds, simplifyWantedsTcM )
-import GHC.Tc.Solver.Default ( tryDefaulting, tryUnsatisfiableGivens, isInteractiveClass )
+import GHC.Tc.Solver.Default ( tryDefaulting, tryDefaultingForAmbiguityCheck
+                             , isInteractiveClass )
 import GHC.Tc.Solver.Dict    ( makeSuperClasses )
 import GHC.Tc.Solver.Rewrite ( rewriteType )
 import GHC.Tc.Utils.Unify
@@ -589,17 +590,6 @@ How is this implemented? It's complicated! So we'll step through it all:
  7) `GHC.Driver.Main.tcRnModule'` -- Reads `tcg_safe_infer` after type-checking, calling
     `GHC.Driver.Main.markUnsafeInfer` (passing the reason along) when safe-inference
     failed.
-
-Note [No defaulting in the ambiguity check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When simplifying constraints for the ambiguity check, we use
-solveWanteds, not simplifyTopWanteds, so that we do no defaulting.
-#11947 was an example:
-   f :: Num a => Int -> Int
-This is ambiguous of course, but we don't want to default the
-(Num alpha) constraint to (Num Int)!  Doing so gives a defaulting
-warning, but no error.
-
 -}
 
 ------------------
@@ -609,11 +599,7 @@ simplifyAmbiguityCheck ty wc
          text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wc
 
        ; (final_wc, _) <- runTcS $ do { wc1 <- solveWanteds wc
-                                      ; tryUnsatisfiableGivens wc1 }
-             -- NB: no defaulting!  See Note [No defaulting in the ambiguity check]
-             -- Note: we do still use Unsatisfiable Givens to solve Wanteds,
-             -- see Wrinkle [Ambiguity] under point (C) of
-             -- Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors.
+                                      ; tryDefaultingForAmbiguityCheck wc1 }
 
        ; discardResult (reportUnsolved final_wc)
 

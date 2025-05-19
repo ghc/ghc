@@ -366,8 +366,9 @@ zonkCoVar = zonkId
 ************************************************************************
 -}
 
--- | Check that a coercion is appropriate for filling a hole. (The hole
--- itself is needed only for printing.)
+-- | Debugging-only!  Check that a coercion is appropriate for filling a
+--   hole. (The hole itself is needed only for printing.)
+--
 -- Always returns the checked coercion, but this return value is necessary
 -- so that the input coercion is forced only when the output is forced.
 checkCoercionHole :: CoVar -> Coercion -> ZonkM Coercion
@@ -752,11 +753,18 @@ zonkTidyFRRInfos = go []
   where
     go zs env [] = return (env, reverse zs)
     go zs env (FRR_Info { frr_info_origin = FixedRuntimeRepOrigin ty orig
-                        , frr_info_not_concrete = mb_not_conc } : tys)
+                        , frr_info_not_concrete = mb_not_conc
+                        , frr_info_other_origin = mb_other_orig
+                        } : tys)
       = do { (env, ty) <- zonkTidyTcType env ty
            ; (env, mb_not_conc) <- go_mb_not_conc env mb_not_conc
+           ; (env, mb_other_orig) <-
+               case mb_other_orig of
+                 Nothing -> return (env, Nothing)
+                 Just o  -> do { (env', o') <- zonkTidyOrigin env o; return (env', Just o') }
            ; let info = FRR_Info { frr_info_origin = FixedRuntimeRepOrigin ty orig
-                                 , frr_info_not_concrete = mb_not_conc }
+                                 , frr_info_not_concrete = mb_not_conc
+                                 , frr_info_other_origin = mb_other_orig }
            ; go (info:zs) env tys }
 
     go_mb_not_conc env Nothing = return (env, Nothing)

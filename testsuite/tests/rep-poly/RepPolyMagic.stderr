@@ -1,9 +1,11 @@
-
 RepPolyMagic.hs:12:7: error: [GHC-55287]
     • The second argument of ‘seq’
       does not have a fixed runtime representation.
       Its type is:
         b0 :: TYPE r0
+      When unifying:
+        • a -> b0 -> b0
+        • a -> b -> b
       Cannot unify ‘r’ with the type variable ‘r0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: seq
@@ -14,7 +16,11 @@ RepPolyMagic.hs:15:7: error: [GHC-55287]
       does not have a fixed runtime representation.
       Its type is:
         a0 :: TYPE q0
+      When unifying:
+        • (a0 -> a) -> a0 -> a
+        • (a -> a) -> a -> a
       Cannot unify ‘r’ with the type variable ‘q0’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: oneShot
       In an equation for ‘bar’: bar = oneShot
+
