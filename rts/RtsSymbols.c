@@ -906,7 +906,10 @@ extern char **environ;
       SymI_HasProto(revertCAFs)                                         \
       SymI_HasProto(RtsFlags)                                           \
       SymI_NeedsDataProto(rts_breakpoint_io_action)                     \
-      SymI_NeedsDataProto(rts_stop_next_breakpoint)                     \
+      SymI_NeedsProto(rts_enableStopNextBreakpointAll)                  \
+      SymI_NeedsProto(rts_disableStopNextBreakpointAll)                 \
+      SymI_NeedsProto(rts_enableStopNextBreakpoint)                     \
+      SymI_NeedsProto(rts_disableStopNextBreakpoint)                    \
       SymI_NeedsDataProto(rts_stop_on_exception)                        \
       SymI_HasProto(stopTimer)                                          \
       SymI_HasProto(n_capabilities)                                     \
