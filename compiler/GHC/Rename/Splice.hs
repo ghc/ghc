@@ -142,7 +142,6 @@ rnTypedBracket e br_body
 
        ; traceRn "Renaming typed TH bracket" empty
        ; (body', fvs_e) <- setThLevel (Brack cur_level RnPendingTyped) $ rnLExpr br_body
-
        ; return (HsTypedBracket noExtField body', fvs_e)
 
        }
@@ -174,7 +173,7 @@ rnUntypedBracket e br_body
        ; (body', fvs_e) <-
          -- See Note [Rebindable syntax and Template Haskell]
          unsetXOptM LangExt.RebindableSyntax $
-         setThLevel (Brack cur_level (RnPendingUntyped ps_var)) $
+         setThLevel (UntypedBrack cur_level ps_var) $
                   rn_utbracket br_body
        ; pendings <- readMutVar ps_var
        ; return (HsUntypedBracket pendings body', fvs_e)
@@ -274,33 +273,33 @@ We don't want the type checker to see these bogus unbound variables.
 
 rnUntypedSpliceGen :: (HsUntypedSplice GhcRn -> RnM (a, FreeVars))
                                                     -- Outside brackets, run splice
-                   -> (Name -> HsUntypedSplice GhcRn -> (PendingRnSplice, a))
+                   -> (UntypedSpliceFlavour, HsUntypedSpliceResult z -> HsUntypedSplice GhcRn -> RnM a)
                                                    -- Inside brackets, make it pending
                    -> HsUntypedSplice GhcPs
                    -> RnM (a, FreeVars)
-rnUntypedSpliceGen run_splice pend_splice splice
+rnUntypedSpliceGen run_splice (flavour, run_pending) splice
   = addErrCtxt (UntypedSpliceCtxt splice) $ do
     { level <- getThLevel
     ; case level of
-        Brack _ RnPendingTyped
+        TypedBrack {}
           -> failWithTc $ thSyntaxError
                         $ MismatchedSpliceType Untyped IsSplice
 
-        Brack pop_level (RnPendingUntyped ps_var)
+        UntypedBrack pop_level ps_var
           -> do { (splice', fvs) <- setThLevel pop_level $
-                                    rnUntypedSplice splice
+                                    rnUntypedSplice splice flavour
                 ; loc  <- getSrcSpanM
                 ; splice_name <- newLocalBndrRn (L (noAnnSrcSpan loc) unqualSplice)
-                ; let (pending_splice, result) = pend_splice splice_name splice'
+                ; result <- run_pending (HsUntypedSpliceNested splice_name) splice'
                 ; ps <- readMutVar ps_var
-                ; writeMutVar ps_var (pending_splice : ps)
+                ; writeMutVar ps_var (PendingRnSplice splice_name splice' : ps)
                 ; return (result, fvs) }
 
         _ ->  do { checkTopSpliceAllowed splice
                  ; cur_level <- getThLevel
                  ; (splice', fvs1) <- checkNoErrs $
                                       setThLevel (Splice Untyped cur_level) $
-                                      rnUntypedSplice splice
+                                      rnUntypedSplice splice flavour
                    -- checkNoErrs: don't attempt to run the splice if
                    -- renaming it failed; otherwise we get a cascade of
                    -- errors from e.g. unbound variables
@@ -339,9 +338,11 @@ runRnSplice flavour run_meta ppr_res splice
             Nothing -> return splice
             Just h  -> h splice
 
+       -- TODO: Should call tcUntypedSplice here
        ; let the_expr = case splice' of
                 HsUntypedSpliceExpr _ e ->  e
                 HsQuasiQuote _ q str -> mkQuasiQuoteExpr flavour q str
+                XUntypedSplice {} -> pprPanic "runRnSplice: XUntypedSplice" (pprUntypedSplice False Nothing splice')
 
              -- Typecheck the expression
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
@@ -376,18 +377,20 @@ runRnSplice flavour run_meta ppr_res splice
                  UntypedDeclSplice -> True
                  _                 -> False
 
-------------------
-makePending :: UntypedSpliceFlavour
-            -> Name
-            -> HsUntypedSplice GhcRn
-            -> PendingRnSplice
-makePending flavour n (HsUntypedSpliceExpr _ e)
-  = PendingRnSplice flavour n e
-makePending flavour n (HsQuasiQuote _ quoter quote)
-  = PendingRnSplice flavour n (mkQuasiQuoteExpr flavour quoter quote)
+
+recordPendingSplice :: SplicePointName -> HsImplicitLiftSplice -> PendingStuff -> TcM (HsExpr GhcRn)
+recordPendingSplice sp pn (RnPending ref) = do
+  let expr = XUntypedSplice pn
+  updTcRef ref (PendingRnSplice sp expr:)
+  return (HsUntypedSplice (HsUntypedSpliceNested sp) expr)
+-- Splices are not lifted for typed brackets
+recordPendingSplice sp pn (RnPendingTyped) = do
+  let expr = XTypedSplice pn
+  return (HsTypedSplice (HsTypedSpliceNested sp) expr)
+recordPendingSplice _ _ (TcPending _ _ _) = panic "impossible"
 
 ------------------
-mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name
+mkQuasiQuoteExpr :: UntypedSpliceFlavour -> LIdP GhcRn
                  -> XRec GhcPs FastString
                  -> LHsExpr GhcRn
 -- Return the expression (quoter "...quote...")
@@ -400,7 +403,7 @@ mkQuasiQuoteExpr flavour quoter (L q_span' quote)
                     quoteExpr
   where
     q_span = noAnnSrcSpan (locA q_span')
-    quoterExpr = L q_span $! mkHsVar          $! (L (l2l q_span) quoter)
+    quoterExpr = L q_span $! mkHsVar          $! quoter
     quoteExpr  = L q_span $! HsLit noExtField $! HsString NoSourceText quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName
@@ -415,33 +418,44 @@ unqualSplice :: RdrName
 -- We use "spn" (which is arbitrary) because it is brief but grepable-for.
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "spn"))
 
-rnUntypedSplice :: HsUntypedSplice GhcPs -> RnM (HsUntypedSplice GhcRn, FreeVars)
+rnUntypedSplice :: HsUntypedSplice GhcPs
+                -> UntypedSpliceFlavour
+                -> RnM ( HsUntypedSplice GhcRn
+                       , FreeVars)
 -- Not exported...used for all
-rnUntypedSplice (HsUntypedSpliceExpr annCo expr)
+rnUntypedSplice (HsUntypedSpliceExpr _ expr) flavour
   = do  { (expr', fvs) <- rnLExpr expr
-        ; return (HsUntypedSpliceExpr annCo expr', fvs) }
+        ; return (HsUntypedSpliceExpr (HsUserSpliceExt flavour) expr', fvs) }
 
-rnUntypedSplice (HsQuasiQuote ext quoter quote)
+rnUntypedSplice (HsQuasiQuote _ quoter quote) flavour
   = do  { -- Rename the quoter; akin to the HsVar case of rnExpr
-        ; quoter' <- lookupOccRn WL_TermVariable quoter
-        ; let res_name = noLocA (WithUserRdr quoter quoter')
+        ; quoter' <- lookupLocatedOccRn WL_TermVariable quoter
+        ; let res_name = WithUserRdr (unLoc quoter) <$> quoter'
         ; this_mod <- getModule
-        ; when (nameIsLocalOrFrom this_mod quoter') $
+        ; when (nameIsLocalOrFrom this_mod (unLoc quoter')) $
           checkThLocalNameNoLift res_name
 
-        ; return (HsQuasiQuote ext quoter' quote, unitFV quoter') }
+
+        ; return (HsQuasiQuote (HsQuasiQuoteExt flavour) quoter' quote, unitFV (unLoc quoter')) }
 
 ---------------------
-rnTypedSplice :: LHsExpr GhcPs -- Typed splice expression
+rnTypedSplice :: HsTypedSplice GhcPs -- Typed splice expression
               -> RnM (HsExpr GhcRn, FreeVars)
-rnTypedSplice expr
-  = addErrCtxt (TypedSpliceCtxt Nothing expr) $ do
+rnTypedSplice sp@(HsTypedSpliceExpr _ expr)
+  = addErrCtxt (TypedSpliceCtxt Nothing sp) $ do
     { level <- getThLevel
     ; case level of
-        Brack pop_level RnPendingTyped
-          -> setThLevel pop_level rn_splice
+        TypedBrack pop_level
+          -> do {
+                loc <- getSrcSpanM
+                ; n' <- newLocalBndrRn (L (noAnnSrcSpan loc) unqualSplice)
+                ; (e, fvs) <- setThLevel pop_level rn_splice
+                ; return (HsTypedSplice (HsTypedSpliceNested n') (HsTypedSpliceExpr noExtField e), fvs)
 
-        Brack _ (RnPendingUntyped _)
+
+              }
+
+        UntypedBrack {}
           -> failWithTc $ thSyntaxError $ MismatchedSpliceType Typed IsSplice
 
         _ -> do { unlessXOptM LangExt.TemplateHaskell
@@ -464,24 +478,21 @@ rnTypedSplice expr
                       lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
                       fvs2      = lcl_names `plusFV` gbl_names
 
-                ; return (result, fvs1 `plusFV` fvs2) } }
+                ; return (HsTypedSplice HsTypedSpliceTop (HsTypedSpliceExpr noExtField result), fvs1 `plusFV` fvs2) } }
   where
-    rn_splice :: RnM (HsExpr GhcRn, FreeVars)
+    rn_splice :: RnM (LHsExpr GhcRn, FreeVars)
     rn_splice =
-      do { loc <- getSrcSpanM
-         -- The renamer allocates a splice-point name to every typed splice
-         -- (incl the top level ones for which it will not ultimately be used)
-         ; n' <- newLocalBndrRn (L (noAnnSrcSpan loc) unqualSplice)
+      do {
          ; (expr', fvs) <- rnLExpr expr
-         ; return (HsTypedSplice n' expr', fvs) }
+         ; return (expr', fvs) }
 
 rnUntypedSpliceExpr :: HsUntypedSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnUntypedSpliceExpr splice
   = rnUntypedSpliceGen run_expr_splice pend_expr_splice splice
   where
-    pend_expr_splice :: Name -> HsUntypedSplice GhcRn -> (PendingRnSplice, HsExpr GhcRn)
-    pend_expr_splice name rn_splice
-        = (makePending UntypedExpSplice name rn_splice, HsUntypedSplice (HsUntypedSpliceNested name) rn_splice)
+    pend_expr_splice :: (UntypedSpliceFlavour, HsUntypedSpliceResult (HsExpr GhcRn) -> HsUntypedSplice GhcRn -> RnM (HsExpr GhcRn))
+    pend_expr_splice
+      = (UntypedExpSplice, \x y -> pure $ HsUntypedSplice x y)
 
     run_expr_splice rn_splice
       = do { traceRn "rnUntypedSpliceExpr: untyped expression splice" empty
@@ -663,9 +674,9 @@ rnSpliceType :: HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeVars)
 rnSpliceType splice
   = rnUntypedSpliceGen run_type_splice pend_type_splice splice
   where
-    pend_type_splice name rn_splice
-       = ( makePending UntypedTypeSplice name rn_splice
-         , HsSpliceTy (HsUntypedSpliceNested name) rn_splice)
+    pend_type_splice
+       = ( UntypedTypeSplice
+         , \x y -> pure $ HsSpliceTy x y)
 
     run_type_splice :: HsUntypedSplice GhcRn -> RnM (HsType GhcRn, FreeVars)
     run_type_splice rn_splice
@@ -743,9 +754,9 @@ rnSplicePat :: HsUntypedSplice GhcPs -> RnM ( (HsUntypedSplice GhcRn, HsUntypedS
 rnSplicePat splice
   = rnUntypedSpliceGen run_pat_splice pend_pat_splice splice
   where
-    pend_pat_splice name rn_splice
-      = (makePending UntypedPatSplice name rn_splice
-        , (rn_splice, HsUntypedSpliceNested name)) -- Pat splice is nested and thus simply renamed
+    pend_pat_splice
+      = (UntypedPatSplice
+        , \x y -> pure (y, x)) -- Pat splice is nested and thus simply renamed
 
     run_pat_splice rn_splice
       = do { traceRn "rnSplicePat: untyped pattern splice" empty
@@ -763,9 +774,9 @@ rnSpliceTyPat :: HsUntypedSplice GhcPs -> RnM ( (HsUntypedSplice GhcRn, HsUntype
 rnSpliceTyPat splice
   = rnUntypedSpliceGen run_ty_pat_splice pend_ty_pat_splice splice
   where
-    pend_ty_pat_splice name rn_splice
-      = (makePending UntypedTypeSplice name rn_splice
-        , (rn_splice, HsUntypedSpliceNested name)) -- HsType splice is nested and thus simply renamed
+    pend_ty_pat_splice
+      = (UntypedTypeSplice
+        , \x y -> pure (y, x))
 
     run_ty_pat_splice rn_splice
       = do { traceRn "rnSpliceTyPat: untyped pattern splice" empty
@@ -782,9 +793,9 @@ rnSpliceDecl :: SpliceDecl GhcPs -> RnM (SpliceDecl GhcRn, FreeVars)
 rnSpliceDecl (SpliceDecl _ (L loc splice) flg)
   = rnUntypedSpliceGen run_decl_splice pend_decl_splice splice
   where
-    pend_decl_splice name rn_splice
-       = ( makePending UntypedDeclSplice name rn_splice
-         , SpliceDecl noExtField (L loc rn_splice) flg)
+    pend_decl_splice
+       = ( UntypedDeclSplice
+         , \_ y -> pure $ SpliceDecl noExtField (L loc y) flg)
 
     run_decl_splice rn_splice  = pprPanic "rnSpliceDecl" (pprUntypedSplice True Nothing rn_splice)
 
@@ -795,7 +806,7 @@ rnTopSpliceDecls splice
          ; cur_level <- getThLevel
          ; (rn_splice, fvs) <- checkNoErrs $
                                setThLevel (Splice Untyped cur_level) $
-                               rnUntypedSplice splice
+                               rnUntypedSplice splice UntypedDeclSplice
            -- As always, be sure to checkNoErrs above lest we end up with
            -- holes making it to typechecking, hence #12584.
            --
@@ -934,28 +945,28 @@ checkThLocalTyName name
 -- | Check whether we are allowed to use a Name in this context (for TH purposes)
 -- In the case of a level incorrect program, attempt to fix it by using
 -- a Lift constraint.
-checkThLocalNameWithLift :: LIdOccP GhcRn -> RnM ()
+checkThLocalNameWithLift :: LIdOccP GhcRn -> (LIdOccP GhcRn -> HsExpr GhcRn) -> RnM (HsExpr GhcRn)
 checkThLocalNameWithLift = checkThLocalName True
 
 -- | Check whether we are allowed to use a Name in this context (for TH purposes)
 -- In the case of a level incorrect program, do not attempt to fix it by using
 -- a Lift constraint.
 checkThLocalNameNoLift :: LIdOccP GhcRn -> RnM ()
-checkThLocalNameNoLift = checkThLocalName False
+checkThLocalNameNoLift name = checkThLocalName False name (panic "not used") >> return ()
 
-checkThLocalName :: Bool -> LIdOccP GhcRn -> RnM ()
-checkThLocalName allow_lifting name_var
+checkThLocalName :: Bool -> LIdOccP GhcRn -> (LIdOccP GhcRn -> HsExpr GhcRn) -> RnM (HsExpr GhcRn)
+checkThLocalName allow_lifting name_var mk_res
   | isUnboundName name   -- Do not report two errors for
-  = return ()            --   $(not_in_scope args)
+  = return (mk_res name_var)            --   $(not_in_scope args)
 
   | isWiredInName name
-  = return ()
+  = return (mk_res name_var)
 
   | otherwise
   = do  {
           mb_local_use <- getCurrentAndBindLevel name
         ; case mb_local_use of {
-             Nothing -> return () ;  -- Not a locally-bound thing
+             Nothing -> return (mk_res name_var) ;  -- Not a locally-bound thing
              Just (top_lvl, bind_lvl, use_lvl) ->
     do  { let use_lvl_idx = thLevelIndex use_lvl
         ; cur_mod <- extractModule <$> getGblEnv
@@ -966,7 +977,7 @@ checkThLocalName allow_lifting name_var
         ; dflags <- getDynFlags
         ; env <- getGlobalRdrEnv
         ; let mgre = lookupGRE_Name env name
-        ; checkCrossLevelLifting dflags (LevelCheckSplice name mgre) top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name_var } } }
+        ; checkCrossLevelLifting dflags (LevelCheckSplice name mgre) top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name_var mk_res } } }
   where
     name = getName name_var
 
@@ -979,41 +990,39 @@ checkCrossLevelLifting :: DynFlags
                        -> Set.Set ThLevelIndex
                        -> ThLevel
                        -> ThLevelIndex
-                       -> LIdOccP GhcRn -> TcM ()
-checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name_var
+                       -> LIdOccP GhcRn
+                       -> (LIdOccP GhcRn -> HsExpr GhcRn)
+                       -> TcM (HsExpr GhcRn)
+checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name_var mk_res
   -- 1. If name is in-scope, at the correct level.
-  | use_lvl_idx `Set.member` bind_lvl = return ()
+  | use_lvl_idx `Set.member` bind_lvl = return (mk_res name_var)
   -- 2. Name is imported with -XImplicitStagePersistence
   | not is_local
-  , xopt LangExt.ImplicitStagePersistence dflags = return ()
+  , xopt LangExt.ImplicitStagePersistence dflags = return (mk_res name_var)
   -- 3. Name is top-level, with -XImplicitStagePersistence, and needs
   -- to be persisted into the future.
   | isTopLevel top_lvl
   , is_local
   , any (use_lvl_idx >=) (Set.toList bind_lvl)
-  , xopt LangExt.ImplicitStagePersistence dflags = when (isExternalName name) (keepAlive name)
+  , xopt LangExt.ImplicitStagePersistence dflags = when (isExternalName name) (keepAlive name) >> return (mk_res name_var)
   -- 4. Name is in an untyped bracket, and lifting is allowed.
-  | Brack _ (RnPendingUntyped ps_var) <- use_lvl   -- Only for untyped brackets
+  | Brack _ pending <- use_lvl
   , any (use_lvl_idx >=) (Set.toList bind_lvl)
   , allow_lifting
   = do
-      let mgre = case reason of
-                  LevelCheckSplice _ gre -> gre
-                  _ -> Nothing
-      let pend_splice = PendingImplicitLift bind_lvl use_lvl_idx mgre name_var
+       let mgre = case reason of
+                    LevelCheckSplice _ gre -> gre
+                    _ -> Nothing
+       (splice_name :: Name) <- newLocalBndrRn (noLocA unqualSplice)
+       let  pend_splice :: HsImplicitLiftSplice
+            pend_splice = HsImplicitLiftSplice bind_lvl use_lvl_idx mgre name_var
        -- Warning for implicit lift (#17804)
-      addDetailedDiagnostic (TcRnImplicitLift name)
+       addDetailedDiagnostic (TcRnImplicitLift name)
 
-       -- Update the pending splices
-      ps <- readMutVar ps_var
-      writeMutVar ps_var (pend_splice : ps)
-  -- 5. For a typed bracket, these checks happen again later on (checkThLocalId)
-  -- In the future we should do all the level checks here.
-  | Brack _ RnPendingTyped <- use_lvl  -- Lift for typed brackets is inserted later.
-  , any (use_lvl_idx >=) (Set.toList bind_lvl)
-    = return ()
+       -- Update the pending splices if we are renaming a typed bracket
+       recordPendingSplice splice_name pend_splice pending
   -- Otherwise, we have a level error, report.
-  | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx Nothing ErrorWithoutFlag)
+  | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx Nothing ErrorWithoutFlag) >> return (mk_res name_var)
   where
     name = getName name_var
 

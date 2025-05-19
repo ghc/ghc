@@ -4,9 +4,6 @@ T14681.hs:(9,2)-(10,63): Splicing declarations
     [d| g = $(pure
                 $ VarE '(+) `AppE` LitE (IntegerL (- 1))
                     `AppE` (LitE (IntegerL (- 1)))) |]
-    pending(rn) [<spn, pure
-                         $ VarE '(+) `AppE` LitE (IntegerL (- 1))
-                             `AppE` (LitE (IntegerL (- 1)))>]
   ======>
     g = (+) (-1) (-1)
 T14681.hs:(11,2)-(12,66): Splicing declarations
@@ -14,8 +11,5 @@ T14681.hs:(11,2)-(12,66): Splicing declarations
           = $(pure
                 $ VarE '(+#) `AppE` LitE (IntPrimL (- 1))
                     `AppE` (LitE (IntPrimL (- 1)))) |]
-    pending(rn) [<spn, pure
-                         $ VarE '(+#) `AppE` LitE (IntPrimL (- 1))
-                             `AppE` (LitE (IntPrimL (- 1)))>]
   ======>
     h _ = (+#) -1# -1#

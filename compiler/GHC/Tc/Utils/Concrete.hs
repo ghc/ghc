@@ -678,7 +678,7 @@ checkFRR_with check_kind frr_ctxt ty
           -> return refl
 
           -- See [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep].
-          | Brack _ (TcPending {}) <- th_lvl
+          | TypedBrack {} <- th_lvl
           -> return refl
 
           -- Otherwise: ensure that the kind 'ki' of 'ty' is concrete.

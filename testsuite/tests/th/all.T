@@ -637,3 +637,5 @@ test('T25083', [extra_files(['T25083_A.hs', 'T25083_B.hs'])], multimod_compile_a
 test('T25174', normal, compile, [''])
 test('T25179', normal, compile, [''])
 test('FunNameTH', normal, compile, [''])
+test('QQInQuote', normal, compile, [''])
+test('QQTopError', normal, compile_fail, ['-fdiagnostics-show-caret'])

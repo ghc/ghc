@@ -1,13 +1,8 @@
-
 TH_overloaded_constraints_fail.hs:20:14: error: [GHC-83865]
     • Couldn't match type ‘Identity’ with ‘Q’
       Expected: Q Exp
         Actual: Identity Exp
     • In the expression: idQ
-      In the expression:
-        [| $(idQ) $(qq) |]
-        pending(rn) [<spn, qq>, <spn, idQ>]
-      In an equation for ‘quote’:
-          quote
-            = [| $(idQ) $(qq) |]
-              pending(rn) [<spn, qq>, <spn, idQ>]
+      In the expression: [| $(idQ) $(qq) |]
+      In an equation for ‘quote’: quote = [| $(idQ) $(qq) |]
+

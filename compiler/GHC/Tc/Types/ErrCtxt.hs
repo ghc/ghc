@@ -209,9 +209,9 @@ data ErrCtxtMsg
   => TypedTHBracketCtxt !(LHsExpr (GhcPass p))
   -- | In an untyped Template Haskell splice or quasi-quote.
   | UntypedSpliceCtxt !(HsUntypedSplice GhcPs)
-  -- | In a typed TEmplate Haskell splice.
+  -- | In a typed Template Haskell splice.
   | forall p. OutputableBndrId p
-  => TypedSpliceCtxt !(Maybe SplicePointName) !(LHsExpr (GhcPass p))
+  => TypedSpliceCtxt !(Maybe SplicePointName) !(HsTypedSplice (GhcPass p))
   -- | In the result of a typed Template Haskell splice.
   | TypedSpliceResultCtxt !(LHsExpr GhcTc)
   -- | In an argument to the Template Haskell @reifyInstances@ function.

@@ -3072,9 +3072,8 @@ instance ExactPrint (HsExpr GhcPs) where
     return (HsUntypedBracket a (VarBr an0 b e'))
 
   exact (HsTypedSplice an s)   = do
-    an0 <- markEpToken an
     s' <- markAnnotated s
-    return (HsTypedSplice an0 s')
+    return (HsTypedSplice an s')
 
   exact (HsUntypedSplice an s) = do
     s' <- markAnnotated s
@@ -3167,6 +3166,16 @@ instance ExactPrint (HsPragE GhcPs) where
     l1' <- printStringAtAA l1 (sourceTextToString (sl_st sl) (unpackFS $ sl_fs sl))
     c' <- markEpToken c
     return (HsPragSCC (AnnPragma o' c' s l1' l2 t m,st) sl)
+
+instance ExactPrint (HsTypedSplice GhcPs) where
+  getAnnotationEntry _ = NoEntryVal
+
+  setAnnotationAnchor a _ _ _ = a
+
+  exact (HsTypedSpliceExpr an e) = do
+    an0 <- markEpToken an
+    e' <- markAnnotated e
+    return (HsTypedSpliceExpr an0 e')
 
 
 -- ---------------------------------------------------------------------

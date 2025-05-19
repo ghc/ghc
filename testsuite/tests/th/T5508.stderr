@@ -3,6 +3,5 @@ T5508.hs:(7,8)-(10,29): Splicing expression
            p = VarP x
            v = return (LamE [p] $ VarE x)
        [| $v . id |]
-       pending(rn) [<spn, v>]
   ======>
     ((\ x -> x) . id)

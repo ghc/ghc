@@ -516,8 +516,12 @@ type family XXTupArg  x
 -- -------------------------------------
 -- HsUntypedSplice type families
 type family XUntypedSpliceExpr x
+type family XTypedSpliceExpr x
 type family XQuasiQuote        x
 type family XXUntypedSplice    x
+
+-- HsTypedSplice type families
+type family XXTypedSplice      x
 
 -- -------------------------------------
 -- HsQuoteBracket type families
