@@ -823,15 +823,9 @@ addDLL_PEi386( pathchar *dll_name, HINSTANCE *loaded )
     const DWORD flags[] = { LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, 0 };
 
     int cFormat, cFlag;
-    int flags_start = 1; /* Assume we don't support the new API.  */
-
-    /* Detect if newer API are available, if not, skip the first flags entry.  */
-    if (GetProcAddress((HMODULE)LoadLibraryW(L"Kernel32.DLL"), "AddDllDirectory")) {
-        flags_start = 0;
-    }
 
     /* Iterate through the possible flags and formats.  */
-    for (cFlag = flags_start; cFlag < 2; cFlag++)
+    for (cFlag = 0; cFlag < 2; cFlag++)
     {
         for (cFormat = 0; cFormat < 4; cFormat++)
         {
