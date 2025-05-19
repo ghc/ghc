@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables, CPP,
-    UnboxedTuples, LambdaCase #-}
+    UnboxedTuples, LambdaCase, UnliftedFFITypes #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
@@ -20,6 +20,7 @@ import GHCi.InfoTable
 #endif
 
 import qualified GHC.InfoProv as InfoProv
+import GHCi.Debugger
 import GHCi.FFI
 import GHCi.Message
 import GHCi.ObjLink
@@ -332,7 +333,7 @@ withBreakAction opts breakMVar statusMVar act
      stablePtr <- newStablePtr onBreak
      poke breakPointIOAction stablePtr
      when (breakOnException opts) $ poke exceptionFlag 1
-     when (singleStep opts) $ setStepFlag
+     when (singleStep opts) rts_enableStopNextBreakpointAll
      return stablePtr
         -- Breaking on exceptions is not enabled by default, since it
         -- might be a bit surprising.  The exception flag is turned off
@@ -363,7 +364,7 @@ withBreakAction opts breakMVar statusMVar act
    resetBreakAction stablePtr = do
      poke breakPointIOAction noBreakStablePtr
      poke exceptionFlag 0
-     resetStepFlag
+     rts_disableStopNextBreakpointAll
      freeStablePtr stablePtr
 
 resumeStmt
@@ -395,28 +396,6 @@ abandonStmt hvref = do
   putMVar resumeBreakMVar ()
   _ <- takeMVar resumeStatusMVar
   return ()
-
-foreign import ccall "&rts_stop_next_breakpoint" stepFlag      :: Ptr CInt
-foreign import ccall "&rts_stop_on_exception"    exceptionFlag :: Ptr CInt
-
-setStepFlag :: IO ()
-setStepFlag = poke stepFlag 1
-resetStepFlag :: IO ()
-resetStepFlag = poke stepFlag 0
-
-type BreakpointCallback
-     = Addr#   -- pointer to the breakpoint tick module name
-    -> Addr#   -- pointer to the breakpoint tick module unit id
-    -> Int#    -- breakpoint tick index
-    -> Addr#   -- pointer to the breakpoint info module name
-    -> Addr#   -- pointer to the breakpoint info module unit id
-    -> Int#    -- breakpoint info index
-    -> Bool    -- exception?
-    -> HValue  -- the AP_STACK, or exception
-    -> IO ()
-
-foreign import ccall "&rts_breakpoint_io_action"
-   breakPointIOAction :: Ptr (StablePtr BreakpointCallback)
 
 noBreakStablePtr :: StablePtr BreakpointCallback
 noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
