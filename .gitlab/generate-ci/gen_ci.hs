@@ -874,7 +874,10 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
         -- We have to trigger cabal build in an independent way to mitigate Wine hangs at MSYS2/Arm64EC
         , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l -c './hadrian/build-cabal clean'"
         , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh build_hadrian"
-        , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l .gitlab/ci.sh test_hadrian"
+        -- We have to extend PATH to location of cross-compiler toolchain because
+        -- "--enable-distro-toolchain" is used.
+        -- Cross-compiled version of Windres tool is required by hello world test to be present at the PATH.
+        , "/opt/wine-arm64ec-msys2-deb12/bin/wine c:/msys64/usr/bin/bash.exe -l -c 'export PATH=/opt/ghc-bootstrap/mingw/bin:$PATH && .gitlab/ci.sh test_hadrian'"
         ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
