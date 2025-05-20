@@ -1333,38 +1333,60 @@ integerGcde a b = case integerGcde# a b of
 
 -- | Computes the modular inverse.
 --
--- I.e. y = integerRecipMod# x m
---        = x^(-1) `mod` m
+-- @integerRecipMod# x m@ behaves as follows:
 --
--- with 0 < y < |m|
+--   * If m > 1 and gcd x m = 1, it returns an integer y with 0 < y < m such
+--     that x*y is congruent to 1 modulo m.
 --
+--   * If m > 1 and gcd x m > 1, it fails.
+--
+--   * If m = 1, it returns @0@ for all x.  The computation effectively takes
+--     place in the zero ring, which has a single element 0 with 0+0 = 0*0 = 0:
+--     the element 0 is the multiplicative identity element and is its own
+--     multiplicative inverse.
+--
+--   * If m = 0, it fails.
+--
+-- NB. Successful evaluation returns a value of the form @(# n | #)@; failure is
+-- indicated by returning @(# | () #)@.
 integerRecipMod#
    :: Integer
    -> Natural
    -> (# Natural | () #)
 integerRecipMod# x m
-   | integerIsZero x = (# | () #)
    | naturalIsZero m = (# | () #)
-   | naturalIsOne  m = (# | () #)
+   | naturalIsOne  m = (# naturalZero | #)
+   | integerIsZero x = (# | () #)
    | True            = Backend.integer_recip_mod x m
 
 
 -- | Computes the modular exponentiation.
 --
--- I.e. y = integer_powmod b e m
---        = b^e `mod` m
+-- @integerPowMod# b e m@ behaves as follows:
 --
--- with 0 <= y < abs m
+--   * If m > 1 and e >= 0, it returns an integer y with 0 <= y < m
+--     and y congruent to b^e modulo m.
 --
--- If e is negative, we use `integerRecipMod#` to try to find a modular
--- multiplicative inverse (which may not exist).
+--   * If m > 1 and e < 0, it uses `integerRecipMod#` to try to find a modular
+--     multiplicative inverse b' (which only exists if gcd b m = 1) and then
+--     caculates (b')^(-e) modulo m (note that -e > 0); if the inverse does not
+--     exist then it fails.
+--
+--   * If m = 1, it returns @0@ for all b and e.
+--
+--   * If m = 0, it fails.
+--
+-- NB. Successful evaluation returns a value of the form @(# n | #)@; failure is
+-- indicated by returning @(# | () #)@.
+
 integerPowMod# :: Integer -> Integer -> Natural -> (# Natural | () #)
 integerPowMod# !b !e !m
-   | naturalIsZero m     = (# | () #)
-   | naturalIsOne  m     = (# naturalZero | #)
-   | integerIsZero e     = (# naturalOne  | #)
-   | integerIsZero b     = (# naturalZero | #)
-   | integerIsOne  b     = (# naturalOne  | #)
+   | naturalIsZero m  = (# | () #)
+   | naturalIsOne  m  = (# naturalZero | #)
+   | integerIsZero e  = (# naturalOne  | #)
+   | integerIsZero b
+     && integerGt e 0 = (# naturalZero | #)
+   | integerIsOne  b  = (# naturalOne  | #)
      -- when the exponent is negative, try to find the modular multiplicative
      -- inverse and use it instead
    | integerIsNegative e = case integerRecipMod# b m of

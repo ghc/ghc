@@ -23,6 +23,9 @@
       * `GHC.ExecutionStack.Internal`.
   * Deprecate `GHC.JS.Prim.Internal.Build`, as per [CLC #329](https://github.com/haskell/core-libraries-committee/issues/329)
 
+  * Fix incorrect results of `integerPowMod` when the base is 0 and the exponent is negative, and `integerRecipMod` when the modulus is zero ([#26017](https://gitlab.haskell.org/ghc/ghc/-/issues/26017)).
+
+
 ## 4.21.0.0 *TBA*
   * Change `SrcLoc` to be a strict and unboxed (finishing [CLC proposal #55](https://github.com/haskell/core-libraries-committee/issues/55))
   * Introduce `Data.Bounded` module exporting the `Bounded` typeclass (finishing [CLC proposal #208](https://github.com/haskell/core-libraries-committee/issues/208))
