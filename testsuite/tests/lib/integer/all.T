@@ -27,3 +27,4 @@ test('integerImportExport', normal, compile_and_run, [''])
 
 test('T19345', [], compile_and_run, [''])
 test('T20066', [exit_code(1)], compile_and_run, [''])
+test('T26017', [], compile_and_run, [''])

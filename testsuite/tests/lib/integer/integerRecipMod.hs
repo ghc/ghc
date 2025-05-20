@@ -28,6 +28,8 @@ main = do
    -- positive modulo
    print $ mapMaybe f [-7..71]
 
-   -- modulo == 1 or 0
+   -- modulo == 1 -> succeed and return 0
    print (recipModInteger 77 1)
+
+   -- modulo == 0 -> fail
    print (recipModInteger 77 0)
