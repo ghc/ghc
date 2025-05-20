@@ -164,6 +164,61 @@ newtype ItblPtr = ItblPtr (RemotePtr Heap.StgInfoTable)
 newtype AddrPtr = AddrPtr (RemotePtr ())
   deriving (NFData)
 
+{-
+--------------------------------------------------------------------------------
+-- * Byte Code Objects (BCOs)
+--------------------------------------------------------------------------------
+
+Note [Case continuation BCOs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A stack with a BCO stack frame at the top looks like:
+
+                                      (an StgBCO)
+         |       ...        |      +---> +---------[1]--+
+         +------------------+      |     | info_tbl_ptr | ------+
+         |    OTHER FRAME   |      |     +--------------+       |
+         +------------------+      |     | StgArrBytes* | <--- the byte code
+         |       ...        |      |     +--------------+       |
+         +------------------+      |     |     ...      |       |
+         |       fvs1       |      |                            |
+         +------------------+      |                            |
+         |       ...        |      |        (StgInfoTable)      |
+         +------------------+      |           +----------+ <---+
+         |      args1       |      |           |    ...   |
+         +------------------+      |           +----------+
+         |   some StgBCO*   | -----+           | type=BCO |
+         +------------------+                  +----------+
+      Sp | stg_apply_interp | -----+           |   ...    |
+         +------------------+      |
+                                   |
+                                   |   (StgInfoTable)
+                                   +----> +--------------+
+                                          |     ...      |
+                                          +--------------+
+                                          | type=RET_BCO |
+                                          +--------------+
+                                          |     ...      |
+
+
+The byte code for a BCO heap object makes use of arguments and free variables
+which can typically be found within the BCO stack frame. In the code, these
+variables are referenced via a statically known stack offset (tracked using
+`BCEnv` in `StgToByteCode`).
+
+However, in /case continuation/ BCOs, the code may additionally refer to free
+variables that are outside of that BCO's stack frame -- some free variables of a
+case continuation BCO may only be found in the stack frame of a parent BCO.
+
+Yet, references to these out-of-frame variables are also done in terms of stack
+offsets. Thus, they rely on the position of /another frame/ to be fixed. (See
+Note [PUSH_L underflow] for more information about references to previous
+frames and nested BCOs)
+
+This makes case continuation BCOs special: unlike normal BCOs, case cont BCO
+frames cannot be moved on the stack independently from their parent BCOs.
+-}
+
 data UnlinkedBCO
    = UnlinkedBCO {
         unlinkedBCOName   :: !Name,
