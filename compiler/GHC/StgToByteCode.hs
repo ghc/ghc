@@ -253,7 +253,11 @@ mkProtoBCO
    -> Int       -- ^ arity
    -> WordOff   -- ^ bitmap size
    -> [StgWord] -- ^ bitmap
-   -> Bool      -- ^ True <=> is a return point, rather than a function
+   -> Bool      -- ^ True <=> it's a case continuation, rather than a function
+                -- Used for
+                --  (A) Stack check collision and
+                --  (B) Mark the BCO wrt whether it contains non-local stack
+                --    references. See Note [Case continuation BCOs].
    -> [FFIInfo]
    -> ProtoBCO Name
 mkProtoBCO platform _add_bco_name nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
@@ -264,7 +268,8 @@ mkProtoBCO platform _add_bco_name nm instrs_ordlist origin arity bitmap_size bit
         protoBCOBitmapSize = fromIntegral bitmap_size,
         protoBCOArity = arity,
         protoBCOExpr = origin,
-        protoBCOFFIs = ffis
+        protoBCOFFIs = ffis,
+        protoBCOIsCaseCont = is_ret
       }
      where
 #if MIN_VERSION_rts(1,0,3)
@@ -353,6 +358,9 @@ schemeTopBind (id, rhs)
 -- Park the resulting BCO in the monad.  Also requires the
 -- name of the variable to which this value was bound,
 -- so as to give the resulting BCO a name.
+--
+-- The resulting ProtoBCO expects the free variables and the function arguments
+-- to be in the stack directly before it.
 schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
                                 -- will appear in the thunk.  Empty for
                                 -- top-level things, which have no free vars.
@@ -391,6 +399,8 @@ schemeR_wrk fvs nm original_body (args, body)
          -- them unlike constructor fields.
          szsb_args = map (wordsToBytes platform . idSizeW platform) all_args
          sum_szsb_args  = sum szsb_args
+         -- Make a stack offset for each argument or free var -- they should
+         -- appear contiguous in the stack, in order.
          p_init    = Map.fromList (zip all_args (mkStackOffsets 0 szsb_args))
 
          -- make the arg bitmap
@@ -1401,7 +1411,7 @@ Note [unboxed tuple bytecodes and tuple_BCO]
 tupleBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
 tupleBCO platform args_info args =
   mkProtoBCO platform Nothing invented_name body_code (Left [])
-             0{-no arity-} bitmap_size bitmap False{-is alts-}
+             0{-no arity-} bitmap_size bitmap False{-not alts-}
   where
     {-
       The tuple BCO is never referred to by name, so we can get away
@@ -1422,7 +1432,7 @@ tupleBCO platform args_info args =
 primCallBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
 primCallBCO platform args_info args =
   mkProtoBCO platform Nothing invented_name body_code (Left [])
-             0{-no arity-} bitmap_size bitmap False{-is alts-}
+             0{-no arity-} bitmap_size bitmap False{-not alts-}
   where
     {-
       The primcall BCO is never referred to by name, so we can get away

@@ -55,6 +55,7 @@ import CLOSURE stg_AP_STACK_info;
 import CLOSURE stg_AP_info;
 import CLOSURE stg_ARR_WORDS_info;
 import CLOSURE stg_BCO_info;
+import CLOSURE stg_CASE_CONT_BCO_info;
 import CLOSURE stg_C_FINALIZER_LIST_info;
 import CLOSURE stg_DEAD_WEAK_info;
 import CLOSURE stg_END_STM_WATCH_QUEUE_closure;
@@ -2434,7 +2435,8 @@ stg_deRefStablePtrzh ( P_ sp )
    Bytecode object primitives
    -------------------------------------------------------------------------  */
 
-stg_newBCOzh ( P_ instrs,
+stg_newBCO2zh ( CBool is_case_cont,
+               P_ instrs,
                P_ literals,
                P_ ptrs,
                W_ arity,
@@ -2449,7 +2451,16 @@ stg_newBCOzh ( P_ instrs,
 
     bco = Hp - bytes + WDS(1);
     // No memory barrier necessary as this is a new allocation.
-    SET_HDR(bco, stg_BCO_info, CCS_MAIN);
+    if (is_case_cont > 0) {
+     /* Uses stg_CASE_CONT_BCO_info to construct the BCO frame (rather than stg_BCO_info).
+      * Case continuations may contain non-local references to parent frames. The distinct info table
+      * tag allows the RTS to identify such non-local frames.
+      * See Note [Case continuation BCOs]
+      */
+      SET_HDR(bco, stg_CASE_CONT_BCO_info, CCS_MAIN);
+    } else {
+      SET_HDR(bco, stg_BCO_info, CCS_MAIN);
+    }
 
     StgBCO_instrs(bco)     = instrs;
     StgBCO_literals(bco)   = literals;

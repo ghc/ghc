@@ -167,14 +167,108 @@ newtype ItblPtr = ItblPtr (RemotePtr Heap.StgInfoTable)
 newtype AddrPtr = AddrPtr (RemotePtr ())
   deriving (NFData)
 
+{-
+--------------------------------------------------------------------------------
+-- * Byte Code Objects (BCOs)
+--------------------------------------------------------------------------------
+
+Note [Case continuation BCOs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A stack with a BCO stack frame at the top looks like:
+
+                                      (an StgBCO)
+         |       ...        |      +---> +---------[1]--+
+         +------------------+      |     | info_tbl_ptr | ------+
+         |    OTHER FRAME   |      |     +--------------+       |
+         +------------------+      |     | StgArrBytes* | <--- the byte code
+         |       ...        |      |     +--------------+       |
+         +------------------+      |     |     ...      |       |
+         |       fvs1       |      |                            |
+         +------------------+      |                            |
+         |       ...        |      |        (StgInfoTable)      |
+         +------------------+      |           +----------+ <---+
+         |      args1       |      |           |    ...   |
+         +------------------+      |           +----------+
+         |   some StgBCO*   | -----+           | type=BCO |
+         +------------------+                  +----------+
+      Sp | stg_apply_interp | -----+           |   ...    |
+         +------------------+      |
+                                   |
+                                   |   (StgInfoTable)
+                                   +----> +--------------+
+                                          |     ...      |
+                                          +--------------+
+                                          | type=RET_BCO |
+                                          +--------------+
+                                          |     ...      |
+
+
+The byte code for a BCO heap object makes use of arguments and free variables
+which can typically be found within the BCO stack frame. In the code, these
+variables are referenced via a statically known stack offset (tracked using
+`BCEnv` in `StgToByteCode`).
+
+However, in /case continuation/ BCOs, the code may additionally refer to free
+variables that are outside of that BCO's stack frame -- some free variables of a
+case continuation BCO may only be found in the stack frame of a parent BCO.
+
+Yet, references to these out-of-frame variables are also done in terms of stack
+offsets. Thus, they rely on the position of /another frame/ to be fixed. (See
+Note [PUSH_L underflow] for more information about references to previous
+frames and nested BCOs)
+
+This makes case continuation BCOs special: unlike normal BCOs, case cont BCO
+frames cannot be moved on the stack independently from their parent BCOs.
+
+In order to be able to distinguish them at runtime, the code generator will use
+distinct info table pointers for their closures, even though they will have the
+same structure on the heap (StgBCO). Specifically:
+
+  - Normal BCOs are always headed by the `stg_BCO_info` pointer.
+  - Case continuation BCOs are always headed by the `stg_CASE_CONT_BCO_info` pointer.
+
+A primary reason why we need to distinguish these two cases is to know where we
+can insert a debugger step-out frame (`stg_stop_after_ret_frame`). In
+particular, because case cont BCOs may refer to the parent frame, we must not
+insert step-out frames between a case cont BCO and its parent.
+
+As an example, consider the following, where `y` is free in the case alternatives:
+
+    f x y = case x of
+      True -> y - 1
+      False -> y + 1 :: Int
+
+While interpreting f, the args x and y will be on the stack as part of f's frame.
+In its body, a case continuation BCO is pushed (PUSH_ALTS) and then `x` is
+entered to be evaluated. Upon entering `x`, the stack would look something like:
+
+    <f arg 2>
+    <f arg 1>
+    ...
+    <Case continuation BCO Frame>
+
+We cannot insert a step out frame in between:
+
+
+    <f arg 2>
+    <f arg 1>
+    ...
+    <inserted step-out frame>      <--- BAD! Breaks stack offsets in the case cont.
+    <Case continuation BCO Frame>
+
+Instead, we must traverse until the parent BCO and insert the step-out frame before it instead.
+-}
+
 data UnlinkedBCO
    = UnlinkedBCO {
         unlinkedBCOName   :: !Name,
         unlinkedBCOArity  :: {-# UNPACK #-} !Int,
-        unlinkedBCOInstrs :: !(BCOByteArray Word16),      -- insns
-        unlinkedBCOBitmap :: !(BCOByteArray Word),      -- bitmap
+        unlinkedBCOInstrs :: !(BCOByteArray Word16),   -- insns
+        unlinkedBCOBitmap :: !(BCOByteArray Word),     -- bitmap
         unlinkedBCOLits   :: !(FlatBag BCONPtr),       -- non-ptrs
-        unlinkedBCOPtrs   :: !(FlatBag BCOPtr)         -- ptrs
+        unlinkedBCOPtrs   :: !(FlatBag BCOPtr),        -- ptrs
+        unlinkedBCOIsCaseCont :: !Bool                 -- See Note [Case continuation BCOs]
    }
 
 instance NFData UnlinkedBCO where
@@ -227,10 +321,11 @@ seqCgBreakInfo CgBreakInfo{..} =
     rnf cgb_resty
 
 instance Outputable UnlinkedBCO where
-   ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
+   ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs pi)
       = sep [text "BCO", ppr nm, text "with",
              ppr (sizeFlatBag lits), text "lits",
-             ppr (sizeFlatBag ptrs), text "ptrs" ]
+             ppr (sizeFlatBag ptrs), text "ptrs",
+             ppr pi, text "is_pos_indep"]
 
 instance Outputable CgBreakInfo where
    ppr info = text "CgBreakInfo" <+>

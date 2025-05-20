@@ -53,7 +53,8 @@ data ProtoBCO a
         -- what the BCO came from, for debugging only
         protoBCOExpr       :: Either [CgStgAlt] CgStgRhs,
         -- malloc'd pointers
-        protoBCOFFIs       :: [FFIInfo]
+        protoBCOFFIs       :: [FFIInfo],
+        protoBCOIsCaseCont :: !Bool -- See Note [Case continuation BCOs]
    }
 
 -- | A local block label (e.g. identifying a case alternative).

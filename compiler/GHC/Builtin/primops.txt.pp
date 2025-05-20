@@ -3872,12 +3872,13 @@ primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    with
    out_of_line = True
 
-primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO #)
-   { @'newBCO#' instrs lits ptrs arity bitmap@ creates a new bytecode object. The
+primop  NewBCOOp "newBCO2#" GenPrimOp
+   Int8# -> ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO #)
+   { @'newBCO2#' is_case_cont instrs lits ptrs arity bitmap@ creates a new bytecode object. The
      resulting object encodes a function of the given arity with the instructions
      encoded in @instrs@, and a static reference table usage bitmap given by
-     @bitmap@. }
+     @bitmap@. The @is_case_cont@ boolean indicates whether the BCO is a case
+     continuation (see Note [Case continuation BCOs]) }
    with
    effect = ReadWriteEffect
    out_of_line      = True

@@ -639,7 +639,7 @@ extern char **environ;
       SymI_HasDataProto(stg_copySmallMutableArrayzh)                        \
       SymI_HasDataProto(stg_casSmallArrayzh)                                \
       SymI_HasDataProto(stg_copyArray_barrier)                              \
-      SymI_HasDataProto(stg_newBCOzh)                                       \
+      SymI_HasDataProto(stg_newBCO2zh)                                      \
       SymI_HasDataProto(stg_newByteArrayzh)                                 \
       SymI_HasDataProto(stg_casIntArrayzh)                                  \
       SymI_HasDataProto(stg_casInt8Arrayzh)                                 \

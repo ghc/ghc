@@ -85,7 +85,7 @@ bcoFreeNames :: UnlinkedBCO -> UniqDSet Name
 bcoFreeNames bco
   = bco_refs bco `uniqDSetMinusUniqSet` mkNameSet [unlinkedBCOName bco]
   where
-    bco_refs (UnlinkedBCO _ _ _ _ nonptrs ptrs)
+    bco_refs (UnlinkedBCO _ _ _ _ nonptrs ptrs _)
         = unionManyUniqDSets (
              mkUniqDSet [ n | BCOPtrName n <- elemsFlatBag ptrs ] :
              mkUniqDSet [ n | BCONPtrItbl n <- elemsFlatBag nonptrs ] :
@@ -236,7 +236,8 @@ assembleBCO platform
                       , protoBCOInstrs     = instrs
                       , protoBCOBitmap     = bitmap
                       , protoBCOBitmapSize = bsize
-                      , protoBCOArity      = arity }) = do
+                      , protoBCOArity      = arity
+                      , protoBCOIsCaseCont = isCC }) = do
   -- pass 1: collect up the offsets of the local labels.
   let initial_offset = 0
 
@@ -266,7 +267,7 @@ assembleBCO platform
 
   let !insns_arr =  mkBCOByteArray $ final_isn_array
       !bitmap_arr = mkBCOByteArray $ mkBitmapArray bsize bitmap
-      ul_bco = UnlinkedBCO nm arity insns_arr bitmap_arr (fromSmallArray final_lit_array) (fromSmallArray final_ptr_array)
+      ul_bco = UnlinkedBCO nm arity insns_arr bitmap_arr (fromSmallArray final_lit_array) (fromSmallArray final_ptr_array) isCC
 
   -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
   -- objects, since they might get run too early.  Disable this until

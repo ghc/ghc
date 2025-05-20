@@ -26,12 +26,12 @@ module GHC.Exts
      -- **  Legacy interface for arrays of arrays
      module GHC.Internal.ArrayArray,
      -- *  Primitive operations
-     {-# DEPRECATED ["The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14", "These symbols should be imported from ghc-internal instead if needed."] #-}
+     {-# DEPRECATED ["The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 10.14", "These symbols should be imported from ghc-internal instead if needed."] #-}
      Prim.BCO,
      {-# DEPRECATED ["The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14", "These symbols should be imported from ghc-internal instead if needed."] #-}
      Prim.mkApUpd0#,
      {-# DEPRECATED ["The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14", "These symbols should be imported from ghc-internal instead if needed."] #-}
-     Prim.newBCO#,
+     IExts.newBCO#,
      module GHC.Prim,
      module GHC.Prim.Ext,
      -- **  Running 'RealWorld' state thread
@@ -119,7 +119,7 @@ module GHC.Exts
      maxTupleSize
      ) where
 
-import GHC.Internal.Exts
+import GHC.Internal.Exts hiding ( newBCO# )
 import GHC.Internal.ArrayArray
 import GHC.Prim hiding
   ( coerce
@@ -132,7 +132,7 @@ import GHC.Prim hiding
   , isByteArrayWeaklyPinned#, isMutableByteArrayWeaklyPinned#
 
   -- deprecated
-  , BCO, mkApUpd0#, newBCO#
+  , BCO, mkApUpd0#
 
   -- Don't re-export vector FMA instructions
   , fmaddFloatX4#
@@ -256,8 +256,10 @@ import GHC.Prim hiding
   , minWord8X32#
   , minWord8X64#
   )
+import qualified GHC.Internal.Exts as IExts
+  ( newBCO# )
 import qualified GHC.Prim as Prim
-  ( BCO, mkApUpd0#, newBCO# )
+  ( BCO, mkApUpd0# )
 
 import GHC.Prim.Ext
 

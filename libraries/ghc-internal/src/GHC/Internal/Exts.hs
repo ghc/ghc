@@ -163,6 +163,9 @@ module GHC.Internal.Exts
 
         -- * The maximum tuple size
         maxTupleSize,
+
+        -- * Interpreter
+        newBCO#
        ) where
 
 import GHC.Internal.Prim hiding ( coerce, dataToTagSmall#, dataToTagLarge#, whereFrom# )
@@ -469,3 +472,18 @@ resizeSmallMutableArray# arr0 szNew a s0 =
 -- accessible\" by word.
 considerAccessible :: Bool
 considerAccessible = True
+
+--------------------------------------------------------------------------------
+-- Interpreter
+
+{-|
+@'newBCO#' instrs lits ptrs arity bitmap@ creates a new bytecode object. The
+resulting object encodes a function of the given arity with the instructions
+encoded in @instrs@, and a static reference table usage bitmap given by
+@bitmap@.
+
+Note: Case continuation BCOs, with non-local stack references, must be
+constructed using @'newBCO2#' 1@ instead. See Note [Case continuation BCOs].
+-}
+newBCO# :: ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO #)
+newBCO# b1 b2 a1 i1 b3 s = newBCO2# (intToInt8# 0#) b1 b2 a1 i1 b3 s
