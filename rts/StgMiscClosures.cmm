@@ -464,6 +464,12 @@ INFO_TABLE_RET( stg_dead_thread, RET_SMALL,
 
 /* ----------------------------------------------------------------------------
    Entry code for a BCO
+
+   `stg_BCO` and `stg_CASE_CONT_BCO` distinguish between a BCO that refers to
+   non-local variables in its code (using a stack offset) and those that do not.
+   Only case-continuation BCOs should use non-local variables.
+   Otherwise, `stg_BCO` and `stg_CASE_CONT_BCO` behave the same.
+   See Note [Case continuation BCOs].
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_FUN( stg_BCO, 3, 0, BCO, "BCO", "BCO", 0, ARG_BCO )
@@ -473,6 +479,15 @@ INFO_TABLE_FUN( stg_BCO, 3, 0, BCO, "BCO", "BCO", 0, ARG_BCO )
   Sp_adj(-2);
   // Skip the stack check; the interpreter will do one before using
   // the stack anyway.
+  Sp(1) = R1;
+  Sp(0) = stg_apply_interp_info;
+  jump stg_yield_to_interpreter [];
+}
+
+INFO_TABLE_FUN( stg_CASE_CONT_BCO, 3, 0, BCO, "BCO", "BCO", 0, ARG_BCO )
+{
+  /* Exactly as for stg_BCO */
+  Sp_adj(-2);
   Sp(1) = R1;
   Sp(0) = stg_apply_interp_info;
   jump stg_yield_to_interpreter [];

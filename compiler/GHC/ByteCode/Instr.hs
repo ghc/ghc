@@ -51,7 +51,8 @@ data ProtoBCO a
         protoBCOBitmapSize :: Word,
         protoBCOArity      :: Int,
         -- what the BCO came from, for debugging only
-        protoBCOExpr       :: Either [CgStgAlt] CgStgRhs
+        protoBCOExpr       :: Either [CgStgAlt] CgStgRhs,
+        protoBCOIsCaseCont :: !Bool -- See Note [Case continuation BCOs]
    }
 
 -- | A local block label (e.g. identifying a case alternative).

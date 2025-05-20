@@ -87,11 +87,11 @@ linkBCO' arr ResolvedBCO{..} = do
       literals_barr = barr (getBCOByteArray resolvedBCOLits)
 
   PtrsArr marr <- mkPtrsArray arr n_ptrs ptrs
+  let is_case_cont | resolvedBCOIsCaseCont = intToInt8# 1#
+                   | otherwise             = intToInt8# 0#
   IO $ \s ->
     case unsafeFreezeArray# marr s of { (# s, arr #) ->
-    case newBCO insns_barr literals_barr arr arity# bitmap_barr of { IO io ->
-    io s
-    }}
+      newBCO2# is_case_cont insns_barr literals_barr arr arity# bitmap_barr s }
 
 
 -- we recursively link any sub-BCOs while making the ptrs array

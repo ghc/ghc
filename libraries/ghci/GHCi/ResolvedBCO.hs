@@ -45,7 +45,8 @@ data ResolvedBCO
         resolvedBCOBitmap :: BCOByteArray Word,         -- ^ bitmap
         resolvedBCOLits   :: BCOByteArray Word,
           -- ^ non-ptrs - subword sized entries still take up a full (host) word
-        resolvedBCOPtrs   :: (SizedSeq ResolvedBCOPtr)  -- ^ ptrs
+        resolvedBCOPtrs   :: (SizedSeq ResolvedBCOPtr), -- ^ ptrs
+        resolvedBCOIsCaseCont :: !Bool                  -- ^ See Note [Case continuation BCOs]
    }
    deriving (Generic, Show)
 
@@ -86,7 +87,8 @@ instance Binary ResolvedBCO where
     put resolvedBCOBitmap
     put resolvedBCOLits
     put resolvedBCOPtrs
-  get = ResolvedBCO <$> get <*> get <*> get <*> get <*> get <*> get
+    put resolvedBCOIsCaseCont
+  get = ResolvedBCO <$> get <*> get <*> get <*> get <*> get <*> get <*> get
 
 -- See Note [BCOByteArray serialization]
 instance (Binary a, Storable a, IArray UArray a) => Binary (BCOByteArray a) where

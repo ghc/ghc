@@ -215,14 +215,14 @@ PUSH_L instruction.
 
 |---------|
 |  BCO_1  | -<-┐
-|---------|
+|---------|    |
  .........     |
 |---------|    | PUSH_L <n>
 |  BCO_N  | ->-┘
 |---------|
 
 Here BCO_N is syntactically nested within the code for BCO_1 and will result
-in code that references the prior stack frame of BCO_1 for some of it's local
+in code that references the prior stack frame of BCO_1 for some of its local
 variables. If a stack overflow happens between the creation of the stack frame
 for BCO_1 and BCO_N the RTS might move BCO_N to a new stack chunk while leaving
 BCO_1 in place, invalidating a simple offset based reference to the outer stack
@@ -583,14 +583,35 @@ interpretBCO (Capability* cap)
     //
     //       We have a BCO application to perform.  Stack looks like:
     //
-    //          |     ....      |
-    //          +---------------+
-    //          |     arg1      |
-    //          +---------------+
-    //          |     BCO       |
-    //          +---------------+
-    //       Sp |   RET_BCO     |
-    //          +---------------+
+    //
+    //                                       (an StgBCO)
+    //                                    +---> +---------[1]--+
+    //                                    |     | stg_BCO_info | ------+
+    //                                    |     +--------------+       |
+    //                                    |     | StgArrBytes* | <--- the byte code
+    //          |       ...        |      |     +--------------+       |
+    //          +------------------+      |     |     ...      |       |
+    //          |       fvs1       |      |                            |
+    //          +------------------+      |                            |
+    //          |       ...        |      |        (StgInfoTable)      |
+    //          +------------------+      |           +----------+ <---+
+    //          |      args1       |      |           |    ...   |
+    //          +------------------+      |           +----------+
+    //          |   some StgBCO*   | -----+           | type=BCO |
+    //          +------------------+                  +----------+
+    //       Sp | stg_apply_interp | -----+           |   ...    |
+    //          +------------------+      |
+    //                                    |
+    //                                    |   (StgInfoTable)
+    //                                    +----> +--------------+
+    //                                           |     ...      |
+    //                                           +--------------+
+    //                                           | type=RET_BCO |
+    //                                           +--------------+
+    //                                           |     ...      |
+    //
+    // [1] An StgBCO's info table pointer may also be stg_CASE_CONT_BCO_info.
+    //      See Note [Case continuation BCOs].
     //
     else if (SpW(0) == (W_)&stg_apply_interp_info) {
         obj = UNTAG_CLOSURE((StgClosure *)ReadSpW(1));
@@ -1559,7 +1580,7 @@ run_BCO:
             // Here we make sure references we push are tagged.
             // See Note [CBV Functions and the interpreter] in Info.hs
 
-            //Safe some memory reads if we already have a tag.
+            //Save some memory reads if we already have a tag.
             if(GET_CLOSURE_TAG(tagged_obj) == 0) {
                 StgClosure *obj = UNTAG_CLOSURE(tagged_obj);
                 switch ( get_itbl(obj)->type ) {

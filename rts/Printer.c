@@ -690,6 +690,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("stg_ctoi_V_info" );
             } else if (c == (StgWord)&stg_BCO_info) {
                 debugBelch("stg_BCO_info" );
+            } else if (c == (StgWord)&stg_CASE_CONT_BCO_info) {
+                debugBelch("stg_CASE_CONT_BCO_info" );
             } else if (c == (StgWord)&stg_apply_interp_info) {
                 debugBelch("stg_apply_interp_info" );
             } else if (c == (StgWord)&stg_ret_t_info) {
