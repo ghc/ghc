@@ -3,16 +3,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 
-module GHC.Internal.Exception.Backtrace
-    ( -- * Backtrace mechanisms
-      BacktraceMechanism(..)
-    , getBacktraceMechanismState
-    , setBacktraceMechanismState
-      -- * Collecting backtraces
-    , Backtraces(..)
-    , displayBacktraces
-    , collectBacktraces
-    ) where
+module GHC.Internal.Exception.Backtrace where
 
 import GHC.Internal.Base
 import GHC.Internal.Data.OldList
