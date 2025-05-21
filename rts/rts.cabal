@@ -301,11 +301,11 @@ flag smp
 flag find-ptr
   default: False
   manual: True
--- Some cabal flags used to control the flavours we want to produce
--- for libHSrts in hadrian. By default, we just produce vanilla and
--- threaded. The flags "compose": if you enable debug and profiling,
--- you will produce vanilla, _thr, _debug, _p but also _thr_p,
--- _thr_debug_p and so on.
+-- -- Some cabal flags used to control the flavours we want to produce
+-- -- for libHSrts in hadrian. By default, we just produce vanilla and
+-- -- threaded. The flags "compose": if you enable debug and profiling,
+-- -- you will produce vanilla, _thr, _debug, _p but also _thr_p,
+-- -- _thr_debug_p and so on.
 flag profiling
   default: False
   manual: True
@@ -326,19 +326,283 @@ flag thread-sanitizer
   default: False
   manual: True
 
+common rts-base-config
+    ghc-options: -this-unit-id rts -ghcversion-file=include/ghcversion.h -optc-DFS_NAMESPACE=rts
+    cmm-options:
+
+    include-dirs: include .
+    includes: Rts.h
+    build-depends:
+      rts-headers,
+      rts-fs,
+      rts
+
+common rts-c-sources-base
+    cmm-sources:
+      Apply.cmm
+      Compact.cmm
+      ContinuationOps.cmm
+      Exception.cmm
+      HeapStackCheck.cmm
+      Jumps_D.cmm
+      Jumps_V16.cmm
+      PrimOps.cmm
+      StgMiscClosures.cmm
+      StgStartup.cmm
+      StgStdThunks.cmm
+      Updates.cmm
+
+    -- Adjustor stuff
+    if flag(libffi-adjustors)
+      c-sources: adjustor/LibffiAdjustor.c
+    else
+      if arch(i386)
+        asm-sources: adjustor/Nativei386Asm.S
+        c-sources: adjustor/Nativei386.c
+      if arch(x86_64)
+        if os(mingw32)
+          asm-sources: adjustor/NativeAmd64MingwAsm.S
+          c-sources: adjustor/NativeAmd64Mingw.c
+        else
+          asm-sources: adjustor/NativeAmd64Asm.S
+          c-sources: adjustor/NativeAmd64.c
+      if !arch(x86_64) && !arch(i386)
+        c-sources: adjustor/LibffiAdjustor.c
+
+    if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64) || arch(loongarch64)
+      asm-sources: StgCRunAsm.S
+
+    c-sources: Adjustor.c
+               adjustor/AdjustorPool.c
+               ExecPage.c
+               Arena.c
+               Capability.c
+               CheckUnload.c
+               CheckVectorSupport.c
+               CloneStack.c
+               ClosureFlags.c
+               ClosureSize.c
+               Continuation.c
+               Disassembler.c
+               FileLock.c
+               ForeignExports.c
+               Globals.c
+               Hash.c
+               Heap.c
+               Hpc.c
+               HsFFI.c
+               Inlines.c
+               Interpreter.c
+               IOManager.c
+               LdvProfile.c
+               Libdw.c
+               LibdwPool.c
+               Linker.c
+               ReportMemoryMap.c
+               Messages.c
+               OldARMAtomic.c
+               PathUtils.c
+               Pool.c
+               Printer.c
+               ProfHeap.c
+               ProfilerReport.c
+               ProfilerReportJson.c
+               Profiling.c
+               IPE.c
+               Proftimer.c
+               RaiseAsync.c
+               RetainerProfile.c
+               RetainerSet.c
+               RtsAPI.c
+               RtsDllMain.c
+               RtsFlags.c
+               RtsMain.c
+               RtsMessages.c
+               RtsStartup.c
+               RtsSymbolInfo.c
+               RtsSymbols.c
+               RtsUtils.c
+               STM.c
+               Schedule.c
+               Sparks.c
+               SpinLock.c
+               StableName.c
+               StablePtr.c
+               StaticPtrTable.c
+               Stats.c
+               StgCRun.c
+               StgPrimFloat.c
+               Task.c
+               ThreadLabels.c
+               ThreadPaused.c
+               Threads.c
+               Ticky.c
+               Timer.c
+               TopHandler.c
+               Trace.c
+               TraverseHeap.c
+               TraverseHeapTest.c
+               TSANUtils.c
+               WSDeque.c
+               Weak.c
+               ZeroSlop.c
+               eventlog/EventLog.c
+               eventlog/EventLogWriter.c
+               hooks/FlagDefaults.c
+               hooks/LongGCSync.c
+               hooks/MallocFail.c
+               hooks/OnExit.c
+               hooks/OutOfHeap.c
+               hooks/StackOverflow.c
+               linker/CacheFlush.c
+               linker/Elf.c
+               linker/InitFini.c
+               linker/LoadArchive.c
+               linker/LoadNativeObjPosix.c
+               linker/M32Alloc.c
+               linker/MMap.c
+               linker/MachO.c
+               linker/macho/plt.c
+               linker/macho/plt_aarch64.c
+               linker/PEi386.c
+               linker/SymbolExtras.c
+               linker/elf_got.c
+               linker/elf_plt.c
+               linker/elf_plt_aarch64.c
+               linker/elf_plt_riscv64.c
+               linker/elf_plt_arm.c
+               linker/elf_reloc.c
+               linker/elf_reloc_aarch64.c
+               linker/elf_reloc_riscv64.c
+               linker/elf_tlsgd.c
+               linker/elf_util.c
+               sm/BlockAlloc.c
+               sm/CNF.c
+               sm/Compact.c
+               sm/Evac.c
+               sm/Evac_thr.c
+               sm/GC.c
+               sm/GCAux.c
+               sm/GCUtils.c
+               sm/MBlock.c
+               sm/MarkWeak.c
+               sm/NonMoving.c
+               sm/NonMovingAllocate.c
+               sm/NonMovingCensus.c
+               sm/NonMovingMark.c
+               sm/NonMovingScav.c
+               sm/NonMovingShortcut.c
+               sm/NonMovingSweep.c
+               sm/Sanity.c
+               sm/Scav.c
+               sm/Scav_thr.c
+               sm/Storage.c
+               sm/Sweep.c
+
+    if os(windows)
+       c-sources: win32/AsyncMIO.c
+                  win32/AsyncWinIO.c
+                  win32/AwaitEvent.c
+                  win32/ConsoleHandler.c
+                  win32/GetEnv.c
+                  win32/GetTime.c
+                  win32/MIOManager.c
+                  win32/OSMem.c
+                  win32/OSThreads.c
+                  win32/ThrIOManager.c
+                  win32/Ticker.c
+                  win32/WorkQueue.c
+                  win32/veh_excn.c
+    elif arch(wasm32)
+      asm-sources: wasm/Wasm.S
+      c-sources: wasm/StgRun.c
+                 wasm/GetTime.c
+                 wasm/OSMem.c
+                 wasm/OSThreads.c
+                 wasm/JSFFI.c
+                 wasm/JSFFIGlobals.c
+                 -- Note: Select.c included for wasm32
+                 posix/Select.c
+      cmm-sources: wasm/jsval.cmm
+                   wasm/blocker.cmm
+                   wasm/scheduler.cmm
+    -- Posix-like
+    else
+       c-sources: posix/GetEnv.c
+                  posix/GetTime.c
+                  posix/Ticker.c
+                  posix/OSMem.c
+                  posix/OSThreads.c
+                  posix/Select.c
+                  posix/Signals.c
+                  posix/TTY.c
+
+common rts-link-options
+    extra-libraries: ffi
+    extra-libraries-static: ffi
+
+    if os(linux)
+       extra-libraries: c
+    if flag(libm)
+       extra-libraries: m
+    if flag(librt)
+       extra-libraries: rt
+    if flag(libdl)
+       extra-libraries: dl
+    if os(windows)
+       extra-libraries:
+          wsock32 gdi32 winmm
+          dbghelp
+          psapi
+       cpp-options: -D_WIN32_WINNT=0x06010000
+       cc-options: -D_WIN32_WINNT=0x06010000
+    if flag(need-pthread)
+       extra-libraries: pthread
+    if flag(need-atomic)
+       extra-libraries: atomic
+    if flag(libbfd)
+       extra-libraries: bfd iberty
+    if flag(libdw)
+       extra-libraries: elf dw
+    if flag(libnuma)
+       extra-libraries: numa
+    if flag(libzstd)
+       if flag(static-libzstd)
+          if os(darwin)
+             buildable: False
+          else
+             extra-libraries: :libzstd.a
+       else
+          extra-libraries: zstd
+
+    if os(osx)
+      ld-options: "-Wl,-search_paths_first"
+                  "-Wl,-undefined,dynamic_lookup"
+      if !arch(x86_64) && !arch(aarch64)
+         ld-options: -read_only_relocs warning
+
+common rts-global-build-flags
+    ghc-options: -DCOMPILING_RTS
+    cpp-options: -DCOMPILING_RTS
+    if !flag(smp)
+       ghc-options: -DNOSMP
+       cpp-options: -DNOSMP
+    if flag(thread-sanitizer)
+      cc-options: -fsanitize=thread
+      ld-options: -fsanitize=thread
+
+common rts-debug-flags
+    ghc-options: -optc-DDEBUG
+    cpp-options: -DDEBUG -fno-omit-frame-pointer -g3 -O0
+
+common rts-threaded-flags
+    ghc-options: -DTHREADED_RTS
+    cpp-options: -DTHREADED_RTS
+
+-- the _main_ library needs to deal with all the _configure_ time stuff.
 library
-    -- rts is a wired in package and
-    -- expects the unit-id to be
-    -- set without version
-    --
-    -- When building the rts package, we want to pass the ghcversion.h. As we
-    -- don't have one during the rts bootstrap process. It's part of the rts
-    -- and looked up from the rts.  Thus without an rts there is no ghcversion.h
     ghc-options: -this-unit-id rts -ghcversion-file=include/ghcversion.h -optc-DFS_NAMESPACE=rts
     cmm-options: -this-unit-id rts
-
-    exposed: True
-    exposed-modules:
 
     autogen-includes:
       ghcautoconf.h
@@ -354,451 +618,170 @@ library
       rts/EventLogConstants.h
       rts/EventTypes.h
 
-    if arch(javascript)
+    install-includes:
+      -- Common headers for non-JS builds
+      Cmm.h HsFFI.h MachDeps.h Jumps.h Rts.h RtsAPI.h RtsSymbols.h Stg.h
+      ghcconfig.h ghcversion.h
+      rts/ghc_ffi.h
+      rts/Adjustor.h
+      rts/ExecPage.h
+      rts/BlockSignals.h
+      rts/Config.h
+      rts/Constants.h
+      rts/EventLogFormat.h
+      rts/EventLogWriter.h
+      rts/FileLock.h
+      rts/Flags.h
+      rts/ForeignExports.h
+      rts/GetTime.h
+      rts/Globals.h
+      rts/Hpc.h
+      rts/IOInterface.h
+      rts/Libdw.h
+      rts/LibdwPool.h
+      rts/Linker.h
+      rts/Main.h
+      rts/Messages.h
+      rts/NonMoving.h
+      rts/OSThreads.h
+      rts/Parallel.h
+      rts/PrimFloat.h
+      rts/Profiling.h
+      rts/IPE.h
+      rts/PosixSource.h
+      rts/Signals.h
+      rts/SpinLock.h
+      rts/StableName.h
+      rts/StablePtr.h
+      rts/StaticPtrTable.h
+      rts/TTY.h
+      rts/Threads.h
+      rts/Ticky.h
+      rts/Time.h
+      rts/Timer.h
+      rts/TSANUtils.h
+      rts/Types.h
+      rts/Utils.h
+      rts/prof/CCS.h
+      rts/prof/Heap.h
+      rts/prof/LDV.h
+      rts/storage/Block.h
+      rts/storage/ClosureMacros.h
+      rts/storage/Closures.h
+      rts/storage/Heap.h
+      rts/storage/HeapAlloc.h
+      rts/storage/GC.h
+      rts/storage/InfoTables.h
+      rts/storage/MBlock.h
+      rts/storage/TSO.h
+      stg/DLL.h
+      stg/MiscClosures.h
+      stg/Prim.h
+      stg/Regs.h
+      stg/SMP.h
+      stg/Ticky.h
+      stg/Types.h
 
-      include-dirs: include
+    autogen-cmm-sources:
+      AutoApply.cmm
+      AutoApply_V16.cmm
 
-      js-sources:
-        js/config.js
-        js/structs.js
-        js/arith.js
-        js/compact.js
-        js/debug.js
-        js/enum.js
-        js/environment.js
-        js/eventlog.js
-        js/gc.js
-        js/goog.js
-        js/hscore.js
-        js/md5.js
-        js/mem.js
-        js/node-exports.js
-        js/object.js
-        js/profiling.js
-        js/rts.js
-        js/stableptr.js
-        js/staticpointer.js
-        js/stm.js
-        js/string.js
-        js/thread.js
-        js/unicode.js
-        js/verify.js
-        js/weak.js
-        js/globals.js
-        js/time.js
-
-      install-includes: HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
-                        ghcconfig.h
-                        ghcversion.h
-                        stg/MachRegsForHost.h
-                        stg/Types.h
-
-    else
-      -- Here we declare several flavours to be available when passing the
-      -- suitable (combination of) flag(s) when configuring the RTS from hadrian,
-      -- using Cabal.
-      if flag(threaded)
-        extra-library-flavours: _thr
-        if flag(dynamic)
-          extra-dynamic-library-flavours: _thr
-
-      if flag(profiling)
-        extra-library-flavours: _p
-        if flag(threaded)
-          extra-library-flavours: _thr_p
-        if flag(debug)
-          extra-library-flavours: _debug_p
-          if flag(threaded)
-            extra-library-flavours: _thr_debug_p
-        if flag(dynamic)
-          extra-dynamic-library-flavours: _p
-          if flag(threaded)
-            extra-dynamic-library-flavours: _thr_p
-          if flag(debug)
-            extra-dynamic-library-flavours: _debug_p
-            if flag(threaded)
-              extra-dynamic-library-flavours: _thr_debug_p
-
-      if flag(debug)
-        extra-library-flavours: _debug
-        if flag(dynamic)
-          extra-dynamic-library-flavours: _debug
-        if flag(threaded)
-          extra-library-flavours: _thr_debug
-          if flag(dynamic)
-            extra-dynamic-library-flavours: _thr_debug
-
-      if flag(thread-sanitizer)
-        cc-options: -fsanitize=thread
-        ld-options: -fsanitize=thread
-
-      if os(linux)
-         -- the RTS depends upon libc. while this dependency is generally
-         -- implicitly added by `cc`, we must explicitly add it here to ensure
-         -- that it is ordered correctly with libpthread, since ghc-internal.cabal
-         -- also explicitly lists libc. See #19029.
-         extra-libraries: c
-      if flag(libm)
-         -- for ldexp()
-         extra-libraries: m
-      if flag(librt)
-         extra-libraries: rt
-      if flag(libdl)
-         extra-libraries: dl
-      if os(windows)
-         extra-libraries:
-            -- for the linker
-            wsock32 gdi32 winmm
-            -- for crash dump
-            dbghelp
-            -- for process information
-            psapi
-         -- TODO: Hadrian will use this cabal file, so drop WINVER from Hadrian's configs.
-         -- Minimum supported Windows version.
-         -- These numbers can be found at:
-         --  https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
-         -- If we're compiling on windows, enforce that we only support Windows 7+
-         -- Adding this here means it doesn't have to be done in individual .c files
-         -- and also centralizes the versioning.
-         cpp-options: -D_WIN32_WINNT=0x06010000
-         cc-options: -D_WIN32_WINNT=0x06010000
-      if flag(need-pthread)
-         -- for pthread_getthreadid_np, pthread_create, ...
-         extra-libraries: pthread
-      if flag(need-atomic)
-         -- for sub-word-sized atomic operations (#19119)
-         extra-libraries: atomic
-      if flag(libbfd)
-         -- for debugging
-         extra-libraries: bfd iberty
-      if flag(libdw)
-         -- for backtraces
-         extra-libraries: elf dw
-      if flag(libnuma)
-         extra-libraries: numa
-      if flag(libzstd)
-         if flag(static-libzstd)
-            if os(darwin)
-               buildable: False
-            else
-               extra-libraries: :libzstd.a
-         else
-            extra-libraries: zstd
-      if !flag(smp)
-         cpp-options: -DNOSMP
-
-      include-dirs: include .
-      includes: Rts.h
-      install-includes: Cmm.h HsFFI.h MachDeps.h Jumps.h Rts.h RtsAPI.h RtsSymbols.h Stg.h
-                        ghcconfig.h ghcversion.h
-                        ghcautoconf.h
-                        ghcplatform.h
-                        DerivedConstants.h
-                        rts/EventLogConstants.h
-                        rts/EventTypes.h
-                        -- ^ generated
-                        rts/ghc_ffi.h
-                        rts/Adjustor.h
-                        rts/ExecPage.h
-                        rts/BlockSignals.h
-                        rts/Config.h
-                        rts/Constants.h
-                        rts/EventLogFormat.h
-                        rts/EventLogWriter.h
-                        rts/FileLock.h
-                        rts/Flags.h
-                        rts/ForeignExports.h
-                        rts/GetTime.h
-                        rts/Globals.h
-                        rts/Hpc.h
-                        rts/IOInterface.h
-                        rts/Libdw.h
-                        rts/LibdwPool.h
-                        rts/Linker.h
-                        rts/Main.h
-                        rts/Messages.h
-                        rts/NonMoving.h
-                        rts/OSThreads.h
-                        rts/Parallel.h
-                        rts/PrimFloat.h
-                        rts/Profiling.h
-                        rts/IPE.h
-                        rts/PosixSource.h
-                        rts/Signals.h
-                        rts/SpinLock.h
-                        rts/StableName.h
-                        rts/StablePtr.h
-                        rts/StaticPtrTable.h
-                        rts/TTY.h
-                        rts/Threads.h
-                        rts/Ticky.h
-                        rts/Time.h
-                        rts/Timer.h
-                        rts/TSANUtils.h
-                        rts/Types.h
-                        rts/Utils.h
-                        rts/prof/CCS.h
-                        rts/prof/Heap.h
-                        rts/prof/LDV.h
-                        rts/storage/Block.h
-                        rts/storage/ClosureMacros.h
-                        rts/storage/Closures.h
-                        rts/storage/Heap.h
-                        rts/storage/HeapAlloc.h
-                        rts/storage/GC.h
-                        rts/storage/InfoTables.h
-                        rts/storage/MBlock.h
-                        rts/storage/TSO.h
-                        stg/DLL.h
-                        stg/MiscClosures.h
-                        stg/Prim.h
-                        stg/Regs.h
-                        stg/SMP.h
-                        stg/Ticky.h
-                        stg/Types.h
-
-      if os(osx)
-        ld-options: "-Wl,-search_paths_first"
-                    -- See Note [Undefined symbols in the RTS]
-                    "-Wl,-undefined,dynamic_lookup"
-        if !arch(x86_64) && !arch(aarch64)
-           ld-options: -read_only_relocs warning
-
-      cmm-sources:
-        Apply.cmm
-        Compact.cmm
-        ContinuationOps.cmm
-        Exception.cmm
-        HeapStackCheck.cmm
-        Jumps_D.cmm
-        Jumps_V16.cmm
-        PrimOps.cmm
-        StgMiscClosures.cmm
-        StgStartup.cmm
-        StgStdThunks.cmm
-        Updates.cmm
-
-      autogen-cmm-sources:
-        AutoApply.cmm
-        AutoApply_V16.cmm
-
-      if arch(x86_64)
-        cmm-sources:
-          Jumps_V32.cmm (-mavx2)
-          Jumps_V64.cmm (-mavx512f)
-        autogen-cmm-sources:
-          AutoApply_V32.cmm (-mavx2)
-          AutoApply_V64.cmm (-mavx512f)
-      else
-        cmm-sources:
-          Jumps_V32.cmm
-          Jumps_V64.cmm
-        autogen-cmm-sources:
-          AutoApply_V32.cmm
-          AutoApply_V64.cmm
-
-      -- we always link against libffi, even without libffi-adjustors enabled.
-      -- libffi is used by the Interpreter and some of its symbols are declared
-      -- in RtsSymbols.c
-      extra-libraries: ffi
-      extra-libraries-static: ffi
-
-      -- Adjustor stuff
-      if flag(libffi-adjustors)
-        c-sources: adjustor/LibffiAdjustor.c
-      else
-        -- Use GHC's native adjustors
-        if arch(i386)
-          asm-sources: adjustor/Nativei386Asm.S
-          c-sources: adjustor/Nativei386.c
-        if arch(x86_64)
-          if os(mingw32)
-            asm-sources: adjustor/NativeAmd64MingwAsm.S
-            c-sources: adjustor/NativeAmd64Mingw.c
-          else
-            asm-sources: adjustor/NativeAmd64Asm.S
-            c-sources: adjustor/NativeAmd64.c
-        -- fall back to the LibffiAdjustor if neither i386, or x86_64
-        if !arch(x86_64) && !arch(i386)
-          c-sources: adjustor/LibffiAdjustor.c
-
-      -- Use assembler STG entrypoint on architectures where it is used
-      if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64) || arch(loongarch64)
-        asm-sources: StgCRunAsm.S
-
-      c-sources: Adjustor.c
-                 adjustor/AdjustorPool.c
-                 ExecPage.c
-                 Arena.c
-                 Capability.c
-                 CheckUnload.c
-                 CheckVectorSupport.c
-                 CloneStack.c
-                 ClosureFlags.c
-                 ClosureSize.c
-                 Continuation.c
-                 Disassembler.c
-                 FileLock.c
-                 ForeignExports.c
-                 Globals.c
-                 Hash.c
-                 Heap.c
-                 Hpc.c
-                 HsFFI.c
-                 Inlines.c
-                 Interpreter.c
-                 IOManager.c
-                 LdvProfile.c
-                 Libdw.c
-                 LibdwPool.c
-                 Linker.c
-                 ReportMemoryMap.c
-                 Messages.c
-                 OldARMAtomic.c
-                 PathUtils.c
-                 Pool.c
-                 Printer.c
-                 ProfHeap.c
-                 ProfilerReport.c
-                 ProfilerReportJson.c
-                 Profiling.c
-                 IPE.c
-                 Proftimer.c
-                 RaiseAsync.c
-                 RetainerProfile.c
-                 RetainerSet.c
-                 RtsAPI.c
-                 RtsDllMain.c
-                 RtsFlags.c
-                 RtsMain.c
-                 RtsMessages.c
-                 RtsStartup.c
-                 RtsSymbolInfo.c
-                 RtsSymbols.c
-                 RtsUtils.c
-                 STM.c
-                 Schedule.c
-                 Sparks.c
-                 SpinLock.c
-                 StableName.c
-                 StablePtr.c
-                 StaticPtrTable.c
-                 Stats.c
-                 StgCRun.c
-                 StgPrimFloat.c
-                 Task.c
-                 ThreadLabels.c
-                 ThreadPaused.c
-                 Threads.c
-                 Ticky.c
-                 Timer.c
-                 TopHandler.c
-                 Trace.c
-                 TraverseHeap.c
-                 TraverseHeapTest.c
-                 TSANUtils.c
-                 WSDeque.c
-                 Weak.c
-                 ZeroSlop.c
-                 eventlog/EventLog.c
-                 eventlog/EventLogWriter.c
-                 hooks/FlagDefaults.c
-                 hooks/LongGCSync.c
-                 hooks/MallocFail.c
-                 hooks/OnExit.c
-                 hooks/OutOfHeap.c
-                 hooks/StackOverflow.c
-                 linker/CacheFlush.c
-                 linker/Elf.c
-                 linker/InitFini.c
-                 linker/LoadArchive.c
-                 linker/LoadNativeObjPosix.c
-                 linker/M32Alloc.c
-                 linker/MMap.c
-                 linker/MachO.c
-                 linker/macho/plt.c
-                 linker/macho/plt_aarch64.c
-                 linker/ProddableBlocks.c
-                 linker/PEi386.c
-                 linker/SymbolExtras.c
-                 linker/elf_got.c
-                 linker/elf_plt.c
-                 linker/elf_plt_aarch64.c
-                 linker/elf_plt_riscv64.c
-                 linker/elf_plt_arm.c
-                 linker/elf_reloc.c
-                 linker/elf_reloc_aarch64.c
-                 linker/elf_reloc_riscv64.c
-                 linker/elf_tlsgd.c
-                 linker/elf_util.c
-                 sm/BlockAlloc.c
-                 sm/CNF.c
-                 sm/Compact.c
-                 sm/Evac.c
-                 sm/Evac_thr.c
-                 sm/GC.c
-                 sm/GCAux.c
-                 sm/GCUtils.c
-                 sm/MBlock.c
-                 sm/MarkWeak.c
-                 sm/NonMoving.c
-                 sm/NonMovingAllocate.c
-                 sm/NonMovingCensus.c
-                 sm/NonMovingMark.c
-                 sm/NonMovingScav.c
-                 sm/NonMovingShortcut.c
-                 sm/NonMovingSweep.c
-                 sm/Sanity.c
-                 sm/Scav.c
-                 sm/Scav_thr.c
-                 sm/Storage.c
-                 sm/Sweep.c
-                 -- I wish we had wildcards..., this would be:
-                 -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
-
-      if os(windows)
-         c-sources: win32/AsyncMIO.c
-                    win32/AsyncWinIO.c
-                    win32/AwaitEvent.c
-                    win32/ConsoleHandler.c
-                    win32/GetEnv.c
-                    win32/GetTime.c
-                    win32/MIOManager.c
-                    win32/OSMem.c
-                    win32/OSThreads.c
-                    win32/ThrIOManager.c
-                    win32/Ticker.c
-                    win32/WorkQueue.c
-                    win32/veh_excn.c
-                    -- win32/**/*.c
-      elif arch(wasm32)
-        asm-sources: wasm/Wasm.S
-        c-sources: wasm/StgRun.c
-                   wasm/GetTime.c
-                   wasm/OSMem.c
-                   wasm/OSThreads.c
-                   wasm/JSFFI.c
-                   wasm/JSFFIGlobals.c
-                   posix/Select.c
-        cmm-sources: wasm/jsval.cmm
-                     wasm/blocker.cmm
-                     wasm/scheduler.cmm
-      else
-         c-sources: posix/GetEnv.c
-                    posix/GetTime.c
-                    posix/Ticker.c
-                    posix/OSMem.c
-                    posix/OSThreads.c
-                    posix/Select.c
-                    posix/Signals.c
-                    posix/TTY.c
-                    -- ticker/*.c
-                    -- We don't want to compile posix/ticker/*.c, these will be #included
-                    -- from Ticker.c
+    include-dirs: include .
 
     build-depends:
       rts-headers,
       rts-fs
+
+    if arch(x86_64)
+      cmm-sources:
+        Jumps_V32.cmm (-mavx2)
+        Jumps_V64.cmm (-mavx512f)
+      autogen-cmm-sources:
+        AutoApply_V32.cmm (-mavx2)
+        AutoApply_V64.cmm (-mavx512f)
+    else
+      cmm-sources:
+        Jumps_V32.cmm
+        Jumps_V64.cmm
+      autogen-cmm-sources:
+        AutoApply_V32.cmm
+        AutoApply_V64.cmm
+
+library ghcjs
+    import: rts-base-config
+
+    -- Keep original JS specific settings for the main library
+    include-dirs: include
+    js-sources:
+      js/config.js
+      js/structs.js
+      js/arith.js
+      js/compact.js
+      js/debug.js
+      js/enum.js
+      js/environment.js
+      js/eventlog.js
+      js/gc.js
+      js/goog.js
+      js/hscore.js
+      js/md5.js
+      js/mem.js
+      js/node-exports.js
+      js/object.js
+      js/profiling.js
+      js/rts.js
+      js/stableptr.js
+      js/staticpointer.js
+      js/stm.js
+      js/string.js
+      js/thread.js
+      js/unicode.js
+      js/verify.js
+      js/weak.js
+      js/globals.js
+      js/time.js
+    install-includes: HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
+                      ghcconfig.h
+                      ghcversion.h
+                      stg/MachRegsForHost.h
+                      stg/Types.h
+    -- Add JS specific install-includes again
+    install-includes: HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
+                      ghcconfig.h ghcversion.h
+                      stg/MachRegsForHost.h stg/Types.h
+
+-- this is basiclly the "vanilla" version
+library nonthreaded-nodebug
+    import: rts-base-config, rts-c-sources-base, rts-link-options, rts-global-build-flags
+    visibility: public
+    build-depends: rts
+
+    ghc-options: -ghcversion-file=include/ghcversion.h -optc-DFS_NAMESPACE=rts
+    ghc-options: -optc-DRtsWay="v"
+
+    if arch(javascript)
+      buildable: False
+
+library threaded-nodebug
+    import: rts-base-config, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-threaded-flags
+    visibility: public
+    build-depends: rts
+    if arch(javascript)
+      buildable: False
+
+library nonthreaded-debug
+    import: rts-base-config, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-debug-flags
+    visibility: public
+    build-depends: rts
+    if arch(javascript)
+      buildable: False
+
+library threaded-debug
+    import: rts-base-config, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-threaded-flags, rts-debug-flags
+    visibility: public
+    build-depends: rts
+    if arch(javascript)
+      buildable: False
 
 -- Note [Undefined symbols in the RTS]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

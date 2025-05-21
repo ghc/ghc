@@ -111,6 +111,17 @@ $(GHC2): _build/stage1.done
 	@$(LIB)
 	@echo ">>> Building with GHC: $(GHC1) and Cabal: $(CABAL)"
 	@echo ">>> Using $(THREADS) threads"
+
+	# this is stupid, having to build the rts first. We need to find a better way to do this.
+	# We might be able to just have the `ghc` executable depend on the specific rts we want to
+	# set as a default.
+	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
+		PATH=$(PWD)/_build/stage1/bin:$(PATH) \
+		$(CABAL) build --project-file=cabal.project.stage2 --builddir=_build/stage2/cabal -j -w ghc \
+		--ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" \
+		rts:nonthreaded-nodebug \
+		> _build/logs/rts.log 2> _build/logs/rts.err
+
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
 		PATH=$(PWD)/_build/stage1/bin:$(PATH) \
 		$(CABAL) build --project-file=cabal.project.stage2 --builddir=_build/stage2/cabal -j -w ghc \

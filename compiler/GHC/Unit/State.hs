@@ -112,6 +112,7 @@ import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
 import Data.List ( intersperse, partition, sortBy, isSuffixOf, sortOn )
 import Data.Set (Set)
+import Data.String (fromString)
 import Data.Monoid (First(..))
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Set as Set
@@ -370,7 +371,7 @@ initUnitConfig dflags cached_dbs home_units =
          -- Since "base" is not wired in, then the unit-id is discovered
          -- from the settings file by default, but can be overriden by power-users
          -- by specifying `-base-unit-id` flag.
-         | otherwise = filter (hu_id /=) [baseUnitId dflags, ghcInternalUnitId, rtsUnitId]
+         | otherwise = filter (hu_id /=) [baseUnitId dflags, ghcInternalUnitId, rtsWayUnitId dflags, rtsUnitId]
 
        -- if the home unit is indefinite, it means we are type-checking it only
        -- (not producing any code). Hence we can use virtual units instantiated
@@ -644,7 +645,7 @@ initUnits logger dflags cached_dbs home_units = do
 
   (unit_state,dbs) <- withTiming logger (text "initializing unit database")
                    forceUnitInfoMap
-                 $ mkUnitState logger (initUnitConfig dflags cached_dbs home_units)
+                 $ mkUnitState logger dflags (initUnitConfig dflags cached_dbs home_units)
 
   putDumpFileMaybe logger Opt_D_dump_mod_map "Module Map"
     FormatText (updSDocContext (\ctx -> ctx {sdocLineLength = 200})
@@ -1093,6 +1094,7 @@ type WiringMap = UniqMap UnitId UnitId
 
 findWiredInUnits
    :: Logger
+   -> [UnitId]            -- wired in unit ids
    -> UnitPrecedenceMap
    -> [UnitInfo]           -- database
    -> VisibilityMap             -- info on what units are visible
@@ -1100,13 +1102,22 @@ findWiredInUnits
    -> IO ([UnitInfo],  -- unit database updated for wired in
           WiringMap)   -- map from unit id to wired identity
 
-findWiredInUnits logger prec_map pkgs vis_map = do
+findWiredInUnits logger unitIdsToFind prec_map pkgs vis_map = do
   -- Now we must find our wired-in units, and rename them to
   -- their canonical names (eg. base-1.0 ==> base), as described
   -- in Note [Wired-in units] in GHC.Unit.Types
   let
         matches :: UnitInfo -> UnitId -> Bool
-        pc `matches` pid = unitPackageName pc == PackageName (unitIdFS pid)
+        pc `matches` pid | (pkg, comp) <- break (==':') (unitIdString pid)
+                         , not (null comp)
+          = unitPackageName pc == PackageName (fromString pkg)
+            -- note: GenericUnitInfo uses the same type for
+            --       unitPackageName and unitComponentName
+            && unitComponentName pc == Just (PackageName (fromString (drop 1 comp)))
+        pc `matches` pid
+          = unitPackageName pc == PackageName (unitIdFS pid)
+            && unitComponentName pc == Nothing
+
 
         -- find which package corresponds to each wired-in package
         -- delete any other packages with the same name
@@ -1126,7 +1137,8 @@ findWiredInUnits logger prec_map pkgs vis_map = do
         -- available.
         --
         findWiredInUnit :: [UnitInfo] -> UnitId -> IO (Maybe (UnitId, UnitInfo))
-        findWiredInUnit pkgs wired_pkg = firstJustsM [try all_exposed_ps, try all_ps, notfound]
+        findWiredInUnit pkgs wired_pkg = do
+            firstJustsM [try all_exposed_ps, try all_ps, notfound]
           where
                 all_ps = [ p | p <- pkgs, p `matches` wired_pkg ]
                 all_exposed_ps = [ p | p <- all_ps, (mkUnit p) `elemUniqMap` vis_map ]
@@ -1151,7 +1163,7 @@ findWiredInUnits logger prec_map pkgs vis_map = do
                         return (wired_pkg, pkg)
 
 
-  mb_wired_in_pkgs <- mapM (findWiredInUnit pkgs) wiredInUnitIds
+  mb_wired_in_pkgs <- mapM (findWiredInUnit pkgs) unitIdsToFind
   let
         wired_in_pkgs = catMaybes mb_wired_in_pkgs
 
@@ -1464,9 +1476,10 @@ validateDatabase cfg pkg_map1 =
 
 mkUnitState
     :: Logger
+    -> DynFlags
     -> UnitConfig
     -> IO (UnitState,[UnitDatabase UnitId])
-mkUnitState logger cfg = do
+mkUnitState logger dflags cfg = do
 {-
    Plan.
 
@@ -1621,7 +1634,7 @@ mkUnitState logger cfg = do
   -- it modifies the unit ids of wired in packages, but when we process
   -- package arguments we need to key against the old versions.
   --
-  (pkgs2, wired_map) <- findWiredInUnits logger prec_map pkgs1 vis_map2
+  (pkgs2, wired_map) <- findWiredInUnits logger (rtsWayUnitId dflags:wiredInUnitIds) prec_map pkgs1 vis_map2
   let pkg_db = mkUnitInfoMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
