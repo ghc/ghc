@@ -22,6 +22,7 @@
       * `GHC.TypeNats.Internal`
       * `GHC.ExecutionStack.Internal`.
   * Deprecate `GHC.JS.Prim.Internal.Build`, as per [CLC #329](https://github.com/haskell/core-libraries-committee/issues/329)
+  * Expose constructor and field of `Backtraces` from `Control.Exception.Backtrace`, as per [CLC #199](https://github.com/haskell/core-libraries-committee/issues/199#issuecomment-1954662391)
 
   * Fix incorrect results of `integerPowMod` when the base is 0 and the exponent is negative, and `integerRecipMod` when the modulus is zero ([#26017](https://gitlab.haskell.org/ghc/ghc/-/issues/26017)).
 
