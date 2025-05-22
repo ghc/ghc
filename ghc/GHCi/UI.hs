@@ -493,7 +493,7 @@ interactiveUI config srcs maybe_exprs = do
     -- Initialise buffering for the *interpreted* I/O system
    (nobuffering, flush) <- runInternal initInterpBuffering
 
-   installInteractiveHomeUnit
+   installInteractiveHomeUnits
 
    -- Update the LogAction. Ensure we don't override the user's log action lest
    -- we break -ddump-json (#14078)
@@ -685,8 +685,8 @@ commands in the GHCi session.
 -- Within GHCi, you can rely on this property.
 --
 -- For motivation and design, see Note [Multiple Home Units aware GHCi]
-installInteractiveHomeUnit :: GHC.GhcMonad m => m ()
-installInteractiveHomeUnit = do
+installInteractiveHomeUnits :: GHC.GhcMonad m => m ()
+installInteractiveHomeUnits = do
   logger <- getLogger
   hsc_env <- GHC.getSession
   -- The initial set of DynFlags used for interactive evaluation is the same
@@ -736,8 +736,6 @@ installInteractiveHomeUnit = do
 
   let
     -- Explicitly depends on all current home units.
-    -- Additionally, we remove all 'importPaths', to avoid accidentally adding
-    -- any 'Target's to this 'Unit' that are not ':load'ed.
     dflagsSession =
       setHomeUnitId interactiveSessionUnitId $ dflags
         { packageFlags =
@@ -747,7 +745,6 @@ installInteractiveHomeUnit = do
           , let uid = homeUnitId homeUnit
           ] ++
           (packageFlags dflags)
-        , importPaths = []
         }
 
   let
