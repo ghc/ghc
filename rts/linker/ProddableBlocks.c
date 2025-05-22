@@ -8,9 +8,16 @@
 
 
 /*
- * Sanity checking.  For each ObjectCode, maintain a list of address ranges
- * which may be prodded during relocation, and abort if we try and write
- * outside any of these.
+ * Note [Proddable blocks]
+ * ~~~~~~~~~~~~~~~~~~~~~~~
+ * For each ObjectCode, we maintain a ProddableBlockSet representing the set of
+ * address ranges containing data belonging to the object. This set is
+ * represented here as an array of intervals sorted by start address. This
+ * allows us to efficiently query and insert via binary search. Array resizing
+ * is done according to an exponential growth schedule.
+ *
+ * While performing relocations we check against this set and and abort if we
+ * try and write outside any of these.
  */
 
 #include "Rts.h"
