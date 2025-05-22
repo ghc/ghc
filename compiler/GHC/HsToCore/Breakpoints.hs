@@ -18,6 +18,7 @@ import GHC.Utils.Outputable as Outputable
 
 import Data.List (intersperse)
 import Data.Array
+import qualified Data.IntMap as IntMap
 
 -- | Initialize memory for breakpoint data that is shared between the bytecode
 -- generator and the interpreter.
@@ -38,15 +39,16 @@ mkModBreaks interp mod extendedMixEntries
            locsTicks  = listArray (0,count-1) [ tick_loc  t | t <- entries ]
            varsTicks  = listArray (0,count-1) [ tick_ids  t | t <- entries ]
            declsTicks = listArray (0,count-1) [ tick_path t | t <- entries ]
-    return $ emptyModBreaks
-                       { modBreaks_flags  = breakArray
-                       , modBreaks_locs   = locsTicks
-                       , modBreaks_vars   = varsTicks
-                       , modBreaks_decls  = declsTicks
-                       , modBreaks_ccs    = ccs
-                       , modBreaks_module = moduleName mod
-                       , modBreaks_module_unitid = toUnitId $ moduleUnit mod
-                       }
+    return $ ModBreaks
+      { modBreaks_flags  = breakArray
+      , modBreaks_locs   = locsTicks
+      , modBreaks_vars   = varsTicks
+      , modBreaks_decls  = declsTicks
+      , modBreaks_ccs    = ccs
+      , modBreaks_breakInfo = IntMap.empty
+      , modBreaks_module = moduleName mod
+      , modBreaks_module_unitid = toUnitId $ moduleUnit mod
+      }
 
 mkCCSArray
   :: Interp -> Module -> Int -> [Tick]

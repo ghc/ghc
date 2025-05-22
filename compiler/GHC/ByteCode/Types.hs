@@ -19,7 +19,7 @@ module GHC.ByteCode.Types
   , ItblEnv, ItblPtr(..)
   , AddrEnv, AddrPtr(..)
   , CgBreakInfo(..)
-  , ModBreaks (..), BreakIndex, emptyModBreaks
+  , ModBreaks (..), BreakIndex
   , CCostCentre
   , FlatBag, sizeFlatBag, fromSmallArray, elemsFlatBag
   ) where
@@ -45,12 +45,11 @@ import Foreign
 import Data.Array
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
 import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Iface.Syntax
-import Language.Haskell.Syntax.Module.Name (ModuleName, mkModuleNameFS)
+import Language.Haskell.Syntax.Module.Name (ModuleName)
 import GHC.Unit.Types (UnitId(..))
 
 -- -----------------------------------------------------------------------------
@@ -250,7 +249,7 @@ data CCostCentre
 -- | All the information about the breakpoints for a module
 data ModBreaks
    = ModBreaks
-   { modBreaks_flags :: ForeignRef BreakArray
+   { modBreaks_flags :: !(ForeignRef BreakArray)
         -- ^ The array of flags, one per breakpoint,
         -- indicating which breakpoints are enabled.
    , modBreaks_locs :: !(Array BreakIndex SrcSpan)
@@ -280,20 +279,6 @@ seqModBreaks ModBreaks{..} =
   rnf (fmap seqCgBreakInfo modBreaks_breakInfo) `seq`
   rnf modBreaks_module `seq`
   rnf modBreaks_module_unitid
-
--- | Construct an empty ModBreaks
-emptyModBreaks :: ModBreaks
-emptyModBreaks = ModBreaks
-   { modBreaks_flags = error "ModBreaks.modBreaks_array not initialised"
-         -- ToDo: can we avoid this?
-   , modBreaks_locs  = array (0,-1) []
-   , modBreaks_vars  = array (0,-1) []
-   , modBreaks_decls = array (0,-1) []
-   , modBreaks_ccs = array (0,-1) []
-   , modBreaks_breakInfo = IntMap.empty
-   , modBreaks_module = mkModuleNameFS nilFS
-   , modBreaks_module_unitid = UnitId nilFS
-   }
 
 {-
 Note [Field modBreaks_decls]

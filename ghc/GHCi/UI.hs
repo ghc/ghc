@@ -3629,8 +3629,10 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
     -- Return all possible bids for a given Module
     bidsByModule :: GhciMonad m => [ModuleName] -> Module -> m [String]
     bidsByModule nonquals mod = do
-      (_, decls) <- getModBreak mod
-      let bids = nub $ declPath <$> elems decls
+      mb_decls <- fmap GHC.modBreaks_decls <$> getModBreak mod
+      let bids = case mb_decls of
+            Just decls -> nub $ declPath <$> elems decls
+            Nothing -> []
       pure $ case (moduleName mod) `elem` nonquals of
               True  -> bids
               False -> (combineModIdent (showModule mod)) <$> bids
@@ -3656,11 +3658,14 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
     -- declarations. See Note [Field modBreaks_decls] in GHC.ByteCode.Types
     addNestedDecls :: GhciMonad m => (String, Module) -> m [String]
     addNestedDecls (ident, mod) = do
-        (_, decls) <- getModBreak mod
-        let (mod_str, topLvl, _) = splitIdent ident
-            ident_decls = [ elm | elm@(el : _) <- elems decls, el == topLvl ]
-            bids = nub $ declPath <$> ident_decls
-        pure $ map (combineModIdent mod_str) bids
+        mb_decls <- fmap GHC.modBreaks_decls <$> getModBreak mod
+        case mb_decls of
+          Nothing -> pure []
+          Just decls -> do
+            let (mod_str, topLvl, _) = splitIdent ident
+                ident_decls = [ elm | elm@(el : _) <- elems decls, el == topLvl ]
+                bids = nub $ declPath <$> ident_decls
+            pure $ map (combineModIdent mod_str) bids
 
 completeModule = wrapIdentCompleterMod $ \w -> do
   hsc_env <- GHC.getSession
@@ -4066,7 +4071,7 @@ breakById inp = do
   case mb_error of
     Left sdoc -> printForUser sdoc
     Right (mod, mod_info, fun_str) -> do
-      let modBreaks = GHC.modInfoModBreaks mod_info
+      let modBreaks = expectJust (GHC.modInfoModBreaks mod_info)
       findBreakAndSet mod $ \_ -> findBreakForBind fun_str modBreaks
 
 breakSyntax :: a

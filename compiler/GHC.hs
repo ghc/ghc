@@ -1307,7 +1307,7 @@ typecheckModule pmod = do
            minf_instances = fixSafeInstances safe $ instEnvElts $ md_insts details,
            minf_iface     = Nothing,
            minf_safe      = safe,
-           minf_modBreaks = emptyModBreaks
+           minf_modBreaks = Nothing
          }}
 
 -- | Desugar a typechecked module.
@@ -1461,7 +1461,7 @@ data ModuleInfo = ModuleInfo {
         minf_instances :: [ClsInst],
         minf_iface     :: Maybe ModIface,
         minf_safe      :: SafeHaskellMode,
-        minf_modBreaks :: ModBreaks
+        minf_modBreaks :: Maybe ModBreaks
   }
         -- We don't want HomeModInfo here, because a ModuleInfo applies
         -- to package modules too.
@@ -1490,7 +1490,7 @@ getPackageModuleInfo hsc_env mdl
                         minf_instances = error "getModuleInfo: instances for package module unimplemented",
                         minf_iface     = Just iface,
                         minf_safe      = getSafeMode $ mi_trust iface,
-                        minf_modBreaks = emptyModBreaks
+                        minf_modBreaks = Nothing
                 }))
 
 availsToGlobalRdrEnv :: HasDebugCallStack => HscEnv -> Module -> [AvailInfo] -> IfGlobalRdrEnv
@@ -1567,7 +1567,7 @@ modInfoIface = minf_iface
 modInfoSafe :: ModuleInfo -> SafeHaskellMode
 modInfoSafe = minf_safe
 
-modInfoModBreaks :: ModuleInfo -> ModBreaks
+modInfoModBreaks :: ModuleInfo -> Maybe ModBreaks
 modInfoModBreaks = minf_modBreaks
 
 isDictonaryId :: Id -> Bool

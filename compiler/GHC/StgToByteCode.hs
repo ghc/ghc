@@ -439,8 +439,8 @@ schemeER_wrk d p rhs = schemeE d 0 p rhs
 --
 -- If the breakpoint is inlined from another module, look it up in the home
 -- package table.
--- If the module doesn't exist there, or its module pointer is null (which means
--- that the 'ModBreaks' value is uninitialized), skip the instruction.
+-- If the module doesn't exist there, or if the 'ModBreaks' value is
+-- uninitialized, skip the instruction (i.e. return Nothing).
 break_info ::
   HscEnv ->
   Module ->
@@ -449,18 +449,11 @@ break_info ::
   BcM (Maybe ModBreaks)
 break_info hsc_env mod current_mod current_mod_breaks
   | mod == current_mod
-  = pure $ check_mod_ptr =<< current_mod_breaks
+  = pure current_mod_breaks
   | otherwise
   = ioToBc (lookupHpt (hsc_HPT hsc_env) (moduleName mod)) >>= \case
-      Just hp -> pure $ check_mod_ptr (getModBreaks hp)
+      Just hp -> pure $ getModBreaks hp
       Nothing -> pure Nothing
-  where
-    check_mod_ptr mb
-      | mod_ptr <- modBreaks_module mb
-      , not $ nullFS $ moduleNameFS mod_ptr
-      = Just mb
-      | otherwise
-      = Nothing
 
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
 getVarOffSets platform depth env = map getOffSet
