@@ -42,6 +42,7 @@ import GHC.Types.Var( EvVar, tyVarKind )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( IntWithInf, intGtLimit )
+import GHC.Types.Unique.Set( nonDetStrictFoldUniqSet )
 
 import GHC.Data.Bag
 
@@ -278,10 +279,10 @@ solveNestedImplications implics
        ; traceTcS "solveNestedImplications end }" $
                   vcat [ text "unsolved_implics =" <+> ppr unsolved_implics ]
 
-       ; return (catBagMaybes unsolved_implics) }
+       ; return unsolved_implics }
 
-solveImplication :: Implication    -- Wanted
-                 -> TcS (Maybe Implication) -- Simplified implication (empty or singleton)
+solveImplication :: Implication     -- Wanted
+                 -> TcS Implication -- Simplified implication (empty or singleton)
 -- Precondition: The TcS monad contains an empty worklist and given-only inerts
 -- which after trying to solve this implication we must restore to their original value
 solveImplication imp@(Implic { ic_tclvl  = tclvl
@@ -291,7 +292,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                              , ic_info   = info
                              , ic_status = status })
   | isSolvedStatus status
-  = return (Just imp)  -- Do nothing
+  = return imp  -- Do nothing
 
   | otherwise  -- Even for IC_Insoluble it is worth doing more work
                -- The insoluble stuff might be in one sub-implication
@@ -351,81 +352,77 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
     -}
 
 ----------------------
-setImplicationStatus :: Implication -> TcS (Maybe Implication)
+setImplicationStatus :: Implication -> TcS Implication
 -- Finalise the implication returned from solveImplication,
 -- setting the ic_status field
 -- Precondition: the ic_status field is not already IC_Solved
 -- Return Nothing if we can discard the implication altogether
-setImplicationStatus implic@(Implic { ic_status     = old_status
-                                    , ic_info       = info
-                                    , ic_wanted     = wc
-                                    , ic_given      = givens })
+setImplicationStatus implic@(Implic { ic_status = old_status
+                                    , ic_info   = info
+                                    , ic_wanted = wc })
  | assertPpr (not (isSolvedStatus old_status)) (ppr info) $
    -- Precondition: we only set the status if it is not already solved
-   not (isSolvedWC pruned_wc)
+   not (isSolvedWC wc)
  = do { traceTcS "setImplicationStatus(not-all-solved) {" (ppr implic)
 
-      ; implic <- neededEvVars implic
-
-      ; let new_status | insolubleWC pruned_wc = IC_Insoluble
-                       | otherwise             = IC_Unsolved
-            new_implic = implic { ic_status = new_status
-                                , ic_wanted = pruned_wc }
+      ; let new_status | insolubleWC wc = IC_Insoluble
+                       | otherwise      = IC_Unsolved
+            new_implic = pruneImplications (implic { ic_status = new_status })
 
       ; traceTcS "setImplicationStatus(not-all-solved) }" (ppr new_implic)
 
-      ; return $ Just new_implic }
+      ; return new_implic }
 
- | otherwise  -- Everything is solved
-              -- Set status to IC_Solved,
-              -- and compute the dead givens and outer needs
-              -- See Note [Tracking redundant constraints]
- = do { traceTcS "setImplicationStatus(all-solved) {" (ppr implic)
+ | otherwise
+ = do { traceTcS "setImplicationStatus(solved) {" (ppr implic)
 
-      ; implic@(Implic { ic_need_inner = need_inner
-                       , ic_need_outer = need_outer }) <- neededEvVars implic
+      ; (dead_givens, implic) <- neededEvVars implic
 
       ; bad_telescope <- checkBadTelescope implic
 
-      ; let warn_givens = findUnnecessaryGivens info need_inner givens
-
-            discard_entire_implication  -- Can we discard the entire implication?
-              =  null warn_givens           -- No warning from this implication
-              && not bad_telescope
-              && isEmptyWC pruned_wc        -- No live children
-              && isEmptyVarSet need_outer   -- No needed vars to pass up to parent
-
-            final_status
+      ; let final_status
               | bad_telescope = IC_BadTelescope
-              | otherwise     = IC_Solved { ics_dead = warn_givens }
-            final_implic = implic { ic_status = final_status
-                                  , ic_wanted = pruned_wc }
+              | otherwise     = IC_Solved { ics_dead = dead_givens }
+            final_implic = pruneImplications (implic { ic_status = final_status })
 
-      ; traceTcS "setImplicationStatus(all-solved) }" $
-        vcat [ text "discard:" <+> ppr discard_entire_implication
-             , text "new_implic:" <+> ppr final_implic ]
+      ; traceTcS "setImplicationStatus(solved) }" (ppr final_implic)
+      ; return final_implic }
 
-      ; return $ if discard_entire_implication
-                 then Nothing
-                 else Just final_implic }
- where
-   WC { wc_simple = simples, wc_impl = implics, wc_errors = errs } = wc
+pruneImplications :: Implication -> Implication
+-- We have now taken account of the `needs_outer` variables of these
+-- implications, so we can drop any that are no longer necessary
+pruneImplications implic@(Implic { ic_wanted      = wc
+                                 , ic_need_pruned = old_needs })
+  = implic { ic_need_pruned = new_needs
+           , ic_wanted      = wc { wc_impl = new_implics } }
+                              -- Do not prune holes; these should be reported
+  where
+    (new_needs, new_implics) = foldr do_one (old_needs, emptyBag) (wc_impl wc)
 
-   pruned_implics = filterBag keep_me implics
-   pruned_wc = WC { wc_simple = simples
-                  , wc_impl   = pruned_implics
-                  , wc_errors = errs }   -- do not prune holes; these should be reported
+    do_one :: Implication -> (EvNeedSet, Bag Implication) -> (EvNeedSet, Bag Implication)
+    do_one implic (ens, implics)
+      | keep_me implic = (ens, implic `consBag` implics)
+      | otherwise      = (add_needs ens implic, implics)
 
-   keep_me :: Implication -> Bool
-   keep_me ic
-     | IC_Solved { ics_dead = dead_givens } <- ic_status ic
-                          -- Fully solved
-     , null dead_givens   -- No redundant givens to report
-     , isEmptyBag (wc_impl (ic_wanted ic))
-           -- And no children that might have things to report
-     = False       -- Tnen we don't need to keep it
-     | otherwise
-     = True        -- Otherwise, keep it
+    keep_me :: Implication -> Bool
+    keep_me (Implic { ic_status = status, ic_wanted = wanted })
+      | IC_Solved { ics_dead = dead_givens } <- status -- Fully solved
+      , null dead_givens                               -- No redundant givens to report
+      , isEmptyBag (wc_impl wanted)                    -- No children that might have things to report
+      = False
+      | otherwise
+      = True        -- Otherwise, keep it
+
+    add_needs :: EvNeedSet -> Implication -> EvNeedSet
+    -- For a default-method implication, add all its needed vars to ens_dms
+    -- For anything else, just propagate
+    add_needs (ENS { ens_dms = dms, ens_fvs = fvs })
+              (Implic { ic_need_outer = ENS { ens_dms = dms1, ens_fvs = fvs1 }
+                      , ic_info = info })
+      | is_dm_skol info = ENS { ens_dms = dms `unionVarSet` dms1 `unionVarSet` fvs1
+                              , ens_fvs = fvs }
+      | otherwise       = ENS { ens_dms = dms `unionVarSet` dms1
+                              , ens_fvs = fvs `unionVarSet` fvs1 }
 
 findUnnecessaryGivens :: SkolemInfoAnon -> VarSet -> [EvVar] -> [EvVar]
 findUnnecessaryGivens info need_inner givens
@@ -523,7 +520,7 @@ warnRedundantGivens (SigSkol ctxt _ _)
 warnRedundantGivens (InstSkol {}) = True
 warnRedundantGivens _             = False
 
-neededEvVars :: Implication -> TcS Implication
+neededEvVars :: Implication -> TcS ([EvVar], Implication)
 -- Find all the evidence variables that are "needed",
 -- and delete dead evidence bindings
 --   See Note [Tracking redundant constraints]
@@ -546,49 +543,61 @@ neededEvVars :: Implication -> TcS Implication
 --     evidence bindings, to give the final needed variables
 --
 neededEvVars implic@(Implic { ic_given = givens
+                            , ic_info  = info
                             , ic_binds = ev_binds_var
                             , ic_wanted = WC { wc_impl = implics }
-                            , ic_need_inner = old_needs })
+                            , ic_need_pruned = need_pruned })
  = do { ev_binds <- TcS.getTcEvBindsMap ev_binds_var
       ; tcvs     <- TcS.getTcEvTyCoVars ev_binds_var
 
-      ; let seeds_i   = get_implic_needs normal_implics
-            seeds_w   = nonDetStrictFoldEvBindMap add_wanted emptyVarSet ev_binds
-                        -- It's OK to use a non-deterministic fold here
-                        -- because add_wanted is commutative
-            all_seeds = old_needs `unionVarSet` seeds_i `unionVarSet` seeds_w `unionVarSet` tcvs
+      ; let -- Get the variables needed by the implications
+            ENS { ens_dms = implic_dm_seeds, ens_fvs = implic_other_seeds }
+              = foldr add_implic_seeds need_pruned implics
 
-            need_inner_ignoring_dms = findNeededEvVars ev_binds all_seeds
-            need_inner_from_dms     = findNeededEvVars ev_binds (get_implic_needs dm_implics)
-            need_inner_full         = need_inner_ignoring_dms `unionVarSet` need_inner_from_dms
-            live_ev_binds = filterEvBindMap (needed_ev_bind need_inner_full) ev_binds
+            -- Get the variables needed by the solved bindings
+            seeds_w = nonDetStrictFoldEvBindMap add_wanted tcvs ev_binds
+                        -- `seeds_w` are the vars mentioned by all the solved Wanted bindings
+                        -- (It's OK to use a non-deterministic fold here
+                        --  because add_wanted is commutative.)
 
-            need_outer    = varSetMinusEvBindMap need_inner_full live_ev_binds
-                            `delVarSetList` givens
+            need_ignoring_dms = findNeededGivenEvVars ev_binds (implic_other_seeds `unionVarSet` seeds_w)
+            need_from_dms     = findNeededGivenEvVars ev_binds implic_dm_seeds
+            need_full         = need_ignoring_dms `unionVarSet` need_from_dms
+            live_ev_binds = filterEvBindMap (needed_ev_bind need_full) ev_binds
 
       ; TcS.setTcEvBindsMap ev_binds_var live_ev_binds
            -- See Note [Delete dead Given evidence bindings]
 
+      ; let -- `dead_givens` are the Givens from this implication that are unused
+            dead_givens = findUnnecessaryGivens info need_ignoring_dms givens
+
+            -- `need_outer` are the Givens from outer scopes that are used in this implication
+            need_outer
+              | is_dm_skol info = ENS { ens_dms = trim live_ev_binds need_full
+                                      , ens_fvs = emptyVarSet }
+              | otherwise       = ENS { ens_dms = trim live_ev_binds need_from_dms
+                                      , ens_fvs = trim live_ev_binds need_ignoring_dms }
       ; traceTcS "neededEvVars" $
-        vcat [ text "old_needs:" <+> ppr old_needs
-             , text "all_seeds:" <+> ppr all_seeds
+        vcat [ text "old need_pruned:" <+> ppr need_pruned
              , text "tcvs:" <+> ppr tcvs
+             , text "need_ignoring_dms:" <+> ppr need_ignoring_dms
+             , text "need_from_dms:"     <+> ppr need_from_dms
+             , text "need_outer:" <+> ppr need_outer
+             , text "dead_givens:" <+> ppr dead_givens
              , text "ev_binds:" <+> ppr ev_binds
              , text "live_ev_binds:" <+> ppr live_ev_binds ]
 
-      ; return (implic { ic_need_inner = need_inner_ignoring_dms
-                       , ic_need_outer = need_outer }) }
+      ; return ( dead_givens
+               , implic { ic_need_outer = need_outer }) }
  where
-   (dm_implics, normal_implics) = partitionBag is_dm_implic implics
-      -- dm_implics is usually empty
+   trim :: EvBindMap -> VarSet -> VarSet
+   -- Delete variables bound by Givens or bindings
+   trim live_ev_binds needs = (needs `varSetMinusEvBindMap` live_ev_binds)
+                              `delVarSetList` givens
 
-   is_dm_implic (Implic { ic_info = skol_info })
-      | MethSkol _ is_dm <- skol_info = is_dm
-      | otherwise                     = False
-
-   get_implic_needs = foldr add_implic_seeds emptyVarSet
+   add_implic_seeds :: Implication -> EvNeedSet -> EvNeedSet
    add_implic_seeds (Implic { ic_need_outer = needs }) acc
-      = needs `unionVarSet` acc
+      = needs `unionEvNeedSet` acc
 
    needed_ev_bind needed (EvBind { eb_lhs = ev_var, eb_info = info })
      | EvBindGiven{} <- info = ev_var `elemVarSet` needed
@@ -598,6 +607,30 @@ neededEvVars implic@(Implic { ic_given = givens
    add_wanted (EvBind { eb_info = info, eb_rhs = rhs }) needs
      | EvBindGiven{} <- info = needs  -- Add the rhs vars of the Wanted bindings only
      | otherwise = evVarsOfTerm rhs `unionVarSet` needs
+
+is_dm_skol :: SkolemInfoAnon -> Bool
+is_dm_skol (MethSkol _ is_dm) = is_dm
+is_dm_skol _                  = False
+
+findNeededGivenEvVars :: EvBindMap -> VarSet -> VarSet
+-- Find all the Given evidence needed by seeds,
+-- looking transitively through bindings for Givens (only)
+findNeededGivenEvVars ev_binds seeds
+  = transCloVarSet also_needs seeds
+  where
+   also_needs :: VarSet -> VarSet
+   also_needs needs = nonDetStrictFoldUniqSet add emptyVarSet needs
+     -- It's OK to use a non-deterministic fold here because we immediately
+     -- forget about the ordering by creating a set
+
+   add :: Var -> VarSet -> VarSet
+   add v needs
+     | Just ev_bind <- lookupEvBind ev_binds v
+     , EvBind { eb_info = EvBindGiven, eb_rhs = rhs } <- ev_bind
+       -- Look at Given bindings only
+     = evVarsOfTerm rhs `unionVarSet` needs
+     | otherwise
+     = needs
 
 -------------------------------------------------
 simplifyDelayedErrors :: Bag DelayedError -> TcS (Bag DelayedError)

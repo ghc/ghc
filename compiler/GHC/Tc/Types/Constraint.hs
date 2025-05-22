@@ -67,6 +67,7 @@ module GHC.Tc.Types.Constraint (
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         UserGiven, getUserGivensFromImplics,
         HasGivenEqs(..), checkImplicationInvariants,
+        EvNeedSet(..), emptyEvNeedSet, unionEvNeedSet, extendEvNeedSet,
 
         -- CtLocEnv
         CtLocEnv(..), setCtLocEnvLoc, setCtLocEnvLvl, getCtLocEnvLoc, getCtLocEnvLvl, ctLocEnvInGeneratedCode,
@@ -1462,13 +1463,28 @@ data Implication
       --     been discarded
       -- See Note [Needed evidence variables]
       -- and (RC2) in Note [Tracking redundant constraints]a
-      ic_need_inner :: VarSet,    -- Includes all used Given evidence
-      ic_need_outer :: VarSet,    -- Includes only the free Given evidence
-                                  --  i.e. ic_need_inner after deleting
-                                  --       (a) givens (b) binders of ic_binds
+      ic_need_outer  :: EvNeedSet,  -- Includes only the free Given evidence
+                                    -- i.e. after deleting (a) ic_givens (b) binders of ic_binds
+      ic_need_pruned :: EvNeedSet,  -- Union of the ic_need_outer EvNeedSets of implications that
+                                    -- have been pruned from wc_impl.ic_wanted
 
       ic_status   :: ImplicStatus
     }
+
+data EvNeedSet = ENS { ens_dms :: VarSet   -- Needed only by default methods
+                     , ens_fvs :: VarSet   -- Needed by things /other than/ default methods
+                 }
+
+emptyEvNeedSet :: EvNeedSet
+emptyEvNeedSet = ENS { ens_dms = emptyVarSet, ens_fvs = emptyVarSet }
+
+unionEvNeedSet :: EvNeedSet -> EvNeedSet -> EvNeedSet
+unionEvNeedSet (ENS { ens_dms = dm1, ens_fvs = fv1 })
+               (ENS { ens_dms = dm2, ens_fvs = fv2 })
+  = ENS { ens_dms = dm1 `unionVarSet` dm2, ens_fvs = fv1 `unionVarSet` fv2 }
+
+extendEvNeedSet :: EvNeedSet -> Var -> EvNeedSet
+extendEvNeedSet ens@(ENS { ens_fvs = fvs }) v = ens { ens_fvs = fvs `extendVarSet` v }
 
 implicationPrototype :: CtLocEnv -> Implication
 implicationPrototype ct_loc_env
@@ -1485,8 +1501,8 @@ implicationPrototype ct_loc_env
             , ic_wanted     = emptyWC
             , ic_given_eqs  = MaybeGivenEqs
             , ic_status     = IC_Unsolved
-            , ic_need_inner = emptyVarSet
-            , ic_need_outer = emptyVarSet }
+            , ic_need_pruned = emptyEvNeedSet
+            , ic_need_outer  = emptyEvNeedSet }
 
 data ImplicStatus
   = IC_Solved     -- All wanteds in the tree are solved, all the way down
@@ -1562,7 +1578,7 @@ instance Outputable Implication where
               , ic_given = given, ic_given_eqs = given_eqs
               , ic_wanted = wanted, ic_status = status
               , ic_binds = binds
-              , ic_need_inner = need_in, ic_need_outer = need_out
+              , ic_need_pruned = need_pruned, ic_need_outer = need_out
               , ic_info = info })
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
@@ -1572,9 +1588,14 @@ instance Outputable Implication where
                , hang (text "Given =")  2 (pprEvVars given)
                , hang (text "Wanted =") 2 (ppr wanted)
                , text "Binds =" <+> ppr binds
-               , whenPprDebug (text "Needed inner =" <+> ppr need_in)
+               , whenPprDebug (text "Needed pruned =" <+> ppr need_pruned)
                , whenPprDebug (text "Needed outer =" <+> ppr need_out)
                , pprSkolInfo info ] <+> rbrace)
+
+instance Outputable EvNeedSet where
+  ppr (ENS { ens_dms = dms, ens_fvs = fvs })
+    = text "ENS" <> braces (sep [text "ens_dms =" <+> ppr dms
+                                , text "ens_fvs =" <+> ppr fvs])
 
 instance Outputable ImplicStatus where
   ppr IC_Insoluble    = text "Insoluble"

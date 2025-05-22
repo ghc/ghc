@@ -28,7 +28,7 @@ module GHC.Tc.Types.Evidence (
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
-  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
+  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable,
 
   evTermCoercion, evTermCoercion_maybe,
   EvCallStack(..),
@@ -864,25 +864,6 @@ evTermCoercion tm = case evTermCoercion_maybe tm of
                   Free variables
 *                                                                      *
 ********************************************************************* -}
-
-findNeededEvVars :: EvBindMap -> VarSet -> VarSet
--- Find all the Given evidence needed by seeds,
--- looking transitively through binds
-findNeededEvVars ev_binds seeds
-  = transCloVarSet also_needs seeds
-  where
-   also_needs :: VarSet -> VarSet
-   also_needs needs = nonDetStrictFoldUniqSet add emptyVarSet needs
-     -- It's OK to use a non-deterministic fold here because we immediately
-     -- forget about the ordering by creating a set
-
-   add :: Var -> VarSet -> VarSet
-   add v needs
-     | Just ev_bind <- lookupEvBind ev_binds v
-     , EvBind { eb_info = EvBindGiven, eb_rhs = rhs } <- ev_bind
-     = evVarsOfTerm rhs `unionVarSet` needs
-     | otherwise
-     = needs
 
 evVarsOfTerm :: EvTerm -> VarSet
 evVarsOfTerm (EvExpr e)         = exprSomeFreeVars isEvVar e
