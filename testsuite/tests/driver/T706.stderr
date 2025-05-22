@@ -1,0 +1,4 @@
+*** Exception: <interactive>:1:1: error: [GHC-58427]
+    attempting to use module `interactive-session:T706' (./T706.hs) which is not loaded
+<interactive>:1:1: error: [GHC-88464] Variable not in scope: test
+

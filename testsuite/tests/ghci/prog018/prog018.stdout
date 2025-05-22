@@ -1,5 +1,5 @@
-[1 of 3] Compiling A                ( A.hs, interpreted )[main]
-[2 of 3] Compiling B                ( B.hs, interpreted )[main]
+[1 of 3] Compiling A                ( A.hs, interpreted )[interactive-session]
+[2 of 3] Compiling B                ( B.hs, interpreted )[interactive-session]
 [3 of 3] Compiling C                ( C.hs, interpreted )[interactive-session]
 A.hs:5:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
