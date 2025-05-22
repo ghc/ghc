@@ -891,3 +891,29 @@ t40 = do
         , "x='a'"
         , ""
         ]
+
+t41 :: IO ()
+t41 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module CFG where"
+        , ""
+        , "{-# LINE 6 \"src/CFG.ag\" #-}"
+        , ""
+        , "import Data.Word"
+        , "import ByteCode"
+        ]
+
+t42 :: IO ()
+t42 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "module T23465 where"
+        , ""
+        , "{-# WARNInG"
+        , "   in \"x-f\" f \"fw\" ;"
+        , "   in \"x-f\" g \"gw\""
+        , "#-}"
+        , "f = f"
+        , "g = g"
+        ]
