@@ -254,3 +254,4 @@ test('T24700', normal, compile_and_run, ['-O'])
 test('T24893', normal, compile_and_run, ['-O'])
 
 test('CCallConv', [req_c], compile_and_run, ['CCallConv_c.c'])
+test('T26061', normal, compile_and_run, [''])
