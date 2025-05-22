@@ -315,8 +315,8 @@ module Control.Exception.Backtrace where
   type BacktraceMechanism :: *
   data BacktraceMechanism = CostCentreBacktrace | HasCallStackBacktrace | ExecutionBacktrace | IPEBacktrace
   type Backtraces :: *
-  data Backtraces = ...
-  collectBacktraces :: (?callStack::GHC.Internal.Stack.Types.CallStack) => GHC.Types.IO Backtraces
+  data Backtraces = Backtraces {btrCostCentre :: GHC.Internal.Maybe.Maybe (GHC.Internal.Ptr.Ptr GHC.Internal.Stack.CCS.CostCentreStack), btrHasCallStack :: GHC.Internal.Maybe.Maybe GHC.Internal.Stack.Types.CallStack, btrExecutionStack :: GHC.Internal.Maybe.Maybe [GHC.Internal.ExecutionStack.Internal.Location], btrIpe :: GHC.Internal.Maybe.Maybe [GHC.Internal.Stack.CloneStack.StackEntry]}
+  collectBacktraces :: (?callStack::GHC.Internal.Stack.Types.CallStack) => GHC.Internal.Types.IO Backtraces
   displayBacktraces :: Backtraces -> GHC.Internal.Base.String
   getBacktraceMechanismState :: BacktraceMechanism -> GHC.Types.IO GHC.Types.Bool
   setBacktraceMechanismState :: BacktraceMechanism -> GHC.Types.Bool -> GHC.Types.IO ()

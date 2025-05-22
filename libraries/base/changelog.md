@@ -2,6 +2,7 @@
 
 ## 4.20.2 *July 2025*
   * Fix incorrect results of `integerPowMod` when the base is 0 and the exponent is negative, and `integerRecipMod` when the modulus is zero ([#26017](https://gitlab.haskell.org/ghc/ghc/-/issues/26017)).
+  * Expose constructor and field of `Backtraces` from `Control.Exception.Backtrace`, as per [CLC #199](https://github.com/haskell/core-libraries-committee/issues/199#issuecomment-1954662391)
 
 ## 4.20.1 *Jan 2025*
   * Shipped with GHC 9.10.2
