@@ -273,7 +273,7 @@ $tab          { warnTab }
 -- set.
 
 "{-" / { isNormalComment }       { nested_comment }
-"/*" / { ifExtension GhcCppBit } { cpp_comment }
+-- "/*" / { ifExtension GhcCppBit } { cpp_comment }
 
 -- Single-line comments are a bit tricky.  Haskell 98 says that two or
 -- more dashes followed by a symbol should be parsed as a varsym, so we
@@ -333,11 +333,16 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
 
-  ^\#.*\n                    / { ifExtensionGhcCppNotComment } { cppSkip }
+  ^\ *\# \ * $idchar+ .*\n   / { ifExtensionGhcCppNotComment } { cppSkip }
+
+  ^\# pragma .* \n     / { ifExtensionGhcCppNotComment } { cppSkip } -- GCC 3.3 CPP generated, apparently
+  ^\# \! .* \n         / { ifExtensionGhcCppNotComment } { cppSkip } -- #!, for scripts  -- gcc
+  ^\  \# \! .* \n      / { ifExtensionGhcCppNotComment } { cppSkip } --  #!, for scripts -- clang; See #6132
 
   ^\# pragma .* \n                      ; -- GCC 3.3 CPP generated, apparently
   ^\# \! .* \n                          ; -- #!, for scripts  -- gcc
   ^\  \# \! .* \n                       ; --  #!, for scripts -- clang; See #6132
+
   ()                                    { do_bol }
 }
 
@@ -1771,8 +1776,9 @@ linePrag span buf len buf2 = do
   usePosPrags <- getBit UsePosPragsBit
   if usePosPrags
     then begin line_prag2 span buf len buf2
-    else let !src = lexemeToFastString buf len
-         in return (L span (ITline_prag (SourceText src)))
+    -- else let !src = lexemeToFastString buf len
+    --      in return (L span (ITline_prag (SourceText src)))
+    else nested_comment span buf len buf2
 
 -- When 'UsePosPragsBit' is not set, it is expected that we emit a token instead
 -- of updating the position in 'PState'
@@ -3745,6 +3751,7 @@ lexToken = do
         let span = mkPsSpan loc1 end
         let bytes = byteDiff buf buf2
         span `seq` setLastToken buf span bytes
+        -- function t is `Action p`
         lt <- t span buf bytes buf2
         let lt' = unLoc lt
         if (isComment lt') then setLastComment lt else setLastTk lt
