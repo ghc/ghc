@@ -2717,8 +2717,8 @@ instance ExactPrint (DefaultDecl GhcPs) where
 
   exact (DefaultDecl (d,op,cp) cl tys) = do
     d' <- markEpToken d
-    op' <- markEpToken op
     cl' <- markAnnotated cl
+    op' <- markEpToken op
     tys' <- markAnnotated tys
     cp' <- markEpToken cp
     return (DefaultDecl (d',op',cp') cl' tys')
