@@ -522,9 +522,8 @@ result_fs = fsLit "_result"
 
 -- | Read the 'ModBreaks' of the given home 'Module' from the 'HomeUnitGraph'.
 readModBreaks :: HscEnv -> Module -> IO ModBreaks
-readModBreaks hsc_env mod =
-  getModBreaks . expectJust <$>
-    HUG.lookupHugByModule mod (hsc_HUG hsc_env)
+readModBreaks hsc_env mod = expectJust . getModBreaks . expectJust <$> HUG.lookupHugByModule mod (hsc_HUG hsc_env)
+
 
 bindLocalsAtBreakpoint
         :: HscEnv

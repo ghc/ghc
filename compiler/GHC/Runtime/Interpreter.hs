@@ -435,22 +435,24 @@ handleSeqHValueStatus interp unit_env eval_status =
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
 
       let put x = putStrLn ("*** Ignoring breakpoint " ++ (showSDocUnsafe x))
+      let nothing_case = put $ brackets . ppr $ mkGeneralSrcSpan (fsLit "<unknown>")
       case maybe_break of
-        Nothing ->
+        Nothing -> nothing_case
           -- Nothing case - should not occur!
           -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
-          put $ brackets . ppr $
-            mkGeneralSrcSpan (fsLit "<unknown>")
 
         Just break -> do
           let bi = evalBreakpointToId break
 
           -- Just case: Stopped at a breakpoint, extract SrcSpan information
           -- from the breakpoint.
-          breaks_tick <- getModBreaks . expectJust <$>
+          mb_modbreaks <- getModBreaks . expectJust <$>
                           lookupHugByModule (ibi_tick_mod bi) (ue_home_unit_graph unit_env)
-          put $ brackets . ppr $
-            (modBreaks_locs breaks_tick) ! ibi_tick_index bi
+          case mb_modbreaks of
+            -- Nothing case - should not occur! We should have the appropriate
+            -- breakpoint information
+            Nothing -> nothing_case
+            Just modbreaks -> put $ brackets . ppr $ (modBreaks_locs modbreaks) ! ibi_tick_index bi
 
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
@@ -737,14 +739,14 @@ fromEvalResult :: EvalResult a -> IO a
 fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
 fromEvalResult (EvalSuccess a) = return a
 
-getModBreaks :: HomeModInfo -> ModBreaks
+getModBreaks :: HomeModInfo -> Maybe ModBreaks
 getModBreaks hmi
   | Just linkable <- homeModInfoByteCode hmi,
     -- The linkable may have 'DotO's as well; only consider BCOs. See #20570.
     [cbc] <- linkableBCOs linkable
-  = fromMaybe emptyModBreaks (bc_breaks cbc)
+  = bc_breaks cbc
   | otherwise
-  = emptyModBreaks -- probably object code
+  = Nothing -- probably object code
 
 -- | Interpreter uses Profiling way
 interpreterProfiled :: Interp -> Bool

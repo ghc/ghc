@@ -145,15 +145,17 @@ resolveFunctionBreakpoint inp = do
     validateBP _ "" (Just _) = pure $ Just $ text "Function name is missing"
     validateBP _ fun_str (Just modl) = do
         isInterpr <- GHC.moduleIsInterpreted modl
-        (_, decls) <- getModBreak modl
         mb_err_msg <- case isInterpr of
-          False -> pure $ Just $ text "Module" <+> quotes (ppr modl)
-                        <+> text "is not interpreted"
-          True -> case fun_str `elem` (intercalate "." <$> elems decls) of
-                False -> pure $ Just $
-                   text "No breakpoint found for" <+> quotes (text fun_str)
-                   <+> text "in module" <+> quotes (ppr modl)
-                True  -> pure Nothing
+          False -> pure $ Just $ text "Module" <+> quotes (ppr modl) <+> text "is not interpreted"
+          True -> do
+            mb_modbreaks <- getModBreak modl
+            let found = case mb_modbreaks of
+                  Nothing -> False
+                  Just mb -> fun_str `elem` (intercalate "." <$> elems (GHC.modBreaks_decls mb))
+            if found
+              then pure Nothing
+              else pure $ Just $ text "No breakpoint found for" <+> quotes (text fun_str)
+                                  <+> text "in module" <+> quotes (ppr modl)
         pure mb_err_msg
 
 -- | The aim of this function is to find the breakpoints for all the RHSs of
@@ -184,8 +186,7 @@ type TickArray = Array Int [(GHC.BreakIndex,RealSrcSpan)]
 makeModuleLineMap :: GhcMonad m => Module -> m (Maybe TickArray)
 makeModuleLineMap m = do
   mi <- GHC.getModuleInfo m
-  return $
-    mkTickArray . assocs . GHC.modBreaks_locs . GHC.modInfoModBreaks <$> mi
+  return $ mkTickArray . assocs . GHC.modBreaks_locs <$> (GHC.modInfoModBreaks =<< mi)
   where
     mkTickArray :: [(BreakIndex, SrcSpan)] -> TickArray
     mkTickArray ticks
@@ -195,15 +196,12 @@ makeModuleLineMap m = do
             max_line = foldr max 0 [ GHC.srcSpanEndLine sp | (_, RealSrcSpan sp _) <- ticks ]
             srcSpanLines pan = [ GHC.srcSpanStartLine pan ..  GHC.srcSpanEndLine pan ]
 
--- | Get the 'modBreaks_locs' and 'modBreaks_decls' of the given 'Module'
+-- | Get the 'ModBreaks' of the given 'Module' when available
 getModBreak :: GHC.GhcMonad m
-            => Module -> m (Array Int SrcSpan, Array Int [String])
+            => Module -> m (Maybe ModBreaks)
 getModBreak m = do
    mod_info      <- fromMaybe (panic "getModBreak") <$> GHC.getModuleInfo m
-   let modBreaks  = GHC.modInfoModBreaks mod_info
-   let ticks      = GHC.modBreaks_locs  modBreaks
-   let decls      = GHC.modBreaks_decls modBreaks
-   return (ticks, decls)
+   pure $ GHC.modInfoModBreaks mod_info
 
 --------------------------------------------------------------------------------
 -- Getting current breakpoint information
