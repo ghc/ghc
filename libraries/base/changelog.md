@@ -22,6 +22,7 @@
       * `GHC.TypeNats.Internal`
       * `GHC.ExecutionStack.Internal`.
   * Deprecate `GHC.JS.Prim.Internal.Build`, as per [CLC #329](https://github.com/haskell/core-libraries-committee/issues/329)
+  * Expose constructor and field of `Backtraces` from `Control.Exception.Backtrace`, as per [CLC #199](https://github.com/haskell/core-libraries-committee/issues/199#issuecomment-1954662391)
 
 ## 4.21.0.0 *TBA*
   * Change `SrcLoc` to be a strict and unboxed (finishing [CLC proposal #55](https://github.com/haskell/core-libraries-committee/issues/55))
