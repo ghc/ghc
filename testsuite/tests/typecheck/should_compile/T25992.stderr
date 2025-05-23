@@ -1,0 +1,3 @@
+ T25992.hs:7:10: error: [GHC-30606] [-Wredundant-constraints, Werror=redundant-constraints]
+    • Redundant constraint: Eq a
+    • In the instance declaration for ‘Semigroup (P a)’

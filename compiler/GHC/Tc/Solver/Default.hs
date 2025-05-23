@@ -247,11 +247,11 @@ tryUnsatisfiableGivens wc =
      ; solveAgainIf did_work final_wc }
   where
     go_wc (WC { wc_simple = wtds, wc_impl = impls, wc_errors = errs })
-      = do impls' <- mapMaybeBagM go_impl impls
+      = do impls' <- mapBagM go_impl impls
            return $ WC { wc_simple = wtds, wc_impl = impls', wc_errors = errs }
     go_impl impl
       | isSolvedStatus (ic_status impl)
-      = return $ Just impl
+      = return impl
       -- Is there a Given with type "Unsatisfiable msg"?
       -- If so, use it to solve all other Wanteds.
       | unsat_given:_ <- mapMaybe unsatisfiableEv_maybe (ic_given impl)
@@ -271,7 +271,7 @@ unsatisfiableEv_maybe v = (v,) <$> isUnsatisfiableCt_maybe (idType v)
 -- | We have an implication with an 'Unsatisfiable' Given; use that Given to
 -- solve all the other Wanted constraints, including those nested within
 -- deeper implications.
-solveImplicationUsingUnsatGiven :: (EvVar, Type) -> Implication -> TcS (Maybe Implication)
+solveImplicationUsingUnsatGiven :: (EvVar, Type) -> Implication -> TcS Implication
 solveImplicationUsingUnsatGiven
   unsat_given@(given_ev,_)
   impl@(Implic { ic_wanted = wtd, ic_tclvl = tclvl, ic_binds = ev_binds_var
@@ -279,7 +279,7 @@ solveImplicationUsingUnsatGiven
   | isCoEvBindsVar ev_binds_var
   -- We can't use Unsatisfiable evidence in kinds.
   -- See Note [Coercion evidence only] in GHC.Tc.Types.Evidence.
-  = return $ Just impl
+  = return impl
   | otherwise
   = do { wcs <- nestImplicTcS ev_binds_var tclvl $ go_wc wtd
        ; setImplicationStatus $
@@ -290,7 +290,7 @@ solveImplicationUsingUnsatGiven
     go_wc :: WantedConstraints -> TcS WantedConstraints
     go_wc wc@(WC { wc_simple = wtds, wc_impl = impls })
       = do { mapBagM_ go_simple wtds
-           ; impls <- mapMaybeBagM (solveImplicationUsingUnsatGiven unsat_given) impls
+           ; impls <- mapBagM (solveImplicationUsingUnsatGiven unsat_given) impls
            ; return $ wc { wc_simple = emptyBag, wc_impl = impls } }
     go_simple :: Ct -> TcS ()
     go_simple ct = case ctEvidence ct of
