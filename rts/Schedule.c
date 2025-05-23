@@ -3088,14 +3088,9 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
             return STOP_FRAME;
 
         case CATCH_RETRY_FRAME: {
-            StgTRecHeader *trec = tso -> trec;
-            StgTRecHeader *outer = trec -> enclosing_trec;
             debugTrace(DEBUG_stm,
                        "found CATCH_RETRY_FRAME at %p during raise", p);
-            debugTrace(DEBUG_stm, "trec=%p outer=%p", trec, outer);
-            stmAbortTransaction(cap, trec);
-            stmFreeAbortedTRec(cap, trec);
-            tso -> trec = outer;
+            stmAbortNestedCatchRetryTransaction(cap, tso, (StgCatchRetryFrame *)p);
             p = next;
             continue;
         }
@@ -3248,14 +3243,9 @@ findAtomicallyFrameHelper (Capability *cap, StgTSO *tso)
         return ATOMICALLY_FRAME;
 
     case CATCH_RETRY_FRAME: {
-        StgTRecHeader *trec = tso -> trec;
-        StgTRecHeader *outer = trec -> enclosing_trec;
         debugTrace(DEBUG_stm,
                    "found CATCH_RETRY_FRAME at %p while aborting after orElse", p);
-        debugTrace(DEBUG_stm, "trec=%p outer=%p", trec, outer);
-        stmAbortTransaction(cap, trec);
-        stmFreeAbortedTRec(cap, trec);
-        tso -> trec = outer;
+        stmAbortNestedCatchRetryTransaction(cap, tso, (StgCatchRetryFrame *)p);
         p = next;
         continue;
     }

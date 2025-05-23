@@ -67,6 +67,9 @@ StgTRecHeader *stmStartNestedTransaction(Capability *cap, StgTRecHeader *outer
 
 void stmAbortTransaction(Capability *cap, StgTRecHeader *trec);
 void stmFreeAbortedTRec(Capability *cap, StgTRecHeader *trec);
+void stmAbortNestedCatchRetryTransaction(Capability *cap,
+                                         StgTSO *tso,
+                                         StgCatchRetryFrame *frame);
 
 /*
  * Ensure that a subsequent commit / validation will fail.  We use this
