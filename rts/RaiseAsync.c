@@ -1043,8 +1043,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
             }
 
         case CATCH_STM_FRAME:
-        case CATCH_RETRY_FRAME:
-            // CATCH frames within an atomically block: abort the
+            // CATCH_STM frame within an atomically block: abort the
             // inner transaction and continue.  Eventually we will
             // hit the outer transaction that will get frozen (see
             // above).
@@ -1056,11 +1055,37 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
         {
             StgTRecHeader *trec = tso -> trec;
             StgTRecHeader *outer = trec -> enclosing_trec;
-            debugTraceCap(DEBUG_stm, cap,
-                          "found atomically block delivering async exception");
+            debugTraceCap(DEBUG_stm, cap, "raiseAsync: traversing CATCH_STM frame");
             stmAbortTransaction(cap, trec);
             stmFreeAbortedTRec(cap, trec);
             tso -> trec = outer;
+            break;
+        };
+
+        case CATCH_RETRY_FRAME:
+            // CATCH_RETY frame within an atomically block: if we're executing
+            // the lhs code, abort the inner transaction and continue; if we're
+            // executing thr rhs, continue (no nested transaction to abort. See
+            // Note [catchRetry# implementation]). Eventually we will hit the
+            // outer transaction that will get frozen (see above).
+            //
+            // As for the CATCH_STM_FRAME case above, we do not care
+            // whether the transaction is valid or not because its
+            // possible validity cannot have caused the exception
+            // and will not be visible after the abort.
+        {
+            if (!((StgCatchRetryFrame *)frame) -> running_alt_code) {
+                debugTraceCap(DEBUG_stm, cap, "raiseAsync: traversing CATCH_RETRY frame (lhs)");
+                StgTRecHeader *trec = tso -> trec;
+                StgTRecHeader *outer = trec -> enclosing_trec;
+                stmAbortTransaction(cap, trec);
+                stmFreeAbortedTRec(cap, trec);
+                tso -> trec = outer;
+            }
+            else
+            {
+                debugTraceCap(DEBUG_stm, cap, "raiseAsync: traversing CATCH_RETRY frame (rhs)");
+            }
             break;
         };
 
