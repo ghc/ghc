@@ -275,7 +275,7 @@ solveImplicationUsingUnsatGiven :: (EvVar, Type) -> Implication -> TcS Implicati
 solveImplicationUsingUnsatGiven
   unsat_given@(given_ev,_)
   impl@(Implic { ic_wanted = wtd, ic_tclvl = tclvl, ic_binds = ev_binds_var
-               , ic_need_pruned = inner })
+               , ic_need_implic = inner })
   | isCoEvBindsVar ev_binds_var
   -- We can't use Unsatisfiable evidence in kinds.
   -- See Note [Coercion evidence only] in GHC.Tc.Types.Evidence.
@@ -284,7 +284,7 @@ solveImplicationUsingUnsatGiven
   = do { wcs <- nestImplicTcS ev_binds_var tclvl $ go_wc wtd
        ; setImplicationStatus $
          impl { ic_wanted = wcs
-              , ic_need_pruned = inner `extendEvNeedSet` given_ev } }
+              , ic_need_implic = inner `extendEvNeedSet` given_ev } }
                 -- Record that the Given is needed; I'm not certain why
   where
     go_wc :: WantedConstraints -> TcS WantedConstraints

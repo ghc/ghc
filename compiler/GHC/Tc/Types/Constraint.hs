@@ -67,7 +67,7 @@ module GHC.Tc.Types.Constraint (
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         UserGiven, getUserGivensFromImplics,
         HasGivenEqs(..), checkImplicationInvariants,
-        EvNeedSet(..), emptyEvNeedSet, unionEvNeedSet, extendEvNeedSet,
+        EvNeedSet(..), emptyEvNeedSet, unionEvNeedSet, extendEvNeedSet, delGivensFromEvNeedSet,
 
         -- CtLocEnv
         CtLocEnv(..), setCtLocEnvLoc, setCtLocEnvLvl, getCtLocEnvLoc, getCtLocEnvLvl, ctLocEnvInGeneratedCode,
@@ -1459,14 +1459,17 @@ data Implication
 
       -- The ic_need fields keep track of which Given evidence
       -- is used by this implication or its children
-      -- NB: including stuff used by nested implications that have since
-      --     been discarded
-      -- See Note [Needed evidence variables]
-      -- and (RC2) in Note [Tracking redundant constraints]a
-      ic_need_outer  :: EvNeedSet,  -- Includes only the free Given evidence
-                                    -- i.e. after deleting (a) ic_givens (b) binders of ic_binds
-      ic_need_pruned :: EvNeedSet,  -- Union of the ic_need_outer EvNeedSets of implications that
-                                    -- have been pruned from wc_impl.ic_wanted
+      -- See Note [Tracking redundant constraints]
+      -- NB: including stuff used by fully-solved nested implications that have
+      --      since been discarded
+      ic_need  :: EvNeedSet,        -- Includes needed Given evidence
+                                    --   /after/ deleting the binders of ic_binds, but
+                                    --   /before/ deleting ic_givens
+
+      ic_need_implic :: EvNeedSet,  -- Union of of the ic_need of all implications in ic_wanted
+                                    -- /including/ any fully-solved implications that have been
+                                    -- discarded.  This discarding is why we need to keep this
+                                    -- field in the first place.
 
       ic_status   :: ImplicStatus
     }
@@ -1486,6 +1489,11 @@ unionEvNeedSet (ENS { ens_dms = dm1, ens_fvs = fv1 })
 extendEvNeedSet :: EvNeedSet -> Var -> EvNeedSet
 extendEvNeedSet ens@(ENS { ens_fvs = fvs }) v = ens { ens_fvs = fvs `extendVarSet` v }
 
+delGivensFromEvNeedSet :: EvNeedSet -> [Var] -> EvNeedSet
+delGivensFromEvNeedSet (ENS { ens_dms = dms, ens_fvs = fvs }) givens
+  = ENS { ens_dms = dms `delVarSetList` givens
+        , ens_fvs = fvs `delVarSetList` givens }
+
 implicationPrototype :: CtLocEnv -> Implication
 implicationPrototype ct_loc_env
    = Implic { -- These fields must be initialised
@@ -1494,15 +1502,17 @@ implicationPrototype ct_loc_env
             , ic_info       = panic "newImplic:info"
             , ic_warn_inaccessible = panic "newImplic:warn_inaccessible"
 
-            , ic_env        = ct_loc_env
+              -- Given by caller
+            , ic_env = ct_loc_env
+
               -- The rest have sensible default values
-            , ic_skols      = []
-            , ic_given      = []
-            , ic_wanted     = emptyWC
-            , ic_given_eqs  = MaybeGivenEqs
-            , ic_status     = IC_Unsolved
-            , ic_need_pruned = emptyEvNeedSet
-            , ic_need_outer  = emptyEvNeedSet }
+            , ic_skols       = []
+            , ic_given       = []
+            , ic_wanted      = emptyWC
+            , ic_given_eqs   = MaybeGivenEqs
+            , ic_status      = IC_Unsolved
+            , ic_need        = emptyEvNeedSet
+            , ic_need_implic = emptyEvNeedSet }
 
 data ImplicStatus
   = IC_Solved     -- All wanteds in the tree are solved, all the way down
@@ -1578,7 +1588,7 @@ instance Outputable Implication where
               , ic_given = given, ic_given_eqs = given_eqs
               , ic_wanted = wanted, ic_status = status
               , ic_binds = binds
-              , ic_need_pruned = need_pruned, ic_need_outer = need_out
+              , ic_need = need, ic_need_implic = need_implic
               , ic_info = info })
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
@@ -1588,8 +1598,8 @@ instance Outputable Implication where
                , hang (text "Given =")  2 (pprEvVars given)
                , hang (text "Wanted =") 2 (ppr wanted)
                , text "Binds =" <+> ppr binds
-               , whenPprDebug (text "Needed pruned =" <+> ppr need_pruned)
-               , whenPprDebug (text "Needed outer =" <+> ppr need_out)
+               , text "need =" <+> ppr need
+               , text "need_implic =" <+> ppr need_implic
                , pprSkolInfo info ] <+> rbrace)
 
 instance Outputable EvNeedSet where
@@ -1683,18 +1693,6 @@ all at once, creating one implication constraint for the lot:
   Instead, the outer quantification over kx should be in a separate
   implication. TL;DR: an explicit forall should generate an implication
   quantified only over those explicitly quantified variables.
-
-Note [Needed evidence variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Th ic_need_evs field holds the free vars of ic_binds, and all the
-ic_binds in nested implications.
-
-  * Main purpose: if one of the ic_givens is not mentioned in here, it
-    is redundant.
-
-  * solveImplication may drop an implication altogether if it has no
-    remaining 'wanteds'. But we still track the free vars of its
-    evidence binds, even though it has now disappeared.
 
 Note [Shadowing in a constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
