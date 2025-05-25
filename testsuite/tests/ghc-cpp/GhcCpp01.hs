@@ -44,7 +44,9 @@ aa = 1
 z = 1
 #endif
 
+{-
 /* multi-line
    cpp-style comment */
 {- Haskell comment
    /* ignores cpp comments, so unclosed is fine -}
+-}
