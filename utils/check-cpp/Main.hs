@@ -147,8 +147,8 @@ getPState dflags includes popts filename str = pstate
             , pp_defines = predefinedMacros dflags
             , pp_scope = (PpScope True PpNoGroup) :| []
             }
-    -- pstate = Lexer.initParserState initState popts buf loc
-    pstate = Lexer.initPragState initState popts buf loc
+    pstate = Lexer.initParserState initState popts buf loc
+    -- pstate = Lexer.initPragState initState popts buf loc
     loc = mkRealSrcLoc (mkFastString filename) 1 1
     buf = stringToStringBuffer str
 
@@ -598,7 +598,7 @@ t20 :: IO ()
 t20 = do
     dump
         [ "{-# LANGUAGE CPP #-}"
-        , "#if __GLASGOW_HASKELL__ >= 913"
+        , "#if __GLASGOW_HASKELL__ > 913"
         , "{-# LANGUAGE GHC_CPP #-}"
         , "#endif"
         , ""
