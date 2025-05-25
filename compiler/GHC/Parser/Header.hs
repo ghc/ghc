@@ -14,6 +14,7 @@ module GHC.Parser.Header
    ( getImports
    , mkPrelImports -- used by the renamer too
    , getOptionsFromFile
+   , lazyGetToks, getOptions'
    , getOptions
    , toArgs
    , checkProcessArgsResult
@@ -216,15 +217,16 @@ getOptionsFromFile :: DynFlags
                    -> UnitEnv
                    -> ParserOpts
                    -> [String] -- ^ Supported LANGUAGE pragmas
-                   -> FilePath            -- ^ Input file
+                   -> FilePath -- ^ Input file
                    -> IO (Messages PsMessage, [Located String]) -- ^ Parsed options, if any.
-getOptionsFromFile df unit_env opts supported filename
+getOptionsFromFile df unit_env popts supported filename
     = Exception.bracket
               (openBinaryFile filename ReadMode)
               (hClose)
               (\handle -> do
-                  (warns, opts) <- fmap (getOptions' opts supported)
-                               (lazyGetToks df unit_env opts' filename handle)
+                  (warns, opts) <- fmap (getOptions' popts supported)
+                               (getPragState df unit_env popts' filename handle
+                               >>= \prag_state -> lazyGetToks prag_state handle)
                   seqList opts
                     $ seqList (bagToList $ getMessages warns)
                     $ return (warns, opts))
@@ -236,22 +238,25 @@ getOptionsFromFile df unit_env opts supported filename
           -- we already have an apparently-complete token.
           -- We therefore just turn Opt_Haddock off when doing the lazy
           -- lex.
-          opts' = disableHaddock opts
+          popts' = disableHaddock popts
 
 blockSize :: Int
 -- blockSize = 17 -- for testing :-)
 blockSize = 1024
 
-lazyGetToks :: DynFlags -> UnitEnv -> ParserOpts -> FilePath -> Handle -> IO [Located Token]
-lazyGetToks df unit_env popts filename handle = do
+getPragState :: DynFlags -> UnitEnv -> ParserOpts -> FilePath -> Handle -> IO (PState PpState)
+getPragState df unit_env popts filename handle = do
   buf <- hGetStringBufferBlock handle blockSize
+  let loc  = mkRealSrcLoc (mkFastString filename) 1 1
   let prag_state = if Lexer.ghcCppEnabled popts
         then initPragStateWithMacros df unit_env popts buf loc
         else initPragState popts buf loc
+  return prag_state
+
+lazyGetToks :: PState PpState -> Handle -> IO [Located Token]
+lazyGetToks prag_state handle = do
   unsafeInterleaveIO $ lazyLexBuf handle prag_state False blockSize
  where
-  loc  = mkRealSrcLoc (mkFastString filename) 1 1
-
   lazyLexBuf :: Handle -> PState PpState -> Bool -> Int -> IO [Located Token]
   lazyLexBuf handle state eof size =
     case unP (lexer False return) state of

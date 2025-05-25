@@ -147,8 +147,8 @@ getPState dflags includes popts filename str = pstate
             , pp_defines = predefinedMacros dflags
             , pp_scope = (PpScope True PpNoGroup) :| []
             }
-    pstate = Lexer.initParserState initState popts buf loc
-    -- pstate = Lexer.initPragState initState popts buf loc
+    -- pstate = Lexer.initParserState initState popts buf loc
+    pstate = Lexer.initPragState initState popts buf loc
     loc = mkRealSrcLoc (mkFastString filename) 1 1
     buf = stringToStringBuffer str
 
@@ -571,7 +571,7 @@ initDynFlags2 file = do
     hsc_env <- getSession
     let unit_env = hsc_unit_env hsc_env
     (_, src_opts) <- liftIO $ getOptionsFromFile dflags0 unit_env parser_opts0 (supportedLanguagePragmas dflags0) file
-    liftIO $ putStrLn $ "src_opts:" ++ show src_opts
+    liftIO $ putStrLn $ "src_opts:" ++ show  (map unLoc src_opts)
     (dflags1, _, _) <- GHC.parseDynamicFilePragma logger dflags0 src_opts
     -- Turn this on last to avoid T10942
     let dflags2 = dflags1 `GHC.gopt_set` GHC.Opt_KeepRawTokenStream
@@ -584,9 +584,14 @@ initDynFlags2 file = do
     _ <- GHC.setSessionDynFlags dflags3
     return dflags3
 
-ddd :: IO ()
-ddd = ghcWrapper libdirNow $ do
+getPragmas1 :: IO ()
+getPragmas1 = ghcWrapper libdirNow $ do
     _dflags <- initDynFlags2 "Example4.hs"
+    return ()
+
+getPragmas2 :: IO ()
+getPragmas2 = ghcWrapper libdirNow $ do
+    _dflags <- initDynFlags2 "Example18.hs"
     return ()
 
 t20 :: IO ()
@@ -916,4 +921,21 @@ t42 = do
         , "#-}"
         , "f = f"
         , "g = g"
+        ]
+
+t43 :: IO ()
+t43 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "{-# LANGUAGE Trustworthy #-}"
+        -- , "#if MIN_VERSION_base(4,10,0)"
+        , "#if 1"
+        , "{-# LANGUAGE GADTs #-}"
+        -- , "# if !(MIN_VERSION_base(4,11,0))"
+        , "# if !(1)"
+        , "{-# LANGUAGE TypeInType #-}"
+        , "# endif"
+        , "#endif"
+        , "module T23465 where"
+        , ""
         ]
