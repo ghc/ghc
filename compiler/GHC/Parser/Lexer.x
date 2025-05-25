@@ -333,7 +333,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
 
-  ^\ *\# \ * $idchar+ .*\n   / { ifExtensionGhcCppNotComment } { cppSkip }
+  ^\# \ * $idchar+ .*\n   / { ifExtensionGhcCppNotComment } { cppSkip } -- No leading space, otherwise clashes with OverloadedLabels
 
   ^\# pragma .* \n     / { ifExtensionGhcCppNotComment } { cppSkip } -- GCC 3.3 CPP generated, apparently
   ^\# \! .* \n         / { ifExtensionGhcCppNotComment } { cppSkip } -- #!, for scripts  -- gcc
