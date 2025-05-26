@@ -3,7 +3,8 @@ T10279.hs:10:9: error: [GHC-51294]
     • Failed to load interface for ‘A’.
       no unit id matching ‘rts-1.0.3’ was found
       (This unit ID looks like the source package ID;
-       the real unit ID is ‘rts’)
+       the real unit ID is ‘rts’
+       and 1 other candidate)
     • In the untyped splice:
         $(conE
             (Name

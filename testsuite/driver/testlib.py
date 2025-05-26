@@ -1390,9 +1390,12 @@ def normalise_win32_io_errors(name, opts):
 
 def normalise_version_( *pkgs ):
     def normalise_version__( str ):
+        # First strip the ghc-version_ prefix if present at the start of package names
+        # Use word boundary to ensure we only match actual package name prefixes
+        str_no_ghc_prefix = re.sub(r'\bghc-[0-9.]+_([a-zA-Z])', r'\1', str)
         # (name)(-version)(-hash)(-components)
-        return re.sub('(' + '|'.join(map(re.escape,pkgs)) + r')-[0-9.]+(-[0-9a-zA-Z+]+)?(-[0-9a-zA-Z]+)?',
-                      r'\1-<VERSION>-<HASH>', str)
+        return re.sub('(' + '|'.join(map(re.escape,pkgs)) + r')-[0-9.]+(-[0-9a-zA-Z+]+)?(-[0-9a-zA-Z+]+)?',
+                      r'\1-<VERSION>-<HASH>', str_no_ghc_prefix)
     return normalise_version__
 
 def normalise_version( *pkgs ):
@@ -2867,7 +2870,7 @@ def grep_output(normaliser: OutputNormalizer, pattern_file, actual_file, is_subs
 
 # Note [Null device handling]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# On windows the null device is 'nul' instead of '/dev/null'.
+# On Windows the null device is 'nul' instead of '/dev/null'.
 # This can in principle be easily solved by using os.devnull.
 # Not doing so causes issues when python tries to read/write/open
 # the null device.
@@ -3007,8 +3010,6 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
     # clang may warn about unused argument when used as assembler
     s = re.sub('.*warning: argument unused during compilation:.*\n', '', s)
-    # Emscripten displays cache info and old emcc doesn't support EMCC_LOGGING=0
-    s = re.sub('cache:INFO: .*\n', '', s)
 
     return s
 
@@ -3129,7 +3130,7 @@ def normalise_output( s: str ) -> str:
 
 def normalise_asm( s: str ) -> str:
     lines = s.split('\n')
-    # Only keep insuctions and labels not starting with a dot.
+    # Only keep instructions and labels not starting with a dot.
     metadata = re.compile('^[ \t]*\\..*$')
     out = []
     for line in lines:
