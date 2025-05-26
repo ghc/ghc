@@ -583,7 +583,11 @@ addTickHsExpr (HsProc x pat cmdtop) =
 addTickHsExpr (XExpr (WrapExpr w e)) =
         liftM (XExpr . WrapExpr w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
-addTickHsExpr (XExpr (ExpandedThingTc o e)) = addTickHsExpanded o e
+addTickHsExpr (XExpr (ExpandedThingTc o e)) =
+        liftM (XExpr . ExpandedThingTc o) $
+              (addTickHsExpr e)        -- Explicitly no tick on inside
+
+  -- addTickHsExpanded o e
 
 
 addTickHsExpr e@(XExpr (ConLikeTc {})) = return e
@@ -607,24 +611,24 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
 
-addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
-  -- We always want statements to get a tick, so we can step over each one.
-  -- To avoid duplicates we blacklist SrcSpans we already inserted here.
-  OrigStmt (L pos _) _ -> do_tick_black pos
-  _                    -> skip
-  where
-    skip = addTickHsExpr e
-    do_tick_black pos = do
-      d <- getDensity
-      case d of
-         TickForCoverage    -> tick_it_black pos
-         TickForBreakPoints -> tick_it_black pos
-         _                  -> skip
-    tick_it_black pos =
-      unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
-                             (withBlackListed (locA pos) $
-                               addTickHsExpr e)
+-- addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
+-- addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
+--   -- We always want statements to get a tick, so we can step over each one.
+--   -- To avoid duplicates we blacklist SrcSpans we already inserted here.
+--   OrigStmt (L pos _) _ -> do_tick_black pos
+--   _                    -> skip
+--   where
+--     skip = addTickHsExpr e
+--     do_tick_black pos = do
+--       d <- getDensity
+--       case d of
+--          TickForCoverage    -> tick_it_black pos
+--          TickForBreakPoints -> tick_it_black pos
+--          _                  -> skip
+--     tick_it_black pos =
+--       unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
+--                              (withBlackListed (locA pos) $
+--                                addTickHsExpr e)
 
 addTickTupArg :: HsTupArg GhcTc -> TM (HsTupArg GhcTc)
 addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e
