@@ -44,7 +44,7 @@ jobs:
 
     - name: Build the bindist
       shell: devx {0}
-      run: make
+      run: make CABAL=$PWD/_build/stage0/bin/cabal
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -54,7 +54,7 @@ jobs:
 
     - name: Run the testsuite
       shell: devx {0}
-      run: make test
+      run: make test CABAL=$PWD/_build/stage0/bin/cabal
 
     - name: Upload test results
       uses: actions/upload-artifact@v4

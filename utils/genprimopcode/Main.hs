@@ -200,12 +200,6 @@ main = getArgs >>= \args ->
                       "--make-haskell-source"
                          -> putStr (gen_hs_source p_o_specs)
 
-                      "--wrappers-module"
-                         -> putStr (gen_wrappers_module p_o_specs)
-
-                      "--prim-module"
-                         -> putStr (gen_hs_source_module p_o_specs)
-
                       "--wired-in-docs"
                          -> putStr (gen_wired_in_docs p_o_specs)
 
@@ -214,6 +208,12 @@ main = getArgs >>= \args ->
 
                       "--foundation-tests"
                          -> putStr (gen_foundation_tests p_o_specs)
+
+                      "--wrappers-module"
+                         -> putStr (gen_wrappers_module p_o_specs)
+
+                      "--prim-module"
+                         -> putStr (gen_hs_source_module p_o_specs)
 
                       _ -> error "Should not happen, known_args out of sync?"
                    )
@@ -241,7 +241,7 @@ known_args
        "--make-latex-doc",
        "--wired-in-docs",
        "--wired-in-deprecations",
-       "--foundation-tests"
+       "--foundation-tests",
        "--wrappers-module",
        "--prim-module"
      ]

@@ -189,6 +189,9 @@ emptyLoaderState dflags = LoaderState
   where init_pkgs = let addToUDFM' (k, v) m = addToUDFM m k v
                     in foldr addToUDFM' emptyUDFM [
                       (rtsUnitId, (LoadedPkgInfo rtsUnitId [] [] [] emptyUniqDSet))
+                    -- FIXME? Should this be the rtsWayUnitId of the current ghc, or the one
+                    --        for the target build? I think target-build seems right, but I'm
+                    --        not fully convinced.
                     , (rtsWayUnitId dflags, (LoadedPkgInfo (rtsWayUnitId dflags) [] [] [] emptyUniqDSet))
                     ]
 

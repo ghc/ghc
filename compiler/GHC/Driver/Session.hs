@@ -1311,6 +1311,8 @@ dynamic_flags_deps = [
         (NoArg (unSetGeneralFlag Opt_AutoLinkPackages))
   , make_ord_flag defGhcFlag "no-hs-main"
         (NoArg (setGeneralFlag Opt_NoHsMain))
+  , make_ord_flag defGhcFlag "no-rts"
+        (NoArg (setGeneralFlag Opt_NoRts))
   , make_ord_flag defGhcFlag "fno-state-hack"
         (NoArg (setGeneralFlag Opt_G_NoStateHack))
   , make_ord_flag defGhcFlag "fno-opt-coercion"
@@ -3408,7 +3410,9 @@ picCCOpts dflags =
             else [])
       -- gcc may be configured to have PIC on by default, let's be
       -- explicit here, see #15847
-       | otherwise -> ["-fno-PIC"]
+      -- FIXME: actually no, because -fPIC may be required for ASLR too!
+      -- Zig cc doesn't support `-fno-pic` in this case
+       | otherwise -> [] -- ["-fno-PIC"]
 
 pieCCLDOpts :: DynFlags -> [String]
 pieCCLDOpts dflags
