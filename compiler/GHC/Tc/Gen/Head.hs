@@ -205,12 +205,10 @@ data EWrap = EPar    AppCtxt
            | EExpand (HsExpr GhcRn)
            | EHsWrap HsWrapper
 
-data AppCtxt
-  = VAExpansion
-
-  | VACall
-       (HsExpr GhcRn) Int  -- In the third argument of function f
-       SrcSpan             -- The SrcSpan of the application (f e1 e2 e3)
+data AppCtxt =
+  VACall
+     (HsExpr GhcRn) Int  -- In the third argument of function f
+     SrcSpan             -- The SrcSpan of the application (f e1 e2 e3)
                          --    noSrcSpan if outermost; see Note [AppCtxt]
 
 
@@ -242,11 +240,9 @@ a second time.
 -}
 
 appCtxtLoc :: AppCtxt -> SrcSpan
-appCtxtLoc VAExpansion = generatedSrcSpan
 appCtxtLoc (VACall _ _ l)    = l
 
 insideExpansion :: AppCtxt -> Bool
-insideExpansion (VAExpansion {}) = True
 insideExpansion (VACall _ _ loc)   = isGeneratedSrcSpan loc
 
 instance Outputable QLFlag where
@@ -254,7 +250,6 @@ instance Outputable QLFlag where
   ppr NoQL = text "NoQL"
 
 instance Outputable AppCtxt where
-  ppr VAExpansion       = text "VAExpansion"
   ppr (VACall f n l)    = text "VACall" <+> int n <+> ppr f  <+> ppr l
 
 type family XPass (p :: TcPass) where
@@ -338,11 +333,9 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     set :: EpAnn ann -> AppCtxt -> AppCtxt
     set l (VACall f n _)          = VACall f n (locA l)
-    set _ ctx = ctx
 
     dec :: EpAnn ann -> AppCtxt -> AppCtxt
     dec l (VACall f n _)          = VACall f (n-1) (locA l)
-    dec _ ctx = ctx
 
 -- | Rebuild an application: takes a type-checked application head
 -- expression together with arguments in the form of typechecked 'HsExprArg's
