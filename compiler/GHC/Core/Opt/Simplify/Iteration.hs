@@ -2349,15 +2349,12 @@ simplOutId env fun cont
 
        -- If we are not in the first iteration, we have already tried rules and inlining
        -- at the end of the previous iteration; no need to repeat that
---       ; if not (sm_first_iter (seMode env))
---         then rebuildCall env arg_info cont
---         else
--- Do this BEFORE so that we can take advantage of single-occ inlines
--- Example: T21839c which takes an extra Simplifier iteration after w/w
--- if you don't do this
+       ; if not (sm_first_iter (seMode env))
+         then rebuildCall env arg_info cont
+         else
 
     -- Try rewrite rules: Plan (BEFORE) in Note [When to apply rewrite rules]
-       ; mb_match <- if not (null rules_for_me) &&
+    do { mb_match <- if not (null rules_for_me) &&
                         (isClassOpId fun || activeUnfolding (seMode env) fun)
                      then tryRules env rules_for_me fun out_args
                      else return Nothing
@@ -2375,7 +2372,7 @@ simplOutId env fun cont
 
     -- Neither worked, so just rebuild
     rebuildCall env arg_info cont
-    } } } }
+    } } } } }
 
 ---------------------------------------------------------
 --      Dealing with a call site
