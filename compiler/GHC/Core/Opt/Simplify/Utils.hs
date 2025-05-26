@@ -24,7 +24,7 @@ module GHC.Core.Opt.Simplify.Utils (
         SimplCont(..), DupFlag(..), FromWhat(..), StaticEnv,
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
-        contIsTrivial, contArgs, contIsRhs, argSummaries,
+        contIsTrivial, contArgs, contIsRhs,
         countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
@@ -538,10 +538,14 @@ contArgs cont
     lone _               = True
 
     go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
-                                        = go (argSummary se arg : args) k
+                                        = go (is_interesting arg se : args) k
     go args (ApplyToTy { sc_cont = k }) = go args k
     go args (CastIt { sc_cont = k })    = go args k
     go args k                           = (False, reverse args, k)
+
+    is_interesting arg se = interestingArg se arg
+                   -- Do *not* use short-cutting substitution here
+                   -- because we want to get as much IdInfo as possible
 
 contOutArgs :: SimplEnv -> SimplCont -> [OutExpr]
 -- Get the leading arguments from the `SimplCont`, as /OutExprs/
@@ -884,15 +888,6 @@ strictArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
       -- Why NonRecursive?  Becuase it's a bit like
       --   let a = g x in f a
 
-argSummaries :: SimplEnv -> [ArgSpec] -> [ArgSummary]
-argSummaries env args
-  = go args
-  where
-    env' = zapSubstEnv env  -- The args are simplified already
-    go []                               = []
-    go (TyArg {} : args)                = go args
-    go (ValArg { as_arg = arg } : args) = argSummary env' arg : go args
-
 interestingCallContext :: SimplEnv -> SimplCont -> CallCtxt
 -- See Note [Interesting call context]
 interestingCallContext env cont
@@ -1039,9 +1034,9 @@ Wrinkles:
 
 -}
 
-argSummary :: SimplEnv -> CoreExpr -> ArgSummary
+interestingArg :: SimplEnv -> CoreExpr -> ArgSummary
 -- See Note [Interesting arguments]
-argSummary env e = go env 0 e
+interestingArg env e = go env 0 e
   where
     -- n is # value args to which the expression is applied
     go env n (Var v)
@@ -1049,8 +1044,6 @@ argSummary env e = go env 0 e
            DoneId v'            -> go_var n v'
            DoneEx e _           -> go (zapSubstEnv env)             n e
            ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) n e
-         -- NB: substId looks up in the InScopeSet:
-         --     we want to get as much IdInfo as possible
 
     go _   _ (Lit l)
        | isLitRubbish l        = NonTrivArg -- See (IA3) in Note [Interesting arguments]
