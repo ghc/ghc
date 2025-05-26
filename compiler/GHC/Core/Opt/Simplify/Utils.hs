@@ -1574,11 +1574,18 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br    = 1
-                  , occ_in_lam  = NotInsideLam
-                  , occ_int_cxt = int_cxt }
-      =  isNotTopLevel top_lvl      -- Get rid of allocation
-      || (int_cxt==IsInteresting && idArity bndr > 0)   -- Function is applied
-   --   || (early_phase && not (isConLikeUnfolding unf))  -- See early_phase
+                  , occ_in_lam  = NotInsideLam }
+        = isNotTopLevel top_lvl || sePhase env /= FinalPhase
+          -- Inline even top level things if not inside lambda
+          -- Can reduce simplifier iterations, when something is later
+          -- inlining and becomes dead
+          --
+          -- But not in FinalPhase because that's just after we have
+          -- carefully floated out constants to top level
+
+   --      =  isNotTopLevel top_lvl      -- Get rid of allocation
+   --      || (int_cxt==IsInteresting && idArity bndr > 0)   -- Function is applied
+   -- OLD  || (early_phase && not (isConLikeUnfolding unf))  -- See early_phase
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = IsInsideLam
                   , occ_int_cxt = IsInteresting }
