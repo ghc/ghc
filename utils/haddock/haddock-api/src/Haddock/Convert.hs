@@ -23,6 +23,7 @@ module Haddock.Convert
   ( tyThingToLHsDecl
   , synifyInstHead
   , synifyFamInst
+  , synifyKindSig
   , PrintRuntimeReps (..)
   ) where
 

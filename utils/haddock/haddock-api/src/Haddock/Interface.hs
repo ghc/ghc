@@ -102,7 +102,6 @@ processModules
                                 -- environment
 processModules verbosity modules flags extIfaces = do
   liftIO Compat.setEncoding
-  dflags <- getDynFlags
 
   -- Map from a module to a corresponding installed interface
   let instIfaceMap :: InstIfaceMap
@@ -122,10 +121,11 @@ processModules verbosity modules flags extIfaces = do
         Set.unions $ map (Set.fromList . ifaceExports) $
         filter (\i -> not $ OptHide `elem` ifaceOptions i) interfaces
       mods = Set.fromList $ map ifaceMod interfaces
+      expInfo = (exportedNames, mods)
 
   interfaces' <- {-# SCC attachInstances #-}
                  withTimingM "attachInstances" (const ()) $ do
-                   attachInstances (exportedNames, mods) interfaces instIfaceMap (isJust oneShotHiFile)
+                   attachInstances expInfo interfaces instIfaceMap (isJust oneShotHiFile)
 
   -- Combine the link envs of the external packages into one
   let extLinks  = Map.unions (map ifLinkEnv extIfaces)
@@ -140,7 +140,7 @@ processModules verbosity modules flags extIfaces = do
     withTimingM "renameAllInterfaces" (const ()) $
       for interfaces' $ \i -> do
         withTimingM ("renameInterface: " <+> pprModuleName (moduleName (ifaceMod i))) (const ()) $
-          renameInterface dflags ignoredSymbolSet links warnings (Flag_Hoogle `elem` flags) i
+          renameInterface ignoredSymbolSet links expInfo warnings (Flag_Hoogle `elem` flags) i
 
   return (interfaces'', homeLinks)
 

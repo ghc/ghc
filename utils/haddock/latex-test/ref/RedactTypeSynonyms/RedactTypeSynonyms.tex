@@ -1,0 +1,53 @@
+\haddockmoduleheading{RedactTypeSynonyms}
+\label{module:RedactTypeSynonyms}
+\haddockbeginheader
+{\haddockverb\begin{verbatim}
+module RedactTypeSynonyms (
+    ExportedType1, ExportedType2, ExportedType3, ExportedType4, ExportedType5,
+    exportedFn
+  ) where\end{verbatim}}
+\haddockendheader
+
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+type ExportedType1 :: Type
+\end{tabular}]
+{\haddockbegindoc
+A type that should be redacted.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+type ExportedType2 a :: Type
+\end{tabular}]
+{\haddockbegindoc
+Another type that should be redacted, but that shouldn't suppress the
+ warning about AlsoHidden, because it's also visible in \haddockid{exportedFn}.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+type ExportedType3 :: Constraint
+\end{tabular}]
+{\haddockbegindoc
+For a little kind variety.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+type ExportedType4 a = (a, ExportedType2 a)
+\end{tabular}]
+{\haddockbegindoc
+This type does not need to be redacted.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+type ExportedType5 f a :: (k1, k2, Type)
+\end{tabular}]
+{\haddockbegindoc
+This type has parameters in the result kind.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+exportedFn :: Bool -> AlsoHidden
+\end{tabular}]
+{\haddockbegindoc
+A function.\par}
+\end{haddockdesc}

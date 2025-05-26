@@ -31,7 +31,6 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.Ord (comparing)
 import qualified Data.Sequence as Seq
-import qualified Data.Set as Set
 import GHC
 import GHC.Builtin.Types (unrestrictedFunTyConName)
 import GHC.Core (isOrphan)
@@ -62,12 +61,8 @@ import GHC.Unit.State
 import GHC.Utils.Outputable (sep, text, (<+>))
 
 import Haddock.Convert
-import Haddock.GhcUtils (typeNames)
+import Haddock.GhcUtils (isNameHidden, isTypeHidden)
 import Haddock.Types
-
-type ExportedNames = Set.Set Name
-type Modules = Set.Set Module
-type ExportInfo = (ExportedNames, Modules)
 
 -- Also attaches fixities
 attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> Bool -> Ghc [Interface]
@@ -389,16 +384,6 @@ instFam FamInst{fi_fam = n, fi_tys = ts, fi_rhs = t} =
 -- Filtering hidden instances
 --------------------------------------------------------------------------------
 
--- | A class or data type is hidden iff
---
--- * it is defined in one of the modules that are being processed
---
--- * and it is not exported by any non-hidden module
-isNameHidden :: ExportInfo -> Name -> Bool
-isNameHidden (names, modules) name =
-  nameModule name `Set.member` modules
-    && not (name `Set.member` names)
-
 -- | We say that an instance is «hidden» iff its class or any (part)
 -- of its type(s) is hidden.
 isInstanceHidden :: ExportInfo -> Name -> [Type] -> Bool
@@ -410,12 +395,3 @@ isInstanceHidden expInfo cls tyNames =
 
     instTypeHidden :: Bool
     instTypeHidden = any (isTypeHidden expInfo) tyNames
-
-isTypeHidden :: ExportInfo -> Type -> Bool
-isTypeHidden expInfo = typeHidden
-  where
-    typeHidden :: Type -> Bool
-    typeHidden t = any nameHidden $ typeNames t
-
-    nameHidden :: Name -> Bool
-    nameHidden = isNameHidden expInfo

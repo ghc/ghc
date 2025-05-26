@@ -11,6 +11,10 @@
 
  * Include `package_info` with haddock's `--show-interface` option.
 
+ * `{-# OPTIONS_HADDOCK redact-type-synonyms #-}` pragma will hide the RHS of
+   type synonyms, and display the result kind instead, if the RHS contains any
+   unexported types.
+
 ## Changes in 2.28.0
  * `hi-haddock` is integrated, which means docstrings are no longer extracted
    through typchecked module results. Instead, docstrings are taken from Haskell

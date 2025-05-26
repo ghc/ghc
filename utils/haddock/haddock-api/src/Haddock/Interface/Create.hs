@@ -395,6 +395,7 @@ parseOption "prune" = return (Just OptPrune)
 parseOption "not-home" = return (Just OptNotHome)
 parseOption "show-extensions" = return (Just OptShowExtensions)
 parseOption "print-explicit-runtime-reps" = return (Just OptPrintRuntimeRep)
+parseOption "redact-type-synonyms" = return (Just OptRedactTypeSyns)
 parseOption other = warn ("Unrecognised option: " ++ other) >> return Nothing
 
 --------------------------------------------------------------------------------

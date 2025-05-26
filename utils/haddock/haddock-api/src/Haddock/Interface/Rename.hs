@@ -25,7 +25,9 @@ import Control.Applicative ()
 import Control.DeepSeq (force)
 import Control.Monad hiding (mapM)
 import Control.Monad.Reader
-import Control.Monad.Writer.CPS
+import Control.Monad.Trans.Maybe (MaybeT (..), hoistMaybe)
+import Control.Monad.Trans.Writer.CPS (WriterT, runWriterT)
+import Control.Monad.Writer.Class
 import Data.Foldable (traverse_)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -33,12 +35,15 @@ import Data.Traversable (mapM)
 
 import GHC hiding (NoLink, HsTypeGhcPsExt (..))
 import GHC.Builtin.Types (eqTyCon_RDR, tupleDataConName, tupleTyConName)
+import GHC.Core.TyCon (tyConResKind)
+import GHC.Driver.DynFlags (getDynFlags)
 import GHC.Types.Basic (Boxity (..), TopLevelFlag (..), TupleSort (..))
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName (Exact))
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 
 import Haddock.Backends.Hoogle (ppExportD)
+import Haddock.Convert (synifyKindSig)
 import Haddock.GhcUtils
 import Haddock.Types
 
@@ -51,9 +56,7 @@ import Haddock.Types
 -- The renamed output gets written into fields in the Haddock interface record
 -- that were previously left empty.
 renameInterface
-  :: DynFlags
-  -- ^ GHC session dyn flags
-  -> Map.Map (Maybe String) (Set.Set String)
+  :: Map.Map (Maybe String) (Set.Set String)
   -- ^ Ignored symbols. A map from module names to unqualified names. Module
   -- 'Just M' mapping to name 'f' means that link warnings should not be
   -- generated for occurances of specifically 'M.f'. Module 'Nothing' mapping to
@@ -61,6 +64,7 @@ renameInterface
   -> LinkEnv
   -- ^ Link environment. A map from 'Name' to 'Module', where name 'n' maps to
   -- module 'M' if 'M' is the preferred link destination for name 'n'.
+  -> ExportInfo
   -> Bool
   -- ^ Are warnings enabled?
   -> Bool
@@ -68,18 +72,17 @@ renameInterface
   -> Interface
   -- ^ The interface we are renaming.
   -> Ghc Interface
-  -- ^ The renamed interface. Note that there is nothing really special about
-  -- this being in the 'Ghc' monad. This could very easily be any 'MonadIO' or
-  -- even pure, depending on the link warnings are reported.
-renameInterface dflags ignoreSet renamingEnv warnings hoogle iface = do
-  let (iface', warnedNames) =
-        runRnM
-          dflags
-          mdl
-          localLinkEnv
-          warnName
-          (hoogle && not (OptHide `elem` ifaceOptions iface))
-          (renameInterfaceRn iface)
+  -- ^ The renamed interface. The 'Ghc' monad is used to look up type
+  -- information and to get dynamic flags.
+renameInterface ignoreSet renamingEnv expInfo warnings hoogle iface = do
+  (iface', warnedNames) <-
+    runRnM
+      mdl
+      localLinkEnv
+      (expInfo <$ guard (OptRedactTypeSyns `elem` ifaceOptions iface))
+      warnName
+      (hoogle && not (OptHide `elem` ifaceOptions iface))
+      (renameInterfaceRn iface)
   reportMissingLinks mdl warnedNames
   return iface'
   where
@@ -144,14 +147,20 @@ reportMissingLinks mdl names
 -- | A renaming monad which provides 'MonadReader' access to a renaming
 -- environment, and 'MonadWriter' access to a 'Set' of names for which link
 -- warnings should be generated, based on the renaming environment.
-newtype RnM a = RnM {unRnM :: ReaderT RnMEnv (Writer (Set.Set Name)) a}
+newtype RnM a = RnM {unRnM :: ReaderT RnMEnv (WriterT (Set.Set Name) Ghc) a}
   deriving newtype (Functor, Applicative, Monad, MonadReader RnMEnv, MonadWriter (Set.Set Name))
+
+liftGhc :: Ghc a -> RnM a
+liftGhc = RnM . lift . lift
 
 -- | The renaming monad environment. Stores the linking environment (mapping
 -- names to modules), the link warning predicate, and the current module.
 data RnMEnv = RnMEnv
   { rnLinkEnv :: LinkEnv
   -- ^ The linking environment (map from names to modules)
+  , rnExportInfo :: Maybe ExportInfo
+  -- ^ Information about exported names and modules, only if
+  -- redact-type-synonyms is enabled
   , rnWarnName :: (Name -> Bool)
   -- ^ Link warning predicate (whether failing to find a link destination
   -- for a given name should result in a warning)
@@ -159,26 +168,24 @@ data RnMEnv = RnMEnv
   -- ^ The current module
   , rnHoogleOutput :: Bool
   -- ^ Should Hoogle output be generated for this module?
-  , rnDynFlags :: DynFlags
-  -- ^ GHC Session DynFlags, necessary for Hoogle output generation
   }
 
 -- | Run the renamer action in a renaming environment built using the given
 -- module, link env, and link warning predicate. Returns the renamed value along
 -- with a set of 'Name's that were not renamed and should be warned for (i.e.
 -- they satisfied the link warning predicate).
-runRnM :: DynFlags -> Module -> LinkEnv -> (Name -> Bool) -> Bool -> RnM a -> (a, Set.Set Name)
-runRnM dflags mdl linkEnv warnName hoogleOutput rn =
-  runWriter $ runReaderT (unRnM rn) rnEnv
+runRnM :: Module -> LinkEnv -> Maybe ExportInfo -> (Name -> Bool) -> Bool -> RnM a -> Ghc (a, Set.Set Name)
+runRnM mdl linkEnv mbExpInfo warnName hoogleOutput rn =
+  runWriterT $ runReaderT (unRnM rn) rnEnv
   where
     rnEnv :: RnMEnv
     rnEnv =
       RnMEnv
         { rnLinkEnv = linkEnv
+        , rnExportInfo = mbExpInfo
         , rnWarnName = warnName
         , rnModuleString = moduleString mdl
         , rnHoogleOutput = hoogleOutput
-        , rnDynFlags = dflags
         }
 
 --------------------------------------------------------------------------------
@@ -243,12 +250,13 @@ renameExportItem item = case item of
   ExportDecl ed@(ExportD decl pats doc subs instances fixities splice) -> do
     -- If Hoogle output should be generated, generate it
     RnMEnv{..} <- ask
+    dflags0 <- liftGhc getDynFlags
     let !hoogleOut =
           force $
             if rnHoogleOutput
               then
                 -- Since Hoogle is line based, we want to avoid breaking long lines.
-                let dflags = rnDynFlags{pprCols = maxBound}
+                let dflags = dflags0{pprCols = maxBound}
                  in ppExportD dflags ed
               else []
 
@@ -536,7 +544,16 @@ renameTyClD d = case d of
   SynDecl{tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdRhs = rhs} -> do
     lname' <- renameNameL lname
     tyvars' <- renameLHsQTyVars tyvars
-    rhs' <- renameLType rhs
+    rhs' <- maybe (renameLType rhs) pure <=< runMaybeT $ do
+      expInfo <- MaybeT $ asks rnExportInfo
+      -- Given that we have matched on a 'SynDecl', this lookup /really should/
+      -- be 'ATyCon', and the 'synTyConRhs_maybe' result /really should/ be
+      -- 'Just', but out of an abundance of caution, failing either expectation
+      -- gracefully exits the monad instead of erroring.
+      ATyCon tc <- MaybeT $ liftGhc $ GHC.lookupName $ getName lname
+      guard . isTypeHidden expInfo <=< hoistMaybe $ synTyConRhs_maybe tc
+      let hsKind = synifyKindSig $ tyConResKind tc
+      lift $ fmap (XHsType . HsRedacted) <$> renameLType hsKind
     return
       ( SynDecl
           { tcdSExt = noExtField

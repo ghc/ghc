@@ -66,7 +66,7 @@ import GHC.Utils.Outputable (Outputable, SDocContext, ppr)
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (panic)
 
-import Haddock.Types (DocName, DocNameI, XRecCond, HsTypeDocNameIExt(..))
+import Haddock.Types (DocName, DocNameI, ExportInfo, XRecCond, HsTypeDocNameIExt(..))
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName
@@ -770,6 +770,26 @@ typeNames ty = go ty Set.empty
         LitTy _ -> acc
         CastTy t' _ -> go t' acc
         CoercionTy{} -> acc
+
+
+-- | A class or data type is hidden iff
+--
+-- * it is defined in one of the modules that are being processed
+--
+-- * and it is not exported by any non-hidden module
+isNameHidden :: ExportInfo -> Name -> Bool
+isNameHidden (names, modules) name =
+  nameModule name `Set.member` modules
+    && not (name `Set.member` names)
+
+isTypeHidden :: ExportInfo -> Type -> Bool
+isTypeHidden expInfo = typeHidden
+  where
+    typeHidden :: Type -> Bool
+    typeHidden t = any nameHidden $ typeNames t
+
+    nameHidden :: Name -> Bool
+    nameHidden = isNameHidden expInfo
 
 -------------------------------------------------------------------------------
 

@@ -116,6 +116,8 @@ definitions with "[thing]"
   Show all enabled LANGUAGE extensions
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
   Show all `RuntimeRep` type variables
+{-# OPTIONS_HADDOCK redact-type-synonyms #-}
+  Hide the RHS of type synonyms that use unexported types
 ```
 
 # Grid tables

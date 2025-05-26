@@ -1,0 +1,205 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >RedactTypeSynonyms</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>RedactTypeSynonyms</p
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><span class="keyword"
+	      >type</span
+	      > <a href="#"
+	      >ExportedType1</a
+	      > :: <a href="#" title="Data.Kind"
+	      >Type</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >type</span
+	      > <a href="#"
+	      >ExportedType2</a
+	      > a :: <a href="#" title="Data.Kind"
+	      >Type</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >type</span
+	      > <a href="#"
+	      >ExportedType3</a
+	      > :: <a href="#" title="Data.Kind"
+	      >Constraint</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >type</span
+	      > <a href="#"
+	      >ExportedType4</a
+	      > a = (a, <a href="#" title="RedactTypeSynonyms"
+	      >ExportedType2</a
+	      > a)</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >type</span
+	      > <a href="#"
+	      >ExportedType5</a
+	      > (f :: k1 -&gt; k2) (a :: k1) :: (k1, k2, <a href="#" title="Data.Kind"
+	      >Type</a
+	      >)</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >exportedFn</a
+	      > :: <a href="#" title="Data.Bool"
+	      >Bool</a
+	      > -&gt; AlsoHidden</li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >type</span
+	    > <a id="t:ExportedType1" class="def"
+	    >ExportedType1</a
+	    > :: <a href="#" title="Data.Kind"
+	    >Type</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >A type that should be redacted.</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >type</span
+	    > <a id="t:ExportedType2" class="def"
+	    >ExportedType2</a
+	    > a :: <a href="#" title="Data.Kind"
+	    >Type</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Another type that should be redacted, but that shouldn't suppress the
+ warning about AlsoHidden, because it's also visible in <code
+	      ><a href="#" title="RedactTypeSynonyms"
+		>exportedFn</a
+		></code
+	      >.</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >type</span
+	    > <a id="t:ExportedType3" class="def"
+	    >ExportedType3</a
+	    > :: <a href="#" title="Data.Kind"
+	    >Constraint</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >For a little kind variety.</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >type</span
+	    > <a id="t:ExportedType4" class="def"
+	    >ExportedType4</a
+	    > a = (a, <a href="#" title="RedactTypeSynonyms"
+	    >ExportedType2</a
+	    > a) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >This type does not need to be redacted.</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >type</span
+	    > <a id="t:ExportedType5" class="def"
+	    >ExportedType5</a
+	    > (f :: k1 -&gt; k2) (a :: k1) :: (k1, k2, <a href="#" title="Data.Kind"
+	    >Type</a
+	    >) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >This type has parameters in the result kind.</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:exportedFn" class="def"
+	    >exportedFn</a
+	    > :: <a href="#" title="Data.Bool"
+	    >Bool</a
+	    > -&gt; AlsoHidden <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >A function.</p
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

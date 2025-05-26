@@ -87,6 +87,9 @@ data DocPaths = DocPaths
   -- ^ path to hyperlinked sources
   }
 type WarningMap = Map Name (Doc Name)
+type ExportedNames = Set.Set Name
+type Modules = Set.Set Module
+type ExportInfo = (ExportedNames, Modules)
 
 -----------------------------------------------------------------------------
 
@@ -697,6 +700,9 @@ data DocOption
   | -- | Render runtime reps for this module (see
     -- the GHC @-fprint-explicit-runtime-reps@ flag)
     OptPrintRuntimeRep
+  | -- | Hide the RHS of type synonyms in this module
+    -- that use unexported types.
+    OptRedactTypeSyns
   deriving (Eq, Show)
 
 -- | Option controlling how to qualify names
@@ -873,6 +879,8 @@ data HsTypeDocNameIExt
                 (LHsType DocNameI)
 
   | HsRecTy     [LHsConDeclRecField DocNameI]
+
+  | HsRedacted  (HsType DocNameI) -- ^ contains the kind of the redacted type
 
 type instance XNumTy DocNameI = NoExtField
 type instance XStrTy DocNameI = NoExtField

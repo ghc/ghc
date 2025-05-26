@@ -469,7 +469,11 @@ ppTySyn
           ( [keyword "type", ppBinder summary occ]
               ++ ppTyVars unicode qual (hsQTvExplicit ltyvars)
           )
-      full = hdr <+> equals <+> ppPatSigType unicode qual (noLocA sig_type)
+      full = hdr <+> def
+      def = case unLoc ltype of
+        XHsType (HsRedacted k) ->
+          dcolon unicode <+> ppType unicode qual HideEmptyContexts k
+        _ -> equals <+> ppPatSigType unicode qual (noLocA sig_type)
       occ = nameOccName . getName $ name
       fixs
         | summary = noHtml
@@ -1874,6 +1878,7 @@ ppr_mono_ty (HsDocTy _ ty _) unicode qual emptyCtxts =
   ppr_mono_lty ty unicode qual emptyCtxts
 ppr_mono_ty (HsWildCardTy _) _ _ _ = char '_'
 ppr_mono_ty (HsTyLit _ n) _ _ _ = ppr_tylit n
+ppr_mono_ty (XHsType HsRedacted{}) _ _ _ = error "ppr_mono_ty: HsRedacted can't be used here"
 
 ppr_tylit :: HsTyLit DocNameI -> Html
 ppr_tylit (HsNumTy _ n) = toHtml (show n)

@@ -478,7 +478,11 @@ ppTySyn
               : ppDocBinder name
               : map ppWcSymName (tyvarNames ltyvars)
           )
-      full = hdr <+> char '=' <+> ppLType unicode ltype
+      full = hdr <+> def
+      def = case unLoc ltype of
+        XHsType (HsRedacted k) ->
+          dcolon unicode <+> ppType unicode k
+        _ -> equals <+> ppLType unicode ltype
 ppTySyn _ _ _ = error "declaration not supported by ppTySyn"
 
 -------------------------------------------------------------------------------
@@ -1360,6 +1364,7 @@ ppr_mono_ty (HsDocTy _ ty _) unicode =
 ppr_mono_ty (HsWildCardTy _) _ = char '_'
 ppr_mono_ty (HsTyLit _ t) u = ppr_tylit t u
 ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
+ppr_mono_ty (XHsType HsRedacted{}) _ = error "ppr_mono_ty: HsRedacted can't be used here"
 
 ppr_tylit :: HsTyLit DocNameI -> Bool -> LaTeX
 ppr_tylit (HsNumTy _ n) _ = integer n

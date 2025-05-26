@@ -201,6 +201,21 @@ Individual arguments to a function may be documented like this: ::
 Pattern synonyms, GADT-style data constructors, and class methods also
 support this style of documentation.
 
+.. _instance-documentation:
+
+Instance Documentation
+~~~~~~~~~~~~~~~~~~~~~~
+
+As instances are not exported, their documentation appears as part of the
+documentation for the corresponding class and the data types that appear in the
+instance head. This may result in the documentation appearing in multiple
+modules.
+
+If the class is *hidden* (meaning defined in this package but not exported by
+any exposed module), or if any of the data types that appear in the instance
+head are hidden (ditto), then no documentation for the instance is produced,
+even if the instance has an associated documentation comment.
+
 .. _module-description:
 
 The Module Description
@@ -784,6 +799,12 @@ The following attributes are currently understood by Haddock:
     are defaulted to ``LiftedRep`` so that end users don't have to see the
     underlying levity polymorphism. This flag is analogous to GHC's
     ``-fprint-explicit-runtime-reps`` flag.
+
+``redact-type-synonyms``
+   Hide the RHS of type synonyms, and display the result kind instead, if the
+   RHS contains any hidden types. ("Hidden" here means the same as in the
+   feature that hides class instances if those instances contain any hidden
+   types; see :ref:`instance-documentation`.)
 
 .. _markup:
 

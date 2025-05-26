@@ -423,6 +423,8 @@ instance Binary DocOption where
     putByte bh 4
   put_ bh OptPrintRuntimeRep = do
     putByte bh 5
+  put_ bh OptRedactTypeSyns = do
+    putByte bh 6
   get bh = do
     h <- getByte bh
     case h of
@@ -438,6 +440,8 @@ instance Binary DocOption where
         return OptShowExtensions
       5 -> do
         return OptPrintRuntimeRep
+      6 -> do
+        return OptRedactTypeSyns
       n -> fail $ "invalid binary data found: " <> show n
 
 instance Binary Example where
