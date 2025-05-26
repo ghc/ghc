@@ -3927,9 +3927,12 @@ mkDupableContWithDmds env df dmds
         -- it, then postInlineUnconditionally will just inline it again, perhaps
         -- taking an extra Simplifier iteration (e.g. in test T21839c). So make
         -- a `let` only if `couldBeSmallEnoughToInline` says that it is big enough
+        -- NB: postInlineUnconditionally does not fire on strict demands,
+        --     so account for that too
         ; let uf_opts = seUnfoldingOpts env
         ; (let_floats2, arg'')
-              <- if couldBeSmallEnoughToInline uf_opts (unfoldingUseThreshold uf_opts) arg'
+              <- if not (isStrUsedDmd dmd) &&
+                    couldBeSmallEnoughToInline uf_opts (unfoldingUseThreshold uf_opts) arg'
                  then return (emptyLetFloats, arg')
                  else makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
 
