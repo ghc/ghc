@@ -682,15 +682,22 @@ library
       stg/Ticky.h
       stg/Types.h
 
-    autogen-cmm-sources:
-      AutoApply.cmm
-      AutoApply_V16.cmm
-
     include-dirs: include .
 
     build-depends:
       rts-headers,
       rts-fs
+
+    -- FIXME: by virtue of being part of the rts main library, these do not get
+    -- the flags (debug, threaded, ...) as the sub libraries.  Thus we are
+    -- likely missing -DDEBUG, -DTHREADED_RTS, etc.
+    -- One solution to this would be to turn all of these into `.h` files, and
+    -- then have the `AutoApply.cmm` in `rts-c-sources-base` include them.  This
+    -- would mean they are included in the sublibraries which will in turn apply
+    -- the sublibrary specific (c)flags.
+    autogen-cmm-sources:
+      AutoApply.cmm
+      AutoApply_V16.cmm
 
     if arch(x86_64)
       cmm-sources:

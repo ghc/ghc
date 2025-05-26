@@ -134,6 +134,15 @@ package *
   executable-dynamic: False
   executable-static: False
 
+package rts-headers
+  ghc-options: -no-rts
+
+package rts-fs
+  ghc-options: -no-rts
+
+package rts
+  ghc-options: -no-rts
+
 package ghc
   flags: +build-tool-depends +internal-interpreter
 

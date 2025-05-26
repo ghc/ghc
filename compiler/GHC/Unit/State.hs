@@ -1635,6 +1635,16 @@ mkUnitState logger dflags cfg = do
   -- package arguments we need to key against the old versions.
   --
   (pkgs2, wired_map) <- findWiredInUnits logger (rtsWayUnitId dflags:wiredInUnitIds) prec_map pkgs1 vis_map2
+
+  --
+  -- Sanity check. If the rtsWayUnitId is not in the database, then we have a
+  -- problem.  The RTS is effectively missing.
+  unless (null pkgs1 || gopt Opt_NoRts dflags || anyUniqMap (== rtsWayUnitId dflags) wired_map) $ do
+    pprPanic "mkUnitState" $ ppr ( length pkgs1
+                                , gopt Opt_NoRts dflags
+                                , anyUniqMap (== rtsWayUnitId dflags) wired_map
+                                , wired_map) <> text "; The RTS for " <> ppr (rtsWayUnitId dflags) <> text " is missing from the package database.  Please check your installation."
+
   let pkg_db = mkUnitInfoMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
