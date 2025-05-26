@@ -2342,19 +2342,11 @@ simplOutId env fun cont
 
 -- Normal case for (f e1 .. en)
 simplOutId env fun cont
-  = do { rule_base <- getSimplRules
+  = -- Try rewrite rules: Plan (BEFORE) in Note [When to apply rewrite rules]
+    do { rule_base <- getSimplRules
        ; let rules_for_me = getRules rule_base fun
-             arg_info     = mkArgInfo env fun rules_for_me cont
              out_args     = contOutArgs env cont :: [OutExpr]
-
-       -- If we are not in the first iteration, we have already tried rules and inlining
-       -- at the end of the previous iteration; no need to repeat that
-       ; if not (sm_first_iter (seMode env))
-         then rebuildCall env arg_info cont
-         else
-
-    -- Try rewrite rules: Plan (BEFORE) in Note [When to apply rewrite rules]
-    do { mb_match <- if not (null rules_for_me) &&
+       ; mb_match <- if not (null rules_for_me) &&
                         (isClassOpId fun || activeUnfolding (seMode env) fun)
                      then tryRules env rules_for_me fun out_args
                      else return Nothing
@@ -2365,13 +2357,15 @@ simplOutId env fun cont
 
     -- Try inlining
     do { logger <- getLogger
-       ; mb_inline <- tryInlining env logger fun (contArgs cont)
+       ; mb_inline <- tryInlining env logger fun cont
        ; case mb_inline of{
-            Just expr -> simplExprF env expr cont ;
+            Just expr -> do { checkedTick (UnfoldingDone fun)
+                            ; simplExprF env expr cont } ;
             Nothing ->
 
     -- Neither worked, so just rebuild
-    rebuildCall env arg_info cont
+    do { let arg_info = mkArgInfo env fun rules_for_me cont
+       ; rebuildCall env arg_info cont
     } } } } }
 
 ---------------------------------------------------------
@@ -2444,39 +2438,28 @@ rebuildCall env fun_info
 
 ---------- No further useful info, revert to generic rebuild ------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
+  | null rules
+  = rebuild env (argInfoExpr fun rev_args) cont
+  | otherwise  -- Try rules again: Plan (AFTER) in Note [When to apply rewrite rules]
   = do { let args = reverse rev_args
-
-       -- Try rules again: Plan (AFTER) in Note [When to apply rewrite rules]
-       ; mb_match <- if null rules
-                     then return Nothing
-                     else tryRules env rules fun (map argSpecArg args)
-       ; case mb_match of {
+       ; mb_match <- tryRules env rules fun (map argSpecArg args)
+       ; case mb_match of
            Just (rule_arity, rhs) -> simplExprF env rhs $
-                                     pushSimplifiedArgs env (drop rule_arity args) cont ;
-           Nothing ->
-
-    do { logger <- getLogger
-       ; mb_inline <- tryInlining env logger fun (null args, argSummaries env args, cont)
-       ; case mb_inline of
-           Just body -> simplExprF env body $
-                        pushSimplifiedArgs env args cont
-           Nothing   -> rebuild env (argInfoExpr fun rev_args) cont
-    } } }
+                                     pushSimplifiedArgs env (drop rule_arity args) cont
+           Nothing -> rebuild env (argInfoExpr fun rev_args) cont }
 
 -----------------------------------
-tryInlining :: SimplEnv -> Logger -> OutId
-            -> (Bool, [ArgSummary], SimplCont)
-            -> SimplM (Maybe OutExpr)
-tryInlining env logger fun (lone_variable, arg_infos, call_cont)
-  | Just expr <- callSiteInline env logger fun lone_variable arg_infos interesting_cont
-  = do { dump_inline expr call_cont
-       ; checkedTick (UnfoldingDone fun)
+tryInlining :: SimplEnv -> Logger -> OutId -> SimplCont -> SimplM (Maybe OutExpr)
+tryInlining env logger var cont
+  | Just expr <- callSiteInline env logger var lone_variable arg_infos interesting_cont
+  = do { dump_inline expr cont
        ; return (Just expr) }
 
   | otherwise
   = return Nothing
 
   where
+    (lone_variable, arg_infos, call_cont) = contArgs cont
     interesting_cont = interestingCallContext env call_cont
 
     log_inlining doc
@@ -2487,12 +2470,12 @@ tryInlining env logger fun (lone_variable, arg_infos, call_cont)
     dump_inline unfolding cont
       | not (logHasDumpFlag logger Opt_D_dump_inlinings) = return ()
       | not (logHasDumpFlag logger Opt_D_verbose_core2core)
-      = when (isExternalName (idName fun)) $
+      = when (isExternalName (idName var)) $
             log_inlining $
-                sep [text "Inlining done:", nest 4 (ppr fun)]
+                sep [text "Inlining done:", nest 4 (ppr var)]
       | otherwise
       = log_inlining $
-           sep [text "Inlining done: " <> ppr fun,
+           sep [text "Inlining done: " <> ppr var,
                 nest 4 (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
                               text "Cont:  " <+> ppr cont])]
 

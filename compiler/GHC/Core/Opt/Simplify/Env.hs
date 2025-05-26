@@ -272,35 +272,32 @@ seUnfoldingOpts env = sm_uf_opts (seMode env)
 
 -- See Note [The environments of the Simplify pass]
 data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
-  { sm_phase            :: !CompilerPhase
-  , sm_names            :: ![String]      -- ^ Name(s) of the phase
-  , sm_first_iter       :: !Bool          -- ^ True <=> first iteration
-                                          --   False <=> second or subsequent iteration
-  , sm_rules            :: !Bool          -- ^ Whether RULES are enabled
-  , sm_inline           :: !Bool          -- ^ Whether inlining is enabled
-  , sm_eta_expand       :: !Bool          -- ^ Whether eta-expansion is enabled
-  , sm_cast_swizzle     :: !Bool          -- ^ Do we swizzle casts past lambdas?
-  , sm_uf_opts          :: !UnfoldingOpts -- ^ Unfolding options
-  , sm_case_case        :: !Bool          -- ^ Whether case-of-case is enabled
-  , sm_pre_inline       :: !Bool          -- ^ Whether pre-inlining is enabled
-  , sm_float_enable     :: !FloatEnable   -- ^ Whether to enable floating out
+  { sm_phase        :: !CompilerPhase
+  , sm_names        :: ![String]      -- ^ Name(s) of the phase
+  , sm_rules        :: !Bool          -- ^ Whether RULES are enabled
+  , sm_inline       :: !Bool          -- ^ Whether inlining is enabled
+  , sm_eta_expand   :: !Bool          -- ^ Whether eta-expansion is enabled
+  , sm_cast_swizzle :: !Bool          -- ^ Do we swizzle casts past lambdas?
+  , sm_uf_opts      :: !UnfoldingOpts -- ^ Unfolding options
+  , sm_case_case    :: !Bool          -- ^ Whether case-of-case is enabled
+  , sm_pre_inline   :: !Bool          -- ^ Whether pre-inlining is enabled
+  , sm_float_enable :: !FloatEnable   -- ^ Whether to enable floating out
   , sm_do_eta_reduction :: !Bool
-  , sm_arity_opts       :: !ArityOpts
-  , sm_rule_opts        :: !RuleOpts
-  , sm_case_folding     :: !Bool
-  , sm_case_merge       :: !Bool
-  , sm_co_opt_opts      :: !OptCoercionOpts -- ^ Coercion optimiser options
+  , sm_arity_opts :: !ArityOpts
+  , sm_rule_opts :: !RuleOpts
+  , sm_case_folding :: !Bool
+  , sm_case_merge :: !Bool
+  , sm_co_opt_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
   }
 
 instance Outputable SimplMode where
     ppr (SimplMode { sm_phase = p , sm_names = ss
-                   , sm_first_iter = fi, sm_rules = r, sm_inline = i
+                   , sm_rules = r, sm_inline = i
                    , sm_cast_swizzle = cs
                    , sm_eta_expand = eta, sm_case_case = cc })
        = text "SimplMode" <+> braces (
          sep [ text "Phase =" <+> ppr p <+>
                brackets (text (concat $ intersperse "," ss)) <> comma
-             , pp_flag fi  (text "first-iter") <> comma
              , pp_flag i   (text "inline") <> comma
              , pp_flag r   (text "rules") <> comma
              , pp_flag eta (text "eta-expand") <> comma
