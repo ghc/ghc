@@ -119,7 +119,7 @@ $(GHC2): _build/stage1.done
 		PATH=$(PWD)/_build/stage1/bin:$(PATH) \
 		$(CABAL) build --project-file=cabal.project.stage2 --builddir=_build/stage2/cabal -j -w ghc \
 		--ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" \
-		rts:nonthreaded-nodebug \
+		rts:nonthreaded-nodebug rts:nonthreaded-debug \
 		> _build/logs/rts.log 2> _build/logs/rts.err
 
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
