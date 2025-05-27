@@ -518,6 +518,8 @@ wanteds os = concat
 
           ,closureFieldGcptr C "StgInd" "indirectee"
 
+          ,closureSize  C "StgStopAfterRetFrame"
+
           ,closureSize  C "StgMutVar"
           ,closureField C "StgMutVar" "var"
 

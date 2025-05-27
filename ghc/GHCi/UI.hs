@@ -249,7 +249,7 @@ ghciCommands = map mkCmd [
   ("sprint",    keepGoing sprintCmd,            completeExpression),
   ("step",      keepGoing stepCmd,              completeIdentifier),
   ("steplocal", keepGoing stepLocalCmd,         completeIdentifier),
-  ("stepout",   keepGoing stepOutCmd,           completeIdentifier),
+  ("stepout",   keepGoing stepOutCmd,           noCompletion),
   ("stepmodule",keepGoing stepModuleCmd,        completeIdentifier),
   ("type",      keepGoing' typeOfExpr,          completeExpression),
   ("trace",     keepGoing traceCmd,             completeExpression),
@@ -4165,10 +4165,7 @@ stepCmd arg = withSandboxOnly ":step" $ step arg
   step expression = runStmt expression GHC.SingleStep >> return ()
 
 stepOutCmd :: GhciMonad m => String -> m ()
-stepOutCmd arg = withSandboxOnly ":stepout" $ step arg
-  where
-  step []         = doContinue GHC.StepOut
-  step expression = stepCmd expression
+stepOutCmd _ = withSandboxOnly ":stepout" $ doContinue GHC.StepOut
 
 stepLocalCmd :: GhciMonad m => String -> m ()
 stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg

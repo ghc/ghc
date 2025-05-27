@@ -33,7 +33,7 @@ initSimpleOpts dflags = SimpleOpts
 data EvalStep
   -- | ... at every breakpoint tick
   = EvalStepSingle
-  -- | ... after every return stmt
+  -- | ... after any return stmt
   | EvalStepOut
   -- | ... only on explicit breakpoints
   | EvalStepNone

@@ -603,7 +603,7 @@ interpretBCO (Capability* cap)
     if (cap->r.rCurrentTSO->flags & TSO_STOP_AFTER_RETURN) {
 
       StgPtr frame;
-      frame = cap->r.rCurrentTSO->stackobj->sp;
+      frame = Sp;
 
       // Insert the stg_stop_after_ret_frame after the first frame that is NOT a
       // case continuation BCO.
@@ -614,17 +614,22 @@ interpretBCO (Capability* cap)
       while (*frame == (W_)&stg_CASE_CONT_BCO_info) {
         frame += stack_frame_sizeW((StgClosure *)frame);
       }
-      // New frame goes right after the first non-case-cont frame
+      // New frame goes /right after the first/ non-case-cont frame
       frame += stack_frame_sizeW((StgClosure *)frame);
 
       // TODO: Handle stack bottom edge case!? if frame == STACK BOTTOM...
 
       // Make space for the new frame
+      memmove((W_*)Sp - sizeofW(StgStopAfterRetFrame), Sp, (uint8_t*)frame - (uint8_t*)Sp);
       Sp_subW(sizeofW(StgStopAfterRetFrame));
-      memmove(frame-sizeof(StgStopAfterRetFrame), frame, (uint8_t*)cap->r.rCurrentTSO->stackobj->sp - (uint8_t*)frame);
+
+      // Point to newly opened space
+      frame -= sizeofW(StgStopAfterRetFrame);
 
       // Then write it.
       ((StgStopAfterRetFrame*)frame)->header.info = &stg_stop_after_ret_frame_info;
+
+      // TODO: Write profiling info if needed
 
       // Frame was pushed, mark as done to not do it again
       cap->r.rCurrentTSO->flags &= ~TSO_STOP_AFTER_RETURN;
@@ -681,7 +686,6 @@ interpretBCO (Capability* cap)
     //
     // [1] An StgBCO's info table pointer may also be stg_CASE_CONT_BCO_info.
     //      See Note [Case continuation BCOs].
-    //
     else if (SpW(0) == (W_)&stg_apply_interp_info) {
         obj = UNTAG_CLOSURE((StgClosure *)ReadSpW(1));
         Sp_addW(2);

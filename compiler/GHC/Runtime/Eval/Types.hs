@@ -47,7 +47,7 @@ data SingleStep
    -- | :step [expr]
    | SingleStep
 
-   -- | :stepout [expr]
+   -- | :stepout
    | StepOut
 
    -- | :steplocal [expr]

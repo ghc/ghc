@@ -29,8 +29,8 @@ import CLOSURE stg_stop_after_ret_frame_info;
  *
  * See Note [Debugger: Step-out] for details.
  */
-INFO_TABLE_RET (stg_stop_after_ret_frame, RET_SMALL)
-    return (/* no return values */)
+INFO_TABLE_RET (stg_stop_after_ret_frame, RET_SMALL, W_ info_ptr)
+    /* no args => explicit stack */
 {
 
     /* We've entered a stg_stop_after_ret_frame, thus we want to stop at the next
@@ -40,7 +40,12 @@ INFO_TABLE_RET (stg_stop_after_ret_frame, RET_SMALL)
     StgTSO_flags(CurrentTSO) =
        %lobits32( TO_W_(StgTSO_flags(CurrentTSO)) | TSO_STOP_NEXT_BREAKPOINT );
 
-
     /* After enabling the single step mode, execution is resumed by returning
-     * to the frame this one intercepted. */
+     * to the frame this one intercepted.
+     *
+     * Note: Arguments passed to the frame we intercepted must be propagated,
+     * and the floating point registers untouched! See Note [Frames intercepting frames].
+     */
+    Sp = Sp + SIZEOF_StgStopAfterRetFrame;
+    jump %ENTRY_CODE(Sp(0)) GP_ARG_REGS; // NB. all GP arg regs live!
 }

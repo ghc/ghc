@@ -198,7 +198,7 @@ doSeq ref = do
 resumeSeq :: RemoteRef (ResumeContext ()) -> IO (EvalStatus ())
 resumeSeq hvref = do
     ResumeContext{..} <- localRef hvref
-    withBreakAction evalOptsSeq resumeBreakMVar resumeStatusMVar $
+    withBreakAction evalOptsSeq resumeBreakMVar resumeStatusMVar (Just resumeThreadId) $
       mask_ $ do
         putMVar resumeBreakMVar () -- this awakens the stopped thread...
         redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
@@ -227,7 +227,7 @@ sandboxIO opts io = do
   -- We are running in uninterruptibleMask
   breakMVar <- newEmptyMVar
   statusMVar <- newEmptyMVar
-  withBreakAction opts breakMVar statusMVar $ do
+  withBreakAction opts breakMVar statusMVar Nothing $ do
     let runIt = measureAlloc $ tryEval $ rethrow opts $ clearCCS io
     if useSandboxThread opts
        then do
@@ -322,8 +322,8 @@ tryEval io = do
 -- resets everything when the computation has stopped running.  This
 -- is a not-very-good way to ensure that only the interactive
 -- evaluation should generate breakpoints.
-withBreakAction :: EvalOpts -> MVar () -> MVar (EvalStatus b) -> IO a -> IO a
-withBreakAction opts breakMVar statusMVar act
+withBreakAction :: EvalOpts -> MVar () -> MVar (EvalStatus b) -> Maybe ThreadId {-^ If resuming, the current threadId -} -> IO a -> IO a
+withBreakAction opts breakMVar statusMVar mtid act
  = bracket setBreakAction resetBreakAction (\_ -> act)
  where
    setBreakAction = do
@@ -332,8 +332,10 @@ withBreakAction opts breakMVar statusMVar act
      when (breakOnException opts) $ poke exceptionFlag 1
      when (singleStep opts) rts_enableStopNextBreakpointAll
      when (stepOut opts) $ do
-      ThreadId tid <- myThreadId
-      rts_enableStopAfterReturn tid
+      case mtid of
+        Nothing -> rts_enableStopNextBreakpointAll -- just enable single-step when no thread is stopped
+        Just (ThreadId tid) -> do
+          rts_enableStopAfterReturn tid
      return stablePtr
         -- Breaking on exceptions is not enabled by default, since it
         -- might be a bit surprising.  The exception flag is turned off
@@ -365,10 +367,9 @@ withBreakAction opts breakMVar statusMVar act
      poke breakPointIOAction noBreakStablePtr
      poke exceptionFlag 0
      rts_disableStopNextBreakpointAll
-
-     ThreadId tid <- myThreadId
-     rts_disableStopAfterReturn tid
-
+     case mtid of
+      Just (ThreadId tid) -> rts_disableStopAfterReturn tid
+      _                   -> pure ()
      freeStablePtr stablePtr
 
 resumeStmt
@@ -376,7 +377,7 @@ resumeStmt
   -> IO (EvalStatus [HValueRef])
 resumeStmt opts hvref = do
   ResumeContext{..} <- localRef hvref
-  withBreakAction opts resumeBreakMVar resumeStatusMVar $
+  withBreakAction opts resumeBreakMVar resumeStatusMVar (Just resumeThreadId) $
     mask_ $ do
       putMVar resumeBreakMVar () -- this awakens the stopped thread...
       redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
