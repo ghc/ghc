@@ -60,6 +60,7 @@ import GHC.Types.PkgQual
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Misc        ( split )
 import GHC.Utils.Monad       ( liftIO )
 import GHC.Utils.Binary        ( openBinMem, put_ )
 import GHC.Utils.Logger
