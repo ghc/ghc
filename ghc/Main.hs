@@ -116,11 +116,18 @@ main = do
    configureHandleEncoding
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
+    prog0 <- getProgName
     argv0 <- getArgs
 
+    -- either pass @--target=...@ to select the target, or use a symbolic
+    -- or (copy of the executable) name that ends with @-ghc@. E.g.
+    -- x86_64-unknown-linux-ghc would select the x86_64-unknown-linux target.
     let (target_args, argv1) = partition ("--target=" `isPrefixOf`) argv0
-        mbTarget | null target_args = Nothing
-                 | otherwise = Just (drop 9 (last target_args))
+        mbTarget | not (null target_args) = Just (drop 9 (last target_args))
+                 | "-ghc" `isSuffixOf` prog0
+                 , parts <- split '-' prog0
+                 , length parts > 3 = Just (take (length prog0 - 4) prog0)
+                 | otherwise = Nothing
 
 
     let (minusB_args, argv1') = partition ("-B" `isPrefixOf`) argv1
