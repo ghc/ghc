@@ -251,8 +251,8 @@ We can compile ``D``, then load the whole program, like this:
 
 .. code-block:: none
 
-    ghci> :! ghc -c -dynamic D.hs
-    ghci> :load A
+    ghci> :! ghc -c -this-unit-id interactive-session -dynamic D.hs
+    ghci> :load A B C D
     Compiling B                ( B.hs, interpreted )
     Compiling C                ( C.hs, interpreted )
     Compiling A                ( A.hs, interpreted )
@@ -267,6 +267,10 @@ compilation.
 Note the :ghc-flag:`-dynamic` flag to GHC: GHCi uses dynamically-linked object
 code (if you are on a platform that supports it), and so in order to use
 compiled code with GHCi it must be compiled for dynamic linking.
+
+Also, note the :ghc-flag:`-this-unit-id ⟨unit-id⟩` `interactive-session` to GHC: GHCi
+can only use the object code of a module loaded via :ghci-cmd:`:load`,
+if the object code has been compiled for the `interactive-session`.
 
 At any time you can use the command :ghci-cmd:`:show modules` to get a list of
 the modules currently loaded into GHCi:
@@ -301,8 +305,8 @@ So let's try compiling one of the other modules:
 
 .. code-block:: none
 
-    *ghci> :! ghc -c C.hs
-    *ghci> :load A
+    *ghci> :! ghc -c -this-unit-id interactive-session -dynamic C.hs
+    *ghci> :load A B C D
     Compiling D                ( D.hs, interpreted )
     Compiling B                ( B.hs, interpreted )
     Compiling C                ( C.hs, interpreted )
@@ -316,7 +320,7 @@ rejected ``C``\'s object file. Ok, so let's also compile ``D``:
 
 .. code-block:: none
 
-    *ghci> :! ghc -c D.hs
+    *ghci> :! ghc -c -this-unit-id interactive-session -dynamic D.hs
     *ghci> :reload
     Ok, modules loaded: A, B, C, D.
 
@@ -325,7 +329,7 @@ picked up by :ghci-cmd:`:reload`, only :ghci-cmd:`:load`:
 
 .. code-block:: none
 
-    *ghci> :load A
+    *ghci> :load A B C D
     Compiling B                ( B.hs, interpreted )
     Compiling A                ( A.hs, interpreted )
     Ok, modules loaded: A, B, C (C.o), D (D.o).
