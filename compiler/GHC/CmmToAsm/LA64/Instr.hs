@@ -143,9 +143,16 @@ regUsageOfInstr platform instr = case instr of
   J_TBL _ _ t              -> usage ([t], [])
   B t                      -> usage (regTarget t, [])
   BL t ps                  -> usage (regTarget t ++ ps, callerSavedRegisters)
+  CALL t ps                -> usage (regTarget t ++ ps, callerSavedRegisters)
   CALL36 t                 -> usage (regTarget t, [])
   TAIL36 r t               -> usage (regTarget t, regOp r)
-  BCOND _ j d t tmp        -> usage (regTarget t ++ regOp j ++ regOp d ++ regOp tmp, regOp tmp)
+  -- Here two kinds of BCOND and BCOND1 are implemented, mainly because we want
+  -- to distinguish between two kinds of conditional jumps with different jump
+  -- ranges, corresponding to 2 and 1 instruction implementations respectively.
+  --
+  -- BCOND1 is selected by default.
+  BCOND1 _ j d t           -> usage (regTarget t ++ regOp j ++ regOp d, [])
+  BCOND _ j d t            -> usage (regTarget t ++ regOp j ++ regOp d, [])
   BEQZ j t                 -> usage (regTarget t ++ regOp j, [])
   BNEZ j t                 -> usage (regTarget t ++ regOp j, [])
   -- 5. Common Memory Access Instructions --------------------------------------
@@ -157,6 +164,7 @@ regUsageOfInstr platform instr = case instr of
   STX _ dst src            -> usage (regOp src ++ regOp dst, [])
   LDPTR _ dst src          -> usage (regOp src, regOp dst)
   STPTR _ dst src          -> usage (regOp src ++ regOp dst, [])
+  PRELD _hint src          -> usage (regOp src, [])
   -- 6. Bound Check Memory Access Instructions ---------------------------------
   -- LDCOND dst src1 src2     -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- STCOND dst src1 src2     -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -176,6 +184,7 @@ regUsageOfInstr platform instr = case instr of
   SCVTF dst src            -> usage (regOp src, regOp dst)
   FCVTZS dst src1 src2     -> usage (regOp src2, regOp src1 ++ regOp dst)
   FABS dst src             -> usage (regOp src, regOp dst)
+  FSQRT dst src            -> usage (regOp src, regOp dst)
   FMA _ dst src1 src2 src3 -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
 
   _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
@@ -317,9 +326,11 @@ patchRegsOfInstr instr env = case instr of
     J_TBL ids mbLbl t  -> J_TBL ids mbLbl (env t)
     B t            -> B (patchTarget t)
     BL t ps        -> BL (patchTarget t) ps
+    CALL t ps      -> CALL (patchTarget t) ps
     CALL36 t       -> CALL36 (patchTarget t)
     TAIL36 r t     -> TAIL36 (patchOp r) (patchTarget t)
-    BCOND c j d t tmp -> BCOND c (patchOp j) (patchOp d) (patchTarget t) (patchOp tmp)
+    BCOND1 c j d t -> BCOND1 c (patchOp j) (patchOp d) (patchTarget t)
+    BCOND c j d t  -> BCOND c (patchOp j) (patchOp d) (patchTarget t)
     BEQZ j t       -> BEQZ (patchOp j) (patchTarget t)
     BNEZ j t       -> BNEZ (patchOp j) (patchTarget t)
     -- 5. Common Memory Access Instructions --------------------------------------
@@ -332,6 +343,7 @@ patchRegsOfInstr instr env = case instr of
     STX f o1 o2        -> STX f (patchOp o1)  (patchOp o2)
     LDPTR f o1 o2      -> LDPTR f (patchOp o1)  (patchOp o2)
     STPTR f o1 o2      -> STPTR f (patchOp o1)  (patchOp o2)
+    PRELD o1 o2         -> PRELD (patchOp o1) (patchOp o2)
     -- 6. Bound Check Memory Access Instructions ---------------------------------
     -- LDCOND o1 o2 o3       -> LDCOND  (patchOp o1)  (patchOp o2)  (patchOp o3)
     -- STCOND o1 o2 o3       -> STCOND  (patchOp o1)  (patchOp o2)  (patchOp o3)
@@ -350,6 +362,7 @@ patchRegsOfInstr instr env = case instr of
     FMAXA o1 o2 o3      -> FMAXA  (patchOp o1)  (patchOp o2)  (patchOp o3)
     FNEG o1 o2          -> FNEG  (patchOp o1)  (patchOp o2)
     FABS o1 o2          -> FABS  (patchOp o1)  (patchOp o2)
+    FSQRT o1 o2         -> FSQRT  (patchOp o1)  (patchOp o2)
     FMA s o1 o2 o3 o4   -> FMA s (patchOp o1)  (patchOp o2)  (patchOp o3)  (patchOp o4)
 
     _                   -> panic $ "patchRegsOfInstr: " ++ instrCon instr
@@ -381,8 +394,10 @@ isJumpishInstr instr = case instr of
   J_TBL {} -> True
   B {} -> True
   BL {} -> True
+  CALL {} -> True
   CALL36 {} -> True
   TAIL36 {} -> True
+  BCOND1 {} -> True
   BCOND {} -> True
   BEQZ {} -> True
   BNEZ {} -> True
@@ -395,9 +410,11 @@ jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (J_TBL ids _mbLbl _r) = catMaybes ids
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (BL t _) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (CALL t _) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (CALL36 t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (TAIL36 _ t) = [id | TBlock id <- [t]]
-jumpDestsOfInstr (BCOND _ _ _ t _) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (BCOND1 _ _ _ t) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (BCOND _ _ _ t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (BEQZ _ t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (BNEZ _ t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr _ = []
@@ -413,9 +430,11 @@ patchJumpInstr instr patchF =
     J_TBL ids mbLbl r -> J_TBL (map (fmap patchF) ids) mbLbl r
     B (TBlock bid) -> B (TBlock (patchF bid))
     BL (TBlock bid) ps -> BL (TBlock (patchF bid)) ps
+    CALL (TBlock bid) ps -> CALL (TBlock (patchF bid)) ps
     CALL36 (TBlock bid) -> CALL36 (TBlock (patchF bid))
     TAIL36 r (TBlock bid) -> TAIL36 r (TBlock (patchF bid))
-    BCOND c o1 o2 (TBlock bid) tmp -> BCOND c o1 o2 (TBlock (patchF bid)) tmp
+    BCOND1 c o1 o2 (TBlock bid) -> BCOND1 c o1 o2 (TBlock (patchF bid))
+    BCOND c o1 o2 (TBlock bid) -> BCOND c o1 o2 (TBlock (patchF bid))
     BEQZ j (TBlock bid) -> BEQZ j (TBlock (patchF bid))
     BNEZ j (TBlock bid) -> BNEZ j (TBlock (patchF bid))
     _ -> panic $ "patchJumpInstr: " ++ instrCon instr
@@ -501,9 +520,9 @@ canFallthroughTo insn bid =
     J (TBlock target) -> bid == target
     J_TBL targets _ _ -> all isTargetBid targets
     B (TBlock target) -> bid == target
-    CALL36 (TBlock target) -> bid == target
     TAIL36 _ (TBlock target) -> bid == target
-    BCOND _ _ _ (TBlock target) _ -> bid == target
+    BCOND1 _ _ _ (TBlock target) -> bid == target
+    BCOND _ _ _ (TBlock target) -> bid == target
     _ -> False
   where
     isTargetBid target = case target of
@@ -589,7 +608,6 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 
     insert_dealloc insn r = case insn of
       J {} -> dealloc ++ (insn : r)
-      J_TBL {} -> dealloc ++ (insn : r)
       ANN _ e -> insert_dealloc e r
       _other | jumpDestsOfInstr insn /= [] ->
         patchJumpInstr insn retarget : r
@@ -697,9 +715,11 @@ data Instr
     | J_TBL [Maybe BlockId] (Maybe CLabel) Reg
     | B Target
     | BL Target [Reg]
+    | CALL Target [Reg]
     | CALL36 Target
     | TAIL36 Operand Target
-    | BCOND Cond Operand Operand Target Operand
+    | BCOND1 Cond Operand Operand Target
+    | BCOND Cond Operand Operand Target
     | BEQZ Operand Target
     | BNEZ Operand Target
     -- 5. Common Memory Access Instructions --------------------------------------
@@ -711,6 +731,7 @@ data Instr
     | STX Format Operand Operand
     | LDPTR Format Operand Operand
     | STPTR Format Operand Operand
+    | PRELD Operand Operand
     -- 6. Bound Check Memory Access Instructions ---------------------------------
     -- 7. Atomic Memory Access Instructions --------------------------------------
     -- 8. Barrier Instructions ---------------------------------------------------
@@ -726,6 +747,7 @@ data Instr
     | FMINA Operand Operand Operand
     | FNEG Operand Operand
     | FABS Operand Operand
+    | FSQRT Operand Operand
     -- Floating-point fused multiply-add instructions
     --  fmadd : d =   r1 * r2 + r3
     --  fnmsub: d =   r1 * r2 - r3
@@ -809,8 +831,10 @@ instrCon i =
       J_TBL{} -> "J_TBL"
       B{} -> "B"
       BL{} -> "BL"
+      CALL{} -> "CALL"
       CALL36{} -> "CALL36"
       TAIL36{} -> "TAIL36"
+      BCOND1{} -> "BCOND1"
       BCOND{} -> "BCOND"
       BEQZ{} -> "BEQZ"
       BNEZ{} -> "BNEZ"
@@ -822,6 +846,7 @@ instrCon i =
       STX{} -> "STX"
       LDPTR{} -> "LDPTR"
       STPTR{} -> "STPTR"
+      PRELD{} -> "PRELD"
       DBAR{} -> "DBAR"
       IBAR{} -> "IBAR"
       FCVT{} -> "FCVT"
@@ -833,6 +858,7 @@ instrCon i =
       FMINA{} -> "FMINA"
       FNEG{} -> "FNEG"
       FABS{} -> "FABS"
+      FSQRT{} -> "FSQRT"
       FMA variant _ _ _ _ ->
         case variant of
           FMAdd  -> "FMADD"
@@ -979,6 +1005,8 @@ widthFromOpReg (OpReg W32 _) = W32
 widthFromOpReg (OpReg W64 _) = W64
 widthFromOpReg _ = W64
 
-lessW64 :: Width -> Bool
-lessW64 w | w == W8 || w == W16 || w == W32 = True
-lessW64 _   = False
+ldFormat :: Format -> Format
+ldFormat f
+  | f `elem` [II8, II16, II32, II64] = II64
+  | f `elem` [FF32, FF64] = FF64
+  | otherwise = pprPanic "unsupported ldFormat: " (text $ show f)

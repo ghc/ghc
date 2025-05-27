@@ -32,7 +32,7 @@ ncgLA64 config =
       maxSpillSlots             = LA64.maxSpillSlots config,
       allocatableRegs           = LA64.allocatableRegs platform,
       ncgAllocMoreStack         = LA64.allocMoreStack platform,
-      ncgMakeFarBranches        = \_p _i bs -> pure bs,
+      ncgMakeFarBranches        = LA64.makeFarBranches,
       extractUnwindPoints       = const [],
       invertCondBranches        = \_ _ -> id
     }

@@ -1,4 +1,3 @@
-
 module GHC.CmmToAsm.LA64.Ppr (pprNatCmmDecl, pprInstr) where
 
 import GHC.Prelude hiding (EQ)
@@ -437,32 +436,28 @@ pprInstr platform instr = case instr of
     -- ADD.{W/D}, SUB.{W/D}
     -- ADDI.{W/D}, ADDU16I.D
   ADD  o1 o2 o3
-    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 && isSingleOp o1 && isSingleOp o2 && isSingleOp o3 -> op3 (text "\tfadd.s") o1 o2 o3
-    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 && isDoubleOp o1 && isDoubleOp o2 && isDoubleOp o3 -> op3 (text "\tfadd.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tadd.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tadd.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, isImmOp o3, (OpImm (ImmInteger i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\taddi.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, isImmOp o3, (OpImm (ImmInt i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\taddi.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, isImmOp o3, (OpImm (ImmInteger i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\taddi.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, isImmOp o3, (OpImm (ImmInt i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\taddi.d") o1 o2 o3
+    | isFloatOp o2 && isFloatOp o3 && isSingleOp o2 && isSingleOp o3 -> op3 (text "\tfadd.s") o1 o2 o3
+    | isFloatOp o2 && isFloatOp o3 && isDoubleOp o2 && isDoubleOp o3 -> op3 (text "\tfadd.d") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tadd.w") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tadd.d") o1 o2 o3
+    | OpReg W32 _ <- o2, isImmOp o3 -> op3 (text "\taddi.w") o1 o2 o3
+    | OpReg W64 _ <- o2, isImmOp o3 -> op3 (text "\taddi.d") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: ADD error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
     -- TODO: Not complete.
     -- Here we should add addu16i.d for optimizations of accelerating GOT accession
     -- with ldptr.w/d, stptr.w/d
   SUB  o1 o2 o3
-    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 && isSingleOp o1 && isSingleOp o2 && isSingleOp o3 -> op3 (text "\tfsub.s") o1 o2 o3
-    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 && isDoubleOp o1 && isDoubleOp o2 && isDoubleOp o3 -> op3 (text "\tfsub.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tsub.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tsub.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, isImmOp o3, (OpImm (ImmInteger i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\taddi.w") o1 o2 (negOp o3)
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, isImmOp o3, (OpImm (ImmInt i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\taddi.w") o1 o2 (negOp o3)
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, isImmOp o3, (OpImm (ImmInteger i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\taddi.d") o1 o2 (negOp o3)
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, isImmOp o3, (OpImm (ImmInt i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\taddi.d") o1 o2 (negOp o3)
+    | isFloatOp o2 && isFloatOp o3 && isSingleOp o2 && isSingleOp o3 -> op3 (text "\tfsub.s") o1 o2 o3
+    | isFloatOp o2 && isFloatOp o3 && isDoubleOp o2 && isDoubleOp o3 -> op3 (text "\tfsub.d") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tsub.w") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tsub.d") o1 o2 o3
+    | OpReg W32 _ <- o2, isImmOp o3 -> op3 (text "\taddi.w") o1 o2 (negOp o3)
+    | OpReg W64 _ <- o2, isImmOp o3 -> op3 (text "\taddi.d") o1 o2 (negOp o3)
     | otherwise -> pprPanic "LA64.ppr: SUB error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
     -- ALSL.{W[U]/D}
   ALSL  o1 o2 o3 o4
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3, isImmOp o4 -> op4 (text "\talsl.w") o1 o2 o3 o4
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3, isImmOp o4 -> op4 (text "\talsl.d") o1 o2 o3 o4
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3, isImmOp o4 -> op4 (text "\talsl.w") o1 o2 o3 o4
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3, isImmOp o4 -> op4 (text "\talsl.d") o1 o2 o3 o4
     | otherwise -> pprPanic "LA64.ppr: ALSL error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   ALSLU  o1 o2 o3 o4 -> op4 (text "\talsl.wu") o1 o2 o3 o4
     -- LoongArch-Assembler should implement following pesudo instructions, here we can directly use them.
@@ -491,14 +486,12 @@ pprInstr platform instr = case instr of
     -- SSLT[U]
     -- SSLT[U]I
   SSLT  o1 o2 o3
-    | OpReg W64 _ <- o1, isImmOp o3, (OpImm (ImmInteger i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\tslti") o1 o2 o3
-    | OpReg W64 _ <- o1, isImmOp o3, (OpImm (ImmInt i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\tslti") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3  -> op3 (text "\tslt") o1 o2 o3
+    | isImmOp o3 -> op3 (text "\tslti") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3  -> op3 (text "\tslt") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: SSLT error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   SSLTU  o1 o2 o3
-    | OpReg W64 _ <- o1, isImmOp o3, (OpImm (ImmInteger i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\tsltui") o1 o2 o3
-    | OpReg W64 _ <- o1, isImmOp o3, (OpImm (ImmInt i)) <- o3, fitsInNbits 12 (fromIntegral i) -> op3 (text "\tsltui") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tsltu") o1 o2 o3
+    | isImmOp o3 -> op3 (text "\tsltui") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tsltu") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: SSLTU error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
     -- PCADDI, PCADDU121, PCADDU18l, PCALAU12I
   PCADDI  o1 o2     -> op2 (text "\tpcaddi") o1 o2
@@ -511,19 +504,16 @@ pprInstr platform instr = case instr of
     -- AND, OR, NOR, XOR, ANDN, ORN
     -- ANDI, ORI, XORI: zero-extention
   AND  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tand") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInteger i)) <- o3, isUnsignOp (fromIntegral i), fitsInNbits 13 (fromIntegral i) -> op3 (text "\tandi") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInt i)) <- o3, isUnsignOp (fromIntegral i), fitsInNbits 13 (fromIntegral i) -> op3 (text "\tandi") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tand") o1 o2 o3
+    | OpReg W64 _ <- o2, isImmOp o3 -> op3 (text "\tandi") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: AND error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   OR  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tor") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInteger i)) <- o3, isUnsignOp (fromIntegral i), fitsInNbits 13 (fromIntegral i) -> op3 (text "\tori") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInt i)) <- o3, isUnsignOp (fromIntegral i), fitsInNbits 13 (fromIntegral i) -> op3 (text "\tori") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tor") o1 o2 o3
+    | OpReg W64 _ <- o2, isImmOp o3 -> op3 (text "\tori") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: OR error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   XOR  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\txor") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInteger i)) <- o3, isUnsignOp (fromIntegral i), fitsInNbits 13 (fromIntegral i) -> op3 (text "\txori") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInt i)) <- o3, isUnsignOp (fromIntegral i), fitsInNbits 13 (fromIntegral i) -> op3 (text "\txori") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\txor") o1 o2 o3
+    | OpReg W64 _ <- o2, isImmOp o3 -> op3 (text "\txori") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: XOR error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   NOR  o1 o2 o3   -> op3 (text "\tnor") o1 o2 o3
   ANDN  o1 o2 o3  -> op3 (text "\tandn") o1 o2 o3
@@ -535,10 +525,10 @@ pprInstr platform instr = case instr of
   NOP -> line $ text "\tnop"
   -- NEG o1 o2, alias for "sub o1, r0, o2"
   NEG o1 o2
-    | isFloatOp o1 && isFloatOp o2 && isSingleOp o1 && isSingleOp o2 -> op2 (text "\tfneg.s") o1 o2
-    | isFloatOp o1 && isFloatOp o2 && isDoubleOp o1 && isDoubleOp o2 -> op2 (text "\tfneg.d") o1 o2
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2 -> op3 (text "\tsub.w" ) o1 zero o2
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2 -> op3 (text "\tsub.d" ) o1 zero o2
+    | isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfneg.s") o1 o2
+    | isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfneg.d") o1 o2
+    | OpReg W32 _ <- o2 -> op3 (text "\tsub.w" ) o1 zero o2
+    | OpReg W64 _ <- o2 -> op3 (text "\tsub.d" ) o1 zero o2
     | otherwise -> pprPanic "LA64.ppr: NEG error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2)
   -- Here we can do more simplitcations.
   -- To be honest, floating point instructions are too scarce, so maybe
@@ -552,22 +542,12 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 && not (isFloatOp o2) && isDoubleOp o1 -> op2 (text "\tmovgr2fr.d") o1 o2
     | not (isFloatOp o1) && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tmovfr2gr.s") o1 o2
     | not (isFloatOp o1) && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tmovfr2gr.d") o1 o2
-    | OpReg W64 _ <- o1, isImmOp o2, (OpImm (ImmInteger i)) <- o2, fitsInNbits 12 (fromIntegral i) ->
+    | isImmOp o2, (OpImm (ImmInt i)) <- o2, fitsInNbits 12 (fromIntegral i) ->
       lines_ [text "\taddi.d" <+> pprOp platform o1 <> comma <+> pprOp platform x0 <+> comma <> pprOp platform o2]
-    | OpReg W64 _ <- o1, isImmOp o2, (OpImm (ImmInt i)) <- o2, fitsInNbits 12 (fromIntegral i) ->
+    | isImmOp o2, (OpImm (ImmInteger i)) <- o2, fitsInNbits 12 (fromIntegral i) ->
       lines_ [text "\taddi.d" <+> pprOp platform o1 <> comma <+> pprOp platform x0 <+> comma <> pprOp platform o2]
-    | OpReg _ _ <- o1, isImmOp o2, (OpImm (ImmInteger i)) <- o2, fitsInNbits 12 (fromIntegral i) ->
-      lines_ [
-              text "\taddi.d" <+> pprOp platform o1 <> comma <+> pprOp platform x0 <+> comma <> pprOp platform o2,
-              text "\tbstrpick.d" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> pprOp platform (OpImm (ImmInt ((widthToInt $ widthFromOpReg o1) - 1) )) <+> text ", 0"
-             ]
-    | OpReg _ _ <- o1, isImmOp o2, (OpImm (ImmInt i)) <- o2, fitsInNbits 12 (fromIntegral i) ->
-      lines_ [
-              text "\taddi.d" <+> pprOp platform o1 <> comma <+> pprOp platform x0 <+> comma <> pprOp platform o2,
-              text "\tbstrpick.d" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> pprOp platform (OpImm (ImmInt ((widthToInt $ widthFromOpReg o1) - 1) )) <+> text ", 0"
-             ]
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2 -> op2 (text "\tmove") o1 o2
-    | OpReg _ _ <- o1, OpReg _ _ <- o2  ->
+    | OpReg W64 _ <- o2 -> op2 (text "\tmove") o1 o2
+    | OpReg _ _ <- o2  ->
       lines_ [
         text "\tbstrpick.d" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform (OpImm (ImmInt ((widthToInt (min (widthFromOpReg o1) (widthFromOpReg o2))) - 1))) <+> text ", 0"
              ]
@@ -690,18 +670,18 @@ pprInstr platform instr = case instr of
     _ -> pprPanic "LA64.ppr: CSET error: " (pprCond cond <+> pprOp platform dst <> comma <+> (ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2)
 
     where
-      subFor o1 o2  | (OpReg W64 _) <- dst, (OpReg W64 _) <- o1, (OpImm _) <- o2  =
+      subFor o1 o2  | (OpReg W64 _) <- dst, (OpImm _) <- o2  =
                         text "\taddi.d" <+> pprOp platform dst <> comma <+> pprOp platform o1 <> comma <+> pprOp platform (negOp o2)
-                    | (OpReg W64 _) <- dst, (OpReg W64 _) <- o1,(OpReg W64 _) <- o2 =
+                    | (OpReg W64 _) <- dst, (OpReg W64 _) <- o2 =
                         text "\tsub.d" <+> pprOp platform dst <> comma <+> pprOp platform o1 <> comma <+> pprOp platform o2
                     | otherwise = pprPanic "LA64.ppr: unknown subFor format: " ((ppr (widthFromOpReg dst)) <+> pprOp platform dst <+> (ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2)
 
-      sltFor o1 o2  | (OpReg W64 _) <- dst, (OpReg W64 _) <- o1, (OpImm _) <- o2   = text "\tslti"
-                    | (OpReg W64 _) <- dst, (OpReg W64 _) <- o1, (OpReg W64 _) <- o2 = text "\tslt"
+      sltFor o1 o2  | (OpReg W64 _) <- dst, (OpImm _) <- o2   = text "\tslti"
+                    | (OpReg W64 _) <- dst, (OpReg W64 _) <- o2 = text "\tslt"
                     | otherwise = pprPanic "LA64.ppr: unknown sltFor format: " ((ppr (widthFromOpReg dst)) <+> pprOp platform dst <+> (ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2)
 
-      sltuFor o1 o2 | (OpReg W64 _) <- dst, (OpReg W64 _) <- o1, (OpImm _) <- o2   = text "\tsltui"
-                    | (OpReg W64 _) <- dst, (OpReg W64 _) <- o1, (OpReg W64 _) <- o2 = text "\tsltu"
+      sltuFor o1 o2 | (OpReg W64 _) <- dst, (OpImm _) <- o2   = text "\tsltui"
+                    | (OpReg W64 _) <- dst, (OpReg W64 _) <- o2 = text "\tsltu"
                     | otherwise = pprPanic "LA64.ppr: unknown sltuFor format: " ((ppr (widthFromOpReg dst)) <+> pprOp platform dst <+> (ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2)
 
     -- MUL.{W/D}, MULH, {W[U]/D[U]}, 'h' means high 32bit.
@@ -709,41 +689,41 @@ pprInstr platform instr = case instr of
   MUL  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 && isSingleOp o1 && isSingleOp o2 && isSingleOp o3 -> op3 (text "\tfmul.s") o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 && isDoubleOp o1 && isDoubleOp o2 && isDoubleOp o3 -> op3 (text "\tfmul.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmul.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tmul.d") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmul.w") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tmul.d") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: MUL error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   MULW   o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmulw.d.w") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmulw.d.w") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: MULW error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   MULWU  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmulw.d.wu") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmulw.d.wu") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: MULWU error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   MULH  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmulh.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o2 -> op3 (text "\tmulh.d") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmulh.w") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o2 -> op3 (text "\tmulh.d") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: MULH error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   MULHU  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmulh.wu") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tmulh.du") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmulh.wu") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tmulh.du") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: MULHU error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
     -- DIV.{W[U]/D[U]}, MOD.{W[U]/D[U]}
   DIV  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 && isSingleOp o1 && isSingleOp o2 && isSingleOp o3 -> op3 (text "\tfdiv.s") o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 && isDoubleOp o1 && isDoubleOp o2 && isDoubleOp o3 -> op3 (text "\tfdiv.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tdiv.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tdiv.d") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tdiv.w") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tdiv.d") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: DIV error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   DIVU  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tdiv.wu") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tdiv.du") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tdiv.wu") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tdiv.du") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: DIVU error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   MOD  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmod.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tmod.d") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmod.w") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tmod.d") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: MOD error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   MODU  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmod.wu") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tmod.du") o1 o2 o3
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tmod.wu") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tmod.du") o1 o2 o3
     | otherwise -> pprPanic "LA64.ppr: MODU error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   -- 2. Bit-shift Instuctions --------------------------------------------------
     -- SLL.W, SRL.W, SRA.W, ROTR.W
@@ -751,58 +731,42 @@ pprInstr platform instr = case instr of
     -- SLLI.W, SRLI.W, SRAI.W, ROTRI.W
     -- SLLI.D, SRLI.D, SRAI.D, ROTRI.D
   SLL  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tsll.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tsll.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, (OpImm (ImmInteger i)) <- o3, 0 <= i, i < 32 ->
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tsll.w") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tsll.d") o1 o2 o3
+    | OpReg W32 _ <- o2, isImmOp o3 ->
         lines_ [text "\tslli.w" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, (OpImm (ImmInt i)) <- o3, 0 <= i, i < 32 ->
-        lines_ [text "\tslli.w" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInteger i)) <- o3, 0 <= i, i < 64 ->
-        lines_ [text "\tslli.d" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInt i)) <- o3, 0 <= i, i < 64 ->
+    | OpReg W64 _ <- o2, isImmOp o3 ->
         lines_ [text "\tslli.d" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
     | otherwise -> pprPanic "LA64.ppr: SLL error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   SRL  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tsrl.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tsrl.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, (OpImm (ImmInteger i)) <- o3, 0 <= i, i < 32 ->
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tsrl.w") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tsrl.d") o1 o2 o3
+    | OpReg W32 _ <- o2, isImmOp o3 ->
         lines_ [text "\tsrli.w" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, (OpImm (ImmInt i)) <- o3, 0 <= i, i < 32 ->
-        lines_ [text "\tsrli.w" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInteger i)) <- o3, 0 <= i, i < 64 ->
-        lines_ [text "\tsrli.d" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInt i)) <- o3, 0 <= i, i < 64 ->
+    | OpReg W64 _ <- o2, isImmOp o3 ->
         lines_ [text "\tsrli.d" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
     | otherwise -> pprPanic "LA64.ppr: SRL error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   SRA  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tsra.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tsra.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, (OpImm (ImmInteger i)) <- o3, 0 <= i, i < 32 ->
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\tsra.w") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\tsra.d") o1 o2 o3
+    | OpReg W32 _ <- o2, isImmOp o3 ->
         lines_ [text "\tsrai.w" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, (OpImm (ImmInt i)) <- o3, 0 <= i, i < 32 ->
-        lines_ [text "\tsrai.w" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInteger i)) <- o3, 0 <= i, i < 64 ->
-        lines_ [text "\tsrai.d" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInt i)) <- o3, 0 <= i, i < 64 ->
+    | OpReg W64 _ <- o2, isImmOp o3 ->
         lines_ [text "\tsrai.d" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
     | otherwise -> pprPanic "LA64.ppr: SRA error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   ROTR  o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\trotr.w") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\trotr.d") o1 o2 o3
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, (OpImm (ImmInteger i)) <- o3, 0 <= i, i < 32 ->
+    | OpReg W32 _ <- o2, OpReg W32 _ <- o3 -> op3 (text "\trotr.w") o1 o2 o3
+    | OpReg W64 _ <- o2, OpReg W64 _ <- o3 -> op3 (text "\trotr.d") o1 o2 o3
+    | OpReg W32 _ <- o2, isImmOp o3 ->
         lines_ [text "\trotri.w" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2, (OpImm (ImmInt i)) <- o3, 0 <= i, i < 32 ->
-        lines_ [text "\trotri.w" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInteger i)) <- o3, 0 <= i, i < 64 ->
-        lines_ [text "\trotri.d" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2, (OpImm (ImmInt i)) <- o3, 0 <= i, i < 64 ->
+    | OpReg W64 _ <- o2, isImmOp o3 ->
         lines_ [text "\trotri.d" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3]
     | otherwise -> pprPanic "LA64.ppr: ROTR error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2 <+> (ppr (widthFromOpReg o3)) <+> pprOp platform o3)
   -- 3. Bit-manupulation Instructions ------------------------------------------
     -- EXT.W{B/H}
   EXT o1 o2
-    | OpReg W64 _ <- o1, OpReg W8 _ <- o2  -> op2 (text "\text.w.b") o1 o2
-    | OpReg W64 _ <- o1, OpReg W16 _ <- o2 -> op2 (text "\text.w.h") o1 o2
+    | OpReg W8 _ <- o2  -> op2 (text "\text.w.b") o1 o2
+    | OpReg W16 _ <- o2 -> op2 (text "\text.w.h") o1 o2
     | otherwise -> pprPanic "LA64.ppr: EXT error: " ((ppr (widthFromOpReg o1)) <+> pprOp platform o1 <+> (ppr (widthFromOpReg o2)) <+> pprOp platform o2)
     -- CL{O/Z}.{W/D}, CT{O/Z}.{W/D}
   CLO o1 o2
@@ -823,8 +787,8 @@ pprInstr platform instr = case instr of
     | otherwise -> pprPanic "LA64.ppr: CTZ error" (pprOp platform o1 <+> pprOp platform o2)
     -- BYTEPICK.{W/D} rd, rj, rk, sa2/sa3
   BYTEPICK o1 o2 o3 o4
-    | OpReg W64 _ <- o1, OpReg W32 _ <- o2 -> op4 (text "\tbytepick.w") o1 o2 o3 o4
-    | OpReg W64 _ <- o1, OpReg W64 _ <- o2 -> op4 (text "\tbytepick.d") o1 o2 o3 o4
+    | OpReg W32 _ <- o2 -> op4 (text "\tbytepick.w") o1 o2 o3 o4
+    | OpReg W64 _ <- o2 -> op4 (text "\tbytepick.d") o1 o2 o3 o4
     | otherwise -> pprPanic "LA64.ppr: BYTEPICK error" (pprOp platform o1 <+> pprOp platform o2 <+> pprOp platform o3 <+> pprOp platform o4)
     -- REVB.{2H/4H/2W/D}
   REVB2H o1 o2 -> op2 (text "\trevb.2h") o1 o2
@@ -857,7 +821,7 @@ pprInstr platform instr = case instr of
     -- BL
     -- JIRL
     -- jr rd = jirl $zero, rd, 0: Commonly used for subroutine return.
-  J (TReg r) -> line $ text "\tjirl" <+> text "$r1" <> comma <+> pprReg W64 r <> comma <+> text " 0"
+  J (TReg r) -> line $ text "\tjirl" <+> text "$r0" <> comma <+> pprReg W64 r <> comma <+> text " 0"
   J_TBL _ _ r    -> pprInstr platform (B (TReg r))
 
   B (TBlock bid) -> line $ text "\tb" <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
@@ -868,71 +832,89 @@ pprInstr platform instr = case instr of
   BL (TLabel lbl) _ -> line $ text "\tbl" <+> pprAsmLabel platform lbl
   BL (TReg r) _    -> line $ text "\tjirl" <+> text "$r1" <> comma <+> pprReg W64 r <> comma <+> text " 0"
 
+  CALL (TBlock bid) _ -> line $ text "\tcall36" <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+  CALL (TLabel lbl) _ -> line $ text "\tcall36" <+> pprAsmLabel platform lbl
+  CALL (TReg r) _ -> line $ text "\tjirl" <+> text "$r1" <> comma <+> pprReg W64 r <> comma <+> text " 0"
+
   CALL36 (TBlock bid) -> line $ text "\tcall36" <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
   CALL36 (TLabel lbl) -> line $ text "\tcall36" <+> pprAsmLabel platform lbl
-  CALL36 _ -> panic "LA64.ppr: CALL36: Unexpected pattern!"
+  CALL36 _ -> panic "LA64.ppr: CALL36: Not to registers!"
   TAIL36 r (TBlock bid) -> line $ text "\ttail36" <+> pprOp platform r <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
   TAIL36 r (TLabel lbl) -> line $ text "\ttail36" <+> pprOp platform r <> comma <+> pprAsmLabel platform lbl
-  TAIL36 _ _ -> panic "LA64.ppr: TAIL36: Unexpected pattern!"
+  TAIL36 _ _ -> panic "LA64.ppr: TAIL36: Not to registers!"
 
-  BCOND c j d (TLabel lbl) _t -> case c of
-    _ -> line $ text "\t" <> pprBcond c <+> pprOp platform j <> comma <+> pprOp platform d <> comma <+> pprAsmLabel platform lbl
+  BCOND1 c j d (TBlock bid) -> case c of
+    SLE ->
+      line $ text "\tbge" <+> pprOp platform d <> comma <+> pprOp platform j <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+    SGT ->
+      line $ text "\tblt" <+> pprOp platform d <> comma <+> pprOp platform j <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+    ULE ->
+      line $ text "\tbgeu" <+> pprOp platform d <> comma <+> pprOp platform j <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+    UGT ->
+      line $ text "\tbltu" <+> pprOp platform d <> comma <+> pprOp platform j <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+    _ -> line $ text "\t" <> pprBcond c <+> pprOp platform j <> comma <+> pprOp platform d <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
 
-  BCOND c j d (TBlock bid) t -> case c of
+  BCOND1 _ _ _ (TLabel _) -> panic "LA64.ppr: BCOND1: No conditional branching to TLabel!"
+
+  BCOND1 _ _ _ (TReg _) -> panic "LA64.ppr: BCOND1: No conditional branching to registers!"
+
+  -- Reuse t8(IP) register
+  BCOND c j d (TBlock bid) -> case c of
     SLE ->
       lines_ [
-              text "\tslt" <+> pprOp platform t <> comma <+> pprOp platform  d <> comma <+> pprOp platform j,
-              text "\tbeqz" <+> pprOp platform t <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+              text "\tslt $t8, " <+> pprOp platform  d <> comma <+> pprOp platform j,
+              text "\tbeqz $t8, " <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
              ]
     SGT ->
       lines_ [
-              text "\tslt" <+> pprOp platform t <> comma <+> pprOp platform  d <> comma <+> pprOp platform j,
-              text "\tbnez" <+> pprOp platform t <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+              text "\tslt $t8, " <+> pprOp platform  d <> comma <+> pprOp platform j,
+              text "\tbnez $t8, " <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
              ]
     ULE ->
       lines_ [
-              text "\tsltu" <+> pprOp platform t <> comma <+> pprOp platform  d <> comma <+> pprOp platform j,
-              text "\tbeqz" <+> pprOp platform t <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+              text "\tsltu $t8, " <+> pprOp platform  d <> comma <+> pprOp platform j,
+              text "\tbeqz $t8, " <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
              ]
     UGT ->
       lines_ [
-              text "\tsltu" <+> pprOp platform t <> comma <+> pprOp platform  d <> comma <+> pprOp platform j,
-              text "\tbnez" <+> pprOp platform t <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+              text "\tsltu $t8, " <+> pprOp platform  d <> comma <+> pprOp platform j,
+              text "\tbnez $t8, " <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
              ]
     EQ ->
       lines_ [
-              text "\tsub.d" <+> pprOp platform t <> comma <+> pprOp platform  j <> comma <+> pprOp platform d,
-              text "\tbeqz" <+> pprOp platform t <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+              text "\tsub.d $t8, " <+> pprOp platform  j <> comma <+> pprOp platform d,
+              text "\tbeqz $t8, " <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
              ]
     NE ->
       lines_ [
-              text "\tsub.d" <+> pprOp platform t <> comma <+> pprOp platform  j <> comma <+> pprOp platform d,
-              text "\tbnez" <+> pprOp platform t <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+              text "\tsub.d $t8, " <+> pprOp platform  j <> comma <+> pprOp platform d,
+              text "\tbnez $t8, " <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
              ]
     SLT ->
       lines_ [
-              text "\tslt" <+> pprOp platform t <> comma <+> pprOp platform  j <> comma <+> pprOp platform d,
-              text "\tbnez" <+> pprOp platform t <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+              text "\tslt $t8, " <+> pprOp platform  j <> comma <+> pprOp platform d,
+              text "\tbnez $t8, " <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
              ]
     SGE ->
       lines_ [
-              text "\tslt" <+> pprOp platform t <> comma <+> pprOp platform  j <> comma <+> pprOp platform d,
-              text "\tbeqz" <+> pprOp platform t <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+              text "\tslt $t8, " <+> pprOp platform  j <> comma <+> pprOp platform d,
+              text "\tbeqz $t8, " <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
              ]
     ULT ->
       lines_ [
-              text "\tsltu" <+> pprOp platform t <> comma <+> pprOp platform  j <> comma <+> pprOp platform d,
-              text "\tbnez" <+> pprOp platform t <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+              text "\tsltu $t8, " <+> pprOp platform  j <> comma <+> pprOp platform d,
+              text "\tbnez $t8, " <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
              ]
     UGE ->
       lines_ [
-              text "\tsltu" <+> pprOp platform t <> comma <+> pprOp platform  j <> comma <+> pprOp platform d,
-              text "\tbeqz" <+> pprOp platform t <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+              text "\tsltu $t8, " <+> pprOp platform  j <> comma <+> pprOp platform d,
+              text "\tbeqz $t8, " <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
              ]
+    _ -> panic "LA64.ppr: BCOND: Unsupported cond!"
 
-    _ -> line $ text "\t" <> pprBcond c <+> pprOp platform j <> comma <+> pprOp platform d <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+  BCOND _ _ _ (TLabel _) -> panic "LA64.ppr: BCOND: No conditional branching to TLabel!"
 
-  BCOND _ _ _ (TReg _) _     -> panic "LA64.ppr: BCOND: No conditional branching to registers!"
+  BCOND _ _ _ (TReg _) -> panic "LA64.ppr: BCOND: No conditional branching to registers!"
 
   BEQZ j (TBlock bid) ->
     line $ text "\tbeqz" <+> pprOp platform j <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
@@ -951,12 +933,34 @@ pprInstr platform instr = case instr of
     -- LD: load, ST: store, x: offset in register, u: load unsigned imm.
     -- LD format dst src: 'src' means final address, not single register or immdiate.
   -- Load symbol's address
+  LD _fmt o1 (OpImm (ImmIndex lbl' off)) | Just (_, lbl) <- dynamicLinkerLabelInfo lbl' ->
+    lines_ [ text "\tpcalau12i" <+> pprOp platform o1 <> comma <+> text "%got_pc_hi20(" <> pprAsmLabel platform lbl <> text ")"
+            , text "\tld.d"   <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%got_pc_lo12(" <> pprAsmLabel platform lbl <> text ")"
+            , text "\taddi.d"   <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> int off
+           ]
+  LD _fmt o1 (OpImm (ImmIndex lbl off)) | isForeignLabel lbl ->
+    lines_ [ text "\tpcalau12i" <+> pprOp platform o1 <> comma <+> text "%got_pc_hi20(" <> pprAsmLabel platform lbl <> text ")"
+            , text "\tld.d"   <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%got_pc_lo12(" <> pprAsmLabel platform lbl <> text ")"
+            , text "\taddi.d"   <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> int off
+           ]
   LD _fmt o1 (OpImm (ImmIndex lbl off)) ->
-    lines_ [ text "\tla.global" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl
-           , text "\taddi.d" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> int off
+    lines_ [ text "\tpcalau12i" <+> pprOp platform o1 <> comma <+> text "%pc_hi20(" <> pprAsmLabel platform lbl <> text ")"
+            , text "\taddi.d"    <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%pc_lo12(" <> pprAsmLabel platform lbl <> text ")"
+            , text "\taddi.d"   <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> int off
+           ]
+
+  LD _fmt o1 (OpImm (ImmCLbl lbl')) | Just (_, lbl) <- dynamicLinkerLabelInfo lbl' ->
+    lines_ [ text "\tpcalau12i" <+> pprOp platform o1 <> comma <+> text "%got_pc_hi20(" <> pprAsmLabel platform lbl <> text ")"
+            , text "\tld.d"   <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%got_pc_lo12(" <> pprAsmLabel platform lbl <> text ")"
+           ]
+  LD _fmt o1 (OpImm (ImmCLbl lbl)) | isForeignLabel lbl ->
+    lines_ [ text "\tpcalau12i" <+> pprOp platform o1 <> comma <+> text "%got_pc_hi20(" <> pprAsmLabel platform lbl <> text ")"
+            , text "\tld.d"   <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%got_pc_lo12(" <> pprAsmLabel platform lbl <> text ")"
            ]
   LD _fmt o1 (OpImm (ImmCLbl lbl)) ->
-    line $ text "\tla.global" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl
+    lines_ [ text "\tpcalau12i" <+> pprOp platform o1 <> comma <+> text "%pc_hi20(" <> pprAsmLabel platform lbl <> text ")"
+            , text "\taddi.d"    <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%pc_lo12(" <> pprAsmLabel platform lbl <> text ")"
+           ]
 
   LD II8  o1 o2 -> op2 (text "\tld.b") o1 o2
   LD II16 o1 o2 -> op2 (text "\tld.h") o1 o2
@@ -1005,6 +1009,8 @@ pprInstr platform instr = case instr of
   STX II64  o1 o2 -> op2 (text "\tstx.d")  o1 o2
   STX FF32  o1 o2 -> op2 (text "\tfstx.s") o1 o2
   STX FF64  o1 o2 -> op2 (text "\tfstx.d") o1 o2
+
+  PRELD h o1@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tpreld") h o1
   -- 6. Bound Check Memory Access Instructions ---------------------------------
     -- LD{GT/LE}.{B/H/W/D}, ST{GT/LE}.{B/H/W/D}
   -- 7. Atomic Memory Access Instructions --------------------------------------
@@ -1092,6 +1098,7 @@ pprInstr platform instr = case instr of
   FMAXA o1 o2 o3 -> op3 (text "fmaxa." <> if isSingleOp o2 then text "s" else text "d") o1 o2 o3
   FABS o1 o2 -> op2 (text "fabs." <> if isSingleOp o2 then text "s" else text "d") o1 o2
   FNEG o1 o2 -> op2 (text "fneg." <> if isSingleOp o2 then text "s" else text "d") o1 o2
+  FSQRT o1 o2 -> op2 (text "fsqrt." <> if isSingleOp o2 then text "s" else text "d") o1 o2
   FMA variant d o1 o2 o3 ->
     let fma = case variant of
                 FMAdd   -> text "\tfmadd." <+> floatPrecission d

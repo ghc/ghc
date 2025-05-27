@@ -6,6 +6,7 @@
 module GHC.CmmToAsm.LA64.CodeGen (
       cmmTopCodeGen
     , generateJumpTableForInstr
+    , makeFarBranches
 )
 
 where
@@ -31,7 +32,7 @@ import GHC.CmmToAsm.Monad
     getNewLabelNat,
     getNewRegNat,
     getPicBaseMaybeNat,
-    getPlatform,
+    getPlatform
   )
 import GHC.CmmToAsm.PIC
 import GHC.CmmToAsm.LA64.Cond
@@ -53,10 +54,10 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Cmm.Dataflow.Label()
 import GHC.Utils.Monad
 import Control.Monad
-import GHC.Types.Unique.DSM()
+import GHC.Cmm.Dataflow.Label
+import GHC.Types.Unique.DSM
 
 -- [General layout of an NCG]
 cmmTopCodeGen ::
@@ -449,14 +450,6 @@ getRegister e = do
 getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
 
 -- OPTIMIZATION WARNING: CmmExpr rewrites
--- Maybe we can do more?
--- 1. Rewrite: Reg + (-i) => Reg - i
-getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt i w1)]) | i < 0
-  = getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt (-i) w1)])
-
--- 2. Rewrite: Reg - (-i) => Reg + i
-getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i < 0
-  = getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt (-i) w1)])
 
 -- Generic case.
 getRegister' config plat expr =
@@ -616,19 +609,37 @@ getRegister' config plat expr =
         x -> pprPanic ("getRegister' (monadic CmmMachOp): " ++ show x) (pdoc plat expr)
       where
         -- In the case of 32- or 16- or 8-bit values we need to sign-extend to 64-bits
-        negate code w reg = do
+        negate code w reg
+          | w `elem` [W8, W16] = do
             return $ Any (intFormat w) $ \dst ->
-                code `appOL`
-                signExtend w W64 reg reg `snocOL`
+                code `snocOL`
+                EXT (OpReg W64 reg) (OpReg w reg) `snocOL`
                 NEG (OpReg W64 dst) (OpReg W64 reg) `appOL`
                 truncateReg W64 w dst
+          | otherwise = do
+            return $ Any (intFormat w) $ \dst ->
+                code `snocOL`
+                NEG (OpReg W64 dst) (OpReg w reg)
 
-        ss_conv from to reg code =
+        ss_conv from to reg code
+          | from `elem` [W8, W16] || to `elem` [W8, W16] = do
+            return $ Any (intFormat to) $ \dst ->
+                code `snocOL`
+                EXT (OpReg W64 dst) (OpReg (min from to) reg) `appOL`
+                -- At this point an 8- or 16-bit value would be sign-extended
+                -- to 64-bits. Truncate back down the final width.
+                truncateReg W64 to dst
+          | from == W32 && to == W64 = do
+            return $ Any (intFormat to) $ \dst ->
+                code `snocOL`
+                SLL (OpReg to dst) (OpReg from reg) (OpImm (ImmInt 0))
+          | from == to = do
+            return $ Any (intFormat from) $ \dst ->
+                 code `snocOL` MOV (OpReg from dst) (OpReg from reg)
+          | otherwise = do
             return $ Any (intFormat to) $ \dst ->
                 code `appOL`
                 signExtend from W64 reg dst `appOL`
-                -- At this point an 8- or 16-bit value would be sign-extended
-                -- to 64-bits. Truncate back down the final width.
                 truncateReg W64 to dst
 
 
@@ -646,337 +657,532 @@ getRegister' config plat expr =
     CmmMachOp (MO_Add _) [expr'@(CmmReg (CmmGlobal _r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
     CmmMachOp (MO_Sub _) [expr'@(CmmReg (CmmGlobal _r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
 
-    CmmMachOp (MO_Add w) [x, CmmLit (CmmInt n _)]
-      | w `elem` [W8, W16, W32]
-      , fitsInNbits 12 (fromIntegral n) -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `snocOL`
-                                    annExpr expr (ADD (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInt (fromIntegral n) ))) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+    CmmMachOp (MO_Add w) [x, CmmLit (CmmInt n _)] | fitsInNbits 12 (fromIntegral n) -> do
+      if w `elem` [W8, W16]
+        then do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `snocOL`
+                                        annExpr expr (EXT (OpReg W64 reg_x) (OpReg w reg_x)) `snocOL`
+                                        ADD (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n))
+                                     )
+        else do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (ADD (OpReg W64 dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
-    CmmMachOp (MO_Sub w) [x, CmmLit (CmmInt n _)]
-      | w `elem` [W8, W16, W32]
-      , fitsInNbits 12 (fromIntegral n) -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `snocOL`
-                                    annExpr expr (SUB (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInt (fromIntegral n) ))) `appOL`
-                                    truncateReg W64 w dst
-                                 )
-
-    CmmMachOp (MO_Add w) [CmmReg reg, CmmLit (CmmInt n _)]
-      | w `elem` [W8, W16, W32]
-      , fitsInNbits 12 (fromIntegral n) -> do
-      let w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
-          r' = getRegisterReg plat reg
-      return $ Any (intFormat w) ( \dst ->
-                                    signExtend w' W64 r' r' `snocOL`
-                                    annExpr expr (ADD (OpReg W64 dst) (OpReg w' r') (OpImm (ImmInt (fromIntegral n) ))) `appOL`
-                                    truncateReg W64 w dst
-                                 )
-
-    CmmMachOp (MO_Sub w) [CmmReg reg, CmmLit (CmmInt n _)]
-      | w `elem` [W8, W16, W32]
-      , fitsInNbits 12 (fromIntegral n) -> do
-      let w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
-          r' = getRegisterReg plat reg
-      return $ Any (intFormat w) ( \dst ->
-                                    signExtend w' W64 r' r' `snocOL`
-                                    annExpr expr (SUB (OpReg W64 dst) (OpReg w' r') (OpImm (ImmInt (fromIntegral n) ))) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+    CmmMachOp (MO_Sub w) [x, CmmLit (CmmInt n _)] | fitsInNbits 12 (fromIntegral n) -> do
+      if w `elem` [W8, W16]
+        then do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `snocOL`
+                                        annExpr expr (EXT (OpReg W64 reg_x) (OpReg w reg_x)) `snocOL`
+                                        SUB (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n))
+                                     )
+        else do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SUB (OpReg W64 dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
     CmmMachOp (MO_U_Quot w) [x, y]
-      | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `appOL`
-                                    code_y `appOL`
-                                    truncateReg (formatToWidth format_y) W64 reg_y `snocOL`
-                                    annExpr expr (DIVU (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+      | w `elem` [W8, W16] -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) (\dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      truncateReg w W64 reg_x `appOL`
+                                      truncateReg w W64 reg_y `snocOL`
+                                      annExpr expr (DIVU (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
 
     -- 2. Shifts.
-    CmmMachOp (MO_Shl w) [x, y]
-      | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `appOL`
-                                    code_y `appOL`
-                                    signExtend (formatToWidth format_y) W64 reg_y reg_y `snocOL`
-                                    annExpr expr (SLL (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+    CmmMachOp (MO_Shl w) [x, y] ->
+      case y of
+        CmmLit (CmmInt n _) | w `elem` [W8, W16], 0 <= n, n < fromIntegral (widthInBits w) -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `snocOL`
+                                        annExpr expr (EXT (OpReg W64 reg_x) (OpReg w reg_x)) `snocOL`
+                                        SLL (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n))
+                                     )
+        CmmLit (CmmInt n _) | 0 <= n, n < fromIntegral (widthInBits w) -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SLL (OpReg W64 dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
-    CmmMachOp (MO_Shl w) [x, CmmLit (CmmInt n _)]
-      | w `elem` [W8, W16, W32]
-      , 0 <= n, n < fromIntegral (widthInBits w) -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `snocOL`
-                                    annExpr expr (SLL (OpReg W64 dst) (OpReg w reg_x) (OpImm (ImmInt (fromIntegral n) ))) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        _ | w `elem` [W8, W16] -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `snocOL`
+                                        annExpr expr (EXT (OpReg W64 reg_x) (OpReg w reg_x)) `snocOL`
+                                        EXT (OpReg W64 reg_y) (OpReg w reg_y) `snocOL`
+                                        SLL (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)
+                                     )
+        _ -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `snocOL`
+                                        annExpr expr (SLL (OpReg W64 dst) (OpReg w reg_x) (OpReg w reg_y))
+                                     )
 
     -- MO_S_Shr: signed-shift-right
-    CmmMachOp (MO_S_Shr w) [x, y]
-      | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `appOL`
-                                    code_y `appOL`
-                                    signExtend (formatToWidth format_y) W64 reg_y reg_y `snocOL`
-                                    annExpr expr (SRA (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
-    CmmMachOp (MO_S_Shr w) [x, CmmLit (CmmInt n _)]
-      | w `elem` [W8, W16, W32]
-      , fitsInNbits 12 (fromIntegral n) -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w)  (\dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `snocOL`
-                                    annExpr expr (SRA (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInt (fromIntegral n) ))) `appOL`
-                                    truncateReg W64 w dst
-                                  )
+    CmmMachOp (MO_S_Shr w) [x, y] ->
+      case y of
+        CmmLit (CmmInt n _) | w `elem` [W8, W16], 0 <= n, n < fromIntegral (widthInBits w) -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w)  (\dst ->
+                                        code_x `snocOL`
+                                        annExpr expr (EXT (OpReg W64 reg_x) (OpReg w reg_x)) `snocOL`
+                                        SRA (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n))
+                                      )
+        CmmLit (CmmInt n _) | 0 <= n, n < fromIntegral (widthInBits w) -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SRA (OpReg W64 dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+
+        _ | w `elem` [W8, W16] -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `snocOL`
+                                        annExpr expr (EXT (OpReg W64 reg_x) (OpReg w reg_x)) `snocOL`
+                                        EXT (OpReg W64 reg_y) (OpReg w reg_y) `snocOL`
+                                        SRA (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)
+                                     )
+        _ -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `snocOL`
+                                        annExpr expr (SRA (OpReg W64 dst) (OpReg w reg_x) (OpReg w reg_y))
+                                     )
 
     -- MO_U_Shr: unsigned-shift-right
-    CmmMachOp (MO_U_Shr w) [x, y]
-      | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `appOL`
-                                    code_y `appOL`
-                                    truncateReg (formatToWidth format_y) W64 reg_y `snocOL`
-                                    annExpr expr (SRL (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
-    CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)]
-      | w `elem` [W8, W16, W32]
-      , 0 <= n, n < fromIntegral (widthInBits w) -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `snocOL`
-                                    annExpr expr (SRL (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInt (fromIntegral n) ))) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+    CmmMachOp (MO_U_Shr w) [x, y] ->
+      case y of
+        CmmLit (CmmInt n _) | w `elem` [W8, W16], 0 <= n, n < fromIntegral (widthInBits w) -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        truncateReg w W64 reg_x `snocOL`
+                                        annExpr expr (SRL (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n)))
+                                     )
+        CmmLit (CmmInt n _) | 0 <= n, n < fromIntegral (widthInBits w) -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SRL (OpReg W64 dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+
+        _ | w `elem` [W8, W16] -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `appOL`
+                                        truncateReg w W64 reg_x `appOL`
+                                        truncateReg w W64 reg_y `snocOL`
+                                        annExpr expr (SRL (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                     )
+        _ -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `snocOL`
+                                        annExpr expr (SRL (OpReg W64 dst) (OpReg w reg_x) (OpReg w reg_y))
+                                     )
 
     -- 3. Logic &&, ||
     -- andi Instr's Imm-operand is zero-extended.
-    CmmMachOp (MO_And w) [x, y]
-      | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `appOL`
-                                    code_y `appOL`
-                                    truncateReg (formatToWidth format_y) W64 reg_y `snocOL`
-                                    annExpr expr (AND (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+    CmmMachOp (MO_And w) [x, y] ->
+      case y of
+        CmmLit (CmmInt n _) | w `elem` [W8, W16, W32], (n :: Integer) >= 0, (n :: Integer) <= 4095 -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        truncateReg w W64 reg_x `snocOL`
+                                        annExpr expr (AND (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n)))
+                                     )
 
-    CmmMachOp (MO_And w) [x, CmmLit (CmmInt n _)]
-      | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `snocOL`
-                                    annExpr expr (AND (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInt (fromIntegral n) ))) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        CmmLit (CmmInt n _) | (n :: Integer) >= 0, (n :: Integer) <= 4095 -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (AND (OpReg W64 dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
-    CmmMachOp (MO_Or w) [x, y]
-      | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `appOL`
-                                    code_y `appOL`
-                                    truncateReg (formatToWidth format_y) W64 reg_y `snocOL`
-                                    annExpr expr (OR (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        CmmLit (CmmInt n _) | w `elem` [W8, W16, W32] -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          tmp <- getNewRegNat II64
+          return $ Any (intFormat w) (\dst ->
+                                       code_x `appOL`
+                                       truncateReg w W64 reg_x `snocOL`
+                                       annExpr expr (MOV (OpReg W64 tmp) (OpImm (ImmInteger n))) `snocOL`
+                                       AND (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 tmp)
+                                     )
 
-    CmmMachOp (MO_Or w) [x, CmmLit (CmmInt n _)]
-      | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `snocOL`
-                                    annExpr expr (OR (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInt (fromIntegral n) ))) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        CmmLit (CmmInt n _) -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          tmp <- getNewRegNat II64
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `snocOL`
+                                        annExpr expr (MOV (OpReg W64 tmp) (OpImm (ImmInteger  n))) `snocOL`
+                                        AND (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 tmp)
+                                     )
 
-    CmmMachOp (MO_Xor w) [x, y]
-      | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `appOL`
-                                    code_y `appOL`
-                                    truncateReg (formatToWidth format_y) W64 reg_y `snocOL`
-                                    annExpr expr (XOR (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        _ | w `elem` [W8, W16, W32] -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `appOL`
+                                        truncateReg w W64 reg_x `appOL`
+                                        truncateReg w W64 reg_y `snocOL`
+                                        annExpr expr (AND (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                     )
 
-    CmmMachOp (MO_Xor w) [x, CmmLit (CmmInt n _)]
-      | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `snocOL`
-                                    annExpr expr (XOR (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInt (fromIntegral n) ))) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        _ -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `snocOL`
+                                        annExpr expr (AND (OpReg W64 dst) (OpReg w reg_x) (OpReg w reg_y))
+                                     )
+
+    -- ori Instr's Imm-operand is zero-extended.
+    CmmMachOp (MO_Or w) [x, y] ->
+      case y of
+        CmmLit (CmmInt n _) | w `elem` [W8, W16, W32], (n :: Integer) >= 0, (n :: Integer) <= 4095 -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        truncateReg w W64 reg_x `snocOL`
+                                        annExpr expr (OR (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n)))
+                                     )
+
+        CmmLit (CmmInt n _) | (n :: Integer) >= 0, (n :: Integer) <= 4095 -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (OR (OpReg W64 dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+
+        CmmLit (CmmInt n _) | w `elem` [W8, W16, W32] -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          tmp <- getNewRegNat II64
+          return $ Any (intFormat w) (\dst ->
+                                       code_x `appOL`
+                                       truncateReg w W64 reg_x `snocOL`
+                                       annExpr expr (MOV (OpReg W64 tmp) (OpImm (ImmInteger n))) `snocOL`
+                                       OR (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 tmp)
+                                     )
+
+        CmmLit (CmmInt n _) -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          tmp <- getNewRegNat II64
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `snocOL`
+                                        annExpr expr (MOV (OpReg W64 tmp) (OpImm (ImmInteger  n))) `snocOL`
+                                        OR (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 tmp)
+                                     )
+
+        _ | w `elem` [W8, W16, W32] -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `appOL`
+                                        truncateReg w W64 reg_x `appOL`
+                                        truncateReg w W64 reg_y `snocOL`
+                                        annExpr expr (OR (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                     )
+
+        _ -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `snocOL`
+                                        annExpr expr (OR (OpReg W64 dst) (OpReg w reg_x) (OpReg w reg_y))
+                                     )
+
+    -- xori Instr's Imm-operand is zero-extended.
+    CmmMachOp (MO_Xor w) [x, y] ->
+      case y of
+        CmmLit (CmmInt n _) | w `elem` [W8, W16, W32], (n :: Integer) >= 0, (n :: Integer) <= 4095 -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        truncateReg w W64 reg_x `snocOL`
+                                        annExpr expr (XOR (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n)))
+                                     )
+
+        CmmLit (CmmInt n _) | (n :: Integer) >= 0, (n :: Integer) <= 4095 -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (XOR (OpReg W64 dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+
+        CmmLit (CmmInt n _) | w `elem` [W8, W16, W32] -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          tmp <- getNewRegNat II64
+          return $ Any (intFormat w) (\dst ->
+                                       code_x `appOL`
+                                       truncateReg w W64 reg_x `snocOL`
+                                       annExpr expr (MOV (OpReg W64 tmp) (OpImm (ImmInteger n))) `snocOL`
+                                       XOR (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 tmp)
+                                     )
+
+        CmmLit (CmmInt n _) -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          tmp <- getNewRegNat II64
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `snocOL`
+                                        annExpr expr (MOV (OpReg W64 tmp) (OpImm (ImmInteger  n))) `snocOL`
+                                        XOR (OpReg W64 dst) (OpReg w reg_x) (OpReg W64 tmp)
+                                     )
+
+        _ | w `elem` [W8, W16, W32] -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `appOL`
+                                        truncateReg w W64 reg_x `appOL`
+                                        truncateReg w W64 reg_y `snocOL`
+                                        annExpr expr (XOR (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                     )
+
+        _ -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          (reg_y, _format_y, code_y) <- getSomeReg y
+          return $ Any (intFormat w) (\dst ->
+                                        code_x `appOL`
+                                        code_y `snocOL`
+                                        annExpr expr (XOR (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                     )
 
     -- CSET commands register operand being W64.
     CmmMachOp (MO_Eq w) [x, y]
       | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `appOL`
-                                    code_y `appOL`
-                                    signExtend (formatToWidth format_y) W64 reg_y reg_y `snocOL`
-                                    annExpr expr (CSET EQ (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      signExtend w W64 reg_x reg_x `appOL`
+                                      signExtend w W64 reg_y reg_y `snocOL`
+                                      annExpr expr (CSET EQ (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+       | otherwise -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `snocOL`
+                                      annExpr expr (CSET EQ (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
 
     CmmMachOp (MO_Ne w) [x, y]
       | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `appOL`
-                                    code_y `appOL`
-                                    signExtend (formatToWidth format_y) W64 reg_y reg_y `snocOL`
-                                    annExpr expr (CSET NE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      signExtend w W64 reg_x reg_x `appOL`
+                                      signExtend w W64 reg_y reg_y `snocOL`
+                                      annExpr expr (CSET NE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+      | otherwise -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `snocOL`
+                                      annExpr expr (CSET NE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+
+    CmmMachOp (MO_S_Lt w) [x, CmmLit (CmmInt n _)]
+      | w `elem` [W8, W16, W32]
+      , fitsInNbits 12 (fromIntegral n) -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      signExtend w W64 reg_x reg_x `snocOL`
+                                      annExpr expr (SSLT (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n)))
+                                   )
+      | fitsInNbits 12 (fromIntegral n) -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        return $ Any (intFormat w) ( \dst -> code_x `snocOL` annExpr expr (SSLT (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n))))
+
+    CmmMachOp (MO_U_Lt w) [x, CmmLit (CmmInt n _)]
+      | w `elem` [W8, W16, W32]
+      , fitsInNbits 12 (fromIntegral n) -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      truncateReg w W64 reg_x `snocOL`
+                                      annExpr expr (SSLTU (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger n)))
+                                   )
+      | fitsInNbits 12 (fromIntegral n) -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        return $ Any (intFormat w) ( \dst -> code_x `snocOL` annExpr expr (SSLTU (OpReg W64 dst) (OpReg W64 reg_x) (OpImm (ImmInteger  n))))
 
     CmmMachOp (MO_S_Lt w) [x, y]
       | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `appOL`
-                                    code_y `appOL`
-                                    signExtend (formatToWidth format_y) W64 reg_y reg_y `snocOL`
-                                    annExpr expr (CSET SLT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      signExtend w W64 reg_x reg_x `appOL`
+                                      signExtend w W64 reg_y reg_y `snocOL`
+                                      annExpr expr (CSET SLT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+      | otherwise -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `snocOL`
+                                      annExpr expr (CSET SLT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
 
     CmmMachOp (MO_S_Le w) [x, y]
       | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `appOL`
-                                    code_y `appOL`
-                                    signExtend (formatToWidth format_y) W64 reg_y reg_y `snocOL`
-                                    annExpr expr (CSET SLE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      signExtend w W64 reg_x reg_x `appOL`
+                                      signExtend w W64 reg_y reg_y `snocOL`
+                                      annExpr expr (CSET SLE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+      | otherwise -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `snocOL`
+                                      annExpr expr (CSET SLE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
 
     CmmMachOp (MO_S_Ge w) [x, y]
       | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `appOL`
-                                    code_y `appOL`
-                                    signExtend (formatToWidth format_y) W64 reg_y reg_y `snocOL`
-                                    annExpr expr (CSET SGE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      signExtend w W64 reg_x reg_x `appOL`
+                                      signExtend w W64 reg_y reg_y `snocOL`
+                                      annExpr expr (CSET SGE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+      | otherwise -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `snocOL`
+                                      annExpr expr (CSET SGE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
 
     CmmMachOp (MO_S_Gt w) [x, y]
       | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    signExtend (formatToWidth format_x) W64 reg_x reg_x `appOL`
-                                    code_y `appOL`
-                                    signExtend (formatToWidth format_y) W64 reg_y reg_y `snocOL`
-                                    annExpr expr (CSET SGT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      signExtend w W64 reg_x reg_x `appOL`
+                                      signExtend w W64 reg_y reg_y `snocOL`
+                                      annExpr expr (CSET SGT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+      | otherwise -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `snocOL`
+                                      annExpr expr (CSET SGT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
 
     CmmMachOp (MO_U_Lt w) [x, y]
       | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `appOL`
-                                    code_y `appOL`
-                                    truncateReg (formatToWidth format_y) W64 reg_y `snocOL`
-                                    annExpr expr (CSET ULT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      truncateReg w W64 reg_x `appOL`
+                                      truncateReg w W64 reg_y `snocOL`
+                                      annExpr expr (CSET ULT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+      | otherwise -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `snocOL`
+                                      annExpr expr (CSET ULT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
 
     CmmMachOp (MO_U_Le w) [x, y]
       | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `appOL`
-                                    code_y `appOL`
-                                    truncateReg (formatToWidth format_y) W64 reg_y `snocOL`
-                                    annExpr expr (CSET ULE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      truncateReg w W64 reg_x `appOL`
+                                      truncateReg w W64 reg_y `snocOL`
+                                      annExpr expr (CSET ULE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+      | otherwise -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `snocOL`
+                                      annExpr expr (CSET ULE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
 
     CmmMachOp (MO_U_Ge w) [x, y]
       | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `appOL`
-                                    code_y `appOL`
-                                    truncateReg (formatToWidth format_y) W64 reg_y `snocOL`
-                                    annExpr expr (CSET UGE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      truncateReg w W64 reg_x `appOL`
+                                      truncateReg w W64 reg_y `snocOL`
+                                      annExpr expr (CSET UGE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+      | otherwise -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `snocOL`
+                                      annExpr expr (CSET UGE (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
 
     CmmMachOp (MO_U_Gt w) [x, y]
       | w `elem` [W8, W16, W32] -> do
-      (reg_x, format_x, code_x) <- getSomeReg x
-      (reg_y, format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) ( \dst ->
-                                    code_x `appOL`
-                                    truncateReg (formatToWidth format_x) W64 reg_x `appOL`
-                                    code_y `appOL`
-                                    truncateReg (formatToWidth format_y) W64 reg_y `snocOL`
-                                    annExpr expr (CSET UGT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y)) `appOL`
-                                    truncateReg W64 w dst
-                                 )
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `appOL`
+                                      truncateReg w W64 reg_x `appOL`
+                                      truncateReg w W64 reg_y `snocOL`
+                                      annExpr expr (CSET UGT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
+      | otherwise -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        return $ Any (intFormat w) ( \dst ->
+                                      code_x `appOL`
+                                      code_y `snocOL`
+                                      annExpr expr (CSET UGT (OpReg W64 dst) (OpReg W64 reg_x) (OpReg W64 reg_y))
+                                   )
 
 
     -- Generic binary case.
@@ -1044,21 +1250,6 @@ getRegister' config plat expr =
         MO_U_Quot w  -> intOp False w (\d x y -> annExpr expr (DIVU d x y))
         MO_U_Rem w   -> intOp False w (\d x y -> annExpr expr (MODU d x y))
 
-        MO_Eq   w    -> intOp False  w (\d x y -> annExpr expr (CSET EQ d x y))
-        MO_Ne   w    -> intOp False  w (\d x y -> annExpr expr (CSET NE d x y))
-
-        -- Signed comparisons
-        MO_S_Ge w    -> intOp True  w (\d x y -> annExpr expr (CSET SGE d x y))
-        MO_S_Le w    -> intOp True  w (\d x y -> annExpr expr (CSET SLE d x y))
-        MO_S_Gt w    -> intOp True  w (\d x y -> annExpr expr (CSET SGT d x y))
-        MO_S_Lt w    -> intOp True  w (\d x y -> annExpr expr (CSET SLT d x y))
-
-        -- Unsigned comparisons
-        MO_U_Ge w    -> intOp False w (\d x y -> annExpr expr (CSET UGE d x y))
-        MO_U_Le w    -> intOp False w (\d x y -> annExpr expr (CSET ULE d x y))
-        MO_U_Gt w    -> intOp False w (\d x y -> annExpr expr (CSET UGT d x y))
-        MO_U_Lt w    -> intOp False w (\d x y -> annExpr expr (CSET ULT d x y))
-
         -- Floating point arithmetic
         MO_F_Add w   -> floatOp w (\d x y -> unitOL $ annExpr expr (ADD d x y))
         MO_F_Sub w   -> floatOp w (\d x y -> unitOL $ annExpr expr (SUB d x y))
@@ -1074,15 +1265,6 @@ getRegister' config plat expr =
         MO_F_Le w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET FLE d x y))
         MO_F_Gt w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET FGT d x y))
         MO_F_Lt w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET FLT d x y))
-
-        MO_Shl   w   -> intOp False w (\d x y -> annExpr expr (SLL d x y))
-        MO_U_Shr w   -> intOp False w (\d x y -> annExpr expr (SRL d x y))
-        MO_S_Shr w   -> intOp True  w (\d x y -> annExpr expr (SRA d x y))
-
-        -- Bitwise operations
-        MO_And   w   -> intOp False w (\d x y -> annExpr expr (AND d x y))
-        MO_Or    w   -> intOp False w (\d x y -> annExpr expr (OR d x y))
-        MO_Xor   w   -> intOp False w (\d x y -> annExpr expr (XOR d x y))
 
         op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ pprMachOp op <+> text "in" <+> pdoc plat expr
 
@@ -1148,8 +1330,7 @@ getRegister' config plat expr =
             code_y `snocOL`
             MULW (OpReg W64 tmp1) (OpReg W64 reg_x) (OpReg W64 reg_y) `snocOL`
             ADD (OpReg W64 tmp2) (OpReg W32 tmp1) (OpImm (ImmInt 0)) `snocOL`
-            CSET NE (OpReg W64 dst) (OpReg W64 tmp1)  (OpReg W64 tmp2) `appOL`
-            truncateReg W64 W32 dst
+            CSET NE (OpReg W64 dst) (OpReg W64 tmp1)  (OpReg W64 tmp2)
                                      )
 
     -- General case
@@ -1193,8 +1374,7 @@ getRegister' config plat expr =
                 -- extract valid result via result's width
                 -- slli.w for W32, otherwise ext.w.[b, h]
                 extract w tmp2 tmp1 `snocOL`
-                CSET NE (OpReg W64 dst) (OpReg W64 tmp1)  (OpReg W64 tmp2) `appOL`
-                truncateReg W64 w dst
+                CSET NE (OpReg W64 dst) (OpReg W64 tmp1)  (OpReg W64 tmp2)
                                         )
 
         -- Should it be happened?
@@ -1210,11 +1390,10 @@ signExtend w w' r r'
   | w > w' = pprPanic "Sign-extend Error: not a sign extension, but a truncation." $ ppr w <> text "->" <+> ppr w'
   | w > W64 || w' > W64  = pprPanic "Sign-extend Error: from/to register width greater than 64-bit." $ ppr w <> text "->" <+> ppr w'
   | w == W64 && w' == W64 && r == r' = nilOL
-  | w == W64 && w' == W64 = unitOL $ MOV (OpReg w' r') (OpReg w r)
   | w == W32 && w' == W64 = unitOL $ SLL (OpReg W64 r') (OpReg w r) (OpImm (ImmInt 0))
   -- Sign-extend W8 and W16 to W64.
   | w `elem` [W8, W16] = unitOL $ EXT (OpReg W64 r') (OpReg w r)
-  | w == W32 && w' == W32 = unitOL $ MOV (OpReg w' r') (OpReg w r)
+  | w == w' = unitOL $ MOV (OpReg w' r') (OpReg w r)
   | otherwise = pprPanic "signExtend: Unexpected width: " $ ppr w  <> text "->" <+> ppr w'
 
 -- | Instructions to truncate the value in the given register from width @w@
@@ -1321,12 +1500,19 @@ assignReg_FltCode = assignReg_IntCode
 
 -- Jumps
 genJump :: CmmExpr{-the branch target-} -> NatM InstrBlock
--- `b label` may be optimal, but not the right one in some scenarios.
--- genJump expr@(CmmLit (CmmLabel lbl))
---   = return $ unitOL (annExpr expr (J (TLabel lbl)))
 genJump expr = do
-  (target, _format, code) <- getSomeReg expr
-  return (code `appOL` unitOL (annExpr expr (J (TReg target))))
+  case expr of
+    (CmmLit (CmmLabel lbl)) -> do
+      return $ unitOL (annExpr expr (TAIL36 (OpReg W64 tmpReg) (TLabel lbl)))
+    (CmmLit (CmmBlock bid)) -> do
+      return $ unitOL (annExpr expr (TAIL36 (OpReg W64 tmpReg) (TBlock bid)))
+    _ -> do
+      (target, _format, code) <- getSomeReg expr
+      -- I'd like to do more.
+      return $ COMMENT (text "genJump for unknow expr: " <+> (text (show expr))) `consOL`
+        (code `appOL`
+          unitOL (annExpr expr (J (TReg target)))
+        )
 
 -- -----------------------------------------------------------------------------
 --  Unconditional branches
@@ -1369,65 +1555,47 @@ genCondJump bid expr = do
 
       -- Generic case.
       CmmMachOp mop [x, y] -> do
-
-        let ubcond w cmp | w `elem` [W8, W16, W32] = do
+        let ubcond w cmp = do
               (reg_x, format_x, code_x) <- getSomeReg x
               (reg_y, format_y, code_y) <- getSomeReg y
-              reg_t <- getNewRegNat (intFormat W64)
-              return $
-                code_x `appOL`
-                truncateReg (formatToWidth format_x) W64 reg_x  `appOL`
-                code_y `appOL`
-                truncateReg (formatToWidth format_y) W64 reg_y  `snocOL`
-                MOV (OpReg W64 reg_t) (OpImm (ImmInt 12)) `snocOL`
-                BCOND cmp (OpReg W64 reg_x) (OpReg W64 reg_y) (TBlock bid) (OpReg W64 reg_t)
-            ubcond _w cmp = do
-              (reg_x, _format_x, code_x) <- getSomeReg x
-              (reg_y, _format_y, code_y) <- getSomeReg y
-              reg_t <- getNewRegNat (intFormat W64)
-              return $
-                code_x `appOL`
-                code_y `snocOL`
-                MOV (OpReg W64 reg_t) (OpImm (ImmInt 12)) `snocOL`
-                BCOND cmp (OpReg W64 reg_x) (OpReg W64 reg_y) (TBlock bid) (OpReg W64 reg_t)
+              return $ case w of
+                w | w `elem` [W8, W16, W32] ->
+                    code_x `appOL`
+                    truncateReg (formatToWidth format_x) W64 reg_x  `appOL`
+                    code_y `appOL`
+                    truncateReg (formatToWidth format_y) W64 reg_y  `snocOL`
+                    BCOND1 cmp (OpReg W64 reg_x) (OpReg W64 reg_y) (TBlock bid)
+                _ ->
+                    code_x `appOL`
+                    code_y `snocOL`
+                    BCOND1 cmp (OpReg W64 reg_x) (OpReg W64 reg_y) (TBlock bid)
 
-
-            sbcond w cmp | w `elem` [W8, W16, W32] = do
+            sbcond w cmp = do
               (reg_x, format_x, code_x) <- getSomeReg x
               (reg_y, format_y, code_y) <- getSomeReg y
-              reg_t <- getNewRegNat (intFormat W64)
-              return $
-                code_x `appOL`
-                signExtend (formatToWidth format_x) W64 reg_x reg_x `appOL`
-                code_y `appOL`
-                signExtend (formatToWidth format_y) W64 reg_y reg_y `snocOL`
-                MOV (OpReg W64 reg_t) (OpImm (ImmInt 13)) `snocOL`
-                BCOND cmp (OpReg W64 reg_x) (OpReg W64 reg_y) (TBlock bid) (OpReg W64 reg_t)
-
-            sbcond _w cmp = do
-              (reg_x, _format_x, code_x) <- getSomeReg x
-              (reg_y, _format_y, code_y) <- getSomeReg y
-              reg_t <- getNewRegNat (intFormat W64)
-              return $
-                code_x `appOL`
-                code_y `snocOL`
-                MOV (OpReg W64 reg_t) (OpImm (ImmInt 13)) `snocOL`
-                BCOND cmp (OpReg W64 reg_x) (OpReg W64 reg_y) (TBlock bid) (OpReg W64 reg_t)
-
+              return $ case w of
+                w | w `elem` [W8, W16, W32] ->
+                  code_x `appOL`
+                  signExtend (formatToWidth format_x) W64 reg_x reg_x `appOL`
+                  code_y `appOL`
+                  signExtend (formatToWidth format_y) W64 reg_y reg_y `snocOL`
+                  BCOND1 cmp (OpReg W64 reg_x) (OpReg W64 reg_y) (TBlock bid)
+                _ ->
+                  code_x `appOL`
+                  code_y `snocOL`
+                  BCOND1 cmp (OpReg W64 reg_x) (OpReg W64 reg_y) (TBlock bid)
 
             fbcond w cmp = do
               (reg_fx, _format_fx, code_fx) <- getFloatReg x
               (reg_fy, _format_fy, code_fy) <- getFloatReg y
               rst <- OpReg W64 <$> getNewRegNat II64
               oneReg <- OpReg W64 <$> getNewRegNat II64
-              reg_t <- getNewRegNat (intFormat W64)
               return $
                 code_fx `appOL`
                 code_fy `snocOL`
-                MOV (OpReg W64 reg_t) (OpImm (ImmInt 14)) `snocOL`
                 CSET cmp rst (OpReg w reg_fx) (OpReg w reg_fy) `snocOL`
                 MOV oneReg (OpImm (ImmInt 1)) `snocOL`
-                BCOND EQ rst oneReg (TBlock bid) (OpReg W64 reg_t)
+                BCOND1 EQ rst oneReg (TBlock bid)
 
 
         case mop of
@@ -1437,15 +1605,12 @@ genCondJump bid expr = do
           MO_F_Ge w -> fbcond w FGE
           MO_F_Lt w -> fbcond w FLT
           MO_F_Le w -> fbcond w FLE
-
           MO_Eq w   -> sbcond w EQ
           MO_Ne w   -> sbcond w NE
-
           MO_S_Gt w -> sbcond w SGT
           MO_S_Ge w -> sbcond w SGE
           MO_S_Lt w -> sbcond w SLT
           MO_S_Le w -> sbcond w SLE
-
           MO_U_Gt w -> ubcond w UGT
           MO_U_Ge w -> ubcond w UGE
           MO_U_Lt w -> ubcond w ULT
@@ -1453,7 +1618,6 @@ genCondJump bid expr = do
           _ -> pprPanic "LA64.genCondJump:case mop: " (text $ show expr)
 
       _ -> pprPanic "LA64.genCondJump: " (text $ show expr)
-
 
 -- | Generate conditional branching instructions
 -- This is basically an "if with else" statement.
@@ -1513,16 +1677,14 @@ genCCall target dest_regs arg_regs = do
     -- be a foreign procedure with an address expr
     -- and a calling convention.
     ForeignTarget expr _cconv -> do
---      (call_target, call_target_code) <- case expr of
---        -- if this is a label, let's just directly to it.  This will produce the
---        -- correct CALL relocation for BL.
---        (CmmLit (CmmLabel lbl)) -> pure (TLabel lbl, nilOL)
---        -- if it's not a label, let's compute the expression into a
---        -- register and jump to that.
---        _ -> do
-      (call_target_reg, call_target_code) <- do
-        (reg, _format, reg_code) <- getSomeReg expr
-        pure (reg, reg_code)
+      (call_target, call_target_code) <- case expr of
+        -- if this is a label, let's just directly to it.
+        (CmmLit (CmmLabel lbl)) -> pure (TLabel lbl, nilOL)
+        -- if it's not a label, let's compute the expression into a
+        -- register and jump to that.
+        _ -> do
+          (reg, _format, reg_code) <- getSomeReg expr
+          pure (TReg reg, reg_code)
       -- compute the code and register logic for all arg_regs.
       -- this will give us the format information to match on.
       arg_regs' <- mapM getSomeReg arg_regs
@@ -1562,8 +1724,7 @@ genCCall target dest_regs arg_regs = do
             call_target_code -- compute the label (possibly into a register)
               `appOL` moveStackDown (stackSpaceWords)
               `appOL` passArgumentsCode -- put the arguments into x0, ...
-              -- `snocOL` BL call_target passRegs -- branch and link (C calls aren't tail calls, but return)
-              `snocOL` BL (TReg call_target_reg) passRegs -- branch and link (C calls aren't tail calls, but return)
+              `snocOL` CALL call_target passRegs -- branch and link (C calls aren't tail calls, but return)
               `appOL` readResultsCode -- parse the results into registers
               `appOL` moveStackUp (stackSpaceWords)
       return code
@@ -1571,11 +1732,79 @@ genCCall target dest_regs arg_regs = do
     PrimTarget MO_F32_Fabs
       | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
         unaryFloatOp W32 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
+      | otherwise -> panic "mal-formed MO_F32_Fabs"
     PrimTarget MO_F64_Fabs
       | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
         unaryFloatOp W64 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
+      | otherwise -> panic "mal-formed MO_F64_Fabs"
 
-    -- or a possibly side-effecting machine operation
+    PrimTarget MO_F32_Sqrt
+      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
+        unaryFloatOp W32 (\d x -> unitOL $ FSQRT d x) arg_reg dest_reg
+      | otherwise -> panic "mal-formed MO_F32_Sqrt"
+    PrimTarget MO_F64_Sqrt
+      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
+        unaryFloatOp W64 (\d x -> unitOL $ FSQRT d x) arg_reg dest_reg
+      | otherwise -> panic "mal-formed MO_F64_Sqrt"
+
+    PrimTarget (MO_Clz w)
+      | w `elem` [W32, W64],
+      [arg_reg] <- arg_regs,
+      [dest_reg] <- dest_regs -> do
+      platform <- getPlatform
+      (reg_x, _format_x, code_x) <- getSomeReg arg_reg
+      let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
+      return ( code_x `snocOL`
+               CLZ (OpReg w dst_reg) (OpReg w reg_x)
+             )
+      | w `elem` [W8, W16],
+      [arg_reg] <- arg_regs,
+      [dest_reg] <- dest_regs -> do
+        platform <- getPlatform
+        (reg_x, _format_x, code_x) <- getSomeReg arg_reg
+        let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
+        return ( code_x `appOL` toOL
+                 [
+                  MOV (OpReg W64 dst_reg) (OpImm (ImmInt 1)),
+                  SLL (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpImm (ImmInt (31-shift))),
+                  SLL (OpReg W64 reg_x) (OpReg W64 reg_x) (OpImm (ImmInt (32-shift))),
+                  OR (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpReg W64 reg_x),
+                  CLZ (OpReg W64 dst_reg) (OpReg W32 dst_reg)
+                 ]
+               )
+      | otherwise -> unsupported (MO_Clz w)
+      where
+        shift = widthToInt w
+
+    PrimTarget (MO_Ctz w)
+      | w `elem` [W32, W64],
+      [arg_reg] <- arg_regs,
+      [dest_reg] <- dest_regs -> do
+      platform <- getPlatform
+      (reg_x, _format_x, code_x) <- getSomeReg arg_reg
+      let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
+      return ( code_x `snocOL`
+               CTZ (OpReg w dst_reg) (OpReg w reg_x)
+             )
+      | w `elem` [W8, W16],
+      [arg_reg] <- arg_regs,
+      [dest_reg] <- dest_regs -> do
+      platform <- getPlatform
+      (reg_x, _format_x, code_x) <- getSomeReg arg_reg
+      let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
+      return ( code_x `appOL` toOL
+               [
+                MOV (OpReg W64 dst_reg) (OpImm (ImmInt 1)),
+                SLL (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpImm (ImmInt shift)),
+                BSTRPICK II64 (OpReg W64 reg_x) (OpReg W64 reg_x) (OpImm (ImmInt (shift-1))) (OpImm (ImmInt 0)),
+                OR  (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpReg W64 reg_x),
+                CTZ (OpReg W64 dst_reg) (OpReg W64 dst_reg)
+               ]
+             )
+      | otherwise -> unsupported (MO_Ctz w)
+      where
+        shift = (widthToInt w)
+
     -- mop :: CallishMachOp (see GHC.Cmm.MachOp)
     PrimTarget mop -> do
       -- We'll need config to construct forien targets
@@ -1603,8 +1832,6 @@ genCCall target dest_regs arg_regs = do
         MO_F64_Log1P -> mkCCall "log1p"
         MO_F64_Exp   -> mkCCall "exp"
         MO_F64_ExpM1 -> mkCCall "expm1"
-        MO_F64_Fabs  -> mkCCall "fabs"
-        MO_F64_Sqrt  -> mkCCall "sqrt"
 
         -- 32 bit float ops
         MO_F32_Pwr   -> mkCCall "powf"
@@ -1625,8 +1852,6 @@ genCCall target dest_regs arg_regs = do
         MO_F32_Log1P -> mkCCall "log1pf"
         MO_F32_Exp   -> mkCCall "expf"
         MO_F32_ExpM1 -> mkCCall "expm1f"
-        MO_F32_Fabs  -> mkCCall "fabsf"
-        MO_F32_Sqrt  -> mkCCall "sqrtf"
 
         -- 64-bit primops
         MO_I64_ToI   -> mkCCall "hs_int64ToInt"
@@ -1715,11 +1940,10 @@ genCCall target dest_regs arg_regs = do
         MO_PopCnt w         -> mkCCall (popCntLabel w)
         MO_Pdep w           -> mkCCall (pdepLabel w)
         MO_Pext w           -> mkCCall (pextLabel w)
-        MO_Clz w            -> mkCCall (clzLabel w)
-        MO_Ctz w            -> mkCCall (ctzLabel w)
         MO_BSwap w          -> mkCCall (bSwapLabel w)
         MO_BRev w           -> mkCCall (bRevLabel w)
 
+    -- or a possibly side-effecting machine operation
         mo@(MO_AtomicRead w ord)
           | [p_reg] <- arg_regs
           , [dst_reg] <- dest_regs -> do
@@ -1891,3 +2115,122 @@ genCCall target dest_regs arg_regs = do
       let dst = getRegisterReg platform (CmmLocal dest_reg)
       let code = code_fx `appOL` op (OpReg w dst) (OpReg w reg_fx)
       pure code
+
+data BlockInRange = InRange | NotInRange BlockId
+
+genCondFarJump :: (MonadGetUnique m) => Cond -> Operand -> Operand -> BlockId -> m InstrBlock
+genCondFarJump cond op1 op2 far_target = do
+  return $ toOL [ ann (text "Conditional far jump to: " <> ppr far_target)
+                $ BCOND cond op1 op2 (TBlock far_target)
+                ]
+
+makeFarBranches ::
+  Platform ->
+  LabelMap RawCmmStatics ->
+  [NatBasicBlock Instr] ->
+  UniqDSM [NatBasicBlock Instr]
+
+makeFarBranches {- only used when debugging -} _platform statics basic_blocks = do
+  -- All offsets/positions are counted in multiples of 4 bytes (the size of LoongArch64 instructions)
+  -- That is an offset of 1 represents a 4-byte/one instruction offset.
+  let (func_size, lblMap) = foldl' calc_lbl_positions (0, mapEmpty) basic_blocks
+  if func_size < max_cond_jump_dist
+    then pure basic_blocks
+    else do
+      (_, blocks) <- mapAccumLM (replace_blk lblMap) 0 basic_blocks
+      pure $ concat blocks
+  where
+    max_cond_jump_dist = 2 ^ (15 :: Int) - 8 :: Int
+    -- Currently all inline info tables fit into 64 bytes.
+    max_info_size = 16 :: Int
+    long_bc_jump_dist = 2 :: Int
+
+    -- Replace out of range conditional jumps with unconditional jumps.
+    replace_blk :: LabelMap Int -> Int -> GenBasicBlock Instr -> UniqDSM (Int, [GenBasicBlock Instr])
+    replace_blk !m !pos (BasicBlock lbl instrs) = do
+      -- Account for a potential info table before the label.
+      let !block_pos = pos + infoTblSize_maybe lbl
+      (!pos', instrs') <- mapAccumLM (replace_jump m) block_pos instrs
+      let instrs'' = concat instrs'
+      -- We might have introduced new labels, so split the instructions into basic blocks again if neccesary.
+      let (top, split_blocks, no_data) = foldr mkBlocks ([], [], []) instrs''
+      -- There should be no data in the instruction stream at this point
+      massert (null no_data)
+
+      let final_blocks = BasicBlock lbl top : split_blocks
+      pure (pos', final_blocks)
+
+    replace_jump :: LabelMap Int -> Int -> Instr -> UniqDSM (Int, [Instr])
+    replace_jump !m !pos instr = do
+      case instr of
+        ANN ann instr -> do
+          replace_jump m pos instr >>= \case
+            (idx, instr' : instrs') -> pure (idx, ANN ann instr' : instrs')
+            (idx, []) -> pprPanic "replace_jump" (text "empty return list for " <+> ppr idx)
+
+        BCOND1 cond op1 op2 t ->
+          case target_in_range m t pos of
+            InRange -> pure (pos + 1, [instr])
+            NotInRange far_target -> do
+              jmp_code <- genCondFarJump cond op1 op2 far_target
+              pure (pos + long_bc_jump_dist, fromOL jmp_code)
+
+        _ -> pure (pos + instr_size instr, [instr])
+
+    target_in_range :: LabelMap Int -> Target -> Int -> BlockInRange
+    target_in_range m target src =
+      case target of
+        (TReg{}) -> InRange
+        (TBlock bid) -> block_in_range m src bid
+        (TLabel clbl)
+          | Just bid <- maybeLocalBlockLabel clbl
+          -> block_in_range m src bid
+          | otherwise
+          -> InRange
+
+    block_in_range :: LabelMap Int -> Int -> BlockId -> BlockInRange
+    block_in_range m src_pos dest_lbl =
+      case mapLookup dest_lbl m of
+        Nothing ->
+          pprTrace "not in range" (ppr dest_lbl) $ NotInRange dest_lbl
+        Just dest_pos ->
+          if abs (dest_pos - src_pos) < max_cond_jump_dist
+            then InRange
+          else NotInRange dest_lbl
+
+    calc_lbl_positions :: (Int, LabelMap Int) -> GenBasicBlock Instr -> (Int, LabelMap Int)
+    calc_lbl_positions (pos, m) (BasicBlock lbl instrs) =
+      let !pos' = pos + infoTblSize_maybe lbl
+       in foldl' instr_pos (pos', mapInsert lbl pos' m) instrs
+
+    instr_pos :: (Int, LabelMap Int) -> Instr -> (Int, LabelMap Int)
+    instr_pos (pos, m) instr = (pos + instr_size instr, m)
+
+    infoTblSize_maybe bid =
+      case mapLookup bid statics of
+        Nothing -> 0 :: Int
+        Just _info_static -> max_info_size
+
+    instr_size :: Instr -> Int
+    instr_size i = case i of
+      COMMENT {} -> 0
+      MULTILINE_COMMENT {} -> 0
+      ANN _ instr -> instr_size instr
+      LOCATION {} -> 0
+      DELTA {} -> 0
+      -- At this point there should be no NEWBLOCK in the instruction stream (pos, mapInsert bid pos m)
+      NEWBLOCK {} -> panic "mkFarBranched - Unexpected"
+      LDATA {} -> panic "mkFarBranched - Unexpected"
+      PUSH_STACK_FRAME -> 4
+      POP_STACK_FRAME -> 4
+      CSET {} -> 2
+      LD _ _ (OpImm (ImmIndex _ _)) -> 3
+      LD _ _ (OpImm (ImmCLbl _)) -> 2
+      SCVTF {} -> 2
+      FCVTZS {} -> 4
+      BCOND {} -> long_bc_jump_dist
+      CALL (TReg _) _ -> 1
+      CALL {} -> 2
+      CALL36 {} -> 2
+      TAIL36 {} -> 2
+      _ -> 1
