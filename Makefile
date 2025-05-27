@@ -76,7 +76,17 @@ STAGE2_TARGETS += ghc-bignum:ghc-bignum ghc-compact:ghc-compact ghc-experimental
 # I don't understand why this following line somehow breaks the build...
 # STAGE2_TARGETS += system-cxx-std-lib:system-cxx-std-lib
 
-$(GHC1): _build/booted
+# export CABAL := $(shell cabal update 2>&1 >/dev/null && cabal build cabal-install -v0 --disable-tests --project-dir libraries/Cabal && cabal list-bin -v0 --project-dir libraries/Cabal cabal-install:exe:cabal)
+_build/stage0/bin/cabal:
+	@echo ">>> Building Cabal..."
+	@mkdir -p _build/stage0/bin
+	@mkdir -p _build/logs
+	cabal build --disable-tests --project-dir libraries/Cabal --builddir=_build/stage0/cabal cabal-install:exe:cabal -j -w ghc \
+		> _build/logs/cabal.log 2> _build/logs/cabal.err
+	cp -rfp $(shell cabal list-bin -v0 --project-dir libraries/Cabal cabal-install:exe:cabal --builddir=_build/stage0/cabal -v0) _build/stage0/bin/cabal
+	@echo ">>> Cabal built successfully."
+
+$(GHC1): _build/booted $(CABAL)
 	@echo ">>> Building with GHC: $(GHC0) and Cabal: $(CABAL)"
 	@echo ">>> Using $(THREADS) threads"
 	@mkdir -p _build/logs
