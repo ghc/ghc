@@ -583,6 +583,7 @@ targetToSettings tgt@Target{..} =
   , ("LLVM llc command", llc_cmd)
   , ("LLVM opt command", llvm_opt_cmd)
   , ("LLVM llvm-as command", llvm_as_cmd)
+  , ("LLVM llvm-as flags", "") -- see ec826009b3a9d5f8e975ca2c8002832276043c18, #25793
   , ("Use inplace MinGW toolchain", use_inplace_mingw)
   , ("target RTS linker only supports shared libraries", yesNo (targetRTSLinkerOnlySupportsSharedLibs tgt))
   , ("Use interpreter", yesNo (targetSupportsInterpreter tgt))
