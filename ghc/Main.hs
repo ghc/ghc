@@ -92,7 +92,7 @@ import System.Exit
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
-import Data.List ( isPrefixOf, partition, intercalate )
+import Data.List ( isPrefixOf, isSuffixOf, partition, intercalate )
 import Prelude
 import qualified Data.List.NonEmpty as NE
 
