@@ -77,6 +77,8 @@ STAGE2_TARGETS += ghc-bignum:ghc-bignum ghc-compact:ghc-compact ghc-experimental
 # STAGE2_TARGETS += system-cxx-std-lib:system-cxx-std-lib
 
 # export CABAL := $(shell cabal update 2>&1 >/dev/null && cabal build cabal-install -v0 --disable-tests --project-dir libraries/Cabal && cabal list-bin -v0 --project-dir libraries/Cabal cabal-install:exe:cabal)
+$(abspath _build/stage0/bin/cabal): _build/stage0/bin/cabal
+
 _build/stage0/bin/cabal:
 	@echo ">>> Building Cabal..."
 	@mkdir -p _build/stage0/bin
