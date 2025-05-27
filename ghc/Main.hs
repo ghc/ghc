@@ -122,8 +122,8 @@ main = do
     -- either pass @--target=...@ to select the target, or use a symbolic
     -- or (copy of the executable) name that ends with @-ghc@. E.g.
     -- x86_64-unknown-linux-ghc would select the x86_64-unknown-linux target.
-    let (target_args, argv1) = partition ("--target=" `isPrefixOf`) argv0
-        mbTarget | not (null target_args) = Just (drop 9 (last target_args))
+    let (target_args, argv1) = partition ("-target=" `isPrefixOf`) argv0
+        mbTarget | not (null target_args) = Just (drop 8 (last target_args))
                  | "-ghc" `isSuffixOf` prog0
                  , parts <- split '-' prog0
                  , length parts > 3 = Just (take (length prog0 - 4) prog0)
@@ -134,7 +134,7 @@ main = do
         mbMinusB | null minusB_args = Nothing
                  | otherwise = Just (drop 2 (last minusB_args))
 
-    let (list_targets_args, argv1'') = partition (== "--list-targets") argv1'
+    let (list_targets_args, argv1'') = partition (== "-list-targets") argv1'
         list_targets = not (null list_targets_args)
 
     -- find top directory for the given target. Or default to usual topdir.
@@ -143,7 +143,7 @@ main = do
       let targets_dir = topdir </> "targets"
       -- list targets when asked
       when list_targets $ do
-        putStrLn "Installed extra targets:"
+        putStrLn $ "Installed targets (in " ++ targets_dir ++ "):"
         doesDirectoryExist targets_dir >>= \case
           True -> do
                     ds <- listDirectory targets_dir
