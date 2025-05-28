@@ -29,6 +29,7 @@ module Haddock.Backends.Xhtml.Utils
   , pabrackets
   , parens
   , parenList
+  , parenBreakableList
   , ubxParenList
   , ubxSumList
   , arrow
@@ -175,6 +176,10 @@ punctuate h (d0 : ds) = go d0 ds
   where
     go d [] = [d]
     go d (e : es) = (d +++ h) : go e es
+
+parenBreakableList :: [Html] -> Html
+parenBreakableList = (thespan ! [theclass "breakable"]) . parens . hsep . punctuate comma
+                     . map (thespan ! [theclass "unbreakable"])
 
 parenList :: [Html] -> Html
 parenList = parens . hsep . punctuate comma

@@ -735,7 +735,7 @@ ppContext cxt unicode qual emptyCtxts = ppContextNoLocs (map unLoc cxt) unicode 
 ppHsContext :: [HsType DocNameI] -> Unicode -> Qualification -> Html
 ppHsContext [] _ _ = noHtml
 ppHsContext [p] unicode qual = ppCtxType unicode qual p
-ppHsContext cxt unicode qual = parenList (map (ppType unicode qual HideEmptyContexts) cxt)
+ppHsContext cxt unicode qual = parenBreakableList (map (ppType unicode qual HideEmptyContexts) cxt)
 
 -------------------------------------------------------------------------------
 

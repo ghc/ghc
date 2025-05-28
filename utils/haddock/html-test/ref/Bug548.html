@@ -252,11 +252,17 @@
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Alternative:2"
 		      ></span
-		      > (<a href="#" title="Control.Arrow"
-		      >ArrowZero</a
-		      > a, <a href="#" title="Control.Arrow"
-		      >ArrowPlus</a
-		      > a) =&gt; <a href="#" title="Control.Applicative"
+		      > <span class="breakable"
+		      >(<span class="unbreakable"
+			><a href="#" title="Control.Arrow"
+			  >ArrowZero</a
+			  > a</span
+			>, <span class="unbreakable"
+			><a href="#" title="Control.Arrow"
+			  >ArrowPlus</a
+			  > a</span
+			>)</span
+		      > =&gt; <a href="#" title="Control.Applicative"
 		      >Alternative</a
 		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
@@ -484,15 +490,25 @@
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Data:5"
 		      ></span
-		      > (<a href="#" title="Data.Dynamic"
-		      >Typeable</a
-		      > a, <a href="#" title="Data.Dynamic"
-		      >Typeable</a
-		      > b, <a href="#" title="Data.Dynamic"
-		      >Typeable</a
-		      > c, <a href="#" title="Data.Data"
-		      >Data</a
-		      > (a b c)) =&gt; <a href="#" title="Data.Data"
+		      > <span class="breakable"
+		      >(<span class="unbreakable"
+			><a href="#" title="Data.Dynamic"
+			  >Typeable</a
+			  > a</span
+			>, <span class="unbreakable"
+			><a href="#" title="Data.Dynamic"
+			  >Typeable</a
+			  > b</span
+			>, <span class="unbreakable"
+			><a href="#" title="Data.Dynamic"
+			  >Typeable</a
+			  > c</span
+			>, <span class="unbreakable"
+			><a href="#" title="Data.Data"
+			  >Data</a
+			  > (a b c)</span
+			>)</span
+		      > =&gt; <a href="#" title="Data.Data"
 		      >Data</a
 		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
@@ -594,11 +610,17 @@
 			  >Typeable</a
 			  > t =&gt; (<span class="keyword"
 			  >forall</span
-			  > d e. (<a href="#" title="Data.Data"
-			  >Data</a
-			  > d, <a href="#" title="Data.Data"
-			  >Data</a
-			  > e) =&gt; c0 (t d e)) -&gt; <a href="#" title="Data.Maybe"
+			  > d e. <span class="breakable"
+			  >(<span class="unbreakable"
+			    ><a href="#" title="Data.Data"
+			      >Data</a
+			      > d</span
+			    >, <span class="unbreakable"
+			    ><a href="#" title="Data.Data"
+			      >Data</a
+			      > e</span
+			    >)</span
+			  > =&gt; c0 (t d e)) -&gt; <a href="#" title="Data.Maybe"
 			  >Maybe</a
 			  > (c0 (<a href="#" title="Bug548"
 			  >WrappedArrow</a
