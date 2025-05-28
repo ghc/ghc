@@ -571,8 +571,13 @@ table.info {
   margin-left: 0;
 }
 
+#interface span.unbreakable,
 #interface td.src {
   white-space: nowrap;
+}
+
+#interface span.breakable {
+  white-space: pre-wrap;
 }
 
 /* @end */
