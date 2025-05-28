@@ -1394,8 +1394,9 @@ def normalise_version_( *pkgs ):
         # Use word boundary to ensure we only match actual package name prefixes
         str_no_ghc_prefix = re.sub(r'\bghc-[0-9.]+_([a-zA-Z])', r'\1', str)
         # (name)(-version)(-hash)(-components)
-        return re.sub('(' + '|'.join(map(re.escape,pkgs)) + r')-[0-9.]+(-[0-9a-zA-Z+]+)?(-[0-9a-zA-Z+]+)?',
+        ver_hash = re.sub('(' + '|'.join(map(re.escape,pkgs)) + r')-[0-9.]+(-[0-9a-zA-Z+]+)?(-[0-9a-zA-Z+]+)?',
                       r'\1-<VERSION>-<HASH>', str_no_ghc_prefix)
+        return re.sub(r'\bghc_([a-zA-Z-]+-<VERSION>-<HASH>)', r'\1', ver_hash)
     return normalise_version__
 
 def normalise_version( *pkgs ):
