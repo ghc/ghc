@@ -27,7 +27,7 @@ module GHC.Core.Opt.Simplify.Utils (
         contIsTrivial, contArgs, contIsRhs,
         countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
-        interestingCallContext,
+        interestingCallContext, okToDup,
 
         -- ArgInfo
         ArgInfo(..), ArgSpec(..), mkArgInfo,
@@ -214,8 +214,8 @@ data SimplCont
       , sc_cont :: SimplCont }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
-        CoreTickish     -- Tick tickish <hole>
-        SimplCont
+      { sc_tick :: CoreTickish     -- Tick tickish <hole>
+      , sc_cont ::  SimplCont }
 
 data FromWhat = FromLet | FromBeta Levity
 
@@ -223,6 +223,10 @@ data FromWhat = FromLet | FromBeta Levity
 data DupFlag = NoDup       -- Unsimplified, might be big
              | Simplified  -- Simplified
              | OkToDup     -- Simplified and small
+
+okToDup :: DupFlag -> Bool
+okToDup OkToDup = True
+okToDup _       = False
 
 isSimplified :: DupFlag -> Bool
 isSimplified NoDup = False
@@ -442,13 +446,14 @@ contIsStop (Stop {}) = True
 contIsStop _         = False
 
 contIsDupable :: SimplCont -> Bool
-contIsDupable (Stop {})                         = True
-contIsDupable (ApplyToTy  { sc_cont = k })      = contIsDupable k
-contIsDupable (ApplyToVal { sc_dup = OkToDup }) = True -- See Note [DupFlag invariants]
-contIsDupable (Select { sc_dup = OkToDup })     = True -- ...ditto...
-contIsDupable (StrictArg { sc_dup = OkToDup })  = True -- ...ditto...
-contIsDupable (CastIt { sc_cont = k })          = contIsDupable k
-contIsDupable _                                 = False
+contIsDupable (Stop {})                     = True
+contIsDupable (ApplyToVal { sc_dup = dup }) = okToDup dup -- See Note [DupFlag invariants]
+contIsDupable (Select     { sc_dup = dup }) = okToDup dup -- ...ditto...
+contIsDupable (StrictArg  { sc_dup = dup }) = okToDup dup -- ...ditto...
+contIsDupable (StrictBind { sc_dup = dup }) = okToDup dup -- ...ditto...
+contIsDupable (ApplyToTy  { sc_cont = k })  = contIsDupable k
+contIsDupable (CastIt { sc_cont = k })      = contIsDupable k
+contIsDupable (TickIt { sc_cont = k })      = contIsDupable k
 
 -------------------
 contIsTrivial :: SimplCont -> Bool

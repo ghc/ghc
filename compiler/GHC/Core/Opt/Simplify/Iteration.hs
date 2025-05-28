@@ -2112,8 +2112,8 @@ wrapJoinCont env cont thing_inside
 
   | otherwise
     -- Normal case; see Note [Join points and case-of-case]
-  = do { (floats1, cont')  <- mkDupableCont env cont
-       ; (floats2, result) <- thing_inside (env `setInScopeFromF` floats1) cont'
+  = do { (floats1, env', cont') <- mkDupableCont env cont
+       ; (floats2, result) <- thing_inside env' cont'
        ; return (floats1 `addFloats` floats2, result) }
 
 
@@ -3259,34 +3259,75 @@ doCaseToLet scrut case_bndr
 --------------------------------------------------
 
 reallyRebuildCase env scrut case_bndr alts cont
-  | not (seCaseCase env)    -- Only when case-of-case is on.
-                            -- See GHC.Driver.Config.Core.Opt.Simplify
-                            --    Note [Case-of-case and full laziness]
-  = do { case_expr <- simplAlts env scrut case_bndr alts
-                                (mkBoringStop (contHoleType cont))
-       ; rebuild (zapSubstEnv env) case_expr cont }
+  -- ToDo: this code has a lot in common with wrapJoinCont; combine
+  -- Also (join j = e in body) is very like a case with two alternatives
+  -- If we aren't going to push StrictArg f into a case, we shouldn't push
+  -- it into joins either.  More reasons to common-up
+  | contIsStop cont   -- Shortcut for commmon case
+  = do { case_expr <- simplAlts env scrut case_bndr alts cont
+       ; return (emptyFloats env, case_expr) }
 
   | otherwise
-  = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
-       ; case_expr <- simplAlts env' scrut
-                                (scaleIdBy holeScaling case_bndr)
-                                (scaleAltsBy holeScaling alts)
-                                cont'
-       ; return (floats, case_expr) }
+  = do { let (cont_inner, cont_outer)
+--                | contIsDupable cont    = all_inner cont -- Do this first, befoe seCaseCase
+--                                                         -- (ToDo: explain... join points)
+                | not (seCaseCase env)  = all_outer cont
+                | not alts_would_dup    = all_inner cont
+                | otherwise             = split cont     -- See Note [Strict arguments]
+               -- seCaseCase: see GHC.Driver.Config.Core.Opt.Simplify
+               --    Note [Case-of-case and full laziness]
+
+       ; (floats1, env', cont_inner') <- mkDupableCaseCont env alts_would_dup cont_inner
+       ; case_expr <- simplAlts env' scrut case_bndr alts cont_inner'
+       ; let (floats1', case_expr') = wrapJoinFloatsX floats1 case_expr
+       ; (floats2, res_expr) <- rebuild env' case_expr' cont_outer
+       ; return (floats1' `addFloats` floats2, res_expr) }
   where
-    holeScaling = contHoleScaling cont
-    -- Note [Scaling in case-of-case]
+    alts_would_dup = altsWouldDup alts
 
-{-
-simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
-try to eliminate uses of v in the RHSs in favour of case_bndr; that
-way, there's a chance that v will now only be used once, and hence
-inlined.
+    all_outer cont = (mkBoringStop (contHoleType cont), cont)
+    all_inner cont = (cont, mkBoringStop (contResultType cont))
 
-Historical note: we use to do the "case binder swap" in the Simplifier
-so there were additional complications if the scrutinee was a variable.
-Now the binder-swap stuff is done in the occurrence analyser; see
-"GHC.Core.Opt.OccurAnal" Note [Binder swap].
+    -- Tricky function!  We must push OkToDup things into cont_inner,
+    -- to maintain join points
+    dont_push_inside_multi_case :: SimplCont -> Bool
+    dont_push_inside_multi_case cont
+      = case cont of
+           StrictArg { sc_fun = fun, sc_dup = dup }
+             -> not (okToDup dup) &&  null (ai_rules fun)
+           StrictBind { sc_dup = dup }
+             -> not (okToDup dup)
+           _ -> False
+
+    split cont@(Stop {}) = (cont, cont)
+    split cont
+      | dont_push_inside_multi_case cont = all_outer cont
+      | otherwise                       = (cont { sc_cont = inner }, outer)
+      where
+       (inner, outer) = split (sc_cont cont)
+
+{- Note [Strict arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f (case x of I# y -> e1) e2 e3
+where `f` is strict.  It's always good to push the call into the case, giving
+   case x of I# y -> f e1 e2 e3
+But things are much more nuanced when there are /multiple/ alternatives:
+   f (case x of True -> e1a; False -> e1b) e2 e3
+We have to be careful about duplicating e1, e2, but `mkDupableCont` deals with that
+so we /could/ get
+   let a2 = e2; a3 = e3 in
+   case x of { True -> f e1a a2 a3; False -> f e1b a2 a3 }
+This might be good if `f` has rewrite rules, because now it can "see" e1a/e1b.  But
+but even then not necessarily -- it can't "see" e2 and e3, unless they are epandable.
+So it is may be better just to leave it as it was, namely
+   f (case x of True -> e1a; False -> e1b) e2 e3
+Strightforward!
+
+To "leave it as it was" means that in `reallyRebuildCase` instead of pushing the
+continuation ito the case branches, just build the case and wrapper the outer
+continuation around it with `rebuild`.
+
 
 Note [knownCon occ info]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3413,21 +3454,27 @@ simplAlts :: SimplEnv
           -> OutExpr         -- Scrutinee
           -> InId            -- Case binder
           -> [InAlt]         -- Non-empty
-          -> SimplCont
+          -> SimplCont       -- Precondition: this can be duplicated
           -> SimplM OutExpr  -- Returns the complete simplified case expression
 
 simplAlts env0 scrut case_bndr alts cont'
   = do  { traceSmpl "simplAlts" (vcat [ ppr case_bndr
                                       , text "cont':" <+> ppr cont'
                                       , text "in_scope" <+> ppr (seInScope env0) ])
-        ; (env1, case_bndr1) <- simplBinder env0 case_bndr
-        ; let case_bndr2 = case_bndr1 `setIdUnfolding` evaldUnfolding
-              env2       = modifyInScope env1 case_bndr2
+
+        -- hole_scaling: see Note [Scaling in case-of-case]
+        ; let hole_scaling = contHoleScaling cont'
+              case_bndr1   = scaleIdBy hole_scaling case_bndr
+              alts1        = scaleAltsBy hole_scaling alts
+
+        ; (env1, case_bndr2) <- simplBinder env0 case_bndr1
+        ; let case_bndr3 = case_bndr2 `setIdUnfolding` evaldUnfolding
+              env2       = modifyInScope env1 case_bndr3
               -- See Note [Case binder evaluated-ness]
               fam_envs   = seFamEnvs env0
 
         ; (alt_env', scrut', case_bndr') <- improveSeq fam_envs env2 scrut
-                                                       case_bndr case_bndr2 alts
+                                                       case_bndr case_bndr3 alts1
 
         ; (imposs_deflt_cons, in_alts) <- prepareAlts scrut' case_bndr alts
           -- NB: it's possible that the returned in_alts is empty: this is handled
@@ -3842,16 +3889,16 @@ join points and inlining them away.  See #4930.
 -}
 
 --------------------
-mkDupableCaseCont :: SimplEnv -> [InAlt] -> SimplCont
+mkDupableCaseCont :: SimplEnv
+                  -> Bool  -- True <=> more than one non-bottom alternative
+                           -- (result of altsWouldDup)
+                  -> SimplCont
                   -> SimplM ( SimplFloats  -- Join points (if any)
                             , SimplEnv     -- Use this for the alts
                             , SimplCont)
-mkDupableCaseCont env alts cont
-  | altsWouldDup alts = do { (floats, cont) <- mkDupableCont env cont
-                           ; let env' = bumpCaseDepth $
-                                        env `setInScopeFromF` floats
-                           ; return (floats, env', cont) }
-  | otherwise         = return (emptyFloats env, env, cont)
+mkDupableCaseCont env alts_would_dup cont
+  | alts_would_dup = mkDupableCont env cont
+  | otherwise      = return (emptyFloats env, env, cont)
 
 altsWouldDup :: [InAlt] -> Bool -- True iff strictly > 1 non-bottom alternative
 altsWouldDup []  = False        -- See Note [Bottom alternatives]
@@ -3871,9 +3918,14 @@ mkDupableCont :: SimplEnv
               -> SimplCont
               -> SimplM ( SimplFloats  -- Incoming SimplEnv augmented with
                                        --   extra let/join-floats and in-scope variables
+                        , SimplEnv
                         , SimplCont)   -- dup_cont: duplicable continuation
 mkDupableCont env cont
-  = mkDupableContWithDmds (zapSubstEnv env) DupSelectToo (repeat topDmd) cont
+  = do { (floats, cont') <- mkDupableContWithDmds (zapSubstEnv env)
+                                  DupSelectToo (repeat topDmd) cont
+       ; let env' = bumpCaseDepth $
+                    env `setInScopeFromF` floats
+       ; return (floats, env', cont') }
 
 mkDupableContWithDmds
    :: SimplEnvIS -> DupContFlag
@@ -3964,10 +4016,11 @@ mkDupableContWithDmds env _ _
 
        ; mkDupableStrictBind env bndr' join_body res_ty }
 
-mkDupableContWithDmds env DupSelectToo _
-    (StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty })
+mkDupableContWithDmds env df _
+    sarg_cont@(StrictArg { sc_fun = fun, sc_cont = app_cont, sc_fun_ty = fun_ty })
   -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-  | isNothing (isDataConId_maybe (ai_fun fun))
+  | DupSelectToo <- df
+  , isNothing (isDataConId_maybe (ai_fun fun))
          -- isDataConId: see point (DJ4) of Note [Duplicating join points]
   = -- Use Plan C of Note [Duplicating StrictArg]
     --   StrictArg (f a b <>) : ApplyTo e1 : ApplyTo e2: K
@@ -3979,13 +4032,25 @@ mkDupableContWithDmds env DupSelectToo _
 
        ; (floats_s, args') <- mapAndUnzipM (makeTrivialArg env) (ai_args fun)
 
-       ; (floats, cont') <- mkDupableContWithDmds env DupAppsOnly dmds cont
+       ; (floats, app_cont') <- mkDupableContWithDmds env DupAppsOnly dmds app_cont
                  -- Use the demands from the function to add the right
                  -- demand info on any bindings we make for further args
 
        ; return ( foldl' addLetFloats floats floats_s
                 , StrictArg { sc_fun = fun { ai_args = args' }
-                            , sc_cont = cont', sc_dup = OkToDup, sc_fun_ty = fun_ty }) }
+                            , sc_cont = app_cont', sc_dup = OkToDup
+                            , sc_fun_ty = fun_ty }) }
+
+  | otherwise
+  = -- Use Plan B of Note [Duplicating StrictArg]
+    --   K  -->   join j x = K[ x ]
+    --            j <>
+    do { let arg_ty = funArgTy fun_ty
+             rhs_ty = contResultType app_cont
+       ; arg_bndr <- newId (fsLit "jarg") ManyTy arg_ty
+       ; let env' = env `addNewInScopeIds` [arg_bndr]
+       ; (floats, join_rhs) <- simplOutId env' arg_bndr sarg_cont
+       ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }
 
 
 {-
@@ -4041,7 +4106,8 @@ mkDupableContWithDmds env _ _
         --              in case [...hole...] of { pi -> ji xij }
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
     do  { tick (CaseOfCase case_bndr)
-        ; (floats, alt_env, alt_cont) <- mkDupableCaseCont (se `setInScopeFromE` env) alts cont
+        ; (floats, alt_env, alt_cont) <- mkDupableCaseCont (se `setInScopeFromE` env)
+                                                           (altsWouldDup alts) cont
                 -- NB: We call mkDupableCaseCont here to make cont duplicable
                 --     (if necessary, depending on the number of alts)
                 -- And this is important: see Note [Fusing case continuations]
@@ -4075,17 +4141,6 @@ mkDupableContWithDmds env _ _
                           , sc_env  = zapSubstEnv se `setInScopeFromF` all_floats
                                       -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                           , sc_cont = mkBoringStop (contResultType cont) } ) }
-
-mkDupableContWithDmds env _ _ cont
-  = -- Use Plan B of Note [Duplicating StrictArg]
-    --   K  -->   join j x = K[ x ]
-    --            j <>
-    do { let arg_ty = contHoleType cont
-             rhs_ty = contResultType cont
-       ; arg_bndr <- newId (fsLit "arg") ManyTy arg_ty
-       ; let env' = env `addNewInScopeIds` [arg_bndr]
-       ; (floats, join_rhs) <- simplOutId env' arg_bndr cont
-       ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }
 
 mkDupableStrictBind :: SimplEnv -> OutId -> OutExpr -> OutType
                     -> SimplM (SimplFloats, SimplCont)
