@@ -1645,7 +1645,44 @@ mkUnitState logger dflags cfg = do
                                 , anyUniqMap (== rtsWayUnitId dflags) wired_map
                                 , wired_map) <> text "; The RTS for " <> ppr (rtsWayUnitId dflags) <> text " is missing from the package database.  Please check your installation."
 
-  let pkg_db = mkUnitInfoMap pkgs2
+  let pkgs3 = if gopt Opt_NoRts dflags && not (anyUniqMap (== ghcInternalUnitId) wired_map)
+              then pkgs2
+              else
+              -- At this point we should have `ghcInternalUnitId`, and the `rtsWiredUnitId dflags`.
+              -- The graph looks something like this:
+              --  ghc-internal
+              --    '- rtsWayUnitId dflags
+              --       '- rts ...
+              -- Notably the rtsWayUnitId is chosen by GHC _after_ the build plan by e.g. cabal
+              -- has been constructed.  We still need to ensure that ordering when linking
+              -- is correct. As such we'll manually make rtsWayUnitId dflags a dependency
+              -- of ghcInternalUnitId.
+
+              -- pkgs2: [UnitInfo] = [GenUnitInfo UnitId] = [GenericUnitInfo PackageId PackageName UnitId ModuleName (GenModule (GenUnit UnitId))]
+              -- GenericUnitInfo { unitId: UnitId, ..., unitAbiHash: ShortText, unitDepends: [UnitId], unitAbiDepends: [(UnitId, ShortText)], ... }
+              -- ghcInternalUnitId: UnitId
+              -- rtsWayUnitId dflags: UnitId
+                let rtsWayUnitIdHash = case [ unitAbiHash pkg | pkg <- pkgs2
+                                            , unitId pkg == rtsWayUnitId dflags] of
+                                            [] -> panic "rtsWayUnitId not found in wired-in packages"
+                                            [x] -> x
+                                            _ -> panic "rtsWayUnitId found multiple times in wired-in packages"
+                    ghcInternalUnit = case [ pkg | pkg <- pkgs2
+                                          , unitId pkg == ghcInternalUnitId ] of
+                                          [] -> panic "ghcInternalUnitId not found in wired-in packages"
+                                          [x] -> x
+                                          _ -> panic "ghcInternalUnitId found multiple times in wired-in packages"
+
+                    -- update ghcInternalUnit to depend on rtsWayUnitId dflags
+                    ghcInternalUnit' = ghcInternalUnit
+                      { unitDepends = rtsWayUnitId dflags : unitDepends ghcInternalUnit
+                      , unitAbiDepends = (rtsWayUnitId dflags, rtsWayUnitIdHash) : unitAbiDepends ghcInternalUnit
+                      }
+                in map (\pkg -> if unitId pkg == ghcInternalUnitId
+                                  then ghcInternalUnit'
+                                  else pkg) pkgs2
+
+  let pkg_db = mkUnitInfoMap pkgs3
 
   -- Update the visibility map, so we treat wired packages as visible.
   let vis_map = updateVisibilityMap wired_map vis_map2
@@ -1679,7 +1716,7 @@ mkUnitState logger dflags cfg = do
                 return (updateVisibilityMap wired_map plugin_vis_map2)
 
   let pkgname_map = listToUFM [ (unitPackageName p, unitInstanceOf p)
-                              | p <- pkgs2
+                              | p <- pkgs3
                               ]
   -- The explicitUnits accurately reflects the set of units we have turned
   -- on; as such, it also is the only way one can come up with requirements.
