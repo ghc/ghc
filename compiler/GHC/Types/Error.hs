@@ -602,8 +602,14 @@ instance Diagnostic e => ToJson (MsgEnvelope e) where
     where
       diag = errMsgDiagnostic m
       opts = defaultDiagnosticOpts @e
-      style = mkErrStyle (errMsgContext m)
-      ctx = defaultSDocContext {sdocStyle = style }
+      ctx = defaultSDocContext {
+          sdocStyle = mkErrStyle (errMsgContext m)
+        , sdocCanUseUnicode = True
+             -- Using Unicode makes it easier to consume the JSON output,
+             -- e.g. a suggestion to use foldl' will be displayed as
+             -- \u2018foldl'\u2019, which is not easily confused with
+             -- the quoted ‘foldl’ (note: no tick).
+        }
       diagMsg = filter (not . isEmpty ctx) (unDecorated (diagnosticMessage (opts) diag))
       renderToJSString :: SDoc -> JsonDoc
       renderToJSString = JSString . (renderWithContext ctx)
