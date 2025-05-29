@@ -33,12 +33,20 @@ INFO_TABLE_RET (stg_stop_after_ret_frame, RET_SMALL, W_ info_ptr)
     /* no args => explicit stack */
 {
 
-    /* We've entered a stg_stop_after_ret_frame, thus we want to stop at the next
-     * immediate breakpoint in this thread. Toggle TSO_STOP_NEXT_BREAKPOINT for
-     * this thread exclusively. */
+    /* We've entered a stg_stop_after_ret_frame, thus we may want to stop at
+     * the next immediate breakpoint in this thread. If TSO_STOP_AFTER_RETURN
+     * is ON, toggle TSO_STOP_NEXT_BREAKPOINT for this thread exclusively. */
+    W_ flags;
+    flags = TO_W_(StgTSO_flags(CurrentTSO));
 
-    StgTSO_flags(CurrentTSO) =
-       %lobits32( TO_W_(StgTSO_flags(CurrentTSO)) | TSO_STOP_NEXT_BREAKPOINT );
+    if ((flags & TSO_STOP_AFTER_RETURN) > 0) {
+        StgTSO_flags(CurrentTSO) =
+           %lobits32( flags | TSO_STOP_NEXT_BREAKPOINT );
+
+        /* Don't stepout again */
+        StgTSO_flags(CurrentTSO) =
+           %lobits32( flags & ~TSO_STOP_AFTER_RETURN );
+    }
 
     /* After enabling the single step mode, execution is resumed by returning
      * to the frame this one intercepted.

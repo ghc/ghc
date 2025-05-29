@@ -600,7 +600,8 @@ interpretBCO (Capability* cap)
     // this bco returns).
     //
     // See Note [Debugger: Step-out] for details
-    if (cap->r.rCurrentTSO->flags & TSO_STOP_AFTER_RETURN) {
+    // ROMES: STOP INSERTING THE FRAME DYNAMICALLY.
+    if (false && cap->r.rCurrentTSO->flags & TSO_STOP_AFTER_RETURN) {
 
       StgPtr frame;
       frame = Sp;
@@ -614,10 +615,11 @@ interpretBCO (Capability* cap)
       while (*frame == (W_)&stg_CASE_CONT_BCO_info) {
         frame += stack_frame_sizeW((StgClosure *)frame);
       }
+      // TODO: Handle stack bottom edge case!? if frame == STACK BOTTOM...
+      // stack underflow *and* overflow...
+
       // New frame goes /right after the first/ non-case-cont frame
       frame += stack_frame_sizeW((StgClosure *)frame);
-
-      // TODO: Handle stack bottom edge case!? if frame == STACK BOTTOM...
 
       // Make space for the new frame
       memmove((W_*)Sp - sizeofW(StgStopAfterRetFrame), Sp, (uint8_t*)frame - (uint8_t*)Sp);
