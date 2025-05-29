@@ -47,3 +47,8 @@ test('AtomicFetch',
      ],
      multi_compile_and_run,
      ['AtomicFetch', [('AtomicFetch_cmm.cmm', '')], ''])
+
+test('T25601',
+     [req_cmm],
+     multi_compile_and_run,
+     ['T25601', [('T25601a.cmm', '')], ''])

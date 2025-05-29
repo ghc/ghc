@@ -6067,10 +6067,23 @@ genByteSwap width dst src = do
       W64 | is32Bit -> do
         let Reg64 dst_hi dst_lo = localReg64 dst
         RegCode64 vcode rhi rlo <- iselExpr64 src
-        return $ vcode `appOL`
-                 toOL [ MOV II32 (OpReg rlo) (OpReg dst_hi),
-                        MOV II32 (OpReg rhi) (OpReg dst_lo),
-                        BSWAP II32 dst_hi,
+        tmp <- getNewRegNat II32
+        -- Swap the low and high halves of the register.
+        --
+        -- NB: if dst_hi == rhi, we must make sure to preserve the contents
+        -- of rhi before writing to dst_hi (#25601).
+        let shuffle = if dst_hi == rhi && dst_lo == rlo then
+                        toOL [ MOV II32 (OpReg rhi) (OpReg tmp),
+                               MOV II32 (OpReg rlo) (OpReg dst_hi),
+                               MOV II32 (OpReg tmp) (OpReg dst_lo) ]
+                      else if dst_hi == rhi then
+                        toOL [ MOV II32 (OpReg rhi) (OpReg dst_lo),
+                               MOV II32 (OpReg rlo) (OpReg dst_hi) ]
+                      else
+                        toOL [ MOV II32 (OpReg rlo) (OpReg dst_hi),
+                               MOV II32 (OpReg rhi) (OpReg dst_lo) ]
+        return $ vcode `appOL` shuffle `appOL`
+                 toOL [ BSWAP II32 dst_hi,
                         BSWAP II32 dst_lo ]
       W16 -> do
         let dst_r = getLocalRegReg dst
