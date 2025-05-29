@@ -109,6 +109,9 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $2="$$2 -mcmodel=medium"
         ;;
 
+    javascript*)
+        $3="$$3 -sEXPORTED_RUNTIME_METHODS=HEAP8,HEAPU8"
+
     esac
 
     AC_MSG_RESULT([done])

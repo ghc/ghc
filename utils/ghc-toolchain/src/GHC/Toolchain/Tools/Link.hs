@@ -324,6 +324,10 @@ addPlatformDepLinkFlags archOs cc ccLink0 = do
     ArchOS ArchPPC OSAIX ->
       -- We need `-D_THREAD_SAFE` to unlock the thread-local `errno`.
       return $ ccLink2 & over _prgFlags (++["-D_THREAD_SAFE","-Wl,-bnotextro"])
+    ArchOS ArchJavaScript OSGhcjs ->
+      -- Since https://github.com/emscripten-core/emscripten/blob/main/ChangeLog.md#407---041525
+      -- the emcc linker does not export the HEAP8 memory view which is used by the js RTS by default anymore.
+      return $ ccLink2 & _prgFlags %++ "-sEXPORTED_RUNTIME_METHODS=HEAP8,HEAPU8"
     _ ->
       return ccLink2
 
