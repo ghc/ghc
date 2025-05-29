@@ -83,8 +83,7 @@ _build/stage0/bin/cabal:
 	@echo ">>> Building Cabal..."
 	@mkdir -p _build/stage0/bin
 	@mkdir -p _build/logs
-	cabal build --disable-tests --project-dir libraries/Cabal --builddir=_build/stage0/cabal cabal-install:exe:cabal -j -w ghc \
-		> _build/logs/cabal.log 2> _build/logs/cabal.err
+	cabal build --disable-tests --project-dir libraries/Cabal --builddir=_build/stage0/cabal cabal-install:exe:cabal -j -w ghc |& tee _build/logs/cabal.log
 	cp -rfp $(shell cabal list-bin -v0 --project-dir libraries/Cabal cabal-install:exe:cabal --builddir=_build/stage0/cabal -v0) _build/stage0/bin/cabal
 	@echo ">>> Cabal built successfully."
 
@@ -95,7 +94,7 @@ $(GHC1): _build/booted $(CABAL)
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
 		$(CABAL) build --project-file=cabal.project.stage1 --builddir=_build/stage1/cabal -j -w $(GHC0) \
 		$(STAGE1_TARGETS) \
-		> _build/logs/stage1.log 2> _build/logs/stage1.err
+		|& tee _build/logs/stage1.log
 
 _build/stage1.done: $(GHC1)
 	mkdir -p _build/stage1/{bin,lib}
@@ -110,7 +109,7 @@ _build/stage1.done: $(GHC1)
 
 	cp -rfp utils/hsc2hs/data/template-hsc.h _build/stage1/lib/template-hsc.h
 
-	_build/stage1/bin/ghc-toolchain --triple $(TARGET_TRIPLE) --output-settings -o _build/stage1/lib/settings --cc $(CC) --cxx $(CXX) > _build/logs/ghc-toolchain.log 2> _build/logs/ghc-toolchain.err
+	_build/stage1/bin/ghc-toolchain --triple $(TARGET_TRIPLE) --output-settings -o _build/stage1/lib/settings --cc $(CC) --cxx $(CXX) |& tee _build/logs/ghc-toolchain.log
 
 	rm -fR _build/stage1/lib/package.conf.d; ln -s $(abspath $(wildcard ./_build/stage1/cabal/packagedb/ghc-*)) _build/stage1/lib/package.conf.d
 	_build/stage1/bin/ghc-pkg recache
@@ -132,14 +131,14 @@ $(GHC2): _build/stage1.done
 		$(CABAL) build --project-file=cabal.project.stage2 --builddir=_build/stage2/cabal -j -w ghc \
 		--ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" \
 		rts:nonthreaded-nodebug rts:nonthreaded-debug \
-		> _build/logs/rts.log 2> _build/logs/rts.err
+		|& tee _build/logs/rts.log
 
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
 		PATH=$(PWD)/_build/stage1/bin:$(PATH) \
 		$(CABAL) build --project-file=cabal.project.stage2 --builddir=_build/stage2/cabal -j -w ghc \
 		--ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" \
 		$(STAGE2_TARGETS) \
-		> _build/logs/stage2.log 2> _build/logs/stage2.err
+		|& tee _build/logs/stage2.log
 
 _build/stage2.done: $(GHC2)
 	mkdir -p _build/stage2/{bin,lib}
@@ -183,7 +182,7 @@ _build/bindist: _build/stage2.done driver/ghc-usage.txt driver/ghci-usage.txt
 _build/booted:
 	@echo ">>> Running ./boot script..."
 	@mkdir -p _build/logs
-	./boot > _build/logs/boot.log 2> _build/logs/boot.err
+	./boot |& tee _build/logs/boot.log
 	touch $@
 
 # --- Clean Targets ---
