@@ -854,11 +854,17 @@ minimum xs              =  foldl1' min xs
 -- ==== __Laziness__
 --
 -- Note that 'iterate' is lazy, potentially leading to thunk build-up if
--- the consumer doesn't force each iterate. See 'iterate'' for a strict
+-- the consumer doesn't force each element. See 'iterate'' for a strict
 -- variant of this function.
 --
--- >>> take 1 $ iterate undefined 42
--- [42]
+-- >>> let xs = iterate (\x -> if x == 0 then undefined else x - 1) 2
+-- >>> xs
+-- [2,1,0,*** Exception: Prelude.undefined
+-- >>> length (take 10 xs)
+-- 10
+--
+-- In @xs@ every element following @0@ is bottom, but the list itself is
+-- infinitely long because it is generated without forcing its elements.
 --
 -- ==== __Examples__
 --
@@ -889,24 +895,26 @@ iterateFB c f x0 = go x0
 
 -- | 'iterate'' is the strict version of 'iterate'.
 --
--- It forces the result of each application of the function to weak head normal
--- form (WHNF)
--- before proceeding.
+-- It forces each element to weak head normal form (WHNF) before proceeding.
 --
--- >>> take 1 $ iterate' undefined 42
+-- ==== __Laziness__
+--
+-- >>> let xs = iterate' (\x -> if x == 0 then undefined else x - 1) 2
+-- >>> xs
+-- [2,1,0*** Exception: Prelude.undefined
+-- >>> length (take 10 xs)
 -- *** Exception: Prelude.undefined
+--
+-- The list @xs@ has 3 elements followed by a tail that is bottom.
+--
 {-# NOINLINE [1] iterate' #-}
 iterate' :: (a -> a) -> a -> [a]
-iterate' f x =
-    let x' = f x
-    in x' `seq` (x : iterate' f x')
+iterate' f !x = x : iterate' f (f x)
 
 {-# INLINE [0] iterate'FB #-} -- See Note [Inline FB functions]
 iterate'FB :: (a -> b -> b) -> (a -> a) -> a -> b
 iterate'FB c f x0 = go x0
-  where go x =
-            let x' = f x
-            in x' `seq` (x `c` go x')
+  where go !x = x `c` go (f x)
 
 {-# RULES
 "iterate'"    [~1] forall f x.   iterate' f x = build (\c _n -> iterate'FB c f x)

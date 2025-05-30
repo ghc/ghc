@@ -8,6 +8,7 @@
   * `GHC.Exts.IOPort#` and its related operations have been removed  ([CLC #213](https://github.com/haskell/core-libraries-committee/issues/213))
   * Fix bug where `naturalAndNot` was incorrectly truncating results ([CLC proposal #350](github.com/haskell/core-libraries-committee/issues/350))
   * Remove extra laziness from `Data.Bifunctor.Bifunctor` instances for all tuples to have the same laziness as their `Data.Functor.Functor` counterparts (i.e. they became more strict than before) ([CLC proposal #339](https://github.com/haskell/core-libraries-committee/issues/339))
+  * Adjust the strictness of `Data.List.iterate'` to be more reasonable: every element of the output list is forced to WHNF when the `(:)` containing it is forced. ([CLC proposal #335)](https://github.com/haskell/core-libraries-committee/issues/335)
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1
