@@ -386,11 +386,9 @@ schemeR_wrk fvs nm original_body (args, body)
          bits = argBits platform (reverse (map (idArgRep platform) all_args))
          bitmap_size = strictGenericLength bits
          bitmap = mkBitmap platform bits
+     body_code <- schemeER_wrk sum_szsb_args p_init body
 
-     body_code <- schemeER_wrk (wordSize platform + sum_szsb_args) p_init body
-     let stop_frame = PUSH_UBX (LitLabel (mkFastString "stg_stop_after_ret_frame_info") IsData) 1
-
-     pure (mkProtoBCO platform add_bco_name nm (stop_frame `consOL` body_code) (Right original_body)
+     pure (mkProtoBCO platform add_bco_name nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
 
 -- | Introduce break instructions for ticked expressions.
@@ -796,12 +794,14 @@ doTailCall init_d s p fn args = do
    platform <- profilePlatform <$> getProfile
 
    -- Push a stop-frame before the call
-   -- let !d2 = init_d + wordSize platform {- step out frame uses 1 word -}
+   let !d2 = init_d + wordSize platform {- step out frame uses 1 word -}
 
    -- Do tail call only after
-   instrs <- do_pushes init_d args (map (atomRep platform) args)
+   instrs <- do_pushes d2 args (map (atomRep platform) args)
 
-   return instrs
+   return $
+    unitOL (PUSH_UBX (LitLabel (mkFastString "stg_stop_after_ret_frame_info") IsData) 1)
+      `appOL` instrs
 
   where
   do_pushes !d [] reps = do
