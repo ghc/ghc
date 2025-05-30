@@ -41,11 +41,12 @@ INFO_TABLE_RET (stg_stop_after_ret_frame, RET_SMALL, W_ info_ptr)
 
     if ((flags & TSO_STOP_AFTER_RETURN) > 0) {
         StgTSO_flags(CurrentTSO) =
-           %lobits32( flags | TSO_STOP_NEXT_BREAKPOINT );
+           %lobits32( (flags | TSO_STOP_NEXT_BREAKPOINT)
+                             & ~TSO_STOP_AFTER_RETURN /* don't step out again! */ );
 
-        /* Don't stepout again */
-        StgTSO_flags(CurrentTSO) =
-           %lobits32( flags & ~TSO_STOP_AFTER_RETURN );
+        ccall debugBelch("THE STOP AFTER RET FRAME WAS ACTIVE\n");
+    } else {
+        ccall debugBelch("THE STOP AFTER RET FRAME WAS NOT!!!! ACTIVE\n");
     }
 
     /* After enabling the single step mode, execution is resumed by returning
