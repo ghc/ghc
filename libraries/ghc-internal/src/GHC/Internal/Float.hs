@@ -430,14 +430,10 @@ naturalToFloat# (NB b) = case integerToBinaryFloat' (IP b) of
 
 -- | @since base-2.01
 --
--- Beware that 'toRational' generates garbage for non-finite arguments:
---
--- >>> toRational (1/0 :: Float)
--- 340282366920938463463374607431768211456 % 1
--- >>> toRational (0/0 :: Float)
--- 510423550381407695195061911147652317184 % 1
---
 instance  Real Float  where
+    toRational x
+      | isInfinite x = if x > 0 then infinity else -infinity
+      | isNaN x = notANumber
     toRational (F# x#)  =
         case decodeFloat_Int# x# of
           (# m#, e# #)
@@ -686,14 +682,10 @@ naturalToDouble# (NB b) = case integerToBinaryFloat' (IP b) of
 
 -- | @since base-2.01
 --
--- Beware that 'toRational' generates garbage for non-finite arguments:
---
--- >>> toRational (1/0)
--- 179769313 (and 300 more digits...) % 1
--- >>> toRational (0/0)
--- 269653970 (and 300 more digits...) % 1
---
 instance  Real Double  where
+    toRational x
+      | isInfinite x = if x > 0 then infinity else -infinity
+      | isNaN x = notANumber
     toRational (D# x#)  =
         case integerDecodeDouble# x# of
           (# m, e# #)
