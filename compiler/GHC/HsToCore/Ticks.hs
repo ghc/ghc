@@ -1,12 +1,11 @@
-{-# LANGUAGE DeriveFunctor            #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE TypeFamilies             #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 {-
 (c) Galois, 2006
 (c) University of Glasgow, 2007
+(c) Florian Ragwitz, 2025
 -}
 
 module GHC.HsToCore.Ticks
@@ -38,7 +37,9 @@ import GHC.Utils.Logger
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import GHC.Types.Name.Set hiding (FreeVars)
 import GHC.Types.Name
 import GHC.Types.CostCentre
@@ -48,6 +49,7 @@ import GHC.Types.ProfAuto
 
 import Control.Monad
 import Data.List (isSuffixOf, intersperse)
+import Data.Foldable (toList)
 
 import Trace.Hpc.Mix
 
@@ -123,6 +125,7 @@ addTicksToBinds logger cfg
                       , density      = mkDensity tickish $ ticks_profAuto cfg
                       , this_mod     = mod
                       , tickishType  = tickish
+                      , recSelBinds  = emptyVarEnv
                       }
                 (binds',_,st') = unTM (addTickLHsBinds binds) env st
             in (binds', st')
@@ -224,8 +227,7 @@ addTickLHsBind :: LHsBind GhcTc -> TM (LHsBind GhcTc)
 addTickLHsBind (L pos (XHsBindsLR bind@(AbsBinds { abs_binds = binds
                                                  , abs_exports = abs_exports
                                                  }))) =
-  withEnv add_exports $
-    withEnv add_inlines $ do
+  withEnv (add_rec_sels . add_inlines . add_exports) $ do
       binds' <- addTickLHsBinds binds
       return $ L pos $ XHsBindsLR $ bind { abs_binds = binds' }
   where
@@ -247,6 +249,12 @@ addTickLHsBind (L pos (XHsBindsLR bind@(AbsBinds { abs_binds = binds
                       | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
                       , isInlinePragma (idInlinePragma pid) ] }
 
+   add_rec_sels env =
+     env{ recSelBinds = recSelBinds env `extendVarEnvList`
+                          [ (abe_mono, abe_poly)
+                          | ABE{ abe_poly, abe_mono } <- abs_exports
+                          , RecSelId{} <- [idDetails abe_poly] ] }
+
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches }))) = do
   let name = getOccString id
   decl_path <- getPathEntry
@@ -260,6 +268,10 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
   -- See Note [inline sccs]
   tickish <- tickishType `liftM` getEnv
   case tickish of { ProfNotes | inline -> return (L pos funBind); _ -> do
+
+  -- See Note [Record-selector ticks]
+  selTick <- recSelTick id
+  case selTick of { Just tick -> tick_rec_sel tick; _ -> do
 
   (fvs, mg) <-
         getFreeVars $
@@ -288,7 +300,40 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
   let mbCons = maybe Prelude.id (:)
   return $ L pos $ funBind { fun_matches = mg
                            , fun_ext = second (tick `mbCons`) (fun_ext funBind) }
-  }
+  } }
+  where
+    -- See Note [Record-selector ticks]
+    tick_rec_sel tick =
+      pure $ L pos $ funBind { fun_ext = second (tick :) (fun_ext funBind) }
+
+
+-- Note [Record-selector ticks]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Users expect (see #17834) that accessing a record field by its name using
+-- NamedFieldPuns or RecordWildCards will mark it as covered. This is very
+-- reasonable, because otherwise the use of those two language features will
+-- produce unnecessary noise in coverage reports, distracting from real
+-- coverage problems.
+--
+-- Because of that, GHC chooses to treat record selectors specially for
+-- coverage purposes to improve the developer experience.
+--
+-- This is done by keeping track of which 'Id's are effectively bound to
+-- record fields (using NamedFieldPuns or RecordWildCards) in 'TickTransEnv's
+-- 'recSelBinds', and making 'HsVar's corresponding to those fields tick the
+-- appropriate box when executed.
+--
+-- To enable that, we also treat 'FunBind's for record selector functions
+-- specially. We only create a TopLevelBox for the record selector function,
+-- skipping the ExpBox that'd normally be created. This simplifies the re-use
+-- of ticks for the same record selector, and is done by not recursing into
+-- the fun_matches match group for record selector functions.
+--
+-- This scheme could be extended further in the future, making coverage for
+-- constructor fields (named or even positional) mean that the field was
+-- accessed at run-time. For the time being, we only cover NamedFieldPuns and
+-- RecordWildCards binds to cover most practical use-cases while keeping it
+-- simple.
 
 -- TODO: Revisit this
 addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
@@ -471,7 +516,10 @@ addBinTickLHsExpr boxLabel e@(L pos e0)
 -- in the addTickLHsExpr family of functions.)
 
 addTickHsExpr :: HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpr e@(HsVar _ (L _ id))  = do freeVar id; return e
+-- See Note [Record-selector ticks]
+addTickHsExpr e@(HsVar _ (L _ id)) =
+    freeVar id >> recSelTick id >>= pure . maybe e wrap
+  where wrap tick = XExpr . HsTick tick . noLocA $ e
 addTickHsExpr e@(HsIPVar {})            = return e
 addTickHsExpr e@(HsOverLit {})          = return e
 addTickHsExpr e@(HsOverLabel{})         = return e
@@ -532,7 +580,7 @@ addTickHsExpr (HsMultiIf ty alts)
        ; alts' <- mapM (traverse $ addTickGRHS isOneOfMany False False) alts
        ; return $ HsMultiIf ty alts' }
 addTickHsExpr (HsLet x binds e) =
-        bindLocals (collectLocalBinders CollNoDictBinders binds) $ do
+        bindLocals binds $ do
           binds' <- addTickHsLocalBinds binds -- to think about: !patterns.
           e' <- addTickLHsExprLetBody e
           return (HsLet x binds' e')
@@ -580,6 +628,7 @@ addTickHsExpr e@(HsUntypedSplice{})  = return e
 addTickHsExpr e@(HsGetField {})      = return e
 addTickHsExpr e@(HsProjection {})    = return e
 addTickHsExpr (HsProc x pat cmdtop) =
+      bindLocals pat $
         liftM2 (HsProc x)
                 (addTickLPat pat)
                 (traverse (addTickHsCmdTop) cmdtop)
@@ -646,19 +695,17 @@ addTickMatch :: Bool -> Bool -> Bool {-Is this Do Expansion-} ->  Match GhcTc (L
              -> TM (Match GhcTc (LHsExpr GhcTc))
 addTickMatch isOneOfMany isLambda isDoExp match@(Match { m_pats = L _ pats
                                                        , m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders CollNoDictBinders pats) $ do
+  bindLocals pats $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda isDoExp gRHSs
     return $ match { m_grhss = gRHSs' }
 
 addTickGRHSs :: Bool -> Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
              -> TM (GRHSs GhcTc (LHsExpr GhcTc))
 addTickGRHSs isOneOfMany isLambda isDoExp (GRHSs x guarded local_binds) =
-  bindLocals binders $ do
+  bindLocals local_binds $ do
     local_binds' <- addTickHsLocalBinds local_binds
     guarded' <- mapM (traverse (addTickGRHS isOneOfMany isLambda isDoExp)) guarded
     return $ GRHSs x guarded' local_binds'
-  where
-    binders = collectLocalBinders CollNoDictBinders local_binds
 
 addTickGRHS :: Bool -> Bool -> Bool -> GRHS GhcTc (LHsExpr GhcTc)
             -> TM (GRHS GhcTc (LHsExpr GhcTc))
@@ -697,7 +744,7 @@ addTickLStmts isGuard stmts = do
 addTickLStmts' :: (Maybe (Bool -> BoxLabel)) -> [ExprLStmt GhcTc] -> TM a
                -> TM ([ExprLStmt GhcTc], a)
 addTickLStmts' isGuard lstmts res
-  = bindLocals (collectLStmtsBinders CollNoDictBinders lstmts) $
+  = bindLocals lstmts $
     do { lstmts' <- mapM (traverse (addTickStmt isGuard)) lstmts
        ; a <- res
        ; return (lstmts', a) }
@@ -710,6 +757,7 @@ addTickStmt _isGuard (LastStmt x e noret ret) =
                 (pure noret)
                 (addTickSyntaxExpr hpcSrcSpan ret)
 addTickStmt _isGuard (BindStmt xbs pat e) =
+      bindLocals pat $
         liftM4 (\b f -> BindStmt $ XBindStmtTc
                     { xbstc_bindOp = b
                     , xbstc_boundResultType = xbstc_boundResultType xbs
@@ -770,17 +818,19 @@ addTickApplicativeArg isGuard (op, arg) =
   liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
  where
   addTickArg (ApplicativeArgOne m_fail pat expr isBody) =
-    ApplicativeArgOne
-      <$> mapM (addTickSyntaxExpr hpcSrcSpan) m_fail
-      <*> addTickLPat pat
-      <*> addTickLHsExpr expr
-      <*> pure isBody
+    bindLocals pat $
+      ApplicativeArgOne
+        <$> mapM (addTickSyntaxExpr hpcSrcSpan) m_fail
+        <*> addTickLPat pat
+        <*> addTickLHsExpr expr
+        <*> pure isBody
   addTickArg (ApplicativeArgMany x stmts ret pat ctxt) =
-    (ApplicativeArgMany x)
-      <$> addTickLStmts isGuard stmts
-      <*> (unLoc <$> addTickLHsExpr (L (noAnnSrcSpan hpcSrcSpan) ret))
-      <*> addTickLPat pat
-      <*> pure ctxt
+    bindLocals pat $
+      ApplicativeArgMany x
+        <$> addTickLStmts isGuard stmts
+        <*> (unLoc <$> addTickLHsExpr (L (noAnnSrcSpan hpcSrcSpan) ret))
+        <*> addTickLPat pat
+        <*> pure ctxt
 
 addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ParStmtBlock GhcTc GhcTc
                       -> TM (ParStmtBlock GhcTc GhcTc)
@@ -871,7 +921,7 @@ addTickHsCmd (HsCmdIf x cnd e1 c2 c3) =
                 (addTickLHsCmd c2)
                 (addTickLHsCmd c3)
 addTickHsCmd (HsCmdLet x binds c) =
-        bindLocals (collectLocalBinders CollNoDictBinders binds) $ do
+        bindLocals binds $ do
           binds' <- addTickHsLocalBinds binds -- to think about: !patterns.
           c' <- addTickLHsCmd c
           return (HsCmdLet x binds' c')
@@ -907,18 +957,16 @@ addTickCmdMatchGroup mg@(MG { mg_alts = (L l matches) }) = do
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = L _ pats, m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders CollNoDictBinders pats) $ do
+  bindLocals pats $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
     return $ match { m_grhss = gRHSs' }
 
 addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
 addTickCmdGRHSs (GRHSs x guarded local_binds) =
-  bindLocals binders $ do
+  bindLocals local_binds $ do
     local_binds' <- addTickHsLocalBinds local_binds
     guarded' <- mapM (traverse addTickCmdGRHS) guarded
     return $ GRHSs x guarded' local_binds'
-  where
-    binders = collectLocalBinders CollNoDictBinders local_binds
 
 addTickCmdGRHS :: GRHS GhcTc (LHsCmd GhcTc) -> TM (GRHS GhcTc (LHsCmd GhcTc))
 -- The *guards* are *not* Cmds, although the body is
@@ -937,15 +985,14 @@ addTickLCmdStmts stmts = do
 addTickLCmdStmts' :: [LStmt GhcTc (LHsCmd GhcTc)] -> TM a
                   -> TM ([LStmt GhcTc (LHsCmd GhcTc)], a)
 addTickLCmdStmts' lstmts res
-  = bindLocals binders $ do
+  = bindLocals lstmts $ do
         lstmts' <- mapM (traverse addTickCmdStmt) lstmts
         a <- res
         return (lstmts', a)
-  where
-        binders = collectLStmtsBinders CollNoDictBinders lstmts
 
 addTickCmdStmt :: Stmt GhcTc (LHsCmd GhcTc) -> TM (Stmt GhcTc (LHsCmd GhcTc))
 addTickCmdStmt (BindStmt x pat c) =
+      bindLocals pat $
         liftM2 (BindStmt x)
                 (addTickLPat pat)
                 (addTickLHsCmd c)
@@ -1006,11 +1053,13 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
 
 data TickTransState = TT { ticks       :: !(SizedSeq Tick)
                          , ccIndices   :: !CostCentreState
+                         , recSelTicks :: !(IdEnv CoreTickish)
                          }
 
 initTTState :: TickTransState
 initTTState = TT { ticks        = emptySS
                  , ccIndices    = newCostCentreState
+                 , recSelTicks  = emptyVarEnv
                  }
 
 addMixEntry :: Tick -> TM Int
@@ -1020,6 +1069,10 @@ addMixEntry ent = do
     st { ticks = addToSS (ticks st) ent
        }
   return c
+
+addRecSelTick :: Id -> CoreTickish -> TM ()
+addRecSelTick sel tick =
+  setState $ \s -> s{ recSelTicks = extendVarEnv (recSelTicks s) sel tick }
 
 data TickTransEnv = TTE { fileName     :: FastString
                         , density      :: TickDensity
@@ -1033,6 +1086,7 @@ data TickTransEnv = TTE { fileName     :: FastString
                         , blackList    :: Set RealSrcSpan
                         , this_mod     :: Module
                         , tickishType  :: TickishType
+                        , recSelBinds  :: IdEnv Id
                         }
 
 --      deriving Show
@@ -1154,12 +1208,13 @@ ifGoodTickSrcSpan pos then_code else_code = do
   good <- isGoodTickSrcSpan pos
   if good then then_code else else_code
 
-bindLocals :: [Id] -> TM a -> TM a
-bindLocals new_ids (TM m)
-  = TM $ \ env st ->
-                 case m env{ inScope = inScope env `extendVarSetList` new_ids } st of
-                   (r, fv, st') -> (r, fv `delListFromOccEnv` occs, st')
-  where occs = [ nameOccName (idName id) | id <- new_ids ]
+bindLocals :: (CollectBinders bndr, CollectFldBinders bndr) => bndr -> TM a -> TM a
+bindLocals from (TM m) = TM $ \env st ->
+  case m (with_bnds env) st of
+    (r, fv, st') -> (r, fv `delListFromOccEnv` (map (nameOccName . idName) new_bnds), st')
+  where with_bnds e = e{ inScope = inScope e `extendVarSetList` new_bnds
+                       , recSelBinds = recSelBinds e `plusVarEnv` collectFldBinds from }
+        new_bnds = collectBinds from
 
 withBlackListed :: SrcSpan -> TM a -> TM a
 withBlackListed (RealSrcSpan ss _) = withEnv (\ env -> env { blackList = Set.insert ss (blackList env) })
@@ -1185,6 +1240,17 @@ allocTickBox boxLabel countEntries topOnly pos m
       env <- getEnv
       tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
       return (this_loc (XExpr $ HsTick tickish $ this_loc e))
+
+recSelTick :: Id -> TM (Maybe CoreTickish)
+recSelTick id = ifDensity TickForCoverage maybe_tick (pure Nothing)
+  where
+    maybe_tick = getEnv >>=
+      maybe (pure Nothing) tick . (`lookupVarEnv` id) . recSelBinds
+    tick sel = getState >>=
+      maybe (alloc sel) (pure . Just) . (`lookupVarEnv` sel) . recSelTicks
+    alloc sel = allocATickBox (box sel) False False (getSrcSpan sel) noFVs
+                  >>= traverse (\t -> t <$ addRecSelTick sel t)
+    box sel = TopLevelBox [getOccString sel]
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations
@@ -1288,3 +1354,98 @@ matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
         matchCount :: LMatch GhcTc body -> Int
         matchCount (L _ (Match { m_grhss = GRHSs _ grhss _ }))
           = length grhss
+
+-- | Convenience class used by 'bindLocals' to collect new bindings from
+-- various parts of he AST. Just delegates to
+-- 'collect{Pat,Pats,Local,LStmts}Binders' from 'GHC.Hs.Utils' as appropriate.
+class CollectBinders a where
+  collectBinds :: a -> [Id]
+
+-- | Variant of 'CollectBinders' which collects information on which locals
+-- are bound to record fields (currently only via 'RecordWildCards' or
+-- 'NamedFieldPuns') to enable better coverage support for record selectors.
+--
+-- See Note [Record-selector ticks].
+class CollectFldBinders a where
+  collectFldBinds :: a -> IdEnv Id
+
+instance CollectBinders (LocatedA (Pat GhcTc)) where
+  collectBinds = collectPatBinders CollNoDictBinders
+instance CollectBinders [LocatedA (Pat GhcTc)] where
+  collectBinds = collectPatsBinders CollNoDictBinders
+instance CollectBinders (HsLocalBinds GhcTc) where
+  collectBinds = collectLocalBinders CollNoDictBinders
+instance CollectBinders [LocatedA (Stmt GhcTc (LocatedA (HsExpr GhcTc)))] where
+  collectBinds = collectLStmtsBinders CollNoDictBinders
+instance CollectBinders [LocatedA (Stmt GhcTc (LocatedA (HsCmd GhcTc)))] where
+  collectBinds = collectLStmtsBinders CollNoDictBinders
+
+instance (CollectFldBinders a) => CollectFldBinders [a] where
+  collectFldBinds = foldr (flip plusVarEnv . collectFldBinds) emptyVarEnv
+instance (CollectFldBinders e) => CollectFldBinders (GenLocated l e) where
+  collectFldBinds = collectFldBinds . unLoc
+instance CollectFldBinders (Pat GhcTc) where
+  collectFldBinds ConPat{ pat_args = RecCon HsRecFields{ rec_flds, rec_dotdot } } =
+    collectFldBinds rec_flds `plusVarEnv` plusVarEnvList (zipWith fld_bnds [0..] rec_flds)
+    where n_explicit | Just (L _ (RecFieldsDotDot n)) <- rec_dotdot = n
+                     | otherwise = length rec_flds
+          fld_bnds n (L _ HsFieldBind{ hfbLHS = L _ FieldOcc{ foLabel = L _ sel }
+                                     , hfbRHS = L _ (VarPat _ (L _ var))
+                                     , hfbPun })
+            | hfbPun || n >= n_explicit = unitVarEnv var sel
+          fld_bnds _ _ = emptyVarEnv
+  collectFldBinds ConPat{ pat_args = PrefixCon pats } = collectFldBinds pats
+  collectFldBinds ConPat{ pat_args = InfixCon p1 p2 } = collectFldBinds [p1, p2]
+  collectFldBinds (LazyPat _ pat) = collectFldBinds pat
+  collectFldBinds (BangPat _ pat) = collectFldBinds pat
+  collectFldBinds (AsPat _ _ pat) = collectFldBinds pat
+  collectFldBinds (ViewPat _ _ pat) = collectFldBinds pat
+  collectFldBinds (ParPat _ pat) = collectFldBinds pat
+  collectFldBinds (ListPat _ pats) = collectFldBinds pats
+  collectFldBinds (TuplePat _ pats _) = collectFldBinds pats
+  collectFldBinds (SumPat _ pats _ _) = collectFldBinds pats
+  collectFldBinds (SigPat _ pat _) = collectFldBinds pat
+  collectFldBinds (XPat exp) = collectFldBinds exp
+  collectFldBinds VarPat{} = emptyVarEnv
+  collectFldBinds WildPat{} = emptyVarEnv
+  collectFldBinds OrPat{} = emptyVarEnv
+  collectFldBinds LitPat{} = emptyVarEnv
+  collectFldBinds NPat{} = emptyVarEnv
+  collectFldBinds NPlusKPat{} = emptyVarEnv
+  collectFldBinds SplicePat{} = emptyVarEnv
+  collectFldBinds EmbTyPat{} = emptyVarEnv
+  collectFldBinds InvisPat{} = emptyVarEnv
+instance (CollectFldBinders r) => CollectFldBinders (HsFieldBind l r) where
+  collectFldBinds = collectFldBinds . hfbRHS
+instance CollectFldBinders XXPatGhcTc where
+  collectFldBinds (CoPat _ pat _) = collectFldBinds pat
+  collectFldBinds (ExpansionPat _ pat) = collectFldBinds pat
+instance CollectFldBinders (HsLocalBinds GhcTc) where
+  collectFldBinds (HsValBinds _ bnds) = collectFldBinds bnds
+  collectFldBinds HsIPBinds{} = emptyVarEnv
+  collectFldBinds EmptyLocalBinds{} = emptyVarEnv
+instance CollectFldBinders (HsValBinds GhcTc) where
+  collectFldBinds (ValBinds _ bnds _) = collectFldBinds bnds
+  collectFldBinds (XValBindsLR (NValBinds bnds _)) = collectFldBinds (map snd bnds)
+instance CollectFldBinders (HsBind GhcTc) where
+  collectFldBinds PatBind{ pat_lhs } = collectFldBinds pat_lhs
+  collectFldBinds (XHsBindsLR AbsBinds{ abs_exports, abs_binds }) =
+    mkVarEnv [ (abe_poly, sel)
+             | ABE{ abe_poly, abe_mono } <- abs_exports
+             , Just sel <- [lookupVarEnv monos abe_mono] ]
+    where monos = collectFldBinds abs_binds
+  collectFldBinds VarBind{} = emptyVarEnv
+  collectFldBinds FunBind{} = emptyVarEnv
+  collectFldBinds PatSynBind{} = emptyVarEnv
+instance CollectFldBinders (Stmt GhcTc e) where
+  collectFldBinds (BindStmt _ pat _) = collectFldBinds pat
+  collectFldBinds (LetStmt _ bnds) = collectFldBinds bnds
+  collectFldBinds (ParStmt _ xs _ _) = collectFldBinds [s | ParStmtBlock _ ss _ _ <- toList xs, s <- ss]
+  collectFldBinds TransStmt{ trS_stmts } = collectFldBinds trS_stmts
+  collectFldBinds RecStmt{ recS_stmts } = collectFldBinds recS_stmts
+  collectFldBinds (XStmtLR (ApplicativeStmt _ args _)) = collectFldBinds (map snd args)
+  collectFldBinds LastStmt{} = emptyVarEnv
+  collectFldBinds BodyStmt{} = emptyVarEnv
+instance CollectFldBinders (ApplicativeArg GhcTc) where
+  collectFldBinds ApplicativeArgOne{ app_arg_pattern } = collectFldBinds app_arg_pattern
+  collectFldBinds ApplicativeArgMany{ bv_pattern } = collectFldBinds bv_pattern
