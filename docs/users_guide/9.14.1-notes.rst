@@ -138,6 +138,11 @@ Compiler
   uses of the now deprecated ``pattern`` namespace specifier in import/export
   lists. See `GHC Proposal #581, section 2.3 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0581-namespace-specified-imports.rst#deprecate-use-of-pattern-in-import-export-lists>`_.
 
+- Code coverage (:ghc-flag:`-fhpc`) now treats uses of record fields via
+  :extension:`RecordWildCards` or :extension:`NamedFieldPuns` as if the fields
+  were accessed using the generated record selector functions, marking the fields
+  as covered in coverage reports (:ghc-ticket:`17834`).
+
 GHCi
 ~~~~
 
