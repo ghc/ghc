@@ -703,15 +703,6 @@ fromIntegral = fromInteger . toInteger
 
 -- | General coercion to 'Fractional' types.
 --
--- WARNING: This function goes through the 'Rational' type, which does not have values for 'NaN' for example.
--- This means it does not round-trip.
---
--- For 'Double' it also behaves differently with or without -O0:
---
--- > Prelude> realToFrac nan -- With -O0
--- > -Infinity
--- > Prelude> realToFrac nan
--- > NaN
 realToFrac :: (Real a, Fractional b) => a -> b
 {-# NOINLINE [1] realToFrac #-}
 -- See Note [Allow time for type-specialisation rules to fire]

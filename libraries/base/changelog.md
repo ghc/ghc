@@ -2,6 +2,7 @@
 
 ## 4.23.0.0 *TBA*
   * Add `Data.List.NonEmpty.mapMaybe`. ([CLC proposal #337](https://github.com/haskell/core-libraries-committee/issues/337))
+  * Fix issues with toRational for types capable to represent infinite and not-a-number values ([CLC proposal #338](https://github.com/haskell/core-libraries-committee/issues/338))
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1
