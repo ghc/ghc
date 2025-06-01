@@ -134,6 +134,9 @@ data Interface = Interface
   -- Names from modules that are entirely re-exported don't count as visible.
   , ifaceInstances :: [ClsInst]
   -- ^ Instances exported by the module.
+  , ifaceOrphanDeps :: [Module]
+  -- ^ The list of modules to check for orphan instances if this module is
+  -- imported.
   , ifaceOrphanInstances :: [DocInstance GhcRn]
   -- ^ Orphan instances
   , ifaceRnOrphanInstances :: [DocInstance DocNameI]

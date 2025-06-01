@@ -88,7 +88,10 @@ attachInstances expInfo ifaces instIfaceMap isOneShot = do
           , fromOrig == Just True || not (null reExp)
           ]
       mods_to_load = moduleSetElts mods
-      mods_visible = mkModuleSet $ map ifaceMod ifaces
+      -- We need to ensure orphans in modules outside of this package are included.
+      -- See https://gitlab.haskell.org/ghc/ghc/-/issues/25147
+      -- and https://gitlab.haskell.org/ghc/ghc/-/issues/26079
+      mods_visible = mkModuleSet $ concatMap (liftA2 (:) ifaceMod ifaceOrphanDeps) ifaces
 
   (_msgs, mb_index) <- do
     hsc_env <- getSession
