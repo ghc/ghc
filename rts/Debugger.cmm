@@ -29,7 +29,7 @@ import CLOSURE stg_stop_after_ret_frame_info;
  *
  * See Note [Debugger: Step-out] for details.
  */
-INFO_TABLE_RET (stg_stop_after_ret_frame, RET_SMALL, W_ info_ptr)
+INFO_TABLE_RET (stg_stop_after_ret_frame, RET_SMALL, W_ info_ptr, W_ enabled)
     /* no args => explicit stack */
 {
 
