@@ -760,8 +760,9 @@ exprCtOrigin (HsHole _)          = Shouldn'tHappenOrigin "hole expression"
 exprCtOrigin (HsForAll {})       = Shouldn'tHappenOrigin "forall telescope"    -- See Note [Types in terms]
 exprCtOrigin (HsQual {})         = Shouldn'tHappenOrigin "constraint context"  -- See Note [Types in terms]
 exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -- See Note [Types in terms]
-exprCtOrigin (XExpr (ExpandedThingRn{})) = Shouldn'tHappenOrigin "XExpr ExpandedThingRn"
-exprCtOrigin (XExpr (PopErrCtxt {})) = Shouldn'tHappenOrigin "PopErrCtxt"
+exprCtOrigin (XExpr (ExpandedThingRn (OrigStmt {}) _)) = DoOrigin
+exprCtOrigin (XExpr (ExpandedThingRn (OrigExpr e) _)) = exprCtOrigin e
+exprCtOrigin (XExpr (PopErrCtxt e)) = exprCtOrigin e
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
 
 -- | Extract a suitable CtOrigin from a MatchGroup
