@@ -711,4 +711,5 @@ typedef struct {
 // Closure type: RET_SMALL
 typedef struct {
     StgHeader header;
+    StgWord enabled;
 } StgStopAfterRetFrame;

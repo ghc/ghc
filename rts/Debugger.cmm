@@ -37,14 +37,16 @@ INFO_TABLE_RET (stg_stop_after_ret_frame, RET_SMALL, W_ info_ptr)
      * the next immediate breakpoint in this thread. If TSO_STOP_AFTER_RETURN
      * is ON, toggle TSO_STOP_NEXT_BREAKPOINT for this thread exclusively. */
     W_ flags;
+    W_ enabled;
     flags = TO_W_(StgTSO_flags(CurrentTSO));
+    enabled = Sp(1);
 
-    if ((flags & TSO_STOP_AFTER_RETURN) > 0) {
+    if (enabled > 0) {
         StgTSO_flags(CurrentTSO) =
-           %lobits32( (flags | TSO_STOP_NEXT_BREAKPOINT)
-                             & ~TSO_STOP_AFTER_RETURN /* don't step out again! */ );
+           %lobits32( flags | TSO_STOP_NEXT_BREAKPOINT );
 
         ccall debugBelch("THE STOP AFTER RET FRAME WAS ACTIVE\n");
+
     } else {
         ccall debugBelch("THE STOP AFTER RET FRAME WAS NOT!!!! ACTIVE\n");
     }

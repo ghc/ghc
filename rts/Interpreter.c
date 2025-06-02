@@ -601,7 +601,7 @@ interpretBCO (Capability* cap)
     //
     // See Note [Debugger: Step-out] for details
     // ROMES: STOP INSERTING THE FRAME DYNAMICALLY.
-    if (false && cap->r.rCurrentTSO->flags & TSO_STOP_AFTER_RETURN) {
+    if (cap->r.rCurrentTSO->flags & TSO_STOP_AFTER_RETURN) {
 
       StgPtr frame;
       frame = Sp;
@@ -612,24 +612,26 @@ interpretBCO (Capability* cap)
       // Do /not/ insert a step-out frame between case continuation
       // frames and their parent BCO frame. Case continuation BCOs may have
       // non-local stack references. See Note [Case continuation BCOs].
-      while (*frame == (W_)&stg_CASE_CONT_BCO_info) {
+
+      // UPDATE COMMENTS: NOW FIND STOP FRAME AND ACTIVATE IT
+      while (*frame != (W_)&stg_stop_after_ret_frame_info) {
         frame += stack_frame_sizeW((StgClosure *)frame);
       }
       // TODO: Handle stack bottom edge case!? if frame == STACK BOTTOM...
       // stack underflow *and* overflow...
 
       // New frame goes /right after the first/ non-case-cont frame
-      frame += stack_frame_sizeW((StgClosure *)frame);
+      // frame += stack_frame_sizeW((StgClosure *)frame);
 
       // Make space for the new frame
-      memmove((W_*)Sp - sizeofW(StgStopAfterRetFrame), Sp, (uint8_t*)frame - (uint8_t*)Sp);
-      Sp_subW(sizeofW(StgStopAfterRetFrame));
+      // memmove((W_*)Sp - sizeofW(StgStopAfterRetFrame), Sp, (uint8_t*)frame - (uint8_t*)Sp);
+      // Sp_subW(sizeofW(StgStopAfterRetFrame));
 
       // Point to newly opened space
-      frame -= sizeofW(StgStopAfterRetFrame);
+      // frame -= sizeofW(StgStopAfterRetFrame);
 
       // Then write it.
-      ((StgStopAfterRetFrame*)frame)->header.info = &stg_stop_after_ret_frame_info;
+      ((StgStopAfterRetFrame*)frame)->enabled = 1;
 
       // TODO: Write profiling info if needed
 
