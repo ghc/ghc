@@ -349,7 +349,7 @@ The earlier example would need to be rewritten like this: ::
       HCons :: a -> HList t -> HList (a : t)
 
     data Tuple :: Tuple2 Type Type -> Type where
-      Tuple :: a -> b -> Tuple2 a b
+      Tuple :: a -> b -> Tuple (a, b)
 
     foo0 :: HList []
     foo0 = HNil
