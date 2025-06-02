@@ -17,7 +17,7 @@
 
 module GHC.Tc.Gen.Head
        ( HsExprArg(..), TcPass(..), QLFlag(..), EWrap(..)
-       , AppCtxt(..), appCtxtLoc, insideExpansion
+       , AppCtxt(..), appCtxtLoc, insideExpansion, appCtxtExpr
        , splitHsApps, rebuildHsApps
        , addArgWrap, isHsValArg
        , leadingValArgs, isVisibleArg
@@ -243,7 +243,10 @@ appCtxtLoc :: AppCtxt -> SrcSpan
 appCtxtLoc (VACall _ _ l)    = l
 
 insideExpansion :: AppCtxt -> Bool
-insideExpansion (VACall _ _ loc)   = isGeneratedSrcSpan loc
+insideExpansion ctxt  = isGeneratedSrcSpan (appCtxtLoc ctxt)
+
+appCtxtExpr :: AppCtxt -> HsExpr GhcRn
+appCtxtExpr (VACall e _ _) = e
 
 instance Outputable QLFlag where
   ppr DoQL = text "DoQL"
@@ -528,14 +531,15 @@ tcInferAppHead_maybe :: HsExpr GhcRn
                      -> TcM (Maybe (HsExpr GhcTc, TcSigmaType))
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- Returns Nothing for a complicated head
-tcInferAppHead_maybe fun
-  = case fun of
+tcInferAppHead_maybe fun =
+    case fun of
       HsVar _ nm                  -> Just <$> tcInferId nm
       XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
-      XExpr (ExpandedThingRn _ e) -> Just <$> (setInGeneratedCode $ tcExprSigma False e) -- We do not want to instantiate e c.f. T19167
+      XExpr (ExpandedThingRn _ e) -> Just <$> (setInGeneratedCode $ -- We do not want to instantiate c.f. T19167
+                                                tcExprSigma False (exprCtOrigin fun) e)
       XExpr (PopErrCtxt e)        -> tcInferAppHead_maybe e
       ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
-      HsOverLit _ lit             -> Just <$> tcInferOverLit lit -- TODO: Do we need this?
+      HsOverLit _ lit             -> Just <$> tcInferOverLit lit
       _                           -> return Nothing
 
 addHeadCtxt :: AppCtxt -> TcM a -> TcM a
