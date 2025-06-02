@@ -175,7 +175,7 @@ tcPolyExprCheck expr res_ty
 
       -- The special case for lambda: go to tcLambdaMatches, passing pat_tys
       tc_body e@(HsLam x lam_variant matches)
-        = do { (wrap, matches') <- tcLambdaMatches e lam_variant matches pat_tys
+        = do { (wrap, matches') <-  tcLambdaMatches e lam_variant matches pat_tys
                                                    (mkCheckExpType rho_ty)
                -- NB: tcLambdaMatches concludes with deep skolemisation,
                --     if DeepSubsumption is on;  hence no need to do that here
@@ -265,6 +265,15 @@ tcMonoExprNC (L loc expr) res_ty
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 
+
+routes_via_tcApp :: HsExpr GhcRn -> Bool
+routes_via_tcApp (HsVar {}) = True
+routes_via_tcApp (HsApp {})  = True
+routes_via_tcApp (OpApp {})         = True
+routes_via_tcApp (HsAppType {})      = True
+routes_via_tcApp (ExprWithTySig {})  = True
+routes_via_tcApp _ = False
+
 ---------------
 tcExpr :: HsExpr GhcRn
        -> ExpRhoType   -- DeepSubsumption <=> when checking, this type
@@ -286,14 +295,14 @@ tcExpr :: HsExpr GhcRn
 -- These constructors are the union of
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
--- See Note [Application chains and heads] in GHC.Tc.Gen.App
-tcExpr e@(HsVar {})              res_ty = tcApp e res_ty
-tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
-tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
-tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
-tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
+-- See Note [Application chains and heads] in GHC.Tc.Gen.Ap
+tcExpr e@(HsVar {})              res_ty = tcApp (exprCtOrigin e) e res_ty
+tcExpr e@(HsApp {})              res_ty = tcApp (exprCtOrigin e) e res_ty
+tcExpr e@(OpApp {})              res_ty = tcApp (exprCtOrigin e) e res_ty
+tcExpr e@(HsAppType {})          res_ty = tcApp (exprCtOrigin e) e res_ty
+tcExpr e@(ExprWithTySig {})      res_ty = tcApp (exprCtOrigin e) e res_ty
 
-tcExpr (XExpr e)                 res_ty = tcXExpr e res_ty
+tcExpr (XExpr e')                res_ty = tcXExpr e' res_ty
 
 -- Typecheck an occurrence of an unbound Id
 --
@@ -362,7 +371,7 @@ tcExpr e@(HsOverLit _ lit) res_ty
          -- See Note [Short cut for overloaded literals] in GHC.Tc.Utils.TcMType
        ; case mb_res of
            Just lit' -> return (HsOverLit noExtField lit')
-           Nothing   -> tcApp e res_ty }
+           Nothing   -> tcApp (exprCtOrigin e) e res_ty }
            -- Why go via tcApp? See Note [Typechecking overloaded literals]
 
 {- Note [Typechecking overloaded literals]
@@ -743,16 +752,19 @@ tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
 tcXExpr (PopErrCtxt e) res_ty
-  = popErrCtxt $ -- See Part 3 of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-      addExprCtxt e $
-      tcExpr e res_ty
+  = do popErrCtxt $ -- See Part 3 of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
+         addExprCtxt e $
+         tcExpr e res_ty
 
-tcXExpr (ExpandedThingRn o e) res_ty
+tcXExpr xe@(ExpandedThingRn o e) res_ty
    = mkExpandedTc o <$> -- necessary for breakpoints
-       do setInGeneratedCode $ tcExpr e res_ty
+      do setInGeneratedCode $
+           if routes_via_tcApp e
+           then tcApp (exprCtOrigin (XExpr xe)) e res_ty
+           else tcExpr e res_ty
 
 -- For record selection, same as HsVar case
-tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
+tcXExpr xe res_ty = tcApp (exprCtOrigin (XExpr xe)) (XExpr xe) res_ty
 
 
 {-
