@@ -179,17 +179,17 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 tcInferSigma inst (L loc rn_expr)
   = addExprCtxt rn_expr $
     setSrcSpanA loc     $
-    do { (_, app_res_sigma) <- tcExprSigma inst rn_expr
+    do { (_, app_res_sigma) <- tcExprSigma inst (exprCtOrigin rn_expr) rn_expr
        ; return app_res_sigma }
 
--- Very similar to tcApp, but returns a sigma type
+-- Very similar to tcApp, but returns a sigma (uninstantiated) type
 -- cf. T19167. the head is an expanded expression applied to a type
-tcExprSigma :: Bool -> HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
-tcExprSigma inst rn_expr
+tcExprSigma :: Bool -> CtOrigin -> HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcExprSigma inst fun_orig rn_expr
   = do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
        ; do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
-       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
+       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst fun_orig (tc_fun, fun_ctxt) fun_sigma rn_args
        ; tc_args <- tcValArgs do_ql inst_args
        ; let tc_expr = rebuildHsApps (tc_fun, fun_ctxt) tc_args
        ; return (tc_expr, app_res_sigma) }
@@ -397,11 +397,12 @@ Unify result type /before/ typechecking the args
 The latter is much better. That is why we call checkResultType before tcValArgs.
 -}
 
-tcApp :: HsExpr GhcRn
+tcApp :: CtOrigin
+      -> HsExpr GhcRn
       -> ExpRhoType   -- When checking, -XDeepSubsumption <=> deeply skolemised
       -> TcM (HsExpr GhcTc)
 -- See Note [tcApp: typechecking applications]
-tcApp rn_expr exp_res_ty
+tcApp fun_orig rn_expr exp_res_ty
   = do { -- Step 1: Split the application chain
          (fun@(rn_fun, fun_ctxt), rn_args) <- splitHsApps rn_expr
        ; traceTc "tcApp {" $
@@ -421,7 +422,7 @@ tcApp rn_expr exp_res_ty
               , text "do_ql:" <+> ppr do_ql]
 
        ; (inst_args, app_res_rho)
-              <- tcInstFun do_ql True (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
+              <- tcInstFun do_ql True fun_orig (tc_fun, fun_ctxt) fun_sigma rn_args
 
        ; case do_ql of
             NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
@@ -654,15 +655,17 @@ tcInstFun :: QLFlag
                     --    in tcInferSigma, which is used only to implement :type
                     -- Otherwise we do eager instantiation; in Fig 5 of the paper
                     --    |-inst returns a rho-type
-          -> (HsExpr GhcTc, HsExpr GhcRn, AppCtxt)
+          -> CtOrigin
+          -> (HsExpr GhcTc, AppCtxt)
           -> TcSigmaType -> [HsExprArg 'TcpRn]
           -> TcM ( [HsExprArg 'TcpInst]
                  , TcSigmaType )
 -- This crucial function implements the |-inst judgement in Fig 4, plus the
 -- modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
-tcInstFun do_ql inst_final (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
-  = do { traceTc "tcInstFun" (vcat [ text "tc_fun" <+> ppr tc_fun
+tcInstFun do_ql inst_final fun_orig (tc_fun, fun_ctxt) fun_sigma rn_args
+  = do { traceTc "tcInstFun" (vcat [ text "origin" <+> ppr fun_orig
+                                   , text "tc_fun" <+> ppr tc_fun
                                    , text "fun_sigma" <+> ppr fun_sigma
                                    , text "args:" <+> ppr rn_args
                                    , text "do_ql" <+> ppr do_ql
@@ -671,8 +674,6 @@ tcInstFun do_ql inst_final (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
                                  -- Note [tcApp: typechecking applications]
                  go 1 [] fun_sigma rn_args }
   where
-    fun_orig = exprCtOrigin rn_fun
-
     -- These are the type variables which must be instantiated to concrete
     -- types. See Note [Representation-polymorphic Ids with no binding]
     -- in GHC.Tc.Utils.Concrete
@@ -1775,7 +1776,7 @@ quickLookArg1 ctxt larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_rho)
        ; do_ql <- wantQuickLook rn_fun
        ; ((inst_args, app_res_rho), wanted)
              <- captureConstraints $
-                tcInstFun do_ql True (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
+                tcInstFun do_ql True (exprCtOrigin arg) (tc_fun, fun_ctxt) fun_sigma rn_args
                 -- We must capture type-class and equality constraints here, but
                 -- not equality constraints.  See (QLA6) in Note [Quick Look at
                 -- value arguments]
