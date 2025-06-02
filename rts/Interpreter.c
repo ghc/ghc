@@ -313,11 +313,13 @@ void rts_disableStopNextBreakpointAll(void)
 void rts_enableStopNextBreakpoint(StgPtr tso)
 {
     ((StgTSO *)tso)->flags |= TSO_STOP_NEXT_BREAKPOINT;
+    debugBelch("rts_enableStopNextBreakpoint: %p\n", tso);
 }
 
 void rts_disableStopNextBreakpoint(StgPtr tso)
 {
     ((StgTSO *)tso)->flags &= ~TSO_STOP_NEXT_BREAKPOINT;
+    debugBelch("rts_disableStopNextBreakpoint: %p\n", tso);
 }
 
 /* ---------------------------------------------------------------------------
@@ -327,11 +329,13 @@ void rts_disableStopNextBreakpoint(StgPtr tso)
 void rts_enableStopAfterReturn(StgPtr tso)
 {
   ((StgTSO *)tso)->flags |= TSO_STOP_AFTER_RETURN;
+  debugBelch("rts_enableStopAfterReturn: %p\n", tso);
 }
 
 void rts_disableStopAfterReturn(StgPtr tso)
 {
   ((StgTSO *)tso)->flags &= ~TSO_STOP_AFTER_RETURN;
+  debugBelch("rts_disableStopAfterReturn: %p\n", tso);
 }
 
 /*
@@ -1464,6 +1468,7 @@ run_BCO:
             cap->r.rCCCS = pushCostCentre(cap->r.rCCCS,
                                           (CostCentre*)BCO_LIT(arg8_cc));
 #endif
+            debugBelch("BREAK %p[%d] FOUND on TSO %p. SHOULD STOP=%d\n", (StgArrBytes*)BCO_PTR(arg1_brk_array), arg6_tick_index, cap->r.rCurrentTSO, stop_next_breakpoint);
 
             // if we are returning from a break then skip this section
             // and continue executing
@@ -1481,6 +1486,8 @@ run_BCO:
                }
                else if (stop_next_breakpoint == true || ignore_count == 0)
                {
+                  debugBelch("ACTUALLY BREAKING AT %p[%d]", (StgArrBytes*)BCO_PTR(arg1_brk_array), arg6_tick_index);
+
                   // make sure we don't automatically stop at the
                   // next breakpoint
                   rts_stop_next_breakpoint = 0;
