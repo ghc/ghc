@@ -150,14 +150,6 @@ data GenericUnitInfo srcpkgid srcpkgname uid modulename mod = GenericUnitInfo
       -- components that can be registered in a database and used by other
       -- modules.
 
-   , unitFlags          :: [ST.ShortText]
-      -- ^ Flags used to build this unit. These are the flags that were
-      -- specified/or automatically elected when cabal built this unit.
-      --
-      -- This is a list of strings, each string is a flag name. The order of
-      -- the flags is not important. They are prefixed with + or - to indicate
-      -- whether the flag was enabled or disabled.
-
    , unitAbiHash        :: ST.ShortText
       -- ^ ABI hash used to avoid mixing up units compiled with different
       -- dependencies, compiler, options, etc.
@@ -544,7 +536,7 @@ instance Binary DbUnitInfo where
          unitId unitInstanceOf unitInstantiations
          unitPackageId
          unitPackageName unitPackageVersion
-         unitComponentName unitFlags
+         unitComponentName
          unitAbiHash unitDepends unitAbiDepends unitImportDirs
          unitLibraries unitExtDepLibsSys unitExtDepLibsGhc
          unitLibraryDirs unitLibraryDynDirs
@@ -558,7 +550,6 @@ instance Binary DbUnitInfo where
     put unitPackageName
     put unitPackageVersion
     put unitComponentName
-    put unitFlags
     put unitId
     put unitInstanceOf
     put unitInstantiations
@@ -590,7 +581,6 @@ instance Binary DbUnitInfo where
     unitPackageName    <- get
     unitPackageVersion <- get
     unitComponentName  <- get
-    unitFlags          <- get
     unitId             <- get
     unitInstanceOf     <- get
     unitInstantiations <- get
@@ -624,7 +614,6 @@ instance Binary DbUnitInfo where
               unitPackageName
               unitPackageVersion
               unitComponentName
-              unitFlags
               unitAbiHash
               unitDepends
               unitAbiDepends
