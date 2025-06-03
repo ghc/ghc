@@ -74,6 +74,9 @@ active-repositories: :none
 constraints:
   -- we do not want to use the rts-headers from stage1
   rts-headers source, rts-fs source
+  -- All build dependencies should be installed, i.e. from stage1.
+  -- I cannot write build:* but ghc-internal is enough to do the job.
+  , build:any.ghc-internal installed
 
 package *
   library-vanilla: True
