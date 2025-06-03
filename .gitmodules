@@ -10,7 +10,7 @@
 	path = libraries/Cabal
 	url = https://github.com/stable-haskell/cabal
 	ignore = untracked
-	branch = wip/make-build
+	branch = andrea/cross-compile
 [submodule "libraries/containers"]
 	path = libraries/containers
 	url = https://gitlab.haskell.org/ghc/packages/containers.git
