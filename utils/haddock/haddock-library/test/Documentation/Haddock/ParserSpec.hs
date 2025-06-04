@@ -284,6 +284,13 @@ spec = do
       it "supports title for deprecated picture syntax" $ do
         "<<b a z>>" `shouldParseTo` image "b" "a z"
 
+    context "when parsing inline math" $ do
+      it "accepts inline math immediately after punctuation" $ do
+        "(\\(1 + 2 = 3\\) is an example of addition)"
+          `shouldParseTo` "("
+          <> DocMathInline "1 + 2 = 3"
+          <> " is an example of addition)"
+
     context "when parsing display math" $ do
       it "accepts markdown syntax for display math containing newlines" $ do
         "\\[\\pi\n\\pi\\]" `shouldParseTo` DocMathDisplay "\\pi\n\\pi"
