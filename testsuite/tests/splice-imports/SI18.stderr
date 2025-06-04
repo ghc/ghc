@@ -1,6 +1,4 @@
 SI18.hs:7:9: error: [GHC-28914]
     • Level error: ‘a’ is bound at level 0 but used at level 1
-      Hint: quoting [| a |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
     • In the Template Haskell quotation: 'a
 

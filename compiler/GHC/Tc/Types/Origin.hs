@@ -23,6 +23,7 @@ module GHC.Tc.Types.Origin (
   pprCtOrigin, isGivenOrigin, isWantedWantedFunDepOrigin,
   isWantedSuperclassOrigin,
   ClsInstOrQC(..), NakedScFlag(..), NonLinearPatternReason(..),
+  HsImplicitLiftSplice(..),
 
   TypedThing(..), TyVarBndrs(..),
 
@@ -649,6 +650,7 @@ data CtOrigin
       Type   -- the instance-sig type
       Type   -- the instantiated type of the method
   | AmbiguityCheckOrigin UserTypeCtxt
+  | ImplicitLiftOrigin HsImplicitLiftSplice
 
 data NonLinearPatternReason
   = LazyPatternReason
@@ -946,6 +948,7 @@ pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO (OmittedFieldOrigin Nothing) = text "an omitted anonymous field"
 pprCtO (OmittedFieldOrigin (Just fl)) = hsep [text "omitted field" <+> quotes (ppr fl)]
 pprCtO BracketOrigin         = text "a quotation bracket"
+pprCtO (ImplicitLiftOrigin isp) = text "an implicit lift of" <+> quotes (ppr (implicit_lift_lid isp))
 
 -- These ones are handled by pprCtOrigin, but we nevertheless sometimes
 -- get here via callStackOriginFS, when doing ambiguity checks

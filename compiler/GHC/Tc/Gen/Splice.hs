@@ -861,13 +861,14 @@ tcUntypedSplice (QuoteWrapper _ m_var) splice_name (HsQuasiQuote (HsQuasiQuoteEx
   -- If 'x' occurs many times we may get many identical
   -- bindings of the same SplicePointName, but that doesn't
   -- matter, although it's a mite untidy.
-tcUntypedSplice q splice_name (XUntypedSplice (HsImplicitLiftSplice id_name))
-  = do { id_ty <- newOpenFlexiTyVarTy
+tcUntypedSplice q splice_name (XUntypedSplice ils)
+  = do { let id_name = implicit_lift_lid ils
+       ; id_ty <- newOpenFlexiTyVarTy
        ; let v_expr = noLocA (HsVar noExtField id_name)
        ; v_expr' <- tcCheckMonoExpr v_expr id_ty
        -- lift :: Quote m' => a -> m' Exp
        ; lift <- setSrcSpan (getLocA id_name) $
-                  newMethodFromName (OccurrenceOf (getName id_name))
+                  newMethodFromName (ImplicitLiftOrigin ils)
                                      GHC.Builtin.Names.TH.liftName
                                      [getRuntimeRep id_ty, id_ty]
        ; let res = nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLocA lift)) v_expr'
@@ -885,14 +886,15 @@ tcPendingSpliceTyped q@(QuoteWrapper _ m_var) splice_name (HsTypedSpliceExpr _ e
                          (mkLHsWrap (applyQuoteWrapper q)
                            (nlHsTyApp untype_code [rep, res_ty])) expr'
        ; return (PendingTcSplice splice_name expr'') }
-tcPendingSpliceTyped q splice_name (XTypedSplice (HsImplicitLiftSplice id_name)) res_ty
-  = do { res_ty <- expTypeToType res_ty
+tcPendingSpliceTyped q splice_name (XTypedSplice ils) res_ty
+  = do { let id_name = implicit_lift_lid ils
+       ; res_ty <- expTypeToType res_ty
        ; let rep = getRuntimeRep res_ty
        ; let v_expr = noLocA (HsVar noExtField id_name)
        ; v_expr' <- tcCheckMonoExpr v_expr res_ty
        -- lift :: Quote m' => a -> m' Exp
        ; lift <- setSrcSpan (getLocA id_name) $
-                  newMethodFromName (OccurrenceOf (getName id_name))
+                  newMethodFromName (ImplicitLiftOrigin ils)
                                      GHC.Builtin.Names.TH.liftName
                                      [rep, res_ty]
        ; let res = nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLocA lift)) v_expr'
@@ -956,7 +958,7 @@ tcTypedSplice (HsTypedSpliceNested sp) expr res_ty
   where
     loc = case expr of
             HsTypedSpliceExpr _ expr -> getLocA expr
-            XTypedSplice (HsImplicitLiftSplice expr) -> getLocA expr
+            XTypedSplice (HsImplicitLiftSplice _ _ _ expr) -> getLocA expr
 tcTypedSplice _ _ _ = panic "tcTypedSplice: invalid splice"
 
 

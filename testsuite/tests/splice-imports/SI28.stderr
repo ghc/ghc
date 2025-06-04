@@ -1,8 +1,7 @@
 SI28.hs:8:13: error: [GHC-28914]
     • Level error: ‘id’ is bound at level 1 but used at level 0
-      Hint: quoting [| id |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
-      From imports {imported from ‘Prelude’ at 1 at SI28.hs:6:1-20}
+    • Available from the imports:
+      • imported from ‘Prelude’ at 1 at SI28.hs:6:1-20
     • In the Template Haskell quotation: [| id |]
       In the untyped splice: $([| id |])
 

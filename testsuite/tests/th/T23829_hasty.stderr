@@ -1,6 +1,4 @@
 T23829_hasty.hs:8:26: error: [GHC-28914]
     • Level error: ‘ty’ is bound at level 0 but used at level -1
-      Hint: quoting [| ty |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
     • In the untyped splice: $ty
 

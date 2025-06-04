@@ -603,6 +603,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     report1 = [ ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
                  -- (Handles TypeError and Unsatisfiable)
 
+              , ("implicit lifting", is_implicit_lifting, True, mkImplicitLiftingReporter)
               , given_eq_spec
               , ("insoluble2",      utterly_wrong,  True, mkGroupReporter mkEqErr)
               , ("skolem eq1",      very_wrong,     True, mkSkolReporter)
@@ -663,6 +664,11 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     --
     -- See also Note [Implementation of Unsatisfiable constraints], point (F).
     is_user_type_error item _ = containsUserTypeError (errorItemPred item)
+
+    is_implicit_lifting item _ =
+      case (errorItemOrigin item) of
+        ImplicitLiftOrigin {} -> True
+        _ -> False
 
     is_homo_equality _ (EqPred _ ty1 ty2)
       = typeKind ty1 `tcEqType` typeKind ty2
@@ -1076,7 +1082,7 @@ mkUserTypeErrorReporter :: Reporter
 mkUserTypeErrorReporter ctxt
   = mapM_ $ \item -> do { let err = important ctxt $ mkUserTypeError item
                         ; maybeReportError ctxt (item :| []) err
-                        ; addDeferredBinding err item }
+                        ; addSolverDeferredBinding err item }
 
 mkUserTypeError :: ErrorItem -> TcSolverReportMsg
 mkUserTypeError item
@@ -1088,6 +1094,22 @@ mkUserTypeError item
   = pprPanic "mkUserTypeError" (ppr item)
   where
     pty = errorItemPred item
+
+mkImplicitLiftingReporter :: Reporter
+mkImplicitLiftingReporter ctxt
+  = mapM_ $ \item -> do { let err = mkImplicitLiftingError item
+                        ; msg <- mkErrorReport (ctLocEnv (errorItemCtLoc item)) err (Just ctxt) [] []
+                        ; reportDiagnostic msg
+                        ; addDeferredBinding ctxt [] [] err item
+                        }
+
+  where
+    mkImplicitLiftingError :: ErrorItem -> TcRnMessage
+    mkImplicitLiftingError item =
+      case errorItemOrigin item of
+        ImplicitLiftOrigin (HsImplicitLiftSplice bound used gre name) ->
+          TcRnBadlyLevelled (LevelCheckSplice (getName name) gre) bound used (Just item) (cec_defer_type_errors ctxt)
+        _ -> pprPanic "mkImplicitLiftingError" (ppr item)
 
 mkGivenErrorReporter :: Reporter
 -- See Note [Given errors]
@@ -1186,7 +1208,7 @@ reportGroup mk_err ctxt items
        ; maybeReportError ctxt items err
            -- But see Note [Always warn with -fdefer-type-errors]
        ; traceTc "reportGroup" (ppr items)
-       ; mapM_ (addDeferredBinding err) items }
+       ; mapM_ (addSolverDeferredBinding err) items }
            -- Add deferred bindings for all
            -- Redundant if we are going to abort compilation,
            -- but that's hard to know for sure, and if we don't
@@ -1219,15 +1241,23 @@ maybeReportError ctxt items@(item1:|_) (SolverReport { sr_important_msg = import
        msg <- mkErrorReport (ctLocEnv (errorItemCtLoc item1)) diag (Just ctxt) supp hints
        reportDiagnostic msg
 
-addDeferredBinding :: SolverReport -> ErrorItem -> TcM ()
+addSolverDeferredBinding :: SolverReport -> ErrorItem -> TcM ()
+addSolverDeferredBinding err item =
+  let ctxt = reportContext . sr_important_msg $ err
+      supp = sr_supplementary err
+      hints = sr_hints err
+      important = sr_important_msg err
+  in addDeferredBinding ctxt supp hints (TcRnSolverReport important ErrorWithoutFlag) item
+
+
+addDeferredBinding :: SolverReportErrCtxt -> [SupplementaryInfo] -> [GhcHint] -> TcRnMessage -> ErrorItem -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
-addDeferredBinding err (EI { ei_evdest = Just dest
-                           , ei_pred = item_ty
-                           , ei_loc = loc })
+addDeferredBinding ctxt supp hints msg (EI { ei_evdest = Just dest
+                                           , ei_pred = item_ty
+                                           , ei_loc = loc })
   -- if evdest is Just, then the constraint was from a wanted
-  | let ctxt = reportContext . sr_important_msg $ err
-  , deferringAnyBindings ctxt
-  = do { err_tm <- mkErrorTerm loc item_ty err
+  | deferringAnyBindings ctxt
+  = do { err_tm <- mkErrorTerm loc item_ty ctxt msg supp hints
        ; let ev_binds_var = cec_binds ctxt
 
        ; case dest of
@@ -1238,15 +1268,24 @@ addDeferredBinding err (EI { ei_evdest = Just dest
                      let co_var = coHoleCoVar hole
                    ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var EvNonCanonical err_tm
                    ; fillCoercionHole hole (mkCoVarCo co_var) } }
-addDeferredBinding _ _ = return ()    -- Do not set any evidence for Given
+addDeferredBinding _ _ _ _ _ = return ()    -- Do not set any evidence for Given
+
+mkSolverErrorTerm :: CtLoc -> Type  -- of the error term
+                  -> SolverReport -> TcM EvTerm
+mkSolverErrorTerm ct_loc ty err
+  = mkErrorTerm ct_loc ty (reportContext . sr_important_msg $ err)
+                          (TcRnSolverReport (sr_important_msg err) ErrorWithoutFlag)
+                          (sr_supplementary err)
+                          (sr_hints err)
 
 mkErrorTerm :: CtLoc -> Type  -- of the error term
-            -> SolverReport -> TcM EvTerm
-mkErrorTerm ct_loc ty (SolverReport { sr_important_msg = important, sr_supplementary = supp, sr_hints = hints })
+            -> SolverReportErrCtxt -> TcRnMessage
+            -> [SupplementaryInfo] -> [GhcHint] -> TcM EvTerm
+mkErrorTerm ct_loc ty ctxt msg supp hints
   = do { msg <- mkErrorReport
                   (ctLocEnv ct_loc)
-                  (TcRnSolverReport important ErrorWithoutFlag)
-                  (Just $ reportContext important)
+                  msg
+                  (Just $ ctxt)
                   supp
                   hints
          -- This will be reported at runtime, so we always want "error:" in the report, never "warning:"
@@ -1520,7 +1559,7 @@ maybeAddDeferredBindings hole report = do
       -- not for holes in partial type signatures
       -- cf. addDeferredBinding
       when (deferringAnyBindings ctxt) $ do
-        err_tm <- mkErrorTerm (hole_loc hole) ref_ty report
+        err_tm <- mkSolverErrorTerm (hole_loc hole) ref_ty report
           -- NB: ref_ty, not hole_ty. hole_ty might be rewritten.
           -- See Note [Holes in expressions] in GHC.Hs.Expr
         writeMutVar ref err_tm

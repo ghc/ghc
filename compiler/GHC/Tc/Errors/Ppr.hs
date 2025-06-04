@@ -1517,23 +1517,8 @@ instance Diagnostic TcRnMessage where
       hsep [ text "Unknown type variable" <> plural errorVars
            , text "on the RHS of injectivity condition:"
            , interpp'SP errorVars ]
-    TcRnBadlyLevelled reason bind_lvls use_lvl
-      ->
-      mkSimpleDecorated $
-         vcat $
-         [ fsep [ text "Level error:", pprLevelCheckReason reason
-                , text "is bound at" <+> pprThBindLevel bind_lvls
-                , text "but used at level" <+> ppr use_lvl]
-         ] ++
-         [ fsep [ text "Hint: quoting" <+> thBrackets (ppUnless (isValName n) "t") (ppr n)
-                , text "or an enclosing expression"
-                , text "would allow the quotation to be used at an earlier level"
-                ]
-         | LevelCheckSplice n _ <- [reason]
-         ] ++
-         [ "From imports" <+> (ppr (gre_imp gre))
-         | LevelCheckSplice _ (Just gre) <- [reason]
-         , not (isEmptyBag (gre_imp gre)) ]
+    TcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt _reason
+      -> pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt
     TcRnBadlyLevelledType name bind_lvls use_lvl
       -> mkSimpleDecorated $
          text "Badly levelled type:" <+> ppr name <+>
@@ -2490,8 +2475,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnknownTyVarsOnRhsOfInjCond{}
       -> ErrorWithoutFlag
-    TcRnBadlyLevelled{}
-      -> ErrorWithoutFlag
+    TcRnBadlyLevelled _ _ _ _ reason
+      -> reason
     TcRnBadlyLevelledType{}
       -> WarningWithFlag Opt_WarnBadlyLevelledTypes
     TcRnTyThingUsedWrong{}
@@ -3422,6 +3407,22 @@ instance Diagnostic TcRnMessage where
 
   diagnosticCode = constructorCode @GHC
 
+pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
+pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $
+         [ fsep [ text "Level error:", pprLevelCheckReason reason
+                , text "is bound at" <+> pprThBindLevel bind_lvls
+                , text "but used at level" <+> ppr use_lvl]
+         ] ++
+         [hang (text "Could not be resolved by implicit lifting due to the following error:") 2
+          (text "No instance for:" <+> quotes (ppr (errorItemPred item)))
+         | Just item <- [lift_attempt]
+         ] ++
+         [ vcat (text "Available from the imports:" : ppr_imports (gre_imp gre))
+         | LevelCheckSplice _ (Just gre) <- [reason]
+         , not (isEmptyBag (gre_imp gre)) ]
+  where
+    ppr_imports :: Bag ImportSpec -> [SDoc]
+    ppr_imports = map ((bullet <+>) . ppr ) . bagToList
 
 note :: SDoc -> SDoc
 note note = "Note" <> colon <+> note <> dot

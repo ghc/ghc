@@ -1,18 +1,12 @@
 annfail03.hs:12:16: error: [GHC-28914]
     • Level error: ‘InModule’ is bound at level 0 but used at level -1
-      Hint: quoting [| InModule |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
     • In the annotation: {-# ANN module InModule #-}
 
 annfail03.hs:14:18: error: [GHC-28914]
     • Level error: ‘InModule’ is bound at level 0 but used at level -1
-      Hint: quoting [| InModule |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
     • In the annotation: {-# ANN type Foo InModule #-}
 
 annfail03.hs:17:11: error: [GHC-28914]
     • Level error: ‘InModule’ is bound at level 0 but used at level -1
-      Hint: quoting [| InModule |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
     • In the annotation: {-# ANN f InModule #-}
 
