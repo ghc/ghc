@@ -55,6 +55,7 @@ import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish (CoreTickish)
 import GHC.Types.Unique.Set (UniqSet)
+import GHC.Types.ThLevelIndex
 import GHC.Core.ConLike ( conLikeName, ConLike )
 import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Misc
@@ -78,7 +79,7 @@ import Data.Foldable ( toList )
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Void (Void)
-
+import qualified Data.Set as S
 {- *********************************************************************
 *                                                                      *
                 Expressions proper
@@ -2293,7 +2294,10 @@ data PendingTcSplice
 -- See Note [Lifecycle of an untyped splice, and PendingRnSplice]
 data HsImplicitLiftSplice =
         HsImplicitLiftSplice
-          { implicit_lift_lid :: LIdOccP GhcRn
+          { implicit_lift_bind_lvl :: S.Set ThLevelIndex
+          , implicit_lift_used_lvl :: ThLevelIndex
+          , implicit_lift_gre :: Maybe GlobalRdrElt
+          , implicit_lift_lid :: LIdOccP GhcRn
           }
 
 -- | Information about a user-written splice, discovered by the renamer
@@ -2316,7 +2320,7 @@ pprTypedSplice n (HsTypedSpliceExpr _ e) = ppr_splice (text "$$") n e
 pprTypedSplice n (XTypedSplice p) =
   case ghcPass @p of
     GhcRn -> case p of
-              HsImplicitLiftSplice lid -> ppr lid <+> whenPprDebug (maybe empty (brackets . ppr) n)
+              HsImplicitLiftSplice _ _ _ lid -> ppr lid <+> whenPprDebug (maybe empty (brackets . ppr) n)
 
 pprUntypedSplice :: forall p. (OutputableBndrId p)
                  => Bool -- Whether to precede the splice with "$"
@@ -2329,7 +2333,7 @@ pprUntypedSplice _     _ (HsQuasiQuote _ q s)      = ppr_quasi (unLoc q) (unLoc 
 pprUntypedSplice _     _ (XUntypedSplice x) =
   case ghcPass @p of
     GhcRn -> case x of
-              HsImplicitLiftSplice lid -> ppr lid
+              HsImplicitLiftSplice _ _ _ lid -> ppr lid
 
 ppr_quasi :: OutputableBndr p => p -> FastString -> SDoc
 ppr_quasi quoter quote = char '[' <> ppr quoter <> vbar <>

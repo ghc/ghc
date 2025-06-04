@@ -1,25 +1,7 @@
-T10384.hs:3:33: error: [GHC-39999]
-    • Ambiguous type variable ‘m0’ arising from a quotation bracket
-      prevents the constraint ‘(GHC.Internal.TH.Syntax.Quote
-                                  m0)’ from being solved.
-      Relevant bindings include
-        x :: (forall a. a -> a)
-             -> GHC.Internal.TH.Syntax.Code m0 (a0 -> a0)
-          (bound at T10384.hs:3:1)
-      Probable fix: use a type annotation to specify what ‘m0’ should be.
-      Potentially matching instance:
-        instance GHC.Internal.TH.Syntax.Quote IO
-          -- Defined in ‘GHC.Internal.TH.Syntax’
-        ...plus one instance involving out-of-scope types
-        (use -fprint-potential-instances to see them all)
-    • In the Template Haskell typed quotation: [|| y ||]
-      In the expression: [|| y ||]
-      In the expression: \ (y :: forall a. a -> a) -> [|| y ||]
-
-T10384.hs:3:37: error: [GHC-39999]
-    • No instance for ‘GHC.Internal.TH.Lift.Lift (a0 -> a0)’
-        arising from a use of ‘y’
-        (maybe you haven't applied a function to enough arguments?)
+T10384.hs:3:37: error: [GHC-28914]
+    • Level error: ‘y’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘GHC.Internal.TH.Lift.Lift (a0 -> a0)’
     • In the typed Template Haskell splice: y
       In the Template Haskell typed quotation: [|| y ||]
       In the expression: [|| y ||]

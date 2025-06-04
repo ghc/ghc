@@ -2033,7 +2033,7 @@ instance forall pass . HiePass pass => ToHie (HsUntypedSplice (GhcPass pass)) wh
   toHie (XUntypedSplice ext) =
     case ghcPass @pass of
       GhcRn -> case ext of
-        HsImplicitLiftSplice lid -> toHie (C Use lid)
+        HsImplicitLiftSplice _ _ _ lid -> toHie (C Use lid)
 
 instance ToHie PendingTcSplice where
   toHie (PendingTcSplice _ e) = toHie e
@@ -2071,7 +2071,7 @@ instance (HiePass p) => ToHie (LocatedA (HsUntypedSplice (GhcPass p))) where
       XUntypedSplice x ->
         case ghcPass @p of
           GhcRn -> case x of
-            HsImplicitLiftSplice lid ->
+            HsImplicitLiftSplice _ _ _ lid ->
               [ toHie $ C Use lid
               ]
 
@@ -2083,7 +2083,7 @@ instance HiePass p => ToHie (LocatedA (HsTypedSplice (GhcPass p))) where
       XTypedSplice x ->
         case ghcPass @p of
           GhcRn -> case x of
-            HsImplicitLiftSplice lid ->
+            HsImplicitLiftSplice _ _ _ lid ->
               [ toHie $ C Use lid
               ]
 

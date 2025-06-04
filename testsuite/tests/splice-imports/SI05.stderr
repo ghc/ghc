@@ -1,8 +1,7 @@
 SI05.hs:10:11: error: [GHC-28914]
     • Level error: ‘SI01A.sid’ is bound at level 0 but used at level -1
-      Hint: quoting [| SI01A.sid |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
-      From imports {imported from ‘SI01A’ at SI05.hs:6:1-12}
+    • Available from the imports:
+      • imported from ‘SI01A’ at SI05.hs:6:1-12
     • In the untyped splice: $(sid [| pure () |])
 
 SI05.hs:10:11: error: [GHC-87543]
