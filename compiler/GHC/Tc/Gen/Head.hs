@@ -320,7 +320,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
         ctxt' = case splice of
             HsUntypedSpliceExpr _ (L l _) -> set l ctxt -- l :: SrcAnn AnnListItem
             HsQuasiQuote _ _ (L l _)      -> set l ctxt -- l :: SrcAnn NoEpAnns
-            (XUntypedSplice (HsImplicitLiftSplice (L l _))) -> set l ctxt
+            (XUntypedSplice (HsImplicitLiftSplice _ _ _ (L l _))) -> set l ctxt
 
     -- See Note [Looking through ExpandedThingRn]
     go (XExpr (ExpandedThingRn o e)) ctxt args

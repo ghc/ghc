@@ -3498,6 +3498,8 @@ data TcRnMessage where
     :: !LevelCheckReason -- ^ The binding
     -> !(Set.Set ThLevelIndex) -- ^ The binding levels
     -> !ThLevelIndex -- ^ The level at which the binding is used.
+    -> !(Maybe ErrorItem) -- ^ The attempt we made to implicitly lift the binding.
+    -> DiagnosticReason   -- ^ Whether to defer this error or fail
     -> TcRnMessage
 
   {-| TcRnBadlyLevelledWarn is a warning that occurs when a TH type binding is

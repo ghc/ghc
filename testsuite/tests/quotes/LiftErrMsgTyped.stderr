@@ -1,0 +1,36 @@
+LiftErrMsgTyped.hs:14:12: error: [GHC-28914]
+    • Level error: ‘id’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘Lift (a -> a)’
+    • Available from the imports:
+      • imported from ‘Prelude’ at LiftErrMsgTyped.hs:3:8-17
+    • In the typed Template Haskell splice: id
+      In the Template Haskell typed quotation: [|| id ||]
+      In the expression: [|| id ||]
+
+LiftErrMsgTyped.hs:17:14: error: [GHC-28914]
+    • Level error: ‘id’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘Lift (a -> a)’
+    • Available from the imports:
+      • imported from ‘Prelude’ at LiftErrMsgTyped.hs:3:8-17
+    • In the typed Template Haskell splice: id
+      In the expression: id
+      In the Template Haskell typed quotation: [|| (id, id) ||]
+
+LiftErrMsgTyped.hs:20:13: error: [GHC-28914]
+    • Level error: ‘local_b’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘Lift B’
+    • In the typed Template Haskell splice: local_b
+      In the Template Haskell typed quotation: [|| local_b ||]
+      In the expression: [|| local_b ||]
+
+LiftErrMsgTyped.hs:23:15: error: [GHC-28914]
+    • Level error: ‘x’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘Lift a’
+    • In the typed Template Haskell splice: x
+      In the Template Haskell typed quotation: [|| x ||]
+      In the expression: [|| x ||]
+

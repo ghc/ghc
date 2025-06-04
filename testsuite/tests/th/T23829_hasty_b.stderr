@@ -1,7 +1,5 @@
 T23829_hasty_b.hs:8:42: error: [GHC-28914]
     • Level error: ‘ty’ is bound at level 1 but used at level 0
-      Hint: quoting [t| ty |] or an enclosing expression
-      would allow the quotation to be used at an earlier level
     • In the untyped splice: $ty
       In the Template Haskell quotation:
         [t| forall (ty :: TypeQ). Proxy $ty |]

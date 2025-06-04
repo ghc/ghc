@@ -1,0 +1,41 @@
+LiftErrMsg.hs:14:11: error: [GHC-28914]
+    • Level error: ‘id’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘Lift (a2 -> a2)’
+    • Available from the imports:
+      • imported from ‘Prelude’ at LiftErrMsg.hs:3:8-17
+    • In the expression: [| id |]
+      In an equation for ‘test’: test = [| id |]
+
+LiftErrMsg.hs:17:13: error: [GHC-28914]
+    • Level error: ‘id’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘Lift (a1 -> a1)’
+    • Available from the imports:
+      • imported from ‘Prelude’ at LiftErrMsg.hs:3:8-17
+    • In the expression: [| (id, id) |]
+      In an equation for ‘test2’: test2 = [| (id, id) |]
+
+LiftErrMsg.hs:17:17: error: [GHC-28914]
+    • Level error: ‘id’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘Lift (a0 -> a0)’
+    • Available from the imports:
+      • imported from ‘Prelude’ at LiftErrMsg.hs:3:8-17
+    • In the expression: [| (id, id) |]
+      In an equation for ‘test2’: test2 = [| (id, id) |]
+
+LiftErrMsg.hs:20:12: error: [GHC-28914]
+    • Level error: ‘local_b’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘Lift B’
+    • In the expression: [| local_b |]
+      In an equation for ‘test3’: test3 = [| local_b |]
+
+LiftErrMsg.hs:23:14: error: [GHC-28914]
+    • Level error: ‘x’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘Lift a’
+    • In the expression: [| x |]
+      In an equation for ‘test4’: test4 x = [| x |]
+

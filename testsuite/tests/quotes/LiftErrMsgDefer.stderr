@@ -1,0 +1,17 @@
+LiftErrMsgDefer: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.TypeError:
+
+LiftErrMsgDefer.hs:14:12: warning: [GHC-28914] [-Wdeferred-type-errors (in -Wdefault)]
+    • Level error: ‘id’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘Lift (a2 -> a2)’
+    • Available from the imports:
+      • imported from ‘Prelude’ at LiftErrMsgDefer.hs:3:8-11
+    • In the expression: [| id |]
+      In an equation for ‘test1’: test1 = [| id |]
+(deferred type error)
+
+HasCallStack backtrace:
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
+  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
+

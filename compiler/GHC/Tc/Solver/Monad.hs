@@ -1569,7 +1569,7 @@ checkCrossLevelClsInst dflags reason bind_lvls use_lvl_idx is_local
   -- With ImplicitStagePersistence, using later than bound is fine
   | xopt LangExt.ImplicitStagePersistence dflags
   , any (use_lvl_idx >=) bind_lvls  = return ()
-  | otherwise = TcM.addErrTc (TcRnBadlyLevelled reason bind_lvls use_lvl_idx)
+  | otherwise = TcM.addErrTc (TcRnBadlyLevelled reason bind_lvls use_lvl_idx Nothing ErrorWithoutFlag)
 
 
 
