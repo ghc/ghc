@@ -38,7 +38,7 @@ import GHC.Platform
 import GHC.Platform.Host
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
-import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
+import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings, languageEditionMsg )
 #endif
 
 import GHC.Runtime.Loader   ( loadFrontendPlugin, initializeSessionPlugins )
@@ -334,7 +334,9 @@ showBanner _postLoadMode dflags = do
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
    -- Show the GHCi banner
-   when (isInteractiveMode _postLoadMode && verb >= 1) $ putStrLn ghciWelcomeMsg
+   when (isInteractiveMode _postLoadMode && verb >= 1) $
+    do putStrLn ghciWelcomeMsg
+       putStrLn $ languageEditionMsg (language dflags)
 #endif
 
    -- Display details of the configuration in verbose mode

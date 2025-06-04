@@ -28,7 +28,8 @@ module GHCi.UI (
         GhciSettings(..),
         defaultGhciSettings,
         ghciCommands,
-        ghciWelcomeMsg
+        ghciWelcomeMsg,
+        languageEditionMsg
     ) where
 
 -- GHCi
@@ -198,6 +199,10 @@ defaultGhciSettings =
 ghciWelcomeMsg :: String
 ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
                  ": https://www.haskell.org/ghc/  :? for help"
+
+languageEditionMsg :: Maybe Language -> String
+languageEditionMsg Nothing     = "Using default language edition: " ++ show defaultLanguage
+languageEditionMsg (Just lang) = "Using language edition: " ++ show lang
 
 ghciCommands :: [Command]
 ghciCommands = map mkCmd [
