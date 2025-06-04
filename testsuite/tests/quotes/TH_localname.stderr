@@ -1,39 +1,7 @@
-TH_localname.hs:3:11: error: [GHC-39999]
-    • Ambiguous type variable ‘m0’ arising from a quotation bracket
-      prevents the constraint ‘(GHC.Internal.TH.Syntax.Quote
-                                  m0)’ from being solved.
-      Relevant bindings include
-        x :: t0 -> m0 GHC.Internal.TH.Syntax.Exp
-          (bound at TH_localname.hs:3:1)
-      Probable fix: use a type annotation to specify what ‘m0’ should be.
-      Potentially matching instance:
-        instance GHC.Internal.TH.Syntax.Quote IO
-          -- Defined in ‘GHC.Internal.TH.Syntax’
-        ...plus one instance involving out-of-scope types
-        (use -fprint-potential-instances to see them all)
-    • In the expression: [| y |]
-      In the expression: \ y -> [| y |]
-      In an equation for ‘x’: x = \ y -> [| y |]
-
-TH_localname.hs:3:14: error: [GHC-39999]
-    • Ambiguous type variable ‘t0’ arising from a use of ‘y’
-      prevents the constraint ‘(GHC.Internal.TH.Lift.Lift
-                                  t0)’ from being solved.
-      Relevant bindings include
-        y :: t0 (bound at TH_localname.hs:3:6)
-        x :: t0 -> m0 GHC.Internal.TH.Syntax.Exp
-          (bound at TH_localname.hs:3:1)
-      Probable fix: use a type annotation to specify what ‘t0’ should be.
-      Potentially matching instances:
-        instance (GHC.Internal.TH.Lift.Lift a,
-                  GHC.Internal.TH.Lift.Lift b) =>
-                 GHC.Internal.TH.Lift.Lift (Either a b)
-          -- Defined in ‘GHC.Internal.TH.Lift’
-        instance GHC.Internal.TH.Lift.Lift Integer
-          -- Defined in ‘GHC.Internal.TH.Lift’
-        ...plus 15 others
-        ...plus 71 instances involving out-of-scope types
-        (use -fprint-potential-instances to see them all)
+TH_localname.hs:3:14: error: [GHC-28914]
+    • Level error: ‘y’ is bound at level 0 but used at level 1
+    • Could not be resolved by implicit lifting due to the following error:
+        No instance for: ‘GHC.Internal.TH.Lift.Lift t0’
     • In the expression: [| y |]
       In the expression: \ y -> [| y |]
       In an equation for ‘x’: x = \ y -> [| y |]

@@ -80,11 +80,13 @@ import GHC.Utils.Monad
 import GHC.Utils.Misc( HasDebugCallStack )
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
+import GHC.Types.ThLevelIndex
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Kind as Hs
 import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.Set as S
 
 {- *********************************************************************
 *                                                                      *
@@ -647,6 +649,7 @@ data CtOrigin
       Type   -- the instance-sig type
       Type   -- the instantiated type of the method
   | AmbiguityCheckOrigin UserTypeCtxt
+  | ImplicitLiftOrigin (S.Set ThLevelIndex) ThLevelIndex (Maybe GlobalRdrElt) Name
 
 data NonLinearPatternReason
   = LazyPatternReason
@@ -944,6 +947,7 @@ pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO (OmittedFieldOrigin Nothing) = text "an omitted anonymous field"
 pprCtO (OmittedFieldOrigin (Just fl)) = hsep [text "omitted field" <+> quotes (ppr fl)]
 pprCtO BracketOrigin         = text "a quotation bracket"
+pprCtO (ImplicitLiftOrigin _ _ _ n) = text "an implicit lift of" <+> quotes (ppr n)
 
 -- These ones are handled by pprCtOrigin, but we nevertheless sometimes
 -- get here via callStackOriginFS, when doing ambiguity checks
@@ -977,7 +981,6 @@ pprNonLinearPatternReason GeneralisedPatternReason = parens (text "non-variable 
 pprNonLinearPatternReason PatternSynonymReason = parens (text "pattern synonyms aren't linear")
 pprNonLinearPatternReason ViewPatternReason = parens (text "view patterns aren't linear")
 pprNonLinearPatternReason OtherPatternReason = empty
-
 
 {- *********************************************************************
 *                                                                      *

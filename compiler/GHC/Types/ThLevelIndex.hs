@@ -3,7 +3,7 @@ module GHC.Types.ThLevelIndex where
 import GHC.Prelude
 import GHC.Utils.Outputable
 import GHC.Types.Basic ( ImportLevel(..) )
-import Data.Data
+import Data.Data (Data)
 
 -- | The integer which represents the level
 newtype ThLevelIndex = ThLevelIndex Int deriving (Eq, Ord, Data)
@@ -34,3 +34,4 @@ thLevelIndexFromImportLevel :: ImportLevel -> ThLevelIndex
 thLevelIndexFromImportLevel NormalLevel = topLevelIndex
 thLevelIndexFromImportLevel SpliceLevel = spliceLevelIndex
 thLevelIndexFromImportLevel QuoteLevel  = quoteLevelIndex
+

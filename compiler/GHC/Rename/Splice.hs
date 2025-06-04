@@ -1004,16 +1004,19 @@ checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use
   , any (use_lvl_idx >=) (Set.toList bind_lvl)
   , allow_lifting
   = do
+       let mgre = case reason of
+                   LevelCheckSplice _ gre -> gre
+                   _ -> Nothing
        (splice_name :: Name) <- newLocalBndrRn (noLocA unqualSplice)
        let  pend_splice :: HsImplicitLiftSplice
-            pend_splice = HsImplicitLiftSplice name_var
+            pend_splice = HsImplicitLiftSplice bind_lvl use_lvl_idx mgre name_var
        -- Warning for implicit lift (#17804)
        addDetailedDiagnostic (TcRnImplicitLift name)
 
        -- Update the pending splices if we are renaming a typed bracket
        recordPendingSplice splice_name pend_splice pending
   -- Otherwise, we have a level error, report.
-  | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx ) >> return (HsVar noExtField name_var)
+  | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx Nothing ErrorWithoutFlag ) >> return (HsVar noExtField name_var)
   where
     name = getName name_var
 
