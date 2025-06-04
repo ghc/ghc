@@ -1,4 +1,4 @@
-type X :: ★ → ★ → Constraint
+type X ∷ ★ → ★ → Constraint
 class X a b | a → b where
   to ∷ a → b
   {-# MINIMAL to #-}

@@ -1,0 +1,56 @@
+<interactive>:8:10: error: [GHC-44432]
+    • The standalone kind signature for ‘Foo’
+        lacks an accompanying binding
+    • In the Template Haskell quotation: [d| type Foo ∷ Type |]
+
+<interactive>:16:11: error: [GHC-03790]
+    Parse error in command: (_ ⤙ _) ∷ _
+
+<interactive>:21:5: error: [GHC-76037]
+    • Not in scope: type variable ‘c’
+    • In the Template Haskell quotation:
+        [d| type family Foo a = b | b → c |]
+
+<interactive>:26:7: error: [GHC-83865]
+    • Couldn't match expected type: t0 → t
+                  with actual type: [a0]
+    • The function ‘[]’ is applied to one visible argument,
+        but its type ‘[a]’ has none
+      In the expression: [] 0
+      In the expression: \ _ → [] 0
+    • Relevant bindings include
+        it ∷ p → t (bound at <interactive>:26:1)
+
+<interactive>:28:12: error: [GHC-83865]
+    • Couldn't match expected type ‘()’ with actual type ‘[a0]’
+    • In the pattern: []
+      In a case alternative: [] → 0
+      In the expression: case () of [] → 0
+
+<interactive>:30:6: error: [GHC-83865]
+    • Couldn't match expected type ‘Bool’ with actual type ‘[a0]’
+    • In the expression: []
+      In a stmt of a pattern guard for
+                     a multi-way if alternative:
+        []
+      In the expression: if | [] → 0
+
+<interactive>:34:6: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a multi-way if alternative: | True → ...
+
+<interactive>:37:11: error: [GHC-83865]
+    • Couldn't match expected type ‘()’ with actual type ‘(a0, b0)’
+    • In the expression: proc _ → \ _ → undefined ⤙ 0
+      In an equation for ‘it’: it = proc _ → \ _ → undefined ⤙ 0
+
+<interactive>:42:17: error: [GHC-76037]
+    • Not in scope: ‘x’
+    • In the Template Haskell quotation: [d| pattern Foo x ← Nothing |]
+
+<interactive>:44:17: error: [GHC-76037]
+    • Not in scope: ‘x’
+    • In the Template Haskell quotation:
+        [d| pattern Foo x ← Nothing where
+                            Foo _ = Nothing |]
+

@@ -1,0 +1,44 @@
+:set -fprint-unicode-syntax
+:set -XArrows -XImplicitParams -XMultiWayIf -XPatternSynonyms -XTemplateHaskell -XTypeFamilyDependencies
+
+---------------------------------------
+-- Double-colon checks
+
+import Data.Kind
+[d| type Foo :: Type |]
+
+:{
+foo :: (?imp :: Int) => Int
+foo = ?imp
+:}
+:t foo
+
+proc x -> (_ -< _) :: _
+
+---------------------------------------
+-- Rightwards arrow checks
+
+[d| type family Foo a = b | b -> c |]
+
+type family Foo a = b | b -> a
+:i Foo
+
+\_ -> [] 0
+
+case () of [] -> 0
+
+if | [] -> 0
+
+:{
+if | True -> 0
+   | True -> 1
+:}
+
+proc _ -> \_ -> undefined -< 0
+
+---------------------------------------
+-- Leftwards arrow checks
+
+[d| pattern Foo x <- Nothing |]
+
+[d| pattern Foo x <- Nothing where Foo _ = Nothing |]

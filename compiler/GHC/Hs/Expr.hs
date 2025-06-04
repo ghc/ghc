@@ -956,7 +956,7 @@ ppr_expr (HsIf _ e1 e2 e3)
 ppr_expr (HsMultiIf _ alts)
   = hang (text "if") 3  (vcat $ toList $ NE.map ppr_alt alts)
   where ppr_alt (L _ (GRHS _ guards expr)) =
-          hang vbar 2 (hang (interpp'SP guards) 2 (text "->" <+> pprDeeper (ppr expr)))
+          hang vbar 2 (hang (interpp'SP guards) 2 (arrow <+> pprDeeper (ppr expr)))
         ppr_alt (L _ (XGRHS x)) = ppr x
 
 -- special case: let ... in let ...
@@ -1029,7 +1029,7 @@ ppr_expr (HsUntypedBracket b q)
       ppr rnq `ppr_with_pending_tc_splices` ps
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
-  = hsep [text "proc", ppr pat, text "->", ppr cmd]
+  = hsep [text "proc", ppr pat, arrow, ppr cmd]
 
 ppr_expr (HsStatic _ e)
   = hsep [text "static", ppr e]
@@ -1844,10 +1844,10 @@ pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 
 matchSeparator :: HsMatchContext fn -> SDoc
 matchSeparator FunRhs{}         = text "="
-matchSeparator CaseAlt          = text "->"
-matchSeparator LamAlt{}         = text "->"
-matchSeparator IfAlt            = text "->"
-matchSeparator ArrowMatchCtxt{} = text "->"
+matchSeparator CaseAlt          = arrow
+matchSeparator LamAlt{}         = arrow
+matchSeparator IfAlt            = arrow
+matchSeparator ArrowMatchCtxt{} = arrow
 matchSeparator PatBindRhs       = text "="
 matchSeparator PatBindGuards    = text "="
 matchSeparator StmtCtxt{}       = text "<-"

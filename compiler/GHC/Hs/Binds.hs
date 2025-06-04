@@ -627,9 +627,9 @@ instance (OutputableBndrId l, OutputableBndrId r)
                     GhcTc -> ppr v
 
       ppr_rhs = case dir of
-          Unidirectional           -> ppr_simple (text "<-")
+          Unidirectional           -> ppr_simple larrow
           ImplicitBidirectional    -> ppr_simple equals
-          ExplicitBidirectional mg -> ppr_simple (text "<-") <+> text "where" $$
+          ExplicitBidirectional mg -> ppr_simple larrow <+> text "where" $$
                                       (nest 2 $ pprFunBind mg)
 
 pprTicks :: SDoc -> SDoc -> SDoc

@@ -1747,7 +1747,7 @@ pprTyTcApp ctxt_prec tc tys =
        , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
                 Required (IA_Arg ty Required IA_Nil) <- tys
        -> maybeParen ctxt_prec funPrec
-         $ char '?' <> ftext (getLexicalFastString n) <> text "::" <> ppr_ty topPrec ty
+         $ char '?' <> ftext (getLexicalFastString n) <> dcolon <> ppr_ty topPrec ty
 
        | IfaceTupleTyCon arity sort <- ifaceTyConSort info
        , not debug

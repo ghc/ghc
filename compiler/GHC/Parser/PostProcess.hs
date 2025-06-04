@@ -1935,7 +1935,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsLitPV (L l a) = cmdFail l (ppr a)
   mkHsOverLitPV (L l a) = cmdFail (locA l) (ppr a)
   mkHsWildCardPV l = cmdFail l (text "_")
-  mkHsTySigPV l a sig _ = cmdFail (locA l) (ppr a <+> text "::" <+> ppr sig)
+  mkHsTySigPV l a sig _ = cmdFail (locA l) (ppr a <+> dcolon <+> ppr sig)
   mkHsExplicitListPV l xs _ = cmdFail l $
     brackets (pprWithCommas ppr xs)
   mkHsSplicePV (L l sp) = cmdFail l (pprUntypedSplice True Nothing sp)

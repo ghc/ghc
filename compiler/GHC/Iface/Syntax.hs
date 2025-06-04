@@ -1377,7 +1377,7 @@ pprIfaceDecl ss decl@(IfaceFamily { ifName = tycon
 
     pp_inj_cond res inj = case filterByList inj binders of
        []  -> empty
-       tvs -> hsep [vbar, ppr res, text "->", interppSP (map ifTyConBinderName tvs)]
+       tvs -> hsep [vbar, ppr res, arrow, interppSP (map ifTyConBinderName tvs)]
 
     pp_rhs IfaceDataFamilyTyCon
       = ppShowIface ss (text "data")
@@ -1464,7 +1464,7 @@ pprRoles suppress_if tyCon bndrs roles
          text "type role" <+> tyCon <+> hsep (map ppr froles)
 
 pprStandaloneKindSig :: SDoc -> IfaceType -> SDoc
-pprStandaloneKindSig tyCon ty = text "type" <+> tyCon <+> text "::" <+> ppr ty
+pprStandaloneKindSig tyCon ty = text "type" <+> tyCon <+> dcolon <+> ppr ty
 
 pprInfixIfDeclBndr :: ShowHowMuch -> OccName -> SDoc
 pprInfixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) name

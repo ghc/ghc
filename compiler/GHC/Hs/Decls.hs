@@ -699,7 +699,7 @@ instance OutputableBndrId p
                   TyVarSig _ tv_bndr -> text "=" <+> ppr tv_bndr
       pp_inj = case mb_inj of
                  Just (L _ (InjectivityAnn _ lhs rhs)) ->
-                   hsep [ vbar, ppr lhs, text "->", hsep (map ppr rhs) ]
+                   hsep [ vbar, ppr lhs, arrow, hsep (map ppr rhs) ]
                  Nothing -> empty
       (pp_where, pp_eqns) = case info of
         ClosedTypeFamily mb_eqns ->
@@ -868,7 +868,7 @@ instance OutputableBndrId p
 instance OutputableBndrId p
        => Outputable (StandaloneKindSig (GhcPass p)) where
   ppr (StandaloneKindSig _ v ki)
-    = text "type" <+> pprPrefixOcc (unLoc v) <+> text "::" <+> ppr ki
+    = text "type" <+> pprPrefixOcc (unLoc v) <+> dcolon <+> ppr ki
 
 pp_condecls :: forall p. OutputableBndrId p => [LConDecl (GhcPass p)] -> SDoc
 pp_condecls cs

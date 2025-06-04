@@ -11,13 +11,13 @@ f ∷ ∀ (a ∷ ★ → ★) b. C a ⇒ a b
 f ∷ ∀ (a ∷ ★ → ★) b. C a ⇒ a b
 f ∷ ∀ (a ∷ ★ → ★) b. C a ⇒ a b
 fmap ∷ ∀ (f ∷ ★ → ★) a b. Functor f ⇒ (a → b) → f a → f b
-type Functor :: (★ → ★) → Constraint
+type Functor ∷ (★ → ★) → Constraint
 class Functor f where
   fmap ∷ ∀ a b. (a → b) → f a → f b
   ...
   	-- Defined in ‘GHC.Internal.Base’
 Functor ∷ (★ → ★) → Constraint
-type Functor :: (★ → ★) → Constraint
+type Functor ∷ (★ → ★) → Constraint
 class Functor f where
   fmap ∷ ∀ a b. (a → b) → f a → f b
   (<$) ∷ ∀ a b. a → f b → f a
@@ -77,7 +77,7 @@ datatypeName
       (a ∷ k1).
     Datatype d ⇒
     t d f a → [Char]
-type Datatype :: ∀ {k}. k → Constraint
+type Datatype ∷ ∀ {k}. k → Constraint
 class Datatype d where
   datatypeName ∷ ∀ k1 (t ∷ k → (k1 → ★) → k1 → ★) (f ∷ k1 → ★)
                    (a ∷ k1).
