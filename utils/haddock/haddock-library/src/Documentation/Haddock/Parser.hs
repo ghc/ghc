@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -28,6 +29,7 @@ import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
 import Data.Char (chr, isAlpha, isSpace, isUpper)
+import Data.Functor (($>))
 import Data.List (elemIndex, intercalate, intersperse, unfoldr)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Monoid
@@ -186,11 +188,29 @@ specialChar = "_/<@\"&'`#[ "
 -- to ensure that we have already given a chance to more meaningful parsers
 -- before capturing their characters.
 string' :: Parser (DocH mod a)
-string' = DocString . unescape . T.unpack <$> takeWhile1_ (`notElem` specialChar)
+string' =
+  DocString
+    <$> ((:) <$> rawOrEscChar "" <*> many (rawOrEscChar "(["))
+    -- After the first character, stop for @\(@ or @\[@ math starters. (The
+    -- first character won't start a valid math string because this parser
+    -- should follow math parsers. But this parser is expected to accept at
+    -- least one character from all inputs that don't start with special
+    -- characters, so the first character parser can't have the @"(["@
+    -- restriction.)
   where
-    unescape "" = ""
-    unescape ('\\' : x : xs) = x : unescape xs
-    unescape (x : xs) = x : unescape xs
+    -- | Parse a single logical character, either raw or escaped. Don't accept
+    -- escaped characters from the argument string.
+    rawOrEscChar :: [Char] -> Parser Char
+    rawOrEscChar restrictedEscapes = try $ Parsec.noneOf specialChar >>= \case
+      -- Handle backslashes:
+      --   - Fail on forbidden escape characters.
+      --   - Non-forbidden characters: simply unescape, e.g. parse "\b" as 'b',
+      --   - Trailing backslash: treat it as a raw backslash, not an escape
+      --     sequence. (This is the logic that this parser followed when this
+      --     comment was written; it is not necessarily intentional but now I
+      --     don't want to break anything relying on it.)
+      '\\' -> Parsec.noneOf restrictedEscapes <|> Parsec.eof $> '\\'
+      c -> pure c
 
 -- | Skips a single special character and treats it as a plain string.
 -- This is done to skip over any special characters belonging to other
