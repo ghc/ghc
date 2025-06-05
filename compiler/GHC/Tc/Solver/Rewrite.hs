@@ -223,7 +223,7 @@ a better error message anyway.)
 -- | See Note [Rewriting].
 -- If (xi, co, rewriters) <- rewrite mode ev ty, then co :: xi ~r ty
 -- where r is the role in @ev@.
--- rewriters is the set of coercion holes that have been used to rewrite
+-- `rewriters` is the set of coercion holes that have been used to rewrite
 -- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
 rewrite :: CtEvidence -> TcType
         -> TcS (Reduction, RewriterSet)
