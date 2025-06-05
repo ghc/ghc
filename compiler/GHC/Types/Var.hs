@@ -574,9 +574,9 @@ information.  In (FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
      True            True          FTF_C_C
 where isPredTy is defined in GHC.Core.Predicate, and sees if t1's
 kind is Constraint.  See GHC.Core.Type.chooseFunTyFlag, and
-GHC.Core.TyCo.Rep Note [Types for coercions, predicates, and evidence]
+GHC.Core.Predicate Note [Types for coercions, predicates, and evidence]
 
-The term (Lam b e) donesn't carry an FunTyFlag; instead it uses
+The term (Lam b e) doesn't carry an FunTyFlag; instead it uses
 mkFunctionType when we want to get its types; see mkLamType.  This is
 just an engineering choice; we could cache here too if we wanted.
 

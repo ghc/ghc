@@ -66,7 +66,7 @@ import GHC.Types.Unique.Supply
 import GHC.Core
 import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec, mkCast )
 import GHC.Core.Type
-import GHC.Core.Predicate    ( scopedSort, isCoVarType )
+import GHC.Core.Predicate    ( scopedSort, isEqPred )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Coercion     ( isCoVar, mkRepReflCo, mkForAllVisCos )
 import GHC.Core.DataCon      ( DataCon, dataConWorkId, dataConWrapId )
@@ -240,7 +240,7 @@ mkLitRubbish :: Type -> Maybe CoreExpr
 mkLitRubbish ty
   | not (noFreeVarsOfType rep)
   = Nothing   -- Satisfy INVARIANT 1
-  | isCoVarType ty
+  | isEqPred ty
   = Nothing   -- Satisfy INVARIANT 2
   | otherwise
   = Just (Lit (LitRubbish torc rep) `mkTyApps` [ty])
