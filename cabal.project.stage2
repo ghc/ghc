@@ -10,59 +10,59 @@ packages:
   libraries/ghc-experimental
   libraries/base
   compiler
-  libraries/ghc-platform/
-  libraries/ghc-compact/
-  libraries/ghc-bignum/
-  libraries/integer-gmp/
-  libraries/ghc-boot/
-  libraries/ghc-boot-th/
+  libraries/ghc-platform
+  libraries/ghc-compact
+  libraries/ghc-bignum
+  libraries/integer-gmp
+  libraries/ghc-boot
+  libraries/ghc-boot-th
   libraries/ghc-heap
   libraries/ghci
   libraries/stm
   libraries/template-haskell
   libraries/hpc
   libraries/system-cxx-std-lib
-  ghc/
+  ghc
   utils/ghc-pkg
   utils/hsc2hs
   utils/unlit
   utils/genprimopcode
   utils/deriveConstants
-  utils/ghc-toolchain/
+  utils/ghc-toolchain
   libraries/array
   libraries/binary
   libraries/bytestring
   libraries/containers/containers
   libraries/deepseq
-  libraries/directory/
+  libraries/directory
   libraries/exceptions
-  libraries/file-io/
-  libraries/filepath/
+  libraries/file-io
+  libraries/filepath
   libraries/mtl
-  libraries/os-string/
+  libraries/os-string
   libraries/parsec
-  libraries/pretty/
-  libraries/process/
+  libraries/pretty
+  libraries/process
   libraries/semaphore-compat
   libraries/text
   libraries/time
   libraries/transformers
-  libraries/unix/
-  libraries/xhtml/
-  libraries/Win32/
+  libraries/unix
+  libraries/xhtml
+  libraries/Win32
   libraries/Cabal/Cabal-syntax
   libraries/Cabal/Cabal
   https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz
   https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
   https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
 
-  libraries/haskeline/
-  libraries/terminfo/
+  libraries/haskeline
+  libraries/terminfo
   utils/hp2ps
   utils/hpc
-  utils/iserv
-  utils/genapply/
-  utils/runghc/
+  utils/ghc-iserv
+  utils/genapply
+  utils/runghc
 
 
 -- project-rts

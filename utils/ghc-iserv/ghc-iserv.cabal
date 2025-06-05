@@ -1,0 +1,44 @@
+-- WARNING: ghc-iserv.cabal is automatically generated from ghc-iserv.cabal.in
+-- by ../../configure.  Make sure you are editing ghc-iserv.cabal.in, not
+-- ghc-iserv.cabal.
+
+Name: ghc-iserv
+Version: 9.13
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: iserv allows GHC to delegate Template Haskell computations
+Description:
+  GHC can be provided with a path to the iserv binary with
+  @-pgmi=/path/to/iserv-bin@, and will in combination with
+  @-fexternal-interpreter@, compile Template Haskell though the
+  @iserv-bin@ delegate. This is very similar to how ghcjs has been
+  compiling Template Haskell, by spawning a separate delegate (so
+  called runner on the javascript vm) and evaluating the splices
+  there.
+
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable ghc-iserv
+    Default-Language: Haskell2010
+    ghc-options: -no-hs-main
+    Main-Is: Main.hs
+    C-Sources: cbits/iservmain.c
+    Hs-Source-Dirs: src
+    include-dirs: .
+    Build-Depends: array      >= 0.5 && < 0.6,
+                   base       >= 4   && < 5,
+                   binary     >= 0.7 && < 0.11,
+                   bytestring >= 0.10 && < 0.13,
+                   containers >= 0.5 && < 0.8,
+                   deepseq    >= 1.4 && < 1.6,
+                   ghci       == 9.13
+
+    if os(windows)
+        Cpp-Options: -DWINDOWS
+    else
+        Build-Depends: unix   >= 2.7 && < 2.9

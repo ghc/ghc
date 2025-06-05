@@ -9,31 +9,31 @@ packages:
   rts-fs
 
   -- other packages.
-  ghc/
-  compiler/
-  libraries/directory/
-  libraries/file-io/
-  libraries/filepath/
-  libraries/ghc-platform/
-  libraries/ghc-boot/
-  libraries/ghc-boot-th/
+  ghc
+  compiler
+  libraries/directory
+  libraries/file-io
+  libraries/filepath
+  libraries/ghc-platform
+  libraries/ghc-boot
+  libraries/ghc-boot-th
   libraries/ghc-heap
   libraries/ghci
-  libraries/os-string/
-  libraries/process/
+  libraries/os-string
+  libraries/process
   libraries/semaphore-compat
   libraries/time
-  libraries/unix/
-  libraries/Win32/
+  libraries/unix
+  libraries/Win32
   libraries/Cabal/Cabal-syntax
   libraries/Cabal/Cabal
   utils/ghc-pkg
   utils/hsc2hs
   utils/unlit
-  utils/genprimopcode/
-  utils/genapply/
-  utils/deriveConstants/
-  utils/ghc-toolchain/
+  utils/genprimopcode
+  utils/genapply
+  utils/deriveConstants
+  utils/ghc-toolchain
   utils/ghc-toolchain/exe
 
 benchmarks: False

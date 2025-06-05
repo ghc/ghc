@@ -78,7 +78,7 @@ CONFIGURED_FILES := \
 	libraries/template-haskell/template-haskell.cabal \
 	libraries/ghci/ghci.cabal \
 	utils/ghc-pkg/ghc-pkg.cabal \
-	utils/iserv/iserv.cabal \
+	utils/ghc-iserv/ghc-iserv.cabal \
 	utils/runghc/runghc.cabal \
 	libraries/ghc-internal/ghc-internal.cabal \
 	libraries/ghc-experimental/ghc-experimental.cabal \
@@ -120,7 +120,7 @@ STAGE2_TARGETS := \
 	hp2ps:hp2ps \
 	hpc-bin:hpc \
 	integer-gmp:integer-gmp \
-	iserv:iserv \
+	ghc-iserv:ghc-iserv \
 	runghc:runghc \
 	system-cxx-std-lib:system-cxx-std-lib \
 	terminfo:terminfo \
@@ -136,7 +136,7 @@ STAGE2_EXECUTABLES := \
 	genapply \
 	genprimopcode \
 	ghc  \
-	iserv \
+	ghc-iserv \
 	ghc-pkg \
 	hp2ps \
 	hpc \
