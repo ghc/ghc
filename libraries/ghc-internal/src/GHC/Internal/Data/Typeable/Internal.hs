@@ -167,6 +167,9 @@ rnfKindRep (KindRepTypeLitD _ t) = rnfString t
 
 rnfRuntimeRep :: RuntimeRep -> ()
 rnfRuntimeRep (VecRep !_ !_) = ()
+rnfRuntimeRep (TupleRep rs) = rnfList rnfRuntimeRep rs
+rnfRuntimeRep (SumRep rs) = rnfList rnfRuntimeRep rs
+rnfRuntimeRep (BoxedRep !_) = ()
 rnfRuntimeRep !_             = ()
 
 rnfList :: (a -> ()) -> [a] -> ()

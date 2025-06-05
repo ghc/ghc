@@ -425,13 +425,11 @@ coreToStgExpr expr@(App _ _)
 coreToStgExpr expr@(Lam _ _)
   = let
         (args, body) = myCollectBinders expr
-    in
-    case filterStgBinders args of
+    in assertPpr
+         (null (filterStgBinders args))
+         (text "coreToStgExpr: unexpected value lambda: " $$ ppr expr)
+         (coreToStgExpr body)
 
-      [] -> coreToStgExpr body
-
-      _ -> pprPanic "coretoStgExpr" $
-        text "Unexpected value lambda:" $$ ppr expr
 
 coreToStgExpr (Tick tick expr)
   = do

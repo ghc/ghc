@@ -295,11 +295,9 @@ instance Outputable SlotTy where
   ppr FloatSlot       = text "FloatSlot"
   ppr (VecSlot n e)   = text "VecSlot" <+> ppr n <+> ppr e
 
-repSlotTy :: [PrimRep] -> Maybe SlotTy
-repSlotTy reps = case reps of
-                  [] -> Nothing
-                  [rep] -> Just (primRepSlot rep)
-                  _ -> pprPanic "repSlotTy" (ppr reps)
+repSlotTy :: PrimOrVoidRep -> Maybe SlotTy
+repSlotTy VoidRep = Nothing
+repSlotTy (NVRep rep) = Just (primRepSlot rep)
 
 primRepSlot :: PrimRep -> SlotTy
 primRepSlot (BoxedRep mlev) = case mlev of

@@ -390,12 +390,12 @@ slowArgs platform args sccProfilingEnabled  -- careful: reps contains voids (V),
         stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
         this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
         save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just $ cccsExpr platform)]
-        save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit $ "stg_restore_cccs_" ++ arg_reps)
-        arg_reps = case maximum (fmap fst args1) of
-            V64 -> "v64"
-            V32 -> "v32"
-            V16 -> "v16"
-            _   -> "d"
+        save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId label_name
+        label_name = case maximum (fmap fst args1) of
+            V64 -> fsLit "stg_restore_cccs_v64"
+            V32 -> fsLit "stg_restore_cccs_v32"
+            V16 -> fsLit "stg_restore_cccs_v16"
+            _   -> fsLit "stg_restore_cccs_d"
 
 
 

@@ -15,8 +15,6 @@ else:
 
 libs_base_uri = '../libraries'
 
-# N.B. If you add a package to this list be sure to also add a corresponding
-# LIBRARY_VERSION macro call to configure.ac.
 lib_versions = {
     'base': '@LIBRARY_base_UNIT_ID@',
     'ghc-prim': '@LIBRARY_ghc_prim_UNIT_ID@',

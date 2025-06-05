@@ -41,9 +41,6 @@ mkUnarisedIds fs tys = mapM (mkUnarisedId fs) tys
 mkUnarisedId :: MonadUnique m => FastString -> NvUnaryType -> m Id
 mkUnarisedId s t = mkSysLocalM s ManyTy t
 
--- Checks if id is a top level error application.
--- isErrorAp_maybe :: Id ->
-
 -- | Extract the default case alternative
 -- findDefaultStg :: [Alt b] -> ([Alt b], Maybe (Expr b))
 findDefaultStg

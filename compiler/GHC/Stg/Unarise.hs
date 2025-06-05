@@ -391,7 +391,7 @@ import GHC.Types.Basic
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import GHC.Data.FastString (FastString, mkFastString, fsLit)
+import GHC.Data.FastString (FastString, fsLit)
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
@@ -681,7 +681,7 @@ elimCase rho args bndr (MultiValAlt _) [GenStgAlt{ alt_con   = _
 
 elimCase rho args@(tag_arg : real_args) bndr (MultiValAlt _) alts
   | isUnboxedSumBndr bndr
-  = do tag_bndr <- mkId (mkFastString "tag") tagTy
+  = do tag_bndr <- mkId (fsLit "tag") tagTy
           -- this won't be used but we need a binder anyway
        let rho1 = extendRho rho bndr (MultiVal args)
            scrut' = case tag_arg of
@@ -871,10 +871,9 @@ mapSumIdBinders alt_bndr args rhs rho0
       --           text "rhs" <+> ppr rhs $$
       --           text "rhs_with_casts" <+> ppr rhs_with_casts
       --           ) $
-    if isMultiValBndr alt_bndr
-      then return (extendRho rho0 alt_bndr (MultiVal typed_id_args), rhs_with_casts rhs)
-      else assert (typed_id_args `lengthIs` 1) $
-            return (extendRho rho0 alt_bndr (UnaryVal (head typed_id_args)), rhs_with_casts rhs)
+    case typed_id_args of
+      [arg] -> return (extendRho rho0 alt_bndr (UnaryVal arg), rhs_with_casts rhs)
+      _ -> return (extendRho rho0 alt_bndr (MultiVal typed_id_args), rhs_with_casts rhs)
 
 -- Convert the argument to the given type, and wrap the conversion
 -- around the given expression. Use the given Id as a name for the
@@ -923,7 +922,7 @@ mkUbxSum dc ty_args args0 us
   = let
       _ :| sum_slots = ubxSumRepType ty_args
       -- drop tag slot
-      field_slots = (mapMaybe (repSlotTy . stgArgRep) args0)
+      field_slots = (mapMaybe (repSlotTy . stgArgRep1) args0)
       tag = dataConTag dc
       layout'  = layoutUbxSum sum_slots field_slots
 
@@ -1076,13 +1075,13 @@ unariseArgBinder is_con_arg rho x =
       -- break the post-unarisation invariant that says unboxed tuple/sum
       -- binders should vanish. See Note [Post-unarisation invariants].
       | isUnboxedSumType (idType x) || isUnboxedTupleType (idType x)
-      -> do x' <- mkId (mkFastString "us") (primRepToType rep)
+      -> do x' <- mkId (fsLit "us") (primRepToType rep)
             return (extendRho rho x (MultiVal [StgVarArg x']), [x'])
       | otherwise
       -> return (extendRhoWithoutValue rho x, [x])
 
     reps -> do
-      xs <- mkIds (mkFastString "us") (map primRepToType reps)
+      xs <- mkIds (fsLit "us") (map primRepToType reps)
       return (extendRho rho x (MultiVal (map StgVarArg xs)), xs)
 
 --------------------------------------------------------------------------------
@@ -1149,13 +1148,6 @@ mkIds fs tys = mkUnarisedIds fs tys
 
 mkId :: FastString -> NvUnaryType -> UniqSM Id
 mkId s t = mkUnarisedId s t
-
-isMultiValBndr :: Id -> Bool
-isMultiValBndr id
-  | [_] <- typePrimRep (idType id)
-  = False
-  | otherwise
-  = True
 
 isUnboxedSumBndr :: Id -> Bool
 isUnboxedSumBndr = isUnboxedSumType . idType

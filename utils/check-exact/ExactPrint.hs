@@ -2294,7 +2294,7 @@ instance ExactPrint (HsBind GhcPs) where
     bind' <- markAnnotated bind
     return (PatSynBind x bind')
 
-  exact x = error $ "HsBind: exact for " ++ showAst x
+  exact (VarBind x _ _) = dataConCantHappen x
 
 -- ---------------------------------------------------------------------
 
