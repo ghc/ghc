@@ -827,12 +827,17 @@ Notice that
   hence the applications of those lambdas.
 
   We use the simple optimiser to simplify this to
-     let { d = d2; d1 = $dfOrdInt } in f @Int @b (d2:Eq b)
+     let { d = d2; d1 = $dfOrdInt } in f @Int @b d1 d
 
   Important: do no inlining in this "simple optimiser" phase:
-  use `simpleOptExprNoInline`. E.g. we don't want to turn
-     let { d1=d; d2=d } in f d1 d2    -->    f d d
+  use `simpleOptExprNoInline`. E.g. we don't want to turn it into
+     f @Int @b $dfOrdInt d2
   because the latter is harder to match.
+
+  Similarly if we have
+     let { d1=d; d2=d } in f d1 d2
+  we don't want to inline d1/d2 to get this
+     f d d
 
 (SP2) $sf does not simply quantify over (d:Ord a). Instead, to figure out what
   it should quantify over, and to include the 'd3' binding in the body of $sf,
@@ -1203,7 +1208,7 @@ finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_args
            ; tracePm "dsSpec" (vcat
                 [ text "fun:" <+> ppr poly_id
                 , text "spec_bndrs:" <+> ppr spec_bndrs
-                , text "args:" <+>  ppr rule_args ])
+                , text "rule_args:" <+>  ppr rule_args ])
            ; return (unitOL (spec_id, spec_rhs), rule) }
                 -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
                 --     makeCorePair overwrites the unfolding, which we have
@@ -1348,38 +1353,37 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
   = Left (DsRuleIgnoredDueToConstructor con) -- See Note [No RULES on datacons]
 
   | otherwise = case decompose fun2 args2 of
-        Nothing -> -- pprTrace "decomposeRuleLhs 3" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-                   --                                    , text "orig_lhs:" <+> ppr orig_lhs
-                   --                                    , text "rhs_fvs:" <+> ppr rhs_fvs
-                   --                                    , text "orig_lhs:" <+> ppr orig_lhs
-                   --                                    , text "lhs1:" <+> ppr lhs1
-                   --                                    , text "lhs2:" <+> ppr lhs2
-                   --                                    , text "fun2:" <+> ppr fun2
-                   --                                    , text "args2:" <+> ppr args2
-                   --                                    ]) $
+        Nothing ->  pprTrace "decomposeRuleLhs 3" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+                                                       , text "orig_lhs:" <+> ppr orig_lhs
+                                                       , text "rhs_fvs:" <+> ppr rhs_fvs
+                                                       , text "lhs1:" <+> ppr lhs1
+                                                       , text "lhs2:" <+> ppr lhs2
+                                                       , text "fun2:" <+> ppr fun2
+                                                       , text "args2:" <+> ppr args2
+                                                       ]) $
                    Left (DsRuleLhsTooComplicated orig_lhs lhs2)
 
         Just (fn_id, args)
           | not (null unbound) ->
             -- Check for things unbound on LHS
             -- See Note [Unused spec binders]
-            -- pprTrace "decomposeRuleLhs 1" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-            --                                     , text "orig_lhs:" <+> ppr orig_lhs
-            --                                     , text "lhs_fvs:" <+> ppr lhs_fvs
-            --                                     , text "rhs_fvs:" <+> ppr rhs_fvs
-            --                                     , text "unbound:" <+> ppr unbound
-            --                                     ]) $
+             pprTrace "decomposeRuleLhs 1" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+                                                 , text "orig_lhs:" <+> ppr orig_lhs
+                                                 , text "lhs_fvs:" <+> ppr lhs_fvs
+                                                 , text "rhs_fvs:" <+> ppr rhs_fvs
+                                                 , text "unbound:" <+> ppr unbound
+                                                 ]) $
             Left (DsRuleBindersNotBound unbound orig_bndrs orig_lhs lhs2)
           | otherwise ->
-            -- pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-            --                                    , text "orig_lhs:" <+> ppr orig_lhs
-            --                                    , text "lhs1:"     <+> ppr lhs1
-            --                                    , text "trimmed_bndrs:" <+> ppr trimmed_bndrs
-            --                                    , text "extra_dicts:" <+> ppr extra_dicts
-            --                                    , text "fn_id:" <+> ppr fn_id
-            --                                    , text "args:"   <+> ppr args
-            --                                    , text "args fvs:" <+> ppr (exprsFreeVarsList args)
-            --                                    ]) $
+            pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+                                               , text "orig_lhs:" <+> ppr orig_lhs
+                                               , text "lhs1:"     <+> ppr lhs1
+                                               , text "trimmed_bndrs:" <+> ppr trimmed_bndrs
+                                               , text "extra_dicts:" <+> ppr extra_dicts
+                                               , text "fn_id:" <+> ppr fn_id
+                                               , text "args:"   <+> ppr args
+                                               , text "args fvs:" <+> ppr (exprsFreeVarsList args)
+                                               ]) $
             Right (trimmed_bndrs ++ extra_dicts, fn_id, args)
 
           where -- See Note [Variables unbound on the LHS]
@@ -1396,9 +1400,11 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                     | d <- exprsSomeFreeVarsList is_extra args ]
 
                 is_extra v
-                  = isEvVar v
-                      -- isEvVar: includes coercions, matching what
-                      --          happens in `split_lets` (isDictId, isCoVar)
+                  = isSimplePredTy (idType v)
+                      -- isSimplePredTy: includes coercions and dictionaries
+                      -- But NOT dictionary functions; and in particular not
+                      -- superclass-selector fuctions
+
                     && not (v `elemVarSet` orig_bndr_set)
                     && not (v == fn_id)
                        -- fn_id: do not quantify over the function itself, which may
@@ -1430,9 +1436,10 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
 
    split_lets :: CoreExpr -> ([(DictId,CoreExpr)], CoreExpr)
    split_lets (Let (NonRec d r) body)
-     | isDictId d  -- Catches dictionaries, yes, but also catches dictionary
-                   -- /functions/ arising from solving a
-                   -- quantified contraint (#24370)
+     | isPredTy (idType d)
+       -- isPredTy: catches dictionaries, yes, but also catches
+       -- dictionary /functions/ arising from solving a
+       -- quantified contraint (see #24370)
      = ((d,r):bs, body')
      where (bs, body') = split_lets body
 
