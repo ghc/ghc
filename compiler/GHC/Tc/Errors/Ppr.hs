@@ -5305,7 +5305,6 @@ pprArising :: CtLoc -> SDoc
 -- Used for the main, top-level error message
 -- We've done special processing for TypeEq, KindEq, givens
 pprArising ct_loc
-  | in_generated_code = empty  -- See Note ["Arising from" messages in generated code]
   | suppress_origin   = empty
   | otherwise         = pprCtOrigin orig
   where
