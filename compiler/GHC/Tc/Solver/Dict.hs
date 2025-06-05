@@ -343,6 +343,11 @@ There are two more similar "equality classes" like this.  The full list is
   pattern matching. Its compile-time allocation decreased by 40% when
   I added the "replace" rather than "add" semantics.)
 
+  We achieve this by
+   (a) not expanding superclasses for equality classes at all;
+       see the `isEqualityClass` test in `mk_strict_superclasses`
+   (b) special logic to solve (t1 ~ t2) in `solveEqualityDict`.
+
 (EQC2) Faced with [W] t1 ~ t2, it's always OK to reduce it to [W] t1 ~# t2,
   without worrying about Note [Instance and Given overlap].  Why?  Because
   if we had [G] s1 ~ s2, then we'd get the superclass [G] s1 ~# s2, and
@@ -392,6 +397,7 @@ There is a bit of special treatment: search for isCTupleClass.
 -}
 
 solveEqualityDict :: CtEvidence -> Class -> [Type] -> SolverStage Void
+-- See Note [Solving equality classes]
 -- Precondition: (isEqualityClass cls) True, so cls is (~), (~~), or Coercible
 solveEqualityDict ev cls tys
   | CtWanted (WantedCt { ctev_dest = dest }) <- ev
@@ -1752,7 +1758,7 @@ So here's the plan:
 
 1. Eagerly generate superclasses for given (but not wanted)
    constraints; see Note [Eagerly expand given superclasses].
-   This is done using mkStrictSuperClasses in canClassNC, when
+   This is done using mkStrictSuperClasses in canDictCt, when
    we take a non-canonical Given constraint and cannonicalise it.
 
    However stop if you encounter the same class twice.  That is,
@@ -1764,7 +1770,7 @@ So here's the plan:
    solveSimpleWanteds; Note [Danger of adding superclasses during solving]
 
    However, /do/ continue to eagerly expand superclasses for new /given/
-   /non-canonical/ constraints (canClassNC does this).  As #12175
+   /non-canonical/ constraints (canDictCt does this).  As #12175
    showed, a type-family application can expand to a class constraint,
    and we want to see its superclasses for just the same reason as
    Note [Eagerly expand given superclasses].
@@ -1820,7 +1826,7 @@ point in fruitlessly expanding further.  This case just falls out from
 our strategy.  Consider
   f :: C a => a -> Bool
   f x = x==x
-Then canClassNC gets the [G] d1: C a constraint, and eager emits superclasses
+Then canDictCt gets the [G] d1: C a constraint, and eager emits superclasses
 G] d2: D a, [G] d3: C a (psc).  (The "psc" means it has its cc_pend_sc has pending
 expansion fuel.)
 When processing d3 we find a match with d1 in the inert set, and we always
@@ -1857,11 +1863,11 @@ where
 
 So we may need to do a little work on the givens to expose the
 class that has the superclasses.  That's why the superclass
-expansion for Givens happens in canClassNC.
+expansion for Givens happens in canDictCt.
 
 This same scenario happens with quantified constraints, whose superclasses
 are also eagerly expanded. Test case: typecheck/should_compile/T16502b
-These are handled in canForAllNC, analogously to canClassNC.
+These are handled in canForAllNC, analogously to canDictCt.
 
 Note [Why adding superclasses can help]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2015,7 +2021,7 @@ mk_strict_superclasses :: ExpansionFuel -> NameSet -> CtEvidence
 -- The caller of this function is supposed to perform fuel book keeping
 -- Precondition: fuel >= 0
 mk_strict_superclasses _ _ _ _ _ cls _
-  | isEqualityClass cls
+  | isEqualityClass cls  -- See (EQC1) in Note [Solving equality classes]
   = return []
 
 mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar })) tvs theta cls tys
@@ -2202,8 +2208,7 @@ BUT this is an unboxed value!  And nothing has prepared us for
 dictionary "functions" that are unboxed.  Actually it does just
 about work, but the simplifier ends up with stuff like
    case (/\a. eq_sel d) of df -> ...(df @Int)...
-and fails to simplify that any further.  And it doesn't satisfy
-isPredTy any more.
+and fails to simplify that any further.
 
 So for now we simply decline to take superclasses in the quantified
 case.  Instead we have a special case in GHC.Tc.Solver.Equality.tryQCsEqCt
