@@ -90,7 +90,7 @@ module GHC.Tc.Utils.TcType (
   isIntegerTy, isNaturalTy,
   isBoolTy, isUnitTy, isAnyTy, isZonkAnyTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy,
-  isPredTy, isTyVarClassPred,
+  isPredTy, isSimplePredTy, isTyVarClassPred,
   checkValidClsArgs, hasTyVarHead,
   isRigidTy, anyTy_maybe,
 
@@ -155,7 +155,7 @@ module GHC.Tc.Utils.TcType (
   mkTyConTy, mkTyVarTy, mkTyVarTys,
   mkTyCoVarTy, mkTyCoVarTys,
 
-  isClassPred, isEqPred, isIPLikePred, isEqClassPred,
+  isClassPred, isEqPredTy, isIPLikePred, isEqClassPred,
   isEqualityClass, mkClassPred,
   tcSplitQuantPredTy, tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
   isRuntimeRepVar, isFixedRuntimeRepKind,
@@ -1785,11 +1785,11 @@ hasTyVarHead ty                 -- Haskell 98 allows predicates of form
 evVarPred :: EvVar -> PredType
 evVarPred var = varType var
   -- Historical note: I used to have an ASSERT here,
-  -- checking (isEvVarType (varType var)).  But with something like
+  -- checking (isPredTy (varType var)).  But with something like
   --   f :: c => _ -> _
   -- we end up with (c :: kappa), and (kappa ~ Constraint).  Until
   -- we solve and zonk (which there is no particular reason to do for
-  -- partial signatures, (isEvVarType kappa) will return False. But
+  -- partial signatures, (isPredTy kappa) will return False. But
   -- nothing is wrong.  So I just removed the ASSERT.
 
 ---------------------------

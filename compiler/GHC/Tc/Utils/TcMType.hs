@@ -227,7 +227,7 @@ newWanteds orig = mapM (newWanted orig Nothing)
 
 cloneWantedCtEv :: CtEvidence -> TcM CtEvidence
 cloneWantedCtEv (CtWanted ctev@(WantedCt { ctev_pred = pty, ctev_dest = HoleDest _ }))
-  | isEqPred pty
+  | isEqPredTy pty
   = do { co_hole <- newCoercionHole pty
        ; return $ CtWanted (ctev { ctev_dest = HoleDest co_hole }) }
   | otherwise

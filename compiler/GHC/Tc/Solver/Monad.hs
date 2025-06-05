@@ -1270,7 +1270,7 @@ checkForCyclicBinds ev_binds_map
     cycles = [c | CyclicSCC c <- stronglyConnCompFromEdgedVerticesUniq edges]
 
     coercion_cycles = [c | c <- cycles, any is_co_bind c]
-    is_co_bind (EvBind { eb_lhs = b }) = isEqPred (varType b)
+    is_co_bind (EvBind { eb_lhs = b }) = isEqPredTy (varType b)
 
     edges :: [ Node EvVar EvBind ]
     edges = [ DigraphNode bind bndr (nonDetEltsUniqSet (evVarsOfTerm rhs))
@@ -2134,7 +2134,7 @@ newWantedEvVarNC :: CtLoc -> RewriterSet
                  -> TcPredType -> TcS WantedCtEvidence
 -- Don't look up in the solved/inerts; we know it's not there
 newWantedEvVarNC loc rewriters pty
-  = assertPpr (not (isEqPred pty)) (ppr pty) $
+  = assertPpr (not (isEqPredTy pty)) (ppr pty) $
     do { new_ev <- newEvVar pty
        ; traceTcS "Emitting new wanted" (ppr new_ev <+> dcolon <+> ppr pty $$
                                          pprCtLoc loc)
@@ -2155,7 +2155,7 @@ newWantedEvVar :: CtLoc -> RewriterSet
                -> TcPredType -> TcS MaybeNew
 -- For anything except ClassPred, this is the same as newWantedEvVarNC
 newWantedEvVar loc rewriters pty
-  = assertPpr (not (isEqPred pty))
+  = assertPpr (not (isEqPredTy pty))
       (vcat [ text "newWantedEvVar: HoleDestPred"
             , text "pty:" <+> ppr pty ]) $
     do { mb_ct <- lookupInInerts loc pty
