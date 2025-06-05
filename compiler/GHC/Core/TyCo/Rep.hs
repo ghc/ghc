@@ -261,47 +261,9 @@ FunTy is the constructor for a function type.  Here are the details:
   multiplicity argument nondependent in #20164.
 
 * Re the ft_af field: see Note [FunTyFlag] in GHC.Types.Var
-  See Note [Types for coercions, predicates, and evidence]
-  This visibility info makes no difference in Core; it matters
-  only when we regard the type as a Haskell source type.
-
-Note [Types for coercions, predicates, and evidence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We treat differently:
-
-  (a) Predicate types
-        Test: isPredTy
-        Binders: DictIds
-        Kind: Constraint
-        Examples: (Eq a), and (a ~ b)
-
-  (b) Coercion types are primitive, unboxed equalities
-        Test: isCoVarTy
-        Binders: CoVars (can appear in coercions)
-        Kind: TYPE (TupleRep [])
-        Examples: (t1 ~# t2) or (t1 ~R# t2)
-
-  (c) Evidence types is the type of evidence manipulated by
-      the type constraint solver.
-        Test: isEvVarType
-        Binders: EvVars
-        Kind: Constraint or TYPE (TupleRep [])
-        Examples: all coercion types and predicate types
-
-Coercion types and predicate types are mutually exclusive,
-but evidence types are a superset of both.
-
-When treated as a user type,
-
-  - Predicates (of kind Constraint) are invisible and are
-    implicitly instantiated
-
-  - Coercion types, and non-pred evidence types (i.e. not
-    of kind Constraint), are just regular old types, are
-    visible, and are not implicitly instantiated.
-
-In a FunTy { ft_af = af } and af = FTF_C_T or FTF_C_C, the argument
-type is always a Predicate type.
+  See Note [Types for coercions, predicates, and evidence] in
+  GHC.Core.Predicate.  This visibility info makes no difference in Core;
+  it matter only when we regard the type as a Haskell source type.
 
 Note [Weird typing rule for ForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

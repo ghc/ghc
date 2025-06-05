@@ -294,7 +294,7 @@ have type
   $bP :: forall a b. (a ~# Maybe b, Eq b) => [b] -> X a
 
 and that is bad because (a ~# Maybe b) is not a predicate type
-(see Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
+(see Note [Types for coercions, predicates, and evidence] in GHC.Core.Predicate
 and is not implicitly instantiated.
 
 So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and

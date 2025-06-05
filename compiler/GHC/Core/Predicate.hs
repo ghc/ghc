@@ -8,7 +8,7 @@ Describes predicates as they are considered by the solver.
 
 module GHC.Core.Predicate (
   Pred(..), classifyPredType,
-  isPredTy, isEvVarType,
+  isPredTy, isSimplePredTy,
 
   -- Equality predicates
   EqRel(..), eqRelRole,
@@ -70,6 +70,55 @@ import GHC.Data.FastString
 *                                                                      *
 ********************************************************************* -}
 
+{- Note [Types for coercions, predicates, and evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A "predicate" or "predicate type",
+    type synonym `PredType`
+    returns True to `isPredTy`
+is any type of kind (CONSTRAINT r) for some `r`.
+
+  (a) A "class predicate" (aka dictionary type) is the type of a (boxed)
+      type-class dictionary
+        Test: isDictTy
+        Binders: DictIds
+        Kind: Constraint
+        Examples: (Eq a), and (a ~ b)
+
+  (b) An "equality predicate" is a primitive, unboxed equalities
+        Test: isEqPred
+        Binders: CoVars (can appear in coercions)
+        Kind: CONSTRAINT (TupleRep [])
+        Examples: (t1 ~# t2) or (t1 ~R# t2)
+
+  (c) A "simple predicate type" is either a class predicate or an equality predicate
+        Test: isSimplePredTy
+        Kind: Constraint or CONSTRAINT (TupleRep [])
+        Examples: all coercion types and dictionary types
+
+  (d) A "forall-predicate" is the type of a possibly-polymorphic function
+      returning a predicate; e.g.
+           forall a. Eq a => Eq [a]
+
+  (e) An "irred predicate" is any other type of kind (CONSTRAINT r),
+      typically something like `c` or `c Int`, for some suitably-kinded `c`
+
+
+* Predicates are classified by `classifyPredType`.
+
+* Equality types and dictionary types are mutually exclusive.
+
+* Predicates are the things solved by the constraint solver; and
+  /evidence terms/ witness those solutions.  An /evidence variable/
+  (or EvVar) has a type that is a PredType.
+
+* Generally speaking, the /type/ of a predicate determines its /value/;
+  that is, predicates are singleton types.  The big exception is implicit
+  parameters.  See Note [Type determines value]
+
+* In a FunTy { ft_af = af }, where af = FTF_C_T or FTF_C_C,
+  the argument type is always a Predicate type.
+-}
+
 -- | A predicate in the solver. The solver tries to prove Wanted predicates
 -- from Given ones.
 data Pred
@@ -93,45 +142,132 @@ data Pred
   --     as ClassPred, as if we had a tuple class with two superclasses
   --        class (c1, c2) => CTuple2 c1 c2
 
-classifyPredType :: PredType -> Pred
-classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
-    Just (tc, [_, _, ty1, ty2])
-      | tc `hasKey` eqReprPrimTyConKey -> EqPred ReprEq ty1 ty2
-      | tc `hasKey` eqPrimTyConKey     -> EqPred NomEq  ty1 ty2
+classifyPredType :: HasDebugCallStack => PredType -> Pred
+-- Precondition: the argument is a predicate type, with kind (CONSTRAINT _)
+classifyPredType ev_ty
+  = assertPpr (isPredTy ev_ty) (ppr ev_ty) $
+    case splitTyConApp_maybe ev_ty of
+      Just (tc, [_, _, ty1, ty2])
+        | tc `hasKey` eqReprPrimTyConKey -> EqPred ReprEq ty1 ty2
+        | tc `hasKey` eqPrimTyConKey     -> EqPred NomEq  ty1 ty2
 
-    Just (tc, tys)
-      | Just clas <- tyConClass_maybe tc
-      -> ClassPred clas tys
+      Just (tc, tys)
+        | Just clas <- tyConClass_maybe tc
+        -> ClassPred clas tys
 
-    _ | (tvs, rho) <- splitForAllTyCoVars ev_ty
-      , (theta, pred) <- splitFunTys rho
-      , not (null tvs && null theta)
-      -> ForAllPred tvs (map scaledThing theta) pred
+      _ | (tvs, rho) <- splitForAllTyCoVars ev_ty
+        , (theta, pred) <- splitFunTys rho
+        , not (null tvs && null theta)
+        -> ForAllPred tvs (map scaledThing theta) pred
 
-      | otherwise
-      -> IrredPred ev_ty
+        | otherwise
+        -> IrredPred ev_ty
 
--- --------------------- Dictionary types ---------------------------------
+isSimplePredTy :: HasDebugCallStack => Type -> Bool
+-- Return True for (t1 ~# t2) regardless of role, and (C tys)
+-- /Not/ true of quantified-predicate type like (forall a. Eq a => Eq [a])
+-- Precondition: expects a type that classifies values (i.e. not a type constructor)
+-- See Note [Types for coercions, predicates, and evidence]
+isSimplePredTy ty
+  = case tyConAppTyCon_maybe ty of
+       Nothing -> False
+       Just tc -> isClassTyCon tc ||
+                  tc `hasKey` eqPrimTyConKey ||
+                  tc `hasKey` eqReprPrimTyConKey
+
+isPredTy :: Type -> Bool
+-- True of all types of kind (CONSTRAINT r) for some `r`
+-- See Note [Types for coercions, predicates, and evidence]
+--
+-- In particular it is True of
+--    - the constraints handled by the constraint solver,
+--      including quantified constraints
+--    - dictionary functions (forall a. Eq a => Eq [a])
+isPredTy ty = case typeTypeOrConstraint ty of
+                        TypeLike       -> False
+                        ConstraintLike -> True
+
+typeDeterminesValue :: PredType -> Bool
+-- ^ Is the type *guaranteed* to determine the value?
+-- Might say No even if the type does determine the value.
+-- See Note [Type determines value]
+typeDeterminesValue ty = isDictTy ty && not (couldBeIPLike ty)
+
+
+{-
+Note [Evidence for quantified constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The superclass mechanism in GHC.Tc.Solver.Dict.makeSuperClasses risks
+taking a quantified constraint like
+   (forall a. C a => a ~ b)
+and generate superclass evidence
+   (forall a. C a => a ~# b)
+
+This is a funny thing: neither isPredTy nor isCoVarType are true
+of it.  So we are careful not to generate it in the first place:
+see Note [Equality superclasses in quantified constraints]
+in GHC.Tc.Solver.Dict.
+-}
+
+-- --------------------- Equality predicates ---------------------------------
+
+-- | Does this type classify a core (unlifted) Coercion?
+-- At either role nominal or representational
+--    (t1 ~# t2) or (t1 ~R# t2)
+-- See Note [Types for coercions, predicates, and evidence] in "GHC.Core.TyCo.Rep"
+isEqPred :: PredType -> Bool
+-- True of (s ~# t) (s ~R# t)
+-- NB: but NOT true of (s ~ t) or (s ~~ t) or (Coecible s t)
+isEqPred ty
+  | Just tc <- tyConAppTyCon_maybe ty
+  = tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
+  | otherwise
+  = False
+
+isCoVarType :: Type -> Bool
+-- Just a synonym for isEqPred
+isCoVarType = isEqPred
+
+isReprEqPred :: PredType -> Bool
+-- True of (s ~R# t)
+isReprEqPred ty
+  | Just tc <- tyConAppTyCon_maybe ty
+  = tc `hasKey` eqReprPrimTyConKey
+  | otherwise
+  = False
+
+-- --------------------- Class predicates ---------------------------------
 
 mkClassPred :: Class -> [Type] -> PredType
 mkClassPred clas tys = mkTyConApp (classTyCon clas) tys
 
-isDictTy :: Type -> Bool
--- True of dictionaries (Eq a) and
---         dictionary functions (forall a. Eq a => Eq [a])
--- See Note [Type determines value]
--- See #24370 (and the isDictId call in GHC.HsToCore.Binds.decomposeRuleLhs)
---     for why it's important to catch dictionary bindings
-isDictTy ty = isClassPred pred
-  where
-    (_, pred) = splitInvisPiTys ty
+isClassPred :: PredType -> Bool
+isClassPred ty = case tyConAppTyCon_maybe ty of
+    Just tc -> isClassTyCon tc
+    _       -> False
 
--- | Is the type *guaranteed* to determine the value?
---
--- Might say No even if the type does determine the value. (See the Note)
-typeDeterminesValue :: Type -> Bool
--- See Note [Type determines value]
-typeDeterminesValue ty = isDictTy ty && not (couldBeIPLike ty)
+isDictTy :: Type -> Bool
+isDictTy = isClassPred
+
+isEqClassPred :: PredType -> Bool
+isEqClassPred ty  -- True of (s ~ t) and (s ~~ t)
+                  -- ToDo: should we check saturation?
+  | Just tc <- tyConAppTyCon_maybe ty
+  , Just cls <- tyConClass_maybe tc
+  = isEqualityClass cls
+  | otherwise
+  = False
+
+isEqualityClass :: Class -> Bool
+-- True of (~), (~~), and Coercible
+-- These all have a single primitive-equality superclass, either (~N# or ~R#)
+isEqualityClass cls
+  = cls `hasKey` heqTyConKey
+    || cls `hasKey` eqTyConKey
+    || cls `hasKey` coercibleTyConKey
+
+isCTupleClass :: Class -> Bool
+isCTupleClass cls = isTupleTyCon (classTyCon cls)
 
 getClassPredTys :: HasDebugCallStack => PredType -> (Class, [Type])
 getClassPredTys ty = case getClassPredTys_maybe ty of
@@ -264,92 +400,6 @@ pprPredType pred
                      NomEq  -> eqPrimTyCon
                      ReprEq -> eqReprPrimTyCon
       _ -> ppr pred
-
-{- *********************************************************************
-*                                                                      *
-*                   Predicates on PredType                             *
-*                                                                      *
-********************************************************************* -}
-
-{-
-Note [Evidence for quantified constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The superclass mechanism in GHC.Tc.Solver.Dict.makeSuperClasses risks
-taking a quantified constraint like
-   (forall a. C a => a ~ b)
-and generate superclass evidence
-   (forall a. C a => a ~# b)
-
-This is a funny thing: neither isPredTy nor isCoVarType are true
-of it.  So we are careful not to generate it in the first place:
-see Note [Equality superclasses in quantified constraints]
-in GHC.Tc.Solver.Dict.
--}
-
-isPredTy :: HasDebugCallStack => Type -> Bool
--- Precondition: expects a type that classifies values
--- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
--- Returns True for types of kind (CONSTRAINT _), False for ones of kind (TYPE _)
-isPredTy ty = case typeTypeOrConstraint ty of
-                  TypeLike       -> False
-                  ConstraintLike -> True
-
--- | Does this type classify a core (unlifted) Coercion?
--- At either role nominal or representational
---    (t1 ~# t2) or (t1 ~R# t2)
--- See Note [Types for coercions, predicates, and evidence] in "GHC.Core.TyCo.Rep"
-isCoVarType :: Type -> Bool
-  -- ToDo: should we check saturation?
-isCoVarType ty = isEqPred ty
-
-isEvVarType :: Type -> Bool
--- True of (a) predicates, of kind Constraint, such as (Eq t), and (s ~ t)
---         (b) coercion types, such as (s ~# t) or (s ~R# t)
--- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
--- See Note [Evidence for quantified constraints]
-isEvVarType ty = isCoVarType ty || isPredTy ty
-
-isEqPred :: PredType -> Bool
--- True of (s ~# t) (s ~R# t)
--- NB: but NOT true of (s ~ t) or (s ~~ t) or (Coecible s t)
-isEqPred ty
-  | Just tc <- tyConAppTyCon_maybe ty
-  = tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
-  | otherwise
-  = False
-
-isReprEqPred :: PredType -> Bool
--- True of (s ~R# t)
-isReprEqPred ty
-  | Just tc <- tyConAppTyCon_maybe ty
-  = tc `hasKey` eqReprPrimTyConKey
-  | otherwise
-  = False
-
-isClassPred :: PredType -> Bool
-isClassPred ty = case tyConAppTyCon_maybe ty of
-    Just tc -> isClassTyCon tc
-    _       -> False
-
-isEqClassPred :: PredType -> Bool
-isEqClassPred ty  -- True of (s ~ t) and (s ~~ t)
-                  -- ToDo: should we check saturation?
-  | Just tc <- tyConAppTyCon_maybe ty
-  , Just cls <- tyConClass_maybe tc
-  = isEqualityClass cls
-  | otherwise
-  = False
-
-isEqualityClass :: Class -> Bool
--- True of (~), (~~), and Coercible
--- These all have a single primitive-equality superclass, either (~N# or ~R#)
-isEqualityClass cls
-  = cls `hasKey` heqTyConKey
-    || cls `hasKey` eqTyConKey
-    || cls `hasKey` coercibleTyConKey
-
-isCTupleClass :: Class -> Bool
-isCTupleClass cls = isTupleTyCon (classTyCon cls)
 
 {- *********************************************************************
 *                                                                      *
@@ -572,7 +622,7 @@ In both of these cases, we want to be sure, so we should be conservative:
 ********************************************************************* -}
 
 isEvVar :: Var -> Bool
-isEvVar var = isEvVarType (varType var)
+isEvVar var = isPredTy (varType var)
 
 isDictId :: Id -> Bool
 isDictId id = isDictTy (varType id)
