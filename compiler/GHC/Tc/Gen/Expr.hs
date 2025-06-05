@@ -295,7 +295,7 @@ tcExpr :: HsExpr GhcRn
 -- These constructors are the union of
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
--- See Note [Application chains and heads] in GHC.Tc.Gen.Ap
+-- See Note [Application chains and heads] in GHC.Tc.Gen.App
 tcExpr e@(HsVar {})              res_ty = tcApp (exprCtOrigin e) e res_ty
 tcExpr e@(HsApp {})              res_ty = tcApp (exprCtOrigin e) e res_ty
 tcExpr e@(OpApp {})              res_ty = tcApp (exprCtOrigin e) e res_ty
