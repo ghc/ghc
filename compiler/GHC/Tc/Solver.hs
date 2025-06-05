@@ -1981,7 +1981,7 @@ Note [Lift equality constraints when quantifying]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We can't quantify over a constraint (t1 ~# t2) because that isn't a
 predicate type; see Note [Types for coercions, predicates, and evidence]
-in GHC.Core.TyCo.Rep.
+in GHC.Core.Predicate
 
 So we have to 'lift' it to (t1 ~ t2).  Similarly (~R#) must be lifted
 to Coercible.

@@ -28,7 +28,7 @@ module GHC.Tc.Types.Evidence (
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evCastE, evDFunApp,  evDictApp, evSelector, evDelayedError,
-  evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
+  evVarsOfTerm, mkEvScSelectors, evTypeable,
   evWrapIPE, evUnwrapIPE, evUnaryDictAppE,
   mkEvCast,
 
@@ -70,6 +70,7 @@ import GHC.Core.InstEnv ( CanonicalEvidence )
 
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
+import GHC.Types.Name( isInternalName )
 import GHC.Types.Var
 import GHC.Types.Id( idScaledType )
 import GHC.Types.Var.Env

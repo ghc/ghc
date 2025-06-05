@@ -884,17 +884,22 @@ From this the typechecker generates
     SpecPrag (wrap_fn :: forall a b. (Eq a, Ix b) => XXX
                       -> forall p q. (Ix p, Ix q) => XXX[ Int/a, (p,q)/b ])
 
+    wrap_fn = /\ p q \(d1::Ix p)(d2:Ix q).
+              let w1 = $fEqInt
+                  w2 = $fIxPair d1 d2
+              HOLE @Int @(p,q) (w1:Eq Int) (w2:Ix (p,q))
+
 From these we generate:
 
-    Rule:       forall p, q, (dp:Ix p), (dq:Ix q).
-                    f Int (p,q) dInt ($dfInPair dp dq) = f_spec p q dp dq
+    Rule:       forall p, q, (dInt::Eq Int), (dp:Ix p), (dq:Ix q).
+                    f Int (p,q) dInt ($fIxPair dp dq) = f_spec p q dp dq
 
-    Spec bind:  f_spec = wrap_fn <poly_rhs>
+    Spec bind:  f_spec = wrap_fn[ <poly_rhs> ]
 
 Note that
 
   * The LHS of the rule may mention dictionary *expressions* (eg
-    $dfIxPair dp dq), and that is essential because the dp, dq are
+    $fIxPair dp dq), and that is essential because the dp, dq are
     needed on the RHS.
 
   * The RHS of f_spec, <poly_rhs> has a *copy* of 'binds', so that it

@@ -4990,8 +4990,8 @@ pprHoleError ctxt (Hole { hole_ty, hole_occ}) (HoleError sort other_tvs hole_sko
 
     pp_hole_type_with_kind
       | isLiftedTypeKind hole_kind
-        || isCoVarType hole_ty -- Don't print the kind of unlifted
-                               -- equalities (#15039)
+        || isEqPred hole_ty  -- Don't print the kind of unlifted
+                             -- equalities (#15039)
       = pprType hole_ty
       | otherwise
       = pprType hole_ty <+> dcolon <+> pprKind hole_kind
