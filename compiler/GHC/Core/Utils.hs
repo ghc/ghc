@@ -74,7 +74,7 @@ import GHC.Core.Ppr
 import GHC.Core.FVs( bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
-import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.Predicate( isEqPred )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX )
 import GHC.Core.Coercion
@@ -282,7 +282,7 @@ mkCast expr co
       Cast expr co2 -> mkCast expr (mkTransCo co2 co)
       Tick t expr   -> Tick t (mkCast expr co)
 
-      Coercion e_co | isCoVarType (coercionRKind co)
+      Coercion e_co | isEqPred (coercionRKind co)
          -- The guard here checks that g has a (~#) on both sides,
          -- otherwise decomposeCo fails.  Can in principle happen
          -- with unsafeCoerce
