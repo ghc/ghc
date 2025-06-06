@@ -841,7 +841,7 @@ mkPatSynRecSelBinds :: PatSyn
                     -> FieldSelectors
                     -> [(Id, LHsBind GhcRn)]
 mkPatSynRecSelBinds ps fields has_sel
-  = [ mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl has_sel
+  = [ mkOneRecordSelector False [PatSynCon ps] (RecSelPatSyn ps) fld_lbl has_sel
     | fld_lbl <- fields ]
 
 isUnidirectional :: HsPatSynDir a -> Bool
