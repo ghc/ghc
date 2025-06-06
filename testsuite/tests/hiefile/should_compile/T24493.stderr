@@ -1,3 +1,4 @@
+
 ==================== HIE AST ====================
 File: T24493.hs
 Node@T24493.hs:(1,8)-(3,8): Source: From source
@@ -25,8 +26,9 @@ Node@T24493.hs:(1,8)-(3,8): Source: From source
       Node@T24493.hs:3:6-8: Source: From source
                             {(annotations: {(HsLit, HsExpr)}),  (types: [0]), 
                              (identifier info: {})}
-                                                    
+                            
 
+[(0, (GHC.Internal.Base.String {}))]
 
 
 Got valid scopes
