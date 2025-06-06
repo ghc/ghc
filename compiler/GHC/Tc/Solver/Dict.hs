@@ -11,9 +11,11 @@ module GHC.Tc.Solver.Dict (
 
 import GHC.Prelude
 
+import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
+
 import GHC.Tc.Errors.Types
 import GHC.Tc.Instance.FunDeps
-import GHC.Tc.Instance.Class( safeOverlap, matchEqualityInst )
+import GHC.Tc.Instance.Class( matchEqualityInst )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
@@ -62,8 +64,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.Maybe ( listToMaybe, mapMaybe, isJust )
 import Data.Void( Void )
 
-import Control.Monad.Trans.Maybe( MaybeT, runMaybeT )
-import Control.Monad.Trans.Class( lift )
 import Control.Monad
 
 {- *********************************************************************
@@ -749,15 +749,15 @@ tryInertDicts dict_ct
 
 try_inert_dicts :: InertCans -> DictCt -> TcS (StopOrContinue ())
 try_inert_dicts inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys })
-  | Just dict_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
+  | let loc_w = ctEvLoc ev_w
+  , Just dict_i <- lookupInertDict inerts loc_w cls tys
   , let ev_i  = dictCtEvidence dict_i
         loc_i = ctEvLoc ev_i
-        loc_w = ctEvLoc ev_w
   = -- There is a matching dictionary in the inert set
     do { -- First to try to solve it /completely/ from top level instances
          -- See Note [Shortcut solving]
          dflags <- getDynFlags
-       ; short_cut_worked <- shortCutSolver dflags ev_w ev_i
+       ; short_cut_worked <- shortCutSolver dflags dict_w ev_i
        ; if short_cut_worked
          then stopWith ev_w "interactDict/solved from instance"
 
@@ -787,19 +787,19 @@ try_inert_dicts inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys
 
 -- See Note [Shortcut solving]
 shortCutSolver :: DynFlags
-               -> CtEvidence -- Work item
+               -> DictCt     -- Work item
                -> CtEvidence -- Inert we want to try to replace
                -> TcS Bool   -- True <=> success
-shortCutSolver dflags ev_w ev_i
-  | CtWanted wanted <- ev_w
-  , CtGiven  {}     <- ev_i
+shortCutSolver dflags dict_w@(DictCt { di_ev = ev_w }) ev_i
+  | CtWanted (WantedCt { ctev_pred = pred_w }) <- ev_w
+  , CtGiven  {} <- ev_i
     -- We are about to solve a [W] constraint from a [G] constraint. We take
     -- a moment to see if we can get a better solution using an instance.
     -- Note that we only do this for the sake of performance. Exactly the same
     -- programs should typecheck regardless of whether we take this step or
     -- not. See Note [Shortcut solving]
 
-  , not (isIPLikePred (ctEvPred ev_w))   -- Not for implicit parameters (#18627)
+  , not (isIPLikePred pred_w)   -- Not for implicit parameters (#18627)
 
   , not (xopt LangExt.IncoherentInstances dflags)
     -- If IncoherentInstances is on then we cannot rely on coherence of proofs
@@ -810,6 +810,14 @@ shortCutSolver dflags ev_w ev_i
   , gopt Opt_SolveConstantDicts dflags
     -- Enabled by the -fsolve-constant-dicts flag
 
+  = tryTcS $
+    do { updInertSet zapInertSet   -- Remove all Givens, solved dicts etc
+       ; solveSimpleWanteds (unitBag (CDictCan dict_w)) }
+
+  | otherwise
+  = return False
+
+{-
   = do { ev_binds_var <- getTcEvBindsVar
        ; ev_binds <- assertPpr (not (isCoEvBindsVar ev_binds_var )) (ppr ev_w) $
                      getTcEvBindsMap ev_binds_var
@@ -888,6 +896,8 @@ shortCutSolver dflags ev_w ev_i
           Just dict_ct -> return $ Cached (ctEvExpr (dictCtEvidence dict_ct))
           Nothing      -> Fresh <$> newWantedNC loc rws pty
       | otherwise = mzero
+
+-}
 
 {- *******************************************************************
 *                                                                    *

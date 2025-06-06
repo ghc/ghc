@@ -15,14 +15,14 @@
 module GHC.Tc.Solver.Monad (
 
     -- The TcS monad
-    TcS(..), TcSEnv(..), TcSMode(..),
+    TcS(..), TcSEnv(..),
     runTcS, runTcSEarlyAbort, runTcSWithEvBinds, runTcSInerts,
     runTcSSpecPrag,
     failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     runTcSEqualities,
-    nestTcS, nestImplicTcS, setEvBindsTcS, setTcLevelTcS,
+    nestTcS, nestImplicTcS, tryTcS,
+    setEvBindsTcS, setTcLevelTcS,
     emitImplicationTcS, emitTvImplicationTcS,
-    emitImplication,
     emitFunDepWanteds,
 
     selectNextWorkItem,
@@ -35,6 +35,9 @@ module GHC.Tc.Solver.Monad (
 
     QCInst(..),
 
+    -- TcSMode
+    TcSMode(..), getTcSMode, setTcSMode,
+    
     -- The pipeline
     StopOrContinue(..), continueWith, stopWith,
     startAgainWith, SolverStage(Stage, runSolverStage), simpleStage,
@@ -60,7 +63,6 @@ module GHC.Tc.Solver.Monad (
     setWantedEvTerm, setEvBindIfWanted,
     newEvVar, newGivenEvVar, emitNewGivens,
     checkReductionDepth,
-    getSolvedDicts, setSolvedDicts,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
@@ -88,10 +90,11 @@ module GHC.Tc.Solver.Monad (
     kickOutAfterUnification, kickOutRewritable,
 
     -- Inert Safe Haskell safe-overlap failures
-    addInertSafehask, insertSafeOverlapFailureTcS, updInertSafehask,
+    insertSafeOverlapFailureTcS,
     getSafeOverlapFailures,
 
     -- Inert solved dictionaries
+    getSolvedDicts, setSolvedDicts,
     updSolvedDicts, lookupSolvedDict,
 
     -- Irreds
@@ -508,20 +511,18 @@ kickOutAfterFillingCoercionHole hole
       = False
 
 --------------
-addInertSafehask :: InertCans -> DictCt -> InertCans
-addInertSafehask ics item
-  = ics { inert_safehask = addDict item (inert_dicts ics) }
-
 insertSafeOverlapFailureTcS :: InstanceWhat -> DictCt -> TcS ()
 -- See Note [Safe Haskell Overlapping Instances Implementation] in GHC.Tc.Solver
 insertSafeOverlapFailureTcS what item
-  | safeOverlap what = return ()
-  | otherwise        = updInertCans (\ics -> addInertSafehask ics item)
+  | safeOverlap what
+  = return ()
+  | otherwise
+  = updInertSet (\is -> is { inert_safehask = addDict item (inert_safehask is) })
 
 getSafeOverlapFailures :: TcS (Bag DictCt)
 -- See Note [Safe Haskell Overlapping Instances Implementation] in GHC.Tc.Solver
 getSafeOverlapFailures
- = do { IC { inert_safehask = safehask } <- getInertCans
+ = do { IS { inert_safehask = safehask } <- getInertSet
       ; return $ foldDicts consBag safehask emptyBag }
 
 --------------
@@ -651,11 +652,6 @@ updInertCans :: (InertCans -> InertCans) -> TcS ()
 -- Modify the inert set with the supplied function
 updInertCans upd_fn
   = updInertSet $ \ inerts -> inerts { inert_cans = upd_fn (inert_cans inerts) }
-
-updInertSafehask :: (DictMap DictCt -> DictMap DictCt) -> TcS ()
--- Modify the inert set with the supplied function
-updInertSafehask upd_fn
-  = updInertCans $ \ ics -> ics { inert_safehask = upd_fn (inert_safehask ics) }
 
 getInertEqs :: TcS InertEqs
 getInertEqs = do { inert <- getInertCans; return (inert_eqs inert) }
@@ -1171,7 +1167,7 @@ Note that currently we **do not** refrain from using top-level instances,
 even though we also can't run them in reverse; this isn't a problem for the
 specialiser (which is currently the sole consumer of this functionality).
 
-The implementation is as follows: in TcSFullySolveMode, when we are about to
+The implementation is as follows: in TcSSpecPrag mode, when we are about to
 solve a Wanted quantified constraint by emitting an implication, we call the
 special function `solveCompletelyIfRequired`. This function recursively calls
 the solver but in TcSVanilla mode (i.e. full-blown solving, with no restrictions).
@@ -1211,7 +1207,7 @@ runTcSWithEvBinds' :: TcSMode
                    -> EvBindsVar
                    -> TcS a
                    -> TcM a
-runTcSWithEvBinds' mode ev_binds_var tcs
+runTcSWithEvBinds' mode ev_binds_var thing_inside
   = do { unified_var <- TcM.newTcRef 0
        ; step_count  <- TcM.newTcRef 0
 
@@ -1219,7 +1215,7 @@ runTcSWithEvBinds' mode ev_binds_var tcs
        -- Subtle point: see (TGE6) in Note [Tracking Given equalities]
        --               in GHC.Tc.Solver.InertSet
        ; tc_lvl      <- TcM.getTcLevel
-       ; inert_var   <- TcM.newTcRef (emptyInert tc_lvl)
+       ; inert_var   <- TcM.newTcRef (emptyInertSet tc_lvl)
 
        ; wl_var      <- TcM.newTcRef emptyWorkList
        ; unif_lvl_var <- TcM.newTcRef Nothing
@@ -1232,7 +1228,7 @@ runTcSWithEvBinds' mode ev_binds_var tcs
                           , tcs_worklist           = wl_var }
 
              -- Run the computation
-       ; res <- unTcS tcs env
+       ; res <- unTcS thing_inside env
 
        ; count <- TcM.readTcRef step_count
        ; when (count > 0) $
@@ -1344,17 +1340,57 @@ nestTcS (TcS thing_inside)
        ; res <- thing_inside nest_env
 
        ; new_inerts <- TcM.readTcRef new_inert_var
-
-       -- we want to propagate the safe haskell failures
-       ; let old_ic = inert_cans inerts
-             new_ic = inert_cans new_inerts
-             nxt_ic = old_ic { inert_safehask = inert_safehask new_ic }
-
-       ; TcM.writeTcRef inerts_var  -- See Note [Propagate the solved dictionaries]
-                        (inerts { inert_solved_dicts = inert_solved_dicts new_inerts
-                                , inert_cans = nxt_ic })
+       ; TcM.updTcRef inerts_var (`updateInertsWith` new_inerts)
 
        ; return res }
+
+tryTcS :: TcS WantedConstraints -> TcS Bool
+-- Like nestTcS, but
+--   (a) be a no-op if the nested computation returns Nothing
+--   (b) if (but only if) success, propagate nested bindings to the caller
+tryTcS (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var
+                        , tcs_ev_binds = old_ev_binds_var
+                        , tcs_worklist = wl_var }) ->
+    do { old_inerts       <- TcM.readTcRef inerts_var
+       ; new_inert_var    <- TcM.newTcRef old_inerts
+       ; new_wl_var       <- TcM.newTcRef emptyWorkList
+       ; new_ev_binds_var <- TcM.newTcEvBinds
+       ; let nest_env = env { tcs_ev_binds = new_ev_binds_var
+                            , tcs_inerts   = new_inert_var
+                            , tcs_worklist = new_wl_var }
+
+       ; wc <- thing_inside nest_env
+
+       ; if not (isSolvedWC wc)
+         then return False
+         else do {  -- Successfully solved
+                   -- Add the new bindings to the existing ones
+                   new_ev_binds <- TcM.getTcEvBindsMap new_ev_binds_var
+                 ; TcM.updTcEvBindsMap old_ev_binds_var (`unionEvBindMap` new_ev_binds)
+
+                 -- Update the existing inert set
+                 ; new_inerts <- TcM.readTcRef new_inert_var
+                 ; TcM.updTcRef inerts_var (`updateInertsWith` new_inerts)
+
+                  -- We **must not** drop solved implications, due
+                  -- to Note [Free vars of EvFun] in GHC.Tc.Types.Evidence;
+                  -- so we re-emit them here.
+                 ; TcM.updTcRef wl_var (extendWorkListImplics (wc_impl wc))
+
+                 ; return True } }
+
+updateInertsWith :: InertSet -> InertSet -> InertSet
+-- Update the current inert set with bits from a nested solve,
+-- that finished with a new inert set
+-- In particular, propagage:
+--    - solved dictionaires; see Note [Propagate the solved dictionaries]
+--    - Safe Haskell failures
+updateInertsWith current_inerts
+                 (IS { inert_solved_dicts = new_solved
+                     , inert_safehask     = new_safehask })
+  = current_inerts { inert_solved_dicts = new_solved
+                   , inert_safehask     = new_safehask }
 
 emitImplicationTcS :: TcLevel -> SkolemInfoAnon
                    -> [TcTyVar]        -- Skolems
@@ -1374,7 +1410,7 @@ emitImplicationTcS new_tclvl skol_info skol_tvs givens wanteds
                                  , ic_binds  = ev_binds_var
                                  , ic_info   = skol_info }) }
 
-       ; emitImplication imp
+       ; updWorkListTcS (extendWorkListImplic imp)
        ; return (TcEvBinds (ic_binds imp)) }
 
 emitTvImplicationTcS :: TcLevel -> SkolemInfoAnon
@@ -1393,7 +1429,7 @@ emitTvImplicationTcS new_tclvl skol_info skol_tvs wanteds
                                  , ic_binds  = ev_binds_var
                                  , ic_info   = skol_info }) }
 
-       ; emitImplication imp }
+       ; updWorkListTcS (extendWorkListImplic imp) }
 
 
 {- Note [Propagate the solved dictionaries]
@@ -1411,6 +1447,13 @@ if you do so.
 
 -- Getters and setters of GHC.Tc.Utils.Env fields
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+getTcSMode :: TcS TcSMode
+getTcSMode = TcS (return . tcs_mode)
+
+setTcSMode :: TcSMode -> TcS a -> TcS a
+setTcSMode mode thing_inside
+  = TcS (\env -> unTcS thing_inside (env { tcs_mode = mode }))
 
 getUnifiedRef :: TcS (IORef Int)
 getUnifiedRef = TcS (return . tcs_unified)
@@ -1779,10 +1822,6 @@ emitWork cts
   | otherwise
   = do { traceTcS "Emitting fresh work" (pprBag cts)
        ; updWorkListTcS (extendWorkListCts cts) }
-
-emitImplication :: Implication -> TcS ()
-emitImplication implic
-  = updWorkListTcS (extendWorkListImplic implic)
 
 selectNextWorkItem :: TcS (Maybe Ct)
 -- Pick which work item to do next

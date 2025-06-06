@@ -1353,37 +1353,37 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
   = Left (DsRuleIgnoredDueToConstructor con) -- See Note [No RULES on datacons]
 
   | otherwise = case decompose fun2 args2 of
-        Nothing ->  pprTrace "decomposeRuleLhs 3" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-                                                       , text "orig_lhs:" <+> ppr orig_lhs
-                                                       , text "rhs_fvs:" <+> ppr rhs_fvs
-                                                       , text "lhs1:" <+> ppr lhs1
-                                                       , text "lhs2:" <+> ppr lhs2
-                                                       , text "fun2:" <+> ppr fun2
-                                                       , text "args2:" <+> ppr args2
-                                                       ]) $
+        Nothing ->  -- pprTrace "decomposeRuleLhs 3" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+                    --                                   , text "orig_lhs:" <+> ppr orig_lhs
+                    --                                   , text "rhs_fvs:" <+> ppr rhs_fvs
+                    --                                   , text "lhs1:" <+> ppr lhs1
+                    --                                   , text "lhs2:" <+> ppr lhs2
+                    --                                   , text "fun2:" <+> ppr fun2
+                    --                                   , text "args2:" <+> ppr args2
+                    --                                   ]) $
                    Left (DsRuleLhsTooComplicated orig_lhs lhs2)
 
         Just (fn_id, args)
           | not (null unbound) ->
             -- Check for things unbound on LHS
             -- See Note [Unused spec binders]
-             pprTrace "decomposeRuleLhs 1" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-                                                 , text "orig_lhs:" <+> ppr orig_lhs
-                                                 , text "lhs_fvs:" <+> ppr lhs_fvs
-                                                 , text "rhs_fvs:" <+> ppr rhs_fvs
-                                                 , text "unbound:" <+> ppr unbound
-                                                 ]) $
+             -- pprTrace "decomposeRuleLhs 1" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+             --                                    , text "orig_lhs:" <+> ppr orig_lhs
+             --                                    , text "lhs_fvs:" <+> ppr lhs_fvs
+             --                                    , text "rhs_fvs:" <+> ppr rhs_fvs
+             --                                    , text "unbound:" <+> ppr unbound
+             --                                    ]) $
             Left (DsRuleBindersNotBound unbound orig_bndrs orig_lhs lhs2)
           | otherwise ->
-            pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-                                               , text "orig_lhs:" <+> ppr orig_lhs
-                                               , text "lhs1:"     <+> ppr lhs1
-                                               , text "trimmed_bndrs:" <+> ppr trimmed_bndrs
-                                               , text "extra_dicts:" <+> ppr extra_dicts
-                                               , text "fn_id:" <+> ppr fn_id
-                                               , text "args:"   <+> ppr args
-                                               , text "args fvs:" <+> ppr (exprsFreeVarsList args)
-                                               ]) $
+            -- pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+            --                                   , text "orig_lhs:" <+> ppr orig_lhs
+            --                                   , text "lhs1:"     <+> ppr lhs1
+            --                                   , text "trimmed_bndrs:" <+> ppr trimmed_bndrs
+            --                                   , text "extra_dicts:" <+> ppr extra_dicts
+            --                                   , text "fn_id:" <+> ppr fn_id
+            --                                   , text "args:"   <+> ppr args
+            --                                   , text "args fvs:" <+> ppr (exprsFreeVarsList args)
+            --                                   ]) $
             Right (trimmed_bndrs ++ extra_dicts, fn_id, args)
 
           where -- See Note [Variables unbound on the LHS]
