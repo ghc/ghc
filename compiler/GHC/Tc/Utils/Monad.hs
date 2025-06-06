@@ -102,8 +102,8 @@ module GHC.Tc.Utils.Monad(
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
   addTcEvBind, addTcEvBinds, addTopEvBinds,
-  getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
-  chooseUniqueOccTc,
+  getTcEvBindsMap, setTcEvBindsMap, updTcEvBindsMap,
+  getTcEvTyCoVars, chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
   emitConstraints, emitStaticConstraints, emitSimple, emitSimples,
   emitImplication, emitImplications, ensureReflMultiplicityCo,
@@ -1810,6 +1810,12 @@ setTcEvBindsMap v@(CoEvBindsVar {}) ev_binds
   = return ()
   | otherwise
   = pprPanic "setTcEvBindsMap" (ppr v $$ ppr ev_binds)
+
+updTcEvBindsMap :: EvBindsVar -> (EvBindMap -> EvBindMap) -> TcM ()
+updTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) upd
+  = updTcRef ev_ref upd
+updTcEvBindsMap v@(CoEvBindsVar {}) _
+  = pprPanic "updTcEvBindsMap" (ppr v)
 
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
