@@ -37,7 +37,7 @@ module GHC.Tc.Solver.Monad (
 
     -- TcSMode
     TcSMode(..), getTcSMode, setTcSMode,
-    
+
     -- The pipeline
     StopOrContinue(..), continueWith, stopWith,
     startAgainWith, SolverStage(Stage, runSolverStage), simpleStage,
