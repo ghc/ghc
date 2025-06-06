@@ -12,9 +12,11 @@ module GHC.Tc.Solver.Dict (
 
 import GHC.Prelude
 
+import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
+
 import GHC.Tc.Errors.Types
 import GHC.Tc.Instance.FunDeps
-import GHC.Tc.Instance.Class( safeOverlap, matchEqualityInst )
+import GHC.Tc.Instance.Class( matchEqualityInst )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
@@ -59,8 +61,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.Maybe ( listToMaybe, mapMaybe, isJust )
 import Data.Void( Void )
 
-import Control.Monad.Trans.Maybe( MaybeT, runMaybeT )
-import Control.Monad.Trans.Class( lift )
 import Control.Monad
 
 {- *********************************************************************
@@ -705,67 +705,75 @@ tryInertDicts dict_ct
 
 try_inert_dicts :: InertCans -> DictCt -> TcS (StopOrContinue ())
 try_inert_dicts inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys })
-  | Just dict_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
+  | let loc_w = ctEvLoc ev_w
+  , Just dict_i <- lookupInertDict inerts loc_w cls tys
   , let ev_i  = dictCtEvidence dict_i
         loc_i = ctEvLoc ev_i
-        loc_w = ctEvLoc ev_w
   = -- There is a matching dictionary in the inert set
     do { -- First to try to solve it /completely/ from top level instances
          -- See Note [Shortcut solving]
-         dflags <- getDynFlags
-       ; short_cut_worked <- shortCutSolver dflags ev_w ev_i
-       ; if short_cut_worked
-         then stopWith ev_w "interactDict/solved from instance"
+       ; short_cut_worked <- tryShortCutSolver (isGiven ev_i) dict_w
 
-         -- Next see if we are in "loopy-superclass" land.  If so,
-         -- we don't want to replace the (Given) inert with the
-         -- (Wanted) work-item, or vice versa; we want to hang on
-         -- to both, and try to solve the work-item via an instance.
-         -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
-         else if prohibitedSuperClassSolve loc_i loc_w
-         then continueWith ()
-         else
-    do { -- The short-cut solver didn't fire, and loopy superclasses
-         -- are dealt with, so we can either solve
-         -- the inert from the work-item or vice-versa.
-       ; case solveOneFromTheOther (CDictCan dict_i) (CDictCan dict_w) of
-           KeepInert -> do { traceTcS "lookupInertDict:KeepInert" (ppr dict_w)
-                           ; setEvBindIfWanted ev_w EvCanonical (ctEvTerm ev_i)
-                           ; return $ Stop ev_w (text "Dict equal" <+> ppr dict_w) }
-           KeepWork  -> do { traceTcS "lookupInertDict:KeepWork" (ppr dict_w)
-                           ; setEvBindIfWanted ev_i EvCanonical (ctEvTerm ev_w)
-                           ; updInertCans (updDicts $ delDict dict_w)
-                           ; continueWith () } } }
+       ; if | short_cut_worked
+            -> stopWith ev_w "shortCutSolver worked(1)"
+
+            -- Next see if we are in "loopy-superclass" land.  If so,
+            -- we don't want to replace the (Given) inert with the
+            -- (Wanted) work-item, or vice versa; we want to hang on
+            -- to both, and try to solve the work-item via an instance.
+            -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
+            | prohibitedSuperClassSolve loc_i loc_w
+            -> continueWith ()
+
+            | otherwise -- We can either solve the inert from the work-item or vice-versa.
+            -> case solveOneFromTheOther (CDictCan dict_i) (CDictCan dict_w) of
+                 KeepInert -> do { traceTcS "lookupInertDict:KeepInert" (ppr dict_w)
+                                 ; setEvBindIfWanted ev_w EvCanonical (ctEvTerm ev_i)
+                                 ; return $ Stop ev_w (text "Dict equal" <+> ppr dict_w) }
+                 KeepWork  -> do { traceTcS "lookupInertDict:KeepWork" (ppr dict_w)
+                                 ; setEvBindIfWanted ev_i EvCanonical (ctEvTerm ev_w)
+                                 ; updInertCans (updDicts $ delDict dict_w)
+                                 ; continueWith () } }
 
   | otherwise
   = do { traceTcS "tryInertDicts:no" (ppr dict_w $$ ppr cls <+> ppr tys)
        ; continueWith () }
 
 -- See Note [Shortcut solving]
-shortCutSolver :: DynFlags
-               -> CtEvidence -- Work item
-               -> CtEvidence -- Inert we want to try to replace
-               -> TcS Bool   -- True <=> success
-shortCutSolver dflags ev_w ev_i
-  | CtWanted wanted <- ev_w
-  , CtGiven  {}     <- ev_i
-    -- We are about to solve a [W] constraint from a [G] constraint. We take
-    -- a moment to see if we can get a better solution using an instance.
-    -- Note that we only do this for the sake of performance. Exactly the same
-    -- programs should typecheck regardless of whether we take this step or
-    -- not. See Note [Shortcut solving]
+tryShortCutSolver :: Bool       -- True <=> try the short-cut solver; False <=> don't
+                  -> DictCt     -- Work item
+                  -> TcS Bool   -- True <=> success
+-- We are about to solve a [W] constraint from a [G] constraint. We take
+-- a moment to see if we can get a better solution using an instance.
+-- Note that we only do this for the sake of performance. Exactly the same
+-- programs should typecheck regardless of whether we take this step or
+-- not. See Note [Shortcut solving]
+tryShortCutSolver try_short_cut dict_w@(DictCt { di_ev = ev_w })
+  | not try_short_cut
+  = return False
+  | otherwise
+  = do { dflags <- getDynFlags
+       ; if | CtWanted (WantedCt { ctev_pred = pred_w }) <- ev_w
 
-  , not (isIPLikePred (ctEvPred ev_w))   -- Not for implicit parameters (#18627)
+            , not (isIPLikePred pred_w)   -- Not for implicit parameters (#18627)
 
-  , not (xopt LangExt.IncoherentInstances dflags)
-    -- If IncoherentInstances is on then we cannot rely on coherence of proofs
-    -- in order to justify this optimization: The proof provided by the
-    -- [G] constraint's superclass may be different from the top-level proof.
-    -- See Note [Shortcut solving: incoherence]
+            , not (xopt LangExt.IncoherentInstances dflags)
+              -- If IncoherentInstances is on then we cannot rely on coherence of proofs
+              -- in order to justify this optimization: The proof provided by the
+              -- [G] constraint's superclass may be different from the top-level proof.
+              -- See Note [Shortcut solving: incoherence]
 
-  , gopt Opt_SolveConstantDicts dflags
-    -- Enabled by the -fsolve-constant-dicts flag
+            , gopt Opt_SolveConstantDicts dflags
+              -- Enabled by the -fsolve-constant-dicts flag
 
+            -> tryTcS $  -- tryTcS tries to completely solve some contraints
+               do { updInertSet zapInertSet   -- Remove all Givens, solved dicts etc
+                  ; solveSimpleWanteds (unitBag (CDictCan dict_w)) }
+
+            | otherwise
+            -> return False }
+
+{-
   = do { ev_binds_var <- getTcEvBindsVar
        ; ev_binds <- assertPpr (not (isCoEvBindsVar ev_binds_var )) (ppr ev_w) $
                      getTcEvBindsMap ev_binds_var
@@ -845,6 +853,8 @@ shortCutSolver dflags ev_w ev_i
           Nothing      -> Fresh <$> newWantedNC loc rws pty
       | otherwise = mzero
 
+-}
+
 {- *******************************************************************
 *                                                                    *
          Top-level reaction for class constraints (CDictCan)
@@ -873,11 +883,14 @@ try_instances inerts work_item@(DictCt { di_ev = ev, di_cls = cls
         ; lkup_res <- matchClassInst dflags inerts cls xis dict_loc
         ; case lkup_res of
                OneInst { cir_what = what }
-                  -> do { insertSafeOverlapFailureTcS what work_item
-                        ; updSolvedDicts what work_item
-                        ; chooseInstance ev lkup_res }
-               _  -> -- NoInstance or NotSure
-                     -- We didn't solve it; so try functional dependencies
+                  -> do { let is_local_given = case what of { LocalInstance -> True; _ -> False }
+                        ; take_shortcut <- tryShortCutSolver is_local_given work_item
+                        ; if take_shortcut
+                          then stopWith ev "shortCutSolver worked(2)"
+                          else do { insertSafeOverlapFailureTcS what work_item
+                                  ; updSolvedDicts what work_item
+                                  ; chooseInstance ev lkup_res } }
+               _  -> -- NoInstance or NotSure: we didn't solve it
                      continueWith () }
    where
      dict_loc = ctEvLoc ev
@@ -1955,10 +1968,10 @@ So, we swizzle it around to get (forall b c. (b ~ F a) => C1 c).
 
 More generally, if we are expanding the superclasses of
   g0 :: forall tvs. theta => cls tys
-and find a superclass constraint
+and find a superclass constraint (itself perhaps a quantified constraint)
   forall sc_tvs. sc_theta => sc_inner_pred
 we must have a selector
-  sel_id :: forall cls_tvs. cls cls_tvs -> forall sc_tvs. sc_theta => sc_inner_pred
+  sel_id :: forall cls_tvs. cls cls_tvs => forall sc_tvs. sc_theta => sc_inner_pred
 and thus build
   g_sc :: forall tvs sc_tvs. theta => sc_theta => sc_inner_pred
   g_sc = /\ tvs. /\ sc_tvs. \ theta_ids. \ sc_theta_ids.
@@ -1971,7 +1984,13 @@ the sc_theta_ids at all. So our final construction is
   g_sc = /\ tvs. /\ sc_tvs. \ theta_ids.
          sel_id tys (g0 tvs theta_ids) sc_tvs
 
-  -}
+(NQCS1) Common case.  If theta_ids[] we get just
+     g_sc = /\ tvs. /\sc_tvs. sel_id tys (g0 tvs) sc_tvs
+  and can eta-reduce even more to
+     g_sc = /\ tvs. sel_id tys (g0 tvs)
+  and if tvs=[] we get the straight superclass selection
+     g_sc = sel_id tys g0
+-}
 
 makeSuperClasses :: [Ct] -> TcS [Ct]
 -- Returns strict superclasses, transitively, see Note [The superclass story]
@@ -2051,7 +2070,7 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
       -- See Note [Nested quantified constraint superclasses]
     mk_given_desc :: Id -> PredType -> (PredType, EvTerm)
     mk_given_desc sel_id sc_pred
-      = (swizzled_pred, swizzled_evterm)
+      = (swizzled_pred, EvExpr swizzled_evterm)
       where
         (sc_tvs, sc_rho)          = splitForAllTyCoVars sc_pred
         (sc_theta, sc_inner_pred) = splitFunTys sc_rho
@@ -2060,17 +2079,18 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
         all_theta     = theta `chkAppend` (map scaledThing sc_theta)
         swizzled_pred = mkInfSigmaTy all_tvs all_theta sc_inner_pred
 
-        -- evar :: forall tvs. theta => cls tys
+        -- evar   :: forall tvs. theta => cls tys
         -- sel_id :: forall cls_tvs. cls cls_tvs
-        --                        -> forall sc_tvs. sc_theta => sc_inner_pred
+        --                        => forall sc_tvs. sc_theta => sc_inner_pred
         -- swizzled_evterm :: forall tvs sc_tvs. theta => sc_theta => sc_inner_pred
-        swizzled_evterm = EvExpr $
-          mkLams all_tvs $
-          mkLams dict_ids $
-          Var sel_id
-            `mkTyApps` tys
-            `App` (evId evar `mkVarApps` (tvs ++ dict_ids))
-            `mkVarApps` sc_tvs
+        swizzled_evterm
+          | null tvs, null theta -- See wrinkle (NQCS1)
+          = Var sel_id `mkTyApps` tys `App` evId evar
+          | otherwise
+          = mkLams all_tvs $ mkLams dict_ids $
+            Var sel_id `mkTyApps` tys
+                       `App` (evId evar `mkVarApps` (tvs ++ dict_ids))
+                       `mkVarApps` sc_tvs
 
     sc_loc | isCTupleClass cls = loc
            | otherwise         = loc { ctl_origin = mk_sc_origin (ctLocOrigin loc) }

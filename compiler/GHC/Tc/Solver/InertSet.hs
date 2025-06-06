@@ -10,13 +10,14 @@ module GHC.Tc.Solver.InertSet (
     extendWorkListCts, extendWorkListCtList,
     extendWorkListEq, extendWorkListChildEqs,
     extendWorkListRewrittenEqs,
-    appendWorkList, extendWorkListImplic,
+    appendWorkList,
+    extendWorkListImplic, extendWorkListImplics,
     workListSize,
 
     -- * The inert set
     InertSet(..),
     InertCans(..),
-    emptyInert,
+    emptyInertSet, zapInertSet,
 
     noGivenNewtypeReprEqs, updGivenEqs,
     prohibitedSuperClassSolve,
@@ -272,6 +273,9 @@ extendWorkListNonEq ct wl = wl { wl_rest = ct : wl_rest wl }
 extendWorkListImplic :: Implication -> WorkList -> WorkList
 extendWorkListImplic implic wl = wl { wl_implics = implic `consBag` wl_implics wl }
 
+extendWorkListImplics :: Bag Implication -> WorkList -> WorkList
+extendWorkListImplics implics wl = wl { wl_implics = implics `unionBags` wl_implics wl }
+
 extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic about what kind of constraint
 extendWorkListCt ct wl
@@ -360,14 +364,26 @@ data InertSet
               -- Always a dictionary solved by an instance decl; never an implict parameter
               -- See Note [Solved dictionaries]
               -- and Note [Do not add superclasses of solved dictionaries]
+
+       , inert_safehask :: DictMap DictCt
+              -- Failed dictionary resolution due to Safe Haskell overlapping
+              -- instances restriction. We keep this separate from inert_dicts
+              -- as it doesn't cause compilation failure, just safe inference
+              -- failure.
+              --
+              -- ^ See Note [Safe Haskell Overlapping Instances Implementation]
+              -- in GHC.Tc.Solver
        }
 
 instance Outputable InertSet where
   ppr (IS { inert_cans = ics
+          , inert_safehask = safehask
           , inert_solved_dicts = solved_dicts })
       = vcat [ ppr ics
              , ppUnless (null dicts) $
-               text "Solved dicts =" <+> vcat (map ppr dicts) ]
+               text "Solved dicts =" <+> vcat (map ppr dicts)
+             , ppUnless (isEmptyTcAppMap safehask) $
+               text "Safe Haskell unsafe overlap =" <+> pprBag (dictsToBag safehask) ]
          where
            dicts = bagToList (dictsToBag solved_dicts)
 
@@ -378,16 +394,20 @@ emptyInertCans given_eq_lvl
        , inert_given_eq_lvl = given_eq_lvl
        , inert_given_eqs    = False
        , inert_dicts        = emptyDictMap
-       , inert_safehask     = emptyDictMap
        , inert_insts        = []
        , inert_irreds       = emptyBag }
 
-emptyInert :: TcLevel -> InertSet
-emptyInert given_eq_lvl
+emptyInertSet :: TcLevel -> InertSet
+emptyInertSet given_eq_lvl
   = IS { inert_cans           = emptyInertCans given_eq_lvl
        , inert_cycle_breakers = emptyBag :| []
        , inert_famapp_cache   = emptyFunEqs
-       , inert_solved_dicts   = emptyDictMap }
+       , inert_solved_dicts   = emptyDictMap
+       , inert_safehask     = emptyDictMap }
+
+zapInertSet :: InertSet -> InertSet
+zapInertSet (IS { inert_cans = cans })
+  = emptyInertSet (inert_given_eq_lvl cans)
 
 {- Note [Solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -690,7 +710,7 @@ should update inert_given_eq_lvl?
    conservatively assume that there are some.
 
    This initialisation in done in `runTcSWithEvBinds`, which passes
-   the current TcLevl to `emptyInert`.
+   the current TcLevl to `emptyInertSet`.
 
 Historical note: prior to #24938 we also ignored Given equalities that
 did not mention an "outer" type variable.  But that is wrong, as #24938
@@ -1254,15 +1274,6 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
 
        , inert_insts :: [QCInst]
 
-       , inert_safehask :: DictMap DictCt
-              -- Failed dictionary resolution due to Safe Haskell overlapping
-              -- instances restriction. We keep this separate from inert_dicts
-              -- as it doesn't cause compilation failure, just safe inference
-              -- failure.
-              --
-              -- ^ See Note [Safe Haskell Overlapping Instances Implementation]
-              -- in GHC.Tc.Solver
-
        , inert_irreds :: InertIrreds
               -- Irreducible predicates that cannot be made canonical,
               --     and which don't interact with others (e.g.  (c a))
@@ -1290,7 +1301,6 @@ instance Outputable InertCans where
   ppr (IC { inert_eqs = eqs
           , inert_funeqs = funeqs
           , inert_dicts = dicts
-          , inert_safehask = safehask
           , inert_irreds = irreds
           , inert_given_eq_lvl = ge_lvl
           , inert_given_eqs = given_eqs
@@ -1305,8 +1315,6 @@ instance Outputable InertCans where
           <+> pprBag (foldFunEqs consBag funeqs emptyBag)
       , ppUnless (isEmptyTcAppMap dicts) $
         text "Dictionaries =" <+> pprBag (dictsToBag dicts)
-      , ppUnless (isEmptyTcAppMap safehask) $
-        text "Safe Haskell unsafe overlap =" <+> pprBag (dictsToBag safehask)
       , ppUnless (isEmptyBag irreds) $
         text "Irreds =" <+> pprBag irreds
       , ppUnless (null insts) $
@@ -1616,7 +1624,6 @@ kickOutRewritableLHS ko_spec new_fr@(_, new_role)
                              , inert_insts    = old_insts })
   = (kicked_out, inert_cans_in)
   where
-    -- inert_safehask stays unchanged; is that right?
     inert_cans_in = ics { inert_eqs      = tv_eqs_in
                         , inert_dicts    = dicts_in
                         , inert_funeqs   = feqs_in
@@ -2134,8 +2141,9 @@ that this chain of events won't happen, but that's very fragile.)
 
 -- | Extract only Given constraints from the inert set.
 inertGivens :: InertSet -> InertSet
-inertGivens is@(IS { inert_cans = cans }) =
-  is { inert_cans = givens_cans
+inertGivens is@(IS { inert_cans = cans, inert_safehask = safehask }) =
+  is { inert_cans         = givens_cans
+     , inert_safehask     = safehask_givens
      , inert_solved_dicts = emptyDictMap
      }
   where
@@ -2151,7 +2159,7 @@ inertGivens is@(IS { inert_cans = cans }) =
     (eq_givens_list, _) = partitionInertEqs isGivenEq (inert_eqs cans)
     (funeq_givens_list, _) = partitionFunEqs isGivenEq (inert_funeqs cans)
     dict_givens = filterDicts isGivenDict (inert_dicts cans)
-    safehask_givens = filterDicts isGivenDict (inert_safehask cans)
+    safehask_givens = filterDicts isGivenDict safehask
     irreds_givens = filterBag isGivenIrred (inert_irreds cans)
 
     eq_givens = foldr addInertEqs emptyTyEqs eq_givens_list
@@ -2162,6 +2170,5 @@ inertGivens is@(IS { inert_cans = cans }) =
         { inert_eqs      = eq_givens
         , inert_funeqs   = funeq_givens
         , inert_dicts    = dict_givens
-        , inert_safehask = safehask_givens
         , inert_irreds   = irreds_givens
         }

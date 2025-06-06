@@ -1053,29 +1053,45 @@ dsSpec poly_rhs (SpecPrag poly_id spec_co spec_inl)
                -- perhaps with the body of the lambda wrapped in some WpLets
                -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
   = dsHsWrapper spec_app $ \core_app ->
+    dsSpec_help (idName poly_id) poly_id poly_rhs
+                spec_inl spec_bndrs (core_app (Var poly_id))
+
+{-
     do { dflags <- getDynFlags
        ; case decomposeRuleLhs dflags spec_bndrs (core_app (Var poly_id))
                                                  (mkVarSet spec_bndrs) of {
            Left msg -> do { diagnosticDs msg; return Nothing } ;
            Right (rule_bndrs, poly_id, rule_lhs_args) ->
-                finishSpecPrag (idName poly_id) poly_rhs
-                               rule_bndrs poly_id rule_lhs_args
-                               spec_bndrs core_app spec_inl } }
 
-dsSpec poly_rhs (
-  SpecPragE
-    { spe_fn_nm = poly_nm
-    , spe_fn_id = poly_id
-    , spe_inl   = inl
-    , spe_bndrs = bndrs
-    , spe_call  = the_call
-    })
+    do { tracePm "dsSpec(old route)" $
+         vcat [ text "poly_id" <+> ppr poly_id
+              , text "spec_bndrs" <+> ppr spec_bndrs
+              , text "the_call" <+> ppr (core_app (Var poly_id))
+              , text "rule_bndrs" <+> ppr rule_bndrs
+              , text "rule_lhs_args" <+> ppr rule_lhs_args ]
+
+       ; finishSpecPrag (idName poly_id) poly_rhs
+                               rule_bndrs poly_id rule_lhs_args
+                               spec_bndrs core_app spec_inl } } }
+-}
+
+dsSpec poly_rhs (SpecPragE { spe_fn_nm = poly_nm
+                           , spe_fn_id = poly_id
+                           , spe_inl   = inl
+                           , spe_bndrs = bndrs
+                           , spe_call  = the_call })
   -- SpecPragE case: See Note [Handling new-form SPECIALISE pragmas] in GHC.Tc.Gen.Sig
   = do { ds_call <- unsetGOptM Opt_EnableRewriteRules $ -- Note [Desugaring RULE left hand sides]
                     unsetWOptM Opt_WarnIdentities     $
                     zapUnspecables $
-                      dsLExpr the_call
+                    dsLExpr the_call
+       ; dsSpec_help poly_nm poly_id poly_rhs inl bndrs ds_call }
 
+dsSpec_help :: Name -> Id -> CoreExpr              -- Function to specialise
+            -> InlinePragma -> [Var] -> CoreExpr
+            -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
+dsSpec_help poly_nm poly_id poly_rhs inl bndrs ds_call
+  = do {
        -- Simplify the (desugared) call; see wrinkle (SP1)
        -- in Note [Desugaring new-form SPECIALISE pragmas]
        ; dflags  <- getDynFlags
@@ -1086,34 +1102,35 @@ dsSpec poly_rhs (
             Nothing -> do { diagnosticDs (DsRuleLhsTooComplicated ds_call core_call)
                            ; return Nothing } ;
 
-            Just (bndr_set, spec_const_binds, lhs_args) ->
+            Just (bndr_set, spec_const_binds, rule_lhs_args) ->
 
     do { let const_bndrs = mkVarSet (bindersOfBinds spec_const_binds)
              all_bndrs   = bndr_set `unionVarSet` const_bndrs
                   -- all_bndrs: all binders in core_call that should be quantified
 
              -- rule_bndrs; see (SP3) in Note [Desugaring new-form SPECIALISE pragmas]
-             rule_bndrs = scopedSort (exprsSomeFreeVarsList (`elemVarSet` all_bndrs) lhs_args)
+             rule_bndrs = scopedSort (exprsSomeFreeVarsList (`elemVarSet` all_bndrs) rule_lhs_args)
              spec_bndrs = filterOut (`elemVarSet` const_bndrs) rule_bndrs
 
              mk_spec_body fn_body = mkLets spec_const_binds  $
-                                    mkCoreApps fn_body lhs_args
+                                    mkCoreApps fn_body rule_lhs_args
 
-       ; tracePm "dsSpec" (vcat [ text "poly_id" <+> ppr poly_id
-                                , text "bndrs"   <+> ppr bndrs
-                                , text "lhs_args" <+> ppr lhs_args
-                                , text "bndr_set" <+> ppr bndr_set
-                                , text "all_bndrs"   <+> ppr all_bndrs
-                                , text "rule_bndrs" <+> ppr rule_bndrs
-                                , text "const_bndrs"   <+> ppr const_bndrs
-                                , text "spec_bndrs" <+> ppr spec_bndrs
-                                , text "core_call fvs" <+> ppr (exprFreeVars core_call)
-                                , text "spec_const_binds" <+> ppr spec_const_binds
-                                , text "ds_call" <+> ppr ds_call
-                                , text "core_call" <+> ppr core_call ])
+       ; tracePm "dsSpec(new route)" $
+         vcat [ text "poly_id" <+> ppr poly_id
+              , text "bndrs"   <+> ppr bndrs
+              , text "ds_call" <+> ppr ds_call
+              , text "core_call" <+> ppr core_call
+              , text "bndr_set" <+> ppr bndr_set
+              , text "all_bndrs"   <+> ppr all_bndrs
+              , text "rule_bndrs" <+> ppr rule_bndrs
+              , text "rule_lhs_args" <+> ppr rule_lhs_args
+              , text "const_bndrs"   <+> ppr const_bndrs
+              , text "spec_bndrs" <+> ppr spec_bndrs
+              , text "core_call fvs" <+> ppr (exprFreeVars core_call)
+              , text "spec_const_binds" <+> ppr spec_const_binds ]
 
        ; finishSpecPrag poly_nm poly_rhs
-                        rule_bndrs poly_id lhs_args
+                        rule_bndrs poly_id rule_lhs_args
                         spec_bndrs mk_spec_body inl } } }
 
 prepareSpecLHS :: Id -> [EvVar] -> CoreExpr
@@ -1129,7 +1146,10 @@ prepareSpecLHS poly_id evs the_call
     go qevs acc (Cast e _)
       = go qevs acc e
     go qevs acc (Let bind e)
-      | not (all isDictId bndrs)   -- A normal 'let' is too complicated
+      | not (all (isPredTy . varType) bndrs)
+        -- A normal 'let' is too complicated
+        -- But we definitely include quantified constraints
+        -- E.g. this is fine:  let (d :: forall a. Eq a => Eq (f a) = d2
       = Nothing
 
       -- (a) (1) in Note [prepareSpecLHS]
@@ -1161,7 +1181,7 @@ finishSpecPrag :: Name -> CoreExpr                    -- RHS to specialise
                -> [Var] -> Id -> [CoreExpr]           -- RULE LHS pattern
                -> [Var] -> (CoreExpr -> CoreExpr) -> InlinePragma   -- Specialised form
                -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
-finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_args
+finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_lhs_args
                                 spec_bndrs mk_spec_body spec_inl
   | Just reason <- mb_useless
   = do { diagnosticDs $ DsUselessSpecialisePragma poly_nm is_dfun reason
@@ -1174,7 +1194,7 @@ finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_args
 
   where
     -- The RULE looks like
-    --    RULE "USPEC" forall rule_bndrs. f rule_args = $sf spec_bndrs
+    --    RULE "USPEC" forall rule_bndrs. f rule_lhs_args = $sf spec_bndrs
     -- The specialised function looks like
     --    $sf spec_bndrs = mk_spec_body <f's original rhs>
     -- We also use mk_spec_body to specialise the methods in f's stable unfolding
@@ -1189,17 +1209,17 @@ finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_args
 
                  simpl_opts = initSimpleOpts dflags
                  fn_unf     = realIdUnfolding poly_id
-                 spec_unf   = specUnfolding simpl_opts spec_bndrs mk_spec_body rule_args fn_unf
+                 spec_unf   = specUnfolding simpl_opts spec_bndrs mk_spec_body rule_lhs_args fn_unf
                  spec_id    = mkLocalId spec_name ManyTy spec_ty
                                 -- Specialised binding is toplevel, hence Many.
                                 `setInlinePragma` specFunInlinePrag poly_id id_inl spec_inl
                                 `setIdUnfolding`  spec_unf
 
                  rule = mkSpecRule dflags this_mod False rule_act (text "USPEC")
-                                   poly_id rule_bndrs rule_args
+                                   poly_id rule_bndrs rule_lhs_args
                                    (mkVarApps (Var spec_id) spec_bndrs)
 
-                 rule_ty  = exprType (mkApps (Var poly_id) rule_args)
+                 rule_ty  = exprType (mkApps (Var poly_id) rule_lhs_args)
                  spec_ty  = mkLamTypes spec_bndrs rule_ty
                  spec_rhs = mkLams spec_bndrs (mk_spec_body poly_rhs)
 
@@ -1208,7 +1228,7 @@ finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_args
            ; tracePm "dsSpec" (vcat
                 [ text "fun:" <+> ppr poly_id
                 , text "spec_bndrs:" <+> ppr spec_bndrs
-                , text "rule_args:" <+>  ppr rule_args ])
+                , text "rule_lhs_args:" <+>  ppr rule_lhs_args ])
            ; return (unitOL (spec_id, spec_rhs), rule) }
                 -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
                 --     makeCorePair overwrites the unfolding, which we have
@@ -1228,7 +1248,7 @@ finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_args
       -- See Note [Activation pragmas for SPECIALISE]
       = Just UselessSpecialiseForNoInlineFunction
 
-      | all is_nop_arg rule_args, not (isInlinePragma spec_inl)
+      | all is_nop_arg rule_lhs_args, not (isInlinePragma spec_inl)
       -- The specialisation does nothing.
       -- But don't complain if it is SPECIALISE INLINE (#4444)
       = Just UselessSpecialiseNoSpecialisation
@@ -1353,37 +1373,37 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
   = Left (DsRuleIgnoredDueToConstructor con) -- See Note [No RULES on datacons]
 
   | otherwise = case decompose fun2 args2 of
-        Nothing ->  pprTrace "decomposeRuleLhs 3" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-                                                       , text "orig_lhs:" <+> ppr orig_lhs
-                                                       , text "rhs_fvs:" <+> ppr rhs_fvs
-                                                       , text "lhs1:" <+> ppr lhs1
-                                                       , text "lhs2:" <+> ppr lhs2
-                                                       , text "fun2:" <+> ppr fun2
-                                                       , text "args2:" <+> ppr args2
-                                                       ]) $
+        Nothing ->  -- pprTrace "decomposeRuleLhs 3" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+                    --                                   , text "orig_lhs:" <+> ppr orig_lhs
+                    --                                   , text "rhs_fvs:" <+> ppr rhs_fvs
+                    --                                   , text "lhs1:" <+> ppr lhs1
+                    --                                   , text "lhs2:" <+> ppr lhs2
+                    --                                   , text "fun2:" <+> ppr fun2
+                    --                                   , text "args2:" <+> ppr args2
+                    --                                   ]) $
                    Left (DsRuleLhsTooComplicated orig_lhs lhs2)
 
         Just (fn_id, args)
           | not (null unbound) ->
             -- Check for things unbound on LHS
             -- See Note [Unused spec binders]
-             pprTrace "decomposeRuleLhs 1" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-                                                 , text "orig_lhs:" <+> ppr orig_lhs
-                                                 , text "lhs_fvs:" <+> ppr lhs_fvs
-                                                 , text "rhs_fvs:" <+> ppr rhs_fvs
-                                                 , text "unbound:" <+> ppr unbound
-                                                 ]) $
+             -- pprTrace "decomposeRuleLhs 1" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+             --                                    , text "orig_lhs:" <+> ppr orig_lhs
+             --                                    , text "lhs_fvs:" <+> ppr lhs_fvs
+             --                                    , text "rhs_fvs:" <+> ppr rhs_fvs
+             --                                    , text "unbound:" <+> ppr unbound
+             --                                    ]) $
             Left (DsRuleBindersNotBound unbound orig_bndrs orig_lhs lhs2)
           | otherwise ->
-            pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-                                               , text "orig_lhs:" <+> ppr orig_lhs
-                                               , text "lhs1:"     <+> ppr lhs1
-                                               , text "trimmed_bndrs:" <+> ppr trimmed_bndrs
-                                               , text "extra_dicts:" <+> ppr extra_dicts
-                                               , text "fn_id:" <+> ppr fn_id
-                                               , text "args:"   <+> ppr args
-                                               , text "args fvs:" <+> ppr (exprsFreeVarsList args)
-                                               ]) $
+            -- pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+            --                                   , text "orig_lhs:" <+> ppr orig_lhs
+            --                                   , text "lhs1:"     <+> ppr lhs1
+            --                                   , text "trimmed_bndrs:" <+> ppr trimmed_bndrs
+            --                                   , text "extra_dicts:" <+> ppr extra_dicts
+            --                                   , text "fn_id:" <+> ppr fn_id
+            --                                   , text "args:"   <+> ppr args
+            --                                   , text "args fvs:" <+> ppr (exprsFreeVarsList args)
+            --                                   ]) $
             Right (trimmed_bndrs ++ extra_dicts, fn_id, args)
 
           where -- See Note [Variables unbound on the LHS]
