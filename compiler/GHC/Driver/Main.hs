@@ -170,7 +170,7 @@ import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
 import GHC.Iface.Ext.Ast    ( mkHieFile )
-import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
+import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module, hie_types )
 import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result)
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
@@ -292,6 +292,7 @@ import GHC.Types.TypeEnv
 import System.IO
 import {-# SOURCE #-} GHC.Driver.Pipeline
 import Data.Time
+import qualified Data.Array as A
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
@@ -620,7 +621,8 @@ extract_renamed_stuff mod_summary tc_result = do
         hieFile <- mkHieFile mod_summary tc_result (fromJust rn_info)
         let out_file = ml_hie_file $ ms_location mod_summary
         liftIO $ writeHieFile out_file hieFile
-        liftIO $ putDumpFileMaybe logger Opt_D_dump_hie "HIE AST" FormatHaskell (ppr $ hie_asts hieFile)
+        liftIO $ putDumpFileMaybe logger Opt_D_dump_hie "HIE AST" FormatHaskell (ppr (hie_asts hieFile)
+                                                                             $+$ ppr (A.assocs $ hie_types hieFile) )
 
         -- Validate HIE files
         when (gopt Opt_ValidateHie dflags) $ do

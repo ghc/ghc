@@ -170,6 +170,18 @@ data HieType a
   | HCoercionTy
     deriving (Functor, Foldable, Traversable, Eq)
 
+instance Outputable a => Outputable (HieType a) where
+  ppr (HTyVarTy name) = ppr name
+  ppr (HAppTy fun arg) = parens $ ppr fun <+> ppr arg
+  ppr (HTyConApp tc args) = parens $ ppr tc <+> ppr args
+  ppr (HForAllTy ((name, ty), flag) body) =
+    text "forall" <+> ppr flag <+> ppr name O.<> text ":" <+> ppr ty O.<> text "." <+> ppr body
+  ppr (HFunTy mult arg res) = parens $ ppr arg <+> arrow <+> ppr res <+> ppr mult
+  ppr (HQualTy ctxt ty) = parens $ ppr ctxt <+> text "=>" <+> ppr ty
+  ppr (HLitTy lit) = ppr lit
+  ppr (HCastTy ty) = text "cast" <+> ppr ty
+  ppr HCoercionTy = text "<coercion>"
+
 type HieTypeFlat = HieType TypeIndex
 
 -- | Roughly isomorphic to the original core 'Type'.
@@ -232,6 +244,10 @@ newtype HieArgs a = HieArgs [(Bool,a)]
 instance Binary (HieArgs TypeIndex) where
   put_ bh (HieArgs xs) = put_ bh xs
   get bh = HieArgs <$> get bh
+
+instance Outputable a => Outputable (HieArgs a) where
+  ppr (HieArgs args) = braces $ hsep $ punctuate comma $ map pprArg args
+    where pprArg (vis, ty) = (if vis then id else parens) (ppr ty)
 
 
 -- A HiePath is just a lexical FastString. We use a lexical FastString to avoid
