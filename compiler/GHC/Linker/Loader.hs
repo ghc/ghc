@@ -940,7 +940,7 @@ linkSomeBCOs :: Interp
                         -- value of the corresponding unlinked BCO
 
 linkSomeBCOs interp pkgs_loaded ue le mods = do
-  let flat = Foldable.toList (bc_bcos mods)
+  let flat = concatMap (Foldable.toList . bc_bcos) mods
       (static_bcos, bcos) = partition unlinkedBCOIsStatic flat
       names = map unlinkedBCOName bcos
       bco_ix = mkNameEnv (zip names [0..])
@@ -955,7 +955,7 @@ linkSomeBCOs interp pkgs_loaded ue le mods = do
     let names = map unlinkedBCOName bcos
         bco_deps = mkNameEnv
           [ ( unlinkedBCOName bco
-            , mapMaybe (\case BCOPtrName n | n `elem` names -> Just n; _ -> Nothing) (ssElts (unlinkedBCOPtrs bco))
+            , mapMaybe (\case BCOPtrName n | n `elem` names -> Just n; _ -> Nothing) (Foldable.toList (unlinkedBCOPtrs bco))
             )
           | bco <- bcos
           ]

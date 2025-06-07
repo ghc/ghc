@@ -130,7 +130,7 @@ import GHC.Core.Multiplicity (scaledThing)
 import GHC.Settings (Platform)
 import GHC.Core.TyCon (primRepCompatible, primRepsCompatible)
 import GHC.Utils.Panic.Plain (panic)
-import GHC.Stg.InferTags.TagSig
+import GHC.Stg.EnforceEpt.TagSig
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    => Platform

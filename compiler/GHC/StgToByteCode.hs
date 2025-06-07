@@ -129,9 +129,6 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
            runBc hsc_env this_mod mb_modBreaks (mkVarEnv (getDcs flattened_binds)) $
              FlatBag.fromList (fromIntegral $ length flattened_binds) <$> mapM schemeTopBind flattened_binds
 
-        when (notNull ffis)
-             (panic "GHC.StgToByteCode.byteCodeGen: missing final emitBc?")
-
         putDumpFileMaybe logger Opt_D_dump_BCOs
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr $ elemsFlatBag proto_bcos)))
@@ -2240,7 +2237,7 @@ pushAtom d p (StgVarArg var)
             | idType var `eqType` addrPrimTy ->
               return (unitOL (PUSH_ADDR (getName var)), szb)
 
-            | idPrimRep var == BoxedRep (Just Unlifted) -> do
+            | idPrimRepU var == BoxedRep (Just Unlifted) -> do
               mayDc <- lookupDc var
               case mayDc of
                 Nothing ->
@@ -2624,7 +2621,7 @@ runBc :: HscEnv -> Module -> Maybe ModBreaks -> IdEnv DataCon
       -> BcM r
       -> IO (BcM_State, r)
 runBc hsc_env this_mod modBreaks dcs (BcM m)
-   = m (BcM_State hsc_env this_mod 0 modBreaks IntMap.empty dcs 0)
+   = m (BcM_State hsc_env this_mod 0 modBreaks IntMap.empty 0 dcs)
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do

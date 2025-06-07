@@ -598,8 +598,8 @@ assembleI platform i = case i of
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit_ bci_PUSH_G [Op p]
   PUSH_TAGGED nm dcon      -> do p <- ptr (BCOPtrName nm)
-                                 itbl_no <- lit [BCONPtrItbl (getName dcon)]
-                                 emit bci_PUSH_TAGGED [Op p, Op itbl_no]
+                                 itbl_no <- lit (OnlyOne (BCONPtrItbl (getName dcon)))
+                                 emit_ bci_PUSH_TAGGED [Op p, Op itbl_no]
   PUSH_ALTS proto pk
                            -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
