@@ -1,5 +1,5 @@
 {-# LANGUAGE GHC_CPP #-}
--- {-# OPTIONS -ddump-ghc-cpp -dkeep-comments #-}
+{-# OPTIONS -ddump-ghc-cpp -dkeep-comments #-}
 module GhcCpp01 where
 
 -- Check leading whitespace on a directive
@@ -50,3 +50,24 @@ z = 1
 {- Haskell comment
    /* ignores cpp comments, so unclosed is fine -}
 -}
+
+-- CPP directives in pragmas -----------------
+
+-- No directive
+{-# RULES
+"foldg/Empty"   forall e v o c. foldg e v o c Empty = e
+#-}
+foldg = undefined
+data Empty = Empty
+
+-- With directive
+{-# RULES
+"Lazy Bitstream streamChunks/unstreamChunks fusion"
+    forall s. streamChunks s = s
+#if 0
+"Lazy Bitstream unstreamChunks/streamChunks fusion"
+    forall v. unId (unstreamChunks (streamChunks v)) = v
+#endif
+#-}
+unstreamChunks = undefined
+streamChunks = undefined

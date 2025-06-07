@@ -939,3 +939,31 @@ t43 = do
         , "module T23465 where"
         , ""
         ]
+
+t44 :: IO ()
+t44 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , "{-# RULES"
+        , "\"Lazy Bitstream streamChunks/unstreamChunks fusion\""
+        , "    ∀s. streamChunks (unId (unstreamChunks s)) = s"
+        , "#if 1"
+        , "\"Lazy Bitstream unstreamChunks/streamChunks fusion\""
+        , "    ∀v. unId (unstreamChunks (streamChunks v)) = v"
+        , "#endif"
+        , "  #-}"
+        , ""
+        ]
+
+t45 :: IO ()
+t45 = do
+    dump
+        [ "{-# LANGUAGE GHC_CPP #-}"
+        , ""
+        , "foo ="
+        , "-- deliberate missing #if"
+        , "#else"
+        , "           toRow $(return $ ConP cname $ map VarP cvars) = $(toFields cvars)|]"
+        , "#endif"
+        , ""
+        ]

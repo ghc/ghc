@@ -201,7 +201,7 @@ setAccepting on = do
     let possible_accepting = parent_on && on
     let (new_group_state, accepting) =
             case (group_state, possible_accepting) of
-                (PpNoGroup, _) -> error "setAccepting for state PpNoGroup"
+                (PpNoGroup, _) -> error "setAccepting for state PpNoGroup" -- AZ: Tested in GhcCpp02
                 (PpInGroupStillInactive, True) -> (PpInGroupHasBeenActive, True)
                 (PpInGroupStillInactive, False) -> (PpInGroupStillInactive, False)
                 (PpInGroupHasBeenActive, _) -> (PpInGroupHasBeenActive, False)

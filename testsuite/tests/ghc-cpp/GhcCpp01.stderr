@@ -13,7 +13,7 @@
 
 #define MIN_VERSION_Cabal_syntax(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 15 || ( major1 ) == 3 && ( major2 ) == 15 && ( minor ) <= 0 )
 
-#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250524 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250524 && ( pl2 ) <= 0 )
+#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250606 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250606 && ( pl2 ) <= 0 )
 
 #define MIN_VERSION_array(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 5 || ( major1 ) == 0 && ( major2 ) == 5 && ( minor ) <= 8 )
 
@@ -188,9 +188,9 @@
 #define VERSION_xhtml 3000.2.2.1
 
 
-#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250524
+#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250606
 
-#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250524
+#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250606
 
 #define __GLASGOW_HASKELL_PATCHLEVEL2__ 0
 
@@ -198,7 +198,7 @@
 ------------------------------
 
 - |{-# LANGUAGE GHC_CPP #-}
-- |-- {-# OPTIONS -ddump-ghc-cpp -dkeep-comments #-}
+- |{-# OPTIONS -ddump-ghc-cpp -dkeep-comments #-}
   |module GhcCpp01 where
 
 - |-- Check leading whitespace on a directive
@@ -249,8 +249,40 @@
 {- Haskell comment
    /* ignores cpp comments, so unclosed is fine -}
 -}
+
+- |-- CPP directives in pragmas -----------------
+
+- |-- No directive
+  |{-# RULES
+  |"foldg/Empty"   forall e v o c. foldg e v o c Empty = e
+  |#-}
+  |foldg = undefined
+  |data Empty = Empty
+
+- |-- With directive
+  |{-# RULES
+  |"Lazy Bitstream streamChunks/unstreamChunks fusion"
+  |    forall s. streamChunks s = s
+- |#if 0
+- |"Lazy Bitstream unstreamChunks/streamChunks fusion"
+- |    forall v. unId (unstreamChunks (streamChunks v)) = v
+- |#endif
+  |#-}
+  |unstreamChunks = undefined
+  |streamChunks = undefined
   |
 ------------------------------
 
 
+
+GhcCpp01.hs:58:1: warning: [GHC-95396] [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "foldg/Empty" may never fire
+      because ‘foldg’ might inline first
+    Suggested fix: Add an INLINE[n] or NOINLINE[n] pragma for ‘foldg’
+
+GhcCpp01.hs:65:1: warning: [GHC-95396] [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "Lazy Bitstream streamChunks/unstreamChunks fusion" may never fire
+      because ‘streamChunks’ might inline first
+    Suggested fix:
+      Add an INLINE[n] or NOINLINE[n] pragma for ‘streamChunks’
 
