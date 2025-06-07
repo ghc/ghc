@@ -273,6 +273,10 @@ toIfaceTyLit (StrTyLit x) = IfaceStrTyLit (LexicalFastString x)
 toIfaceTyLit (CharTyLit x) = IfaceCharTyLit x
 
 ----------------
+toIfaceCastCoercion :: CastCoercion -> IfaceCastCoercion
+toIfaceCastCoercion (CCoercion co) = IfaceCCoercion (toIfaceCoercion co)
+toIfaceCastCoercion (ZCoercion ty cos) = IfaceZCoercion (toIfaceType ty) (map toIfaceCoercion cos)
+
 toIfaceCoercion :: Coercion -> IfaceCoercion
 toIfaceCoercion = toIfaceCoercionX emptyVarSet
 
@@ -570,7 +574,7 @@ toIfaceExpr (Case s x ty as)
   | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
   | otherwise               = IfaceCase (toIfaceExpr s) (mkIfLclName (getOccFS x)) (map toIfaceAlt as)
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
-toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
+toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCastCoercion co)
 toIfaceExpr (Tick t e)      = IfaceTick (toIfaceTickish t) (toIfaceExpr e)
 
 toIfaceOneShot :: Id -> IfaceOneShot

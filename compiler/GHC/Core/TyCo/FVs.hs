@@ -14,8 +14,12 @@ module GHC.Core.TyCo.FVs
 
         shallowTyCoVarsOfCo, shallowTyCoVarsOfCos,
         tyCoVarsOfCo, tyCoVarsOfCos, tyCoVarsOfMCo,
+        tyCoVarsOfCastCo,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
+        coVarsOfCastCo,
+        shallowCoVarsOfCos,
+        tyCoVarsOfCastCoercionDSet,
         tyCoVarsOfCoDSet,
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList,
@@ -297,6 +301,10 @@ runTyCoVars f = appEndo f emptyVarSet
 *                                                                      *
 ********************************************************************* -}
 
+tyCoVarsOfCastCo :: CastCoercion -> TyCoVarSet
+tyCoVarsOfCastCo (CCoercion co)     = coVarsOfCo co
+tyCoVarsOfCastCo (ZCoercion ty cos) = tyCoVarsOfType ty `unionVarSet` tyCoVarsOfCos cos -- TODO: more efficient?
+
 tyCoVarsOfType :: Type -> TyCoVarSet
 -- The "deep" TyCoVars of the the type
 tyCoVarsOfType ty = runTyCoVars (deep_ty ty)
@@ -400,6 +408,11 @@ shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and sy
     do_hole _ _  = mempty   -- Ignore coercion holes
 
 
+-- Only the shallow CoVars (no TyVars).  TODO: better implementation?
+shallowCoVarsOfCos :: [Coercion] -> CoVarSet
+shallowCoVarsOfCos cos = filterVarSet isCoVar $ shallowTyCoVarsOfCos cos
+
+
 {- *********************************************************************
 *                                                                      *
           Free coercion variables
@@ -416,6 +429,10 @@ Notice that we look deeply, into kinds.
 
 See #14880.
 -}
+
+coVarsOfCastCo :: CastCoercion -> CoVarSet
+coVarsOfCastCo (CCoercion co) = coVarsOfCo co
+coVarsOfCastCo (ZCoercion ty cos) = coVarsOfType ty `unionVarSet` coVarsOfCos cos -- TODO: more efficient?
 
 -- See Note [Finding free coercion variables]
 coVarsOfType  :: Type       -> CoVarSet
@@ -631,6 +648,9 @@ tyCoFVsOfTypes :: [Type] -> FV
 tyCoFVsOfTypes (ty:tys) fv_cand in_scope acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfTypes tys) fv_cand in_scope acc
 tyCoFVsOfTypes []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 
+tyCoVarsOfCastCoercionDSet :: CastCoercion -> DTyCoVarSet
+tyCoVarsOfCastCoercionDSet co = fvDVarSet $ tyCoFVsOfCastCoercion co
+
 -- | Get a deterministic set of the vars free in a coercion
 tyCoVarsOfCoDSet :: Coercion -> DTyCoVarSet
 -- See Note [Free variables of types]
@@ -643,6 +663,10 @@ tyCoVarsOfCoList co = fvVarList $ tyCoFVsOfCo co
 tyCoFVsOfMCo :: MCoercion -> FV
 tyCoFVsOfMCo MRefl    = emptyFV
 tyCoFVsOfMCo (MCo co) = tyCoFVsOfCo co
+
+tyCoFVsOfCastCoercion :: CastCoercion -> FV
+tyCoFVsOfCastCoercion (CCoercion co) = tyCoFVsOfCo co
+tyCoFVsOfCastCoercion (ZCoercion ty cos) = unionsFV (tyCoFVsOfType ty : map tyCoFVsOfCo cos)
 
 tyCoFVsOfCo :: Coercion -> FV
 -- Extracts type and coercion variables from a coercion

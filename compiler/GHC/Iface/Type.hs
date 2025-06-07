@@ -14,6 +14,7 @@ module GHC.Iface.Type (
         IfLclName(..), mkIfLclName, ifLclNameFS,
 
         IfaceType(..), IfacePredType, IfaceKind, IfaceCoercion(..),
+        IfaceCastCoercion(..),
         IfaceAxiomRule(..),IfaceMCoercion(..),
         IfaceMult,
         IfaceTyCon(..),
@@ -52,6 +53,7 @@ module GHC.Iface.Type (
         pprIfaceForAllPart, pprIfaceForAllPartMust, pprIfaceForAll,
         pprIfaceSigmaType, pprIfaceTyLit,
         pprIfaceCoercion, pprParendIfaceCoercion,
+        pprIfaceCastCoercion, pprParendIfaceCastCoercion,
         splitIfaceSigmaTy, pprIfaceTypeApp, pprUserIfaceForAll,
         pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp,
         isIfaceRhoType,
@@ -472,6 +474,11 @@ This one change leads to an 15% reduction in residency for GHC when embedding
 data IfaceMCoercion
   = IfaceMRefl
   | IfaceMCo IfaceCoercion deriving (Eq, Ord)
+
+data IfaceCastCoercion
+  = IfaceCCoercion IfaceCoercion
+  | IfaceZCoercion IfaceType [IfaceCoercion]
+  deriving (Eq, Ord)
 
 data IfaceCoercion
   = IfaceReflCo       IfaceType
@@ -2031,6 +2038,14 @@ pprIfaceTyLit (IfaceNumTyLit n) = integer n
 pprIfaceTyLit (IfaceStrTyLit n) = text (show n)
 pprIfaceTyLit (IfaceCharTyLit c) = text (show c)
 
+pprIfaceCastCoercion :: IfaceCastCoercion -> SDoc
+pprIfaceCastCoercion (IfaceCCoercion co) = pprIfaceCoercion co
+pprIfaceCastCoercion (IfaceZCoercion ty cos) = text "Zap" <+> pprParendIfaceType ty <+> ppr cos
+
+pprParendIfaceCastCoercion :: IfaceCastCoercion -> SDoc
+pprParendIfaceCastCoercion (IfaceCCoercion co) = pprParendIfaceCoercion co
+pprParendIfaceCastCoercion (IfaceZCoercion ty cos) = parens (pprIfaceCastCoercion (IfaceZCoercion ty cos))
+
 pprIfaceCoercion, pprParendIfaceCoercion :: IfaceCoercion -> SDoc
 pprIfaceCoercion = ppr_co topPrec
 pprParendIfaceCoercion = ppr_co appPrec
@@ -2422,6 +2437,26 @@ instance Binary IfaceMCoercion where
                  return $ IfaceMCo a
          _ -> panic ("get IfaceMCoercion " ++ show tag)
 
+instance Binary IfaceCastCoercion where
+  put_ bh (IfaceCCoercion a) = do
+          putByte bh 1
+          put_ bh a
+  put_ bh (IfaceZCoercion a b) = do
+          putByte bh 2
+          put_ bh a
+          put_ bh b
+
+  get bh = do
+    tag <- getByte bh
+    case tag of
+         1 -> do a <- get bh
+                 return $ IfaceCCoercion a
+         2 -> do a <- get bh
+                 b <- get bh
+                 return $ IfaceZCoercion a b
+         _ -> panic ("get IfaceCastCoercion " ++ show tag)
+
+
 instance Binary IfaceCoercion where
   put_ bh (IfaceReflCo a) = do
           putByte bh 1
@@ -2600,6 +2635,11 @@ instance NFData IfaceTyLit where
     IfaceNumTyLit f1 -> rnf f1
     IfaceStrTyLit f1 -> rnf f1
     IfaceCharTyLit f1 -> rnf f1
+
+instance NFData IfaceCastCoercion where
+  rnf = \case
+    IfaceCCoercion f1 -> rnf f1
+    IfaceZCoercion f1 f2 -> rnf f1 `seq` rnf f2
 
 instance NFData IfaceCoercion where
   rnf = \case

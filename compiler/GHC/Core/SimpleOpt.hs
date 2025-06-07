@@ -288,7 +288,7 @@ simple_opt_expr env expr
     go (Coercion co)    = Coercion (go_co co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)      = mk_cast (go e) (go_co co)
+    go (Cast e co)      = mk_cast (go e) (go_cast_co co)
     go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
                              (env', Nothing)   -> simple_opt_expr env' body
                              (env', Just bind) -> Let bind (simple_opt_expr env' body)
@@ -323,6 +323,9 @@ simple_opt_expr env expr
         (env', b') = subst_opt_bndr env b
 
     ----------------------
+    go_cast_co (CCoercion co) = CCoercion (go_co co)
+    go_cast_co (ZCoercion ty cos) = ZCoercion (substTyUnchecked subst ty) (substCos subst cos)
+
     go_co co = optCoercion (so_co_opts (soe_opts env)) subst co
 
     ----------------------
@@ -348,14 +351,15 @@ simple_opt_expr env expr
          bs = reverse bs'
          e' = simple_opt_expr env e
 
-mk_cast :: CoreExpr -> CoercionR -> CoreExpr
+mk_cast :: CoreExpr -> CastCoercion -> CoreExpr
 -- Like GHC.Core.Utils.mkCast, but does a full reflexivity check.
 -- mkCast doesn't do that because the Simplifier does (in simplCast)
 -- But in SimpleOpt it's nice to kill those nested casts (#18112)
-mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCo` co2)
+mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCastCo` co2)
 mk_cast (Tick t e)   co         = Tick t (mk_cast e co)
-mk_cast e co | isReflexiveCo co = e
+mk_cast e co | isReflexiveCastCo (exprType e) co = e
              | otherwise        = Cast e co
+
 
 ----------------------
 -- simple_app collects arguments for beta reduction
@@ -435,11 +439,13 @@ simple_app env e as
 finish_app :: HasDebugCallStack
            => SimpleOptEnv -> OutExpr -> [SimpleClo] -> OutExpr
 -- See Note [Eliminate casts in function position]
-finish_app env (Cast (Lam x e) co) as@(_:_)
+finish_app env (Cast (Lam x e) (CCoercion co)) as@(_:_)
   | not (isTyVar x) && not (isCoVar x)
   , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
   , Just (x',e') <- pushCoercionIntoLambda (soeInScope env) x e co
   = simple_app (soeZapSubst env) (Lam x' e') as
+
+-- TODO: ZCoercion version of the finish_app
 
 finish_app env fun args
   = foldl mk_app fun args
@@ -1291,10 +1297,12 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     go subst floats (Tick t expr) cont
        | not (tickishIsCode t) = go subst floats expr cont
 
-    go subst floats (Cast expr co1) (CC args m_co2)
+    go subst floats (Cast expr (CCoercion co1)) (CC args m_co2)
        | Just (args', m_co1') <- pushCoArgs (subst_co subst co1) args
             -- See Note [Push coercions in exprIsConApp_maybe]
        = go subst floats expr (CC args' (m_co1' `mkTransMCo` m_co2))
+
+    -- TODO: ZCoercion in exprIsConApp_maybe
 
     go subst floats (App fun arg) (CC args mco)
        | let arg_type = exprType arg
@@ -1582,7 +1590,7 @@ exprIsLambda_maybe ise (Tick t e)
     = Just (x, e, t:ts)
 
 -- Also possible: A casted lambda. Push the coercion inside
-exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
+exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e (CCoercion co))
     | Just (x, e,ts) <- exprIsLambda_maybe ise casted_e
     -- Only do value lambdas.
     -- this implies that x is not in scope in gamma (makes this code simpler)
@@ -1592,6 +1600,8 @@ exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
     , let res = Just (x',e',ts)
     = --pprTrace "exprIsLambda_maybe:Cast" (vcat [ppr casted_e,ppr co,ppr res)])
       res
+
+-- TODO: exprIsLambda_maybe for ZCoercion
 
 -- Another attempt: See if we find a partial unfolding
 exprIsLambda_maybe ise@(ISE in_scope_set id_unf) e

@@ -1564,6 +1564,10 @@ tcIfaceTyLit (IfaceCharTyLit n) = return (CharTyLit n)
 ************************************************************************
 -}
 
+tcIfaceCastCoercion :: IfaceCastCoercion -> IfL CastCoercion
+tcIfaceCastCoercion (IfaceCCoercion co)     = CCoercion <$> tcIfaceCo co
+tcIfaceCastCoercion (IfaceZCoercion ty cos) = ZCoercion <$> tcIfaceType ty <*> mapM tcIfaceCo cos
+
 tcIfaceCo :: IfaceCoercion -> IfL Coercion
 tcIfaceCo = go
   where
@@ -1618,7 +1622,7 @@ tcIfaceExpr (IfaceCo co)
   = Coercion <$> tcIfaceCo co
 
 tcIfaceExpr (IfaceCast expr co)
-  = Cast <$> tcIfaceExpr expr <*> tcIfaceCo co
+  = Cast <$> tcIfaceExpr expr <*> tcIfaceCastCoercion co
 
 tcIfaceExpr (IfaceLcl name)
   = Var <$> tcIfaceLclId name

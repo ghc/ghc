@@ -462,7 +462,7 @@ matchWithDict [cls, mty]
                mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
                  Var k
                    `App`
-                 (Var sv `Cast` mkTransCo (mkSubCo co2) (mkSymCo co))
+                 (Var sv `Cast` CCoercion (mkTransCo (mkSubCo co2) (mkSymCo co)))
 
        ; tc <- tcLookupTyCon withDictClassName
        ; let withdict_data_con = expectJust
@@ -941,7 +941,7 @@ matchDataToTag dataToTagClass [levity, dty] = do
             dataToTagDataCon = tyConSingleDataCon (classTyCon dataToTagClass)
             mk_ev _ = evDataConApp dataToTagDataCon
                                    [levity, dty]
-                                   [methodRep `Cast` methodCo]
+                                   [methodRep `Cast` CCoercion methodCo]
      -> addUsedDataCons rdr_env repTyCon -- See wrinkles DTW2 and DTW3
           $> OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
                      , cir_mk_ev = mk_ev

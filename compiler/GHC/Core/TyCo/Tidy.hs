@@ -4,6 +4,7 @@ module GHC.Core.TyCo.Tidy
         -- * Tidying type related things up for printing
         tidyType, tidyTypes,
         tidyCo,   tidyCos,
+        tidyCastCo,
         tidyTopType,
 
         tidyOpenType,  tidyOpenTypes,
@@ -362,3 +363,7 @@ tidyCo env co
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = strictMap (tidyCo env)
+
+tidyCastCo :: TidyEnv -> CastCoercion -> CastCoercion
+tidyCastCo env (CCoercion co) = CCoercion (tidyCo env co)
+tidyCastCo env (ZCoercion ty cos) = ZCoercion (tidyType env ty) (tidyCos env cos)

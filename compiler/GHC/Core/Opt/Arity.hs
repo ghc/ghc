@@ -2042,7 +2042,7 @@ etaExpandAT in_scope at orig_expr
 
 eta_expand :: InScopeSet -> [OneShotInfo] -> CoreExpr -> CoreExpr
 eta_expand in_scope one_shots (Cast expr co)
-  = mkCast (eta_expand in_scope one_shots expr) co
+  = mkCastCo (eta_expand in_scope one_shots expr) co
     -- This mkCast is important, because eta_expand might return an
     -- expression with a cast at the outside; and tryCastWorkerWrapper
     -- asssumes that we don't have nested casts. Makes a difference
@@ -2221,7 +2221,7 @@ etaInfoApp in_scope expr eis
     go subst (Tick t e) eis
       = Tick (substTickish subst t) (go subst e eis)
 
-    go subst (Cast e co) (EI bs mco)
+    go subst (Cast e (CCoercion co)) (EI bs mco) -- TODO: etaInfoApp ZCoercion
       = go subst e (EI bs mco')
       where
         mco' = checkReflexiveMCo (Core.substCo subst co `mkTransMCoR` mco)
@@ -2701,13 +2701,13 @@ same fix.
 tryEtaReduce :: UnVarSet -> [Var] -> CoreExpr -> SubDemand -> Maybe CoreExpr
 -- Return an expression equal to (\bndrs. body)
 tryEtaReduce rec_ids bndrs body eval_sd
-  = go (reverse bndrs) body (mkRepReflCo (exprType body))
+  = go (reverse bndrs) body (CCoercion (mkRepReflCo (exprType body)))
   where
     incoming_arity = count isId bndrs -- See Note [Eta reduction makes sense], point (2)
 
     go :: [Var]            -- Binders, innermost first, types [a3,a2,a1]
        -> CoreExpr         -- Of type tr
-       -> Coercion         -- Of type tr ~ ts
+       -> CastCoercion     -- Of type tr ~ ts
        -> Maybe CoreExpr   -- Of type a1 -> a2 -> a3 -> ts
     -- See Note [Eta reduction with casted arguments]
     -- for why we have an accumulating coercion
@@ -2717,7 +2717,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
 
     -- See Note [Eta reduction with casted function]
     go bs (Cast e co1) co2
-      = go bs e (co1 `mkTransCo` co2)
+      = go bs e (co1 `mkTransCastCo` co2)
 
     go bs (Tick t e) co
       | tickishFloatable t
@@ -2740,7 +2740,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
       , remaining_bndrs `ltLength` bndrs
             -- Only reply Just if /something/ has happened
       , ok_fun fun
-      , let used_vars     = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
+      , let used_vars     = exprFreeVars fun `unionVarSet` tyCoVarsOfCastCo co
             reduced_bndrs = mkVarSet (dropList remaining_bndrs bndrs)
             -- reduced_bndrs are the ones we are eta-reducing away
       , used_vars `disjointVarSet` reduced_bndrs
@@ -2749,7 +2749,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
           -- See Note [Eta reduction makes sense], intro and point (1)
           -- NB: don't compute used_vars from exprFreeVars (mkCast fun co)
           --     because the latter may be ill formed if the guard fails (#21801)
-      = Just (mkLams (reverse remaining_bndrs) (mkCast fun co))
+      = Just (mkLams (reverse remaining_bndrs) (mkCastCo fun co))
 
     go _remaining_bndrs _fun  _  = -- pprTrace "tER fail" (ppr _fun $$ ppr _remaining_bndrs) $
                                    Nothing
@@ -2797,17 +2797,17 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ---------------
     ok_arg :: Var              -- Of type bndr_t
            -> CoreExpr         -- Of type arg_t
-           -> Coercion         -- Of kind (t1~t2)
+           -> CastCoercion     -- Of kind (t1~t2)
            -> Type             -- Type (arg_t -> t1) of the function
                                --      to which the argument is supplied
-           -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
-                               --   (and similarly for tyvars, coercion args)
+           -> Maybe (CastCoercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
+                                   --   (and similarly for tyvars, coercion args)
                     , [CoreTickish])
     -- See Note [Eta reduction with casted arguments]
-    ok_arg bndr (Type arg_ty) co fun_ty
+    ok_arg bndr (Type arg_ty) (CCoercion co) fun_ty
        | Just tv <- getTyVar_maybe arg_ty
        , bndr == tv  = case splitForAllForAllTyBinder_maybe fun_ty of
-           Just (Bndr _ vis, _) -> Just (fco, [])
+           Just (Bndr _ vis, _) -> Just (CCoercion fco, [])
              where !fco = mkForAllCo tv vis coreTyLamForAllTyFlag kco co
                    -- The lambda we are eta-reducing always has visibility
                    -- 'coreTyLamForAllTyFlag' which may or may not match
@@ -2817,24 +2817,24 @@ tryEtaReduce rec_ids bndrs body eval_sd
                                (text "fun:" <+> ppr bndr
                                 $$ text "arg:" <+> ppr arg_ty
                                 $$ text "fun_ty:" <+> ppr fun_ty)
-    ok_arg bndr (Var v) co fun_ty
+    ok_arg bndr (Var v) (CCoercion co) fun_ty
        | bndr == v
        , let mult = idMult bndr
        , Just (_af, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
-       = Just (mkFunResCo Representational bndr co, [])
-    ok_arg bndr (Cast e co_arg) co fun_ty
+       = Just (CCoercion $ mkFunResCo Representational bndr co, [])
+    ok_arg bndr (Cast e co_arg) (CCoercion co) fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
        , Just (_, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqType` idMult bndr
-       = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
+       = Just (CCoercion $ mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCastCo (exprType e) co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co fun_ty
        | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
        = Just (co', t:ticks)
-
+    -- TODO ok_arg for ZCoercion?
     ok_arg _ _ _ _ = Nothing
 
 -- | Can we eta-reduce the given function
@@ -3107,13 +3107,13 @@ collectBindersPushingCo e
     go :: [Var] -> CoreExpr -> ([Var], CoreExpr)
     -- The accumulator is in reverse order
     go bs (Lam b e)   = go (b:bs) e
-    go bs (Cast e co) = go_c bs e co
+    go bs (Cast e (CCoercion co)) = go_c bs e co  -- TODO: ought to have ZCoercion case or go_c generalised
     go bs e           = (reverse bs, e)
 
     -- We are in a cast; peel off casts until we hit a lambda.
-    go_c :: [Var] -> CoreExpr -> CoercionR -> ([Var], CoreExpr)
+    go_c :: [Var] -> CoreExpr -> Coercion -> ([Var], CoreExpr)
     -- (go_c bs e c) is same as (go bs e (e |> c))
-    go_c bs (Cast e co1) co2 = go_c bs e (co1 `mkTransCo` co2)
+    go_c bs (Cast e (CCoercion co1)) co2 = go_c bs e (co1 `mkTransCo` co2) -- TODO ditto
     go_c bs (Lam b e)    co  = go_lam bs b e co
     go_c bs e            co  = (reverse bs, mkCast e co)
 

@@ -21,6 +21,7 @@ module GHC.Tc.Zonk.Type (
         zonkTcTypesToTypesX, zonkScaledTcTypesToTypesX,
         zonkTyVarOcc,
         zonkCoToCo,
+        zonkCastCo,
         zonkEvBinds, zonkTcEvBinds,
         zonkTcMethInfoToMethInfoX,
         lookupTyVarX,
@@ -531,10 +532,15 @@ zonkScaledTcTypeToTypeX (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX m
 zonkTcTypeToTypeX   :: TcType   -> ZonkTcM Type
 zonkTcTypesToTypesX :: [TcType] -> ZonkTcM [Type]
 zonkCoToCo          :: Coercion -> ZonkTcM Coercion
-(zonkTcTypeToTypeX, zonkTcTypesToTypesX, zonkCoToCo)
+zonkCosToCos        :: [Coercion] -> ZonkTcM [Coercion]
+(zonkTcTypeToTypeX, zonkTcTypesToTypesX, zonkCoToCo, zonkCosToCos)
   = case mapTyCoX zonk_tycomapper of
-      (zty, ztys, zco, _) ->
-        (ZonkT . flip zty, ZonkT . flip ztys, ZonkT . flip zco)
+      (zty, ztys, zco, zcos) ->
+        (ZonkT . flip zty, ZonkT . flip ztys, ZonkT . flip zco, ZonkT. flip zcos)
+
+zonkCastCo :: CastCoercion -> ZonkTcM CastCoercion
+zonkCastCo (CCoercion co) = CCoercion <$> zonkCoToCo co
+zonkCastCo (ZCoercion ty cos) = ZCoercion <$> zonkTcTypeToTypeX ty <*> zonkCosToCos cos
 
 zonkScaledTcTypesToTypesX :: [Scaled TcType] -> ZonkTcM [Scaled Type]
 zonkScaledTcTypesToTypesX scaled_tys =
@@ -1778,7 +1784,7 @@ zonkCoreExpr (Type ty)
     = Type <$> zonkTcTypeToTypeX ty
 
 zonkCoreExpr (Cast e co)
-    = Cast <$> zonkCoreExpr e <*> zonkCoToCo co
+    = Cast <$> zonkCoreExpr e <*> zonkCastCo co
 zonkCoreExpr (Tick t e)
     = Tick t <$> zonkCoreExpr e -- Do we need to zonk in ticks?
 

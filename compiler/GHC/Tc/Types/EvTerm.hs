@@ -17,6 +17,7 @@ import GHC.Builtin.Types ( unitTy )
 
 import GHC.Core.Type
 import GHC.Core
+import GHC.Core.Coercion (CastCoercion(..))
 import GHC.Core.Make
 import GHC.Core.Utils
 
@@ -67,6 +68,6 @@ evCallStack (EvCsPushCall fs loc tm) = do
         -- so we use unwrapIP to strip the dictionary wrapper
         -- See Note [Overview of implicit CallStacks]
         let ip_co = unwrapIP (exprType tm)
-        return (pushCS nameExpr locExpr (Cast tm ip_co))
+        return (pushCS nameExpr locExpr (Cast tm (CCoercion ip_co)))
 
   mkPush fs loc tm

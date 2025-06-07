@@ -19,7 +19,7 @@ module GHC.Core.Map.Type (
    mkDeBruijnContext, extendCME, extendCMEs, emptyCME,
 
    -- * Utilities for use by friends only
-   TypeMapG, CoercionMapG,
+   TypeMapG, CoercionMapG, CastCoercionMapG,
 
    DeBruijn(..), deBruijnize, eqDeBruijnType, eqDeBruijnVar,
 
@@ -127,6 +127,64 @@ lkC (D env co) (CoercionMapX core_tm) = lkT (D env $ coercionType co)
 xtC :: DeBruijn Coercion -> XT a -> CoercionMapX a -> CoercionMapX a
 xtC (D env co) f (CoercionMapX m)
   = CoercionMapX (xtT (D env $ coercionType co) f m)
+
+
+{-
+************************************************************************
+*                                                                      *
+                   Cast Coercions
+*                                                                      *
+************************************************************************
+-}
+
+-- We should really never care about the contents of a cast coercion. Instead,
+-- just look up the coercion's RHS type.
+newtype CastCoercionMap a = CastCoercionMap (CastCoercionMapG a)
+
+-- TODO(22292): derive
+instance Functor CastCoercionMap where
+    fmap f = \ (CastCoercionMap m) -> CastCoercionMap (fmap f m)
+    {-# INLINE fmap #-}
+
+instance TrieMap CastCoercionMap where
+   type Key CastCoercionMap = CastCoercion
+   emptyTM                     = CastCoercionMap emptyTM
+   lookupTM k   (CastCoercionMap m) = lookupTM (deBruijnize k) m
+   alterTM k f  (CastCoercionMap m) = CastCoercionMap (alterTM (deBruijnize k) f m)
+   foldTM k     (CastCoercionMap m) = foldTM k m
+   filterTM f   (CastCoercionMap m) = CastCoercionMap (filterTM f m)
+   mapMaybeTM f (CastCoercionMap m) = CastCoercionMap (mapMaybeTM f m)
+
+type CastCoercionMapG = GenMap CastCoercionMapX
+newtype CastCoercionMapX a = CastCoercionMapX (TypeMapX a)
+
+-- TODO(22292): derive
+instance Functor CastCoercionMapX where
+    fmap f = \ (CastCoercionMapX core_tm) -> CastCoercionMapX (fmap f core_tm)
+    {-# INLINE fmap #-}
+
+instance TrieMap CastCoercionMapX where
+  type Key CastCoercionMapX = DeBruijn CastCoercion
+  emptyTM = CastCoercionMapX emptyTM
+  lookupTM = lkX
+  alterTM  = xtX
+  foldTM f (CastCoercionMapX core_tm) = foldTM f core_tm
+  filterTM f (CastCoercionMapX core_tm) = CastCoercionMapX (filterTM f core_tm)
+  mapMaybeTM f (CastCoercionMapX core_tm) = CastCoercionMapX (mapMaybeTM f core_tm)
+
+instance Eq (DeBruijn CastCoercion) where
+  D env1 co1 == D env2 co2
+    = D env1 (castCoercionRKind co1) ==
+      D env2 (castCoercionRKind co2)
+
+lkX :: DeBruijn CastCoercion -> CastCoercionMapX a -> Maybe a
+lkX (D env co) (CastCoercionMapX core_tm) = lkT (D env $ castCoercionRKind co)
+                                        core_tm
+
+xtX :: DeBruijn CastCoercion -> XT a -> CastCoercionMapX a -> CastCoercionMapX a
+xtX (D env co) f (CastCoercionMapX m)
+  = CastCoercionMapX (xtT (D env $ castCoercionRKind co) f m)
+
 
 {-
 ************************************************************************

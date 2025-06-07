@@ -26,10 +26,11 @@ import GHC.Core.Make      ( mkLitRubbish )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
 import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
-                          , mkCast, exprType
+                          , mkCastCo, exprType
                           , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
+import GHC.Core.TyCo.Subst ( substCastCo )
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
 -- import GHC.Core.Ppr( pprIds )
 
@@ -1192,7 +1193,7 @@ specExpr env (Coercion co) = return (Coercion (substCo env co), emptyUDs)
 specExpr _   (Lit lit)     = return (Lit lit,                   emptyUDs)
 specExpr env (Cast e co)
   = do { (e', uds) <- specExpr env e
-       ; return ((mkCast e' (substCo env co)), uds) }
+       ; return ((mkCastCo e' (substCastCo (se_subst env) co)), uds) }
 specExpr env (Tick tickish body)
   = do { (body', uds) <- specExpr env body
        ; return (Tick (specTickish env tickish) body', uds) }

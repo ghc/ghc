@@ -25,7 +25,7 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Predicate( isEqualityClass, isCTupleClass )
 import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds )
-import GHC.Core.Coercion ( Coercion )
+import GHC.Core.Coercion ( Coercion, CastCoercion(..) )
 import GHC.Core.TyCo.FVs     ( coVarsOfCos )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Multiplicity ( scaledThing )
@@ -445,7 +445,7 @@ dmdAnal' env dmd (Var var)
   = WithDmdType (dmdTransform env var dmd) (Var var)
 
 dmdAnal' env dmd (Cast e co)
-  = WithDmdType (dmd_ty `plusDmdType` coercionDmdEnv co) (Cast e' co)
+  = WithDmdType (dmd_ty `plusDmdType` castCoercionDmdEnv co) (Cast e' co)
   where
     WithDmdType dmd_ty e' = dmdAnal env dmd e
 
@@ -2402,6 +2402,10 @@ noArgsDmdType dmd_env = DmdType dmd_env []
 
 coercionDmdEnv :: Coercion -> DmdEnv
 coercionDmdEnv co = coercionsDmdEnv [co]
+
+castCoercionDmdEnv :: CastCoercion -> DmdEnv
+castCoercionDmdEnv (CCoercion co)    = coercionDmdEnv co
+castCoercionDmdEnv (ZCoercion _ cos) = coercionsDmdEnv cos
 
 coercionsDmdEnv :: [Coercion] -> DmdEnv
 coercionsDmdEnv cos

@@ -27,7 +27,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
+  evId, evCoercion, evCast, evCastCo, evDFunApp,  evDataConApp, evSelector,
   mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
 
   evTermCoercion, evTermCoercion_maybe,
@@ -38,7 +38,7 @@ module GHC.Tc.Types.Evidence (
   HoleExprRef(..),
 
   -- * TcCoercion
-  TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
+  TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, TcCastCoercion, CoercionHole,
   TcMCoercion, TcMCoercionN, TcMCoercionR,
   Role(..), LeftOrRight(..), pickLR,
   maybeSymCo,
@@ -109,6 +109,7 @@ type TcCoercionP  = CoercionP    -- a phantom coercion
 type TcMCoercion  = MCoercion
 type TcMCoercionN = MCoercionN  -- nominal
 type TcMCoercionR = MCoercionR  -- representational
+type TcCastCoercion = CastCoercion
 
 
 -- | If a 'SwapFlag' is 'IsSwapped', flip the orientation of a coercion
@@ -529,7 +530,10 @@ evCoercion co = EvExpr (Coercion co)
 -- | d |> co
 evCast :: EvExpr -> TcCoercion -> EvTerm
 evCast et tc | isReflCo tc = EvExpr et
-             | otherwise   = EvExpr (Cast et tc)
+             | otherwise   = evCastCo et (CCoercion tc)
+
+evCastCo :: EvExpr -> TcCastCoercion -> EvTerm
+evCastCo et tc = EvExpr (Cast et tc)
 
 -- Dictionary instance application
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
@@ -814,10 +818,9 @@ Wrinkles
 
 mkEvCast :: EvExpr -> TcCoercion -> EvTerm
 mkEvCast ev lco
-  | assertPpr (coercionRole lco == Representational)
+  = assertPpr (coercionRole lco == Representational)
               (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]) $
-    isReflCo lco = EvExpr ev
-  | otherwise    = evCast ev lco
+    evCast ev lco
 
 
 mkEvScSelectors         -- Assume   class (..., D ty, ...) => C a b
@@ -850,7 +853,7 @@ evTermCoercion_maybe ev_term
     go (Var v)       = return (mkCoVarCo v)
     go (Coercion co) = return co
     go (Cast tm co)  = do { co' <- go tm
-                          ; return (mkCoCast co' co) }
+                          ; return (mkCoCastCo co' co) }
     go _             = Nothing
 
 evTermCoercion :: EvTerm -> TcCoercion

@@ -81,7 +81,7 @@ exprStats (Lam b e)       = bndrStats b `plusCS` exprStats e
 exprStats (Let b e)       = bindStats NotTopLevel b `plusCS` exprStats e
 exprStats (Case e b _ as) = exprStats e `plusCS` bndrStats b
                                         `plusCS` sumCS altStats as
-exprStats (Cast e co)     = coStats co `plusCS` exprStats e
+exprStats (Cast e co)     = castCoStats co `plusCS` exprStats e
 exprStats (Tick _ e)      = exprStats e
 
 altStats :: CoreAlt -> CoreStats
@@ -93,6 +93,9 @@ altBndrStats vs = oneTM `plusCS` sumCS (tyStats . varType) vs
 
 tyStats :: Type -> CoreStats
 tyStats ty = zeroCS { cs_ty = typeSize ty }
+
+castCoStats :: CastCoercion -> CoreStats
+castCoStats co = zeroCS { cs_co = castCoercionSize co }
 
 coStats :: Coercion -> CoreStats
 coStats co = zeroCS { cs_co = coercionSize co }

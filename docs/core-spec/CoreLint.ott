@@ -79,6 +79,8 @@ k2 elt { *, # }
 ------------------- :: Cast
 G; D |-tm e |> g : t
 
+TODO: update rule for Cast to cover ZCoercion
+
 G; empty |-tm e : t
 ------------------- :: Tick
 G; D |-tm e {tick} : t
