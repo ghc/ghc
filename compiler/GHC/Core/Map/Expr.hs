@@ -139,7 +139,7 @@ data CoreMapX a
        , cm_lit   :: LiteralMap a
        , cm_co    :: CoercionMapG a
        , cm_type  :: TypeMapG a
-       , cm_cast  :: CoreMapG (CoercionMapG a)
+       , cm_cast  :: CoreMapG (CastCoercionMapG a)
        , cm_tick  :: CoreMapG (TickishMap a)
        , cm_app   :: CoreMapG (CoreMapG a)
        , cm_lam   :: CoreMapG (BndrMap a)    -- Note [Binders]
@@ -277,13 +277,14 @@ instance TrieMap CoreMapX where
 ftE :: (a->Bool) -> CoreMapX a -> CoreMapX a
 ftE f (CM { cm_var = cvar, cm_lit = clit
           , cm_co = cco, cm_type = ctype
-          , cm_cast = ccast , cm_app = capp
+          , cm_cast = ccast, cm_app = capp
           , cm_lam = clam, cm_letn = cletn
           , cm_letr = cletr, cm_case = ccase
           , cm_ecase = cecase, cm_tick = ctick })
   = CM { cm_var = filterTM f cvar, cm_lit = filterTM f clit
        , cm_co = filterTM f cco, cm_type = filterTM f ctype
-       , cm_cast = fmap (filterTM f) ccast, cm_app = fmap (filterTM f) capp
+       , cm_cast = fmap (filterTM f) ccast
+       , cm_app = fmap (filterTM f) capp
        , cm_lam = fmap (filterTM f) clam, cm_letn = fmap (fmap (filterTM f)) cletn
        , cm_letr = fmap (fmap (filterTM f)) cletr, cm_case = fmap (filterTM f) ccase
        , cm_ecase = fmap (filterTM f) cecase, cm_tick = fmap (filterTM f) ctick }
@@ -291,7 +292,7 @@ ftE f (CM { cm_var = cvar, cm_lit = clit
 mpE :: (a -> Maybe b) -> CoreMapX a -> CoreMapX b
 mpE f (CM { cm_var = cvar, cm_lit = clit
           , cm_co = cco, cm_type = ctype
-          , cm_cast = ccast , cm_app = capp
+          , cm_cast = ccast, cm_app = capp
           , cm_lam = clam, cm_letn = cletn
           , cm_letr = cletr, cm_case = ccase
           , cm_ecase = cecase, cm_tick = ctick })

@@ -14,10 +14,14 @@ module GHC.Core.TyCo.FVs
 
         shallowTyCoVarsOfCo, shallowTyCoVarsOfCos,
         tyCoVarsOfCo, tyCoVarsOfCos, tyCoVarsOfMCo,
+        tyCoVarsOfCastCo,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
+        coVarsOfCastCo,
+        shallowCoVarsOfCo, shallowCoVarsOfCos, shallowCoVarsOfCastCo,
+        tyCoVarsOfCastCoercionDSet,
         tyCoVarsOfCoDSet,
-        tyCoFVsOfCo, tyCoFVsOfCos,
+        tyCoFVsOfCo, tyCoFVsOfCos, tyCoFVsOfCoVarSet,
         tyCoVarsOfCoList,
         coVarsOfCoDSet, coVarsOfCosDSet,
 
@@ -309,6 +313,10 @@ runTyCoVars f = appEndoOS f emptyVarSet
 *                                                                      *
 ********************************************************************* -}
 
+tyCoVarsOfCastCo :: CastCoercion -> TyCoVarSet
+tyCoVarsOfCastCo (CCoercion co)     = coVarsOfCo co
+tyCoVarsOfCastCo (ZCoercion ty cos) = tyCoVarsOfType ty `unionVarSet` cos
+
 tyCoVarsOfType :: Type -> TyCoVarSet
 -- The "deep" TyCoVars of the the type
 tyCoVarsOfType ty = runTyCoVars (deep_ty ty)
@@ -420,6 +428,21 @@ shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and sy
     do_hole _ _  = mempty   -- Ignore coercion holes
 
 
+-- Only the shallow CoVars (no TyVars).  TODO: better implementation?
+shallowCoVarsOfCos :: [Coercion] -> CoVarSet
+shallowCoVarsOfCos cos = filterVarSet isCoVar $ shallowTyCoVarsOfCos cos
+
+shallowCoVarsOfCo :: Coercion -> CoVarSet
+shallowCoVarsOfCo co = filterVarSet isCoVar $ shallowTyCoVarsOfCo co
+
+shallowCoVarsOfType :: Type -> CoVarSet
+shallowCoVarsOfType ty = filterVarSet isCoVar $ shallowTyCoVarsOfType ty
+
+shallowCoVarsOfCastCo :: CastCoercion -> CoVarSet
+shallowCoVarsOfCastCo (CCoercion co) = shallowCoVarsOfCo co
+shallowCoVarsOfCastCo (ZCoercion ty cos) = shallowCoVarsOfType ty `unionVarSet` cos
+
+
 {- *********************************************************************
 *                                                                      *
           Free coercion variables
@@ -441,6 +464,10 @@ Notice that
 
 See #14880.
 -}
+
+coVarsOfCastCo :: CastCoercion -> CoVarSet
+coVarsOfCastCo (CCoercion co) = coVarsOfCo co
+coVarsOfCastCo (ZCoercion ty cos) = coVarsOfType ty `unionVarSet` cos -- TODO cos doesn't include deep, this isn't enough?
 
 -- See Note [Finding free coercion variables]
 coVarsOfType  :: Type       -> CoVarSet
@@ -657,6 +684,9 @@ tyCoFVsOfTypes :: [Type] -> FV
 tyCoFVsOfTypes (ty:tys) fv_cand in_scope acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfTypes tys) fv_cand in_scope acc
 tyCoFVsOfTypes []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 
+tyCoVarsOfCastCoercionDSet :: CastCoercion -> DTyCoVarSet
+tyCoVarsOfCastCoercionDSet co = fvDVarSet $ tyCoFVsOfCastCoercion co
+
 -- | Get a deterministic set of the vars free in a coercion
 tyCoVarsOfCoDSet :: Coercion -> DTyCoVarSet
 -- See Note [Free variables of types]
@@ -671,6 +701,13 @@ tyCoFVsOfMCo mco fv_cand in_scope acc
   = case mco of
        MRefl  -> emptyFV fv_cand in_scope acc
        MCo co -> tyCoFVsOfCo co fv_cand in_scope acc
+
+tyCoFVsOfCastCoercion :: CastCoercion -> FV
+tyCoFVsOfCastCoercion (CCoercion co) = tyCoFVsOfCo co
+tyCoFVsOfCastCoercion (ZCoercion ty cos) = tyCoFVsOfType ty `unionFV` tyCoFVsOfCoVarSet cos
+
+tyCoFVsOfCoVarSet :: CoVarSet -> FV
+tyCoFVsOfCoVarSet = nonDetStrictFoldVarSet (unionFV . tyCoFVsOfCoVar) emptyFV -- TODO better way? Nondeterminism?
 
 tyCoFVsOfCo :: Coercion -> FV
 -- Extracts type and coercion variables from a coercion

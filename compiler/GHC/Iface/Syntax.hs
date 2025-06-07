@@ -693,7 +693,7 @@ data IfaceExpr
   | IfaceCase   IfaceExpr IfLclName [IfaceAlt]
   | IfaceECase  IfaceExpr IfaceType     -- See Note [Empty case alternatives]
   | IfaceLet    (IfaceBinding IfaceLetBndr) IfaceExpr
-  | IfaceCast   IfaceExpr IfaceCoercion
+  | IfaceCast   IfaceExpr IfaceCastCoercion
   | IfaceLit    Literal
   | IfaceLitRubbish TypeOrConstraint IfaceType
        -- See GHC.Types.Literal Note [Rubbish literals] item (6)
@@ -1817,7 +1817,7 @@ pprIfaceExpr add_par (IfaceCase scrut bndr alts)
 pprIfaceExpr _       (IfaceCast expr co)
   = sep [pprParendIfaceExpr expr,
          nest 2 (text "`cast`"),
-         pprParendIfaceCoercion co]
+         pprParendIfaceCastCoercion co]
 
 pprIfaceExpr add_par (IfaceLet (IfaceNonRec b rhs) body)
   = add_par (sep [text "let {",
@@ -2074,6 +2074,10 @@ freeNamesIfMCoercion :: IfaceMCoercion -> NameSet
 freeNamesIfMCoercion IfaceMRefl    = emptyNameSet
 freeNamesIfMCoercion (IfaceMCo co) = freeNamesIfCoercion co
 
+freeNamesIfCastCoercion :: IfaceCastCoercion -> NameSet
+freeNamesIfCastCoercion (IfaceCCoercion co) = freeNamesIfCoercion co
+freeNamesIfCastCoercion (IfaceZCoercion ty cos) = freeNamesIfType ty &&& fnList freeNamesIfCoercion cos
+
 freeNamesIfCoercion :: IfaceCoercion -> NameSet
 freeNamesIfCoercion (IfaceReflCo t) = freeNamesIfType t
 freeNamesIfCoercion (IfaceGReflCo _ t mco)
@@ -2160,7 +2164,7 @@ freeNamesIfExpr (IfaceCo co)          = freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTuple _ as)     = fnList freeNamesIfExpr as
 freeNamesIfExpr (IfaceLam (b,_) body) = freeNamesIfBndr b &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
-freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
+freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCastCoercion co
 freeNamesIfExpr (IfaceTick t e)       = freeNamesIfTickish t &&& freeNamesIfExpr e
 freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
 freeNamesIfExpr (IfaceCase s _ alts)

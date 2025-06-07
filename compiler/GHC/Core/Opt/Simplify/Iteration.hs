@@ -623,7 +623,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
   where
     -- Force the occ_fs so that the old Id is not retained in the new Id.
     !occ_fs = getOccFS bndr
-    work_ty = coercionLKind co
+    work_ty = castCoercionLKind (exprType rhs) co
     info   = idInfo bndr
     work_arity = arityInfo info `min` typeArity work_ty
 
@@ -644,7 +644,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
     mk_worker_unfolding top_lvl work_id work_rhs
       = case realUnfoldingInfo info of -- NB: the real one, even for loop-breakers
            unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
-             | isStableSource src -> return (unf { uf_tmpl = mkCast unf_rhs (mkSymCo co) })
+             | isStableSource src -> return (unf { uf_tmpl = mkCast unf_rhs (mkSymCo (castCoToCo (exprType rhs) co)) })
            _ -> mkLetUnfolding env top_lvl VanillaSrc work_id False work_rhs
 
 tryCastWorkerWrapper env _ _ bndr rhs  -- All other bindings
@@ -1672,10 +1672,10 @@ optOutCoercion env co already_optimised
     empty_subst = mkEmptySubst (seInScope env)
     opts = seOptCoercionOpts env
 
-simplCast :: SimplEnv -> InExpr -> InCoercion -> SimplCont
+simplCast :: SimplEnv -> InExpr -> InCastCoercion -> SimplCont
           -> SimplM (SimplFloats, OutExpr)
 simplCast env body co0 cont0
-  = do  { co1   <- {-#SCC "simplCast-simplCoercion" #-} simplCoercion env co0
+  = do  { co1   <- {-#SCC "simplCast-simplCoercion" #-} simplCoercion env (castCoToCo (exprType body) co0) -- TODO better way?
         ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
                    if isReflCo co1
                    then return cont0  -- See Note [Optimising reflexivity]
@@ -3434,9 +3434,9 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 improveSeq fam_envs env scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
   | Just (Reduction co ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
   = do { case_bndr2 <- newId (fsLit "nt") ManyTy ty2
-        ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) NotJoinPoint
+        ; let rhs  = DoneEx (Var case_bndr2 `Cast` CCoercion (mkSymCo co)) NotJoinPoint
               env2 = extendIdSubst env case_bndr rhs
-        ; return (env2, scrut `Cast` co, case_bndr2) }
+        ; return (env2, scrut `Cast` CCoercion co, case_bndr2) }
 
 improveSeq _ env scrut _ case_bndr1 _
   = return (env, scrut, case_bndr1)

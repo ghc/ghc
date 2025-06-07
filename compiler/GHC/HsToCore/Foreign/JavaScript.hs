@@ -241,7 +241,7 @@ dsJsImport id co (CLabel cid) _ _ _ = do
    (_resTy, foRhs) <- jsResultWrapper ty
 --   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
    let rhs = foRhs (Lit (LitLabel cid fod))
-       rhs' = Cast rhs co
+       rhs' = Cast rhs (CCoercion co)
 
    return ([(id, rhs')], mempty, mempty)
 
@@ -310,7 +310,7 @@ dsJsFExportDynamic id co0 cconv = do
                         , Lam stbl_value ccall_adj
                         ]
 
-        fed = (id `setInlineActivation` NeverActive, Cast io_app co0)
+        fed = (id `setInlineActivation` NeverActive, Cast io_app (CCoercion co0))
                -- Never inline the f.e.d. function, because the litlit
                -- might not be in scope in other modules.
 
@@ -353,7 +353,7 @@ dsJsCall fn_id co (CCall (CCallSpec target cconv safety)) _mDeclHeader = do
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
         wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkLams (tvs ++ args) wrapper_body
-        wrap_rhs'    = Cast wrap_rhs co
+        wrap_rhs'    = Cast wrap_rhs (CCoercion co)
         fn_id_w_inl  = fn_id
                        `setIdUnfolding`
                        mkInlineUnfoldingWithArity simpl_opts VanillaSrc

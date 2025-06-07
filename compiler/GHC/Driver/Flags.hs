@@ -378,6 +378,7 @@ impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
                 ,(Opt_ByteCodeAndObjectCode, turnOn, Opt_WriteByteCode)
                 ,(Opt_InfoTableMap, turnOn, Opt_InfoTableMapWithStack)
                 ,(Opt_InfoTableMap, turnOn, Opt_InfoTableMapWithFallback)
+                ,(Opt_DoCoreLinting, turnOff, Opt_ZapCasts)
                 ] ++ validHoleFitsImpliedGFlags
 
 -- | General flags that are switched on/off when other general flags are switched
@@ -888,6 +889,7 @@ data GeneralFlag
 
    | Opt_G_NoStateHack
    | Opt_G_NoOptCoercion
+   | Opt_ZapCasts
    deriving (Eq, Show, Enum)
 
 -- | The set of flags which affect optimisation for the purposes of

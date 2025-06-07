@@ -51,7 +51,8 @@ module GHC.Core.FVs (
         freeVars,               -- CoreExpr -> CoreExprWithFVs
         freeVarsBind,           -- CoreBind -> DVarSet -> (DVarSet, CoreBindWithFVs)
         freeVarsOf,             -- CoreExprWithFVs -> DIdSet
-        freeVarsOfAnn
+        freeVarsOfAnn,
+        unionFVss
     ) where
 
 import GHC.Prelude
@@ -259,7 +260,7 @@ exprFVs (App fun arg) fv_cand in_scope acc =
 exprFVs (Lam bndr body) fv_cand in_scope acc =
   addBndrFV bndr (exprFVs body) fv_cand in_scope acc
 exprFVs (Cast expr co) fv_cand in_scope acc =
-  (exprFVs expr `unionFV` tyCoFVsOfCo co) fv_cand in_scope acc
+  (exprFVs expr `unionFV` cast_co_fvs co) fv_cand in_scope acc
 
 exprFVs (Case scrut bndr ty alts) fv_cand in_scope acc
   = (exprFVs scrut `unionFV` tyCoFVsOfType ty `unionFV` addBndrFV bndr
@@ -275,6 +276,10 @@ exprFVs (Let (Rec pairs) body) fv_cand in_scope acc
   = addBndrsFV (map fst pairs)
                (mapUnionFV rhs_fvs pairs `unionFV` exprFVs body)
                fv_cand in_scope acc
+
+cast_co_fvs :: CastCoercion -> FV
+cast_co_fvs (CCoercion co)     fv_cand in_scope acc = (tyCoFVsOfCo co) fv_cand in_scope acc
+cast_co_fvs (ZCoercion ty cos) fv_cand in_scope acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCoVarSet cos) fv_cand in_scope acc
 
 ---------
 rhs_fvs :: (Id, CoreExpr) -> FV
@@ -749,7 +754,7 @@ freeVars = go
         , AnnCast expr2 (cfvs, co) )
       where
         expr2 = go expr
-        cfvs  = tyCoVarsOfCoDSet co
+        cfvs  = tyCoVarsOfCastCoercionDSet co
 
     go (Tick tickish expr)
       = ( tickishFVs tickish `unionFVs` freeVarsOf expr2

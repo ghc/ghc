@@ -30,9 +30,10 @@ import GHC.Core.Rules
 import GHC.Core.Subst (substTickish)
 import GHC.Core.TyCon (tyConClass_maybe)
 import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
-                          , mkCast, exprType, exprIsHNF
+                          , mkCastCo, exprType, exprIsHNF
                           , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
+import GHC.Core.TyCo.Subst ( substCastCo )
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.Simplify.Env ( SimplPhase(..), isActive )
@@ -1197,7 +1198,7 @@ specExpr env (Coercion co) = return (Coercion (substCo env co), emptyUDs)
 specExpr _   (Lit lit)     = return (Lit lit,                   emptyUDs)
 specExpr env (Cast e co)
   = do { (e', uds) <- specExpr env e
-       ; return ((mkCast e' (substCo env co)), uds) }
+       ; return ((mkCastCo e' (substCastCo (se_subst env) co)), uds) }
 specExpr env (Tick tickish body)
   = do { (body', uds) <- specExpr env body
        ; return (Tick (specTickish env tickish) body', uds) }

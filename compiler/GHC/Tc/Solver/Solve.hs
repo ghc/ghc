@@ -35,6 +35,8 @@ import GHC.Core.Reduction
 import GHC.Core.Coercion
 import GHC.Core.TyCo.FVs( coVarsOfCos )
 import GHC.Core.Class( classHasSCs )
+-- import GHC.Core.TyCo.FVs
+-- import GHC.Core.TyCo.Rep (Coercion(..))
 
 import GHC.Types.Id(  idType )
 import GHC.Types.Var( EvVar, tyVarKind )
@@ -51,6 +53,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import GHC.Driver.Session
+-- import GHC.Driver.DynFlags ( hasZapCasts )
 
 
 import Control.Monad
@@ -1723,30 +1726,77 @@ finish_rewrite
   (Reduction co new_pred)
   rewriters
   = assert (isEmptyCoHoleSet rewriters) $ -- this is a Given, not a wanted
-    do { let loc = ctEvLoc ev
+    do { -- zap_casts <- hasZapCasts <$> getDynFlags
+       ; let loc = ctEvLoc ev
              -- mkEvCast optimises ReflCo
              ev_rw_role = ctEvRewriteRole ev
              new_tm = assert (coercionRole co == ev_rw_role)
-                      evCast (evId old_evar) $   -- evCast optimises ReflCo
-                      downgradeRole Representational ev_rw_role co
+                      evCastCo (evId old_evar)   -- evCast optimises ReflCo
+                               (downgradeRole Representational ev_rw_role co)
+                               new_pred
        ; new_ev <- newGivenEv loc (new_pred, new_tm)
        ; continueWith $ CtGiven new_ev }
 
 finish_rewrite
-  ev@(CtWanted (WantedCt { ctev_rewriters = rewriters, ctev_dest = dest }))
+  ev@(CtWanted (WantedCt { ctev_pred = old_pred, ctev_rewriters = rewriters, ctev_dest = dest }))
   (Reduction co new_pred)
   new_rewriters
-  = do { let loc = ctEvLoc ev
+  = do { -- zap_casts <- hasZapCasts <$> getDynFlags
+       ; let loc = ctEvLoc ev
              rewriters' = rewriters S.<> new_rewriters
              ev_rw_role = ctEvRewriteRole ev
        ; mb_new_ev <- newWanted loc rewriters' new_pred
        ; massert (coercionRole co == ev_rw_role)
        ; setWantedDict dest EvCanonical $
-         evCast (getEvExpr mb_new_ev)                $
-         downgradeRole Representational ev_rw_role (mkSymCo co)
+         evCastCo (getEvExpr mb_new_ev)
+                  (downgradeRole Representational ev_rw_role (mkSymCo co))
+                  old_pred
        ; case mb_new_ev of
             Fresh  new_ev -> continueWith $ CtWanted new_ev
             Cached _      -> stopWith ev "Cached wanted" }
+
+
+-- | Decide whether to represent the coercion as a 'CCoercion' or 'ZCoercion'
+-- based on its rough structure.  In particular, use 'CCoercion' for individual
+-- axioms (for which the RHS type may be much larger).
+--
+-- The boolean indicates whether cast zapping is enabled (since the user may
+-- disable it by using `-fno-zap-casts` or `-dcore-lint`).
+--
+-- See Note [Zapped casts] in GHC.Core.TyCo.Rep.
+--
+-- mkCastCoercion :: Bool -> Type -> Coercion -> CastCoercion
+-- mkCastCoercion zap_casts lhs_ty co
+--    | isSmallCo co || not zap_casts = CCoercion co
+--    | otherwise                     = ZCoercion lhs_ty (shallowCoVarsOfCo co)
+
+-- | Is this coercion probably smaller than its type? This is a rough heuristic,
+-- but crucially we treat axioms (perhaps wrapped in Sym/Sub/etc.) as small
+-- because we might have something like
+--
+--   axF :: F Int ~ SomeVeryBigType
+--
+-- so we want to cast by `CCoercion (axF <Int>)` rather than `ZCoercion  SomeVeryBigType []`.
+--
+-- isSmallCo :: Coercion -> Bool
+-- isSmallCo Refl{}       = True
+-- isSmallCo GRefl{}      = True
+-- isSmallCo AxiomCo{}    = True
+-- isSmallCo CoVarCo{}    = True
+-- isSmallCo (SymCo co)   = isSmallCo co
+-- isSmallCo (KindCo co)  = isSmallCo co
+-- isSmallCo (SubCo co)   = isSmallCo co
+-- isSmallCo TyConAppCo{} = False
+-- isSmallCo AppCo{}      = False
+-- isSmallCo ForAllCo{}   = False
+-- isSmallCo FunCo{}      = False
+-- isSmallCo UnivCo{}     = False
+-- isSmallCo TransCo{}    = False
+-- isSmallCo SelCo{}      = False
+-- isSmallCo LRCo{}       = False
+-- isSmallCo InstCo{}     = False
+-- isSmallCo HoleCo{}     = False
+
 
 {- *******************************************************************
 *                                                                    *

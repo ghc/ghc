@@ -5,7 +5,6 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-
 module GHC.Core.SimpleOpt (
         SimpleOpts (..), defaultSimpleOpts,
 
@@ -333,14 +332,14 @@ simple_opt_expr env expr = go expr
       where
         (env', bndrs') = subst_opt_bndrs env bndrs
 
-mk_cast :: CoreExpr -> CoercionR -> CoreExpr
+mk_cast :: CoreExpr -> CastCoercion -> CoreExpr
 -- Like GHC.Core.Utils.mkCast, but does a full reflexivity check.
 -- mkCast doesn't do that because the Simplifier does (in simplCast)
 -- But in SimpleOpt it's nice to kill those nested casts (#18112)
-mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCo` co2)
+mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCastCo` co2)
 mk_cast (Tick t e)   co         = Tick t (mk_cast e co)
 mk_cast e co
-  | isReflexiveCo co
+  | isReflexiveCastCo (exprType e) co
   = e
   | otherwise
   = Cast e co
@@ -410,7 +409,7 @@ simple_app env e0@(Lam {}) as0@(_:_)
       = rebuild_app env (simple_opt_expr env e) as
 
     do_beta env (Cast e co) as =
-      do_beta env e (add_cast env co as)
+      do_beta env e (add_cast env (castCoToCo (exprType e) co) as)  -- TODO eliminate castCoToCo?
 
     do_beta env body as
       = simple_app env body as
@@ -458,7 +457,7 @@ simple_app env (Let bind body) args
           expr' = Let bind' (simple_opt_expr env' body)
 
 simple_app env (Cast e co) as
-  = simple_app env e (add_cast env co as)
+  = simple_app env e (add_cast env (castCoToCo (exprType e) co) as) -- TODO eliminate castCoToCo?
 
 simple_app env e as
   = rebuild_app env (simple_opt_expr env e) as
@@ -481,7 +480,7 @@ rebuild_app env fun args = foldl mk_app fun args
     in_scope = soeInScope env
     mk_app out_fun = \case
       ApplyToArg arg -> App out_fun (simple_opt_clo in_scope arg)
-      CastIt co      -> mk_cast out_fun co
+      CastIt co      -> mk_cast out_fun (CCoercion co)
 
 {- Note [Desugaring unlifted newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1407,7 +1406,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
        | not (tickishIsCode t) = go subst floats expr cont
 
     go subst floats (Cast expr co1) (CC args m_co2)
-       | Just (args', m_co1') <- pushCoArgs (subst_co subst co1) args
+       | Just (args', m_co1') <- pushCoArgs (subst_co subst (castCoToCo (exprType expr) co1)) args
             -- See Note [Push coercions in exprIsConApp_maybe]
        = go subst floats expr (CC args' (m_co1' `mkTransMCo` m_co2))
 
@@ -1697,11 +1696,12 @@ exprIsLambda_maybe ise (Tick t e)
     = Just (x, e, t:ts)
 
 -- Also possible: A casted lambda. Push the coercion inside
-exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
+exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e cco)
     | Just (x, e,ts) <- exprIsLambda_maybe ise casted_e
     -- Only do value lambdas.
     -- this implies that x is not in scope in gamma (makes this code simpler)
     , not (isTyVar x) && not (isCoVar x)
+    , let co = castCoToCo (exprType casted_e) cco
     , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
     , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e co
     , let res = Just (x',e',ts)

@@ -40,7 +40,7 @@ import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
 import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Type
-import GHC.Core.TyCo.FVs    ( tyCoVarsOfMCo )
+import GHC.Core.TyCo.FVs    ( tyCoVarsOfMCo, coVarsOfCastCo )
 
 import GHC.Data.Maybe( orElse )
 import GHC.Data.Graph.Directed ( SCC(..), Node(..)
@@ -2287,7 +2287,7 @@ occ_anal_lam_tail env expr@(Lam {})
 occ_anal_lam_tail env (Cast expr co)
   = let  WUD usage expr' = occ_anal_lam_tail env expr
          -- usage1: see Note [Gather occurrences of coercion variables]
-         usage1 = addManyOccs usage (coVarsOfCo co)
+         usage1 = addManyOccs usage (coVarsOfCastCo co)
 
          -- usage2: see Note [Occ-anal and cast worker/wrapper]
          usage2 = case expr of
@@ -2612,7 +2612,7 @@ occAnal env (Tick tickish body)
 
 occAnal env (Cast expr co)
   = let  (WUD usage expr') = occAnal env expr
-         usage1 = addManyOccs usage (coVarsOfCo co)
+         usage1 = addManyOccs usage (coVarsOfCastCo co)
              -- usage2: see Note [Gather occurrences of coercion variables]
          usage2 = markAllNonTail usage1
              -- usage3: calls inside expr aren't tail calls any more
@@ -3569,7 +3569,7 @@ scrutOkForBinderSwap e
   = case e of
       Tick _ e        -> scrutOkForBinderSwap e  -- Drop ticks
       Var v           -> DoBinderSwap v MRefl
-      Cast (Var v) co -> DoBinderSwap v (MCo (mkSymCo co))
+      Cast (Var v) co -> DoBinderSwap v (MCo (mkSymCo (castCoToCo (idType v) co))) -- TODO: can we do better?
                          -- Cast: see Note [Case of cast]
       _               -> NoBinderSwap
 

@@ -152,7 +152,7 @@ overloadedCallsCC =
           <*> pure t
           <*> mapM processAlt alts
         Cast e co ->
-          mkCast <$> processExpr e <*> pure co
+          mkCastCo <$> processExpr e <*> pure co
         Tick t e -> do
           trackSourceNote t $
             mkTick t <$> processExpr e

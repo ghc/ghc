@@ -13,7 +13,8 @@ module GHC.Core.Subst (
 
         -- ** Substituting into expressions and related types
         deShadowBinds, substRuleInfo, substRulesForImportedIds,
-        substTyUnchecked, substCo, substExpr, substExprSC, substBind, substBindSC,
+        substTyUnchecked, substCo, substCos, substExpr, substExprSC, substBind, substBindSC,
+        substCastCo,
         substUnfolding, substUnfoldingSC,
         lookupIdSubst, lookupIdSubst_maybe, substIdType, substIdOcc,
         substTickish, substDVarSet, substIdInfo,
@@ -45,7 +46,7 @@ import GHC.Core.Utils
         -- We are defining local versions
 import GHC.Core.Type hiding ( substTy )
 import GHC.Core.Coercion
-    ( tyCoFVsOfCo, mkCoVarCo, substCoVarBndr )
+    ( tyCoFVsOfCo, mkCoVarCo, substCos, substCoVarBndr, substCastCo )
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env as InScopeSet
@@ -260,7 +261,7 @@ substExpr subst expr
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)     = Cast (go e) (substCo subst co)
+    go (Cast e co)     = Cast (go e) (substCastCo subst co)
        -- Do not optimise even identity coercions
        -- Reason: substitution applies to the LHS of RULES, and
        --         if you "optimise" an identity coercion, you may

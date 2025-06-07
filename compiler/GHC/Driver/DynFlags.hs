@@ -7,7 +7,7 @@ module GHC.Driver.DynFlags (
         Language(..),
         FatalMessager, FlushOut(..),
         ProfAuto(..),
-        hasPprDebug, hasNoDebugOutput, hasNoStateHack, hasNoOptCoercion,
+        hasPprDebug, hasNoDebugOutput, hasNoStateHack, hasNoOptCoercion, hasZapCasts,
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset,
         wopt, wopt_set, wopt_unset,
@@ -997,6 +997,9 @@ hasNoStateHack = gopt Opt_G_NoStateHack
 hasNoOptCoercion :: DynFlags -> Bool
 hasNoOptCoercion = gopt Opt_G_NoOptCoercion
 
+hasZapCasts :: DynFlags -> Bool
+hasZapCasts = gopt Opt_ZapCasts
+
 -- | Test whether a 'DumpFlag' is set
 dopt :: DumpFlag -> DynFlags -> Bool
 dopt = getDumpFlagFrom verbosity dumpFlags
@@ -1174,6 +1177,7 @@ defaultFlags settings
       Opt_DumpWithWays,
       Opt_CompactUnwind,
       Opt_ShowErrorContext,
+      Opt_ZapCasts,
       Opt_SuppressStgReps,
       Opt_UnoptimizedCoreForInterpreter,
       Opt_SpecialiseIncoherents,

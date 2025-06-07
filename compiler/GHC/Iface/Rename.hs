@@ -845,7 +845,7 @@ rnIfaceExpr (IfaceLet (IfaceRec pairs) body)
                                             <*> rnIfaceExpr rhs) pairs)
                <*> rnIfaceExpr body
 rnIfaceExpr (IfaceCast expr co)
-    = IfaceCast <$> rnIfaceExpr expr <*> rnIfaceCo co
+    = IfaceCast <$> rnIfaceExpr expr <*> rnIfaceCastCo co
 rnIfaceExpr (IfaceLit lit)           = pure (IfaceLit lit)
 rnIfaceExpr (IfaceLitRubbish tc rep) = IfaceLitRubbish tc <$> rnIfaceType rep
 rnIfaceExpr (IfaceFCall cc ty)       = IfaceFCall cc <$> rnIfaceType ty
@@ -886,6 +886,10 @@ rnIfaceLamBndr (bndr, oneshot) = (,) <$> rnIfaceBndr bndr <*> pure oneshot
 rnIfaceMCo :: Rename IfaceMCoercion
 rnIfaceMCo IfaceMRefl    = pure IfaceMRefl
 rnIfaceMCo (IfaceMCo co) = IfaceMCo <$> rnIfaceCo co
+
+rnIfaceCastCo :: Rename IfaceCastCoercion
+rnIfaceCastCo (IfaceCCoercion co) = IfaceCCoercion <$> rnIfaceCo co
+rnIfaceCastCo (IfaceZCoercion ty cos) = IfaceZCoercion <$> rnIfaceType ty <*> mapM rnIfaceCo cos
 
 rnIfaceCo :: Rename IfaceCoercion
 rnIfaceCo (IfaceReflCo ty)              = IfaceReflCo <$> rnIfaceType ty

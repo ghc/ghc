@@ -1896,9 +1896,9 @@ rebuildLam env bndrs@(bndr:_) body cont
       | -- Note [Casts and lambdas]
         seCastSwizzle env
       , not (any bad bndrs)
-      = mkCast (mk_lams bndrs body) (mkPiCos Representational bndrs co)
+      = mkCast (mk_lams bndrs body) (mkPiCos Representational bndrs (castCoToCo (exprType body) co))
       where
-        co_vars  = tyCoVarsOfCo co
+        co_vars  = tyCoVarsOfCastCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
 
     mk_lams bndrs body
@@ -2719,7 +2719,7 @@ mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity cas
     identity_alt (Alt con args rhs) = check_eq rhs con args
 
     check_eq (Cast rhs co) con args        -- See Note [RHS casts]
-      = not (any (`elemVarSet` tyCoVarsOfCo co) args) && check_eq rhs con args
+      = not (any (`elemVarSet` tyCoVarsOfCastCo co) args) && check_eq rhs con args
     check_eq (Tick t e) alt args
       = tickishFloatable t && check_eq e alt args
 

@@ -885,9 +885,11 @@ lintCoreExpr (Var var)
 lintCoreExpr (Lit lit)
   = return (literalType lit, zeroUE)
 
-lintCoreExpr (Cast expr co)
+lintCoreExpr (Cast expr cco)
   = do { (expr_ty, ue) <- markAllJoinsBad (lintCoreExpr expr)
             -- markAllJoinsBad: see Note [Join points and casts]
+
+       ; let co = castCoToCo (exprType expr) cco
 
        ; lintCoercion co
        ; lintRole co Representational (coercionRole co)

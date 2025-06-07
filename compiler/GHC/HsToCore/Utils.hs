@@ -474,7 +474,7 @@ mkCastDs :: CoreExpr -> Coercion -> CoreExpr
 -- So here we do not make the assertion checks that we make in
 -- GHC.Core.Utils.mkCast; and we do less peephole optimisation too
 mkCastDs e co | isReflCo co = e
-              | otherwise   = Cast e co
+              | otherwise   = Cast e (CCoercion co)
 
 {-
 ************************************************************************

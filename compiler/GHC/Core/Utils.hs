@@ -9,7 +9,7 @@ Utility functions on @Core@ syntax
 -- | Commonly useful utilities for manipulating the Core language
 module GHC.Core.Utils (
         -- * Constructing expressions
-        mkCast, mkCastMCo, mkPiMCo,
+        mkCast, mkCastZ, mkCastCo, mkCastMCo, mkPiMCo,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
         bindNonRec, needsCaseBinding, needsCaseBindingL,
         mkAltExpr, mkDefaultCase, mkSingleAltCase,
@@ -79,6 +79,7 @@ import GHC.Core.Predicate( isEqPred )
 import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX, eqTypeIgnoringMultiplicity )
+import GHC.Core.TyCo.FVs
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.TyCon
@@ -139,7 +140,7 @@ exprType (Let bind body)
   , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
   | otherwise                = exprType body
 exprType (Case _ _ ty _)     = ty
-exprType (Cast _ co)         = coercionRKind co
+exprType (Cast _ co)         = castCoercionRKind co
 exprType (Tick _ e)          = exprType e
 exprType (Lam binder expr)   = mkLamType binder (exprType expr)
 exprType e@(App _ _)
@@ -251,7 +252,7 @@ applyTypeToArgs op_ty args
 
 mkCastMCo :: CoreExpr -> MCoercionR -> CoreExpr
 mkCastMCo e MRefl    = e
-mkCastMCo e (MCo co) = Cast e co
+mkCastMCo e (MCo co) = Cast e (CCoercion co)
   -- We are careful to use (MCo co) only when co is not reflexive
   -- Hence (Cast e co) rather than (mkCast e co)
 
@@ -265,6 +266,10 @@ mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
              Casts
 *                                                                      *
 ********************************************************************* -}
+
+mkCastCo :: HasDebugCallStack => CoreExpr -> CastCoercion -> CoreExpr
+mkCastCo expr (CCoercion co)     = mkCast expr co
+mkCastCo expr (ZCoercion ty cos) = mkCastZ expr ty cos
 
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
@@ -282,7 +287,7 @@ mkCast expr co
             , text "expr:" <+> ppr expr
             , callStackDoc ]) $
     case expr of
-      Cast expr co2 -> mkCast expr (mkTransCo co2 co)
+      Cast expr co2 -> mkCastCo expr (mkTransCastCoCo co2 co)
       Tick t expr   -> Tick t (mkCast expr co)
 
       Coercion e_co | isEqPred (coercionRKind co)
@@ -292,7 +297,18 @@ mkCast expr co
                       -> Coercion (mkCoCast e_co co)
 
       _ | isReflCo co -> expr
-        | otherwise   -> Cast expr co
+        | otherwise   -> Cast expr (CCoercion co)
+
+-- | Wrap the given expression in a zapped cast (see Note [Zapped casts] in
+-- GHC.Core.TyCo.Rep).
+mkCastZ :: HasDebugCallStack => CoreExpr -> Type -> CoVarSet -> CoreExpr
+mkCastZ expr ty cos =
+    case expr of
+      Cast expr co -> mkCastZ expr ty (shallowCoVarsOfCastCo co `unionVarSet` cos)
+      Tick t expr -> Tick t (mkCastZ expr ty cos)
+      Coercion e_co | isEqPred ty -> Coercion (mkCoCastCo e_co (ZCoercion ty cos))
+      _ -> Cast expr (ZCoercion ty cos)
+
 
 
 {- *********************************************************************
@@ -2509,7 +2525,7 @@ cheapEqExpr' ignoreTick e1 e2
     go (Type t1)  (Type t2)        = t1 `eqType` t2
     go (Coercion c1) (Coercion c2) = c1 `eqCoercion` c2
     go (App f1 a1) (App f2 a2)     = f1 `go` f2 && a1 `go` a2
-    go (Cast e1 t1) (Cast e2 t2)   = e1 `go` e2 && t1 `eqCoercion` t2
+    go (Cast e1 co1) (Cast e2 co2) = e1 `go` e2 && eqCastCoercion co1 co2
 
     go (Tick t1 e1) e2 | ignoreTick t1 = go e1 e2
     go e1 (Tick t2 e2) | ignoreTick t2 = go e1 e2
@@ -2605,7 +2621,7 @@ diffExpr _   env (Type t1)  (Type t2)  | eqTypeX env t1 t2              = []
 diffExpr _   env (Coercion co1) (Coercion co2)
                                        | eqCoercionX env co1 co2        = []
 diffExpr top env (Cast e1 co1)  (Cast e2 co2)
-  | eqCoercionX env co1 co2                = diffExpr top env e1 e2
+  | eqCastCoercionX env co1 co2            = diffExpr top env e1 e2
 diffExpr top env (Tick n1 e1)   e2
   | not (tickishIsCode n1)                 = diffExpr top env e1 e2
 diffExpr top env e1             (Tick n2 e2)

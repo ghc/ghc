@@ -21,6 +21,7 @@ module GHC.Tc.Zonk.Type (
         zonkTcTypesToTypesX, zonkScaledTcTypesToTypesX,
         zonkTyVarOcc,
         zonkCoToCo,
+        zonkCastCo,
         zonkEvBinds, zonkTcEvBinds,
         zonkTcMethInfoToMethInfoX,
         lookupTyVarX,
@@ -55,6 +56,7 @@ import GHC.Tc.Zonk.TcType
     ( tcInitTidyEnv, tcInitOpenTidyEnv
     , writeMetaTyVarRef
     , checkCoercionHole
+    , unpackCoercionHole_maybe
     , zonkCoVar )
 
 import GHC.Core.Coercion
@@ -64,6 +66,7 @@ import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep( CoercionPlusHoles(..) )
+import GHC.Core.TyCo.FVs
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -78,11 +81,13 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.TypeEnv
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import GHC.Types.TyThing
 
 import GHC.Tc.Types.BasicTypes
@@ -95,6 +100,9 @@ import Control.Monad.Trans.Class ( lift )
 import Data.List.NonEmpty ( NonEmpty )
 import Data.Foldable ( toList )
 import Data.Traversable ( for )
+import Data.Semigroup
+
+import GHC.Driver.DynFlags ( getDynFlags, hasZapCasts )
 
 {- Note [What is zonking?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -534,10 +542,18 @@ zonkScaledTcTypeToTypeX (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX m
 zonkTcTypeToTypeX   :: TcType   -> ZonkTcM Type
 zonkTcTypesToTypesX :: [TcType] -> ZonkTcM [Type]
 zonkCoToCo          :: Coercion -> ZonkTcM Coercion
-(zonkTcTypeToTypeX, zonkTcTypesToTypesX, zonkCoToCo)
+_zonkCosToCos        :: [Coercion] -> ZonkTcM [Coercion]
+(zonkTcTypeToTypeX, zonkTcTypesToTypesX, zonkCoToCo, _zonkCosToCos)
   = case mapTyCoX zonk_tycomapper of
-      (zty, ztys, zco, _) ->
-        (ZonkT . flip zty, ZonkT . flip ztys, ZonkT . flip zco)
+      (zty, ztys, zco, zcos) ->
+        (ZonkT . flip zty, ZonkT . flip ztys, ZonkT . flip zco, ZonkT. flip zcos)
+
+zonkCastCo :: CastCoercion -> ZonkTcM CastCoercion
+zonkCastCo (CCoercion co) = CCoercion <$> zonkCoToCo co
+zonkCastCo (ZCoercion ty cos) = ZCoercion <$> zonkTcTypeToTypeX ty <*> zonkCoVarSet cos
+
+zonkCoVarSet :: CoVarSet -> ZonkTcM CoVarSet
+zonkCoVarSet = fmap shallowCoVarsOfCos . mapM zonkCoVarOcc . nonDetEltsUniqSet
 
 zonkScaledTcTypesToTypesX :: [Scaled TcType] -> ZonkTcM [Scaled Type]
 zonkScaledTcTypesToTypesX scaled_tys =
@@ -1809,9 +1825,49 @@ Wrinkles:
 ************************************************************************
 -}
 
+zonkShallowCoVarsOfCo :: TcCoercion -> ZonkTcM CoVarSet
+zonkShallowCoVarsOfCo co
+  = unZCVSM $ go_co co
+  where
+    go_hole :: CoercionHole -> ZonkTcM CoVarSet
+    go_hole hole
+      = do { m_co <- lift $ liftZonkM $ unpackCoercionHole_maybe hole
+           ; case m_co of
+               Nothing -> return emptyVarSet  -- Not filled (TODO emit log message?)
+               Just co -> unZCVSM (go_co (cph_co co)) }         -- Filled: look inside
+
+    go_co :: Coercion -> ZonkCoVarSetMonoid
+    (_, _, go_co, _) = foldTyCo folder ()
+
+    folder :: TyCoFolder () ZonkCoVarSetMonoid
+    folder = TyCoFolder { tcf_view  = noView
+                        , tcf_tyvar = \ _ _ -> mempty
+                        , tcf_covar = \ _ cv -> ZCVSM (pure (unitVarSet cv))
+                        , tcf_hole  = \ _ -> ZCVSM . go_hole
+                        , tcf_tycobinder = \ _ _ _ -> () }
+
+newtype ZonkCoVarSetMonoid = ZCVSM { unZCVSM :: ZonkTcM CoVarSet }
+
+instance Semigroup ZonkCoVarSetMonoid where
+  ZCVSM l <> ZCVSM r = ZCVSM (unionVarSet <$> l <*> r)
+
+instance Monoid ZonkCoVarSetMonoid where
+  mempty = ZCVSM (return emptyVarSet)
+
+
+
 zonkEvTerm :: EvTerm -> ZonkTcM EvTerm
 zonkEvTerm (EvExpr e)
   = EvExpr <$> zonkCoreExpr e
+zonkEvTerm (EvCastExpr e (CCoercion co) co_res_ty)
+  = do { zap_casts <- hasZapCasts <$> lift getDynFlags
+       ; co_res_ty' <- zonkTcTypeToTypeX co_res_ty
+       ; if zap_casts
+         then EvCastExpr <$> zonkCoreExpr e <*> (ZCoercion co_res_ty' <$> zonkShallowCoVarsOfCo co) <*> pure co_res_ty'
+         else EvExpr <$> zonkCoreExpr (Cast e (CCoercion co))
+       }
+zonkEvTerm ev@(EvCastExpr _ (ZCoercion{}) _)
+  = pprPanic "zonkEvTerm: ZCoercion" (ppr ev)
 zonkEvTerm (EvTypeable ty ev)
   = EvTypeable <$> zonkTcTypeToTypeX ty <*> zonkEvTypeable ev
 zonkEvTerm (EvFun { et_tvs = tvs, et_given = evs
@@ -1837,7 +1893,7 @@ zonkCoreExpr (Type ty)
     = Type <$> zonkTcTypeToTypeX ty
 
 zonkCoreExpr (Cast e co)
-    = Cast <$> zonkCoreExpr e <*> zonkCoToCo co
+    = Cast <$> zonkCoreExpr e <*> zonkCastCo co
 zonkCoreExpr (Tick t e)
     = Tick t <$> zonkCoreExpr e -- Do we need to zonk in ticks?
 

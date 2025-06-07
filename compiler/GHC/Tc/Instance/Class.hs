@@ -455,7 +455,7 @@ matchWithDict [cls_ty, mty]
                = mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
                  Var k `App` (evUnaryDictAppE cls dict_args meth_arg)
                where
-                 meth_arg = Var sv `Cast` mkSubCo (evExprCoercion ev_expr)
+                 meth_arg = Var sv `Cast` CCoercion (mkSubCo (evExprCoercion ev_expr))
 
        ; let mk_ev [c] = evDictApp wd_cls [cls_ty, mty] [evWithDict c]
              mk_ev e   = pprPanic "matchWithDict" (ppr e)
@@ -657,7 +657,7 @@ matchDataToTag dataToTagClass [levity, dty] = do
                                (mkReflCo Representational intPrimTy)
      -> do { addUsedDataCons rdr_env repTyCon   -- See wrinkles DTW2 and DTW3
            ; let mk_ev _ = evDictApp dataToTagClass [levity, dty] $
-                           [methodRep `Cast` methodCo]
+                           [methodRep `Cast` CCoercion methodCo]
            ; pure (OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
                            , cir_mk_ev     = mk_ev
                            , cir_canonical = EvCanonical

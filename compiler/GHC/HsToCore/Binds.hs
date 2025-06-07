@@ -1188,7 +1188,7 @@ pickSpecBinds is_local known_bndrs (bind:binds)
 
 getCastedVar :: CoreExpr -> Maybe (Var, MCoercionR)
 getCastedVar (Var v)           = Just (v, MRefl)
-getCastedVar (Cast (Var v) co) = Just (v, MCo co)
+getCastedVar (Cast (Var v) (CCoercion co)) = Just (v, MCo co) -- TODO what about ZCoercion case?
 getCastedVar _                 = Nothing
 
 specFunInlinePrag :: Id -> InlinePragma
@@ -1725,6 +1725,7 @@ dsEvBind (EvBind { eb_lhs = v, eb_rhs = r, eb_info = info }) = do
 
 dsEvTerm :: EvTerm -> DsM CoreExpr
 dsEvTerm (EvExpr e)          = return e
+dsEvTerm (EvCastExpr e co _) = return (Cast e co)
 dsEvTerm (EvTypeable ty ev)  = dsEvTypeable ty ev
 dsEvTerm (EvFun { et_tvs = tvs, et_given = given
                 , et_binds = ev_binds, et_body = wanted_id })

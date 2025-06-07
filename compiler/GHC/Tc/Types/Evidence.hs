@@ -29,7 +29,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evCastE, evDFunApp,  evDictApp, evSelector, evDelayedError,
+  evId, evCoercion, evCast, evCastE, evCastCo, evDFunApp,  evDictApp, evSelector, evDelayedError,
   mkEvScSelectors, evTypeable,
   evWrapIPE, evUnwrapIPE, evUnaryDictAppE,
   mkEvCast,
@@ -44,7 +44,7 @@ module GHC.Tc.Types.Evidence (
   HoleExprRef(..),
 
   -- * TcCoercion
-  TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
+  TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, TcCastCoercion, CoercionHole,
   TcMCoercion, TcMCoercionN, TcMCoercionR,
   Role(..), LeftOrRight(..), pickLR,
   maybeSymCo,
@@ -122,6 +122,7 @@ type TcCoercionP  = CoercionP    -- a phantom coercion
 type TcMCoercion  = MCoercion
 type TcMCoercionN = MCoercionN  -- nominal
 type TcMCoercionR = MCoercionR  -- representational
+type TcCastCoercion = CastCoercion
 
 
 -- | If a 'SwapFlag' is 'IsSwapped', flip the orientation of a coercion
@@ -634,11 +635,20 @@ optSubTypeHsWrapper wrap
     not_in v (WpSubType w)             = not_in v w
     not_in v (WpCompose w1 w2)         = not_in v w1 && not_in v w2
     not_in v (WpEvApp (EvExpr e))      = not (v `elemVarSet` exprFreeVars e)
+    not_in v (WpEvApp (EvCastExpr e co ty)) = not (v `elemVarSet` exprFreeVars e)
+                                           && not_in_cast_co v co
+                                           && not (anyFreeVarsOfType (== v) ty)
     not_in _ (WpEvApp (EvTypeable {})) = False  -- Giving up; conservative
     not_in _ (WpEvApp (EvFun {}))      = False  -- Giving up; conservative
     not_in _ (WpTyLam {}) = False    -- Give  up; conservative
     not_in _ (WpEvLam {}) = False    -- Ditto
     not_in _ (WpLet {})   = False    -- Ditto
+
+    not_in_cast_co :: TyVar -> CastCoercion -> Bool
+    not_in_cast_co v = \case
+      CCoercion co     -> not (anyFreeVarsOfCo (== v) co)
+      ZCoercion ty cvs -> not (anyFreeVarsOfType (== v) ty)
+                       && not (v `elemVarSet` cvs)
 
     not_in_submult :: TyVar -> SubMultCo -> Bool
     not_in_submult v = \case
@@ -880,6 +890,8 @@ mkGivenEvBind ev tm = EvBind { eb_info = EvBindGiven, eb_lhs = ev, eb_rhs = tm }
 data EvTerm
   = EvExpr EvExpr
 
+  | EvCastExpr EvExpr TcCastCoercion TcType
+
   | EvTypeable Type EvTypeable   -- Dictionary for (Typeable ty)
 
   | EvFun     -- /\as \ds. let binds in v
@@ -916,7 +928,10 @@ evCastE ee co
   | assertPpr (coercionRole co == Representational)
               (vcat [text "Coercion of wrong role passed to evCastE:", ppr ee, ppr co]) $
     isReflCo co = ee
-  | otherwise   = Cast ee co
+  | otherwise   = Cast ee (CCoercion co)
+
+evCastCo :: EvExpr -> TcCoercion -> TcType -> EvTerm
+evCastCo et co co_res_ty = EvCastExpr et (CCoercion co) co_res_ty -- TODO: should evCastCo check isReflCo?
 
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
 -- Dictionary instance application, including when the "dictionary function"
@@ -1256,7 +1271,7 @@ evExprCoercion_maybe :: EvExpr -> Maybe TcCoercion
 evExprCoercion_maybe (Var v)       = return (mkCoVarCo v)
 evExprCoercion_maybe (Coercion co) = return co
 evExprCoercion_maybe (Cast tm co)  = do { co' <- evExprCoercion_maybe tm
-                                        ; return (mkCoCast co' co) }
+                                        ; return (mkCoCastCo co' co) }
 evExprCoercion_maybe _             = Nothing
 
 evExprCoercion :: EvExpr -> TcCoercion
@@ -1305,6 +1320,7 @@ nestedEvIdsOfTerm tm = fvVarSet (filterFV isNestedEvId (evTermFVs tm))
 
 evTermFVs :: EvTerm -> FV
 evTermFVs (EvExpr e)         = exprFVs e
+evTermFVs (EvCastExpr e co _ty) = exprFVs (Cast e co) -- TODO safe to ignore ty here?
 evTermFVs (EvTypeable _ ev)  = evFVsOfTypeable ev
 evTermFVs (EvFun { et_tvs = tvs, et_given = given
                  , et_binds = tc_ev_binds, et_body = v })
@@ -1412,6 +1428,7 @@ instance Outputable EvBind where
 
 instance Outputable EvTerm where
   ppr (EvExpr e)         = ppr e
+  ppr (EvCastExpr e co ty) = text "EvCastExpr" <+> ppr e <+> ppr co <+> ppr ty
   ppr (EvTypeable ty ev) = ppr ev <+> dcolon <+> text "Typeable" <+> ppr ty
   ppr (EvFun { et_tvs = tvs, et_given = gs, et_binds = bs, et_body = w })
       = hang (text "\\" <+> sep (map pprLamBndr (tvs ++ gs)) <+> arrow)

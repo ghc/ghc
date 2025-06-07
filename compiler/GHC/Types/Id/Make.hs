@@ -1219,7 +1219,7 @@ wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
   where
     unboxer arg_id = do { rep_id <- newLocal (fsLit "cowrap_unbx") (Scaled (idMult arg_id) rep_ty)
                         ; (rep_ids, rep_fn) <- unbox_rep rep_id
-                        ; let co_bind = NonRec rep_id (Var arg_id `Cast` co)
+                        ; let co_bind = NonRec rep_id (Var arg_id `Cast` CCoercion co)
                         ; return (rep_ids, Let co_bind . rep_fn) }
     boxer = Boxer $ \ subst ->
             do { (rep_ids, rep_expr)
@@ -1229,7 +1229,7 @@ wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
                                        ; return ([rep_id], Var rep_id) }
                          Boxer boxer -> boxer subst
                ; let sco = substCo subst co
-               ; return (rep_ids, rep_expr `Cast` mkSymCo sco) }
+               ; return (rep_ids, rep_expr `Cast` CCoercion (mkSymCo sco)) }
 
 ------------------------
 unitUnboxer :: Unboxer
@@ -2142,7 +2142,7 @@ coerceId = pcRepPolyId coerceName ty concs info
     [eqR,x,eq] = mkTemplateLocals [eqRTy, a, eqRPrimTy]
     rhs = mkLams (bndrs ++ [eqR, x]) $
           mkWildCase (Var eqR) (unrestricted eqRTy) b $
-          [Alt (DataAlt coercibleDataCon) [eq] (Cast (Var x) (mkCoVarCo eq))]
+          [Alt (DataAlt coercibleDataCon) [eq] (Cast (Var x) (CCoercion (mkCoVarCo eq)))]
 
     concs = mkRepPolyIdConcreteTyVars
             [((mkTyVarTy av, mkArgPos 1 Top), rv)]

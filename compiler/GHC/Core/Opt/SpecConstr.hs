@@ -1527,7 +1527,7 @@ scExpr' _   e@(Lit {})   = return (nullUsage, e, [])
 scExpr' env (Tick t e)   = do (usg, e', ws) <- scExpr env e
                               return (usg, Tick (scTickish env t) e', ws)
 scExpr' env (Cast e co)  = do (usg, e', ws) <- scExpr env e
-                              return (usg, mkCast e' (scSubstCo env co), ws)
+                              return (usg, mkCastCo e' (substCastCo (sc_subst env) co), ws)
                               -- Important to use mkCast here
                               -- See Note [SpecConstr call patterns]
 scExpr' env e@(App _ _)  = scApp env (collectArgs e)
@@ -2693,7 +2693,7 @@ argToPat1 env in_scope val_env (Cast arg co) arg_occ arg_str
           else
                 return (interesting, Cast arg' co, strict_args) }
   where
-    ty2 = coercionRKind co
+    ty2 = castCoercionRKind co
 
   -- Check for a constructor application
   -- NB: this *precedes* the Var case, so that we catch nullary constrs

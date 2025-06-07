@@ -2042,7 +2042,7 @@ etaExpandAT in_scope at orig_expr
 
 eta_expand :: InScopeSet -> [OneShotInfo] -> CoreExpr -> CoreExpr
 eta_expand in_scope one_shots (Cast expr co)
-  = mkCast (eta_expand in_scope one_shots expr) co
+  = mkCastCo (eta_expand in_scope one_shots expr) co
     -- This mkCast is important, because eta_expand might return an
     -- expression with a cast at the outside; and tryCastWorkerWrapper
     -- asssumes that we don't have nested casts. Makes a difference
@@ -2221,9 +2221,10 @@ etaInfoApp in_scope expr eis
     go subst (Tick t e) eis
       = Tick (substTickish subst t) (go subst e eis)
 
-    go subst (Cast e co) (EI bs mco)
+    go subst (Cast e cco) (EI bs mco)
       = go subst e (EI bs mco')
       where
+        co = castCoToCo (exprType e) cco -- TODO: can we avoid this?
         mco' = checkReflexiveMCo (Core.substCo subst co `mkTransMCoR` mco)
                -- See Note [Check for reflexive casts in eta expansion]
 
@@ -2716,7 +2717,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
 
     -- See Note [Eta reduction with casted function]
     go bs (Cast e co1) co2
-      = go bs e (co1 `mkTransCo` co2)
+      = go bs e (castCoToCo (exprType e) co1 `mkTransCo` co2)
 
     go bs (Tick t e) co
       | tickishFloatable t
@@ -2826,13 +2827,12 @@ tryEtaReduce rec_ids bndrs body eval_sd
        , Just (_, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqType` idMult bndr
-       = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
+       = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCo (castCoToCo (exprType e) co_arg)) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co fun_ty
        | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
        = Just (co', t:ticks)
-
     ok_arg _ _ _ _ = Nothing
 
 -- | Can we eta-reduce the given function
@@ -3119,13 +3119,13 @@ collectBindersPushingCo e
     go :: [Var] -> CoreExpr -> ([Var], CoreExpr)
     -- The accumulator is in reverse order
     go bs (Lam b e)   = go (b:bs) e
-    go bs (Cast e co) = go_c bs e co
+    go bs (Cast e co) = go_c bs e (castCoToCo (exprType e) co) -- TODO: can we do better?
     go bs e           = (reverse bs, e)
 
     -- We are in a cast; peel off casts until we hit a lambda.
-    go_c :: [Var] -> CoreExpr -> CoercionR -> ([Var], CoreExpr)
+    go_c :: [Var] -> CoreExpr -> Coercion -> ([Var], CoreExpr)
     -- (go_c bs e c) is same as (go bs e (e |> c))
-    go_c bs (Cast e co1) co2 = go_c bs e (co1 `mkTransCo` co2)
+    go_c bs (Cast e co1) co2 = go_c bs e (castCoToCo (exprType e) co1 `mkTransCo` co2) -- TODO: can we do better?
     go_c bs (Lam b e)    co  = go_lam bs b e co
     go_c bs e            co  = (reverse bs, mkCast e co)
 

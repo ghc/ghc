@@ -9,6 +9,7 @@ import Language.Haskell.Syntax.Specificity (ForAllTyFlag)
 
 data Type
 data Coercion
+data CastCoercion
 data FunSel
 data CoSel
 data UnivCoProvenance

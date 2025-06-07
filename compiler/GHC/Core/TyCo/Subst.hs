@@ -33,6 +33,8 @@ module GHC.Core.TyCo.Subst
         substTy, substTyAddInScope, substScaledTy,
         substTyUnchecked, substTysUnchecked, substScaledTysUnchecked, substThetaUnchecked,
         substTyWithUnchecked, substScaledTyUnchecked,
+        substCastCo,
+        substCoVarSet,
         substTyWithInScope,
         substTys, substScaledTys, substTheta,
         lookupTyVar,
@@ -831,6 +833,14 @@ lookupTyVar :: Subst -> TyVar  -> Maybe Type
 lookupTyVar (Subst _ _ tenv _) tv
   = assert (isTyVar tv )
     lookupVarEnv tenv tv
+
+substCastCo :: HasDebugCallStack => Subst -> CastCoercion -> CastCoercion
+substCastCo subst (CCoercion co)     = CCoercion (substCo subst co)
+substCastCo subst (ZCoercion ty cos) = ZCoercion (substTy subst ty) (substCoVarSet subst cos)
+
+substCoVarSet :: HasDebugCallStack => Subst -> CoVarSet -> CoVarSet
+substCoVarSet subst = nonDetStrictFoldVarSet (unionVarSet . shallowCoVarsOfCo . substCoVar subst) emptyVarSet -- TODO better impl; determinism?
+
 
 -- | Substitute within a 'Coercion'
 -- The substitution has to satisfy the invariants described in
