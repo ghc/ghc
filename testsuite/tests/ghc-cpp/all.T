@@ -19,3 +19,5 @@ test('GhcCpp01',
      [normalise_errmsg_fun(normalise_haskell_full_version, normalise_haskell_pl1,normalise_min_version_haskell)],
      compile,
      ['-ddump-ghc-cpp -dkeep-comments'])
+
+test('GhcCpp02', normal, compile, [''])
