@@ -199,6 +199,10 @@ ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
 ppr_expr add_par (Cast expr co)
   = add_par $ sep [pprParendExpr expr, text "`cast`" <+> pprOptCo co]
 
+ppr_expr add_par (CastZ expr ty cos)
+  = add_par $ sep [pprParendExpr expr, text "`castZ`" <+> ppr ty, parens (sep (map ppr cos))] -- TODO format
+
+
 ppr_expr add_par expr@(Lam _ _)
   = let
         (bndrs, body) = collectBinders expr

@@ -633,6 +633,8 @@ rnIfaceExpr (IfaceLet (IfaceRec pairs) body)
                <*> rnIfaceExpr body
 rnIfaceExpr (IfaceCast expr co)
     = IfaceCast <$> rnIfaceExpr expr <*> rnIfaceCo co
+rnIfaceExpr (IfaceCastZ expr ty cos)
+    = IfaceCastZ <$> rnIfaceExpr expr <*> rnIfaceType ty <*> mapM rnIfaceCo cos
 rnIfaceExpr (IfaceLit lit)           = pure (IfaceLit lit)
 rnIfaceExpr (IfaceLitRubbish tc rep) = IfaceLitRubbish tc <$> rnIfaceType rep
 rnIfaceExpr (IfaceFCall cc ty)       = IfaceFCall cc <$> rnIfaceType ty

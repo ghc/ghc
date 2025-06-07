@@ -92,6 +92,7 @@ doExpr env (Case scrut b ty alts) =
   where
     doAlt (Alt con bs rhs)  = Alt con bs <$> doExpr env rhs
 doExpr env (Cast expr co)   = Cast <$> doExpr env expr <*> pure co
+doExpr env (CastZ e ty cos) = CastZ <$> doExpr env e <*> pure ty <*> pure cos
 doExpr env (Tick t e)       = Tick t <$> doExpr env e
 doExpr _env e@(Type _)      = pure e
 doExpr _env e@(Coercion _)  = pure e

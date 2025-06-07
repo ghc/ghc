@@ -39,7 +39,7 @@ import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Predicate   ( isDictId )
 import GHC.Core.Type
-import GHC.Core.TyCo.FVs    ( tyCoVarsOfMCo )
+import GHC.Core.TyCo.FVs    ( coVarsOfCos, tyCoVarsOfMCo )
 
 import GHC.Data.Maybe( orElse )
 import GHC.Data.Graph.Directed ( SCC(..), Node(..)
@@ -1960,6 +1960,7 @@ cheapExprSize e
     go1 n (Coercion {})   = n
     go1 n (Tick _ e)      = go1 n e
     go1 n (Cast e _)      = go1 n e
+    go1 n (CastZ e _ _)   = go1 n e
     go1 n (App f a)       = go (go1 n f) a
     go1 n (Lam b e)
       | isTyVar b         = go1 n e
@@ -2108,6 +2109,7 @@ isOneShotFun :: CoreExpr -> Bool
 -- are all one-shot.  If there aren't any lambdas at all, this is True
 isOneShotFun (Lam b e)  = isOneShotBndr b && isOneShotFun e
 isOneShotFun (Cast e _) = isOneShotFun e
+isOneShotFun (CastZ e _ _) = isOneShotFun e
 isOneShotFun _          = True
 
 zapLambdaBndrs :: CoreExpr -> FullArgCount -> CoreExpr
@@ -2128,6 +2130,7 @@ zapLambdaBndrs fun arg_count
     zap 0 e | isOneShotFun e = Nothing  -- All remaining lambdas are one-shot
             | otherwise      = Just e   -- in which case no need to zap
     zap n (Cast e co) = do { e' <- zap n e; return (Cast e' co) }
+    zap n (CastZ e ty cos) = do { e' <- zap n e; return (CastZ e' ty cos) }
     zap n (Lam b e)   = do { e' <- zap (n-1) e
                            ; return (Lam (zap_bndr b) e') }
     zap _ _           = Nothing  -- More arguments than lambdas
@@ -2213,6 +2216,8 @@ occ_anal_lam_tail env (Cast expr co)
          usage3 = markAllNonTail usage2
 
     in WUD usage3 (Cast expr' co)
+
+-- TODO occ_anal_lam_tail for CastZ
 
 occ_anal_lam_tail env expr  -- Not Lam, not Cast
   = occAnal env expr
@@ -2525,6 +2530,15 @@ occAnal env (Cast expr co)
          usage2 = markAllNonTail usage1
              -- usage3: calls inside expr aren't tail calls any more
     in WUD usage2 (Cast expr' co)
+
+occAnal env (CastZ expr ty cos)
+  = let  (WUD usage expr') = occAnal env expr
+         usage1 = addManyOccs usage (coVarsOfCos cos)
+         usage2 = addManyOccs usage1 (coVarsOfType ty)
+             -- see Note [Gather occurrences of coercion variables]
+         usage3 = markAllNonTail usage2
+             -- calls inside expr aren't tail calls any more
+    in WUD usage3 (CastZ expr' ty cos)
 
 occAnal env app@(App _ _)
   = occAnalApp env (collectArgsTicks tickishFloatable app)
@@ -3443,6 +3457,7 @@ scrutOkForBinderSwap (Cast (Var v) co)
         -- over-conservatively. But I have never seen one, so I'm leaving
         -- the code as simple as possible. Losing the binder-swap in a
         -- rare case probably has very low impact.
+-- TODO: scrutOkForBinderSwap for CastZ
 scrutOkForBinderSwap (Tick _ e) = scrutOkForBinderSwap e  -- Drop ticks
 scrutOkForBinderSwap _          = NoBinderSwap
 

@@ -26,10 +26,11 @@ import GHC.Core.Make      ( mkLitRubbish )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
 import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
-                          , mkCast, exprType
+                          , mkCast, mkCastZ, exprType
                           , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
+import GHC.Core.TyCo.Subst ( substCos )
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
 -- import GHC.Core.Ppr( pprIds )
 
@@ -1193,6 +1194,9 @@ specExpr _   (Lit lit)     = return (Lit lit,                   emptyUDs)
 specExpr env (Cast e co)
   = do { (e', uds) <- specExpr env e
        ; return ((mkCast e' (substCo env co)), uds) }
+specExpr env (CastZ e ty cos)
+  = do { (e', uds) <- specExpr env e
+       ; return ((mkCastZ e' (substTy env ty) (substCos (se_subst env) cos)), uds) }
 specExpr env (Tick tickish body)
   = do { (body', uds) <- specExpr env body
        ; return (Tick (specTickish env tickish) body', uds) }
@@ -3212,6 +3216,7 @@ interestingDict arg arg_ty
     go (App fn (Coercion _)) = go fn
     go (Tick _ a)            = go a
     go (Cast e _)            = go e
+    go (CastZ e _ _)         = go e
     go _                     = True
 
 thenUDs :: UsageDetails -> UsageDetails -> UsageDetails

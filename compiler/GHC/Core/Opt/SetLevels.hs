@@ -343,6 +343,10 @@ lvlExpr env (_, AnnCast expr (_, co)) = do
     expr' <- lvlNonTailExpr env expr
     return (Cast expr' (substCo (le_subst env) co))
 
+lvlExpr env (_, AnnCastZ expr (_, ty) cos) = do
+    expr' <- lvlNonTailExpr env expr
+    return (CastZ expr' (substTyUnchecked (le_subst env) ty) (map (substCo (le_subst env) . snd) cos))
+
 lvlExpr env (_, AnnTick tickish expr) = do
     expr' <- lvlNonTailExpr env expr
     let tickish' = substTickish (le_subst env) tickish
@@ -608,6 +612,10 @@ lvlMFE env strict_ctxt (_, AnnTick t e)
 lvlMFE env strict_ctxt (_, AnnCast e (_, co))
   = do  { e' <- lvlMFE env strict_ctxt e
         ; return (Cast e' (substCo (le_subst env) co)) }
+
+lvlMFE env strict_ctxt (_, AnnCastZ e (_, ty) cos)
+  = do  { e' <- lvlMFE env strict_ctxt e
+        ; return (CastZ e' (substTyUnchecked (le_subst env) ty) (map (substCo (le_subst env) . snd) cos)) }
 
 lvlMFE env strict_ctxt e@(_, AnnCase {})
   | strict_ctxt       -- Don't share cases in a strict context
@@ -1179,6 +1187,7 @@ notWorthFloating e abs_vars
        | otherwise              = False
     go (Tick t e) n             = not (tickishIsCode t) && go e n
     go (Cast e _)  n            = go e n
+    go (CastZ e _ _) n          = go e n
     go (Case e b _ as) n
       | null as
       = go e n     -- See Note [Empty case is trivial]

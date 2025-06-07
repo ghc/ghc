@@ -104,7 +104,7 @@ module GHC.Core.Coercion (
         eqCoercion, eqCoercionX,
 
         -- ** Forcing evaluation of coercions
-        seqCo,
+        seqCo, seqCos,
 
         -- * Pretty-printing
         pprCo, pprParendCo,

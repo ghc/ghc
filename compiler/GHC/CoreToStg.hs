@@ -441,6 +441,8 @@ coreToStgExpr (Tick tick expr)
 
 coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
+coreToStgExpr (CastZ expr _ _)
+  = coreToStgExpr expr
 
 -- Cases require a little more real work.
 coreToStgExpr (Case scrut bndr _ alts)
@@ -821,6 +823,7 @@ myCollectBinders expr
   where
     go bs (Lam b e)          = go (b:bs) e
     go bs (Cast e _)         = go bs e
+    go bs (CastZ e _ _)      = go bs e
     go bs e                  = (reverse bs, e)
 
 -- | If the argument expression is (potential chain of) 'App', return the head
@@ -839,6 +842,7 @@ myCollectArgs expr
                                 -- See Note [Ticks in applications]
                                 go e as (t:ts) -- ticks can appear in type apps
     go (Cast e _)       as ts = go e as ts
+    go (CastZ e _ _)    as ts = go e as ts
     go (Case e b _ alts) as ts  -- Just like in exprIsTrivial!
                                 -- Otherwise we fall over in case we encounter
                                 -- `(case f a of {}) b` in the future.

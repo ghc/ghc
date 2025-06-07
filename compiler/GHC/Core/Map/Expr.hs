@@ -140,6 +140,7 @@ data CoreMapX a
        , cm_co    :: CoercionMapG a
        , cm_type  :: TypeMapG a
        , cm_cast  :: CoreMapG (CoercionMapG a)
+       , cm_castz :: CoreMapG (TypeMapG a)
        , cm_tick  :: CoreMapG (TickishMap a)
        , cm_app   :: CoreMapG (CoreMapG a)
        , cm_lam   :: CoreMapG (BndrMap a)    -- Note [Binders]
@@ -160,6 +161,7 @@ eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
     -- See Note [Alpha-equality for Coercion arguments]
     go (Coercion {}) (Coercion {}) = True
     go (Cast e1 co1) (Cast e2 co2) = D env1 co1 == D env2 co2 && go e1 e2
+    go (CastZ e1 ty1 cos1) (CastZ e2 ty2 cos2) = eqDeBruijnType (D env1 ty1) (D env2 ty2) && go e1 e2 -- TODO: compare cos
     go (App f1 a1)   (App f2 a2)   = go f1 f2 && go a1 a2
     go (Tick n1 e1) (Tick n2 e2)
       =  eqDeBruijnTickish (D env1 n1) (D env2 n2)
@@ -248,7 +250,8 @@ is NOT considered equal to
 emptyE :: CoreMapX a
 emptyE = CM { cm_var = emptyTM, cm_lit = emptyTM
             , cm_co = emptyTM, cm_type = emptyTM
-            , cm_cast = emptyTM, cm_app = emptyTM
+            , cm_cast = emptyTM, cm_castz = emptyTM
+            , cm_app = emptyTM
             , cm_lam = emptyTM, cm_letn = emptyTM
             , cm_letr = emptyTM, cm_case = emptyTM
             , cm_ecase = emptyTM, cm_tick = emptyTM }
@@ -256,11 +259,12 @@ emptyE = CM { cm_var = emptyTM, cm_lit = emptyTM
 -- TODO(22292): derive
 instance Functor CoreMapX where
     fmap f CM
-      { cm_var = cvar, cm_lit = clit, cm_co = cco, cm_type = ctype, cm_cast = ccast
+      { cm_var = cvar, cm_lit = clit, cm_co = cco, cm_type = ctype, cm_cast = ccast, cm_castz = ccastz
       , cm_app = capp, cm_lam = clam, cm_letn = cletn, cm_letr = cletr, cm_case = ccase
       , cm_ecase = cecase, cm_tick = ctick } = CM
       { cm_var = fmap f cvar, cm_lit = fmap f clit, cm_co = fmap f cco, cm_type = fmap f ctype
-      , cm_cast = fmap (fmap f) ccast, cm_app = fmap (fmap f) capp, cm_lam = fmap (fmap f) clam
+      , cm_cast = fmap (fmap f) ccast, cm_castz = fmap (fmap f) ccastz
+      , cm_app = fmap (fmap f) capp, cm_lam = fmap (fmap f) clam
       , cm_letn = fmap (fmap (fmap f)) cletn, cm_letr = fmap (fmap (fmap f)) cletr
       , cm_case = fmap (fmap f) ccase, cm_ecase = fmap (fmap f) cecase
       , cm_tick = fmap (fmap f) ctick }
@@ -278,13 +282,16 @@ instance TrieMap CoreMapX where
 ftE :: (a->Bool) -> CoreMapX a -> CoreMapX a
 ftE f (CM { cm_var = cvar, cm_lit = clit
           , cm_co = cco, cm_type = ctype
-          , cm_cast = ccast , cm_app = capp
+          , cm_cast = ccast, cm_castz = ccastz
+          , cm_app = capp
           , cm_lam = clam, cm_letn = cletn
           , cm_letr = cletr, cm_case = ccase
           , cm_ecase = cecase, cm_tick = ctick })
   = CM { cm_var = filterTM f cvar, cm_lit = filterTM f clit
        , cm_co = filterTM f cco, cm_type = filterTM f ctype
-       , cm_cast = fmap (filterTM f) ccast, cm_app = fmap (filterTM f) capp
+       , cm_cast = fmap (filterTM f) ccast
+       , cm_castz = fmap (filterTM f) ccastz
+       , cm_app = fmap (filterTM f) capp
        , cm_lam = fmap (filterTM f) clam, cm_letn = fmap (fmap (filterTM f)) cletn
        , cm_letr = fmap (fmap (filterTM f)) cletr, cm_case = fmap (filterTM f) ccase
        , cm_ecase = fmap (filterTM f) cecase, cm_tick = fmap (filterTM f) ctick }
@@ -292,13 +299,15 @@ ftE f (CM { cm_var = cvar, cm_lit = clit
 mpE :: (a -> Maybe b) -> CoreMapX a -> CoreMapX b
 mpE f (CM { cm_var = cvar, cm_lit = clit
           , cm_co = cco, cm_type = ctype
-          , cm_cast = ccast , cm_app = capp
+          , cm_cast = ccast, cm_castz = ccastz
+          , cm_app = capp
           , cm_lam = clam, cm_letn = cletn
           , cm_letr = cletr, cm_case = ccase
           , cm_ecase = cecase, cm_tick = ctick })
   = CM { cm_var = mapMaybeTM f cvar, cm_lit = mapMaybeTM f clit
        , cm_co = mapMaybeTM f cco, cm_type = mapMaybeTM f ctype
-       , cm_cast = fmap (mapMaybeTM f) ccast, cm_app = fmap (mapMaybeTM f) capp
+       , cm_cast = fmap (mapMaybeTM f) ccast, cm_castz = fmap (mapMaybeTM f) ccastz
+       , cm_app = fmap (mapMaybeTM f) capp
        , cm_lam = fmap (mapMaybeTM f) clam, cm_letn = fmap (fmap (mapMaybeTM f)) cletn
        , cm_letr = fmap (fmap (mapMaybeTM f)) cletr, cm_case = fmap (mapMaybeTM f) ccase
        , cm_ecase = fmap (mapMaybeTM f) cecase, cm_tick = fmap (mapMaybeTM f) ctick }
@@ -327,6 +336,7 @@ fdE k m
   . foldTM k (cm_co m)
   . foldTM k (cm_type m)
   . foldTM (foldTM k) (cm_cast m)
+  . foldTM (foldTM k) (cm_castz m)
   . foldTM (foldTM k) (cm_tick m)
   . foldTM (foldTM k) (cm_app m)
   . foldTM (foldTM k) (cm_lam m)
@@ -344,6 +354,7 @@ lkE (D env expr) cm = go expr cm
     go (Type t)             = cm_type >.> lkG (D env t)
     go (Coercion c)         = cm_co   >.> lkG (D env c)
     go (Cast e c)           = cm_cast >.> lkG (D env e) >=> lkG (D env c)
+    go (CastZ e ty cos)     = cm_castz >.> lkG (D env e) >=> lkG (D env ty) -- TODO: safe for cm_castz to ignore cos?
     go (Tick tickish e)     = cm_tick >.> lkG (D env e) >=> lkTickish tickish
     go (App e1 e2)          = cm_app  >.> lkG (D env e2) >=> lkG (D env e1)
     go (Lam v e)            = cm_lam  >.> lkG (D (extendCME env v) e)
@@ -371,6 +382,8 @@ xtE (D env (Coercion c))         f m = m { cm_co   = cm_co m
 xtE (D _   (Lit l))              f m = m { cm_lit  = cm_lit m  |> alterTM l f }
 xtE (D env (Cast e c))           f m = m { cm_cast = cm_cast m |> xtG (D env e)
                                                  |>> xtG (D env c) f }
+xtE (D env (CastZ e ty cos))     f m = m { cm_castz = cm_castz m |> xtG (D env e)
+                                                 |>> xtG (D env ty) f }
 xtE (D env (Tick t e))           f m = m { cm_tick = cm_tick m |> xtG (D env e)
                                                  |>> xtTickish t f }
 xtE (D env (App e1 e2))          f m = m { cm_app = cm_app m |> xtG (D env e2)

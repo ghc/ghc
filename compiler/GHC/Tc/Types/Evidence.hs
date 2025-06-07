@@ -27,7 +27,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
+  evId, evCoercion, evCast, evCastZ, evDFunApp,  evDataConApp, evSelector,
   mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
 
   evTermCoercion, evTermCoercion_maybe,
@@ -56,6 +56,7 @@ import GHC.Types.Var
 import GHC.Types.Id( idScaledType )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
+import GHC.Core.Utils
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
@@ -531,6 +532,9 @@ evCast :: EvExpr -> TcCoercion -> EvTerm
 evCast et tc | isReflCo tc = EvExpr et
              | otherwise   = EvExpr (Cast et tc)
 
+evCastZ :: EvExpr -> Type -> [TcCoercion] -> EvTerm
+evCastZ et ty cos = EvExpr (mkCastZ et ty cos)
+
 -- Dictionary instance application
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
 evDFunApp df tys ets = EvExpr $ Var df `mkTyApps` tys `mkApps` ets
@@ -816,7 +820,7 @@ mkEvCast :: EvExpr -> TcCoercion -> EvTerm
 mkEvCast ev lco
   | assertPpr (coercionRole lco == Representational)
               (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]) $
-    isReflCo lco = EvExpr ev
+    isReflCo lco = EvExpr ev -- TODO redundant with evCast
   | otherwise    = evCast ev lco
 
 
@@ -851,6 +855,7 @@ evTermCoercion_maybe ev_term
     go (Coercion co) = return co
     go (Cast tm co)  = do { co' <- go tm
                           ; return (mkCoCast co' co) }
+    -- TODO evTermCoercion_maybe CastZ
     go _             = Nothing
 
 evTermCoercion :: EvTerm -> TcCoercion

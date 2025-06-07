@@ -129,6 +129,8 @@ overloadedCallsCC =
           <*> mapM processAlt alts
         Cast e co ->
           mkCast <$> processExpr e <*> pure co
+        CastZ e ty cos ->
+          mkCastZ <$> processExpr e <*> pure ty <*> pure cos
         Tick t e -> do
           trackSourceNote t $
             mkTick t <$> processExpr e
@@ -180,6 +182,8 @@ overloadedCallsCC =
             exprName e
           Cast e _ ->
             exprName e
+          CastZ e _ _ ->
+            exprName e
           _ ->
             Nothing
 
@@ -200,4 +204,5 @@ overloadedCallsCC =
           Var var -> isJoinId var
           Tick _ e -> isJoinVarExpr e
           Cast e _ -> isJoinVarExpr e
+          CastZ e _ _ -> isJoinVarExpr e
           _ -> False

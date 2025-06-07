@@ -74,6 +74,7 @@ exitifyProgram binds = map goTopLvl binds
     go _    e@(Type {})     = e
     go _    e@(Coercion {}) = e
     go in_scope (Cast e' c) = Cast (go in_scope e') c
+    go in_scope (CastZ e' ty cos) = CastZ (go in_scope e') ty cos
     go in_scope (Tick t e') = Tick t (go in_scope e')
     go in_scope (App e1 e2) = App (go in_scope e1) (go in_scope e2)
 

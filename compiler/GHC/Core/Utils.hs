@@ -9,7 +9,7 @@ Utility functions on @Core@ syntax
 -- | Commonly useful utilities for manipulating the Core language
 module GHC.Core.Utils (
         -- * Constructing expressions
-        mkCast, mkCastMCo, mkPiMCo,
+        mkCast, mkCastZ, mkCastMCo, mkPiMCo,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
         bindNonRec, needsCaseBinding, needsCaseBindingL,
         mkAltExpr, mkDefaultCase, mkSingleAltCase,
@@ -77,6 +77,7 @@ import GHC.Core.Type as Type
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX )
+import GHC.Core.TyCo.FVs ( coVarsOfCos )
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.TyCon
@@ -139,6 +140,7 @@ exprType (Let bind body)
   | otherwise                = exprType body
 exprType (Case _ _ ty _)     = ty
 exprType (Cast _ co)         = coercionRKind co
+exprType (CastZ _ ty _)      = ty
 exprType (Tick _ e)          = exprType e
 exprType (Lam binder expr)   = mkLamType binder (exprType expr)
 exprType e@(App _ _)
@@ -280,6 +282,7 @@ mkCast expr co
           $$ callStackDoc) $
     case expr of
       Cast expr co2 -> mkCast expr (mkTransCo co2 co)
+      CastZ expr ty cos -> mkCastZ expr ty (co:cos)
       Tick t expr   -> Tick t (mkCast expr co)
 
       Coercion e_co | isCoVarType (coercionRKind co)
@@ -290,6 +293,20 @@ mkCast expr co
 
       _ | isReflCo co -> expr
         | otherwise   -> Cast expr co
+
+mkCastZ :: HasDebugCallStack => CoreExpr -> Type -> [Coercion] -> CoreExpr
+mkCastZ expr ty cos =
+    case expr of
+      Cast expr co2 -> mkCastZ expr ty (co2:cos)
+      CastZ expr _ty cos2 -> mkCastZ expr ty (cos2 ++ cos)
+      Tick t expr -> Tick t (mkCastZ expr ty cos)
+      -- TODO: do we need other cases from mkCast?
+      _ -> CastZ expr ty (zapCos cos)
+
+-- | Throw away the structure of coercions, retaining only the set of variables on which they depend.
+zapCos :: [Coercion] -> [Coercion]
+zapCos co = map mkCoVarCo $ nonDetEltsUniqSet (coVarsOfCos co) -- TODO nonDetEltsUniqSet justified?
+
 
 
 {- *********************************************************************
@@ -343,6 +360,7 @@ mkTick t orig_expr = mkTick' id id orig_expr
     -- unfoldings. We therefore make an effort to put everything into
     -- the right place no matter what we start with.
     Cast e co   -> mkTick' (top . flip Cast co) rest e
+    CastZ e ty cos -> mkTick' (top . (\ e' -> CastZ e' ty cos)) rest e
     Coercion co -> Coercion co
 
     Lam x e
@@ -402,6 +420,7 @@ isSaturatedConApp e = go e []
         go (Var fun) args
            = isConLikeId fun && idArity fun == valArgCount args
         go (Cast f _) as = go f as
+        go (CastZ f _ _) as = go f as
         go _ _ = False
 
 mkTickNoHNF :: CoreTickish -> CoreExpr -> CoreExpr
@@ -446,6 +465,7 @@ stripTicksE p expr = go expr
         go (Let b e)        = Let (go_bs b) (go e)
         go (Case e b t as)  = Case (go e) b t (map go_a as)
         go (Cast e c)       = Cast (go e) c
+        go (CastZ e ty cos) = CastZ (go e) ty cos
         go (Tick t e)
           | p t             = go e
           | otherwise       = Tick t (go e)
@@ -462,6 +482,7 @@ stripTicksT p expr = fromOL $ go expr
         go (Let b e)        = go_bs b `appOL` go e
         go (Case e _ _ as)  = go e `appOL` concatOL (map go_a as)
         go (Cast e _)       = go e
+        go (CastZ e _ _)    = go e
         go (Tick t e)
           | p t             = t `consOL` go e
           | otherwise       = go e
@@ -1305,6 +1326,7 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go (Lam b e)  | not (isRuntimeVar b)  = go e
     go (Tick t e) | not (tickishIsCode t) = go e              -- See Note [Tick trivial]
     go (Cast e _)                         = go e
+    go (CastZ e _ _)                      = go e
     go (Case e b _ as)
       | null as
       = go e     -- See Note [Empty case is trivial]
@@ -1370,6 +1392,7 @@ exprIsDupable platform e
     go n (Var {})      = decrement n
     go n (Tick _ e)    = go n e
     go n (Cast e _)    = go n e
+    go n (CastZ e _ _) = go n e
     go n (App f a) | Just n' <- go n a = go n' f
     go n (Lit lit) | litIsDupable platform lit = decrement n
     go _ _ = Nothing
@@ -1523,6 +1546,7 @@ exprIsCheapX ok_app expandable e
     go _ (Type {})                    = True
     go _ (Coercion {})                = True
     go n (Cast e _)                   = go n e
+    go n (CastZ e _ _)                = go n e
     go n (Case scrut _ _ alts)        = not expandable && ok scrut &&
                                         and [ go n rhs | Alt _ _ rhs <- alts ]
     go n (Tick t e) | tickishCounts t = False
@@ -1801,6 +1825,7 @@ expr_ok _ _ (Coercion _) = True
 
 expr_ok fun_ok primop_ok (Var v)    = app_ok fun_ok primop_ok v []
 expr_ok fun_ok primop_ok (Cast e _) = expr_ok fun_ok primop_ok e
+expr_ok fun_ok primop_ok (CastZ e _ _) = expr_ok fun_ok primop_ok e
 expr_ok fun_ok primop_ok (Lam b e)
                  | isTyVar b = expr_ok fun_ok primop_ok  e
                  | otherwise = True
@@ -2186,6 +2211,7 @@ exprIsHNFlike is_con is_con_unf e
                                    && is_hnf_like e
                                       -- See Note [exprIsHNF Tick]
     is_hnf_like (Cast e _)       = is_hnf_like e
+    is_hnf_like (CastZ e _ _)    = is_hnf_like e
     is_hnf_like (App e a)
       | isValArg a               = app_is_value e [a]
       | otherwise                = is_hnf_like e
@@ -2200,6 +2226,7 @@ exprIsHNFlike is_con is_con_unf e
     app_is_value (Var f)    as = id_app_is_value f as
     app_is_value (Tick _ f) as = app_is_value f as
     app_is_value (Cast f _) as = app_is_value f as
+    app_is_value (CastZ f _ _) as = app_is_value f as
     app_is_value (App f a)  as | isValArg a = app_is_value f (a:as)
                                | otherwise  = app_is_value f as
     app_is_value _          _  = False
@@ -2481,6 +2508,7 @@ cheapEqExpr' ignoreTick e1 e2
     go (Coercion c1) (Coercion c2) = c1 `eqCoercion` c2
     go (App f1 a1) (App f2 a2)     = f1 `go` f2 && a1 `go` a2
     go (Cast e1 t1) (Cast e2 t2)   = e1 `go` e2 && t1 `eqCoercion` t2
+    go (CastZ e1 ty1 cos1) (CastZ e2 ty2 cos2) = e1 `go` e2 && ty1 `eqType` ty2 -- TODO: do we need to compare cos? probably
 
     go (Tick t1 e1) e2 | ignoreTick t1 = go e1 e2
     go e1 (Tick t2 e2) | ignoreTick t2 = go e1 e2
@@ -2578,6 +2606,8 @@ diffExpr _   env (Coercion co1) (Coercion co2)
                                        | eqCoercionX env co1 co2        = []
 diffExpr top env (Cast e1 co1)  (Cast e2 co2)
   | eqCoercionX env co1 co2                = diffExpr top env e1 e2
+diffExpr top env (CastZ e1 ty1 cos1) (CastZ e2 ty2 cos2)
+  | eqTypeX env ty1 ty2                    = diffExpr top env e1 e2 -- TODO: safe to ignore cos?
 diffExpr top env (Tick n1 e1)   e2
   | not (tickishIsCode n1)                 = diffExpr top env e1 e2
 diffExpr top env e1             (Tick n2 e2)

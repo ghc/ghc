@@ -131,6 +131,7 @@ manifestArity (Lam v e) | isId v        = 1 + manifestArity e
                         | otherwise     = manifestArity e
 manifestArity (Tick t e) | not (tickishIsCode t) =  manifestArity e
 manifestArity (Cast e _)                = manifestArity e
+manifestArity (CastZ e _ _)             = manifestArity e
 manifestArity _                         = 0
 
 joinRhsArity :: CoreExpr -> JoinArity
@@ -1578,6 +1579,9 @@ arityType env (Var v)
 arityType env (Cast e _)
   = arityType env e
 
+arityType env (CastZ e _ _)
+  = arityType env e
+
         -- Lambdas; increase arity
 arityType env (Lam x e)
   | isId x    = arityLam x (arityType env' e)
@@ -1677,6 +1681,7 @@ cheapArityType e = go e
   where
     go (Var v)                  = idArityType v
     go (Cast e _)               = go e
+    go (CastZ e _ _)            = go e
     go (Lam x e)  | isId x      = arityLam x (go e)
                   | otherwise   = go e
     go (App e a)  | isTypeArg a = go e
@@ -1721,6 +1726,7 @@ exprArity e = go e
                  | otherwise       = go e
     go (Tick t e) | not (tickishIsCode t) = go e
     go (Cast e _)                  = go e
+    go (CastZ e _ _)               = go e
     go (App e (Type _))            = go e
     go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
         -- See Note [exprArity for applications]
@@ -1748,6 +1754,7 @@ exprIsDeadEnd e
                    | otherwise   = go (n+1) e
     go n (Tick _ e)              = go n e
     go n (Cast e _)              = go n e
+    go n (CastZ e _ _)           = go n e
     go n (Let _ e)               = go n e
     go n (Lam v e) | isTyVar v   = go n e
                    | otherwise   = False
@@ -2048,6 +2055,8 @@ eta_expand in_scope one_shots (Cast expr co)
     -- asssumes that we don't have nested casts. Makes a difference
     -- in compile-time for T18223
 
+-- TODO: eta_expand for CastZ?
+
 eta_expand in_scope one_shots orig_expr
   = go in_scope one_shots [] orig_expr
   where
@@ -2226,6 +2235,9 @@ etaInfoApp in_scope expr eis
       where
         mco' = checkReflexiveMCo (Core.substCo subst co `mkTransMCoR` mco)
                -- See Note [Check for reflexive casts in eta expansion]
+
+    go subst (CastZ e ty cos) (EI bs mco)
+      = go subst e (EI bs mco) -- TODO: etaInfoApp shouldn't ignore ty/cos
 
     go subst (Case e b ty alts) eis
       = Case (Core.substExprSC subst e) b1 ty' alts'
@@ -2719,6 +2731,9 @@ tryEtaReduce rec_ids bndrs body eval_sd
     go bs (Cast e co1) co2
       = go bs e (co1 `mkTransCo` co2)
 
+    go bs (CastZ e ty cos) co2
+      = Nothing -- TODO tryEtaReduce for CastZ
+
     go bs (Tick t e) co
       | tickishFloatable t
       = fmap (Tick t) $ go bs e co
@@ -2758,6 +2773,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
     -- See Note [Eta reduction makes sense], point (1)
     ok_fun (App fun (Type {})) = ok_fun fun
     ok_fun (Cast fun _)        = ok_fun fun
+    ok_fun (CastZ fun _ _)     = ok_fun fun
     ok_fun (Tick _ expr)       = ok_fun expr
     ok_fun (Var fun_id)        = is_eta_reduction_sound fun_id
     ok_fun _fun                = False
@@ -2831,6 +2847,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
        = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
+    -- TODO: ok_arg for CastZ?
     ok_arg bndr (Tick t arg) co fun_ty
        | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
        = Just (co', t:ticks)
@@ -3108,12 +3125,14 @@ collectBindersPushingCo e
     -- The accumulator is in reverse order
     go bs (Lam b e)   = go (b:bs) e
     go bs (Cast e co) = go_c bs e co
+    -- TODO: collectBindersPushingCo for CastZ
     go bs e           = (reverse bs, e)
 
     -- We are in a cast; peel off casts until we hit a lambda.
     go_c :: [Var] -> CoreExpr -> CoercionR -> ([Var], CoreExpr)
     -- (go_c bs e c) is same as (go bs e (e |> c))
     go_c bs (Cast e co1) co2 = go_c bs e (co1 `mkTransCo` co2)
+    -- TODO: collectBindersPushingCo for CastZ
     go_c bs (Lam b e)    co  = go_lam bs b e co
     go_c bs e            co  = (reverse bs, mkCast e co)
 

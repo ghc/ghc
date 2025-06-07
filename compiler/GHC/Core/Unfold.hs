@@ -304,6 +304,7 @@ inlineBoringOk e
 
     go credit (Tick _ e) = go credit e      -- dubious
     go credit (Cast e _) = go credit e      -- See (IB3)
+    go credit (CastZ e _ _) = go credit e
 
     go _      (Lit l)    = litIsTrivial l && boringCxtOk
 
@@ -519,6 +520,7 @@ uncondInlineJoin bndrs body
       | isDataConId v     = not seen_fv -- e.g. $j a b = K a b
       | v `elem` bndrs    = not seen_fv -- e.g. $j a b = b a
     go seen_fv (Cast e _) = go seen_fv e
+    go seen_fv (CastZ e _ _) = go seen_fv e
     go seen_fv (Tick _ e) = go seen_fv e
     go _ _                = False
 
@@ -535,6 +537,7 @@ uncondInlineJoin bndrs body
       | isTyCoArg a      = go_arg f     -- e.g. $j f = K (f @a)
       | otherwise        = Nothing
     go_arg (Cast e _)    = go_arg e
+    go_arg (CastZ e _ _) = go_arg e
     go_arg (Tick _ e)    = go_arg e
     go_arg (Var f)       = Just $! f `notElem` bndrs
     go_arg _             = Nothing
@@ -555,6 +558,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
   = size_up expr
   where
     size_up (Cast e _) = size_up e
+    size_up (CastZ e _ _) = size_up e
     size_up (Tick _ e) = size_up e
     size_up (Type _)   = sizeZero           -- Types cost nothing
     size_up (Coercion _) = sizeZero
@@ -622,6 +626,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
         where
           is_top_arg (Var v) | v `elem` top_args = Just v
           is_top_arg (Cast e _) = is_top_arg e
+          is_top_arg (CastZ e _ _) = is_top_arg e
           is_top_arg _ = Nothing
 
       where
@@ -678,6 +683,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     size_up_app (Var fun)     args voids = size_up_call fun args voids
     size_up_app (Tick _ expr) args voids = size_up_app expr args voids
     size_up_app (Cast expr _) args voids = size_up_app expr args voids
+    size_up_app (CastZ expr _ _) args voids = size_up_app expr args voids
     size_up_app other         args voids = size_up other `addSizeN`
                                            callSize (length args) voids
        -- if the lhs is not an App or a Var, or an invisible thing like a

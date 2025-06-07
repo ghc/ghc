@@ -579,6 +579,7 @@ tryCastWorkerWrapper :: SimplEnv -> BindContext
                      -> InId -> OutId -> OutExpr
                      -> SimplM (SimplFloats, SimplEnv)
 -- See Note [Cast worker/wrapper]
+-- TODO: tryCastWorkerWrapper for CastZ
 tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
   | BC_Let top_lvl is_rec <- bind_cxt  -- Not join points
   , not (isDFunId bndr) -- nor DFuns; cast w/w is no help, and we can't transform
@@ -760,6 +761,7 @@ prepareRhs env top_lvl occ rhs0
            | isTypeArg arg             = go fun n_val_args
            | otherwise                 = go fun (n_val_args + 1)
          go (Cast rhs _)  n_val_args   = go rhs n_val_args
+         go (CastZ rhs _ _) n_val_args = go rhs n_val_args
          go (Tick _ rhs)  n_val_args   = go rhs n_val_args
          go _             _            = False
 
@@ -767,6 +769,9 @@ prepareRhs env top_lvl occ rhs0
     anfise (Cast rhs co)
         = do { (floats, rhs') <- anfise rhs
              ; return (floats, Cast rhs' co) }
+    anfise (CastZ rhs ty cos)
+        = do { (floats, rhs') <- anfise rhs
+             ; return (floats, CastZ rhs' ty cos) }
     anfise (App fun (Type ty))
         = do { (floats, rhs') <- anfise fun
              ; return (floats, App rhs' (Type ty)) }
@@ -818,6 +823,10 @@ makeTrivial env top_lvl dmd occ_fs expr
   | Cast expr' co <- expr
   = do { (floats, triv_expr) <- makeTrivial env top_lvl dmd occ_fs expr'
        ; return (floats, Cast triv_expr co) }
+
+  | CastZ expr' ty cos <- expr
+  = do { (floats, triv_expr) <- makeTrivial env top_lvl dmd occ_fs expr'
+       ; return (floats, CastZ triv_expr ty cos) }
 
   | otherwise -- 'expr' is not of form (Cast e co)
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
@@ -1183,6 +1192,7 @@ simplExprF1 env (Var v)        cont = {-#SCC "simplInId" #-} simplInId env v con
 simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
 simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
 simplExprF1 env (Cast body co) cont = {-#SCC "simplCast" #-} simplCast env body co cont
+simplExprF1 env (CastZ body ty cos) cont = {-#SCC "simplCastZ" #-} simplCastZ env body ty cos cont
 simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
 
 simplExprF1 env (App fun arg) cont
@@ -1471,6 +1481,8 @@ simplTick env tickish expr cont
     where (inc,outc) = splitCont tail
   splitCont cont@(CastIt { sc_cont = tail }) = (cont { sc_cont = inc }, outc)
     where (inc,outc) = splitCont tail
+  splitCont cont@(CastZIt { sc_cont = tail }) = (cont { sc_cont = inc }, outc)
+    where (inc,outc) = splitCont tail
   splitCont other = (mkBoringStop (contHoleType other), other)
 
   getDoneId (DoneId id)  = Just id
@@ -1535,6 +1547,8 @@ rebuild_go env expr cont
            -- NB: mkCast implements the (Coercion co |> g) optimisation
         where
           co' = optOutCoercion env co opt
+      CastZIt { sc_type = ty, sc_cos = cos, sc_cont = cont }
+        -> rebuild_go env (mkCastZ expr ty cos) cont
 
       Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
         -> rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
@@ -1671,6 +1685,13 @@ optOutCoercion env co already_optimised
   where
     empty_subst = mkEmptySubst (seInScope env)
     opts = seOptCoercionOpts env
+
+simplCastZ :: SimplEnv -> InExpr -> InType -> [InCoercion] -> SimplCont
+           -> SimplM (SimplFloats, OutExpr)
+simplCastZ env body ty cos cont0
+  = do { ty' <- simplType env ty
+       ; cos' <- mapM (simplCoercion env) cos
+       ; simplExprF env body (CastZIt { sc_type = ty', sc_cos = cos', sc_hole_ty = substTy env (exprType body), sc_cont = cont0 }) }
 
 simplCast :: SimplEnv -> InExpr -> InCoercion -> SimplCont
           -> SimplM (SimplFloats, OutExpr)
@@ -2722,6 +2743,7 @@ trySeqRules in_env scrut rhs cont
 
     -- Lazily evaluated, so we don't do most of this
     drop_casts (Cast e _) = drop_casts e
+    drop_casts (CastZ e _ _) = drop_casts e
     drop_casts e          = e
 
 {- Note [User-defined RULES for seq]
@@ -3874,6 +3896,13 @@ mkDupableContWithDmds env dmds (CastIt { sc_co = co, sc_opt = opt, sc_cont = con
                                  , sc_opt = True, sc_cont = cont' }) }
                  -- optOutCoercion: see Note [Avoid re-simplifying coercions]
 
+mkDupableContWithDmds env dmds (CastZIt { sc_type = ty, sc_cos = cos, sc_hole_ty = hole_ty, sc_cont = cont })
+  = do  { (floats, cont') <- mkDupableContWithDmds env dmds cont
+        ; return (floats, CastZIt { sc_type = ty
+                                  , sc_cos = cos
+                                  , sc_hole_ty = hole_ty
+                                  , sc_cont = cont' }) }
+
 -- Duplicating ticks for now, not sure if this is good or not
 mkDupableContWithDmds env dmds (TickIt t cont)
   = do  { (floats, cont') <- mkDupableContWithDmds env dmds cont
@@ -3933,6 +3962,7 @@ mkDupableContWithDmds env _
     thumbsUpPlanA (Stop {})                    = True
     thumbsUpPlanA (Select {})                  = True
     thumbsUpPlanA (CastIt { sc_cont = k })     = thumbsUpPlanA k
+    thumbsUpPlanA (CastZIt { sc_cont = k })    = thumbsUpPlanA k
     thumbsUpPlanA (TickIt _ k)                 = thumbsUpPlanA k
     thumbsUpPlanA (ApplyToVal { sc_cont = k }) = thumbsUpPlanA k
     thumbsUpPlanA (ApplyToTy  { sc_cont = k }) = thumbsUpPlanA k

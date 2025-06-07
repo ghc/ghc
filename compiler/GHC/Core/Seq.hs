@@ -21,7 +21,7 @@ import GHC.Types.Tickish
 import GHC.Types.Var.Set( seqDVarSet )
 import GHC.Types.Var( varType, tyVarKind )
 import GHC.Core.Type( seqType, isTyVar )
-import GHC.Core.Coercion( seqCo )
+import GHC.Core.Coercion( seqCo, seqCos )
 import GHC.Types.Id( idInfo )
 
 -- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
@@ -64,6 +64,7 @@ seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
 seqExpr (Let b e)       = seqBind b `seq` seqExpr e
 seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
 seqExpr (Cast e co)     = seqExpr e `seq` seqCo co
+seqExpr (CastZ e ty cos)= seqExpr e `seq` seqType ty `seq` seqCos cos
 seqExpr (Tick n e)      = seqTickish n `seq` seqExpr e
 seqExpr (Type t)        = seqType t
 seqExpr (Coercion co)   = seqCo co

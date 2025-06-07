@@ -1620,6 +1620,9 @@ tcIfaceExpr (IfaceCo co)
 tcIfaceExpr (IfaceCast expr co)
   = Cast <$> tcIfaceExpr expr <*> tcIfaceCo co
 
+tcIfaceExpr (IfaceCastZ expr ty cos)
+  = CastZ <$> tcIfaceExpr expr <*> tcIfaceType ty <*> mapM tcIfaceCo cos
+
 tcIfaceExpr (IfaceLcl name)
   = Var <$> tcIfaceLclId name
 

@@ -860,6 +860,7 @@ addCoreCt nabla x e = do
     -- syntax). See Note [COMPLETE sets on data families]
     -- core_expr x e | pprTrace "core_expr" (ppr x $$ ppr e) False = undefined
     core_expr x (Cast e _co) = core_expr x e
+    core_expr x (CastZ e _ty _co) = core_expr x e
     core_expr x (Tick _t e) = core_expr x e
     core_expr x e
       | Just (pmLitAsStringLit -> Just s) <- coreExprAsPmLit e
@@ -1000,6 +1001,8 @@ makeDictsCoherent (Case scrut bndr ty alts)
       , let expr' = makeDictsCoherent expr ]
 makeDictsCoherent (Cast expr co)
   = Cast (makeDictsCoherent expr) co
+makeDictsCoherent (CastZ expr ty cos)
+  = CastZ (makeDictsCoherent expr) ty cos
 makeDictsCoherent (Tick tick expr)
   = Tick tick (makeDictsCoherent expr)
 makeDictsCoherent ty@(Type {})

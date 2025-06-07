@@ -476,6 +476,8 @@ callArityAnal arity int (Tick t e)
     = second (Tick t) $ callArityAnal arity int e
 callArityAnal arity int (Cast e co)
     = second (\e -> Cast e co) $ callArityAnal arity int e
+callArityAnal arity int (CastZ e ty cos)
+    = second (\e -> CastZ e ty cos) $ callArityAnal arity int e
 
 -- The interesting case: Variables, Lambdas, Lets, Applications, Cases
 callArityAnal arity int e@(Var v)

@@ -249,6 +249,10 @@ satExpr (Cast expr coercion) interesting_ids = do
     (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids
     return (Cast expr' coercion, sat_info_expr, expr_app)
 
+satExpr (CastZ expr ty cos) interesting_ids = do
+    (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids
+    return (CastZ expr' ty cos, sat_info_expr, expr_app)
+
 {-
 ************************************************************************
 

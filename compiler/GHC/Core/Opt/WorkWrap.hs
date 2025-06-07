@@ -131,6 +131,10 @@ wwExpr ww_opts (Cast expr co) = do
     new_expr <- wwExpr ww_opts expr
     return (Cast new_expr co)
 
+wwExpr ww_opts (CastZ expr ty cos) = do
+    new_expr <- wwExpr ww_opts expr
+    return (CastZ new_expr ty cos)
+
 wwExpr ww_opts (Let bind expr)
   = mkLets <$> wwBind ww_opts bind <*> wwExpr ww_opts expr
 

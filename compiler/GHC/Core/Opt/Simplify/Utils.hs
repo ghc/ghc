@@ -169,6 +169,12 @@ data SimplCont
                                 --      in GHC.Core.Opt.Simplify.Iteration
       , sc_cont :: SimplCont }
 
+  | CastZIt              -- (CastZIt ty cos K)[e] = K[ e `castZ` (co, tys) ]
+      { sc_type :: OutType
+      , sc_cos  :: [OutCoercion]  -- The coercions simplified (TODO: invariant?)
+      , sc_hole_ty :: OutType
+      , sc_cont :: SimplCont }
+
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
       { sc_dup     :: DupFlag   -- See Note [DupFlag invariants]
       , sc_hole_ty :: OutType   -- Type of the function, presumably (forall a. blah)
@@ -278,6 +284,8 @@ instance Outputable SimplCont where
       pps = [ppr interesting] ++ [ppr eval_sd | eval_sd /= topSubDmd]
   ppr (CastIt { sc_co = co, sc_cont = cont })
     = (text "CastIt" <+> pprOptCo co) $$ ppr cont
+  ppr (CastZIt { sc_type = ty, sc_cos = cos, sc_cont = cont })
+    = (text "CastZIt" <+> ppr ty <+> ppr cos) $$ ppr cont
   ppr (TickIt t cont)
     = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
@@ -435,6 +443,7 @@ mkLazyArgStop ty fun_info = Stop ty (lazyArgContext fun_info) arg_sd
 contIsRhs :: SimplCont -> Maybe RecFlag
 contIsRhs (Stop _ (RhsCtxt is_rec) _) = Just is_rec
 contIsRhs (CastIt { sc_cont = k })    = contIsRhs k   -- For f = e |> co, treat e as Rhs context
+contIsRhs (CastZIt { sc_cont = k })   = contIsRhs k
 contIsRhs _                           = Nothing
 
 -------------------
@@ -449,6 +458,7 @@ contIsDupable (ApplyToVal { sc_dup = OkToDup }) = True -- See Note [DupFlag inva
 contIsDupable (Select { sc_dup = OkToDup })     = True -- ...ditto...
 contIsDupable (StrictArg { sc_dup = OkToDup })  = True -- ...ditto...
 contIsDupable (CastIt { sc_cont = k })          = contIsDupable k
+contIsDupable (CastZIt { sc_cont = k })         = contIsDupable k
 contIsDupable _                                 = False
 
 -------------------
@@ -458,12 +468,14 @@ contIsTrivial (ApplyToTy { sc_cont = k })                       = contIsTrivial 
 -- This one doesn't look right.  A value application is not trivial
 -- contIsTrivial (ApplyToVal { sc_arg = Coercion _, sc_cont = k }) = contIsTrivial k
 contIsTrivial (CastIt { sc_cont = k })                          = contIsTrivial k
+contIsTrivial (CastZIt { sc_cont = k })                         = contIsTrivial k
 contIsTrivial _                                                 = False
 
 -------------------
 contResultType :: SimplCont -> OutType
 contResultType (Stop ty _ _)                = ty
 contResultType (CastIt { sc_cont = k })     = contResultType k
+contResultType (CastZIt { sc_cont = k })    = contResultType k
 contResultType (StrictBind { sc_cont = k }) = contResultType k
 contResultType (StrictArg { sc_cont = k })  = contResultType k
 contResultType (Select { sc_cont = k })     = contResultType k
@@ -475,6 +487,7 @@ contHoleType :: SimplCont -> OutType
 contHoleType (Stop ty _ _)                    = ty
 contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt { sc_co = co })          = coercionLKind co
+contHoleType (CastZIt { sc_hole_ty = ty })    = ty
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
 contHoleType (StrictArg  { sc_fun_ty = ty })  = funArgTy ty
@@ -496,6 +509,8 @@ contHoleScaling :: SimplCont -> Mult
 contHoleScaling (Stop _ _ _) = OneTy
 contHoleScaling (CastIt { sc_cont = k })
   = contHoleScaling k
+contHoleScaling (CastZIt { sc_cont = k })
+  = contHoleScaling k
 contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k })
   = idMult id `mkMultMul` contHoleScaling k
 contHoleScaling (Select { sc_bndr = id, sc_cont = k })
@@ -515,6 +530,7 @@ countArgs :: SimplCont -> Int
 countArgs (ApplyToTy  { sc_cont = cont }) = 1 + countArgs cont
 countArgs (ApplyToVal { sc_cont = cont }) = 1 + countArgs cont
 countArgs (CastIt     { sc_cont = cont }) = countArgs cont
+countArgs (CastZIt     { sc_cont = cont }) = countArgs cont
 countArgs _                               = 0
 
 countValArgs :: SimplCont -> Int
@@ -522,6 +538,7 @@ countValArgs :: SimplCont -> Int
 countValArgs (ApplyToTy  { sc_cont = cont }) = countValArgs cont
 countValArgs (ApplyToVal { sc_cont = cont }) = 1 + countValArgs cont
 countValArgs (CastIt     { sc_cont = cont }) = countValArgs cont
+countValArgs (CastZIt    { sc_cont = cont }) = countValArgs cont
 countValArgs _                               = 0
 
 -------------------
@@ -536,12 +553,14 @@ contArgs cont
     lone (ApplyToTy  {}) = False  -- See Note [Lone variables] in GHC.Core.Unfold
     lone (ApplyToVal {}) = False  -- NB: even a type application or cast
     lone (CastIt {})     = False  --     stops it being "lone"
+    lone (CastZIt {})    = False
     lone _               = True
 
     go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
                                         = go (is_interesting arg se : args) k
     go args (ApplyToTy { sc_cont = k }) = go args k
     go args (CastIt { sc_cont = k })    = go args k
+    go args (CastZIt { sc_cont = k })   = go args k
     go args k                           = (False, reverse args, k)
 
     is_interesting arg se = interestingArg se arg
@@ -591,6 +610,7 @@ contEvalContext k = case k of
   Stop _ _ sd              -> sd
   TickIt _ k               -> contEvalContext k
   CastIt   { sc_cont = k } -> contEvalContext k
+  CastZIt   { sc_cont = k } -> contEvalContext k
   ApplyToTy{ sc_cont = k } -> contEvalContext k
     --  ApplyToVal{sc_cont=k}      -> mkCalledOnceDmd $ contEvalContext k
     -- Not 100% sure that's correct, . Here's an example:
@@ -915,6 +935,7 @@ interestingCallContext env cont
     interesting (TickIt _ k)                 = interesting k
     interesting (ApplyToTy { sc_cont = k })  = interesting k
     interesting (CastIt { sc_cont = k })     = interesting k
+    interesting (CastZIt { sc_cont = k })    = interesting k
         -- If this call is the arg of a strict function, the context
         -- is a bit interesting.  If we inline here, we may get useful
         -- evaluation information to avoid repeated evals: e.g.
@@ -955,6 +976,7 @@ contHasRules cont
     go (ApplyToVal { sc_cont = cont }) = go cont
     go (ApplyToTy  { sc_cont = cont }) = go cont
     go (CastIt { sc_cont = cont })     = go cont
+    go (CastZIt { sc_cont = cont })    = go cont
     go (StrictArg { sc_fun = fun })    = ai_encl fun
     go (Stop _ RuleArgCtxt _)          = True
     go (TickIt _ c)                    = go c
@@ -1013,6 +1035,7 @@ interestingArg env e = go env 0 e
     go env n (App fn _)        = go env (n+1) fn
     go env n (Tick _ a)        = go env n a
     go env n (Cast e _)        = go env n e
+    go env n (CastZ e _ _)     = go env n e
     go env n (Lam v e)
        | isTyVar v             = go env n e
        | n>0                   = NonTrivArg     -- (\x.b) e   is NonTriv
@@ -1841,6 +1864,8 @@ rebuildLam env bndrs@(bndr:_) body cont
         co_vars  = tyCoVarsOfCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
 
+    -- TODO: mk_lams for CastZ
+
     mk_lams bndrs body
       = mkLams bndrs body
 
@@ -1956,6 +1981,7 @@ wantEtaExpansion :: CoreExpr -> Bool
 -- Mostly True; but False of PAPs which will immediately eta-reduce again
 -- See Note [Which RHSs do we eta-expand?]
 wantEtaExpansion (Cast e _)             = wantEtaExpansion e
+wantEtaExpansion (CastZ e _ _)          = wantEtaExpansion e
 wantEtaExpansion (Tick _ e)             = wantEtaExpansion e
 wantEtaExpansion (Lam b e) | isTyVar b  = wantEtaExpansion e
 wantEtaExpansion (App e _)              = wantEtaExpansion e
@@ -2660,6 +2686,7 @@ mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity cas
 
     check_eq (Cast rhs co) con args        -- See Note [RHS casts]
       = not (any (`elemVarSet` tyCoVarsOfCo co) args) && check_eq rhs con args
+    -- TODO: check_eq CastZ
     check_eq (Tick t e) alt args
       = tickishFloatable t && check_eq e alt args
 
@@ -2687,6 +2714,7 @@ mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity cas
         -- Don't worry about nested casts, because the simplifier combines them
 
     re_cast scrut (Cast rhs co) = Cast (re_cast scrut rhs) co
+    -- TODO: re_cast CastZ
     re_cast scrut _             = scrut
 
 mkCase1 mode scrut bndr alts_ty alts = mkCase2 mode scrut bndr alts_ty alts

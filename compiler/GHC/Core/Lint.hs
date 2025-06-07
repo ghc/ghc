@@ -895,6 +895,9 @@ lintCoreExpr (Cast expr co)
        ; ensureEqTys from_ty expr_ty (mkCastErr expr co from_ty expr_ty)
        ; return (to_ty, ue) }
 
+lintCoreExpr (CastZ expr ty cos)
+  = lintCoreExpr (Cast expr (mkUnivCo (PluginProv "TODO") cos Representational (exprType expr) ty))
+
 lintCoreExpr (Tick tickish expr)
   = do { case tickish of
            Breakpoint _ _ ids _ -> forM_ ids $ \id -> lintIdOcc id 0

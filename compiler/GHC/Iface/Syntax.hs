@@ -688,6 +688,7 @@ data IfaceExpr
   | IfaceECase  IfaceExpr IfaceType     -- See Note [Empty case alternatives]
   | IfaceLet    (IfaceBinding IfaceLetBndr) IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
+  | IfaceCastZ  IfaceExpr IfaceType [IfaceCoercion]
   | IfaceLit    Literal
   | IfaceLitRubbish TypeOrConstraint IfaceType
        -- See GHC.Types.Literal Note [Rubbish literals] item (6)
@@ -1813,6 +1814,13 @@ pprIfaceExpr _       (IfaceCast expr co)
          nest 2 (text "`cast`"),
          pprParendIfaceCoercion co]
 
+pprIfaceExpr _       (IfaceCastZ expr ty cos)
+  = sep [pprParendIfaceExpr expr,
+         nest 2 (text "`castZ`"),
+         pprParendIfaceType ty
+         -- TODO: cos
+         ]
+
 pprIfaceExpr add_par (IfaceLet (IfaceNonRec b rhs) body)
   = add_par (sep [text "let {",
                   nest 2 (ppr_bind (b, rhs)),
@@ -2150,6 +2158,7 @@ freeNamesIfExpr (IfaceTuple _ as)     = fnList freeNamesIfExpr as
 freeNamesIfExpr (IfaceLam (b,_) body) = freeNamesIfBndr b &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
 freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
+freeNamesIfExpr (IfaceCastZ e ty cos) = freeNamesIfExpr e &&& freeNamesIfType ty &&& fnList freeNamesIfCoercion cos
 freeNamesIfExpr (IfaceTick t e)       = freeNamesIfTickish t &&& freeNamesIfExpr e
 freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
 freeNamesIfExpr (IfaceCase s _ alts)
@@ -2854,6 +2863,11 @@ instance Binary IfaceExpr where
         putByte bh 14
         put_ bh r
         put_ bh torc
+    put_ bh (IfaceCastZ a b c) = do
+        putByte bh 15
+        put_ bh a
+        put_ bh b
+        put_ bh c
     get bh = do
         h <- getByte bh
         case h of
@@ -2899,6 +2913,10 @@ instance Binary IfaceExpr where
             14 -> do r <- get bh
                      torc <- get bh
                      return (IfaceLitRubbish torc r)
+            15 -> do a <- get bh
+                     b <- get bh
+                     c <- get bh
+                     return (IfaceCastZ a b c)
             _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceTickish where
@@ -3168,6 +3186,7 @@ instance NFData IfaceExpr where
     IfaceECase e ty -> rnf e `seq` rnf ty
     IfaceLet bind e -> rnf bind `seq` rnf e
     IfaceCast e co -> rnf e `seq` rnf co
+    IfaceCastZ e ty cos -> rnf e `seq` rnf ty `seq` rnf cos
     IfaceLit l -> rnf l `seq` ()
     IfaceLitRubbish tc r -> rnf tc `seq` rnf r `seq` ()
     IfaceFCall fc ty -> rnf fc `seq` rnf ty

@@ -1116,6 +1116,8 @@ match renv subst e1 (Cast e2 co2) mco
 match renv subst (Cast e1 co1) e2 mco
   = matchTemplateCast renv subst e1 co1 e2 mco
 
+-- TODO: rule matching for CastZ
+
 ------------------------ Literals ---------------------
 match _ subst (Lit lit1) (Lit lit2) mco
   | lit1 == lit2
@@ -1950,6 +1952,7 @@ ruleCheck _   (Coercion _)    = emptyBag
 ruleCheck env (App f a)       = ruleCheckApp env (App f a) []
 ruleCheck env (Tick _ e)      = ruleCheck env e
 ruleCheck env (Cast e _)      = ruleCheck env e
+ruleCheck env (CastZ e _ _)   = ruleCheck env e
 ruleCheck env (Let bd e)      = let (env', ds) = ruleCheckBind env bd
                                 in  ds `unionBags` ruleCheck env' e
 ruleCheck env (Lam b e)       = ruleCheck (env `extendInScopeRC` b) e

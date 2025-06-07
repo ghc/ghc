@@ -119,6 +119,7 @@ topLevelBindsCC pred core_bind =
     -- or casts. So look through these as well.
     addCC :: Id -> CoreExpr -> LateCCM s CoreExpr
     addCC bndr (Cast rhs co) = pure Cast <*> addCC bndr rhs <*> pure co
+    addCC bndr (CastZ rhs ty cos) = CastZ <$> addCC bndr rhs <*> pure ty <*> pure cos
     addCC bndr (Tick t rhs) = (Tick t) <$> addCC bndr rhs
     addCC bndr (Lam b rhs) = Lam b <$> addCC bndr rhs
     addCC bndr rhs = do

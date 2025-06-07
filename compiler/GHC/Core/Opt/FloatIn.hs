@@ -162,6 +162,13 @@ fiExpr platform to_drop (_, AnnCast expr (co_ann, co))
     (drop_here, [e_drop])
       = sepBindsByDropPoint platform False to_drop
           (freeVarsOfAnn co_ann) [freeVarsOf expr]
+fiExpr platform to_drop (_, AnnCastZ expr (ty_ann, ty) cos)
+  = wrapFloats drop_here $
+    CastZ (fiExpr platform e_drop expr) ty (map snd cos)
+  where
+    (drop_here, [e_drop])
+      = sepBindsByDropPoint platform False to_drop
+          (unionFVss (freeVarsOfAnn ty_ann : map (freeVarsOfAnn . fst) cos))  [freeVarsOf expr]
 
 {-
 Applications: we do float inside applications, mainly because we

@@ -449,6 +449,11 @@ dmdAnal' env dmd (Cast e co)
   where
     WithDmdType dmd_ty e' = dmdAnal env dmd e
 
+dmdAnal' env dmd (CastZ e ty cos)
+  = WithDmdType (dmd_ty `plusDmdType` coercionsDmdEnv cos) (CastZ e' ty cos)
+  where
+    WithDmdType dmd_ty e' = dmdAnal env dmd e
+
 dmdAnal' env dmd (Tick t e)
   = WithDmdType dmd_ty (Tick t e')
   where
@@ -2130,6 +2135,7 @@ finaliseArgBoxities env fn ww_arity arg_dmds div rhs
       | isTyVar v = Lam v (set_lam_dmds (dmd:dmds) e)
       | otherwise = Lam (v `setIdDemandInfo` dmd) (set_lam_dmds dmds e)
     set_lam_dmds dmds (Cast e co) = Cast (set_lam_dmds dmds e) co
+    set_lam_dmds dmds (CastZ e ty cos) = CastZ (set_lam_dmds dmds e) ty cos
        -- This case happens for an OPAQUE function, which may look like
        --     f = (\x y. blah) |> co
        -- We give it strictness but no boxity (#22502)

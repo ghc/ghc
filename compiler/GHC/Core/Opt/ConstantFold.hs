@@ -2637,6 +2637,7 @@ match_inline (Type _ : e : _) = go e
     go (App f a)    = do { f' <- go f; pure $ App f' a }
     -- inline (f |> co)
     go (Cast e co)  = do { app <- go e; pure (Cast app co) }
+    go (CastZ e ty cos) = do { app <- go e; pure (CastZ app ty cos) }
     -- inline (<tick> f)
     go (Tick t e)   = do { app <- go e; pure (Tick t app) }
     go _            = Nothing

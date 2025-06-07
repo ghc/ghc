@@ -1373,6 +1373,7 @@ setScrutOcc :: ScEnv -> ScUsage -> OutExpr -> ArgOcc -> ScUsage
 -- _Overwrite_ the occurrence info for the scrutinee, if the scrutinee
 -- is a variable, and an interesting variable
 setScrutOcc env usg (Cast e _) occ      = setScrutOcc env usg e occ
+setScrutOcc env usg (CastZ e _ _) occ   = setScrutOcc env usg e occ
 setScrutOcc env usg (Tick _ e) occ      = setScrutOcc env usg e occ
 setScrutOcc env usg (Var v)    occ
   | Just RecArg <- lookupHowBound env v = usg { scu_occs = extendVarEnv (scu_occs usg) v occ }
@@ -1531,6 +1532,9 @@ scExpr' env (Cast e co)  = do (usg, e', ws) <- scExpr env e
                               return (usg, mkCast e' (scSubstCo env co), ws)
                               -- Important to use mkCast here
                               -- See Note [SpecConstr call patterns]
+scExpr' env (CastZ e ty cos) = do (usg, e', ws) <- scExpr env e
+                                  let !(MkSolo ty') = scSubstTy env ty
+                                  return (usg, mkCastZ e' ty' (map (scSubstCo env) cos), ws)
 scExpr' env e@(App _ _)  = scApp env (collectArgs e)
 scExpr' env (Lam b e)    = do let (env', b') = extendBndr env b
                               (usg, e', ws) <- scExpr env' e
@@ -2540,6 +2544,7 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
           n_cons (Var v) | v `elemVarSet` q_set = 0
                          | otherwise            = 1
           n_cons (Cast e _)  = n_cons e
+          n_cons (CastZ e _ _) = n_cons e
           n_cons (App e1 e2) = n_cons e1 + n_cons e2
           n_cons (Lit {})    = 1
           n_cons _           = 0
@@ -2695,6 +2700,8 @@ argToPat1 env in_scope val_env (Cast arg co) arg_occ arg_str
                 return (interesting, Cast arg' co, strict_args) }
   where
     ty2 = coercionRKind co
+
+-- TODO argToPat1 for CastZ
 
   -- Check for a constructor application
   -- NB: this *precedes* the Var case, so that we catch nullary constrs

@@ -13,7 +13,7 @@ module GHC.Core.Subst (
 
         -- ** Substituting into expressions and related types
         deShadowBinds, substRuleInfo, substRulesForImportedIds,
-        substTyUnchecked, substCo, substExpr, substExprSC, substBind, substBindSC,
+        substTyUnchecked, substCo, substCos, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
         lookupIdSubst, lookupIdSubst_maybe, substIdType, substIdOcc,
         substTickish, substDVarSet, substIdInfo,
@@ -45,7 +45,7 @@ import GHC.Core.Utils
         -- We are defining local versions
 import GHC.Core.Type hiding ( substTy )
 import GHC.Core.Coercion
-    ( tyCoFVsOfCo, mkCoVarCo, substCoVarBndr )
+    ( tyCoFVsOfCo, mkCoVarCo, substCos, substCoVarBndr )
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env as InScopeSet
@@ -264,6 +264,8 @@ substExpr subst expr
        --         if you "optimise" an identity coercion, you may
        --         lose a binder. We optimise the LHS of rules at
        --         construction time
+
+    go (CastZ e ty cos) = CastZ (go e) (substTyUnchecked subst ty) (map (substCo subst) cos)
 
     go (Lam bndr body) = Lam bndr' (substExpr subst' body)
                        where

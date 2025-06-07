@@ -259,6 +259,7 @@ data Expr b
   | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
   | Cast  (Expr b) CoercionR        -- The Coercion has Representational role
+  | CastZ (Expr b) Type [Coercion]  -- TODO: docs; TODO more efficient deps?
   | Tick  CoreTickish (Expr b)
   | Type  Type
   | Coercion Coercion
@@ -1941,6 +1942,7 @@ deTagExpr (Let bind body)           = Let (deTagBind bind) (deTagExpr body)
 deTagExpr (Case e (TB b _) ty alts) = Case (deTagExpr e) b ty (map deTagAlt alts)
 deTagExpr (Tick t e)                = Tick t (deTagExpr e)
 deTagExpr (Cast e co)               = Cast (deTagExpr e) co
+deTagExpr (CastZ e ty cos)          = CastZ (deTagExpr e) ty cos
 
 deTagBind :: TaggedBind t -> CoreBind
 deTagBind (NonRec (TB b _) rhs) = NonRec b (deTagExpr rhs)
@@ -2251,6 +2253,7 @@ collectFunSimple expr
         App f _a    -> go f
         Tick _t e   -> go e
         Cast e _co  -> go e
+        CastZ e _ _ -> go e
         e           -> e
 
 -- | fmap on the body of a lambda.
@@ -2267,6 +2270,7 @@ wrapLamBody f expr = go expr
 stripNArgs :: Word -> Expr a -> Maybe (Expr a)
 stripNArgs !n (Tick _ e) = stripNArgs n e
 stripNArgs n (Cast f _) = stripNArgs n f
+stripNArgs n (CastZ f _ _) = stripNArgs n f
 stripNArgs 0 e = Just e
 stripNArgs n (App f _) = stripNArgs (n - 1) f
 stripNArgs _ _ = Nothing
@@ -2359,6 +2363,7 @@ data AnnExpr' bndr annot
   | AnnLet      (AnnBind bndr annot) (AnnExpr bndr annot)
   | AnnCast     (AnnExpr bndr annot) (annot, Coercion)
                    -- Put an annotation on the (root of) the coercion
+  | AnnCastZ    (AnnExpr bndr annot) (annot, Type) [(annot, Coercion)]
   | AnnTick     CoreTickish (AnnExpr bndr annot)
   | AnnType     Type
   | AnnCoercion Coercion
@@ -2401,6 +2406,7 @@ deAnnotate' (AnnLit  lit)         = Lit lit
 deAnnotate' (AnnLam  binder body) = Lam binder (deAnnotate body)
 deAnnotate' (AnnApp  fun arg)     = App (deAnnotate fun) (deAnnotate arg)
 deAnnotate' (AnnCast e (_,co))    = Cast (deAnnotate e) co
+deAnnotate' (AnnCastZ e (_,ty) cos) = CastZ (deAnnotate e) ty (map snd cos)
 deAnnotate' (AnnTick tick body)   = Tick tick (deAnnotate body)
 
 deAnnotate' (AnnLet bind body)

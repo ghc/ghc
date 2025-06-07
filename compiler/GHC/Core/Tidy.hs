@@ -213,6 +213,7 @@ tidyExpr _   (Lit lit)     = Lit lit
 tidyExpr env (App f a)     = App (tidyExpr env f) (tidyExpr env a)
 tidyExpr env (Tick t e)    = Tick (tidyTickish env t) (tidyExpr env e)
 tidyExpr env (Cast e co)   = Cast (tidyExpr env e) (tidyCo env co)
+tidyExpr env (CastZ e ty cos) = CastZ (tidyExpr env e) (tidyType env ty) (tidyCos env cos)
 
 tidyExpr env (Let b e)
   = tidyBind env b      =: \ (env', b') ->

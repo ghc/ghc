@@ -220,6 +220,11 @@ cprAnal' env (Cast e co)
   where
     (cpr_ty, e') = cprAnal env e
 
+cprAnal' env (CastZ e ty cos)
+  = (cpr_ty, CastZ e' ty cos)
+  where
+    (cpr_ty, e') = cprAnal env e
+
 cprAnal' env (Tick t e)
   = (cpr_ty, Tick t e')
   where

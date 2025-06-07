@@ -713,6 +713,7 @@ cseExpr env (Var v)               = lookupSubst env v
 cseExpr env (App f a)             = App (cseExpr env f) (tryForCSE env a)
 cseExpr env (Tick t e)            = Tick t (cseExpr env e)
 cseExpr env (Cast e co)           = Cast (tryForCSE env e) (substCo (csEnvSubst env) co)
+cseExpr env (CastZ e ty cos)      = CastZ (tryForCSE env e) (substTyUnchecked (csEnvSubst env) ty) (substCos (csEnvSubst env) cos)
 cseExpr env (Lam b e)             = let (env', b') = addBinder env b
                                     in Lam b' (cseExpr env' e)
 cseExpr env (Let bind e)          = let (env', bind') = cseBind NotTopLevel env bind

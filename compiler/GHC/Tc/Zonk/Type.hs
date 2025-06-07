@@ -1779,6 +1779,8 @@ zonkCoreExpr (Type ty)
 
 zonkCoreExpr (Cast e co)
     = Cast <$> zonkCoreExpr e <*> zonkCoToCo co
+zonkCoreExpr (CastZ e ty cos)
+    = CastZ <$> zonkCoreExpr e <*> zonkTcTypeToTypeX ty <*> mapM zonkCoToCo cos
 zonkCoreExpr (Tick t e)
     = Tick t <$> zonkCoreExpr e -- Do we need to zonk in ticks?
 

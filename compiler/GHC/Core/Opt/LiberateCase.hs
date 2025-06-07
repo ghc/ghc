@@ -237,6 +237,7 @@ libCase env e@(App {})          | let (fun, args) = collectArgs e
 libCase env (App fun arg)       = App (libCase env fun) (libCase env arg)
 libCase env (Tick tickish body) = Tick tickish (libCase env body)
 libCase env (Cast e co)         = Cast (libCase env e) co
+libCase env (CastZ e ty cos)    = CastZ (libCase env e) ty cos
 
 libCase env (Lam binder body)
   = Lam binder (libCase (addBinders env [binder]) body)
@@ -252,6 +253,7 @@ libCase env (Case scrut bndr ty alts)
     env_alts = addBinders (mk_alt_env scrut) [bndr]
     mk_alt_env (Var scrut_var) = addScrutedVar env scrut_var
     mk_alt_env (Cast scrut _)  = mk_alt_env scrut       -- Note [Scrutinee with cast]
+    mk_alt_env (CastZ scrut _ _) = mk_alt_env scrut
     mk_alt_env _               = env
 
 libCaseAlt :: LibCaseEnv -> Alt CoreBndr -> Alt CoreBndr

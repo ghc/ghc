@@ -389,6 +389,10 @@ floatExpr (Cast expr co)
   = case (floatExpr expr) of { (fs, floating_defns, expr') ->
     (fs, floating_defns, Cast expr' co) }
 
+floatExpr (CastZ expr ty cos)
+  = case (floatExpr expr) of { (fs, floating_defns, expr') ->
+    (fs, floating_defns, CastZ expr' ty cos) }
+
 floatExpr (Let bind body)
   = case bind_spec of
       FloatMe dest_lvl

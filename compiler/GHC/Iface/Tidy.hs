@@ -514,6 +514,7 @@ collectCostCentres mod_name binds rules
       Let b e -> go (go_bind cs b) e
       Case scrt _ _ alts -> go_alts (go cs scrt) alts
       Cast e _ -> go cs e
+      CastZ e _ _ -> go cs e
       Tick (ProfNote cc _ _) e ->
         go (if ccFromThisModule cc mod_name then S.insert cc cs else cs) e
       Tick _ e -> go cs e
@@ -958,6 +959,7 @@ dffvExpr (Lam v e)            = extendScope v (dffvExpr e)
 dffvExpr (Tick (Breakpoint _ _ ids _) e) = mapM_ insert ids >> dffvExpr e
 dffvExpr (Tick _other e)    = dffvExpr e
 dffvExpr (Cast e _)           = dffvExpr e
+dffvExpr (CastZ e _ _)        = dffvExpr e
 dffvExpr (Let (NonRec x r) e) = dffvBind (x,r) >> extendScope x (dffvExpr e)
 dffvExpr (Let (Rec prs) e)    = extendScopeList (map fst prs) $
                                 (mapM_ dffvBind prs >> dffvExpr e)

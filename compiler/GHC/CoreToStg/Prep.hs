@@ -852,6 +852,10 @@ cpeRhsE env (Cast expr co)
    = do { (floats, expr') <- cpeRhsE env expr
         ; return (floats, Cast expr' (cpSubstCo env co)) }
 
+cpeRhsE env (CastZ expr ty cos)
+   = do { (floats, expr') <- cpeRhsE env expr
+        ; return (floats, CastZ expr' (cpSubstTy env ty) (map (cpSubstCo env) cos)) }
+
 cpeRhsE env expr@(Lam {})
    = do { let (bndrs,body) = collectBinders expr
         ; (env', bndrs') <- cpCloneBndrs env bndrs
@@ -989,6 +993,10 @@ rhsToBody env (Cast e co)
   = do { (floats, e') <- rhsToBody env e
        ; return (floats, Cast e' co) }
 
+rhsToBody env (CastZ e ty cos)
+  = do { (floats, e') <- rhsToBody env e
+       ; return (floats, CastZ e' ty cos) }
+
 rhsToBody env expr@(Lam {})   -- See Note [No eta reduction needed in rhsToBody]
   | all isTyVar bndrs           -- Type lambdas are ok
   = return (emptyFloats, expr)
@@ -1097,6 +1105,7 @@ cpeApp top_env expr
             = go fun (AIApp arg : as)
         go (Cast fun co)      as
             = go fun (AICast co : as)
+        -- TODO: collect_args CastZ
         go (Tick tickish fun) as
             -- Profiling ticks are slightly less strict so we expand their scope
             -- if they cover partial applications of things like primOps.
@@ -1322,6 +1331,7 @@ cpeApp top_env expr
 isLazyExpr :: CoreExpr -> Bool
 -- See Note [lazyId magic] in GHC.Types.Id.Make
 isLazyExpr (Cast e _)              = isLazyExpr e
+isLazyExpr (CastZ e _ _)           = isLazyExpr e
 isLazyExpr (Tick _ e)              = isLazyExpr e
 isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
 isLazyExpr _                       = False
@@ -1628,6 +1638,7 @@ eta_would_wreck_join :: CoreExpr -> Bool
 eta_would_wreck_join (Let bs e)        = isJoinBind bs || eta_would_wreck_join e
 eta_would_wreck_join (Lam _ e)         = eta_would_wreck_join e
 eta_would_wreck_join (Cast e _)        = eta_would_wreck_join e
+eta_would_wreck_join (CastZ e _ _)     = eta_would_wreck_join e
 eta_would_wreck_join (Tick _ e)        = eta_would_wreck_join e
 eta_would_wreck_join (Case _ _ _ alts) = any eta_would_wreck_join (rhssOfAlts alts)
 eta_would_wreck_join _                 = False

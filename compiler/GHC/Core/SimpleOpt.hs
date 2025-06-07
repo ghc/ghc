@@ -33,6 +33,7 @@ import GHC.Core.DataCon
 import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
+import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 
@@ -289,6 +290,7 @@ simple_opt_expr env expr
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
     go (Cast e co)      = mk_cast (go e) (go_co co)
+    go (CastZ e ty cos) = mk_cast_z (go e) (substTyUnchecked subst ty) (map go_co cos) -- TODO no point calling optCoercion?
     go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
                              (env', Nothing)   -> simple_opt_expr env' body
                              (env', Just bind) -> Let bind (simple_opt_expr env' body)
@@ -356,6 +358,14 @@ mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCo` co2)
 mk_cast (Tick t e)   co         = Tick t (mk_cast e co)
 mk_cast e co | isReflexiveCo co = e
              | otherwise        = Cast e co
+
+mk_cast_z :: CoreExpr -> Type -> [Coercion] -> CoreExpr
+-- TODO think
+mk_cast_z (Cast e co) ty cos = mk_cast_z e ty (co : cos)
+mk_cast_z (CastZ e ty1 cos1) ty2 cos2 = mk_cast_z e ty2 (cos1 ++ cos2)
+mk_cast_z (Tick t e)   ty cos    = Tick t (mk_cast_z e ty cos)
+mk_cast_z e ty cos | exprType e `eqType` ty = e
+                   | otherwise              = mkCastZ e ty cos
 
 ----------------------
 -- simple_app collects arguments for beta reduction
@@ -440,6 +450,8 @@ finish_app env (Cast (Lam x e) co) as@(_:_)
   , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
   , Just (x',e') <- pushCoercionIntoLambda (soeInScope env) x e co
   = simple_app (soeZapSubst env) (Lam x' e') as
+
+-- TODO: CastZ version of the finish_app
 
 finish_app env fun args
   = foldl mk_app fun args
@@ -1296,6 +1308,8 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
             -- See Note [Push coercions in exprIsConApp_maybe]
        = go subst floats expr (CC args' (m_co1' `mkTransMCo` m_co2))
 
+    -- TODO: Cast in exprIsConApp_maybe
+
     go subst floats (App fun arg) (CC args mco)
        | let arg_type = exprType arg
        , not (isTypeArg arg) && needsCaseBinding arg_type arg
@@ -1592,6 +1606,8 @@ exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
     , let res = Just (x',e',ts)
     = --pprTrace "exprIsLambda_maybe:Cast" (vcat [ppr casted_e,ppr co,ppr res)])
       res
+
+-- TODO: exprIsLambda_maybe for CastZ
 
 -- Another attempt: See if we find a partial unfolding
 exprIsLambda_maybe ise@(ISE in_scope_set id_unf) e

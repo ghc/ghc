@@ -82,6 +82,8 @@ exprStats (Let b e)       = bindStats NotTopLevel b `plusCS` exprStats e
 exprStats (Case e b _ as) = exprStats e `plusCS` bndrStats b
                                         `plusCS` sumCS altStats as
 exprStats (Cast e co)     = coStats co `plusCS` exprStats e
+exprStats (CastZ e ty cos)= exprStats e `plusCS` tyStats ty
+                                        `plusCS` sumCS coStats cos
 exprStats (Tick _ e)      = exprStats e
 
 altStats :: CoreAlt -> CoreStats
@@ -113,6 +115,7 @@ exprSize (Lam b e)       = bndrSize b + exprSize e
 exprSize (Let b e)       = bindSize b + exprSize e
 exprSize (Case e b _ as) = exprSize e + bndrSize b + 1 + sum (map altSize as)
 exprSize (Cast e _)      = 1 + exprSize e
+exprSize (CastZ e _ _)   = 1 + exprSize e
 exprSize (Tick n e)      = tickSize n + exprSize e
 exprSize (Type _)        = 1
 exprSize (Coercion _)    = 1

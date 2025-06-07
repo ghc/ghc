@@ -1123,6 +1123,8 @@ prepareSpecLHS poly_id evs the_call
        -> Maybe (IdSet, [CoreBind], [CoreExpr])
     go qevs acc (Cast e _)
       = go qevs acc e
+    go qevs acc (CastZ e _ _)
+      = go qevs acc e
     go qevs acc (Let bind e)
       | not (all isDictId bndrs)   -- A normal 'let' is too complicated
       = Nothing
@@ -1247,6 +1249,7 @@ finishSpecPrag poly_nm poly_rhs rule_bndrs poly_id rule_args
     is_nop_arg (Type {})     = True
     is_nop_arg (Coercion {}) = True
     is_nop_arg (Cast e _)    = is_nop_arg e
+    is_nop_arg (CastZ e _ _) = is_nop_arg e
     is_nop_arg (Tick _ e)    = is_nop_arg e
     is_nop_arg (Var x)       = x `elem` spec_bndrs
     is_nop_arg _             = False

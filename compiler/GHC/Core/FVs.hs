@@ -51,7 +51,8 @@ module GHC.Core.FVs (
         freeVars,               -- CoreExpr -> CoreExprWithFVs
         freeVarsBind,           -- CoreBind -> DVarSet -> (DVarSet, CoreBindWithFVs)
         freeVarsOf,             -- CoreExprWithFVs -> DIdSet
-        freeVarsOfAnn
+        freeVarsOfAnn,
+        unionFVss
     ) where
 
 import GHC.Prelude
@@ -260,6 +261,8 @@ expr_fvs (Lam bndr body) fv_cand in_scope acc =
   addBndr bndr (expr_fvs body) fv_cand in_scope acc
 expr_fvs (Cast expr co) fv_cand in_scope acc =
   (expr_fvs expr `unionFV` tyCoFVsOfCo co) fv_cand in_scope acc
+expr_fvs (CastZ expr ty cos) fv_cand in_scope acc =
+  (expr_fvs expr `unionFV` tyCoFVsOfType ty `unionFV` mapUnionFV tyCoFVsOfCo cos) fv_cand in_scope acc
 
 expr_fvs (Case scrut bndr ty alts) fv_cand in_scope acc
   = (expr_fvs scrut `unionFV` tyCoFVsOfType ty `unionFV` addBndr bndr
@@ -401,6 +404,7 @@ orphNamesOfExpr e
     go (Lam v e)            = go e `delFromNameSet` idName v
     go (Tick _ e)           = go e
     go (Cast e _co)         = go e  -- See wrinkle (ON1) of Note [Finding orphan names]
+    go (CastZ e _ty _cvs)   = go e
     go (Let (NonRec _ r) e) = go e `unionNameSet` go r
     go (Let (Rec prs) e)    = orphNamesOfExprs (map snd prs) `unionNameSet` go e
     go (Case e _ ty as)     = go e `unionNameSet` orphNamesOfType ty
@@ -753,6 +757,14 @@ freeVars = go
       where
         expr2 = go expr
         cfvs  = tyCoVarsOfCoDSet co
+
+    go (CastZ expr ty cos)
+      = ( freeVarsOf expr2 `unionFVs` cfvs {- `unionFVs` mapUnionFV fst fvs_cos -} -- TODO
+        , AnnCastZ expr2 (cfvs, ty) fvs_cos )
+      where
+        expr2 = go expr
+        cfvs  = tyCoVarsOfTypeDSet ty
+        fvs_cos = map (\co -> (tyCoVarsOfCoDSet co, co)) cos
 
     go (Tick tickish expr)
       = ( tickishFVs tickish `unionFVs` freeVarsOf expr2

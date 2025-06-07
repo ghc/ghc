@@ -571,6 +571,7 @@ toIfaceExpr (Case s x ty as)
   | otherwise               = IfaceCase (toIfaceExpr s) (mkIfLclName (getOccFS x)) (map toIfaceAlt as)
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
 toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
+toIfaceExpr (CastZ e ty cos)= IfaceCastZ (toIfaceExpr e) (toIfaceType ty) (map toIfaceCoercion cos)
 toIfaceExpr (Tick t e)      = IfaceTick (toIfaceTickish t) (toIfaceExpr e)
 
 toIfaceOneShot :: Id -> IfaceOneShot

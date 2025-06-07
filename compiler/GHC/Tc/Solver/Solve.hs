@@ -38,6 +38,7 @@ import GHC.Core.Coercion
 import GHC.Core.Class( classHasSCs )
 
 import GHC.Types.Id(  idType )
+import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.Var( EvVar, tyVarKind )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -1458,8 +1459,10 @@ finish_rewrite
              -- mkEvCast optimises ReflCo
              ev_rw_role = ctEvRewriteRole ev
              new_tm = assert (coercionRole co == ev_rw_role)
-                      mkEvCast (evId old_evar)
-                         (downgradeRole Representational ev_rw_role co)
+                      -- TODO: here and later we need to decide using flags whether to use mkEvCast or evCastZ
+                      --mkEvCast (evId old_evar)
+                      --   (downgradeRole Representational ev_rw_role co)
+                      evCastZ (evId old_evar) new_pred [co]
        ; new_ev <- newGivenEvVar loc (new_pred, new_tm)
        ; continueWith $ CtGiven new_ev }
 
@@ -1473,11 +1476,15 @@ finish_rewrite
        ; mb_new_ev <- newWanted loc rewriters' new_pred
        ; massert (coercionRole co == ev_rw_role)
        ; setWantedEvTerm dest EvCanonical $
-            mkEvCast (getEvExpr mb_new_ev)
-                     (downgradeRole Representational ev_rw_role (mkSymCo co))
+            -- TODO: look at flags to decide here too
+            --mkEvCast (getEvExpr mb_new_ev)
+            --         (downgradeRole Representational ev_rw_role (mkSymCo co))
+            evCastZ (getEvExpr mb_new_ev) new_pred [co]
        ; case mb_new_ev of
             Fresh  new_ev -> continueWith $ CtWanted new_ev
             Cached _      -> stopWith ev "Cached wanted" }
+
+
 
 {- *******************************************************************
 *                                                                    *
