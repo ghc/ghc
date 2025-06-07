@@ -234,12 +234,12 @@ data Message a where
   -- | Evaluate something. This is used to support :force in GHCi.
   Seq
     :: HValueRef
-    -> Message (EvalStatus HValueRef)
+    -> Message (EvalStatus ())
 
   -- | Resume forcing a free variable in a breakpoint (#2950)
   ResumeSeq
-    :: RemoteRef (ResumeContext (HValueRef))
-    -> Message (EvalStatus HValueRef)
+    :: RemoteRef (ResumeContext ())
+    -> Message (EvalStatus ())
 
 deriving instance Show (Message a)
 
