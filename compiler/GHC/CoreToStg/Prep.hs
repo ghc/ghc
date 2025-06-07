@@ -2257,8 +2257,8 @@ decideFloatInfo FIA{fia_levity=lev, fia_demand=dmd, fia_is_hnf=is_hnf,
   | is_string             = (CaseBound, TopLvlFloatable)
       -- String literals are unboxed (so must be case-bound) and float to
       -- the top-level
-  | ok_for_spec           = (CaseBound, case lev of Unlifted -> LazyContextFloatable
-                                                    Lifted   -> TopLvlFloatable)
+  -- TODO: figre out if ok_for_spec is a good enough predicate for floating unlifted bindings
+  | ok_for_spec           = (CaseBound, TopLvlFloatable)
       -- See Note [Speculative evaluation]
       -- Ok-for-spec-eval things will be case-bound, lifted or not.
       -- But when it's lifted we are ok with floating it to top-level
