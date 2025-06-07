@@ -15,4 +15,4 @@ mappend = <_ :: forall a. Monoid a => a -> a -> a>
 foldl' = <_ :: forall (t :: * -> *) b a.
                Foldable t =>
                (b -> a -> b) -> b -> t a -> b>
-f = <_ :: forall b. (forall a. a -> a) -> b -> b>
+f = (_t8::(forall a. a -> a) -> b -> b)

@@ -367,7 +367,7 @@ cPprTermBase y =
   , ifTerm' (isTyCon doubleTyCon  . ty) ppr_double
   , ifTerm' (isTyCon integerTyCon . ty) ppr_integer
   , ifTerm' (isTyCon naturalTyCon . ty) ppr_natural
-  , ifFunSuspension         (isFunTy . ty) ppr_fun
+  , ifFunSuspension      (isFunTy . ty) ppr_fun
   ]
  where
    ifTerm :: (Term -> Bool)
@@ -386,9 +386,11 @@ cPprTermBase y =
                    -> (Precedence -> Term -> m (Maybe SDoc))
                    -> Precedence -> Term -> m (Maybe SDoc)
    ifFunSuspension pred f prec t@Suspension{ctype = ctype}
-       | ctype `elem` fun_ctype && pred t    = f prec t
+       | ctype `elem` fun_ctype && pred t = f prec t
      where
-       fun_ctype = [ FUN, FUN_1_0, FUN_0_1, FUN_2_0, FUN_1_1, FUN_0_2, FUN_STATIC ]
+       -- TODO(ozkutuk): PAP _seems to be_ indicate a function closure,
+       -- I have no idea what AP is though
+       fun_ctype = [ FUN, FUN_1_0, FUN_0_1, FUN_2_0, FUN_1_1, FUN_0_2, FUN_STATIC, AP, PAP ]
    ifFunSuspension _ _ _ _  = return Nothing
 
    isFunTy :: Type -> Bool

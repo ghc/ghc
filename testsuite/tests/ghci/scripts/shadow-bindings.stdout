@@ -27,7 +27,7 @@ it :: () = ()
 Expecting T and foo with function type
 type T :: *
 data T = ...
-foo :: T -> Bool = <_ :: T -> Bool>
+foo :: T -> Bool = _
 it :: () = ()
 Expecting T and foo :: Bool
 type T :: *
