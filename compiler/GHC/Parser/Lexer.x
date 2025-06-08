@@ -335,9 +335,9 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 
   ^\# \ * $idchar+ .*\n   / { ifExtensionGhcCppNotComment } { cppSkip } -- No leading space, otherwise clashes with OverloadedLabels
 
-  ^\# pragma .* \n     / { ifExtensionGhcCppNotComment } { cppSkip } -- GCC 3.3 CPP generated, apparently
-  ^\# \! .* \n         / { ifExtensionGhcCppNotComment } { cppSkip } -- #!, for scripts  -- gcc
-  ^\  \# \! .* \n      / { ifExtensionGhcCppNotComment } { cppSkip } --  #!, for scripts -- clang; See #6132
+  ^\# pragma .* \n        / { ifExtensionGhcCppNotComment } { cppSkip } -- GCC 3.3 CPP generated, apparently
+  ^\# \! .* \n            / { ifExtensionGhcCppNotComment } { cppSkip } -- #!, for scripts  -- gcc
+  ^\  \# \! .* \n         / { ifExtensionGhcCppNotComment } { cppSkip } --  #!, for scripts -- clang; See #6132
 
   ^\# pragma .* \n                      ; -- GCC 3.3 CPP generated, apparently
   ^\# \! .* \n                          ; -- #!, for scripts  -- gcc
@@ -351,7 +351,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 <skipping> {
   -- Ghc CPP symbols
   ^\# \ * @cppkeyword  .* \n  { cppToken cpp_prag }
-  ^.*\n                           { cppSkip }
+  ^.*\n                       { cppSkip }
 }
 
 -- after a layout keyword (let, where, do, of), we begin a new layout
