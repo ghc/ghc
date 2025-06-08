@@ -295,6 +295,7 @@ data Instr
         | VPBROADCAST Format Format Operand Reg -- scalar format, vector format, source, destination
         | VEXTRACT    Format Imm Reg Operand
         | INSERTPS    Format Imm Operand Reg
+        | VINSERTPS   Format Imm Operand Reg Reg
         | PINSR       Format Format Imm Operand Reg -- scalar format, vector format, offset, scalar src, vector
         | PEXTR       Format Format Imm Reg Operand -- scalar format, vector format, offset, vector src, scalar dst
 
@@ -312,6 +313,8 @@ data Instr
         | MOVDQU      Format Operand Operand
         -- | AVX unaligned move of integer vectors
         | VMOVDQU     Format Operand Operand
+        -- | Alias for VMOVSS/VMOVSD, used to merge two vectors
+        | VMOV_MERGE  Format Reg Reg Reg
 
         -- logic operations
         | PXOR        Format Operand Reg
@@ -341,12 +344,23 @@ data Instr
         | PSHUFHW    Format Imm Operand Reg
         | PSHUFD     Format Imm Operand Reg
         | VPSHUFD    Format Imm Operand Reg
+        | BLEND      Format Imm Operand Reg
+        | VBLEND     Format Imm Operand Reg Reg
         | PBLENDW    Format Imm Operand Reg
 
         -- | Move two 32-bit floats from the high part of an xmm register
         -- to the low part of another xmm register.
+        --
+        -- If the format is a vector format, the destination register is treated as the second source.
+        -- If the format is FF32 or FF64, the destination register is not treated as a source.
         | MOVHLPS    Format Reg Reg
+        | VMOVHLPS   Format Reg Reg Reg
+        | MOVLHPS    Format Reg Reg
+        | VMOVLHPS   Format Reg Reg Reg
         | UNPCKL     Format Operand Reg
+        | VUNPCKL    Format Operand Reg Reg
+        | UNPCKH     Format Operand Reg
+        | VUNPCKH    Format Operand Reg Reg
         | PUNPCKLQDQ Format Operand Reg
         | PUNPCKLDQ  Format Operand Reg
         | PUNPCKLWD  Format Operand Reg
@@ -521,6 +535,8 @@ regUsageOfInstr platform instr
             where pos = ( off `shiftR` 4 ) .&. 0b11
     INSERTPS fmt _off src dst
       -> mkRU ((use_R fmt src []) ++ [mk fmt dst]) [mk fmt dst]
+    VINSERTPS fmt _imm src2 src1 dst
+      -> mkRU (use_R fmt src2 [mk fmt src1]) [mk fmt dst]
     PINSR sFmt vFmt _off src dst
       -> mkRU (use_R sFmt src [mk vFmt dst]) [mk vFmt dst]
     PEXTR sFmt vFmt _off src dst
@@ -532,6 +548,7 @@ regUsageOfInstr platform instr
     MOVH         fmt src dst   -> usageRM fmt src dst
     MOVDQU       fmt src dst   -> usageRW fmt src dst
     VMOVDQU      fmt src dst   -> usageRW fmt src dst
+    VMOV_MERGE   fmt src2 src1 dst -> mkRU [mk fmt src1, mk fmt src2] [mk fmt dst]
 
     PXOR fmt (OpReg src) dst
       | src == dst
@@ -574,6 +591,10 @@ regUsageOfInstr platform instr
       -> mkRU (use_R fmt src []) [mk fmt dst]
     VPSHUFD fmt _mask src dst
       -> mkRU (use_R fmt src []) [mk fmt dst]
+    BLEND fmt _mask src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    VBLEND fmt _mask src2 src1 dst
+      -> mkRU (use_R fmt src2 [mk fmt src1]) [mk fmt dst]
     PBLENDW fmt _mask src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
@@ -584,9 +605,29 @@ regUsageOfInstr platform instr
     PALIGNR fmt _off src dst -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
     MOVHLPS    fmt src dst
-      -> mkRU [mk fmt src] [mk fmt dst]
+      -> case fmt of
+           VecFormat {} -> mkRU [mk fmt src, mk fmt dst] [mk fmt dst]
+           -- MOVHLPS moves the high 64 bits of src to the low 64 bits of dst,
+           -- keeping the high 64 bits of dst intact.
+           -- If we only care about the lower 64 bits of the result,
+           -- dst is only written to, not read.
+           FF64 -> mkRU [mk (VecFormat 2 FmtDouble) src] [mk fmt dst]
+           FF32 -> mkRU [mk (VecFormat 4 FmtFloat) src] [mk fmt dst]
+           _ -> pprPanic "regUsage: invalid format for MOVHLPS" (ppr fmt)
+    VMOVHLPS   fmt src2 src1 dst
+      -> mkRU [mk fmt src1, mk fmt src2] [mk fmt dst]
+    MOVLHPS    fmt src dst
+      -> mkRU [mk fmt src, mk fmt dst] [mk fmt dst]
+    VMOVLHPS   fmt src2 src1 dst
+      -> mkRU [mk fmt src1, mk fmt src2] [mk fmt dst]
     UNPCKL fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    VUNPCKL fmt src2 src1 dst
+      -> mkRU (use_R fmt src2 [mk fmt src1]) [mk fmt dst]
+    UNPCKH fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    VUNPCKH fmt src2 src1 dst
+      -> mkRU (use_R fmt src2 [mk fmt src1]) [mk fmt dst]
     PUNPCKLQDQ fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PUNPCKLDQ fmt src dst
@@ -812,6 +853,8 @@ patchRegsOfInstr platform instr env
       -> VEXTRACT fmt off (env src) (patchOp dst)
     INSERTPS    fmt off src dst
       -> INSERTPS fmt off (patchOp src) (env dst)
+    VINSERTPS   fmt off src2 src1 dst
+      -> VINSERTPS fmt off (patchOp src2) (env src1) (env dst)
     PINSR       fmt1 fmt2 off src dst
       -> PINSR fmt1 fmt2 off (patchOp src) (env dst)
     PEXTR       fmt1 fmt2 off src dst
@@ -823,6 +866,7 @@ patchRegsOfInstr platform instr env
     MOVH       fmt src dst   -> MOVH  fmt (patchOp src) (patchOp dst)
     MOVDQU     fmt src dst   -> MOVDQU  fmt (patchOp src) (patchOp dst)
     VMOVDQU    fmt src dst   -> VMOVDQU fmt (patchOp src) (patchOp dst)
+    VMOV_MERGE fmt src2 src1 dst -> VMOV_MERGE fmt (env src2) (env src1) (env dst)
 
     PXOR       fmt src dst   -> PXOR fmt (patchOp src) (env dst)
     VPXOR      fmt s1 s2 dst -> VPXOR fmt (env s1) (env s2) (env dst)
@@ -855,6 +899,10 @@ patchRegsOfInstr platform instr env
       -> PSHUFD  fmt off (patchOp src) (env dst)
     VPSHUFD      fmt off src dst
       -> VPSHUFD fmt off (patchOp src) (env dst)
+    BLEND        fmt mask src dst
+      -> BLEND   fmt mask (patchOp src) (env dst)
+    VBLEND       fmt mask src2 src1 dst
+      -> VBLEND  fmt mask (patchOp src2) (env src1) (env dst)
     PBLENDW      fmt mask src dst
       -> PBLENDW fmt mask (patchOp src) (env dst)
 
@@ -871,8 +919,20 @@ patchRegsOfInstr platform instr env
 
     MOVHLPS    fmt src dst
       -> MOVHLPS fmt (env src) (env dst)
+    VMOVHLPS   fmt src2 src1 dst
+      -> VMOVHLPS fmt (env src2) (env src1) (env dst)
+    MOVLHPS    fmt src dst
+      -> MOVLHPS fmt (env src) (env dst)
+    VMOVLHPS   fmt src2 src1 dst
+      -> VMOVLHPS fmt (env src2) (env src1) (env dst)
     UNPCKL fmt src dst
       -> UNPCKL fmt (patchOp src) (env dst)
+    VUNPCKL fmt src2 src1 dst
+      -> VUNPCKL fmt (patchOp src2) (env src1) (env dst)
+    UNPCKH fmt src dst
+      -> UNPCKH fmt (patchOp src) (env dst)
+    VUNPCKH fmt src2 src1 dst
+      -> VUNPCKH fmt (patchOp src2) (env src1) (env dst)
     PUNPCKLQDQ fmt src dst
       -> PUNPCKLQDQ fmt (patchOp src) (env dst)
     PUNPCKLDQ fmt src dst

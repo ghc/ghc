@@ -143,6 +143,10 @@ Compiler
   were accessed using the generated record selector functions, marking the fields
   as covered in coverage reports (:ghc-ticket:`17834`).
 
+- SIMD support in the X86 native code generator has been extended with 128-bit
+  integer operations.  Also, ``shuffleFloatX4#`` and ``shuffleDoubleX2#`` no longer
+  require ``-mavx``.
+
 GHCi
 ~~~~
 

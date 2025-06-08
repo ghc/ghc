@@ -93,7 +93,7 @@ import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (fold)
 import Data.Int
-import Data.List (partition)
+import Data.List (partition, (\\))
 import Data.Maybe
 import Data.Word
 
@@ -1363,15 +1363,11 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_U_Shr rep -> shift_code rep SHR x y {-False-}
       MO_S_Shr rep -> shift_code rep SAR x y {-False-}
 
-      MO_VF_Shuffle l w is
-        | l * widthInBits w == 128
-        -> if
-            | avx
-            -> vector_shuffle_float l w x y is
-            | otherwise
-            -> sorry "Please enable the -mavx flag"
-        | otherwise
-        -> sorry "Please use -fllvm for wide shuffle instructions"
+      MO_VF_Shuffle 4 W32 is | avx -> vector_shuffle_float_avx 4 x y is
+                             | otherwise -> vector_shuffle_floatx4_sse sse4_1 x y is
+      MO_VF_Shuffle 2 W64 is | avx -> vector_shuffle_double_avx 2 x y is
+                             | otherwise -> vector_shuffle_doublex2_sse x y is
+      MO_VF_Shuffle {} -> sorry "Please use -fllvm for wide shuffle instructions"
 
       MO_VF_Extract l W32   | avx       -> vector_float_extract l W32 x y
                             | otherwise -> vector_float_extract_sse l W32 x y
@@ -1688,17 +1684,24 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                         -> CmmExpr
                         -> CmmExpr
                         -> NatM Register
-    vector_float_op_avx instr l w expr1 expr2 = do
-      (reg1, exp1) <- getSomeReg expr1
-      (reg2, exp2) <- getSomeReg expr2
-      let format   = case w of
+    vector_float_op_avx instr l w = vector_op_avx_reg (\fmt -> instr fmt . OpReg) format
+      where format = case w of
                        W32 -> VecFormat l FmtFloat
                        W64 -> VecFormat l FmtDouble
                        _ -> pprPanic "Floating-point AVX vector operation not supported at this width"
                              (text "width:" <+> ppr w)
-          -- opcode src2 src1 dst <==> dst = src1 `opcode` src2
+
+    vector_op_avx_reg :: (Format -> Reg -> Reg -> Reg -> Instr)
+                      -> Format
+                      -> CmmExpr
+                      -> CmmExpr
+                      -> NatM Register
+    vector_op_avx_reg instr format expr1 expr2 = do
+      (reg1, exp1) <- getSomeReg expr1
+      (reg2, exp2) <- getSomeReg expr2
+      let -- opcode src2 src1 dst <==> dst = src1 `opcode` src2
           code dst = exp1 `appOL` exp2 `snocOL`
-                     (instr format (OpReg reg2) reg1 dst)
+                     (instr format reg2 reg1 dst)
       return (Any format code)
 
     vector_float_op_sse :: (Format -> Operand -> Reg -> Instr)
@@ -1721,17 +1724,24 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                        _ -> pprPanic "Integer SSE vector operation not supported at this width"
                               (text "width:" <+> ppr w)
 
+    -- This function is similar to genTrivialCode, but re-using it would require
+    -- handling alignment correctly: SSE vector instructions typically require 16-byte
+    -- alignment for their memory operand (this restriction is relaxed with VEX-encoded
+    -- instructions).
+    -- For now, we always load the value into a register and avoid the alignment issue.
     vector_op_sse :: (Format -> Operand -> Reg -> Instr)
                   -> Format
                   -> CmmExpr
                   -> CmmExpr
                   -> NatM Register
-    vector_op_sse instr format expr1 expr2 = do
-      -- This function is similar to genTrivialCode, but re-using it would require
-      -- handling alignment correctly: SSE vector instructions typically require 16-byte
-      -- alignment for their memory operand (this restriction is relaxed with VEX-encoded
-      -- instructions).
-      -- For now, we always load the value into a register and avoid the alignment issue.
+    vector_op_sse instr = vector_op_sse_reg (\fmt -> instr fmt . OpReg)
+
+    vector_op_sse_reg :: (Format -> Reg -> Reg -> Instr)
+                      -> Format
+                      -> CmmExpr
+                      -> CmmExpr
+                      -> NatM Register
+    vector_op_sse_reg instr format expr1 expr2 = do
       config <- getConfig
       exp1_code <- getAnyReg expr1
       (reg2, exp2_code) <- getSomeReg expr2 -- vector registers are never clobbered by an instruction
@@ -1741,10 +1751,10 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
             | dst == reg2 = exp2_code `snocOL`
                             movInstr config format (OpReg reg2) (OpReg tmp) `appOL` -- MOVU or MOVDQU
                             exp1_code dst `snocOL`
-                            instr format (OpReg tmp) dst
+                            instr format tmp dst
             | otherwise = exp2_code `appOL`
                           exp1_code dst `snocOL`
-                          instr format (OpReg reg2) dst
+                          instr format reg2 dst
       return (Any format code)
     --------------------
     vector_float_extract :: Length
@@ -1762,15 +1772,14 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                 CmmInt _ _ -> exp `snocOL` (VPSHUFD format imm (OpReg r) dst)
                 _          -> pprPanic "Unsupported AVX floating-point vector extract offset" (ppr lit)
       return (Any FF32 code)
-    vector_float_extract l W64 expr (CmmLit lit) = do
+    vector_float_extract _ W64 expr (CmmLit lit) = do
       (r, exp) <- getSomeReg expr
-      let format   = VecFormat l FmtDouble
-          code dst
+      let code dst
             = case lit of
                 CmmInt 0 _ -> exp `snocOL`
                               (MOV FF64 (OpReg r) (OpReg dst))
                 CmmInt 1 _ -> exp `snocOL`
-                              (MOVHLPS format r dst)
+                              (MOVHLPS FF64 r dst)
                 _          -> pprPanic "Unsupported AVX floating-point vector extract offset" (ppr lit)
       return (Any FF64 code)
     vector_float_extract _ w c e =
@@ -1877,7 +1886,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
               CmmInt 0 _ -> exp `snocOL`
                             (MOVD fmt II64 (OpReg r) (OpReg dst))
               CmmInt 1 _ -> exp `snocOL`
-                            (MOVHLPS fmt r tmp) `snocOL`
+                            (MOVHLPS FF64 r tmp) `snocOL`
                             (MOVD fmt II64 (OpReg tmp) (OpReg dst))
               _          -> panic "Error in offset while unpacking"
       return (Any II64 code)
@@ -2031,82 +2040,320 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         Min -> Any format codeMin
         Max -> Any format codeMax
 
-    vector_shuffle_float :: Length -> Width -> CmmExpr -> CmmExpr -> [Int] -> NatM Register
-    vector_shuffle_float l w v1 v2 is = do
-      (r1, exp1) <- getSomeReg v1
-      (r2, exp2) <- getSomeReg v2
-      let fmt = VecFormat l (if w == W32 then FmtFloat else FmtDouble)
-          code dst
-            = exp1 `appOL` (exp2 `appOL` shuffleInstructions fmt r1 r2 is dst)
-      return (Any fmt code)
+    vector_shuffle_floatx4_sse :: Bool -> CmmExpr -> CmmExpr -> [Int] -> NatM Register
+    vector_shuffle_floatx4_sse sse4_1 v1 v2 is
+      | length is == 4, all (\i -> 0 <= i && i < 8) is = do
+        let fmt = VecFormat 4 FmtFloat
 
-    shuffleInstructions :: Format -> Reg -> Reg -> [Int] -> Reg -> OrdList Instr
-    shuffleInstructions fmt v1 v2 is dst =
-      case fmt of
-        VecFormat 2 FmtDouble ->
-          case is of
-            [i1, i2] -> case (i1, i2) of
-              (0,0) -> unitOL (VSHUF fmt (ImmInt 0b00) (OpReg v1) v1 dst)
-              (1,1) -> unitOL (VSHUF fmt (ImmInt 0b11) (OpReg v1) v1 dst)
-              (2,2) -> unitOL (VSHUF fmt (ImmInt 0b00) (OpReg v2) v2 dst)
-              (3,3) -> unitOL (VSHUF fmt (ImmInt 0b11) (OpReg v2) v2 dst)
-              (0,1) -> unitOL (VMOVU fmt (OpReg v1) (OpReg dst))
-              (2,3) -> unitOL (VMOVU fmt (OpReg v2) (OpReg dst))
-              (1,0) -> unitOL (VSHUF fmt (ImmInt 0b01) (OpReg v1) v1 dst)
-              (3,2) -> unitOL (VSHUF fmt (ImmInt 0b01) (OpReg v2) v2 dst)
-              (0,2) -> unitOL (VSHUF fmt (ImmInt 0b00) (OpReg v2) v1 dst)
-              (2,0) -> unitOL (VSHUF fmt (ImmInt 0b00) (OpReg v1) v2 dst)
-              (0,3) -> unitOL (VSHUF fmt (ImmInt 0b10) (OpReg v2) v1 dst)
-              (3,0) -> unitOL (VSHUF fmt (ImmInt 0b01) (OpReg v1) v2 dst)
-              (1,2) -> unitOL (VSHUF fmt (ImmInt 0b01) (OpReg v2) v1 dst)
-              (2,1) -> unitOL (VSHUF fmt (ImmInt 0b10) (OpReg v1) v2 dst)
-              (1,3) -> unitOL (VSHUF fmt (ImmInt 0b11) (OpReg v2) v1 dst)
-              (3,1) -> unitOL (VSHUF fmt (ImmInt 0b11) (OpReg v1) v2 dst)
-              _ -> pprPanic "vector shuffle: indices out of bounds 0 <= i <= 3" (ppr is)
-            _ -> pprPanic "vector shuffle: wrong number of indices (expected 2)" (ppr is)
-        VecFormat 4 FmtFloat
-          -- indices 0 <= i <= 7
-          | all ( (>= 0) <&&> (<= 7) ) is ->
-          case [(i, i-4) | i <- is] of
-            [(i1, j1), (i2, j2), (i3, j3), (i4, j4)]
-              | all ( <= 3 ) is
-              , let imm = i1 + i2 `shiftL` 2 + i3 `shiftL` 4 + i4 `shiftL` 6
-              -> unitOL (VSHUF fmt (ImmInt imm) (OpReg v1) v1 dst)
-              | all ( >= 4 ) is
-              , let imm = j1 + j2 `shiftL` 2 + j3 `shiftL` 4 + j4 `shiftL` 6
-              -> unitOL (VSHUF fmt (ImmInt imm) (OpReg v2) v2 dst)
-              | i1 <= 3, i2 <= 3
-              , i3 >= 4, i4 >= 4
-              , let imm = i1 + i2 `shiftL` 2 + (i3 - 4) `shiftL` 4 + (i4 - 4) `shiftL` 6
-              -> unitOL (VSHUF fmt (ImmInt imm) (OpReg v2) v1 dst)
-              | i1 >= 4, i2 >= 4
-              , i3 <= 3, i4 <= 3
-              , let imm = (i1 - 4) + (i2 - 4) `shiftL` 2 + i3 `shiftL` 4 + i4 `shiftL` 6
-              -> unitOL (VSHUF fmt (ImmInt imm) (OpReg v1) v2 dst)
-              | otherwise
-              ->
-              -- Fall-back code with 4 INSERTPS operations.
-              -- SIMD NCG TODO: handle more cases with better lowering.
-              let -- bits: ss_dd_zzzz
-                  -- ss: pick source location
-                  -- dd: pick destination location
-                  -- zzzz: pick locations to be zeroed
-                  insertImm src dst = shiftL   ( src `mod` 4 ) 6
-                                    .|. shiftL dst 4
-                  vec src = if src >= 4 then v2 else v1
-              in unitOL
-                (INSERTPS fmt (ImmInt $ insertImm i1 0 .|. 0b1110) (OpReg $ vec i1) dst)
-                `snocOL`
-                (INSERTPS fmt (ImmInt $ insertImm i2 1) (OpReg $ vec i2) dst)
-                `snocOL`
-                (INSERTPS fmt (ImmInt $ insertImm i3 2) (OpReg $ vec i3) dst)
-                `snocOL`
-                (INSERTPS fmt (ImmInt $ insertImm i4 3) (OpReg $ vec i4) dst)
-            _ -> pprPanic "vector shuffle: wrong number of indices (expected 4)" (ppr is)
-          | otherwise
-          -> pprPanic "vector shuffle: indices out of bounds 0 <= i <= 7" (ppr is)
-        _ ->
-          pprPanic "vector shuffle: unsupported format" (ppr fmt)
+            -- A helper function to shuffle a vector `r` in-place using (dst,src) pairs
+            -- (r[d0],r[d1],...) <- (r[s0],r[s1],...)
+            inplaceShuffle pairs r = do
+              let mask = foldl' (\acc (dst,src) -> acc .|. (src `shiftL` (2 * dst))) 0 pairs
+              case mask of
+                0b11_10_01_00 -> nilOL -- trivial
+                0b01_00_01_00 -> unitOL (MOVLHPS fmt r r)
+                0b11_10_11_10 -> unitOL (MOVHLPS fmt r r)
+                0b01_01_00_00 -> unitOL (UNPCKL fmt (OpReg r) r)
+                0b11_11_10_10 -> unitOL (UNPCKH fmt (OpReg r) r)
+                _ -> unitOL (SHUF fmt (ImmInt mask) (OpReg r) r)
+
+            -- All elements are from one source vector
+            oneSource p0 p1 p2 p3 v = do
+              exp <- getAnyReg v
+              let code dst = exp dst `appOL`
+                             inplaceShuffle [p0,p1,p2,p3] dst
+              return $ Any fmt code
+
+            -- Two elements from one vector, other two from the other vector
+            twoAndTwo (0,0) (1,1) (2,0) (3,1) v1 v2 = vector_op_sse_reg MOVLHPS fmt v1 v2
+            twoAndTwo (2,0) (3,1) (0,0) (1,1) v1 v2 = vector_op_sse_reg MOVLHPS fmt v2 v1
+            twoAndTwo (2,2) (3,3) (0,2) (1,3) v1 v2 = vector_op_sse_reg MOVHLPS fmt v1 v2
+            twoAndTwo (0,2) (1,3) (2,2) (3,3) v1 v2 = vector_op_sse_reg MOVHLPS fmt v2 v1
+            twoAndTwo (0,0) (2,1) (1,0) (3,1) v1 v2 = vector_op_sse UNPCKL fmt v1 v2
+            twoAndTwo (1,0) (3,1) (0,0) (2,1) v1 v2 = vector_op_sse UNPCKL fmt v2 v1
+            twoAndTwo (0,2) (2,3) (1,2) (3,3) v1 v2 = vector_op_sse UNPCKH fmt v1 v2
+            twoAndTwo (1,2) (3,3) (0,2) (2,3) v1 v2 = vector_op_sse UNPCKH fmt v2 v1
+            twoAndTwo p0 p1 q0 q1 v1 v2 =
+              if sse4_1 && all (\(dst,src) -> dst == src) [p0,p1,q0,q1] then
+                let imm = (1 `shiftL` fst q0) .|. (1 `shiftL` fst q1)
+                in vector_op_sse (`BLEND` (ImmInt imm)) fmt v1 v2
+              else do
+                let imm = snd p0 .|. (snd p1 `shiftL` 2) .|. (snd q0 `shiftL` 4) .|. (snd q1 `shiftL` 6)
+                reg <- vector_op_sse (`SHUF` (ImmInt imm)) fmt v1 v2
+                exp <- anyReg reg
+                let code dst = exp dst `appOL`
+                               inplaceShuffle [(fst p0,0),(fst p1,1),(fst q0,2),(fst q1,3)] dst
+                return $ Any fmt code
+
+            -- Three elements from one vector, the last one from the other vector
+            threeAndOne p0 p1 p2 q0 v1 v2
+              | sse4_1 = do -- Use INSERTPS
+                exp1 <- getAnyReg v1
+                (r2, exp2) <- getSomeReg v2
+                let imm2 = (snd q0 `shiftL` 6) .|. (fst q0 `shiftL` 4)
+                dst <- getNewRegNat fmt
+                let code = exp1 dst `appOL` exp2 `appOL`
+                           inplaceShuffle [p0,p1,p2,(fst q0,fst q0)] dst `snocOL`
+                           (INSERTPS fmt (ImmInt imm2) (OpReg r2) dst)
+                return $ Fixed fmt dst code
+
+              | (_, 0) <- q0, 0 `notElem` [snd p0,snd p1,snd p2] = do -- Use MOVSS
+                exp1 <- getAnyReg v1
+                (r2, exp2) <- getSomeReg v2
+                dst <- getNewRegNat fmt
+                let code = exp1 dst `appOL` exp2 `snocOL`
+                           (MOV fmt (OpReg r2) (OpReg dst)) `appOL`
+                           inplaceShuffle [p0,p1,p2,(fst q0,0)] dst
+                return $ Fixed fmt dst code
+
+              | otherwise = do -- Use two or three SHUFPSs
+                (r1, exp1) <- getSomeReg v1
+                exp2 <- getAnyReg v2
+                let makeMask i0 i1 i2 i3 = i0 .|. (i1 `shiftL` 2) .|. (i2 `shiftL` 4) .|. (i3 `shiftL` 6)
+                let imm1 = makeMask (snd q0) (snd q0) (snd p0) (snd p0)
+                    (imm2, pairs) =
+                      if fst q0 == 1 then
+                        (makeMask 2 1 (snd p1) (snd p2), [(fst p0,0),(fst q0,1),(fst p1,2),(fst p2,3)])
+                        -- dst <- (dst[2],dst[1],r1[snd p1],r1[snd p2]) = (v1[snd p0],v2[snd q0],v1[snd p1],v1[snd p2])
+                        -- (dst[fst p0],dst[fst q0],dst[fst p1],dst[fst p2]) <- dst
+                      else
+                        (makeMask 0 2 (snd p1) (snd p2), [(fst q0,0),(fst p0,1),(fst p1,2),(fst p2,3)])
+                        -- dst <- (dst[0],dst[2],r1[snd p1],r1[snd p2]) = (v2[snd q0],v1[snd p0],v1[snd p1],v1[snd p2])
+                        -- (dst[fst p0],dst[fst q0],dst[fst p1],dst[fst p2]) <- dst
+                dst <- getNewRegNat fmt
+                let code = exp1 `appOL` exp2 dst `snocOL`
+                           (SHUF fmt (ImmInt imm1) (OpReg r1) dst) `snocOL` -- dst <- (dst[snd q0],dst[snd q0],r1[snd p0],r1[snd p0]) = (v2[snd q0],v2[snd q0],v1[snd p0],v1[snd p0])
+                           (SHUF fmt (ImmInt imm2) (OpReg r1) dst) `appOL`
+                           inplaceShuffle pairs dst
+                return $ Fixed fmt dst code
+
+        -- We partition the list of indices into those that refer to the first vector and those that
+        -- refer to the second, and handle each case depending on the number of indices in each group.
+        let (from_first, from_second) = partition (\(_dstPos, srcPos) -> srcPos < 4) (zip [0..] is)
+        case (from_first, map (\(dst, src) -> (dst, src - 4)) from_second) of
+          ([p0,p1,p2,p3], []) -> oneSource p0 p1 p2 p3 v1
+          ([], [q0,q1,q2,q3]) -> oneSource q0 q1 q2 q3 v2
+          ([p0,p1], [q0,q1]) -> twoAndTwo p0 p1 q0 q1 v1 v2
+          ([p0], [q0,q1,q2]) -> threeAndOne q0 q1 q2 p0 v2 v1
+          ([p0,p1,p2], [q0]) -> threeAndOne p0 p1 p2 q0 v1 v2
+          _ -> pprPanic "vector shuffle: cannot occur" (ppr is)
+      | otherwise = pprPanic "vector shuffle: wrong indices" (ppr is)
+
+    -- Shuffle with AVX instructions.
+    -- The components above 128 bits are shuffled in the same way as the lower 128 bits.
+    -- For example, `l == 8 && is == [0,2,5,7]` would represent `shuffleFloatX8# _ _ (# 0#, 2#, 9#, 11#, 4#, 6#, 13#, 15# #)`.
+    vector_shuffle_float_avx :: Length -- Vector length. 4 for XMM, 8 for YMM, 16 for ZMM.
+                             -> CmmExpr
+                             -> CmmExpr
+                             -> [Int] -- 4-element list of indices
+                             -> NatM Register
+    vector_shuffle_float_avx l v1 v2 is
+      | length is == 4, all (\i -> 0 <= i && i < 8) is = do
+        let fmt = VecFormat l FmtFloat
+
+            -- A helper function to shuffle a vector using (dst,src) pairs
+            -- (dst[d0],dst[d1],...) <- (r[s0],r[s1],...)
+            inplaceShuffle pairs r dst = do
+              let mask = foldl' (\acc (dst,src) -> acc .|. (src `shiftL` (2 * dst))) 0 pairs
+              case mask of
+                0b11_10_01_00 | r == dst -> nilOL
+                              | otherwise -> unitOL (VMOVU fmt (OpReg r) (OpReg dst)) -- trivial
+                0b01_00_01_00 | l == 4 -> unitOL (VMOVLHPS fmt r r dst) -- 128-bit only
+                0b11_10_11_10 | l == 4 -> unitOL (VMOVHLPS fmt r r dst) -- 128-bit only
+                0b01_01_00_00 -> unitOL (VUNPCKL fmt (OpReg r) r dst)
+                0b11_11_10_10 -> unitOL (VUNPCKH fmt (OpReg r) r dst)
+                _ -> unitOL (VSHUF fmt (ImmInt mask) (OpReg r) r dst)
+
+            -- All elements are from one source vector
+            oneSource p0 p1 p2 p3 v = do
+              (r, exp) <- getSomeReg v
+              let code dst = exp `appOL`
+                             inplaceShuffle [p0,p1,p2,p3] r dst
+              return $ Any fmt code
+
+            -- Two elements from one vector, other two from the other vector
+            twoAndTwo (0,0) (1,1) (2,0) (3,1) v1 v2 | l == 4 = vector_op_avx_reg VMOVLHPS fmt v1 v2
+            twoAndTwo (2,0) (3,1) (0,0) (1,1) v1 v2 | l == 4 = vector_op_avx_reg VMOVLHPS fmt v2 v1
+            twoAndTwo (2,2) (3,3) (0,2) (1,3) v1 v2 | l == 4 = vector_op_avx_reg VMOVHLPS fmt v1 v2
+            twoAndTwo (0,2) (1,3) (2,2) (3,3) v1 v2 | l == 4 = vector_op_avx_reg VMOVHLPS fmt v2 v1
+            twoAndTwo (0,0) (2,1) (1,0) (3,1) v1 v2 = vector_float_op_avx VUNPCKL l W32 v1 v2
+            twoAndTwo (1,0) (3,1) (0,0) (2,1) v1 v2 = vector_float_op_avx VUNPCKL l W32 v2 v1
+            twoAndTwo (0,2) (2,3) (1,2) (3,3) v1 v2 = vector_float_op_avx VUNPCKH l W32 v1 v2
+            twoAndTwo (1,2) (3,3) (0,2) (2,3) v1 v2 = vector_float_op_avx VUNPCKH l W32 v2 v1
+            twoAndTwo p0 p1 q0 q1 v1 v2 =
+              if l <= 8 && all (\(dst,src) -> dst == src) [p0,p1,q0,q1] then
+                -- VBLENDPS does not support ZMM (no EVEX-encoded variant)
+                let imm = (1 `shiftL` fst q0) .|. (1 `shiftL` fst q1)
+                    imm' = if l == 4 then imm .|. (imm `shiftL` 4) else imm
+                in vector_float_op_avx (`VBLEND` (ImmInt imm')) l W32 v1 v2
+              else do
+                let imm1 = snd p0 .|. (snd p1 `shiftL` 2) .|. (snd q0 `shiftL` 4) .|. (snd q1 `shiftL` 6)
+                reg <- vector_float_op_avx (`VSHUF` (ImmInt imm1)) l W32 v1 v2
+                exp <- anyReg reg
+                let code dst = exp dst `appOL`
+                               inplaceShuffle [(fst p0,0),(fst p1,1),(fst q0,2),(fst q1,3)] dst dst
+                return $ Any fmt code
+
+            -- Three elements from one vector, the last one from the other vector
+            threeAndOne p0 p1 p2 q0 v1 v2
+              | l == 4, (_, 0) <- q0, 0 `notElem` [snd p0,snd p1,snd p2] = do -- Use VMOVSS (128-bit only)
+                (r1, exp1) <- getSomeReg v1
+                (r2, exp2) <- getSomeReg v2
+                let code dst = exp1 `appOL` exp2 `snocOL`
+                               (VMOV_MERGE fmt r2 r1 dst) `appOL`
+                               inplaceShuffle [p0,p1,p2,(fst q0,0)] dst dst
+                return $ Any fmt code
+
+              | l == 4 = do -- Use VINSERTPS (128-bit only)
+                (r1, exp1) <- getSomeReg v1
+                (r2, exp2) <- getSomeReg v2
+                let i = case [0, 1, 2, 3] \\ [snd p0, snd p1, snd p2] of
+                          i:_ -> i -- We can clobber this position of r1
+                          _ -> panic "cannot occur"
+                    imm = (snd q0 `shiftL` 6) .|. (i `shiftL` 4)
+                    code dst = exp1 `appOL` exp2 `snocOL`
+                               (VINSERTPS fmt (ImmInt imm) (OpReg r2) r1 dst) `appOL`
+                               inplaceShuffle [p0,p1,p2,(fst q0,i)] dst dst
+                return $ Any fmt code
+
+              | otherwise = do -- Use two or three VSHUFPSs
+                (r1, exp1) <- getSomeReg v1
+                exp2 <- getAnyReg v2
+                let makeMask i0 i1 i2 i3 = i0 .|. (i1 `shiftL` 2) .|. (i2 `shiftL` 4) .|. (i3 `shiftL` 6)
+                let imm1 = makeMask (snd q0) (snd q0) (snd p0) (snd p0)
+                    (imm2, pairs) =
+                      if fst q0 == 1 then
+                        (makeMask 2 1 (snd p1) (snd p2), [(fst p0,0),(fst q0,1),(fst p1,2),(fst p2,3)])
+                        -- dst <- (dst[2],dst[1],r1[snd p1],r1[snd p2]) = (v1[snd p0],v2[snd q0],v1[snd p1],v1[snd p2])
+                        -- (dst[fst p0],dst[fst q0],dst[fst p1],dst[fst p2]) <- dst
+                      else
+                        (makeMask 0 2 (snd p1) (snd p2), [(fst q0,0),(fst p0,1),(fst p1,2),(fst p2,3)])
+                        -- dst <- (dst[0],dst[2],r1[snd p1],r1[snd p2]) = (v2[snd q0],v1[snd p0],v1[snd p1],v1[snd p2])
+                        -- (dst[fst p0],dst[fst q0],dst[fst p1],dst[fst p2]) <- dst
+                dst <- getNewRegNat fmt
+                let code = exp1 `appOL` exp2 dst `snocOL`
+                           (VSHUF fmt (ImmInt imm1) (OpReg r1) dst dst) `snocOL` -- dst <- (dst[snd q0],dst[snd q0],r1[snd p0],r1[snd p0]) = (v2[snd q0],v2[snd q0],v1[snd p0],v1[snd p0])
+                           (VSHUF fmt (ImmInt imm2) (OpReg r1) dst dst) `appOL`
+                           inplaceShuffle pairs dst dst
+                return $ Fixed fmt dst code
+
+        -- We partition the list of indices into those that refer to the first vector and those that
+        -- refer to the second, and handle each case depending on the number of indices in each group.
+        let (from_first, from_second) = partition (\(_dstPos, srcPos) -> srcPos < 4) (zip [0..] is)
+        case (from_first, map (\(dst, src) -> (dst, src - 4)) from_second) of
+          ([p0,p1,p2,p3], []) -> oneSource p0 p1 p2 p3 v1
+          ([], [q0,q1,q2,q3]) -> oneSource q0 q1 q2 q3 v2
+          ([p0,p1], [q0,q1]) -> twoAndTwo p0 p1 q0 q1 v1 v2
+          ([p0], [q0,q1,q2]) -> threeAndOne q0 q1 q2 p0 v2 v1
+          ([p0,p1,p2], [q0]) -> threeAndOne p0 p1 p2 q0 v1 v2
+          _ -> pprPanic "vector shuffle: cannot occur" (ppr is)
+      | otherwise = pprPanic "vector shuffle: wrong indices" (ppr is)
+
+    vector_shuffle_doublex2_sse :: CmmExpr -> CmmExpr -> [Int] -> NatM Register
+    vector_shuffle_doublex2_sse v1 v2 is
+      | [i0, i1] <- is =
+        let fmt = VecFormat 2 FmtDouble
+        in case (i0, i1) of
+          -- Trivial cases
+          (0, 1) -> getRegister' platform is32Bit v1
+          (2, 3) -> getRegister' platform is32Bit v2
+
+          -- MOVSD/UNPCKLPD/UNPCKHPD have shorter encoding than SHUFPD
+          -- If SSE4.1 is available, BLENDPD could also be used in place of MOVSD (the encoding is longer though)
+          (0, 3) -> vector_op_sse (\_ src -> MOV fmt src . OpReg) fmt v2 v1 -- MOVSD
+          (2, 1) -> vector_op_sse (\_ src -> MOV fmt src . OpReg) fmt v1 v2 -- MOVSD
+          _ | i0 == i1 -> do
+            exp <- getAnyReg (if i0 <= 1 then v1 else v2)
+            let unpck = if i0 == 0 || i0 == 2
+                        then UNPCKL
+                        else UNPCKH
+                code dst = exp dst `snocOL`
+                           (unpck fmt (OpReg dst) dst)
+            return (Any fmt code)
+          (0, 2) -> vector_op_sse UNPCKL fmt v1 v2
+          (2, 0) -> vector_op_sse UNPCKL fmt v2 v1
+          (1, 3) -> vector_op_sse UNPCKH fmt v1 v2
+          (3, 1) -> vector_op_sse UNPCKH fmt v2 v1
+
+          -- SHUFPD
+          (1, 2) -> vector_op_sse (`SHUF` (ImmInt 0b01)) fmt v1 v2
+          (3, 0) -> vector_op_sse (`SHUF` (ImmInt 0b01)) fmt v2 v1
+          (1, 0) -> do
+            exp <- getAnyReg v1
+            let code dst = exp dst `snocOL`
+                           (SHUF fmt (ImmInt 0b01) (OpReg dst) dst)
+            return (Any fmt code)
+          (3, 2) -> do
+            exp <- getAnyReg v2
+            let code dst = exp dst `snocOL`
+                           (SHUF fmt (ImmInt 0b01) (OpReg dst) dst)
+            return (Any fmt code)
+          _ -> pprPanic "vector shuffle: indices out of bounds 0 <= i <= 3" (ppr is)
+      | otherwise = pprPanic "vector shuffle: wrong number of indices (expected 2)" (ppr is)
+
+    -- Shuffle with AVX instructions.
+    -- The components above 128 bits are shuffled in the same way as the lower 128 bits.
+    -- For example, `l == 4 && is == [0,3]` would represent `shuffleDoubleX4# _ _ (# 0#, 5#, 2#, 7# #)`.
+    vector_shuffle_double_avx :: Length -- Vector length. 2 for XMM, 4 for YMM, 8 for ZMM.
+                              -> CmmExpr
+                              -> CmmExpr
+                              -> [Int] -- 2-element list of indices
+                              -> NatM Register
+    vector_shuffle_double_avx l v1 v2 is
+      | [i0, i1] <- is =
+        let fmt = VecFormat l FmtDouble
+            repeatShufpdMask m = case l of
+              8 -> m .|. (m `shiftL` 2) .|. (m `shiftL` 4) .|. (m `shiftL` 6)
+              4 -> m .|. (m `shiftL` 2)
+              _ -> m
+        in case (i0, i1) of
+          -- Trivial cases
+          (0, 1) -> getRegister' platform is32Bit v1
+          (2, 3) -> getRegister' platform is32Bit v2
+
+          -- VMOVSD/VUNPCKLPD/VUNPCKHPD have shorter encoding than VSHUFPD
+          (0, 3) | l == 2 -> do
+                   (r1, exp1) <- getSomeReg v1
+                   (r2, exp2) <- getSomeReg v2
+                   let code dst = exp1 `appOL` exp2 `snocOL`
+                                  (VMOV_MERGE fmt r1 r2 dst) -- VMOVSD
+                   return (Any fmt code)
+                 | otherwise -> vector_float_op_avx (`VSHUF` (ImmInt $ repeatShufpdMask 0b10)) l W64 v1 v2
+          (2, 1) | l == 2 -> do
+                   (r1, exp1) <- getSomeReg v1
+                   (r2, exp2) <- getSomeReg v2
+                   let code dst = exp1 `appOL` exp2 `snocOL`
+                                  (VMOV_MERGE fmt r2 r1 dst) -- VMOVSD
+                   return (Any fmt code)
+                 | otherwise -> vector_float_op_avx (`VSHUF` (ImmInt $ repeatShufpdMask 0b10)) l W64 v2 v1
+          _ | i0 == i1 -> do
+            (r, exp) <- getSomeReg (if i0 <= 1 then v1 else v2)
+            let unpck = if i0 == 0 || i0 == 2
+                        then VUNPCKL
+                        else VUNPCKH
+                code dst = exp `snocOL`
+                           (unpck fmt (OpReg r) r dst)
+            return (Any fmt code)
+          (0, 2) -> vector_float_op_avx VUNPCKL l W64 v1 v2
+          (2, 0) -> vector_float_op_avx VUNPCKL l W64 v2 v1
+          (1, 3) -> vector_float_op_avx VUNPCKH l W64 v1 v2
+          (3, 1) -> vector_float_op_avx VUNPCKH l W64 v2 v1
+
+          -- SHUFPD
+          (1, 2) -> vector_float_op_avx (`VSHUF` (ImmInt $ repeatShufpdMask 0b01)) l W64 v1 v2
+          (3, 0) -> vector_float_op_avx (`VSHUF` (ImmInt $ repeatShufpdMask 0b01)) l W64 v2 v1
+          (1, 0) -> do
+            (r, exp) <- getSomeReg v1
+            let code dst = exp `snocOL`
+                           (VSHUF fmt (ImmInt $ repeatShufpdMask 0b01) (OpReg r) r dst)
+            return (Any fmt code)
+          (3, 2) -> do
+            (r, exp) <- getSomeReg v2
+            let code dst = exp `snocOL`
+                           (VSHUF fmt (ImmInt $ repeatShufpdMask 0b01) (OpReg r) r dst)
+            return (Any fmt code)
+          _ -> pprPanic "vector shuffle: indices out of bounds 0 <= i <= 3" (ppr is)
+      | otherwise = pprPanic "vector shuffle: wrong number of indices (expected 2)" (ppr is)
 
     isZeroVecLit :: CmmExpr -> Bool
     isZeroVecLit (CmmLit (CmmVec elems)) = all (\lit -> case lit of CmmInt 0 _ -> True; _ -> False) elems
@@ -2801,7 +3048,7 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
               = case offset of
                   CmmInt 0 _ -> valExp `appOL`
                                 vecExp `snocOL`
-                                (MOVHLPS fmt vecReg tmp) `snocOL`
+                                (MOVHLPS FF64 vecReg tmp) `snocOL`
                                 (MOVD II64 fmt (OpReg valReg) (OpReg dst)) `snocOL`
                                 (PUNPCKLQDQ fmt (OpReg tmp) dst)
                   CmmInt 1 _ -> valExp `appOL`
