@@ -1,12 +1,11 @@
 
-T8428.hs:11:19: error: [GHC-83865]
-    • Couldn't match type: (forall s. ST s) a
-                     with: forall s. ST s a
-      Expected: IdentityT (forall s. ST s) a -> forall s. ST s a
-        Actual: IdentityT (forall s. ST s) a -> (forall s. ST s) a
-    • In the second argument of ‘(.)’, namely ‘runIdentityT’
-      In the expression: runST . runIdentityT
-      In an equation for ‘runIdST’: runIdST = runST . runIdentityT
-    • Relevant bindings include
-        runIdST :: IdentityT (forall s. ST s) a -> a
-          (bound at T8428.hs:11:1)
+T8428.hs:10:23: error: [GHC-83865]
+    • Expected kind ‘* -> *’, but ‘forall s. ST s’ has kind ‘*’
+    • In the first argument of ‘IdentityT’, namely ‘(forall s. ST s)’
+      In the type signature: runIdST :: IdentityT (forall s. ST s) a -> a
+
+T8428.hs:10:33: error: [GHC-83865]
+    • Expecting one more argument to ‘ST s’
+      Expected a type, but ‘ST s’ has kind ‘* -> *’
+    • In the first argument of ‘IdentityT’, namely ‘(forall s. ST s)’
+      In the type signature: runIdST :: IdentityT (forall s. ST s) a -> a

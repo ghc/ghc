@@ -6,8 +6,11 @@
 
 module T7019a where
 
+import Data.Kind
+
 newtype Free c a = Free { runFree :: forall r. c r => (a -> r) -> r }
 
+type C :: (Type -> Constraint) -> Constraint
 type C c = forall a. c (Free c a)
 
 -- Notice that C is a synonym, illegal!

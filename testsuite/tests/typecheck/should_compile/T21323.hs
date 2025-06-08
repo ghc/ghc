@@ -30,6 +30,7 @@ newtype a `ViaRep` rep = ViaRep a
 class    Coercible (Rep a x) (rep x) => AuxCoercible a rep x
 instance Coercible (Rep a x) (rep x) => AuxCoercible a rep x
 
+type ForallAuxCoercible :: Type -> (Type -> Type) -> Constraint
 type ForallAuxCoercible a rep = forall x. AuxCoercible a rep x
 
 instance (Generic a, ForallAuxCoercible a rep) => Generic (ViaRep a rep) where

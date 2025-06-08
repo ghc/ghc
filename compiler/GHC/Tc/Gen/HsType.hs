@@ -1150,16 +1150,20 @@ tcHsType mode (HsOpTy _ _ ty1 (L _ (WithUserRdr _ op)) ty2) exp_kind
 --------- Foralls
 tcHsType mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
   | HsForAllInvis{} <- tele
-  = tc_hs_forall_ty tele ty exp_kind
-                 -- For an invisible forall, we allow the body to have
-                 -- an arbitrary kind (hence exp_kind above).
+  , Check kind <- exp_kind
+  , isConstraintLikeKind kind
+  = do { r <- tc_hs_forall_ty tele ty exp_kind
+       ; checkExpKind t r constraintKind exp_kind }
+                 -- For an invisible forall, we allow the body to be
+                 -- a Constraint if we are checking against a known kind.
                  -- See Note [Body kind of a HsForAllTy]
 
-  | HsForAllVis{} <- tele
+  | otherwise
   = do { ek <- newOpenTypeKind
        ; r <- tc_hs_forall_ty tele ty (Check ek)
        ; checkExpKind t r ek exp_kind }
-                 -- For a visible forall, we require that the body is of kind TYPE r.
+                 -- In all other cases, the body of a forall should
+                 -- have kind TYPE r.
                  -- See Note [Body kind of a HsForAllTy]
 
   where
@@ -2068,14 +2072,14 @@ typecheck/should_compile/tc170).
 A forall can also be used in an instance head, then the body should
 be a constraint.
 
-Right now, we do not have any easy way to enforce that a type is
-either a TYPE something or CONSTRAINT something, so we accept any kind.
-This is unsound (#22063). We could fix this by implementing a TypeLike
-predicate, see #20000.
+To distinguish between those cases, we check exp_kind, exactly like
+when kind-checking (=>), see Note [Body kind of a HsQualTy].
+An alternative fix would be implementing a TypeLike predicate, see #20000.
 
 For a forall with a required argument, we do not allow constraints;
-e.g. forall a -> Eq a is invalid. Therefore, we can enforce that the body
-is a TYPE something in this case (#24176).
+e.g. forall a -> Eq a is invalid. The users never handle dictionaries
+explicitly, and furthermore that can lead to crashes (#24176).
+Therefore, we can enforce that the body is a TYPE something in this case.
 
 Note [Body kind of a HsQualTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
