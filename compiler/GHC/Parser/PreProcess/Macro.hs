@@ -32,29 +32,35 @@ details
 
 -- TODO: Parse tokens with original locations in them.
 
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 import Data.Maybe
 
+import Data.Semigroup qualified as S
 import GHC.Parser.PreProcess.Eval
 import GHC.Parser.PreProcess.ParsePP
 import GHC.Parser.PreProcess.Parser qualified as Parser
 import GHC.Parser.PreProcess.ParserM
 import GHC.Parser.PreProcess.State
-import qualified Data.Semigroup as S
 import GHC.Prelude
+import GHC.Types.SrcLoc
+import GHC.Utils.Outputable
 
 -- ---------------------------------------------------------------------
 
 --    We evaluate to an Int, which we convert to a bool
-cppCond :: String -> PP Bool
-cppCond str = do
-  s <- getPpState
-  let
-    expanded = expand (pp_defines s) str
-    v = case Parser.parseExpr expanded of
-        Left err -> error $ "parseExpr:" ++ show (err, expanded)
-        Right tree -> eval tree
-  return (toBool v)
+cppCond :: SrcSpan -> String -> PP Bool
+cppCond loc str = do
+    s <- getPpState
+    let
+        expanded = expand (pp_defines s) str
+    v <- case Parser.parseExpr expanded of
+        Left err -> do
+            addGhcCPPError loc
+              (hang (text "Error evaluating CPP condition:") 2
+               (text err <+> text "of" $+$ text expanded))
+            return 0
+        Right tree -> return (eval tree)
+    return (toBool v)
 
 -- ---------------------------------------------------------------------
 
@@ -75,31 +81,32 @@ expandToks 0 _ ts = error $ "macro_expansion limit (" ++ show maxExpansions ++ "
 expandToks cnt s ts =
     let
         (!expansionDone, !r) = doExpandToks False s ts
-    in
+     in
         if expansionDone
-            then expandToks (cnt -1) s r
+            then expandToks (cnt - 1) s r
             else r
 
 doExpandToks :: Bool -> MacroDefines -> [Token] -> (Bool, [Token])
 doExpandToks ed _ [] = (ed, [])
-doExpandToks ed s (TIdentifierLParen n: ts) =
-  -- TIdentifierLParen has no meaning here (only in a #define), so
-  -- restore it to its constituent tokens
-  doExpandToks ed s (TIdentifier (init n):TOpenParen "(":ts)
-doExpandToks _  s (TIdentifier "defined" : ts) = (True, rest)
-  -- See Note: [defined unary operator] below
+doExpandToks ed s (TIdentifierLParen n : ts) =
+    -- TIdentifierLParen has no meaning here (only in a #define), so
+    -- restore it to its constituent tokens
+    doExpandToks ed s (TIdentifier (init n) : TOpenParen "(" : ts)
+doExpandToks _ s (TIdentifier "defined" : ts) = (True, rest)
   where
+    -- See Note: [defined unary operator] below
+
     rest = case getExpandArgs ts of
-      (Just [[TIdentifier macro_name]], rest0) ->
-        case Map.lookup macro_name s of
-          Nothing -> TInteger "0" : rest0
-          Just _ ->TInteger "1" : rest0
-      (Nothing, TIdentifier macro_name:ts0) ->
-        case Map.lookup macro_name s of
-          Nothing -> TInteger "0" : ts0
-          Just _ ->TInteger "1" : ts0
-      (Nothing,_) -> error $ "defined: expected an identifier, got:" ++ show ts
-      (Just args,_) -> error $ "defined: expected a single arg, got:" ++ show args
+        (Just [[TIdentifier macro_name]], rest0) ->
+            case Map.lookup macro_name s of
+                Nothing -> TInteger "0" : rest0
+                Just _ -> TInteger "1" : rest0
+        (Nothing, TIdentifier macro_name : ts0) ->
+            case Map.lookup macro_name s of
+                Nothing -> TInteger "0" : ts0
+                Just _ -> TInteger "1" : ts0
+        (Nothing, _) -> error $ "defined: expected an identifier, got:" ++ show ts
+        (Just args, _) -> error $ "defined: expected a single arg, got:" ++ show args
 doExpandToks ed s (TIdentifier n : ts) = (ed'', expanded ++ rest)
   where
     (ed', expanded, ts') = case Map.lookup n s of
