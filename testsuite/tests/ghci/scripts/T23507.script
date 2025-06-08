@@ -1,4 +1,9 @@
 let f () = ()
 :sprint f
+f ()
+:sprint f
+
 let x = 3
+:sprint x
+x
 :sprint x

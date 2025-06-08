@@ -1,26 +1,26 @@
-fmap = (_t1::forall (f :: * -> *) a b.
+fmap = <_ :: forall (f :: * -> *) a b.
              Functor f =>
-             (a -> b) -> f a -> f b)
+             (a -> b) -> f a -> f b>
 fmap
   :: forall (f :: * -> *) a b. Functor f => (a -> b) -> f a -> f b
 _t1
   :: forall (f :: * -> *) a b. Functor f => (a -> b) -> f a -> f b
-show = (_t2::forall a. Show a => a -> String)
+show = <_ :: forall a. Show a => a -> String>
 show :: forall a. Show a => a -> String
 _t2 :: forall a. Show a => a -> String
 "\"foo\""
 ["7","42"]
-_t1 = (_t3::forall (f :: * -> *) a b.
+_t1 = <_ :: forall (f :: * -> *) a b.
             Functor f =>
-            (a -> b) -> f a -> f b)
+            (a -> b) -> f a -> f b>
 _t3
   :: forall (f :: * -> *) a b. Functor f => (a -> b) -> f a -> f b
-_t2 = (_t4::forall a. Show a => a -> String)
+_t2 = <_ :: forall a. Show a => a -> String>
 _t4 :: forall a. Show a => a -> String
 ["7","42"]
-id = (_t5::forall a. a -> a)
+id = <_ :: forall a. a -> a>
 id :: forall a. a -> a
 _t5 :: forall a. a -> a
-print = (_t6::forall a. Show a => a -> IO ())
+print = <_ :: forall a. Show a => a -> IO ()>
 print :: forall a. Show a => a -> IO ()
 _t6 :: forall a. Show a => a -> IO ()

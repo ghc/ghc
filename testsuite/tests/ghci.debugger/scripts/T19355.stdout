@@ -1,8 +1,12 @@
-fmap = (_t1::Functor f => (a -> b) -> f a -> f b)
-fmap = (_t2::forall (f :: * -> *) a b.
+fmap = <_ :: forall (f :: * -> *) a b.
              Functor f =>
-             (a -> b) -> f a -> f b)
-<*> = (_t3::forall (f :: * -> *) a b.
+             (a -> b) -> f a -> f b>
+fmap = <_ :: forall (f :: * -> *) a b.
+             Functor f =>
+             (a -> b) -> f a -> f b>
+<*> = <_ :: forall (f :: * -> *) a b.
             Applicative f =>
-            f (a -> b) -> f a -> f b)
-<*> = (_t4::Applicative f => f (a -> b) -> f a -> f b)
+            f (a -> b) -> f a -> f b>
+<*> = <_ :: forall (f :: * -> *) a b.
+            Applicative f =>
+            f (a -> b) -> f a -> f b>

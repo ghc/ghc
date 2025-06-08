@@ -4,8 +4,10 @@ Identifier ‘realWorld#’ is not eligible for the :print, :sprint or :force co
 Type constructor ‘Word8#’ is not eligible for the :print, :sprint or :force commands.
 Type constructor ‘Int’ is not eligible for the :print, :sprint or :force commands.
 Identifier ‘void#’ is not eligible for the :print, :sprint or :force commands.
-error = (_t1::GHC.Internal.Stack.Types.HasCallStack => [Char] -> a)
-oneShot = (_t2::(a -> b) -> a -> b)
-xor# = (_t3::Word# -> Word# -> Word#)
-seq# = (_t4::a -> State# s -> (# State# s, a #))
-lazy = (_t5::a -> a)
+error = <_ :: forall a.
+              GHC.Internal.Stack.Types.HasCallStack =>
+              [Char] -> a>
+oneShot = <_ :: forall a b. (a -> b) -> a -> b>
+xor# = <_ :: Word# -> Word# -> Word#>
+seq# = <_ :: forall a s. a -> State# s -> (# State# s, a #)>
+lazy = <_ :: forall a. a -> a>

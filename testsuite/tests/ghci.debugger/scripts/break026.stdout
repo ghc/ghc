@@ -1,7 +1,7 @@
 Stopped in Test.foldl, break026.hs:5:16-22
 _result :: Int = _
 c :: Int = 0
-go :: Int -> [t1] -> Int = _
+go :: Int -> [t1] -> Int = <_ :: Int -> [t1] -> Int>
 xs :: [t1] = _
 Stopped in Test.foldl.go, break026.hs:7:23-35
 _result :: Int = _
@@ -19,7 +19,7 @@ c = 1
 Stopped in Test.foldl, break026.hs:5:16-22
 _result :: Int = _
 c :: Int = 0
-go :: Int -> [t1] -> Int = _
+go :: Int -> [t1] -> Int = <_ :: Int -> [t1] -> Int>
 xs :: [t1] = _
 Stopped in Test.foldl.go, break026.hs:7:23-35
 _result :: Int = _

@@ -13,14 +13,14 @@ _result :: [a]
 f :: t -> a
 xs :: [t]
 xs :: [t] = []
-f :: t -> a = _
+f :: t -> a = <_ :: t -> a>
 _result :: [a] = _
 Logged breakpoint at Test3.hs:2:18-20
 _result :: a
 f :: Integer -> a
 x :: Integer
 xs :: [t] = []
-f :: Integer -> a = _
+f :: Integer -> a = <_ :: Integer -> a>
 x :: Integer = 2
 _result :: a = _
 _result = 3

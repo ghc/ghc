@@ -3,19 +3,19 @@ Breakpoint 1 activated at T19157.hs:8:23-37
 ---------------------- Test 1
 Stopped in T19157.mySum.go, T19157.hs:8:23-37
 _result :: Int = _
-go :: Int -> [Int] -> Int = _
+go :: Int -> [Int] -> Int = <_ :: Int -> [Int] -> Int>
 s :: Int = 1
 ss :: [Int] = [2,3,4,5,6]
 sum :: Int = 0
 Stopped in T19157.mySum.go, T19157.hs:8:23-37
 _result :: Int = _
-go :: Int -> [Int] -> Int = _
+go :: Int -> [Int] -> Int = <_ :: Int -> [Int] -> Int>
 s :: Int = 4
 ss :: [Int] = [5,6]
 sum :: Int = _
 Stopped in T19157.mySum.go, T19157.hs:8:23-37
 _result :: Int = _
-go :: Int -> [Int] -> Int = _
+go :: Int -> [Int] -> Int = <_ :: Int -> [Int] -> Int>
 s :: Int = 6
 ss :: [Int] = []
 sum :: Int = _
@@ -26,7 +26,7 @@ sum :: Int = _
 ---------------------- Test 2
 Stopped in T19157.mySum.go, T19157.hs:8:23-37
 _result :: Int = _
-go :: Int -> [Int] -> Int = _
+go :: Int -> [Int] -> Int = <_ :: Int -> [Int] -> Int>
 s :: Int = 1001
 ss :: [Int] = _
 sum :: Int = _

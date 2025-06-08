@@ -1,16 +1,16 @@
 Stopped in Main.mymap, Test3.hs:2:18-31
 _result :: [a] = _
-f :: Int -> a = _
+f :: Int -> a = <_ :: Int -> a>
 x :: Int = 1
 xs :: [Int] = [2,3]
 xs :: [Int] = [2,3]
-f :: Int -> a = _
+f :: Int -> a = <_ :: Int -> a>
 x :: Int = 1
 _result :: [a] = _
 y = (_t1::a)
 y = 2
 xs :: [Int] = [2,3]
-f :: Int -> Int = _
+f :: Int -> Int = <_ :: Int -> Int>
 x :: Int = 1
 _result :: [Int] = _
 y :: Int = 2

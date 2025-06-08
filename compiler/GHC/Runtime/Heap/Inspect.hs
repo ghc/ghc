@@ -1,6 +1,4 @@
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE ViewPatterns #-}
-
 {-# LANGUAGE CPP #-}
 
 #if __GLASGOW_HASKELL__ > 912
@@ -388,9 +386,7 @@ cPprTermBase y =
    ifFunSuspension pred f prec t@Suspension{ctype = ctype}
        | ctype `elem` fun_ctype && pred t = f prec t
      where
-       -- TODO(ozkutuk): PAP _seems to be_ indicate a function closure,
-       -- I have no idea what AP is though
-       fun_ctype = [ FUN, FUN_1_0, FUN_0_1, FUN_2_0, FUN_1_1, FUN_0_2, FUN_STATIC, AP, PAP ]
+       fun_ctype = [ FUN, FUN_1_0, FUN_0_1, FUN_2_0, FUN_1_1, FUN_0_2, FUN_STATIC, PAP ]
    ifFunSuspension _ _ _ _  = return Nothing
 
    isFunTy :: Type -> Bool
@@ -513,8 +509,8 @@ cPprTermBase y =
    ppr_list _ _ = panic "doList"
 
    ppr_fun :: Precedence -> Term -> m (Maybe SDoc)
-   ppr_fun _ (ty -> fun_ty) = return $ Just $
-     angleBrackets (underscore <+> dcolon <+> pprType fun_ty)
+   ppr_fun _ t = return $ Just $
+     angleBrackets (underscore <+> dcolon <+> pprType (ty t))
 
 
 repPrim :: TyCon -> [Word] -> SDoc
