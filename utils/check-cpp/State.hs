@@ -32,17 +32,22 @@ module State (
     ghcCppEnabled,
     setInLinePragma,
     getInLinePragma,
+    addGhcCPPError,
 ) where
 
 import Data.List.NonEmpty ((<|))
-import qualified Data.List.NonEmpty as NonEmpty
-import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.List.NonEmpty qualified as NonEmpty
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
 import GHC.Base
+import GHC.Data.FastString
 import GHC.Data.StringBuffer
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..))
-import qualified GHC.Parser.Lexer as Lexer
+import GHC.Parser.Lexer qualified as Lexer
+import GHC.Parser.Errors.Types (PsMessage(PsErrGhcCpp))
+import GHC.Utils.Error
+-- import GHC.Parser.PreProcess.ParserM (Token (..))
 import GHC.Types.SrcLoc
 import ParserM (Token (..))
 
@@ -192,20 +197,22 @@ pushAccepting on = do
 
 -- Note: this is only ever called in the context of a pp group (i.e.
 -- after pushAccepting) from processing #else or #elif
-setAccepting :: Bool -> PP AcceptingResult
-setAccepting on = do
+setAccepting :: SrcSpan -> Bool -> PP AcceptingResult
+setAccepting loc on = do
     current <- getAccepting
     parent_scope <- parentScope
     let parent_on = pp_accepting parent_scope
     current_scope <- getScope
     let group_state = pp_group_state current_scope
     let possible_accepting = parent_on && on
-    let (new_group_state, accepting) =
+    (new_group_state, accepting) <-
             case (group_state, possible_accepting) of
-                (PpNoGroup, _) -> error "setAccepting for state PpNoGroup"
-                (PpInGroupStillInactive, True) -> (PpInGroupHasBeenActive, True)
-                (PpInGroupStillInactive, False) -> (PpInGroupStillInactive, False)
-                (PpInGroupHasBeenActive, _) -> (PpInGroupHasBeenActive, False)
+                (PpNoGroup, _) -> do
+                  addGhcCPPError loc "setAccepting for state PpNoGroup"
+                  return (PpNoGroup, True)
+                (PpInGroupStillInactive, True) -> return (PpInGroupHasBeenActive, True)
+                (PpInGroupStillInactive, False) -> return (PpInGroupStillInactive, False)
+                (PpInGroupHasBeenActive, _) -> return (PpInGroupHasBeenActive, False)
 
     -- let (new_group_state, accepting)
     --       = trace ("setAccepting:" ++ show ((group_state, possible_accepting),  (new_group_state', accepting'))) (new_group_state', accepting')
@@ -405,3 +412,7 @@ insertMacroDef (MacroName name args) def md =
             Just dm -> Map.insert name (Map.insert arity (args, def) dm) md
 
 -- ---------------------------------------------------------------------
+
+addGhcCPPError :: SrcSpan -> String -> P p ()
+addGhcCPPError loc err
+  = Lexer.addError $ mkPlainErrorMsgEnvelope loc $ PsErrGhcCpp (fsLit err)

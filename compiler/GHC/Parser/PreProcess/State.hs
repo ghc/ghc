@@ -32,6 +32,7 @@ module GHC.Parser.PreProcess.State (
     ghcCppEnabled,
     setInLinePragma,
     getInLinePragma,
+    addGhcCPPError,
 ) where
 
 import Data.List.NonEmpty ((<|))
@@ -41,12 +42,15 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
 import GHC.Base
 import GHC.Data.StringBuffer
+import GHC.Parser.Errors.Types (PsMessage (PsErrGhcCpp))
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..))
 import GHC.Parser.Lexer qualified as Lexer
 import GHC.Parser.PreProcess.ParserM (Token (..))
 import GHC.Types.SrcLoc
+import GHC.Utils.Error
 
 import GHC.Prelude
+import GHC.Utils.Outputable (text, (<+>))
 
 -- ---------------------------------------------------------------------
 
@@ -191,20 +195,22 @@ pushAccepting on = do
 
 -- Note: this is only ever called in the context of a pp group (i.e.
 -- after pushAccepting) from processing #else or #elif
-setAccepting :: Bool -> PP AcceptingResult
-setAccepting on = do
+setAccepting :: SrcSpan -> SDoc -> Bool -> PP AcceptingResult
+setAccepting loc ctx on = do
     current <- getAccepting
     parent_scope <- parentScope
     let parent_on = pp_accepting parent_scope
     current_scope <- getScope
     let group_state = pp_group_state current_scope
     let possible_accepting = parent_on && on
-    let (new_group_state, accepting) =
-            case (group_state, possible_accepting) of
-                (PpNoGroup, _) -> error "setAccepting for state PpNoGroup" -- AZ: Tested in GhcCpp02
-                (PpInGroupStillInactive, True) -> (PpInGroupHasBeenActive, True)
-                (PpInGroupStillInactive, False) -> (PpInGroupStillInactive, False)
-                (PpInGroupHasBeenActive, _) -> (PpInGroupHasBeenActive, False)
+    (new_group_state, accepting) <-
+        case (group_state, possible_accepting) of
+            (PpNoGroup, _) -> do
+                addGhcCPPError loc (ctx <+> text "without #if")
+                return (PpNoGroup, True)
+            (PpInGroupStillInactive, True) -> return (PpInGroupHasBeenActive, True)
+            (PpInGroupStillInactive, False) -> return (PpInGroupStillInactive, False)
+            (PpInGroupHasBeenActive, _) -> return (PpInGroupHasBeenActive, False)
 
     -- let (new_group_state, accepting)
     --       = trace ("setAccepting:" ++ show ((group_state, possible_accepting),  (new_group_state', accepting'))) (new_group_state', accepting')
@@ -231,19 +237,29 @@ acceptingStateChange old new =
         _ -> ArNoChange
 
 -- Exit a scope group
-popAccepting :: PP AcceptingResult
-popAccepting =
-    P $ \s ->
-        let
-            current = scopeValue $ pp_scope (pp s)
-            new_scope = case pp_scope (pp s) of
-                c :| [] -> c :| []
-                -- c :| [] -> (trace ("popAccepting:keeping old:" ++ show c) c) :| []
-                _ :| (h : t) -> h :| t
-         in
-            POk
-                s{pp = (pp s){pp_scope = new_scope}}
-                (acceptingStateChange current (scopeValue new_scope))
+popAccepting :: SrcSpan -> PP AcceptingResult
+-- popAccepting =
+--     P $ \s ->
+--         let
+--             current = scopeValue $ pp_scope (pp s)
+--             new_scope = case pp_scope (pp s) of
+--                 c :| [] -> c :| []
+--                 -- c :| [] -> (trace ("popAccepting:keeping old:" ++ show c) c) :| []
+--                 _ :| (h : t) -> h :| t
+--          in
+--             POk
+--                 s{pp = (pp s){pp_scope = new_scope}}
+--                 (acceptingStateChange current (scopeValue new_scope))
+popAccepting loc = do
+  scopes <- getScopes
+  new_scope <- case scopes of
+      c :| [] -> do
+        addGhcCPPError loc (text "#endif without #if")
+        return (c :| [])
+      _ :| (h : t) -> return (h :| t)
+  setScopes new_scope
+  let current = scopeValue scopes
+  return (acceptingStateChange current (scopeValue new_scope))
 
 scopeValue :: NonEmpty PpScope -> Bool
 scopeValue s = pp_accepting $ NonEmpty.head s
@@ -279,6 +295,13 @@ setScope scope =
                 _ :| rest -> scope :| rest
          in
             POk s{pp = (pp s){pp_scope = new_scope}} ()
+
+getScopes :: PP (NonEmpty PpScope)
+getScopes = P $ \s -> POk s (pp_scope (pp s))
+
+setScopes :: (NonEmpty PpScope) -> PP ()
+setScopes new_scope =
+    P $ \s -> POk s{pp = (pp s){pp_scope = new_scope}} ()
 
 {-
 Note [PpScope stack]
@@ -404,3 +427,7 @@ insertMacroDef (MacroName name args) def md =
             Just dm -> Map.insert name (Map.insert arity (args, def) dm) md
 
 -- ---------------------------------------------------------------------
+
+addGhcCPPError :: SrcSpan -> SDoc -> P p ()
+addGhcCPPError loc err =
+    Lexer.addError $ mkPlainErrorMsgEnvelope loc $ PsErrGhcCpp err

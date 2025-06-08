@@ -1,6 +1,7 @@
 module PreProcess where
 
 import Data.List
+import Data.Maybe (fromMaybe, listToMaybe)
 import qualified Data.Map as Map
 import Debug.Trace
 import GHC hiding (addSourceToTokens)
@@ -20,6 +21,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
+import GHC.Parser.Errors.Types (PsMessage(PsErrGhcCpp))
 
 import Macro
 import ParsePP
@@ -241,7 +243,7 @@ ppLexer queueComments cont =
                                         pushContinuation tk
                                         contIgnoreTok tk
                                     else do
-                                        mdump <- processCppToks s
+                                        mdump <- processCppToks tk
                                         case mdump of
                                             Just dump ->
                                                 -- We have a dump of the state, put it into an ignored token
@@ -270,25 +272,25 @@ ppLexer queueComments cont =
 
 -- ---------------------------------------------------------------------
 
-processCppToks :: FastString -> PP (Maybe String)
+processCppToks :: Located Lexer.Token -> PP (Maybe String)
 processCppToks fs = do
     let
         get (L _ (ITcpp False s _)) = unpackFS s
         get (L _ (ITcpp True s _)) = init $ unpackFS s
-        get _ = error "should not"
+        get _ = panic "Should be ITcpp"
     -- Combine any prior continuation tokens
     cs <- popContinuation
-    processCpp (reverse $ unpackFS fs : map get cs)
+    let loc = combineLocs fs (fromMaybe fs (listToMaybe cs))
+    processCpp  loc (concat $ reverse $ map get (fs:cs))
 
-processCpp :: [String] -> PP (Maybe String)
-processCpp ss = do
-    let s = concat ss
+processCpp :: SrcSpan -> String -> PP (Maybe String)
+processCpp loc s = do
     let directive = parseDirective s
     if directive == Right CppDumpState
         then return (Just "\ndumped state\n")
         else do
             case directive of
-                Left err -> error $ show (err, s)
+                Left err ->  Lexer.addError $ mkPlainErrorMsgEnvelope loc $ PsErrGhcCpp (fsLit (show err))
                 Right (CppInclude filename) -> do
                     ppInclude filename
                 Right (CppDefine name args def) -> do
@@ -309,11 +311,11 @@ processCpp ss = do
                     acceptStateChange ar
                 Right CppElse -> do
                     accepting <- getAccepting
-                    ar <- setAccepting (not accepting)
+                    ar <- setAccepting loc (not accepting)
                     acceptStateChange ar
                 Right (CppElIf cond) -> do
                     val <- cppCond cond
-                    ar <- setAccepting val
+                    ar <- setAccepting loc val
                     acceptStateChange ar
                 Right CppEndif -> do
                     ar <- popAccepting

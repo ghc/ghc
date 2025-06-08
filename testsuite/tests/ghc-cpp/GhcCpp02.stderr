@@ -1,0 +1,4 @@
+GhcCpp02.hs:5:1: error: [GHC-93098] #else without #if
+
+GhcCpp02.hs:7:1: error: [GHC-93098] #endif without #if
+
