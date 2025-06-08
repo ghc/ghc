@@ -1,4 +1,3 @@
-
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
@@ -17,7 +16,7 @@
 
 module GHC.Tc.Gen.Head
        ( HsExprArg(..), TcPass(..), QLFlag(..), EWrap(..)
-       , AppCtxt(..), appCtxtLoc, insideExpansion, appCtxtExpr
+       , AppCtxt, appCtxtLoc, insideExpansion
        , splitHsApps, rebuildHsApps
        , addArgWrap, isHsValArg
        , leadingValArgs, isVisibleArg
@@ -174,6 +173,7 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
                , eaql_arg_ty  :: Scaled TcSigmaType  -- Argument type expected by function
                , eaql_larg    :: LHsExpr GhcRn       -- Original application, for
                                                      -- location and error msgs
+               , eaql_rn_fun  :: HsExpr GhcRn  -- Head of the argument if it is an application
                , eaql_tc_fun  :: (HsExpr GhcTc, AppCtxt) -- Typechecked head
                , eaql_fun_ue  :: UsageEnv -- Usage environment of the typechecked head (QLA5)
                , eaql_args    :: [HsExprArg 'TcpInst]    -- Args: instantiated, not typechecked
@@ -205,11 +205,11 @@ data EWrap = EPar    AppCtxt
            | EExpand (HsExpr GhcRn)
            | EHsWrap HsWrapper
 
-data AppCtxt =
-  VACall
-     (HsExpr GhcRn) Int  -- In the third argument of function f
-     SrcSpan             -- The SrcSpan of the application (f e1 e2 e3)
-                         --    noSrcSpan if outermost; see Note [AppCtxt]
+type AppCtxt = SrcSpan
+  -- VACall
+  --    (HsExpr GhcRn) Int  -- In the third argument of function f
+  --    SrcSpan             -- The SrcSpan of the application (f e1 e2 e3)
+  --                        --    noSrcSpan if outermost; see Note [AppCtxt]
 
 
 {- Note [AppCtxt]
@@ -240,20 +240,14 @@ a second time.
 -}
 
 appCtxtLoc :: AppCtxt -> SrcSpan
-appCtxtLoc (VACall _ _ l)    = l
+appCtxtLoc l    = l
 
 insideExpansion :: AppCtxt -> Bool
-insideExpansion ctxt  = isGeneratedSrcSpan (appCtxtLoc ctxt)
-
-appCtxtExpr :: AppCtxt -> HsExpr GhcRn
-appCtxtExpr (VACall e _ _) = e
+insideExpansion l  = isGeneratedSrcSpan l
 
 instance Outputable QLFlag where
   ppr DoQL = text "DoQL"
   ppr NoQL = text "NoQL"
-
-instance Outputable AppCtxt where
-  ppr (VACall f n l)    = text "VACall" <+> int n <+> ppr f  <+> ppr l
 
 type family XPass (p :: TcPass) where
   XPass 'TcpRn   = 'Renamed
@@ -284,46 +278,32 @@ splitHsApps :: HsExpr GhcRn
 -- This uses the TcM monad solely because we must run modFinalizers when looking
 -- through HsUntypedSplices
 -- (see Note [Looking through Template Haskell splices in splitHsApps]).
-splitHsApps e = go e (top_ctxt 0 e) []
+splitHsApps e = go e noSrcSpan []
   where
-    top_ctxt :: Int -> HsExpr GhcRn -> AppCtxt
-    -- Always returns VACall fun n_val_args noSrcSpan
-    -- to initialise the argument splitting in 'go'
-    -- See Note [AppCtxt]
-    top_ctxt n (HsPar _ fun)        = top_lctxt n fun
-    top_ctxt n (HsPragE _ _ fun)    = top_lctxt n fun
-    top_ctxt n (HsAppType _ fun _)  = top_lctxt (n+1) fun
-    top_ctxt n (HsApp _ fun _)      = top_lctxt (n+1) fun
-    top_ctxt n (XExpr (PopErrCtxt fun)) = top_ctxt n fun
-    top_ctxt n other_fun            = VACall other_fun n noSrcSpan
-
-    top_lctxt :: Int -> LHsExpr GhcRn -> AppCtxt
-    top_lctxt n (L _ fun) = top_ctxt n fun
-
     go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
        -> TcM ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
     -- Modify the AppCtxt as we walk inwards, so it describes the next argument
-    go (HsPar _ (L l fun))           ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)     : args)
-    go (HsPragE _ p (L l fun))       ctxt args = go fun (set l ctxt) (EPrag      ctxt p     : args)
-    go (HsAppType _ (L l fun) ty)    ctxt args = go fun (dec l ctxt) (mkETypeArg ctxt ty    : args)
-    go (HsApp _ (L l fun) arg)       ctxt args = go fun (dec l ctxt) (mkEValArg  ctxt arg   : args)
+    go (HsPar _ (L l fun))        ctxt args = go fun (locA l) (EWrap (EPar ctxt)     : args)
+    go (HsPragE _ p (L l fun))    ctxt args = go fun (locA l) (EPrag      ctxt p     : args)
+    go (HsAppType _ (L _ fun) ty) ctxt args = go fun ctxt (mkETypeArg ctxt ty    : args)
+    go (HsApp _ (L _ fun) arg)    ctxt args = go fun ctxt (mkEValArg  ctxt arg   : args)
 
     -- See Note [Looking through Template Haskell splices in splitHsApps]
-    go e@(HsUntypedSplice splice_res splice) ctxt args
+    go e@(HsUntypedSplice splice_res splice) _ args
       = do { fun <- getUntypedSpliceBody splice_res
            ; go fun ctxt' (EWrap (EExpand e) : args) }
       where
         ctxt' :: AppCtxt
         ctxt' = case splice of
-            HsUntypedSpliceExpr _ (L l _) -> set l ctxt -- l :: SrcAnn AnnListItem
-            HsQuasiQuote _ _ (L l _)      -> set l ctxt -- l :: SrcAnn NoEpAnns
-            (XUntypedSplice (HsImplicitLiftSplice _ _ _ (L l _))) -> set l ctxt
+            HsUntypedSpliceExpr _ (L l _) -> locA l -- l :: SrcAnn AnnListItem
+            HsQuasiQuote _ _ (L l _)      -> locA l -- l :: SrcAnn NoEpAnns
+            (XUntypedSplice (HsImplicitLiftSplice _ _ _ (L l _))) -> locA l
 
     -- See Note [Desugar OpApp in the typechecker]
     go e@(OpApp _ arg1 (L l op) arg2) _ args
-      = pure ( (op, VACall op 0 (locA l))
-             ,   mkEValArg (VACall op 1 generatedSrcSpan) arg1
-               : mkEValArg (VACall op 2 generatedSrcSpan) arg2
+      = pure ( (op, locA l)
+             ,   mkEValArg generatedSrcSpan arg1
+               : mkEValArg generatedSrcSpan arg2
                     -- generatedSrcSpan because this the span of the call,
                     -- and its hard to say exactly what that is
                : EWrap (EExpand e)
@@ -334,11 +314,6 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     go e ctxt args = pure ((e,ctxt), args)
 
-    set :: EpAnn ann -> AppCtxt -> AppCtxt
-    set l (VACall f n _)          = VACall f n (locA l)
-
-    dec :: EpAnn ann -> AppCtxt -> AppCtxt
-    dec l (VACall f n _)          = VACall f (n-1) (locA l)
 
 -- | Rebuild an application: takes a type-checked application head
 -- expression together with arguments in the form of typechecked 'HsExprArg's
@@ -542,13 +517,12 @@ tcInferAppHead_maybe fun =
       HsOverLit _ lit             -> Just <$> tcInferOverLit lit
       _                           -> return Nothing
 
-addHeadCtxt :: AppCtxt -> TcM a -> TcM a
-addHeadCtxt fun_ctxt thing_inside
+addHeadCtxt :: AppCtxt -> TcM a -> TcM a --TODO ANI: Why not just setSrcSpan?
+addHeadCtxt fun_loc thing_inside
   | not (isGoodSrcSpan fun_loc)       -- noSrcSpan => no arguments
   = thing_inside                      -- => context is already set
   | otherwise
   = setSrcSpan fun_loc thing_inside
-  where fun_loc = appCtxtLoc fun_ctxt
 
 
 {- *********************************************************************
