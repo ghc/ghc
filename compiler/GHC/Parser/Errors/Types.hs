@@ -516,7 +516,7 @@ data PsMessage
       !Bool -- ^ Is ExplicitNamespaces on?
 
    -- | An error originating from processing a GHC_CPP directive
-   | PsErrGhcCpp !SDoc
+   | PsErrGhcCpp !SDoc -- AZ:TODO: consider finer granularity
 
    deriving Generic
 

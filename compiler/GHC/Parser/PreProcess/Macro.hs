@@ -51,78 +51,97 @@ import GHC.Utils.Outputable
 cppCond :: SrcSpan -> String -> PP Bool
 cppCond loc str = do
     s <- getPpState
-    let
-        expanded = expand (pp_defines s) str
+    expanded <- expand loc (pp_defines s) str
     v <- case Parser.parseExpr expanded of
         Left err -> do
-            addGhcCPPError loc
-              (hang (text "Error evaluating CPP condition:") 2
-               (text err <+> text "of" $+$ text expanded))
+            addGhcCPPError
+                loc
+                ( hang
+                    (text "Error evaluating CPP condition:")
+                    2
+                    (text err <+> text "of" $+$ text expanded)
+                )
             return 0
         Right tree -> return (eval tree)
     return (toBool v)
 
 -- ---------------------------------------------------------------------
 
-expand :: MacroDefines -> String -> String
-expand s str = expanded
-  where
-    -- TODO: repeat until re-expand or fixpoint
-    toks = case cppLex False str of
-        Left err -> error $ "expand:" ++ show (err, str)
-        Right tks -> tks
-    expanded = combineToks $ map t_str $ expandToks maxExpansions s toks
+expand :: SrcSpan -> MacroDefines -> String -> PP String
+expand loc s str = do
+    toks <- case cppLex False str of
+        Left err -> do
+            addGhcCPPError
+                loc
+                ( hang
+                    (text "Error evaluating CPP condition1:") -- AZ:TODO remove 1
+                    2
+                    (text err <+> text "of" $+$ text str)
+                )
+            return []
+        Right tks -> return tks
+    expandedToks <- expandToks loc maxExpansions s toks
+    return $ combineToks $ map t_str expandedToks
 
 maxExpansions :: Int
 maxExpansions = 15
 
-expandToks :: Int -> MacroDefines -> [Token] -> [Token]
-expandToks 0 _ ts = error $ "macro_expansion limit (" ++ show maxExpansions ++ ") hit, aborting. ts=" ++ show ts
-expandToks cnt s ts =
-    let
-        (!expansionDone, !r) = doExpandToks False s ts
-     in
-        if expansionDone
-            then expandToks (cnt - 1) s r
-            else r
+expandToks :: SrcSpan -> Int -> MacroDefines -> [Token] -> PP [Token]
+expandToks loc 0 _ ts = do
+    -- error $ "macro_expansion limit (" ++ show maxExpansions ++ ") hit, aborting. ts=" ++ show ts
+    addGhcCPPError
+        loc
+        ( hang
+            (text "CPP macro expansion limit hit:")
+            2
+            (text (combineToks $ map t_str ts))
+        )
+    return ts
+expandToks loc cnt s ts = do
+    (!expansionDone, !r) <- doExpandToks loc False s ts
+    if expansionDone
+        then expandToks loc (cnt - 1) s r
+        else return r
 
-doExpandToks :: Bool -> MacroDefines -> [Token] -> (Bool, [Token])
-doExpandToks ed _ [] = (ed, [])
-doExpandToks ed s (TIdentifierLParen n : ts) =
+doExpandToks :: SrcSpan -> Bool -> MacroDefines -> [Token] -> PP (Bool, [Token])
+doExpandToks _loc ed _ [] = return (ed, [])
+doExpandToks loc ed s (TIdentifierLParen n : ts) =
     -- TIdentifierLParen has no meaning here (only in a #define), so
     -- restore it to its constituent tokens
-    doExpandToks ed s (TIdentifier (init n) : TOpenParen "(" : ts)
-doExpandToks _ s (TIdentifier "defined" : ts) = (True, rest)
-  where
-    -- See Note: [defined unary operator] below
+    doExpandToks loc ed s (TIdentifier (init n) : TOpenParen "(" : ts)
+doExpandToks loc _ s (TIdentifier "defined" : ts) = do
+    let
+        -- See Note: [defined unary operator] below
 
-    rest = case getExpandArgs ts of
-        (Just [[TIdentifier macro_name]], rest0) ->
-            case Map.lookup macro_name s of
-                Nothing -> TInteger "0" : rest0
-                Just _ -> TInteger "1" : rest0
-        (Nothing, TIdentifier macro_name : ts0) ->
-            case Map.lookup macro_name s of
-                Nothing -> TInteger "0" : ts0
-                Just _ -> TInteger "1" : ts0
-        (Nothing, _) -> error $ "defined: expected an identifier, got:" ++ show ts
-        (Just args, _) -> error $ "defined: expected a single arg, got:" ++ show args
-doExpandToks ed s (TIdentifier n : ts) = (ed'', expanded ++ rest)
-  where
-    (ed', expanded, ts') = case Map.lookup n s of
-        Nothing -> (ed, [TIdentifier n], ts)
-        Just defs -> (ed0, r, rest1)
-          where
-            (args, rest0) = getExpandArgs ts
-            fallbackArgs = fromMaybe (Nothing, [TIdentifier n]) (Map.lookup Nothing defs)
-            (m_args, rhs) = fromMaybe fallbackArgs (Map.lookup (arg_arity args) defs)
-            (ed0, r, rest1) = case m_args of
-                Nothing -> (True, rhs, ts)
-                Just _ -> (True, replace_args args m_args rhs, rest0)
-    (ed'', rest) = doExpandToks ed' s ts'
-doExpandToks ed s (t : ts) = (ed', t : r)
-  where
-    (ed', r) = doExpandToks ed s ts
+        rest = case getExpandArgs ts of
+            (Just [[TIdentifier macro_name]], rest0) ->
+                case Map.lookup macro_name s of
+                    Nothing -> TInteger "0" : rest0
+                    Just _ -> TInteger "1" : rest0
+            (Nothing, TIdentifier macro_name : ts0) ->
+                case Map.lookup macro_name s of
+                    Nothing -> TInteger "0" : ts0
+                    Just _ -> TInteger "1" : ts0
+            (Nothing, _) -> error $ "defined: expected an identifier, got:" ++ show ts
+            (Just args, _) -> error $ "defined: expected a single arg, got:" ++ show args
+    return (True, rest)
+doExpandToks loc ed s (TIdentifier n : ts) = do
+    let
+        (ed', expanded, ts') = case Map.lookup n s of
+            Nothing -> (ed, [TIdentifier n], ts)
+            Just defs -> (ed0, r, rest1)
+              where
+                (args, rest0) = getExpandArgs ts
+                fallbackArgs = fromMaybe (Nothing, [TIdentifier n]) (Map.lookup Nothing defs)
+                (m_args, rhs) = fromMaybe fallbackArgs (Map.lookup (arg_arity args) defs)
+                (ed0, r, rest1) = case m_args of
+                    Nothing -> (True, rhs, ts)
+                    Just _ -> (True, replace_args args m_args rhs, rest0)
+    (ed'', rest) <- doExpandToks loc ed' s ts'
+    return (ed'', expanded ++ rest)
+doExpandToks loc ed s (t : ts) = do
+    (ed', r) <- doExpandToks loc ed s ts
+    return (ed', t : r)
 
 {-
 Note: [defined unary operator]
