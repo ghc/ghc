@@ -40,6 +40,7 @@ library
       Prelude.Experimental
     if arch(wasm32)
         exposed-modules:  GHC.Wasm.Prim
+                          GHC.Wasm.Uint8Array
     other-extensions:
     build-depends:    base >=4.20 && < 4.22,
                       ghc-internal == @ProjectVersionForLib@.*
