@@ -515,6 +515,9 @@ data PsMessage
    | PsWarnPatternNamespaceSpecifier
       !Bool -- ^ Is ExplicitNamespaces on?
 
+   -- | An error originating from processing a GHC_CPP directive
+   | PsErrGhcCpp !SDoc
+
    deriving Generic
 
 -- | Extra details about a parse error, which helps

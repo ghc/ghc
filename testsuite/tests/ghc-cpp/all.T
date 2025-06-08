@@ -20,4 +20,4 @@ test('GhcCpp01',
      compile,
      ['-ddump-ghc-cpp -dkeep-comments'])
 
-test('GhcCpp02', normal, compile, [''])
+test('GhcCpp02', normal, compile_fail, [''])
