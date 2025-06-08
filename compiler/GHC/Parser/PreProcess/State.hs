@@ -238,18 +238,6 @@ acceptingStateChange old new =
 
 -- Exit a scope group
 popAccepting :: SrcSpan -> PP AcceptingResult
--- popAccepting =
---     P $ \s ->
---         let
---             current = scopeValue $ pp_scope (pp s)
---             new_scope = case pp_scope (pp s) of
---                 c :| [] -> c :| []
---                 -- c :| [] -> (trace ("popAccepting:keeping old:" ++ show c) c) :| []
---                 _ :| (h : t) -> h :| t
---          in
---             POk
---                 s{pp = (pp s){pp_scope = new_scope}}
---                 (acceptingStateChange current (scopeValue new_scope))
 popAccepting loc = do
   scopes <- getScopes
   new_scope <- case scopes of
