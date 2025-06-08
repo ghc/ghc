@@ -12,6 +12,18 @@ static void printVec_int64(vint64m1_t v, int length) {
   }
   printf("]\n");
 }
+void printVecs_int64x2(vint64m1_t v1, vint64m1_t v2, vint64m1_t v3,
+                       vint64m1_t v4, vint64m1_t v5, vint64m1_t v6,
+                       vint64m1_t v7, vint64m1_t v8, vint64m1_t v9,
+                       vint64m1_t v10, vint64m1_t v11, vint64m1_t v12,
+                       vint64m1_t v13, vint64m1_t v14, vint64m1_t v15,
+                       vint64m1_t v16, vint64m1_t v17, vint64m1_t v18,
+                       vint64m1_t v19, vint64m1_t v20, vint64m1_t v21,
+                       vint64m1_t v22, vint64m1_t v23, vint64m1_t v24,
+                       vint64m1_t v25, vint64m1_t v26, vint64m1_t v27,
+                       vint64m1_t v28, vint64m1_t v29, vint64m1_t v30,
+                       vint64m1_t v31, vint64m1_t v32, vint64m1_t v33,
+                       vint64m1_t v34, vint64m1_t v35, vint64m1_t v36);
 
 // Provide many vectors to enforce stack usage
 void printVecs_int64x2(vint64m1_t v1, vint64m1_t v2, vint64m1_t v3,
