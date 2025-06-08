@@ -7,9 +7,9 @@ AC_DEFUN([FP_GCC_SUPPORTS_NO_PIE],
    AC_REQUIRE([AC_PROG_CC])
    AC_MSG_CHECKING([whether CC supports -no-pie])
    echo 'int main() { return 0; }' > conftest.c
-   "$CC" $CONF_GCC_CC_OPTS_STAGE2 -c conftest.c
+   "$CC" -c conftest.c
    # Some GCC versions only warn when passed an unrecognized flag.
-   if "$CC" $CONF_GCC_LINKER_OPTS_STAGE2 -no-pie -Werror conftest.o -o conftest > conftest.txt 2>&1 && ! grep -i unrecognized conftest.txt > /dev/null 2>&1; then
+   if "$CC" -no-pie -Werror conftest.o -o conftest > conftest.txt 2>&1 && ! grep -i unrecognized conftest.txt > /dev/null 2>&1; then
        CONF_GCC_SUPPORTS_NO_PIE=YES
        AC_MSG_RESULT([yes])
    else
