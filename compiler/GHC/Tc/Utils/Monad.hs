@@ -1730,6 +1730,7 @@ mkErrCtxt env ctxts
 --          else go dbg 0 env ctxts
  = go False 0 env ctxts -- regular error ctx
  where
+   go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
    go _ _ _   [] = return []
    go dbg n env ((is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
