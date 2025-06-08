@@ -270,7 +270,7 @@ processCpp loc s = do
                 Right (CppUndef name) -> do
                     ppUndef name
                 Right (CppIf cond) -> do
-                    val <- cppCond cond
+                    val <- cppCond loc cond
                     ar <- pushAccepting val
                     acceptStateChange ar
                 Right (CppIfdef name) -> do
@@ -286,7 +286,7 @@ processCpp loc s = do
                     ar <- setAccepting loc (text "#else") (not accepting)
                     acceptStateChange ar
                 Right (CppElIf cond) -> do
-                    val <- cppCond cond
+                    val <- cppCond loc cond
                     ar <- setAccepting loc (text "#elif") val
                     acceptStateChange ar
                 Right CppEndif -> do
