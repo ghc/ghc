@@ -1836,7 +1836,7 @@ rebuildLam env bndrs@(bndr:_) body cont
       | -- Note [Casts and lambdas]
         seCastSwizzle env
       , not (any bad bndrs)
-      = mkCastCo (mk_lams bndrs body) (mkPisCastCo Representational bndrs (exprType body) co)
+      = mkCast (mk_lams bndrs body) (mkPiCos Representational bndrs (castCoToCo (exprType body) co))
       where
         co_vars  = tyCoVarsOfCastCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars

@@ -54,9 +54,7 @@ module GHC.Core.Coercion (
 
         -- ** Cast coercions
         castCoToCo,
-        mkSymCastCo,
         mkTransCastCo, mkTransCastCoCo, mkTransCoCastCo,
-        mkPisCastCo,
 
         -- ** Decomposition
         instNewTyCon_maybe,
@@ -75,7 +73,7 @@ module GHC.Core.Coercion (
         pickLR,
 
         isGReflCo, isReflCo, isReflCo_maybe, isGReflCo_maybe, isReflexiveCo, isReflexiveCo_maybe,
-        isReflCastCo, isReflexiveCastCo,
+        isReflexiveCastCo,
         isReflCoVar_maybe, isGReflMCo, mkGReflLeftMCo, mkGReflRightMCo,
         mkCoherenceRightMCo,
 
@@ -2859,9 +2857,6 @@ castCoToCo :: Type -> CastCoercion -> CoercionR
 castCoToCo _      (CCoercion co)         = co
 castCoToCo lhs_ty (ZCoercion rhs_ty cos) = mkUnivCo ZCoercionProv (map CoVarCo (nonDetEltsUniqSet cos)) Representational lhs_ty rhs_ty
 
-mkSymCastCo :: Type -> CastCoercion -> Coercion
-mkSymCastCo lhs_ty cco = mkSymCo (castCoToCo lhs_ty cco)
-
 -- | Compose two 'CastCoercion's transitively, like 'mkTransCo'.  If either is
 -- zapped the whole result will be zapped.
 mkTransCastCo :: HasDebugCallStack => CastCoercion -> CastCoercion -> CastCoercion
@@ -2877,14 +2872,6 @@ mkTransCastCoCo (ZCoercion _ cos) co2 = ZCoercion (coercionRKind co2) (shallowCo
 mkTransCoCastCo :: HasDebugCallStack => Coercion -> CastCoercion -> CastCoercion
 mkTransCoCastCo co1 (CCoercion co2)    = CCoercion (mkTransCo co1 co2)
 mkTransCoCastCo co1 (ZCoercion ty cos) = ZCoercion ty (shallowCoVarsOfCo co1 `unionVarSet` cos)
-
--- TODO: Adapt this or rebuildLam to work for ZCoercion
-mkPisCastCo :: Role -> [Var] -> Type -> CastCoercion -> CastCoercion
-mkPisCastCo r vs expr_ty = CCoercion . mkPiCos r vs . castCoToCo expr_ty
-
-isReflCastCo :: CastCoercion -> Bool
-isReflCastCo (CCoercion co) = isReflCo co
-isReflCastCo (ZCoercion _ _) = False -- TODO: track this?
 
 -- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
 -- as it walks over the entire coercion.

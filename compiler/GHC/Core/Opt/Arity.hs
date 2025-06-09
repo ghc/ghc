@@ -2829,7 +2829,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
        , Just (_, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqType` idMult bndr
-       = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCastCo (exprType e) co_arg) co, ticks)
+       = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCo (castCoToCo (exprType e) co_arg)) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co fun_ty

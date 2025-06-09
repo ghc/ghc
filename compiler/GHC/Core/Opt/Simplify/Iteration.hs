@@ -644,7 +644,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
     mk_worker_unfolding top_lvl work_id work_rhs
       = case realUnfoldingInfo info of -- NB: the real one, even for loop-breakers
            unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
-             | isStableSource src -> return (unf { uf_tmpl = mkCast unf_rhs (mkSymCastCo (exprType rhs) co) })
+             | isStableSource src -> return (unf { uf_tmpl = mkCast unf_rhs (mkSymCo (castCoToCo (exprType rhs) co)) })
            _ -> mkLetUnfolding env top_lvl VanillaSrc work_id False work_rhs
 
 tryCastWorkerWrapper env _ _ bndr rhs  -- All other bindings
