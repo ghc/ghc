@@ -680,7 +680,14 @@ evVarsOfTermList (EvTypeable _ ev)  =
     EvTypeableTyApp e1 e2 -> concatMap evVarsOfTermList [e1,e2]
     EvTypeableTrFun e1 e2 e3 -> concatMap evVarsOfTermList [e1,e2,e3]
     EvTypeableTyLit e     -> evVarsOfTermList e
-evVarsOfTermList (EvFun{}) = []
+evVarsOfTermList (EvFun { et_given = givens, et_binds = EvBinds binds_b, et_body = body_id })
+  = let
+      binds = bagToList binds_b
+      lhs_evvars = S.fromList $ map evBindVar binds
+      rhs_evvars = S.fromList $ concatMap (evVarsOfTermList . eb_rhs) binds
+    in
+      S.toList $
+        ( ( S.insert body_id rhs_evvars ) S.\\ S.fromList givens ) S.\\ lhs_evvars
 
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))
