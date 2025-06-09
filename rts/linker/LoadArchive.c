@@ -40,7 +40,7 @@ static uint32_t read4Bytes(const char buf[static 4])
     return ntohl(*(uint32_t*)buf);
 }
 
-static StgBool loadFatArchive(char tmp[static 20], FILE* f, pathchar* path)
+static bool loadFatArchive(char tmp[static 20], FILE* f, pathchar* path)
 {
     uint32_t nfat_arch, nfat_offset, cputype, cpusubtype;
 #if defined(i386_HOST_ARCH)
@@ -90,6 +90,7 @@ static StgBool loadFatArchive(char tmp[static 20], FILE* f, pathchar* path)
         }
 
         /* Read the header */
+        char tmp[20];
         n = fread(tmp, 1, 8, f);
         if (n != 8) {
             errorBelch("Failed reading header from `%" PATH_FMT "'", path);
@@ -110,7 +111,7 @@ static StgBool loadFatArchive(char tmp[static 20], FILE* f, pathchar* path)
 static StgBool readThinArchiveMember(int n, int memberSize, pathchar* path,
         char* fileName, char* image)
 {
-    StgBool has_succeeded = false;
+    bool has_succeeded = false;
     FILE* member = NULL;
     pathchar *pathCopy, *dirName, *memberPath, *objFileName;
     memberPath = NULL;
@@ -148,10 +149,9 @@ inner_fail:
     return has_succeeded;
 }
 
-static StgBool checkFatArchive(char magic[static 20], FILE* f, pathchar* path)
+static bool checkFatArchive(char magic[static 20], FILE* f, pathchar* path)
 {
-    StgBool success;
-    success = false;
+    bool success = false;
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
     /* Not a standard archive, look for a fat archive magic number: */
     if (read4Bytes(magic) == FAT_MAGIC)
@@ -175,7 +175,7 @@ static StgBool checkFatArchive(char magic[static 20], FILE* f, pathchar* path)
  * be reallocated on return; the old value is now _invalid_.
  * @param gnuFileIndexSize The size of the index.
  */
-static StgBool
+static bool
 lookupGNUArchiveIndex(int gnuFileIndexSize, char **fileName_,
     char* gnuFileIndex, pathchar* path, size_t* thisFileNameSize,
     size_t* fileNameSize)
@@ -252,8 +252,7 @@ HsInt loadArchive_ (pathchar *path)
     size_t thisFileNameSize = (size_t)-1; /* shut up bogus GCC warning */
     char *fileName;
     size_t fileNameSize;
-    int isObject, isGnuIndex, isThin, isImportLib;
-    char tmp[20];
+    bool isGnuIndex, isThin, isImportLib;
     char *gnuFileIndex;
     int gnuFileIndexSize;
     int misalignment = 0;
@@ -275,8 +274,8 @@ HsInt loadArchive_ (pathchar *path)
     fileNameSize = 32;
     fileName = stgMallocBytes(fileNameSize, "loadArchive(fileName)");
 
-    isThin = 0;
-    isImportLib = 0;
+    isThin = false;
+    isImportLib = false;
 
     f = pathopen(path, WSTR("rb"));
     if (!f)
@@ -322,10 +321,10 @@ HsInt loadArchive_ (pathchar *path)
      *
      */
     else if (strncmp(tmp, "!<thin>\n", 8) == 0) {
-        isThin = 1;
+        isThin = true;
     }
     else {
-        StgBool success = checkFatArchive(tmp, f, path);
+        bool success = checkFatArchive(tmp, f, path);
         if (!success)
             goto fail;
     }
@@ -379,7 +378,7 @@ HsInt loadArchive_ (pathchar *path)
             FAIL("Failed reading magic from `%" PATH_FMT "' at %ld. Got %c%c",
                  path, ftell(f), tmp[0], tmp[1]);
 
-        isGnuIndex = 0;
+        isGnuIndex = false;
         /* Check for BSD-variant large filenames */
         if (0 == strncmp(fileName, "#1/", 3)) {
             size_t n = 0;
@@ -419,7 +418,7 @@ HsInt loadArchive_ (pathchar *path)
         else if (0 == strncmp(fileName, "//", 2)) {
             fileName[0] = '\0';
             thisFileNameSize = 0;
-            isGnuIndex = 1;
+            isGnuIndex = true;
         }
         /* Check for a file in the GNU file index */
         else if (fileName[0] == '/') {
@@ -486,8 +485,6 @@ HsInt loadArchive_ (pathchar *path)
         DEBUG_LOG("\tisObject = %d\n", isObject);
 
         if (isObject) {
-            pathchar *archiveMemberName;
-
             DEBUG_LOG("Member is an object file...loading...\n");
 
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
@@ -523,7 +520,7 @@ HsInt loadArchive_ (pathchar *path)
             // I don't understand why this extra +1 is needed here; pathprintf
             // should have given us the correct length but in practice it seems
             // to be one byte short on Win32.
-            archiveMemberName = stgMallocBytes((size+1+1) * sizeof(pathchar), "loadArchive(file)");
+            pathchar *archiveMemberName = stgMallocBytes((size+1+1) * sizeof(pathchar), "loadArchive(file)");
             pathprintf(archiveMemberName, size+1, WSTR("%" PATH_FMT "(#%d:%.*s)"),
                        path, memberIdx, (int)thisFileNameSize, fileName);
 
