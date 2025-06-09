@@ -63,6 +63,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FVs
+import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Rep    -- needs to build types & coercions in a knot
 import GHC.Core.TyCo.Subst ( substTyCoVars )
 import GHC.Core.InstEnv
@@ -1566,7 +1567,7 @@ tcIfaceTyLit (IfaceCharTyLit n) = return (CharTyLit n)
 
 tcIfaceCastCoercion :: IfaceCastCoercion -> IfL CastCoercion
 tcIfaceCastCoercion (IfaceCCoercion co)     = CCoercion <$> tcIfaceCo co
-tcIfaceCastCoercion (IfaceZCoercion ty cos) = ZCoercion <$> tcIfaceType ty <*> mapM tcIfaceCo cos
+tcIfaceCastCoercion (IfaceZCoercion ty cos) = ZCoercion <$> tcIfaceType ty <*> (shallowCoVarsOfCos <$> mapM tcIfaceCo cos)
 
 tcIfaceCo :: IfaceCoercion -> IfL Coercion
 tcIfaceCo = go

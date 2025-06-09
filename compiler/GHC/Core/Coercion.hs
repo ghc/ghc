@@ -57,7 +57,6 @@ module GHC.Core.Coercion (
         mkSymCastCo,
         mkTransCastCo, mkTransCastCoCo, mkTransCoCastCo,
         mkPisCastCo,
-        zapCo, zapCos, zapCastCo,
 
         -- ** Decomposition
         instNewTyCon_maybe,
@@ -2421,7 +2420,7 @@ seqMCo (MCo co) = seqCo co
 
 seqCastCoercion :: CastCoercion -> ()
 seqCastCoercion (CCoercion co) = seqCo co
-seqCastCoercion (ZCoercion ty cos) = seqType ty `seq` seqCos cos
+seqCastCoercion (ZCoercion ty cos) = seqType ty `seq` seqVarSet cos
 
 seqCo :: Coercion -> ()
 seqCo (Refl ty)             = seqType ty
@@ -2858,7 +2857,7 @@ eqCastCoercionX env = eqTypeX env `on` castCoercionRKind
 -- have discarded the original 'Coercion'.
 castCoToCo :: Type -> CastCoercion -> CoercionR
 castCoToCo _      (CCoercion co)         = co
-castCoToCo lhs_ty (ZCoercion rhs_ty cos) = mkUnivCo ZCoercionProv cos Representational lhs_ty rhs_ty
+castCoToCo lhs_ty (ZCoercion rhs_ty cos) = mkUnivCo ZCoercionProv (map CoVarCo (nonDetEltsUniqSet cos)) Representational lhs_ty rhs_ty
 
 mkSymCastCo :: Type -> CastCoercion -> Coercion
 mkSymCastCo lhs_ty cco = mkSymCo (castCoToCo lhs_ty cco)
@@ -2867,41 +2866,21 @@ mkSymCastCo lhs_ty cco = mkSymCo (castCoToCo lhs_ty cco)
 -- zapped the whole result will be zapped.
 mkTransCastCo :: HasDebugCallStack => CastCoercion -> CastCoercion -> CastCoercion
 mkTransCastCo cco (CCoercion co)     = mkTransCastCoCo cco co
-mkTransCastCo cco (ZCoercion ty cos) = ZCoercion ty (zapCastCo cco ++ cos)
+mkTransCastCo cco (ZCoercion ty cos) = ZCoercion ty (shallowCoVarsOfCastCo cco `unionVarSet` cos)
 
 -- | Transitively compose a 'CastCoercion' followed by a 'Coercion'.
 mkTransCastCoCo :: HasDebugCallStack => CastCoercion -> Coercion -> CastCoercion
 mkTransCastCoCo (CCoercion co1)   co2 = CCoercion (mkTransCo co1 co2)
-mkTransCastCoCo (ZCoercion _ cos) co2 = ZCoercion (coercionRKind co2) (zapCo co2 ++ cos)
+mkTransCastCoCo (ZCoercion _ cos) co2 = ZCoercion (coercionRKind co2) (shallowCoVarsOfCo co2 `unionVarSet` cos)
 
 -- | Transitively compose a 'Coercion' followed by a 'CastCoercion'.
 mkTransCoCastCo :: HasDebugCallStack => Coercion -> CastCoercion -> CastCoercion
 mkTransCoCastCo co1 (CCoercion co2)    = CCoercion (mkTransCo co1 co2)
-mkTransCoCastCo co1 (ZCoercion ty cos) = ZCoercion ty (zapCo co1 ++ cos)
+mkTransCoCastCo co1 (ZCoercion ty cos) = ZCoercion ty (shallowCoVarsOfCo co1 `unionVarSet` cos)
 
 -- TODO: Adapt this or rebuildLam to work for ZCoercion
 mkPisCastCo :: Role -> [Var] -> Type -> CastCoercion -> CastCoercion
 mkPisCastCo r vs expr_ty = CCoercion . mkPiCos r vs . castCoToCo expr_ty
-
-
-zapCo :: Coercion -> [Coercion]
-zapCo co = zapCos [co]
-
--- | Throw away the structure of coercions, retaining only the set of variables
--- on which they depend.
---
--- It is important we use only the *shallow* free CoVars here, because those are
--- the ones on which the original coercions necessarily depended and which may
--- be substituted away later. If we use the deep CoVars here, we can end up
--- retaining references to CoVars that are no longer in scope (see Note [Shallow
--- and deep free variables] in GHC.Core.TyCo.FVs).
-zapCos :: [Coercion] -> [Coercion]
-zapCos cos = map mkCoVarCo $ nonDetEltsUniqSet (shallowCoVarsOfCos cos) -- TODO nonDetEltsUniqSet justified?
-
-zapCastCo :: CastCoercion -> [Coercion]
-zapCastCo (CCoercion co)    = zapCo co
-zapCastCo (ZCoercion _ cos) = cos
-
 
 isReflCastCo :: CastCoercion -> Bool
 isReflCastCo (CCoercion co) = isReflCo co

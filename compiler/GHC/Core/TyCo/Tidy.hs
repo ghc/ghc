@@ -26,6 +26,7 @@ import GHC.Core.TyCo.FVs
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
@@ -366,4 +367,4 @@ tidyCos env = strictMap (tidyCo env)
 
 tidyCastCo :: TidyEnv -> CastCoercion -> CastCoercion
 tidyCastCo env (CCoercion co) = CCoercion (tidyCo env co)
-tidyCastCo env (ZCoercion ty cos) = ZCoercion (tidyType env ty) (tidyCos env cos)
+tidyCastCo env (ZCoercion ty cos) = ZCoercion (tidyType env ty) (mapVarSet (tidyTyCoVarOcc env) cos)

@@ -36,6 +36,7 @@ import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Coercion
 import GHC.Core.Class( classHasSCs )
+import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Rep (Coercion(..))
 
 import GHC.Types.Id(  idType )
@@ -1494,7 +1495,7 @@ finish_rewrite
 mkCastCoercion :: Bool -> Type -> Coercion -> CastCoercion
 mkCastCoercion zap_casts lhs_ty co
    | isSmallCo co || not zap_casts = CCoercion co
-   | otherwise                     = ZCoercion lhs_ty (zapCo co)
+   | otherwise                     = ZCoercion lhs_ty (shallowCoVarsOfCo co)
 
 -- | Is this coercion probably smaller than its type? This is a rough heuristic,
 -- but crucially we treat axioms (perhaps wrapped in Sym/Sub/etc.) as small

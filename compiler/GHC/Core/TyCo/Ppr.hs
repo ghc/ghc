@@ -48,6 +48,7 @@ import GHC.Types.Var
 
 import GHC.Iface.Type
 
+import GHC.Types.Unique.Set
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 
@@ -138,7 +139,7 @@ pprCastCo co = getPprStyle $ \ sty -> pprIfaceCastCoercion (tidyToIfaceCastCoSty
 
 tidyToIfaceCastCoSty :: CastCoercion -> PprStyle -> IfaceCastCoercion
 tidyToIfaceCastCoSty (CCoercion co)     sty = IfaceCCoercion (tidyToIfaceCoSty co sty)
-tidyToIfaceCastCoSty (ZCoercion ty cos) sty = IfaceZCoercion (tidyToIfaceType ty) (map (flip tidyToIfaceCoSty sty) cos) -- TODO
+tidyToIfaceCastCoSty (ZCoercion ty cos) sty = IfaceZCoercion (tidyToIfaceType ty) (map (flip tidyToIfaceCoSty sty . CoVarCo) (nonDetEltsUniqSet cos)) -- TODO
 
 tidyToIfaceCoSty :: Coercion -> PprStyle -> IfaceCoercion
 tidyToIfaceCoSty co sty

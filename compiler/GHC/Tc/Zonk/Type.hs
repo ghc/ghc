@@ -64,6 +64,7 @@ import GHC.Tc.Zonk.TcType
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCon
+import GHC.Core.TyCo.FVs
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -78,11 +79,13 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.TypeEnv
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import GHC.Types.TyThing
 
 import GHC.Tc.Types.BasicTypes
@@ -532,15 +535,18 @@ zonkScaledTcTypeToTypeX (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX m
 zonkTcTypeToTypeX   :: TcType   -> ZonkTcM Type
 zonkTcTypesToTypesX :: [TcType] -> ZonkTcM [Type]
 zonkCoToCo          :: Coercion -> ZonkTcM Coercion
-zonkCosToCos        :: [Coercion] -> ZonkTcM [Coercion]
-(zonkTcTypeToTypeX, zonkTcTypesToTypesX, zonkCoToCo, zonkCosToCos)
+_zonkCosToCos        :: [Coercion] -> ZonkTcM [Coercion]
+(zonkTcTypeToTypeX, zonkTcTypesToTypesX, zonkCoToCo, _zonkCosToCos)
   = case mapTyCoX zonk_tycomapper of
       (zty, ztys, zco, zcos) ->
         (ZonkT . flip zty, ZonkT . flip ztys, ZonkT . flip zco, ZonkT. flip zcos)
 
 zonkCastCo :: CastCoercion -> ZonkTcM CastCoercion
 zonkCastCo (CCoercion co) = CCoercion <$> zonkCoToCo co
-zonkCastCo (ZCoercion ty cos) = ZCoercion <$> zonkTcTypeToTypeX ty <*> zonkCosToCos cos
+zonkCastCo (ZCoercion ty cos) = ZCoercion <$> zonkTcTypeToTypeX ty <*> zonkCoVarSet cos
+
+zonkCoVarSet :: CoVarSet -> ZonkTcM CoVarSet
+zonkCoVarSet = fmap shallowCoVarsOfCos . mapM zonkCoVarOcc . nonDetEltsUniqSet
 
 zonkScaledTcTypesToTypesX :: [Scaled TcType] -> ZonkTcM [Scaled Type]
 zonkScaledTcTypesToTypesX scaled_tys =

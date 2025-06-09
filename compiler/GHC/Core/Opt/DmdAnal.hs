@@ -2405,12 +2405,16 @@ coercionDmdEnv co = coercionsDmdEnv [co]
 
 castCoercionDmdEnv :: CastCoercion -> DmdEnv
 castCoercionDmdEnv (CCoercion co)    = coercionDmdEnv co
-castCoercionDmdEnv (ZCoercion _ cos) = coercionsDmdEnv cos
+castCoercionDmdEnv (ZCoercion _ cos) = coVarSetDmdEnv cos
 
 coercionsDmdEnv :: [Coercion] -> DmdEnv
 coercionsDmdEnv cos
   = mkTermDmdEnv $ mapVarEnv (const topDmd) $ getUniqSet $ coVarsOfCos cos
   -- The VarSet from coVarsOfCos is really a VarEnv Var
+
+coVarSetDmdEnv :: CoVarSet -> DmdEnv
+coVarSetDmdEnv cos
+  = mkTermDmdEnv $ mapVarEnv (const topDmd) $ getUniqSet cos -- TODO shallow/deep confusion?
 
 addVarDmd :: DmdType -> Var -> Demand -> DmdType
 addVarDmd (DmdType fv ds) var dmd

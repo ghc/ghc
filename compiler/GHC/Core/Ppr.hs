@@ -35,6 +35,7 @@ import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Literal( pprLiteral )
 import GHC.Types.Name( pprInfixName, pprPrefixName )
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
@@ -173,7 +174,7 @@ pprOptCastCoercion :: CastCoercion -> SDoc
 pprOptCastCoercion (CCoercion co) = pprOptCo co
 pprOptCastCoercion (ZCoercion ty cos) = -- TODO review ppr format
     sdocOption sdocSuppressCoercions $ \case
-              True  -> angleBrackets (text "ZapCo:" <> int (sum (map coercionSize cos))) <+> dcolon <+> co_type
+              True  -> angleBrackets (text "ZapCo:" <> int (sizeVarSet cos)) <+> dcolon <+> co_type
               False -> parens $ sep [text "Zap", ppr cos, dcolon <+> co_type]
     where
       co_type = sdocOption sdocSuppressCoercionTypes $ \case

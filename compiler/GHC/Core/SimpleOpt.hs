@@ -33,6 +33,7 @@ import GHC.Core.DataCon
 import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
+import GHC.Core.TyCo.Subst
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 
@@ -324,7 +325,7 @@ simple_opt_expr env expr
 
     ----------------------
     go_cast_co (CCoercion co) = CCoercion (go_co co)
-    go_cast_co (ZCoercion ty cos) = ZCoercion (substTyUnchecked subst ty) (substCos subst cos)
+    go_cast_co (ZCoercion ty cos) = ZCoercion (substTyUnchecked subst ty) (substCoVarSet subst cos)
 
     go_co co = optCoercion (so_co_opts (soe_opts env)) subst co
 

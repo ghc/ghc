@@ -77,7 +77,7 @@ import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstr
 
 -- friends:
 import GHC.Types.Var
-import GHC.Types.Var.Set( elemVarSet )
+import GHC.Types.Var.Set
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
@@ -877,8 +877,14 @@ automatically imply `-fno-zap-casts`.
 TODO: probably the boot libraries ought to be distributed with `-fno-zap-casts`,
 so users can get full checks from `-dcore-lint`.
 
-TODO: for simplicity ZCoercion currently stores a list of Coercions, but in
-principle we need only the CoVars.
+ZCoercion discards the structure of the coercion, retaining only the set of variables
+on which it depends.  It is important we store only the "shallow" free CoVars in the
+set, because those are the ones on which the original coercions necessarily depended
+and which may be substituted away later. If we use the deep CoVars, we can end up
+retaining references to CoVars that are no longer in scope. See also
+Note [Shallow and deep free variables] in GHC.Core.TyCo.FVs.
+
+TODO: review determinism; are our uses of nonDetEltsUniqSet and similar safe?
 
 -}
 
@@ -887,7 +893,7 @@ principle we need only the CoVars.
 -- and free CoVars.  See Note [Zapped casts].
 data CastCoercion
   = CCoercion CoercionR        -- Not zapped; the Coercion has Representational role
-  | ZCoercion Type [Coercion]  -- Zapped; the Coercions are just variables (TODO: use CoVarSet instead?)
+  | ZCoercion Type CoVarSet    -- Zapped; stores only the RHS type and free CoVars
   deriving Data.Data
 
 -- | A 'Coercion' is concrete evidence of the equality/convertibility
@@ -2069,7 +2075,7 @@ typesSize tys = foldr ((+) . typeSize) 0 tys
 
 castCoercionSize :: CastCoercion -> Int
 castCoercionSize (CCoercion co) = coercionSize co
-castCoercionSize (ZCoercion ty cos) = typeSize ty + sum (map coercionSize cos)
+castCoercionSize (ZCoercion ty cos) = typeSize ty + sizeVarSet cos
 
 coercionSize :: Coercion -> Int
 coercionSize (Refl ty)             = typeSize ty

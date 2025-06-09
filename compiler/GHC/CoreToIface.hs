@@ -85,6 +85,7 @@ import GHC.Types.Tickish
 import GHC.Types.Demand ( isNopSig )
 import GHC.Types.Cpr ( topCprSig )
 import GHC.Types.SrcLoc (unLoc)
+import GHC.Types.Unique.Set
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -275,7 +276,7 @@ toIfaceTyLit (CharTyLit x) = IfaceCharTyLit x
 ----------------
 toIfaceCastCoercion :: CastCoercion -> IfaceCastCoercion
 toIfaceCastCoercion (CCoercion co) = IfaceCCoercion (toIfaceCoercion co)
-toIfaceCastCoercion (ZCoercion ty cos) = IfaceZCoercion (toIfaceType ty) (map toIfaceCoercion cos)
+toIfaceCastCoercion (ZCoercion ty cos) = IfaceZCoercion (toIfaceType ty) (map (toIfaceCoercion . CoVarCo) (nonDetEltsUniqSet cos)) -- TODO determinism
 
 toIfaceCoercion :: Coercion -> IfaceCoercion
 toIfaceCoercion = toIfaceCoercionX emptyVarSet

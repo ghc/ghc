@@ -77,6 +77,7 @@ import GHC.Core.Type as Type
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX )
+import GHC.Core.TyCo.FVs
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.TyCon
@@ -297,13 +298,13 @@ mkCast expr co
 
 -- | Wrap the given expression in a zapped cast (see Note [Zapped casts] in
 -- GHC.Core.TyCo.Rep).
-mkCastZ :: HasDebugCallStack => CoreExpr -> Type -> [Coercion] -> CoreExpr
+mkCastZ :: HasDebugCallStack => CoreExpr -> Type -> CoVarSet -> CoreExpr
 mkCastZ expr ty cos =
     case expr of
-      Cast expr co -> mkCastZ expr ty (zapCastCo co ++ cos)
+      Cast expr co -> mkCastZ expr ty (shallowCoVarsOfCastCo co `unionVarSet` cos)
       Tick t expr -> Tick t (mkCastZ expr ty cos)
       -- TODO: do we need other cases from mkCast?
-      _ -> Cast expr (ZCoercion ty (zapCos cos))
+      _ -> Cast expr (ZCoercion ty cos)
 
 
 
