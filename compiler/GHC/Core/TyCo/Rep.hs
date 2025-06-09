@@ -847,16 +847,17 @@ Note [Zapped casts]
 ~~~~~~~~~~~~~~~~~~~
 A "zapped cast" is a Cast that does not store the full Coercion being used to
 cast, but instead stores the type resulting from the cast and a set of CoVars
-used in the original coercion.  This reduces the effectiveness of Core Lint,
-because it cannot check the original coercion.
+used in the original coercion.  The CastCoercion type is used to represent
+the coercion argument to a cast; it may be either a full coercion (CCoercion)
+or zapped (ZCoercion).
 
 Zapping casts is motivated by performance (see #8095 and related tickets).
 Sometimes the structure of the coercion can be very large, for example when
 using type families that take many reduction steps, and when Core Lint is
 not being used, the full structure of the coercion is not needed.  We merely
 need the result type (to support exprType) and the set of coercion variables
-(to avoid floating a coercion out of the scope in which it is valid).
-TODO: reference another note about this.
+(to avoid floating a coercion out of the scope in which it is valid, see
+Note [The importance of tracking UnivCo dependencies]).
 
 Zapped casts are introduced in exactly one place: finish_rewrite in
 GHC.Tc.Solver.Solve. This uses a heuristic (isSmallCo) to determine whether
@@ -870,10 +871,21 @@ which is much smaller than:
 
 This arises in practice with the Rep type family from GHC Generics.
 
+We can convert a ZCoercion back into a normal Coercion using castCoToCo to
+produce a UnivCo; such coercions can be identified for debugging with the
+ZCoercionProv provenance. This is sometimes necessary in the optimizer, when a
+Cast needs to be moved elsewhere.  Since a UnivCo must store both the left and
+right hand side types, it is less compact than a ZCoercion, so it is best to
+avoid castCoToCo where possible.
+
 The `-fzap-casts` and `-fno-zap-casts` flags can be used to enable or disable
 cast zapping, for comparative performance testing or to ensure casts are not
-zapped when debugging the compiler.  In addition, using `-dcore-lint` will
-automatically imply `-fno-zap-casts`.
+zapped when debugging the compiler.
+
+Zapping reduces the effectiveness of Core Lint, because it cannot check that
+the original coercion was well-typed.  Thus `-dcore-lint` will automatically
+imply `-fno-zap-casts` for the same module.  However, imported modules may still
+include zapped casts.
 TODO: probably the boot libraries ought to be distributed with `-fno-zap-casts`,
 so users can get full checks from `-dcore-lint`.
 
