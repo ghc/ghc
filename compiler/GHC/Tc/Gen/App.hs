@@ -457,7 +457,7 @@ quickLookResultType :: TcRhoType -> ExpRhoType -> TcM ()
 quickLookResultType app_res_rho (Check exp_rho) = qlUnify app_res_rho exp_rho
 quickLookResultType  _           _              = return ()
 
-finishApp :: (HsExpr GhcTc, AppCtxt) -> [HsExprArg 'TcpTc]
+finishApp :: (HsExpr GhcTc, SrcSpan) -> [HsExprArg 'TcpTc]
           -> TcRhoType -> HsWrapper
           -> TcM (HsExpr GhcTc)
 -- Do final checks and wrap up the result
@@ -472,7 +472,7 @@ finishApp tc_head@(tc_fun,_) tc_args app_res_rho res_wrap
        ; return (mkHsWrap res_wrap res_expr) }
 
 checkResultTy :: HsExpr GhcRn
-              -> (HsExpr GhcTc, AppCtxt)  -- Head
+              -> (HsExpr GhcTc, SrcSpan)  -- Head
               -> [HsExprArg p]            -- Arguments, just error messages
               -> TcRhoType  -- Inferred type of the application; zonked to
                             --   expose foralls, but maybe not deeply instantiated
@@ -521,7 +521,7 @@ checkResultTy rn_expr (tc_fun, fun_ctxt) inst_args app_res_rho (Check res_ty)
     -- the source program; it was added by the renamer.  See
     -- Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr
     perhaps_add_res_ty_ctxt thing_inside
-      | insideExpansion fun_ctxt
+      | isGeneratedSrcSpan fun_ctxt
       = thing_inside
       | otherwise
       = addFunResCtxt tc_fun inst_args app_res_rho (mkCheckExpType res_ty) $
@@ -675,7 +675,7 @@ tcInstFun :: QLFlag
                     -- Otherwise we do eager instantiation; in Fig 5 of the paper
                     --    |-inst returns a rho-type
           -> CtOrigin
-          -> (HsExpr GhcTc, HsExpr GhcRn, AppCtxt)
+          -> (HsExpr GhcTc, HsExpr GhcRn, SrcSpan)
           -> TcSigmaType -> [HsExprArg 'TcpRn]
           -> TcM ( [HsExprArg 'TcpInst]
                  , TcSigmaType )
@@ -1707,7 +1707,7 @@ This turned out to be more subtle than I expected.  Wrinkles:
 
 -}
 
-quickLookArg :: QLFlag -> Int -> AppCtxt -> HsExpr GhcRn
+quickLookArg :: QLFlag -> Int -> SrcSpan -> HsExpr GhcRn
              -> LHsExpr GhcRn          -- ^ Argument
              -> Scaled TcSigmaTypeFRR  -- ^ Type expected by the function
              -> TcM (HsExprArg 'TcpInst)
@@ -1721,7 +1721,7 @@ quickLookArg DoQL pos ctxt fun larg orig_arg_ty
          then skipQuickLook ctxt larg orig_arg_ty
          else quickLookArg1 pos ctxt fun larg orig_arg_ty }
 
-skipQuickLook :: AppCtxt -> LHsExpr GhcRn -> Scaled TcRhoType
+skipQuickLook :: SrcSpan -> LHsExpr GhcRn -> Scaled TcRhoType
               -> TcM (HsExprArg 'TcpInst)
 skipQuickLook ctxt larg arg_ty
   = return (EValArg { ea_ctxt   = ctxt
@@ -1762,7 +1762,7 @@ isGuardedTy ty
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | otherwise                               = False
 
-quickLookArg1 :: Int -> AppCtxt -> HsExpr GhcRn -> LHsExpr GhcRn
+quickLookArg1 :: Int -> SrcSpan -> HsExpr GhcRn -> LHsExpr GhcRn
               -> Scaled TcRhoType  -- Deeply skolemised
               -> TcM (HsExprArg 'TcpInst)
 -- quickLookArg1 implements the "QL Argument" judgement in Fig 5 of the paper
@@ -2205,7 +2205,7 @@ isTagToEnum :: HsExpr GhcTc -> Bool
 isTagToEnum (HsVar _ (L _ fun_id)) = fun_id `hasKey` tagToEnumKey
 isTagToEnum _ = False
 
-tcTagToEnum :: (HsExpr GhcTc, AppCtxt) -> [HsExprArg 'TcpTc]
+tcTagToEnum :: (HsExpr GhcTc, SrcSpan) -> [HsExprArg 'TcpTc]
             -> TcRhoType
             -> TcM (HsExpr GhcTc)
 -- tagToEnum# :: forall a. Int# -> a
@@ -2332,7 +2332,7 @@ Wrinkle [Representation-polymorphic lambdas] in Note [Typechecking data construc
 -- if the representation of its argument isn't known.
 --
 -- See Note [Eta-expanding rep-poly unlifted newtypes].
-rejectRepPolyNewtypes :: (HsExpr GhcTc, AppCtxt)
+rejectRepPolyNewtypes :: (HsExpr GhcTc, SrcSpan)
                       -> TcRhoType
                       -> TcM ()
 rejectRepPolyNewtypes (fun,_) app_res_rho = case fun of
