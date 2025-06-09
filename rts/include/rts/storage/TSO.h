@@ -157,9 +157,10 @@ typedef struct StgTSO_ {
     /*
      * The allocation limit for this thread, which is updated as the
      * thread allocates.  If the value drops below zero, and
-     * TSO_ALLOC_LIMIT is set in flags, we raise an exception in the
-     * thread, and give the thread a little more space to handle the
-     * exception before we raise the exception again.
+     * TSO_ALLOC_LIMIT is set in flags, then a handler is triggerd.
+     * Either we raise an exception in the thread, and give the thread
+     * a little more space to handle the exception before we raise the
+     * exception again; or we run a user defined handler.
      *
      * This is an integer, because we might update it in a place where
      * it isn't convenient to raise the exception, so we want it to

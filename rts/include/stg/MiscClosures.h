@@ -604,7 +604,9 @@ RTS_FUN_DECL(stg_traceEventzh);
 RTS_FUN_DECL(stg_traceBinaryEventzh);
 RTS_FUN_DECL(stg_traceMarkerzh);
 RTS_FUN_DECL(stg_getThreadAllocationCounterzh);
+RTS_FUN_DECL(stg_getOtherThreadAllocationCounterzh);
 RTS_FUN_DECL(stg_setThreadAllocationCounterzh);
+RTS_FUN_DECL(stg_setOtherThreadAllocationCounterzh);
 
 RTS_FUN_DECL(stg_castWord64ToDoublezh);
 RTS_FUN_DECL(stg_castDoubleToWord64zh);

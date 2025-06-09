@@ -1,0 +1,140 @@
+default behaviour
+worker starting
+2
+3
+worker died
+T22859: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.SomeAsyncException:
+
+allocation limit exceeded
+just log once on the hook being triggered
+worker starting
+2
+3
+allocation limit triggered 1
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+29
+worker done
+just log on the hook being triggered
+worker starting
+2
+3
+allocation limit triggered 2
+4
+5
+allocation limit triggered 2
+6
+7
+allocation limit triggered 2
+8
+9
+allocation limit triggered 2
+10
+11
+allocation limit triggered 2
+12
+13
+allocation limit triggered 2
+14
+15
+allocation limit triggered 2
+16
+17
+allocation limit triggered 2
+18
+19
+allocation limit triggered 2
+20
+21
+allocation limit triggered 2
+22
+23
+allocation limit triggered 2
+24
+25
+allocation limit triggered 2
+26
+27
+allocation limit triggered 2
+28
+29
+allocation limit triggered 2
+30
+29
+worker done
+kill from the hook
+worker starting
+2
+3
+worker died
+T22859: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.SomeAsyncException:
+
+allocation limit exceeded
+do nothing
+worker starting
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+29
+worker done
+kill and log
+worker starting
+2
+3
+allocation limit triggered 3
+worker died
+T22859: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.SomeAsyncException:
+
+allocation limit exceeded
+done

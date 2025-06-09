@@ -5876,6 +5876,7 @@ module GHC.PrimOps where
   seq# :: forall a s. a -> State# s -> (# State# s, a #)
   setAddrRange# :: Addr# -> Int# -> Int# -> State# RealWorld -> State# RealWorld
   setByteArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> State# d
+  setOtherThreadAllocationCounter# :: Int64# -> ThreadId# -> State# RealWorld -> State# RealWorld
   setThreadAllocationCounter# :: Int64# -> State# RealWorld -> State# RealWorld
   shiftL# :: Word# -> Int# -> Word#
   shiftRL# :: Word# -> Int# -> Word#
@@ -10918,6 +10919,16 @@ module Prelude.Experimental where
   type Unit# :: GHC.Internal.Types.ZeroBitType
   data Unit# = ...
   getSolo :: forall a. Solo a -> a
+
+module System.Mem.Experimental where
+  -- Safety: None
+  type AllocationLimitKillBehaviour :: *
+  data AllocationLimitKillBehaviour = KillOnAllocationLimit | DontKillOnAllocationLimit
+  disableAllocationLimitFor :: GHC.Internal.Conc.Sync.ThreadId -> GHC.Internal.Types.IO ()
+  enableAllocationLimitFor :: GHC.Internal.Conc.Sync.ThreadId -> GHC.Internal.Types.IO ()
+  getAllocationCounterFor :: GHC.Internal.Conc.Sync.ThreadId -> GHC.Internal.Types.IO GHC.Internal.Int.Int64
+  setAllocationCounterFor :: GHC.Internal.Int.Int64 -> GHC.Internal.Conc.Sync.ThreadId -> GHC.Internal.Types.IO ()
+  setGlobalAllocationLimitHandler :: AllocationLimitKillBehaviour -> GHC.Internal.Maybe.Maybe (GHC.Internal.Conc.Sync.ThreadId -> GHC.Internal.Types.IO ()) -> GHC.Internal.Types.IO ()
 
 
 -- Instances:

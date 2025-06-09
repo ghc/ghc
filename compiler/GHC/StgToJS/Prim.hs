@@ -1173,6 +1173,7 @@ genPrim prof bound ty op = case op of
   WhereFromOp                       -> unhandledPrimop op -- should be easily implementable with o.f.n
 
   SetThreadAllocationCounter        -> unhandledPrimop op
+  SetOtherThreadAllocationCounter   -> unhandledPrimop op
 
 ------------------------------- Vector -----------------------------------------
 -- For now, vectors are unsupported on the JS backend. Simply put, they do not

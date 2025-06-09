@@ -4065,6 +4065,15 @@ primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
    effect = ReadWriteEffect
    out_of_line      = True
 
+primop  SetOtherThreadAllocationCounter "setOtherThreadAllocationCounter#" GenPrimOp
+   Int64# -> ThreadId# -> State# RealWorld -> State# RealWorld
+   { Sets the allocation counter for the another thread to the given value.
+     This doesn't take allocations into the current nursery chunk into account.
+     Therefore it is only accurate if the other thread is not currently running. }
+   with
+   effect = ReadWriteEffect
+   out_of_line      = True
+
 primtype StackSnapshot#
    { Haskell representation of a @StgStack*@ that was created (cloned)
      with a function in "GHC.Stack.CloneStack". Please check the
