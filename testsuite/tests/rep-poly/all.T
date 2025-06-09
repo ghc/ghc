@@ -41,6 +41,7 @@ test('T23883a', normal, compile_fail, [''])
 test('T23883b', normal, compile_fail, [''])
 test('T23883c', normal, compile_fail, [''])
 test('T23903', normal, compile_fail, [''])
+test('T26107', js_broken(22364), compile, ['-O'])
 
 test('EtaExpandDataCon', normal, compile, ['-O'])
 test('EtaExpandStupid1', normal, compile, ['-Wno-deprecated-flags'])

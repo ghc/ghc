@@ -39,8 +39,8 @@ type InferStgAlt        = GenStgAlt        'InferTaggedBinders
 combineAltInfo :: TagInfo -> TagInfo -> TagInfo
 combineAltInfo TagDunno         _              = TagDunno
 combineAltInfo _                TagDunno       = TagDunno
-combineAltInfo (TagTuple {})    TagProper      = panic "Combining unboxed tuple with non-tuple result"
-combineAltInfo TagProper       (TagTuple {})   = panic "Combining unboxed tuple with non-tuple result"
+combineAltInfo (TagTuple {})    TagProper      = TagDunno  -- This can happen with rep-polymorphic result, see #26107
+combineAltInfo TagProper       (TagTuple {})   = TagDunno  -- This can happen with rep-polymorphic result, see #26107
 combineAltInfo TagProper        TagProper      = TagProper
 combineAltInfo (TagTuple is1)  (TagTuple is2)  = TagTuple (zipWithEqual combineAltInfo is1 is2)
 combineAltInfo (TagTagged)      ti             = ti
