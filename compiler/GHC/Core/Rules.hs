@@ -1108,15 +1108,13 @@ match renv subst (Coercion co1) (Coercion co2) MRefl
 --     Note [Casts in the target]
 --     Note [Cancel reflexive casts]
 
-match renv subst e1 (Cast e2 (CCoercion co2)) mco
-  = match renv subst e1 e2 (checkReflexiveMCo (mkTransMCoR co2 mco))
+match renv subst e1 (Cast e2 co2) mco
+  = match renv subst e1 e2 (checkReflexiveMCo (mkTransMCoR (castCoToCo (exprType e2) co2) mco))
     -- checkReflexiveMCo: cancel casts if possible
     -- This is important: see Note [Cancel reflexive casts]
 
-match renv subst (Cast e1 (CCoercion co1)) e2 mco
-  = matchTemplateCast renv subst e1 co1 e2 mco
-
--- TODO: rule matching for ZCoercion
+match renv subst (Cast e1 co1) e2 mco
+  = matchTemplateCast renv subst e1 (castCoToCo (exprType e1) co1) e2 mco
 
 ------------------------ Literals ---------------------
 match _ subst (Lit lit1) (Lit lit2) mco
