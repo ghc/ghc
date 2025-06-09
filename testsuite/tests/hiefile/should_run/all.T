@@ -9,3 +9,4 @@ test('T23540', [extra_run_opts('"' + config.libdir + '"'), extra_files(['TestUti
 test('T23120', [extra_run_opts('"' + config.libdir + '"'), extra_files(['TestUtils.hs'])], compile_and_run, ['-package ghc -fwrite-ide-info'])
 test('T24544', [extra_run_opts('"' + config.libdir + '"'), extra_files(['TestUtils.hs'])], compile_and_run, ['-package ghc -fwrite-ide-info'])
 test('HieGadtConSigs', [extra_run_opts('"' + config.libdir + '"'), extra_files(['TestUtils.hs'])], compile_and_run, ['-package ghc -fwrite-ide-info'])
+test('T25709', [extra_run_opts('"' + config.libdir + '"'), extra_files(['TestUtils.hs'])], compile_and_run, ['-package ghc -fwrite-ide-info'])
