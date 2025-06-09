@@ -1223,14 +1223,16 @@ Other
     :type: dynamic
 
     :since: TODO
+    :default: enabled
 
     Reduce the size of Core terms by discarding coercion proofs that are needed
     only for debugging the compiler.  This usually helps improve compile-time
     performance for some programs that make heavy use of type families.
 
-    When this flag is enabled, Core Lint will be less effective at verifying the
-    correctness of Core programs involving casts. Hence this is automatically
-    switched off by :ghc-flag:`-dcore-lint`.
+    This is enabled by default. When it is enabled, Core Lint will be less
+    effective at verifying the correctness of Core programs involving casts.
+    Hence it is automatically switched off by :ghc-flag:`-dcore-lint`, or you
+    can disable it using ``-fno-zap-casts``.
 
 .. ghc-flag:: -dno-typeable-binds
     :shortdesc: Don't generate bindings for Typeable methods
