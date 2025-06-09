@@ -30,7 +30,7 @@ module GHC.Tc.Types(
 
         -- The environment types
         Env(..),
-        TcGblEnv(..), TcLclEnv(..), modifyLclCtxt, TcLclCtxt(..),
+        TcGblEnv(..), seqTcGblEnv, TcLclEnv(..), modifyLclCtxt, TcLclCtxt(..),
         setLclEnvTcLevel, getLclEnvTcLevel,
         setLclEnvLoc, getLclEnvLoc, lclEnvInGeneratedCode,
         IfGblEnv(..), IfLclEnv(..),
@@ -171,10 +171,11 @@ import GHC.Unit.Module.Deps
 import GHC.Unit.Module.ModDetails
 
 import GHC.Utils.Error
-import GHC.Utils.Outputable
 import GHC.Utils.Fingerprint
-import GHC.Utils.Panic
 import GHC.Utils.Logger
+import GHC.Utils.Misc ( seqList )
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import GHC.Builtin.Names ( isUnboundName )
 
@@ -696,6 +697,19 @@ data TcGblEnv
         tcg_next_wrapper_num :: TcRef (ModuleEnv Int)
         -- ^ See Note [Generating fresh names for FFI wrappers]
     }
+
+-- | Force the final result bits of a 'TcGblEnv'. This is used
+-- to
+seqTcGblEnv :: TcGblEnv -> ()
+seqTcGblEnv env =
+    tcg_type_env env `seq`
+    tcg_ann_env env `seq`
+    maybe () (`seqList` ()) (tcg_rn_exports env) `seq`
+    seqList (tcg_import_decls env) `seq`
+    seqList (tcg_merged env) `seq`
+    maybe () (`seq` ()) (tcg_rn_decls env) `seq`
+    tcg_dus env `seq`
+    ()
 
 -- NB: topModIdentity, not topModSemantic!
 -- Definition sites of orphan identities will be identity modules, not semantic
