@@ -1,0 +1,110 @@
+==========================
+At point (22,26), we found:
+==========================
+┌
+│ $dTypeable at T25709.hs:22:14-19, of type: Typeable a
+│     is an evidence variable bound by a let, depending on: [$dTypeable]
+│           with scope: LocalScope T25709.hs:22:14-29
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ $dTypeable at T25709.hs:22:1-29, of type: Typeable a
+   │     is an evidence variable bound by a HsWrapper
+   │           with scope: LocalScope T25709.hs:22:1-29
+   │           bound at: T25709.hs:22:1-29
+   │     Defined at <no location info>
+   └
+
+┌
+│ $dTypeable at T25709.hs:22:14-19, of type: Typeable a
+│     is an evidence variable bound by a let, depending on: [df, irred]
+│           with scope: LocalScope T25709.hs:22:14-29
+│           
+│     Defined at <no location info>
+└
+|
++- ┌
+|  │ df at T25709.hs:22:1-29, of type: forall x. c x => Typeable x
+|  │     is an evidence variable bound by a HsWrapper
+|  │           with scope: LocalScope T25709.hs:22:1-29
+|  │           bound at: T25709.hs:22:1-29
+|  │     Defined at <no location info>
+|  └
+|
+`- ┌
+   │ irred at T25709.hs:22:14-19, of type: c a
+   │     is an evidence variable bound by a let, depending on: [irred]
+   │           with scope: LocalScope T25709.hs:22:14-29
+   │           
+   │     Defined at <no location info>
+   └
+   |
+   `- ┌
+      │ irred at T25709.hs:22:14-19, of type: c a
+      │     is an evidence variable bound by a pattern
+      │           with scope: LocalScope T25709.hs:22:14-29
+      │           
+      │     Defined at <no location info>
+      └
+
+==========================
+At point (29,5), we found:
+==========================
+┌
+│ df at T25709.hs:1:1, of type: forall x. Ord x => Eq [x]
+│     is an evidence variable bound by a let, depending on: [$p1Ord,
+│                                                            $fEqList]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
++- ┌
+|  │ $p1Ord at T25709.hs:1:1, of type: forall a. Ord a => Eq a
+|  │     is a usage of an external evidence variable
+|  │     Defined in `GHC.Internal.Classes'
+|  └
+|
+`- ┌
+   │ $fEqList at T25709.hs:1:1, of type: forall a. Eq a => Eq [a]
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Classes'
+   └
+
+==========================
+At point (32,13), we found:
+==========================
+┌
+│ $dShow at T25709.hs:32:1-16, of type: Show a
+│     is an evidence variable bound by a let, depending on: [df, irred]
+│           with scope: LocalScope T25709.hs:32:1-16
+│           bound at: T25709.hs:32:1-16
+│     Defined at <no location info>
+└
+|
++- ┌
+|  │ df at T25709.hs:32:1-16, of type: forall x. c x => Show x
+|  │     is an evidence variable bound by a HsWrapper
+|  │           with scope: LocalScope T25709.hs:32:1-16
+|  │           bound at: T25709.hs:32:1-16
+|  │     Defined at <no location info>
+|  └
+|
+`- ┌
+   │ irred at T25709.hs:32:1-16, of type: c a
+   │     is an evidence variable bound by a let, depending on: [irred]
+   │           with scope: LocalScope T25709.hs:32:1-16
+   │           bound at: T25709.hs:32:1-16
+   │     Defined at <no location info>
+   └
+   |
+   `- ┌
+      │ irred at T25709.hs:32:1-16, of type: c a
+      │     is an evidence variable bound by a HsWrapper
+      │           with scope: LocalScope T25709.hs:32:1-16
+      │           bound at: T25709.hs:32:1-16
+      │     Defined at <no location info>
+      └
+
