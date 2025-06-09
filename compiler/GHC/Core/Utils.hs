@@ -303,7 +303,7 @@ mkCastZ expr ty cos =
     case expr of
       Cast expr co -> mkCastZ expr ty (shallowCoVarsOfCastCo co `unionVarSet` cos)
       Tick t expr -> Tick t (mkCastZ expr ty cos)
-      -- TODO: do we need other cases from mkCast?
+      Coercion e_co | isCoVarType ty -> Coercion (mkCoCastCo e_co (ZCoercion ty cos))
       _ -> Cast expr (ZCoercion ty cos)
 
 
