@@ -5327,8 +5327,8 @@ pprArising :: CtLoc -> SDoc
 -- Used for the main, top-level error message
 -- We've done special processing for TypeEq, KindEq, givens
 pprArising ct_loc
-  | in_generated_code = pprCtOrigin orig -- TODO ANI: maybe should go way
   | suppress_origin   = empty
+  | in_generated_code = pprCtOrigin orig -- TODO ANI: maybe should go way
   | otherwise         = pprCtOrigin orig
   where
     orig = ctLocOrigin ct_loc
