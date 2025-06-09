@@ -38,6 +38,7 @@ library
       GHC.RTS.Flags.Experimental
       GHC.Stats.Experimental
       Prelude.Experimental
+      System.Mem.Experimental
     if arch(wasm32)
         exposed-modules:  GHC.Wasm.Prim
     other-extensions:

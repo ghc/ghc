@@ -209,6 +209,10 @@ void flushExec(W_ len, AdjustorExecutable exec_addr);
 // Used by GC checks in external .cmm code:
 extern W_ large_alloc_lim;
 
+// Should triggering an allocation limit kill the thread
+// and should we run a user-defined hook when it is triggered.
+void setAllocLimitKill(bool, bool);
+
 /* -----------------------------------------------------------------------------
    Performing Garbage Collection
    -------------------------------------------------------------------------- */

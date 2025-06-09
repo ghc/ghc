@@ -2889,6 +2889,11 @@ stg_getThreadAllocationCounterzh ()
     return (StgTSO_alloc_limit(CurrentTSO) - TO_I64(offset));
 }
 
+stg_getOtherThreadAllocationCounterzh ( gcptr t )
+{
+    return (StgTSO_alloc_limit(t));
+}
+
 stg_setThreadAllocationCounterzh ( I64 counter )
 {
     // Allocation in the current block will be subtracted by
@@ -2898,6 +2903,12 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     W_ offset;
     offset = Hp - bdescr_start(CurrentNursery);
     StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
+    return ();
+}
+
+stg_setOtherThreadAllocationCounterzh ( I64 counter, gcptr t )
+{
+    StgTSO_alloc_limit(t) = counter;
     return ();
 }
 

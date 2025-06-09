@@ -4610,6 +4610,7 @@ module GHC.Base where
   sequence :: forall (m :: * -> *) a. Monad m => [m a] -> m [a]
   setAddrRange# :: Addr# -> Int# -> Int# -> State# RealWorld -> State# RealWorld
   setByteArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> State# d
+  setOtherThreadAllocationCounter# :: Int64# -> ThreadId# -> State# RealWorld -> State# RealWorld
   setThreadAllocationCounter# :: Int64# -> State# RealWorld -> State# RealWorld
   shiftL# :: Word# -> Int# -> Word#
   shiftRL# :: Word# -> Int# -> Word#
@@ -6836,6 +6837,7 @@ module GHC.Exts where
   seq# :: forall a s. a -> State# s -> (# State# s, a #)
   setAddrRange# :: Addr# -> Int# -> Int# -> State# RealWorld -> State# RealWorld
   setByteArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> State# d
+  setOtherThreadAllocationCounter# :: Int64# -> ThreadId# -> State# RealWorld -> State# RealWorld
   setThreadAllocationCounter# :: Int64# -> State# RealWorld -> State# RealWorld
   shiftL# :: Word# -> Int# -> Word#
   shiftRL# :: Word# -> Int# -> Word#

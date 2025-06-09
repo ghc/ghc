@@ -1775,6 +1775,7 @@ emitPrimOp cfg primop =
   TraceEventBinaryOp -> alwaysExternal
   TraceMarkerOp -> alwaysExternal
   SetThreadAllocationCounter -> alwaysExternal
+  SetOtherThreadAllocationCounter -> alwaysExternal
   KeepAliveOp -> alwaysExternal
 
  where
