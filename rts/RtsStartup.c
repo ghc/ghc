@@ -224,6 +224,7 @@ static void initBuiltinGcRoots(void)
      * GHC.Core.Make.mkExceptionId.
      */
     getStablePtr((StgPtr)absentSumFieldError_closure);
+    getStablePtr((StgPtr)runAllocationLimitHandler_closure);
 }
 
 void

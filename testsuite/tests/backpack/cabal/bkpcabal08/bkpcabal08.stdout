@@ -13,13 +13,13 @@ Building library 'q' instantiated with
 for bkpcabal08-0.1.0.0...
 [2 of 4] Compiling B[sig]           ( q/B.hsig, nothing )
 [3 of 4] Compiling M                ( q/M.hs, nothing ) [A changed]
-[4 of 4] Instantiating bkpcabal08-0.1.0.0-CoQJNXLfoYQ4TyvApzFHv-p
+[4 of 4] Instantiating bkpcabal08-0.1.0.0-LjROTJ30vjpHLvYNUnY1dD-p
 Preprocessing library 'q' for bkpcabal08-0.1.0.0...
 Building library 'q' instantiated with
-  A = bkpcabal08-0.1.0.0-5HJrxUERN7CD204UZeT4Ws-impl:A
-  B = bkpcabal08-0.1.0.0-5HJrxUERN7CD204UZeT4Ws-impl:B
+  A = bkpcabal08-0.1.0.0-KxkxGUgMJM6Dqo87AQu6V5-impl:A
+  B = bkpcabal08-0.1.0.0-KxkxGUgMJM6Dqo87AQu6V5-impl:B
 for bkpcabal08-0.1.0.0...
-[1 of 3] Compiling A[sig]           ( q/A.hsig, dist/build/bkpcabal08-0.1.0.0-1DQJ9DKc4h59P07qcb0kBc-q+J5mAfRWG9IgLmFQVftCb8t/A.o ) [Prelude package changed]
-[2 of 3] Compiling B[sig]           ( q/B.hsig, dist/build/bkpcabal08-0.1.0.0-1DQJ9DKc4h59P07qcb0kBc-q+J5mAfRWG9IgLmFQVftCb8t/B.o ) [Prelude package changed]
+[1 of 3] Compiling A[sig]           ( q/A.hsig, dist/build/bkpcabal08-0.1.0.0-9Cd344YIpXKFRnHN0O8bjR-q+BXOBBkqkS8ELakzWUKHCOx/A.o ) [Prelude package changed]
+[2 of 3] Compiling B[sig]           ( q/B.hsig, dist/build/bkpcabal08-0.1.0.0-9Cd344YIpXKFRnHN0O8bjR-q+BXOBBkqkS8ELakzWUKHCOx/B.o ) [Prelude package changed]
 Preprocessing library 'r' for bkpcabal08-0.1.0.0...
 Building library 'r' for bkpcabal08-0.1.0.0...

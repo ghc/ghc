@@ -2505,6 +2505,7 @@ module GHC.Prim where
   seq :: forall {r :: GHC.Internal.Types.RuntimeRep} a (b :: TYPE r). a -> b -> b
   setAddrRange# :: Addr# -> Int# -> Int# -> State# RealWorld -> State# RealWorld
   setByteArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> Int# -> State# d -> State# d
+  setOtherThreadAllocationCounter# :: Int64# -> ThreadId# -> State# RealWorld -> State# RealWorld
   setThreadAllocationCounter# :: Int64# -> State# RealWorld -> State# RealWorld
   shrinkMutableByteArray# :: forall d. MutableByteArray# d -> Int# -> State# d -> State# d
   shrinkSmallMutableArray# :: forall {l :: GHC.Internal.Types.Levity} d (a :: TYPE (GHC.Internal.Types.BoxedRep l)). SmallMutableArray# d a -> Int# -> State# d -> State# d
@@ -3489,6 +3490,7 @@ module GHC.PrimopWrappers where
   retry# :: forall a_levpoly. GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, a_levpoly #)
   setAddrRange# :: GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   setByteArray# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
+  setOtherThreadAllocationCounter# :: GHC.Internal.Prim.Int64# -> GHC.Internal.Prim.ThreadId# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   setThreadAllocationCounter# :: GHC.Internal.Prim.Int64# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   shrinkMutableByteArray# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
   shrinkSmallMutableArray# :: forall s a_levpoly. GHC.Internal.Prim.SmallMutableArray# s a_levpoly -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s

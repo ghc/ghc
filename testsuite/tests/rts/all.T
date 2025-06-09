@@ -643,3 +643,8 @@ test('T25280', [unless(opsys('linux'),skip),req_process,js_skip], compile_and_ru
 test('T25560', [req_c_rts, ignore_stderr], compile_and_run, [''])
 
 test('TestProddableBlockSet', [req_c_rts], multimod_compile_and_run, ['TestProddableBlockSet.c', '-no-hs-main'])
+test('T22859', 
+     [js_skip,
+      # Allocation behaviour differs with the wasm backend so we get different output
+      when(arch('wasm32'), skip)],
+     compile_and_run, ['-with-rtsopts -A8K'])

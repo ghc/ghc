@@ -748,6 +748,7 @@ extern char **environ;
       SymI_HasProto(rts_enableThreadAllocationLimit)                    \
       SymI_HasProto(rts_disableThreadAllocationLimit)                   \
       SymI_HasProto(rts_setMainThread)                                  \
+      SymI_HasProto(setAllocLimitKill)                                  \
       SymI_HasProto(setProgArgv)                                        \
       SymI_HasProto(startupHaskell)                                     \
       SymI_HasProto(shutdownHaskell)                                    \
@@ -922,7 +923,9 @@ extern char **environ;
       SymI_HasDataProto(stg_traceMarkerzh)                                  \
       SymI_HasDataProto(stg_traceBinaryEventzh)                             \
       SymI_HasDataProto(stg_getThreadAllocationCounterzh)                   \
+      SymI_HasDataProto(stg_getOtherThreadAllocationCounterzh)              \
       SymI_HasDataProto(stg_setThreadAllocationCounterzh)                   \
+      SymI_HasDataProto(stg_setOtherThreadAllocationCounterzh)              \
       SymI_HasProto(getMonotonicNSec)                                   \
       SymI_HasProto(lockFile)                                           \
       SymI_HasProto(unlockFile)                                         \
