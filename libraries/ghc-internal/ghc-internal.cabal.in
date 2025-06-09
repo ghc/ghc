@@ -122,6 +122,7 @@ Library
         rts == 1.0.*
 
     exposed-modules:
+        GHC.Internal.AllocationLimitHandler
         GHC.Internal.ClosureTypes
         GHC.Internal.Control.Arrow
         GHC.Internal.Control.Category
