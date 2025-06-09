@@ -172,10 +172,12 @@ noParens pp = pp
 
 pprOptCastCoercion :: CastCoercion -> SDoc
 pprOptCastCoercion (CCoercion co) = pprOptCo co
-pprOptCastCoercion (ZCoercion ty cos) = -- TODO review ppr format
-    sdocOption sdocSuppressCoercions $ \case
+pprOptCastCoercion (ZCoercion ty cos) = pprOptZappedCo ty cos
+
+pprOptZappedCo :: Type -> CoVarSet -> SDoc
+pprOptZappedCo ty cos = sdocOption sdocSuppressCoercions $ \case
               True  -> angleBrackets (text "ZapCo:" <> int (sizeVarSet cos)) <+> dcolon <+> co_type
-              False -> parens $ sep [text "Zap", ppr cos, dcolon <+> co_type]
+              False -> parens $ sep [text "ZapCo", ppr cos, dcolon <+> co_type]
     where
       co_type = sdocOption sdocSuppressCoercionTypes $ \case
           True -> int (typeSize ty) <+> text "..."
