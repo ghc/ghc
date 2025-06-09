@@ -408,6 +408,7 @@ tcApp fun_orig rn_expr exp_res_ty
            vcat [ text "rn_expr:" <+> ppr rn_expr
                 , text "rn_fun:" <+> ppr rn_fun
                 , text "fun_ctxt:" <+> ppr fun_ctxt
+                , text "orig:" <+> ppr fun_orig
                 , text "rn_args:" <+> ppr rn_args ]
 
        -- Step 2: Infer the type of `fun`, the head of the application
@@ -769,7 +770,7 @@ tcInstFun do_ql inst_final fun_orig (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
       = do { (_inst_tvs, wrap, fun_rho) <-
                 -- addHeadCtxt: important for the class constraints
                 -- that may be emitted from instantiating fun_sigma
-                addHeadCtxt fun_ctxt $
+                setSrcSpan fun_ctxt $
                 instantiateSigma fun_orig fun_conc_tvs tvs theta body2
                   -- See Note [Representation-polymorphism checking built-ins]
                   -- in GHC.Tc.Utils.Concrete.
