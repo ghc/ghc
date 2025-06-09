@@ -3435,8 +3435,8 @@ scrutOkForBinderSwap :: OutExpr -> BinderSwapDecision
 -- We use this same function in SpecConstr, and Simplify.Iteration,
 -- when something binder-swap-like is happening
 scrutOkForBinderSwap (Var v)    = DoBinderSwap v MRefl
-scrutOkForBinderSwap (Cast (Var v) (CCoercion co)) -- TODO scrutOkForBinderSwap for ZCoercion
-  | not (isDictId v)             = DoBinderSwap v (MCo (mkSymCo co))
+scrutOkForBinderSwap (Cast (Var v) co)
+  | not (isDictId v)             = DoBinderSwap v (MCo (mkSymCo (castCoToCo (idType v) co))) -- TODO: can we do better?
         -- Cast: see Note [Case of cast]
         -- isDictId: see Note [Care with binder-swap on dictionaries]
         -- The isDictId rejects a Constraint/Constraint binder-swap, perhaps
