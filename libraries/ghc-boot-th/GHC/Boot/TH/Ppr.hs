@@ -231,8 +231,9 @@ pprExp _ (ArithSeqE d) = ppr d
 pprExp _ (ListE es) = brackets (commaSep es)
 pprExp i (SigE e t) = parensIf (i > noPrec) $ pprExp sigPrec e
                                           <+> dcolon <+> pprType sigPrec t
-pprExp _ (RecConE nm fs) = pprName' Applied nm <> braces (pprFields fs)
-pprExp _ (RecUpdE e fs) = pprExp appPrec e <> braces (pprFields fs)
+pprExp _ (RecConE nm fs) = pprName' Applied nm <> braces (pprFields Nothing fs)
+pprExp _ (RecConWildE nm fs n) = pprName' Applied nm <> braces (pprFields (Just n) fs)
+pprExp _ (RecUpdE e fs) = pprExp appPrec e <> braces (pprFields Nothing fs) -- FIXME: this can also have dots in surface syntax
 pprExp i (StaticE e) = parensIf (i >= appPrec) $
                          text "static"<+> pprExp appPrec e
 pprExp _ (UnboundVarE v) = pprName' Applied v
@@ -250,8 +251,16 @@ pprExp i (ForallE tvars body) =
 pprExp i (ConstrainedE ctx body) =
   parensIf (i >= funPrec) $ sep [pprCtxWith pprExp ctx, pprExp qualPrec body]
 
-pprFields :: [(Name,Exp)] -> Doc
-pprFields = sep . punctuate comma . map (\(s,e) -> pprName' Applied s <+> equals <+> ppr e)
+-- See Note [DotDot fields] in Language.Haskell.Syntax.Pat.
+pprFields :: Maybe Int -> [(Name,Exp)] -> Doc
+pprFields dotdot fs =
+  sep
+  . punctuate comma
+  . (case dotdot of
+        Nothing -> id
+        Just n -> (`mappend` [text ".."]) . take n)
+  . map (\(s,e) -> pprName' Applied s <+> equals <+> ppr e)
+  $ fs
 
 pprMaybeExp :: Precedence -> Maybe Exp -> Doc
 pprMaybeExp _ Nothing = empty

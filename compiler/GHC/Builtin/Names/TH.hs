@@ -60,7 +60,7 @@ templateHaskellNames = [
     lamCasesEName, tupEName, unboxedTupEName, unboxedSumEName,
     condEName, multiIfEName, letEName, caseEName, doEName, mdoEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
-    listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
+    listEName, sigEName, recConEName, recConWildEName, recUpdEName, staticEName, unboundVarEName,
     labelEName, implicitParamVarEName, getFieldEName, projectionEName,
     typeEName, forallEName, forallVisEName, constrainedEName,
     -- FieldExp
@@ -347,10 +347,11 @@ fromThenEName         = libFun (fsLit "fromThenE")         fromThenEIdKey
 fromToEName           = libFun (fsLit "fromToE")           fromToEIdKey
 fromThenToEName       = libFun (fsLit "fromThenToE")       fromThenToEIdKey
 -- end ArithSeq
-listEName, sigEName, recConEName, recUpdEName :: Name
+listEName, sigEName, recConEName, recConWildEName, recUpdEName :: Name
 listEName             = libFun (fsLit "listE")             listEIdKey
 sigEName              = libFun (fsLit "sigE")              sigEIdKey
 recConEName           = libFun (fsLit "recConE")           recConEIdKey
+recConWildEName       = libFun (fsLit "recConWildE")       recConWildEIdKey
 recUpdEName           = libFun (fsLit "recUpdE")           recUpdEIdKey
 staticEName           = libFun (fsLit "staticE")           staticEIdKey
 unboundVarEName       = libFun (fsLit "unboundVarE")       unboundVarEIdKey
@@ -892,7 +893,7 @@ varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
     unboundVarEIdKey, labelEIdKey, implicitParamVarEIdKey, mdoEIdKey,
-    getFieldEIdKey, projectionEIdKey, typeEIdKey, forallEIdKey,
+    getFieldEIdKey, projectionEIdKey, typeEIdKey, recConWildEIdKey, forallEIdKey,
     forallVisEIdKey, constrainedEIdKey :: Unique
 varEIdKey              = mkPreludeMiscIdUnique 270
 conEIdKey              = mkPreludeMiscIdUnique 271
@@ -934,6 +935,7 @@ typeEIdKey             = mkPreludeMiscIdUnique 306
 forallEIdKey           = mkPreludeMiscIdUnique 802
 forallVisEIdKey        = mkPreludeMiscIdUnique 803
 constrainedEIdKey      = mkPreludeMiscIdUnique 804
+recConWildEIdKey       = mkPreludeMiscIdUnique 806
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique

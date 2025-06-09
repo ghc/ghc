@@ -1666,7 +1666,7 @@ repE (ExplicitSum _ alt arity e)
 repE (RecordCon { rcon_con = c, rcon_flds = flds })
  = do { x <- lookupWithUserRdrLOcc c;
         fs <- repFields flds;
-        repRecCon x fs }
+        repRecCon x fs $ fmap (\(L _ (RecFieldsDotDot n)) -> n) $ rec_dotdot flds }
 repE (RecordUpd { rupd_expr = e, rupd_flds = RegularRecUpdFields { recUpdFields = flds } })
  = do { x <- repLE e;
         fs <- repUpdFields flds;
@@ -1833,7 +1833,7 @@ repLGRHS (L _ (GRHS _ ss rhs))
        ; return (gs, guarded) }
 
 repFields :: HsRecordBinds GhcRn -> MetaM (Core [M TH.FieldExp])
-repFields (HsRecFields { rec_flds = flds })
+repFields (HsRecFields { rec_flds = flds }) -- The select on field names here caused a bug in TH after rec_dotdot was added.
   = repListM fieldExpTyConName rep_fld flds
   where
     rep_fld :: LHsRecField GhcRn (LHsExpr GhcRn)
@@ -2580,8 +2580,14 @@ repListExp (MkC es) = rep2 listEName [es]
 repSigExp :: Core (M TH.Exp) -> Core (M TH.Type) -> MetaM (Core (M TH.Exp))
 repSigExp (MkC e) (MkC t) = rep2 sigEName [e,t]
 
-repRecCon :: Core TH.Name -> Core [M TH.FieldExp]-> MetaM (Core (M TH.Exp))
-repRecCon (MkC c) (MkC fs) = rep2 recConEName [c,fs]
+repRecCon :: Core TH.Name -> Core [M TH.FieldExp] -> Maybe Int -> MetaM (Core (M TH.Exp))
+repRecCon (MkC c) (MkC fs) hasWildCard =
+  case hasWildCard of
+    { Nothing -> rep2 recConEName [c,fs]
+    ; Just n -> do
+        MkC n' <- coreIntLit n
+        rep2 recConWildEName [c,fs,n']
+    }
 
 repRecUpd :: Core (M TH.Exp) -> Core [M TH.FieldExp] -> MetaM (Core (M TH.Exp))
 repRecUpd (MkC e) (MkC fs) = rep2 recUpdEName [e,fs]

@@ -637,3 +637,4 @@ test('T25083', [extra_files(['T25083_A.hs', 'T25083_B.hs'])], multimod_compile_a
 test('T25174', normal, compile, [''])
 test('T25179', normal, compile, [''])
 test('FunNameTH', normal, compile, [''])
+test('T24537', normal, compile_and_run, ['-v0 -ddump-splices -dsuppress-uniques'])

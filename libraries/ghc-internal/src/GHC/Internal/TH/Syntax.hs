@@ -1885,6 +1885,11 @@ data Exp
   | ListE [ Exp ]                      -- ^ @{ [1,2,3] }@
   | SigE Exp Type                      -- ^ @{ e :: t }@
   | RecConE Name [FieldExp]            -- ^ @{ T { x = y, z = w } }@
+                                       -- Record constructor without a wild card.
+  | RecConWildE Name [FieldExp] Int    -- ^ @{ T { x = y, z = w, ... } }@
+                                       -- I.e. like `RecConE` but with a wild card.
+                                       -- See Note [DotDot fields] in Language.Haskell.Syntax.Pat
+                                       -- for the meaning of the Int parameter.
   | RecUpdE Exp [FieldExp]             -- ^ @{ (f x) { z = w } }@
   | StaticE Exp                        -- ^ @{ static e }@
   | UnboundVarE Name                   -- ^ @{ _x }@

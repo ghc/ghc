@@ -1,0 +1,4 @@
+LetE [ValD (VarP field0_0) (NormalB (LitE (IntegerL 3))) []] (RecConWildE Main.H [(Main.field0,VarE field0_0)] 1)
+"let field0_0 = 3\n in Main.H{Main.field0 = field0_0, ..}"
+LetE [ValD (VarP field0_2) (NormalB (LitE (IntegerL 3))) [],ValD (VarP field1_1) (NormalB (LitE (StringL "a"))) []] (RecConWildE Main.H [(Main.field0,VarE field0_2),(Main.field1,VarE field1_1)] 1)
+"let {field0_0 = 3; field1_1 = \"a\"}\n in Main.H{Main.field0 = field0_0, ..}"

@@ -378,6 +378,9 @@ sigE e t = do { e1 <- e; t1 <- t; pure (SigE e1 t1) }
 recConE :: Quote m => Name -> [m (Name,Exp)] -> m Exp
 recConE c fs = do { flds <- sequenceA fs; pure (RecConE c flds) }
 
+recConWildE :: Quote m => Name -> [m (Name,Exp)] -> Int -> m Exp
+recConWildE c fs n = do { flds <- sequenceA fs; pure (RecConWildE c flds n) }
+
 recUpdE :: Quote m => m Exp -> [m (Name,Exp)] -> m Exp
 recUpdE e fs = do { e1 <- e; flds <- sequenceA fs; pure (RecUpdE e1 flds) }
 

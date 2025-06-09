@@ -1180,9 +1180,8 @@ cvtl e = wrapLA (cvt e)
     cvt (SigE e t)       = do { e' <- cvtl e; t' <- cvtSigType t
                               ; let pe = parenthesizeHsExpr sigPrec e'
                               ; return $ ExprWithTySig noAnn pe (mkHsWildCardBndrs t') }
-    cvt (RecConE c flds) = do { c' <- cNameN c
-                              ; flds' <- mapM (cvtFld (wrapParLA mkFieldOcc)) flds
-                              ; return $ mkRdrRecordCon c' (HsRecFields noExtField flds' Nothing) noAnn }
+    cvt (RecConE c flds) = thToHsRecCon c flds Nothing
+    cvt (RecConWildE c flds n) = thToHsRecCon c flds (Just (L noAnn (RecFieldsDotDot n)))
     cvt (RecUpdE e flds) = do { e' <- cvtl e
                               ; flds'
                                   <- mapM (cvtFld (wrapParLA mkFieldOcc))
@@ -1225,6 +1224,11 @@ cvtl e = wrapLA (cvt e)
          ; let tele = setTelescopeBndrsNameSpace varName $
                       mkHsForAllVisTele noAnn tvs'
          ; return $ HsForAll noExtField tele body' }
+
+thToHsRecCon c flds maybeDotDot = do
+  { c' <- cNameN c
+  ; flds' <- mapM (cvtFld (wrapParLA mkFieldOcc)) flds
+  ; return $ mkRdrRecordCon c' (HsRecFields noExtField flds' maybeDotDot) noAnn }
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:
