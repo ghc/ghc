@@ -10916,6 +10916,16 @@ module Prelude.Experimental where
   data Unit# = ...
   getSolo :: forall a. Solo a -> a
 
+module System.Mem.Experimental where
+  -- Safety: None
+  type AllocationLimitKillBehaviour :: *
+  data AllocationLimitKillBehaviour = KillOnAllocationLimit | DontKillOnAllocationLimit
+  disableAllocationLimitFor :: GHC.Internal.Conc.Sync.ThreadId -> GHC.Types.IO ()
+  enableAllocationLimitFor :: GHC.Internal.Conc.Sync.ThreadId -> GHC.Types.IO ()
+  getAllocationCounterFor :: GHC.Internal.Conc.Sync.ThreadId -> GHC.Types.IO GHC.Internal.Int.Int64
+  setAllocationCounterFor :: GHC.Internal.Int.Int64 -> GHC.Internal.Conc.Sync.ThreadId -> GHC.Types.IO ()
+  setGlobalAllocationLimitHandler :: AllocationLimitKillBehaviour -> GHC.Internal.Maybe.Maybe (GHC.Internal.Conc.Sync.ThreadId -> GHC.Types.IO ()) -> GHC.Types.IO ()
+
 
 -- Instances:
 instance GHC.Internal.Base.Alternative GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
