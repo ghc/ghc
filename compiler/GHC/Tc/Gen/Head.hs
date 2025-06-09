@@ -16,7 +16,6 @@
 
 module GHC.Tc.Gen.Head
        ( HsExprArg(..), TcPass(..), QLFlag(..), EWrap(..)
-       , AppCtxt, appCtxtLoc, insideExpansion
        , splitHsApps, rebuildHsApps
        , addArgWrap, isHsValArg
        , leadingValArgs, isVisibleArg
@@ -162,19 +161,19 @@ data TcPass = TcpRn     -- Arguments decomposed
 data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
 
   -- Data constructor EValArg represents a value argument
-  EValArg :: { ea_ctxt   :: AppCtxt
+  EValArg :: { ea_ctxt   :: SrcSpan
              , ea_arg_ty :: !(XEVAType p)
              , ea_arg    :: LHsExpr (GhcPass (XPass p)) }
           -> HsExprArg p
 
   -- Data constructor EValArgQL represents an argument that has been
   -- partly-type-checked by Quick Look; see Note [EValArgQL]
-  EValArgQL :: { eaql_ctxt    :: AppCtxt
+  EValArgQL :: { eaql_ctxt    :: SrcSpan
                , eaql_arg_ty  :: Scaled TcSigmaType  -- Argument type expected by function
                , eaql_larg    :: LHsExpr GhcRn       -- Original application, for
                                                      -- location and error msgs
                , eaql_rn_fun  :: HsExpr GhcRn  -- Head of the argument if it is an application
-               , eaql_tc_fun  :: (HsExpr GhcTc, AppCtxt) -- Typechecked head
+               , eaql_tc_fun  :: (HsExpr GhcTc, SrcSpan) -- Typechecked head
                , eaql_fun_ue  :: UsageEnv -- Usage environment of the typechecked head (QLA5)
                , eaql_args    :: [HsExprArg 'TcpInst]    -- Args: instantiated, not typechecked
                , eaql_wanted  :: WantedConstraints
@@ -183,12 +182,12 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
                , eaql_res_rho :: TcRhoType }           -- Result type of the application
             -> HsExprArg 'TcpInst  -- Only exists in TcpInst phase
 
-  ETypeArg :: { ea_ctxt   :: AppCtxt
+  ETypeArg :: { ea_ctxt   :: SrcSpan
               , ea_hs_ty  :: LHsWcType GhcRn  -- The type arg
               , ea_ty_arg :: !(XETAType p) }  -- Kind-checked type arg
            -> HsExprArg p
 
-  EPrag :: AppCtxt -> (HsPragE (GhcPass (XPass p))) -> HsExprArg p
+  EPrag :: SrcSpan -> (HsPragE (GhcPass (XPass p))) -> HsExprArg p
   EWrap :: EWrap                                    -> HsExprArg p
 
 type family XETAType (p :: TcPass) where  -- Type arguments
@@ -201,49 +200,10 @@ type family XEVAType (p :: TcPass) where   -- Value arguments
 
 data QLFlag = DoQL | NoQL
 
-data EWrap = EPar    AppCtxt
+data EWrap = EPar    SrcSpan
            | EExpand (HsExpr GhcRn)
            | EHsWrap HsWrapper
 
-type AppCtxt = SrcSpan
-  -- VACall
-  --    (HsExpr GhcRn) Int  -- In the third argument of function f
-  --    SrcSpan             -- The SrcSpan of the application (f e1 e2 e3)
-  --                        --    noSrcSpan if outermost; see Note [AppCtxt]
-
-
-{- Note [AppCtxt]
-~~~~~~~~~~~~~~~~~
-In a call (f e1 ... en), we pair up each argument with an AppCtxt. For
-example, the AppCtxt for e3 allows us to say
-    "In the third argument of `f`"
-See splitHsApps.
-
-To do this we must take a quick look into the expression to find the
-function at the head (`f` in this case) and how many arguments it
-has. That is what the funcion top_ctxt does.
-
-If the function part is an expansion, we don't want to look further.
-For example, with rebindable syntax the expression
-    (if e1 then e2 else e3) e4 e5
-might expand to
-    (ifThenElse e1 e2 e3) e4 e5
-For e4 we an AppCtxt that says "In the first argument of (if ...)",
-not "In the fourth argument of ifThenElse".  So top_ctxt stops
-at expansions.
-
-The SrcSpan in an AppCtxt describes the whole call.  We initialise
-it to noSrcSpan, because splitHsApps deals in HsExpr not LHsExpr, so
-we don't have a span for the whole call; and we use that noSrcSpan in
-GHC.Tc.Gen.App.tcInstFun (set_fun_ctxt) to avoid pushing "In the expression `f`"
-a second time.
--}
-
-appCtxtLoc :: AppCtxt -> SrcSpan
-appCtxtLoc l    = l
-
-insideExpansion :: AppCtxt -> Bool
-insideExpansion l  = isGeneratedSrcSpan l
 
 instance Outputable QLFlag where
   ppr DoQL = text "DoQL"
@@ -254,11 +214,11 @@ type family XPass (p :: TcPass) where
   XPass 'TcpInst = 'Renamed
   XPass 'TcpTc   = 'Typechecked
 
-mkEValArg :: AppCtxt -> LHsExpr GhcRn -> HsExprArg 'TcpRn
+mkEValArg :: SrcSpan -> LHsExpr GhcRn -> HsExprArg 'TcpRn
 mkEValArg ctxt e = EValArg { ea_arg = e, ea_ctxt = ctxt
                            , ea_arg_ty = noExtField }
 
-mkETypeArg :: AppCtxt -> LHsWcType GhcRn -> HsExprArg 'TcpRn
+mkETypeArg :: SrcSpan -> LHsWcType GhcRn -> HsExprArg 'TcpRn
 mkETypeArg ctxt hs_ty =
   ETypeArg { ea_ctxt = ctxt
            , ea_hs_ty = hs_ty
@@ -271,7 +231,7 @@ addArgWrap wrap args
 
 
 splitHsApps :: HsExpr GhcRn
-            -> TcM ( (HsExpr GhcRn, AppCtxt)  -- Head
+            -> TcM ( (HsExpr GhcRn, SrcSpan)  -- Head
                    , [HsExprArg 'TcpRn])      -- Args
 -- See Note [splitHsApps].
 --
@@ -280,20 +240,20 @@ splitHsApps :: HsExpr GhcRn
 -- (see Note [Looking through Template Haskell splices in splitHsApps]).
 splitHsApps e = go e noSrcSpan []
   where
-    go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
-       -> TcM ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
-    -- Modify the AppCtxt as we walk inwards, so it describes the next argument
+    go :: HsExpr GhcRn -> SrcSpan -> [HsExprArg 'TcpRn]
+       -> TcM ((HsExpr GhcRn, SrcSpan), [HsExprArg 'TcpRn])
+    -- Modify the SrcSpan as we walk inwards, so it describes the next argument
     go (HsPar _ (L l fun))        ctxt args = go fun (locA l) (EWrap (EPar ctxt)     : args)
     go (HsPragE _ p (L l fun))    ctxt args = go fun (locA l) (EPrag      ctxt p     : args)
-    go (HsAppType _ (L _ fun) ty) ctxt args = go fun ctxt (mkETypeArg ctxt ty    : args)
-    go (HsApp _ (L _ fun) arg)    ctxt args = go fun ctxt (mkEValArg  ctxt arg   : args)
+    go (HsAppType _ (L l fun) ty) ctxt args = go fun (locA l) (mkETypeArg ctxt ty    : args)
+    go (HsApp _ (L l fun) arg)    ctxt args = go fun (locA l) (mkEValArg  ctxt arg   : args)
 
     -- See Note [Looking through Template Haskell splices in splitHsApps]
     go e@(HsUntypedSplice splice_res splice) _ args
       = do { fun <- getUntypedSpliceBody splice_res
            ; go fun ctxt' (EWrap (EExpand e) : args) }
       where
-        ctxt' :: AppCtxt
+        ctxt' :: SrcSpan
         ctxt' = case splice of
             HsUntypedSpliceExpr _ (L l _) -> locA l -- l :: SrcAnn AnnListItem
             HsQuasiQuote _ _ (L l _)      -> locA l -- l :: SrcAnn NoEpAnns
@@ -323,7 +283,7 @@ splitHsApps e = go e noSrcSpan []
 -- representation-polymorphic unlifted newtypes have been eta-expanded.
 --
 -- See Note [Eta-expanding rep-poly unlifted newtypes].
-rebuildHsApps :: (HsExpr GhcTc, AppCtxt)
+rebuildHsApps :: (HsExpr GhcTc, SrcSpan)
                       -- ^ the function being applied
               -> [HsExprArg 'TcpTc]
                       -- ^ the arguments to the function
@@ -344,7 +304,7 @@ rebuildHsApps (fun, ctxt) (arg : args)
       EWrap (EHsWrap wrap)
         -> rebuildHsApps (mkHsWrap wrap fun, ctxt) args
   where
-    lfun = L (noAnnSrcSpan $ appCtxtLoc ctxt) fun
+    lfun = L (noAnnSrcSpan ctxt) fun
 
 isHsValArg :: HsExprArg id -> Bool
 isHsValArg (EValArg {}) = True
@@ -477,7 +437,7 @@ Wrinkle (UTS1):
 *                                                                      *
 ********************************************************************* -}
 
-tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
+tcInferAppHead :: (HsExpr GhcRn, SrcSpan)
                -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Infer type of the head of an application
 --   i.e. the 'f' in (f e1 ... en)
@@ -517,7 +477,7 @@ tcInferAppHead_maybe fun =
       HsOverLit _ lit             -> Just <$> tcInferOverLit lit
       _                           -> return Nothing
 
-addHeadCtxt :: AppCtxt -> TcM a -> TcM a --TODO ANI: Why not just setSrcSpan?
+addHeadCtxt :: SrcSpan -> TcM a -> TcM a --TODO ANI: Why not just setSrcSpan?
 addHeadCtxt fun_loc thing_inside
   | not (isGoodSrcSpan fun_loc)       -- noSrcSpan => no arguments
   = thing_inside                      -- => context is already set
