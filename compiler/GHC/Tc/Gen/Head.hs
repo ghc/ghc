@@ -26,7 +26,7 @@ module GHC.Tc.Gen.Head
        , nonBidirectionalErr
 
        , pprArgInst
-       , addHeadCtxt, addExprCtxt, addFunResCtxt ) where
+       , addExprCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
@@ -455,8 +455,8 @@ tcInferAppHead :: (HsExpr GhcRn, SrcSpan)
 --     cases are dealt with by splitHsApps.
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
-tcInferAppHead (fun,ctxt)
-  = addHeadCtxt ctxt $
+tcInferAppHead (fun,fun_loc)
+  = setSrcSpan fun_loc $
     do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
@@ -476,13 +476,6 @@ tcInferAppHead_maybe fun =
       ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit             -> Just <$> tcInferOverLit lit
       _                           -> return Nothing
-
-addHeadCtxt :: SrcSpan -> TcM a -> TcM a --TODO ANI: Why not just setSrcSpan?
-addHeadCtxt fun_loc thing_inside
-  | not (isGoodSrcSpan fun_loc)       -- noSrcSpan => no arguments
-  = thing_inside                      -- => context is already set
-  | otherwise
-  = setSrcSpan fun_loc thing_inside
 
 
 {- *********************************************************************
