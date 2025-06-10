@@ -1464,7 +1464,7 @@ This Note explains what GHC now does for unary classes.
 (UCM0) Throughout the compiler, right up to the code generator, GHC thinks that a
   unary class is just like a non-unary class:
     - Represented by a data type,
-    - with one (constructor),
+    - with one constructor,
     - which has one field
 
 (UCM1) Then when converting from Core to STG, in GHC.CoreToStg, we effectively
@@ -1573,7 +1573,7 @@ some at least three really subtle bad consequences.
 
 * Problem 1: When we represented unary classes via a newtype, the
     newtype axiom looked like
-           t1::CONSTRAINT r ~ t2::TYPE r
+           t1::CONSTRAINT r ~R# t2::TYPE r
     If TYPE and CONSTRAINT are apart, this can create unsoundness, via KindCo;
     see #21623.  Now we never make such a coercion, so that worry about TYPE
     being apart from CONSTRAINT has gone away entirely.  Hooray.

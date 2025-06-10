@@ -3363,7 +3363,7 @@ Now do a binder-swap on the case-expression:
 
   h = \ @(a :: Bool) ($dSing :: Sing a)
       let the_co =  Main.N:Sing[0] <a> :: Sing a ~R# Bool
-      case ($dSing |> the_co) of wild
+      case ($dSing |> the_co) of (wild::Bool)
         True  -> f @'True (True |> sym the_co)
         False -> f @a     (wild |> sym the_co)
 
