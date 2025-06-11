@@ -90,7 +90,7 @@ executable haddock
 
   -- haddock typically only supports a single GHC major version
   build-depends:
-    base >= 4.13.0.0 && <4.22,
+    base >= 4.13.0.0 && <4.23,
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
     haddock-api == 2.30.0

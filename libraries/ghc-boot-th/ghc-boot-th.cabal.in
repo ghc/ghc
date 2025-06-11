@@ -49,8 +49,8 @@ Library
             GHC.Lexeme
 
     build-depends:
-        base       >= 4.7 && < 4.22,
-        pretty      == 1.1.*
+        base       >= 4.7 && < 4.23,
+        pretty     == 1.1.*
 
     if flag(bootstrap)
         cpp-options: -DBOOTSTRAP_TH

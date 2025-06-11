@@ -85,7 +85,7 @@ library
     Build-Depends:
         rts,
         array            == 0.5.*,
-        base             >= 4.8 && < 4.22,
+        base             >= 4.8 && < 4.23,
         -- ghc-internal     == @ProjectVersionForLib@.*
         -- TODO: Use GHC.Internal.Desugar and GHC.Internal.Base from
         -- ghc-internal instead of ignoring the deprecation warning in GHCi.TH

@@ -4,7 +4,7 @@ cabal-version:  3.0
 -- Make sure you are editing ghc-experimental.cabal.in, not ghc-experimental.cabal
 
 name:           base
-version:        4.21.0.0
+version:        4.22.0.0
 -- NOTE: Don't forget to update ./changelog.md
 
 license:        BSD-3-Clause
