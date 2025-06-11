@@ -13,7 +13,6 @@ import GHC.Exts.Heap.InfoTable
 import Data.Char
 import Data.List (intercalate)
 import Foreign
-import GHC.CString
 import GHC.Exts
 
 {- To find the string in the constructor's info table we need to consider
