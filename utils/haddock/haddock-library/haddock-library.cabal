@@ -46,7 +46,7 @@ common ghc-options
     -Wnoncanonical-monad-instances -Wmissing-home-modules
 
   build-depends:
-    , base         >= 4.10     && < 4.22
+    , base         >= 4.10     && < 4.23
     , containers   >= 0.4.2.1  && < 0.9
     , text         ^>= 1.2.3.0 || ^>= 2.0 || ^>= 2.1
     , parsec       ^>= 3.1.13.0
