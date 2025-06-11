@@ -1,6 +1,6 @@
 cabal-version:  2.2
 name:           ghc-prim
-version:        0.13.0
+version:        0.13.1
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD-3-Clause
 license-file:   LICENSE

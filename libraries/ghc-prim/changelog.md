@@ -1,6 +1,8 @@
-## 0.14.0
+## 0.13.1
 
-- ghc-prim's modules have been merged into ghc-internal and ghc-prim is now deprecated.
+- Shipped with GHC 9.14.1
+
+- `ghc-prim`'s implementation has been merged into `ghc-internal`; `ghc-prim` is now deprecated.
 
 ## 0.13.0
 
