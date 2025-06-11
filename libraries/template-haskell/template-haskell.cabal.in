@@ -3,7 +3,7 @@
 -- template-haskell.cabal.
 
 name:           template-haskell
-version:        2.23.0.0
+version:        2.24.0.0
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
 license-file:   LICENSE
