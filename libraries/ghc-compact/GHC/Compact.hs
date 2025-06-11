@@ -82,8 +82,8 @@ module GHC.Compact (
   ) where
 
 import Control.Concurrent.MVar
-import GHC.Prim
-import GHC.Types
+import GHC.Exts
+import GHC.IO
 
 -- | A 'Compact' contains fully evaluated, pure, immutable data.
 --

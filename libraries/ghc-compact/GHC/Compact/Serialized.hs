@@ -26,12 +26,10 @@ module GHC.Compact.Serialized(
   importCompactByteStrings,
 ) where
 
-import GHC.Prim
-import GHC.Types
+import GHC.Exts
 import GHC.Word (Word8)
-import GHC.IO (unIO)
-
-import GHC.Ptr (Ptr(..), plusPtr)
+import GHC.IO (IO(..), unIO)
+import GHC.Ptr (plusPtr)
 
 import Control.Concurrent
 import qualified Data.ByteString as ByteString
