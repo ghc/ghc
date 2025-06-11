@@ -39,7 +39,7 @@ library
     UnboxedTuples
     CPP
 
-  build-depends: base       >= 4.9.0 && < 4.22,
+  build-depends: base       >= 4.9.0 && < 4.23,
                  bytestring >= 0.10.6.0 && <0.13
   ghc-options: -Wall
 
