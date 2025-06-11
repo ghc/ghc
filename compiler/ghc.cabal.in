@@ -140,7 +140,8 @@ Library
         ghc-boot-th-next     == @ProjectVersionMunged@
     else
       Build-Depends:
-        ghc-boot-th          == @ProjectVersionMunged@
+        ghc-boot-th          == @ProjectVersionMunged@,
+        ghc-internal         == @ProjectVersionForLib@.0,
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.15

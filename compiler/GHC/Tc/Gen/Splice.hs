@@ -148,7 +148,11 @@ import qualified GHC.Boot.TH.Ppr    as TH
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import Unsafe.Coerce    ( unsafeCoerce )
+#if !MIN_VERSION_base(4,22,0)
 import GHC.Desugar ( AnnotationWrapper(..) )
+#else
+import GHC.Internal.Desugar ( AnnotationWrapper(..) )
+#endif
 import Control.DeepSeq
 #endif
 
