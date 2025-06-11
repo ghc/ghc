@@ -1900,12 +1900,15 @@ Suppose we have a function with a complicated type:
 
 and suppose it is called at:
 
-    f 7 @T1 @T2 @T3 dEqT1 ($dfShow dShowT2) t3
+    f @T1 @T2 @T3 7 dEqT1 ($dfShow dShowT2) t3
 
 This call is described as a 'CallInfo' whose 'ci_key' is:
 
-    [ SpecType T1, SpecType T2, UnspecType, UnspecArg, SpecDict dEqT1
-    , SpecDict ($dfShow dShowT2), UnspecArg ]
+    [ SpecType T1, SpecType T2, UnspecType
+    , UnspecArg
+    , SpecDict dEqT1
+    , SpecDict ($dfShow dShowT2)
+    , UnspecArg ]
 
 Why are 'a' and 'b' identified as 'SpecType', while 'c' is 'UnspecType'?
 Because we must specialise the function on type variables that appear
