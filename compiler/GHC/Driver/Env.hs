@@ -34,7 +34,6 @@ module GHC.Driver.Env
    , hugInstancesBelow
    , hugAnnsBelow
    , hugCompleteSigsBelow
-   , hugFamInstancesBelow
 
     -- * Legacy API
    , hscUpdateHPT
@@ -231,17 +230,6 @@ hugAnnsBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO AnnEnv
 hugAnnsBelow hsc uid mn = foldr (flip extendAnnEnvList) emptyAnnEnv <$>
   hugSomeThingsBelowUs (md_anns . hm_details) False hsc uid mn
 
-hugFamInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (ModuleEnv FamInstEnv)
-hugFamInstancesBelow = hugSomeThingsBelowUs' combine emptyModuleEnv True
-  where
-    hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv . (md_fam_insts . hm_details)
-    hmiModule     = mi_module . hm_iface
-    combine :: HomeModInfo -> ModuleEnv FamInstEnv -> ModuleEnv FamInstEnv
-    combine md acc = do
-      let famInstEnv = hmiFamInstEnv md
-          mod = hmiModule md
-       in extendModuleEnvWith unionFamInstEnv acc mod famInstEnv
-
 -- | Find all COMPLETE pragmas in modules that are in the transitive closure of the
 -- given module.
 hugCompleteSigsBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO CompleteMatches
@@ -249,7 +237,7 @@ hugCompleteSigsBelow hsc uid mn = foldr (++) [] <$>
   hugSomeThingsBelowUs (md_complete_matches . hm_details) False hsc uid mn
 
 -- | Find instances visible from the given set of imports
-hugInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [FamInst])
+hugInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [(Module, FamInstEnv)])
 hugInstancesBelow hsc_env uid mnwib = do
  let mn = gwib_mod mnwib
  (insts, famInsts) <-
@@ -259,7 +247,7 @@ hugInstancesBelow hsc_env uid mnwib = do
                                   -- Don't include instances for the current module
                                   in if moduleName (mi_module (hm_iface mod_info)) == mn
                                        then []
-                                       else [(md_insts details, md_fam_insts details)])
+                                       else [(md_insts details, [(mi_module $ hm_iface mod_info, extendFamInstEnvList emptyFamInstEnv $ md_fam_insts details)])])
                           True -- Include -hi-boot
                           hsc_env
                           uid
@@ -269,19 +257,16 @@ hugInstancesBelow hsc_env uid mnwib = do
 -- | Get things from modules in the transitive closure of the given module.
 --
 -- Note: Don't expose this function. This is a footgun if exposed!
-hugSomeThingsBelowUs' :: (HomeModInfo -> a -> a) -> a -> Bool -> HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO a
-hugSomeThingsBelowUs' _ acc _ hsc_env _ _ | isOneShot (ghcMode (hsc_dflags hsc_env)) = return acc
+hugSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO [[a]]
 -- An explicit check to see if we are in one-shot mode to avoid poking the ModuleGraph thunk
 -- These things are currently stored in the EPS for home packages. (See #25795 for
 -- progress in removing these kind of checks)
 -- See Note [Downsweep and the ModuleGraph]
-hugSomeThingsBelowUs' combine acc include_hi_boot hsc_env uid mn
+hugSomeThingsBelowUs _ _ hsc_env _ _ | isOneShot (ghcMode (hsc_dflags hsc_env)) = return []
+hugSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
   = let hug = hsc_HUG hsc_env
         mg  = hsc_mod_graph hsc_env
-        combine' Nothing acc = acc
-        combine' (Just hmi) acc = combine hmi acc
     in
-    foldr combine' acc <$>
     sequence
     [ things
       -- "Finding each non-hi-boot module below me" maybe could be cached (well,
@@ -300,22 +285,14 @@ hugSomeThingsBelowUs' combine acc include_hi_boot hsc_env uid mn
 
         -- Look it up in the HUG
     , let things = lookupHug hug mod_uid mod >>= \case
-                    Just info -> return $ Just info
-                    Nothing -> pprTrace "WARNING in hugSomeThingsBelowUs" msg (pure Nothing)
+                    Just info -> return $ extract info
+                    Nothing -> pprTrace "WARNING in hugSomeThingsBelowUs" msg mempty
           msg = vcat [text "missing module" <+> ppr mod,
                      text "When starting from"  <+> ppr mn,
                      text "below:" <+> ppr (moduleGraphModulesBelow mg uid mn),
                       text "Probable cause: out-of-date interface files"]
                         -- This really shouldn't happen, but see #962
     ]
-
--- | Get things from modules in the transitive closure of the given module.
---
--- Note: Don't expose this function. This is a footgun if exposed!
-hugSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO [[a]]
-hugSomeThingsBelowUs f = hugSomeThingsBelowUs' combine []
-  where
-    combine hmi acc = f hmi : acc
 
 -- | Deal with gathering annotations in from all possible places
 --   and combining them into a single 'AnnEnv'
