@@ -266,6 +266,9 @@ hugInstancesBelow hsc_env uid mnwib = do
                           mnwib
  return (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
 
+-- | Get things from modules in the transitive closure of the given module.
+--
+-- Note: Don't expose this function. This is a footgun if exposed!
 hugSomeThingsBelowUs' :: (HomeModInfo -> a -> a) -> a -> Bool -> HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO a
 hugSomeThingsBelowUs' _ acc _ hsc_env _ _ | isOneShot (ghcMode (hsc_dflags hsc_env)) = return acc
 -- An explicit check to see if we are in one-shot mode to avoid poking the ModuleGraph thunk

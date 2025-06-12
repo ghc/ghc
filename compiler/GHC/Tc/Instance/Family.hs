@@ -25,6 +25,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 
 import GHC.Iface.Load
+import GHC.IO (unsafeInterleaveIO)
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Evidence
@@ -317,7 +318,7 @@ checkFamInstConsistency directlyImpMods hsc_env unitId mnwib
              -- See Note [Order of type family consistency checks]
              }
 
-       ; hpt_fam_insts <- liftIO $ hugFamInstancesBelow hsc_env unitId mnwib
+       ; hpt_fam_insts <- liftIO $ unsafeInterleaveIO $ hugFamInstancesBelow hsc_env unitId mnwib
        ; debug_consistent_set <- mapM (\x -> (\y -> (x, length y)) <$> modConsistent x) directlyImpMods
        ; traceTc "init_consistent_set" (ppr debug_consistent_set)
        ; let init_consistent_set = map fst (reverse (sortOn snd debug_consistent_set))
