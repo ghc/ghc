@@ -604,11 +604,15 @@ interpretBCO (Capability* cap)
     // this bco returns).
     //
     // See Note [Debugger: Step-out] for details
-    // ROMES: STOP INSERTING THE FRAME DYNAMICALLY.
+    // TODOOOOOOOOOOOOOOOO UPDATES
     if (cap->r.rCurrentTSO->flags & TSO_STOP_AFTER_RETURN) {
 
       StgPtr frame;
+      StgBCO* bco;
+      StgWord16* bco_instrs;
       frame = Sp;
+
+      frame += stack_frame_sizeW((StgClosure *)frame); // ignore first BCO because this is the one we are stopped at. We only want to stop at the next one up the stack.
 
       // Insert the stg_stop_after_ret_frame after the first frame that is NOT a
       // case continuation BCO.
@@ -618,26 +622,47 @@ interpretBCO (Capability* cap)
       // non-local stack references. See Note [Case continuation BCOs].
 
       // UPDATE COMMENTS: NOW FIND STOP FRAME AND ACTIVATE IT
-      while (*frame != (W_)&stg_stop_after_ret_frame_info) {
+      while (get_itbl((StgClosure*)frame)->type != RET_BCO)
+      { // TODO: HANDLE IF STACK BOTTOM
         frame += stack_frame_sizeW((StgClosure *)frame);
+        printf("Wasn't right, keep going\n");
       }
+
+      printf("Found frame\n");
+
       // TODO: Handle stack bottom edge case!? if frame == STACK BOTTOM...
       // stack underflow *and* overflow...
 
-      // New frame goes /right after the first/ non-case-cont frame
-      // frame += stack_frame_sizeW((StgClosure *)frame);
-
-      // Make space for the new frame
-      // memmove((W_*)Sp - sizeofW(StgStopAfterRetFrame), Sp, (uint8_t*)frame - (uint8_t*)Sp);
-      // Sp_subW(sizeofW(StgStopAfterRetFrame));
-
-      // Point to newly opened space
-      // frame -= sizeofW(StgStopAfterRetFrame);
-
       // Then write it.
-      ((StgStopAfterRetFrame*)frame)->enabled = 1;
+      // ((StgStopAfterRetFrame*)frame)->enabled = 1;
 
       // TODO: Write profiling info if needed
+
+      bco = (StgBCO*)(frame[1]); // BCO is first argument of RET_BCO frame
+      ASSERT(get_itbl((StgClosure*)bco)->type == BCO);
+      bco_instrs = (StgWord16*)(bco->instrs->payload);
+
+      if ((bco_instrs[0] /* BRK_FUN ALWAYS FIRST INSTR */ & 0xFF) == bci_BRK_FUN) {
+          printf("Found BRK FUN\n");
+          printf("Enabling breakpoint of BCO: %p\n", bco);
+
+          int brk_array, tick_index;
+          StgArrBytes *breakPoints;
+          StgPtr* ptrs;
+
+          ptrs = (StgPtr*)(&bco->ptrs->payload[0]);
+          brk_array  = bco_instrs[1];
+          tick_index = bco_instrs[6];
+
+          breakPoints = (StgArrBytes *) BCO_PTR(brk_array);
+          // ACTIVATE
+          ((StgInt*)breakPoints->payload)[tick_index] = 0;
+      }
+      else if ((bco_instrs[0] & 0xFF) == bci_BRK_INTERNAL) {
+          printf("Found BRK INTERNAL\n");
+          printf("Enabling breakpoint of BCO: %p\n", bco);
+          bco_instrs[1] = 1; // ACTIVATE
+      }
 
       // Frame was pushed, mark as done to not do it again
       cap->r.rCurrentTSO->flags &= ~TSO_STOP_AFTER_RETURN;
@@ -1470,6 +1495,8 @@ run_BCO:
 #endif
             debugBelch("BREAK %p[%d] FOUND on TSO %p. SHOULD STOP=%d\n", (StgArrBytes*)BCO_PTR(arg1_brk_array), arg6_tick_index, cap->r.rCurrentTSO, stop_next_breakpoint);
 
+            printf("Passing breakpoint of BCO: %p\n", bco);
+
             // if we are returning from a break then skip this section
             // and continue executing
             if (!returning_from_break)
@@ -1569,6 +1596,20 @@ run_BCO:
 
             // continue normal execution of the byte code instructions
             goto nextInsn;
+        }
+
+        case bci_BRK_INTERNAL:
+        {
+          printf("BREAK INTERNAL\n");
+          StgWord16 active = BCO_NEXT;
+          printf("BREAK INTERNAL: %d\n", active);
+          if (active) {
+            printf("BREAK INTERNAL is active\n");
+            // Break on next!
+            cap->r.rCurrentTSO->flags |= TSO_STOP_NEXT_BREAKPOINT;
+          }
+
+          goto nextInsn;
         }
 
         case bci_STKCHECK: {

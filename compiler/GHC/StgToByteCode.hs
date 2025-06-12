@@ -793,17 +793,8 @@ doTailCall
 doTailCall init_d s p fn args = do
    platform <- profilePlatform <$> getProfile
 
-   -- Push a stop-frame before the call
-   let !d2 = init_d + wordSize platform * 2 {- step out frame uses 2 word -}
-
    -- Do tail call only after
-   instrs <- do_pushes d2 args (map (atomRep platform) args)
-
-   return $
-    -- Todo: make this an exit brk point frame from a specific Stg construct
-    PUSH_UBX (LitNumber LitNumWord 0{-not enabled-}) 1
-    `consOL` PUSH_UBX (LitLabel (mkFastString "stg_stop_after_ret_frame_info") IsData) 1
-      `consOL` instrs
+   do_pushes init_d args (map (atomRep platform) args)
 
   where
   do_pushes !d [] reps = do
@@ -1377,9 +1368,11 @@ doCase d s p scrut bndr alts
      alt_stuff <- mapM codeAlt alts
      alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
 
-     let alt_final
+     let alt_final1
            | ubx_tuple_frame    = SLIDE 0 2 `consOL` alt_final0
            | otherwise          = alt_final0
+         alt_final
+          = BRK_INTERNAL 0 `consOL` alt_final1
 
      add_bco_name <- shouldAddBcoName
      let

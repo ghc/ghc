@@ -272,6 +272,9 @@ data BCInstr
                       !UnitId                -- breakpoint info module unit id
                       !Word16                -- breakpoint info index
                       (RemotePtr CostCentre)
+   -- An internal breakpoint should only be set by the compiler or RTS
+   -- See Note [BRK_INTERNAL]
+   | BRK_INTERNAL     !Word16 {- enabled? -}
 
 #if MIN_VERSION_rts(1,0,3)
    -- | A "meta"-instruction for recording the name of a BCO for debugging purposes.
@@ -468,6 +471,7 @@ instance Outputable BCInstr where
                                <+> text "<tick_module>" <+> text "<tick_module_unitid>" <+> ppr tickx
                                <+> text "<info_module>" <+> text "<info_module_unitid>" <+> ppr infox
                                <+> text "<cc>"
+   ppr (BRK_INTERNAL active) = text "BRK_INTERNAL" <+> ppr active
 #if MIN_VERSION_rts(1,0,3)
    ppr (BCO_NAME nm)         = text "BCO_NAME" <+> text (show nm)
 #endif
@@ -593,6 +597,7 @@ bciStackUse OP_INDEX_ADDR{}         = 0
 
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0
+bciStackUse BRK_INTERNAL{}        = 0
 
 -- These insns actually reduce stack use, but we need the high-tide level,
 -- so can't use this info.  Not that it matters much.

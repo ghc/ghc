@@ -70,10 +70,9 @@ INFO_TABLE_RET (stg_orig_thunk_info_frame, RET_SMALL,
 Note [Frames intercepting frames]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A frame which "intercepts" the following frame (to do additional work or
-manipulate the stack, such as `stg_orig_thunk_info_frame` or
-`stg_stop_after_ret_frame`) must take care to passthrough all the registers and
-arguments when it returns to the next frame. This is done by jumping with
-GP_ARG_REGS as in:
+manipulate the stack, such as `stg_orig_thunk_info_frame`) must take care to
+passthrough all the registers and arguments when it returns to the next frame.
+This is done by jumping with GP_ARG_REGS as in:
 
     jump %ENTRY_CODE(Sp(0)) GP_ARG_REGS; // NB. all GP arg regs live!
 

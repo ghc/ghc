@@ -700,16 +700,3 @@ typedef struct {
     StgWord stack[];
 } StgContinuation;
 
-/* ----------------------------------------------------------------------------
-   Debugger
-   ------------------------------------------------------------------------- */
-
-// A stop-after-ret stack frame is inserted between the first and second frame
-// to intercept a return to the parent and implement the debugger step-out feature.
-// See Note [Debugger: Step-out].
-//
-// Closure type: RET_SMALL
-typedef struct {
-    StgHeader header;
-    StgWord enabled;
-} StgStopAfterRetFrame;
