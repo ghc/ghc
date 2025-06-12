@@ -120,7 +120,7 @@ import GHC.Core.TyCo.Ppr( debugPprType )
 import GHC.Core.TyCo.Tidy( tidyTopType )
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons, orphNamesOfFamInst
-   , famInstEnvElts, extendFamInstEnvList, normaliseType )
+   , famInstEnvElts, extendFamInstEnvList, normaliseType, emptyFamInstEnv, unionFamInstEnv )
 
 import GHC.Parser.Header       ( mkPrelImports )
 
@@ -467,8 +467,8 @@ tcRnImports hsc_env import_decls
   = do  { (rn_imports, imp_user_spec, rdr_env, imports) <- rnImports import_decls
         -- Get the default declarations for the classes imported by this module
         -- and group them by class.
-        ; tc_defaults <-(NE.groupBy ((==) `on` cd_class) . (concatMap defaultList))
-                        <$> tcGetClsDefaults (M.keys $ imp_mods imports)
+        ; tc_defaults <- NE.groupBy ((==) `on` cd_class) . (concatMap defaultList)
+                         <$> tcGetClsDefaults (M.keys $ imp_mods imports)
         ; this_mod <- getModule
         ; gbl_env <- getGblEnv
         ; let unitId = homeUnitId $ hsc_home_unit hsc_env
@@ -480,8 +480,10 @@ tcRnImports hsc_env import_decls
                 -- filtering also ensures that we don't see instances from
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
-              ; (home_insts, home_fam_insts) <- liftIO $
+              ; (home_insts, home_mod_fam_inst_env) <- liftIO $
                     hugInstancesBelow hsc_env unitId mnwib
+              ; let home_fam_inst_env = foldl' unionFamInstEnv emptyFamInstEnv $ snd <$> home_mod_fam_inst_env
+              ; let hpt_fam_insts = mkModuleEnv home_mod_fam_inst_env
 
                 -- We use 'unsafeInterleaveIO' to avoid redundant memory allocations
                 -- See Note [Lazily loading COMPLETE pragmas] from GHC.HsToCore.Monad
@@ -507,8 +509,7 @@ tcRnImports hsc_env import_decls
               tcg_rn_imports   = rn_imports,
               tcg_default      = foldMap subsume tc_defaults,
               tcg_inst_env     = tcg_inst_env gbl `unionInstEnv` home_insts,
-              tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)
-                                                      home_fam_insts
+              tcg_fam_inst_env = unionFamInstEnv (tcg_fam_inst_env gbl) home_fam_inst_env
             }) $ do {
 
         ; traceRn "rn1" (ppr (imp_direct_dep_mods imports))
@@ -538,7 +539,7 @@ tcRnImports hsc_env import_decls
                              $ imports }
         ; logger <- getLogger
         ; withTiming logger (text "ConsistencyCheck"<+>brackets (ppr this_mod)) (const ())
-            $ checkFamInstConsistency dir_imp_mods
+            $ checkFamInstConsistency hpt_fam_insts dir_imp_mods
         ; traceRn "rn1: } checking family instance consistency" empty
 
         ; gbl_env <- getGblEnv
