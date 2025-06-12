@@ -41,7 +41,6 @@ module GHC.Unit.Home.PackageTable
     -- * Queries about home modules
   , hptCompleteSigs
   , hptAllInstances
-  , hptAllFamInstances
   , hptAllAnnotations
 
     -- ** More Traversal-based queries
@@ -207,14 +206,6 @@ hptAllInstances hpt = do
      return (md_insts details, md_fam_insts details)
   let (insts, famInsts) = unzip hits
   return (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
-
--- | Find all the family instance declarations from the HPT
-hptAllFamInstances :: HomePackageTable -> IO (ModuleEnv FamInstEnv)
-hptAllFamInstances = fmap mkModuleEnv . concatHpt (\hmi -> [(hmiModule hmi, hmiFamInstEnv hmi)])
-  where
-    hmiModule     = mi_module . hm_iface
-    hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv
-                      . md_fam_insts . hm_details
 
 -- | All annotations from the HPT
 hptAllAnnotations :: HomePackageTable -> IO AnnEnv
