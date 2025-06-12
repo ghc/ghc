@@ -232,7 +232,7 @@ hugAnnsBelow hsc uid mn = foldr (flip extendAnnEnvList) emptyAnnEnv <$>
   hugSomeThingsBelowUs (md_anns . hm_details) False hsc uid mn
 
 hugFamInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (ModuleEnv FamInstEnv)
-hugFamInstancesBelow = hugSomeThingsBelowUs' combine emptyModuleEnv False
+hugFamInstancesBelow = hugSomeThingsBelowUs' combine emptyModuleEnv True
   where
     hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv . (md_fam_insts . hm_details)
     hmiModule     = mi_module . hm_iface
