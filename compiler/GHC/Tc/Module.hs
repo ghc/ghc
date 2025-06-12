@@ -538,7 +538,7 @@ tcRnImports hsc_env import_decls
                              $ imports }
         ; logger <- getLogger
         ; withTiming logger (text "ConsistencyCheck"<+>brackets (ppr this_mod)) (const ())
-            $ checkFamInstConsistency dir_imp_mods
+            $ checkFamInstConsistency dir_imp_mods hsc_env unitId mnwib
         ; traceRn "rn1: } checking family instance consistency" empty
 
         ; gbl_env <- getGblEnv
