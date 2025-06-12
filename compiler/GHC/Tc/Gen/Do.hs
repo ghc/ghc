@@ -1,4 +1,3 @@
-
 {-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes       #-}
@@ -20,7 +19,7 @@ module GHC.Tc.Gen.Do (expandDoStmts) where
 import GHC.Prelude
 
 import GHC.Rename.Utils ( wrapGenSpan, genHsExpApps, genHsApp, genHsLet,
-                          genHsLamDoExp, genHsCaseAltDoExp )
+                          genHsLamDoExp, genHsCaseAltDoExp, genWildPat )
 import GHC.Rename.Env   ( irrefutableConLikeRn )
 
 import GHC.Tc.Utils.Monad
@@ -202,7 +201,7 @@ mk_failable_expr doFlav lpat expr@(L _exprloc _) fail_op =
 -- \x. case x of {pat -> rhs; _ -> fail "Pattern match failure..."}
 mk_fail_block :: HsDoFlavour
               -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (HsExpr GhcRn)
-mk_fail_block doFlav pat@(L ploc _) e (Just (SyntaxExprRn fail_op)) =
+mk_fail_block doFlav pat e (Just (SyntaxExprRn fail_op)) =
   do  dflags <- getDynFlags
       return $ HsLam noAnn LamCases $ mkMatchGroup (doExpansionOrigin doFlav) -- \
                 (wrapGenSpan [ genHsCaseAltDoExp doFlav pat e                 --  pat -> expr
@@ -210,12 +209,12 @@ mk_fail_block doFlav pat@(L ploc _) e (Just (SyntaxExprRn fail_op)) =
                              ])
         where
           fail_alt_case :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> LMatch GhcRn (LHsExpr GhcRn)
-          fail_alt_case dflags pat fail_op = genHsCaseAltDoExp doFlav (L ploc $ WildPat noExtField) $
+          fail_alt_case dflags pat fail_op = genHsCaseAltDoExp doFlav genWildPat $
                                              wrapGenSpan (fail_op_expr dflags pat fail_op)
 
           fail_op_expr :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
           fail_op_expr dflags pat fail_op
-            = genHsApp fail_op (mk_fail_msg_expr dflags pat)
+            = mkExpandedPatRn pat $ genHsApp fail_op (mk_fail_msg_expr dflags pat)
 
           mk_fail_msg_expr :: DynFlags -> LPat GhcRn -> LHsExpr GhcRn
           mk_fail_msg_expr dflags pat
@@ -489,3 +488,6 @@ mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
 
 genPopErrCtxtExpr :: LHsExpr GhcRn -> LHsExpr GhcRn
 genPopErrCtxtExpr (L loc a) = L loc (mkPopErrCtxtExpr a)
+
+mkExpandedPatRn :: LPat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
+mkExpandedPatRn pat e = XExpr (ExpandedThingRn (OrigPat pat) e)
