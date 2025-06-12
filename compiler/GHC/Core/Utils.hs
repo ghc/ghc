@@ -74,7 +74,7 @@ import GHC.Core.Ppr
 import GHC.Core.FVs( bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
-import GHC.Core.Predicate( isEqPred, isCoVarType )
+import GHC.Core.Predicate( isEqPred )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX )
 import GHC.Core.Coercion
