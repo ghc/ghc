@@ -673,6 +673,7 @@ type instance XXExpr GhcTc = XXExprGhcTc
 --   See Note [Handling overloaded and rebindable constructs] in `GHC.Rename.Expr`
 data HsThingRn = OrigExpr (HsExpr GhcRn)                -- ^ The source, user written, expression
                | OrigStmt (ExprLStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
+               | OrigPat  (LPat GhcRn)                  -- ^ Used for failable patterns that trigger MonadFail constraints
 
 data XXExprGhcRn
   = ExpandedThingRn { xrn_orig     :: HsThingRn       -- The original source thing to be used for error messages
@@ -1021,8 +1022,9 @@ ppr_expr (XExpr x) = case ghcPass @p of
 instance Outputable HsThingRn where
   ppr thing
     = case thing of
-        OrigExpr x     -> ppr_builder "<OrigExpr>:" x
-        OrigStmt x _   -> ppr_builder "<OrigStmt>:" x
+        OrigExpr x    -> ppr_builder "<OrigExpr>:" x
+        OrigStmt x _  -> ppr_builder "<OrigStmt>:" x
+        OrigPat  x    -> ppr_builder "<OrigPat>:" x
     where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
 
 instance Outputable XXExprGhcRn where
