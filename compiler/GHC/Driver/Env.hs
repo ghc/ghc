@@ -240,7 +240,7 @@ hugFamInstancesBelow = hugSomeThingsBelowUs' combine emptyModuleEnv False
     combine md acc = do
       let famInstEnv = hmiFamInstEnv md
           mod = hmiModule md
-       in extendModuleEnv acc mod famInstEnv
+       in extendModuleEnvWith unionFamInstEnv acc mod famInstEnv
 
 -- | Find all COMPLETE pragmas in modules that are in the transitive closure of the
 -- given module.
