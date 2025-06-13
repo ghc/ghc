@@ -43,7 +43,6 @@ module GHC.Unit.Home.Graph
 
   -- * Very important queries
   , allInstances
-  , allFamInstances
   , allAnns
   , allCompleteSigs
 
@@ -109,10 +108,6 @@ allInstances :: HomeUnitGraph -> IO (InstEnv, [FamInst])
 allInstances hug = foldr go (pure (emptyInstEnv, [])) hug where
   go hue = liftA2 (\(a,b) (a',b') -> (a `unionInstEnv` a', b ++ b'))
                   (hptAllInstances (homeUnitEnv_hpt hue))
-
-allFamInstances :: HomeUnitGraph -> IO (ModuleEnv FamInstEnv)
-allFamInstances hug = foldr go (pure emptyModuleEnv) hug where
-  go hue = liftA2 plusModuleEnv (hptAllFamInstances (homeUnitEnv_hpt hue))
 
 allAnns :: HomeUnitGraph -> IO AnnEnv
 allAnns hug = foldr go (pure emptyAnnEnv) hug where
