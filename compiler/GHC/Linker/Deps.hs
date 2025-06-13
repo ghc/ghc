@@ -156,9 +156,10 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
           listToUDFM [(moduleName (mi_module (hm_iface m)), m) | m <- mmods]
         link_libs =
           uniqDSetToList (unionManyUniqDSets (init_pkg_set : pkgs))
+      deps <- oneshot_deps opts link_libs
       pure $
         LinkModules (LinkHomeModule <$> link_mods) :
-        (LinkLibrary <$> link_libs)
+        deps
 
     -- This code is used in `--make` mode to calculate the home package and unit dependencies
     -- for a set of modules.
@@ -168,15 +169,15 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
     -- It is also a matter of correctness to use the module graph so that dependencies between home units
     -- is resolved correctly.
-    make_deps_loop :: (UniqDSet UnitId, Set.Set NodeKey) -> [ModNodeKeyWithUid] -> (UniqDSet UnitId, Set.Set NodeKey)
+    make_deps_loop :: (UniqDSet Module, Set.Set NodeKey) -> [ModNodeKeyWithUid] -> (UniqDSet Module, Set.Set NodeKey)
     make_deps_loop found [] = found
     make_deps_loop found@(found_units, found_mods) (nk:nexts)
       | NodeKey_Module nk `Set.member` found_mods = make_deps_loop found nexts
       | otherwise =
         case fmap mkNodeKey <$> mgReachable mod_graph (NodeKey_Module nk) of
           Nothing ->
-              let (ModNodeKeyWithUid _ uid) = nk
-              in make_deps_loop (addOneToUniqDSet found_units uid, found_mods) nexts
+              let (ModNodeKeyWithUid GWIB {gwib_mod} uid) = nk
+              in make_deps_loop (addOneToUniqDSet found_units (Module (RealUnit (Definite uid)) gwib_mod), found_mods) nexts
           Just trans_deps ->
             let deps = Set.insert (NodeKey_Module nk) (Set.fromList trans_deps)
                 -- See #936 and the ghci.prog007 test for why we have to continue traversing through
@@ -195,7 +196,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
           let iface = hm_iface hmi
           case mi_hsc_src iface of
             HsBootFile -> throwProgramError opts $ link_boot_mod_error (mi_module iface)
-            _ -> pure (mkUniqDSet $ Set.toList $ dep_direct_pkgs (mi_deps iface), hmi)
+            _ -> pure (mkUniqDSet [usg_mod | UsagePackageModule {usg_mod} <- mi_usages iface, not (unitEnv_member (moduleUnitId usg_mod) (ue_home_unit_graph unit_env))], hmi)
         Nothing -> throwProgramError opts $
           text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
 
@@ -344,7 +345,7 @@ oneshot_deps_loop opts (mod : mods) acc = do
 
     try_iface =
       liftIO (ldLoadIface opts load_reason mod) >>= \case
-        Failed err -> throwE (NoInterface err)
+        Failed _ -> add_library
         Succeeded iface ->
           location >>= \case
             InstalledFound loc _ -> with_iface loc iface
