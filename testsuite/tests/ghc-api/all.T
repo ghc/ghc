@@ -40,4 +40,4 @@ test('T20757', [unless(opsys('mingw32'), skip), exit_code(1)],
                compile_and_run,
                ['-package ghc'])
 test('PrimOpEffect_Sanity', normal, compile_and_run, ['-Wall -Werror -package ghc'])
-test('T26120', [expect_broken(26120)], compile_and_run, ['-package ghc'])
+test('T26120', [], compile_and_run, ['-package ghc'])
