@@ -1056,25 +1056,6 @@ dsSpec poly_rhs (SpecPrag poly_id spec_co spec_inl)
     dsSpec_help (idName poly_id) poly_id poly_rhs
                 spec_inl spec_bndrs (core_app (Var poly_id))
 
-{-
-    do { dflags <- getDynFlags
-       ; case decomposeRuleLhs dflags spec_bndrs (core_app (Var poly_id))
-                                                 (mkVarSet spec_bndrs) of {
-           Left msg -> do { diagnosticDs msg; return Nothing } ;
-           Right (rule_bndrs, poly_id, rule_lhs_args) ->
-
-    do { tracePm "dsSpec(old route)" $
-         vcat [ text "poly_id" <+> ppr poly_id
-              , text "spec_bndrs" <+> ppr spec_bndrs
-              , text "the_call" <+> ppr (core_app (Var poly_id))
-              , text "rule_bndrs" <+> ppr rule_bndrs
-              , text "rule_lhs_args" <+> ppr rule_lhs_args ]
-
-       ; finishSpecPrag (idName poly_id) poly_rhs
-                               rule_bndrs poly_id rule_lhs_args
-                               spec_bndrs core_app spec_inl } } }
--}
-
 dsSpec poly_rhs (SpecPragE { spe_fn_nm = poly_nm
                            , spe_fn_id = poly_id
                            , spe_inl   = inl
