@@ -168,7 +168,7 @@ putArchEntry (ArchiveEntry name time own grp mode st_size file) = do
   putPaddedInt          6 own
   putPaddedInt          6 grp
   putPaddedInt          8 mode
-  putPaddedInt         10 (st_size + pad)
+  putPaddedInt         10 st_size
   putByteString           "\x60\x0a"
   putByteString           file
   when (pad == 1) $
