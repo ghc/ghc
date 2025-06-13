@@ -25,7 +25,7 @@ override CABAL_ARGS += \
 	--logs-dir=_build/$(STAGE)/logs
 
 override CABAL_BUILD_ARGS += \
-	-j -v -w $(GHC) \
+	-j -v -w $(GHC) --with-gcc=$(CC) \
 	--project-file=cabal.project.$(STAGE) \
 	--builddir=_build/$(STAGE)
 
@@ -60,6 +60,25 @@ define HADRIAN_SETTINGS
 ]
 endef
 
+define run_and_log
+@set -e; \
+LOGDIR=$(@D)/../logs; \
+mkdir -p "$$LOGDIR"; \
+STDOUT_LOG="$$LOGDIR/$(notdir $@).stdout.log"; \
+STDERR_LOG="$$LOGDIR/$(notdir $@).stderr.log"; \
+echo "+ $(1)"; \
+( { $(1); } >"$$STDOUT_LOG" 2>"$$STDERR_LOG" ) || { \
+  if [ -s "$$STDERR_LOG" ]; then \
+    cat "$$STDERR_LOG"; \
+    echo "See logs: $$STDERR_LOG (stderr), $$STDOUT_LOG (stdout)"; \
+  elif [ -s "$$STDOUT_LOG" ]; then \
+    cat "$$STDOUT_LOG"; \
+    echo "See logs: $$STDERR_LOG (stderr), $$STDOUT_LOG (stdout)"; \
+  fi; \
+  exit 1; \
+}
+endef
+
 # Handle CPUS and THREADS
 CPUS_DETECT_SCRIPT := ./mk/detect-cpu-count.sh
 CPUS := $(shell if [ -x $(CPUS_DETECT_SCRIPT) ]; then $(CPUS_DETECT_SCRIPT); else echo 2; fi)
@@ -88,17 +107,16 @@ CONFIGURED_FILES := \
 # --- Main Targets ---
 all: _build/bindist # booted will depend on prepare-sources
 
-STAGE_TARGETS := \
+STAGE_UTIL_TARGETS := \
 	deriveConstants:deriveConstants \
 	genapply:genapply \
 	genprimopcode:genprimopcode \
-	ghc-bin:ghc \
 	ghc-pkg:ghc-pkg \
 	hsc2hs:hsc2hs \
 	rts-headers:rts-headers \
 	unlit:unlit
 
-STAGE1_TARGETS := $(STAGE_TARGETS) ghc-toolchain-bin:ghc-toolchain-bin
+STAGE1_TARGETS := $(STAGE_UTIL_TARGETS) ghc-bin:ghc ghc-toolchain-bin:ghc-toolchain-bin
 
 # TODO: dedup
 STAGE1_EXECUTABLES := \
@@ -111,20 +129,30 @@ STAGE1_EXECUTABLES := \
 	hsc2hs \
 	unlit
 
+# We really want to work towards `cabal build/instsall ghc-bin:ghc`.
 STAGE2_TARGETS := \
-	$(STAGE_TARGETS) \
+	ghc-bin:ghc
+
+STAGE2_UTIL_TARGETS := \
+	$(STAGE_UTIL_TARGETS) \
+	ghc-iserv:ghc-iserv \
+	hp2ps:hp2ps \
+	hpc-bin:hpc \
+	runghc:runghc \
 	ghc-bignum:ghc-bignum \
 	ghc-compact:ghc-compact \
 	ghc-experimental:ghc-experimental \
 	ghc-toolchain:ghc-toolchain \
-	hp2ps:hp2ps \
-	hpc-bin:hpc \
 	integer-gmp:integer-gmp \
-	ghc-iserv:ghc-iserv \
-	runghc:runghc \
 	system-cxx-std-lib:system-cxx-std-lib \
 	terminfo:terminfo \
 	xhtml:xhtml
+
+# These things should be built on demand.
+# hp2ps:hp2ps \
+# hpc-bin:hpc \
+# ghc-iserv:ghc-iserv \
+# runghc:runghc \
 
 # This package is just utterly retarded
 # I don't understand why this following line somehow breaks the build...
@@ -132,15 +160,17 @@ STAGE2_TARGETS := \
 
 # TODO: dedup
 STAGE2_EXECUTABLES := \
+	ghc
+
+STAGE2_UTIL_EXECUTABLES := \
 	deriveConstants \
 	genapply \
 	genprimopcode \
-	ghc  \
+	hsc2hs \
 	ghc-iserv \
 	ghc-pkg \
 	hp2ps \
 	hpc \
-	hsc2hs \
 	runghc \
 	unlit
 
@@ -151,7 +181,7 @@ $(abspath _build/stage0/bin/cabal): _build/stage0/bin/cabal
 _build/stage0/bin/cabal:
 	@echo ">>> Building Cabal..."
 	@mkdir -p _build/stage0/bin _build/logs
-	cabal build -j -w $(GHC0) --disable-tests --project-dir libraries/Cabal --builddir=_build/stage0/cabal cabal-install:exe:cabal |& tee _build/logs/cabal.log
+	$(call run_and_log, cabal build -j -w $(GHC0) --disable-tests --project-dir libraries/Cabal --builddir=_build/stage0/cabal cabal-install:exe:cabal)
 	cp -rfp $(shell cabal list-bin -v0 -j -w $(GHC0) --project-dir libraries/Cabal --builddir=_build/stage0/cabal cabal-install:exe:cabal) _build/stage0/bin/cabal
 	@echo ">>> Cabal built successfully."
 
@@ -164,13 +194,12 @@ _build/stage1/%: private GHC=$(GHC0)
 $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES)) &: $(CABAL) | _build/booted
 	# Force cabal to replan
 	rm -rf _build/stage2/cache
-	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
-		$(CABAL_BUILD) $(STAGE1_TARGETS) \
-		|& tee _build/logs/stage1.log
+	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
+		$(CABAL_BUILD) $(STAGE1_TARGETS))
 
 _build/stage1/lib/settings: _build/stage1/bin/ghc-toolchain-bin
 	@mkdir -p $(@D)
-	_build/stage1/bin/ghc-toolchain-bin --triple $(TARGET_TRIPLE) --output-settings -o $@ --cc $(CC) --cxx $(CXX) |& tee _build/logs/ghc-toolchain.log
+	$(call run_and_log, _build/stage1/bin/ghc-toolchain-bin --triple $(TARGET_TRIPLE) --output-settings -o $@ --cc $(CC) --cxx $(CXX))
 
 _build/stage1/lib/package.conf.d/package.cache: _build/stage1/bin/ghc-pkg _build/stage1/lib/settings
 	@mkdir -p _build/stage1/lib/package.conf.d
@@ -194,10 +223,21 @@ _build/stage2/%: private GHC=$(realpath _build/stage1/bin/ghc)
 $(addprefix _build/stage2/bin/,$(STAGE2_EXECUTABLES)) &: $(CABAL) stage1
 	# Force cabal to replan
 	rm -rf _build/stage2/cache
-	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
+	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
 		PATH=$(PWD)/_build/stage1/bin:$(PATH) \
-		$(CABAL_BUILD) --ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" -W $(GHC0) $(STAGE2_TARGETS) \
-		|& tee _build/logs/stage2.log
+		$(CABAL_BUILD) --ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" -W $(GHC0) $(STAGE2_TARGETS) )
+
+# Do we want to build these with the stage2 GHC or the stage1 GHC?
+# Traditionally we build them with the stage1 ghc, but we could just as well
+# build them with the stage2 ghc; seems like a better/cleaner idea to me (moritz).
+.PHONY: $(addprefix _build/stage2/bin/,$(STAGE2_UTIL_EXECUTABLES))
+$(addprefix _build/stage2/bin/,$(STAGE2_UTIL_EXECUTABLES)) &: $(CABAL) stage1
+	# Force cabal to replan
+	rm -rf _build/stage2/cache
+	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
+		PATH=$(PWD)/_build/stage1/bin:$(PATH) \
+		$(CABAL_BUILD) --ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" -W $(GHC0) $(STAGE2_UTIL_TARGETS) )
+
 
 # # We use PATH=... here to ensure all the build-tool-depends (deriveConstants, genapply, genprimopcode, ...) are
 # # available in PATH while cabal evaluates configure files. Cabal sadly does not support build-tool-depends or
@@ -274,7 +314,7 @@ _build/booted:
 	@mkdir -p _build/logs
 	./boot |& tee _build/logs/boot.log
 	@echo ">>> Running ./configure script..."
-	./configure |& tee _build/logs/configure.log
+	$(call run_and_log, ./configure)
 	touch $@
 
 # --- Clean Targets ---
@@ -307,6 +347,8 @@ distclean: clean
 test: _build/bindist
 	@echo ">>> Running tests with THREADS=${THREADS}" >&2
 	TEST_HC=`pwd`/_build/bindist/bin/ghc \
+	TEST_CC=$(CC) \
+	TEST_CXX=$(CXX) \
 	METRICS_FILE=`pwd`/_build/test-perf.csv \
 	SUMMARY_FILE=`pwd`/_build/test-summary.txt \
 	JUNIT_FILE=`pwd`/_build/test-junit.xml \

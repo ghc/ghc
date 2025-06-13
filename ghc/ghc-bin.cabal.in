@@ -1,3 +1,4 @@
+Cabal-Version: 3.0
 -- WARNING: ghc-bin.cabal is automatically generated from ghc-bin.cabal.in by
 -- ./configure.  Make sure you are editing ghc-bin.cabal.in, not ghc-bin.cabal.
 
@@ -15,7 +16,6 @@ Description:
     to the Glasgow Haskell Compiler.
 Category: Development
 Build-Type: Simple
-Cabal-Version: >=1.10
 
 Flag internal-interpreter
     Description: Build with internal interpreter support.
@@ -44,6 +44,15 @@ Executable ghc
                    transformers >= 0.5 && < 0.7,
                    ghc-boot      == @ProjectVersionMunged@,
                    ghc           == @ProjectVersionMunged@
+
+    if impl(ghc > 9.12)
+        -- we need to depend on the specific rts we want to link our
+        -- final GHC against.
+        -- TODO: add debug flag and extend those extra cases.
+        if flag(threaded)
+            Build-Depends: rts:threaded-nodebug
+        else
+            Build-Depends: rts:nonthreaded-nodebug
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.15
