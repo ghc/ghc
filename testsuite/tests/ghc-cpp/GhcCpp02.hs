@@ -12,3 +12,14 @@ foo =
 #if EXISTENT_MACRO(4)
 bar = 3
 #endif
+
+#define FOO(X) FOO(X)
+#if FOO(3)
+
+#endif
+
+#if defined 34
+#endif
+
+#if defined(A,B)
+#endif
