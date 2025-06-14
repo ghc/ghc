@@ -32,9 +32,9 @@ details
 
 -- TODO: Parse tokens with original locations in them.
 
+import Data.List (intercalate)
 import Data.Map qualified as Map
 import Data.Maybe
-import Data.List (intercalate)
 
 import Data.Semigroup qualified as S
 import GHC.Parser.PreProcess.Eval
@@ -45,6 +45,7 @@ import GHC.Parser.PreProcess.State
 import GHC.Prelude
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic (panic)
 
 -- ---------------------------------------------------------------------
 
@@ -111,7 +112,8 @@ doExpandToks loc ed s (TIdentifierLParen n : ts) =
     doExpandToks loc ed s (TIdentifier (init n) : TOpenParen "(" : ts)
 doExpandToks loc _ s (TIdentifier "defined" : ts) = do
     -- See Note: ['defined' unary operator] below
-    case getExpandArgs ts of
+    expandedArgs <- getExpandArgs loc ts
+    case expandedArgs of
         (Just [[TIdentifier macro_name]], rest0) ->
             case Map.lookup macro_name s of
                 Nothing -> return (True, TInteger "0" : rest0)
@@ -130,7 +132,6 @@ doExpandToks loc _ s (TIdentifier "defined" : ts) = do
                 )
             return (False, [])
         (Just args, _) -> do
-          -- error $ "defined: expected a single arg, got:" ++ show args
             addGhcCPPError
                 loc
                 ( hang
@@ -140,12 +141,12 @@ doExpandToks loc _ s (TIdentifier "defined" : ts) = do
                 )
             return (False, [])
 doExpandToks loc ed s (TIdentifier n : ts) = do
+    (args, rest0) <- getExpandArgs loc ts
     let
         (ed', expanded, ts') = case Map.lookup n s of
             Nothing -> (ed, [TIdentifier n], ts)
             Just defs -> (ed0, r, rest1)
               where
-                (args, rest0) = getExpandArgs ts
                 fallbackArgs = fromMaybe (Nothing, [TIdentifier n]) (Map.lookup Nothing defs)
                 (m_args, rhs) = fromMaybe fallbackArgs (Map.lookup (arg_arity args) defs)
                 (ed0, r, rest1) = case m_args of
@@ -201,7 +202,7 @@ replace_args (Just args) (Just m_args) rhs = rhs'
     -- At this point, the surrounding context should guarantee that the
     -- args and m_args have the same arity
     rhs' = foldl' (\acc (arg, m_arg) -> replace_arg arg m_arg acc) rhs (zip args m_args)
-replace_args args margs _ = error $ "replace_args: impossible, mismatch between: " ++ show (args, margs)
+replace_args args margs _ = panic $ "replace_args: impossible, mismatch between: " ++ show (args, margs)
 
 -- The spec (https://timsong-cpp.github.io/cppwp/n4140/cpp#replace-10)
 -- says an arg can only be an identifier
@@ -227,11 +228,19 @@ inner parentheses do not separate arguments.
 {- | Look for possible arguments to a macro expansion.
 The only thing we look for are commas, open parens, and close parens.
 -}
-getExpandArgs :: [Token] -> (Maybe [[Token]], [Token])
-getExpandArgs ts =
+getExpandArgs :: SrcSpan -> [Token] -> PP (Maybe [[Token]], [Token])
+getExpandArgs loc ts =
     case pArgs ts of
-        Left err -> error $ err
-        Right r -> r
+        Left err -> do
+            addGhcCPPError
+                loc
+                ( hang
+                    (text "CPP: cannot expand macro arguments:")
+                    2
+                    (text err <+> text "in" $+$ text (concatMap t_str ts))
+                )
+            return (Nothing, ts)
+        Right r -> return r
 
 pArgs :: [Token] -> Either String (Maybe [[Token]], [Token])
 pArgs (TOpenParen _ : ts) = do
@@ -341,7 +350,7 @@ m5 :: Either String (Maybe [[Token]], [Token])
 m5 = do
     -- toks <- cppLex "(43,foo(a)) some other stuff"
     toks <- cppLex False "( ff(bar(),baz), 4 )"
-    return $ getExpandArgs toks
+    pArgs toks
 
 tt :: Either String ([[Char]], [Char])
 tt = case m5 of
