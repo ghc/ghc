@@ -34,6 +34,7 @@ details
 
 import Data.Map qualified as Map
 import Data.Maybe
+import Data.List (intercalate)
 
 import Data.Semigroup qualified as S
 import GHC.Parser.PreProcess.Eval
@@ -74,7 +75,7 @@ expand loc s str = do
             addGhcCPPError
                 loc
                 ( hang
-                    (text "Error evaluating CPP condition1:") -- AZ:TODO remove 1
+                    (text "Error evaluating CPP condition:")
                     2
                     (text err <+> text "of" $+$ text str)
                 )
@@ -88,7 +89,6 @@ maxExpansions = 15
 
 expandToks :: SrcSpan -> Int -> MacroDefines -> [Token] -> PP [Token]
 expandToks loc 0 _ ts = do
-    -- error $ "macro_expansion limit (" ++ show maxExpansions ++ ") hit, aborting. ts=" ++ show ts
     addGhcCPPError
         loc
         ( hang
@@ -110,21 +110,35 @@ doExpandToks loc ed s (TIdentifierLParen n : ts) =
     -- restore it to its constituent tokens
     doExpandToks loc ed s (TIdentifier (init n) : TOpenParen "(" : ts)
 doExpandToks loc _ s (TIdentifier "defined" : ts) = do
-    let
-        -- See Note: [defined unary operator] below
-
-        rest = case getExpandArgs ts of
-            (Just [[TIdentifier macro_name]], rest0) ->
-                case Map.lookup macro_name s of
-                    Nothing -> TInteger "0" : rest0
-                    Just _ -> TInteger "1" : rest0
-            (Nothing, TIdentifier macro_name : ts0) ->
-                case Map.lookup macro_name s of
-                    Nothing -> TInteger "0" : ts0
-                    Just _ -> TInteger "1" : ts0
-            (Nothing, _) -> error $ "defined: expected an identifier, got:" ++ show ts
-            (Just args, _) -> error $ "defined: expected a single arg, got:" ++ show args
-    return (True, rest)
+    -- See Note: ['defined' unary operator] below
+    case getExpandArgs ts of
+        (Just [[TIdentifier macro_name]], rest0) ->
+            case Map.lookup macro_name s of
+                Nothing -> return (True, TInteger "0" : rest0)
+                Just _ -> return (True, TInteger "1" : rest0)
+        (Nothing, TIdentifier macro_name : ts0) ->
+            case Map.lookup macro_name s of
+                Nothing -> return (True, TInteger "0" : ts0)
+                Just _ -> return (True, TInteger "1" : ts0)
+        (Nothing, _) -> do
+            addGhcCPPError
+                loc
+                ( hang
+                    (text "CPP defined: expected an identifier, got:")
+                    2
+                    (text (concatMap t_str ts))
+                )
+            return (False, [])
+        (Just args, _) -> do
+          -- error $ "defined: expected a single arg, got:" ++ show args
+            addGhcCPPError
+                loc
+                ( hang
+                    (text "CPP defined: expected a single arg, got:")
+                    2
+                    (text (intercalate "," (map (concatMap t_str) args)))
+                )
+            return (False, [])
 doExpandToks loc ed s (TIdentifier n : ts) = do
     let
         (ed', expanded, ts') = case Map.lookup n s of
@@ -144,8 +158,8 @@ doExpandToks loc ed s (t : ts) = do
     return (ed', t : r)
 
 {-
-Note: [defined unary operator]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note: ['defined' unary operator]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 From https://timsong-cpp.github.io/cppwp/n4140/cpp#cond-1
 
