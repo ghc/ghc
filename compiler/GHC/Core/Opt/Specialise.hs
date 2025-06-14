@@ -1639,10 +1639,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
              -- Namely those free in `ty` that aren't in scope
              -- See (MP2) in Note [Specialising polymorphic dictionaries]
            ; let poly_qvars = scopedSort $ fvVarList $ specArgsFVs not_in_scope call_args
-                 poly_qvar_es = map varToCoreExpr poly_qvars  -- Account for CoVars
-
-                 subst' = subst `Core.extendSubstInScopeList` poly_qvars
-                          -- Maybe we should clone the poly_qvars telescope?
+                 subst'     = subst `Core.extendSubstInScopeList` poly_qvars
+                              -- Maybe we should clone the poly_qvars telescope?
 
              -- Any free Ids will have caused the call to be dropped
            ; massertPpr (all isTyCoVar poly_qvars)
@@ -1651,9 +1649,10 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
            ; (useful, subst'', rule_bndrs, rule_lhs_args, spec_bndrs, spec_args)
                  <- specHeader subst' rhs_bndrs all_call_args
            ; (rule_bndrs, rule_lhs_args, spec_bndrs, spec_args)
-                 <- return ( poly_qvars ++ rule_bndrs, poly_qvar_es ++ rule_lhs_args
-                           , poly_qvars ++ spec_bndrs, poly_qvar_es ++ spec_args )
+                 <- return ( poly_qvars ++ rule_bndrs, rule_lhs_args
+                           , poly_qvars ++ spec_bndrs, spec_args )
 
+{-
            ; pprTrace "spec_call" (vcat
                 [ text "fun:       "  <+> ppr fn
                 , text "call info: "  <+> ppr _ci
@@ -1666,6 +1665,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                 , text "rhs_bndrs"    <+> ppr rhs_bndrs
                 , text "rhs_body"     <+> ppr rhs_body ]) $
              return ()
+-}
 
            ; let env' = env { se_subst = subst'' }
                  all_rules = rules_acc ++ existing_rules
@@ -1678,7 +1678,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
              else
         do { -- Run the specialiser on the specialised RHS
              (rhs_body', rhs_uds) <- specExpr env' $
-                                     mkLams (dropList spec_args rhs_bndrs) rhs_body
+                                     mkLams (dropList all_call_args rhs_bndrs) rhs_body
 
                 -- Add the { d1' = dx1; d2' = dx2 } usage stuff
                 -- to the rhs_uds; see Note [Specialising Calls]
@@ -1736,8 +1736,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                        DFunId unary        -> DFunId unary
                        _                   -> VanillaId
 
-           ; spec_fn <- pprTrace "next" (ppr fn) $
-                        newSpecIdSM (idName fn) spec_fn_ty1 spec_fn_details spec_fn_info
+           ; spec_fn <- newSpecIdSM (idName fn) spec_fn_ty1 spec_fn_details spec_fn_info
            ; let
                 -- The rule to put in the function's specialisation is:
                 --      forall x @b d1' d2'.

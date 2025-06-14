@@ -1636,7 +1636,8 @@ match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
         -- template x, so we must rename first!
 
 ------------------------------------------
-match_tmpl_var :: RuleMatchEnv
+match_tmpl_var :: HasDebugCallStack
+               => RuleMatchEnv
                -> RuleSubst
                -> Var                -- Template
                -> CoreExpr           -- Target
