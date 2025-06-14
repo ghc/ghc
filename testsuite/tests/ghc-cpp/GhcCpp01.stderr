@@ -13,7 +13,7 @@
 
 #define MIN_VERSION_Cabal_syntax(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 15 || ( major1 ) == 3 && ( major2 ) == 15 && ( minor ) <= 0 )
 
-#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250606 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250606 && ( pl2 ) <= 0 )
+#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 913 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) < 20250614 || ( ( ma ) * 100 + ( mi ) ) == 913 && ( pl1 ) == 20250614 && ( pl2 ) <= 0 )
 
 #define MIN_VERSION_array(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 5 || ( major1 ) == 0 && ( major2 ) == 5 && ( minor ) <= 8 )
 
@@ -23,7 +23,7 @@
 
 #define MIN_VERSION_bytestring(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 12 || ( major1 ) == 0 && ( major2 ) == 12 && ( minor ) <= 2 )
 
-#define MIN_VERSION_containers(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 7 || ( major1 ) == 0 && ( major2 ) == 7 && ( minor ) <= 0 )
+#define MIN_VERSION_containers(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 8 || ( major1 ) == 0 && ( major2 ) == 8 && ( minor ) <= 0 )
 
 #define MIN_VERSION_deepseq(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 5 || ( major1 ) == 1 && ( major2 ) == 5 && ( minor ) <= 1 )
 
@@ -61,7 +61,7 @@
 
 #define MIN_VERSION_haddock_library(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 11 || ( major1 ) == 1 && ( major2 ) == 11 && ( minor ) <= 0 )
 
-#define MIN_VERSION_haskeline(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 8 || ( major1 ) == 0 && ( major2 ) == 8 && ( minor ) <= 2 )
+#define MIN_VERSION_haskeline(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 8 || ( major1 ) == 0 && ( major2 ) == 8 && ( minor ) <= 3 )
 
 #define MIN_VERSION_hpc(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 7 || ( major1 ) == 0 && ( major2 ) == 7 && ( minor ) <= 0 )
 
@@ -111,7 +111,7 @@
 
 #define VERSION_bytestring 0.12.2.0
 
-#define VERSION_containers 0.7
+#define VERSION_containers 0.8
 
 #define VERSION_deepseq 1.5.1.0
 
@@ -149,9 +149,9 @@
 
 #define VERSION_haddock_library 1.11.0
 
-#define VERSION_haskeline 0.8.2.1
+#define VERSION_haskeline 0.8.3.0
 
-#define VERSION_hpc 0.7.0.1
+#define VERSION_hpc 0.7.0.2
 
 #define VERSION_integer_gmp 1.1
 
@@ -188,9 +188,9 @@
 #define VERSION_xhtml 3000.2.2.1
 
 
-#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250606
+#define __GLASGOW_HASKELL_FULL_VERSION__ 9.13.20250614
 
-#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250606
+#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250614
 
 #define __GLASGOW_HASKELL_PATCHLEVEL2__ 0
 
