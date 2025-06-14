@@ -100,7 +100,7 @@ words :-
     <0>         \-? [0-9][0-9]*                             { mkTv TInteger  }
     <0>         \" [^\"]* \"                                { mkTv (TString . tail . init) }
                 -- TODO: distinguish the quotes used in the token
-    <0>         ' [^']* '                                   { mkTv (TString . tail . init) } 
+    <0>         ' [^']* '                                   { mkTv (TString . tail . init) }
     <0>         ()                                          { begin other }
 
     <other>     .+                   { \i -> do {setStartCode 0;
