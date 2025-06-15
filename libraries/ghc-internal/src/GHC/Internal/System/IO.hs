@@ -425,6 +425,21 @@ getContents'    =  hGetContents' stdin
 --
 -- This operation may fail with the same errors as 'getContents' and 'putStr'.
 --
+-- If it doesn't produce output the buffering settings may not be
+-- correct, use ^D (ctrl+D) to close stdin which forces
+-- the buffer to be consumed.
+--
+-- You may wish to set the buffering style appropriate to your program's
+-- needs before using this function, for example:
+--
+-- @
+-- main :: IO ()
+-- main = do
+--   hSetBuffering stdin LineBuffering
+--   hSetBuffering stdout NoBuffering
+--   interact (concatMap (\str -> str ++ str) . L.lines)
+-- @
+--
 -- ==== __Examples__
 --
 -- >>> interact (\str -> str ++ str)
