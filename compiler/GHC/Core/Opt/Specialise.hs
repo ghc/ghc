@@ -1784,43 +1784,6 @@ alreadyCovered env bndrs fn args is_active rules
   where
     in_scope = substInScopeSet (se_subst env)
 
-{-
-specRhs :: SpecEnv -> [InVar] -> InExpr -> [OutExpr]
-        -> SpecM (OutExpr, UsageDetails)
-
-specRhs env bndrs body []  -- Like specExpr (Lam bndrs body)
-  = specLam env' bndrs' body
-  where
-    (env', bndrs') = substBndrs env bndrs
-
-specRhs _env [] body args
-  = -- The caller should have ensured that there are no more
-    -- args than we have binders on the RHS
-    pprPanic "specRhs:too many args" (ppr args $$ ppr body)
-
-specRhs env@(SE { se_subst = subst }) (bndr:bndrs) body (arg:args)
-  | exprIsTrivial arg
-  , let env' = env { se_subst = Core.extendSubst subst bndr arg }
-  = specRhs env' bndrs body args
-
-
-  | otherwise  -- Non-trivial argument; it must be a dictionary
-  = do { fresh_id <- newIdBndr "dx" (exprType arg)
-       ; let fresh_id' = fresh_id `addDictUnfolding` arg
-             dict_bind = mkDB (NonRec fresh_id' arg)
-             env' = env { se_subst = Core.extendSubst subst bndr (Var fresh_id')
-                                      `Core.extendSubstInScope` fresh_id' }
-                                      -- Ensure the new unfolding is in the in-scope set
-       ; (body', uds) <- specRhs env' bndrs body args
-       ; return (body', dict_bind `consDictBind` uds) }
-
-consDictBind :: DictBind -> UsageDetails -> UsageDetails
-consDictBind db uds@MkUD{ud_binds=FDB{fdb_binds = binds, fdb_bndrs = bs}}
-  = uds { ud_binds = FDB{ fdb_binds = db `consOL` binds
-                        , fdb_bndrs = bs `extendVarSetList` bindersOfDictBind db } }
-
--}
-
 -- Convenience function for invoking lookupRule from Specialise
 -- The SpecEnv's InScopeSet should include all the Vars in the [CoreExpr]
 specLookupRule :: HasDebugCallStack
@@ -2611,7 +2574,7 @@ specHeader subst (bndr:bndrs) (UnspecType : args)
 
 specHeader subst (bndr:bndrs) (_ : args)
   | isDeadBinder bndr
-  , let (subst1, bndr') = Core.substBndr subst bndr
+  , let (subst1, bndr') = Core.substBndr subst (zapIdOccInfo bndr)
   , Just rubbish_lit <- mkLitRubbish (idType bndr')
   = -- See Note [Drop dead args from specialisations]
     do { (useful, subst2, rule_bs, rule_es, spec_bs, spec_args) <- specHeader subst1 bndrs args
