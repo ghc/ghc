@@ -1467,6 +1467,7 @@ module Data.List.NonEmpty where
   last :: forall a. NonEmpty a -> a
   length :: forall a. NonEmpty a -> GHC.Internal.Types.Int
   map :: forall a b. (a -> b) -> NonEmpty a -> NonEmpty b
+  mapMaybe :: forall a b. (a -> GHC.Internal.Maybe.Maybe b) -> NonEmpty a -> [b]
   nonEmpty :: forall a. [a] -> GHC.Internal.Maybe.Maybe (NonEmpty a)
   nub :: forall a. GHC.Internal.Classes.Eq a => NonEmpty a -> NonEmpty a
   nubBy :: forall a. (a -> a -> GHC.Internal.Types.Bool) -> NonEmpty a -> NonEmpty a

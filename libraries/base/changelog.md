@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.23.0.0 *TBA*
+  * Add `Data.List.NonEmpty.mapMaybe`. ([CLC proposal #337](https://github.com/haskell/core-libraries-committee/issues/337))
+
 ## 4.22.0.0 *TBA*
   * Define `displayException` of `SomeAsyncException` to unwrap the exception.
       ([CLC proposal #309](https://github.com/haskell/core-libraries-committee/issues/309))

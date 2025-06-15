@@ -78,6 +78,7 @@ module Data.List.NonEmpty (
    , span        -- :: (a -> Bool) -> NonEmpty a -> ([a], [a])
    , break       -- :: (a -> Bool) -> NonEmpty a -> ([a], [a])
    , filter      -- :: (a -> Bool) -> NonEmpty a -> [a]
+   , mapMaybe    -- :: (a -> Maybe b) -> NonEmpty a -> [b]
    , partition   -- :: (a -> Bool) -> NonEmpty a -> ([a],[a])
    , group       -- :: (Foldable f, Eq a) => f a -> [NonEmpty a]
    , groupBy     -- :: Foldable f => (a -> a -> Bool) -> f a -> [NonEmpty a]
@@ -118,6 +119,7 @@ import qualified Prelude
 
 import           Control.Applicative (Applicative (..), Alternative (many))
 import qualified Data.List                        as List
+import qualified Data.Maybe                       as List (mapMaybe)
 import           GHC.Internal.Data.Foldable       hiding (length, toList)
 import qualified GHC.Internal.Data.Foldable       as Foldable
 import           GHC.Internal.Data.Function       (on)
@@ -441,6 +443,14 @@ break p = span (not . p)
 -- | @'filter' p xs@ removes any elements from @xs@ that do not satisfy @p@.
 filter :: (a -> Bool) -> NonEmpty a -> [a]
 filter p = List.filter p . toList
+
+-- | The 'mapMaybe' function is a version of 'map' which can throw
+-- out elements. In particular, the functional argument returns
+-- something of type @'Maybe' b@. If this is 'Nothing', no element
+-- is added on to the result list. If it is @'Just' b@, then @b@ is
+-- included in the result list.
+mapMaybe :: (a -> Maybe b) -> NonEmpty a -> [b]
+mapMaybe f (x :| xs) = maybe id (:) (f x) $ List.mapMaybe f xs
 
 -- | The 'partition' function takes a predicate @p@ and a stream
 -- @xs@, and returns a pair of lists. The first list corresponds to the
