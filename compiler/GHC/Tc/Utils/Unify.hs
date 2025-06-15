@@ -581,6 +581,11 @@ implicationNeeded skol_info skol_tvs given
 
 alwaysBuildImplication :: SkolemInfoAnon -> Bool
 -- See Note [When to build an implication]
+alwaysBuildImplication (SigSkol ctxt _ _)
+  = case ctxt of
+      FunSigCtxt {} -> True  -- RHS of a binding with a signature
+      SpecInstCtxt  -> True  -- SpecInstCtxt: this is rather delicate
+      _             -> False
 alwaysBuildImplication _ = False
 
 {-  Commmented out for now while I figure out about error messages.
