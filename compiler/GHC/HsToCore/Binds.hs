@@ -1100,6 +1100,7 @@ dsSpec_help poly_nm poly_id poly_rhs inl bndrs ds_call
 
        ; tracePm "dsSpec(new route)" $
          vcat [ text "poly_id" <+> ppr poly_id
+              , text "unfolding" <+> ppr (realIdUnfolding poly_id)
               , text "bndrs"   <+> ppr bndrs
               , text "ds_call" <+> ppr ds_call
               , text "core_call" <+> ppr core_call
