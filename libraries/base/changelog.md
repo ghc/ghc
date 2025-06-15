@@ -4,6 +4,7 @@
   * Define `displayException` of `SomeAsyncException` to unwrap the exception.
       ([CLC proposal #309](https://github.com/haskell/core-libraries-committee/issues/309))
   * Restrict `Data.List.NonEmpty.unzip` to `NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)`. ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
+  * Add `Data.List.NonEmpty.mapMaybe`. ([CLC proposal #337](https://github.com/haskell/core-libraries-committee/issues/337))
   * Modify the implementation of `Control.Exception.throw` to avoid call-sites being inferred as diverging via precise exception.
     ([GHC #25066](https://gitlab.haskell.org/ghc/ghc/-/issues/25066), [CLC proposal #290](https://github.com/haskell/core-libraries-committee/issues/290))
   * `Data.List.NonEmpty.{init,last,tails1}` are now defined using only total functions (rather than partial ones). ([CLC proposal #293](https://github.com/haskell/core-libraries-committee/issues/293))
