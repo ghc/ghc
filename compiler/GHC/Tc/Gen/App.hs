@@ -460,6 +460,7 @@ finishApp tc_head@(tc_fun,_) tc_args app_res_rho res_wrap
        ; res_expr <- if isTagToEnum tc_fun
                      then tcTagToEnum tc_head tc_args app_res_rho
                      else return (rebuildHsApps tc_head tc_args)
+       ; traceTc "End tcApp }" (ppr tc_fun)
        ; return (mkHsWrap res_wrap res_expr) }
 
 checkResultTy :: HsExpr GhcRn
