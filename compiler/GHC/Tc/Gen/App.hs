@@ -854,7 +854,8 @@ tcInstFun do_ql inst_final fun_orig (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
     -- Rule IARG from Fig 4 of the QL paper:
     go1 pos acc fun_ty
         (EValArg { ea_arg = arg, ea_ctxt = ctxt } : rest_args)
-      = do { let herald = ExpectedFunTyArg (HsExprTcThing tc_fun) (unLoc arg)
+      = do { let herald | DoOrigin <- fun_orig = ExpectedFunTySyntaxOp fun_orig tc_fun -- cf. RepPolyDoBind.hs
+                        | otherwise = ExpectedFunTyArg (HsExprTcThing tc_fun) (unLoc arg)
            ; (wrap, arg_ty, res_ty) <-
                 -- NB: matchActualFunTy does the rep-poly check.
                 -- For example, suppose we have f :: forall r (a::TYPE r). a -> Int
