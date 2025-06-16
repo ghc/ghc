@@ -243,18 +243,18 @@ splitHsApps e = go e noSrcSpan []
     go :: HsExpr GhcRn -> SrcSpan -> [HsExprArg 'TcpRn]
        -> TcM ((HsExpr GhcRn, SrcSpan), [HsExprArg 'TcpRn])
     -- Modify the SrcSpan as we walk inwards, so it describes the next argument
-    go (HsPar _ (L l fun))        ctxt args = go fun (locA l) (EWrap (EPar ctxt)     : args)
-    go (HsPragE _ p (L l fun))    ctxt args = go fun (locA l) (EPrag      ctxt p     : args)
-    go (HsAppType _ (L l fun) ty) ctxt args = go fun (locA l) (mkETypeArg ctxt ty    : args)
-    go (HsApp _ (L l fun) arg)    ctxt args = go fun (locA l) (mkEValArg  ctxt arg   : args)
+    go (HsPar _ (L l fun))        sloc args = go fun (locA l) (EWrap (EPar sloc)     : args)
+    go (HsPragE _ p (L l fun))    sloc args = go fun (locA l) (EPrag      sloc p     : args)
+    go (HsAppType _ (L l fun) ty) sloc args = go fun (locA l) (mkETypeArg sloc ty    : args)
+    go (HsApp _ (L l fun) arg)    sloc args = go fun (locA l) (mkEValArg  sloc arg   : args)
 
     -- See Note [Looking through Template Haskell splices in splitHsApps]
     go e@(HsUntypedSplice splice_res splice) _ args
       = do { fun <- getUntypedSpliceBody splice_res
-           ; go fun ctxt' (EWrap (EExpand e) : args) }
+           ; go fun sloc' (EWrap (EExpand e) : args) }
       where
-        ctxt' :: SrcSpan
-        ctxt' = case splice of
+        sloc' :: SrcSpan
+        sloc' = case splice of
             HsUntypedSpliceExpr _ (L l _) -> locA l -- l :: SrcAnn AnnListItem
             HsQuasiQuote _ _ (L l _)      -> locA l -- l :: SrcAnn NoEpAnns
             (XUntypedSplice (HsImplicitLiftSplice _ _ _ (L l _))) -> locA l
@@ -268,11 +268,11 @@ splitHsApps e = go e noSrcSpan []
                     -- and its hard to say exactly what that is
                : EWrap (EExpand e)
                : args )
-    go (XExpr (PopErrCtxt fun)) ctxt args = go fun ctxt args
+    go (XExpr (PopErrCtxt fun)) sloc args = go fun sloc args
       -- look through PopErrCtxt (cf. T17594f) we do not want to lose the opportunity of calling tcEValArgQL
       -- unlike HsPar, it is okay to forget about the PopErrCtxts as it does not persist over in GhcTc land
 
-    go e ctxt args = pure ((e,ctxt), args)
+    go e sloc args = pure ((e, sloc), args)
 
 
 -- | Rebuild an application: takes a type-checked application head
@@ -289,22 +289,22 @@ rebuildHsApps :: (HsExpr GhcTc, SrcSpan)
                       -- ^ the arguments to the function
               -> HsExpr GhcTc
 rebuildHsApps (fun, _) [] = fun
-rebuildHsApps (fun, ctxt) (arg : args)
+rebuildHsApps (fun, sloc) (arg : args)
   = case arg of
-      EValArg { ea_arg = arg, ea_ctxt = ctxt' }
-        -> rebuildHsApps (HsApp noExtField lfun arg, ctxt') args
-      ETypeArg { ea_hs_ty = hs_ty, ea_ty_arg = ty, ea_ctxt = ctxt' }
-        -> rebuildHsApps (HsAppType ty lfun hs_ty, ctxt') args
-      EPrag ctxt' p
-        -> rebuildHsApps (HsPragE noExtField p lfun, ctxt') args
-      EWrap (EPar ctxt')
-        -> rebuildHsApps (gHsPar lfun, ctxt') args
+      EValArg { ea_arg = arg, ea_ctxt = sloc' }
+        -> rebuildHsApps (HsApp noExtField lfun arg, sloc') args
+      ETypeArg { ea_hs_ty = hs_ty, ea_ty_arg = ty, ea_ctxt = sloc' }
+        -> rebuildHsApps (HsAppType ty lfun hs_ty, sloc') args
+      EPrag sloc' p
+        -> rebuildHsApps (HsPragE noExtField p lfun, sloc') args
+      EWrap (EPar sloc')
+        -> rebuildHsApps (gHsPar lfun, sloc') args
       EWrap (EExpand o)
-        -> rebuildHsApps (mkExpandedExprTc o fun, ctxt) args
+        -> rebuildHsApps (mkExpandedExprTc o fun, sloc) args
       EWrap (EHsWrap wrap)
-        -> rebuildHsApps (mkHsWrap wrap fun, ctxt) args
+        -> rebuildHsApps (mkHsWrap wrap fun, sloc) args
   where
-    lfun = L (noAnnSrcSpan ctxt) fun
+    lfun = L (noAnnSrcSpan sloc) fun
 
 isHsValArg :: HsExprArg id -> Bool
 isHsValArg (EValArg {}) = True
@@ -330,8 +330,8 @@ instance OutputableBndrId (XPass p) => Outputable (HsExprArg p) where
   ppr (EPrag _ p)                     = text "EPrag" <+> ppr p
   ppr (ETypeArg { ea_hs_ty = hs_ty }) = char '@' <> ppr hs_ty
   ppr (EWrap wrap)                    = ppr wrap
-  ppr (EValArg { ea_arg = arg, ea_ctxt = ctxt })
-    = text "EValArg" <> braces (ppr ctxt) <+> ppr arg
+  ppr (EValArg { ea_arg = arg, ea_ctxt = sloc })
+    = text "EValArg" <> braces (ppr sloc) <+> ppr arg
   ppr (EValArgQL { eaql_tc_fun = fun, eaql_args = args, eaql_res_rho = ty})
     = hang (text "EValArgQL" <+> ppr fun)
          2 (vcat [ ppr args, text "ea_ql_ty:" <+> ppr ty ])
