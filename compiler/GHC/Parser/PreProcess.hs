@@ -294,8 +294,6 @@ processCpp loc s = do
                     acceptStateChange ar
                 Right CppDumpState -> do
                     return ()
-            -- accepting <- getAccepting
-            -- return (trace ("processCpp:" ++ show (accepting,directive)) Nothing)
             return Nothing
 
 acceptStateChange :: AcceptingResult -> PP ()
