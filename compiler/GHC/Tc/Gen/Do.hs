@@ -75,20 +75,20 @@ expand_do_stmts _ (stmt@(L _ (XStmtLR ApplicativeStmt{})): _) =
 
 expand_do_stmts _ [] = pprPanic "expand_do_stmts: impossible happened. Empty stmts" empty
 
-expand_do_stmts flav [stmt@(L _loc (LastStmt _ (L body_loc body) _ ret_expr))]
+expand_do_stmts flav [stmt@(L sloc (LastStmt _ body@(L body_loc _) _ ret_expr))]
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (5) below
 -- last statement of a list comprehension, needs to explicitly return it
 -- See `checkLastStmt` and `Syntax.Expr.StmtLR.LastStmt`
    | NoSyntaxExprRn <- ret_expr
    -- Last statement is just body if we are not in ListComp context. See Syntax.Expr.LastStmt
-   = return $ L body_loc (mkExpandedStmt stmt flav (HsPar noExtField (L body_loc body)))
+   = return $ L sloc (mkExpandedStmt stmt flav (HsPar noExtField body))
    | SyntaxExprRn ret <- ret_expr
    --
    --    ------------------------------------------------
    --               return e  ~~> return e
    -- to make T18324 work
-   = do let expansion = genHsApp ret (L body_loc body)
-        return $ L body_loc (mkExpandedStmt stmt flav (HsPar noExtField (L body_loc expansion)))
+   = do let expansion = L body_loc (genHsApp ret body)
+        return $ L sloc (mkExpandedStmt stmt flav (HsPar noExtField expansion))
 
 expand_do_stmts doFlavour (stmt@(L loc (LetStmt _ bs)) : lstmts) =
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (3) below
