@@ -403,17 +403,17 @@ tcApp :: CtOrigin
 -- See Note [tcApp: typechecking applications]
 tcApp fun_orig rn_expr exp_res_ty
   = do { -- Step 1: Split the application chain
-         (fun@(rn_fun, fun_ctxt), rn_args) <- splitHsApps rn_expr
+         (fun@(rn_fun, fun_loc), rn_args) <- splitHsApps rn_expr
        ; traceTc "tcApp {" $
            vcat [ text "rn_expr:" <+> ppr rn_expr
                 , text "rn_fun:" <+> ppr rn_fun
-                , text "fun_ctxt:" <+> ppr fun_ctxt
+                , text "fun_loc:" <+> ppr fun_loc
                 , text "orig:" <+> ppr fun_orig
                 , text "rn_args:" <+> ppr rn_args ]
 
        -- Step 2: Infer the type of `fun`, the head of the application
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
-       ; let tc_head = (tc_fun, fun_ctxt)
+       ; let tc_head = (tc_fun, fun_loc)
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
        ; traceTc "tcApp:inferAppHead" $
@@ -422,7 +422,7 @@ tcApp fun_orig rn_expr exp_res_ty
               , text "do_ql:" <+> ppr do_ql]
 
        ; (inst_args, app_res_rho)
-              <- tcInstFun do_ql True fun_orig (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
+              <- tcInstFun do_ql True fun_orig (tc_fun, rn_fun, fun_loc) fun_sigma rn_args
 
        ; case do_ql of
             NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
@@ -485,7 +485,7 @@ checkResultTy _ _ _ app_res_rho (Infer inf_res)
   = do { co <- fillInferResult app_res_rho inf_res
        ; return (mkWpCastN co) }
 
-checkResultTy rn_expr (tc_fun, fun_ctxt) inst_args app_res_rho (Check res_ty)
+checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho (Check res_ty)
 -- Unify with expected type from the context
 -- See Note [Unify with expected type before typechecking arguments]
 --
@@ -522,7 +522,7 @@ checkResultTy rn_expr (tc_fun, fun_ctxt) inst_args app_res_rho (Check res_ty)
     -- the source program; it was added by the renamer.  See
     -- Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr
     perhaps_add_res_ty_ctxt thing_inside
-      | isGeneratedSrcSpan fun_ctxt
+      | isGeneratedSrcSpan fun_loc
       = thing_inside
       | otherwise
       = addFunResCtxt tc_fun inst_args app_res_rho (mkCheckExpType res_ty) $
@@ -915,10 +915,8 @@ addArgCtxt :: Int -> HsExpr GhcRn -> LHsExpr GhcRn
 -- 1. In the normal case, we add an informative context
 --          "In the third argument of f, namely blah"
 -- 2. If we are deep inside generated code (`isGeneratedCode` is `True`)
---    or if all or part of this particular application is an expansion
---    `VAExpansion`, just use the less-informative context
 --          "In the expression: arg"
---   Unless the arg is also a generated thing, in which case do nothing.
+--  If the arg is also a generated thing, i.e. arg_loc is generatedSrcSpan, we would print do nothing.
 --  See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 --  See Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
 addArgCtxt arg_no fun (L arg_loc arg) thing_inside
