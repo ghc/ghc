@@ -43,8 +43,6 @@ import Data.Word (Word8)
 -- Parser Monad
 newtype ParserM a = ParserM {unParserM :: AlexInput -> St -> Either String (AlexInput, St, a)}
 
--- newtype P a       = P     { unP :: PState -> ParseResult a }
-
 instance Functor ParserM where
     fmap = liftM
 
