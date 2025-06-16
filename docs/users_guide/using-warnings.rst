@@ -2536,7 +2536,7 @@ of ``-W(no-)*``.
 
     :since: 9.8.1
 
-    Ino accordance with `GHC Proposal #134
+    In accordance with `GHC Proposal #134
     <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0134-deprecating-exports-proposal.rst>`__,
     it is now possible to deprecate certain exports of a name without deprecating the name itself.
 
@@ -2556,8 +2556,8 @@ of ``-W(no-)*``.
           )
         import A
 
-     When :ghc-flag:`-Wincomplete-export-warnings` is enabled, GHC warns about exports
-     that are not deprecating a name that is deprecated with another export in that module.
+    When :ghc-flag:`-Wincomplete-export-warnings` is enabled, GHC warns about exports
+    that are not deprecating a name that is deprecated with another export in that module.
 
 .. ghc-flag:: -Wbadly-levelled-types
     :shortdesc: warn when type binding is used at the wrong Template Haskell level.
@@ -2630,7 +2630,7 @@ of ``-W(no-)*``.
     :since: 9.10.1
 
     Introduced in GHC 9.10.1 with the introduction of an implicit
-    :base-ref:`Control.Exception.Context.ExceptionContext`` context to
+    :base-ref:`Control.Exception.Context.ExceptionContext` context to
     :base-ref:`Control.Exception.SomeException`. To preserve compatibility
     with earlier compilers, this constraints is implicitly defaulted to
     :base-ref:`Control.Exception.Context.emptyExceptionContext` when no other
