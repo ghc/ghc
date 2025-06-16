@@ -767,93 +767,21 @@ tryShortCutSolver try_short_cut dict_w@(DictCt { di_ev = ev_w })
               -- Enabled by the -fsolve-constant-dicts flag
 
             -> tryTcS $  -- tryTcS tries to completely solve some contraints
-               do { updInertSet zapInertSet   -- Remove all Givens, solved dicts etc
+               do { updInertSet zap_cans
                   ; solveSimpleWanteds (unitBag (CDictCan dict_w)) }
 
             | otherwise
             -> return False }
 
-{-
-  = do { ev_binds_var <- getTcEvBindsVar
-       ; ev_binds <- assertPpr (not (isCoEvBindsVar ev_binds_var )) (ppr ev_w) $
-                     getTcEvBindsMap ev_binds_var
-       ; solved_dicts <- getSolvedDicts
-
-       ; mb_stuff <- runMaybeT $
-                     try_solve_from_instance (ev_binds, solved_dicts) wanted
-
-       ; case mb_stuff of
-           Nothing -> return False
-           Just (ev_binds', solved_dicts')
-              -> do { setTcEvBindsMap ev_binds_var ev_binds'
-                    ; setSolvedDicts solved_dicts'
-                    ; return True } }
-
-  | otherwise
-  = return False
   where
-    -- This `CtLoc` is used only to check the well-staged condition of any
-    -- candidate DFun. Our subgoals all have the same stage as our root
-    -- [W] constraint so it is safe to use this while solving them.
-    loc_w = ctEvLoc ev_w
+    zap_cans :: InertSet -> InertSet
+    -- Zap the inert Givens (so we don't try to use them for solving)
+    -- and any inert Wanteds (no harm but not much benefit either.
+    -- But preserve the current solved_dicts, so that one invocation of
+    -- tryShortCutSolver can benefit from the work of earlier invocations
+    zap_cans inerts@(IS { inert_cans = cans })
+       = inerts { inert_cans = emptyInertCans (inert_given_eq_lvl cans) }
 
-    try_solve_from_instance   -- See Note [Shortcut try_solve_from_instance]
-      :: (EvBindMap, DictMap DictCt) -> WantedCtEvidence
-      -> MaybeT TcS (EvBindMap, DictMap DictCt)
-    try_solve_from_instance (ev_binds, solved_dicts) wtd@(WantedCt { ctev_loc = loc, ctev_pred = pred })
-      | ClassPred cls tys <- classifyPredType pred
-      = do { inst_res <- lift $ matchGlobalInst dflags True cls tys loc_w
-           ; lift $ warn_custom_warn_instance inst_res loc_w
-                 -- See Note [Implementation of deprecated instances]
-           ; case inst_res of
-               OneInst { cir_new_theta   = preds
-                       , cir_mk_ev       = mk_ev
-                       , cir_canonical   = canonical
-                       , cir_what        = what }
-                 | safeOverlap what
-                 , all isTyFamFree preds  -- Note [Shortcut solving: type families]
-                 -> do { let dict_ct = DictCt { di_ev = CtWanted wtd, di_cls = cls
-                                              , di_tys = tys, di_pend_sc = doNotExpand }
-                             solved_dicts' = addSolvedDict dict_ct solved_dicts
-                             -- solved_dicts': it is important that we add our goal
-                             -- to the cache before we solve! Otherwise we may end
-                             -- up in a loop while solving recursive dictionaries.
-
-                       ; lift $ traceTcS "shortCutSolver: found instance" (ppr preds)
-                       ; loc' <- lift $ checkInstanceOK loc what pred
-                       ; lift $ checkReductionDepth loc' pred
-
-
-                       ; evc_vs <- mapM (new_wanted_cached wtd loc' solved_dicts') preds
-                                  -- Emit work for subgoals but use our local cache
-                                  -- so we can solve recursive dictionaries.
-
-                       ; let ev_tm     = mk_ev (map getEvExpr evc_vs)
-                             ev_binds' = extendEvBinds ev_binds $
-                                         mkWantedEvBind (wantedCtEvEvId wtd) canonical ev_tm
-
-                       ; foldlM try_solve_from_instance (ev_binds', solved_dicts') $
-                         freshGoals evc_vs }
-
-               _ -> mzero }
-
-      | otherwise
-      = mzero
-
-
-    -- Use a local cache of solved dicts while emitting EvVars for new work
-    -- We bail out of the entire computation if we need to emit an EvVar for
-    -- a subgoal that isn't a ClassPred.
-    new_wanted_cached :: WantedCtEvidence -> CtLoc
-                      -> DictMap DictCt -> TcPredType -> MaybeT TcS MaybeNew
-    new_wanted_cached (WantedCt { ctev_rewriters = rws }) loc cache pty
-      | ClassPred cls tys <- classifyPredType pty
-      = lift $ case findDict cache loc_w cls tys of
-          Just dict_ct -> return $ Cached (ctEvExpr (dictCtEvidence dict_ct))
-          Nothing      -> Fresh <$> newWantedNC loc rws pty
-      | otherwise = mzero
-
--}
 
 {- *******************************************************************
 *                                                                    *

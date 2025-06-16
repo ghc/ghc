@@ -1360,7 +1360,9 @@ tryTcS (TcS thing_inside)
                             , tcs_inerts   = new_inert_var
                             , tcs_worklist = new_wl_var }
 
+       ; TcM.traceTc "tryTcS {" (ppr old_inerts)
        ; wc <- thing_inside nest_env
+       ; TcM.traceTc "tryTcS }" (ppr wc)
 
        ; if not (isSolvedWC wc)
          then return False
@@ -1372,6 +1374,8 @@ tryTcS (TcS thing_inside)
                  -- Update the existing inert set
                  ; new_inerts <- TcM.readTcRef new_inert_var
                  ; TcM.updTcRef inerts_var (`updateInertsWith` new_inerts)
+
+                 ; TcM.traceTc "tryTcS update" (ppr (inert_solved_dicts new_inerts))
 
                   -- We **must not** drop solved implications, due
                   -- to Note [Free vars of EvFun] in GHC.Tc.Types.Evidence;

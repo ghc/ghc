@@ -17,7 +17,7 @@ module GHC.Tc.Solver.InertSet (
     -- * The inert set
     InertSet(..),
     InertCans(..),
-    emptyInertSet, zapInertSet,
+    emptyInertSet, emptyInertCans,
 
     noGivenNewtypeReprEqs, updGivenEqs,
     prohibitedSuperClassSolve,
@@ -404,10 +404,6 @@ emptyInertSet given_eq_lvl
        , inert_famapp_cache   = emptyFunEqs
        , inert_solved_dicts   = emptyDictMap
        , inert_safehask     = emptyDictMap }
-
-zapInertSet :: InertSet -> InertSet
-zapInertSet (IS { inert_cans = cans })
-  = emptyInertSet (inert_given_eq_lvl cans)
 
 {- Note [Solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
