@@ -2965,15 +2965,14 @@ singleCall spec_env id args
                      unitBag (CI { ci_key  = args
                                  , ci_fvs  = fvVarSet call_fvs }) }
   where
-    call_fvs | gopt Opt_PolymorphicSpecialisation (se_dflags spec_env)
-             = specArgsFVs isLocalVar args
-             | otherwise
-             = specArgsFVs isLocalId args
+    poly_spec = gopt Opt_PolymorphicSpecialisation (se_dflags spec_env)
 
-        -- specArgFreeIds: we specifically look for free Ids, not TyVars
-        --    see (MP1) in Note [Specialising polymorphic dictionaries]
-        --
-        -- We don't include the 'id' itself.
+    -- With -fpolymorphic-specialisation, keep just local /Ids/
+    -- Otherwise, keep /all/ free vars including TyVars
+    -- See (MP1) in Note [Specialising polymorphic dictionaries]
+    -- But NB: we don't include the 'id' itself.
+    call_fvs | poly_spec = specArgsFVs isLocalId args
+             | otherwise = specArgsFVs isLocalVar args
 
 mkCallUDs :: SpecEnv -> OutExpr -> [OutExpr] -> UsageDetails
 mkCallUDs env fun args
@@ -3504,7 +3503,7 @@ What should we do when a value is specialised to a *strict* unboxed value?
                            in h:t
 
 Could convert let to case:
- 
+
         map_*_Int# f (x:xs) = case f x of h# ->
                               let t = map f xs
                               in h#:t
