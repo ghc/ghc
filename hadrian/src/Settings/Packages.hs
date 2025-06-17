@@ -11,6 +11,7 @@ import Settings.Builders.Common (wayCcArgs)
 import GHC.Toolchain.Target
 import GHC.Platform.ArchOS
 import Data.Version.Extra
+import Settings.Program (ghcWithInterpreter)
 
 -- | Package-specific command-line arguments.
 packageArgs :: Args
