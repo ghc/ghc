@@ -26,6 +26,7 @@ import Utilities
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Toolchain.Program
 import GHC.Platform.ArchOS
+import Settings.Program (ghcWithInterpreter)
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()

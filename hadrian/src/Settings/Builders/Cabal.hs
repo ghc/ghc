@@ -11,7 +11,7 @@ import Settings.Builders.Common
 import qualified Settings.Builders.Common as S
 import Control.Exception (assert)
 import qualified Data.Set as Set
-import Settings.Program (programContext)
+import Settings.Program (programContext, ghcWithInterpreter)
 import GHC.Toolchain (ccLinkProgram, tgtCCompilerLink)
 import GHC.Toolchain.Program (prgFlags)
 

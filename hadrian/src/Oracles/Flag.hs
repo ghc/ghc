@@ -7,7 +7,6 @@ module Oracles.Flag (
     targetRTSLinkerOnlySupportsSharedLibs,
     targetSupportsThreadedRts,
     targetSupportsSMP,
-    ghcWithInterpreter,
     useLibffiForAdjustors,
     arSupportsDashL,
     arSupportsAtFile
@@ -145,32 +144,6 @@ targetSupportsSMP = do
      , ver < ARMv7          -> return False
      | goodArch             -> return True
      | otherwise            -> return False
-
-
--- | When cross compiling, enable for stage0 to get ghci
--- support. But when not cross compiling, disable for
--- stage0, otherwise we introduce extra dependencies
--- like haskeline etc, and mixing stageBoot/stage0 libs
--- can cause extra trouble (e.g. #25406)
---
--- Also checks whether the target supports GHCi.
-ghcWithInterpreter :: Stage -> Action Bool
-ghcWithInterpreter stage = do
-    is_cross <- flag CrossCompiling
-    goodOs <- anyTargetOs [ OSMinGW32, OSLinux, OSSolaris2 -- TODO "cygwin32"?,
-                          , OSFreeBSD, OSDragonFly, OSNetBSD, OSOpenBSD
-                          , OSDarwin, OSKFreeBSD
-                          , OSWasi ]
-    goodArch <- (||) <$>
-                anyTargetArch [ ArchX86, ArchX86_64, ArchPPC
-                              , ArchAArch64, ArchS390X
-                              , ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2
-                              , ArchRISCV64, ArchLoongArch64
-                              , ArchWasm32 ]
-                              <*> isArmTarget
-    -- Maybe this should just be false for cross compilers. But for now
-    -- I've kept the old behaviour where it will say yes. (See #25939)
-    return $ goodOs && goodArch && (stage >= Stage1 || is_cross)
 
 useLibffiForAdjustors :: Action Bool
 useLibffiForAdjustors = queryTargetTarget tgtUseLibffiForAdjustors
