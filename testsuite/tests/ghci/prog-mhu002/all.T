@@ -20,7 +20,7 @@ test('prog-mhu002c',
      extra_hc_opts('-fno-ghci-leak-check'),
      cmd_prefix('ghciWayFlags=' + config.ghci_way_flags),
      req_interp],
-     ghci_multiunit_script, [['unitA', 'unitB', 'unitC', 'unitD'], 'prog-mhu002c.script'])
+     ghci_multiunit_script, [['unitA', 'unitB', 'unitC', 'unitD'], 'prog-mhu002c.script', '-XGHC2021'])
 test('prog-mhu002d',
      [extra_files(['a/', 'b/', 'c/', 'd/'
                   , 'unitA', 'unitB', 'unitC', 'unitD',

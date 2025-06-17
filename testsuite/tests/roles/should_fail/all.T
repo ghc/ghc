@@ -1,4 +1,4 @@
-test('Roles5', normal, compile_fail, [''])
+test('Roles5', normal, compile_fail, ['-XGHC2021'])
 test('Roles6', normal, compile_fail, [''])
 test('Roles7', normal, compile_fail, [''])
 test('Roles8', normal, compile_fail, [''])

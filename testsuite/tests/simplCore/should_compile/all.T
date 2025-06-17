@@ -428,7 +428,7 @@ test('T21689', [extra_files(['T21689a.hs'])], multimod_compile, ['T21689', '-v0 
 test('T21801', normal, compile, ['-O -dcore-lint'])
 test('T21848', [grep_errmsg(r'SPEC wombat') ], compile, ['-O -ddump-spec'])
 test('T21694b', [grep_errmsg(r'Arity=4') ], compile, ['-O -ddump-simpl'])
-test('T21960', [grep_errmsg(r'^ Arity=5') ], compile, ['-O2 -ddump-simpl'])
+test('T21960', [grep_errmsg(r'^ Arity=5') ], compile, ['-O2 -ddump-simpl -XGHC2021'])
 test('T21948', [grep_errmsg(r'^ Arity=5') ], compile, ['-O -ddump-simpl'])
 test('DataToTagFamilyScrut', normal, compile, ['-O -ddump-simpl -dsuppress-all -dno-typeable-binds -dsuppress-uniques'])
 test('T21763', only_ways(['optasm']), compile, ['-O2 -ddump-rules'])

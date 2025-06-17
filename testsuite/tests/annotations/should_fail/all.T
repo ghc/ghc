@@ -1,6 +1,6 @@
 
 test('annfail01', req_th, compile_fail, [''])
-test('annfail02', req_th, compile_fail, [''])
+test('annfail02', req_th, compile_fail, ['-XGHC2021'])
 test('annfail03', req_th, compile_fail, [''])
 test('annfail04', [extra_files(['Annfail04_Help.hs']),
                    req_th], multimod_compile_fail, ['annfail04', '-v0'])

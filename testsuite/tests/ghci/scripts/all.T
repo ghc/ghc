@@ -53,7 +53,7 @@ test('ghci022', normal, ghci_script, ['ghci022.script'])
 test('ghci023', normal, ghci_script, ['ghci023.script'])
 test('ghci024',
      [req_interp, when(fast(), skip)],
-     makefile_test, [])
+     makefile_test, ['-XGHC2021'])
 test('T9367',
      [req_interp, when(fast() or config.os != 'mingw32', skip)],
      makefile_test, [])

@@ -221,7 +221,7 @@ test('T5700', [], multimod_compile,
 
 test('TH_PromotedTuple', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_PromotedList', normal, compile, ['-v0'])
-test('TH_Promoted1Tuple', normal, compile_fail, ['-v0'])
+test('TH_Promoted1Tuple', normal, compile_fail, ['-v0', '-XGHC2021'])
 test('TH_RichKinds', normal, compile, ['-v0'])
 test('TH_RichKinds2', normal, compile, ['-v0'])
 
@@ -265,7 +265,7 @@ test('ClosedFam2TH', normal, compile, ['-v0'])
 
 test('T8028', [], multimod_compile, ['T8028', '-v0 ' + config.ghc_th_way_flags])
 
-test('TH_Roles1', normal, compile_fail, ['-v0'])
+test('TH_Roles1', normal, compile_fail, ['-v0', '-XGHC2021'])
 test('TH_Roles2', normalise_version('ghc-internal', 'array', 'base', 'deepseq', 'ghc-prim',
                                     'ghc-boot', 'ghc-boot-th',
                                     'pretty', 'template-haskell',

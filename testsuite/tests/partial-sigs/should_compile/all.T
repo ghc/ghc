@@ -56,7 +56,7 @@ test('ScopedNamedWildcardsGood', normal, compile, ['-ddump-types -fno-warn-parti
 test('ShowNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('SimpleGen', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('SkipMany', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
-test('SomethingShowable', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('SomethingShowable', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures -XGHC2021'])
 test('TypeFamilyInstanceLHS', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Uncurry', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('UncurryNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
