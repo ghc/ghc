@@ -1,4 +1,5 @@
 -- !!! this module supposedly includes one of each Haskell construct
+{-# LANGUAGE GHC2021 #-}
 
 -- HsImpExp stuff
 

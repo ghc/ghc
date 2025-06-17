@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module T12681 where
 import qualified T12681a
 

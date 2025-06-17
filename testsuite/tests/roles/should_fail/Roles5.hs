@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module Roles5 where
 
 data T a

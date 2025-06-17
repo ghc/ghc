@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module T8570 where
 
 import T8570a (Image(filepath), logo)

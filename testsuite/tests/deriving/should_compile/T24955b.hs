@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wmissing-deriving-strategies #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FunctionalDependencies, GHC2021 #-}
 
 module T24955b () where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, GHC2021 #-}
 {-| `elem`, 'print',
 `Unknown',
 '<>', ':=:', 'Bool'

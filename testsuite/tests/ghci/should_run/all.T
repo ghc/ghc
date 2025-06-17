@@ -22,9 +22,9 @@ test('T9914',      just_ghci, ghci_script, ['T9914.script'])
 test('T9915',      just_ghci, ghci_script, ['T9915.script'])
 test('T10145',     just_ghci, ghci_script, ['T10145.script'])
 test('T7253',      just_ghci, ghci_script, ['T7253.script'])
-test('T10857a',    just_ghci, ghci_script, ['T10857a.script'])
+test('T10857a',    [extra_hc_opts("-XGHC2021"), just_ghci], ghci_script, ['T10857a.script'])
 test('T10857b',
-      [extra_hc_opts("-XMonomorphismRestriction -XNoExtendedDefaultRules")],
+      [extra_hc_opts("-XMonomorphismRestriction -XNoExtendedDefaultRules -XGHC2021")],
                    ghci_script, ['T10857b.script'])
 test('T11328',     just_ghci, ghci_script, ['T11328.script'])
 test('T11825',     just_ghci, ghci_script, ['T11825.script'])

@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module T22241 where
 
 data D = D { unD :: !Int }

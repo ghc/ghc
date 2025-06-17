@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 
 module T7453 where
 

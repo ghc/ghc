@@ -5,25 +5,25 @@ include $(TOP)/mk/test.mk
 ghci024:
 	@echo "~~~~~~~~~~ Testing :set"
 	printf ":set\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE)
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021
 	@echo "~~~~~~~~~~ Testing :set -a"
 	printf ":set -a\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) \
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021\
 	    | grep -E "^([^ ]|  -fno-print-explicit-foralls|  -Wno-implicit-prelude)"
 	@echo "~~~~~~~~~~ Testing :show languages"
 	printf ":show languages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE)
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021
 	@echo "~~~~~~~~~~ Testing :show languages, with -XMagicHash"
 	printf ":set -XMagicHash\n:show languages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE)
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021
 	@echo "~~~~~~~~~~ Testing :show packages"
 	printf ":show packages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) \
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021\
 	    | grep -E "^([^ ]|  -package|base|ghc-prim|integer|rts|Cabal)" \
 	    | sed "s/Cabal-[0-9.]*/Cabal-VERSION/"
 	@echo "~~~~~~~~~~ Testing :show packages, including the ghc package"
 	printf ":set -package ghc\n:show packages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) \
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021\
 	    | grep -E "^([^ ]|  -package|base|ghc-prim|integer|rts|Cabal)" \
 	    | sed "s/Cabal-[0-9.]*/Cabal-VERSION/"
 

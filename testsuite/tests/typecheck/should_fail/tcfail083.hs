@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module ShouldFail where
 
 data Bar = Bar { flag :: Bool } deriving( Show )

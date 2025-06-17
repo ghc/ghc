@@ -19,7 +19,7 @@ docs:
        named chunks:
        haddock options:
        language:
-         Nothing
+         Just GHC2021
        language extensions:
          MonomorphismRestriction
          RelaxedPolyRec

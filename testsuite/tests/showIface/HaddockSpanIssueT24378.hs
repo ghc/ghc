@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 {-| `elem`, 'print',
 `Unknown',
 '<>', ':=:', 'Bool'

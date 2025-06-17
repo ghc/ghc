@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving, GHC2021 #-}
 
 {-# OPTIONS_GHC -Wmissing-deriving-strategies #-}
 

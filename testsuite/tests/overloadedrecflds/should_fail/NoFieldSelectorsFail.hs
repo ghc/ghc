@@ -1,4 +1,4 @@
-{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE NoFieldSelectors, GHC2021 #-}
 module NoFieldSelectorsFail (foo, bar) where
 
 import NoFieldSelectorsFailA

@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 {-# OPTIONS_GHC -Wno-x-partial #-}
 module MutRec where
 

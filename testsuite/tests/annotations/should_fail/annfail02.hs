@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module Annfail02 where
 -- Testing annotating things that don't exist in the right namespace
 

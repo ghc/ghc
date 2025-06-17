@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module HaddockIssue849
   ( module Data.Functor.Identity
   , module Data.Maybe

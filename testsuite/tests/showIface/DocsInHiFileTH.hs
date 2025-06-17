@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, FlexibleInstances, TypeFamilies, DataKinds #-}
+{-# LANGUAGE TemplateHaskell, FlexibleInstances, TypeFamilies, DataKinds, GHC2021 #-}
 {-# LANGUAGE MultiParamTypeClasses, StandaloneKindSignatures, PolyKinds #-}
 {-# LANGUAGE PatternSynonyms #-}
 
