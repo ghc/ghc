@@ -285,6 +285,7 @@ module Control.Exception where
   catchJust :: forall e b a. Exception e => (e -> GHC.Internal.Maybe.Maybe b) -> GHC.Internal.Types.IO a -> (b -> GHC.Internal.Types.IO a) -> GHC.Internal.Types.IO a
   catchNoPropagate :: forall e a. Exception e => GHC.Internal.Types.IO a -> (ExceptionWithContext e -> GHC.Internal.Types.IO a) -> GHC.Internal.Types.IO a
   catches :: forall a. GHC.Internal.Types.IO a -> [Handler a] -> GHC.Internal.Types.IO a
+  displayExceptionWithInfo :: SomeException -> GHC.Internal.Base.String
   evaluate :: forall a. a -> GHC.Internal.Types.IO a
   finally :: forall a b. GHC.Internal.Types.IO a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO a
   getMaskingState :: GHC.Internal.Types.IO MaskingState

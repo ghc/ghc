@@ -246,7 +246,7 @@ instance Exception SomeException where
 --    * The exception context
 --
 -- By default, 'uncaughtExceptionHandler' uses 'displayExceptionWithInfo' to print uncaught exceptions.
--- This default can be overriden with 'setUncaughtExceptionHandler', for
+-- This default can be overridden with 'setUncaughtExceptionHandler', for
 -- instance, to present custom error messages on exceptions to the user.
 --
 -- @since base-4.21
