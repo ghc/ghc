@@ -1000,7 +1000,7 @@ dsSpec_help poly_nm poly_id poly_rhs spec_inl orig_bndrs ds_call
              known_vars   = mkVarSet rule_bndrs `extendVarSetList` bindersOfBinds rn_binds
              picked_binds = pickSpecBinds is_local known_vars binds
 
-             -- Fins `spec_bndrs`: (S5) of Note [Desugaring new-form SPECIALISE pragmas]
+             -- Find `spec_bndrs`: (S5) of Note [Desugaring new-form SPECIALISE pragmas]
              -- Make spec_bndrs, the variables to pass to the specialised
              -- function, by filtering out the rule_bndrs that aren't needed
              spec_binds_bndr_set = mkVarSet (bindersOfBinds picked_binds)
