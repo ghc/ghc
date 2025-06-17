@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 {-# OPTIONS_GHC -Wmissing-deriving-strategies #-}
 
 module T24955a () where

@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 {-# OPTIONS_GHC -fdefer-type-errors #-}
 
 module T18467 where

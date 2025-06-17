@@ -1,4 +1,4 @@
-:set -XRequiredTypeArguments -XTemplateHaskell
+:set -XRequiredTypeArguments -XTemplateHaskell -XGHC2021
 import Language.Haskell.TH (typeE)
 f :: forall a -> Num a => a; f _ = 42
 f $(typeE [t|Int|])   -- requires -XExplicitNamespaces

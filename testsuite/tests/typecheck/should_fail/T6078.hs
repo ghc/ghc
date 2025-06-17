@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, GHC2021 #-}
 module T6078 where
 
 import GHC.Ptr

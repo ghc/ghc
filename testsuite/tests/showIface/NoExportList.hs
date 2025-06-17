@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 -- | Module header
 module NoExportList where
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 -- !!! Check that using a label belonging to another constructor
 -- !!! is flagged as being incorrect.
 module ShouldFail where

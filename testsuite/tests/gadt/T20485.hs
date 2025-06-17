@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PatternSynonyms, GHC2021 #-}
 module T20485 where
 
 import Data.Type.Equality

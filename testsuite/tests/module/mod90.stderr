@@ -1,5 +1,4 @@
-
-mod90.hs:3:16: error: [GHC-35373]
+mod90.hs:4:16: error: [GHC-35373]
     In the import of ‘Prelude’:
       an item called ‘Left’
       is exported, but it is a data constructor of

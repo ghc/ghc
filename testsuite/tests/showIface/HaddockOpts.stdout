@@ -12,7 +12,7 @@ docs:
        haddock options:
          not-home, show-extensions
        language:
-         Nothing
+         Just GHC2021
        language extensions:
          MonomorphismRestriction
          RelaxedPolyRec

@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module T10770a where
 
 import Data.Typeable

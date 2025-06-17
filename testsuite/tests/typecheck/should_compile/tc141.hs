@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, GHC2021 #-}
 
 -- Scoped type variables on pattern bindings
 -- This should *fail* on GHC 5.02 and lower,

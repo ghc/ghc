@@ -47,6 +47,10 @@ editCoreBinding early modName pgm = do
     go (NonRec v e : bs) = go_bind NonRec v e : go bs
     go [] = []
 
+    go_bind :: (CoreBndr -> Expr CoreBndr -> a)
+            -> CoreBndr
+            -> Expr CoreBndr
+            -> a
     go_bind c v e
       | occNameString (getOccName v) == "testBinding"
       , exprType e `eqType` intTy

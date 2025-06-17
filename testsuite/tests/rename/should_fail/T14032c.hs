@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 
 module T14032c where
 

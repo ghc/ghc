@@ -35,8 +35,8 @@ LanguageExts:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface LanguageExts.hi | grep -A 100 'docs:'
 
 ReExports:
-	'$(TEST_HC)' $(TEST_HC_OPTS) --make -haddock -v0 Inner0 Inner1 Inner2 Inner3 Inner4 ReExports
-	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface ReExports.hi | grep -A 200 'docs:'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -XGHC2021 --make -haddock -v0 Inner0 Inner1 Inner2 Inner3 Inner4 ReExports
+	'$(TEST_HC)' $(TEST_HC_OPTS) -XGHC2021 --show-iface ReExports.hi | grep -A 200 'docs:'
 
 HaddockIssue849:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -haddock HaddockIssue849.hs

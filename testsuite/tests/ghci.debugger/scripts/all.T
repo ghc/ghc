@@ -65,7 +65,7 @@ test('break011',
      [extra_files(['../Test7.hs']),
       combined_output],
      ghci_script, ['break011.script'])
-test('break012', normal, ghci_script, ['break012.script'])
+test('break012', [extra_hc_opts('-XGHC2021')], ghci_script, ['break012.script'])
 test('break013', normal, ghci_script, ['break013.script'])
 test('break014', normal, ghci_script, ['break014.script'])
 test('break015', expect_broken(1532), ghci_script, ['break015.script'])
@@ -78,7 +78,7 @@ test('break020', extra_files(['Break020b.hs']), ghci_script, ['break020.script']
 test('break021', extra_files(['Break020b.hs', 'break020.hs']), ghci_script, ['break021.script'])
 test('break024', combined_output, ghci_script, ['break024.script'])
 test('break025', normal, ghci_script, ['break025.script'])
-test('break026', normal, ghci_script, ['break026.script'])
+test('break026', [extra_hc_opts('-XGHC2021')], ghci_script, ['break026.script'])
 test('break027', extra_files(['../QSort.hs']), ghci_script, ['break027.script'])
 test('break028', normal, ghci_script, ['break028.script'])
 test('dynbrk001', extra_files(['../QSort.hs']), ghci_script, ['dynbrk001.script'])
@@ -120,14 +120,14 @@ test('T13825-debugger',
       [when(arch('powerpc64'), expect_broken(14455)),
        when(arch('arm'), fragile_for(17557, ['ghci-ext']))],
       ghci_script, ['T13825-debugger.script'])
-test('T14628', normal, ghci_script, ['T14628.script'])
+test('T14628', [extra_hc_opts('-XGHC2021')], ghci_script, ['T14628.script'])
 test('T14690', normal, ghci_script, ['T14690.script'])
 test('T16700', normal, ghci_script, ['T16700.script'])
 
 test('break029', extra_files(['break029.hs']), ghci_script, ['break029.script'])
 test('T2215', normal, ghci_script, ['T2215.script'])
 test('T17989', normal, ghci_script, ['T17989.script'])
-test('T18045', normal, ghci_script, ['T18045.script'])
+test('T18045', [extra_hc_opts('-XGHC2021')], ghci_script, ['T18045.script'])
 test('T19157', normal, ghci_script, ['T19157.script'])
 test('T19355', normal, ghci_script, ['T19355.script'])
 test('T19394', normal, ghci_script, ['T19394.script'])

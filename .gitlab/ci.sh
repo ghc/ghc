@@ -814,7 +814,7 @@ function cabal_abi_test() {
   mkdir -p "$OUT"
   "$HC" \
     -hidir tmp -odir tmp -fforce-recomp -haddock \
-    -iCabal/Cabal/src -XNoPolyKinds Distribution.Simple -j"$cores" \
+    -iCabal/Cabal/src -XHaskell2010 -XNoPolyKinds Distribution.Simple -j"$cores" \
     -fobject-determinism \
     "$@" 2>&1 | sed '1d' | tee $OUT/log
   summarise_hi_files
@@ -835,7 +835,7 @@ function cabal_test() {
     -dumpdir "$OUT/dumps" -ddump-timings \
     -j"$cores" \
     +RTS --machine-readable "-t$OUT/rts.log" -RTS \
-    -ilibraries/Cabal/Cabal/src -XNoPolyKinds Distribution.Simple \
+    -ilibraries/Cabal/Cabal/src -XHaskell2010 -XNoPolyKinds Distribution.Simple \
     "$@" 2>&1 | tee $OUT/log
   rm -Rf tmp
   end_section cabal-test
