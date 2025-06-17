@@ -34,7 +34,6 @@ import Base
 import Context
 import Oracles.Flag
 import Oracles.Setting (setting, Setting(..))
-import Oracles.Setting (settingsFileSetting, ToolchainSetting(..))
 import Packages
 
 import GHC.IO.Encoding (getFileSystemEncoding)
@@ -240,7 +239,7 @@ instance H.Builder Builder where
         Ghc _ st -> do
             root <- buildRoot
             unlitPath  <- builderPath Unlit
-            distro_mingw <- settingsFileSetting ToolchainSetting_DistroMinGW
+            distro_mingw <- lookupSystemConfig "settings-use-distro-mingw"
             libffi_adjustors <- useLibffiForAdjustors
             use_system_ffi <- flag UseSystemFfi
 
