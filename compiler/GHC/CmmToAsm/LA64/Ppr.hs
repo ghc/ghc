@@ -1015,6 +1015,10 @@ pprInstr platform instr = case instr of
     -- LD{GT/LE}.{B/H/W/D}, ST{GT/LE}.{B/H/W/D}
   -- 7. Atomic Memory Access Instructions --------------------------------------
     -- AM{SWAP/ADD/AND/OR/XOR/MAX/MIN}[DB].{W/D}, AM{MAX/MIN}[_DB].{WU/DU}
+  AMSWAPDB II8 o1 o2 o3 -> op3 (text "\tamswap_db.b") o1 o2 o3
+  AMSWAPDB II16 o1 o2 o3 -> op3 (text "\tamswap_db.h") o1 o2 o3
+  AMSWAPDB II32 o1 o2 o3 -> op3 (text "\tamswap_db.w") o1 o2 o3
+  AMSWAPDB II64 o1 o2 o3 -> op3 (text "\tamswap_db.d") o1 o2 o3
     -- AM.{SWAP/ADD}[_DB].{B/H}
     -- AMCAS[_DB].{B/H/W/D}
     -- LL.{W/D}, SC.{W/D}
@@ -1112,19 +1116,28 @@ pprInstr platform instr = case instr of
         op3 op o1 o2 o3     = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
         op4 op o1 o2 o3 o4  = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
 {-
-    -- TODO: Support dbar with different hints.
+    Support dbar with different hints.
     On LoongArch uses "dbar 0" (full completion barrier) for everything.
     But the full completion barrier has no performance to tell, so
     Loongson-3A6000 and newer processors have made finer granularity hints
     available:
 
+    Hint 0x700: barrier for "read after read" from the same address.
     Bit4: ordering or completion (0: completion, 1: ordering)
     Bit3: barrier for previous read (0: true, 1: false)
     Bit2: barrier for previous write (0: true, 1: false)
     Bit1: barrier for succeeding read (0: true, 1: false)
     Bit0: barrier for succeeding write (0: true, 1: false)
+
+    DBAR 0b10100: acquire
+    DBAR 0b10010: release
+    DBAR 0b10000: seqcst
 -}
         pprBarrierType Hint0 = text "0x0"
+        pprBarrierType HintSeqcst  = text "0x10"
+        pprBarrierType HintRelease = text "0x12"
+        pprBarrierType HintAcquire = text "0x14"
+        pprBarrierType Hint700 = text "0x700"
         floatPrecission o | isSingleOp o = text "s"
                           | isDoubleOp o = text "d"
                           | otherwise  = pprPanic "Impossible floating point precission: " (pprOp platform o)

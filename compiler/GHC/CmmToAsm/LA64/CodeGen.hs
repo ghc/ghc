@@ -1910,13 +1910,12 @@ genCCall target dest_regs arg_regs = do
         MO_W64X2_Max -> unsupported mop
 
         -- Memory Ordering
-        -- A hint value of 0 is mandatory by default, and it indicates a fully functional synchronization barrier.
-        -- Only after all previous load/store access operations are completely executed, the DBAR 0 instruction can be executed;
-        -- and only after the execution of DBAR 0 is completed, all subsequent load/store access operations can be executed.
-
-        MO_AcquireFence -> pure (unitOL (DBAR Hint0))
-        MO_ReleaseFence -> pure (unitOL (DBAR Hint0))
-        MO_SeqCstFence  -> pure (unitOL (DBAR Hint0))
+        -- Support finer-grained DBAR hints for LA664 and newer uarchs.
+        -- These are treated as DBAR 0 on older uarchs, so we can start
+        -- to unconditionally emit the new hints right away.
+        MO_AcquireFence -> pure (unitOL (DBAR HintAcquire))
+        MO_ReleaseFence -> pure (unitOL (DBAR HintRelease))
+        MO_SeqCstFence  -> pure (unitOL (DBAR HintSeqcst))
 
         MO_Touch        -> pure nilOL -- Keep variables live (when using interior pointers)
         -- Prefetch
@@ -1954,12 +1953,11 @@ genCCall target dest_regs arg_regs = do
 
                       MemOrderAcquire -> toOL [
                                                 ann moDescr (LD (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)),
-                                                DBAR Hint0
+                                                DBAR HintAcquire
                                               ]
-                      MemOrderSeqCst -> toOL [
-                                                ann moDescr (DBAR Hint0),
-                                                LD (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p),
-                                                DBAR Hint0
+                      MemOrderSeqCst -> toOL  [
+                                                ann moDescr (LD (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)),
+                                                DBAR HintSeqcst
                                               ]
                       _ -> panic $ "Unexpected MemOrderRelease on an AtomicRead: " ++ show mo
                   dst = getRegisterReg platform (CmmLocal dst_reg)
@@ -1974,15 +1972,9 @@ genCCall target dest_regs arg_regs = do
               (val, fmt_val, code_val) <- getSomeReg val_reg
               let instrs = case ord of
                       MemOrderRelaxed -> unitOL $ ann moDescr (ST fmt_val (OpReg w val) (OpAddr $ AddrReg p))
-                      MemOrderRelease -> toOL [
-                                                ann moDescr (DBAR Hint0),
-                                                ST fmt_val (OpReg w val) (OpAddr $ AddrReg p)
-                                              ]
-                      MemOrderSeqCst  -> toOL [
-                                                ann moDescr (DBAR Hint0),
-                                                ST fmt_val (OpReg w val) (OpAddr $ AddrReg p),
-                                                DBAR Hint0
-                                              ]
+                      -- implement with AMSWAPDB
+                      MemOrderRelease -> unitOL $ ann moDescr (AMSWAPDB fmt_val (OpReg w zeroReg) (OpReg w val) (OpReg w p))
+                      MemOrderSeqCst  -> unitOL $ ann moDescr (AMSWAPDB fmt_val (OpReg w zeroReg) (OpReg w val) (OpReg w p))
                       _ ->  panic $ "Unexpected MemOrderAcquire on an AtomicWrite" ++ show mo
                   moDescr = (text . show) mo
                   code =

@@ -169,6 +169,7 @@ regUsageOfInstr platform instr = case instr of
   -- LDCOND dst src1 src2     -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- STCOND dst src1 src2     -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- 7. Atomic Memory Access Instructions --------------------------------------
+  AMSWAPDB _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- 8. Barrier Instructions ---------------------------------------------------
   DBAR _hint               -> usage ([], [])
   IBAR _hint               -> usage ([], [])
@@ -343,13 +344,13 @@ patchRegsOfInstr instr env = case instr of
     STX f o1 o2        -> STX f (patchOp o1)  (patchOp o2)
     LDPTR f o1 o2      -> LDPTR f (patchOp o1)  (patchOp o2)
     STPTR f o1 o2      -> STPTR f (patchOp o1)  (patchOp o2)
-    PRELD o1 o2         -> PRELD (patchOp o1) (patchOp o2)
+    PRELD o1 o2        -> PRELD (patchOp o1) (patchOp o2)
     -- 6. Bound Check Memory Access Instructions ---------------------------------
     -- LDCOND o1 o2 o3       -> LDCOND  (patchOp o1)  (patchOp o2)  (patchOp o3)
     -- STCOND o1 o2 o3       -> STCOND  (patchOp o1)  (patchOp o2)  (patchOp o3)
     -- 7. Atomic Memory Access Instructions --------------------------------------
+    AMSWAPDB f o1 o2 o3 -> AMSWAPDB f (patchOp o1) (patchOp o2) (patchOp o3)
     -- 8. Barrier Instructions ---------------------------------------------------
-    -- TODO: need fix
     DBAR o1             -> DBAR o1
     IBAR o1             -> IBAR o1
     -- 11. Floating Point Instructions -------------------------------------------
@@ -734,6 +735,7 @@ data Instr
     | PRELD Operand Operand
     -- 6. Bound Check Memory Access Instructions ---------------------------------
     -- 7. Atomic Memory Access Instructions --------------------------------------
+    | AMSWAPDB Format Operand Operand Operand
     -- 8. Barrier Instructions ---------------------------------------------------
     | DBAR BarrierType
     | IBAR BarrierType
@@ -755,8 +757,13 @@ data Instr
     --  fnmadd: d = - r1 * r2 - r3
     | FMA FMASign Operand Operand Operand Operand
 
--- TODO: Not complete.
-data BarrierType = Hint0
+data BarrierType
+  = Hint0
+  | Hint700
+  | HintAcquire
+  | HintRelease
+  | HintSeqcst
+  deriving (Eq, Show)
 
 instrCon :: Instr -> String
 instrCon i =
@@ -847,6 +854,7 @@ instrCon i =
       LDPTR{} -> "LDPTR"
       STPTR{} -> "STPTR"
       PRELD{} -> "PRELD"
+      AMSWAPDB{} -> "AMSWAPDB"
       DBAR{} -> "DBAR"
       IBAR{} -> "IBAR"
       FCVT{} -> "FCVT"
