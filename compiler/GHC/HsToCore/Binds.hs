@@ -1098,8 +1098,8 @@ dsSpec poly_rhs (
 
              mk_spec_body fn_body = mkLets spec_const_binds  $
                                     mkApps fn_body lhs_args
-                                    -- ToDo: not mkCoreApps!  That uses exprType on fun which
-                                    --       fails in specUnfolding, sigh
+                                    -- NB: not mkCoreApps!  That uses exprType on fun
+                                    --     which fails in specUnfolding, sigh
 
        ; tracePm "dsSpec" (vcat [ text "poly_id" <+> ppr poly_id
                                 , text "bndrs"   <+> ppr bndrs
