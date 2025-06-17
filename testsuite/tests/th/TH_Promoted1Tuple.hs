@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, GHC2021 #-}
 
 module TH_Promoted1Tuple where
 

@@ -17,7 +17,7 @@ test('prog-mhu002c',
                   , 'unitA', 'unitB', 'unitC', 'unitD',
                   ]),
      # See Note [Disabling ghci-leak-check]
-     extra_hc_opts('-fno-ghci-leak-check'),
+     extra_hc_opts('-fno-ghci-leak-check -XGHC2021'),
      cmd_prefix('ghciWayFlags=' + config.ghci_way_flags),
      req_interp],
      ghci_multiunit_script, [['unitA', 'unitB', 'unitC', 'unitD'], 'prog-mhu002c.script'])

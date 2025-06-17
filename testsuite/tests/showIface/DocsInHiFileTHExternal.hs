@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module DocsInHiFileTHExternal where
 
 -- |This is an external function

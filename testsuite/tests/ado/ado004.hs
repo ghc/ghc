@@ -1,4 +1,4 @@
-{-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE ApplicativeDo, GHC2021 #-}
 {-# OPTIONS_GHC -ddump-types #-}
 module Test where
 

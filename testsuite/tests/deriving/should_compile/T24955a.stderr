@@ -1,4 +1,4 @@
-T24955a.hs:10:12: warning: [GHC-55631] [-Wmissing-deriving-strategies]
+T24955a.hs:11:12: warning: [GHC-55631] [-Wmissing-deriving-strategies]
     • No deriving strategy specified. Did you want stock, newtype, or anyclass?
     • In the newtype declaration for ‘N’
     Suggested fixes:

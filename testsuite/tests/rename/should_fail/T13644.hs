@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module T13644 where
 
 import T13644A

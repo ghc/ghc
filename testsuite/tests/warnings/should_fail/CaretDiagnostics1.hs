@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 module CaretDiagnostics1 where
 
 main :: IO ()

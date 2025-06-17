@@ -15,7 +15,7 @@ language edition consists of a collection of language extensions, and there are
 many other language extensions not currently part of a language edition but that
 can be enabled explicitly.
 
-Currently, :extension:`GHC2021` is used by default if no other language edition
+Currently, :extension:`GHC2024` is used by default if no other language edition
 is explicitly requested, for backwards compatibility purposes. Since later
 versions of GHC may use a different language edition by default, users are
 advised to declare a language edition explicitly.  Using :extension:`GHC2024` is

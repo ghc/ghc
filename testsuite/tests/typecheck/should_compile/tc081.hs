@@ -1,3 +1,4 @@
+{-# LANGUAGE GHC2021 #-}
 -- !!! an example Simon made up
 --
 module ShouldSucceed where

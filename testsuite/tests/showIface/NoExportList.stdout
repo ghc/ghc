@@ -9,11 +9,11 @@ docs:
          [fα -> [text:
                    -- ^ Documentation for 'R'\'s 'fα' field.
                  identifiers:
-                   {NoExportList.hs:13:38}
+                   {NoExportList.hs:14:38}
                    R
-                   {NoExportList.hs:13:38}
+                   {NoExportList.hs:14:38}
                    R
-                   {NoExportList.hs:13:45-46}
+                   {NoExportList.hs:14:45-46}
                    fα],
           $fEqR -> [text:
                       -- | A very lazy Eq instance
@@ -48,7 +48,7 @@ docs:
        named chunks:
        haddock options:
        language:
-         Nothing
+         Just GHC2021
        language extensions:
          MonomorphismRestriction
          RelaxedPolyRec
@@ -99,4 +99,3 @@ docs:
          ListTuplePuns
          ImplicitStagePersistence
 extensible fields:
-

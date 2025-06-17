@@ -12,8 +12,8 @@ f = \ (x :: T) ->
       join {
         j [InlPrag=NOINLINE, Dmd=MC(1,L)] :: Bool -> Bool
         [LclId[JoinId(1)(Just [!])], Arity=1, Str=<1L>, Unf=OtherCon []]
-        j (eta [OS=OneShot] :: Bool)
-          = case eta of {
+        j (y [OS=OneShot] :: Bool)
+          = case y of {
               False -> GHC.Internal.Types.False;
               True ->
                 case f x of {

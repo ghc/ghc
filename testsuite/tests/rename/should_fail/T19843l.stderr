@@ -1,4 +1,3 @@
-
-T19843l.hs:7:12: error: [GHC-76037]
+T19843l.hs:8:12: error: [GHC-76037]
     Not in scope: type constructor or class ‘WrongName’
-    Suggested fix: Perhaps use ‘FongName’ (line 4)
+    Suggested fix: Perhaps use ‘FongName’ (line 5)

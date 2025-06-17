@@ -1,4 +1,4 @@
-{-# language MagicHash #-}
+{-# language MagicHash, GHC2021 #-}
 
 -- | 'foo#' `Bar##` `*##`
 module MagicHashInHaddocks where
