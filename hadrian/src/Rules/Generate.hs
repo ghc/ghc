@@ -424,7 +424,7 @@ bindistRules = do
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
     , interpolateVar "LlvmTarget" $ getTarget tgtLlvmTarget
     , interpolateSetting "ProjectVersion" ProjectVersion
-    , interpolateVar "SettingsUseDistroMINGW" $ settingsFileSetting ToolchainSetting_DistroMinGW
+    , interpolateVar "SettingsUseDistroMINGW" $ lookupSystemConfig "settings-use-distro-mingw"
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
     , interpolateVar "TargetHasLibm" $ lookupSystemConfig "target-has-libm"
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
@@ -529,7 +529,7 @@ generateSettings settingsFile = do
         , ("LLVM opt command", queryTarget optPath)
         , ("LLVM llvm-as command", queryTarget llvmAsPath)
         , ("LLVM llvm-as flags", queryTarget llvmAsFlags)
-        , ("Use inplace MinGW toolchain", expr $ settingsFileSetting ToolchainSetting_DistroMinGW)
+        , ("Use inplace MinGW toolchain", expr $ lookupSystemConfig "settings-use-distro-mingw")
 
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
