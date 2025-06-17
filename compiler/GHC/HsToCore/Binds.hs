@@ -1097,7 +1097,9 @@ dsSpec poly_rhs (
              spec_bndrs = filterOut (`elemVarSet` const_bndrs) rule_bndrs
 
              mk_spec_body fn_body = mkLets spec_const_binds  $
-                                    mkCoreApps fn_body lhs_args
+                                    mkApps fn_body rule_lhs_args
+                                    -- ToDo: not mkCoreApps!  That uses exprType on fun which
+                                    --       fails in specUnfolding, sigh
 
        ; tracePm "dsSpec" (vcat [ text "poly_id" <+> ppr poly_id
                                 , text "bndrs"   <+> ppr bndrs
