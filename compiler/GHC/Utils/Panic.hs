@@ -177,7 +177,7 @@ showGhcException ctx = showPlainGhcException . \case
   PprProgramError str sdoc -> PlainProgramError $
       concat [str, "\n\n", renderWithContext ctx sdoc]
 
-throwGhcException :: GhcException -> a
+throwGhcException :: HasCallStack => GhcException -> a
 throwGhcException = Exception.throw
 
 throwGhcExceptionIO :: GhcException -> IO a
@@ -192,7 +192,7 @@ pprPanic s doc = withFrozenCallStack $ panicDoc s (doc $$ callStackDoc)
 
 -- | Throw an exception saying "bug in GHC"
 panicDoc :: HasCallStack => String -> SDoc -> a
-panicDoc x doc = throwGhcException (PprPanic x doc)
+panicDoc x doc = withFrozenCallStack $ throwGhcException (PprPanic x doc)
 
 -- | Throw an exception saying "this isn't finished yet"
 sorryDoc :: String -> SDoc -> a
