@@ -116,7 +116,9 @@ module Control.Exception
      bracket_,
      bracketOnError,
      finally,
-     onException
+     onException,
+     -- ** Printing
+     displayExceptionWithInfo
 
      ) where
 
