@@ -1071,7 +1071,7 @@ dsSpec poly_rhs (SpecPragE { spe_fn_nm = poly_nm
 dsSpec_help :: Name -> Id -> CoreExpr              -- Function to specialise
             -> InlinePragma -> [Var] -> CoreExpr
             -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
-dsSpec_help poly_nm poly_id poly_rhs inl bndrs ds_call
+dsSpec_help poly_nm poly_id poly_rhs inl orig_bndrs ds_call
   = do {
        -- Simplify the (desugared) call; see wrinkle (SP1)
        -- in Note [Desugaring new-form SPECIALISE pragmas]
@@ -1079,21 +1079,20 @@ dsSpec_help poly_nm poly_id poly_rhs inl bndrs ds_call
        ; let simpl_opts = initSimpleOpts dflags
              core_call  = simpleOptExprNoInline simpl_opts ds_call
 
-       ; case prepareSpecLHS poly_id bndrs core_call of {
+       ; case decomposeCall poly_id [] core_call of {
             Nothing -> do { diagnosticDs (DsRuleLhsTooComplicated ds_call core_call)
                            ; return Nothing } ;
 
-            Just (bndr_set, spec_const_binds, rule_lhs_args) ->
+            Just (rev_binds, rule_lhs_args) ->
 
-    do { let const_bndrs = mkVarSet (bindersOfBinds spec_const_binds)
-             all_bndrs   = bndr_set `unionVarSet` const_bndrs
-                  -- all_bndrs: all binders in core_call that should be quantified
+    do { let orig_bndr_set = mkVarSet orig_bndrs
+             rule_bndrs = scopedSort (exprsSomeFreeVarsList (`elemVarSet` orig_bndr_set)
+                                                            rule_lhs_args)
+             spec_binds = grabSpecBinds orig_bndr_set (mkVarSet rule_bndrs) rev_binds
+             spec_binds_bndr_set = mkVarSet (bindersOfBinds spec_binds)
+             spec_bndrs = filterOut (`elemVarSet` spec_binds_bndr_set) rule_bndrs
 
-             -- rule_bndrs; see (SP3) in Note [Desugaring new-form SPECIALISE pragmas]
-             rule_bndrs = scopedSort (exprsSomeFreeVarsList (`elemVarSet` all_bndrs) rule_lhs_args)
-             spec_bndrs = filterOut (`elemVarSet` const_bndrs) rule_bndrs
-
-             mk_spec_body fn_body = mkLets spec_const_binds  $
+             mk_spec_body fn_body = mkLets spec_binds  $
                                     mkApps fn_body rule_lhs_args
                                     -- ToDo: not mkCoreApps!  That uses exprType on fun which
                                     --       fails in specUnfolding, sigh
@@ -1117,11 +1116,64 @@ dsSpec_help poly_nm poly_id poly_rhs inl bndrs ds_call
                         rule_bndrs poly_id rule_lhs_args
                         spec_bndrs mk_spec_body inl } } }
 
-prepareSpecLHS :: Id -> [EvVar] -> CoreExpr
-               -> Maybe (VarSet, [CoreBind], [CoreExpr])
--- See Note [prepareSpecLHS]
-prepareSpecLHS poly_id evs the_call
-  = go (mkVarSet evs) [] the_call
+decomposeCall :: Id -> CoreExpr
+               -> Maybe ( [CoreBind]    -- Reversed bindings
+                        , [CoreExpr] )  -- Args of the call
+decomposeCall poly_id binds
+  = go [] binds
+  where
+    go acc (Let bind body)
+      = go (bind:acc) body
+    go add e
+      | Just (Var fun, args) <- collectArgs e
+      = assertPpr (fun == poly_id) (ppr fun $$ ppr poly_id) $
+        Just (acc, args)
+      | otherwise
+      = Nothing
+
+
+grabSpecBinds :: VarSet -> VarSet -> [CoreBind] -> [CoreBind]
+grabSpecBinds orig_bndrs rule_bndrs rev_binds
+   = rename_binds ++ spec_binds
+  where
+    (known_bndrs, rename_binds, other_binds)
+        = get_renamings rule_bndrs ([],[]) rev_binds
+    spec_binds = pick_spec_binds known_bndrs other_binds
+
+    ------------------------
+    get_renamings :: VarSet  -- Variables bound by a successful match on the call
+                  -> ([CoreBind],[CoreBind])   -- Accumulating parameter, in order
+                  -> [CoreBind]     -- Reversed, innermost first
+                  -> ( VarSet
+                     , [CoreBind]   -- Renamings, in order
+                     , [CoreBind])  -- Other bindings, in order
+    get_renamings _ acc [] acc
+
+    get_renamings bndrs (rn_binds, other_binds) (bind : binds)
+      | NonRec d r <- bind
+      , d `elemVarSet` bndrs
+      , Just (v, mco) <- getCastedVar r
+      , let flipped_bind = NonRec v (mkCastMCo (Var d) (mkSymMCo mco))
+      = get_renamings (bndrs `extendVarSet` v)
+                      (flipped_bind:rn_binds, other_binds)
+                      binds
+      | otherwise
+      = get_renamings bndrs (rn_binds, bind:other_binds) binds
+
+    ------------------------
+    pick_spec_binds :: VarSet -> [CoreBind] -> [CoreBind]
+    pick_spec_binds known_bndrs [] = []
+    pick_spec_binds known_bndrs (bind:binds)
+      | all keep_me (rhssOfBind bind)
+      , let known_bndrs' = known_bndrs `extendVarSetList` bindersOfBind bind
+      = bind : pick_spec_binds known_bndrs' binds
+      | otherwise
+      = pick_spec_binds known_bndrs binds
+      where
+        keep_me rhs = isEmptyVarSet (exprSomFreeVars bad_var rhs)
+        bad_var v = v `elemVarSet` orig_bndrs && not (bndr `elemVarSet` known_bndrs)
+
+{-
   where
     go :: VarSet        -- Quantified variables, or dependencies thereof
        -> [CoreBind]    -- Reversed list of constant evidence bindings
@@ -1133,7 +1185,7 @@ prepareSpecLHS poly_id evs the_call
       | not (all (isPredTy . varType) bndrs)
         -- A normal 'let' is too complicated
         -- But we definitely include quantified constraints
-        -- E.g. this is fine:  let (d :: forall a. Eq a => Eq (f a) = d2
+        -- E.g. this is fine:  let (d :: forall a. Eq a => Eq (f a) = d2)
       = Nothing
 
       -- (a) (1) in Note [prepareSpecLHS]
@@ -1156,10 +1208,10 @@ prepareSpecLHS poly_id evs the_call
       = Nothing
 
     transfer_to_spec_rhs qevs rhs
-      = isEmptyVarSet $ exprSomeFreeVars is_quant_id rhs
       where
         is_quant_id v = isId v && v `elemVarSet` qevs
       -- See (a) (2) in Note [prepareSpecLHS]
+-}
 
 finishSpecPrag :: Name -> CoreExpr                    -- RHS to specialise
                -> [Var] -> Id -> [CoreExpr]           -- RULE LHS pattern
