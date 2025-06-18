@@ -13,6 +13,7 @@
 
 #include "Capability.h"
 #include "Printer.h"
+#include "AllocArray.h"
 
 StgWord heap_view_closureSize(StgClosure *closure) {
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
@@ -278,18 +279,14 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     StgClosure **ptrs = (StgClosure **) stgMallocBytes(sizeof(StgClosure *) * size, "heap_view_closurePtrs");
     StgWord nptrs = collect_pointers(closure, ptrs);
 
-    size = nptrs + mutArrPtrsCardTableSize(nptrs);
-    StgMutArrPtrs *arr =
-        (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
-    TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), nptrs, 0);
-    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, cap->r.rCCCS);
-    arr->ptrs = nptrs;
-    arr->size = size;
+    StgMutArrPtrs *arr = allocateMutArrPtrs(cap, nptrs, cap->r.rCCCS);
+    if (RTS_UNLIKELY(arr == NULL)) goto end;
+    SET_INFO((StgClosure *) arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info);
 
     for (StgWord i = 0; i<nptrs; i++) {
         arr->payload[i] = ptrs[i];
     }
+end:
     stgFree(ptrs);
-
     return arr;
 }

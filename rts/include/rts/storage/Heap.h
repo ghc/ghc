@@ -10,6 +10,7 @@
 
 #include "rts/storage/Closures.h"
 
+/* Returns NULL on allocation failure */
 StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure);
 
 void heap_view_closure_ptrs_in_pap_payload(StgClosure *ptrs[], StgWord *nptrs

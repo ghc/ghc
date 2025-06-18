@@ -2537,6 +2537,10 @@ for:
     // Collect pointers.
     ("ptr" ptrArray) = foreign "C" heap_view_closurePtrs(MyCapability() "ptr", clos "ptr");
 
+    if (ptrArray == NULL) (likely: False) {
+        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+    }
+
     return (info, dat_arr, ptrArray);
 }
 
