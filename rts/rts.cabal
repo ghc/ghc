@@ -400,6 +400,7 @@ library
         asm-sources: StgCRunAsm.S
 
       c-sources: Adjustor.c
+                 AllocArray.c
                  adjustor/AdjustorPool.c
                  ExecPage.c
                  Arena.c
