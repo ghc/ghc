@@ -40,7 +40,6 @@ import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.IORef
 import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.Version
 import Data.Word
 import GHC hiding (NoLink)
@@ -315,10 +314,6 @@ data BinDictionary = BinDictionary
 -- * GhcBinary instances
 
 -------------------------------------------------------------------------------
-
-instance (Ord k, Binary k, Binary v) => Binary (Map k v) where
-  put_ bh m = put_ bh (Map.toList m)
-  get bh = fmap (Map.fromList) (get bh)
 
 instance Binary PackageInfo where
   put_ bh PackageInfo{piPackageName, piPackageVersion} = do

@@ -96,10 +96,6 @@ data HieFile = HieFile
 
 type NameEntityInfo = M.Map Name (S.Set EntityInfo)
 
-instance Binary NameEntityInfo where
-  put_ bh m = put_ bh $ M.toList m
-  get bh = fmap M.fromList (get bh)
-
 instance Binary HieFile where
   put_ bh hf = do
     put_ bh $ hie_hs_file hf
