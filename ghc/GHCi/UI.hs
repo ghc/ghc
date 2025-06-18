@@ -1302,12 +1302,17 @@ runOneCommand eh gCmd = do
       st <- getGHCiState
       ghciHandle (\e -> lift $ eh e >>= return . Just) $
         handleSourceError printErrorAndFail $
-          cmd_wrapper st $ doCommand c
+          handleGhciCommandError printErrorAndContinue $
+            cmd_wrapper st $ doCommand c
                -- source error's are handled by runStmt
                -- is the handler necessary here?
   where
     printErrorAndFail err = do
         printGhciException err
+        return $ Just False     -- Exit ghc -e, but not GHCi
+
+    printErrorAndContinue err = do
+        printGhciCommandException err
         return $ Just False     -- Exit ghc -e, but not GHCi
 
     noSpace q = q >>= maybe (return Nothing)
@@ -2286,13 +2291,16 @@ unAddModule files = do
 -- | @:reload@ command
 reloadModule :: GhciMonad m => String -> m ()
 reloadModule m = do
-  session <- GHC.getSession
-  let home_unit = homeUnitId (hsc_home_unit session)
-  ok <- doLoadAndCollectInfo Reload (loadTargets home_unit)
+  loadTarget <- findLoadTarget
+  ok <- doLoadAndCollectInfo Reload loadTarget
   when (failed ok) failIfExprEvalMode
   where
-    loadTargets hu | null m    = LoadAllTargets
-                   | otherwise = LoadUpTo (mkModule hu (GHC.mkModuleName m))
+    findLoadTarget
+      | null m    =
+          pure LoadAllTargets
+      | otherwise = do
+          mod' <- lookupHomeUnitModuleName (GHC.mkModuleName m)
+          pure $ LoadUpTo mod'
 
 reloadModuleDefer :: GhciMonad m => String -> m ()
 reloadModuleDefer = wrapDeferTypeErrors . reloadModule
@@ -4747,8 +4755,11 @@ showException se =
            Just other_ghc_ex        -> putException (show other_ghc_ex)
            Nothing                  ->
                case fromException se of
-               Just UserInterrupt -> putException "Interrupted."
-               _                  -> putException ("*** Exception: " ++ show se)
+                Just (GhciCommandError s) -> putException (show (GhciCommandError s))
+                Nothing ->
+                  case fromException se of
+                  Just UserInterrupt -> putException "Interrupted."
+                  _                  -> putException ("*** Exception: " ++ show se)
   where
     putException = hPutStrLn stderr
 
@@ -4798,15 +4809,22 @@ lookupModuleName mName = lookupQualifiedModuleName NoPkgQual mName
 lookupQualifiedModuleName :: GHC.GhcMonad m => PkgQual -> ModuleName -> m Module
 lookupQualifiedModuleName qual modl = do
   GHC.lookupAllQualifiedModuleNames qual modl >>= \case
-    [] -> throwGhcException (CmdLineError ("module '" ++ str ++ "' could not be found."))
+    [] -> throwGhciCommandError (GhciModuleError $ GhciModuleNameNotFound modl)
     [m] -> pure m
-    ms -> throwGhcException (CmdLineError ("module name '" ++ str ++ "' is ambiguous:\n" ++ errorMsg ms))
+    ms -> throwGhciCommandError (GhciModuleError $ GhciAmbiguousModuleName modl ms)
+
+lookupHomeUnitModuleName :: GHC.GhcMonad m => ModuleName -> m HomeUnitModule
+lookupHomeUnitModuleName modl = do
+  m <- GHC.lookupLoadedHomeModuleByModuleName modl >>= \case
+    Nothing -> throwGhciCommandError (GhciModuleError $ GhciNoLocalModuleName modl)
+    Just [m] -> pure m
+    Just ms -> throwGhciCommandError (GhciModuleError $ GhciAmbiguousModuleName modl ms)
+
+  if unitIsDefinite (moduleUnit m)
+    then pure (fmap toUnitId m)
+    else throwGhcException (CmdLineError ("module '" ++ str ++ "' is not from a definite unit"))
   where
     str = moduleNameString modl
-    errorMsg ms = intercalate "\n"
-      [ "- " ++ unitIdString (toUnitId (moduleUnit m)) ++ ":" ++ moduleNameString (moduleName m)
-      | m <- ms
-      ]
 
 showModule :: Module -> String
 showModule = moduleNameString . moduleName

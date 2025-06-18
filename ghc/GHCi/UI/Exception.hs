@@ -5,7 +5,10 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE LambdaCase #-}
 module GHCi.UI.Exception
-  ( GhciMessage(..)
+  ( GhciCommandError(..)
+  , throwGhciCommandError
+  , handleGhciCommandError
+  , GhciMessage(..)
   , GhciMessageOpts(..)
   , fromGhcOpts
   , toGhcHint
@@ -29,18 +32,56 @@ import GHC.Tc.Errors.Ppr
 import GHC.Tc.Errors.Types
 
 import GHC.Types.Error.Codes
+import GHC.Types.SrcLoc (interactiveSrcSpan)
 import GHC.TypeLits
 
 import GHC.Unit.State
 
 import GHC.Utils.Outputable
+import GHC.Utils.Error
 
 import GHC.Generics
 import GHC.Types.Error
 import GHC.Types
 import qualified GHC
 
+import Control.Exception
+import Control.Monad.Catch as MC (MonadCatch, catch)
+import Control.Monad.IO.Class
 import Data.List.NonEmpty (NonEmpty(..))
+
+-- | A 'GhciCommandError' are messages that caused the abortion of a GHCi command.
+newtype GhciCommandError =  GhciCommandError (Messages GhciMessage)
+
+instance Exception GhciCommandError
+
+instance Show GhciCommandError where
+  -- We implement 'Show' because it's required by the 'Exception' instance, but diagnostics
+  -- shouldn't be shown via the 'Show' typeclass, but rather rendered using the ppr functions.
+  -- This also explains why there is no 'Show' instance for a 'MsgEnvelope'.
+  show (GhciCommandError msgs) =
+      renderWithContext defaultSDocContext
+    . vcat
+    . pprMsgEnvelopeBagWithLocDefault
+    . getMessages
+    $ msgs
+
+-- | Perform the given action and call the exception handler if the action
+-- throws a 'SourceError'.  See 'SourceError' for more information.
+handleGhciCommandError :: (MonadCatch m) =>
+                     (GhciCommandError -> m a) -- ^ exception handler
+                  -> m a -- ^ action to perform
+                  -> m a
+handleGhciCommandError handler act =
+  MC.catch act (\(e :: GhciCommandError) -> handler e)
+
+throwGhciCommandError :: MonadIO m => GhciCommandMessage -> m a
+throwGhciCommandError errorMessage =
+  liftIO
+    . throwIO
+    . GhciCommandError
+    . singleMessage
+    $ mkPlainErrorMsgEnvelope interactiveSrcSpan (GhciCommandMessage errorMessage)
 
 -- | The Options passed to 'diagnosticMessage'
 -- in the 'Diagnostic' instance of 'GhciMessage'.
@@ -257,6 +298,9 @@ data GhciModuleError
   | GhciNoResolvedModules
   | GhciNoModuleForName GHC.Name
   | GhciNoMatchingModuleExport
+  | GhciNoLocalModuleName !GHC.ModuleName
+  | GhciModuleNameNotFound !GHC.ModuleName
+  | GhciAmbiguousModuleName !GHC.ModuleName ![GHC.Module]
   deriving Generic
 
 instance Diagnostic GhciModuleError where
@@ -278,6 +322,16 @@ instance Diagnostic GhciModuleError where
       -> "No module for" <+> ppr name
     GhciNoMatchingModuleExport
       -> "No matching export in any local modules."
+    GhciNoLocalModuleName modl
+      -> "Module" <+> quotes (ppr modl) <+> "cannot be found locally"
+    GhciModuleNameNotFound modl
+      -> "module" <+> quotes (ppr modl) <+> "could not be found."
+    GhciAmbiguousModuleName modl candidates
+      -> "Module name" <+> quotes (ppr modl) <+> "is ambiguous" $+$
+        vcat
+          [ text "-" <+> ppr (GHC.moduleName m) <> colon <> ppr (GHC.moduleUnit m)
+          | m <- candidates
+          ]
 
   diagnosticReason = \case
     GhciModuleNotFound{} ->
@@ -293,6 +347,12 @@ instance Diagnostic GhciModuleError where
     GhciNoModuleForName{} ->
       ErrorWithoutFlag
     GhciNoMatchingModuleExport{} ->
+      ErrorWithoutFlag
+    GhciNoLocalModuleName{} ->
+      ErrorWithoutFlag
+    GhciModuleNameNotFound{} ->
+      ErrorWithoutFlag
+    GhciAmbiguousModuleName{} ->
       ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -310,7 +370,12 @@ instance Diagnostic GhciModuleError where
       []
     GhciNoMatchingModuleExport{} ->
       []
-
+    GhciNoLocalModuleName{} ->
+      []
+    GhciModuleNameNotFound{} ->
+      []
+    GhciAmbiguousModuleName{} ->
+      []
   diagnosticCode = constructorCode @GHCi
 
 -- | A Diagnostic emitted by GHCi while executing a command
@@ -487,6 +552,9 @@ type family GhciDiagnosticCode c = n | n -> c where
   GhciDiagnosticCode "GhciNoModuleForName"                = 21847
   GhciDiagnosticCode "GhciNoMatchingModuleExport"         = 59723
   GhciDiagnosticCode "GhciArgumentParseError"             = 35671
+  GhciDiagnosticCode "GhciNoLocalModuleName"              = 81235
+  GhciDiagnosticCode "GhciModuleNameNotFound"             = 40475
+  GhciDiagnosticCode "GhciAmbiguousModuleName"            = 59019
 
 type GhciConRecursInto :: Symbol -> Maybe Type
 type family GhciConRecursInto con where

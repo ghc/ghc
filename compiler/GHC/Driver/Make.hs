@@ -116,6 +116,7 @@ import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.Maybe
 import Data.List (sortOn, groupBy, sortBy)
+import qualified Data.List as List
 import System.FilePath
 
 import Control.Monad.IO.Class
@@ -520,13 +521,14 @@ countMods (UnresolvedCycle ns) = length ns
 createBuildPlan :: ModuleGraph -> Maybe HomeUnitModule -> [BuildPlan]
 createBuildPlan mod_graph maybe_top_mod =
     let -- Step 1: Compute SCCs without .hi-boot files, to find the cycles
-        cycle_mod_graph = topSortModuleGraph True mod_graph maybe_top_mod
+        cycle_mod_graph   = topSortModuleGraph True  mod_graph maybe_top_mod
+        acyclic_mod_graph = topSortModuleGraph False mod_graph maybe_top_mod
 
         -- Step 2: Reanalyse loops, with relevant boot modules, to solve the cycles.
         build_plan :: [BuildPlan]
         build_plan
           -- Fast path, if there are no boot modules just do a normal toposort
-          | isEmptyModuleEnv boot_modules = collapseAcyclic $ topSortModuleGraph False mod_graph maybe_top_mod
+          | isEmptyModuleEnv boot_modules = collapseAcyclic acyclic_mod_graph
           | otherwise = toBuildPlan cycle_mod_graph []
 
         toBuildPlan :: [SCC ModuleGraphNode] -> [ModuleGraphNode] -> [BuildPlan]
@@ -598,14 +600,17 @@ createBuildPlan mod_graph maybe_top_mod =
         collapseAcyclic [] = []
 
         topSortWithBoot nodes = topSortModules False (select_boot_modules nodes ++ nodes) Nothing
-
-
   in
-
-    assertPpr (sum (map countMods build_plan) == lengthMG mod_graph)
-              (vcat [text "Build plan missing nodes:", (text "PLAN:" <+> ppr (sum (map countMods build_plan))), (text "GRAPH:" <+> ppr (lengthMG mod_graph))])
+    -- We need to use 'acyclic_mod_graph', since if 'maybe_top_mod' is 'Just', then the resulting module
+    -- graph is pruned, reducing the number of 'build_plan' elements.
+    -- We don't use the size of 'cycle_mod_graph', as it removes @.hi-boot@ modules. These are added
+    -- later in the processing.
+    assertPpr (sum (map countMods build_plan) == lengthMGWithSCC acyclic_mod_graph)
+              (vcat [text "Build plan missing nodes:", (text "PLAN:" <+> ppr (sum (map countMods build_plan))), (text "GRAPH:" <+> ppr (lengthMGWithSCC acyclic_mod_graph))])
               build_plan
-
+  where
+    lengthMGWithSCC :: [SCC a] -> Int
+    lengthMGWithSCC = List.foldl' (\acc scc -> length scc + acc) 0
 
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
