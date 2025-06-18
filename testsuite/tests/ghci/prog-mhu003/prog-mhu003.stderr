@@ -1,9 +1,15 @@
-module name 'Foo' is ambiguous:
-- b-0.0.0:Foo
-- d-0.0.0:Foo
-module name 'Foo' is ambiguous:
-- b-0.0.0:Foo
-- d-0.0.0:Foo
-module name 'Foo' is ambiguous:
-- b-0.0.0:Foo
-- d-0.0.0:Foo
+<interactive>: error: [GHCi-59019]
+    Module name ‘Foo’ is ambiguous
+    - Foo:b-0.0.0
+    - Foo:d-0.0.0
+
+<interactive>: error: [GHCi-59019]
+    Module name ‘Foo’ is ambiguous
+    - Foo:b-0.0.0
+    - Foo:d-0.0.0
+
+<interactive>: error: [GHCi-59019]
+    Module name ‘Foo’ is ambiguous
+    - Foo:b-0.0.0
+    - Foo:d-0.0.0
+

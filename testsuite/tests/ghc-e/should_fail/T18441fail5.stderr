@@ -1,4 +1,4 @@
-<no location info>: error: [GHC-82272]
-    module ‘Abcde’ cannot be found locally
+<interactive>: error: [GHCi-81235]
+    Module ‘Abcde’ cannot be found locally
 
 1

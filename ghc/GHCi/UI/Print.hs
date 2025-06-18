@@ -5,6 +5,7 @@ module GHCi.UI.Print
   , printForUserPartWay
   , printError
   , printGhciException
+  , printGhciCommandException
   ) where
 
 import qualified GHC
@@ -64,13 +65,16 @@ printForUserPartWay doc = do
 -- | pretty-print a 'GhciCommandMessage'
 printError :: GhcMonad m => GhciCommandMessage -> m ()
 printError err =
-  let errEnvelope = mkPlainErrorMsgEnvelope (UnhelpfulSpan UnhelpfulInteractive) err
+  let errEnvelope = mkPlainErrorMsgEnvelope interactiveSrcSpan err
   in  printError' (const NoDiagnosticOpts) (singleMessage errEnvelope)
 
 -- | Print the all diagnostics in a 'SourceError'.  Specialised for GHCi error reporting
 -- for some error messages.
 printGhciException :: GhcMonad m => SourceError -> m ()
 printGhciException err = printError' initGhciPrintConfig (GhciGhcMessage <$> (srcErrorMessages err))
+
+printGhciCommandException :: GhcMonad m => GhciCommandError -> m ()
+printGhciCommandException (GhciCommandError errs) = printError' initGhciPrintConfig errs
 
 printError' :: (GhcMonad m, Diagnostic a) => (DynFlags -> DiagnosticOpts a) -> Messages a -> m ()
 printError' get_config err = do

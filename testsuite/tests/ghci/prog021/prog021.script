@@ -1,0 +1,15 @@
+-- Loads all targets
+:load A B
+:m + A B
+f 5
+g 5
+h 5
+-- Load only one target
+:reload A
+:m A
+putStrLn "B is not loaded, we can't add it to the context"
+:m + B
+f 5
+putStrLn "`g` and `h` are not in scope"
+g 5
+h 5
