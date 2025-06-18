@@ -1079,14 +1079,15 @@ dsSpec_help poly_nm poly_id poly_rhs inl orig_bndrs ds_call
        ; let simpl_opts = initSimpleOpts dflags
              core_call  = simpleOptExprNoInline simpl_opts ds_call
 
-       ; case decomposeCall poly_id [] core_call of {
+       ; case decomposeCall poly_id core_call of {
             Nothing -> do { diagnosticDs (DsRuleLhsTooComplicated ds_call core_call)
                            ; return Nothing } ;
 
             Just (rev_binds, rule_lhs_args) ->
 
     do { let orig_bndr_set = mkVarSet orig_bndrs
-             rule_bndrs = scopedSort (exprsSomeFreeVarsList (`elemVarSet` orig_bndr_set)
+             locally_bound = orig_bndr_set `extendVarSetList` bindersOfBinds rev_binds
+             rule_bndrs = scopedSort (exprsSomeFreeVarsList (`elemVarSet` locally_bound)
                                                             rule_lhs_args)
              spec_binds = grabSpecBinds orig_bndr_set (mkVarSet rule_bndrs) rev_binds
              spec_binds_bndr_set = mkVarSet (bindersOfBinds spec_binds)
@@ -1100,17 +1101,14 @@ dsSpec_help poly_nm poly_id poly_rhs inl orig_bndrs ds_call
        ; tracePm "dsSpec(new route)" $
          vcat [ text "poly_id" <+> ppr poly_id
               , text "unfolding" <+> ppr (realIdUnfolding poly_id)
-              , text "bndrs"   <+> ppr bndrs
+              , text "orig_bndrs"   <+> ppr orig_bndrs
               , text "ds_call" <+> ppr ds_call
               , text "core_call" <+> ppr core_call
-              , text "bndr_set" <+> ppr bndr_set
-              , text "all_bndrs"   <+> ppr all_bndrs
+              , text "rev_binds" <+> ppr rev_binds
               , text "rule_bndrs" <+> ppr rule_bndrs
               , text "rule_lhs_args" <+> ppr rule_lhs_args
-              , text "const_bndrs"   <+> ppr const_bndrs
               , text "spec_bndrs" <+> ppr spec_bndrs
-              , text "core_call fvs" <+> ppr (exprFreeVars core_call)
-              , text "spec_const_binds" <+> ppr spec_const_binds ]
+              , text "spec_binds" <+> ppr spec_binds ]
 
        ; finishSpecPrag poly_nm poly_rhs
                         rule_bndrs poly_id rule_lhs_args
@@ -1124,8 +1122,8 @@ decomposeCall poly_id binds
   where
     go acc (Let bind body)
       = go (bind:acc) body
-    go add e
-      | Just (Var fun, args) <- collectArgs e
+    go acc e
+      | (Var fun, args) <- collectArgs e
       = assertPpr (fun == poly_id) (ppr fun $$ ppr poly_id) $
         Just (acc, args)
       | otherwise
@@ -1134,44 +1132,55 @@ decomposeCall poly_id binds
 
 grabSpecBinds :: VarSet -> VarSet -> [CoreBind] -> [CoreBind]
 grabSpecBinds orig_bndrs rule_bndrs rev_binds
-   = rename_binds ++ spec_binds
+   = reverse rename_binds ++ spec_binds
   where
-    (known_bndrs, rename_binds, other_binds)
-        = get_renamings rule_bndrs ([],[]) rev_binds
+    (known_bndrs, (rename_binds, other_binds))
+        = get_renamings orig_bndrs rule_bndrs ([],[]) rev_binds
     spec_binds = pick_spec_binds known_bndrs other_binds
 
     ------------------------
-    get_renamings :: VarSet  -- Variables bound by a successful match on the call
+    get_renamings :: VarSet  -- Locally bound variables
+                  -> VarSet  -- Variables bound by a successful match on the call
                   -> ([CoreBind],[CoreBind])   -- Accumulating parameter, in order
                   -> [CoreBind]     -- Reversed, innermost first
                   -> ( VarSet
-                     , [CoreBind]   -- Renamings, in order
-                     , [CoreBind])  -- Other bindings, in order
-    get_renamings _ acc [] acc
+                     , ([CoreBind]    -- Renamings, in order
+                     ,  [CoreBind]))  -- Other bindings, in order
+    get_renamings _ bndrs acc [] = (bndrs, acc)
 
-    get_renamings bndrs (rn_binds, other_binds) (bind : binds)
+    get_renamings locals bndrs (rn_binds, other_binds) (bind : binds)
       | NonRec d r <- bind
       , d `elemVarSet` bndrs
       , Just (v, mco) <- getCastedVar r
+      , v `elemVarSet` locals
       , let flipped_bind = NonRec v (mkCastMCo (Var d) (mkSymMCo mco))
       = get_renamings (bndrs `extendVarSet` v)
+                      (locals `extendVarSet` d)
                       (flipped_bind:rn_binds, other_binds)
                       binds
       | otherwise
-      = get_renamings bndrs (rn_binds, bind:other_binds) binds
+      = get_renamings bndrs
+                     (locals `extendVarSetList` bindersOf bind)
+                     (rn_binds, bind:other_binds)
+                     binds
 
     ------------------------
     pick_spec_binds :: VarSet -> [CoreBind] -> [CoreBind]
-    pick_spec_binds known_bndrs [] = []
+    pick_spec_binds _ [] = []
     pick_spec_binds known_bndrs (bind:binds)
       | all keep_me (rhssOfBind bind)
-      , let known_bndrs' = known_bndrs `extendVarSetList` bindersOfBind bind
+      , let known_bndrs' = known_bndrs `extendVarSetList` bindersOf bind
       = bind : pick_spec_binds known_bndrs' binds
       | otherwise
       = pick_spec_binds known_bndrs binds
       where
-        keep_me rhs = isEmptyVarSet (exprSomFreeVars bad_var rhs)
-        bad_var v = v `elemVarSet` orig_bndrs && not (bndr `elemVarSet` known_bndrs)
+        keep_me rhs = isEmptyVarSet (exprSomeFreeVars bad_var rhs)
+        bad_var v = v `elemVarSet` orig_bndrs && not (v `elemVarSet` known_bndrs)
+
+getCastedVar :: CoreExpr -> Maybe (Var, MCoercionR)
+getCastedVar (Var v)           = Just (v, MRefl)
+getCastedVar (Cast (Var v) co) = Just (v, MCo co)
+getCastedVar _                 = Nothing
 
 {-
   where
