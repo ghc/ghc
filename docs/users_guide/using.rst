@@ -835,8 +835,12 @@ pass to ``--make`` mode.
 
 Then when the compiler starts in ``--make`` mode it will compile both units ``a`` and ``b``.
 
-There is also very basic support for multiple home units in GHCi, at the moment you can start
-a GHCi session with multiple units but only the `:reload`:ghci-cmd: is supported.
+GHCi has full support for multiple home units.
+Multiple home units can be given via the `-unit @⟨filename⟩`:ghc-flag:.
+
+.. code-block:: none
+
+    ghc --interactive -unit @unitA -unit @unitB
 
 .. ghc-flag:: -unit @⟨filename⟩
     :shortdesc: Specify the options to build a specific unit.
