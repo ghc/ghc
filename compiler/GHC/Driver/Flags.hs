@@ -758,6 +758,9 @@ data GeneralFlag
    | Opt_GhciBrowser
    | Opt_GhciBrowserRedirectWasiConsole
 
+   -- | Instruct GHCi to load all targets on startup
+   | Opt_GhciDoLoadTargets
+
    | Opt_HelpfulErrors
    | Opt_DeferTypeErrors             -- Since 7.6
    | Opt_DeferTypedHoles             -- Since 7.10

@@ -67,6 +67,7 @@ module GHC.Unit.Module.Graph
    , mapMG, mgMapM
    , mgModSummaries
    , mgLookupModule
+   , mgLookupModuleName
    , mgHasHoles
    , showModMsg
 
@@ -520,6 +521,20 @@ mgLookupModule ModuleGraph{..} m = listToMaybe $ mapMaybe go mg_mss
     go (ModuleNode _ ms)
       | NotBoot <- isBootModuleNodeInfo ms
       , moduleNodeInfoModule ms == m
+      = Just ms
+    go _ = Nothing
+
+-- | Lookup up a 'ModuleNameWithIsBoot' in the 'ModuleGraph'.
+--
+-- Multiple nodes in the 'ModuleGraph' can have the same 'ModuleName'
+-- and 'IsBootInterface'.
+--
+-- Careful: Linear in the size of the module graph.
+mgLookupModuleName :: ModuleGraph -> ModuleNameWithIsBoot -> [ModuleNodeInfo]
+mgLookupModuleName ModuleGraph{..} m = mapMaybe go mg_mss
+  where
+    go (ModuleNode _ ms)
+      | moduleNodeInfoMnwib ms == m
       = Just ms
     go _ = Nothing
 

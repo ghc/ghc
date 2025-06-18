@@ -948,7 +948,7 @@ runGHCi paths maybe_exprs = do
   -- immediately rather than going on to evaluate the expression.
   when (not (null paths)) $ do
      ok <- ghciHandle (\e -> do showException e; return Failed) $
-                    loadModule paths
+                    loadModule (if gopt Opt_GhciDoLoadTargets dflags then LoadTargets else DontLoadTargets) paths
      when (isJust maybe_exprs && failed ok) $
         liftIO (exitWith (ExitFailure 1))
 
@@ -2196,20 +2196,31 @@ wrapDeferTypeErrors load =
           })
         old new
 
-loadModule :: GhciMonad m => [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
-loadModule fs = do
-  (_, result) <- runAndPrintStats (const Nothing) (loadModule' fs)
+loadModule :: GhciMonad m => LoadTargets -> [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
+loadModule loadTargets fs = do
+  (_, result) <- runAndPrintStats (const Nothing) (loadModule' loadTargets fs)
   either (liftIO . Exception.throwIO) return result
 
 -- | @:load@ command
 loadModule_ :: GhciMonad m => [FilePath] -> m ()
-loadModule_ fs = void $ loadModule (zip3 fs (repeat (Just interactiveSessionUnitId)) (repeat Nothing))
+loadModule_ fs = void $ loadModule LoadTargets (zip3 fs (repeat (Just interactiveSessionUnitId)) (repeat Nothing))
 
 loadModuleDefer :: GhciMonad m => [FilePath] -> m ()
 loadModuleDefer = wrapDeferTypeErrors . loadModule_
 
-loadModule' :: GhciMonad m => [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
-loadModule' files = do
+-- | How much to actually load.
+-- Used to implement the `-fno-load-initial-targets` flag.
+-- During GHCi startup, we check whether the flag is set and
+-- invoke 'loadModule'' with 'DontLoadTargets'.
+data LoadTargets
+  = DontLoadTargets
+  -- ^ Used when `-fno-load-initial-targets` is given
+  | LoadTargets
+  -- ^ The Default
+  deriving (Show, Eq, Ord)
+
+loadModule' :: GhciMonad m => LoadTargets -> [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
+loadModule' loadTargets files = do
   let (filenames, uids, phases) = unzip3 files
   exp_filenames <- mapM expandPath filenames
   let files' = zip3 exp_filenames uids phases
@@ -2229,7 +2240,9 @@ loadModule' files = do
         clearCaches
 
         GHC.setTargets targets
-        doLoadAndCollectInfo Load LoadAllTargets
+        case loadTargets of
+          LoadTargets -> doLoadAndCollectInfo Load LoadAllTargets
+          DontLoadTargets -> doLoadAndCollectInfo Load (LoadUpTo [])
 
   if gopt Opt_GhciLeakCheck dflags
     then do
@@ -2291,16 +2304,21 @@ unAddModule files = do
 -- | @:reload@ command
 reloadModule :: GhciMonad m => String -> m ()
 reloadModule m = do
-  loadTarget <- findLoadTarget
+  let mods = words m
+  loadTarget <- findLoadTargets mods
   ok <- doLoadAndCollectInfo Reload loadTarget
   when (failed ok) failIfExprEvalMode
   where
-    findLoadTarget
-      | null m    =
+    findLoadTargets modls
+      | null modls =
           pure LoadAllTargets
+      | modls == ["none"] =
+          -- "none" is a special targets that unloads all already loaded modules
+          pure $ LoadUpTo []
       | otherwise = do
-          mod' <- lookupHomeUnitModuleName (GHC.mkModuleName m)
-          pure $ LoadUpTo mod'
+          mod_graph <- GHC.getModuleGraph
+          mods <- traverse (lookupHomeUnitModuleName mod_graph) [mkModuleName modl | modl <- modls]
+          pure $ LoadUpTo mods
 
 reloadModuleDefer :: GhciMonad m => String -> m ()
 reloadModuleDefer = wrapDeferTypeErrors . reloadModule
@@ -4813,12 +4831,12 @@ lookupQualifiedModuleName qual modl = do
     [m] -> pure m
     ms -> throwGhciCommandError (GhciModuleError $ GhciAmbiguousModuleName modl ms)
 
-lookupHomeUnitModuleName :: GHC.GhcMonad m => ModuleName -> m HomeUnitModule
-lookupHomeUnitModuleName modl = do
-  m <- GHC.lookupLoadedHomeModuleByModuleName modl >>= \case
-    Nothing -> throwGhciCommandError (GhciModuleError $ GhciNoLocalModuleName modl)
-    Just [m] -> pure m
-    Just ms -> throwGhciCommandError (GhciModuleError $ GhciAmbiguousModuleName modl ms)
+lookupHomeUnitModuleName :: GHC.GhcMonad m => GHC.ModuleGraph -> ModuleName -> m HomeUnitModule
+lookupHomeUnitModuleName mod_graph modl = do
+  m <- case GHC.mgLookupModuleName mod_graph (GWIB modl GHC.NotBoot) of
+    [] -> throwGhciCommandError (GhciModuleError $ GhciNoLocalModuleName modl)
+    [m] -> pure $ GHC.moduleNodeInfoModule m
+    ms -> throwGhciCommandError (GhciModuleError $ GhciAmbiguousModuleName modl (map GHC.moduleNodeInfoModule ms))
 
   if unitIsDefinite (moduleUnit m)
     then pure (fmap toUnitId m)

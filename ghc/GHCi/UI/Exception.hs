@@ -67,7 +67,7 @@ instance Show GhciCommandError where
     $ msgs
 
 -- | Perform the given action and call the exception handler if the action
--- throws a 'SourceError'.  See 'SourceError' for more information.
+-- throws a 'GhciCommandError'.  See 'GhciCommandError' for more information.
 handleGhciCommandError :: (MonadCatch m) =>
                      (GhciCommandError -> m a) -- ^ exception handler
                   -> m a -- ^ action to perform
