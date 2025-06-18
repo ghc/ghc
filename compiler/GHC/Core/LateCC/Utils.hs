@@ -5,6 +5,7 @@ module GHC.Core.LateCC.Utils
     -- ** Helpers for defining insertion methods
   , getCCFlavour
   , insertCC
+  , insertCCRhs
   ) where
 
 import GHC.Prelude
@@ -77,4 +78,27 @@ insertCC cc_name cc_loc expr = do
           s { lateCCState_ccs = S.insert cc (lateCCState_ccs s)
             }
     return $ mkTick note expr
+
+-- | Insert a cost centre with the specified name and source span on the rhs
+-- of a binder. The inserted cost centre will be appropriately tracked in the
+-- late cost centre state.
+insertCCRhs
+  :: FastString
+  -- ^ Name of the cost centre to insert
+  -> SrcSpan
+  -- ^ Source location to associate with the cost centre
+  -> CoreExpr
+  -- ^ Expression to wrap in the cost centre
+  -> LateCCM s CoreExpr
+insertCCRhs cc_name cc_loc expr = addCC expr
+  where
+    -- For binder rhss we want to put the cost centre below the lambda as we only care about
+    -- executions of the RHS. Note that the lambdas might be hidden under ticks
+    -- or casts. So look through these as well.
+    addCC :: CoreExpr -> LateCCM s CoreExpr
+    addCC (Cast rhs co) = pure Cast <*> addCC rhs <*> pure co
+    addCC (Tick t rhs) = (Tick t) <$> addCC rhs
+    addCC (Lam b rhs) = Lam b <$> addCC rhs
+    addCC rhs = do
+      insertCC cc_name cc_loc rhs
 

@@ -123,7 +123,7 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
-import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
+import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO, initLintPassResultConfig )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.CoreToStg
 import GHC.Driver.Config.CoreToStg.Prep
@@ -1955,6 +1955,8 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                     , lateCCEnv_countEntries= gopt Opt_ProfCountEntries dflags
                     , lateCCEnv_collectCCs = True
                     }
+                -- lateCC runs after tidy, so all the tidy invariants should be upheld.
+              , lateCCConfig_lintCfg = initLintPassResultConfig dflags [] CoreTidy
               }
 
         (late_cc_binds, late_cc_state) <-

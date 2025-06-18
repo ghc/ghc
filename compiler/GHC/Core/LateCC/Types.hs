@@ -19,6 +19,8 @@ import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Unit.Types
 
+import GHC.Core.Lint
+
 -- | Late cost center insertion configuration.
 --
 -- Specifies whether cost centers are added to overloaded function call sites
@@ -29,6 +31,7 @@ data LateCCConfig =
         { lateCCConfig_whichBinds :: !LateCCBindSpec
         , lateCCConfig_overloadedCalls :: !Bool
         , lateCCConfig_env :: !LateCCEnv
+        , lateCCConfig_lintCfg :: !LintPassResultConfig
         }
 
 -- | The types of top-level bindings we support adding cost centers to.
@@ -36,6 +39,7 @@ data LateCCBindSpec =
       LateCCNone
     | LateCCBinds
     | LateCCOverloadedBinds
+    deriving Eq
 
 -- | Late cost centre insertion environment
 data LateCCEnv = LateCCEnv

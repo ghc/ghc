@@ -13,6 +13,7 @@ import GHC.Core.LateCC.OverloadedCalls
 import GHC.Core.LateCC.TopLevelBinds
 import GHC.Core.LateCC.Types
 import GHC.Core.LateCC.Utils
+import GHC.Core.Lint (lintPassResult)
 import GHC.Core.Seq
 import qualified GHC.Data.Strict as Strict
 import GHC.Core.Utils
@@ -23,6 +24,7 @@ import GHC.Utils.Logger
 import GHC.Utils.Outputable
 import GHC.Types.RepType (mightBeFunTy)
 
+import Control.Monad (when)
 -- | Late cost center insertion logic used by the driver
 addLateCostCenters ::
      Logger
@@ -73,6 +75,9 @@ addLateCostCenters logger LateCCConfig{..} core_binds = do
           ( top_level_cc_binds
           , top_level_late_cc_state { lateCCState_extra = Strict.Nothing }
           )
+
+    when (lateCCConfig_whichBinds /= LateCCNone || lateCCConfig_overloadedCalls) $ do
+      lintPassResult logger lateCCConfig_lintCfg top_level_cc_binds
 
     return (late_cc_binds, late_cc_state)
   where

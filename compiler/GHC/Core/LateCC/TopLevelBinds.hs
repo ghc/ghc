@@ -114,15 +114,9 @@ topLevelBindsCC pred core_bind =
       = addCC bndr rhs
       | otherwise = pure rhs
 
-    -- We want to put the cost centre below the lambda as we only care about
-    -- executions of the RHS. Note that the lambdas might be hidden under ticks
-    -- or casts. So look through these as well.
-    addCC :: Id -> CoreExpr -> LateCCM s CoreExpr
-    addCC bndr (Cast rhs co) = pure Cast <*> addCC bndr rhs <*> pure co
-    addCC bndr (Tick t rhs) = (Tick t) <$> addCC bndr rhs
-    addCC bndr (Lam b rhs) = Lam b <$> addCC bndr rhs
     addCC bndr rhs = do
       let name = idName bndr
           cc_loc = nameSrcSpan name
           cc_name = getOccFS name
-      insertCC cc_name cc_loc rhs
+      insertCCRhs cc_name cc_loc rhs
+

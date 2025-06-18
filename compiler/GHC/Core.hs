@@ -99,6 +99,7 @@ import GHC.Types.Var.Env( InScopeSet )
 import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Core.Coercion
+import {-# SOURCE #-} GHC.Core.Ppr ()
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -110,6 +111,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique.Set
 
 import GHC.Utils.Binary
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -2175,7 +2177,7 @@ collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
 -- | Strip off exactly N leading lambdas (type or value).
 -- Good for use with join points.
 -- Panic if there aren't enough
-collectNBinders :: JoinArity -> Expr b -> ([b], Expr b)
+collectNBinders :: (HasCallStack, OutputableBndr b) => JoinArity -> Expr b -> ([b], Expr b)
 
 collectBinders expr
   = go [] expr
@@ -2206,7 +2208,8 @@ collectNBinders orig_n orig_expr
   where
     go 0 bs expr      = (reverse bs, expr)
     go n bs (Lam b e) = go (n-1) (b:bs) e
-    go _ _  _         = pprPanic "collectNBinders" $ int orig_n
+    go _ _  _         = pprPanic "collectNBinders" $ 
+                          (int orig_n) $$ if debugIsOn then (ppr orig_expr) else empty
 
 -- | Strip off exactly N leading value lambdas
 -- returning all the binders found up to that point

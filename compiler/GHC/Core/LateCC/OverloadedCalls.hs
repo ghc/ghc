@@ -63,7 +63,7 @@ overloadedCallsCC =
                 fmap (Strict.fromMaybe (UnhelpfulSpan UnhelpfulNoLocationInfo)) $
                   lift $ gets lateCCState_extra
 
-              insertCC cc_name cc_srcspan expr
+              insertCCRhs cc_name cc_srcspan expr
             else
               return expr
 
