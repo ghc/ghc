@@ -1965,6 +1965,13 @@ instance (Binary v) => Binary (IntMap v) where
   put_ bh m = put_ bh (IntMap.toAscList m)
   get bh = IntMap.fromAscList <$> get bh
 
+instance (Ord k, Binary k, Binary v) => Binary (Map k v) where
+  put_ bh m = put_ bh $ Map.toList m
+  -- Unfortunately, we can't use fromAscList, since k is often
+  -- instantiated to Name which has a non-deterministic Ord instance
+  -- that only compares the Uniques, and the Uniques are likely
+  -- changed when deserializing!
+  get bh = Map.fromList <$> get bh
 
 {- Note [FingerprintWithValue]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
