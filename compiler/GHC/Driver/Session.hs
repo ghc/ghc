@@ -2505,6 +2505,9 @@ fFlagsDeps = [
   flagGhciSpec "ghci-browser"                 Opt_GhciBrowser,
   flagGhciSpec "ghci-browser-redirect-wasi-console" Opt_GhciBrowserRedirectWasiConsole,
 
+  -- load all targets on GHCi startup
+  flagGhciSpec "load-initial-targets"         Opt_GhciDoLoadTargets,
+
   flagSpec "helpful-errors"                   Opt_HelpfulErrors,
   flagSpec "hpc"                              Opt_Hpc,
   flagSpec "ignore-asserts"                   Opt_IgnoreAsserts,

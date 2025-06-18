@@ -1141,6 +1141,7 @@ defaultFlags settings
       Opt_GenManifest,
       Opt_GhciHistory,
       Opt_GhciSandbox,
+      Opt_GhciDoLoadTargets,
       Opt_HelpfulErrors,
       Opt_KeepHiFiles,
       Opt_KeepOFiles,

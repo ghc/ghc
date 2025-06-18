@@ -2087,6 +2087,19 @@ mostly obvious.
     that any previously loaded modules have been correctly garbage
     collected. Emits messages if a leak is detected.
 
+.. ghc-flag:: -fload-initial-targets
+    :shortdesc: Load targets on GHCi startup.
+    :type: dynamic
+    :reverse: -fno-load-initial-targets
+    :category:
+
+    :default: on
+    :since: 9.14.1
+
+    Compile all targets on GHCi startup.
+    By disabling this flag you can speed up the initial start time of GHCi.
+    When targets are needed, they can be loaded by using the :ghci-cmd:`:reload`.
+
 Packages
 ~~~~~~~~
 
@@ -2759,7 +2772,7 @@ commonly used commands.
 
     Quits GHCi. You can also quit by typing :kbd:`Control-D` at the prompt.
 
-.. ghci-cmd:: :reload;[!]
+.. ghci-cmd:: :reload;[!] [none | ⟨mod1⟩ ...]
 
     Attempts to reload the current target set (see :ghci-cmd:`:load`) if any of
     the modules in the set, or any dependent module, has changed. Note
@@ -2772,6 +2785,11 @@ commonly used commands.
     Effectively, the :ghc-flag:`-fdefer-type-errors` flag is set before loading
     and unset after loading if the flag has not already been set before.
     See :ref:`defer-type-errors` for further motivation and details.
+
+    If given a module name target, GHCi will load all modules in the module graph
+    up to the given module name ``⟨mod1⟩``. If multiple name targets are given, all module
+    targets will be loaded.
+    To unload all currently loaded targets, the target ``none`` unloads all targets.
 
 .. ghci-cmd:: :run
 

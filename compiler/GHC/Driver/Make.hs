@@ -344,8 +344,9 @@ warnUnknownModules hsc_env dflags mod_graph = do
 data LoadHowMuch
    = LoadAllTargets
      -- ^ Load all targets and its dependencies.
-   | LoadUpTo HomeUnitModule
-     -- ^ Load only the given module and its dependencies.
+   | LoadUpTo [HomeUnitModule]
+     -- ^ Load only the given modules and its dependencies.
+     -- If empty, we load none of the targets
    | LoadDependenciesOf HomeUnitModule
      -- ^ Load only the dependencies of the given module, but not the module
      -- itself.
@@ -518,7 +519,7 @@ countMods (ResolvedCycle ns) = length ns
 countMods (UnresolvedCycle ns) = length ns
 
 -- See Note [Upsweep] for a high-level description.
-createBuildPlan :: ModuleGraph -> Maybe HomeUnitModule -> [BuildPlan]
+createBuildPlan :: ModuleGraph -> Maybe [HomeUnitModule] -> [BuildPlan]
 createBuildPlan mod_graph maybe_top_mod =
     let -- Step 1: Compute SCCs without .hi-boot files, to find the cycles
         cycle_mod_graph   = topSortModuleGraph True  mod_graph maybe_top_mod
@@ -645,16 +646,20 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
 
     -- check that the module given in HowMuch actually exists, otherwise
     -- topSortModuleGraph will bomb later.
-    let checkHowMuch (LoadUpTo m)           = checkMod m
-        checkHowMuch (LoadDependenciesOf m) = checkMod m
+    let checkHowMuch (LoadUpTo ms)          = checkMods ms
+        checkHowMuch (LoadDependenciesOf m) = checkMods [m]
         checkHowMuch _ = id
 
-        checkMod m and_then
-            | m `Set.member` all_home_mods = and_then
-            | otherwise = do
-                    throwOneError $ mkPlainErrorMsgEnvelope noSrcSpan
-                                  $ GhcDriverMessage
-                                  $ DriverModuleNotFound (moduleUnit m) (moduleName m)
+        checkMods ms and_then =
+          case List.partition (`Set.member` all_home_mods) ms of
+            (_, []) -> and_then
+            (_, not_found_mods) -> do
+              let
+                mkModuleNotFoundError m =
+                  mkPlainErrorMsgEnvelope noSrcSpan
+                  $ GhcDriverMessage
+                  $ DriverModuleNotFound (moduleUnit m) (moduleName m)
+              throwErrors $ mkMessages $ listToBag [mkModuleNotFoundError not_found | not_found <- not_found_mods]
 
     checkHowMuch how_much $ do
 
@@ -667,12 +672,12 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
     -- are definitely unnecessary, then emit a warning.
     warnUnnecessarySourceImports (filterToposortToModules mg2_with_srcimps)
 
-    let maybe_top_mod = case how_much of
+    let maybe_top_mods = case how_much of
                           LoadUpTo m           -> Just m
-                          LoadDependenciesOf m -> Just m
+                          LoadDependenciesOf m -> Just [m]
                           _                    -> Nothing
 
-        build_plan = createBuildPlan mod_graph maybe_top_mod
+        build_plan = createBuildPlan mod_graph maybe_top_mods
 
 
     cache <- liftIO $ maybe (return []) iface_clearCache mhmi_cache
@@ -1306,7 +1311,7 @@ topSortModuleGraph
           :: Bool
           -- ^ Drop hi-boot nodes? (see below)
           -> ModuleGraph
-          -> Maybe HomeUnitModule
+          -> Maybe [HomeUnitModule]
              -- ^ Root module name.  If @Nothing@, use the full graph.
           -> [SCC ModuleGraphNode]
 -- ^ Calculate SCCs of the module graph, possibly dropping the hi-boot nodes
@@ -1356,7 +1361,7 @@ topSortModuleGraph drop_hs_boot_nodes module_graph mb_root_mod =
     cmpModuleGraphNodes k1 k2 = compare (moduleGraphNodeRank k1) (moduleGraphNodeRank k2)
                                   `mappend` compare k2 k1
 
-topSortModules :: Bool -> [ModuleGraphNode] -> Maybe HomeUnitModule -> [SCC ModuleGraphNode]
+topSortModules :: Bool -> [ModuleGraphNode] -> Maybe [HomeUnitModule] -> [SCC ModuleGraphNode]
 topSortModules drop_hs_boot_nodes summaries mb_root_mod
   = map (fmap summaryNodeSummary) $ stronglyConnCompG initial_graph
   where
@@ -1365,17 +1370,20 @@ topSortModules drop_hs_boot_nodes summaries mb_root_mod
 
     initial_graph = case mb_root_mod of
         Nothing -> graph
-        Just (Module uid root_mod) ->
+        Just mods ->
             -- restrict the graph to just those modules reachable from
             -- the specified module.  We do this by building a graph with
             -- the full set of nodes, and determining the reachable set from
             -- the specified node.
-            let root | Just node <- lookup_node $ NodeKey_Module $ ModNodeKeyWithUid (GWIB root_mod NotBoot) uid
-                     , graph `hasVertexG` node
-                     = node
-                     | otherwise
-                     = throwGhcException (ProgramError "module does not exist")
-            in graphFromEdgedVerticesUniq (seq root (root:allReachable (graphReachability graph) root))
+            let
+              findNodeForModule (Module uid root_mod)
+                | Just node <- lookup_node $ NodeKey_Module $ ModNodeKeyWithUid (GWIB root_mod NotBoot) uid
+                , graph `hasVertexG` node
+                = seq node node
+                | otherwise
+                = throwGhcException (ProgramError "module does not exist")
+              roots = fmap findNodeForModule mods
+            in graphFromEdgedVerticesUniq (seq roots (roots ++ allReachableMany (graphReachability graph) roots))
 
 newtype ModNodeMap a = ModNodeMap { unModNodeMap :: Map.Map ModNodeKey a }
   deriving (Functor, Traversable, Foldable)

@@ -1,0 +1,12 @@
+-- Nothing is loaded
+f 5
+g 5
+h 5
+-- Can't add modules to context, as they are not loaded
+:m A
+-- Load more modules
+:reload A B
+:m A B
+f 5
+g 5
+h 5
