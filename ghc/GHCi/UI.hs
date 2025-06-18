@@ -2286,13 +2286,16 @@ unAddModule files = do
 -- | @:reload@ command
 reloadModule :: GhciMonad m => String -> m ()
 reloadModule m = do
-  session <- GHC.getSession
-  let home_unit = homeUnitId (hsc_home_unit session)
-  ok <- doLoadAndCollectInfo Reload (loadTargets home_unit)
+  loadTarget <- findLoadTarget
+  ok <- doLoadAndCollectInfo Reload loadTarget
   when (failed ok) failIfExprEvalMode
   where
-    loadTargets hu | null m    = LoadAllTargets
-                   | otherwise = LoadUpTo (mkModule hu (GHC.mkModuleName m))
+    findLoadTarget
+      | null m    =
+          pure LoadAllTargets
+      | otherwise = do
+          mod' <- lookupHomeUnitModuleName (GHC.mkModuleName m)
+          pure $ LoadUpTo mod'
 
 reloadModuleDefer :: GhciMonad m => String -> m ()
 reloadModuleDefer = wrapDeferTypeErrors . reloadModule
@@ -4794,6 +4797,13 @@ lookupModule mName = lookupModuleName (GHC.mkModuleName mName)
 
 lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 lookupModuleName mName = lookupQualifiedModuleName NoPkgQual mName
+
+lookupHomeUnitModuleName :: GHC.GhcMonad m => ModuleName -> m HomeUnitModule
+lookupHomeUnitModuleName mName = do
+  m <- lookupQualifiedModuleName NoPkgQual mName
+  if unitIsDefinite (moduleUnit m)
+    then pure (fmap toUnitId m)
+    else throwGhcException (CmdLineError ("module name '" ++ moduleNameString mName ++ "' is not a loaded module"))
 
 lookupQualifiedModuleName :: GHC.GhcMonad m => PkgQual -> ModuleName -> m Module
 lookupQualifiedModuleName qual modl = do

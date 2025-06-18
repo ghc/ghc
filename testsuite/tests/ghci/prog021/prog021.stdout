@@ -1,0 +1,6 @@
+[5]
+Just 5
+[5]
+B is not loaded, we can't add it to the context
+[5]
+`g` and `h` are not in scope
