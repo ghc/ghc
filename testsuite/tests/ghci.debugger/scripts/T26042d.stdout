@@ -10,8 +10,5 @@ _result ::
      ^^^^^^^^^^^^^^^^^
 7    putStrLn "hello3"
 hello2
-Stopped in Main.main, T26042d.hs:7:3-19
-_result ::
-  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
-  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
-        () #) = _
+hello3
+hello4
