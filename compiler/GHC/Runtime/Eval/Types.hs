@@ -49,6 +49,11 @@ data SingleStep
 
    -- | :stepout
    | StepOut
+      { initiatedFrom :: Maybe SrcSpan
+        -- ^ Step-out locations are filtered to make sure we don't stop at a
+        -- continuation that is within the function from which step-out was
+        -- initiated. See Note [Debugger: Step-out]
+      }
 
    -- | :steplocal [expr]
    | LocalStep
@@ -62,24 +67,74 @@ data SingleStep
 -- step at every breakpoint or after every return (see @'EvalStep'@).
 enableGhcStepMode :: SingleStep -> EvalStep
 enableGhcStepMode RunToCompletion = EvalStepNone
-enableGhcStepMode StepOut         = EvalStepOut
+enableGhcStepMode StepOut{}       = EvalStepOut
 -- for the remaining step modes we need to stop at every single breakpoint.
 enableGhcStepMode _               = EvalStepSingle
 
--- | Given a 'SingleStep' mode and the SrcSpan of a breakpoint we hit, return
--- @True@ if based on the step-mode alone we should stop at this breakpoint.
+-- | Given a 'SingleStep' mode, whether the breakpoint was explicitly active,
+-- and the SrcSpan of a breakpoint we hit, return @True@ if we should stop at
+-- this breakpoint.
 --
 -- In particular, this will always be @False@ for @'RunToCompletion'@ and
 -- @'RunAndLogSteps'@. We'd need further information e.g. about the user
 -- breakpoints to determine whether to break in those modes.
-breakHere :: SingleStep -> SrcSpan -> Bool
-breakHere step break_span = case step of
-  RunToCompletion -> False
-  RunAndLogSteps  -> False
-  StepOut         -> True
-  SingleStep      -> True
-  LocalStep  span -> break_span `isSubspanOf` span
-  ModuleStep span -> srcSpanFileName_maybe span == srcSpanFileName_maybe break_span
+breakHere :: Bool       -- ^ Was this breakpoint explicitly active (in the @BreakArray@s)?
+          -> SingleStep -- ^ What kind of stepping were we doing
+          -> SrcSpan    -- ^ The span of the breakpoint we hit
+          -> Bool       -- ^ Should we stop here then?
+breakHere b RunToCompletion _ = b
+breakHere b RunAndLogSteps  _ = b
+breakHere _ SingleStep      _ = True
+breakHere b step break_span   = case step of
+  LocalStep start_span  -> b || break_span `isSubspanOf` start_span
+  ModuleStep start_span -> b || srcSpanFileName_maybe start_span == srcSpanFileName_maybe break_span
+  StepOut Nothing       -> True
+  StepOut (Just start)  ->
+    -- See Note [Debugger: Filtering step-out stops]
+    not (break_span `isSubspanOf` start)
+
+{-
+Note [Debugger: Filtering step-out stops]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Recall from Note [Debugger: Step-out] that the RTS explicitly enables the
+breakpoint at the start of the first continuation frame on the stack, when
+the step-out flag is set.
+
+Often, the continuation on top of the stack will be part of the same function
+from which step-out was initiated. A trivial example is a case expression:
+
+  f x = case <brk>g x of ...
+
+If we're stopped in <brk>, the continuation will be in the case alternatives rather
+than in the function which called `f`. This is especially relevant for monadic
+do-blocks which may end up being compiled to long chains of case expressions,
+such as IO, and we don't want to stop at every line in the block while stepping out!
+
+To make sure we only stop at a continuation outside of the current function, we
+compare the continuation breakpoint `SrcSpan` against the current one. If the
+continuation breakpoint is within the current function, instead of stopping, we
+re-trigger step-out and return to the RTS interpreter right away.
+
+This behaviour is very similar to `:steplocal`, which is implemented by
+yielding from the RTS at every breakpoint (using `:step`) but only really
+stopping when the breakpoint's `SrcSpan` is contained in the current function.
+
+The function which determines if we should stop at the current breakpoint is
+`breakHere`. For `StepOut`, `breakHere` will only return `True` if the
+breakpoint is not contained in the function from which step-out was initiated.
+
+Notably, this means we will ignore breakpoints enabled by the user if they are
+contained in the function we are stepping out of.
+
+If we had a way to distinguish whether a breakpoint was explicitly enabled (in
+`BreakArrays`) by the user vs by step-out we could additionally break on
+user-enabled breakpoints; however, it's not straightforward to determine this
+and arguably it may be uncommon for a user to use step-out to run until the
+next breakpoint in the same function. Of course, if a breakpoint in any other
+function is hit before returning to the continuation, we will still stop there
+(`breakHere` will be `True` because the break point is not within the initiator
+function).
+-}
 
 data ExecResult
 

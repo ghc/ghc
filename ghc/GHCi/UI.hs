@@ -4191,7 +4191,14 @@ stepCmd arg = withSandboxOnly ":step" $ step arg
   step expression = runStmt expression GHC.SingleStep >> return ()
 
 stepOutCmd :: GhciMonad m => String -> m ()
-stepOutCmd _ = withSandboxOnly ":stepout" $ doContinue GHC.StepOut
+stepOutCmd _ = withSandboxOnly ":stepout" $ do
+  mb_span <- getCurrentBreakSpan
+  case mb_span of
+    Nothing -> doContinue (GHC.StepOut Nothing)
+    Just loc -> do
+      md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
+      current_toplevel_decl <- flip enclosingTickSpan loc <$> getTickArray md
+      doContinue (GHC.StepOut (Just (RealSrcSpan current_toplevel_decl Strict.Nothing)))
 
 stepLocalCmd :: GhciMonad m => String -> m ()
 stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
