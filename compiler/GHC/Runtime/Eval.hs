@@ -355,14 +355,14 @@ handleRunStatus step expr bindings final_ids status history0 = do
         decl      = intercalate "." $ modBreaks_decls tick_brks ! ibi_tick_index ibi
 
       -- Was this breakpoint explicitly enabled (ie. in @BreakArray@)?
-      b <- liftIO $ breakpointStatus interp (modBreaks_flags tick_brks) (ibi_tick_index ibi)
+      bactive <- liftIO $ breakpointStatus interp (modBreaks_flags tick_brks) (ibi_tick_index ibi)
 
       apStack_fhv <- liftIO $ mkFinalizedHValue interp apStack_ref
       resume_ctxt_fhv   <- liftIO $ mkFinalizedHValue interp resume_ctxt
 
       -- This breakpoint is enabled or we mean to break here;
       -- we want to stop instead of just logging it.
-      if b || breakHere step span then do
+      if breakHere bactive step span then do
         -- This function only returns control to ghci with 'ExecBreak' when it is really meant to break.
         -- Specifically, for :steplocal or :stepmodule, don't return control
         -- and simply resume execution from here until we hit a breakpoint we do want to stop at.
@@ -386,6 +386,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
         setSession hsc_env2
         return (ExecBreak names (Just ibi))
       else do
+        -- resume with the same step type
         let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
         status <- liftIO $ GHCi.resumeStmt interp eval_opts resume_ctxt_fhv
         history <- if not tracing then pure history0 else do
@@ -451,7 +452,7 @@ resumeExec step mbCnt
                     hist' = case mb_brkpt of
                        Nothing -> pure prevHistoryLst
                        Just bi
-                         | breakHere step span -> do
+                         | breakHere False step span -> do
                             hist1 <- liftIO (mkHistory hsc_env apStack bi)
                             return $ hist1 `consBL` fromListBL 50 hist
                          | otherwise -> pure prevHistoryLst
