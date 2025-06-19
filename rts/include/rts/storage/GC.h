@@ -170,35 +170,105 @@ void listAllBlocks(ListBlocksCb cb, void *user);
 /* -----------------------------------------------------------------------------
    Generic allocation
 
-   StgPtr allocate(Capability *cap, W_ n)
-                                Allocates memory from the nursery in
-                                the current Capability.
-
-   StgPtr allocatePinned(Capability *cap, W_ n, W_ alignment, W_ align_off)
-                                Allocates a chunk of contiguous store
-                                n words long, which is at a fixed
-                                address (won't be moved by GC). The
-                                word at the byte offset 'align_off'
-                                will be aligned to 'alignment', which
-                                must be a power of two.
-                                Returns a pointer to the first word.
-                                Always succeeds.
-
-                                NOTE: the GC can't in general handle
-                                pinned objects, so allocatePinned()
-                                can only be used for ByteArrays at the
-                                moment.
-
-                                Don't forget to TICK_ALLOC_XXX(...)
-                                after calling allocate or
-                                allocatePinned, for the
-                                benefit of the ticky-ticky profiler.
-
+   See: Note [allocate and allocateMightFail]
+        Note [allocatePinned]
+        Note [allocate failure]
    -------------------------------------------------------------------------- */
 
 StgPtr  allocate          ( Capability *cap, W_ n );
 StgPtr  allocateMightFail ( Capability *cap, W_ n );
 StgPtr  allocatePinned    ( Capability *cap, W_ n, W_ alignment, W_ align_off);
+
+/* Note [allocate and allocateMightFail]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   allocate() and allocateMightFail() allocate an area of memory n
+   *words* large, from the nursery of the supplied Capability, or from
+   the global block pool if the area requested is larger than
+   LARGE_OBJECT_THRESHOLD.  Memory is not allocated from the current
+   nursery block, so as not to interfere with Hp/HpLim.
+
+   The address of the allocated memory is returned.
+
+   After allocating, fill in the heap closure header, e.g.
+   SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
+   and call TICK_ALLOC_XXX(...) for the benefit of the ticky-ticky
+   profiler.
+
+   On allocation failure, allocateMightFail() returns NULL whereas
+   allocate() terminates the RTS. See Note [allocate failure]. You
+   should prefer allocateMightFail() in cases where you can propagate
+   the failure up to a context in which you can raise exceptions, e.g.
+   in primops.
+ */
+
+/* Note [allocatePinned]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   allocatePinned() allocates a chunk of contiguous store n *words*
+   long, which is at a fixed address (i.e. won't be moved by GC). The
+   word at the byte offset 'align_off' will be aligned to 'alignment',
+   which must be a power of two.
+
+   The address of the allocated memory is returned.
+
+   The GC can't in general handle pinned objects, so allocatePinned()
+   can only be used for ByteArrays / stg_ARR_WORDS at the moment.
+
+   On allocation failure, allocatePinned() returns NULL.
+   See Note [allocate failure].
+ */
+
+/* Note [allocate failure]
+   ~~~~~~~~~~~~~~~~~~~~~~~
+
+   The allocation functions differ in how they handle failure to
+   allocate:
+
+    * on failure allocateMightFail() returns NULL
+    * on failure allocatePinned() returns NULL
+    * on failure allocate() terminates the RTS (and thus typically
+      the whole process)
+
+   Each of these functions tries _quite_ hard to avoid allocation
+   failure however. If the nursery is already full, then another block
+   is allocated from the global block pool. If we need to get memory
+   from the OS and that operation fails, or if we would exceed
+   maxHeapSize then we fail.
+
+   There are two main existing conventions within the RTS for handling
+   allocation failure.
+
+   1. Start from a primop that uses one of the MAYBE_GC_* macros to
+      provide an opportunity to GC. Then buried deeply within C code
+      called from the primop, use allocate().
+
+   2. Start from a primop that uses one of the MAYBE_GC_* macros to
+      provide an opportunity to GC. Use allocateMightFail() within the
+      C code called from the primop. If that fails, propagate the
+      failure up to the primop where it can throw a HeapOverflow
+      exception.
+
+   Being able to throw an exception is preferable, since it's more
+   polite, provides better reporting and potentially it can be
+   caught and handled by the user program.
+
+   An advantage of the first approach is that its simpler to implement.
+   It does not require any mechanism to propagate failure (and undoing
+   any effects along the way so the operation can be safely retried
+   after GC).
+
+   Arguably neither existing convention is ideal. One might imagine
+   that when failure from allocateMightFail() propagates to the top
+   level primop, the primop would not throw a HeapOverflow exception
+   but invoke the GC with a request to make available at least the
+   required number of words. The GC may be able to succeed, in which
+   case the original operation can be retried. Or if the GC is unable
+   to free enough memory then it can throw the HeapOverflow exception.
+   In practice however, though there is a mechanism (via HpAlloc) to
+   tell the GC how much memory was needed, this is not used to decide
+   if we have to fail the allocation, it is just used for error
+   reporting.
+ */
 
 /* memory allocator for executable memory */
 typedef void* AdjustorWritable;

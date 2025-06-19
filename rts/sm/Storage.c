@@ -1065,25 +1065,10 @@ accountAllocation(Capability *cap, W_ n)
  * overwriting closures].
  */
 
-/* -----------------------------------------------------------------------------
-   StgPtr allocate (Capability *cap, W_ n)
-
-   Allocates an area of memory n *words* large, from the nursery of
-   the supplied Capability, or from the global block pool if the area
-   requested is larger than LARGE_OBJECT_THRESHOLD.  Memory is not
-   allocated from the current nursery block, so as not to interfere
-   with Hp/HpLim.
-
-   The address of the allocated memory is returned. allocate() never
-   fails; if it returns, the returned value is a valid address.  If
-   the nursery is already full, then another block is allocated from
-   the global block pool.  If we need to get memory from the OS and
-   that operation fails, then the whole process will be killed.
-   -------------------------------------------------------------------------- */
-
 /*
- * Allocate some n words of heap memory; terminating
- * on heap overflow
+ * Allocate some n words of heap memory; terminating on heap overflow.
+ *
+ * See Note [allocate and allocateMightFail].
  */
 StgPtr
 allocate (Capability *cap, W_ n)
@@ -1103,8 +1088,9 @@ allocate (Capability *cap, W_ n)
 }
 
 /*
- * Allocate some n words of heap memory; returning NULL
- * on heap overflow
+ * Allocate some n words of heap memory; returning NULL on heap overflow.
+ *
+ * See Note [allocate and allocateMightFail].
  */
 StgPtr
 allocateMightFail (Capability *cap, W_ n)
@@ -1302,6 +1288,9 @@ start_new_pinned_block(Capability *cap)
 
 /* ---------------------------------------------------------------------------
    Allocate a fixed/pinned object.
+
+   See Note [allocatePinned] for the interface. This describes the
+   implementation.
 
    We allocate small pinned objects into a single block, allocating a
    new block when the current one overflows.  The block is chained
