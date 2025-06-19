@@ -361,6 +361,11 @@ By simply enabling the breakpoint heading the continuation we can ensure that
 when it is returned to we will stop there without additional work -- it
 leverages the existing break point insertion process and stopping mechanisms.
 
+See Note [Debugger: Filtering step-out stops] for details on how the
+interpreter further filters the continuation we stop at to make sure we onky
+break on a continuation outside of the function from which step-out was
+initiated.
+
 A limitation of this approach is that stepping-out of a function that was
 tail-called will skip its caller since no stack frame is pushed for a tail
 call (i.e. a tail call returns directly to its caller's first non-tail caller).
