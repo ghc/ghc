@@ -15,6 +15,7 @@
 #include "RtsFlags.h"
 #include "Hash.h"
 #include "Trace.h"
+#include "AllocArray.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -31,25 +32,16 @@
  * determined by the ByteArray# length.
  */
 
-static StgArrBytes *
-allocateArrBytes(Capability *cap, size_t size_in_bytes)
-{
-    /* round up to a whole number of words */
-    uint32_t data_size_in_words  = ROUNDUP_BYTES_TO_WDS(size_in_bytes);
-    uint32_t total_size_in_words = sizeofW(StgArrBytes) + data_size_in_words;
-
-    StgArrBytes *arr = (StgArrBytes *) allocate(cap, total_size_in_words);
-    SET_ARR_HDR(arr, &stg_ARR_WORDS_info, cap->r.rCCCS, size_in_bytes);
-    return arr;
-}
-
 void
 setThreadLabel(Capability  *cap,
                StgTSO      *tso,
                char *label)
 {
     int len = strlen(label);
-    StgArrBytes *arr = allocateArrBytes(cap, len);
+    StgArrBytes *arr = allocateArrBytes(cap, len, cap->r.rCCCS);
+    // On allocation failure don't perform the effect. It's not convenient to
+    // propagate failure from here since there are multiple callers in the RTS.
+    if (RTS_UNLIKELY(arr == NULL)) return;
     memcpy(&arr->payload, label, len);
     labelThread(cap, tso, arr);
 }
