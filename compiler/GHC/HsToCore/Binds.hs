@@ -57,6 +57,7 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Rules
+import GHC.Core.Ppr( pprCoreBinders )
 import GHC.Core.TyCo.Compare( eqType )
 
 import GHC.Builtin.Names
@@ -1002,6 +1003,88 @@ when we would rather avoid passing both dictionaries, and instead generate:
   $sg @c d = let { d1 = $p1Ord d; d2 = d } in <g-rhs> @c @c d1 d2
 
 For now, we accept this infelicity.
+
+Note [Desugaring new-form SPECIALISE pragmas] -- Take 2
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  f :: forall a b c d. (Ord a, Ord b, Eq c, Ix d) => ...
+  f = rhs
+  {-# SPECIALISE f @p @[p] @[Int] @(q,r) #-}
+
+The type-checker generates `the_call` which looks like
+
+  spe_bndrs = (dx1 :: Ord p) (dx2::Ix q) (dx3::Ix r)
+  the_call = let d6 = dx1
+                 d2 = $fOrdList d6
+                 d3 = $fEqList $fEqInt
+                 d7 = dx1   -- Solver may introduce
+                 d1 = d7    -- these indirections
+                 d4 = $fIxPair dx2 dx3
+             in f @p @p @[Int] @(q,r)
+                  (d1::Ord p) (d2::Ord [p]) (d3::Eq [Int]) (d4::Ix (q,r)
+
+We /could/ generate
+   RULE  f d1 d2 d3 d4 e1..en = $sf d1 d2 d3 d4
+   $sf d1 d2 d3 d4 = <rhs> d1 d2 d3 d4
+
+But that would do no specialisation! What we want is this:
+   RULE  f d1 _d2 _d3 d4 e1..en = $sf d1 d4
+   $sf d1 d4 =  let d7 = d1   -- Renaming
+                    dx1 = d7  -- Renaming
+                    d6 = dx1
+                    d2 = $fOrdList d6
+                    d3 = $fEqList $fEqInt
+                in rhs d1 d2 d3 d4
+
+Notice that:
+  * We pass some, but not all, of the matched dictionaries to $sf
+
+  * We get specialisations for d2 and d3, but not for d1, nor d4.
+
+  * We had to introduce some renaming bindings at the top
+    to line things up
+
+The transformation goes in these steps
+(S1) decomposeCall: decomopose `the_call` into
+     - `rev_binds`: the enclosing let-bindings (actually reversed)
+     - `rule_lhs_args`: the arguments of the call itself
+    We carefully arrange that the dictionary arguments of the actual
+    call, `rule_lhs_args` are all distinct dictionary variables,
+    not expressions. How? We use `simpleOptExprNoInline` to avoid
+    inlining the let-bindings.
+
+(S2) Compute `rule_bndrs`: the free vars of `rule_lhs_args`, which
+   will be the forall'd template variables of the RULE.  In the example,
+       rule_bndrs = d1,d2,d3,d4
+
+(S3) grabSpecBinds: transform `rev_binds` into `spec_binds`: the
+   bindings we will wrap around the call in the RHS of `$sf`
+
+(S4) Find `spec_bndrs`, the subset of `rule_bndrs` that we actually
+   need to pass to `$sf`, simply by filtering out those that are
+   bound by `spec_binds`.  In the example
+      spec_bndrs = d1,d4
+
+
+     Working inner
+* Grab any bindings we can that will "shadow" the forall'd
+  rule-bndrs, giving specialised bindings for them.
+  * We keep a set of known_bndrs starting with {d1,..,dn}
+  * We keep a binding iff no free var is
+      (a) in orig_bndrs (i.e. not totally free)
+      (b) not in known_bndrs
+  * If we keep it, add its binder to known_bndrs; if not, don't
+
+To maximise what we can "grab", start by extracting /renamings/ of the
+forall'd rule_bndrs, and bringing them to the top.  A renaming is
+    rule_bndr = d
+If we see this:
+  * Bring d=rule_bndr to the top
+  * Add d to the set of variables to look for on the right.
+    e.g.    rule_bndrs = d1, d2
+            Bindings   { d7=d9; d1=d7 }
+        Bring to the top  { d7=d1; d9=d7 }
+
 -}
 
 ------------------------
@@ -1083,13 +1166,18 @@ dsSpec_help poly_nm poly_id poly_rhs inl orig_bndrs ds_call
             Nothing -> do { diagnosticDs (DsRuleLhsTooComplicated ds_call core_call)
                            ; return Nothing } ;
 
-            Just (rev_binds, rule_lhs_args) ->
+            Just (binds, rule_lhs_args) ->
 
-    do { let orig_bndr_set = mkVarSet orig_bndrs
-             locally_bound = orig_bndr_set `extendVarSetList` bindersOfBinds rev_binds
-             rule_bndrs = scopedSort (exprsSomeFreeVarsList (`elemVarSet` locally_bound)
-                                                            rule_lhs_args)
-             spec_binds = grabSpecBinds orig_bndr_set (mkVarSet rule_bndrs) rev_binds
+    do { let locals = mkVarSet orig_bndrs `extendVarSetList` bindersOfBinds binds
+             is_local :: Var -> Bool
+             is_local v = v `elemVarSet` locals
+
+             rule_bndrs = scopedSort (exprsSomeFreeVarsList is_local rule_lhs_args)
+             rn_binds = getRenamings orig_bndrs binds rule_bndrs
+
+             spec_binds = pickSpecBinds is_local (mkVarSet rule_bndrs)
+                                        (rn_binds ++ binds)
+
              spec_binds_bndr_set = mkVarSet (bindersOfBinds spec_binds)
              spec_bndrs = filterOut (`elemVarSet` spec_binds_bndr_set) rule_bndrs
 
@@ -1101,13 +1189,14 @@ dsSpec_help poly_nm poly_id poly_rhs inl orig_bndrs ds_call
        ; tracePm "dsSpec(new route)" $
          vcat [ text "poly_id" <+> ppr poly_id
               , text "unfolding" <+> ppr (realIdUnfolding poly_id)
-              , text "orig_bndrs"   <+> ppr orig_bndrs
+              , text "orig_bndrs"   <+> pprCoreBinders orig_bndrs
               , text "ds_call" <+> ppr ds_call
               , text "core_call" <+> ppr core_call
-              , text "rev_binds" <+> ppr rev_binds
+              , text "binds" <+> ppr binds
               , text "rule_bndrs" <+> ppr rule_bndrs
               , text "rule_lhs_args" <+> ppr rule_lhs_args
               , text "spec_bndrs" <+> ppr spec_bndrs
+              , text "rn_binds" <+> ppr rn_binds
               , text "spec_binds" <+> ppr spec_binds ]
 
        ; finishSpecPrag poly_nm poly_rhs
@@ -1115,7 +1204,7 @@ dsSpec_help poly_nm poly_id poly_rhs inl orig_bndrs ds_call
                         spec_bndrs mk_spec_body inl } } }
 
 decomposeCall :: Id -> CoreExpr
-               -> Maybe ( [CoreBind]    -- Reversed bindings
+               -> Maybe ( [CoreBind]
                         , [CoreExpr] )  -- Args of the call
 decomposeCall poly_id binds
   = go [] binds
@@ -1125,42 +1214,78 @@ decomposeCall poly_id binds
     go acc e
       | (Var fun, args) <- collectArgs e
       = assertPpr (fun == poly_id) (ppr fun $$ ppr poly_id) $
-        Just (acc, args)
+        Just (reverse acc, args)
       | otherwise
       = Nothing
 
+getRenamings :: [Var] -> [CoreBind]  -- orig_bndrs and bindings
+             -> [Var]                -- rule_bndrs
+             -> [CoreBind]           -- Binds some of the orig_bndrs to a rule_bndr
+getRenamings orig_bndrs binds rule_bndrs
+  = [ NonRec b e | b <- orig_bndrs
+                 , not (b `elem` rule_bndrs)
+                 , Just e <- [lookupVarEnv final_renamings b] ]
+  where
+    init_renamings, final_renamings :: IdEnv CoreExpr
+    -- In this function, IdEnv maps a local variable to (v |> co),
+    -- where `v` is a rule_bndr
 
-grabSpecBinds :: VarSet -> VarSet -> [CoreBind] -> [CoreBind]
-grabSpecBinds orig_bndrs rule_bndrs rev_binds
-   = reverse rename_binds ++ spec_binds
+    init_renamings = mkVarEnv [ (v, Var v) | v <- rule_bndrs, isId v ]
+    final_renamings = go binds
+
+    go :: [CoreBind] -> IdEnv CoreExpr
+    go [] = init_renamings
+    go (bind : binds)
+       | NonRec b rhs <- bind
+       , Just (v, mco) <- getCastedVar rhs
+       , Just e <- lookupVarEnv renamings v
+       = extendVarEnv renamings b (mkCastMCo e (mkSymMCo mco))
+       | otherwise
+       = renamings
+       where
+         renamings = go binds
+
+pickSpecBinds :: (Var -> Bool) -> VarSet -> [CoreBind] -> [CoreBind]
+pickSpecBinds _ _ [] = []
+pickSpecBinds is_local known_bndrs (bind:binds)
+      | all keep_me (rhssOfBind bind)
+      , let known_bndrs' = known_bndrs `extendVarSetList` bindersOf bind
+      = bind : pickSpecBinds is_local known_bndrs' binds
+      | otherwise
+      = pickSpecBinds is_local known_bndrs binds
+      where
+        keep_me rhs = isEmptyVarSet (exprSomeFreeVars bad_var rhs)
+        bad_var v = is_local v && not (v `elemVarSet` known_bndrs)
+{-
+grabSpecBinds :: (Var -> Bool) -> VarSet -> [CoreBind]
+              -> ([CoreBind], [CoreBind])
+grabSpecBinds is_local rule_bndrs rev_binds
+   = (reverse rename_binds, spec_binds)
   where
     (known_bndrs, (rename_binds, other_binds))
-        = get_renamings orig_bndrs rule_bndrs ([],[]) rev_binds
+        = get_renamings rule_bndrs ([],[]) rev_binds
     spec_binds = pick_spec_binds known_bndrs other_binds
 
     ------------------------
-    get_renamings :: VarSet  -- Locally bound variables
-                  -> VarSet  -- Variables bound by a successful match on the call
+    get_renamings :: VarSet  -- Variables bound by a successful match on the call
                   -> ([CoreBind],[CoreBind])   -- Accumulating parameter, in order
                   -> [CoreBind]     -- Reversed, innermost first
                   -> ( VarSet
                      , ([CoreBind]    -- Renamings, in order
                      ,  [CoreBind]))  -- Other bindings, in order
-    get_renamings _ bndrs acc [] = (bndrs, acc)
+    get_renamings bndrs acc [] = (bndrs, acc)
 
-    get_renamings locals bndrs (rn_binds, other_binds) (bind : binds)
+    get_renamings bndrs (rn_binds, other_binds) (bind : binds)
       | NonRec d r <- bind
       , d `elemVarSet` bndrs
       , Just (v, mco) <- getCastedVar r
-      , v `elemVarSet` locals
+      , is_local v
       , let flipped_bind = NonRec v (mkCastMCo (Var d) (mkSymMCo mco))
       = get_renamings (bndrs `extendVarSet` v)
-                      (locals `extendVarSet` d)
                       (flipped_bind:rn_binds, other_binds)
                       binds
       | otherwise
       = get_renamings bndrs
-                     (locals `extendVarSetList` bindersOf bind)
                      (rn_binds, bind:other_binds)
                      binds
 
@@ -1175,7 +1300,8 @@ grabSpecBinds orig_bndrs rule_bndrs rev_binds
       = pick_spec_binds known_bndrs binds
       where
         keep_me rhs = isEmptyVarSet (exprSomeFreeVars bad_var rhs)
-        bad_var v = v `elemVarSet` orig_bndrs && not (v `elemVarSet` known_bndrs)
+        bad_var v = is_local v && not (v `elemVarSet` known_bndrs)
+-}
 
 getCastedVar :: CoreExpr -> Maybe (Var, MCoercionR)
 getCastedVar (Var v)           = Just (v, MRefl)
