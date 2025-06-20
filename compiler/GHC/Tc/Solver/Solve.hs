@@ -1301,7 +1301,8 @@ tryInertQCs qc
 try_inert_qcs :: QCInst -> [QCInst] -> TcS (StopOrContinue ())
 try_inert_qcs (QCI { qci_ev = ev_w }) inerts =
   case mapMaybe matching_inert inerts of
-    [] -> continueWith ()
+    [] -> do { traceTcS "tryInertQCs:nothing" (ppr ev_w $$ ppr inerts)
+             ; continueWith () }
     ev_i:_ ->
       do { traceTcS "tryInertQCs:KeepInert" (ppr ev_i)
          ; setEvBindIfWanted ev_w EvCanonical (ctEvTerm ev_i)
@@ -1700,108 +1701,3 @@ runTcPluginSolvers solvers all_cts
     addOne (givens, wanteds) (ev,ct) = case ctEvidence ct of
       CtGiven  {} -> (ct:givens, wanteds)
       CtWanted {} -> (givens, (ev,ct):wanteds)
-
---------------------------------------------------------------------------------
-
-{-
--- | If the mode is 'TcSSpecPrag', attempt to fully solve the Wanted
--- constraints that arise from solving 'Ct'.
---
--- If not in 'TcSSpecPrag' mode, simply run 'thing_inside'.
---
--- See Note [TcSSpecPrag] in GHC.Tc.Solver.Monad.
-solveCompletelyIfRequired :: Ct -> TcS (StopOrContinue a) -> TcS (StopOrContinue a)
-solveCompletelyIfRequired ct (TcS thing_inside)
-  = TcS $ \ env@(TcSEnv { tcs_ev_binds = outer_ev_binds_var
-                        , tcs_unified  = outer_unified_var
-                        , tcs_unif_lvl = outer_unif_lvl_var
-                        , tcs_inerts   = outer_inert_var
-                        , tcs_count    = outer_count
-                        , tcs_mode     = mode
-                        }) ->
-  case mode of
-    TcSSpecPrag ->
-      do { traceTc "solveCompletelyIfRequired {" empty
-           -- Create a fresh environment for the inner computation
-         ; outer_inerts <- TcM.readTcRef outer_inert_var
-         ; let outer_givens = inertGivens outer_inerts
-           -- Keep the ambient Given inerts, but drop the Wanteds.
-         ; new_inert_var    <- TcM.newTcRef outer_givens
-         ; new_wl_var       <- TcM.newTcRef emptyWorkList
-         ; new_ev_binds_var <- TcM.newTcEvBinds
-
-         ; let
-            inner_env =
-              TcSEnv
-                -- KEY part: recur with TcSVanilla
-                { tcs_mode     = TcSVanilla
-
-                -- Use new variables for evidence bindings, inerts; and
-                -- the work list. We may want to discard all of these if the
-                -- inner computation doesn't fully solve all the constraints.
-                , tcs_ev_binds = new_ev_binds_var
-                , tcs_inerts   = new_inert_var
-                , tcs_worklist = new_wl_var
-
-                -- Inherit the other variables. In particular, inherit the
-                -- variables to do with unification, as filling metavariables
-                -- is a side-effect that we are not reverting, even when we
-                -- discard the result of the inner computation.
-                , tcs_unif_lvl = outer_unif_lvl_var
-                , tcs_unified  = outer_unified_var
-                , tcs_count    = outer_count
-                }
-
-           -- Solve the constraint
-         ; let wc = emptyWC { wc_simple = unitBag ct }
-         ; traceTc "solveCompletelyIfRequired solveWanteds" $
-            vcat [ text "ct:" <+> ppr ct
-                 ]
-         ; solved_wc <- unTcS (solveWanteds wc) inner_env
-            -- NB: it would probably make more sense to call 'thing_inside',
-            -- collecting all constraints that were added to the work list as
-            -- a result, and calling 'solveWanteds' on that. This would avoid
-            -- restarting from the top of the solver pipeline.
-            -- For the time being, we just call 'solveWanteds' on the original
-            -- constraint, which is simpler
-
-         ; if isSolvedWC solved_wc
-           then
-             do { -- The constraint was fully solved. Continue with
-                  -- the inner solver state.
-                ; traceTc "solveCompletelyIfRequired: fully solved }" $
-                   vcat [ text "ct:" <+> ppr ct
-                        , text "solved_wc:" <+> ppr solved_wc ]
-
-                  -- Add new evidence bindings to the existing ones
-                ; inner_ev_binds <- TcM.getTcEvBindsMap new_ev_binds_var
-                ; addTcEvBinds outer_ev_binds_var inner_ev_binds
-
-                  -- Keep the outer inert set and work list: the inner work
-                  -- list is empty, and there are no leftover unsolved
-                  -- Wanteds.
-                  -- However, we **must not** drop solved implications, due
-                  -- to Note [Free vars of EvFun] in GHC.Tc.Types.Evidence;
-                  -- so we re-emit them here.
-                ; let re_emit_implic impl = unTcS ( TcS.emitImplication impl ) env
-                ; traverse_ re_emit_implic $ wc_impl solved_wc
-                ; return $ Stop (ctEvidence ct) (text "Fully solved:" <+> ppr ct)
-                }
-           else
-             do { traceTc "solveCompletelyIfRequired: unsolved }" $
-                   vcat [ text "ct:" <+> ppr ct
-                        , text "solved_wc:" <+> ppr solved_wc ]
-                  -- Failed to fully solve the constraint:
-                  --
-                  --  - discard the inner solver state,
-                  --  - add the original constraint as an inert.
-                ; unTcS (updInertIrreds (IrredCt (ctEvidence ct) IrredShapeReason)) env
-                    -- NB: currently we only call 'solveCompletelyIfRequired'
-                    -- from 'solveForAll'; so we just stash the unsolved quantified
-                    -- constraint in the irreds.
-
-                 ; return $ Stop (ctEvidence ct) (text "Not fully solved; kept as inert:" <+> ppr ct)
-                 } }
-    _notFullySolveMode ->
-      thing_inside env
--}

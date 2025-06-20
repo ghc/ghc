@@ -1168,17 +1168,18 @@ dsSpec_help poly_nm poly_id poly_rhs spec_inl orig_bndrs ds_call
              is_local v = v `elemVarSet` locals
 
              rule_bndrs = scopedSort (exprsSomeFreeVarsList is_local rule_lhs_args)
-             rn_binds   = getRenamings orig_bndrs binds rule_bndrs
 
-             spec_binds = pickSpecBinds is_local (mkVarSet rule_bndrs) binds
+             rn_binds     = getRenamings orig_bndrs binds rule_bndrs
+             known_vars   = mkVarSet rule_bndrs `extendVarSetList` bindersOfBinds rn_binds
+             picked_binds = pickSpecBinds is_local known_vars binds
 
              -- Make spec_bndrs, the variables to pass to the specialised
              -- function, by filtering out the rule_bndrs that aren't needed
-             spec_binds_bndr_set = mkVarSet (bindersOfBinds spec_binds)
+             spec_binds_bndr_set = mkVarSet (bindersOfBinds picked_binds)
                                    `minusVarSet` exprsFreeVars (rhssOfBinds rn_binds)
              spec_bndrs = filterOut (`elemVarSet` spec_binds_bndr_set) rule_bndrs
 
-             mk_spec_body fn_body = mkLets (rn_binds ++ spec_binds)  $
+             mk_spec_body fn_body = mkLets (rn_binds ++ picked_binds)  $
                                     mkApps fn_body rule_lhs_args
                                     -- ToDo: not mkCoreApps!  That uses exprType on fun which
                                     --       fails in specUnfolding, sigh
@@ -1227,7 +1228,7 @@ dsSpec_help poly_nm poly_id poly_rhs spec_inl orig_bndrs ds_call
               , text "rule_bndrs" <+> ppr rule_bndrs
               , text "spec_bndrs" <+> ppr spec_bndrs
               , text "rn_binds" <+> ppr rn_binds
-              , text "spec_binds" <+> ppr spec_binds ]
+              , text "picked_binds" <+> ppr picked_binds ]
 
        ; dsWarnOrphanRule rule
 
