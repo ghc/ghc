@@ -1148,6 +1148,11 @@ stg_listThreadszh ()
   P_ arr;
 
   ("ptr" arr) = ccall listThreads(MyCapability() "ptr");
+
+  if (arr == NULL) (likely: False) {
+    jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+  }
+
   return (arr);
 }
 

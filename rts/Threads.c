@@ -25,6 +25,7 @@
 #include "Printer.h"
 #include "sm/Sanity.h"
 #include "sm/Storage.h"
+#include "AllocArray.h"
 
 #include <string.h>
 
@@ -879,6 +880,7 @@ loop:
     return true;
 }
 
+/* Return NULL on allocation failure */
 StgMutArrPtrs *listThreads(Capability *cap)
 {
     ACQUIRE_LOCK(&sched_mutex);
@@ -892,13 +894,8 @@ StgMutArrPtrs *listThreads(Capability *cap)
     }
 
     // Allocate a suitably-sized array...
-    const StgWord size = n_threads + mutArrPtrsCardTableSize(n_threads);
-    StgMutArrPtrs *arr =
-        (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
-    SET_HDR(arr, &stg_MUT_ARR_PTRS_DIRTY_info, CCS_SYSTEM);
-    TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), size, 0);
-    arr->ptrs = n_threads;
-    arr->size = size;
+    StgMutArrPtrs *arr = allocateMutArrPtrs(cap, n_threads, cap->r.rCCCS);
+    if (RTS_UNLIKELY(arr == NULL)) goto end;
 
     // Populate it...
     StgWord i = 0;
@@ -913,6 +910,7 @@ StgMutArrPtrs *listThreads(Capability *cap)
         }
     }
     CHECKM(i == n_threads, "listThreads: Found too few threads");
+end:
     RELEASE_LOCK(&sched_mutex);
     return arr;
 }
