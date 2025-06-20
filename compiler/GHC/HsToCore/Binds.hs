@@ -1209,8 +1209,9 @@ decomposeCall :: Id -> CoreExpr
 decomposeCall poly_id binds
   = go [] binds
   where
-    go acc (Let bind body)
-      = go (bind:acc) body
+    go acc (Let bind body) = go (bind:acc) body
+    go acc (Cast e _)      = go acc e  -- Discard outer casts
+                                       -- ToDo: document this
     go acc e
       | (Var fun, args) <- collectArgs e
       = assertPpr (fun == poly_id) (ppr fun $$ ppr poly_id) $
