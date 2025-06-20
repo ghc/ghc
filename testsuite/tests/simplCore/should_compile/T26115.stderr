@@ -1,0 +1,6 @@
+[GblId[DFunId],
+ Unf=DFun: \ (@b_awW) ->
+[GblId[DFunId],
+ Unf=DFun: \ (@b_aBU) ->
+[GblId[DFunId],
+ Unf=DFun: \ (@p_awR) (@q_awS) (v_B1 :: C p_awR q_awS) ->

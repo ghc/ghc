@@ -39,7 +39,7 @@ module GHC.Core (
         isId, cmpAltCon, cmpAlt, ltAlt,
 
         -- ** Simple 'Expr' access functions and predicates
-        bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
+        bindersOf, bindersOfBinds, rhssOfBind, rhssOfBinds, rhssOfAlts,
         foldBindersOfBindStrict, foldBindersOfBindsStrict,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders, collectNValBinders_maybe,
@@ -2153,6 +2153,11 @@ foldBindersOfBindsStrict f = \z binds -> foldl' fold_bind z binds
 rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
+
+rhssOfBinds :: [Bind b] -> [Expr b]
+rhssOfBinds []             = []
+rhssOfBinds (NonRec _ rhs : bs) = rhs : rhssOfBinds bs
+rhssOfBinds (Rec pairs    : bs) = map snd pairs ++ rhssOfBinds bs
 
 rhssOfAlts :: [Alt b] -> [Expr b]
 rhssOfAlts alts = [e | Alt _ _ e <- alts]
