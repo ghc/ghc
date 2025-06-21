@@ -2020,12 +2020,11 @@ instFlexiXTcM subst (tv:tvs)
              subst' = extendTvSubstWithClone subst tv tv'
        ; instFlexiXTcM subst' tvs  }
 
-matchGlobalInst :: DynFlags
-                -> Bool      -- True <=> caller is the short-cut solver
-                             -- See Note [Shortcut solving: overlap]
-                -> Class -> [Type] -> CtLoc -> TcS TcM.ClsInstResult
-matchGlobalInst dflags short_cut cls tys loc
-  = wrapTcS $ TcM.matchGlobalInst dflags short_cut cls tys (Just loc)
+matchGlobalInst :: DynFlags -> Class -> [Type] -> CtLoc -> TcS TcM.ClsInstResult
+matchGlobalInst dflags cls tys loc
+  = do { mode <- getTcSMode
+       ; let short_cut = mode == TcSSpecPrag
+       ; wrapTcS $ TcM.matchGlobalInst dflags short_cut cls tys (Just loc) }
 
 tcInstSkolTyVarsX :: SkolemInfo -> Subst -> [TyVar] -> TcS (Subst, [TcTyVar])
 tcInstSkolTyVarsX skol_info subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX skol_info subst tvs

@@ -767,6 +767,7 @@ tryShortCutSolver try_short_cut dict_w@(DictCt { di_ev = ev_w })
               -- Enabled by the -fsolve-constant-dicts flag
 
             -> tryTcS $  -- tryTcS tries to completely solve some contraints
+               setTcSMode TcSSpecPrag $
                do { updInertSet zap_cans
                   ; solveSimpleWanteds (unitBag (CDictCan dict_w)) }
 
@@ -899,7 +900,7 @@ matchClassInst dflags inerts clas tys loc
                    ; return local_res }
 
            NoInstance  -- No local instances, so try global ones
-              -> do { global_res <- matchGlobalInst dflags False clas tys loc
+              -> do { global_res <- matchGlobalInst dflags clas tys loc
                     ; warn_custom_warn_instance global_res loc
                           -- See Note [Implementation of deprecated instances]
                     ; traceTcS "} matchClassInst global result" $ ppr global_res

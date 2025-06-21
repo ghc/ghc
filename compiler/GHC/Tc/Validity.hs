@@ -26,13 +26,13 @@ import GHC.Data.Maybe
 import GHC.Tc.Utils.Unify    ( tcSubTypeAmbiguity )
 import GHC.Tc.Solver         ( simplifyAmbiguityCheck )
 import GHC.Tc.Instance.Class ( matchGlobalInst, ClsInstResult(..), AssocInstInfo(..) )
-import GHC.Tc.Utils.TcType
+import GHC.Tc.Instance.FunDeps
+import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
+import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Instance.FunDeps
-import GHC.Tc.Instance.Family
 import GHC.Tc.Zonk.TcType
 
 import GHC.Builtin.Types
