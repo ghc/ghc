@@ -14,8 +14,8 @@ module GHC.Parser.PreProcess (
 ) where
 
 import Data.List (intercalate, sortBy)
-import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Map qualified as Map
+import Data.Maybe (fromMaybe, listToMaybe)
 import Debug.Trace (trace)
 import GHC.Data.FastString
 import GHC.Data.Strict qualified as Strict
@@ -23,6 +23,7 @@ import GHC.Data.StringBuffer
 import GHC.Driver.DynFlags (DynFlags, xopt)
 import GHC.LanguageExtensions qualified as LangExt
 import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.Errors.Types (PsMessage (PsErrGhcCpp))
 import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..), Token (..))
 import GHC.Parser.Lexer qualified as Lexer
 import GHC.Parser.PreProcess.Macro
@@ -34,7 +35,6 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Outputable (text)
 import GHC.Utils.Panic.Plain (panic)
-import GHC.Parser.Errors.Types (PsMessage(PsErrGhcCpp))
 
 -- ---------------------------------------------------------------------
 
@@ -42,9 +42,10 @@ dumpGhcCpp :: DynFlags -> PState PpState -> SDoc
 dumpGhcCpp dflags pst = output
   where
     ghc_cpp_enabled = xopt LangExt.GhcCpp dflags
-    output = if ghc_cpp_enabled
-                then text $ sepa ++ defines ++ sepa ++ final ++ sepa
-                else text "GHC_CPP not enabled"
+    output =
+        if ghc_cpp_enabled
+            then text $ sepa ++ defines ++ sepa ++ final ++ sepa
+            else text "GHC_CPP not enabled"
     -- Note: pst is the state /before/ the parser runs, so we can use it to lex.
     (pst_final, bare_toks) = lexAll pst
     comments = reverse (Lexer.comment_q pst_final)
@@ -76,6 +77,7 @@ renderCombinedToks toks = showCppTokenStream toks
 -- ---------------------------------------------------------------------
 -- addSourceToTokens copied here to unbreak an import loop.
 -- It should probably move somewhere else
+-- TODO: We should be able to do away with this once #26095 is done
 
 {- | Given a source location and a StringBuffer corresponding to this
 location, return a rich token stream with the source associated to the
@@ -105,7 +107,8 @@ addSourceToTokens loc0 buf0 (t@(L sp _) : ts) =
 
 -- ---------------------------------------------------------------------
 
--- Tweaked from showRichTokenStream
+-- Tweaked from showRichTokenStream, to add markers per line if it is
+-- currently active or not
 showCppTokenStream :: [(Located Token, String)] -> String
 showCppTokenStream ts0 = go startLoc ts0 ""
   where
@@ -196,7 +199,7 @@ ppLexer queueComments cont =
                     ppLexer queueComments cont
              in
                 case tk of
-                -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
+                    -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
                     L _ ITeof -> do
                         mInp <- popIncludeLoc
                         case mInp of
@@ -219,13 +222,11 @@ ppLexer queueComments cont =
                                         case mdump of
                                             Just dump ->
                                                 -- We have a dump of the state, put it into an ignored token
+                                                -- AZ: TODO: is this actually useful?
                                                 contIgnoreTok (L l (ITcpp continuation (appendFS s (fsLit dump)) sp))
                                             Nothing -> contIgnoreTok tk
                             else contInner tk
                     L _ (ITcppIgnored _ _) -> contIgnoreTok tk
-                    L _ (ITline_prag _) -> do
-                        setInLinePragma True
-                        contIgnoreTok tk
                     _ -> do
                         state <- getCppState
                         inLinePragma <- getInLinePragma
@@ -253,7 +254,7 @@ processCppToks fs = do
     -- Combine any prior continuation tokens
     cs <- popContinuation
     let loc = combineLocs fs (fromMaybe fs (listToMaybe cs))
-    processCpp  loc (concat $ reverse $ map get (fs:cs))
+    processCpp loc (concat $ reverse $ map get (fs : cs))
 
 processCpp :: SrcSpan -> String -> PP (Maybe String)
 processCpp loc s = do
@@ -262,13 +263,11 @@ processCpp loc s = do
         then return (Just "\ndumped state\n")
         else do
             case directive of
-                Left err ->  Lexer.addError $ mkPlainErrorMsgEnvelope loc $ PsErrGhcCpp (text err)
+                Left err -> Lexer.addError $ mkPlainErrorMsgEnvelope loc $ PsErrGhcCpp (text err)
                 Right (CppInclude filename) -> do
                     ppInclude filename
-                Right (CppDefine name args def) -> do
-                    ppDefine (MacroName name args) def
-                Right (CppUndef name) -> do
-                    ppUndef name
+                Right (CppDefine name args def) -> ppDefine (MacroName name args) def
+                Right (CppUndef name) -> ppUndef name
                 Right (CppIf cond) -> do
                     val <- cppCond loc cond
                     ar <- pushAccepting val
