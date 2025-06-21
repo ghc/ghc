@@ -2033,7 +2033,28 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
           `appOL` moveStackUp stackSpaceWords
   return code
   where
-    -- Implementiation of the RISCV ABI calling convention.
+    -- TODO: Deallocate heap-allocated vectors after the main call
+    allocVectorHeap :: (Reg, Format, ForeignHint, InstrBlock) -> NatM (Reg, Format, ForeignHint, InstrBlock)
+    allocVectorHeap arg@(r, format, hint, code_r) | isVecFormat format = do
+      platform <- getPlatform
+      resRegUnq <- getUniqueM
+      let resLocalReg = LocalReg resRegUnq b64
+          resReg = getRegisterReg platform (CmmLocal resLocalReg)
+      callCode <- mkCCall "malloc_vlen_vector" [resLocalReg] []
+      let code = callCode `appOL` code_r `appOL` toOL [VS1R (OpReg format r) (OpAddr (AddrReg resReg))]
+      pure (resReg, II64, hint, code)
+    allocVectorHeap _ = panic "Unsupported general case"
+
+    mkCCall :: FastString ->   [CmmFormal] -> [CmmActual] -> NatM InstrBlock
+    mkCCall name dest_regs arg_regs = do
+      config <- getConfig
+      target <-
+        cmmMakeDynamicReference config CallReference
+          $ mkForeignLabel name ForeignLabelInThisPackage IsFunction
+      let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
+      genCCall (ForeignTarget target cconv) dest_regs arg_regs
+
+    -- Implementation of the RISCV ABI calling convention.
     -- https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/948463cd5dbebea7c1869e20146b17a2cc8fda2f/riscv-cc.adoc#integer-calling-convention
     passArguments :: [Reg] -> [Reg] -> [Reg] -> [(Reg, Format, ForeignHint, InstrBlock)] -> Int -> [Reg] -> InstrBlock -> NatM (Int, [Reg], InstrBlock)
     -- Base case: no more arguments to pass (left)
@@ -2114,46 +2135,25 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
               `snocOL` ann (text "Pass vector argument: " <> ppr r) mov
       passArguments gpRegs fpRegs vRegs args stackSpaceWords (vReg : accumRegs) accumCode'
 
-    -- No more vector regs, and we want to pass a vector argument.
-    passArguments gpRegs fpRegs [] ((r, format, _hint, code_r) : args) stackSpaceWords accumRegs accumCode
+    -- No more vector but free gp regs, and we want to pass a vector argument: Pass vector on heap and move its address to gp vector.
+    passArguments (gpReg : gpRegs) fpRegs [] (arg@(r, format, _hint, code_r) : args) stackSpaceWords accumRegs accumCode
       | isVecFormat format = do
-      let (stackSpaceWords', stackPass_code) = mkStackPass format r stackSpaceWords
-          stackCode = code_r `appOL` toOL stackPass_code 
-      passArguments gpRegs fpRegs [] args stackSpaceWords' accumRegs (stackCode `appOL` accumCode)
+      (r', format', _hint, code_r') <- allocVectorHeap arg
+      let code = code_r' `appOL` toOL [MOV (OpReg II64 gpReg) (OpReg II64 r')]
+      passArguments gpRegs fpRegs [] args stackSpaceWords (gpReg : accumRegs) (accumCode `appOL` code)
+
+    -- No more vector and gp regs, and we want to pass a vector argument: Pass vector address on stack and the vector itself on heap.
+    -- We need to put its address in the next slot
+    -- In RISC-V terms we pass an "aggregate by reference"
+    passArguments [] fpRegs [] (arg@(r, format, _hint, code_r) : args) stackSpaceWords accumRegs accumCode
+      | isVecFormat format = do
+      (r', format', _hint, code_r') <- allocVectorHeap arg
+      let spOffet = 8 * stackSpaceWords
+          str = STR format' (OpReg II64 r') (OpAddr (AddrRegImm spMachReg (ImmInt spOffet)))
+          code = code_r' `snocOL` str 
+      passArguments [] fpRegs [] args (stackSpaceWords + 1) accumRegs (accumCode `appOL` code)
 
     passArguments _ _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
-
-    mkStackPass :: Format -> Reg ->  Int -> (Int, [Instr])
-    mkStackPass fmt reg stackSpaceWords =
-      case spOffet of
-        imm | fitsIn12bitImm imm && not (isVecFormat fmt) -> (stackSpaceWords', [mkStrSpImm imm])
-        imm ->
-          ( stackSpaceWords',
-            [ movImmToTmp imm,
-              addSpToTmp,
-              mkStrTmp
-            ]
-          )
-      where
-        fmt'
-          | isVecFormat fmt =
-              fmt
-          | otherwise =
-              scalarMoveFormat fmt
-        mkStrSpImm imm =
-          ANN (text "Pass arg SP@" <> int spOffet)
-            $ (STR fmt' (OpReg fmt reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm))))
-        movImmToTmp imm =
-          ANN (text "Pass arg: TMP <- " <> int imm)
-            $ MOV tmp (OpImm (ImmInt imm))
-        addSpToTmp =
-          ANN (text "Pass arg: TMP <- SP + TMP ")
-            $ ADD tmp tmp sp
-        mkStrTmp =
-          ANN (text "Pass arg SP@" <> int spOffet)
-            $ (STR fmt' (OpReg fmt reg) (OpAddr (AddrReg tmpReg)))
-        stackSpaceWords' = stackSpaceWords + (formatInBytes fmt * 8)
-        spOffet = 8 * stackSpaceWords
 
     readResults :: [Reg] -> [Reg] -> [Reg] -> [LocalReg] -> [Reg] -> InstrBlock -> NatM InstrBlock
     readResults _ _ _ [] _ accumCode = return accumCode
@@ -2704,6 +2704,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       VFMIN {} -> 2
       VFMAX {} -> 2
       VRGATHER {} -> 2
+      VS1R {} -> 1
       VFMA {} -> 3
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1

@@ -982,7 +982,7 @@ extern char **environ;
       SymI_NeedsProto(__umodti3)
 #else
 #define RTS_LIBGCC_SYMBOLS
-#endif
+ #endif
 
 #if defined(riscv64_HOST_ARCH)
 // See https://gcc.gnu.org/onlinedocs/gccint/Integer-library-routines.html as
@@ -991,6 +991,8 @@ extern char **environ;
 #define RTS_ARCH_LIBGCC_SYMBOLS \
   SymI_NeedsProto(__clzdi2) \
   SymI_NeedsProto(__ctzdi2)
+#define RISCV_RTS_SYMBOLS                              \
+  SymI_NeedsProto(malloc_vlen_vector)
 #else
 #define RTS_ARCH_LIBGCC_SYMBOLS
 #endif

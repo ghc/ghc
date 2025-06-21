@@ -11,40 +11,18 @@ static void printVec_int64(vint64m1_t v, int length) {
     printf(", %ld", temp[i]);
   }
   printf("]\n");
+  fflush(stdout);
 }
-void printVecs_int64x2(vint64m1_t v1, vint64m1_t v2, vint64m1_t v3,
-                       vint64m1_t v4, vint64m1_t v5, vint64m1_t v6,
-                       vint64m1_t v7, vint64m1_t v8, vint64m1_t v9,
-                       vint64m1_t v10, vint64m1_t v11, vint64m1_t v12,
-                       vint64m1_t v13, vint64m1_t v14, vint64m1_t v15,
-                       vint64m1_t v16, vint64m1_t v17, vint64m1_t v18,
-                       vint64m1_t v19, vint64m1_t v20, vint64m1_t v21,
-                       vint64m1_t v22, vint64m1_t v23, vint64m1_t v24,
-                       vint64m1_t v25, vint64m1_t v26, vint64m1_t v27,
-                       vint64m1_t v28, vint64m1_t v29, vint64m1_t v30,
-                       vint64m1_t v31, vint64m1_t v32, vint64m1_t v33,
-                       vint64m1_t v34, vint64m1_t v35, vint64m1_t v36);
-
 // Provide many vectors to enforce stack usage
-void printVecs_int64x2(vint64m1_t v1, vint64m1_t v2, vint64m1_t v3,
-                       vint64m1_t v4, vint64m1_t v5, vint64m1_t v6,
-                       vint64m1_t v7, vint64m1_t v8, vint64m1_t v9,
-                       vint64m1_t v10, vint64m1_t v11, vint64m1_t v12,
-                       vint64m1_t v13, vint64m1_t v14, vint64m1_t v15,
-                       vint64m1_t v16, vint64m1_t v17, vint64m1_t v18,
-                       vint64m1_t v19, vint64m1_t v20, vint64m1_t v21,
-                       vint64m1_t v22, vint64m1_t v23, vint64m1_t v24,
-                       vint64m1_t v25, vint64m1_t v26, vint64m1_t v27,
-                       vint64m1_t v28, vint64m1_t v29, vint64m1_t v30,
-                       vint64m1_t v31, vint64m1_t v32, vint64m1_t v33,
-                       vint64m1_t v34, vint64m1_t v35, vint64m1_t v36) {
-  printVec_int64(v1, 2);
-  printVec_int64(v2, 2);
-  printVec_int64(v3, 2);
-  printVec_int64(v4, 2);
-  printVec_int64(v5, 2);
-  printVec_int64(v6, 2);
-  printVec_int64(v7, 2);
+void printVecs_int64x2_c(vint64m1_t v8, vint64m1_t v9, vint64m1_t v10,
+                         vint64m1_t v11, vint64m1_t v12, vint64m1_t v13,
+                         vint64m1_t v14, vint64m1_t v15, vint64m1_t v16,
+                         vint64m1_t v17, vint64m1_t v18, vint64m1_t v19,
+                         vint64m1_t v20, vint64m1_t v21, vint64m1_t v22,
+                         vint64m1_t v23, vint64m1_t a0, vint64m1_t a1,
+                         vint64m1_t a2, vint64m1_t a3, vint64m1_t a4,
+                         vint64m1_t a5, vint64m1_t a6, vint64m1_t a7,
+                         vint64m1_t s0) {
   printVec_int64(v8, 2);
   printVec_int64(v9, 2);
   printVec_int64(v10, 2);
@@ -61,19 +39,31 @@ void printVecs_int64x2(vint64m1_t v1, vint64m1_t v2, vint64m1_t v3,
   printVec_int64(v21, 2);
   printVec_int64(v22, 2);
   printVec_int64(v23, 2);
-  printVec_int64(v24, 2);
-  printVec_int64(v25, 2);
-  printVec_int64(v26, 2);
-  printVec_int64(v27, 2);
-  printVec_int64(v28, 2);
-  printVec_int64(v29, 2);
-  printVec_int64(v30, 2);
-  printVec_int64(v31, 2);
-  printVec_int64(v32, 2);
-  printVec_int64(v33, 2);
-  printVec_int64(v34, 2);
-  printVec_int64(v35, 2);
-  printVec_int64(v36, 2);
-
+  printVec_int64(a0, 2);
+  printVec_int64(a1, 2);
+  printVec_int64(a2, 2);
+  printVec_int64(a3, 2);
+  printVec_int64(a4, 2);
+  printVec_int64(a5, 2);
+  printVec_int64(a6, 2);
+  printVec_int64(a7, 2);
+  printVec_int64(s0, 2);
+  // printVec_int64(v26, 2);
+  //  printVec_int64(v27, 2);
+  //  printVec_int64(v28, 2);
+  //  printVec_int64(v29, 2);
+  //  printVec_int64(v30, 2);
+  //  printVec_int64(v31, 2);
+  //  printVec_int64(v32, 2);
+  //  printVec_int64(v33, 2);
+  //  printVec_int64(v34, 2);
+  //  printVec_int64(v35, 2);
+  //  printVec_int64(v36, 2);
+  //
   fflush(stdout);
 }
+
+// vint64m1_t return_int64X2() {
+//   int64_t v[] = {INT64_MIN, INT64_MAX};
+//   return __riscv_vle64_v_i64m1(v, 2);
+// }

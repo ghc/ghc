@@ -2,7 +2,13 @@
 #include "CheckVectorSupport.h"
 
 #if defined(__riscv_v) && defined(__riscv_v_intrinsic)
-  #include <riscv_vector.h>
+#include <riscv_vector.h>
+#include <stdlib.h>
+
+// TODO: Find better file for this.
+void* malloc_vlen_vector() {
+  return malloc(__riscv_vlenb());
+}
 #endif
 
 // Check support for vector registers (conservative).

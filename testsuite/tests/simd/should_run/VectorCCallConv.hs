@@ -7,47 +7,55 @@
 module Main where
 
 import Data.Int
+import GHC.Int
 import GHC.Prim
 
-foreign import ccall "printVecs_int64x2"
+foreign import ccall "printVecs_int64x2_c"
   printVecs_int64x2# ::
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
-    Int64X2# ->
+    Int64X2# -> -- v1
+    Int64X2# -> -- v2
+    Int64X2# -> -- v3
+    Int64X2# -> -- v4
+    Int64X2# -> -- v5
+    Int64X2# -> -- v6
+    Int64X2# -> -- v7
+    Int64X2# -> -- v8
+    Int64X2# -> -- v9
+    Int64X2# -> -- v10
+    Int64X2# -> -- v11
+    Int64X2# -> -- v12
+    Int64X2# -> -- v13
+    Int64X2# -> -- v14
+    Int64X2# -> -- v15
+    Int64X2# -> -- v16
+    Int64X2# -> -- v17
+    Int64X2# -> -- v18
+    Int64X2# -> -- v19
+    Int64X2# -> -- v20
+    Int64X2# -> -- v21
+    Int64X2# -> -- v22
+    Int64X2# -> -- v23
+    Int64X2# -> -- v24
+    Int64X2# -> -- v25
+    --    Int64X2# -> -- v26
+    --    Int64X2# -> -- v27
+    --    Int64X2# -> -- v28
+    --    Int64X2# -> -- v29
+    --    Int64X2# -> -- v30
+    --    Int64X2# ->
+    --    Int64X2# ->
+    --    Int64X2# ->
+    --    Int64X2# ->
+    --    Int64X2# ->
+    --    Int64X2# ->
     IO ()
+
+-- foreign import ccall "return_int64X2"
+--   return_int64X2# :: (# #) -> Int64X2#
+--
+-- unpackInt64X2 :: Int64X2# -> (Int64, Int64)
+-- unpackInt64X2 v = case unpackInt64X2# v of
+--   (# x0, x1 #) -> (I64# x0, I64# x1)
 
 main :: IO ()
 main = do
@@ -81,12 +89,12 @@ main = do
       v28 = packInt64X2# (# 54#Int64, 55#Int64 #)
       v29 = packInt64X2# (# 56#Int64, 57#Int64 #)
       v30 = packInt64X2# (# 58#Int64, 59#Int64 #)
-      v31 = packInt64X2# (# 60#Int64, 61#Int64 #)
-      v32 = packInt64X2# (# 62#Int64, 63#Int64 #)
-      v33 = packInt64X2# (# 64#Int64, 65#Int64 #)
-      v34 = packInt64X2# (# 66#Int64, 67#Int64 #)
-      v35 = packInt64X2# (# 68#Int64, 69#Int64 #)
-      v36 = packInt64X2# (# 70#Int64, 71#Int64 #)
+  --      v31 = packInt64X2# (# 60#Int64, 61#Int64 #)
+  --      v32 = packInt64X2# (# 62#Int64, 63#Int64 #)
+  --      v33 = packInt64X2# (# 64#Int64, 65#Int64 #)
+  --      v34 = packInt64X2# (# 66#Int64, 67#Int64 #)
+  --      v35 = packInt64X2# (# 68#Int64, 69#Int64 #)
+  --      v36 = packInt64X2# (# 70#Int64, 71#Int64 #)
 
   printVecs_int64x2#
     v1
@@ -114,14 +122,20 @@ main = do
     v23
     v24
     v25
-    v26
-    v27
-    v28
-    v29
-    v30
-    v31
-    v32
-    v33
-    v34
-    v35
-    v26
+
+--    v26
+
+--    v27
+--    v28
+--    v29
+--    v30
+
+--    v31
+--    v32
+--    v33
+--    v34
+--    v35
+--    v26
+
+--    let v = return_int64X2#
+--    print $ unpackInt64X2 v
