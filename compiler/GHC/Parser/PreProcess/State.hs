@@ -32,6 +32,7 @@ module GHC.Parser.PreProcess.State (
     ghcCppEnabled,
     setInLinePragma,
     getInLinePragma,
+    mkGhcCPPError,
     addGhcCPPError,
 ) where
 
@@ -414,6 +415,8 @@ insertMacroDef (MacroName name args) def md =
 
 -- ---------------------------------------------------------------------
 
+mkGhcCPPError :: SrcSpan -> SDoc -> MsgEnvelope PsMessage
+mkGhcCPPError loc err = mkPlainErrorMsgEnvelope loc $ PsErrGhcCpp err
+
 addGhcCPPError :: SrcSpan -> SDoc -> P p ()
-addGhcCPPError loc err =
-    Lexer.addError $ mkPlainErrorMsgEnvelope loc $ PsErrGhcCpp err
+addGhcCPPError loc err = Lexer.addError $ mkGhcCPPError loc err

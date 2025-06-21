@@ -37,12 +37,15 @@ import Data.Map qualified as Map
 import Data.Maybe
 
 import Data.Semigroup qualified as S
+import GHC.Driver.Errors.Types (PsMessage)
+import GHC.Parser.Lexer qualified as Lexer
 import GHC.Parser.PreProcess.Eval
 import GHC.Parser.PreProcess.ParsePP
 import GHC.Parser.PreProcess.Parser qualified as Parser
 import GHC.Parser.PreProcess.ParserM
 import GHC.Parser.PreProcess.State
 import GHC.Prelude
+import GHC.Types.Error (MsgEnvelope)
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
@@ -54,58 +57,84 @@ cppCond :: SrcSpan -> String -> PP Bool
 cppCond loc str = do
     s <- getPpState
     expanded <- expand loc (pp_defines s) str
-    v <- case Parser.parseExpr expanded of
+    case expanded of
         Left err -> do
-            addGhcCPPError
-                loc
-                ( hang
-                    (text "Error evaluating CPP condition:")
-                    2
-                    (text err <+> text "of" $+$ text expanded)
-                )
-            return 0
-        Right tree -> return (eval tree)
-    return (toBool v)
+            Lexer.addError err
+            return False
+        Right expanded -> do
+            v <- case Parser.parseExpr expanded of
+                Left err -> do
+                    let detail =
+                            if str == expanded || expanded == ""
+                                then
+                                    [ text str
+                                    ]
+                                else
+                                    [ text expanded
+                                    , text "expanded from:"
+                                    , text str
+                                    ]
+                    addGhcCPPError
+                        loc
+                        ( hang
+                            (text "Error evaluating CPP condition:")
+                            2
+                            ( text err
+                                <+> text "of"
+                                $+$ vcat detail
+                            )
+                        )
+                    return 0
+                Right tree -> return (eval tree)
+            return (toBool v)
 
 -- ---------------------------------------------------------------------
 
-expand :: SrcSpan -> MacroDefines -> String -> PP String
+expand :: SrcSpan -> MacroDefines -> String -> PP (Either (MsgEnvelope PsMessage) String)
 expand loc s str = do
-    toks <- case cppLex False str of
+    case cppLex False str of
         Left err -> do
-            addGhcCPPError
-                loc
-                ( hang
-                    (text "Error evaluating CPP condition:")
-                    2
-                    (text err <+> text "of" $+$ text str)
+            return
+                ( Left $
+                    mkGhcCPPError
+                        loc
+                        ( hang
+                            (text "Error evaluating CPP condition:")
+                            2
+                            (text err <+> text "of" $+$ text str)
+                        )
                 )
-            return []
-        Right tks -> return tks
-    expandedToks <- expandToks loc maxExpansions s toks
-    return $ combineToks $ map t_str expandedToks
+        Right tks -> do
+            expandedToks <- expandToks loc maxExpansions s tks
+            case expandedToks of
+                Left err -> return (Left err)
+                Right toks -> return $ Right $ combineToks $ map t_str toks
 
 maxExpansions :: Int
 maxExpansions = 15
 
-expandToks :: SrcSpan -> Int -> MacroDefines -> [Token] -> PP [Token]
+expandToks :: SrcSpan -> Int -> MacroDefines -> [Token] -> PP (Either (MsgEnvelope PsMessage) [Token])
 expandToks loc 0 _ ts = do
-    addGhcCPPError
-        loc
-        ( hang
-            (text "CPP macro expansion limit hit:")
-            2
-            (text (combineToks $ map t_str ts))
-        )
-    return ts
+    return $
+        Left $
+            mkGhcCPPError
+                loc
+                ( hang
+                    (text "CPP macro expansion limit hit:")
+                    2
+                    (text (combineToks $ map t_str ts))
+                )
 expandToks loc cnt s ts = do
-    (!expansionDone, !r) <- doExpandToks loc False s ts
-    if expansionDone
-        then expandToks loc (cnt - 1) s r
-        else return r
+    expansion <- doExpandToks loc False s ts
+    case expansion of
+        Left err -> return (Left err)
+        Right (!expansionDone, !r) ->
+            if expansionDone
+                then expandToks loc (cnt - 1) s r
+                else return (Right r)
 
-doExpandToks :: SrcSpan -> Bool -> MacroDefines -> [Token] -> PP (Bool, [Token])
-doExpandToks _loc ed _ [] = return (ed, [])
+doExpandToks :: SrcSpan -> Bool -> MacroDefines -> [Token] -> PP (Either (MsgEnvelope PsMessage) (Bool, [Token]))
+doExpandToks _loc ed _ [] = return $ Right (ed, [])
 doExpandToks loc ed s (TIdentifierLParen n : ts) =
     -- TIdentifierLParen has no meaning here (only in a #define), so
     -- restore it to its constituent tokens
@@ -116,30 +145,32 @@ doExpandToks loc _ s (TIdentifier "defined" : ts) = do
     case expandedArgs of
         (Just [[TIdentifier macro_name]], rest0) ->
             case Map.lookup macro_name s of
-                Nothing -> return (True, TInteger "0" : rest0)
-                Just _ -> return (True, TInteger "1" : rest0)
+                Nothing -> return $ Right (True, TInteger "0" : rest0)
+                Just _ -> return $ Right (True, TInteger "1" : rest0)
         (Nothing, TIdentifier macro_name : ts0) ->
             case Map.lookup macro_name s of
-                Nothing -> return (True, TInteger "0" : ts0)
-                Just _ -> return (True, TInteger "1" : ts0)
+                Nothing -> return $ Right (True, TInteger "0" : ts0)
+                Just _ -> return $ Right (True, TInteger "1" : ts0)
         (Nothing, _) -> do
-            addGhcCPPError
-                loc
-                ( hang
-                    (text "CPP defined: expected an identifier, got:")
-                    2
-                    (text (concatMap t_str ts))
-                )
-            return (False, [])
+            return $
+                Left $
+                    mkGhcCPPError
+                        loc
+                        ( hang
+                            (text "CPP defined: expected an identifier, got:")
+                            2
+                            (text (concatMap t_str ts))
+                        )
         (Just args, _) -> do
-            addGhcCPPError
-                loc
-                ( hang
-                    (text "CPP defined: expected a single arg, got:")
-                    2
-                    (text (intercalate "," (map (concatMap t_str) args)))
-                )
-            return (False, [])
+            return $
+                Left $
+                    mkGhcCPPError
+                        loc
+                        ( hang
+                            (text "CPP defined: expected a single arg, got:")
+                            2
+                            (text (intercalate "," (map (concatMap t_str) args)))
+                        )
 doExpandToks loc ed s (TIdentifier n : ts) = do
     (args, rest0) <- getExpandArgs loc ts
     let
@@ -152,11 +183,15 @@ doExpandToks loc ed s (TIdentifier n : ts) = do
                 (ed0, r, rest1) = case m_args of
                     Nothing -> (True, rhs, ts)
                     Just _ -> (True, replace_args args m_args rhs, rest0)
-    (ed'', rest) <- doExpandToks loc ed' s ts'
-    return (ed'', expanded ++ rest)
+    expansion <- doExpandToks loc ed' s ts'
+    case expansion of
+        Left err -> return $ Left err
+        Right (ed'', rest) -> return $ Right (ed'', expanded ++ rest)
 doExpandToks loc ed s (t : ts) = do
-    (ed', r) <- doExpandToks loc ed s ts
-    return (ed', t : r)
+    expansion <- doExpandToks loc ed s ts
+    case expansion of
+        Left err -> return (Left err)
+        Right (ed', r) -> return $ Right (ed', t : r)
 
 {-
 Note: ['defined' unary operator]
