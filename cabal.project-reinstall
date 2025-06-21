@@ -68,6 +68,9 @@ constraints: ghc +internal-interpreter +dynamic-system-linke,
              any.pretty installed,
              any.template-haskell installed
 
+allow-newer:
+  ghc-paths:Cabal
+
 
 benchmarks: False
 tests: False
