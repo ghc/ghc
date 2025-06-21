@@ -74,15 +74,12 @@ cppCond loc str = do
                                     , text "expanded from:"
                                     , text str
                                     ]
-                    addGhcCPPError
+                    addGhcCPPError'
                         loc
-                        ( hang
-                            (text "Error evaluating CPP condition:")
-                            2
-                            ( text err
-                                <+> text "of"
-                                $+$ vcat detail
-                            )
+                        "Error evaluating CPP condition:"
+                        ( text err
+                            <+> text "of"
+                            $+$ vcat detail
                         )
                     return 0
                 Right tree -> return (eval tree)
@@ -96,13 +93,10 @@ expand loc s str = do
         Left err -> do
             return
                 ( Left $
-                    mkGhcCPPError
+                    mkGhcCPPError'
                         loc
-                        ( hang
-                            (text "Error evaluating CPP condition:")
-                            2
-                            (text err <+> text "of" $+$ text str)
-                        )
+                        "Error evaluating CPP condition:"
+                        (text err <+> text "of" $+$ text str)
                 )
         Right tks -> do
             expandedToks <- expandToks loc maxExpansions s tks
@@ -117,13 +111,10 @@ expandToks :: SrcSpan -> Int -> MacroDefines -> [Token] -> PP (Either (MsgEnvelo
 expandToks loc 0 _ ts = do
     return $
         Left $
-            mkGhcCPPError
+            mkGhcCPPError'
                 loc
-                ( hang
-                    (text "CPP macro expansion limit hit:")
-                    2
-                    (text (combineToks $ map t_str ts))
-                )
+                "CPP macro expansion limit hit:"
+                (text (combineToks $ map t_str ts))
 expandToks loc cnt s ts = do
     expansion <- doExpandToks loc False s ts
     case expansion of
@@ -154,23 +145,17 @@ doExpandToks loc _ s (TIdentifier "defined" : ts) = do
         (Nothing, _) -> do
             return $
                 Left $
-                    mkGhcCPPError
+                    mkGhcCPPError'
                         loc
-                        ( hang
-                            (text "CPP defined: expected an identifier, got:")
-                            2
-                            (text (concatMap t_str ts))
-                        )
+                        "CPP defined: expected an identifier, got:"
+                        (text (concatMap t_str ts))
         (Just args, _) -> do
             return $
                 Left $
-                    mkGhcCPPError
+                    mkGhcCPPError'
                         loc
-                        ( hang
-                            (text "CPP defined: expected a single arg, got:")
-                            2
-                            (text (intercalate "," (map (concatMap t_str) args)))
-                        )
+                        "CPP defined: expected a single arg, got:"
+                        (text (intercalate "," (map (concatMap t_str) args)))
 doExpandToks loc ed s (TIdentifier n : ts) = do
     (args, rest0) <- getExpandArgs loc ts
     let
@@ -267,13 +252,10 @@ getExpandArgs :: SrcSpan -> [Token] -> PP (Maybe [[Token]], [Token])
 getExpandArgs loc ts =
     case pArgs ts of
         Left err -> do
-            addGhcCPPError
+            addGhcCPPError'
                 loc
-                ( hang
-                    (text "CPP: cannot expand macro arguments:")
-                    2
-                    (text err <+> text "in" $+$ text (concatMap t_str ts))
-                )
+                "CPP: cannot expand macro arguments:"
+                (text err <+> text "in" $+$ text (concatMap t_str ts))
             return (Nothing, ts)
         Right r -> return r
 
