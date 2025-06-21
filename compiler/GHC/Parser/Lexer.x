@@ -59,7 +59,6 @@ module GHC.Parser.Lexer (
    Token(..), lexer, lexerDbg,
    ParserOpts(..), mkParserOpts,
    PState (..), initParserState, initPragState,
-   PSavedAlrState(..), getAlrState, setAlrState,
    startSkipping, stopSkipping,
    P(..), ParseResult(POk, PFailed),
    allocateComments, allocatePriorComments, allocateFinalComments,
@@ -273,7 +272,6 @@ $tab          { warnTab }
 -- set.
 
 "{-" / { isNormalComment }       { nested_comment }
--- "/*" / { ifExtension GhcCppBit } { cpp_comment }
 
 -- Single-line comments are a bit tricky.  Haskell 98 says that two or
 -- more dashes followed by a symbol should be parsed as a varsym, so we
@@ -1351,6 +1349,7 @@ hopefully_open_brace :: Action p
 hopefully_open_brace span buf len buf2
  = do relaxed <- getBit RelaxedLayoutBit
       ctx <- getContext
+      -- See Note [GHC_CPP saved offset]
       offset <- getOffset
       let
           isOK = relaxed ||
@@ -1592,15 +1591,6 @@ nested_doc_comment span buf _len _buf2 = {-# SCC "nested_doc_comment" #-} withLe
         dropTrailingDec "-}" = ""
         dropTrailingDec (x:xs) = x:dropTrailingDec xs
 
-cpp_comment :: Action p
-cpp_comment span buf len _buf2 = {-# SCC "cpp_comment" #-} do
-  l <- getLastLocIncludingComments
-  let endComment input (L _ comment) = commentEnd lexToken input (Nothing, ITblockComment comment l) buf span
-  input <- getInput
-  -- Include decorator in comment
-  let start_decorator = reverse $ lexemeToString buf len
-  cpp_comment_logic endComment start_decorator input span
-
 {-# INLINE nested_comment_logic #-}
 -- | Includes the trailing '-}' decorators
 -- drop the last two elements with the callback if you don't want them to be included
@@ -1634,31 +1624,6 @@ nested_comment_logic endComment commentAcc input span = go commentAcc (1::Int) i
                            go (parsedAcc ++ '\n':commentAcc) n input
         Just (_,_)   -> go ('\n':commentAcc) n input
       Just (c,input) -> go (c:commentAcc) n input
-
-{-# INLINE cpp_comment_logic #-}
--- | Includes the trailing '*/' decorators
--- drop the last two elements with the callback if you don't want them to be included
-cpp_comment_logic
-  :: (AlexInput -> Located String -> P p (PsLocated Token))  -- ^ Continuation that gets the rest of the input and the lexed comment
-  -> String -- ^ starting value for accumulator (reversed) - When we want to include a decorator '/*' in the comment
-  -> AlexInput
-  -> PsSpan
-  -> P p (PsLocated Token)
-cpp_comment_logic endComment commentAcc input span = go commentAcc (1::Int) input
-  where
-    go commentAcc 0 input@(AI end_loc _) = do
-      let comment = reverse commentAcc
-          cspan = mkSrcSpanPs $ mkPsSpan (psSpanStart span) end_loc
-          lcomment = L cspan comment
-      endComment input lcomment
-    go commentAcc n input = case alexGetChar' input of
-      Nothing -> errBrace input (psRealSpan span)
-      Just ('*',input) -> case alexGetChar' input of
-        Nothing  -> errBrace input (psRealSpan span)
-        Just ('/',input) -> go ('/':'*':commentAcc) (n-1) input -- '/'
-        Just (_,_)          -> go ('*':commentAcc) n input
-      Just (c,input) -> go (c:commentAcc) n input
-
 
 ghcCppSet :: P p Bool
 ghcCppSet = do
@@ -1775,9 +1740,12 @@ linePrag span buf len buf2 = do
   usePosPrags <- getBit UsePosPragsBit
   if usePosPrags
     then begin line_prag2 span buf len buf2
-    -- else let !src = lexemeToFastString buf len
-    --      in return (L span (ITline_prag (SourceText src)))
-    else nested_comment span buf len buf2
+    else do
+      useGhcCpp <- getBit GhcCppBit
+      if useGhcCpp
+        then nested_comment span buf len buf2
+        else let !src = lexemeToFastString buf len
+             in return (L span (ITline_prag (SourceText src)))
 
 -- When 'UsePosPragsBit' is not set, it is expected that we emit a token instead
 -- of updating the position in 'PState'
@@ -2166,6 +2134,7 @@ do_bol span _str _len _buf2 = do
         -- See Note [Nested comment line pragmas]
         b <- getBit InNestedCommentBit
         if b then return (L span ITcomment_line_prag) else do
+          -- See Note [GHC_CPP saved offset]
           resetOffset
           (pos, gen_semic) <- getOffside
           case pos of
@@ -2216,6 +2185,7 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
 new_layout_context :: Bool -> Bool -> Token -> Action p
 new_layout_context strict gen_semic tok span _buf len _buf2 = do
     _ <- popLexState
+    -- See Note [GHC_CPP saved offset]
     current_col <- getOffset
     let offset = current_col - len
     ctx <- getContext
@@ -2670,6 +2640,7 @@ data PState a = PState {
         pp :: !a,
         -- If a CPP directive occurs in the layout context, we need to
         -- store the prior column so any alr processing can continue.
+        -- See Note [GHC_CPP saved offset]
         pp_last_col :: !(Maybe Int)
      }
         -- last_loc and last_len are used when generating error messages,
@@ -2683,32 +2654,6 @@ data PState a = PState {
         -- calling the action in the token.  So from the perspective
         -- of the action, it is the *current* token.  Do I understand
         -- correctly?
-
-data PSavedAlrState = PSavedAlrState {
-        -- s_warnings  :: Messages PsMessage,
-        -- s_errors    :: Messages PsMessage,
-        s_lex_state :: [Int],
-        s_context :: [LayoutContext],
-        s_alr_pending_implicit_tokens :: [PsLocated Token],
-        s_alr_next_token :: Maybe (PsLocated Token),
-        s_alr_last_loc :: PsSpan,
-        s_alr_context :: [ALRContext],
-        s_alr_expecting_ocurly :: Maybe ALRLayout,
-        s_alr_justClosedExplicitLetBlock :: Bool,
-        s_last_col :: Int
-     }
-
-
--- -- | Use for emulating (limited) CPP preprocessing in GHC.
--- -- TODO: move this into PreProcess, and make a param on PState
--- data PpState = PpState {
---         pp_defines :: !(Map String [String]),
---         pp_continuation :: ![Located Token],
---         -- pp_context :: ![PpContext],
---         pp_context :: ![Token], -- What preprocessor directive we are currently processing
---         pp_accepting :: !Bool
---      }
---     deriving (Show)
 
 data PpContext = PpContextIf [Located Token]
     deriving (Show)
@@ -2825,7 +2770,7 @@ getLastBufCur = P $ \s@(PState { last_buf_cur = last_buf_cur }) -> POk s last_bu
 getLastLen :: P p Int
 getLastLen = P $ \s@(PState { last_len = last_len }) -> POk s last_len
 
--- see Note [TBD]
+-- See Note [GHC_CPP saved offset]
 getOffset :: P p Int
 getOffset = P $ \s@(PState { pp_last_col = last_col,
                              loc = l}) ->
@@ -2835,72 +2780,53 @@ getOffset = P $ \s@(PState { pp_last_col = last_col,
     --          (fromMaybe (srcLocCol (psRealLoc l)) last_col)
   in POk s { pp_last_col = Nothing} offset
 
+-- See Note [GHC_CPP saved offset]
 resetOffset :: P p ()
 resetOffset = P $ \s -> POk s { pp_last_col = Nothing} ()
+
+{- Note [GHC_CPP saved offset]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The layout processing machinery examines the offset of the previous
+line when doing its calculations.
+
+When GHC_CPP is used, a set of CPP directives may ignore some number
+of preceding lines, each of which has a different offset.
+
+We deal with this as follows
+
+- When we start skipping lines due to CPP we store the offset of the
+  line before the CPP directive
+- We explicitly ask for the offset using `getOffset` when doing layout
+  calculations
+- If there is a stored offset, we use that instead of the prior line
+  offset
+
+-}
 
 startSkipping :: P p ()
 startSkipping = do
   pushLexState skipping
   -- pushLexState (trace ("startSkipping:" ++ show skipping) skipping)
 
-stopSkipping :: P p Int
+stopSkipping :: P p ()
 stopSkipping = do
-  -- popLexState
-  ret <- popLexState
+  _ <- popLexState
   -- We just processed a CPP directive, which included a trailing newline.
   -- To properly sync up, we now need to ensure that `do_bol` processing occurs.
-  -- But this call does not emit a token.
-  -- Maybe it should be an argument to lexToken instead?
-  -- Alternatively, push the input location to the previous char.
-  AI ps buf <- getInput
-  last_buf_cur <- getLastBufCur
-  last_loc <- getLastLoc
+  -- But this call does not emit a token, so we instead
+  -- change the input location to the previous char, the newline
+  AI _ps buf <- getInput
   last_tk <- getLastTk
   case last_tk of
     Strict.Just (L l _) -> do
       let ps' = PsLoc (realSrcSpanEnd (psRealSpan l)) (bufSpanEnd (psBufSpan l))
       let cur' = (cur buf) - 1
-      -- let cur' = trace ("stopSkipping:(cur',ps'):" ++ show (cur'',ps')) cur''
       setInput (AI ps' (buf { cur = cur'}))
     _ -> return ()
-  -- return $ trace ("stopSkipping: (ps, cur buf, last_loc, last_buf_cur, last_tk):" ++ show (ps, cur buf, last_loc, last_buf_cur, last_tk)) ret
-  return ret
 
   -- old <- popLexState
   -- return (trace ("stopSkipping:" ++ show old) old)
-
-
-getAlrState :: P p PSavedAlrState
-getAlrState = P $ \s@(PState  {loc=l}) -> POk s
-  PSavedAlrState {
-        -- s_warnings = warnings s,
-        -- s_errors = errors s,
-        -- s_lex_state = lex_state s,
-        s_lex_state = lex_state s,
-        s_context = context s,
-        s_alr_pending_implicit_tokens = alr_pending_implicit_tokens s,
-        s_alr_next_token = alr_next_token s,
-        s_alr_last_loc = alr_last_loc s,
-        s_alr_context = alr_context s,
-        s_alr_expecting_ocurly = alr_expecting_ocurly s,
-        s_alr_justClosedExplicitLetBlock = alr_justClosedExplicitLetBlock s,
-        s_last_col = srcLocCol (psRealLoc l)
-    }
-
-setAlrState :: PSavedAlrState -> P p ()
-setAlrState ss = P $ \s -> POk s {
-        -- errors = s_errors ss,
-        -- warnings = s_warnings ss,
-        lex_state = s_lex_state ss,
-        context = s_context ss,
-        alr_pending_implicit_tokens = s_alr_pending_implicit_tokens ss,
-        alr_next_token = s_alr_next_token ss,
-        alr_last_loc = s_alr_last_loc ss,
-        alr_context = s_alr_context ss,
-        alr_expecting_ocurly = s_alr_expecting_ocurly ss,
-        alr_justClosedExplicitLetBlock = s_alr_justClosedExplicitLetBlock ss,
-        pp_last_col = Just (s_last_col ss)
-    } ()
 
 
 
@@ -3199,6 +3125,7 @@ disableHaddock opts = upd_bitmap (xunset HaddockBit)
   where
     upd_bitmap f = opts { pExtsBitmap = f (pExtsBitmap opts) }
 
+-- TODO:AZ check which of these are actually needed,
 enableGhcCpp :: ParserOpts -> ParserOpts
 enableGhcCpp = enableExtBit GhcCppBit
 
@@ -3880,8 +3807,6 @@ warn_unknown_prag prags span buf len buf2 = do
 %*                                                                      *
 %************************************************************************
 -}
-
--- TODO:AZ: we should have only mkParensEpToks. Delete mkParensEpAnn, mkParensLocs
 
 -- |Given a 'RealSrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
 -- 'EpToken' values for the opening and closing bordering on the start

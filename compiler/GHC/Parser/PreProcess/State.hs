@@ -71,7 +71,6 @@ initPpState =
         , pp_continuation = []
         , pp_defines = Map.empty
         , pp_scope = (PpScope True PpNoGroup) :| []
-        , pp_alr_state = Nothing
         , pp_in_line_pragma = False
         }
 
@@ -81,7 +80,6 @@ data PpState = PpState
     , pp_continuation :: ![Located Lexer.Token]
     , pp_defines :: !MacroDefines
     , pp_scope :: !(NonEmpty PpScope)
-    , pp_alr_state :: Maybe Lexer.PSavedAlrState
     , pp_in_line_pragma :: !Bool
     }
 
