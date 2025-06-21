@@ -17,6 +17,7 @@
 #include "Prelude.h"
 #include "ThreadLabels.h"
 #include "Trace.h"
+#include "AllocArray.h"
 
 // List of dead weak pointers collected by the last GC
 static StgWeak *finalizer_list = NULL;
@@ -89,8 +90,6 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 {
     StgWeak *w;
     StgTSO *t;
-    StgMutArrPtrs *arr;
-    StgWord size;
     uint32_t n, i;
 
     // n_finalizers is not necessarily zero under non-moving collection
@@ -147,13 +146,10 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 
     debugTrace(DEBUG_weak, "weak: batching %d finalizers", n);
 
-    size = n + mutArrPtrsCardTableSize(n);
-    arr = (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
-    TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
+    StgMutArrPtrs *arr = allocateMutArrPtrs(cap, n, CCS_SYSTEM_OR_NULL);
+    if (RTS_UNLIKELY(arr == NULL)) exitHeapOverflow();
     // No write barrier needed here; this array is only going to referred to by this core.
-    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCS_SYSTEM);
-    arr->ptrs = n;
-    arr->size = size;
+    SET_INFO((StgClosure *) arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info);
 
     n = 0;
     for (w = list; w; w = w->link) {
@@ -163,6 +159,10 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
         }
     }
     // set all the cards to 1
+    StgWord size = n + mutArrPtrsCardTableSize(n);
+    // TODO: does this need to be a StgMutArrPtrs with a card table?
+    // If the cards are all 1 and the array is clean, couldn't it
+    // be a StgSmallMutArrPtrs instead?
     for (i = n; i < size; i++) {
         arr->payload[i] = (StgClosure *)(W_)(-1);
     }
