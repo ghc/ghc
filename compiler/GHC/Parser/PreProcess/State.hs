@@ -32,6 +32,8 @@ module GHC.Parser.PreProcess.State (
     ghcCppEnabled,
     setInLinePragma,
     getInLinePragma,
+    mkGhcCPPError',
+    addGhcCPPError',
     mkGhcCPPError,
     addGhcCPPError,
 ) where
@@ -51,7 +53,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Error
 
 import GHC.Prelude
-import GHC.Utils.Outputable (text, (<+>))
+import GHC.Utils.Outputable (hang, text, (<+>))
 
 -- ---------------------------------------------------------------------
 
@@ -238,15 +240,15 @@ acceptingStateChange old new =
 -- Exit a scope group
 popAccepting :: SrcSpan -> PP AcceptingResult
 popAccepting loc = do
-  scopes <- getScopes
-  new_scope <- case scopes of
-      c :| [] -> do
-        addGhcCPPError loc (text "#endif without #if")
-        return (c :| [])
-      _ :| (h : t) -> return (h :| t)
-  setScopes new_scope
-  let current = scopeValue scopes
-  return (acceptingStateChange current (scopeValue new_scope))
+    scopes <- getScopes
+    new_scope <- case scopes of
+        c :| [] -> do
+            addGhcCPPError loc (text "#endif without #if")
+            return (c :| [])
+        _ :| (h : t) -> return (h :| t)
+    setScopes new_scope
+    let current = scopeValue scopes
+    return (acceptingStateChange current (scopeValue new_scope))
 
 scopeValue :: NonEmpty PpScope -> Bool
 scopeValue s = pp_accepting $ NonEmpty.head s
@@ -414,6 +416,19 @@ insertMacroDef (MacroName name args) def md =
             Just dm -> Map.insert name (Map.insert arity (args, def) dm) md
 
 -- ---------------------------------------------------------------------
+
+mkGhcCPPError' :: SrcSpan -> String -> SDoc -> MsgEnvelope PsMessage
+mkGhcCPPError' loc title detail =
+    mkGhcCPPError
+        loc
+        ( hang
+            (text title)
+            2
+            detail
+        )
+
+addGhcCPPError' :: SrcSpan -> String -> SDoc -> P p ()
+addGhcCPPError' loc title detail = Lexer.addError $ mkGhcCPPError' loc title detail
 
 mkGhcCPPError :: SrcSpan -> SDoc -> MsgEnvelope PsMessage
 mkGhcCPPError loc err = mkPlainErrorMsgEnvelope loc $ PsErrGhcCpp err
