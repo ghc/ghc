@@ -291,6 +291,7 @@ DLL_IMPORT_RTS extern char  *prog_name;
 
 void reportStackOverflow(StgTSO* tso);
 void reportHeapOverflow(void);
+void exitHeapOverflow(void) STG_NORETURN;;
 
 void stg_exit(int n) STG_NORETURN;
 

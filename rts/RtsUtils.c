@@ -198,6 +198,13 @@ reportHeapOverflow(void)
                             (W_)RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
 }
 
+void
+exitHeapOverflow(void)
+{
+    reportHeapOverflow();  // reportHeapOverflow() doesn't exit (see #2592)
+    stg_exit(EXIT_HEAPOVERFLOW);
+}
+
 /* -----------------------------------------------------------------------------
    Sleep for the given period of time.
    -------------------------------------------------------------------------- */

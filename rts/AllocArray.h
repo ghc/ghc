@@ -14,7 +14,11 @@
 
 #include "BeginPrivate.h"
 
-/* All these allocation functions return NULL on failure. */
+/* All these allocation functions return NULL on failure. If the context
+ * allows, then propagatethe failure upwards, e.g. to a CMM primop where a
+ * heap overflow exception can be thrown. Otherwise, use:
+ *   if (RTS_UNLIKELY(p == NULL)) exitHeapOverflow();
+ */
 
 /* Allocate a StgMutArrPtrs for a given number of elements. It is allocated in
  * the DIRTY state.
