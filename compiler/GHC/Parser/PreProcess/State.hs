@@ -32,10 +32,7 @@ module GHC.Parser.PreProcess.State (
     ghcCppEnabled,
     setInLinePragma,
     getInLinePragma,
-    mkGhcCPPError',
     addGhcCPPError',
-    mkGhcCPPError,
-    addGhcCPPError,
 ) where
 
 import Data.List.NonEmpty ((<|))
@@ -58,6 +55,8 @@ import GHC.Utils.Outputable (hang, text, (<+>))
 -- ---------------------------------------------------------------------
 
 type PP = P PpState
+
+-- ---------------------------------------------------------------------
 
 data CppState
     = CppIgnoring
@@ -268,7 +267,7 @@ parentScope =
                 c :| [] -> c -- Perhaps should return enabled instead
                 _ :| (h : _t) -> h
          in
-            POk s new_scope
+            POk s (new_scope)
 
 -- Get the current scope value
 getScope :: PP PpScope
@@ -427,11 +426,11 @@ mkGhcCPPError' loc title detail =
             detail
         )
 
-addGhcCPPError' :: SrcSpan -> String -> SDoc -> P p ()
+addGhcCPPError' :: SrcSpan -> String -> SDoc -> PP ()
 addGhcCPPError' loc title detail = Lexer.addError $ mkGhcCPPError' loc title detail
 
 mkGhcCPPError :: SrcSpan -> SDoc -> MsgEnvelope PsMessage
 mkGhcCPPError loc err = mkPlainErrorMsgEnvelope loc $ PsErrGhcCpp err
 
-addGhcCPPError :: SrcSpan -> SDoc -> P p ()
+addGhcCPPError :: SrcSpan -> SDoc -> PP ()
 addGhcCPPError loc err = Lexer.addError $ mkGhcCPPError loc err
