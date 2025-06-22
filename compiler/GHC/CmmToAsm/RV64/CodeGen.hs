@@ -2137,7 +2137,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
 
     -- No more free vector argument registers , and we want to pass a vector argument.
     -- See Note [RISC-V vector C calling convention]
-    passArguments gpRegs fpRegs [] ((_r, format, _hint, _code_r) : _args) _stackSpaceWords _accumRegs _accumCode
+    passArguments _gpRegs _fpRegs [] ((_r, format, _hint, _code_r) : _args) _stackSpaceWords _accumRegs _accumCode
       | isVecFormat format =
       panic "C call: no free vector argument registers. We only support 16 vector arguments (registers v8 - v23)."
 
