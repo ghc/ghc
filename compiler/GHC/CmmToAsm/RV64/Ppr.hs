@@ -22,6 +22,7 @@ import GHC.Types.Basic (Alignment, alignmentBytes, mkAlignment)
 import GHC.Types.Unique (getUnique, pprUniqueAlways)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Data.OrdList
 
 pprNatCmmDecl :: forall doc. (IsDoc doc) => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
 pprNatCmmDecl config (CmmData section dats) =
@@ -143,7 +144,7 @@ pprBasicBlock ::
 pprBasicBlock config info_env (BasicBlock blockid instrs) =
   maybe_infotable
     $ pprLabel platform asmLbl
-    $$ vcat (map (pprInstr platform) (id {-detectTrivialDeadlock-} instrs'))
+    $$ (vcat . fromOL) (mapOL (pprInstr platform) (id {-detectTrivialDeadlock-} instrs'))
     $$ ppWhen
       (ncgDwarfEnabled config)
       ( -- Emit both end labels since this may end up being a standalone
@@ -154,7 +155,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs) =
           )
       )
   where
-    instrs' = injectVectorConfig optInstrs
+    instrs' = injectVectorConfig (toOL optInstrs)
     -- TODO: Check if we can  filter more instructions here.
     -- TODO: Shouldn't this be a more general check on a higher level? And, is this still needed?
     -- Filter out identity moves. E.g. mov x18, x18 will be dropped.
@@ -163,34 +164,34 @@ pprBasicBlock config info_env (BasicBlock blockid instrs) =
         f (MOV o1 o2) | o1 == o2 = False
         f _ = True
 
-    injectVectorConfig :: [Instr] -> [Instr]
-    injectVectorConfig instrs = fst $ foldl injectVectorConfig' ([], Nothing) instrs
+    injectVectorConfig :: OrdList Instr -> OrdList Instr
+    injectVectorConfig instrs = fst $ foldlOL injectVectorConfig' (nilOL, Nothing) instrs
 
     -- TODO: Fuse this with optInstrs
     -- TODO: Check config and only run this when vectors are configured
     -- TODO: Check if vectorMinBits is sufficient for the vector config
-    injectVectorConfig' :: ([Instr], Maybe Format) -> Instr -> ([Instr], Maybe Format)
+    injectVectorConfig' :: (OrdList Instr, Maybe Format) -> Instr -> (OrdList Instr, Maybe Format)
     injectVectorConfig' (accInstr, configuredVecFmt) currInstr =
       let configuredVecFmt' Nothing = Nothing
           configuredVecFmt' (Just fmt') = if isJumpishInstr currInstr then Nothing else Just fmt'
        in case (configuredVecFmt, instrVecFormat platform currInstr) of
-            (fmtA, Nothing) ->
+            (_fmtA, Nothing) ->
               -- no vector instruction
               ( accInstr
-                  -- TODO: The performance of this appending is probably horrible. Check OrdList.
-                  ++ [ -- (MULTILINE_COMMENT (text "No vector instruction" <> colon <+> text (instrCon currInstr) <+> pprInstr platform currInstr <> dot <> text "Current context" <> colon <+> ppr fmtA <> comma <+> text "New context" <+> ppr (configuredVecFmt' configuredVecFmt))),
-                       currInstr
-                     ],
+                  `appOL` toOL
+                    [ -- (MULTILINE_COMMENT (text "No vector instruction" <> colon <+> text (instrCon currInstr) <+> pprInstr platform currInstr)),
+                      currInstr
+                    ],
                 configuredVecFmt' configuredVecFmt
               )
             (Nothing, Just fmtB) ->
               -- vector instruction, but no active config
               ( accInstr
-                  -- TODO: The performance of this appending is probably horrible. Check OrdList.
-                  ++ [ COMMENT (text "No active vector config. Setting" <+> ppr fmtB),
-                       (configVec fmtB),
-                       currInstr
-                     ],
+                  `appOL` toOL
+                    [ COMMENT (text "No active vector config. Setting" <+> ppr fmtB),
+                      (configVec fmtB),
+                      currInstr
+                    ],
                 configuredVecFmt' (Just fmtB)
               )
             (Just fmtA, Just fmtB) ->
@@ -198,15 +199,20 @@ pprBasicBlock config info_env (BasicBlock blockid instrs) =
                 then
                   -- vectors already correctly configured
                   ( accInstr
-                      -- TODO: The performance of this appending is probably horrible. Check OrdList.
-                      ++ [COMMENT (text "Active vector config. Keeping" <+> ppr fmtB), currInstr],
+                      `appOL` toOL
+                        [ COMMENT (text "Active vector config. Keeping" <+> ppr fmtB),
+                          currInstr
+                        ],
                     configuredVecFmt' (Just fmtA)
                   )
                 else
                   -- re-configure
                   ( accInstr
-                      -- TODO: The performance of this appending is probably horrible. Check OrdList.
-                      ++ [(COMMENT (text "Wrong active vector config. Setting" <+> ppr fmtB)), (configVec fmtB), currInstr],
+                      `appOL` toOL
+                        [ (COMMENT (text "Wrong active vector config. Setting" <+> ppr fmtB)),
+                          (configVec fmtB),
+                          currInstr
+                        ],
                     configuredVecFmt' (Just fmtB)
                   )
 
