@@ -132,7 +132,6 @@ regUsageOfInstr platform instr = case instr of
   -- allocator doesn't use the src* registers as dst. (Otherwise, we end up
   -- with an illegal instruction.)
   VRGATHER dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst ++ regOp src1 ++ regOp src2)
-  VS1R src dst -> usage (regOp src ++ regOp dst, [])
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   VFMA _ op1 op2 op3 ->
@@ -249,7 +248,6 @@ patchRegsOfInstr instr env = case instr of
   VFMIN o1 o2 o3 -> VFMIN (patchOp o1) (patchOp o2) (patchOp o3)
   VFMAX o1 o2 o3 -> VFMAX (patchOp o1) (patchOp o2) (patchOp o3)
   VRGATHER o1 o2 o3 -> VRGATHER (patchOp o1) (patchOp o2) (patchOp o3)
-  VS1R o1 o2 -> VS1R (patchOp o1) (patchOp o2)
   FMA s o1 o2 o3 o4 ->
     FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   VFMA s o1 o2 o3 ->
@@ -701,7 +699,6 @@ data Instr
   | VFMAX Operand Operand Operand
   | VFMA FMASign Operand Operand Operand
   | VRGATHER Operand Operand Operand
-  | VS1R Operand Operand
 
 data Signage = Signed | Unsigned
   deriving (Eq, Show)
@@ -793,7 +790,6 @@ instrCon i =
     VFMIN {} -> "VFMIN"
     VFMAX {} -> "VFMAX"
     VRGATHER {} -> "VRGATHER"
-    VS1R {} -> "VS1R"
     FMA variant _ _ _ _ ->
       case variant of
         FMAdd -> "FMADD"

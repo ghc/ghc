@@ -1934,6 +1934,27 @@ genCondBranch true false expr =
 -- -----------------------------------------------------------------------------
 --  Generating C calls
 
+-- Note [RISC-V vector C calling convention]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- In short:
+--  1. The first 16 vector arguments are passed in registers v8 - v23
+--  2. If there are free general registers, the pointers (references) to more
+--     vectors are passed in them
+--  3. Otherwise, the pointers are passed on stack
+--
+-- (1) is easy to accomplish. (2) and (3) require the vector register to be
+-- stored with its full width. This width is unknown at compile time. So, the
+-- natural way of storing it as temporary variable on the C stack conflicts
+-- with GHC wanting to know the exact stack size at compile time.
+--
+-- One could consider to allocate space for the vector registers to be passed
+-- by reference on the heap. However, this turned out to be very complex and is
+-- left for later versions of this NCG.
+--
+-- For now, we expect that 16 vector arguments is probably sufficient for very
+-- most function types.
+
 -- | Generate a call to a C function.
 --
 -- - Integer values are passed in GP registers a0-a7.
@@ -2033,27 +2054,6 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
           `appOL` moveStackUp stackSpaceWords
   return code
   where
-    -- TODO: Deallocate heap-allocated vectors after the main call
-    allocVectorHeap :: (Reg, Format, ForeignHint, InstrBlock) -> NatM (Reg, Format, ForeignHint, InstrBlock)
-    allocVectorHeap arg@(r, format, hint, code_r) | isVecFormat format = do
-      platform <- getPlatform
-      resRegUnq <- getUniqueM
-      let resLocalReg = LocalReg resRegUnq b64
-          resReg = getRegisterReg platform (CmmLocal resLocalReg)
-      callCode <- mkCCall "malloc_vlen_vector" [resLocalReg] []
-      let code = callCode `appOL` code_r `appOL` toOL [VS1R (OpReg format r) (OpAddr (AddrReg resReg))]
-      pure (resReg, II64, hint, code)
-    allocVectorHeap _ = panic "Unsupported general case"
-
-    mkCCall :: FastString ->   [CmmFormal] -> [CmmActual] -> NatM InstrBlock
-    mkCCall name dest_regs arg_regs = do
-      config <- getConfig
-      target <-
-        cmmMakeDynamicReference config CallReference
-          $ mkForeignLabel name ForeignLabelInThisPackage IsFunction
-      let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
-      genCCall (ForeignTarget target cconv) dest_regs arg_regs
-
     -- Implementation of the RISCV ABI calling convention.
     -- https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/948463cd5dbebea7c1869e20146b17a2cc8fda2f/riscv-cc.adoc#integer-calling-convention
     passArguments :: [Reg] -> [Reg] -> [Reg] -> [(Reg, Format, ForeignHint, InstrBlock)] -> Int -> [Reg] -> InstrBlock -> NatM (Int, [Reg], InstrBlock)
@@ -2135,23 +2135,11 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
               `snocOL` ann (text "Pass vector argument: " <> ppr r) mov
       passArguments gpRegs fpRegs vRegs args stackSpaceWords (vReg : accumRegs) accumCode'
 
-    -- No more vector but free gp regs, and we want to pass a vector argument: Pass vector on heap and move its address to gp vector.
-    passArguments (gpReg : gpRegs) fpRegs [] (arg@(r, format, _hint, code_r) : args) stackSpaceWords accumRegs accumCode
-      | isVecFormat format = do
-      (r', format', _hint, code_r') <- allocVectorHeap arg
-      let code = code_r' `appOL` toOL [MOV (OpReg II64 gpReg) (OpReg II64 r')]
-      passArguments gpRegs fpRegs [] args stackSpaceWords (gpReg : accumRegs) (accumCode `appOL` code)
-
-    -- No more vector and gp regs, and we want to pass a vector argument: Pass vector address on stack and the vector itself on heap.
-    -- We need to put its address in the next slot
-    -- In RISC-V terms we pass an "aggregate by reference"
-    passArguments [] fpRegs [] (arg@(r, format, _hint, code_r) : args) stackSpaceWords accumRegs accumCode
-      | isVecFormat format = do
-      (r', format', _hint, code_r') <- allocVectorHeap arg
-      let spOffet = 8 * stackSpaceWords
-          str = STR format' (OpReg II64 r') (OpAddr (AddrRegImm spMachReg (ImmInt spOffet)))
-          code = code_r' `snocOL` str 
-      passArguments [] fpRegs [] args (stackSpaceWords + 1) accumRegs (accumCode `appOL` code)
+    -- No more free vector argument registers , and we want to pass a vector argument.
+    -- See Note [RISC-V vector C calling convention]
+    passArguments gpRegs fpRegs [] ((_r, format, _hint, _code_r) : _args) _stackSpaceWords _accumRegs _accumCode
+      | isVecFormat format =
+      panic "C call: no free vector argument registers. We only support 16 vector arguments (registers v8 - v23)."
 
     passArguments _ _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
 
@@ -2704,7 +2692,6 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       VFMIN {} -> 2
       VFMAX {} -> 2
       VRGATHER {} -> 2
-      VS1R {} -> 1
       VFMA {} -> 3
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1

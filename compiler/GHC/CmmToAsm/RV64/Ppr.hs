@@ -876,8 +876,6 @@ pprInstr platform instr = case instr of
   VFMAX o1 o2 o3 -> pprPanic "RV64.pprInstr - VFMAX wrong operands." (pprOps platform [o1, o2, o3])
   VRGATHER o1 o2 o3 | allVectorRegOps [o1, o2, o3] -> op3 (text "\tvrgather.vv") o1 o2 o3
   VRGATHER o1 o2 o3 -> pprPanic "RV64.pprInstr - VRGATHER wrong operands." (pprOps platform [o1, o2, o3])
-  VS1R o1 o2  | isVectorRegOp o1 -> op2 (text "\tvs1r.v") o1 o2
-  VS1R o1 o2  -> pprPanic "RV64.pprInstr - VS1R wrong operands." (pprOps platform [o1, o2])
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op1 op o1 = line $ op <+> pprOp platform o1
