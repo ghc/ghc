@@ -35,97 +35,90 @@ details
 import Data.List (intercalate)
 import Data.Map qualified as Map
 import Data.Maybe
-
 import Data.Semigroup qualified as S
-import GHC.Driver.Errors.Types (PsMessage)
-import GHC.Parser.Lexer qualified as Lexer
+
+import GHC.Base
+import GHC.Parser.Lexer (P (..), PState (..), ParseResult (..))
 import GHC.Parser.PreProcess.Eval
 import GHC.Parser.PreProcess.ParsePP
 import GHC.Parser.PreProcess.Parser qualified as Parser
 import GHC.Parser.PreProcess.ParserM
 import GHC.Parser.PreProcess.State
 import GHC.Prelude
-import GHC.Types.Error (MsgEnvelope)
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
 
 -- ---------------------------------------------------------------------
 
---    We evaluate to an Int, which we convert to a bool
+-- We evaluate to an Int, which we convert to a bool
 cppCond :: SrcSpan -> String -> PP Bool
 cppCond loc str = do
-    s <- getPpState
+    r <- runPM $ cppCond' loc str
+    return $ fromMaybe False r
+
+cppCond' :: SrcSpan -> String -> PPM Bool
+cppCond' loc str = do
+    s <- liftPM getPpState
     expanded <- expand loc (pp_defines s) str
-    case expanded of
+    v <- case Parser.parseExpr expanded of
         Left err -> do
-            Lexer.addError err
-            return False
-        Right expanded -> do
-            v <- case Parser.parseExpr expanded of
-                Left err -> do
-                    let detail =
-                            if str == expanded || expanded == ""
-                                then
-                                    [ text str
-                                    ]
-                                else
-                                    [ text expanded
-                                    , text "expanded from:"
-                                    , text str
-                                    ]
-                    addGhcCPPError'
-                        loc
-                        "Error evaluating CPP condition:"
-                        ( text err
-                            <+> text "of"
-                            $+$ vcat detail
-                        )
-                    return 0
-                Right tree -> return (eval tree)
-            return (toBool v)
+            let detail =
+                    if str == expanded || expanded == ""
+                        then
+                            [text str]
+                        else
+                            [ text expanded
+                            , text "expanded from:"
+                            , text str
+                            ]
+            liftPM $
+                addGhcCPPError'
+                    loc
+                    "Error evaluating CPP condition:"
+                    ( text err
+                        <+> text "of"
+                        $+$ vcat detail
+                    )
+            return 0
+        Right tree -> return (eval tree)
+    return (toBool v)
 
 -- ---------------------------------------------------------------------
 
-expand :: SrcSpan -> MacroDefines -> String -> PP (Either (MsgEnvelope PsMessage) String)
+expand :: SrcSpan -> MacroDefines -> String -> PPM String
 expand loc s str = do
     case cppLex False str of
         Left err -> do
-            return
-                ( Left $
-                    mkGhcCPPError'
-                        loc
-                        "Error evaluating CPP condition:"
-                        (text err <+> text "of" $+$ text str)
-                )
+            liftPM $
+                addGhcCPPError'
+                    loc
+                    "Error evaluating CPP condition:"
+                    (text err <+> text "of" $+$ text str)
+            failPM
         Right tks -> do
-            expandedToks <- expandToks loc maxExpansions s tks
-            case expandedToks of
-                Left err -> return (Left err)
-                Right toks -> return $ Right $ combineToks $ map t_str toks
+            toks <- expandToks loc maxExpansions s tks
+            return $ combineToks $ map t_str toks
 
 maxExpansions :: Int
 maxExpansions = 15
 
-expandToks :: SrcSpan -> Int -> MacroDefines -> [Token] -> PP (Either (MsgEnvelope PsMessage) [Token])
+expandToks :: SrcSpan -> Int -> MacroDefines -> [Token] -> PPM [Token]
 expandToks loc 0 _ ts = do
-    return $
-        Left $
-            mkGhcCPPError'
-                loc
-                "CPP macro expansion limit hit:"
-                (text (combineToks $ map t_str ts))
+    liftPM $
+        addGhcCPPError'
+            loc
+            "CPP macro expansion limit hit:"
+            (text (combineToks $ map t_str ts))
+    failPM
 expandToks loc cnt s ts = do
-    expansion <- doExpandToks loc False s ts
-    case expansion of
-        Left err -> return (Left err)
-        Right (!expansionDone, !r) ->
-            if expansionDone
-                then expandToks loc (cnt - 1) s r
-                else return (Right r)
+    (!expansionDone, !r) <- doExpandToks loc False s ts
+    if expansionDone
+        then expandToks loc (cnt - 1) s r
+        else return r
 
-doExpandToks :: SrcSpan -> Bool -> MacroDefines -> [Token] -> PP (Either (MsgEnvelope PsMessage) (Bool, [Token]))
-doExpandToks _loc ed _ [] = return $ Right (ed, [])
+doExpandToks :: SrcSpan -> Bool -> MacroDefines -> [Token] -> PPM (Bool, [Token])
+doExpandToks _loc ed _ [] = return (ed, [])
 doExpandToks loc ed s (TIdentifierLParen n : ts) =
     -- TIdentifierLParen has no meaning here (only in a #define), so
     -- restore it to its constituent tokens
@@ -136,26 +129,26 @@ doExpandToks loc _ s (TIdentifier "defined" : ts) = do
     case expandedArgs of
         (Just [[TIdentifier macro_name]], rest0) ->
             case Map.lookup macro_name s of
-                Nothing -> return $ Right (True, TInteger "0" : rest0)
-                Just _ -> return $ Right (True, TInteger "1" : rest0)
+                Nothing -> return (True, TInteger "0" : rest0)
+                Just _ -> return (True, TInteger "1" : rest0)
         (Nothing, TIdentifier macro_name : ts0) ->
             case Map.lookup macro_name s of
-                Nothing -> return $ Right (True, TInteger "0" : ts0)
-                Just _ -> return $ Right (True, TInteger "1" : ts0)
+                Nothing -> return (True, TInteger "0" : ts0)
+                Just _ -> return (True, TInteger "1" : ts0)
         (Nothing, _) -> do
-            return $
-                Left $
-                    mkGhcCPPError'
-                        loc
-                        "CPP defined: expected an identifier, got:"
-                        (text (concatMap t_str ts))
+            liftPM $
+                addGhcCPPError'
+                    loc
+                    "CPP defined: expected an identifier, got:"
+                    (text (concatMap t_str ts))
+            failPM -- TODO:AZ make part of addGhcCPPError'?
         (Just args, _) -> do
-            return $
-                Left $
-                    mkGhcCPPError'
-                        loc
-                        "CPP defined: expected a single arg, got:"
-                        (text (intercalate "," (map (concatMap t_str) args)))
+            liftPM $
+                addGhcCPPError'
+                    loc
+                    "CPP defined: expected a single arg, got:"
+                    (text (intercalate "," (map (concatMap t_str) args)))
+            failPM -- TODO:AZ make part of addGhcCPPError'?
 doExpandToks loc ed s (TIdentifier n : ts) = do
     (args, rest0) <- getExpandArgs loc ts
     let
@@ -168,15 +161,11 @@ doExpandToks loc ed s (TIdentifier n : ts) = do
                 (ed0, r, rest1) = case m_args of
                     Nothing -> (True, rhs, ts)
                     Just _ -> (True, replace_args args m_args rhs, rest0)
-    expansion <- doExpandToks loc ed' s ts'
-    case expansion of
-        Left err -> return $ Left err
-        Right (ed'', rest) -> return $ Right (ed'', expanded ++ rest)
+    (ed'', rest) <- doExpandToks loc ed' s ts'
+    return (ed'', expanded ++ rest)
 doExpandToks loc ed s (t : ts) = do
-    expansion <- doExpandToks loc ed s ts
-    case expansion of
-        Left err -> return (Left err)
-        Right (ed', r) -> return $ Right (ed', t : r)
+    (ed', r) <- doExpandToks loc ed s ts
+    return (ed', t : r)
 
 {-
 Note: ['defined' unary operator]
@@ -248,14 +237,15 @@ inner parentheses do not separate arguments.
 {- | Look for possible arguments to a macro expansion.
 The only thing we look for are commas, open parens, and close parens.
 -}
-getExpandArgs :: SrcSpan -> [Token] -> PP (Maybe [[Token]], [Token])
+getExpandArgs :: SrcSpan -> [Token] -> PPM (Maybe [[Token]], [Token])
 getExpandArgs loc ts =
     case pArgs ts of
         Left err -> do
-            addGhcCPPError'
-                loc
-                "CPP: cannot expand macro arguments:"
-                (text err <+> text "in" $+$ text (concatMap t_str ts))
+            liftPM $
+                addGhcCPPError'
+                    loc
+                    "CPP: cannot expand macro arguments:"
+                    (text err <+> text "in" $+$ text (concatMap t_str ts))
             return (Nothing, ts)
         Right r -> return r
 
@@ -335,6 +325,65 @@ isOther (TComma _) = False
 isOther (TOpenParen _) = False
 isOther (TCloseParen _) = False
 isOther _ = True
+
+-- ---------------------------------------------------------------------
+
+-- | Wrapper around P Monad to include a Maybe result
+type PPM = PM PpState
+-- See Note [PPM Monad]
+
+newtype PM p a = PM {unPM :: PState p -> ParseResult p (Maybe a)}
+
+instance Functor (PM p) where
+    fmap = liftM
+
+instance Applicative (PM p) where
+    pure = returnP
+    (<*>) = ap
+
+instance Monad (PM p) where
+    (>>=) = thenP
+
+returnP :: a -> PM p a
+returnP a = a `seq` (PM $ \s -> POk s (Just a))
+
+failPM :: PM p a
+failPM = PM $ \s -> POk s Nothing
+
+thenP :: PM p a -> (a -> PM p b) -> PM p b
+(PM m) `thenP` k = PM $ \s ->
+    case m s of
+        POk s1 Nothing -> POk s1 Nothing
+        POk s1 (Just a) -> (unPM (k a)) s1
+        PFailed s1 -> PFailed s1
+
+runPM :: PM p a -> P p (Maybe a)
+runPM m = P $ \s -> (unPM m) s
+
+liftPM :: P p a -> PM p a
+liftPM m = PM $ \s -> case (unP m) s of
+    POk s1 a -> POk s1 (Just a)
+    PFailed s1 -> PFailed s1
+
+{-
+Note [PPM Monad]
+~~~~~~~~~~~~~~~~
+
+The PPM monad is a combination of the Lexer P monad and the Maybe
+monad.
+
+It is used when processing GHC_CPP macro conditionals, where we may
+find an error processing the condition, such as a CPP parse error,
+undefined macro, or similar.
+
+In this case we do not want to fail the overall GHC Parse, and simply
+reporting the error and continuing is not enough, as the CPP
+processing needs to be aware that there was a failure in the
+processing, and not continue. In particular, this prevents reporting
+additional CPP errors after the originating cause, and simplifies the
+coding to not have to match on returned Maybe results
+-}
+
 
 -- ---------------------------------------------------------------------
 
