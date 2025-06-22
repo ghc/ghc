@@ -2658,15 +2658,6 @@ data PState a = PState {
 data PpContext = PpContextIf [Located Token]
     deriving (Show)
 
--- TODO: delete
--- initPpState :: PpState
--- initPpState = PpState
---    { pp_defines = Map.empty
---    , pp_continuation = []
---    , pp_context = []
---    , pp_accepting = True
---    }
-
 data ALRContext = ALRNoLayout Bool{- does it contain commas? -}
                               Bool{- is it a 'let' block? -}
                 | ALRLayout ALRLayout Int
@@ -3104,8 +3095,6 @@ mkParserOpts extensionFlags diag_opts
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
       .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
       .|. GhcCppBit                   `xoptBit` LangExt.GhcCpp
-      -- .|. (trace ("GhcCppBit:" ++ show (GhcCppBit                   `xoptBit` LangExt.GhcCpp))
-      --       GhcCppBit                   `xoptBit` LangExt.GhcCpp)
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
@@ -3148,7 +3137,6 @@ extBitEnabled bit opts = xtest bit (pExtsBitmap opts)
 -- | Set parser options for parsing OPTIONS pragmas
 initPragState :: p -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState p
 initPragState p options buf loc = (initParserState p options buf loc)
--- initPragState options buf loc = (initParserState options buf (trace ("initPragState:" ++ show bol) loc))
    { lex_state = [bol, option_prags, 0]
    }
 
@@ -3337,9 +3325,6 @@ popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
           POk s{ context = tl } ()
         []     ->
           unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
-          -- let s' = (trace "popContext empty" s)
-          -- in
-          --   unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P p ()
@@ -3395,8 +3380,6 @@ srcParseFail :: P p a
 srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
     unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
-    -- let s' = trace ("srcParseFail") s
-    -- in unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s'
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
