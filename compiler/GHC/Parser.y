@@ -767,18 +767,6 @@ TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
--- Ghc CPP
--- '#define'       { L _ (ITcppDefine _) }
--- '#include'      { L _ (ITcppInclude _) }
--- '#undef'        { L _ (ITcppUndef _) }
--- '#error'        { L _ (ITcppError _) }
--- '#if'           { L _ (ITcppIf _) }
--- '#ifdef'        { L _ (ITcppIfdef _) }
--- '#ifndef'       { L _ (ITcppIfndef _) }
--- '#elif'         { L _ (ITcppElif _) }
--- '#else'         { L _ ITcppElse }
--- '#endif'        { L _ ITcppEndif }
-
 -- %monad { P p } { >>= } { return }
 %monad { P PpState } { >>= } { return }
 %lexer { (lexer True) } { L _ ITeof }
@@ -4610,10 +4598,6 @@ amsA' :: (NoAnn t, MonadP m) => Located a -> m (GenLocated (EpAnn t) a)
 amsA' (L l a) = do
   !cs <- getCommentsFor l
   return (L (EpAnn (spanAsAnchor l) noAnn cs) a)
-
--- acsExpr :: (EpAnnComments -> LHsExpr GhcPs) -> P PpState ECP
--- acsExpr a = do { expr :: (LHsExpr GhcPs) <- runPV $ acsa a
---                ; return (ecpFromExp $ expr) }
 
 amsA :: MonadP m => LocatedA a -> [TrailingAnn] -> m (LocatedA a)
 amsA (L !l a) bs = do
