@@ -701,6 +701,9 @@ Bugs in GHC
 -  Because of a toolchain limitation we are unable to support full Unicode paths
    on Windows. On Windows we support up to Latin-1. See :ghc-ticket:`12971` for more.
 
+-  For technical reasons, partial record selectors cannot be made
+   multiplicity-polymorphic, so they are always unrestricted.
+
 .. _bugs-ghci:
 
 Bugs in GHCi (the interactive GHC)
