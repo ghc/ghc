@@ -216,7 +216,7 @@ AC_SUBST([LlvmAsCmd])
 
 dnl We know that `clang` supports `--target` and it is necessary to pass it
 dnl lest we see #25793.
-if test -z "$LlvmAsFlags" ; then
+if test -z "$LlvmAsFlags" && ! test -z "$LlvmTarget"; then
     LlvmAsFlags="--target=$LlvmTarget"
 fi
 AC_SUBST([LlvmAsFlags])
