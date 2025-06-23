@@ -21,6 +21,9 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvTypeEnv
   , modifyLclEnvTcLevel
 
+  , getLclEnvGenCtxt
+  , setLclEnvGenCtxt
+  , setLclCtxtGenCtxt
   , lclEnvInGeneratedCode
 
   , addLclEnvErrCtxt
@@ -90,7 +93,7 @@ data TcLclCtxt
   = TcLclCtxt {
         tcl_loc        :: RealSrcSpan,     -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_in_gen_code :: Bool,           -- See Note [Rebindable syntax and XXExprGhcRn]
+        tcl_in_gen_code :: SrcCodeCtxt,
         tcl_tclvl      :: TcLevel,
         tcl_bndrs      :: TcBinderStack,   -- Used for reporting relevant bindings,
                                            -- and for tidying type
@@ -163,8 +166,20 @@ setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = ctxt })
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
 addLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = ctxt : (tcl_ctxt env) })
 
+getLclEnvSrcCodeCtxt :: TcLclEnv -> SrcCodeCtxt a
+getLclEnvSrcCodeCtxt = tcl_user_code_ctxt . tcl_lcl_ctxt
+
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
-lclEnvInGeneratedCode = tcl_in_gen_code . tcl_lcl_ctxt
+lclEnvInGeneratedCode env =
+  case (getLclEnvSrcCodeCtxt env) of
+    UserCode -> False
+    GeneratedCode{} -> True
+
+setLclCtxtSrcCodeCtxt :: SrcCodeCtxt p -> TcLclCtxt -> TcLclCtxt
+setLclCtxtSrcCodeCtxt syntax_thing env = env { tcl_ct_orig = syntax_thing }
+
+setLclEnvSrcCodeCtxt :: SrcCodeCtxt p -> TcLclEnv -> TcLclEnv
+setLclEnvSrcCodeCtxt syntax_thing = modifyLclCtxt (setLclCtxtSrcCodeCtxt syntax_thing)
 
 getLclEnvBinderStack :: TcLclEnv -> TcBinderStack
 getLclEnvBinderStack = tcl_bndrs . tcl_lcl_ctxt
