@@ -21,9 +21,9 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvTypeEnv
   , modifyLclEnvTcLevel
 
-  , getLclEnvGenCtxt
-  , setLclEnvGenCtxt
-  , setLclCtxtGenCtxt
+  , getLclEnvSrcCodeCtxt
+  , setLclEnvSrcCodeCtxt
+  , setLclCtxtSrcCodeCtxt
   , lclEnvInGeneratedCode
 
   , addLclEnvErrCtxt
@@ -35,6 +35,7 @@ module GHC.Tc.Types.LclEnv (
 
 import GHC.Prelude
 
+import GHC.Hs ( SrcCodeCtxt (..) )
 import GHC.Tc.Utils.TcType ( TcLevel )
 import GHC.Tc.Errors.Types ( TcRnMessage )
 
@@ -166,8 +167,8 @@ setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = ctxt })
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
 addLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = ctxt : (tcl_ctxt env) })
 
-getLclEnvSrcCodeCtxt :: TcLclEnv -> SrcCodeCtxt a
-getLclEnvSrcCodeCtxt = tcl_user_code_ctxt . tcl_lcl_ctxt
+getLclEnvSrcCodeCtxt :: TcLclEnv -> SrcCodeCtxt
+getLclEnvSrcCodeCtxt = tcl_in_gen_code . tcl_lcl_ctxt
 
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
 lclEnvInGeneratedCode env =
@@ -175,11 +176,11 @@ lclEnvInGeneratedCode env =
     UserCode -> False
     GeneratedCode{} -> True
 
-setLclCtxtSrcCodeCtxt :: SrcCodeCtxt p -> TcLclCtxt -> TcLclCtxt
-setLclCtxtSrcCodeCtxt syntax_thing env = env { tcl_ct_orig = syntax_thing }
+setLclCtxtSrcCodeCtxt :: SrcCodeCtxt -> TcLclCtxt -> TcLclCtxt
+setLclCtxtSrcCodeCtxt userOrGen env = env { tcl_in_gen_code = userOrGen }
 
-setLclEnvSrcCodeCtxt :: SrcCodeCtxt p -> TcLclEnv -> TcLclEnv
-setLclEnvSrcCodeCtxt syntax_thing = modifyLclCtxt (setLclCtxtSrcCodeCtxt syntax_thing)
+setLclEnvSrcCodeCtxt :: SrcCodeCtxt -> TcLclEnv -> TcLclEnv
+setLclEnvSrcCodeCtxt userOrGen = modifyLclCtxt (setLclCtxtSrcCodeCtxt userOrGen)
 
 getLclEnvBinderStack :: TcLclEnv -> TcBinderStack
 getLclEnvBinderStack = tcl_bndrs . tcl_lcl_ctxt
