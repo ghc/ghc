@@ -8,7 +8,7 @@ import argparse
 import sys
 from sys import stderr
 
-TARBALL_VERSION = '0.8'
+TARBALL_VERSION = '0.9'
 BASE_URL = "https://downloads.haskell.org/ghc/mingw/{}".format(TARBALL_VERSION)
 DEST = Path('ghc-tarballs/mingw-w64')
 ARCHS = ['x86_64', 'sources']
