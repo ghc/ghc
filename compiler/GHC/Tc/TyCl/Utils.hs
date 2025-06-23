@@ -32,7 +32,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Bind( tcValBinds )
 import GHC.Tc.Utils.TcType
 
-import GHC.Builtin.Types( unitTy )
+import GHC.Builtin.Types( unitTy, manyDataConTy, multiplicityTy )
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Hs
@@ -71,6 +71,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Reader ( mkRdrUnqual )
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Var (mkTyVar)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
@@ -853,11 +854,11 @@ mkRecSelBinds :: [TyCon] -> [(Id, LHsBind GhcRn)]
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
 mkRecSelBinds tycons
-  = map mkRecSelBind [ (tc,fld) | tc <- tycons
-                                , fld <- tyConFieldLabels tc ]
+  = [ mkRecSelBind tc fld | tc <- tycons
+                          , fld <- tyConFieldLabels tc ]
 
-mkRecSelBind :: (TyCon, FieldLabel) -> (Id, LHsBind GhcRn)
-mkRecSelBind (tycon, fl)
+mkRecSelBind :: TyCon -> FieldLabel -> (Id, LHsBind GhcRn)
+mkRecSelBind tycon fl
   = mkOneRecordSelector all_cons (RecSelData tycon) fl
         FieldSelectors  -- See Note [NoFieldSelectors and naughty record selectors]
   where
@@ -916,17 +917,24 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                                                   -- thus suppressing making a binding
                                                   -- A slight hack!
 
+    all_other_fields_unrestricted = all all_other_unrestricted all_cons
+      where
+        all_other_unrestricted PatSynCon{} = False
+        all_other_unrestricted (RealDataCon dc) = dataConOtherFieldsAllMultMany dc lbl
+
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkForAllTys sel_tvbs $
+           | otherwise  = mkForAllTys (sel_tvbs ++ mult_tvb) $
                           -- Urgh! See Note [The stupid context] in GHC.Core.DataCon
-                          mkPhiTy (conLikeStupidTheta con1) $
+                          mkPhiTy (conLikeStupidTheta con1)                       $
                           -- req_theta is empty for normal DataCon
-                          mkPhiTy req_theta                 $
-                          mkVisFunTyMany data_ty            $
-                            -- Record selectors are always typed with Many. We
-                            -- could improve on it in the case where all the
-                            -- fields in all the constructor have multiplicity Many.
+                          mkPhiTy req_theta                                       $
+                          mkVisFunTy sel_mult data_ty                             $
                           field_ty
+    non_partial = length all_cons == length cons_w_field -- See Note [Multiplicity and partial selectors]
+    (mult_tvb, sel_mult) = if non_partial && all_other_fields_unrestricted
+      then ([mkForAllTyBinder (Invisible InferredSpec) mult_var], mkTyVarTy mult_var)
+      else ([], manyDataConTy)
+    mult_var = mkTyVar (mkSysTvName (mkBuiltinUnique 1) (fsLit "m")) multiplicityTy
 
     -- make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
@@ -1165,4 +1173,14 @@ Therefore, when used in the right-hand side of `unT`, GHC attempts to
 instantiate `a` with `(forall b. b -> b) -> Int`, which is impredicative.
 To make sure that GHC is OK with this, we enable ImpredicativeTypes internally
 when typechecking these HsBinds so that the user does not have to.
+
+Note [Multiplicity and partial selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+While all logic for making record selectors multiplicity-polymorphic also
+applies to partial selectors, there is a technical difficulty: the catch-all
+default case that is added throws away its argument, and so cannot be linear.
+A possible workaround turned up a bug (see #23380). There may exist a more
+complicated workaround, but the combination of linear types and partial
+selectors is not expected to be very popular in practice, so it was decided
+to not allow multiplicity-polymorphic partial selectors at all.
 -}

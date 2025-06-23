@@ -11,6 +11,19 @@ for specific guidance on migrating programs to this release.
 Language
 ~~~~~~~~
 
+* With :extension:`LinearTypes` record selector functions are now
+  multiplicity-polymorphic when possible. Take the following example:
+
+  ::
+
+      data Record = Rec { x %'Many :: Int, y :: Char }
+
+  The selector function ``y`` will now have type ``y :: Record %m -> Char``,
+  because the ``x`` field is allowed to be discarded.
+  In particular this always applies to the selector of a newtype wrapper.
+  (Note that in theory this should also work with partial record selectors,
+  but for technical reasons this is not supported, see :ghc-ticket:`23380`)
+
 Compiler
 ~~~~~~~~
 

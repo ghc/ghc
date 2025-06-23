@@ -240,7 +240,7 @@ to use ``MkT1`` in higher order functions. The additional multiplicity
 argument ``m`` is marked as inferred (see
 :ref:`inferred-vs-specified`), so that there is no conflict with
 visible type application. When displaying types, unless
-``-XLinearTypes`` is enabled, multiplicity polymorphic functions are
+``-XLinearTypes`` is enabled, multiplicity-polymorphic functions are
 printed as regular functions (see :ref:`printing-linear-types`);
 therefore constructors appear to have regular function types.
 
@@ -258,21 +258,33 @@ using GADT syntax or record syntax. Given
 ::
 
     data T2 a b c where
-        MkT2 :: a -> b %1 -> c %1 -> T2 a b c -- Note unrestricted arrow in the first argument
+        MkT2 :: a -> b %1 -> c -> T2 a b c -- Note the unrestricted arrows on a and c
 
-the value ``MkT2 x y z`` can be constructed only if ``x`` is
-unrestricted. On the other hand, a linear function which is matching
-on ``MkT2 x y z`` must consume ``y`` and ``z`` exactly once, but there
-is no restriction on ``x``. The same example can be written using record syntax:
+the value ``MkT2 x y z`` can be constructed only if ``x`` and
+``z`` are unrestricted. On the other hand, a linear function which is
+matching on ``MkT2 x y z`` must consume ``y`` exactly once, but there
+is no restriction on ``x`` and ``z``.
+The same example can be written using record syntax:
 
 ::
 
-    data T2 a b c = MkT2 { x %'Many :: a, y :: b, z :: c }
+    data T2 a b c = MkT2 { x %'Many :: a, y :: b, z %'Many :: c }
 
 Again, the constructor ``MkT2`` has type ``MkT2 :: a -> b %1 -> c %1 -> T2 a b c``.
 Note that by default record fields are linear, only unrestricted fields
-require a multiplicity annotation. The annotation has no effect on the record selectors.
-So ``x`` has type ``x :: T2 a b c -> a`` and similarly ``y`` has type ``y :: T2 a b c -> b``.
+require a multiplicity annotation.
+
+The multiplicity of record selectors is inferred from the multiplicity of the fields. Note that
+the effect of a selector is to discard all the other fields, so it can only be linear if all the
+other fields are unrestricted. So ``x`` has type ``x :: T2 a b c -> a``, because the ``y`` field
+is not unrestricted. But the ``x`` and ``z`` fields are unrestricted, so the selector for ``y``
+can be linear, and therefore it is made to be multiplicity-polymorphic: ``y :: T2 a b c %m -> b``.
+In particular this always applies to the selector of a newtype wrapper.
+
+In the case of multiple constructors, this logic is repeated for each constructor. So a selector
+is only made multiplicity-polymorphic if for every constructor all the other fields are unrestricted.
+(For technical reasons, partial record selectors cannot be made multiplicity-polymorphic, so they
+are always unrestricted. See :ghc-ticket:`23380`)
 
 It is also possible to define a multiplicity-polymorphic field:
 

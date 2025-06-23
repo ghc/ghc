@@ -3541,12 +3541,12 @@ pprHoleFit :: HoleFitDispConfig -> HoleFit -> SDoc
 pprHoleFit _ (RawHoleFit sd) = sd
 pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (TcHoleFit (HoleFit {..})) =
  hang display 2 provenance
- where tyApp = sep $ zipWithEqual pprArg vars hfWrap
+ where tyApps = concat $ zipWithEqual pprArg vars hfWrap
          where pprArg b arg = case binderFlag b of
-                                Specified -> text "@" <> pprParendType arg
+                                Specified -> [text "@" <> pprParendType arg]
                                   -- Do not print type application for inferred
                                   -- variables (#16456)
-                                Inferred  -> empty
+                                Inferred  -> []
                                 Required  -> pprPanic "pprHoleFit: bad Required"
                                                          (ppr b <+> ppr arg)
        tyAppVars = sep $ punctuate comma $
@@ -3573,9 +3573,9 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (TcHoleFit (HoleFit {..})) =
                    IdHFCand id_    -> pprPrefixOcc id_
        tyDisp = ppWhen sTy $ dcolon <+> ppr hfType
        has = not . null
-       wrapDisp = ppWhen (has hfWrap && (sWrp || sWrpVars))
+       wrapDisp = ppWhen (has tyApps && (sWrp || sWrpVars))
                    $ text "with" <+> if sWrp || not sTy
-                                     then occDisp <+> tyApp
+                                     then occDisp <+> sep tyApps
                                      else tyAppVars
        docs = case hfDoc of
                 Just d -> pprHsDocStrings d
