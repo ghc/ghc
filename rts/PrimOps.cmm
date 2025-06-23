@@ -112,20 +112,14 @@ import CLOSURE stg_sel_0_upd_info;
 
 stg_newByteArrayzh ( W_ n )
 {
-    W_ words, payload_words;
     gcptr p;
 
     MAYBE_GC_N(stg_newByteArrayzh, n);
 
-    payload_words = ROUNDUP_BYTES_TO_WDS(n);
-    words = BYTES_TO_WDS(SIZEOF_StgArrBytes) + payload_words;
-    ("ptr" p) = ccall allocateMightFail(MyCapability() "ptr", words);
-    if (p == NULL) {
+    ("ptr" p) = ccall allocateArrBytes(MyCapability() "ptr", n, CCCS);
+    if (p == NULL) (likely: False) {
         jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
     }
-    TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
-    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
-    StgArrBytes_bytes(p) = n;
     return (p);
 }
 
@@ -134,64 +128,29 @@ stg_newByteArrayzh ( W_ n )
 
 stg_newPinnedByteArrayzh ( W_ n )
 {
-    W_ words, bytes, payload_words;
     gcptr p;
 
     MAYBE_GC_N(stg_newPinnedByteArrayzh, n);
 
-    bytes = n;
-    /* payload_words is what we will tell the profiler we had to allocate */
-    payload_words = ROUNDUP_BYTES_TO_WDS(bytes);
-    /* When we actually allocate memory, we need to allow space for the
-       header: */
-    bytes = bytes + SIZEOF_StgArrBytes;
-    /* Now we convert to a number of words: */
-    words = ROUNDUP_BYTES_TO_WDS(bytes);
-
-    ("ptr" p) = ccall allocatePinned(MyCapability() "ptr", words, BA_ALIGN, SIZEOF_StgArrBytes);
-    if (p == NULL) {
+    ("ptr" p) = ccall allocateArrBytesPinned(MyCapability() "ptr", n,
+                                             BA_ALIGN, CCCS);
+    if (p == NULL) (likely: False) {
         jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
     }
-    TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
-
-    /* No write barrier needed since this is a new allocation. */
-    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
-    StgArrBytes_bytes(p) = n;
     return (p);
 }
 
 stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
 {
-    W_ words, bytes, payload_words;
     gcptr p;
 
     again: MAYBE_GC(again);
 
-    /* we always supply at least word-aligned memory, so there's no
-       need to allow extra space for alignment if the requirement is less
-       than a word.  This also prevents mischief with alignment == 0. */
-    if (alignment <= SIZEOF_W) { alignment = SIZEOF_W; }
-
-    bytes = n;
-
-    /* payload_words is what we will tell the profiler we had to allocate */
-    payload_words = ROUNDUP_BYTES_TO_WDS(bytes);
-
-    /* When we actually allocate memory, we need to allow space for the
-       header: */
-    bytes = bytes + SIZEOF_StgArrBytes;
-    /* Now we convert to a number of words: */
-    words = ROUNDUP_BYTES_TO_WDS(bytes);
-
-    ("ptr" p) = ccall allocatePinned(MyCapability() "ptr", words, alignment, SIZEOF_StgArrBytes);
-    if (p == NULL) {
+    ("ptr" p) = ccall allocateArrBytesPinned(MyCapability() "ptr", n,
+                                             alignment, CCCS);
+    if (p == NULL) (likely: False) {
         jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
     }
-    TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
-
-    /* No write barrier needed since this is a new allocation. */
-    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
-    StgArrBytes_bytes(p) = n;
     return (p);
 }
 
@@ -399,36 +358,23 @@ stg_casInt64Arrayzh( gcptr arr, W_ ind, I64 old, I64 new )
 
 stg_newArrayzh ( W_ n /* words */, gcptr init )
 {
-    W_ words, size, p;
     gcptr arr;
 
     again: MAYBE_GC(again);
 
-    // the mark area contains one byte for each 2^MUT_ARR_PTRS_CARD_BITS words
-    // in the array, making sure we round up, and then rounding up to a whole
-    // number of words.
-    size = n + mutArrPtrsCardWords(n);
-    words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;
-    ("ptr" arr) = ccall allocateMightFail(MyCapability() "ptr",words);
-    if (arr == NULL) {
+    ("ptr" arr) = ccall allocateMutArrPtrs(MyCapability() "ptr", n, CCCS);
+    if (arr == NULL) (likely: False) {
         jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
     }
-    TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);
 
-    /* No write barrier needed since this is a new allocation. */
-    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
-    StgMutArrPtrs_ptrs(arr) = n;
-    StgMutArrPtrs_size(arr) = size;
-
-    /* Ensure that the card array is initialized */
-    if (n != 0) {
-        setCardsValue(arr, 0, n, 0);
-    }
-
-    // Initialise all elements of the array with the value in R2
+    // Initialise all elements of the array with the value init
+    W_ p;
     p = arr + SIZEOF_StgMutArrPtrs;
+    // Avoid the shift for `WDS(n)` in the inner loop
+    W_ limit;
+    limit = arr + SIZEOF_StgMutArrPtrs + WDS(n);
   for:
-    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) (likely: True) {
+    if (p < limit) (likely: True) {
         W_[p] = init;
         p = p + WDS(1);
         goto for;
@@ -522,23 +468,17 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
 
 stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
 {
-    W_ words, size, p;
     gcptr arr;
 
     again: MAYBE_GC(again);
 
-    words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;
-    ("ptr" arr) = ccall allocateMightFail(MyCapability() "ptr",words);
+    ("ptr" arr) = ccall allocateSmallMutArrPtrs(MyCapability() "ptr", n, CCCS);
     if (arr == NULL) (likely: False) {
         jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
     }
-    TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
 
-    /* No write barrier needed since this is a new allocation. */
-    SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
-    StgSmallMutArrPtrs_ptrs(arr) = n;
-
-    // Initialise all elements of the array with the value in R2
+    // Initialise all elements of the array with the value init
+    W_ p;
     p = arr + SIZEOF_StgSmallMutArrPtrs;
     // Avoid the shift for `WDS(n)` in the inner loop
     W_ limit;
