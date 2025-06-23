@@ -136,6 +136,7 @@ STAGE2_TARGETS := \
 STAGE2_UTIL_TARGETS := \
 	$(STAGE_UTIL_TARGETS) \
 	ghc-iserv:ghc-iserv \
+	rts:nonthreaded-debug \
 	hp2ps:hp2ps \
 	hpc-bin:hpc \
 	runghc:runghc \
