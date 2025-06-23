@@ -36,7 +36,10 @@ module GHC.Hs (
         Fixity,
 
         HsModule(..), AnnsModule(..),
-        HsParsedModule(..), XModulePs(..)
+        HsParsedModule(..), XModulePs(..),
+
+        SrcCodeCtxt(..)
+
 ) where
 
 -- friends:
@@ -146,3 +149,17 @@ data HsParsedModule = HsParsedModule {
        -- the .hi file, so that we can force recompilation if any of
        -- them change (#3589)
   }
+
+-- All the various located syntax things that sets the user context code in TcLclEnv
+-- data SrcCodeOrigin  =
+--     ExprThing (HsExpr GhcRn)
+--   | PatThing (LPat GhcRn)
+--   | StmtThing (ExprLStmt GhcRn) HsDoFlavour
+
+-- I'm a looking at a generated thing or am I a user written thing?
+data SrcCodeCtxt = UserCode | GeneratedCode HsThingRn
+
+-- mkSrcCodeOrigin :: HsThingRn -> SrcCodeOrigin
+-- mkSrcCodeOrigin (OrigExpr e) = ExprThing e
+-- mkSrcCodeOrigin (OrigPat p) = PatThing p
+-- mkSrcCodeOrigin (OrigStmt s f) = StmtThing e f
