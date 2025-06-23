@@ -176,18 +176,21 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 -- True  <=> instantiate -- return a rho-type
 -- False <=> don't instantiate -- return a sigma-type
 tcInferSigma inst (L loc rn_expr)
-  = addExprCtxt rn_expr $
-    setSrcSpanA loc     $
-    do { (_, app_res_sigma) <- tcExprSigma inst (exprCtOrigin rn_expr) rn_expr
+  = setSrcSpanA loc     $
+    addExprCtxt rn_expr $
+    do { (_, app_res_sigma) <- tcExprSigma inst rn_expr
        ; return app_res_sigma }
 
 -- Very similar to tcApp, but returns a sigma (uninstantiated) type
+-- CAUTION: Any changes to tcApp should be reflected here
 -- cf. T19167. the head is an expanded expression applied to a type
-tcExprSigma :: Bool -> CtOrigin -> HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
-tcExprSigma inst fun_orig rn_expr
+tcExprSigma :: Bool -> HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcExprSigma inst rn_expr
   = do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
        ; do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
+       ; code_ctxt <- getSrcCodeCtxt
+       ; let fun_orig = srcCodeCtxtCtOrigin rn_expr code_ctxt
        ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst fun_orig (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
        ; tc_args <- tcValArgs do_ql rn_fun inst_args
        ; let tc_expr = rebuildHsApps (tc_fun, fun_ctxt) tc_args
@@ -395,13 +398,12 @@ Unify result type /before/ typechecking the args
 
 The latter is much better. That is why we call checkResultType before tcValArgs.
 -}
-
-tcApp :: CtOrigin
-      -> HsExpr GhcRn
+-- CAUTION: Any changes to tcApp should be reflected in tcExprSigma
+tcApp :: HsExpr GhcRn
       -> ExpRhoType   -- When checking, -XDeepSubsumption <=> deeply skolemised
       -> TcM (HsExpr GhcTc)
 -- See Note [tcApp: typechecking applications]
-tcApp fun_orig rn_expr exp_res_ty
+tcApp rn_expr exp_res_ty
   = do { -- Step 1: Split the application chain
          (fun@(rn_fun, fun_loc), rn_args) <- splitHsApps rn_expr
        ; traceTc "tcApp {" $
@@ -420,7 +422,8 @@ tcApp fun_orig rn_expr exp_res_ty
          vcat [ text "tc_fun:" <+> ppr tc_fun
               , text "fun_sigma:" <+> ppr fun_sigma
               , text "do_ql:" <+> ppr do_ql]
-
+       ; code_ctxt <- getSrcCodeCtxt
+       ; let fun_orig = srcCodeCtxtCtOrigin rn_fun code_ctxt
        ; (inst_args, app_res_rho)
               <- tcInstFun do_ql True fun_orig (tc_fun, rn_fun, fun_loc) fun_sigma rn_args
 

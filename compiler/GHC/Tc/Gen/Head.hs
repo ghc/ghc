@@ -470,8 +470,8 @@ tcInferAppHead_maybe fun =
     case fun of
       HsVar _ nm                  -> Just <$> tcInferId nm
       XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
-      XExpr (ExpandedThingRn _ e) -> Just <$> (setInGeneratedCode $ -- We do not want to instantiate c.f. T19167
-                                                tcExprSigma False (exprCtOrigin fun) e)
+      XExpr (ExpandedThingRn o e) -> Just <$> (setInGeneratedCode o $ -- We do not want to instantiate c.f. T19167
+                                                tcExprSigma False e)
       XExpr (PopErrCtxt e)        -> tcInferAppHead_maybe e
       ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit             -> Just <$> tcInferOverLit lit
