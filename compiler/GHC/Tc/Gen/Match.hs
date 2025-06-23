@@ -980,7 +980,7 @@ tcDoStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
                 -- in full generality; see #1537
 
           ((rhs_ty, rhs', pat_mult, pat', new_res_ty, thing), bind_op')
-            <- tcSyntaxOp DoOrigin (xbsrn_bindOp xbsrn) [SynRho, SynFun SynAny SynRho] res_ty $
+            <- tcSyntaxOp DoStmtOrigin (xbsrn_bindOp xbsrn) [SynRho, SynFun SynAny SynRho] res_ty $
                 \ [rhs_ty, pat_ty, new_res_ty] [rhs_mult,fun_mult,pat_mult] ->
                 do { rhs' <-tcScalingUsage rhs_mult $ tcCheckMonoExprNC rhs rhs_ty
                    ; (pat', thing) <- tcScalingUsage fun_mult $ tcCheckPat (StmtCtxt ctxt) pat (Scaled pat_mult pat_ty) $
@@ -1004,7 +1004,7 @@ tcDoStmt _ (BodyStmt _ rhs then_op _) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax;
                 --   (>>) :: rhs_ty -> new_res_ty -> res_ty
         ; ((rhs', rhs_ty, new_res_ty, thing), then_op')
-            <- tcSyntaxOp DoOrigin then_op [SynRho, SynRho] res_ty $
+            <- tcSyntaxOp DoStmtOrigin then_op [SynRho, SynRho] res_ty $
                \ [rhs_ty, new_res_ty] [rhs_mult,fun_mult] ->
                do { rhs' <- tcScalingUsage rhs_mult $ tcCheckMonoExprNC rhs rhs_ty
                   ; thing <- tcScalingUsage fun_mult $ thing_inside (mkCheckExpType new_res_ty)
@@ -1031,18 +1031,18 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
                              -- Unify the types of the "final" Ids (which may
                              -- be polymorphic) with those of "knot-tied" Ids
                       ; (_, ret_op')
-                          <- tcSyntaxOp DoOrigin ret_op [synKnownType tup_ty]
+                          <- tcSyntaxOp DoStmtOrigin ret_op [synKnownType tup_ty]
                                         inner_res_ty $ \_ _ -> return ()
                       ; return (ret_op', tup_rets) }
 
         ; ((_, mfix_op'), mfix_res_ty)
             <- tcInfer $ \ exp_ty ->
-               tcSyntaxOp DoOrigin mfix_op
+               tcSyntaxOp DoStmtOrigin mfix_op
                           [synKnownType (mkVisFunTyMany tup_ty stmts_ty)] exp_ty $
                \ _ _ -> return ()
 
         ; ((thing, new_res_ty), bind_op')
-            <- tcSyntaxOp DoOrigin bind_op
+            <- tcSyntaxOp DoStmtOrigin bind_op
                           [ synKnownType mfix_res_ty
                           , SynFun (synKnownType tup_ty) SynRho ]
                           res_ty $
@@ -1071,7 +1071,7 @@ tcDoStmt ctxt (XStmtLR (ApplicativeStmt _ pairs mb_join)) res_ty thing_inside
             Nothing -> (, Nothing) <$> tc_app_stmts res_ty
             Just join_op ->
               second Just <$>
-              (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
+              (tcSyntaxOp DoStmtOrigin join_op [SynRho] res_ty $
                \ [rhs_ty] [rhs_mult] -> tcScalingUsage rhs_mult $ tc_app_stmts (mkCheckExpType rhs_ty))
 
         ; return (XStmtLR $ ApplicativeStmt body_ty pairs' mb_join', thing) }
@@ -1188,7 +1188,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
     goOps _ [] = return []
     goOps t_left ((op,t_i,exp_ty) : ops)
       = do { (_, op')
-               <- tcSyntaxOp DoOrigin op
+               <- tcSyntaxOp DoStmtOrigin op
                              [synKnownType t_left, synKnownType exp_ty] t_i $
                    \ _ _ -> return ()
            ; t_i <- readExpType t_i

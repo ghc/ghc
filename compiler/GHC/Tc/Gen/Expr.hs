@@ -114,10 +114,9 @@ tcCheckPolyExprNC expr res_ty = tcPolyLExprNC expr (mkCheckExpType res_ty)
 tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
                            -> TcM (LHsExpr GhcTc)
 
-tcPolyLExpr e@(L loc expr) res_ty
-  = setUserCodeCtxt (ExprThing e) $
-    -- setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    -- addExprCtxt expr $  -- Note [Error contexts in generated code]
+tcPolyLExpr (L loc expr) res_ty
+  = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
+    addExprCtxt expr $  -- Note [Error contexts in generated code]
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
@@ -747,7 +746,7 @@ tcXExpr (PopErrCtxt e) res_ty
          addExprCtxt e $
          tcExpr e res_ty
 
-tcXExpr xe@(ExpandedThingRn o e) res_ty
+tcXExpr (ExpandedThingRn o e) res_ty
    = mkExpandedTc o <$> -- necessary for breakpoints
       do setInGeneratedCode o $
            tcExpr e res_ty

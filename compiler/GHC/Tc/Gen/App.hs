@@ -410,7 +410,6 @@ tcApp rn_expr exp_res_ty
            vcat [ text "rn_expr:" <+> ppr rn_expr
                 , text "rn_fun:" <+> ppr rn_fun
                 , text "fun_loc:" <+> ppr fun_loc
-                , text "orig:" <+> ppr fun_orig
                 , text "rn_args:" <+> ppr rn_args ]
 
        -- Step 2: Infer the type of `fun`, the head of the application
@@ -418,12 +417,13 @@ tcApp rn_expr exp_res_ty
        ; let tc_head = (tc_fun, fun_loc)
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
+       ; code_ctxt <- getSrcCodeCtxt
+       ; let fun_orig = srcCodeCtxtCtOrigin rn_fun code_ctxt
        ; traceTc "tcApp:inferAppHead" $
          vcat [ text "tc_fun:" <+> ppr tc_fun
               , text "fun_sigma:" <+> ppr fun_sigma
+              , text "fun_origin" <+> ppr fun_orig
               , text "do_ql:" <+> ppr do_ql]
-       ; code_ctxt <- getSrcCodeCtxt
-       ; let fun_orig = srcCodeCtxtCtOrigin rn_fun code_ctxt
        ; (inst_args, app_res_rho)
               <- tcInstFun do_ql True fun_orig (tc_fun, rn_fun, fun_loc) fun_sigma rn_args
 
@@ -857,7 +857,7 @@ tcInstFun do_ql inst_final fun_orig (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
     -- Rule IARG from Fig 4 of the QL paper:
     go1 pos acc fun_ty
         (EValArg { ea_arg = arg, ea_ctxt = ctxt } : rest_args)
-      = do { let herald | DoOrigin <- fun_orig = ExpectedFunTySyntaxOp fun_orig tc_fun -- cf. RepPolyDoBind.hs
+      = do { let herald | DoStmtOrigin <- fun_orig = ExpectedFunTySyntaxOp fun_orig tc_fun -- cf. RepPolyDoBind.hs
                         | otherwise = ExpectedFunTyArg (HsExprTcThing tc_fun) (unLoc arg)
            ; (wrap, arg_ty, res_ty) <-
                 -- NB: matchActualFunTy does the rep-poly check.
