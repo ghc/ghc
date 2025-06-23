@@ -653,6 +653,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
 
           -- Typecheck the expanded expression.
         ; expr' <- addErrCtxt err_ctxt $
+                   setInGeneratedCode (OrigExpr expr) $
                    tcExpr ds_expr (Check ds_res_ty)
             -- NB: it's important to use ds_res_ty and not res_ty here.
             -- Test case: T18802b.

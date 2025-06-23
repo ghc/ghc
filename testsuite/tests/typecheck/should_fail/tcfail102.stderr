@@ -1,9 +1,9 @@
-
 tcfail102.hs:1:14: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 tcfail102.hs:9:7: error: [GHC-39999]
     • Could not deduce ‘Integral (Ratio a)’
+        arising from a record update
       from the context: Integral a
         bound by the type signature for:
                    f :: forall a. Integral a => P (Ratio a) -> P (Ratio a)
@@ -13,3 +13,4 @@ tcfail102.hs:9:7: error: [GHC-39999]
       and data constructor ‘P’.
       In the expression: x {p = p x}
       In an equation for ‘f’: f x = x {p = p x}
+

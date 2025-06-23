@@ -981,7 +981,7 @@ setSrcSpan (RealSrcSpan loc _) thing_inside
   = updLclCtxt (\env -> env { tcl_loc = loc, tcl_in_gen_code = UserCode })
               thing_inside
 
-setSrcSpan loc@(UnhelpfulSpan _) thing_inside
+setSrcSpan (UnhelpfulSpan _) thing_inside
   = thing_inside
 
 getSrcCodeCtxt :: TcRn SrcCodeCtxt

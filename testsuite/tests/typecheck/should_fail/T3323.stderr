@@ -1,17 +1,17 @@
-
 T3323.hs:18:7: error: [GHC-39999]
     • Could not deduce ‘GHC.Internal.IO.Device.RawIO dev0’
+        arising from a record update
       from the context: (GHC.Internal.IO.Device.RawIO dev,
                          GHC.Internal.IO.Device.IODevice dev,
                          GHC.Internal.IO.BufferedIO.BufferedIO dev,
-                         ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable
+                         ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable
                            dev)
         bound by a pattern with constructor:
                    Handle__ :: forall dev enc_state dec_state.
                                (GHC.Internal.IO.Device.RawIO dev,
                                 GHC.Internal.IO.Device.IODevice dev,
                                 GHC.Internal.IO.BufferedIO.BufferedIO dev,
-                                ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable
+                                ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable
                                   dev) =>
                                dev
                                -> HandleType
@@ -42,3 +42,4 @@ T3323.hs:18:7: error: [GHC-39999]
       and existential variables ‘dev’, ‘enc_state’, ‘dec_state’.
       In the expression: h {haDevice = undefined}
       In an equation for ‘f’: f h = h {haDevice = undefined}
+
