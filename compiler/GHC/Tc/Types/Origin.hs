@@ -585,7 +585,7 @@ data CtOrigin
       -- `ty1` to `ty2`.
 
   | DefaultOrigin       -- Typechecking a default decl
-  | DoOrigin            -- Arising from a do expression
+  | DoStmtOrigin            -- Arising from a do expression
   | DoPatOrigin (LPat GhcRn) -- Arising from a failable pattern in
                              -- a do expression
   | MCompOrigin         -- Arising from a monad comprehension
@@ -751,7 +751,7 @@ exprCtOrigin (HsCase _ _ matches) = matchesCtOrigin matches
 exprCtOrigin (HsIf {})           = IfThenElseOrigin
 exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e
-exprCtOrigin (HsDo {})           = DoOrigin
+exprCtOrigin (HsDo {})           = DoStmtOrigin
 exprCtOrigin (RecordCon {})      = Shouldn'tHappenOrigin "record construction"
 exprCtOrigin (RecordUpd {})      = RecordUpdOrigin
 exprCtOrigin (ExprWithTySig {})  = ExprSigOrigin
@@ -774,7 +774,7 @@ exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
 
 hsThingCtOrigin :: HsThingRn -> CtOrigin
 hsThingCtOrigin (OrigExpr e) = exprCtOrigin e
-hsThingCtOrigin (OrigStmt{}) = DoOrigin
+hsThingCtOrigin (OrigStmt{}) = DoStmtOrigin
 hsThingCtOrigin (OrigPat p) = DoPatOrigin p
 
 srcCodeCtxtCtOrigin :: HsExpr GhcRn -> SrcCodeCtxt -> CtOrigin
@@ -946,7 +946,7 @@ pprCtO (DerivOrigin standalone)
   | standalone               = text "a 'deriving' declaration"
   | otherwise                = text "the 'deriving' clause of a data type declaration"
 pprCtO DefaultOrigin         = text "a 'default' declaration"
-pprCtO DoOrigin              = text "a do statement"
+pprCtO DoStmtOrigin              = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
 pprCtO ArrowCmdOrigin        = text "an arrow command"
