@@ -58,6 +58,7 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles,
 
   -- * Error management
+  setUserCodeCtxt, getUserCodeCtxt,
   getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
   inGeneratedCode, setInGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
@@ -399,7 +400,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_lcl_ctxt   = TcLclCtxt {
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
-                tcl_in_gen_code = False,
+                tcl_user_code_ctxt = NotGeneratedCode,
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topLevel,
@@ -973,29 +974,45 @@ getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (getLclEnvLoc env) Stri
 inGeneratedCode :: TcRn Bool
 inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 
-setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
--- See Note [Error contexts in generated code]
--- for the tcl_in_gen_code manipulation
-setSrcSpan (RealSrcSpan loc _) thing_inside
-  = updLclCtxt (\env -> env { tcl_loc = loc, tcl_in_gen_code = False })
-              thing_inside
+-- setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
+-- -- See Note [Error contexts in generated code]
+-- -- for the tcl_in_gen_code manipulation
+-- setSrcSpan (RealSrcSpan loc _) thing_inside
+--   = updLclCtxt (\env -> env { tcl_loc = loc, tcl_in_gen_code = UserCode })
+--               thing_inside
 
-setSrcSpan loc@(UnhelpfulSpan _) thing_inside
-  | isGeneratedSrcSpan loc
-  = setInGeneratedCode thing_inside
+-- setSrcSpan loc@(UnhelpfulSpan _) thing_inside
+--   | isGeneratedSrcSpan loc
+--   = setInGeneratedCode thing_inside
 
-  | otherwise
-  = thing_inside
+--   | otherwise
+--   = thing_inside
 
 -- | Mark the inner computation as being done inside generated code.
 --
 -- See Note [Error contexts in generated code]
-setInGeneratedCode :: TcRn a -> TcRn a
-setInGeneratedCode thing_inside =
-  updLclCtxt (\env -> env { tcl_in_gen_code = True }) thing_inside
+-- setInGeneratedCode :: TcRn a -> TcRn a
+-- setInGeneratedCode thing_inside =
+--   updLclCtxt (\env -> env { tcl_user_code_ctxt = Gen }) thing_inside
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
+
+setSrcCodeCtxt :: SrcSpan -> SrcCodeOrigin a -> TcRn a -> TcRn a
+setSrcCodeCtxt (RealSrcSpan loc _) _ thing_inside =
+  = updLclCtxt (\env -> env { tcl_loc = loc, tcl_in_gen_code = UserCode })
+              thing_inside
+
+setSrcCodeCtxt loc@(UnhelpfulSpan _) src_code_thing thing_inside =
+  | isGeneratedSrcSpan loc
+  = updLclCtxt (\env -> env { tcl_in_gen_code = GeneratedCode src_code_thing }) thing_inside
+
+  | otherwise
+  = thing_inside
+
+getSrcCodeCtxt :: TcRn (SrcCodeCtxt p)
+getSrcCodeCtxt = getLclEnvSrcCodeCtxt <$> getLclEnv
+
 
 addLocM :: (HasLoc t) => (a -> TcM b) -> GenLocated t a -> TcM b
 addLocM fn (L loc a) = setSrcSpan (getHasLoc loc) $ fn a

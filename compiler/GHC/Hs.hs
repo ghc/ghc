@@ -37,6 +37,8 @@ module GHC.Hs (
 
         HsModule(..), AnnsModule(..),
         HsParsedModule(..), XModulePs(..)
+
+        GenContext (..), SyntaxThingRn (..)
 ) where
 
 -- friends:
@@ -146,3 +148,14 @@ data HsParsedModule = HsParsedModule {
        -- the .hi file, so that we can force recompilation if any of
        -- them change (#3589)
   }
+
+-- All the various located syntax things that sets the user context code in TcLclEnv
+data SrcCodeOrigin p  =
+    DeclThing (HsDecl p)
+  | ExprThing (HsExpr p)
+  | PatThing (HsPat p)
+  | TypeThing (HsType p)
+  | BindThing (HsLocalBind p)
+
+-- I'm a looking at a generated thing or am I a user written thing?
+data SrcCodeCtxt p = UserCode | GeneratedCode (SrcCodeOrigin p)
