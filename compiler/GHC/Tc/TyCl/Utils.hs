@@ -32,7 +32,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Bind( tcValBinds )
 import GHC.Tc.Utils.TcType
 
-import GHC.Builtin.Types( unitTy )
+import GHC.Builtin.Types( unitTy, manyDataConTy, multiplicityTy )
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Hs
@@ -71,6 +71,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Reader ( mkRdrUnqual )
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Var (mkTyVar)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
@@ -765,7 +766,8 @@ addTyConsToGblEnv tyclss
     do { traceTc "tcAddTyCons" $ vcat
             [ text "tycons" <+> ppr tyclss
             , text "implicits" <+> ppr implicit_things ]
-       ; gbl_env <- tcRecSelBinds (mkRecSelBinds tyclss)
+       ; linearEnabled <- xoptM LangExt.LinearTypes
+       ; gbl_env <- tcRecSelBinds (mkRecSelBinds linearEnabled tyclss)
        ; th_bndrs <- tcTyThBinders implicit_things
        ; return (gbl_env, th_bndrs)
        }
@@ -848,24 +850,24 @@ tcRecSelBinds sel_bind_prs
                                              , let loc = getSrcSpan sel_id ]
     binds = [(NonRecursive, [bind]) | (_, bind) <- sel_bind_prs]
 
-mkRecSelBinds :: [TyCon] -> [(Id, LHsBind GhcRn)]
+mkRecSelBinds :: Bool -> [TyCon] -> [(Id, LHsBind GhcRn)]
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
-mkRecSelBinds tycons
-  = map mkRecSelBind [ (tc,fld) | tc <- tycons
-                                , fld <- tyConFieldLabels tc ]
+mkRecSelBinds allowMultiplicity tycons
+  = [ mkRecSelBind allowMultiplicity tc fld | tc <- tycons
+                                        , fld <- tyConFieldLabels tc ]
 
-mkRecSelBind :: (TyCon, FieldLabel) -> (Id, LHsBind GhcRn)
-mkRecSelBind (tycon, fl)
-  = mkOneRecordSelector all_cons (RecSelData tycon) fl
+mkRecSelBind :: Bool -> TyCon -> FieldLabel -> (Id, LHsBind GhcRn)
+mkRecSelBind allowMultiplicity tycon fl
+  = mkOneRecordSelector allowMultiplicity all_cons (RecSelData tycon) fl
         FieldSelectors  -- See Note [NoFieldSelectors and naughty record selectors]
   where
     all_cons = map RealDataCon (tyConDataCons tycon)
 
-mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel -> FieldSelectors
+mkOneRecordSelector :: Bool -> [ConLike] -> RecSelParent -> FieldLabel -> FieldSelectors
                     -> (Id, LHsBind GhcRn)
-mkOneRecordSelector all_cons idDetails fl has_sel
+mkOneRecordSelector allowMultiplicity all_cons idDetails fl has_sel
   = (sel_id, L (noAnnSrcSpan loc) sel_bind)
   where
     loc      = getSrcSpan sel_name
@@ -916,17 +918,24 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                                                   -- thus suppressing making a binding
                                                   -- A slight hack!
 
+    all_other_fields_unrestricted = all all_other_unrestricted all_cons
+      where
+        all_other_unrestricted PatSynCon{} = False
+        all_other_unrestricted (RealDataCon dc) = dataConOtherFieldsAllMultMany dc lbl
+
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkForAllTys sel_tvbs $
+           | otherwise  = mkForAllTys (sel_tvbs ++ mult_tvb) $
                           -- Urgh! See Note [The stupid context] in GHC.Core.DataCon
-                          mkPhiTy (conLikeStupidTheta con1) $
+                          mkPhiTy (conLikeStupidTheta con1)                       $
                           -- req_theta is empty for normal DataCon
-                          mkPhiTy req_theta                 $
-                          mkVisFunTyMany data_ty            $
-                            -- Record selectors are always typed with Many. We
-                            -- could improve on it in the case where all the
-                            -- fields in all the constructor have multiplicity Many.
+                          mkPhiTy req_theta                                       $
+                          mkVisFunTy sel_mult data_ty                             $
                           field_ty
+    non_partial = length all_cons == length cons_w_field -- See Note [Multiplicity and partial selectors]
+    (mult_tvb, sel_mult) = if allowMultiplicity && non_partial && all_other_fields_unrestricted
+      then ([mkForAllTyBinder (Invisible InferredSpec) mult_var], mkTyVarTy mult_var)
+      else ([], manyDataConTy)
+    mult_var = mkTyVar (mkSysTvName (mkBuiltinUnique 1) (fsLit "m")) multiplicityTy
 
     -- make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
@@ -1165,4 +1174,13 @@ Therefore, when used in the right-hand side of `unT`, GHC attempts to
 instantiate `a` with `(forall b. b -> b) -> Int`, which is impredicative.
 To make sure that GHC is OK with this, we enable ImpredicativeTypes internally
 when typechecking these HsBinds so that the user does not have to.
+
+Note [Multiplicity and partial selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+While all logic for making record selectors multiplicity-polymorphic also applies
+to partial selectors, there is a technical difficulty: the catch-all default case
+that is added throws away its argument, and so cannot be linear. A simple workaround
+was not found. There may exist a more complicated workaround, but the combination of
+linear types and partial selectors is not expected to be very popular in practice, so
+it was decided to not allow multiplicity-polymorphic partial selectors at all.
 -}
