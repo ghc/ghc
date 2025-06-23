@@ -1,4 +1,3 @@
-
 DRFHoleFits.hs:7:7: error: [GHC-88464]
     • Found hole: _ :: T -> Int
     • In the expression: _ :: T -> Int
@@ -6,8 +5,8 @@ DRFHoleFits.hs:7:7: error: [GHC-88464]
     • Relevant bindings include
         bar :: T -> Int (bound at DRFHoleFits.hs:7:1)
       Valid hole fits include
-        foo :: T -> Int (defined at DRFHoleFits.hs:5:16)
         bar :: T -> Int (defined at DRFHoleFits.hs:7:1)
+        foo :: T -> Int (defined at DRFHoleFits.hs:5:16)
 
 DRFHoleFits.hs:8:7: error: [GHC-88464]
     • Found hole: _ :: A.S -> Int
@@ -20,3 +19,4 @@ DRFHoleFits.hs:8:7: error: [GHC-88464]
         A.foo :: A.S -> Int
           (imported qualified from ‘DRFHoleFits_A’ at DRFHoleFits.hs:3:1-35
            (and originally defined at DRFHoleFits_A.hs:5:16-18))
+

@@ -44,6 +44,7 @@ module GHC.Core.DataCon (
         dataConInstOrigArgTys, dataConRepArgTys, dataConResRepTyArgs,
         dataConInstUnivs,
         dataConFieldLabels, dataConFieldType, dataConFieldType_maybe,
+        dataConOtherFieldsAllMultMany,
         dataConSrcBangs,
         dataConSourceArity, dataConVisArity, dataConRepArity,
         dataConIsInfix,
@@ -1405,6 +1406,15 @@ dataConFieldType_maybe :: DataCon -> FieldLabelString
                        -> Maybe (FieldLabel, Type)
 dataConFieldType_maybe con label
   = find ((== label) . flLabel . fst) (dcFields con `zip` (scaledThing <$> dcOrigArgTys con))
+
+-- | Check if all the fields of the 'DataCon' have multiplicity 'Many',
+-- except for the given labelled field. In this case the selector
+-- of the given field can be a linear function, since it is allowed
+-- to discard all the other fields.
+dataConOtherFieldsAllMultMany :: DataCon -> FieldLabelString -> Bool
+dataConOtherFieldsAllMultMany con label
+  = all (\(fld, mult) -> flLabel fld == label || isManyTy mult)
+      (dcFields con `zip` (scaledMult <$> dcOrigArgTys con))
 
 -- | Strictness/unpack annotations, from user; or, for imported
 -- DataCons, from the interface file

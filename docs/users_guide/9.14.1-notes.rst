@@ -67,6 +67,13 @@ Language
 
   This causes the constructor to have type ``Rec :: Int %'Many -> Char %1 -> Record``.
 
+  Also record selector functions are now multiplicity-polymorphic when possible.
+  In the above example the selector function ``y`` now has type
+  ``y :: Record %m -> Char``, because the ``x`` field is allowed to be discarded.
+  In particular this always applies to the selector of a newtype wrapper.
+  (Note that in theory this should also work with partial record selectors,
+  but for technical reasons this is not supported.)
+
 * The :extension:`ExplicitNamespaces` extension now allows the ``data``
   namespace specifier in import and export lists.
 
