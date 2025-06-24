@@ -562,6 +562,85 @@ slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
   }
 }
 
+static void
+set_bco_RESUME_STEP_OUTs(StgWord16 *instrs, int bciPtr, int val) {
+  bciPtr++; // skip fst arg
+  StgWord16 to_prev = BCO_NEXT;
+  StgWord16 to_next = BCO_NEXT;
+
+  while (to_prev != 0) {
+    instrs[to_prev+1] = val;
+    to_prev = instrs[to_prev+2];
+  }
+  while (to_next != 0) {
+    instrs[to_next+1] = val;
+    to_next = instrs[to_next+3];
+  }
+}
+
+
+/* Traverse from the given stack pointer upwards until a continuation BCO with
+ * a breakpoint is found -- then enable that breakpoint.
+ * See Note [Debugger: Step-out]
+ */
+static void
+enable_break_on_continuation(Capability *cap, void *Sp) {
+
+  StgBCO* bco;
+  StgWord16* bco_instrs;
+  StgHalfWord type;
+
+  /* Traverse upwards until continuation BCO, or the end */
+  while ((type = get_itbl((StgClosure*)Sp)->type) != RET_BCO
+                                         && type  != STOP_FRAME) {
+    Sp = SafeSpWP(stack_frame_sizeW((StgClosure *)Sp));
+  }
+
+  ASSERT(type == RET_BCO || type == STOP_FRAME);
+  if (type == RET_BCO) {
+
+    bco = (StgBCO*)(SpW(1)); // BCO is first arg of a RET_BCO
+    ASSERT(get_itbl((StgClosure*)bco)->type == BCO);
+    bco_instrs = (StgWord16*)(bco->instrs->payload);
+
+    /* A breakpoint instruction (BRK_FUN or BRK_ALTS) is always the first
+     * instruction in a BCO */
+    if ((bco_instrs[0] & 0xFF) == bci_BRK_FUN) {
+        int brk_array, tick_index;
+        StgArrBytes *breakPoints;
+        StgPtr* ptrs;
+
+        ptrs = (StgPtr*)(&bco->ptrs->payload[0]);
+        brk_array  = bco_instrs[1];
+        tick_index = bco_instrs[6];
+
+        breakPoints = (StgArrBytes *) BCO_PTR(brk_array);
+        // ACTIVATE the breakpoint by tick index
+        ((StgInt*)breakPoints->payload)[tick_index] = 0;
+    }
+    // TODO: ASSERT IN STG2BC: All Case continuation BCOs start with a RESUME_STEP_OUT instruction that is never active but points to the remaining ones
+    else {
+      if ((bco_instrs[0] & 0xFF) == bci_RESUME_STEP_OUT) {
+
+        // Step-out will resume and trigger a specific breakpoint further up
+        // the stack when the case alternative is selected.
+        // See Note [Debugger: RESUME_STEP_OUT]
+        set_bco_RESUME_STEP_OUTs(bco_instrs, 1 /*start ix*/, 1 /* Enable them all */);
+        bco_instrs[1] = 0; /* and disable the first stub one again; this one is not meant to run, only find the others. */
+      }
+      else {
+        // Unlikely: This continuation BCO doesn't have a BRK_FUN nor is a case
+        // continuation BCO with RESUME_STEP_OUT.
+        // Keep looking for a frame to trigger a breakpoint in in the stack:
+        enable_break_on_continuation(cap, Sp);
+      }
+    }
+  }
+  else /* type == STOP_FRAME */ {
+    /* No continuation frame to further stop at: Nothing to do */
+  }
+}
+
 // Compute the pointer tag for the constructor and tag the pointer;
 // see Note [Data constructor dynamic tags] in GHC.StgToCmm.Closure.
 //
@@ -618,62 +697,17 @@ interpretBCO (Capability* cap)
      * See Note [Debugger: Step-out]
      */
     if (cap->r.rCurrentTSO->flags & TSO_STOP_AFTER_RETURN) {
+      StgPtr frame;
 
-      StgBCO* bco;
-      StgWord16* bco_instrs;
-      StgHalfWord type;
+      /* The first BCO on the stack as we re-enter the interpreter is the one
+       * we are already stopped at. Skip it. */
+      frame = SafeSpWP(stack_frame_sizeW((StgClosure *)Sp));
 
-      /* Store the entry Sp; traverse the stack modifying Sp (using Sp macros);
-       * restore Sp afterwards. */
-      StgPtr restoreStackPointer = Sp;
+      /* Enable the breakpoint in the first breakable continuation */
+      enable_break_on_continuation(cap, frame);
 
-      /* The first BCO on the stack is the one we are already stopped at.
-       * Skip it. */
-      Sp = SafeSpWP(stack_frame_sizeW((StgClosure *)Sp));
-
-      /* Traverse upwards until continuation BCO, or the end */
-      while ((type = get_itbl((StgClosure*)Sp)->type) != RET_BCO
-                                             && type  != STOP_FRAME) {
-        Sp = SafeSpWP(stack_frame_sizeW((StgClosure *)Sp));
-      }
-
-      ASSERT(type == RET_BCO || type == STOP_FRAME);
-      if (type == RET_BCO) {
-
-        bco = (StgBCO*)(SpW(1)); // BCO is first arg of a RET_BCO
-        ASSERT(get_itbl((StgClosure*)bco)->type == BCO);
-        bco_instrs = (StgWord16*)(bco->instrs->payload);
-
-        /* A breakpoint instruction (BRK_FUN or BRK_ALTS) is always the first
-         * instruction in a BCO */
-        if ((bco_instrs[0] & 0xFF) == bci_BRK_FUN) {
-            int brk_array, tick_index;
-            StgArrBytes *breakPoints;
-            StgPtr* ptrs;
-
-            ptrs = (StgPtr*)(&bco->ptrs->payload[0]);
-            brk_array  = bco_instrs[1];
-            tick_index = bco_instrs[6];
-
-            breakPoints = (StgArrBytes *) BCO_PTR(brk_array);
-            // ACTIVATE the breakpoint by tick index
-            ((StgInt*)breakPoints->payload)[tick_index] = 0;
-        }
-        else if ((bco_instrs[0] & 0xFF) == bci_BRK_ALTS) {
-            // ACTIVATE BRK_ALTS by setting its only argument to ON
-            bco_instrs[1] = 1;
-        }
-        // else: if there is no BRK instruction perhaps we should keep
-        // traversing; that said, the continuation should always have a BRK
-      }
-      else /* type == STOP_FRAME */ {
-        /* No continuation frame to further stop at: Nothing to do */
-      }
-
-      // Mark as done to not do it again
+      /* Mark as done to not do it again */
       cap->r.rCurrentTSO->flags &= ~TSO_STOP_AFTER_RETURN;
-
-      Sp = restoreStackPointer;
     }
 
     // ------------------------------------------------------------------------
@@ -1600,12 +1634,21 @@ run_BCO:
             goto nextInsn;
         }
 
-        /* See Note [Debugger: BRK_ALTS] */
-        case bci_BRK_ALTS:
+        /* See Note [Debugger: RESUME_STEP_OUT] */
+        case bci_RESUME_STEP_OUT:
         {
-          StgWord16 active = BCO_NEXT;
+          StgWord16 active  = BCO_NEXT;
+          bciPtr++; /* arg2 */
+          bciPtr++; /* arg3 */
+
           if (active) {
-            cap->r.rCurrentTSO->flags |= TSO_STOP_NEXT_BREAKPOINT;
+            // Try to look for a continuation to activate a breakpoint on on
+            // the stack again.
+            enable_break_on_continuation(cap, Sp);
+
+            // Make sure the remaining RESUME_STEP_OUTs in this BCO are
+            // disabled since we took this one.
+            set_bco_RESUME_STEP_OUTs(instrs, bciPtr - 3 /* index */, 0 /* Disable them all */);
           }
 
           goto nextInsn;

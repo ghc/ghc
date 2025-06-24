@@ -4,6 +4,7 @@
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -75,6 +76,7 @@ import Data.List ( genericReplicate, intersperse
                  , partition, scanl', sortBy, zip4, zip6 )
 import Foreign hiding (shiftL, shiftR)
 import Control.Monad
+import Control.Monad.Trans.State
 import Data.Char
 
 import GHC.Unit.Module
@@ -96,6 +98,7 @@ import Data.Either ( partitionEithers )
 import GHC.Stg.Syntax
 import qualified Data.IntSet as IntSet
 import GHC.CoreToIface
+import Data.Bifunctor (Bifunctor(..))
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -1367,6 +1370,43 @@ doCase d s p scrut bndr alts
 
         bitmap = intsToReverseBitmap platform bitmap_size' pointers
 
+        -- See Note [Debugger: RESUME_STEP_OUT]
+        -- We could do this in a single pass, but it is easier to do two.
+        fillInResStepOutStubs instrs = fst $ runState (fillInBackwards =<< fillInForwards instrs) (0, True)
+
+        fillInForwards :: BCInstrList -> State (Word16, Bool) BCInstrList
+        fillInForwards instrs = do
+          put (0, True) -- reset
+          forM instrs $ \i -> do
+            (off, isFirst) <- get
+            case i of
+               RESUME_STEP_OUT o _ n -> do
+                 -- Reset offset
+                 put (0, False)
+                 if isFirst
+                   then return $ RESUME_STEP_OUT o 0 n
+                   else return $ RESUME_STEP_OUT o off n
+               _ -> do
+                 modify (first (+ (bciSize platform i + 1)))
+                 return i
+
+        fillInBackwards :: BCInstrList -> State (Word16, Bool) BCInstrList
+        fillInBackwards instrs = reverseOL <$> do
+          put (0, True) -- reset
+          forM (reverseOL instrs) $ \i -> do
+            (off, isFirst) <- get
+            case i of
+               RESUME_STEP_OUT o p _ -> do
+                 -- Reset offset
+                 put (0, False)
+                 if isFirst
+                   then return $ RESUME_STEP_OUT o p 0
+                   else return $ RESUME_STEP_OUT o p off
+               _ -> do
+                 modify (first (+ (bciSize platform i + 1)))
+                 return i
+
+
      alt_stuff <- mapM codeAlt alts
      alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
 
@@ -1375,8 +1415,9 @@ doCase d s p scrut bndr alts
            | otherwise          = alt_final0
          alt_final
            | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
-                                -- See Note [Debugger: BRK_ALTS]
-                                = BRK_ALTS 0 `consOL` alt_final1
+                                -- See Note [Debugger: RESUME_STEP_OUT]
+                                = {- TODO: ASSERT IN BYTECODE THINGS -}
+                                  fillInResStepOutStubs (RESUME_STEP_OUT 0 0 0 `consOL` alt_final1)
            | otherwise          = alt_final1
 
      add_bco_name <- shouldAddBcoName
@@ -2402,13 +2443,13 @@ mkMultiBranch :: Maybe Int      -- # datacons in tycon, if alg alt
               -> BcM BCInstrList
 mkMultiBranch maybe_ncons raw_ways = do
      lbl_default <- getLabelBc
-
+     hsc_env <- getHscEnv
      let
          mkTree :: [(Discr, BCInstrList)] -> Discr -> Discr -> BcM BCInstrList
          mkTree [] _range_lo _range_hi = return (unitOL (JMP lbl_default))
              -- shouldn't happen?
 
-         mkTree [val] range_lo range_hi
+         mkTree [(second insertStubResStepOut -> val)] range_lo range_hi
             | range_lo == range_hi
             = return (snd val)
             | null defaults -- Note [CASEFAIL]
@@ -2417,7 +2458,8 @@ mkMultiBranch maybe_ncons raw_ways = do
                             `consOL` (snd val
                             `appOL`  (LABEL lbl `consOL` unitOL CASEFAIL)))
             | otherwise
-            = return (testEQ (fst val) lbl_default `consOL` snd val)
+            = return (testEQ (fst val) lbl_default
+                        `consOL` snd val)
 
             -- Note [CASEFAIL]
             -- ~~~~~~~~~~~~~~~
@@ -2448,8 +2490,22 @@ mkMultiBranch maybe_ncons raw_ways = do
          the_default
             = case defaults of
                 []         -> nilOL
-                [(_, def)] -> LABEL lbl_default `consOL` def
+                [(_, def)] -> LABEL lbl_default `consOL` insertStubResStepOut def
                 _          -> panic "mkMultiBranch/the_default"
+
+         -- See Note [Debugger: RESUME_STEP_OUT]
+         insertStubResStepOut (SnocOL instrs i)
+           | not (gopt Opt_InsertBreakpoints (hsc_dflags hsc_env))
+           = instrs `snocOL` i -- do nothing
+           -- look through instrs which diverge control flow
+           | any id $ [True | ENTER <- [i]]
+                   ++ [True | RETURN{} <- [i]]
+                   ++ [True | PRIMCALL{} <- [i]]
+           = insertStubResStepOut instrs `snocOL` i
+           | otherwise
+           = instrs `snocOL` i `snocOL` RESUME_STEP_OUT 0 0 0
+         insertStubResStepOut NilOL = NilOL
+
      instrs <- mkTree notd_ways init_lo init_hi
      return (instrs `appOL` the_default)
   where

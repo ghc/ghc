@@ -856,7 +856,7 @@ assembleI platform i = case i of
                                                   , Op np
                                                   ]
 
-  BRK_ALTS active -> emit_ bci_BRK_ALTS [SmallOp active]
+  RESUME_STEP_OUT on prev next -> emit_ bci_RESUME_STEP_OUT [SmallOp on, SmallOp prev, SmallOp next]
 
 #if MIN_VERSION_rts(1,0,3)
   BCO_NAME name            -> do np <- lit1 (BCONPtrStr name)

@@ -94,8 +94,11 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("\n");
          pc += 6;
          break;
-      case bci_BRK_ALTS:
-         debugBelch ("BRK_ALTS %d\n", BCO_NEXT);
+      case bci_RESUME_STEP_OUT:
+         unsigned int active = BCO_NEXT;
+         unsigned int prev = BCO_NEXT;
+         unsigned int next = BCO_NEXT;
+         debugBelch ("RESUME_STEP_OUT on:%d prev_off:%d next_off:%d\n", active, prev, next);
          break;
       case bci_SWIZZLE: {
          W_     stkoff = BCO_GET_LARGE_ARG;

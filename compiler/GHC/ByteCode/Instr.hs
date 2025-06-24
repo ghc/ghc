@@ -8,10 +8,11 @@
 
 -- | Bytecode instruction definitions
 module GHC.ByteCode.Instr (
-        BCInstr(..), ProtoBCO(..), bciStackUse, LocalLabel(..)
+        BCInstr(..), ProtoBCO(..), bciStackUse, bciSize, LocalLabel(..)
   ) where
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.ByteCode.Types
 import GHC.Cmm.Type (Width)
@@ -273,8 +274,10 @@ data BCInstr
                       (RemotePtr CostCentre)
 
    -- An internal breakpoint for triggering a break on any case alternative
-   -- See Note [Debugger: BRK_ALTS]
-   | BRK_ALTS         !Word16 {- enabled? -}
+   -- See Note [Debugger: RESUME_STEP_OUT]
+   | RESUME_STEP_OUT  !Word16 {- enabled? -}
+                      !Word16 {- offset to prev RESUME_STEP_OUT within same BCO -}
+                      !Word16 {- offset to next RESUME_STEP_OUT within same BCO -}
 
 #if MIN_VERSION_rts(1,0,3)
    -- | A "meta"-instruction for recording the name of a BCO for debugging purposes.
@@ -471,7 +474,8 @@ instance Outputable BCInstr where
                                <+> text "<tick_module>" <+> text "<tick_module_unitid>" <+> ppr tickx
                                <+> text "<info_module>" <+> text "<info_module_unitid>" <+> ppr infox
                                <+> text "<cc>"
-   ppr (BRK_ALTS active)     = text "BRK_ALTS" <+> ppr active
+   ppr (RESUME_STEP_OUT on prev next)
+                             = text "RESUME_STEP_OUT" <+> ppr on <+> ppr prev <+> ppr next
 #if MIN_VERSION_rts(1,0,3)
    ppr (BCO_NAME nm)         = text "BCO_NAME" <+> text (show nm)
 #endif
@@ -597,7 +601,7 @@ bciStackUse OP_INDEX_ADDR{}         = 0
 
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0
-bciStackUse BRK_ALTS{}            = 0
+bciStackUse RESUME_STEP_OUT{}     = 0
 
 -- These insns actually reduce stack use, but we need the high-tide level,
 -- so can't use this info.  Not that it matters much.
@@ -608,3 +612,121 @@ bciStackUse PACK{}                = 1 -- worst case is PACK 0 words
 #if MIN_VERSION_rts(1,0,3)
 bciStackUse BCO_NAME{}            = 0
 #endif
+
+-- | The size of a bytecode instruction's arguments in number of Word16 (the
+-- size of bytecode instructions)
+bciSize :: Platform -> BCInstr -> Word16
+bciSize p STKCHECK{}            = wordSizeInBc p
+bciSize p PUSH_L{}              = wordSizeInBc p
+bciSize p PUSH_LL{}             = 2*wordSizeInBc p
+bciSize p PUSH_LLL{}            = 3*wordSizeInBc p
+bciSize p PUSH8{}               = wordSizeInBc p
+bciSize p PUSH16{}              = wordSizeInBc p
+bciSize p PUSH32{}              = wordSizeInBc p
+bciSize p PUSH8_W{}             = wordSizeInBc p
+bciSize p PUSH16_W{}            = wordSizeInBc p
+bciSize p PUSH32_W{}            = wordSizeInBc p
+bciSize p PUSH_G{}              = wordSizeInBc p
+bciSize p PUSH_PRIMOP{}         = wordSizeInBc p
+bciSize p PUSH_BCO{}            = wordSizeInBc p
+bciSize p PUSH_ALTS{}           = wordSizeInBc p
+bciSize p PUSH_ALTS_TUPLE{}     = 3*wordSizeInBc p
+bciSize _ (PUSH_PAD8)           = 0
+bciSize _ (PUSH_PAD16)          = 0
+bciSize _ (PUSH_PAD32)          = 0
+bciSize p (PUSH_UBX8 _)         = wordSizeInBc p
+bciSize p (PUSH_UBX16 _)        = wordSizeInBc p
+bciSize p (PUSH_UBX32 _)        = wordSizeInBc p
+bciSize p (PUSH_UBX{})          = 2*wordSizeInBc p
+bciSize p PUSH_ADDR{}           = 1+wordSizeInBc p
+bciSize _ PUSH_APPLY_N{}        = 0
+bciSize _ PUSH_APPLY_V{}        = 0
+bciSize _ PUSH_APPLY_F{}        = 0
+bciSize _ PUSH_APPLY_D{}        = 0
+bciSize _ PUSH_APPLY_L{}        = 0
+bciSize _ PUSH_APPLY_P{}        = 0
+bciSize _ PUSH_APPLY_PP{}       = 0
+bciSize _ PUSH_APPLY_PPP{}      = 0
+bciSize _ PUSH_APPLY_PPPP{}     = 0
+bciSize _ PUSH_APPLY_PPPPP{}    = 0
+bciSize _ PUSH_APPLY_PPPPPP{}   = 0
+bciSize p ALLOC_AP{}            = wordSizeInBc p
+bciSize p ALLOC_AP_NOUPD{}      = wordSizeInBc p
+bciSize p ALLOC_PAP{}           = 2*wordSizeInBc p
+bciSize p (UNPACK _)            = wordSizeInBc p
+bciSize _ LABEL{}               = 0
+bciSize p TESTLT_I{}            = 2*wordSizeInBc p
+bciSize p TESTEQ_I{}            = 2*wordSizeInBc p
+bciSize p TESTLT_W{}            = 2*wordSizeInBc p
+bciSize p TESTEQ_W{}            = 2*wordSizeInBc p
+bciSize p TESTLT_I64{}          = 2*wordSizeInBc p
+bciSize p TESTEQ_I64{}          = 2*wordSizeInBc p
+bciSize p TESTLT_I32{}          = 2*wordSizeInBc p
+bciSize p TESTEQ_I32{}          = 2*wordSizeInBc p
+bciSize p TESTLT_I16{}          = 2*wordSizeInBc p
+bciSize p TESTEQ_I16{}          = 2*wordSizeInBc p
+bciSize p TESTLT_I8{}           = 2*wordSizeInBc p
+bciSize p TESTEQ_I8{}           = 2*wordSizeInBc p
+bciSize p TESTLT_W64{}          = 2*wordSizeInBc p
+bciSize p TESTEQ_W64{}          = 2*wordSizeInBc p
+bciSize p TESTLT_W32{}          = 2*wordSizeInBc p
+bciSize p TESTEQ_W32{}          = 2*wordSizeInBc p
+bciSize p TESTLT_W16{}          = 2*wordSizeInBc p
+bciSize p TESTEQ_W16{}          = 2*wordSizeInBc p
+bciSize p TESTLT_W8{}           = 2*wordSizeInBc p
+bciSize p TESTEQ_W8{}           = 2*wordSizeInBc p
+bciSize p TESTLT_F{}            = 2*wordSizeInBc p
+bciSize p TESTEQ_F{}            = 2*wordSizeInBc p
+bciSize p TESTLT_D{}            = 2*wordSizeInBc p
+bciSize p TESTEQ_D{}            = 2*wordSizeInBc p
+bciSize p TESTLT_P{}            = 1+wordSizeInBc p
+bciSize p TESTEQ_P{}            = 1+wordSizeInBc p
+bciSize _ CASEFAIL{}            = 0
+bciSize p JMP{}                 = wordSizeInBc p
+bciSize _ ENTER{}               = 0
+bciSize _ RETURN{}              = 0
+bciSize _ RETURN_TUPLE{}        = 0
+bciSize p CCALL{}               = 1+2*wordSizeInBc p
+bciSize _ PRIMCALL{}            = 0
+bciSize _ OP_ADD{}              = 0
+bciSize _ OP_SUB{}              = 0
+bciSize _ OP_AND{}              = 0
+bciSize _ OP_XOR{}              = 0
+bciSize _ OP_OR{}               = 0
+bciSize _ OP_NOT{}              = 0
+bciSize _ OP_NEG{}              = 0
+bciSize _ OP_MUL{}              = 0
+bciSize _ OP_SHL{}              = 0
+bciSize _ OP_ASR{}              = 0
+bciSize _ OP_LSR{}              = 0
+
+bciSize _ OP_NEQ{}              = 0
+bciSize _ OP_EQ{}               = 0
+bciSize _ OP_S_LT{}             = 0
+bciSize _ OP_S_GT{}             = 0
+bciSize _ OP_S_LE{}             = 0
+bciSize _ OP_S_GE{}             = 0
+bciSize _ OP_U_LT{}             = 0
+bciSize _ OP_U_GT{}             = 0
+bciSize _ OP_U_LE{}             = 0
+bciSize _ OP_U_GE{}             = 0
+
+bciSize _ OP_INDEX_ADDR{}       = 0
+
+bciSize p SWIZZLE{}             = 2*wordSizeInBc p
+bciSize p BRK_FUN{}             = 2+6*wordSizeInBc p
+bciSize _ RESUME_STEP_OUT{}     = 3
+
+bciSize p SLIDE{}               = 2*wordSizeInBc p
+bciSize p MKAP{}                = 2*wordSizeInBc p
+bciSize p MKPAP{}               = 2*wordSizeInBc p
+bciSize p PACK{}                = 2*wordSizeInBc p
+#if MIN_VERSION_rts(1,0,3)
+bciSize p BCO_NAME{}            = wordSizeInBc p
+#endif
+
+wordSizeInBc :: Platform -> Word16
+wordSizeInBc p =
+  case platformWordSize p of
+    PW4 -> 2
+    PW8 -> 4
