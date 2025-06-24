@@ -990,9 +990,9 @@ getSrcCodeCtxt = getLclEnvSrcCodeCtxt <$> getLclEnv
 -- | Mark the inner computation as being done inside generated code.
 --
 -- See Note [Error contexts in generated code]
-setInGeneratedCode :: HsThingRn -> TcRn a -> TcRn a
-setInGeneratedCode syntax_thing thing_inside =
-  updLclCtxt (setLclCtxtSrcCodeCtxt (GeneratedCode syntax_thing)) thing_inside
+setInGeneratedCode :: SrcCodeOrigin -> TcRn a -> TcRn a
+setInGeneratedCode scOrig thing_inside =
+  updLclCtxt (setLclCtxtSrcCodeCtxt (GeneratedCode scOrig)) thing_inside
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)

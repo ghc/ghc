@@ -763,18 +763,18 @@ exprCtOrigin (HsHole _)          = Shouldn'tHappenOrigin "hole expression"
 exprCtOrigin (HsForAll {})       = Shouldn'tHappenOrigin "forall telescope"    -- See Note [Types in terms]
 exprCtOrigin (HsQual {})         = Shouldn'tHappenOrigin "constraint context"  -- See Note [Types in terms]
 exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -- See Note [Types in terms]
-exprCtOrigin (XExpr (ExpandedThingRn {})) = Shouldn'tHappenOrigin "XExpr ExpandedThingRn"
+exprCtOrigin (XExpr (ExpandedThingRn o _)) = srcCodeOriginCtOrigin o
 exprCtOrigin (XExpr (PopErrCtxt e)) = exprCtOrigin e
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
 
-hsThingCtOrigin :: HsThingRn -> CtOrigin
-hsThingCtOrigin (OrigExpr e) = exprCtOrigin e
-hsThingCtOrigin (OrigStmt{}) = DoStmtOrigin
-hsThingCtOrigin (OrigPat p) = DoPatOrigin p
+srcCodeOriginCtOrigin :: SrcCodeOrigin -> CtOrigin
+srcCodeOriginCtOrigin (OrigExpr e) = exprCtOrigin e
+srcCodeOriginCtOrigin (OrigStmt{}) = DoStmtOrigin
+srcCodeOriginCtOrigin (OrigPat p) = DoPatOrigin p
 
 srcCodeCtxtCtOrigin :: HsExpr GhcRn -> SrcCodeCtxt -> CtOrigin
 srcCodeCtxtCtOrigin e UserCode = exprCtOrigin e
-srcCodeCtxtCtOrigin _ (GeneratedCode e) = hsThingCtOrigin e
+srcCodeCtxtCtOrigin _ (GeneratedCode e) = srcCodeOriginCtOrigin e
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin

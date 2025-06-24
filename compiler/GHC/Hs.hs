@@ -150,16 +150,8 @@ data HsParsedModule = HsParsedModule {
        -- them change (#3589)
   }
 
--- All the various located syntax things that sets the user context code in TcLclEnv
--- data SrcCodeOrigin  =
---     ExprThing (HsExpr GhcRn)
---   | PatThing (LPat GhcRn)
---   | StmtThing (ExprLStmt GhcRn) HsDoFlavour
-
--- I'm a looking at a generated thing or am I a user written thing?
-data SrcCodeCtxt = UserCode | GeneratedCode HsThingRn
-
--- mkSrcCodeOrigin :: HsThingRn -> SrcCodeOrigin
--- mkSrcCodeOrigin (OrigExpr e) = ExprThing e
--- mkSrcCodeOrigin (OrigPat p) = PatThing p
--- mkSrcCodeOrigin (OrigStmt s f) = StmtThing e f
+-- Used in TcLclCtxt.tcl_in_gen_code to mark if the current expression
+-- is a user generated code or a compiler generated expansion of some user written code
+data SrcCodeCtxt
+  = UserCode
+  | GeneratedCode SrcCodeOrigin
