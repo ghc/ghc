@@ -134,6 +134,7 @@ import System.IO.Error (catchIOError)
 import System.Environment (lookupEnv)
 import System.FilePath (normalise, (</>))
 import System.Directory
+import System.OsPath (OsPath)
 import GHC.Foreign (withCString, peekCString)
 
 import qualified Data.Set as Set
@@ -948,7 +949,7 @@ setDynamicNow dflags0 =
 data PkgDbRef
   = GlobalPkgDb
   | UserPkgDb
-  | PkgDbPath FilePath
+  | PkgDbPath OsPath
   deriving Eq
 
 -- | Used to differentiate the scope an include needs to apply to.

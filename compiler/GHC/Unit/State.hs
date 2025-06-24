@@ -109,6 +109,8 @@ import GHC.Utils.Exception
 
 import System.Directory
 import System.FilePath as FilePath
+import System.OsPath (OsPath, decodeUtf, unsafeEncodeUtf)
+import qualified System.OsPath as OsPath
 import Control.Monad
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
@@ -405,7 +407,7 @@ initUnitConfig dflags cached_dbs home_units =
 
   where
     offsetPackageDb :: Maybe FilePath -> PackageDBFlag -> PackageDBFlag
-    offsetPackageDb (Just offset) (PackageDB (PkgDbPath p)) | isRelative p = PackageDB (PkgDbPath (offset </> p))
+    offsetPackageDb (Just offset) (PackageDB (PkgDbPath p)) | OsPath.isRelative p = PackageDB (PkgDbPath (OsPath.unsafeEncodeUtf offset OsPath.</> p))
     offsetPackageDb _ p = p
 
 
@@ -500,12 +502,12 @@ emptyUnitState = UnitState {
 
 -- | Unit database
 data UnitDatabase unit = UnitDatabase
-   { unitDatabasePath  :: FilePath
+   { unitDatabasePath  :: OsPath
    , unitDatabaseUnits :: [GenUnitInfo unit]
    }
 
 instance Outputable u => Outputable (UnitDatabase u) where
-  ppr (UnitDatabase fp _u) = text "DB:" <+> text fp
+  ppr (UnitDatabase fp _u) = text "DB:" <+> text (fromMaybe "invalid path" (decodeUtf fp))
 
 type UnitInfoMap = UniqMap UnitId UnitInfo
 
@@ -720,9 +722,9 @@ getUnitDbRefs cfg = do
         Left _ -> system_conf_refs
         Right path
          | Just (xs, x) <- snocView path, isSearchPathSeparator x
-         -> map PkgDbPath (splitSearchPath xs) ++ system_conf_refs
+         -> map (PkgDbPath . unsafeEncodeUtf) (splitSearchPath xs) ++ system_conf_refs
          | otherwise
-         -> map PkgDbPath (splitSearchPath path)
+         -> map (PkgDbPath . unsafeEncodeUtf) (splitSearchPath path)
 
   -- Apply the package DB-related flags from the command line to get the
   -- final list of package DBs.
@@ -758,7 +760,7 @@ resolveUnitDatabase cfg UserPkgDb = runMaybeT $ do
   let pkgconf = dir </> unitConfigDBName cfg
   exist <- tryMaybeT $ doesDirectoryExist pkgconf
   if exist then return pkgconf else mzero
-resolveUnitDatabase _ (PkgDbPath name) = return $ Just name
+resolveUnitDatabase _ (PkgDbPath name) = return $ Just (fromMaybe undefined (decodeUtf name))
 
 readUnitDatabase :: Logger -> UnitConfig -> FilePath -> IO (UnitDatabase UnitId)
 readUnitDatabase logger cfg conf_file = do
@@ -790,7 +792,7 @@ readUnitDatabase logger cfg conf_file = do
       pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) . mkUnitKeyInfo)
                          proto_pkg_configs
   --
-  return $ UnitDatabase conf_file' pkg_configs1
+  return $ UnitDatabase (unsafeEncodeUtf conf_file') pkg_configs1
   where
     readDirStyleUnitInfo conf_dir = do
       let filename = conf_dir </> "package.cache"
@@ -1388,7 +1390,7 @@ mergeDatabases logger = foldM merge (emptyUniqMap, emptyUniqMap) . zip [1..]
   where
     merge (pkg_map, prec_map) (i, UnitDatabase db_path db) = do
       debugTraceMsg logger 2 $
-          text "loading package database" <+> text db_path
+          text "loading package database" <+> text (fromMaybe "invalid path" (decodeUtf db_path))
       forM_ (Set.toList override_set) $ \pkg ->
           debugTraceMsg logger 2 $
               text "package" <+> ppr pkg <+>

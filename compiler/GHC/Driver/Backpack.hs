@@ -91,6 +91,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC.Types.Error (mkUnknownDiagnostic)
+import System.OsPath (unsafeEncodeUtf)
 
 -- | Entry point to compile a Backpack file.
 doBackpack :: [FilePath] -> Ghc ()
@@ -433,7 +434,7 @@ addUnit u = do
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
          let newdb = UnitDatabase
-               { unitDatabasePath  = "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
+               { unitDatabasePath  = unsafeEncodeUtf $ "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
                , unitDatabaseUnits = [u]
                }
          in return (dbs ++ [newdb]) -- added at the end because ordering matters

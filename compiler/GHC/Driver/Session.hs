@@ -278,6 +278,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Word
 import System.FilePath
+import System.OsPath (unsafeEncodeUtf)
 import Text.ParserCombinators.ReadP hiding (char)
 import Text.ParserCombinators.ReadP as R
 
@@ -1962,7 +1963,7 @@ package_flags_deps :: [(Deprecation, Flag (CmdLineP DynFlags))]
 package_flags_deps = [
         ------- Packages ----------------------------------------------------
     make_ord_flag defFlag "package-db"
-      (HasArg (addPkgDbRef . PkgDbPath))
+      (HasArg (addPkgDbRef . PkgDbPath . unsafeEncodeUtf))
   , make_ord_flag defFlag "clear-package-db"      (NoArg clearPkgDb)
   , make_ord_flag defFlag "no-global-package-db"  (NoArg removeGlobalPkgDb)
   , make_ord_flag defFlag "no-user-package-db"    (NoArg removeUserPkgDb)
@@ -1972,7 +1973,7 @@ package_flags_deps = [
       (NoArg (addPkgDbRef UserPkgDb))
     -- backwards compat with GHC<=7.4 :
   , make_dep_flag defFlag "package-conf"
-      (HasArg $ addPkgDbRef . PkgDbPath) "Use -package-db instead"
+      (HasArg $ addPkgDbRef . PkgDbPath . unsafeEncodeUtf) "Use -package-db instead"
   , make_dep_flag defFlag "no-user-package-conf"
       (NoArg removeUserPkgDb)              "Use -no-user-package-db instead"
   , make_ord_flag defGhcFlag "package-name"       (HasArg $ \name ->
@@ -3377,7 +3378,7 @@ parseEnvFile :: FilePath -> String -> DynP ()
 parseEnvFile envfile = mapM_ parseEntry . lines
   where
     parseEntry str = case words str of
-      ("package-db": _)     -> addPkgDbRef (PkgDbPath (envdir </> db))
+      ("package-db": _)     -> addPkgDbRef (PkgDbPath (unsafeEncodeUtf (envdir </> db)))
         -- relative package dbs are interpreted relative to the env file
         where envdir = takeDirectory envfile
               db     = drop 11 str
