@@ -36,7 +36,6 @@ import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Builtin.PrimOps
 import GHC.Types.SptEntry
-import GHCi.BreakArray
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.FFI
@@ -48,6 +47,7 @@ import Data.ByteString (ByteString)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.HsToCore.Breakpoints (ModBreaks)
+import GHC.Unit.Module
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -258,8 +258,8 @@ data BCOPtr
   = BCOPtrName   !Name
   | BCOPtrPrimOp !PrimOp
   | BCOPtrBCO    !UnlinkedBCO
-  | BCOPtrBreakArray (ForeignRef BreakArray)
-    -- ^ a pointer to a breakpoint's module's BreakArray in GHCi's memory
+  | BCOPtrBreakArray !Module
+    -- ^ Converted to the actual 'BreakArray' remote pointer at link-time
 
 instance NFData BCOPtr where
   rnf (BCOPtrBCO bco) = rnf bco
@@ -279,6 +279,8 @@ data BCONPtr
   | BCONPtrFS    !FastString
   -- | A libffi ffi_cif function prototype.
   | BCONPtrFFIInfo !FFIInfo
+  -- | A 'CostCentre' remote pointer array's respective 'BreakpointId'
+  | BCONPtrCostCentre !InternalBreakpointId
 
 instance NFData BCONPtr where
   rnf x = x `seq` ()

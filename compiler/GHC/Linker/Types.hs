@@ -50,10 +50,12 @@ where
 
 import GHC.Prelude
 import GHC.Unit                ( UnitId, Module )
-import GHC.ByteCode.Types      ( ItblEnv, AddrEnv, CompiledByteCode )
-import GHCi.RemoteTypes        ( ForeignHValue, RemotePtr )
+import GHC.ByteCode.Types
+import GHCi.BreakArray
+import GHCi.RemoteTypes
 import GHCi.Message            ( LoadedDLL )
 
+import GHC.Stack.CCS
 import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, filterNameEnv )
 import GHC.Types.Name          ( Name )
 import GHC.Types.SptEntry
@@ -61,6 +63,7 @@ import GHC.Types.SptEntry
 import GHC.Utils.Outputable
 
 import Control.Concurrent.MVar
+import Data.Array
 import Data.Time               ( UTCTime )
 import GHC.Unit.Module.Env
 import GHC.Types.Unique.DSet
@@ -69,6 +72,7 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.Maybe (mapMaybe)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
+import GHC.HsToCore.Breakpoints (BreakTickIndex)
 
 
 {- **********************************************************************
@@ -181,10 +185,17 @@ data LinkerEnv = LinkerEnv
   , addr_env    :: !AddrEnv
       -- ^ Like 'closure_env' and 'itbl_env', but for top-level 'Addr#' literals,
       -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode.
+
+  , breakarray_env :: !(ModuleEnv (ForeignRef BreakArray))
+      -- ^ Each 'Module's remote pointer of 'BreakArray'.
+
+  , ccs_env :: !(ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)))
+      -- ^ Each 'Module's array of remote pointers of 'CostCentre'.
+      -- Untouched when not profiling.
   }
 
 filterLinkerEnv :: (Name -> Bool) -> LinkerEnv -> LinkerEnv
-filterLinkerEnv f le = LinkerEnv
+filterLinkerEnv f le = le
   { closure_env = filterNameEnv (f . fst) (closure_env le)
   , itbl_env    = filterNameEnv (f . fst) (itbl_env le)
   , addr_env    = filterNameEnv (f . fst) (addr_env le)

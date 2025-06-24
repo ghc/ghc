@@ -33,7 +33,6 @@ import GHC.Platform.Profile
 
 import GHC.Runtime.Interpreter
 import GHCi.FFI
-import GHCi.RemoteTypes
 import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Types.Name
@@ -83,7 +82,6 @@ import Data.Char
 import GHC.Unit.Module
 import qualified GHC.Unit.Home.Graph as HUG
 
-import Data.Array
 import Data.Coerce (coerce)
 #if MIN_VERSION_rts(1,0,3)
 import qualified Data.ByteString.Char8 as BS
@@ -409,7 +407,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
   current_mod <- getCurrentModule
   liftIO (readModBreaksMaybe (hsc_HUG hsc_env) current_mod) >>= \case
     Nothing -> pure code
-    Just ModBreaks {modBreaks_flags = breaks, modBreaks_ccs = cc_arr} -> do
+    Just ModBreaks {} -> do
       platform <- profilePlatform <$> getProfile
       let idOffSets = getVarOffSets platform d p fvs
           ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
@@ -420,14 +418,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
       let info_mod = current_mod
       infox <- newBreakInfo breakInfo
 
-      let cc | Just interp <- hsc_interp hsc_env
-             , interpreterProfiled interp
-             = cc_arr ! bi_tick_index tick_id
-             | otherwise = toRemotePtr nullPtr
-
-          breakInstr = BRK_FUN breaks (InternalBreakpointId info_mod infox) cc
-
-      return $ breakInstr `consOL` code
+      return $ BRK_FUN (InternalBreakpointId info_mod infox) `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
 -- | Determine the GHCi-allocated 'BreakArray' and module pointer for the module
@@ -2649,7 +2640,7 @@ data BcM_State
    = BcM_State
         { nextlabel      :: !Word32 -- ^ For generating local labels
         , breakInfoIdx   :: !Int    -- ^ Next index for breakInfo array
-        , internalBreaks :: InternalModBreaks
+        , internalBreaks :: !InternalModBreaks
           -- ^ Info at breakpoints occurrences. Indexed with
           -- 'InternalBreakpointId'. See Note [Breakpoint identifiers] in
           -- GHC.ByteCode.Breakpoints.

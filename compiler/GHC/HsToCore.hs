@@ -98,6 +98,7 @@ import GHC.Unit.Module.Deps
 import Data.List (partition)
 import Data.IORef
 import GHC.Iface.Make (mkRecompUsageInfo)
+import GHC.Runtime.Interpreter (interpreterProfiled)
 
 {-
 ************************************************************************
@@ -164,7 +165,7 @@ deSugar hsc_env
         ; let modBreaks
                 | Just (_, specs) <- m_tickInfo
                 , breakpointsAllowed dflags
-                = Just $ mkModBreaks mod specs
+                = Just $ mkModBreaks (interpreterProfiled $ hscInterp hsc_env) mod specs
                 | otherwise
                 = Nothing
 

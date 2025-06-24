@@ -28,7 +28,6 @@ import GHC.Prelude hiding ( any )
 import GHC.ByteCode.Instr
 import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
-import GHCi.RemoteTypes
 import GHC.Runtime.Heap.Layout ( fromStgWord, StgWord )
 
 import GHC.Types.Name
@@ -843,12 +842,12 @@ assembleI platform i = case i of
     W8                   -> emit_ bci_OP_INDEX_ADDR_08 []
     _                    -> unsupported_width
 
-  BRK_FUN arr (InternalBreakpointId info_mod infox) cc -> do
-    p1 <- ptr (BCOPtrBreakArray arr)
+  BRK_FUN ibi@(InternalBreakpointId info_mod infox) -> do
+    p1 <- ptr $ BCOPtrBreakArray info_mod
     info_addr <- lit1 $ BCONPtrFS $ moduleNameFS $ moduleName info_mod
     info_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS $ moduleUnitId info_mod
     info_wix <- int infox
-    np <- addr cc
+    np <- lit1 $ BCONPtrCostCentre ibi
     emit_ bci_BRK_FUN [ Op p1, Op info_addr, Op info_unitid_addr
                       , Op info_wix, Op np ]
 
@@ -892,7 +891,6 @@ assembleI platform i = case i of
     literal (LitRubbish {}) = word 0
 
     litlabel fs = lit1 (BCONPtrLbl fs)
-    addr (RemotePtr a) = word (fromIntegral a)
     words ws = lit (fmap BCONPtrWord ws)
     word w = words (OnlyOne w)
     word2 w1 w2 = words (OnlyTwo w1 w2)

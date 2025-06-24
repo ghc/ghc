@@ -114,10 +114,10 @@ data InternalBreakpointId = InternalBreakpointId
 -- 'InternalModBreaks' are constructed during bytecode generation and stored in
 -- 'CompiledByteCode' afterwards.
 data InternalModBreaks = InternalModBreaks
-      { imodBreaks_breakInfo :: IntMap CgBreakInfo
+      { imodBreaks_breakInfo :: !(IntMap CgBreakInfo)
         -- ^ Access code-gen time information about a breakpoint, indexed by
         -- 'InternalBreakpointId'.
-      , imodBreaks_module :: !Module
+      , imodBreaks_module    :: !Module
         -- ^ Cache the module corresponding to these 'InternalModBreaks' for
         -- sanity checks. Don't export it!
       }

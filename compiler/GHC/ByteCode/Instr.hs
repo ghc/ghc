@@ -15,7 +15,6 @@ import GHC.Prelude
 
 import GHC.ByteCode.Types
 import GHC.Cmm.Type (Width)
-import GHCi.RemoteTypes
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Utils.Outputable
 import GHC.Types.Name
@@ -32,10 +31,8 @@ import Data.Word
 import Data.ByteString (ByteString)
 #endif
 
-import GHC.Stack.CCS (CostCentre)
 
 import GHC.Stg.Syntax
-import GHCi.BreakArray (BreakArray)
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
@@ -261,9 +258,7 @@ data BCInstr
                    -- Note [unboxed tuple bytecodes and tuple_BCO] in GHC.StgToByteCode
 
    -- Breakpoints
-   | BRK_FUN          (ForeignRef BreakArray)
-                      !InternalBreakpointId
-                      (RemotePtr CostCentre)
+   | BRK_FUN          !InternalBreakpointId
 
    -- An internal breakpoint for triggering a break on any case alternative
    -- See Note [Debugger: BRK_ALTS]
@@ -459,7 +454,7 @@ instance Outputable BCInstr where
    ppr ENTER                 = text "ENTER"
    ppr (RETURN pk)           = text "RETURN  " <+> ppr pk
    ppr (RETURN_TUPLE)        = text "RETURN_TUPLE"
-   ppr (BRK_FUN _ (InternalBreakpointId info_mod infox) _)
+   ppr (BRK_FUN (InternalBreakpointId info_mod infox))
                              = text "BRK_FUN" <+> text "<breakarray>"
                                <+> ppr info_mod <+> ppr infox
                                <+> text "<cc>"
