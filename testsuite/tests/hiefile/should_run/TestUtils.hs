@@ -25,9 +25,6 @@ import GHC.Iface.Ext.Utils
 import GHC.Driver.Session
 import GHC.SysTools
 
-makeNc :: IO NameCache
-makeNc = initNameCache 'z' []
-
 dynFlagsForPrinting :: String -> IO DynFlags
 dynFlagsForPrinting libdir = do
   systemSettings <- initSysTools libdir
@@ -37,7 +34,7 @@ readTestHie :: FilePath -> IO (DynFlags, HieFile)
 readTestHie fp = do
   libdir:_ <- getArgs
   df <- dynFlagsForPrinting libdir
-  nc <- makeNc
+  nc <- newNameCache
   hfr <- readHieFile nc fp
   pure (df, hie_file_result hfr)
 
