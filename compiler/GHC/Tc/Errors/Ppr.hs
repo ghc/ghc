@@ -5306,11 +5306,9 @@ pprArising :: CtLoc -> SDoc
 -- We've done special processing for TypeEq, KindEq, givens
 pprArising ct_loc
   | suppress_origin   = empty
-  | in_generated_code = pprCtOrigin orig -- TODO ANI: maybe should go way
   | otherwise         = pprCtOrigin orig
   where
     orig = ctLocOrigin ct_loc
-    in_generated_code = ctLocEnvInGeneratedCode (ctLocEnv ct_loc)
     suppress_origin
       | isGivenOrigin orig = True
       | otherwise          = case orig of
