@@ -1359,7 +1359,7 @@ stg_atomicallyzh (P_ stm)
     old_trec = StgTSO_trec(CurrentTSO);
 
     /* Nested transactions are not allowed; raise an exception */
-    if (old_trec != NO_TREC) {
+    if (old_trec != NO_TREC) (likely: False) {
         jump stg_raisezh(ghczminternal_GHCziInternalziControlziExceptionziBase_nestedAtomically_closure);
     }
 
