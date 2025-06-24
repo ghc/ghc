@@ -28,9 +28,11 @@ import GHCi.ResolvedBCO
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 
+import GHC.Unit.Module.Env
 import GHC.Unit.Types
 
 import GHC.Data.FastString
+import GHC.Data.Maybe
 import GHC.Data.SizedSeq
 
 import GHC.Linker.Types
@@ -95,6 +97,13 @@ lookupLiteral interp pkgs_loaded le ptr = case ptr of
   BCONPtrFFIInfo (FFIInfo {..}) -> do
     RemotePtr p <- interpCmd interp $ PrepFFI ffiInfoArgs ffiInfoRet
     pure $ fromIntegral p
+  BCONPtrCostCentre tick_mod tick_no
+    | interpreterProfiled interp ->
+        case expectJust (lookupModuleEnv (ccs_env le) tick_mod) ! tick_no of
+          RemotePtr p -> pure $ fromIntegral p
+    | otherwise ->
+        case toRemotePtr nullPtr of
+          RemotePtr p -> pure $ fromIntegral p
 
 lookupStaticPtr :: Interp -> FastString -> IO (Ptr ())
 lookupStaticPtr interp addr_of_label_string = do
@@ -175,8 +184,9 @@ resolvePtr interp pkgs_loaded le bco_ix ptr = case ptr of
   BCOPtrBCO bco
     -> ResolvedBCOPtrBCO <$> linkBCO interp pkgs_loaded le bco_ix bco
 
-  BCOPtrBreakArray breakarray
-    -> withForeignRef breakarray $ \ba -> return (ResolvedBCOPtrBreakArray ba)
+  BCOPtrBreakArray tick_mod ->
+    withForeignRef (expectJust (lookupModuleEnv (breakarray_env le) tick_mod)) $
+      \ba -> pure $ ResolvedBCOPtrBreakArray ba
 
 -- | Look up the address of a Haskell symbol in the currently
 -- loaded units.

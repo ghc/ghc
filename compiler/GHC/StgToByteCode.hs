@@ -32,7 +32,6 @@ import GHC.Platform.Profile
 
 import GHC.Runtime.Interpreter
 import GHCi.FFI
-import GHCi.RemoteTypes
 import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Types.Name
@@ -80,7 +79,6 @@ import Data.Char
 import GHC.Unit.Module
 import qualified GHC.Unit.Home.Graph as HUG
 
-import Data.Array
 import Data.Coerce (coerce)
 #if MIN_VERSION_rts(1,0,3)
 import qualified Data.ByteString.Char8 as BS
@@ -395,7 +393,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
     Nothing -> pure code
     Just current_mod_breaks -> break_info hsc_env tick_mod current_mod mb_current_mod_breaks >>= \case
       Nothing -> pure code
-      Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = tick_mod_ptr, modBreaks_module_unitid = tick_mod_id_ptr, modBreaks_ccs = cc_arr} -> do
+      Just ModBreaks {modBreaks_module = tick_mod} -> do
         platform <- profilePlatform <$> getProfile
         let idOffSets = getVarOffSets platform d p fvs
             ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
@@ -403,21 +401,15 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
             toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
             breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
 
-        let info_mod_ptr = modBreaks_module current_mod_breaks
-            info_mod_id_ptr = modBreaks_module_unitid current_mod_breaks
+        let info_mod = modBreaks_module current_mod_breaks
         infox <- newBreakInfo breakInfo
-
-        let cc | Just interp <- hsc_interp hsc_env
-              , interpreterProfiled interp
-              = cc_arr ! tick_no
-              | otherwise = toRemotePtr nullPtr
 
         let -- cast that checks that round-tripping through Word16 doesn't change the value
             toW16 x = let r = fromIntegral x :: Word16
                       in if fromIntegral r == x
                         then r
                         else pprPanic "schemeER_wrk: breakpoint tick/info index too large!" (ppr x)
-            breakInstr = BRK_FUN breaks tick_mod_ptr tick_mod_id_ptr (toW16 tick_no) info_mod_ptr info_mod_id_ptr (toW16 infox) cc
+            breakInstr = BRK_FUN tick_mod (toW16 tick_no) info_mod (toW16 infox)
         return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 

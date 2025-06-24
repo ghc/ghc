@@ -1,14 +1,15 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module GHC.HsToCore.Breakpoints
-  ( mkModBreaks
+  ( mkModBreaks,
+    hydrateModBreaks
   ) where
 
 import GHC.Prelude
 
 import qualified GHC.Runtime.Interpreter as GHCi
-import GHC.Runtime.Interpreter.Types
-import GHCi.RemoteTypes
+import GHC.Runtime.Interpreter
 import GHC.ByteCode.Types
-import GHC.Stack.CCS
 import GHC.Unit
 
 import GHC.HsToCore.Ticks (Tick (..))
@@ -18,6 +19,7 @@ import GHC.Utils.Outputable as Outputable
 
 import Data.List (intersperse)
 import Data.Array
+import Data.Array.Base (numElements)
 import qualified Data.IntMap as IntMap
 
 -- | Initialize memory for breakpoint data that is shared between the bytecode
@@ -32,34 +34,33 @@ mkModBreaks interp mod extendedMixEntries
   = do
     let count = fromIntegral $ sizeSS extendedMixEntries
         entries = ssElts extendedMixEntries
-
-    breakArray <- GHCi.newBreakArray interp count
-    ccs <- mkCCSArray interp mod count entries
     let
            locsTicks  = listArray (0,count-1) [ tick_loc  t | t <- entries ]
            varsTicks  = listArray (0,count-1) [ tick_ids  t | t <- entries ]
            declsTicks = listArray (0,count-1) [ tick_path t | t <- entries ]
-    return $ ModBreaks
-      { modBreaks_flags  = breakArray
-      , modBreaks_locs   = locsTicks
-      , modBreaks_vars   = varsTicks
-      , modBreaks_decls  = declsTicks
-      , modBreaks_ccs    = ccs
-      , modBreaks_breakInfo = IntMap.empty
-      , modBreaks_module = moduleName mod
-      , modBreaks_module_unitid = toUnitId $ moduleUnit mod
-      }
+           ccs
+             | interpreterProfiled interp =
+                 listArray
+                   (0, count - 1)
+                   [ ( concat $ intersperse "." $ tick_path t,
+                       renderWithContext defaultSDocContext $ ppr $ tick_loc t
+                     )
+                   | t <- entries
+                   ]
+             | otherwise = listArray (0, -1) []
+    hydrateModBreaks interp $
+      ModBreaks
+        { modBreaks_flags = undefined,
+          modBreaks_locs = locsTicks,
+          modBreaks_vars = varsTicks,
+          modBreaks_decls = declsTicks,
+          modBreaks_ccs = ccs,
+          modBreaks_breakInfo = IntMap.empty,
+          modBreaks_module = mod
+        }
 
-mkCCSArray
-  :: Interp -> Module -> Int -> [Tick]
-  -> IO (Array BreakIndex (RemotePtr GHC.Stack.CCS.CostCentre))
-mkCCSArray interp modul count entries
-  | GHCi.interpreterProfiled interp = do
-      let module_str = moduleNameString (moduleName modul)
-      costcentres <- GHCi.mkCostCentres interp module_str (map mk_one entries)
-      return (listArray (0,count-1) costcentres)
-  | otherwise = return (listArray (0,-1) [])
- where
-    mk_one t = (name, src)
-      where name = concat $ intersperse "." $ tick_path t
-            src = renderWithContext defaultSDocContext $ ppr $ tick_loc t
+hydrateModBreaks :: Interp -> ModBreaks -> IO ModBreaks
+hydrateModBreaks interp ModBreaks {..} = do
+  let count = numElements modBreaks_locs
+  modBreaks_flags <- GHCi.newBreakArray interp count
+  pure ModBreaks {..}
