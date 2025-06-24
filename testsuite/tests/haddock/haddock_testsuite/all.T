@@ -24,3 +24,8 @@ test('haddockForeignTest',
      [ignore_stdout, ignore_stderr, req_haddock, extra_files(['./haddock-th-foreign-repro/A.hs', './haddock-th-foreign-repro/B.hs', './haddock-th-foreign-repro/F.hs', './haddock-th-foreign-repro/arith.c'])],
      makefile_test,
      ['haddockForeignTest'])
+
+test('T26114',
+   [ignore_stderr, req_haddock, extra_files(['T26114.hs'])],
+   makefile_test,
+   ['T26114'])
