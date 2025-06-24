@@ -76,3 +76,7 @@ hypsrcTest:
 .PHONY: haddockForeignTest
 haddockForeignTest:
 	'$(HADDOCK)' A.hs B.hs F.hs arith.c
+
+.PHONY: T26114
+T26114:
+	'$(HADDOCK)' T26114.hs
