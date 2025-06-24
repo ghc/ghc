@@ -4,6 +4,7 @@
 module GHC.Types.Name.Cache
   ( NameCache (..)
   , newNameCache
+  , newNameCache'
   , initNameCache
   , takeUniqFromNameCache
   , updateNameCache'
@@ -140,11 +141,27 @@ extendOrigNameCache nc mod occ name
   where
     combine _ occ_env = extendOccEnv occ_env occ name
 
-newNameCache :: Char -> OrigNameCache -> IO NameCache
-newNameCache c nc = NameCache c <$> newMVar nc
+-- | Initialize a new name cache
+newNameCache :: IO NameCache
+newNameCache = newNameCache' 'r' knownKeysOrigNameCache
 
+-- | This is a version of `newNameCache` that lets you supply your
+-- own unique tag and set of known key names. This can go wrong if the tag
+-- supplied is one reserved by GHC for internal purposes. See #26055 for
+-- an example.
+--
+-- Use `newNameCache` when possible.
+newNameCache' :: Char -> OrigNameCache -> IO NameCache
+newNameCache' c nc = NameCache c <$> newMVar nc
+
+-- | This takes a tag for uniques to be generated and the list of knownKeyNames
+-- These must be initialized properly to ensure that names generated from this
+-- NameCache do not conflict with known key names.
+--
+-- Use `newNameCache` or `newNameCache'` instead
+{-# DEPRECATED initNameCache "Use newNameCache or newNameCache' instead" #-}
 initNameCache :: Char -> [Name] -> IO NameCache
-initNameCache c names = newNameCache c (initOrigNames names)
+initNameCache c names = newNameCache' c (initOrigNames names)
 
 initOrigNames :: [Name] -> OrigNameCache
 initOrigNames names = foldl' extendOrigNameCache' emptyModuleEnv names
