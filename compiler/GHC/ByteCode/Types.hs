@@ -46,11 +46,9 @@ import Data.Array
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
 import qualified GHC.Exts.Heap as Heap
-import GHC.Stack.CCS
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Iface.Syntax
-import Language.Haskell.Syntax.Module.Name (ModuleName)
-import GHC.Unit.Types (UnitId(..))
+import GHC.Unit.Module
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -257,8 +255,8 @@ data BCOPtr
   = BCOPtrName   !Name
   | BCOPtrPrimOp !PrimOp
   | BCOPtrBCO    !UnlinkedBCO
-  | BCOPtrBreakArray (ForeignRef BreakArray)
-    -- ^ a pointer to a breakpoint's module's BreakArray in GHCi's memory
+  | BCOPtrBreakArray !Module
+    -- ^ Converted to the actual 'BreakArray' remote pointer at link-time
 
 instance NFData BCOPtr where
   rnf (BCOPtrBCO bco) = rnf bco
@@ -278,6 +276,8 @@ data BCONPtr
   | BCONPtrFS    !FastString
   -- | A libffi ffi_cif function prototype.
   | BCONPtrFFIInfo !FFIInfo
+  -- | A 'CostCentre' remote pointer array's respective 'Module' and index.
+  | BCONPtrCostCentre !Module !BreakIndex
 
 instance NFData BCONPtr where
   rnf x = x `seq` ()
@@ -323,7 +323,7 @@ data CCostCentre
 -- | All the information about the breakpoints for a module
 data ModBreaks
    = ModBreaks
-   { modBreaks_flags :: !(ForeignRef BreakArray)
+   { modBreaks_flags :: ForeignRef BreakArray
         -- ^ The array of flags, one per breakpoint,
         -- indicating which breakpoints are enabled.
    , modBreaks_locs :: !(Array BreakIndex SrcSpan)
@@ -333,14 +333,13 @@ data ModBreaks
    , modBreaks_decls :: !(Array BreakIndex [String])
         -- ^ An array giving the names of the declarations enclosing each breakpoint.
         -- See Note [Field modBreaks_decls]
-   , modBreaks_ccs :: !(Array BreakIndex (RemotePtr CostCentre))
-        -- ^ Array pointing to cost centre for each breakpoint
-   , modBreaks_breakInfo :: IntMap CgBreakInfo
+   , modBreaks_ccs :: !(Array BreakIndex (String, String))
+        -- ^ Array pointing to cost centre info for each breakpoint;
+        -- actual 'CostCentre' allocation is done at link-time.
+   , modBreaks_breakInfo :: !(IntMap CgBreakInfo)
         -- ^ info about each breakpoint from the bytecode generator
-   , modBreaks_module :: !ModuleName
+   , modBreaks_module :: !Module
         -- ^ info about the module in which we are setting the breakpoint
-   , modBreaks_module_unitid :: !UnitId
-        -- ^ The 'UnitId' of the 'ModuleName'
    }
 
 seqModBreaks :: ModBreaks -> ()
@@ -351,8 +350,7 @@ seqModBreaks ModBreaks{..} =
   rnf modBreaks_decls `seq`
   rnf modBreaks_ccs `seq`
   rnf (fmap seqCgBreakInfo modBreaks_breakInfo) `seq`
-  rnf modBreaks_module `seq`
-  rnf modBreaks_module_unitid
+  rnf modBreaks_module
 
 {-
 Note [Field modBreaks_decls]
