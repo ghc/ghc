@@ -31,6 +31,8 @@ features should be avoided where possible.
 
 The FFI libraries are documented in the accompanying  library
 documentation; see for example the :base-ref:`Foreign.` module.
+For documentation on FFI with WebAssembly, see the
+:ref:`WebAssembly chapter <wasm-jsffi>`.
 
 GHC differences to the FFI Chapter
 ----------------------------------
