@@ -650,20 +650,20 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
     do  { -- Expand the record update. See Note [Record Updates].
         ; (ds_expr, ds_res_ty, err_ctxt)
             <- expandRecordUpd record_expr possible_parents rbnds res_ty
+        ; addErrCtxt err_ctxt $
+          setInGeneratedCode (OrigExpr expr) $
+          do { -- Typecheck the expanded expression.
+               expr' <- tcExpr ds_expr (Check ds_res_ty)
+               -- NB: it's important to use ds_res_ty and not res_ty here.
+               -- Test case: T18802b.
 
-          -- Typecheck the expanded expression.
-        ; expr' <- addErrCtxt err_ctxt $
-                   setInGeneratedCode (OrigExpr expr) $
-                   tcExpr ds_expr (Check ds_res_ty)
-            -- NB: it's important to use ds_res_ty and not res_ty here.
-            -- Test case: T18802b.
-
-        ; addErrCtxt err_ctxt $ tcWrapResultMono expr expr' ds_res_ty res_ty
-            -- We need to unify the result type of the expanded
-            -- expression with the expected result type.
-            --
-            -- See Note [Unifying result types in tcRecordUpd].
-            -- Test case: T10808.
+             ; tcWrapResultMono expr expr' ds_res_ty res_ty
+             -- We need to unify the result type of the expanded
+             -- expression with the expected result type.
+             --
+             -- See Note [Unifying result types in tcRecordUpd].
+             -- Test case: T10808.
+             }
         }
 
 tcExpr e@(RecordUpd { rupd_flds = OverloadedRecUpdFields {}}) _
