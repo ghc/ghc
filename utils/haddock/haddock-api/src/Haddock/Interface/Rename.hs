@@ -110,6 +110,7 @@ renameInterface ignoreSet renamingEnv expInfo warnings hoogle iface = do
         && isExternalName name
         && not (isBuiltInSyntax name)
         && not (isTyVarName name)
+        && not (isDerivedOccName $ nameOccName name)
         && Exact name /= eqTyCon_RDR
         -- Must not be in the set of ignored symbols for the module or the
         -- unqualified ignored symbols
