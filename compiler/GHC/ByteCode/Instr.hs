@@ -273,8 +273,8 @@ data BCInstr
                       (RemotePtr CostCentre)
 
    -- An internal breakpoint for triggering a break on any case alternative
-   -- See Note [Debugger: BRK_TRIGGER]
-   | BRK_TRIGGER      !Word16 {- condition flag -} !Word16 {- target flag -}
+   -- See Note [Debugger: BRK_ALTS]
+   | BRK_ALTS         !Word16 {- enabled? -}
 
 #if MIN_VERSION_rts(1,0,3)
    -- | A "meta"-instruction for recording the name of a BCO for debugging purposes.
@@ -471,7 +471,7 @@ instance Outputable BCInstr where
                                <+> text "<tick_module>" <+> text "<tick_module_unitid>" <+> ppr tickx
                                <+> text "<info_module>" <+> text "<info_module_unitid>" <+> ppr infox
                                <+> text "<cc>"
-   ppr (BRK_TRIGGER cnd tgt) = text "BRK_TRIGGER" <+> ppr cnd <+> ppr tgt
+   ppr (BRK_ALTS active)     = text "BRK_ALTS" <+> ppr active
 #if MIN_VERSION_rts(1,0,3)
    ppr (BCO_NAME nm)         = text "BCO_NAME" <+> text (show nm)
 #endif
@@ -597,7 +597,7 @@ bciStackUse OP_INDEX_ADDR{}         = 0
 
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0
-bciStackUse BRK_TRIGGER{}         = 0
+bciStackUse BRK_ALTS{}            = 0
 
 -- These insns actually reduce stack use, but we need the high-tide level,
 -- so can't use this info.  Not that it matters much.

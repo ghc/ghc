@@ -1367,15 +1367,7 @@ doCase d s p scrut bndr alts
 
         bitmap = intsToReverseBitmap platform bitmap_size' pointers
 
-        addAltBrkTrigger (d, alt_instrs)
-          -- See Note [Debugger: BRK_TRIGGER]
-          | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
-          , ConsOL BRK_FUN{} _ <- alt_instrs
-          = (d, BRK_TRIGGER 512{-TSO_STOP_NEXT_BREAKPOINT-} 1024{-TSO_STOP_AFTER_RETURN-} `consOL` alt_instrs)
-          | otherwise
-          = (d, alt_instrs)
-
-     alt_stuff <- mapM (fmap addAltBrkTrigger . codeAlt) alts
+     alt_stuff <- mapM codeAlt alts
      alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
 
      let alt_final1
@@ -1383,8 +1375,8 @@ doCase d s p scrut bndr alts
            | otherwise          = alt_final0
          alt_final
            | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
-                                -- See Note [Debugger: BRK_TRIGGER]
-                                = BRK_TRIGGER 0 0 `consOL` alt_final1
+                                -- See Note [Debugger: BRK_ALTS]
+                                = BRK_ALTS 0 `consOL` alt_final1
            | otherwise          = alt_final1
 
      add_bco_name <- shouldAddBcoName
@@ -1406,9 +1398,8 @@ doCase d s p scrut bndr alts
             in return (PUSH_ALTS alt_bco scrut_rep `consOL` scrut_code)
 
 {-
-Note [Debugger: BRK_TRIGGER]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TODO:UPDATE!
+Note [Debugger: BRK_ALTS]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 As described in Note [Debugger: Step-out] in rts/Interpreter.c, to implement
 the stepping-out debugger feature we traverse the stack at runtime, identify
 the first continuation BCO, and explicitly enable that BCO's breakpoint thus
