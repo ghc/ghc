@@ -4170,7 +4170,7 @@ stepOutCmd _ = withSandboxOnly ":stepout" $ do
   case mb_span of
     Nothing -> doContinue (GHC.StepOut Nothing)
     Just loc -> do
-      md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
+      md <- fromMaybe (panic "stepOutCmd") <$> getCurrentBreakModule
       current_toplevel_decl <- flip enclosingTickSpan loc <$> getTickArray md
       doContinue (GHC.StepOut (Just (RealSrcSpan current_toplevel_decl Strict.Nothing)))
 
