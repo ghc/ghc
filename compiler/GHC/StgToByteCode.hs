@@ -396,6 +396,11 @@ schemeER_wrk d p (StgTick bp (StgCase scrut bndr _ alts)) = do
   doCase d 0 p scrut bndr alts
 schemeER_wrk d p (StgTick bp rhs) = do
   code <- schemeE d 0 p rhs
+  addBreakInstr d p bp code
+schemeER_wrk d p rhs = schemeE d 0 p rhs
+
+addBreakInstr :: StackDepth -> BCEnv -> StgTickish -> BCInstrList -> BcM BCInstrList
+addBreakInstr d p (Breakpoint tick_ty tick_no fvs tick_mod) code = do
   hsc_env <- getHscEnv
   current_mod <- getCurrentModule
   mb_current_mod_breaks <- getCurrentModBreaks
@@ -429,10 +434,6 @@ schemeER_wrk d p (StgTick bp rhs) = do
                         else pprPanic "schemeER_wrk: breakpoint tick/info index too large!" (ppr x)
             breakInstr = BRK_FUN breaks tick_mod_ptr tick_mod_id_ptr (toW16 tick_no) info_mod_ptr info_mod_id_ptr (toW16 infox) cc
         return $ breakInstr `consOL` code
-schemeER_wrk d p rhs = schemeE d 0 p rhs
-
-addBreakInstr :: StackDepth -> BCEnv -> StgTickish -> BCInstrList -> BcM BCInstrList
-addBreakInstr d p (Breakpoint tick_ty tick_no fvs tick_mod) code = do
 addBreakInstr _ _ _ code
   = return code -- ignore other kinds of tick
 
