@@ -390,11 +390,7 @@ schemeR_wrk fvs nm original_body (args, body)
 -- | Introduce break instructions for ticked expressions.
 -- If no breakpoint information is available, the instruction is omitted.
 schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
--- Handle ticks around Case expressions specially because we introduce a
--- special BRK_FUN in case continuation BCOs as per Note [Debugger: BRK_FUN in case continuations]
-schemeER_wrk d p (StgTick bp (StgCase scrut bndr _ alts)) = do
-  doCase d 0 p scrut bndr alts
-schemeER_wrk d p (StgTick bp rhs) = do
+schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
   code <- schemeE d 0 p rhs
   hsc_env <- getHscEnv
   current_mod <- getCurrentModule
@@ -430,11 +426,6 @@ schemeER_wrk d p (StgTick bp rhs) = do
             breakInstr = BRK_FUN breaks tick_mod_ptr tick_mod_id_ptr (toW16 tick_no) info_mod_ptr info_mod_id_ptr (toW16 infox) cc
         return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
-
-addBreakInstr :: StackDepth -> BCEnv -> StgTickish -> BCInstrList -> BcM BCInstrList
-addBreakInstr d p (Breakpoint tick_ty tick_no fvs tick_mod) code = do
-addBreakInstr _ _ _ code
-  = return code -- ignore other kinds of tick
 
 -- | Determine the GHCi-allocated 'BreakArray' and module pointer for the module
 -- from which the breakpoint originates.
@@ -1384,7 +1375,7 @@ doCase d s p scrut bndr alts
            | otherwise          = alt_final0
          alt_final
            | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
-                                -- See Note [Debugger: BRK_FUN in case continuations]
+                                -- See Note [Debugger: BRK_ALTS]
                                 = BRK_ALTS 0 `consOL` alt_final1
            | otherwise          = alt_final1
 
