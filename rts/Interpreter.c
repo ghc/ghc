@@ -1605,7 +1605,71 @@ run_BCO:
         {
           StgWord16 active = BCO_NEXT;
           if (active) {
-            cap->r.rCurrentTSO->flags |= TSO_STOP_NEXT_BREAKPOINT;
+            StgClosure *ioAction;
+            StgAP_STACK *new_aps;
+            int size_words;
+
+            ioAction = (StgClosure *) deRefStablePtr (rts_breakpoint_io_action);
+
+            size_words = BCO_BITMAP_SIZE(obj) + 2;
+            new_aps = (StgAP_STACK *) allocate(cap, AP_STACK_sizeW(size_words));
+            new_aps->size = size_words;
+            new_aps->fun = &stg_dummy_ret_closure;
+
+            new_aps->payload[0] = (StgClosure *)&stg_apply_interp_info;
+            new_aps->payload[1] = (StgClosure *)obj;
+
+            for (int i = 2; i < size_words; i++)
+            {
+               new_aps->payload[i] = (StgClosure *)ReadSpW(i-2);
+            }
+
+            SET_HDR(new_aps,&stg_AP_STACK_info,cap->r.rCCCS);
+
+            // Arrange the stack to call the breakpoint IO action, and
+            // continue execution of this BCO when the IO action returns.
+            //
+            // ioAction :: Addr#       -- the breakpoint tick module
+            //          -> Addr#       -- the breakpoint tick module unit id
+            //          -> Int#        -- the breakpoint tick index
+            //          -> Addr#       -- the breakpoint info module
+            //          -> Addr#       -- the breakpoint info module unit id
+            //          -> Int#        -- the breakpoint info index
+            //          -> Bool        -- exception?
+            //          -> HValue      -- the AP_STACK, or exception
+            //          -> IO ()
+            //
+            ioAction = (StgClosure *) deRefStablePtr (
+                rts_breakpoint_io_action);
+
+            Sp_subW(19);
+            SpW(18) = (W_)obj;
+            SpW(17) = (W_)&stg_apply_interp_info;
+            SpW(16) = (W_)new_aps;
+            SpW(15) = (W_)True_closure;         // True <=> no src location
+            SpW(14) = (W_)&stg_ap_ppv_info;
+            SpW(13) = 0;
+            SpW(12) = (W_)&stg_ap_n_info;
+            SpW(11) = 0;
+            SpW(10) = (W_)&stg_ap_n_info;
+            SpW(9)  = 0;
+            SpW(8)  = (W_)&stg_ap_n_info;
+            SpW(7)  = 0;
+            SpW(6)  = (W_)&stg_ap_n_info;
+            SpW(5)  = 0;
+            SpW(4)  = (W_)&stg_ap_n_info;
+            SpW(3)  = 0;
+            SpW(2)  = (W_)&stg_ap_n_info;
+            SpW(1)  = (W_)ioAction;
+            SpW(0)  = (W_)&stg_enter_info;
+
+            // Make sure don't stop again on reentry
+            instrs[bciPtr-1] = 0; // update: active=0
+
+            // stop this thread and return to the scheduler -
+            // eventually we will come back and the IO action on
+            // the top of the stack will be executed
+            RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
           }
 
           goto nextInsn;
