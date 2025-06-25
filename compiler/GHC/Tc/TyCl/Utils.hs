@@ -766,8 +766,7 @@ addTyConsToGblEnv tyclss
     do { traceTc "tcAddTyCons" $ vcat
             [ text "tycons" <+> ppr tyclss
             , text "implicits" <+> ppr implicit_things ]
-       ; linearEnabled <- xoptM LangExt.LinearTypes
-       ; gbl_env <- tcRecSelBinds (mkRecSelBinds linearEnabled tyclss)
+       ; gbl_env <- tcRecSelBinds (mkRecSelBinds tyclss)
        ; th_bndrs <- tcTyThBinders implicit_things
        ; return (gbl_env, th_bndrs)
        }
@@ -850,24 +849,24 @@ tcRecSelBinds sel_bind_prs
                                              , let loc = getSrcSpan sel_id ]
     binds = [(NonRecursive, [bind]) | (_, bind) <- sel_bind_prs]
 
-mkRecSelBinds :: Bool -> [TyCon] -> [(Id, LHsBind GhcRn)]
+mkRecSelBinds :: [TyCon] -> [(Id, LHsBind GhcRn)]
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
-mkRecSelBinds allowMultiplicity tycons
-  = [ mkRecSelBind allowMultiplicity tc fld | tc <- tycons
-                                        , fld <- tyConFieldLabels tc ]
+mkRecSelBinds tycons
+  = [ mkRecSelBind tc fld | tc <- tycons
+                          , fld <- tyConFieldLabels tc ]
 
-mkRecSelBind :: Bool -> TyCon -> FieldLabel -> (Id, LHsBind GhcRn)
-mkRecSelBind allowMultiplicity tycon fl
-  = mkOneRecordSelector allowMultiplicity all_cons (RecSelData tycon) fl
+mkRecSelBind :: TyCon -> FieldLabel -> (Id, LHsBind GhcRn)
+mkRecSelBind tycon fl
+  = mkOneRecordSelector all_cons (RecSelData tycon) fl
         FieldSelectors  -- See Note [NoFieldSelectors and naughty record selectors]
   where
     all_cons = map RealDataCon (tyConDataCons tycon)
 
-mkOneRecordSelector :: Bool -> [ConLike] -> RecSelParent -> FieldLabel -> FieldSelectors
+mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel -> FieldSelectors
                     -> (Id, LHsBind GhcRn)
-mkOneRecordSelector allowMultiplicity all_cons idDetails fl has_sel
+mkOneRecordSelector all_cons idDetails fl has_sel
   = (sel_id, L (noAnnSrcSpan loc) sel_bind)
   where
     loc      = getSrcSpan sel_name
@@ -932,7 +931,7 @@ mkOneRecordSelector allowMultiplicity all_cons idDetails fl has_sel
                           mkVisFunTy sel_mult data_ty                             $
                           field_ty
     non_partial = length all_cons == length cons_w_field -- See Note [Multiplicity and partial selectors]
-    (mult_tvb, sel_mult) = if allowMultiplicity && non_partial && all_other_fields_unrestricted
+    (mult_tvb, sel_mult) = if non_partial && all_other_fields_unrestricted
       then ([mkForAllTyBinder (Invisible InferredSpec) mult_var], mkTyVarTy mult_var)
       else ([], manyDataConTy)
     mult_var = mkTyVar (mkSysTvName (mkBuiltinUnique 1) (fsLit "m")) multiplicityTy
