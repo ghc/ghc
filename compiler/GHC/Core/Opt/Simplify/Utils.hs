@@ -1494,6 +1494,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
         -- so substituting rhs inside a lambda doesn't change the occ info.
         -- Sadly, not quite the same as exprIsHNF.
     canInlineInLam (Lit _)    = True
+    canInlineInLam (Cast e _) = canInlineInLam e
     canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
     canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
     canInlineInLam (Var v)    = case idOccInfo v of
@@ -1612,7 +1613,7 @@ postInlineUnconditionally env bind_cxt old_bndr bndr rhs
                                             -- so inlining duplicates code but nothing more
 
         | otherwise
-        -> work_ok in_lam int_cxt && smallEnoughToInline uf_opts unfolding
+        -> work_ok in_lam int_cxt && (n_br == 1 || smallEnoughToInline uf_opts unfolding)
               -- Multiple syntactic occurences; but lazy, and small enough to dup
               -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
 
