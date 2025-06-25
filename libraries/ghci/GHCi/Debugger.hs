@@ -65,10 +65,7 @@ foreign import ccall "&rts_stop_on_exception" exceptionFlag :: Ptr CInt
 --------------------------------------------------------------------------------
 
 type BreakpointCallback
-     = Addr#   -- pointer to the breakpoint tick module name
-    -> Addr#   -- pointer to the breakpoint tick module unit id
-    -> Int#    -- breakpoint tick index
-    -> Addr#   -- pointer to the breakpoint info module name
+     = Addr#   -- pointer to the breakpoint info module name
     -> Addr#   -- pointer to the breakpoint info module unit id
     -> Int#    -- breakpoint info index
     -> Bool    -- exception?

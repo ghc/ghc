@@ -97,9 +97,9 @@ lookupLiteral interp pkgs_loaded le ptr = case ptr of
   BCONPtrFFIInfo (FFIInfo {..}) -> do
     RemotePtr p <- interpCmd interp $ PrepFFI ffiInfoArgs ffiInfoRet
     pure $ fromIntegral p
-  BCONPtrCostCentre tick_mod tick_no
-    | interpreterProfiled interp ->
-        case expectJust (lookupModuleEnv (ccs_env le) tick_mod) ! tick_no of
+  BCONPtrCostCentre InternalBreakpointId{..}
+    | interpreterProfiled interp -> do
+        case expectJust (lookupModuleEnv (ccs_env le) ibi_info_mod) ! ibi_info_index of
           RemotePtr p -> pure $ fromIntegral p
     | otherwise ->
         case toRemotePtr nullPtr of

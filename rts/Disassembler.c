@@ -84,16 +84,23 @@ disInstr ( StgBCO *bco, int pc )
 
 
    switch (instr & 0xff) {
-      case bci_BRK_FUN:
-         debugBelch ("BRK_FUN  " );  printPtr( ptrs[instrs[pc]] );
-         debugBelch (" %d ", instrs[pc+1]); printPtr( ptrs[instrs[pc+2]] );
-         CostCentre* cc = (CostCentre*)literals[instrs[pc+5]];
+      case bci_BRK_FUN: {
+         W_ p1, info_mod, info_unit_id, info_wix, np;
+         p1           = BCO_GET_LARGE_ARG;
+         info_mod     = BCO_GET_LARGE_ARG;
+         info_unit_id = BCO_GET_LARGE_ARG;
+         info_wix     = BCO_GET_LARGE_ARG;
+         np           = BCO_GET_LARGE_ARG;
+         debugBelch ("BRK_FUN " );  printPtr( ptrs[p1] );
+         debugBelch("%" FMT_Word, literals[info_mod] );
+         debugBelch("%" FMT_Word, literals[info_unit_id] );
+         debugBelch("%" FMT_Word, literals[info_wix] );
+         CostCentre* cc = (CostCentre*)literals[np];
          if (cc) {
            debugBelch(" %s", cc->label);
          }
          debugBelch("\n");
-         pc += 6;
-         break;
+         break; }
       case bci_BRK_ALTS:
          debugBelch ("BRK_ALTS %d\n", BCO_NEXT);
          break;

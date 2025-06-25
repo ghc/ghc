@@ -28,6 +28,7 @@ module GHC.Linker.Loader
    , extendLoadedEnv
    , deleteFromLoadedEnv
    -- * Internals
+   , allocateBreakArrays
    , rmDupLinkables
    , modifyLoaderState
    , initLinkDepsOpts
@@ -122,6 +123,11 @@ import System.Win32.Info (getSystemDirectory)
 import GHC.Utils.Exception
 import GHC.Unit.Home.Graph (lookupHug, unitEnv_foldWithKey)
 import GHC.Driver.Downsweep
+import GHC.HsToCore.Breakpoints
+import qualified Data.IntMap.Strict as IM
+import qualified GHC.Runtime.Interpreter as GHCi
+import GHC.Data.Maybe (expectJust)
+import Foreign.Ptr (nullPtr)
 
 
 
@@ -699,13 +705,13 @@ loadDecls interp hsc_env span linkable = do
           le2_breakarray_env <-
             allocateBreakArrays
               interp
-              (catMaybes $ map bc_breaks cbcs)
               (breakarray_env le)
+              (map bc_breaks cbcs)
           le2_ccs_env <-
             allocateCCS
               interp
-              (catMaybes $ map bc_breaks cbcs)
               (ccs_env le)
+              (map bc_breaks cbcs)
           let le2 = le { itbl_env = le2_itbl_env
                        , addr_env = le2_addr_env
                        , breakarray_env = le2_breakarray_env
@@ -933,12 +939,8 @@ dynLinkBCOs interp pls bcos = do
             le1 = linker_env pls
         ie2 <- linkITbls interp (itbl_env le1) (concatMap bc_itbls cbcs)
         ae2 <- foldlM (\env cbc -> allocateTopStrings interp (bc_strs cbc) env) (addr_env le1) cbcs
-        be2 <-
-          allocateBreakArrays
-            interp
-            (catMaybes $ map bc_breaks cbcs)
-            (breakarray_env le1)
-        ce2 <- allocateCCS interp (catMaybes $ map bc_breaks cbcs) (ccs_env le1)
+        be2 <- allocateBreakArrays interp (breakarray_env le1) (map bc_breaks cbcs)
+        ce2 <- allocateCCS         interp (ccs_env le1)        (map bc_breaks cbcs)
         let le2 = le1 { itbl_env = ie2, addr_env = ae2, breakarray_env = be2, ccs_env = ce2 }
 
         names_and_refs <- linkSomeBCOs interp (pkgs_loaded pls) le2 cbcs
@@ -1656,44 +1658,80 @@ allocateTopStrings interp topStrings prev_env = do
   where
     mk_entry nm ptr = (nm, (nm, AddrPtr ptr))
 
--- | Given a list of 'ModBreaks' collected from a list of
--- 'CompiledByteCode', allocate the 'BreakArray'.
+-- | Given a list of 'InternalModBreaks and 'ModBreaks' collected from a list of
+-- 'CompiledByteCode', allocate the 'BreakArray' used to trigger breakpoints.
 allocateBreakArrays ::
   Interp ->
-  [ModBreaks] ->
   ModuleEnv (ForeignRef BreakArray) ->
+  [InternalModBreaks] ->
   IO (ModuleEnv (ForeignRef BreakArray))
-allocateBreakArrays _interp mbs be =
+allocateBreakArrays interp =
   foldlM
-    ( \be0 ModBreaks {..} ->
-        evaluate $ extendModuleEnv be0 modBreaks_module modBreaks_flags
+    ( \be0 imbs -> do
+        let bi = imodBreaks_breakInfo imbs
+            hi = maybe 0 fst (IM.lookupMax bi) -- allocate as many slots as internal breakpoints
+        if not $ elemModuleEnv (imodBreaks_module imbs) be0 then do
+          -- If no BreakArray is assigned to this module yet, create one
+          breakArray <- GHCi.newBreakArray interp hi
+          evaluate $ extendModuleEnv be0 (imodBreaks_module imbs) breakArray
+        else
+          return be0
     )
-    be
-    mbs
 
--- | Given a list of 'ModBreaks' collected from a list of
--- 'CompiledByteCode', allocate the 'CostCentre' arrays when profiling
--- is enabled.
+-- | Given a list of 'InternalModBreaks' and 'ModBreaks' collected from a list
+-- of 'CompiledByteCode', allocate the 'CostCentre' arrays when profiling is
+-- enabled.
+--
+-- Note that the resulting CostCenter is indexed by the 'InternalBreakpointId',
+-- not by 'BreakpointId'. At runtime, BRK_FUN instructions are annotated with
+-- internal ids -- we'll look them up in the array and push the corresponding
+-- cost center.
 allocateCCS ::
   Interp ->
-  [ModBreaks] ->
-  ModuleEnv (Array BreakIndex (RemotePtr CostCentre)) ->
-  IO (ModuleEnv (Array BreakIndex (RemotePtr CostCentre)))
-allocateCCS interp mbs ce
-  | interpreterProfiled interp =
+  ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)) ->
+  [InternalModBreaks] ->
+  IO (ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)))
+allocateCCS interp ce mbss
+  | interpreterProfiled interp = do
+      -- First construct the CCSs for each module, using the 'ModBreaks'
+      ccs_map <- foldlM
+        ( \(ccs_map :: ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre))) imbs -> do
+          case imodBreaks_modBreaks imbs of
+            Nothing -> return ccs_map -- don't add it
+            Just mbs -> do
+              ccs <-
+                mkCostCentres
+                  interp
+                  (moduleNameString $ moduleName $ modBreaks_module mbs)
+                  (elems $ modBreaks_ccs mbs)
+              evaluate $
+                extendModuleEnv ccs_map (modBreaks_module mbs) $
+                  listArray (0, length ccs - 1) ccs
+        ) emptyModuleEnv mbss
+      -- Now, construct an array indexed by an 'InternalBreakpointId' index by first
+      -- finding the matching 'BreakpointId' and then looking it up in the ccs_map
       foldlM
-        ( \ce0 ModBreaks {..} -> do
-            ccs <-
-              mkCostCentres
-                interp
-                (moduleNameString $ moduleName modBreaks_module)
-                (elems modBreaks_ccs)
+        ( \ce0 imbs -> do
+          let breakModl    = imodBreaks_module imbs
+              breakInfoMap = imodBreaks_breakInfo imbs
+              hi           = maybe 0 fst (IM.lookupMax breakInfoMap) -- as many slots as internal breaks
+              ccss         = expectJust $ lookupModuleEnv ccs_map breakModl
+          ccs_im <- foldlM
+            (\(bids :: IM.IntMap (RemotePtr CostCentre)) cgi -> do
+              let tickBreakId = bi_tick_index $ cgb_tick_id cgi
+              pure $ IM.insert tickBreakId (ccss ! tickBreakId) bids
+            ) mempty breakInfoMap
+          if not $ elemModuleEnv breakModl ce0 then do
             evaluate $
-              extendModuleEnv ce0 modBreaks_module $
-                listArray
-                  (0, length ccs - 1)
-                  ccs
+              extendModuleEnv ce0 breakModl $
+                listArray (0, hi-1) $
+                  map (\i -> case IM.lookup i ccs_im of
+                        Nothing -> toRemotePtr nullPtr
+                        Just ccs -> ccs
+                      ) [0..hi-1]
+          else
+            return ce0
         )
         ce
-        mbs
+        mbss
   | otherwise = pure ce

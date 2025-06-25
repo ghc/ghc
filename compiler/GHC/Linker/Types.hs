@@ -72,6 +72,7 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.Maybe (mapMaybe)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
+import GHC.HsToCore.Breakpoints (BreakTickIndex)
 
 
 {- **********************************************************************
@@ -188,7 +189,7 @@ data LinkerEnv = LinkerEnv
   , breakarray_env :: !(ModuleEnv (ForeignRef BreakArray))
       -- ^ Each 'Module's remote pointer of 'BreakArray'.
 
-  , ccs_env :: !(ModuleEnv (Array BreakIndex (RemotePtr CostCentre)))
+  , ccs_env :: !(ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)))
       -- ^ Each 'Module's array of remote pointers of 'CostCentre'.
       -- Untouched when not profiling.
   }

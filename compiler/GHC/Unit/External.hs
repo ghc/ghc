@@ -24,7 +24,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv ( InstEnv, emptyInstEnv )
 import GHC.Core.Opt.ConstantFold
-import GHC.Core.Rules ( RuleBase, mkRuleBase)
+import GHC.Core.Rules ( RuleBase, mkRuleBase )
 
 import GHC.Types.Annotations ( AnnEnv, emptyAnnEnv )
 import GHC.Types.CompleteMatch

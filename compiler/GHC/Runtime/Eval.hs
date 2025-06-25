@@ -64,6 +64,7 @@ import GHCi.RemoteTypes
 import GHC.ByteCode.Types
 
 import GHC.Linker.Loader as Loader
+import GHC.Linker.Types (LinkerEnv(..))
 
 import GHC.Hs
 
@@ -111,7 +112,6 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DSet
 import GHC.Types.TyThing
-import GHC.Types.Breakpoint
 import GHC.Types.Unique.Map
 
 import GHC.Types.Avail
@@ -127,16 +127,16 @@ import GHC.Tc.Utils.Instantiate (instDFunType)
 import GHC.Tc.Utils.Monad
 
 import GHC.IfaceToCore
+import GHC.ByteCode.Breakpoints
 
 import Control.Monad
-import Data.Array
 import Data.Dynamic
 import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
 import Data.List.NonEmpty (NonEmpty)
 import Unsafe.Coerce ( unsafeCoerce )
 import qualified GHC.Unit.Home.Graph as HUG
+import GHCi.BreakArray (BreakArray)
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -148,13 +148,13 @@ mkHistory :: HUG.HomeUnitGraph -> ForeignHValue -> InternalBreakpointId -> IO Hi
 mkHistory hug hval ibi = History hval ibi <$> findEnclosingDecls hug ibi
 
 getHistoryModule :: History -> Module
-getHistoryModule = ibi_tick_mod . historyBreakpointId
+getHistoryModule = ibi_info_mod . historyBreakpointId
 
 getHistorySpan :: HUG.HomeUnitGraph -> History -> IO SrcSpan
 getHistorySpan hug hist = do
   let ibi = historyBreakpointId hist
-  brks <- readModBreaks hug (ibi_tick_mod ibi)
-  return $ modBreaks_locs brks ! ibi_tick_index ibi
+  brks <- expectJust <$> readModBreaks hug ibi
+  return $ expectJust $ getBreakLoc ibi brks
 
 {- | Finds the enclosing top level function name -}
 -- ToDo: a better way to do this would be to keep hold of the decl_path computed
@@ -162,8 +162,10 @@ getHistorySpan hug hist = do
 -- for each tick.
 findEnclosingDecls :: HUG.HomeUnitGraph -> InternalBreakpointId -> IO [String]
 findEnclosingDecls hug ibi = do
-  brks <- readModBreaks hug (ibi_tick_mod ibi)
-  return $ modBreaks_decls brks ! ibi_tick_index ibi
+  readModBreaks hug ibi >>= \case
+    Nothing -> return []
+    Just brks -> return $
+      fromMaybe [] (getBreakDecls ibi brks)
 
 -- | Update fixity environment in the current interactive context.
 updateFixityEnv :: GhcMonad m => FixityEnv -> m ()
@@ -348,15 +350,17 @@ handleRunStatus step expr bindings final_ids status history0 = do
     --  - the breakpoint was explicitly enabled (in @BreakArray@)
     --  - or one of the stepping options in @EvalOpts@ caused us to stop at one
     EvalBreak apStack_ref (Just eval_break) resume_ctxt ccs -> do
-      let ibi = evalBreakpointToId eval_break
       let hug = hsc_HUG hsc_env
-      tick_brks <- liftIO $ readModBreaks hug (ibi_tick_mod ibi)
+      let ibi@InternalBreakpointId{ibi_info_index}
+            = evalBreakpointToId eval_break
+      brks <- liftIO $ readModBreaks hug ibi
+      breakArray     <- getBreakArray interp ibi (expectJust brks)
       let
-        span      = modBreaks_locs tick_brks ! ibi_tick_index ibi
-        decl      = intercalate "." $ modBreaks_decls tick_brks ! ibi_tick_index ibi
+        span = fromMaybe noSrcSpan $ getBreakLoc ibi =<< brks
+        decl = intercalate "." $ fromMaybe [] $ getBreakDecls ibi =<< brks
 
       -- Was this breakpoint explicitly enabled (ie. in @BreakArray@)?
-      bactive <- liftIO $ breakpointStatus interp (modBreaks_flags tick_brks) (ibi_tick_index ibi)
+      bactive <- liftIO $ breakpointStatus interp breakArray ibi_info_index
 
       apStack_fhv <- liftIO $ mkFinalizedHValue interp apStack_ref
       resume_ctxt_fhv   <- liftIO $ mkFinalizedHValue interp resume_ctxt
@@ -444,7 +448,8 @@ resumeExec step mbCnt
                 -- When the user specified a break ignore count, set it
                 -- in the interpreter
                 case (mb_brkpt, mbCnt) of
-                  (Just brkpt, Just cnt) -> setupBreakpoint interp (toBreakpointId brkpt) cnt
+                  (Just ibi, Just cnt) ->
+                    setupBreakpoint interp ibi cnt
                   _ -> return ()
 
                 let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
@@ -453,20 +458,35 @@ resumeExec step mbCnt
                     hug = hsc_HUG hsc_env
                     hist' = case mb_brkpt of
                        Nothing -> pure prevHistoryLst
-                       Just bi
+                       Just ibi
                          | breakHere False step span -> do
-                            hist1 <- liftIO (mkHistory hug apStack bi)
+                            hist1 <- liftIO (mkHistory hug apStack ibi)
                             return $ hist1 `consBL` fromListBL 50 hist
                          | otherwise -> pure prevHistoryLst
                 handleRunStatus step expr bindings final_ids status =<< hist'
 
-setupBreakpoint :: GhcMonad m => Interp -> BreakpointId -> Int -> m ()   -- #19157
-setupBreakpoint interp bi cnt = do
+setupBreakpoint :: GhcMonad m => Interp -> InternalBreakpointId -> Int -> m ()   -- #19157
+setupBreakpoint interp ibi cnt = do
   hug <- hsc_HUG <$> getSession
-  modBreaks <- liftIO $ readModBreaks hug (bi_tick_mod bi)
-  let breakarray = modBreaks_flags modBreaks
-  _ <- liftIO $ GHCi.storeBreakpoint interp breakarray (bi_tick_index bi) cnt
-  pure ()
+  ims <- liftIO $ readModBreaks hug ibi
+  breakArray <- getBreakArray interp ibi (expectJust ims)
+  liftIO $ GHCi.storeBreakpoint interp breakArray (ibi_info_index ibi) cnt
+
+getBreakArray :: GhcMonad m => Interp -> InternalBreakpointId -> InternalModBreaks -> m (ForeignRef BreakArray)
+getBreakArray interp InternalBreakpointId{ibi_info_mod} imbs = do
+
+  liftIO $ modifyLoaderState interp $ \ld_st -> do
+    let le = linker_env ld_st
+
+    -- Recall that BreakArrays are allocated only at BCO link time, so if we
+    -- haven't linked the BCOs we intend to break at yet, we allocate the arrays here.
+    ba_env <- allocateBreakArrays interp (breakarray_env le) [imbs]
+
+    return
+      ( ld_st { linker_env = le{breakarray_env = ba_env} }
+      , expectJust {- just computed -} $
+        lookupModuleEnv ba_env ibi_info_mod
+      )
 
 back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)
 back n = moveHist (+n)
@@ -495,8 +515,8 @@ moveHist fn = do
             span <- case mb_info of
                       Nothing  -> return $ mkGeneralSrcSpan (fsLit "<unknown>")
                       Just ibi -> liftIO $ do
-                        brks <- readModBreaks (hsc_HUG hsc_env) (ibi_tick_mod ibi)
-                        return $ modBreaks_locs brks ! ibi_tick_index ibi
+                        brks <- readModBreaks (hsc_HUG hsc_env) ibi
+                        return $ fromMaybe noSrcSpan $ getBreakLoc ibi =<< brks
             (hsc_env1, names) <-
               liftIO $ bindLocalsAtBreakpoint hsc_env apStack span mb_info
             let ic = hsc_IC hsc_env1
@@ -557,11 +577,10 @@ bindLocalsAtBreakpoint hsc_env apStack span Nothing = do
 -- of the breakpoint and the free variables of the expression.
 bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi) = do
    let hug = hsc_HUG hsc_env
-   info_brks <- readModBreaks hug (ibi_info_mod ibi)
-   tick_brks <- readModBreaks hug (ibi_tick_mod ibi)
-   let info   = expectJust $ IntMap.lookup (ibi_info_index ibi) (modBreaks_breakInfo info_brks)
+   info_brks <- readModBreaks hug ibi
+   let info   = getInternalBreak ibi (expectJust info_brks)
        interp = hscInterp hsc_env
-       occs   = modBreaks_vars tick_brks ! ibi_tick_index ibi
+       occs   = fromMaybe [] $ getBreakVars ibi =<< info_brks
 
   -- Rehydrate to understand the breakpoint info relative to the current environment.
   -- This design is critical to preventing leaks (#22530)
@@ -701,6 +720,7 @@ pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
   {-
   Note [Syncing breakpoint info]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ROMES:TODO: Update
   To display the values of the free variables for a single breakpoint, the
   function `GHC.Runtime.Eval.bindLocalsAtBreakpoint` pulls
   out the information from the fields `modBreaks_breakInfo` and
@@ -1320,3 +1340,4 @@ reconstructType hsc_env bound id = do
 
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
 mkRuntimeUnkTyVar name kind = mkTcTyVar name kind RuntimeUnk
+

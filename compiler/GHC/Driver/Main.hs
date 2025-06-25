@@ -304,6 +304,7 @@ import GHC.Cmm.Config (CmmConfig)
 import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
+import GHC.HsToCore.Breakpoints (ModBreaks)
 
 {- **********************************************************************
 %*                                                                      *

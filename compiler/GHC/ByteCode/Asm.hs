@@ -73,7 +73,6 @@ import GHC.Float (castFloatToWord32, castDoubleToWord64)
 import qualified Data.List as List ( any )
 import GHC.Exts
 
-
 -- -----------------------------------------------------------------------------
 -- Unlinked BCOs
 
@@ -109,14 +108,14 @@ assembleBCOs
   -> FlatBag (ProtoBCO Name)
   -> [TyCon]
   -> [(Name, ByteString)]
-  -> Maybe ModBreaks
+  -> InternalModBreaks
   -> [SptEntry]
   -> IO CompiledByteCode
 assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   let itbls = mkITbls profile tycons
-  bcos    <- mapM (assembleBCO (profilePlatform profile)) proto_bcos
+  bcos <- mapM (assembleBCO (profilePlatform profile)) proto_bcos
   return CompiledByteCode
     { bc_bcos = bcos
     , bc_itbls = itbls
@@ -841,19 +840,14 @@ assembleI platform i = case i of
     W8                   -> emit_ bci_OP_INDEX_ADDR_08 []
     _                    -> unsupported_width
 
-  BRK_FUN tick_mod tickx info_mod infox ->
-                              do p1 <- ptr $ BCOPtrBreakArray tick_mod
-                                 tick_addr <- lit1 $ BCONPtrFS $ moduleNameFS $ moduleName tick_mod
-                                 info_addr <- lit1 $ BCONPtrFS $ moduleNameFS $ moduleName info_mod
-                                 tick_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS $ moduleUnitId $ tick_mod
-                                 info_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS $ moduleUnitId $ info_mod
-                                 np <- lit1 $ BCONPtrCostCentre tick_mod $ fromIntegral tickx
-                                 emit_ bci_BRK_FUN [ Op p1
-                                                  , Op tick_addr, Op info_addr
-                                                  , Op tick_unitid_addr, Op info_unitid_addr
-                                                  , SmallOp tickx, SmallOp infox
-                                                  , Op np
-                                                  ]
+  BRK_FUN ibi@(InternalBreakpointId info_mod infox) -> do
+    p1 <- ptr $ BCOPtrBreakArray info_mod
+    info_addr <- lit1 $ BCONPtrFS $ moduleNameFS $ moduleName info_mod
+    info_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS $ moduleUnitId info_mod
+    info_wix <- int infox
+    np <- lit1 $ BCONPtrCostCentre ibi
+    emit_ bci_BRK_FUN [ Op p1, Op info_addr, Op info_unitid_addr
+                      , Op info_wix, Op np ]
 
   BRK_ALTS active -> emit_ bci_BRK_ALTS [SmallOp active]
 
