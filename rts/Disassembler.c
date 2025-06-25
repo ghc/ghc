@@ -85,14 +85,15 @@ disInstr ( StgBCO *bco, int pc )
 
    switch (instr & 0xff) {
       case bci_BRK_FUN:
-         debugBelch ("BRK_FUN  " );  printPtr( ptrs[instrs[pc]] );
-         debugBelch (" %d ", instrs[pc+1]); printPtr( ptrs[instrs[pc+2]] );
-         CostCentre* cc = (CostCentre*)literals[instrs[pc+5]];
-         if (cc) {
-           debugBelch(" %s", cc->label);
-         }
-         debugBelch("\n");
-         pc += 6;
+         debugBelch ("BRK_FUN todo " );  printPtr( ptrs[instrs[pc]] );
+         // TODO: I don't get how this used to work
+         // debugBelch (" %d ", instrs[pc+1]); printPtr( ptrs[instrs[pc+2]] );
+         // CostCentre* cc = (CostCentre*)literals[instrs[pc+3]];
+         // if (cc) {
+         //   debugBelch(" %s", cc->label);
+         // }
+         // debugBelch("\n");
+         // pc += 6;
          break;
       case bci_BRK_ALTS:
          debugBelch ("BRK_ALTS %d\n", BCO_NEXT);

@@ -1454,9 +1454,9 @@ run_BCO:
         /* check for a breakpoint on the beginning of a let binding */
         case bci_BRK_FUN:
         {
-            int arg1_brk_array, arg2_tick_mod, arg3_info_mod, arg4_tick_mod_id, arg5_info_mod_id, arg6_tick_index, arg7_info_index;
+            int arg1_brk_array, arg2_info_mod_name, arg3_info_mod_id, arg4_info_index;
 #if defined(PROFILING)
-            int arg8_cc;
+            int arg5_cc;
 #endif
             StgArrBytes *breakPoints;
             int returning_from_break, stop_next_breakpoint;
@@ -1471,14 +1471,11 @@ run_BCO:
             int size_words;
 
             arg1_brk_array      = BCO_GET_LARGE_ARG;
-            arg2_tick_mod       = BCO_GET_LARGE_ARG;
-            arg3_info_mod       = BCO_GET_LARGE_ARG;
-            arg4_tick_mod_id    = BCO_GET_LARGE_ARG;
-            arg5_info_mod_id    = BCO_GET_LARGE_ARG;
-            arg6_tick_index     = BCO_NEXT;
-            arg7_info_index     = BCO_NEXT;
+            arg2_info_mod_name  = BCO_GET_LARGE_ARG;
+            arg3_info_mod_id    = BCO_GET_LARGE_ARG;
+            arg4_info_index     = BCO_GET_LARGE_ARG;
 #if defined(PROFILING)
-            arg8_cc             = BCO_GET_LARGE_ARG;
+            arg5_cc             = BCO_GET_LARGE_ARG;
 #else
             BCO_GET_LARGE_ARG;
 #endif
@@ -1498,7 +1495,7 @@ run_BCO:
 
 #if defined(PROFILING)
             cap->r.rCCCS = pushCostCentre(cap->r.rCCCS,
-                                          (CostCentre*)BCO_LIT(arg8_cc));
+                                          (CostCentre*)BCO_LIT(arg5_cc));
 #endif
 
             // if we are returning from a break then skip this section
@@ -1509,7 +1506,7 @@ run_BCO:
 
                // stop the current thread if either `stop_next_breakpoint` is
                // true OR if the ignore count for this particular breakpoint is zero
-               StgInt ignore_count = ((StgInt*)breakPoints->payload)[arg6_tick_index];
+               StgInt ignore_count = ((StgInt*)breakPoints->payload)[BCO_LIT(arg6_tick_index)];
                if (stop_next_breakpoint == false && ignore_count > 0)
                {
                   // decrement and write back ignore count
