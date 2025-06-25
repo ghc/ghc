@@ -1564,6 +1564,7 @@ afterRunStmt :: GhciMonad m => SingleStep {-^ Type of step we took just before -
              -> GHC.ExecResult -> m GHC.ExecResult
 afterRunStmt step run_result = do
   resumes <- GHC.getResumeContext
+  hug <- hsc_HUG <$> GHC.getSession
   case run_result of
      GHC.ExecComplete{..} ->
        case execResult of
@@ -1573,7 +1574,9 @@ afterRunStmt step run_result = do
             when show_types $ printTypeOfNames names
      GHC.ExecBreak names mb_info
          | first_resume : _ <- resumes
-         -> do mb_id_loc <- toBreakIdAndLocation mb_info
+         -> do mbid <- maybe (pure Nothing)
+                        (fmap Just . liftIO . internalBreakIdToBreakId hug) mb_info
+               mb_id_loc <- toBreakIdAndLocation mbid
                let bCmd = maybe "" ( \(_,l) -> onBreakCmd l ) mb_id_loc
                if (null bCmd)
                  then printStoppedAtBreakInfo first_resume names
@@ -1606,13 +1609,13 @@ runAllocs m = do
     _ -> Nothing
 
 toBreakIdAndLocation :: GhciMonad m
-                     => Maybe GHC.InternalBreakpointId -> m (Maybe (Int, BreakLocation))
+                     => Maybe GHC.BreakpointId -> m (Maybe (Int, BreakLocation))
 toBreakIdAndLocation Nothing = return Nothing
 toBreakIdAndLocation (Just inf) = do
   st <- getGHCiState
   return $ listToMaybe [ id_loc | id_loc@(_,loc) <- IntMap.assocs (breaks st),
-                                  breakModule loc == ibi_tick_mod inf,
-                                  breakTick loc == ibi_tick_index inf ]
+                                  breakModule loc == bi_tick_mod inf,
+                                  breakTick loc == bi_tick_index inf ]
 
 printStoppedAtBreakInfo :: GHC.GhcMonad m => Resume -> [Name] -> m ()
 printStoppedAtBreakInfo res names = do
@@ -3792,7 +3795,7 @@ pprStopped res =
          <> text (GHC.resumeDecl res))
     <> char ',' <+> ppr (GHC.resumeSpan res)
  where
-  mb_mod_name = moduleName <$> ibi_tick_mod <$> GHC.resumeBreakpointId res
+  mb_mod_name = moduleName . bi_tick_mod . fst <$> GHC.resumeBreakpointId res
 
 showUnits :: GHC.GhcMonad m => m ()
 showUnits = mapNonInteractiveHomeUnitsM $ \dflags -> do

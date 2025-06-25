@@ -377,7 +377,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
             , resumeBindings = bindings
             , resumeFinalIds = final_ids
             , resumeApStack = apStack_fhv
-            , resumeBreakpointId = Just ibi
+            , resumeBreakpointId = Just (bid, ibi)
             , resumeSpan = span
             , resumeHistory = toListBL history0
             , resumeDecl = decl
@@ -445,9 +445,8 @@ resumeExec step mbCnt
                 -- When the user specified a break ignore count, set it
                 -- in the interpreter
                 case (mb_brkpt, mbCnt) of
-                  (Just brkpt, Just cnt) -> do
-                    brkid <- liftIO $ internalBreakIdToBreakId (hsc_HUG hsc_env) brkpt
-                    setupBreakpoint hsc_env brkid cnt
+                  (Just (bid, _ibi), Just cnt) ->
+                    setupBreakpoint hsc_env bid cnt
                   _ -> return ()
 
                 let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
@@ -456,9 +455,8 @@ resumeExec step mbCnt
                     hug = hsc_HUG hsc_env
                     hist' = case mb_brkpt of
                        Nothing -> pure prevHistoryLst
-                       Just ibi
+                       Just (bid, ibi)
                          | breakHere False step span -> do
-                            bid   <- liftIO (internalBreakIdToBreakId hug ibi)
                             hist1 <- liftIO (mkHistory hug apStack bid ibi)
                             return $ hist1 `consBL` fromListBL 50 hist
                          | otherwise -> pure prevHistoryLst
@@ -499,12 +497,11 @@ moveHist fn = do
           update_ic apStack mb_info = do
             span <- case mb_info of
                       Nothing  -> return $ mkGeneralSrcSpan (fsLit "<unknown>")
-                      Just ibi -> liftIO $ do
-                        bid  <- internalBreakIdToBreakId (hsc_HUG hsc_env) ibi
+                      Just (bid, _ibi) -> liftIO $ do
                         brks <- readModBreaks (hsc_HUG hsc_env) (bi_tick_mod bid)
                         return $ modBreaks_locs brks ! bi_tick_index bid
             (hsc_env1, names) <-
-              liftIO $ bindLocalsAtBreakpoint hsc_env apStack span mb_info
+              liftIO $ bindLocalsAtBreakpoint hsc_env apStack span (snd <$> mb_info)
             let ic = hsc_IC hsc_env1
                 r' = r { resumeHistoryIx = new_ix }
                 ic' = ic { ic_resume = r':rs }
@@ -523,7 +520,7 @@ moveHist fn = do
                           update_ic apStack mb_brkpt
            else case history !! (new_ix - 1) of
                    History{..} ->
-                     update_ic historyApStack (Just historyInternalBreakpointId)
+                     update_ic historyApStack (Just (historyBreakpointId, historyInternalBreakpointId))
 
 
 -- -----------------------------------------------------------------------------

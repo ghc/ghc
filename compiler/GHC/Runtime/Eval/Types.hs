@@ -175,8 +175,9 @@ data Resume = Resume
        , resumeFinalIds  :: [Id]         -- [Id] to bind on completion
        , resumeApStack   :: ForeignHValue -- The object from which we can get
                                         -- value of the free variables.
-       , resumeBreakpointId :: Maybe InternalBreakpointId
-                                        -- ^ the breakpoint we stopped at
+       , resumeBreakpointId :: Maybe (BreakpointId, InternalBreakpointId)
+                                        -- ^ the internal breakpoint we stopped at
+                                        -- and a cached computation of BreakpointId from it.
                                         -- (Nothing <=> exception)
        , resumeSpan      :: SrcSpan     -- just a copy of the SrcSpan
                                         -- from the ModBreaks,
