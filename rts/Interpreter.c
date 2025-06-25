@@ -644,7 +644,7 @@ interpretBCO (Capability* cap)
         ASSERT(get_itbl((StgClosure*)bco)->type == BCO);
         bco_instrs = (StgWord16*)(bco->instrs->payload);
 
-        /* A breakpoint instruction (BRK_FUN or BRK_ALTS) is always the first
+        /* A breakpoint instruction (BRK_FUN or BRK_TRIGGER) is always the first
          * instruction in a BCO */
         if ((bco_instrs[0] & 0xFF) == bci_BRK_FUN) {
             int brk_array, tick_index;
@@ -659,12 +659,16 @@ interpretBCO (Capability* cap)
             // ACTIVATE the breakpoint by tick index
             ((StgInt*)breakPoints->payload)[tick_index] = 0;
         }
-        else if ((bco_instrs[0] & 0xFF) == bci_BRK_ALTS) {
-            // ACTIVATE BRK_ALTS by setting its only argument to ON
-            bco_instrs[1] = 1;
+        else if ((bco_instrs[0] & 0xFF) == bci_BRK_TRIGGER) {
+            // ACTIVATE BRK_TRIGGER by setting activation to STOP_NEXT_BRK
+            ASSERT(bco_instrs[1] == 0);
+            bco_instrs[2] = TSO_STOP_NEXT_BREAKPOINT;
         }
         // else: if there is no BRK instruction perhaps we should keep
         // traversing; that said, the continuation should always have a BRK
+        // else {
+        //   goto TODO
+        // }
       }
       else /* type == STOP_FRAME */ {
         /* No continuation frame to further stop at: Nothing to do */
@@ -1600,12 +1604,16 @@ run_BCO:
             goto nextInsn;
         }
 
-        /* See Note [Debugger: BRK_ALTS] */
-        case bci_BRK_ALTS:
+        /* See Note [Debugger: BRK_TRIGGER] */
+        case bci_BRK_TRIGGER:
         {
-          StgWord16 active = BCO_NEXT;
-          if (active) {
-            cap->r.rCurrentTSO->flags |= TSO_STOP_NEXT_BREAKPOINT;
+          StgWord16 condition_flags = BCO_NEXT;
+          StgWord16 activate_flags = BCO_NEXT;
+          if (condition_flags == 0 || cap->r.rCurrentTSO->flags & condition_flags) {
+            cap->r.rCurrentTSO->flags |= activate_flags;
+            /* Disable condition flags; to preserve them make sure they're part
+             * of condition_flags too */
+            cap->r.rCurrentTSO->flags &= ~activate_flags;
           }
 
           goto nextInsn;

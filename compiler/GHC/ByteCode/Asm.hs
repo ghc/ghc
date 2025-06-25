@@ -856,7 +856,7 @@ assembleI platform i = case i of
                                                   , Op np
                                                   ]
 
-  BRK_ALTS active -> emit_ bci_BRK_ALTS [SmallOp active]
+  BRK_TRIGGER cnd tgt -> emit_ bci_BRK_TRIGGER [SmallOp cnd, SmallOp tgt]
 
 #if MIN_VERSION_rts(1,0,3)
   BCO_NAME name            -> do np <- lit1 (BCONPtrStr name)
