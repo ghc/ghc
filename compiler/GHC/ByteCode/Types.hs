@@ -19,13 +19,14 @@ module GHC.ByteCode.Types
   , ItblEnv, ItblPtr(..)
   , AddrEnv, AddrPtr(..)
   , CgBreakInfo(..)
-  , ModBreaks (..), BreakIndex
+  , ModBreaks (..)
   , CCostCentre
   , FlatBag, sizeFlatBag, fromSmallArray, elemsFlatBag
   ) where
 
 import GHC.Prelude
 
+import GHC.Types.Breakpoint
 import GHC.Data.FastString
 import GHC.Data.FlatBag
 import GHC.Types.Name
@@ -49,8 +50,7 @@ import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Iface.Syntax
-import Language.Haskell.Syntax.Module.Name (ModuleName)
-import GHC.Unit.Types (UnitId(..))
+import GHC.Unit.Module (Module)
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -288,9 +288,12 @@ instance NFData BCONPtr where
 -- preventing space leaks (see #22530)
 data CgBreakInfo
    = CgBreakInfo
-   { cgb_tyvars :: ![IfaceTvBndr] -- ^ Type variables in scope at the breakpoint
-   , cgb_vars   :: ![Maybe (IfaceIdBndr, Word)]
-   , cgb_resty  :: !IfaceType
+   { cgb_tyvars  :: ![IfaceTvBndr] -- ^ Type variables in scope at the breakpoint
+   , cgb_vars    :: ![Maybe (IfaceIdBndr, Word)]
+   , cgb_resty   :: !IfaceType
+   , cgb_tick_id :: !BreakpointId
+     -- ^ This field records the original breakpoint tick identifier for this
+     -- internal breakpoint info. See Note [Breakpoint identifiers].
    }
 -- See Note [Syncing breakpoint info] in GHC.Runtime.Eval
 
@@ -298,7 +301,8 @@ seqCgBreakInfo :: CgBreakInfo -> ()
 seqCgBreakInfo CgBreakInfo{..} =
     rnf cgb_tyvars `seq`
     rnf cgb_vars `seq`
-    rnf cgb_resty
+    rnf cgb_resty `seq`
+    rnf cgb_tick_id
 
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
@@ -309,13 +313,11 @@ instance Outputable UnlinkedBCO where
 instance Outputable CgBreakInfo where
    ppr info = text "CgBreakInfo" <+>
               parens (ppr (cgb_vars info) <+>
-                      ppr (cgb_resty info))
+                      ppr (cgb_resty info) <+>
+                      ppr (cgb_tick_id info))
 
 -- -----------------------------------------------------------------------------
 -- Breakpoints
-
--- | Breakpoint index
-type BreakIndex = Int
 
 -- | C CostCentre type
 data CCostCentre
@@ -326,21 +328,19 @@ data ModBreaks
    { modBreaks_flags :: !(ForeignRef BreakArray)
         -- ^ The array of flags, one per breakpoint,
         -- indicating which breakpoints are enabled.
-   , modBreaks_locs :: !(Array BreakIndex SrcSpan)
+   , modBreaks_locs :: !(Array BreakTickIndex SrcSpan)
         -- ^ An array giving the source span of each breakpoint.
-   , modBreaks_vars :: !(Array BreakIndex [OccName])
+   , modBreaks_vars :: !(Array BreakTickIndex [OccName])
         -- ^ An array giving the names of the free variables at each breakpoint.
-   , modBreaks_decls :: !(Array BreakIndex [String])
+   , modBreaks_decls :: !(Array BreakTickIndex [String])
         -- ^ An array giving the names of the declarations enclosing each breakpoint.
         -- See Note [Field modBreaks_decls]
-   , modBreaks_ccs :: !(Array BreakIndex (RemotePtr CostCentre))
+   , modBreaks_ccs :: !(Array BreakTickIndex (RemotePtr CostCentre))
         -- ^ Array pointing to cost centre for each breakpoint
    , modBreaks_breakInfo :: IntMap CgBreakInfo
         -- ^ info about each breakpoint from the bytecode generator
-   , modBreaks_module :: !ModuleName
+   , modBreaks_module :: !Module
         -- ^ info about the module in which we are setting the breakpoint
-   , modBreaks_module_unitid :: !UnitId
-        -- ^ The 'UnitId' of the 'ModuleName'
    }
 
 seqModBreaks :: ModBreaks -> ()
@@ -351,12 +351,11 @@ seqModBreaks ModBreaks{..} =
   rnf modBreaks_decls `seq`
   rnf modBreaks_ccs `seq`
   rnf (fmap seqCgBreakInfo modBreaks_breakInfo) `seq`
-  rnf modBreaks_module `seq`
-  rnf modBreaks_module_unitid
+  rnf modBreaks_module
 
 {-
 Note [Field modBreaks_decls]
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A value of eg ["foo", "bar", "baz"] in a `modBreaks_decls` field means:
 The breakpoint is in the function called "baz" that is declared in a `let`
 or `where` clause of a declaration called "bar", which itself is declared

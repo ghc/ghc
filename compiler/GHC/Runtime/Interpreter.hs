@@ -27,8 +27,10 @@ module GHC.Runtime.Interpreter
   , getClosure
   , whereFrom
   , getModBreaks
+  , readModBreaks
   , seqHValue
   , evalBreakpointToId
+  , internalBreakIdToBreakId
   , interpreterDynamic
   , interpreterProfiled
 
@@ -117,9 +119,11 @@ import qualified GHC.InfoProv as InfoProv
 
 import GHC.Builtin.Names
 import GHC.Types.Name
+import qualified GHC.Unit.Home.Graph as HUG
 
 -- Standard libraries
 import GHC.Exts
+import qualified Data.IntMap as IntMap
 
 {- Note [Remote GHCi]
    ~~~~~~~~~~~~~~~~~~
@@ -413,17 +417,27 @@ evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
 evalBreakpointToId eval_break =
   let
     mkUnitId u = fsToUnit $ mkFastStringShortByteString u
-
     toModule u n = mkModule (mkUnitId u) (mkModuleName n)
-    tickl = toModule (eb_tick_mod_unit eval_break) (eb_tick_mod eval_break)
-    infol = toModule (eb_info_mod_unit eval_break) (eb_info_mod eval_break)
   in
     InternalBreakpointId
-      { ibi_tick_mod   = tickl
-      , ibi_tick_index = eb_tick_index eval_break
-      , ibi_info_mod   = infol
+      { ibi_info_mod   = toModule (eb_info_mod_unit eval_break) (eb_info_mod eval_break)
       , ibi_info_index = eb_info_index eval_break
       }
+
+-- | An @'InternalBreakpointId'@ is an index into the @IntMap 'CgBreakInfo'@ of
+-- a specific module's @'ModBreaks'@.
+--
+-- To get the @'BreakpointId'@, an index from the Core-level ticks to the
+-- associated SrcSpans and other source-level relevant details, lookup it up in
+-- the @'CgBreakInfo'@ of this internal id's module.
+--
+-- See also Note [Breakpoint identifiers]
+internalBreakIdToBreakId :: HomeUnitGraph -> InternalBreakpointId -> IO BreakpointId
+internalBreakIdToBreakId hug ibi = do
+  ModBreaks{modBreaks_breakInfo} <- readModBreaks hug (ibi_info_mod ibi)
+  let CgBreakInfo{cgb_tick_id} = expectJust $
+        IntMap.lookup (ibi_info_index ibi) modBreaks_breakInfo
+  return cgb_tick_id
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
 handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
@@ -442,17 +456,18 @@ handleSeqHValueStatus interp unit_env eval_status =
           -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
 
         Just break -> do
-          let bi = evalBreakpointToId break
+          let ibi = evalBreakpointToId break
+              hug = ue_home_unit_graph unit_env
+          bi <- internalBreakIdToBreakId hug ibi
 
           -- Just case: Stopped at a breakpoint, extract SrcSpan information
           -- from the breakpoint.
-          mb_modbreaks <- getModBreaks . expectJust <$>
-                          lookupHugByModule (ibi_tick_mod bi) (ue_home_unit_graph unit_env)
+          mb_modbreaks <- getModBreaks . expectJust <$> lookupHugByModule (bi_tick_mod bi) hug
           case mb_modbreaks of
             -- Nothing case - should not occur! We should have the appropriate
             -- breakpoint information
             Nothing -> nothing_case
-            Just modbreaks -> put $ brackets . ppr $ (modBreaks_locs modbreaks) ! ibi_tick_index bi
+            Just modbreaks -> put $ brackets . ppr $ (modBreaks_locs modbreaks) ! bi_tick_index bi
 
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
@@ -735,10 +750,6 @@ wormholeRef interp _r = case interpInstance interp of
 -- -----------------------------------------------------------------------------
 -- Misc utils
 
-fromEvalResult :: EvalResult a -> IO a
-fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
-fromEvalResult (EvalSuccess a) = return a
-
 getModBreaks :: HomeModInfo -> Maybe ModBreaks
 getModBreaks hmi
   | Just linkable <- homeModInfoByteCode hmi,
@@ -747,6 +758,15 @@ getModBreaks hmi
   = bc_breaks cbc
   | otherwise
   = Nothing -- probably object code
+
+-- | Read the 'ModBreaks' of the given home 'Module' from the 'HomeUnitGraph'.
+readModBreaks :: HomeUnitGraph -> Module -> IO ModBreaks
+readModBreaks hug mod =
+  expectJust . getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
+
+fromEvalResult :: EvalResult a -> IO a
+fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
+fromEvalResult (EvalSuccess a) = return a
 
 -- | Interpreter uses Profiling way
 interpreterProfiled :: Interp -> Bool

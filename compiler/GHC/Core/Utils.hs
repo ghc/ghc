@@ -2492,11 +2492,10 @@ cheapEqExpr' ignoreTick e1 e2
 
 -- Used by diffBinds, which is itself only used in GHC.Core.Lint.lintAnnots
 eqTickish :: RnEnv2 -> CoreTickish -> CoreTickish -> Bool
-eqTickish env (Breakpoint lext lid lids lmod) (Breakpoint rext rid rids rmod)
+eqTickish env (Breakpoint lext lid lids) (Breakpoint rext rid rids)
       = lid == rid &&
         map (rnOccL env) lids == map (rnOccR env) rids &&
-        lext == rext &&
-        lmod == rmod
+        lext == rext
 eqTickish _ l r = l == r
 
 -- | Finds differences between core bindings, see @diffExpr@.

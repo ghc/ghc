@@ -19,6 +19,7 @@ import GHC.Utils.Outputable as Outputable
 import Data.List (intersperse)
 import Data.Array
 import qualified Data.IntMap as IntMap
+import GHC.Types.Breakpoint
 
 -- | Initialize memory for breakpoint data that is shared between the bytecode
 -- generator and the interpreter.
@@ -46,13 +47,12 @@ mkModBreaks interp mod extendedMixEntries
       , modBreaks_decls  = declsTicks
       , modBreaks_ccs    = ccs
       , modBreaks_breakInfo = IntMap.empty
-      , modBreaks_module = moduleName mod
-      , modBreaks_module_unitid = toUnitId $ moduleUnit mod
+      , modBreaks_module = mod
       }
 
 mkCCSArray
   :: Interp -> Module -> Int -> [Tick]
-  -> IO (Array BreakIndex (RemotePtr GHC.Stack.CCS.CostCentre))
+  -> IO (Array BreakTickIndex (RemotePtr GHC.Stack.CCS.CostCentre))
 mkCCSArray interp modul count entries
   | GHCi.interpreterProfiled interp = do
       let module_str = moduleNameString (moduleName modul)

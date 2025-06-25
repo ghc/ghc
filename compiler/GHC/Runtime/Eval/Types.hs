@@ -193,6 +193,10 @@ type ResumeBindings = ([TyThing], IcGlobalRdrEnv)
 
 data History = History
   { historyApStack        :: ForeignHValue
-  , historyBreakpointId   :: InternalBreakpointId -- ^ breakpoint identifier
-  , historyEnclosingDecls :: [String]             -- ^ declarations enclosing the breakpoint
+  , historyBreakpointId   :: BreakpointId
+    -- ^ Cache the 'BreakpointId' computed from the 'InternalBreakpointId'
+  , historyInternalBreakpointId :: InternalBreakpointId
+    -- ^ internal breakpoint identifier
+  , historyEnclosingDecls :: [String]
+    -- ^ declarations enclosing the breakpoint
   }

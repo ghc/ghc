@@ -70,6 +70,7 @@ import GHC.Data.OrdList
 import GHC.Data.Maybe
 import GHC.Types.Tickish
 import GHC.Types.SptEntry
+import GHC.Types.Breakpoint
 
 import Data.List ( genericReplicate, intersperse
                  , partition, scanl', sortBy, zip4, zip6 )
@@ -390,7 +391,7 @@ schemeR_wrk fvs nm original_body (args, body)
 -- | Introduce break instructions for ticked expressions.
 -- If no breakpoint information is available, the instruction is omitted.
 schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
-schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
+schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
   code <- schemeE d 0 p rhs
   hsc_env <- getHscEnv
   current_mod <- getCurrentModule
@@ -399,31 +400,26 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
     -- if we're not generating ModBreaks for this module for some reason, we
     -- can't store breakpoint occurrence information.
     Nothing -> pure code
-    Just current_mod_breaks -> break_info hsc_env tick_mod current_mod mb_current_mod_breaks >>= \case
+    Just current_mod_breaks -> break_info hsc_env (bi_tick_mod tick_id) current_mod mb_current_mod_breaks >>= \case
       Nothing -> pure code
-      Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = tick_mod_ptr, modBreaks_module_unitid = tick_mod_id_ptr, modBreaks_ccs = cc_arr} -> do
+      Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = _tick_mod, modBreaks_ccs = cc_arr} -> do
         platform <- profilePlatform <$> getProfile
         let idOffSets = getVarOffSets platform d p fvs
             ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
             toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
             toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-            breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
+            breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty tick_id
 
-        let info_mod_ptr = modBreaks_module current_mod_breaks
-            info_mod_id_ptr = modBreaks_module_unitid current_mod_breaks
+        let info_mod = modBreaks_module current_mod_breaks
         infox <- newBreakInfo breakInfo
 
         let cc | Just interp <- hsc_interp hsc_env
               , interpreterProfiled interp
-              = cc_arr ! tick_no
+              = cc_arr ! bi_tick_index tick_id
               | otherwise = toRemotePtr nullPtr
 
-        let -- cast that checks that round-tripping through Word16 doesn't change the value
-            toW16 x = let r = fromIntegral x :: Word16
-                      in if fromIntegral r == x
-                        then r
-                        else pprPanic "schemeER_wrk: breakpoint tick/info index too large!" (ppr x)
-            breakInstr = BRK_FUN breaks tick_mod_ptr tick_mod_id_ptr (toW16 tick_no) info_mod_ptr info_mod_id_ptr (toW16 infox) cc
+            breakInstr = BRK_FUN breaks (InternalBreakpointId info_mod infox) cc
+
         return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
@@ -648,10 +644,9 @@ schemeE d s p (StgLet _ext binds body) = do
      thunk_codes <- sequence compile_binds
      return (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
 
-schemeE _d _s _p (StgTick (Breakpoint _ bp_id _ _) _rhs)
-   = panic ("schemeE: Breakpoint without let binding: " ++
-            show bp_id ++
-            " forgot to run bcPrep?")
+schemeE _d _s _p (StgTick (Breakpoint _ bp_id _) _rhs)
+   = pprPanic "schemeE: Breakpoint without let binding:"
+        (ppr bp_id <+> text "forgot to run bcPrep?")
 
 -- ignore other kinds of tick
 schemeE d s p (StgTick _ rhs) = schemeE d s p rhs

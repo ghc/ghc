@@ -55,6 +55,7 @@ import Data.Bifunctor (second)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
+import GHC.Types.Breakpoint (BreakpointId(..))
 
 {-
 ************************************************************************
@@ -1235,7 +1236,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
 
     Breakpoints -> do
       i <- addMixEntry me
-      pure (Breakpoint noExtField i ids (this_mod env))
+      pure (Breakpoint noExtField (BreakpointId (this_mod env) i) ids)
 
     SourceNotes | RealSrcSpan pos' _ <- pos ->
       return $ SourceNote pos' $ LexicalFastString cc_name

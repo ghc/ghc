@@ -31,6 +31,7 @@ import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHC.Runtime.Heap.Layout ( fromStgWord, StgWord )
 
+import GHC.Types.Breakpoint
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Literal
@@ -842,19 +843,14 @@ assembleI platform i = case i of
     W8                   -> emit_ bci_OP_INDEX_ADDR_08 []
     _                    -> unsupported_width
 
-  BRK_FUN arr tick_mod tick_mod_id tickx info_mod info_mod_id infox cc ->
-                              do p1 <- ptr (BCOPtrBreakArray arr)
-                                 tick_addr <- lit1 $ BCONPtrFS $ moduleNameFS tick_mod
-                                 info_addr <- lit1 $ BCONPtrFS $ moduleNameFS info_mod
-                                 tick_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS tick_mod_id
-                                 info_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS info_mod_id
-                                 np <- addr cc
-                                 emit_ bci_BRK_FUN [ Op p1
-                                                  , Op tick_addr, Op info_addr
-                                                  , Op tick_unitid_addr, Op info_unitid_addr
-                                                  , SmallOp tickx, SmallOp infox
-                                                  , Op np
-                                                  ]
+  BRK_FUN arr (InternalBreakpointId info_mod infox) cc -> do
+    p1 <- ptr (BCOPtrBreakArray arr)
+    info_addr <- lit1 $ BCONPtrFS $ moduleNameFS $ moduleName info_mod
+    info_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS $ moduleUnitId info_mod
+    info_wix <- int infox
+    np <- addr cc
+    emit_ bci_BRK_FUN [ Op p1, Op info_addr, Op info_unitid_addr
+                      , Op info_wix, Op np ]
 
   BRK_ALTS active -> emit_ bci_BRK_ALTS [SmallOp active]
 

@@ -72,6 +72,7 @@ import GHC.Iface.Syntax
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula qualified as BF(BooleanFormula(..))
 
+import GHC.Types.Breakpoint
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( noinlineIdName, noinlineConstraintIdName )
@@ -586,8 +587,8 @@ toIfaceTickish (ProfNote cc tick push) = IfaceSCC cc tick push
 toIfaceTickish (HpcTick modl ix)       = IfaceHpcTick modl ix
 toIfaceTickish (SourceNote src (LexicalFastString names)) =
   IfaceSource src names
-toIfaceTickish (Breakpoint _ ix fv m) =
-  IfaceBreakpoint ix (toIfaceVar <$> fv) m
+toIfaceTickish (Breakpoint _ ix fv) =
+  IfaceBreakpoint ix (toIfaceVar <$> fv)
 
 ---------------------
 toIfaceBind :: Bind Id -> IfaceBinding IfaceLetBndr
@@ -704,12 +705,13 @@ toIfaceLFInfo nm lfi = case lfi of
 
 -- Dehydrating CgBreakInfo
 
-dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> CgBreakInfo
-dehydrateCgBreakInfo ty_vars idOffSets tick_ty =
+dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> BreakpointId -> CgBreakInfo
+dehydrateCgBreakInfo ty_vars idOffSets tick_ty bid =
           CgBreakInfo
             { cgb_tyvars = map toIfaceTvBndr ty_vars
             , cgb_vars = map (fmap (\(i, offset) -> (toIfaceIdBndr i, offset))) idOffSets
             , cgb_resty = toIfaceType tick_ty
+            , cgb_tick_id = bid
             }
 
 {- Note [Inlining and hs-boot files]

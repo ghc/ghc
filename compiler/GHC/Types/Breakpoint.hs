@@ -1,44 +1,46 @@
+{-# LANGUAGE RecordWildCards #-}
+
 -- | Breakpoint related types
 module GHC.Types.Breakpoint
   ( BreakpointId (..)
   , InternalBreakpointId (..)
-  , toBreakpointId
+  , BreakTickIndex, BreakInfoIndex
   )
 where
 
+import Control.DeepSeq
 import GHC.Prelude
 import GHC.Unit.Module
+import GHC.Utils.Outputable
+import Data.Data (Data)
+
+-- | Breakpoint tick index
+type BreakTickIndex = Int
+
+-- | Internal breakpoint info index
+type BreakInfoIndex = Int
 
 -- | Breakpoint identifier.
 --
 -- See Note [Breakpoint identifiers]
 data BreakpointId = BreakpointId
-  { bi_tick_mod   :: !Module  -- ^ Breakpoint tick module
-  , bi_tick_index :: !Int     -- ^ Breakpoint tick index
+  { bi_tick_mod   :: !Module         -- ^ Breakpoint tick module
+  , bi_tick_index :: !BreakTickIndex -- ^ Breakpoint tick index
   }
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Data)
 
 -- | Internal breakpoint identifier
 --
 -- See Note [Breakpoint identifiers]
 data InternalBreakpointId = InternalBreakpointId
-  { ibi_tick_mod   :: !Module  -- ^ Breakpoint tick module
-  , ibi_tick_index :: !Int     -- ^ Breakpoint tick index
-  , ibi_info_mod   :: !Module  -- ^ Breakpoint info module
-  , ibi_info_index :: !Int     -- ^ Breakpoint info index
+  { ibi_info_mod   :: !Module         -- ^ Breakpoint tick module
+  , ibi_info_index :: !BreakInfoIndex -- ^ Breakpoint tick index
   }
   deriving (Eq, Ord)
 
-toBreakpointId :: InternalBreakpointId -> BreakpointId
-toBreakpointId ibi = BreakpointId
-  { bi_tick_mod   = ibi_tick_mod ibi
-  , bi_tick_index = ibi_tick_index ibi
-  }
-
-
 -- Note [Breakpoint identifiers]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
+-- ROMES:TODO: UPDATE NOTE
 -- Before optimization a breakpoint is identified uniquely with a tick module
 -- and a tick index. See BreakpointId. A tick module contains an array, indexed
 -- with the tick indexes, which indicates breakpoint status.
@@ -53,3 +55,23 @@ toBreakpointId ibi = BreakpointId
 -- So every breakpoint occurrence gets assigned a module-unique *info index* and
 -- we store it alongside the occurrence module (*info module*) in the
 -- InternalBreakpointId datatype.
+
+--------------------------------------------------------------------------------
+-- Instances
+--------------------------------------------------------------------------------
+
+instance Outputable BreakpointId where
+  ppr BreakpointId{..} =
+    text "BreakpointId" <+> ppr bi_tick_mod <+> ppr bi_tick_index
+
+instance Outputable InternalBreakpointId where
+  ppr InternalBreakpointId{..} =
+    text "InternalBreakpointId" <+> ppr ibi_info_mod <+> ppr ibi_info_index
+
+instance NFData BreakpointId where
+  rnf BreakpointId{..} =
+    rnf bi_tick_mod `seq` rnf bi_tick_index
+
+instance NFData InternalBreakpointId where
+  rnf InternalBreakpointId{..} =
+    rnf ibi_info_mod `seq` rnf ibi_info_index

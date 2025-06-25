@@ -41,6 +41,7 @@ import Language.Haskell.Syntax.Extension ( NoExtField )
 
 import Data.Data
 import GHC.Utils.Outputable (Outputable (ppr), text)
+import GHC.Types.Breakpoint
 
 {- *********************************************************************
 *                                                                      *
@@ -128,7 +129,7 @@ data GenTickish pass =
   -- and (b) substituting (don't substitute for them)
   | Breakpoint
     { breakpointExt    :: XBreakpoint pass
-    , breakpointId     :: !Int
+    , breakpointId     :: !BreakpointId
     , breakpointFVs    :: [XTickishId pass]
                                 -- ^ the order of this list is important:
                                 -- it matches the order of the lists in the
@@ -136,7 +137,6 @@ data GenTickish pass =
                                 --
                                 -- Careful about substitution!  See
                                 -- Note [substTickish] in "GHC.Core.Subst".
-    , breakpointModule :: Module
     }
 
   -- | A source note.
