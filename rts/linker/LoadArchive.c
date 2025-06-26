@@ -223,21 +223,22 @@ lookupGNUArchiveIndex(int gnuFileIndexSize, char **fileName_,
     char* gnuFileIndex, pathchar* path, size_t* thisFileNameSize,
     size_t* fileNameSize)
 {
-    int n;
     char *fileName = *fileName_;
     if (isdigit(fileName[1])) {
-        int i;
-        for (n = 2; isdigit(fileName[n]); n++)
-            ;
-
-        fileName[n] = '\0';
-        n = atoi(fileName + 1);
         if (gnuFileIndex == NULL) {
             errorBelch("loadArchive: GNU-variant filename "
                     "without an index while reading from `%" PATH_FMT "'",
                     path);
             return false;
         }
+
+        int n;
+        for (n = 2; isdigit(fileName[n]); n++)
+            ;
+
+        char *end;
+        fileName[n] = '\0';
+        n = strtol(fileName + 1, &end, 10);
         if (n < 0 || n > gnuFileIndexSize) {
             errorBelch("loadArchive: GNU-variant filename "
                     "offset %d out of range [0..%d] "
@@ -245,17 +246,27 @@ lookupGNUArchiveIndex(int gnuFileIndexSize, char **fileName_,
                     n, gnuFileIndexSize, path);
             return false;
         }
-        if (n != 0 && gnuFileIndex[n - 1] != '\n') {
+
+        // Check that the previous entry ends with the expected
+        // end-of-string delimiter.
+#if defined(mingw32_HOST_OS)
+#define IS_SYMBOL_DELIMITER(STR) (STR =='\n' || STR == '\0')
+#else
+#define IS_SYMBOL_DELIMITER(STR) (STR =='\n')
+#endif
+        if (n != 0 && !IS_SYMBOL_DELIMITER(gnuFileIndex[n - 1])) {
             errorBelch("loadArchive: GNU-variant filename offset "
                     "%d invalid (range [0..%d]) while reading "
                     "filename from `%" PATH_FMT "'",
                     n, gnuFileIndexSize, path);
             return false;
         }
-        for (i = n; gnuFileIndex[i] != '\n'; i++)
+
+        int i;
+        for (i = n; !IS_SYMBOL_DELIMITER(gnuFileIndex[i]); i++)
             ;
 
-        size_t FileNameSize = i - n - 1;
+        size_t FileNameSize = i - n;
         if (FileNameSize >= *fileNameSize) {
             /* Double it to avoid potentially continually
              increasing it by 1 */
