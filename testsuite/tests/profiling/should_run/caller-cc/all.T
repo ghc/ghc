@@ -8,6 +8,7 @@ setTestOpts(only_ways(prof_ways))
 setTestOpts(extra_files(['Main.hs']))
 setTestOpts(extra_run_opts('7'))
 setTestOpts(grep_prof("Main.hs"))
+setTestOpts(grep_prof("calling:"))
 
 # N.B. Main.hs is stolen from heapprof001.
 
