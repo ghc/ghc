@@ -28,6 +28,7 @@ module GHC.ByteCode.Types
 
 import GHC.Prelude
 
+import GHC.ByteCode.Breakpoints
 import GHC.Data.FastString
 import GHC.Data.FlatBag
 import GHC.Types.Name
@@ -35,7 +36,6 @@ import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Builtin.PrimOps
 import GHC.Types.SptEntry
-import GHC.Types.Tickish ( BreakpointId(..) )
 import GHCi.BreakArray
 import GHCi.Message
 import GHCi.RemoteTypes
@@ -47,10 +47,7 @@ import Foreign
 import Data.ByteString (ByteString)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
-import GHC.Iface.Syntax
-import Data.IntMap (IntMap)
 import GHC.HsToCore.Breakpoints (ModBreaks)
-import GHC.Unit.Module (Module)
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -65,8 +62,9 @@ data CompiledByteCode = CompiledByteCode
   , bc_strs   :: [(Name, ByteString)]
     -- ^ top-level strings (heap allocated)
 
-  , bc_breaks :: Maybe (InternalModBreaks, ModBreaks)
-    -- ^ internal breakpoint info (Nothing if breakpoints are disabled)
+  , bc_breaks :: (Maybe (InternalModBreaks, ModBreaks))
+    -- ^ internal breakpoint info (no tick-level 'ModBreaks' if breakpoints are disabled)
+    --
     -- TODO: If ModBreaks is serialized and reconstructed as part of ModDetails
     -- we don't need to keep it here as it can be fetched from the
     -- 'HomeModInfo' directly.
@@ -291,112 +289,3 @@ instance Outputable UnlinkedBCO where
              ppr (sizeFlatBag lits), text "lits",
              ppr (sizeFlatBag ptrs), text "ptrs" ]
 
-instance Outputable CgBreakInfo where
-   ppr info = text "CgBreakInfo" <+>
-              parens (ppr (cgb_vars info) <+>
-                      ppr (cgb_resty info) <+>
-                      ppr (cgb_tick_id info))
-
---------------------------------------------------------------------------------
--- * 'InternalModBreaks'
---------------------------------------------------------------------------------
-
--- | Internal breakpoint info index
-type BreakInfoIndex = Int
-
--- | Internal breakpoint identifier
---
--- Indexes into the structures in the @'InternalModBreaks'@ produced during ByteCode generation.
--- See Note [Breakpoint identifiers]
-data InternalBreakpointId = InternalBreakpointId
-  { ibi_info_mod   :: !Module         -- ^ Breakpoint tick module
-  , ibi_info_index :: !BreakInfoIndex -- ^ Breakpoint tick index
-  }
-  deriving (Eq, Ord)
-
--- Note [Breakpoint identifiers]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- ROMES:TODO: UPDATE NOTE
--- Before optimization a breakpoint is identified uniquely with a tick module
--- and a tick index. See BreakpointId. A tick module contains an array, indexed
--- with the tick indexes, which indicates breakpoint status.
---
--- When we generate ByteCode, we collect information for every breakpoint at
--- their *occurrence sites* (see CgBreakInfo in GHC.ByteCode.Types) and these info
--- are stored in the ModIface of the occurrence module. Because of inlining, we
--- can't reuse the tick index to uniquely identify an occurrence; because of
--- cross-module inlining, we can't assume that the occurrence module is the same
--- as the tick module (#24712).
---
--- So every breakpoint occurrence gets assigned a module-unique *info index* and
--- we store it alongside the occurrence module (*info module*) in the
--- InternalBreakpointId datatype.
-
-instance Outputable InternalBreakpointId where
-  ppr InternalBreakpointId{..} =
-    text "InternalBreakpointId" <+> ppr ibi_info_mod <+> ppr ibi_info_index
-
-instance NFData InternalBreakpointId where
-  rnf InternalBreakpointId{..} =
-    rnf ibi_info_mod `seq` rnf ibi_info_index
-
--- | Internal mod breaks store the runtime-relevant information of breakpoints.
---
--- Importantly, it maps 'InternalBreakpointId's to 'CgBreakInfo'.
---
--- 'InternalModBreaks' are constructed during bytecode generation and stored in
--- 'CompiledByteCode' afterwards.
-data InternalModBreaks = InternalModBreaks
-      { imodBreaks_breakInfo :: IntMap CgBreakInfo
-        -- ^ Access code-gen time information about a breakpoint, indexed by
-        -- 'InternalBreakpointId'.
-      }
-
--- | Information about a breakpoint that we know at code-generation time
--- In order to be used, this needs to be hydrated relative to the current HscEnv by
--- 'hydrateCgBreakInfo'. Everything here can be fully forced and that's critical for
--- preventing space leaks (see #22530)
-data CgBreakInfo
-   = CgBreakInfo
-   { cgb_tyvars  :: ![IfaceTvBndr] -- ^ Type variables in scope at the breakpoint
-   , cgb_vars    :: ![Maybe (IfaceIdBndr, Word)]
-   , cgb_resty   :: !IfaceType
-   , cgb_tick_id :: !BreakpointId
-     -- ^ This field records the original breakpoint tick identifier for this
-     -- internal breakpoint info. See Note [Breakpoint identifiers].
-   }
--- See Note [Syncing breakpoint info] in GHC.Runtime.Eval
-
-seqInternalModBreaks :: InternalModBreaks -> ()
-seqInternalModBreaks InternalModBreaks{..} =
-    rnf (fmap seqCgBreakInfo imodBreaks_breakInfo)
-
-seqCgBreakInfo :: CgBreakInfo -> ()
-seqCgBreakInfo CgBreakInfo{..} =
-    rnf cgb_tyvars `seq`
-    rnf cgb_vars `seq`
-    rnf cgb_resty `seq`
-    rnf cgb_tick_id
-
--- TODO!!!!!
--- , modBreaks_breakInfo :: IntMap CgBreakInfo
---      -- ^ info about each breakpoint from the bytecode generator
---
---
-
--- mkCCSArray
---   :: Interp -> Module -> Int -> [Tick]
---   -> IO (Array BreakTickIndex (RemotePtr GHC.Stack.CCS.CostCentre))
--- mkCCSArray interp modul count entries
---   | interpreterProfiled interp = do
---       let module_str = moduleNameString (moduleName modul)
---       costcentres <- GHCi.mkCostCentres interp module_str (map mk_one entries)
---       return (listArray (0,count-1) costcentres)
---   | otherwise = return (listArray (0,-1) [])
---  where
---     mk_one t = (name, src)
---       where name = concat $ intersperse "." $ tick_path t
---             src = renderWithContext defaultSDocContext $ ppr $ tick_loc t
---   , modBreaks_ccs :: !(Array BreakTickIndex (RemotePtr CostCentre))
---        -- ^ Array pointing to cost centre for each breakpoint
---    ccs <- mkCCSArray interpProfiled mod count entries

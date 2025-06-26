@@ -22,7 +22,6 @@ import GHC.Driver.Monad
 import GHC.Driver.Session.Inspect
 import GHC.Runtime.Eval
 import GHC.Runtime.Eval.Utils
-import GHC.Types.Breakpoint
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Unit.Module

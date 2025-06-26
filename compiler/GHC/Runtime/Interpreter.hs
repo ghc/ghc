@@ -76,9 +76,10 @@ import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
-import GHC.ByteCode.Types
 import GHC.HsToCore.Breakpoints
+import GHC.ByteCode.Breakpoints
 
+import GHC.ByteCode.Types
 import GHC.Linker.Types
 
 import GHC.Data.Maybe
@@ -122,7 +123,6 @@ import qualified GHC.Unit.Home.Graph as HUG
 
 -- Standard libraries
 import GHC.Exts
-import qualified Data.IntMap as IntMap
 
 {- Note [Remote GHCi]
    ~~~~~~~~~~~~~~~~~~
@@ -433,9 +433,8 @@ evalBreakpointToId eval_break =
 -- See also Note [Breakpoint identifiers]
 internalBreakIdToBreakId :: HomeUnitGraph -> InternalBreakpointId -> IO BreakpointId
 internalBreakIdToBreakId hug ibi = do
-  (InternalModBreaks{imodBreaks_breakInfo}, _) <- readModBreaks hug (ibi_info_mod ibi)
-  let CgBreakInfo{cgb_tick_id} = expectJust $
-        IntMap.lookup (ibi_info_index ibi) imodBreaks_breakInfo
+  (imbs, _) <- readModBreaks hug (ibi_info_mod ibi)
+  let CgBreakInfo{cgb_tick_id} = getInternalBreak ibi imbs
   return cgb_tick_id
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
@@ -750,8 +749,8 @@ wormholeRef interp _r = case interpInstance interp of
 -- * Finding breakpoint information
 --------------------------------------------------------------------------------
 
--- | Get the 'InternalModBreaks' breakpoint information from the ByteCode
--- object associated to this 'HomeModInfo'.
+-- | Get the breakpoint information from the ByteCode object associated to this
+-- 'HomeModInfo'.
 getModBreaks :: HomeModInfo -> Maybe (InternalModBreaks, ModBreaks)
 getModBreaks hmi
   | Just linkable <- homeModInfoByteCode hmi,
@@ -763,17 +762,11 @@ getModBreaks hmi
 
 -- | Read the 'InternalModBreaks' and 'ModBreaks' of the given home 'Module'
 -- from the 'HomeUnitGraph'.
-readModBreaks :: HomeUnitGraph -> BreakpointId -> IO ModBreaks
+readModBreaks :: HomeUnitGraph -> Module -> IO (InternalModBreaks, ModBreaks)
 readModBreaks hug mod = expectJust <$> readModBreaksMaybe hug mod
 
-readInternalModBreaks :: HomeUnitGraph -> InternalBreakpointId -> IO InternalModBreaks
-readInternalModBreaks hug mod = expectJust <$> readInternalModBreaksMaybe hug mod
-
-readModBreaksMaybe :: HomeUnitGraph -> Module -> IO (Maybe ModBreaks)
+readModBreaksMaybe :: HomeUnitGraph -> Module -> IO (Maybe (InternalModBreaks, ModBreaks))
 readModBreaksMaybe hug mod = getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
-
-readInternalModBreaksMaybe :: HomeUnitGraph -> Module -> IO (Maybe InternalModBreaks)
-readInternalModBreaksMaybe hug mod = getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
 
 -- -----------------------------------------------------------------------------
 -- Misc utils

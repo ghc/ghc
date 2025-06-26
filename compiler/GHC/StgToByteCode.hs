@@ -4,13 +4,14 @@
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE DerivingVia #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
 --
 
 -- | GHC.StgToByteCode: Generate bytecode from STG
-module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen) where
+module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen ) where
 
 import GHC.Prelude
 
@@ -70,7 +71,8 @@ import GHC.Data.OrdList
 import GHC.Data.Maybe
 import GHC.Types.Tickish
 import GHC.Types.SptEntry
-import GHC.Types.Breakpoint
+import GHC.HsToCore.Breakpoints
+import GHC.ByteCode.Breakpoints
 
 import Data.List ( genericReplicate, intersperse
                  , partition, scanl', sortBy, zip4, zip6 )
@@ -97,6 +99,10 @@ import Data.Either ( partitionEithers )
 import GHC.Stg.Syntax
 import qualified Data.IntSet as IntSet
 import GHC.CoreToIface
+
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader (ReaderT)
+import Control.Monad.Trans.State  (StateT)
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -131,9 +137,15 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr $ elemsFlatBag proto_bcos)))
 
-        let mod_breaks = case modBreaks of
-             Nothing -> Nothing
-             Just mb -> Just mb{ modBreaks_breakInfo = breakInfo }
+        let all_mod_breaks = case mb_modBreaks of
+             Just modBreaks -> Just (modBreaks, internalBreaks)
+             Nothing        -> Nothing
+             -- no modBreaks, thus drop all
+             -- internalBreaks? Will we ever want to have internal breakpoints in
+             -- a module for which we're not doing breakpoints at all? probably
+             -- not?
+             -- TODO: Consider always returning InternalBreaks;
+             -- TODO: Consider making ModBreaks a SUM that can be empty instead of using Maybe.
         cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries
 
         -- Squash space leaks in the CompiledByteCode.  This is really
@@ -314,7 +326,7 @@ schemeTopBind (id, rhs)
         -- because mkConAppCode treats nullary constructor applications
         -- by just re-using the single top-level definition.  So
         -- for the worker itself, we must allocate it directly.
-    -- ioToBc (putStrLn $ "top level BCO")
+    -- liftIO (putStrLn $ "top level BCO")
     pure (mkProtoBCO platform add_bco_name
                        (getName id) (toOL [PACK data_con 0, RETURN P])
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
@@ -395,7 +407,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
   code <- schemeE d 0 p rhs
   hsc_env <- getHscEnv
   current_mod <- getCurrentModule
-  ioToBc (readModBreaksMaybe (hsc_HUG hsc_env) current_mod) >>= \case
+  liftIO (readModBreaksMaybe (hsc_HUG hsc_env) current_mod) >>= \case
     Nothing -> pure code
     Just ModBreaks {modBreaks_flags = breaks, modBreaks_ccs = cc_arr} -> do
       platform <- profilePlatform <$> getProfile
@@ -409,9 +421,9 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
       infox <- newBreakInfo breakInfo
 
       let cc | Just interp <- hsc_interp hsc_env
-            , interpreterProfiled interp
-            = cc_arr ! bi_tick_index tick_id
-            | otherwise = toRemotePtr nullPtr
+             , interpreterProfiled interp
+             = cc_arr ! bi_tick_index tick_id
+             | otherwise = toRemotePtr nullPtr
 
           breakInstr = BRK_FUN breaks (InternalBreakpointId info_mod infox) cc
 
@@ -447,7 +459,7 @@ break_info hsc_env mod current_mod current_mod_breaks
   | mod == current_mod
   = pure current_mod_breaks
   | otherwise
-  = ioToBc (HUG.lookupHugByModule mod (hsc_HUG hsc_env)) >>= \case
+  = liftIO (HUG.lookupHugByModule mod (hsc_HUG hsc_env)) >>= \case
       Just hp -> pure $ getModBreaks hp
       Nothing -> pure Nothing
 
@@ -2625,55 +2637,33 @@ typeArgReps platform = map (toArgRep platform) . typePrimRep
 -- -----------------------------------------------------------------------------
 -- The bytecode generator's monad
 
-data BcM_State
-   = BcM_State
-        { bcm_hsc_env :: HscEnv
-        , thisModule  :: Module          -- current module (for breakpoints)
-        , nextlabel   :: Word32          -- for generating local labels
-        , breakInfo   :: IntMap CgBreakInfo -- ^ Info at breakpoint occurrence.
-                                            -- Indexed with breakpoint *info* index.
-                                            -- See Note [Breakpoint identifiers]
-                                            -- in GHC.Types.Breakpoint
-        , breakInfoIdx :: !Int              -- ^ Next index for breakInfo array
+-- | Read only environment for generating ByteCode
+data BcM_Env
+   = BcM_Env
+        { bcm_hsc_env    :: HscEnv
+        , bcm_module     :: Module -- current module (for breakpoints)
+        , bcm_mod_breaks :: Maybe ModBreaks -- this module's ModBreaks
         }
 
-newtype BcM r = BcM (BcM_State -> IO (BcM_State, r)) deriving (Functor)
+data BcM_State
+   = BcM_State
+        { nextlabel      :: !Word32 -- ^ For generating local labels
+        , breakInfoIdx   :: !Int    -- ^ Next index for breakInfo array
+        , internalBreaks :: InternalModBreaks
+          -- ^ Info at breakpoints occurrences. Indexed with
+          -- 'InternalBreakpointId'. See Note [Breakpoint identifiers] in
+          -- GHC.ByteCode.Breakpoints.
+        }
 
-ioToBc :: IO a -> BcM a
-ioToBc io = BcM $ \st -> do
-  x <- io
-  return (st, x)
+newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (BcM_State, r))
+  deriving (Functor, Applicative, Monad, MonadIO)
+    via (ReaderT BcM_Env (StateT BcM_State IO))
 
 runBc :: HscEnv -> Module -> Maybe ModBreaks
       -> BcM r
       -> IO (BcM_State, r)
 runBc hsc_env this_mod modBreaks (BcM m)
-   = m (BcM_State hsc_env this_mod 0 modBreaks IntMap.empty 0)
-
-thenBc :: BcM a -> (a -> BcM b) -> BcM b
-thenBc (BcM expr) cont = BcM $ \st0 -> do
-  (st1, q) <- expr st0
-  let BcM k = cont q
-  (st2, r) <- k st1
-  return (st2, r)
-
-thenBc_ :: BcM a -> BcM b -> BcM b
-thenBc_ (BcM expr) (BcM cont) = BcM $ \st0 -> do
-  (st1, _) <- expr st0
-  (st2, r) <- cont st1
-  return (st2, r)
-
-returnBc :: a -> BcM a
-returnBc result = BcM $ \st -> (return (st, result))
-
-instance Applicative BcM where
-    pure = returnBc
-    (<*>) = ap
-    (*>) = thenBc_
-
-instance Monad BcM where
-  (>>=) = thenBc
-  (>>)  = (*>)
+   = m (BcM_Env hsc_env this_mod modBreaks) (BcM_State 0 0 (mkInternalModBreaks this_mod mempty))
 
 instance HasDynFlags BcM where
     getDynFlags = BcM $ \st -> return (st, hsc_dflags (bcm_hsc_env st))
@@ -2703,14 +2693,15 @@ getLabelsBc n
   = BcM $ \st -> let ctr = nextlabel st
                  in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])
 
-newBreakInfo :: CgBreakInfo -> BcM Int
-newBreakInfo info = BcM $ \st ->
+newBreakInfo :: CgBreakInfo -> BcM InternalBreakpointId
+newBreakInfo info = BcM $ \env st ->
   let ix = breakInfoIdx st
+      ibi = InternalBreakpointId (bcm_module env) ix
       st' = st
-              { breakInfo = IntMap.insert ix info (breakInfo st)
-              , breakInfoIdx = ix + 1
-              }
-  in return (st', ix)
+        { internalBreaks = addInternalBreak ibi info (internalBreaks st)
+        , breakInfoIdx = ix + 1
+        }
+  in return (st', ibi)
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \st -> return (st, thisModule st)

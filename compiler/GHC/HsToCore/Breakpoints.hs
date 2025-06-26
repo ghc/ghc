@@ -1,4 +1,16 @@
 -- | Information attached to Breakpoints generated from Ticks
+--
+-- The breakpoint information stored in 'ModBreaks' is generated during
+-- desugaring from the ticks annotating the source expressions.
+--
+-- This information can be queried per-breakpoint using the 'BreakpointId'
+-- datatype, which indexes tick-level breakpoint information.
+--
+-- 'ModBreaks' and 'BreakpointId's are not to be confused with
+-- 'InternalModBreaks' and 'InternalBreakId's. The latter are constructed
+-- during bytecode generation and can be found in 'GHC.ByteCode.Breakpoints'.
+--
+-- See Note [ModBreaks vs InternalModBreaks] and Note [Breakpoint identifiers]
 module GHC.HsToCore.Breakpoints
   ( -- * ModBreaks
     mkModBreaks, ModBreaks(modBreaks_locs, modBreaks_vars, modBreaks_decls)
