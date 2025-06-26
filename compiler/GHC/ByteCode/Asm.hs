@@ -31,7 +31,6 @@ import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHC.Runtime.Heap.Layout ( fromStgWord, StgWord )
 
-import GHC.Types.Breakpoint
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Literal
@@ -74,6 +73,7 @@ import GHC.Float (castFloatToWord32, castDoubleToWord64)
 
 import qualified Data.List as List ( any )
 import GHC.Exts
+import GHC.HsToCore.Breakpoints (ModBreaks(..))
 
 
 -- -----------------------------------------------------------------------------
@@ -111,7 +111,7 @@ assembleBCOs
   -> FlatBag (ProtoBCO Name)
   -> [TyCon]
   -> [(Name, ByteString)]
-  -> Maybe ModBreaks
+  -> Maybe (InternalModBreaks, ModBreaks)
   -> [SptEntry]
   -> IO CompiledByteCode
 assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do

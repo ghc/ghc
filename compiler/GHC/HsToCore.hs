@@ -97,7 +97,6 @@ import GHC.Unit.Module.Deps
 
 import Data.List (partition)
 import Data.IORef
-import Data.Traversable (for)
 import GHC.Iface.Make (mkRecompUsageInfo)
 
 {-
@@ -162,13 +161,12 @@ deSugar hsc_env
                                        mod mod_loc
                                        export_set (typeEnvTyCons type_env) binds
                               else return (binds, Nothing)
-        ; modBreaks <- for
-           [ (i, s)
-           | i <- hsc_interp hsc_env
-           , (_, s) <- m_tickInfo
-           , breakpointsAllowed dflags
-           ]
-           $ \(interp, specs) -> mkModBreaks interp mod specs
+        ; let modBreaks
+                | Just (_, specs) <- m_tickInfo
+                , breakpointsAllowed dflags
+                = Just $ mkModBreaks mod specs
+                | otherwise
+                = Nothing
 
         ; ds_hpc_info <- case m_tickInfo of
             Just (orig_file2, ticks)

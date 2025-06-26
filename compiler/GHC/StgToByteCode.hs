@@ -395,32 +395,27 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
   code <- schemeE d 0 p rhs
   hsc_env <- getHscEnv
   current_mod <- getCurrentModule
-  mb_current_mod_breaks <- getCurrentModBreaks
-  case mb_current_mod_breaks of
-    -- if we're not generating ModBreaks for this module for some reason, we
-    -- can't store breakpoint occurrence information.
+  ioToBc (readModBreaksMaybe (hsc_HUG hsc_env) current_mod) >>= \case
     Nothing -> pure code
-    Just current_mod_breaks -> break_info hsc_env (bi_tick_mod tick_id) current_mod mb_current_mod_breaks >>= \case
-      Nothing -> pure code
-      Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = _tick_mod, modBreaks_ccs = cc_arr} -> do
-        platform <- profilePlatform <$> getProfile
-        let idOffSets = getVarOffSets platform d p fvs
-            ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-            toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
-            toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-            breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty tick_id
+    Just ModBreaks {modBreaks_flags = breaks, modBreaks_ccs = cc_arr} -> do
+      platform <- profilePlatform <$> getProfile
+      let idOffSets = getVarOffSets platform d p fvs
+          ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+          toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+          toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+          breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty tick_id
 
-        let info_mod = modBreaks_module current_mod_breaks
-        infox <- newBreakInfo breakInfo
+      let info_mod = current_mod
+      infox <- newBreakInfo breakInfo
 
-        let cc | Just interp <- hsc_interp hsc_env
-              , interpreterProfiled interp
-              = cc_arr ! bi_tick_index tick_id
-              | otherwise = toRemotePtr nullPtr
+      let cc | Just interp <- hsc_interp hsc_env
+            , interpreterProfiled interp
+            = cc_arr ! bi_tick_index tick_id
+            | otherwise = toRemotePtr nullPtr
 
-            breakInstr = BRK_FUN breaks (InternalBreakpointId info_mod infox) cc
+          breakInstr = BRK_FUN breaks (InternalBreakpointId info_mod infox) cc
 
-        return $ breakInstr `consOL` code
+      return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
 -- | Determine the GHCi-allocated 'BreakArray' and module pointer for the module
@@ -2635,8 +2630,6 @@ data BcM_State
         { bcm_hsc_env :: HscEnv
         , thisModule  :: Module          -- current module (for breakpoints)
         , nextlabel   :: Word32          -- for generating local labels
-        , modBreaks   :: Maybe ModBreaks -- info about breakpoints
-
         , breakInfo   :: IntMap CgBreakInfo -- ^ Info at breakpoint occurrence.
                                             -- Indexed with breakpoint *info* index.
                                             -- See Note [Breakpoint identifiers]
@@ -2721,9 +2714,6 @@ newBreakInfo info = BcM $ \st ->
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \st -> return (st, thisModule st)
-
-getCurrentModBreaks :: BcM (Maybe ModBreaks)
-getCurrentModBreaks = BcM $ \st -> return (st, modBreaks st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"

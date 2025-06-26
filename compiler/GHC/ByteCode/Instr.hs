@@ -36,7 +36,6 @@ import GHC.Stack.CCS (CostCentre)
 
 import GHC.Stg.Syntax
 import GHCi.BreakArray (BreakArray)
-import GHC.Types.Breakpoint
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions

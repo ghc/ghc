@@ -31,7 +31,6 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Stats (exprStats)
-import GHC.Types.Breakpoint
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Literal( pprLiteral )
 import GHC.Types.Name( pprInfixName, pprPrefixName )

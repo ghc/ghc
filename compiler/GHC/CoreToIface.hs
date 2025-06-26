@@ -72,7 +72,6 @@ import GHC.Iface.Syntax
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula qualified as BF(BooleanFormula(..))
 
-import GHC.Types.Breakpoint
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( noinlineIdName, noinlineConstraintIdName )

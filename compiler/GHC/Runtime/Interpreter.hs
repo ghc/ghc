@@ -28,11 +28,10 @@ module GHC.Runtime.Interpreter
   , whereFrom
   , getModBreaks
   , readModBreaks
+  , readModBreaksMaybe
   , seqHValue
   , evalBreakpointToId
   , internalBreakIdToBreakId
-  , interpreterDynamic
-  , interpreterProfiled
 
   -- * The object-code linker
   , initObjLinker
@@ -77,8 +76,8 @@ import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
-import GHC.Types.Breakpoint
 import GHC.ByteCode.Types
+import GHC.HsToCore.Breakpoints
 
 import GHC.Linker.Types
 
@@ -434,9 +433,9 @@ evalBreakpointToId eval_break =
 -- See also Note [Breakpoint identifiers]
 internalBreakIdToBreakId :: HomeUnitGraph -> InternalBreakpointId -> IO BreakpointId
 internalBreakIdToBreakId hug ibi = do
-  ModBreaks{modBreaks_breakInfo} <- readModBreaks hug (ibi_info_mod ibi)
+  (InternalModBreaks{imodBreaks_breakInfo}, _) <- readModBreaks hug (ibi_info_mod ibi)
   let CgBreakInfo{cgb_tick_id} = expectJust $
-        IntMap.lookup (ibi_info_index ibi) modBreaks_breakInfo
+        IntMap.lookup (ibi_info_index ibi) imodBreaks_breakInfo
   return cgb_tick_id
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
@@ -467,7 +466,7 @@ handleSeqHValueStatus interp unit_env eval_status =
             -- Nothing case - should not occur! We should have the appropriate
             -- breakpoint information
             Nothing -> nothing_case
-            Just modbreaks -> put $ brackets . ppr $ (modBreaks_locs modbreaks) ! bi_tick_index bi
+            Just (_, modbreaks) -> put $ brackets . ppr $ (modBreaks_locs modbreaks) ! bi_tick_index bi
 
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
@@ -747,10 +746,13 @@ wormholeRef interp _r = case interpInstance interp of
   ExternalInterp {}
     -> throwIO (InstallationError "this operation requires -fno-external-interpreter")
 
--- -----------------------------------------------------------------------------
--- Misc utils
+--------------------------------------------------------------------------------
+-- * Finding breakpoint information
+--------------------------------------------------------------------------------
 
-getModBreaks :: HomeModInfo -> Maybe ModBreaks
+-- | Get the 'InternalModBreaks' breakpoint information from the ByteCode
+-- object associated to this 'HomeModInfo'.
+getModBreaks :: HomeModInfo -> Maybe (InternalModBreaks, ModBreaks)
 getModBreaks hmi
   | Just linkable <- homeModInfoByteCode hmi,
     -- The linkable may have 'DotO's as well; only consider BCOs. See #20570.
@@ -759,33 +761,24 @@ getModBreaks hmi
   | otherwise
   = Nothing -- probably object code
 
--- | Read the 'ModBreaks' of the given home 'Module' from the 'HomeUnitGraph'.
-readModBreaks :: HomeUnitGraph -> Module -> IO ModBreaks
-readModBreaks hug mod =
-  expectJust . getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
+-- | Read the 'InternalModBreaks' and 'ModBreaks' of the given home 'Module'
+-- from the 'HomeUnitGraph'.
+readModBreaks :: HomeUnitGraph -> BreakpointId -> IO ModBreaks
+readModBreaks hug mod = expectJust <$> readModBreaksMaybe hug mod
+
+readInternalModBreaks :: HomeUnitGraph -> InternalBreakpointId -> IO InternalModBreaks
+readInternalModBreaks hug mod = expectJust <$> readInternalModBreaksMaybe hug mod
+
+readModBreaksMaybe :: HomeUnitGraph -> Module -> IO (Maybe ModBreaks)
+readModBreaksMaybe hug mod = getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
+
+readInternalModBreaksMaybe :: HomeUnitGraph -> Module -> IO (Maybe InternalModBreaks)
+readInternalModBreaksMaybe hug mod = getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
+
+-- -----------------------------------------------------------------------------
+-- Misc utils
 
 fromEvalResult :: EvalResult a -> IO a
 fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
 fromEvalResult (EvalSuccess a) = return a
 
--- | Interpreter uses Profiling way
-interpreterProfiled :: Interp -> Bool
-interpreterProfiled interp = case interpInstance interp of
-#if defined(HAVE_INTERNAL_INTERPRETER)
-  InternalInterp     -> hostIsProfiled
-#endif
-  ExternalInterp ext -> case ext of
-    ExtIServ i -> iservConfProfiled (interpConfig i)
-    ExtJS {}   -> False -- we don't support profiling yet in the JS backend
-    ExtWasm i -> wasmInterpProfiled $ interpConfig i
-
--- | Interpreter uses Dynamic way
-interpreterDynamic :: Interp -> Bool
-interpreterDynamic interp = case interpInstance interp of
-#if defined(HAVE_INTERNAL_INTERPRETER)
-  InternalInterp     -> hostIsDynamic
-#endif
-  ExternalInterp ext -> case ext of
-    ExtIServ i -> iservConfDynamic (interpConfig i)
-    ExtJS {}   -> False -- dynamic doesn't make sense for JS
-    ExtWasm {} -> True  -- wasm dyld can only load dynamic code

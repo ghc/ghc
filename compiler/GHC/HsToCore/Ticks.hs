@@ -55,7 +55,6 @@ import Data.Bifunctor (second)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
-import GHC.Types.Breakpoint (BreakpointId(..))
 
 {-
 ************************************************************************

@@ -892,7 +892,6 @@ Library
         GHC.Types.Annotations
         GHC.Types.Avail
         GHC.Types.Basic
-        GHC.Types.Breakpoint
         GHC.Types.CompleteMatch
         GHC.Types.CostCentre
         GHC.Types.CostCentre.State

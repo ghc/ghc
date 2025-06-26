@@ -17,17 +17,18 @@ import GHC.Prelude
 
 import GHCi.RemoteTypes
 import GHCi.Message (EvalExpr, ResumeContext)
+import GHC.ByteCode.Types (InternalBreakpointId(..))
 import GHC.Driver.Config (EvalStep(..))
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.TyThing
-import GHC.Types.Breakpoint
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Utils.Exception
 
 import Data.Word
 import GHC.Stack.CCS
+import GHC.Types.Tickish (BreakpointId)
 
 data ExecOptions
  = ExecOptions
