@@ -601,7 +601,7 @@ scanl' = scanlGo'
 -- See Note [scanl rewrite rules]
 {-# RULES
 "scanl'"  [~1] forall f a bs . scanl' f a bs =
-  build (\c n -> a `c` foldr (scanlFB' f c) (flipSeq n) bs a)
+  build (\c n -> a `seq` (a `c` foldr (scanlFB' f c) (flipSeq n) bs a))
 "scanlList'" [1] forall f a bs .
     foldr (scanlFB' f (:)) (flipSeq []) bs a = tail (scanl' f a bs)
  #-}
