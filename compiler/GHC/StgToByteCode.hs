@@ -2666,10 +2666,10 @@ runBc hsc_env this_mod modBreaks (BcM m)
    = m (BcM_Env hsc_env this_mod modBreaks) (BcM_State 0 0 (mkInternalModBreaks this_mod mempty))
 
 instance HasDynFlags BcM where
-    getDynFlags = BcM $ \st -> return (st, hsc_dflags (bcm_hsc_env st))
+    getDynFlags = hsc_dflags <$> getHscEnv
 
 getHscEnv :: BcM HscEnv
-getHscEnv = BcM $ \st -> return (st, bcm_hsc_env st)
+getHscEnv = BcM $ \env st -> return (st, bcm_hsc_env env)
 
 getProfile :: BcM Profile
 getProfile = targetProfile <$> getDynFlags
@@ -2682,16 +2682,16 @@ shouldAddBcoName = do
     else return Nothing
 
 getLabelBc :: BcM LocalLabel
-getLabelBc
-  = BcM $ \st -> do let nl = nextlabel st
-                    when (nl == maxBound) $
-                        panic "getLabelBc: Ran out of labels"
-                    return (st{nextlabel = nl + 1}, LocalLabel nl)
+getLabelBc = BcM $ \_ st ->
+  do let nl = nextlabel st
+     when (nl == maxBound) $
+         panic "getLabelBc: Ran out of labels"
+     return (st{nextlabel = nl + 1}, LocalLabel nl)
 
 getLabelsBc :: Word32 -> BcM [LocalLabel]
-getLabelsBc n
-  = BcM $ \st -> let ctr = nextlabel st
-                 in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])
+getLabelsBc n = BcM $ \_ st ->
+  let ctr = nextlabel st
+   in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])
 
 newBreakInfo :: CgBreakInfo -> BcM InternalBreakpointId
 newBreakInfo info = BcM $ \env st ->
@@ -2704,7 +2704,7 @@ newBreakInfo info = BcM $ \env st ->
   in return (st', ibi)
 
 getCurrentModule :: BcM Module
-getCurrentModule = BcM $ \st -> return (st, thisModule st)
+getCurrentModule = BcM $ \env st -> return (st, thisModule env)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
