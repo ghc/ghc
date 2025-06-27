@@ -1,5 +1,4 @@
-
-T9739.hs:4:1: error: [GHC-29210]
+T9739.hs:5:1: error: [GHC-29210]
     • Superclass cycle for ‘Class1’
         one of whose superclasses is ‘Class3’
         one of whose superclasses is ‘Class1’
@@ -7,10 +6,11 @@ T9739.hs:4:1: error: [GHC-29210]
     Suggested fix:
       Perhaps you intended to use the ‘UndecidableSuperClasses’ extension
 
-T9739.hs:9:1: error: [GHC-29210]
+T9739.hs:10:1: error: [GHC-29210]
     • Superclass cycle for ‘Class3’
         one of whose superclasses is ‘Class1’
         one of whose superclasses is ‘Class3’
     • In the class declaration for ‘Class3’
     Suggested fix:
       Perhaps you intended to use the ‘UndecidableSuperClasses’ extension
+
