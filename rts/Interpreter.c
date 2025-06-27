@@ -1506,11 +1506,11 @@ run_BCO:
 
                // stop the current thread if either `stop_next_breakpoint` is
                // true OR if the ignore count for this particular breakpoint is zero
-               StgInt ignore_count = ((StgInt*)breakPoints->payload)[BCO_LIT(arg6_tick_index)];
+               StgInt ignore_count = ((StgInt*)breakPoints->payload)[BCO_LIT(arg4_info_index)];
                if (stop_next_breakpoint == false && ignore_count > 0)
                {
                   // decrement and write back ignore count
-                  ((StgInt*)breakPoints->payload)[arg6_tick_index] = --ignore_count;
+                  ((StgInt*)breakPoints->payload)[BCO_LIT(arg4_info_index)] = --ignore_count;
                }
                else if (stop_next_breakpoint == true || ignore_count == 0)
                {
@@ -1544,10 +1544,7 @@ run_BCO:
                   // Arrange the stack to call the breakpoint IO action, and
                   // continue execution of this BCO when the IO action returns.
                   //
-                  // ioAction :: Addr#       -- the breakpoint tick module
-                  //          -> Addr#       -- the breakpoint tick module unit id
-                  //          -> Int#        -- the breakpoint tick index
-                  //          -> Addr#       -- the breakpoint info module
+                  // ioAction :: Addr#       -- the breakpoint info module
                   //          -> Addr#       -- the breakpoint info module unit id
                   //          -> Int#        -- the breakpoint info index
                   //          -> Bool        -- exception?
@@ -1557,23 +1554,17 @@ run_BCO:
                   ioAction = (StgClosure *) deRefStablePtr (
                       rts_breakpoint_io_action);
 
-                  Sp_subW(19);
-                  SpW(18) = (W_)obj;
-                  SpW(17) = (W_)&stg_apply_interp_info;
-                  SpW(16) = (W_)new_aps;
-                  SpW(15) = (W_)False_closure;         // True <=> an exception
-                  SpW(14) = (W_)&stg_ap_ppv_info;
-                  SpW(13)  = (W_)arg7_info_index;
-                  SpW(12)  = (W_)&stg_ap_n_info;
-                  SpW(11)  = (W_)BCO_LIT(arg5_info_mod_id);
-                  SpW(10)  = (W_)&stg_ap_n_info;
-                  SpW(9)  = (W_)BCO_LIT(arg3_info_mod);
-                  SpW(8)  = (W_)&stg_ap_n_info;
-                  SpW(7)  = (W_)arg6_tick_index;
+                  Sp_subW(13);
+                  SpW(12) = (W_)obj;
+                  SpW(11) = (W_)&stg_apply_interp_info;
+                  SpW(10) = (W_)new_aps;
+                  SpW(9) = (W_)False_closure;         // True <=> an exception
+                  SpW(8) = (W_)&stg_ap_ppv_info;
+                  SpW(7)  = (W_)BCO_LIT(arg4_info_index);
                   SpW(6)  = (W_)&stg_ap_n_info;
-                  SpW(5)  = (W_)BCO_LIT(arg4_tick_mod_id);
+                  SpW(5)  = (W_)BCO_LIT(arg3_info_mod_id);
                   SpW(4)  = (W_)&stg_ap_n_info;
-                  SpW(3)  = (W_)BCO_LIT(arg2_tick_mod);
+                  SpW(3)  = (W_)BCO_LIT(arg2_info_mod_name);
                   SpW(2)  = (W_)&stg_ap_n_info;
                   SpW(1)  = (W_)ioAction;
                   SpW(0)  = (W_)&stg_enter_info;
