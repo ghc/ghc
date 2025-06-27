@@ -4787,6 +4787,7 @@ checkValidTyCl tc
   = setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc            $
     recoverM recovery_code     $
+    checkNoErrs                $
     do { traceTc "Starting validity for tycon" (ppr tc)
        ; checkValidTyCon tc
        ; checkTyConConsistentWithBoot tc -- See Note [TyCon boot consistency checking]
@@ -4991,7 +4992,7 @@ checkValidTyCon tc
     check_fields ((label, con1) :| other_fields)
         -- These fields all have the same name, but are from
         -- different constructors in the data type
-        = recoverM (return ()) $ mapM_ checkOne other_fields
+        = mapM_ checkOne other_fields
                 -- Check that all the fields in the group have the same type
                 -- NB: this check assumes that all the constructors of a given
                 -- data type use the same type variables
@@ -5001,8 +5002,10 @@ checkValidTyCon tc
         lbl = flLabel label
 
         checkOne (_, con2)    -- Do it both ways to ensure they are structurally identical
-            = do { checkFieldCompat lbl con1 con2 res1 res2 fty1 fty2
-                 ; checkFieldCompat lbl con2 con1 res2 res1 fty2 fty1 }
+            = do { ((), no_errs) <- askNoErrs $
+                    checkFieldCompat lbl con1 con2 res1 res2 fty1 fty2
+                 ; when no_errs $
+                    checkFieldCompat lbl con2 con1 res2 res1 fty2 fty1 }
             where
                 res2 = dataConOrigResTy con2
                 fty2 = dataConFieldType con2 lbl
@@ -5029,8 +5032,10 @@ checkPartialRecordField all_cons fld
 checkFieldCompat :: FieldLabelString -> DataCon -> DataCon
                  -> Type -> Type -> Type -> Type -> TcM ()
 checkFieldCompat fld con1 con2 res1 res2 fty1 fty2
-  = do  { checkTc (isJust mb_subst1) (TcRnCommonFieldResultTypeMismatch con1 con2 fld)
-        ; checkTc (isJust mb_subst2) (TcRnCommonFieldTypeMismatch con1 con2 fld) }
+  = if isNothing mb_subst1
+      then addErrTc $ TcRnCommonFieldResultTypeMismatch con1 con2 fld
+      else when (isNothing mb_subst2) $
+        addErrTc $ TcRnCommonFieldTypeMismatch con1 con2 fld
   where
     mb_subst1 = tcMatchTy res1 res2
     mb_subst2 = tcMatchTyX (expectJust mb_subst1) fty1 fty2
