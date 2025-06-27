@@ -98,6 +98,7 @@ import GHC.CoreToIface
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT(..))
 import Control.Monad.Trans.State  (StateT(..))
+import qualified GHC.Unit.Home.Graph as HUG
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -124,7 +125,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
             flattenBind (StgRec bs)     = bs
 
         (proto_bcos, BcM_State{..}) <-
-           runBc hsc_env this_mod $ do
+           runBc hsc_env this_mod mb_modBreaks $ do
              let flattened_binds = concatMap flattenBind (reverse lifted_binds)
              FlatBag.fromList (fromIntegral $ length flattened_binds) <$> mapM schemeTopBind flattened_binds
 
@@ -399,7 +400,8 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
   code <- schemeE d 0 p rhs
   hsc_env <- getHscEnv
   current_mod <- getCurrentModule
-  liftIO (readModBreaksMaybe (hsc_HUG hsc_env) current_mod) >>= \case
+  current_breaks <- getCurrentModuleBreaks
+  liftIO (break_info hsc_env (bi_tick_mod tick_id) current_mod current_breaks) >>= \case
     Nothing -> pure code
     Just _ -> do
       platform <- profilePlatform <$> getProfile
@@ -414,15 +416,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
       return $ BRK_FUN ibi `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
--- TODO: WHERE TO PUT
--- Determine the GHCi-allocated 'BreakArray' and module pointer for the module
--- from which the breakpoint originates.
--- These are stored in 'ModBreaks' as remote pointers in order to allow the BCOs
--- to refer to pointers in GHCi's address space.
--- They are initialized in 'GHC.HsToCore.Breakpoints.mkModBreaks', called by
--- 'GHC.HsToCore.deSugar'.
---
--- Breakpoints might be disabled because we're in TH, because
+-- | Breakpoints might be disabled because we're in TH, because
 -- @-fno-break-points@ was specified, or because a module was reloaded without
 -- reinitializing 'ModBreaks'.
 --
@@ -431,9 +425,22 @@ schemeER_wrk d p rhs = schemeE d 0 p rhs
 -- If that is 'Nothing', consider breakpoints to be disabled and skip the
 -- instruction.
 --
--- If the breakpoint is inlined from another module, look it up in the HUG (home unit graph).
--- If the module doesn't exist there, or if the 'ModBreaks' value is
--- uninitialized, skip the instruction (i.e. return Nothing).
+-- If the breakpoint is inlined from another module, look it up in the home
+-- package table.
+-- If the module doesn't exist there, skip the instruction.
+break_info ::
+  HscEnv ->
+  Module ->
+  Module ->
+  Maybe ModBreaks ->
+  IO (Maybe ModBreaks)
+break_info hsc_env mod current_mod current_mod_breaks = do
+  if mod == current_mod then
+    return current_mod_breaks
+  else
+    HUG.lookupHugByModule mod (hsc_HUG hsc_env) >>= \case
+      Just hm -> return $ snd <$> getModBreaks hm
+      Nothing -> pure Nothing
 
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
 getVarOffSets platform depth env = map getOffSet
@@ -2614,6 +2621,7 @@ data BcM_Env
    = BcM_Env
         { bcm_hsc_env    :: HscEnv
         , bcm_module     :: Module -- current module (for breakpoints)
+        , bcm_breaks     :: Maybe ModBreaks -- modbreaks for the current module
         }
 
 data BcM_State
@@ -2630,9 +2638,9 @@ newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (r, BcM_State))
   deriving (Functor, Applicative, Monad, MonadIO)
     via (ReaderT BcM_Env (StateT BcM_State IO))
 
-runBc :: HscEnv -> Module -> BcM r -> IO (r, BcM_State)
-runBc hsc_env this_mod (BcM m)
-   = m (BcM_Env hsc_env this_mod) (BcM_State 0 0 (mkInternalModBreaks this_mod mempty))
+runBc :: HscEnv -> Module -> Maybe ModBreaks -> BcM r -> IO (r, BcM_State)
+runBc hsc_env this_mod mbs (BcM m)
+   = m (BcM_Env hsc_env this_mod mbs) (BcM_State 0 0 (mkInternalModBreaks this_mod mempty))
 
 instance HasDynFlags BcM where
     getDynFlags = hsc_dflags <$> getHscEnv
@@ -2674,6 +2682,9 @@ newBreakInfo info = BcM $ \env st ->
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \env st -> return (bcm_module env, st)
+
+getCurrentModuleBreaks :: BcM (Maybe ModBreaks)
+getCurrentModuleBreaks = BcM $ \env st -> return (bcm_breaks env, st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"

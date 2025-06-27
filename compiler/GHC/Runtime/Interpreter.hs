@@ -123,6 +123,7 @@ import qualified GHC.Unit.Home.Graph as HUG
 
 -- Standard libraries
 import GHC.Exts
+import GHC.Stack
 
 {- Note [Remote GHCi]
    ~~~~~~~~~~~~~~~~~~
@@ -465,7 +466,7 @@ handleSeqHValueStatus interp unit_env eval_status =
             -- Nothing case - should not occur! We should have the appropriate
             -- breakpoint information
             Nothing -> nothing_case
-            Just (_, modbreaks) -> put $ brackets . ppr $ (modBreaks_locs modbreaks) ! bi_tick_index bi
+            Just (_, modbreaks) -> put $ brackets . ppr $ getBreakLoc bi modbreaks
 
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
@@ -762,10 +763,10 @@ getModBreaks hmi
 
 -- | Read the 'InternalModBreaks' and 'ModBreaks' of the given home 'Module'
 -- from the 'HomeUnitGraph'.
-readModBreaks :: HomeUnitGraph -> Module -> IO (InternalModBreaks, ModBreaks)
+readModBreaks :: HasCallStack => HomeUnitGraph -> Module -> IO (InternalModBreaks, ModBreaks)
 readModBreaks hug mod = expectJust <$> readModBreaksMaybe hug mod
 
-readModBreaksMaybe :: HomeUnitGraph -> Module -> IO (Maybe (InternalModBreaks, ModBreaks))
+readModBreaksMaybe :: HasCallStack => HomeUnitGraph -> Module -> IO (Maybe (InternalModBreaks, ModBreaks))
 readModBreaksMaybe hug mod = getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
 
 -- -----------------------------------------------------------------------------

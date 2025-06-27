@@ -156,7 +156,7 @@ getHistorySpan :: HUG.HomeUnitGraph -> History -> IO SrcSpan
 getHistorySpan hug hist = do
   let bid = historyBreakpointId hist
   (_, brks) <- readModBreaks hug (bi_tick_mod bid)
-  return $ modBreaks_locs brks ! bi_tick_index bid
+  return $ getBreakLoc bid brks
 
 {- | Finds the enclosing top level function name -}
 -- ToDo: a better way to do this would be to keep hold of the decl_path computed
@@ -357,7 +357,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
       (_, tick_brks) <- liftIO $ readModBreaks hug (bi_tick_mod bid)
       breakArray     <- getBreakArray interp ibi
       let
-        span      = modBreaks_locs tick_brks ! bi_tick_index bid
+        span      = getBreakLoc bid tick_brks
         decl      = intercalate "." $ modBreaks_decls tick_brks ! bi_tick_index bid
 
       -- Was this breakpoint explicitly enabled (ie. in @BreakArray@)?
@@ -505,7 +505,7 @@ moveHist fn = do
                       Nothing  -> return $ mkGeneralSrcSpan (fsLit "<unknown>")
                       Just (bid, _ibi) -> liftIO $ do
                         (_, brks) <- readModBreaks (hsc_HUG hsc_env) (bi_tick_mod bid)
-                        return $ modBreaks_locs brks ! bi_tick_index bid -- todo: getBreakLoc
+                        return $ getBreakLoc bid brks
             (hsc_env1, names) <-
               liftIO $ bindLocalsAtBreakpoint hsc_env apStack span (snd <$> mb_info)
             let ic = hsc_IC hsc_env1
