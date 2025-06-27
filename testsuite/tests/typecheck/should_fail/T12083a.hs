@@ -1,6 +1,7 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 module T12803a where
 
 type Constrd a = Num a ⇒ a

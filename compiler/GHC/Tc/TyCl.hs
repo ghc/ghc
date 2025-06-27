@@ -4787,6 +4787,7 @@ checkValidTyCl tc
   = setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc            $
     recoverM recovery_code     $
+    checkNoErrs                $
     do { traceTc "Starting validity for tycon" (ppr tc)
        ; checkValidTyCon tc
        ; checkTyConConsistentWithBoot tc -- See Note [TyCon boot consistency checking]
@@ -4817,6 +4818,9 @@ So we replace T with an abstract TyCon which will do no harm.
 See indexed-types/should_fail/BadSock and #10896
 
 Some notes:
+
+* Not all errors in `checkValidTyCon` fail in the monad. To make sure
+  we also recover from these, we use `checkNoErrs`. See (#26149)
 
 * We must make fakes for promoted DataCons too. Consider (#15215)
       data T a = MkT ...
@@ -4991,7 +4995,7 @@ checkValidTyCon tc
     check_fields ((label, con1) :| other_fields)
         -- These fields all have the same name, but are from
         -- different constructors in the data type
-        = recoverM (return ()) $ mapM_ checkOne other_fields
+        = mapM_ checkOne other_fields
                 -- Check that all the fields in the group have the same type
                 -- NB: this check assumes that all the constructors of a given
                 -- data type use the same type variables
@@ -5001,11 +5005,14 @@ checkValidTyCon tc
         lbl = flLabel label
 
         checkOne (_, con2)    -- Do it both ways to ensure they are structurally identical
-            = do { checkFieldCompat lbl con1 con2 res1 res2 fty1 fty2
-                 ; checkFieldCompat lbl con2 con1 res2 res1 fty2 fty1 }
+            = case (one_vs_two `firstJust` two_vs_one) of
+                Just err -> addErrTc err
+                Nothing  -> return ()
             where
                 res2 = dataConOrigResTy con2
                 fty2 = dataConFieldType con2 lbl
+                one_vs_two = checkFieldCompat lbl con1 con2 res1 res2 fty1 fty2
+                two_vs_one = checkFieldCompat lbl con2 con1 res2 res1 fty2 fty1
 
 checkPartialRecordField :: [DataCon] -> FieldLabel -> TcM ()
 -- Checks the partial record field selector, and warns.
@@ -5027,13 +5034,15 @@ checkPartialRecordField all_cons fld
     inst_tys = dataConResRepTyArgs con1
 
 checkFieldCompat :: FieldLabelString -> DataCon -> DataCon
-                 -> Type -> Type -> Type -> Type -> TcM ()
+                 -> Type -> Type -> Type -> Type -> Maybe TcRnMessage
 checkFieldCompat fld con1 con2 res1 res2 fty1 fty2
-  = do  { checkTc (isJust mb_subst1) (TcRnCommonFieldResultTypeMismatch con1 con2 fld)
-        ; checkTc (isJust mb_subst2) (TcRnCommonFieldTypeMismatch con1 con2 fld) }
-  where
-    mb_subst1 = tcMatchTy res1 res2
-    mb_subst2 = tcMatchTyX (expectJust mb_subst1) fty1 fty2
+  | Just subst_res <- tcMatchTy res1 res2        -- Result types  match
+  = if isJust (tcMatchTyX subst_res fty1 fty2)   -- Match field types under `subst_res`
+    then Nothing   -- Success!
+    else  -- Field types don't match
+          Just $ TcRnCommonFieldTypeMismatch con1 con2 fld
+  | otherwise -- Result types don't match
+  = Just $ TcRnCommonFieldResultTypeMismatch con1 con2 fld
 
 -------------------------------
 checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()
