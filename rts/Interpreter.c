@@ -1454,9 +1454,9 @@ run_BCO:
         /* check for a breakpoint on the beginning of a let binding */
         case bci_BRK_FUN:
         {
-            int arg1_brk_array, arg2_info_mod_name, arg3_info_mod_id, arg4_info_index;
+            W_ arg1_brk_array, arg2_info_mod_name, arg3_info_mod_id, arg4_info_index;
 #if defined(PROFILING)
-            int arg5_cc;
+            W_ arg5_cc;
 #endif
             StgArrBytes *breakPoints;
             int returning_from_break, stop_next_breakpoint;
@@ -1473,7 +1473,7 @@ run_BCO:
             arg1_brk_array      = BCO_GET_LARGE_ARG;
             arg2_info_mod_name  = BCO_GET_LARGE_ARG;
             arg3_info_mod_id    = BCO_GET_LARGE_ARG;
-            arg4_info_index     = BCO_GET_LARGE_ARG;
+            arg4_info_index     = BCO_LIT(BCO_GET_LARGE_ARG);
 #if defined(PROFILING)
             arg5_cc             = BCO_GET_LARGE_ARG;
 #else
@@ -1506,11 +1506,11 @@ run_BCO:
 
                // stop the current thread if either `stop_next_breakpoint` is
                // true OR if the ignore count for this particular breakpoint is zero
-               StgInt ignore_count = ((StgInt*)breakPoints->payload)[BCO_LIT(arg4_info_index)];
+               StgInt ignore_count = ((StgInt*)breakPoints->payload)[arg4_info_index];
                if (stop_next_breakpoint == false && ignore_count > 0)
                {
                   // decrement and write back ignore count
-                  ((StgInt*)breakPoints->payload)[BCO_LIT(arg4_info_index)] = --ignore_count;
+                  ((StgInt*)breakPoints->payload)[arg4_info_index] = --ignore_count;
                }
                else if (stop_next_breakpoint == true || ignore_count == 0)
                {
@@ -1560,7 +1560,7 @@ run_BCO:
                   SpW(10) = (W_)new_aps;
                   SpW(9) = (W_)False_closure;         // True <=> an exception
                   SpW(8) = (W_)&stg_ap_ppv_info;
-                  SpW(7)  = (W_)BCO_LIT(arg4_info_index);
+                  SpW(7)  = (W_)arg4_info_index;
                   SpW(6)  = (W_)&stg_ap_n_info;
                   SpW(5)  = (W_)BCO_LIT(arg3_info_mod_id);
                   SpW(4)  = (W_)&stg_ap_n_info;

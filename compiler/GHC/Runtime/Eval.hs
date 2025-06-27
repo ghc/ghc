@@ -475,6 +475,7 @@ getBreakArray :: GhcMonad m => Interp -> InternalBreakpointId -> m (ForeignRef B
 getBreakArray interp InternalBreakpointId{ibi_info_mod} = do
   breakArrays <- liftIO $ breakarray_env . linker_env . expectJust
                        <$> Loader.getLoaderState interp
+  pprTraceM "hello" (ppr $ moduleEnvKeys breakArrays)
   return $ expectJust $ lookupModuleEnv breakArrays ibi_info_mod
 
 back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)

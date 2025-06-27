@@ -36,6 +36,7 @@ import GHC.Types.Tickish
 import GHC.Unit.Module (Module)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.HsToCore.Breakpoints (ModBreaks)
 
 {-
 Note [ModBreaks vs InternalModBreaks]
@@ -120,6 +121,11 @@ data InternalModBreaks = InternalModBreaks
       , imodBreaks_module    :: !Module
         -- ^ Also cache the module corresponding to these 'InternalModBreaks',
         -- for instance for internal sanity checks.
+
+      -- , imodBreaks_modBreaks :: !ModBreaks
+      --   -- ^ Store the original ModBreaks for this module, unchanged.
+      --   -- Allows us to query about source-level breakpoint information using
+      --   -- an internal breakpoint id.
       }
 
 -- | Construct an 'InternalModBreaks'
