@@ -49,6 +49,7 @@ import GHCi.RemoteTypes
 import GHCi.Message         ( Pipe )
 
 import GHC.Platform
+import GHC.Platform.Ways
 import GHC.Utils.TmpFs
 import GHC.Utils.Logger
 import GHC.Unit.Env

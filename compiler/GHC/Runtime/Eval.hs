@@ -128,7 +128,6 @@ import GHC.Tc.Utils.Monad
 
 import GHC.IfaceToCore
 import GHC.HsToCore.Breakpoints
-import GHC.ByteCode.Breakpoints
 
 import Control.Monad
 import Data.Array
@@ -450,7 +449,7 @@ resumeExec step mbCnt
                 -- When the user specified a break ignore count, set it
                 -- in the interpreter
                 case (mb_brkpt, mbCnt) of
-                  (Just (bid, ibi), Just cnt) ->
+                  (Just (_bid, ibi), Just cnt) ->
                     setupBreakpoint interp ibi cnt
                   _ -> return ()
 
