@@ -15,9 +15,10 @@
 -- See Note [ModBreaks vs InternalModBreaks] and Note [Breakpoint identifiers]
 module GHC.HsToCore.Breakpoints
   ( -- * ModBreaks
-    mkModBreaks, ModBreaks(modBreaks_locs, modBreaks_vars, modBreaks_decls, modBreaks_ccs)
+    mkModBreaks, ModBreaks(..)
 
     -- ** Queries
+    -- TODO: See where we could use these rather than using the arrays directly.
   , getBreakLoc, getBreakVars, getBreakDecls, getBreakCCS
 
     -- ** Re-exports BreakpointId
@@ -66,7 +67,7 @@ data ModBreaks
         -- actual 'CostCentre' allocation is done at link-time.
    , modBreaks_module :: !Module
         -- ^ The module to which this ModBreaks is associated.
-        -- We cache this here for internal sanity checks (don't export it!).
+        -- We also cache this here for internal sanity checks.
    }
 
 -- | Initialize memory for breakpoint data that is shared between the bytecode

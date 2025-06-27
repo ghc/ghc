@@ -64,6 +64,7 @@ import GHCi.RemoteTypes
 import GHC.ByteCode.Types
 
 import GHC.Linker.Loader as Loader
+import GHC.Linker.Types (LinkerEnv(..))
 
 import GHC.Hs
 
@@ -111,7 +112,6 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DSet
 import GHC.Types.TyThing
-import GHC.Types.Breakpoint
 import GHC.Types.Unique.Map
 
 import GHC.Types.Avail
@@ -127,6 +127,8 @@ import GHC.Tc.Utils.Instantiate (instDFunType)
 import GHC.Tc.Utils.Monad
 
 import GHC.IfaceToCore
+import GHC.HsToCore.Breakpoints
+import GHC.ByteCode.Breakpoints
 
 import Control.Monad
 import Data.Array
@@ -137,6 +139,7 @@ import Data.List (find,intercalate)
 import Data.List.NonEmpty (NonEmpty)
 import Unsafe.Coerce ( unsafeCoerce )
 import qualified GHC.Unit.Home.Graph as HUG
+import GHCi.BreakArray (BreakArray)
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -153,7 +156,7 @@ getHistoryModule = bi_tick_mod . historyBreakpointId
 getHistorySpan :: HUG.HomeUnitGraph -> History -> IO SrcSpan
 getHistorySpan hug hist = do
   let bid = historyBreakpointId hist
-  brks <- readModBreaks hug (bi_tick_mod bid)
+  (_, brks) <- readModBreaks hug (bi_tick_mod bid)
   return $ modBreaks_locs brks ! bi_tick_index bid
 
 {- | Finds the enclosing top level function name -}
@@ -162,7 +165,7 @@ getHistorySpan hug hist = do
 -- for each tick.
 findEnclosingDecls :: HUG.HomeUnitGraph -> BreakpointId -> IO [String]
 findEnclosingDecls hug bid = do
-  brks <- readModBreaks hug (bi_tick_mod bid)
+  (_, brks) <- readModBreaks hug (bi_tick_mod bid)
   return $ modBreaks_decls brks ! bi_tick_index bid
 
 -- | Update fixity environment in the current interactive context.
@@ -349,15 +352,17 @@ handleRunStatus step expr bindings final_ids status history0 = do
     --  - or one of the stepping options in @EvalOpts@ caused us to stop at one
     EvalBreak apStack_ref (Just eval_break) resume_ctxt ccs -> do
       let hug = hsc_HUG hsc_env
-      let ibi = evalBreakpointToId eval_break
-      bid       <- liftIO $ internalBreakIdToBreakId hug ibi
-      tick_brks <- liftIO $ readModBreaks hug (bi_tick_mod bid)
+      let ibi@InternalBreakpointId{ibi_info_index}
+            = evalBreakpointToId eval_break
+      bid            <- liftIO $ internalBreakIdToBreakId hug ibi
+      (_, tick_brks) <- liftIO $ readModBreaks hug (bi_tick_mod bid)
+      breakArray     <- getBreakArray interp ibi
       let
         span      = modBreaks_locs tick_brks ! bi_tick_index bid
         decl      = intercalate "." $ modBreaks_decls tick_brks ! bi_tick_index bid
 
       -- Was this breakpoint explicitly enabled (ie. in @BreakArray@)?
-      bactive <- liftIO $ breakpointStatus interp (modBreaks_flags tick_brks) (bi_tick_index bid)
+      bactive <- liftIO $ breakpointStatus interp breakArray ibi_info_index
 
       apStack_fhv <- liftIO $ mkFinalizedHValue interp apStack_ref
       resume_ctxt_fhv   <- liftIO $ mkFinalizedHValue interp resume_ctxt
@@ -445,8 +450,8 @@ resumeExec step mbCnt
                 -- When the user specified a break ignore count, set it
                 -- in the interpreter
                 case (mb_brkpt, mbCnt) of
-                  (Just (bid, _ibi), Just cnt) ->
-                    setupBreakpoint hsc_env bid cnt
+                  (Just (bid, ibi), Just cnt) ->
+                    setupBreakpoint interp ibi cnt
                   _ -> return ()
 
                 let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
@@ -462,14 +467,16 @@ resumeExec step mbCnt
                          | otherwise -> pure prevHistoryLst
                 handleRunStatus step expr bindings final_ids status =<< hist'
 
-setupBreakpoint :: GhcMonad m => HscEnv -> BreakpointId -> Int -> m ()   -- #19157
-setupBreakpoint hsc_env bi cnt = do
-  let modl = bi_tick_mod bi
-  modBreaks <- liftIO $ readModBreaks (hsc_HUG hsc_env) modl
-  let breakarray = modBreaks_flags modBreaks
-      interp = hscInterp hsc_env
-  _ <- liftIO $ GHCi.storeBreakpoint interp breakarray (bi_tick_index bi) cnt
-  pure ()
+setupBreakpoint :: GhcMonad m => Interp -> InternalBreakpointId -> Int -> m ()   -- #19157
+setupBreakpoint interp ibi cnt = do
+  breakArray <- getBreakArray interp ibi
+  liftIO $ GHCi.storeBreakpoint interp breakArray (ibi_info_index ibi) cnt
+
+getBreakArray :: GhcMonad m => Interp -> InternalBreakpointId -> m (ForeignRef BreakArray)
+getBreakArray interp InternalBreakpointId{ibi_info_mod} = do
+  breakArrays <- liftIO $ breakarray_env . linker_env . expectJust
+                       <$> Loader.getLoaderState interp
+  return $ expectJust $ lookupModuleEnv breakArrays ibi_info_mod
 
 back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)
 back n = moveHist (+n)
@@ -498,8 +505,8 @@ moveHist fn = do
             span <- case mb_info of
                       Nothing  -> return $ mkGeneralSrcSpan (fsLit "<unknown>")
                       Just (bid, _ibi) -> liftIO $ do
-                        brks <- readModBreaks (hsc_HUG hsc_env) (bi_tick_mod bid)
-                        return $ modBreaks_locs brks ! bi_tick_index bid
+                        (_, brks) <- readModBreaks (hsc_HUG hsc_env) (bi_tick_mod bid)
+                        return $ modBreaks_locs brks ! bi_tick_index bid -- todo: getBreakLoc
             (hsc_env1, names) <-
               liftIO $ bindLocalsAtBreakpoint hsc_env apStack span (snd <$> mb_info)
             let ic = hsc_IC hsc_env1
@@ -560,10 +567,10 @@ bindLocalsAtBreakpoint hsc_env apStack span Nothing = do
 -- of the breakpoint and the free variables of the expression.
 bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi) = do
    let hug = hsc_HUG hsc_env
-   info_brks <- readModBreaks hug (ibi_info_mod ibi)
+   (info_brks, _) <- readModBreaks hug (ibi_info_mod ibi)
    bid       <- internalBreakIdToBreakId hug ibi
-   tick_brks <- readModBreaks hug (bi_tick_mod bid)
-   let info   = expectJust $ IntMap.lookup (ibi_info_index ibi) (modBreaks_breakInfo info_brks)
+   (_, tick_brks) <- readModBreaks hug (bi_tick_mod bid)
+   let info   = expectJust $ IntMap.lookup (ibi_info_index ibi) (imodBreaks_breakInfo info_brks)
        interp = hscInterp hsc_env
        occs   = modBreaks_vars tick_brks ! bi_tick_index bid
 

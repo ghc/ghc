@@ -408,6 +408,8 @@ import GHC.Core.FamInstEnv ( FamInst, famInstEnvElts, orphNamesOfFamInst )
 import GHC.Core.InstEnv
 import GHC.Core
 
+import GHC.HsToCore.Breakpoints
+
 import GHC.Data.Maybe
 
 import GHC.Types.Id
@@ -427,7 +429,6 @@ import GHC.Types.Basic
 import GHC.Types.TyThing
 import GHC.Types.Name.Env
 import GHC.Types.TypeEnv
-import GHC.Types.Breakpoint
 import GHC.Types.PkgQual
 
 import GHC.Unit

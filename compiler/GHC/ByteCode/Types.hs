@@ -63,11 +63,20 @@ data CompiledByteCode = CompiledByteCode
     -- ^ top-level strings (heap allocated)
 
   , bc_breaks :: (Maybe (InternalModBreaks, ModBreaks))
-    -- ^ internal breakpoint info (no tick-level 'ModBreaks' if breakpoints are disabled)
+    -- ^ All (internal and tick-level) breakpoint information (no information
+    -- if breakpoints are disabled).
     --
+    -- This information is used when loading a bytecode object: we will
+    -- construct the arrays to be used at runtime to trigger breakpoints then
+    -- from it (in 'allocateBreakArrays' and 'allocateCCS' in 'GHC.ByteCode.Loader').
+    --
+    -- Moreover, when a breakpoint is hit we will find the associated
+    -- breakpoint information indexed by the internal breakpoint id here (in
+    -- 'getModBreaks').
+
     -- TODO: If ModBreaks is serialized and reconstructed as part of ModDetails
-    -- we don't need to keep it here as it can be fetched from the
-    -- 'HomeModInfo' directly.
+    -- we don't need to keep it in bc_breaks as it can be fetched from the
+    -- 'HomeModInfo' directly, right?
 
   , bc_spt_entries :: ![SptEntry]
     -- ^ Static pointer table entries which should be loaded along with the

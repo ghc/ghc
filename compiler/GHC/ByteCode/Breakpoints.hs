@@ -10,7 +10,7 @@
 -- See Note [ModBreaks vs InternalModBreaks] and Note [Breakpoint identifiers]
 module GHC.ByteCode.Breakpoints
   ( -- * Internal Mod Breaks
-    InternalModBreaks(imodBreaks_breakInfo), CgBreakInfo(..)
+    InternalModBreaks(..), CgBreakInfo(..)
   , mkInternalModBreaks
 
     -- ** Operations
@@ -118,8 +118,8 @@ data InternalModBreaks = InternalModBreaks
         -- ^ Access code-gen time information about a breakpoint, indexed by
         -- 'InternalBreakpointId'.
       , imodBreaks_module    :: !Module
-        -- ^ Cache the module corresponding to these 'InternalModBreaks' for
-        -- sanity checks. Don't export it!
+        -- ^ Also cache the module corresponding to these 'InternalModBreaks',
+        -- for instance for internal sanity checks.
       }
 
 -- | Construct an 'InternalModBreaks'
@@ -160,24 +160,6 @@ assert_modules_match ibi_mod imbs_mod =
   assertPpr (ibi_mod == imbs_mod)
     (text "Tried to query the InternalModBreaks of module" <+> ppr imbs_mod
         <+> text "with an InternalBreakpointId for module" <+> ppr ibi_mod)
-
--- TODO: See what Cheng has in .
--- mkCCSArray
---   :: Interp -> Module -> Int -> [Tick]
---   -> IO (Array BreakTickIndex (RemotePtr GHC.Stack.CCS.CostCentre))
--- mkCCSArray interp modul count entries
---   | interpreterProfiled interp = do
---       let module_str = moduleNameString (moduleName modul)
---       costcentres <- GHCi.mkCostCentres interp module_str (map mk_one entries)
---       return (listArray (0,count-1) costcentres)
---   | otherwise = return (listArray (0,-1) [])
---  where
---     mk_one t = (name, src)
---       where name = concat $ intersperse "." $ tick_path t
---             src = renderWithContext defaultSDocContext $ ppr $ tick_loc t
---   , modBreaks_ccs :: !(Array BreakTickIndex (RemotePtr CostCentre))
---        -- ^ Array pointing to cost centre for each breakpoint
---    ccs <- mkCCSArray interpProfiled mod count entries
 
 --------------------------------------------------------------------------------
 -- Instances

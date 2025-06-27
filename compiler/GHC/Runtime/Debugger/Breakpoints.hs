@@ -16,7 +16,7 @@ import Data.Maybe
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as S
 
-import GHC.ByteCode.Types
+import GHC.HsToCore.Breakpoints
 import GHC.Driver.Env
 import GHC.Driver.Monad
 import GHC.Driver.Session.Inspect
@@ -196,7 +196,7 @@ type TickArray = Array Int [(BreakTickIndex,RealSrcSpan)]
 makeModuleLineMap :: GhcMonad m => Module -> m (Maybe TickArray)
 makeModuleLineMap m = do
   mi <- getModuleInfo m
-  return $ mkTickArray . assocs . modBreaks_locs <$> (modInfoModBreaks =<< mi)
+  return $ mkTickArray . assocs . modBreaks_locs <$> (fmap snd . modInfoModBreaks =<< mi)
   where
     mkTickArray :: [(BreakTickIndex, SrcSpan)] -> TickArray
     mkTickArray ticks
@@ -210,7 +210,7 @@ makeModuleLineMap m = do
 getModBreak :: GhcMonad m => Module -> m (Maybe ModBreaks)
 getModBreak m = do
    mod_info <- fromMaybe (panic "getModBreak") <$> getModuleInfo m
-   pure $ modInfoModBreaks mod_info
+   pure $ snd <$> modInfoModBreaks mod_info
 
 --------------------------------------------------------------------------------
 -- Getting current breakpoint information

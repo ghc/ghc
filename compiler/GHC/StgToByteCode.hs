@@ -80,16 +80,13 @@ import Control.Monad
 import Data.Char
 
 import GHC.Unit.Module
-import qualified GHC.Unit.Home.Graph as HUG
 
 import Data.Coerce (coerce)
 #if MIN_VERSION_rts(1,0,3)
 import qualified Data.ByteString.Char8 as BS
 #endif
 import Data.Map (Map)
-import Data.IntMap (IntMap)
 import qualified Data.Map as Map
-import qualified Data.IntMap as IntMap
 import qualified GHC.Data.FiniteMap as Map
 import Data.Ord
 import Data.Either ( partitionEithers )
@@ -99,8 +96,8 @@ import qualified Data.IntSet as IntSet
 import GHC.CoreToIface
 
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader (ReaderT)
-import Control.Monad.Trans.State  (StateT)
+import Control.Monad.Trans.Reader (ReaderT(..))
+import Control.Monad.Trans.State  (StateT(..))
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -126,8 +123,8 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
             flattenBind (StgNonRec b e) = [(b,e)]
             flattenBind (StgRec bs)     = bs
 
-        (BcM_State{..}, proto_bcos) <-
-           runBc hsc_env this_mod mb_modBreaks $ do
+        (proto_bcos, BcM_State{..}) <-
+           runBc hsc_env this_mod $ do
              let flattened_binds = concatMap flattenBind (reverse lifted_binds)
              FlatBag.fromList (fromIntegral $ length flattened_binds) <$> mapM schemeTopBind flattened_binds
 
@@ -136,15 +133,12 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
            (vcat (intersperse (char ' ') (map ppr $ elemsFlatBag proto_bcos)))
 
         let all_mod_breaks = case mb_modBreaks of
-             Just modBreaks -> Just (modBreaks, internalBreaks)
+             Just modBreaks -> Just (internalBreaks, modBreaks)
              Nothing        -> Nothing
              -- no modBreaks, thus drop all
              -- internalBreaks? Will we ever want to have internal breakpoints in
              -- a module for which we're not doing breakpoints at all? probably
-             -- not?
-             -- TODO: Consider always returning InternalBreaks;
-             -- TODO: Consider making ModBreaks a SUM that can be empty instead of using Maybe.
-        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries
+        cbc <- assembleBCOs profile proto_bcos tycs strings all_mod_breaks spt_entries
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi
@@ -407,7 +401,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
   current_mod <- getCurrentModule
   liftIO (readModBreaksMaybe (hsc_HUG hsc_env) current_mod) >>= \case
     Nothing -> pure code
-    Just ModBreaks {} -> do
+    Just _ -> do
       platform <- profilePlatform <$> getProfile
       let idOffSets = getVarOffSets platform d p fvs
           ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
@@ -415,13 +409,13 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
           toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
           breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty tick_id
 
-      let info_mod = current_mod
-      infox <- newBreakInfo breakInfo
+      ibi <- newBreakInfo breakInfo
 
-      return $ BRK_FUN (InternalBreakpointId info_mod infox) `consOL` code
+      return $ BRK_FUN ibi `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
--- | Determine the GHCi-allocated 'BreakArray' and module pointer for the module
+-- TODO: WHERE TO PUT
+-- Determine the GHCi-allocated 'BreakArray' and module pointer for the module
 -- from which the breakpoint originates.
 -- These are stored in 'ModBreaks' as remote pointers in order to allow the BCOs
 -- to refer to pointers in GHCi's address space.
@@ -440,19 +434,6 @@ schemeER_wrk d p rhs = schemeE d 0 p rhs
 -- If the breakpoint is inlined from another module, look it up in the HUG (home unit graph).
 -- If the module doesn't exist there, or if the 'ModBreaks' value is
 -- uninitialized, skip the instruction (i.e. return Nothing).
-break_info ::
-  HscEnv ->
-  Module ->
-  Module ->
-  Maybe ModBreaks ->
-  BcM (Maybe ModBreaks)
-break_info hsc_env mod current_mod current_mod_breaks
-  | mod == current_mod
-  = pure current_mod_breaks
-  | otherwise
-  = liftIO (HUG.lookupHugByModule mod (hsc_HUG hsc_env)) >>= \case
-      Just hp -> pure $ getModBreaks hp
-      Nothing -> pure Nothing
 
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
 getVarOffSets platform depth env = map getOffSet
@@ -2633,7 +2614,6 @@ data BcM_Env
    = BcM_Env
         { bcm_hsc_env    :: HscEnv
         , bcm_module     :: Module -- current module (for breakpoints)
-        , bcm_mod_breaks :: Maybe ModBreaks -- this module's ModBreaks
         }
 
 data BcM_State
@@ -2646,21 +2626,19 @@ data BcM_State
           -- GHC.ByteCode.Breakpoints.
         }
 
-newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (BcM_State, r))
+newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (r, BcM_State))
   deriving (Functor, Applicative, Monad, MonadIO)
     via (ReaderT BcM_Env (StateT BcM_State IO))
 
-runBc :: HscEnv -> Module -> Maybe ModBreaks
-      -> BcM r
-      -> IO (BcM_State, r)
-runBc hsc_env this_mod modBreaks (BcM m)
-   = m (BcM_Env hsc_env this_mod modBreaks) (BcM_State 0 0 (mkInternalModBreaks this_mod mempty))
+runBc :: HscEnv -> Module -> BcM r -> IO (r, BcM_State)
+runBc hsc_env this_mod (BcM m)
+   = m (BcM_Env hsc_env this_mod) (BcM_State 0 0 (mkInternalModBreaks this_mod mempty))
 
 instance HasDynFlags BcM where
     getDynFlags = hsc_dflags <$> getHscEnv
 
 getHscEnv :: BcM HscEnv
-getHscEnv = BcM $ \env st -> return (st, bcm_hsc_env env)
+getHscEnv = BcM $ \env st -> return (bcm_hsc_env env, st)
 
 getProfile :: BcM Profile
 getProfile = targetProfile <$> getDynFlags
@@ -2677,12 +2655,12 @@ getLabelBc = BcM $ \_ st ->
   do let nl = nextlabel st
      when (nl == maxBound) $
          panic "getLabelBc: Ran out of labels"
-     return (st{nextlabel = nl + 1}, LocalLabel nl)
+     return (LocalLabel nl, st{nextlabel = nl + 1})
 
 getLabelsBc :: Word32 -> BcM [LocalLabel]
 getLabelsBc n = BcM $ \_ st ->
   let ctr = nextlabel st
-   in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])
+   in return (coerce [ctr .. ctr+n-1], st{nextlabel = ctr+n})
 
 newBreakInfo :: CgBreakInfo -> BcM InternalBreakpointId
 newBreakInfo info = BcM $ \env st ->
@@ -2692,10 +2670,10 @@ newBreakInfo info = BcM $ \env st ->
         { internalBreaks = addInternalBreak ibi info (internalBreaks st)
         , breakInfoIdx = ix + 1
         }
-  in return (st', ibi)
+  in return (ibi, st')
 
 getCurrentModule :: BcM Module
-getCurrentModule = BcM $ \env st -> return (st, thisModule env)
+getCurrentModule = BcM $ \env st -> return (bcm_module env, st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
