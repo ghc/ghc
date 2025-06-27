@@ -72,8 +72,6 @@ import GHC.Float (castFloatToWord32, castDoubleToWord64)
 
 import qualified Data.List as List ( any )
 import GHC.Exts
-import GHC.HsToCore.Breakpoints (ModBreaks(..))
-
 
 -- -----------------------------------------------------------------------------
 -- Unlinked BCOs
@@ -110,14 +108,14 @@ assembleBCOs
   -> FlatBag (ProtoBCO Name)
   -> [TyCon]
   -> [(Name, ByteString)]
-  -> Maybe (InternalModBreaks, ModBreaks)
+  -> InternalModBreaks
   -> [SptEntry]
   -> IO CompiledByteCode
 assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   let itbls = mkITbls profile tycons
-  bcos    <- mapM (assembleBCO (profilePlatform profile)) proto_bcos
+  bcos <- mapM (assembleBCO (profilePlatform profile)) proto_bcos
   return CompiledByteCode
     { bc_bcos = bcos
     , bc_itbls = itbls

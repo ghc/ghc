@@ -13,11 +13,16 @@ module GHC.ByteCode.Breakpoints
     InternalModBreaks(..), CgBreakInfo(..)
   , mkInternalModBreaks
 
-    -- ** Operations
-  , getInternalBreak, addInternalBreak
-
     -- ** Internal breakpoint identifier
   , InternalBreakpointId(..), BreakInfoIndex
+
+    -- * Operations
+
+    -- ** Internal-level operations
+  , getInternalBreak, addInternalBreak
+
+    -- ** Source-level information operations
+  , getBreakLoc, getBreakVars, getBreakDecls, getBreakCCS
 
     -- * Utils
   , seqInternalModBreaks
@@ -26,17 +31,19 @@ module GHC.ByteCode.Breakpoints
   where
 
 import GHC.Prelude
+import GHC.Types.SrcLoc
+import GHC.Types.Name.Occurrence
 import Control.DeepSeq
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
 
+import GHC.HsToCore.Breakpoints
 import GHC.Iface.Syntax
-import GHC.Types.Tickish
 
 import GHC.Unit.Module (Module)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.HsToCore.Breakpoints (ModBreaks)
+import Data.Array
 
 {-
 Note [ModBreaks vs InternalModBreaks]
@@ -122,15 +129,18 @@ data InternalModBreaks = InternalModBreaks
         -- ^ Also cache the module corresponding to these 'InternalModBreaks',
         -- for instance for internal sanity checks.
 
-      -- , imodBreaks_modBreaks :: !ModBreaks
-      --   -- ^ Store the original ModBreaks for this module, unchanged.
-      --   -- Allows us to query about source-level breakpoint information using
-      --   -- an internal breakpoint id.
+      , imodBreaks_modBreaks :: !(Maybe ModBreaks)
+        -- ^ Store the original ModBreaks for this module, unchanged.
+        -- Allows us to query about source-level breakpoint information using
+        -- an internal breakpoint id.
       }
 
 -- | Construct an 'InternalModBreaks'
-mkInternalModBreaks :: Module -> IntMap CgBreakInfo -> InternalModBreaks
-mkInternalModBreaks mod im = InternalModBreaks im mod
+mkInternalModBreaks :: Module -> Maybe ModBreaks -> InternalModBreaks
+mkInternalModBreaks mod mbs =
+  assertPpr (Just mod == (modBreaks_module <$> mbs))
+    (text "Constructing InternalModBreaks with the ModBreaks of a different module!") $
+      InternalModBreaks mempty mod mbs
 
 -- | Information about a breakpoint that we know at code-generation time
 -- In order to be used, this needs to be hydrated relative to the current HscEnv by
@@ -166,6 +176,34 @@ assert_modules_match ibi_mod imbs_mod =
   assertPpr (ibi_mod == imbs_mod)
     (text "Tried to query the InternalModBreaks of module" <+> ppr imbs_mod
         <+> text "with an InternalBreakpointId for module" <+> ppr ibi_mod)
+
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+
+-- | Get the source span for this breakpoint
+getBreakLoc  :: InternalBreakpointId -> InternalModBreaks -> Maybe SrcSpan
+getBreakLoc = getBreakXXX modBreaks_locs
+
+-- | Get the vars for this breakpoint
+getBreakVars  :: InternalBreakpointId -> InternalModBreaks -> Maybe [OccName]
+getBreakVars = getBreakXXX modBreaks_vars
+
+-- | Get the decls for this breakpoint
+getBreakDecls :: InternalBreakpointId -> InternalModBreaks -> Maybe [String]
+getBreakDecls = getBreakXXX modBreaks_decls
+
+-- | Get the decls for this breakpoint
+getBreakCCS :: InternalBreakpointId -> InternalModBreaks -> Maybe (String, String)
+getBreakCCS = getBreakXXX modBreaks_ccs
+
+-- | Internal utility to access a ModBreaks field at a particular breakpoint index
+getBreakXXX :: (ModBreaks -> Array BreakTickIndex a) -> InternalBreakpointId -> InternalModBreaks -> Maybe a
+getBreakXXX view (InternalBreakpointId ibi_mod ibi_ix) imbs =
+  assert_modules_match ibi_mod (imodBreaks_module imbs) $ do
+    let cgb = imodBreaks_breakInfo imbs IM.! ibi_ix
+    mbs <- imodBreaks_modBreaks imbs
+    Just $ view mbs ! bi_tick_index (cgb_tick_id cgb)
 
 --------------------------------------------------------------------------------
 -- Instances

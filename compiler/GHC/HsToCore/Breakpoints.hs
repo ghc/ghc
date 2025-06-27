@@ -17,10 +17,6 @@ module GHC.HsToCore.Breakpoints
   ( -- * ModBreaks
     mkModBreaks, ModBreaks(..)
 
-    -- ** Queries
-    -- TODO: See where we could use these rather than using the arrays directly.
-  , getBreakLoc, getBreakVars, getBreakDecls, getBreakCCS
-
     -- ** Re-exports BreakpointId
   , BreakpointId(..), BreakTickIndex
   ) where
@@ -35,7 +31,6 @@ import GHC.Types.Name (OccName)
 import GHC.Types.Tickish (BreakTickIndex, BreakpointId(..))
 import GHC.Unit.Module (Module)
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import Data.List (intersperse)
 
 --------------------------------------------------------------------------------
@@ -102,34 +97,6 @@ mkModBreaks interpreterProfiled modl extendedMixEntries
       , modBreaks_ccs    = ccs
       , modBreaks_module = modl
       }
-
--- | Get the source span for this breakpoint
-getBreakLoc  :: BreakpointId -> ModBreaks -> SrcSpan
-getBreakLoc = getBreakXXX modBreaks_locs
-
--- | Get the vars for this breakpoint
-getBreakVars  :: BreakpointId -> ModBreaks -> [OccName]
-getBreakVars = getBreakXXX modBreaks_vars
-
--- | Get the decls for this breakpoint
-getBreakDecls :: BreakpointId -> ModBreaks -> [String]
-getBreakDecls = getBreakXXX modBreaks_decls
-
--- | Get the decls for this breakpoint
-getBreakCCS :: BreakpointId -> ModBreaks -> (String, String)
-getBreakCCS = getBreakXXX modBreaks_ccs
-
--- | Internal utility to access a ModBreaks field at a particular breakpoint index
-getBreakXXX :: (ModBreaks -> Array BreakTickIndex a) -> BreakpointId -> ModBreaks -> a
-getBreakXXX view (BreakpointId bid_mod ix) mbs =
-  assert_modules_match bid_mod (modBreaks_module mbs) $ view mbs ! ix
-
--- | Assert that the module in the 'BreakpointId' and in 'ModBreaks' match.
-assert_modules_match :: Module -> Module -> a -> a
-assert_modules_match bid_mod mbs_mod =
-  assertPpr (bid_mod == mbs_mod)
-    (text "Tried to query the ModBreaks of module" <+> ppr mbs_mod
-        <+> text "with a BreakpointId for module" <+> ppr bid_mod)
 
 {-
 Note [Field modBreaks_decls]

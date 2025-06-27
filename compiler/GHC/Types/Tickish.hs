@@ -45,6 +45,7 @@ import Language.Haskell.Syntax.Extension ( NoExtField )
 
 import Data.Data
 import GHC.Utils.Outputable (Outputable (ppr), text, (<+>))
+import Data.Array
 
 {- *********************************************************************
 *                                                                      *
@@ -179,6 +180,8 @@ deriving instance Data (GenTickish 'TickishPassCmm)
 --------------------------------------------------------------------------------
 
 -- | Breakpoint tick index
+-- newtype BreakTickIndex = BreakTickIndex Int
+--   deriving (Eq, Ord, Data, Ix, NFData, Outputable)
 type BreakTickIndex = Int
 
 -- | Breakpoint identifier.

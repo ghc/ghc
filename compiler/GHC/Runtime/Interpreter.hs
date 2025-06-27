@@ -28,10 +28,8 @@ module GHC.Runtime.Interpreter
   , whereFrom
   , getModBreaks
   , readModBreaks
-  , readModBreaksMaybe
   , seqHValue
   , evalBreakpointToId
-  , internalBreakIdToBreakId
 
   -- * The object-code linker
   , initObjLinker
@@ -76,7 +74,6 @@ import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
-import GHC.HsToCore.Breakpoints
 import GHC.ByteCode.Breakpoints
 
 import GHC.ByteCode.Types
@@ -95,12 +92,10 @@ import GHC.Utils.Fingerprint
 
 import GHC.Unit.Module
 import GHC.Unit.Home.ModInfo
-import GHC.Unit.Home.Graph (lookupHugByModule)
 import GHC.Unit.Env
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run
-import GHC.Platform.Ways
 #endif
 
 import Control.Concurrent
@@ -109,10 +104,8 @@ import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (mask)
 import Data.Binary
 import Data.ByteString (ByteString)
-import Data.Array ((!))
 import Foreign hiding (void)
 import qualified GHC.Exts.Heap as Heap
-import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Directory
 import System.Process
 import qualified GHC.InfoProv as InfoProv
@@ -424,20 +417,6 @@ evalBreakpointToId eval_break =
       , ibi_info_index = eb_info_index eval_break
       }
 
--- | An @'InternalBreakpointId'@ is an index into the @IntMap 'CgBreakInfo'@ of
--- a specific module's @'ModBreaks'@.
---
--- To get the @'BreakpointId'@, an index from the Core-level ticks to the
--- associated SrcSpans and other source-level relevant details, lookup it up in
--- the @'CgBreakInfo'@ of this internal id's module.
---
--- See also Note [Breakpoint identifiers]
-internalBreakIdToBreakId :: HomeUnitGraph -> InternalBreakpointId -> IO BreakpointId
-internalBreakIdToBreakId hug ibi = do
-  (imbs, _) <- readModBreaks hug (ibi_info_mod ibi)
-  let CgBreakInfo{cgb_tick_id} = getInternalBreak ibi imbs
-  return cgb_tick_id
-
 -- | Process the result of a Seq or ResumeSeq message.             #2950
 handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
 handleSeqHValueStatus interp unit_env eval_status =
@@ -457,16 +436,15 @@ handleSeqHValueStatus interp unit_env eval_status =
         Just break -> do
           let ibi = evalBreakpointToId break
               hug = ue_home_unit_graph unit_env
-          bi <- internalBreakIdToBreakId hug ibi
 
           -- Just case: Stopped at a breakpoint, extract SrcSpan information
           -- from the breakpoint.
-          mb_modbreaks <- getModBreaks . expectJust <$> lookupHugByModule (bi_tick_mod bi) hug
+          mb_modbreaks <- readModBreaks hug ibi
           case mb_modbreaks of
             -- Nothing case - should not occur! We should have the appropriate
             -- breakpoint information
             Nothing -> nothing_case
-            Just (_, modbreaks) -> put $ brackets . ppr $ getBreakLoc bi modbreaks
+            Just modbreaks -> put $ brackets . ppr $ getBreakLoc ibi modbreaks
 
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
@@ -752,22 +730,19 @@ wormholeRef interp _r = case interpInstance interp of
 
 -- | Get the breakpoint information from the ByteCode object associated to this
 -- 'HomeModInfo'.
-getModBreaks :: HomeModInfo -> Maybe (InternalModBreaks, ModBreaks)
+getModBreaks :: HomeModInfo -> Maybe InternalModBreaks
 getModBreaks hmi
   | Just linkable <- homeModInfoByteCode hmi,
     -- The linkable may have 'DotO's as well; only consider BCOs. See #20570.
     [cbc] <- linkableBCOs linkable
-  = bc_breaks cbc
+  = Just $ bc_breaks cbc
   | otherwise
   = Nothing -- probably object code
 
 -- | Read the 'InternalModBreaks' and 'ModBreaks' of the given home 'Module'
 -- from the 'HomeUnitGraph'.
-readModBreaks :: HasCallStack => HomeUnitGraph -> Module -> IO (InternalModBreaks, ModBreaks)
-readModBreaks hug mod = expectJust <$> readModBreaksMaybe hug mod
-
-readModBreaksMaybe :: HasCallStack => HomeUnitGraph -> Module -> IO (Maybe (InternalModBreaks, ModBreaks))
-readModBreaksMaybe hug mod = getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
+readModBreaks :: HasCallStack => HomeUnitGraph -> InternalBreakpointId -> IO (Maybe InternalModBreaks)
+readModBreaks hug ibi = getModBreaks . expectJust <$> HUG.lookupHugByModule (ibi_info_mod ibi) hug
 
 -- -----------------------------------------------------------------------------
 -- Misc utils

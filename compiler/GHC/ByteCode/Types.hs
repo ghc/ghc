@@ -46,7 +46,6 @@ import Foreign
 import Data.ByteString (ByteString)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
-import GHC.HsToCore.Breakpoints (ModBreaks)
 import GHC.Unit.Module
 
 -- -----------------------------------------------------------------------------
@@ -62,9 +61,8 @@ data CompiledByteCode = CompiledByteCode
   , bc_strs   :: [(Name, ByteString)]
     -- ^ top-level strings (heap allocated)
 
-  , bc_breaks :: (Maybe (InternalModBreaks, ModBreaks))
-    -- ^ All (internal and tick-level) breakpoint information (no information
-    -- if breakpoints are disabled).
+  , bc_breaks :: InternalModBreaks
+    -- ^ All breakpoint information (no information if breakpoints are disabled).
     --
     -- This information is used when loading a bytecode object: we will
     -- construct the arrays to be used at runtime to trigger breakpoints then
@@ -73,10 +71,6 @@ data CompiledByteCode = CompiledByteCode
     -- Moreover, when a breakpoint is hit we will find the associated
     -- breakpoint information indexed by the internal breakpoint id here (in
     -- 'getModBreaks').
-
-    -- TODO: If ModBreaks is serialized and reconstructed as part of ModDetails
-    -- we don't need to keep it in bc_breaks as it can be fetched from the
-    -- 'HomeModInfo' directly, right?
 
   , bc_spt_entries :: ![SptEntry]
     -- ^ Static pointer table entries which should be loaded along with the

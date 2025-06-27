@@ -98,7 +98,6 @@ import GHC.CoreToIface
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT(..))
 import Control.Monad.Trans.State  (StateT(..))
-import qualified GHC.Unit.Home.Graph as HUG
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -133,13 +132,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr $ elemsFlatBag proto_bcos)))
 
-        let all_mod_breaks = case mb_modBreaks of
-             Just modBreaks -> Just (internalBreaks, modBreaks)
-             Nothing        -> Nothing
-             -- no modBreaks, thus drop all
-             -- internalBreaks? Will we ever want to have internal breakpoints in
-             -- a module for which we're not doing breakpoints at all? probably
-        cbc <- assembleBCOs profile proto_bcos tycs strings all_mod_breaks spt_entries
+        cbc <- assembleBCOs profile proto_bcos tycs strings internalBreaks spt_entries
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi
@@ -398,49 +391,20 @@ schemeR_wrk fvs nm original_body (args, body)
 schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
 schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
   code <- schemeE d 0 p rhs
-  hsc_env <- getHscEnv
-  current_mod <- getCurrentModule
-  current_breaks <- getCurrentModuleBreaks
-  liftIO (break_info hsc_env (bi_tick_mod tick_id) current_mod current_breaks) >>= \case
-    Nothing -> pure code
-    Just _ -> do
-      platform <- profilePlatform <$> getProfile
-      let idOffSets = getVarOffSets platform d p fvs
-          ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-          toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
-          toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-          breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty tick_id
+  platform <- profilePlatform <$> getProfile
+  let idOffSets = getVarOffSets platform d p fvs
+      ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+      toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+      toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+      breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty tick_id
 
-      ibi <- newBreakInfo breakInfo
+  -- TODO: Lookup tick_id in InternalBreakMods and if it returns Nothing then
+  -- we don't have Breakpoint information for this Breakpoint so might as well
+  -- not emit the instruction.
+  ibi <- newBreakInfo breakInfo
+  return $ BRK_FUN ibi `consOL` code
 
-      return $ BRK_FUN ibi `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
-
--- | Breakpoints might be disabled because we're in TH, because
--- @-fno-break-points@ was specified, or because a module was reloaded without
--- reinitializing 'ModBreaks'.
---
--- If the module stored in the breakpoint is the currently processed module, use
--- the 'ModBreaks' from the state.
--- If that is 'Nothing', consider breakpoints to be disabled and skip the
--- instruction.
---
--- If the breakpoint is inlined from another module, look it up in the home
--- package table.
--- If the module doesn't exist there, skip the instruction.
-break_info ::
-  HscEnv ->
-  Module ->
-  Module ->
-  Maybe ModBreaks ->
-  IO (Maybe ModBreaks)
-break_info hsc_env mod current_mod current_mod_breaks = do
-  if mod == current_mod then
-    return current_mod_breaks
-  else
-    HUG.lookupHugByModule mod (hsc_HUG hsc_env) >>= \case
-      Just hm -> return $ snd <$> getModBreaks hm
-      Nothing -> pure Nothing
 
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
 getVarOffSets platform depth env = map getOffSet
@@ -2621,7 +2585,6 @@ data BcM_Env
    = BcM_Env
         { bcm_hsc_env    :: HscEnv
         , bcm_module     :: Module -- current module (for breakpoints)
-        , bcm_breaks     :: Maybe ModBreaks -- modbreaks for the current module
         }
 
 data BcM_State
@@ -2640,7 +2603,7 @@ newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (r, BcM_State))
 
 runBc :: HscEnv -> Module -> Maybe ModBreaks -> BcM r -> IO (r, BcM_State)
 runBc hsc_env this_mod mbs (BcM m)
-   = m (BcM_Env hsc_env this_mod mbs) (BcM_State 0 0 (mkInternalModBreaks this_mod mempty))
+   = m (BcM_Env hsc_env this_mod) (BcM_State 0 0 (mkInternalModBreaks this_mod mbs))
 
 instance HasDynFlags BcM where
     getDynFlags = hsc_dflags <$> getHscEnv
@@ -2682,9 +2645,6 @@ newBreakInfo info = BcM $ \env st ->
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \env st -> return (bcm_module env, st)
-
-getCurrentModuleBreaks :: BcM (Maybe ModBreaks)
-getCurrentModuleBreaks = BcM $ \env st -> return (bcm_breaks env, st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
