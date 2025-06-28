@@ -4,6 +4,8 @@
   * Add `Data.List.NonEmpty.mapMaybe`. ([CLC proposal #337](https://github.com/haskell/core-libraries-committee/issues/337))
 
 ## 4.22.0.0 *TBA*
+  * Shipped with GHC 9.14.1
+  * The internal `GHC.Weak.Finalize.runFinalizerBatch` function has been deprecated ([CLC proposal #342](https://github.com/haskell/core-libraries-committee/issues/342))
   * Define `displayException` of `SomeAsyncException` to unwrap the exception.
       ([CLC proposal #309](https://github.com/haskell/core-libraries-committee/issues/309))
   * Restrict `Data.List.NonEmpty.unzip` to `NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)`. ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
