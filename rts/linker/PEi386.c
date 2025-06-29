@@ -1174,8 +1174,10 @@ bool checkAndLoadImportLibrary( pathchar* arch_name, char* member_name, FILE* f 
     // Because the symbol has been loaded before we actually need it, if a
     // stronger reference wants to add a duplicate we should discard this
     // one to preserve link order.
-    if (!ghciInsertSymbolTable(dll, symhash, symbol, sym, false,
-                               SYM_TYPE_CODE | SYM_TYPE_DUP_DISCARD, NULL))
+    SymType symType = SYM_TYPE_DUP_DISCARD | SYM_TYPE_HIDDEN;
+    symType |= hdr.Type == IMPORT_OBJECT_CODE ? SYM_TYPE_CODE : SYM_TYPE_DATA;
+
+    if (!ghciInsertSymbolTable(dll, symhash, symbol, sym, false, symType, NULL))
       return false;
 
     return true;
