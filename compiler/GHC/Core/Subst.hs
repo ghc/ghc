@@ -163,12 +163,14 @@ extendIdSubstList (Subst in_scope ids tvs cvs) prs
 -- | Add a substitution appropriate to the thing being substituted
 --   (whether an expression, type, or coercion). See also
 --   'extendIdSubst', 'extendTvSubst', 'extendCvSubst'
-extendSubst :: Subst -> Var -> CoreArg -> Subst
+extendSubst :: HasDebugCallStack => Subst -> Var -> CoreArg -> Subst
 extendSubst subst var arg
   = case arg of
-      Type ty     -> assert (isTyVar var) $ extendTvSubst subst var ty
-      Coercion co -> assert (isCoVar var) $ extendCvSubst subst var co
-      _           -> assert (isId    var) $ extendIdSubst subst var arg
+      Type ty     -> assertPpr (isTyVar var) doc $ extendTvSubst subst var ty
+      Coercion co -> assertPpr (isCoVar var) doc $ extendCvSubst subst var co
+      _           -> assertPpr (isId    var) doc $ extendIdSubst subst var arg
+  where
+   doc = ppr var <+> text ":=" <+> ppr arg
 
 extendSubstWithVar :: Subst -> Var -> Var -> Subst
 extendSubstWithVar subst v1 v2
