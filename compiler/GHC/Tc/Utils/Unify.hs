@@ -586,6 +586,10 @@ alwaysBuildImplication _ = False
 {-  Commmented out for now while I figure out about error messages.
     See #14185
 
+Caution: we get some duplication of errors if we build more implications.
+Because we get one error for each function RHS, even if it's for
+the same class constraint.
+
 alwaysBuildImplication (SigSkol ctxt _ _)
   = case ctxt of
       FunSigCtxt {} -> True  -- RHS of a binding with a signature

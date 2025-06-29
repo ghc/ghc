@@ -548,3 +548,6 @@ test('T25965', normal, compile, ['-O'])
 test('T25703',  [grep_errmsg(r'SPEC')], compile, ['-O -fpolymorphic-specialisation -ddump-rule-firings'])
 test('T25703a', [grep_errmsg(r'SPEC')], compile, ['-O -fpolymorphic-specialisation -ddump-rule-firings'])
 
+test('T26115', [grep_errmsg(r'DFun')], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('T26116', normal, compile, ['-O -ddump-rules'])
+

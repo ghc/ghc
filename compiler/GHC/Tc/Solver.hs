@@ -1036,8 +1036,7 @@ findInferredDiff annotated_theta inferred_theta
          -- See `Note [Quantification and partial signatures]` Wrinkle 2
 
        ; return (map (box_pred . ctPred) $
-                 bagToList               $
-                 wc_simple residual) }
+                 bagToList residual) }
   where
      box_pred :: PredType -> PredType
      box_pred pred = case classifyPredType pred of
