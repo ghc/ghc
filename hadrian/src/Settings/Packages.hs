@@ -312,6 +312,7 @@ rtsPackageArgs = package rts ? do
     libzstdLibraryDir <- getSetting LibZstdLibDir
 
     x86 <- queryTarget (\ tgt -> archOS_arch (tgtArchOs tgt) `elem` [ ArchX86, ArchX86_64 ])
+    riscv64 <- queryTarget (\ tgt -> archOS_arch (tgtArchOs tgt) == ArchRISCV64)
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
@@ -327,11 +328,13 @@ rtsPackageArgs = package rts ? do
             --
             -- In particular, we **do not** pass -mavx when compiling
             -- AutoApply_V16.cmm, as that would lock out targets with SSE2 but not AVX.
-          , inputs ["**/AutoApply_V32.cmm"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/AutoApply_V64.cmm"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/AutoApply_V16.cmm"] ? pure [ "-mriscv-vlen 128" | riscv64]
+          , inputs ["**/AutoApply_V32.cmm"] ? pure ([ "-mavx2"    | x86 ] ++ [ "-mriscv-vlen 256" | riscv64])
+          , inputs ["**/AutoApply_V64.cmm"] ? pure ([ "-mavx512f" | x86 ] ++ [ "-mriscv-vlen 512" | riscv64])
 
-          , inputs ["**/Jumps_V32.cmm"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/Jumps_V64.cmm"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/Jumps_V16.cmm"] ? pure [ "-mriscv-vlen 128" | riscv64]
+          , inputs ["**/Jumps_V32.cmm"] ? pure ([ "-mavx2"    | x86 ] ++ [ "-mriscv-vlen 256" | riscv64])
+          , inputs ["**/Jumps_V64.cmm"] ? pure ([ "-mavx512f" | x86 ] ++ [ "-mriscv-vlen 512" | riscv64])
           ]
 
     let cArgs = mconcat
@@ -405,11 +408,13 @@ rtsPackageArgs = package rts ? do
                    , "**/AutoApply_V64.c" ] ? pure ["-fno-PIC", "-static"]
 
             -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
-          , inputs ["**/AutoApply_V32.c"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/AutoApply_V64.c"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/AutoApply_V16.c"] ? pure [ "-march=rv64g_zvl128b" | riscv64]
+          , inputs ["**/AutoApply_V32.c"] ? pure ([ "-mavx2"    | x86 ] ++ [ "-march=rv64g_zvl256b" | riscv64])
+          , inputs ["**/AutoApply_V64.c"] ? pure ([ "-mavx512f" | x86 ] ++ [ "-march=rv64g_zvl512b" | riscv64])
 
-          , inputs ["**/Jumps_V32.c"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/Jumps_V64.c"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/Jumps_V16.c"] ? pure [ "-mriscv-vlen 128" | riscv64]
+          , inputs ["**/Jumps_V32.c"] ? pure ([ "-mavx2"    | x86 ] ++ [ "-march=rv64g_zvl256b" | riscv64])
+          , inputs ["**/Jumps_V64.c"] ? pure ([ "-mavx512f" | x86 ] ++ [ "-march=rv64g_zvl512b" | riscv64])
 
           -- inlining warnings happen in Compact
           , inputs ["**/Compact.c"] ? arg "-Wno-inline"
