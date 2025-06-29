@@ -33,7 +33,7 @@ tried :: forall (e :: Type). (forall m. C1T e m) => e -> ()
 tried = try @e
 
 -- From the call to "try", we get [W] D (T e).
--- After using the instance for D, we get the QC [G] C3 m ==> [W] C1 (T e) m.
+-- After using the instance for D, we get the QC [W] (forall m. C3 m ==> C1 (T e) m)
 --
 -- The Given "[G] C3 m" thus arises from superclass expansion
 -- from "D (T e)", which contains a type family application, T.
@@ -41,3 +41,16 @@ tried = try @e
 -- expanding the superclasses of C3 (in this case, C2); in particular
 -- ltPatersonSize needs to handle a type family in its second argument.
 
+{-  [G] forall m. C1T e m
+    --> sc
+    [G] forall m. C1 (T e) m    <<--- aJT
+
+    [W] D (T e)
+--> instance
+    [W] (forall m. C3 m => C1 (T e) m)
+
+    ---- Implication: forall m2 ---
+    [G] C3 m2
+    [W] C1 (T e) m2
+    --> solve via qci
+-}

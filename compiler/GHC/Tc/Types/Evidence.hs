@@ -355,11 +355,13 @@ data EvBindsVar
       --     (dictionaries etc)
       -- Some Given, some Wanted
 
-      ebv_tcvs :: IORef CoVarSet
-      -- The free Given coercion vars needed by Wanted coercions that
-      -- are solved by filling in their HoleDest in-place. Since they
-      -- don't appear in ebv_binds, we keep track of their free
-      -- variables so that we can report unused given constraints
+      ebv_tcvs :: IORef [TcCoercion]
+      -- When we solve a Wanted by filling in a CoercionHole, it is as
+      -- if we were adding an evidence binding
+      --       co_hole := coercion
+      -- We keep all these RHS coercions in a list, alongside `ebv_binds`,
+      --  so that we can report unused given constraints,
+      --  in GHC.Tc.Solver.neededEvVars
       -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
     }
 
@@ -367,7 +369,7 @@ data EvBindsVar
 
       -- See above for comments on ebv_uniq, ebv_tcvs
       ebv_uniq :: Unique,
-      ebv_tcvs :: IORef CoVarSet
+      ebv_tcvs :: IORef [TcCoercion]
     }
 
 instance Data.Data TcEvBinds where
@@ -504,8 +506,8 @@ data EvTerm
   | EvFun     -- /\as \ds. let binds in v
       { et_tvs   :: [TyVar]
       , et_given :: [EvVar]
-      , et_binds :: TcEvBinds -- This field is why we need an EvFun
-                              -- constructor, and can't just use EvExpr
+      , et_binds :: Bag EvBind -- This field is why we need an EvFun
+                               -- constructor, and can't just use EvExpr
       , et_body  :: EvVar }
 
   deriving Data.Data
@@ -871,7 +873,11 @@ relevantEvVar v = isInternalName (varName v)
 evVarsOfTerm :: EvTerm -> VarSet
 evVarsOfTerm (EvExpr e)         = exprSomeFreeVars relevantEvVar e
 evVarsOfTerm (EvTypeable _ ev)  = evVarsOfTypeable ev
-evVarsOfTerm (EvFun {})         = emptyVarSet -- See Note [Free vars of EvFun]
+evVarsOfTerm (EvFun { et_tvs = tvs, et_given = given, et_binds = binds, et_body = v })
+  = fvs `delVarSetList` bndrs
+  where
+    fvs = foldr (unionVarSet . evVarsOfTerm . eb_rhs) (unitVarSet v) binds
+    bndrs = foldr ((:) . eb_lhs) (tvs ++ given) binds
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = mapUnionVarSet evVarsOfTerm
@@ -884,26 +890,11 @@ evVarsOfTypeable ev =
     EvTypeableTrFun em e1 e2 -> evVarsOfTerms [em,e1,e2]
     EvTypeableTyLit e        -> evVarsOfTerm e
 
-
-{- Note [Free vars of EvFun]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Finding the free vars of an EvFun is made tricky by the fact the
-bindings et_binds may be a mutable variable.  Fortunately, we
-can just squeeze by.  Here's how.
-
-* evVarsOfTerm is used only by GHC.Tc.Solver.neededEvVars.
-* Each EvBindsVar in an et_binds field of an EvFun is /also/ in the
-  ic_binds field of an Implication
-* So we can track usage via the processing for that implication,
-  (see Note [Tracking redundant constraints] in GHC.Tc.Solver).
-  We can ignore usage from the EvFun altogether.
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
                   Pretty printing
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 instance Outputable HsWrapper where
   ppr co_fn = pprHsWrapper co_fn (no_parens (text "<>"))

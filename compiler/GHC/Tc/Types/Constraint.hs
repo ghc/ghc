@@ -351,9 +351,10 @@ instance Outputable IrredCt where
 -- See Note [Quantified constraints] in GHC.Tc.Solver.Solve
 data QCInst
   -- | A quantified constraint, of type @forall tvs. context => ty@
-  = QCI { qci_ev   :: CtEvidence
-        , qci_tvs  :: [TcTyVar]  -- ^ @tvs@
-        , qci_body :: TcPredType -- ^ the body of the @forall@, i.e. @ty@
+  = QCI { qci_ev    :: CtEvidence -- See Note [Ct/evidence invariant]
+        , qci_tvs   :: [TcTyVar]  -- ^ @tvs@
+        , qci_theta :: TcThetaType
+        , qci_body  :: TcPredType -- ^ the body of the @forall@, i.e. @ty@
         , qci_pend_sc :: ExpansionFuel
              -- ^ Invariants: qci_pend_sc > 0 =>
              --
@@ -990,8 +991,9 @@ pendingScDict_maybe _ = Nothing
 
 pendingScInst_maybe :: QCInst -> Maybe QCInst
 -- Same as isPendingScDict, but for QCInsts
-pendingScInst_maybe qci@(QCI { qci_pend_sc = f })
-  | pendingFuel f = Just (qci { qci_pend_sc = doNotExpand })
+pendingScInst_maybe qci@(QCI { qci_ev = ev, qci_pend_sc = f })
+  | isGiven ev -- Do not expand Wanted QCIs
+  , pendingFuel f = Just (qci { qci_pend_sc = doNotExpand })
   | otherwise     = Nothing
 
 superClassesMightHelp :: WantedConstraints -> Bool
