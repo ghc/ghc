@@ -35,7 +35,7 @@ module GHC.Tc.Types.LclEnv (
 
 import GHC.Prelude
 
-import GHC.Hs ( SrcCodeCtxt (..) )
+import GHC.Hs ( SrcCodeCtxt (..), isGeneratedCodeCtxt )
 import GHC.Tc.Utils.TcType ( TcLevel )
 import GHC.Tc.Errors.Types ( TcRnMessage )
 
@@ -171,16 +171,16 @@ getLclEnvSrcCodeCtxt :: TcLclEnv -> SrcCodeCtxt
 getLclEnvSrcCodeCtxt = tcl_in_gen_code . tcl_lcl_ctxt
 
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
-lclEnvInGeneratedCode env =
-  case (getLclEnvSrcCodeCtxt env) of
-    UserCode -> False
-    GeneratedCode{} -> True
+lclEnvInGeneratedCode = lclCtxtInGeneratedCode . tcl_lcl_ctxt
+
+lclCtxtInGeneratedCode :: TcLclCtxt -> Bool
+lclCtxtInGeneratedCode = isGeneratedCodeCtxt . tcl_in_gen_code
 
 setLclCtxtSrcCodeCtxt :: SrcCodeCtxt -> TcLclCtxt -> TcLclCtxt
 setLclCtxtSrcCodeCtxt userOrGen env = env { tcl_in_gen_code = userOrGen }
 
 setLclEnvSrcCodeCtxt :: SrcCodeCtxt -> TcLclEnv -> TcLclEnv
-setLclEnvSrcCodeCtxt userOrGen = modifyLclCtxt (setLclCtxtSrcCodeCtxt userOrGen)
+setLclEnvSrcCodeCtxt userOrGen = modifyLclCtxt (\ctxt -> setLclCtxtSrcCodeCtxt userOrGen ctxt)
 
 getLclEnvBinderStack :: TcLclEnv -> TcBinderStack
 getLclEnvBinderStack = tcl_bndrs . tcl_lcl_ctxt

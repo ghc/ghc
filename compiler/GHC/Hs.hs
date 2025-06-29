@@ -38,7 +38,7 @@ module GHC.Hs (
         HsModule(..), AnnsModule(..),
         HsParsedModule(..), XModulePs(..),
 
-        SrcCodeCtxt(..)
+        SrcCodeCtxt(..), isUserCodeCtxt, isGeneratedCodeCtxt
 
 ) where
 
@@ -155,3 +155,11 @@ data HsParsedModule = HsParsedModule {
 data SrcCodeCtxt
   = UserCode
   | GeneratedCode SrcCodeOrigin
+
+isUserCodeCtxt :: SrcCodeCtxt -> Bool
+isUserCodeCtxt UserCode = True
+isUserCodeCtxt _ = False
+
+isGeneratedCodeCtxt :: SrcCodeCtxt -> Bool
+isGeneratedCodeCtxt UserCode = False
+isGeneratedCodeCtxt _ = True
