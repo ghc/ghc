@@ -78,14 +78,17 @@ data StgToCmmConfig = StgToCmmConfig
                                                  -- Note [Saving foreign call target to local] for details
   ------------------------------ SIMD flags ------------------------------------
   -- Each of these flags checks vector compatibility with the backend requested
-  -- during compilation. In essence, this means checking for @-fllvm@ which is
-  -- the only backend that currently allows SIMD instructions, see
-  -- Ghc.StgToCmm.Prim.checkVecCompatibility for these flags only call site.
+  -- during compilation. Some backends (e.g. the C backend) or architectures
+  -- don't implement SIMD instructions, see
+  -- Ghc.StgToCmm.Prim.checkVecCompatibility for these flags' only call site.
   , stgToCmmVecInstrsErr   :: Maybe String       -- ^ Error (if any) to raise when vector instructions are
                                                  -- used, see @StgToCmm.Prim.checkVecCompatibility@
   , stgToCmmAvx            :: !Bool              -- ^ check for Advanced Vector Extensions
   , stgToCmmAvx2           :: !Bool              -- ^ check for Advanced Vector Extensions 2
   , stgToCmmAvx512f        :: !Bool              -- ^ check for Advanced Vector 512-bit Extensions
+  -- TODO: This could be used to replace architecture specific logic ("Is this
+  -- AVX...?") Right now, it's only used for RISC-V.
+  , stgToCmmVectorMinBits  :: Maybe Word         -- ^ The minimal amount of bits a vector register can hold
   }
 
 
