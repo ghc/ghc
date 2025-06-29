@@ -187,6 +187,9 @@ specUnfolding opts spec_bndrs spec_app rule_lhs_args
                    spec_app (mkLams old_bndrs arg)
                    -- The beta-redexes created by spec_app will be
                    -- simplified away by simplOptExpr
+                   -- ToDo: this is VERY DELICATE for type args.  We make
+                   --        (\@a @b x y. TYPE ty) ty1 ty2 d1 d2
+                   -- and rely on it simplifying to ty[ty1/a, ty2/b]
 
 specUnfolding opts spec_bndrs spec_app rule_lhs_args
               (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
