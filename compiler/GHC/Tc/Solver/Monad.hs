@@ -388,8 +388,9 @@ updInertDicts dict_ct@(DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
   = do { traceTcS "Adding inert dict" (ppr dict_ct $$ ppr cls  <+> ppr tys)
 
        ; if | isGiven ev, Just (str_ty, _) <- isIPPred_maybe cls tys
-            -> -- See (SIP1) and (SIP2) in Note [Shadowing of implicit parameters]
-               -- Update /both/ inert_cans /and/ inert_solved_dicts.
+            -> -- For [G] ?x::ty, remove any dicts mentioning ?x,
+              --    from /both/ inert_cans /and/ inert_solved_dicts (#23761)
+               -- See (SIP1) and (SIP2) in Note [Shadowing of implicit parameters]
                updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
                inerts { inert_cans         = updDicts (filterDicts (does_not_mention_ip_for str_ty)) ics
                       , inert_solved_dicts = filterDicts (does_not_mention_ip_for str_ty) solved }
@@ -848,20 +849,10 @@ lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 lookupInInerts loc pty
   | ClassPred cls tys <- classifyPredType pty
   = do { inerts <- getInertSet
-       ; mode   <- getTcSMode
-       ; let mb_solved = lookupSolvedDict inerts loc cls tys
-             mb_inert  = fmap dictCtEvidence $
-                         lookupInertDict mode (inert_cans inerts) loc cls tys
-       ; return $ do -- Maybe monad
-            found_ev <- mb_solved `mplus` mb_inert
-
-            -- We're about to "solve" the wanted we're looking up, so we
-            -- must make sure doing so wouldn't run afoul of
-            -- Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
-            -- Forgetting this led to #20666.
-            guard $ not (prohibitedSuperClassSolve (ctEvLoc found_ev) loc)
-
-            return found_ev }
+       ; return (lookupSolvedDict inerts loc cls tys) }
+            -- Do /not/ look in the inert_cans, because doing so bypasses all
+            -- all the careful tests in tryInertDicts, nleading to
+            --    #20666 (prohibitedSuperClassSolve) and #26117 (short-cut solve)
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
 
