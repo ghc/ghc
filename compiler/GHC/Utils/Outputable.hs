@@ -45,7 +45,7 @@ module GHC.Utils.Outputable (
         semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lambda,
-        lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
+        lparen, rparen, lbrack, rbrack, lbrace, rbrace, tab, underscore,
         blankLine, forAllLit, bullet, ellipsis,
         ($+$),
         cat, fcat,
@@ -789,7 +789,7 @@ lambda     = unicodeSyntax (char 'λ') (char '\\')
 ellipsis   = docToSDoc Pretty.ellipsis
 
 semi, comma, colon, equals, space, underscore, dot, vbar :: IsLine doc => doc
-lparen, rparen, lbrack, rbrack, lbrace, rbrace :: IsLine doc => doc
+lparen, rparen, lbrack, rbrack, lbrace, rbrace, tab :: IsLine doc => doc
 semi       = char ';'
 comma      = char ','
 colon      = char ':'
@@ -804,6 +804,7 @@ lbrack     = char '['
 rbrack     = char ']'
 lbrace     = char '{'
 rbrace     = char '}'
+tab        = char '\t'
 
 forAllLit :: SDoc
 forAllLit = unicodeSyntax (char '∀') (text "forall")
