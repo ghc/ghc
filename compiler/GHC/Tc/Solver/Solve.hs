@@ -290,9 +290,9 @@ solveNestedImplications implics
 `trySolveImplication` may be invoked while solving simple wanteds, notably from
 `solveWantedForAll`.  It returns a Bool to say if solving succeeded or failed.
 
-It used `nestImplicTcS` to build a nested scope.  One subtle point is that
+It uses `nestImplicTcS` to build a nested scope.  One subtle point is that
 `nestImplicTcS` uses the `inert_givens` (not the `inert_cans`) of the current
-inert set to initialse the `InertSet` of the nested scope.  It super-important not
+inert set to initialse the `InertSet` of the nested scope.  It is super-important not
 to pollute the sub-solving problem with the unsolved Wanteds of the current scope.
 
 Whenever we do `solveSimpleGivens`, we snapshot the `inert_cans` into `inert_givens`.
@@ -1409,7 +1409,7 @@ solveWantedForAll qci tvs theta body_pred
                    addInertForAll qci
                  ; stopWith (CtWanted wtd) "Wanted forall-constraint:unsolved" }
 
-         else do { -- Completely solved; build an evidence terms
+         else do { -- Completely solved; build an evidence term
                    setWantedEvTerm dest EvCanonical $
                    EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
                          , et_binds = evBindMapBinds evbs, et_body = w_id }
@@ -1440,7 +1440,7 @@ All the machinery is to hand; there is little to do.
 
 There are some tricky corners though:
 
-(WFA1) We can take a more straightforward parth when there is a matching Given, e.g.
+(WFA1) We can take a more straightforward path when there is a matching Given, e.g.
           [W] dg :: forall c d. (Eq c, Ord d) => C x c d
     In this case, it's better to directly solve the Wanted from the Given, instead
     of building an implication. This is more than a simple optimisation; see
@@ -1451,7 +1451,7 @@ There are some tricky corners though:
     (QC-INV) Every quantified constraint returns a non-bottom dictionary
 
   just as every top-level instance declaration guarantees to return a non-bottom
-  dictionary.  But as #19690 shows, it is possible to get a bottom dicionary
+  dictionary.  But as #19690 shows, it is possible to get a bottom dictionary
   by superclass selection if we aren't careful.  The situation is very similar
   to that described in Note [Recursive superclasses] in GHC.Tc.TyCl.Instance;
   and we use the same solution:
@@ -1482,10 +1482,10 @@ There are some tricky corners though:
         {-# SPECIALISE f :: forall f. (forall x. Eq x => Eq (f x)) => Int -> f Int #-}
       This SPECIALISE is treated like an expression with a type signature, so
       we instantiate the constraints, simplify them and re-generalise.  From the
-      instantaiation we get  [W] d :: (forall x. Eq a => Eq (f x))
+      instantiation we get  [W] d :: (forall x. Eq a => Eq (f x))
       and we want to generalise over that.  We do not want to attempt to solve it
-      and them get stuck, and emit an error message.  If we can't solve it, better
-      to leave it alone
+      and then get stuck, and emit an error message.  If we can't solve it, better
+      to leave it alone.
 
       We still need to simplify quantified constraints that can be
       /fully solved/ from instances, otherwise we would never be able to

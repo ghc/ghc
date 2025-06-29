@@ -24,8 +24,6 @@ module GHC.Tc.Solver.Types (
 import GHC.Prelude
 
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Origin
-import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin )
 import GHC.Tc.Utils.TcType
 
 import GHC.Types.Unique
@@ -33,7 +31,6 @@ import GHC.Types.Unique.DFM
 
 import GHC.Core.Class
 import GHC.Core.Map.Type
-import GHC.Core.Predicate
 import GHC.Core.TyCon
 import GHC.Core.TyCon.Env
 
@@ -142,13 +139,8 @@ type DictMap a = TcAppMap a
 emptyDictMap :: DictMap a
 emptyDictMap = emptyTcAppMap
 
-findDict :: DictMap a -> CtLoc -> Class -> [Type] -> Maybe a
-findDict m loc cls tys
-  | Just {} <- isCallStackPred cls tys
-  , Just {} <- isPushCallStackOrigin_maybe (ctLocOrigin loc)
-  = Nothing             -- See Note [Solving CallStack constraints]
-
-  | otherwise
+findDict :: DictMap a -> Class -> [Type] -> Maybe a
+findDict m cls tys
   = findTcApp m (classTyCon cls) tys
 
 findDictsByClass :: DictMap a -> Class -> Bag a
@@ -164,33 +156,6 @@ dictsToBag = tcAppMapToBag
 
 foldDicts :: (a -> b -> b) -> DictMap a -> b -> b
 foldDicts = foldTcAppMap
-
-{- Note [Solving CallStack constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See Note [Overview of implicit CallStacks] in GHc.Tc.Types.Evidence.
-
-Suppose f :: HasCallStack => blah.  Then
-
-* Each call to 'f' gives rise to
-    [W] s1 :: IP "callStack" CallStack    -- CtOrigin = OccurrenceOf f
-  with a CtOrigin that says "OccurrenceOf f".
-  Remember that HasCallStack is just shorthand for
-    IP "callStack" CallStack
-  See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-
-* We canonicalise such constraints, in GHC.Tc.Solver.Dict.canDictNC, by
-  pushing the call-site info on the stack, and changing the CtOrigin
-  to record that has been done.
-   Bind:  s1 = pushCallStack <site-info> s2
-   [W] s2 :: IP "callStack" CallStack   -- CtOrigin = IPOccOrigin
-
-* Then, and only then, we can solve the constraint from an enclosing
-  Given.
-
-So we must be careful /not/ to solve 's1' from the Givens.  Again,
-we ensure this by arranging that findDict always misses when looking
-up such constraints.
--}
 
 {- *********************************************************************
 *                                                                      *

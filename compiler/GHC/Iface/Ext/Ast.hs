@@ -673,14 +673,7 @@ instance ToHie (Context (Located (WithUserRdr Name))) where
   toHie (C c (L l (WithUserRdr _ n))) = toHie $ C c (L l n)
 
 evVarsOfTermList :: EvTerm -> [EvId]
-evVarsOfTermList (EvExpr e)         = exprSomeFreeVarsList isEvVar e
-evVarsOfTermList (EvTypeable _ ev)  =
-  case ev of
-    EvTypeableTyCon _ e   -> concatMap evVarsOfTermList e
-    EvTypeableTyApp e1 e2 -> concatMap evVarsOfTermList [e1,e2]
-    EvTypeableTrFun e1 e2 e3 -> concatMap evVarsOfTermList [e1,e2,e3]
-    EvTypeableTyLit e     -> evVarsOfTermList e
-evVarsOfTermList (EvFun{}) = []
+evVarsOfTermList tm = toList (evVarsOfTerm tm)
 
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))

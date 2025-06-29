@@ -836,7 +836,7 @@ Notice that:
 
 The transformation goes in these steps
 
-(S1) decomposeCall: decomopose `the_call` into
+(S1) decomposeCall: decompose `the_call` into
      - `binds`: the enclosing let-bindings
      - `rule_lhs_args`: the arguments of the call itself
 
@@ -848,7 +848,8 @@ The transformation goes in these steps
   The lambdas come from the type signature, which is then re-instantiated,
   hence the applications of those lambdas.
 
-  so `decomposeCall` uses the simple optimiser to simplify this to
+  To handle these, `decomposeCall` uses the simple optimiser to simplify
+  this to
      let { d = d2; d1 = $dfOrdInt } in f @Int @b d1 d
 
   Wrinkle (S1a): do no inlining in this "simple optimiser" phase:
@@ -870,13 +871,28 @@ The transformation goes in these steps
 
 (S3) `getRenamings`: starting from the rule_bndrs, make bindings for
    all other variables that are equal to them.  In the example, we
-   make renaming-bindings for d7, dx1, d6.
+   make renaming-bindings for d7, dx1, d6.  Our goal is to bind
+   as many variables as possible, by deducing them from `rule_bndrs`.
+   If we have the binding
+     d1 = d7  (where `d1` is a rule_bndr)
+   we want to generate the renaming
+     d7 = d1
+   which instead deduces d7 from d1
 
    NB1: we don't actually have to remove the original bindings;
         it's harmless to leave them
    NB2: We also reverse bindings like  d1 = d2 |> co, to get
            d2 = d1 |> sym co
-        It's easy and may help.
+        It's easy and slightly improves our ability to get bindings
+        for local variables from `rule_bndrs`. I'm not sure if it
+        matters in practice, but it's easy to do.
+   NB3: `getRenamings` works innermost first, so that we get transitivity.
+        E.g in our example we have
+                 d7 = dx1
+                 d1 = d7     where d1 is rule_bndr
+        `getRenamings` generate the renamings
+                 dx1 = d1
+                 d7 = d2
 
 (S4) `pickSpecBinds`: pick the bindings we want to keep in the
    specialised function.  We start from `known_vars`, the variables we
@@ -1079,7 +1095,7 @@ decomposeCall poly_id ds_call
   = do { dflags  <- getDynFlags
        ; let simpl_opts = initSimpleOpts dflags
              core_call  = simpleOptExprNoInline simpl_opts ds_call
-               -- simpleOpeExprNoInlint: see Wrinkle (S1a)!
+               -- simpleOptExprNoInline: see Wrinkle (S1a)!
 
        ; case go [] core_call of {
            Nothing -> do { diagnosticDs (DsRuleLhsTooComplicated ds_call core_call)
