@@ -342,6 +342,98 @@
    Finally, we enter `ocResolve`, where we resolve relocations and and allocate
    jump islands (using the m32 allocator for backing storage) as necessary.
 
+   Note [Windows API Set]
+   ~~~~~~~~~~~~~~~~~~~~~~
+   Windows has a concept called API Sets [1][2] which is intended to be Windows's
+   equivalent to glibc's symbolic versioning.  It is also used to handle the API
+   surface difference between different device classes.  e.g. the API might be
+   handled differently between a desktop and tablet.
+
+   This is handled through two mechanisms:
+
+   1. Direct Forward:  These use import libraries to manage to first level
+      redirection.  So what used to be in ucrt.dll is now redirected based on
+      ucrt.lib.  Every API now points to a possible different set of API sets
+      each following the API set contract:
+
+      * The name must begin either with the string api- or ext-.
+      * Names that begin with api- represent APIs that exist on all Windows
+        editions that satisfy the API's version requirements.
+      * Names that begin with ext- represent APIs that may not exist on all
+        Windows editions.
+      * The name must end with the sequence l<n>-<n>-<n>, where n consists of
+        decimal digits.
+      * The body of the name can be alphanumeric characters, or dashes (-).
+      * The name is case insensitive.
+
+      Here are some examples of API set contract names:
+
+        - api-ms-win-core-ums-l1-1-0
+        - ext-ms-win-com-ole32-l1-1-5
+        - ext-ms-win-ntuser-window-l1-1-0
+        - ext-ms-win-ntuser-window-l1-1-1
+
+      Forward references don't require anything special from the calling
+      application in that the Windows loader through "LoadLibrary" will
+      automatically load the right reference for you if given an API set
+      name including the ".dll" suffix.  For example:
+
+      INFO: DLL api-ms-win-eventing-provider-l1-1-0.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-apiquery-l1-1-0.dll was redirected to C:\WINDOWS\SYSTEM32\ntdll.dll by API set
+      INFO: DLL api-ms-win-core-processthreads-l1-1-3.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-processthreads-l1-1-2.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-processthreads-l1-1-1.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-processthreads-l1-1-0.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-registry-l1-1-0.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-heap-l1-1-0.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-heap-l2-1-0.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-memory-l1-1-1.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-memory-l1-1-0.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-memory-l1-1-2.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+      INFO: DLL api-ms-win-core-handle-l1-1-0.dll was redirected to C:\WINDOWS\SYSTEM32\kernelbase.dll by API set
+
+      Which shows how the loader has redirected some of the references used
+      by ghci.
+
+      Historically though we've treated shared libs lazily.  We would load\
+      the shared library, but not resolve the symbol immediately and wait until
+      the symbol is requested to iterate in order through the shared libraries.
+
+      This assumes that you ever only had one version of a symbol.  i.e. we had
+      an assumption that all exported symbols in different shared libraries
+      should be the same, because most of the time they come from re-exporting
+      from a base library.  This is a bit of a weak assumption and doesn't hold
+      with API Sets.
+
+      For that reason the loader now resolves symbols immediately, and because
+      we now resolve using BIND_NOW we must make sure that a symbol loaded
+      through an OC has precedent because the BIND_NOW refernce was not asked
+      for.   For that reason we load the symbols for API sets with the
+      SYM_TYPE_DUP_DISCARD flag set.
+
+    2. Reverse forwarders:  This is when the application has a direct reference
+       to the old name of an API. e.g. if GHC still used "msvcrt.dll" or
+       "ucrt.dll" we would have had to deal with this case.  In this case the
+       loader intercepts the call and if it exists the dll is loaded.  There is
+       an extra indirection as you go from foo.dll => api-ms-foo-1.dll => foo_imp.dll
+
+       But if the API doesn't exist on the device it's resolved to a stub in the
+       API set that if called will result in an error should it be called [3].
+
+    This means that usages of GetProcAddress and LoadLibrary to check for the
+    existance of a function aren't safe, because they'll always succeed, but may
+    result in a pointer to the stub rather than the actual function.
+
+    WHat does this mean for the RTS linker? Nothing.  We don't have a fallback
+    for if the function doesn't exist.  The RTS is merely just executing what
+    it was told to run.  It's writers of libraries that have to be careful when
+    doing dlopen()/LoadLibrary.
+
+
+   [1] https://learn.microsoft.com/en-us/windows/win32/apiindex/windows-apisets
+   [2] https://mingwpy.github.io/ucrt.html#api-set-implementation
+   [3] https://learn.microsoft.com/en-us/windows/win32/apiindex/detect-api-set-availability
+
 */
 
 #include "Rts.h"
@@ -1055,7 +1147,8 @@ bool checkAndLoadImportLibrary( pathchar* arch_name, char* member_name, FILE* f 
     // We must call `addDLL_PEi386` directly rather than `addDLL` because `addDLL`
     // is now a wrapper around `loadNativeObj` which acquires a lock which we
     // already have here.
-    const char* result = addDLL_PEi386(dll, NULL);
+    HINSTANCE instance;
+    const char* result = addDLL_PEi386(dll, &instance);
 
     stgFree(image);
 
@@ -1069,6 +1162,22 @@ bool checkAndLoadImportLibrary( pathchar* arch_name, char* member_name, FILE* f 
     }
 
     stgFree(dll);
+
+    // See Note [Windows API Set]
+    // We must immediately tie the symbol to the shared library.  The easiest
+    // way is to load the symbol immediately. We already have all the
+    // information so might as well
+    SymbolAddr* sym = lookupSymbolInDLL_PEi386 (symbol, instance, dll, NULL);
+    ASSERT(sym);
+    // The symbol must have been found, and we can add it to the RTS symbol table
+    IF_DEBUG(linker, debugBelch("checkAndLoadImportLibrary: resolved symbol %s to %p\n", symbol, sym));
+    // Because the symbol has been loaded before we actually need it, if a
+    // stronger reference wants to add a duplicate we should discard this
+    // one to preserve link order.
+    if (!ghciInsertSymbolTable(dll, symhash, symbol, sym, false,
+                               SYM_TYPE_CODE | SYM_TYPE_DUP_DISCARD, NULL))
+      return false;
+
     return true;
 }
 
