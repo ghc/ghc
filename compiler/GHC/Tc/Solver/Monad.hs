@@ -844,31 +844,17 @@ lookupFamAppInert rewrite_pred fam_tc tys
           Nothing              -> Nothing
           Just (ecl :: [EqCt]) -> find (rewrite_pred . eqCtFlavourRole) ecl
 
-lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
+lookupSolvedDictTcS :: TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet?
-lookupInInerts loc pty
+lookupSolvedDictTcS pty
   | ClassPred cls tys <- classifyPredType pty
   = do { inerts <- getInertSet
-       ; return (lookupSolvedDict inerts loc cls tys) }
+       ; return (lookupSolvedDict inerts cls tys) }
             -- Do /not/ look in the inert_cans, because doing so bypasses all
             -- all the careful tests in tryInertDicts, nleading to
             --    #20666 (prohibitedSuperClassSolve) and #26117 (short-cut solve)
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
-
--- | Look up a dictionary inert.
-lookupInertDict :: TcSMode -> InertCans -> CtLoc -> Class -> [Type] -> Maybe DictCt
-lookupInertDict mode (IC { inert_dicts = dicts }) loc cls tys
-  | TcSShortCut <- mode   -- Ignore the inerts (esp Givens) in TsSShortCut mode
-  = Nothing               -- See Note [Shortcut solving] in GHC.Tc.Solver.Dict
-  | otherwise
-  = findDict dicts loc cls tys
-
--- | Look up a solved inert.
-lookupSolvedDict :: InertSet -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
--- Returns just if exactly this predicate type exists in the solved.
-lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
-  = fmap dictCtEvidence (findDict solved loc cls tys)
 
 ---------------------------
 lookupFamAppCache :: TyCon -> [Type] -> TcS (Maybe Reduction)
@@ -2081,7 +2067,7 @@ newWantedEvVar loc rewriters pty
   = assertPpr (not (isEqPred pty))
       (vcat [ text "newWantedEvVar: HoleDestPred"
             , text "pty:" <+> ppr pty ]) $
-    do { mb_ct <- lookupInInerts loc pty
+    do { mb_ct <- lookupSolvedDictTcS pty
        ; case mb_ct of
             Just ctev
               -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev

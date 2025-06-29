@@ -125,7 +125,7 @@ canDictCt ev cls tys
   -- call, we need to push the current call-site onto the stack instead
   -- of solving it directly from a given.
   -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-  -- and Note [Solving CallStack constraints] in GHC.Tc.Solver.Types
+  -- and Note [Solving CallStack constraints]
   = Stage $
     do { -- First we emit a new constraint that will capture the
          -- given CallStack.
@@ -171,8 +171,33 @@ solveCallStack ev ev_cs
        ; setEvBindIfWanted ev EvCanonical ev_tm }
          -- EvCanonical: see Note [CallStack and ExceptionContext hack]
 
-{- Note [CallStack and ExceptionContext hack]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Solving CallStack constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Note [Overview of implicit CallStacks] in GHc.Tc.Types.Evidence.
+
+Suppose f :: HasCallStack => blah.  Then
+
+* Each call to 'f' gives rise to
+    [W] s1 :: IP "callStack" CallStack    -- CtOrigin = OccurrenceOf f
+  with a CtOrigin that says "OccurrenceOf f".
+  Remember that HasCallStack is just shorthand for
+    IP "callStack" CallStack
+  See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
+
+* We canonicalise such constraints, in GHC.Tc.Solver.Dict.canDictNC, by
+  pushing the call-site info on the stack, and changing the CtOrigin
+  to record that has been done.
+   Bind:  s1 = pushCallStack <site-info> s2
+   [W] s2 :: IP "callStack" CallStack   -- CtOrigin = IPOccOrigin
+
+* Then, and only then, we can solve the constraint from an enclosing
+  Given.
+
+So we must be careful /not/ to solve 's1' from the Givens.  We guarantee
+this by canonicalising before looking up in the inert set.
+
+Note [CallStack and ExceptionContext hack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It isn't really right that we treat CallStack and ExceptionContext dictionaries
 as canonical, in the sense of Note [Coherence and specialisation: overview].
 They definitely are not!
@@ -697,10 +722,12 @@ tryInertDicts dict_ct
 
 try_inert_dicts :: TcSMode -> InertCans -> DictCt -> TcS (StopOrContinue ())
 try_inert_dicts mode inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys })
-  | let loc_w = ctEvLoc ev_w
-  , Just dict_i <- lookupInertDict mode inerts loc_w cls tys
+  | not (mode == TcSShortCut)   -- Ignore the inerts (esp Givens) in short-cut mode
+                                -- See Note [Shortcut solving]
+  , Just dict_i <- lookupInertDict inerts cls tys
   , let ev_i  = dictCtEvidence dict_i
         loc_i = ctEvLoc ev_i
+        loc_w = ctEvLoc ev_w
   = -- There is a matching dictionary in the inert set
     do { -- First to try to solve it /completely/ from top level instances
          -- See Note [Shortcut solving]
@@ -789,7 +816,7 @@ try_instances inerts work_item@(DictCt { di_ev = ev, di_cls = cls
   = continueWith ()
      -- See Note [No Given/Given fundeps]
 
-  | Just solved_ev <- lookupSolvedDict inerts dict_loc cls xis   -- Cached
+  | Just solved_ev <- lookupSolvedDict inerts cls xis   -- Cached
   = do { setEvBindIfWanted ev EvCanonical (ctEvTerm solved_ev)
        ; stopWith ev "Dict/Top (cached)" }
 

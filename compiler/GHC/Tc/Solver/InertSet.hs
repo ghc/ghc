@@ -30,7 +30,7 @@ module GHC.Tc.Solver.InertSet (
 
     -- * Inert Dicts
     updDicts, delDict, addDict, filterDicts, partitionDicts,
-    addSolvedDict,
+    addSolvedDict, lookupSolvedDict, lookupInertDict,
 
     -- * Inert Irreds
     InertIrreds, delIrred, addIrreds, addIrred, foldIrreds,
@@ -68,7 +68,7 @@ import GHC.Core.Reduction
 import GHC.Core.Predicate
 import qualified GHC.Core.TyCo.Rep as Rep
 import GHC.Core.TyCon
-import GHC.Core.Class( classTyCon )
+import GHC.Core.Class( Class, classTyCon )
 import GHC.Builtin.Names( eqPrimTyConKey, heqTyConKey, eqTyConKey, coercibleTyConKey )
 import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
@@ -1426,6 +1426,17 @@ filterFunEqs f = mapMaybeTcAppMap g
                    Inert Dicts
 *                                                                      *
 ********************************************************************* -}
+
+-- | Look up a dictionary inert.
+lookupInertDict :: InertCans -> Class -> [Type] -> Maybe DictCt
+lookupInertDict (IC { inert_dicts = dicts }) cls tys
+  = findDict dicts cls tys
+
+-- | Look up a solved inert.
+lookupSolvedDict :: InertSet -> Class -> [Type] -> Maybe CtEvidence
+-- Returns just if exactly this predicate type exists in the solved.
+lookupSolvedDict (IS { inert_solved_dicts = solved }) cls tys
+  = fmap dictCtEvidence (findDict solved cls tys)
 
 updDicts :: (DictMap DictCt -> DictMap DictCt) -> InertCans -> InertCans
 updDicts upd ics = ics { inert_dicts = upd (inert_dicts ics) }

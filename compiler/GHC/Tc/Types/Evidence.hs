@@ -703,11 +703,9 @@ implicit parameter is not important, see (CS5) below) are solved as follows:
         [W] d2 :: (?stk :: CallStack)    CtOrigin = IPOccOrigin
 
    That is, `d` is a call-stack that has the `foo` call-site pushed on top of
-   `d2`, which can now be solved normally (as in (1) above).  This is done in two
-   places:
-     - In GHC.Tc.Solver.Dict.canDictNC we do the pushing.
-     - In GHC.Tc.Solver.Types.findDict we arrrange /not/ to solve a plan-PUSH
-       constraint by forcing a "miss" in the lookup in the inert set
+   `d2`, which can now be solved normally (as in (1) above).  This is done as follows:
+     - In GHC.Tc.Solver.Dict.canDictCt we do the pushing.
+     - We only look up canonical constraints in the inert set
 
 3. For a CallStack constraint, we choose how to solve it based on its CtOrigin:
 
