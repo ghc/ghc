@@ -173,3 +173,6 @@ test('T25062_V64'
 test('T25169', [], compile_and_run, [''])
 test('T25455', [], compile_and_run, [''])
 test('T25486', [], compile_and_run, [''])
+
+# TODO: Remove debug args
+test('VectorCCallConv', [req_c, unless(arch('riscv64'), skip)], compile_and_run, ['-dppr-debug -ddump-to-file -ddump-cmm -ddump-asm -O0 -g -optc=-g -optc=-save-temps -optc=-fverbose-asm -optc=-O VectorCCallConv_c.c'])
