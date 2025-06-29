@@ -882,7 +882,7 @@ addDLL_PEi386( const pathchar *dll_name, HINSTANCE *loaded )
                     goto error;
                 }
             } else {
-                goto loaded; /* We're done. DLL has been loaded.  */
+                goto loaded_ok; /* We're done. DLL has been loaded.  */
             }
         }
     }
@@ -890,7 +890,7 @@ addDLL_PEi386( const pathchar *dll_name, HINSTANCE *loaded )
     // We failed to load
     goto error;
 
-loaded:
+loaded_ok:
     addLoadedDll(&loaded_dll_cache, dll_name, instance);
     addDLLHandle(buf, instance);
     if (loaded) {
