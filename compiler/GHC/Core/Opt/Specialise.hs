@@ -31,13 +31,11 @@ import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
                           , mkCast, exprType, exprIsHNF
                           , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
-import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
-import GHC.Core.Ppr( pprIds )
 
 import GHC.Builtin.Types  ( unboxedUnitTy )
 
-import GHC.Data.Maybe     ( maybeToList, isJust )
+import GHC.Data.Maybe     ( isJust )
 import GHC.Data.Bag
 import GHC.Data.OrdList
 import GHC.Data.List.SetOps
@@ -48,7 +46,7 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Name
 import GHC.Types.Tickish
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
-import GHC.Types.Var      ( PiTyBinder(..), isLocalVar, isInvisibleFunArg, mkLocalVar )
+import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
@@ -58,6 +56,7 @@ import GHC.Types.Error
 import GHC.Utils.Error ( mkMCDiagnostic )
 import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc
+import GHC.Utils.FV
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -70,8 +69,6 @@ import Data.List.NonEmpty ( NonEmpty (..) )
 import GHC.Core.Subst (substTickish)
 import GHC.Core.TyCon (tyConClass_maybe)
 import GHC.Core.DataCon (dataConTyCon)
-
-import Control.Monad
 
 {-
 ************************************************************************
@@ -1678,11 +1675,16 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     is_dfun   = isDFunId fn
     dflags    = se_dflags env
     this_mod  = se_module env
+    subst     = se_subst env
+    in_scope  = Core.substInScopeSet subst
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
 
     (rhs_bndrs, rhs_body) = collectBindersPushingCo rhs
                             -- See Note [Account for casts in binding]
+
+    not_in_scope :: InterestingVarFun
+    not_in_scope v = isLocalVar v && not (v `elemInScopeSet` in_scope)
 
     ----------------------------------------------------------
         -- Specialise to one particular call pattern
@@ -1695,61 +1697,73 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                | otherwise = call_args
                  saturating_call_args = call_args ++ map mk_extra_dfun_arg (dropList call_args rhs_bndrs)
                  mk_extra_dfun_arg bndr | isTyVar bndr = UnspecType
-                                        | otherwise = UnspecArg
+                                        | otherwise    = UnspecArg
 
-           ; ( useful, rhs_env2, leftover_bndrs
-             , rule_bndrs, rule_lhs_args
-             , spec_bndrs1, dx_binds, spec_args) <- specHeader env rhs_bndrs all_call_args
+             -- Find qvars, the type variables to add to the binders for the rule
+             -- Namely those free in `ty` that aren't in scope
+             -- See (MP2) in Note [Specialising polymorphic dictionaries]
+           ; let poly_qvars = scopedSort $ fvVarList $ specArgsFVs not_in_scope call_args
+                 subst'     = subst `Core.extendSubstInScopeList` poly_qvars
+                              -- Maybe we should clone the poly_qvars telescope?
 
-          ; when False $ pprTrace "spec_call" (vcat
-               [ text "fun:       "  <+> ppr fn
-               , text "call info: "  <+> ppr _ci
-               , text "useful:    "  <+> ppr useful
-               , text "rule_bndrs:"  <+> ppr rule_bndrs
-               , text "lhs_args:  "  <+> ppr rule_lhs_args
-               , text "spec_bndrs1:" <+> ppr spec_bndrs1
-               , text "leftover_bndrs:" <+> pprIds leftover_bndrs
-               , text "spec_args: "  <+> ppr spec_args
-               , text "dx_binds:  "  <+> ppr dx_binds
-               , text "rhs_bndrs"     <+> ppr rhs_bndrs
-               , text "rhs_body"     <+> ppr rhs_body
-               , text "rhs_env2:  "  <+> ppr (se_subst rhs_env2)
-               , ppr dx_binds ]) $
-            return ()
+             -- Any free Ids will have caused the call to be dropped
+           ; massertPpr (all isTyCoVar poly_qvars)
+                        (ppr fn $$ ppr all_call_args $$ ppr poly_qvars)
 
-           ; let all_rules = rules_acc ++ existing_rules
+           ; (useful, subst'', rule_bndrs, rule_lhs_args, spec_bndrs, dx_binds, spec_args)
+                 <- specHeader subst' rhs_bndrs all_call_args
+           ; (rule_bndrs, rule_lhs_args, spec_bndrs, spec_args)
+                 <- return ( poly_qvars ++ rule_bndrs, rule_lhs_args
+                           , poly_qvars ++ spec_bndrs, spec_args )
+
+{-
+           ; pprTrace "spec_call" (vcat
+                [ text "fun:       "  <+> ppr fn
+                , text "call info: "  <+> ppr _ci
+                , text "poly_qvars: " <+> ppr poly_qvars
+                , text "useful:    "  <+> ppr useful
+                , text "rule_bndrs:"  <+> ppr rule_bndrs
+                , text "rule_lhs_args:"  <+> ppr rule_lhs_args
+                , text "spec_bndrs:" <+> ppr spec_bndrs
+                , text "dx_binds:"   <+> ppr dx_binds
+                , text "spec_args: "  <+> ppr spec_args
+                , text "rhs_bndrs"    <+> ppr rhs_bndrs
+                , text "rhs_body"     <+> ppr rhs_body ]) $
+             return ()
+-}
+
+           ; let env' = env { se_subst = subst'' }
+                 all_rules = rules_acc ++ existing_rules
                  -- all_rules: we look both in the rules_acc (generated by this invocation
                  --   of specCalls), and in existing_rules (passed in to specCalls)
            ; if not useful  -- No useful specialisation
-                || alreadyCovered rhs_env2 rule_bndrs fn rule_lhs_args is_active all_rules
+                || alreadyCovered env' rule_bndrs fn rule_lhs_args is_active all_rules
                    -- See (SC1) in Note [Specialisations already covered]
              then return spec_acc
              else
         do { -- Run the specialiser on the specialised RHS
-             -- The "1" suffix is before we maybe add the void arg
-           ; (rhs_body', rhs_uds) <- specExpr rhs_env2 rhs_body
+             (rhs_body', rhs_uds) <- specExpr env' $
+                                     mkLams (dropList all_call_args rhs_bndrs) rhs_body
+
                 -- Add the { d1' = dx1; d2' = dx2 } usage stuff
                 -- to the rhs_uds; see Note [Specialising Calls]
-           ; let rhs_uds_w_dx   = dx_binds `consDictBinds` rhs_uds
-                 spec_rhs_bndrs = spec_bndrs1 ++ leftover_bndrs
-                 (spec_uds, dumped_dbs) = dumpUDs spec_rhs_bndrs rhs_uds_w_dx
-                 spec_rhs1 = mkLams spec_rhs_bndrs $
-                             wrapDictBindsE dumped_dbs rhs_body'
-
-                 spec_fn_ty1 = exprType spec_rhs1
+           ; let (spec_uds, dumped_dbs) = dumpUDs spec_bndrs (dx_binds `consDictBinds` rhs_uds)
+                 spec_rhs = mkLams spec_bndrs $
+                            wrapDictBindsE dumped_dbs rhs_body'
+                 spec_fn_ty = exprType spec_rhs
 
                  -- Maybe add a void arg to the specialised function,
                  -- to avoid unlifted bindings
                  -- See Note [Specialisations Must Be Lifted]
                  -- C.f. GHC.Core.Opt.WorkWrap.Utils.needsVoidWorkerArg
-                 add_void_arg = isUnliftedType spec_fn_ty1 && not (isJoinId fn)
-                 (spec_bndrs, spec_rhs, spec_fn_ty)
-                   | add_void_arg = ( voidPrimId : spec_bndrs1
-                                    , Lam voidArgId spec_rhs1
-                                    , mkVisFunTyMany unboxedUnitTy spec_fn_ty1)
-                   | otherwise   = (spec_bndrs1, spec_rhs1, spec_fn_ty1)
+                 add_void_arg = isUnliftedType spec_fn_ty && not (isJoinId fn)
+                 (spec_bndrs1, spec_rhs1, spec_fn_ty1)
+                   | add_void_arg = ( voidPrimId : spec_bndrs
+                                    , Lam voidArgId spec_rhs
+                                    , mkVisFunTyMany unboxedUnitTy spec_fn_ty)
+                   | otherwise   = (spec_bndrs, spec_rhs, spec_fn_ty)
 
-                 join_arity_decr = length rule_lhs_args - length spec_bndrs
+                 join_arity_decr = length rule_lhs_args - length spec_bndrs1
 
                  --------------------------------------
                  -- Add a suitable unfolding; see Note [Inline specialisations]
@@ -1757,7 +1771,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  -- arguments, not forgetting to wrap the dx_binds around the outside (#22358)
                  simpl_opts = initSimpleOpts dflags
                  wrap_unf_body body = foldr (Let . db_bind) (body `mkApps` spec_args) dx_binds
-                 spec_unf = specUnfolding simpl_opts spec_bndrs wrap_unf_body
+                 spec_unf = specUnfolding simpl_opts spec_bndrs1 wrap_unf_body
                                           rule_lhs_args fn_unf
 
                  --------------------------------------
@@ -1765,7 +1779,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  --      See Note [Arity decrease] in GHC.Core.Opt.Simplify
                  -- Copy InlinePragma information from the parent Id.
                  -- So if f has INLINE[1] so does spec_fn
-                 arity_decr     = count isValArg rule_lhs_args - count isId spec_bndrs
+                 arity_decr     = count isValArg rule_lhs_args - count isId spec_bndrs1
 
                  spec_inl_prag
                    | not is_local     -- See Note [Specialising imported functions]
@@ -1787,7 +1801,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                        DFunId unary        -> DFunId unary
                        _                   -> VanillaId
 
-           ; spec_fn <- newSpecIdSM (idName fn) spec_fn_ty spec_fn_details spec_fn_info
+           ; spec_fn <- newSpecIdSM (idName fn) spec_fn_ty1 spec_fn_details spec_fn_info
            ; let
                 -- The rule to put in the function's specialisation is:
                 --      forall x @b d1' d2'.
@@ -1800,12 +1814,12 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 
                 spec_rule = mkSpecRule dflags this_mod True inl_act
                                     herald fn rule_bndrs rule_lhs_args
-                                    (mkVarApps (Var spec_fn) spec_bndrs)
+                                    (mkVarApps (Var spec_fn) spec_bndrs1)
 
                 spec_f_w_arity = spec_fn
 
                 _rule_trace_doc = vcat [ ppr fn <+> dcolon <+> ppr fn_type
-                                       , ppr spec_fn  <+> dcolon <+> ppr spec_fn_ty
+                                       , ppr spec_fn  <+> dcolon <+> ppr spec_fn_ty1
                                        , ppr rhs_bndrs, ppr call_args
                                        , ppr spec_rule
                                        , text "acc" <+> ppr rules_acc
@@ -1814,7 +1828,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 
            ; -- pprTrace "spec_call: rule" _rule_trace_doc
              return ( spec_rule                  : rules_acc
-                    , (spec_f_w_arity, spec_rhs) : pairs_acc
+                    , (spec_f_w_arity, spec_rhs1) : pairs_acc
                     , spec_uds           `thenUDs` uds_acc
                     ) } }
 
@@ -1837,10 +1851,14 @@ alreadyCovered env bndrs fn args is_active rules
 
 -- Convenience function for invoking lookupRule from Specialise
 -- The SpecEnv's InScopeSet should include all the Vars in the [CoreExpr]
-specLookupRule :: SpecEnv -> Id -> [CoreExpr]
+specLookupRule :: HasDebugCallStack
+               => SpecEnv -> Id -> [CoreExpr]
                -> (Activation -> Bool)  -- Which rules are active
                -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 specLookupRule env fn args is_active rules
+  | null rules
+  = Nothing    -- Saves building a few thunks in the common case
+  | otherwise
   = lookupRule ropts in_scope_env is_active fn args rules
   where
     dflags       = se_dflags env
@@ -1966,12 +1984,15 @@ Suppose we have a function with a complicated type:
 
 and suppose it is called at:
 
-    f 7 @T1 @T2 @T3 dEqT1 ($dfShow dShowT2) t3
+    f @T1 @T2 @T3 7 dEqT1 ($dfShow dShowT2) t3
 
 This call is described as a 'CallInfo' whose 'ci_key' is:
 
-    [ SpecType T1, SpecType T2, UnspecType, UnspecArg, SpecDict dEqT1
-    , SpecDict ($dfShow dShowT2), UnspecArg ]
+    [ SpecType T1, SpecType T2, UnspecType
+    , UnspecArg
+    , SpecDict dEqT1
+    , SpecDict ($dfShow dShowT2)
+    , UnspecArg ]
 
 Why are 'a' and 'b' identified as 'SpecType', while 'c' is 'UnspecType'?
 Because we must specialise the function on type variables that appear
@@ -2147,17 +2168,20 @@ defeated specialisation!  Hence the use of collectBindersPushingCo.
 Note [Evidence foralls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose (#12212) that we are specialising
-   f :: forall a b. (Num a, F a ~ F b) => blah
+   f :: forall a b. (Num a, F a ~# F b) => blah
 with a=b=Int. Then the RULE will be something like
-   RULE forall (d:Num Int) (g :: F Int ~ F Int).
+   RULE forall (d:Num Int) (g :: F Int ~# F Int).
         f Int Int d g = f_spec
+where that `g` is really (Coercion (CoVar g)), since `g` is a
+coercion variable and can't appear as (Var g).
+
 But both varToCoreExpr (when constructing the LHS args), and the
 simplifier (when simplifying the LHS args), will transform to
    RULE forall (d:Num Int) (g :: F Int ~ F Int).
         f Int Int d <F Int> = f_spec
 by replacing g with Refl.  So now 'g' is unbound, which results in a later
 crash. So we use Refl right off the bat, and do not forall-quantify 'g':
- * varToCoreExpr generates a Refl
+ * varToCoreExpr generates a (Coercion Refl)
  * exprsFreeIdsList returns the Ids bound by the args,
    which won't include g
 
@@ -2500,22 +2524,22 @@ data SpecArg
   | UnspecArg
 
 instance Outputable SpecArg where
-  ppr (SpecType t) = text "SpecType" <+> ppr t
-  ppr UnspecType   = text "UnspecType"
-  ppr (SpecDict d) = text "SpecDict" <+> ppr d
-  ppr UnspecArg    = text "UnspecArg"
+  ppr (SpecType t)  = text "SpecType" <+> ppr t
+  ppr (SpecDict d)  = text "SpecDict" <+> ppr d
+  ppr UnspecType    = text "UnspecType"
+  ppr UnspecArg     = text "UnspecArg"
 
-specArgFreeIds :: SpecArg -> IdSet
-specArgFreeIds (SpecType {}) = emptyVarSet
-specArgFreeIds (SpecDict dx) = exprFreeIds dx
-specArgFreeIds UnspecType    = emptyVarSet
-specArgFreeIds UnspecArg     = emptyVarSet
-
-specArgFreeVars :: SpecArg -> VarSet
-specArgFreeVars (SpecType ty) = tyCoVarsOfType ty
-specArgFreeVars (SpecDict dx) = exprFreeVars dx
-specArgFreeVars UnspecType    = emptyVarSet
-specArgFreeVars UnspecArg     = emptyVarSet
+specArgsFVs :: InterestingVarFun -> [SpecArg] -> FV
+-- Find the free vars of the SpecArgs that are not already in scope
+specArgsFVs interesting args
+  = filterFV interesting $
+    foldr (unionFV . get) emptyFV args
+  where
+    get :: SpecArg -> FV
+    get (SpecType ty)   = tyCoFVsOfType ty
+    get (SpecDict dx)   = exprFVs dx
+    get UnspecType      = emptyFV
+    get UnspecArg       = emptyFV
 
 isSpecDict :: SpecArg -> Bool
 isSpecDict (SpecDict {}) = True
@@ -2565,103 +2589,89 @@ isSpecDict _             = False
 --    , [T1, T2, c, i, dEqT1, dShow1]
 --    )
 specHeader
-     :: SpecEnv
-     -> [InBndr]    -- The binders from the original function 'f'
+     :: Core.Subst  -- This substitution applies to the [InBndr]
+     -> [InBndr]    -- Binders from the original function `f`
      -> [SpecArg]   -- From the CallInfo
      -> SpecM ( Bool     -- True <=> some useful specialisation happened
                          -- Not the same as any (isSpecDict args) because
                          -- the args might be longer than bndrs
 
-                -- Returned arguments
-              , SpecEnv      -- Substitution to apply to the body of 'f'
-              , [OutBndr]    -- Leftover binders from the original function 'f'
-                             --   that don’t have a corresponding SpecArg
+              , Core.Subst   -- Apply this to the body
 
                 -- RULE helpers
-              , [OutBndr]    -- Binders for the RULE
-              , [OutExpr]    -- Args for the LHS of the rule
+                -- `RULE forall rule_bndrs. f rule_es = $sf spec_bndrs`
+              , [OutBndr]    -- rule_bndrs: Binders for the RULE
+              , [OutExpr]    -- rule_es:    Args for the LHS of the rule
 
                 -- Specialised function helpers
-              , [OutBndr]    -- Binders for $sf
-              , [DictBind]   -- Auxiliary dictionary bindings
-              , [OutExpr]    -- Specialised arguments for unfolding
-                             -- Same length as "Args for LHS of rule"
+                -- `$sf = \spec_bndrs. let { dx_binds } in <orig-rhs> spec_arg`
+              , [OutBndr]    -- spec_bndrs: Binders for $sf. Subset of rule_bndrs.
+              , [DictBind]   -- dx_binds:   Auxiliary dictionary bindings
+              , [OutExpr]    -- spec_args:  Specialised arguments for unfolding
+                             --             Same length as "Args for LHS of rule"
               )
+
+-- If we run out of binders, stop immediately
+-- See Note [Specialisation Must Preserve Sharing]
+specHeader subst [] _  = pure (False, subst, [], [], [], [], [])
+specHeader subst _  [] = pure (False, subst, [], [], [], [], [])
 
 -- We want to specialise on type 'T1', and so we must construct a substitution
 -- 'a->T1', as well as a LHS argument for the resulting RULE and unfolding
 -- details.
-specHeader env (bndr : bndrs) (SpecType ty : args)
-  = do { -- Find qvars, the type variables to add to the binders for the rule
-         -- Namely those free in `ty` that aren't in scope
-         -- See (MP2) in Note [Specialising polymorphic dictionaries]
-         let in_scope = Core.substInScopeSet (se_subst env)
-             qvars    = scopedSort $
-                        filterOut (`elemInScopeSet` in_scope) $
-                        tyCoVarsOfTypeList ty
-             (env1, qvars') = substBndrs env qvars
-             ty'            = substTy env1 ty
-             env2           = extendTvSubst env1 bndr ty'
-       ; (useful, env3, leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-            <- specHeader env2 bndrs args
-       ; pure ( useful
-              , env3
-              , leftover_bndrs
-              , qvars' ++ rule_bs
-              , Type ty' : rule_es
-              , qvars' ++ bs'
-              , dx
-              , Type ty' : spec_args
-              )
-       }
+specHeader subst (bndr:bndrs) (SpecType ty : args)
+  = do { let subst1 = Core.extendTvSubst subst bndr ty
+       ; (useful, subst2, rule_bs, rule_args, spec_bs, dx, spec_args)
+             <- specHeader subst1 bndrs args
+       ; pure ( useful, subst2
+              , rule_bs,     Type ty : rule_args
+              , spec_bs, dx, Type ty : spec_args ) }
 
 -- Next we have a type that we don't want to specialise. We need to perform
 -- a substitution on it (in case the type refers to 'a'). Additionally, we need
 -- to produce a binder, LHS argument and RHS argument for the resulting rule,
 -- /and/ a binder for the specialised body.
-specHeader env (bndr : bndrs) (UnspecType : args)
-  = do { let (env', bndr') = substBndr env bndr
-       ; (useful, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-            <- specHeader env' bndrs args
-       ; pure ( useful
-              , env''
-              , leftover_bndrs
-              , bndr' : rule_bs
-              , varToCoreExpr bndr' : rule_es
-              , bndr' : bs'
-              , dx
-              , varToCoreExpr bndr' : spec_args
-              )
-       }
+specHeader subst (bndr:bndrs) (UnspecType : args)
+  = do { let (subst1, bndr') = Core.substBndr subst bndr
+       ; (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args)
+             <- specHeader subst1 bndrs args
+       ; let ty_e' = Type (mkTyVarTy bndr')
+       ; pure ( useful, subst2
+              , bndr' : rule_bs,     ty_e' : rule_es
+              , bndr' : spec_bs, dx, ty_e' : spec_args ) }
+
+specHeader subst (bndr:bndrs) (_ : args)
+  | isDeadBinder bndr
+  , let (subst1, bndr') = Core.substBndr subst (zapIdOccInfo bndr)
+  , Just rubbish_lit <- mkLitRubbish (idType bndr')
+  = -- See Note [Drop dead args from specialisations]
+    do { (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader subst1 bndrs args
+       ; pure ( useful, subst2
+              , bndr' : rule_bs, Var bndr'   : rule_es
+              , spec_bs,     dx, rubbish_lit : spec_args ) }
 
 -- Next we want to specialise the 'Eq a' dict away. We need to construct
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
-specHeader env (bndr : bndrs) (SpecDict d : args)
-  | not (isDeadBinder bndr)
-  , allVarSet (`elemInScopeSet` in_scope) (exprFreeVars d)
-    -- See Note [Weird special case for SpecDict]
-  = do { (env1, bndr') <- newDictBndr env bndr -- See Note [Zap occ info in rule binders]
-       ; let (env2, dx_bind, spec_dict) = bindAuxiliaryDict env1 bndr bndr' d
-       ; (_, env3, leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-             <- specHeader env2 bndrs args
-       ; pure ( True      -- Ha!  A useful specialisation!
-              , env3
-              , leftover_bndrs
-              -- See Note [Evidence foralls]
-              , exprFreeIdsList (varToCoreExpr bndr') ++ rule_bs
-              , varToCoreExpr bndr' : rule_es
-              , bs'
-              , maybeToList dx_bind ++ dx
-              , spec_dict : spec_args
-              )
-       }
-   where
-     in_scope = Core.substInScopeSet (se_subst env)
+specHeader subst (bndr:bndrs) (SpecDict dict_arg : args)
+  = do { -- Make up a fresh binder to use in the RULE
+         -- It might turn into a dict binding (via bindAuxiliaryDict) which we
+         -- then float, so we use cloneIdBndr to get a completely fresh binder
+         us <- getUniqueSupplyM
+       ; let (subst1, bndr') = Core.cloneIdBndr subst us (zapIdOccInfo bndr)
+                 -- zapIdOccInfo: see Note [Zap occ info in rule binders]
+
+         -- Extend the substitution to map bndr :-> dict_arg, for use in the RHS
+       ; let (subst2, dx_bind, spec_dict) = bindAuxiliaryDict subst1 bndr bndr' dict_arg
+
+       ; (_, subst3, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader subst2 bndrs args
+
+       ; let dx' = case dx_bind of { Nothing -> dx; Just d -> d : dx }
+       ; pure ( True, subst3      -- Ha!  A useful specialisation!
+              , bndr' : rule_bs,      Var bndr' : rule_es
+              , spec_bs,    dx', spec_dict : spec_args ) }
 
 -- Finally, we don't want to specialise on this argument 'i':
---   - It's an UnSpecArg, or
---   - It's a dead dictionary
 -- We need to produce a binder, LHS and RHS argument for the RULE, and
 -- a binder for the specialised body.
 --
@@ -2669,76 +2679,48 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
 -- why 'i' doesn't appear in our RULE above. But we have no guarantee that
 -- there aren't 'UnspecArg's which come /before/ all of the dictionaries, so
 -- this case must be here.
-specHeader env (bndr : bndrs) (_ : args)
-    -- The "_" can be UnSpecArg, or SpecDict where the bndr is dead
-  = do { -- see Note [Zap occ info in rule binders]
-         let (env', bndr') = substBndr env (zapIdOccInfo bndr)
-       ; (useful, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
-             <- specHeader env' bndrs args
+specHeader subst (bndr:bndrs) (UnspecArg : args)
+  = do { let (subst1, bndr') = Core.substBndr subst (zapIdOccInfo bndr)
+                 -- zapIdOccInfo: see Note [Zap occ info in rule binders]
+       ; (useful, subst2, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader subst1 bndrs args
 
-       ; let bndr_ty = idType bndr'
+       ; let dummy_arg = varToCoreExpr bndr'
+               -- dummy_arg is usually just (Var bndr),
+               -- but if bndr :: t1 ~# t2, it'll be (Coercion (CoVar bndr))
+               --     or even Coercion Refl (if t1=t2)
+               -- See Note [Evidence foralls]
+             bndrs = exprFreeIdsList dummy_arg
 
-             -- See Note [Drop dead args from specialisations]
-             -- C.f. GHC.Core.Opt.WorkWrap.Utils.mk_absent_let
-             (mb_spec_bndr, spec_arg)
-                | isDeadBinder bndr
-                , Just lit_expr <- mkLitRubbish bndr_ty
-                = (Nothing, lit_expr)
-                | otherwise
-                = (Just bndr', varToCoreExpr bndr')
-
-       ; pure ( useful
-              , env''
-              , leftover_bndrs
-              , bndr' : rule_bs
-              , varToCoreExpr bndr' : rule_es
-              , case mb_spec_bndr of
-                  Just b' -> b' : bs'
-                  Nothing -> bs'
-              , dx
-              , spec_arg : spec_args
-              )
-       }
-
--- If we run out of binders, stop immediately
--- See Note [Specialisation Must Preserve Sharing]
-specHeader env [] _ = pure (False, env, [], [], [], [], [], [])
-
--- Return all remaining binders from the original function. These have the
--- invariant that they should all correspond to unspecialised arguments, so
--- it's safe to stop processing at this point.
-specHeader env bndrs []
-  = pure (False, env', bndrs', [], [], [], [], [])
-  where
-    (env', bndrs') = substBndrs env bndrs
+       ; pure ( useful, subst2
+              , bndrs ++ rule_bs,     dummy_arg : rule_es
+              , bndrs ++ spec_bs, dx, dummy_arg : spec_args ) }
 
 
 -- | Binds a dictionary argument to a fresh name, to preserve sharing
 bindAuxiliaryDict
-  :: SpecEnv
+  :: Subst
   -> InId -> OutId -> OutExpr -- Original dict binder, and the witnessing expression
-  -> ( SpecEnv        -- Substitutes for orig_dict_id
+  -> ( Subst          -- Substitutes for orig_dict_id
      , Maybe DictBind -- Auxiliary dict binding, if any
      , OutExpr)       -- Witnessing expression (always trivial)
-bindAuxiliaryDict env@(SE { se_subst = subst })
-                  orig_dict_id fresh_dict_id dict_expr
+bindAuxiliaryDict subst orig_dict_id fresh_dict_id dict_arg
 
   -- If the dictionary argument is trivial,
   -- don’t bother creating a new dict binding; just substitute
-  | exprIsTrivial dict_expr
-  = let env' = env { se_subst = Core.extendSubst subst orig_dict_id dict_expr }
-    in -- pprTrace "bindAuxiliaryDict:trivial" (ppr orig_dict_id <+> ppr dict_id) $
-       (env', Nothing, dict_expr)
+  | exprIsTrivial dict_arg
+  , let subst' = Core.extendSubst subst orig_dict_id dict_arg
+  = -- pprTrace "bindAuxiliaryDict:trivial" (ppr orig_dict_id <+> ppr dict_id) $
+    (subst', Nothing, dict_arg)
 
   | otherwise  -- Non-trivial dictionary arg; make an auxiliary binding
-  = let fresh_dict_id' = fresh_dict_id `addDictUnfolding` dict_expr
+  , let fresh_dict_id' = fresh_dict_id `addDictUnfolding` dict_arg
 
-        dict_bind = mkDB (NonRec fresh_dict_id' dict_expr)
-        env' = env { se_subst = Core.extendSubst subst orig_dict_id (Var fresh_dict_id')
-                                `Core.extendSubstInScope` fresh_dict_id' }
-                                -- Ensure the new unfolding is in the in-scope set
-    in -- pprTrace "bindAuxiliaryDict:non-trivial" (ppr orig_dict_id <+> ppr fresh_dict_id') $
-       (env', Just dict_bind, Var fresh_dict_id')
+        dict_bind = mkDB (NonRec fresh_dict_id' dict_arg)
+        subst'    = Core.extendSubst subst orig_dict_id (Var fresh_dict_id')
+                    `Core.extendSubstInScope` fresh_dict_id'
+                    -- Ensure the new unfolding is in the in-scope set
+  = -- pprTrace "bindAuxiliaryDict:non-trivial" (ppr orig_dict_id <+> ppr fresh_dict_id') $
+    (subst', Just dict_bind, Var fresh_dict_id')
 
 addDictUnfolding :: Id -> CoreExpr -> Id
 -- Add unfolding for freshly-bound Ids: see Note [Make the new dictionaries interesting]
@@ -3052,22 +3034,16 @@ singleCall spec_env id args
   = MkUD {ud_binds = emptyFDBs,
           ud_calls = unitDVarEnv id $ CIS id $
                      unitBag (CI { ci_key  = args
-                                 , ci_fvs  = call_fvs }) }
+                                 , ci_fvs  = fvVarSet call_fvs }) }
   where
-    call_fvs =
-      foldr (unionVarSet . free_var_fn) emptyVarSet args
+    poly_spec = gopt Opt_PolymorphicSpecialisation (se_dflags spec_env)
 
-    free_var_fn =
-      if gopt Opt_PolymorphicSpecialisation (se_dflags spec_env)
-        then specArgFreeIds
-        else specArgFreeVars
-
-
-
-        -- specArgFreeIds: we specifically look for free Ids, not TyVars
-        --    see (MP1) in Note [Specialising polymorphic dictionaries]
-        --
-        -- We don't include the 'id' itself.
+    -- With -fpolymorphic-specialisation, keep just local /Ids/
+    -- Otherwise, keep /all/ free vars including TyVars
+    -- See (MP1) in Note [Specialising polymorphic dictionaries]
+    -- But NB: we don't include the 'id' itself.
+    call_fvs | poly_spec = specArgsFVs isLocalId args
+             | otherwise = specArgsFVs isLocalVar args
 
 mkCallUDs :: SpecEnv -> OutExpr -> [OutExpr] -> UsageDetails
 mkCallUDs env fun args
@@ -3099,12 +3075,13 @@ mkCallUDs' env f args
              -- Establish (CI-KEY): drop trailing args until we get to a SpecDict
 
     mk_spec_arg :: OutExpr -> PiTyBinder -> SpecArg
-    mk_spec_arg arg (Named bndr)
+    mk_spec_arg (Type ty) (Named bndr)
       |  binderVar bndr `elemVarSet` constrained_tyvars
-      = case arg of
-          Type ty -> SpecType ty
-          _       -> pprPanic "ci_key" $ ppr arg
-      |  otherwise = UnspecType
+      = SpecType ty
+      | otherwise
+      = UnspecType
+    mk_spec_arg non_type_arg (Named bndr)
+      = pprPanic "ci_key" $ (ppr non_type_arg $$ ppr bndr)
 
     -- For "invisibleFunArg", which are the type-class dictionaries,
     -- we decide on a case by case basis if we want to specialise
@@ -3542,8 +3519,8 @@ beats_or_same (CI { ci_key = args1 }) (CI { ci_key = args2 })
     go  _ _ = False
 
     go_arg (SpecType ty1) (SpecType ty2) = isJust (tcMatchTy ty1 ty2)
-    go_arg UnspecType     UnspecType     = True
     go_arg (SpecDict {})  (SpecDict {})  = True
+    go_arg UnspecType     UnspecType     = True
     go_arg UnspecArg      UnspecArg      = True
     go_arg _              _              = False
 
@@ -3611,9 +3588,9 @@ mapAndCombineSM f (x:xs) = do (y, uds1) <- f x
                               (ys, uds2) <- mapAndCombineSM f xs
                               return (y:ys, uds1 `thenUDs` uds2)
 
-extendTvSubst :: SpecEnv -> TyVar -> Type -> SpecEnv
-extendTvSubst env tv ty
-  = env { se_subst = Core.extendTvSubst (se_subst env) tv ty }
+-- extendTvSubst :: SpecEnv -> TyVar -> Type -> SpecEnv
+-- extendTvSubst env tv ty
+--   = env { se_subst = Core.extendTvSubst (se_subst env) tv ty }
 
 extendInScope :: SpecEnv -> OutId -> SpecEnv
 extendInScope env@(SE { se_subst = subst }) bndr
@@ -3651,17 +3628,6 @@ cloneRecBndrsSM env@(SE { se_subst = subst }) bndrs
   = do { (subst', bndrs') <- Core.cloneRecIdBndrsM subst bndrs
        ; let env' = env { se_subst = subst' }
        ; return (env', bndrs') }
-
-newDictBndr :: SpecEnv -> CoreBndr -> SpecM (SpecEnv, CoreBndr)
--- Make up completely fresh binders for the dictionaries
--- Their bindings are going to float outwards
-newDictBndr env@(SE { se_subst = subst }) b
-  = do { uniq <- getUniqueM
-       ; let n    = idName b
-             ty'  = substTyUnchecked subst (idType b)
-             b'   = mkUserLocal (nameOccName n) uniq ManyTy ty' (getSrcSpan n)
-             env' = env { se_subst = subst `Core.extendSubstInScope` b' }
-       ; pure (env', b') }
 
 newSpecIdSM :: Name -> Type -> IdDetails -> IdInfo -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
