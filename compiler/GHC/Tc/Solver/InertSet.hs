@@ -10,13 +10,13 @@ module GHC.Tc.Solver.InertSet (
     extendWorkListCts, extendWorkListCtList,
     extendWorkListEq, extendWorkListChildEqs,
     extendWorkListRewrittenEqs,
-    appendWorkList, extendWorkListImplic,
+    appendWorkList,
     workListSize,
 
     -- * The inert set
     InertSet(..),
     InertCans(..),
-    emptyInert,
+    emptyInertSet, emptyInertCans,
 
     noGivenNewtypeReprEqs, updGivenEqs,
     prohibitedSuperClassSolve,
@@ -26,7 +26,6 @@ module GHC.Tc.Solver.InertSet (
     foldTyEqs, delEq, findEq,
     partitionInertEqs, partitionFunEqs,
     filterInertEqs, filterFunEqs,
-    inertGivens,
     foldFunEqs, addEqToCans,
 
     -- * Inert Dicts
@@ -155,17 +154,6 @@ So we arrange to put these particular class constraints in the wl_eqs.
   NB: since we do not currently apply the substitution to the
   inert_solved_dicts, the knot-tying still seems a bit fragile.
   But this makes it better.
-
-Note [Residual implications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The wl_implics in the WorkList are the residual implication
-constraints that are generated while solving or canonicalising the
-current worklist.  Specifically, when canonicalising
-   (forall a. t1 ~ forall a. t2)
-from which we get the implication
-   (forall a. t1 ~ t2)
-See GHC.Tc.Solver.Monad.deferTcSForAllEq
-
 -}
 
 -- See Note [WorkList priorities]
@@ -187,8 +175,6 @@ data WorkList
          -- in GHC.Tc.Types.Constraint for more details.
 
        , wl_rest :: [Ct]
-
-       , wl_implics :: Bag Implication  -- See Note [Residual implications]
     }
 
 isNominalEqualityCt :: Ct -> Bool
@@ -203,15 +189,12 @@ isNominalEqualityCt ct
 
 appendWorkList :: WorkList -> WorkList -> WorkList
 appendWorkList
-    (WL { wl_eqs_N = eqs1_N, wl_eqs_X = eqs1_X, wl_rw_eqs = rw_eqs1
-        , wl_rest = rest1, wl_implics = implics1 })
-    (WL { wl_eqs_N = eqs2_N, wl_eqs_X = eqs2_X, wl_rw_eqs = rw_eqs2
-        , wl_rest = rest2, wl_implics = implics2 })
+    (WL { wl_eqs_N = eqs1_N, wl_eqs_X = eqs1_X, wl_rw_eqs = rw_eqs1, wl_rest = rest1 })
+    (WL { wl_eqs_N = eqs2_N, wl_eqs_X = eqs2_X, wl_rw_eqs = rw_eqs2, wl_rest = rest2 })
    = WL { wl_eqs_N   = eqs1_N   ++ eqs2_N
         , wl_eqs_X   = eqs1_X   ++ eqs2_X
         , wl_rw_eqs  = rw_eqs1  ++ rw_eqs2
-        , wl_rest    = rest1    ++ rest2
-        , wl_implics = implics1 `unionBags`   implics2 }
+        , wl_rest    = rest1    ++ rest2 }
 
 workListSize :: WorkList -> Int
 workListSize (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs, wl_rest = rest })
@@ -269,9 +252,6 @@ extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
 extendWorkListNonEq ct wl = wl { wl_rest = ct : wl_rest wl }
 
-extendWorkListImplic :: Implication -> WorkList -> WorkList
-extendWorkListImplic implic wl = wl { wl_implics = implic `consBag` wl_implics wl }
-
 extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic about what kind of constraint
 extendWorkListCt ct wl
@@ -295,18 +275,18 @@ extendWorkListCts :: Cts -> WorkList -> WorkList
 extendWorkListCts cts wl = foldr extendWorkListCt wl cts
 
 isEmptyWorkList :: WorkList -> Bool
-isEmptyWorkList (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs
-                    , wl_rest = rest, wl_implics = implics })
-  = null eqs_N && null eqs_X && null rw_eqs && null rest && isEmptyBag implics
+isEmptyWorkList (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
+                    , wl_rw_eqs = rw_eqs, wl_rest = rest })
+  = null eqs_N && null eqs_X && null rw_eqs && null rest
 
 emptyWorkList :: WorkList
 emptyWorkList = WL { wl_eqs_N = [], wl_eqs_X = []
-                   , wl_rw_eqs = [], wl_rest = [], wl_implics = emptyBag }
+                   , wl_rw_eqs = [], wl_rest = [] }
 
 -- Pretty printing
 instance Outputable WorkList where
-  ppr (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs
-          , wl_rest = rest, wl_implics = implics })
+  ppr (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
+          , wl_rw_eqs = rw_eqs, wl_rest = rest })
    = text "WL" <+> (braces $
      vcat [ ppUnless (null eqs_N) $
             text "Eqs_N =" <+> vcat (map ppr eqs_N)
@@ -316,9 +296,6 @@ instance Outputable WorkList where
             text "RwEqs =" <+> vcat (map ppr rw_eqs)
           , ppUnless (null rest) $
             text "Non-eqs =" <+> vcat (map ppr rest)
-          , ppUnless (isEmptyBag implics) $
-            ifPprDebug (text "Implics =" <+> vcat (map ppr (bagToList implics)))
-                       (text "(Implics omitted)")
           ])
 
 {- *********************************************************************
@@ -343,6 +320,10 @@ data InertSet
               -- Canonical Given, Wanted
               -- Sometimes called "the inert set"
 
+       , inert_givens :: InertCans
+              -- A subset of inert_cans, containing only Givens
+              -- Used to initialise inert_cans when recursing inside implications
+
        , inert_cycle_breakers :: CycleBreakerVarStack
 
        , inert_famapp_cache :: FunEqMap Reduction
@@ -360,14 +341,26 @@ data InertSet
               -- Always a dictionary solved by an instance decl; never an implict parameter
               -- See Note [Solved dictionaries]
               -- and Note [Do not add superclasses of solved dictionaries]
+
+       , inert_safehask :: DictMap DictCt
+              -- Failed dictionary resolution due to Safe Haskell overlapping
+              -- instances restriction. We keep this separate from inert_dicts
+              -- as it doesn't cause compilation failure, just safe inference
+              -- failure.
+              --
+              -- ^ See Note [Safe Haskell Overlapping Instances Implementation]
+              -- in GHC.Tc.Solver
        }
 
 instance Outputable InertSet where
   ppr (IS { inert_cans = ics
+          , inert_safehask = safehask
           , inert_solved_dicts = solved_dicts })
       = vcat [ ppr ics
              , ppUnless (null dicts) $
-               text "Solved dicts =" <+> vcat (map ppr dicts) ]
+               text "Solved dicts =" <+> vcat (map ppr dicts)
+             , ppUnless (isEmptyTcAppMap safehask) $
+               text "Safe Haskell unsafe overlap =" <+> pprBag (dictsToBag safehask) ]
          where
            dicts = bagToList (dictsToBag solved_dicts)
 
@@ -378,16 +371,19 @@ emptyInertCans given_eq_lvl
        , inert_given_eq_lvl = given_eq_lvl
        , inert_given_eqs    = False
        , inert_dicts        = emptyDictMap
-       , inert_safehask     = emptyDictMap
        , inert_insts        = []
        , inert_irreds       = emptyBag }
 
-emptyInert :: TcLevel -> InertSet
-emptyInert given_eq_lvl
-  = IS { inert_cans           = emptyInertCans given_eq_lvl
+emptyInertSet :: TcLevel -> InertSet
+emptyInertSet given_eq_lvl
+  = IS { inert_cans           = empty_cans
+       , inert_givens         = empty_cans
        , inert_cycle_breakers = emptyBag :| []
        , inert_famapp_cache   = emptyFunEqs
-       , inert_solved_dicts   = emptyDictMap }
+       , inert_solved_dicts   = emptyDictMap
+       , inert_safehask       = emptyDictMap }
+  where
+    empty_cans = emptyInertCans given_eq_lvl
 
 {- Note [Solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -690,7 +686,7 @@ should update inert_given_eq_lvl?
    conservatively assume that there are some.
 
    This initialisation in done in `runTcSWithEvBinds`, which passes
-   the current TcLevl to `emptyInert`.
+   the current TcLevl to `emptyInertSet`.
 
 Historical note: prior to #24938 we also ignored Given equalities that
 did not mention an "outer" type variable.  But that is wrong, as #24938
@@ -1254,15 +1250,6 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
 
        , inert_insts :: [QCInst]
 
-       , inert_safehask :: DictMap DictCt
-              -- Failed dictionary resolution due to Safe Haskell overlapping
-              -- instances restriction. We keep this separate from inert_dicts
-              -- as it doesn't cause compilation failure, just safe inference
-              -- failure.
-              --
-              -- ^ See Note [Safe Haskell Overlapping Instances Implementation]
-              -- in GHC.Tc.Solver
-
        , inert_irreds :: InertIrreds
               -- Irreducible predicates that cannot be made canonical,
               --     and which don't interact with others (e.g.  (c a))
@@ -1290,7 +1277,6 @@ instance Outputable InertCans where
   ppr (IC { inert_eqs = eqs
           , inert_funeqs = funeqs
           , inert_dicts = dicts
-          , inert_safehask = safehask
           , inert_irreds = irreds
           , inert_given_eq_lvl = ge_lvl
           , inert_given_eqs = given_eqs
@@ -1305,8 +1291,6 @@ instance Outputable InertCans where
           <+> pprBag (foldFunEqs consBag funeqs emptyBag)
       , ppUnless (isEmptyTcAppMap dicts) $
         text "Dictionaries =" <+> pprBag (dictsToBag dicts)
-      , ppUnless (isEmptyTcAppMap safehask) $
-        text "Safe Haskell unsafe overlap =" <+> pprBag (dictsToBag safehask)
       , ppUnless (isEmptyBag irreds) $
         text "Irreds =" <+> pprBag irreds
       , ppUnless (null insts) $
@@ -1616,7 +1600,6 @@ kickOutRewritableLHS ko_spec new_fr@(_, new_role)
                              , inert_insts    = old_insts })
   = (kicked_out, inert_cans_in)
   where
-    -- inert_safehask stays unchanged; is that right?
     inert_cans_in = ics { inert_eqs      = tv_eqs_in
                         , inert_dicts    = dicts_in
                         , inert_funeqs   = feqs_in
@@ -1872,8 +1855,9 @@ noGivenNewtypeReprEqs tc (IS { inert_cans = inerts })
       | otherwise
       = False
 
-    might_help_qc (QCI { qci_body = pred })
-      | ClassPred cls [_, t1, t2] <- classifyPredType pred
+    might_help_qc (QCI { qci_ev = ev, qci_body = pred })
+      | isGiven ev
+      , ClassPred cls [_, t1, t2] <- classifyPredType pred
       , cls `hasKey` coercibleTyConKey
       = headed_by_tc t1 t2
       | otherwise
@@ -2125,43 +2109,3 @@ Wrong!  The level-check ensures that the inner implicit parameter wins.
 that this chain of events won't happen, but that's very fragile.)
 -}
 
-{- *********************************************************************
-*                                                                      *
-               Extracting Givens from the inert set
-*                                                                      *
-********************************************************************* -}
-
-
--- | Extract only Given constraints from the inert set.
-inertGivens :: InertSet -> InertSet
-inertGivens is@(IS { inert_cans = cans }) =
-  is { inert_cans = givens_cans
-     , inert_solved_dicts = emptyDictMap
-     }
-  where
-
-    isGivenEq :: EqCt -> Bool
-    isGivenEq eq = isGiven (ctEvidence (CEqCan eq))
-    isGivenDict :: DictCt -> Bool
-    isGivenDict dict = isGiven (ctEvidence (CDictCan dict))
-    isGivenIrred :: IrredCt -> Bool
-    isGivenIrred irred = isGiven (ctEvidence (CIrredCan irred))
-
-    -- Filter the inert constraints for Givens
-    (eq_givens_list, _) = partitionInertEqs isGivenEq (inert_eqs cans)
-    (funeq_givens_list, _) = partitionFunEqs isGivenEq (inert_funeqs cans)
-    dict_givens = filterDicts isGivenDict (inert_dicts cans)
-    safehask_givens = filterDicts isGivenDict (inert_safehask cans)
-    irreds_givens = filterBag isGivenIrred (inert_irreds cans)
-
-    eq_givens = foldr addInertEqs emptyTyEqs eq_givens_list
-    funeq_givens = foldr addFunEqs emptyFunEqs funeq_givens_list
-
-    givens_cans =
-      cans
-        { inert_eqs      = eq_givens
-        , inert_funeqs   = funeq_givens
-        , inert_dicts    = dict_givens
-        , inert_safehask = safehask_givens
-        , inert_irreds   = irreds_givens
-        }

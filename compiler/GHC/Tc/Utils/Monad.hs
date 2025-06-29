@@ -102,8 +102,8 @@ module GHC.Tc.Utils.Monad(
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
   addTcEvBind, addTcEvBinds, addTopEvBinds,
-  getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
-  chooseUniqueOccTc,
+  getTcEvBindsMap, setTcEvBindsMap, updTcEvBinds,
+  getTcEvTyCoVars, chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
   emitConstraints, emitStaticConstraints, emitSimple, emitSimples,
   emitImplication, emitImplications, ensureReflMultiplicityCo,
@@ -221,7 +221,6 @@ import GHC.Types.Name
 import GHC.Types.SafeHaskell
 import GHC.Types.Id
 import GHC.Types.TypeEnv
-import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Env
@@ -1762,7 +1761,7 @@ addTopEvBinds new_ev_binds thing_inside
 
 newTcEvBinds :: TcM EvBindsVar
 newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindMap
-                  ; tcvs_ref  <- newTcRef emptyVarSet
+                  ; tcvs_ref  <- newTcRef []
                   ; uniq <- newUnique
                   ; traceTc "newTcEvBinds" (text "unique =" <+> ppr uniq)
                   ; return (EvBindsVar { ebv_binds = binds_ref
@@ -1774,7 +1773,7 @@ newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindMap
 -- must be made monadically
 newNoTcEvBinds :: TcM EvBindsVar
 newNoTcEvBinds
-  = do { tcvs_ref  <- newTcRef emptyVarSet
+  = do { tcvs_ref  <- newTcRef []
        ; uniq <- newUnique
        ; traceTc "newNoTcEvBinds" (text "unique =" <+> ppr uniq)
        ; return (CoEvBindsVar { ebv_tcvs = tcvs_ref
@@ -1785,14 +1784,14 @@ cloneEvBindsVar :: EvBindsVar -> TcM EvBindsVar
 -- solving don't pollute the original
 cloneEvBindsVar ebv@(EvBindsVar {})
   = do { binds_ref <- newTcRef emptyEvBindMap
-       ; tcvs_ref  <- newTcRef emptyVarSet
+       ; tcvs_ref  <- newTcRef []
        ; return (ebv { ebv_binds = binds_ref
                      , ebv_tcvs = tcvs_ref }) }
 cloneEvBindsVar ebv@(CoEvBindsVar {})
-  = do { tcvs_ref  <- newTcRef emptyVarSet
+  = do { tcvs_ref  <- newTcRef []
        ; return (ebv { ebv_tcvs = tcvs_ref }) }
 
-getTcEvTyCoVars :: EvBindsVar -> TcM TyCoVarSet
+getTcEvTyCoVars :: EvBindsVar -> TcM [TcCoercion]
 getTcEvTyCoVars ev_binds_var
   = readTcRef (ebv_tcvs ev_binds_var)
 
@@ -1810,6 +1809,25 @@ setTcEvBindsMap v@(CoEvBindsVar {}) ev_binds
   = return ()
   | otherwise
   = pprPanic "setTcEvBindsMap" (ppr v $$ ppr ev_binds)
+
+updTcEvBinds :: EvBindsVar -> EvBindsVar -> TcM ()
+updTcEvBinds (EvBindsVar { ebv_binds = old_ebv_ref, ebv_tcvs = old_tcv_ref })
+             (EvBindsVar { ebv_binds = new_ebv_ref, ebv_tcvs = new_tcv_ref })
+  = do { new_ebvs <- readTcRef new_ebv_ref
+       ; updTcRef old_ebv_ref (`unionEvBindMap` new_ebvs)
+       ; new_tcvs <- readTcRef new_tcv_ref
+       ; updTcRef old_tcv_ref (new_tcvs ++) }
+updTcEvBinds (EvBindsVar { ebv_tcvs = old_tcv_ref })
+             (CoEvBindsVar { ebv_tcvs = new_tcv_ref })
+  = do { new_tcvs <- readTcRef new_tcv_ref
+       ; updTcRef old_tcv_ref (new_tcvs ++) }
+updTcEvBinds (CoEvBindsVar { ebv_tcvs = old_tcv_ref })
+             (CoEvBindsVar { ebv_tcvs = new_tcv_ref })
+  = do { new_tcvs <- readTcRef new_tcv_ref
+       ; updTcRef old_tcv_ref (new_tcvs ++) }
+updTcEvBinds old_var new_var
+  = pprPanic "updTcEvBinds" (ppr old_var $$ ppr new_var)
+    -- Terms inside types, no good
 
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
