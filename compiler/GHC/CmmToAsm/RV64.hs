@@ -49,7 +49,7 @@ instance Instruction RV64.Instr where
   mkLoadInstr = RV64.mkLoadInstr
   takeDeltaInstr = RV64.takeDeltaInstr
   isMetaInstr = RV64.isMetaInstr
-  mkRegRegMoveInstr _ _ = RV64.mkRegRegMoveInstr
+  mkRegRegMoveInstr _ = RV64.mkRegRegMoveInstr 
   takeRegRegMoveInstr _ = RV64.takeRegRegMoveInstr
   mkJumpInstr = RV64.mkJumpInstr
   mkStackAllocInstr = RV64.mkStackAllocInstr

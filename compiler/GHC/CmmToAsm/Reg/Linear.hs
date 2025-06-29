@@ -975,6 +975,7 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr fmt
                         = pprPanic ("RegAllocLinear.allocRegsAndSpill: no spill candidates\n")
                         $ vcat
                                 [ text "allocating vreg:  " <> text (show vr)
+                                , text "regClass:         " <> text (show regclass)
                                 , text "assignment:       " <> ppr assig
                                 , text "format:           " <> ppr fmt
                                 , text "freeRegs:         " <> text (showRegs freeRegs)

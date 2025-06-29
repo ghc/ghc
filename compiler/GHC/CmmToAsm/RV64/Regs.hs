@@ -72,6 +72,27 @@ fa7RegNo, d17RegNo :: RegNo
 d17RegNo = 49
 fa7RegNo = d17RegNo
 
+v0RegNo :: RegNo
+v0RegNo = 64
+
+v8RegNo :: RegNo
+v8RegNo = 72
+
+v23RegNo :: RegNo
+v23RegNo = 87
+
+v31RegNo :: RegNo
+v31RegNo = 95
+
+isVectorRegNo :: RegNo -> Bool
+isVectorRegNo r = v0RegNo <= r && r <= v31RegNo
+
+isFloatRegNo :: RegNo -> Bool
+isFloatRegNo r = d0RegNo <= r && r <= d31RegNo
+
+isIntRegNo :: RegNo -> Bool
+isIntRegNo r = x0RegNo <= r && r <= x31RegNo
+
 -- Note [The made-up RISCV64 TMP (IP) register]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -99,18 +120,28 @@ spMachReg = regSingle 2
 
 tmpReg = regSingle tmpRegNo
 
--- | All machine register numbers.
+v0Reg :: Reg
+v0Reg = regSingle v0RegNo
+
+-- | All machine register numbers. Including potential vector registers.
 allMachRegNos :: [RegNo]
-allMachRegNos = intRegs ++ fpRegs
+allMachRegNos = intRegs ++ fpRegs ++ vRegs
   where
     intRegs = [x0RegNo .. x31RegNo]
     fpRegs = [d0RegNo .. d31RegNo]
+    -- TODO: If Vector extension is turned off, this should become the empty list
+    vRegs = [v0RegNo .. v31RegNo]
 
 -- | Registers available to the register allocator.
 --
 -- These are all registers minus those with a fixed role in RISCV ABI (zero, lr,
 -- sp, gp, tp, fp, tmp) and GHC RTS (Base, Sp, Hp, HpLim, R1..R8, F1..F6,
 -- D1..D6.)
+--
+-- We pretend that vector registers are always available. If they aren't, we
+-- simply don't emit instructions using them. This is much simpler than fixing
+-- the register allocators which expect a configuration per platform (which we
+-- can only set when GHC itself gets build.)
 allocatableRegs :: Platform -> [RealReg]
 allocatableRegs platform =
   let isFree = freeReg platform
@@ -123,6 +154,13 @@ allGpArgRegs = map regSingle [a0RegNo .. a7RegNo]
 -- | Floating point argument registers according to the calling convention
 allFpArgRegs :: [Reg]
 allFpArgRegs = map regSingle [fa0RegNo .. fa7RegNo]
+
+-- | Literally all general vector registers (no status registers)
+allVecRegs :: [Reg]
+allVecRegs = map regSingle [v0RegNo .. v31RegNo]
+
+allVecArgRegs :: [Reg]
+allVecArgRegs = map regSingle [v8RegNo .. v23RegNo]
 
 -- * Addressing modes
 
@@ -201,41 +239,33 @@ realRegSqueeze cls rr =
     RcInteger ->
       case rr of
         RealRegSingle regNo
-          | regNo < d0RegNo
-          -> 1
-          | otherwise
-          -> 0
+          | regNo <= x31RegNo -> 1
+          | otherwise -> 0
     RcFloat ->
       case rr of
         RealRegSingle regNo
-          |  regNo < d0RegNo
-          || regNo > d31RegNo
-          -> 0
-          | otherwise
-          -> 1
+          | regNo <= d31RegNo -> 1
+          | otherwise -> 0
     RcVector ->
       case rr of
         RealRegSingle regNo
-          | regNo > d31RegNo
-          -> 1
-          | otherwise
-          -> 0
+          | regNo <= v31RegNo -> 1
+          | otherwise -> 0
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
-  | not (isFloatFormat format) = VirtualRegI u
-  | otherwise =
-      case format of
-        FF32 -> VirtualRegD u
-        FF64 -> VirtualRegD u
-        _ -> panic "RV64.mkVirtualReg"
+  | isIntFormat format = VirtualRegI u
+  | isFloatFormat format = VirtualRegD u
+  | isVecFormat format = VirtualRegV128 u
+  | otherwise = panic $ "RV64.mkVirtualReg: No virtual register type for " ++ show format
 
 {-# INLINE classOfRealReg #-}
 classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
-  | i < d0RegNo = RcInteger
-  | i > d31RegNo = RcVector
-  | otherwise = RcFloat
+  | i <= x31RegNo = RcInteger
+  | i <= d31RegNo = RcFloat
+  | i <= v31RegNo = RcVector
+  | otherwise = panic $ "RV64.classOfRealReg: Unknown register number: " ++ show i
 
 regDotColor :: RealReg -> SDoc
 regDotColor reg =
