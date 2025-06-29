@@ -11,15 +11,19 @@ SUPPORTED_CPU_FEATURES = {
     'sse', 'sse2', 'sse3', 'ssse3', 'sse4_1', 'sse4_2',
     'avx', 'avx2', 'avx512f',
     'fma',
-    'popcnt', 'bmi1', 'bmi2'
+    'popcnt', 'bmi1', 'bmi2',
+
+    # riscv:
+    'zvl128b', 'zvl256b', 'zvl512b'
 }
 
 cpu_feature_cache = None
 
 def get_cpu_features():
-    # Don't use host cpu features when testing cross ghc.
+    # Use the configured CPU features for test runs with CROSS_EMULATOR as we
+    # cannot compute them. Default is `[]`.
     if config.cross:
-        return []
+        return config.cross_cpu_features
     try:
         # This import might fail, e.g. if "ctypes" is not available,
         # in which case we report the empty set of features.
