@@ -411,6 +411,39 @@ import GHC.Platform.Reg
 # define ft10 62
 # define ft11 63
 
+# define v0  64
+# define v1  65
+# define v2  66
+# define v3  67
+# define v4  68
+# define v5  69
+# define v6  70
+# define v7  71
+# define v8  72
+# define v9  73
+# define v10 74
+# define v11 75
+# define v12 76
+# define v13 77
+# define v14 78
+# define v15 79
+# define v16 80
+# define v17 81
+# define v18 82
+# define v19 83
+# define v20 84
+# define v21 85
+# define v22 86
+# define v23 87
+# define v24 88
+# define v25 89
+# define v26 90
+# define v27 91
+# define v28 92
+# define v29 93
+# define v30 94
+# define v31 95
+
 #elif defined(MACHREGS_loongarch64)
 
 # define zero 0
@@ -1142,6 +1175,8 @@ freeReg 8 = False
 -- made-up inter-procedural (ip) register
 -- See Note [The made-up RISCV64 TMP (IP) register]
 freeReg 31 = False
+-- reserve v0 as mask operand
+freeReg 64 = False
 
 # if defined(REG_Base)
 freeReg REG_Base  = False
@@ -1220,6 +1255,27 @@ freeReg REG_D5    = False
 # endif
 # if defined(REG_D6)
 freeReg REG_D6    = False
+# endif
+
+-- N.B. XMM* YMM* and ZMM* refer to the same registers on RISCV64. Thus,
+-- defining freeReg for one vector register size is good enough.
+# if defined(REG_XMM1)
+freeReg REG_XMM1    = False
+# endif
+# if defined(REG_XMM2)
+freeReg REG_XMM2    = False
+# endif
+# if defined(REG_XMM3)
+freeReg REG_XMM3    = False
+# endif
+# if defined(REG_XMM4)
+freeReg REG_XMM4    = False
+# endif
+# if defined(REG_XMM5)
+freeReg REG_XMM5    = False
+# endif
+# if defined(REG_XMM6)
+freeReg REG_XMM6    = False
 # endif
 
 freeReg _ = True

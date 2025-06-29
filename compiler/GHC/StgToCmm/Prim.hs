@@ -2600,6 +2600,7 @@ checkVecCompatibility cfg vcat l w =
   case stgToCmmVecInstrsErr cfg of
     Nothing | isX86 -> checkX86 vecWidth vcat l w
             | platformArch platform == ArchAArch64 -> checkAArch64 vecWidth
+            | platformArch platform == ArchRISCV64 -> checkRISCV64 vecWidth
             | otherwise -> sorry "SIMD vector instructions are not supported on this architecture."
     Just err -> sorry err  -- incompatible backend, do panic
   where
@@ -2632,6 +2633,18 @@ checkVecCompatibility cfg vcat l w =
     checkAArch64 W256 = sorry $ "256-bit wide SIMD vector instructions are not supported."
     checkAArch64 W512 = sorry $ "512-bit wide SIMD vector instructions are not supported."
     checkAArch64 _ = return ()
+
+    checkRISCV64 :: Width -> FCode ()
+    checkRISCV64 w = case stgToCmmVectorMinBits cfg of
+      Nothing -> sorry "Vector support has not been configured. Check '-mriscv-vlen'."
+      Just w' | widthInBits w <= fromIntegral w' -> return ()
+      Just w' ->
+        sorry
+          $ "Vector width is "
+          ++ show w
+          ++ ", but only "
+          ++ show w'
+          ++ " configured. Check '-mriscv-vlen'."
 
     vecWidth = typeWidth (vecCmmType vcat l w)
 
