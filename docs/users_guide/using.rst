@@ -1759,6 +1759,37 @@ Some flags only make sense for particular target platforms.
     multiply-add, which might perform non-IEEE-compliant software emulation on
     some platforms (depending on the implementation of the C standard library).
 
+.. ghc-flag:: -mriscv-vlen
+   :shortdesc: (RISC-V NCG only) Minimal width of vector registers in bits
+   :type: dynamic
+   :category: platform-options
+
+   :default: Not set, which implies that no vector registers are used.
+
+   :since: 9.12.2
+
+   Though the RISC-V ISA supports dynamic configuration of vector registers via
+   "grouping", the GHC register allocators need to know what they can manage.
+   In RISC-V terms the value is the smallest VLEN of the machines the program
+   should be executed on.
+
+   Possible values are ``128``, ``256`` and ``512`` (these values are due to
+   internal alignment with other architectures.)
+
+   The question of "How big are my vector registers?" frequently appears in
+   other architectures as well. So, it could be that this parameter will be
+   useful for other architectures in future GHC versions. Right now, it is only
+   used by the native code generator (NCG) of RISC-V 64. 
+
+   GHC only supports the "'V' Standard Extension for Vector Operations, Version
+   1.0" as defined in "The RISC-V Instruction Set - Manual Volume I". Vendor
+   specific extensions and older standards are not supported. (There are still
+   many machines with older standard implementations around. If in doubt, check
+   your machine specification.)
+
+   This flag also enables vector operation support in the RISC-V NCG. Some
+   programs with vector specific code cannot be compiled without it.
+
 Haddock
 -------
 

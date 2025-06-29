@@ -1696,6 +1696,8 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "mavx512f"     (noArg (\d -> d { avx512f = True }))
   , make_ord_flag defGhcFlag "mavx512pf"    (noArg (\d ->
                                                          d { avx512pf = True }))
+  , make_ord_flag defGhcFlag "mriscv-vlen"
+                                            (word64SuffixM setVectorMinBits)
   , make_ord_flag defGhcFlag "mfma"         (noArg (\d -> d { fma = True }))
 
         ------ Plugin flags ------------------------------------------------
@@ -2861,6 +2863,9 @@ intSuffixM fn = IntSuffix (\n -> updM (fn n))
 word64Suffix :: (Word64 -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 word64Suffix fn = Word64Suffix (\n -> upd (fn n))
 
+word64SuffixM :: (Word64 -> DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
+word64SuffixM fn = Word64Suffix (\n -> updM (fn n))
+
 floatSuffix :: (Float -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 floatSuffix fn = FloatSuffix (\n -> upd (fn n))
 
@@ -3843,3 +3848,14 @@ updatePlatformConstants dflags mconstants = do
   let platform1 = (targetPlatform dflags) { platform_constants = mconstants }
   let dflags1   = dflags { targetPlatform = platform1 }
   return dflags1
+
+setVectorMinBits :: Word64 -> DynFlags -> DynP DynFlags
+setVectorMinBits v dflags = 
+  let validValues = [16,32,64,128,256,512]
+  in 
+    if v `elem` validValues then
+      pure $ dflags { vectorMinBits = (Just . fromIntegral) v} 
+    else do
+      addErr ("Minimal vector register size can only be one of" ++ show validValues)
+      pure dflags
+ 

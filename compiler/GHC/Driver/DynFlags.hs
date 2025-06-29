@@ -449,6 +449,7 @@ data DynFlags = DynFlags {
   avx512er              :: Bool, -- Enable AVX-512 Exponential and Reciprocal Instructions.
   avx512f               :: Bool, -- Enable AVX-512 instructions.
   avx512pf              :: Bool, -- Enable AVX-512 PreFetch Instructions.
+  vectorMinBits         :: Maybe Word, -- Minimal expected vector register width in bits (currently, RISCV-V only) 
   fma                   :: Bool, -- ^ Enable FMA instructions.
 
   -- Constants used to control the amount of optimization done.
@@ -726,6 +727,7 @@ defaultDynFlags mySettings =
         avx512er = False,
         avx512f = False,
         avx512pf = False,
+        vectorMinBits = Nothing,
         -- Use FMA by default on AArch64
         fma = (platformArch . sTargetPlatform $ mySettings) == ArchAArch64,
 
