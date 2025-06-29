@@ -138,6 +138,9 @@ class TestConfig:
 
         # Are we cross-compiling?
         self.cross = False
+
+        # Which cpu-features does CROSS_EMULATOR provide?
+        self.cross_cpu_features = []
         
         # Does the RTS linker only support loading shared libraries?
         self.interp_force_dyn = False
