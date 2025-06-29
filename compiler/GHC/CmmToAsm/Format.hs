@@ -22,6 +22,8 @@ module GHC.CmmToAsm.Format (
     intScalarFormat,
     isFloatFormat,
     vecFormat,
+    floatVecFormat,
+    intVecFormat,
     isVecFormat,
     cmmTypeFormat,
     formatToWidth,
@@ -209,6 +211,12 @@ vecFormat ty =
              W32 -> VecFormat l FmtInt32
              W64 -> VecFormat l FmtInt64
              _   -> pprPanic "Incorrect vector element width" (ppr elemTy)
+
+floatVecFormat :: Int -> Width -> Format
+floatVecFormat length width = vecFormat (cmmVec length (cmmFloat width))
+
+intVecFormat :: Int -> Width -> Format
+intVecFormat length width = vecFormat (cmmVec length (cmmBits width))
 
 -- | Check if a format represents a vector
 isVecFormat :: Format -> Bool
