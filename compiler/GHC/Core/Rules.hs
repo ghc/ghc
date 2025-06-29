@@ -543,7 +543,8 @@ map.
 -- supplied rules to this instance of an application in a given
 -- context, returning the rule applied and the resulting expression if
 -- successful.
-lookupRule :: RuleOpts -> InScopeEnv
+lookupRule :: HasDebugCallStack
+           => RuleOpts -> InScopeEnv
            -> (Activation -> Bool)      -- When rule is active
            -> Id -- Function head
            -> [CoreExpr] -- Args
@@ -675,7 +676,8 @@ start, in general eta expansion wastes work.  SLPJ July 99
 -}
 
 ------------------------------------
-matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
+matchRule :: HasDebugCallStack
+          => RuleOpts -> InScopeEnv -> (Activation -> Bool)
           -> Id -> [CoreExpr] -> [Maybe Name]
           -> CoreRule -> Maybe CoreExpr
 
@@ -720,7 +722,8 @@ matchRule _ rule_env is_active _ args rough_args
 
 
 ---------------------------------------
-matchN  :: InScopeEnv
+matchN  :: HasDebugCallStack
+        => InScopeEnv
         -> RuleName -> [Var] -> [CoreExpr]
         -> [CoreExpr] -> CoreExpr           -- ^ Target; can have more elements than the template
         -> Maybe CoreExpr
@@ -739,7 +742,8 @@ matchN ise _rule_name tmpl_vars tmpl_es target_es rhs
        ; return (bind_wrapper $
                  mkLams tmpl_vars rhs `mkApps` matched_es) }
 
-matchExprs :: InScopeEnv -> [Var] -> [CoreExpr] -> [CoreExpr]
+matchExprs :: HasDebugCallStack
+           => InScopeEnv -> [Var] -> [CoreExpr] -> [CoreExpr]
            -> Maybe (BindWrapper, [CoreExpr])  -- 1-1 with the [Var]
 matchExprs (ISE in_scope id_unf) tmpl_vars tmpl_es target_es
   = do  { rule_subst <- match_exprs init_menv emptyRuleSubst tmpl_es target_es
@@ -795,7 +799,8 @@ matchExprs (ISE in_scope id_unf) tmpl_vars tmpl_es target_es
               , text "Actual args:" <+> ppr target_es ]
 
 ----------------------
-match_exprs :: RuleMatchEnv -> RuleSubst
+match_exprs :: HasDebugCallStack
+            => RuleMatchEnv -> RuleSubst
             -> [CoreExpr]       -- Templates
             -> [CoreExpr]       -- Targets
             -> Maybe RuleSubst
@@ -1056,7 +1061,8 @@ We really should never rely on matching the structure of a coercion
 -}
 
 ----------------------
-match :: RuleMatchEnv
+match :: HasDebugCallStack
+      => RuleMatchEnv
       -> RuleSubst              -- Substitution applies to template only
       -> CoreExpr               -- Template
       -> CoreExpr               -- Target
@@ -1593,7 +1599,8 @@ okToFloat rn_env bind_fvs
     not_captured fv = not (inRnEnvR rn_env fv)
 
 ------------------------------------------
-match_var :: RuleMatchEnv
+match_var :: HasDebugCallStack
+          => RuleMatchEnv
           -> RuleSubst
           -> Var        -- Template
           -> CoreExpr   -- Target
@@ -1629,7 +1636,8 @@ match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
         -- template x, so we must rename first!
 
 ------------------------------------------
-match_tmpl_var :: RuleMatchEnv
+match_tmpl_var :: HasDebugCallStack
+               => RuleMatchEnv
                -> RuleSubst
                -> Var                -- Template
                -> CoreExpr           -- Target
