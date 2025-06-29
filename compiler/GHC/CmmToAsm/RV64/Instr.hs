@@ -21,7 +21,6 @@ import GHC.Data.FastString (LexicalFastString)
 import GHC.Platform
 import GHC.Platform.Reg
 import GHC.Platform.Regs
-import GHC.Platform.Reg.Class.Separate
 import GHC.Prelude
 import GHC.Stack
 import GHC.Types.Unique.DSM
@@ -96,11 +95,11 @@ regUsageOfInstr platform instr = case instr of
   -- ORI's third operand is always an immediate
   ORI dst src1 _ -> usage (regOp src1, regOp dst)
   XORI dst src1 _ -> usage (regOp src1, regOp dst)
-  J_TBL _ _ t -> usage ([t], [])
+  J_TBL _ _ t -> usage ([(t, II64)], [])
   J t -> usage (regTarget t, [])
   B t -> usage (regTarget t, [])
   BCOND _ l r t -> usage (regTarget t ++ regOp l ++ regOp r, [])
-  BL t ps -> usage (t : ps, callerSavedRegisters)
+  BL t ps -> usage ((t, II64) : map (\p -> (p, II64)) ps, callerSavedRegisters)
   CSET dst l r _ -> usage (regOp l ++ regOp r, regOp dst)
   STR _ src dst -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src -> usage (regOp src, regOp dst)
@@ -110,61 +109,82 @@ regUsageOfInstr platform instr = case instr of
   FABS dst src -> usage (regOp src, regOp dst)
   FMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VMV dst src1 -> usage (regOp src1, regOp dst)
+  VID dst -> usage ([], regOp dst)
+  VMSEQ dst src op -> usage (regOp src ++ regOp op, regOp dst)
+  VMERGE dst op1 op2 opm -> usage (regOp op1 ++ regOp op2 ++ regOp opm, regOp dst)
+  VSLIDEDOWN dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
+  -- WARNING: VSETIVLI is a special case. It changes the interpretation of all vector registers!
+  VSETIVLI (OpReg fmt reg) _ _ _ _ _ -> usage ([], [(reg, fmt)])
+  VNEG dst src1 -> usage (regOp src1, regOp dst)
+  VADD dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSUB dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VMUL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VQUOT _mbS dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VREM _s dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VUMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VUMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VFMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VFMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  -- VRGATHER doesn't write to src1. But, we need to ensure the register
+  -- allocator doesn't use the src* registers as dst. (Otherwise, we end up
+  -- with an illegal instruction.)
+  VRGATHER dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst ++ regOp src1 ++ regOp src2)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
+  VFMA _ op1 op2 op3 ->
+    usage (regOp op1 ++ regOp op2 ++ regOp op3, regOp op1)
   _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
   where
     -- filtering the usage is necessary, otherwise the register
     -- allocator will try to allocate pre-defined fixed stg
     -- registers as well, as they show up.
-    usage :: ([Reg], [Reg]) -> RegUsage
+    usage :: ([(Reg, Format)], [(Reg, Format)]) -> RegUsage
     usage (srcRegs, dstRegs) =
       RU
         (map mkFmt $ filter (interesting platform) srcRegs)
         (map mkFmt $ filter (interesting platform) dstRegs)
 
-      -- SIMD NCG TODO: the format here is used for register spilling/unspilling.
-      -- As the RISCV64 NCG does not currently support SIMD registers,
-      -- this simple logic is OK.
-    mkFmt r = RegWithFormat r fmt
-      where
-        fmt = case cls of
-                RcInteger -> II64
-                RcFloat   -> FF64
-                RcVector  -> sorry "The RISCV64 NCG does not (yet) support vectors; please use -fllvm."
-        cls = case r of
-                RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
-                RegReal rr -> classOfRealReg rr
+    mkFmt (r, fmt) = RegWithFormat r fmt
 
-    regAddr :: AddrMode -> [Reg]
-    regAddr (AddrRegImm r1 _imm) = [r1]
-    regAddr (AddrReg r1) = [r1]
+    regAddr :: AddrMode -> [(Reg, Format)]
+    regAddr (AddrRegImm r1 _imm) = [(r1, II64)]
+    regAddr (AddrReg r1) = [(r1, II64)]
 
-    regOp :: Operand -> [Reg]
-    regOp (OpReg _w r1) = [r1]
+    regOp :: Operand -> [(Reg, Format)]
+    regOp (OpReg fmt r1) = [(r1, fmt)]
     regOp (OpAddr a) = regAddr a
     regOp (OpImm _imm) = []
 
-    regTarget :: Target -> [Reg]
+    regTarget :: Target -> [(Reg, Format)]
     regTarget (TBlock _bid) = []
-    regTarget (TReg r1) = [r1]
+    regTarget (TReg r1) = [(r1, II64)]
 
     -- Is this register interesting for the register allocator?
-    interesting :: Platform -> Reg -> Bool
-    interesting _ (RegVirtual _) = True
-    interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
+    interesting :: Platform -> (Reg, Format) -> Bool
+    interesting _ ((RegVirtual _), _) = True
+    interesting platform ((RegReal (RealRegSingle i)), _) = freeReg platform i
 
 -- | Caller-saved registers (according to calling convention)
 --
 -- These registers may be clobbered after a jump.
-callerSavedRegisters :: [Reg]
+callerSavedRegisters :: [(Reg, Format)]
 callerSavedRegisters =
-  [regSingle raRegNo]
-    ++ map regSingle [t0RegNo .. t2RegNo]
-    ++ map regSingle [a0RegNo .. a7RegNo]
-    ++ map regSingle [t3RegNo .. t6RegNo]
-    ++ map regSingle [ft0RegNo .. ft7RegNo]
-    ++ map regSingle [fa0RegNo .. fa7RegNo]
+  [(toTuple . regSingle) raRegNo]
+    ++ map (toTuple . regSingle) [t0RegNo .. t2RegNo]
+    ++ map (toTuple . regSingle) [a0RegNo .. a7RegNo]
+    ++ map (toTuple . regSingle) [t3RegNo .. t6RegNo]
+    ++ map (toTuple . regSingle) [ft0RegNo .. ft7RegNo]
+    ++ map (toTuple . regSingle) [fa0RegNo .. fa7RegNo]
+  where
+    toTuple :: Reg -> (Reg, Format)
+    toTuple r = (r, format r)
+    format r
+      | isIntReg r = II64
+      | isFloatReg r = FF64
+      | otherwise = panic $ "Unexpected register: " ++ show r
 
 -- | Apply a given mapping to all the register references in this instruction.
 patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
@@ -209,8 +229,29 @@ patchRegsOfInstr instr env = case instr of
   FABS o1 o2 -> FABS (patchOp o1) (patchOp o2)
   FMIN o1 o2 o3 -> FMIN (patchOp o1) (patchOp o2) (patchOp o3)
   FMAX o1 o2 o3 -> FMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VMV o1 o2 -> VMV (patchOp o1) (patchOp o2)
+  VID o1 -> VID (patchOp o1)
+  VMSEQ o1 o2 o3 -> VMSEQ (patchOp o1) (patchOp o2) (patchOp o3)
+  VMERGE o1 o2 o3 o4 -> VMERGE (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
+  VSLIDEDOWN o1 o2 o3 -> VSLIDEDOWN (patchOp o1) (patchOp o2) (patchOp o3)
+  VSETIVLI o1 o2 o3 o4 o5 o6 -> VSETIVLI (patchOp o1) o2 o3 o4 o5 o6
+  VNEG o1 o2 -> VNEG (patchOp o1) (patchOp o2)
+  VADD o1 o2 o3 -> VADD (patchOp o1) (patchOp o2) (patchOp o3)
+  VSUB o1 o2 o3 -> VSUB (patchOp o1) (patchOp o2) (patchOp o3)
+  VMUL o1 o2 o3 -> VMUL (patchOp o1) (patchOp o2) (patchOp o3)
+  VQUOT mbS o1 o2 o3 -> VQUOT mbS (patchOp o1) (patchOp o2) (patchOp o3)
+  VREM s o1 o2 o3 -> VREM s (patchOp o1) (patchOp o2) (patchOp o3) 
+  VSMIN o1 o2 o3 -> VSMIN (patchOp o1) (patchOp o2) (patchOp o3)
+  VSMAX o1 o2 o3 -> VSMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VUMIN o1 o2 o3 -> VUMIN (patchOp o1) (patchOp o2) (patchOp o3)
+  VUMAX o1 o2 o3 -> VUMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VFMIN o1 o2 o3 -> VFMIN (patchOp o1) (patchOp o2) (patchOp o3)
+  VFMAX o1 o2 o3 -> VFMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VRGATHER o1 o2 o3 -> VRGATHER (patchOp o1) (patchOp o2) (patchOp o3)
   FMA s o1 o2 o3 o4 ->
     FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
+  VFMA s o1 o2 o3 ->
+    VFMA s (patchOp o1) (patchOp o2) (patchOp o3)
   _ -> panic $ "patchRegsOfInstr: " ++ instrCon instr
   where
     patchOp :: Operand -> Operand
@@ -310,21 +351,24 @@ mkSpillInstr ::
   -- | spill slot to use
   Int ->
   [Instr]
-mkSpillInstr _config (RegWithFormat reg _fmt) delta slot =
-  case off - delta of
-    imm | fitsIn12bitImm imm -> [mkStrSpImm imm]
-    imm ->
-      [ movImmToTmp imm,
-        addSpToTmp,
-        mkStrTmp
-      ]
+mkSpillInstr _config (RegWithFormat reg fmt) delta slot =
+  assertFmtReg fmt reg
+    $ case off - delta of
+      imm | fitsIn12bitImm imm && not (isVecFormat fmt) -> [mkStrSpImm imm]
+      imm ->
+        [ movImmToTmp imm,
+          addSpToTmp,
+          mkStrTmp
+        ]
   where
-    fmt = case reg of
-      RegReal (RealRegSingle n) | n < d0RegNo -> II64
-      _ -> FF64
+    fmt'
+      | isVecFormat fmt =
+          fmt
+      | otherwise =
+          scalarMoveFormat fmt
     mkStrSpImm imm =
       ANN (text "Spill@" <> int (off - delta))
-        $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
+        $ (STR fmt' (OpReg fmt reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm))))
     movImmToTmp imm =
       ANN (text "Spill: TMP <- " <> int imm)
         $ MOV tmp (OpImm (ImmInt imm))
@@ -333,8 +377,7 @@ mkSpillInstr _config (RegWithFormat reg _fmt) delta slot =
         $ ADD tmp tmp sp
     mkStrTmp =
       ANN (text "Spill@" <> int (off - delta))
-        $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg tmpReg))
-
+        $ (STR fmt' (OpReg fmt reg) (OpAddr (AddrReg tmpReg)))
     off = spillSlotToOffset slot
 
 -- | Generate instructions to load a register from a spill slot.
@@ -347,21 +390,23 @@ mkLoadInstr ::
   -- | spill slot to use
   Int ->
   [Instr]
-mkLoadInstr _config (RegWithFormat reg _fmt) delta slot =
+mkLoadInstr _config (RegWithFormat reg fmt) delta slot =
   case off - delta of
-    imm | fitsIn12bitImm imm -> [mkLdrSpImm imm]
+    imm | fitsIn12bitImm imm && not (isVecFormat fmt) -> [mkLdrSpImm imm]
     imm ->
       [ movImmToTmp imm,
         addSpToTmp,
         mkLdrTmp
       ]
   where
-    fmt = case reg of
-      RegReal (RealRegSingle n) | n < d0RegNo -> II64
-      _ -> FF64
+    fmt'
+      | isVecFormat fmt =
+          fmt
+      | otherwise =
+          scalarMoveFormat fmt
     mkLdrSpImm imm =
       ANN (text "Reload@" <> int (off - delta))
-        $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
+        $ LDR fmt' (OpReg fmt' reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
     movImmToTmp imm =
       ANN (text "Reload: TMP <- " <> int imm)
         $ MOV tmp (OpImm (ImmInt imm))
@@ -370,9 +415,14 @@ mkLoadInstr _config (RegWithFormat reg _fmt) delta slot =
         $ ADD tmp tmp sp
     mkLdrTmp =
       ANN (text "Reload@" <> int (off - delta))
-        $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg tmpReg))
+        $ LDR fmt' (OpReg fmt' reg) (OpAddr (AddrReg tmpReg))
 
     off = spillSlotToOffset slot
+
+scalarMoveFormat :: Format -> Format
+scalarMoveFormat fmt
+  | isFloatFormat fmt = FF64
+  | otherwise = II64
 
 -- | See if this instruction is telling us the current C stack delta
 takeDeltaInstr :: Instr -> Maybe Int
@@ -398,11 +448,11 @@ isMetaInstr instr =
 -- | Copy the value in a register to another one.
 --
 -- Must work for all register classes.
-mkRegRegMoveInstr :: Reg -> Reg -> Instr
-mkRegRegMoveInstr src dst = ANN desc instr
+mkRegRegMoveInstr :: Format -> Reg -> Reg -> Instr
+mkRegRegMoveInstr fmt src dst = ANN desc instr
   where
     desc = text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst
-    instr = MOV (operandFromReg dst) (operandFromReg src)
+    instr = MOV (operandFromReg fmt dst) (operandFromReg fmt src)
 
 -- | Take the source and destination from this (potential) reg -> reg move instruction
 --
@@ -411,6 +461,7 @@ mkRegRegMoveInstr src dst = ANN desc instr
 takeRegRegMoveInstr :: Instr -> Maybe (Reg, Reg)
 takeRegRegMoveInstr (MOV (OpReg width dst) (OpReg width' src))
   | width == width' && (isFloatReg dst == isFloatReg src) = pure (src, dst)
+-- TODO: Add VMV case
 takeRegRegMoveInstr _ = Nothing
 
 -- | Make an unconditional jump instruction.
@@ -615,13 +666,11 @@ data Instr
     FCVT FcvtVariant Operand Operand
   | -- | Floating point ABSolute value
     FABS Operand Operand
-
   | -- | Min
     -- dest = min(r1)
     FMIN Operand Operand Operand
   | -- | Max
     FMAX Operand Operand Operand
-
   | -- | Floating-point fused multiply-add instructions
     --
     -- - fmadd : d =   r1 * r2 + r3
@@ -629,12 +678,54 @@ data Instr
     -- - fmsub : d = - r1 * r2 + r3
     -- - fnmadd: d = - r1 * r2 - r3
     FMA FMASign Operand Operand Operand Operand
+  | -- TODO: Care about the variants (<instr>.x.y) -> sum type
+    VMV Operand Operand
+  | VID Operand
+  | VMSEQ Operand Operand Operand
+  | VMERGE Operand Operand Operand Operand
+  | VSLIDEDOWN Operand Operand Operand
+  | VSETIVLI Operand Word Width VectorGrouping TailAgnosticFlag MaskAgnosticFlag
+  | VNEG Operand Operand
+  | VADD Operand Operand Operand
+  | VSUB Operand Operand Operand
+  | VMUL Operand Operand Operand
+  | VQUOT (Maybe Signage) Operand Operand Operand
+  | VREM Signage Operand Operand Operand
+  | VSMIN Operand Operand Operand
+  | VSMAX Operand Operand Operand
+  | VUMIN Operand Operand Operand
+  | VUMAX Operand Operand Operand
+  | VFMIN Operand Operand Operand
+  | VFMAX Operand Operand Operand
+  | VFMA FMASign Operand Operand Operand
+  | VRGATHER Operand Operand Operand
+
+data Signage = Signed | Unsigned
+  deriving (Eq, Show)
 
 -- | Operand of a FENCE instruction (@r@, @w@ or @rw@)
 data FenceType = FenceRead | FenceWrite | FenceReadWrite
 
 -- | Variant of a floating point conversion instruction
 data FcvtVariant = FloatToFloat | IntToFloat | FloatToInt
+
+data VectorGrouping = MF8 | MF4 | MF2 | M1 | M2 | M4 | M8
+  deriving (Eq, Show)
+
+instance Outputable VectorGrouping where
+  ppr = text . show
+
+data TailAgnosticFlag
+  = -- | Tail-agnostic
+    TA
+  | -- | Tail-undisturbed
+    TU
+
+data MaskAgnosticFlag
+  = -- | Mask-agnostic
+    MA
+  | -- | Mask-undisturbed
+    MU
 
 instrCon :: Instr -> String
 instrCon i =
@@ -680,12 +771,37 @@ instrCon i =
     FABS {} -> "FABS"
     FMIN {} -> "FMIN"
     FMAX {} -> "FMAX"
+    VMV {} -> "VMV"
+    VID {} -> "VID"
+    VMSEQ {} -> "VMSEQ"
+    VMERGE {} -> "VMERGE"
+    VSLIDEDOWN {} -> "VSLIDEDOWN"
+    VSETIVLI {} -> "VSETIVLI"
+    VNEG {} -> "VNEG"
+    VADD {} -> "VADD"
+    VREM {} -> "VREM"
+    VSUB {} -> "VSUB"
+    VMUL {} -> "VMUL"
+    VQUOT {} -> "VQUOT"
+    VSMIN {} -> "VSMIN"
+    VSMAX {} -> "VSMAX"
+    VUMIN {} -> "VUMIN"
+    VUMAX {} -> "VUMAX"
+    VFMIN {} -> "VFMIN"
+    VFMAX {} -> "VFMAX"
+    VRGATHER {} -> "VRGATHER"
     FMA variant _ _ _ _ ->
       case variant of
         FMAdd -> "FMADD"
         FMSub -> "FMSUB"
         FNMAdd -> "FNMADD"
         FNMSub -> "FNMSUB"
+    VFMA variant _ _ _ ->
+      case variant of
+        FMAdd -> "VFMADD"
+        FMSub -> "VFMSUB"
+        FNMAdd -> "VFNMADD"
+        FNMSub -> "VFNMSUB"
 
 data Target
   = TBlock BlockId
@@ -693,161 +809,144 @@ data Target
 
 data Operand
   = -- | register
-    OpReg Width Reg
+    OpReg Format Reg
   | -- | immediate value
     OpImm Imm
   | -- | memory reference
     OpAddr AddrMode
   deriving (Eq, Show)
 
-operandFromReg :: Reg -> Operand
-operandFromReg = OpReg W64
+-- TODO: This just wraps a constructor... Inline?
+operandFromReg :: Format -> Reg -> Operand
+operandFromReg = OpReg
 
-operandFromRegNo :: RegNo -> Operand
-operandFromRegNo = operandFromReg . regSingle
+operandFromRegNo :: Format -> RegNo -> Operand
+operandFromRegNo fmt = operandFromReg fmt . regSingle
 
 zero, ra, sp, gp, tp, fp, tmp :: Operand
-zero = operandFromReg zeroReg
-ra = operandFromReg raReg
-sp = operandFromReg spMachReg
-gp = operandFromRegNo 3
-tp = operandFromRegNo 4
-fp = operandFromRegNo 8
-tmp = operandFromReg tmpReg
+zero = operandFromReg II64 zeroReg
+ra = operandFromReg II64 raReg
+sp = operandFromReg II64 spMachReg
+gp = operandFromRegNo II64 3
+tp = operandFromRegNo II64 4
+fp = operandFromRegNo II64 8
+tmp = operandFromReg II64 tmpReg
 
 x0, x1, x2, x3, x4, x5, x6, x7 :: Operand
 x8, x9, x10, x11, x12, x13, x14, x15 :: Operand
 x16, x17, x18, x19, x20, x21, x22, x23 :: Operand
 x24, x25, x26, x27, x28, x29, x30, x31 :: Operand
-x0 = operandFromRegNo x0RegNo
-x1 = operandFromRegNo 1
-x2 = operandFromRegNo 2
-x3 = operandFromRegNo 3
-x4 = operandFromRegNo 4
-x5 = operandFromRegNo x5RegNo
-x6 = operandFromRegNo 6
-x7 = operandFromRegNo x7RegNo
+x0 = operandFromRegNo II64 x0RegNo
+x1 = operandFromRegNo II64 1
+x2 = operandFromRegNo II64 2
+x3 = operandFromRegNo II64 3
+x4 = operandFromRegNo II64 4
+x5 = operandFromRegNo II64 x5RegNo
+x6 = operandFromRegNo II64 6
+x7 = operandFromRegNo II64 x7RegNo
 
-x8 = operandFromRegNo 8
+x8 = operandFromRegNo II64 8
 
-x9 = operandFromRegNo 9
+x9 = operandFromRegNo II64 9
 
-x10 = operandFromRegNo x10RegNo
+x10 = operandFromRegNo II64 x10RegNo
 
-x11 = operandFromRegNo 11
-
-x12 = operandFromRegNo 12
-
-x13 = operandFromRegNo 13
-
-x14 = operandFromRegNo 14
-
-x15 = operandFromRegNo 15
-
-x16 = operandFromRegNo 16
-
-x17 = operandFromRegNo x17RegNo
-
-x18 = operandFromRegNo 18
-
-x19 = operandFromRegNo 19
-
-x20 = operandFromRegNo 20
-
-x21 = operandFromRegNo 21
-
-x22 = operandFromRegNo 22
-
-x23 = operandFromRegNo 23
-
-x24 = operandFromRegNo 24
-
-x25 = operandFromRegNo 25
-
-x26 = operandFromRegNo 26
-
-x27 = operandFromRegNo 27
-
-x28 = operandFromRegNo x28RegNo
-
-x29 = operandFromRegNo 29
-
-x30 = operandFromRegNo 30
-
-x31 = operandFromRegNo x31RegNo
+x11 = operandFromRegNo II64 11
+x12 = operandFromRegNo II64 12
+x13 = operandFromRegNo II64 13
+x14 = operandFromRegNo II64 14
+x15 = operandFromRegNo II64 15
+x16 = operandFromRegNo II64 16
+x17 = operandFromRegNo II64 x17RegNo
+x18 = operandFromRegNo II64 18
+x19 = operandFromRegNo II64 19
+x20 = operandFromRegNo II64 20
+x21 = operandFromRegNo II64 21
+x22 = operandFromRegNo II64 22
+x23 = operandFromRegNo II64 23
+x24 = operandFromRegNo II64 24
+x25 = operandFromRegNo II64 25
+x26 = operandFromRegNo II64 26
+x27 = operandFromRegNo II64 27
+x28 = operandFromRegNo II64 x28RegNo
+x29 = operandFromRegNo II64 29
+x30 = operandFromRegNo II64 30
+x31 = operandFromRegNo II64 x31RegNo
 
 d0, d1, d2, d3, d4, d5, d6, d7 :: Operand
 d8, d9, d10, d11, d12, d13, d14, d15 :: Operand
 d16, d17, d18, d19, d20, d21, d22, d23 :: Operand
 d24, d25, d26, d27, d28, d29, d30, d31 :: Operand
-d0 = operandFromRegNo d0RegNo
-d1 = operandFromRegNo 33
-d2 = operandFromRegNo 34
-d3 = operandFromRegNo 35
-d4 = operandFromRegNo 36
-d5 = operandFromRegNo 37
-d6 = operandFromRegNo 38
-d7 = operandFromRegNo d7RegNo
+d0 = operandFromRegNo FF64 d0RegNo
+d1 = operandFromRegNo FF64 33
+d2 = operandFromRegNo FF64 34
+d3 = operandFromRegNo FF64 35
+d4 = operandFromRegNo FF64 36
+d5 = operandFromRegNo FF64 37
+d6 = operandFromRegNo FF64 38
+d7 = operandFromRegNo FF64 d7RegNo
 
-d8 = operandFromRegNo 40
+d8 = operandFromRegNo FF64 40
 
-d9 = operandFromRegNo 41
+d9 = operandFromRegNo FF64 41
 
-d10 = operandFromRegNo d10RegNo
+d10 = operandFromRegNo FF64 d10RegNo
 
-d11 = operandFromRegNo 43
+d11 = operandFromRegNo FF64 43
 
-d12 = operandFromRegNo 44
+d12 = operandFromRegNo FF64 44
 
-d13 = operandFromRegNo 45
+d13 = operandFromRegNo FF64 45
 
-d14 = operandFromRegNo 46
+d14 = operandFromRegNo FF64 46
 
-d15 = operandFromRegNo 47
+d15 = operandFromRegNo FF64 47
 
-d16 = operandFromRegNo 48
+d16 = operandFromRegNo FF64 48
 
-d17 = operandFromRegNo d17RegNo
+d17 = operandFromRegNo FF64 d17RegNo
 
-d18 = operandFromRegNo 50
+d18 = operandFromRegNo FF64 50
 
-d19 = operandFromRegNo 51
+d19 = operandFromRegNo FF64 51
 
-d20 = operandFromRegNo 52
+d20 = operandFromRegNo FF64 52
 
-d21 = operandFromRegNo 53
+d21 = operandFromRegNo FF64 53
 
-d22 = operandFromRegNo 54
+d22 = operandFromRegNo FF64 54
 
-d23 = operandFromRegNo 55
+d23 = operandFromRegNo FF64 55
 
-d24 = operandFromRegNo 56
+d24 = operandFromRegNo FF64 56
 
-d25 = operandFromRegNo 57
+d25 = operandFromRegNo FF64 57
 
-d26 = operandFromRegNo 58
+d26 = operandFromRegNo FF64 58
 
-d27 = operandFromRegNo 59
+d27 = operandFromRegNo FF64 59
 
-d28 = operandFromRegNo 60
+d28 = operandFromRegNo FF64 60
 
-d29 = operandFromRegNo 61
+d29 = operandFromRegNo FF64 61
 
-d30 = operandFromRegNo 62
+d30 = operandFromRegNo FF64 62
 
-d31 = operandFromRegNo d31RegNo
+d31 = operandFromRegNo FF64 d31RegNo
 
-fitsIn12bitImm :: (Num a, Ord a) => a -> Bool
-fitsIn12bitImm off = off >= intMin12bit && off <= intMax12bit
+fitsIn12bitImm :: (Num a, Ord a, Bits a) => a -> Bool
+fitsIn12bitImm = fitsInBits 12
 
-intMin12bit :: (Num a) => a
-intMin12bit = -2048
-
-intMax12bit :: (Num a) => a
-intMax12bit = 2047
+fitsIn5bitImm :: (Num a, Ord a, Bits a) => a -> Bool
+fitsIn5bitImm = fitsInBits 5
 
 fitsIn32bits :: (Num a, Ord a, Bits a) => a -> Bool
-fitsIn32bits i = (-1 `shiftL` 31) <= i && i <= (1 `shiftL` 31 - 1)
+fitsIn32bits = fitsInBits 32
+
+fitsInBits :: (Num a, Ord a, Bits a) => Int -> a -> Bool
+fitsInBits n i = (-1 `shiftL` n') <= i && i <= (1 `shiftL` n' - 1)
+  where
+    n' = n - 1
 
 isNbitEncodeable :: Int -> Integer -> Bool
 isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `shiftL` shift)
@@ -855,14 +954,71 @@ isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `
 isEncodeableInWidth :: Width -> Integer -> Bool
 isEncodeableInWidth = isNbitEncodeable . widthInBits
 
+isIntRegOp :: Operand -> Bool
+isIntRegOp (OpReg fmt reg) | isIntReg reg = assertFmtReg fmt reg $ True
+isIntRegOp _ = False
+
+isIntImmOp :: Operand -> Bool
+isIntImmOp (OpImm (ImmInt _)) = True
+isIntImmOp (OpImm (ImmInteger _)) = True
+isIntImmOp _ = False
+
 isIntOp :: Operand -> Bool
-isIntOp = not . isFloatOp
+isIntOp op = isIntRegOp op || isIntImmOp op
+
+isFloatRegOp :: Operand -> Bool
+isFloatRegOp (OpReg fmt reg) | isFloatReg reg = assertFmtReg fmt reg $ True
+isFloatRegOp _ = False
+
+isFloatImmOp :: Operand -> Bool
+isFloatImmOp (OpImm (ImmFloat _)) = True
+isFloatImmOp (OpImm (ImmDouble _)) = True
+isFloatImmOp _ = False
 
 isFloatOp :: Operand -> Bool
-isFloatOp (OpReg _ reg) | isFloatReg reg = True
-isFloatOp _ = False
+isFloatOp op = isFloatRegOp op || isFloatImmOp op
+
+assertFmtReg :: (HasCallStack) => Format -> Reg -> a -> a
+assertFmtReg fmt reg | fmtRegCombinationIsSane fmt reg = id
+assertFmtReg fmt reg =
+  pprPanic
+    "Format does not fit to register."
+    (text "fmt" <> colon <+> ppr fmt <+> text "reg" <> colon <+> ppr reg)
+
+fmtRegCombinationIsSane :: Format -> Reg -> Bool
+fmtRegCombinationIsSane fmt reg =
+  (isFloatFormat fmt && isFloatReg reg)
+    || (isIntFormat fmt && isIntReg reg)
+    || (isVecFormat fmt && isVectorReg reg)
+
+isVectorRegOp :: HasCallStack => Operand -> Bool
+isVectorRegOp (OpReg fmt reg) | isVectorReg reg = assertFmtReg fmt reg $ True
+isVectorRegOp _ = False
 
 isFloatReg :: Reg -> Bool
-isFloatReg (RegReal (RealRegSingle i)) | i > 31 = True
+isFloatReg (RegReal (RealRegSingle i)) | isFloatRegNo i = True
 isFloatReg (RegVirtual (VirtualRegD _)) = True
 isFloatReg _ = False
+
+isIntReg :: Reg -> Bool
+isIntReg (RegReal (RealRegSingle i)) | isIntRegNo i = True
+isIntReg (RegVirtual (VirtualRegI _)) = True
+isIntReg _ = False
+
+isVectorReg :: Reg -> Bool
+isVectorReg (RegReal (RealRegSingle i)) | isVectorRegNo i = True
+isVectorReg (RegVirtual (VirtualRegV128 _)) = True
+isVectorReg _ = False
+
+allVectorRegOps :: [Operand] -> Bool
+allVectorRegOps = all isVectorRegOp
+
+allIntVectorRegOps :: [Operand] -> Bool
+allIntVectorRegOps = all $ isVectorFmtRegOp isIntScalarFormat
+
+isVectorFmtRegOp :: (ScalarFormat -> Bool) -> Operand -> Bool
+isVectorFmtRegOp p (OpReg (VecFormat _ sFmt) _r) | p sFmt = True
+isVectorFmtRegOp _ _ = False
+
+allFloatVectorRegOps :: [Operand] -> Bool
+allFloatVectorRegOps = all $ isVectorFmtRegOp isFloatScalarFormat
