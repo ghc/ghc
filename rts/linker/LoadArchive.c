@@ -250,11 +250,11 @@ lookupGNUArchiveIndex(int gnuFileIndexSize, char **fileName_,
         // Check that the previous entry ends with the expected
         // end-of-string delimiter.
 #if defined(mingw32_HOST_OS)
-#define STRING_TABLE_DELIM '\0'
+#define IS_SYMBOL_DELIMITER(STR) (STR =='\n' || STR == '\0')
 #else
-#define STRING_TABLE_DELIM '\n'
+#define IS_SYMBOL_DELIMITER(STR) (STR =='\n')
 #endif
-        if (n != 0 && gnuFileIndex[n - 1] != STRING_TABLE_DELIM) {
+        if (n != 0 && !IS_SYMBOL_DELIMITER(gnuFileIndex[n - 1])) {
             errorBelch("loadArchive: GNU-variant filename offset "
                     "%d invalid (range [0..%d]) while reading "
                     "filename from `%" PATH_FMT "'",
@@ -263,10 +263,10 @@ lookupGNUArchiveIndex(int gnuFileIndexSize, char **fileName_,
         }
 
         int i;
-        for (i = n; gnuFileIndex[i] != '\n'; i++)
+        for (i = n; !IS_SYMBOL_DELIMITER(gnuFileIndex[i]); i++)
             ;
 
-        size_t FileNameSize = i - n - 1;
+        size_t FileNameSize = i - n;
         if (FileNameSize >= *fileNameSize) {
             /* Double it to avoid potentially continually
              increasing it by 1 */
