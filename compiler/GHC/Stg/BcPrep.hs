@@ -49,7 +49,7 @@ bcPrepRHS con@StgRhsCon{} = pure con
 
 bcPrepExpr :: StgExpr -> BcPrepM StgExpr
 -- explicitly match all constructors so we get a warning if we miss any
-bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _ _) rhs)
+bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
   | isLiftedTypeKind (typeKind tick_ty) = do
       id <- newId tick_ty
       rhs' <- bcPrepExpr rhs

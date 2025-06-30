@@ -8,6 +8,9 @@ where
 
 import GHC.Prelude
 import GHC.Unit.Module
+import GHC.Utils.Outputable
+import Control.DeepSeq
+import Data.Data (Data)
 
 -- | Breakpoint identifier.
 --
@@ -16,7 +19,7 @@ data BreakpointId = BreakpointId
   { bi_tick_mod   :: !Module  -- ^ Breakpoint tick module
   , bi_tick_index :: !Int     -- ^ Breakpoint tick index
   }
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Data)
 
 -- | Internal breakpoint identifier
 --
@@ -53,3 +56,11 @@ toBreakpointId ibi = BreakpointId
 -- So every breakpoint occurrence gets assigned a module-unique *info index* and
 -- we store it alongside the occurrence module (*info module*) in the
 -- InternalBreakpointId datatype.
+
+instance Outputable BreakpointId where
+  ppr BreakpointId{bi_tick_mod, bi_tick_index} =
+    text "BreakpointId" <+> ppr bi_tick_mod <+> ppr bi_tick_index
+
+instance NFData BreakpointId where
+  rnf BreakpointId{bi_tick_mod, bi_tick_index} =
+    rnf bi_tick_mod `seq` rnf bi_tick_index

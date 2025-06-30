@@ -897,8 +897,8 @@ lintCoreExpr (Cast expr co)
 
 lintCoreExpr (Tick tickish expr)
   = do { case tickish of
-           Breakpoint _ _ ids _ -> forM_ ids $ \id -> lintIdOcc id 0
-           _                    -> return ()
+           Breakpoint _ _ ids -> forM_ ids $ \id -> lintIdOcc id 0
+           _                  -> return ()
        ; markAllJoinsBadIf block_joins $ lintCoreExpr expr }
   where
     block_joins = not (tickish `tickishScopesLike` SoftScope)

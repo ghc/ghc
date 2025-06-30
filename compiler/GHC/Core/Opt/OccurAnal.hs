@@ -2501,7 +2501,7 @@ occAnal env (Tick tickish body)
       -- For a non-soft tick scope, we can inline lambdas only, so we
       -- abandon tail calls, and do markAllInsideLam too: usage_lam
 
-      |  Breakpoint _ _ ids _ <- tickish
+      | Breakpoint _ _ ids <- tickish
       = -- Never substitute for any of the Ids in a Breakpoint
         addManyOccs usage_lam (mkVarSet ids)
 
