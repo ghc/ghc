@@ -586,8 +586,8 @@ toIfaceTickish (ProfNote cc tick push) = IfaceSCC cc tick push
 toIfaceTickish (HpcTick modl ix)       = IfaceHpcTick modl ix
 toIfaceTickish (SourceNote src (LexicalFastString names)) =
   IfaceSource src names
-toIfaceTickish (Breakpoint _ ix fv m) =
-  IfaceBreakpoint ix (toIfaceVar <$> fv) m
+toIfaceTickish (Breakpoint _ ix fv) =
+  IfaceBreakpoint ix (toIfaceVar <$> fv)
 
 ---------------------
 toIfaceBind :: Bind Id -> IfaceBinding IfaceLetBndr

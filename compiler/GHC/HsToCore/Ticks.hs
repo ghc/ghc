@@ -35,6 +35,7 @@ import GHC.Driver.Flags (DumpFlag(..))
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
+import GHC.Types.Breakpoint
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Id
@@ -1235,7 +1236,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
 
     Breakpoints -> do
       i <- addMixEntry me
-      pure (Breakpoint noExtField i ids (this_mod env))
+      pure (Breakpoint noExtField (BreakpointId (this_mod env) i) ids)
 
     SourceNotes | RealSrcSpan pos' _ <- pos ->
       return $ SourceNote pos' $ LexicalFastString cc_name

@@ -31,6 +31,7 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Stats (exprStats)
+import GHC.Types.Breakpoint
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Literal( pprLiteral )
 import GHC.Types.Name( pprInfixName, pprPrefixName )
@@ -694,10 +695,10 @@ instance Outputable (XTickishId pass) => Outputable (GenTickish pass) where
             ppr modl, comma,
             ppr ix,
             text ">"]
-  ppr (Breakpoint _ext ix vars modl) =
+  ppr (Breakpoint _ext bid vars) =
       hcat [text "break<",
-            ppr modl, comma,
-            ppr ix,
+            ppr (bi_tick_mod bid), comma,
+            ppr (bi_tick_index bid),
             text ">",
             parens (hcat (punctuate comma (map ppr vars)))]
   ppr (ProfNote { profNoteCC = cc,
