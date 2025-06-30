@@ -27,6 +27,7 @@ module GHC.Runtime.Interpreter
   , getClosure
   , whereFrom
   , getModBreaks
+  , readModBreaks
   , seqHValue
   , evalBreakpointToId
   , interpreterDynamic
@@ -117,6 +118,7 @@ import qualified GHC.InfoProv as InfoProv
 
 import GHC.Builtin.Names
 import GHC.Types.Name
+import qualified GHC.Unit.Home.Graph as HUG
 
 -- Standard libraries
 import GHC.Exts
@@ -732,13 +734,12 @@ wormholeRef interp _r = case interpInstance interp of
   ExternalInterp {}
     -> throwIO (InstallationError "this operation requires -fno-external-interpreter")
 
--- -----------------------------------------------------------------------------
--- Misc utils
+--------------------------------------------------------------------------------
+-- * Finding breakpoint information
+--------------------------------------------------------------------------------
 
-fromEvalResult :: EvalResult a -> IO a
-fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
-fromEvalResult (EvalSuccess a) = return a
-
+-- | Get the breakpoint information from the ByteCode object associated to this
+-- 'HomeModInfo'.
 getModBreaks :: HomeModInfo -> Maybe ModBreaks
 getModBreaks hmi
   | Just linkable <- homeModInfoByteCode hmi,
@@ -769,3 +770,16 @@ interpreterDynamic interp = case interpInstance interp of
     ExtIServ i -> iservConfDynamic (interpConfig i)
     ExtJS {}   -> False -- dynamic doesn't make sense for JS
     ExtWasm {} -> True  -- wasm dyld can only load dynamic code
+
+-- | Read the 'InternalModBreaks' and 'ModBreaks' of the given home 'Module'
+-- from the 'HomeUnitGraph'.
+readModBreaks :: HomeUnitGraph -> Module -> IO ModBreaks
+readModBreaks hug modl = expectJust . getModBreaks . expectJust <$> HUG.lookupHugByModule modl hug
+
+-- -----------------------------------------------------------------------------
+-- Misc utils
+
+fromEvalResult :: EvalResult a -> IO a
+fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
+fromEvalResult (EvalSuccess a) = return a
+

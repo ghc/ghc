@@ -526,10 +526,6 @@ moveHist fn = do
 result_fs :: FastString
 result_fs = fsLit "_result"
 
-readModBreaks :: HUG.HomeUnitGraph -> Module -> IO ModBreaks
-readModBreaks hug mod = expectJust . getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
-
-
 bindLocalsAtBreakpoint
         :: HscEnv
         -> ForeignHValue
