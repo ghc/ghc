@@ -24,7 +24,8 @@ module GHC.Runtime.Interpreter.Types
    , interpSymbolSuffix
    , eliminateInterpSymbol
    , interpretedInterpSymbol
-
+   , interpreterProfiled
+   , interpreterDynamic
 
    -- * IServ
    , IServ
@@ -48,6 +49,9 @@ import GHCi.RemoteTypes
 import GHCi.Message         ( Pipe )
 
 import GHC.Platform
+#if defined(HAVE_INTERNAL_INTERPRETER)
+import GHC.Platform.Ways
+#endif
 import GHC.Utils.TmpFs
 import GHC.Utils.Logger
 import GHC.Unit.Env
@@ -135,6 +139,28 @@ data ExtInterpInstance c = ExtInterpInstance
   , instExtra             :: !c
       -- ^ Instance specific extra fields
   }
+
+-- | Interpreter uses Profiling way
+interpreterProfiled :: Interp -> Bool
+interpreterProfiled interp = case interpInstance interp of
+#if defined(HAVE_INTERNAL_INTERPRETER)
+  InternalInterp     -> hostIsProfiled
+#endif
+  ExternalInterp ext -> case ext of
+    ExtIServ i -> iservConfProfiled (interpConfig i)
+    ExtJS {}   -> False -- we don't support profiling yet in the JS backend
+    ExtWasm i -> wasmInterpProfiled $ interpConfig i
+
+-- | Interpreter uses Dynamic way
+interpreterDynamic :: Interp -> Bool
+interpreterDynamic interp = case interpInstance interp of
+#if defined(HAVE_INTERNAL_INTERPRETER)
+  InternalInterp     -> hostIsDynamic
+#endif
+  ExternalInterp ext -> case ext of
+    ExtIServ i -> iservConfDynamic (interpConfig i)
+    ExtJS {}   -> False -- dynamic doesn't make sense for JS
+    ExtWasm {} -> True  -- wasm dyld can only load dynamic code
 
 ------------------------
 -- JS Stuff

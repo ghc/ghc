@@ -30,8 +30,6 @@ module GHC.Runtime.Interpreter
   , readModBreaks
   , seqHValue
   , evalBreakpointToId
-  , interpreterDynamic
-  , interpreterProfiled
 
   -- * The object-code linker
   , initObjLinker
@@ -99,7 +97,6 @@ import GHC.Unit.Env
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run
-import GHC.Platform.Ways
 #endif
 
 import Control.Concurrent
@@ -748,28 +745,6 @@ getModBreaks hmi
   = bc_breaks cbc
   | otherwise
   = Nothing -- probably object code
-
--- | Interpreter uses Profiling way
-interpreterProfiled :: Interp -> Bool
-interpreterProfiled interp = case interpInstance interp of
-#if defined(HAVE_INTERNAL_INTERPRETER)
-  InternalInterp     -> hostIsProfiled
-#endif
-  ExternalInterp ext -> case ext of
-    ExtIServ i -> iservConfProfiled (interpConfig i)
-    ExtJS {}   -> False -- we don't support profiling yet in the JS backend
-    ExtWasm i -> wasmInterpProfiled $ interpConfig i
-
--- | Interpreter uses Dynamic way
-interpreterDynamic :: Interp -> Bool
-interpreterDynamic interp = case interpInstance interp of
-#if defined(HAVE_INTERNAL_INTERPRETER)
-  InternalInterp     -> hostIsDynamic
-#endif
-  ExternalInterp ext -> case ext of
-    ExtIServ i -> iservConfDynamic (interpConfig i)
-    ExtJS {}   -> False -- dynamic doesn't make sense for JS
-    ExtWasm {} -> True  -- wasm dyld can only load dynamic code
 
 -- | Read the 'InternalModBreaks' and 'ModBreaks' of the given home 'Module'
 -- from the 'HomeUnitGraph'.
