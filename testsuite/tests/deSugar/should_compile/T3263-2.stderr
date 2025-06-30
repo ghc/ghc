@@ -1,10 +1,10 @@
-T3263-2.hs:24:6: warning: [GHC-08838] [-Wwrong-do-bind (in -Wdefault)]
+
+T3263-2.hs:25:3: warning: [GHC-08838] [-Wwrong-do-bind (in -Wdefault)]
     A do-notation statement discarded a result of type ‘m Int’
     Suggested fix:
       Suppress this warning by saying ‘_ <- return (return 10 :: m Int)’
 
-T3263-2.hs:36:6: warning: [GHC-08838] [-Wwrong-do-bind (in -Wdefault)]
+T3263-2.hs:37:3: warning: [GHC-08838] [-Wwrong-do-bind (in -Wdefault)]
     A do-notation statement discarded a result of type ‘m Int’
     Suggested fix:
       Suppress this warning by saying ‘_ <- return (return 10 :: m Int)’
-
