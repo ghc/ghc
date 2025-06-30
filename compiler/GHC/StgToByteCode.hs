@@ -33,6 +33,7 @@ import GHC.Platform.Profile
 import GHC.Runtime.Interpreter
 import GHCi.FFI
 import GHC.Types.Basic
+import GHC.Types.Breakpoint
 import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Id
@@ -388,7 +389,7 @@ schemeR_wrk fvs nm original_body (args, body)
 -- | Introduce break instructions for ticked expressions.
 -- If no breakpoint information is available, the instruction is omitted.
 schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
-schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs tick_mod) rhs) = do
+schemeER_wrk d p (StgTick (Breakpoint tick_ty (BreakpointId tick_mod tick_no) fvs) rhs) = do
   code <- schemeE d 0 p rhs
   hsc_env <- getHscEnv
   current_mod <- getCurrentModule
@@ -640,10 +641,9 @@ schemeE d s p (StgLet _ext binds body) = do
      thunk_codes <- sequence compile_binds
      return (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
 
-schemeE _d _s _p (StgTick (Breakpoint _ bp_id _ _) _rhs)
-   = panic ("schemeE: Breakpoint without let binding: " ++
-            show bp_id ++
-            " forgot to run bcPrep?")
+schemeE _d _s _p (StgTick (Breakpoint _ bp_id _) _rhs)
+   = pprPanic "schemeE: Breakpoint without let binding: " $
+            ppr bp_id <> text " forgot to run bcPrep?"
 
 -- ignore other kinds of tick
 schemeE d s p (StgTick _ rhs) = schemeE d s p rhs
