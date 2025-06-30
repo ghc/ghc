@@ -1,5 +1,10 @@
 {-# LANGUAGE UndecidableInstances, TypeFamilies #-}
 
+{-  In -ddump-simpl output we do not want to see
+         case == @(F Int) lvl2_sQO eta_B0 eta_B0 of {
+    where (==) is called at a known type
+-}
+
 module T26117 where
 
 type family F a

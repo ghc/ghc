@@ -2220,8 +2220,10 @@ Warn of loopy local equalities that were dropped.
 
 mkQCErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
 mkQCErr ctxt items
+  | item1 :| _ <- tryFilter (not . ei_suppress) items
+    -- Ignore multiple qc-errors on the same line
   = do { let msg = mkPlainMismatchMsg $
-                   CouldNotDeduce (getUserGivens ctxt) items Nothing
+                   CouldNotDeduce (getUserGivens ctxt) (item1 :| []) Nothing
        ; return $ important ctxt msg }
 
 
