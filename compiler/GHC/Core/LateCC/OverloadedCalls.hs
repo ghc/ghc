@@ -20,7 +20,6 @@ import GHC.Core.Make
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Utils
-import GHC.Tc.Utils.TcType
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.SrcLoc
@@ -28,6 +27,41 @@ import GHC.Types.Tickish
 import GHC.Types.Var
 
 type OverloadedCallsCCState = Strict.Maybe SrcSpan
+
+{- Note [Overloaded Calls and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently GHC considers cost centres as destructive to
+join contexts. Or in other words this is not considered valid:
+
+    join f x = ...
+    in
+              ... -> scc<tick> jmp
+
+This makes the functionality of `-fprof-late-overloaded-calls` not feasible
+for join points in general. We used to try to work around this by putting the
+ticks on the rhs of the join point rather than around the jump. However beyond
+the loss of accuracy this was broken for recursive join points as we ended up
+with something like:
+
+    rec-join f x = scc<tick> ... jmp f x
+
+Which similarly is not valid as the tick once again destroys the tail call.
+One might think we could limit ourselves to non-recursive tail calls and do
+something clever like:
+
+  join f x = scc<tick> ...
+  in ... jmp f x
+
+And sometimes this works! But sometimes the full rhs would look something like:
+
+  join g x = ....
+  join f x = scc<tick> ... -> jmp g x
+
+Which, would again no longer be valid. I believe in the long run we can make
+cost centre ticks non-destructive to join points. Or we could keep track of
+where we are/are not allowed to insert a cost centre. But in the short term I will
+simply disable the annotation of join calls under this flag.
+-}
 
 -- | Insert cost centres on function applications with dictionary arguments. The
 -- source locations attached to the cost centres is approximated based on the
@@ -52,21 +86,10 @@ overloadedCallsCC =
              CoreBndr
           -> LateCCM OverloadedCallsCCState CoreExpr
           -> LateCCM OverloadedCallsCCState CoreExpr
-        wrap_if_join b pexpr = do
+        wrap_if_join _b pexpr = do
+            -- See Note [Overloaded Calls and join points]
             expr <- pexpr
-            if isJoinId b && isOverloadedTy (exprType expr) then do
-              let
-                cc_name :: FastString
-                cc_name = fsLit "join-rhs-" `appendFS` getOccFS b
-
-              cc_srcspan <-
-                fmap (Strict.fromMaybe (UnhelpfulSpan UnhelpfulNoLocationInfo)) $
-                  lift $ gets lateCCState_extra
-
-              insertCC cc_name cc_srcspan expr
-            else
-              return expr
-
+            return expr
 
     processExpr :: CoreExpr -> LateCCM OverloadedCallsCCState CoreExpr
     processExpr expr =
@@ -99,6 +122,7 @@ overloadedCallsCC =
 
               -- Avoid instrumenting join points.
               -- (See comment in processBind above)
+              -- Also see Note [Overloaded Calls and join points]
             && not (isJoinVarExpr f)
           then do
             -- Extract a name and source location from the function being
