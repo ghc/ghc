@@ -1,8 +1,11 @@
+
 -- | GHC API debugger module for finding and setting breakpoints.
 --
 -- This module is user facing and is at least used by `GHCi` and `ghc-debugger`
 -- to find and set breakpoints.
 module GHC.Runtime.Debugger.Breakpoints where
+
+import GHC.Prelude
 
 import Control.Monad.Catch
 import Control.Monad
@@ -13,10 +16,18 @@ import Data.Maybe
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as S
 
-import GHC
-import GHC.Prelude
+import GHC.ByteCode.Types (BreakIndex, ModBreaks(..))
+import GHC.Driver.Env
+import GHC.Driver.Monad
+import GHC.Driver.Session.Inspect
+import GHC.Runtime.Eval
 import GHC.Runtime.Eval.Utils
+import GHC.Types.Name
 import GHC.Types.SrcLoc
+import GHC.Types.Breakpoint
+import GHC.Unit.Module
+import GHC.Unit.Module.Graph
+import GHC.Unit.Module.ModSummary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
@@ -44,10 +55,10 @@ findBreakByLine line arr
         ticks = arr ! line
 
         starts_here = [ (ix,pan) | (ix, pan) <- ticks,
-                        GHC.srcSpanStartLine pan == line ]
+                        srcSpanStartLine pan == line ]
 
         (comp, incomp) = partition ends_here starts_here
-            where ends_here (_,pan) = GHC.srcSpanEndLine pan == line
+            where ends_here (_,pan) = srcSpanEndLine pan == line
 
 -- | Find a breakpoint in the 'TickArray' of a module, given a line number and a column coordinate.
 findBreakByCoord :: (Int, Int) -> TickArray -> Maybe (BreakIndex, RealSrcSpan)
@@ -63,8 +74,8 @@ findBreakByCoord (line, col) arr
         contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Strict.Nothing `spans` (line,col) ]
 
         after_here = [ tick | tick@(_,pan) <- ticks,
-                              GHC.srcSpanStartLine pan == line,
-                              GHC.srcSpanStartCol pan >= col ]
+                              srcSpanStartLine pan == line,
+                              srcSpanStartCol pan >= col ]
 
 leftmostLargestRealSrcSpan :: RealSrcSpan -> RealSrcSpan -> Ordering
 leftmostLargestRealSrcSpan = on compare realSrcSpanStart S.<> on (flip compare) realSrcSpanEnd
@@ -112,7 +123,7 @@ resolveFunctionBreakpoint inp = do
     Nothing -> do
       -- No errors found, go and return the module info
       let mod = fromMaybe (panic "resolveFunctionBreakpoint") mb_mod
-      mb_mod_info  <- GHC.getModuleInfo mod
+      mb_mod_info  <- getModuleInfo mod
       case mb_mod_info of
         Nothing -> pure . Left $
           text "Could not find ModuleInfo of " <> ppr mod
@@ -120,16 +131,16 @@ resolveFunctionBreakpoint inp = do
   where
     -- Try to lookup the module for an identifier that is in scope.
     -- `parseName` throws an exception, if the identifier is not in scope
-    lookupModuleInscope :: GHC.GhcMonad m => String -> m (Maybe Module)
+    lookupModuleInscope :: GhcMonad m => String -> m (Maybe Module)
     lookupModuleInscope mod_top_lvl = do
-        names <- GHC.parseName mod_top_lvl
-        pure $ Just $ NE.head $ GHC.nameModule <$> names
+        names <- parseName mod_top_lvl
+        pure $ Just $ NE.head $ nameModule <$> names
 
     -- Lookup the Module of a module name in the module graph
-    lookupModuleInGraph :: GHC.GhcMonad m => String -> m (Maybe Module)
+    lookupModuleInGraph :: GhcMonad m => String -> m (Maybe Module)
     lookupModuleInGraph mod_str = do
-        graph <- GHC.getModuleGraph
-        let hmods = ms_mod <$> GHC.mgModSummaries graph
+        graph <- getModuleGraph
+        let hmods = ms_mod <$> mgModSummaries graph
         pure $ find ((== mod_str) . moduleNameString . moduleName) hmods
 
     -- Check validity of an identifier to set a breakpoint:
@@ -137,21 +148,21 @@ resolveFunctionBreakpoint inp = do
     --  2. the identifier must be in an interpreted module
     --  3. the ModBreaks array for module `mod` must have an entry
     --     for the function
-    validateBP :: GHC.GhcMonad m => String -> String -> Maybe Module
+    validateBP :: GhcMonad m => String -> String -> Maybe Module
                        -> m (Maybe SDoc)
     validateBP mod_str fun_str Nothing = pure $ Just $ quotes (text
         (combineModIdent mod_str (takeWhile (/= '.') fun_str)))
         <+> text "not in scope"
     validateBP _ "" (Just _) = pure $ Just $ text "Function name is missing"
     validateBP _ fun_str (Just modl) = do
-        isInterpr <- GHC.moduleIsInterpreted modl
+        isInterpr <- moduleIsInterpreted modl
         mb_err_msg <- case isInterpr of
           False -> pure $ Just $ text "Module" <+> quotes (ppr modl) <+> text "is not interpreted"
           True -> do
             mb_modbreaks <- getModBreak modl
             let found = case mb_modbreaks of
                   Nothing -> False
-                  Just mb -> fun_str `elem` (intercalate "." <$> elems (GHC.modBreaks_decls mb))
+                  Just mb -> fun_str `elem` (intercalate "." <$> elems (modBreaks_decls mb))
             if found
               then pure Nothing
               else pure $ Just $ text "No breakpoint found for" <+> quotes (text fun_str)
@@ -163,13 +174,13 @@ resolveFunctionBreakpoint inp = do
 -- for
 --   (a) this binder only (it maybe a top-level or a nested declaration)
 --   (b) that do not have an enclosing breakpoint
-findBreakForBind :: String {-^ Name of bind to break at -} -> GHC.ModBreaks -> [(BreakIndex, RealSrcSpan)]
+findBreakForBind :: String {-^ Name of bind to break at -} -> ModBreaks -> [(BreakIndex, RealSrcSpan)]
 findBreakForBind str_name modbreaks = filter (not . enclosed) ticks
   where
     ticks = [ (index, span)
-            | (index, decls) <- assocs (GHC.modBreaks_decls modbreaks),
+            | (index, decls) <- assocs (modBreaks_decls modbreaks),
               str_name == intercalate "." decls,
-              RealSrcSpan span _ <- [GHC.modBreaks_locs modbreaks ! index] ]
+              RealSrcSpan span _ <- [modBreaks_locs modbreaks ! index] ]
     enclosed (_,sp0) = any subspan ticks
       where subspan (_,sp) = sp /= sp0 &&
                          realSrcSpanStart sp <= realSrcSpanStart sp0 &&
@@ -180,53 +191,53 @@ findBreakForBind str_name modbreaks = filter (not . enclosed) ticks
 --------------------------------------------------------------------------------
 
 -- | Maps line numbers to the breakpoint ticks existing at that line for a module.
-type TickArray = Array Int [(GHC.BreakIndex,RealSrcSpan)]
+type TickArray = Array Int [(BreakIndex,RealSrcSpan)]
 
 -- | Construct the 'TickArray' for the given module.
 makeModuleLineMap :: GhcMonad m => Module -> m (Maybe TickArray)
 makeModuleLineMap m = do
-  mi <- GHC.getModuleInfo m
-  return $ mkTickArray . assocs . GHC.modBreaks_locs <$> (GHC.modInfoModBreaks =<< mi)
+  mi <- getModuleInfo m
+  return $ mkTickArray . assocs . modBreaks_locs <$> (modInfoModBreaks =<< mi)
   where
     mkTickArray :: [(BreakIndex, SrcSpan)] -> TickArray
     mkTickArray ticks
       = accumArray (flip (:)) [] (1, max_line)
             [ (line, (nm,pan)) | (nm,RealSrcSpan pan _) <- ticks, line <- srcSpanLines pan ]
         where
-            max_line = foldr max 0 [ GHC.srcSpanEndLine sp | (_, RealSrcSpan sp _) <- ticks ]
-            srcSpanLines pan = [ GHC.srcSpanStartLine pan ..  GHC.srcSpanEndLine pan ]
+            max_line = foldr max 0 [ srcSpanEndLine sp | (_, RealSrcSpan sp _) <- ticks ]
+            srcSpanLines pan = [ srcSpanStartLine pan ..  srcSpanEndLine pan ]
 
 -- | Get the 'ModBreaks' of the given 'Module' when available
-getModBreak :: GHC.GhcMonad m
-            => Module -> m (Maybe ModBreaks)
+getModBreak :: GhcMonad m => Module -> m (Maybe ModBreaks)
 getModBreak m = do
-   mod_info      <- fromMaybe (panic "getModBreak") <$> GHC.getModuleInfo m
-   pure $ GHC.modInfoModBreaks mod_info
+   mod_info <- fromMaybe (panic "getModBreak") <$> getModuleInfo m
+   pure $ modInfoModBreaks mod_info
 
 --------------------------------------------------------------------------------
 -- Getting current breakpoint information
 --------------------------------------------------------------------------------
 
-getCurrentBreakSpan :: GHC.GhcMonad m => m (Maybe SrcSpan)
+getCurrentBreakSpan :: GhcMonad m => m (Maybe SrcSpan)
 getCurrentBreakSpan = do
-  resumes <- GHC.getResumeContext
+  hug <- hsc_HUG <$> getSession
+  resumes <- getResumeContext
   case resumes of
     [] -> return Nothing
     (r:_) -> do
-        let ix = GHC.resumeHistoryIx r
+        let ix = resumeHistoryIx r
         if ix == 0
-           then return (Just (GHC.resumeSpan r))
+           then return (Just (resumeSpan r))
            else do
-                let hist = GHC.resumeHistory r !! (ix-1)
-                pan <- GHC.getHistorySpan hist
+                let hist = resumeHistory r !! (ix-1)
+                pan <- liftIO $ getHistorySpan hug hist
                 return (Just pan)
 
-getCurrentBreakModule :: GHC.GhcMonad m => m (Maybe Module)
+getCurrentBreakModule :: GhcMonad m => m (Maybe Module)
 getCurrentBreakModule = do
-  resumes <- GHC.getResumeContext
+  resumes <- getResumeContext
   return $ case resumes of
     [] -> Nothing
-    (r:_) -> case GHC.resumeHistoryIx r of
-      0  -> ibi_tick_mod <$> GHC.resumeBreakpointId r
-      ix -> Just $ GHC.getHistoryModule $ GHC.resumeHistory r !! (ix-1)
+    (r:_) -> case resumeHistoryIx r of
+      0  -> ibi_tick_mod <$> resumeBreakpointId r
+      ix -> Just $ getHistoryModule $ resumeHistory r !! (ix-1)
 
