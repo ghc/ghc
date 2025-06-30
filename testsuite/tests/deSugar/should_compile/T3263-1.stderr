@@ -1,8 +1,8 @@
-T3263-1.hs:24:6: warning: [GHC-81995] [-Wunused-do-bind (in -Wall)]
+
+T3263-1.hs:25:3: warning: [GHC-81995] [-Wunused-do-bind (in -Wall)]
     A do-notation statement discarded a result of type ‘Int’
     Suggested fix: Suppress this warning by saying ‘_ <- nonNullM’
 
-T3263-1.hs:34:6: warning: [GHC-81995] [-Wunused-do-bind (in -Wall)]
+T3263-1.hs:35:3: warning: [GHC-81995] [-Wunused-do-bind (in -Wall)]
     A do-notation statement discarded a result of type ‘Int’
     Suggested fix: Suppress this warning by saying ‘_ <- nonNullM’
-
