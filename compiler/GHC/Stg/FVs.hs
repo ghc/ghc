@@ -257,8 +257,8 @@ exprFVs env = go
       , let lcl_fvs' = unionDVarSet (tickish tick) lcl_fvs
       = (StgTick tick e', imp_fvs, top_fvs, lcl_fvs')
         where
-          tickish (Breakpoint _ _ ids _) = mkDVarSet ids
-          tickish _                      = emptyDVarSet
+          tickish (Breakpoint _ _ ids) = mkDVarSet ids
+          tickish _                    = emptyDVarSet
 
     go_bind dc bind body = (dc bind' body', imp_fvs, top_fvs, lcl_fvs)
       where

@@ -1732,9 +1732,9 @@ tcIfaceTickish :: IfaceTickish -> IfL CoreTickish
 tcIfaceTickish (IfaceHpcTick modl ix)   = return (HpcTick modl ix)
 tcIfaceTickish (IfaceSCC  cc tick push) = return (ProfNote cc tick push)
 tcIfaceTickish (IfaceSource src name)   = return (SourceNote src (LexicalFastString name))
-tcIfaceTickish (IfaceBreakpoint ix fvs modl) = do
+tcIfaceTickish (IfaceBreakpoint bid fvs) = do
   fvs' <- mapM tcIfaceExpr fvs
-  return (Breakpoint NoExtField ix [f | Var f <- fvs'] modl)
+  return (Breakpoint NoExtField bid [f | Var f <- fvs'])
 
 -------------------------
 tcIfaceLit :: Literal -> IfL Literal

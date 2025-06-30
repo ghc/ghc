@@ -56,6 +56,7 @@ import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
 
 import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
                            constraintKindTyConKey )
+import GHC.Types.Breakpoint
 import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type
 import GHC.Iface.Recomp.Binary
@@ -699,7 +700,7 @@ data IfaceTickish
   = IfaceHpcTick    Module Int               -- from HpcTick x
   | IfaceSCC        CostCentre Bool Bool     -- from ProfNote
   | IfaceSource  RealSrcSpan FastString      -- from SourceNote
-  | IfaceBreakpoint Int [IfaceExpr] Module   -- from Breakpoint
+  | IfaceBreakpoint BreakpointId [IfaceExpr] -- from Breakpoint
 
 data IfaceAlt = IfaceAlt IfaceConAlt [IfLclName] IfaceExpr
         -- Note: IfLclName, not IfaceBndr (and same with the case binder)
@@ -1848,7 +1849,7 @@ pprIfaceTickish (IfaceSCC cc tick scope)
   = braces (pprCostCentreCore cc <+> ppr tick <+> ppr scope)
 pprIfaceTickish (IfaceSource src _names)
   = braces (pprUserRealSpan True src)
-pprIfaceTickish (IfaceBreakpoint m ix fvs)
+pprIfaceTickish (IfaceBreakpoint (BreakpointId m ix) fvs)
   = braces (text "break" <+> ppr m <+> ppr ix <+> ppr fvs)
 
 ------------------
@@ -2198,7 +2199,7 @@ freeNamesIfaceTyConParent (IfDataInstance ax tc tys)
   = unitNameSet ax &&& freeNamesIfTc tc &&& freeNamesIfAppArgs tys
 
 freeNamesIfTickish :: IfaceTickish -> NameSet
-freeNamesIfTickish (IfaceBreakpoint _ fvs _) =
+freeNamesIfTickish (IfaceBreakpoint _ fvs) =
   fnList freeNamesIfExpr fvs
 freeNamesIfTickish _ = emptyNameSet
 
@@ -2919,7 +2920,7 @@ instance Binary IfaceTickish where
         put_ bh (srcSpanEndLine src)
         put_ bh (srcSpanEndCol src)
         put_ bh name
-    put_ bh (IfaceBreakpoint m ix fvs) = do
+    put_ bh (IfaceBreakpoint (BreakpointId m ix) fvs) = do
         putByte bh 3
         put_ bh m
         put_ bh ix
@@ -2947,7 +2948,7 @@ instance Binary IfaceTickish where
             3 -> do m <- get bh
                     ix <- get bh
                     fvs <- get bh
-                    return (IfaceBreakpoint m ix fvs)
+                    return (IfaceBreakpoint (BreakpointId m ix) fvs)
             _ -> panic ("get IfaceTickish " ++ show h)
 
 instance Binary IfaceConAlt where
@@ -3206,7 +3207,7 @@ instance NFData IfaceTickish where
     IfaceHpcTick m i -> rnf m `seq` rnf i
     IfaceSCC cc b1 b2 -> rnf cc `seq` rnf b1 `seq` rnf b2
     IfaceSource src str -> rnf src `seq` rnf str
-    IfaceBreakpoint m i fvs -> rnf m `seq` rnf i `seq` rnf fvs
+    IfaceBreakpoint i fvs -> rnf i `seq` rnf fvs
 
 instance NFData IfaceConAlt where
   rnf = \case

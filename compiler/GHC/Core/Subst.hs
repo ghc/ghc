@@ -602,8 +602,8 @@ substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
 ------------------
 -- | Drop free vars from the breakpoint if they have a non-variable substitution.
 substTickish :: Subst -> CoreTickish -> CoreTickish
-substTickish subst (Breakpoint ext n ids modl)
-   = Breakpoint ext n (mapMaybe do_one ids) modl
+substTickish subst (Breakpoint ext bid ids)
+   = Breakpoint ext bid (mapMaybe do_one ids)
  where
     do_one = getIdFromTrivialExpr_maybe . lookupIdSubst subst
 

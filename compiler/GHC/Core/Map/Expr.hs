@@ -198,11 +198,10 @@ eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
 
 eqDeBruijnTickish :: DeBruijn CoreTickish -> DeBruijn CoreTickish -> Bool
 eqDeBruijnTickish (D env1 t1) (D env2 t2) = go t1 t2 where
-    go (Breakpoint lext lid lids lmod) (Breakpoint rext rid rids rmod)
+    go (Breakpoint lext lid lids) (Breakpoint rext rid rids)
         =  lid == rid
         && D env1 lids == D env2 rids
         && lext == rext
-        && lmod == rmod
     go l r = l == r
 
 -- Compares for equality, modulo alpha

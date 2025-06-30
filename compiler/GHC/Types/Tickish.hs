@@ -31,6 +31,7 @@ import GHC.Core.Type
 
 import GHC.Unit.Module
 
+import GHC.Types.Breakpoint
 import GHC.Types.CostCentre
 import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
 import GHC.Types.Var
@@ -128,7 +129,7 @@ data GenTickish pass =
   -- and (b) substituting (don't substitute for them)
   | Breakpoint
     { breakpointExt    :: XBreakpoint pass
-    , breakpointId     :: !Int
+    , breakpointId     :: !BreakpointId
     , breakpointFVs    :: [XTickishId pass]
                                 -- ^ the order of this list is important:
                                 -- it matches the order of the lists in the
@@ -136,7 +137,6 @@ data GenTickish pass =
                                 --
                                 -- Careful about substitution!  See
                                 -- Note [substTickish] in "GHC.Core.Subst".
-    , breakpointModule :: Module
     }
 
   -- | A source note.

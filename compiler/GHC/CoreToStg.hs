@@ -643,10 +643,10 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
 coreToStgTick :: Type -- type of the ticked expression
               -> CoreTickish
               -> StgTickish
-coreToStgTick _ty (HpcTick m i)                = HpcTick m i
-coreToStgTick _ty (SourceNote span nm)         = SourceNote span nm
-coreToStgTick _ty (ProfNote cc cnt scope)      = ProfNote cc cnt scope
-coreToStgTick !ty (Breakpoint _ bid fvs modl)  = Breakpoint ty bid fvs modl
+coreToStgTick _ty (HpcTick m i)           = HpcTick m i
+coreToStgTick _ty (SourceNote span nm)    = SourceNote span nm
+coreToStgTick _ty (ProfNote cc cnt scope) = ProfNote cc cnt scope
+coreToStgTick !ty (Breakpoint _ bid fvs)  = Breakpoint ty bid fvs
 
 -- ---------------------------------------------------------------------------
 -- The magic for lets:

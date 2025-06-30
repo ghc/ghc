@@ -842,9 +842,9 @@ cpeRhsE env (Tick tickish expr)
   = do { body <- cpeBodyNF env expr
        ; return (emptyFloats, mkTick tickish' body) }
   where
-    tickish' | Breakpoint ext n fvs modl <- tickish
+    tickish' | Breakpoint ext bid fvs <- tickish
              -- See also 'substTickish'
-             = Breakpoint ext n (map (getIdFromTrivialExpr . lookupCorePrepEnv env) fvs) modl
+             = Breakpoint ext bid (map (getIdFromTrivialExpr . lookupCorePrepEnv env) fvs)
              | otherwise
              = tickish
 
