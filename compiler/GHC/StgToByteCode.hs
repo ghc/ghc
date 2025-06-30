@@ -4,13 +4,14 @@
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE DerivingVia #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
 --
 
 -- | GHC.StgToByteCode: Generate bytecode from STG
-module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen) where
+module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen ) where
 
 import GHC.Prelude
 
@@ -96,6 +97,10 @@ import GHC.Stg.Syntax
 import qualified Data.IntSet as IntSet
 import GHC.CoreToIface
 
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader (ReaderT(..))
+import Control.Monad.Trans.State  (StateT(..))
+
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
 
@@ -120,7 +125,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
             flattenBind (StgNonRec b e) = [(b,e)]
             flattenBind (StgRec bs)     = bs
 
-        (BcM_State{..}, proto_bcos) <-
+        (proto_bcos, BcM_State{..}) <-
            runBc hsc_env this_mod mb_modBreaks $ do
              let flattened_binds = concatMap flattenBind (reverse lifted_binds)
              FlatBag.fromList (fromIntegral $ length flattened_binds) <$> mapM schemeTopBind flattened_binds
@@ -312,7 +317,7 @@ schemeTopBind (id, rhs)
         -- because mkConAppCode treats nullary constructor applications
         -- by just re-using the single top-level definition.  So
         -- for the worker itself, we must allocate it directly.
-    -- ioToBc (putStrLn $ "top level BCO")
+    -- liftIO (putStrLn $ "top level BCO")
     pure (mkProtoBCO platform add_bco_name
                        (getName id) (toOL [PACK data_con 0, RETURN P])
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
@@ -449,7 +454,7 @@ break_info hsc_env mod current_mod current_mod_breaks
   | mod == current_mod
   = pure current_mod_breaks
   | otherwise
-  = ioToBc (HUG.lookupHugByModule mod (hsc_HUG hsc_env)) >>= \case
+  = liftIO (HUG.lookupHugByModule mod (hsc_HUG hsc_env)) >>= \case
       Just hp -> pure $ getModBreaks hp
       Nothing -> pure Nothing
 
@@ -642,8 +647,8 @@ schemeE d s p (StgLet _ext binds body) = do
      return (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
 
 schemeE _d _s _p (StgTick (Breakpoint _ bp_id _) _rhs)
-   = pprPanic "schemeE: Breakpoint without let binding: " $
-            ppr bp_id <> text " forgot to run bcPrep?"
+   = pprPanic "schemeE: Breakpoint without let binding:"
+        (ppr bp_id <+> text "forgot to run bcPrep?")
 
 -- ignore other kinds of tick
 schemeE d s p (StgTick _ rhs) = schemeE d s p rhs
@@ -2651,63 +2656,38 @@ typeArgReps platform = map (toArgRep platform) . typePrimRep
 -- -----------------------------------------------------------------------------
 -- The bytecode generator's monad
 
-data BcM_State
-   = BcM_State
-        { bcm_hsc_env :: HscEnv
-        , thisModule  :: Module          -- current module (for breakpoints)
-        , nextlabel   :: Word32          -- for generating local labels
-        , modBreaks   :: Maybe ModBreaks -- info about breakpoints
-
-        , breakInfo   :: IntMap CgBreakInfo -- ^ Info at breakpoint occurrence.
-                                            -- Indexed with breakpoint *info* index.
-                                            -- See Note [Breakpoint identifiers]
-                                            -- in GHC.Types.Breakpoint
-        , breakInfoIdx :: !Int              -- ^ Next index for breakInfo array
+-- | Read only environment for generating ByteCode
+data BcM_Env
+   = BcM_Env
+        { bcm_hsc_env    :: HscEnv
+        , bcm_module     :: Module -- current module (for breakpoints)
         }
 
-newtype BcM r = BcM (BcM_State -> IO (BcM_State, r)) deriving (Functor)
+data BcM_State
+   = BcM_State
+        { nextlabel      :: !Word32 -- ^ For generating local labels
+        , breakInfoIdx   :: !Int    -- ^ Next index for breakInfo array
+        , modBreaks      :: Maybe ModBreaks -- info about breakpoints
 
-ioToBc :: IO a -> BcM a
-ioToBc io = BcM $ \st -> do
-  x <- io
-  return (st, x)
+        , breakInfo      :: IntMap CgBreakInfo -- ^ Info at breakpoint occurrence.
+                                               -- Indexed with breakpoint *info* index.
+                                               -- See Note [Breakpoint identifiers]
+                                               -- in GHC.Types.Breakpoint
+        }
 
-runBc :: HscEnv -> Module -> Maybe ModBreaks
-      -> BcM r
-      -> IO (BcM_State, r)
-runBc hsc_env this_mod modBreaks (BcM m)
-   = m (BcM_State hsc_env this_mod 0 modBreaks IntMap.empty 0)
+newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (r, BcM_State))
+  deriving (Functor, Applicative, Monad, MonadIO)
+    via (ReaderT BcM_Env (StateT BcM_State IO))
 
-thenBc :: BcM a -> (a -> BcM b) -> BcM b
-thenBc (BcM expr) cont = BcM $ \st0 -> do
-  (st1, q) <- expr st0
-  let BcM k = cont q
-  (st2, r) <- k st1
-  return (st2, r)
-
-thenBc_ :: BcM a -> BcM b -> BcM b
-thenBc_ (BcM expr) (BcM cont) = BcM $ \st0 -> do
-  (st1, _) <- expr st0
-  (st2, r) <- cont st1
-  return (st2, r)
-
-returnBc :: a -> BcM a
-returnBc result = BcM $ \st -> (return (st, result))
-
-instance Applicative BcM where
-    pure = returnBc
-    (<*>) = ap
-    (*>) = thenBc_
-
-instance Monad BcM where
-  (>>=) = thenBc
-  (>>)  = (*>)
+runBc :: HscEnv -> Module -> Maybe ModBreaks -> BcM r -> IO (r, BcM_State)
+runBc hsc_env this_mod mbs (BcM m)
+   = m (BcM_Env hsc_env this_mod) (BcM_State 0 0 mbs IntMap.empty)
 
 instance HasDynFlags BcM where
-    getDynFlags = BcM $ \st -> return (st, hsc_dflags (bcm_hsc_env st))
+    getDynFlags = hsc_dflags <$> getHscEnv
 
 getHscEnv :: BcM HscEnv
-getHscEnv = BcM $ \st -> return (st, bcm_hsc_env st)
+getHscEnv = BcM $ \env st -> return (bcm_hsc_env env, st)
 
 getProfile :: BcM Profile
 getProfile = targetProfile <$> getDynFlags
@@ -2720,31 +2700,31 @@ shouldAddBcoName = do
     else return Nothing
 
 getLabelBc :: BcM LocalLabel
-getLabelBc
-  = BcM $ \st -> do let nl = nextlabel st
-                    when (nl == maxBound) $
-                        panic "getLabelBc: Ran out of labels"
-                    return (st{nextlabel = nl + 1}, LocalLabel nl)
+getLabelBc = BcM $ \_ st ->
+  do let nl = nextlabel st
+     when (nl == maxBound) $
+         panic "getLabelBc: Ran out of labels"
+     return (LocalLabel nl, st{nextlabel = nl + 1})
 
 getLabelsBc :: Word32 -> BcM [LocalLabel]
-getLabelsBc n
-  = BcM $ \st -> let ctr = nextlabel st
-                 in return (st{nextlabel = ctr+n}, coerce [ctr .. ctr+n-1])
+getLabelsBc n = BcM $ \_ st ->
+  let ctr = nextlabel st
+   in return (coerce [ctr .. ctr+n-1], st{nextlabel = ctr+n})
 
 newBreakInfo :: CgBreakInfo -> BcM Int
-newBreakInfo info = BcM $ \st ->
+newBreakInfo info = BcM $ \_ st ->
   let ix = breakInfoIdx st
       st' = st
-              { breakInfo = IntMap.insert ix info (breakInfo st)
-              , breakInfoIdx = ix + 1
-              }
-  in return (st', ix)
+        { breakInfo = IntMap.insert ix info (breakInfo st)
+        , breakInfoIdx = ix + 1
+        }
+  in return (ix, st')
 
 getCurrentModule :: BcM Module
-getCurrentModule = BcM $ \st -> return (st, thisModule st)
+getCurrentModule = BcM $ \env st -> return (bcm_module env, st)
 
 getCurrentModBreaks :: BcM (Maybe ModBreaks)
-getCurrentModBreaks = BcM $ \st -> return (st, modBreaks st)
+getCurrentModBreaks = BcM $ \_env st -> return (modBreaks st, st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
