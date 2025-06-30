@@ -1899,7 +1899,7 @@ getGHCiMonad :: GhcMonad m => m Name
 getGHCiMonad = fmap (ic_monad . hsc_IC) getSession
 
 getHistorySpan :: GhcMonad m => History -> m SrcSpan
-getHistorySpan h = withSession $ \hsc_env -> liftIO $ GHC.Runtime.Eval.getHistorySpan hsc_env h
+getHistorySpan h = withSession $ \hsc_env -> liftIO $ GHC.Runtime.Eval.getHistorySpan (hsc_HUG hsc_env) h
 
 obtainTermFromVal :: GhcMonad m => Int ->  Bool -> Type -> a -> m Term
 obtainTermFromVal bound force ty a = withSession $ \hsc_env ->

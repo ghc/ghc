@@ -4397,7 +4397,7 @@ getIgnoreCount str =
 setupBreakpoint :: GhciMonad m => GHC.BreakpointId -> Int -> m()
 setupBreakpoint loc count = do
     hsc_env <- GHC.getSession
-    GHC.setupBreakpoint hsc_env loc count
+    GHC.setupBreakpoint (hscInterp hsc_env) loc count
 
 backCmd :: GhciMonad m => String -> m ()
 backCmd arg
