@@ -87,6 +87,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Kind as Hs
 import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NE
 
 {- *********************************************************************
 *                                                                      *
@@ -742,7 +743,7 @@ exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
 exprCtOrigin (NegApp _ e _)       = lexprCtOrigin e
 exprCtOrigin (HsPar _ e)          = lexprCtOrigin e
-exprCtOrigin (HsProjection _ _)   = SectionOrigin
+exprCtOrigin (HsProjection _ p)   = GetFieldOrigin ((field_label . unLoc . dfoLabel . NE.head . NE.reverse) p)
 exprCtOrigin (SectionL _ _ _)     = SectionOrigin
 exprCtOrigin (SectionR _ _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {})   = Shouldn'tHappenOrigin "explicit tuple"
