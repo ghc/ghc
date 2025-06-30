@@ -571,9 +571,7 @@ of your profiled program will be different to that of the unprofiled one.
     Some overloaded calls may not be annotated, specifically in cases where the
     optimizer turns an overloaded function into a join point. Calls to such
     functions will not be wrapped in ``SCC`` annotations, since it would make
-    them non-tail calls, which is a requirement for join points. Instead,
-    ``SCC`` annotations are added around the body of overloaded join variables
-    and given distinct names (``join-rhs-<var>``) to avoid confusion.
+    them non-tail calls, which is a requirement for join points.
 
 .. ghc-flag:: -fprof-cafs
     :shortdesc: Auto-add ``SCC``\\ s to all CAFs
