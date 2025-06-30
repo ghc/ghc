@@ -165,7 +165,7 @@ import GHC.JS.Syntax
 
 import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
 
-import GHC.Iface.Load   ( ifaceStats, writeIface, flagsToIfCompression, getGhcPrimIface )
+import GHC.Iface.Load   ( ifaceStats, writeIface, flagsToIfCompression, getGhcPrimIface, loadSysInterface )
 import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
@@ -1765,7 +1765,7 @@ hscCheckSafe' m l = do
         -- so we need to call 'getModuleInterface' to load from disk
         case iface of
             Just _  -> return iface
-            Nothing -> snd `fmap` (liftIO $ getModuleInterface hsc_env m)
+            Nothing -> liftIO $ initIfaceLoad hsc_env (Just <$> loadSysInterface (text "checkSafeImports") m)
 
 
 -- | Check the list of packages are trusted.
