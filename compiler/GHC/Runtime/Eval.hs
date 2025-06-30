@@ -144,25 +144,25 @@ import qualified GHC.Unit.Home.Graph as HUG
 getResumeContext :: GhcMonad m => m [Resume]
 getResumeContext = withSession (return . ic_resume . hsc_IC)
 
-mkHistory :: HscEnv -> ForeignHValue -> InternalBreakpointId -> IO History
-mkHistory hsc_env hval ibi = History hval ibi <$> findEnclosingDecls hsc_env ibi
+mkHistory :: HUG.HomeUnitGraph -> ForeignHValue -> InternalBreakpointId -> IO History
+mkHistory hug hval ibi = History hval ibi <$> findEnclosingDecls hug ibi
 
 getHistoryModule :: History -> Module
 getHistoryModule = ibi_tick_mod . historyBreakpointId
 
-getHistorySpan :: HscEnv -> History -> IO SrcSpan
-getHistorySpan hsc_env hist = do
+getHistorySpan :: HUG.HomeUnitGraph -> History -> IO SrcSpan
+getHistorySpan hug hist = do
   let ibi = historyBreakpointId hist
-  brks <- readModBreaks hsc_env (ibi_tick_mod ibi)
+  brks <- readModBreaks hug (ibi_tick_mod ibi)
   return $ modBreaks_locs brks ! ibi_tick_index ibi
 
 {- | Finds the enclosing top level function name -}
 -- ToDo: a better way to do this would be to keep hold of the decl_path computed
 -- by the coverage pass, which gives the list of lexically-enclosing bindings
 -- for each tick.
-findEnclosingDecls :: HscEnv -> InternalBreakpointId -> IO [String]
-findEnclosingDecls hsc_env ibi = do
-  brks <- readModBreaks hsc_env (ibi_tick_mod ibi)
+findEnclosingDecls :: HUG.HomeUnitGraph -> InternalBreakpointId -> IO [String]
+findEnclosingDecls hug ibi = do
+  brks <- readModBreaks hug (ibi_tick_mod ibi)
   return $ modBreaks_decls brks ! ibi_tick_index ibi
 
 -- | Update fixity environment in the current interactive context.
@@ -349,7 +349,8 @@ handleRunStatus step expr bindings final_ids status history0 = do
     --  - or one of the stepping options in @EvalOpts@ caused us to stop at one
     EvalBreak apStack_ref (Just eval_break) resume_ctxt ccs -> do
       let ibi = evalBreakpointToId eval_break
-      tick_brks <- liftIO $ readModBreaks hsc_env (ibi_tick_mod ibi)
+      let hug = hsc_HUG hsc_env
+      tick_brks <- liftIO $ readModBreaks hug (ibi_tick_mod ibi)
       let
         span      = modBreaks_locs tick_brks ! ibi_tick_index ibi
         decl      = intercalate "." $ modBreaks_decls tick_brks ! ibi_tick_index ibi
@@ -390,7 +391,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
         let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
         status <- liftIO $ GHCi.resumeStmt interp eval_opts resume_ctxt_fhv
         history <- if not tracing then pure history0 else do
-          history1 <- liftIO $ mkHistory hsc_env apStack_fhv ibi
+          history1 <- liftIO $ mkHistory hug apStack_fhv ibi
           let !history' = history1 `consBL` history0
                 -- history is strict, otherwise our BoundedList is pointless.
           return history'
@@ -443,27 +444,27 @@ resumeExec step mbCnt
                 -- When the user specified a break ignore count, set it
                 -- in the interpreter
                 case (mb_brkpt, mbCnt) of
-                  (Just brkpt, Just cnt) -> setupBreakpoint hsc_env (toBreakpointId brkpt) cnt
+                  (Just brkpt, Just cnt) -> setupBreakpoint interp (toBreakpointId brkpt) cnt
                   _ -> return ()
 
                 let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
                 status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
                 let prevHistoryLst = fromListBL 50 hist
+                    hug = hsc_HUG hsc_env
                     hist' = case mb_brkpt of
                        Nothing -> pure prevHistoryLst
                        Just bi
                          | breakHere False step span -> do
-                            hist1 <- liftIO (mkHistory hsc_env apStack bi)
+                            hist1 <- liftIO (mkHistory hug apStack bi)
                             return $ hist1 `consBL` fromListBL 50 hist
                          | otherwise -> pure prevHistoryLst
                 handleRunStatus step expr bindings final_ids status =<< hist'
 
-setupBreakpoint :: GhcMonad m => HscEnv -> BreakpointId -> Int -> m ()   -- #19157
-setupBreakpoint hsc_env bi cnt = do
-  let modl = bi_tick_mod bi
-  modBreaks <- liftIO $ readModBreaks hsc_env modl
+setupBreakpoint :: GhcMonad m => Interp -> BreakpointId -> Int -> m ()   -- #19157
+setupBreakpoint interp bi cnt = do
+  hug <- hsc_HUG <$> getSession
+  modBreaks <- liftIO $ readModBreaks hug (bi_tick_mod bi)
   let breakarray = modBreaks_flags modBreaks
-      interp = hscInterp hsc_env
   _ <- liftIO $ GHCi.storeBreakpoint interp breakarray (bi_tick_index bi) cnt
   pure ()
 
@@ -494,7 +495,7 @@ moveHist fn = do
             span <- case mb_info of
                       Nothing  -> return $ mkGeneralSrcSpan (fsLit "<unknown>")
                       Just ibi -> liftIO $ do
-                        brks <- readModBreaks hsc_env (ibi_tick_mod ibi)
+                        brks <- readModBreaks (hsc_HUG hsc_env) (ibi_tick_mod ibi)
                         return $ modBreaks_locs brks ! ibi_tick_index ibi
             (hsc_env1, names) <-
               liftIO $ bindLocalsAtBreakpoint hsc_env apStack span mb_info
@@ -525,9 +526,8 @@ moveHist fn = do
 result_fs :: FastString
 result_fs = fsLit "_result"
 
--- | Read the 'ModBreaks' of the given home 'Module' from the 'HomeUnitGraph'.
-readModBreaks :: HscEnv -> Module -> IO ModBreaks
-readModBreaks hsc_env mod = expectJust . getModBreaks . expectJust <$> HUG.lookupHugByModule mod (hsc_HUG hsc_env)
+readModBreaks :: HUG.HomeUnitGraph -> Module -> IO ModBreaks
+readModBreaks hug mod = expectJust . getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
 
 
 bindLocalsAtBreakpoint
@@ -560,8 +560,9 @@ bindLocalsAtBreakpoint hsc_env apStack span Nothing = do
 -- Just case: we stopped at a breakpoint, we have information about the location
 -- of the breakpoint and the free variables of the expression.
 bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi) = do
-   info_brks <- readModBreaks hsc_env (ibi_info_mod ibi)
-   tick_brks <- readModBreaks hsc_env (ibi_tick_mod ibi)
+   let hug = hsc_HUG hsc_env
+   info_brks <- readModBreaks hug (ibi_info_mod ibi)
+   tick_brks <- readModBreaks hug (ibi_tick_mod ibi)
    let info   = expectJust $ IntMap.lookup (ibi_info_index ibi) (modBreaks_breakInfo info_brks)
        interp = hscInterp hsc_env
        occs   = modBreaks_vars tick_brks ! ibi_tick_index ibi
