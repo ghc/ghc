@@ -21,17 +21,20 @@ module GHC.Types.Tickish (
   isProfTick,
   TickishPlacement(..),
   tickishPlace,
-  tickishContains
+  tickishContains,
+
+  -- * Breakpoint tick identifiers
+  BreakpointId(..), BreakTickIndex
 ) where
 
 import GHC.Prelude
 import GHC.Data.FastString
+import Control.DeepSeq
 
 import GHC.Core.Type
 
 import GHC.Unit.Module
 
-import GHC.Types.Breakpoint
 import GHC.Types.CostCentre
 import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
 import GHC.Types.Var
@@ -41,7 +44,7 @@ import GHC.Utils.Panic
 import Language.Haskell.Syntax.Extension ( NoExtField )
 
 import Data.Data
-import GHC.Utils.Outputable (Outputable (ppr), text)
+import GHC.Utils.Outputable (Outputable (ppr), text, (<+>))
 
 {- *********************************************************************
 *                                                                      *
@@ -171,6 +174,35 @@ deriving instance Eq (GenTickish 'TickishPassCmm)
 deriving instance Ord (GenTickish 'TickishPassCmm)
 deriving instance Data (GenTickish 'TickishPassCmm)
 
+--------------------------------------------------------------------------------
+-- Tick breakpoint index
+--------------------------------------------------------------------------------
+
+-- | Breakpoint tick index
+-- newtype BreakTickIndex = BreakTickIndex Int
+--   deriving (Eq, Ord, Data, Ix, NFData, Outputable)
+type BreakTickIndex = Int
+
+-- | Breakpoint identifier.
+--
+-- Indexes into the structures in the @'ModBreaks'@ created during desugaring
+-- (after inserting the breakpoint ticks in the expressions).
+-- See Note [Breakpoint identifiers]
+data BreakpointId = BreakpointId
+  { bi_tick_mod   :: !Module         -- ^ Breakpoint tick module
+  , bi_tick_index :: !BreakTickIndex -- ^ Breakpoint tick index
+  }
+  deriving (Eq, Ord, Data)
+
+instance Outputable BreakpointId where
+  ppr BreakpointId{bi_tick_mod, bi_tick_index} =
+    text "BreakpointId" <+> ppr bi_tick_mod <+> ppr bi_tick_index
+
+instance NFData BreakpointId where
+  rnf BreakpointId{bi_tick_mod, bi_tick_index} =
+    rnf bi_tick_mod `seq` rnf bi_tick_index
+
+--------------------------------------------------------------------------------
 
 -- | A "counting tick" (where tickishCounts is True) is one that
 -- counts evaluations in some way.  We cannot discard a counting tick,

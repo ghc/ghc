@@ -91,7 +91,7 @@ data ModuleInfo = ModuleInfo {
         minf_instances :: [ClsInst],
         minf_iface     :: Maybe ModIface,
         minf_safe      :: SafeHaskellMode,
-        minf_modBreaks :: Maybe ModBreaks
+        minf_modBreaks :: Maybe InternalModBreaks
   }
         -- We don't want HomeModInfo here, because a ModuleInfo applies
         -- to package modules too.
@@ -196,6 +196,6 @@ modInfoIface = minf_iface
 modInfoSafe :: ModuleInfo -> SafeHaskellMode
 modInfoSafe = minf_safe
 
-modInfoModBreaks :: ModuleInfo -> Maybe ModBreaks
+modInfoModBreaks :: ModuleInfo -> Maybe InternalModBreaks
 modInfoModBreaks = minf_modBreaks
 

@@ -1660,12 +1660,12 @@ allocateTopStrings interp topStrings prev_env = do
 -- 'CompiledByteCode', allocate the 'BreakArray'.
 allocateBreakArrays ::
   Interp ->
-  [ModBreaks] ->
+  [InternalModBreaks] ->
   ModuleEnv (ForeignRef BreakArray) ->
   IO (ModuleEnv (ForeignRef BreakArray))
 allocateBreakArrays _interp mbs be =
   foldlM
-    ( \be0 ModBreaks {..} ->
+    ( \be0 InternalModBreaks{imodBreaks_modBreaks=ModBreaks {..}} ->
         evaluate $ extendModuleEnv be0 modBreaks_module modBreaks_flags
     )
     be
@@ -1676,13 +1676,13 @@ allocateBreakArrays _interp mbs be =
 -- is enabled.
 allocateCCS ::
   Interp ->
-  [ModBreaks] ->
-  ModuleEnv (Array BreakIndex (RemotePtr CostCentre)) ->
-  IO (ModuleEnv (Array BreakIndex (RemotePtr CostCentre)))
+  [InternalModBreaks] ->
+  ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)) ->
+  IO (ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)))
 allocateCCS interp mbs ce
   | interpreterProfiled interp =
       foldlM
-        ( \ce0 ModBreaks {..} -> do
+        ( \ce0 InternalModBreaks{imodBreaks_modBreaks=ModBreaks {..}} -> do
             ccs <-
               mkCostCentres
                 interp

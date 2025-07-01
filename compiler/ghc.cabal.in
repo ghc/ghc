@@ -223,6 +223,7 @@ Library
         GHC.Builtin.Uniques
         GHC.Builtin.Utils
         GHC.ByteCode.Asm
+        GHC.ByteCode.Breakpoints
         GHC.ByteCode.InfoTable
         GHC.ByteCode.Instr
         GHC.ByteCode.Linker
@@ -892,7 +893,6 @@ Library
         GHC.Types.Annotations
         GHC.Types.Avail
         GHC.Types.Basic
-        GHC.Types.Breakpoint
         GHC.Types.CompleteMatch
         GHC.Types.CostCentre
         GHC.Types.CostCentre.State
