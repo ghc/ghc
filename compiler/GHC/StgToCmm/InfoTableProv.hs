@@ -66,6 +66,28 @@ construction, the 'compressed' field of each IPE buffer list node is examined.
 If the field indicates that the data has been compressed, the entry data and
 strings table are decompressed before continuing with the normal IPE map
 construction.
+
+Note [IPE Stripping and magic words]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For systems which support ELF executables:
+
+The metadata part of IPE info is placed into a separate ELF section (.ipe).
+This can then be stripped afterwards if you don't require the metadata
+
+```
+-- Remove the section
+objcopy --remove-section .ipe <your-exe>
+-- Repack and compress the executable
+upx <your-exe>
+```
+
+The .ipe section starts with a magic 64-bit word "IPE\nIPE\n`, encoded as ascii.
+
+The RTS checks to see if the .ipe section starts with the magic word. If the
+section has been stripped then it won't start with the magic word and the
+metadata won't be accessible for the info tables.
+
 -}
 
 emitIpeBufferListNode ::
@@ -124,6 +146,13 @@ emitIpeBufferListNode this_mod ents dus0 = do
         ipe_buffer_lbl :: CLabel
         ipe_buffer_lbl = mkIPELabel this_mod
 
+        -- A magic word we can use to see if the IPE information has been stripped
+        -- or not
+        -- See Note [IPE Stripping and magic words]
+        -- "IPE\nIPE\n", null terminated.
+        ipe_header :: CmmStatic
+        ipe_header = CmmStaticLit (CmmInt 0x4950450049504500 W64)
+
         ipe_buffer_node :: [CmmStatic]
         ipe_buffer_node = map CmmStaticLit
           [ -- 'next' field
@@ -165,12 +194,12 @@ emitIpeBufferListNode this_mod ents dus0 = do
     -- Emit the strings table
     emitDecl $ CmmData
       (Section IPE strings_lbl)
-      (CmmStaticsRaw strings_lbl strings)
+      (CmmStaticsRaw strings_lbl (ipe_header : strings))
 
     -- Emit the list of IPE buffer entries
     emitDecl $ CmmData
       (Section IPE entries_lbl)
-      (CmmStaticsRaw entries_lbl entries)
+      (CmmStaticsRaw entries_lbl (ipe_header : entries))
 
     -- Emit the IPE buffer list node
     emitDecl $ CmmData

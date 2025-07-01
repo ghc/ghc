@@ -48,7 +48,8 @@ HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
     // Allocate buffers for IPE buffer list node
     IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode));
     node->tables = malloc(sizeof(StgInfoTable *));
-    node->entries = malloc(sizeof(IpeBufferEntry));
+    node->entries_block = malloc(sizeof(StgWord64) + sizeof(IpeBufferEntry));
+    node->entries_block->magic = IPE_MAGIC_WORD;
 
     StringTable st;
     init_string_table(&st);
@@ -61,9 +62,13 @@ HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
     node->compressed = 0;
     node->count = 1;
     node->tables[0] = get_itbl(fortyTwo);
-    node->entries[0] = makeAnyProvEntry(cap, &st, 42);
+    node->entries_block->entries[0] = makeAnyProvEntry(cap, &st, 42);
     node->entries_size = sizeof(IpeBufferEntry);
-    node->string_table = st.buffer;
+
+    IpeStringTableBlock *string_table_block = malloc(sizeof(StgWord64) + st.size);
+    string_table_block->magic = IPE_MAGIC_WORD;
+    memcpy(string_table_block->string_table, st.buffer, st.size);
+    node->string_table_block = string_table_block;
     node->string_table_size = st.size;
 
     registerInfoProvList(node);
@@ -90,7 +95,8 @@ void shouldFindTwoIfTwoHaveBeenRegistered(Capability *cap,
     // Allocate buffers for IPE buffer list node
     IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode));
     node->tables = malloc(sizeof(StgInfoTable *));
-    node->entries = malloc(sizeof(IpeBufferEntry));
+    node->entries_block = malloc(sizeof(StgWord64) + sizeof(IpeBufferEntry));
+    node->entries_block->magic = IPE_MAGIC_WORD;
 
     StringTable st;
     init_string_table(&st);
@@ -103,9 +109,12 @@ void shouldFindTwoIfTwoHaveBeenRegistered(Capability *cap,
     node->compressed = 0;
     node->count = 1;
     node->tables[0] = get_itbl(twentyThree);
-    node->entries[0] = makeAnyProvEntry(cap, &st, 23);
+    node->entries_block->entries[0] = makeAnyProvEntry(cap, &st, 23);
     node->entries_size = sizeof(IpeBufferEntry);
-    node->string_table = st.buffer;
+    IpeStringTableBlock *string_table_block = malloc(sizeof(StgWord64) + st.size);
+    string_table_block->magic = IPE_MAGIC_WORD;
+    memcpy(string_table_block->string_table, st.buffer, st.size);
+    node->string_table_block = string_table_block;
     node->string_table_size = st.size;
 
     registerInfoProvList(node);
@@ -121,7 +130,8 @@ void shouldFindTwoFromTheSameList(Capability *cap) {
     // Allocate buffers for IPE buffer list node
     IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode));
     node->tables = malloc(sizeof(StgInfoTable *) * 2);
-    node->entries = malloc(sizeof(IpeBufferEntry) * 2);
+    node->entries_block = malloc(sizeof(StgWord64) + sizeof(IpeBufferEntry) * 2);
+    node->entries_block->magic = IPE_MAGIC_WORD;
 
     StringTable st;
     init_string_table(&st);
@@ -133,10 +143,13 @@ void shouldFindTwoFromTheSameList(Capability *cap) {
     node->count = 2;
     node->tables[0] = get_itbl(one);
     node->tables[1] = get_itbl(two);
-    node->entries[0] = makeAnyProvEntry(cap, &st, 1);
-    node->entries[1] = makeAnyProvEntry(cap, &st, 2);
+    node->entries_block->entries[0] = makeAnyProvEntry(cap, &st, 1);
+    node->entries_block->entries[1] = makeAnyProvEntry(cap, &st, 2);
     node->entries_size = sizeof(IpeBufferEntry) * 2;
-    node->string_table = st.buffer;
+    IpeStringTableBlock *string_table_block = malloc(sizeof(StgWord64) + st.size);
+    string_table_block->magic = IPE_MAGIC_WORD;
+    memcpy(string_table_block->string_table, st.buffer, st.size);
+    node->string_table_block = string_table_block;
     node->string_table_size = st.size;
 
     registerInfoProvList(node);
@@ -152,7 +165,11 @@ void shouldDealWithAnEmptyList(Capability *cap, HaskellObj fortyTwo) {
     IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode));
     node->count = 0;
     node->next = NULL;
-    node->string_table = "";
+    IpeStringTableBlock *string_table_block = malloc(sizeof(StgWord64));
+    string_table_block->magic = IPE_MAGIC_WORD;
+
+    node->entries_block = malloc(sizeof(StgWord64));
+    node->entries_block->magic = IPE_MAGIC_WORD;
 
     registerInfoProvList(node);
 

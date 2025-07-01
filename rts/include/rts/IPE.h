@@ -63,6 +63,20 @@ typedef struct {
 
 GHC_STATIC_ASSERT(sizeof(IpeBufferEntry) % (WORD_SIZE_IN_BITS / 8) == 0, "sizeof(IpeBufferEntry) must be a multiple of the word size");
 
+// The magic word is IPE\nIPE\n, which occupies the full 64 bit width of a word.
+// See Note [IPE Stripping and magic words]
+#define IPE_MAGIC_WORD 0x4950450049504500UL
+
+typedef struct {
+    StgWord magic;          // Must be IPE_MAGIC_WORD
+    IpeBufferEntry entries[]; // Flexible array member
+} IpeBufferEntryBlock;
+
+typedef struct {
+    StgWord magic;          // Must be IPE_MAGIC_WORD
+    char string_table[];    // Flexible array member for string table
+} IpeStringTableBlock;
+
 typedef struct IpeBufferListNode_ {
     struct IpeBufferListNode_ *next;
 
@@ -76,10 +90,10 @@ typedef struct IpeBufferListNode_ {
     // When TNTC is enabled, these will point to the entry code
     // not the info table itself.
     const StgInfoTable **tables;
-    IpeBufferEntry *entries;
+    IpeBufferEntryBlock *entries_block;
     StgWord entries_size; // decompressed size
 
-    const char *string_table;
+    const IpeStringTableBlock *string_table_block;
     StgWord string_table_size; // decompressed size
 
     // Shared by all entries
