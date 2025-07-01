@@ -164,12 +164,12 @@ emitIpeBufferListNode this_mod ents dus0 = do
 
     -- Emit the strings table
     emitDecl $ CmmData
-      (Section Data strings_lbl)
+      (Section IPE strings_lbl)
       (CmmStaticsRaw strings_lbl strings)
 
     -- Emit the list of IPE buffer entries
     emitDecl $ CmmData
-      (Section Data entries_lbl)
+      (Section IPE entries_lbl)
       (CmmStaticsRaw entries_lbl entries)
 
     -- Emit the IPE buffer list node

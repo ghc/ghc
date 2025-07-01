@@ -278,6 +278,7 @@ data SectionType
   | InitArray           -- .init_array on ELF, .ctor on Windows
   | FiniArray           -- .fini_array on ELF, .dtor on Windows
   | CString
+  | IPE
   | OtherSection String
   deriving (Show)
 
@@ -298,6 +299,7 @@ sectionProtection (Section t _) = case t of
     CString                 -> ReadOnlySection
     Data                    -> ReadWriteSection
     UninitialisedData       -> ReadWriteSection
+    IPE                     -> ReadWriteSection
     (OtherSection _)        -> ReadWriteSection
 
 {-
@@ -557,4 +559,5 @@ pprSectionType s = doubleQuotes $ case s of
   InitArray               -> text "initarray"
   FiniArray               -> text "finiarray"
   CString                 -> text "cstring"
+  IPE                     -> text "ipe"
   OtherSection s'         -> text s'

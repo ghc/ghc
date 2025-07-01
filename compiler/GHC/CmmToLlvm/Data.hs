@@ -145,7 +145,7 @@ llvmSectionType p t = case t of
     CString                 -> case platformOS p of
                                  OSMinGW32 -> fsLit ".rdata$str"
                                  _         -> fsLit ".rodata.str"
-
+    IPE                     -> fsLit ".ipe"
     InitArray               -> panic "llvmSectionType: InitArray"
     FiniArray               -> panic "llvmSectionType: FiniArray"
     OtherSection _          -> panic "llvmSectionType: unknown section type"
