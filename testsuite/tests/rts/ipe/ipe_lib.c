@@ -64,7 +64,8 @@ IpeBufferListNode *makeAnyProvEntries(Capability *cap, int start, int end) {
     // Allocate buffers for IpeBufferListNode
     IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode));
     node->tables = malloc(sizeof(StgInfoTable *) * n);
-    node->entries = malloc(sizeof(IpeBufferEntry) * n);
+    node->entries_block = malloc(sizeof(StgWord64) + sizeof(IpeBufferEntry) * n);
+    node->entries_block->magic = IPE_MAGIC_WORD;
 
     StringTable st;
     init_string_table(&st);
@@ -83,14 +84,19 @@ IpeBufferListNode *makeAnyProvEntries(Capability *cap, int start, int end) {
     for (int i=start; i < end; i++) {
         HaskellObj closure = rts_mkInt(cap, 42);
         node->tables[i]  = get_itbl(closure);
-        node->entries[i] = makeAnyProvEntry(cap, &st, i);
+        node->entries_block->entries[i] = makeAnyProvEntry(cap, &st, i);
     }
 
     // Set the rest of the fields
     node->next = NULL;
     node->compressed = 0;
     node->count = n;
-    node->string_table = st.buffer;
+
+    IpeStringTableBlock *string_table_block =
+      malloc(sizeof(StgWord64) + st.size);
+    string_table_block->magic = IPE_MAGIC_WORD;
+    memcpy(string_table_block->string_table, st.buffer, st.size);
+    node->string_table_block = string_table_block;
 
     return node;
 }

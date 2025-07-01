@@ -10,6 +10,7 @@ import qualified Data.ByteString.Internal as BSI
 import GHC.IO (unsafePerformIO)
 #endif
 
+import Data.Char
 import GHC.Prelude
 import GHC.Platform
 import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
@@ -66,6 +67,28 @@ construction, the 'compressed' field of each IPE buffer list node is examined.
 If the field indicates that the data has been compressed, the entry data and
 strings table are decompressed before continuing with the normal IPE map
 construction.
+
+Note [IPE Stripping and magic words]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For systems which support ELF executables:
+
+The metadata part of IPE info is placed into a separate ELF section (.ipe).
+This can then be stripped afterwards if you don't require the metadata
+
+```
+-- Remove the section
+objcopy --remove-section .ipe <your-exe>
+-- Repack and compress the executable
+upx <your-exe>
+```
+
+The .ipe section starts with a magic 64-bit word "IPE\0IPE\0`, encoded as ascii.
+
+The RTS checks to see if the .ipe section starts with the magic word. If the
+section has been stripped then it won't start with the magic word and the
+metadata won't be accessible for the info tables.
+
 -}
 
 emitIpeBufferListNode ::
@@ -110,7 +133,7 @@ emitIpeBufferListNode this_mod ents dus0 = do
         strings_bytes = compress defaultCompressionLevel uncompressed_strings
 
         strings :: [CmmStatic]
-        strings = [CmmString strings_bytes]
+        strings = [CmmString (ipe_header `mappend` strings_bytes)]
 
         uncompressed_entries :: BS.ByteString
         uncompressed_entries = toIpeBufferEntries (platformByteOrder platform) cg_ipes
@@ -119,10 +142,33 @@ emitIpeBufferListNode this_mod ents dus0 = do
         entries_bytes = compress defaultCompressionLevel uncompressed_entries
 
         entries :: [CmmStatic]
-        entries = [CmmString entries_bytes]
+        entries = [CmmString (ipe_header `mappend` entries_bytes)]
 
         ipe_buffer_lbl :: CLabel
         ipe_buffer_lbl = mkIPELabel this_mod
+
+        -- A string which fits into one 64-bit word.
+        ipe_header_word :: Word64
+        ipe_header_word = stringToWord64BE "IPE\0IPE\0"
+
+        -- Convert 8 bytes to Word64 using big-endian interpretation
+        stringToWord64BE :: String -> Word64
+        stringToWord64BE = foldl' (\acc b -> GHC.Prelude.shiftL acc 8 .|. fromIntegral (ord b)) 0
+
+        -- A magic word we can use to see if the IPE information has been stripped
+        -- or not
+        -- See Note [IPE Stripping and magic words]
+        -- When read then literally the string should read IPE\0IPE\0 in hex dumps.
+        --
+        -- There is some complexity here to turn this into a ByteString rather than
+        -- a simpler CmmStaticLit, since the unregistered backend does not cope well
+        -- with CmmStaticsRaw being a mixure of CmmStaticLit and CmmString.
+        ipe_header :: BS.ByteString
+        ipe_header = BSL.toStrict . BSB.toLazyByteString $
+                       case platformByteOrder platform of
+                         LittleEndian -> BSB.word64LE ipe_header_word
+                         BigEndian -> BSB.word64BE ipe_header_word
+
 
         ipe_buffer_node :: [CmmStatic]
         ipe_buffer_node = map CmmStaticLit
