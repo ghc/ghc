@@ -202,7 +202,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                  -- libraries in the runInjectRpaths phase below.
                  --
                  -- See Note [Dynamic linking on macOS]
-                 ++ [ Option "-Wl,-dead_strip_dylibs", Option "-Wl,-headerpad,8000" ]
+                 ++ [ Option "-Wl,-dead_strip_dylibs", Option "-Wl,-headerpad,16000" ]
               )
             -- Make sure to honour -fno-use-rpaths if set on darwin as well; see #20004
             when (gopt Opt_RPath dflags) $
