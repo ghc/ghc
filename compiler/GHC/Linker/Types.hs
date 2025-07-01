@@ -188,7 +188,7 @@ data LinkerEnv = LinkerEnv
   , breakarray_env :: !(ModuleEnv (ForeignRef BreakArray))
       -- ^ Each 'Module's remote pointer of 'BreakArray'.
 
-  , ccs_env :: !(ModuleEnv (Array BreakIndex (RemotePtr CostCentre)))
+  , ccs_env :: !(ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)))
       -- ^ Each 'Module's array of remote pointers of 'CostCentre'.
       -- Untouched when not profiling.
   }

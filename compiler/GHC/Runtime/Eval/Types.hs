@@ -17,11 +17,11 @@ import GHC.Prelude
 
 import GHCi.RemoteTypes
 import GHCi.Message (EvalExpr, ResumeContext)
+import GHC.ByteCode.Types (InternalBreakpointId(..))
 import GHC.Driver.Config (EvalStep(..))
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.TyThing
-import GHC.Types.Breakpoint
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Utils.Exception
@@ -176,7 +176,7 @@ data Resume = Resume
        , resumeApStack   :: ForeignHValue -- The object from which we can get
                                         -- value of the free variables.
        , resumeBreakpointId :: Maybe InternalBreakpointId
-                                        -- ^ the breakpoint we stopped at
+                                        -- ^ the internal breakpoint we stopped at
                                         -- (Nothing <=> exception)
        , resumeSpan      :: SrcSpan     -- just a copy of the SrcSpan
                                         -- from the ModBreaks,

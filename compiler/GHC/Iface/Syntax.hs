@@ -56,7 +56,6 @@ import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
 
 import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
                            constraintKindTyConKey )
-import GHC.Types.Breakpoint
 import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type
 import GHC.Iface.Recomp.Binary
@@ -75,6 +74,7 @@ import GHC.Types.Avail
 import GHC.Types.ForeignCall
 import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
+import GHC.Types.Tickish
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
 import GHC.Types.SrcLoc

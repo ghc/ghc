@@ -109,7 +109,7 @@ assembleBCOs
   -> FlatBag (ProtoBCO Name)
   -> [TyCon]
   -> [(Name, ByteString)]
-  -> Maybe ModBreaks
+  -> Maybe InternalModBreaks
   -> [SptEntry]
   -> IO CompiledByteCode
 assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
