@@ -874,7 +874,11 @@ function run_hadrian() {
     fail "BUILD_FLAVOUR not set"
   fi
   read -r -a args <<< "${HADRIAN_ARGS:-}"
-  if [ -n "${VERBOSE:-}" ]; then args+=("-V"); fi
+  if [ -n "${VERBOSE:-}" ]; then
+    args+=("-V")
+  else
+    args+=("-q")
+  fi
   # Before running the compiler, unset variables gitlab env vars as these
   # can destabilise the performance test (see #20341)
   (unset $(compgen -v | grep CI_*);
