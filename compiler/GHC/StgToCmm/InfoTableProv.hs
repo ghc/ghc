@@ -175,6 +175,9 @@ emitIpeBufferListNode this_mod ents dus0 = do
           [ -- 'next' field
             zeroCLit platform
 
+            -- 'node_id' field
+          , zeroCLit platform
+
             -- 'compressed' field
           , int do_compress
 

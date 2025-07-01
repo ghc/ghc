@@ -23,6 +23,7 @@
 #include "Printer.h"
 #include "Trace.h"
 #include "sm/GCThread.h"
+#include "IPE.h"
 
 #include <fs_rts.h>
 #include <string.h>
@@ -230,9 +231,10 @@ closureIdentity( const StgClosure *p )
             return closure_type_names[info->type];
         }
     }
-    case HEAP_BY_INFO_TABLE: {
-        return get_itbl(p);
-        }
+    case HEAP_BY_INFO_TABLE:
+    {
+        return (void *) (p->header.info);
+    }
 
     default:
         barf("closureIdentity");
@@ -853,6 +855,20 @@ aggregateCensusInfo( void )
 }
 #endif
 
+static void
+recordIPEHeapSample(FILE *hp_file, uint64_t table_id, size_t count)
+{
+    // Print to heap profile file
+    fprintf(hp_file, "0x%" PRIx64, table_id);
+
+    // Create label string for tracing
+    char str[100];
+    sprintf(str, "0x%" PRIx64, table_id);
+
+    // Emit the profiling sample (convert count to bytes)
+    traceHeapProfSampleString(str, count * sizeof(W_));
+}
+
 /* -----------------------------------------------------------------------------
  * Print out the results of a heap census.
  * -------------------------------------------------------------------------- */
@@ -915,6 +931,11 @@ dumpCensus( Census *census )
     }
 #endif
 
+    // Census entries which we need to group together.
+    // Used by IPE profiling to group together bands which don't have IPE information.
+    // Printing at the end in the 0 band
+    uint64_t uncategorised_count = 0;
+
     for (ctr = census->ctrs; ctr != NULL; ctr = ctr->next) {
 
 #if defined(PROFILING)
@@ -945,11 +966,15 @@ dumpCensus( Census *census )
                                       count * sizeof(W_));
             break;
         case HEAP_BY_INFO_TABLE:
-            fprintf(hp_file, "%p", ctr->identity);
-            char str[100];
-            sprintf(str, "%p", ctr->identity);
-            traceHeapProfSampleString(str, count * sizeof(W_));
+        {
+            uint64_t table_id = lookupIPEId(ctr->identity);
+            if (! table_id) {
+              uncategorised_count += count;
+              continue;
+            }
+            recordIPEHeapSample(hp_file, table_id, count);
             break;
+        }
 #if defined(PROFILING)
         case HEAP_BY_CCS:
             fprint_ccs(hp_file, (CostCentreStack *)ctr->identity,
@@ -1000,6 +1025,16 @@ dumpCensus( Census *census )
         }
 
         fprintf(hp_file, "\t%" FMT_Word "\n", (W_)count * sizeof(W_));
+    }
+
+    // Print the unallocated data into the 0 band for info table profiling.
+    switch (RtsFlags.ProfFlags.doHeapProfile) {
+        case HEAP_BY_INFO_TABLE:
+            recordIPEHeapSample(hp_file, 0, uncategorised_count);
+            break;
+        default:
+            ASSERT(uncategorised_count == 0);
+            break;
     }
 
     traceHeapProfSampleEnd(era);

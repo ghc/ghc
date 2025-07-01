@@ -62,12 +62,35 @@ entry's containing IpeBufferListNode and its index in that node.
 When the user looks up an IPE entry, we convert it to the user-facing
 InfoProvEnt representation.
 
+Note [Stable identifiers for IPE entries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Each IPE entry is given a stable identifier which remains the same across
+different runs of the executable (unlike the address of the info table).
+
+The identifier is a 64-bit word which consists of two parts.
+
+* The high 32-bits are a per-node identifier.
+* The low 32-bits are the index of the entry in the node.
+
+When a node is queued in the pending list by `registerInfoProvList` it is
+given a unique identifier from an incrementing global variable.
+
+The unique key can be computed by using the `IPE_ENTRY_KEY` macro.
+
 */
 
 typedef struct {
     IpeBufferListNode *node;
     uint32_t idx;
 } IpeMapEntry;
+
+// See Note [Stable identifiers for IPE entries]
+#define IPE_ENTRY_KEY(entry) \
+    MAKE_IPE_KEY((entry).node->node_id, (entry).idx)
+
+#define MAKE_IPE_KEY(module_id, idx) \
+    ((((uint64_t)(module_id)) << 32) | ((uint64_t)(idx)))
 
 #if defined(THREADED_RTS)
 static Mutex ipeMapLock;
@@ -77,6 +100,9 @@ static HashTable *ipeMap = NULL;
 
 // Accessed atomically
 static IpeBufferListNode *ipeBufferList = NULL;
+
+// A global counter which is used to give an IPE entry a unique value across runs.
+static StgWord next_module_id = 1; // Start at 1 to reserve 0 as "invalid"
 
 static void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode*);
 static void updateIpeMap(void);
@@ -114,6 +140,7 @@ static InfoProvEnt ipeBufferEntryToIpe(const IpeBufferListNode *node, uint32_t i
     return (InfoProvEnt) {
             .info = node->tables[idx],
             .prov = {
+                .info_prov_id  = MAKE_IPE_KEY(node->node_id, idx),
                 .table_name = &strings[ent->table_name],
                 .closure_desc = ent->closure_desc,
                 .ty_desc = &strings[ent->ty_desc],
@@ -179,11 +206,30 @@ ipeMapLock; we instead use atomic CAS operations to add to the list.
 
 A performance test for IPE registration and lookup can be found here:
 https://gitlab.haskell.org/ghc/ghc/-/merge_requests/5724#note_370806
+
+Note that IPEs are still regiestered even if the .ipe section is stripped. That's
+because you may still want to query what the unique identifier for an info table is
+so it can be reconciled with previously extracted metadata information. For example,
+when `-hi` profiling or using `whereFrom`.
+
 */
 void registerInfoProvList(IpeBufferListNode *node) {
+
+        // Grab a fresh module_id
+    uint32_t module_id;
+    StgWord temp_module_id;
+    while (true) {
+        temp_module_id = next_module_id;
+        if (cas(&next_module_id, temp_module_id, temp_module_id+1) == temp_module_id) {
+            module_id = (uint32_t) temp_module_id;
+            break;
+        }
+
+    }
     while (true) {
         IpeBufferListNode *old = RELAXED_LOAD(&ipeBufferList);
         node->next = old;
+        node->node_id = module_id;
         if (cas_ptr((volatile void **) &ipeBufferList, old, node) == (void *) old) {
             return;
         }
@@ -202,6 +248,18 @@ bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out) {
         return true;
     } else {
         return false;
+    }
+}
+
+// Returns 0 when the info table is not present in the info table map.
+// See Note [Stable identifiers for IPE entries]
+uint64_t lookupIPEId(const StgInfoTable *info) {
+    updateIpeMap();
+    IpeMapEntry *map_ent = (IpeMapEntry *) lookupHashTable(ipeMap, (StgWord)(info));
+    if (map_ent){
+        return IPE_ENTRY_KEY(*map_ent);
+    } else {
+        return 0;
     }
 }
 
