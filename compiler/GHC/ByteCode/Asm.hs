@@ -841,19 +841,24 @@ assembleI platform i = case i of
     W8                   -> emit_ bci_OP_INDEX_ADDR_08 []
     _                    -> unsupported_width
 
-  BRK_FUN tick_mod tickx info_mod infox ->
-                              do p1 <- ptr $ BCOPtrBreakArray tick_mod
-                                 tick_addr <- lit1 $ BCONPtrFS $ moduleNameFS $ moduleName tick_mod
-                                 info_addr <- lit1 $ BCONPtrFS $ moduleNameFS $ moduleName info_mod
-                                 tick_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS $ moduleUnitId $ tick_mod
-                                 info_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS $ moduleUnitId $ info_mod
-                                 np <- lit1 $ BCONPtrCostCentre tick_mod $ fromIntegral tickx
-                                 emit_ bci_BRK_FUN [ Op p1
-                                                  , Op tick_addr, Op info_addr
-                                                  , Op tick_unitid_addr, Op info_unitid_addr
-                                                  , SmallOp tickx, SmallOp infox
-                                                  , Op np
-                                                  ]
+  BRK_FUN (InternalBreakpointId tick_mod tickx info_mod infox) -> do
+    let -- cast that checks that round-tripping through Word16 doesn't change the value
+        toW16 x = let r = fromIntegral x :: Word16
+                  in if fromIntegral r == x
+                    then r
+                    else pprPanic "schemeER_wrk: breakpoint tick/info index too large!" (ppr x)
+    p1 <- ptr $ BCOPtrBreakArray tick_mod
+    tick_addr <- lit1 $ BCONPtrFS $ moduleNameFS $ moduleName tick_mod
+    info_addr <- lit1 $ BCONPtrFS $ moduleNameFS $ moduleName info_mod
+    tick_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS $ moduleUnitId $ tick_mod
+    info_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS $ moduleUnitId $ info_mod
+    np <- lit1 $ BCONPtrCostCentre (BreakpointId tick_mod tickx)
+    emit_ bci_BRK_FUN [ Op p1
+                     , Op tick_addr, Op info_addr
+                     , Op tick_unitid_addr, Op info_unitid_addr
+                     , SmallOp (toW16 tickx), SmallOp (toW16 infox)
+                     , Op np
+                     ]
 
   BRK_ALTS active -> emit_ bci_BRK_ALTS [SmallOp (if active then 1 else 0)]
 
