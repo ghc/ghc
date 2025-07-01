@@ -585,8 +585,9 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
     }
 #endif
 
+    const int MAX_ATTEMPTS = 256;
     attempt = 0;
-    while (1) {
+    while (attempt < MAX_ATTEMPTS) {
         *len &= ~MBLOCK_MASK;
 
         if (*len < MBLOCK_SIZE) {
@@ -621,6 +622,10 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
             }
         }
         attempt++;
+    }
+
+    if (at == NULL) {
+        sysErrorBelch("failed to reserve heap memory");
     }
 
     return at;
