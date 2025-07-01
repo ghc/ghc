@@ -236,6 +236,10 @@ pprGNUSectionHeader config t suffix =
         | OSMinGW32 <- platformOS platform
                     -> text ".rdata"
         | otherwise -> text ".rodata.str"
+      IPE
+        | OSMinGW32 <- platformOS platform
+                    -> text ".rdata"
+        | otherwise -> text ".ipe"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
     flags = case t of
@@ -248,6 +252,10 @@ pprGNUSectionHeader config t suffix =
         | OSMinGW32 <- platformOS platform
                     -> empty
         | otherwise -> text ",\"aMS\"," <> sectionType platform "progbits" <> text ",1"
+      IPE
+        | OSMinGW32 <- platformOS platform
+                    -> empty
+        | otherwise -> text ",\"a\"," <> sectionType platform "progbits"
       _ -> empty
 {-# SPECIALIZE pprGNUSectionHeader :: NCGConfig -> SectionType -> CLabel -> SDoc #-}
 {-# SPECIALIZE pprGNUSectionHeader :: NCGConfig -> SectionType -> CLabel -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
@@ -262,6 +270,7 @@ pprXcoffSectionHeader t = case t of
   RelocatableReadOnlyData -> text ".csect .text[PR] # RelocatableReadOnlyData"
   CString                 -> text ".csect .text[PR] # CString"
   UninitialisedData       -> text ".csect .data[BS]"
+  IPE                     -> text ".csect .text[PR] #IPE"
   _                       -> panic "pprXcoffSectionHeader: unknown section type"
 {-# SPECIALIZE pprXcoffSectionHeader :: SectionType -> SDoc #-}
 {-# SPECIALIZE pprXcoffSectionHeader :: SectionType -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
@@ -276,6 +285,7 @@ pprDarwinSectionHeader t = case t of
   InitArray               -> text ".section\t__DATA,__mod_init_func,mod_init_funcs"
   FiniArray               -> panic "pprDarwinSectionHeader: fini not supported"
   CString                 -> text ".section\t__TEXT,__cstring,cstring_literals"
+  IPE                     -> text ".const"
   OtherSection _          -> panic "pprDarwinSectionHeader: unknown section type"
 {-# SPECIALIZE pprDarwinSectionHeader :: SectionType -> SDoc #-}
 {-# SPECIALIZE pprDarwinSectionHeader :: SectionType -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
