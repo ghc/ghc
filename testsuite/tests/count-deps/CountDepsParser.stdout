@@ -5,6 +5,7 @@ GHC.Builtin.Types
 GHC.Builtin.Types.Literals
 GHC.Builtin.Types.Prim
 GHC.Builtin.Uniques
+GHC.ByteCode.Breakpoints
 GHC.ByteCode.Types
 GHC.Cmm.BlockId
 GHC.Cmm.CLabel
@@ -114,8 +115,10 @@ GHC.Hs.Pat
 GHC.Hs.Specificity
 GHC.Hs.Type
 GHC.Hs.Utils
+GHC.HsToCore.Breakpoints
 GHC.HsToCore.Errors.Types
 GHC.HsToCore.Pmc.Solver.Types
+GHC.HsToCore.Ticks
 GHC.Iface.Errors.Types
 GHC.Iface.Ext.Fields
 GHC.Iface.Flags
@@ -171,7 +174,6 @@ GHC.Tc.Zonk.Monad
 GHC.Types.Annotations
 GHC.Types.Avail
 GHC.Types.Basic
-GHC.Types.Breakpoint
 GHC.Types.CompleteMatch
 GHC.Types.CostCentre
 GHC.Types.CostCentre.State

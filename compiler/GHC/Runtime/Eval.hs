@@ -64,6 +64,7 @@ import GHCi.RemoteTypes
 import GHC.ByteCode.Types
 
 import GHC.Linker.Loader as Loader
+import GHC.Linker.Types (LinkedBreaks (..))
 
 import GHC.Hs
 
@@ -126,6 +127,7 @@ import GHC.Tc.Utils.Instantiate (instDFunType)
 import GHC.Tc.Utils.Monad
 
 import GHC.IfaceToCore
+import GHC.ByteCode.Breakpoints
 
 import Control.Monad
 import Data.Dynamic
@@ -134,7 +136,7 @@ import Data.List (find,intercalate)
 import Data.List.NonEmpty (NonEmpty)
 import Unsafe.Coerce ( unsafeCoerce )
 import qualified GHC.Unit.Home.Graph as HUG
-import GHC.ByteCode.Breakpoints
+import GHCi.BreakArray (BreakArray)
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -348,13 +350,15 @@ handleRunStatus step expr bindings final_ids status history0 = do
     EvalBreak apStack_ref (Just eval_break) resume_ctxt ccs -> do
       let ibi = evalBreakpointToId eval_break
       let hug = hsc_HUG hsc_env
-      tick_brks <- liftIO $ readModBreaks hug (ibi_tick_mod ibi)
+      tick_brks  <- liftIO $ readModBreaks hug (ibi_tick_mod ibi)
       let
         span = getBreakLoc ibi tick_brks
         decl = intercalate "." $ getBreakDecls ibi tick_brks
 
       -- Was this breakpoint explicitly enabled (ie. in @BreakArray@)?
-      bactive <- liftIO $ breakpointStatus interp (modBreaks_flags $ imodBreaks_modBreaks tick_brks) (ibi_tick_index ibi)
+      bactive <- liftIO $ do
+        breakArray <- getBreakArray interp (toBreakpointId ibi) tick_brks
+        breakpointStatus interp breakArray (ibi_tick_index ibi)
 
       apStack_fhv <- liftIO $ mkFinalizedHValue interp apStack_ref
       resume_ctxt_fhv   <- liftIO $ mkFinalizedHValue interp resume_ctxt
@@ -462,9 +466,29 @@ setupBreakpoint :: GhcMonad m => Interp -> BreakpointId -> Int -> m ()   -- #191
 setupBreakpoint interp bi cnt = do
   hug <- hsc_HUG <$> getSession
   modBreaks <- liftIO $ readModBreaks hug (bi_tick_mod bi)
-  let breakarray = modBreaks_flags $ imodBreaks_modBreaks modBreaks
-  _ <- liftIO $ GHCi.storeBreakpoint interp breakarray (bi_tick_index bi) cnt
-  pure ()
+  breakArray <- liftIO $ getBreakArray interp bi modBreaks
+  liftIO $ GHCi.storeBreakpoint interp breakArray (bi_tick_index bi) cnt
+
+getBreakArray :: Interp -> BreakpointId -> InternalModBreaks -> IO (ForeignRef BreakArray)
+getBreakArray interp BreakpointId{bi_tick_mod} imbs = do
+  breaks0 <- linked_breaks . fromMaybe (panic "Loader not initialised") <$> getLoaderState interp
+  case lookupModuleEnv (breakarray_env breaks0) bi_tick_mod of
+    Just ba -> return ba
+    Nothing -> do
+      modifyLoaderState interp $ \ld_st -> do
+        let lb = linked_breaks ld_st
+
+        -- Recall that BreakArrays are allocated only at BCO link time, so if we
+        -- haven't linked the BCOs we intend to break at yet, we allocate the arrays here.
+        ba_env <- allocateBreakArrays interp (breakarray_env lb) [imbs]
+
+        let ld_st' = ld_st { linked_breaks = lb{breakarray_env = ba_env} }
+        let ba = expectJust {- just computed -} $ lookupModuleEnv ba_env bi_tick_mod
+
+        return
+          ( ld_st'
+          , ba
+          )
 
 back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)
 back n = moveHist (+n)

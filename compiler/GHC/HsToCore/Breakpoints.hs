@@ -33,14 +33,6 @@ import GHC.Unit.Module (Module)
 import GHC.Utils.Outputable
 import Data.List (intersperse)
 
-import GHCi.BreakArray (BreakArray)
-import GHCi.RemoteTypes (ForeignRef)
-
--- TODO: Break this cycle
-import {-# SOURCE #-} GHC.Runtime.Interpreter.Types (Interp, interpreterProfiled)
-import {-# SOURCE #-} qualified GHC.Runtime.Interpreter as GHCi (newBreakArray)
-import Data.Array.Base (numElements)
-
 --------------------------------------------------------------------------------
 -- ModBreaks
 --------------------------------------------------------------------------------
@@ -58,10 +50,7 @@ import Data.Array.Base (numElements)
 -- and 'modBreaks_decls'.
 data ModBreaks
    = ModBreaks
-   { modBreaks_flags  :: ForeignRef BreakArray
-        -- ^ The array of flags, one per breakpoint,
-        -- indicating which breakpoints are enabled.
-   , modBreaks_locs   :: !(Array BreakTickIndex SrcSpan)
+   { modBreaks_locs   :: !(Array BreakTickIndex SrcSpan)
         -- ^ An array giving the source span of each breakpoint.
    , modBreaks_vars   :: !(Array BreakTickIndex [OccName])
         -- ^ An array giving the names of the free variables at each breakpoint.
@@ -83,40 +72,31 @@ data ModBreaks
 -- generator needs to encode this information for each expression, the data is
 -- allocated remotely in GHCi's address space and passed to the codegen as
 -- foreign pointers.
-mkModBreaks :: Interp -> Module -> SizedSeq Tick -> IO ModBreaks
-mkModBreaks interp mod extendedMixEntries
-  = do
-    let count = fromIntegral $ sizeSS extendedMixEntries
+mkModBreaks :: Bool {-^ Whether the interpreter is profiled and thus if we should include store a CCS array -}
+            -> Module -> SizedSeq Tick -> ModBreaks
+mkModBreaks interpreterProfiled modl extendedMixEntries
+  = let count = fromIntegral $ sizeSS extendedMixEntries
         entries = ssElts extendedMixEntries
-    let
-           locsTicks  = listArray (0,count-1) [ tick_loc  t | t <- entries ]
-           varsTicks  = listArray (0,count-1) [ tick_ids  t | t <- entries ]
-           declsTicks = listArray (0,count-1) [ tick_path t | t <- entries ]
-           ccs
-             | interpreterProfiled interp =
-                 listArray
-                   (0, count - 1)
-                   [ ( concat $ intersperse "." $ tick_path t,
-                       renderWithContext defaultSDocContext $ ppr $ tick_loc t
-                     )
-                   | t <- entries
-                   ]
-             | otherwise = listArray (0, -1) []
-    hydrateModBreaks interp $
-      ModBreaks
-        { modBreaks_flags = undefined,
-          modBreaks_locs = locsTicks,
-          modBreaks_vars = varsTicks,
-          modBreaks_decls = declsTicks,
-          modBreaks_ccs = ccs,
-          modBreaks_module = mod
-        }
-
-hydrateModBreaks :: Interp -> ModBreaks -> IO ModBreaks
-hydrateModBreaks interp ModBreaks {..} = do
-  let count = numElements modBreaks_locs
-  modBreaks_flags <- GHCi.newBreakArray interp count
-  pure ModBreaks {..}
+        locsTicks  = listArray (0,count-1) [ tick_loc  t | t <- entries ]
+        varsTicks  = listArray (0,count-1) [ tick_ids  t | t <- entries ]
+        declsTicks = listArray (0,count-1) [ tick_path t | t <- entries ]
+        ccs
+          | interpreterProfiled =
+              listArray
+                (0, count - 1)
+                [ ( concat $ intersperse "." $ tick_path t,
+                    renderWithContext defaultSDocContext $ ppr $ tick_loc t
+                  )
+                | t <- entries
+                ]
+          | otherwise = listArray (0, -1) []
+     in ModBreaks
+      { modBreaks_locs   = locsTicks
+      , modBreaks_vars   = varsTicks
+      , modBreaks_decls  = declsTicks
+      , modBreaks_ccs    = ccs
+      , modBreaks_module = modl
+      }
 
 {-
 Note [Field modBreaks_decls]
