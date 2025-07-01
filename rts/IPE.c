@@ -81,6 +81,16 @@ static IpeBufferListNode *ipeBufferList = NULL;
 static void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode*);
 static void updateIpeMap(void);
 
+// Check whether the IpeBufferListNode has the relevant magic words.
+// See Note [IPE Stripping and magic words]
+static inline bool ipe_node_valid(const IpeBufferListNode *node) {
+    return node &&
+           node->entries_block &&
+           node->string_table_block &&
+           node->entries_block->magic == IPE_MAGIC_WORD &&
+           node->string_table_block->magic == IPE_MAGIC_WORD;
+}
+
 #if defined(THREADED_RTS)
 
 void initIpe(void) { initMutex(&ipeMapLock); }
@@ -99,8 +109,8 @@ static InfoProvEnt ipeBufferEntryToIpe(const IpeBufferListNode *node, uint32_t i
 {
     CHECK(idx < node->count);
     CHECK(!node->compressed);
-    const char *strings = node->string_table;
-    const IpeBufferEntry *ent = &node->entries[idx];
+    const char *strings = node->string_table_block->string_table;
+    const IpeBufferEntry *ent = &node->entries_block->entries[idx];
     return (InfoProvEnt) {
             .info = node->tables[idx],
             .prov = {
@@ -121,19 +131,23 @@ static InfoProvEnt ipeBufferEntryToIpe(const IpeBufferListNode *node, uint32_t i
 static void traceIPEFromHashTable(void *data STG_UNUSED, StgWord key STG_UNUSED,
                                   const void *value) {
     const IpeMapEntry *map_ent = (const IpeMapEntry *)value;
-    const InfoProvEnt ipe = ipeBufferEntryToIpe(map_ent->node, map_ent->idx);
-    traceIPE(&ipe);
+    if (ipe_node_valid(map_ent->node)){
+      const InfoProvEnt ipe = ipeBufferEntryToIpe(map_ent->node, map_ent->idx);
+      traceIPE(&ipe);
+    }
 }
 
 void dumpIPEToEventLog(void) {
     // Dump pending entries
     IpeBufferListNode *node = RELAXED_LOAD(&ipeBufferList);
     while (node != NULL) {
-        decompressIPEBufferListNodeIfCompressed(node);
+        if (ipe_node_valid(node)){
+          decompressIPEBufferListNodeIfCompressed(node);
 
-        for (uint32_t i = 0; i < node->count; i++) {
-            const InfoProvEnt ent = ipeBufferEntryToIpe(node, i);
-            traceIPE(&ent);
+          for (uint32_t i = 0; i < node->count; i++) {
+              const InfoProvEnt ent = ipeBufferEntryToIpe(node, i);
+              traceIPE(&ent);
+          }
         }
         node = node->next;
     }
@@ -183,7 +197,7 @@ void formatClosureDescIpe(const InfoProvEnt *ipe_buf, char *str_buf) {
 bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out) {
     updateIpeMap();
     IpeMapEntry *map_ent = (IpeMapEntry *) lookupHashTable(ipeMap, (StgWord)info);
-    if (map_ent) {
+    if (map_ent && ipe_node_valid(map_ent->node)) {
         *out = ipeBufferEntryToIpe(map_ent->node, map_ent->idx);
         return true;
     } else {
