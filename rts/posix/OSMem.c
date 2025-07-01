@@ -586,6 +586,11 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
 #endif
 
     const int MAX_ATTEMPTS = 256;
+    void *bad_allocs[MAX_ATTEMPTS];
+    size_t bad_alloc_lens[MAX_ATTEMPTS];
+    memset(bad_allocs, 0, sizeof(void*) * MAX_ATTEMPTS);
+    memset(bad_alloc_lens, 0, sizeof(size_t) * MAX_ATTEMPTS);
+
     attempt = 0;
     while (attempt < MAX_ATTEMPTS) {
         *len &= ~MBLOCK_MASK;
@@ -612,16 +617,29 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
         } else if ((W_)at >= minimumAddress) {
             // Success! We were given a block of memory starting above the 8 GB
             // mark, which is what we were looking for.
-
             break;
         } else {
             // We got addressing space but it wasn't above the 8GB mark.
-            // Try again.
-            if (munmap(at, *len) < 0) {
-                sysErrorBelch("unable to release reserved heap");
+            // Free any portion *above* 8GB and hang on to the rest to increase
+            // the likelihood that we get a suitable allocation next iteration.
+            uintptr_t end = (W_) at + *len;
+            bad_allocs[attempt] = at;
+            if (end > minimumAddress) {
+                if (munmap((void *) minimumAddress, end - minimumAddress) < 0) {
+                    sysErrorBelch("unable to release high portion of low memory reservation");
+                }
+                bad_alloc_lens[attempt] = minimumAddress - (W_) at;
+            } else {
+                bad_alloc_lens[attempt] = *len;
             }
         }
         attempt++;
+    }
+
+    for (int i=0; i < MAX_ATTEMPTS; i++) {
+        if (bad_allocs[i] != NULL && munmap(bad_allocs[i], bad_alloc_lens[i]) < 0) {
+            sysErrorBelch("unable to release reserved heap");
+        }
     }
 
     if (at == NULL) {
