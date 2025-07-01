@@ -201,7 +201,7 @@ module GHC (
         getResumeContext,
         GHC.obtainTermFromId, GHC.obtainTermFromVal, reconstructType,
         modInfoModBreaks,
-        ModBreaks(..), BreakIndex,
+        ModBreaks(..), BreakTickIndex,
         BreakpointId(..), InternalBreakpointId(..),
         GHC.Runtime.Eval.back,
         GHC.Runtime.Eval.forward,
@@ -427,7 +427,6 @@ import GHC.Types.Basic
 import GHC.Types.TyThing
 import GHC.Types.Name.Env
 import GHC.Types.TypeEnv
-import GHC.Types.Breakpoint
 import GHC.Types.PkgQual
 
 import GHC.Unit

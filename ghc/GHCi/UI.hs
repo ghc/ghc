@@ -45,6 +45,7 @@ import GHC.Runtime.Eval (mkTopLevEnv)
 import GHC.Runtime.Eval.Utils
 
 -- The GHC interface
+import GHC.ByteCode.Breakpoints (imodBreaks_modBreaks)
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHCi.BreakArray( breakOn, breakOff )
@@ -66,7 +67,8 @@ import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
              GetDocsFailure(..), pushLogHookM,
-             getModuleGraph, handleSourceError )
+             getModuleGraph, handleSourceError,
+             InternalBreakpointId(..) )
 import GHC.Driver.Main (hscParseModuleWithLocation, hscParseStmtWithLocation)
 import GHC.Hs.ImpExp
 import GHC.Hs
@@ -78,7 +80,6 @@ import GHC.Core.TyCo.Ppr
 import GHC.Types.SafeHaskell ( getSafeMode )
 import GHC.Types.SourceError ( SourceError )
 import GHC.Types.Name
-import GHC.Types.Breakpoint
 import GHC.Types.Var ( varType )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Builtin.Names
@@ -4473,7 +4474,7 @@ breakById inp = do
     Left sdoc -> printForUser sdoc
     Right (mod, mod_info, fun_str) -> do
       let modBreaks = expectJust (GHC.modInfoModBreaks mod_info)
-      findBreakAndSet mod $ \_ -> findBreakForBind fun_str modBreaks
+      findBreakAndSet mod $ \_ -> findBreakForBind fun_str (imodBreaks_modBreaks modBreaks)
 
 breakSyntax :: a
 breakSyntax = throwGhcException $ CmdLineError ("Syntax: :break [<mod>.]<func>[.<func>]\n"
