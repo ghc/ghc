@@ -18,6 +18,8 @@ module GHC.Linker.Types
    , ClosureEnv
    , emptyClosureEnv
    , extendClosureEnv
+   , LinkedBreaks(..)
+   , filterLinkedBreaks
    , LinkableSet
    , mkLinkableSet
    , unionLinkableSet
@@ -159,6 +161,9 @@ data LoaderState = LoaderState
     , temp_sos :: ![(FilePath, String)]
         -- ^ We need to remember the name of previous temporary DLL/.so
         -- libraries so we can link them (see #10322)
+
+    , linked_breaks :: !LinkedBreaks
+        -- ^ Mapping from loaded modules to their breakpoint arrays
     }
 
 uninitializedLoader :: IO Loader
@@ -184,20 +189,13 @@ data LinkerEnv = LinkerEnv
   , addr_env    :: !AddrEnv
       -- ^ Like 'closure_env' and 'itbl_env', but for top-level 'Addr#' literals,
       -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode.
-
-  , breakarray_env :: !(ModuleEnv (ForeignRef BreakArray))
-      -- ^ Each 'Module's remote pointer of 'BreakArray'.
-
-  , ccs_env :: !(ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)))
-      -- ^ Each 'Module's array of remote pointers of 'CostCentre'.
-      -- Untouched when not profiling.
   }
 
 filterLinkerEnv :: (Name -> Bool) -> LinkerEnv -> LinkerEnv
-filterLinkerEnv f le = le
-  { closure_env = filterNameEnv (f . fst) (closure_env le)
-  , itbl_env    = filterNameEnv (f . fst) (itbl_env le)
-  , addr_env    = filterNameEnv (f . fst) (addr_env le)
+filterLinkerEnv f (LinkerEnv closure_e itbl_e addr_e) = LinkerEnv
+  { closure_env = filterNameEnv (f . fst) closure_e
+  , itbl_env    = filterNameEnv (f . fst) itbl_e
+  , addr_env    = filterNameEnv (f . fst) addr_e
   }
 
 type ClosureEnv = NameEnv (Name, ForeignHValue)
@@ -208,6 +206,29 @@ emptyClosureEnv = emptyNameEnv
 extendClosureEnv :: ClosureEnv -> [(Name,ForeignHValue)] -> ClosureEnv
 extendClosureEnv cl_env pairs
   = extendNameEnvList cl_env [ (n, (n,v)) | (n,v) <- pairs]
+
+-- | 'BreakArray's and CCSs are allocated per-module at link-time.
+--
+-- Specifically, a module's 'BreakArray' is allocated either:
+--  - When a BCO for that module is linked
+--  - When :break is used on a given module *before* the BCO has been linked.
+--
+-- We keep this structure in the 'LoaderState'
+data LinkedBreaks
+  = LinkedBreaks
+  { breakarray_env :: !(ModuleEnv (ForeignRef BreakArray))
+      -- ^ Each 'Module's remote pointer of 'BreakArray'.
+
+  , ccs_env :: !(ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)))
+      -- ^ Each 'Module's array of remote pointers of 'CostCentre'.
+      -- Untouched when not profiling.
+  }
+
+filterLinkedBreaks :: (Module -> Bool) -> LinkedBreaks -> LinkedBreaks
+filterLinkedBreaks f (LinkedBreaks ba_e ccs_e) = LinkedBreaks
+  { breakarray_env = filterModuleEnv (\m _ -> f m) ba_e
+  , ccs_env        = filterModuleEnv (\m _ -> f m) ccs_e
+  }
 
 type PkgsLoaded = UniqDFM UnitId LoadedPkgInfo
 
