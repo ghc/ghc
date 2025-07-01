@@ -285,6 +285,9 @@ pprAlignForSection platform seg = line $
        Data
         | ppc64          -> text ".align 3"
         | otherwise      -> text ".align 2"
+       IPE
+        | ppc64          -> text ".align 3"
+        | otherwise      -> text ".align 2"
        ReadOnlyData
         | ppc64          -> text ".align 3"
         | otherwise      -> text ".align 2"
