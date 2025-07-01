@@ -416,12 +416,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty (BreakpointId tick_mod tick_no) fv
         let info_mod = modBreaks_module current_mod_breaks
         infox <- newBreakInfo breakInfo
 
-        let -- cast that checks that round-tripping through Word16 doesn't change the value
-            toW16 x = let r = fromIntegral x :: Word16
-                      in if fromIntegral r == x
-                        then r
-                        else pprPanic "schemeER_wrk: breakpoint tick/info index too large!" (ppr x)
-            breakInstr = BRK_FUN tick_mod (toW16 tick_no) info_mod (toW16 infox)
+        let breakInstr = BRK_FUN (InternalBreakpointId tick_mod tick_no info_mod infox)
         return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
