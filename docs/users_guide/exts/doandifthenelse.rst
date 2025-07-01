@@ -1,7 +1,7 @@
 .. _doandifthenelse:
 
 Do And If Then Else
-============
+===================
 
 .. extension:: DoAndIfThenElse
     :shortdesc: Allow semicolons in ``if`` expressions.
