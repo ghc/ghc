@@ -1480,7 +1480,7 @@ void postIPE(const InfoProvEnt *ipe)
     CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_IPE);
     postPayloadSize(&eventBuf, len);
-    postWord64(&eventBuf, (StgWord) INFO_PTR_TO_STRUCT(ipe->info));
+    postWord64(&eventBuf, (StgWord) (ipe->prov.info_prov_id));
     postStringLen(&eventBuf, ipe->prov.table_name, table_name_len);
     postStringLen(&eventBuf, closure_desc_buf, closure_desc_len);
     postStringLen(&eventBuf, ipe->prov.ty_desc, ty_desc_len);
