@@ -16,7 +16,8 @@ import Data.Maybe
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as S
 
-import GHC.ByteCode.Types (BreakIndex, ModBreaks(..))
+import GHC.HsToCore.Breakpoints
+import GHC.ByteCode.Breakpoints
 import GHC.Driver.Env
 import GHC.Driver.Monad
 import GHC.Driver.Session.Inspect
@@ -24,7 +25,6 @@ import GHC.Runtime.Eval
 import GHC.Runtime.Eval.Utils
 import GHC.Types.Name
 import GHC.Types.SrcLoc
-import GHC.Types.Breakpoint
 import GHC.Unit.Module
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModSummary
@@ -44,7 +44,7 @@ import qualified GHC.Data.Strict as Strict
 --    - the leftmost subexpression starting on the specified line, or
 --    - the rightmost subexpression enclosing the specified line
 --
-findBreakByLine :: Int {-^ Line number -} -> TickArray -> Maybe (BreakIndex, RealSrcSpan)
+findBreakByLine :: Int {-^ Line number -} -> TickArray -> Maybe (BreakTickIndex, RealSrcSpan)
 findBreakByLine line arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
@@ -61,7 +61,7 @@ findBreakByLine line arr
             where ends_here (_,pan) = srcSpanEndLine pan == line
 
 -- | Find a breakpoint in the 'TickArray' of a module, given a line number and a column coordinate.
-findBreakByCoord :: (Int, Int) -> TickArray -> Maybe (BreakIndex, RealSrcSpan)
+findBreakByCoord :: (Int, Int) -> TickArray -> Maybe (BreakTickIndex, RealSrcSpan)
 findBreakByCoord (line, col) arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
@@ -174,7 +174,7 @@ resolveFunctionBreakpoint inp = do
 -- for
 --   (a) this binder only (it maybe a top-level or a nested declaration)
 --   (b) that do not have an enclosing breakpoint
-findBreakForBind :: String {-^ Name of bind to break at -} -> ModBreaks -> [(BreakIndex, RealSrcSpan)]
+findBreakForBind :: String {-^ Name of bind to break at -} -> ModBreaks -> [(BreakTickIndex, RealSrcSpan)]
 findBreakForBind str_name modbreaks = filter (not . enclosed) ticks
   where
     ticks = [ (index, span)
@@ -191,15 +191,15 @@ findBreakForBind str_name modbreaks = filter (not . enclosed) ticks
 --------------------------------------------------------------------------------
 
 -- | Maps line numbers to the breakpoint ticks existing at that line for a module.
-type TickArray = Array Int [(BreakIndex,RealSrcSpan)]
+type TickArray = Array Int [(BreakTickIndex,RealSrcSpan)]
 
 -- | Construct the 'TickArray' for the given module.
 makeModuleLineMap :: GhcMonad m => Module -> m (Maybe TickArray)
 makeModuleLineMap m = do
   mi <- getModuleInfo m
-  return $ mkTickArray . assocs . modBreaks_locs <$> (modInfoModBreaks =<< mi)
+  return $ mkTickArray . assocs . modBreaks_locs . imodBreaks_modBreaks <$> (modInfoModBreaks =<< mi)
   where
-    mkTickArray :: [(BreakIndex, SrcSpan)] -> TickArray
+    mkTickArray :: [(BreakTickIndex, SrcSpan)] -> TickArray
     mkTickArray ticks
       = accumArray (flip (:)) [] (1, max_line)
             [ (line, (nm,pan)) | (nm,RealSrcSpan pan _) <- ticks, line <- srcSpanLines pan ]
@@ -211,7 +211,7 @@ makeModuleLineMap m = do
 getModBreak :: GhcMonad m => Module -> m (Maybe ModBreaks)
 getModBreak m = do
    mod_info <- fromMaybe (panic "getModBreak") <$> getModuleInfo m
-   pure $ modInfoModBreaks mod_info
+   pure $ imodBreaks_modBreaks <$> modInfoModBreaks mod_info
 
 --------------------------------------------------------------------------------
 -- Getting current breakpoint information

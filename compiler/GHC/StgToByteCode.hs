@@ -34,7 +34,6 @@ import GHC.Platform.Profile
 import GHC.Runtime.Interpreter
 import GHCi.FFI
 import GHC.Types.Basic
-import GHC.Types.Breakpoint
 import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Id
@@ -71,6 +70,7 @@ import GHC.Data.OrdList
 import GHC.Data.Maybe
 import GHC.Types.Tickish
 import GHC.Types.SptEntry
+import GHC.ByteCode.Breakpoints
 
 import Data.List ( genericReplicate, intersperse
                  , partition, scanl', sortBy, zip4, zip6 )
@@ -134,9 +134,9 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr $ elemsFlatBag proto_bcos)))
 
-        let mod_breaks = case modBreaks of
+        let mod_breaks = case mb_modBreaks of
              Nothing -> Nothing
-             Just mb -> Just mb{ modBreaks_breakInfo = breakInfo }
+             Just mb -> Just $ mkInternalModBreaks this_mod breakInfo mb
         cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries
 
         -- Squash space leaks in the CompiledByteCode.  This is really
@@ -405,7 +405,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty (BreakpointId tick_mod tick_no) fv
     Nothing -> pure code
     Just current_mod_breaks -> break_info hsc_env tick_mod current_mod mb_current_mod_breaks >>= \case
       Nothing -> pure code
-      Just ModBreaks {modBreaks_module = tick_mod} -> do
+      Just ModBreaks{modBreaks_module = tick_mod} -> do
         platform <- profilePlatform <$> getProfile
         let idOffSets = getVarOffSets platform d p fvs
             ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
@@ -455,7 +455,7 @@ break_info hsc_env mod current_mod current_mod_breaks
   = pure current_mod_breaks
   | otherwise
   = liftIO (HUG.lookupHugByModule mod (hsc_HUG hsc_env)) >>= \case
-      Just hp -> pure $ getModBreaks hp
+      Just hp -> pure $ imodBreaks_modBreaks <$> getModBreaks hp
       Nothing -> pure Nothing
 
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
@@ -2659,20 +2659,19 @@ typeArgReps platform = map (toArgRep platform) . typePrimRep
 -- | Read only environment for generating ByteCode
 data BcM_Env
    = BcM_Env
-        { bcm_hsc_env    :: HscEnv
-        , bcm_module     :: Module -- current module (for breakpoints)
+        { bcm_hsc_env    :: !HscEnv
+        , bcm_module     :: !Module -- current module (for breakpoints)
+        , modBreaks      :: !(Maybe ModBreaks)
         }
 
 data BcM_State
    = BcM_State
         { nextlabel      :: !Word32 -- ^ For generating local labels
         , breakInfoIdx   :: !Int    -- ^ Next index for breakInfo array
-        , modBreaks      :: Maybe ModBreaks -- info about breakpoints
-
-        , breakInfo      :: IntMap CgBreakInfo -- ^ Info at breakpoint occurrence.
-                                               -- Indexed with breakpoint *info* index.
-                                               -- See Note [Breakpoint identifiers]
-                                               -- in GHC.Types.Breakpoint
+        , breakInfo      :: !(IntMap CgBreakInfo)
+          -- ^ Info at breakpoints occurrences. Indexed with
+          -- 'InternalBreakpointId'. See Note [Breakpoint identifiers] in
+          -- GHC.ByteCode.Breakpoints.
         }
 
 newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (r, BcM_State))
@@ -2681,7 +2680,7 @@ newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (r, BcM_State))
 
 runBc :: HscEnv -> Module -> Maybe ModBreaks -> BcM r -> IO (r, BcM_State)
 runBc hsc_env this_mod mbs (BcM m)
-   = m (BcM_Env hsc_env this_mod) (BcM_State 0 0 mbs IntMap.empty)
+   = m (BcM_Env hsc_env this_mod mbs) (BcM_State 0 0 IntMap.empty)
 
 instance HasDynFlags BcM where
     getDynFlags = hsc_dflags <$> getHscEnv
@@ -2724,7 +2723,7 @@ getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \env st -> return (bcm_module env, st)
 
 getCurrentModBreaks :: BcM (Maybe ModBreaks)
-getCurrentModBreaks = BcM $ \_env st -> return (modBreaks st, st)
+getCurrentModBreaks = BcM $ \env st -> return (modBreaks env, st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
