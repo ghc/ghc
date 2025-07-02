@@ -27,7 +27,9 @@ module GHC.Runtime.Interpreter
   , getClosure
   , whereFrom
   , getModBreaks
-  , readModBreaks
+  , readIModBreaks
+  , readIModBreaksMaybe
+  , readIModModBreaks
   , seqHValue
   , evalBreakpointToId
 
@@ -92,7 +94,6 @@ import GHC.Utils.Fingerprint
 
 import GHC.Unit.Module
 import GHC.Unit.Home.ModInfo
-import GHC.Unit.Home.Graph (lookupHugByModule)
 import GHC.Unit.Env
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
@@ -411,15 +412,10 @@ evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
 evalBreakpointToId eval_break =
   let
     mkUnitId u = fsToUnit $ mkFastStringShortByteString u
-
     toModule u n = mkModule (mkUnitId u) (mkModuleName n)
-    tickl = toModule (eb_tick_mod_unit eval_break) (eb_tick_mod eval_break)
-    infol = toModule (eb_info_mod_unit eval_break) (eb_info_mod eval_break)
   in
     InternalBreakpointId
-      { ibi_tick_mod   = tickl
-      , ibi_tick_index = eb_tick_index eval_break
-      , ibi_info_mod   = infol
+      { ibi_info_mod   = toModule (eb_info_mod_unit eval_break) (eb_info_mod eval_break)
       , ibi_info_index = eb_info_index eval_break
       }
 
@@ -440,17 +436,18 @@ handleSeqHValueStatus interp unit_env eval_status =
           -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
 
         Just break -> do
-          let bi = evalBreakpointToId break
+          let ibi = evalBreakpointToId break
+              hug = ue_home_unit_graph unit_env
 
           -- Just case: Stopped at a breakpoint, extract SrcSpan information
           -- from the breakpoint.
-          mb_modbreaks <- getModBreaks . expectJust <$>
-                          lookupHugByModule (ibi_tick_mod bi) (ue_home_unit_graph unit_env)
+          mb_modbreaks <- readIModBreaksMaybe hug (ibi_info_mod ibi)
           case mb_modbreaks of
             -- Nothing case - should not occur! We should have the appropriate
             -- breakpoint information
             Nothing -> nothing_case
-            Just modbreaks -> put $ brackets . ppr $ getBreakLoc bi modbreaks
+            Just modbreaks -> put . brackets . ppr =<<
+              getBreakLoc (readIModModBreaks hug) ibi modbreaks
 
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
@@ -745,10 +742,18 @@ getModBreaks hmi
   | otherwise
   = Nothing -- probably object code
 
--- | Read the 'InternalModBreaks' and 'ModBreaks' of the given home 'Module'
--- from the 'HomeUnitGraph'.
-readModBreaks :: HomeUnitGraph -> Module -> IO InternalModBreaks
-readModBreaks hug modl = expectJust . getModBreaks . expectJust <$> HUG.lookupHugByModule modl hug
+-- | Read the 'InternalModBreaks' of the given home 'Module' (via
+-- 'InternalBreakpointId') from the 'HomeUnitGraph'.
+readIModBreaks :: HomeUnitGraph -> InternalBreakpointId -> IO InternalModBreaks
+readIModBreaks hug ibi = expectJust <$> readIModBreaksMaybe hug (ibi_info_mod ibi)
+
+-- | Read the 'InternalModBreaks' of the given home 'Module' from the 'HomeUnitGraph'.
+readIModBreaksMaybe :: HomeUnitGraph -> Module -> IO (Maybe InternalModBreaks)
+readIModBreaksMaybe hug mod = getModBreaks . expectJust <$> HUG.lookupHugByModule mod hug
+
+-- | Read the 'ModBreaks' from the given module's 'InternalModBreaks'
+readIModModBreaks :: HUG.HomeUnitGraph -> Module -> IO ModBreaks
+readIModModBreaks hug mod = imodBreaks_modBreaks . expectJust <$> readIModBreaksMaybe hug mod
 
 -- -----------------------------------------------------------------------------
 -- Misc utils
