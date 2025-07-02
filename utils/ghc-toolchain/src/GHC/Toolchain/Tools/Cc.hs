@@ -176,6 +176,8 @@ addPlatformDepCcFlags archOs cc0 = do
       -- On LoongArch64, we need `-mcmodel=medium` to tell gcc to generate big
       -- enough jump instruction.
       return $ cc1 & _ccFlags %++ "-mcmodel=medium"
+    ArchOS ArchRISCV64 _ ->
+      return $ cc1 & _ccFlags %++ "-march=rv64gcv"
     _ ->
       return cc1
 
