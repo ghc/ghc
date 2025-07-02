@@ -19,6 +19,7 @@
 #include "sm/Storage.h"
 #include "sm/NonMovingMark.h"
 #include "Arena.h"
+#include "IOManager.h"
 #include <stdbool.h>
 
 #if !defined(mingw32_HOST_OS) && defined(HAVE_SIGNAL_H)
@@ -30,7 +31,6 @@
 #include <io.h>
 #include <windows.h>
 #include <shfolder.h> /* SHGetFolderPathW */
-#include "IOManager.h"
 #include "win32/AsyncWinIO.h"
 #include "win32/AsyncMIO.h"
 #endif
@@ -778,6 +778,7 @@ extern char **environ;
       SymI_HasProto(rts_enableThreadAllocationLimit)                    \
       SymI_HasProto(rts_disableThreadAllocationLimit)                   \
       SymI_HasProto(rts_setMainThread)                                  \
+      SymI_HasDataProto(rts_IOManagerFeatures)                          \
       SymI_HasProto(setAllocLimitKill)                                  \
       SymI_HasProto(setProgArgv)                                        \
       SymI_HasProto(startupHaskell)                                     \
