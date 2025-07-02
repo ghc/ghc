@@ -405,7 +405,13 @@ getFamInsts hpt_fam_insts mod
   | Just env <- lookupModuleEnv hpt_fam_insts mod = return env
   | otherwise = do { _ <- initIfaceTcRn (loadSysInterface doc mod)
                    ; eps <- getEps
-                   ; return (expectJust $
+                   -- Workaround for #26154:
+                   -- We use `fromMaybe emptyFamInstEnv` instead of `expectJust` because
+                   -- the module `mod` comes from the `ModIface`'s `Dependencies`, while
+                   -- `hpt_fam_insts` is built from `moduleGraphModulesBelow`.
+                   -- Due to inconsistencies between the two, `mod` might not be present
+                   -- in `hpt_fam_insts`.
+                   ; return (fromMaybe emptyFamInstEnv $
                              lookupModuleEnv (eps_mod_fam_inst_env eps) mod) }
   where
     doc = ppr mod <+> text "is a family-instance module"
