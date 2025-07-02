@@ -22,15 +22,77 @@
 #include "Capability.h"
 #include "sm/GC.h" // for evac_fn
 
+/* First we have symbols that are exported from the RTS. These are part of an
+ * interface between the RTS and the ghc-internal library but are not part of
+ * the RTS external API, and hence are not part of the installed public
+ * rts/include headers.
+ *
+ * These have to be defined before the #include "BeginPrivate.h", which makes
+ * all the subsequent symbols local to the shared lib.
+ *
+ * The exported symbols here must also have entries in RtsSymbols.c
+ */
+
+
+/* IOManagerFeatures is a bitset of features supported by an I/O manager, and
+ * rts_IOManagerFeatures is a global variable of this type for the currently
+ * selected I/O manager. This allows other code in the RTS and in libraries
+ * (mostly ghc-internal and base) to do things conditionally on I/O manager
+ * features.
+ *
+ * Historically such code was conditional on hard-coded assumptions about
+ * which I/O manager is available for particular platforms or RTS ways.
+ * For example, historically a lot of code has been conditional on whether
+ * the RTS way was threaded or non-threaded, as a proxy for whether the I/O
+ * manager is in the RTS or in Haskell, because historically each impled the
+ * other. This can instead now be done conditionally on the I/O manager
+ * feature IOMgrInRTS.
+ */
+enum IOManagerFeatures {
+    /* This means that the I/O manager is implemented within the RTS. The
+     * inverse is that it is implemented in Haskell. Interaction with an in-RTS
+     * I/O manager should be via the appropriate primops, while interaction
+     * with in-Haskell I/O managers can be done by normal library calls.
+     *
+     * In principle this is independent of the RTS threaded/non-threaded way:
+     * neither implies the other. This is intended to allow for using in-RTS
+     * I/O managers in the threaded or non-threaded RTS.
+     */
+    IOMgrInRTS = 1 << 0
+
+    /* As we go along, we will add more feature bits here.
+     Examples include:
+       - supports non-blocking + readiness notification
+       - supports async file reads/writes
+       - prefer socket async read/write or non-blocking + readiness
+       - supports async socket ops (connect, accept etc)
+       - supports async file/dir ops (file open, stat)
+       - supports direct/unbuffered I/O ?
+       - supports file io at arbitrary offsets
+     */
+};
+
+/* Exported global var that is shared with the I/O code in the ghc-internal
+ * library to tell us the set of features supported by the currently selected
+ * I/O manager. This is set during RTS startup (when the I/O manager is
+ * selected), and is immutable thereafter so can be read freely.
+ */
+extern StgWord rts_IOManagerFeatures;
+
 #if defined(mingw32_HOST_OS)
-/* Global var (only on Windows) that is exported (hence before BeginPrivate.h)
- * to be shared with the I/O code in the base library to tell us which style
- * of I/O manager we are using: one that uses the Windows native API HANDLEs,
- * or one that uses Posix style fds.
+/* Exported global var (only on Windows) that is shared with the I/O code in
+ * the ghc-internal library to tell us which style of I/O manager we are using:
+ * one that uses the Windows native API HANDLEs, or one that uses Posix style
+ * fds.
+ *
+ * TODO: replace this var with a feature bit in IOManagerFeatures above.
  */
 extern bool rts_IOManagerIsWin32Native;
 #endif
 
+
+/* Everything after this is internal to the RTS.
+ */
 #include "BeginPrivate.h"
 
 /* The ./configure gives us a set of CPP flags, one for each named I/O manager:
