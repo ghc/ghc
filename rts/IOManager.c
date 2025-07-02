@@ -105,6 +105,10 @@ GHC_STATIC_ASSERT(sizeof(StgAsyncIOOp)
 /* Global var to tell us which I/O manager impl we are using */
 IOManagerType iomgr_type;
 
+/* Global var exported to library code to declare a bit-set of features
+ * supported by the currently selected I/O manager. */
+StgWord rts_IOManagerFeatures = IOMgrNotInitialised;
+
 #if defined(mingw32_HOST_OS)
 /* Global var (only on Windows) that is exported to be shared with the I/O code
  * in the base library to tell us which style of I/O manager we are using: one
@@ -214,7 +218,7 @@ parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag)
 
 /* Based on the I/O manager RTS flag, select an I/O manager to use.
  *
- * This fills in the iomgr_type and rts_IOManagerIsWin32Native globals.
+ * This fills in the iomgr_type and rts_IOManagerFeatures globals.
  * Must be called before the I/O manager is started.
  *
  * Called early in the RTS initialisation, after the RTS flags have been
@@ -296,9 +300,51 @@ void selectIOManager(void)
 #endif
 
         default:
-          barf("selectIOManager: %d", RtsFlags.MiscFlags.ioManager);
+          barf("selectIOManager: none selected: %d",
+               RtsFlags.MiscFlags.ioManager);
     }
 
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+            rts_IOManagerFeatures = IOMgrInRTS;
+            break;
+#endif
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            rts_IOManagerFeatures = IOMgrInRTS;
+            break;
+#endif
+#if defined(IOMGR_ENABLED_POLL)
+        case IO_MANAGER_POLL:
+            rts_IOManagerFeatures = IOMgrInRTS;
+            break;
+#endif
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+            rts_IOManagerFeatures = 0;
+            break;
+#endif
+#if defined(IOMGR_ENABLED_MIO_WIN32)
+        case IO_MANAGER_MIO_WIN32:
+            rts_IOManagerFeatures = 0;
+            break;
+#endif
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MANAGER_WINIO:
+            rts_IOManagerFeatures = 0;
+            break;
+#endif
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+            rts_IOManagerFeatures = IOMgrInRTS;
+            break;
+#endif
+    }
+    ASSERT(!(rts_IOManagerFeatures & IOMgrNotInitialised));
+    debugTrace(DEBUG_iomanager,
+               "selected %s I/O manager; features bitset 0x%" FMT_Word,
+               showIOManager(), rts_IOManagerFeatures);
 #if defined(mingw32_HOST_OS)
     rts_IOManagerIsWin32Native = iomgr_type == IO_MANAGER_WINIO;
 #endif
