@@ -132,7 +132,7 @@ module GHC.Unit.Module.Graph
     -- the graph. It's not immediately clear to me why users do depend on them.
    , SummaryNode
    , summaryNodeSummary
-   , summaryNodeKey
+   , summaryNodeKey, nodeKeyModNameUnit, addNormalEdge
 
    )
 where
@@ -256,6 +256,8 @@ data ModuleGraphNode
   -- | Package dependency
   | UnitNode [UnitId] UnitId
 
+instance Show ModuleGraphNode where
+  show = showSDocUnsafe . ppr
 
 data ModuleNodeEdge = ModuleNodeEdge { edgeLevel :: ImportLevel
                                      , edgeTargetKey :: NodeKey }
@@ -266,6 +268,12 @@ mkModuleEdge level key = ModuleNodeEdge level key
 -- | A 'normal' edge in the graph which isn't offset by an import stage.
 mkNormalEdge :: NodeKey -> ModuleNodeEdge
 mkNormalEdge = mkModuleEdge NormalLevel
+
+addNormalEdge :: ModNodeKeyWithUid -> ModuleGraphNode -> ModuleGraphNode
+addNormalEdge key (ModuleNode edges info) =
+  ModuleNode (mkNormalEdge (NodeKey_Module key) : edges) info
+addNormalEdge _ node = node
+  -- error $ "addNormalEdge: expected ModuleNode, got: " ++ show node
 
 instance Outputable ModuleNodeEdge where
   ppr (ModuleNodeEdge level key) =
@@ -758,6 +766,10 @@ nodeKeyUnitId (NodeKey_ExternalUnit uid) = uid
 nodeKeyModName :: NodeKey -> Maybe ModuleName
 nodeKeyModName (NodeKey_Module mk) = Just (gwib_mod $ mnkModuleName mk)
 nodeKeyModName _ = Nothing
+
+nodeKeyModNameUnit :: NodeKey -> Maybe (ModuleName, UnitId)
+nodeKeyModNameUnit (NodeKey_Module mk) = Just (gwib_mod $ mnkModuleName mk, mnkUnitId mk)
+nodeKeyModNameUnit _ = Nothing
 
 msKey :: ModSummary -> ModNodeKeyWithUid
 msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)

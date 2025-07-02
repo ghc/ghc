@@ -66,6 +66,8 @@ module GHC.Unit.Home.Graph
   , unitEnv_lookup
   , unitEnv_traverseWithKey
   , unitEnv_assocs
+  , collapseHomeModInfoHug
+  , updateBootModules
   ) where
 
 import GHC.Prelude
@@ -92,6 +94,8 @@ import GHC.Data.Graph.Directed
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
+import GHC.Unit.Module.Graph (ModNodeKeyWithUid (..))
+import GHC.Types.Unique.DSet (mkUniqDSet)
 
 
 -- | Get all 'CompleteMatches' (arising from COMPLETE pragmas) present across
@@ -171,6 +175,12 @@ mkHomeUnitEnv us dbs dflags hpt home_unit = HomeUnitEnv
 --------------------------------------------------------------------------------
 -- * Operations on HUG
 --------------------------------------------------------------------------------
+collapseHomeModInfoHug :: ModuleName -> UnitId -> HomeUnitGraph -> IO ()
+collapseHomeModInfoHug mod_name hmi_unit hug =
+  case unitEnv_lookup_maybe hmi_unit hug of
+    Nothing -> pprPanic "collapseHomeModInfoHug" (ppr mod_name)
+    Just hue -> do
+      collapseModuleHpt (homeUnitEnv_hpt hue) mod_name
 
 -- | Add an entry to the 'HomePackageTable' under the unit of that entry.
 addHomeModInfoToHug :: HomeModInfo -> HomeUnitGraph -> IO ()
@@ -215,6 +225,36 @@ updateUnitFlags :: UnitId -> (DynFlags -> DynFlags) -> HomeUnitGraph -> HomeUnit
 updateUnitFlags uid f = unitEnv_adjust update uid
   where
     update hue = hue { homeUnitEnv_dflags = f (homeUnitEnv_dflags hue) }
+
+-- | Update the boot module sets for units in the 'HomeUnitGraph'.
+--
+-- This function takes a list of module node keys with unit IDs and updates
+-- the 'homeUnit_boot_module_set' field for each relevant unit in the graph.
+-- It extracts boot modules (those with 'IsBoot') from the input list,
+-- groups them by unit ID, and adds the module names to the corresponding
+-- unit's boot module set.
+--
+-- This is used during module graph processing to keep track of which
+-- modules have *.hs-boot files in each home unit, which is important
+-- for dependency analysis and compilation ordering.
+updateBootModules :: [ModNodeKeyWithUid] -> HomeUnitGraph -> HomeUnitGraph
+updateBootModules mns hug =
+  let -- Extract boot modules and group by unit ID
+      bootModulesByUnit :: [(UnitId, [ModuleName])]
+      bootModulesByUnit =
+        Map.toList $ Map.fromListWith (++)
+          [ (mnkUnitId mnk, [gwib_mod (mnkModuleName mnk)])
+          | mnk <- mns
+          , gwib_isBoot (mnkModuleName mnk) == IsBoot
+          ]
+
+      -- Update a single unit's boot module set
+      updateUnit :: UnitId -> [ModuleName] -> HomeUnitGraph -> HomeUnitGraph
+      updateUnit uid moduleNames = unitEnv_adjust updateEnv uid
+        where
+          updateEnv hue = hue {homeUnitEnv_hpt=(homeUnitEnv_hpt hue){bootMods = mkUniqDSet moduleNames} }
+
+  in foldr (uncurry updateUnit) hug bootModulesByUnit
 
 --------------------------------------------------------------------------------
 -- ** Reachability

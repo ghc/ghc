@@ -14,6 +14,9 @@ import GHC.Unit.Types
 data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: !ModuleNameWithIsBoot
                                            , mnkUnitId     :: !UnitId } deriving (Eq, Ord)
 
+instance Show ModNodeKeyWithUid where
+  show = showSDocUnsafe . ppr
+
 mnkToModule :: ModNodeKeyWithUid -> Module
 mnkToModule (ModNodeKeyWithUid mnwib uid) = Module (RealUnit (Definite uid)) (gwib_mod mnwib)
 

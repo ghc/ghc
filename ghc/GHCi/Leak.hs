@@ -43,8 +43,8 @@ data LeakModIndicators = LeakModIndicators
 getLeakIndicators :: HscEnv -> IO LeakIndicators
 getLeakIndicators hsc_env =
   fmap LeakIndicators $ do
-    hpt <- readIORef $ hptInternalTableRef $ hsc_HPT hsc_env
-    forM (eltsUDFM hpt) $ \hmi@HomeModInfo{..} -> do
+    hms <- readHptInternalTable $ hsc_HPT hsc_env
+    forM hms $ \hmi@HomeModInfo{..} -> do
       leakMod <- mkWeakPtr hmi Nothing
       leakIface <- mkWeakPtr hm_iface Nothing
       leakDetails <- mkWeakPtr hm_details Nothing

@@ -48,6 +48,7 @@ module GHC.Types.Unique.DFM (
         elemUDFM,
         foldUDFM, foldWithKeyUDFM,
         eltsUDFM,
+        eltKeysUDFM,
         filterUDFM, filterUDFM_Directly,
         isNullUDFM,
         sizeUDFM,
@@ -68,7 +69,7 @@ module GHC.Types.Unique.DFM (
         udfmToUfm,
         nonDetStrictFoldUDFM,
         unsafeCastUDFMKey,
-        alwaysUnsafeUfmToUdfm,
+        alwaysUnsafeUfmToUdfm, elemUDFM', pprUDFM_directy, mapMaybeUDFMWithKey,
     ) where
 
 import GHC.Prelude
@@ -82,9 +83,11 @@ import Data.Data
 import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
 import Data.Function (on)
+import Data.Word (Word64)
 import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
 import Unsafe.Coerce
 import qualified GHC.Data.Word64Set as W
+import Data.Bifunctor (second, Bifunctor (bimap))
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -313,6 +316,9 @@ lookupUDFM_Directly (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey k) m
 elemUDFM :: Uniquable key => key -> UniqDFM key elt -> Bool
 elemUDFM k (UDFM m _i) = M.member (getKey $ getUnique k) m
 
+elemUDFM' :: Uniquable key => Unique -> UniqDFM key elt -> Bool
+elemUDFM' k (UDFM m _i) = M.member (getKey k) m
+
 -- | Performs a deterministic fold over the UniqDFM.
 -- It's O(n log n) while the corresponding function on `UniqFM` is O(n).
 foldUDFM :: (elt -> a -> a) -> a -> UniqDFM key elt -> a
@@ -340,8 +346,16 @@ eltsUDFM :: UniqDFM key elt -> [elt]
 -- The INLINE makes it a good producer (from the map)
 eltsUDFM (UDFM m _i) = map taggedFst (sort_it m)
 
+eltKeysUDFM :: UniqDFM key elt -> [(Unique, elt)]
+{-# INLINE eltKeysUDFM #-}
+-- The INLINE makes it a good producer (from the map)
+eltKeysUDFM (UDFM m _i) = map (bimap mkUniqueGrimily taggedFst) (sort_it_with_key m)
+
 sort_it :: M.Word64Map (TaggedVal elt) -> [TaggedVal elt]
 sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
+
+sort_it_with_key :: M.Word64Map (TaggedVal elt) -> [(Word64, TaggedVal elt)]
+sort_it_with_key m = sortBy (compare `on` (taggedSnd . snd)) (M.toList m)
 
 filterUDFM :: (elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
 filterUDFM p (UDFM m i) = UDFM (M.filter (\(TaggedVal v _) -> p v) m) i
@@ -472,6 +486,11 @@ mapMaybeUDFM :: forall elt1 elt2 key.
                 (elt1 -> Maybe elt2) -> UniqDFM key elt1 -> UniqDFM key elt2
 mapMaybeUDFM f (UDFM m i) = UDFM (M.mapMaybe (traverse f) m) i
 
+
+mapMaybeUDFMWithKey :: forall elt1 elt2 key.
+                (Unique -> elt1 -> Maybe elt2) -> UniqDFM key elt1 -> UniqDFM key elt2
+mapMaybeUDFMWithKey f (UDFM m i) = UDFM (M.mapMaybeWithKey (traverse . f . mkUniqueGrimily) m) i
+
 anyUDFM :: (elt -> Bool) -> UniqDFM key elt -> Bool
 anyUDFM p (UDFM m _i) = M.foldr ((||) . p . taggedFst) False m
 
@@ -507,3 +526,10 @@ pprUDFM :: UniqDFM key a    -- ^ The things to be pretty printed
        -> SDoc          -- ^ 'SDoc' where the things have been pretty
                         -- printed
 pprUDFM ufm pp = pp (eltsUDFM ufm)
+
+
+pprUDFM_directy:: UniqDFM key a    -- ^ The things to be pretty printed
+       -> ([(Unique, a)] -> SDoc) -- ^ The pretty printing function to use on the elements
+       -> SDoc          -- ^ 'SDoc' where the things have been pretty
+                        -- printed
+pprUDFM_directy ufm pp = pp (eltKeysUDFM ufm)

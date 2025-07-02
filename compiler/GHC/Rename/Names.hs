@@ -110,6 +110,7 @@ import Data.Function    ( on )
 import qualified Data.Set as S
 import System.FilePath  ((</>))
 import System.IO
+import Debug.Trace (traceM)
 
 
 {-
@@ -370,6 +371,10 @@ rnImportDecl this_mod
 
 
     iface <- loadSrcInterface doc imp_mod_name want_boot pkg_qual
+    -- when (mi_boot iface /= want_boot) $ do
+    --   traceM $ "rnImportDecl: mi_boot iface = " ++ show (mi_boot iface) ++
+    --            ", want_boot = " ++ show want_boot ++
+    --            ", iface = " ++ showSDocUnsafe (ppr $ mi_module iface)
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
