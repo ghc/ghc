@@ -92,14 +92,14 @@ data GhcFlagMode
 
 data OptKind m                             -- Suppose the flag is -f
     = NoArg     (EwM m ())                 -- -f all by itself
-    | HasArg    (String -> EwM m ())       -- -farg or -f arg
+    | HasArg    (String -> EwM m ())       -- -farg or -f=arg or -f arg
     | SepArg    (String -> EwM m ())       -- -f arg
-    | Prefix    (String -> EwM m ())       -- -farg
-    | OptPrefix (String -> EwM m ())       -- -f or -farg (i.e. the arg is optional)
-    | OptIntSuffix (Maybe Int -> EwM m ()) -- -f or -f=n; pass n to fn
-    | IntSuffix (Int -> EwM m ())          -- -f or -f=n; pass n to fn
-    | Word64Suffix (Word64 -> EwM m ())    -- -f or -f=n; pass n to fn
-    | FloatSuffix (Float -> EwM m ())      -- -f or -f=n; pass n to fn
+    | Prefix    (String -> EwM m ())       -- -farg or -f=arg
+    | OptPrefix (String -> EwM m ())       -- -f or -farg or -f=arg (i.e. the arg is optional)
+    | OptIntSuffix (Maybe Int -> EwM m ()) -- -f or -fn or -f=n; pass n to fn
+    | IntSuffix (Int -> EwM m ())          -- -fn or -f=n; pass n to fn
+    | Word64Suffix (Word64 -> EwM m ())    -- -fn or -f=n; pass n to fn
+    | FloatSuffix (Float -> EwM m ())      -- -fn or -f=n; pass n to fn
     | PassFlag  (String -> EwM m ())       -- -f; pass "-f" fn
     | AnySuffix (String -> EwM m ())       -- -f or -farg; pass entire "-farg" to fn
 
