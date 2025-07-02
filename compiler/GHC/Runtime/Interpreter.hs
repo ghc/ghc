@@ -28,6 +28,7 @@ module GHC.Runtime.Interpreter
   , whereFrom
   , getModBreaks
   , readModBreaks
+  , readModBreaksMaybe
   , seqHValue
   , evalBreakpointToId
 
@@ -436,16 +437,17 @@ handleSeqHValueStatus interp unit_env eval_status =
 
         Just break -> do
           let ibi = evalBreakpointToId break
+              hug = ue_home_unit_graph unit_env
 
           -- Just case: Stopped at a breakpoint, extract SrcSpan information
           -- from the breakpoint.
-          mb_modbreaks <- getModBreaks . expectJust <$>
-                          lookupHugByModule (ibi_tick_mod bi) (ue_home_unit_graph unit_env)
+          mb_modbreaks <- readModBreaksMaybe hug (ibi_info_mod ibi)
           case mb_modbreaks of
             -- Nothing case - should not occur! We should have the appropriate
             -- breakpoint information
             Nothing -> nothing_case
-            Just modbreaks -> put $ brackets . ppr $ getBreakLoc ibi modbreaks
+            Just modbreaks -> put . brackets . ppr =<<
+              getBreakLoc (fmap imodBreaks_modBreaks . readModBreaks hug) ibi modbreaks
 
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
@@ -740,10 +742,13 @@ getModBreaks hmi
   | otherwise
   = Nothing -- probably object code
 
--- | Read the 'InternalModBreaks' and 'ModBreaks' of the given home 'Module'
--- from the 'HomeUnitGraph'.
+-- | Read the 'InternalModBreaks' of the given home 'Module' from the 'HomeUnitGraph'.
 readModBreaks :: HomeUnitGraph -> Module -> IO InternalModBreaks
-readModBreaks hug modl = expectJust . getModBreaks . expectJust <$> HUG.lookupHugByModule modl hug
+readModBreaks hug modl = expectJust <$> readModBreaksMaybe hug modl
+
+-- | Read the 'InternalModBreaks' of the given home 'Module' from the 'HomeUnitGraph'.
+readModBreaksMaybe :: HomeUnitGraph -> Module -> IO (Maybe InternalModBreaks)
+readModBreaksMaybe hug modl = getModBreaks . expectJust <$> HUG.lookupHugByModule modl hug
 
 -- -----------------------------------------------------------------------------
 -- Misc utils
