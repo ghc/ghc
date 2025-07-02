@@ -100,6 +100,14 @@ data GHCiState = GHCiState
             -- ^ 'tickarrays' caches the 'TickArray' for loaded modules,
             -- so that we don't rebuild it each time the user sets
             -- a breakpoint.
+
+        internalBreaks :: BreakpointOccurrences,
+            -- ^ Keep a mapping from the source-level 'BreakpointId' to the
+            -- occurrences of that breakpoint across modules.
+            -- When we want to stop at a source 'BreakpointId', we essentially
+            -- trigger a breakpoint for all 'InternalBreakpointId's matching
+            -- the same source-id.
+
         ghci_commands  :: [Command],
             -- ^ available ghci commands
         ghci_macros    :: [Command],
@@ -238,16 +246,15 @@ data LocalConfigBehaviour
 
 data BreakLocation
    = BreakLocation
-   { breakModule :: !GHC.Module
-   , breakLoc    :: !SrcSpan
-   , breakTick   :: {-# UNPACK #-} !Int
+   { breakLoc    :: !SrcSpan
+   , breakId     :: !GHC.BreakpointId
+     -- ^ The 'BreakpointId' uniquely identifies a source-level breakpoint
    , breakEnabled:: !Bool
    , onBreakCmd  :: String
    }
 
 instance Eq BreakLocation where
-  loc1 == loc2 = breakModule loc1 == breakModule loc2 &&
-                 breakTick loc1   == breakTick loc2
+  loc1 == loc2 = breakId loc1 == breakId loc2
 
 prettyLocations :: IntMap.IntMap BreakLocation -> SDoc
 prettyLocations  locs =
@@ -256,7 +263,7 @@ prettyLocations  locs =
       False -> vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ IntMap.toAscList locs
 
 instance Outputable BreakLocation where
-   ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+> pprEnaDisa <+>
+   ppr loc = (ppr $ GHC.bi_tick_mod $ breakId loc) <+> ppr (breakLoc loc) <+> pprEnaDisa <+>
                 if null (onBreakCmd loc)
                    then empty
                    else doubleQuotes (text (onBreakCmd loc))
