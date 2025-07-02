@@ -45,7 +45,7 @@ import GHC.Runtime.Eval (mkTopLevEnv)
 import GHC.Runtime.Eval.Utils
 
 -- The GHC interface
-import GHC.ByteCode.Breakpoints (imodBreaks_modBreaks)
+import GHC.ByteCode.Breakpoints (imodBreaks_modBreaks, InternalBreakpointId(..), getBreakSourceId)
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHCi.BreakArray( breakOn, breakOff )
@@ -68,7 +68,7 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
              GetDocsFailure(..), pushLogHookM,
              getModuleGraph, handleSourceError,
-             InternalBreakpointId(..) )
+             BreakpointId(..) )
 import GHC.Driver.Main (hscParseModuleWithLocation, hscParseStmtWithLocation)
 import GHC.Hs.ImpExp
 import GHC.Hs
@@ -546,6 +546,7 @@ interactiveUI config srcs maybe_exprs = do
                    break_ctr          = 0,
                    breaks             = IntMap.empty,
                    tickarrays         = emptyModuleEnv,
+                   internalBreaks     = emptyModuleEnv,
                    ghci_commands      = availableCommands config,
                    ghci_macros        = [],
                    last_command       = Nothing,
@@ -1616,13 +1617,15 @@ toBreakIdAndLocation :: GhciMonad m
 toBreakIdAndLocation Nothing = return Nothing
 toBreakIdAndLocation (Just inf) = do
   st <- getGHCiState
+  hug <- hsc_HUG <$> GHC.getSession
+  brks <- liftIO $ readIModBreaks hug inf
+  let bi = getBreakSourceId inf brks
   return $ listToMaybe [ id_loc | id_loc@(_,loc) <- IntMap.assocs (breaks st),
-                                  breakModule loc == ibi_tick_mod inf,
-                                  breakTick loc == ibi_tick_index inf ]
+                                  breakId loc == bi ]
 
 printStoppedAtBreakInfo :: GHC.GhcMonad m => Resume -> [Name] -> m ()
 printStoppedAtBreakInfo res names = do
-  printForUser $ pprStopped res
+  printForUser =<< pprStopped res
   --  printTypeOfNames session names
   let namesSorted = sortBy compareNames names
   tythings <- catMaybes `liftM` mapM GHC.lookupName namesSorted
@@ -3804,22 +3807,32 @@ showBkptTable = do
 showContext :: GHC.GhcMonad m => m ()
 showContext = do
    resumes <- GHC.getResumeContext
-   printForUser $ vcat (map pp_resume (reverse resumes))
+   docs <- mapM pp_resume (reverse resumes)
+   printForUser $ vcat docs
   where
-   pp_resume res =
-        text "--> " <> text (GHC.resumeStmt res)
-        $$ nest 2 (pprStopped res)
+   pp_resume res = do
+    stopped <- pprStopped res
+    return $
+      text "--> " <> text (GHC.resumeStmt res)
+      $$ nest 2 stopped
 
-pprStopped :: GHC.Resume -> SDoc
-pprStopped res =
-  text "Stopped in"
-    <+> ((case mb_mod_name of
-           Nothing -> empty
-           Just mod_name -> ftext (moduleNameFS mod_name) <> char '.')
-         <> text (GHC.resumeDecl res))
-    <> char ',' <+> ppr (GHC.resumeSpan res)
- where
-  mb_mod_name = moduleName <$> ibi_tick_mod <$> GHC.resumeBreakpointId res
+pprStopped :: GHC.GhcMonad m => GHC.Resume -> m SDoc
+pprStopped res = do
+  let mibi = GHC.resumeBreakpointId res
+  mb_mod_name <- case mibi of
+    Nothing -> pure Nothing
+    Just ibi -> do
+      hug <- hsc_HUG <$> GHC.getSession
+      brks <- liftIO $ readIModBreaks hug ibi
+      return $ Just $ moduleName $
+        bi_tick_mod $ getBreakSourceId ibi brks
+  return $
+    text "Stopped in"
+      <+> ((case mb_mod_name of
+             Nothing -> empty
+             Just mod_name -> ftext (moduleNameFS mod_name) <> char '.')
+           <> text (GHC.resumeDecl res))
+      <> char ',' <+> ppr (GHC.resumeSpan res)
 
 showUnits :: GHC.GhcMonad m => m ()
 showUnits = mapNonInteractiveHomeUnitsM $ \dflags -> do
@@ -4373,12 +4386,8 @@ ignoreCmd argLine = withSandboxOnly ":ignore" $ do
     result <- ignoreSwitch (words argLine)
     case result of
       Left sdoc -> printForUser sdoc
-      Right (loc, count)   -> do
-        let bi = GHC.BreakpointId
-                  { bi_tick_mod   = breakModule loc
-                  , bi_tick_index = breakTick loc
-                  }
-        setupBreakpoint bi count
+      Right (loc, count) -> do
+        setupBreakpoint (breakId loc) count
 
 ignoreSwitch :: GhciMonad m => [String] -> m (Either SDoc (BreakLocation, Int))
 ignoreSwitch [break, count] = do
@@ -4395,10 +4404,13 @@ getIgnoreCount str =
     where
       sdocIgnore = text "Ignore count" <+> quotes (text str)
 
-setupBreakpoint :: GhciMonad m => GHC.BreakpointId -> Int -> m()
-setupBreakpoint loc count = do
+setupBreakpoint :: GhciMonad m => GHC.BreakpointId -> Int -> m ()
+setupBreakpoint bi count = do
     hsc_env <- GHC.getSession
-    GHC.setupBreakpoint (hscInterp hsc_env) loc count
+    -- Trigger all internal breaks that match this source break id
+    internal_break_ids <- getInternalBreaksOf bi
+    forM_ internal_break_ids $ \ibi -> do
+      GHC.setupBreakpoint (hscInterp hsc_env) ibi count
 
 backCmd :: GhciMonad m => String -> m ()
 backCmd arg
@@ -4489,20 +4501,20 @@ findBreakAndSet md lookupTickTree = do
       some -> mapM_ breakAt some
  where
    breakAt (tick, pan) = do
-         setBreakFlag md tick True
-         (alreadySet, nm) <-
-               recordBreak $ BreakLocation
-                       { breakModule = md
-                       , breakLoc = RealSrcSpan pan Strict.Nothing
-                       , breakTick = tick
-                       , onBreakCmd = ""
-                       , breakEnabled = True
-                       }
-         printForUser $
-            text "Breakpoint " <> ppr nm <>
-            if alreadySet
-               then text " was already set at " <> ppr pan
-               else text " activated at " <> ppr pan
+      let bi = BreakpointId md tick
+      setBreakFlag bi True
+      (alreadySet, nm) <-
+            recordBreak $ BreakLocation
+                    { breakLoc = RealSrcSpan pan Strict.Nothing
+                    , breakId = bi
+                    , onBreakCmd = ""
+                    , breakEnabled = True
+                    }
+      printForUser $
+         text "Breakpoint " <> ppr nm <>
+         if alreadySet
+            then text " was already set at " <> ppr pan
+            else text " activated at " <> ppr pan
 
 -- For now, use ANSI bold on terminals that we know support it.
 -- Otherwise, we add a line of carets under the active expression instead.
@@ -4749,14 +4761,32 @@ turnBreakOnOff :: GhciMonad m => Bool -> BreakLocation -> m BreakLocation
 turnBreakOnOff onOff loc
   | onOff == breakEnabled loc = return loc
   | otherwise = do
-      setBreakFlag (breakModule loc) (breakTick loc)  onOff
+      setBreakFlag (breakId loc) onOff
       return loc { breakEnabled = onOff }
 
-setBreakFlag :: GhciMonad m => Module -> Int -> Bool ->m ()
-setBreakFlag  md ix enaDisa = do
+setBreakFlag :: GhciMonad m => GHC.BreakpointId -> Bool -> m ()
+setBreakFlag (BreakpointId md ix) enaDisa = do
   let enaDisaToCount True = breakOn
       enaDisaToCount False = breakOff
-  setupBreakpoint (GHC.BreakpointId md ix) $ enaDisaToCount enaDisa
+  setupBreakpoint (BreakpointId md ix) $ enaDisaToCount enaDisa
+
+-- --------------------------------------------------------------------------
+-- Find matching Internal Breakpoints
+
+-- | Find all the internal breakpoints that use the given source-level breakpoint id
+getInternalBreaksOf :: GhciMonad m => BreakpointId -> m [InternalBreakpointId]
+getInternalBreaksOf bi = do
+    st <- getGHCiState
+    let ibrks = internalBreaks st
+    case lookupBreakpointOccurrences ibrks bi of
+      Just bs -> return bs
+      Nothing -> do
+        -- Refresh the internal breakpoints map
+        bs <- mkBreakpointOccurrences
+        setGHCiState st{internalBreaks = bs}
+        return $
+          fromMaybe [] {- still not found after refresh -} $
+            lookupBreakpointOccurrences bs bi
 
 -- ---------------------------------------------------------------------------
 -- User code exception handling
