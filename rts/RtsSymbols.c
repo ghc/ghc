@@ -178,7 +178,6 @@ extern char **environ;
       SymI_HasProto(stg_asyncWritezh)                    \
       SymI_HasProto(stg_asyncDoProczh)                   \
       SymI_HasProto(rts_InstallConsoleEvent)             \
-      SymI_HasDataProto(rts_IOManagerIsWin32Native)          \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_NeedsProto(__mingw_module_is_dll)             \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
