@@ -86,7 +86,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
     --   WASM_DYLINK_NEEDED, otherwise dyld can't load it.
     --
     --
-    let pkgs_without_rts = filter ((/= rtsUnitId) . unitId) pkgs_with_rts
+    let pkgs_without_rts = filter ((/= PackageName (fsLit "rts")) . unitPackageName) pkgs_with_rts
         pkgs
          | ArchWasm32 <- arch      = pkgs_with_rts
          | OSMinGW32 <- os         = pkgs_with_rts

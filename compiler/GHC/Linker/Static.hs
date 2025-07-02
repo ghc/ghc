@@ -293,7 +293,7 @@ linkStaticLib logger dflags unit_env o_files dep_units = do
         | gopt Opt_LinkRts dflags
         = pkg_cfgs_init
         | otherwise
-        = filter ((/= rtsUnitId) . unitId) pkg_cfgs_init
+        = filter ((/= PackageName (fsLit "rts")) . unitPackageName) pkg_cfgs_init
 
   archives <- concatMapM (collectArchives namever ways_) pkg_cfgs
 
