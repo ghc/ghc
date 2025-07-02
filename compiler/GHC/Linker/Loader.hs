@@ -123,13 +123,8 @@ import System.Win32.Info (getSystemDirectory)
 import GHC.Utils.Exception
 import GHC.Unit.Home.Graph (lookupHug, unitEnv_foldWithKey)
 import GHC.Driver.Downsweep
-import GHC.HsToCore.Breakpoints
-import qualified Data.IntMap.Strict as IM
 import qualified GHC.Runtime.Interpreter as GHCi
-import GHC.Data.Maybe (expectJust)
-import Foreign.Ptr (nullPtr)
-
-
+import Data.Array.Base (numElements)
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1659,70 +1654,41 @@ allocateBreakArrays ::
   IO (ModuleEnv (ForeignRef BreakArray))
 allocateBreakArrays interp =
   foldlM
-    ( \be0 imbs -> do
-        let bi = imodBreaks_breakInfo imbs
-            hi = maybe 0 fst (IM.lookupMax bi) -- allocate as many slots as internal breakpoints
-        if not $ elemModuleEnv (imodBreaks_module imbs) be0 then do
-          -- If no BreakArray is assigned to this module yet, create one
-          breakArray <- GHCi.newBreakArray interp hi
-          evaluate $ extendModuleEnv be0 (imodBreaks_module imbs) breakArray
+    ( \be0 InternalModBreaks{imodBreaks_modBreaks=ModBreaks {..}} -> do
+        -- If no BreakArray is assigned to this module yet, create one
+        if not $ elemModuleEnv modBreaks_module be0 then do
+          let count = numElements modBreaks_locs
+          breakArray <- GHCi.newBreakArray interp count
+          evaluate $ extendModuleEnv be0 modBreaks_module breakArray
         else
           return be0
     )
 
--- | Given a list of 'InternalModBreaks' and 'ModBreaks' collected from a list
+-- | Given a list of 'InternalModBreaks' collected from a list
 -- of 'CompiledByteCode', allocate the 'CostCentre' arrays when profiling is
 -- enabled.
---
--- Note that the resulting CostCenter is indexed by the 'InternalBreakpointId',
--- not by 'BreakpointId'. At runtime, BRK_FUN instructions are annotated with
--- internal ids -- we'll look them up in the array and push the corresponding
--- cost center.
 allocateCCS ::
   Interp ->
   ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)) ->
   [InternalModBreaks] ->
   IO (ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)))
 allocateCCS interp ce mbss
-  | interpreterProfiled interp = do
-      -- First construct the CCSs for each module, using the 'ModBreaks'
-      ccs_map <- foldlM
-        ( \(ccs_map :: ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre))) imbs -> do
-          case imodBreaks_modBreaks imbs of
-            Nothing -> return ccs_map -- don't add it
-            Just mbs -> do
-              ccs <-
-                mkCostCentres
-                  interp
-                  (moduleNameString $ moduleName $ modBreaks_module mbs)
-                  (elems $ modBreaks_ccs mbs)
-              evaluate $
-                extendModuleEnv ccs_map (modBreaks_module mbs) $
-                  listArray (0, length ccs - 1) ccs
-        ) emptyModuleEnv mbss
-      -- Now, construct an array indexed by an 'InternalBreakpointId' index by first
-      -- finding the matching 'BreakpointId' and then looking it up in the ccs_map
+  | interpreterProfiled interp =
       foldlM
-        ( \ce0 imbs -> do
-          let breakModl    = imodBreaks_module imbs
-              breakInfoMap = imodBreaks_breakInfo imbs
-              hi           = maybe 0 fst (IM.lookupMax breakInfoMap) -- as many slots as internal breaks
-              ccss         = expectJust $ lookupModuleEnv ccs_map breakModl
-          ccs_im <- foldlM
-            (\(bids :: IM.IntMap (RemotePtr CostCentre)) cgi -> do
-              let tickBreakId = bi_tick_index $ cgb_tick_id cgi
-              pure $ IM.insert tickBreakId (ccss ! tickBreakId) bids
-            ) mempty breakInfoMap
-          if not $ elemModuleEnv breakModl ce0 then do
-            evaluate $
-              extendModuleEnv ce0 breakModl $
-                listArray (0, hi-1) $
-                  map (\i -> case IM.lookup i ccs_im of
-                        Nothing -> toRemotePtr nullPtr
-                        Just ccs -> ccs
-                      ) [0..hi-1]
-          else
-            return ce0
+        ( \ce0 InternalModBreaks{imodBreaks_modBreaks=ModBreaks {..}} -> do
+            ccs <-
+              mkCostCentres
+                interp
+                (moduleNameString $ moduleName modBreaks_module)
+                (elems modBreaks_ccs)
+            if not $ elemModuleEnv modBreaks_module ce0 then do
+              evaluate $
+                extendModuleEnv ce0 modBreaks_module $
+                  listArray
+                    (0, length ccs - 1)
+                    ccs
+            else
+              return ce0
         )
         ce
         mbss
