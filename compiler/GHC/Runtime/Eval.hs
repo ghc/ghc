@@ -18,7 +18,7 @@ module GHC.Runtime.Eval (
         abandon, abandonAll,
         getResumeContext,
         getHistorySpan,
-        getModBreaks, readModBreaks,
+        getModBreaks, readIModBreaks, readIModModBreaks,
         getHistoryModule,
         setupBreakpoint,
         back, forward,
@@ -147,14 +147,17 @@ getResumeContext = withSession (return . ic_resume . hsc_IC)
 mkHistory :: HUG.HomeUnitGraph -> ForeignHValue -> InternalBreakpointId -> IO History
 mkHistory hug hval ibi = History hval ibi <$> findEnclosingDecls hug ibi
 
-getHistoryModule :: History -> Module
-getHistoryModule = ibi_tick_mod . historyBreakpointId
+getHistoryModule :: HUG.HomeUnitGraph -> History -> IO Module
+getHistoryModule hug hist = do
+  let ibi = historyBreakpointId hist
+  brks <- readIModBreaks hug ibi
+  return $ bi_tick_mod $ getBreakSourceId ibi brks
 
 getHistorySpan :: HUG.HomeUnitGraph -> History -> IO SrcSpan
 getHistorySpan hug hist = do
   let ibi = historyBreakpointId hist
-  brks <- readModBreaks hug (ibi_tick_mod ibi)
-  return $ getBreakLoc ibi brks
+  brks <- readIModBreaks hug ibi
+  getBreakLoc (readIModModBreaks hug) ibi brks
 
 {- | Finds the enclosing top level function name -}
 -- ToDo: a better way to do this would be to keep hold of the decl_path computed
@@ -162,8 +165,8 @@ getHistorySpan hug hist = do
 -- for each tick.
 findEnclosingDecls :: HUG.HomeUnitGraph -> InternalBreakpointId -> IO [String]
 findEnclosingDecls hug ibi = do
-  brks <- readModBreaks hug (ibi_tick_mod ibi)
-  return $ getBreakDecls ibi brks
+  brks <- readIModBreaks hug ibi
+  getBreakDecls (readIModModBreaks hug) ibi brks
 
 -- | Update fixity environment in the current interactive context.
 updateFixityEnv :: GhcMonad m => FixityEnv -> m ()
@@ -350,15 +353,14 @@ handleRunStatus step expr bindings final_ids status history0 = do
     EvalBreak apStack_ref (Just eval_break) resume_ctxt ccs -> do
       let ibi = evalBreakpointToId eval_break
       let hug = hsc_HUG hsc_env
-      tick_brks  <- liftIO $ readModBreaks hug (ibi_tick_mod ibi)
-      let
-        span = getBreakLoc ibi tick_brks
-        decl = intercalate "." $ getBreakDecls ibi tick_brks
+      info_brks  <- liftIO $ readIModBreaks hug ibi
+      span <- liftIO $ getBreakLoc (readIModModBreaks hug) ibi info_brks
+      decl <- liftIO $ intercalate "." <$> getBreakDecls (readIModModBreaks hug) ibi info_brks
 
       -- Was this breakpoint explicitly enabled (ie. in @BreakArray@)?
       bactive <- liftIO $ do
-        breakArray <- getBreakArray interp (toBreakpointId ibi) tick_brks
-        breakpointStatus interp breakArray (ibi_tick_index ibi)
+        breakArray <- getBreakArray interp ibi info_brks
+        breakpointStatus interp breakArray (ibi_info_index ibi)
 
       apStack_fhv <- liftIO $ mkFinalizedHValue interp apStack_ref
       resume_ctxt_fhv   <- liftIO $ mkFinalizedHValue interp resume_ctxt
@@ -446,7 +448,7 @@ resumeExec step mbCnt
                 -- When the user specified a break ignore count, set it
                 -- in the interpreter
                 case (mb_brkpt, mbCnt) of
-                  (Just brkpt, Just cnt) -> setupBreakpoint interp (toBreakpointId brkpt) cnt
+                  (Just brkpt, Just cnt) -> setupBreakpoint interp brkpt cnt
                   _ -> return ()
 
                 let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
@@ -462,17 +464,18 @@ resumeExec step mbCnt
                          | otherwise -> pure prevHistoryLst
                 handleRunStatus step expr bindings final_ids status =<< hist'
 
-setupBreakpoint :: GhcMonad m => Interp -> BreakpointId -> Int -> m ()   -- #19157
-setupBreakpoint interp bi cnt = do
+setupBreakpoint :: GhcMonad m => Interp -> InternalBreakpointId -> Int -> m ()   -- #19157
+setupBreakpoint interp ibi cnt = do
   hug <- hsc_HUG <$> getSession
-  modBreaks <- liftIO $ readModBreaks hug (bi_tick_mod bi)
-  breakArray <- liftIO $ getBreakArray interp bi modBreaks
-  liftIO $ GHCi.storeBreakpoint interp breakArray (bi_tick_index bi) cnt
+  liftIO $ do
+    modBreaks <- readIModBreaks hug ibi
+    breakArray <- getBreakArray interp ibi modBreaks
+    GHCi.storeBreakpoint interp breakArray (ibi_info_index ibi) cnt
 
-getBreakArray :: Interp -> BreakpointId -> InternalModBreaks -> IO (ForeignRef BreakArray)
-getBreakArray interp BreakpointId{bi_tick_mod} imbs = do
+getBreakArray :: Interp -> InternalBreakpointId -> InternalModBreaks -> IO (ForeignRef BreakArray)
+getBreakArray interp InternalBreakpointId{ibi_info_mod} imbs = do
   breaks0 <- linked_breaks . fromMaybe (panic "Loader not initialised") <$> getLoaderState interp
-  case lookupModuleEnv (breakarray_env breaks0) bi_tick_mod of
+  case lookupModuleEnv (breakarray_env breaks0) ibi_info_mod of
     Just ba -> return ba
     Nothing -> do
       modifyLoaderState interp $ \ld_st -> do
@@ -483,13 +486,12 @@ getBreakArray interp BreakpointId{bi_tick_mod} imbs = do
         ba_env <- allocateBreakArrays interp (breakarray_env lb) [imbs]
 
         let ld_st' = ld_st { linked_breaks = lb{breakarray_env = ba_env} }
-        let ba = expectJust {- just computed -} $ lookupModuleEnv ba_env bi_tick_mod
+        let ba = expectJust {- just computed -} $ lookupModuleEnv ba_env ibi_info_mod
 
         return
           ( ld_st'
           , ba
           )
-
 back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)
 back n = moveHist (+n)
 
@@ -517,8 +519,9 @@ moveHist fn = do
             span <- case mb_info of
                       Nothing  -> return $ mkGeneralSrcSpan (fsLit "<unknown>")
                       Just ibi -> liftIO $ do
-                        brks <- readModBreaks (hsc_HUG hsc_env) (ibi_tick_mod ibi)
-                        return $ getBreakLoc ibi brks
+                        let hug = hsc_HUG hsc_env
+                        brks <- readIModBreaks hug ibi
+                        getBreakLoc (readIModModBreaks hug) ibi brks
             (hsc_env1, names) <-
               liftIO $ bindLocalsAtBreakpoint hsc_env apStack span mb_info
             let ic = hsc_IC hsc_env1
@@ -579,11 +582,10 @@ bindLocalsAtBreakpoint hsc_env apStack span Nothing = do
 -- of the breakpoint and the free variables of the expression.
 bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi) = do
    let hug = hsc_HUG hsc_env
-   info_brks <- readModBreaks hug (ibi_info_mod ibi)
-   tick_brks <- readModBreaks hug (ibi_tick_mod ibi)
-   let info   = getInternalBreak ibi (info_brks)
+   info_brks <- readIModBreaks hug ibi
+   let info   = getInternalBreak ibi info_brks
        interp = hscInterp hsc_env
-       occs   = getBreakVars ibi tick_brks
+   occs <- getBreakVars (readIModModBreaks hug) ibi info_brks
 
   -- Rehydrate to understand the breakpoint info relative to the current environment.
   -- This design is critical to preventing leaks (#22530)
