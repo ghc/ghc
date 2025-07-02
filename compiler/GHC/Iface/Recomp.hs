@@ -1247,7 +1247,7 @@ addAbiHashes hsc_env info
       -- wildcard may lead to some unfortunate consequences.
       IfacePublic
         exports fixities warns anns decls
-        defaults insts fam_insts rules
+        defaults insts fam_insts fields rules
         trust _trust_pkg -- TODO: trust_pkg ignored
         complete
         _cache
@@ -1424,7 +1424,7 @@ addAbiHashes hsc_env info
   dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods_no_self
 
   let !orphan_hash = computeFingerprint (mk_put_name local_env)
-                                     (map ifDFun orph_insts, orph_rules, orph_fis)
+                                     (map ifDFun orph_insts, fields, orph_rules, orph_fis)
 
   -- Hash of the transitive things in dependencies
   let !dep_hash = computeFingerprint putNameLiterally

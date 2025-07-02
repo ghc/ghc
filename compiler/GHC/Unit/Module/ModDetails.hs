@@ -1,5 +1,6 @@
 module GHC.Unit.Module.ModDetails
    ( ModDetails (..)
+   , FieldInst, FieldInfo
    , emptyModDetails
    )
 where
@@ -7,12 +8,14 @@ where
 import GHC.Core         ( CoreRule )
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv ( InstEnv, emptyInstEnv )
-
+import GHC.Core.TyCon
 import GHC.Types.Avail
 import GHC.Types.CompleteMatch
 import GHC.Types.DefaultEnv
 import GHC.Types.TypeEnv
 import GHC.Types.Annotations ( Annotation )
+import GHC.Types.FieldLabel
+import GHC.Types.Name (Name)
 
 -- | The 'ModDetails' is essentially a cache for information in the 'ModIface'
 -- for home modules only. Information relating to packages will be loaded into
@@ -31,6 +34,7 @@ data ModDetails = ModDetails
       -- ^ 'DFunId's for the instances in this module
 
    , md_fam_insts :: ![FamInst]
+   , md_fields    :: ![FieldInst]
    , md_rules     :: ![CoreRule]
       -- ^ Domain may include 'Id's from other modules
 
@@ -42,6 +46,9 @@ data ModDetails = ModDetails
       -- ^ Complete match pragmas for this module
    }
 
+type FieldInst = (TyCon, FieldLabel, FieldInfo)
+type FieldInfo = (Name, Name)
+
 -- | Constructs an empty ModDetails
 emptyModDetails :: ModDetails
 emptyModDetails = ModDetails
@@ -50,6 +57,7 @@ emptyModDetails = ModDetails
    , md_defaults         = emptyDefaultEnv
    , md_insts            = emptyInstEnv
    , md_rules            = []
+   , md_fields           = []
    , md_fam_insts        = []
    , md_anns             = []
    , md_complete_matches = []

@@ -2916,7 +2916,7 @@ data TcRnMessage where
 
      Test cases: parser/should_fail/RecordDotSyntaxFail5
   -}
-  TcRnNoRebindableSyntaxRecordDot :: TcRnMessage
+  TcRnNoRebindableSyntaxRecordDot :: TcRnMessage -- TODO: remove that
 
   {-| TcRnNoFieldPunsRecordDot is an error triggered by the use of record field puns
       in an overloaded record update without enabling NamedFieldPuns.

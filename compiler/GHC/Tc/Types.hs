@@ -188,6 +188,7 @@ import Data.Dynamic  ( Dynamic )
 import Data.Map ( Map )
 import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
+import GHC.Types.FieldLabel (FieldLabel)
 
 -- | The import specification as written by the user, including
 -- the list of explicitly imported names. Used in 'ModIface' to
@@ -506,6 +507,7 @@ data TcGblEnv
           -- NB. BangPattern is to fix a leak, see #15111
         tcg_fam_inst_env :: !FamInstEnv, -- ^ Ditto for family instances
           -- NB. BangPattern is to fix a leak, see #15111
+        tcg_fld_inst_env :: !FieldInstEnv,
         tcg_ann_env      :: AnnEnv,     -- ^ And for annotations
         tcg_complete_match_env :: CompleteMatches,
         -- ^ The complete matches for all /home-package/ modules;
@@ -558,6 +560,8 @@ data TcGblEnv
           -- ^ INVARIANT: all these GREs were imported; that is,
           -- they all have a non-empty gre_imp field.
         tcg_keep      :: TcRef NameSet,
+
+        tcg_requested_fields :: TcRef [(FieldLabel, ((Id, LHsBind GhcRn), (Id, LHsBind GhcRn)))],
 
         tcg_th_used :: TcRef Bool,
           -- ^ @True@ \<=> Template Haskell syntax used.
@@ -646,6 +650,7 @@ data TcGblEnv
         tcg_ksigs     :: NameSet,            -- ...Top-level TyCon names that *lack* a signature
         tcg_insts     :: [ClsInst],          -- ...Instances
         tcg_fam_insts :: [FamInst],          -- ...Family instances
+        tcg_fields    :: Bag FieldInst,      -- ...Fields
         tcg_rules     :: [LRuleDecl GhcTc],  -- ...Rules
         tcg_fords     :: [LForeignDecl GhcTc], -- ...Foreign import & exports
         tcg_patsyns   :: [PatSyn],            -- ...Pattern synonyms
@@ -700,6 +705,8 @@ data TcGblEnv
         tcg_next_wrapper_num :: TcRef (ModuleEnv Int)
         -- ^ See Note [Generating fresh names for FFI wrappers]
     }
+
+type FieldInstEnv = NameEnv (Id, Id) 
 
 -- NB: topModIdentity, not topModSemantic!
 -- Definition sites of orphan identities will be identity modules, not semantic

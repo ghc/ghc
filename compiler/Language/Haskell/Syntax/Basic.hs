@@ -7,9 +7,12 @@ import Data.Eq
 import Data.Ord
 import Data.Bool
 import Prelude
+import Data.Coerce (coerce)
 
-import GHC.Data.FastString (FastString)
+import GHC.Data.FastString (FastString, lexicalCompareFS)
 import Control.DeepSeq
+
+import GHC.Utils.Binary (Binary)
 
 {-
 ************************************************************************
@@ -56,7 +59,10 @@ Field Labels
 -- | Field labels are just represented as strings;
 -- they are not necessarily unique (even within a module)
 newtype FieldLabelString = FieldLabelString { field_label:: FastString }
-  deriving (Data, Eq, NFData)
+  deriving (Data, Eq, NFData, Binary)
+
+lexicalCompareFieldLabel :: FieldLabelString -> FieldLabelString -> Ordering
+lexicalCompareFieldLabel = coerce lexicalCompareFS
 
 {-
 ************************************************************************

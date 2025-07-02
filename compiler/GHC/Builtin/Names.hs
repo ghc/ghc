@@ -446,6 +446,7 @@ basicKnownKeyNames
 
         -- Overloaded record fields
         hasFieldClassName,
+        setFieldClassName,
 
         -- ExceptionContext
         exceptionContextTyConName,
@@ -1602,6 +1603,10 @@ hasFieldClassName :: Name
 hasFieldClassName
  = clsQual gHC_INTERNAL_RECORDS (fsLit "HasField") hasFieldClassNameKey
 
+setFieldClassName :: Name
+setFieldClassName
+ = clsQual gHC_INTERNAL_RECORDS (fsLit "SetField") setFieldClassNameKey
+
 -- ExceptionContext
 exceptionContextTyConName, emptyExceptionContextName :: Name
 exceptionContextTyConName =
@@ -1787,6 +1792,9 @@ ipClassKey = mkPreludeClassUnique 49
 -- Overloaded record fields
 hasFieldClassNameKey :: Unique
 hasFieldClassNameKey = mkPreludeClassUnique 50
+
+setFieldClassNameKey :: Unique
+setFieldClassNameKey = mkPreludeClassUnique 51
 
 
 ---------------- Template Haskell -------------------

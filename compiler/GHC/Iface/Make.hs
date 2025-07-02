@@ -89,7 +89,8 @@ import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Deps
 import GHC.Unit.Module.WholeCoreBindings (encodeIfaceForeign, emptyIfaceForeign)
-
+import GHC.Types.FieldLabel (flLabel)
+import Language.Haskell.Syntax.Basic (lexicalCompareFieldLabel)
 import Data.Function
 import Data.List ( sortBy )
 import Data.Ord
@@ -310,6 +311,7 @@ mkIface_ hsc_env
          ModDetails{  md_defaults  = defaults,
                       md_insts     = insts,
                       md_fam_insts = fam_insts,
+                      md_fields    = fields,
                       md_rules     = rules,
                       md_anns      = anns,
                       md_types     = type_env,
@@ -348,6 +350,7 @@ mkIface_ hsc_env
           -- deterministic, so we sort by OccName to canonicalize it.
           -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for more details.
         warns       = toIfaceWarnings src_warns
+        iface_fields = map fieldinstToIfaceFieldInst fields
         iface_rules = map coreRuleToIfaceRule rules
         iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode (instEnvElts insts)
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
@@ -372,6 +375,7 @@ mkIface_ hsc_env
           -- Sort these lexicographically, so that
           -- the result is stable across compilations
           & set_mi_insts            (sortBy cmp_inst     iface_insts)
+          & set_mi_fields           (sortBy cmp_fields   iface_fields)
           & set_mi_fam_insts        (sortBy cmp_fam_inst iface_fam_insts)
           & set_mi_rules            (sortBy cmp_rule     iface_rules)
 
@@ -395,6 +399,11 @@ mkIface_ hsc_env
      -- because the latter is not stable across compilations:
      cmp_inst     = comparing (nameOccName . ifDFun)
      cmp_fam_inst = comparing (nameOccName . ifFamInstTcName)
+
+     cmp_fields :: IfaceFieldInst -> IfaceFieldInst -> Ordering
+     cmp_fields (tyCon1, fld1, _) (tyCon2, fld2, _) =
+        comparing nameOccName tyCon1 tyCon2 `mappend`
+        lexicalCompareFieldLabel (flLabel fld1) (flLabel fld2)
 
      dflags = hsc_dflags hsc_env
 
@@ -456,6 +465,12 @@ ifaceRoughMatchTcs tcs = map do_rough tcs
   where
     do_rough RM_WildCard     = Nothing
     do_rough (RM_KnownTc n) = Just (toIfaceTyCon_name n)
+
+--------------------------
+
+fieldinstToIfaceFieldInst :: FieldInst -> IfaceFieldInst
+fieldinstToIfaceFieldInst (tyCon, fld, fldInfo)
+  = (getName tyCon, fld, fldInfo)
 
 --------------------------
 coreRuleToIfaceRule :: CoreRule -> IfaceRule

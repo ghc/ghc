@@ -259,7 +259,7 @@ newtype RecFieldsDotDot = RecFieldsDotDot { unRecFieldsDotDot :: Int }
 --   Nothing => the normal case
 --   Just n  => the group uses ".." notation,
 --
--- In the latter case:
+-- :In the latter case
 --
 --   *before* renamer: rec_flds are exactly the n user-written fields
 --

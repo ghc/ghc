@@ -237,6 +237,7 @@ typecheckIface iface
         ; defaults  <- tcIfaceDefaults iface_mod (mi_defaults iface)
         ; insts     <- mapM tcIfaceInst (mi_insts iface)
         ; fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+        ; fields    <- mapM tcIfaceField (mi_fields iface)
         ; rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; anns      <- tcIfaceAnnotations (mi_anns iface)
 
@@ -256,6 +257,7 @@ typecheckIface iface
                               , md_defaults  = defaults
                               , md_insts     = mkInstEnv insts
                               , md_fam_insts = fam_insts
+                              , md_fields    = fields
                               , md_rules     = rules
                               , md_anns      = anns
                               , md_exports   = exports
@@ -488,6 +490,7 @@ typecheckIfacesForMerging mod ifaces tc_env_vars =
         defaults  <- tcIfaceDefaults (mi_semantic_module iface) (mi_defaults iface)
         insts     <- mapM tcIfaceInst (mi_insts iface)
         fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+        fields    <- mapM tcIfaceField (mi_fields iface)
         rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         anns      <- tcIfaceAnnotations (mi_anns iface)
         exports   <- ifaceExportNames (mi_exports iface)
@@ -496,6 +499,7 @@ typecheckIfacesForMerging mod ifaces tc_env_vars =
                             , md_defaults  = defaults
                             , md_insts     = mkInstEnv insts
                             , md_fam_insts = fam_insts
+                            , md_fields    = fields
                             , md_rules     = rules
                             , md_anns      = anns
                             , md_exports   = exports
@@ -530,6 +534,7 @@ typecheckIfaceForInstantiate nsubst iface
     defaults  <- tcIfaceDefaults iface_mod (mi_defaults iface)
     insts     <- mapM tcIfaceInst (mi_insts iface)
     fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+    fields    <- mapM tcIfaceField (mi_fields iface)
     rules     <- tcIfaceRules ignore_prags (mi_rules iface)
     anns      <- tcIfaceAnnotations (mi_anns iface)
     exports   <- ifaceExportNames (mi_exports iface)
@@ -538,6 +543,7 @@ typecheckIfaceForInstantiate nsubst iface
                         , md_defaults  = defaults
                         , md_insts     = mkInstEnv insts
                         , md_fam_insts = fam_insts
+                        , md_fields    = fields
                         , md_rules     = rules
                         , md_anns      = anns
                         , md_exports   = exports
@@ -1360,6 +1366,20 @@ tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
              -- will panic if branched, but that's OK
          ; let mb_tcs' = map tcRoughTyCon mb_tcs
          ; return (mkImportedFamInst fam mb_tcs' axiom' orphan) }
+
+{-
+************************************************************************
+*                                                                      *
+                Fields
+*                                                                      *
+************************************************************************
+-}
+
+tcIfaceField :: IfaceFieldInst -> IfL FieldInst -- Improve pretty printing
+tcIfaceField (tyConName, fieldInfo, bndr) = forkM (text "Field") $ do
+  thing <- tcIfaceImplicit tyConName
+  let !tyCon = tyThingTyCon thing
+  pure (tyCon, fieldInfo, bndr)
 
 {-
 ************************************************************************

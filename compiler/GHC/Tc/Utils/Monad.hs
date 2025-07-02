@@ -273,6 +273,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         zany_n_var   <- newIORef 0 ;
         let { type_env_var = hsc_type_env_vars hsc_env };
 
+        requested_fields <- newIORef [] ;
+
         dependent_files_var <- newIORef [] ;
         static_wc_var       <- newIORef emptyWC ;
         cc_st_var           <- newIORef newCostCentreState ;
@@ -315,6 +317,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_th_state         = th_state_var,
                 tcg_th_remote_state  = th_remote_state_var,
                 tcg_th_docs          = th_docs_var,
+                tcg_requested_fields = requested_fields,
 
                 tcg_mod            = mod,
                 tcg_semantic_mod   = homeModuleInstantiation mhome_unit mod,
@@ -327,6 +330,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
                 tcg_fam_inst_env   = emptyFamInstEnv,
+                tcg_fld_inst_env   = emptyNameEnv,
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_complete_match_env = [],
                 tcg_th_used        = th_var,
@@ -356,6 +360,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_tcs            = [],
                 tcg_insts          = [],
                 tcg_fam_insts      = [],
+                tcg_fields         = mempty,
                 tcg_rules          = [],
                 tcg_fords          = [],
                 tcg_patsyns        = [],

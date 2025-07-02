@@ -188,6 +188,7 @@ import qualified Data.Map as M
 import Data.Foldable ( for_ )
 import Data.Traversable ( for )
 import Data.IORef( newIORef )
+import GHC.Tc.TyCl.Utils (tcRecSetterBinds)
 
 
 
@@ -480,7 +481,7 @@ tcRnImports hsc_env import_decls
                 -- filtering also ensures that we don't see instances from
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
-              ; (home_insts, home_mod_fam_inst_env) <- liftIO $
+              ; (home_insts, home_mod_fam_inst_env, home_fields) <- liftIO $
                     hugInstancesBelow hsc_env unitId mnwib
               ; let home_fam_inst_env = foldl' unionFamInstEnv emptyFamInstEnv $ snd <$> home_mod_fam_inst_env
               ; let hpt_fam_insts = mkModuleEnv home_mod_fam_inst_env
@@ -571,7 +572,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       --    and affects how names are rendered in error messages
       --  * the local env exposes the local Ids to simplifyTop,
       --    so that we get better error messages (monomorphism restriction)
-      ; new_ev_binds <- {-# SCC "simplifyTop" #-}
+      ; main_ev_binds <- {-# SCC "simplifyTop" #-}
                         restoreEnvs (tcg_env, tcl_env) $
                         do { lie_main <- checkMainType tcg_env
                            ; simplifyTop (lie `andWC` lie_main) }
@@ -579,6 +580,14 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
         -- Emit Typeable bindings
       ; tcg_env <- setGblEnv tcg_env $
                    mkTypeableBinds
+      ; (tcg_env, recs_lie) <- setGblEnv tcg_env $
+                   captureTopConstraints $
+                   tcRecSetterBinds
+
+      ; rec_ev_binds <- restoreEnvs (tcg_env, tcl_env) $
+                          simplifyTop recs_lie -- Is that required?
+
+      ; let new_ev_binds = main_ev_binds `mappend` rec_ev_binds
 
       ; traceTc "Tc9" empty
       ; failIfErrsM    -- Stop now if if there have been errors
@@ -1747,7 +1756,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- hence the use of discardWarnings
         tc_envs@(tcg_env, tcl_env)
             <- discardWarnings (tcTopBinds deriv_binds deriv_sigs) ;
-        restoreEnvs tc_envs $ do {  -- Environment doesn't change now
+        restoreEnvs tc_envs $ do { -- Environment doesn't change now
 
                 -- Second pass over class and instance declarations,
                 -- now using the kind-checked decls

@@ -28,6 +28,7 @@ module GHC.Unit.Module.ModIface
       , mi_top_env
       , mi_insts
       , mi_fam_insts
+      , mi_fields
       , mi_rules
       , mi_trust
       , mi_trust_pkg
@@ -55,6 +56,7 @@ module GHC.Unit.Module.ModIface
    , set_mi_warns
    , set_mi_anns
    , set_mi_insts
+   , set_mi_fields
    , set_mi_fam_insts
    , set_mi_rules
    , set_mi_decls
@@ -83,6 +85,7 @@ module GHC.Unit.Module.ModIface
    , IfaceDeclExts
    , IfaceAbiHashesExts
    , IfaceExport
+   , IfaceFieldInst
    , IfacePublic_(..)
    , IfacePublic
    , PartialIfacePublic
@@ -150,7 +153,7 @@ import GHC.Utils.Binary
 
 import Control.DeepSeq
 import Control.Exception
-
+import GHC.Types.FieldLabel (FieldLabel)
 
 {- Note [Interface file stages]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -357,6 +360,7 @@ data IfacePublic_ phase = IfacePublic {
                 -- Instance declarations and rules
         mi_insts_       :: [IfaceClsInst],     -- ^ Sorted class instance
         mi_fam_insts_   :: [IfaceFamInst],  -- ^ Sorted family instances
+        mi_fields_      :: [IfaceFieldInst],
         mi_rules_       :: [IfaceRule],     -- ^ Sorted rules
 
 
@@ -382,6 +386,9 @@ data IfacePublic_ phase = IfacePublic {
                 -- These fields are hashes of different parts of the public interface.
 }
 
+type IfaceFieldInst = (Name, FieldLabel, IfaceFieldInfo)
+type IfaceFieldInfo = (IfExtName, IfExtName)
+
 mkIfacePublic :: [IfaceExport]
                   -> [IfaceDeclExts 'ModIfaceFinal]
                   -> [(OccName, Fixity)]
@@ -390,13 +397,14 @@ mkIfacePublic :: [IfaceExport]
                   -> [IfaceDefault]
                   -> [IfaceClsInst]
                   -> [IfaceFamInst]
+                  -> [IfaceFieldInst]
                   -> [IfaceRule]
                   -> IfaceTrustInfo
                   -> Bool
                   -> [IfaceCompleteMatch]
                   -> IfaceAbiHashes
                   -> IfacePublic
-mkIfacePublic exports decls fixities warns anns defaults insts fam_insts rules trust trust_pkg complete_matches abi_hashes = IfacePublic {
+mkIfacePublic exports decls fixities warns anns defaults insts fam_insts fields rules trust trust_pkg complete_matches abi_hashes = IfacePublic {
   mi_exports_ = exports,
   mi_decls_ = decls,
   mi_fixities_ = fixities,
@@ -405,6 +413,7 @@ mkIfacePublic exports decls fixities warns anns defaults insts fam_insts rules t
   mi_defaults_ = defaults,
   mi_insts_ = insts,
   mi_fam_insts_ = fam_insts,
+  mi_fields_    = fields,
   mi_rules_ = rules,
   mi_trust_ = trust,
   mi_trust_pkg_ = trust_pkg,
@@ -686,6 +695,7 @@ instance Binary (IfacePublic_ 'ModIfaceFinal) where
                        , mi_defaults_ = defaults
                        , mi_insts_ = insts
                        , mi_fam_insts_ = fam_insts
+                       , mi_fields_ = fields
                        , mi_rules_ = rules
                        , mi_trust_ = trust
                        , mi_trust_pkg_ = trust_pkg
@@ -701,6 +711,7 @@ instance Binary (IfacePublic_ 'ModIfaceFinal) where
     lazyPut bh defaults
     lazyPut bh insts
     lazyPut bh fam_insts
+    lazyPut bh fields
     lazyPut bh rules
     lazyPut bh trust
     lazyPut bh trust_pkg
@@ -716,12 +727,13 @@ instance Binary (IfacePublic_ 'ModIfaceFinal) where
     defaults <- lazyGet bh
     insts <- lazyGet bh
     fam_insts <- lazyGet bh
+    fields <- lazyGet bh
     rules <- lazyGet bh
     trust <- lazyGet bh
     trust_pkg <- lazyGet bh
     complete_matches <- lazyGet bh
     abi_hashes <- lazyGet bh
-    return (mkIfacePublic exports decls fixities warns anns defaults insts fam_insts rules trust trust_pkg complete_matches abi_hashes)
+    return (mkIfacePublic exports decls fixities warns anns defaults insts fam_insts fields rules trust trust_pkg complete_matches abi_hashes)
 
 instance Binary IfaceAbiHashes where
   put_ bh (IfaceAbiHashes { mi_abi_mod_hash = mod_hash
@@ -797,6 +809,7 @@ emptyPublicModIface abi_hashes = IfacePublic
   , mi_defaults_ = []
   , mi_insts_ = []
   , mi_fam_insts_ = []
+  , mi_fields_ = []
   , mi_rules_ = []
   , mi_abi_hashes_ = abi_hashes
   , mi_trust_ = noIfaceTrustInfo
@@ -882,7 +895,7 @@ instance NFData IfaceAbiHashes where
     `seq` rnf a6
 
 instance (NFData (IfaceAbiHashesExts phase), NFData (IfaceDeclExts phase)) => NFData (IfacePublic_ phase) where
-  rnf (IfacePublic a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14)
+  rnf (IfacePublic a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15)
     =  rnf a1
     `seq` rnf a2
     `seq` rnf a3
@@ -897,6 +910,7 @@ instance (NFData (IfaceAbiHashesExts phase), NFData (IfaceDeclExts phase)) => NF
     `seq` rnf a12
     `seq` rnf a13
     `seq` rnf a14
+    `seq` rnf a15
 
 instance NFData IfaceCache where
   rnf (IfaceCache a1 a2 a3 a4)
@@ -1021,6 +1035,9 @@ set_mi_anns val = set_mi_public (\iface -> iface { mi_anns_ = val })
 
 set_mi_insts :: [IfaceClsInst] -> ModIface_ phase -> ModIface_ phase
 set_mi_insts val = set_mi_public (\iface -> iface { mi_insts_ = val })
+
+set_mi_fields :: [IfaceFieldInst] -> ModIface_ phase -> ModIface_ phase
+set_mi_fields val = set_mi_public ( \iface -> iface { mi_fields_ = val })
 
 set_mi_fam_insts :: [IfaceFamInst] -> ModIface_ phase -> ModIface_ phase
 set_mi_fam_insts val = set_mi_public (\iface -> iface { mi_fam_insts_ = val })
@@ -1161,6 +1178,7 @@ However, with the pragma, the correct core is generated:
 {-# INLINE mi_top_env #-}
 {-# INLINE mi_insts #-}
 {-# INLINE mi_fam_insts #-}
+{-# INLINE mi_fields #-}
 {-# INLINE mi_rules #-}
 {-# INLINE mi_trust #-}
 {-# INLINE mi_trust_pkg #-}
@@ -1195,6 +1213,7 @@ pattern ModIface ::
   -> IfaceTopEnv
   -> [IfaceClsInst]
   -> [IfaceFamInst]
+  -> [IfaceFieldInst]
   -> [IfaceRule]
   -> IfaceTrustInfo
   -> Bool
@@ -1227,6 +1246,7 @@ pattern ModIface
   , mi_top_env
   , mi_insts
   , mi_fam_insts
+  , mi_fields
   , mi_rules
   , mi_trust
   , mi_trust_pkg
@@ -1255,6 +1275,7 @@ pattern ModIface
       , mi_defaults_ = mi_defaults
       , mi_insts_ = mi_insts
       , mi_fam_insts_ = mi_fam_insts
+      , mi_fields_ = mi_fields
       , mi_rules_ = mi_rules
       , mi_trust_ = mi_trust
       , mi_trust_pkg_ = mi_trust_pkg

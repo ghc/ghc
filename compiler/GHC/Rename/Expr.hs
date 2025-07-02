@@ -564,9 +564,7 @@ rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
 
       -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
       OverloadedRecUpdFields { olRecUpdFields = flds } ->
-        do { unlessXOptM LangExt.RebindableSyntax $
-               addErr TcRnNoRebindableSyntaxRecordDot
-           ; let punnedFields = [fld | (L _ fld) <- flds, hfbPun fld]
+        do { let punnedFields = [fld | (L _ fld) <- flds, hfbPun fld]
            ; punsEnabled <- xoptM LangExt.NamedFieldPuns
            ; unless (null punnedFields || punsEnabled) $
                addErr TcRnNoFieldPunsRecordDot

@@ -245,22 +245,22 @@ hugCompleteSigsBelow hsc uid mn = foldr (++) [] <$>
   hugSomeThingsBelowUs (md_complete_matches . hm_details) False hsc uid mn
 
 -- | Find instances visible from the given set of imports
-hugInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [(Module, FamInstEnv)])
+hugInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [(Module, FamInstEnv)], [FieldInst])
 hugInstancesBelow hsc_env uid mnwib = do
  let mn = gwib_mod mnwib
- (insts, famInsts) <-
-     unzip . concat <$>
+ (insts, famInsts, fields) <-
+     unzip3 . concat <$>
        hugSomeThingsBelowUs (\mod_info ->
                                   let details = hm_details mod_info
                                   -- Don't include instances for the current module
                                   in if moduleName (mi_module (hm_iface mod_info)) == mn
                                        then []
-                                       else [(md_insts details, [(mi_module $ hm_iface mod_info, extendFamInstEnvList emptyFamInstEnv $ md_fam_insts details)])])
+                                       else [(md_insts details, [(mi_module $ hm_iface mod_info, extendFamInstEnvList emptyFamInstEnv $ md_fam_insts details)], md_fields details)])
                           True -- Include -hi-boot
                           hsc_env
                           uid
                           mnwib
- return (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
+ return (foldl' unionInstEnv emptyInstEnv insts, concat famInsts, concat fields)
 
 -- | Get things from modules in the transitive closure of the given module.
 --
@@ -450,4 +450,3 @@ hscUpdateHPT f hsc_env = hsc_env { hsc_unit_env = updateHug (HUG.unitEnv_adjust 
   where
     ue = hsc_unit_env hsc_env
     upd hue = hue { homeUnitEnv_hpt = f (homeUnitEnv_hpt hue) }
-

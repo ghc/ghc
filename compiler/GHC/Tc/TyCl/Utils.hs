@@ -21,7 +21,9 @@ module GHC.Tc.TyCl.Utils(
         addTyConsToGblEnv, mkDefaultMethodType,
 
         -- * Record selectors
-        tcRecSelBinds, mkRecSelBinds, mkOneRecordSelector
+        tcRecSelBinds, mkRecSelBinds, mkOneRecordSelector,
+        mkSetFieldBinds, mkRecordSetterType, mkRecordModifierType,
+        tcRecSetterBinds
     ) where
 
 import GHC.Prelude
@@ -59,7 +61,7 @@ import GHC.Data.FastString
 
 import GHC.Unit.Module
 
-import GHC.Rename.Utils (genHsVar, genLHsApp, genLHsLit, genWildPat, wrapGenSpan)
+import GHC.Rename.Utils (genHsVar, genLHsApp, genLHsLit, genWildPat, wrapGenSpan, genVarPat, genLHsVar, genSimpleConPat, genHsApps)
 
 import GHC.Types.Basic
 import GHC.Types.FieldLabel
@@ -866,18 +868,151 @@ mkRecSelBind (tycon, fl)
 mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel -> FieldSelectors
                     -> (Id, LHsBind GhcRn)
 mkOneRecordSelector all_cons idDetails fl has_sel
-  = (sel_id, L (noAnnSrcSpan loc) sel_bind)
-  where
-    loc      = getSrcSpan sel_name
-    loc'     = noAnnSrcSpan loc
-    locn     = noAnnSrcSpan loc
-    locc     = noAnnSrcSpan loc
-    lbl      = flLabel fl
-    sel_name = flSelector fl
-    sel_lname = L locn sel_name
-    match_ctxt = mkPrefixFunRhs sel_lname noAnn
+  = collectFieldLabelInfo all_cons idDetails fl has_sel mkRecordSelectorBind
 
-    sel_id = mkExportedLocalId rec_details sel_name sel_ty
+mkRecordSelectorBind :: RecordBindBuilder (Id, LHsBind GhcRn)
+mkRecordSelectorBind = mk_record_bind mk_sel_ty mk_match where
+  mk_sel_ty :: Type -> Type -> Type
+  mk_sel_ty data_ty field_ty =
+      mkVisFunTyMany data_ty            $
+        -- Record selectors are always typed with Many. We
+        -- could improve on it in the case where all the
+        -- fields in all the constructor have multiplicity Many.
+      field_ty
+
+  mk_match sel_name match_ctxt con =
+      mkSimpleMatch match_ctxt
+        (L loc [L loc (mk_sel_pat con)])
+        (L loc (mkHsVar (L loc field_var)))
+    where
+      loc :: HasAnnotation e => e
+      loc = noAnnSrcSpan (getSrcSpan sel_name)
+
+      mk_sel_pat con =
+        let con_lname = L loc (noUserRdr (getName con))
+        in ConPat NoExtField con_lname (RecCon rec_fields)
+      rec_fields = HsRecFields { rec_ext = noExtField, rec_flds = [rec_field], rec_dotdot = Nothing }
+      rec_field  = noLocA (HsFieldBind
+                          { hfbAnn = noAnn
+                          , hfbLHS
+                            = L loc (FieldOcc (mkRdrUnqual $ nameOccName sel_name) (L loc sel_name))
+                          , hfbRHS
+                            = L loc (VarPat noExtField (L loc field_var))
+                          , hfbPun = False })
+
+      field_var = mkInternalName (mkBuiltinUnique 10) (getOccName sel_name) loc
+
+tcRecSetterBinds :: TcM TcGblEnv
+tcRecSetterBinds = do
+  req_flds <- tcg_requested_fields <$> getGblEnv
+  flds <- readTcRef req_flds
+  tcg_env <- tcRecSelBinds (get_ids_to_check flds)
+  writeTcRef req_flds []
+  let new_name_env = mkNameEnv $ map remove_binds flds
+  pure (tcg_env {
+          tcg_fld_inst_env = tcg_fld_inst_env tcg_env `plusNameEnv` new_name_env
+      })
+  where
+    remove_binds (n, ((setter, _), (modifier, _))) = (flSelector n, (setter, modifier))
+    get_ids_to_check [] = []
+    get_ids_to_check ( (_, (setter, modifier)) : flds) =
+        setter : modifier : get_ids_to_check flds
+
+
+mkSetFieldBinds :: TyCon -> FieldLabel -> TcM ( (Id, LHsBind GhcRn), (Id, LHsBind GhcRn) )
+mkSetFieldBinds tycon fl =
+  collectFieldLabelInfo all_cons idDetails fl FieldSelectors $ \_ _ -> mk_binds
+  where
+    all_cons = map RealDataCon (tyConDataCons tycon)
+
+    idDetails = RecSelData tycon
+
+    mk_field_lbl prefix uniq =
+      let
+        lbl = flLabel fl
+        newOcc = mkOccNameFS varName (mkFastString prefix `mappend` field_label lbl)
+      in fl {flSelector = flSelector fl `setNameUnique` uniq `tidyNameOcc` newOcc}
+
+    mk_binds cons_w_field rec_details ty_builder = do
+      setter_fl <- mk_field_lbl "setter_" <$> newUnique
+      modifier_fd <- mk_field_lbl "modifier_" <$> newUnique
+      let setter_bind = mkRecordSetterBind fl setter_fl all_cons cons_w_field rec_details ty_builder
+          modifier_bind = mkRecordModifierBind fl modifier_fd all_cons cons_w_field rec_details ty_builder
+      pure (setter_bind, modifier_bind)
+
+
+mkRecordSetterBind :: FieldLabel -> RecordBindBuilder (Id, LHsBind GhcRn)
+mkRecordSetterBind origFl fl = mk_record_bind mkRecordSetterType mk_match fl where
+
+  mk_match =
+    mk_set_fld_match (getOccName $ flSelector fl) origFl $
+      \_ field_var -> (genWildPat, genLHsVar field_var)
+
+mkRecordSetterType :: Type -> Type -> Type
+mkRecordSetterType data_ty field_ty =
+    mkVisFunTyMany field_ty $
+    mkVisFunTyMany data_ty data_ty
+
+mkRecordModifierBind :: FieldLabel -> RecordBindBuilder (Id, LHsBind GhcRn)
+mkRecordModifierBind origFl fl = mk_record_bind mkRecordModifierType mk_match fl where
+
+  mk_match = mk_set_fld_match (mkOccName varName "f") origFl $ \i fun_var ->
+      let fld_nm = mk_set_fld_bind i fl
+          expr = wrapGenSpan $ HsPar noExtField $ genLHsApp (genHsVar fun_var) (genLHsVar fld_nm)
+      in (genVarPat fld_nm, expr)
+
+mkRecordModifierType :: Type -> Type -> Type
+mkRecordModifierType data_ty field_ty =
+    mkVisFunTyMany (mkVisFunTyMany field_ty field_ty) $
+    mkVisFunTyMany data_ty data_ty
+
+mk_set_fld_match :: OccName -> FieldLabel -> (Int -> Name -> (LPat GhcRn, LHsExpr GhcRn)) -> FldBindMatchBuilder
+mk_set_fld_match occ_name fl on_fld setter_name match_ctxt con =
+  let (lhs_con_pats, rhs_con_args)
+              = zipWithAndUnzip mk_con_arg [2..] con_fields
+      con_fields = conLikeFieldLabels con
+      con_name = conLikeName con
+
+  in mkSimpleMatch match_ctxt
+      (L loc [genVarPat arg_var, genSimpleConPat con_name lhs_con_pats])
+      (wrapGenSpan $ genHsApps con_name rhs_con_args)
+  where
+    loc :: HasAnnotation e => e
+    loc = noAnnSrcSpan (getSrcSpan setter_name)
+
+
+    mk_con_arg i fld_lbl
+      | fl == fld_lbl = on_fld i arg_var
+      | otherwise =
+          let fld_nm = mk_set_fld_bind i fld_lbl
+                      in (genVarPat fld_nm, genLHsVar fld_nm)
+
+    arg_var = mkInternalName (mkBuiltinUnique 1) occ_name loc
+
+mk_set_fld_bind :: Int -> FieldLabel -> Name
+mk_set_fld_bind i fld_lbl =
+  mkInternalName (mkBuiltinUnique i)
+    (nameOccName $ flSelector $ fld_lbl)
+    generatedSrcSpan
+
+type ConLikeWithField = ConLike
+
+type RecordBindBuilder r =
+  FieldLabel -> [ConLike] -> [ConLikeWithField] -> IdDetails -> ((Type -> Type -> Type) -> Type) -> r
+
+type FldBindMatchBuilder =
+  Name -> HsMatchContext (LocatedN Name) -> ConLikeWithField -> LMatch GhcRn (LHsExpr GhcRn)
+
+collectFieldLabelInfo :: [ConLike] ->
+                         RecSelParent ->
+                         FieldLabel ->
+                         FieldSelectors ->
+                         RecordBindBuilder r ->
+                         r
+collectFieldLabelInfo all_cons idDetails fl has_sel k
+  = k fl all_cons cons_w_field rec_details sel_ty
+  where
+    lbl = flLabel fl
 
     -- Find a representative constructor, con1
     rec_sel_info@(RSI { rsi_def = cons_w_field })
@@ -916,17 +1051,34 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                                                   -- thus suppressing making a binding
                                                   -- A slight hack!
 
-    sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkForAllTys sel_tvbs $
+    sel_ty | is_naughty = \_ -> unitTy  -- See Note [Naughty record selectors]
+           | otherwise  = \mk_ty ->
+                          mkForAllTys sel_tvbs $
                           -- Urgh! See Note [The stupid context] in GHC.Core.DataCon
                           mkPhiTy (conLikeStupidTheta con1) $
                           -- req_theta is empty for normal DataCon
                           mkPhiTy req_theta                 $
-                          mkVisFunTyMany data_ty            $
-                            -- Record selectors are always typed with Many. We
-                            -- could improve on it in the case where all the
-                            -- fields in all the constructor have multiplicity Many.
-                          field_ty
+                          mk_ty data_ty field_ty
+
+mk_record_bind ::
+  (Type -> Type -> Type) ->
+  FldBindMatchBuilder ->
+  RecordBindBuilder (Id, LHsBind GhcRn)
+mk_record_bind mk_ty mk_match fl all_cons cons_w_field rec_details ty_builder
+  = (sel_id, L loc sel_bind)
+  where
+    sel_ty = ty_builder mk_ty
+
+    loc :: HasAnnotation e => e
+    loc = noAnnSrcSpan (getSrcSpan sel_name)
+
+    sel_name = flSelector fl
+    sel_lname = L loc sel_name
+    sel_id = mkExportedLocalId rec_details sel_name sel_ty
+
+    is_naughty = sel_naughty rec_details
+
+    match_ctxt = mkPrefixFunRhs sel_lname noAnn
 
     -- make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
@@ -934,22 +1086,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     sel_bind = mkTopFunBind (Generated OtherExpansion SkipPmc) sel_lname alts
       where
         alts | is_naughty = [mkSimpleMatch match_ctxt (noLocA []) unit_rhs]
-             | otherwise =  map mk_match cons_w_field ++ deflt
-    mk_match con = mkSimpleMatch match_ctxt
-                                 (L (l2l loc') [L loc' (mk_sel_pat con)])
-                                 (L loc' (mkHsVar (L locn field_var)))
-    mk_sel_pat con =
-      let con_lname = L locn (noUserRdr (getName con))
-      in ConPat NoExtField con_lname (RecCon rec_fields)
-    rec_fields = HsRecFields { rec_ext = noExtField, rec_flds = [rec_field], rec_dotdot = Nothing }
-    rec_field  = noLocA (HsFieldBind
-                        { hfbAnn = noAnn
-                        , hfbLHS
-                           = L locc (FieldOcc (mkRdrUnqual $ nameOccName sel_name) (L locn sel_name))
-                        , hfbRHS
-                           = L loc' (VarPat noExtField (L locn field_var))
-                        , hfbPun = False })
-    field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
+             | otherwise =  map (mk_match sel_name match_ctxt) cons_w_field ++ deflt
 
     -- Add catch-all default case unless the case is exhaustive
     -- We do this explicitly so that we get a nice error message that
@@ -977,7 +1114,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
         inst_tys = dataConResRepTyArgs dc
 
     unit_rhs = mkLHsTupleExpr [] noExtField
-    msg_lit = HsStringPrim NoSourceText (bytesFS (field_label lbl))
+    msg_lit = HsStringPrim NoSourceText (bytesFS (field_label (flLabel fl)))
 
 {-
 Note [Polymorphic selectors]

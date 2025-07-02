@@ -37,6 +37,7 @@ import GHC.Types.SafeHaskell
 import GHC.Types.SourceFile ( HscSource(..), hscSourceToIsBoot )
 import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
+import GHC.Unit.Module.ModDetails (FieldInst)
 
 import Data.Set (Set)
 
@@ -66,6 +67,7 @@ data ModGuts
         mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
         mg_fam_insts :: ![FamInst],
                                          -- ^ Family instances declared in this module
+        mg_fields    :: ![FieldInst],    -- ^ Fields automatically generated in this module
         mg_patsyns   :: ![PatSyn],       -- ^ Pattern synonyms declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
                                          -- See Note [Overall plumbing for rules] in "GHC.Core.Rules"

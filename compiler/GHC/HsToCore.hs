@@ -99,6 +99,7 @@ import Data.List (partition)
 import Data.IORef
 import Data.Traversable (for)
 import GHC.Iface.Make (mkRecompUsageInfo)
+import GHC.Data.Bag (bagToList)
 
 {-
 ************************************************************************
@@ -132,6 +133,7 @@ deSugar hsc_env
                             tcg_ev_binds     = ev_binds,
                             tcg_th_foreign_files = th_foreign_files_var,
                             tcg_fords        = fords,
+                            tcg_fields       = fields,
                             tcg_rules        = rules,
                             tcg_patsyns      = patsyns,
                             tcg_tcs          = tcs,
@@ -259,6 +261,7 @@ deSugar hsc_env
                 mg_defaults     = defaults,
                 mg_insts        = fixSafeInstances safe_mode insts,
                 mg_fam_insts    = fam_insts,
+                mg_fields       = bagToList fields,
                 mg_inst_env     = inst_env,
                 mg_fam_inst_env = fam_inst_env,
                 mg_boot_exports = bootExports self_boot,

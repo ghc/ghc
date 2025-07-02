@@ -69,6 +69,10 @@ import GHC.Tc.Errors.Types
 
 import Data.Functor
 import Data.Maybe
+import GHC.Types.Name.Env (lookupNameEnv)
+import qualified Data.List as List
+import {-# SOURCE #-} GHC.Tc.TyCl.Utils 
+  (mkSetFieldBinds, mkRecordSetterType, mkRecordModifierType)
 
 {- *******************************************************************
 *                                                                    *
@@ -152,6 +156,7 @@ matchGlobalInst dflags short_cut clas tys mb_loc
   | cls_name == withDictClassName      = matchWithDict                          tys
   | cls_name == dataToTagClassName     = matchDataToTag                    clas tys
   | cls_name == hasFieldClassName      = matchHasField    dflags short_cut clas tys mb_loc
+  | cls_name == setFieldClassName      = matchSetField    dflags short_cut clas tys mb_loc
   | cls_name == unsatisfiableClassName = matchUnsatisfiable
   | otherwise                          = matchInstEnv     dflags short_cut clas tys
   where
@@ -1308,6 +1313,110 @@ matchHasField dflags short_cut clas tys mb_ct_loc
      -- See (HF1) in Note [HasField instances]
      try_user_instances = matchInstEnv dflags short_cut clas tys
 
+matchSetField :: DynFlags -> Bool -> Class -> [Type]
+              -> Maybe CtLoc        -- Nothing used only during type validity checking
+              -> TcM ClsInstResult
+matchSetField dflags short_cut clas tys mb_ct_loc
+  = do { fam_inst_envs <- tcGetFamInstEnvs
+       ; rdr_env       <- getGlobalRdrEnv
+       ; case lookupFieldLabel fam_inst_envs rdr_env tys of
+            Just (tc, fl, gre, r_ty, a_ty) ->
+                do { let sel_name = flSelector fl
+                   ; (setter_id, modifier_id) <- lookupSetFieldBinds fl tc
+                   ; (tv_prs, preds, setter_ty, modifier_ty) 
+                        <- tc_inst_setfield_binds setter_id modifier_id
+
+                         -- The first new wanted constraint equates the actual
+                         -- type of the selector with the type (r -> a) within
+                         -- the HasField x r a dictionary.  The preds will
+                         -- typically be empty, but if the datatype has a
+                         -- "stupid theta" then we have to include it here.
+                   ; let tvs   = mkTyVarTys (map snd tv_prs)
+                         theta = 
+                            mkNomEqPred setter_ty (mkRecordSetterType r_ty a_ty) 
+                              : mkNomEqPred modifier_ty (mkRecordModifierType r_ty a_ty) 
+                              : preds
+
+                         -- Use the equality proof to cast the selector Id to
+                         -- type (r -> a), then use the newtype coercion to cast
+                         -- it to a HasField dictionary.
+                         mk_ev (ev1:ev2:evs) = evDFunApp (dataConWrapId dCon) (tys ++ tvs) 
+                              [ evSelector modifier_id tvs evs `Cast` co ev2
+                              , evSelector setter_id tvs evs `Cast` co ev1 
+                              ]
+                           where
+                             co ev = mkSubCo (evTermCoercion (EvExpr ev))
+                         mk_ev _ = panic "matchHasField.mk_ev"
+
+                         dCon = classDataCon clas
+
+                     -- The selector must not be "naughty" (i.e. the field
+                     -- cannot have an existentially quantified type),
+                     -- and it must not be higher-rank.
+                   ; if (isNaughtyRecordSelector setter_id) 
+                      || not (isTauTy setter_ty) 
+                      || not (isTauTy modifier_ty)
+                     then try_user_instances
+                     else
+                do { case mb_ct_loc of
+                       Nothing -> return ()  -- Nothing: happens when type-validity checking
+                       Just loc ->  setCtLocM loc $  -- Set location for warnings
+                         do { -- See Note [Unused name reporting and HasField]
+                              addUsedGRE AllDeprecationWarnings gre
+                            ; keepAlive sel_name
+
+                              -- Warn about incomplete record selection
+                           ; warnIncompleteRecSel dflags setter_id loc }
+
+                   ; return OneInst { cir_new_theta   = theta
+                                    , cir_mk_ev       = mk_ev
+                                    , cir_canonical   = EvCanonical
+                                    , cir_what        = BuiltinInstance } } }
+
+            Nothing -> try_user_instances }
+   where
+     -- See (HF1) in Note [HasField instances]
+     try_user_instances = matchInstEnv dflags short_cut clas tys
+
+     lookupSetFieldBinds :: FieldLabel -> TyCon -> TcM (Id, Id)
+     lookupSetFieldBinds fl tycon = do
+        let sel_name = flSelector fl
+        tcg_env <- getGblEnv
+        let 
+          gbl_flds = tcg_fld_inst_env tcg_env
+          req_flds = tcg_requested_fields tcg_env
+
+        case lookupNameEnv gbl_flds sel_name of
+          Just binds -> pure binds
+          Nothing -> do 
+            reqs <- readTcRef req_flds
+            case List.lookup fl reqs of 
+              Just ((setter, _), (modifier, _)) -> do
+                pure (setter, modifier)
+              Nothing -> do
+                binds@((setter, _), (modifier,_)) <- mkSetFieldBinds tycon fl
+                writeTcRef req_flds ((fl, binds) : reqs)
+                pure (setter, modifier)
+     
+     tc_inst_setfield_binds setter_id modifier_id
+        | null tyvars   -- There may be overloading despite no type variables;
+                        --      (?x :: Int) => Int -> Int
+        = return ([], theta, tau_setter, tau_modifier)
+        | otherwise
+        = do { (subst, tyvars') <- newMetaTyVars tyvars
+            ; let tv_prs  = map tyVarName tyvars `zip` tyvars'
+                  subst'  = extendSubstInScopeSet subst (tyCoVarsOfType rho)
+            ; return ( tv_prs, 
+                       substTheta subst' theta, 
+                       substTy subst' tau_setter, 
+                       substTy subst' tau_modifier ) }
+        where
+          (tyvars, rho) = tcSplitForAllInvisTyVars (idType setter_id)
+          (theta, tau_setter)  = tcSplitPhiTy rho
+          tau_modifier = snd $ tcSplitPhiTy $ snd $ 
+              tcSplitForAllInvisTyVars (idType modifier_id)
+
+
 warnIncompleteRecSel :: DynFlags -> Id -> CtLoc -> TcM ()
 -- Warn about incomplete record selectors
 -- See (IRS6) in Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
@@ -1344,6 +1453,29 @@ lookupHasFieldLabel
 -- A complication is that `T` might be a data family, so we need to
 -- look it up in the `fam_envs` to find its representation tycon.
 lookupHasFieldLabel fam_inst_envs rdr_env arg_tys
+  | Just (_tc, fl, gre, rec_ty, fld_ty) <- lookupFieldLabel fam_inst_envs rdr_env arg_tys
+  = Just (flSelector fl, gre, rec_ty, fld_ty)
+
+  | otherwise
+  = Nothing
+
+
+lookupFieldLabel
+  :: FamInstEnvs -> GlobalRdrEnv -> [Type]
+  -> Maybe ( TyCon         -- Field's parrent TyCon
+           , FieldLabel    -- Field itself
+           , GlobalRdrElt  -- GRE for the selector
+           , Type          -- Type of the record value
+           , Type )        -- Type of the field of the record
+-- If possible, decompose application
+--     (HasField @k @rrep @arep @"fld" @(T t1..tn) @fld-ty),
+--     (SetField @k @rrep @arep @"fld" @(T t1..tn) @fld-ty),
+--  or (getField @k @rrep @arep @"fld" @(T t1..tn) @fld-ty)
+-- and return the pieces, if the record selector is in scope
+--
+-- A complication is that `T` might be a data family, so we need to
+-- look it up in the `fam_envs` to find its representation tycon.
+lookupFieldLabel fam_inst_envs rdr_env arg_tys
   |  -- We are matching HasField {k} {r_rep} {a_rep} x r a...
     (_k : _rec_rep : _fld_rep : x_ty : rec_ty : fld_ty : _) <- arg_tys
     -- x should be a literal string
@@ -1356,7 +1488,7 @@ lookupHasFieldLabel fam_inst_envs rdr_env arg_tys
   , Just fl <- lookupTyConFieldLabel (FieldLabelString x) r_tc
     -- Ensure the field selector is in scope
   , Just gre <- lookupGRE_FieldLabel rdr_env fl
-  = Just (flSelector fl, gre, rec_ty, fld_ty)
+  = Just (tc, fl, gre, rec_ty, fld_ty)
 
   | otherwise
   = Nothing
