@@ -14,7 +14,7 @@ static void sigill_handler(int);
 static void sigill_handler(__attribute__((unused)) int sig) {
     // If we get here, the vector instruction caused an illegal instruction
     // exception. We just swallow it.
-    longjmp(jmpbuf, 1);
+    siglongjmp(jmpbuf, 1);
 }
 #endif
 
@@ -98,9 +98,9 @@ int checkVectorSupport(void) {
     sigaction(SIGILL, &sa, &old_sa);
     
     unsigned vlenb = 0;
-    if (setjmp(jmpbuf) == 0) {
+    if (sigsetjmp(jmpbuf, 1) == 0) {
       // Try to execute a vector instruction
-      vlenb = __riscv_vlenb();
+      asm volatile("csrr %0, vlenb" : "=r" (vlenb) :: "memory");
     }
     // Restore original signal handler
     sigaction(SIGILL, &old_sa, NULL);
