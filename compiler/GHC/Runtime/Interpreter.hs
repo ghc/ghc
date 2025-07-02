@@ -411,15 +411,10 @@ evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
 evalBreakpointToId eval_break =
   let
     mkUnitId u = fsToUnit $ mkFastStringShortByteString u
-
     toModule u n = mkModule (mkUnitId u) (mkModuleName n)
-    tickl = toModule (eb_tick_mod_unit eval_break) (eb_tick_mod eval_break)
-    infol = toModule (eb_info_mod_unit eval_break) (eb_info_mod eval_break)
   in
     InternalBreakpointId
-      { ibi_tick_mod   = tickl
-      , ibi_tick_index = eb_tick_index eval_break
-      , ibi_info_mod   = infol
+      { ibi_info_mod   = toModule (eb_info_mod_unit eval_break) (eb_info_mod eval_break)
       , ibi_info_index = eb_info_index eval_break
       }
 
@@ -440,7 +435,7 @@ handleSeqHValueStatus interp unit_env eval_status =
           -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
 
         Just break -> do
-          let bi = evalBreakpointToId break
+          let ibi = evalBreakpointToId break
 
           -- Just case: Stopped at a breakpoint, extract SrcSpan information
           -- from the breakpoint.
@@ -450,7 +445,7 @@ handleSeqHValueStatus interp unit_env eval_status =
             -- Nothing case - should not occur! We should have the appropriate
             -- breakpoint information
             Nothing -> nothing_case
-            Just modbreaks -> put $ brackets . ppr $ getBreakLoc bi modbreaks
+            Just modbreaks -> put $ brackets . ppr $ getBreakLoc ibi modbreaks
 
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do

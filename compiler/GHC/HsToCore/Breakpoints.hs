@@ -12,7 +12,7 @@
 -- 'InternalModBreaks' and 'InternalBreakId's. The latter are constructed
 -- during bytecode generation and can be found in 'GHC.ByteCode.Breakpoints'.
 --
--- See Note [Breakpoint identifiers]
+-- See Note [ModBreaks vs InternalModBreaks] and Note [Breakpoint identifiers]
 module GHC.HsToCore.Breakpoints
   ( -- * ModBreaks
     mkModBreaks, ModBreaks(..)

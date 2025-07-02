@@ -704,12 +704,13 @@ toIfaceLFInfo nm lfi = case lfi of
 
 -- Dehydrating CgBreakInfo
 
-dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> CgBreakInfo
-dehydrateCgBreakInfo ty_vars idOffSets tick_ty =
+dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> BreakpointId -> CgBreakInfo
+dehydrateCgBreakInfo ty_vars idOffSets tick_ty bid =
           CgBreakInfo
             { cgb_tyvars = map toIfaceTvBndr ty_vars
             , cgb_vars = map (fmap (\(i, offset) -> (toIfaceIdBndr i, offset))) idOffSets
             , cgb_resty = toIfaceType tick_ty
+            , cgb_tick_id = bid
             }
 
 {- Note [Inlining and hs-boot files]
