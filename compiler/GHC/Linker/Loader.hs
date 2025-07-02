@@ -124,7 +124,9 @@ import GHC.Utils.Exception
 import GHC.Unit.Home.Graph (lookupHug, unitEnv_foldWithKey)
 import GHC.Driver.Downsweep
 import qualified GHC.Runtime.Interpreter as GHCi
-import Data.Array.Base (numElements)
+import qualified Data.IntMap.Strict as IM
+import qualified Data.Map.Strict as M
+import Foreign.Ptr (nullPtr)
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1666,10 +1668,10 @@ allocateBreakArrays ::
   IO (ModuleEnv (ForeignRef BreakArray))
 allocateBreakArrays interp =
   foldlM
-    ( \be0 InternalModBreaks{imodBreaks_modBreaks=ModBreaks {..}} -> do
+    ( \be0 InternalModBreaks{imodBreaks_breakInfo, imodBreaks_modBreaks=ModBreaks {..}} -> do
         -- If no BreakArray is assigned to this module yet, create one
         if not $ elemModuleEnv modBreaks_module be0 then do
-          let count = numElements modBreaks_locs
+          let count = maybe 0 ((+1) . fst) $ IM.lookupMax imodBreaks_breakInfo
           breakArray <- GHCi.newBreakArray interp count
           evaluate $ extendModuleEnv be0 modBreaks_module breakArray
         else
@@ -1679,29 +1681,51 @@ allocateBreakArrays interp =
 -- | Given a list of 'InternalModBreaks' collected from a list
 -- of 'CompiledByteCode', allocate the 'CostCentre' arrays when profiling is
 -- enabled.
+--
+-- Note that the resulting arrays are indexed by 'BreakInfoIndex' (internal
+-- breakpoint index), not by tick index
 allocateCCS ::
   Interp ->
-  ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)) ->
+  ModuleEnv (Array BreakInfoIndex (RemotePtr CostCentre)) ->
   [InternalModBreaks] ->
-  IO (ModuleEnv (Array BreakTickIndex (RemotePtr CostCentre)))
+  IO (ModuleEnv (Array BreakInfoIndex (RemotePtr CostCentre)))
 allocateCCS interp ce mbss
-  | interpreterProfiled interp =
-      foldlM
-        ( \ce0 InternalModBreaks{imodBreaks_modBreaks=ModBreaks {..}} -> do
-            ccs <-
+  | interpreterProfiled interp = do
+      -- 1. Create a mapping from source BreakpointId to CostCentre ptr
+      ccss <- M.unions <$> mapM
+        ( \InternalModBreaks{imodBreaks_modBreaks=ModBreaks{..}} -> do
+            ccs <- {- one ccs ptr per tick index -}
               mkCostCentres
                 interp
                 (moduleNameString $ moduleName modBreaks_module)
                 (elems modBreaks_ccs)
-            if not $ elemModuleEnv modBreaks_module ce0 then do
-              evaluate $
-                extendModuleEnv ce0 modBreaks_module $
-                  listArray
-                    (0, length ccs - 1)
-                    ccs
+            return $ M.fromList $
+              zipWith (\el ix -> (BreakpointId modBreaks_module ix, el)) ccs [0..]
+        )
+        mbss
+      -- 2. Create an array with one element for every InternalBreakpointId,
+      --    where every element has the CCS for the corresponding BreakpointId
+      foldlM
+        (\ce0 InternalModBreaks{imodBreaks_breakInfo, imodBreaks_modBreaks=ModBreaks{..}} -> do
+            if not $ elemModuleEnv modBreaks_module ce then do
+              let count = maybe 0 ((+1) . fst) $ IM.lookupMax imodBreaks_breakInfo
+              let ccs = IM.map
+                    (\info ->
+                      fromMaybe (toRemotePtr nullPtr)
+                        (M.lookup (cgb_tick_id info) ccss)
+                    )
+                    imodBreaks_breakInfo
+              assertPpr (count == length ccs)
+                (text "expected CgBreakInfo map to have one entry per valid ix") $
+                evaluate $
+                  extendModuleEnv ce0 modBreaks_module $
+                    listArray
+                      (0, count)
+                      (IM.elems ccs)
             else
               return ce0
         )
         ce
         mbss
+
   | otherwise = pure ce
