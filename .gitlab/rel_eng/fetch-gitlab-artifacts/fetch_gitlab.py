@@ -131,6 +131,9 @@ def fetch_artifacts(release: str, pipeline_id: int,
                     logging.info(f'extracted docs {f} to {dest}')
                 index_path = destdir / 'index.html'
                 index_path.replace(dest / 'index.html')
+                pdfs = list(destdir.glob('*.pdf'))
+                for f in pdfs:
+                  f.replace(dest / f.name)
             elif job.name == 'hackage-doc-tarball':
                 dest = dest_dir / 'hackage_docs'
                 logging.info(f'moved hackage_docs to {dest}')
