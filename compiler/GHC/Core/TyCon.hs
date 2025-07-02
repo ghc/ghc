@@ -1506,6 +1506,10 @@ There are a number of wrinkles
       guide inlining) treats (MkUC e) as the same size as `e`, and similarly
       (op d).
 
+    - `GHC.Core.Unfold.inlineBoringOK` where we want to ensure that we
+      always-inline (MkUC op), even into a boring context. See (IB6)
+      in Note [inlineBoringOk]
+
 (UCM5) `GHC.Core.Unfold.Make.mkDFunUnfolding` builds a `DFunUnfolding` for
    non-unary classes, but just an /ordinary/ unfolding for unary classes.
        instance Num a => Num [a] where { .. }       -- (I1)

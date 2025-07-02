@@ -836,19 +836,20 @@ myCollectArgs expr res_ty
   where
     go h@(Var f) as ts
       | isUnaryClassId f, (the_arg:as') <- dropWhile isTypeArg as
-                              = go the_arg as' ts
+      = go the_arg as' ts
         -- See (UCM1) in Note [Unary class magic] in GHC.Core.TyCon
         -- isUnaryClassId includes both the class op and the data-con
-      | otherwise             = (h, as, ts)
 
-    go (App f a)        as ts = go f (a:as) ts
-    go (Cast e _)       as ts = go e as ts
+      | otherwise
+      = (h, as, ts)
 
-    go (Tick t e)       as ts = assertPpr (not (tickishIsCode t) || all isTypeArg as)
-                                          (ppr e $$ ppr as $$ ppr ts) $
-                                -- See Note [Ticks in applications]
-                                -- ticks can appear in type apps
-                                go e as (coreToStgTick res_ty t : ts)
+    go (App f a)  as ts = go f (a:as) ts
+    go (Cast e _) as ts = go e as ts
+    go (Tick t e) as ts = assertPpr (not (tickishIsCode t) || all isTypeArg as)
+                                    (ppr e $$ ppr as $$ ppr ts) $
+                          -- See Note [Ticks in applications]
+                          -- ticks can appear in type apps
+                          go e as (coreToStgTick res_ty t : ts)
 
     go (Case e b _ alts) as ts  -- Just like in exprIsTrivial!
                                 -- Otherwise we fall over in case we encounter
@@ -859,10 +860,11 @@ myCollectArgs expr res_ty
        | Just rhs <- isUnsafeEqualityCase e b alts
        = go rhs as ts         -- Discards unsafeCoerce in App heads
 
-    go (Lam b e)        as ts
-       | isTyVar b            = go e (drop 1 as) ts -- Note [Collect args]
+    go (Lam b e) as ts
+       | isTyVar b
+       = go e (drop 1 as) ts -- Note [Collect args]
 
-    go e                as ts = (e, as, ts)
+    go e as ts = (e, as, ts)
 
 {- Note [Collect args]
 ~~~~~~~~~~~~~~~~~~~~~~

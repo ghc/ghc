@@ -278,6 +278,14 @@ inlining a saturated call is no bigger than `body`.  Some wrinkles:
   whose body is, in some sense, just as small as (g x y z).
   But `inlineBoringOk` doesn't attempt anything fancy; it just looks
   for a function call with trivial arguments, Keep it simple.
+
+(IB6) If we have an unfolding (K op) where K is a unary-class data constructor,
+  we want to inline it!  So that we get calls (f op), which in turn can see (in
+  STG land) that `op` is already evaluated and properly tagged. (If `op` isn't
+  trivial we will have baled out before we get to the Var case.)  This made
+  a big difference in benchmarks for the `effectful` library; details in !10479.
+
+  See Note [Unary class magic] in GHC/Core/TyCon.
 -}
 
 inlineBoringOk :: CoreExpr -> Bool
@@ -291,6 +299,7 @@ inlineBoringOk e
     is_fun = isValFun e
 
     go :: Int -> CoreExpr -> Bool
+    -- credit = #(value lambdas) = #(value args)
     go credit (Lam x e) | isRuntimeVar x  = go (credit+1) e
                         | otherwise       = go credit e      -- See (IB3)
 
@@ -309,13 +318,15 @@ inlineBoringOk e
     go credit (Tick _ e) = go credit e      -- dubious
     go credit (Cast e _) = go credit e      -- See (IB3)
 
+    -- Lit: we assume credit >= 0; literals aren't functions
     go _      (Lit l)    = litIsTrivial l && boringCxtOk
 
-      -- We assume credit >= 0; literals aren't functions
     go credit (Var v) | isDataConWorkId v, is_fun = boringCxtOk  -- See (IB2)
+                      | isUnaryClassId v          = boringCxtOk  -- See (IB6)
                       | credit >= 0               = boringCxtOk
                       | otherwise                 = boringCxtNotOk
-    go _      _                                   = boringCxtNotOk
+
+    go _ _ = boringCxtNotOk
 
 isValFun :: CoreExpr -> Bool
 -- True of functions with at least
