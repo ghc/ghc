@@ -450,6 +450,8 @@ FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
 
+FP_RISCV_MARCH([CONF_CC_OPTS_STAGE2])
+
 dnl ** Do we have a compatible emsdk version?
 dnl --------------------------------------------------------------
 EMSDK_VERSION("3.1.20", "", "")
