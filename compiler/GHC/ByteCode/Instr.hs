@@ -454,9 +454,8 @@ instance Outputable BCInstr where
    ppr ENTER                 = text "ENTER"
    ppr (RETURN pk)           = text "RETURN  " <+> ppr pk
    ppr (RETURN_TUPLE)        = text "RETURN_TUPLE"
-   ppr (BRK_FUN (InternalBreakpointId tick_mod tickx info_mod infox))
+   ppr (BRK_FUN (InternalBreakpointId info_mod infox))
                              = text "BRK_FUN" <+> text "<breakarray>"
-                               <+> ppr tick_mod <+> ppr tickx
                                <+> ppr info_mod <+> ppr infox
                                <+> text "<cc>"
    ppr (BRK_ALTS active)     = text "BRK_ALTS" <+> ppr active
