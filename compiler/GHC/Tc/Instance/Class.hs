@@ -1340,7 +1340,7 @@ matchSetField dflags short_cut clas tys mb_ct_loc
                          -- Use the equality proof to cast the selector Id to
                          -- type (r -> a), then use the newtype coercion to cast
                          -- it to a HasField dictionary.
-                         mk_ev (ev1:ev2:evs) = evDFunApp (dataConWrapId dCon) (tys ++ tvs) 
+                         mk_ev (ev1:ev2:evs) = evDFunApp (dataConWrapId dCon) tys 
                               [ evSelector modifier_id tvs evs `Cast` co ev2
                               , evSelector setter_id tvs evs `Cast` co ev1 
                               ]
@@ -1395,7 +1395,7 @@ matchSetField dflags short_cut clas tys mb_ct_loc
                 pure (setter, modifier)
               Nothing -> do
                 binds@((setter, _), (modifier,_)) <- mkSetFieldBinds tycon fl
-                writeTcRef req_flds ((fl, binds) : reqs)
+                updTcRef req_flds ((fl, binds) : )
                 pure (setter, modifier)
      
      tc_inst_setfield_binds setter_id modifier_id

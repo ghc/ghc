@@ -561,7 +561,7 @@ data TcGblEnv
           -- they all have a non-empty gre_imp field.
         tcg_keep      :: TcRef NameSet,
 
-        tcg_requested_fields :: TcRef [(FieldLabel, ((Id, LHsBind GhcRn), (Id, LHsBind GhcRn)))],
+        tcg_requested_fields :: TcRef [(FieldLabel, (FieldBind, FieldBind))],
 
         tcg_th_used :: TcRef Bool,
           -- ^ @True@ \<=> Template Haskell syntax used.
@@ -706,7 +706,8 @@ data TcGblEnv
         -- ^ See Note [Generating fresh names for FFI wrappers]
     }
 
-type FieldInstEnv = NameEnv (Id, Id) 
+type FieldInstEnv = NameEnv (Id, Id)
+type FieldBind = (Id, LHsBind GhcRn) 
 
 -- NB: topModIdentity, not topModSemantic!
 -- Definition sites of orphan identities will be identity modules, not semantic

@@ -580,12 +580,13 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
         -- Emit Typeable bindings
       ; tcg_env <- setGblEnv tcg_env $
                    mkTypeableBinds
+
       ; (tcg_env, recs_lie) <- setGblEnv tcg_env $
                    captureTopConstraints $
                    tcRecSetterBinds
 
       ; rec_ev_binds <- restoreEnvs (tcg_env, tcl_env) $
-                          simplifyTop recs_lie -- Is that required?
+                          simplifyTop recs_lie -- TODO sand-witch: Is that required?
 
       ; let new_ev_binds = main_ev_binds `mappend` rec_ev_binds
 

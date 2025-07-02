@@ -2308,7 +2308,7 @@ wildCardKey, absentErrorIdKey, absentConstraintErrorIdKey, augmentIdKey, appendI
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
     impossibleErrorIdKey, impossibleConstraintErrorIdKey,
     patErrorIdKey, voidPrimIdKey,
-    realWorldPrimIdKey, recConErrorIdKey,
+    realWorldPrimIdKey, recConErrorIdKey, recUpdErrorIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendUtf8IdKey, unpackCStringFoldrUtf8IdKey,
     unpackCStringIdKey, unpackCStringAppendIdKey, unpackCStringFoldrIdKey,
     typeErrorIdKey, divIntIdKey, modIntIdKey,
@@ -2409,6 +2409,7 @@ rationalToFloatIdKey   = mkPreludeMiscIdUnique 132
 rationalToDoubleIdKey  = mkPreludeMiscIdUnique 133
 
 seqHashKey             = mkPreludeMiscIdUnique 134
+recUpdErrorIdKey       = mkPreludeMiscIdUnique 135
 
 coerceKey :: Unique
 coerceKey                     = mkPreludeMiscIdUnique 157

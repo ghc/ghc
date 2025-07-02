@@ -104,7 +104,7 @@ module GHC.Internal.Control.Exception.Base (
         finally,
 
         -- * Calls for GHC runtime
-        recSelError, recConError,
+        recSelError, recConError, recUpdError,
         impossibleError, impossibleConstraintError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
         typeError,
@@ -422,11 +422,13 @@ instance Exception NoMatchingContinuationPrompt
 -----
 
 -- See Note [Compiler error functions] in ghc-internal:GHC.Internal.Prim.Panic
-recSelError, recConError, typeError,
+recSelError, recUpdError, recConError, typeError,
   nonExhaustiveGuardsError, patError, noMethodBindingError
         :: Addr# -> a   -- All take a UTF8-encoded C string
 
 recSelError              s = throw (RecSelError ("No match in record selector "
+                                                 ++ unpackCStringUtf8# s))  -- No location info unfortunately
+recUpdError              s = throw (RecUpdError ("No match in record update "
                                                  ++ unpackCStringUtf8# s))  -- No location info unfortunately
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
 recConError              s = throw (RecConError      (untangle s "Missing field in record construction"))

@@ -43,7 +43,7 @@ module GHC.Core.Make (
 
         -- * Error Ids
         mkRuntimeErrorApp, mkImpossibleExpr, mkAbsentErrorApp, errorIds,
-        rEC_CON_ERROR_ID,
+        rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID,
         nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
         pAT_ERROR_ID, rEC_SEL_ERROR_ID,
         tYPE_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID
@@ -906,6 +906,7 @@ errorIds
       nO_METHOD_BINDING_ERROR_ID,
       pAT_ERROR_ID,
       rEC_CON_ERROR_ID,
+      rEC_UPD_ERROR_ID,
       rEC_SEL_ERROR_ID,
       iMPOSSIBLE_ERROR_ID, iMPOSSIBLE_CONSTRAINT_ERROR_ID,
       aBSENT_ERROR_ID,  aBSENT_CONSTRAINT_ERROR_ID,
@@ -913,13 +914,14 @@ errorIds
       tYPE_ERROR_ID   -- Used with Opt_DeferTypeErrors, see #10284
       ]
 
-recSelErrorName, recConErrorName, patErrorName :: Name
+recSelErrorName, recConErrorName, patErrorName, recUpdErrorName :: Name
 nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 typeErrorName :: Name
 absentSumFieldErrorName :: Name
 
 recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
 recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
+recUpdErrorName     = err_nm "recUpdError"     recUpdErrorIdKey     rEC_UPD_ERROR_ID
 patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
 typeErrorName       = err_nm "typeError"       typeErrorIdKey       tYPE_ERROR_ID
 
@@ -931,11 +933,12 @@ nonExhaustiveGuardsErrorName = err_nm "nonExhaustiveGuardsError"
 err_nm :: String -> Unique -> Id -> Name
 err_nm str uniq id = mkWiredInIdName gHC_INTERNAL_CONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
-rEC_SEL_ERROR_ID, rEC_CON_ERROR_ID :: Id
+rEC_SEL_ERROR_ID, rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
 tYPE_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId TypeLike recSelErrorName
 rEC_CON_ERROR_ID                = mkRuntimeErrorId TypeLike recConErrorName
+rEC_UPD_ERROR_ID                = mkRuntimeErrorId TypeLike recUpdErrorName
 pAT_ERROR_ID                    = mkRuntimeErrorId TypeLike patErrorName
 nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId TypeLike noMethodBindingErrorName
 nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId TypeLike nonExhaustiveGuardsErrorName

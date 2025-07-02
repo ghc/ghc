@@ -42,7 +42,7 @@ import GHC.Hs
 import GHC.Core.TyCo.Rep( Type(..), Coercion(..), MCoercion(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate
-import GHC.Core.Make( rEC_SEL_ERROR_ID )
+import GHC.Core.Make( rEC_SEL_ERROR_ID, rEC_UPD_ERROR_ID )
 import GHC.Core.Class
 import GHC.Core.Type
 import GHC.Core.TyCon
@@ -871,7 +871,10 @@ mkOneRecordSelector all_cons idDetails fl has_sel
   = collectFieldLabelInfo all_cons idDetails fl has_sel mkRecordSelectorBind
 
 mkRecordSelectorBind :: RecordBindBuilder (Id, LHsBind GhcRn)
-mkRecordSelectorBind = mk_record_bind mk_sel_ty mk_match where
+mkRecordSelectorBind fl = mk_record_bind 1 err_expr mk_sel_ty mk_match fl where
+
+  err_expr = make_rec_error_expr fl rEC_SEL_ERROR_ID
+
   mk_sel_ty :: Type -> Type -> Type
   mk_sel_ty data_ty field_ty =
       mkVisFunTyMany data_ty            $
@@ -931,21 +934,22 @@ mkSetFieldBinds tycon fl =
       let
         lbl = flLabel fl
         newOcc = mkOccNameFS varName (mkFastString prefix `mappend` field_label lbl)
-      in fl {flSelector = flSelector fl `setNameUnique` uniq `tidyNameOcc` newOcc}
+      in fl { flSelector = flSelector fl `setNameUnique` uniq `tidyNameOcc` newOcc }
 
     mk_binds cons_w_field rec_details ty_builder = do
       setter_fl <- mk_field_lbl "setter_" <$> newUnique
-      modifier_fd <- mk_field_lbl "modifier_" <$> newUnique
+      modifier_fl <- mk_field_lbl "modifier_" <$> newUnique
       let setter_bind = mkRecordSetterBind fl setter_fl all_cons cons_w_field rec_details ty_builder
-          modifier_bind = mkRecordModifierBind fl modifier_fd all_cons cons_w_field rec_details ty_builder
+          modifier_bind = mkRecordModifierBind fl modifier_fl all_cons cons_w_field rec_details ty_builder
       pure (setter_bind, modifier_bind)
 
-
 mkRecordSetterBind :: FieldLabel -> RecordBindBuilder (Id, LHsBind GhcRn)
-mkRecordSetterBind origFl fl = mk_record_bind mkRecordSetterType mk_match fl where
+mkRecordSetterBind origFl fl = mk_record_bind 2 err_expr mkRecordSetterType mk_match fl where
+
+  err_expr = make_rec_error_expr origFl rEC_UPD_ERROR_ID
 
   mk_match =
-    mk_set_fld_match (getOccName $ flSelector fl) origFl $
+    mk_set_fld_match (getOccName $ flSelector origFl) origFl $
       \_ field_var -> (genWildPat, genLHsVar field_var)
 
 mkRecordSetterType :: Type -> Type -> Type
@@ -954,7 +958,9 @@ mkRecordSetterType data_ty field_ty =
     mkVisFunTyMany data_ty data_ty
 
 mkRecordModifierBind :: FieldLabel -> RecordBindBuilder (Id, LHsBind GhcRn)
-mkRecordModifierBind origFl fl = mk_record_bind mkRecordModifierType mk_match fl where
+mkRecordModifierBind origFl fl = mk_record_bind 2 err_expr mkRecordModifierType mk_match fl where
+
+  err_expr = make_rec_error_expr origFl rEC_UPD_ERROR_ID
 
   mk_match = mk_set_fld_match (mkOccName varName "f") origFl $ \i fun_var ->
       let fld_nm = mk_set_fld_bind i fl
@@ -1060,11 +1066,21 @@ collectFieldLabelInfo all_cons idDetails fl has_sel k
                           mkPhiTy req_theta                 $
                           mk_ty data_ty field_ty
 
+make_rec_error_expr :: FieldLabel -> Id -> LHsExpr GhcRn
+make_rec_error_expr fl err_id =
+  genLHsApp
+      (genHsVar (getName err_id))
+      (genLHsLit msg_lit)
+  where
+    msg_lit = HsStringPrim NoSourceText (bytesFS (field_label (flLabel fl)))
+
 mk_record_bind ::
+  Int ->
+  LHsExpr GhcRn ->
   (Type -> Type -> Type) ->
   FldBindMatchBuilder ->
   RecordBindBuilder (Id, LHsBind GhcRn)
-mk_record_bind mk_ty mk_match fl all_cons cons_w_field rec_details ty_builder
+mk_record_bind num_args err_expr mk_ty mk_match fl all_cons cons_w_field rec_details ty_builder
   = (sel_id, L loc sel_bind)
   where
     sel_ty = ty_builder mk_ty
@@ -1092,10 +1108,8 @@ mk_record_bind mk_ty mk_match fl all_cons cons_w_field rec_details ty_builder
     -- We do this explicitly so that we get a nice error message that
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
-          | otherwise = [mkSimpleMatch match_ctxt (wrapGenSpan [genWildPat])
-                            (genLHsApp
-                                (genHsVar (getName rEC_SEL_ERROR_ID))
-                                (genLHsLit msg_lit))]
+          | otherwise = [mkSimpleMatch match_ctxt (wrapGenSpan (replicate num_args genWildPat))
+                            err_expr]
 
         -- Do not add a default case unless there are unmatched
         -- constructors.  We must take account of GADTs, else we
@@ -1114,7 +1128,6 @@ mk_record_bind mk_ty mk_match fl all_cons cons_w_field rec_details ty_builder
         inst_tys = dataConResRepTyArgs dc
 
     unit_rhs = mkLHsTupleExpr [] noExtField
-    msg_lit = HsStringPrim NoSourceText (bytesFS (field_label (flLabel fl)))
 
 {-
 Note [Polymorphic selectors]
