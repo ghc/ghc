@@ -1229,11 +1229,10 @@ mkFRRUnboxedSum = FRRUnboxedSum
 -- and is reported separately.
 pprFixedRuntimeRepContext :: FixedRuntimeRepContext -> SDoc
 pprFixedRuntimeRepContext (FRRRecordCon lbl _arg)
-  = sep [ text "The field", quotes (ppr lbl)
+  = sep [ text "The field", quotes (ppr lbl) -- TODO ANI: Where does this get used? Add missing test?
         , text "of the record constructor" ]
-pprFixedRuntimeRepContext (FRRRecordUpdate lbl _arg)
-  = sep [ text "The record update at field"
-        , quotes (ppr lbl) ]
+pprFixedRuntimeRepContext (FRRRecordUpdate lbl _)
+  = sep [ text "The field", quotes (ppr lbl) ]
 pprFixedRuntimeRepContext (FRRBinder binder)
   = sep [ text "The binder"
         , quotes (ppr binder) ]
