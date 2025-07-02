@@ -548,7 +548,7 @@ The available mode flags are:
 
     Print ``YES`` if GHC was compiled to use symbols with leading underscores
     in object files, ``NO`` otherwise.
-    This is usually atarget platform dependent.
+    This is usually target platform dependent.
 
 .. ghc-flag:: --print-libdir
     :shortdesc: display GHC library directory
