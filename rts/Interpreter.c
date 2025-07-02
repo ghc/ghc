@@ -685,8 +685,6 @@ interpretBCO (Capability* cap)
      */
     if (cap->r.rCurrentTSO->flags & TSO_STOP_AFTER_RETURN) {
 
-      StgBCO* bco;
-      StgWord16* bco_instrs;
       StgHalfWord type;
 
       /* Store the entry Sp; traverse the stack modifying Sp (using Sp macros);
@@ -706,28 +704,33 @@ interpretBCO (Capability* cap)
       ASSERT(type == RET_BCO || type == STOP_FRAME);
       if (type == RET_BCO) {
 
-        bco = (StgBCO*)(SpW(1)); // BCO is first arg of a RET_BCO
+        StgBCO* bco = (StgBCO*)(SpW(1)); // BCO is first arg of a RET_BCO
         ASSERT(get_itbl((StgClosure*)bco)->type == BCO);
-        bco_instrs = (StgWord16*)(bco->instrs->payload);
+
+        StgWord16* instrs = (StgWord16*)(bco->instrs->payload);
+        StgWord16 bci = instrs[0];
 
         /* A breakpoint instruction (BRK_FUN or BRK_ALTS) is always the first
          * instruction in a BCO */
-        if ((bco_instrs[0] & 0xFF) == bci_BRK_FUN) {
-            int brk_array, tick_index;
-            StgArrBytes *breakPoints;
-            StgPtr* ptrs;
+        if ((bci & 0xFF) == bci_BRK_FUN) {
+            // Define rest of variables used by BCO_* Macros
+            int bciPtr = 0;
 
-            ptrs = (StgPtr*)(&bco->ptrs->payload[0]);
-            brk_array  = bco_instrs[1];
-            tick_index = bco_instrs[6];
+            W_ arg1_brk_array, arg4_info_index;
+            arg1_brk_array      = BCO_GET_LARGE_ARG;
+            /* info_mod_name = */ BCO_GET_LARGE_ARG;
+            /* info_mod_id   = */ BCO_GET_LARGE_ARG;
+            arg4_info_index     = BCO_NEXT;
 
-            breakPoints = (StgArrBytes *) BCO_PTR(brk_array);
+            StgPtr* ptrs = (StgPtr*)(&bco->ptrs->payload[0]);
+            StgArrBytes* breakPoints = (StgArrBytes *) BCO_PTR(arg1_brk_array);
+
             // ACTIVATE the breakpoint by tick index
-            ((StgInt*)breakPoints->payload)[tick_index] = 0;
+            ((StgInt*)breakPoints->payload)[arg4_info_index] = 0;
         }
-        else if ((bco_instrs[0] & 0xFF) == bci_BRK_ALTS) {
+        else if ((bci & 0xFF) == bci_BRK_ALTS) {
             // ACTIVATE BRK_ALTS by setting its only argument to ON
-            bco_instrs[1] = 1;
+            instrs[1] = 1;
         }
         // else: if there is no BRK instruction perhaps we should keep
         // traversing; that said, the continuation should always have a BRK
@@ -1520,9 +1523,9 @@ run_BCO:
         /* check for a breakpoint on the beginning of a let binding */
         case bci_BRK_FUN:
         {
-            int arg1_brk_array, arg2_tick_mod, arg3_info_mod, arg4_tick_mod_id, arg5_info_mod_id, arg6_tick_index, arg7_info_index;
+            W_ arg1_brk_array, arg2_info_mod_name, arg3_info_mod_id, arg4_info_index;
 #if defined(PROFILING)
-            int arg8_cc;
+            W_ arg5_cc;
 #endif
             StgArrBytes *breakPoints;
             int returning_from_break, stop_next_breakpoint;
@@ -1537,14 +1540,11 @@ run_BCO:
             int size_words;
 
             arg1_brk_array      = BCO_GET_LARGE_ARG;
-            arg2_tick_mod       = BCO_GET_LARGE_ARG;
-            arg3_info_mod       = BCO_GET_LARGE_ARG;
-            arg4_tick_mod_id    = BCO_GET_LARGE_ARG;
-            arg5_info_mod_id    = BCO_GET_LARGE_ARG;
-            arg6_tick_index     = BCO_NEXT;
-            arg7_info_index     = BCO_NEXT;
+            arg2_info_mod_name  = BCO_GET_LARGE_ARG;
+            arg3_info_mod_id    = BCO_GET_LARGE_ARG;
+            arg4_info_index     = BCO_NEXT;
 #if defined(PROFILING)
-            arg8_cc             = BCO_GET_LARGE_ARG;
+            arg5_cc             = BCO_GET_LARGE_ARG;
 #else
             BCO_GET_LARGE_ARG;
 #endif
@@ -1564,7 +1564,7 @@ run_BCO:
 
 #if defined(PROFILING)
             cap->r.rCCCS = pushCostCentre(cap->r.rCCCS,
-                                          (CostCentre*)BCO_LIT(arg8_cc));
+                                          (CostCentre*)BCO_LIT(arg5_cc));
 #endif
 
             // if we are returning from a break then skip this section
@@ -1575,11 +1575,11 @@ run_BCO:
 
                // stop the current thread if either `stop_next_breakpoint` is
                // true OR if the ignore count for this particular breakpoint is zero
-               StgInt ignore_count = ((StgInt*)breakPoints->payload)[arg6_tick_index];
+               StgInt ignore_count = ((StgInt*)breakPoints->payload)[arg4_info_index];
                if (stop_next_breakpoint == false && ignore_count > 0)
                {
                   // decrement and write back ignore count
-                  ((StgInt*)breakPoints->payload)[arg6_tick_index] = --ignore_count;
+                  ((StgInt*)breakPoints->payload)[arg4_info_index] = --ignore_count;
                }
                else if (stop_next_breakpoint == true || ignore_count == 0)
                {
@@ -1613,10 +1613,7 @@ run_BCO:
                   // Arrange the stack to call the breakpoint IO action, and
                   // continue execution of this BCO when the IO action returns.
                   //
-                  // ioAction :: Addr#       -- the breakpoint tick module
-                  //          -> Addr#       -- the breakpoint tick module unit id
-                  //          -> Int#        -- the breakpoint tick index
-                  //          -> Addr#       -- the breakpoint info module
+                  // ioAction :: Addr#       -- the breakpoint info module
                   //          -> Addr#       -- the breakpoint info module unit id
                   //          -> Int#        -- the breakpoint info index
                   //          -> Bool        -- exception?
@@ -1626,23 +1623,17 @@ run_BCO:
                   ioAction = (StgClosure *) deRefStablePtr (
                       rts_breakpoint_io_action);
 
-                  Sp_subW(19);
-                  SpW(18) = (W_)obj;
-                  SpW(17) = (W_)&stg_apply_interp_info;
-                  SpW(16) = (W_)new_aps;
-                  SpW(15) = (W_)False_closure;         // True <=> an exception
-                  SpW(14) = (W_)&stg_ap_ppv_info;
-                  SpW(13)  = (W_)arg7_info_index;
-                  SpW(12)  = (W_)&stg_ap_n_info;
-                  SpW(11)  = (W_)BCO_LIT(arg5_info_mod_id);
-                  SpW(10)  = (W_)&stg_ap_n_info;
-                  SpW(9)  = (W_)BCO_LIT(arg3_info_mod);
-                  SpW(8)  = (W_)&stg_ap_n_info;
-                  SpW(7)  = (W_)arg6_tick_index;
+                  Sp_subW(13);
+                  SpW(12) = (W_)obj;
+                  SpW(11) = (W_)&stg_apply_interp_info;
+                  SpW(10) = (W_)new_aps;
+                  SpW(9) = (W_)False_closure;         // True <=> an exception
+                  SpW(8) = (W_)&stg_ap_ppv_info;
+                  SpW(7)  = (W_)arg4_info_index;
                   SpW(6)  = (W_)&stg_ap_n_info;
-                  SpW(5)  = (W_)BCO_LIT(arg4_tick_mod_id);
+                  SpW(5)  = (W_)BCO_LIT(arg3_info_mod_id);
                   SpW(4)  = (W_)&stg_ap_n_info;
-                  SpW(3)  = (W_)BCO_LIT(arg2_tick_mod);
+                  SpW(3)  = (W_)BCO_LIT(arg2_info_mod_name);
                   SpW(2)  = (W_)&stg_ap_n_info;
                   SpW(1)  = (W_)ioAction;
                   SpW(0)  = (W_)&stg_enter_info;

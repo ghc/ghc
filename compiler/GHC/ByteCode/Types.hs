@@ -285,7 +285,7 @@ data BCONPtr
   -- | A libffi ffi_cif function prototype.
   | BCONPtrFFIInfo !FFIInfo
   -- | A 'CostCentre' remote pointer array's respective 'BreakpointId'
-  | BCONPtrCostCentre !BreakpointId
+  | BCONPtrCostCentre !InternalBreakpointId
 
 instance NFData BCONPtr where
   rnf x = x `seq` ()

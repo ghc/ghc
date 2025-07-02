@@ -31,6 +31,9 @@ import GHC.Unit.Module.ModSummary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
+import qualified Data.IntMap.Strict as IntMap
+import qualified GHC.Unit.Home.Graph as HUG
+import qualified GHC.Unit.Home.PackageTable as HPT
 
 --------------------------------------------------------------------------------
 -- Finding Module breakpoints
@@ -214,6 +217,47 @@ getModBreak m = do
    pure $ imodBreaks_modBreaks <$> modInfoModBreaks mod_info
 
 --------------------------------------------------------------------------------
+-- Mapping source-level BreakpointIds to IBI occurrences
+-- (See Note [Breakpoint identifiers])
+--------------------------------------------------------------------------------
+
+-- | A source-level breakpoint may have been inlined into many occurrences, now
+-- referred by 'InternalBreakpointId'. When a breakpoint is set on a certain
+-- source breakpoint, it means all *ocurrences* of that breakpoint across
+-- modules should be stopped at -- hence we keep a trie from BreakpointId to
+-- the list of internal break ids using it.
+-- See also Note [Breakpoint identifiers]
+type BreakpointOccurrences = ModuleEnv (IntMap.IntMap [InternalBreakpointId])
+
+-- | Lookup all InternalBreakpointIds matching the given BreakpointId
+-- Nothing if BreakpointId not in map
+lookupBreakpointOccurrences :: BreakpointOccurrences -> BreakpointId -> Maybe [InternalBreakpointId]
+lookupBreakpointOccurrences bmp (BreakpointId md tick) =
+  lookupModuleEnv bmp md >>= IntMap.lookup tick
+
+-- | Construct a mapping from Source 'BreakpointId's to 'InternalBreakpointId's from the given list of 'ModInfo's
+mkBreakpointOccurrences :: forall m. GhcMonad m => m BreakpointOccurrences
+mkBreakpointOccurrences = do
+  hug <- hsc_HUG <$> getSession
+  liftIO $ foldr go (pure emptyModuleEnv) hug
+  where
+    go :: HUG.HomeUnitEnv -> IO BreakpointOccurrences -> IO BreakpointOccurrences
+    go hue mbmp = do
+      bmp <- mbmp
+      ibrkss <- HPT.concatHpt (\hmi -> maybeToList (getModBreaks hmi))
+                             (HUG.homeUnitEnv_hpt hue)
+      return $ foldr addBreakToMap bmp ibrkss
+
+    addBreakToMap :: InternalModBreaks -> BreakpointOccurrences -> BreakpointOccurrences
+    addBreakToMap ibrks bmp0 = do
+      let imod = modBreaks_module $ imodBreaks_modBreaks ibrks
+      IntMap.foldrWithKey (\info_ix cgi bmp -> do
+          let ibi = InternalBreakpointId imod info_ix
+          let BreakpointId tick_mod tick_ix = cgb_tick_id cgi
+          extendModuleEnvWith (IntMap.unionWith (S.<>)) bmp tick_mod (IntMap.singleton tick_ix [ibi])
+        ) bmp0 (imodBreaks_breakInfo ibrks)
+
+--------------------------------------------------------------------------------
 -- Getting current breakpoint information
 --------------------------------------------------------------------------------
 
@@ -235,9 +279,15 @@ getCurrentBreakSpan = do
 getCurrentBreakModule :: GhcMonad m => m (Maybe Module)
 getCurrentBreakModule = do
   resumes <- getResumeContext
-  return $ case resumes of
-    [] -> Nothing
+  hug <- hsc_HUG <$> getSession
+  liftIO $ case resumes of
+    [] -> pure Nothing
     (r:_) -> case resumeHistoryIx r of
-      0  -> ibi_tick_mod <$> resumeBreakpointId r
-      ix -> Just $ getHistoryModule $ resumeHistory r !! (ix-1)
+      0  -> case resumeBreakpointId r of
+        Nothing -> pure Nothing
+        Just ibi -> do
+          brks <- readIModBreaks hug ibi
+          return $ Just $ bi_tick_mod $ getBreakSourceId ibi brks
+      ix ->
+          Just <$> getHistoryModule hug (resumeHistory r !! (ix-1))
 
