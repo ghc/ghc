@@ -1234,8 +1234,8 @@ Other places that requires from the same treatment:
 
 -- Warn about certain types of values discarded in monadic bindings (#3263)
 warnDiscardedDoBindings :: LHsExpr GhcTc -> Type -> Type -> DsM ()
-warnDiscardedDoBindings rhs m_ty elt_ty
-  = do { warn_unused <- woptM Opt_WarnUnusedDoBind
+warnDiscardedDoBindings rhs@(L rhs_loc _) m_ty elt_ty
+  = putSrcSpanDsA rhs_loc $ do { warn_unused <- woptM Opt_WarnUnusedDoBind
        ; warn_wrong <- woptM Opt_WarnWrongDoBind
        ; when (warn_unused || warn_wrong) $
     do { fam_inst_envs <- dsGetFamInstEnvs
