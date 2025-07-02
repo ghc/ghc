@@ -109,13 +109,6 @@ IOManagerType iomgr_type;
  * supported by the currently selected I/O manager. */
 StgWord rts_IOManagerFeatures = IOMgrNotInitialised;
 
-#if defined(mingw32_HOST_OS)
-/* Global var (only on Windows) that is exported to be shared with the I/O code
- * in the base library to tell us which style of I/O manager we are using: one
- * that uses the Windows native API HANDLEs, or one that uses Posix style fds.
- */
-bool rts_IOManagerIsWin32Native = false;
-#endif
 
 enum IOManagerAvailability
 parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag)
@@ -332,7 +325,7 @@ void selectIOManager(void)
 #endif
 #if defined(IOMGR_ENABLED_WINIO)
         case IO_MANAGER_WINIO:
-            rts_IOManagerFeatures = 0;
+            rts_IOManagerFeatures = IOMgrUsesHANDLEs;
             break;
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
@@ -345,9 +338,6 @@ void selectIOManager(void)
     debugTrace(DEBUG_iomanager,
                "selected %s I/O manager; features bitset 0x%" FMT_Word,
                showIOManager(), rts_IOManagerFeatures);
-#if defined(mingw32_HOST_OS)
-    rts_IOManagerIsWin32Native = iomgr_type == IO_MANAGER_WINIO;
-#endif
 }
 
 

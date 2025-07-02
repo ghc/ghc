@@ -60,6 +60,13 @@ enum IOManagerFeatures {
      */
     IOMgrInRTS = 1 << 0,
 
+    /* This means that the I/O manager uses the Win32 API's HANDLE type to
+     * refer to open files. The inverse is that it uses Posix style fds.
+     * This is always false on Poisx platforms, while on Windows it is true
+     * for some but not all of the Windows I/O manager implementations.
+     */
+    IOMgrUsesHANDLEs = 1 << 1,
+
     /* As we go along, we will add more feature bits here.
      Examples include:
        - supports non-blocking + readiness notification
@@ -84,17 +91,6 @@ enum IOManagerFeatures {
  * selected), and is immutable thereafter so can be read freely.
  */
 extern StgWord rts_IOManagerFeatures;
-
-#if defined(mingw32_HOST_OS)
-/* Exported global var (only on Windows) that is shared with the I/O code in
- * the ghc-internal library to tell us which style of I/O manager we are using:
- * one that uses the Windows native API HANDLEs, or one that uses Posix style
- * fds.
- *
- * TODO: replace this var with a feature bit in IOManagerFeatures above.
- */
-extern bool rts_IOManagerIsWin32Native;
-#endif
 
 
 /* Everything after this is internal to the RTS.

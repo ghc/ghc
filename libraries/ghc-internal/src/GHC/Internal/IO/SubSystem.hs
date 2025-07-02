@@ -51,6 +51,7 @@ module GHC.Internal.IO.SubSystem (
   -- other. This can instead now be done conditionally on the I\/O manager
   -- feature 'iomgrInRTS'.
   iomgrInRTS,
+  iomgrUsesHANDLEs,
  ) where
 
 import GHC.Internal.Base
@@ -59,14 +60,6 @@ import GHC.Internal.Num
 import GHC.Internal.Prim (Word#, and#, indexWordOffAddr#, uncheckedShiftL#)
 import GHC.Internal.Ptr (Ptr(..))
 import GHC.Internal.Show
-
-#if defined(mingw32_HOST_OS)
-import GHC.Internal.IO.Unsafe
-import GHC.Internal.Foreign.Ptr
-import GHC.Internal.Foreign.Storable
-import GHC.Internal.Foreign.C.Types
-import GHC.Internal.Foreign.Marshal.Utils
-#endif
 
 infixl 7 <!>
 
@@ -89,14 +82,10 @@ deriving instance Show IoSubSystem
 -- On Windows execute the second action if WINIO as active, otherwise fall back to
 -- the first action.
 conditional :: a -> a -> a
-#if defined(mingw32_HOST_OS)
 conditional posix windows =
   case ioSubSystem of
     IoPOSIX -> posix
     IoNative -> windows
-#else
-conditional posix _       = posix
-#endif
 
 -- | Infix version of `conditional`.
 -- posix <!> windows == conditional posix windows
@@ -123,23 +112,7 @@ isWindowsNativeIO = False <!> True
 -- On non-Windows systems this value is always 'IoPOSIX'.
 --
 ioSubSystem :: IoSubSystem
-#if defined(mingw32_HOST_OS)
-{-# INLINE ioSubSystem #-}
-ioSubSystem =
-  case toBool ioManagerIsWin32NativeCBool of
-    False -> IoPOSIX
-    True  -> IoNative
-
-{-# NOINLINE ioManagerIsWin32NativeCBool #-}
-ioManagerIsWin32NativeCBool :: CBool
-ioManagerIsWin32NativeCBool =
-  unsafeDupablePerformIO $ peek ioManagerIsWin32NativePtr
-
-foreign import ccall "&rts_IOManagerIsWin32Native"
-  ioManagerIsWin32NativePtr :: Ptr CBool
-#else
-ioSubSystem = IoPOSIX
-#endif
+ioSubSystem = if iomgrUsesHANDLEs then IoNative else IoPOSIX
 
 withIoSubSystem :: (IoSubSystem -> IO a) -> IO a
 withIoSubSystem f = f ioSubSystem
@@ -159,9 +132,11 @@ whenIoSubSystem m f = do let sub = ioSubSystem
 --
 data IOManagerFeature =
        IOMgrInRTS
+     | IOMgrUsesHANDLEs
 
 ioManagerFeatureBitmask :: IOManagerFeature -> Word#
 ioManagerFeatureBitmask IOMgrInRTS       = 1## `uncheckedShiftL#` 0#
+ioManagerFeatureBitmask IOMgrUsesHANDLEs = 1## `uncheckedShiftL#` 1#
 
 -- | This means that the I\/O manager is implemented within the RTS. The
 -- inverse is that it is implemented in Haskell. Interaction with an in-RTS
@@ -175,12 +150,26 @@ ioManagerFeatureBitmask IOMgrInRTS       = 1## `uncheckedShiftL#` 0#
 iomgrInRTS :: Bool
 iomgrInRTS = ioManagerFeature IOMgrInRTS
 
+-- | This means that the I\/O manager uses the Win32 API's HANDLE type to
+-- refer to open files. The inverse is that it uses Posix style fds.
+-- This is always false on Poisx platforms, while on Windows it is true
+-- for some but not all of the Windows I\/O manager implementations.
+--
+iomgrUsesHANDLEs :: Bool
+iomgrUsesHANDLEs = ioManagerFeature IOMgrUsesHANDLEs
+
 -- | Test for availablity of a feature of the current I\/O manager.
 --
 -- The I\/O manager is selected on startup and not changed thereafter. Thus
 -- these feature tests are stable, but must be made at runtime.
 --
 ioManagerFeature :: IOManagerFeature -> Bool
+
+-- This is an optimisation, for static rather than dynamic knowledge.
+#if !defined(mingw32_HOST_OS)
+ioManagerFeature IOMgrUsesHANDLEs = False
+#endif
+
 ioManagerFeature feature =
   case ioManagerFeaturesPtr of
     Ptr ioManagerFeaturesAddr# ->
