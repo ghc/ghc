@@ -572,15 +572,12 @@ dictSelRule :: Int -> Arity -> RuleFun
 -- from it
 --       sel_i t1..tk (D t1..tk op1 ... opm) = opi
 --
-dictSelRule val_index n_ty_args _ id_unf fuck args
+dictSelRule val_index n_ty_args _ id_unf _ args
   | (dict_arg : _) <- drop n_ty_args args
   , Just (_, floats, con, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
-  = Just (wrapFloats floats $ getNth con con_args val_index)
+  = Just (wrapFloats floats $ getNth con_args val_index)
   | otherwise
   = Nothing
-  where
-    getNth con xs n = assertPpr (xs `lengthExceeds` n) (ppr fuck $$ ppr args $$ ppr n_ty_args $$ ppr con $$ ppr n $$ ppr xs) $
-                xs !! n
 
 {-
 ************************************************************************
