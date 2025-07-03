@@ -68,6 +68,7 @@ import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec, mkCast )
 import GHC.Core.Type
 import GHC.Core.Predicate    ( isCoVarType )
 import GHC.Core.TyCo.Compare ( eqType )
+import GHC.Core.Coercion     ( mkRepReflCo, mkForAllVisCos )
 import GHC.Core.DataCon      ( DataCon, dataConWorkId, dataConWrapId )
 import GHC.Core.Multiplicity
 

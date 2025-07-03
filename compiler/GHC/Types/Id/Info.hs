@@ -206,12 +206,14 @@ data IdDetails
   | CoVarId    -- ^ A coercion variable
                -- This only covers /un-lifted/ coercions, of type
                -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
+
   | JoinId JoinArity (Maybe [CbvMark])
         -- ^ An 'Id' for a join point taking n arguments
         -- Note [Join points] in "GHC.Core"
         -- Can also work as a WorkerLikeId if given `CbvMark`s.
         -- See Note [CBV Function Ids]
         -- The [CbvMark] is always empty (and ignored) until after Tidy.
+
   | WorkerLikeId [CbvMark]
         -- ^ An 'Id' for a worker like function, which might expect some arguments to be
         -- passed both evaluated and tagged.

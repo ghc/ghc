@@ -658,7 +658,7 @@ through A, so it should have ManyOcc.  Bear this case in mind!
   treatment to /pre-existing/ non-recursive join points, not the ones that we
   discover for the first time in this sweep of the occurrence analyser.
 
-* In occ_env, the new (occ_join_points :: IdEnv OccInfoEnv) maps
+* In occ_env, the new (occ_join_points :: IdEnv IdOccEnv) maps
   each in-scope non-recursive join point, such as `j` above, to
   a "zeroed form" of its RHS's usage details. The "zeroed form"
     * deletes ManyOccs
@@ -714,7 +714,7 @@ There are a couple of tricky wrinkles
      This requires work in two places.
      * In `preprocess_env`, we detect if the newly-bound variables intersect
        the free vars of occ_join_points.  (These free vars are conveniently
-       simply the domain of the OccInfoEnv for that join point.) If so,
+       simply the domain of the IdOccEnv for that join point.) If so,
        we zap the entire occ_join_points.
      * In `postprcess_uds`, we add the chucked-out join points to the
        returned UsageDetails, with `andUDs`.
@@ -1173,7 +1173,7 @@ occAnalRec env lvl (CyclicSCC details_s) (WUD body_uds binds)
 
     needed :: NodeDetails -> Bool
     needed (ND { nd_bndr = bndr }) = isExportedId bndr || bndr `elemVarEnv` body_env
-    body_env = ud_env body_uds
+    body_env = ud_id_env body_uds
 
     ------------------------------
     -- Make the nodes for the loop-breaker analysis
@@ -2217,7 +2217,7 @@ occ_anal_lam_tail env expr@(Lam {})
          in go env' (bndr':rev_bndrs) body
 
     go env rev_bndrs body
-      = addInScope env rev_bndrs $ \env ->
+      = addInScope env (reverse rev_bndrs) $ \env ->
         let !(WUD usage body') = occ_anal_lam_tail env body
             wrap_lam body bndr = Lam (tagLamBinder usage bndr) body
         in WUD (usage `addLamTyCoVarOccs` rev_bndrs)
@@ -2298,7 +2298,7 @@ occAnalUnfolding !env unf
               -- scope remain in scope; there is no cloning etc.
 
       unf@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
-        -> let WUD uds args' = addInScopeList env bndrs $ \ env ->
+        -> let WUD uds args' = addInScope env bndrs $ \ env ->
                                occAnalList env args
            in WTUD (TUD 0 uds) (unf { df_args = args' })
               -- No need to use tagLamBinders because we
@@ -2316,11 +2316,11 @@ occAnalRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
   where
     rule' = rule { ru_args = args', ru_rhs = rhs' }
 
-    WUD lhs_uds args' = addInScopeList env bndrs $ \env ->
+    WUD lhs_uds args' = addInScope env bndrs $ \env ->
                         occAnalList env args
 
     lhs_uds' = markAllManyNonTail lhs_uds
-    WUD rhs_uds rhs' = addInScopeList env bndrs $ \env ->
+    WUD rhs_uds rhs' = addInScope env bndrs $ \env ->
                        occAnal env rhs
                           -- Note [Rules are extra RHSs]
                           -- Note [Rule dependency info]
@@ -2627,7 +2627,7 @@ occAnal env (Case scrut bndr ty alts)
         WUD uds2 alts' = do_alts env alts
 
     do_alt !env (Alt con bndrs rhs)
-      = addInScopeList env bndrs $ \ env ->
+      = addInScope env bndrs $ \ env ->
         let WUD rhs_usage rhs' = occAnal env rhs
             tagged_bndrs = tagLamBinders rhs_usage bndrs
         in                 -- See Note [Binders in case alternatives]
@@ -2923,12 +2923,12 @@ data OccEnv
                -- Vars (TyVars and Ids) free in the range of occ_bs_env
 
              -- Usage details of the RHS of in-scope non-recursive join points
-             -- Invariant: no Id maps to an empty OccInfoEnv
+             -- Invariant: no Id maps to an empty IdOccEnv
              -- See Note [Occurrence analysis for join points]
            , occ_join_points :: !JoinPointInfo
     }
 
-type JoinPointInfo = IdEnv OccInfoEnv
+type JoinPointInfo = IdEnv IdOccEnv
 
 -----------------------------
 {- Note [OccEncl]
@@ -3121,13 +3121,6 @@ isRhsEnv (OccEnv { occ_encl = cxt }) = case cxt of
                                           OccRhs -> True
                                           _      -> False
 
-addInScopeList :: OccEnv -> [Var]
-               -> (OccEnv -> WithUsageDetails a) -> WithUsageDetails a
-{-# INLINE addInScopeList #-}
-addInScopeList env bndrs thing_inside
- | null bndrs = thing_inside env  -- E.g. nullary constructors in a `case`
- | otherwise  = addInScope env bndrs thing_inside
-
 addInScopeOne :: OccEnv -> Id
                -> (OccEnv -> WithUsageDetails a) -> WithUsageDetails a
 {-# INLINE addInScopeOne #-}
@@ -3146,6 +3139,9 @@ addInScope :: OccEnv -> [Var]
 -- Fast path when the is no environment-munging to do
 -- This is rather common: notably at top level, but nested too
 addInScope env bndrs thing_inside
+  | null bndrs   -- E.g. nullary constructors in a `case`
+  = thing_inside env
+
   | isEmptyVarEnv (occ_bs_env env)
   , isEmptyVarEnv (occ_join_points env)
   , WUD uds res <- thing_inside env
@@ -3189,7 +3185,7 @@ preprocess_env env@(OccEnv { occ_join_points = join_points
     bndr_fm :: UniqFM Var Var
     bndr_fm = getUniqSet bndr_set
 
-    is_bad :: Unique -> OccInfoEnv -> Bool -> Bool
+    is_bad :: Unique -> IdOccEnv -> Bool -> Bool
     is_bad uniq join_uds rest
       = uniq `elemUniqSet_Directly` bndr_set ||
         not (bndr_fm `disjointUFM` join_uds) ||
@@ -3207,11 +3203,11 @@ postprocess_uds bndrs bad_joins uds
        | isEmptyVarEnv bad_joins = uds
        | otherwise               = modifyUDEnv extend_with_bad_joins uds
 
-    extend_with_bad_joins :: OccInfoEnv -> OccInfoEnv
+    extend_with_bad_joins :: IdOccEnv -> IdOccEnv
     extend_with_bad_joins env
        = nonDetStrictFoldUFM_Directly add_bad_join env bad_joins
 
-    add_bad_join :: Unique -> OccInfoEnv -> OccInfoEnv -> OccInfoEnv
+    add_bad_join :: Unique -> IdOccEnv -> IdOccEnv -> IdOccEnv
     -- Behave like `andUDs` when adding in the bad_joins
     add_bad_join uniq join_env env
       | uniq `elemVarEnvByKey` env = plusVarEnv_C andLocalOcc env join_env
@@ -3226,9 +3222,9 @@ addJoinPoint env bndr rhs_uds
   where
     zeroed_form = mkZeroedForm rhs_uds
 
-mkZeroedForm :: UsageDetails -> OccInfoEnv
+mkZeroedForm :: UsageDetails -> IdOccEnv
 -- See Note [Occurrence analysis for join points] for "zeroed form"
-mkZeroedForm (UD { ud_env = rhs_occs })
+mkZeroedForm (UD { ud_id_env = rhs_occs })
   = mapMaybeUFM do_one rhs_occs
   where
     do_one :: LocalOcc -> Maybe LocalOcc
@@ -3653,10 +3649,10 @@ places where tail calls are not allowed, and each of these causes all variables
 to get marked with 'NoTailCallInfo'.
 
 Instead of relying on `mapVarEnv`, then, we carry three 'IdEnv's around along
-with the 'OccInfoEnv'. Each of these extra environments is a "zapped set"
+with the 'IdOccEnv'. Each of these extra environments is a "zapped set"
 recording which variables have been zapped in some way. Zapping all occurrence
 info then simply means setting the corresponding zapped set to the whole
-'OccInfoEnv', a fast O(1) operation.
+'IdOccEnv', a fast O(1) operation.
 
 Note [LocalOcc]
 ~~~~~~~~~~~~~~~
@@ -3672,7 +3668,7 @@ For example, in (case x of A -> y; B -> y; C -> True),
 
 -}
 
-type OccInfoEnv = VarEnv LocalOcc        -- A finite map from an expression's
+type IdOccEnv = VarEnv LocalOcc        -- A finite map from an expression's
                                          -- free variables to their usage
 
 data LocalOcc  -- See Note [LocalOcc]
@@ -3692,25 +3688,40 @@ localTailCallInfo :: LocalOcc -> TailCallInfo
 localTailCallInfo (OneOccL  { lo_tail = tci }) = tci
 localTailCallInfo (ManyOccL tci)               = tci
 
-type ZappedSet = OccInfoEnv -- Values are ignored
+-- For TyVars and CoVars we gather only whether it occurs once or
+-- many times; we aren't interested in case-branches or tail-calls
+data TyCoOccEnv = VarEnv TyCoOcc
+
+data TyCoOcc = OneOccTyCo | ManyOccTyCo
+
+type ZappedSet     = IdOccEnv
+type ZappedTyCoSet = TyCoOccEnv
+  -- The values in the range of the IdOccEnv/TyCoOccEnv are ignored
+  -- Only the domain matters
 
 data UsageDetails
-  = UD { ud_env       :: !OccInfoEnv
+  = UD { ud_id_env    :: !IdOccEnv
        , ud_z_many    :: !ZappedSet   -- apply 'markMany' to these
        , ud_z_in_lam  :: !ZappedSet   -- apply 'markInsideLam' to these
        , ud_z_tail    :: !ZappedSet   -- zap tail-call info for these
+       , ud_tyco_env  :: !TyCoOccEnv
+       , ud_z_tyzo    :: !ZappedTyCoSet
        }
-  -- INVARIANT: All three zapped sets are subsets of ud_env
+  -- INVARIANT: `ud_z_many`, `ud_z_in_lam` and `ud_z_tail`
+o  --             are all subsets of ud_id_env
+  --            `ud_z_tyco` is a subset of ud_tycon_env
 
 instance Outputable UsageDetails where
-  ppr ud@(UD { ud_env = env, ud_z_tail = z_tail })
+  ppr ud@(UD { ud_id_env = env, ud_tyco_env = tyco_env })
     = text "UD" <+> (braces $ fsep $ punctuate comma $
-      [ ppr uq <+> text ":->" <+> ppr (lookupOccInfoByUnique ud uq)
-      | (uq, _) <- nonDetStrictFoldVarEnv_Directly do_one [] env ])
-      $$ nest 2 (text "ud_z_tail" <+> ppr z_tail)
+        [ ppr uq <+> text ":->" <+> ppr (lookupOccByUnique ud uq)
+        | uq <- nonDetStrictFoldVarEnv_Directly do_one [] id_env ]
+        ++
+        [ ppr uq <+> text ":->" <+> ppr (lookupTyCoOccByUnique ud uq)
+        | uq <- nonDetStrictFoldVarEnv_Directly do_one [] tyco_env ])
     where
-      do_one :: Unique -> LocalOcc -> [(Unique,LocalOcc)] -> [(Unique,LocalOcc)]
-      do_one uniq occ occs = (uniq, occ) : occs
+      do_one :: Unique -> a -> [Unique] -> [Unique]
+      do_one uniq _ uniqs = uniq : uniqs
 
 ---------------------
 -- | TailUsageDetails captures the result of applying 'occAnalLamTail'
@@ -3741,7 +3752,7 @@ mkOneTyVarOcc :: OccEnv -> TyVar -> UsageDetails
 mkOneTyVarOcc !_env tv
   = mkSimpleDetails (unitVarEnv tv occ)
   where
-    occ = OneOccL { lo_n_br = 1, lo_int_cxt = NotInteresting
+    occ = OneOccL { lo_n_br = 1, lo_int_cxt = NotInteresting
                   , lo_tail = NoTailCallInfo }
 
 mkOneIdOcc :: OccEnv -> Var -> InterestingCxt -> JoinArity -> UsageDetails
@@ -3764,7 +3775,7 @@ mkOneIdOcc !env id int_cxt arity
                   , lo_tail = AlwaysTailCalled arity }
 
 -- Add several occurrences, assumed not to be tail calls
-add_many_occ :: Var -> OccInfoEnv -> OccInfoEnv
+add_many_occ :: Var -> IdOccEnv -> IdOccEnv
 add_many_occ v env = extendVarEnv env v (ManyOccL NoTailCallInfo)
         -- Give a non-committal binder info (i.e noOccInfo) because
         --   a) Many copies of the specialised thing can appear
@@ -3795,23 +3806,28 @@ emptyDetails = mkSimpleDetails emptyVarEnv
 isEmptyDetails :: UsageDetails -> Bool
 isEmptyDetails (UD { ud_env = env }) = isEmptyVarEnv env
 
-mkSimpleDetails :: OccInfoEnv -> UsageDetails
+mkSimpleDetails :: IdOccEnv -> UsageDetails
 mkSimpleDetails env = UD { ud_env       = env
                          , ud_z_many    = emptyVarEnv
                          , ud_z_in_lam  = emptyVarEnv
                          , ud_z_tail    = emptyVarEnv }
 
-modifyUDEnv :: (OccInfoEnv -> OccInfoEnv) -> UsageDetails -> UsageDetails
+modifyUDEnv :: (IdOccEnv -> IdOccEnv) -> UsageDetails -> UsageDetails
 modifyUDEnv f uds@(UD { ud_env = env }) = uds { ud_env = f env }
 
 delBndrsFromUDs :: [Var] -> UsageDetails -> UsageDetails
 -- Delete these binders from the UsageDetails
+-- But /add/ the free vars of the types
 delBndrsFromUDs bndrs (UD { ud_env = env, ud_z_many = z_many
                           , ud_z_in_lam  = z_in_lam, ud_z_tail = z_tail })
   = UD { ud_env       = env      `delVarEnvList` bndrs
        , ud_z_many    = z_many   `delVarEnvList` bndrs
        , ud_z_in_lam  = z_in_lam `delVarEnvList` bndrs
        , ud_z_tail    = z_tail   `delVarEnvList` bndrs }
+  where
+    ty_fvs []     = emptyVarSet
+    ty_fvs (b:bs) = tyCoVarsOfType b `unionVarSet`
+                    (ty_fvs bs `delVarSet` b)
 
 markAllMany, markAllInsideLam, markAllNonTail, markAllManyNonTail
   :: UsageDetails -> UsageDetails
@@ -3841,7 +3857,7 @@ udFreeVars :: VarSet -> UsageDetails -> VarSet
 -- Find the subset of bndrs that are mentioned in uds
 udFreeVars bndrs (UD { ud_env = env }) = restrictFreeVars bndrs env
 
-restrictFreeVars :: VarSet -> OccInfoEnv -> VarSet
+restrictFreeVars :: VarSet -> IdOccEnv -> VarSet
 restrictFreeVars bndrs fvs = restrictUniqSetToUFM bndrs fvs
 
 -------------------
@@ -3868,16 +3884,24 @@ lookupLetOccInfo :: UsageDetails -> Id -> OccInfo
 --     we are about to re-generate it and it shouldn't be "sticky"
 lookupLetOccInfo ud id
  | isExportedId id = noOccInfo
- | otherwise       = lookupOccInfoByUnique ud (idUnique id)
+ | otherwise       = lookupOccByUnique ud (idUnique id)
 
 lookupOccInfo :: UsageDetails -> Id -> OccInfo
-lookupOccInfo ud id = lookupOccInfoByUnique ud (idUnique id)
+lookupOccInfo ud id = lookupOccByUnique ud (idUnique id)
 
-lookupOccInfoByUnique :: UsageDetails -> Unique -> OccInfo
-lookupOccInfoByUnique (UD { ud_env       = env
-                          , ud_z_many    = z_many
-                          , ud_z_in_lam  = z_in_lam
-                          , ud_z_tail    = z_tail })
+lookupTyCoOccByUnique :: UsageDetails -> Unique -> TyCoOcc
+lookupTyCoByUnique (UD { ud_tyco_env = env, ud_z_tyco = z_tyco }) uniq
+  = case lookupVarEnv_Directly env uniq of
+      Nothing -> Nothing
+      Just ManyOccTyCo -> Just ManyOccTyCo
+      Just OneOccTyCo | uniq `elemVarEnvByKey` z_tyco = Just ManyOccTyCo
+                      | otherwise                     = Just OneOccTyCo
+
+lookupOccByUnique :: UsageDetails -> Unique -> OccInfo
+lookupOccByUnique (UD { ud_env       = env
+                      , ud_z_many    = z_many
+                      , ud_z_in_lam  = z_in_lam
+                      , ud_z_tail    = z_tail })
                   uniq
   = case lookupVarEnv_Directly env uniq of
       Nothing -> IAmDead
