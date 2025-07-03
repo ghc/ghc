@@ -242,6 +242,7 @@ import Control.Monad
 
 import qualified Data.Map as Map
 import GHC.Core.Coercion (isReflCo)
+import GHC.Core.FieldInstEnv (emptyFieldEnv)
 
 
 {-
@@ -330,7 +331,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
                 tcg_fam_inst_env   = emptyFamInstEnv,
-                tcg_fld_inst_env   = emptyNameEnv,
+                tcg_fld_inst_env   = emptyFieldEnv,
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_complete_match_env = [],
                 tcg_th_used        = th_var,

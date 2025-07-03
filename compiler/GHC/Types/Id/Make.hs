@@ -574,7 +574,7 @@ dictSelRule :: Int -> Arity -> RuleFun
 --
 dictSelRule val_index n_ty_args _ id_unf _ args
   | (dict_arg : _) <- drop n_ty_args args
-  , Just (_, floats, con, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
+  , Just (_, floats, _, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
   = Just (wrapFloats floats $ getNth con_args val_index)
   | otherwise
   = Nothing

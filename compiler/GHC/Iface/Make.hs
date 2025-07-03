@@ -401,8 +401,7 @@ mkIface_ hsc_env
      cmp_fam_inst = comparing (nameOccName . ifFamInstTcName)
 
      cmp_fields :: IfaceFieldInst -> IfaceFieldInst -> Ordering
-     cmp_fields (tyCon1, fld1, _) (tyCon2, fld2, _) =
-        comparing nameOccName tyCon1 tyCon2 `mappend`
+     cmp_fields (fld1, _) (fld2, _) =
         lexicalCompareFieldLabel (flLabel fld1) (flLabel fld2)
 
      dflags = hsc_dflags hsc_env
@@ -469,8 +468,8 @@ ifaceRoughMatchTcs tcs = map do_rough tcs
 --------------------------
 
 fieldinstToIfaceFieldInst :: FieldInst -> IfaceFieldInst
-fieldinstToIfaceFieldInst (tyCon, fld, fldInfo)
-  = (getName tyCon, fld, fldInfo)
+fieldinstToIfaceFieldInst (fld, fldInfo)
+  = (fld, fmap getName fldInfo)
 
 --------------------------
 coreRuleToIfaceRule :: CoreRule -> IfaceRule

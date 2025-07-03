@@ -89,6 +89,7 @@ import GHC.Builtin.Names
 
 import Data.IORef
 import qualified Data.Set as Set
+import GHC.Core.FieldInstEnv
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env hsc = do
@@ -245,22 +246,25 @@ hugCompleteSigsBelow hsc uid mn = foldr (++) [] <$>
   hugSomeThingsBelowUs (md_complete_matches . hm_details) False hsc uid mn
 
 -- | Find instances visible from the given set of imports
-hugInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [(Module, FamInstEnv)], [FieldInst])
+hugInstancesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> IO (InstEnv, [(Module, FamInstEnv)], FieldInstEnv)
 hugInstancesBelow hsc_env uid mnwib = do
  let mn = gwib_mod mnwib
  (insts, famInsts, fields) <-
      unzip3 . concat <$>
        hugSomeThingsBelowUs (\mod_info ->
                                   let details = hm_details mod_info
+                                      fam_inst = (mi_module $ hm_iface mod_info, extendFamInstEnvList emptyFamInstEnv $ md_fam_insts details)
                                   -- Don't include instances for the current module
                                   in if moduleName (mi_module (hm_iface mod_info)) == mn
                                        then []
-                                       else [(md_insts details, [(mi_module $ hm_iface mod_info, extendFamInstEnvList emptyFamInstEnv $ md_fam_insts details)], md_fields details)])
+                                       else [(md_insts details, [fam_inst], md_fields details)])
                           True -- Include -hi-boot
                           hsc_env
                           uid
                           mnwib
- return (foldl' unionInstEnv emptyInstEnv insts, concat famInsts, concat fields)
+ return ( foldl' unionInstEnv emptyInstEnv insts, 
+          concat famInsts, 
+          foldl' extendFieldEnv emptyFieldEnv fields)
 
 -- | Get things from modules in the transitive closure of the given module.
 --

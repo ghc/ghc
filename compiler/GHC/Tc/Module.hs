@@ -189,6 +189,7 @@ import Data.Foldable ( for_ )
 import Data.Traversable ( for )
 import Data.IORef( newIORef )
 import GHC.Tc.TyCl.Utils (tcRecSetterBinds)
+import GHC.Core.FieldInstEnv (plusFieldEnv)
 
 
 
@@ -510,6 +511,7 @@ tcRnImports hsc_env import_decls
               tcg_rn_imports   = rn_imports,
               tcg_default      = foldMap subsume tc_defaults,
               tcg_inst_env     = tcg_inst_env gbl `unionInstEnv` home_insts,
+              tcg_fld_inst_env = tcg_fld_inst_env gbl `plusFieldEnv` home_fields,
               tcg_fam_inst_env = unionFamInstEnv (tcg_fam_inst_env gbl) home_fam_inst_env
             }) $ do {
 

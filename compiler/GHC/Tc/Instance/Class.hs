@@ -69,8 +69,8 @@ import GHC.Tc.Errors.Types
 
 import Data.Functor
 import Data.Maybe
-import GHC.Types.Name.Env (lookupNameEnv)
 import qualified Data.List as List
+import GHC.Core.FieldInstEnv (lookupFieldEnv)
 import {-# SOURCE #-} GHC.Tc.TyCl.Utils 
   (mkSetFieldBinds, mkRecordSetterType, mkRecordModifierType)
 
@@ -1322,7 +1322,10 @@ matchSetField dflags short_cut clas tys mb_ct_loc
        ; case lookupFieldLabel fam_inst_envs rdr_env tys of
             Just (tc, fl, gre, r_ty, a_ty) ->
                 do { let sel_name = flSelector fl
-                   ; (setter_id, modifier_id) <- lookupSetFieldBinds fl tc
+                   ; MkFieldBinds {
+                        fieldSetter = setter_id, 
+                        fieldModifier = modifier_id
+                      } <- lookupSetFieldBinds fl tc
                    ; (tv_prs, preds, setter_ty, modifier_ty) 
                         <- tc_inst_setfield_binds setter_id modifier_id
 
@@ -1378,25 +1381,24 @@ matchSetField dflags short_cut clas tys mb_ct_loc
      -- See (HF1) in Note [HasField instances]
      try_user_instances = matchInstEnv dflags short_cut clas tys
 
-     lookupSetFieldBinds :: FieldLabel -> TyCon -> TcM (Id, Id)
+     lookupSetFieldBinds :: FieldLabel -> TyCon -> TcM (FieldBinds Id)
      lookupSetFieldBinds fl tycon = do
-        let sel_name = flSelector fl
         tcg_env <- getGblEnv
         let 
           gbl_flds = tcg_fld_inst_env tcg_env
           req_flds = tcg_requested_fields tcg_env
 
-        case lookupNameEnv gbl_flds sel_name of
+        case lookupFieldEnv gbl_flds fl of
           Just binds -> pure binds
           Nothing -> do 
             reqs <- readTcRef req_flds
             case List.lookup fl reqs of 
-              Just ((setter, _), (modifier, _)) -> do
-                pure (setter, modifier)
+              Just binds -> do
+                pure (fmap fst binds)
               Nothing -> do
-                binds@((setter, _), (modifier,_)) <- mkSetFieldBinds tycon fl
+                binds <- mkSetFieldBinds tycon fl
                 updTcRef req_flds ((fl, binds) : )
-                pure (setter, modifier)
+                pure (fmap fst binds)
      
      tc_inst_setfield_binds setter_id modifier_id
         | null tyvars   -- There may be overloading despite no type variables;

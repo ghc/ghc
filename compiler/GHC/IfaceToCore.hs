@@ -1376,10 +1376,9 @@ tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
 -}
 
 tcIfaceField :: IfaceFieldInst -> IfL FieldInst -- Improve pretty printing
-tcIfaceField (tyConName, fieldInfo, bndr) = forkM (text "Field") $ do
-  thing <- tcIfaceImplicit tyConName
-  let !tyCon = tyThingTyCon thing
-  pure (tyCon, fieldInfo, bndr)
+tcIfaceField (fieldInfo, bndrs) = forkM (text "Field") $ do
+  bndrs' <- traverse tcIfaceExtId bndrs
+  pure (fieldInfo, bndrs')
 
 {-
 ************************************************************************

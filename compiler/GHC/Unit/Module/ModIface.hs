@@ -153,7 +153,7 @@ import GHC.Utils.Binary
 
 import Control.DeepSeq
 import Control.Exception
-import GHC.Types.FieldLabel (FieldLabel)
+import GHC.Types.FieldLabel (FieldLabel, FieldBinds)
 
 {- Note [Interface file stages]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -386,8 +386,8 @@ data IfacePublic_ phase = IfacePublic {
                 -- These fields are hashes of different parts of the public interface.
 }
 
-type IfaceFieldInst = (Name, FieldLabel, IfaceFieldInfo)
-type IfaceFieldInfo = (IfExtName, IfExtName)
+type IfaceFieldInst = (FieldLabel, IfaceFieldInfo)
+type IfaceFieldInfo = FieldBinds IfExtName
 
 mkIfacePublic :: [IfaceExport]
                   -> [IfaceDeclExts 'ModIfaceFinal]

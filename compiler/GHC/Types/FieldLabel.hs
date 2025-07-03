@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable FieldLabelString
+{-# LANGUAGE DerivingStrategies #-}
 
 {-
 %
@@ -43,6 +44,7 @@ module GHC.Types.FieldLabel
    , DuplicateRecordFields(..)
    , FieldSelectors(..)
    , flIsOverloaded
+   , FieldBinds(..)
    )
 where
 
@@ -88,6 +90,9 @@ instance Outputable FieldLabel where
     ppr fl = ppr (flLabel fl) <> whenPprDebug (braces (ppr (flSelector fl))
                                                 <> ppr (flHasDuplicateRecordFields fl)
                                                 <> ppr (flHasFieldSelector fl))
+
+instance Uniquable FieldLabel where
+  getUnique = getUnique . flSelector
 
 instance Outputable FieldLabelString where
   ppr (FieldLabelString l) = ppr l
@@ -151,3 +156,24 @@ flIsOverloaded :: FieldLabel -> Bool
 flIsOverloaded fl =
  flHasDuplicateRecordFields fl == DuplicateRecordFields
  || flHasFieldSelector fl == NoFieldSelectors
+
+
+-- | A named tuple for carrying around binders
+-- required for operations with fields
+data FieldBinds a = MkFieldBinds
+  { fieldSetter :: a
+  , fieldModifier :: a
+  } deriving stock (Functor, Foldable, Traversable)
+
+instance Binary a => Binary (FieldBinds a) where 
+  put_ h (MkFieldBinds s m) = do
+    put_ h s
+    put_ h m
+  
+  get h = do
+    s <- get h
+    m <- get h
+    pure (MkFieldBinds s m)
+  
+instance NFData a => NFData (FieldBinds a) where
+  rnf (MkFieldBinds s m) = rnf s `seq` rnf m 

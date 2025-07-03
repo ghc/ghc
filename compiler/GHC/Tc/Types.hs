@@ -188,7 +188,8 @@ import Data.Dynamic  ( Dynamic )
 import Data.Map ( Map )
 import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
-import GHC.Types.FieldLabel (FieldLabel)
+import GHC.Types.FieldLabel (FieldLabel, FieldBinds)
+import GHC.Core.FieldInstEnv (FieldInstEnv)
 
 -- | The import specification as written by the user, including
 -- the list of explicitly imported names. Used in 'ModIface' to
@@ -561,7 +562,7 @@ data TcGblEnv
           -- they all have a non-empty gre_imp field.
         tcg_keep      :: TcRef NameSet,
 
-        tcg_requested_fields :: TcRef [(FieldLabel, (FieldBind, FieldBind))],
+        tcg_requested_fields :: TcRef [(FieldLabel, FieldBinds (Id, LHsBind GhcRn))],
 
         tcg_th_used :: TcRef Bool,
           -- ^ @True@ \<=> Template Haskell syntax used.
@@ -705,9 +706,6 @@ data TcGblEnv
         tcg_next_wrapper_num :: TcRef (ModuleEnv Int)
         -- ^ See Note [Generating fresh names for FFI wrappers]
     }
-
-type FieldInstEnv = NameEnv (Id, Id)
-type FieldBind = (Id, LHsBind GhcRn) 
 
 -- NB: topModIdentity, not topModSemantic!
 -- Definition sites of orphan identities will be identity modules, not semantic

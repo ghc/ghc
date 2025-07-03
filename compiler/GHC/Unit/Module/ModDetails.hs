@@ -8,14 +8,13 @@ where
 import GHC.Core         ( CoreRule )
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv ( InstEnv, emptyInstEnv )
-import GHC.Core.TyCon
 import GHC.Types.Avail
 import GHC.Types.CompleteMatch
 import GHC.Types.DefaultEnv
 import GHC.Types.TypeEnv
 import GHC.Types.Annotations ( Annotation )
 import GHC.Types.FieldLabel
-import GHC.Types.Name (Name)
+import GHC.Types.Var (Id)
 
 -- | The 'ModDetails' is essentially a cache for information in the 'ModIface'
 -- for home modules only. Information relating to packages will be loaded into
@@ -46,8 +45,8 @@ data ModDetails = ModDetails
       -- ^ Complete match pragmas for this module
    }
 
-type FieldInst = (TyCon, FieldLabel, FieldInfo)
-type FieldInfo = (Name, Name)
+type FieldInst = (FieldLabel, FieldInfo)
+type FieldInfo = FieldBinds Id
 
 -- | Constructs an empty ModDetails
 emptyModDetails :: ModDetails

@@ -82,6 +82,9 @@ import qualified GHC.LanguageExtensions as LangExt
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad
+import GHC.Core.FieldInstEnv (extendFieldEnv)
+import GHC.Data.Bag (listToBag)
+import Data.Foldable (Foldable(toList))
 
 {-
 ************************************************************************
@@ -911,18 +914,18 @@ tcRecSetterBinds = do
   flds <- readTcRef req_flds
   tcg_env <- tcRecSelBinds (get_ids_to_check flds)
   writeTcRef req_flds []
-  let new_name_env = mkNameEnv $ map remove_binds flds
+  let new_fld_insts = map remove_binds flds
   pure (tcg_env {
-          tcg_fld_inst_env = tcg_fld_inst_env tcg_env `plusNameEnv` new_name_env
+          tcg_fld_inst_env = tcg_fld_inst_env tcg_env `extendFieldEnv` new_fld_insts,
+          tcg_fields = tcg_fields tcg_env `mappend` listToBag new_fld_insts 
       })
   where
-    remove_binds (n, ((setter, _), (modifier, _))) = (flSelector n, (setter, modifier))
-    get_ids_to_check [] = []
-    get_ids_to_check ( (_, (setter, modifier)) : flds) =
-        setter : modifier : get_ids_to_check flds
+    remove_binds = fmap (fmap fst)
+
+    get_ids_to_check = concatMap (toList . snd)
 
 
-mkSetFieldBinds :: TyCon -> FieldLabel -> TcM ( (Id, LHsBind GhcRn), (Id, LHsBind GhcRn) )
+mkSetFieldBinds :: TyCon -> FieldLabel -> TcM (FieldBinds (Id, LHsBind GhcRn) )
 mkSetFieldBinds tycon fl =
   collectFieldLabelInfo all_cons idDetails fl FieldSelectors $ \_ _ -> mk_binds
   where
@@ -937,11 +940,16 @@ mkSetFieldBinds tycon fl =
       in fl { flSelector = flSelector fl `setNameUnique` uniq `tidyNameOcc` newOcc }
 
     mk_binds cons_w_field rec_details ty_builder = do
-      setter_fl <- mk_field_lbl "setter_" <$> newUnique
-      modifier_fl <- mk_field_lbl "modifier_" <$> newUnique
-      let setter_bind = mkRecordSetterBind fl setter_fl all_cons cons_w_field rec_details ty_builder
-          modifier_bind = mkRecordModifierBind fl modifier_fl all_cons cons_w_field rec_details ty_builder
-      pure (setter_bind, modifier_bind)
+      let build_fld_bind prefix builder = do
+            new_fl <- mk_field_lbl prefix <$> newUnique
+            pure $ builder fl new_fl all_cons cons_w_field rec_details ty_builder
+
+      setter_bind <- build_fld_bind "setter_" mkRecordSetterBind
+      modifier_bind <- build_fld_bind "modifier_" mkRecordModifierBind
+      pure MkFieldBinds {
+          fieldSetter = setter_bind,
+          fieldModifier = modifier_bind
+        }
 
 mkRecordSetterBind :: FieldLabel -> RecordBindBuilder (Id, LHsBind GhcRn)
 mkRecordSetterBind origFl fl = mk_record_bind 2 err_expr mkRecordSetterType mk_match fl where
