@@ -81,3 +81,21 @@ main = do
   print "Return values"
   let v = return_int64X2# (# #)
   print $ unpackInt64X2 v
+
+  print "Initial vectors" -- Check that these registers weren't messed up
+  print $ unpackInt64X2 v8
+  print $ unpackInt64X2 v9
+  print $ unpackInt64X2 v10
+  print $ unpackInt64X2 v11
+  print $ unpackInt64X2 v12
+  print $ unpackInt64X2 v13
+  print $ unpackInt64X2 v14
+  print $ unpackInt64X2 v15
+  print $ unpackInt64X2 v16
+  print $ unpackInt64X2 v17
+  print $ unpackInt64X2 v18
+  print $ unpackInt64X2 v19
+  print $ unpackInt64X2 v20
+  print $ unpackInt64X2 v21
+  print $ unpackInt64X2 v22
+  print $ unpackInt64X2 v23
