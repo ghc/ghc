@@ -876,9 +876,6 @@ AC_SUBST([UseLibm])
 TargetHasLibm=$UseLibm
 AC_SUBST(TargetHasLibm)
 
-FP_BFD_FLAG
-AC_SUBST([UseLibbfd])
-
 dnl ################################################################
 dnl Check for libraries
 dnl ################################################################

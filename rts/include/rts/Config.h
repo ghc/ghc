@@ -20,13 +20,6 @@
 #endif
 
 /*
- * Whether the runtime system will use libbfd for debugging purposes.
- */
-#if defined(DEBUG) && defined(HAVE_BFD_H) && defined(HAVE_LIBBFD) && !defined(_WIN32)
-#define USING_LIBBFD 1
-#endif
-
-/*
  * We previously only offer the eventlog in a subset of RTS ways; we now
  * enable it unconditionally to simplify packaging. See #18948.
  */
@@ -101,4 +94,3 @@ code.
 #else
 #define CACHELINE_SIZE 64
 #endif
-

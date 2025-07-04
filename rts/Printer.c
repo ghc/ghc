@@ -883,109 +883,10 @@ const char *lookupGHCName( void *addr )
  * Symbol table loading
  * ------------------------------------------------------------------------*/
 
-/* Causing linking trouble on Win32 plats, so I'm
-   disabling this for now.
-*/
-#if defined(USING_LIBBFD)
-#    define PACKAGE 1
-#    define PACKAGE_VERSION 1
-/* Those PACKAGE_* defines are workarounds for bfd:
- *     https://sourceware.org/bugzilla/show_bug.cgi?id=14243
- * ghc's build system filter PACKAGE_* values out specifically to avoid clashes
- * with user's autoconf-based Cabal packages.
- * It's a shame <bfd.h> checks for unrelated fields instead of actually used
- * macros.
- */
-#    include <bfd.h>
-
-/* Fairly ad-hoc piece of code that seems to filter out a lot of
- * rubbish like the obj-splitting symbols
- */
-
-static bool isReal( flagword flags STG_UNUSED, const char *name )
-{
-#if 0
-    /* ToDo: make this work on BFD */
-    int tp = type & N_TYPE;
-    if (tp == N_TEXT || tp == N_DATA) {
-        return (name[0] == '_' && name[1] != '_');
-    } else {
-        return false;
-    }
-#else
-    if (*name == '\0'  ||
-        (name[0] == 'g' && name[1] == 'c' && name[2] == 'c') ||
-        (name[0] == 'c' && name[1] == 'c' && name[2] == '.')) {
-        return false;
-    }
-    return true;
-#endif
-}
-
-extern void DEBUG_LoadSymbols( const char *name )
-{
-    bfd* abfd;
-    char **matching;
-
-    bfd_init();
-    abfd = bfd_openr(name, "default");
-    if (abfd == NULL) {
-        barf("can't open executable %s to get symbol table", name);
-    }
-    if (!bfd_check_format_matches (abfd, bfd_object, &matching)) {
-        barf("mismatch");
-    }
-
-    {
-        long storage_needed;
-        asymbol **symbol_table;
-        long number_of_symbols;
-        long num_real_syms = 0;
-        long i;
-
-        storage_needed = bfd_get_symtab_upper_bound (abfd);
-
-        if (storage_needed < 0) {
-            barf("can't read symbol table");
-        }
-        symbol_table = (asymbol **) stgMallocBytes(storage_needed,"DEBUG_LoadSymbols");
-
-        number_of_symbols = bfd_canonicalize_symtab (abfd, symbol_table);
-
-        if (number_of_symbols < 0) {
-            barf("can't canonicalise symbol table");
-        }
-
-        if (add_to_fname_table == NULL)
-            add_to_fname_table = allocHashTable();
-
-        for( i = 0; i != number_of_symbols; ++i ) {
-            symbol_info info;
-            bfd_get_symbol_info(abfd,symbol_table[i],&info);
-            if (isReal(info.type, info.name)) {
-                insertHashTable(add_to_fname_table,
-                                info.value, (void*)info.name);
-                num_real_syms += 1;
-            }
-        }
-
-        IF_DEBUG(interpreter,
-                 debugBelch("Loaded %ld symbols. Of which %ld are real symbols\n",
-                         number_of_symbols, num_real_syms)
-                 );
-
-        stgFree(symbol_table);
-    }
-}
-
-#else /* USING_LIBBFD */
-
 extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
 {
   /* nothing, yet */
 }
-
-#endif /* USING_LIBBFD */
 
 void findPtr(P_ p, int);                /* keep gcc -Wall happy */
 
