@@ -171,8 +171,6 @@ AS_IF(
   [test "$CABAL_FLAG_libm" = 1],
   [AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])])
 
-AS_IF([test "$CABAL_FLAG_libbfd" = 1], [FP_WHEN_ENABLED_BFD])
-
 dnl ################################################################
 dnl Check for libraries
 dnl ################################################################

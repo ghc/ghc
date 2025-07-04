@@ -46,9 +46,6 @@ flag libffi-adjustors
 flag need-pthread
   default: False
   manual: True
-flag libbfd
-  default: False
-  manual: True
 flag need-atomic
   default: False
   manual: True
@@ -250,9 +247,6 @@ library
       if flag(need-atomic)
          -- for sub-word-sized atomic operations (#19119)
          extra-libraries: atomic
-      if flag(libbfd)
-         -- for debugging
-         extra-libraries: bfd iberty
       if flag(libdw)
          -- for backtraces
          extra-libraries: elf dw
