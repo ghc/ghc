@@ -23,7 +23,7 @@ import GHC.Core.DataCon
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Predicate( isEqualityClass, isCTupleClass )
+import GHC.Core.Predicate( isEqualityClass {- , isCTupleClass -} )
 import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds )
 import GHC.Core.Coercion ( Coercion )
 import GHC.Core.TyCo.FVs     ( coVarsOfCos )
@@ -2194,7 +2194,7 @@ doNotUnbox :: Type -> Bool
 doNotUnbox arg_ty
   = case tyConAppTyCon_maybe arg_ty of
       Just tc | Just cls <- tyConClass_maybe tc
-              -> not (isEqualityClass cls || isCTupleClass cls)
+              -> not (isEqualityClass cls)
        -- See (DNB2) and (DNB1) in Note [Do not unbox class dictionaries]
 
       _ -> False
@@ -2232,22 +2232,32 @@ TL;DR we /never/ unbox class dictionaries. Unboxing the dictionary, and passing
 a raft of higher-order functions isn't a huge win anyway -- you really want to
 specialise the function.
 
-Wrinkle (DNB1): we /do/ want to unbox tuple dictionaries (#23398)
-     f :: (% Eq a, Show a %) => blah
-  with -fdicts-strict it is great to unbox to
-     $wf :: Eq a => Show a => blah
-  (where I have written out the currying explicitly).  Now we can specialise
-  $wf on the Eq or Show dictionary.  Nothing is lost.
+Wrinkle (DNB1): we /do not/ to unbox tuple dictionaries either.  We used to
+  have a special case to unbox tuple dictionaries (#23398), but it ultimately
+  turned out to be a very bad idea (see !19747#note_626297).   In summary:
 
-  And something is gained.  It is possible that `f` will look like this:
-     f = /\a. \d:(% Eq a, Show a %). ... f @a (% sel1 d, sel2 d %)...
-  where there is a recurive call to `f`, or to another function that takes the
-  same tuple dictionary, but where the tuple is built from the components of
-  `d`.  The Simplier does not fix this.  But if we unpacked the dictionary
-  we'd get
-     $wf = /\a. \(d1:Eq a) (d2:Show a). let d = (% d1, d2 %)
-             in ...f @a (% sel1 d, sel2 d %)
-  and all the tuple building and taking apart will disappear.
+  - If w/w unboxes tuple dictionaries we get things like
+         case d of CTuple2 d1 d2 -> blah
+    rather than
+         let { d1 = sc_sel1 d; d2 = sc_sel2 d } in blah
+    The latter works much better with the specialiser: when `d` is instantiated
+    to some useful dictionary the `sc_sel1 d` selection can fire.
+
+   - The attempt to deal with unpacking dictionaries with `case` led to
+     significant extra complexity in the type-class specialiser (#26158) that is
+     rendered unnecessary if we only take do superclass selection with superclass
+     selectors, never with `case` expressions.
+
+     Even with that extra complexity, specialisation was /still/ sometimes worse,
+     and sometimes /tremendously/ worse (a factor of 70x); see #19747.
+
+   - Suppose f :: forall a. (% Eq a, Show a %) => blah
+     The specialiser is perfectly capable of specialising a call like
+             f @Int (% dEqInt, dShowInt %)
+     so the tuple doesn't get in the way.
+
+   - It's simpler and more uniform.  There is nothing special about constraint
+     tuples; anyone can write   class (C1 a, C2 a) => D a  where {}
 
 Wrinkle (DNB2): we /do/ want to unbox equality dictionaries,
   for (~), (~~), and Coercible (#23398).  Their payload is a single unboxed

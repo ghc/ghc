@@ -1,42 +1,35 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 76, types: 117, coercions: 4, joins: 0/0}
+  = {terms: 65, types: 107, coercions: 4, joins: 0/0}
 
--- RHS size: {terms: 18, types: 11, coercions: 0, joins: 0/0}
-T23398.$wfoo [InlPrag=[2]]
-  :: forall a. (Eq a, Show a) => a -> a -> String
-[GblId[StrictWorker([!, !])],
- Arity=4,
- Str=<SP(1C(1,C(1,L)),A)><SP(A,1C(1,L),A)><L><L>,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [30 60 0 0] 120 0}]
-T23398.$wfoo
-  = \ (@a) (ww :: Eq a) (ww1 :: Show a) (eta :: a) (eta1 :: a) ->
-      case == @a ww eta eta1 of {
-        False -> show @a ww1 eta1;
-        True -> show @a ww1 eta
-      }
-
--- RHS size: {terms: 12, types: 12, coercions: 0, joins: 0/0}
-foo [InlPrag=[2]] :: forall a. PairDict a => a -> a -> String
+-- RHS size: {terms: 20, types: 21, coercions: 0, joins: 0/0}
+foo :: forall a. PairDict a => a -> a -> String
 [GblId,
  Arity=3,
- Str=<S!P(SP(SC(S,C(1,L)),A),SP(A,SC(S,L),A))><L><L>,
- Unf=Unf{Src=StableSystem, TopLvl=True,
+ Str=<SP(SP(1C(1,C(1,L)),A),SP(A,1C(1,L),A))><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a)
-                 ($dCTuple2 [Occ=Once1!] :: PairDict a)
-                 (eta [Occ=Once1] :: a)
-                 (eta1 [Occ=Once1] :: a) ->
-                 case $dCTuple2 of { (ww [Occ=Once1], ww1 [Occ=Once1]) ->
-                 T23398.$wfoo @a ww ww1 eta eta1
-                 }}]
+         Guidance=IF_ARGS [90 0 0] 180 0}]
 foo
   = \ (@a) ($dCTuple2 :: PairDict a) (eta :: a) (eta1 :: a) ->
-      case $dCTuple2 of { (ww, ww1) -> T23398.$wfoo @a ww ww1 eta eta1 }
+      case ==
+             @a
+             (GHC.Internal.Classes.$p0CTuple2 @(Eq a) @(Show a) $dCTuple2)
+             eta
+             eta1
+      of {
+        False ->
+          show
+            @a
+            (GHC.Internal.Classes.$p1CTuple2 @(Eq a) @(Show a) $dCTuple2)
+            eta1;
+        True ->
+          show
+            @a
+            (GHC.Internal.Classes.$p1CTuple2 @(Eq a) @(Show a) $dCTuple2)
+            eta
+      }
 
 Rec {
 -- RHS size: {terms: 21, types: 19, coercions: 3, joins: 0/0}
