@@ -442,7 +442,6 @@ rtsPackageArgs = package rts ? do
           , useSystemFfi                    `cabalFlag` "use-system-libffi"
           , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"
           , flag UseLibpthread              `cabalFlag` "need-pthread"
-          , flag UseLibbfd                  `cabalFlag` "libbfd"
           , flag NeedLibatomic              `cabalFlag` "need-atomic"
           , flag UseLibdw                   `cabalFlag` "libdw"
           , flag UseLibnuma                 `cabalFlag` "libnuma"

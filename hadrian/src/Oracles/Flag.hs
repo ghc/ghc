@@ -36,7 +36,6 @@ data Flag = CrossCompiling
           | UseLibm
           | UseLibrt
           | UseLibdl
-          | UseLibbfd
           | UseLibpthread
           | NeedLibatomic
           | UseGhcToolchain
@@ -60,7 +59,6 @@ flag f = do
             UseLibm              -> "use-lib-m"
             UseLibrt             -> "use-lib-rt"
             UseLibdl             -> "use-lib-dl"
-            UseLibbfd            -> "use-lib-bfd"
             UseLibpthread        -> "use-lib-pthread"
             NeedLibatomic        -> "need-libatomic"
             UseGhcToolchain      -> "use-ghc-toolchain"
