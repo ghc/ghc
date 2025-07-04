@@ -23,7 +23,6 @@ module GHC.Tc.Solver.Monad (
     nestTcS, nestImplicTcS, setEvBindsTcS, setTcLevelTcS,
     emitImplicationTcS, emitTvImplicationTcS,
     emitImplication,
-    emitFunDepWanteds,
 
     selectNextWorkItem,
     getWorkList,
@@ -106,6 +105,7 @@ module GHC.Tc.Solver.Monad (
 
     -- Unification
     wrapUnifierX, wrapUnifierTcS, unifyFunDeps, uPairsTcM, unifyForAllBody,
+    unifyFunDepWanteds,
 
     -- MetaTyVars
     newFlexiTcSTy, instFlexiX,
@@ -129,8 +129,8 @@ module GHC.Tc.Solver.Monad (
     pprEq,
 
     -- Enforcing invariants for type equalities
-    checkTypeEq
-    instantiateFunDepEqn -- "RAE": remove me
+    checkTypeEq,
+    instantiateFunDepEqn
 ) where
 
 import GHC.Prelude
@@ -1960,15 +1960,15 @@ newFlexiTcSTy knd = wrapTcS (TcM.newFlexiTyVarTy knd)
 cloneMetaTyVar :: TcTyVar -> TcS TcTyVar
 cloneMetaTyVar tv = wrapTcS (TcM.cloneMetaTyVar tv)
 
-instFlexiX :: Subst -> [TKVar] -> TcS Subst
+instFlexiX :: Subst -> [TKVar] -> TcS ([TcTyVar], Subst)
 instFlexiX subst tvs = wrapTcS (instFlexiXTcM subst tvs)
 
-instFlexiXTcM :: Subst -> [TKVar] -> TcM Subst
+instFlexiXTcM :: Subst -> [TKVar] -> TcM ([TcTyVar], Subst)
 -- Makes fresh tyvar, extends the substitution, and the in-scope set
 -- Takes account of the case [k::Type, a::k, ...],
 -- where we must substitute for k in a's kind
 instFlexiXTcM subst []
-  = return subst
+  = return ([], subst)
 instFlexiXTcM subst (tv:tvs)
   = do { uniq <- TcM.newUnique
        ; details <- TcM.newMetaDetails TauTv
@@ -1976,7 +1976,8 @@ instFlexiXTcM subst (tv:tvs)
              kind   = substTyUnchecked subst (tyVarKind tv)
              tv'    = mkTcTyVar name kind details
              subst' = extendTvSubstWithClone subst tv tv'
-       ; instFlexiXTcM subst' tvs  }
+       ; (tvs', subst'') <- instFlexiXTcM subst' tvs
+       ; return (tv':tvs', subst'') }
 
 matchGlobalInst :: DynFlags
                 -> Bool      -- True <=> caller is the short-cut solver
@@ -2242,48 +2243,57 @@ solverDepthError loc ty
 ************************************************************************
 -}
 
-emitFunDepWanteds :: CtEvidence  -- The work item
+unifyFunDepWanteds :: CtEvidence  -- The work item
                   -> [FunDepEqn (CtLoc, RewriterSet)]
-                  -> TcS Bool  -- True <=> some unification happened
+                  -> TcS (Cts, Bool)   -- True <=> some unification happened
 
-emitFunDepWanteds _ [] = return False -- common case noop
+unifyFunDepWanteds _ [] = return (emptyBag, False) -- common case noop
 -- See Note [FunDep and implicit parameter reactions]
 
-emitFunDepWanteds ev fd_eqns
-  = unifyFunDeps ev Nominal do_fundeps
-  where
-    do_fundeps :: UnifyEnv -> TcM ()
-    do_fundeps env = mapM_ (do_one env) fd_eqns
+unifyFunDepWanteds ev fd_eqns
+  = do { (fresh_tvs_s, cts, unified_tvs) <- wrapUnifierX ev Nominal do_fundeps
 
-    do_one :: UnifyEnv -> FunDepEqn (CtLoc, RewriterSet) -> TcM ()
+       -- Figure out if a "real" unification happened: See Note [unifyFunDeps]
+       ; let unif_happened = any is_old_tv unified_tvs
+             fresh_tvs     = mkVarSet (concat fresh_tvs_s)
+             is_old_tv tv  = not (tv `elemVarSet` fresh_tvs)
+
+       ; return (cts, unif_happened) }
+  where
+    do_fundeps :: UnifyEnv -> TcM [[TcTyVar]]
+    do_fundeps env = mapM (do_one env) fd_eqns
+
+    do_one :: UnifyEnv -> FunDepEqn (CtLoc, RewriterSet) -> TcM [TcTyVar]
     do_one uenv (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
-      = do { eqs' <- instantiateFunDepEqn tvs (reverse eqs)
+      = do { (fresh_tvs, eqs') <- instantiateFunDepEqn tvs (reverse eqs)
                      -- (reverse eqs): See Note [Reverse order of fundep equations]
-           ; uPairsTcM env_one eqs' }
+           ; uPairsTcM env_one eqs'
+           ; return fresh_tvs }
       where
         env_one = uenv { u_rewriters = u_rewriters uenv S.<> rewriters
                        , u_loc       = loc }
 
--- "RAE": Move to somewhere more appropriate
-instantiateFunDepEqn :: [TyVar] -> [TypeEqn] -> TcM [TypeEqn]
+instantiateFunDepEqn :: [TyVar] -> [TypeEqn] -> TcM ([TcTyVar], [TypeEqn])
 instantiateFunDepEqn tvs eqs
   | null tvs
-  = return eqs
+  = return ([], eqs)
   | otherwise
   = do { TcM.traceTc "emitFunDepWanteds 2" (ppr tvs $$ ppr eqs)
-       ; subst <- instFlexiXTcM emptySubst tvs  -- Takes account of kind substitution
-       ; return [ Pair (substTyUnchecked subst' ty1) ty2
-                       -- ty2 does not mention fd_qtvs, so no need to subst it.
-                       -- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
-                       --     Wrinkle (1)
-                | Pair ty1 ty2 <- eqs
-                , let subst' = extendSubstInScopeSet subst (tyCoVarsOfType ty1) ]
-                      -- The free vars of ty1 aren't just fd_qtvs: ty1 is the result
-                      -- of matching with the [W] constraint. So we add its free
-                      -- vars to InScopeSet, to satisfy substTy's invariants, even
-                      -- though ty1 will never (currently) be a poytype, so this
-                      -- InScopeSet will never be looked at.
-           }
+       ; (tvs', subst) <- instFlexiXTcM emptySubst tvs  -- Takes account of kind substitution
+       ; return (tvs', map (subst_pair subst) eqs) }
+  where
+    subst_pair subst (Pair ty1 ty2)
+       = Pair (substTyUnchecked subst' ty1) ty2
+              -- ty2 does not mention fd_qtvs, so no need to subst it.
+              -- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
+              --     Wrinkle (1)
+       where
+         subst' = extendSubstInScopeSet subst (tyCoVarsOfType ty1)
+                  -- The free vars of ty1 aren't just fd_qtvs: ty1 is the result
+                  -- of matching with the [W] constraint. So we add its free
+                  -- vars to InScopeSet, to satisfy substTy's invariants, even
+                  -- though ty1 will never (currently) be a poytype, so this
+                  -- InScopeSet will never be looked at.
 
 {-
 ************************************************************************

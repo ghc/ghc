@@ -3146,7 +3146,7 @@ improve_injective_wanted_top fam_envs inj_args fam_tc lhs_tys rhs_ty
                  -- The order of unsubstTvs is important; it must be
                  -- in telescope order e.g. (k:*) (a:k)
 
-           ; subst1 <- instFlexiX subst unsubstTvs
+           ; (_subst_tvs, subst1) <- instFlexiX subst unsubstTvs
                 -- If the current substitution bind [k -> *], and
                 -- one of the un-substituted tyvars is (a::k), we'd better
                 -- be sure to apply the current substitution to a's kind.

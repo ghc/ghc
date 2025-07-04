@@ -99,8 +99,6 @@ solveDict dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
            -- doLocalFunDepImprovement does StartAgain if there
            -- are any fundeps: see (DFL1) in Note [Do fundeps last]
 
-       ; doTopFunDepImprovement dict_ct
-
        ; simpleStage (updInertDicts dict_ct)
        ; stopWithStage (dictCtEvidence dict_ct) "Kept inert DictCt" }
 
@@ -1632,30 +1630,30 @@ as the fundeps.
 #7875 is a case in point.
 -}
 
--- "RAE": Consider moving out of "Solver"
-
 generateTopFunDeps :: InstEnvs -> Cts -> [FunDepEqn (CtLoc, RewriterSet)]
-generateTopFunDeps inst_evs cts = fun_deps
+-- See Note [Fundeps with instances, and equality orientation]
+generateTopFunDeps inst_evs cts
+  = foldMap do_top cts -- "RAE" `unionBags` interactions
   where
-    fun_deps = foldMap do_top cts -- "RAE" `unionBags` interactions
-
+    do_top :: Ct -> [FunDepEqn (CtLoc, RewriterSet)]
     do_top (CDictCan (DictCt { di_ev = ev, di_cls = cls, di_tys = xis }))
       = assert (not (isGiven ev)) $
         improveFromInstEnv inst_evs mk_ct_loc cls xis
       where
-        dict_pred   = mkClassPred cls xis
-        dict_loc    = ctEvLoc ev
-        dict_origin = ctLocOrigin dict_loc
+        dict_pred      = mkClassPred cls xis
+        dict_loc       = ctEvLoc ev
+        dict_origin    = ctLocOrigin dict_loc
+        dict_rewriters = ctEvRewriters ev
 
         mk_ct_loc :: ClsInst  -- The instance decl
                   -> (CtLoc, RewriterSet)
         mk_ct_loc ispec
-          = ( dict_loc { ctl_origin = FunDepOrigin2 dict_pred dict_origin
-                                                    inst_pred inst_loc }
-            , ctEvRewriters ev )
+          = (dict_loc { ctl_origin = new_orig }, dict_rewriters)
           where
             inst_pred = mkClassPred cls (is_tys ispec)
             inst_loc  = getSrcSpan (is_dfun ispec)
+            new_orig  = FunDepOrigin2 dict_pred dict_origin
+                                      inst_pred inst_loc
 
     do_top _other = []
 
@@ -1684,9 +1682,20 @@ doLocalFunDepImprovement dict_ct@(DictCt { di_ev = work_ev, di_cls = cls })
                 , pprCtLoc inert_loc, ppr (isGivenLoc inert_loc)
                 , pprCtLoc derived_loc, ppr (isGivenLoc derived_loc) ])
 
-           ; unifs <- emitFunDepWanteds work_ev $
-                      improveFromAnother (derived_loc, inert_rewriters)
-                                         inert_pred work_pred
+           ; (new_eqs, unifs)
+                 <- unifyFunDepWanteds work_ev $
+                    improveFromAnother (derived_loc, inert_rewriters)
+                                       inert_pred work_pred
+
+           -- Emit the deferred constraints
+           -- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
+           --
+           -- All the constraints in `cts` share the same rewriter set so,
+           -- rather than looking at it one by one, we pass it to
+           -- extendWorkListChildEqs; just a small optimisation.
+           ; unless (isEmptyBag cts) $
+             updWorkListTcS (extendWorkListChildEqs ev new_eqs)
+
            ; return (so_far || unifs)
         }
       where
@@ -1719,16 +1728,17 @@ doTopFunDepImprovement dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis 
        ; if imp then startAgainWith (CDictCan dict_ct)
                      else continueWith () }
   where
-     dict_pred   = mkClassPred cls xis
-     dict_loc    = ctEvLoc ev
-     dict_origin = ctLocOrigin dict_loc
+     dict_pred      = mkClassPred cls xis
+     dict_loc       = ctEvLoc ev
+     dict_origin    = ctLocOrigin dict_loc
+     dict_rewriters = ctEvRewriters ev
 
      mk_ct_loc :: ClsInst   -- The instance decl
                -> (CtLoc, RewriterSet)
      mk_ct_loc ispec
        = ( dict_loc { ctl_origin = FunDepOrigin2 dict_pred dict_origin
                                                  inst_pred inst_loc }
-         , emptyRewriterSet )
+         , dict_rewriters )
        where
          inst_pred = mkClassPred cls (is_tys ispec)
          inst_loc  = getSrcSpan (is_dfun ispec)

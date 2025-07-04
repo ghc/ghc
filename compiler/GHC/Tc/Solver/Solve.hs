@@ -60,7 +60,6 @@ import Control.Monad
 
 import Data.List( deleteFirstsBy )
 import Data.Foldable ( traverse_ )
-import Data.Maybe ( mapMaybe )
 import qualified Data.Semigroup as S
 import Data.Void( Void )
 
@@ -142,26 +141,29 @@ simplify_loop n limit definitely_redo_implications
        ; maybe_simplify_again (n+1) limit unif_happened wc2 }
 
 data NextAction
-  = NoProgress               -- just return the wc that we started with
-  | Done WantedConstraints   -- did a little work, but now we're done; return
-  | TryAgain WantedConstraints Bool  -- try again with the given wc
-                                     -- the Bool days whether to definitely redo
-                                     -- implications
+  = NA_Stop                 -- Just return the WantedConstraints
+  | NA_TryAgain             -- Try again with the given wc
+        WantedConstraints   --    with these WantedConstraints
+        Bool                -- See `definitely_redo_implications` in the comment
+                            --    for `simplify_loop`
 
 maybe_simplify_again :: Int -> IntWithInf -> Bool
                      -> WantedConstraints -> TcS WantedConstraints
 maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
-  = do { result <- firstJustsM [ check_limit
+  = do { -- Look for reasons to stop or continue
+         --   Nothing     => I don't have an opinion
+         --   Just action => Do this action
+         result <- firstJustsM [ check_limit
                                , check_unif_happened
                                , try_expanding_superclasses
                                , try_fundeps ]
        ; case result of
-           Nothing                -> return wc
-           Just NoProgress        -> return wc
-           Just (Done updated_wc) -> return updated_wc
-           Just (TryAgain updated_wc redo_implics)
-             -> simplify_loop n limit redo_implics updated_wc }
+           Nothing      -> return wc
+           Just NA_Stop -> return wc
+           Just (NA_TryAgain updated_wc redo_implics)
+                       -> simplify_loop n limit redo_implics updated_wc }
   where
+    check_limit :: TcS (Maybe NextAction)
     check_limit
       | n `intGtLimit` limit
       = do { -- Add an error (not a warning) if we blow the limit,
@@ -169,18 +171,17 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
              -- (an unsolved constraint), and we don't want that error to suppress
              -- the iteration limit warning!
              addErrTcS $ TcRnSimplifierTooManyIterations simples limit wc
-           ; return (Just NoProgress) }
+           ; return (Just NA_Stop) }
 
       | otherwise
       = return Nothing
 
+    check_unif_happened :: TcS (Maybe NextAction)
     check_unif_happened
-      | unif_happened
-      = return (Just (TryAgain wc True))
+      | unif_happened = return (Just (NA_TryAgain wc True))
+      | otherwise     = return Nothing
 
-      | otherwise
-      = return Nothing
-
+    try_expanding_superclasses :: TcS (Maybe NextAction)
     try_expanding_superclasses
       | superClassesMightHelp wc    -- Returns False quickly if wc is solved
       = -- We still have unsolved goals, and apparently no way to solve them,
@@ -200,32 +201,20 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
                      , text "new_wanted" <+> ppr new_wanted ])
            ; let updated_wc =
                     wc { wc_simple = simples1 `unionBags` listToBag new_wanted }
-           ; return (Just (TryAgain updated_wc (not (null pending_given)))) }}
+           ; return (Just (NA_TryAgain updated_wc (not (null pending_given)))) }}
              -- (not (null pending_given)): see Note [Superclass iteration]
 
       | otherwise
       = return Nothing
 
+    try_fundeps :: TcS (Maybe NextAction)
     try_fundeps
       = do { inst_envs <- getInstEnvs
-           ; let fundeps = generateTopFunDeps inst_envs simples
-           ; if not (null fundeps)
-             then do { fundep_cts <- concatMapM instantiate fundeps
-                     ; let new_simples = simples `unionBags` listToBag fundep_cts
-                           wc_with_fundeps = wc { wc_simple = new_simples }
-         -- False: don't iterate over implications unless there is a unification
-         -- see Note [Superclass iteration]
-                     ; return (Just (TryAgain wc_with_fundeps False)) }
-           ; else return Nothing }
-
-    instantiate (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
-      = do { insted_eqs <- wrapTcS (instantiateFunDepEqn tvs (reverse eqs))
-           ; evs <- mapM (mk_ev loc rewriters) insted_eqs
-           ; return (map mkNonCanonical evs) }
-
-    mk_ev loc rewriters (Pair ty1 ty2)
-      -- discards the evidence
-      = fst <$> newWantedEq loc rewriters Nominal ty1 ty2
+           ; let fundep_eqns = generateTopFunDeps inst_envs simples
+           ; (new_eqs, unif_happened) <- unifyFunDepWanteds fundep_eqns
+           ; if null new_eqs && not unif_happened
+             then return Nothing
+             else return (Just (NA_TryAgain (wc `addSimples` new_eqs) unif_happened)) }
 
 {- Note [Superclass iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
