@@ -416,7 +416,7 @@ def req_basic_simd_cpu( name, opts ):
      - PowerPC with AltiVec (not currently supported)
     """
 
-    if not (arch('aarch64') or have_cpu_feature('sse2') or  have_cpu_feature('zvl128b')):
+    if not (arch('aarch64') or have_cpu_feature('sse2') or have_cpu_feature('zvl128b')):
         opts.skip = True
 
 def req_fma_cpu( name, opts ):

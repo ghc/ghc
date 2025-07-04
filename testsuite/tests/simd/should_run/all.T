@@ -26,7 +26,7 @@ def riscvVlen():
     elif have_cpu_feature('zvl512b'):
         return 512
     else:
-        raise Exception("Vector extension not supported by CPU or VLEN too small.")
+        return 0
 
 # Ensure we set the CPU features we have available.
 #
@@ -35,7 +35,7 @@ def riscvVlen():
 # with or without -mavx2.
 setTestOpts([
     # TODO: -optc and -opta should not be required, but provided by the GHC pipeline
-    when(arch('riscv64'), extra_hc_opts('-mriscv-vlen' + str(riscvVlen()) + " -optc=-march=rv64gv -opta=-march=rv64gv"))
+    when(arch('riscv64') and (riscvVlen() > 0), extra_hc_opts('-mriscv-vlen' + str(riscvVlen()) + " -optc=-march=rv64gv -opta=-march=rv64gv"))
   ])
 
 test('simd_insert_baseline', [], compile_and_run, [''])
