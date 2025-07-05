@@ -231,6 +231,7 @@ instance Outputable RecompReason where
     ModuleRemoved (_st, _uid, m)   -> ppr m <+> text "removed"
     ModuleAdded (_st, _uid, m)     -> ppr m <+> text "added"
     FileChanged fp           -> text fp <+> text "changed"
+    DirChanged dp            -> text dp <+> text "changed"
     CustomReason s           -> text s
     FlagsChanged             -> text "Flags changed"
     LinkFlagsChanged         -> text "Flags changed"

@@ -31,6 +31,9 @@ module GHC.Unit.Finder (
 
     findObjectLinkableMaybe,
     findObjectLinkable,
+
+    -- important that GHC.HsToCore.Usage uses the same hashing method for usage dirs as is done here.
+    getDirHash,
   ) where
 
 import GHC.Prelude
@@ -69,6 +72,7 @@ import GHC.Driver.Env
 import GHC.Driver.Config.Finder
 import qualified Data.Set as Set
 import Data.List.NonEmpty ( NonEmpty (..) )
+import qualified System.Directory as SD
 import qualified System.OsPath as OsPath
 import qualified Data.List.NonEmpty as NE
 
@@ -147,9 +151,19 @@ initFinderCache = do
              hash <- getDirHash key
              atomicModifyIORef' dir_cache $ \c -> (M.insert key hash c, ())
              return hash
-           Just fp -> return fp
-
+           Just fp -> return fp 
   return FinderCache{..}
+
+-- | This function computes a shallow hash of a directory, so really just what files and directories are directly inside it.
+-- It does not look at the contents of the files, or the contents of the directories it contains.
+getDirHash :: FilePath -> IO Fingerprint
+getDirHash dir = do
+  contents <- SD.listDirectory dir
+  -- The documentation of Fingerprints describes this as an easy naive implementation
+  -- I wonder if we should do something more sophisticated here?
+  let hashes = fingerprintString <$> contents
+  let hash   = fingerprintFingerprints hashes
+  return hash
 
 -- -----------------------------------------------------------------------------
 -- The three external entry points

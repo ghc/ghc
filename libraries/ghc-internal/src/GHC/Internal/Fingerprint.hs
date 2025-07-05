@@ -17,7 +17,6 @@ module GHC.Internal.Fingerprint (
         fingerprintString,
         fingerprintFingerprints,
         getFileHash,
-        getDirHash
    ) where
 
 import GHC.Internal.IO
@@ -106,16 +105,6 @@ getFileHash path = withBinaryFile path ReadMode $ \h ->
             when (not eof) loop
 
       in loop
-
--- | Computes the hash of a given file.
--- This function computes a shallow hash of a directory, so really just what files and directories are directly inside it.
--- It does not look at the contents of the files, or the contents of the directories it contains.
-getDirHash :: FilePath -> IO Fingerprint
-getDirHash dir = do 
-  contens <- listDirectory dir 
-  let hashes = fingerprintString <$> contents 
-  let hash   = fingerprintFingerprints hashes
-  return hash 
 
 data MD5Context
 

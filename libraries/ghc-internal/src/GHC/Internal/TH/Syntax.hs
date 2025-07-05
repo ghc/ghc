@@ -836,7 +836,7 @@ getPackageRoot = Q qGetPackageRoot
 --
 --   * ghc -M does not know about these dependencies - it does not execute TH.
 --
---   * The dependency is shallow, just a hash of its direct contents 
+--   * The dependency is shallow, just a hash of its direct contents
 addDependentDirectory :: FilePath -> Q ()
 addDependentDirectory dp = Q (qAddDependentDirectory  dp)
 

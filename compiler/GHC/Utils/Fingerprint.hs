@@ -21,7 +21,6 @@ module GHC.Utils.Fingerprint (
         fingerprintString,
         fingerprintStrings,
         getFileHash,
-        getDirHash,
    ) where
 
 import GHC.Prelude.Basic

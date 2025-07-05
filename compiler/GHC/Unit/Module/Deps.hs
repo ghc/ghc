@@ -368,9 +368,9 @@ data Usage
         -- ^ An optional string which is used in recompilation messages if
         -- dir in question has changed.
 
-        -- Note: We this is a very shallow check, just what the contents of 
-        -- the directory are, aka what files and directories are within it, 
-        -- if those files/directories have their own contents changed...
+        -- Note: We do a very shallow check indeed, just what the contents of
+        -- the directory are, aka what files and directories are within it.
+        -- If those files/directories have their own contents changed...
         -- We won't spot it here, better recursive add them to your usage
         -- seperately.
   }
