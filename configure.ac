@@ -612,9 +612,10 @@ AC_SYS_INTERPRETER()
 
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
-dnl     If gcc, make sure it's at least 4.7
+dnl     If gcc, make sure it's at least 4.7 (14 for RISC-V 64bit)
 dnl
 FP_GCC_VERSION
+FP_RISCV_CHECK_GCC_VERSION
 
 
 dnl ** Check support for the extra flags passed by GHC when compiling via C
