@@ -816,6 +816,7 @@ checkModUsage fc UsageFile{ usg_file_path = file,
    handler = if debugIsOn
       then \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
       else \_ -> return recomp -- if we can't find the file, just recompile, don't fail
+
 checkModUsage fc UsageDirectory{ usg_dir_path = dir,
                                  usg_dir_hash = old_hash,
                                  usg_dir_label = mlabel } =
@@ -829,7 +830,7 @@ checkModUsage fc UsageDirectory{ usg_dir_path = dir,
    reason  = DirChanged $ unpackFS dir
    recomp  = needsRecompileBecause $ fromMaybe reason $ fmap CustomReason mlabel
    handler = if debugIsOn
-      then \e -> pprTrace "UsageDir" (text (show e)) $ return recomp
+      then \e -> pprTrace "UsageDirectory" (text (show e)) $ return recomp
       else \_ -> return recomp -- if we can't find the dir, just recompile, don't fail
 
 -- | We are importing a module whose exports have changed.
