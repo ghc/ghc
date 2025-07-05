@@ -1715,6 +1715,7 @@ module Language.Haskell.TH.Syntax where
     qRunIO :: forall a. GHC.Internal.Types.IO a -> m a
     qGetPackageRoot :: m GHC.Internal.IO.FilePath
     qAddDependentFile :: GHC.Internal.IO.FilePath -> m ()
+    qAddDependentDirectory :: GHC.Internal.IO.FilePath -> m ()
     qAddTempFile :: GHC.Internal.Base.String -> m GHC.Internal.IO.FilePath
     qAddTopDecls :: [Dec] -> m ()
     qAddForeignFilePath :: ForeignSrcLang -> GHC.Internal.Base.String -> m ()

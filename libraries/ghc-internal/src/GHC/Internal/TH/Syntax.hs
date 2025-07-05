@@ -135,6 +135,9 @@ class (MonadIO m, MonadFail m) => Quasi m where
   -- | See 'addDependentFile'.
   qAddDependentFile :: FilePath -> m ()
 
+  -- | See 'addDependentDirectory'.
+  qAddDependentDirectory :: FilePath -> m ()
+
   -- | See 'addTempFile'.
   qAddTempFile :: String -> m FilePath
 
@@ -181,30 +184,31 @@ instance Quasi IO where
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
   qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
 
-  qLookupName _ _       = badIO "lookupName"
-  qReify _              = badIO "reify"
-  qReifyFixity _        = badIO "reifyFixity"
-  qReifyType _          = badIO "reifyFixity"
-  qReifyInstances _ _   = badIO "reifyInstances"
-  qReifyRoles _         = badIO "reifyRoles"
-  qReifyAnnotations _   = badIO "reifyAnnotations"
-  qReifyModule _        = badIO "reifyModule"
-  qReifyConStrictness _ = badIO "reifyConStrictness"
-  qLocation             = badIO "currentLocation"
-  qRecover _ _          = badIO "recover" -- Maybe we could fix this?
-  qGetPackageRoot       = badIO "getProjectRoot"
-  qAddDependentFile _   = badIO "addDependentFile"
-  qAddTempFile _        = badIO "addTempFile"
-  qAddTopDecls _        = badIO "addTopDecls"
-  qAddForeignFilePath _ _ = badIO "addForeignFilePath"
-  qAddModFinalizer _    = badIO "addModFinalizer"
-  qAddCorePlugin _      = badIO "addCorePlugin"
-  qGetQ                 = badIO "getQ"
-  qPutQ _               = badIO "putQ"
-  qIsExtEnabled _       = badIO "isExtEnabled"
-  qExtsEnabled          = badIO "extsEnabled"
-  qPutDoc _ _           = badIO "putDoc"
-  qGetDoc _             = badIO "getDoc"
+  qLookupName _ _          = badIO "lookupName"
+  qReify _                 = badIO "reify"
+  qReifyFixity _           = badIO "reifyFixity"
+  qReifyType _             = badIO "reifyFixity"
+  qReifyInstances _ _      = badIO "reifyInstances"
+  qReifyRoles _            = badIO "reifyRoles"
+  qReifyAnnotations _      = badIO "reifyAnnotations"
+  qReifyModule _           = badIO "reifyModule"
+  qReifyConStrictness _    = badIO "reifyConStrictness"
+  qLocation                = badIO "currentLocation"
+  qRecover _ _             = badIO "recover" -- Maybe we could fix this?
+  qGetPackageRoot          = badIO "getProjectRoot"
+  qAddDependentFile _      = badIO "addDependentFile"
+  qAddDependentDirectory _ = badIO "AddDependentDirectory"
+  qAddTempFile _           = badIO "addTempFile"
+  qAddTopDecls _           = badIO "addTopDecls"
+  qAddForeignFilePath _ _  = badIO "addForeignFilePath"
+  qAddModFinalizer _       = badIO "addModFinalizer"
+  qAddCorePlugin _         = badIO "addCorePlugin"
+  qGetQ                    = badIO "getQ"
+  qPutQ _                  = badIO "putQ"
+  qIsExtEnabled _          = badIO "isExtEnabled"
+  qExtsEnabled             = badIO "extsEnabled"
+  qPutDoc _ _              = badIO "putDoc"
+  qGetDoc _                = badIO "getDoc"
 
 instance Quote IO where
   newName = newNameIO
@@ -822,6 +826,19 @@ getPackageRoot :: Q FilePath
 getPackageRoot = Q qGetPackageRoot
 
 
+-- | Record external directories that runIO is using (dependent upon).
+-- The compiler can then recognize that it should re-compile the Haskell file
+-- when a directory changes.
+--
+-- Expects an absolute file path.
+--
+-- Notes:
+--
+--   * ghc -M does not know about these dependencies - it does not execute TH.
+--
+--   * The dependency is shallow, just a hash of its direct contents 
+addDependentDirectory :: FilePath -> Q ()
+addDependentDirectory dp = Q (qAddDependentDirectory  dp)
 
 -- | Record external files that runIO is using (dependent upon).
 -- The compiler can then recognize that it should re-compile the Haskell file
@@ -961,32 +978,33 @@ instance MonadIO Q where
   liftIO = runIO
 
 instance Quasi Q where
-  qNewName            = newName
-  qReport             = report
-  qRecover            = recover
-  qReify              = reify
-  qReifyFixity        = reifyFixity
-  qReifyType          = reifyType
-  qReifyInstances     = reifyInstances
-  qReifyRoles         = reifyRoles
-  qReifyAnnotations   = reifyAnnotations
-  qReifyModule        = reifyModule
-  qReifyConStrictness = reifyConStrictness
-  qLookupName         = lookupName
-  qLocation           = location
-  qGetPackageRoot     = getPackageRoot
-  qAddDependentFile   = addDependentFile
-  qAddTempFile        = addTempFile
-  qAddTopDecls        = addTopDecls
-  qAddForeignFilePath = addForeignFilePath
-  qAddModFinalizer    = addModFinalizer
-  qAddCorePlugin      = addCorePlugin
-  qGetQ               = getQ
-  qPutQ               = putQ
-  qIsExtEnabled       = isExtEnabled
-  qExtsEnabled        = extsEnabled
-  qPutDoc             = putDoc
-  qGetDoc             = getDoc
+  qNewName               = newName
+  qReport                = report
+  qRecover               = recover
+  qReify                 = reify
+  qReifyFixity           = reifyFixity
+  qReifyType             = reifyType
+  qReifyInstances        = reifyInstances
+  qReifyRoles            = reifyRoles
+  qReifyAnnotations      = reifyAnnotations
+  qReifyModule           = reifyModule
+  qReifyConStrictness    = reifyConStrictness
+  qLookupName            = lookupName
+  qLocation              = location
+  qGetPackageRoot        = getPackageRoot
+  qAddDependentFile      = addDependentFile
+  qAddDependentDirectory = addDependentDirectory
+  qAddTempFile           = addTempFile
+  qAddTopDecls           = addTopDecls
+  qAddForeignFilePath    = addForeignFilePath
+  qAddModFinalizer       = addModFinalizer
+  qAddCorePlugin         = addCorePlugin
+  qGetQ                  = getQ
+  qPutQ                  = putQ
+  qIsExtEnabled          = isExtEnabled
+  qExtsEnabled           = extsEnabled
+  qPutDoc                = putDoc
+  qGetDoc                = getDoc
 
 
 ----------------------------------------------------

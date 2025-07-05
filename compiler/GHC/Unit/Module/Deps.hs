@@ -357,6 +357,23 @@ data Usage
         -- contents don't change.  This previously lead to odd
         -- recompilation behaviors; see #8114
   }
+  | UsageDirectory {
+        usg_dir_path  :: FastString,
+        -- ^ External dir dependency. From TH addDependentFile.
+        -- Should be absolute.
+        usg_dir_hash  :: Fingerprint,
+        -- ^ 'Fingerprint' of the directories contents.
+
+        usg_dir_label :: Maybe String
+        -- ^ An optional string which is used in recompilation messages if
+        -- dir in question has changed.
+
+        -- Note: We this is a very shallow check, just what the contents of 
+        -- the directory are, aka what files and directories are within it, 
+        -- if those files/directories have their own contents changed...
+        -- We won't spot it here, better recursive add them to your usage
+        -- seperately.
+  }
   | UsageHomeModuleInterface {
         usg_mod_name :: ModuleName
         -- ^ Name of the module

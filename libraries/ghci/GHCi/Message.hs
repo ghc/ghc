@@ -291,6 +291,7 @@ data THMessage a where
 
   GetPackageRoot :: THMessage (THResult FilePath)
   AddDependentFile :: FilePath -> THMessage (THResult ())
+  AddDependentDirectory :: FilePath -> THMessage (THResult ())
   AddTempFile :: String -> THMessage (THResult FilePath)
   AddModFinalizer :: RemoteRef (TH.Q ()) -> THMessage (THResult ())
   AddCorePlugin :: String -> THMessage (THResult ())
@@ -343,6 +344,7 @@ getTHMessage = do
     23 -> THMsg <$> (PutDoc <$> get <*> get)
     24 -> THMsg <$> GetDoc <$> get
     25 -> THMsg <$> return GetPackageRoot
+    26 -> THMsg <$> AddDependentDirectory <$> get
     n -> error ("getTHMessage: unknown message " ++ show n)
 
 putTHMessage :: THMessage a -> Put
@@ -373,7 +375,7 @@ putTHMessage m = case m of
   PutDoc l s                  -> putWord8 23 >> put l >> put s
   GetDoc l                    -> putWord8 24 >> put l
   GetPackageRoot              -> putWord8 25
-
+  AddDependentDirectory a     -> putWord8 26 >> put a
 
 data EvalOpts = EvalOpts
   { useSandboxThread :: Bool
