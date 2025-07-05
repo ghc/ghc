@@ -7233,6 +7233,7 @@ module GHC.Fingerprint where
   fingerprintFingerprints :: [Fingerprint] -> Fingerprint
   fingerprintString :: GHC.Internal.Base.String -> Fingerprint
   getFileHash :: GHC.Internal.IO.FilePath -> GHC.Internal.Types.IO Fingerprint
+  getDirHash  :: GHC.Internal.IO.FilePath -> GHC.Internal.Types.IO Fingerprint
 
 module GHC.Fingerprint.Type where
   -- Safety: Safe

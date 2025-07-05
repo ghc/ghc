@@ -269,6 +269,7 @@ mkRecompUsageInfo hsc_env tc_result = do
     else do
      let used_names = mkUsedNames tc_result
      dep_files <- (readIORef (tcg_dependent_files tc_result))
+     dep_dirs  <- (readIORef (tcg_dependent_dirs tc_result))
      (needed_links, needed_pkgs) <- readIORef (tcg_th_needed_deps tc_result)
      let uc = initUsageConfig hsc_env
          plugins = hsc_plugins hsc_env
@@ -289,6 +290,7 @@ mkRecompUsageInfo hsc_env tc_result = do
           (tcg_import_decls tc_result)
           used_names
           dep_files
+          dep_dirs
           (tcg_merged tc_result)
           needed_links
           needed_pkgs

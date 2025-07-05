@@ -107,10 +107,12 @@ initFinderCache :: IO FinderCache
 initFinderCache = do
   mod_cache <- newIORef emptyInstalledModuleEnv
   file_cache <- newIORef M.empty
+  dir_cache <- newIORef M.empty
   let flushFinderCaches :: UnitEnv -> IO ()
       flushFinderCaches ue = do
         atomicModifyIORef' mod_cache $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
         atomicModifyIORef' file_cache $ \_ -> (M.empty, ())
+        atomicModifyIORef' dir_cache  $ \_ -> (M.empty, ())
        where
         is_ext mod _ = not (isUnitEnvInstalledModule ue mod)
 
@@ -137,6 +139,16 @@ initFinderCache = do
              atomicModifyIORef' file_cache $ \c -> (M.insert key hash c, ())
              return hash
            Just fp -> return fp
+      lookupDirCache :: FilePath -> IO Fingerprint
+      lookupDirCache key = do
+         c <- readIORef dir_cache
+         case M.lookup key c of
+           Nothing -> do
+             hash <- getDirHash key
+             atomicModifyIORef' dir_cache $ \c -> (M.insert key hash c, ())
+             return hash
+           Just fp -> return fp
+
   return FinderCache{..}
 
 -- -----------------------------------------------------------------------------
