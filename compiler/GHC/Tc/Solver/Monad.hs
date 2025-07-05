@@ -105,7 +105,7 @@ module GHC.Tc.Solver.Monad (
 
     -- Unification
     wrapUnifierX, wrapUnifierTcS, unifyFunDeps, uPairsTcM, unifyForAllBody,
-    unifyFunDepWanteds,
+    unifyFunDepWanteds, unifyAndEmitFunDepWanteds,
 
     -- MetaTyVars
     newFlexiTcSTy, instFlexiX,
@@ -2242,6 +2242,23 @@ solverDepthError loc ty
 *                                                                      *
 ************************************************************************
 -}
+
+unifyAndEmitFunDepWanteds :: CtEvidence  -- The work item
+                          -> [FunDepEqn (CtLoc, RewriterSet)]
+                          -> TcS Bool   -- True <=> some unification happened
+unifyAndEmitFunDepWanteds ev fd_eqns
+  = do { (new_eqs, unifs)  <- unifyFunDepWanteds ev fd_eqns
+
+       ;   -- Emit the deferred constraints
+           -- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
+           --
+           -- All the constraints in `cts` share the same rewriter set so,
+           -- rather than looking at it one by one, we pass it to
+           -- extendWorkListChildEqs; just a small optimisation.
+       ; unless (isEmptyBag new_eqs) $
+         updWorkListTcS (extendWorkListChildEqs ev new_eqs)
+
+       ; return unifs }
 
 unifyFunDepWanteds :: CtEvidence  -- The work item
                   -> [FunDepEqn (CtLoc, RewriterSet)]

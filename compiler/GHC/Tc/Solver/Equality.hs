@@ -118,7 +118,7 @@ solveEquality ev eq_rel ty1 ty2
                                 ; solveIrred irred_ct } ;
 
             Right eq_ct   -> do { tryInertEqs eq_ct
-                                ; tryFunDeps  eq_rel eq_ct
+                                ; tryFunDeps  eq_ct
                                 ; tryQCsEqCt  eq_ct
                                 ; simpleStage (updInertEqs eq_ct)
                                 ; stopWithStage (eqCtEvidence eq_ct) "Kept inert EqCt" } } }
@@ -3044,8 +3044,8 @@ equality with the template on the left.  Delicate, but it works.
 -}
 
 --------------------
-tryFunDeps :: EqRel -> EqCt -> SolverStage ()
-tryFunDeps eq_rel work_item@(EqCt { eq_lhs = lhs, eq_ev = ev })
+tryFunDeps :: EqCt -> SolverStage ()
+tryFunDeps work_item@(EqCt { eq_lhs = lhs, eq_ev = ev, eq_eq_rel = eq_rel })
   | NomEq <- eq_rel
   , TyFamLHS tc args <- lhs
   = Stage $
@@ -3264,7 +3264,7 @@ improveWantedLocalFunEqs funeqs_for_tc fam_tc args work_ev rhs
   = do { traceTcS "interactFunEq improvements: " $
                    vcat [ text "Eqns:" <+> ppr improvement_eqns
                         , text "Candidates:" <+> ppr funeqs_for_tc ]
-       ; emitFunDepWanteds work_ev improvement_eqns }
+       ; unifyAndEmitFunDepWanteds work_ev improvement_eqns }
   where
     work_loc      = ctEvLoc work_ev
     work_pred     = ctEvPred work_ev

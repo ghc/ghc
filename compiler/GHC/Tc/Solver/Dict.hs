@@ -10,7 +10,7 @@ module GHC.Tc.Solver.Dict (
   solveCallStack,    -- For GHC.Tc.Solver
 
   -- * Functional dependencies
-  generateTopFunDeps
+  doTopFunDepImprovement, doLocalFunDepImprovement
   ) where
 
 import GHC.Prelude
@@ -95,7 +95,7 @@ solveDict dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
 
        -- Try fundeps /after/ tryInstances:
        --     see (DFL2) in Note [Do fundeps last]
-       ; doLocalFunDepImprovement dict_ct
+--       ; doLocalFunDepImprovement dict_ct
            -- doLocalFunDepImprovement does StartAgain if there
            -- are any fundeps: see (DFL1) in Note [Do fundeps last]
 
@@ -1434,7 +1434,7 @@ But in general it's a bit painful to figure out the necessary coercion,
 so we just take the first approach. Here is a better example. Consider:
     class C a b c | a -> b
 And:
-     [G]  d1 : C T Int Char
+     [G] d1 : C T Int Char
      [W] d2 : C T beta Int
 In this case, it's *not even possible* to solve the wanted immediately.
 So we should simply output the functional dependency and add this guy
@@ -1630,16 +1630,23 @@ as the fundeps.
 #7875 is a case in point.
 -}
 
-generateTopFunDeps :: InstEnvs -> Cts -> [FunDepEqn (CtLoc, RewriterSet)]
+doTopFunDepImprovement :: Bag DictCt -> TcS (Cts, Bool)
+-- (doFunDeps inst_envs cts)
+--   * Generate the fundeps from interacting the
+--     top-level `inst_envs` with the constraints `cts`
+--   * Do the unifications and return any unsolved constraints
 -- See Note [Fundeps with instances, and equality orientation]
-generateTopFunDeps inst_evs cts
-  = foldMap do_top cts -- "RAE" `unionBags` interactions
+doTopFunDepImprovement cts
+  = do { inst_envs <- getInstEnvs
+       ; do_dict_fundeps (do_one inst_envs) cts }
   where
-    do_top :: Ct -> [FunDepEqn (CtLoc, RewriterSet)]
-    do_top (CDictCan (DictCt { di_ev = ev, di_cls = cls, di_tys = xis }))
-      = assert (not (isGiven ev)) $
-        improveFromInstEnv inst_evs mk_ct_loc cls xis
+    do_one :: InstEnvs -> DictCt -> TcS (Cts, Bool)
+    do_one inst_envs (DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
+      = unifyFunDepWanteds ev eqns
       where
+        eqns :: [FunDepEqn (CtLoc, RewriterSet)]
+        eqns = improveFromInstEnv inst_envs mk_ct_loc cls xis
+
         dict_pred      = mkClassPred cls xis
         dict_loc       = ctEvLoc ev
         dict_origin    = ctLocOrigin dict_loc
@@ -1655,93 +1662,57 @@ generateTopFunDeps inst_evs cts
             new_orig  = FunDepOrigin2 dict_pred dict_origin
                                       inst_pred inst_loc
 
-    do_top _other = []
-
-
-doLocalFunDepImprovement :: DictCt -> SolverStage ()
--- Add wanted constraints from type-class functional dependencies.
-doLocalFunDepImprovement dict_ct@(DictCt { di_ev = work_ev, di_cls = cls })
-  = Stage $
-    do { inerts <- getInertCans
-       ; imp <- foldlM add_fds False (findDictsByClass (inert_dicts inerts) cls)
-       ; if imp then startAgainWith (CDictCan dict_ct)
-                     else continueWith () }
+doLocalFunDepImprovement :: Bag DictCt -> TcS (Cts,Bool)
+-- Add wanted constraints from type-class functional dependencies
+-- against Givens
+doLocalFunDepImprovement cts
+  = do { inerts <- getInertCans  -- The inert_dicts are all Givens
+       ; do_dict_fundeps (do_one (inert_dicts inerts)) cts }
   where
-    work_pred = ctEvPred work_ev
-    work_loc  = ctEvLoc work_ev
-
-    add_fds :: Bool -> DictCt -> TcS Bool
-    add_fds so_far (DictCt { di_ev = inert_ev })
-      | isGiven work_ev && isGiven inert_ev
-        -- Do not create FDs from Given/Given interactions: See Note [No Given/Given fundeps]
-      = return so_far
-      | otherwise
-      = do { traceTcS "doLocalFunDepImprovement" (vcat
-                [ ppr work_ev
-                , pprCtLoc work_loc, ppr (isGivenLoc work_loc)
-                , pprCtLoc inert_loc, ppr (isGivenLoc inert_loc)
-                , pprCtLoc derived_loc, ppr (isGivenLoc derived_loc) ])
-
-           ; (new_eqs, unifs)
-                 <- unifyFunDepWanteds work_ev $
-                    improveFromAnother (derived_loc, inert_rewriters)
-                                       inert_pred work_pred
-
-           -- Emit the deferred constraints
-           -- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
-           --
-           -- All the constraints in `cts` share the same rewriter set so,
-           -- rather than looking at it one by one, we pass it to
-           -- extendWorkListChildEqs; just a small optimisation.
-           ; unless (isEmptyBag cts) $
-             updWorkListTcS (extendWorkListChildEqs ev new_eqs)
-
-           ; return (so_far || unifs)
-        }
+    do_one givens (DictCt { di_cls = cls, di_ev = wanted_ev })
+      = do_dict_fundeps do_one_given (findDictsByClass givens cls)
       where
-        inert_pred = ctEvPred inert_ev
-        inert_loc  = ctEvLoc inert_ev
-        inert_rewriters = ctEvRewriters inert_ev
-        derived_loc = work_loc { ctl_depth  = ctl_depth work_loc `maxSubGoalDepth`
-                                              ctl_depth inert_loc
-                               , ctl_origin = FunDepOrigin1 work_pred
-                                                            (ctLocOrigin work_loc)
-                                                            (ctLocSpan work_loc)
-                                                            inert_pred
-                                                            (ctLocOrigin inert_loc)
-                                                            (ctLocSpan inert_loc) }
+        wanted_pred = ctEvPred wanted_ev
+        wanted_loc  = ctEvLoc  wanted_ev
 
-doTopFunDepImprovement :: DictCt -> SolverStage ()
--- Try to functional-dependency improvement between the constraint
--- and the top-level instance declarations
--- See Note [Fundeps with instances, and equality orientation]
--- See also Note [Weird fundeps]
-doTopFunDepImprovement dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
-  | isGiven ev     -- No improvement for Givens
-  = Stage $ continueWith ()
-  | otherwise
-  = Stage $
-    do { traceTcS "try_fundeps" (ppr dict_ct)
-       ; instEnvs <- getInstEnvs
-       ; let fundep_eqns = improveFromInstEnv instEnvs mk_ct_loc cls xis
-       ; imp <- emitFunDepWanteds ev fundep_eqns
-       ; if imp then startAgainWith (CDictCan dict_ct)
-                     else continueWith () }
+        do_one_given :: DictCt -> TcS (Cts,Bool)
+        do_one_given (DictCt { di_ev = given_ev })
+          = do { traceTcS "doLocalFunDepImprovement" $
+                 vcat [ ppr wanted_ev
+                      , pprCtLoc wanted_loc, ppr (isGivenLoc wanted_loc)
+                      , pprCtLoc given_loc, ppr (isGivenLoc given_loc)
+                      , pprCtLoc deriv_loc, ppr (isGivenLoc deriv_loc) ]
+
+               ; unifyFunDepWanteds wanted_ev $
+                 improveFromAnother (deriv_loc, given_rewriters)
+                                    given_pred wanted_pred }
+          where
+            given_pred  = ctEvPred given_ev
+            given_loc   = ctEvLoc given_ev
+            given_rewriters = ctEvRewriters given_ev
+            deriv_loc = wanted_loc { ctl_depth  = deriv_depth
+                                   , ctl_origin = deriv_origin }
+            deriv_depth = ctl_depth wanted_loc `maxSubGoalDepth`
+                          ctl_depth given_loc
+            deriv_origin = FunDepOrigin1 wanted_pred
+                                         (ctLocOrigin wanted_loc)
+                                         (ctLocSpan wanted_loc)
+                                         given_pred
+                                         (ctLocOrigin given_loc)
+                                         (ctLocSpan given_loc)
+
+do_dict_fundeps :: (DictCt -> TcS (Cts,Bool)) -> Bag DictCt -> TcS (Cts,Bool)
+do_dict_fundeps do_dict_fundep cts
+  = foldr do_one (return (emptyBag, False)) cts
   where
-     dict_pred      = mkClassPred cls xis
-     dict_loc       = ctEvLoc ev
-     dict_origin    = ctLocOrigin dict_loc
-     dict_rewriters = ctEvRewriters ev
-
-     mk_ct_loc :: ClsInst   -- The instance decl
-               -> (CtLoc, RewriterSet)
-     mk_ct_loc ispec
-       = ( dict_loc { ctl_origin = FunDepOrigin2 dict_pred dict_origin
-                                                 inst_pred inst_loc }
-         , dict_rewriters )
-       where
-         inst_pred = mkClassPred cls (is_tys ispec)
-         inst_loc  = getSrcSpan (is_dfun ispec)
+    do_one :: DictCt -> TcS (Cts,Bool) -> TcS (Cts,Bool)
+    do_one dict_ct do_rest
+      = -- assert (not (isGiven (dictCtEvidence dict_ct)) $
+        do { (cts1, unifs1) <- do_dict_fundep dict_ct
+           ; if isEmptyBag cts1 && not unifs1
+             then do_rest  -- Common case
+             else do { (cts2, unifs2) <- do_rest
+                     ; return (cts1 `unionBags` cts2, unifs1 || unifs2) } }
 
 
 {- *********************************************************************

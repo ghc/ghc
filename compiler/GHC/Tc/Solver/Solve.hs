@@ -26,7 +26,6 @@ import GHC.Tc.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc( mkGivenLoc )
-import GHC.Tc.Instance.FunDeps ( FunDepEqn(..) )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Utils.Monad   as TcM
@@ -47,7 +46,6 @@ import GHC.Types.Unique.Set( nonDetStrictFoldUniqSet )
 
 import GHC.Data.Bag
 import GHC.Data.Maybe
-import GHC.Data.Pair
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -207,14 +205,21 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
       | otherwise
       = return Nothing
 
+    dicts :: Bag DictCt
+    dicts = mapMaybeBag is_dict simples
+          where
+            is_dict (CDictCan d) = Just d
+            is_dict _            = Nothing
+
     try_fundeps :: TcS (Maybe NextAction)
     try_fundeps
-      = do { inst_envs <- getInstEnvs
-           ; let fundep_eqns = generateTopFunDeps inst_envs simples
-           ; (new_eqs, unif_happened) <- unifyFunDepWanteds fundep_eqns
-           ; if null new_eqs && not unif_happened
+      = do { (new_eqs1, unifs1) <- doTopFunDepImprovement dicts
+           ; (new_eqs2, unifs2) <- doLocalFunDepImprovement dicts
+           ; let new_eqs = new_eqs1 `unionBags` new_eqs2
+                 unifs   = unifs1 || unifs2
+           ; if null new_eqs && not unifs
              then return Nothing
-             else return (Just (NA_TryAgain (wc `addSimples` new_eqs) unif_happened)) }
+             else return (Just (NA_TryAgain (wc `addSimples` new_eqs) unifs)) }
 
 {- Note [Superclass iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
