@@ -490,7 +490,7 @@ instance Binary Usage where
             dp    <- get bh
             hash  <- get bh
             label <- get bh
-            return UsageDirectory { usg_dir_path = fp, usg_dir_hash = hash, usg_dir_label = label }
+            return UsageDirectory { usg_dir_path = dp, usg_dir_hash = hash, usg_dir_label = label }
 
           i -> error ("Binary.get(Usage): " ++ show i)
 
