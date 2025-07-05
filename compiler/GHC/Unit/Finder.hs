@@ -151,7 +151,7 @@ initFinderCache = do
              hash <- getDirHash key
              atomicModifyIORef' dir_cache $ \c -> (M.insert key hash c, ())
              return hash
-           Just fp -> return fp 
+           Just fp -> return fp
   return FinderCache{..}
 
 -- | This function computes a shallow hash of a directory, so really just what files and directories are directly inside it.

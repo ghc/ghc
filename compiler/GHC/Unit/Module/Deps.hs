@@ -412,6 +412,7 @@ instance NFData Usage where
   rnf (UsagePackageModule mod hash safe) = rnf mod `seq` rnf hash `seq` rnf safe `seq` ()
   rnf (UsageHomeModule mod uid hash entities exports safe) = rnf mod `seq` rnf uid `seq` rnf hash `seq` rnf entities `seq` rnf exports `seq` rnf safe `seq` ()
   rnf (UsageFile file hash label) = rnf file `seq` rnf hash `seq` rnf label `seq` ()
+  rnf (UsageDirectory dir hash label) = rnf dir `seq` rnf hash `seq` rnf label `seq` ()
   rnf (UsageMergedRequirement mod hash) = rnf mod `seq` rnf hash `seq` ()
   rnf (UsageHomeModuleInterface mod uid hash) = rnf mod `seq` rnf uid `seq` rnf hash `seq` ()
 
@@ -448,6 +449,12 @@ instance Binary Usage where
         put_ bh (usg_unit_id  usg)
         put_ bh (usg_iface_hash usg)
 
+    put_ bh usg@UsageDirectory{} = do
+        putByte bh 5
+        put_ bh (usg_dir_path usg)
+        put_ bh (usg_dir_hash usg)
+        put_ bh (usg_dir_label usg)
+
     get bh = do
         h <- getByte bh
         case h of
@@ -479,6 +486,12 @@ instance Binary Usage where
             uid <- get bh
             hash <- get bh
             return UsageHomeModuleInterface { usg_mod_name = mod, usg_unit_id = uid, usg_iface_hash = hash }
+          5 -> do
+            dp    <- get bh
+            hash  <- get bh
+            label <- get bh
+            return UsageDirectory { usg_dir_path = fp, usg_dir_hash = hash, usg_dir_label = label }
+
           i -> error ("Binary.get(Usage): " ++ show i)
 
 -- | Records the imports that we depend on from a home module,
