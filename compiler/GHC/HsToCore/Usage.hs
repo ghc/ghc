@@ -2,7 +2,7 @@ module GHC.HsToCore.Usage (
     -- * Dependency/fingerprinting code (used by GHC.Iface.Make)
     mkUsageInfo, mkUsedNames,
 
-    UsageConfig(..),
+    UsageConfig(..)
     ) where
 
 import GHC.Prelude
@@ -31,6 +31,7 @@ import GHC.Unit.External
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
+import GHC.Unit.Finder(getDirHash)
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -47,6 +48,8 @@ import GHC.Unit.Finder
 import GHC.Types.Unique.DFM
 import GHC.Driver.Plugins
 import qualified GHC.Unit.Home.Graph as HUG
+
+import qualified System.Directory as SD
 
 {- Note [Module self-dependency]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
