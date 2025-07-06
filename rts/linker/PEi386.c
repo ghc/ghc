@@ -1168,7 +1168,11 @@ bool checkAndLoadImportLibrary( pathchar* arch_name, char* member_name, FILE* f 
     // way is to load the symbol immediately. We already have all the
     // information so might as well
     SymbolAddr* sym = lookupSymbolInDLL_PEi386 (symbol, instance, dll, NULL);
-    ASSERT(sym);
+
+    // Could be an import descriptor etc, skip if no symbol.
+    if (!sym)
+      return true;
+
     // The symbol must have been found, and we can add it to the RTS symbol table
     IF_DEBUG(linker, debugBelch("checkAndLoadImportLibrary: resolved symbol %s to %p\n", symbol, sym));
     // Because the symbol has been loaded before we actually need it, if a
@@ -1932,6 +1936,27 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           }
           if(NULL != targetSection)
               addr = (SymbolAddr*) ((size_t) targetSection->start + getSymValue(info, targetSym));
+          else
+            {
+                // Do the symbol lookup based on name, this follows Microsoft's weak external's
+                // format 3 specifications.  Example header generated:
+                // api-ms-win-crt-stdio-l1-1-0.dll:     file format pe-x86-64
+                //
+                // SYMBOL TABLE:
+                // [  0](sec -1)(fl 0x00)(ty    0)(scl   3) (nx 0) 0x0000000000000000 @comp.id
+                // [  1](sec -1)(fl 0x00)(ty    0)(scl   3) (nx 0) 0x0000000000000000 @feat.00
+                // [  2](sec  0)(fl 0x00)(ty    0)(scl   2) (nx 0) 0x0000000000000000 _write
+                // [  3](sec  0)(fl 0x00)(ty    0)(scl 105) (nx 1) 0x0000000000000000 write
+                // AUX lnno 3 size 0x0 tagndx 2
+                //
+                // https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#auxiliary-format-3-weak-externals
+                SymbolName *target_sname = get_sym_name (getSymShortName (info, targetSym), oc);
+                if (target_sname)
+                  addr = lookupSymbol_PEi386 (target_sname, oc, &type);
+
+                IF_DEBUG(linker, debugBelch("weak external symbol @ %s => %s resolved to %p\n", \
+                                            sname, target_sname, addr));
+            }
       }
       else if (  secNumber == IMAGE_SYM_UNDEFINED && symValue > 0) {
          /* This symbol isn't in any section at all, ie, global bss.
