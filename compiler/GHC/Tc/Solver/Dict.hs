@@ -413,7 +413,7 @@ solveEqualityDict ev cls tys
     do { let loc = ctEvLoc ev
              sc_pred = classMethodInstTy sel_id tys
              ev_expr = EvExpr $ Var sel_id `mkTyApps` tys `App` evId ev_id
-       ; given_ev <- newGivenEvVar loc (sc_pred, ev_expr)
+       ; given_ev <- newGivenEv loc (sc_pred, ev_expr)
        ; startAgainWith (mkNonCanonical $ CtGiven given_ev) }
   | otherwise
   = pprPanic "solveEqualityDict" (ppr cls)
@@ -1403,8 +1403,8 @@ now!).
 Note [FunDep and implicit parameter reactions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Currently, our story of interacting two dictionaries (or a dictionary
-and top-level instances) for functional dependencies, and implicit
-parameters, is that we simply produce new Wanted equalities.  So for example
+and top-level instances) for functional dependencies (including implicit
+parameters), is that we simply produce new Wanted equalities.  So for example
 
         class D a b | a -> b where ...
     Inert:
@@ -1663,43 +1663,46 @@ doTopFunDepImprovement cts
                                       inst_pred inst_loc
 
 doLocalFunDepImprovement :: Bag DictCt -> TcS (Cts,Bool)
--- Add wanted constraints from type-class functional dependencies
--- against Givens
-doLocalFunDepImprovement cts
+-- Using functional dependencies, interact the unsolved Wanteds
+-- against each other and the inert Givens, to produce new equalities
+doLocalFunDepImprovement wanted
   = do { inerts <- getInertCans  -- The inert_dicts are all Givens
-       ; do_dict_fundeps (do_one (inert_dicts inerts)) cts }
+       ; let all_dicts :: DictMap DictCt  -- Both Givens and Wanteds
+             all_dicts = foldr addDict (inert_dicts inerts) wanted
+       ; do_dict_fundeps (do_one all_dicts) wanted }
   where
-    do_one givens (DictCt { di_cls = cls, di_ev = wanted_ev })
-      = do_dict_fundeps do_one_given (findDictsByClass givens cls)
+    -- all_dicts are all the Givens and all the Wanteds
+    do_one all_dicts (DictCt { di_cls = cls, di_ev = wanted_ev })
+      = do_dict_fundeps do_interaction (findDictsByClass all_dicts cls)
       where
         wanted_pred = ctEvPred wanted_ev
         wanted_loc  = ctEvLoc  wanted_ev
 
-        do_one_given :: DictCt -> TcS (Cts,Bool)
-        do_one_given (DictCt { di_ev = given_ev })
+        do_interaction :: DictCt -> TcS (Cts,Bool)
+        do_interaction (DictCt { di_ev = all_ev })  -- This can be Given or Wanted
           = do { traceTcS "doLocalFunDepImprovement" $
                  vcat [ ppr wanted_ev
                       , pprCtLoc wanted_loc, ppr (isGivenLoc wanted_loc)
-                      , pprCtLoc given_loc, ppr (isGivenLoc given_loc)
+                      , pprCtLoc all_loc, ppr (isGivenLoc all_loc)
                       , pprCtLoc deriv_loc, ppr (isGivenLoc deriv_loc) ]
 
                ; unifyFunDepWanteds wanted_ev $
-                 improveFromAnother (deriv_loc, given_rewriters)
-                                    given_pred wanted_pred }
+                 improveFromAnother (deriv_loc, all_rewriters)
+                                    all_pred wanted_pred }
           where
-            given_pred  = ctEvPred given_ev
-            given_loc   = ctEvLoc given_ev
-            given_rewriters = ctEvRewriters given_ev
+            all_pred  = ctEvPred all_ev
+            all_loc   = ctEvLoc all_ev
+            all_rewriters = ctEvRewriters all_ev
             deriv_loc = wanted_loc { ctl_depth  = deriv_depth
                                    , ctl_origin = deriv_origin }
             deriv_depth = ctl_depth wanted_loc `maxSubGoalDepth`
-                          ctl_depth given_loc
+                          ctl_depth all_loc
             deriv_origin = FunDepOrigin1 wanted_pred
                                          (ctLocOrigin wanted_loc)
                                          (ctLocSpan wanted_loc)
-                                         given_pred
-                                         (ctLocOrigin given_loc)
-                                         (ctLocSpan given_loc)
+                                         all_pred
+                                         (ctLocOrigin all_loc)
+                                         (ctLocSpan all_loc)
 
 do_dict_fundeps :: (DictCt -> TcS (Cts,Bool)) -> Bag DictCt -> TcS (Cts,Bool)
 do_dict_fundeps do_dict_fundep cts
@@ -2047,7 +2050,7 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
       = -- See Note [Equality superclasses in quantified constraints]
         return []
       | otherwise
-      = do { given_ev <- newGivenEvVar sc_loc $
+      = do { given_ev <- newGivenEv sc_loc $
                          mk_given_desc sel_id sc_pred
            ; assertFuelPrecondition fuel $
              mk_superclasses fuel rec_clss (CtGiven given_ev) tvs theta sc_pred }

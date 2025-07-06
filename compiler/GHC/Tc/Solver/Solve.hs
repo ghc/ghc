@@ -1563,7 +1563,7 @@ finish_rewrite
              new_tm = assert (coercionRole co == ev_rw_role)
                       mkEvCast (evId old_evar)
                          (downgradeRole Representational ev_rw_role co)
-       ; new_ev <- newGivenEvVar loc (new_pred, new_tm)
+       ; new_ev <- newGivenEv loc (new_pred, new_tm)
        ; continueWith $ CtGiven new_ev }
 
 finish_rewrite

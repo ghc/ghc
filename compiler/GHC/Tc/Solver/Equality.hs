@@ -780,12 +780,12 @@ can_eq_app ev s1 t1 s2 t2
   = do { let co   = mkCoVarCo evar
              co_s = mkLRCo CLeft  co
              co_t = mkLRCo CRight co
-       ; evar_s <- newGivenEvVar loc ( mkTcEqPredLikeEv ev s1 s2
-                                     , evCoercion co_s )
-       ; evar_t <- newGivenEvVar loc ( mkTcEqPredLikeEv ev t1 t2
-                                     , evCoercion co_t )
-       ; emitWorkNC [CtGiven evar_t]
-       ; startAgainWith (mkNonCanonical $ CtGiven evar_s) }
+       ; ev_s <- newGivenEv loc ( mkTcEqPredLikeEv ev s1 s2
+                                , evCoercion co_s )
+       ; ev_t <- newGivenEv loc ( mkTcEqPredLikeEv ev t1 t2
+                                , evCoercion co_t )
+       ; emitWorkNC [CtGiven ev_t]
+       ; startAgainWith (mkNonCanonical $ CtGiven ev_s) }
 
   where
     loc = ctEvLoc ev
@@ -1632,7 +1632,7 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
         -> do { let kind_co  = mkKindCo (mkCoVarCo evar)
                     pred_ty  = unSwap swapped mkNomEqPred ki1 ki2
                     kind_loc = mkKindEqLoc xi1 xi2 loc
-              ; kind_ev <- newGivenEvVar kind_loc (pred_ty, evCoercion kind_co)
+              ; kind_ev <- newGivenEv kind_loc (pred_ty, evCoercion kind_co)
               ; emitWorkNC [CtGiven kind_ev]
               ; finish emptyRewriterSet (givenCtEvCoercion kind_ev) }
 
@@ -2597,7 +2597,7 @@ rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reductio
   = do { let new_tm = evCoercion ( mkSymCo lhs_co
                                   `mkTransCo` maybeSymCo swapped (mkCoVarCo old_evar)
                                   `mkTransCo` rhs_co)
-       ; CtGiven <$> newGivenEvVar loc (new_pred, new_tm) }
+       ; CtGiven <$> newGivenEv loc (new_pred, new_tm) }
 
   | CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rewriters }) <- old_ev
   = do { let rewriters' = rewriters S.<> new_rewriters
@@ -3044,6 +3044,7 @@ equality with the template on the left.  Delicate, but it works.
 -}
 
 --------------------
+
 tryFunDeps :: EqCt -> SolverStage ()
 tryFunDeps work_item@(EqCt { eq_lhs = lhs, eq_ev = ev, eq_eq_rel = eq_rel })
   | NomEq <- eq_rel
@@ -3253,7 +3254,7 @@ improveWantedLocalFunEqs
     -> TyCon -> [TcType] -> CtEvidence -> Xi  -- Work item (Wanted)
     -> TcS Bool   -- True <=> some unifications
 -- Emit improvement equalities for a Wanted constraint, by comparing
--- the current work item with inert CFunEqs (boh Given and Wanted)
+-- the current work item with inert CFunEqs (both Given and Wanted)
 -- E.g.   x + y ~ z,   x + y' ~ z   =>   [W] y ~ y'
 --
 -- See Note [FunDep and implicit parameter reactions]

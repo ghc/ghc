@@ -57,7 +57,7 @@ module GHC.Tc.Solver.Monad (
     unifyTyVar, reportUnifications,
     setEvBind, setWantedEq,
     setWantedEvTerm, setEvBindIfWanted,
-    newEvVar, newGivenEvVar, emitNewGivens,
+    newEvVar, newGivenEv, emitNewGivens,
     checkReductionDepth,
     getSolvedDicts, setSolvedDicts,
 
@@ -2081,12 +2081,12 @@ newNoTcEvBinds = wrapTcS TcM.newNoTcEvBinds
 newEvVar :: TcPredType -> TcS EvVar
 newEvVar pred = wrapTcS (TcM.newEvVar pred)
 
-newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS GivenCtEvidence
+newGivenEv :: CtLoc -> (TcPredType, EvTerm) -> TcS GivenCtEvidence
 -- Make a new variable of the given PredType,
 -- immediately bind it to the given term
 -- and return its CtEvidence
 -- See Note [Bind new Givens immediately] in GHC.Tc.Types.Constraint
-newGivenEvVar loc (pred, rhs)
+newGivenEv loc (pred, rhs)
   = do { new_ev <- newBoundEvVarId pred rhs
        ; return $ GivenCt { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc } }
 
@@ -2101,7 +2101,7 @@ newBoundEvVarId pred rhs
 emitNewGivens :: CtLoc -> [(Role,TcCoercion)] -> TcS ()
 emitNewGivens loc pts
   = do { traceTcS "emitNewGivens" (ppr pts)
-       ; gs <- mapM (newGivenEvVar loc) $
+       ; gs <- mapM (newGivenEv loc) $
                 [ (mkEqPredRole role ty1 ty2, evCoercion co)
                 | (role, co) <- pts
                 , let Pair ty1 ty2 = coercionKind co
@@ -2484,7 +2484,7 @@ checkTypeEq ev eq_rel lhs rhs =
     ---------------------------
     mk_new_given :: (TcTyVar, TcType) -> TcS Ct
     mk_new_given (new_tv, fam_app)
-      = mkNonCanonical . CtGiven <$> newGivenEvVar cb_loc (given_pred, given_term)
+      = mkNonCanonical . CtGiven <$> newGivenEv cb_loc (given_pred, given_term)
       where
         new_ty     = mkTyVarTy new_tv
         given_pred = mkNomEqPred fam_app new_ty
