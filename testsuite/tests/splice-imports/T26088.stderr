@@ -1,0 +1,6 @@
+T26088A.hs:8:8: error: [GHC-28914]
+    • Level error: ‘a’ is bound at level -1 but used at level 1
+    • Available from the imports:
+      • imported from ‘T26088B’ at -1 at T26088A.hs:4:1-21
+    • In the Template Haskell quotation: [| a |]
+

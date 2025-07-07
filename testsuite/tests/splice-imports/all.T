@@ -47,3 +47,4 @@ test('SI35',
      ['-package ghc'])
 test('SI36', [extra_files(["SI36_A.hs", "SI36_B1.hs", "SI36_B2.hs", "SI36_B3.hs", "SI36_C1.hs", "SI36_C2.hs", "SI36_C3.hs"])], multimod_compile_fail, ['SI36', '-v0'])
 test('T26087', [], multimod_compile_fail, ['T26087A', ''])
+test('T26088', [], multimod_compile_fail, ['T26088A', '-v0'])
