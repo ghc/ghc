@@ -73,6 +73,9 @@ module GHC.Types.Error
    , mkLocMessage
    , mkLocMessageWarningGroups
    , getCaretDiagnostic
+
+   , jsonDiagnostic
+
    -- * Queries
    , isIntrinsicErrorMessage
    , isExtrinsicErrorMessage
@@ -109,7 +112,7 @@ import GHC.Utils.Panic
 
 import GHC.Version (cProjectVersion)
 import Data.Bifunctor
-import Data.Foldable    ( fold, toList )
+import Data.Foldable
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.List ( intercalate )
@@ -170,9 +173,6 @@ instance Diagnostic e => Outputable (Messages e) where
         vcat [ text "Resolved:" <+> ppr (errMsgReason envelope),
                pprDiagnostic (errMsgDiagnostic envelope)
              ]
-
-instance (Diagnostic e) => ToJson (Messages e) where
-  json msgs =  JSArray . toList $ json <$> getMessages msgs
 
 {- Note [Discarding Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -573,7 +573,7 @@ instance ToJson DiagnosticCode where
 {- Note [Diagnostic Message JSON Schema]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The below instance of ToJson must conform to the JSON schema
-specified in docs/users_guide/diagnostics-as-json-schema-1_1.json.
+specified in docs/users_guide/diagnostics-as-json-schema-1_2.json.
 When the schema is altered, please bump the version.
 If the content is altered in a backwards compatible way,
 update the minor version (e.g. 1.3 ~> 1.4).
@@ -586,15 +586,17 @@ https://json-schema.org
 -}
 
 schemaVersion :: String
-schemaVersion = "1.1"
+schemaVersion = "1.2"
+
 -- See Note [Diagnostic Message JSON Schema] before editing!
-instance Diagnostic e => ToJson (MsgEnvelope e) where
-  json m = JSObject $ [
+jsonDiagnostic :: forall e. Diagnostic e => String -> MsgEnvelope e -> JsonDoc
+jsonDiagnostic rendered m = JSObject $ [
     ("version", JSString schemaVersion),
     ("ghcVersion", JSString $ "ghc-" ++ cProjectVersion),
     ("span", json $ errMsgSpan m),
     ("severity", json $ errMsgSeverity m),
     ("code", maybe JSNull json (diagnosticCode diag)),
+    ("rendered", JSString rendered),
     ("message", JSArray $ map renderToJSString diagMsg),
     ("hints", JSArray $ map (renderToJSString . ppr) (diagnosticHints diag) ) ]
     ++ [ ("reason", reasonJson)

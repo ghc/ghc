@@ -12,6 +12,7 @@ import GHC.Prelude
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.Error
+import GHC.Utils.Json
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
@@ -46,9 +47,22 @@ printMessages logger msg_opts opts = mapM_ (printMessage logger msg_opts opts) .
 
 printMessage :: forall a. (Diagnostic a) => Logger -> DiagnosticOpts a -> DiagOpts -> MsgEnvelope a -> IO ()
 printMessage logger msg_opts opts message
-  | log_diags_as_json = logJsonMsg logger messageClass message
+  | log_diags_as_json = do
+      decorated <- decorateDiagnostic logflags messageClass location doc
+      let
+        rendered :: String
+        rendered = renderWithContext (log_default_user_context logflags) decorated
+
+        jsonMessage :: JsonDoc
+        jsonMessage = jsonDiagnostic rendered message
+
+      logJsonMsg logger messageClass jsonMessage
+
   | otherwise = logMsg logger messageClass location doc
   where
+    logflags :: LogFlags
+    logflags = logFlags logger
+
     doc :: SDoc
     doc = updSDocContext (\_ -> ctx) (messageWithHints diagnostic)
 
