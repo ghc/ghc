@@ -120,13 +120,13 @@ simplify_loop n limit definitely_redo_implications
                             , int (lengthBag simples) <+> text "simples to solve" ])
        ; traceTcS "simplify_loop: wc =" (ppr wc)
 
-       ; (unifs1, wc1) <- reportUnifications $  -- See Note [Superclass iteration]
-                          solveSimpleWanteds simples
+       ; (n_unifs, wc1) <- reportUnifications $  -- See Note [Superclass iteration]
+                           solveSimpleWanteds simples
                 -- Any insoluble constraints are in 'simples' and so get rewritten
                 -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
 
        ; wc2 <- if not definitely_redo_implications  -- See Note [Superclass iteration]
-                   && unifs1 == 0                    -- for this conditional
+                   && n_unifs == 0                   -- for this conditional
                    && isEmptyBag (wc_impl wc1)
                 then return (wc { wc_simple = wc_simple wc1 })  -- Short cut
                 else do { implics2 <- solveNestedImplications $
@@ -208,10 +208,19 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
 
     try_fundeps :: TcS (Maybe NextAction)
     try_fundeps
-      = do { (new_eqs, unifs) <- doDictFunDepImprovement simples
-           ; if null new_eqs && not unifs
+      = do { (new_eqs, unifs1) <- doDictFunDepImprovement simples
+           ; if null new_eqs && not unifs1
              then return Nothing
-             else return (Just (NA_TryAgain (wc `addSimples` new_eqs) unifs)) }
+             else
+        -- We solve new_eqs immediately, hoping to get some unifications
+        -- If instead we just added them to `wc` we'll iterate and (in case when
+        -- that doesn't solve it) we'll add the same constraint again... loop!
+        do { traceTcS "try_fundeps" (ppr unifs1 $$ ppr new_eqs)
+           ; (n_unifs2, _wc) <- reportUnifications $
+                                solveSimpleWanteds new_eqs
+           ; if (unifs1 || n_unifs2 > 0)
+             then return (Just (NA_TryAgain wc True))
+             else return Nothing } }
 
 {- Note [Superclass iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

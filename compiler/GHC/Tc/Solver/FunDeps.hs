@@ -4,7 +4,8 @@
 -- | Solving Class constraints CDictCan
 module GHC.Tc.Solver.FunDeps (
   unifyAndEmitFunDepWanteds,
-  doDictFunDepImprovement
+  doDictFunDepImprovement,
+  ImprovementResult, noImprovement
   ) where
 
 import GHC.Prelude
