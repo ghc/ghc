@@ -153,7 +153,6 @@ import qualified GHC.Tc.Zonk.TcType  as TcM
 import GHC.Driver.DynFlags
 
 import GHC.Tc.Instance.Class( safeOverlap, instanceReturnsDictCon )
-import GHC.Tc.Instance.FunDeps( FunDepEqn(..) )
 import GHC.Utils.Misc
 
 
@@ -214,7 +213,6 @@ import Data.IORef
 import Data.List ( mapAccumL )
 import Data.List.NonEmpty ( nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Semigroup as S
 import GHC.Types.SrcLoc
 import GHC.Rename.Env
 import GHC.LanguageExtensions as LangExt
