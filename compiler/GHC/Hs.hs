@@ -38,8 +38,6 @@ module GHC.Hs (
         HsModule(..), AnnsModule(..),
         HsParsedModule(..), XModulePs(..),
 
-        SrcCodeCtxt(..), isUserCodeCtxt, isGeneratedCodeCtxt
-
 ) where
 
 -- friends:
@@ -149,17 +147,3 @@ data HsParsedModule = HsParsedModule {
        -- the .hi file, so that we can force recompilation if any of
        -- them change (#3589)
   }
-
--- Used in TcLclCtxt.tcl_in_gen_code to mark if the current expression
--- is a user generated code or a compiler generated expansion of some user written code
-data SrcCodeCtxt
-  = UserCode
-  | GeneratedCode SrcCodeOrigin
-
-isUserCodeCtxt :: SrcCodeCtxt -> Bool
-isUserCodeCtxt UserCode = True
-isUserCodeCtxt _ = False
-
-isGeneratedCodeCtxt :: SrcCodeCtxt -> Bool
-isGeneratedCodeCtxt UserCode = False
-isGeneratedCodeCtxt _ = True
