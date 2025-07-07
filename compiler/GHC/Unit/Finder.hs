@@ -71,6 +71,7 @@ import qualified Data.Map as M
 import GHC.Driver.Env
 import GHC.Driver.Config.Finder
 import qualified Data.Set as Set
+import qualified Data.List as L(sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified System.Directory as SD
 import qualified System.OsPath as OsPath
@@ -161,8 +162,9 @@ getDirHash dir = do
   contents <- SD.listDirectory dir
   -- The documentation of Fingerprints describes this as an easy naive implementation
   -- I wonder if we should do something more sophisticated here?
-  let hashes = fingerprintString <$> contents
-  let hash   = fingerprintFingerprints hashes
+  let hashes  = fingerprintString <$> contents
+  let s_hashes = L.sort hashes
+  let hash    = fingerprintFingerprints s_hashes
   return hash
 
 -- -----------------------------------------------------------------------------
