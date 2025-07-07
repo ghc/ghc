@@ -105,10 +105,9 @@ module GHC.Tc.Solver.Monad (
 
     -- Unification
     wrapUnifierX, wrapUnifierTcS, unifyFunDeps, uPairsTcM, unifyForAllBody,
-    unifyFunDepWanteds, unifyAndEmitFunDepWanteds,
 
     -- MetaTyVars
-    newFlexiTcSTy, instFlexiX,
+    newFlexiTcSTy, instFlexiX, instFlexiXTcM,
     cloneMetaTyVar,
     tcInstSkolTyVarsX,
 
@@ -129,8 +128,7 @@ module GHC.Tc.Solver.Monad (
     pprEq,
 
     -- Enforcing invariants for type equalities
-    checkTypeEq,
-    instantiateFunDepEqn
+    checkTypeEq
 ) where
 
 import GHC.Prelude
@@ -2234,83 +2232,6 @@ solverDepthError loc ty
        ; TcM.failWithTcM (tidy_env, msg) }
   where
     depth = ctLocDepth loc
-
-{-
-************************************************************************
-*                                                                      *
-              Emitting equalities arising from fundeps
-*                                                                      *
-************************************************************************
--}
-
-unifyAndEmitFunDepWanteds :: CtEvidence  -- The work item
-                          -> [FunDepEqn (CtLoc, RewriterSet)]
-                          -> TcS Bool   -- True <=> some unification happened
-unifyAndEmitFunDepWanteds ev fd_eqns
-  = do { (new_eqs, unifs)  <- unifyFunDepWanteds ev fd_eqns
-
-       ;   -- Emit the deferred constraints
-           -- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
-           --
-           -- All the constraints in `cts` share the same rewriter set so,
-           -- rather than looking at it one by one, we pass it to
-           -- extendWorkListChildEqs; just a small optimisation.
-       ; unless (isEmptyBag new_eqs) $
-         updWorkListTcS (extendWorkListChildEqs ev new_eqs)
-
-       ; return unifs }
-
-unifyFunDepWanteds :: CtEvidence  -- The work item
-                  -> [FunDepEqn (CtLoc, RewriterSet)]
-                  -> TcS (Cts, Bool)   -- True <=> some unification happened
-
-unifyFunDepWanteds _ [] = return (emptyBag, False) -- common case noop
--- See Note [FunDep and implicit parameter reactions]
-
-unifyFunDepWanteds ev fd_eqns
-  = do { (fresh_tvs_s, cts, unified_tvs) <- wrapUnifierX ev Nominal do_fundeps
-
-       -- Figure out if a "real" unification happened: See Note [unifyFunDeps]
-       ; let unif_happened = any is_old_tv unified_tvs
-             fresh_tvs     = mkVarSet (concat fresh_tvs_s)
-             is_old_tv tv  = not (tv `elemVarSet` fresh_tvs)
-
-       ; return (cts, unif_happened) }
-  where
-    do_fundeps :: UnifyEnv -> TcM [[TcTyVar]]
-    do_fundeps env = mapM (do_one env) fd_eqns
-
-    do_one :: UnifyEnv -> FunDepEqn (CtLoc, RewriterSet) -> TcM [TcTyVar]
-    do_one uenv (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
-      = do { (fresh_tvs, eqs') <- instantiateFunDepEqn tvs (reverse eqs)
-                     -- (reverse eqs): See Note [Reverse order of fundep equations]
-           ; uPairsTcM env_one eqs'
-           ; return fresh_tvs }
-      where
-        env_one = uenv { u_rewriters = u_rewriters uenv S.<> rewriters
-                       , u_loc       = loc }
-
-instantiateFunDepEqn :: [TyVar] -> [TypeEqn] -> TcM ([TcTyVar], [TypeEqn])
-instantiateFunDepEqn tvs eqs
-  | null tvs
-  = return ([], eqs)
-  | otherwise
-  = do { TcM.traceTc "emitFunDepWanteds 2" (ppr tvs $$ ppr eqs)
-       ; (tvs', subst) <- instFlexiXTcM emptySubst tvs  -- Takes account of kind substitution
-       ; return (tvs', map (subst_pair subst) eqs) }
-  where
-    subst_pair subst (Pair ty1 ty2)
-       = Pair (substTyUnchecked subst' ty1) ty2
-              -- ty2 does not mention fd_qtvs, so no need to subst it.
-              -- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
-              --     Wrinkle (1)
-       where
-         subst' = extendSubstInScopeSet subst (tyCoVarsOfType ty1)
-                  -- The free vars of ty1 aren't just fd_qtvs: ty1 is the result
-                  -- of matching with the [W] constraint. So we add its free
-                  -- vars to InScopeSet, to satisfy substTy's invariants, even
-                  -- though ty1 will never (currently) be a poytype, so this
-                  -- InScopeSet will never be looked at.
 
 {-
 ************************************************************************

@@ -14,6 +14,7 @@ import GHC.Tc.Solver.Irred( solveIrred )
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
 import GHC.Tc.Solver.Rewrite
 import GHC.Tc.Solver.Monad
+import GHC.Tc.Solver.FunDeps( unifyAndEmitFunDepWanteds )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Types( findFunEqsByTyCon )
 import GHC.Tc.Types.Evidence
@@ -3108,13 +3109,17 @@ improve_wanted_top_fun_eqs fam_tc lhs_tys rhs_ty
   | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
   = return (map snd $ tryInteractTopFam ops fam_tc lhs_tys rhs_ty)
 
+  -- ToDo: use ideas in #23162 for closed type families; injectivity only for open
+
   -- See Note [Type inference for type families with injectivity]
+  -- Open, so look for inj
   | Injective inj_args <- tyConInjectivityInfo fam_tc
   = do { fam_envs <- getFamInstEnvs
        ; top_eqns <- improve_injective_wanted_top fam_envs inj_args fam_tc lhs_tys rhs_ty
        ; let local_eqns = improve_injective_wanted_famfam  inj_args fam_tc lhs_tys rhs_ty
        ; traceTcS "improve_wanted_top_fun_eqs" $
          vcat [ ppr fam_tc, text "local_eqns" <+> ppr local_eqns, text "top_eqns" <+> ppr top_eqns ]
+  -- xxx ToDo: this does both local and top => bug?
        ; return (local_eqns ++ top_eqns) }
 
   | otherwise  -- No injectivity
