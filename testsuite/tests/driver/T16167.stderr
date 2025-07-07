@@ -1,1 +1,2 @@
+{"version":"1.2","ghcVersion":"ghc-9.15.20250819","span":{"file":"T16167.hs","start":{"line":1,"column":8},"end":{"line":1,"column":9}},"severity":"Error","code":58481,"rendered":"T16167.hs:1:8: error: [GHC-58481] parse error on input \u2018f\u2019\n","message":["parse error on input \u2018f\u2019"],"hints":[]}
 *** Exception: ExitFailure 1

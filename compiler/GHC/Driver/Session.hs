@@ -1658,9 +1658,6 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_NoTypeableBinds))
   , make_ord_flag defGhcFlag "ddump-debug"
         (setDumpFlag Opt_D_dump_debug)
-  , make_dep_flag defGhcFlag "ddump-json"
-        (setDumpFlag Opt_D_dump_json)
-        "Use `-fdiagnostics-as-json` instead"
   , make_ord_flag defGhcFlag "dppr-debug"
         (setDumpFlag Opt_D_ppr_debug)
   , make_ord_flag defGhcFlag "ddebug-output"
