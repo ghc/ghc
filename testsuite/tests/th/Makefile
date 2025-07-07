@@ -43,6 +43,20 @@ TH_Depends:
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -v0 TH_Depends
 	./TH_Depends
 
+.PHONY: TH_Depends_Dir
+TH_Depends_Dir:
+	$(RM) TH_Depends_external/dummy.txt
+	$(RM) TH_Depends TH_Depends.exe
+	$(RM) TH_Depends.o TH_Depends.hi
+	$(RM) TH_Depends_External.o TH_Depends_External.hi
+	
+	mk_DIR TH_Depends_external
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -v0 TH_Depends_Dir
+	./TH_Depends_Dir
+	sleep 2
+	echo "dummy" > TH_Depends_external/dummy.txt
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -v0 TH_Depends_Dir
+	./TH_Depends_Dir
 
 T8333:
 	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(ghcThWayFlags) T8333.hs < /dev/null
