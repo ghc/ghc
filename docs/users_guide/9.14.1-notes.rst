@@ -143,6 +143,11 @@ Compiler
   were accessed using the generated record selector functions, marking the fields
   as covered in coverage reports (:ghc-ticket:`17834`).
 
+- JSON diagnostics produced with (:ghc-flag:`-fdiagnostics-as-json`) now
+  include the `rendered` diagnostics message, in the exact same format as what
+  GHC would have produced without -fdiagnostics-as-json (including ANSI escape
+  sequences).
+
 GHCi
 ~~~~
 

@@ -1428,7 +1428,7 @@ messages and in GHCi:
     a new line.
 
     The structure of the output is described by a `JSON Schema <https://json-schema.org/>`_.
-    The schema can be downloaded :download:`here <diagnostics-as-json-schema-1_1.json>`.
+    The schema can be downloaded :download:`here <diagnostics-as-json-schema-1_2.json>`.
 
 .. ghc-flag:: -fdiagnostics-color=⟨always|auto|never⟩
     :shortdesc: Use colors in error messages
