@@ -35,6 +35,7 @@ import GHC.Rename.Pat     ( rnPat )
 import GHC.Types.Error
 import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, maxPrec )
 import GHC.Types.SourceText ( SourceText(..) )
+import GHC.Types.ThLevelIndex
 import GHC.Utils.Outputable
 import GHC.Unit.Module
 import GHC.Types.SrcLoc
@@ -1001,7 +1002,7 @@ checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use
   , xopt LangExt.ImplicitStagePersistence dflags = when (isExternalName name) (keepAlive name) >> return (HsVar noExtField name_var)
   -- 4. Name is in a bracket, and lifting is allowed
   | Brack _ pending <- use_lvl
-  , any (use_lvl_idx >=) (Set.toList bind_lvl)
+  , any (\bind_idx -> use_lvl_idx == incThLevelIndex bind_idx) (Set.toList bind_lvl)
   , allow_lifting
   = do
        let mgre = case reason of
