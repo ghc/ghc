@@ -866,7 +866,7 @@ mkTransZeroDeps = first graphReachability {- module graph is acyclic -} . module
 
 -- | Transitive dependencies, but with the stage that each module is required at.
 mkStageDeps :: [ModuleGraphNode] -> (ReachabilityIndex StageSummaryNode, (NodeKey, ModuleStage) -> Maybe StageSummaryNode)
-mkStageDeps = first graphReachability . moduleGraphNodesStages
+mkStageDeps = first cyclicGraphReachability . moduleGraphNodesStages
 
 type ZeroSummaryNode = Node Int ZeroScopeKey
 
