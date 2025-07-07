@@ -55,13 +55,6 @@ Dumping out compiler intermediate structures
     ``Main.p.dump-simpl`` and ``Main.dump-simpl`` instead of overwriting the
     output of one way with the output of another.
 
-.. ghc-flag:: -ddump-json
-    :shortdesc: *(deprecated)* Use :ghc-flag:`-fdiagnostics-as-json` instead
-    :type: dynamic
-
-    This flag was previously used to generated JSON formatted GHC diagnostics,
-    but has been deprecated. Instead, use :ghc-flag:`-fdiagnostics-as-json`.
-
 .. ghc-flag:: -dshow-passes
     :shortdesc: Print out each pass name as it happens
     :type: dynamic

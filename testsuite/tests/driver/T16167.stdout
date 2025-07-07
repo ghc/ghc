@@ -1,2 +1,0 @@
-{"span":null,"doc":"-ddump-json is deprecated: Use `-fdiagnostics-as-json` instead","messageClass":"MCDiagnostic SevWarning WarningWithFlags Opt_WarnDeprecatedFlags :| [] Just GHC-53692"}
-{"span":{"file":"T16167.hs","startLine":1,"startCol":8,"endLine":1,"endCol":9},"doc":"parse error on input \u2018f\u2019","messageClass":"MCDiagnostic SevError ErrorWithoutFlag Just GHC-58481"}
