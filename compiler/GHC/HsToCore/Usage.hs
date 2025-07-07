@@ -2,7 +2,7 @@ module GHC.HsToCore.Usage (
     -- * Dependency/fingerprinting code (used by GHC.Iface.Make)
     mkUsageInfo, mkUsedNames,
 
-    UsageConfig(..)
+    UsageConfig(..),
     ) where
 
 import GHC.Prelude

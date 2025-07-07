@@ -830,7 +830,7 @@ getPackageRoot = Q qGetPackageRoot
 -- The compiler can then recognize that it should re-compile the Haskell file
 -- when a directory changes.
 --
--- Expects an absolute file path.
+-- Expects an absolute directory path.
 --
 -- Notes:
 --

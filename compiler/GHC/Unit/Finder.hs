@@ -32,7 +32,7 @@ module GHC.Unit.Finder (
     findObjectLinkableMaybe,
     findObjectLinkable,
 
-    -- important that GHC.HsToCore.Usage uses the same hashing method for usage dirs as is done here.
+    -- important that GHC.HsToCore.Usage uses the same hashing method for usage dirs as is used here.
     getDirHash,
   ) where
 

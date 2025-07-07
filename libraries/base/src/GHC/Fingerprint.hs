@@ -5,7 +5,7 @@ module GHC.Fingerprint (
         fingerprintData,
         fingerprintString,
         fingerprintFingerprints,
-        getFileHash,
+        getFileHash
    ) where
 
 import GHC.Internal.Fingerprint
