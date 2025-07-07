@@ -15,6 +15,7 @@ module GHC.Tc.Solver.Solve (
 import GHC.Prelude
 
 import GHC.Tc.Solver.Dict
+import GHC.Tc.Solver.FunDeps( doDictFunDepImprovement )
 import GHC.Tc.Solver.Equality( solveEquality )
 import GHC.Tc.Solver.Irred( solveIrred )
 import GHC.Tc.Solver.Rewrite( rewrite, rewriteType )
