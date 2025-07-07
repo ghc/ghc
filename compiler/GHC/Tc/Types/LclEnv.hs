@@ -21,13 +21,14 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvTypeEnv
   , modifyLclEnvTcLevel
 
-  , getLclEnvSrcCodeCtxt
-  , setLclEnvSrcCodeCtxt
-  , setLclCtxtSrcCodeCtxt
+  , getLclEnvSrcCodeOrigin
+  , setLclEnvSrcCodeOrigin
+  , setLclCtxtSrcCodeOrigin
   , lclEnvInGeneratedCode
 
   , addLclEnvErrCtxt
 
+  , ErrCtxtStack (..)
   , ArrowCtxt(..)
   , ThBindEnv
   , TcTypeEnv
@@ -35,7 +36,7 @@ module GHC.Tc.Types.LclEnv (
 
 import GHC.Prelude
 
-import GHC.Hs ( SrcCodeCtxt (..), isGeneratedCodeCtxt )
+import GHC.Hs ( SrcCodeOrigin )
 import GHC.Tc.Utils.TcType ( TcLevel )
 import GHC.Tc.Errors.Types ( TcRnMessage )
 
@@ -90,11 +91,29 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_errs :: TcRef (Messages TcRnMessage)     -- Place to accumulate diagnostics
     }
 
+
+data ErrCtxtStack
+  = UserCodeCtxt {err_ctxt :: [ErrCtxt]}
+  | GeneratedCodeCtxt { src_code_origin :: SrcCodeOrigin
+                      , err_ctxt ::  [ErrCtxt] }
+
+isGeneratedCodeCtxt :: ErrCtxtStack -> Bool
+isGeneratedCodeCtxt UserCodeCtxt{} = False
+isGeneratedCodeCtxt _ = True
+
+get_src_code_origin :: ErrCtxtStack -> Maybe SrcCodeOrigin
+get_src_code_origin (UserCodeCtxt{}) = Nothing
+get_src_code_origin es = Just $ src_code_origin es
+
+modify_err_ctxt_stack :: ([ErrCtxt] -> [ErrCtxt]) -> ErrCtxtStack -> ErrCtxtStack
+modify_err_ctxt_stack f (UserCodeCtxt e) =  UserCodeCtxt (f e)
+modify_err_ctxt_stack _ c = c -- any updates on the err context in generated context should be ignored
+
+
 data TcLclCtxt
   = TcLclCtxt {
         tcl_loc        :: RealSrcSpan,     -- Source span
-        tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_in_gen_code :: SrcCodeCtxt,
+        tcl_ctxt       :: ErrCtxtStack,
         tcl_tclvl      :: TcLevel,
         tcl_bndrs      :: TcBinderStack,   -- Used for reporting relevant bindings,
                                            -- and for tidying type
@@ -159,28 +178,28 @@ getLclEnvLoc :: TcLclEnv -> RealSrcSpan
 getLclEnvLoc = tcl_loc . tcl_lcl_ctxt
 
 getLclEnvErrCtxt :: TcLclEnv -> [ErrCtxt]
-getLclEnvErrCtxt = tcl_ctxt . tcl_lcl_ctxt
+getLclEnvErrCtxt = err_ctxt . tcl_ctxt . tcl_lcl_ctxt
 
 setLclEnvErrCtxt :: [ErrCtxt] -> TcLclEnv -> TcLclEnv
-setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = ctxt })
+setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = modify_err_ctxt_stack (\ _ -> ctxt) (tcl_ctxt env) })
 
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
-addLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = ctxt : (tcl_ctxt env) })
+addLclEnvErrCtxt ec = modifyLclCtxt (\env -> env { tcl_ctxt = modify_err_ctxt_stack (\ctxt -> ec : ctxt) (tcl_ctxt env) })
 
-getLclEnvSrcCodeCtxt :: TcLclEnv -> SrcCodeCtxt
-getLclEnvSrcCodeCtxt = tcl_in_gen_code . tcl_lcl_ctxt
+getLclEnvSrcCodeOrigin :: TcLclEnv -> Maybe SrcCodeOrigin
+getLclEnvSrcCodeOrigin = get_src_code_origin . tcl_ctxt . tcl_lcl_ctxt
+
+setLclEnvSrcCodeOrigin :: SrcCodeOrigin -> TcLclEnv -> TcLclEnv
+setLclEnvSrcCodeOrigin o = modifyLclCtxt (setLclCtxtSrcCodeOrigin o)
+
+setLclCtxtSrcCodeOrigin :: SrcCodeOrigin -> TcLclCtxt -> TcLclCtxt
+setLclCtxtSrcCodeOrigin o ctxt = ctxt { tcl_ctxt = GeneratedCodeCtxt o (err_ctxt $ tcl_ctxt ctxt) }
+
+lclCtxtInGeneratedCode :: TcLclCtxt -> Bool
+lclCtxtInGeneratedCode = isGeneratedCodeCtxt . tcl_ctxt
 
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
 lclEnvInGeneratedCode = lclCtxtInGeneratedCode . tcl_lcl_ctxt
-
-lclCtxtInGeneratedCode :: TcLclCtxt -> Bool
-lclCtxtInGeneratedCode = isGeneratedCodeCtxt . tcl_in_gen_code
-
-setLclCtxtSrcCodeCtxt :: SrcCodeCtxt -> TcLclCtxt -> TcLclCtxt
-setLclCtxtSrcCodeCtxt userOrGen env = env { tcl_in_gen_code = userOrGen }
-
-setLclEnvSrcCodeCtxt :: SrcCodeCtxt -> TcLclEnv -> TcLclEnv
-setLclEnvSrcCodeCtxt userOrGen = modifyLclCtxt (\ctxt -> setLclCtxtSrcCodeCtxt userOrGen ctxt)
 
 getLclEnvBinderStack :: TcLclEnv -> TcBinderStack
 getLclEnvBinderStack = tcl_bndrs . tcl_lcl_ctxt

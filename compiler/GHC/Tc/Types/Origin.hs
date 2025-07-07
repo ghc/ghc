@@ -19,7 +19,7 @@ module GHC.Tc.Types.Origin (
 
   -- * CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
-  srcCodeCtxtCtOrigin,
+  srcCodeOriginCtOrigin,
   isVisibleOrigin, toInvisibleOrigin,
   pprCtOrigin, isGivenOrigin, isWantedWantedFunDepOrigin,
   isWantedSuperclassOrigin,
@@ -653,6 +653,7 @@ data CtOrigin
       Type   -- the instantiated type of the method
   | AmbiguityCheckOrigin UserTypeCtxt
   | ImplicitLiftOrigin HsImplicitLiftSplice
+  | ExpansionOrigin SrcCodeOrigin -- This is due to an expansion of the original thing given by SrcCodeOrigin
 
 data NonLinearPatternReason
   = LazyPatternReason
@@ -764,18 +765,13 @@ exprCtOrigin (HsHole _)          = Shouldn'tHappenOrigin "hole expression"
 exprCtOrigin (HsForAll {})       = Shouldn'tHappenOrigin "forall telescope"    -- See Note [Types in terms]
 exprCtOrigin (HsQual {})         = Shouldn'tHappenOrigin "constraint context"  -- See Note [Types in terms]
 exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -- See Note [Types in terms]
-exprCtOrigin (XExpr (ExpandedThingRn o _)) = srcCodeOriginCtOrigin o
+exprCtOrigin (XExpr (ExpandedThingRn o _)) = ExpansionOrigin o
 exprCtOrigin (XExpr (PopErrCtxt e)) = exprCtOrigin e
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
 
-srcCodeOriginCtOrigin :: SrcCodeOrigin -> CtOrigin
-srcCodeOriginCtOrigin (OrigExpr e) = exprCtOrigin e
-srcCodeOriginCtOrigin (OrigStmt{}) = DoStmtOrigin
-srcCodeOriginCtOrigin (OrigPat p) = DoPatOrigin p
-
-srcCodeCtxtCtOrigin :: HsExpr GhcRn -> SrcCodeCtxt -> CtOrigin
-srcCodeCtxtCtOrigin e UserCode = exprCtOrigin e
-srcCodeCtxtCtOrigin _ (GeneratedCode e) = srcCodeOriginCtOrigin e
+srcCodeOriginCtOrigin :: HsExpr GhcRn -> Maybe SrcCodeOrigin -> CtOrigin
+srcCodeOriginCtOrigin e Nothing = exprCtOrigin e
+srcCodeOriginCtOrigin _ (Just e) = ExpansionOrigin e
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
@@ -800,6 +796,14 @@ pprCtOrigin :: CtOrigin -> SDoc
 -- "arising from ..."
 pprCtOrigin (GivenOrigin sk)
   = ctoHerald <+> ppr sk
+
+pprCtOrigin (ExpansionOrigin o)
+  = ctoHerald <+> what
+    where what :: SDoc
+          what = case o of
+                   OrigStmt{} -> text "a do statement"
+                   OrigExpr e -> text "an expression" <+> ppr e
+                   OrigPat p -> text "a pattern" <+> ppr p
 
 pprCtOrigin (GivenSCOrigin sk d blk)
   = vcat [ ctoHerald <+> pprSkolInfo sk
@@ -984,6 +988,10 @@ pprCtO (InstanceSigOrigin {})       = text "a type signature in an instance"
 pprCtO (AmbiguityCheckOrigin {})    = text "a type ambiguity check"
 pprCtO (ImpedanceMatching {})       = text "combining required constraints"
 pprCtO (NonLinearPatternOrigin _ pat) = hsep [text "a non-linear pattern" <+> quotes (ppr pat)]
+pprCtO (ExpansionOrigin (OrigPat p)) = hsep [text "a pattern" <+> quotes (ppr p)]
+pprCtO (ExpansionOrigin (OrigStmt{})) = text "a do statement"
+pprCtO (ExpansionOrigin (OrigExpr{})) = text "an expression"
+
 
 pprNonLinearPatternReason :: HasDebugCallStack => NonLinearPatternReason -> SDoc
 pprNonLinearPatternReason LazyPatternReason = parens (text "non-variable lazy pattern aren't linear")
