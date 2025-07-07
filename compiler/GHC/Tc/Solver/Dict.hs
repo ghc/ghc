@@ -32,9 +32,9 @@ import GHC.Hs.Type( HsIPName(..) )
 
 import GHC.Core
 import GHC.Core.Type
-import GHC.Core.InstEnv     ( InstEnvs, DFunInstType, ClsInst(..) )
 import GHC.Core.Class
 import GHC.Core.Predicate
+import GHC.Core.InstEnv( DFunInstType )
 import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.Unify ( ruleMatchTyKiX )
 
@@ -58,7 +58,6 @@ import GHC.Driver.DynFlags
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.Foldable( foldrM )
 import Data.Maybe ( listToMaybe, mapMaybe, isJust )
 import Data.Void( Void )
 
