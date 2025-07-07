@@ -189,8 +189,8 @@ tcExprSigma inst rn_expr
   = do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
        ; do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
-       ; code_ctxt <- getSrcCodeCtxt
-       ; let fun_orig = srcCodeCtxtCtOrigin rn_expr code_ctxt
+       ; code_orig <- getSrcCodeOrigin
+       ; let fun_orig = srcCodeOriginCtOrigin rn_expr code_orig
        ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst fun_orig (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
        ; tc_args <- tcValArgs do_ql rn_fun inst_args
        ; let tc_expr = rebuildHsApps (tc_fun, fun_ctxt) tc_args
@@ -417,8 +417,8 @@ tcApp rn_expr exp_res_ty
        ; let tc_head = (tc_fun, fun_loc)
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
-       ; code_ctxt <- getSrcCodeCtxt
-       ; let fun_orig = srcCodeCtxtCtOrigin rn_fun code_ctxt
+       ; code_orig <- getSrcCodeOrigin
+       ; let fun_orig = srcCodeOriginCtOrigin rn_fun code_orig
        ; traceTc "tcApp:inferAppHead" $
          vcat [ text "tc_fun:" <+> ppr tc_fun
               , text "fun_sigma:" <+> ppr fun_sigma
@@ -857,8 +857,7 @@ tcInstFun do_ql inst_final fun_orig (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
     -- Rule IARG from Fig 4 of the QL paper:
     go1 pos acc fun_ty
         (EValArg { ea_arg = arg, ea_ctxt = ctxt } : rest_args)
-      = do { let herald | DoStmtOrigin <- fun_orig = ExpectedFunTySyntaxOp fun_orig tc_fun -- cf. RepPolyDoBind.hs
-                        | otherwise = ExpectedFunTyArg (HsExprTcThing tc_fun) (unLoc arg)
+      = do { let herald = ExpectedFunTyArg (HsExprTcThing tc_fun) (unLoc arg)
            ; (wrap, arg_ty, res_ty) <-
                 -- NB: matchActualFunTy does the rep-poly check.
                 -- For example, suppose we have f :: forall r (a::TYPE r). a -> Int
