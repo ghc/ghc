@@ -205,18 +205,9 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
       | otherwise
       = return Nothing
 
-    dicts :: Bag DictCt
-    dicts = mapMaybeBag is_dict simples
-          where
-            is_dict (CDictCan d) = Just d
-            is_dict _            = Nothing
-
     try_fundeps :: TcS (Maybe NextAction)
     try_fundeps
-      = do { (new_eqs1, unifs1) <- doTopFunDepImprovement dicts
-           ; (new_eqs2, unifs2) <- doLocalFunDepImprovement dicts
-           ; let new_eqs = new_eqs1 `unionBags` new_eqs2
-                 unifs   = unifs1 || unifs2
+      = do { (new_eqs, unifs) <- doDictFunDepImprovement simples
            ; if null new_eqs && not unifs
              then return Nothing
              else return (Just (NA_TryAgain (wc `addSimples` new_eqs) unifs)) }

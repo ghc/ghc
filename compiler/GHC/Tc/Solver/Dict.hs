@@ -10,7 +10,7 @@ module GHC.Tc.Solver.Dict (
   solveCallStack,    -- For GHC.Tc.Solver
 
   -- * Functional dependencies
-  doTopFunDepImprovement, doLocalFunDepImprovement
+  doDictFunDepImprovement
   ) where
 
 import GHC.Prelude
@@ -59,6 +59,7 @@ import GHC.Driver.DynFlags
 
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.Foldable( foldrM )
 import Data.Maybe ( listToMaybe, mapMaybe, isJust )
 import Data.Void( Void )
 
@@ -1630,92 +1631,93 @@ as the fundeps.
 #7875 is a case in point.
 -}
 
-doTopFunDepImprovement :: Bag DictCt -> TcS (Cts, Bool)
--- (doFunDeps inst_envs cts)
+doDictFunDepImprovement :: Cts -> TcS (Cts, Bool)
+-- (doDictFunDepImprovement inst_envs cts)
 --   * Generate the fundeps from interacting the
 --     top-level `inst_envs` with the constraints `cts`
 --   * Do the unifications and return any unsolved constraints
 -- See Note [Fundeps with instances, and equality orientation]
-doTopFunDepImprovement cts
-  = do { inst_envs <- getInstEnvs
-       ; do_dict_fundeps (do_one inst_envs) cts }
+doDictFunDepImprovement unsolved_wanteds
+  = do { inerts <- getInertCans  -- The inert_dicts are all Givens
+       ; inst_envs <- getInstEnvs
+       ; (_, new_eqs, unifs) <- foldrM (do_one_dict inst_envs)
+                                       (inert_dicts inerts, emptyBag, False)
+                                       unsolved_wanteds
+       ; return (new_eqs, unifs) }
+
+do_one_dict :: InstEnvs -> Ct
+            -> (DictMap DictCt, Cts, Bool)
+            -> TcS (DictMap DictCt, Cts, Bool)
+do_one_dict inst_envs (CDictCan dict_ct) (local_dicts, new_eqs, unifs)
+  = do { (new_eqs1, unifs1) <- do_one_top inst_envs dict_ct
+       ; (local_dicts2, new_eqs2, unifs2) <- do_one_local local_dicts dict_ct
+       ; return ( local_dicts2
+                , new_eqs1 `unionBags` new_eqs2 `unionBags` new_eqs
+                , unifs1 || unifs2 || unifs ) }
+
+do_one_dict _ _ acc  -- Non-DictCt constraints
+  = return acc
+
+do_one_top :: InstEnvs -> DictCt -> TcS (Cts, Bool)
+do_one_top inst_envs (DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
+  = unifyFunDepWanteds ev eqns
   where
-    do_one :: InstEnvs -> DictCt -> TcS (Cts, Bool)
-    do_one inst_envs (DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
-      = unifyFunDepWanteds ev eqns
+    eqns :: [FunDepEqn (CtLoc, RewriterSet)]
+    eqns = improveFromInstEnv inst_envs mk_ct_loc cls xis
+
+    dict_pred      = mkClassPred cls xis
+    dict_loc       = ctEvLoc ev
+    dict_origin    = ctLocOrigin dict_loc
+    dict_rewriters = ctEvRewriters ev
+
+    mk_ct_loc :: ClsInst  -- The instance decl
+              -> (CtLoc, RewriterSet)
+    mk_ct_loc ispec
+      = (dict_loc { ctl_origin = new_orig }, dict_rewriters)
       where
-        eqns :: [FunDepEqn (CtLoc, RewriterSet)]
-        eqns = improveFromInstEnv inst_envs mk_ct_loc cls xis
+        inst_pred = mkClassPred cls (is_tys ispec)
+        inst_loc  = getSrcSpan (is_dfun ispec)
+        new_orig  = FunDepOrigin2 dict_pred dict_origin
+                                  inst_pred inst_loc
 
-        dict_pred      = mkClassPred cls xis
-        dict_loc       = ctEvLoc ev
-        dict_origin    = ctLocOrigin dict_loc
-        dict_rewriters = ctEvRewriters ev
-
-        mk_ct_loc :: ClsInst  -- The instance decl
-                  -> (CtLoc, RewriterSet)
-        mk_ct_loc ispec
-          = (dict_loc { ctl_origin = new_orig }, dict_rewriters)
-          where
-            inst_pred = mkClassPred cls (is_tys ispec)
-            inst_loc  = getSrcSpan (is_dfun ispec)
-            new_orig  = FunDepOrigin2 dict_pred dict_origin
-                                      inst_pred inst_loc
-
-doLocalFunDepImprovement :: Bag DictCt -> TcS (Cts,Bool)
+do_one_local :: DictMap DictCt -> DictCt -> TcS (DictMap DictCt, Cts, Bool)
 -- Using functional dependencies, interact the unsolved Wanteds
 -- against each other and the inert Givens, to produce new equalities
-doLocalFunDepImprovement wanted
-  = do { inerts <- getInertCans  -- The inert_dicts are all Givens
-       ; let all_dicts :: DictMap DictCt  -- Both Givens and Wanteds
-             all_dicts = foldr addDict (inert_dicts inerts) wanted
-       ; do_dict_fundeps (do_one all_dicts) wanted }
+do_one_local locals dict_ct@(DictCt { di_cls = cls, di_ev = wanted_ev })
+    -- locals contains all the Givens and earlier Wanteds
+  = do { (new_eqs, unifs) <- foldrM do_interaction (emptyBag, False) $
+                             findDictsByClass locals cls
+       ; return (addDict dict_ct locals, new_eqs, unifs) }
   where
-    -- all_dicts are all the Givens and all the Wanteds
-    do_one all_dicts (DictCt { di_cls = cls, di_ev = wanted_ev })
-      = do_dict_fundeps do_interaction (findDictsByClass all_dicts cls)
+    wanted_pred = ctEvPred wanted_ev
+    wanted_loc  = ctEvLoc  wanted_ev
+
+    do_interaction :: DictCt -> (Cts,Bool) -> TcS (Cts,Bool)
+    do_interaction (DictCt { di_ev = all_ev }) (new_eqs, unifs) -- This can be Given or Wanted
+      = do { traceTcS "doLocalFunDepImprovement" $
+             vcat [ ppr wanted_ev
+                  , pprCtLoc wanted_loc, ppr (isGivenLoc wanted_loc)
+                  , pprCtLoc all_loc, ppr (isGivenLoc all_loc)
+                  , pprCtLoc deriv_loc, ppr (isGivenLoc deriv_loc) ]
+
+           ; (new_eqs1, unifs1) <- unifyFunDepWanteds wanted_ev $
+                                   improveFromAnother (deriv_loc, all_rewriters)
+                                                      all_pred wanted_pred
+           ; return (new_eqs1 `unionBags` new_eqs, unifs1 || unifs) }
       where
-        wanted_pred = ctEvPred wanted_ev
-        wanted_loc  = ctEvLoc  wanted_ev
-
-        do_interaction :: DictCt -> TcS (Cts,Bool)
-        do_interaction (DictCt { di_ev = all_ev })  -- This can be Given or Wanted
-          = do { traceTcS "doLocalFunDepImprovement" $
-                 vcat [ ppr wanted_ev
-                      , pprCtLoc wanted_loc, ppr (isGivenLoc wanted_loc)
-                      , pprCtLoc all_loc, ppr (isGivenLoc all_loc)
-                      , pprCtLoc deriv_loc, ppr (isGivenLoc deriv_loc) ]
-
-               ; unifyFunDepWanteds wanted_ev $
-                 improveFromAnother (deriv_loc, all_rewriters)
-                                    all_pred wanted_pred }
-          where
-            all_pred  = ctEvPred all_ev
-            all_loc   = ctEvLoc all_ev
-            all_rewriters = ctEvRewriters all_ev
-            deriv_loc = wanted_loc { ctl_depth  = deriv_depth
-                                   , ctl_origin = deriv_origin }
-            deriv_depth = ctl_depth wanted_loc `maxSubGoalDepth`
-                          ctl_depth all_loc
-            deriv_origin = FunDepOrigin1 wanted_pred
-                                         (ctLocOrigin wanted_loc)
-                                         (ctLocSpan wanted_loc)
-                                         all_pred
-                                         (ctLocOrigin all_loc)
-                                         (ctLocSpan all_loc)
-
-do_dict_fundeps :: (DictCt -> TcS (Cts,Bool)) -> Bag DictCt -> TcS (Cts,Bool)
-do_dict_fundeps do_dict_fundep cts
-  = foldr do_one (return (emptyBag, False)) cts
-  where
-    do_one :: DictCt -> TcS (Cts,Bool) -> TcS (Cts,Bool)
-    do_one dict_ct do_rest
-      = -- assert (not (isGiven (dictCtEvidence dict_ct)) $
-        do { (cts1, unifs1) <- do_dict_fundep dict_ct
-           ; if isEmptyBag cts1 && not unifs1
-             then do_rest  -- Common case
-             else do { (cts2, unifs2) <- do_rest
-                     ; return (cts1 `unionBags` cts2, unifs1 || unifs2) } }
+        all_pred  = ctEvPred all_ev
+        all_loc   = ctEvLoc all_ev
+        all_rewriters = ctEvRewriters all_ev
+        deriv_loc = wanted_loc { ctl_depth  = deriv_depth
+                               , ctl_origin = deriv_origin }
+        deriv_depth = ctl_depth wanted_loc `maxSubGoalDepth`
+                      ctl_depth all_loc
+        deriv_origin = FunDepOrigin1 wanted_pred
+                                     (ctLocOrigin wanted_loc)
+                                     (ctLocSpan wanted_loc)
+                                     all_pred
+                                     (ctLocOrigin all_loc)
+                                     (ctLocSpan all_loc)
 
 
 {- *********************************************************************
