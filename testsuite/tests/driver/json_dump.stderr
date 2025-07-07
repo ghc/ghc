@@ -1,2 +1,0 @@
-{"span":null,"doc":"-ddump-json is deprecated: Use `-fdiagnostics-as-json` instead","messageClass":"MCDiagnostic SevWarning WarningWithFlags Opt_WarnDeprecatedFlags :| [] Just GHC-53692"}
-{"span":{"file":"json_dump.hs","startLine":6,"startCol":7,"endLine":6,"endCol":8},"doc":"\u2022 No instance for \u2018Num (a -> a)\u2019 arising from the literal \u20185\u2019\n    (maybe you haven't applied a function to enough arguments?)\n\u2022 In the expression: 5\n  In an equation for \u2018id1\u2019: id1 = 5","messageClass":"MCDiagnostic SevError ErrorWithoutFlag Just GHC-39999"}

@@ -498,8 +498,6 @@ interactiveUI config srcs maybe_exprs = do
 
    installInteractiveHomeUnits
 
-   -- Update the LogAction. Ensure we don't override the user's log action lest
-   -- we break -ddump-json (#14078)
    lastErrLocationsRef <- liftIO $ newIORef []
    pushLogHookM (ghciLogAction lastErrLocationsRef)
 

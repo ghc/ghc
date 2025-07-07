@@ -94,7 +94,6 @@ import GHC.Utils.Panic
 
 import GHC.Data.EnumSet (EnumSet)
 import qualified GHC.Data.EnumSet as EnumSet
-import GHC.Data.FastString
 
 import System.Directory
 import System.FilePath  ( takeDirectory, (</>) )
@@ -359,7 +358,6 @@ makeThreadSafe logger = do
            $ pushTraceHook trc
            $ logger
 
--- See Note [JSON Error Messages]
 defaultLogJsonAction :: LogJsonAction
 defaultLogJsonAction logflags msg_class jsdoc =
   case msg_class of
@@ -376,32 +374,6 @@ defaultLogJsonAction logflags msg_class jsdoc =
     putStrSDoc = defaultLogActionHPutStrDoc logflags False stdout
     msg = renderJSON jsdoc
 
--- See Note [JSON Error Messages]
--- this is to be removed
-jsonLogActionWithHandle :: Handle {-^ Standard out -} -> LogAction
-jsonLogActionWithHandle _ _ (MCDiagnostic SevIgnore _ _) _ _ = return () -- suppress the message
-jsonLogActionWithHandle out logflags msg_class srcSpan msg
-  =
-    defaultLogActionHPutStrDoc logflags True out
-      (withPprStyle PprCode (doc $$ text ""))
-    where
-      str = renderWithContext (log_default_user_context logflags) msg
-      doc = renderJSON $
-              JSObject [ ( "span", spanToDumpJSON srcSpan )
-                       , ( "doc" , JSString str )
-                       , ( "messageClass", json msg_class )
-                       ]
-      spanToDumpJSON :: SrcSpan -> JsonDoc
-      spanToDumpJSON s = case s of
-                 (RealSrcSpan rss _) -> JSObject [ ("file", json file)
-                                                , ("startLine", json $ srcSpanStartLine rss)
-                                                , ("startCol", json $ srcSpanStartCol rss)
-                                                , ("endLine", json $ srcSpanEndLine rss)
-                                                , ("endCol", json $ srcSpanEndCol rss)
-                                                ]
-                   where file = unpackFS $ srcSpanFile rss
-                 UnhelpfulSpan _ -> JSNull
-
 -- | The default 'LogAction' prints to 'stdout' and 'stderr'.
 --
 -- To replicate the default log action behaviour with different @out@ and @err@
@@ -413,8 +385,7 @@ defaultLogAction = defaultLogActionWithHandles stdout stderr
 -- Allows clients to replicate the log message formatting of GHC with custom handles.
 defaultLogActionWithHandles :: Handle {-^ Handle for standard output -} -> Handle {-^ Handle for standard errors -} -> LogAction
 defaultLogActionWithHandles out err logflags msg_class srcSpan msg
-  | log_dopt Opt_D_dump_json logflags = jsonLogActionWithHandle out logflags msg_class srcSpan msg
-  | otherwise = case msg_class of
+  = case msg_class of
       MCOutput                     -> printOut msg
       MCDump                       -> printOut (msg $$ blankLine)
       MCInteractive                -> putStrSDoc msg
@@ -490,28 +461,6 @@ defaultLogActionHPutStrDoc logflags asciiSpace h d
   -- Don't add a newline at the end, so that successive
   -- calls to this log-action can output all on the same line
   = printSDoc (log_default_user_context logflags) (Pretty.PageMode asciiSpace) h d
-
---
--- Note [JSON Error Messages]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- When the user requests the compiler output to be dumped as json
--- we used to collect them all in an IORef and then print them at the end.
--- This doesn't work very well with GHCi. (See #14078) So instead we now
--- use the simpler method of just outputting a JSON document inplace to
--- stdout.
---
--- Before the compiler calls log_action, it has already turned the `ErrMsg`
--- into a formatted message. This means that we lose some possible
--- information to provide to the user but refactoring log_action is quite
--- invasive as it is called in many places. So, for now I left it alone
--- and we can refine its behaviour as users request different output.
---
--- The recent work here replaces the purpose of flag -ddump-json with
--- -fdiagnostics-as-json. For temporary backwards compatibility while
--- -ddump-json is being deprecated, `jsonLogAction` has been added in, but
--- it should be removed along with -ddump-json. Similarly, the guard in
--- `defaultLogAction` should be removed. This cleanup is tracked in #24113.
 
 -- | Default action for 'dumpAction' hook
 defaultDumpAction :: DumpCache -> LogAction -> DumpAction
