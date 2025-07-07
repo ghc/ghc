@@ -563,15 +563,6 @@ instance ToJson Severity where
   json SevWarning = JSString "Warning"
   json SevError = JSString "Error"
 
-instance ToJson MessageClass where
-  json MCOutput = JSString "MCOutput"
-  json MCFatal  = JSString "MCFatal"
-  json MCInteractive = JSString "MCInteractive"
-  json MCDump = JSString "MCDump"
-  json MCInfo = JSString "MCInfo"
-  json (MCDiagnostic sev reason code) =
-    JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason <+> ppr code)
-
 instance ToJson DiagnosticCode where
   json c = JSInt (fromIntegral (diagnosticCodeNumber c))
 
