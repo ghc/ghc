@@ -62,6 +62,8 @@ module GHC.Utils.Logger
     , logJsonMsg
     , logDumpMsg
 
+    , decorateDiagnostic
+
     -- * Dumping
     , defaultDumpAction
     , putDumpFile
@@ -419,26 +421,62 @@ defaultLogActionWithHandles out err logflags msg_class srcSpan msg
       MCInfo                       -> printErrs msg
       MCFatal                      -> printErrs msg
       MCDiagnostic SevIgnore _ _   -> pure () -- suppress the message
-      MCDiagnostic _sev _rea _code -> printDiagnostics
+      MCDiagnostic _sev _rea _code -> decorateDiagnostic logflags msg_class srcSpan msg >>= printErrs
     where
       printOut   = defaultLogActionHPrintDoc  logflags False out
       printErrs  = defaultLogActionHPrintDoc  logflags False err
       putStrSDoc = defaultLogActionHPutStrDoc logflags False out
+
+-- This function is used by `defaultLogActionWithHandles` for non-JSON output,
+-- and also by `GHC.Driver.Errors.printMessages` to produce the `rendered`
+-- message on `-fdiagnostics-as-json`.
+--
+-- We would want to eventually consolidate this.  However, this is currently
+-- not feasible for the following reasons:
+--
+-- 1. Some parts of the compiler sidestep `printMessages`, for that reason we
+--    can not decorate the message in `printMessages`.
+--
+-- 2. GHC uses two different code paths for JSON and non-JSON diagnostics.  For
+--    that reason we can not decorate the message in `defaultLogActionWithHandles`.
+--
+--    See also Note [JSON Error Messages]:
+--
+--      `jsonLogAction` should be removed along with -ddump-json
+--
+-- Also note that (1) is the reason why some parts of the compiler produce
+-- diagnostics that don't respect `-fdiagnostics-as-json`.
+--
+-- The plan as I see it is as follows:
+--
+--  1. Refactor all places in the compiler that report diagnostics to go
+--     through `GHC.Driver.Errors.printMessages`.
+--
+--     (It's easy to find all those places by looking for who creates
+--     MCDiagnostic, either directly or via `mkMCDiagnostic` or
+--     `errorDiagnostic`.)
+--
+--  2. Get rid of `-ddump-json`, `jsonLogAction` and consolidate message
+--     decoration at one place (either `printMessages` or
+--     `defaultLogActionWithHandles`)
+--
+-- This story is tracked by #24113.
+decorateDiagnostic :: LogFlags -> MessageClass -> SrcSpan -> SDoc -> IO SDoc
+decorateDiagnostic logflags msg_class srcSpan msg = addCaret
+    where
       -- Pretty print the warning flag, if any (#10752)
+      message :: SDoc
       message = mkLocMessageWarningGroups (log_show_warn_groups logflags) msg_class srcSpan msg
 
-      printDiagnostics = do
+      addCaret :: IO SDoc
+      addCaret = do
         caretDiagnostic <-
             if log_show_caret logflags
             then getCaretDiagnostic msg_class srcSpan
             else pure empty
-        printErrs $ getPprStyle $ \style ->
+        return $ getPprStyle $ \style ->
           withPprStyle (setStyleColoured True style)
             (message $+$ caretDiagnostic $+$ blankLine)
-        -- careful (#2302): printErrs prints in UTF-8,
-        -- whereas converting to string first and using
-        -- hPutStr would just emit the low 8 bits of
-        -- each unicode char.
 
 -- | Like 'defaultLogActionHPutStrDoc' but appends an extra newline.
 defaultLogActionHPrintDoc :: LogFlags -> Bool -> Handle -> SDoc -> IO ()
@@ -603,8 +641,8 @@ defaultTraceAction logflags title doc x =
 logMsg :: Logger -> MessageClass -> SrcSpan -> SDoc -> IO ()
 logMsg logger mc loc msg = putLogMsg logger (logFlags logger) mc loc msg
 
-logJsonMsg :: ToJson a => Logger -> MessageClass -> a -> IO ()
-logJsonMsg logger mc d = putJsonLogMsg logger (logFlags logger) mc  (json d)
+logJsonMsg :: Logger -> MessageClass -> JsonDoc -> IO ()
+logJsonMsg logger mc = putJsonLogMsg logger (logFlags logger) mc
 
 -- | Dump something
 logDumpFile :: Logger -> PprStyle -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
