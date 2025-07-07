@@ -1,0 +1,6 @@
+./T26087B.hs: error: [GHC-92213]
+    Module graph contains a cycle:
+                    module ‘main:T26087B’ (./T26087B.hs)
+            imports module ‘main:T26087A’ (T26087A.hs)
+      which imports module ‘main:T26087B’ (./T26087B.hs)
+
