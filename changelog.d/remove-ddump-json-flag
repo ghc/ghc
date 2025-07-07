@@ -1,0 +1,4 @@
+section: compiler
+synopsis: Remove deprecated flag `-ddump-json`
+issues: #24113
+mrs: !16258
