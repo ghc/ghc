@@ -138,10 +138,8 @@ import qualified GHC.Data.Maybe as M
 import GHC.Data.Graph.Directed.Reachability
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
-import Debug.Trace (traceShowId)
 import qualified Data.Set as S
-import Data.Either (lefts, rights)
-import GHC.Data.Graph.Collapse (VizCollapseMonad(finalGraph))
+import Data.Either (rights)
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -498,8 +496,6 @@ data ModuleGraphNodeWithBootFile
        -- ^ The modules in between the module and its hs-boot file,
        -- not including the hs-boot file itself.
 
-instance Show ModuleGraphNodeWithBootFile where
-  show = showSDocUnsafe . ppr
 
 instance Outputable ModuleGraphNodeWithBootFile where
   ppr (ModuleGraphNodeWithBootFile mgn deps) = text "ModeGraphNodeWithBootFile: " <+> ppr mgn $$ ppr deps
@@ -1323,7 +1319,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
             hsc_env <- asks hsc_env
             let mns :: [ModuleName]
                 mns = mapMaybe (nodeKeyModName . gwib_mod) deps
-                name_units = mapMaybe (nodeKeyModNameUnit . gwib_mod) deps
+                -- name_units = mapMaybe (nodeKeyModNameUnit . gwib_mod) deps
 
             -- pprTraceM "Rehydrating" (ppr deps)
             -- try to collapse the .hs-boot to their .hs in hpt

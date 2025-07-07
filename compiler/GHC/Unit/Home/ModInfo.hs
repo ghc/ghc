@@ -29,7 +29,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SourceFile (isHsBootFile)
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface (..))
-import GHC.Unit (ModuleName)
 
 
 data HomeModeInfoWithBoot = HomeModeInfoWithBoot {
