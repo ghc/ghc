@@ -28,6 +28,7 @@ import qualified Data.Map as Map
 import System.FilePath
 import System.Directory
 
+import GHC.Toolchain.Target
 
 data SettingsError
   = SettingsError_MissingData String
@@ -44,6 +45,7 @@ initSettings top_dir = do
       libexec :: FilePath -> FilePath
       libexec file = top_dir </> ".." </> "bin" </> file
       settingsFile = installed "settings"
+      targetFile   = installed $ "targets" </> "default.target"
 
       readFileSafe :: FilePath -> ExceptT SettingsError m String
       readFileSafe path = liftIO (doesFileExist path) >>= \case
@@ -55,6 +57,11 @@ initSettings top_dir = do
     Just s -> pure s
     Nothing -> throwE $ SettingsError_BadData $
       "Can't parse " ++ show settingsFile
+  targetStr <- readFileSafe targetFile
+  target <- case maybeReadFuzzy @Target targetStr of
+    Just s -> pure s
+    Nothing -> throwE $ SettingsError_BadData $
+      "Can't parse " ++ show targetFile
   let mySettings = Map.fromList settingsList
       getBooleanSetting :: String -> ExceptT SettingsError m Bool
       getBooleanSetting key = either pgmError pure $
@@ -71,6 +78,9 @@ initSettings top_dir = do
   -- format, '/' separated
   mtool_dir <- liftIO $ findToolDir useInplaceMinGW top_dir
         -- see Note [tooldir: How GHC finds mingw on Windows]
+
+  -- NB: ghc-toolchain uses full-paths, but they are substituted for $tooldir when written into settings by hadrian or Settings.
+  -- See SUBST_TOOLDIR and Note [How we configure the bundled windows toolchain] in fp_settings
 
     -- Escape 'top_dir' and 'mtool_dir', to make sure we don't accidentally
     -- introduce unescaped spaces. See #24265 and #25204.
@@ -133,7 +143,6 @@ initSettings top_dir = do
   mergeObjsSupportsResponseFiles <- getBooleanSetting "Merge objects supports response files"
   ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
   arSupportsDashL         <- getBooleanSetting "ar supports -L"
-
 
   -- The package database is either a relative path to the location of the settings file
   -- OR an absolute path.
