@@ -85,66 +85,21 @@ WrapperBinsDir=${bindir}
 # N.B. this is duplicated from includes/ghc.mk.
 lib/settings : config.mk
 	@rm -f $@
-	@echo '[("C compiler command", "$(SettingsCCompilerCommand)")' >> $@
-	@echo ',("C compiler flags", "$(SettingsCCompilerFlags)")' >> $@
-	@echo ',("C++ compiler command", "$(SettingsCxxCompilerCommand)")' >> $@
-	@echo ',("C++ compiler flags", "$(SettingsCxxCompilerFlags)")' >> $@
-	@echo ',("C compiler link flags", "$(SettingsCCompilerLinkFlags)")' >> $@
-	@echo ',("C compiler supports -no-pie", "$(SettingsCCompilerSupportsNoPie)")' >> $@
-	@echo ',("CPP command", "$(SettingsCPPCommand)")' >> $@
-	@echo ',("CPP flags", "$(SettingsCPPFlags)")' >> $@
-	@echo ',("Haskell CPP command", "$(SettingsHaskellCPPCommand)")' >> $@
-	@echo ',("Haskell CPP flags", "$(SettingsHaskellCPPFlags)")' >> $@
-	@echo ',("JavaScript CPP command", "$(SettingsJavaScriptCPPCommand)")' >> $@
-	@echo ',("JavaScript CPP flags", "$(SettingsJavaScriptCPPFlags)")' >> $@
-	@echo ',("C-- CPP command", "$(SettingsCmmCPPCommand)")' >> $@
-	@echo ',("C-- CPP flags", "$(SettingsCmmCPPFlags)")' >> $@
-	@echo ',("C-- CPP supports -g0", "$(SettingsCmmCPPSupportsG0)")' >> $@
-	@echo ',("ld supports compact unwind", "$(LdHasNoCompactUnwind)")' >> $@
-	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
-	@echo ',("ld supports single module", "$(LdHasSingleModule)")' >> $@
-	@echo ',("ld is GNU ld", "$(LdIsGNULd)")' >> $@
-	@echo ',("Merge objects command", "$(SettingsMergeObjectsCommand)")' >> $@
-	@echo ',("Merge objects flags", "$(SettingsMergeObjectsFlags)")' >> $@
-	@echo ',("Merge objects supports response files", "$(MergeObjsSupportsResponseFiles)")' >> $@
-	@echo ',("ar command", "$(SettingsArCommand)")' >> $@
-	@echo ',("ar flags", "$(ArArgs)")' >> $@
-	@echo ',("ar supports at file", "$(ArSupportsAtFile)")' >> $@
-	@echo ',("ar supports -L", "$(ArSupportsDashL)")' >> $@
-	@echo ',("ranlib command", "$(SettingsRanlibCommand)")' >> $@
-	@echo ',("otool command", "$(SettingsOtoolCommand)")' >> $@
-	@echo ',("install_name_tool command", "$(SettingsInstallNameToolCommand)")' >> $@
-	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
+	@echo '[("target has libm", "$(TargetHasLibm)")' >> $@
 	@echo ',("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit")' >> $@
-	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@
-	@echo ',("target platform string", "$(TARGETPLATFORM)")' >> $@
-	@echo ',("target os", "$(HaskellTargetOs)")' >> $@
-	@echo ',("target arch", "$(HaskellTargetArch)")' >> $@
-	@echo ',("target word size", "$(TargetWordSize)")' >> $@
-	@echo ',("target word big endian", "$(TargetWordBigEndian)")' >> $@
-	@echo ',("target has GNU nonexec stack", "$(TargetHasGnuNonexecStack)")' >> $@
-	@echo ',("target has .ident directive", "$(TargetHasIdentDirective)")' >> $@
-	@echo ',("target has subsections via symbols", "$(TargetHasSubsectionsViaSymbols)")' >> $@
-	@echo ',("target has libm", "$(TargetHasLibm)")' >> $@
-	@echo ',("Unregisterised", "$(GhcUnregisterised)")' >> $@
-	@echo ',("LLVM target", "$(LLVMTarget)")' >> $@
-	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
-	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
-	@echo ',("LLVM llvm-as command", "$(SettingsLlvmAsCommand)")' >> $@
-	@echo ',("LLVM llvm-as flags", "$(SettingsLlvmAsFlags)")' >> $@
-	@echo ',("Use inplace MinGW toolchain", "$(SettingsUseDistroMINGW)")' >> $@
-	@echo
 	@echo ',("target RTS linker only supports shared libraries", "$(TargetRTSLinkerOnlySupportsSharedLibs)")' >> $@
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
-	@echo ',("Tables next to code", "$(TablesNextToCode)")' >> $@
-	@echo ',("Leading underscore", "$(LeadingUnderscore)")' >> $@
-	@echo ',("Use LibFFI", "$(UseLibffiForAdjustors)")' >> $@
 	@echo ',("RTS expects libdw", "$(GhcRtsWithLibdw)")' >> $@
 	@echo ',("Relative Global Package DB", "package.conf.d")' >> $@
 	@echo ',("base unit-id", "$(BaseUnitId)")' >> $@
 	@echo "]" >> $@
+
+lib/targets/default.target : config.mk default.target
+	@rm -f $@
+	@echo "Copying the bindist-configured default.target to lib/targets/default.target"
+	cp default.target $@
 
 # We need to install binaries relative to libraries.
 BINARIES = $(wildcard ./bin/*)
@@ -167,7 +122,7 @@ install_bin_direct:
 	$(INSTALL_PROGRAM) ./bin/* "$(DESTDIR)$(WrapperBinsDir)/"
 
 .PHONY: install_lib
-install_lib: lib/settings
+install_lib: lib/settings lib/targets/default.target
 	@echo "Copying libraries to $(DESTDIR)$(ActualLibsDir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
 

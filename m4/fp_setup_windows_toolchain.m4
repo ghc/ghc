@@ -77,6 +77,7 @@ AC_DEFUN([FP_INSTALL_WINDOWS_TOOLCHAIN],[
 # $2 the location that the windows toolchain will be installed in relative to the libdir
 AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
 
+    # TODO: UPDATE COMMENT
     # N.B. The parameters which get plopped in the `settings` file used by the
     # resulting compiler are computed in `FP_SETTINGS`. Specifically, we use
     # $$topdir-relative paths instead of fullpaths to the toolchain, by replacing

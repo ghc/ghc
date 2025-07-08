@@ -132,6 +132,7 @@ AC_ARG_ENABLE(distro-toolchain,
   [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableDistroToolchain])],
   [EnableDistroToolchain=NO]
 )
+AC_SUBST([EnableDistroToolchain])
 
 if test "$EnableDistroToolchain" = "YES"; then
   TarballsAutodownload=NO
@@ -751,8 +752,6 @@ FP_PROG_AR_NEEDS_RANLIB
 
 dnl ** Check to see whether ln -s works
 AC_PROG_LN_S
-
-FP_SETTINGS
 
 dnl ** Find the path to sed
 AC_PATH_PROGS(SedCmd,gsed sed,sed)
