@@ -136,8 +136,6 @@ import qualified GHC.Data.Maybe as M
 import GHC.Data.Graph.Directed.Reachability
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
-import qualified Data.Set as S
-import Data.Either (rights)
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -504,8 +502,8 @@ data BuildPlan
   -- | A simple, single module all alone (which *might* have an hs-boot file, if it isn't part of a cycle)
   = SingleModule ModuleGraphNode
   -- | A resolved cycle, linearised by hs-boot files
-  | ResolvedCycle [(Either ModuleGraphNode ModuleGraphNodeWithBootFile, [ModNodeKeyWithUid])]
-  -- | An actual cycle, which wasn't resolved by hs-boot files and a list of dangling boot nodes
+  | ResolvedCycle [Either ModuleGraphNode ModuleGraphNodeWithBootFile]
+  -- | An actual cycle, which wasn't resolved by hs-boot files
   | UnresolvedCycle [ModuleGraphNode]
 
 instance Outputable BuildPlan where
@@ -520,177 +518,9 @@ countMods (SingleModule _) = 1
 countMods (ResolvedCycle ns) = length ns
 countMods (UnresolvedCycle ns) = length ns
 
--- | For a given module graph and a cycle of nodes, return the dangling boot nodes
--- for each node in the cycle.
---
--- A "dangling boot node" for a given source node is a boot module whose corresponding
--- non-boot module is not reachable from a given source node. This function computes,
--- for each node in the cycle, which boot modules are reachable from that node but whose
--- non-boot counterparts are not reachable.
---
--- for the dangling boot nodes, we have to load its non-boot interface file
---
--- Returns a list of pairs where:
--- - First element: A node from the input cycle
--- - Second element: List of module names that are dangling boot nodes when
---   viewed from that source node
-findDanglingBootNodes :: ModuleGraph
-                            -> [Either ModuleGraphNode ModuleGraphNodeWithBootFile]
-                            -> [(Either ModuleGraphNode ModuleGraphNodeWithBootFile, [ModNodeKeyWithUid])]
-findDanglingBootNodes mg cycle = [(node, onlyReachableBootNotesInTheCycle mg node cycle) | node <- cycle]
-  where
-  onlyReachableBootNotesInTheCycle :: ModuleGraph
-                              -> Either ModuleGraphNode ModuleGraphNodeWithBootFile
-                              -> [Either ModuleGraphNode ModuleGraphNodeWithBootFile]
-                              -> [ModNodeKeyWithUid]
-  onlyReachableBootNotesInTheCycle mg source cycle =
-    let -- Extract the NodeKey from the source node for reachability queries
-        source_key = case source of
-          Left mn -> mkNodeKey mn
-          Right (ModuleGraphNodeWithBootFile mn _) -> mkNodeKey mn
-
-        -- Helper functions to convert between boot and non-boot versions of a NodeKey
-        -- These are needed because we need to check reachability for both versions
-        -- of a module (the .hs file and the .hs-boot file)
-        toBootKey nk = case nk of
-          NodeKey_Module (ModNodeKeyWithUid (GWIB mn _) uid) ->
-            NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid)
-          _ -> nk  -- shouldn't happen for module nodes in this context
-        toBootKeyWithUid (ModNodeKeyWithUid (GWIB mn _) uid) =
-          (ModNodeKeyWithUid (GWIB mn IsBoot) uid)
-
-
-        toNonBootKey nk = case nk of
-          NodeKey_Module (ModNodeKeyWithUid (GWIB mn _) uid) ->
-            NodeKey_Module (ModNodeKeyWithUid (GWIB mn NotBoot) uid)
-          _ -> nk  -- shouldn't happen for module nodes in this context
-
-        -- Check if a cycle node is a dangling boot node from the perspective of source_key
-        -- A dangling boot node satisfies two conditions:
-        -- 1. The boot version (.hs-boot) is reachable from the source
-        -- 2. The non-boot version (.hs) is NOT reachable from the source
-        isDanglingBootNode cycle_node = case cycle_node of
-          Right _boot_node@(ModuleGraphNodeWithBootFile mn _) ->
-            let boot_key = toBootKey (mkNodeKey mn)      -- Get the .hs-boot version key
-                non_boot_key = toNonBootKey (mkNodeKey mn)  -- Get the .hs version key
-            in mgQuery mg source_key boot_key &&         -- Can reach the boot file
-              not (mgQuery mg source_key non_boot_key)  -- Cannot reach the implementation file
-          Left _ -> False  -- Left nodes are regular modules, not boot-file-containing modules
-
-        -- Extract module name from a ModuleGraphNode
-        -- This is used to convert the dangling boot nodes to their module names
-        extractModuleName :: ModuleGraphNode -> ModNodeKeyWithUid
-        extractModuleName mgn = case mgNodeIsModule mgn of
-          Just mni -> toBootKeyWithUid $ moduleNodeInfoModNodeKeyWithUid mni
-          Nothing -> error "Expected module node, got non-module node"
-
-    -- Filter the cycle to find boot nodes that are dangling from the source perspective,
-    -- then extract their module names
-    in [extractModuleName mn | Right boot_node@(ModuleGraphNodeWithBootFile mn _) <- cycle,
-                              isDanglingBootNode (Right boot_node)]
-
-
--- | rewriteModuleGraph modifies the module graph by adding edges
--- indexed by source NodeKey to a set of target boot NodeKeys.
--- we use this to rewrite the module graph
--- so that the source NodeKeys can reach the non-boot corresponding module
-type GraphRewrite = M.Map NodeKey (S.Set NodeKey)
-
-refineGraphByWithBuildPlan :: ModuleGraph -> [BuildPlan] -> ModuleGraph
-refineGraphByWithBuildPlan mod_graph build_plans =
-    let -- Rewrite the module graph to include additional edges
-        bootRewrite = buildRewrite build_plans
-        rewritten_graph =
-          rewriteModuleGraph mod_graph bootRewrite
-    in rewritten_graph
-  where
-
-        -- Rewrite the module graph to include additional edges
-        -- where bootRewrite is a map from NodeKey to a set of root NodeKeys
-        -- it means we can reach the boot module from the root NodeKeys
-        -- we now rewrite it so the root NodeKeys can reach the non-boot corresponding module
-        rewriteModuleGraph :: ModuleGraph -> GraphRewrite -> ModuleGraph
-        rewriteModuleGraph mg bootRewrite =
-          let -- Get all nodes from the module graph
-              nodes = mgModSummaries' mg
-              -- Apply the edge additions to all nodes
-              rewritten_nodes = map (addBootEdges bootRewrite) nodes
-          in mkModuleGraph rewritten_nodes
-
-        -- Function to add edges to a node based on the boot rewrite map
-        addBootEdges :: GraphRewrite -> ModuleGraphNode -> ModuleGraphNode
-        addBootEdges rewriteMap  node =
-          let node_key = mkNodeKey node
-              -- Find all boot modules that this node can reach
-              reachables = fromMaybe S.empty $ M.lookup node_key rewriteMap
-              -- Add edges to the non-boot modules
-              addEdges n [] = n
-              addEdges n (target:targets) = case target of
-                NodeKey_Module modKey -> addEdges (addNormalEdge modKey n) targets
-                _ -> addEdges n targets  -- Skip non-module keys
-          in addEdges node (S.toList reachables)
-
-        -- -- Step 2: Reanalyse loops, with relevant boot modules, to solve the cycles.
-        buildRewrite :: [BuildPlan] -> GraphRewrite
-        buildRewrite build_plans = case build_plans of
-          [] -> M.empty  -- No plans, no rewrites
-          (SingleModule mgn:rest) ->  insertBootKeys S.empty (Left mgn) $ buildRewrite rest
-          (ResolvedCycle nodeExtras:rest) -> foldr (insertBootKeys localBootKeys) (buildRewrite rest) nodes
-            where localBootKeys = Set.fromList $ moduleGraphNodeWithBootFileNodeKeys <$> rights nodes
-                  nodes = fst <$> nodeExtras
-          (UnresolvedCycle _:_) -> error "UnresolvedCycle should not be here, we should have resolved it before"
-        moduleGraphNodeWithBootFileNodeKeys :: ModuleGraphNodeWithBootFile -> NodeKey
-        moduleGraphNodeWithBootFileNodeKeys (ModuleGraphNodeWithBootFile mgn _) = toKey IsBoot $ mkNodeKey mgn
-        toKey k nk = case nk of
-          NodeKey_Module (ModNodeKeyWithUid (GWIB mn _) uid) ->
-            NodeKey_Module (ModNodeKeyWithUid (GWIB mn k) uid)
-          _ -> error "Expected NodeKey_Module with ModNodeKeyWithUid"
-
-        -- insertBootKeys :: ModuleGraphNode -> GraphRewrite -> GraphRewrite
-        insertBootKeys sameCycleBoots node rewriteMap =
-          let node_key = mkNodeKey' node
-              -- Find all boot modules that this node can reach
-              reachable_boots = bootKeysReachedFromModuleGraphNode' node
-              -- Convert boot modules to their non-boot equivalents
-              non_boot_targets = Set.map (toKey NotBoot) $ reachable_boots `S.difference` sameCycleBoots
-              -- not including the boot in the same cycle
-          in if S.null non_boot_targets
-             then rewriteMap
-             else M.insertWith S.union node_key non_boot_targets rewriteMap
-
-        mkNodeKey' (Left node) = mkNodeKey node
-        mkNodeKey' (Right (ModuleGraphNodeWithBootFile node _)) = mkNodeKey node
-
-        bootKeysReachedFromModuleGraphNode' (Left node) = bootKeysReachedFromModuleGraphNode node
-        bootKeysReachedFromModuleGraphNode' (Right (ModuleGraphNodeWithBootFile node _)) = bootKeysReachedFromModuleGraphNode node
-        bootKeysReachedFromModuleGraphNode node =
-          Set.filter (\nk ->
-            case nk of
-              NodeKey_Module (ModNodeKeyWithUid (GWIB mod IsBoot) un) ->
-                NodeKey_Module (ModNodeKeyWithUid (GWIB mod NotBoot) un)
-                `Set.notMember` directDepsSet
-              _ -> False) $
-          Set.fromList directDeps
-          where
-            directDeps = mgNodeDependencies False node
-            directDepsSet = Set.fromList directDeps
-
-
-
 -- See Note [Upsweep] for a high-level description.
-createBuildPlan :: ModuleGraph -> Maybe [HomeUnitModule] -> ([BuildPlan], ModuleGraph)
+createBuildPlan :: ModuleGraph -> Maybe [HomeUnitModule] -> [BuildPlan]
 createBuildPlan mod_graph maybe_top_mod =
-          -- pprTrace "refineGraphByWithBuildPlan" (ppr firstBuildPlan <+> ppr finalBuildPlan) $
-          (finalBuildPlan, refine_mod_graph)
-  where
-    firstBuildPlan = createBuildPlan' mod_graph maybe_top_mod
-    refine_mod_graph = refineGraphByWithBuildPlan mod_graph firstBuildPlan
-    finalBuildPlan = createBuildPlan' refine_mod_graph maybe_top_mod
-
-
-
-createBuildPlan' :: ModuleGraph -> Maybe [HomeUnitModule] -> [BuildPlan]
-createBuildPlan' mod_graph maybe_top_mod =
     let -- Step 1: Compute SCCs without .hi-boot files, to find the cycles
         cycle_mod_graph   = topSortModuleGraph True  mod_graph maybe_top_mod
         acyclic_mod_graph = topSortModuleGraph False mod_graph maybe_top_mod
@@ -711,8 +541,7 @@ createBuildPlan' mod_graph maybe_top_mod =
               -- Now perform another toposort but just with these nodes and relevant hs-boot files.
               -- The result should be acyclic, if it's not, then there's an unresolved cycle in the graph.
               mresolved_cycle = collapseSCC (topSortWithBoot nodes)
-          in acyclic ++ [either UnresolvedCycle (ResolvedCycle . findDanglingBootNodes mod_graph) mresolved_cycle] ++ toBuildPlan sccs []
-
+          in acyclic ++ [either UnresolvedCycle ResolvedCycle mresolved_cycle] ++ toBuildPlan sccs []
 
         -- Compute the intermediate modules between a file and its hs-boot file.
         -- See Step 2a in Note [Upsweep]
@@ -848,9 +677,8 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
                           LoadDependenciesOf m -> Just [m]
                           _                    -> Nothing
 
-        (build_plan, new_mg) = createBuildPlan mod_graph maybe_top_mods
+        build_plan = createBuildPlan mod_graph maybe_top_mods
 
-    let mod_graph = new_mg
 
     cache <- liftIO $ maybe (return []) iface_clearCache mhmi_cache
     let
@@ -883,9 +711,7 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
 
     (upsweep_ok, new_deps) <- withDeferredDiagnostics $ do
       hsc_env <- getSession
-      let new_hsc_env = setModuleGraph mod_graph hsc_env
-      setSession new_hsc_env
-      liftIO $ upsweep worker_limit new_hsc_env mhmi_cache diag_wrapper mHscMessage (toCache pruned_cache) build_plan
+      liftIO $ upsweep worker_limit hsc_env mhmi_cache diag_wrapper mHscMessage (toCache pruned_cache) build_plan
 
     -- At this point, all the HPT variables will be populated, but we don't want
     -- to leak the contents of a failed session.
@@ -1213,9 +1039,9 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       case plan of
         -- If there was no cycle, then typecheckLoop is not necessary
         SingleModule m -> do
-          one_plan <- buildSingleModule hug Nothing NoLoop m
+          one_plans <- buildOneModule m
           (cycle, all_plans) <- buildLoop plans
-          return (cycle, one_plan : all_plans)
+          return (cycle, one_plans ++ all_plans)
 
         -- For a resolved cycle, depend on everything in the loop, then update
         -- the cache to point to this node rather than directly to the module build
@@ -1274,30 +1100,46 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       res_var <- liftIO newEmptyMVar
       let result_var = mkResultVar res_var
       setModulePipeline (mkNodeKey mod) (mkBuildResult origin result_var)
-      return $! (MakeAction build_action res_var)
+      return $! MakeAction build_action res_var
 
+    buildOneModule :: ModuleGraphNode -> BuildM [MakeAction]
+    buildOneModule mn = do
+      let direct_boot_deps = mgNodeBootDependencies mn
+      ma <- buildSingleModule (HUG.updateBootModules direct_boot_deps hug) Nothing NoLoop mn
+      -- decide whether we need to rehydrate the module
+      if null direct_boot_deps
+        then return [ma]
+        else do
+          rehydrate_action <- rehydrateAction' Finalised mn
+          return [ma, rehydrate_action]
 
     buildOneLoopyModule :: HomeUnitGraph->  ModuleGraphNodeWithBootFile -> BuildM [MakeAction]
     buildOneLoopyModule mg (ModuleGraphNodeWithBootFile mn deps) = do
       ma <- buildSingleModule mg (Just deps) (Loop Initialise) mn
       -- Rehydration (1) from Note [Hydrating Modules], "Loops with multiple boot files"
       rehydrate_action <- rehydrateAction Rehydrated ((GWIB (mkNodeKey mn) IsBoot) : (map (\d -> GWIB d NotBoot) deps))
-      return $ [ma, rehydrate_action]
+      return [ma, rehydrate_action]
 
+    eitherModuleBootDeps :: Either ModuleGraphNode ModuleGraphNodeWithBootFile -> [ModNodeKeyWithUid]
+    eitherModuleBootDeps (Left mn) = mgNodeBootDependencies mn
+    eitherModuleBootDeps (Right (ModuleGraphNodeWithBootFile mn _deps)) = mgNodeBootDependencies mn
 
     -- buildModuleLoop :: [Either ModuleGraphNode ModuleGraphNodeWithBootFile] -> BuildM [MakeAction]
     buildModuleLoop ms = do
-      build_modules <- concatMapM (\(node, bootNodes) ->
-          either (fmap pure <$> buildSingleModule (HUG.updateBootModules bootNodes hug) Nothing (Loop Initialise)) (buildOneLoopyModule hug) node) ms
+      build_modules <- concatMapM (\node ->
+          either (fmap pure <$> buildSingleModule (HUG.updateBootModules (eitherModuleBootDeps node) hug) Nothing (Loop Initialise)) (buildOneLoopyModule hug) node) ms
       let extract (Left mn) = GWIB (mkNodeKey mn) NotBoot
           extract (Right (ModuleGraphNodeWithBootFile mn _)) = GWIB (mkNodeKey mn) IsBoot
-      let loop_mods = map (extract . fst) ms
+      let loop_mods = map extract ms
       -- Rehydration (2) from Note [Hydrating Modules], "Loops with multiple boot files"
       -- Fixes the space leak described in that note.
       rehydrate_action <- rehydrateAction Finalised loop_mods
 
       return $ build_modules ++ [rehydrate_action]
-
+    rehydrateAction' :: ResultLoopOrigin -> ModuleGraphNode -> BuildM MakeAction
+    rehydrateAction' origin node =
+      let isBoot = maybe NotBoot isBootModuleNodeInfo (mgNodeIsModule node)  -- Non-module nodes are not boot interfaces
+      in rehydrateAction origin [GWIB (mkNodeKey node) isBoot]
     -- An action which rehydrates the given keys
     rehydrateAction :: ResultLoopOrigin -> [GenWithIsBoot NodeKey] -> BuildM MakeAction
     rehydrateAction origin deps = do
@@ -1308,15 +1150,9 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
           !build_deps = getDependencies (map gwib_mod deps) build_map
       let loop_action = withCurrentUnit loop_unit $ do
             !_ <- wait_deps build_deps
-
             hsc_env <- asks hsc_env
             let mns :: [ModuleName]
                 mns = mapMaybe (nodeKeyModName . gwib_mod) deps
-                -- name_units = mapMaybe (nodeKeyModNameUnit . gwib_mod) deps
-
-            -- pprTraceM "Rehydrating" (ppr deps)
-            -- try to collapse the .hs-boot to their .hs in hpt
-            -- liftIO $ mapM_ (flip (uncurry HUG.collapseHomeModInfoHug) hug) name_units
 
             hmis' <- liftIO $ rehydrateAfter hsc_env mns
 

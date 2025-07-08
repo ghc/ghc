@@ -132,7 +132,7 @@ module GHC.Unit.Module.Graph
     -- the graph. It's not immediately clear to me why users do depend on them.
    , SummaryNode
    , summaryNodeSummary
-   , summaryNodeKey, nodeKeyModNameUnit, addNormalEdge
+   , summaryNodeKey, nodeKeyModNameUnit, addNormalEdge, nodeKeyIsBoot, mgNodeBootDependencies
 
    )
 where
@@ -423,6 +423,15 @@ moduleNodeInfoUnitId (ModuleNodeCompile ms) = ms_unitid ms
 moduleNodeInfoMnwib :: ModuleNodeInfo -> ModuleNameWithIsBoot
 moduleNodeInfoMnwib (ModuleNodeFixed key _) = mnkModuleName key
 moduleNodeInfoMnwib (ModuleNodeCompile ms) = ms_mnwib ms
+
+
+mgNodeBootDependencies :: ModuleGraphNode -> [ModNodeKeyWithUid]
+mgNodeBootDependencies mgn =
+  [ k | Just k <- extractModNodeKey <$> mgNodeDependencies False mgn
+  , IsBoot == mnkIsBoot k ]
+  where extractModNodeKey :: NodeKey -> Maybe ModNodeKeyWithUid
+        extractModNodeKey (NodeKey_Module mk) = Just mk
+        extractModNodeKey _                   = Nothing
 
 -- | Collect the immediate dependencies of a ModuleGraphNode,
 -- optionally avoiding hs-boot dependencies.
@@ -768,6 +777,10 @@ nodeKeyModName _ = Nothing
 nodeKeyModNameUnit :: NodeKey -> Maybe (ModuleName, UnitId)
 nodeKeyModNameUnit (NodeKey_Module mk) = Just (gwib_mod $ mnkModuleName mk, mnkUnitId mk)
 nodeKeyModNameUnit _ = Nothing
+
+nodeKeyIsBoot :: NodeKey -> IsBootInterface
+nodeKeyIsBoot (NodeKey_Module mk) = mnkIsBoot mk
+nodeKeyIsBoot _ = NotBoot  -- Non-module nodes are not boot interfaces
 
 msKey :: ModSummary -> ModNodeKeyWithUid
 msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)
