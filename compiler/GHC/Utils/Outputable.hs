@@ -416,6 +416,7 @@ data SDocContext = SDC
   , sdocSuppressTypeSignatures      :: !Bool
   , sdocSuppressTypeApplications    :: !Bool
   , sdocSuppressIdInfo              :: !Bool
+  , sdocSuppressInstanceDefinedAt   :: !Bool
   , sdocSuppressCoercions           :: !Bool
   , sdocSuppressCoercionTypes       :: !Bool
   , sdocSuppressUnfoldings          :: !Bool
@@ -478,6 +479,7 @@ defaultSDocContext = SDC
   , sdocSuppressTypeSignatures      = False
   , sdocSuppressTypeApplications    = False
   , sdocSuppressIdInfo              = False
+  , sdocSuppressInstanceDefinedAt   = False
   , sdocSuppressCoercions           = False
   , sdocSuppressCoercionTypes       = False
   , sdocSuppressUnfoldings          = False

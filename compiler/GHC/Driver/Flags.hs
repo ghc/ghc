@@ -853,6 +853,8 @@ data GeneralFlag
    | Opt_SuppressTicks      -- ^ Replaces Opt_PprShowTicks
    | Opt_SuppressTimestamps -- ^ Suppress timestamps in dumps
    | Opt_SuppressCoreSizes  -- ^ Suppress per binding Core size stats in dumps
+   -- | Suppress @defined at ...@ output when printing instances.
+   | Opt_SuppressInstanceDefinedAt
 
    -- Error message suppression
    | Opt_ShowErrorContext
