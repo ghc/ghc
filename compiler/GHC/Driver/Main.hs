@@ -1829,7 +1829,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
                          , nest 4 $ (vcat $ badFlags df) $+$
                                     -- MP: Using defaultDiagnosticOpts here is not right but it's also not right to handle these
                                     -- unsafety error messages in an unstructured manner.
-                                    (vcat $ pprMsgEnvelopeBagWithLoc (defaultDiagnosticOpts @e) (getMessages whyUnsafe)) $+$
+                                    (vcat $ unsafePprMsgEnvelopeBagWithLoc (defaultDiagnosticOpts @e) (getMessages whyUnsafe)) $+$
                                     (vcat $ badInsts $ tcg_insts tcg_env)
                          ]
     badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer
