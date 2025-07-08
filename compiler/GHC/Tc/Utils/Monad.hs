@@ -1154,7 +1154,7 @@ reportDiagnostics = mapM_ reportDiagnostic
 
 reportDiagnostic :: MsgEnvelope TcRnMessage -> TcRn ()
 reportDiagnostic msg
-  = do { traceTc "Adding diagnostic:" (pprLocMsgEnvelopeDefault msg) ;
+  = do { traceTc "Adding diagnostic:" (unsafePprLocMsgEnvelopeDefault msg) ;
          errs_var <- getErrsVar ;
          msgs     <- readTcRef errs_var ;
          writeTcRef errs_var (msg `addMessage` msgs) }

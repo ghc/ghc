@@ -26,7 +26,7 @@ import GHC.Parser.Lexer as Lexer
 import qualified GHC.Types.Error as E
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
-import GHC.Utils.Error (pprLocMsgEnvelopeDefault)
+import GHC.Utils.Error (unsafePprLocMsgEnvelopeDefault)
 import GHC.Utils.Outputable (SDocContext, text, ($$))
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (panic)
@@ -52,7 +52,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
     let err : _ = bagToList (E.getMessages $ getPsErrorMessages pst)
      in panic $
           Outputable.renderWithContext sDocContext $
-            text "Hyperlinker parse error:" $$ pprLocMsgEnvelopeDefault err
+            text "Hyperlinker parse error:" $$ unsafePprLocMsgEnvelopeDefault err
   where
     initState = initParserState parserOpts buf start
     buf = stringBufferFromByteString bs

@@ -376,7 +376,7 @@ showErrorMessages :: Messages GhcMessage -> String
 showErrorMessages msgs =
   renderWithContext defaultSDocContext
     $ vcat
-    $ pprMsgEnvelopeBagWithLocDefault
+    $ unsafePprMsgEnvelopeBagWithLocDefault
     $ getMessages
     $ msgs
 

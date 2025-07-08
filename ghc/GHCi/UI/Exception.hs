@@ -62,7 +62,7 @@ instance Show GhciCommandError where
   show (GhciCommandError msgs) =
       renderWithContext defaultSDocContext
     . vcat
-    . pprMsgEnvelopeBagWithLocDefault
+    . unsafePprMsgEnvelopeBagWithLocDefault
     . getMessages
     $ msgs
 

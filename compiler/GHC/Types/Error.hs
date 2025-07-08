@@ -26,7 +26,7 @@ module GHC.Types.Error
 
    -- * Classifying Messages
 
-   , MessageClass (..)
+   , MessageClass (MCDiagnostic, ..)
    , Severity (..)
    , Diagnostic (..)
    , UnknownDiagnostic (..)
@@ -492,7 +492,7 @@ data MessageClass
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | MCDiagnostic Severity ResolvedDiagnosticReason (Maybe DiagnosticCode)
+  | UnsafeMCDiagnostic Severity ResolvedDiagnosticReason (Maybe DiagnosticCode)
     -- ^ Diagnostics from the compiler. This constructor is very powerful as
     -- it allows the construction of a 'MessageClass' with a completely
     -- arbitrary permutation of 'Severity' and 'DiagnosticReason'. As such,
@@ -506,6 +506,10 @@ data MessageClass
     -- this diagnostic. If you are creating a message not tied to any
     -- error-message type, then use Nothing. In the long run, this really
     -- should always have a 'DiagnosticCode'. See Note [Diagnostic codes].
+
+{-# COMPLETE MCOutput, MCFatal, MCInteractive, MCDump, MCInfo, MCDiagnostic #-}
+pattern MCDiagnostic :: Severity -> ResolvedDiagnosticReason -> Maybe DiagnosticCode -> MessageClass
+pattern MCDiagnostic severity reason code <- UnsafeMCDiagnostic severity reason code
 
 {-
 Note [Suppressing Messages]

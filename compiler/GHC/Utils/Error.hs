@@ -22,9 +22,8 @@ module GHC.Utils.Error (
         errorsFound, isEmptyMessages,
 
         -- ** Formatting
-        pprMessageBag, pprMsgEnvelopeBagWithLoc, pprMsgEnvelopeBagWithLocDefault,
-        pprMessages,
-        pprLocMsgEnvelope, pprLocMsgEnvelopeDefault,
+        pprMessageBag, unsafePprMsgEnvelopeBagWithLoc, unsafePprMsgEnvelopeBagWithLocDefault,
+        unsafePprLocMsgEnvelope, unsafePprLocMsgEnvelopeDefault,
         formatBulleted,
 
         -- ** Construction
@@ -265,29 +264,26 @@ formatBulleted (unDecorated -> docs)
     msgs ctx = filter (not . Outputable.isEmpty ctx) docs
     starred = (bullet<+>)
 
-pprMessages :: Diagnostic e => DiagnosticOpts e -> Messages e -> SDoc
-pprMessages e = vcat . pprMsgEnvelopeBagWithLoc e . getMessages
-
-pprMsgEnvelopeBagWithLoc :: Diagnostic e => DiagnosticOpts e -> Bag (MsgEnvelope e) -> [SDoc]
-pprMsgEnvelopeBagWithLoc e bag = [ pprLocMsgEnvelope e item | item <- sortMsgBag Nothing bag ]
+unsafePprMsgEnvelopeBagWithLoc :: Diagnostic e => DiagnosticOpts e -> Bag (MsgEnvelope e) -> [SDoc]
+unsafePprMsgEnvelopeBagWithLoc e bag = [ unsafePprLocMsgEnvelope e item | item <- sortMsgBag Nothing bag ]
 
 -- | Print the messages with the suitable default configuration, usually not what you want but sometimes you don't really
 -- care about what the configuration is (for example, if the message is in a panic).
-pprMsgEnvelopeBagWithLocDefault :: forall e . Diagnostic e => Bag (MsgEnvelope e) -> [SDoc]
-pprMsgEnvelopeBagWithLocDefault bag = [ pprLocMsgEnvelopeDefault item | item <- sortMsgBag Nothing bag ]
+unsafePprMsgEnvelopeBagWithLocDefault :: forall e . Diagnostic e => Bag (MsgEnvelope e) -> [SDoc]
+unsafePprMsgEnvelopeBagWithLocDefault bag = [ unsafePprLocMsgEnvelopeDefault item | item <- sortMsgBag Nothing bag ]
 
-pprLocMsgEnvelopeDefault :: forall e . Diagnostic e => MsgEnvelope e -> SDoc
-pprLocMsgEnvelopeDefault = pprLocMsgEnvelope (defaultDiagnosticOpts @e)
+unsafePprLocMsgEnvelopeDefault :: forall e . Diagnostic e => MsgEnvelope e -> SDoc
+unsafePprLocMsgEnvelopeDefault = unsafePprLocMsgEnvelope (defaultDiagnosticOpts @e)
 
-pprLocMsgEnvelope :: Diagnostic e => DiagnosticOpts e -> MsgEnvelope e -> SDoc
-pprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan      = s
+unsafePprLocMsgEnvelope :: Diagnostic e => DiagnosticOpts e -> MsgEnvelope e -> SDoc
+unsafePprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan      = s
                                , errMsgDiagnostic = e
                                , errMsgSeverity  = sev
                                , errMsgContext   = name_ppr_ctx
                                , errMsgReason    = reason })
   = withErrStyle name_ppr_ctx $
       mkLocMessage
-        (MCDiagnostic sev reason (diagnosticCode e))
+        (UnsafeMCDiagnostic sev reason (diagnosticCode e))
         s
         (formatBulleted $ diagnosticMessage opts e)
 
