@@ -4,7 +4,7 @@ module GHC.Toolchain.Tools.Cxx
     ( Cxx(..)
     , findCxx
       -- * Helpful utilities
-    , compileCxx
+    , compileCxx, _cxxProgram
     ) where
 
 import System.FilePath

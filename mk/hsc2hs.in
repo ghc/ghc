@@ -1,6 +1,6 @@
-HSC2HS_C="@SettingsCCompilerFlags@"
+HSC2HS_C="@CONF_CC_OPTS_STAGE2@"
 
-HSC2HS_L="@SettingsCCompilerLinkFlags@"
+HSC2HS_L="@CONF_GCC_LINKER_OPTS_STAGE2@"
 
 tflag="--template=$libdir/template-hsc.h"
 Iflag="-I$includedir/include/"

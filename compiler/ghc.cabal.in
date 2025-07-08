@@ -131,6 +131,7 @@ Library
                    semaphore-compat,
                    stm,
                    rts,
+                   ghc-toolchain,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-heap   >=9.10.1 && <=@ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@

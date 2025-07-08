@@ -96,6 +96,8 @@ import System.Posix hiding (fdToHandle)
 import qualified System.Info(os)
 #endif
 
+import GHC.Toolchain.Target
+
 -- | Short-circuit 'any' with a \"monadic predicate\".
 anyM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
 anyM _ [] = return False
@@ -583,9 +585,20 @@ readFromSettingsFile settingsFile f = do
       -- It's excusable to not have a settings file (for now at
       -- least) but completely inexcusable to have a malformed one.
       Nothing -> Left $ "Can't parse settings file " ++ show settingsFile
-    case f settingsFile mySettings of
-      Right archOS -> Right archOS
-      Left e -> Left e
+    f settingsFile mySettings
+
+readFromTargetFile :: FilePath
+                   -> (Target -> b)
+                   -> IO (Either String b)
+readFromTargetFile targetFile f = do
+  targetStr <- readFile targetFile
+  pure $ do
+    target <- case maybeReadFuzzy targetStr of
+      Just t -> Right t
+      -- It's excusable to not have a settings file (for now at
+      -- least) but completely inexcusable to have a malformed one.
+      Nothing -> Left $ "Can't parse .target file " ++ show targetFile
+    Right (f target)
 
 getPkgDatabases :: Verbosity
                 -> GhcPkg.DbOpenMode mode DbModifySelector
@@ -618,6 +631,7 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
                    Nothing  -> die err_msg
                    Just dir -> do
                      -- Look for where it is given in the settings file, if marked there.
+                     -- See Note [Settings file] about this file, and why we need GHC to share it with us.
                      let settingsFile = dir </> "settings"
                      exists_settings_file <- doesFileExist settingsFile
                      erel_db <-
@@ -652,16 +666,15 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
     case [ f | FlagUserConfig f <- my_flags ] of
       _ | no_user_db -> return Nothing
       [] -> do
-        -- See Note [Settings file] about this file, and why we need GHC to share it with us.
-        let settingsFile = top_dir </> "settings"
-        exists_settings_file <- doesFileExist settingsFile
+        let targetFile = top_dir </> "targets" </> "default.target"
+        exists_settings_file <- doesFileExist targetFile
         targetArchOS <- case exists_settings_file of
           False -> do
-            warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
+            warn $ "WARNING: target file doesn't exist " ++ show targetFile
             warn "cannot know target platform so guessing target == host (native compiler)."
             pure hostPlatformArchOS
           True ->
-            readFromSettingsFile settingsFile getTargetArchOS >>= \case
+            readFromTargetFile targetFile getTargetArchOS >>= \case
               Right v -> pure v
               Left e -> die e
 
