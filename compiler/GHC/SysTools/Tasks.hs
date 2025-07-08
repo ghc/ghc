@@ -55,7 +55,7 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types (GhcMessage(..), DriverMessage (DriverNoConfiguredLLVMToolchain))
 import GHC.Driver.CmdLine (warnsToMessages)
-import GHC.Types.SrcLoc (noLoc)
+import GHC.Types.SrcLoc (noLoc, noSrcSpan)
 
 {-
 ************************************************************************
@@ -346,7 +346,7 @@ figureLlvmVersion logger dflags = traceSystoolCommand logger "llc" $ do
                 debugTraceMsg logger 2
                     (text "Error (figuring out LLVM version):" <+>
                       text (show err))
-                errorMsg logger $ vcat
+                reportError logger neverQualify emptyDiagOpts noSrcSpan $ vcat
                     [ text "Warning:", nest 9 $
                           text "Couldn't figure out LLVM version!" $$
                           text ("Make sure you have installed LLVM between ["
