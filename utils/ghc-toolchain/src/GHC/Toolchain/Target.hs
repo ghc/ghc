@@ -7,6 +7,9 @@ module GHC.Toolchain.Target
 
   , WordSize(..), wordSize2Bytes
 
+    -- ** Lenses
+  , _tgtCC, _tgtCxx, _tgtCpp, _tgtHsCpp
+
     -- * Re-exports
   , ByteOrder(..)
   ) where
@@ -137,3 +140,29 @@ instance Show Target where
     , ", tgtInstallNameTool = " ++ show tgtInstallNameTool
     , "}"
     ]
+
+--------------------------------------------------------------------------------
+-- Lenses
+--------------------------------------------------------------------------------
+
+_tgtCC :: Lens Target Cc
+_tgtCC = Lens tgtCCompiler (\x o -> o {tgtCCompiler = x})
+
+_tgtCxx :: Lens Target Cxx
+_tgtCxx = Lens tgtCxxCompiler (\x o -> o {tgtCxxCompiler = x})
+
+_tgtCpp :: Lens Target Cpp
+_tgtCpp = Lens tgtCPreprocessor (\x o -> o {tgtCPreprocessor = x})
+
+_tgtHsCpp :: Lens Target HsCpp
+_tgtHsCpp = Lens tgtHsCPreprocessor (\x o -> o {tgtHsCPreprocessor = x})
+
+_tgtJsCpp :: Lens Target (Maybe JsCpp)
+_tgtJsCpp = Lens tgtJsCPreprocessor (\x o -> o {tgtJsCPreprocessor = x})
+
+_tgtCmmCpp :: Lens Target CmmCpp
+_tgtCmmCpp = Lens tgtCmmCPreprocessor (\x o -> o {tgtCmmCPreprocessor = x})
+
+_tgtMergeObjs :: Lens Target (Maybe MergeObjs)
+_tgtMergeObjs = Lens tgtMergeObjs (\x o -> o {tgtMergeObjs = x})
+

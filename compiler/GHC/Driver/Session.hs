@@ -280,6 +280,9 @@ import GHC.Parser.Lexer (mkParserOpts, initParserState, P(..), ParseResult(..))
 
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
+import GHC.Toolchain
+import GHC.Toolchain.Program
+
 import Data.IORef
 import Control.Arrow ((&&&))
 import Control.Monad
@@ -403,6 +406,7 @@ settings dflags = Settings
   , sToolSettings = toolSettings dflags
   , sPlatformMisc = platformMisc dflags
   , sRawSettings = rawSettings dflags
+  , sRawTarget = rawTarget dflags
   }
 
 pgm_L                 :: DynFlags -> String
@@ -3454,9 +3458,58 @@ compilerInfo dflags
       -- Next come the settings, so anything else can be overridden
       -- in the settings file (as "lookup" uses the first match for the
       -- key)
-    : map (fmap $ expandDirectories (topDir dflags) (toolDir dflags))
-          (rawSettings dflags)
-   ++ [("Project version",             projectVersion dflags),
+     : map (fmap expandDirectories)
+           (rawSettings dflags)
+     ++
+      [("C compiler command", queryCmd $ ccProgram . tgtCCompiler),
+       ("C compiler flags", queryFlags $ ccProgram . tgtCCompiler),
+       ("C++ compiler command", queryCmd $ cxxProgram . tgtCxxCompiler),
+       ("C++ compiler flags", queryFlags $ cxxProgram . tgtCxxCompiler),
+       ("C compiler link flags", queryFlags $ ccLinkProgram . tgtCCompilerLink),
+       ("C compiler supports -no-pie", queryBool $ ccLinkSupportsNoPie . tgtCCompilerLink),
+       ("CPP command", queryCmd $ cppProgram . tgtCPreprocessor),
+       ("CPP flags", queryFlags $ cppProgram . tgtCPreprocessor),
+       ("Haskell CPP command", queryCmd $ hsCppProgram . tgtHsCPreprocessor),
+       ("Haskell CPP flags", queryFlags $ hsCppProgram . tgtHsCPreprocessor),
+       ("JavaScript CPP command", queryCmdMaybe jsCppProgram tgtJsCPreprocessor),
+       ("JavaScript CPP flags", queryFlagsMaybe jsCppProgram tgtJsCPreprocessor),
+       ("C-- CPP command", queryCmd $ cmmCppProgram . tgtCmmCPreprocessor),
+       ("C-- CPP flags", queryFlags $ cmmCppProgram . tgtCmmCPreprocessor),
+       ("C-- CPP supports -g0", queryBool $ cmmCppSupportsG0 . tgtCmmCPreprocessor),
+       ("ld supports compact unwind", queryBool $ ccLinkSupportsCompactUnwind . tgtCCompilerLink),
+       ("ld supports filelist", queryBool $ ccLinkSupportsFilelist . tgtCCompilerLink),
+       ("ld supports single module", queryBool $ ccLinkSupportsSingleModule . tgtCCompilerLink),
+       ("ld is GNU ld", queryBool $ ccLinkIsGnu . tgtCCompilerLink),
+       ("Merge objects command", queryCmdMaybe mergeObjsProgram tgtMergeObjs),
+       ("Merge objects flags", queryFlagsMaybe mergeObjsProgram tgtMergeObjs),
+       ("Merge objects supports response files", queryBool $ maybe False mergeObjsSupportsResponseFiles . tgtMergeObjs),
+       ("ar command", queryCmd $ arMkArchive . tgtAr),
+       ("ar flags", queryFlags $ arMkArchive . tgtAr),
+       ("ar supports at file", queryBool $ arSupportsAtFile . tgtAr),
+       ("ar supports -L", queryBool $ arSupportsDashL . tgtAr),
+       ("ranlib command", queryCmdMaybe ranlibProgram tgtRanlib),
+       ("otool command", queryCmdMaybe id tgtOtool),
+       ("install_name_tool command", queryCmdMaybe id tgtInstallNameTool),
+       ("windres command", queryCmd $ fromMaybe (Program "/bin/false" []) . tgtWindres),
+       ("cross compiling", queryBool (not . tgtLocallyExecutable)),
+       ("target platform string", query targetPlatformTriple),
+       ("target os", query (show . archOS_OS . tgtArchOs)),
+       ("target arch", query (show . archOS_arch . tgtArchOs)),
+       ("target word size", query $ show . wordSize2Bytes . tgtWordSize),
+       ("target word big endian", queryBool $ (\case BigEndian -> True; LittleEndian -> False) . tgtEndianness),
+       ("target has GNU nonexec stack", queryBool tgtSupportsGnuNonexecStack),
+       ("target has .ident directive", queryBool tgtSupportsIdentDirective),
+       ("target has subsections via symbols", queryBool tgtSupportsSubsectionsViaSymbols),
+       ("Unregisterised", queryBool tgtUnregisterised),
+       ("LLVM target", query tgtLlvmTarget),
+       ("LLVM llc command", queryCmdMaybe id tgtLlc),
+       ("LLVM opt command", queryCmdMaybe id tgtOpt),
+       ("LLVM llvm-as command", queryCmdMaybe id tgtLlvmAs),
+       ("LLVM llvm-as flags", queryFlagsMaybe id tgtLlvmAs),
+       ("Tables next to code", queryBool tgtTablesNextToCode),
+       ("Leading underscore", queryBool tgtSymbolsHaveLeadingUnderscore)
+      ] ++
+      [("Project version",             projectVersion dflags),
        ("Project Git commit id",       cProjectGitCommitId),
        ("Project Version Int",         cProjectVersionInt),
        ("Project Patch Level",         cProjectPatchLevel),
@@ -3513,9 +3566,16 @@ compilerInfo dflags
     showBool False = "NO"
     platform  = targetPlatform dflags
     isWindows = platformOS platform == OSMinGW32
-    useInplaceMinGW = toolSettings_useInplaceMinGW $ toolSettings dflags
-    expandDirectories :: FilePath -> Maybe FilePath -> String -> String
-    expandDirectories topd mtoold = expandToolDir useInplaceMinGW mtoold . expandTopDir topd
+    expandDirectories = expandToolDir (toolDir dflags) . expandTopDir (topDir dflags)
+    query :: (Target -> a) -> a
+    query f = f (rawTarget dflags)
+    queryFlags f = query (unwords . map escapeArg . prgFlags . f)
+    queryCmd f = expandDirectories (query (prgPath . f))
+    queryBool = showBool . query
+
+    queryCmdMaybe, queryFlagsMaybe :: (a -> Program) -> (Target -> Maybe a) -> String
+    queryCmdMaybe p f = expandDirectories (query (maybe "" (prgPath . p) . f))
+    queryFlagsMaybe p f = query (maybe "" (unwords . map escapeArg . prgFlags . p) . f)
 
 -- Note [Special unit-ids]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -3843,3 +3903,19 @@ updatePlatformConstants dflags mconstants = do
   let platform1 = (targetPlatform dflags) { platform_constants = mconstants }
   let dflags1   = dflags { targetPlatform = platform1 }
   return dflags1
+
+-- ----------------------------------------------------------------------------
+-- Escape Args helpers
+-- ----------------------------------------------------------------------------
+
+-- | Just like 'GHC.ResponseFile.escapeArg', but it is not exposed from base.
+escapeArg :: String -> String
+escapeArg = reverse . foldl' escape []
+
+escape :: String -> Char -> String
+escape cs c
+  |    isSpace c
+    || '\\' == c
+    || '\'' == c
+    || '"'  == c = c:'\\':cs -- n.b., our caller must reverse the result
+  | otherwise    = c:cs

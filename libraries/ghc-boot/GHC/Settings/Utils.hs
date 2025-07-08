@@ -10,6 +10,8 @@ import GHC.BaseDir
 import GHC.Platform.ArchOS
 import System.FilePath
 
+import GHC.Toolchain.Target
+
 maybeRead :: Read a => String -> Maybe a
 maybeRead str = case reads str of
   [(x, "")] -> Just x
@@ -36,19 +38,17 @@ type RawSettings = Map String String
 
 -- | Read target Arch/OS from the settings
 getTargetArchOS
-  :: FilePath     -- ^ Settings filepath (for error messages)
-  -> RawSettings  -- ^ Raw settings file contents
-  -> Either String ArchOS
-getTargetArchOS settingsFile settings =
-  ArchOS <$> readRawSetting settingsFile settings "target arch"
-         <*> readRawSetting settingsFile settings "target os"
+  :: Target -- ^ The 'Target' from which to read the 'ArchOS'
+  -> ArchOS
+getTargetArchOS target = tgtArchOs target
 
 getGlobalPackageDb :: FilePath -> RawSettings -> Either String FilePath
 getGlobalPackageDb settingsFile settings = do
   rel_db <- getRawSetting settingsFile settings "Relative Global Package DB"
   return (dropFileName settingsFile </> rel_db)
 
-
+--------------------------------------------------------------------------------
+-- lib/settings
 
 getRawSetting
   :: FilePath -> RawSettings -> String -> Either String String
@@ -70,10 +70,3 @@ getRawBooleanSetting settingsFile settings key = do
     "NO" -> Right False
     xs -> Left $ "Bad value for " ++ show key ++ ": " ++ show xs
 
-readRawSetting
-  :: (Show a, Read a) => FilePath -> RawSettings -> String -> Either String a
-readRawSetting settingsFile settings key = case Map.lookup key settings of
-  Just xs -> case maybeRead xs of
-    Just v -> Right v
-    Nothing -> Left $ "Failed to read " ++ show key ++ " value " ++ show xs
-  Nothing -> Left $ "No entry for " ++ show key ++ " in " ++ show settingsFile

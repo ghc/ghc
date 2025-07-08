@@ -534,4 +534,3 @@ mkTarget opts = do
                    }
     return t
 
---- ROMES:TODO: fp_settings.m4 in general which I don't think was ported completely (e.g. the basenames and windows llvm-XX and such)

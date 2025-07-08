@@ -90,13 +90,10 @@ the build system finds and wires through the toolchain information.
 3) The next step is to generate the settings file: The file
   `cfg/system.config.in` is preprocessed by configure and the output written to
   `system.config`.  This serves the same purpose as `config.mk` but it rewrites
-  the values that were exported.  As an example `SettingsCCompilerCommand` is
-  rewritten to `settings-c-compiler-command`.
+  the values that were exported.
 
   Next up is `src/Oracles/Settings.hs` which makes from some Haskell ADT to
-  the settings `keys` in the `system.config`.  As an example,
-  `settings-c-compiler-command` is mapped to
-  `SettingsFileSetting_CCompilerCommand`.
+  the settings `keys` in the `system.config`.
 
   The last part of this is the `generateSettings` in `src/Rules/Generate.hs`
   which produces the desired settings file out of Hadrian. This is the
@@ -122,15 +119,13 @@ play nice with the system compiler instead.
 -- | Expand occurrences of the @$tooldir@ interpolation in a string
 -- on Windows, leave the string untouched otherwise.
 expandToolDir
-  :: Bool -- ^ whether we use the ambient mingw toolchain
-  -> Maybe FilePath -- ^ tooldir
+  :: Maybe FilePath -- ^ tooldir
   -> String -> String
 #if defined(mingw32_HOST_OS)
-expandToolDir False (Just tool_dir) s = expandPathVar "tooldir" tool_dir s
-expandToolDir False Nothing         _ = panic "Could not determine $tooldir"
-expandToolDir True  _               s = s
+expandToolDir (Just tool_dir) s = expandPathVar "tooldir" tool_dir s
+expandToolDir Nothing         _ = panic "Could not determine $tooldir"
 #else
-expandToolDir _ _ s = s
+expandToolDir _ s = s
 #endif
 
 -- | Returns a Unix-format path pointing to TopDir.
@@ -164,13 +159,13 @@ tryFindTopDir Nothing
 -- Returns @Nothing@ when not on Windows.
 -- When called on Windows, it either throws an error when the
 -- tooldir can't be located, or returns @Just tooldirpath@.
--- If the distro toolchain is being used we treat Windows the same as Linux
+-- If the distro toolchain is being used, there will be no variables to
+-- substitute for anyway, so this is a no-op.
 findToolDir
-  :: Bool -- ^ whether we use the ambient mingw toolchain
-  -> FilePath -- ^ topdir
+  :: FilePath -- ^ topdir
   -> IO (Maybe FilePath)
 #if defined(mingw32_HOST_OS)
-findToolDir False top_dir = go 0 (top_dir </> "..") []
+findToolDir top_dir = go 0 (top_dir </> "..") []
   where maxDepth = 3
         go :: Int -> FilePath -> [FilePath] -> IO (Maybe FilePath)
         go k path tried
@@ -183,7 +178,6 @@ findToolDir False top_dir = go 0 (top_dir </> "..") []
               if oneLevel
                 then return (Just path)
                 else go (k+1) (path </> "..") tried'
-findToolDir True _ = return Nothing
 #else
-findToolDir _ _ = return Nothing
+findToolDir _ = return Nothing
 #endif

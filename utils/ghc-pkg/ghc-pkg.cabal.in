@@ -29,6 +29,7 @@ Executable ghc-pkg
                    Cabal-syntax,
                    binary,
                    ghc-boot,
+                   ghc-toolchain,
                    bytestring
     if !os(windows)
         Build-Depends: unix

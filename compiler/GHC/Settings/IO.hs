@@ -1,4 +1,4 @@
-
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -16,18 +16,20 @@ import GHC.Utils.CliOption
 import GHC.Utils.Fingerprint
 import GHC.Platform
 import GHC.Utils.Panic
-import GHC.ResponseFile
 import GHC.Settings
 import GHC.SysTools.BaseDir
 import GHC.Unit.Types
 
 import Control.Monad.Trans.Except
 import Control.Monad.IO.Class
-import Data.Char
 import qualified Data.Map as Map
 import System.FilePath
 import System.Directory
 
+import GHC.Toolchain.Program
+import GHC.Toolchain
+import GHC.Data.Maybe
+import Data.Bifunctor (Bifunctor(second))
 
 data SettingsError
   = SettingsError_MissingData String
@@ -44,6 +46,7 @@ initSettings top_dir = do
       libexec :: FilePath -> FilePath
       libexec file = top_dir </> ".." </> "bin" </> file
       settingsFile = installed "settings"
+      targetFile   = installed $ "targets" </> "default.target"
 
       readFileSafe :: FilePath -> ExceptT SettingsError m String
       readFileSafe path = liftIO (doesFileExist path) >>= \case
@@ -55,85 +58,72 @@ initSettings top_dir = do
     Just s -> pure s
     Nothing -> throwE $ SettingsError_BadData $
       "Can't parse " ++ show settingsFile
+  targetStr <- readFileSafe targetFile
+  target <- case maybeReadFuzzy @Target targetStr of
+    Just s -> pure s
+    Nothing -> throwE $ SettingsError_BadData $
+      "Can't parse as Target " ++ show targetFile
   let mySettings = Map.fromList settingsList
       getBooleanSetting :: String -> ExceptT SettingsError m Bool
       getBooleanSetting key = either pgmError pure $
         getRawBooleanSetting settingsFile mySettings key
 
-  -- On Windows, by mingw is often distributed with GHC,
-  -- so we look in TopDir/../mingw/bin,
-  -- as well as TopDir/../../mingw/bin for hadrian.
-  -- But we might be disabled, in which we we don't do that.
-  useInplaceMinGW <- getBooleanSetting "Use inplace MinGW toolchain"
-
   -- see Note [topdir: How GHC finds its files]
   -- NB: top_dir is assumed to be in standard Unix
   -- format, '/' separated
-  mtool_dir <- liftIO $ findToolDir useInplaceMinGW top_dir
+  mtool_dir <- liftIO $ findToolDir top_dir
         -- see Note [tooldir: How GHC finds mingw on Windows]
 
-    -- Escape 'top_dir' and 'mtool_dir', to make sure we don't accidentally
-    -- introduce unescaped spaces. See #24265 and #25204.
-  let escaped_top_dir = escapeArg top_dir
-      escaped_mtool_dir = fmap escapeArg mtool_dir
-
-      getSetting_raw key = either pgmError pure $
+  let getSetting_raw key = either pgmError pure $
         getRawSetting settingsFile mySettings key
       getSetting_topDir top key = either pgmError pure $
         getRawFilePathSetting top settingsFile mySettings key
       getSetting_toolDir top tool key =
-        expandToolDir useInplaceMinGW tool <$> getSetting_topDir top key
-
-      getSetting :: String -> ExceptT SettingsError m String
+        expandToolDir tool <$> getSetting_topDir top key
       getSetting key = getSetting_topDir top_dir key
-      getToolSetting :: String -> ExceptT SettingsError m String
       getToolSetting key = getSetting_toolDir top_dir mtool_dir key
-      getFlagsSetting :: String -> ExceptT SettingsError m [String]
-      getFlagsSetting key = unescapeArgs <$> getSetting_toolDir escaped_top_dir escaped_mtool_dir key
-        -- Make sure to unescape, as we have escaped top_dir and tool_dir.
+
+      expandDirVars top tool = expandToolDir tool . expandTopDir top
+
+      getToolPath :: (Target -> Program) -> String
+      getToolPath key = expandDirVars top_dir mtool_dir (prgPath . key $ target)
+
+      getMaybeToolPath :: (Target -> Maybe Program) -> String
+      getMaybeToolPath key = getToolPath (fromMaybe (Program "" []) . key)
+
+      getToolFlags :: (Target -> Program) -> [String]
+      getToolFlags key = expandDirVars top_dir mtool_dir <$> (prgFlags . key $ target)
+
+      getTool :: (Target -> Program) -> (String, [String])
+      getTool key = (getToolPath key, getToolFlags key)
 
   -- See Note [Settings file] for a little more about this file. We're
   -- just partially applying those functions and throwing 'Left's; they're
   -- written in a very portable style to keep ghc-boot light.
-  targetPlatformString <- getSetting_raw "target platform string"
-  cc_prog <- getToolSetting "C compiler command"
-  cxx_prog <- getToolSetting "C++ compiler command"
-  cc_args0 <- getFlagsSetting "C compiler flags"
-  cxx_args <- getFlagsSetting "C++ compiler flags"
-  gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
-  cmmCppSupportsG0 <- getBooleanSetting "C-- CPP supports -g0"
-  cpp_prog <- getToolSetting "CPP command"
-  cpp_args <- map Option <$> getFlagsSetting "CPP flags"
-  hs_cpp_prog <- getToolSetting "Haskell CPP command"
-  hs_cpp_args <- map Option <$> getFlagsSetting "Haskell CPP flags"
-  js_cpp_prog <- getToolSetting "JavaScript CPP command"
-  js_cpp_args <- map Option <$> getFlagsSetting "JavaScript CPP flags"
-  cmmCpp_prog <- getToolSetting "C-- CPP command"
-  cmmCpp_args <- map Option <$> getFlagsSetting "C-- CPP flags"
+  targetHasLibm <- getBooleanSetting "target has libm"
+  let
+    (cc_prog, cc_args0)  = getTool (ccProgram . tgtCCompiler)
+    (cxx_prog, cxx_args) = getTool (cxxProgram . tgtCxxCompiler)
+    (cpp_prog, cpp_args) = getTool (cppProgram . tgtCPreprocessor)
+    (hs_cpp_prog, hs_cpp_args) = getTool (hsCppProgram . tgtHsCPreprocessor)
+    (js_cpp_prog, js_cpp_args) = getTool (maybe (Program "" []) jsCppProgram . tgtJsCPreprocessor)
+    (cmmCpp_prog, cmmCpp_args) = getTool (cmmCppProgram . tgtCmmCPreprocessor)
 
-  platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings
+    platform = getTargetPlatform targetHasLibm target
 
-  let unreg_cc_args = if platformUnregisterised platform
-                      then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
-                      else []
-      cc_args = cc_args0 ++ unreg_cc_args
+    unreg_cc_args = if platformUnregisterised platform
+                    then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
+                    else []
+    cc_args = cc_args0 ++ unreg_cc_args
 
-      -- The extra flags we need to pass gcc when we invoke it to compile .hc code.
-      --
-      -- -fwrapv is needed for gcc to emit well-behaved code in the presence of
-      -- integer wrap around (#952).
-      extraGccViaCFlags = if platformUnregisterised platform
-                            -- configure guarantees cc support these flags
-                            then ["-fwrapv", "-fno-builtin"]
-                            else []
-
-  ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
-  ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
-  ldSupportsSingleModule  <- getBooleanSetting "ld supports single module"
-  mergeObjsSupportsResponseFiles <- getBooleanSetting "Merge objects supports response files"
-  ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
-  arSupportsDashL         <- getBooleanSetting "ar supports -L"
-
+    -- The extra flags we need to pass gcc when we invoke it to compile .hc code.
+    --
+    -- -fwrapv is needed for gcc to emit well-behaved code in the presence of
+    -- integer wrap around (#952).
+    extraGccViaCFlags = if platformUnregisterised platform
+                          -- configure guarantees cc support these flags
+                          then ["-fwrapv", "-fno-builtin"]
+                          else []
 
   -- The package database is either a relative path to the location of the settings file
   -- OR an absolute path.
@@ -148,41 +138,20 @@ initSettings top_dir = do
   -- architecture-specific stuff is done when building Config.hs
   unlit_path <- getToolSetting "unlit command"
 
-  windres_path <- getToolSetting "windres command"
-  ar_path <- getToolSetting "ar command"
-  otool_path <- getToolSetting "otool command"
-  install_name_tool_path <- getToolSetting "install_name_tool command"
-  ranlib_path <- getToolSetting "ranlib command"
-
-  -- HACK, see setPgmP below. We keep 'words' here to remember to fix
-  -- Config.hs one day.
-
-
-  -- Other things being equal, 'as' and 'ld' are simply 'gcc'
-  cc_link_args <- getFlagsSetting "C compiler link flags"
-  let   as_prog  = cc_prog
-        as_args  = map Option cc_args
-        ld_prog  = cc_prog
-        ld_args  = map Option (cc_args ++ cc_link_args)
-  ld_r_prog <- getToolSetting "Merge objects command"
-  ld_r_args <- getFlagsSetting "Merge objects flags"
-  let ld_r
-        | null ld_r_prog = Nothing
-        | otherwise      = Just (ld_r_prog, map Option ld_r_args)
-
-  llvmTarget <- getSetting_raw "LLVM target"
-
-  -- We just assume on command line
-  lc_prog <- getToolSetting "LLVM llc command"
-  lo_prog <- getToolSetting "LLVM opt command"
-  las_prog <- getToolSetting "LLVM llvm-as command"
-  las_args <- map Option <$> getFlagsSetting "LLVM llvm-as flags"
-
-  let iserv_prog = libexec "ghc-iserv"
+  -- Other things being equal, 'as' is simply 'gcc'
+  let (cc_link, cc_link_args) = getTool (ccLinkProgram . tgtCCompilerLink)
+      as_prog      = cc_prog
+      as_args      = map Option cc_args
+      ld_prog      = cc_link
+      ld_args      = map Option (cc_args ++ cc_link_args)
+      ld_r         = do
+        ld_r_prog <- tgtMergeObjs target
+        let (ld_r_path, ld_r_args) = getTool (mergeObjsProgram . const ld_r_prog)
+        pure (ld_r_path, map Option ld_r_args)
+      iserv_prog   = libexec "ghc-iserv"
 
   targetRTSLinkerOnlySupportsSharedLibs <- getBooleanSetting "target RTS linker only supports shared libraries"
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
-  useLibFFI <- getBooleanSetting "Use LibFFI"
 
   baseUnitId <- getSetting_raw "base unit-id"
 
@@ -206,36 +175,38 @@ initSettings top_dir = do
       }
 
     , sToolSettings = ToolSettings
-      { toolSettings_ldSupportsCompactUnwind = ldSupportsCompactUnwind
-      , toolSettings_ldSupportsFilelist      = ldSupportsFilelist
-      , toolSettings_ldSupportsSingleModule  = ldSupportsSingleModule
-      , toolSettings_mergeObjsSupportsResponseFiles = mergeObjsSupportsResponseFiles
-      , toolSettings_ldIsGnuLd               = ldIsGnuLd
-      , toolSettings_ccSupportsNoPie         = gccSupportsNoPie
-      , toolSettings_useInplaceMinGW         = useInplaceMinGW
-      , toolSettings_arSupportsDashL         = arSupportsDashL
-      , toolSettings_cmmCppSupportsG0        = cmmCppSupportsG0
+      { toolSettings_ldSupportsCompactUnwind = ccLinkSupportsCompactUnwind $ tgtCCompilerLink target
+      , toolSettings_ldSupportsFilelist      = ccLinkSupportsFilelist      $ tgtCCompilerLink target
+      , toolSettings_ldSupportsSingleModule  = ccLinkSupportsSingleModule  $ tgtCCompilerLink target
+      , toolSettings_ldIsGnuLd               = ccLinkIsGnu                 $ tgtCCompilerLink target
+      , toolSettings_ccSupportsNoPie         = ccLinkSupportsNoPie         $ tgtCCompilerLink target
+      , toolSettings_mergeObjsSupportsResponseFiles
+                                      = maybe False mergeObjsSupportsResponseFiles
+                                                         $ tgtMergeObjs target
+      , toolSettings_arSupportsDashL  = arSupportsDashL  $ tgtAr target
+      , toolSettings_cmmCppSupportsG0 = cmmCppSupportsG0 $ tgtCmmCPreprocessor target
 
-      , toolSettings_pgm_L   = unlit_path
-      , toolSettings_pgm_P   = (hs_cpp_prog, hs_cpp_args)
-      , toolSettings_pgm_JSP = (js_cpp_prog, js_cpp_args)
-      , toolSettings_pgm_CmmP = (cmmCpp_prog, cmmCpp_args)
-      , toolSettings_pgm_F   = ""
-      , toolSettings_pgm_c   = cc_prog
-      , toolSettings_pgm_cxx = cxx_prog
-      , toolSettings_pgm_cpp = (cpp_prog, cpp_args)
-      , toolSettings_pgm_a   = (as_prog, as_args)
-      , toolSettings_pgm_l   = (ld_prog, ld_args)
-      , toolSettings_pgm_lm  = ld_r
-      , toolSettings_pgm_windres = windres_path
-      , toolSettings_pgm_ar = ar_path
-      , toolSettings_pgm_otool = otool_path
-      , toolSettings_pgm_install_name_tool = install_name_tool_path
-      , toolSettings_pgm_ranlib = ranlib_path
-      , toolSettings_pgm_lo  = (lo_prog,[])
-      , toolSettings_pgm_lc  = (lc_prog,[])
-      , toolSettings_pgm_las = (las_prog, las_args)
-      , toolSettings_pgm_i   = iserv_prog
+      , toolSettings_pgm_L       = unlit_path
+      , toolSettings_pgm_P       = (hs_cpp_prog, map Option hs_cpp_args)
+      , toolSettings_pgm_JSP     = (js_cpp_prog, map Option js_cpp_args)
+      , toolSettings_pgm_CmmP    = (cmmCpp_prog, map Option cmmCpp_args)
+      , toolSettings_pgm_F       = ""
+      , toolSettings_pgm_c       = cc_prog
+      , toolSettings_pgm_cxx     = cxx_prog
+      , toolSettings_pgm_cpp     = (cpp_prog, map Option cpp_args)
+      , toolSettings_pgm_a       = (as_prog, as_args)
+      , toolSettings_pgm_l       = (ld_prog, ld_args)
+      , toolSettings_pgm_lm      = ld_r
+      , toolSettings_pgm_windres = getMaybeToolPath tgtWindres
+      , toolSettings_pgm_ar      = getToolPath (arMkArchive . tgtAr)
+      , toolSettings_pgm_otool   = getMaybeToolPath tgtOtool
+      , toolSettings_pgm_install_name_tool = getMaybeToolPath tgtInstallNameTool
+      , toolSettings_pgm_ranlib  = getMaybeToolPath (fmap ranlibProgram . tgtRanlib)
+      , toolSettings_pgm_lo      = (getMaybeToolPath tgtOpt,[])
+      , toolSettings_pgm_lc      = (getMaybeToolPath tgtLlc,[])
+      , toolSettings_pgm_las     = second (map Option) $
+                                   getTool (fromMaybe (Program "" []) . tgtLlvmAs)
+      , toolSettings_pgm_i       = iserv_prog
       , toolSettings_opt_L       = []
       , toolSettings_opt_P       = []
       , toolSettings_opt_JSP     = []
@@ -260,65 +231,30 @@ initSettings top_dir = do
 
     , sTargetPlatform = platform
     , sPlatformMisc = PlatformMisc
-      { platformMisc_targetPlatformString = targetPlatformString
+      { platformMisc_targetPlatformString = targetPlatformTriple target
       , platformMisc_ghcWithInterpreter = ghcWithInterpreter
-      , platformMisc_libFFI = useLibFFI
-      , platformMisc_llvmTarget = llvmTarget
+      , platformMisc_libFFI = tgtUseLibffiForAdjustors target
+      , platformMisc_llvmTarget = tgtLlvmTarget target
       , platformMisc_targetRTSLinkerOnlySupportsSharedLibs = targetRTSLinkerOnlySupportsSharedLibs
       }
 
     , sRawSettings    = settingsList
+    , sRawTarget      = target
     }
 
-getTargetPlatform
-  :: FilePath     -- ^ Settings filepath (for error messages)
-  -> RawSettings  -- ^ Raw settings file contents
-  -> Either String Platform
-getTargetPlatform settingsFile settings = do
-  let
-    getBooleanSetting = getRawBooleanSetting settingsFile settings
-    readSetting :: (Show a, Read a) => String -> Either String a
-    readSetting = readRawSetting settingsFile settings
-
-  targetArchOS <- getTargetArchOS settingsFile settings
-  targetWordSize <- readSetting "target word size"
-  targetWordBigEndian <- getBooleanSetting "target word big endian"
-  targetLeadingUnderscore <- getBooleanSetting "Leading underscore"
-  targetUnregisterised <- getBooleanSetting "Unregisterised"
-  targetHasGnuNonexecStack <- getBooleanSetting "target has GNU nonexec stack"
-  targetHasIdentDirective <- getBooleanSetting "target has .ident directive"
-  targetHasSubsectionsViaSymbols <- getBooleanSetting "target has subsections via symbols"
-  targetHasLibm <- getBooleanSetting "target has libm"
-  crossCompiling <- getBooleanSetting "cross compiling"
-  tablesNextToCode <- getBooleanSetting "Tables next to code"
-
-  pure $ Platform
-    { platformArchOS    = targetArchOS
-    , platformWordSize  = targetWordSize
-    , platformByteOrder = if targetWordBigEndian then BigEndian else LittleEndian
-    , platformUnregisterised = targetUnregisterised
-    , platformHasGnuNonexecStack = targetHasGnuNonexecStack
-    , platformHasIdentDirective = targetHasIdentDirective
-    , platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
-    , platformIsCrossCompiling = crossCompiling
-    , platformLeadingUnderscore = targetLeadingUnderscore
-    , platformTablesNextToCode  = tablesNextToCode
+getTargetPlatform :: Bool {-^ Does target have libm -} -> Target -> Platform
+getTargetPlatform targetHasLibm Target{..} = Platform
+    { platformArchOS    = tgtArchOs
+    , platformWordSize  = case tgtWordSize of WS4 -> PW4
+                                              WS8 -> PW8
+    , platformByteOrder = tgtEndianness
+    , platformUnregisterised = tgtUnregisterised
+    , platformHasGnuNonexecStack = tgtSupportsGnuNonexecStack
+    , platformHasIdentDirective = tgtSupportsIdentDirective
+    , platformHasSubsectionsViaSymbols = tgtSupportsSubsectionsViaSymbols
+    , platformIsCrossCompiling = not tgtLocallyExecutable
+    , platformLeadingUnderscore = tgtSymbolsHaveLeadingUnderscore
+    , platformTablesNextToCode  = tgtTablesNextToCode
     , platformHasLibm = targetHasLibm
     , platform_constants = Nothing -- will be filled later when loading (or building) the RTS unit
     }
-
--- ----------------------------------------------------------------------------
--- Escape Args helpers
--- ----------------------------------------------------------------------------
-
--- | Just like 'GHC.ResponseFile.escapeArg', but it is not exposed from base.
-escapeArg :: String -> String
-escapeArg = reverse . foldl' escape []
-
-escape :: String -> Char -> String
-escape cs c
-  |    isSpace c
-    || '\\' == c
-    || '\'' == c
-    || '"'  == c = c:'\\':cs -- n.b., our caller must reverse the result
-  | otherwise    = c:cs
