@@ -87,7 +87,7 @@ import Data.Word (Word64)
 import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
 import Unsafe.Coerce
 import qualified GHC.Data.Word64Set as W
-import Data.Bifunctor (second, Bifunctor (bimap))
+import Data.Bifunctor (Bifunctor (bimap))
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -256,8 +256,6 @@ data ModuleGraphNode
   -- | Package dependency
   | UnitNode [UnitId] UnitId
 
-instance Show ModuleGraphNode where
-  show = showSDocUnsafe . ppr
 
 data ModuleNodeEdge = ModuleNodeEdge { edgeLevel :: ImportLevel
                                      , edgeTargetKey :: NodeKey }
