@@ -573,16 +573,32 @@ instance ToJson DiagnosticCode where
 {- Note [Diagnostic Message JSON Schema]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The below instance of ToJson must conform to the JSON schema
-specified in docs/users_guide/diagnostics-as-json-schema-1_1.json.
+specified in docs/users_guide/diagnostics-as-json-schema-latest.json.
 When the schema is altered, please bump the version.
 If the content is altered in a backwards compatible way,
 update the minor version (e.g. 1.3 ~> 1.4).
 If the content is breaking, update the major version (e.g. 1.3 ~> 2.0).
-When updating the schema, replace the above file and name it appropriately with
-the version appended, and change the documentation of the -fdiagnostics-as-json
-flag to reflect the new schema.
-To learn more about JSON schemas, check out the below link:
-https://json-schema.org
+
+To update to the next minor version:
+
+1. Update `schemaVersion`:
+
+    schemaVersion = "1.2"
+
+2. Create a symlink for the new schema version:
+
+    cp --remove-destination docs/users_guide/diagnostics-as-json-schema-latest.json docs/users_guide/diagnostics-as-json-schema-1_1.json
+    ln -s diagnostics-as-json-schema-latest.json docs/users_guide/diagnostics-as-json-schema-1_2.json
+    git add docs/users_guide/diagnostics-as-json-schema-*
+
+3. Update the schema path in the User's Guide:
+
+    sed -i s/schema-1_1/schema-1_2/ docs/users_guide/using.rst
+
+4. Add your schema changes to `docs/users_guide/diagnostics-as-json-schema-latest.json`.
+
+5. Update this instructions.
+
 -}
 
 schemaVersion :: String
