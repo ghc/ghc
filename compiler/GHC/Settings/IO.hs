@@ -1,4 +1,4 @@
-
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -16,14 +16,12 @@ import GHC.Utils.CliOption
 import GHC.Utils.Fingerprint
 import GHC.Platform
 import GHC.Utils.Panic
-import GHC.ResponseFile
 import GHC.Settings
 import GHC.SysTools.BaseDir
 import GHC.Unit.Types
 
 import Control.Monad.Trans.Except
 import Control.Monad.IO.Class
-import Data.Char
 import qualified Data.Map as Map
 import System.FilePath
 import System.Directory
@@ -31,6 +29,7 @@ import System.Directory
 import GHC.Toolchain.Program
 import GHC.Toolchain
 import GHC.Data.Maybe
+import Data.Bifunctor (Bifunctor(second))
 
 data SettingsError
   = SettingsError_MissingData String
@@ -146,14 +145,14 @@ initSettings top_dir = do
   unlit_path <- getToolSetting "unlit command"
 
   -- Other things being equal, 'as' is simply 'gcc'
-  let cc_link_args = getToolFlags (ccLinkProgram . tgtCCompilerLink)
+  let (cc_link, cc_link_args) = getTool (ccLinkProgram . tgtCCompilerLink)
       as_prog      = cc_prog
       as_args      = map Option cc_args
-      ld_prog      = getToolFlags (ccLinkProgram . tgtCCompilerLink)
+      ld_prog      = cc_link
       ld_args      = map Option (cc_args ++ cc_link_args)
       ld_r         = do
         ld_r_prog <- tgtMergeObjs target
-        let (ld_r_path, ld_r_args) = getTool (const ld_r_prog)
+        let (ld_r_path, ld_r_args) = getTool (mergeObjsProgram . const ld_r_prog)
         pure (ld_r_path, map Option ld_r_args)
       iserv_prog   = libexec "ghc-iserv"
 
@@ -212,7 +211,8 @@ initSettings top_dir = do
       , toolSettings_pgm_ranlib  = getMaybeToolPath (fmap ranlibProgram . tgtRanlib)
       , toolSettings_pgm_lo      = (getMaybeToolPath tgtOpt,[])
       , toolSettings_pgm_lc      = (getMaybeToolPath tgtLlc,[])
-      , toolSettings_pgm_las     = getTool (fromMaybe (Program "" []) . tgtLlvmAs)
+      , toolSettings_pgm_las     = second (map Option) $
+                                   getTool (fromMaybe (Program "" []) . tgtLlvmAs)
       , toolSettings_pgm_i       = iserv_prog
       , toolSettings_opt_L       = []
       , toolSettings_opt_P       = []
@@ -251,7 +251,8 @@ initSettings top_dir = do
 getTargetPlatform :: Bool {-^ Does target have libm -} -> Target -> Platform
 getTargetPlatform targetHasLibm Target{..} = Platform
     { platformArchOS    = tgtArchOs
-    , platformWordSize  = tgtWordSize
+    , platformWordSize  = case tgtWordSize of WS4 -> PW4
+                                              WS8 -> PW8
     , platformByteOrder = tgtEndianness
     , platformUnregisterised = tgtUnregisterised
     , platformHasGnuNonexecStack = tgtSupportsGnuNonexecStack
