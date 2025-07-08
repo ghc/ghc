@@ -58,7 +58,7 @@ packages: ./compiler
 constraints: ghc +internal-interpreter +dynamic-system-linke,
              ghc-bin +internal-interpreter +threaded,
              ghci +internal-interpreter,
-             haddock +in-ghc-tree,
+             haddock-api +in-ghc-tree,
              any.array installed,
              any.base installed,
              any.deepseq installed,
