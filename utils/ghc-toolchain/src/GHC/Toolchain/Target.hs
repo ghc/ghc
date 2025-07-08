@@ -1,7 +1,17 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NamedFieldPuns #-}
-module GHC.Toolchain.Target where
+module GHC.Toolchain.Target
+  (
+    -- * A Toolchain Target
+    Target(..), targetPlatformTriple
 
+  , WordSize(..), wordSize2Bytes
+
+    -- * Re-exports
+  , ByteOrder(..)
+  ) where
+
+import GHC.ByteOrder
 import GHC.Platform.ArchOS
 
 import GHC.Toolchain.Prelude
@@ -19,9 +29,6 @@ import GHC.Toolchain.Tools.MergeObjs
 data WordSize = WS4 | WS8
     deriving (Show, Read, Eq, Ord)
 
-data Endianness = LittleEndian | BigEndian
-    deriving (Show, Read, Eq, Ord)
-
 -- | A 'Target' consists of:
 --
 -- * a target architecture and operating system
@@ -36,7 +43,7 @@ data Target = Target
     , tgtSupportsSubsectionsViaSymbols :: Bool
     , tgtSupportsIdentDirective :: Bool
     , tgtWordSize :: WordSize
-    , tgtEndianness :: Endianness
+    , tgtEndianness :: ByteOrder
     , tgtSymbolsHaveLeadingUnderscore :: Bool
     , tgtLlvmTarget :: String
 
