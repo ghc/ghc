@@ -1552,7 +1552,7 @@ wrapAction msg_wrapper hsc_env k = do
                         -- ThreadKilled in particular needs to actually kill the thread.
                         -- So rethrow that and the other async exceptions
                         Just (err :: SomeAsyncException) -> throwIO err
-                        _ -> errorMsg lcl_logger (text (show exc))
+                        _ -> reportError lcl_logger neverQualify emptyDiagOpts noSrcSpan (text (show exc))
         return Nothing
 
 
