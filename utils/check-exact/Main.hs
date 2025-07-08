@@ -3,6 +3,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_GHC -Wno-x-internalDebugShowMessages #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -11,14 +12,11 @@
 import Data.Data
 import Data.List (intercalate)
 import GHC hiding (moduleName)
-import GHC.Driver.Errors.Types
 import GHC.Driver.Ppr
 import GHC.Hs.Dump
-import GHC.Types.Error
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC.Utils.Error
-import GHC.Utils.Outputable
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
@@ -369,18 +367,10 @@ parseOneFile :: FilePath -> FilePath -> IO (ParsedSource, [Located Token])
 parseOneFile libdir fileName = do
   res <- parseModuleEpAnnsWithCpp libdir defaultCppOptions fileName
   case res of
-    Left m -> error (showErrorMessages m)
+    Left m -> error (internalDebugShowMessages m)
     Right (injectedComments, _dflags, pmod) -> do
       let !pmodWithComments = insertCppComments pmod injectedComments
       return (pmodWithComments, [])
-
-showErrorMessages :: Messages GhcMessage -> String
-showErrorMessages msgs =
-  renderWithContext defaultSDocContext
-    $ vcat
-    $ pprMsgEnvelopeBagWithLocDefault
-    $ getMessages
-    $ msgs
 
 -- ---------------------------------------------------------------------
 

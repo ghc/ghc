@@ -9,7 +9,6 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as BS
 import Data.List (isPrefixOf, isSuffixOf)
-import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (mkFastString)
 import GHC.Data.StringBuffer (StringBuffer, atEnd)
 import GHC.Parser.Errors.Ppr ()
@@ -26,10 +25,7 @@ import GHC.Parser.Lexer as Lexer
 import qualified GHC.Types.Error as E
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
-import GHC.Utils.Error (pprLocMsgEnvelopeDefault)
-import GHC.Utils.Outputable (SDocContext, text, ($$))
-import qualified GHC.Utils.Outputable as Outputable
-import GHC.Utils.Panic (panic)
+import GHC.Utils.Error (panicMessage)
 
 import Haddock.Backends.Hyperlinker.Types as T
 import Haddock.GhcUtils
@@ -40,19 +36,14 @@ import Haddock.GhcUtils
 -- whitespace, and CPP).
 parse
   :: ParserOpts
-  -> SDocContext
   -> FilePath
   -- ^ Path to the source of this module
   -> BS.ByteString
   -- ^ Raw UTF-8 encoded source of this module
   -> [T.Token]
-parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
+parse parserOpts fpath bs = case unP (go False []) initState of
   POk _ toks -> reverse toks
-  PFailed pst ->
-    let err : _ = bagToList (E.getMessages $ getPsErrorMessages pst)
-     in panic $
-          Outputable.renderWithContext sDocContext $
-            text "Hyperlinker parse error:" $$ pprLocMsgEnvelopeDefault err
+  PFailed pst -> panicMessage "Hyperlinker parse error:" (E.getMessages $ getPsErrorMessages pst)
   where
     initState = initParserState parserOpts buf start
     buf = stringBufferFromByteString bs

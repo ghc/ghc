@@ -404,7 +404,7 @@ initTcDsForSolver thing_inside
          thing_inside
        ; case mb_ret of
            Just ret -> pure ret
-           Nothing  -> pprPanic "initTcDsForSolver" (vcat $ pprMsgEnvelopeBagWithLocDefault (getErrorMessages msgs)) }
+           Nothing  -> panicMessage "initTcDsForSolver" (getErrorMessages msgs) }
 
 mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> TcMPluginsRun

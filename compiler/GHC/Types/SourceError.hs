@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-x-internalDebugShowMessages #-}
 -- | Source errors
 module GHC.Types.SourceError
    ( SourceError (..)
@@ -16,8 +17,7 @@ import GHC.Types.Error
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Exception
-import GHC.Utils.Error (pprMsgEnvelopeBagWithLocDefault, DiagOpts, diag_ppr_ctx)
-import GHC.Utils.Outputable
+import GHC.Utils.Error (internalDebugShowMessages, DiagOpts)
 
 import GHC.Driver.Config.Diagnostic (initDiagOpts, initPrintConfig)
 import GHC.Driver.DynFlags (DynFlags, HasDynFlags (getDynFlags))
@@ -73,15 +73,12 @@ initSourceErrorContext dflags =
   in SEC diag_opts print_config
 
 instance Show SourceError where
-  -- We implement 'Show' because it's required by the 'Exception' instance, but diagnostics
-  -- shouldn't be shown via the 'Show' typeclass, but rather rendered using the ppr functions.
+  -- We implement 'Show' because it's required by the 'Exception' instance, but
+  -- diagnostics must not be shown via 'Show', but instead reported via
+  -- `GHC.Driver.Errors.printMessages`.
+  --
   -- This also explains why there is no 'Show' instance for a 'MsgEnvelope'.
-  show (SourceError (SEC diag_opts _) msgs) =
-      renderWithContext (diag_ppr_ctx diag_opts)
-    . vcat
-    . pprMsgEnvelopeBagWithLocDefault
-    . getMessages
-    $ msgs
+  show (SourceError _ msgs) = internalDebugShowMessages msgs
 
 instance Exception SourceError
 

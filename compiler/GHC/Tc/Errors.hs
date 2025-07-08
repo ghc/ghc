@@ -71,7 +71,7 @@ import GHC.Core.TyCo.FVs
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
 
-import GHC.Utils.Error  (diagReasonSeverity,  pprLocMsgEnvelope )
+import GHC.Utils.Error  (diagReasonSeverity, deferredTypeErrorMessage )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as O
 import GHC.Utils.Panic
@@ -1395,9 +1395,8 @@ mkErrorTerm ct_loc ty ctxt msg supp hints
                   hints
          -- This will be reported at runtime, so we always want "error:" in the report, never "warning:"
        ; dflags <- getDynFlags
-       ; let err_msg = pprLocMsgEnvelope (initTcMessageOpts dflags) msg
-             err_str = showSDoc dflags $
-                       err_msg $$ text "(deferred type error)"
+       ; let err_msg = deferredTypeErrorMessage (initTcMessageOpts dflags) msg
+             err_str = showSDoc dflags err_msg
 
        ; return $ evDelayedError ty err_str }
 

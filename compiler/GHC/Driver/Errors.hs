@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-x-InternalMCDiagnostic #-}
 module GHC.Driver.Errors (
     reportError
   , reportDiagnostic
@@ -66,7 +67,7 @@ printMessage logger msg_opts opts message
     doc = updSDocContext (\_ -> ctx) (messageWithHints diagnostic)
 
     messageClass :: MessageClass
-    messageClass = MCDiagnostic severity (errMsgReason message) (diagnosticCode diagnostic)
+    messageClass = InternalMCDiagnostic severity (errMsgReason message) (diagnosticCode diagnostic)
 
     style :: PprStyle
     style = mkErrStyle (errMsgContext message)

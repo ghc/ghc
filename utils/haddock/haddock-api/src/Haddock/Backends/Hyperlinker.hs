@@ -97,7 +97,7 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
       mast
         | M.size asts == 1 = snd <$> M.lookupMin asts
         | otherwise = M.lookup (HiePath (mkFastString file)) asts
-      tokens' = parse parserOpts sDocContext file rawSrc
+      tokens' = parse parserOpts file rawSrc
       ast = fromMaybe (emptyHieAst fileFs) mast
       fullAst = recoverFullIfaceTypes sDocContext types ast
 

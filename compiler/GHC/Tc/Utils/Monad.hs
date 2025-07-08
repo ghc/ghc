@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-x-internalDebugPprMsgEnvelope #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -1432,7 +1433,7 @@ reportDiagnostics = mapM_ reportDiagnostic
 
 reportDiagnostic :: MsgEnvelope TcRnMessage -> TcRn ()
 reportDiagnostic msg
-  = do { traceTc "Adding diagnostic:" (pprLocMsgEnvelopeDefault msg) ;
+  = do { traceTc "Adding diagnostic:" (internalDebugPprMsgEnvelope msg) ;
          errs_var <- getErrsVar ;
          msgs     <- readTcRef errs_var ;
          writeTcRef errs_var (msg `addMessage` msgs) }

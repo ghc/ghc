@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-x-internalDebugShowMessages #-}
 -- | This module provides support for CPP, interpreter directives and line
 -- pragmas.
 module Preprocess
@@ -26,13 +27,11 @@ import qualified GHC.Driver.Phases     as GHC
 import qualified GHC.Driver.Pipeline   as GHC
 import qualified GHC.Parser.Lexer      as GHC
 import qualified GHC.Settings          as GHC
-import qualified GHC.Types.Error       as GHC
 import qualified GHC.Types.SourceError as GHC
 import qualified GHC.Types.SourceFile  as GHC
 import qualified GHC.Types.SrcLoc      as GHC
 import qualified GHC.Utils.Error       as GHC
 import qualified GHC.Utils.Fingerprint as GHC
-import qualified GHC.Utils.Outputable  as GHC
 import GHC.Types.SrcLoc (mkSrcSpan, mkSrcLoc)
 import GHC.Data.FastString (mkFastString)
 
@@ -216,19 +215,11 @@ getPreprocessedSrcDirectPrim cppOptions src_fn = do
       new_env = hsc_env { GHC.hsc_dflags = injectCppOptions cppOptions dfs }
   r <- GHC.liftIO $ GHC.preprocess new_env src_fn Nothing (Just (GHC.Cpp GHC.HsSrcFile))
   case r of
-    Left err -> error $ showErrorMessages err
+    Left err -> error $ GHC.internalDebugShowMessages err
     Right (dflags', hspp_fn) -> do
       buf <- GHC.liftIO $ GHC.hGetStringBuffer hspp_fn
       txt <- GHC.liftIO $ readFileGhc hspp_fn
       return (txt, buf, dflags')
-
-showErrorMessages :: GHC.Messages GHC.DriverMessage -> String
-showErrorMessages msgs =
-  GHC.renderWithContext GHC.defaultSDocContext
-    $ GHC.vcat
-    $ GHC.pprMsgEnvelopeBagWithLocDefault
-    $ GHC.getMessages
-    $ msgs
 
 injectCppOptions :: CppOptions -> GHC.DynFlags -> GHC.DynFlags
 injectCppOptions CppOptions{..} dflags = folded_opt

@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-x-internalDebugShowMessages #-}
 module GHCi.UI.Exception
   ( GhciCommandError(..)
   , throwGhciCommandError
@@ -51,15 +52,12 @@ newtype GhciCommandError =  GhciCommandError (Messages GhciMessage)
 instance Exception GhciCommandError
 
 instance Show GhciCommandError where
-  -- We implement 'Show' because it's required by the 'Exception' instance, but diagnostics
-  -- shouldn't be shown via the 'Show' typeclass, but rather rendered using the ppr functions.
+  -- We implement 'Show' because it's required by the 'Exception' instance, but
+  -- diagnostics must not be shown via 'Show', but instead reported via
+  -- `GHC.Driver.Errors.printMessages`.
+  --
   -- This also explains why there is no 'Show' instance for a 'MsgEnvelope'.
-  show (GhciCommandError msgs) =
-      renderWithContext defaultSDocContext
-    . vcat
-    . pprMsgEnvelopeBagWithLocDefault
-    . getMessages
-    $ msgs
+  show (GhciCommandError msgs) = internalDebugShowMessages msgs
 
 -- | Perform the given action and call the exception handler if the action
 -- throws a 'GhciCommandError'.  See 'GhciCommandError' for more information.

@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
+{-# OPTIONS_GHC -Wwarn=x-internalPprMessages #-}
 
 -------------------------------------------------------------------------------
 -- | Aspects of GHC.Driver.Main dealing with running particular passes.
@@ -1401,9 +1402,15 @@ markUnsafeInfer tcg_env whyUnsafe = do
     whyUnsafe' df = vcat [ quotes pprMod <+> text "has been inferred as unsafe!"
                          , text "Reason:"
                          , nest 4 $ (vcat $ badFlags df) $+$
-                                    -- MP: Using defaultDiagnosticOpts here is not right but it's also not right to handle these
-                                    -- unsafety error messages in an unstructured manner.
-                                    (vcat $ pprMsgEnvelopeBagWithLoc (defaultDiagnosticOpts @e) (getMessages whyUnsafe)) $+$
+
+                                    -- FIXME: `GHC.Utils.Error.internalPprMessages` is an
+                                    -- internal function!
+                                    --
+                                    -- Use `GHC.Driver.Errors.printMessages` to report the
+                                    -- diagnostics here and remove `internalPprMessages`
+                                    -- from the export list of "GHC.Utils.Error".
+                                    (vcat $ internalPprMessages (getMessages whyUnsafe)) $+$
+
                                     (vcat $ badInsts $ tcg_insts tcg_env)
                          ]
     badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer

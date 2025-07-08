@@ -1,5 +1,7 @@
 {-# LANGUAGE ViewPatterns    #-}
 
+{-# OPTIONS_GHC -Wno-x-InternalMCDiagnostic #-}
+
 {-
 (c) The AQUA Project, Glasgow University, 1994-1998
 
@@ -22,10 +24,11 @@ module GHC.Utils.Error (
         errorsFound, isEmptyMessages,
 
         -- ** Formatting
-        pprMessageBag, pprMsgEnvelopeBagWithLoc, pprMsgEnvelopeBagWithLocDefault,
-        pprMessages,
-        pprLocMsgEnvelope, pprLocMsgEnvelopeDefault,
-        formatBulleted,
+        pprMessageBag, formatBulleted,
+        deferredTypeErrorMessage,
+        panicMessage, internalDebugShowMessages, internalDebugPprMsgEnvelope,
+
+        internalPprMessages, -- FIXME: remove this export
 
         -- ** Construction
         DiagOpts (..), emptyDiagOpts, diag_wopt, diag_fatal_wopt,
@@ -265,29 +268,40 @@ formatBulleted (unDecorated -> docs)
     msgs ctx = filter (not . Outputable.isEmpty ctx) docs
     starred = (bullet<+>)
 
-pprMessages :: Diagnostic e => DiagnosticOpts e -> Messages e -> SDoc
-pprMessages e = vcat . pprMsgEnvelopeBagWithLoc e . getMessages
+deferredTypeErrorMessage :: Diagnostic e => DiagnosticOpts e -> MsgEnvelope e -> SDoc
+deferredTypeErrorMessage opts msg = internalPprMessage opts msg $$ text "(deferred type error)"
 
-pprMsgEnvelopeBagWithLoc :: Diagnostic e => DiagnosticOpts e -> Bag (MsgEnvelope e) -> [SDoc]
-pprMsgEnvelopeBagWithLoc e bag = [ pprLocMsgEnvelope e item | item <- sortMsgBag Nothing bag ]
+panicMessage :: Diagnostic e => String -> Bag (MsgEnvelope e) -> a
+panicMessage name msgs = pprPanic name (vcat $ internalPprMessages msgs)
 
--- | Print the messages with the suitable default configuration, usually not what you want but sometimes you don't really
--- care about what the configuration is (for example, if the message is in a panic).
-pprMsgEnvelopeBagWithLocDefault :: forall e . Diagnostic e => Bag (MsgEnvelope e) -> [SDoc]
-pprMsgEnvelopeBagWithLocDefault bag = [ pprLocMsgEnvelopeDefault item | item <- sortMsgBag Nothing bag ]
+{-# WARNING in "x-internalDebugShowMessages" internalDebugShowMessages
+    "Don't use this function for reporting diagnostics!  Use `GHC.Driver.Errors.printMessages` instead." #-}
+internalDebugShowMessages :: Diagnostic e => Messages e -> String
+internalDebugShowMessages =
+    renderWithContext defaultSDocContext
+  . vcat
+  . internalPprMessages
+  . getMessages
 
-pprLocMsgEnvelopeDefault :: forall e . Diagnostic e => MsgEnvelope e -> SDoc
-pprLocMsgEnvelopeDefault = pprLocMsgEnvelope (defaultDiagnosticOpts @e)
+{-# WARNING in "x-internalDebugPprMsgEnvelope" internalDebugPprMsgEnvelope
+    "Don't use this function for reporting diagnostics!  Use `GHC.Driver.Errors.printMessage` instead." #-}
+internalDebugPprMsgEnvelope :: forall e. Diagnostic e => MsgEnvelope e -> SDoc
+internalDebugPprMsgEnvelope = internalPprMessage (defaultDiagnosticOpts @e)
 
-pprLocMsgEnvelope :: Diagnostic e => DiagnosticOpts e -> MsgEnvelope e -> SDoc
-pprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan       = s
+{-# WARNING in "x-internalPprMessages" internalPprMessages
+    "Don't use this function for new code! It sidesteps the structured error machinery. Use `GHC.Driver.Errors.printMessages` instead." #-}
+internalPprMessages :: forall e . Diagnostic e => Bag (MsgEnvelope e) -> [SDoc]
+internalPprMessages = map (internalPprMessage (defaultDiagnosticOpts @e)) . sortMsgBag Nothing
+
+internalPprMessage :: Diagnostic e => DiagnosticOpts e -> MsgEnvelope e -> SDoc
+internalPprMessage opts (MsgEnvelope { errMsgSpan        = s
                                     , errMsgDiagnostic = e
                                     , errMsgSeverity   = sev
                                     , errMsgContext    = name_ppr_ctx
                                     , errMsgReason     = reason })
   = withErrStyle name_ppr_ctx $
       mkLocMessage
-        (MCDiagnostic sev reason (diagnosticCode e))
+        (InternalMCDiagnostic sev reason (diagnosticCode e))
         s
         (formatBulleted $ diagnosticMessage opts e)
 
