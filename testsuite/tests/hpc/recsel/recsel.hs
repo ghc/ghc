@@ -10,7 +10,8 @@ import Trace.Hpc.Tix
 import Trace.Hpc.Reflect
 
 data Foo = Foo { fooA, fooB, fooC, fooD, fooE, fooF, fooG, fooH, fooI
-               , fooJ, fooK, fooL, fooM, fooN, fooO :: Int }
+               , fooJ, fooK, fooL, fooM, fooN, fooO :: Int
+               , fooP, fooQ :: Maybe Int }
 data Bar = Bar { barFoo :: Foo }
 
 fAB Foo{..} = fooA + fooB
@@ -35,14 +36,17 @@ fL = runIdentity . runKleisli (proc f -> do
 fM f | Foo{..} <- f = fooM
 fN f = fooN f
 fO = runIdentity . runKleisli (proc Foo{..} -> returnA -< fooO)
+fP Foo{fooP = Just x} = x
+fP _ = 0
+fQ Foo{fooQ = Just 42} = 1
 
 recSel (n, TopLevelBox [s]) | any (`isPrefixOf` s) ["foo", "bar"] = Just (n, s)
 recSel _ = Nothing
 
 main = do
-  let foo = Foo 42 23 0 1 2 3 4 5 6 7 0xaffe 9 10 11 12
+  let foo = Foo 42 23 0 1 2 3 4 5 6 7 0xaffe 9 10 11 12 (Just 13) (Just 42)
   mapM_ (print . ($ foo))
-        [fAB, fC, fD False, fE . Bar, fF, fG, fH, fI, fJ, fK, fL, fM, fN, fO]
+        [fAB, fC, fD False, fE . Bar, fF, fG, fH, fI, fJ, fK, fL, fM, fN, fO, fP, fQ]
   (Mix _ _ _ _ mixs) <- readMix [".hpc"] (Left "Main")
   let sels = mapMaybe recSel . zip [0..] $ map snd mixs
   (Tix [TixModule "Main" _ _ tix]) <- examineTix
