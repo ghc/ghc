@@ -43,6 +43,7 @@ import GHC.Settings
 import GHC.Platform
 import GHC.Platform.Ways
 
+import GHC.Driver.Errors
 import GHC.Driver.Phases
 import GHC.Driver.Env
 import GHC.Driver.Session
@@ -50,7 +51,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Finder
 
-import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Monad hiding (reportDiagnostic)
 
 import GHC.Runtime.Interpreter
 import GHCi.BreakArray
@@ -1307,9 +1308,9 @@ load_dyn interp hsc_env crash_early dll = do
         then cmdLineErrorIO err
         else do
           when (diag_wopt Opt_WarnMissedExtraSharedLib diag_opts)
-            $ logMsg logger
-                (mkMCDiagnostic diag_opts (WarningWithFlag Opt_WarnMissedExtraSharedLib) Nothing)
-                  noSrcSpan $ withPprStyle defaultUserStyle (note err)
+            $ reportDiagnostic logger
+                neverQualify diag_opts
+                  noSrcSpan (WarningWithFlag Opt_WarnMissedExtraSharedLib) $ withPprStyle defaultUserStyle (note err)
           pure Nothing
   where
     diag_opts = initDiagOpts (hsc_dflags hsc_env)
@@ -1497,8 +1498,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
       , not loading_dynamic_hs_libs
       , interpreterProfiled interp
       = do
-          let diag = mkMCDiagnostic diag_opts WarningWithoutFlag Nothing
-          logMsg logger diag noSrcSpan $ withPprStyle defaultErrStyle $
+          reportDiagnostic logger neverQualify diag_opts noSrcSpan WarningWithoutFlag $ withPprStyle defaultErrStyle $
             text "Interpreter failed to load profiled static library" <+> text lib <> char '.' $$
               text " \tTrying dynamic library instead. If this fails try to rebuild" <+>
               text "libraries with profiling support."
