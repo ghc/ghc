@@ -23,7 +23,6 @@ module GHC.Settings
   , sMergeObjsSupportsResponseFiles
   , sLdIsGnuLd
   , sGccSupportsNoPie
-  , sUseInplaceMinGW
   , sArSupportsDashL
   , sPgm_L
   , sPgm_P
@@ -75,6 +74,7 @@ import GHC.Utils.CliOption
 import GHC.Utils.Fingerprint
 import GHC.Platform
 import GHC.Unit.Types
+import GHC.Toolchain.Target
 
 data Settings = Settings
   { sGhcNameVersion    :: {-# UNPACk #-} !GhcNameVersion
@@ -87,6 +87,10 @@ data Settings = Settings
   -- You shouldn't need to look things up in rawSettings directly.
   -- They should have their own fields instead.
   , sRawSettings       :: [(String, String)]
+
+  -- Store the target to print out information about the raw target description
+  -- (e.g. in --info)
+  , sRawTarget         :: Target
   }
 
 data UnitSettings = UnitSettings { unitSettings_baseUnitId :: !UnitId }
@@ -102,7 +106,6 @@ data ToolSettings = ToolSettings
   , toolSettings_mergeObjsSupportsResponseFiles :: Bool
   , toolSettings_ldIsGnuLd               :: Bool
   , toolSettings_ccSupportsNoPie         :: Bool
-  , toolSettings_useInplaceMinGW         :: Bool
   , toolSettings_arSupportsDashL         :: Bool
   , toolSettings_cmmCppSupportsG0        :: Bool
 
@@ -221,8 +224,6 @@ sLdIsGnuLd :: Settings -> Bool
 sLdIsGnuLd = toolSettings_ldIsGnuLd . sToolSettings
 sGccSupportsNoPie :: Settings -> Bool
 sGccSupportsNoPie = toolSettings_ccSupportsNoPie . sToolSettings
-sUseInplaceMinGW :: Settings -> Bool
-sUseInplaceMinGW = toolSettings_useInplaceMinGW . sToolSettings
 sArSupportsDashL :: Settings -> Bool
 sArSupportsDashL = toolSettings_arSupportsDashL . sToolSettings
 

@@ -89,8 +89,9 @@ AC_ARG_ENABLE(distro-toolchain,
 [AS_HELP_STRING([--enable-distro-toolchain],
                 [Do not use bundled Windows toolchain binaries.])],
   [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableDistroToolchain])],
-  [EnableDistroToolchain=@SettingsUseDistroMINGW@]
+  [EnableDistroToolchain=@EnableDistroToolchain@]
 )
+AC_SUBST([EnableDistroToolchain])
 
 if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
   FP_SETUP_WINDOWS_TOOLCHAIN([$hardtop/mingw/], [\$\$topdir/../mingw/])
@@ -384,8 +385,6 @@ fi
 
 AC_SUBST(BaseUnitId)
 
-FP_SETTINGS
-
 # We get caught by
 #     http://savannah.gnu.org/bugs/index.php?1516
 #     $(eval ...) inside conditionals causes errors
@@ -417,6 +416,34 @@ AC_CONFIG_FILES([mk/hsc2hs])
 AC_OUTPUT
 
 VALIDATE_GHC_TOOLCHAIN([default.target],[default.target.ghc-toolchain])
+
+if test "$EnableDistroToolchain" = "YES"; then
+    # If the user specified --enable-distro-toolchain then we just use the
+    # executable names, not paths. We do this by finding strings of paths to
+    # programs and keeping the basename only:
+    cp default.target default.target.bak
+
+    while IFS= read -r line; do
+      if echo "$line" | grep -q 'prgPath = "'; then
+        path=$(echo "$line" | sed -E 's/.*prgPath = "([[^"]]+)".*/\1/')
+        base=$(basename "$path")
+        echo "$line" | sed "s|$path|$base|"
+      else
+        echo "$line"
+      fi
+    done < default.target.bak > default.target
+    echo "Applied --enable-distro-toolchain basename substitution to default.target:"
+    cat default.target
+fi
+
+if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"; then
+    # Handle the Windows toolchain installed in FP_SETUP_WINDOWS_TOOLCHAIN.
+    # We need to issue a substitution to use $tooldir,
+    # See Note [tooldir: How GHC finds mingw on Windows]
+    SUBST_TOOLDIR([default.target])
+    echo "Applied tooldir substitution to default.target:"
+    cat default.target
+fi
 
 rm -Rf acargs acghc-toolchain actmp-ghc-toolchain
 

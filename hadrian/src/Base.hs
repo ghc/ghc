@@ -151,6 +151,7 @@ ghcLibDeps stage iplace = do
         , "llvm-passes"
         , "ghc-interp.js"
         , "settings"
+        , "targets" -/- "default.target"
         , "ghc-usage.txt"
         , "ghci-usage.txt"
         , "dyld.mjs"
