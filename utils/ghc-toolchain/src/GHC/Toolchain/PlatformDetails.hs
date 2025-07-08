@@ -44,11 +44,11 @@ checkWordSize cc = checking "word size" $ do
         , "#endif"
         ]
 
-checkEndianness :: Cc -> M Endianness
+checkEndianness :: Cc -> M ByteOrder
 checkEndianness cc = do
     checkEndiannessParamH cc <|> checkEndiannessLimitsH cc <|> checkEndianness__BYTE_ORDER__ cc
 
-checkEndiannessParamH :: Cc -> M Endianness
+checkEndiannessParamH :: Cc -> M ByteOrder
 checkEndiannessParamH cc = checking "endianness (param.h)" $ do
     output <- preprocess cc prog
     case reverse $ lines output of
@@ -72,7 +72,7 @@ checkEndiannessParamH cc = checking "endianness (param.h)" $ do
         , "#endif"
         ]
 
-checkEndiannessLimitsH :: Cc -> M Endianness
+checkEndiannessLimitsH :: Cc -> M ByteOrder
 checkEndiannessLimitsH cc = checking "endianness (limits.h)" $ do
     out <- preprocess cc prog
     case reverse $ lines out of
@@ -92,7 +92,7 @@ checkEndiannessLimitsH cc = checking "endianness (limits.h)" $ do
         , "#endif"
         ]
 
-checkEndianness__BYTE_ORDER__ :: Cc -> M Endianness
+checkEndianness__BYTE_ORDER__ :: Cc -> M ByteOrder
 checkEndianness__BYTE_ORDER__ cc = checking "endianness (__BYTE_ORDER__)" $ do
     out <- preprocess cc prog
     case reverse $ lines out of
