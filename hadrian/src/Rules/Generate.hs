@@ -484,7 +484,6 @@ generateSettings settingsFile = do
 
     settings <- traverse sequence $
         [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
         , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
         , ("Use inplace MinGW toolchain", expr $ lookupSystemConfig "settings-use-distro-mingw")
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs)
