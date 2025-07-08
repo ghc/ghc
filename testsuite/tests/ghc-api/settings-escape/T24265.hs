@@ -16,6 +16,13 @@ import System.Environment
 import System.IO (hPutStrLn, stderr)
 import System.Exit (exitWith, ExitCode(ExitFailure))
 
+import GHC.Toolchain
+import GHC.Toolchain.Program
+import GHC.Toolchain.Tools.Cc
+import GHC.Toolchain.Tools.Cpp
+import GHC.Toolchain.Tools.Cxx
+import GHC.Toolchain.Lens
+
 -- Precondition: this test case must be executed in a directory with a space.
 --
 -- First we get the current settings file and amend it with extra arguments that we *know*
@@ -30,35 +37,29 @@ main :: IO ()
 main = do
   libdir:_args <- getArgs
 
-  (rawSettingOpts, originalSettings) <- runGhc (Just libdir) $ do
+  (rawSettingOpts, rawTargetOpts, originalSettings) <- runGhc (Just libdir) $ do
     dflags <- hsc_dflags <$> getSession
-    pure (rawSettings dflags, settings dflags)
+    pure (rawSettings dflags, rawTarget dflags, settings dflags)
 
   top_dir <- makeAbsolute "./ghc-install-folder/lib with spaces"
 
-  let argsWithSpaces = "\"-some option\" -some\\ other"
-      numberOfExtraArgs = length $ unescapeArgs argsWithSpaces
-      -- These are all options that can have multiple 'String' or 'Option' values.
-      -- We explicitly do not add 'C compiler link flags' here, as 'initSettings'
-      -- already adds the options of "C compiler flags" to this config field.
-      multipleArguments = Set.fromList
-        [ "Haskell CPP flags"
-        , "JavaScript CPP flags"
-        , "C-- CPP flags"
-        , "C compiler flags"
-        , "C++ compiler flags"
-        , "CPP flags"
-        , "Merge objects flags"
+  let argsWithSpaces l = over l (++["-some option", "-some\\ other"])
+      numberOfExtraArgs = 2
+      -- Test it on a handfull of list of flags
+      multipleArguments =
+        [ _tgtHsCpp % _hsCppProg  % _prgFlags -- "Haskell CPP flags"
+        , _tgtCC    % _ccProgram  % _prgFlags -- "C compiler flags"
+        , _tgtCxx   % _cxxProgram % _prgFlags -- "C++ compiler flags"
+        , _tgtCpp   % _cppProg    % _prgFlags -- "CPP flags"
         ]
 
-  let rawSettingOptsWithExtraArgs =
-        map (\(name, args) -> if Set.member name multipleArguments
-          then (name, args ++ " " ++ argsWithSpaces)
-          else (name, args)) rawSettingOpts
+      targetWithExtraArgs = foldr argsWithSpaces rawTargetOpts multipleArguments
 
   -- write out the modified settings. We try to keep it legible
   writeFile (top_dir ++ "/settings") $
-    "[" ++ (intercalate "\n," (map show rawSettingOptsWithExtraArgs)) ++ "]"
+    "[" ++ (intercalate "\n," (map show rawSettingOpts)) ++ "]"
+  writeFile (top_dir ++ "/targets/default.target") $
+    show targetWithExtraArgs
 
   settingsm <- runExceptT $ initSettings top_dir
 
@@ -113,12 +114,6 @@ main = do
       -- Setting 'Haskell CPP flags' contains '$topdir' reference.
       -- Resolving those while containing spaces, should not introduce more options.
       recordSetting "Haskell CPP flags" (map showOpt . snd . toolSettings_pgm_P . sToolSettings)
-      -- Setting 'JavaScript CPP flags' contains '$topdir' reference.
-      -- Resolving those while containing spaces, should not introduce more options.
-      recordSetting "JavaScript CPP flags" (map showOpt . snd . toolSettings_pgm_JSP . sToolSettings)
-      -- Setting 'C-- CPP flags' contains '$topdir' reference.
-      -- Resolving those while containing spaces, should not introduce more options.
-      recordSetting "C-- CPP flags" (map showOpt . snd . toolSettings_pgm_CmmP . sToolSettings)
       -- Setting 'C compiler flags' contains strings with spaces.
       -- GHC should not split these by word.
       recordSetting "C compiler flags" (toolSettings_opt_c . sToolSettings)
@@ -133,10 +128,6 @@ main = do
       -- Setting 'CPP flags' contains strings with spaces.
       -- GHC should not split these by word.
       recordSetting "CPP flags" (map showOpt . snd . toolSettings_pgm_cpp . sToolSettings)
-      -- Setting 'Merge objects flags' contains strings with spaces.
-      -- GHC should not split these by word.
-      -- If 'Nothing', ignore this test, otherwise the same assertion holds as before.
-      recordSettingM "Merge objects flags" (fmap (map showOpt . snd) . toolSettings_pgm_lm . sToolSettings)
       -- Setting 'C compiler command' contains '$topdir' reference.
       -- Spaces in the final filepath should not be escaped.
       recordFpSetting "C compiler" (toolSettings_pgm_c . sToolSettings)

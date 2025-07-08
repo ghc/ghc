@@ -146,6 +146,7 @@ import qualified Data.Set as Set
 import GHC.Types.Unique.Set
 
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Toolchain.Target (Target)
 
 -- -----------------------------------------------------------------------------
 -- DynFlags
@@ -179,6 +180,7 @@ data DynFlags = DynFlags {
   toolSettings      :: {-# UNPACK #-} !ToolSettings,
   platformMisc      :: {-# UNPACK #-} !PlatformMisc,
   rawSettings       :: [(String, String)],
+  rawTarget         :: Target,
   tmpDir            :: TempDir,
 
   llvmOptLevel          :: Int,         -- ^ LLVM optimisation level
@@ -657,6 +659,7 @@ defaultDynFlags mySettings =
         targetPlatform = sTargetPlatform mySettings,
         platformMisc = sPlatformMisc mySettings,
         rawSettings = sRawSettings mySettings,
+        rawTarget   = sRawTarget mySettings,
 
         tmpDir                  = panic "defaultDynFlags: uninitialized tmpDir",
 

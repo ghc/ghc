@@ -10,7 +10,7 @@ import qualified Data.Set as Set
 import Base
 import qualified Context
 import Expression
-import Hadrian.Oracles.TextFile (lookupSystemConfig)
+import Hadrian.Oracles.TextFile (lookupSystemConfig, getTargetTarget)
 import Oracles.Flag hiding (arSupportsAtFile, arSupportsDashL)
 import Oracles.ModuleFiles
 import Oracles.Setting
@@ -24,7 +24,6 @@ import Target
 import Utilities
 
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
-import GHC.Toolchain.Program
 import GHC.Platform.ArchOS
 import Settings.Program (ghcWithInterpreter)
 
@@ -263,6 +262,7 @@ generateRules = do
         let prefix = root -/- stageString stage -/- "lib"
             go gen file = generate file (semiEmptyTarget (succStage stage)) gen
         (prefix -/- "settings") %> \out -> go (generateSettings out) out
+        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr getTargetTarget) out
 
   where
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
@@ -425,7 +425,7 @@ bindistRules = do
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
     , interpolateVar "LlvmTarget" $ getTarget tgtLlvmTarget
     , interpolateSetting "ProjectVersion" ProjectVersion
-    , interpolateVar "SettingsUseDistroMINGW" $ lookupSystemConfig "settings-use-distro-mingw"
+    , interpolateVar "EnableDistroToolchain" $ lookupSystemConfig "settings-use-distro-mingw"
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
     , interpolateVar "TargetHasLibm" $ lookupSystemConfig "target-has-libm"
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
@@ -483,62 +483,12 @@ generateSettings settingsFile = do
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
 
     settings <- traverse sequence $
-        [ ("C compiler command",   queryTarget ccPath)
-        , ("C compiler flags",     queryTarget ccFlags)
-        , ("C++ compiler command", queryTarget cxxPath)
-        , ("C++ compiler flags",   queryTarget cxxFlags)
-        , ("C compiler link flags",       queryTarget clinkFlags)
-        , ("C compiler supports -no-pie", queryTarget linkSupportsNoPie)
-        , ("CPP command",         queryTarget cppPath)
-        , ("CPP flags",           queryTarget cppFlags)
-        , ("Haskell CPP command", queryTarget hsCppPath)
-        , ("Haskell CPP flags",   queryTarget hsCppFlags)
-        , ("JavaScript CPP command", queryTarget jsCppPath)
-        , ("JavaScript CPP flags", queryTarget jsCppFlags)
-        , ("C-- CPP command", queryTarget cmmCppPath)
-        , ("C-- CPP flags",   queryTarget cmmCppFlags)
-        , ("C-- CPP supports -g0", queryTarget cmmCppSupportsG0')
-        , ("ld supports compact unwind", queryTarget linkSupportsCompactUnwind)
-        , ("ld supports filelist",       queryTarget linkSupportsFilelist)
-        , ("ld supports single module",       queryTarget linkSupportsSingleModule)
-        , ("ld is GNU ld",               queryTarget linkIsGnu)
-        , ("Merge objects command", queryTarget mergeObjsPath)
-        , ("Merge objects flags", queryTarget mergeObjsFlags)
-        , ("Merge objects supports response files", queryTarget mergeObjsSupportsResponseFiles')
-        , ("ar command",          queryTarget arPath)
-        , ("ar flags",            queryTarget arFlags)
-        , ("ar supports at file", queryTarget arSupportsAtFile')
-        , ("ar supports -L",      queryTarget arSupportsDashL')
-        , ("ranlib command",      queryTarget ranlibPath)
-        , ("otool command",       queryTarget otoolPath)
-        , ("install_name_tool command", queryTarget installNameToolPath)
-        , ("windres command", queryTarget (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
-        , ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
-        , ("target platform string", queryTarget targetPlatformTriple)
-        , ("target os",        queryTarget (show . archOS_OS . tgtArchOs))
-        , ("target arch",      queryTarget (show . archOS_arch . tgtArchOs))
-        , ("target word size", queryTarget wordSize)
-        , ("target word big endian",       queryTarget isBigEndian)
-        , ("target has GNU nonexec stack", queryTarget (yesNo . Toolchain.tgtSupportsGnuNonexecStack))
-        , ("target has .ident directive",  queryTarget (yesNo . Toolchain.tgtSupportsIdentDirective))
-        , ("target has subsections via symbols", queryTarget (yesNo . Toolchain.tgtSupportsSubsectionsViaSymbols))
+        [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
-        , ("Unregisterised", queryTarget (yesNo . tgtUnregisterised))
-        , ("LLVM target", queryTarget tgtLlvmTarget)
-        , ("LLVM llc command", queryTarget llcPath)
-        , ("LLVM opt command", queryTarget optPath)
-        , ("LLVM llvm-as command", queryTarget llvmAsPath)
-        , ("LLVM llvm-as flags", queryTarget llvmAsFlags)
-        , ("Use inplace MinGW toolchain", expr $ lookupSystemConfig "settings-use-distro-mingw")
-
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
         , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
-        , ("Tables next to code", queryTarget (yesNo . tgtTablesNextToCode))
-        , ("Leading underscore",  queryTarget (yesNo . tgtSymbolsHaveLeadingUnderscore))
-        , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)
         , ("RTS expects libdw", yesNo <$> getFlag UseLibdw)
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)
@@ -550,40 +500,6 @@ generateSettings settingsFile = do
             ("[" ++ showTuple s)
             : ((\s' -> "," ++ showTuple s') <$> ss)
             ++ ["]"]
-  where
-    ccPath  = prgPath . ccProgram . tgtCCompiler
-    ccFlags = escapeArgs . prgFlags . ccProgram . tgtCCompiler
-    cxxPath  = prgPath . cxxProgram . tgtCxxCompiler
-    cxxFlags = escapeArgs . prgFlags . cxxProgram . tgtCxxCompiler
-    clinkFlags = escapeArgs . prgFlags . ccLinkProgram . tgtCCompilerLink
-    linkSupportsNoPie = yesNo . ccLinkSupportsNoPie . tgtCCompilerLink
-    cppPath  = prgPath . cppProgram . tgtCPreprocessor
-    cppFlags = escapeArgs . prgFlags . cppProgram . tgtCPreprocessor
-    hsCppPath  = prgPath . hsCppProgram . tgtHsCPreprocessor
-    hsCppFlags = escapeArgs . prgFlags . hsCppProgram . tgtHsCPreprocessor
-    jsCppPath  = maybe "" (prgPath . jsCppProgram) . tgtJsCPreprocessor
-    jsCppFlags = maybe "" (escapeArgs . prgFlags . jsCppProgram) . tgtJsCPreprocessor
-    cmmCppPath  = prgPath . cmmCppProgram . tgtCmmCPreprocessor
-    cmmCppFlags = escapeArgs . prgFlags . cmmCppProgram . tgtCmmCPreprocessor
-    cmmCppSupportsG0' = yesNo . cmmCppSupportsG0 . tgtCmmCPreprocessor
-    mergeObjsPath  = maybe "" (prgPath . mergeObjsProgram) . tgtMergeObjs
-    mergeObjsFlags = maybe "" (escapeArgs . prgFlags . mergeObjsProgram) . tgtMergeObjs
-    linkSupportsSingleModule    = yesNo . ccLinkSupportsSingleModule . tgtCCompilerLink
-    linkSupportsFilelist        = yesNo . ccLinkSupportsFilelist . tgtCCompilerLink
-    linkSupportsCompactUnwind   = yesNo . ccLinkSupportsCompactUnwind . tgtCCompilerLink
-    linkIsGnu                   = yesNo . ccLinkIsGnu . tgtCCompilerLink
-    llcPath = maybe "" prgPath . tgtLlc
-    optPath = maybe "" prgPath . tgtOpt
-    llvmAsPath = maybe "" prgPath . tgtLlvmAs
-    llvmAsFlags = escapeArgs . maybe [] prgFlags . tgtLlvmAs
-    arPath  = prgPath . arMkArchive . tgtAr
-    arFlags = escapeArgs . prgFlags . arMkArchive . tgtAr
-    arSupportsAtFile' = yesNo . arSupportsAtFile . tgtAr
-    arSupportsDashL' = yesNo . arSupportsDashL . tgtAr
-    otoolPath = maybe "" prgPath . tgtOtool
-    installNameToolPath = maybe "" prgPath . tgtInstallNameTool
-    ranlibPath  = maybe "" (prgPath . ranlibProgram) . tgtRanlib
-    mergeObjsSupportsResponseFiles' = maybe "NO" (yesNo . mergeObjsSupportsResponseFiles) . tgtMergeObjs
 
 isBigEndian, wordSize :: Toolchain.Target -> String
 isBigEndian = yesNo . (\case BigEndian -> True; LittleEndian -> False) . tgtEndianness

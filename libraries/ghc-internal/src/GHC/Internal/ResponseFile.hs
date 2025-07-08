@@ -20,7 +20,7 @@
 module GHC.Internal.ResponseFile (
     getArgsWithResponseFiles,
     unescapeArgs,
-    escapeArgs,
+    escapeArgs, escapeArg,
     expandResponse
   ) where
 

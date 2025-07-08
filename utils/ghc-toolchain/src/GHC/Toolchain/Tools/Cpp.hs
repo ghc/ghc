@@ -5,6 +5,9 @@ module GHC.Toolchain.Tools.Cpp
   , Cpp(..), findCpp
   , JsCpp(..), findJsCpp
   , CmmCpp(..), findCmmCpp
+
+    -- * Lenses
+  , _cppProg, _hsCppProg, _jsCppProg, _cmmCppProg
   ) where
 
 import Control.Monad
@@ -188,3 +191,18 @@ findCpp progOpt cc = checking "for C preprocessor" $ do
   let cppProgram = addFlagIfNew "-E" cpp2
   return Cpp{cppProgram}
 
+--------------------------------------------------------------------------------
+-- Lenses
+--------------------------------------------------------------------------------
+
+_cppProg :: Lens Cpp Program
+_cppProg = Lens cppProgram (\x o -> o{cppProgram = x})
+
+_hsCppProg :: Lens HsCpp Program
+_hsCppProg = Lens hsCppProgram (\x o -> o{hsCppProgram = x})
+
+_jsCppProg :: Lens JsCpp Program
+_jsCppProg = Lens jsCppProgram (\x o -> o{jsCppProgram = x})
+
+_cmmCppProg :: Lens CmmCpp Program
+_cmmCppProg = Lens cmmCppProgram (\x o -> o{cmmCppProgram = x})
