@@ -14,7 +14,7 @@ import GHC.Types.Error
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Exception
-import GHC.Utils.Error (pprMsgEnvelopeBagWithLocDefault)
+import GHC.Utils.Error (unsafePprMsgEnvelopeBagWithLocDefault)
 import GHC.Utils.Outputable
 
 import GHC.Driver.Errors.Ppr () -- instance Diagnostic GhcMessage
@@ -59,7 +59,7 @@ instance Show SourceError where
   show (SourceError msgs) =
       renderWithContext defaultSDocContext
     . vcat
-    . pprMsgEnvelopeBagWithLocDefault
+    . unsafePprMsgEnvelopeBagWithLocDefault
     . getMessages
     $ msgs
 

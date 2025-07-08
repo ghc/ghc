@@ -226,7 +226,7 @@ showErrorMessages :: GHC.Messages GHC.DriverMessage -> String
 showErrorMessages msgs =
   GHC.renderWithContext GHC.defaultSDocContext
     $ GHC.vcat
-    $ GHC.pprMsgEnvelopeBagWithLocDefault
+    $ GHC.unsafePprMsgEnvelopeBagWithLocDefault
     $ GHC.getMessages
     $ msgs
 
