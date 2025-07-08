@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE CPP #-}
 
 {- | contains a prettyprinter for the
 Template Haskell datatypes
@@ -88,4 +89,8 @@ module Language.Haskell.TH.Ppr (
 )
 where
 
+#if MIN_VERSION_ghc_boot_th(9,13,0)
 import GHC.Boot.TH.Ppr
+#else
+import GHC.Internal.TH.Ppr
+#endif

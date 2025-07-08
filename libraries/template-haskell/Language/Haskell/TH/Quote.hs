@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE CPP #-}
 {- |
 Module : Language.Haskell.TH.Quote
 Description : Quasi-quoting support for Template Haskell
@@ -20,9 +21,15 @@ module Language.Haskell.TH.Quote
   ,dataToQa, dataToExpQ, dataToPatQ
   ) where
 
+#if MIN_VERSION_ghc_boot_th(9,13,0)
 import GHC.Boot.TH.Syntax
 import GHC.Boot.TH.Quote
 import GHC.Boot.TH.Lift
+#else
+import GHC.Internal.TH.Syntax
+import GHC.Internal.TH.Quote
+import GHC.Internal.TH.Lift
+#endif
 
 
 -- | 'quoteFile' takes a 'QuasiQuoter' and lifts it into one that read

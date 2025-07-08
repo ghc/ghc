@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE CPP #-}
 
 -- |
 -- Language.Haskell.TH.Lib contains lots of useful helper functions for
@@ -123,7 +124,8 @@ module Language.Haskell.TH.Lib (
     ruleVar, typedRuleVar,
     valueAnnotation, typeAnnotation, moduleAnnotation,
     pragInlD, pragSpecD, pragSpecInlD,
-    pragSpecED, pragSpecInlED,
+    -- pragSpecED,
+    -- pragSpecInlED,
     pragSpecInstD, pragRuleD, pragAnnD,
     pragLineD, pragCompleteD,
 
@@ -143,7 +145,11 @@ module Language.Haskell.TH.Lib (
 
    ) where
 
+#if MIN_VERSION_ghc_boot_th(9,13,0)
 import GHC.Boot.TH.Lib hiding
+#else
+import GHC.Internal.TH.Lib hiding
+#endif
   ( tySynD
   , dataD
   , newtypeD
@@ -183,7 +189,11 @@ import GHC.Boot.TH.Lib hiding
   , Role
   , InjectivityAnn
   )
+#if MIN_VERSION_ghc_boot_th(9,13,0)
 import qualified GHC.Boot.TH.Lib as Internal
+#else
+import qualified GHC.Internal.TH.Lib as Internal
+#endif
 import Language.Haskell.TH.Syntax
 
 import Control.Applicative (Applicative(..))

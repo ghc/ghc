@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE CPP #-}
 
 -- | Monadic front-end to Text.PrettyPrint
 module Language.Haskell.TH.PprLib (
@@ -53,4 +54,8 @@ module Language.Haskell.TH.PprLib (
 where
 
 import Prelude hiding ((<>))
+#if MIN_VERSION_ghc_boot_th(9,13,0)
 import GHC.Boot.TH.PprLib
+#else
+import GHC.Internal.TH.PprLib
+#endif

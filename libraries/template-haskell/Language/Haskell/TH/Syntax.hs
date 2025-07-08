@@ -2,6 +2,8 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Language.Haskell.TH.Syntax (
     Quote (..),
@@ -193,9 +195,15 @@ module Language.Haskell.TH.Syntax (
 )
 where
 
+#if MIN_VERSION_ghc_boot_th(9,13,0)
 import GHC.Boot.TH.Lift
 import GHC.Boot.TH.Syntax
+#else
+import GHC.Internal.TH.Lift
+import GHC.Internal.TH.Syntax
+#endif
 import System.FilePath
+import Data.Data (Data)
 
 -- This module completely re-exports 'GHC.Boot.TH.Syntax',
 -- and exports additionally functions that depend on filepath.
@@ -206,3 +214,15 @@ makeRelativeToProject fp | isRelative fp = do
   root <- getPackageRoot
   return (root </> fp)
 makeRelativeToProject fp = return fp
+
+#if !MIN_VERSION_ghc_boot_th(9,13,0)
+-- | A typed variant of 'dataToExpQ'.
+dataToCodeQ :: (Quote m, Data a)
+            => (forall b . Data b => b -> Maybe (Code m b))
+            ->                       a ->        Code m a
+dataToCodeQ f = unsafeCodeCoerce . dataToExpQ (fmap unTypeCode . f)
+
+-- | A typed variant of 'liftData'.
+liftDataTyped :: (Quote m, Data a) => a -> Code m a
+liftDataTyped = dataToCodeQ (const Nothing)
+#endif
