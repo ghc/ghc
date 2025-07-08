@@ -251,7 +251,7 @@ addTickLHsBind (L pos (XHsBindsLR bind@(AbsBinds { abs_binds = binds
 
    add_rec_sels env =
      env{ recSelBinds = recSelBinds env `extendVarEnvList`
-                          [ (abe_mono, abe_poly)
+                          [ (abe_mono, [abe_poly])
                           | ABE{ abe_poly, abe_mono } <- abs_exports
                           , RecSelId{} <- [idDetails abe_poly] ] }
 
@@ -270,8 +270,8 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
   case tickish of { ProfNotes | inline -> return (L pos funBind); _ -> do
 
   -- See Note [Record-selector ticks]
-  selTick <- recSelTick id
-  case selTick of { Just tick -> tick_rec_sel tick; _ -> do
+  selTicks <- recSelTick id
+  case selTicks of { Just ticks -> tick_rec_sel ticks; Nothing -> do
 
   (fvs, mg) <-
         getFreeVars $
@@ -303,8 +303,8 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
   } }
   where
     -- See Note [Record-selector ticks]
-    tick_rec_sel tick =
-      pure $ L pos $ funBind { fun_ext = second (tick :) (fun_ext funBind) }
+    tick_rec_sel ticks =
+      pure $ L pos $ funBind { fun_ext = second (ticks ++) (fun_ext funBind) }
 
 
 -- Note [Record-selector ticks]
@@ -519,7 +519,7 @@ addTickHsExpr :: HsExpr GhcTc -> TM (HsExpr GhcTc)
 -- See Note [Record-selector ticks]
 addTickHsExpr e@(HsVar _ (L _ id)) =
     freeVar id >> recSelTick id >>= pure . maybe e wrap
-  where wrap tick = XExpr . HsTick tick . noLocA $ e
+  where wrap = foldr (\tick -> XExpr . HsTick tick . noLocA) e
 addTickHsExpr e@(HsIPVar {})            = return e
 addTickHsExpr e@(HsOverLit {})          = return e
 addTickHsExpr e@(HsOverLabel{})         = return e
@@ -1086,7 +1086,7 @@ data TickTransEnv = TTE { fileName     :: FastString
                         , blackList    :: Set RealSrcSpan
                         , this_mod     :: Module
                         , tickishType  :: TickishType
-                        , recSelBinds  :: IdEnv Id
+                        , recSelBinds  :: IdEnv [Id]
                         }
 
 --      deriving Show
@@ -1241,11 +1241,12 @@ allocTickBox boxLabel countEntries topOnly pos m
       tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
       return (this_loc (XExpr $ HsTick tickish $ this_loc e))
 
-recSelTick :: Id -> TM (Maybe CoreTickish)
+recSelTick :: Id -> TM (Maybe [CoreTickish])
 recSelTick id = ifDensity TickForCoverage maybe_tick (pure Nothing)
   where
     maybe_tick = getEnv >>=
-      maybe (pure Nothing) tick . (`lookupVarEnv` id) . recSelBinds
+      maybe (pure Nothing) tick_all . (`lookupVarEnv` id) . recSelBinds
+    tick_all = fmap (Just . catMaybes) . mapM tick
     tick sel = getState >>=
       maybe (alloc sel) (pure . Just) . (`lookupVarEnv` sel) . recSelTicks
     alloc sel = allocATickBox (box sel) False False (getSrcSpan sel) noFVs
@@ -1367,7 +1368,7 @@ class CollectBinders a where
 --
 -- See Note [Record-selector ticks].
 class CollectFldBinders a where
-  collectFldBinds :: a -> IdEnv Id
+  collectFldBinds :: a -> IdEnv [Id]
 
 instance CollectBinders (LocatedA (Pat GhcTc)) where
   collectBinds = collectPatBinders CollNoDictBinders
@@ -1385,41 +1386,39 @@ instance (CollectFldBinders a) => CollectFldBinders [a] where
 instance (CollectFldBinders e) => CollectFldBinders (GenLocated l e) where
   collectFldBinds = collectFldBinds . unLoc
 instance CollectFldBinders (Pat GhcTc) where
-  collectFldBinds ConPat{ pat_args = RecCon HsRecFields{ rec_flds, rec_dotdot } } =
-    collectFldBinds rec_flds `plusVarEnv` plusVarEnvList (zipWith fld_bnds [0..] rec_flds)
-    where n_explicit | Just (L _ (RecFieldsDotDot n)) <- rec_dotdot = n
-                     | otherwise = length rec_flds
-          fld_bnds n (L _ HsFieldBind{ hfbLHS = L _ FieldOcc{ foLabel = L _ sel }
-                                     , hfbRHS = L _ (VarPat _ (L _ var))
-                                     , hfbPun })
-            | hfbPun || n >= n_explicit = unitVarEnv var sel
-          fld_bnds _ _ = emptyVarEnv
-  collectFldBinds ConPat{ pat_args = PrefixCon pats } = collectFldBinds pats
-  collectFldBinds ConPat{ pat_args = InfixCon p1 p2 } = collectFldBinds [p1, p2]
-  collectFldBinds (LazyPat _ pat) = collectFldBinds pat
-  collectFldBinds (BangPat _ pat) = collectFldBinds pat
-  collectFldBinds (AsPat _ _ pat) = collectFldBinds pat
-  collectFldBinds (ViewPat _ _ pat) = collectFldBinds pat
-  collectFldBinds (ParPat _ pat) = collectFldBinds pat
-  collectFldBinds (ListPat _ pats) = collectFldBinds pats
-  collectFldBinds (TuplePat _ pats _) = collectFldBinds pats
-  collectFldBinds (SumPat _ pats _ _) = collectFldBinds pats
-  collectFldBinds (SigPat _ pat _) = collectFldBinds pat
-  collectFldBinds (XPat exp) = collectFldBinds exp
-  collectFldBinds VarPat{} = emptyVarEnv
-  collectFldBinds WildPat{} = emptyVarEnv
-  collectFldBinds OrPat{} = emptyVarEnv
-  collectFldBinds LitPat{} = emptyVarEnv
-  collectFldBinds NPat{} = emptyVarEnv
-  collectFldBinds NPlusKPat{} = emptyVarEnv
-  collectFldBinds SplicePat{} = emptyVarEnv
-  collectFldBinds EmbTyPat{} = emptyVarEnv
-  collectFldBinds InvisPat{} = emptyVarEnv
+  collectFldBinds = go [] where
+    go path ConPat{ pat_args = RecCon HsRecFields{ rec_flds } } =
+      plusVarEnvList (map fld_binds rec_flds)
+        where fld_binds (L _ HsFieldBind{ hfbLHS = L _ FieldOcc{ foLabel = L _ sel }
+                                        , hfbRHS = L _ rhs })
+                = go (sel:path) rhs
+    go path ConPat{ pat_args = PrefixCon ps } =
+      plusVarEnvList (map (go path . unLoc) ps)
+    go path ConPat{ pat_args = InfixCon (L _ p1) (L _ p2) } =
+      go path p1 `plusVarEnv` go path p2
+    go [] VarPat{} = emptyVarEnv
+    go path (VarPat _ (L _ var)) = unitVarEnv var path
+    go path (LazyPat _ (L _ p)) = go path p
+    go path (BangPat _ (L _ p)) = go path p
+    go path (AsPat _ _ (L _ p)) = go path p
+    go path (ViewPat _ _ (L _ p)) = go path p
+    go path (ParPat _ (L _ p)) = go path p
+    go path (SigPat _ (L _ p) _) = go path p
+    go path (SumPat _ (L _ p) _ _)  = go path p
+    go path (XPat (CoPat _ p _)) = go path p
+    go path (XPat (ExpansionPat _ p)) = go path p
+    go path (ListPat _ ps) = plusVarEnvList (map (go path . unLoc) ps)
+    go path (TuplePat _ ps _) = plusVarEnvList (map (go path . unLoc) ps)
+    go _ WildPat{} = emptyVarEnv
+    go _ OrPat{} = emptyVarEnv
+    go _ LitPat{} = emptyVarEnv
+    go _ NPat{} = emptyVarEnv
+    go _ NPlusKPat{} = emptyVarEnv
+    go _ SplicePat{} = emptyVarEnv
+    go _ EmbTyPat{} = emptyVarEnv
+    go _ InvisPat{} = emptyVarEnv
 instance (CollectFldBinders r) => CollectFldBinders (HsFieldBind l r) where
   collectFldBinds = collectFldBinds . hfbRHS
-instance CollectFldBinders XXPatGhcTc where
-  collectFldBinds (CoPat _ pat _) = collectFldBinds pat
-  collectFldBinds (ExpansionPat _ pat) = collectFldBinds pat
 instance CollectFldBinders (HsLocalBinds GhcTc) where
   collectFldBinds (HsValBinds _ bnds) = collectFldBinds bnds
   collectFldBinds HsIPBinds{} = emptyVarEnv
@@ -1430,9 +1429,9 @@ instance CollectFldBinders (HsValBinds GhcTc) where
 instance CollectFldBinders (HsBind GhcTc) where
   collectFldBinds PatBind{ pat_lhs } = collectFldBinds pat_lhs
   collectFldBinds (XHsBindsLR AbsBinds{ abs_exports, abs_binds }) =
-    mkVarEnv [ (abe_poly, sel)
+    mkVarEnv [ (abe_poly, sels)
              | ABE{ abe_poly, abe_mono } <- abs_exports
-             , Just sel <- [lookupVarEnv monos abe_mono] ]
+             , Just sels <- [lookupVarEnv monos abe_mono] ]
     where monos = collectFldBinds abs_binds
   collectFldBinds VarBind{} = emptyVarEnv
   collectFldBinds FunBind{} = emptyVarEnv
