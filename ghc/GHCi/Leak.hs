@@ -7,7 +7,6 @@ module GHCi.Leak
 
 import Control.Monad
 import Data.Bits
-import Data.IORef
 import Foreign.Ptr (ptrToIntPtr, intPtrToPtr)
 import GHC
 import GHC.Ptr (Ptr (..))
@@ -23,7 +22,6 @@ import GHC.Linker.Types
 import Prelude
 import System.Mem
 import System.Mem.Weak
-import GHC.Types.Unique.DFM
 import Control.Exception
 
 -- Checking for space leaks in GHCi. See #15111, and the

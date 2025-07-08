@@ -536,18 +536,13 @@ countMods (UnresolvedCycle ns) = length ns
 --   viewed from that source node
 findDanglingBootNodes :: ModuleGraph
                             -> [Either ModuleGraphNode ModuleGraphNodeWithBootFile]
-                            -- ^ The cycle nodes, which may contain boot modules
                             -> [(Either ModuleGraphNode ModuleGraphNodeWithBootFile, [ModNodeKeyWithUid])]
-                            -- ^ Each cycle node paired with its dangling boot node module names
 findDanglingBootNodes mg cycle = [(node, onlyReachableBootNotesInTheCycle mg node cycle) | node <- cycle]
   where
   onlyReachableBootNotesInTheCycle :: ModuleGraph
                               -> Either ModuleGraphNode ModuleGraphNodeWithBootFile
-                              -- ^ The source node to start reachability analysis from
                               -> [Either ModuleGraphNode ModuleGraphNodeWithBootFile]
-                              -- ^ The cycle nodes, which may contain boot modules
                               -> [ModNodeKeyWithUid]
-                              -- ^ Module names of dangling boot nodes reachable from source
   onlyReachableBootNotesInTheCycle mg source cycle =
     let -- Extract the NodeKey from the source node for reachability queries
         source_key = case source of
@@ -610,7 +605,7 @@ refineGraphByWithBuildPlan mod_graph build_plans =
     in rewritten_graph
   where
 
-        -- | Rewrite the module graph to include additional edges
+        -- Rewrite the module graph to include additional edges
         -- where bootRewrite is a map from NodeKey to a set of root NodeKeys
         -- it means we can reach the boot module from the root NodeKeys
         -- we now rewrite it so the root NodeKeys can reach the non-boot corresponding module
