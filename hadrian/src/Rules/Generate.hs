@@ -483,7 +483,9 @@ generateSettings settingsFile = do
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
 
     settings <- traverse sequence $
-        [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
+        [ ("target os",        queryTarget (show . archOS_OS . tgtArchOs))
+        , ("target arch",      queryTarget (show . archOS_arch . tgtArchOs))
+        , ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
         , ("Use inplace MinGW toolchain", expr $ lookupSystemConfig "settings-use-distro-mingw")
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs)
