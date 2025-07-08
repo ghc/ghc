@@ -540,7 +540,7 @@ addErr diag_opts errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
     mk_msg (loc:_) = let (l,hdr) = dumpLoc loc
-                     in  mkLocMessage (Err.mkMCDiagnostic diag_opts WarningWithoutFlag Nothing)
+                     in  mkLocMessage (Err.unsafeMCDiagnostic diag_opts WarningWithoutFlag Nothing)
                                       l (hdr $$ msg)
     mk_msg []      = msg
 

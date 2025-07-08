@@ -376,7 +376,7 @@ initTcDsForSolver thing_inside
          thing_inside
        ; case mb_ret of
            Just ret -> pure ret
-           Nothing  -> pprPanic "initTcDsForSolver" (vcat $ pprMsgEnvelopeBagWithLocDefault (getErrorMessages msgs)) }
+           Nothing  -> pprPanic "initTcDsForSolver" (vcat $ unsafePprMsgEnvelopeBagWithLocDefault (getErrorMessages msgs)) }
 
 mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> PromotionTickContext
