@@ -43,13 +43,20 @@ static void    printStdObjPayload( const StgClosure *obj );
 void printPtr( StgPtr p )
 {
     const char *raw;
-    raw = lookupGHCName(p);
+    raw = lookupDebugSymbol(p);
     if (raw != NULL) {
-        debugBelch("<%s>", raw);
-        debugBelch("[%p]", p);
-    } else {
-        debugBelch("%p", p);
+        debugBelch("<%s>[%p]", raw, p);
+        return;
     }
+
+    StgPtr p0 = (StgPtr)UNTAG_CLOSURE((StgClosure *)p);
+    raw = lookupDebugSymbol(p0);
+    if (raw != NULL) {
+        debugBelch("<%s>[%p+%td]", raw, p0, p - p0);
+        return;
+    }
+
+    debugBelch("%p", p);
 }
 
 void printObj( StgClosure *obj )
@@ -864,30 +871,6 @@ void printLargeAndPinnedObjects(void)
  * Uses symbol table in (unstripped executable)
  * ------------------------------------------------------------------------*/
 
-/* --------------------------------------------------------------------------
- * Simple lookup table
- * address -> function name
- * ------------------------------------------------------------------------*/
-
-static HashTable * add_to_fname_table = NULL;
-
-const char *lookupGHCName( void *addr )
-{
-    if (add_to_fname_table == NULL)
-        return NULL;
-
-    return lookupHashTable(add_to_fname_table, (StgWord)addr);
-}
-
-/* --------------------------------------------------------------------------
- * Symbol table loading
- * ------------------------------------------------------------------------*/
-
-extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
-{
-  /* nothing, yet */
-}
-
 void findPtr(P_ p, int);                /* keep gcc -Wall happy */
 
 int searched = 0;
@@ -991,6 +974,31 @@ void printObj( StgClosure *obj )
 
 
 #endif /* DEBUG */
+
+/* --------------------------------------------------------------------------
+ * Simple lookup table
+ * address -> function name
+ * ------------------------------------------------------------------------*/
+
+static HashTable * add_to_fname_table = NULL;
+
+void registerDebugSymbol( const DebugSymbolEntry entries[], int len ) {
+    if (add_to_fname_table == NULL) {
+        add_to_fname_table = allocHashTable();
+    }
+
+    for (int i = 0; i < len; ++i) {
+        insertHashTable(add_to_fname_table, (StgWord)entries[i].addr, entries[i].sym);
+    }
+}
+
+const char *lookupDebugSymbol( void *addr )
+{
+    if (add_to_fname_table == NULL)
+        return NULL;
+
+    return lookupHashTable(add_to_fname_table, (StgWord)addr);
+}
 
 /* -----------------------------------------------------------------------------
    Closure types

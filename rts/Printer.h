@@ -30,11 +30,9 @@ extern void        printStaticObjects ( StgClosure *obj );
 extern void        printWeakLists ( void );
 extern void        printLargeAndPinnedObjects ( void );
 
-extern void DEBUG_LoadSymbols( const char *name );
-
-extern const char *lookupGHCName( void *addr );
-
 extern const char *what_next_strs[];
 #endif
+
+extern const char *lookupDebugSymbol( void *addr );
 
 #include "EndPrivate.h"

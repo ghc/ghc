@@ -26,6 +26,7 @@ import GHC.CmmToC           ( cmmToC )
 import GHC.Cmm.Lint         ( cmmLint )
 import GHC.Cmm
 import GHC.Cmm.CLabel
+import GHC.Cmm.GenerateDebugSymbolStub
 
 import GHC.StgToCmm.CgUtils (CgStream)
 
@@ -76,7 +77,8 @@ import qualified Data.Set as Set
 
 codeOutput
     :: forall a.
-       Logger
+       Platform
+    -> Logger
     -> TmpFs
     -> LlvmConfigCache
     -> DynFlags
@@ -95,7 +97,7 @@ codeOutput
            (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
            [(ForeignSrcLang, FilePath)]{-foreign_fps-},
            a)
-codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location genForeignStubs foreign_fps pkg_deps dus0
+codeOutput platform logger tmpfs llvm_config dflags unit_state this_mod filenm location genForeignStubs foreign_fps pkg_deps dus0
   cmm_stream
   =
     do  {
@@ -119,10 +121,12 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                 ; return cmm
                 }
 
+              debug_cmm_stream = generateDebugSymbolStub platform this_mod linted_cmm_stream
+
         ; let final_stream :: CgStream RawCmmGroup (ForeignStubs, a)
               final_stream = do
-                  { a <- linted_cmm_stream
-                  ; let stubs = genForeignStubs a
+                  { (a, debug_cstub) <- debug_cmm_stream
+                  ; let stubs = genForeignStubs a `appendStubC` debug_cstub
                   ; emitInitializerDecls this_mod stubs
                   ; return (stubs, a) }
 
