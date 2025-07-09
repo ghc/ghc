@@ -45,7 +45,7 @@ import GHC.Core.Make    ( mkImpossibleExpr )
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
 
-import GHC.Types.Error (MessageClass(..), Severity(..), DiagnosticReason(WarningWithoutFlag), ResolvedDiagnosticReason (..))
+import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( IdDetails(..) )
@@ -783,12 +783,11 @@ specConstrProgram guts
        ; let (_usg, binds', warnings) = initUs_ us $
                               scTopBinds env0 (mg_binds guts)
 
-       ; when (not (null warnings)) $ msg specConstr_warn_class (warn_msg warnings)
+       ; when (not (null warnings)) $ diagnostic WarningWithoutFlag (warn_msg warnings)
 
        ; return (guts { mg_binds = binds' }) }
 
   where
-    specConstr_warn_class = MCDiagnostic SevWarning (ResolvedDiagnosticReason WarningWithoutFlag) Nothing
     warn_msg :: SpecFailWarnings -> SDoc
     warn_msg warnings = text "SpecConstr encountered one or more function(s) with a SPEC argument that resulted in too many arguments," $$
                         text "which resulted in no specialization being generated for these functions:" $$

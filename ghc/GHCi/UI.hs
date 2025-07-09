@@ -53,7 +53,7 @@ import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.PatSyn
 import GHC.Driver.Flags
-import GHC.Driver.Errors
+import GHC.Driver.Errors (printOrThrowDiagnostics)
 import GHC.Driver.Errors.Types
 import GHC.Driver.Phases
 import GHC.Driver.Session as DynFlags

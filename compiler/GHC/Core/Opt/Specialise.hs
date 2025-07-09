@@ -10,7 +10,6 @@ import GHC.Prelude
 
 import GHC.Driver.DynFlags
 import GHC.Driver.Config
-import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 
 import GHC.Core.Type  hiding( substTy, substCo, extendTvSubst, zapSubst )
@@ -53,7 +52,6 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Error
 
-import GHC.Utils.Error ( mkMCDiagnostic )
 import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -932,10 +930,12 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
   | wopt Opt_WarnAllMissedSpecs dflags    = doWarn $ WarningWithFlag Opt_WarnAllMissedSpecs
   | otherwise                             = return ()
   where
+    allCallersInlined :: Bool
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
-    diag_opts = initDiagOpts dflags
+
+    doWarn :: DiagnosticReason -> CoreM ()
     doWarn reason =
-      msg (mkMCDiagnostic diag_opts reason Nothing)
+      diagnostic reason
         (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
                 2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                         | caller <- callers])
