@@ -122,7 +122,6 @@ import System.FilePath
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import qualified Data.Map.Strict as M
-import GHC.Types.TypeEnv
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Class
 import GHC.Driver.Env.KnotVars
