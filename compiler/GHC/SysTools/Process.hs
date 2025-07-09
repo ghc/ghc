@@ -26,6 +26,8 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import GHC.Utils.CliOption
 
+import GHC.Driver.Errors (reportError)
+
 import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, mkSrcSpan )
 import GHC.Data.FastString
 
@@ -286,8 +288,7 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = withPipe $ \ (rea
         BuildMsg msg -> do
           logInfo logger $ withPprStyle defaultUserStyle msg
         BuildError loc msg -> do
-          logMsg logger errorDiagnostic (mkSrcSpan loc loc)
-              $ withPprStyle defaultUserStyle msg
+          reportError logger neverQualify emptyDiagOpts (mkSrcSpan loc loc) msg
 
 parseBuildMessages :: [String] -> [BuildMessage]
 parseBuildMessages str = loop str Nothing

@@ -1,7 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module GHC.Driver.Errors (
-    printOrThrowDiagnostics
+    reportError
+  , reportDiagnostic
   , printMessages
+  , printOrThrowDiagnostics
   , mkDriverPsHeaderMessage
   ) where
 
@@ -13,6 +15,28 @@ import GHC.Types.Error
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
+
+reportError :: Logger -> NamePprCtx -> DiagOpts -> SrcSpan -> SDoc -> IO ()
+reportError logger nameContext opts span doc = do
+  let
+    message :: MsgEnvelope DiagnosticMessage
+    message = mkErrorMsgEnvelope span nameContext DiagnosticMessage {
+        diagMessage = mkDecorated [doc]
+      , diagReason = ErrorWithoutFlag
+      , diagHints = []
+      }
+  printMessage logger NoDiagnosticOpts opts message
+
+reportDiagnostic :: Logger -> NamePprCtx -> DiagOpts -> SrcSpan -> DiagnosticReason -> SDoc -> IO ()
+reportDiagnostic logger nameContext opts span reason doc = do
+  let
+    message :: MsgEnvelope DiagnosticMessage
+    message = mkMsgEnvelope opts span nameContext DiagnosticMessage {
+        diagMessage = mkDecorated [doc]
+      , diagReason = reason
+      , diagHints = []
+      }
+  printMessage logger NoDiagnosticOpts opts message
 
 printMessages :: forall a. (Diagnostic a) => Logger -> DiagnosticOpts a -> DiagOpts -> Messages a -> IO ()
 printMessages logger msg_opts opts = mapM_ (printMessage logger msg_opts opts) . sortMessages
