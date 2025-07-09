@@ -268,6 +268,9 @@ sort = lift List.sort
 -- >>> (sortBy . comparing) fst $ (3, 1) :| [(2, 2), (1, 3)]
 -- (1,3) :| [(2,2),(3,1)]
 --
+-- However, 'sortOn' may still be faster for instances with a more efficient
+-- implementation of '(>)' than 'compare'.
+--
 -- 'sortWith' is an alias for `sortBy . comparing`.
 --
 -- @since 4.20.0.0

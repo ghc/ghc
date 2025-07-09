@@ -216,7 +216,6 @@ module GHC.Internal.Data.OldList
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Bits        ( (.&.) )
 import GHC.Internal.Unicode      ( isSpace )
-import GHC.Internal.Data.Ord         ( comparing )
 import GHC.Internal.Data.Tuple       ( fst, snd )
 
 import GHC.Internal.Num
@@ -1862,10 +1861,13 @@ rqpart cmp x (y:ys) rle rgt r =
 -- >>> (sortBy . comparing) fst [(3, 1), (2, 2), (1, 3)]
 -- [(1,3),(2,2),(3,1)]
 --
+-- However, 'sortOn' may still be faster for instances with a more efficient
+-- implementation of '(>)' than 'compare'.
+--
 -- @since base-4.8.0.0
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
 sortOn f =
-  map snd . sortBy (comparing fst) . map (\x -> let y = f x in y `seq` (y, x))
+  map snd . actualSort (\x y -> fst x > fst y) . map (\x -> let y = f x in y `seq` (y, x))
 
 -- | Construct a list from a single element.
 --
