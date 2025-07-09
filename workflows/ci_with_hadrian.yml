@@ -1,0 +1,4431 @@
+name: GHC CI
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+      - ghc-*
+  schedule:
+    - cron: 0 0 * * *
+  workflow_dispatch: {}
+jobs:
+  aarch64-darwin-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-darwin-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MACOSX_DEPLOYMENT_TARGET: 11.0
+      NIX_SYSTEM: aarch64-darwin
+      TEST_ENV: aarch64-darwin-validate
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: find libraries -name config.sub -exec cp config.sub {} \;
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-darwin-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  aarch64-linux-alpine3_18-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-alpine3_18-validate
+      BROKEN_TESTS: encoding004 T10458
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --disable-ld-override --enable-ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-alpine3_18-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-alpine3_18-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  aarch64-linux-deb10-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb10-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb10-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb10-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  aarch64-linux-deb12-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb12-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb12-validate
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb12-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  aarch64-linux-deb12-validate+llvm:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb12-validate+llvm
+      BUILD_FLAVOUR: validate+llvm
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb12-validate+llvm
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb12-validate+llvm.tar.xz junit.xml unexpected-test-output.tar.gz
+  aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate:
+    env:
+      AR: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate
+      BUILD_FLAVOUR: validate
+      CC: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang
+      CFLAGS: -fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CONF_CC_OPTS_STAGE2: -fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt
+      CROSS_EMULATOR: /opt/wine-arm64ec-msys2-deb12/bin/wine
+      CROSS_TARGET: aarch64-unknown-mingw32
+      CXX: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++
+      HADRIAN_ARGS: --docs=none
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LD: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld
+      LLVMAS: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang
+      NM: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm
+      OBJCOPY: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy
+      OBJDUMP: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump
+      RANLIB: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib
+      SIZE: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size
+      STRINGS: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings
+      STRIP: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip
+      TEST_ENV: aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate
+      WindresCmd: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm:
+    env:
+      AR: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm
+      BUILD_FLAVOUR: validate+llvm
+      CC: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang
+      CFLAGS: -fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CONF_CC_OPTS_STAGE2: -fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt
+      CROSS_EMULATOR: /opt/wine-arm64ec-msys2-deb12/bin/wine
+      CROSS_TARGET: aarch64-unknown-mingw32
+      CXX: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++
+      HADRIAN_ARGS: --docs=none
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LD: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld
+      LLVMAS: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang
+      NM: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm
+      OBJCOPY: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy
+      OBJDUMP: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump
+      RANLIB: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib
+      SIZE: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size
+      STRINGS: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings
+      STRIP: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip
+      TEST_ENV: aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm
+      WindresCmd: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm.tar.xz junit.xml unexpected-test-output.tar.gz
+  hadrian-ghc-in-ghci:
+    env:
+      GHC_FLAGS: -Werror
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Clean repository
+        run: git clean -xdf && git submodule foreach git clean -xdf
+      - name: Setup CI environment
+        run: . .gitlab/ci.sh setup
+      - name: Configure build
+        run: . .gitlab/ci.sh configure
+      - name: Setup Hadrian project
+        run: |
+          echo 'package hadrian' > hadrian/cabal.project.local
+          echo '  ghc-options: -Werror' >> hadrian/cabal.project.local
+      - name: Test GHC-in-GHCi
+        run: |
+          export CORES="$(mk/detect-cpu-count.sh)" && echo ":q" | HADRIAN_ARGS=-j$CORES hadrian/ghci -j$CORES | tail -n2 | grep "Ok,"
+  i386-linux-alpine3_20-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-i386-linux-alpine3_20-validate
+      BROKEN_TESTS: encoding004 T10458 simd009 T25169 T22033
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: i386-linux-alpine3_20-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-i386-linux-alpine3_20-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  i386-linux-deb10-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-i386-linux-deb10-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: i386-linux-deb10-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-i386-linux-deb10-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  i386-linux-deb12-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-i386-linux-deb12-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: i386-linux-deb12-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-i386-linux-deb12-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-aarch64-darwin-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-darwin-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MACOSX_DEPLOYMENT_TARGET: 11.0
+      NIX_SYSTEM: aarch64-darwin
+      TEST_ENV: aarch64-darwin-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: find libraries -name config.sub -exec cp config.sub {} \;
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-darwin-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-aarch64-linux-alpine3_18-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-alpine3_18-validate
+      BROKEN_TESTS: encoding004 T10458
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --disable-ld-override --enable-ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-alpine3_18-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-alpine3_18-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-aarch64-linux-deb10-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb10-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb10-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb10-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-aarch64-linux-deb12-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb12-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb12-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb12-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-aarch64-linux-deb12-validate+llvm:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb12-validate+llvm
+      BUILD_FLAVOUR: validate+llvm
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb12-validate+llvm
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb12-validate+llvm.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate:
+    env:
+      AR: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate
+      BUILD_FLAVOUR: validate
+      CC: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang
+      CFLAGS: -fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CONF_CC_OPTS_STAGE2: -fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt
+      CROSS_EMULATOR: /opt/wine-arm64ec-msys2-deb12/bin/wine
+      CROSS_TARGET: aarch64-unknown-mingw32
+      CXX: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++
+      HADRIAN_ARGS: --docs=none
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LD: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld
+      LLVMAS: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang
+      NM: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm
+      OBJCOPY: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy
+      OBJDUMP: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump
+      RANLIB: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib
+      SIZE: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size
+      STRINGS: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings
+      STRIP: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip
+      TEST_ENV: aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate
+      WindresCmd: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm:
+    env:
+      AR: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm
+      BUILD_FLAVOUR: validate+llvm
+      CC: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang
+      CFLAGS: -fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CONF_CC_OPTS_STAGE2: -fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt
+      CROSS_EMULATOR: /opt/wine-arm64ec-msys2-deb12/bin/wine
+      CROSS_TARGET: aarch64-unknown-mingw32
+      CXX: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++
+      HADRIAN_ARGS: --docs=none
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LD: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld
+      LLVMAS: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang
+      NM: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm
+      OBJCOPY: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy
+      OBJDUMP: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump
+      RANLIB: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib
+      SIZE: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size
+      STRINGS: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings
+      STRIP: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip
+      TEST_ENV: aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm
+      WindresCmd: /opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-i386-linux-alpine3_20-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-i386-linux-alpine3_20-validate
+      BROKEN_TESTS: encoding004 T10458 simd009 T25169 T22033
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: i386-linux-alpine3_20-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-i386-linux-alpine3_20-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-i386-linux-deb10-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-i386-linux-deb10-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: i386-linux-deb10-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-i386-linux-deb10-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-i386-linux-deb12-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-i386-linux-deb12-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: i386-linux-deb12-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-i386-linux-deb12-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-darwin-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-darwin-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MACOSX_DEPLOYMENT_TARGET: 11.0
+      NIX_SYSTEM: x86_64-darwin
+      TEST_ENV: x86_64-darwin-validate
+      XZ_OPT: -9
+      ac_cv_func_clock_gettime: no
+      ac_cv_func_futimens: no
+      ac_cv_func_utimensat: no
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: find libraries -name config.sub -exec cp config.sub {} \;
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-darwin-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-freebsd14-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-freebsd14-validate
+      BUILD_FLAVOUR: validate
+      CABAL_INSTALL_VERSION: 3.10.3.0
+      CC: cc
+      CONFIGURE_ARGS: --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib --with-system-libffi --with-ffi-includes=/usr/local/include --with-ffi-libraries=/usr/local/lib --with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --enable-strict-ghc-toolchain-check
+      CXX: c++
+      GHC_VERSION: 9.6.4
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-freebsd14-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: .gitlab/ci.sh setup
+      - name: Build step 2
+        run: .gitlab/ci.sh configure
+      - name: Build step 3
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 4
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-freebsd14-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-alpine3_12-int_native-validate+fully_static:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static
+      BROKEN_TESTS: ghcilink002 linker_unload_native encoding004 T10458
+      BUILD_FLAVOUR: validate+fully_static
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_12-int_native-validate+fully_static
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-alpine3_12-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_12-validate
+      BROKEN_TESTS: encoding004 T10458
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_12-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_12-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-alpine3_12-validate+fully_static:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_12-validate+fully_static
+      BROKEN_TESTS: ghcilink002 linker_unload_native encoding004 T10458
+      BUILD_FLAVOUR: validate+fully_static
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_12-validate+fully_static
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-alpine3_20-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_20-validate
+      BROKEN_TESTS: encoding004 T10458
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_20-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_20-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      BUILD_FLAVOUR: release+host_fully_static+text_simdutf
+      CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      CROSS_TARGET: wasm32-wasi
+      FIREFOX_LAUNCH_OPTS: |
+        {"browser":"firefox","executablePath":"/usr/bin/firefox"}
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs --docs=no-sphinx-man
+      TEST_ENV: x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      BUILD_FLAVOUR: release+host_fully_static+text_simdutf
+      CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      CROSS_TARGET: wasm32-wasi
+      FIREFOX_LAUNCH_OPTS: |
+        {"browser":"firefox","executablePath":"/usr/bin/firefox"}
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs --docs=no-sphinx-man
+      TEST_ENV: x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      BUILD_FLAVOUR: release+host_fully_static+text_simdutf
+      CONFIGURE_ARGS: --enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      CROSS_TARGET: wasm32-wasi
+      FIREFOX_LAUNCH_OPTS: |
+        {"browser":"firefox","executablePath":"/usr/bin/firefox"}
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs --docs=no-sphinx-man
+      TEST_ENV: x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb10-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb10-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb10-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb10-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb10-validate+debug_info:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb10-validate+debug_info
+      BUILD_FLAVOUR: validate+debug_info
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb10-validate+debug_info
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb10-validate+debug_info.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CROSS_EMULATOR: qemu-aarch64 -L /usr/aarch64-linux-gnu
+      CROSS_TARGET: aarch64-linux-gnu
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb11-cross_aarch64-linux-gnu-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CONFIGURE_WRAPPER: emconfigure
+      CROSS_EMULATOR: js-emulator
+      CROSS_TARGET: javascript-unknown-ghcjs
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb11-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb11-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb11-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb11-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-int_native-validate:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-int_native-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-int_native-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-int_native-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-no_tntc-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-no_tntc-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --disable-tables-next-to-code --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-no_tntc-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-no_tntc-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-numa-slow-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-numa-slow-validate
+      BUILD_FLAVOUR: slow-validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      ENABLE_NUMA: 1
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-numa-slow-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-numa-slow-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-release-perf:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      RUNTEST_ARGS:  --config perf_path=perf
+      TEST_ENV: x86_64-linux-deb12-release
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CROSS_EMULATOR: qemu-riscv64 -L /usr/riscv64-linux-gnu
+      CROSS_TARGET: riscv64-linux-gnu
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-unreg-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-unreg-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-unregisterised --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-unreg-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-unreg-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-validate+boot_nonmoving_gc:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-validate+boot_nonmoving_gc
+      BUILD_FLAVOUR: validate+boot_nonmoving_gc
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      RUNTEST_ARGS: --way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity
+      TEST_ENV: x86_64-linux-deb12-validate+boot_nonmoving_gc
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-validate+boot_nonmoving_gc.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-validate+llvm:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-validate+llvm
+      BUILD_FLAVOUR: validate+llvm
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-validate+llvm
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-validate+llvm.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-validate+thread_sanitizer_cmm:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-validate+thread_sanitizer_cmm
+      BUILD_FLAVOUR: validate+thread_sanitizer_cmm
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --docs=none
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-validate+thread_sanitizer_cmm
+      TSAN_OPTIONS: suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-validate+thread_sanitizer_cmm.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb12-zstd-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-zstd-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-ipe-data-compression --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-zstd-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-zstd-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-deb9-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb9-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb9-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb9-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-fedora33-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora33-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LLC: /bin/false
+      OPT: /bin/false
+      TEST_ENV: x86_64-linux-fedora33-release
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora33-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-fedora33-release-hackage:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora33-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --haddock-for-hackage
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LLC: /bin/false
+      OPT: /bin/false
+      TEST_ENV: x86_64-linux-fedora33-release
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora33-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-fedora33-validate+debug_info:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora33-validate+debug_info
+      BUILD_FLAVOUR: validate+debug_info
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LLC: /bin/false
+      OPT: /bin/false
+      TEST_ENV: x86_64-linux-fedora33-validate+debug_info
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora33-validate+debug_info.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-fedora38-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora38-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-fedora38-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora38-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-rocky8-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-rocky8-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-rocky8-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-rocky8-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-ubuntu18_04-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu18_04-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu18_04-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu18_04-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-ubuntu20_04-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu20_04-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu20_04-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu20_04-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-ubuntu22_04-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu22_04-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu22_04-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu22_04-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CROSS_EMULATOR: qemu-loongarch64 -L /usr/loongarch64-linux-gnu
+      CROSS_TARGET: loongarch64-linux-gnu
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-linux-ubuntu24_04-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu24_04-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu24_04-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu24_04-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-windows-int_native-validate:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-windows-int_native-validate
+      BUILD_FLAVOUR: validate
+      CABAL_INSTALL_VERSION: 3.10.2.0
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      GHC_VERSION: 9.6.4
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MSYSTEM: CLANG64
+      TEST_ENV: x86_64-windows-int_native-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: bash .gitlab/ci.sh setup
+      - name: Build step 2
+        run: bash .gitlab/ci.sh configure
+      - name: Build step 3
+        run: bash .gitlab/ci.sh build_hadrian
+      - name: Build step 4
+        run: bash .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-windows-int_native-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  nightly-x86_64-windows-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-windows-validate
+      BUILD_FLAVOUR: validate
+      CABAL_INSTALL_VERSION: 3.10.2.0
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      GHC_VERSION: 9.6.4
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MSYSTEM: CLANG64
+      TEST_ENV: x86_64-windows-validate
+      XZ_OPT: -9
+    if: github.event_name == 'schedule'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: bash .gitlab/ci.sh setup
+      - name: Build step 2
+        run: bash .gitlab/ci.sh configure
+      - name: Build step 3
+        run: bash .gitlab/ci.sh build_hadrian
+      - name: Build step 4
+        run: bash .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-windows-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-aarch64-darwin-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-darwin-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MACOSX_DEPLOYMENT_TARGET: 11.0
+      NIX_SYSTEM: aarch64-darwin
+      TEST_ENV: aarch64-darwin-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: find libraries -name config.sub -exec cp config.sub {} \;
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-darwin-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-aarch64-linux-alpine3_18-release+no_split_sections:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-alpine3_18-release+no_split_sections
+      BROKEN_TESTS: encoding004 T10458
+      BUILD_FLAVOUR: release+no_split_sections
+      CONFIGURE_ARGS: --disable-ld-override --enable-ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-alpine3_18-release+no_split_sections
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-alpine3_18-release+no_split_sections.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-aarch64-linux-deb10-release+no_split_sections:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb10-release+no_split_sections
+      BUILD_FLAVOUR: release+no_split_sections
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb10-release+no_split_sections
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb10-release+no_split_sections.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-aarch64-linux-deb12-release+no_split_sections:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb12-release+no_split_sections
+      BUILD_FLAVOUR: release+no_split_sections
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb12-release+no_split_sections
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-aarch64-linux-deb12-release+no_split_sections.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-i386-linux-alpine3_20-release+no_split_sections:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-i386-linux-alpine3_20-release+no_split_sections
+      BROKEN_TESTS: encoding004 T10458 simd009 T25169 T22033
+      BUILD_FLAVOUR: release+no_split_sections
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: i386-linux-alpine3_20-release+no_split_sections
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-i386-linux-alpine3_20-release+no_split_sections.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-i386-linux-deb10-release+no_split_sections:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-i386-linux-deb10-release+no_split_sections
+      BUILD_FLAVOUR: release+no_split_sections
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: i386-linux-deb10-release+no_split_sections
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-i386-linux-deb10-release+no_split_sections.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-i386-linux-deb12-release+no_split_sections:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-i386-linux-deb12-release+no_split_sections
+      BUILD_FLAVOUR: release+no_split_sections
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: i386-linux-deb12-release+no_split_sections
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-i386-linux-deb12-release+no_split_sections.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-darwin-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-darwin-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MACOSX_DEPLOYMENT_TARGET: 11.0
+      NIX_SYSTEM: x86_64-darwin
+      TEST_ENV: x86_64-darwin-release
+      XZ_OPT: -9
+      ac_cv_func_clock_gettime: no
+      ac_cv_func_futimens: no
+      ac_cv_func_utimensat: no
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: find libraries -name config.sub -exec cp config.sub {} \;
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-darwin-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-freebsd14-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-freebsd14-release
+      BUILD_FLAVOUR: release
+      CABAL_INSTALL_VERSION: 3.10.3.0
+      CC: cc
+      CONFIGURE_ARGS: --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib --with-system-libffi --with-ffi-includes=/usr/local/include --with-ffi-libraries=/usr/local/lib --with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --enable-strict-ghc-toolchain-check
+      CXX: c++
+      GHC_VERSION: 9.6.4
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-freebsd14-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: .gitlab/ci.sh setup
+      - name: Build step 2
+        run: .gitlab/ci.sh configure
+      - name: Build step 3
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 4
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-freebsd14-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-alpine3_12-int_native-release+fully_static:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_12-int_native-release+fully_static
+      BROKEN_TESTS: ghcilink002 linker_unload_native encoding004 T10458
+      BUILD_FLAVOUR: release+fully_static
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_12-int_native-release+fully_static
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_12-int_native-release+fully_static.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-alpine3_12-release+fully_static+no_split_sections:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_12-release+fully_static+no_split_sections
+      BROKEN_TESTS: ghcilink002 linker_unload_native encoding004 T10458
+      BUILD_FLAVOUR: release+fully_static+no_split_sections
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_12-release+fully_static+no_split_sections
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_12-release+fully_static+no_split_sections.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-alpine3_12-release+no_split_sections:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_12-release+no_split_sections
+      BROKEN_TESTS: encoding004 T10458
+      BUILD_FLAVOUR: release+no_split_sections
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_12-release+no_split_sections
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_12-release+no_split_sections.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-alpine3_20-release+no_split_sections:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_20-release+no_split_sections
+      BROKEN_TESTS: encoding004 T10458
+      BUILD_FLAVOUR: release+no_split_sections
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_20-release+no_split_sections
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_20-release+no_split_sections.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-deb10-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb10-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb10-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb10-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-deb10-release+debug_info:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb10-release+debug_info
+      BUILD_FLAVOUR: release+debug_info
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb10-release+debug_info
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb10-release+debug_info.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-deb11-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb11-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb11-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb11-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-deb12-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-deb9-release+no_split_sections:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb9-release+no_split_sections
+      BUILD_FLAVOUR: release+no_split_sections
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb9-release+no_split_sections
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb9-release+no_split_sections.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-fedora33-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora33-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LLC: /bin/false
+      OPT: /bin/false
+      TEST_ENV: x86_64-linux-fedora33-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora33-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-fedora33-release+debug_info:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora33-release+debug_info
+      BUILD_FLAVOUR: release+debug_info
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LLC: /bin/false
+      OPT: /bin/false
+      TEST_ENV: x86_64-linux-fedora33-release+debug_info
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora33-release+debug_info.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-fedora33-release-hackage:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora33-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --haddock-for-hackage
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LLC: /bin/false
+      OPT: /bin/false
+      TEST_ENV: x86_64-linux-fedora33-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora33-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-fedora38-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora38-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-fedora38-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora38-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-rocky8-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-rocky8-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-rocky8-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-rocky8-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-ubuntu18_04-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu18_04-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu18_04-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu18_04-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-ubuntu20_04-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu20_04-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu20_04-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu20_04-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-ubuntu22_04-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu22_04-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu22_04-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu22_04-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-linux-ubuntu24_04-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu24_04-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu24_04-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu24_04-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-windows-int_native-release:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-windows-int_native-release
+      BUILD_FLAVOUR: release
+      CABAL_INSTALL_VERSION: 3.10.2.0
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      GHC_VERSION: 9.6.4
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MSYSTEM: CLANG64
+      TEST_ENV: x86_64-windows-int_native-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: bash .gitlab/ci.sh setup
+      - name: Build step 2
+        run: bash .gitlab/ci.sh configure
+      - name: Build step 3
+        run: bash .gitlab/ci.sh build_hadrian
+      - name: Build step 4
+        run: bash .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-windows-int_native-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  release-x86_64-windows-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-windows-release
+      BUILD_FLAVOUR: release
+      CABAL_INSTALL_VERSION: 3.10.2.0
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      GHC_VERSION: 9.6.4
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      IGNORE_PERF_FAILURES: all
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MSYSTEM: CLANG64
+      TEST_ENV: x86_64-windows-release
+      XZ_OPT: -9
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: bash .gitlab/ci.sh setup
+      - name: Build step 2
+        run: bash .gitlab/ci.sh configure
+      - name: Build step 3
+        run: bash .gitlab/ci.sh build_hadrian
+      - name: Build step 4
+        run: bash .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-windows-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-darwin-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-darwin-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MACOSX_DEPLOYMENT_TARGET: 11.0
+      NIX_SYSTEM: x86_64-darwin
+      TEST_ENV: x86_64-darwin-validate
+      ac_cv_func_clock_gettime: no
+      ac_cv_func_futimens: no
+      ac_cv_func_utimensat: no
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: find libraries -name config.sub -exec cp config.sub {} \;
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-darwin-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-freebsd14-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-freebsd14-validate
+      BUILD_FLAVOUR: validate
+      CABAL_INSTALL_VERSION: 3.10.3.0
+      CC: cc
+      CONFIGURE_ARGS: --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib --with-system-libffi --with-ffi-includes=/usr/local/include --with-ffi-libraries=/usr/local/lib --with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --enable-strict-ghc-toolchain-check
+      CXX: c++
+      GHC_VERSION: 9.6.4
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-freebsd14-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: .gitlab/ci.sh setup
+      - name: Build step 2
+        run: .gitlab/ci.sh configure
+      - name: Build step 3
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 4
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-freebsd14-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-alpine3_12-int_native-validate+fully_static:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static
+      BROKEN_TESTS: ghcilink002 linker_unload_native encoding004 T10458
+      BUILD_FLAVOUR: validate+fully_static
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_12-int_native-validate+fully_static
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-alpine3_12-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_12-validate
+      BROKEN_TESTS: encoding004 T10458
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_12-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_12-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-alpine3_12-validate+fully_static:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_12-validate+fully_static
+      BROKEN_TESTS: ghcilink002 linker_unload_native encoding004 T10458
+      BUILD_FLAVOUR: validate+fully_static
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_12-validate+fully_static
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-alpine3_20-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_20-validate
+      BROKEN_TESTS: encoding004 T10458
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --disable-ld-override --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-alpine3_20-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_20-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      BUILD_FLAVOUR: release+host_fully_static+text_simdutf
+      CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      CROSS_TARGET: wasm32-wasi
+      FIREFOX_LAUNCH_OPTS: |
+        {"browser":"firefox","executablePath":"/usr/bin/firefox"}
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs --docs=no-sphinx-man
+      TEST_ENV: x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_20-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      BUILD_FLAVOUR: release+host_fully_static+text_simdutf
+      CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      CROSS_TARGET: wasm32-wasi
+      FIREFOX_LAUNCH_OPTS: |
+        {"browser":"firefox","executablePath":"/usr/bin/firefox"}
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs --docs=no-sphinx-man
+      TEST_ENV: x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_20-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+      BUILD_FLAVOUR: release+host_fully_static+text_simdutf
+      CONFIGURE_ARGS: --enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check
+      CROSS_TARGET: wasm32-wasi
+      FIREFOX_LAUNCH_OPTS: |
+        {"browser":"firefox","executablePath":"/usr/bin/firefox"}
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs --docs=no-sphinx-man
+      TEST_ENV: x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-alpine3_20-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb10-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb10-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb10-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb10-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb10-validate+debug_info:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb10-validate+debug_info
+      BUILD_FLAVOUR: validate+debug_info
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb10-validate+debug_info
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb10-validate+debug_info.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb11-cross_aarch64-linux-gnu-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CROSS_EMULATOR: qemu-aarch64 -L /usr/aarch64-linux-gnu
+      CROSS_TARGET: aarch64-linux-gnu
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb11-cross_aarch64-linux-gnu-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CONFIGURE_WRAPPER: emconfigure
+      CROSS_EMULATOR: js-emulator
+      CROSS_TARGET: javascript-unknown-ghcjs
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb11-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb11-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb11-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb11-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-int_native-validate:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-int_native-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-int_native-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-int_native-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-no_tntc-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-no_tntc-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --disable-tables-next-to-code --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-no_tntc-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-no_tntc-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-numa-slow-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-numa-slow-validate
+      BUILD_FLAVOUR: slow-validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      ENABLE_NUMA: 1
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-numa-slow-validate
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-numa-slow-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-release-perf:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      RUNTEST_ARGS:  --config perf_path=perf
+      TEST_ENV: x86_64-linux-deb12-release
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CROSS_EMULATOR: qemu-riscv64 -L /usr/riscv64-linux-gnu
+      CROSS_TARGET: riscv64-linux-gnu
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-unreg-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-unreg-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-unregisterised --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-unreg-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-unreg-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-validate+boot_nonmoving_gc:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-validate+boot_nonmoving_gc
+      BUILD_FLAVOUR: validate+boot_nonmoving_gc
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      RUNTEST_ARGS: --way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity
+      TEST_ENV: x86_64-linux-deb12-validate+boot_nonmoving_gc
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-validate+boot_nonmoving_gc.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-validate+llvm:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-validate+llvm
+      BUILD_FLAVOUR: validate+llvm
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-validate+llvm
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-validate+llvm.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-validate+thread_sanitizer_cmm:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-validate+thread_sanitizer_cmm
+      BUILD_FLAVOUR: validate+thread_sanitizer_cmm
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --docs=none
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-validate+thread_sanitizer_cmm
+      TSAN_OPTIONS: suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-validate+thread_sanitizer_cmm.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb12-zstd-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb12-zstd-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-ipe-data-compression --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb12-zstd-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb12-zstd-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-deb9-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-deb9-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-deb9-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-deb9-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-fedora33-release:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora33-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LLC: /bin/false
+      OPT: /bin/false
+      TEST_ENV: x86_64-linux-fedora33-release
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora33-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-fedora33-release-hackage:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora33-release
+      BUILD_FLAVOUR: release
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      HADRIAN_ARGS: --haddock-for-hackage
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LLC: /bin/false
+      OPT: /bin/false
+      TEST_ENV: x86_64-linux-fedora33-release
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora33-release.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-fedora33-validate+debug_info:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora33-validate+debug_info
+      BUILD_FLAVOUR: validate+debug_info
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LLC: /bin/false
+      OPT: /bin/false
+      TEST_ENV: x86_64-linux-fedora33-validate+debug_info
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora33-validate+debug_info.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-fedora38-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-fedora38-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-fedora38-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-fedora38-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-rocky8-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-rocky8-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-rocky8-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-rocky8-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-ubuntu18_04-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu18_04-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu18_04-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu18_04-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-ubuntu20_04-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu20_04-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu20_04-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu20_04-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-ubuntu22_04-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu22_04-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu22_04-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu22_04-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --with-intree-gmp --enable-strict-ghc-toolchain-check
+      CROSS_EMULATOR: qemu-loongarch64 -L /usr/loongarch64-linux-gnu
+      CROSS_TARGET: loongarch64-linux-gnu
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-linux-ubuntu24_04-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-linux-ubuntu24_04-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: x86_64-linux-ubuntu24_04-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      - name: Build step 1
+        run: sudo chown ghc:ghc -R .
+      - name: Build step 2
+        run: .gitlab/ci.sh setup
+      - name: Build step 3
+        run: .gitlab/ci.sh configure
+      - name: Build step 4
+        run: .gitlab/ci.sh build_hadrian
+      - name: Build step 5
+        run: .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-linux-ubuntu24_04-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-windows-int_native-validate:
+    env:
+      BIGNUM_BACKEND: native
+      BIN_DIST_NAME: ghc-x86_64-windows-int_native-validate
+      BUILD_FLAVOUR: validate
+      CABAL_INSTALL_VERSION: 3.10.2.0
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      GHC_VERSION: 9.6.4
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MSYSTEM: CLANG64
+      TEST_ENV: x86_64-windows-int_native-validate
+    if: contains(github.event.pull_request.labels.*.name, 'full-ci')
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: bash .gitlab/ci.sh setup
+      - name: Build step 2
+        run: bash .gitlab/ci.sh configure
+      - name: Build step 3
+        run: bash .gitlab/ci.sh build_hadrian
+      - name: Build step 4
+        run: bash .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-windows-int_native-validate.tar.xz junit.xml unexpected-test-output.tar.gz
+  x86_64-windows-validate:
+    env:
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-x86_64-windows-validate
+      BUILD_FLAVOUR: validate
+      CABAL_INSTALL_VERSION: 3.10.2.0
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      GHC_VERSION: 9.6.4
+      HADRIAN_ARGS: --docs=no-sphinx-pdfs
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      LANG: en_US.UTF-8
+      MSYSTEM: CLANG64
+      TEST_ENV: x86_64-windows-validate
+    needs:
+      - hadrian-ghc-in-ghci
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build step 1
+        run: bash .gitlab/ci.sh setup
+      - name: Build step 2
+        run: bash .gitlab/ci.sh configure
+      - name: Build step 3
+        run: bash .gitlab/ci.sh build_hadrian
+      - name: Build step 4
+        run: bash .gitlab/ci.sh test_hadrian
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ghc-x86_64-windows-validate.tar.xz junit.xml unexpected-test-output.tar.gz
