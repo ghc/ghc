@@ -1125,7 +1125,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
 
     buildModuleLoop :: [Either ModuleGraphNode ModuleGraphNodeWithBootFile] -> BuildM [MakeAction]
     buildModuleLoop ms = do
-      build_modules <- mapM (either (buildSingleModule (Loop Initialise)) (\(ModuleGraphNodeWithBootFile mn _) -> buildSingleModule (Loop Initialise) mn)) ms
+      build_modules <- concatMapM (either (fmap pure . buildSingleModule (Loop Initialise)) (\(ModuleGraphNodeWithBootFile mn _) -> buildOneModule mn)) ms
       let extract (Left mn) = GWIB (mkNodeKey mn) NotBoot
           extract (Right (ModuleGraphNodeWithBootFile mn _)) = GWIB (mkNodeKey mn) IsBoot
       let loop_mods = map extract ms
@@ -1678,20 +1678,20 @@ rehydrate hsc_env hmis = do
 
 -- If needed, then rehydrate the necessary modules with a suitable KnotVars for the
 -- module currently being compiled.
-maybeRehydrateBefore :: HscEnv -> ModuleNodeInfo -> Maybe [ModuleName] -> IO HscEnv
-maybeRehydrateBefore hsc_env _ Nothing = return hsc_env
-maybeRehydrateBefore hsc_env mni (Just mns) = do
-  knot_var <- initialise_knot_var hsc_env
-  let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
-  hmis <- mapM (fmap expectJust . lookupHpt (hsc_HPT hsc_env')) mns
-  hmis' <- rehydrate hsc_env' hmis
-  mapM_ (\hmi -> HUG.addHomeModInfoToHug hmi (hsc_HUG hsc_env')) hmis'
-  return hsc_env'
+-- maybeRehydrateBefore :: HscEnv -> ModuleNodeInfo -> Maybe [ModuleName] -> IO HscEnv
+-- maybeRehydrateBefore hsc_env _ Nothing = return hsc_env
+-- maybeRehydrateBefore hsc_env mni (Just mns) = do
+--   knot_var <- initialise_knot_var hsc_env
+--   let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
+--   hmis <- mapM (fmap expectJust . lookupHpt (hsc_HPT hsc_env')) mns
+--   hmis' <- rehydrate hsc_env' hmis
+--   mapM_ (\hmi -> HUG.addHomeModInfoToHug hmi (hsc_HUG hsc_env')) hmis'
+--   return hsc_env'
 
-  where
-   initialise_knot_var hsc_env = liftIO $
-    let mod_name = homeModuleInstantiation (hsc_home_unit_maybe hsc_env) (moduleNodeInfoModule mni)
-    in mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
+--   where
+--    initialise_knot_var hsc_env = liftIO $
+--     let mod_name = homeModuleInstantiation (hsc_home_unit_maybe hsc_env) (moduleNodeInfoModule mni)
+--     in mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
 
 rehydrateAfter :: HscEnv
   -> [ModuleName]
