@@ -5,7 +5,11 @@ test('recomp015',
        # See ticket:11022#comment:7
        unless(opsys('linux') or opsys('solaris2') or opsys('openbsd'), skip),
        when(arch('arm'), skip),
-       js_skip # JS backend doesn't support .s assembly files
+       js_skip, # JS backend doesn't support .s assembly files
+
+       # the linker sometimes throws warnings since we don't
+       # generate a .note.GNU-stack section
+       ignore_stderr,
      ],
      makefile_test, [])
 
