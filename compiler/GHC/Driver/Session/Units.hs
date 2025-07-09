@@ -4,10 +4,6 @@
 {-# LANGUAGE TupleSections #-}
 module GHC.Driver.Session.Units (initMake, initMulti) where
 
--- The official GHC API
-import qualified GHC
-import GHC              (parseTargetFiles, Ghc, GhcMonad(..))
-
 import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types

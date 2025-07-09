@@ -35,6 +35,8 @@ import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 
+import GHC.Hs
+import GHC.Unit.Module.ModIface
 import GHC.Parser
 import GHC.Parser.Header
 import GHC.Parser.Lexer
@@ -42,7 +44,6 @@ import GHC.Parser.Annotation
 
 import GHC.Rename.Names
 
-import GHC hiding (Failed, Succeeded)
 import GHC.Tc.Utils.Monad
 import GHC.Iface.Recomp
 
@@ -77,6 +78,8 @@ import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.Data.ShortText as ST
+
+import Language.Haskell.Syntax
 
 import Data.List ( partition )
 import System.Exit
