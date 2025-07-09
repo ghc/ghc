@@ -987,6 +987,14 @@ extern char **environ;
       SymI_NeedsProto(__fixunsdfdi)
 #elif defined(__GNUC__) && SIZEOF_VOID_P == 8
 #define RTS_LIBGCC_SYMBOLS                             \
+      SymI_NeedsProto(__divsc3)                        \
+      SymI_NeedsProto(__divdc3)                        \
+      SymI_NeedsProto(__divtc3)                        \
+      SymI_NeedsProto(__divxc3)                        \
+      SymI_NeedsProto(__muldc3)                        \
+      SymI_NeedsProto(__mulsc3)                        \
+      SymI_NeedsProto(__multc3)                        \
+      SymI_NeedsProto(__mulxc3)                        \
       SymI_NeedsProto(__udivti3)                       \
       SymI_NeedsProto(__umodti3)
 #else
