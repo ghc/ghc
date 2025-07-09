@@ -33,7 +33,7 @@ module GHC.Core.Opt.Monad (
     getAnnotations, getFirstAnnotations,
 
     -- ** Screen output
-    putMsg, putMsgS, errorMsg, msg,
+    putMsg, putMsgS, errorMsg, msg, diagnostic,
     fatalErrorMsg, fatalErrorMsgS,
     debugTraceMsg, debugTraceMsgS,
   ) where
@@ -41,6 +41,8 @@ module GHC.Core.Opt.Monad (
 import GHC.Prelude hiding ( read )
 
 import GHC.Driver.DynFlags
+import GHC.Driver.Errors ( reportDiagnostic, reportError )
+import GHC.Driver.Config.Diagnostic ( initDiagOpts )
 import GHC.Driver.Env
 
 import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv )
@@ -52,7 +54,6 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Error
 
-import GHC.Utils.Error ( errorDiagnostic )
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Logger
 import GHC.Utils.Monad
@@ -383,9 +384,22 @@ putMsgS = putMsg . text
 putMsg :: SDoc -> CoreM ()
 putMsg = msg MCInfo
 
+diagnostic :: DiagnosticReason -> SDoc -> CoreM ()
+diagnostic reason doc = do
+    logger <- getLogger
+    loc <- getSrcSpanM
+    name_ppr_ctx <- getNamePprCtx
+    diag_opts <- initDiagOpts <$> getDynFlags
+    liftIO $ reportDiagnostic logger name_ppr_ctx diag_opts loc reason doc
+
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
-errorMsg doc = msg errorDiagnostic doc
+errorMsg doc = do
+    logger <- getLogger
+    loc <- getSrcSpanM
+    name_ppr_ctx <- getNamePprCtx
+    diag_opts <- initDiagOpts <$> getDynFlags
+    liftIO $ reportError logger name_ppr_ctx diag_opts loc doc
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsgS :: String -> CoreM ()
