@@ -280,6 +280,7 @@ library
                         rts/Bytecodes.h
                         rts/Config.h
                         rts/Constants.h
+                        rts/Debug.h
                         rts/EventLogFormat.h
                         rts/EventLogWriter.h
                         rts/FileLock.h
