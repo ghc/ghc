@@ -15,7 +15,7 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
-#include "Printer.h"    /* DEBUG_LoadSymbols */
+#include "Printer.h"    /* initDebugSymbolTable */
 #include "Schedule.h"   /* initScheduler */
 #include "Stats.h"      /* initStats */
 #include "STM.h"        /* initSTM */
@@ -326,12 +326,10 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     } else {
         setFullProgArgv(*argc,*argv);
         setupRtsFlags(argc, *argv, rts_config);
-
-#if defined(DEBUG)
-        /* load debugging symbols for current binary */
-        DEBUG_LoadSymbols((*argv)[0]);
-#endif /* DEBUG */
     }
+
+    /* initialize debugging symbol table for current binary */
+    initDebugSymbolTable();
 
     /* Based on the RTS flags, decide which I/O manager to use. */
     selectIOManager();

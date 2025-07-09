@@ -43,7 +43,7 @@ static void    printStdObjPayload( const StgClosure *obj );
 void printPtr( StgPtr p )
 {
     const char *raw;
-    raw = lookupGHCName(p);
+    raw = lookupDebugSymbol(p);
     if (raw != NULL) {
         debugBelch("<%s>", raw);
         debugBelch("[%p]", p);
@@ -853,30 +853,6 @@ void printLargeAndPinnedObjects(void)
  * Uses symbol table in (unstripped executable)
  * ------------------------------------------------------------------------*/
 
-/* --------------------------------------------------------------------------
- * Simple lookup table
- * address -> function name
- * ------------------------------------------------------------------------*/
-
-static HashTable * add_to_fname_table = NULL;
-
-const char *lookupGHCName( void *addr )
-{
-    if (add_to_fname_table == NULL)
-        return NULL;
-
-    return lookupHashTable(add_to_fname_table, (StgWord)addr);
-}
-
-/* --------------------------------------------------------------------------
- * Symbol table loading
- * ------------------------------------------------------------------------*/
-
-extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
-{
-  /* nothing, yet */
-}
-
 void findPtr(P_ p, int);                /* keep gcc -Wall happy */
 
 int searched = 0;
@@ -980,6 +956,38 @@ void printObj( StgClosure *obj )
 
 
 #endif /* DEBUG */
+
+/* --------------------------------------------------------------------------
+ * Simple lookup table
+ * address -> function name
+ * ------------------------------------------------------------------------*/
+
+static HashTable * add_to_fname_table = NULL;
+
+void insertDebugSymbol( void *addr, const char *sym ) {
+    ASSERT(add_to_fname_table != NULL);
+
+    insertHashTable(add_to_fname_table, (StgWord)addr, sym);
+}
+
+const char *lookupDebugSymbol( void *addr )
+{
+    if (add_to_fname_table == NULL)
+        return NULL;
+
+    return lookupHashTable(add_to_fname_table, (StgWord)addr);
+}
+
+/* --------------------------------------------------------------------------
+ * Symbol table loading
+ * ------------------------------------------------------------------------*/
+
+extern void initDebugSymbolTable(void)
+{
+  if (add_to_fname_table == NULL) {
+    add_to_fname_table = allocHashTable();
+  }
+}
 
 /* -----------------------------------------------------------------------------
    Closure types

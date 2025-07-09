@@ -2093,7 +2093,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
               (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cmm_cg_infos)
                   <- {-# SCC "codeOutput" #-}
-                    codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename location
+                    codeOutput platform logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename location
                     foreign_stubs foreign_files dependencies (initDUniqSupply 'n' 0) rawcmms1
               return  ( output_filename, stub_c_exists, foreign_fps
                       , Just stg_cg_infos, Just cmm_cg_infos)
@@ -2247,7 +2247,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
                   in NoStubs `appendStubC` ip_init
               | otherwise     = NoStubs
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
-          <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
+          <- codeOutput platform logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
              dus1 rawCmms
         return stub_c_exists
   where
