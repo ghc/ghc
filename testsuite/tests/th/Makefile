@@ -46,9 +46,9 @@ TH_Depends:
 .PHONY: TH_Depends_Dir
 TH_Depends_Dir:
 	rm -rf TH_Depends_external
-	$(RM) TH_Depends TH_Depends.exe
-	$(RM) TH_Depends.o TH_Depends.hi
-	$(RM) TH_Depends_External.o TH_Depends_External.hi
+	$(RM) TH_Depends_Dir TH_Depends_Dir.exe
+	$(RM) TH_Depends_Dir.o TH_Depends_Dir.hi
+	$(RM) TH_Depends_Dir_External.o TH_Depends_Dir_External.hi
 
 	mkdir TH_Depends_external
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -v0 TH_Depends_Dir
