@@ -226,6 +226,7 @@ ghc-linters:
   script:
     - .gitlab/ci.sh configure
     - timeout 10m .gitlab/ci.sh run_hadrian test --test-root-dirs="testsuite/tests/linters"
+    - egrep -v -R '^import GHC([^\.A-Za-z]|$)' compiler || (echo 'No sources in compiler/ should import the `GHC` module'; exit 1)
   dependencies: []
   rules:
     - if: $CI_MERGE_REQUEST_ID
