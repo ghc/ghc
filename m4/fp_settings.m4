@@ -52,7 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsCxxCompilerCommand="$CXX"
     SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
     SettingsCPPCommand="$CPPCmd"
     SettingsCPPFlags="$CONF_CPP_OPTS_STAGE2"
@@ -108,7 +107,6 @@ AC_DEFUN([FP_SETTINGS],
         # We need to issue a substitution to use $tooldir,
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
-        SUBST_TOOLDIR([SettingsCxxCompilerCommand])
         SUBST_TOOLDIR([SettingsCxxCompilerFlags])
         SUBST_TOOLDIR([SettingsCCompilerLinkFlags])
         SUBST_TOOLDIR([SettingsCPPCommand])
@@ -137,7 +135,6 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsCxxCompilerCommand)
     AC_SUBST(SettingsCPPCommand)
     AC_SUBST(SettingsCPPFlags)
     AC_SUBST(SettingsHaskellCPPCommand)
