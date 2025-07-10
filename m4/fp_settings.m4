@@ -52,7 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsArCommand="$ArCmd"
     SettingsRanlibCommand="$RanlibCmd"
     SettingsMergeObjectsCommand="$MergeObjsCmd"
@@ -88,7 +87,6 @@ AC_DEFUN([FP_SETTINGS],
         # We need to issue a substitution to use $tooldir,
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
-        SUBST_TOOLDIR([SettingsCCompilerLinkFlags])
         SUBST_TOOLDIR([SettingsMergeObjectsCommand])
         SUBST_TOOLDIR([SettingsMergeObjectsFlags])
         SUBST_TOOLDIR([SettingsArCommand])
@@ -107,7 +105,6 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsCCompilerLinkFlags)
     AC_SUBST(SettingsCCompilerSupportsNoPie)
     AC_SUBST(SettingsMergeObjectsCommand)
     AC_SUBST(SettingsMergeObjectsFlags)

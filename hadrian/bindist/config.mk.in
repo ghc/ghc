@@ -206,7 +206,6 @@ TablesNextToCode = @TablesNextToCode@
 LeadingUnderscore = @LeadingUnderscore@
 LlvmTarget = @LlvmTarget@
 
-SettingsCCompilerLinkFlags = @SettingsCCompilerLinkFlags@
 SettingsCCompilerSupportsNoPie = @SettingsCCompilerSupportsNoPie@
 SettingsMergeObjectsCommand = @SettingsMergeObjectsCommand@
 SettingsMergeObjectsFlags = @SettingsMergeObjectsFlags@
