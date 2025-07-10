@@ -1124,7 +1124,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
 
     buildModuleLoop :: [Either ModuleGraphNode ModuleGraphNodeWithBootFile] -> BuildM [MakeAction]
     buildModuleLoop ms = do
-      build_modules <- concatMapM (either (fmap pure . buildSingleModule (Loop Initialise)) (\(ModuleGraphNodeWithBootFile mn _) -> buildOneModule mn)) ms
+      build_modules <- mapM (either (buildSingleModule (Loop Initialise)) (\(ModuleGraphNodeWithBootFile mn _) -> buildSingleModule (Loop Initialise) mn)) ms
       let extract (Left mn) = GWIB (mkNodeKey mn) NotBoot
           extract (Right (ModuleGraphNodeWithBootFile mn _)) = GWIB (mkNodeKey mn) IsBoot
       let loop_mods = map extract ms
