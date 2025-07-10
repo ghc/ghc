@@ -52,8 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsJavaScriptCPPCommand="$JavaScriptCPPCmd"
-    SettingsJavaScriptCPPFlags="$JavaScriptCPPArgs"
     SettingsCmmCPPCommand="$CmmCPPCmd"
     SettingsCmmCPPFlags="$CmmCPPArgs"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
@@ -86,7 +84,6 @@ AC_DEFUN([FP_SETTINGS],
         # executable names, not paths.
         dnl XXX="$(basename XXX)"
         SettingsCmmCPPCommand="$(basename $SettingsCmmCPPCommand)"
-        SettingsJavaScriptCPPCommand="$(basename $SettingsJavaScriptCPPCommand)"
         SettingsLdCommand="$(basename $SettingsLdCommand)"
         SettingsMergeObjectsCommand="$(basename $SettingsMergeObjectsCommand)"
         SettingsArCommand="$(basename $SettingsArCommand)"
@@ -104,8 +101,6 @@ AC_DEFUN([FP_SETTINGS],
         SUBST_TOOLDIR([SettingsCCompilerLinkFlags])
         SUBST_TOOLDIR([SettingsCmmCPPCommand])
         SUBST_TOOLDIR([SettingsCmmCPPFlags])
-        SUBST_TOOLDIR([SettingsJavaScriptCPPCommand])
-        SUBST_TOOLDIR([SettingsJavaScriptCPPFlags])
         SUBST_TOOLDIR([SettingsMergeObjectsCommand])
         SUBST_TOOLDIR([SettingsMergeObjectsFlags])
         SUBST_TOOLDIR([SettingsArCommand])
@@ -127,8 +122,6 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsCmmCPPCommand)
     AC_SUBST(SettingsCmmCPPFlags)
     AC_SUBST(SettingsCmmCPPSupportsG0)
-    AC_SUBST(SettingsJavaScriptCPPCommand)
-    AC_SUBST(SettingsJavaScriptCPPFlags)
     AC_SUBST(SettingsCCompilerLinkFlags)
     AC_SUBST(SettingsCCompilerSupportsNoPie)
     AC_SUBST(SettingsMergeObjectsCommand)
