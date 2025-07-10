@@ -206,7 +206,6 @@ TablesNextToCode = @TablesNextToCode@
 LeadingUnderscore = @LeadingUnderscore@
 LlvmTarget = @LlvmTarget@
 
-SettingsCPPCommand = @SettingsCPPCommand@
 SettingsCPPFlags = @SettingsCPPFlags@
 SettingsHaskellCPPCommand = @SettingsHaskellCPPCommand@
 SettingsHaskellCPPFlags = @SettingsHaskellCPPFlags@
