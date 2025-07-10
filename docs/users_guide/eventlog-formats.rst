@@ -779,9 +779,9 @@ the total time spent profiling.
 Cost-centre break-down
 ^^^^^^^^^^^^^^^^^^^^^^
 
-A variable-length packet encoding a heap profile sample broken down by,
- * cost-centre (:rts-flag:`-hc`)
-
+A variable-length packet encoding a heap profile sample.
+This event is only emitted when the heap profile type is set to :rts-flag:`-hc` or :rts-flag:`-hb`.
+Otherwise, a :event-type:`HEAP_PROF_SAMPLE_STRING` event is emitted instead.
 
 .. event-type:: HEAP_PROF_SAMPLE_COST_CENTRE
 
