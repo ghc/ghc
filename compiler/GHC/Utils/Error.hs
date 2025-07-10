@@ -318,7 +318,7 @@ sortMsgBag mopts = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
 ghcExit :: Logger -> Int -> IO ()
 ghcExit logger val
   | val == 0  = exitWith ExitSuccess
-  | otherwise = do errorMsg logger (text "\nCompilation had errors\n\n")
+  | otherwise = do fatalErrorMsg logger (text "\nCompilation had errors\n\n")
                    exitWith (ExitFailure val)
 
 -- -----------------------------------------------------------------------------
