@@ -102,10 +102,7 @@ AC_DEFUN([FP_SETTINGS],
     SettingsOtoolCommand="$OtoolCmd"
     SettingsInstallNameToolCommand="$InstallNameToolCmd"
 
-    SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
-
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsCCompilerSupportsNoPie)
     AC_SUBST(SettingsMergeObjectsCommand)
     AC_SUBST(SettingsMergeObjectsFlags)
     AC_SUBST(SettingsArCommand)
