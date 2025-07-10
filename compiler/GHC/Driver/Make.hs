@@ -52,7 +52,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Tc.Utils.Backpack
-import GHC.Tc.Utils.Monad  ( initIfaceCheck, concatMapM )
+import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 
 import GHC.Runtime.Interpreter
 import qualified GHC.Linker.Loader as Linker
