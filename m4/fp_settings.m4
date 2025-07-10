@@ -52,7 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
     SettingsCxxCompilerCommand="$CXX"
     SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
     SettingsCPPCommand="$CPPCmd"
@@ -109,7 +108,6 @@ AC_DEFUN([FP_SETTINGS],
         # We need to issue a substitution to use $tooldir,
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
-        SUBST_TOOLDIR([SettingsCCompilerFlags])
         SUBST_TOOLDIR([SettingsCxxCompilerCommand])
         SUBST_TOOLDIR([SettingsCxxCompilerFlags])
         SUBST_TOOLDIR([SettingsCCompilerLinkFlags])
@@ -149,7 +147,6 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsCmmCPPSupportsG0)
     AC_SUBST(SettingsJavaScriptCPPCommand)
     AC_SUBST(SettingsJavaScriptCPPFlags)
-    AC_SUBST(SettingsCCompilerFlags)
     AC_SUBST(SettingsCxxCompilerFlags)
     AC_SUBST(SettingsCCompilerLinkFlags)
     AC_SUBST(SettingsCCompilerSupportsNoPie)
