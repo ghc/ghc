@@ -52,12 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    if test -z "$WindresCmd"; then
-        SettingsWindresCommand="/bin/false"
-    else
-        SettingsWindresCommand="$WindresCmd"
-    fi
-
     # LLVM backend tools
     SettingsLlcCommand="$LlcCmd"
     SettingsOptCommand="$OptCmd"
@@ -69,7 +63,6 @@ AC_DEFUN([FP_SETTINGS],
         # executable names, not paths.
         dnl XXX="$(basename XXX)"
         SettingsLdCommand="$(basename $SettingsLdCommand)"
-        SettingsWindresCommand="$(basename $SettingsWindresCommand)"
         SettingsLlcCommand="$(basename $SettingsLlcCommand)"
         SettingsOptCommand="$(basename $SettingsOptCommand)"
         SettingsLlvmAsCommand="$(basename $SettingsLlvmAsCommand)"
@@ -80,7 +73,6 @@ AC_DEFUN([FP_SETTINGS],
         # We need to issue a substitution to use $tooldir,
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
-        SUBST_TOOLDIR([SettingsWindresCommand])
         SUBST_TOOLDIR([SettingsLlcCommand])
         SUBST_TOOLDIR([SettingsOptCommand])
         SUBST_TOOLDIR([SettingsLlvmAsCommand])
@@ -88,7 +80,6 @@ AC_DEFUN([FP_SETTINGS],
     fi
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
     AC_SUBST(SettingsLlvmAsCommand)
