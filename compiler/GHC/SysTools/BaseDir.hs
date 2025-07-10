@@ -90,8 +90,7 @@ the build system finds and wires through the toolchain information.
 3) The next step is to generate the settings file: The file
   `cfg/system.config.in` is preprocessed by configure and the output written to
   `system.config`.  This serves the same purpose as `config.mk` but it rewrites
-  the values that were exported.  As an example `SettingsCCompilerCommand` is
-  rewritten to `settings-c-compiler-command`.
+  the values that were exported.
 
   Next up is `src/Oracles/Settings.hs` which makes from some Haskell ADT to
   the settings `keys` in the `system.config`.  As an example,

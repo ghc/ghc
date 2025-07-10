@@ -52,7 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsCCompilerCommand="$CC"
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
     SettingsCxxCompilerCommand="$CXX"
     SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
@@ -92,7 +91,7 @@ AC_DEFUN([FP_SETTINGS],
     if test "$EnableDistroToolchain" = "YES"; then
         # If the user specified --enable-distro-toolchain then we just use the
         # executable names, not paths.
-        SettingsCCompilerCommand="$(basename $SettingsCCompilerCommand)"
+        dnl XXX="$(basename XXX)"
         SettingsHaskellCPPCommand="$(basename $SettingsHaskellCPPCommand)"
         SettingsCmmCPPCommand="$(basename $SettingsCmmCPPCommand)"
         SettingsJavaScriptCPPCommand="$(basename $SettingsJavaScriptCPPCommand)"
@@ -109,7 +108,7 @@ AC_DEFUN([FP_SETTINGS],
         # Handle the Windows toolchain installed in FP_SETUP_WINDOWS_TOOLCHAIN.
         # We need to issue a substitution to use $tooldir,
         # See Note [tooldir: How GHC finds mingw on Windows]
-        SUBST_TOOLDIR([SettingsCCompilerCommand])
+        dnl SUBST_TOOLDIR([XXX])
         SUBST_TOOLDIR([SettingsCCompilerFlags])
         SUBST_TOOLDIR([SettingsCxxCompilerCommand])
         SUBST_TOOLDIR([SettingsCxxCompilerFlags])
@@ -140,7 +139,6 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsCxxCompilerCommand)
     AC_SUBST(SettingsCPPCommand)
     AC_SUBST(SettingsCPPFlags)
