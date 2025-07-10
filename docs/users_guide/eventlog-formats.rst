@@ -796,11 +796,19 @@ A variable-length packet encoding a heap profile sample broken down by,
 String break-down
 ^^^^^^^^^^^^^^^^^
 
-A variable-length event encoding a heap sample broken down by,
+A variable-length event encoding a heap sample.
+The content of the sample label varies depending on the heap profile type:
 
- * type description (:rts-flag:`-hy`)
- * closure description (:rts-flag:`-hd`)
- * module (:rts-flag:`-hm`)
+   * :rts-flag:`-hT` The sample label contains a closure type, e.g., ``"ghc-bignum:GHC.Num.Integer.IS"``.
+   * :rts-flag:`-hm` The sample label contains a module name, e.g., ``"GHC.Num.Integer"``.
+   * :rts-flag:`-hd` The sample label contains a closure description, e.g., ``"IS"``.
+   * :rts-flag:`-hy` The sample label contains a type description, e.g., ``"Integer"``.
+   * :rts-flag:`-he` The sample label contains a stringified era, e.g., ``"1"``.
+   * :rts-flag:`-hr` The sample label contains a retainer set description, e.g., ``"(184)$stoIntegralSized1"``.
+   * :rts-flag:`-hi` The sample label contains a stringified pointer, e.g., ``"0x1008b7588"``,
+     which can be matched to an info table description emitted by the :event-type:`IPE` event.
+
+If the heap profile type is set to :rts-flag:`-hc` or :rts-flag:`-hb`, a :event-type:`HEAP_PROF_SAMPLE_COST_CENTRE` event is emitted instead.
 
 .. event-type:: HEAP_PROF_SAMPLE_STRING
 
@@ -808,7 +816,7 @@ A variable-length event encoding a heap sample broken down by,
    :length: variable
    :field Word8: profile ID
    :field Word64: heap residency in bytes
-   :field String: type or closure description, or module name
+   :field String: sample label
 
 .. _time-profiler-events:
 
