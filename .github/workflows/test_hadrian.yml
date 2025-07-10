@@ -1,0 +1,94 @@
+name: Test Hadrian GHC-in-GHCi
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  hadrian-ghc-in-ghci:
+    runs-on: ubuntu-latest
+    container:
+      image: haskell:9.12.2
+      options: --user root
+    env:
+      GHC_FLAGS: -Werror
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup GHC Environment
+        uses: ./.github/actions/setup-ghc-env
+
+      - name: Test GHC-in-GHCi
+        run: |
+          export CORES="$(mk/detect-cpu-count.sh)"
+          echo ":q" | HADRIAN_ARGS=-j$CORES hadrian/ghci -j$CORES | tail -n5 | grep "Ok,"
+
+  hadrian-build-test:
+    runs-on: ubuntu-latest
+    container:
+      image: haskell:9.12.2
+      options: --user root
+    env:
+      GHC_FLAGS: -Werror
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb10-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb10-validate
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup GHC Environment
+        uses: ./.github/actions/setup-ghc-env
+
+      - name: Run Hadrian build test
+        shell: bash
+        run: |
+          export CORES="$(mk/detect-cpu-count.sh)"
+          . .gitlab/ci.sh test_hadrian
+
+  hadrian-build-build:
+    runs-on: ubuntu-latest
+    container:
+      image: haskell:9.12.2
+      options: --user root
+    env:
+      GHC_FLAGS: -Werror
+      BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb10-validate
+      BUILD_FLAVOUR: validate
+      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb10-validate
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup GHC Environment
+        uses: ./.github/actions/setup-ghc-env
+
+      - name: Run Hadrian build test
+        shell: bash
+        run: |
+          export CORES="$(mk/detect-cpu-count.sh)"
+          . .gitlab/ci.sh build_hadrian

@@ -1,0 +1,41 @@
+# Dockerfile for GHC CI builds
+FROM haskell:9.4-slim
+
+# Install system dependencies needed for GHC build
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    python3 \
+    python3-pip \
+    autoconf \
+    automake \
+    libtool \
+    make \
+    libgmp-dev \
+    libffi-dev \
+    zlib1g-dev \
+    libnuma-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install additional Python tools if needed
+RUN pip3 install sphinx
+
+# Set up GHC environment
+ENV GHC_FLAGS="-Werror"
+ENV HADRIAN_ARGS=""
+
+# Create a non-root user for safer builds
+RUN useradd -m -s /bin/bash ghcuser
+USER ghcuser
+WORKDIR /home/ghcuser
+
+# Pre-install common Cabal packages to speed up builds
+RUN cabal update && \
+    cabal install --lib alex happy
+
+# Set the working directory for the project
+WORKDIR /ghc
+
+# Default command
+CMD ["bash"]

@@ -1,0 +1,30 @@
+name: 'Setup GHC Environment'
+description: 'Set up the common GHC build environment'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        apt-get update
+        apt-get install build-essential git autoconf python3 libgmp-dev libnuma-dev libncurses-dev -y
+
+    - name: Setup Cabal
+      shell: bash
+      run: |
+        cabal update
+        cabal v2-install alex happy
+
+    - name: Setup CI environment
+      shell: bash
+      run: bash .gitlab/ci.sh setup
+
+    - name: Configure build
+      shell: bash
+      run: bash .gitlab/ci.sh configure
+
+    - name: Setup Hadrian project
+      shell: bash
+      run: |
+        echo 'package hadrian' > hadrian/cabal.project.local

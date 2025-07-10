@@ -1,0 +1,87 @@
+name: Docker CI Examples
+
+on:
+  workflow_dispatch:  # Manual trigger for testing
+
+jobs:
+  # Method 1: Using container at job level
+  container-job:
+    runs-on: ubuntu-latest
+    container:
+      image: haskell:9.4
+      options: --user root
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build with Hadrian
+        run: |
+          cabal update
+          ./hadrian/build --help
+
+  # Method 2: Using docker run in steps
+  docker-steps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build in custom container
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            haskell:9.4 \
+            bash -c "cabal update && ./hadrian/build --help"
+
+  # Method 3: Using a custom Dockerfile
+  custom-dockerfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build custom Docker image
+        run: |
+          cat > Dockerfile.ci << 'EOF'
+          FROM haskell:9.4
+
+          # Install additional dependencies
+          RUN apt-get update && apt-get install -y \
+              build-essential \
+              git \
+              python3 \
+              && rm -rf /var/lib/apt/lists/*
+
+          # Set working directory
+          WORKDIR /ghc
+
+          # Copy project files
+          COPY . .
+
+          # Configure GHC build
+          RUN ./boot && ./configure --with-intree-gmp
+
+          # Set default command
+          CMD ["./hadrian/build", "--help"]
+          EOF
+
+          docker build -f Dockerfile.ci -t ghc-custom .
+
+      - name: Run tests in custom container
+        run: |
+          docker run --rm ghc-custom ./hadrian/build --help
+
+  # Method 4: Using Docker services for dependencies
+  with-services:
+    runs-on: ubuntu-latest
+    container:
+      image: haskell:9.12.2
+      # options: --user root
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Test with services
+        run: |
+          echo "Services are available at service names (e.g., postgres:5432)"
+          # ./hadrian/build --help
