@@ -52,8 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsRanlibCommand="$RanlibCmd"
-
     if test -z "$WindresCmd"; then
         SettingsWindresCommand="/bin/false"
     else
@@ -82,7 +80,6 @@ AC_DEFUN([FP_SETTINGS],
         # We need to issue a substitution to use $tooldir,
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
-        SUBST_TOOLDIR([SettingsRanlibCommand])
         SUBST_TOOLDIR([SettingsWindresCommand])
         SUBST_TOOLDIR([SettingsLlcCommand])
         SUBST_TOOLDIR([SettingsOptCommand])
@@ -91,7 +88,6 @@ AC_DEFUN([FP_SETTINGS],
     fi
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsRanlibCommand)
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
