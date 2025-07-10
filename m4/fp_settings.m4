@@ -90,11 +90,8 @@ AC_DEFUN([FP_SETTINGS],
         SUBST_TOOLDIR([SettingsLlvmAsFlags])
     fi
 
-    SettingsInstallNameToolCommand="$InstallNameToolCmd"
-
     AC_SUBST(EnableDistroToolchain)
     AC_SUBST(SettingsRanlibCommand)
-    AC_SUBST(SettingsInstallNameToolCommand)
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
