@@ -58,7 +58,6 @@ AC_DEFUN([FP_SETTINGS],
         # If the user specified --enable-distro-toolchain then we just use the
         # executable names, not paths.
         dnl XXX="$(basename XXX)"
-        SettingsLdCommand="$(basename $SettingsLdCommand)"
     fi
 
     if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"; then
