@@ -87,6 +87,7 @@ lib/settings : config.mk
 	@rm -f $@
 	@echo '[("target os", "$(HaskellTargetOs)")' >> $@
 	@echo ',("target arch", "$(HaskellTargetArch)")' >> $@
+	@echo ',("target has libm", "$(TargetHasLibm)")' >> $@
 	@echo ',("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit")' >> $@
 	@echo ',("target RTS linker only supports shared libraries", "$(TargetRTSLinkerOnlySupportsSharedLibs)")' >> $@
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
@@ -97,9 +98,10 @@ lib/settings : config.mk
 	@echo ',("base unit-id", "$(BaseUnitId)")' >> $@
 	@echo "]" >> $@
 
-lib/targets/default.target : config.mk
+lib/targets/default.target : config.mk default.target
 	@rm -f $@
-	@echo "DOING DEFAULT.TARGET"
+	@echo "Copying the bindist-configured default.target to lib/targets/default.target"
+	cp default.target $@
 
 # We need to install binaries relative to libraries.
 BINARIES = $(wildcard ./bin/*)
