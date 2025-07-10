@@ -32,7 +32,6 @@ import GHC.Types.Basic
 import GHC.Data.BooleanFormula
 import GHC.Core.Class             ( className, classSCSelIds )
 import GHC.Core.ConLike           ( conLikeName )
-import GHC.Core.FVs
 import GHC.Core.DataCon           ( dataConNonlinearType )
 import GHC.Types.FieldLabel
 import GHC.Hs
@@ -45,11 +44,10 @@ import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
 import GHC.Types.SrcLoc
 import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
-import GHC.Core.Predicate
 import GHC.Core.InstEnv
 import GHC.Tc.Types
 import GHC.Tc.Types.Evidence
-import GHC.Types.Var              ( Id, Var, EvId, varName, varType, varUnique )
+import GHC.Types.Var              ( Id, Var, varName, varType, varUnique )
 import GHC.Types.Var.Env
 import GHC.Builtin.Uniques
 import GHC.Iface.Make             ( mkIfaceExports )
@@ -672,15 +670,12 @@ instance ToHie (Context (Located Name)) where
 instance ToHie (Context (Located (WithUserRdr Name))) where
   toHie (C c (L l (WithUserRdr _ n))) = toHie $ C c (L l n)
 
-evVarsOfTermList :: EvTerm -> [EvId]
-evVarsOfTermList tm = toList (evVarsOfTerm tm)
-
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))
     = concatMapM go $ bagToList bs
     where
       go evbind = do
-          let evDeps = evVarsOfTermList $ eb_rhs evbind
+          let evDeps = evVarsOfTerms $ eb_rhs evbind
               depNames = EvBindDeps $ map varName evDeps
           concatM $
             [ toHie (C (EvidenceVarBind (EvLetBind depNames) (combineScopes sc (mkScope span)) sp)
@@ -701,7 +696,7 @@ instance ToHie (LocatedA HsWrapper) where
           toHie $ C (EvidenceVarBind EvWrapperBind (mkScope osp) (getRealSpanA osp))
                 $ L osp a
         (WpEvApp a) ->
-          concatMapM (toHie . C EvidenceVarUse . L osp) $ evVarsOfTermList a
+          concatMapM (toHie . C EvidenceVarUse . L osp) $ evVarsOfTerms a
         _               -> pure []
 
 instance HiePass p => HasType (LocatedA (HsBind (GhcPass p))) where

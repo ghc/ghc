@@ -28,7 +28,7 @@ module GHC.Tc.Types.Evidence (
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
-  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable,
+  mkEvCast, evVarsOfTerm, evVarsOfTerms, mkEvScSelectors, evTypeable,
 
   evTermCoercion, evTermCoercion_maybe,
   EvCallStack(..),
@@ -61,7 +61,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon ( DataCon, dataConWrapId )
 import GHC.Core.Class (Class, classSCSelId )
-import GHC.Core.FVs   ( exprSomeFreeVars )
+import GHC.Core.FVs
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
 
 import GHC.Types.Unique.DFM
@@ -75,6 +75,7 @@ import GHC.Types.Basic
 
 import GHC.Builtin.Names
 
+import GHC.Utils.FV
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -869,24 +870,30 @@ relevantEvVar :: Var -> Bool
 relevantEvVar v = isInternalName (varName v)
 
 evVarsOfTerm :: EvTerm -> VarSet
-evVarsOfTerm (EvExpr e)         = exprSomeFreeVars relevantEvVar e
-evVarsOfTerm (EvTypeable _ ev)  = evVarsOfTypeable ev
-evVarsOfTerm (EvFun { et_tvs = tvs, et_given = given, et_binds = binds, et_body = v })
-  = fvs `delVarSetList` bndrs
+evVarsOfTerm tm = fvVarSet (filterFV relevantEvVar (evTermFVs tm))
+
+evVarsOfTerms :: EvTerm -> [EvVar]
+evVarsOfTerms tm = fvVarList (filterFV relevantEvVar (evTermFVs tm))
+
+evTermFVs :: EvTerm -> FV
+evTermFVs (EvExpr e)         = exprFVs e
+evTermFVs (EvTypeable _ ev)  = evFVsOfTypeable ev
+evTermFVs (EvFun { et_tvs = tvs, et_given = given, et_binds = binds, et_body = v })
+  = addBndrsFV bndrs fvs
   where
-    fvs = foldr (unionVarSet . evVarsOfTerm . eb_rhs) (unitVarSet v) binds
+    fvs = foldr (unionFV . evTermFVs . eb_rhs) (unitFV v) binds
     bndrs = foldr ((:) . eb_lhs) (tvs ++ given) binds
 
-evVarsOfTerms :: [EvTerm] -> VarSet
-evVarsOfTerms = mapUnionVarSet evVarsOfTerm
+evTermFVss :: [EvTerm] -> FV
+evTermFVss = mapUnionFV evTermFVs
 
-evVarsOfTypeable :: EvTypeable -> VarSet
-evVarsOfTypeable ev =
+evFVsOfTypeable :: EvTypeable -> FV
+evFVsOfTypeable ev =
   case ev of
-    EvTypeableTyCon _ e      -> mapUnionVarSet evVarsOfTerm e
-    EvTypeableTyApp e1 e2    -> evVarsOfTerms [e1,e2]
-    EvTypeableTrFun em e1 e2 -> evVarsOfTerms [em,e1,e2]
-    EvTypeableTyLit e        -> evVarsOfTerm e
+    EvTypeableTyCon _ e      -> mapUnionFV evTermFVs e
+    EvTypeableTyApp e1 e2    -> evTermFVss [e1,e2]
+    EvTypeableTrFun em e1 e2 -> evTermFVss [em,e1,e2]
+    EvTypeableTyLit e        -> evTermFVs e
 
 {- *********************************************************************
 *                                                                      *
