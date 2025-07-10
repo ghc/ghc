@@ -52,20 +52,11 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsCmmCPPCommand="$CmmCPPCmd"
-    SettingsCmmCPPFlags="$CmmCPPArgs"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsArCommand="$ArCmd"
     SettingsRanlibCommand="$RanlibCmd"
     SettingsMergeObjectsCommand="$MergeObjsCmd"
     SettingsMergeObjectsFlags="$MergeObjsArgs"
-
-    AS_CASE(
-      ["$CmmCPPSupportsG0"],
-      [True], [SettingsCmmCPPSupportsG0=YES],
-      [False], [SettingsCmmCPPSupportsG0=NO],
-      [AC_MSG_ERROR(Unknown CPPSupportsG0 value $CmmCPPSupportsG0)]
-    )
 
     if test -z "$WindresCmd"; then
         SettingsWindresCommand="/bin/false"
@@ -83,7 +74,6 @@ AC_DEFUN([FP_SETTINGS],
         # If the user specified --enable-distro-toolchain then we just use the
         # executable names, not paths.
         dnl XXX="$(basename XXX)"
-        SettingsCmmCPPCommand="$(basename $SettingsCmmCPPCommand)"
         SettingsLdCommand="$(basename $SettingsLdCommand)"
         SettingsMergeObjectsCommand="$(basename $SettingsMergeObjectsCommand)"
         SettingsArCommand="$(basename $SettingsArCommand)"
@@ -99,8 +89,6 @@ AC_DEFUN([FP_SETTINGS],
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
         SUBST_TOOLDIR([SettingsCCompilerLinkFlags])
-        SUBST_TOOLDIR([SettingsCmmCPPCommand])
-        SUBST_TOOLDIR([SettingsCmmCPPFlags])
         SUBST_TOOLDIR([SettingsMergeObjectsCommand])
         SUBST_TOOLDIR([SettingsMergeObjectsFlags])
         SUBST_TOOLDIR([SettingsArCommand])
@@ -119,9 +107,6 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsCmmCPPCommand)
-    AC_SUBST(SettingsCmmCPPFlags)
-    AC_SUBST(SettingsCmmCPPSupportsG0)
     AC_SUBST(SettingsCCompilerLinkFlags)
     AC_SUBST(SettingsCCompilerSupportsNoPie)
     AC_SUBST(SettingsMergeObjectsCommand)
