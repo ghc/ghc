@@ -53,7 +53,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 AC_DEFUN([FP_SETTINGS],
 [
     # LLVM backend tools
-    SettingsLlcCommand="$LlcCmd"
     SettingsOptCommand="$OptCmd"
     SettingsLlvmAsCommand="$LlvmAsCmd"
     SettingsLlvmAsFlags="$LlvmAsFlags"
@@ -63,7 +62,6 @@ AC_DEFUN([FP_SETTINGS],
         # executable names, not paths.
         dnl XXX="$(basename XXX)"
         SettingsLdCommand="$(basename $SettingsLdCommand)"
-        SettingsLlcCommand="$(basename $SettingsLlcCommand)"
         SettingsOptCommand="$(basename $SettingsOptCommand)"
         SettingsLlvmAsCommand="$(basename $SettingsLlvmAsCommand)"
     fi
@@ -73,14 +71,12 @@ AC_DEFUN([FP_SETTINGS],
         # We need to issue a substitution to use $tooldir,
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
-        SUBST_TOOLDIR([SettingsLlcCommand])
         SUBST_TOOLDIR([SettingsOptCommand])
         SUBST_TOOLDIR([SettingsLlvmAsCommand])
         SUBST_TOOLDIR([SettingsLlvmAsFlags])
     fi
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
     AC_SUBST(SettingsLlvmAsCommand)
     AC_SUBST(SettingsLlvmAsFlags)
