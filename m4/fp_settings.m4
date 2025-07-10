@@ -52,7 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsArCommand="$ArCmd"
     SettingsRanlibCommand="$RanlibCmd"
 
     if test -z "$WindresCmd"; then
@@ -72,7 +71,6 @@ AC_DEFUN([FP_SETTINGS],
         # executable names, not paths.
         dnl XXX="$(basename XXX)"
         SettingsLdCommand="$(basename $SettingsLdCommand)"
-        SettingsArCommand="$(basename $SettingsArCommand)"
         SettingsWindresCommand="$(basename $SettingsWindresCommand)"
         SettingsLlcCommand="$(basename $SettingsLlcCommand)"
         SettingsOptCommand="$(basename $SettingsOptCommand)"
@@ -84,7 +82,6 @@ AC_DEFUN([FP_SETTINGS],
         # We need to issue a substitution to use $tooldir,
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
-        SUBST_TOOLDIR([SettingsArCommand])
         SUBST_TOOLDIR([SettingsRanlibCommand])
         SUBST_TOOLDIR([SettingsWindresCommand])
         SUBST_TOOLDIR([SettingsLlcCommand])
@@ -98,7 +95,6 @@ AC_DEFUN([FP_SETTINGS],
     SettingsInstallNameToolCommand="$InstallNameToolCmd"
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsArCommand)
     AC_SUBST(SettingsRanlibCommand)
     AC_SUBST(SettingsOtoolCommand)
     AC_SUBST(SettingsInstallNameToolCommand)

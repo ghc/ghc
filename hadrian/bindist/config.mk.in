@@ -206,7 +206,6 @@ TablesNextToCode = @TablesNextToCode@
 LeadingUnderscore = @LeadingUnderscore@
 LlvmTarget = @LlvmTarget@
 
-SettingsArCommand = @SettingsArCommand@
 SettingsOtoolCommand = @SettingsOtoolCommand@
 SettingsInstallNameToolCommand = @SettingsInstallNameToolCommand@
 SettingsRanlibCommand = @SettingsRanlibCommand@
