@@ -52,7 +52,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Tc.Utils.Backpack
-import GHC.Tc.Utils.Monad  ( initIfaceCheck, concatMapM )
+import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 
 import GHC.Runtime.Interpreter
 import qualified GHC.Linker.Loader as Linker
@@ -122,7 +122,6 @@ import System.FilePath
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import qualified Data.Map.Strict as M
-import GHC.Types.TypeEnv
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.Trans.Class
 import GHC.Driver.Env.KnotVars
@@ -547,6 +546,10 @@ createBuildPlan mod_graph maybe_top_mod =
         -- See Step 2a in Note [Upsweep]
         boot_path mn uid =
           Set.toList $
+          -- Don't include the boot module itself
+          -- Keep intermediate dependencies: as per Step 2a in Note [Upsweep], these are
+          -- the transitive dependencies of the non-boot file which transitively depend
+          -- on the boot file.
           -- Don't include the boot module itself
           Set.filter ((/= NodeKey_Module (key IsBoot)) . mkNodeKey)  $
           -- Keep intermediate dependencies: as per Step 2a in Note [Upsweep], these are
@@ -1009,6 +1012,7 @@ interpretBuildPlan :: HomeUnitGraph
                          , IO [Maybe (Maybe HomeModInfo)]) -- An action to query to get all the built modules at the end.
 interpretBuildPlan hug mhmi_cache old_hpt plan = do
   ((mcycle, plans), build_map) <- runStateT (buildLoop plan) (BuildLoopState M.empty 1)
+  -- pprTraceM "interpretBuildPlan" (vcat [text "Build plan:" <+> ppr plan])
   let wait = collect_results (buildDep build_map)
   return (mcycle, plans, wait)
 
@@ -1038,9 +1042,9 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       case plan of
         -- If there was no cycle, then typecheckLoop is not necessary
         SingleModule m -> do
-          one_plan <- buildSingleModule Nothing NoLoop m
+          one_plans <- buildOneModule m
           (cycle, all_plans) <- buildLoop plans
-          return (cycle, one_plan : all_plans)
+          return (cycle, one_plans ++ all_plans)
 
         -- For a resolved cycle, depend on everything in the loop, then update
         -- the cache to point to this node rather than directly to the module build
@@ -1053,11 +1057,11 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
         -- Can't continue past this point as the cycle is unresolved.
         UnresolvedCycle ns -> return (Just ns, [])
 
-    buildSingleModule :: Maybe [NodeKey]  -- Modules we need to rehydrate before compiling this module
-                      -> ResultOrigin
+    buildSingleModule ::
+                      ResultOrigin
                       -> ModuleGraphNode          -- The node we are compiling
                       -> BuildM MakeAction
-    buildSingleModule rehydrate_nodes origin mod = do
+    buildSingleModule origin mod = do
       !build_map <- getBuildMap
       -- 1. Get the direct dependencies of this module
       let direct_deps = mgNodeDependencies False mod
@@ -1065,6 +1069,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
           -- which would retain all the result variables, preventing us from collecting them
           -- after they are no longer used.
           !build_deps = getDependencies direct_deps build_map
+          !direct_boot_deps = mgNodeBootDependenciesWithoutSelfBoot mod
       !build_action <-
             case mod of
               InstantiationNode uid iu -> do
@@ -1075,11 +1080,10 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
                   return Nothing
               ModuleNode _build_deps ms -> do
                 let !old_hmi = M.lookup (mnKey ms) old_hpt
-                    rehydrate_mods = mapMaybe nodeKeyModName <$> rehydrate_nodes
                 mod_idx <- nodeId
                 return $ withCurrentUnit (mgNodeUnitId mod) $ do
                      !_ <- wait_deps build_deps
-                     hmi <- executeCompileNode mod_idx n_mods old_hmi hug rehydrate_mods ms
+                     hmi <- executeCompileNode mod_idx n_mods old_hmi (HUG.updateBootModules direct_boot_deps hug) ms
                      -- Write the HMI to an external cache (if one exists)
                      -- See Note [Caching HomeModInfo]
                      liftIO $ forM mhmi_cache $ \hmi_cache -> addHmiToCache hmi_cache hmi
@@ -1098,20 +1102,29 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       res_var <- liftIO newEmptyMVar
       let result_var = mkResultVar res_var
       setModulePipeline (mkNodeKey mod) (mkBuildResult origin result_var)
-      return $! (MakeAction build_action res_var)
+      return $! MakeAction build_action res_var
 
 
-    buildOneLoopyModule :: ModuleGraphNodeWithBootFile -> BuildM [MakeAction]
-    buildOneLoopyModule (ModuleGraphNodeWithBootFile mn deps) = do
-      ma <- buildSingleModule (Just deps) (Loop Initialise) mn
-      -- Rehydration (1) from Note [Hydrating Modules], "Loops with multiple boot files"
-      rehydrate_action <- rehydrateAction Rehydrated ((GWIB (mkNodeKey mn) IsBoot) : (map (\d -> GWIB d NotBoot) deps))
-      return $ [ma, rehydrate_action]
+    buildOneModule :: ModuleGraphNode -> BuildM [MakeAction]
+    buildOneModule mn = do
+      let direct_boot_deps = nodeBootDependenciesIfIsModule mn
+      ma <- buildSingleModule NoLoop mn
+      -- decide whether we need to rehydrate the module
+      if null direct_boot_deps
+        then return [ma]
+        else do
+          rehydrate_action <- rehydrateAction' Finalised mn
+          return [ma, rehydrate_action]
+      where
+        nodeBootDependenciesIfIsModule mn =
+          case mn of
+            ModuleNode _ _ -> mgNodeBootDependencies mn
+            _ -> []
 
 
     buildModuleLoop :: [Either ModuleGraphNode ModuleGraphNodeWithBootFile] -> BuildM [MakeAction]
     buildModuleLoop ms = do
-      build_modules <- concatMapM (either (fmap (:[]) <$> buildSingleModule Nothing (Loop Initialise)) buildOneLoopyModule) ms
+      build_modules <- mapM (either (buildSingleModule (Loop Initialise)) (\(ModuleGraphNodeWithBootFile mn _) -> buildSingleModule (Loop Initialise) mn)) ms
       let extract (Left mn) = GWIB (mkNodeKey mn) NotBoot
           extract (Right (ModuleGraphNodeWithBootFile mn _)) = GWIB (mkNodeKey mn) IsBoot
       let loop_mods = map extract ms
@@ -1120,7 +1133,10 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       rehydrate_action <- rehydrateAction Finalised loop_mods
 
       return $ build_modules ++ [rehydrate_action]
-
+    rehydrateAction' :: ResultLoopOrigin -> ModuleGraphNode -> BuildM MakeAction
+    rehydrateAction' origin node =
+      let isBoot = maybe NotBoot isBootModuleNodeInfo (mgNodeIsModule node)  -- Non-module nodes are not boot interfaces
+      in rehydrateAction origin [GWIB (mkNodeKey node) isBoot]
     -- An action which rehydrates the given keys
     rehydrateAction :: ResultLoopOrigin -> [GenWithIsBoot NodeKey] -> BuildM MakeAction
     rehydrateAction origin deps = do
@@ -1140,29 +1156,28 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
             checkRehydrationInvariant hmis' deps
 
             -- Add hydrated interfaces to global variable
-            liftIO $ mapM_ (\hmi -> HUG.addHomeModInfoToHug hmi hug) hmis'
+            liftIO $ mapM_ (`HUG.addHomeModInfoToHug` hug) hmis'
             return hmis'
 
       let fanout i = Just . (!! i) <$> mkResultVar res_var
       -- From outside the module loop, anyone must wait for the loop to finish and then
       -- use the result of the rehydrated iface. This makes sure that things not in the
       -- module loop will see the updated interfaces for all the identifiers in the loop.
-          boot_key :: NodeKey -> NodeKey
-          boot_key (NodeKey_Module m) = NodeKey_Module (m { mnkModuleName = (mnkModuleName m) { gwib_isBoot = IsBoot } } )
-          boot_key k = pprPanic "boot_key" (ppr k)
-
-          update_module_pipeline (m, i) =
-            case gwib_isBoot m of
-              NotBoot -> setModulePipeline (gwib_mod m) (mkBuildResult (Loop origin) (fanout i))
-              IsBoot -> do
-                setModulePipeline (gwib_mod m) (mkBuildResult (Loop origin) (fanout i))
-                -- SPECIAL: Anything outside the loop needs to see A rather than A.hs-boot
-                setModulePipeline (boot_key (gwib_mod m)) (mkBuildResult (Loop origin) (fanout i))
-
       let deps_i = zip deps [0..]
-      mapM update_module_pipeline deps_i
+      mapM_ (update_module_pipeline origin fanout) deps_i
 
       return $ MakeAction loop_action res_var
+
+    -- boot_key :: NodeKey -> NodeKey -> Origin
+    boot_key (NodeKey_Module m) = NodeKey_Module (m { mnkModuleName = (mnkModuleName m) { gwib_isBoot = IsBoot } } )
+    boot_key k = pprPanic "boot_key" (ppr k)
+    update_module_pipeline origin fanout (m, i) =
+      case gwib_isBoot m of
+        NotBoot -> setModulePipeline (gwib_mod m) (mkBuildResult (Loop origin) (fanout i))
+        IsBoot -> do
+          setModulePipeline (gwib_mod m) (mkBuildResult (Loop origin) (fanout i))
+          -- SPECIAL: Anything outside the loop needs to see A rather than A.hs-boot
+          setModulePipeline (boot_key (gwib_mod m)) (mkBuildResult (Loop origin) (fanout i))
 
       -- Checks that the interfaces returned from hydration match-up with the names of the
       -- modules which were fed into the function.
@@ -1590,27 +1605,18 @@ executeCompileNode :: Int
   -> Int
   -> Maybe HomeModInfo
   -> HomeUnitGraph
-  -> Maybe [ModuleName] -- List of modules we need to rehydrate before compiling
   -> ModuleNodeInfo
   -> RunMakeM HomeModInfo
-executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
+executeCompileNode k n !old_hmi hug mni = do
   me@MakeEnv{..} <- ask
   -- Rehydrate any dependencies if this module had a boot file or is a signature file.
   lift $ MaybeT (withAbstractSem compile_sem $ withLoggerHsc k me $ \hsc_env -> do
-     hsc_env' <- liftIO $ maybeRehydrateBefore (setHUG hug hsc_env) mni fixed_mrehydrate_mods
+     let hsc_env' = setHUG hug hsc_env
      case mni of
        ModuleNodeCompile mod -> executeCompileNodeWithSource hsc_env' me  mod
        ModuleNodeFixed key loc -> executeCompileNodeFixed hsc_env' me key loc
     )
-
   where
-    fixed_mrehydrate_mods =
-      case moduleNodeInfoHscSource mni of
-        -- MP: It is probably a bit of a misimplementation in backpack that
-        -- compiling a signature requires an knot_var for that unit.
-        -- If you remove this then a lot of backpack tests fail.
-        Just HsigFile -> Just []
-        _        -> mrehydrate_mods
 
     executeCompileNodeFixed :: HscEnv -> MakeEnv -> ModNodeKeyWithUid -> ModLocation -> IO (Maybe HomeModInfo)
     executeCompileNodeFixed hsc_env MakeEnv{diag_wrapper, env_messager} mod loc =
@@ -1671,20 +1677,20 @@ rehydrate hsc_env hmis = do
 
 -- If needed, then rehydrate the necessary modules with a suitable KnotVars for the
 -- module currently being compiled.
-maybeRehydrateBefore :: HscEnv -> ModuleNodeInfo -> Maybe [ModuleName] -> IO HscEnv
-maybeRehydrateBefore hsc_env _ Nothing = return hsc_env
-maybeRehydrateBefore hsc_env mni (Just mns) = do
-  knot_var <- initialise_knot_var hsc_env
-  let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
-  hmis <- mapM (fmap expectJust . lookupHpt (hsc_HPT hsc_env')) mns
-  hmis' <- rehydrate hsc_env' hmis
-  mapM_ (\hmi -> HUG.addHomeModInfoToHug hmi (hsc_HUG hsc_env')) hmis'
-  return hsc_env'
+-- maybeRehydrateBefore :: HscEnv -> ModuleNodeInfo -> Maybe [ModuleName] -> IO HscEnv
+-- maybeRehydrateBefore hsc_env _ Nothing = return hsc_env
+-- maybeRehydrateBefore hsc_env mni (Just mns) = do
+--   knot_var <- initialise_knot_var hsc_env
+--   let hsc_env' = hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
+--   hmis <- mapM (fmap expectJust . lookupHpt (hsc_HPT hsc_env')) mns
+--   hmis' <- rehydrate hsc_env' hmis
+--   mapM_ (\hmi -> HUG.addHomeModInfoToHug hmi (hsc_HUG hsc_env')) hmis'
+--   return hsc_env'
 
-  where
-   initialise_knot_var hsc_env = liftIO $
-    let mod_name = homeModuleInstantiation (hsc_home_unit_maybe hsc_env) (moduleNodeInfoModule mni)
-    in mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
+--   where
+--    initialise_knot_var hsc_env = liftIO $
+--     let mod_name = homeModuleInstantiation (hsc_home_unit_maybe hsc_env) (moduleNodeInfoModule mni)
+--     in mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
 
 rehydrateAfter :: HscEnv
   -> [ModuleName]
@@ -1933,3 +1939,4 @@ which can be checked easily using ghc-debug.
    number of non-boot Modules.
    Why? Each module has a HomeModInfo which contains a ModDetails from that module.
 -}
+

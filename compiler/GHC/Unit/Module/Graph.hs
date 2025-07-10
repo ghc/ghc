@@ -132,7 +132,9 @@ module GHC.Unit.Module.Graph
     -- the graph. It's not immediately clear to me why users do depend on them.
    , SummaryNode
    , summaryNodeSummary
-   , summaryNodeKey
+   , summaryNodeKey, nodeKeyModNameUnit, addNormalEdge, nodeKeyIsBoot
+   , mgNodeBootDependencies
+   , mgNodeBootDependenciesWithoutSelfBoot
 
    )
 where
@@ -266,6 +268,12 @@ mkModuleEdge level key = ModuleNodeEdge level key
 -- | A 'normal' edge in the graph which isn't offset by an import stage.
 mkNormalEdge :: NodeKey -> ModuleNodeEdge
 mkNormalEdge = mkModuleEdge NormalLevel
+
+addNormalEdge :: ModNodeKeyWithUid -> ModuleGraphNode -> ModuleGraphNode
+addNormalEdge key (ModuleNode edges info) =
+  ModuleNode (mkNormalEdge (NodeKey_Module key) : edges) info
+addNormalEdge _ node = node
+  -- error $ "addNormalEdge: expected ModuleNode, got: " ++ show node
 
 instance Outputable ModuleNodeEdge where
   ppr (ModuleNodeEdge level key) =
@@ -417,6 +425,27 @@ moduleNodeInfoUnitId (ModuleNodeCompile ms) = ms_unitid ms
 moduleNodeInfoMnwib :: ModuleNodeInfo -> ModuleNameWithIsBoot
 moduleNodeInfoMnwib (ModuleNodeFixed key _) = mnkModuleName key
 moduleNodeInfoMnwib (ModuleNodeCompile ms) = ms_mnwib ms
+
+mgNodeBootDependenciesWithoutSelfBoot :: ModuleGraphNode -> [ModNodeKeyWithUid]
+mgNodeBootDependenciesWithoutSelfBoot mgn =
+  let bootDeps = mgNodeBootDependencies mgn
+  in case mgn of
+       ModuleNode _ info ->
+           -- If this is a ModuleNode, we need to filter out the corresponding boot module
+           let selfModuleName = case moduleNodeInfoMnwib info of
+                                  GWIB modName _ -> modName
+               selfUnitId = moduleNodeInfoUnitId info
+               bootCounterpart = ModNodeKeyWithUid (GWIB selfModuleName IsBoot) selfUnitId
+           in filter (/= bootCounterpart) bootDeps
+       _ -> bootDeps
+
+mgNodeBootDependencies :: ModuleGraphNode -> [ModNodeKeyWithUid]
+mgNodeBootDependencies mgn =
+  [ k | Just k <- extractModNodeKey <$> mgNodeDependencies False mgn
+  , IsBoot == mnkIsBoot k ]
+  where extractModNodeKey :: NodeKey -> Maybe ModNodeKeyWithUid
+        extractModNodeKey (NodeKey_Module mk) = Just mk
+        extractModNodeKey _                   = Nothing
 
 -- | Collect the immediate dependencies of a ModuleGraphNode,
 -- optionally avoiding hs-boot dependencies.
@@ -758,6 +787,14 @@ nodeKeyUnitId (NodeKey_ExternalUnit uid) = uid
 nodeKeyModName :: NodeKey -> Maybe ModuleName
 nodeKeyModName (NodeKey_Module mk) = Just (gwib_mod $ mnkModuleName mk)
 nodeKeyModName _ = Nothing
+
+nodeKeyModNameUnit :: NodeKey -> Maybe (ModuleName, UnitId)
+nodeKeyModNameUnit (NodeKey_Module mk) = Just (gwib_mod $ mnkModuleName mk, mnkUnitId mk)
+nodeKeyModNameUnit _ = Nothing
+
+nodeKeyIsBoot :: NodeKey -> IsBootInterface
+nodeKeyIsBoot (NodeKey_Module mk) = mnkIsBoot mk
+nodeKeyIsBoot _ = NotBoot  -- Non-module nodes are not boot interfaces
 
 msKey :: ModSummary -> ModNodeKeyWithUid
 msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)

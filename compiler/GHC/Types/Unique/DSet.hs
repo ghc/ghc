@@ -33,7 +33,7 @@ module GHC.Types.Unique.DSet (
         lookupUniqDSet,
         uniqDSetToList,
         partitionUniqDSet,
-        mapUniqDSet, strictFoldUniqDSet, mapMUniqDSet
+        mapUniqDSet, strictFoldUniqDSet, mapMUniqDSet, elementOfUniqDSet'
     ) where
 
 import GHC.Prelude
@@ -104,6 +104,9 @@ nonDetStrictFoldUniqDSet f acc (UniqDSet s) = nonDetStrictFoldUDFM f acc s
 
 elementOfUniqDSet :: Uniquable a => a -> UniqDSet a -> Bool
 elementOfUniqDSet k = elemUDFM k . getUniqDSet
+
+elementOfUniqDSet' :: Uniquable a => Unique -> UniqDSet a -> Bool
+elementOfUniqDSet' k = elemUDFM' k . getUniqDSet
 
 filterUniqDSet :: (a -> Bool) -> UniqDSet a -> UniqDSet a
 filterUniqDSet p (UniqDSet s) = UniqDSet (filterUDFM p s)

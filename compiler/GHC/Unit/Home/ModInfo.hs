@@ -4,12 +4,17 @@ module GHC.Unit.Home.ModInfo
    (
      HomeModInfo (..)
    , HomeModLinkable(..)
+   , HomeModeInfoWithBoot(..)
    , homeModInfoObject
    , homeModInfoByteCode
    , emptyHomeModInfoLinkable
    , justBytecode
    , justObjects
    , bytecodeAndObjects
+   , collapseHomeModeInfoWithBoot
+  --  , homeModeInfoWithBootHomeModeInfo
+   , updateHomeModInfoWithBoot
+   , homeModeInfoWithBootHomeModeInfoWithBoot
    )
 where
 
@@ -22,6 +27,65 @@ import GHC.Linker.Types ( Linkable(..), linkableIsNativeCodeOnly )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Types.SourceFile (isHsBootFile)
+import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface (..))
+
+
+data HomeModeInfoWithBoot = HomeModeInfoWithBoot {
+    hmib_boot_mod_info :: !HomeModInfo,
+    hmib_non_boot_mod_info :: !(Maybe HomeModInfo)
+  } | HomeModeInfoWithoutBoot {
+    hmib_mod_info :: !HomeModInfo
+  }
+instance Outputable HomeModeInfoWithBoot where
+  ppr (HomeModeInfoWithBoot { hmib_boot_mod_info = bootModInfo, hmib_non_boot_mod_info = nonBootModInfo }) =
+    text "HomeModeInfoWithBoot" <+> ppr (mi_module $ hm_iface bootModInfo) <+> ppr (mi_module . hm_iface <$> nonBootModInfo)
+  ppr (HomeModeInfoWithoutBoot { hmib_mod_info = modInfo }) =
+    text "HomeModeInfoWithoutBoot" <+> ppr (mi_module $ hm_iface modInfo)
+
+updateHomeModInfoWithBoot :: HomeModInfo -> Maybe HomeModeInfoWithBoot -> HomeModeInfoWithBoot
+updateHomeModInfoWithBoot newModInfo Nothing = homeModeInfoHomeModeInfoWithBoot newModInfo
+updateHomeModInfoWithBoot newModInfo (Just (HomeModeInfoWithoutBoot _)) = HomeModeInfoWithoutBoot { hmib_mod_info = newModInfo }
+updateHomeModInfoWithBoot newModInfo (Just old)
+    | isHsBootFile $ mi_mod_info_hsc_src (mi_mod_info $ hm_iface newModInfo)
+    = old { hmib_boot_mod_info = newModInfo }
+    | otherwise
+    = old { hmib_non_boot_mod_info = Just newModInfo }
+
+
+homeModeInfoHomeModeInfoWithBoot :: HomeModInfo -> HomeModeInfoWithBoot
+homeModeInfoHomeModeInfoWithBoot modInfo
+  | isHsBootFile $ mi_mod_info_hsc_src (mi_mod_info $ hm_iface modInfo)
+  = HomeModeInfoWithBoot { hmib_boot_mod_info = modInfo, hmib_non_boot_mod_info = Nothing }
+  | otherwise
+  = HomeModeInfoWithoutBoot { hmib_mod_info = modInfo }
+
+-- -- | Convert a 'HomeModeInfoWithBoot' to a 'HomeModInfo'.
+-- -- If the 'HomeModeInfoWithBoot' is a 'HomeModeInfoWithoutBoot',
+-- -- it simply returns the 'hmib_mod_info'.
+-- -- If it is a 'HomeModeInfoWithBoot', it returns the 'hmib_non_boot_mod_info' info
+-- homeModeInfoWithBootHomeModeInfo :: HomeModeInfoWithBoot -> HomeModInfo
+-- homeModeInfoWithBootHomeModeInfo (HomeModeInfoWithBoot { hmib_boot_mod_info = bootModInfo }) = bootModInfo
+-- homeModeInfoWithBootHomeModeInfo (HomeModeInfoWithoutBoot { hmib_mod_info = modInfo }) = modInfo
+
+homeModeInfoWithBootHomeModeInfoWithBoot :: IsBootInterface -> HomeModeInfoWithBoot -> HomeModInfo
+homeModeInfoWithBootHomeModeInfoWithBoot isBoot (HomeModeInfoWithBoot { hmib_boot_mod_info = bootModInfo, hmib_non_boot_mod_info= nonBootModeInfo})
+  | isBoot == NotBoot, (Just nonBoot) <- nonBootModeInfo = nonBoot
+  | otherwise = bootModInfo
+homeModeInfoWithBootHomeModeInfoWithBoot _ (HomeModeInfoWithoutBoot { hmib_mod_info = modInfo }) = modInfo
+
+-- | Convert a 'HomeModeInfoWithBoot' to a 'HomeModeInfoWithoutBoot'.
+-- If the 'HomeModeInfoWithBoot' is already a 'HomeModeInfoWithoutBoot',
+-- it returns it unchanged.
+-- If it is a 'HomeModeInfoWithBoot', it creates a new 'HomeModeInfoWithoutBoot'
+-- with the 'hmib_non_boot_mod_info'.
+collapseHomeModeInfoWithBoot :: HomeModeInfoWithBoot -> HomeModeInfoWithBoot
+collapseHomeModeInfoWithBoot (HomeModeInfoWithBoot { hmib_boot_mod_info = bootModInfo, hmib_non_boot_mod_info = Nothing }) =
+  pprPanic "collapseHomeModeInfoWithBoot: hmib_non_boot_mod_info is Nothing" (ppr $ mi_module $ hm_iface bootModInfo)
+collapseHomeModeInfoWithBoot (HomeModeInfoWithBoot { hmib_non_boot_mod_info = Just nonBootModInfo }) =
+  HomeModeInfoWithoutBoot { hmib_mod_info = nonBootModInfo }
+collapseHomeModeInfoWithBoot (HomeModeInfoWithoutBoot { hmib_mod_info = modInfo }) =
+  HomeModeInfoWithoutBoot { hmib_mod_info = modInfo }
 
 
 -- | Information about modules in the package being compiled
