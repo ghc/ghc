@@ -205,5 +205,3 @@ TargetHasLibm = @TargetHasLibm@
 TablesNextToCode = @TablesNextToCode@
 LeadingUnderscore = @LeadingUnderscore@
 LlvmTarget = @LlvmTarget@
-
-SettingsLlvmAsCommand = @SettingsLlvmAsCommand@
