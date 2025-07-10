@@ -3513,9 +3513,8 @@ compilerInfo dflags
     showBool False = "NO"
     platform  = targetPlatform dflags
     isWindows = platformOS platform == OSMinGW32
-    useInplaceMinGW = toolSettings_useInplaceMinGW $ toolSettings dflags
     expandDirectories :: FilePath -> Maybe FilePath -> String -> String
-    expandDirectories topd mtoold = expandToolDir useInplaceMinGW mtoold . expandTopDir topd
+    expandDirectories topd mtoold = expandToolDir mtoold . expandTopDir topd
 
 -- Note [Special unit-ids]
 -- ~~~~~~~~~~~~~~~~~~~~~~~

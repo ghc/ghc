@@ -68,16 +68,10 @@ initSettings top_dir = do
       getBooleanSetting key = either pgmError pure $
         getRawBooleanSetting settingsFile mySettings key
 
-  -- On Windows, by mingw is often distributed with GHC,
-  -- so we look in TopDir/../mingw/bin,
-  -- as well as TopDir/../../mingw/bin for hadrian.
-  -- But we might be disabled, in which we we don't do that.
-  useInplaceMinGW <- getBooleanSetting "Use inplace MinGW toolchain"
-
   -- see Note [topdir: How GHC finds its files]
   -- NB: top_dir is assumed to be in standard Unix
   -- format, '/' separated
-  mtool_dir <- liftIO $ findToolDir useInplaceMinGW top_dir
+  mtool_dir <- liftIO $ findToolDir top_dir
         -- see Note [tooldir: How GHC finds mingw on Windows]
 
   let getSetting_raw key = either pgmError pure $
@@ -85,11 +79,11 @@ initSettings top_dir = do
       getSetting_topDir top key = either pgmError pure $
         getRawFilePathSetting top settingsFile mySettings key
       getSetting_toolDir top tool key =
-        expandToolDir useInplaceMinGW tool <$> getSetting_topDir top key
+        expandToolDir tool <$> getSetting_topDir top key
       getSetting key = getSetting_topDir top_dir key
       getToolSetting key = getSetting_toolDir top_dir mtool_dir key
 
-      expandDirVars top tool = expandToolDir useInplaceMinGW tool . expandTopDir top
+      expandDirVars top tool = expandToolDir tool . expandTopDir top
 
       getToolPath :: (Target -> Program) -> String
       getToolPath key = expandDirVars top_dir mtool_dir (prgPath . key $ target)
@@ -189,7 +183,6 @@ initSettings top_dir = do
       , toolSettings_mergeObjsSupportsResponseFiles
                                       = maybe False mergeObjsSupportsResponseFiles
                                                          $ tgtMergeObjs target
-      , toolSettings_useInplaceMinGW  = useInplaceMinGW
       , toolSettings_arSupportsDashL  = arSupportsDashL  $ tgtAr target
       , toolSettings_cmmCppSupportsG0 = cmmCppSupportsG0 $ tgtCmmCPreprocessor target
 

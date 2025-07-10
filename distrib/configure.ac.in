@@ -91,6 +91,7 @@ AC_ARG_ENABLE(distro-toolchain,
   [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableDistroToolchain])],
   [EnableDistroToolchain=@EnableDistroToolchain@]
 )
+AC_SUBST([EnableDistroToolchain])
 
 if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
   FP_SETUP_WINDOWS_TOOLCHAIN([$hardtop/mingw/], [\$\$topdir/../mingw/])
@@ -383,8 +384,6 @@ if test -n "$BASE_UNIT_ID"; then
 fi
 
 AC_SUBST(BaseUnitId)
-
-FP_SETTINGS
 
 # We get caught by
 #     http://savannah.gnu.org/bugs/index.php?1516

@@ -141,7 +141,6 @@ bindistRules = do
         installPrefix <- fromMaybe (error prefixErr) <$> cmdPrefix
         installTo NotRelocatable installPrefix
 
-    -- TODO: ROMES: TOUCH HERE?
     phony "binary-dist-dir" $ do
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull

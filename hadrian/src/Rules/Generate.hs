@@ -487,7 +487,6 @@ generateSettings settingsFile = do
         , ("target arch",      queryTarget (show . archOS_arch . tgtArchOs))
         , ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
-        , ("Use inplace MinGW toolchain", expr $ lookupSystemConfig "settings-use-distro-mingw")
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)

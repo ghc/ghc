@@ -23,7 +23,6 @@ module GHC.Settings
   , sMergeObjsSupportsResponseFiles
   , sLdIsGnuLd
   , sGccSupportsNoPie
-  , sUseInplaceMinGW
   , sArSupportsDashL
   , sPgm_L
   , sPgm_P
@@ -102,7 +101,6 @@ data ToolSettings = ToolSettings
   , toolSettings_mergeObjsSupportsResponseFiles :: Bool
   , toolSettings_ldIsGnuLd               :: Bool
   , toolSettings_ccSupportsNoPie         :: Bool
-  , toolSettings_useInplaceMinGW         :: Bool
   , toolSettings_arSupportsDashL         :: Bool
   , toolSettings_cmmCppSupportsG0        :: Bool
 
@@ -221,8 +219,6 @@ sLdIsGnuLd :: Settings -> Bool
 sLdIsGnuLd = toolSettings_ldIsGnuLd . sToolSettings
 sGccSupportsNoPie :: Settings -> Bool
 sGccSupportsNoPie = toolSettings_ccSupportsNoPie . sToolSettings
-sUseInplaceMinGW :: Settings -> Bool
-sUseInplaceMinGW = toolSettings_useInplaceMinGW . sToolSettings
 sArSupportsDashL :: Settings -> Bool
 sArSupportsDashL = toolSettings_arSupportsDashL . sToolSettings
 

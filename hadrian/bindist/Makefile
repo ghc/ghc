@@ -88,7 +88,6 @@ lib/settings : config.mk
 	@echo '[("target os", "$(HaskellTargetOs)")' >> $@
 	@echo ',("target arch", "$(HaskellTargetArch)")' >> $@
 	@echo ',("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit")' >> $@
-	@echo ',("Use inplace MinGW toolchain", "$(EnableDistroToolchain)")' >> $@
 	@echo ',("target RTS linker only supports shared libraries", "$(TargetRTSLinkerOnlySupportsSharedLibs)")' >> $@
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
@@ -97,6 +96,10 @@ lib/settings : config.mk
 	@echo ',("Relative Global Package DB", "package.conf.d")' >> $@
 	@echo ',("base unit-id", "$(BaseUnitId)")' >> $@
 	@echo "]" >> $@
+
+lib/targets/default.target : config.mk
+	@rm -f $@
+	@echo "DOING DEFAULT.TARGET"
 
 # We need to install binaries relative to libraries.
 BINARIES = $(wildcard ./bin/*)
