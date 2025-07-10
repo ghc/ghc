@@ -206,5 +206,4 @@ TablesNextToCode = @TablesNextToCode@
 LeadingUnderscore = @LeadingUnderscore@
 LlvmTarget = @LlvmTarget@
 
-SettingsOptCommand = @SettingsOptCommand@
 SettingsLlvmAsCommand = @SettingsLlvmAsCommand@
