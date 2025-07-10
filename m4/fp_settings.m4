@@ -54,8 +54,6 @@ AC_DEFUN([FP_SETTINGS],
 [
     SettingsArCommand="$ArCmd"
     SettingsRanlibCommand="$RanlibCmd"
-    SettingsMergeObjectsCommand="$MergeObjsCmd"
-    SettingsMergeObjectsFlags="$MergeObjsArgs"
 
     if test -z "$WindresCmd"; then
         SettingsWindresCommand="/bin/false"
@@ -74,7 +72,6 @@ AC_DEFUN([FP_SETTINGS],
         # executable names, not paths.
         dnl XXX="$(basename XXX)"
         SettingsLdCommand="$(basename $SettingsLdCommand)"
-        SettingsMergeObjectsCommand="$(basename $SettingsMergeObjectsCommand)"
         SettingsArCommand="$(basename $SettingsArCommand)"
         SettingsWindresCommand="$(basename $SettingsWindresCommand)"
         SettingsLlcCommand="$(basename $SettingsLlcCommand)"
@@ -87,8 +84,6 @@ AC_DEFUN([FP_SETTINGS],
         # We need to issue a substitution to use $tooldir,
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
-        SUBST_TOOLDIR([SettingsMergeObjectsCommand])
-        SUBST_TOOLDIR([SettingsMergeObjectsFlags])
         SUBST_TOOLDIR([SettingsArCommand])
         SUBST_TOOLDIR([SettingsRanlibCommand])
         SUBST_TOOLDIR([SettingsWindresCommand])
@@ -103,8 +98,6 @@ AC_DEFUN([FP_SETTINGS],
     SettingsInstallNameToolCommand="$InstallNameToolCmd"
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsMergeObjectsCommand)
-    AC_SUBST(SettingsMergeObjectsFlags)
     AC_SUBST(SettingsArCommand)
     AC_SUBST(SettingsRanlibCommand)
     AC_SUBST(SettingsOtoolCommand)
