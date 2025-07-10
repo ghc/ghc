@@ -52,8 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsUseDistroMINGW="$EnableDistroToolchain"
-
     SettingsCCompilerCommand="$CC"
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
     SettingsCxxCompilerCommand="$CXX"
@@ -141,6 +139,7 @@ AC_DEFUN([FP_SETTINGS],
 
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
 
+    AC_SUBST(EnableDistroToolchain)
     AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsCxxCompilerCommand)
     AC_SUBST(SettingsCPPCommand)
@@ -167,5 +166,4 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsOptCommand)
     AC_SUBST(SettingsLlvmAsCommand)
     AC_SUBST(SettingsLlvmAsFlags)
-    AC_SUBST(SettingsUseDistroMINGW)
 ])

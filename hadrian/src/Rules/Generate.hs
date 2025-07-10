@@ -425,7 +425,7 @@ bindistRules = do
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
     , interpolateVar "LlvmTarget" $ getTarget tgtLlvmTarget
     , interpolateSetting "ProjectVersion" ProjectVersion
-    , interpolateVar "SettingsUseDistroMINGW" $ lookupSystemConfig "settings-use-distro-mingw"
+    , interpolateVar "EnableDistroToolchain" $ lookupSystemConfig "settings-use-distro-mingw"
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
     , interpolateVar "TargetHasLibm" $ lookupSystemConfig "target-has-libm"
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
