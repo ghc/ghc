@@ -1069,7 +1069,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
           -- which would retain all the result variables, preventing us from collecting them
           -- after they are no longer used.
           !build_deps = getDependencies direct_deps build_map
-          !direct_boot_deps = mgNodeBootDependencies mod
+          !direct_boot_deps = mgNodeBootDependenciesWithoutSelfBoot mod
       !build_action <-
             case mod of
               InstantiationNode uid iu -> do

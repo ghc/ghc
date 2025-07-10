@@ -132,7 +132,9 @@ module GHC.Unit.Module.Graph
     -- the graph. It's not immediately clear to me why users do depend on them.
    , SummaryNode
    , summaryNodeSummary
-   , summaryNodeKey, nodeKeyModNameUnit, addNormalEdge, nodeKeyIsBoot, mgNodeBootDependencies
+   , summaryNodeKey, nodeKeyModNameUnit, addNormalEdge, nodeKeyIsBoot
+   , mgNodeBootDependencies
+   , mgNodeBootDependenciesWithoutSelfBoot
 
    )
 where
@@ -424,6 +426,18 @@ moduleNodeInfoMnwib :: ModuleNodeInfo -> ModuleNameWithIsBoot
 moduleNodeInfoMnwib (ModuleNodeFixed key _) = mnkModuleName key
 moduleNodeInfoMnwib (ModuleNodeCompile ms) = ms_mnwib ms
 
+mgNodeBootDependenciesWithoutSelfBoot :: ModuleGraphNode -> [ModNodeKeyWithUid]
+mgNodeBootDependenciesWithoutSelfBoot mgn =
+  let bootDeps = mgNodeBootDependencies mgn
+  in case mgn of
+       ModuleNode _ info ->
+           -- If this is a ModuleNode, we need to filter out the corresponding boot module
+           let selfModuleName = case moduleNodeInfoMnwib info of
+                                  GWIB modName _ -> modName
+               selfUnitId = moduleNodeInfoUnitId info
+               bootCounterpart = ModNodeKeyWithUid (GWIB selfModuleName IsBoot) selfUnitId
+           in filter (/= bootCounterpart) bootDeps
+       _ -> bootDeps
 
 mgNodeBootDependencies :: ModuleGraphNode -> [ModNodeKeyWithUid]
 mgNodeBootDependencies mgn =
