@@ -52,7 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsCPPFlags="$CONF_CPP_OPTS_STAGE2"
     SettingsHaskellCPPCommand="$HaskellCPPCmd"
     SettingsHaskellCPPFlags="$HaskellCPPArgs"
     SettingsJavaScriptCPPCommand="$JavaScriptCPPCmd"
@@ -106,7 +105,6 @@ AC_DEFUN([FP_SETTINGS],
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
         SUBST_TOOLDIR([SettingsCCompilerLinkFlags])
-        SUBST_TOOLDIR([SettingsCPPFlags])
         SUBST_TOOLDIR([SettingsHaskellCPPCommand])
         SUBST_TOOLDIR([SettingsHaskellCPPFlags])
         SUBST_TOOLDIR([SettingsCmmCPPCommand])
@@ -131,7 +129,6 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsCPPFlags)
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)
     AC_SUBST(SettingsCmmCPPCommand)
