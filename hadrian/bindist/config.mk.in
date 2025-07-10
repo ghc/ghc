@@ -215,7 +215,6 @@ SettingsJavaScriptCPPFlags = @SettingsJavaScriptCPPFlags@
 SettingsCmmCPPCommand = @SettingsCmmCPPCommand@
 SettingsCmmCPPFlags = @SettingsCmmCPPFlags@
 SettingsCmmCPPSupportsG0 = @SettingsCmmCPPSupportsG0@
-SettingsCxxCompilerFlags = @SettingsCxxCompilerFlags@
 SettingsCCompilerLinkFlags = @SettingsCCompilerLinkFlags@
 SettingsCCompilerSupportsNoPie = @SettingsCCompilerSupportsNoPie@
 SettingsMergeObjectsCommand = @SettingsMergeObjectsCommand@
