@@ -239,6 +239,7 @@ initSettings top_dir = do
       }
 
     , sRawSettings    = settingsList
+    , sRawTarget      = target
     }
 
 getTargetPlatform :: Bool {-^ Does target have libm -} -> Target -> Platform
