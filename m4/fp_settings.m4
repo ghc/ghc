@@ -52,8 +52,6 @@ AC_DEFUN([SUBST_TOOLDIR],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsHaskellCPPCommand="$HaskellCPPCmd"
-    SettingsHaskellCPPFlags="$HaskellCPPArgs"
     SettingsJavaScriptCPPCommand="$JavaScriptCPPCmd"
     SettingsJavaScriptCPPFlags="$JavaScriptCPPArgs"
     SettingsCmmCPPCommand="$CmmCPPCmd"
@@ -87,7 +85,6 @@ AC_DEFUN([FP_SETTINGS],
         # If the user specified --enable-distro-toolchain then we just use the
         # executable names, not paths.
         dnl XXX="$(basename XXX)"
-        SettingsHaskellCPPCommand="$(basename $SettingsHaskellCPPCommand)"
         SettingsCmmCPPCommand="$(basename $SettingsCmmCPPCommand)"
         SettingsJavaScriptCPPCommand="$(basename $SettingsJavaScriptCPPCommand)"
         SettingsLdCommand="$(basename $SettingsLdCommand)"
@@ -105,8 +102,6 @@ AC_DEFUN([FP_SETTINGS],
         # See Note [tooldir: How GHC finds mingw on Windows]
         dnl SUBST_TOOLDIR([XXX])
         SUBST_TOOLDIR([SettingsCCompilerLinkFlags])
-        SUBST_TOOLDIR([SettingsHaskellCPPCommand])
-        SUBST_TOOLDIR([SettingsHaskellCPPFlags])
         SUBST_TOOLDIR([SettingsCmmCPPCommand])
         SUBST_TOOLDIR([SettingsCmmCPPFlags])
         SUBST_TOOLDIR([SettingsJavaScriptCPPCommand])
@@ -129,8 +124,6 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
 
     AC_SUBST(EnableDistroToolchain)
-    AC_SUBST(SettingsHaskellCPPCommand)
-    AC_SUBST(SettingsHaskellCPPFlags)
     AC_SUBST(SettingsCmmCPPCommand)
     AC_SUBST(SettingsCmmCPPFlags)
     AC_SUBST(SettingsCmmCPPSupportsG0)
