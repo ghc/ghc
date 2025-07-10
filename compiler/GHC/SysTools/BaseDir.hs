@@ -93,9 +93,7 @@ the build system finds and wires through the toolchain information.
   the values that were exported.
 
   Next up is `src/Oracles/Settings.hs` which makes from some Haskell ADT to
-  the settings `keys` in the `system.config`.  As an example,
-  `settings-c-compiler-command` is mapped to
-  `SettingsFileSetting_CCompilerCommand`.
+  the settings `keys` in the `system.config`.
 
   The last part of this is the `generateSettings` in `src/Rules/Generate.hs`
   which produces the desired settings file out of Hadrian. This is the
