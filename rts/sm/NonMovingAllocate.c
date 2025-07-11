@@ -183,7 +183,6 @@ static struct NonmovingSegment *nonmovingPopFreeSegment(void)
         if (cas((StgVolatilePtr) &nonmovingHeap.free,
                 (StgWord) seg,
                 (StgWord) seg->link) == (StgWord) seg) {
-            __sync_sub_and_fetch(&nonmovingHeap.n_free, 1);
             return seg;
         }
     }

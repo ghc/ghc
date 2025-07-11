@@ -603,7 +603,6 @@ void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
         if (cas((StgVolatilePtr) &nonmovingHeap.free, (StgWord) old, (StgWord) seg) == (StgWord) old)
             break;
     }
-    __sync_add_and_fetch(&nonmovingHeap.n_free, 1);
 }
 
 static int
@@ -621,20 +620,26 @@ cmp_segment_ptr (const void *x, const void *y)
 void nonmovingPruneFreeSegmentList(void)
 {
   trace(TRACE_nonmoving_gc, "Pruning free segment list.");
+
   // Atomically grab the entire free list.
   struct NonmovingSegment *free;
-  size_t length;
   while (true) {
     free = ACQUIRE_LOAD(&nonmovingHeap.free);
-    length = ACQUIRE_LOAD(&nonmovingHeap.n_free);
     if (cas((StgVolatilePtr) &nonmovingHeap.free,
             (StgWord) free,
             (StgWord) NULL) == (StgWord) free) {
-        atomic_dec((StgVolatilePtr) &nonmovingHeap.n_free, length);
         break;
     }
-    // Save the current free list so the sanity checker can see these segments.
-    nonmovingHeap.saved_free = free;
+  }
+  // Save the current free list so the sanity checker can see these segments.
+  nonmovingHeap.saved_free = free;
+
+  // Calculate the length of the list we've taken
+  size_t length = 0;
+  struct NonmovingSegment *free1 = free;
+  while (free1) {
+    length++;
+    free1 = free1->link;
   }
 
   // Sort the free list by address.
@@ -692,7 +697,6 @@ void nonmovingPruneFreeSegmentList(void)
       if (cas((StgVolatilePtr) &nonmovingHeap.free,
               (StgWord) rest,
               (StgWord) free) == (StgWord) rest) {
-          __sync_add_and_fetch(&nonmovingHeap.n_free, new_length);
           break;
       }
     }
