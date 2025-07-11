@@ -279,7 +279,6 @@ import GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer (mkParserOpts, initParserState, P(..), ParseResult(..))
 
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
-import GHC.ResponseFile
 
 import GHC.Toolchain
 import GHC.Toolchain.Program
@@ -3570,13 +3569,13 @@ compilerInfo dflags
     expandDirectories = expandToolDir (toolDir dflags) . expandTopDir (topDir dflags)
     query :: (Target -> a) -> a
     query f = f (rawTarget dflags)
-    queryFlags f = query (escapeArgs . prgFlags . f)
+    queryFlags f = query (unwords . map escapeArg . prgFlags . f)
     queryCmd f = expandDirectories (query (prgPath . f))
     queryBool = showBool . query
 
     queryCmdMaybe, queryFlagsMaybe :: (a -> Program) -> (Target -> Maybe a) -> String
     queryCmdMaybe p f = expandDirectories (query (maybe "" (prgPath . p) . f))
-    queryFlagsMaybe p f = query (maybe "" (escapeArgs . prgFlags . p) . f)
+    queryFlagsMaybe p f = query (maybe "" (unwords . map escapeArg . prgFlags . p) . f)
 
 -- Note [Special unit-ids]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -3904,3 +3903,19 @@ updatePlatformConstants dflags mconstants = do
   let platform1 = (targetPlatform dflags) { platform_constants = mconstants }
   let dflags1   = dflags { targetPlatform = platform1 }
   return dflags1
+
+-- ----------------------------------------------------------------------------
+-- Escape Args helpers
+-- ----------------------------------------------------------------------------
+
+-- | Just like 'GHC.ResponseFile.escapeArg', but it is not exposed from base.
+escapeArg :: String -> String
+escapeArg = reverse . foldl' escape []
+
+escape :: String -> Char -> String
+escape cs c
+  |    isSpace c
+    || '\\' == c
+    || '\'' == c
+    || '"'  == c = c:'\\':cs -- n.b., our caller must reverse the result
+  | otherwise    = c:cs

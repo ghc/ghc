@@ -124,7 +124,6 @@ expandToolDir
 #if defined(mingw32_HOST_OS)
 expandToolDir (Just tool_dir) s = expandPathVar "tooldir" tool_dir s
 expandToolDir Nothing         _ = panic "Could not determine $tooldir"
-expandToolDir _               s = s
 #else
 expandToolDir _ s = s
 #endif
@@ -179,7 +178,6 @@ findToolDir top_dir = go 0 (top_dir </> "..") []
               if oneLevel
                 then return (Just path)
                 else go (k+1) (path </> "..") tried'
-findToolDir _ = return Nothing
 #else
 findToolDir _ = return Nothing
 #endif
