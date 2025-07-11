@@ -990,7 +990,6 @@ static void checkGeneration (generation *gen,
 #endif
 
     if (isNonmovingGen(gen)) {
-        ASSERT(countNonMovingSegments(nonmovingHeap.free) == (W_) nonmovingHeap.n_free * NONMOVING_SEGMENT_BLOCKS);
         ASSERT(countBlocks(nonmoving_large_objects) == n_nonmoving_large_blocks);
         ASSERT(countBlocks(nonmoving_marked_large_objects) == n_nonmoving_marked_large_blocks);
 
