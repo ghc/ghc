@@ -2594,12 +2594,12 @@ specHeader
               , Core.Subst   -- Apply this to the body
 
                 -- RULE helpers
-                -- RULE forall rule_bndrs. f rule_es = $sf spec_bndrs
+                -- `RULE forall rule_bndrs. f rule_es = $sf spec_bndrs`
               , [OutBndr]    -- rule_bndrs: Binders for the RULE
               , [OutExpr]    -- rule_es:    Args for the LHS of the rule
 
                 -- Specialised function helpers
-                -- $sf = \spec_bndrs. let { dx_binds } in <orig-rhs> spec_arg
+                -- `$sf = \spec_bndrs. let { dx_binds } in <orig-rhs> spec_arg`
               , [OutBndr]    -- spec_bndrs: Binders for $sf. Subset of rule_bndrs.
               , [DictBind]   -- dx_binds:   Auxiliary dictionary bindings
               , [OutExpr]    -- spec_args:  Specialised arguments for unfolding

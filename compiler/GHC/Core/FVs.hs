@@ -188,24 +188,21 @@ exprSomeFreeVarsDSet fv_cand e = fvDVarSet $ filterFV fv_cand $ exprFVs e
 exprsSomeFreeVars :: InterestingVarFun  -- Says which 'Var's are interesting
                   -> [CoreExpr]
                   -> VarSet
-exprsSomeFreeVars fv_cand es =
-  fvVarSet $ filterFV fv_cand $ mapUnionFV exprFVs es
+exprsSomeFreeVars fv_cand es = fvVarSet $ filterFV fv_cand $ mapUnionFV exprFVs es
 
 -- | Finds free variables in several expressions selected by a predicate
 -- returning a deterministically ordered list.
 exprsSomeFreeVarsList :: InterestingVarFun  -- Says which 'Var's are interesting
                       -> [CoreExpr]
                       -> [Var]
-exprsSomeFreeVarsList fv_cand es =
-  fvVarList $ filterFV fv_cand $ mapUnionFV exprFVs es
+exprsSomeFreeVarsList fv_cand es = fvVarList $ filterFV fv_cand $ mapUnionFV exprFVs es
 
 -- | Finds free variables in several expressions selected by a predicate
 -- returning a deterministic set.
 exprsSomeFreeVarsDSet :: InterestingVarFun -- ^ Says which 'Var's are interesting
                       -> [CoreExpr]
                       -> DVarSet
-exprsSomeFreeVarsDSet fv_cand e =
-  fvDVarSet $ filterFV fv_cand $ mapUnionFV exprFVs e
+exprsSomeFreeVarsDSet fv_cand e = fvDVarSet $ filterFV fv_cand $ mapUnionFV exprFVs e
 
 --      Comment about obsolete code
 -- We used to gather the free variables the RULES at a variable occurrence
