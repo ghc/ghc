@@ -151,7 +151,7 @@ getHistoryModule :: HUG.HomeUnitGraph -> History -> IO Module
 getHistoryModule hug hist = do
   let ibi = historyBreakpointId hist
   brks <- readIModBreaks hug ibi
-  return $ bi_tick_mod $ getBreakSourceId ibi brks
+  return $ getBreakSourceMod ibi brks
 
 getHistorySpan :: HUG.HomeUnitGraph -> History -> IO SrcSpan
 getHistorySpan hug hist = do
