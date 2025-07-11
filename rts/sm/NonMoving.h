@@ -134,8 +134,6 @@ struct NonmovingHeap {
     // saved free segment list, so the sanity checker can
     // see the segments while the free list is being pruned.
     struct NonmovingSegment *saved_free;
-    // how many segments in free segment list? accessed atomically.
-    unsigned int n_free;
 
     // records the current length of the nonmovingAllocator.current arrays
     unsigned int n_caps;
