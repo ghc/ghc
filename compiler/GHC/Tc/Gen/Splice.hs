@@ -1528,13 +1528,6 @@ instance TH.Quasi TcM where
     ref <- fmap tcg_dependent_dirs getGblEnv
     dep_dirs <- readTcRef ref
     writeTcRef ref (dp:dep_dirs)
-    -- listDirectory does not return an absolute path, so
-    -- we need to prepend the directory path to make the
-    -- the contents absolute.
-    contents <- liftIO $ listDirectory dp
-    let path_prefix = dp ++ "\\"
-    let abs_contents = map (path_prefix ++) contents
-    return abs_contents
 
   qAddTempFile suffix = do
     dflags <- getDynFlags

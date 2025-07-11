@@ -33,7 +33,6 @@ module Language.Haskell.TH.Syntax (
     addCorePlugin,
     addDependentFile,
     addDependentDirectory,
-    addDependentDirectory_,
     addForeignFile,
     addForeignFilePath,
     addForeignSource,

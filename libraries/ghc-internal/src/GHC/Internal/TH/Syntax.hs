@@ -136,7 +136,7 @@ class (MonadIO m, MonadFail m) => Quasi m where
   qAddDependentFile :: FilePath -> m ()
 
   -- | See 'addDependentDirectory'.
-  qAddDependentDirectory :: FilePath -> m [FilePath]
+  qAddDependentDirectory :: FilePath -> m ()
 
   -- | See 'addTempFile'.
   qAddTempFile :: String -> m FilePath
@@ -839,23 +839,9 @@ getPackageRoot = Q qGetPackageRoot
 --   * The dependency is shallow, just a hash of its direct contents. It returns
 --     a list of the contents (absolute paths), files and subdirectories both, so
 --     you can manually depend on (a subset of) those, if you wish.
-addDependentDirectory :: FilePath -> Q [FilePath]
+addDependentDirectory :: FilePath -> Q ()
 addDependentDirectory dp = Q (qAddDependentDirectory dp)
 
--- | Record external directories that runIO is using (dependent upon).
--- The compiler can then recognize that it should re-compile the Haskell file
--- when a directory changes.
---
--- Expects an absolute directory path.
---
--- Notes:
---
---   * ghc -M does not know about these dependencies - it does not execute TH.
---
---   * The dependency is shallow, just a hash of its direct contents.
---     See 'addDependentDirectory' for a version that returns the contents.
-addDependentDirectory_ :: FilePath -> Q ()
-addDependentDirectory_ dp = addDependentDirectory dp >> pure ()
 
 -- | Record external files that runIO is using (dependent upon).
 -- The compiler can then recognize that it should re-compile the Haskell file

@@ -291,7 +291,7 @@ data THMessage a where
 
   GetPackageRoot :: THMessage (THResult FilePath)
   AddDependentFile :: FilePath -> THMessage (THResult ())
-  AddDependentDirectory :: FilePath -> THMessage (THResult [FilePath])
+  AddDependentDirectory :: FilePath -> THMessage (THResult ())
   AddTempFile :: String -> THMessage (THResult FilePath)
   AddModFinalizer :: RemoteRef (TH.Q ()) -> THMessage (THResult ())
   AddCorePlugin :: String -> THMessage (THResult ())
