@@ -407,6 +407,7 @@ settings dflags = Settings
   , sToolSettings = toolSettings dflags
   , sPlatformMisc = platformMisc dflags
   , sRawSettings = rawSettings dflags
+  , sRawTarget = rawTarget dflags
   }
 
 pgm_L                 :: DynFlags -> String
