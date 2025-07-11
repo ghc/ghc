@@ -279,6 +279,10 @@ import GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer (mkParserOpts, initParserState, P(..), ParseResult(..))
 
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
+import GHC.ResponseFile
+
+import GHC.Toolchain
+import GHC.Toolchain.Program
 
 import Data.IORef
 import Control.Arrow ((&&&))
@@ -3454,69 +3458,58 @@ compilerInfo dflags
       -- Next come the settings, so anything else can be overridden
       -- in the settings file (as "lookup" uses the first match for the
       -- key)
-    -- TODO:
-    -- : map (fmap $ )
-    --       (rawSettings dflags)
-     :
-      [("C compiler command", query),
-       ("C compiler flags", "$(SettingsCCompilerFlags)"),
-       ("C++ compiler command", "$(SettingsCxxCompilerCommand)"),
-       ("C++ compiler flags", "$(SettingsCxxCompilerFlags)"),
-       ("C compiler link flags", "$(SettingsCCompilerLinkFlags)"),
-       ("C compiler supports -no-pie", "$(SettingsCCompilerSupportsNoPie)"),
-       ("CPP command", "$(SettingsCPPCommand)"),
-       ("CPP flags", "$(SettingsCPPFlags)"),
-       ("Haskell CPP command", "$(SettingsHaskellCPPCommand)"),
-       ("Haskell CPP flags", "$(SettingsHaskellCPPFlags)"),
-       ("JavaScript CPP command", "$(SettingsJavaScriptCPPCommand)"),
-       ("JavaScript CPP flags", "$(SettingsJavaScriptCPPFlags)"),
-       ("C-- CPP command", "$(SettingsCmmCPPCommand)"),
-       ("C-- CPP flags", "$(SettingsCmmCPPFlags)"),
-       ("C-- CPP supports -g0", "$(SettingsCmmCPPSupportsG0)"),
-       ("ld supports compact unwind", "$(LdHasNoCompactUnwind)"),
-       ("ld supports filelist", "$(LdHasFilelist)"),
-       ("ld supports single module", "$(LdHasSingleModule)"),
-       ("ld is GNU ld", "$(LdIsGNULd)"),
-       ("Merge objects command", "$(SettingsMergeObjectsCommand)"),
-       ("Merge objects flags", "$(SettingsMergeObjectsFlags)"),
-       ("Merge objects supports response files", "$(MergeObjsSupportsResponseFiles)"),
-       ("ar command", "$(SettingsArCommand)"),
-       ("ar flags", "$(ArArgs)"),
-       ("ar supports at file", "$(ArSupportsAtFile)"),
-       ("ar supports -L", "$(ArSupportsDashL)"),
-       ("ranlib command", "$(SettingsRanlibCommand)"),
-       ("otool command", "$(SettingsOtoolCommand)"),
-       ("install_name_tool command", "$(SettingsInstallNameToolCommand)"),
-       ("windres command", "$(SettingsWindresCommand)"),
-       ("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit"),
-       ("cross compiling", "$(CrossCompiling)"),
-       ("target platform string", "$(TARGETPLATFORM)"),
-       ("target os", "$(HaskellTargetOs)"),
-       ("target arch", "$(HaskellTargetArch)"),
-       ("target word size", "$(TargetWordSize)"),
-       ("target word big endian", "$(TargetWordBigEndian)"),
-       ("target has GNU nonexec stack", "$(TargetHasGnuNonexecStack)"),
-       ("target has .ident directive", "$(TargetHasIdentDirective)"),
-       ("target has subsections via symbols", "$(TargetHasSubsectionsViaSymbols)"),
-       ("target has libm", "$(TargetHasLibm)"),
-       ("Unregisterised", "$(GhcUnregisterised)"),
-       ("LLVM target", "$(LLVMTarget)"),
-       ("LLVM llc command", "$(SettingsLlcCommand)"),
-       ("LLVM opt command", "$(SettingsOptCommand)"),
-       ("LLVM llvm-as command", "$(SettingsLlvmAsCommand)"),
-       ("LLVM llvm-as flags", "$(SettingsLlvmAsFlags)"),
-       ("target RTS linker only supports shared libraries", "$(TargetRTSLinkerOnlySupportsSharedLibs)"),
-       ("Use interpreter", "$(GhcWithInterpreter)"),
-       ("Support SMP", "$(GhcWithSMP)"),
-       ("RTS ways", "$(GhcRTSWays)"),
-       ("Tables next to code", "$(TablesNextToCode)"),
-       ("Leading underscore", "$(LeadingUnderscore)"),
-       ("Use LibFFI", "$(UseLibffiForAdjustors)"),
-       ("RTS expects libdw", "$(GhcRtsWithLibdw)"),
-       ("Relative Global Package DB", "package.conf.d"),
-       ("base unit-id", "$(BaseUnitId)")
-      ]
-   ++ [("Project version",             projectVersion dflags),
+     : map (fmap expandDirectories)
+           (rawSettings dflags)
+     ++
+      [("C compiler command", queryCmd $ ccProgram . tgtCCompiler),
+       ("C compiler flags", queryFlags $ ccProgram . tgtCCompiler),
+       ("C++ compiler command", queryCmd $ cxxProgram . tgtCxxCompiler),
+       ("C++ compiler flags", queryFlags $ cxxProgram . tgtCxxCompiler),
+       ("C compiler link flags", queryFlags $ ccLinkProgram . tgtCCompilerLink),
+       ("C compiler supports -no-pie", queryBool $ ccLinkSupportsNoPie . tgtCCompilerLink),
+       ("CPP command", queryCmd $ cppProgram . tgtCPreprocessor),
+       ("CPP flags", queryFlags $ cppProgram . tgtCPreprocessor),
+       ("Haskell CPP command", queryCmd $ hsCppProgram . tgtHsCPreprocessor),
+       ("Haskell CPP flags", queryFlags $ hsCppProgram . tgtHsCPreprocessor),
+       ("JavaScript CPP command", queryCmdMaybe jsCppProgram tgtJsCPreprocessor),
+       ("JavaScript CPP flags", queryFlagsMaybe jsCppProgram tgtJsCPreprocessor),
+       ("C-- CPP command", queryCmd $ cmmCppProgram . tgtCmmCPreprocessor),
+       ("C-- CPP flags", queryFlags $ cmmCppProgram . tgtCmmCPreprocessor),
+       ("C-- CPP supports -g0", queryBool $ cmmCppSupportsG0 . tgtCmmCPreprocessor),
+       ("ld supports compact unwind", queryBool $ ccLinkSupportsCompactUnwind . tgtCCompilerLink),
+       ("ld supports filelist", queryBool $ ccLinkSupportsFilelist . tgtCCompilerLink),
+       ("ld supports single module", queryBool $ ccLinkSupportsSingleModule . tgtCCompilerLink),
+       ("ld is GNU ld", queryBool $ ccLinkIsGnu . tgtCCompilerLink),
+       ("Merge objects command", queryCmdMaybe mergeObjsProgram tgtMergeObjs),
+       ("Merge objects flags", queryFlagsMaybe mergeObjsProgram tgtMergeObjs),
+       ("Merge objects supports response files", queryBool $ maybe False mergeObjsSupportsResponseFiles . tgtMergeObjs),
+       ("ar command", queryCmd $ arMkArchive . tgtAr),
+       ("ar flags", queryFlags $ arMkArchive . tgtAr),
+       ("ar supports at file", queryBool $ arSupportsAtFile . tgtAr),
+       ("ar supports -L", queryBool $ arSupportsDashL . tgtAr),
+       ("ranlib command", queryCmdMaybe ranlibProgram tgtRanlib),
+       ("otool command", queryCmdMaybe id tgtOtool),
+       ("install_name_tool command", queryCmdMaybe id tgtInstallNameTool),
+       ("windres command", queryCmd $ fromMaybe (Program "/bin/false" []) . tgtWindres),
+       ("cross compiling", queryBool (not . tgtLocallyExecutable)),
+       ("target platform string", query targetPlatformTriple),
+       ("target os", query (show . archOS_OS . tgtArchOs)),
+       ("target arch", query (show . archOS_arch . tgtArchOs)),
+       ("target word size", query $ show . wordSize2Bytes . tgtWordSize),
+       ("target word big endian", queryBool $ (\case BigEndian -> True; LittleEndian -> False) . tgtEndianness),
+       ("target has GNU nonexec stack", queryBool tgtSupportsGnuNonexecStack),
+       ("target has .ident directive", queryBool tgtSupportsIdentDirective),
+       ("target has subsections via symbols", queryBool tgtSupportsSubsectionsViaSymbols),
+       ("Unregisterised", queryBool tgtUnregisterised),
+       ("LLVM target", query tgtLlvmTarget),
+       ("LLVM llc command", queryCmdMaybe id tgtLlc),
+       ("LLVM opt command", queryCmdMaybe id tgtOpt),
+       ("LLVM llvm-as command", queryCmdMaybe id tgtLlvmAs),
+       ("LLVM llvm-as flags", queryFlagsMaybe id tgtLlvmAs),
+       ("Tables next to code", queryBool tgtTablesNextToCode),
+       ("Leading underscore", queryBool tgtSymbolsHaveLeadingUnderscore)
+      ] ++
+      [("Project version",             projectVersion dflags),
        ("Project Git commit id",       cProjectGitCommitId),
        ("Project Version Int",         cProjectVersionInt),
        ("Project Patch Level",         cProjectPatchLevel),
@@ -3574,7 +3567,15 @@ compilerInfo dflags
     platform  = targetPlatform dflags
     isWindows = platformOS platform == OSMinGW32
     expandDirectories = expandToolDir (toolDir dflags) . expandTopDir (topDir dflags)
+    query :: (Target -> a) -> a
     query f = f (rawTarget dflags)
+    queryFlags f = query (escapeArgs . prgFlags . f)
+    queryCmd f = expandDirectories (query (prgPath . f))
+    queryBool = showBool . query
+
+    queryCmdMaybe, queryFlagsMaybe :: (a -> Program) -> (Target -> Maybe a) -> String
+    queryCmdMaybe p f = expandDirectories (query (maybe "" (prgPath . p) . f))
+    queryFlagsMaybe p f = query (maybe "" (escapeArgs . prgFlags . p) . f)
 
 -- Note [Special unit-ids]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
