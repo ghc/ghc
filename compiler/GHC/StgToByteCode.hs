@@ -2683,3 +2683,14 @@ getCurrentModBreaks = BcM $ \env st -> return (modBreaks env, st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
+
+-- Dehydrating CgBreakInfo
+
+dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> BreakpointId -> CgBreakInfo
+dehydrateCgBreakInfo ty_vars idOffSets tick_ty bid =
+          CgBreakInfo
+            { cgb_tyvars = map toIfaceTvBndr ty_vars
+            , cgb_vars = map (fmap (\(i, offset) -> (toIfaceIdBndr i, offset))) idOffSets
+            , cgb_resty = toIfaceType tick_ty
+            , cgb_tick_id = bid
+            }
