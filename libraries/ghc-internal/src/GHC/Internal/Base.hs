@@ -1047,7 +1047,7 @@ class Functor f where
 -- * sequence computations and combine their results ('<*>' and 'liftA2').
 --
 -- A minimal complete definition must include implementations of 'pure'
--- and of either '<*>' or 'liftA2'. If it defines both, then they must behave
+-- and one of either '<*>' or 'liftA2'. If it defines both, then they must behave
 -- the same as their default definitions:
 --
 --      @('<*>') = 'liftA2' 'id'@
