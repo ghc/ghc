@@ -836,11 +836,11 @@ getPackageRoot = Q qGetPackageRoot
 --
 --   * ghc -M does not know about these dependencies - it does not execute TH.
 --
---   * The dependency is shallow, just a hash of its direct contents.
---     Basically, it only sees a list of names, and hashes those names.
---     It does not look at directory metadata, recurse into subdirectories
---     or look at file contents. As long as the list of names remains the same,
---     the directory is considered unchanged.
+--   * The dependency is shallow, based only on the direct content.
+--     Basically, it only sees a list of names. It does not look at directory
+--     metadata, recurse into subdirectories, or look at file contents. As
+--     long as the list of names remains the same, the directory is considered
+--     unchanged.
 --
 --   * The state of the directory is read at the interface generation time,
 --     not at the time of the function call.
