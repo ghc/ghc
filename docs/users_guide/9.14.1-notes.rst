@@ -232,6 +232,11 @@ Cmm
   They are replaced, respectively, by ``SpecialiseEP``, ``pragSpecED`` and
   ``pragSpecInlED``.
 
+- We have added the ``addDependentDirectory`` function to match
+  ``addDependentFile``, which adds a directory to the list of dependencies that
+  the recompilation checker will look at to determine if a module needs to be
+  recompiled.
+
 Included libraries
 ~~~~~~~~~~~~~~~~~~
 
