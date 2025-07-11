@@ -5,14 +5,9 @@ GHC.Builtin.Types
 GHC.Builtin.Types.Literals
 GHC.Builtin.Types.Prim
 GHC.Builtin.Uniques
-GHC.ByteCode.Breakpoints
-GHC.ByteCode.Types
 GHC.Cmm.BlockId
 GHC.Cmm.CLabel
 GHC.Cmm.Dataflow.Label
-GHC.Cmm.Expr
-GHC.Cmm.MachOp
-GHC.Cmm.Reg
 GHC.Cmm.Type
 GHC.CmmToAsm.CFG.Weight
 GHC.Core
@@ -65,7 +60,6 @@ GHC.Data.FastMutInt
 GHC.Data.FastString
 GHC.Data.FastString.Env
 GHC.Data.FiniteMap
-GHC.Data.FlatBag
 GHC.Data.Graph.Directed
 GHC.Data.Graph.Directed.Internal
 GHC.Data.Graph.UnVar
@@ -77,7 +71,6 @@ GHC.Data.Maybe
 GHC.Data.OrdList
 GHC.Data.OsPath
 GHC.Data.Pair
-GHC.Data.SmallArray
 GHC.Data.Strict
 GHC.Data.StringBuffer
 GHC.Data.TrieMap
@@ -111,8 +104,6 @@ GHC.Hs.Pat
 GHC.Hs.Specificity
 GHC.Hs.Type
 GHC.Hs.Utils
-GHC.HsToCore.Breakpoints
-GHC.HsToCore.Ticks
 GHC.Iface.Errors.Types
 GHC.Iface.Ext.Fields
 GHC.Iface.Flags
@@ -182,7 +173,6 @@ GHC.Types.RepType
 GHC.Types.SafeHaskell
 GHC.Types.SourceFile
 GHC.Types.SourceText
-GHC.Types.SptEntry
 GHC.Types.SrcLoc
 GHC.Types.ThLevelIndex
 GHC.Types.Tickish
