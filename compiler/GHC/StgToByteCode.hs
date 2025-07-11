@@ -63,7 +63,7 @@ import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
                               assertNonVoidIds, assertNonVoidStgArgs )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
-import GHC.Runtime.Interpreter ( interpreterProfiled )
+import GHC.Runtime.Interpreter ( interpreterProfiled, readIModModBreaks )
 import GHC.Data.Bitmap
 import GHC.Data.FlatBag as FlatBag
 import GHC.Data.OrdList
@@ -99,6 +99,7 @@ import GHC.CoreToIface
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT(..))
 import Control.Monad.Trans.State  (StateT(..))
+import Data.Array ((!))
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -393,26 +394,30 @@ schemeR_wrk fvs nm original_body (args, body)
 -- | Introduce break instructions for ticked expressions.
 -- If no breakpoint information is available, the instruction is omitted.
 schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
-schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
-  code <- schemeE d 0 p rhs
-  mb_current_mod_breaks <- getCurrentModBreaks
-  case mb_current_mod_breaks of
-    -- if we're not generating ModBreaks for this module for some reason, we
-    -- can't store breakpoint occurrence information.
-    Nothing -> pure code
-    Just current_mod_breaks -> do
-      platform <- profilePlatform <$> getProfile
-      let idOffSets = getVarOffSets platform d p fvs
-          ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-          toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
-          toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-          breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty tick_id
+schemeER_wrk d p (StgTick bp@(Breakpoint tick_ty tick_id fvs) rhs) = do
+  platform <- profilePlatform <$> getProfile
 
-      let info_mod = modBreaks_module current_mod_breaks
-      infox <- newBreakInfo breakInfo
+  code <- case rhs of
+    -- When we find a tick surrounding a case expression we introduce a new BRK_FUN
+    -- instruction at the start of the case *continuation*, in addition to the
+    -- usual BRK_FUN surrounding the StgCase)
+    -- See Note [TODO]
+    StgCase scrut bndr _ alts
+      -> doCase d 0 p (Just bp) scrut bndr alts
+    _ -> schemeE d 0 p rhs
 
-      let breakInstr = BRK_FUN (InternalBreakpointId info_mod infox)
-      return $ breakInstr `consOL` code
+  let idOffSets = getVarOffSets platform d p fvs
+      ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+      toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+      toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+      breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty (Right tick_id)
+
+  mibi <- newBreakInfo breakInfo
+
+  return $ case mibi of
+    Nothing  -> code
+    Just ibi -> BRK_FUN ibi 0 `consOL` code
+
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
@@ -614,7 +619,7 @@ schemeE d s p (StgTick _ rhs) = schemeE d s p rhs
 schemeE d s p (StgCase scrut _ _ []) = schemeE d s p scrut
 
 schemeE d s p (StgCase scrut bndr _ alts)
-   = doCase d s p scrut bndr alts
+   = doCase d s p Nothing scrut bndr alts
 
 
 {-
@@ -1106,11 +1111,15 @@ doCase
     :: StackDepth
     -> Sequel
     -> BCEnv
+    -> Maybe StgTickish
+    -- ^ The breakpoint surrounding the full case expression, if any (only
+    -- source-level cases get breakpoint ticks, and those are the only we care
+    -- about). See Note [TODO]
     -> CgStgExpr
     -> Id
     -> [CgStgAlt]
     -> BcM BCInstrList
-doCase d s p scrut bndr alts
+doCase d s p m_bid scrut bndr alts
   = do
      profile <- getProfile
      hsc_env <- getHscEnv
@@ -1327,11 +1336,28 @@ doCase d s p scrut bndr alts
      let alt_final1
            | ubx_tuple_frame    = SLIDE 0 2 `consOL` alt_final0
            | otherwise          = alt_final0
-         alt_final
-           | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
-                                -- See Note [Debugger: BRK_ALTS]
-                                = BRK_ALTS False `consOL` alt_final1
-           | otherwise          = alt_final1
+
+     alt_final <- case m_bid of
+       Just (Breakpoint tick_ty tick_id fvs)
+         | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
+         -- Construct an internal breakpoint to put at the start of this case
+         -- continuation BCO.
+         -- See Note [TODO]
+         -> do
+          internal_tick_loc <- makeCaseInternalBreakLoc tick_id
+
+          -- same fvs available in the case expression are available in the case continuation
+          let idOffSets = getVarOffSets platform d p fvs
+              ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+              toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+              toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+              breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty (Left internal_tick_loc)
+
+          mibi <- newBreakInfo breakInfo
+          return $ case mibi of
+            Nothing  -> alt_final1
+            Just ibi -> {- BRK_FUN ibi (d_alts - d) `consOL` -} alt_final1
+       _ -> pure alt_final1
 
      add_bco_name <- shouldAddBcoName
      let
@@ -1350,6 +1376,24 @@ doCase d s p scrut bndr alts
                   [rep] -> rep
                   _     -> panic "schemeE(StgCase).push_alts"
             in return (PUSH_ALTS alt_bco scrut_rep `consOL` scrut_code)
+
+makeCaseInternalBreakLoc :: BreakpointId -> BcM InternalBreakLoc
+makeCaseInternalBreakLoc bid = do
+  hug         <- hsc_HUG <$> getHscEnv
+  curr_mod    <- getCurrentModule
+  mb_mod_brks <- getCurrentModBreaks
+
+  -- TODO: Subtract the scrutinee loc from the case loc to get continuation loc
+  InternalBreakLoc <$> case bid of
+    BreakpointId{bi_tick_mod, bi_tick_index}
+      | bi_tick_mod == curr_mod
+      , Just these_mbs <- mb_mod_brks
+      -> do
+        return $ modBreaks_locs these_mbs ! bi_tick_index
+      | otherwise
+      -> do
+        other_mbs <- liftIO $ readIModModBreaks hug bi_tick_mod
+        return $ modBreaks_locs other_mbs ! bi_tick_index
 
 {-
 Note [Debugger: BRK_ALTS]
@@ -2671,14 +2715,19 @@ getLabelsBc n = BcM $ \_ st ->
   let ctr = nextlabel st
    in return (coerce [ctr .. ctr+n-1], st{nextlabel = ctr+n})
 
-newBreakInfo :: CgBreakInfo -> BcM Int
-newBreakInfo info = BcM $ \_ st ->
-  let ix = breakInfoIdx st
-      st' = st
-        { breakInfo = IntMap.insert ix info (breakInfo st)
-        , breakInfoIdx = ix + 1
-        }
-  in return (ix, st')
+newBreakInfo :: CgBreakInfo -> BcM (Maybe InternalBreakpointId)
+newBreakInfo info = BcM $ \env st -> do
+  -- if we're not generating ModBreaks for this module for some reason, we
+  -- can't store breakpoint occurrence information.
+  case modBreaks env of
+    Nothing -> pure (Nothing, st)
+    Just modBreaks -> do
+      let ix = breakInfoIdx st
+          st' = st
+            { breakInfo = IntMap.insert ix info (breakInfo st)
+            , breakInfoIdx = ix + 1
+            }
+      return (Just $ InternalBreakpointId (modBreaks_module modBreaks) ix, st')
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \env st -> return (bcm_module env, st)
@@ -2691,7 +2740,7 @@ tickFS = fsLit "ticked"
 
 -- Dehydrating CgBreakInfo
 
-dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> BreakpointId -> CgBreakInfo
+dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> Either InternalBreakLoc BreakpointId -> CgBreakInfo
 dehydrateCgBreakInfo ty_vars idOffSets tick_ty bid =
           CgBreakInfo
             { cgb_tyvars = map toIfaceTvBndr ty_vars

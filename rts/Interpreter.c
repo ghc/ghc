@@ -747,6 +747,7 @@ interpretBCO (Capability* cap)
             /* info_mod_name = */ BCO_GET_LARGE_ARG;
             /* info_mod_id   = */ BCO_GET_LARGE_ARG;
             arg4_info_index     = BCO_NEXT;
+            /* byte_off      = BCO_NEXT; */
 
             StgPtr* ptrs = (StgPtr*)(&bco->ptrs->payload[0]);
             StgArrBytes* breakPoints = (StgArrBytes *) BCO_PTR(arg1_brk_array);
@@ -1572,9 +1573,9 @@ run_BCO:
         /* check for a breakpoint on the beginning of a let binding */
         case bci_BRK_FUN:
         {
-            W_ arg1_brk_array, arg2_info_mod_name, arg3_info_mod_id, arg4_info_index;
+            W_ arg1_brk_array, arg2_info_mod_name, arg3_info_mod_id, arg4_info_index, arg5_byte_off;
 #if defined(PROFILING)
-            W_ arg5_cc;
+            W_ arg6_cc;
 #endif
             StgArrBytes *breakPoints;
             int returning_from_break, stop_next_breakpoint;
@@ -1592,8 +1593,9 @@ run_BCO:
             arg2_info_mod_name  = BCO_GET_LARGE_ARG;
             arg3_info_mod_id    = BCO_GET_LARGE_ARG;
             arg4_info_index     = BCO_NEXT;
+            arg5_byte_off       = BCO_NEXT;
 #if defined(PROFILING)
-            arg5_cc             = BCO_GET_LARGE_ARG;
+            arg6_cc             = BCO_GET_LARGE_ARG;
 #else
             BCO_GET_LARGE_ARG;
 #endif
@@ -1613,7 +1615,7 @@ run_BCO:
 
 #if defined(PROFILING)
             cap->r.rCCCS = pushCostCentre(cap->r.rCCCS,
-                                          (CostCentre*)BCO_LIT(arg5_cc));
+                                          (CostCentre*)BCO_LIT(arg6_cc));
 #endif
 
             // if we are returning from a break then skip this section
@@ -1653,7 +1655,12 @@ run_BCO:
                   // copy the contents of the top stack frame into the AP_STACK
                   for (i = 2; i < size_words; i++)
                   {
-                     new_aps->payload[i] = (StgClosure *)ReadSpW(i-2);
+                     // BAD ASSUMPTION: BITMAP Vars are on top of the stack.
+                     // THEY ARE NOT FOR PUSH_ALTS:
+                     //   THE FIRST THING ON THE STACK IS GOING TO BE
+                     //       ctoi_***
+                     //TODO UPDATE DOCUMENTATION EXPLANING ARG5_BYTE_OFF
+                     new_aps->payload[i] = (StgClosure *)ReadSpB(((ptrdiff_t)(i-2) * (ptrdiff_t)sizeof(W_)) + arg5_byte_off);
                   }
 
                   // No write barrier is needed here as this is a new allocation
