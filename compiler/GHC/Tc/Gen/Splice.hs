@@ -173,8 +173,6 @@ import GHC.Parser.HaddockLex (lexHsDoc)
 import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
 
-import System.Directory(listDirectory)
-
 {-
 Note [Template Haskell state diagram]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
