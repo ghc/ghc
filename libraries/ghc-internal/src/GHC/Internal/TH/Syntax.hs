@@ -836,12 +836,16 @@ getPackageRoot = Q qGetPackageRoot
 --
 --   * ghc -M does not know about these dependencies - it does not execute TH.
 --
---   * The dependency is shallow, just a hash of its direct contents. It returns
---     a list of the contents (absolute paths), files and subdirectories both, so
---     you can manually depend on (a subset of) those, if you wish.
+--   * The dependency is shallow, just a hash of its direct contents.
+--     Basically, it only sees a list of names, and hashes those names.
+--     It does not look at directory metadata, recurse into subdirectories
+--     or look at file contents. As long as the list of names remains the same,
+--     the directory is considered unchanged.
+--
+--   * The state of the directory is read at the interface generation time,
+--     not at the time of the function call.
 addDependentDirectory :: FilePath -> Q ()
 addDependentDirectory dp = Q (qAddDependentDirectory dp)
-
 
 -- | Record external files that runIO is using (dependent upon).
 -- The compiler can then recognize that it should re-compile the Haskell file
@@ -853,7 +857,11 @@ addDependentDirectory dp = Q (qAddDependentDirectory dp)
 --
 --   * ghc -M does not know about these dependencies - it does not execute TH.
 --
---   * The dependency is based on file content, not a modification time
+--   * The dependency is based on file content, not a modification time or
+--     any other metadata associated with the file (e.g. permissions).
+--
+--   * The state of the file is read at the interface generation time,
+--     not at the time of the function call.
 addDependentFile :: FilePath -> Q ()
 addDependentFile fp = Q (qAddDependentFile fp)
 

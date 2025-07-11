@@ -732,12 +732,14 @@ be recompiled.
 
 When using Template Haskell or plugins, you can use the functions
 ``addDependentFile`` and ``addDependentDirectory`` to add additional
-dependencies to the module being compiled. When adding a file, this means
-that the contents of the file changing between compilations will trigger a
-recompilation of the module. When adding a directory, this means that any 
-file or subdirectory *added* to or *removed* from the directory will trigger
-recompilation of the module, so it is not a recursive dependency.
-  
+dependencies to the module being compiled.
+
+- When adding a file, this means that the contents of the file changing between
+  compilations will trigger a recompilation of the module.
+- When adding a directory, this means that any file or subdirectory *added* to or
+  *removed* from the directory will trigger recompilation of the module, so
+  it is not a recursive dependency.
+
 .. _mutual-recursion:
 
 Mutually recursive modules and hs-boot files
