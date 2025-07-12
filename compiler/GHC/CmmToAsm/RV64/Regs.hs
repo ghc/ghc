@@ -159,6 +159,7 @@ allFpArgRegs = map regSingle [fa0RegNo .. fa7RegNo]
 allVecRegs :: [Reg]
 allVecRegs = map regSingle [v0RegNo .. v31RegNo]
 
+-- | Vector argument `Reg`s according to the calling convention
 allVecArgRegs :: [Reg]
 allVecArgRegs = map regSingle [v8RegNo .. v23RegNo]
 
