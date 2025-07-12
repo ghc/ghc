@@ -2126,8 +2126,9 @@ def _get_cpu_info_from_ibm_pa_features():
 
 def _get_cpu_info_from_riscv_isa():
 	'''
-	Returns the CPU info gathered from 'cat /proc/device-tree/cpus/cpu@0/riscv,isa'
-	Returns {} if this file does not exist (i.e. we're not on RISC-V Linux)
+    Returns the CPU info gathered from 'cat
+    /proc/device-tree/cpus/cpu@0/riscv,isa' (Linux) and/or tries to figure out
+    vector extensions by running assembly code.
 	'''
 
 	def remove_prefix(prefix, text):
@@ -2165,10 +2166,10 @@ def _get_cpu_info_from_riscv_isa():
 
 		flags = output.split('_')
 
-		# The usage of the Zvl* extensions in the industry is very
-		# inconsistent. Though, they are useful to communicate the VLEN. So, if
-		# they are not provided by the system, we try to figure them out on our
-		# own.
+        # The usage of the Zvl* extensions in the industry is very
+        # inconsistent. Though, they are useful to communicate the VLEN. So, if
+        # they are not provided by the system, we try to figure them out on our
+        # own.
 
 		# E.g. rv64imafdcvh
 		arch_string = flags[0]
