@@ -1493,7 +1493,7 @@ async def do_test(name: TestName,
         dst_makefile = in_testdir('Makefile')
         if src_makefile.exists():
             makefile = src_makefile.read_text(encoding='UTF-8')
-            makefile = re.sub('TOP=.*', 'TOP=%s' % config.top, makefile, 1)
+            makefile = re.sub('TOP=.*', 'TOP=%s' % config.top, makefile, count=1)
             dst_makefile.write_text(makefile, encoding='UTF-8')
 
     if opts.pre_cmd:
@@ -2708,7 +2708,7 @@ def normalise_errmsg(s: str) -> str:
 
     # filter out unsupported GNU_PROPERTY_TYPE (5), which is emitted by LLVM10
     # and not understood by older binutils (ar, ranlib, ...)
-    s = modify_lines(s, lambda l: re.sub(r'^(.+)warning: (.+): unsupported GNU_PROPERTY_TYPE \(5\) type: 0xc000000(.*)$', '', l))
+    s = modify_lines(s, lambda l: re.sub(r'^(.+)warning: (.+): unsupported GNU_PROPERTY_TYPE (?:\(5\) )?type: 0xc000000(.*)$', '', l))
 
     s = re.sub(r'ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)

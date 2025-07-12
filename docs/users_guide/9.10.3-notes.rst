@@ -1,0 +1,165 @@
+.. _release-9-10-3:
+
+Version 9.10.3
+===============
+The significant changes to the various parts of the compiler are listed in the
+following sections. See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.10>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+
+Compiler
+~~~~~~~~
+
+- Don't cache solved [W] HasCallStack constraints to avoid re-using old
+  call-stacks instead of constructing new ones. (:ghc-ticket:`25529`)
+
+- Fix EmptyCase panic in tcMatches when \case{} is checked against a function
+  type preceded by invisible forall. (:ghc-ticket:`25960`)
+
+- Fix panic triggered by combination of \case{} and forall t ->. (:ghc-ticket:`25004`)
+
+- Fix GHC.SysTools.Ar archive member size writing logic that was emitting wrong
+  archive member sizes in headers. (:ghc-ticket:`26120`, :ghc-ticket:`22586`)
+
+- Fix multiple bugs in name resolution of subordinate import lists related to
+  type namespace specifiers and hiding clauses. (:ghc-ticket:`22581`, :ghc-ticket:`25983`, :ghc-ticket:`25984`, :ghc-ticket:`25991`)
+
+- Use mkTrAppChecked in ds_ev_typeable to avoid false negatives for type
+  equality involving function types. (:ghc-ticket:`25998`)
+
+- Fix bytecode generation for ``tagToEnum# <LITERAL>``. (:ghc-ticket:`25975`)
+
+- Don't report used duplicate record fields as unused. (:ghc-ticket:`24035`)
+
+- Propagate long distance info to guarded let binds for better pattern-match
+  checking warnings. (:ghc-ticket:`25749`)
+
+- Prevent incorrect unpacking optimizations for GADTs with multiple constructors. (:ghc-ticket:`25672`)
+
+- Introduce a separate argument limit for forced specs via SPEC argument with
+  warning when limit is exceeded. (:ghc-ticket:`25197`)
+
+Build system and packaging
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- 9.10 hadrian can build with Cabal-3.12.1. (:ghc-ticket:`25605`)
+
+- GHC settings: always unescape escaped spaces to fix handling of spaces in
+  executable paths. (:ghc-ticket:`25204`)
+
+Native code generator backend
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- x86 NCG: Fix code generation of bswap64 on i386. (:ghc-ticket:`25601`)
+
+- AArch64 NCG: Fix sub-word arithmetic right shift by zero-extending sub-word
+  values. (:ghc-ticket:`26061`)
+
+- NCG: AArch64 - Add -finter-module-far-jumps flag for modules with far jumps
+  outside the current module. (:ghc-ticket:`24648`)
+
+LLVM backend
+~~~~~~~~~~~~
+
+- LLVM: fix typo in padLiveArgs that was incorrectly computing too many padding
+  registers causing segfaults. (:ghc-ticket:`25770`, :ghc-ticket:`25773`)
+
+- llvmGen: Fix linkage of built-in arrays to use Appending linkage instead of
+  Internal. (:ghc-ticket:`25769`)
+
+- llvmGen: Fix built-in variable predicate to check for `@llvm` rather than
+  `$llvm`.
+
+WebAssembly backend
+~~~~~~~~~~~~~~~~~~~
+
+- wasm: use primitive opcodes for fabs and sqrt operations.
+
+Runtime system
+~~~~~~~~~~~~~~
+
+- rts: Implement WEAK EXTERNAL undef redirection by target symbol name.
+
+- rts: Handle API set symbol versioning conflicts.
+
+- rts: fix rts_clearMemory logic when sanity checks are enabled. (:ghc-ticket:`26011`)
+
+- rts/linker: Improve efficiency of proddable blocks structure by using binary
+  search instead of linked lists for better performance with split sections. (:ghc-ticket:`26009`)
+
+- rts/linker/PEi386: Don't repeatedly load DLLs by maintaining a hash-set of
+  loaded DLL names. (:ghc-ticket:`26009`, :ghc-ticket:`26052`)
+
+- rts/linker: Don't fail due to RTLD_NOW by attempting eager binding first,
+  then reverting to lazy binding on failure. (:ghc-ticket:`25943`)
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- base: Expose Backtraces constructor and fields. (:ghc-ticket:`26049`)
+
+- base: Note strictness changes made in 4.16.0.0. (:ghc-ticket:`25886`)
+
+- Fix bugs in ``integerRecipMod`` and ``integerPowMod`` return values. (:ghc-ticket:`26017`)
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+- perf: Replace uses of genericLength with strictGenericLength to reduce time
+  spent in 'assembleBCOs' and allocations. (:ghc-ticket:`25706`)
+
+Build tools
+~~~~~~~~~~~
+
+- configure: Drop probing of ld.gold since `gold` has been dropped from
+  binutils-2.44. (:ghc-ticket:`25716`)
+
+- get-win32-tarballs.py: List tarball files to be downloaded if we cannot find
+  them. (:ghc-ticket:`25929`)
+
+- hp2ps Utilities.c: include stdlib.h instead of extern malloc and realloc.
+
+Included libraries
+~~~~~~~~~~~~~~~~~~
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:  Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal: Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal: Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable

@@ -997,7 +997,7 @@ job_groups =
      -- Fully static build, in theory usable on any linux distribution.
      , fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken static))
      -- Dynamically linked build, suitable for building your own static executables on alpine
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken vanilla))
+     , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken vanilla)))
      , disableValidate (standardBuildsWithConfig AArch64 (Linux Alpine318) (splitSectionsBroken vanilla))
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine318) (splitSectionsBroken vanilla))
      , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
