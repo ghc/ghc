@@ -392,9 +392,14 @@ module GHC.Generics  (
 -- instance (Encode a) => Encode (Tree a)
 -- @
 --
--- The generic default is being used. In the future, it will hopefully be
--- possible to use @deriving Encode@ as well, but GHC does not yet support
--- that syntax for this situation.
+-- The generic default is being used. Alternatively the @DeriveAnyClass@ language extension can be
+-- used to derive Encode:
+--
+-- @
+-- {-# LANGUAGE DeriveAnyClass #-}
+-- data Tree a = Leaf a | Node (Tree a) (Tree a)
+--   deriving (Generic, Encode)
+-- @
 --
 -- Having @Encode@ as a class has the advantage that we can define
 -- non-generic special cases, which is particularly useful for abstract
