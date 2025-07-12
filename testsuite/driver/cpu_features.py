@@ -14,7 +14,8 @@ SUPPORTED_CPU_FEATURES = {
     'popcnt', 'bmi1', 'bmi2',
 
     # riscv:
-    'zvl128b', 'zvl256b', 'zvl512b'
+    'zvl32b', 'zvl64b', 'zvl128b', 'zvl256b', 'zvl512b',
+    'zvl1024b'
 }
 
 cpu_feature_cache = None
