@@ -424,7 +424,8 @@ def req_fma_cpu( name, opts ):
     Require FMA support.
     """
 
-    # RISC-V: Imply float and double extensions, so we only have to change for vectors.
+    # RISC-V: We imply float and double extensions (rv64g), so we only have to
+    # check for vector support.
     if not(have_cpu_feature('avx') or have_cpu_feature('zvl128b')):
         opts.skip = True
 
