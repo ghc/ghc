@@ -213,10 +213,10 @@ vecFormat ty =
              _   -> pprPanic "Incorrect vector element width" (ppr elemTy)
 
 floatVecFormat :: Int -> Width -> Format
-floatVecFormat length width = vecFormat (cmmVec length (cmmFloat width))
+floatVecFormat length = vecFormat . cmmVec length . cmmFloat
 
 intVecFormat :: Int -> Width -> Format
-intVecFormat length width = vecFormat (cmmVec length (cmmBits width))
+intVecFormat length = vecFormat . cmmVec length . cmmBits
 
 -- | Check if a format represents a vector
 isVecFormat :: Format -> Bool
