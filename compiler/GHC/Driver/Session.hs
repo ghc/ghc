@@ -2864,7 +2864,7 @@ word64Suffix :: (Word64 -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 word64Suffix fn = Word64Suffix (\n -> upd (fn n))
 
 word64SuffixM :: (Word64 -> DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
-word64SuffixM fn = Word64Suffix (\n -> updM (fn n))
+word64SuffixM fn = Word64Suffix (updM . fn)
 
 floatSuffix :: (Float -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 floatSuffix fn = FloatSuffix (\n -> upd (fn n))
@@ -3850,12 +3850,11 @@ updatePlatformConstants dflags mconstants = do
   return dflags1
 
 setVectorMinBits :: Word64 -> DynFlags -> DynP DynFlags
-setVectorMinBits v dflags = 
-  let validValues = [16,32,64,128,256,512]
-  in 
+setVectorMinBits v dflags =
+  let validValues = [16, 32, 64, 128, 256, 512]
+  in
     if v `elem` validValues then
-      pure $ dflags { vectorMinBits = (Just . fromIntegral) v} 
+      pure $ dflags { vectorMinBits = (Just . fromIntegral) v}
     else do
-      addErr ("Minimal vector register size can only be one of" ++ show validValues)
+      addErr ("Minimal vector register size can only be one of: " ++ show validValues)
       pure dflags
- 
