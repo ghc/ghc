@@ -2,6 +2,7 @@
 
 module GHC.CmmToAsm.RV64.Ppr (pprNatCmmDecl, pprInstr) where
 
+import Data.Maybe
 import GHC.Cmm hiding (topInfoTable)
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
@@ -155,7 +156,11 @@ pprBasicBlock config info_env (BasicBlock blockid instrs) =
           )
       )
   where
-    instrs' = injectVectorConfig (toOL optInstrs)
+    instrs' :: OrdList Instr
+    instrs'
+      | isJust (ncgVectorMinBits config) = injectVectorConfig (toOL optInstrs)
+      | otherwise = toOL optInstrs
+
     -- TODO: Check if we can  filter more instructions here.
     -- TODO: Shouldn't this be a more general check on a higher level? And, is this still needed?
     -- Filter out identity moves. E.g. mov x18, x18 will be dropped.
@@ -168,8 +173,6 @@ pprBasicBlock config info_env (BasicBlock blockid instrs) =
     injectVectorConfig instrs = fst $ foldlOL injectVectorConfig' (nilOL, Nothing) instrs
 
     -- TODO: Fuse this with optInstrs
-    -- TODO: Check config and only run this when vectors are configured
-    -- TODO: Check if vectorMinBits is sufficient for the vector config
     injectVectorConfig' :: (OrdList Instr, Maybe Format) -> Instr -> (OrdList Instr, Maybe Format)
     injectVectorConfig' (accInstr, configuredVecFmt) currInstr =
       let configuredVecFmt' Nothing = Nothing
@@ -217,14 +220,16 @@ pprBasicBlock config info_env (BasicBlock blockid instrs) =
                   )
 
     configVec :: Format -> Instr
-    configVec (VecFormat length fmt) =
-      VSETIVLI
-        (OpReg II64 zeroReg)
-        (fromIntegral length)
-        ((formatToWidth . scalarFormatFormat) fmt)
-        M1
-        TA
-        MA
+    configVec vFmt@(VecFormat length fmt)
+      | Just vlen <- (ncgVectorMinBits config),
+        (formatInBytes vFmt) * 8 <= fromIntegral vlen =
+          VSETIVLI
+            (OpReg II64 zeroReg)
+            (fromIntegral length)
+            ((formatToWidth . scalarFormatFormat) fmt)
+            M1
+            TA
+            MA
     configVec fmt = pprPanic "Unsupported vector configuration" ((text . show) fmt)
 
     asmLbl = blockLbl blockid
@@ -620,7 +625,6 @@ pprInstr platform instr = case instr of
     | isFloatRegOp o1 && isIntRegOp o2 && isDoubleOp o1 -> op2 (text "\tfmv.d.x") o1 o2
     | isIntRegOp o1 && isFloatRegOp o2 && isSingleOp o2 -> op2 (text "\tfmv.x.w") o1 o2
     | isIntRegOp o1 && isFloatRegOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.x.d") o1 o2
-    -- TODO: Why does this NOP (reg1 == reg2) happen?
     | isVectorRegOp o1 && isVectorRegOp o2 -> op2 (text "\tvmv.v.v") o1 o2
     | (OpImm (ImmInteger i)) <- o2,
       fitsIn12bitImm i ->

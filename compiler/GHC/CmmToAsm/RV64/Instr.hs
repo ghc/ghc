@@ -951,12 +951,12 @@ assertFmtReg fmt reg =
   pprPanic
     "Format does not fit to register."
     (text "fmt" <> colon <+> ppr fmt <+> text "reg" <> colon <+> ppr reg)
-  where
-    fmtRegCombinationIsSane :: Format -> Reg -> Bool
-    fmtRegCombinationIsSane fmt reg =
-      (isFloatFormat fmt && isFloatReg reg)
-        || (isIntFormat fmt && isIntReg reg)
-        || (isVecFormat fmt && isVectorReg reg)
+
+fmtRegCombinationIsSane :: Format -> Reg -> Bool
+fmtRegCombinationIsSane fmt reg =
+  (isFloatFormat fmt && isFloatReg reg)
+    || (isIntFormat fmt && isIntReg reg)
+    || (isVecFormat fmt && isVectorReg reg)
 
 isVectorRegOp :: HasCallStack => Operand -> Bool
 isVectorRegOp (OpReg fmt reg) | isVectorReg reg = assertFmtReg fmt reg $ True
