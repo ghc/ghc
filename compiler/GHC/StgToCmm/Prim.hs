@@ -2638,11 +2638,15 @@ checkVecCompatibility cfg vcat l w =
 
     checkRISCV64 :: Width -> FCode ()
     checkRISCV64 w = case stgToCmmVectorMinBits cfg of
-      Nothing -> sorry "Vector support has not been configured."
+      Nothing -> sorry "Vector support has not been configured. Check '-mriscv-vlen'."
       Just w' | widthInBits w <= fromIntegral w' -> return ()
       Just w' ->
         sorry
-          $ "Vector size is " ++ show w ++ ", but only " ++ show w' ++ " configured."
+          $ "Vector width is "
+          ++ show w
+          ++ ", but only "
+          ++ show w'
+          ++ " configured. Check '-mriscv-vlen'."
 
     vecWidth = typeWidth (vecCmmType vcat l w)
 
