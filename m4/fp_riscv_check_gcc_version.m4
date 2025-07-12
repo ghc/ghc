@@ -18,7 +18,7 @@
 AC_DEFUN([FP_RISCV_CHECK_GCC_VERSION], [
   AC_REQUIRE([FP_GCC_VERSION])
   AC_REQUIRE([AC_CANONICAL_TARGET])
-  #
+  
   # Check if target is RISC-V
   case "$target" in
     riscv64*-*-*)
