@@ -71,7 +71,6 @@ getFreeRegs cls (FreeRegs g f v) =
   case cls of
     RcInteger -> go 0 g allocatableIntRegs
     RcFloat -> go 32 f allocatableDoubleRegs
-    -- TODO: If there's no Vector support, we should return an empty list or panic.
     RcVector -> go 64 v allocatableVectorRegs
   where
     go _ _ [] = []
@@ -90,7 +89,7 @@ getFreeRegs cls (FreeRegs g f v) =
 allocateReg :: (HasCallStack) => RealReg -> FreeRegs -> FreeRegs
 allocateReg (RealRegSingle r) (FreeRegs g f v)
   | r < 32 && testBit g r = FreeRegs (clearBit g r) f v
-  | r >= 32 && testBit f (r - 32) = FreeRegs g (clearBit f (r - 32)) v
+  | r >= 32 && r <= 63 && testBit f (r - 32) = FreeRegs g (clearBit f (r - 32)) v
   | r >= 64 && testBit v (r - 64) = FreeRegs g f (clearBit v (r - 64))
   | otherwise =
       pprPanic "Linear.RV64.allocateReg"
