@@ -123,13 +123,12 @@ tmpReg = regSingle tmpRegNo
 v0Reg :: Reg
 v0Reg = regSingle v0RegNo
 
--- | All machine register numbers. Including potential vector registers.
+-- | All machine register numbers, including potential vector registers.
 allMachRegNos :: [RegNo]
 allMachRegNos = intRegs ++ fpRegs ++ vRegs
   where
     intRegs = [x0RegNo .. x31RegNo]
     fpRegs = [d0RegNo .. d31RegNo]
-    -- TODO: If Vector extension is turned off, this should become the empty list
     vRegs = [v0RegNo .. v31RegNo]
 
 -- | Registers available to the register allocator.
@@ -138,10 +137,10 @@ allMachRegNos = intRegs ++ fpRegs ++ vRegs
 -- sp, gp, tp, fp, tmp) and GHC RTS (Base, Sp, Hp, HpLim, R1..R8, F1..F6,
 -- D1..D6.)
 --
--- We pretend that vector registers are always available. If they aren't, we
--- simply don't emit instructions using them. This is much simpler than fixing
--- the register allocators which expect a configuration per platform (which we
--- can only set when GHC itself gets build.)
+-- We pretend that vector registers (RVV 1.0) are always available. If they
+-- aren't, we simply don't emit instructions using them. This is much simpler
+-- than fixing the register allocators which expect a configuration per
+-- platform (which we can only set when GHC itself gets built.)
 allocatableRegs :: Platform -> [RealReg]
 allocatableRegs platform =
   let isFree = freeReg platform
