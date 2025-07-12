@@ -144,8 +144,8 @@ allocatableRegs arch rc =
     ArchMipsel    -> panic "trivColorable ArchMipsel"
     ArchS390X     -> panic "trivColorable ArchS390X"
     ArchRISCV64   -> case rc of
-      Separate.RcInteger -> 14 -- TODO: Write the calculation of this magic number down. And, fix the value if needed.
-      Separate.RcFloat   -> 20 -- TODO: See riscv64.h for TODO.
+      Separate.RcInteger -> 32 - 7 - 11 -- 32 - (zero, lr, sp, gp, tp, fp, tmp) - 11 STG regs
+      Separate.RcFloat   -> 32 - 2 * 6 -- 32 - float STG regs - double STG regs |  TODO: See riscv64.h for TODO.
       Separate.RcVector  -> 32 - 6 - 1 -- 32 - pc_MAX_Real_XMM_REG - 1 mask_register
     ArchLoongArch64   -> case rc of
       Separate.RcInteger -> 16
