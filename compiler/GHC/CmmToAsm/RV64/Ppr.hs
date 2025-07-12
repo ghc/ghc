@@ -837,7 +837,6 @@ pprInstr platform instr = case instr of
   VMERGE o1 o2 o3 o4 -> pprPanic "RV64.pprInstr - VMERGE wrong operands." (pprOps platform [o1, o2, o3, o4])
   VSLIDEDOWN o1 o2 o3 | allVectorRegOps [o1, o2] && isIntOp o3 -> op3 (text "\tvslidedown.vx") o1 o2 o3
   VSLIDEDOWN o1 o2 o3 -> pprPanic "RV64.pprInstr - VSLIDEDOWN wrong operands." (pprOps platform [o1, o2, o3])
-  -- TODO: adjust VSETIVLI to contain only format?
   VSETIVLI (OpReg fmt dst) len width grouping ta ma ->
     line
       $ text "\tvsetivli"
