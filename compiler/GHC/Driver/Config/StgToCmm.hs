@@ -88,7 +88,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmAvx           = isAvxEnabled                   dflags
   , stgToCmmAvx2          = isAvx2Enabled                  dflags
   , stgToCmmAvx512f       = isAvx512fEnabled               dflags
-  , stgToCmmVectorMinBits = vectorMinBits dflags
+  , stgToCmmVectorMinBits = vectorMinBits                  dflags
   , stgToCmmTickyAP       = gopt Opt_Ticky_AP dflags
   -- See Note [Saving foreign call target to local]
   , stgToCmmSaveFCallTargetToLocal = any (callerSaves platform) $ activeStgRegs platform
