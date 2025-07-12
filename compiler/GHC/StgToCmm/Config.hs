@@ -76,12 +76,11 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmTickyAP                   :: !Bool   -- ^ Disable use of precomputed standard thunks.
   , stgToCmmSaveFCallTargetToLocal    :: !Bool   -- ^ Save a foreign call target to a Cmm local, see
                                                  -- Note [Saving foreign call target to local] for details
-  -- TODO: Update comment
   ------------------------------ SIMD flags ------------------------------------
   -- Each of these flags checks vector compatibility with the backend requested
-  -- during compilation. In essence, this means checking for @-fllvm@ which is
-  -- the only backend that currently allows SIMD instructions, see
-  -- Ghc.StgToCmm.Prim.checkVecCompatibility for these flags only call site.
+  -- during compilation. Some backends (e.g. the C backend) or architectures
+  -- don't implement SIMD instructions, see
+  -- Ghc.StgToCmm.Prim.checkVecCompatibility for these flags' only call site.
   , stgToCmmVecInstrsErr   :: Maybe String       -- ^ Error (if any) to raise when vector instructions are
                                                  -- used, see @StgToCmm.Prim.checkVecCompatibility@
   , stgToCmmAvx            :: !Bool              -- ^ check for Advanced Vector Extensions
