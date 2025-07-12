@@ -138,21 +138,6 @@ regUsageOfInstr platform instr = case instr of
     usage (regOp op1 ++ regOp op2 ++ regOp op3, regOp op1)
   _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
   where
-    -- filtering the usage is necessary, otherwise the register
-    -- allocator will try to allocate pre-defined fixed stg
-    -- registers as well, as they show up.
-    usage :: ([(Reg, Format)], [(Reg, Format)]) -> RegUsage
-    usage (srcRegs, dstRegs) =
-      RU
-        (map mkFmt $ filter (interesting platform) srcRegs)
-        (map mkFmt $ filter (interesting platform) dstRegs)
-
-    mkFmt (r, fmt) = RegWithFormat r fmt
-
-    regAddr :: AddrMode -> [(Reg, Format)]
-    regAddr (AddrRegImm r1 _imm) = [(r1, II64)]
-    regAddr (AddrReg r1) = [(r1, II64)]
-
     regOp :: Operand -> [(Reg, Format)]
     regOp (OpReg fmt r1) = [(r1, fmt)]
     regOp (OpAddr a) = regAddr a
@@ -162,10 +147,25 @@ regUsageOfInstr platform instr = case instr of
     regTarget (TBlock _bid) = []
     regTarget (TReg r1) = [(r1, II64)]
 
-    -- Is this register interesting for the register allocator?
-    interesting :: Platform -> (Reg, Format) -> Bool
-    interesting _ ((RegVirtual _), _) = True
-    interesting platform ((RegReal (RealRegSingle i)), _) = freeReg platform i
+    regAddr :: AddrMode -> [(Reg, Format)]
+    regAddr (AddrRegImm r1 _imm) = [(r1, II64)]
+    regAddr (AddrReg r1) = [(r1, II64)]
+
+    -- filtering the usage is necessary, otherwise the register
+    -- allocator will try to allocate pre-defined fixed stg
+    -- registers as well, as they show up.
+    usage :: ([(Reg, Format)], [(Reg, Format)]) -> RegUsage
+    usage (srcRegs, dstRegs) =
+      RU
+        (map mkFmt $ filter (interesting platform) srcRegs)
+        (map mkFmt $ filter (interesting platform) dstRegs)
+      where
+        mkFmt (r, fmt) = RegWithFormat r fmt
+
+        -- Is this register interesting for the register allocator?
+        interesting :: Platform -> (Reg, Format) -> Bool
+        interesting _ ((RegVirtual _), _) = True
+        interesting platform ((RegReal (RealRegSingle i)), _) = freeReg platform i
 
 -- | Caller-saved registers (according to calling convention)
 --
@@ -240,7 +240,7 @@ patchRegsOfInstr instr env = case instr of
   VSUB o1 o2 o3 -> VSUB (patchOp o1) (patchOp o2) (patchOp o3)
   VMUL o1 o2 o3 -> VMUL (patchOp o1) (patchOp o2) (patchOp o3)
   VQUOT mbS o1 o2 o3 -> VQUOT mbS (patchOp o1) (patchOp o2) (patchOp o3)
-  VREM s o1 o2 o3 -> VREM s (patchOp o1) (patchOp o2) (patchOp o3) 
+  VREM s o1 o2 o3 -> VREM s (patchOp o1) (patchOp o2) (patchOp o3)
   VSMIN o1 o2 o3 -> VSMIN (patchOp o1) (patchOp o2) (patchOp o3)
   VSMAX o1 o2 o3 -> VSMAX (patchOp o1) (patchOp o2) (patchOp o3)
   VUMIN o1 o2 o3 -> VUMIN (patchOp o1) (patchOp o2) (patchOp o3)
@@ -452,7 +452,7 @@ mkRegRegMoveInstr :: Format -> Reg -> Reg -> Instr
 mkRegRegMoveInstr fmt src dst = ANN desc instr
   where
     desc = text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst
-    instr = MOV (operandFromReg fmt dst) (operandFromReg fmt src)
+    instr = MOV (OpReg fmt dst) (OpReg fmt src)
 
 -- | Take the source and destination from this (potential) reg -> reg move instruction
 --
@@ -678,8 +678,7 @@ data Instr
     -- - fmsub : d = - r1 * r2 + r3
     -- - fnmadd: d = - r1 * r2 - r3
     FMA FMASign Operand Operand Operand Operand
-  | -- TODO: Care about the variants (<instr>.x.y) -> sum type
-    VMV Operand Operand
+  | VMV Operand Operand
   | VID Operand
   | VMSEQ Operand Operand Operand
   | VMERGE Operand Operand Operand Operand
@@ -816,21 +815,17 @@ data Operand
     OpAddr AddrMode
   deriving (Eq, Show)
 
--- TODO: This just wraps a constructor... Inline?
-operandFromReg :: Format -> Reg -> Operand
-operandFromReg = OpReg
-
 operandFromRegNo :: Format -> RegNo -> Operand
-operandFromRegNo fmt = operandFromReg fmt . regSingle
+operandFromRegNo fmt = OpReg fmt . regSingle
 
 zero, ra, sp, gp, tp, fp, tmp :: Operand
-zero = operandFromReg II64 zeroReg
-ra = operandFromReg II64 raReg
-sp = operandFromReg II64 spMachReg
+zero = OpReg II64 zeroReg
+ra = OpReg II64 raReg
+sp = OpReg II64 spMachReg
 gp = operandFromRegNo II64 3
 tp = operandFromRegNo II64 4
 fp = operandFromRegNo II64 8
-tmp = operandFromReg II64 tmpReg
+tmp = OpReg II64 tmpReg
 
 x0, x1, x2, x3, x4, x5, x6, x7 :: Operand
 x8, x9, x10, x11, x12, x13, x14, x15 :: Operand
@@ -844,13 +839,9 @@ x4 = operandFromRegNo II64 4
 x5 = operandFromRegNo II64 x5RegNo
 x6 = operandFromRegNo II64 6
 x7 = operandFromRegNo II64 x7RegNo
-
 x8 = operandFromRegNo II64 8
-
 x9 = operandFromRegNo II64 9
-
 x10 = operandFromRegNo II64 x10RegNo
-
 x11 = operandFromRegNo II64 11
 x12 = operandFromRegNo II64 12
 x13 = operandFromRegNo II64 13
@@ -885,53 +876,29 @@ d4 = operandFromRegNo FF64 36
 d5 = operandFromRegNo FF64 37
 d6 = operandFromRegNo FF64 38
 d7 = operandFromRegNo FF64 d7RegNo
-
 d8 = operandFromRegNo FF64 40
-
 d9 = operandFromRegNo FF64 41
-
 d10 = operandFromRegNo FF64 d10RegNo
-
 d11 = operandFromRegNo FF64 43
-
 d12 = operandFromRegNo FF64 44
-
 d13 = operandFromRegNo FF64 45
-
 d14 = operandFromRegNo FF64 46
-
 d15 = operandFromRegNo FF64 47
-
 d16 = operandFromRegNo FF64 48
-
 d17 = operandFromRegNo FF64 d17RegNo
-
 d18 = operandFromRegNo FF64 50
-
 d19 = operandFromRegNo FF64 51
-
 d20 = operandFromRegNo FF64 52
-
 d21 = operandFromRegNo FF64 53
-
 d22 = operandFromRegNo FF64 54
-
 d23 = operandFromRegNo FF64 55
-
 d24 = operandFromRegNo FF64 56
-
 d25 = operandFromRegNo FF64 57
-
 d26 = operandFromRegNo FF64 58
-
 d27 = operandFromRegNo FF64 59
-
 d28 = operandFromRegNo FF64 60
-
 d29 = operandFromRegNo FF64 61
-
 d30 = operandFromRegNo FF64 62
-
 d31 = operandFromRegNo FF64 d31RegNo
 
 fitsIn12bitImm :: (Num a, Ord a, Bits a) => a -> Bool
@@ -984,12 +951,12 @@ assertFmtReg fmt reg =
   pprPanic
     "Format does not fit to register."
     (text "fmt" <> colon <+> ppr fmt <+> text "reg" <> colon <+> ppr reg)
-
-fmtRegCombinationIsSane :: Format -> Reg -> Bool
-fmtRegCombinationIsSane fmt reg =
-  (isFloatFormat fmt && isFloatReg reg)
-    || (isIntFormat fmt && isIntReg reg)
-    || (isVecFormat fmt && isVectorReg reg)
+  where
+    fmtRegCombinationIsSane :: Format -> Reg -> Bool
+    fmtRegCombinationIsSane fmt reg =
+      (isFloatFormat fmt && isFloatReg reg)
+        || (isIntFormat fmt && isIntReg reg)
+        || (isVecFormat fmt && isVectorReg reg)
 
 isVectorRegOp :: HasCallStack => Operand -> Bool
 isVectorRegOp (OpReg fmt reg) | isVectorReg reg = assertFmtReg fmt reg $ True
