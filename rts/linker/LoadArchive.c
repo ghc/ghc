@@ -275,6 +275,13 @@ lookupGNUArchiveIndex(int gnuFileIndexSize, char **fileName_,
                     "loadArchive(fileName)");
         }
         memcpy(fileName, gnuFileIndex + n, FileNameSize);
+
+
+       /* llvm-ar terminates string table entries with `/\n`. */
+       if (fileName[FileNameSize-1] == '/') {
+           FileNameSize--;
+       }
+
         fileName[FileNameSize] = '\0';
         *thisFileNameSize = FileNameSize;
     }
