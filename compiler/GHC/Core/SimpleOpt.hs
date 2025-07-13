@@ -153,8 +153,7 @@ simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
 -- created from DynFlags, but not necessarily.
 
 simpleOptExpr opts expr
-  = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
-    simpleOptExprWith opts init_subst expr
+  = simpleOptExprWith opts init_subst expr
   where
     init_subst = mkEmptySubst (mkInScopeSet (mapVarSet zapIdUnfolding (exprFreeVars expr)))
         -- zapIdUnfolding: see Note [The InScopeSet for simpleOptExpr]
@@ -176,9 +175,10 @@ simpleOptExprNoInline opts expr
 simpleOptExprWith :: HasDebugCallStack => SimpleOpts -> Subst -> InExpr -> OutExpr
 -- See Note [The simple optimiser]
 simpleOptExprWith opts subst expr
-  = simple_opt_expr init_env (occurAnalyseExpr expr)
+  = simple_opt_expr init_env occ_expr
   where
     init_env = (emptyEnv opts) { soe_subst = subst }
+    occ_expr = occurAnalyseExpr expr
 
 ----------------------
 simpleOptPgm :: SimpleOpts
@@ -493,7 +493,7 @@ simple_type_bind env@(SOE { soe_subst = subst })
   | occurs_once || typeIsSmallEnoughToInline out_ty
   = (env { soe_subst = extendTvSubst subst in_tv out_ty }, Nothing)
 
-  | otherwise
+  | otherwise  -- Make a type binding
   = let (subst1, tv1) = substTyVarBndr subst in_tv
         out_tv = tv1 `setTyVarUnfolding` out_ty
     in ( env { soe_subst = extendTvSubst subst1 in_tv (mkTyVarTy out_tv) }
@@ -504,7 +504,7 @@ simple_type_bind env@(SOE { soe_subst = subst })
     subst_for_rhs = setInScope (soe_subst rhs_env) (substInScopeSet subst)
     out_ty        = substTyUnchecked subst_for_rhs in_ty
     bndr_occ      = tyVarOccInfo in_tv
-    occurs_once {- syntactically -} = isOneOcc bndr_occ && occ_n_br bndr_occ == 1
+    occurs_once {- syntactically -} = isOneTyCoOcc bndr_occ
 
 ----------------------
 simple_bind_pair :: SimpleOptEnv
@@ -1621,7 +1621,7 @@ exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
     | Just (x, e,ts) <- exprIsLambda_maybe ise casted_e
     -- Only do value lambdas.
     -- this implies that x is not in scope in gamma (makes this code simpler)
-    , not (isTyVar x) && not (isCoVar x)
+    , isNonCoVarId x
     , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
     , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e co
     , let res = Just (x',e',ts)

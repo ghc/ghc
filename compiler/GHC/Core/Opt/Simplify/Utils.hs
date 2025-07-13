@@ -1444,7 +1444,7 @@ preInlineTypeUnconditionally env tv rhs_ty
   -- Inline unconditionally if it occurs exactly once, inside a lambda or not.
   -- No work is wasted by substituting inside a lambda, although if the
   -- lambda is inlined a lot, we migth duplicate the type.
-  | OneOcc{ occ_n_br = 1 } <- tyVarOccInfo tv
+  | isOneTyCoOcc (tyVarOccInfo tv)
   = Just $! extendTvSubst env tv $! substTy env rhs_ty
 
   | otherwise

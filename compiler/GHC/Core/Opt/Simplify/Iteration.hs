@@ -204,6 +204,9 @@ simplTopBinds env0 binds0
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
                 -- See Note [Glomming] in "GHC.Core.Opt.OccurAnal".
+                --
+                -- But the type of that top-level binder might mention a let-bound
+                -- type variable, so we put all those let-bindings at the front
         -- See Note [Bangs in the Simplifier]
         ; (ty_floats,  env1) <- {-#SCC "simplTopBinds-simplRecBndrs" #-}
                                 simplTopTyVarBinds env0 binds0
@@ -291,10 +294,12 @@ simplTyVarBind :: SimplEnv -> InTyVar -> InType
 -- Returned SimplFloats is empty, or singleton type binding
 simplTyVarBind env tv ty
   | Just env' <- preInlineTypeUnconditionally env tv ty
-  = return (emptyFloats env', env')
+  = -- pprTrace "Pre-inline-tv" (ppr tv <+> equals <+> ppr ty) $
+    return (emptyFloats env', env')
   | otherwise
   = do { ty' <- simplType env ty
-       ; completeTyVarBindX env (zapTyVarUnfolding tv) ty' }
+       ; -- pprTrace "Don't pre-inline-tv" (ppr tv <+> equals <+> ppr ty') $
+         completeTyVarBindX env (zapTyVarUnfolding tv) ty' }
          -- Zap any unfolding because competeTyVarBindX will add
          -- the new unfolding and we don't wnat to waste work
          -- substituting the old one
@@ -303,7 +308,8 @@ completeTyVarBindX :: SimplEnv -> InTyVar -> OutType
                    -> SimplM (SimplFloats, SimplEnv)
 completeTyVarBindX env in_tv out_ty
   | postInlineTypeUnconditionally out_ty
-  = return (emptyFloats env, extendTvSubst env in_tv out_ty)
+  = -- pprTrace "Post-inline-tv" (ppr in_tv <+> equals <+> ppr out_ty) $
+    return (emptyFloats env, extendTvSubst env in_tv out_ty)
 
   | otherwise
   = do { (env1, out_tv) <- simplTyVarBndr env in_tv
@@ -314,7 +320,9 @@ completeTyVarBindX env in_tv out_ty
                --     occurrence of in_tv. After all, in a beta-redex, in_tv
                --     had no unfolding. See (TCL2) in
                --     Note [Type and coercion lets] in GHC.Core
-       ; return (mkFloatBind env2 (NonRec out_tv_w_unf (Type out_ty))) }
+       ; -- pprTrace "Don't post-inline-tv" (ppr in_tv <+> equals <+> ppr out_tv_w_unf
+         --                                  <+> equals <+> ppr out_ty) $
+         return (mkFloatBind env2 (NonRec out_tv_w_unf (Type out_ty))) }
 
 {-
 ************************************************************************

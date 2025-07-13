@@ -39,7 +39,6 @@ import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Predicate   ( isDictId )
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs    ( tyCoVarsOfMCo )
 
 import GHC.Data.Maybe( orElse )
@@ -50,6 +49,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Types.Id
+import GHC.Types.Name( isExternalName )
 import GHC.Types.Id.Info
 import GHC.Types.Basic
 import GHC.Types.Tickish
@@ -65,6 +65,8 @@ import GHC.Utils.Misc
 import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
+import qualified Data.Semigroup  as S( Semigroup(..) )
+import qualified Data.Monoid as S( Monoid(..) )
 import Data.List (mapAccumL)
 import Data.List.NonEmpty (NonEmpty (..))
 
@@ -100,18 +102,15 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
     init_env = initOccEnv { occ_rule_act = active_rule
                           , occ_unf_act  = active_unf }
 
-    WUD final_usage occ_anald_binds = go binds init_env
-    WUD _ occ_anald_glommed_binds = occAnalRecBind init_env TopLevel
-                                                    imp_rule_edges
-                                                    (flattenBinds binds)
-                                                    initial_uds
+    WUD final_usage occ_anald_binds = go binds                init_env
+    WUD _   occ_anald_glommed_binds = go (glomValBinds binds) init_env
           -- It's crucial to re-analyse the glommed-together bindings
           -- so that we establish the right loop breakers. Otherwise
           -- we can easily create an infinite loop (#9583 is an example)
           --
-          -- Also crucial to re-analyse the /original/ bindings
-          -- in case the first pass accidentally discarded as dead code
-          -- a binding that was actually needed (albeit before its
+          -- Also crucial to re-analyse the /original/ bindings, not the
+          -- occ_anald_binds, in case the first pass accidentally discarded as
+          -- dead code a binding that was actually needed (albeit before its
           -- definition site).  #17724 threw this up.
 
     initial_uds = addManyOccs emptyDetails (rulesFreeVars imp_rules)
@@ -971,16 +970,32 @@ occAnalBind
   -> WithUsageDetails r              -- Of the whole let(rec)
 
 occAnalBind env lvl ire (Rec pairs) thing_inside combine
-  = addInScopeList env (map fst pairs) $ \env ->
+  = addInScope env (map fst pairs) $ \env ->
     let WUD body_uds body'  = thing_inside env
         WUD bind_uds binds' = occAnalRecBind env lvl ire pairs body_uds
     in WUD bind_uds (combine binds' body')
 
-occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
-  | isTyVar bndr      -- A type let; we don't gather usage info
-  = let !(WUD body_uds res) = addInScopeOne env bndr thing_inside
-    in WUD body_uds (combine [NonRec bndr rhs] res)
+occAnalBind !env _lvl _ire (NonRec bndr rhs) thing_inside combine
+  | isTyCoVar bndr      -- A type/coercion let
+  = let !(WUD body_uds (occ,res))
+             = addInScopeOne env bndr $ \env_body ->
+               let !(WUD inner_uds inner_res) = thing_inside env_body
+                   !tyco_occ = lookupTyCoOcc inner_uds bndr
+               in (WUD inner_uds (tyco_occ, inner_res))
 
+        rhs_tyco_occs = case rhs of
+                           Type ty     -> occAnalTy ty
+                           Coercion co -> occAnalCo co
+                           _ -> pprPanic "occAnalBind" (ppr (NonRec bndr rhs))
+    in
+    case occ of
+      TyCoDead -> WUD body_uds res
+      _        -> WUD (body_uds `addTyCoOccs` rhs_tyco_occs)
+                      (combine [NonRec bndr' rhs] res)
+               where
+                  bndr' = tagTyCoBinder occ bndr
+
+occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   -- /Existing/ non-recursive join points
   -- See Note [Occurrence analysis for join points]
   | mb_join@(JoinPoint {}) <- idJoinPointHood bndr
@@ -1134,19 +1149,13 @@ occAnalRec :: OccEnv -> TopLevelFlag
            -> WithUsageDetails [CoreBind]
 
 -- The NonRec case is just like a Let (NonRec ...) above
+-- except that type variables can't occur
 occAnalRec !_ lvl
            (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = wtuds }))
            (WUD body_uds binds)
-  -- Currently we don't gather occ-info for tyvars,
-  -- so we never discard dead bindings -- Need to fix this
-  | isTyVar bndr
-  = let (tagged_bndr, mb_join) = tagNonRecBinder lvl occ bndr
-        !(WUD rhs_uds' rhs') = adjustNonRecRhs mb_join wtuds
-        !bndr' = tagged_bndr
-    in WUD (body_uds `andUDs` rhs_uds')
-           (NonRec bndr' rhs' : binds)
-
-  | isDeadOcc occ  -- Check for dead code: see Note [Dead code]
+  | assertPpr (not (isTyVar bndr)) (ppr bndr) $
+    -- Rec blocks have no TyVar bindings in them
+    isDeadOcc occ  -- Check for dead code: see Note [Dead code]
   = WUD body_uds binds
 
   | otherwise
@@ -1705,7 +1714,7 @@ rank (r, _, _) = r
 makeNode :: OccEnv -> ImpRuleEdges -> VarSet
          -> (Var, CoreExpr) -> LetrecNode
 -- See Note [Recursive bindings: the grand plan]
-makeNode !env _imp_rule_edges bndr_set (bndr, rhs@(Type rhs_ty))
+makeNode !_env _imp_rule_edges bndr_set (bndr, rhs@(Type rhs_ty))
   = -- This is a type binding, e.g.  let @x = Maybe Int in ...
     assert (isTyVar bndr) $
     DigraphNode { node_payload      = details
@@ -1719,8 +1728,7 @@ makeNode !env _imp_rule_edges bndr_set (bndr, rhs@(Type rhs_ty))
                  , nd_weak_fvs        = emptyVarSet
                  , nd_active_rule_fvs = emptyVarSet }
 
-    rhs_env = setNonTailCtxt OccRhs env
-    rhs_uds = occAnalTy rhs_env rhs_ty
+    rhs_uds = mkTyCoUDs (occAnalTy rhs_ty)
     rhs_fvs = udFreeVars bndr_set rhs_uds
 
 makeNode !env imp_rule_edges bndr_set (bndr, rhs)
@@ -2229,9 +2237,9 @@ occ_anal_lam_tail env (Cast expr co)
   = let  WUD expr_uds expr' = occ_anal_lam_tail env expr
 
          -- co_uds: see Note [Gather occurrences of coercion variables]
-         co_uds = occAnalCo env co
+         co_uds = occAnalCo co
 
-         usage1 = expr_uds `andUDs` co_uds
+         usage1 = expr_uds `addTyCoOccs` co_uds
 
          -- usage2: see Note [Occ-anal and cast worker/wrapper]
          usage2 = case expr of
@@ -2436,14 +2444,54 @@ float ==>
 This is worse than the slow cascade, so we only want to say "certainly_inline"
 if it really is certain.  Look at the note with preInlineUnconditionally
 for the various clauses.  See #24582 for an example of the two getting out of sync.
+-}
 
+{- *********************************************************************
+*                                                                      *
+                Types
+*                                                                      *
+********************************************************************* -}
 
-************************************************************************
+newtype TyCoOccs = TyCoOccs { get_tyco_occs :: TyCoOccEnv }
+
+instance S.Semigroup TyCoOccs where
+  (TyCoOccs o1) <> (TyCoOccs o2) = TyCoOccs (plusTyCoOccEnv o1 o2)
+
+instance S.Monoid TyCoOccs where
+  mempty = TyCoOccs emptyVarEnv
+
+occTyCoFolder :: TyCoFolder TyCoVarSet TyCoOccs
+occTyCoFolder
+  = TyCoFolder { tcf_view  = \_ -> Nothing   -- No need to expand synonyms
+               , tcf_tyvar = do_var
+               , tcf_covar = do_var
+               , tcf_hole  = \_ h -> pprPanic "occTyCoFolder:hole" (ppr h)
+               , tcf_tycobinder = do_binder }
+  where
+    do_var :: TyCoVarSet -> TyCoVar -> TyCoOccs
+    do_var locals tcv
+      | tcv `elemVarSet` locals      = mempty
+      | isExternalName (varName tcv) = mempty  -- TyVars from other modules
+      | otherwise                    = TyCoOccs (unitVarEnv tcv TyCoOne)
+
+    do_binder :: TyCoVarSet -> TyCoVar -> ForAllTyFlag -> TyCoVarSet
+    do_binder locals tcv _ = extendVarSet locals tcv
+
+occAnalTy  :: Type -> TyCoOccEnv
+occAnalCo  :: Coercion -> TyCoOccEnv
+occAnalTy ty = get_tyco_occs (occ_anal_ty ty)
+occAnalCo co = get_tyco_occs (occ_anal_co co)
+
+occ_anal_ty  :: Type -> TyCoOccs
+occ_anal_co  :: Coercion -> TyCoOccs
+(occ_anal_ty, _, occ_anal_co, _) = foldTyCo occTyCoFolder emptyVarSet
+-- No need to return a modified type, unlike expressions
+
+{- *********************************************************************
 *                                                                      *
                 Expressions
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 occAnalList :: OccEnv -> [CoreExpr] -> WithUsageDetails [CoreExpr]
 occAnalList !_   []    = WUD emptyDetails []
@@ -2451,50 +2499,6 @@ occAnalList env (e:es) = let
                           (WUD uds1 e') = occAnal env e
                           (WUD uds2 es') = occAnalList env es
                          in WUD (uds1 `andUDs` uds2) (e' : es')
-
-occAnalTys :: OccEnv -> [Type] -> UsageDetails
-occAnalTys env tys = foldr (andUDs . occAnalTy env) emptyDetails tys
-
-occAnalTy :: OccEnv -> Type -> UsageDetails
--- No need to return a modified type, unlike expressions
-occAnalTy env (TyVarTy tv)              = mkOneTyVarOcc env tv
-occAnalTy _   (LitTy {})                = emptyDetails
-occAnalTy env (AppTy t1 t2)             = occAnalTy env t1 `andUDs` occAnalTy env t2
-occAnalTy env (CastTy ty co)            = occAnalTy env ty `andUDs` occAnalCo env co
-occAnalTy env (CoercionTy co)           = occAnalCo env co
-occAnalTy env (TyConApp _ tys)          = occAnalTys env tys
-occAnalTy env (ForAllTy (Bndr tv _) ty) = delBndrsFromUDs [tv] (occAnalTy env ty)
-occAnalTy env (FunTy { ft_mult = w, ft_arg = arg, ft_res = res })
-  = occAnalTy env w `andUDs` occAnalTy env arg `andUDs` occAnalTy env res
-
-occAnalCos :: OccEnv -> [Coercion] -> UsageDetails
-occAnalCos env cos = foldr (andUDs . occAnalCo env) emptyDetails cos
-
-occAnalMCo :: OccEnv -> MCoercion -> UsageDetails
-occAnalMCo _   MRefl    = emptyDetails
-occAnalMCo env (MCo co) = occAnalCo env co
-
-occAnalCo :: OccEnv -> Coercion -> UsageDetails
-occAnalCo !env (Refl ty)           = occAnalTy env ty
-occAnalCo !env (GRefl _ ty mco)    = occAnalTy env ty `andUDs` occAnalMCo env mco
-occAnalCo !env (AppCo co1 co2)     = occAnalCo env co1 `andUDs` occAnalCo env co2
-occAnalCo env (CoVarCo cv)         = mkOneIdOcc env cv NotInteresting 0
-occAnalCo _ (HoleCo hole)          = pprPanic "occAnalCo:HoleCo" (ppr hole)
-occAnalCo env (SymCo co)           = occAnalCo env co
-occAnalCo env (TransCo co1 co2)    = occAnalCo env co1 `andUDs` occAnalCo env co2
-occAnalCo env (AxiomCo _ cos)      = occAnalCos env cos
-occAnalCo env (SelCo _ co)         = occAnalCo env co
-occAnalCo env (LRCo _ co)          = occAnalCo env co
-occAnalCo env (InstCo co arg)      = occAnalCo env co `andUDs` occAnalCo env arg
-occAnalCo env (KindCo co)          = occAnalCo env co
-occAnalCo env (SubCo co)           = occAnalCo env co
-occAnalCo env (TyConAppCo _ _ cos) = occAnalCos env cos
-occAnalCo !env (FunCo { fco_mult = cw, fco_arg = c1, fco_res = c2 })
-  = occAnalCo env cw `andUDs` occAnalCo env c1 `andUDs` occAnalCo env c2
-occAnalCo env (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = cos })
-  = occAnalTy env t1 `andUDs` occAnalTy env t2 `andUDs` occAnalCos env cos
-occAnalCo env (ForAllCo { fco_tcv = tv, fco_kind = kind_co, fco_body = co })
-  = occAnalCo env kind_co `andUDs` delBndrsFromUDs [tv] (occAnalCo env co)
 
 occAnal :: OccEnv
         -> CoreExpr
@@ -2510,8 +2514,8 @@ occAnal env expr@(Var _) = occAnalApp env (expr, [], [])
     -- rules in them, so the *specialised* versions looked as if they
     -- weren't used at all.
 
-occAnal env (Type ty)     = WUD (occAnalTy env ty) (Type ty)
-occAnal env (Coercion co) = WUD (occAnalCo env co) (Coercion co)
+occAnal _env (Type ty)     = WUD (mkTyCoUDs (occAnalTy ty)) (Type ty)
+occAnal _env (Coercion co) = WUD (mkTyCoUDs (occAnalCo co)) (Coercion co)
 
 {- Note [Gather occurrences of coercion variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2589,10 +2593,10 @@ occAnal env (Tick tickish body)
 
 occAnal env (Cast expr co)
   = let  (WUD expr_uds expr') = occAnal env expr
-         co_uds = occAnalCo env co
+         co_uds = occAnalCo co
              -- co_uds: see Note [Gather occurrences of coercion variables]
-         uds = markAllNonTail (expr_uds `andUDs` co_uds)
-             -- co_uds': calls inside expr aren't tail calls any more
+         uds = markAllNonTail (expr_uds `addTyCoOccs` co_uds)
+             -- markAllNonTail: calls inside expr aren't tail calls any more
     in WUD uds (Cast expr' co)
 
 occAnal env app@(App _ _)
@@ -2614,7 +2618,9 @@ occAnal env (Case scrut bndr ty alts)
                tagged_bndr = tagLamBinder alts_usage bndr
            in WUD alts_usage (tagged_bndr, alts')
 
-      total_usage = markAllNonTail scrut_usage `andUDs` alts_usage
+      total_usage = markAllNonTail scrut_usage
+                    `andUDs` alts_usage
+                    `addTyCoOccs` occAnalTy ty
                     -- Alts can have tail calls, but the scrutinee can't
 
     in WUD total_usage (Case scrut' tagged_bndr ty alts')
@@ -2719,7 +2725,7 @@ occAnalApp !env (Var fun, args, ticks)
 occAnalApp env (Var fun_id, args, ticks)
   = WUD all_uds (mkTicks ticks app')
   where
-    -- Lots of banged bindings: this is a very heavily bit of code,
+    -- Lots of banged bindings: this is a very heavily used bit of code,
     -- so it pays not to make lots of thunks here, all of which
     -- will ultimately be forced.
     !(fun', fun_id')  = lookupBndrSwap env fun_id
@@ -3136,24 +3142,23 @@ addInScope :: OccEnv -> [Var]
 -- We do not assume that the bndrs are in scope order; in fact the
 -- call in occ_anal_lam_tail gives them to addInScope in /reverse/ order
 
--- Fast path when the is no environment-munging to do
--- This is rather common: notably at top level, but nested too
 addInScope env bndrs thing_inside
   | null bndrs   -- E.g. nullary constructors in a `case`
   = thing_inside env
 
+  -- Fast path when the is no environment-munging to do
+  -- This is rather common: notably at top level, but nested too
   | isEmptyVarEnv (occ_bs_env env)
   , isEmptyVarEnv (occ_join_points env)
   , WUD uds res <- thing_inside env
   = WUD (delBndrsFromUDs bndrs uds) res
 
-addInScope env bndrs thing_inside
+  -- Normal path
+  | let !(env', bad_joins) = preprocess_env env bndr_set
+        !(WUD uds res)     = thing_inside env'
+        uds'               = postprocess_uds bndrs bad_joins uds
+        bndr_set           = mkVarSet bndrs
   = WUD uds' res
-  where
-    bndr_set           = mkVarSet bndrs
-    !(env', bad_joins) = preprocess_env env bndr_set
-    !(WUD uds res)     = thing_inside env'
-    uds'               = postprocess_uds bndrs bad_joins uds
 
 preprocess_env :: OccEnv -> VarSet -> (OccEnv, JoinPointInfo)
 preprocess_env env@(OccEnv { occ_join_points = join_points
@@ -3668,8 +3673,8 @@ For example, in (case x of A -> y; B -> y; C -> True),
 
 -}
 
-type IdOccEnv = VarEnv LocalOcc        -- A finite map from an expression's
-                                         -- free variables to their usage
+type IdOccEnv = IdEnv LocalOcc        -- A finite map from an expression's
+                                       -- free variables to their usage
 
 data LocalOcc  -- See Note [LocalOcc]
      = OneOccL { lo_n_br  :: {-# UNPACK #-} !BranchCount  -- Number of syntactic occurrences
@@ -3690,9 +3695,7 @@ localTailCallInfo (ManyOccL tci)               = tci
 
 -- For TyVars and CoVars we gather only whether it occurs once or
 -- many times; we aren't interested in case-branches or tail-calls
-data TyCoOccEnv = VarEnv TyCoOcc
-
-data TyCoOcc = OneOccTyCo | ManyOccTyCo
+type TyCoOccEnv = TyCoVarEnv TyCoOccInfo
 
 type ZappedSet     = IdOccEnv
 type ZappedTyCoSet = TyCoOccEnv
@@ -3704,24 +3707,19 @@ data UsageDetails
        , ud_z_many    :: !ZappedSet   -- apply 'markMany' to these
        , ud_z_in_lam  :: !ZappedSet   -- apply 'markInsideLam' to these
        , ud_z_tail    :: !ZappedSet   -- zap tail-call info for these
+
        , ud_tyco_env  :: !TyCoOccEnv
-       , ud_z_tyzo    :: !ZappedTyCoSet
+       , ud_z_tyco    :: !ZappedTyCoSet  -- These ones occur many times
        }
   -- INVARIANT: `ud_z_many`, `ud_z_in_lam` and `ud_z_tail`
-o  --             are all subsets of ud_id_env
-  --            `ud_z_tyco` is a subset of ud_tycon_env
+  --             are all subsets of ud_id_env
+  --            `ud_z_tyco` is a subset of ud_tyco_env
 
 instance Outputable UsageDetails where
-  ppr ud@(UD { ud_id_env = env, ud_tyco_env = tyco_env })
-    = text "UD" <+> (braces $ fsep $ punctuate comma $
-        [ ppr uq <+> text ":->" <+> ppr (lookupOccByUnique ud uq)
-        | uq <- nonDetStrictFoldVarEnv_Directly do_one [] id_env ]
-        ++
-        [ ppr uq <+> text ":->" <+> ppr (lookupTyCoOccByUnique ud uq)
-        | uq <- nonDetStrictFoldVarEnv_Directly do_one [] tyco_env ])
-    where
-      do_one :: Unique -> a -> [Unique] -> [Unique]
-      do_one uniq _ uniqs = uniq : uniqs
+  ppr (UD { ud_id_env = id_env, ud_tyco_env = tyco_env })
+    = text "UD" <+> (braces $ vcat
+        [ text "ud_id_env =" <+> ppr id_env
+        , text "ud_tyco_env =" <+> ppr tyco_env ])
 
 ---------------------
 -- | TailUsageDetails captures the result of applying 'occAnalLamTail'
@@ -3743,17 +3741,12 @@ data WithTailUsageDetails a = WTUD !TailUsageDetails !a
 -------------------
 -- UsageDetails API
 
-andUDs, orUDs
-        :: UsageDetails -> UsageDetails -> UsageDetails
+plusTyCoOccEnv :: TyCoOccEnv -> TyCoOccEnv -> TyCoOccEnv
+plusTyCoOccEnv env1 env2 = plusVarEnv_C plusTyCoOccInfo env1 env2
+
+andUDs, orUDs :: UsageDetails -> UsageDetails -> UsageDetails
 andUDs = combineUsageDetailsWith andLocalOcc
 orUDs  = combineUsageDetailsWith orLocalOcc
-
-mkOneTyVarOcc :: OccEnv -> TyVar -> UsageDetails
-mkOneTyVarOcc !_env tv
-  = mkSimpleDetails (unitVarEnv tv occ)
-  where
-    occ = OneOccL { lo_n_br = 1, lo_int_cxt = NotInteresting
-                  , lo_tail = NoTailCallInfo }
 
 mkOneIdOcc :: OccEnv -> Var -> InterestingCxt -> JoinArity -> UsageDetails
 mkOneIdOcc !env id int_cxt arity
@@ -3765,10 +3758,10 @@ mkOneIdOcc !env id int_cxt arity
   = -- See Note [Occurrence analysis for join points]
     assertPpr (not (isEmptyVarEnv join_uds)) (ppr id) $
        -- We only put non-empty join-points into occ_join_points
-    mkSimpleDetails (extendVarEnv join_uds id occ)
+    mkIdUDs (extendVarEnv join_uds id occ)
 
   | otherwise
-  = mkSimpleDetails (unitVarEnv id occ)
+  = mkIdUDs (unitVarEnv id occ)
 
   where
     occ = OneOccL { lo_n_br = 1, lo_int_cxt = int_cxt
@@ -3786,10 +3779,14 @@ add_many_occ v env = extendVarEnv env v (ManyOccL NoTailCallInfo)
 addManyOccs :: UsageDetails -> VarSet -> UsageDetails
 addManyOccs uds var_set
   | isEmptyVarSet var_set = uds
-  | otherwise             = uds { ud_env = add_to (ud_env uds) }
+  | otherwise             = uds { ud_id_env = add_to (ud_id_env uds) }
   where
     add_to env = nonDetStrictFoldUniqSet add_many_occ env var_set
     -- It's OK to use nonDetStrictFoldUniqSet here because add_many_occ commutes
+
+addTyCoOccs :: UsageDetails -> TyCoOccEnv -> UsageDetails
+addTyCoOccs uds@(UD { ud_tyco_env = env}) extras
+  = uds { ud_tyco_env = env `plusTyCoOccEnv` extras }
 
 addLamTyCoVarOccs :: UsageDetails -> [Var] -> UsageDetails
 -- occAnalLamBndrs :: OccEnv -> UsageDetails -> [Var] -> WithUsageDetails [Var]
@@ -3801,39 +3798,52 @@ addLamTyCoVarOccs uds bndrs
     add bndr uds = uds `addManyOccs` tyCoVarsOfType (varType bndr)
 
 emptyDetails :: UsageDetails
-emptyDetails = mkSimpleDetails emptyVarEnv
+emptyDetails = UD { ud_id_env   = emptyVarEnv
+                  , ud_z_many   = emptyVarEnv
+                  , ud_z_in_lam = emptyVarEnv
+                  , ud_z_tail   = emptyVarEnv
+                  , ud_tyco_env = emptyVarEnv
+                  , ud_z_tyco   = emptyVarEnv }
 
 isEmptyDetails :: UsageDetails -> Bool
-isEmptyDetails (UD { ud_env = env }) = isEmptyVarEnv env
+isEmptyDetails (UD { ud_id_env = id_env, ud_tyco_env = tyco_env })
+  = isEmptyVarEnv id_env && isEmptyVarEnv tyco_env
 
-mkSimpleDetails :: IdOccEnv -> UsageDetails
-mkSimpleDetails env = UD { ud_env       = env
-                         , ud_z_many    = emptyVarEnv
-                         , ud_z_in_lam  = emptyVarEnv
-                         , ud_z_tail    = emptyVarEnv }
+mkIdUDs :: IdOccEnv -> UsageDetails
+mkIdUDs env = emptyDetails { ud_id_env = env }
+
+mkTyCoUDs :: TyCoOccEnv -> UsageDetails
+mkTyCoUDs env = emptyDetails { ud_tyco_env = env }
 
 modifyUDEnv :: (IdOccEnv -> IdOccEnv) -> UsageDetails -> UsageDetails
-modifyUDEnv f uds@(UD { ud_env = env }) = uds { ud_env = f env }
+modifyUDEnv f uds@(UD { ud_id_env = env }) = uds { ud_id_env = f env }
 
 delBndrsFromUDs :: [Var] -> UsageDetails -> UsageDetails
 -- Delete these binders from the UsageDetails
--- But /add/ the free vars of the types
-delBndrsFromUDs bndrs (UD { ud_env = env, ud_z_many = z_many
-                          , ud_z_in_lam  = z_in_lam, ud_z_tail = z_tail })
-  = UD { ud_env       = env      `delVarEnvList` bndrs
+-- But /add/ the free vars of the types.  That may seem odd, but this is
+-- a very convenient place to do it!
+delBndrsFromUDs bndrs (UD { ud_id_env = env, ud_z_many = z_many
+                          , ud_z_in_lam  = z_in_lam, ud_z_tail = z_tail
+                          , ud_tyco_env = tyco_env, ud_z_tyco = z_tyco })
+  = UD { ud_id_env    = env      `delVarEnvList` bndrs
        , ud_z_many    = z_many   `delVarEnvList` bndrs
        , ud_z_in_lam  = z_in_lam `delVarEnvList` bndrs
-       , ud_z_tail    = z_tail   `delVarEnvList` bndrs }
+       , ud_z_tail    = z_tail   `delVarEnvList` bndrs
+       , ud_tyco_env  = adjust bndrs tyco_env
+       , ud_z_tyco    = z_tyco   `delVarEnvList` bndrs
+       }
   where
-    ty_fvs []     = emptyVarSet
-    ty_fvs (b:bs) = tyCoVarsOfType b `unionVarSet`
-                    (ty_fvs bs `delVarSet` b)
+    adjust :: [Var] -> TyCoOccEnv -> TyCoOccEnv
+    -- Delete binders, but add the free vars of their types
+    adjust []     env = env
+    adjust (b:bs) env = occAnalTy (varType b) `plusTyCoOccEnv`
+                        (adjust bs env `delVarEnv` b)
 
 markAllMany, markAllInsideLam, markAllNonTail, markAllManyNonTail
   :: UsageDetails -> UsageDetails
-markAllMany      ud@(UD { ud_env = env }) = ud { ud_z_many   = env }
-markAllInsideLam ud@(UD { ud_env = env }) = ud { ud_z_in_lam = env }
-markAllNonTail   ud@(UD { ud_env = env }) = ud { ud_z_tail   = env }
+markAllMany      ud@(UD { ud_id_env = env }) = ud { ud_z_many   = env }
+markAllInsideLam ud@(UD { ud_id_env = env }) = ud { ud_z_in_lam = env }
+markAllNonTail   ud@(UD { ud_id_env = env }) = ud { ud_z_tail   = env }
 markAllManyNonTail = markAllMany . markAllNonTail -- effectively sets to noOccInfo
 
 markAllInsideLamIf, markAllNonTailIf :: Bool -> UsageDetails -> UsageDetails
@@ -3846,7 +3856,7 @@ markAllNonTailIf False ud = ud
 
 lookupTailCallInfo :: UsageDetails -> Id -> TailCallInfo
 lookupTailCallInfo uds id
-  | UD { ud_z_tail = z_tail, ud_env = env } <- uds
+  | UD { ud_z_tail = z_tail, ud_id_env = env } <- uds
   , not (id `elemVarEnv` z_tail)
   , Just occ <- lookupVarEnv env id
   = localTailCallInfo occ
@@ -3855,9 +3865,10 @@ lookupTailCallInfo uds id
 
 udFreeVars :: VarSet -> UsageDetails -> VarSet
 -- Find the subset of bndrs that are mentioned in uds
-udFreeVars bndrs (UD { ud_env = env }) = restrictFreeVars bndrs env
+udFreeVars bndrs (UD { ud_id_env = id_env, ud_tyco_env = tyco_env })
+  = restrictFreeVars bndrs id_env `unionVarSet` restrictFreeVars bndrs tyco_env
 
-restrictFreeVars :: VarSet -> IdOccEnv -> VarSet
+restrictFreeVars :: VarSet -> VarEnv a -> VarSet
 restrictFreeVars bndrs fvs = restrictUniqSetToUFM bndrs fvs
 
 -------------------
@@ -3867,15 +3878,19 @@ combineUsageDetailsWith :: (LocalOcc -> LocalOcc -> LocalOcc)
                         -> UsageDetails -> UsageDetails -> UsageDetails
 {-# INLINE combineUsageDetailsWith #-}
 combineUsageDetailsWith plus_occ_info
-    uds1@(UD { ud_env = env1, ud_z_many = z_many1, ud_z_in_lam = z_in_lam1, ud_z_tail = z_tail1 })
-    uds2@(UD { ud_env = env2, ud_z_many = z_many2, ud_z_in_lam = z_in_lam2, ud_z_tail = z_tail2 })
-  | isEmptyVarEnv env1 = uds2
-  | isEmptyVarEnv env2 = uds1
+    uds1@(UD { ud_id_env = env1, ud_z_many = z_many1, ud_z_in_lam = z_in_lam1, ud_z_tail = z_tail1
+             , ud_tyco_env = tyco_env1, ud_z_tyco = z_tyco1 })
+    uds2@(UD { ud_id_env = env2, ud_z_many = z_many2, ud_z_in_lam = z_in_lam2, ud_z_tail = z_tail2
+             , ud_tyco_env = tyco_env2, ud_z_tyco = z_tyco2 })
+  | isEmptyDetails uds1 = uds2
+  | isEmptyDetails uds2 = uds1
   | otherwise
-  = UD { ud_env       = plusVarEnv_C plus_occ_info env1 env2
-       , ud_z_many    = plusVarEnv z_many1   z_many2
-       , ud_z_in_lam  = plusVarEnv z_in_lam1 z_in_lam2
-       , ud_z_tail    = plusVarEnv z_tail1   z_tail2 }
+  = UD { ud_id_env   = plusVarEnv_C plus_occ_info env1 env2
+       , ud_z_many   = plusVarEnv z_many1   z_many2
+       , ud_z_in_lam = plusVarEnv z_in_lam1 z_in_lam2
+       , ud_z_tail   = plusVarEnv z_tail1   z_tail2
+       , ud_tyco_env = plusTyCoOccEnv tyco_env1 tyco_env2
+       , ud_z_tyco   = plusVarEnv z_tyco1 z_tyco2 }
 
 lookupLetOccInfo :: UsageDetails -> Id -> OccInfo
 -- Don't use locally-generated occ_info for exported (visible-elsewhere)
@@ -3884,21 +3899,24 @@ lookupLetOccInfo :: UsageDetails -> Id -> OccInfo
 --     we are about to re-generate it and it shouldn't be "sticky"
 lookupLetOccInfo ud id
  | isExportedId id = noOccInfo
- | otherwise       = lookupOccByUnique ud (idUnique id)
+ | otherwise       = lookupIdOccByUnique ud (idUnique id)
 
-lookupOccInfo :: UsageDetails -> Id -> OccInfo
-lookupOccInfo ud id = lookupOccByUnique ud (idUnique id)
+lookupIdOccInfo :: UsageDetails -> Id -> OccInfo
+lookupIdOccInfo ud id = lookupIdOccByUnique ud (idUnique id)
 
-lookupTyCoOccByUnique :: UsageDetails -> Unique -> TyCoOcc
-lookupTyCoByUnique (UD { ud_tyco_env = env, ud_z_tyco = z_tyco }) uniq
+lookupTyCoOcc :: UsageDetails -> TyCoVar -> TyCoOccInfo
+lookupTyCoOcc uds tcv = lookupTyCoOccByUnique uds (varUnique tcv)
+
+lookupTyCoOccByUnique :: UsageDetails -> Unique -> TyCoOccInfo
+lookupTyCoOccByUnique (UD { ud_tyco_env = env, ud_z_tyco = z_tyco }) uniq
   = case lookupVarEnv_Directly env uniq of
-      Nothing -> Nothing
-      Just ManyOccTyCo -> Just ManyOccTyCo
-      Just OneOccTyCo | uniq `elemVarEnvByKey` z_tyco = Just ManyOccTyCo
-                      | otherwise                     = Just OneOccTyCo
+      Nothing -> TyCoDead
+      Just TyCoOne | uniq `elemVarEnvByKey` z_tyco -> TyCoMany
+                   | otherwise                     -> TyCoOne
+      Just occ -> occ
 
-lookupOccByUnique :: UsageDetails -> Unique -> OccInfo
-lookupOccByUnique (UD { ud_env       = env
+lookupIdOccByUnique :: UsageDetails -> Unique -> OccInfo
+lookupIdOccByUnique (UD { ud_id_env    = env
                       , ud_z_many    = z_many
                       , ud_z_in_lam  = z_in_lam
                       , ud_z_tail    = z_tail })
@@ -3925,6 +3943,12 @@ lookupOccByUnique (UD { ud_env       = env
         | otherwise                     = ti
 
 
+tyCoOccToIdOcc :: TyCoOccInfo -> OccInfo
+-- Used for CoVars
+tyCoOccToIdOcc TyCoDead = IAmDead
+tyCoOccToIdOcc TyCoOne  = OneOcc { occ_in_lam = NotInsideLam, occ_n_br = 1
+                                 , occ_int_cxt = NotInteresting, occ_tail = NoTailCallInfo }
+tyCoOccToIdOcc TyCoMany = noOccInfo
 
 -------------------
 -- See Note [Adjusting right-hand sides]
@@ -3958,34 +3982,42 @@ adjustTailArity mb_rhs_ja (TUD ja usage)
 type IdWithOccInfo = Id
 
 tagLamBinders :: UsageDetails        -- Of scope
-              -> [Id]                -- Binders
+              -> [CoreBndr]          -- Binders
               -> [IdWithOccInfo]     -- Tagged binders
 tagLamBinders usage binders
   = map (tagLamBinder usage) binders
 
 tagLamBinder :: UsageDetails       -- Of scope
-             -> Id                 -- Binder
+             -> CoreBndr           -- Binder
              -> IdWithOccInfo      -- Tagged binders
 -- Used for lambda and case binders
--- No-op on TyVars
+-- No-op on TyVars; we could tag them but not much point
 -- A lambda binder never has an unfolding, so no need to look for that
 tagLamBinder usage bndr
-  = setBinderOcc (markNonTail occ) bndr
+  | isTyCoVar bndr
+  = bndr
+  | otherwise
+  = setIdBinderOcc (markNonTail occ) bndr
       -- markNonTail: don't try to make an argument into a join point
   where
-    occ = lookupOccInfo usage bndr
+    occ = lookupIdOccInfo usage bndr
+
+tagTyCoBinder :: TyCoOccInfo -> TyCoVar -> TyCoVar
+tagTyCoBinder occ bndr
+  | isId bndr = setIdOccInfo bndr (tyCoOccToIdOcc occ)
+  | otherwise = setTyVarOccInfo bndr occ
 
 tagNonRecBinder :: TopLevelFlag           -- At top level?
                 -> OccInfo                -- Of scope
-                -> CoreBndr               -- Binder
+                -> Id                     -- Binder
                 -> (IdWithOccInfo, JoinPointHood)  -- Tagged binder
 -- Precondition: OccInfo is not IAmDead
 tagNonRecBinder lvl occ bndr
   | okForJoinPoint lvl bndr tail_call_info
   , AlwaysTailCalled ar <- tail_call_info
-  = (setBinderOcc occ bndr,        JoinPoint ar)
+  = (setIdBinderOcc occ bndr,        JoinPoint ar)
   | otherwise
-  = (setBinderOcc zapped_occ bndr, NotJoinPoint)
+  = (setIdBinderOcc zapped_occ bndr, NotJoinPoint)
  where
     tail_call_info = tailCallInfo occ
     zapped_occ     = markNonTail occ
@@ -4035,18 +4067,17 @@ tagRecBinders lvl body_uds details_s
      adj_uds = foldr andUDs body_uds rhs_udss'
 
      -- 4. Tag each binder with its adjusted details
-     bndrs'    = [ setBinderOcc (lookupLetOccInfo adj_uds bndr) bndr
+     bndrs'    = [ setIdBinderOcc (lookupLetOccInfo adj_uds bndr) bndr
                  | bndr <- bndrs ]
 
    in
    WUD adj_uds bndrs'
 
-setBinderOcc :: OccInfo -> CoreBndr -> CoreBndr
-setBinderOcc occ_info bndr
-  | isTyVar bndr = if (occ_info == tyVarOccInfo bndr) then bndr
-                   else setTyVarOccInfo bndr occ_info
-  | otherwise    = if (occ_info == idOccInfo bndr) then bndr
-                   else setIdOccInfo bndr occ_info
+setIdBinderOcc :: OccInfo -> CoreBndr -> CoreBndr
+setIdBinderOcc occ_info bndr
+  = assertPpr (isNonCoVarId bndr) (ppr bndr) $
+    if (occ_info == idOccInfo bndr) then bndr
+    else setIdOccInfo bndr occ_info
 
 -- | Decide whether some bindings should be made into join points or not, based
 -- on its occurrences. This is

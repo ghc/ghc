@@ -441,8 +441,8 @@ type IndEnv = IdEnv (Id, [CoreTickish]) -- Maps local_id -> exported_id, ticks
 shortOutIndirections :: CoreProgram -> CoreProgram
 shortOutIndirections binds
   | isEmptyVarEnv ind_env = binds
-  | no_need_to_flatten    = binds'                      -- See Note [Rules and indirection-zapping]
-  | otherwise             = [Rec (flattenBinds binds')] -- for this no_need_to_flatten stuff
+  | no_need_to_flatten    = binds'              -- See Note [Rules and indirection-zapping]
+  | otherwise             = glomValBinds binds' -- for this no_need_to_flatten stuff
   where
     ind_env            = makeIndEnv binds
     -- These exported Ids are the subjects  of the indirection-elimination

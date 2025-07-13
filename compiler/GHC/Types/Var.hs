@@ -128,7 +128,7 @@ import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , nonDetCmpUnique )
-import GHC.Types.Basic( TypeOrConstraint(..), OccInfo, noOccInfo )
+import GHC.Types.Basic( TypeOrConstraint(..), OccInfo, noOccInfo, TyCoOccInfo(..) )
 import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
@@ -269,7 +269,7 @@ data Var
         varType      :: Kind,          -- ^ The type or kind of the 'Var' in question
         tv_unfolding :: Maybe Type,    -- ^ The type to which the variable is bound to,
                                        -- if any, see Note [Type and coercion lets] in GHC.Core
-        tv_occ_info  :: OccInfo
+        tv_occ_info  :: TyCoOccInfo
  }
 
   | TcTyVar {                           -- Used only during type inference
@@ -1032,8 +1032,8 @@ tyVarUnfolding_maybe :: TyVar -> Maybe Type
 tyVarUnfolding_maybe (TyVar { tv_unfolding = unf }) = unf
 tyVarUnfolding_maybe _ = Nothing
 
-tyVarOccInfo :: TyVar -> OccInfo
-tyVarOccInfo (TcTyVar {}) = noOccInfo
+tyVarOccInfo :: TyVar -> TyCoOccInfo
+tyVarOccInfo (TcTyVar {}) = TyCoMany
 tyVarOccInfo tv = assertPpr (isTyVar tv) (ppr tv) $ tv_occ_info tv
 
 setTyVarUnique :: TyVar -> Unique -> TyVar
@@ -1059,7 +1059,7 @@ zapTyVarUnfolding tv@(TcTyVar {}) = tv
   -- Why: because zapTyVarUnfolding is called by substTyBndr during typechecking
 zapTyVarUnfolding v = pprPanic "zapTyVarUnfolding" (ppr v)
 
-setTyVarOccInfo :: HasDebugCallStack => TyVar -> OccInfo -> TyVar
+setTyVarOccInfo :: HasDebugCallStack => TyVar -> TyCoOccInfo -> TyVar
 setTyVarOccInfo tv@(TyVar {}) occ_info
   = tv {tv_occ_info = occ_info}
 setTyVarOccInfo tv            occ_info
@@ -1101,7 +1101,7 @@ mkTyVar name kind = TyVar { varName      = name
                           , realUnique   = nameUnique name
                           , varType      = kind
                           , tv_unfolding = Nothing
-                          , tv_occ_info  = noOccInfo
+                          , tv_occ_info  = TyCoMany
                           }
 
 mkTyVarWithUnfolding :: Name -> Kind -> Type -> TyVar
@@ -1109,7 +1109,7 @@ mkTyVarWithUnfolding name kind unf = TyVar { varName      = name
                                            , realUnique   = nameUnique name
                                            , varType      = kind
                                            , tv_unfolding = Just unf
-                                           , tv_occ_info  = noOccInfo
+                                           , tv_occ_info  = TyCoMany
                                            }
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar

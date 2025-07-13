@@ -780,10 +780,10 @@ specImports top_env (MkUD { ud_binds = dict_binds, ud_calls = calls })
              local_rule_base = extendRuleBaseList emptyRuleBase rules_for_locals
              final_binds
                | null spec_binds = wrapDictBinds dict_binds []
-               | otherwise       = [Rec $ mapFst (addRulesToId local_rule_base) $
-                                          flattenBinds                          $
-                                          wrapDictBinds dict_binds              $
-                                          spec_binds]
+               | otherwise       = glomValBinds $
+                                   wrapDictBinds dict_binds                          $
+                                   map (mapBindBndrs (addRulesToId local_rule_base)) $
+                                   spec_binds
 
        ; return (rules_for_imps, final_binds)
     }

@@ -42,7 +42,8 @@ module GHC.Core (
         foldBindersOfBindStrict, foldBindersOfBindsStrict,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders, collectNValBinders_maybe,
-        collectArgs, collectValArgs, stripNArgs, collectArgsTicks, flattenBinds,
+        collectArgs, collectValArgs, stripNArgs, collectArgsTicks,
+        flattenBinds, glomValBinds, mapBindBndrs,
         collectFunSimple,
 
         exprToType,
@@ -2174,7 +2175,6 @@ foldBindersOfBindsStrict f = \z binds -> foldl' fold_bind z binds
   where
     fold_bind = (foldBindersOfBindStrict f)
 
-
 rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
@@ -2188,6 +2188,21 @@ flattenBinds :: [Bind b] -> [(b, Expr b)]
 flattenBinds (NonRec b r : binds) = (b,r) : flattenBinds binds
 flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds
 flattenBinds []                   = []
+
+glomValBinds :: [Bind b] -> [Bind b]
+-- Glom all the value bindings into a single Rec;
+-- Leave any type bindings as NonRecs, bringing them to the front
+glomValBinds bs = go [] bs
+  where
+    go prs (b@(NonRec _ (Type {})) : bs) = b : go prs bs
+    go prs (NonRec b r : bs) = go ((b,r) : prs) bs
+    go prs (Rec rprs   : bs) = go (rprs ++ prs) bs
+    go []  [] = []
+    go prs [] = [Rec prs]
+
+mapBindBndrs :: (b -> b) -> Bind b -> Bind b
+mapBindBndrs f (NonRec b r) = NonRec (f b) r
+mapBindBndrs f (Rec prs)    = Rec (mapFst f prs)
 
 -- | We often want to strip off leading lambdas before getting down to
 -- business. Variants are 'collectTyBinders', 'collectValBinders',

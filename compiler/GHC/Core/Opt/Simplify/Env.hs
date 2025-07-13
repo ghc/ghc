@@ -930,22 +930,19 @@ mkRecFloats :: SimplFloats -> SimplFloats
 -- If any are type bindings they must be non-recursive, so
 --   do not need to be joined into a letrec; indeed they must not
 --   since Rec{} is not allowed to have type binders
-mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs ff
+mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats val_bs ff
                                 , sfJoinFloats = join_bs
                                 , sfInScope    = in_scope })
-  = assertPpr (isNilOL bs || isNilOL join_bs) (ppr floats) $
-    SimplFloats { sfLetFloats  = LetFloats (type_bs `appOL` val_b) ff
+  = assertPpr (isNilOL val_bs || isNilOL join_bs) (ppr floats) $
+    SimplFloats { sfLetFloats  = LetFloats val_b ff
                 , sfJoinFloats = join_b
                 , sfInScope    = in_scope }
   where
-    type_bs, val_bs :: OrdList OutBind
-    (type_bs, val_bs) = partitionOL isTypeBind bs
-
     -- See Note [Bangs in the Simplifier]
     !val_b  | isNilOL val_bs  = nilOL
-            | otherwise       = unitOL (Rec (flattenBinds (fromOL val_bs)))
+            | otherwise       = toOL (glomValBinds (fromOL val_bs))
     !join_b | isNilOL join_bs = nilOL
-            | otherwise       = unitOL (Rec (flattenBinds (fromOL join_bs)))
+            | otherwise       = toOL (glomValBinds (fromOL join_bs))
 
 wrapFloats :: SimplFloats -> OutExpr -> OutExpr
 -- Wrap the floats around the expression
