@@ -3,7 +3,7 @@ GHC runtime linker: fatal error: I found a duplicate definition for symbol
 whilst processing object file
    E:\ghc-dev\msys64\home\Tamar\ghc\testsuite\tests\rts\T11223\T11223_link_order_a_b_2_fail.run\libfoo_link_lib_3.a
 The symbol was previously defined in
-   E:\ghc-dev\msys64\home\Tamar\ghc\testsuite\tests\rts\T11223\T11223_link_order_a_b_2_fail.run\libbar_link_lib_3.a(#2:bar_link_lib_3.o)
+   E:\ghc-dev\msys64\home\Tamar\ghc\testsuite\tests\rts\T11223\T11223_link_order_a_b_2_fail.run\libbar_link_lib_3.a(#3:bar_link_lib_3.o)
 This could be caused by:
    * Loading two different object files which export the same symbol
    * Specifying the same object file twice on the GHCi command line
