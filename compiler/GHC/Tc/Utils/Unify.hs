@@ -908,13 +908,13 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
 new_infer_arg_ty :: CtOrigin -> Int -> TcM (Scaled ExpSigmaTypeFRR)
 new_infer_arg_ty herald arg_pos -- position for error messages only
   = do { mult     <- newFlexiTyVarTy multiplicityTy
-       ; inf_hole <- newInferExpTypeFRR (FRRExpectedFunTy herald arg_pos)
+       ; inf_hole <- newInferExpTypeFRR (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos)
        ; return (mkScaled mult inf_hole) }
 
 new_check_arg_ty :: CtOrigin -> Int -> TcM (Scaled TcType)
 new_check_arg_ty herald arg_pos -- Position for error messages only, 1 for first arg
   = do { mult   <- newFlexiTyVarTy multiplicityTy
-       ; arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy herald arg_pos)
+       ; arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos)
        ; return (mkScaled mult arg_ty) }
 
 mkFunTysMsg :: CtOrigin
