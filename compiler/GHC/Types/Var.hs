@@ -128,7 +128,7 @@ import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , nonDetCmpUnique )
-import GHC.Types.Basic( TypeOrConstraint(..), OccInfo, noOccInfo, TyCoOccInfo(..) )
+import GHC.Types.Basic( TypeOrConstraint(..), OccInfo, TyCoOccInfo(..) )
 import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
