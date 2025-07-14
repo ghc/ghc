@@ -1,0 +1,9 @@
+# This is a IDE configuration file which tells IDEs such as `ghcide` how
+# to set up a GHC API session for this project.
+#
+# To use it in windows systems replace the config with
+# cradle: {bios: {program: "./hadrian/hie-bios.bat"}}
+#
+# The format is documented here - https://github.com/mpickering/hie-bios
+cradle: {bios: {program: "./hadrian/hie-bios",
+		with-ghc: "~/.ghcup/bin/ghc"}}

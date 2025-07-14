@@ -174,7 +174,7 @@ matchActualFunTy herald mb_thing err_info fun_ty
 
     go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
-      do { hasFixedRuntimeRep_syntactic (FRRExpectedFunTy herald 1) arg_ty
+      do { hasFixedRuntimeRep_syntactic (FRRExpectedFunTy (updatePositionCtOrigin 1 herald) 1) arg_ty
          ; return (idHsWrapper, Scaled w arg_ty, res_ty) }
 
     go ty@(TyVarTy tv)
@@ -852,7 +852,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
                                    , ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
         do { let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
-           ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
+           ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos) arg_ty
            ; (wrap_res, result) <- check (n_req - 1)
                                          (mkCheckExpFunPatTy (Scaled mult arg_ty) : rev_pat_tys)
                                          res_ty
