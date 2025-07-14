@@ -432,9 +432,20 @@ idRuleAndUnfoldingVars of x.  No need for type variables, hence not using
 idFreeVars.
 -}
 
+fiExpr platform to_drop (_,AnnLet (AnnNonRec bndr (rhs_fvs, rhs)) body)
+  | Just bind' <- is_tyco_rhs rhs -- See Note [Don't float in type or coercion lets]
+  = wrapFloats drop_here $
+    Let bind' (fiExpr platform body_drop body)
+  where
+    is_tyco_rhs :: CoreExprWithFVs' -> Maybe CoreBind
+    is_tyco_rhs  (AnnType     ty) = Just (NonRec bndr (Type ty))
+    is_tyco_rhs  (AnnCoercion co) = Just (NonRec bndr (Coercion co))
+    is_tyco_rhs _ = Nothing
+
+    (drop_here, [body_drop]) = sepBindsByDropPoint platform False to_drop
+                                             rhs_fvs [freeVarsOf body]
+
 fiExpr platform to_drop (_,AnnLet bind body)
-  | Just bind' <- is_tyco_bind bind -- See Note [Don't float in type or coercion lets]
-  = Let bind' (fiExpr platform to_drop body)
   | otherwise
   = fiExpr platform (after ++ new_float : before) body
            -- to_drop is in reverse dependency order
@@ -442,10 +453,6 @@ fiExpr platform to_drop (_,AnnLet bind body)
     (before, new_float, after) = fiBind platform to_drop bind body_fvs
     body_fvs                   = freeVarsOf body
 
-    is_tyco_bind :: CoreBindWithFVs -> Maybe CoreBind
-    is_tyco_bind (AnnNonRec bndr (_, AnnType     ty)) = Just (NonRec bndr (Type ty))
-    is_tyco_bind (AnnNonRec bndr (_, AnnCoercion co)) = Just (NonRec bndr (Coercion co))
-    is_tyco_bind _ = Nothing
 
 {- Note [Floating primops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -530,7 +537,7 @@ Note [Don't float in type or coercion lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't float type-lets or coercion-lets inward. Doing so does not
 save allocation; and if we did we't have to be careful of the variables
-mentiond in the idType of the case-binder.  For example
+mentioned in the idType of the case-binder.  For example
     \(x :: Maybe b) -> let a = Maybe b in
                        case x of (cb :: a) of { Just y -> ... }
 We must not float the `a = Maybe b` into the case alternatives, because

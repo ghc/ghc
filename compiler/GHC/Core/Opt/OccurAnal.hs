@@ -2718,9 +2718,10 @@ occAnalApp !env (Var fun, args, ticks)
   --     we don't want to occ-anal them twice in the runRW# case!
   --     This caused #18296
   | fun `hasKey` runRWKey
-  , [t1, t2, arg]  <- args
+  , [a1@(Type t1), a2@(Type t2), arg]  <- args
   , WUD usage arg' <- adjustNonRecRhs (JoinPoint 1) $ occAnalLamTail env arg
-  = WUD usage (mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
+  = WUD (usage `addTyCoOccs` occAnalTy t1 `addTyCoOccs` occAnalTy t2)
+        (mkTicks ticks $ mkApps (Var fun) [a1, a2, arg'])
 
 occAnalApp env (Var fun_id, args, ticks)
   = WUD all_uds (mkTicks ticks app')
