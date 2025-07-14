@@ -21,6 +21,7 @@ module GHC.Tc.Types.Origin (
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
   srcCodeOriginCtOrigin,
   isVisibleOrigin, toInvisibleOrigin,
+  updatePositionCtOrigin,
   pprCtOrigin, isGivenOrigin, isWantedWantedFunDepOrigin,
   isWantedSuperclassOrigin,
   ClsInstOrQC(..), NakedScFlag(..), NonLinearPatternReason(..),
@@ -707,6 +708,12 @@ data CtOrigin
       !(HsExpr GhcRn)
        -- ^ the entire lambda-case expression
 
+updatePositionCtOrigin :: Int -> CtOrigin -> CtOrigin
+updatePositionCtOrigin i (ExpectedFunTySyntaxOp _ c e) = ExpectedFunTySyntaxOp i c e
+updatePositionCtOrigin i (ExpectedFunTyViewPat _ e) = ExpectedFunTyViewPat i e
+updatePositionCtOrigin i (ExpectedFunTyArg _ t e) = ExpectedFunTyArg i t e
+updatePositionCtOrigin i (ExpectedFunTyMatches _ t e) = ExpectedFunTyMatches i t e
+updatePositionCtOrigin _ c = c
 
 
 data NonLinearPatternReason
