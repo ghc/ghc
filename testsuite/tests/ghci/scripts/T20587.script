@@ -1,6 +1,3 @@
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-
 :set -v1 -i -i. -ib -fhide-source-paths
 
 :shell mkdir b

@@ -7,7 +7,7 @@ main = do
       -- begin initialize
       df0 <- GHC.getSessionDynFlags
       let df1 = df0{GHC.ghcMode    = GHC.CompManager,
-                    GHC.backend    = GHC.interpreterBackend,
+                    GHC.backend    = GHC.bytecodeBackend,
                     GHC.ghcLink    = GHC.LinkInMemory,
                     GHC.verbosity  = 0}
       _ <- GHC.setSessionDynFlags df1

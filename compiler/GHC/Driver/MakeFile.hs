@@ -225,9 +225,9 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps dflags _ _ _ _ _ (CyclicSCC nodes)
+processDeps _ hsc_env _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    throwOneError $ cyclicModuleErr nodes
+    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $ cyclicModuleErr nodes
 
 -- processDeps _ _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
 --   =     -- There shouldn't be any backpack instantiations; report them as well
@@ -254,7 +254,7 @@ processDeps dflags hsc_env excl_mods root hdl m_dep_json (AcyclicSCC (ModuleNode
   hs_deps_all <-
     if null all_missing_errors
       then pure (boot_deps ++ not_boot_deps)
-      else throwErrors (mkMessages (listToBag all_missing_errors))
+      else throwErrors (initSourceErrorContext dflags) (mkMessages (listToBag all_missing_errors))
   let deps = cpp_deps_all ++ hs_deps_all
   updateJson m_dep_json (updateDepJSON include_pkg_deps pp dep_node deps)
   writeDependencies include_pkg_deps root hdl extra_suffixes dep_node deps

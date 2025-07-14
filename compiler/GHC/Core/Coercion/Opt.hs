@@ -177,12 +177,12 @@ optCoercion opts env co
   = optCoercion' env co
 
 {-
-  = pprTrace "optCoercion {" (text "Co:" <> ppr (coercionSize co)) $
+  = pprTrace "optCoercion {" (text "Co:" <> ppr co) $
     let result = optCoercion' env co in
     pprTrace "optCoercion }"
        (vcat [ text "Co:"    <+> ppr (coercionSize co)
              , text "Optco:" <+> ppWhen (isReflCo result) (text "(refl)")
-                             <+> ppr (coercionSize result) ]) $
+                             <+> ppr result ]) $
     result
 -}
 
@@ -317,7 +317,7 @@ opt_co4' env sym  rep r (GRefl _r ty (MCo kco))
               (text "Expected role:" <+> ppr r $$
                text "Found role:" <+> ppr _r   $$
                text "Type:" <+> ppr ty) $
-    if isGReflCo kco || isGReflCo kco'
+    if isReflKindCo kco || isReflKindCo kco'
     then wrapSym sym ty_co
     else wrapSym sym $ mk_coherence_right_co r' (coercionRKind ty_co) kco' ty_co
             -- ty :: k1
@@ -841,55 +841,58 @@ opt_trans_rule is co1 co2@(AppCo co2a co2b)
 -- Push transitivity inside forall
 -- forall over types.
 opt_trans_rule is co1 co2
-  | Just (tv1, visL1, _visR1, eta1, r1) <- splitForAllCo_ty_maybe co1
-  , Just (tv2, _visL2, visR2, eta2, r2) <- etaForAllCo_ty_maybe co2
-  = push_trans tv1 eta1 r1 tv2 eta2 r2 visL1 visR2
+  | Just (tv1, visL1, _visR1, kco1, r1) <- splitForAllCo_ty_maybe co1
+  , Just (tv2, _visL2, visR2, kco2, r2) <- etaForAllCo_ty_maybe co2
+  = push_trans tv1 kco1 r1 tv2 kco2 r2 visL1 visR2
 
-  | Just (tv2, _visL2, visR2, eta2, r2) <- splitForAllCo_ty_maybe co2
-  , Just (tv1, visL1, _visR1, eta1, r1) <- etaForAllCo_ty_maybe co1
-  = push_trans tv1 eta1 r1 tv2 eta2 r2 visL1 visR2
+  | Just (tv2, _visL2, visR2, kco2, r2) <- splitForAllCo_ty_maybe co2
+  , Just (tv1, visL1, _visR1, kco1, r1) <- etaForAllCo_ty_maybe co1
+  = push_trans tv1 kco1 r1 tv2 kco2 r2 visL1 visR2
 
   where
-  push_trans tv1 eta1 r1 tv2 eta2 r2 visL visR
+  push_trans tv1 kco1 r1 tv2 kco2 r2 visL visR
     -- Given:
-    --   co1 = /\ tv1 : eta1 <visL, visM>. r1
-    --   co2 = /\ tv2 : eta2 <visM, visR>. r2
+    --   co1 = /\ tv1 : kco1 <visL, visM>. r1
+    --   co2 = /\ tv2 : kco2 <visM, visR>. r2
     -- Wanted:
-    --   /\tv1 : (eta1;eta2) <visL, visR>.  (r1; r2[tv2 |-> tv1 |> eta1])
+    --   /\tv1 : (kco1;kco2) <visL, visR>.  (r1; r2[tv2 |-> tv1 |> kco1])
     = fireTransRule "EtaAllTy_ty" co1 co2 $
-      mkForAllCo tv1 visL visR (opt_trans is eta1 eta2) (opt_trans is' r1 r2')
+      mkForAllCo tv1 visL visR
+                 (kindCoToMKindCo (opt_trans is kco1 kco2))
+                 (opt_trans is' r1 r2')
     where
       is' = is `extendInScopeSet` tv1
-      r2' = substCoWithUnchecked [tv2] [mkCastTy (TyVarTy tv1) eta1] r2
+      r2' = substCoWithInScope is' [tv2] [mkCastTy (TyVarTy tv1) kco1] r2
 
 -- Push transitivity inside forall
 -- forall over coercions.
 opt_trans_rule is co1 co2
-  | Just (cv1, visL1, _visR1, eta1, r1) <- splitForAllCo_co_maybe co1
-  , Just (cv2, _visL2, visR2, eta2, r2) <- etaForAllCo_co_maybe co2
-  = push_trans cv1 eta1 r1 cv2 eta2 r2 visL1 visR2
+  | Just (cv1, visL1, _visR1, kco1, r1) <- splitForAllCo_co_maybe co1
+  , Just (cv2, _visL2, visR2, kco2, r2) <- etaForAllCo_co_maybe co2
+  = push_trans cv1 kco1 r1 cv2 kco2 r2 visL1 visR2
 
-  | Just (cv2, _visL2, visR2, eta2, r2) <- splitForAllCo_co_maybe co2
-  , Just (cv1, visL1, _visR1, eta1, r1) <- etaForAllCo_co_maybe co1
-  = push_trans cv1 eta1 r1 cv2 eta2 r2 visL1 visR2
+  | Just (cv2, _visL2, visR2, kco2, r2) <- splitForAllCo_co_maybe co2
+  , Just (cv1, visL1, _visR1, kco1, r1) <- etaForAllCo_co_maybe co1
+  = push_trans cv1 kco1 r1 cv2 kco2 r2 visL1 visR2
 
   where
-  push_trans cv1 eta1 r1 cv2 eta2 r2 visL visR
+  push_trans cv1 kco1 r1 cv2 kco2 r2 visL visR
     -- Given:
-    --   co1 = /\ (cv1 : eta1) <visL, visM>. r1
-    --   co2 = /\ (cv2 : eta2) <visM, visR>. r2
+    --   co1 = /\ (cv1 : kco1) <visL, visM>. r1
+    --   co2 = /\ (cv2 : kco2) <visM, visR>. r2
     -- Wanted:
-    --   n1 = nth 2 eta1
-    --   n2 = nth 3 eta1
-    --   nco = /\ cv1 : (eta1;eta2). (r1; r2[cv2 |-> (sym n1);cv1;n2])
+    --   n1 = nth 2 kco1
+    --   n2 = nth 3 kco1
+    --   nco = /\ cv1 : (kco1;kco2). (r1; r2[cv2 |-> (sym n1);cv1;n2])
     = fireTransRule "EtaAllTy_co" co1 co2 $
-      mkForAllCo cv1 visL visR (opt_trans is eta1 eta2) (opt_trans is' r1 r2')
+      mkForAllCo cv1 visL visR (coToMCo (opt_trans is kco1 kco2))
+                               (opt_trans is' r1 r2')
     where
       is'  = is `extendInScopeSet` cv1
       role = coVarRole cv1
-      eta1' = downgradeRole role Nominal eta1
-      n1   = mkSelCo (SelTyCon 2 role) eta1'
-      n2   = mkSelCo (SelTyCon 3 role) eta1'
+      kco1' = downgradeRole role Nominal kco1
+      n1   = mkSelCo (SelTyCon 2 role) kco1'
+      n2   = mkSelCo (SelTyCon 3 role) kco1'
       r2'  = substCo (zipCvSubst [cv2] [(mkSymCo n1) `mk_trans_co`
                                         (mkCoVarCo cv1) `mk_trans_co` n2])
                     r2
@@ -1285,7 +1288,8 @@ Here,
   eta2 = mkSelCo (SelTyCon 3 r) h1 :: (s2 ~ s4)
   h2   = mkInstCo g (cv1 ~ (sym eta1;c1;eta2))
 -}
-etaForAllCo_ty_maybe :: Coercion -> Maybe (TyVar, ForAllTyFlag, ForAllTyFlag, Coercion, Coercion)
+etaForAllCo_ty_maybe :: Coercion
+                     -> Maybe (TyVar, ForAllTyFlag, ForAllTyFlag, KindCoercion, Coercion)
 -- Try to make the coercion be of form (forall tv:kind_co. co)
 etaForAllCo_ty_maybe co
   | Just (tv, visL, visR, kind_co, r) <- splitForAllCo_ty_maybe co
@@ -1305,7 +1309,8 @@ etaForAllCo_ty_maybe co
   | otherwise
   = Nothing
 
-etaForAllCo_co_maybe :: Coercion -> Maybe (CoVar, ForAllTyFlag, ForAllTyFlag, Coercion, Coercion)
+etaForAllCo_co_maybe :: Coercion
+                     -> Maybe (CoVar, ForAllTyFlag, ForAllTyFlag, KindCoercion, Coercion)
 -- Try to make the coercion be of form (forall cv:kind_co. co)
 etaForAllCo_co_maybe co
   | Just (cv, visL, visR, kind_co, r) <- splitForAllCo_co_maybe co
@@ -1428,13 +1433,17 @@ But if sym=Swapped, things are trickier.  Here is an identity that helps:
 
 -}
 optForAllCoBndr :: LiftingContext -> SwapFlag
-                -> TyCoVar -> Coercion
-                -> (LiftingContext, TyCoVar, Coercion)
+                -> TyCoVar -> MCoercionN
+                -> (LiftingContext, TyCoVar, MCoercionN)
 -- See Note [Optimising ForAllCo]
-optForAllCoBndr env sym tcv kco
-  = (env', tcv', kco')
+optForAllCoBndr env sym tcv k_mco
+  = (env', tcv', k_mco')
   where
-    kco' = opt_co4 env sym False Nominal kco  -- Push sym into kco
+    -- Push sym into kco
+    k_mco' = case k_mco of
+                MRefl -> MRefl
+                MCo co -> MCo (opt_co4 env sym False Nominal co)
+
     (env', tcv') = updateLCSubst env upd_subst
 
     upd_subst :: Subst -> (Subst, TyCoVar)
@@ -1443,26 +1452,32 @@ optForAllCoBndr env sym tcv kco
       | otherwise   = upd_subst_cv subst
 
     upd_subst_tv subst
-      | notSwapped sym || isReflCo kco' = (subst1, tv1)
-      | otherwise                       = (subst2, tv2)
+      = case k_mco' of
+          MCo k_co' | isSwapped sym -> (subst2, tv2)
+            where
+               -- In the Swapped case, we re-kind the type variable, AND
+               -- override the substitution for the original variable to the
+               -- re-kinded one, suitably casted
+               tv2    = tv1 `setTyVarKind` coercionLKind k_co'
+               subst2 = (extendTvSubst subst1 tcv (mkTyVarTy tv2 `CastTy` k_co'))
+                        `extendSubstInScope` tv2
+
+          _ -> (subst1, tv1)
       where
         -- subst1,tv1: apply the substitution to the binder and its kind
         -- NB: varKind tv = coercionLKind kco
         (subst1, tv1) = substTyVarBndr subst tcv
-        -- In the Swapped case, we re-kind the type variable, AND
-        -- override the substitution for the original variable to the
-        -- re-kinded one, suitably casted
-        tv2    = tv1 `setTyVarKind` coercionLKind kco'
-        subst2 = (extendTvSubst subst1 tcv (mkTyVarTy tv2 `CastTy` kco'))
-                 `extendSubstInScope` tv2
 
     upd_subst_cv subst   -- ToDo: probably not right yet
-      | notSwapped sym || isReflCo kco' = (subst1, cv1)
-      | otherwise                       = (subst2, cv2)
-      where
+      = case k_mco' of
+          MCo k_co' | isSwapped sym -> (subst2, cv2)
+            where
+              cv2    = cv1 `setTyVarKind` coercionLKind k_co'
+              subst2 = subst1 `extendSubstInScope` cv2
+
+          _ -> (subst1, cv1)
+        where
         (subst1, cv1) = substCoVarBndr subst tcv
-        cv2    = cv1 `setTyVarKind` coercionLKind kco'
-        subst2 = subst1 `extendSubstInScope` cv2
 
 
 {- **********************************************************************

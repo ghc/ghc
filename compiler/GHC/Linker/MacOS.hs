@@ -17,7 +17,6 @@ import GHC.Unit.Types
 import GHC.Unit.State
 import GHC.Unit.Env
 
-import GHC.Settings
 import GHC.SysTools.Tasks
 
 import GHC.Runtime.Interpreter
@@ -49,13 +48,13 @@ import Text.ParserCombinators.ReadP as Parser
 -- dynamic library through @-add_rpath@.
 --
 -- See Note [Dynamic linking on macOS]
-runInjectRPaths :: Logger -> ToolSettings -> [FilePath] -> FilePath -> IO ()
-runInjectRPaths logger toolSettings lib_paths dylib = do
-  info <- lines <$> askOtool logger toolSettings Nothing [Option "-L", Option dylib]
+runInjectRPaths :: Logger -> OtoolConfig -> InstallNameConfig -> [FilePath] -> FilePath -> IO ()
+runInjectRPaths logger otool_opts install_name_opts lib_paths dylib = do
+  info <- lines <$> askOtool logger otool_opts Nothing [Option "-L", Option dylib]
   -- filter the output for only the libraries. And then drop the @rpath prefix.
   let libs = fmap (drop 7) $ filter (isPrefixOf "@rpath") $ fmap (head.words) $ info
   -- find any pre-existing LC_PATH items
-  info <- lines <$> askOtool logger toolSettings Nothing [Option "-l", Option dylib]
+  info <- lines <$> askOtool logger otool_opts Nothing [Option "-l", Option dylib]
   let paths = mapMaybe get_rpath info
       lib_paths' = [ p | p <- lib_paths, not (p `elem` paths) ]
   -- only find those rpaths, that aren't already in the library.
@@ -63,7 +62,7 @@ runInjectRPaths logger toolSettings lib_paths dylib = do
   -- inject the rpaths
   case rpaths of
     [] -> return ()
-    _  -> runInstallNameTool logger toolSettings $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
+    _  -> runInstallNameTool logger install_name_opts $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
 
 get_rpath :: String -> Maybe FilePath
 get_rpath l = case readP_to_S rpath_parser l of
@@ -162,7 +161,7 @@ loadFramework interp extraPaths rootname
      -- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
 
-     -- Try to call loadDLL for each candidate path.
+     -- Try to call loadDLLs for each candidate path.
      --
      -- See Note [macOS Big Sur dynamic libraries]
      findLoadDLL [] errs =
@@ -170,7 +169,7 @@ loadFramework interp extraPaths rootname
        -- has no built-in paths for frameworks: give up
        return $ Just errs
      findLoadDLL (p:ps) errs =
-       do { dll <- loadDLL interp (p </> fwk_file)
+       do { dll <- loadDLLs interp [p </> fwk_file]
           ; case dll of
               Right _  -> return Nothing
               Left err -> findLoadDLL ps ((p ++ ": " ++ err):errs)

@@ -76,7 +76,9 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  , manyDataConTyCon
                                  , liftedRepTyCon, liftedDataConTyCon
                                  , sumTyCon )
-import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy, funTyFlagTyCon )
+import GHC.Base ( Multiplicity(..) )
+import GHC.Core.Multiplicity ( pprArrowWithMultiplicity )
+import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
 import GHC.Core.TyCo.Rep( CoSel, UnivCoProvenance(..) )
 import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
@@ -132,7 +134,7 @@ data IfaceBndr          -- Local (non-top-level) binders
   deriving (Eq, Ord)
 
 
-type IfaceIdBndr  = (IfaceType, IfLclName, IfaceType)
+type IfaceIdBndr  = (IfaceType, IfLclName, IfaceType)  -- (multiplicity, name, type)
 type IfaceTvBndr  = (IfLclName, IfaceKind)
 
 ifaceTvBndrName :: IfaceTvBndr -> IfLclName
@@ -479,7 +481,7 @@ data IfaceCoercion
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
-  | IfaceForAllCo     IfaceBndr !ForAllTyFlag !ForAllTyFlag IfaceCoercion IfaceCoercion
+  | IfaceForAllCo     IfaceBndr !ForAllTyFlag !ForAllTyFlag IfaceMCoercion IfaceCoercion
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomCo      IfaceAxiomRule [IfaceCoercion]
        -- ^ There are only a fixed number of CoAxiomRules, so it suffices
@@ -1120,24 +1122,15 @@ pprPrecIfaceType prec ty =
   hideNonStandardTypes (ppr_ty prec) ty
 
 pprTypeArrow :: FunTyFlag -> IfaceMult -> SDoc
-pprTypeArrow af mult
-  = pprArrow (mb_conc, pprPrecIfaceType) af mult
+pprTypeArrow af mult = pprArrowWithMultiplicity af ppr_mult
   where
-    mb_conc (IfaceTyConApp tc _) = Just tc
-    mb_conc _                    = Nothing
-
-pprArrow :: (a -> Maybe IfaceTyCon, PprPrec -> a -> SDoc)
-         -> FunTyFlag -> a -> SDoc
--- Prints a thin arrow (->) with its multiplicity
--- Used for both FunTy and FunCo, hence higher order arguments
-pprArrow (mb_conc, ppr_mult) af mult
-  | isFUNArg af
-  = case mb_conc mult of
-      Just tc | tc `ifaceTyConHasKey` manyDataConKey -> arrow
-              | tc `ifaceTyConHasKey` oneDataConKey  -> lollipop
-      _ -> text "%" <> ppr_mult appPrec mult <+> arrow
-  | otherwise
-  = ppr (funTyFlagTyCon af)
+    ppr_mult = case mult of
+      IfaceTyConApp tc IA_Nil
+        | tc `ifaceTyConHasKey` manyDataConKey
+        -> Left Many
+        | tc `ifaceTyConHasKey` oneDataConKey
+        -> Left One
+      _ -> Right $ pprPrecIfaceType appPrec mult
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty ctxt_prec ty
@@ -1454,10 +1447,9 @@ pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPartMust tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllMust tvs ctxt sdoc
 
-pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)]
+pprIfaceForAllCoPart :: [(IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag)]
                      -> SDoc -> SDoc
-pprIfaceForAllCoPart tvs sdoc
-  = sep [ pprIfaceForAllCo tvs, sdoc ]
+pprIfaceForAllCoPart tvs sdoc = sep [ pprIfaceForAllCo tvs, sdoc ]
 
 ppr_iface_forall_part :: ShowForAllFlag
                       -> [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
@@ -1494,11 +1486,11 @@ ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ vis) : bndrs) vis1
   | otherwise              = (all_bndrs, [])
 ppr_itv_bndrs [] _ = ([], [])
 
-pprIfaceForAllCo :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
+pprIfaceForAllCo :: [(IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
 pprIfaceForAllCo []  = empty
 pprIfaceForAllCo tvs = text "forall" <+> pprIfaceForAllCoBndrs tvs <> dot
 
-pprIfaceForAllCoBndrs :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
+pprIfaceForAllCoBndrs :: [(IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
 pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
 
 pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
@@ -1513,10 +1505,17 @@ pprIfaceForAllBndr bndr =
     -- See Note [Suppressing binder signatures]
     suppress_sig = SuppressBndrSig False
 
-pprIfaceForAllCoBndr :: (IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag) -> SDoc
-pprIfaceForAllCoBndr (tv, kind_co, visL, visR)
-  = parens (ppr tv <> pp_vis <+> dcolon <+> pprIfaceCoercion kind_co)
+pprIfaceForAllCoBndr :: (IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag) -> SDoc
+pprIfaceForAllCoBndr (tcv, kind_mco, visL, visR)
+  = parens (ppr (ifaceBndrName tcv) <> pp_vis
+            <+> text "::~" <+> pprIfaceCoercion kind_co)
+    -- We print (tcv ::~ kind_co), with the "::~" reminding us the type of tcv
+    -- isn't kind_co; rather it's (coercionLKind kind_co).  We used "::" previously
+    -- which grievously confused me.
   where
+    kind_co = case kind_mco of
+                   IfaceMRefl  -> IfaceReflCo (ifaceBndrType tcv)
+                   IfaceMCo co -> co
     pp_vis | visL == coreTyLamForAllTyFlag
            , visR == coreTyLamForAllTyFlag
            = empty
@@ -2053,9 +2052,14 @@ ppr_co ctxt_prec (IfaceFunCo r co_mult co1 co2)
     ppr_fun_tail co_mult1 other_co
       = [ppr_arrow co_mult1 <> ppr_role r <+> pprIfaceCoercion other_co]
 
-    ppr_arrow = pprArrow (mb_conc, ppr_co) visArgTypeLike
-    mb_conc (IfaceTyConAppCo _ tc _) = Just tc
-    mb_conc _                        = Nothing
+    ppr_arrow = pprArrowWithMultiplicity visArgTypeLike . ppr_mult
+    ppr_mult (IfaceReflCo (IfaceTyConApp tc IA_Nil))
+      | tc `ifaceTyConHasKey` manyDataConKey
+      = Left Many
+      | tc `ifaceTyConHasKey` oneDataConKey
+      = Left One
+    ppr_mult w =
+      Right $ ppr_co appPrec w
 
 ppr_co _         (IfaceTyConAppCo r tc cos)
   = parens (pprIfaceCoTcApp topPrec tc cos) <> ppr_role r
@@ -2069,10 +2073,8 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
   where
     (tvs, inner_co) = split_co co
 
-    split_co (IfaceForAllCo (IfaceTvBndr (name, _)) visL visR kind_co co')
-      = let (tvs, co'') = split_co co' in ((name,kind_co,visL,visR):tvs,co'')
-    split_co (IfaceForAllCo (IfaceIdBndr (_, name, _)) visL visR kind_co co')
-      = let (tvs, co'') = split_co co' in ((name,kind_co,visL,visR):tvs,co'')
+    split_co (IfaceForAllCo bndr visL visR kind_co co')
+      = let (tvs, co'') = split_co co' in ((bndr,kind_co,visL,visR):tvs,co'')
     split_co co' = ([], co')
 
 -- Why these three? See Note [Free TyVars and CoVars in IfaceType]

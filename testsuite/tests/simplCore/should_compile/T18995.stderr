@@ -4,7 +4,7 @@ Result size of Tidy Core
   = {terms: 19, types: 14, coercions: 12, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T18995.$trModule4 :: GHC.Prim.Addr#
+T18995.$trModule4 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -12,15 +12,15 @@ T18995.$trModule4 :: GHC.Prim.Addr#
 T18995.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T18995.$trModule3 :: GHC.Types.TrName
+T18995.$trModule3 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T18995.$trModule3 = GHC.Types.TrNameS T18995.$trModule4
+T18995.$trModule3 = GHC.Internal.Types.TrNameS T18995.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T18995.$trModule2 :: GHC.Prim.Addr#
+T18995.$trModule2 :: GHC.Internal.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -28,21 +28,21 @@ T18995.$trModule2 :: GHC.Prim.Addr#
 T18995.$trModule2 = "T18995"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T18995.$trModule1 :: GHC.Types.TrName
+T18995.$trModule1 :: GHC.Internal.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T18995.$trModule1 = GHC.Types.TrNameS T18995.$trModule2
+T18995.$trModule1 = GHC.Internal.Types.TrNameS T18995.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T18995.$trModule :: GHC.Types.Module
+T18995.$trModule :: GHC.Internal.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
 T18995.$trModule
-  = GHC.Types.Module T18995.$trModule3 T18995.$trModule1
+  = GHC.Internal.Types.Module T18995.$trModule3 T18995.$trModule1
 
 -- RHS size: {terms: 4, types: 7, coercions: 12, joins: 0/0}
 foo :: IO ()
@@ -55,18 +55,16 @@ foo
       @(forall a. Show a => a -> IO ())
       (GHC.Internal.System.IO.print1
        `cast` (forall (a :: <*>_N).
-               <Show a>_R
-               %<Many>_N ->_R <a>_R
-               %<Many>_N ->_R Sym (GHC.Types.N:IO[0] <()>_R)
+               <Show a>_R ->_R <a>_R ->_R Sym (GHC.Internal.Types.N:IO <()>_R)
                :: (forall a.
                    Show a =>
                    a
-                   -> GHC.Prim.State# GHC.Prim.RealWorld
-                   -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))
+                   -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+                   -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, () #))
                   ~R# (forall a. Show a => a -> IO ())))
       @Bool
       GHC.Internal.Show.$fShowBool
-      GHC.Types.True
+      GHC.Internal.Types.True
 
 
 

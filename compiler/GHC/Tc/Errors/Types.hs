@@ -2822,7 +2822,6 @@ data TcRnMessage where
   -}
   TcRnIllegalNewtype
             :: DataCon
-            -> Bool -- ^ True if linear types enabled
             -> IllegalNewtypeReason
             -> TcRnMessage
 

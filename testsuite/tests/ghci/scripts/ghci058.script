@@ -1,7 +1,3 @@
-
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-
 :set prompt ""
 :set -v1
 
@@ -14,4 +10,3 @@ c
 :shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -this-unit-id interactive-session -c Ghci058.hs
 :l Ghci058
 c
-

@@ -169,9 +169,9 @@ main' postLoadMode units dflags0 args flagWarnings = do
   let dflt_backend = backend dflags0
       (mode, bcknd, link)
          = case postLoadMode of
-               DoInteractive   -> (CompManager, interpreterBackend,  LinkInMemory)
-               DoEval _        -> (CompManager, interpreterBackend,  LinkInMemory)
-               DoRun           -> (CompManager, interpreterBackend,  LinkInMemory)
+               DoInteractive   -> (CompManager, bytecodeBackend,  LinkInMemory)
+               DoEval _        -> (CompManager, bytecodeBackend,  LinkInMemory)
+               DoRun           -> (CompManager, bytecodeBackend,  LinkInMemory)
                DoMake          -> (CompManager, dflt_backend, LinkBinary)
                DoBackpack      -> (CompManager, dflt_backend, LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_backend, LinkBinary)

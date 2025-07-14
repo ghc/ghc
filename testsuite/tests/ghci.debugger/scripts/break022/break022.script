@@ -1,6 +1,3 @@
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-
 -- We have this structure of modules:
 
 -- A (imports B.boot)

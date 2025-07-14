@@ -102,14 +102,16 @@ doBackpack [src_filename] = do
     let dflags1 = dflags0
     let parser_opts1 = initParserOpts dflags1
     logger0 <- getLogger
-    (p_warns, src_opts) <- liftIO $ getOptionsFromFile parser_opts1 (supportedLanguagePragmas dflags1) src_filename
+    let sec0 = initSourceErrorContext dflags0
+
+    (p_warns, src_opts) <- liftIO $ getOptionsFromFile parser_opts1 sec0 (supportedLanguagePragmas dflags1) src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma logger0 dflags1 src_opts
     modifySession (hscSetFlags dflags)
     logger <- getLogger -- Get the logger after having set the session flags,
                         -- so that logger options are correctly set.
                         -- Not doing so caused #20396.
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
-    liftIO $ checkProcessArgsResult unhandled_flags
+    liftIO $ checkProcessArgsResult dflags unhandled_flags
     let print_config = initPrintConfig dflags
     liftIO $ printOrThrowDiagnostics logger print_config (initDiagOpts dflags) (GhcPsMessage <$> p_warns)
     liftIO $ printOrThrowDiagnostics logger print_config (initDiagOpts dflags) (GhcDriverMessage <$> warns)
@@ -117,8 +119,9 @@ doBackpack [src_filename] = do
 
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
+        sec = initSourceErrorContext dflags
     case unP parseBackpack (initParserState (initParserOpts dflags) buf loc) of
-        PFailed pst -> throwErrors (GhcPsMessage <$> getPsErrorMessages pst)
+        PFailed pst -> throwErrors sec (GhcPsMessage <$> getPsErrorMessages pst)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
@@ -396,6 +399,7 @@ buildUnit session cid insts lunit = do
             unitExtDepLibsSys = [],
             unitExtDepLibsGhc = [],
             unitLibraryDynDirs = [],
+            unitLibraryBytecodeDirs = [],
             unitLibraryDirs = [],
             unitExtDepFrameworks = [],
             unitExtDepFrameworkDirs = [],
@@ -439,7 +443,7 @@ addUnit u = do
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
          let newdb = UnitDatabase
-               { unitDatabasePath  = "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
+               { unitDatabasePath  = unsafeEncodeUtf $ "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
                , unitDatabaseUnits = [u]
                }
          in return (dbs ++ [newdb]) -- added at the end because ordering matters
@@ -577,7 +581,7 @@ mkBackpackMsg = do
           showMsg msg reason =
             backpackProgressMsg level logger $ pprWithUnitState state $
                 showModuleIndex mod_index <>
-                msg <> showModMsg dflags (recompileRequired recomp) node
+                msg <> showModMsg dflags node
                     <> reason
       in case node of
         InstantiationNode _ _ ->
@@ -788,8 +792,8 @@ summariseRequirement pn mod_name = do
 
     env <- getBkpEnv
     src_hash <- liftIO $ getFileHash (bkp_filename env)
-    hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
-    hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
+    hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file_ospath location)
+    hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file_ospath location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
     let fc = hsc_FC hsc_env
@@ -806,6 +810,7 @@ summariseRequirement pn mod_name = do
         ms_dyn_obj_date = Nothing,
         ms_iface_date = hi_timestamp,
         ms_hie_date = hie_timestamp,
+        ms_bytecode_date = Nothing,
         ms_srcimps = [],
         ms_textual_imps = ((,,) NormalLevel NoPkgQual . noLoc) <$> extra_sig_imports,
         ms_opts = [],
@@ -875,8 +880,8 @@ hsModuleToModSummary home_keys pn hsc_src modname
                                 HsSrcFile  -> os "hs")
                              hsc_src
     -- This duplicates a pile of logic in GHC.Driver.Make
-    hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
-    hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
+    hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file_ospath location)
+    hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file_ospath location)
 
     query <- liftIO $ hscUnitIndexQuery hsc_env
 
@@ -928,6 +933,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
             ms_hs_hash = fingerprint0,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
             ms_dyn_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
+            ms_bytecode_date = Nothing,
             ms_iface_date = hi_timestamp,
             ms_hie_date = hie_timestamp
           }

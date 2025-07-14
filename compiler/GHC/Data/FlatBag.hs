@@ -16,6 +16,8 @@ import GHC.Prelude
 import Control.DeepSeq
 
 import GHC.Data.SmallArray
+import GHC.Utils.Binary
+import GHC.Utils.Panic
 
 -- | Store elements in a flattened representation.
 --
@@ -65,6 +67,21 @@ instance NFData a => NFData (FlatBag a) where
   rnf (UnitFlatBag a) = rnf a
   rnf (TupleFlatBag a b) = rnf a `seq` rnf b
   rnf (FlatBag arr) = rnfSmallArray arr
+
+instance (Binary a) => Binary (FlatBag a) where
+  get bh = do
+    t <- getByte bh
+    case t of
+      0 -> pure EmptyFlatBag
+      1 -> UnitFlatBag <$> get bh
+      2 -> TupleFlatBag <$> get bh <*> get bh
+      3 -> FlatBag <$> get bh
+      _ -> panic "Binary FlatBag: invalid byte"
+
+  put_ bh EmptyFlatBag = putByte bh 0
+  put_ bh (UnitFlatBag a) = putByte bh 1 *> put_ bh a
+  put_ bh (TupleFlatBag a b) = putByte bh 2 *> put_ bh a *> put_ bh b
+  put_ bh (FlatBag arr) = putByte bh 3 *> put_ bh arr
 
 -- | Create an empty 'FlatBag'.
 --
@@ -129,4 +146,3 @@ fromSmallArray s = case sizeofSmallArray s of
                       1 -> UnitFlatBag (indexSmallArray s 0)
                       2 -> TupleFlatBag (indexSmallArray s 0) (indexSmallArray s 1)
                       _ -> FlatBag s
-

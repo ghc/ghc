@@ -136,9 +136,12 @@ class TestConfig:
         # Do we have interpreter support?
         self.have_interp = False
 
+        # Do we have external interpreter support?
+        self.have_ext_interp = False
+
         # Are we cross-compiling?
         self.cross = False
-        
+
         # Does the RTS linker only support loading shared libraries?
         self.interp_force_dyn = False
 
