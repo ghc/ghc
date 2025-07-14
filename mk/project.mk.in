@@ -61,33 +61,6 @@ ProjectGitCommitId = @ProjectGitCommitId@
 # Additionally for the compiler, the platform this compiler will
 # generate code for is the TARGET.  TARGET is not meaningful outside
 # the compiler sources.
-#
-# Guidelines for when to use HOST vs. TARGET:
-#
-#  - In the build system (Makefile, foo.mk), normally we should test
-#    $(HOSTPLATFORM).  There are some cases (eg. installation), where
-#    we expect $(HOSTPLATFORM)==$(TARGETPLATFORM), so in those cases it
-#    doesn't matter which is used.
-#
-#  - In the compiler itself, we should test HOST or TARGET depending
-#    on whether the conditional relates to the code being generated, or
-#    the platform on which the compiler is running.  See the section
-#    on "coding-style" in the commentary for more details.
-#
-#  - In all other code, we should be testing HOST only.
-#
-# NOTE: cross-compiling is not well supported by the build system.
-# You have to do a lot of work by hand to cross compile: see the
-# section on "Porting GHC" in the Building Guide.
-
-TARGETPLATFORM          = @TargetPlatform@
-
-HostOS_CPP              = @HostOS_CPP@
-
-TargetPlatform_CPP      = @TargetPlatform_CPP@
-TargetArch_CPP          = @TargetArch_CPP@
-TargetOS_CPP            = @TargetOS_CPP@
-LLVMTarget              = @LLVMTarget@
 
 ################################################################################
 #

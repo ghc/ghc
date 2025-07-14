@@ -405,35 +405,16 @@ bindistRules = do
     , interpolateSetting "ProjectPatchLevel1" ProjectPatchLevel1
     , interpolateSetting "ProjectPatchLevel2" ProjectPatchLevel2
     , interpolateSetting "ProjectGitCommitId" ProjectGitCommitId
-
-    , interpolateVar "HostOS_CPP" $ fmap cppify $ interp $ queryHost queryOS
-
-    , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
-    , interpolateVar "TargetPlatform_CPP" $ cppify <$> getTarget targetPlatformTriple
-    , interpolateVar "TargetArch_CPP" $ cppify <$> getTarget queryArch
-    , interpolateVar "TargetOS_CPP" $ cppify <$> getTarget queryOS
-    , interpolateVar "LLVMTarget" $ getTarget tgtLlvmTarget
     ]
   templateRule ("distrib" -/- "configure.ac") $ mconcat
     [ interpolateSetting "ConfiguredEmsdkVersion" EmsdkVersion
-    , interpolateVar "CrossCompilePrefix" $ do
-        crossCompiling <- interp $ getFlag CrossCompiling
-        tpf <- setting TargetPlatformFull
-        pure $ if crossCompiling then tpf <> "-" else ""
     , interpolateVar "LeadingUnderscore" $ yesNo <$> getTarget tgtSymbolsHaveLeadingUnderscore
     , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
-    , interpolateVar "LlvmTarget" $ getTarget tgtLlvmTarget
     , interpolateSetting "ProjectVersion" ProjectVersion
     , interpolateVar "EnableDistroToolchain" $ lookupSystemConfig "settings-use-distro-mingw"
-    , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
     , interpolateVar "TargetHasLibm" $ lookupSystemConfig "target-has-libm"
-    , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
-    , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
-    , interpolateVar "TargetWordSize" $ getTarget wordSize
-    , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
     , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ getFlag UseLibdw
-    , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
     , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP
     , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
     ]
