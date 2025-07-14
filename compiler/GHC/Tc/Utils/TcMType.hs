@@ -582,7 +582,7 @@ ensureMonoType res_ty
   = return ()
   | otherwise
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; _co <- unifyInvisibleType res_ty mono_ty
+       ; _co <- unifyInvisibleType InvisibleKind res_ty mono_ty
        ; return () }
 
 promoteTcType :: TcLevel -> TcType -> TcM (TcCoercionN, TcType)
@@ -608,7 +608,7 @@ promoteTcType dest_lvl ty
                 -- where alpha and rr are fresh and from level dest_lvl
       = do { rr      <- newMetaTyVarTyAtLevel dest_lvl runtimeRepTy
            ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (mkTYPEapp rr)
-           ; co <- unifyInvisibleType ty prom_ty
+           ; co <- unifyInvisibleType InvisibleKind ty prom_ty
            ; return (co, prom_ty) }
 
 {- Note [Promoting a type]
@@ -1586,7 +1586,7 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (CoVarCo cv) = go_cv dv cv
 
     go_co dv (ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = co })
-      = do { dv1 <- go_co dv kind_co
+      = do { dv1 <- go_mco dv kind_co
            ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` tcv) dv1 co }
 
     go_mco dv MRefl    = return dv

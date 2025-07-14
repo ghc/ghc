@@ -1,0 +1,4 @@
+Testing recompilation in GHCi after touching .hi file...
+[1 of 1] Compiling BytecodeTest     ( BytecodeTest.hs, BytecodeTest.gbc )[main] [Missing bytecode]
+Ok, one module loaded.
+Leaving GHCi.

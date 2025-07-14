@@ -28,7 +28,7 @@ module GHC.Driver.DynFlags (
         ParMakeCount(..),
         ways,
         HasDynFlags(..), ContainsDynFlags(..),
-        RtsOptsEnabled(..),
+        RtsOptsEnabled(..), haveRtsOptsFlags,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
         PackageFlag(..), PackageArg(..), ModRenaming(..),
@@ -101,6 +101,7 @@ import GHC.Core.Unfold
 import GHC.Data.Bool
 import GHC.Data.EnumSet (EnumSet)
 import GHC.Data.Maybe
+import GHC.Data.OsPath ( OsPath )
 import GHC.Builtin.Names ( mAIN_NAME )
 import GHC.Driver.Backend
 import GHC.Driver.Flags
@@ -275,6 +276,7 @@ data DynFlags = DynFlags {
   dylibInstallName      :: Maybe String,
   hiDir                 :: Maybe String,
   hieDir                :: Maybe String,
+  bytecodeDir           :: Maybe String,
   stubDir               :: Maybe String,
   dumpDir               :: Maybe String,
 
@@ -282,6 +284,7 @@ data DynFlags = DynFlags {
   hcSuf                 :: String,
   hiSuf_                :: String,
   hieSuf                :: String,
+  bytecodeSuf           :: String,
 
   dynObjectSuf_         :: String,
   dynHiSuf_             :: String,
@@ -604,6 +607,7 @@ defaultDynFlags mySettings =
         dylibInstallName        = Nothing,
         hiDir                   = Nothing,
         hieDir                  = Nothing,
+        bytecodeDir             = Nothing,
         stubDir                 = Nothing,
         dumpDir                 = Nothing,
 
@@ -611,6 +615,7 @@ defaultDynFlags mySettings =
         hcSuf                   = phaseInputExt HCc,
         hiSuf_                  = "hi",
         hieSuf                  = "hie",
+        bytecodeSuf             = "gbc",
 
         dynObjectSuf_           = "dyn_" ++ phaseInputExt StopLn,
         dynHiSuf_               = "dyn_hi",
@@ -801,6 +806,7 @@ data GhcLink
   | LinkInMemory        -- ^ Use the in-memory dynamic linker (works for both
                         --   bytecode and object code).
   | LinkDynLib          -- ^ Link objects into a dynamic lib (DLL on Windows, DSO on ELF platforms)
+  | LinkBytecodeLib     -- ^ Link bytecode objects into a bytecode lib
   | LinkStaticLib       -- ^ Link objects into a static lib
   | LinkMergedObj       -- ^ Link objects into a merged "GHCi object"
   deriving (Eq, Show)
@@ -891,6 +897,13 @@ data RtsOptsEnabled
   | RtsOptsAll
   deriving (Show)
 
+haveRtsOptsFlags :: DynFlags -> Bool
+haveRtsOptsFlags dflags =
+        isJust (rtsOpts dflags) || case rtsOptsEnabled dflags of
+                                       RtsOptsSafeOnly -> False
+                                       _ -> True
+
+
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?
 positionIndependent :: DynFlags -> Bool
 positionIndependent dflags = gopt Opt_PIC dflags || gopt Opt_PIE dflags
@@ -935,7 +948,7 @@ setDynamicNow dflags0 =
 data PkgDbRef
   = GlobalPkgDb
   | UserPkgDb
-  | PkgDbPath FilePath
+  | PkgDbPath OsPath
   deriving Eq
 
 

@@ -1,0 +1,4 @@
+[1 of 2] Compiling Bytecode         ( Bytecode.hs, Bytecode.gbc )
+[2 of 2] Linking testpkg-1.2.3.4-XXX.bytecodelib
+Reading package info from "bytecode.pkg" ... done.
+"bytecode from a package"

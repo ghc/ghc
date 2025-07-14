@@ -285,8 +285,11 @@ makeBufSpan ss = pspan
 
 -- ---------------------------------------------------------------------
 
-parseError :: (GHC.MonadIO m) => GHC.PState -> m b
-parseError pst = GHC.throwErrors (fmap GHC.GhcPsMessage (GHC.getPsErrorMessages pst))
+parseError :: GHC.GhcMonad m => GHC.PState -> m b
+parseError pst = do
+  hsc_env <- GHC.getSession
+  let sec = GHC.initSourceErrorContext (GHC.hsc_dflags hsc_env)
+  GHC.throwErrors sec (fmap GHC.GhcPsMessage (GHC.getPsErrorMessages pst))
 
 -- ---------------------------------------------------------------------
 

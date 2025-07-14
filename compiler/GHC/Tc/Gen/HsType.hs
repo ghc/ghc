@@ -1945,10 +1945,10 @@ checkExpectedKind hs_ty ty act_kind exp_kind
 
        ; (new_args, act_kind') <- tcInstInvisibleTyBindersN n_to_inst act_kind
 
-       ; let origin = TypeEqOrigin { uo_actual   = act_kind'
-                                   , uo_expected = exp_kind
-                                   , uo_thing    = Just (HsTypeRnThing hs_ty)
-                                   , uo_visible  = True } -- the hs_ty is visible
+       ; let origin = TypeEqOrigin { uo_actual    = act_kind'
+                                   , uo_expected  = exp_kind
+                                   , uo_thing     = Just (HsTypeRnThing hs_ty)
+                                   , uo_invisible = Nothing } -- the hs_ty is visible
 
        ; traceTc "checkExpectedKindX" $
          vcat [ ppr hs_ty

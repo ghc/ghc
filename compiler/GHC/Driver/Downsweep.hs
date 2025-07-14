@@ -423,9 +423,10 @@ downsweepFromRootNodes hsc_env old_summaries excl_mods allow_dup_roots mode root
           -> IO ()
         checkDuplicates root_map
            | not allow_dup_roots
-           , dup_root:_ <- dup_roots = liftIO $ multiRootsErr dup_root
+           , dup_root:_ <- dup_roots = liftIO $ multiRootsErr sec dup_root
            | otherwise = pure ()
            where
+             sec = initSourceErrorContext (hsc_dflags hsc_env)
              dup_roots :: [[ModuleNodeInfo]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton $ map rights (M.elems root_map)
 
@@ -655,10 +656,10 @@ loopUnit lcl_hsc_env cache (u:uxs) = do
                  Just us -> loopUnit lcl_hsc_env (loopUnit lcl_hsc_env (Map.insert nk (UnitNode us u) cache) us) uxs
                  Nothing -> pprPanic "loopUnit" (text "Malformed package database, missing " <+> ppr u)
 
-multiRootsErr :: [ModuleNodeInfo] -> IO ()
-multiRootsErr [] = panic "multiRootsErr"
-multiRootsErr summs@(summ1:_)
-  = throwOneError $ fmap GhcDriverMessage $
+multiRootsErr :: SourceErrorContext -> [ModuleNodeInfo] -> IO ()
+multiRootsErr _ [] = panic "multiRootsErr"
+multiRootsErr sec summs@(summ1:_)
+  = throwOneError sec $ fmap GhcDriverMessage $
     mkPlainErrorMsgEnvelope noSrcSpan $ DriverDuplicatedModuleDeclaration mod files
   where
     mod = moduleNodeInfoModule summ1
@@ -706,7 +707,7 @@ linkNodes summaries uid hue =
 
       main_sum = any (== NodeKey_Module (ModNodeKeyWithUid (GWIB (mainModuleNameIs dflags) NotBoot) uid)) unit_nodes
 
-      do_linking =  main_sum || no_hs_main || ghcLink dflags == LinkDynLib || ghcLink dflags == LinkStaticLib
+      do_linking =  main_sum || no_hs_main || ghcLink dflags == LinkDynLib || ghcLink dflags == LinkStaticLib || ghcLink dflags == LinkBytecodeLib
 
   in if | ghcLink dflags == LinkBinary && isJust ofile && not do_linking ->
             Just (Left $ singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan (DriverRedirectedNoMain $ mainModuleNameIs dflags))
@@ -916,7 +917,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
                    else (,) <$> (new_temp_file (hiSuf_ dflags) (dynHiSuf_ dflags))
                             <*> (new_temp_file (objectSuf_ dflags) (dynObjectSuf_ dflags))
                let new_dflags = case enable_spec of
-                                  EnableByteCode -> dflags { backend = interpreterBackend }
+                                  EnableByteCode -> dflags { backend = bytecodeBackend }
                                   EnableObject   -> dflags { backend = defaultBackendOf ms }
                                   EnableByteCodeAndObject -> (gopt_set dflags Opt_ByteCodeAndObjectCode) { backend = defaultBackendOf ms}
                let ms' = ms
@@ -1264,7 +1265,7 @@ checkSummaryHash
   | ms_hs_hash old_summary == src_hash &&
       not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
            -- update the object-file timestamp
-           obj_timestamp <- modificationTimeIfExists (ml_obj_file location)
+           obj_timestamp <- modificationTimeIfExists (ml_obj_file_ospath location)
 
            -- We have to repopulate the Finder's cache for file targets
            -- because the file might not even be on the regular search path
@@ -1276,8 +1277,8 @@ checkSummaryHash
                hsc_src = ms_hsc_src old_summary
            addModuleToFinder fc mod location hsc_src
 
-           hi_timestamp <- modificationTimeIfExists (ml_hi_file location)
-           hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
+           hi_timestamp <- modificationTimeIfExists (ml_hi_file_ospath location)
+           hie_timestamp <- modificationTimeIfExists (ml_hie_file_ospath location)
 
            return $ Right
              ( old_summary
@@ -1481,11 +1482,11 @@ data MakeNewModSummary
 makeNewModSummary :: HscEnv -> MakeNewModSummary -> IO ModSummary
 makeNewModSummary hsc_env MakeNewModSummary{..} = do
   let PreprocessedImports{..} = nms_preimps
-  obj_timestamp <- modificationTimeIfExists (ml_obj_file nms_location)
-  dyn_obj_timestamp <- modificationTimeIfExists (ml_dyn_obj_file nms_location)
-  hi_timestamp <- modificationTimeIfExists (ml_hi_file nms_location)
-  hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
-
+  obj_timestamp <- modificationTimeIfExists (ml_obj_file_ospath nms_location)
+  dyn_obj_timestamp <- modificationTimeIfExists (ml_dyn_obj_file_ospath nms_location)
+  hi_timestamp <- modificationTimeIfExists (ml_hi_file_ospath nms_location)
+  hie_timestamp <- modificationTimeIfExists (ml_hie_file_ospath nms_location)
+  bytecode_timestamp <- modificationTimeIfExists (ml_bytecode_file_ospath nms_location)
   extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
   (implicit_sigs, _inst_deps) <- implicitRequirementsShallow (hscSetActiveUnitId (moduleUnitId nms_mod) hsc_env) pi_theimps
 
@@ -1508,6 +1509,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
         , ms_hie_date = hie_timestamp
         , ms_obj_date = obj_timestamp
         , ms_dyn_obj_date = dyn_obj_timestamp
+        , ms_bytecode_date = bytecode_timestamp
         }
 
 data PreprocessedImports
@@ -1538,7 +1540,8 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
       <- ExceptT $ do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
-          mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
+              sec = initSourceErrorContext pi_local_dflags
+          mimps <- getImports popts sec imp_prelude pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
   let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
   let rn_imps = fmap (\(sp, pk, lmn@(L _ mn)) -> (sp, rn_pkg_qual mn pk, lmn))

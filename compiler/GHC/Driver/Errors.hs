@@ -43,7 +43,7 @@ printMessages logger msg_opts opts msgs
 printOrThrowDiagnostics :: Logger -> GhcMessageOpts -> DiagOpts -> Messages GhcMessage -> IO ()
 printOrThrowDiagnostics logger print_config opts msgs
   | errorsOrFatalWarningsFound msgs
-  = throwErrors msgs
+  = throwErrors (SEC opts print_config) msgs
   | otherwise
   = printMessages logger print_config opts msgs
 

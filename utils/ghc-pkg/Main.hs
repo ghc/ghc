@@ -1434,6 +1434,9 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.unitExtDepLibsGhc  = map ST.pack $ extraGHCiLibraries pkg,
        GhcPkg.unitLibraryDirs    = map ST.pack $ libraryDirs pkg,
        GhcPkg.unitLibraryDynDirs = map ST.pack $ libraryDynDirs pkg,
+       GhcPkg.unitLibraryBytecodeDirs = [],
+       -- TODO: When the Cabal submodule is updated to support "library-bytecode-dirs", use
+       -- that value here. The rest of the compiler is already adjusted to support it.
        GhcPkg.unitExtDepFrameworks = map ST.pack $ frameworks pkg,
        GhcPkg.unitExtDepFrameworkDirs = map ST.pack $ frameworkDirs pkg,
        GhcPkg.unitLinkerOptions  = map ST.pack $ ldOptions pkg,
@@ -2042,7 +2045,8 @@ checkHSLib _verbosity dirs lib = do
                    "lib" ++ lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dylib",
                    "lib" ++ lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dylib",
                    lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll",
-                   lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll"
+                   lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll",
+                   lib ++ ".bytecodelib"
                   ]
   b <- liftIO $ doesFileExistOnPath filenames dirs
   when (not b) $

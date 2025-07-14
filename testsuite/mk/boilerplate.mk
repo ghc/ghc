@@ -289,18 +289,22 @@ ifeq "$(GhcDynamic)$(GhcProfiled)" "YESYES"
 ghcThWayFlags     ?= -prof -dynamic
 ghciWayFlags      ?= -prof -dynamic
 ghcPluginWayFlags ?= -prof -dynamic
+ghciWayExt        ?= p_dyn_hi
 else ifeq "$(GhcDynamic)" "YES"
 ghcThWayFlags     ?= -dynamic
 ghciWayFlags      ?= -dynamic
 ghcPluginWayFlags ?= -dynamic
+ghciWayExt        ?= dyn_hi
 else ifeq "$(GhcProfiled)" "YES"
 ghcThWayFlags     ?= -prof
 ghciWayFlags      ?= -prof
 ghcPluginWayFlags ?= -prof
+ghciWayExt        ?= p_hi
 else
 ghcThWayFlags     ?= -static
 ghciWayFlags      ?= -static
 ghcPluginWayFlags ?= -static
+ghciWayExt        ?= hi
 endif
 
 # -----------------------------------------------------------------------------

@@ -46,8 +46,7 @@ module GHC.Unit.Home.PackageTable
 
     -- ** More Traversal-based queries
   , hptCollectDependencies
-  , hptCollectObjects
-  , hptCollectModules
+  , hptCollectHomeModInfo
 
     -- ** Memory dangerous queries
   , concatHpt
@@ -75,7 +74,6 @@ module GHC.Unit.Home.PackageTable
   ) where
 
 import GHC.Prelude
-import GHC.Data.Maybe
 
 import Data.IORef
 import Control.Monad ((<$!>))
@@ -83,7 +81,6 @@ import qualified Data.Set as Set
 
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv
-import GHC.Linker.Types
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Types.Unique.DFM
@@ -242,20 +239,11 @@ hptCollectDependencies HPT{table} = do
 -- The linkable objects are given by @'homeModInfoObject'@.
 --
 -- $O(n)$ in the number of modules in the HPT.
-hptCollectObjects :: HomePackageTable -> IO [Linkable]
-hptCollectObjects HPT{table} = do
+hptCollectHomeModInfo :: HomePackageTable -> IO [HomeModInfo]
+hptCollectHomeModInfo HPT{table} = do
   hpt <- readIORef table
   return $
-    foldr ((:) . expectJust . homeModInfoObject) [] hpt
-
--- | Collect all module ifaces in the HPT
---
--- $O(n)$ in the number of modules in the HPT.
-hptCollectModules :: HomePackageTable -> IO [Module]
-hptCollectModules HPT{table} = do
-  hpt <- readIORef table
-  return $
-    foldr ((:) . mi_module . hm_iface) [] hpt
+    foldr (:) [] hpt
 
 --------------------------------------------------------------------------------
 -- * Utilities

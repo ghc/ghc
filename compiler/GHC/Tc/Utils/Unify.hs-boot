@@ -7,7 +7,7 @@ import GHC.Tc.Types            ( TcM )
 import GHC.Tc.Types.Constraint ( Cts )
 import GHC.Tc.Types.Evidence   ( TcCoercion )
 import GHC.Tc.Types.Origin     ( CtOrigin, TypedThing )
-import GHC.Tc.Utils.TcType     ( TcType, ConcreteTvOrigin )
+import GHC.Tc.Utils.TcType     ( TcType, ConcreteTvOrigin, InvisibleBit )
 
 import GHC.Data.FastString ( FastString )
 
@@ -16,7 +16,7 @@ import GHC.Data.FastString ( FastString )
 --   GHC.Tc.Utils.Unify and GHC.Tc.Utils.Instantiate/GHC.Tc.Utils.TcMType
 
 unifyType          :: Maybe TypedThing -> TcTauType -> TcTauType -> TcM TcCoercion
-unifyInvisibleType :: TcTauType -> TcTauType -> TcM TcCoercion
+unifyInvisibleType :: InvisibleBit -> TcTauType -> TcTauType -> TcM TcCoercion
 
 tcSubMult :: CtOrigin -> Mult -> Mult -> TcM ()
 

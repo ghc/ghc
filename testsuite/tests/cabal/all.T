@@ -35,6 +35,26 @@ test('ghcpkg06', [extra_files(['test.pkg', 'testdup.pkg'])], makefile_test, [])
 
 test('ghcpkg07', [extra_files(['test.pkg', 'test7a.pkg', 'test7b.pkg'])], makefile_test, [])
 
+test('pkg_bytecode', [extra_files(['bytecode.pkg', 'Bytecode.hs', "bytecode.script"])
+                     , normalise_errmsg_fun(normaliseDynlibNames)
+                     , copy_files
+                     , req_bco ], makefile_test, [])
+
+test('pkg_bytecode_foreign', [extra_files(['bytecode_foreign.pkg', "BytecodeForeign.hs", "BytecodeForeign.c", "bytecode_foreign.script"])
+                             , normalise_errmsg_fun(normaliseDynlibNames)
+                             , copy_files
+                             , req_bco ], makefile_test, [])
+
+test('pkg_bytecode_with_o', [extra_files(['bytecode_foreign.pkg', "BytecodeForeign.hs", "BytecodeForeign.c", "bytecode_foreign.script"])
+                               , normalise_errmsg_fun(normaliseDynlibNames)
+                               , copy_files
+                               , req_bco ], makefile_test, [])
+
+test('pkg_bytecode_with_gbc', [extra_files(['bytecode_foreign.pkg', "BytecodeForeign.hs", "BytecodeForeign.c", "bytecode_foreign.script"])
+                               , normalise_errmsg_fun(normaliseDynlibNames)
+                               , copy_files
+                               , req_bco ], makefile_test, [])
+
 # Test that we *can* compile a module that also belongs to a package
 # (this was disallowed in GHC 6.4 and earlier)
 test('pkg01', normal, compile, [''])

@@ -30,15 +30,6 @@ Executable iserv
     C-Sources: cbits/iservmain.c
     Hs-Source-Dirs: src
     include-dirs: .
-    Build-Depends: array      >= 0.5 && < 0.6,
-                   base       >= 4   && < 5,
-                   binary     >= 0.7 && < 0.11,
-                   bytestring >= 0.10 && < 0.13,
-                   containers >= 0.5 && < 0.9,
-                   deepseq    >= 1.4 && < 1.6,
-                   ghci       == @ProjectVersionMunged@
-
-    if os(windows)
-        Cpp-Options: -DWINDOWS
-    else
-        Build-Depends: unix   >= 2.7 && < 2.9
+    Build-Depends:
+      base >= 4   && < 5,
+      ghci == @ProjectVersionMunged@

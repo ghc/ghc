@@ -228,16 +228,13 @@ instance ExceptionMonad m => GhcMonad (GhcT m) where
 
 -- | Print the all diagnostics in a 'SourceError'.  Useful inside exception
 --   handlers.
-printException :: (HasLogger m, MonadIO m, HasDynFlags m) => SourceError -> m ()
-printException err = do
-  dflags <- getDynFlags
+printException :: (MonadIO m, HasLogger m) => SourceError -> m ()
+printException (SourceError (SEC diag_opts print_config) errs) = do
   logger <- getLogger
-  let !diag_opts = initDiagOpts dflags
-      !print_config = initPrintConfig dflags
-  liftIO $ printMessages logger print_config diag_opts (srcErrorMessages err)
+  liftIO $ printMessages logger print_config diag_opts errs
 
 -- | A function called to log warnings and errors.
-type WarnErrLogger = forall m. (HasDynFlags m , MonadIO m, HasLogger m) => Maybe SourceError -> m ()
+type WarnErrLogger = forall m. (MonadIO m, HasLogger m) => Maybe SourceError -> m ()
 
 defaultWarnErrLogger :: WarnErrLogger
 defaultWarnErrLogger Nothing  = return ()

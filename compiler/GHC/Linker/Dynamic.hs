@@ -12,6 +12,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Ways
 import GHC.Settings (ToolSettings(toolSettings_ldSupportsSingleModule))
+import GHC.SysTools.Tasks
 
 import GHC.Driver.Config.Linker
 import GHC.Driver.Session
@@ -207,8 +208,10 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                  ++ [ Option "-Wl,-dead_strip_dylibs", Option "-Wl,-headerpad,8000" ]
               )
             -- Make sure to honour -fno-use-rpaths if set on darwin as well; see #20004
-            when (gopt Opt_RPath dflags) $
-              runInjectRPaths logger (toolSettings dflags) pkg_lib_paths output_fn
+            when (gopt Opt_RPath dflags) $ do
+              let otool_opts = configureOtool dflags
+              let install_name_opts = configureInstallName dflags
+              runInjectRPaths logger otool_opts install_name_opts pkg_lib_paths output_fn
         _ -> do
             -------------------------------------------------------------------
             -- Making a DSO
