@@ -24,6 +24,10 @@ import GHC.Driver.Config.Diagnostic
 
 import GHC.Rename.Unbound
 
+import Language.Haskell.Syntax (DotFieldOcc (..))
+import Language.Haskell.Syntax.Basic (FieldLabelString (..))
+import GHC.Hs.Expr (SrcCodeOrigin (..), HsExpr (..))
+
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Errors.Types
@@ -2349,7 +2353,7 @@ mk_dict_err ctxt (item, (matches, pot_unifiers, unsafe_overlapped))
       isNothing (lookupLocalRdrOcc lcl_env occ_name)
 
     record_field = case orig of
-      GetFieldOrigin name -> Just (mkVarOccFS name)
+      ExpansionOrigin (OrigExpr (HsGetField _ _ (L _ name))) -> Just (mkVarOccFS (field_label $ unLoc $ dfoLabel name))
       _                   -> Nothing
 
 {- Note [Report candidate instances]
