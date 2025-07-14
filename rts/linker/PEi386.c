@@ -1313,7 +1313,7 @@ lookupSymbolInDLL_PEi386 ( const SymbolName* lbl, HINSTANCE instance, pathchar* 
          it generates call *__imp_foo, and __imp_foo here has exactly
          the same semantics as in __imp_foo = GetProcAddress(..., "foo")
      */
-    if (sym == NULL && strncmp (lbl, "__imp_", 6) == 0) {
+    if (sym == NULL && dependent && strncmp (lbl, "__imp_", 6) == 0) {
         sym = GetProcAddress(instance,
                              lbl + 6);
         if (sym != NULL) {
@@ -1328,12 +1328,6 @@ lookupSymbolInDLL_PEi386 ( const SymbolName* lbl, HINSTANCE instance, pathchar* 
             return (void*) indirect;
            }
     }
-
-    sym = GetProcAddress(instance, lbl);
-    if (sym != NULL) {
-        /*debugBelch("found %s in %s\n", lbl,dll_name);*/
-        return sym;
-       }
 
     return NULL;
 }
