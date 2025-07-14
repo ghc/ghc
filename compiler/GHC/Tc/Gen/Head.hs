@@ -655,7 +655,7 @@ tcInferOverLit lit@(OverLit { ol_val = val
        ; let
            thing    = NameThing from_name
            mb_thing = Just thing
-           herald   = ExpectedFunTyArg thing (HsLit noExtField hs_lit)
+           herald   = ExpectedFunTyArg 1 thing (HsLit noExtField hs_lit)
        ; (wrap2, sarg_ty, res_ty) <- matchActualFunTy herald mb_thing (1, from_ty) from_ty
 
        ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)

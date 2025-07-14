@@ -45,7 +45,7 @@ module GHC.Tc.Types.Origin (
   FRRArrowContext(..), pprFRRArrowContext,
 
   -- ** ExpectedFunTy FixedRuntimeRepOrigin
-  ExpectedFunTyOrigin(..), pprExpectedFunTyOrigin, pprExpectedFunTyHerald,
+  pprExpectedFunTyHerald,
 
   -- * InstanceWhat
   InstanceWhat(..), SafeOverlapping
@@ -86,7 +86,6 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Kind as Hs
 import Data.List.NonEmpty (NonEmpty (..))
-import qualified Data.List.NonEmpty as NE
 
 {- *********************************************************************
 *                                                                      *
@@ -653,7 +652,62 @@ data CtOrigin
       Type   -- the instantiated type of the method
   | AmbiguityCheckOrigin UserTypeCtxt
   | ImplicitLiftOrigin HsImplicitLiftSplice
+
   | ExpansionOrigin SrcCodeOrigin -- This is due to an expansion of the original thing given by SrcCodeOrigin
+
+
+
+  -- | A rebindable syntax operator is expected to have a function type.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyDoBind, RepPolyDoBody{1,2}, RepPolyMc{Bind,Body,Guard}, RepPolyNPlusK
+  | forall (p :: Pass)
+     . (OutputableBndrId p)
+    => ExpectedFunTySyntaxOp Int
+         !CtOrigin !(HsExpr (GhcPass p))
+                    -- ^ rebindable syntax operator
+
+  -- | A view pattern must have a function type.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyBinder
+  | ExpectedFunTyViewPat Int
+    !(HsExpr GhcRn)
+      -- ^ function used in the view pattern
+
+  -- | Need to be able to extract an argument type from a function type.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyApp
+  | forall (p :: Pass)
+     . Outputable (HsExpr (GhcPass p)) => ExpectedFunTyArg
+          Int
+          -- ^ Argument number
+          !TypedThing
+            -- ^ function
+          !(HsExpr (GhcPass p))
+            -- ^ argument
+
+  -- | Ensure that a function defined by equations indeed has a function type
+  -- with the appropriate number of arguments.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyBinder, RepPolyRecordPattern, RepPolyWildcardPattern
+  | ExpectedFunTyMatches Int
+      !TypedThing
+        -- ^ name of the function
+      !(MatchGroup GhcRn (LHsExpr GhcRn))
+       -- ^ equations
+
+  -- | Ensure that a lambda abstraction has a function type.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyLambda, RepPolyMatch
+  | ExpectedFunTyLam HsLamVariant
+      !(HsExpr GhcRn)
+       -- ^ the entire lambda-case expression
+
+
 
 data NonLinearPatternReason
   = LazyPatternReason
@@ -739,7 +793,7 @@ exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
 exprCtOrigin (NegApp _ e _)       = lexprCtOrigin e
 exprCtOrigin (HsPar _ e)          = lexprCtOrigin e
-exprCtOrigin (HsProjection _ p)   = GetFieldOrigin ((field_label . unLoc . dfoLabel . NE.head . NE.reverse) p)
+exprCtOrigin e@(HsProjection _ _) = ExpansionOrigin (OrigExpr e)
 exprCtOrigin (SectionL _ _ _)     = SectionOrigin
 exprCtOrigin (SectionR _ _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {})   = Shouldn'tHappenOrigin "explicit tuple"
@@ -768,6 +822,7 @@ exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -
 exprCtOrigin (XExpr (ExpandedThingRn o _)) = ExpansionOrigin o
 exprCtOrigin (XExpr (PopErrCtxt e)) = exprCtOrigin e
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
+
 
 srcCodeOriginCtOrigin :: HsExpr GhcRn -> Maybe SrcCodeOrigin -> CtOrigin
 srcCodeOriginCtOrigin e Nothing = exprCtOrigin e
@@ -802,7 +857,7 @@ pprCtOrigin (ExpansionOrigin o)
     where what :: SDoc
           what = case o of
                    OrigStmt{} -> text "a do statement"
-                   OrigExpr e -> text "an expression" <+> ppr e
+                   OrigExpr e -> pprCtO (exprCtOrigin e)
                    OrigPat p -> text "a pattern" <+> ppr p
 
 pprCtOrigin (GivenSCOrigin sk d blk)
@@ -917,8 +972,37 @@ pprCtOrigin (NonLinearPatternOrigin reason pat)
   = hang (ctoHerald <+> text "a non-linear pattern" <+> quotes (ppr pat))
        2 (pprNonLinearPatternReason reason)
 
+pprCtOrigin (ExpectedFunTySyntaxOp i orig op) =
+      vcat [ sep [ the_arg_of i
+                 , text "the rebindable syntax operator"
+                 , quotes (ppr op) ]
+           , nest 2 (ppr orig) ]
+pprCtOrigin (ExpectedFunTyViewPat i expr) =
+      vcat [ the_arg_of i <+> text "the view pattern"
+           , nest 2 (ppr expr) ]
+pprCtOrigin (ExpectedFunTyArg i fun arg) =
+      sep [ text "The" <+> speakNth i <+> text "argument"
+          , quotes (ppr arg)
+          , text "of"
+          , quotes (ppr fun) ]
+pprCtOrigin (ExpectedFunTyMatches i fun (MG { mg_alts = L _ alts }))
+      | null alts
+      = the_arg_of i <+> quotes (ppr fun)
+      | otherwise
+      = text "The" <+> speakNth i <+> text "pattern in the equation" <> plural alts
+     <+> text "for" <+> quotes (ppr fun)
+pprCtOrigin (ExpectedFunTyLam lam_variant _) = binder_of $ lamCaseKeyword lam_variant
+
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
+
+
+the_arg_of :: Int -> SDoc
+the_arg_of i = text "The" <+> speakNth i <+> text "argument of"
+
+binder_of :: SDoc -> SDoc
+binder_of what = text "The binder of the" <+> what <+> text "expression"
+
 
 -- | Short one-liners
 pprCtO :: HasDebugCallStack => CtOrigin -> SDoc
@@ -945,7 +1029,7 @@ pprCtO (ScOrigin (IsQC {}) _) = text "the head of a quantified constraint"
 pprCtO DerivClauseOrigin     = text "the 'deriving' clause of a data type declaration"
 pprCtO StandAloneDerivOrigin = text "a 'deriving' declaration"
 pprCtO DefaultOrigin         = text "a 'default' declaration"
-pprCtO DoStmtOrigin              = text "a do statement"
+pprCtO DoStmtOrigin          = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
 pprCtO ArrowCmdOrigin        = text "an arrow command"
@@ -990,8 +1074,12 @@ pprCtO (ImpedanceMatching {})       = text "combining required constraints"
 pprCtO (NonLinearPatternOrigin _ pat) = hsep [text "a non-linear pattern" <+> quotes (ppr pat)]
 pprCtO (ExpansionOrigin (OrigPat p)) = hsep [text "a pattern" <+> quotes (ppr p)]
 pprCtO (ExpansionOrigin (OrigStmt{})) = text "a do statement"
-pprCtO (ExpansionOrigin (OrigExpr{})) = text "an expression"
-
+pprCtO (ExpansionOrigin (OrigExpr e)) = text "an expression" <+> ppr e
+pprCtO (ExpectedFunTySyntaxOp{}) = text "a rebindable syntax operator"
+pprCtO (ExpectedFunTyViewPat{}) = text "a view pattern"
+pprCtO (ExpectedFunTyArg{}) = text "a funtion head"
+pprCtO (ExpectedFunTyMatches{}) = text "a match statement"
+pprCtO (ExpectedFunTyLam{}) = text "a lambda expression"
 
 pprNonLinearPatternReason :: HasDebugCallStack => NonLinearPatternReason -> SDoc
 pprNonLinearPatternReason LazyPatternReason = parens (text "non-variable lazy pattern aren't linear")
@@ -1204,7 +1292,7 @@ data FixedRuntimeRepContext
   --
   -- See 'ExpectedFunTyOrigin' for more details.
   | FRRExpectedFunTy
-      !ExpectedFunTyOrigin
+      !CtOrigin -- !ExpectedFunTyOrigin
       !Int
         -- ^ argument position (1-indexed)
 
@@ -1285,8 +1373,8 @@ pprFixedRuntimeRepContext FRRBindStmtGuard
   = sep [ text "The body of the bind statement" ]
 pprFixedRuntimeRepContext (FRRArrow arrowContext)
   = pprFRRArrowContext arrowContext
-pprFixedRuntimeRepContext (FRRExpectedFunTy funTyOrig arg_pos)
-  = pprExpectedFunTyOrigin funTyOrig arg_pos
+pprFixedRuntimeRepContext (FRRExpectedFunTy funTyOrig _)
+  = pprCtOrigin funTyOrig
 
 instance Outputable FixedRuntimeRepContext where
   ppr = pprFixedRuntimeRepContext
@@ -1439,102 +1527,56 @@ instance Outputable FRRArrowContext where
 --     Uses 'pprExpectedFunTyOrigin'.
 --     See 'FixedRuntimeRepContext' for the situations in which
 --     representation-polymorphism checks are performed.
-data ExpectedFunTyOrigin
 
-  -- | A rebindable syntax operator is expected to have a function type.
-  --
-  -- Test cases for representation-polymorphism checks:
-  --   RepPolyDoBind, RepPolyDoBody{1,2}, RepPolyMc{Bind,Body,Guard}, RepPolyNPlusK
-  = forall (p :: Pass)
-     . (OutputableBndrId p)
-    => ExpectedFunTySyntaxOp !CtOrigin !(HsExpr (GhcPass p))
-      -- ^ rebindable syntax operator
 
-  -- | A view pattern must have a function type.
-  --
-  -- Test cases for representation-polymorphism checks:
-  --   RepPolyBinder
-  | ExpectedFunTyViewPat
-    !(HsExpr GhcRn)
-      -- ^ function used in the view pattern
+-- pprExpectedFunTyOrigin :: --  ExpectedFunTyOrigin
+--                        -- -> Int -- ^ argument position (starting at 1)
+--                        -> SDoc
+-- pprExpectedFunTyOrigin funTy_origin =
+--   case funTy_origin of
+--     ExpectedFunTySyntaxOp i orig op ->
+--       vcat [ sep [ the_arg_of
+--                  , text "the rebindable syntax operator"
+--                  , quotes (ppr op) ]
+--            , nest 2 (ppr orig) ]
+--     ExpectedFunTyViewPat i expr ->
+--       vcat [ the_arg_of <+> text "the view pattern"
+--            , nest 2 (ppr expr) ]
+--     ExpectedFunTyArg fun arg ->
+--       sep [ text "The argument"
+--           , quotes (ppr arg)
+--           , text "of"
+--           , quotes (ppr fun) ]
+--     ExpectedFunTyMatches i fun (MG { mg_alts = L _ alts })
+--       | null alts
+--       -> the_arg_of <+> quotes (ppr fun)
+--       | otherwise
+--       -> text "The" <+> speakNth i <+> text "pattern in the equation" <> plural alts
+--      <+> text "for" <+> quotes (ppr fun)
+--     ExpectedFunTyLam lam_variant _ -> binder_of $ lamCaseKeyword lam_variant
+--   where
+--     the_arg_of :: Int -> SDoc
+--     the_arg_of i = text "The" <+> speakNth i <+> text "argument of"
 
-  -- | Need to be able to extract an argument type from a function type.
-  --
-  -- Test cases for representation-polymorphism checks:
-  --   RepPolyApp
-  | forall (p :: Pass)
-     . Outputable (HsExpr (GhcPass p)) => ExpectedFunTyArg
-          !TypedThing
-            -- ^ function
-          !(HsExpr (GhcPass p))
-            -- ^ argument
+--     binder_of :: SDoc -> SDoc
+--     binder_of what = text "The binder of the" <+> what <+> text "expression"
 
-  -- | Ensure that a function defined by equations indeed has a function type
-  -- with the appropriate number of arguments.
-  --
-  -- Test cases for representation-polymorphism checks:
-  --   RepPolyBinder, RepPolyRecordPattern, RepPolyWildcardPattern
-  | ExpectedFunTyMatches
-      !TypedThing
-        -- ^ name of the function
-      !(MatchGroup GhcRn (LHsExpr GhcRn))
-       -- ^ equations
-
-  -- | Ensure that a lambda abstraction has a function type.
-  --
-  -- Test cases for representation-polymorphism checks:
-  --   RepPolyLambda, RepPolyMatch
-  | ExpectedFunTyLam HsLamVariant
-      !(HsExpr GhcRn)
-       -- ^ the entire lambda-case expression
-
-pprExpectedFunTyOrigin :: ExpectedFunTyOrigin
-                       -> Int -- ^ argument position (starting at 1)
-                       -> SDoc
-pprExpectedFunTyOrigin funTy_origin i =
-  case funTy_origin of
-    ExpectedFunTySyntaxOp orig op ->
-      vcat [ sep [ the_arg_of
-                 , text "the rebindable syntax operator"
-                 , quotes (ppr op) ]
-           , nest 2 (ppr orig) ]
-    ExpectedFunTyViewPat expr ->
-      vcat [ the_arg_of <+> text "the view pattern"
-           , nest 2 (ppr expr) ]
-    ExpectedFunTyArg fun arg ->
-      sep [ text "The argument"
-          , quotes (ppr arg)
-          , text "of"
-          , quotes (ppr fun) ]
-    ExpectedFunTyMatches fun (MG { mg_alts = L _ alts })
-      | null alts
-      -> the_arg_of <+> quotes (ppr fun)
-      | otherwise
-      -> text "The" <+> speakNth i <+> text "pattern in the equation" <> plural alts
-     <+> text "for" <+> quotes (ppr fun)
-    ExpectedFunTyLam lam_variant _ -> binder_of $ lamCaseKeyword lam_variant
-  where
-    the_arg_of :: SDoc
-    the_arg_of = text "The" <+> speakNth i <+> text "argument of"
-
-    binder_of :: SDoc -> SDoc
-    binder_of what = text "The binder of the" <+> what <+> text "expression"
-
-pprExpectedFunTyHerald :: ExpectedFunTyOrigin -> SDoc
+pprExpectedFunTyHerald :: CtOrigin -> SDoc
 pprExpectedFunTyHerald (ExpectedFunTySyntaxOp {})
   = text "This rebindable syntax expects a function with"
 pprExpectedFunTyHerald (ExpectedFunTyViewPat {})
   = text "A view pattern expression expects"
-pprExpectedFunTyHerald (ExpectedFunTyArg fun _)
+pprExpectedFunTyHerald (ExpectedFunTyArg _ fun _)
   = sep [ text "The function" <+> quotes (ppr fun)
         , text "is applied to" ]
-pprExpectedFunTyHerald (ExpectedFunTyMatches fun (MG { mg_alts = L _ alts }))
+pprExpectedFunTyHerald (ExpectedFunTyMatches _ fun (MG { mg_alts = L _ alts }))
   = text "The equation" <> plural alts <+> text "for" <+> quotes (ppr fun) <+> hasOrHave alts
 pprExpectedFunTyHerald (ExpectedFunTyLam lam_variant expr)
   = sep [ text "The" <+> lamCaseKeyword lam_variant <+> text "expression"
                      <+> quotes (pprSetDepth (PartWay 1) (ppr expr))
                -- The pprSetDepth makes the lambda abstraction print briefly
         , text "has" ]
+pprExpectedFunTyHerald orig = ppr (Shouldn'tHappenOrigin "pprExpectedFunTyHerald") <+> ppr orig
 
 {- *******************************************************************
 *                                                                    *

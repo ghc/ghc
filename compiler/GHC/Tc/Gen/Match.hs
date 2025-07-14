@@ -118,7 +118,7 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
   = assertPpr (funBindPrecondition matches) (pprMatches matches) $
     do  {  -- Check that they all have the same no of arguments
           arity <- checkArgCounts matches
-
+        ; let herald = ExpectedFunTyMatches arity (NameThing fun_name) matches
         ; traceTc "tcFunBindMatches 1" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
 
         ; (wrap_fun, r)
@@ -138,7 +138,7 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
         ; return (wrap_fun, r) }
   where
     mctxt  = mkPrefixFunRhs (noLocA fun_name) noAnn
-    herald = ExpectedFunTyMatches (NameThing fun_name) matches
+
 
 funBindPrecondition :: MatchGroup GhcRn (LHsExpr GhcRn) -> Bool
 funBindPrecondition (MG { mg_alts = L _ alts })

@@ -135,7 +135,7 @@ import Data.Traversable (for)
 --
 -- See Note [Return arguments with a fixed RuntimeRep].
 matchActualFunTy
-  :: ExpectedFunTyOrigin
+  :: CtOrigin
       -- ^ See Note [Herald for matchExpectedFunTys]
   -> Maybe TypedThing
       -- ^ The thing with type TcSigmaType
@@ -241,7 +241,7 @@ Ugh!
 -- INVARIANT: the returned argument types all have a syntactically fixed RuntimeRep
 -- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 -- See Note [Return arguments with a fixed RuntimeRep].
-matchActualFunTys :: ExpectedFunTyOrigin -- ^ See Note [Herald for matchExpectedFunTys]
+matchActualFunTys :: CtOrigin -- ^ See Note [Herald for matchExpectedFunTys]
                   -> CtOrigin
                   -> Arity
                   -> TcSigmaType
@@ -776,7 +776,7 @@ Example:
 -- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 -- See Note [Return arguments with a fixed RuntimeRep].
 matchExpectedFunTys :: forall a.
-                       ExpectedFunTyOrigin  -- See Note [Herald for matchExpectedFunTys]
+                       CtOrigin  -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
                     -> VisArity
                     -> ExpSigmaType
@@ -905,19 +905,19 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
            ; co <- unifyType Nothing (mkScaledFunTys more_arg_tys res_ty) fun_ty
            ; return (mkWpCastN co, result) }
 
-new_infer_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled ExpSigmaTypeFRR)
+new_infer_arg_ty :: CtOrigin -> Int -> TcM (Scaled ExpSigmaTypeFRR)
 new_infer_arg_ty herald arg_pos -- position for error messages only
   = do { mult     <- newFlexiTyVarTy multiplicityTy
        ; inf_hole <- newInferExpTypeFRR (FRRExpectedFunTy herald arg_pos)
        ; return (mkScaled mult inf_hole) }
 
-new_check_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled TcType)
+new_check_arg_ty :: CtOrigin -> Int -> TcM (Scaled TcType)
 new_check_arg_ty herald arg_pos -- Position for error messages only, 1 for first arg
   = do { mult   <- newFlexiTyVarTy multiplicityTy
        ; arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy herald arg_pos)
        ; return (mkScaled mult arg_ty) }
 
-mkFunTysMsg :: ExpectedFunTyOrigin
+mkFunTysMsg :: CtOrigin
             -> (VisArity, TcType)
             -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
 -- See Note [Reporting application arity errors]
