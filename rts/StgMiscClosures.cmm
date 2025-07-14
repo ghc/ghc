@@ -150,7 +150,6 @@ stg_interp_constr7_entry (P_ ret) { return (ret + 7); }
 INFO_TABLE_RET( stg_ctoi_R1p, RET_BCO)
     /* explicit stack */
 {
-    Sp_adj(-2);
     Sp(1) = R1;
     Sp(0) = stg_ret_p_info;
     jump stg_yield_to_interpreter [];
@@ -162,7 +161,6 @@ INFO_TABLE_RET( stg_ctoi_R1p, RET_BCO)
 INFO_TABLE_RET( stg_ctoi_R1n, RET_BCO )
     /* explicit stack */
 {
-    Sp_adj(-2);
     Sp(1) = R1;
     Sp(0) = stg_ret_n_info;
     jump stg_yield_to_interpreter [];
@@ -174,7 +172,6 @@ INFO_TABLE_RET( stg_ctoi_R1n, RET_BCO )
 INFO_TABLE_RET( stg_ctoi_F1, RET_BCO )
     /* explicit stack */
 {
-    Sp_adj(-2);
     F_[Sp + WDS(1)] = F1;
     Sp(0) = stg_ret_f_info;
     jump stg_yield_to_interpreter [];
@@ -186,7 +183,7 @@ INFO_TABLE_RET( stg_ctoi_F1, RET_BCO )
 INFO_TABLE_RET( stg_ctoi_D1, RET_BCO )
     /* explicit stack */
 {
-    Sp_adj(-1) - SIZEOF_DOUBLE;
+    Sp_adj(1) - SIZEOF_DOUBLE;
     D_[Sp + WDS(1)] = D1;
     Sp(0) = stg_ret_d_info;
     jump stg_yield_to_interpreter [];
@@ -198,7 +195,7 @@ INFO_TABLE_RET( stg_ctoi_D1, RET_BCO )
 INFO_TABLE_RET( stg_ctoi_L1, RET_BCO )
     /* explicit stack */
 {
-    Sp_adj(-1) - 8;
+    Sp_adj(1) - 8;
     L_[Sp + WDS(1)] = L1;
     Sp(0) = stg_ret_l_info;
     jump stg_yield_to_interpreter [];
@@ -210,7 +207,6 @@ INFO_TABLE_RET( stg_ctoi_L1, RET_BCO )
 INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
     /* explicit stack */
 {
-    Sp_adj(-1);
     Sp(0) = stg_ret_v_info;
     jump stg_yield_to_interpreter [];
 }
