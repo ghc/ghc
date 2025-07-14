@@ -31,6 +31,6 @@ NEW_VALUE=<Output from the above>
 
 curl --fail-with-body --request PUT --header "PRIVATE-TOKEN: $GITLAB_WRITE" \
     "https://gitlab.haskell.org/api/v4/projects/1/variables/PERF_NOTES_PUSH_CREDENTIALS" \
-    --form "value=$NEW_VALUE"
+    --form "value=test-metrics.sh:$NEW_VALUE"
 
 ```
