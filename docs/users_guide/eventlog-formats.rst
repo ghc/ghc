@@ -693,6 +693,8 @@ A single fixed-width event emitted during program start-up describing the sample
    :field String: retainer filter
    :field String: biography filter
 
+The profile ID field is reserved for future use.
+
 Cost centre definitions
 ^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -792,6 +794,7 @@ Otherwise, a :event-type:`HEAP_PROF_SAMPLE_STRING` event is emitted instead.
    :field Word8: stack depth
    :field Word32[]: cost centre stack starting with inner-most (cost centre numbers)
 
+The profile ID field is reserved for future use.
 
 String break-down
 ^^^^^^^^^^^^^^^^^
@@ -817,6 +820,8 @@ If the heap profile type is set to :rts-flag:`-hc` or :rts-flag:`-hb`, a :event-
    :field Word8: profile ID
    :field Word64: heap residency in bytes
    :field String: sample label
+
+The profile ID field is reserved for future use.
 
 .. _time-profiler-events:
 
