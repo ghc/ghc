@@ -57,7 +57,7 @@ T17673.facIO1 = \ (n :: Int) (eta [OS=OneShot] :: GHC.Internal.Prim.State# GHC.I
 -- RHS size: {terms: 1, types: 0, coercions: 6, joins: 0/0}
 facIO [InlPrag=NOINLINE[final]] :: Int -> IO Int
 [GblId, Arity=2, Str=<1!P(L)><L>, Cpr=1, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
-facIO = T17673.facIO1 `cast` (<Int>_R %<Many>_N ->_R Sym (GHC.Internal.Types.N:IO <Int>_R) :: (Int -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, Int #)) ~R# (Int -> IO Int))
+facIO = T17673.facIO1 `cast` (<Int>_R ->_R Sym (GHC.Internal.Types.N:IO <Int>_R) :: (Int -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, Int #)) ~R# (Int -> IO Int))
 
 
 

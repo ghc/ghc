@@ -23,5 +23,7 @@ data LinkerConfig = LinkerConfig
   , linkerOptionsPost :: [Option]         -- ^ Linker options (after user options)
   , linkerTempDir     :: TempDir          -- ^ Temporary directory to use
   , linkerFilter      :: [String] -> [String] -- ^ Output filter
+  , linkerSupportsCompactUnwind :: !Bool  -- ^ Does the linker support compact unwind
+  , linkerIsGnuLd     :: !Bool            -- ^ Is it GNU LD (used for gc-sections support)
   }
 

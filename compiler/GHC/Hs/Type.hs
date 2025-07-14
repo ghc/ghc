@@ -111,6 +111,8 @@ import GHC.Core.DataCon ( SrcStrictness(..), SrcUnpackedness(..)
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 
+import GHC.Base ( Multiplicity(..) )
+
 import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.SourceText
 import GHC.Types.Name
@@ -568,9 +570,10 @@ instance
 
 -- See #18846
 pprHsArrow :: (Outputable mult, OutputableBndrId pass) => HsMultAnnOf mult (GhcPass pass) -> SDoc
-pprHsArrow (HsUnannotated _)    = pprArrowWithMultiplicity visArgTypeLike (Left False)
-pprHsArrow (HsLinearAnn _)      = pprArrowWithMultiplicity visArgTypeLike (Left True)
-pprHsArrow (HsExplicitMult _ p) = pprArrowWithMultiplicity visArgTypeLike (Right (ppr p))
+pprHsArrow (HsUnannotated _)    = pprArrowWithMultiplicity visArgTypeLike (Left Many)
+pprHsArrow (HsLinearAnn _)      = pprArrowWithMultiplicity visArgTypeLike (Left One)
+pprHsArrow (HsExplicitMult _ p) = pprArrowWithMultiplicity visArgTypeLike (Right $ ppr p)
+  -- NB: 'ppr p' will put the parentheses where the user did.
 
 -- Used to print, for instance, let bindings:
 --   let %1 x = …

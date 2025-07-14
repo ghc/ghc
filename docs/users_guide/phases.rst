@@ -849,8 +849,11 @@ Options affecting code generation
     :type: dynamic
     :category: codegen
 
-    If a home package module has byte-code available then use that instead of
+    If a module has byte-code available then use that instead of
     an object file (if that's available) to evaluate and run TH splices.
+
+    This also prefers to load bytecode libraries when trying to find the library
+    to satisfy a package dependency.
 
     This is useful with flags such as :ghc-flag:`-fbyte-code-and-object-code`, which
     tells the compiler to generate byte-code, and :ghc-flag:`-fwrite-if-simplified-core` which
@@ -859,6 +862,19 @@ Options affecting code generation
     This flag also interacts with :ghc-flag:`-fno-code`, if this flag is enabled
     then any modules which are required to be compiled for Template Haskell evaluation
     will generate byte-code rather than object code.
+
+.. ghc-flag:: -fwrite-byte-code
+    :shortdesc: Write byte-code object files
+    :type: dynamic
+    :category: codegen
+
+    Write byte-code files (``.gbc``) when byte-code is generated.
+    These files can be used to avoid recompiling modules when using the byte-code
+    interpreter.
+
+    By default when using :ghc-flag:`-fbyte-code` no byte-code files are written.
+    This flag is implied by :ghc-flag:`-fbyte-code-and-object-code`.
+
 
 
 .. _options-linker:
@@ -1034,6 +1050,23 @@ for example).
     must be named properly, so that GHC recognizes the shared object
     when linking against this package.
     See :ref:`shared object name mangling <building-packages>` for details.
+
+.. ghc-flag:: -bytecodelib
+    :shortdesc: Generate a bytecode library
+    :type: dynamic
+    :category: linking
+
+    Generate a bytecode library. A bytecode library is a collection of bytecode
+    artifacts and a library for foreign sources.
+
+    This mode can be used to package bytecode together for a library.
+
+    When used in one-shot mode, the arguments are expected to be bytecode files (.gbc files)
+    and any additional foreign object files needed to create the library.
+
+
+
+
 
 .. ghc-flag:: -dynload
     :shortdesc: Selects one of a number of modes for finding shared libraries at runtime.

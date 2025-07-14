@@ -11,7 +11,7 @@ T24808.getMaybe1 :: MyMaybe -> MyMaybe
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
-T24808.getMaybe1 = \ (ds_dFC :: MyMaybe) -> ds_dFC
+T24808.getMaybe1 = \ (ds :: MyMaybe) -> ds
 
 -- RHS size: {terms: 1, types: 0, coercions: 4, joins: 0/0}
 getMaybe :: MyMaybe -> Maybe Int
@@ -23,7 +23,7 @@ getMaybe :: MyMaybe -> Maybe Int
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 getMaybe
   = T24808.getMaybe1
-    `cast` (<MyMaybe>_R %<Many>_N ->_R T24808.N:MyMaybe[0]
+    `cast` (<MyMaybe>_R ->_R T24808.N:MyMaybe
             :: (MyMaybe -> MyMaybe) ~R# (MyMaybe -> Maybe Int))
 
 -- RHS size: {terms: 37, types: 9, coercions: 5, joins: 0/0}
@@ -35,18 +35,18 @@ myFunction :: MyMaybe -> MyMaybe
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [30] 161 20}]
 myFunction
-  = \ (ds_dFw :: MyMaybe) ->
-      case ds_dFw `cast` (T24808.N:MyMaybe[0] :: MyMaybe ~R# Maybe Int)
-      of {
+  = \ (ds :: MyMaybe) ->
+      case ds `cast` (T24808.N:MyMaybe :: MyMaybe ~R# Maybe Int) of {
         Nothing ->
           (GHC.Internal.Maybe.Nothing @Int)
-          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe);
-        Just n_axK ->
+          `cast` (Sym T24808.N:MyMaybe :: Maybe Int ~R# MyMaybe);
+        Just n ->
           (GHC.Internal.Maybe.Just
              @Int
-             (case n_axK of { GHC.Types.I# x1_aFS ->
-              case x1_aFS of wild2_aFU {
-                __DEFAULT -> GHC.Types.I# (GHC.Prim.+# 10# wild2_aFU);
+             (case n of { GHC.Internal.Types.I# x1 ->
+              case x1 of wild2 {
+                __DEFAULT ->
+                  GHC.Internal.Types.I# (GHC.Internal.Prim.+# 10# wild2);
                 9223372036854775798# -> GHC.Internal.Enum.$fEnumInt2;
                 9223372036854775799# -> GHC.Internal.Enum.$fEnumInt2;
                 9223372036854775800# -> GHC.Internal.Enum.$fEnumInt2;
@@ -59,7 +59,7 @@ myFunction
                 9223372036854775807# -> GHC.Internal.Enum.$fEnumInt2
               }
               }))
-          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe)
+          `cast` (Sym T24808.N:MyMaybe :: Maybe Int ~R# MyMaybe)
       }
 
 -- RHS size: {terms: 37, types: 9, coercions: 5, joins: 0/0}
@@ -71,18 +71,18 @@ bar :: MyMaybe -> MyMaybe
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [30] 161 20}]
 bar
-  = \ (ds_dFw :: MyMaybe) ->
-      case ds_dFw `cast` (T24808.N:MyMaybe[0] :: MyMaybe ~R# Maybe Int)
-      of {
+  = \ (ds :: MyMaybe) ->
+      case ds `cast` (T24808.N:MyMaybe :: MyMaybe ~R# Maybe Int) of {
         Nothing ->
           (GHC.Internal.Maybe.Nothing @Int)
-          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe);
-        Just n_axK ->
+          `cast` (Sym T24808.N:MyMaybe :: Maybe Int ~R# MyMaybe);
+        Just n ->
           (GHC.Internal.Maybe.Just
              @Int
-             (case n_axK of { GHC.Types.I# x1_aFS ->
-              case x1_aFS of wild2_aFU {
-                __DEFAULT -> GHC.Types.I# (GHC.Prim.+# 10# wild2_aFU);
+             (case n of { GHC.Internal.Types.I# x1 ->
+              case x1 of wild2 {
+                __DEFAULT ->
+                  GHC.Internal.Types.I# (GHC.Internal.Prim.+# 10# wild2);
                 9223372036854775798# -> GHC.Internal.Enum.$fEnumInt2;
                 9223372036854775799# -> GHC.Internal.Enum.$fEnumInt2;
                 9223372036854775800# -> GHC.Internal.Enum.$fEnumInt2;
@@ -95,7 +95,7 @@ bar
                 9223372036854775807# -> GHC.Internal.Enum.$fEnumInt2
               }
               }))
-          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe)
+          `cast` (Sym T24808.N:MyMaybe :: Maybe Int ~R# MyMaybe)
       }
 
 -- RHS size: {terms: 37, types: 9, coercions: 5, joins: 0/0}
@@ -107,18 +107,18 @@ T24808.foo1 :: MyMaybe -> MyMaybe
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [30] 161 20}]
 T24808.foo1
-  = \ (ds_dFw :: MyMaybe) ->
-      case ds_dFw `cast` (T24808.N:MyMaybe[0] :: MyMaybe ~R# Maybe Int)
-      of {
+  = \ (ds :: MyMaybe) ->
+      case ds `cast` (T24808.N:MyMaybe :: MyMaybe ~R# Maybe Int) of {
         Nothing ->
           (GHC.Internal.Maybe.Nothing @Int)
-          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe);
-        Just n_axK ->
+          `cast` (Sym T24808.N:MyMaybe :: Maybe Int ~R# MyMaybe);
+        Just n ->
           (GHC.Internal.Maybe.Just
              @Int
-             (case n_axK of { GHC.Types.I# x1_aFS ->
-              case x1_aFS of wild2_aFU {
-                __DEFAULT -> GHC.Types.I# (GHC.Prim.+# 10# wild2_aFU);
+             (case n of { GHC.Internal.Types.I# x1 ->
+              case x1 of wild2 {
+                __DEFAULT ->
+                  GHC.Internal.Types.I# (GHC.Internal.Prim.+# 10# wild2);
                 9223372036854775798# -> GHC.Internal.Enum.$fEnumInt2;
                 9223372036854775799# -> GHC.Internal.Enum.$fEnumInt2;
                 9223372036854775800# -> GHC.Internal.Enum.$fEnumInt2;
@@ -131,7 +131,7 @@ T24808.foo1
                 9223372036854775807# -> GHC.Internal.Enum.$fEnumInt2
               }
               }))
-          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe)
+          `cast` (Sym T24808.N:MyMaybe :: Maybe Int ~R# MyMaybe)
       }
 
 -- RHS size: {terms: 1, types: 0, coercions: 4, joins: 0/0}
@@ -144,7 +144,7 @@ foo :: MyMaybe -> Maybe Int
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 foo
   = T24808.foo1
-    `cast` (<MyMaybe>_R %<Many>_N ->_R T24808.N:MyMaybe[0]
+    `cast` (<MyMaybe>_R ->_R T24808.N:MyMaybe
             :: (MyMaybe -> MyMaybe) ~R# (MyMaybe -> Maybe Int))
 
 

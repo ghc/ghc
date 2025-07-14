@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
 
 -- | Breakpoint information constructed during ByteCode generation.
 --
@@ -44,6 +45,7 @@ import GHC.HsToCore.Breakpoints
 import GHC.Iface.Syntax
 
 import GHC.Unit.Module (Module)
+import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import Data.Array
@@ -297,3 +299,26 @@ instance Outputable CgBreakInfo where
               parens (ppr (cgb_vars info) <+>
                       ppr (cgb_resty info) <+>
                       ppr (cgb_tick_id info))
+
+instance Binary CgBreakInfo where
+  put_ bh CgBreakInfo {..} =
+    put_ bh cgb_tyvars
+      *> put_ bh cgb_vars
+      *> put_ bh cgb_resty
+      *> put_ bh cgb_tick_id
+
+  get bh = CgBreakInfo <$> get bh <*> get bh <*> get bh <*> get bh
+
+instance Binary InternalModBreaks where
+  get bh = InternalModBreaks <$> get bh <*> get bh
+
+  put_ bh InternalModBreaks {..} =
+    put_ bh imodBreaks_breakInfo *> put_ bh imodBreaks_modBreaks
+
+deriving via BreakpointId instance Binary InternalBreakLoc
+
+instance Binary InternalBreakpointId where
+  get bh = InternalBreakpointId <$> get bh <*> get bh
+
+  put_ bh InternalBreakpointId {..} =
+    put_ bh ibi_info_mod *> put_ bh ibi_info_index

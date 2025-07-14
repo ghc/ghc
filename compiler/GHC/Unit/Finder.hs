@@ -60,7 +60,6 @@ import GHC.Types.SourceFile
 
 import GHC.Fingerprint
 import Data.IORef
-import System.Directory.OsPath
 import Control.Applicative ((<|>))
 import Control.Monad
 import Data.Time
@@ -630,13 +629,15 @@ mkHomeModLocation2 fopts mod src_basename ext =
        hi_fn  = mkHiPath   fopts src_basename mod_basename
        dyn_hi_fn  = mkDynHiPath   fopts src_basename mod_basename
        hie_fn = mkHiePath  fopts src_basename mod_basename
+       bytecode_fn = mkBytecodePath fopts src_basename mod_basename
 
    in (OsPathModLocation{ ml_hs_file_ospath   = Just (src_basename <.> ext),
                           ml_hi_file_ospath   = hi_fn,
                           ml_dyn_hi_file_ospath = dyn_hi_fn,
                           ml_obj_file_ospath  = obj_fn,
                           ml_dyn_obj_file_ospath = dyn_obj_fn,
-                          ml_hie_file_ospath  = hie_fn })
+                          ml_hie_file_ospath  = hie_fn,
+                          ml_bytecode_file_ospath = bytecode_fn })
 
 mkHomeModHiOnlyLocation :: FinderOpts
                         -> ModuleName
@@ -656,6 +657,7 @@ mkHiOnlyModLocation fopts hisuf dynhisuf path basename
        obj_fn = mkObjPath fopts full_basename basename
        dyn_obj_fn = mkDynObjPath fopts full_basename basename
        hie_fn = mkHiePath fopts full_basename basename
+       bytecode_fn = mkBytecodePath fopts full_basename basename
    in OsPathModLocation{  ml_hs_file_ospath   = Nothing,
                           ml_hi_file_ospath   = full_basename <.> hisuf,
                               -- Remove the .hi-boot suffix from
@@ -666,7 +668,8 @@ mkHiOnlyModLocation fopts hisuf dynhisuf path basename
                           -- MP: TODO
                           ml_dyn_hi_file_ospath  = full_basename <.> dynhisuf,
                           ml_obj_file_ospath  = obj_fn,
-                          ml_hie_file_ospath  = hie_fn
+                          ml_hie_file_ospath  = hie_fn,
+                          ml_bytecode_file_ospath = bytecode_fn
                   }
 
 -- | Constructs the filename of a .o file for a given source file.
@@ -745,7 +748,20 @@ mkHiePath fopts basename mod_basename = hie_basename <.> hiesuf
                 hie_basename | Just dir <- hiedir = dir </> mod_basename
                              | otherwise          = basename
 
-
+-- | Constructs the filename of a .gbc file for a given source file.
+-- Does /not/ check whether the .gbc file exists
+mkBytecodePath
+  :: FinderOpts
+  -> OsPath             -- the filename of the source file, minus the extension
+  -> OsPath             -- the module name with dots replaced by slashes
+  -> OsPath
+mkBytecodePath fopts basename mod_basename = bytecode_basename <.> bytecodesuf
+ where
+                bytecodedir = finder_bytecodeDir fopts
+                bytecodesuf = finder_bytecodeSuf fopts
+                bytecode_basename
+                             | Just dir <- bytecodedir = dir </> mod_basename
+                             | otherwise          = basename
 
 -- -----------------------------------------------------------------------------
 -- Filenames of the stub files
@@ -782,7 +798,7 @@ mkStubPaths fopts mod location = do
 findObjectLinkableMaybe :: Module -> ModLocation -> IO (Maybe Linkable)
 findObjectLinkableMaybe mod locn
    = do let obj_fn = ml_obj_file locn
-        maybe_obj_time <- modificationTimeIfExists obj_fn
+        maybe_obj_time <- modificationTimeIfExists (ml_obj_file_ospath locn)
         case maybe_obj_time of
           Nothing -> return Nothing
           Just obj_time -> liftM Just (findObjectLinkable mod obj_fn obj_time)

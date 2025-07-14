@@ -423,6 +423,25 @@ Redirecting the compilation output(s)
     Finally, the option ``-hcsuf`` ⟨suffix⟩ will change the ``.hc`` file
     suffix for compiler-generated intermediate C files.
 
+.. ghc-flag:: -gbcsuf ⟨suffix⟩
+    :shortdesc: set the suffix to use for bytecode files
+    :type: dynamic
+    :category:
+
+    The option ``-gbcsuf`` ⟨suffix⟩ will change the ``.gbc`` file
+    suffix for bytecode files to whatever you specify. This is useful
+    when you want to avoid conflicts between different bytecode versions
+    or when building with different flags.
+
+.. ghc-flag:: -gbcdir ⟨dir⟩
+    :shortdesc: set the directory for bytecode files
+    :type: dynamic
+    :category:
+
+    The option ``-gbcdir`` ⟨dir⟩ will change the directory where
+    bytecode files (``.gbc``) are placed. By default, bytecode files
+    are placed in the same directory as the source files.
+
 .. _keeping-intermediates:
 
 Keeping Intermediate Files

@@ -1,7 +1,3 @@
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-:l
-
 :shell echo module A where {} >A.hs
 :shell echo module B where { import A } >B.hs
 
