@@ -171,7 +171,8 @@ module GHC.Core.Type (
         anyFreeVarsOfType, anyFreeVarsOfTypes,
         noFreeVarsOfType,
         expandTypeSynonyms, expandSynTyConApp_maybe,
-        typeSize, occCheckExpand, expandTyVarUnfoldings,
+        typeSize, occCheckExpand,
+        expandTyVarUnfoldings, expandSomeTyVarUnfoldings,
 
         -- ** Closing over kinds
         closeOverKindsDSet, closeOverKindsList,
@@ -491,7 +492,7 @@ on its fast path must also be inlined, linked back to this Note.
 *                                                                      *
 ********************************************************************* -}
 
-expandTyVarUnfoldings :: TyVarSet -> Type -> Type
+expandTyVarUnfoldings :: TyVarSet  -> Type -> Type
 -- (expandTyVarUnfoldings tvs ty) replace any occurrences of `tvs` in `ty`
 -- with their unfoldings.  The returned type does not mention any of `tvs`.
 --
@@ -500,7 +501,11 @@ expandTyVarUnfoldings :: TyVarSet -> Type -> Type
 -- also in scope, without having been shadowed.
 expandTyVarUnfoldings tvs ty
   | isEmptyVarSet tvs = ty
-  | otherwise         = runIdentity (expand ty)
+  | otherwise         = expandSomeTyVarUnfoldings (`elemVarSet` tvs) ty
+
+expandSomeTyVarUnfoldings :: (TyVar -> Bool) -> Type -> Type
+expandSomeTyVarUnfoldings expand_me ty
+  = runIdentity (expand ty)
   where
     expand :: Type -> Identity Type
     (expand, _, _, _)
@@ -508,8 +513,8 @@ expandTyVarUnfoldings tvs ty
                              , tcm_hole = exp_hole, tcm_tycobinder = exp_tcb
                              , tcm_tycon = pure })
     exp_tv _ tv = case tyVarUnfolding_maybe tv of
-                    Just ty | tv `elemVarSet` tvs -> expand ty
-                    _                             -> pure (TyVarTy tv)
+                    Just ty | expand_me tv -> expand ty
+                    _                      -> pure (TyVarTy tv)
     exp_cv _   cv = pure (CoVarCo cv)
     exp_hole _ cv = pprPanic "expand_tv_unf" (ppr cv)
     exp_tcb :: () -> TyCoVar -> ForAllTyFlag -> (() -> TyCoVar -> Identity r) -> Identity r

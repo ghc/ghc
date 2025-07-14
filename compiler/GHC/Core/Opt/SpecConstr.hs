@@ -2679,8 +2679,8 @@ argToPat1 :: ScEnv
   -> ArgOcc
   -> StrictnessMark
   -> UniqSM (Bool, Expr CoreBndr, [Id])
-argToPat1 _env _in_scope _val_env arg@(Type {}) _arg_occ _arg_str
-  = return (False, arg, [])
+argToPat1 _env in_scope _val_env (Type ty) _arg_occ _arg_str
+  = return (False, Type (mkTyPat in_scope ty), [])
 
 argToPat1 env in_scope val_env (Tick _ arg) arg_occ arg_str
   = argToPat env in_scope val_env arg arg_occ arg_str
@@ -2819,8 +2819,19 @@ argToPat in_scope val_env arg arg_occ
 
   -- The default case: make a wild-card
   -- We use this for coercions too
-argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
-  = wildCardPat (exprType arg) arg_str
+argToPat1 _env in_scope _val_env arg _arg_occ arg_str
+  = wildCardPat (mkTyPat in_scope (exprType arg)) arg_str
+
+mkTyPat :: InScopeSet -> Type -> Type
+-- Expand unfoldings of any tyvars not in the in-scope set
+-- E.g. call  f @a @b{=a} (K @a)
+-- The tyvars `a` and `b` might have been in scope at the call site,
+-- but not at the definition site.  We want a call pattern
+--            f @a @a (K @a) a
+mkTyPat in_scope ty
+  = expandSomeTyVarUnfoldings not_in_scope ty
+  where
+    not_in_scope tv = not (tv `elemInScopeSet` in_scope)
 
 -- | wildCardPats are always boring
 wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])

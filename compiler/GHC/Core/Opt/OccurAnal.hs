@@ -2228,8 +2228,7 @@ occ_anal_lam_tail env expr@(Lam {})
       = addInScope env (reverse rev_bndrs) $ \env ->
         let !(WUD usage body') = occ_anal_lam_tail env body
             wrap_lam body bndr = Lam (tagLamBinder usage bndr) body
-        in WUD (usage `addLamTyCoVarOccs` rev_bndrs)
-               (foldl' wrap_lam body' rev_bndrs)
+        in WUD usage (foldl' wrap_lam body' rev_bndrs)
 
 -- For casts, keep going in the same lambda-group
 -- See Note [Occurrence analysis for lambda binders]
@@ -3136,12 +3135,15 @@ addInScopeOne env bndr = addInScope env [bndr]
 addInScope :: OccEnv -> [Var]
            -> (OccEnv -> WithUsageDetails a) -> WithUsageDetails a
 {-# INLINE addInScope #-}
+-- Do occ-analysis under a telescope of binders
+-- `addInScope` accounts for
+--    -- Accounting for the free vars of the types of the binders
+--    - Dealing with the interaction between shadowing and
+--      the `bad_join` and binder-swap mechanisms
 -- This function is called a lot, so we want to inline the fast path
--- so we don't have to allocate thing_inside and call it
+--   so we don't have to allocate thing_inside and call it
 -- The bndrs must include TyVars as well as Ids, because of
 --     (BS3) in Note [Binder swap]
--- We do not assume that the bndrs are in scope order; in fact the
--- call in occ_anal_lam_tail gives them to addInScope in /reverse/ order
 
 addInScope env bndrs thing_inside
   | null bndrs   -- E.g. nullary constructors in a `case`
@@ -3788,15 +3790,6 @@ addManyOccs uds var_set
 addTyCoOccs :: UsageDetails -> TyCoOccEnv -> UsageDetails
 addTyCoOccs uds@(UD { ud_tyco_env = env}) extras
   = uds { ud_tyco_env = env `plusTyCoOccEnv` extras }
-
-addLamTyCoVarOccs :: UsageDetails -> [Var] -> UsageDetails
--- occAnalLamBndrs :: OccEnv -> UsageDetails -> [Var] -> WithUsageDetails [Var]
--- Add any TyCoVars free in the type of a lambda-binder
--- See Note [Gather occurrences of coercion variables]
-addLamTyCoVarOccs uds bndrs
-  = foldr add uds bndrs
-  where
-    add bndr uds = uds `addManyOccs` tyCoVarsOfType (varType bndr)
 
 emptyDetails :: UsageDetails
 emptyDetails = UD { ud_id_env   = emptyVarEnv
