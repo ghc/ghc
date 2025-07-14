@@ -421,7 +421,7 @@ loadExternalPlugins ps = do
 loadExternalPluginLib :: FilePath -> IO ()
 loadExternalPluginLib path = do
   -- load library
-  loadDLL path >>= \case
+  loadDLLs [path] >>= \case
     Left errmsg -> pprPanic "loadExternalPluginLib"
                      (vcat [ text "Can't load plugin library"
                            , text "  Library path: " <> text path

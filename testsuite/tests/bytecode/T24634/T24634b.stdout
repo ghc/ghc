@@ -1,4 +1,4 @@
-[1 of 3] Compiling Hello            ( Hello.hs, Hello.o, interpreted )
-[2 of 3] Compiling Main             ( Main.hs, Main.o, interpreted )
+[1 of 3] Compiling Hello            ( Hello.hs, Hello.o, Hello.gbc )
+[2 of 3] Compiling Main             ( Main.hs, Main.o, Main.gbc )
 [3 of 3] Linking Main
 966

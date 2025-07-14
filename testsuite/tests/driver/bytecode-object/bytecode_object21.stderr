@@ -1,0 +1,4 @@
+<no location info>: error: [GHC-47338]
+    The following modules are missing a linkable which is needed for creating a library:
+      main:BytecodeTest
+

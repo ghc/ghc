@@ -15,6 +15,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch
 import GHC.Driver.Hooks
+import GHC.Driver.DynFlags
 import Control.Monad.Trans.Reader
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Pipeline.Phases
@@ -66,12 +67,12 @@ import GHC.Unit.Finder
 import Data.IORef
 import GHC.Types.Name.Env
 import GHC.Platform.Ways
+import GHC.Runtime.Loader (initializePlugins)
 import GHC.Driver.LlvmConfigCache (readLlvmConfigCache)
 import GHC.CmmToLlvm.Config (LlvmTarget (..), LlvmConfig (..))
 import {-# SOURCE #-} GHC.Driver.Pipeline (compileForeign, compileEmptyStub)
 import GHC.Settings
 import System.IO
-import GHC.Linker.ExtraObj
 import GHC.Linker.Dynamic
 import GHC.Utils.Panic
 import GHC.Utils.Touch
@@ -83,7 +84,7 @@ import GHC.StgToJS.Linker.Linker (embedJsFile)
 
 import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Home.ModInfo
-import GHC.Runtime.Loader (initializePlugins)
+
 
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch) via (ReaderT (Hooks, PhaseHook) IO)
@@ -411,6 +412,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
   let unit_env  = hsc_unit_env hsc_env
   let home_unit = hsc_home_unit_maybe hsc_env
   let tmpfs     = hsc_tmpfs hsc_env
+  let tmpdir    = tmpDir dflags
   let platform  = ue_platform unit_env
   let hcc       = cc_phase `eqPhase` HCc
 
@@ -432,7 +434,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
   let include_paths = include_paths_quote ++ include_paths_global
 
   let gcc_extra_viac_flags = extraGccViaCFlags dflags
-  let pic_c_flags = picCCOpts dflags
+  let cc_config = configureCc dflags
 
   let verbFlags = getVerbFlags dflags
 
@@ -481,14 +483,14 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
   ghcVersionH <- getGhcVersionIncludeFlags dflags unit_env
 
   withAtomicRename output_fn $ \temp_outputFilename ->
-    GHC.SysTools.runCc (phaseForeignLanguage cc_phase) logger tmpfs dflags (
+    GHC.SysTools.runCc (phaseForeignLanguage cc_phase) logger tmpfs tmpdir cc_config (
                   [ GHC.SysTools.Option "-c"
                   , GHC.SysTools.FileOption "" input_fn
                   , GHC.SysTools.Option "-o"
                   , GHC.SysTools.FileOption "" temp_outputFilename
                   ]
                  ++ map GHC.SysTools.Option (
-                    pic_c_flags
+                    (ccPicOpts cc_config)
 
                  -- See Note [Produce big objects on Windows]
                  ++ [ "-Wa,-mbig-obj"
@@ -603,7 +605,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               mlinkable <-
                 if gopt Opt_ByteCodeAndObjectCode dflags
                   then do
-                    bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
+                    bc <- generateAndWriteByteCodeLinkable hsc_env (mkCgInteractiveGuts cgguts) mod_location
                     return $ emptyHomeModInfoLinkable { homeMod_bytecode = Just bc }
 
                   else return emptyHomeModInfoLinkable
@@ -620,7 +622,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
             do
               final_iface <- mkFullIface hsc_env partial_iface Nothing Nothing NoStubs []
               hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
-              bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
+              bc <- generateAndWriteByteCodeLinkable hsc_env (mkCgInteractiveGuts cgguts) mod_location
               return ([], final_iface, emptyHomeModInfoLinkable { homeMod_bytecode = Just bc } , panic "interpreter")
 
 
@@ -660,10 +662,11 @@ getFileArgs hsc_env input_fn = do
   let dflags0 = hsc_dflags hsc_env
       logger  = hsc_logger hsc_env
       parser_opts = initParserOpts dflags0
-  (warns0, src_opts) <- getOptionsFromFile parser_opts (supportedLanguagePragmas dflags0) input_fn
+      sec = initSourceErrorContext dflags0
+  (warns0, src_opts) <- getOptionsFromFile parser_opts sec (supportedLanguagePragmas dflags0) input_fn
   (dflags1, unhandled_flags, warns)
     <- parseDynamicFilePragma logger dflags0 src_opts
-  checkProcessArgsResult unhandled_flags
+  checkProcessArgsResult dflags0 unhandled_flags
   return (dflags1, warns0, warns)
 
 runCppPhase :: HscEnv -> FilePath -> FilePath -> IO FilePath
@@ -710,9 +713,10 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
         popts = initParserOpts dflags
         rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
         rn_imps = fmap (\(s, rpk, lmn@(L _ mn)) -> (s, rn_pkg_qual mn rpk, lmn))
-    eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
+        sec = initSourceErrorContext dflags
+    eimps <- getImports popts sec imp_prelude buf input_fn (basename <.> suff)
     case eimps of
-        Left errs -> throwErrors (GhcPsMessage <$> errs)
+        Left errs -> throwErrors sec (GhcPsMessage <$> errs)
         Right (src_imps,imps, L _ mod_name) -> return
               (Just buf, mod_name, rn_imps imps, src_imps)
 
@@ -722,16 +726,17 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- the object file for one module.)
   -- Note the nasty duplication with the same computation in compileFile above
   location <- mkOneShotModLocation pipe_env dflags src_flavour mod_name
-  let o_file = ml_obj_file location -- The real object file
-      hi_file = ml_hi_file location
-      hie_file = ml_hie_file location
-      dyn_o_file = ml_dyn_obj_file location
+  let o_file = ml_obj_file_ospath location -- The real object file
+      hi_file = ml_hi_file_ospath location
+      hie_file = ml_hie_file_ospath location
+      dyn_o_file = ml_dyn_obj_file_ospath location
 
   src_hash <- getFileHash (basename <.> suff)
   hi_date <- modificationTimeIfExists hi_file
   hie_date <- modificationTimeIfExists hie_file
   o_mod <- modificationTimeIfExists o_file
   dyn_o_mod <- modificationTimeIfExists dyn_o_file
+  bytecode_date <- modificationTimeIfExists (ml_bytecode_file_ospath location)
 
   -- Tell the finder cache about this module
   mod <- do
@@ -753,6 +758,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
                                 ms_parsed_mod   = Nothing,
                                 ms_iface_date   = hi_date,
                                 ms_hie_date     = hie_date,
+                                ms_bytecode_date = bytecode_date,
                                 ms_textual_imps = imps,
                                 ms_srcimps      = src_imps }
 
@@ -1135,7 +1141,8 @@ joinObjectFiles hsc_env o_files output_fn
 
   | otherwise = do
   withAtomicRename output_fn $ \tmp_ar ->
-      liftIO $ runAr logger dflags Nothing $ map Option $ ["qc" ++ dashL, tmp_ar] ++ o_files
+      let ar_opts = configureAr dflags
+      in liftIO $ runAr logger ar_opts Nothing $ map Option $ ["qc" ++ dashL, tmp_ar] ++ o_files
   where
     dashLSupported = sArSupportsDashL (settings dflags)
     dashL = if dashLSupported then "L" else ""

@@ -75,6 +75,7 @@ import GHC.Driver.Backend
 import GHC.Hs hiding (HoleError)
 
 import GHC.Tc.Errors.Types
+import GHC.Tc.Errors.Types.PromotionErr (pprTermLevelUseCtxt)
 import GHC.Tc.Errors.Hole.FitTypes
 import GHC.Tc.Types.BasicTypes
 import GHC.Tc.Types.Constraint
@@ -128,8 +129,10 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.BooleanFormula (pprBooleanFormulaNice)
 
+import qualified Data.Semigroup as S
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Foldable ( fold )
 import Data.Function (on)
@@ -137,7 +140,6 @@ import Data.List ( groupBy, sortBy, tails
                  , partition, unfoldr )
 import Data.Ord ( comparing )
 import Data.Bifunctor
-import GHC.Tc.Errors.Types.PromotionErr (pprTermLevelUseCtxt)
 
 
 defaultTcRnMessageOpts :: TcRnMessageOpts
@@ -246,6 +248,7 @@ instance Diagnostic TcRnMessage where
               2 (text "Pattern synonym declarations are only valid at top level")
     TcRnLinearPatSyn ty
       -> mkSimpleDecorated $
+           pprWithLinearTypes $
            hang (text "Pattern synonyms do not support linear fields (GHC #18806):") 2 (ppr ty)
     TcRnEmptyRecordUpdate
       -> mkSimpleDecorated $ text "Empty record update"
@@ -454,6 +457,7 @@ instance Diagnostic TcRnMessage where
             UnboxedSumType   -> text "sum"
     TcRnLinearFuncInKind ty
       -> mkSimpleDecorated $
+           pprWithLinearTypes $
            text "Illegal linear function in a kind:" <+> pprType ty
     TcRnForAllEscapeError ty kind
       -> mkSimpleDecorated $ vcat
@@ -1251,9 +1255,8 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
         ppr feature <+> text "are not allowed in type data declarations."
 
-    TcRnIllegalNewtype con show_linear_types reason
-      -> mkSimpleDecorated $
-        vcat [msg, additional]
+    TcRnIllegalNewtype con reason
+      -> mkSimpleDecorated $ vcat [msg, additional]
         where
           (msg,additional) =
             case reason of
@@ -1263,20 +1266,21 @@ instance Diagnostic TcRnMessage where
                   nest 2 $
                     text "but" <+> quotes (ppr con) <+> text "has" <+> speakN n_flds
                 ],
-                ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
+                ppr con <+> dcolon <+> ppr (dataConWrapperType con))
               IsNonLinear ->
                 (text "A newtype constructor must be linear",
-                ppr con <+> dcolon <+> ppr (dataConDisplayType True con))
+                pprWithLinearTypes $
+                  ppr con <+> dcolon <+> ppr (dataConWrapperType con))
               IsGADT ->
                 (text "A newtype must not be a GADT",
                 ppr con <+> dcolon <+> pprWithInvisibleBitsWhen sneaky_eq_spec
-                                       (ppr $ dataConDisplayType show_linear_types con))
+                                       (ppr $ dataConWrapperType con))
               HasConstructorContext ->
                 (text "A newtype constructor must not have a context in its type",
-                ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
+                ppr con <+> dcolon <+> ppr (dataConWrapperType con))
               HasExistentialTyVar ->
                 (text "A newtype constructor must not have existential type variables",
-                ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
+                ppr con <+> dcolon <+> ppr (dataConWrapperType con))
               HasStrictnessAnnotation ->
                 (text "A newtype constructor must not have a strictness annotation", empty)
 
@@ -1676,10 +1680,9 @@ instance Diagnostic TcRnMessage where
     TcRnGADTsDisabled tc_name -> mkSimpleDecorated $
       text "Illegal generalised algebraic data declaration for" <+> quotes (ppr tc_name)
     TcRnExistentialQuantificationDisabled con -> mkSimpleDecorated $
-      sdocOption sdocLinearTypes (\show_linear_types ->
         hang (text "Data constructor" <+> quotes (ppr con) <+>
               text "has existential type variables, a context, or a specialised result type")
-           2 (ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con)))
+           2 (ppr con <+> dcolon <+> ppr (dataConWrapperType con))
     TcRnGADTDataContext tc_name -> mkSimpleDecorated $
       text "A data type declared in GADT style cannot have a context:" <+> quotes (ppr tc_name)
     TcRnMultipleConForNewtype tycon n -> mkSimpleDecorated $
@@ -3985,18 +3988,23 @@ pprTcSolverReportMsg ctxt
   (CannotUnifyVariable
     { mismatchMsg         = msg
     , cannotUnifyReason   = reason })
-  =  pprMismatchMsg ctxt msg
-  $$ pprCannotUnifyVariableReason ctxt reason
+  =  let invis_bits = mismatchInvisibleBits msg
+         mismatch_msg = pprMismatchMsg ctxt msg
+     in pprWithInvisibleBits invis_bits $
+           mismatch_msg $$ pprCannotUnifyVariableReason ctxt reason
 pprTcSolverReportMsg ctxt
   (Mismatch
      { mismatchMsg           = mismatch_msg
      , mismatchTyVarInfo     = tv_info
      , mismatchAmbiguityInfo = ambig_infos
      , mismatchCoercibleInfo = coercible_info })
-  = vcat ([ pprMismatchMsg ctxt mismatch_msg
-          , maybe empty (pprTyVarInfo ctxt) tv_info
-          , maybe empty pprCoercibleMsg coercible_info ]
-          ++ (map pprAmbiguityInfo ambig_infos))
+  = let invis_bits = mismatchInvisibleBits mismatch_msg
+        ppr_mismatch = pprMismatchMsg ctxt mismatch_msg
+    in pprWithInvisibleBits invis_bits $
+         vcat ([ ppr_mismatch
+               , maybe empty (pprTyVarInfo ctxt) tv_info
+               , maybe empty pprCoercibleMsg coercible_info ]
+               ++ (map pprAmbiguityInfo ambig_infos))
 pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
   vcat (map make_msg frr_origs)
   where
@@ -4105,7 +4113,12 @@ pprTcSolverReportMsg ctxt (UnboundImplicitParams (item :| items)) =
      then addArising (errorItemCtLoc item) $
             sep [ text "Unbound implicit parameter" <> plural preds
                 , nest 2 (pprParendTheta preds) ]
-     else pprMismatchMsg ctxt (CouldNotDeduce givens (item :| items) Nothing)
+     else
+        let mismatch = CouldNotDeduce givens (item :| items) Nothing
+            invis_bits = mismatchInvisibleBits mismatch
+            ppr_msg = pprMismatchMsg ctxt mismatch
+        in
+          pprWithInvisibleBits invis_bits ppr_msg
   where
     preds = map errorItemPred (item : items)
 pprTcSolverReportMsg _ (AmbiguityPreventsSolvingCt item ambigs) =
@@ -4115,7 +4128,7 @@ pprTcSolverReportMsg _ (AmbiguityPreventsSolvingCt item ambigs) =
   <+> text "from being solved."
 pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
   (CannotResolveInstance item unifiers candidates rel_binds)
-  =
+  = pprWithInvisibleBits invis_bits $
     vcat
       [ no_inst_msg
       , extra_note
@@ -4152,12 +4165,17 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
                    && not (null unifiers)
                    && null useful_givens
 
+    invis_bits :: InvisibleBits
     no_inst_msg :: SDoc
-    no_inst_msg
+    (invis_bits, no_inst_msg)
       | lead_with_ambig
-      = pprTcSolverReportMsg ctxt $ AmbiguityPreventsSolvingCt item (ambig_kvs, ambig_tvs)
+      = (Set.empty, pprTcSolverReportMsg ctxt $ AmbiguityPreventsSolvingCt item (ambig_kvs, ambig_tvs))
       | otherwise
-      = pprMismatchMsg ctxt $ CouldNotDeduce useful_givens (item :| []) Nothing
+      = let mismatch = CouldNotDeduce useful_givens (item :| []) Nothing
+        in
+          ( mismatchInvisibleBits mismatch
+          , pprMismatchMsg ctxt $ CouldNotDeduce useful_givens (item :| []) Nothing
+          )
 
     -- Report "potential instances" only when the constraint arises
     -- directly from the user's use of an overloaded function
@@ -4375,6 +4393,44 @@ pprUntouchableVariable tv (Implic { ic_given = given, ic_info = skol_info, ic_en
         , nest 2 $ text "bound by" <+> ppr skol_info
         , nest 2 $ text "at" <+> ppr (getCtLocEnvLoc env) ]
 
+-- | Which invisible bits of types should be displayed to the user when
+-- rendering a 'MismatchMsg'?
+--
+-- See Note [Showing invisible bits of types in error messages] in GHC.Tc.Errors.Ppr.
+mismatchInvisibleBits :: MismatchMsg -> InvisibleBits
+mismatchInvisibleBits
+  (BasicMismatch { mismatch_item = item
+                 , mismatch_ty1  = ty1
+                 , mismatch_ty2  = ty2
+                 , mismatch_whenMatching = mb_match_txt })
+   = invis_bits1 S.<> invis_bits2
+   where
+      orig   = errorItemOrigin item
+      invis_bits1 = shouldPprWithInvisibleBits ty1 ty2 orig
+      invis_bits2 =
+        case mb_match_txt of
+        Nothing -> Set.empty
+        Just (WhenMatching cty1 cty2 sub_o _) ->
+          shouldPprWithInvisibleBits cty1 cty2 sub_o
+mismatchInvisibleBits
+  (TypeEqMismatch { teq_mismatch_item     = item
+                  , teq_mismatch_ty1      = ty1
+                  , teq_mismatch_ty2      = ty2 })
+  = shouldPprWithInvisibleBits ty1 ty2 (errorItemOrigin item)
+mismatchInvisibleBits (CouldNotDeduce { cnd_extra = mb_extra })
+  = case mb_extra of
+      Nothing -> Set.empty
+      Just (CND_Extra _ ty1 ty2) ->
+        mayLookIdentical ty1 ty2
+
+-- | Turn a 'MismatchMsg' into an 'SDoc'.
+--
+-- Use 'mismatchInvisibleBits' to compute which invisible bits should be
+-- displayed to the user when rendering this 'SDoc'.
+--
+-- (NB: this function doesn't directly update the 'SDocContext' because the
+-- returned 'SDoc' might only be part of a larger 'SDoc', and we likely want the
+-- entire larger message to have an updated 'SDocContext'.)
 pprMismatchMsg :: SolverReportErrCtxt -> MismatchMsg -> SDoc
 pprMismatchMsg ctxt
   (BasicMismatch { mismatch_ea   = ea
@@ -4438,8 +4494,9 @@ pprMismatchMsg ctxt
                   , teq_mismatch_what     = mb_thing
                   , teq_mb_same_occ       = mb_same_occ })
   = vcat [ addArising ct_loc $
-           pprWithInvisibleBitsWhen ppr_invis_bits msg
-           $$ maybe empty pprSameOccInfo mb_same_occ
+             vcat [ msg
+                  , maybe empty pprSameOccInfo mb_same_occ
+                  ]
          , pprQCOriginExtra item ]
   where
 
@@ -4460,12 +4517,14 @@ pprMismatchMsg ctxt
       -- bale_out_msg: the mismatched types are /inside/ exp and act
     bale_out_msg = vcat errs
       where
-        errs = case mk_ea_msg ctxt Nothing level orig of
-                  Left ea_info -> pprMismatchMsg ctxt mismatch_err
-                                : map (pprExpectedActualInfo ctxt) ea_info
-                  Right ea_err -> [ pprMismatchMsg ctxt mismatch_err
-                                  , ea_err ]
         mismatch_err = mkBasicMismatchMsg NoEA item ty1 ty2
+        ppr_mismatch_err = pprMismatchMsg ctxt mismatch_err
+        errs =
+          case mk_ea_msg ctxt Nothing level orig of
+            Left ea_info -> ppr_mismatch_err
+                          : map (pprExpectedActualInfo ctxt) ea_info
+            Right ea_err -> [ ppr_mismatch_err
+                            , ea_err ]
 
       -- 'expected' is (TYPE rep) or (CONSTRAINT rep)
     msg_for_exp_sort exp_torc exp_rep
@@ -4505,7 +4564,6 @@ pprMismatchMsg ctxt
     ct_loc = errorItemCtLoc item
     orig   = errorItemOrigin item
     level  = ctLocTypeOrKind_maybe ct_loc `orElse` TypeLevel
-    ppr_invis_bits = shouldPprWithInvisibleBits ty1 ty2 orig
 
     num_args_msg = case level of
       KindLevel
@@ -4630,49 +4688,118 @@ pprKindMismatchMsg thing exp act
 -- a visible equality, check the expected/actual types to see if the types
 -- have equal visible components. If the 'CtOrigin' is
 -- not a 'TypeEqOrigin', fall back on the actual mismatched types themselves.
-shouldPprWithInvisibleBits :: Type -> Type -> CtOrigin -> Bool
-shouldPprWithInvisibleBits _ty1 _ty2 (TypeEqOrigin { uo_actual = act
-                                                   , uo_expected = exp
-                                                   , uo_visible = vis })
-  | not vis   = True                  -- See tests T15870, T16204c
-  | otherwise = mayLookIdentical act exp   -- See tests T9171, T9144.
+shouldPprWithInvisibleBits :: Type -> Type -> CtOrigin -> Set InvisibleBit
+shouldPprWithInvisibleBits ty1 ty2
+  eq@(TypeEqOrigin { uo_actual = act, uo_expected = exp })
+  = mconcat
+      [ maybe Set.empty Set.singleton $ invisibleOrigin_maybe eq
+        -- Heuristic: if 'ty1 ~ ty2' arose from an invisible kind argument, e.g.
+        -- 'T @{ty1} a ~ T @{ty2} b', then pretty-print the expected/actual types
+        -- with explicit kinds.
+        --
+        -- This is helpful in some cases, see e.g. tests T15870, T16204c.
+        --
+        -- TODO: remove this logic after tackling #26468.
+
+      , mayLookIdentical act exp
+        -- See tests T9171, T9144.
+
+      , mayLookIdentical ty1 ty2
+      ]
+shouldPprWithInvisibleBits ty1 ty2
+  eq@(KindEqOrigin act exp orig _)
+  = mconcat
+      [ maybe Set.empty Set.singleton $ invisibleOrigin_maybe eq
+      , mayLookIdentical act exp
+      , shouldPprWithInvisibleBits ty1 ty2 orig
+      ]
 shouldPprWithInvisibleBits ty1 ty2 _ct
   = mayLookIdentical ty1 ty2
 
+pprWithLinearTypes :: SDoc -> SDoc
+pprWithLinearTypes =
+  updSDocContext $ \ctx -> ctx { sdocLinearTypes = True }
+
 {- Note [Showing invisible bits of types in error messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It can be terribly confusing to get an error message like (#9171)
+When we display a type, we usually suppress some parts of the type to avoid
+unnecessary clutter:
 
-    Couldn't match expected type ‘GetParam Base (GetParam Base Int)’
-                with actual type ‘GetParam Base (GetParam Base Int)’
+  - Kinds. Controlled by -fprint-explicit-kinds.
 
-The reason may be that the kinds don't match up.  Typically you'll get
-more useful information, but not when it's as a result of ambiguity.
+      Unless -fprint-explicit-kinds is enabled, we avoid printing
+      invisible type applications. For example, rather than:
 
-To mitigate this, when we find a type or kind mis-match:
+        (:) @Type Int tys
+        Proxy @{Nat} 3
 
-* See if normally-visible parts of the type would make the two types
-  look different.  This check is made by
-  `GHC.Core.TyCo.Compare.mayLookIdentical`
+      we display
 
-* If not, display the types with their normally-visible parts made visible,
-  by setting flags in the `SDocContext":
-  Specifically:
-    - Display kind arguments: sdocPrintExplicitKinds
-    - Don't default away runtime-reps: sdocPrintExplicitRuntimeReps,
-           which controls `GHC.Iface.Type.hideNonStandardTypes`
-  (NB: foralls are always printed by pprType, it turns out.)
+        (:) Int tys
+        Proxy 3
 
-As a result the above error message would instead be displayed as:
+  - RuntimeReps. Controlled by -fprint-explicit-runtime-reps.
 
-    Couldn't match expected type
-                  ‘GetParam @* @k2 @* Base (GetParam @* @* @k2 Base Int)’
-                with actual type
-                  ‘GetParam @* @k20 @* Base (GetParam @* @* @k20 Base Int)’
+      Unless -fprint-explicit-runtime-reps is enabled, rather than:
 
-Which makes it clearer that the culprit is the mismatch between `k2` and `k20`.
+        (#,#) :: forall {r1} {r2}. TYPE r1 -> TYPE r2 -> TYPE (TupleRep '[r1, r2])
+        ($) :: forall {r} a (b :: TYPE r). (a -> b) -> a -> b
 
-Another example of what goes wrong without this: #24553.
+      we display
+
+        (#,#) :: Type -> Type -> TYPE (TupleRep '[LiftedRep, LiftedRep])
+        ($) :: forall a b. (a -> b) -> a -> b
+
+  - Multiplicities. Controlled by -XLinearTypes.
+
+      Unless -XLinearTypes is enabled, rather than:
+
+        (a %1 -> b)
+        forall (m :: Multiplicity). a %m -> b
+
+      we display
+
+        (a -> b)
+
+To achieve this, each of these user-facing flags controls a field of
+'SDocContext', respectively:
+
+    * sdocPrintExplicitKinds
+    * sdocPrintExplicitRuntimeReps
+    * sdocLinearTypes
+
+The pretty-printer in GHC.Iface.Type then consults these when deciding how much
+to show.
+
+However, we don't want to rely on the user turning these flags on manually,
+as this can cause deeply confusing error messages. Examples:
+
+  #9171
+
+      Expected type: ‘F @k    a’
+        Actual type: ‘F @Type a’
+
+    If we hide the kinds, we get the horrible error message
+
+      Couldn't match expected type ‘F a’
+                  with actual type ‘F a’
+
+  #24553 and #26340
+
+      Expected type: ‘TYPE r’
+        Actual type: ‘Type’
+
+    If we hide RuntimeReps, we get the error message:
+
+      Couldn't match expected type ‘Type’
+                  with actual type ‘Type’
+
+To avoid these deeply confusing error messages, when we pretty-print a type
+mismatch (e.g. in 'pprTcSolverReportMsg'), we first call 'mayLookIdentical',
+which computes which normally-invisible parts of the types should be displayed
+in order to make the types visibly distinct (if any). Then 'pprWithInvisibleBits'
+updates the SDocContext to ensure that those invisible bits are shown to the user,
+even when the user hasn't manually set e.g. -fprint-explicit-kinds.
 -}
 
 {- *********************************************************************
@@ -4898,8 +5025,7 @@ pprCoercibleMsg (OutOfScopeNewtypeConstructor tc dc) =
 pprWhenMatching :: SolverReportErrCtxt -> WhenMatching -> SDoc
 pprWhenMatching ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
   sdocOption sdocPrintExplicitCoercions $ \printExplicitCoercions ->
-    if printExplicitCoercions
-       || not (cty1 `pickyEqType` cty2)
+    if printExplicitCoercions || not (cty1 `pickyEqType` cty2)
       then vcat [ hang (text "When matching" <+> sub_whats)
                       2 (vcat [ ppr cty1 <+> dcolon <+>
                                ppr (typeKind cty1)
@@ -5501,7 +5627,9 @@ mk_ea_msg ctxt at_top level
   | Just item <- at_top
   , let  ea = EA $ if expanded_syns then Just ea_expanded else Nothing
          mismatch = mkBasicMismatchMsg ea item exp act
-  = Right (pprMismatchMsg ctxt mismatch)
+         invis_bits = mismatchInvisibleBits mismatch
+         ppr_mismatch = pprMismatchMsg ctxt mismatch
+  = Right $ pprWithInvisibleBits invis_bits ppr_mismatch
   | otherwise
   = Left $
     if expanded_syns
@@ -6986,14 +7114,15 @@ pprTHReifyError = \case
        text "No roles associated with" <+> (ppr thing)
   CannotRepresentType sort ty
     -> mkSimpleDecorated $
+       (if show_linear then pprWithLinearTypes else id) $
        hang (text "Can't represent" <+> sort_doc <+> text "in Template Haskell:")
           2 (ppr ty)
      where
-       sort_doc = text $
+       (show_linear, sort_doc) =
          case sort of
-           LinearInvisibleArgument -> "linear invisible argument"
-           CoercionsInTypes -> "coercions in types"
-           DataConVisibleForall -> "visible forall in the type of a data constructor"
+           LinearInvisibleArgument -> (True , text "linear invisible argument")
+           CoercionsInTypes        -> (False, text "coercions in types")
+           DataConVisibleForall    -> (False, text "visible forall in the type of a data constructor")
 
 pprTypedTHError :: TypedTHError -> DecoratedSDoc
 pprTypedTHError = \case

@@ -2076,7 +2076,7 @@ freeNamesIfCoercion (IfaceTyConAppCo _ tc cos)
 freeNamesIfCoercion (IfaceAppCo c1 c2)
   = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
 freeNamesIfCoercion (IfaceForAllCo _tcv _visL _visR kind_co co)
-  = freeNamesIfCoercion kind_co &&& freeNamesIfCoercion co
+  = freeNamesIfMCoercion kind_co &&& freeNamesIfCoercion co
 freeNamesIfCoercion (IfaceFreeCoVar _) = emptyNameSet
 freeNamesIfCoercion (IfaceCoVarCo _)   = emptyNameSet
 freeNamesIfCoercion (IfaceHoleCo _)    = emptyNameSet

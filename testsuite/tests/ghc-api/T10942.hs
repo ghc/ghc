@@ -7,6 +7,7 @@ import GHC
 import Control.Monad.IO.Class (liftIO)
 import System.Environment
 import GHC.Parser.Header
+import GHC.Types.SourceError (initSourceErrorContext)
 import GHC.Utils.Outputable
 import GHC.Data.StringBuffer
 
@@ -19,6 +20,7 @@ main = do
                          `gopt_set` Opt_Haddock
         filename = "T10942_A.hs"
         parser_opts = initParserOpts dflags'
+        sec = initSourceErrorContext dflags'
     setSessionDynFlags dflags'
     stringBuffer <- liftIO $ hGetStringBuffer filename
-    liftIO $ print (map unLoc (snd $ getOptions parser_opts (supportedLanguagePragmas dflags) stringBuffer filename))
+    liftIO $ print (map unLoc (snd $ getOptions parser_opts sec (supportedLanguagePragmas dflags) stringBuffer filename))

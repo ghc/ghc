@@ -32,7 +32,7 @@ import GHC.Types.Basic
 import GHC.Data.BooleanFormula
 import GHC.Core.Class             ( className, classSCSelIds )
 import GHC.Core.ConLike           ( conLikeName )
-import GHC.Core.DataCon           ( dataConNonlinearType )
+import GHC.Core.DataCon           ( dataConWrapperType )
 import GHC.Types.FieldLabel
 import GHC.Hs
 import GHC.Hs.Syn.Type
@@ -628,7 +628,7 @@ instance ToHie (Context (Located Var)) where
                 Nothing-> name'
               ty = case isDataConId_maybe name' of
                       Nothing -> varType name'
-                      Just dc -> dataConNonlinearType dc
+                      Just dc -> dataConWrapperType dc
           -- insert the entity info for the name into the entity_infos map
           insertEntityInfo (varName name) $ idEntityInfo name
           insertEntityInfo (varName name') $ idEntityInfo name'

@@ -140,6 +140,7 @@ pprUnitInfo GenericUnitInfo {..} =
       field "import-dirs"          (fsep (map (text . ST.unpack) unitImportDirs)),
       field "library-dirs"         (fsep (map (text . ST.unpack) unitLibraryDirs)),
       field "dynamic-library-dirs" (fsep (map (text . ST.unpack) unitLibraryDynDirs)),
+      field "bytecode-library-dirs" (fsep (map (text . ST.unpack) unitLibraryBytecodeDirs)),
       field "hs-libraries"         (fsep (map (text . ST.unpack) unitLibraries)),
       field "extra-libraries"      (fsep (map (text . ST.unpack) unitExtDepLibsSys)),
       field "extra-ghci-libraries" (fsep (map (text . ST.unpack) unitExtDepLibsGhc)),

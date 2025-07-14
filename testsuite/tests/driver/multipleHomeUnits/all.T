@@ -65,7 +65,7 @@ test('multipleHomeUnits_import_order', [extra_files([ 'unitOrder1', 'unitOrder2'
 
 test('multipleHomeUnits_recomp', [copy_files,extra_files([ 'Recomp.hs', 'unitRecomp', 'unitDep', 'Dep.hs'])], makefile_test, [])
 
-test('multipleHomeUnits_recomp_th', [filter_stdout_lines(r'.*Compiling.*'), copy_files, extra_files(['thRecomp.script', 'unitRecompTH', 'unitDep', 'RecompTH.hs', 'Dep.hs', '../../ghci/shell.hs'])  , extra_run_opts('-v1 -unit @unitRecompTH -unit @unitDep')], ghci_script, ['thRecomp.script'])
+test('multipleHomeUnits_recomp_th', [filter_stdout_lines(r'.*Compiling.*'), copy_files, extra_files(['thRecomp.script', 'unitRecompTH', 'unitDep', 'RecompTH.hs', 'Dep.hs'])  , extra_run_opts('-v1 -unit @unitRecompTH -unit @unitDep')], ghci_script, ['thRecomp.script'])
 
 test('multipleHomeUnits_shared', [extra_files([ 'A.hs', 'unitShared1', 'unitShared2'])], multiunit_compile, [['unitShared1', 'unitShared2'], '-fhide-source-paths'])
 
@@ -76,7 +76,3 @@ test('T25122',
     [ extra_files(
         [ 'T25122', 'unitSame1', 'unitSame2'])
     ], multiunit_compile, [['unitSame1', 'unitSame2'], '-v0 -fhide-source-paths -Werror -Wmissing-home-modules'])
-
-
-
-

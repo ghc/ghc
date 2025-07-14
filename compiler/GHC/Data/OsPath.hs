@@ -11,6 +11,15 @@ module GHC.Data.OsPath
   -- * Common utility functions
   , (</>)
   , (<.>)
+  , splitSearchPath
+  , isRelative
+  , dropTrailingPathSeparator
+  , takeDirectory
+  , isSuffixOf
+  , doesDirectoryExist
+  , doesFileExist
+  , getDirectoryContents
+  , createDirectoryIfMissing
   )
   where
 
@@ -20,6 +29,8 @@ import GHC.Utils.Misc (HasCallStack)
 import GHC.Utils.Panic (panic)
 
 import System.OsPath
+import System.OsString (isSuffixOf)
+import System.Directory.OsPath (doesDirectoryExist, doesFileExist, getDirectoryContents, createDirectoryIfMissing)
 import System.Directory.Internal (os)
 
 -- | Decode an 'OsPath' to 'FilePath', throwing an 'error' if decoding failed.

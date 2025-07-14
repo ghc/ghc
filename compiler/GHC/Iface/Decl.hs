@@ -54,12 +54,12 @@ import Data.List ( findIndex, mapAccumL )
 ************************************************************************
 -}
 
-tyThingToIfaceDecl :: Bool -> TyThing -> IfaceDecl
-tyThingToIfaceDecl _ (AnId id)      = idToIfaceDecl id
-tyThingToIfaceDecl _ (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
-tyThingToIfaceDecl _ (ACoAxiom ax)  = coAxiomToIfaceDecl ax
-tyThingToIfaceDecl show_linear_types (AConLike cl)  = case cl of
-    RealDataCon dc -> dataConToIfaceDecl show_linear_types dc -- for ppr purposes only
+tyThingToIfaceDecl :: TyThing -> IfaceDecl
+tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
+tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
+tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
+tyThingToIfaceDecl (AConLike cl)  = case cl of
+    RealDataCon dc -> dataConToIfaceDecl dc
     PatSynCon ps   -> patSynToIfaceDecl ps
 
 --------------------------
@@ -75,10 +75,10 @@ idToIfaceDecl id
               ifIdInfo    = toIfaceIdInfo (idInfo id) }
 
 --------------------------
-dataConToIfaceDecl :: Bool -> DataCon -> IfaceDecl
-dataConToIfaceDecl show_linear_types dataCon
+dataConToIfaceDecl :: DataCon -> IfaceDecl
+dataConToIfaceDecl dataCon
   = IfaceId { ifName      = getName dataCon,
-              ifType      = toIfaceType (dataConDisplayType show_linear_types dataCon),
+              ifType      = toIfaceType (dataConWrapperType dataCon),
               ifIdDetails = IfVanillaId,
               ifIdInfo    = [] }
 

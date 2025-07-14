@@ -38,7 +38,7 @@ module GHC.Runtime.Interpreter
   , lookupSymbol
   , lookupSymbolInDLL
   , lookupClosure
-  , loadDLL
+  , loadDLLs
   , loadArchive
   , loadObj
   , unloadObj
@@ -559,13 +559,13 @@ withSymbolCache interp str determine_addr = do
 purgeLookupSymbolCache :: Interp -> IO ()
 purgeLookupSymbolCache interp = purgeInterpSymbolCache (interpSymbolCache interp)
 
--- | loadDLL loads a dynamic library using the OS's native linker
+-- | 'loadDLLs' loads dynamic libraries using the OS's native linker
 -- (i.e. dlopen() on Unix, LoadLibrary() on Windows).  It takes either
--- an absolute pathname to the file, or a relative filename
--- (e.g. "libfoo.so" or "foo.dll").  In the latter case, loadDLL
--- searches the standard locations for the appropriate library.
-loadDLL :: Interp -> String -> IO (Either String (RemotePtr LoadedDLL))
-loadDLL interp str = interpCmd interp (LoadDLL str)
+-- absolute pathnames to the files, or relative filenames
+-- (e.g. "libfoo.so" or "foo.dll").  In the latter case, 'loadDLLs'
+-- searches the standard locations for the appropriate libraries.
+loadDLLs :: Interp -> [String] -> IO (Either String [RemotePtr LoadedDLL])
+loadDLLs interp strs = interpCmd interp (LoadDLLs strs)
 
 loadArchive :: Interp -> String -> IO ()
 loadArchive interp path = do
@@ -761,4 +761,3 @@ readIModModBreaks hug mod = imodBreaks_modBreaks . expectJust <$> readIModBreaks
 fromEvalResult :: EvalResult a -> IO a
 fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
 fromEvalResult (EvalSuccess a) = return a
-

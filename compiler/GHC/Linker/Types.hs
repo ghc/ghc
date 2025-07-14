@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 -----------------------------------------------------------------------------
 --
@@ -12,14 +13,32 @@ module GHC.Linker.Types
    ( Loader (..)
    , LoaderState (..)
    , uninitializedLoader
+
+   -- * Bytecode Loader State
+   , BytecodeLoaderState(..)
+   , BytecodeState(..)
+   , emptyBytecodeLoaderState
+   , emptyBytecodeState
+   , modifyHomePackageBytecodeState
+   , modifyExternalPackageBytecodeState
+   , modifyBytecodeLoaderState
+   , lookupNameBytecodeState
+   , lookupBreakArrayBytecodeState
+   , lookupInfoTableBytecodeState
+   , lookupAddressBytecodeState
+   , lookupCCSBytecodeState
+   , BytecodeLoaderStateModifier
+   , BytecodeLoaderStateTraverser
+   , traverseHomePackageBytecodeState
+   , traverseExternalPackageBytecodeState
    , modifyClosureEnv
    , LinkerEnv(..)
-   , filterLinkerEnv
+   , emptyLinkerEnv
    , ClosureEnv
    , emptyClosureEnv
    , extendClosureEnv
    , LinkedBreaks(..)
-   , filterLinkedBreaks
+   , emptyLinkedBreaks
    , LinkableSet
    , mkLinkableSet
    , unionLinkableSet
@@ -30,7 +49,10 @@ module GHC.Linker.Types
    , PkgsLoaded
 
    -- * Linkable
-   , Linkable(..)
+   , Linkable
+   , WholeCoreBindingsLinkable
+   , LinkableWith(..)
+   , mkModuleByteCodeLinkable
    , LinkablePart(..)
    , LinkableObjectSort (..)
    , linkableIsNativeCodeOnly
@@ -38,15 +60,18 @@ module GHC.Linker.Types
    , linkableLibs
    , linkableFiles
    , linkableBCOs
+   , linkablePartBCOs
+   , linkableModuleByteCodes
    , linkableNativeParts
    , linkablePartitionParts
    , linkablePartPath
-   , linkablePartAllBCOs
    , isNativeCode
    , isNativeLib
    , linkableFilterByteCode
    , linkableFilterNative
    , partitionLinkables
+
+   , ModuleByteCode(..)
    )
 where
 
@@ -58,7 +83,7 @@ import GHCi.RemoteTypes
 import GHCi.Message            ( LoadedDLL )
 
 import GHC.Stack.CCS
-import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, filterNameEnv )
+import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, lookupNameEnv )
 import GHC.Types.Name          ( Name )
 import GHC.Types.SptEntry
 
@@ -74,6 +99,8 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.Maybe (mapMaybe)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
+import Control.Applicative ((<|>))
+import Data.Functor.Identity
 
 
 {- **********************************************************************
@@ -145,8 +172,9 @@ and be able to lookup symbols specifically in them too (similarly to
 newtype Loader = Loader { loader_state :: MVar (Maybe LoaderState) }
 
 data LoaderState = LoaderState
-    { linker_env :: !LinkerEnv
-        -- ^ Current global mapping from Names to their true values
+    { bco_loader_state :: !BytecodeLoaderState
+        -- ^ Information about bytecode objects we have loaded into the
+        -- interpreter.
 
     , bcos_loaded :: !LinkableSet
         -- ^ The currently loaded interpreted modules (home package)
@@ -155,26 +183,118 @@ data LoaderState = LoaderState
         -- ^ And the currently-loaded compiled modules (home package)
 
     , pkgs_loaded :: !PkgsLoaded
-        -- ^ The currently-loaded packages; always object code
+        -- ^ The currently-loaded packages;
         -- haskell libraries, system libraries, transitive dependencies
 
     , temp_sos :: ![(FilePath, String)]
         -- ^ We need to remember the name of previous temporary DLL/.so
         -- libraries so we can link them (see #10322)
-
-    , linked_breaks :: !LinkedBreaks
-        -- ^ Mapping from loaded modules to their breakpoint arrays
     }
+
+data BytecodeState = BytecodeState
+        { bco_linker_env :: !LinkerEnv
+        -- ^ Current global mapping from Names to their true values
+        , bco_linked_breaks :: !LinkedBreaks
+        -- ^ Mapping from loaded modules to their breakpoint arrays
+        }
+
+-- | The 'BytecodeLoaderState' captures all the information about bytecode loaded
+-- into the interpreter.
+-- It is separated into two parts. One for bytecode objects loaded by the home package and
+-- one for bytecode objects loaded from bytecode libraries for external packages.
+-- Much like the HPT/EPS split, the home package state can be unloaded by calling 'unload'.
+data BytecodeLoaderState = BytecodeLoaderState
+       { homePackage_loaded :: BytecodeState
+       -- ^ Information about bytecode objects from the home package we have loaded into the interpreter.
+       , externalPackage_loaded :: BytecodeState
+       -- ^ Information about bytecode objects from external packages we have loaded into the interpreter.
+       }
+
+
+-- | Find a name loaded from bytecode
+lookupNameBytecodeState :: BytecodeLoaderState -> Name -> Maybe (Name, ForeignHValue)
+lookupNameBytecodeState (BytecodeLoaderState home_package external_package) name = do
+      lookupNameEnv (closure_env (bco_linker_env home_package)) name
+  <|> lookupNameEnv (closure_env (bco_linker_env external_package)) name
+
+-- | Look up a break array in the bytecode loader state.
+lookupBreakArrayBytecodeState :: BytecodeLoaderState -> Module -> Maybe (ForeignRef BreakArray)
+lookupBreakArrayBytecodeState (BytecodeLoaderState home_package external_package) break_mod = do
+  lookupModuleEnv (breakarray_env (bco_linked_breaks home_package)) break_mod
+  <|> lookupModuleEnv (breakarray_env (bco_linked_breaks external_package)) break_mod
+
+-- | Look up an info table in the bytecode loader state.
+lookupInfoTableBytecodeState :: BytecodeLoaderState -> Name -> Maybe (Name, ItblPtr)
+lookupInfoTableBytecodeState (BytecodeLoaderState home_package external_package) info_mod = do
+  lookupNameEnv (itbl_env (bco_linker_env home_package)) info_mod
+  <|> lookupNameEnv (itbl_env (bco_linker_env external_package)) info_mod
+
+-- | Look up an address in the bytecode loader state.
+lookupAddressBytecodeState :: BytecodeLoaderState -> Name -> Maybe (Name, AddrPtr)
+lookupAddressBytecodeState (BytecodeLoaderState home_package external_package) addr_mod = do
+  lookupNameEnv (addr_env (bco_linker_env home_package)) addr_mod
+  <|> lookupNameEnv (addr_env (bco_linker_env external_package)) addr_mod
+
+-- | Look up a cost centre stack in the bytecode loader state.
+lookupCCSBytecodeState :: BytecodeLoaderState -> Module -> Maybe (Array BreakTickIndex (RemotePtr CostCentre))
+lookupCCSBytecodeState (BytecodeLoaderState home_package external_package) ccs_mod = do
+  lookupModuleEnv (ccs_env (bco_linked_breaks home_package)) ccs_mod
+  <|> lookupModuleEnv (ccs_env (bco_linked_breaks external_package)) ccs_mod
+
+emptyBytecodeLoaderState :: BytecodeLoaderState
+emptyBytecodeLoaderState = BytecodeLoaderState
+    { homePackage_loaded = emptyBytecodeState
+    , externalPackage_loaded = emptyBytecodeState
+    }
+
+emptyBytecodeState :: BytecodeState
+emptyBytecodeState = BytecodeState
+    { bco_linker_env = emptyLinkerEnv
+    , bco_linked_breaks = emptyLinkedBreaks
+    }
+
+
+-- Some parts of the compiler can be used to load bytecode into either the home package or
+-- external package state. They are parameterised by a 'BytecodeLoaderStateModifier' or
+-- 'BytecodeLoaderStateTraverser' so they know which part of the state to update.
+
+type BytecodeLoaderStateModifier = BytecodeLoaderState -> (BytecodeState -> BytecodeState) -> BytecodeLoaderState
+type BytecodeLoaderStateTraverser m = BytecodeLoaderState -> (BytecodeState -> m BytecodeState) -> m BytecodeLoaderState
+
+-- | Only update the home package bytecode state.
+modifyHomePackageBytecodeState :: BytecodeLoaderState -> (BytecodeState -> BytecodeState) -> BytecodeLoaderState
+modifyHomePackageBytecodeState bls f = runIdentity $ traverseHomePackageBytecodeState bls (return . f)
+
+-- | Only update the external package bytecode state.
+modifyExternalPackageBytecodeState :: BytecodeLoaderState -> (BytecodeState -> BytecodeState) -> BytecodeLoaderState
+modifyExternalPackageBytecodeState bls f = runIdentity $ traverseExternalPackageBytecodeState bls (return . f)
+
+-- | Effectfully update the home package bytecode state.
+traverseHomePackageBytecodeState :: Monad m => BytecodeLoaderState -> (BytecodeState -> m BytecodeState) -> m BytecodeLoaderState
+traverseHomePackageBytecodeState bls f = do
+  home_package <- f (homePackage_loaded bls)
+  return bls { homePackage_loaded = home_package }
+
+-- | Effectfully update the external package bytecode state.
+traverseExternalPackageBytecodeState :: Monad m => BytecodeLoaderState -> (BytecodeState -> m BytecodeState) -> m BytecodeLoaderState
+traverseExternalPackageBytecodeState bls f = do
+  external_package <- f (externalPackage_loaded bls)
+  return bls { externalPackage_loaded = external_package }
+
+
+modifyBytecodeLoaderState :: BytecodeLoaderStateModifier -> LoaderState -> (BytecodeState -> BytecodeState) -> LoaderState
+modifyBytecodeLoaderState modify_bytecode_loader_state pls f = pls { bco_loader_state = modify_bytecode_loader_state (bco_loader_state pls) f }
 
 uninitializedLoader :: IO Loader
 uninitializedLoader = Loader <$> newMVar Nothing
 
-modifyClosureEnv :: LoaderState -> (ClosureEnv -> ClosureEnv) -> LoaderState
+modifyClosureEnv :: BytecodeState -> (ClosureEnv -> ClosureEnv) -> BytecodeState
 modifyClosureEnv pls f =
-    let le = linker_env pls
+    let le = bco_linker_env pls
         ce = closure_env le
-    in pls { linker_env = le { closure_env = f ce } }
+    in pls { bco_linker_env = le { closure_env = f ce } }
 
+-- | Information about loaded bytecode
 data LinkerEnv = LinkerEnv
   { closure_env :: !ClosureEnv
       -- ^ Current global mapping from closure Names to their true values
@@ -191,11 +311,11 @@ data LinkerEnv = LinkerEnv
       -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode.
   }
 
-filterLinkerEnv :: (Name -> Bool) -> LinkerEnv -> LinkerEnv
-filterLinkerEnv f (LinkerEnv closure_e itbl_e addr_e) = LinkerEnv
-  { closure_env = filterNameEnv (f . fst) closure_e
-  , itbl_env    = filterNameEnv (f . fst) itbl_e
-  , addr_env    = filterNameEnv (f . fst) addr_e
+emptyLinkerEnv :: LinkerEnv
+emptyLinkerEnv = LinkerEnv
+  { closure_env = emptyNameEnv
+  , itbl_env    = emptyNameEnv
+  , addr_env    = emptyNameEnv
   }
 
 type ClosureEnv = NameEnv (Name, ForeignHValue)
@@ -224,10 +344,10 @@ data LinkedBreaks
       -- Untouched when not profiling.
   }
 
-filterLinkedBreaks :: (Module -> Bool) -> LinkedBreaks -> LinkedBreaks
-filterLinkedBreaks f (LinkedBreaks ba_e ccs_e) = LinkedBreaks
-  { breakarray_env = filterModuleEnv (\m _ -> f m) ba_e
-  , ccs_env        = filterModuleEnv (\m _ -> f m) ccs_e
+emptyLinkedBreaks :: LinkedBreaks
+emptyLinkedBreaks = LinkedBreaks
+  { breakarray_env = emptyModuleEnv
+  , ccs_env        = emptyModuleEnv
   }
 
 type PkgsLoaded = UniqDFM UnitId LoadedPkgInfo
@@ -251,7 +371,7 @@ instance Outputable LoadedPkgInfo where
 
 
 -- | Information we can use to dynamically link modules into the compiler
-data Linkable = Linkable
+data LinkableWith parts = Linkable
   { linkableTime     :: !UTCTime
       -- ^ Time at which this linkable was built
       -- (i.e. when the bytecodes were produced,
@@ -260,9 +380,13 @@ data Linkable = Linkable
   , linkableModule   :: !Module
       -- ^ The linkable module itself
 
-  , linkableParts :: NonEmpty LinkablePart
+  , linkableParts :: parts
     -- ^ Files and chunks of code to link.
- }
+ } deriving (Functor, Traversable, Foldable)
+
+type Linkable = LinkableWith (NonEmpty LinkablePart)
+
+type WholeCoreBindingsLinkable = LinkableWith WholeCoreBindings
 
 type LinkableSet = ModuleEnv Linkable
 
@@ -279,7 +403,7 @@ unionLinkableSet = plusModuleEnv_C go
       | linkableTime l1 > linkableTime l2 = l1
       | otherwise = l2
 
-instance Outputable Linkable where
+instance Outputable a => Outputable (LinkableWith a) where
   ppr (Linkable when_made mod parts)
      = (text "Linkable" <+> parens (text (show when_made)) <+> ppr mod)
        $$ nest 3 (ppr parts)
@@ -315,20 +439,23 @@ data LinkablePart
   | DotDLL FilePath
       -- ^ Dynamically linked library file (.so, .dll, .dylib)
 
-  | CoreBindings WholeCoreBindings
-      -- ^ Serialised core which we can turn into BCOs (or object files), or
-      -- used by some other backend See Note [Interface Files with Core
-      -- Definitions]
-
-  | LazyBCOs
-      CompiledByteCode
-      -- ^ Some BCOs generated on-demand when forced. This is used for
-      -- WholeCoreBindings, see Note [Interface Files with Core Definitions]
-      [FilePath]
-      -- ^ Objects containing foreign stubs and files
-
-  | BCOs CompiledByteCode
+  | DotGBC ModuleByteCode
     -- ^ A byte-code object, lives only in memory.
+
+
+-- | The in-memory representation of a bytecode object
+-- These are stored on-disk as .gbc files.
+data ModuleByteCode = ModuleByteCode { gbc_module :: Module
+                                      , gbc_compiled_byte_code :: CompiledByteCode
+                                      , gbc_foreign_files :: [FilePath]  -- ^ Path to object files
+                                      }
+
+mkModuleByteCodeLinkable :: UTCTime -> ModuleByteCode -> Linkable
+mkModuleByteCodeLinkable linkable_time bco =
+  Linkable linkable_time (gbc_module bco) (pure (DotGBC bco))
+
+instance Outputable ModuleByteCode where
+  ppr (ModuleByteCode mod _cbc _fos) = text "ModuleByteCode" <+> ppr mod
 
 instance Outputable LinkablePart where
   ppr (DotO path sort)   = text "DotO" <+> text path <+> pprSort sort
@@ -338,9 +465,7 @@ instance Outputable LinkablePart where
         ForeignObject -> brackets (text "foreign")
   ppr (DotA path)       = text "DotA" <+> text path
   ppr (DotDLL path)     = text "DotDLL" <+> text path
-  ppr (BCOs bco)        = text "BCOs" <+> ppr bco
-  ppr (LazyBCOs{})      = text "LazyBCOs"
-  ppr (CoreBindings {}) = text "CoreBindings"
+  ppr (DotGBC bco)      = text "DotGBC" <+> ppr bco
 
 -- | Return true if the linkable only consists of native code (no BCO)
 linkableIsNativeCodeOnly :: Linkable -> Bool
@@ -348,9 +473,12 @@ linkableIsNativeCodeOnly l = all isNativeCode (NE.toList (linkableParts l))
 
 -- | List the BCOs parts of a linkable.
 --
--- This excludes the LazyBCOs and the CoreBindings parts
+-- This excludes the CoreBindings parts
 linkableBCOs :: Linkable -> [CompiledByteCode]
-linkableBCOs l = [ cbc | BCOs cbc <- NE.toList (linkableParts l) ]
+linkableBCOs l = [ gbc_compiled_byte_code gbc | DotGBC gbc <- NE.toList (linkableParts l) ]
+
+linkableModuleByteCodes :: Linkable -> [ModuleByteCode]
+linkableModuleByteCodes l = [ mbc | DotGBC mbc <- NE.toList (linkableParts l) ]
 
 -- | List the native linkable parts (.o/.so/.dll) of a linkable
 linkableNativeParts :: Linkable -> [LinkablePart]
@@ -380,9 +508,7 @@ isNativeCode = \case
   DotO {}         -> True
   DotA {}         -> True
   DotDLL {}       -> True
-  BCOs {}         -> False
-  LazyBCOs{}      -> False
-  CoreBindings {} -> False
+  DotGBC {}       -> False
 
 -- | Is the part a native library? (.so/.dll)
 isNativeLib :: LinkablePart -> Bool
@@ -390,9 +516,7 @@ isNativeLib = \case
   DotO {}         -> False
   DotA {}         -> True
   DotDLL {}       -> True
-  BCOs {}         -> False
-  LazyBCOs{}      -> False
-  CoreBindings {} -> False
+  DotGBC {}       -> False
 
 -- | Get the FilePath of linkable part (if applicable)
 linkablePartPath :: LinkablePart -> Maybe FilePath
@@ -400,9 +524,7 @@ linkablePartPath = \case
   DotO fn _       -> Just fn
   DotA fn         -> Just fn
   DotDLL fn       -> Just fn
-  CoreBindings {} -> Nothing
-  LazyBCOs {}     -> Nothing
-  BCOs {}         -> Nothing
+  DotGBC {}       -> Nothing
 
 -- | Return the paths of all object code files (.o, .a, .so) contained in this
 -- 'LinkablePart'.
@@ -411,9 +533,7 @@ linkablePartNativePaths = \case
   DotO fn _       -> [fn]
   DotA fn         -> [fn]
   DotDLL fn       -> [fn]
-  CoreBindings {} -> []
-  LazyBCOs _ fos  -> fos
-  BCOs {}         -> []
+  DotGBC {}       -> []
 
 -- | Return the paths of all object files (.o) contained in this 'LinkablePart'.
 linkablePartObjectPaths :: LinkablePart -> [FilePath]
@@ -421,17 +541,14 @@ linkablePartObjectPaths = \case
   DotO fn _ -> [fn]
   DotA _ -> []
   DotDLL _ -> []
-  CoreBindings {} -> []
-  LazyBCOs _ fos -> fos
-  BCOs {} -> []
+  DotGBC bco -> gbc_foreign_files bco
 
 -- | Retrieve the compiled byte-code from the linkable part.
 --
 -- Contrary to linkableBCOs, this includes byte-code from LazyBCOs.
-linkablePartAllBCOs :: LinkablePart -> [CompiledByteCode]
-linkablePartAllBCOs = \case
-  BCOs bco    -> [bco]
-  LazyBCOs bcos _ -> [bcos]
+linkablePartBCOs :: LinkablePart -> [CompiledByteCode]
+linkablePartBCOs = \case
+  DotGBC bco    -> [gbc_compiled_byte_code bco]
   _           -> []
 
 linkableFilter :: (LinkablePart -> [LinkablePart]) -> Linkable -> Maybe Linkable
@@ -440,33 +557,31 @@ linkableFilter f linkable = do
   Just linkable {linkableParts = new}
 
 linkablePartNative :: LinkablePart -> [LinkablePart]
-linkablePartNative = \case
-  u@DotO {}  -> [u]
-  u@DotA {} -> [u]
-  u@DotDLL {} -> [u]
-  LazyBCOs _ os -> [DotO f ForeignObject | f <- os]
-  _ -> []
+linkablePartNative u = case u of
+  DotO {}  -> [u]
+  DotA {} -> [u]
+  DotDLL {} -> [u]
+  DotGBC bco -> [DotO f ForeignObject | f <- gbc_foreign_files bco]
 
 linkablePartByteCode :: LinkablePart -> [LinkablePart]
 linkablePartByteCode = \case
-  u@BCOs {}  -> [u]
-  LazyBCOs bcos _ -> [BCOs bcos]
+  u@DotGBC {}  -> [u]
   _ -> []
 
 -- | Transform the 'LinkablePart' list in this 'Linkable' to contain only
--- object code files (.o, .a, .so) without 'LazyBCOs'.
+-- object code files (.o, .a, .so) without 'BCOs'.
 -- If no 'LinkablePart' remains, return 'Nothing'.
 linkableFilterNative :: Linkable -> Maybe Linkable
 linkableFilterNative = linkableFilter linkablePartNative
 
 -- | Transform the 'LinkablePart' list in this 'Linkable' to contain only byte
--- code without 'LazyBCOs'.
+-- code
 -- If no 'LinkablePart' remains, return 'Nothing'.
 linkableFilterByteCode :: Linkable -> Maybe Linkable
 linkableFilterByteCode = linkableFilter linkablePartByteCode
 
 -- | Split the 'LinkablePart' lists in each 'Linkable' into only object code
--- files (.o, .a, .so) and only byte code, without 'LazyBCOs', and return two
+-- files (.o, .a, .so) and only byte code, and return two
 -- lists containing the nonempty 'Linkable's for each.
 partitionLinkables :: [Linkable] -> ([Linkable], [Linkable])
 partitionLinkables linkables =
@@ -494,7 +609,7 @@ data LibrarySpec
    | DLL String         -- "Unadorned" name of a .DLL/.so
                         --  e.g.    On unix     "qt"  denotes "libqt.so"
                         --          On Windows  "burble"  denotes "burble.DLL" or "libburble.dll"
-                        --  loadDLL is platform-specific and adds the lib/.so/.DLL
+                        --  loadDLLs is platform-specific and adds the lib/.so/.DLL
                         --  suffixes platform-dependently
 
    | DLLPath FilePath   -- Absolute or relative pathname to a dynamic library
@@ -502,9 +617,13 @@ data LibrarySpec
 
    | Framework String   -- Only used for darwin, but does no harm
 
+   | BytecodeLibrary FilePath
+      -- ^ A bytecode library file (.bytecodelib)
+
 instance Outputable LibrarySpec where
   ppr (Objects objs) = text "Objects" <+> ppr (map (text @SDoc) objs)
   ppr (Archive a) = text "Archive" <+> text a
   ppr (DLL s) = text "DLL" <+> text s
   ppr (DLLPath f) = text "DLLPath" <+> text f
   ppr (Framework s) = text "Framework" <+> text s
+  ppr (BytecodeLibrary f) = text "BytecodeLibrary" <+> text f

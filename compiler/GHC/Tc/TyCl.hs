@@ -5074,7 +5074,7 @@ checkValidDataCon dflags existential_ok tc con
         ; checkTc (isJust (tcMatchTyKi res_ty_tmpl orig_res_ty))
                   (TcRnDataConParentTypeMismatch con res_ty_tmpl)
             -- Note that checkTc aborts if it finds an error. This is
-            -- critical to avoid panicking when we call dataConDisplayType
+            -- critical to avoid panicking when we call dataConWrapperType
             -- on an un-rejiggable datacon!
             -- Also NB that we match the *kind* as well as the *type* (#18357)
             -- However, if the kind is the only thing that doesn't match, the
@@ -5082,7 +5082,7 @@ checkValidDataCon dflags existential_ok tc con
             --    type family Star where Star = Type
             --    newtype T :: Type where MkT :: Int -> (T :: Star)
 
-        ; traceTc "checkValidDataCon 2" (ppr data_con_display_type)
+        ; traceTc "checkValidDataCon 2" $ ppr (dataConWrapperType con)
 
           -- Check that the result type is a *monotype*
           --  e.g. reject this:   MkT :: T (forall a. a->a)
@@ -5112,7 +5112,7 @@ checkValidDataCon dflags existential_ok tc con
         ; when (isNewTyCon tc) (checkNewDataCon con)
 
           -- Check all argument types for validity
-        ; checkValidType ctxt data_con_display_type
+        ; checkValidType ctxt (dataConWrapperType con)
 
           -- Check that existentials are allowed if they are used
         ; unless (existential_ok || isVanillaDataCon con) $
@@ -5189,7 +5189,7 @@ checkValidDataCon dflags existential_ok tc con
                , text "Datacon src bangs:" <+> ppr (dataConSrcBangs con)
                , text "Datacon impl bangs:" <+> ppr (dataConImplBangs con)
                , text "Datacon rep type:" <+> ppr (dataConRepType con)
-               , text "Datacon display type:" <+> ppr data_con_display_type
+               , text "Datacon wrapper type:" <+> ppr (dataConWrapperType con)
                , text "Rep typcon binders:" <+> ppr (tyConBinders (dataConTyCon con))
                , case tyConFamInst_maybe (dataConTyCon con) of
                    Nothing -> text "not family"
@@ -5207,9 +5207,6 @@ checkValidDataCon dflags existential_ok tc con
     bad_bang n
       = TcRnBadFieldAnnotation n con
 
-    show_linear_types     = xopt LangExt.LinearTypes dflags
-    data_con_display_type = dataConDisplayType show_linear_types con
-
 -------------------------------
 checkNewDataCon :: DataCon -> TcM ()
 -- Further checks for the data constructor of a newtype
@@ -5218,36 +5215,35 @@ checkNewDataCon :: DataCon -> TcM ()
 --   newtype C = MkC Int#
 -- But they are caught earlier, by GHC.Tc.Gen.HsType.checkDataKindSig
 checkNewDataCon con
-  = do  { show_linear_types <- xopt LangExt.LinearTypes <$> getDynFlags
-        ; checkNoErrs $
+  = do  { checkNoErrs $
           -- Fail here if the newtype is invalid: subsequent code in
           -- checkValidDataCon can fall over if it comes across an invalid newtype.
      do { case arg_tys of
             [Scaled arg_mult _] ->
               unless (ok_mult arg_mult) $
               addErrTc $
-              TcRnIllegalNewtype con show_linear_types IsNonLinear
+              TcRnIllegalNewtype con IsNonLinear
             _ ->
               addErrTc $
-              TcRnIllegalNewtype con show_linear_types (DoesNotHaveSingleField $ length arg_tys)
+              TcRnIllegalNewtype con (DoesNotHaveSingleField $ length arg_tys)
 
-          -- Add an error if the newtype is a GADt or has existentials.
+          -- Add an error if the newtype is a GADT or has existentials.
           --
           -- If the newtype is a GADT, the GADT error is enough;
           -- we don't need to *also* complain about existentials.
         ; if not (null eq_spec)
-          then addErrTc $ TcRnIllegalNewtype con show_linear_types IsGADT
+          then addErrTc $ TcRnIllegalNewtype con IsGADT
           else unless (null ex_tvs) $
                addErrTc $
-               TcRnIllegalNewtype con show_linear_types HasExistentialTyVar
+               TcRnIllegalNewtype con HasExistentialTyVar
 
         ; unless (null theta) $
           addErrTc $
-          TcRnIllegalNewtype con show_linear_types HasConstructorContext
+          TcRnIllegalNewtype con HasConstructorContext
 
         ; unless (all ok_bang (dataConSrcBangs con)) $
           addErrTc $
-          TcRnIllegalNewtype con show_linear_types HasStrictnessAnnotation } }
+          TcRnIllegalNewtype con HasStrictnessAnnotation } }
   where
 
     (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)

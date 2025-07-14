@@ -1,6 +1,7 @@
 -- (c) The University of Glasgow 2006
 -- (c) The GRASP/AQUA Project, Glasgow University, 1998
 
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MagicHash #-}
 
@@ -13,7 +14,10 @@ module GHC.Core.TyCo.Compare (
 
     pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck,
     tcEqTyConApps, tcEqTyConAppArgs,
-    mayLookIdentical,
+
+    -- ** Dealing with invisible bits in types
+    mayLookIdentical, pprWithInvisibleBits,
+    InvisibleBit(..), InvisibleBits,
 
     -- * Type comparison
     nonDetCmpType,
@@ -38,13 +42,20 @@ import GHC.Types.Unique
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 
+import {-# SOURCE #-} GHC.Tc.Utils.TcType (isMetaTyVar)
+
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
 import GHC.Base (reallyUnsafePtrEquality#)
 
+import Control.Monad ( unless )
+import Control.Monad.Trans.Writer.CPS ( Writer )
+import qualified Control.Monad.Trans.Writer.CPS as Writer
 import qualified Data.Semigroup as S
+import Data.Set ( Set )
+import qualified Data.Set as Set
 
 {- GHC.Core.TyCo.Compare overview
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -767,79 +778,299 @@ nonDetCmpTc tc1 tc2
 *                                                                      *
 ********************************************************************* -}
 
-mayLookIdentical :: Type -> Type -> Bool
--- | Returns True if the /visible/ part of the types
--- might look equal, even if they are really unequal (in the invisible bits)
+-- | Something in a type which might be invisible.
 --
--- This function is very similar to tc_eq_type but it is much more
--- heuristic.  Notably, it is always safe to return True, even with types
--- that might (in truth) be unequal  -- this affects error messages only
--- (Originally this test was done by eqType with an extra flag, but the result
---  was hard to understand.)
+-- Used to avoid reporting confusing errors to the user, like:
+--
+-- > Couldn't match (a -> b) with (a -> b)
+--
+-- When in fact it is e.g. (a %1 -> b) vs (a %Many -> b), but the multiplicites
+-- have been suppressed.
+--
+-- See Note [Showing invisible bits of types in error messages] in GHC.Tc.Errors.Ppr.
+data InvisibleBit
+  = InvisibleKind
+  | InvisibleRuntimeRep
+  | InvisibleMultiplicity
+  deriving stock (Eq, Ord, Show)
+instance Outputable InvisibleBit where
+  ppr thing = text (show thing)
+
+-- | A collection of 'InvisibleBit's.
+type InvisibleBits = Set InvisibleBit
+
+-- | Make the sure the given invisible bits are displayed.
+--
+-- See Note [Showing invisible bits of types in error messages] in GHC.Tc.Errors.Ppr.
+pprWithInvisibleBits :: Set InvisibleBit -> SDoc -> SDoc
+pprWithInvisibleBits invis_bits
+  = updSDocContext $ \ctx ->
+      ctx { sdocPrintExplicitKinds
+              = show_kinds || sdocPrintExplicitKinds ctx
+          , sdocPrintExplicitRuntimeReps
+              = show_reps  || sdocPrintExplicitRuntimeReps ctx
+          , sdocLinearTypes
+              = show_mults || sdocLinearTypes ctx
+  -- Question: what about 'sdocPrintExplicitCoercions'?
+  -- Currently, we never enable that automatically; it's always up to the user
+  -- to enable it.
+          }
+  where
+    show_kinds = InvisibleKind         `Set.member` invis_bits
+    show_reps  = InvisibleRuntimeRep   `Set.member` invis_bits
+    show_mults = InvisibleMultiplicity `Set.member` invis_bits
+
+mayLookIdentical :: Type -> Type -> InvisibleBits
+-- | 'mayLookIdentical' returns:
+--
+--  - An empty set if the two types are distinct unequal, and remain distinct
+--    even if we hide explicit kinds, runtime-reps, multiplicities.
+--  - A non-empty set of 'invis_bits', if the two types might look equal, but
+--    are in fact distinct in the returned 'invis_bits'.
+--
+-- See Note [mayLookIdentical], as well as
+-- Note [Showing invisible bits of types in error messages] in GHC.Tc.Errors.Ppr.
 mayLookIdentical orig_ty1 orig_ty2
-  = go orig_env orig_ty1 orig_ty2
+  = case Writer.runWriter $ go orig_env True orig_ty1 orig_ty2 of
+      (eq, invis_things) ->
+        if eq
+        then invis_things
+        else Set.empty
   where
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
 
-    go :: RnEnv2 -> Type -> Type -> Bool
+    tell_on_mismatch :: InvisibleBit -> Writer InvisibleBits Bool -> Writer InvisibleBits Bool
+    tell_on_mismatch what inner
+      = do { let (inner_vis_ok, inner_invis) = Writer.runWriter inner
+                 ok = inner_vis_ok && Set.null inner_invis
+           ; unless ok $
+               Writer.tell $
+                 if inner_vis_ok
+                 then -- If the inner mismatch is invisible,
+                      -- we need to print those invisible bits as well.
+                      --
+                      -- See Note [mayLookIdentical]
+                      Set.insert what inner_invis
+                 else Set.singleton what
+           ; return ok
+           }
 
-    go env (TyConApp tc1 ts1) (TyConApp tc2 ts2)
+    -- See Note [mayLookIdentical]
+    go :: RnEnv2
+       -> Bool -- are we at the top-level? used only for Wrinkle [MetaTv mismatch at top-level only]
+       -> Type -- lhs type
+       -> Type -- rhs type
+       -> Writer InvisibleBits Bool
+        -- True  <=> types might be visibly equal
+        -- False <=> types are definitely not visibly equal
+        -- Invisible bits: the invisible bits in which the types differ (if any)
+    go env _top (TyConApp tc1 ts1) (TyConApp tc2 ts2)
       | tc1 == tc2, not (isForgetfulSynTyCon tc1) -- See Note [Comparing type synonyms]
       = gos env (tyConBinders tc1) ts1 ts2
 
-    go env t1 t2 | Just t1' <- coreView t1 = go env t1' t2
-    go env t1 t2 | Just t2' <- coreView t2 = go env t1 t2'
+    go env top t1 t2 | Just t1' <- coreView t1 = go env top t1' t2
+    go env top t1 t2 | Just t2' <- coreView t2 = go env top t1 t2'
 
-    go env (TyVarTy tv1)   (TyVarTy tv2)   = rnOccL env tv1 == rnOccR env tv2
-    go _   (LitTy lit1)    (LitTy lit2)    = lit1 == lit2
-    go env (CastTy t1 _)   t2              = go env t1 t2
-    go env t1              (CastTy t2 _)   = go env t1 t2
-    go _   (CoercionTy {}) (CoercionTy {}) = True
+    go env _top (TyVarTy tv1) (TyVarTy tv2)
+      | rnOccL env tv1 == rnOccR env tv2
+      = return True
+    go env top (TyVarTy tv) ty
+      | isDefaultableTyVar tv
+      -- See Note [Defaultable tyvars in mayLookIdentical]
+      = discard_defaultable_tyvar tv
+      | isMetaTyVar tv
+      -- See Note [Metavariables in mayLookIdentical]
+      = if not top -- Wrinkle [MetaTv mismatch at top-level only]
+        then return False
+        else
+          do { kind_ok <- tell_on_mismatch InvisibleKind $ go env False (tyVarKind tv) (typeKind ty)
+             ; return $ not kind_ok }
+    go env top ty (TyVarTy tv)
+      | isDefaultableTyVar tv
+      -- See Note [Defaultable tyvars in mayLookIdentical]
+      = discard_defaultable_tyvar tv
+      | isMetaTyVar tv
+      -- See Note [Metavariables in mayLookIdentical]
+      = if not top -- Wrinkle [MetaTv mismatch at top-level only]
+        then return False
+        else
+          do { kind_ok <- tell_on_mismatch InvisibleKind $ go env False (typeKind ty) (tyVarKind tv)
+             ; return $ not kind_ok }
+    go _ _ (TyVarTy {}) (TyVarTy {}) = return False
 
-    go env (ForAllTy (Bndr tv1 vis1) ty1)
-           (ForAllTy (Bndr tv2 vis2) ty2)
-      =  vis1 `eqForAllVis` vis2  -- See Note [ForAllTy and type equality]
-      && go (rnBndr2 env tv1 tv2) ty1 ty2
-         -- Visible stuff only: ignore kinds of binders
+    go _   _   (LitTy lit1)    (LitTy lit2)    = return $ lit1 == lit2
+    go top vis (CastTy t1 _)   t2              = go top vis t1 t2
+    go top vis t1              (CastTy t2 _)   = go top vis t1 t2
+    go _   _   (CoercionTy {}) (CoercionTy {}) = return True
 
-    -- If we have (forall (r::RunTimeRep). ty1  ~   blah) then respond
-    -- with True.  Reason: the type pretty-printer defaults RuntimeRep
-    -- foralls (see Ghc.Iface.Type.hideNonStandardTypes).  That can make,
-    -- say (forall r. TYPE r -> Type) into (Type -> Type), so it looks the
-    -- same as a very different type (#24553).  By responding True, we
-    -- tell GHC (see calls of mayLookIdentical) to display without defaulting.
-    -- See Note [Showing invisible bits of types in error messages]
-    -- in GHC.Tc.Errors.Ppr
-    go _ (ForAllTy b _) _ | isDefaultableBndr b = True
-    go _ _ (ForAllTy b _) | isDefaultableBndr b = True
+    go env _top (ForAllTy (Bndr tv1 vis1) ty1)
+                (ForAllTy (Bndr tv2 vis2) ty2)
+      = if vis1 `eqForAllVis` vis2  -- See Note [ForAllTy and type equality]
+        then do { _kind_ok <- tell_on_mismatch InvisibleKind $ go env False (tyVarKind tv1) (tyVarKind tv2)
+                ; go (rnBndr2 env tv1 tv2) False ty1 ty2 }
+        else return False
 
-    go env (FunTy _ w1 arg1 res1) (FunTy _ w2 arg2 res2)
-      = go env arg1 arg2 && go env res1 res2 && go env w1 w2
-        -- Visible stuff only: ignore agg kinds
+    -- See Note [Defaultable tyvars in mayLookIdentical]
+    go _ _ (ForAllTy b@(Bndr tv _) _) _ | isDefaultableBndr b = discard_defaultable_tyvar tv
+    go _ _ _ (ForAllTy b@(Bndr tv _) _) | isDefaultableBndr b = discard_defaultable_tyvar tv
+
+    go env _top (FunTy _ w1 arg1 res1) (FunTy _ w2 arg2 res2)
+      = do { _mult_ok <- tell_on_mismatch InvisibleMultiplicity $ go env False w1 w2
+           ; _reps_ok <- tell_on_mismatch InvisibleRuntimeRep $
+               (&&) <$> go env False (typeKind arg1) (typeKind arg2)
+                    <*> go env False (typeKind res1) (typeKind res2)
+           ; (&&) <$> go env False arg1 arg2 <*> go env False res1 res2 }
 
       -- See Note [Equality on AppTys] in GHC.Core.Type
-    go env (AppTy s1 t1) ty2
+    go env _top (AppTy s1 t1) ty2
       | Just (s2, t2) <- tcSplitAppTyNoView_maybe ty2
-      = go env s1 s2 && go env t1 t2
-    go env ty1 (AppTy s2 t2)
+      = (&&) <$> go env False s1 s2 <*> go env False t1 t2
+    go env _top ty1 (AppTy s2 t2)
       | Just (s1, t1) <- tcSplitAppTyNoView_maybe ty1
-      = go env s1 s2 && go env t1 t2
+      = (&&) <$> go env False s1 s2 <*> go env False t1 t2
 
-    go env (TyConApp tc1 ts1)   (TyConApp tc2 ts2)
-      = tc1 == tc2 && gos env (tyConBinders tc1) ts1 ts2
+    go _ _ _ _ = return False
 
-    go _ _ _ = False
+    discard_defaultable_tyvar :: TyVar -> Writer InvisibleBits Bool
+    discard_defaultable_tyvar tv =
+      do { let what =
+                 if isMultiplicityTy (tyVarKind tv)
+                 then InvisibleMultiplicity
+                 else InvisibleRuntimeRep
+        ; Writer.tell $ Set.singleton what
+        ; return True }
 
-    gos :: RnEnv2 -> [TyConBinder] -> [Type] -> [Type] -> Bool
-    gos _   _         []       []      = True
+    gos :: RnEnv2 -> [TyConBinder] -> [Type] -> [Type] -> Writer InvisibleBits Bool
+    gos _   _  []       []      = return True
     gos env bs (t1:ts1) (t2:ts2)
       | (invisible, bs') <- case bs of
                                []     -> (False,                    [])
                                (b:bs) -> (isInvisibleTyConBinder b, bs)
-      = (invisible || go env t1 t2) && gos env bs' ts1 ts2
+      = if invisible
+        then do { _kind_ok <- tell_on_mismatch InvisibleKind $ go env False t1 t2
+                ; gos env bs' ts1 ts2 }
+        else do { (&&) <$> go env False t1 t2 <*> gos env bs' ts1 ts2 }
 
-    gos _ _ _ _ = False
+    gos _ _ _ _ = return False
 
+{- Note [mayLookIdentical]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+As described in Note [Showing invisible bits of types in error messages]
+in GHC.Tc.Errors.Ppr, the job of 'mayLookIdentical' is to compute whether two
+types that are not equal may in fact look identical when pretty-printed to the
+user, due to the hiding of explicit kinds, runtime-reps or multiplicities.
+
+'mayLookIdentical' can return:
+
+  - an empty set:
+      The types definitely don't look identical, even if we hide all
+      RuntimeReps, kinds, multiplicities, etc.
+
+  - a non-empty set of invis_bits:
+      The types may look identical to the user, so please don't hide 'invis_bits'
+      when pretty-printing them.
+
+Note that 'mayLookIdentical' is conservative: it can sometimes return a non-empty
+result when in fact the types might not look identical, even after hiding all the
+invisible bits. That's OK: all that happens is that we show a bit of extra
+clutter; better that than occasionally displaying very confusing error messages.
+
+To compute which invisible bits should be shown, the main worker function 'go'
+walks through the two input types in parallel, accumulating a set of 'InvisBits'
+in the Writer monad.
+
+  - If the two types are definitely visibly unequal, 'go' returns 'False'.
+  - If the two types might be visibly equal, it returns 'True'.
+    Sometimes 'go' can return 'True' even when the types aren't really visibly
+    equal, e.g. because of Note [Defaultable tyvars in mayLookIdentical].
+    That's OK; all that means is that we will sometimes unnecessarily switch
+    on some explicit pretty-printing flags.
+  - The 'invis_bits' that go computes in the monad are the invisible bits in
+    which the two types are definitely unequal.
+    This is implemented by using the 'tell_on_mismatch' on function when we
+    look at an invisible bit of the types.
+
+    For example, suppose we have (a %m -> b) vs (a %n -> b):
+
+      * We recursively call 'go' on the multiplicities, which tells us
+        that 'm' and 'n' are unequal.
+      * We write in the monad that there is a mismatch in a multiplicity.
+
+    Note that, when the inner types differ in yet another invisible component,
+    e.g. an invisible kind argument inside a multiplicity:
+
+      (a %(M @k1 t) -> b)   vs   (a %(M @k2 t) -> b)
+
+    then we need to enable the pretty-printing of /both/ multiplicities and
+    explicit kinds. This is handled by 'tell_on_mismatch'.
+
+Note [Metavariables in mayLookIdentical]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have a type mismatch, like in the 'PprExplicitKinds' test:
+
+  alpha[tau] :: TYPE (RR @k1)
+  b[sk]      :: TYPE (RR @k2)
+
+Of course, 'alpha' and 'b' don't really look identical: they are type variables
+with different names. We don't need to display any invisible bits for that to
+be apparent to the user.
+
+However, the user might wonder: why didn't 'alpha' unify? In this case, the
+reason is that the kinds don't match, so it makes sense to show explicit kinds
+to communicate that to the user.
+
+Conclusion: in 'mayLookIdentical', when one of the types is a metavariable and
+the kinds don't match, return:
+
+  1. Visibly identical == True (the 'lie')
+  2. Parts in which they are invisibly different: the kinds.
+
+Otherwise, if the kinds do match, then set 'visibly identical == False'.
+
+This has the net effect of switching on -fprint-explicit-kinds in the error
+message, as desired.
+
+Wrinkle [MetaTv mismatch at top-level only]
+
+  The logic described in the Note only applies for top-level mismatches
+  such as
+
+    alpha[tau] ~ b[sk]
+
+  If the mismatch is nested more deeply inside the type, don't bother. This
+  is to avoid needlessly cluttering the error message, e.g. in
+
+    T alpha ~ T b
+
+  we shouldn't turn on explicit kinds just because of the 'alpha' vs 'b'
+  mismatch. Relevant test case: T8030.
+
+Note [Defaultable tyvars in mayLookIdentical]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are dealing with the following type mismatch in 'mayLookIdentical':
+
+  ty1: forall (r::RuntimeRep). TYPE r -> Type
+  ty2:                         Type   -> Type
+
+The type pretty-printer defaults 'RuntimeRep' foralls (see GHC.Iface.Type.hideNonStandardTypes),
+which will make the two types identical.
+
+Hence, whenever we see a 'forall' whose binder has kind RuntimeRep, bail out
+and say:
+
+  1. May look identical: True.
+  2. Parts in which the types are invisibly different: the RuntimeReps.
+
+Hence, we will pass -fprint-explicit-runtime-reps when displaying ty1, which
+will avoid a confusing error message.
+
+The same applies for multiplicity variables, e.g.
+
+  ty1: forall (m :: Multiplicity). a %m -> b
+  ty2:                             a    -> b
+
+See Note [Showing invisible bits of types in error messages] in GHC.Tc.Errors.Ppr
+-}
 
 isDefaultableBndr :: ForAllTyBinder -> Bool
 -- This function should line up with the defaulting done
@@ -847,7 +1078,9 @@ isDefaultableBndr :: ForAllTyBinder -> Bool
 -- See Note [Showing invisible bits of types in error messages]
 --   in GHC.Tc.Errors.Ppr
 isDefaultableBndr (Bndr tv vis)
-  = isInvisibleForAllTyFlag vis && is_defaultable (tyVarKind tv)
+  = isInvisibleForAllTyFlag vis && isDefaultableTyVar tv
+isDefaultableTyVar :: TyVar -> Bool
+isDefaultableTyVar tv =
+  isLevityTy ki || isRuntimeRepTy ki  || isMultiplicityTy ki
   where
-    is_defaultable ki = isLevityTy ki || isRuntimeRepTy ki  || isMultiplicityTy ki
-
+    ki = tyVarKind tv

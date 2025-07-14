@@ -282,6 +282,10 @@ instance Diagnostic DriverMessage where
             ++ " and "
             ++ llvmVersionStr supportedLlvmVersionUpperBound
             ++ ") and reinstall GHC to ensure -fllvm works")
+    DriverMissingLinkableForModule mods
+      -> mkSimpleDecorated $
+        vcat [ text "The following modules are missing a linkable which is needed for creating a library:"
+             , nest 2 $ hcat (map ppr mods) ]
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -353,6 +357,8 @@ instance Diagnostic DriverMessage where
       -> ErrorWithoutFlag
     DriverNoConfiguredLLVMToolchain
       -> WarningWithoutFlag
+    DriverMissingLinkableForModule {}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     DriverUnknownMessage m
@@ -425,6 +431,8 @@ instance Diagnostic DriverMessage where
     DriverInstantiationNodeInDependencyGeneration {}
       -> noHints
     DriverNoConfiguredLLVMToolchain
+      -> noHints
+    DriverMissingLinkableForModule {}
       -> noHints
 
   diagnosticCode = constructorCode @GHC

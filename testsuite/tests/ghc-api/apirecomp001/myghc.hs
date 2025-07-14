@@ -37,7 +37,7 @@ main = do
     prn "target nothing: ok"
 
     dflags <- getSessionDynFlags
-    setSessionDynFlags $ dflags { backend = interpreterBackend }
+    setSessionDynFlags $ dflags { backend = bytecodeBackend }
     ok <- load LoadAllTargets
     when (failed ok) $ error "Couldn't load A.hs in interpreted mode"
     prn "target interpreted: ok"

@@ -1,6 +1,3 @@
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-
 :set -v1
 System.IO.writeFile "T1914A.hs" "module T1914A where { import T1914B; }"
 System.IO.writeFile "T1914B.hs" "module T1914B where { type T = Int; }"

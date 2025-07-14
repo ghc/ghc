@@ -911,14 +911,8 @@ pprConDecl (ConDeclGADT { con_names = cons
                 <+> pprLHsContext mcxt,
               sep (ppr_args args ++ [ppr res_ty]) ])
   where
-    ppr_args (PrefixConGADT _ args) = map (pprHsConDeclFieldWith (\arr tyDoc -> tyDoc <+> ppr_arr arr)) args
+    ppr_args (PrefixConGADT _ args) = map (pprHsConDeclFieldWith (\arr tyDoc -> tyDoc <+> pprHsArrow arr)) args
     ppr_args (RecConGADT _ fields) = [pprHsConDeclRecFields (unLoc fields) <+> arrow]
-
-    -- Display linear arrows as unrestricted with -XNoLinearTypes
-    -- (cf. dataConDisplayType in Note [Displaying linear fields] in GHC.Core.DataCon)
-    ppr_arr (HsLinearAnn _) = sdocOption sdocLinearTypes $ \show_linear_types ->
-                                  if show_linear_types then lollipop else arrow
-    ppr_arr arr = pprHsArrow arr
 
 ppr_con_names :: (OutputableBndr a) => [GenLocated l a] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
