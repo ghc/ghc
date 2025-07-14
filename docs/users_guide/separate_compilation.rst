@@ -710,7 +710,7 @@ beautiful sight!
 You can read about :ghc-wiki:`how all this works <commentary/compiler/recompilation-avoidance>` in the GHC commentary.
 
 Recompilation for Template Haskell and Plugins
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Recompilation checking gets a bit more complicated when using Template Haskell or
 plugins. Both these features execute code at compile time and so if any of the
@@ -726,6 +726,19 @@ dependencies are created on the object file dependencies of the expression. For 
 if ``foo`` is from module ``A`` and ``bar`` is from module ``B``, the module will
 now depend on ``A.o`` and ``B.o``, if either of these change then the module will
 be recompiled.
+
+``addDependentFile`` and ``addDependentDirectory``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When using Template Haskell or plugins, you can use the functions
+``addDependentFile`` and ``addDependentDirectory`` to add additional
+dependencies to the module being compiled.
+
+- When adding a file, this means that the contents of the file changing between
+  compilations will trigger a recompilation of the module.
+- When adding a directory, this means that any file or subdirectory *added* to or
+  *removed* from the directory will trigger recompilation of the module, so
+  it is not a recursive dependency.
 
 .. _mutual-recursion:
 
