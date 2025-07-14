@@ -95,6 +95,13 @@ bool eventlog_enabled; // protected by state_change_mutex to ensure
  * buffer size, EVENT_LOG_SIZE. We must ensure that no variable-length event
  * exceeds this limit. For this reason we impose maximum length limits on
  * fields which may have unbounded values.
+ *
+ * Note [Profile ID]
+ * ~~~~~~~~~~~~~~~~~
+ * The profile ID field of eventlog entries is reserved for future use,
+ * with an eye towards supporting multiple parallel heap profiles.
+ * In the current RTS, the profile ID is hardcoded to 0.
+ *
  */
 
 static const EventLogWriter *event_log_writer = NULL;
@@ -1219,7 +1226,7 @@ static HeapProfBreakdown getHeapProfBreakdown(void)
     }
 }
 
-void postHeapProfBegin(StgWord8 profile_id)
+void postHeapProfBegin(void)
 {
     ACQUIRE_LOCK(&eventBufMutex);
     PROFILING_FLAGS *flags = &RtsFlags.ProfFlags;
@@ -1244,7 +1251,8 @@ void postHeapProfBegin(StgWord8 profile_id)
     CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_BEGIN);
     postPayloadSize(&eventBuf, len);
-    postWord8(&eventBuf, profile_id);
+    // See Note [Profile ID].
+    postWord8(&eventBuf, 0);
     postWord64(&eventBuf, TimeToNS(flags->heapProfileInterval));
     postWord32(&eventBuf, getHeapProfBreakdown());
     postStringLen(&eventBuf, flags->modSelector, modSelector_len);
@@ -1286,8 +1294,7 @@ void postHeapProfSampleEnd(StgInt era)
     RELEASE_LOCK(&eventBufMutex);
 }
 
-void postHeapProfSampleString(StgWord8 profile_id,
-                              const char *label,
+void postHeapProfSampleString(const char *label,
                               StgWord64 residency)
 {
     ACQUIRE_LOCK(&eventBufMutex);
@@ -1296,7 +1303,8 @@ void postHeapProfSampleString(StgWord8 profile_id,
     CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_SAMPLE_STRING);
     postPayloadSize(&eventBuf, len);
-    postWord8(&eventBuf, profile_id);
+    // See Note [Profile ID].
+    postWord8(&eventBuf, 0);
     postWord64(&eventBuf, residency);
     postStringLen(&eventBuf, label, label_len);
     RELEASE_LOCK(&eventBufMutex);
@@ -1325,8 +1333,7 @@ void postHeapProfCostCentre(StgWord32 ccID,
     RELEASE_LOCK(&eventBufMutex);
 }
 
-void postHeapProfSampleCostCentre(StgWord8 profile_id,
-                                  CostCentreStack *stack,
+void postHeapProfSampleCostCentre(CostCentreStack *stack,
                                   StgWord64 residency)
 {
     ACQUIRE_LOCK(&eventBufMutex);
@@ -1340,7 +1347,8 @@ void postHeapProfSampleCostCentre(StgWord8 profile_id,
     CHECK(!ensureRoomForVariableEvent(&eventBuf, len));
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_SAMPLE_COST_CENTRE);
     postPayloadSize(&eventBuf, len);
-    postWord8(&eventBuf, profile_id);
+    // See Note [Profile ID].
+    postWord8(&eventBuf, 0);
     postWord64(&eventBuf, residency);
     postWord8(&eventBuf, depth);
     for (ccs = stack;

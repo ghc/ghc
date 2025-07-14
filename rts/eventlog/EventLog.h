@@ -163,14 +163,13 @@ void postTaskMigrateEvent (EventTaskId taskId,
 
 void postTaskDeleteEvent (EventTaskId taskId);
 
-void postHeapProfBegin(StgWord8 profile_id);
+void postHeapProfBegin(void);
 
 void postHeapProfSampleBegin(StgInt era);
 void postHeapBioProfSampleBegin(StgInt era, StgWord64 time_ns);
 void postHeapProfSampleEnd(StgInt era);
 
-void postHeapProfSampleString(StgWord8 profile_id,
-                              const char *label,
+void postHeapProfSampleString(const char *label,
                               StgWord64 residency);
 
 #if defined(PROFILING)
@@ -180,8 +179,7 @@ void postHeapProfCostCentre(StgWord32 ccID,
                             const char *srcloc,
                             StgBool is_caf);
 
-void postHeapProfSampleCostCentre(StgWord8 profile_id,
-                                  CostCentreStack *stack,
+void postHeapProfSampleCostCentre(CostCentreStack *stack,
                                   StgWord64 residency);
 
 void postProfSampleCostCentre(Capability *cap,

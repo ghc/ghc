@@ -303,20 +303,18 @@ void traceTaskMigrate_ (Task       *task,
 
 void traceTaskDelete_ (Task       *task);
 
-void traceHeapProfBegin(StgWord8 profile_id);
+void traceHeapProfBegin(void);
 void traceHeapProfSampleBegin(StgInt era);
 void traceHeapBioProfSampleBegin(StgInt era, StgWord64 time);
 void traceHeapProfSampleEnd(StgInt era);
-void traceHeapProfSampleString(StgWord8 profile_id,
-                               const char *label, StgWord residency);
+void traceHeapProfSampleString(const char *label, StgWord residency);
 #if defined(PROFILING)
 void traceHeapProfCostCentre(StgWord32 ccID,
                              const char *label,
                              const char *module,
                              const char *srcloc,
                              StgBool is_caf);
-void traceHeapProfSampleCostCentre(StgWord8 profile_id,
-                                   CostCentreStack *stack, StgWord residency);
+void traceHeapProfSampleCostCentre(CostCentreStack *stack, StgWord residency);
 
 void traceProfSampleCostCentre(Capability *cap,
                                CostCentreStack *stack, StgWord ticks);
@@ -369,14 +367,14 @@ void flushTrace(void);
 #define traceTaskCreate_(taskID, cap) /* nothing */
 #define traceTaskMigrate_(taskID, cap, new_cap) /* nothing */
 #define traceTaskDelete_(taskID) /* nothing */
-#define traceHeapProfBegin(profile_id) /* nothing */
+#define traceHeapProfBegin() /* nothing */
 #define traceHeapProfCostCentre(ccID, label, module, srcloc, is_caf) /* nothing */
 #define traceIPE(ipe) /* nothing */
 #define traceHeapProfSampleBegin(era) /* nothing */
 #define traceHeapBioProfSampleBegin(era, time) /* nothing */
 #define traceHeapProfSampleEnd(era) /* nothing */
-#define traceHeapProfSampleCostCentre(profile_id, stack, residency) /* nothing */
-#define traceHeapProfSampleString(profile_id, label, residency) /* nothing */
+#define traceHeapProfSampleCostCentre(stack, residency) /* nothing */
+#define traceHeapProfSampleString(label, residency) /* nothing */
 
 #define traceConcMarkBegin() /* nothing */
 #define traceConcMarkEnd(marked_obj_count) /* nothing */

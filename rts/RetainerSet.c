@@ -238,7 +238,7 @@ printRetainerSetShort(FILE *f, RetainerSet *rs, W_ total_size, uint32_t max_leng
         }
     }
     fputs(tmp, f);
-    traceHeapProfSampleString(0, tmp, total_size);
+    traceHeapProfSampleString(tmp, total_size);
 }
 
 /* -----------------------------------------------------------------------------

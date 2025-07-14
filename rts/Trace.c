@@ -647,10 +647,10 @@ void traceTaskDelete_ (Task *task)
     }
 }
 
-void traceHeapProfBegin(StgWord8 profile_id)
+void traceHeapProfBegin(void)
 {
     if (eventlog_enabled) {
-        postHeapProfBegin(profile_id);
+        postHeapProfBegin();
     }
 }
 void traceHeapBioProfSampleBegin(StgInt era, StgWord64 time)
@@ -674,11 +674,10 @@ void traceHeapProfSampleEnd(StgInt era)
     }
 }
 
-void traceHeapProfSampleString(StgWord8 profile_id,
-                               const char *label, StgWord residency)
+void traceHeapProfSampleString(const char *label, StgWord residency)
 {
     if (eventlog_enabled) {
-        postHeapProfSampleString(profile_id, label, residency);
+        postHeapProfSampleString(label, residency);
     }
 }
 
@@ -718,11 +717,10 @@ void traceHeapProfCostCentre(StgWord32 ccID,
 }
 
 // This one is for .hp samples
-void traceHeapProfSampleCostCentre(StgWord8 profile_id,
-                                   CostCentreStack *stack, StgWord residency)
+void traceHeapProfSampleCostCentre(CostCentreStack *stack, StgWord residency)
 {
     if (eventlog_enabled) {
-        postHeapProfSampleCostCentre(profile_id, stack, residency);
+        postHeapProfSampleCostCentre(stack, residency);
     }
 }
 

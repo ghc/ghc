@@ -557,7 +557,7 @@ initHeapProfiling(void)
 
     restore_locale();
 
-    traceHeapProfBegin(0);
+    traceHeapProfBegin();
 }
 
 void
@@ -896,17 +896,17 @@ dumpCensus( Census *census )
 
 
         // Eventlog
-        traceHeapProfSampleString(0, "VOID",
+        traceHeapProfSampleString("VOID",
                 (census->void_total * sizeof(W_)));
-        traceHeapProfSampleString(0, "LAG",
+        traceHeapProfSampleString("LAG",
                 ((census->not_used - census->void_total) *
                                      sizeof(W_)));
-        traceHeapProfSampleString(0, "USE",
+        traceHeapProfSampleString("USE",
                 ((census->used - census->drag_total) *
                                      sizeof(W_)));
-        traceHeapProfSampleString(0, "INHERENT_USE",
+        traceHeapProfSampleString("INHERENT_USE",
                 (census->prim * sizeof(W_)));
-        traceHeapProfSampleString(0, "DRAG",
+        traceHeapProfSampleString("DRAG",
                 (census->drag_total * sizeof(W_)));
 
         traceHeapProfSampleEnd(era);
@@ -941,33 +941,33 @@ dumpCensus( Census *census )
         switch (RtsFlags.ProfFlags.doHeapProfile) {
         case HEAP_BY_CLOSURE_TYPE:
             fprintf(hp_file, "%s", (char *)ctr->identity);
-            traceHeapProfSampleString(0, (char *)ctr->identity,
+            traceHeapProfSampleString((char *)ctr->identity,
                                       count * sizeof(W_));
             break;
         case HEAP_BY_INFO_TABLE:
             fprintf(hp_file, "%p", ctr->identity);
             char str[100];
             sprintf(str, "%p", ctr->identity);
-            traceHeapProfSampleString(0, str, count * sizeof(W_));
+            traceHeapProfSampleString(str, count * sizeof(W_));
             break;
 #if defined(PROFILING)
         case HEAP_BY_CCS:
             fprint_ccs(hp_file, (CostCentreStack *)ctr->identity,
                        RtsFlags.ProfFlags.ccsLength);
-            traceHeapProfSampleCostCentre(0, (CostCentreStack *)ctr->identity,
+            traceHeapProfSampleCostCentre((CostCentreStack *)ctr->identity,
                                           count * sizeof(W_));
             break;
         case HEAP_BY_ERA:
             fprintf(hp_file, "%" FMT_Word, (StgWord)ctr->identity);
             char str_era[100];
             sprintf(str_era, "%" FMT_Word, (StgWord)ctr->identity);
-            traceHeapProfSampleString(0, str_era, count * sizeof(W_));
+            traceHeapProfSampleString(str_era, count * sizeof(W_));
             break;
         case HEAP_BY_MOD:
         case HEAP_BY_DESCR:
         case HEAP_BY_TYPE:
             fprintf(hp_file, "%s", (char *)ctr->identity);
-            traceHeapProfSampleString(0, (char *)ctr->identity,
+            traceHeapProfSampleString((char *)ctr->identity,
                                       count * sizeof(W_));
             break;
         case HEAP_BY_RETAINER:
