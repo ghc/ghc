@@ -473,6 +473,72 @@ void interp_shutdown( void ){
 
 #endif
 
+const StgPtr ctoi_tuple_infos[] = {
+    (StgPtr) &stg_ctoi_t0_info,
+    (StgPtr) &stg_ctoi_t1_info,
+    (StgPtr) &stg_ctoi_t2_info,
+    (StgPtr) &stg_ctoi_t3_info,
+    (StgPtr) &stg_ctoi_t4_info,
+    (StgPtr) &stg_ctoi_t5_info,
+    (StgPtr) &stg_ctoi_t6_info,
+    (StgPtr) &stg_ctoi_t7_info,
+    (StgPtr) &stg_ctoi_t8_info,
+    (StgPtr) &stg_ctoi_t9_info,
+    (StgPtr) &stg_ctoi_t10_info,
+    (StgPtr) &stg_ctoi_t11_info,
+    (StgPtr) &stg_ctoi_t12_info,
+    (StgPtr) &stg_ctoi_t13_info,
+    (StgPtr) &stg_ctoi_t14_info,
+    (StgPtr) &stg_ctoi_t15_info,
+    (StgPtr) &stg_ctoi_t16_info,
+    (StgPtr) &stg_ctoi_t17_info,
+    (StgPtr) &stg_ctoi_t18_info,
+    (StgPtr) &stg_ctoi_t19_info,
+    (StgPtr) &stg_ctoi_t20_info,
+    (StgPtr) &stg_ctoi_t21_info,
+    (StgPtr) &stg_ctoi_t22_info,
+    (StgPtr) &stg_ctoi_t23_info,
+    (StgPtr) &stg_ctoi_t24_info,
+    (StgPtr) &stg_ctoi_t25_info,
+    (StgPtr) &stg_ctoi_t26_info,
+    (StgPtr) &stg_ctoi_t27_info,
+    (StgPtr) &stg_ctoi_t28_info,
+    (StgPtr) &stg_ctoi_t29_info,
+    (StgPtr) &stg_ctoi_t30_info,
+    (StgPtr) &stg_ctoi_t31_info,
+    (StgPtr) &stg_ctoi_t32_info,
+    (StgPtr) &stg_ctoi_t33_info,
+    (StgPtr) &stg_ctoi_t34_info,
+    (StgPtr) &stg_ctoi_t35_info,
+    (StgPtr) &stg_ctoi_t36_info,
+    (StgPtr) &stg_ctoi_t37_info,
+    (StgPtr) &stg_ctoi_t38_info,
+    (StgPtr) &stg_ctoi_t39_info,
+    (StgPtr) &stg_ctoi_t40_info,
+    (StgPtr) &stg_ctoi_t41_info,
+    (StgPtr) &stg_ctoi_t42_info,
+    (StgPtr) &stg_ctoi_t43_info,
+    (StgPtr) &stg_ctoi_t44_info,
+    (StgPtr) &stg_ctoi_t45_info,
+    (StgPtr) &stg_ctoi_t46_info,
+    (StgPtr) &stg_ctoi_t47_info,
+    (StgPtr) &stg_ctoi_t48_info,
+    (StgPtr) &stg_ctoi_t49_info,
+    (StgPtr) &stg_ctoi_t50_info,
+    (StgPtr) &stg_ctoi_t51_info,
+    (StgPtr) &stg_ctoi_t52_info,
+    (StgPtr) &stg_ctoi_t53_info,
+    (StgPtr) &stg_ctoi_t54_info,
+    (StgPtr) &stg_ctoi_t55_info,
+    (StgPtr) &stg_ctoi_t56_info,
+    (StgPtr) &stg_ctoi_t57_info,
+    (StgPtr) &stg_ctoi_t58_info,
+    (StgPtr) &stg_ctoi_t59_info,
+    (StgPtr) &stg_ctoi_t60_info,
+    (StgPtr) &stg_ctoi_t61_info,
+    (StgPtr) &stg_ctoi_t62_info,
+};
+
 #if defined(PROFILING)
 
 //
@@ -1828,82 +1894,11 @@ run_BCO:
             SpW(-1) = BCO_PTR(o_tuple_bco);
             SpW(-2) = tuple_info;
             SpW(-3) = BCO_PTR(o_bco);
-            W_ ctoi_t_offset;
             int tuple_stack_words = (tuple_info >> 24) & 0xff;
-            switch(tuple_stack_words) {
-                case 0:  ctoi_t_offset = (W_)&stg_ctoi_t0_info;  break;
-                case 1:  ctoi_t_offset = (W_)&stg_ctoi_t1_info;  break;
-                case 2:  ctoi_t_offset = (W_)&stg_ctoi_t2_info;  break;
-                case 3:  ctoi_t_offset = (W_)&stg_ctoi_t3_info;  break;
-                case 4:  ctoi_t_offset = (W_)&stg_ctoi_t4_info;  break;
-                case 5:  ctoi_t_offset = (W_)&stg_ctoi_t5_info;  break;
-                case 6:  ctoi_t_offset = (W_)&stg_ctoi_t6_info;  break;
-                case 7:  ctoi_t_offset = (W_)&stg_ctoi_t7_info;  break;
-                case 8:  ctoi_t_offset = (W_)&stg_ctoi_t8_info;  break;
-                case 9:  ctoi_t_offset = (W_)&stg_ctoi_t9_info;  break;
-
-                case 10: ctoi_t_offset = (W_)&stg_ctoi_t10_info; break;
-                case 11: ctoi_t_offset = (W_)&stg_ctoi_t11_info; break;
-                case 12: ctoi_t_offset = (W_)&stg_ctoi_t12_info; break;
-                case 13: ctoi_t_offset = (W_)&stg_ctoi_t13_info; break;
-                case 14: ctoi_t_offset = (W_)&stg_ctoi_t14_info; break;
-                case 15: ctoi_t_offset = (W_)&stg_ctoi_t15_info; break;
-                case 16: ctoi_t_offset = (W_)&stg_ctoi_t16_info; break;
-                case 17: ctoi_t_offset = (W_)&stg_ctoi_t17_info; break;
-                case 18: ctoi_t_offset = (W_)&stg_ctoi_t18_info; break;
-                case 19: ctoi_t_offset = (W_)&stg_ctoi_t19_info; break;
-
-                case 20: ctoi_t_offset = (W_)&stg_ctoi_t20_info; break;
-                case 21: ctoi_t_offset = (W_)&stg_ctoi_t21_info; break;
-                case 22: ctoi_t_offset = (W_)&stg_ctoi_t22_info; break;
-                case 23: ctoi_t_offset = (W_)&stg_ctoi_t23_info; break;
-                case 24: ctoi_t_offset = (W_)&stg_ctoi_t24_info; break;
-                case 25: ctoi_t_offset = (W_)&stg_ctoi_t25_info; break;
-                case 26: ctoi_t_offset = (W_)&stg_ctoi_t26_info; break;
-                case 27: ctoi_t_offset = (W_)&stg_ctoi_t27_info; break;
-                case 28: ctoi_t_offset = (W_)&stg_ctoi_t28_info; break;
-                case 29: ctoi_t_offset = (W_)&stg_ctoi_t29_info; break;
-
-                case 30: ctoi_t_offset = (W_)&stg_ctoi_t30_info; break;
-                case 31: ctoi_t_offset = (W_)&stg_ctoi_t31_info; break;
-                case 32: ctoi_t_offset = (W_)&stg_ctoi_t32_info; break;
-                case 33: ctoi_t_offset = (W_)&stg_ctoi_t33_info; break;
-                case 34: ctoi_t_offset = (W_)&stg_ctoi_t34_info; break;
-                case 35: ctoi_t_offset = (W_)&stg_ctoi_t35_info; break;
-                case 36: ctoi_t_offset = (W_)&stg_ctoi_t36_info; break;
-                case 37: ctoi_t_offset = (W_)&stg_ctoi_t37_info; break;
-                case 38: ctoi_t_offset = (W_)&stg_ctoi_t38_info; break;
-                case 39: ctoi_t_offset = (W_)&stg_ctoi_t39_info; break;
-
-                case 40: ctoi_t_offset = (W_)&stg_ctoi_t40_info; break;
-                case 41: ctoi_t_offset = (W_)&stg_ctoi_t41_info; break;
-                case 42: ctoi_t_offset = (W_)&stg_ctoi_t42_info; break;
-                case 43: ctoi_t_offset = (W_)&stg_ctoi_t43_info; break;
-                case 44: ctoi_t_offset = (W_)&stg_ctoi_t44_info; break;
-                case 45: ctoi_t_offset = (W_)&stg_ctoi_t45_info; break;
-                case 46: ctoi_t_offset = (W_)&stg_ctoi_t46_info; break;
-                case 47: ctoi_t_offset = (W_)&stg_ctoi_t47_info; break;
-                case 48: ctoi_t_offset = (W_)&stg_ctoi_t48_info; break;
-                case 49: ctoi_t_offset = (W_)&stg_ctoi_t49_info; break;
-
-                case 50: ctoi_t_offset = (W_)&stg_ctoi_t50_info; break;
-                case 51: ctoi_t_offset = (W_)&stg_ctoi_t51_info; break;
-                case 52: ctoi_t_offset = (W_)&stg_ctoi_t52_info; break;
-                case 53: ctoi_t_offset = (W_)&stg_ctoi_t53_info; break;
-                case 54: ctoi_t_offset = (W_)&stg_ctoi_t54_info; break;
-                case 55: ctoi_t_offset = (W_)&stg_ctoi_t55_info; break;
-                case 56: ctoi_t_offset = (W_)&stg_ctoi_t56_info; break;
-                case 57: ctoi_t_offset = (W_)&stg_ctoi_t57_info; break;
-                case 58: ctoi_t_offset = (W_)&stg_ctoi_t58_info; break;
-                case 59: ctoi_t_offset = (W_)&stg_ctoi_t59_info; break;
-
-                case 60: ctoi_t_offset = (W_)&stg_ctoi_t60_info; break;
-                case 61: ctoi_t_offset = (W_)&stg_ctoi_t61_info; break;
-                case 62: ctoi_t_offset = (W_)&stg_ctoi_t62_info; break;
-
-                default: barf("unsupported tuple size %d", tuple_stack_words);
+            if (tuple_stack_words > 62) {
+                barf("unsupported tuple size %d", tuple_stack_words);
             }
-
+            W_ ctoi_t_offset = (W_) ctoi_tuple_infos[tuple_stack_words];
             SpW(-4) = ctoi_t_offset;
             Sp_subW(4);
             goto nextInsn;
