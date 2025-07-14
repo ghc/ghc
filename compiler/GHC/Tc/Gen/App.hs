@@ -857,7 +857,7 @@ tcInstFun do_ql inst_final fun_orig (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
     -- Rule IARG from Fig 4 of the QL paper:
     go1 pos acc fun_ty
         (EValArg { ea_arg = arg, ea_ctxt = ctxt } : rest_args)
-      = do { let herald = ExpectedFunTyArg (HsExprTcThing tc_fun) (unLoc arg)
+      = do { let herald = ExpectedFunTyArg pos (HsExprTcThing tc_fun) (unLoc arg)
            ; (wrap, arg_ty, res_ty) <-
                 -- NB: matchActualFunTy does the rep-poly check.
                 -- For example, suppose we have f :: forall r (a::TYPE r). a -> Int
@@ -876,7 +876,7 @@ tcInstFun do_ql inst_final fun_orig (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
     -- Make a fresh nus for each argument in rule IVAR
     new_arg_ty (L _ arg) i
       = do { arg_nu <- newOpenFlexiFRRTyVarTy $
-                       FRRExpectedFunTy (ExpectedFunTyArg (HsExprTcThing tc_fun) arg) i
+                       FRRExpectedFunTy (ExpectedFunTyArg i (HsExprTcThing tc_fun) arg) i
                -- Following matchActualFunTy, we create nu_i :: TYPE kappa_i[conc],
                -- thereby ensuring that the arguments have concrete runtime representations
 
