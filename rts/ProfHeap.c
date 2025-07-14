@@ -557,7 +557,7 @@ initHeapProfiling(void)
 
     restore_locale();
 
-    traceHeapProfBegin();
+    traceInitEvent(traceHeapProfBegin);
 }
 
 void
