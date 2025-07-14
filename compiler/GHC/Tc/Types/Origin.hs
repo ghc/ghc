@@ -788,7 +788,8 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ (WithUserRdr _ name))) = OccurrenceOf name
-exprCtOrigin (HsGetField _ _ (L _ f)) = GetFieldOrigin (field_label $ unLoc $ dfoLabel f)
+exprCtOrigin e@(HsGetField _ _ (L _ _)) = ExpansionOrigin (OrigExpr e)
+                                        -- GetFieldOrigin (field_label $ unLoc $ dfoLabel f)
 exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin l
 exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
@@ -1081,6 +1082,7 @@ pprCtO (ImpedanceMatching {})       = text "combining required constraints"
 pprCtO (NonLinearPatternOrigin _ pat) = hsep [text "a non-linear pattern" <+> quotes (ppr pat)]
 pprCtO (ExpansionOrigin (OrigPat p)) = hsep [text "a pattern" <+> quotes (ppr p)]
 pprCtO (ExpansionOrigin (OrigStmt{})) = text "a do statement"
+pprCtO (ExpansionOrigin (OrigExpr (HsGetField _ _ (L _ f)))) = hsep [text "selecting the field", quotes (ppr f)]
 pprCtO (ExpansionOrigin (OrigExpr e)) = text "an expression" <+> ppr e
 pprCtO (ExpectedFunTySyntaxOp{}) = text "a rebindable syntax operator"
 pprCtO (ExpectedFunTyViewPat{}) = text "a view pattern"
