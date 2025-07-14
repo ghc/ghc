@@ -2251,6 +2251,13 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    *(uint64_t *)pP = S + A;
                    break;
                }
+           case 11: /* IMAGE_REL_AMD64_SECREL (PE constant 11) */
+              {
+                  uint64_t offset = S - (uint64_t) section.start;
+                  CHECK((uint32_t) offset == offset);
+                   *(uint32_t *)pP = offset + A;
+                  break;
+              }
             case 2: /* R_X86_64_32 (ELF constant 10) - IMAGE_REL_AMD64_ADDR32 (PE constant 2) */
             case 3: /* IMAGE_REL_AMD64_ADDR32NB (PE constant 3) */
             case 17: /* R_X86_64_32S ELF constant, no PE mapping. See note [ELF constant in PE file] */
