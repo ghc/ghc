@@ -550,7 +550,7 @@ static void nonmovingBumpEpoch(void) {
  *   arbitrary allocator sizes, we need to do some precomputation and make
  *   use of the integer division by constants optimisation.
  *
- * We currenlty try to balance these considerations by adopting the following scheme.
+ * We currently try to balance these considerations by adopting the following scheme.
  * We have nonmoving_alloca_dense_cnt "dense" allocators starting with size
  * NONMOVING_ALLOCA0, and incrementing by NONMOVING_ALLOCA_DENSE_INCREMENT.
  * These service the vast majority of allocations.
