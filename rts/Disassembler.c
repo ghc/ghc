@@ -92,9 +92,9 @@ disInstr ( StgBCO *bco, int pc )
          info_wix     = BCO_NEXT;
          np           = BCO_GET_LARGE_ARG;
          debugBelch ("BRK_FUN " );  printPtr( ptrs[p1] );
-         debugBelch("%" FMT_Word, literals[info_mod] );
-         debugBelch("%" FMT_Word, literals[info_unit_id] );
-         debugBelch("%" FMT_Word, info_wix );
+         debugBelch(" %" FMT_Word, literals[info_mod] );
+         debugBelch(" %" FMT_Word, literals[info_unit_id] );
+         debugBelch(" %" FMT_Word, info_wix );
          CostCentre* cc = (CostCentre*)literals[np];
          if (cc) {
            debugBelch(" %s", cc->label);
