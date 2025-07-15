@@ -203,6 +203,10 @@ Library
         cbits/genSym.c
         cbits/keepCAFsForGHCi.c
 
+    -- See #26197
+    if impl(ghc >= 9.14)
+        ghc-options:    -Wno-pattern-namespace-specifier
+
     hs-source-dirs:
         .
 
