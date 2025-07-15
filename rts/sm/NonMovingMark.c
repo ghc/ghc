@@ -606,7 +606,7 @@ static
 bool check_in_nonmoving_heap(StgClosure *p) {
     if (HEAP_ALLOCED_GC(p)) {
         // This works for both large and small objects:
-        return Bdescr((P_)p)->flags & BF_NONMOVING;
+        return block_get_flags(Bdescr((P_)p)) & BF_NONMOVING;
     } else {
         return true; // a static object
     }
@@ -722,13 +722,14 @@ STATIC_INLINE bool needs_upd_rem_set_mark(StgClosure *p)
 {
     // TODO: Deduplicate with mark_closure
     bdescr *bd = Bdescr((StgPtr) p);
+    uint16_t flags = block_get_flags(bd);
     if (bd->gen != oldest_gen) {
         return false;
-    } else if (bd->flags & BF_LARGE) {
-        if (! (bd->flags & BF_NONMOVING_SWEEPING)) {
+    } else if (flags & BF_LARGE) {
+        if (! (flags & BF_NONMOVING_SWEEPING)) {
             return false;
         } else {
-            return ! (bd->flags & BF_MARKED);
+            return ! (flags & BF_MARKED);
         }
     } else {
         struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
@@ -740,8 +741,8 @@ STATIC_INLINE bool needs_upd_rem_set_mark(StgClosure *p)
 static void finish_upd_rem_set_mark_large(bdescr* bd) {
     // Someone else may have already marked it.
     ACQUIRE_LOCK(&nonmoving_large_objects_mutex);
-    if (! (bd->flags & BF_MARKED)) {
-        bd->flags |= BF_MARKED;
+    if (! (block_get_flags(bd) & BF_MARKED)) {
+        block_set_flag(bd, BF_MARKED);
         dbl_link_remove(bd, &nonmoving_large_objects);
         dbl_link_onto(bd, &nonmoving_marked_large_objects);
         n_nonmoving_large_blocks -= bd->blocks;
@@ -754,7 +755,7 @@ static void finish_upd_rem_set_mark_large(bdescr* bd) {
 STATIC_INLINE void finish_upd_rem_set_mark(StgClosure *p)
 {
     bdescr *bd = Bdescr((StgPtr) p);
-    if (bd->flags & BF_LARGE) {
+    if (block_get_flags(bd) & BF_LARGE) {
         // This function is extracted so that this function can be inline
         finish_upd_rem_set_mark_large(bd);
     } else {
@@ -1371,35 +1372,36 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
 
     // N.B. only the first block of a compact region is guaranteed to carry
     // BF_NONMOVING; consequently we must separately check for BF_COMPACT.
-    if (bd->flags & (BF_COMPACT | BF_NONMOVING)) {
+    const uint16_t flags = block_get_flags(bd);
+    if (flags & (BF_COMPACT | BF_NONMOVING)) {
 
-        if (bd->flags & BF_COMPACT) {
+        if (flags & BF_COMPACT) {
             StgCompactNFData *str = objectGetCompact((StgClosure*)p);
             bd = Bdescr((P_)str);
 
-            if (! (bd->flags & BF_NONMOVING_SWEEPING)) {
+            if (! (flags & BF_NONMOVING_SWEEPING)) {
                 // Not in the snapshot
                 return;
             }
 
-            if (! (bd->flags & BF_MARKED)) {
+            if (! (flags & BF_MARKED)) {
                 dbl_link_remove(bd, &nonmoving_compact_objects);
                 dbl_link_onto(bd, &nonmoving_marked_compact_objects);
                 StgWord blocks = str->totalW / BLOCK_SIZE_W;
                 n_nonmoving_compact_blocks -= blocks;
                 n_nonmoving_marked_compact_blocks += blocks;
-                bd->flags |= BF_MARKED;
+                block_set_flag(bd, BF_MARKED);
             }
 
             // N.B. the object being marked is in a compact region so by
             // definition there is no need to do any tracing here.
             goto done;
-        } else if (bd->flags & BF_LARGE) {
-            if (! (bd->flags & BF_NONMOVING_SWEEPING)) {
+        } else if (flags & BF_LARGE) {
+            if (! (flags & BF_NONMOVING_SWEEPING)) {
                 // Not in the snapshot
                 goto done;
             }
-            if (bd->flags & BF_MARKED) {
+            if (flags & BF_MARKED) {
                 goto done;
             }
         } else {
@@ -1731,24 +1733,25 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
      * the object's pointers since in the case of marking stacks there may be a
      * mutator waiting for us to finish so it can start execution.
      */
-    if (bd->flags & BF_LARGE) {
+    uint16_t bd_flags = block_get_flags(bd);
+    if (bd_flags & BF_LARGE) {
         /* Marking a large object isn't idempotent since we move it to
          * nonmoving_marked_large_objects; to ensure that we don't repeatedly
          * mark a large object, we only set BF_MARKED on large objects in the
          * nonmoving heap while holding nonmoving_large_objects_mutex
          */
         ACQUIRE_LOCK(&nonmoving_large_objects_mutex);
-        if (! (bd->flags & BF_MARKED)) {
+        if (! (bd_flags & BF_MARKED)) {
             // Remove the object from nonmoving_large_objects and link it to
             // nonmoving_marked_large_objects
             dbl_link_remove(bd, &nonmoving_large_objects);
             dbl_link_onto(bd, &nonmoving_marked_large_objects);
             n_nonmoving_large_blocks -= bd->blocks;
             n_nonmoving_marked_large_blocks += bd->blocks;
-            bd->flags |= BF_MARKED;
+            block_set_flag(bd, BF_MARKED);
         }
         RELEASE_LOCK(&nonmoving_large_objects_mutex);
-    } else if (bd->flags & BF_NONMOVING) {
+    } else if (bd_flags & BF_NONMOVING) {
         // TODO: Kill repetition
         struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
         nonmoving_block_idx block_idx = nonmovingGetBlockIdx((StgPtr) p);
@@ -1763,7 +1766,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
 done:
-    if (origin != NULL && (!HEAP_ALLOCED(p) || bd->flags & BF_NONMOVING)) {
+    if (origin != NULL && (!HEAP_ALLOCED(p) || block_get_flags(bd) & BF_NONMOVING)) {
         if (UNTAG_CLOSURE((StgClosure*)p0) != p && *origin == p0) {
             if (cas((StgVolatilePtr)origin, (StgWord)p0, (StgWord)TAG_CLOSURE(tag, p)) == (StgWord)p0) {
                 // debugBelch("Thunk optimization successful\n");
@@ -1860,19 +1863,20 @@ bool nonmovingIsAlive (StgClosure *p)
     }
 
     bdescr *bd = Bdescr((P_)p);
+    uint16_t bd_flags = block_get_flags(bd);
 
     // All non-static objects in the non-moving heap should be marked as
     // BF_NONMOVING
-    ASSERT(bd->flags & BF_NONMOVING);
+    ASSERT(bd_flags & BF_NONMOVING);
 
-    if (bd->flags & (BF_COMPACT | BF_LARGE)) {
-        if (bd->flags & BF_COMPACT) {
+    if (bd_flags & (BF_COMPACT | BF_LARGE)) {
+        if (bd_flags & BF_COMPACT) {
             StgCompactNFData *str = objectGetCompact((StgClosure*)p);
             bd = Bdescr((P_)str);
         }
-        return (bd->flags & BF_NONMOVING_SWEEPING) == 0
+        return (bd_flags & BF_NONMOVING_SWEEPING) == 0
                    // the large object wasn't in the snapshot and therefore wasn't marked
-            || (bd->flags & BF_MARKED) != 0;
+            || (bd_flags & BF_MARKED) != 0;
                    // The object was marked
     } else {
         struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
@@ -1926,8 +1930,8 @@ static bool nonmovingIsNowAlive (StgClosure *p)
     }
 
     bdescr *bd = Bdescr((P_)p);
+    const uint16_t flags = block_get_flags(bd);
 
-    const uint16_t flags = bd->flags;
     if (flags & BF_LARGE) {
         if (flags & BF_PINNED && !(flags & BF_NONMOVING)) {
             // In this case we have a pinned object living in a non-full
@@ -1937,15 +1941,15 @@ static bool nonmovingIsNowAlive (StgClosure *p)
             return true;
         }
 
-        ASSERT(bd->flags & BF_NONMOVING);
-        return (bd->flags & BF_NONMOVING_SWEEPING) == 0
+        ASSERT(flags & BF_NONMOVING);
+        return (flags & BF_NONMOVING_SWEEPING) == 0
                    // the large object wasn't in the snapshot and therefore wasn't marked
-            || (bd->flags & BF_MARKED) != 0;
+            || (flags & BF_MARKED) != 0;
                    // The object was marked
     } else {
         // All non-static objects in the non-moving heap should be marked as
         // BF_NONMOVING.
-        ASSERT(bd->flags & BF_NONMOVING);
+        ASSERT(flags & BF_NONMOVING);
 
         struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
         StgClosure *snapshot_loc =
@@ -2008,7 +2012,8 @@ bool nonmovingTidyWeaks (struct MarkQueue_ *queue)
 
         // See Note [Weak pointer processing and the non-moving GC] in
         // MarkWeak.c
-        bool key_in_nonmoving = HEAP_ALLOCED_GC(w->key) && Bdescr((StgPtr) w->key)->flags & BF_NONMOVING;
+        bdescr *key_bd = Bdescr((StgPtr) w->key);
+        bool key_in_nonmoving = HEAP_ALLOCED_GC(w->key) && block_get_flags(key_bd) & BF_NONMOVING;
         if (!key_in_nonmoving || nonmovingIsNowAlive(w->key)) {
             nonmovingMarkLiveWeak(queue, w);
             did_work = true;

@@ -295,6 +295,28 @@ dbl_link_replace(bdescr *new_, bdescr *old, bdescr **list)
     }
 }
 
+INLINE_HEADER void
+block_set_flag(bdescr *bd, uint16_t flag)
+{
+    // TODO: This ordering is stronger than necessary for many users (e.g.
+    // setting flags).
+    __atomic_or_fetch(&bd->flags, flag, __ATOMIC_SEQ_CST);
+}
+
+INLINE_HEADER void
+block_clear_flag(bdescr *bd, uint16_t flag)
+{
+    // TODO: This ordering is stronger than necessary for many users (e.g.
+    // setting flags).
+    __atomic_and_fetch(&bd->flags, ~flag, __ATOMIC_SEQ_CST);
+}
+
+INLINE_HEADER uint16_t
+block_get_flags(bdescr *bd)
+{
+    return RELAXED_LOAD(&bd->flags);
+}
+
 /* Initialisation ---------------------------------------------------------- */
 
 extern void initBlockAllocator(void);
