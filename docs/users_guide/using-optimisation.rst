@@ -547,15 +547,23 @@ as such you shouldn't need to set any of them explicitly. A flag
     Eta-expand let-bindings to increase their arity.
 
 .. ghc-flag:: -fdo-clever-arg-eta-expansion
-    :shortdesc: Enable sophisticated argument eta-expansion. Implied by :ghc-flag:`-O2`.
+    :shortdesc: Enable sophisticated argument eta-expansion. Implied by :ghc-flag:`-O`.
     :type: dynamic
     :reverse: -fno-do-clever-arg-eta-expansion
     :category:
 
     :default: off
+    :since: 9.10.1
 
     Eta-expand arguments to increase their arity to avoid allocating unnecessary
     thunks for them.
+
+    For example in code like `foo = f (g x)` this flag will determine which analysis
+    is used to decide the arity of `g x`, with the goal of avoiding a thunk for `g x`
+    in cases where `g` is a function with an arity higher than one.
+
+    Enabling the flag enables a more sophisticated analysis, resulting in better
+    runtime but longer compile time.
 
 .. ghc-flag:: -feager-blackholing
     :shortdesc: Turn on :ref:`eager blackholing <parallel-compile-options>`
