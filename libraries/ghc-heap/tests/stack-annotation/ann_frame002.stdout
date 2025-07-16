@@ -1,11 +1,11 @@
 Start some work
 10946
 Annotation stack: 
-main:Main ann_frame002.hs:35-7:35-10
-main:Main ann_frame002.hs:35-3:35-6
+ann_frame002.hs:25:7 in main:Main
+ann_frame002.hs:25:3 in main:Main
 Finish some work
 Some more ork in bar
 17711
 Annotation stack: 
-"bar"
-main:Main ann_frame002.hs:50-7:50-25
+bar
+ann_frame002.hs:40:7 in main:Main
