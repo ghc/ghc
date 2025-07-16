@@ -69,6 +69,8 @@ constraints: ghc +internal-interpreter +dynamic-system-linke,
              any.pretty installed,
              any.template-haskell installed
 
+package *
+    happy-options: --strict
 
 benchmarks: False
 tests: False
