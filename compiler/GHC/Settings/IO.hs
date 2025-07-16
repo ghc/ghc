@@ -97,10 +97,6 @@ initSettings top_dir = do
       getTool :: (Target -> Program) -> (String, [String])
       getTool key = (getToolPath key, getToolFlags key)
 
-  -- See Note [Settings file] for a little more about this file. We're
-  -- just partially applying those functions and throwing 'Left's; they're
-  -- written in a very portable style to keep ghc-boot light.
-  targetHasLibm <- getBooleanSetting "target has libm"
   let
     (cc_prog, cc_args0)  = getTool (ccProgram . tgtCCompiler)
     (cxx_prog, cxx_args) = getTool (cxxProgram . tgtCxxCompiler)
@@ -109,7 +105,7 @@ initSettings top_dir = do
     (js_cpp_prog, js_cpp_args) = getTool (maybe (Program "" []) jsCppProgram . tgtJsCPreprocessor)
     (cmmCpp_prog, cmmCpp_args) = getTool (cmmCppProgram . tgtCmmCPreprocessor)
 
-    platform = getTargetPlatform targetHasLibm target
+    platform = getTargetPlatform target
 
     unreg_cc_args = if platformUnregisterised platform
                     then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
@@ -242,8 +238,8 @@ initSettings top_dir = do
     , sRawTarget      = target
     }
 
-getTargetPlatform :: Bool {-^ Does target have libm -} -> Target -> Platform
-getTargetPlatform targetHasLibm Target{..} = Platform
+getTargetPlatform :: Target -> Platform
+getTargetPlatform Target{..} = Platform
     { platformArchOS    = tgtArchOs
     , platformWordSize  = case tgtWordSize of WS4 -> PW4
                                               WS8 -> PW8
@@ -255,6 +251,6 @@ getTargetPlatform targetHasLibm Target{..} = Platform
     , platformIsCrossCompiling = not tgtLocallyExecutable
     , platformLeadingUnderscore = tgtSymbolsHaveLeadingUnderscore
     , platformTablesNextToCode  = tgtTablesNextToCode
-    , platformHasLibm = targetHasLibm
+    , platformHasLibm = tgtHasLibm
     , platform_constants = Nothing -- will be filled later when loading (or building) the RTS unit
     }

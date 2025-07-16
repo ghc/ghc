@@ -157,6 +157,7 @@ AC_DEFUN([PREP_TARGET_FILE],[
     PREP_BOOLEAN([Unregisterised])
     PREP_BOOLEAN([TablesNextToCode])
     PREP_BOOLEAN([UseLibffiForAdjustors])
+    PREP_BOOLEAN([TargetHasLibm])
     PREP_BOOLEAN([ArIsGNUAr])
     PREP_BOOLEAN([ArNeedsRanLib])
     PREP_NOT_BOOLEAN([CrossCompiling])
