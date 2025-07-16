@@ -1171,12 +1171,12 @@ doCase d s p scrut bndr alts
 
         -- depth of stack after the return value has been pushed
         d_bndr =
-            d + ret_frame_size_b + bndr_size
+            d + bndr_size
 
         -- depth of stack after the extra info table for an unlifted return
         -- has been pushed, if any.  This is the stack depth at the
         -- continuation.
-        d_alts = d + ret_frame_size_b + bndr_size + unlifted_itbl_size_b
+        d_alts = d + bndr_size + unlifted_itbl_size_b
 
         -- Env in which to compile the alts, not including
         -- any vars bound by the alts themselves
@@ -1718,6 +1718,10 @@ tupleBCO platform args_info args =
       with using a fake name here. We will need to change this if we want
       to save some memory by sharing the BCO between places that have
       the same tuple shape
+
+      ROMES:TODO: This seems like it would have a pretty good impact.
+      Looking at examples like UnboxedTuple.hs shows many occurrences of the
+      same tuple_BCO
     -}
     invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "tuple")
 
