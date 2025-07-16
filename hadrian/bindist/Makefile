@@ -85,8 +85,7 @@ WrapperBinsDir=${bindir}
 # N.B. this is duplicated from includes/ghc.mk.
 lib/settings : config.mk
 	@rm -f $@
-	@echo '[("target has libm", "$(TargetHasLibm)")' >> $@
-	@echo ',("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit")' >> $@
+	@echo '[("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit")' >> $@
 	@echo ',("target RTS linker only supports shared libraries", "$(TargetRTSLinkerOnlySupportsSharedLibs)")' >> $@
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@

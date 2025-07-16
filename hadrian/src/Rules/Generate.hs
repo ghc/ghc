@@ -413,7 +413,6 @@ bindistRules = do
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
     , interpolateSetting "ProjectVersion" ProjectVersion
     , interpolateVar "EnableDistroToolchain" $ lookupSystemConfig "settings-use-distro-mingw"
-    , interpolateVar "TargetHasLibm" $ lookupSystemConfig "target-has-libm"
     , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ getFlag UseLibdw
     , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP
     , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
@@ -465,7 +464,6 @@ generateSettings settingsFile = do
 
     settings <- traverse sequence $
         [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
