@@ -70,8 +70,6 @@ import GHC.Core.Subst (substTickish)
 import GHC.Core.TyCon (tyConClass_maybe)
 import GHC.Core.DataCon (dataConTyCon)
 
-import Control.Monad
-
 {-
 ************************************************************************
 *                                                                      *

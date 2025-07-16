@@ -623,7 +623,7 @@ neededEvVars implic@(Implic { ic_info        = info
     add_wanted :: EvBind -> VarSet -> VarSet
     add_wanted (EvBind { eb_info = info, eb_rhs = rhs }) needs
       | EvBindGiven{} <- info = needs  -- Add the rhs vars of the Wanted bindings only
-      | otherwise = evIdsOfTerm rhs `unionVarSet` needs
+      | otherwise = nestedEvIdsOfTerm rhs `unionVarSet` needs
 
     is_dm_skol :: SkolemInfoAnon -> Bool
     is_dm_skol (MethSkol _ is_dm) = is_dm
@@ -645,7 +645,7 @@ findNeededGivenEvVars ev_binds seeds
      | Just ev_bind <- lookupEvBind ev_binds v
      , EvBind { eb_info = EvBindGiven, eb_rhs = rhs } <- ev_bind
        -- Look at Given bindings only
-     = evIdsOfTerm rhs `unionVarSet` needs
+     = nestedEvIdsOfTerm rhs `unionVarSet` needs
      | otherwise
      = needs
 

@@ -28,7 +28,8 @@ module GHC.Tc.Types.Evidence (
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
-  mkEvCast, evIdsOfTerm, evIdsOfTerms, mkEvScSelectors, evTypeable,
+  mkEvCast, mkEvScSelectors, evTypeable,
+  nestedEvIdsOfTerm, evTermFVs,
 
   evTermCoercion, evTermCoercion_maybe,
   EvCallStack(..),
@@ -864,17 +865,15 @@ evTermCoercion tm = case evTermCoercion_maybe tm of
 *                                                                      *
 ********************************************************************* -}
 
-relevantEvId :: Var -> Bool
--- Just returns /local/ free evidence variables; i.e ones with Internal Names
+isNestedEvId :: Var -> Bool
+-- Just returns /nested/ free evidence variables; i.e ones with Internal Names
 -- Top-level ones (DFuns, dictionary selectors and the like) don't count
 -- Evidence variables are always Ids; do not pick TyVars
-relevantEvId v = isId v && isInternalName (varName v)
+isNestedEvId v = isId v && isInternalName (varName v)
 
-evIdsOfTerm :: EvTerm -> VarSet
-evIdsOfTerm tm = fvVarSet (filterFV relevantEvId (evTermFVs tm))
-
-evIdsOfTerms :: EvTerm -> [EvVar]
-evIdsOfTerms tm = fvVarList (filterFV relevantEvId (evTermFVs tm))
+nestedEvIdsOfTerm :: EvTerm -> VarSet
+-- Returns only EvIds satisfying relevantEvId
+nestedEvIdsOfTerm tm = fvVarSet (filterFV isNestedEvId (evTermFVs tm))
 
 evTermFVs :: EvTerm -> FV
 evTermFVs (EvExpr e)         = exprFVs e

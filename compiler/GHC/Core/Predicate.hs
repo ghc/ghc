@@ -30,7 +30,7 @@ module GHC.Core.Predicate (
   isIPPred_maybe,
 
   -- Evidence variables
-  DictId, isEvVar, isDictId,
+  DictId, isEvId, isDictId,
 
   -- * Well-scoped free variables
   scopedSort, tyCoVarsOfTypeWellScoped,
@@ -109,7 +109,7 @@ is any type of kind (CONSTRAINT r) for some `r`.
 
 * Predicates are the things solved by the constraint solver; and
   /evidence terms/ witness those solutions.  An /evidence variable/
-  (or EvVar) has a type that is a PredType.
+  (or EvId) has a type that is a PredType.
 
 * Generally speaking, the /type/ of a predicate determines its /value/;
   that is, predicates are singleton types.  The big exception is implicit
@@ -621,8 +621,8 @@ In both of these cases, we want to be sure, so we should be conservative:
 *                                                                      *
 ********************************************************************* -}
 
-isEvVar :: Var -> Bool
-isEvVar var = isPredTy (varType var)
+isEvId :: Var -> Bool
+isEvId var = isPredTy (varType var)
 
 isDictId :: Id -> Bool
 isDictId id = isDictTy (varType id)
@@ -632,7 +632,7 @@ isDictId id = isDictTy (varType id)
 *                                                                      *
                  scopedSort
 
-       This function lives here becuase it uses isEvVar
+       This function lives here becuase it uses isEvId
 *                                                                      *
 ********************************************************************* -}
 
@@ -714,7 +714,7 @@ scopedSort = go [] []
     insert v []     []         = ([v], [tyCoVarsOfType (varType v)])
     insert v (a:as) (fvs:fvss)
       | (isTyVar v && isId a) ||          -- TyVars precede Ids
-        (isEvVar v && isId a && not (isEvVar a)) || -- DictIds precede non-DictIds
+        (isEvId v && isId a && not (isEvId a)) || -- DictIds precede non-DictIds
         (v `elemVarSet` fvs)
           -- (a) put Ids after TyVars, and (b) respect dependencies
       , (as', fvss') <- insert v as fvss

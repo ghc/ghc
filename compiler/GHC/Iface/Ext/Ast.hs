@@ -32,12 +32,12 @@ import GHC.Types.Basic
 import GHC.Data.BooleanFormula
 import GHC.Core.Class             ( className, classSCSelIds )
 import GHC.Core.ConLike           ( conLikeName )
-import GHC.Core.FVs
 import GHC.Core.DataCon           ( dataConNonlinearType )
 import GHC.Types.FieldLabel
 import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Utils.Monad            ( concatMapM, MonadIO(liftIO) )
+import GHC.Utils.FV               ( fvVarList, filterFV )
 import GHC.Types.Id               ( isDataConId_maybe )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe, getName )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
@@ -45,8 +45,8 @@ import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
 import GHC.Types.SrcLoc
 import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
-import GHC.Core.Predicate
 import GHC.Core.InstEnv
+import GHC.Core.Predicate         ( isEvId )
 import GHC.Tc.Types
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var              ( Id, Var, EvId, varName, varType, varUnique )
@@ -672,22 +672,16 @@ instance ToHie (Context (Located Name)) where
 instance ToHie (Context (Located (WithUserRdr Name))) where
   toHie (C c (L l (WithUserRdr _ n))) = toHie $ C c (L l n)
 
-evVarsOfTermList :: EvTerm -> [EvId]
-evVarsOfTermList (EvExpr e)         = exprSomeFreeVarsList isEvVar e
-evVarsOfTermList (EvTypeable _ ev)  =
-  case ev of
-    EvTypeableTyCon _ e   -> concatMap evVarsOfTermList e
-    EvTypeableTyApp e1 e2 -> concatMap evVarsOfTermList [e1,e2]
-    EvTypeableTrFun e1 e2 e3 -> concatMap evVarsOfTermList [e1,e2,e3]
-    EvTypeableTyLit e     -> evVarsOfTermList e
-evVarsOfTermList (EvFun{}) = []
+hieEvIdsOfTerm :: EvTerm -> [EvId]
+-- Returns only EvIds satisfying relevantEvId
+hieEvIdsOfTerm tm = fvVarList (filterFV isEvId (evTermFVs tm))
 
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))
     = concatMapM go $ bagToList bs
     where
       go evbind = do
-          let evDeps = evVarsOfTermList $ eb_rhs evbind
+          let evDeps = hieEvIdsOfTerm $ eb_rhs evbind
               depNames = EvBindDeps $ map varName evDeps
           concatM $
             [ toHie (C (EvidenceVarBind (EvLetBind depNames) (combineScopes sc (mkScope span)) sp)
@@ -708,7 +702,7 @@ instance ToHie (LocatedA HsWrapper) where
           toHie $ C (EvidenceVarBind EvWrapperBind (mkScope osp) (getRealSpanA osp))
                 $ L osp a
         (WpEvApp a) ->
-          concatMapM (toHie . C EvidenceVarUse . L osp) $ evVarsOfTermList a
+          concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
         _               -> pure []
 
 instance HiePass p => HasType (LocatedA (HsBind (GhcPass p))) where
