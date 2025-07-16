@@ -625,6 +625,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     :category:
 
     :default: off
+    :since: 9.12.1
 
     This experimental flag is a slightly less heavy weight alternative
     to :ghc-flag:`-fexpose-all-unfoldings`.
