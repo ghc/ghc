@@ -2730,8 +2730,10 @@ normSplitTyConApp_maybe fam_envs ty
   | let Reduction co ty1 = topNormaliseType_maybe fam_envs ty
                            `orElse` (mkReflRedn Representational ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
-  = assertPpr (not (isNewTyCon tc)) (ppr ty $$ ppr ty1) $  -- Check post-condition
-    Just (tc, tc_args, co)
+  , not (isNewTyCon tc)  -- How can tc be a newtype, after `topNormaliseType`?
+                         -- Answer: if it is a recursive newtype, `topNormaliseType`
+                         --         may be a no-op.   Example: tc226
+  = Just (tc, tc_args, co)
 normSplitTyConApp_maybe _ _ = Nothing
 
 {-
