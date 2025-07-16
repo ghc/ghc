@@ -5,6 +5,7 @@ module GHC.Toolchain.PlatformDetails
     , checkSubsectionsViaSymbols
     , checkIdentDirective
     , checkGnuNonexecStack
+    , checkTargetHasLibm
     ) where
 
 import Data.List (isInfixOf)
@@ -112,8 +113,6 @@ checkEndianness__BYTE_ORDER__ cc = checking "endianness (__BYTE_ORDER__)" $ do
         , "#endif"
         ]
 
-
-
 checkLeadingUnderscore :: Cc -> Nm -> M Bool
 checkLeadingUnderscore cc nm = checking ctxt $ withTempDir $ \dir -> do
     let test_o = dir </> "test.o"
@@ -155,6 +154,21 @@ checkGnuNonexecStack archOs =
     prog = unlines [ asmStmt (".section .note.GNU-stack,\"\","++progbits)
                    , asmStmt ".section .text"
                    ]
+
+checkTargetHasLibm :: Cc -> M Bool
+checkTargetHasLibm cc0 = testCompile "whether target has libm" prog cc
+  where
+    cc = cc0 & _ccProgram % _prgFlags %++ "-lm"
+    prog = unlines
+        [ "char atan (void);"
+        , "int"
+        , "main (void)"
+        , "{"
+        , "return atan ();"
+        , "  ;"
+        , "  return 0;"
+        , "}"
+        ]
 
 asmStmt :: String -> String
 asmStmt s = "__asm__(\"" ++ foldMap escape s ++ "\");"

@@ -57,6 +57,10 @@ data Target = Target
     , tgtUseLibffiForAdjustors :: Bool
     -- ^ We need to know whether or not to include libffi headers, and generate additional code for it
 
+      -- Target support
+    , tgtHasLibm :: Bool
+    -- ^ Does this target have a libm library that should always be linked against?
+
       -- C toolchain
     , tgtCCompiler :: Cc
     , tgtCxxCompiler :: Cxx
@@ -121,6 +125,7 @@ instance Show Target where
     , ", tgtUnregisterised = " ++ show tgtUnregisterised
     , ", tgtTablesNextToCode = " ++ show tgtTablesNextToCode
     , ", tgtUseLibffiForAdjustors = " ++ show tgtUseLibffiForAdjustors
+    , ", tgtHasLibm = " ++ show tgtHasLibm
     , ", tgtCCompiler = " ++ show tgtCCompiler
     , ", tgtCxxCompiler = " ++ show tgtCxxCompiler
     , ", tgtCPreprocessor = " ++ show tgtCPreprocessor

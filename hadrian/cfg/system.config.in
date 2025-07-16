@@ -81,8 +81,6 @@ project-git-commit-id  = @ProjectGitCommitId@
 # See Note [tooldir: How GHC finds mingw on Windows]
 settings-use-distro-mingw = @EnableDistroToolchain@
 
-target-has-libm = @TargetHasLibm@
-
 # Include and library directories:
 #=================================
 

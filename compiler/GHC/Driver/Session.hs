@@ -3498,6 +3498,7 @@ compilerInfo dflags
        ("target word size", query $ show . wordSize2Bytes . tgtWordSize),
        ("target word big endian", queryBool $ (\case BigEndian -> True; LittleEndian -> False) . tgtEndianness),
        ("target has GNU nonexec stack", queryBool tgtSupportsGnuNonexecStack),
+       ("target has libm", queryBool tgtHasLibm),
        ("target has .ident directive", queryBool tgtSupportsIdentDirective),
        ("target has subsections via symbols", queryBool tgtSupportsSubsectionsViaSymbols),
        ("Unregisterised", queryBool tgtUnregisterised),
