@@ -149,10 +149,14 @@ instance (OutputableBndrId p
     ppr (ImportDecl { ideclExt = impExt, ideclName = mod'
                     , ideclPkgQual = pkg
                     , ideclSource = from, ideclSafe = safe
+                    , ideclLevelSpec = level
                     , ideclQualified = qual
                     , ideclAs = as, ideclImportList = spec })
-      = hang (hsep [text "import", ppr_imp impExt from, pp_implicit impExt, pp_safe safe,
-                    pp_qual qual False, ppr pkg, ppr mod', pp_qual qual True, pp_as as])
+      = hang (hsep [text "import", ppr_imp impExt from, pp_implicit impExt,
+                    pp_level level False, pp_safe safe, pp_qual qual False,
+                    ppr pkg, ppr mod',
+                    pp_level level True, pp_qual qual True,
+                    pp_as as])
              4 (pp_spec spec)
       where
         pp_implicit ext =
@@ -168,6 +172,15 @@ instance (OutputableBndrId p
         pp_qual QualifiedPre True = empty -- Prepositive qualifier/postpositive position.
         pp_qual QualifiedPost False = empty -- Postpositive qualifier/prepositive position.
         pp_qual NotQualified _ = empty
+
+        pp_level (LevelStylePre  sty) False = pp_level_style sty
+        pp_level (LevelStylePost   _) False = empty
+        pp_level (LevelStylePre    _) True = empty
+        pp_level (LevelStylePost sty) True = pp_level_style sty
+        pp_level NotLevelled _ = empty
+
+        pp_level_style ImportDeclQuote = text "quote"
+        pp_level_style ImportDeclSplice = text "splice"
 
         pp_safe False   = empty
         pp_safe True    = text "safe"
