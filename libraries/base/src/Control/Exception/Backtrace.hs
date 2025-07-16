@@ -50,6 +50,10 @@ module Control.Exception.Backtrace
       BacktraceMechanism(..)
     , getBacktraceMechanismState
     , setBacktraceMechanismState
+      -- * Display Backtrace mechanisms
+    , DisplayBacktraceMechanisms(..)
+    , getDisplayBacktraceMechanisms
+    , setDisplayBacktraceMechanismsState
       -- * Collecting backtraces
     , Backtraces(..)
     , displayBacktraces

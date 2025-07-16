@@ -323,11 +323,23 @@ module Control.Exception.Backtrace where
   type BacktraceMechanism :: *
   data BacktraceMechanism = CostCentreBacktrace | HasCallStackBacktrace | ExecutionBacktrace | IPEBacktrace
   type Backtraces :: *
-  data Backtraces = Backtraces {btrCostCentre :: GHC.Internal.Maybe.Maybe (GHC.Internal.Ptr.Ptr GHC.Internal.Stack.CCS.CostCentreStack), btrHasCallStack :: GHC.Internal.Maybe.Maybe GHC.Internal.Stack.Types.CallStack, btrExecutionStack :: GHC.Internal.Maybe.Maybe [GHC.Internal.ExecutionStack.Internal.Location], btrIpe :: GHC.Internal.Maybe.Maybe [GHC.Internal.Stack.CloneStack.StackEntry]}
+  data Backtraces
+    = Backtraces {btrCostCentre :: GHC.Internal.Maybe.Maybe (GHC.Internal.Ptr.Ptr GHC.Internal.Stack.CCS.CostCentreStack),
+                  btrDisplayCostCentre :: GHC.Internal.Ptr.Ptr GHC.Internal.Stack.CCS.CostCentreStack -> GHC.Internal.Base.String,
+                  btrHasCallStack :: GHC.Internal.Maybe.Maybe GHC.Internal.Stack.Types.CallStack,
+                  btrDisplayHasCallStack :: GHC.Internal.Stack.Types.CallStack -> GHC.Internal.Base.String,
+                  btrExecutionStack :: GHC.Internal.Maybe.Maybe GHC.Internal.ExecutionStack.Internal.StackTrace,
+                  btrDisplayExecutionStack :: GHC.Internal.ExecutionStack.Internal.StackTrace -> GHC.Internal.Base.String,
+                  btrIpe :: GHC.Internal.Maybe.Maybe GHC.Internal.Stack.CloneStack.StackSnapshot,
+                  btrDisplayIpe :: GHC.Internal.Stack.CloneStack.StackSnapshot -> GHC.Internal.Base.String}
+  type DisplayBacktraceMechanisms :: *
+  data DisplayBacktraceMechanisms = DisplayBacktraceMechanisms {displayCostCentreBacktrace :: GHC.Internal.Ptr.Ptr GHC.Internal.Stack.CCS.CostCentreStack -> GHC.Internal.Base.String, displayHasCallStackBacktrace :: GHC.Internal.Stack.Types.CallStack -> GHC.Internal.Base.String, displayExecutionBacktrace :: GHC.Internal.ExecutionStack.Internal.StackTrace -> GHC.Internal.Base.String, displayIpeBacktrace :: GHC.Internal.Stack.CloneStack.StackSnapshot -> GHC.Internal.Base.String}
   collectBacktraces :: (?callStack::GHC.Internal.Stack.Types.CallStack) => GHC.Internal.Types.IO Backtraces
   displayBacktraces :: Backtraces -> GHC.Internal.Base.String
   getBacktraceMechanismState :: BacktraceMechanism -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
+  getDisplayBacktraceMechanisms :: GHC.Internal.Types.IO DisplayBacktraceMechanisms
   setBacktraceMechanismState :: BacktraceMechanism -> GHC.Internal.Types.Bool -> GHC.Internal.Types.IO ()
+  setDisplayBacktraceMechanismsState :: DisplayBacktraceMechanisms -> GHC.Internal.Types.IO ()
 
 module Control.Exception.Base where
   -- Safety: Safe
