@@ -427,7 +427,7 @@ bindistRules = do
     , interpolateSetting "ProjectVersion" ProjectVersion
     , interpolateVar "EnableDistroToolchain" $ lookupSystemConfig "settings-use-distro-mingw"
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
-    , interpolateVar "TargetHasLibm" $ lookupSystemConfig "target-has-libm"
+    , interpolateVar "TargetHasLibm" $ yesNo <$> getTarget tgtHasLibm
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
     , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
     , interpolateVar "TargetWordSize" $ getTarget wordSize
@@ -484,7 +484,6 @@ generateSettings settingsFile = do
 
     settings <- traverse sequence $
         [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
