@@ -1123,7 +1123,7 @@ importdecls_semi
         | {- empty -}           { [] }
 
 importdecl :: { LImportDecl GhcPs }
-        : 'import' maybe_src maybe_splice maybe_safe optqualified maybe_pkg modid maybe_splice optqualified maybeas maybeimpspec
+        : 'import' maybe_src maybe_level maybe_safe optqualified maybe_pkg modid maybe_level optqualified maybeas maybeimpspec
                 {% do {
                   ; let { ; mPreQual = $5
                           ; mPostQual = $9
@@ -1163,7 +1163,7 @@ maybe_safe :: { (Maybe (EpToken "safe"),Bool) }
         : 'safe'                                { (Just (epTok $1),True) }
         | {- empty -}                           { (Nothing,      False) }
 
-maybe_splice :: { (Maybe EpAnnLevel) }
+maybe_level :: { (Maybe EpAnnLevel) }
         : 'splice'                              { (Just (EpAnnLevelSplice (epTok $1))) }
         | 'quote'                               { (Just (EpAnnLevelQuote (epTok $1))) }
         | {- empty -}                           { (Nothing) }

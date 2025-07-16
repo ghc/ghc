@@ -216,3 +216,6 @@ test('T24237', normal, compile_fail, [''])
 
 test('Test25454', [ignore_stderr, req_ppr_deps], makefile_test, ['Test25454'])
 test('Test25885', [ignore_stderr, req_ppr_deps], makefile_test, ['Test25885'])
+
+test('TestLevelImports', [ignore_stderr, req_ppr_deps], makefile_test, ['TestLevelImports'])
+test('TestNamedDefaults', [ignore_stderr, req_ppr_deps], makefile_test, ['TestNamedDefaults'])

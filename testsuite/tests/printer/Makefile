@@ -901,3 +901,14 @@ Test25467:
 Test25885:
 	$(CHECK_PPR)   $(LIBDIR) Test25885.hs
 	$(CHECK_EXACT) $(LIBDIR) Test25885.hs
+
+.PHONY: TestLevelImports
+TestLevelImports:
+	$(CHECK_PPR)   $(LIBDIR) TestLevelImports.hs
+	$(CHECK_EXACT) $(LIBDIR) TestLevelImports.hs
+
+
+.PHONY: TestNamedDefaults
+TestNamedDefaults:
+	$(CHECK_PPR)   $(LIBDIR) TestNamedDefaults.hs
+	$(CHECK_EXACT) $(LIBDIR) TestNamedDefaults.hs

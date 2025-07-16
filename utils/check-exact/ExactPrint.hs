@@ -802,6 +802,7 @@ markLensBracketsC' a l =
       c' <- markEpUniToken c
       return (set l (ListBanana o c') a)
     ListNone -> return (set l ListNone a)
+
 -- -------------------------------------
 
 markEpToken :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
@@ -937,6 +938,7 @@ lam_where k annsModule = fmap (\newAnns -> annsModule { am_where = newAnns })
 --   { importDeclAnnImport    :: EpToken "import" -- ^ The location of the @import@ keyword
 --   , importDeclAnnPragma    :: Maybe (EpaLocation, EpToken "#-}") -- ^ The locations of @{-# SOURCE@ and @#-}@ respectively
 --   , importDeclAnnSafe      :: Maybe (EpToken "safe") -- ^ The location of the @safe@ keyword
+--   , importDeclAnnLevel     :: Maybe EpAnnLevel -- ^ The location of the @splice@ or @quote@ keyword
 --   , importDeclAnnQualified :: Maybe (EpToken "qualified") -- ^ The location of the @qualified@ keyword
 --   , importDeclAnnPackage   :: Maybe EpaLocation -- ^ The location of the package name (when using @-XPackageImports@)
 --   , importDeclAnnAs        :: Maybe (EpToken "as") -- ^ The location of the @as@ keyword
@@ -953,6 +955,10 @@ limportDeclAnnImport k annImp = fmap (\new -> annImp { importDeclAnnImport = new
 limportDeclAnnSafe :: Lens EpAnnImportDecl (Maybe (EpToken "safe"))
 limportDeclAnnSafe k annImp = fmap (\new -> annImp { importDeclAnnSafe = new })
                                      (k (importDeclAnnSafe annImp))
+
+limportDeclAnnLevel :: Lens EpAnnImportDecl (Maybe EpAnnLevel)
+limportDeclAnnLevel k annImp = fmap (\new -> annImp { importDeclAnnLevel = new })
+                                     (k (importDeclAnnLevel annImp))
 
 limportDeclAnnQualified :: Lens EpAnnImportDecl (Maybe (EpToken "qualified"))
 limportDeclAnnQualified k annImp = fmap (\new -> annImp { importDeclAnnQualified = new })
@@ -1625,9 +1631,15 @@ instance ExactPrint (ImportDecl GhcPs) where
               printStringAtLsDelta (SameLine 1) "#-}"
               return Nothing
         NoSourceText -> return (importDeclAnnPragma an)
+    -- pre level
+    ann0' <- case st of
+        LevelStylePre _ -> markLensFun' ann0 limportDeclAnnLevel (\mt -> mapM markEpAnnLevel mt)
+        _ -> return ann0
+
+
     ann1 <- if safeflag
-      then markLensFun' ann0 limportDeclAnnSafe (\mt -> mapM markEpToken mt)
-      else return ann0
+      then markLensFun' ann0' limportDeclAnnSafe (\mt -> mapM markEpToken mt)
+      else return ann0'
     ann2 <-
       case qualFlag of
         QualifiedPre  -- 'qualified' appears in prepositive position.
@@ -1640,11 +1652,16 @@ instance ExactPrint (ImportDecl GhcPs) where
        _ -> return ann2
     modname' <- markAnnotated modname
 
+    -- post level
+    ann3' <- case st of
+        LevelStylePost _ -> markLensFun' ann3 limportDeclAnnLevel (\mt -> mapM markEpAnnLevel mt)
+        _ -> return ann3
+
     ann4 <-
       case qualFlag of
         QualifiedPost  -- 'qualified' appears in postpositive position.
-          -> markLensFun' ann3 limportDeclAnnQualified (\ml -> mapM markEpToken ml)
-        _ -> return ann3
+          -> markLensFun' ann3' limportDeclAnnQualified (\ml -> mapM markEpToken ml)
+        _ -> return ann3'
 
     (importDeclAnnAs', mAs') <-
       case mAs of
@@ -1669,6 +1686,9 @@ instance ExactPrint (ImportDecl GhcPs) where
     return (ImportDecl (XImportDeclPass (EpAnn anc' an2 cs') msrc impl)
                      modname' mpkg src st safeflag qualFlag mAs' hiding')
 
+markEpAnnLevel :: (Monad m, Monoid w) => EpAnnLevel -> EP w m EpAnnLevel
+markEpAnnLevel (EpAnnLevelSplice tok) = EpAnnLevelSplice <$> markEpToken tok
+markEpAnnLevel (EpAnnLevelQuote tok) = EpAnnLevelQuote <$> markEpToken tok
 
 -- ---------------------------------------------------------------------
 
@@ -2717,8 +2737,8 @@ instance ExactPrint (DefaultDecl GhcPs) where
 
   exact (DefaultDecl (d,op,cp) cl tys) = do
     d' <- markEpToken d
-    op' <- markEpToken op
     cl' <- markAnnotated cl
+    op' <- markEpToken op
     tys' <- markAnnotated tys
     cp' <- markEpToken cp
     return (DefaultDecl (d',op',cp') cl' tys')
