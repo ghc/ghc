@@ -596,8 +596,7 @@ library
 -- GHC already does `-undefined dynamic_lookup`, so we just do that for now, but
 -- we might try to get more precise with `-U` in the future.
 --
--- Note that the RTS also `-u`s some atomics symbols that *are* defined --- and
--- defined within the RTS! It is not immediately clear why this is needed. This
--- dates back to c06e3f46d24ef69f3a3d794f5f604cb8c2a40cbc which mentions a build
--- failure that it was suggested that this fix, but the precise reasoning is not
--- explained.
+-- Note that the RTS also `-u`s some symbols for atomic operations that *are* defined
+-- by `ghc-internal`. This is needed when the RTS is compiled when the RTS is
+-- compiled with, e.g., the unregisterised backend since the code-generator will
+-- reference these symbols when compiling atomic primops in Cmm sources.
