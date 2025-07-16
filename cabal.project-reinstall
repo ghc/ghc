@@ -70,6 +70,9 @@ constraints: ghc +internal-interpreter +dynamic-system-linke,
              any.template-haskell installed
 
 
+package *
+    happy-options: --strict
+
 benchmarks: False
 tests: False
 allow-boot-library-installs: True
