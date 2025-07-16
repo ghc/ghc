@@ -28,7 +28,7 @@ module GHC.Tc.Types.Evidence (
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
-  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable,
+  mkEvCast, evIdsOfTerm, evIdsOfTerms, mkEvScSelectors, evTypeable,
 
   evTermCoercion, evTermCoercion_maybe,
   EvCallStack(..),
@@ -61,7 +61,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon ( DataCon, dataConWrapId )
 import GHC.Core.Class (Class, classSCSelId )
-import GHC.Core.FVs   ( exprSomeFreeVars )
+import GHC.Core.FVs
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
 
 import GHC.Types.Unique.DFM
@@ -75,6 +75,7 @@ import GHC.Types.Basic
 
 import GHC.Builtin.Names
 
+import GHC.Utils.FV
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -703,11 +704,9 @@ implicit parameter is not important, see (CS5) below) are solved as follows:
         [W] d2 :: (?stk :: CallStack)    CtOrigin = IPOccOrigin
 
    That is, `d` is a call-stack that has the `foo` call-site pushed on top of
-   `d2`, which can now be solved normally (as in (1) above).  This is done in two
-   places:
-     - In GHC.Tc.Solver.Dict.canDictNC we do the pushing.
-     - In GHC.Tc.Solver.Types.findDict we arrrange /not/ to solve a plan-PUSH
-       constraint by forcing a "miss" in the lookup in the inert set
+   `d2`, which can now be solved normally (as in (1) above).  This is done as follows:
+     - In GHC.Tc.Solver.Dict.canDictCt we do the pushing.
+     - We only look up canonical constraints in the inert set
 
 3. For a CallStack constraint, we choose how to solve it based on its CtOrigin:
 
@@ -865,30 +864,37 @@ evTermCoercion tm = case evTermCoercion_maybe tm of
 *                                                                      *
 ********************************************************************* -}
 
-relevantEvVar :: Var -> Bool
+relevantEvId :: Var -> Bool
 -- Just returns /local/ free evidence variables; i.e ones with Internal Names
 -- Top-level ones (DFuns, dictionary selectors and the like) don't count
-relevantEvVar v = isInternalName (varName v)
+-- Evidence variables are always Ids; do not pick TyVars
+relevantEvId v = isId v && isInternalName (varName v)
 
-evVarsOfTerm :: EvTerm -> VarSet
-evVarsOfTerm (EvExpr e)         = exprSomeFreeVars relevantEvVar e
-evVarsOfTerm (EvTypeable _ ev)  = evVarsOfTypeable ev
-evVarsOfTerm (EvFun { et_tvs = tvs, et_given = given, et_binds = binds, et_body = v })
-  = fvs `delVarSetList` bndrs
+evIdsOfTerm :: EvTerm -> VarSet
+evIdsOfTerm tm = fvVarSet (filterFV relevantEvId (evTermFVs tm))
+
+evIdsOfTerms :: EvTerm -> [EvVar]
+evIdsOfTerms tm = fvVarList (filterFV relevantEvId (evTermFVs tm))
+
+evTermFVs :: EvTerm -> FV
+evTermFVs (EvExpr e)         = exprFVs e
+evTermFVs (EvTypeable _ ev)  = evFVsOfTypeable ev
+evTermFVs (EvFun { et_tvs = tvs, et_given = given, et_binds = binds, et_body = v })
+  = addBndrsFV bndrs fvs
   where
-    fvs = foldr (unionVarSet . evVarsOfTerm . eb_rhs) (unitVarSet v) binds
+    fvs = foldr (unionFV . evTermFVs . eb_rhs) (unitFV v) binds
     bndrs = foldr ((:) . eb_lhs) (tvs ++ given) binds
 
-evVarsOfTerms :: [EvTerm] -> VarSet
-evVarsOfTerms = mapUnionVarSet evVarsOfTerm
+evTermFVss :: [EvTerm] -> FV
+evTermFVss = mapUnionFV evTermFVs
 
-evVarsOfTypeable :: EvTypeable -> VarSet
-evVarsOfTypeable ev =
+evFVsOfTypeable :: EvTypeable -> FV
+evFVsOfTypeable ev =
   case ev of
-    EvTypeableTyCon _ e      -> mapUnionVarSet evVarsOfTerm e
-    EvTypeableTyApp e1 e2    -> evVarsOfTerms [e1,e2]
-    EvTypeableTrFun em e1 e2 -> evVarsOfTerms [em,e1,e2]
-    EvTypeableTyLit e        -> evVarsOfTerm e
+    EvTypeableTyCon _ e      -> mapUnionFV evTermFVs e
+    EvTypeableTyApp e1 e2    -> evTermFVss [e1,e2]
+    EvTypeableTrFun em e1 e2 -> evTermFVss [em,e1,e2]
+    EvTypeableTyLit e        -> evTermFVs e
 
 {- *********************************************************************
 *                                                                      *

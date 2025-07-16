@@ -532,7 +532,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                                     unifyForAllBody ev (eqRelRole eq_rel) $ \uenv ->
                                     go uenv skol_tvs init_subst2 bndrs1 bndrs2
 
-      ; traceTcS "Trying to solve the immplication" (ppr s1 $$ ppr s2 $$ ppr wanteds)
+      ; traceTcS "Trying to solve the implication" (ppr s1 $$ ppr s2 $$ ppr wanteds)
       ; ev_binds_var <- newNoTcEvBinds
       ; solved <- trySolveImplication $
                   (implicationPrototype (ctLocEnv loc))

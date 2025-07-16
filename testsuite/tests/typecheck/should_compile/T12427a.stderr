@@ -1,4 +1,3 @@
-
 T12427a.hs:17:29: error: [GHC-91028]
     • Couldn't match expected type ‘p’
                   with actual type ‘(forall b. [b] -> [b]) -> Int’
@@ -24,12 +23,11 @@ T12427a.hs:28:6: error: [GHC-91028]
     • In the pattern: T1 _ x1
       In a pattern binding: T1 _ x1 = undefined
 
-T12427a.hs:41:6: error: [GHC-25897]
-    • Couldn't match type ‘b’ with ‘[b]’
+T12427a.hs:41:6: error: [GHC-83865]
+    • Couldn't match type: forall b. [b] -> [b]
+                     with: forall a. a -> a
       Expected: (forall b. [b] -> [b]) -> Int
         Actual: (forall a. a -> a) -> Int
-      ‘b’ is a rigid type variable bound by
-        the type [b] -> [b]
-        at T12427a.hs:41:1-19
     • In the pattern: T1 _ x3
       In a pattern binding: T1 _ x3 = undefined
+
