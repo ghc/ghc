@@ -605,7 +605,7 @@ doc-tarball:
     - mv docs/*.tar.xz docs/*.pdf .
     - ls -lh
 
-hackage-doc-tarball:
+.hackage-doc-tarball:
   stage: packaging
   needs:
     - job: nightly-x86_64-linux-fedora33-release-hackage
@@ -635,8 +635,21 @@ hackage-doc-tarball:
     - . .gitlab/ci.sh configure
     - ./upload_ghc_libs.py prepare --bindist ghc*linux/
     - mv .upload-libs/docs ../hackage_docs
+
+nightly-hackage-doc-tarball:
+  extends: .hackage-doc-tarball
+  needs:
+    - job: nightly-x86_64-linux-fedora33-release-hackage
+    - job: source-tarball
   rules:
     - if: $NIGHTLY
+
+release-hackage-doc-tarball:
+  extends: .hackage-doc-tarball
+  needs:
+    - job: release-x86_64-linux-fedora33-release-hackage
+    - job: source-tarball
+  rules:
     - if: '$RELEASE_JOB == "yes"'
 
 source-tarball:
