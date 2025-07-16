@@ -52,6 +52,7 @@ def prep_base():
 def prep_ghc_internal():
     shutil.copy('config.guess', 'libraries/ghc-internal')
     shutil.copy('config.sub', 'libraries/ghc-internal')
+    build_copy_file(PACKAGES['ghc-internal'], Path('GHC/Internal/PrimopWrappers.hs'))
 
 def build_copy_file(pkg: Package, f: Path):
     target = Path('_build') / 'stage1' / pkg.path / 'build' / f
@@ -74,9 +75,6 @@ def modify_file(pkg: Package, fname: Path, f: Callable[[str], str]):
     target = pkg.path / fname
     s = target.read_text()
     target.write_text(f(s))
-
-def prep_ghc_prim():
-    build_copy_file(PACKAGES['ghc-prim'], Path('GHC/PrimopWrappers.hs'))
 
 def prep_ghc_bignum():
     shutil.copy('config.guess', 'libraries/base')
@@ -112,7 +110,6 @@ PACKAGES = {
         Package('base', Path("libraries/base"), prep_base),
         Package('ghc-internal', Path("libraries/ghc-internal"), prep_ghc_internal),
         Package('ghc-experimental', Path("libraries/ghc-experimental"), no_prep),
-        Package('ghc-prim', Path("libraries/ghc-prim"), prep_ghc_prim),
         Package('integer-gmp', Path("libraries/integer-gmp"), no_prep),
         Package('ghc-bignum', Path("libraries/ghc-bignum"), prep_ghc_bignum),
         Package('template-haskell', Path("libraries/template-haskell"), no_prep),
@@ -137,7 +134,6 @@ def cabal_upload(tarball: Path, creds: Credentials, publish: bool=False, extra_a
     run(['cabal', 'upload'] + extra_args + [tarball] + creds_args, check=True)
 
 def prepare_sdist(pkg: Package):
-
     print(f'Preparing package {pkg.name}...')
     shutil.rmtree(pkg.path / 'dist-newstyle', ignore_errors=True)
     build_file_hadrian(pkg.path / '{}.cabal'.format(pkg.name))
