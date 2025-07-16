@@ -619,7 +619,7 @@ inline void updateRemembSetPushThunk(Capability *cap, StgThunk *thunk)
 {
     const StgInfoTable *info;
     do {
-        info = *(StgInfoTable* volatile*) &thunk->header.info;
+        info = get_itbl((StgClosure*) thunk);
     } while (info == &stg_WHITEHOLE_info);
 
     const StgThunkInfoTable *thunk_info = THUNK_INFO_PTR_TO_STRUCT(info);
@@ -1343,7 +1343,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
             goto done;
 
         case WHITEHOLE:
-            while (*(StgInfoTable* volatile*) &p->header.info == &stg_WHITEHOLE_info)
+            while (get_itbl(p) == &stg_WHITEHOLE_info)
 #if defined(PARALLEL_GC)
                 busy_wait_nop()
 #endif
@@ -1714,7 +1714,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
         break;
 
     case WHITEHOLE:
-        while (*(StgInfoTable* volatile*) &p->header.info == &stg_WHITEHOLE_info);
+        while (get_itbl(p) == &stg_WHITEHOLE_info);
         goto try_again;
 
     case COMPACT_NFDATA:
