@@ -28,7 +28,7 @@ build-type:     Custom
 extra-source-files: changelog.md
 
 custom-setup
-    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.14, directory, filepath
+    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.16, directory, filepath
 
 source-repository head
     type:     git

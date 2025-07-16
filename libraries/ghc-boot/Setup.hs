@@ -10,6 +10,7 @@ import Distribution.Verbosity
 import Distribution.Simple.Program
 import Distribution.Simple.Utils
 import Distribution.Simple.Setup
+import qualified Distribution.Simple.LocalBuildInfo as LBI
 
 import System.IO
 import System.Directory
@@ -32,12 +33,13 @@ main = defaultMainWithHooks ghcHooks
 ghcAutogen :: Verbosity -> LocalBuildInfo -> IO ()
 ghcAutogen verbosity lbi@LocalBuildInfo{..} = do
   -- Get compiler/ root directory from the cabal file
-  let Just compilerRoot = takeDirectory <$> pkgDescrFile
+  let Just compilerRoot = takeDirectory . i <$> pkgDescrFile
 
-  let platformHostFile = "GHC/Platform/Host.hs"
-      platformHostPath = autogenPackageModulesDir lbi </> platformHostFile
+      i = LBI.interpretSymbolicPathLBI lbi
+      platformHostFile = "GHC/Platform/Host.hs"
+      platformHostPath = i (autogenPackageModulesDir lbi) </> platformHostFile
       ghcVersionFile = "GHC/Version.hs"
-      ghcVersionPath = autogenPackageModulesDir lbi </> ghcVersionFile
+      ghcVersionPath = i (autogenPackageModulesDir lbi) </> ghcVersionFile
 
   -- Get compiler settings
   settings <- lookupEnv "HADRIAN_SETTINGS" >>= \case
