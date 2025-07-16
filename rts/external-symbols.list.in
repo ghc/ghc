@@ -55,6 +55,12 @@ ghczminternal_GHCziInternalziWord_W16zh_con_info
 ghczminternal_GHCziInternalziWord_W32zh_con_info
 ghczminternal_GHCziInternalziWord_W64zh_con_info
 ghczminternal_GHCziInternalziStable_StablePtr_con_info
+ghczminternal_GHCziInternalziStackziCloneStack_StackSnapshot_closure
+
+#if 0
+N.B. These symbols are defined in ghc-internal and may be referenced by the
+unregisterised code-generator when compiling RTS Cmm sources.
+#endif
 hs_atomic_add8
 hs_atomic_add16
 hs_atomic_add32
@@ -95,4 +101,3 @@ hs_atomicwrite8
 hs_atomicwrite16
 hs_atomicwrite32
 hs_atomicwrite64
-ghczminternal_GHCziInternalziStackziCloneStack_StackSnapshot_closure
