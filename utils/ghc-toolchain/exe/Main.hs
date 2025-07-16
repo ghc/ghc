@@ -486,6 +486,7 @@ mkTarget opts = do
     tgtSupportsSubsectionsViaSymbols <- checkSubsectionsViaSymbols archOs cc
     tgtSupportsIdentDirective <- checkIdentDirective cc
     tgtSupportsGnuNonexecStack <- checkGnuNonexecStack archOs cc
+    tgtHasLibm <- checkTargetHasLibm cc
 
     -- code generator configuration
     tgtUnregisterised <- determineUnregisterised archOs (optUnregisterised opts)
@@ -526,6 +527,7 @@ mkTarget opts = do
                    , tgtUnregisterised
                    , tgtTablesNextToCode
                    , tgtUseLibffiForAdjustors = tgtUseLibffi
+                   , tgtHasLibm
                    , tgtSymbolsHaveLeadingUnderscore
                    , tgtSupportsSubsectionsViaSymbols
                    , tgtSupportsIdentDirective

@@ -12,6 +12,7 @@ Target
 , tgtUnregisterised = @UnregisterisedBool@
 , tgtTablesNextToCode = @TablesNextToCodeBool@
 , tgtUseLibffiForAdjustors = @UseLibffiForAdjustorsBool@
+, tgtHasLibm = @TargetHasLibmBool@
 , tgtCCompiler = Cc {ccProgram = Program {prgPath = "@CC@", prgFlags = @CONF_CC_OPTS_STAGE2List@}}
 , tgtCxxCompiler = Cxx {cxxProgram = Program {prgPath = "@CXX@", prgFlags = @CONF_CXX_OPTS_STAGE2List@}}
 , tgtCPreprocessor = Cpp {cppProgram = Program {prgPath = "@CPPCmd@", prgFlags = @CONF_CPP_OPTS_STAGE2List@}}
