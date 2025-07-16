@@ -1276,6 +1276,7 @@ scavenge_one(StgPtr p)
     bool no_luck;
     bool saved_eager_promotion;
 
+try_again:
     saved_eager_promotion = gct->eager_promotion;
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
@@ -1616,6 +1617,13 @@ scavenge_one(StgPtr p)
     case CONTINUATION:
         scavenge_continuation((StgContinuation *)p);
         break;
+
+    case WHITEHOLE:
+        // This may happen when the nonmoving GC is in use via two paths:
+        //   1. when an MVAR is being marked concurrently
+        //   2. when the object belongs to a chain of selectors being short-cutted.
+        while (get_itbl((StgClosure*) p) == &stg_WHITEHOLE_info);
+        goto try_again;
 
     default:
         barf("scavenge_one: strange object %d", (int)(info->type));
