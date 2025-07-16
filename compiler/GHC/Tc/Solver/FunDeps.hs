@@ -256,12 +256,12 @@ Consider T4254b:
   From the ambiguity check on the type signature we get
     [G] FD Int b
     [W] FD Int beta
-  If we ineract that Wanted with /both/ the t0p-level instance, /and/ the
+  If we interact that Wanted with /both/ the top-level instance, /and/ the
   local Given, we'll get
       beta ~ Int   and     beta ~ b
   respectively.  That would generate (b~Bool), which would fai.  I think
   it doesn't matter which of the two we pick, but historically we have
-  picked teh local-fundeps firs.
+  picked the local-fundeps first.
 
 (DFL2) Try solving from top-level instances before fundeps.
   From the definition `foo = op` we get
