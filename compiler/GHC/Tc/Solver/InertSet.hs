@@ -1960,6 +1960,9 @@ solveOneFromTheOther :: Ct  -- Inert    (Dict or Irred)
 -- We can always solve one from the other: even if both are wanted,
 -- although we don't rewrite wanteds with wanteds, we can combine
 -- two wanteds into one by solving one from the other
+--
+-- Compare the corresponding function for equalities:
+--      GHC.Tc.Solver.Equality.inertEqsCanDischarge
 
 solveOneFromTheOther ct_i ct_w
   | CtWanted {} <- ev_w
@@ -1968,32 +1971,37 @@ solveOneFromTheOther ct_i ct_w
   = -- Inert must be Given
     KeepWork
 
-  | CtWanted {} <- ev_w
+  | CtWanted (WantedCt { ctev_rewriters = rw_w }) <- ev_w
   = -- Inert is Given or Wanted
     case ev_i of
       CtGiven {} -> KeepInert
         -- work is Wanted; inert is Given: easy choice.
 
-      CtWanted {} -- Both are Wanted
+      CtWanted (WantedCt { ctev_rewriters = rw_i }) -- Both are Wanted
         -- If only one has no pending superclasses, use it
         -- Otherwise we can get infinite superclass expansion (#22516)
         -- in silly cases like   class C T b => C a b where ...
-        | not is_psc_i, is_psc_w     -> KeepInert
-        | is_psc_i,     not is_psc_w -> KeepWork
+        | Just res <- better (not is_psc_i) (not is_psc_w)
+        -> res
+
+        -- If only one has an empty rewriter set, use it
+        | Just res <- better (isEmptyRewriterSet rw_i) (isEmptyRewriterSet rw_w)
+        -> res
 
         -- If only one is a WantedSuperclassOrigin (arising from expanding
         -- a Wanted class constraint), keep the other: wanted superclasses
         -- may be unexpected by users
-        | not is_wsc_orig_i, is_wsc_orig_w     -> KeepInert
-        | is_wsc_orig_i,     not is_wsc_orig_w -> KeepWork
+        | Just res <- better (not is_wsc_orig_i) (not is_wsc_orig_w)
+        -> res
 
-        -- otherwise, just choose the lower span
+        -- Otherwise, just choose the lower span
         -- reason: if we have something like (abs 1) (where the
         -- Num constraint cannot be satisfied), it's better to
         -- get an error about abs than about 1.
         -- This test might become more elaborate if we see an
         -- opportunity to improve the error messages
         | ((<) `on` ctLocSpan) loc_i loc_w -> KeepInert
+
         | otherwise                        -> KeepWork
 
   -- From here on the work-item is Given
@@ -2016,6 +2024,15 @@ solveOneFromTheOther ct_i ct_w
   | otherwise   -- Both are Given, levels differ
   = different_level_strategy
   where
+     better :: Bool -> Bool -> Maybe InteractResult
+     -- (better inert-is-good wanted-is-good) returns
+     --   Just KeepWork  if wanted is strictly better than inert
+     --   Just KeepInert if inert is strictly better than wanted
+     --   Nothing if they are the same
+     better True False = Just KeepInert
+     better False True = Just KeepWork
+     better _     _    = Nothing
+
      ev_i  = ctEvidence ct_i
      ev_w  = ctEvidence ct_w
 
