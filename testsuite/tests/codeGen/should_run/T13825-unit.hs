@@ -25,8 +25,8 @@ tests :: Ghc ()
 tests = do
       (_, _, off) <- runTest [("a", FloatRep), ("b", DoubleRep)]
       assert_32_64 (map fmt off)
-          ["F(a,4)", "F(b,8)"]
-          ["F(a,8)", "P(4,12)", "F(b,16)"]
+          ["F(b,4)", "F(a,12)"]
+          ["F(b,8)", "F(a,16)", "P(4,20)"]
 
       (_, _, off) <- runTest [("a", FloatRep), ("b", FloatRep)]
       assert_32_64 (map fmt off)
@@ -40,8 +40,8 @@ tests = do
 
       (_, _, off) <- runTest [("a", FloatRep), ("b", FloatRep), ("c", Int64Rep)]
       assert_32_64 (map fmt off)
-          ["F(a,4)", "F(b,8)", "F(c,12)"]
-          ["F(a,8)", "F(b,12)", "F(c,16)"]
+          ["F(c,4)", "F(a,12)", "F(b,16)"]
+          ["F(c,8)", "F(a,16)", "F(b,20)"]
 
       (_, _, off) <- runTest [("a", Int64Rep), ("b", FloatRep), ("c", FloatRep)]
       assert_32_64 (map fmt off)
@@ -50,8 +50,8 @@ tests = do
 
       (_, _, off) <- runTest [("a", Int64Rep), ("b", FloatRep), ("c", Int64Rep)]
       assert_32_64 (map fmt off)
-          ["F(a,4)", "F(b,12)", "F(c,16)"]
-          ["F(a,8)", "F(b,16)", "P(4,20)", "F(c,24)"]
+          ["F(a,4)", "F(c,12)", "F(b,20)"]
+          ["F(a,8)", "F(c,16)", "F(b,24)", "P(4,28)"]
 
 
 assert_32_64 :: (Eq a, Show a) => a -> a -> a -> Ghc ()

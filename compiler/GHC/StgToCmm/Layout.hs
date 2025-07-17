@@ -56,7 +56,8 @@ import GHC.Platform.Profile
 import GHC.Unit
 
 import GHC.Utils.Misc
-import Data.List (mapAccumL, partition)
+import Data.List (mapAccumL, partition, sortBy)
+import Data.Ord (comparing)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
@@ -459,10 +460,19 @@ mkVirtHeapOffsetsWithPadding profile header things =
       ThunkHeader -> thunkHdrSize profile
     hdr_bytes = wordsToBytes platform hdr_words
 
-    (ptrs, non_ptrs) = partition (isGcPtrRep . fst . fromNonVoid) things
+    (ptrs, unsorted_non_ptrs) = partition (isGcPtrRep . fst . fromNonVoid) things
+
+    -- Sort the non-pointer fields by their size, starting with the largest
+    -- size, so that we can pack them more efficiently.
+
+    cmp_sizes (NonVoid (rep1, _)) (NonVoid (rep2, _)) =
+        comparing (primRepSizeB platform) rep2 rep1
+
+    non_ptrs = sortBy cmp_sizes unsorted_non_ptrs
 
     (bytes_of_ptrs, ptrs_w_offsets) =
        mapAccumL computeOffset 0 ptrs
+
     (tot_bytes, non_ptrs_w_offsets) =
        mapAccumL computeOffset bytes_of_ptrs non_ptrs
 

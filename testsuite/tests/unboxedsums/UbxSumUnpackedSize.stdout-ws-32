@@ -29,4 +29,4 @@ size: 11
 
 ### u_maybeW32
 U_MaybeW32 NothingW32 (JustW32 0) NothingW32 (JustW32 4294967295) NothingW32 (JustW32 0) NothingW32 (JustW32 4294967295)
-size: 17
+size: 11
