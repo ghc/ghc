@@ -281,7 +281,7 @@ instance Diagnostic DriverMessage where
             ++ llvmVersionStr supportedLlvmVersionLowerBound
             ++ " and "
             ++ llvmVersionStr supportedLlvmVersionUpperBound
-            ++ ") and reinstall GHC to make -fllvm work")
+            ++ ") and reinstall GHC to ensure -fllvm works")
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -352,7 +352,7 @@ instance Diagnostic DriverMessage where
     DriverInstantiationNodeInDependencyGeneration {}
       -> ErrorWithoutFlag
     DriverNoConfiguredLLVMToolchain
-      -> ErrorWithoutFlag
+      -> WarningWithoutFlag
 
   diagnosticHints = \case
     DriverUnknownMessage m
