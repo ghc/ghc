@@ -74,12 +74,12 @@ import GHC.Utils.Outputable as Ppr
 import GHC.Utils.Panic
 import GHC.Char
 import GHC.Exts.Heap
-import GHC.Runtime.Heap.Layout ( roundUpTo )
+import GHC.Runtime.Heap.Layout (ByteOff)
 import GHC.IO (throwIO)
 
 import Control.Monad
 import Data.Maybe
-import Data.List ((\\))
+import Data.List ((\\), mapAccumL)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import GHC.Exts
@@ -88,6 +88,10 @@ import Data.Sequence (viewl, ViewL(..))
 import Foreign hiding (shiftL, shiftR)
 import System.IO.Unsafe
 import GHC.InfoProv
+
+import GHC.StgToCmm.Closure ( NonVoid(NonVoid))
+import GHC.StgToCmm.Layout (mkVirtHeapOffsets, ClosureHeader(..))
+import Data.Array (Array, (!), array)
 
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
@@ -922,63 +926,80 @@ extractSubTerms :: (Type -> ForeignHValue -> TcM Term)
                 -> [Word]          -- ^ data arguments
                 -> [Type]
                 -> TcM [Term]
-extractSubTerms recurse ptr_args data_args = liftM thdOf3 . go 0 0
+extractSubTerms recurse ptr_args data_args tys = do
+  dflags <- getDynFlags
+  let profile = targetProfile dflags
+      (n_primreps, r) = mapAccumL collectReps 0 tys
+      (rep_tys, make_term) = unzip r
+      (_tot_words, ptr_words, nv_rep_offsets) =
+          mkVirtHeapOffsets profile NoHeader (map NonVoid $ concat rep_tys)
+      rep_offsets = map (\(NonVoid x, off) -> (x, off)) nv_rep_offsets
+      -- index maps the Int index of each PrimRep to its ByteOff
+      index :: Array Int ByteOff
+      index = array (0, n_primreps-1) rep_offsets
+  mapM (\m -> m index ptr_words) make_term
   where
-    go ptr_i arr_i [] = return (ptr_i, arr_i, [])
-    go ptr_i arr_i (ty:tys)
+
+    {- Collect all PrimReps from the Type, indexing each with an Int.
+       Also returns a function to construct the Term once the heap offset of
+       each indexed PrimRep is known.
+    -}
+    collectReps :: Int                  -- first index to use
+                -> Type
+                -> ( Int                -- next available index
+                   , ( [(PrimRep, Int)] -- indexed PrimReps
+                     , Array Int ByteOff -> Int -> TcM Term
+                     ))
+    collectReps n ty
       | Just (tc, elem_tys) <- tcSplitTyConApp_maybe ty
       , isUnboxedTupleTyCon tc
-                -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
-      = do (ptr_i, arr_i, terms0) <-
-               go ptr_i arr_i (dropRuntimeRepArgs elem_tys)
-           (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
-           return (ptr_i, arr_i, unboxedTupleTerm ty terms0 : terms1)
-      | otherwise
-      = case typePrimRep ty of
-          [rep_ty] -> do
-            (ptr_i, arr_i, term0)  <- go_rep ptr_i arr_i ty rep_ty
-            (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
-            return (ptr_i, arr_i, term0 : terms1)
-          rep_tys -> do
-           (ptr_i, arr_i, terms0) <- go_unary_types ptr_i arr_i rep_tys
-           (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
-           return (ptr_i, arr_i, unboxedTupleTerm ty terms0 : terms1)
+      -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
+      = let (n', sub) = mapAccumL collectReps n (dropRuntimeRepArgs elem_tys)
+            (reps, mk_terms) = unzip sub
+        in (n', (concat reps,
+                   \idx ptr_words -> unboxedTupleTerm ty <$>
+                        mapM (\mk -> mk idx ptr_words) mk_terms))
+      | otherwise =
+          case typePrimRep ty of
+              [rep] -> (n + 1
+                       ,([(rep, n)]
+                        ,\idx ptr_words -> mkTerm ptr_words ty rep (idx ! n)))
+              reps  -> let n_reps = length reps
+                           indexed_reps = zip reps [n..]
+                           mk idx ptr_words =
+                               unboxedTupleTerm ty <$>
+                                 mapM (\(rep, i) -> mkTerm ptr_words ty rep (idx ! i))
+                                      indexed_reps
+                       in (n + n_reps, (indexed_reps, mk))
 
-    go_unary_types ptr_i arr_i [] = return (ptr_i, arr_i, [])
-    go_unary_types ptr_i arr_i (rep_ty:rep_tys) = do
-      tv <- newVar liftedTypeKind
-      (ptr_i, arr_i, term0)  <- go_rep ptr_i arr_i tv rep_ty
-      (ptr_i, arr_i, terms1) <- go_unary_types ptr_i arr_i rep_tys
-      return (ptr_i, arr_i, term0 : terms1)
 
-    go_rep ptr_i arr_i ty rep
+
+    mkTerm :: Int -> Type -> PrimRep -> ByteOff -> TcM Term
+    mkTerm ptr_words ty rep byte_offset
       | isGcPtrRep rep = do
-          t <- recurse ty $ ptr_args !! ptr_i
-          return (ptr_i + 1, arr_i, t)
-      | otherwise = do
-          -- This is a bit involved since we allow packing multiple fields
-          -- within a single word. See also
-          -- GHC.StgToCmm.Layout.mkVirtHeapOffsetsWithPadding
           platform <- getPlatform
           let word_size = platformWordSizeInBytes platform
-              endian = platformByteOrder platform
-              size_b = primRepSizeB platform rep
-              -- Align the start offset (eg, 2-byte value should be 2-byte
-              -- aligned). But not more than to a word. The offset calculation
-              -- should be the same with the offset calculation in
-              -- GHC.StgToCmm.Layout.mkVirtHeapOffsetsWithPadding.
-              !aligned_idx = roundUpTo arr_i (min word_size size_b)
-              !new_arr_i = aligned_idx + size_b
-              ws | size_b < word_size =
-                     [index size_b aligned_idx word_size endian]
-                 | otherwise =
-                     let (q, r) = size_b `quotRem` word_size
-                     in assert (r == 0 )
-                        [ data_args !! i
-                        | o <- [0.. q - 1]
-                        , let i = (aligned_idx `quot` word_size) + o
-                        ]
-          return (ptr_i, new_arr_i, Prim ty ws)
+              (word_offset, r) = byte_offset `quotRem` word_size
+          massert (word_offset < length ptr_args)
+          massert (r == 0)
+          r <- recurse ty (ptr_args !! (byte_offset `quot` word_size))
+          pure r
+      | otherwise = do
+          platform <- getPlatform
+          let word_size = platformWordSizeInBytes platform
+              endian    = platformByteOrder platform
+              size_b    = primRepSizeB platform rep
+              ws        | size_b < word_size
+                        = [index size_b (byte_offset - word_size * ptr_words) word_size endian]
+                        | otherwise
+                        =
+                            let (q, r) = size_b `quotRem` word_size
+                            in assert (r == 0 )
+                                [ data_args !! i
+                                | o <- [0.. q - 1]
+                                , let i = (byte_offset `quot` word_size) - ptr_words + o
+                                ]
+          return (Prim ty ws)
 
     unboxedTupleTerm ty terms
       = Term ty (Right (tupleDataCon Unboxed (length terms)))
