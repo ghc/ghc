@@ -532,6 +532,8 @@ can_eq_nc_forall ev eq_rel s1 s2
                                     unifyForAllBody ev (eqRelRole eq_rel) $ \uenv ->
                                     go uenv skol_tvs init_subst2 bndrs1 bndrs2
 
+      -- Solve the implication right away, using `trySolveImplication`
+      -- See (SF6) in Note [Solving forall equalities]
       ; traceTcS "Trying to solve the implication" (ppr s1 $$ ppr s2 $$ ppr wanteds)
       ; ev_binds_var <- newNoTcEvBinds
       ; solved <- trySolveImplication $
@@ -620,6 +622,21 @@ There are lots of wrinkles of course:
    especially Refl ones.  We use the `unifyForAllBody` wrapper for `uType`,
    because we want to /gather/ the equality constraint (to put in the implication)
    rather than /emit/ them into the monad, as `wrapUnifierTcS` does.
+
+(SF6) We solve the implication on the spot, using `trySolveImplication`.  In
+   the past we instead generated an `Implication` to be solved later.  Nice in
+   some ways but it added complexity:
+      - We needed a `wl_implics` field of `WorkList` to collect
+        these emitted implications
+      - The types of `solveSimpleWanteds` and friends were more complicated
+      - Trickily, an `EvFun` had to contain an `EvBindsVar` ref-cell, which made
+        `evVarsOfTerm` harder.  Now an `EvFun` just contains the bindings.
+   The disadvantage of solve-on-the-spot is that if we fail we are simply
+   left with an unsolved (forall a. blah) ~ (forall b. blah), and it may
+   not be clear /why we couldn't solve it.  But on balance the error messages
+   improve: it is easier to undertand that
+       (forall a. a->a) ~ (forall b. b->Int)
+   is insoluble than it is to understand a message about matching `a` with `Int`.
 -}
 
 {- Note [Unwrap newtypes first]
@@ -2706,7 +2723,7 @@ tryInertEqs :: EqCt -> SolverStage ()
 tryInertEqs work_item@(EqCt { eq_ev = ev, eq_eq_rel = eq_rel })
   = Stage $
     do { inerts <- getInertCans
-       ; if | Just (ev_i, swapped) <- inertsCanDischarge inerts work_item
+       ; if | Just (ev_i, swapped) <- inertsEqsCanDischarge inerts work_item
             -> do { setEvBindIfWanted ev EvCanonical $
                     evCoercion (maybeSymCo swapped $
                                 downgradeRole (eqRelRole eq_rel)
@@ -2717,10 +2734,10 @@ tryInertEqs work_item@(EqCt { eq_ev = ev, eq_eq_rel = eq_rel })
             | otherwise
             -> continueWith () }
 
-inertsCanDischarge :: InertCans -> EqCt
-                   -> Maybe ( CtEvidence  -- The evidence for the inert
-                            , SwapFlag )  -- Whether we need mkSymCo
-inertsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
+inertsEqsCanDischarge :: InertCans -> EqCt
+                      -> Maybe ( CtEvidence  -- The evidence for the inert
+                               , SwapFlag )  -- Whether we need mkSymCo
+inertsEqsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
                                 , eq_ev = ev_w, eq_eq_rel = eq_rel })
   | (ev_i : _) <- [ ev_i | EqCt { eq_ev = ev_i, eq_rhs = rhs_i
                                 , eq_eq_rel = eq_rel }
@@ -2766,7 +2783,7 @@ inertsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
              -- Prefer the one that has no rewriters
              -- See (CE4) in Note [Combining equalities]
 
-inertsCanDischarge _ _ = Nothing
+inertsEqsCanDischarge _ _ = Nothing
 
 
 
