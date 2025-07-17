@@ -19,7 +19,8 @@ module GHC.Internal.Stack.CloneStack (
   cloneMyStack,
   cloneThreadStack,
   decode,
-  prettyStackEntry
+  prettyStackEntry,
+  toStackEntry,
   ) where
 
 import GHC.Internal.MVar
@@ -40,7 +41,7 @@ import GHC.Internal.ClosureTypes
 --
 -- @since base-4.17.0.0
 data StackSnapshot = StackSnapshot !StackSnapshot#
-
+-- TODO @fendor: deprecate
 foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, ByteArray# #)
 
 foreign import prim "stg_cloneMyStackzh" cloneMyStack# :: State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
@@ -208,6 +209,7 @@ cloneThreadStack (ThreadId tid#) = do
 
 -- | Representation for the source location where a return frame was pushed on the stack.
 -- This happens every time when a @case ... of@ scrutinee is evaluated.
+-- TODO @fendor: deprecate
 data StackEntry = StackEntry
   { functionName :: String,
     moduleName :: String,
@@ -232,9 +234,11 @@ data StackEntry = StackEntry
 --     is evaluated.)
 --
 -- @since base-4.17.0.0
+-- TODO @fendor: deprecate
 decode :: StackSnapshot -> IO [StackEntry]
 decode stackSnapshot = catMaybes `fmap` getDecodedStackArray stackSnapshot
 
+-- TODO @fendor: deprecate
 toStackEntry :: InfoProv -> StackEntry
 toStackEntry infoProv =
   StackEntry
@@ -244,6 +248,7 @@ toStackEntry infoProv =
     closureType = ipDesc infoProv
   }
 
+-- TODO @fendor: deprecate
 getDecodedStackArray :: StackSnapshot -> IO [Maybe StackEntry]
 getDecodedStackArray (StackSnapshot s) =
   IO $ \s0 -> case decodeStack# s s0 of
@@ -263,6 +268,7 @@ getDecodedStackArray (StackSnapshot s) =
 
     wordSize = sizeOf (nullPtr :: Ptr ())
 
+-- TODO @fendor: deprecate
 prettyStackEntry :: StackEntry -> String
 prettyStackEntry (StackEntry {moduleName=mod_nm, functionName=fun_nm, srcLoc=loc}) =
     "  " ++ mod_nm ++ "." ++ fun_nm ++ " (" ++ loc ++ ")"

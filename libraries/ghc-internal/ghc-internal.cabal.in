@@ -231,6 +231,12 @@ Library
         GHC.Internal.GHCi
         GHC.Internal.GHCi.Helpers
         GHC.Internal.Generics
+        GHC.Internal.Heap.Closures
+        GHC.Internal.Heap.Constants
+        GHC.Internal.Heap.InfoTable
+        GHC.Internal.Heap.InfoTable.Types
+        GHC.Internal.Heap.InfoTableProf
+        GHC.Internal.Heap.ProfInfo.Types
         GHC.Internal.InfoProv
         GHC.Internal.InfoProv.Types
         GHC.Internal.IO
@@ -283,7 +289,6 @@ Library
         GHC.Internal.RTS.Flags
         GHC.Internal.RTS.Flags.Test
         GHC.Internal.ST
-        GHC.Internal.Stack.CloneStack
         GHC.Internal.StaticPtr
         GHC.Internal.STRef
         GHC.Internal.Show
@@ -291,6 +296,9 @@ Library
         GHC.Internal.StableName
         GHC.Internal.Stack
         GHC.Internal.Stack.CCS
+        GHC.Internal.Stack.CloneStack
+        GHC.Internal.Stack.Constants
+        GHC.Internal.Stack.Decode
         GHC.Internal.Stack.Types
         GHC.Internal.Stats
         GHC.Internal.Storable
@@ -449,9 +457,12 @@ Library
           cbits/popcnt.c
           cbits/vectorQuotRem.c
           cbits/word2float.c
+          cbits/Stack_c.c
 
       cmm-sources:
           cbits/StackCloningDecoding.cmm
+          cbits/Stack.cmm
+          cbits/HeapPrim.cmm
 
     if arch(javascript)
       js-sources:

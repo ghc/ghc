@@ -7,6 +7,8 @@ module GHC.Internal.Exception.Backtrace where
 
 import GHC.Internal.Base
 import GHC.Internal.Data.OldList
+import GHC.Internal.Data.Functor
+import GHC.Internal.Data.Maybe
 import GHC.Internal.IORef
 import GHC.Internal.IO.Unsafe (unsafePerformIO)
 import GHC.Internal.Exception.Context
@@ -16,6 +18,7 @@ import qualified GHC.Internal.Stack as HCS
 import qualified GHC.Internal.ExecutionStack as ExecStack
 import qualified GHC.Internal.ExecutionStack.Internal as ExecStack
 import qualified GHC.Internal.Stack.CloneStack as CloneStack
+import qualified GHC.Internal.Stack.Decode as Decode
 import qualified GHC.Internal.Stack.CCS as CCS
 
 -- | How to collect a backtrace when an exception is thrown.
@@ -91,8 +94,8 @@ data Backtraces =
     Backtraces {
         btrCostCentre :: Maybe (Ptr CCS.CostCentreStack),
         btrHasCallStack :: Maybe HCS.CallStack,
-        btrExecutionStack :: Maybe [ExecStack.Location],
-        btrIpe :: Maybe [CloneStack.StackEntry]
+        btrExecutionStack :: Maybe ExecStack.StackTrace,
+        btrIpe :: Maybe CloneStack.StackSnapshot
     }
 
 -- | Render a set of backtraces to a human-readable string.
@@ -109,8 +112,11 @@ displayBacktraces bts = concat
 
     -- The unsafePerformIO here is safe as we don't currently unload cost-centres.
     displayCc   = unlines . map (indent 2) . unsafePerformIO . CCS.ccsToStrings
-    displayExec = unlines . map (indent 2 . flip ExecStack.showLocation "")
-    displayIpe  = unlines . map (indent 2 . CloneStack.prettyStackEntry)
+    -- 'fromMaybe' is fine here, if this was 'Nothing', 'collectStackTrace' would be 'Nothing' already.
+    displayExec = unlines . map (indent 2 . flip ExecStack.showLocation "") . fromMaybe [] . ExecStack.stackFrames
+    -- The unsafePerformIO here is safe as 'StackSnapshot' makes sure neither the stack frames nor
+    -- references closures can be garbage collected.
+    displayIpe  = unlines . map (indent 2 . Decode.prettyStackEntry) . unsafePerformIO . CloneStack.decode
     displayHsc  = unlines . map (indent 2 . prettyCallSite) . HCS.getCallStack
       where prettyCallSite (f, loc) = f ++ ", called at " ++ HCS.prettySrcLoc loc
 
@@ -140,12 +146,11 @@ collectBacktraces' enabled = HCS.withFrozenCallStack $ do
         Just `fmap` CCS.getCurrentCCS ()
 
     exec <- collect ExecutionBacktrace $ do
-        ExecStack.getStackTrace
+        ExecStack.collectStackTrace
 
     ipe <- collect IPEBacktrace $ do
         stack <- CloneStack.cloneMyStack
-        stackEntries <- CloneStack.decode stack
-        return (Just stackEntries)
+        pure (Just stack)
 
     hcs <- collect HasCallStackBacktrace $ do
         return (Just ?callStack)
