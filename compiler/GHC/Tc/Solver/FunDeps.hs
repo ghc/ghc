@@ -295,39 +295,24 @@ as the fundeps.
 #7875 is a case in point.
 -}
 
-doDictFunDepImprovement :: Cts -> TcS ImprovementResult
+doDictFunDepImprovement :: DictCt -> SolverStage Void
 -- (doDictFunDepImprovement inst_envs cts)
 --   * Generate the fundeps from interacting the
 --     top-level `inst_envs` with the constraints `cts`
 --   * Do the unifications and return any unsolved constraints
 -- See Note [Fundeps with instances, and equality orientation]
--- foldrM :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
-doDictFunDepImprovement unsolved_wanteds
-  = do { inerts    <- getInertCans  -- The inert_dicts are all Givens
-       ; inst_envs <- getInstEnvs
-       ; (_, imp_res) <- foldM (do_one_dict inst_envs)
-                               (inert_dicts inerts, noopImprovement)
-                               unsolved_wanteds
-       ; return imp_res }
 
-do_one_dict :: InstEnvs
-            -> (DictMap DictCt, ImprovementResult)
-            -> Ct
-            -> TcS (DictMap DictCt, ImprovementResult)
--- The `local_dicts` accumulator starts life as just the Givens, but
---   as we encounter each Wanted we augment it. Result: each Wanted
---   is interacted with all the Givens, and all prededing Wanteds.
---   This is worst-case quadratic because we have to compare each
---   constraint with all the others, to find all the pairwise interactions
-do_one_dict inst_envs (local_dicts, imp_res) (CDictCan dict_ct)
-  = do { (local_dicts1, imp_res1) <- do_one_local local_dicts dict_ct
+-- doLocalFunDepImprovement does StartAgain if there
+-- are any fundeps: see (DFL1) in Note [Do fundeps last]
+
+doDictFunDepImprovement dict_ct
+  = do { inst_envs <- getInstEnvs
+       ; imp_res1 <- do_dict_local_fds dict_ct
        ; if noImprovement imp_res1
          then do { imp_res2 <- do_one_top inst_envs dict_ct
-                 ; return (local_dicts1, imp_res `plusImprovements` imp_res2) }
-         else      return (local_dicts1, imp_res `plusImprovements` imp_res1) }
+                 ; return (imp_res `plusImprovements` imp_res2) }
+         else      return (imp_res `plusImprovements` imp_res1) }
 
-do_one_dict _ acc _  -- Non-DictCt constraints
-  = return acc
 
 do_one_top :: InstEnvs -> DictCt -> TcS ImprovementResult
 do_one_top inst_envs (DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
@@ -351,14 +336,14 @@ do_one_top inst_envs (DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
         new_orig  = FunDepOrigin2 dict_pred dict_origin
                                   inst_pred inst_loc
 
-do_one_local :: DictMap DictCt -> DictCt -> TcS (DictMap DictCt, ImprovementResult)
--- Using functional dependencies, interact the unsolved Wanteds
--- against each other and the inert Givens, to produce new equalities
-do_one_local locals dict_ct@(DictCt { di_cls = cls, di_ev = wanted_ev })
+do_dict_local_fds :: DictCt -> TcS ImprovementResult
+-- Using functional dependencies, interact the DictCt with the
+-- inert Givens and Wanteds, to produce new equalities
+do_dict_local_fds dict_ct@(DictCt { di_cls = cls, di_ev = wanted_ev })
     -- locals contains all the Givens and earlier Wanteds
-  = do { imp_res <- foldM do_interaction noopImprovement $
-                    findDictsByClass locals cls
-       ; return (addDict dict_ct locals, imp_res) }
+  = do { inerts <- getInertCans
+       ; foldM do_interaction noopImprovement $
+         findDictsByClass locals cls }
   where
     wanted_pred = ctEvPred wanted_ev
     wanted_loc  = ctEvLoc  wanted_ev
