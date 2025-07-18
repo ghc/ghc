@@ -1,0 +1,16 @@
+       documentation structure:
+         re-exported module(s): [A]
+           [A.a, A.b, A.c]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+       documentation structure:
+         re-exported module(s): [A]
+           [A.a, A.b, A.c]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:

@@ -173,7 +173,9 @@ mkDocStructureFromExportList mdl import_avails export_list =
                  -> Avails
                  -> DocStructureItem
     moduleExport alias avails =
-        DsiModExport (nubSortNE orig_names) (sortAvails (nubAvails avails))
+        {- For module re-exports, use the original order (which is already deterministic) -}
+        DsiModExport (nubSortNE orig_names)
+          (DefinitelyDeterministicAvails (nubAvails avails))
       where
         orig_names = M.findWithDefault aliasErr alias aliasMap
         aliasErr = error $ "mkDocStructureFromExportList: "
