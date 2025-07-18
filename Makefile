@@ -179,12 +179,17 @@ STAGE2_UTIL_EXECUTABLES := \
 # export CABAL := $(shell cabal update 2>&1 >/dev/null && cabal build cabal-install -v0 --disable-tests --project-dir libraries/Cabal && cabal list-bin -v0 --project-dir libraries/Cabal cabal-install:exe:cabal)
 $(abspath _build/stage0/bin/cabal): _build/stage0/bin/cabal
 
-.PHONY: _build/stage0/bin/cabal
+# --- Stage 0 build ---
+
+# This just builds cabal-install, which is used to build the rest of the project.
+
+# We need an absolute path here otherwise cabal will consider the path relative to `the project directory
+_build/stage0/bin/cabal: BUILD_ARGS=-j -w $(GHC0) --disable-tests --project-dir libraries/Cabal --builddir=$(abspath _build/stage0)
 _build/stage0/bin/cabal:
 	@echo ">>> Building Cabal..."
 	@mkdir -p _build/stage0/bin _build/logs
-	$(call run_and_log, cabal build -j -w $(GHC0) --disable-tests --project-dir libraries/Cabal --builddir=_build/stage0/cabal cabal-install:exe:cabal)
-	cp -rfp $(shell cabal list-bin -v0 -j -w $(GHC0) --project-dir libraries/Cabal --builddir=_build/stage0/cabal cabal-install:exe:cabal) _build/stage0/bin/cabal
+	cabal build $(BUILD_ARGS) cabal-install:exe:cabal
+	cp -rfp $(shell cabal list-bin -v0 $(BUILD_ARGS) cabal-install:exe:cabal) _build/stage0/bin/cabal
 	@echo ">>> Cabal built successfully."
 
 # --- Stage 1 build ---
