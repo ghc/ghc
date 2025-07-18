@@ -195,7 +195,7 @@ _build/stage1/%: private GHC=$(GHC0)
 .PHONY: $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES))
 $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES)) &: $(CABAL) | _build/booted
 	# Force cabal to replan
-	rm -rf _build/stage2/cache
+	rm -rf _build/stage1/cache
 	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
 		$(CABAL_BUILD) $(STAGE1_TARGETS))
 
