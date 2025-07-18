@@ -50,6 +50,8 @@ import GHC.Prelude
 
 import GHC.StgToCmm.Types
 
+import GHC.ByteCode.Types
+
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom

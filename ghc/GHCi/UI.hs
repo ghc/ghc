@@ -45,7 +45,7 @@ import GHC.Runtime.Eval (mkTopLevEnv)
 import GHC.Runtime.Eval.Utils
 
 -- The GHC interface
-import GHC.ByteCode.Breakpoints (imodBreaks_modBreaks, InternalBreakpointId(..), getBreakSourceId, getBreakSourceMod)
+import GHC.ByteCode.Breakpoints (imodBreaks_modBreaks, InternalBreakpointId(..), getBreakSourceId)
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHCi.BreakArray( breakOn, breakOff )
@@ -1621,7 +1621,7 @@ toBreakIdAndLocation (Just inf) = do
   brks <- liftIO $ readIModBreaks hug inf
   let bi = getBreakSourceId inf brks
   return $ listToMaybe [ id_loc | id_loc@(_,loc) <- IntMap.assocs (breaks st),
-                                  Right (breakId loc) == bi ]
+                                  breakId loc == bi ]
 
 printStoppedAtBreakInfo :: GHC.GhcMonad m => Resume -> [Name] -> m ()
 printStoppedAtBreakInfo res names = do
@@ -3825,7 +3825,7 @@ pprStopped res = do
       hug <- hsc_HUG <$> GHC.getSession
       brks <- liftIO $ readIModBreaks hug ibi
       return $ Just $ moduleName $
-        getBreakSourceMod ibi brks
+        bi_tick_mod $ getBreakSourceId ibi brks
   return $
     text "Stopped in"
       <+> ((case mb_mod_name of

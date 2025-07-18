@@ -841,7 +841,7 @@ assembleI platform i = case i of
     W8                   -> emit_ bci_OP_INDEX_ADDR_08 []
     _                    -> unsupported_width
 
-  BRK_FUN ibi@(InternalBreakpointId info_mod infox) byteOff -> do
+  BRK_FUN ibi@(InternalBreakpointId info_mod infox) -> do
     p1 <- ptr $ BCOPtrBreakArray info_mod
     let -- cast that checks that round-tripping through Word16 doesn't change the value
         toW16 x = let r = fromIntegral x :: Word16
@@ -852,7 +852,7 @@ assembleI platform i = case i of
     info_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS     $ moduleUnitId info_mod
     np               <- lit1 $ BCONPtrCostCentre ibi
     emit_ bci_BRK_FUN [ Op p1, Op info_addr, Op info_unitid_addr
-                      , SmallOp (toW16 infox), SmallOp (toW16 byteOff), Op np ]
+                      , SmallOp (toW16 infox), Op np ]
 
   BRK_ALTS active -> emit_ bci_BRK_ALTS [SmallOp (if active then 1 else 0)]
 

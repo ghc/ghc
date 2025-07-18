@@ -58,7 +58,6 @@ import GHCi.RemoteTypes
 import GHC.Iface.Load
 import GHCi.Message (ConInfoTable(..), LoadedDLL)
 
-import GHC.ByteCode.Breakpoints
 import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
@@ -1712,10 +1711,8 @@ allocateCCS interp ce mbss
               let count = 1 + (maybe 0 fst $ IM.lookupMax imodBreaks_breakInfo)
               let ccs = IM.map
                     (\info ->
-                      case cgb_tick_id info of
-                        Right bi -> fromMaybe (toRemotePtr nullPtr)
-                          (M.lookup bi ccss)
-                        Left InternalBreakLoc{} -> toRemotePtr nullPtr
+                      fromMaybe (toRemotePtr nullPtr)
+                        (M.lookup (cgb_tick_id info) ccss)
                     )
                     imodBreaks_breakInfo
               assertPpr (count == length ccs)
