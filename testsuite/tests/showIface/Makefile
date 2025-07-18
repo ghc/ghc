@@ -49,3 +49,7 @@ HaddockSpanIssueT24378:
 MagicHashInHaddocks:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -haddock MagicHashInHaddocks.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface MagicHashInHaddocks.hi | grep -A 200 'docs:'
+
+T25897:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -haddock -v0 T25897.hs T25897b.hs T25897c.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T25897.hi | grep -A 4 'documentation structure:'

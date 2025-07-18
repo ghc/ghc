@@ -13,3 +13,4 @@ test('ReExports', extra_files(['Inner0.hs', 'Inner1.hs', 'Inner2.hs', 'Inner3.hs
 test('HaddockIssue849', normal, makefile_test, [])
 test('HaddockSpanIssueT24378', normal, makefile_test, [])
 test('MagicHashInHaddocks', normal, makefile_test, [])
+test('T25897', extra_files(['T25897b.hs', 'T25897c.hs']), makefile_test, [])
