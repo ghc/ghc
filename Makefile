@@ -362,4 +362,4 @@ test: _build/bindist
 	make -C testsuite/tests test THREADS=${THREADS}
 
 # Inform Make that these are not actual files if they get deleted by other means
-.PHONY: clean distclean test all configure
+.PHONY: clean distclean test all
