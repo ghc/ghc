@@ -136,7 +136,11 @@ module Data.List
      unlines,
      unwords,
      -- **  \"Set\" operations
+     -- | Consider using @Data.Set@ from @containers@ package,
+     -- which offers a much wider and often more efficient range
+     -- of operations on sets.
      nub,
+     nubOrd,
      delete,
      (\\),
      union,
@@ -157,6 +161,7 @@ module Data.List
      -- ***  User-supplied equality (replacing an @Eq@ context)
      -- |  The predicate is assumed to define an equivalence.
      nubBy,
+     nubOrdBy,
      deleteBy,
      deleteFirstsBy,
      unionBy,
@@ -180,12 +185,14 @@ module Data.List
      ) where
 
 import GHC.Internal.Data.Bool (otherwise)
+import GHC.Internal.Data.Function (const)
 import GHC.Internal.Data.List
 import GHC.Internal.Data.List.NonEmpty (NonEmpty(..))
-import GHC.Internal.Data.Ord (Ordering(..), (<), (>))
+import GHC.Internal.Data.Ord (Ord, compare, Ordering(..), (<), (>))
 import GHC.Internal.Int (Int)
 import GHC.Internal.Num ((-))
 import GHC.List (build)
+import qualified Data.List.NubOrdSet as NubOrdSet
 
 inits1, tails1 :: [a] -> [NonEmpty a]
 
@@ -282,3 +289,25 @@ compareLength xs n
     (\m -> if m > 0 then LT else EQ)
     xs
     n
+
+-- | Same as 'nub', but asymptotically faster, taking only /O/(/n/ log /d/) time,
+-- where /d/ is the number of distinct elements in the list.
+--
+-- @since 4.23.0.0
+nubOrd :: Ord a => [a] -> [a]
+nubOrd = nubOrdBy compare
+{-# INLINE nubOrd #-}
+
+-- | Overloaded version of 'Data.List.nubOrd'.
+--
+-- The supplied comparison relation is supposed to be reflexive, transitive
+-- and antisymmetric, same as for 'sortBy'.
+--
+-- @since 4.23.0.0
+nubOrdBy :: (a -> a -> Ordering) -> [a] -> [a]
+nubOrdBy cmp xs = foldr
+  (\x cont seen -> if NubOrdSet.member cmp x seen then cont seen else x : cont (NubOrdSet.insert cmp x seen))
+  (const [])
+  xs
+  NubOrdSet.empty
+{-# INLINE nubOrdBy #-}

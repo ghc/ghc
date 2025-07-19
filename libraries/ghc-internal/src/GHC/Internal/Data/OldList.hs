@@ -494,21 +494,16 @@ dropLengthMaybe (_:x') (_:y') = dropLengthMaybe x' y'
 isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
 isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 
--- | \(\mathcal{O}(n^2)\). The 'nub' function removes duplicate elements from a
+-- | The 'nub' function removes duplicate elements from a
 -- list. In particular, it keeps only the first occurrence of each element. (The
 -- name 'nub' means \`essence\'.) It is a special case of 'nubBy', which allows
 -- the programmer to supply their own equality test.
 --
+-- This function knows too little about the elements to be efficient.
+-- Its asymptotic complexity is
+-- /O/(/n/ ⋅ /d/), where /d/ is the number of distinct elements in the list.
 --
--- If there exists @instance Ord a@, it's faster to use `nubOrd` from the `containers` package
--- ([link to the latest online documentation](https://hackage.haskell.org/package/containers/docs/Data-Containers-ListUtils.html#v:nubOrd)),
--- which takes only \(\mathcal{O}(n \log d)\) time where `d` is the number of
--- distinct elements in the list.
---
--- Another approach to speed up 'nub' is to use
--- 'map' @Data.List.NonEmpty.@'Data.List.NonEmpty.head' . @Data.List.NonEmpty.@'Data.List.NonEmpty.group' . 'sort',
--- which takes \(\mathcal{O}(n \log n)\) time, requires @instance Ord a@ and doesn't
--- preserve the order.
+-- If there exists @instance Ord a@, it's faster to use 'Data.List.nubOrd'.
 --
 -- ==== __Examples__
 --
