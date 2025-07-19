@@ -2,6 +2,7 @@
 
 ## 4.23.0.0 *TBA*
   * Add `Data.List.NonEmpty.mapMaybe`. ([CLC proposal #337](https://github.com/haskell/core-libraries-committee/issues/337))
+  * Add `nubOrd` / `nubOrdBy` to `Data.List` and `Data.List.NonEmpty`. ([CLC proposal #336](https://github.com/haskell/core-libraries-committee/issues/336))
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1

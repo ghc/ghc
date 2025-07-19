@@ -305,6 +305,7 @@ Library
             , GHC.JS.Foreign.Callback
 
     other-modules:
+        Data.List.Set
         System.CPUTime.Unsupported
         System.CPUTime.Utils
     if os(windows)

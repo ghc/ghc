@@ -137,6 +137,7 @@ module Data.List
      unwords,
      -- **  \"Set\" operations
      nub,
+     nubOrd,
      delete,
      (\\),
      union,
@@ -157,6 +158,7 @@ module Data.List
      -- ***  User-supplied equality (replacing an @Eq@ context)
      -- |  The predicate is assumed to define an equivalence.
      nubBy,
+     nubOrdBy,
      deleteBy,
      deleteFirstsBy,
      unionBy,
@@ -180,12 +182,14 @@ module Data.List
      ) where
 
 import GHC.Internal.Data.Bool (otherwise)
+import GHC.Internal.Data.Function (const, flip)
 import GHC.Internal.Data.List
 import GHC.Internal.Data.List.NonEmpty (NonEmpty(..))
-import GHC.Internal.Data.Ord (Ordering(..), (<), (>))
+import GHC.Internal.Data.Ord (Ord, compare, Ordering(..), (<), (>))
 import GHC.Internal.Int (Int)
 import GHC.Internal.Num ((-))
 import GHC.List (build)
+import qualified Data.List.Set as Set
 
 inits1, tails1 :: [a] -> [NonEmpty a]
 
@@ -282,3 +286,15 @@ compareLength xs n
     (\m -> if m > 0 then LT else EQ)
     xs
     n
+
+-- | Same as 'nub', but asymptotically faster, taking only /O/(/n/ log /n/) time.
+--
+-- @since 4.23.0.0
+nubOrd :: Ord a => [a] -> [a]
+nubOrd = nubOrdBy compare
+
+-- | Overloaded version of 'Data.List.nubOrd'.
+--
+-- @since 4.23.0.0
+nubOrdBy :: (a -> a -> Ordering) -> [a] -> [a]
+nubOrdBy cmp = flip (foldr (\x acc seen -> if Set.member cmp x seen then acc seen else x : acc (Set.insert cmp x seen)) (const [])) Set.empty

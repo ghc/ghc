@@ -94,7 +94,9 @@ module Data.List.NonEmpty (
    , isPrefixOf  -- :: Eq a => [a] -> NonEmpty a -> Bool
    -- * \"Set\" operations
    , nub         -- :: Eq a => NonEmpty a -> NonEmpty a
+   , nubOrd      -- :: Ord a => NonEmpty a -> NonEmpty a
    , nubBy       -- :: (a -> a -> Bool) -> NonEmpty a -> NonEmpty a
+   , nubOrdBy    -- :: (a -> a -> Ordering) -> NonEmpty a -> NonEmpty a
    -- * Indexing streams
    , (!!)        -- :: NonEmpty a -> Int -> a
    -- * Zipping and unzipping streams
@@ -119,6 +121,7 @@ import qualified Prelude
 
 import           Control.Applicative (Applicative (..), Alternative (many))
 import qualified Data.List                        as List
+import qualified Data.List.Set                    as Set
 import qualified Data.Maybe                       as List (mapMaybe)
 import           GHC.Internal.Data.Foldable       hiding (length, toList)
 import qualified GHC.Internal.Data.Foldable       as Foldable
@@ -571,6 +574,18 @@ nub = nubBy (==)
 -- function.
 nubBy :: (a -> a -> Bool) -> NonEmpty a -> NonEmpty a
 nubBy eq (a :| as) = a :| List.nubBy eq (List.filter (\b -> not (eq a b)) as)
+
+-- | Same as 'nub', but asymptotically faster, taking only /O/(/n/ log /n/) time.
+--
+-- @since 4.23.0.0
+nubOrd :: Ord a => NonEmpty a -> NonEmpty a
+nubOrd = nubOrdBy compare
+
+-- | Overloaded version of 'Data.List.NonEmpty.nubOrd'.
+--
+-- @since 4.23.0.0
+nubOrdBy :: (a -> a -> Ordering) -> NonEmpty a -> NonEmpty a
+nubOrdBy cmp (y :| ys) = y :| foldr (\x acc seen -> if Set.member cmp x seen then acc seen else x : acc (Set.insert cmp x seen)) (const []) ys (Set.insert cmp y Set.empty)
 
 -- | 'transpose' for 'NonEmpty', behaves the same as 'GHC.Internal.Data.List.transpose'
 -- The rows/columns need not be the same length, in which case
