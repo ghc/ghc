@@ -1379,6 +1379,8 @@ module Data.List where
   notElem :: forall (t :: * -> *) a. (GHC.Internal.Data.Foldable.Foldable t, GHC.Internal.Classes.Eq a) => a -> t a -> GHC.Internal.Types.Bool
   nub :: forall a. GHC.Internal.Classes.Eq a => [a] -> [a]
   nubBy :: forall a. (a -> a -> GHC.Internal.Types.Bool) -> [a] -> [a]
+  nubOrd :: forall a. GHC.Internal.Classes.Ord a => [a] -> [a]
+  nubOrdBy :: forall a. (a -> a -> GHC.Internal.Types.Ordering) -> [a] -> [a]
   null :: forall (t :: * -> *) a. GHC.Internal.Data.Foldable.Foldable t => t a -> GHC.Internal.Types.Bool
   or :: forall (t :: * -> *). GHC.Internal.Data.Foldable.Foldable t => t GHC.Internal.Types.Bool -> GHC.Internal.Types.Bool
   partition :: forall a. (a -> GHC.Internal.Types.Bool) -> [a] -> ([a], [a])
@@ -1473,6 +1475,8 @@ module Data.List.NonEmpty where
   nonEmpty :: forall a. [a] -> GHC.Internal.Maybe.Maybe (NonEmpty a)
   nub :: forall a. GHC.Internal.Classes.Eq a => NonEmpty a -> NonEmpty a
   nubBy :: forall a. (a -> a -> GHC.Internal.Types.Bool) -> NonEmpty a -> NonEmpty a
+  nubOrd :: forall a. GHC.Internal.Classes.Ord a => NonEmpty a -> NonEmpty a
+  nubOrdBy :: forall a. (a -> a -> GHC.Internal.Types.Ordering) -> NonEmpty a -> NonEmpty a
   partition :: forall a. (a -> GHC.Internal.Types.Bool) -> NonEmpty a -> ([a], [a])
   permutations :: forall a. [a] -> NonEmpty [a]
   permutations1 :: forall a. NonEmpty a -> NonEmpty (NonEmpty a)

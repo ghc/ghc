@@ -303,6 +303,7 @@ Library
             , GHC.JS.Foreign.Callback
 
     other-modules:
+        Data.List.NubOrdSet
         System.CPUTime.Unsupported
         System.CPUTime.Utils
     if os(windows)
