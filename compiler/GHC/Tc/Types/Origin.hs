@@ -83,8 +83,6 @@ import GHC.Utils.Misc( HasDebugCallStack )
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import qualified Data.Kind as Hs
 import Data.List.NonEmpty (NonEmpty (..))
 
@@ -656,7 +654,7 @@ data CtOrigin
 
   | ExpansionOrigin SrcCodeOrigin -- This is due to an expansion of the original thing given by SrcCodeOrigin
 
-
+  | ExpectedTySyntax !CtOrigin (HsExpr GhcRn)
 
   -- | A rebindable syntax operator is expected to have a function type.
   --
@@ -682,8 +680,6 @@ data CtOrigin
   --   RepPolyApp
   | forall (p :: Pass)
      . Outputable (HsExpr (GhcPass p)) => ExpectedFunTyArg
-          Int
-          -- ^ Argument number
           !TypedThing
             -- ^ function
           !(HsExpr (GhcPass p))
@@ -711,7 +707,6 @@ data CtOrigin
 updatePositionCtOrigin :: Int -> CtOrigin -> CtOrigin
 updatePositionCtOrigin i (ExpectedFunTySyntaxOp _ c e) = ExpectedFunTySyntaxOp i c e
 updatePositionCtOrigin i (ExpectedFunTyViewPat _ e) = ExpectedFunTyViewPat i e
-updatePositionCtOrigin i (ExpectedFunTyArg _ t e) = ExpectedFunTyArg i t e
 updatePositionCtOrigin i (ExpectedFunTyMatches _ t e) = ExpectedFunTyMatches i t e
 updatePositionCtOrigin _ c = c
 
@@ -812,7 +807,7 @@ exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e
 exprCtOrigin (HsDo {})           = DoStmtOrigin
 exprCtOrigin (RecordCon {})      = Shouldn'tHappenOrigin "record construction"
-exprCtOrigin (RecordUpd {})      = RecordUpdOrigin
+exprCtOrigin (RecordUpd{})       = RecordUpdOrigin
 exprCtOrigin (ExprWithTySig {})  = ExprSigOrigin
 exprCtOrigin (ArithSeq {})       = Shouldn'tHappenOrigin "arithmetic sequence"
 exprCtOrigin (HsPragE _ _ e)     = lexprCtOrigin e
@@ -862,11 +857,20 @@ pprCtOrigin (GivenOrigin sk)
 
 pprCtOrigin (ExpansionOrigin o)
   = ctoHerald <+> what
-    where what :: SDoc
-          what = case o of
-                   OrigStmt{} -> text "a do statement"
-                   OrigExpr e -> pprCtO (exprCtOrigin e)
-                   OrigPat p -> text "a pattern" <+> ppr p
+    where
+      what :: SDoc
+      what = case o of
+        OrigStmt{} ->
+          text "a do statement"
+        OrigPat p ->
+          text "a do statement" $$
+             text "with the failable pattern" <+> quotes (ppr p)
+        OrigExpr (HsGetField _ _ (L _ f)) ->
+          hsep [text "selecting the field", quotes (ppr f)]
+        OrigExpr (HsOverLabel _ l) ->
+          hsep [text "the overloaded label" ,quotes (char '#' <> ppr l)]
+        OrigExpr e@(RecordUpd{}) -> hsep [text "a record update" <+> quotes (ppr e) ]
+        OrigExpr e -> text "the expression" <+> (ppr e)
 
 pprCtOrigin (GivenSCOrigin sk d blk)
   = vcat [ ctoHerald <+> pprSkolInfo sk
@@ -980,16 +984,21 @@ pprCtOrigin (NonLinearPatternOrigin reason pat)
   = hang (ctoHerald <+> text "a non-linear pattern" <+> quotes (ppr pat))
        2 (pprNonLinearPatternReason reason)
 
+pprCtOrigin (ExpectedTySyntax orig arg)
+  =  vcat [ text "The expression" <+> quotes (ppr arg)
+          , nest 2 (ppr orig) ]
+
 pprCtOrigin (ExpectedFunTySyntaxOp i orig op) =
       vcat [ sep [ the_arg_of i
                  , text "the rebindable syntax operator"
                  , quotes (ppr op) ]
            , nest 2 (ppr orig) ]
+
 pprCtOrigin (ExpectedFunTyViewPat i expr) =
       vcat [ the_arg_of i <+> text "the view pattern"
            , nest 2 (ppr expr) ]
-pprCtOrigin (ExpectedFunTyArg i fun arg) =
-      sep [ text "The" <+> speakNth i <+> text "argument"
+pprCtOrigin (ExpectedFunTyArg fun arg) =
+      sep [ text "The argument"
           , quotes (ppr arg)
           , text "of"
           , quotes (ppr fun) ]
@@ -1080,10 +1089,10 @@ pprCtO (InstanceSigOrigin {})       = text "a type signature in an instance"
 pprCtO (AmbiguityCheckOrigin {})    = text "a type ambiguity check"
 pprCtO (ImpedanceMatching {})       = text "combining required constraints"
 pprCtO (NonLinearPatternOrigin _ pat) = hsep [text "a non-linear pattern" <+> quotes (ppr pat)]
-pprCtO (ExpansionOrigin (OrigPat p)) = hsep [text "a pattern" <+> quotes (ppr p)]
-pprCtO (ExpansionOrigin (OrigStmt{})) = text "a do statement"
-pprCtO (ExpansionOrigin (OrigExpr (HsGetField _ _ (L _ f)))) = hsep [text "selecting the field", quotes (ppr f)]
 pprCtO (ExpansionOrigin (OrigExpr e)) = text "an expression" <+> ppr e
+pprCtO (ExpansionOrigin (OrigStmt{})) = text "a do statement"
+pprCtO (ExpansionOrigin (OrigPat{})) = text "a pattern"
+pprCtO (ExpectedTySyntax o _) = pprCtO o
 pprCtO (ExpectedFunTySyntaxOp{}) = text "a rebindable syntax operator"
 pprCtO (ExpectedFunTyViewPat{}) = text "a view pattern"
 pprCtO (ExpectedFunTyArg{}) = text "a funtion head"
@@ -1301,7 +1310,7 @@ data FixedRuntimeRepContext
   --
   -- See 'ExpectedFunTyOrigin' for more details.
   | FRRExpectedFunTy
-      !CtOrigin -- !ExpectedFunTyOrigin
+      !CtOrigin
       !Int
         -- ^ argument position (1-indexed)
 
@@ -1575,7 +1584,7 @@ pprExpectedFunTyHerald (ExpectedFunTySyntaxOp {})
   = text "This rebindable syntax expects a function with"
 pprExpectedFunTyHerald (ExpectedFunTyViewPat {})
   = text "A view pattern expression expects"
-pprExpectedFunTyHerald (ExpectedFunTyArg _ fun _)
+pprExpectedFunTyHerald (ExpectedFunTyArg fun _)
   = sep [ text "The function" <+> quotes (ppr fun)
         , text "is applied to" ]
 pprExpectedFunTyHerald (ExpectedFunTyMatches _ fun (MG { mg_alts = L _ alts }))
