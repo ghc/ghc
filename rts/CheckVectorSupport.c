@@ -96,7 +96,7 @@ int checkVectorSupport(void) {
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sigaction(SIGILL, &sa, &old_sa);
-    
+
     unsigned vlenb = 0;
     if (sigsetjmp(jmpbuf, 1) == 0) {
       // Try to execute a vector instruction

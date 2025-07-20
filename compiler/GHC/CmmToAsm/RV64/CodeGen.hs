@@ -1380,7 +1380,6 @@ getRegister' config plat expr =
         -- Vector operations
         MO_VF_Extract _length w -> vecExtract ((scalarFormatFormat . floatScalarFormat) w)
         MO_V_Extract _length w -> vecExtract ((scalarFormatFormat . intScalarFormat) w)
-
         MO_VF_Add length w -> vecOp (floatVecFormat length w) VADD
         MO_V_Add length w -> vecOp (intVecFormat length w) VADD
         MO_VF_Sub length w -> vecOp (floatVecFormat length w) VSUB
@@ -1398,8 +1397,8 @@ getRegister' config plat expr =
         -- TODO: This is the general implementation of MO_V_Shuffle. There's a
         -- lot of room for optimizations left for special cases. See the X86
         -- NCG for examples.
-        MO_V_Shuffle length w idxs -> genericVectorShuffle intVecFormat length w idxs 
-        MO_VF_Shuffle length w idxs-> genericVectorShuffle floatVecFormat length w idxs
+        MO_V_Shuffle length w idxs -> genericVectorShuffle intVecFormat length w idxs
+        MO_VF_Shuffle length w idxs -> genericVectorShuffle floatVecFormat length w idxs
         _e -> panic $ "Missing operation " ++ show expr
 
     -- Generic ternary case.
