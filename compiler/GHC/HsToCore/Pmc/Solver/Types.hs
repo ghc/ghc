@@ -63,7 +63,7 @@ import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
-import GHC.Tc.Solver.InertSet (InertSet, emptyInert)
+import GHC.Tc.Solver.InertSet (InertSet, emptyInertSet)
 import GHC.Tc.Utils.TcType (isStringTy, topTcLevel)
 import GHC.Types.CompleteMatch
 import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
@@ -129,7 +129,7 @@ instance Outputable TyState where
   ppr (TySt n inert) = ppr n <+> ppr inert
 
 initTyState :: TyState
-initTyState = TySt 0 (emptyInert topTcLevel)
+initTyState = TySt 0 (emptyInertSet topTcLevel)
 
 -- | The term oracle state. Stores 'VarInfo' for encountered 'Id's. These
 -- entries are possibly shared when we figure out that two variables must be

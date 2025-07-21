@@ -39,7 +39,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Solver( reportUnsolvedEqualities, pushLevelAndSolveEqualitiesX
                     , emitResidualConstraints )
 import GHC.Tc.Solver.Solve( solveWanteds )
-import GHC.Tc.Solver.Monad( runTcS, runTcSSpecPrag )
+import GHC.Tc.Solver.Monad( runTcS, runTcSWithEvBinds )
 import GHC.Tc.Validity ( checkValidType )
 
 import GHC.Tc.Utils.Monad
@@ -759,9 +759,7 @@ This is done in three parts.
 
     (1) Typecheck the expression, capturing its constraints
 
-    (2) Solve these constraints, but in special TcSSpecPrag mode which ensures
-        each original Wanted is either fully solved or left untouched.
-        See Note [Fully solving constraints for specialisation].
+    (2) Solve these constraints
 
     (3) Compute the constraints to quantify over, using `getRuleQuantCts` on
         the unsolved constraints returned by (2).
@@ -796,68 +794,6 @@ This is done in three parts.
     (3) Then we build the specialised function $sf, and concoct a RULE
         of the form:
            forall @a @b d1 d2 d3. f d1 d2 d3 = $sf d1 d2 d3
-
-Note [Fully solving constraints for specialisation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As far as specialisation is concerned, it is actively harmful to simplify
-constraints without /fully/ solving them.
-
-Example:
-
-  f :: ∀ a t. (Eq a, ∀x. Eq x => Eq (t x)). t a -> Char
-  {-# SPECIALISE f @Int #-}
-
-  Typechecking 'f' will result in [W] Eq Int, [W] ∀x. Eq x => Eq (t x).
-  We absolutely MUST leave the quantified constraint alone, because we want to
-  quantify over it. If we were to try to simplify it, we would emit an
-  implication and would thereafter never be able to quantify over the original
-  quantified constraint.
-
-  However, we still need to simplify quantified constraints that can be
-  /fully solved/ from instances, otherwise we would never be able to
-  specialise them away. Example: {-# SPECIALISE f @a @[] #-}.
-
-The conclusion is this:
-
-  when solving the constraints that arise from a specialise pragma, following
-  the recipe described in Note [Handling new-form SPECIALISE pragmas], all
-  Wanted quantified constraints should either be:
-    - fully solved (no free evidence variables), or
-    - left untouched.
-
-To achieve this, we run the solver in a special "all-or-nothing" solving mode,
-described in Note [TcSSpecPrag] in GHC.Tc.Solver.Monad.
-
-Note that a similar problem arises in other situations in which the solver takes
-an irreversible step, such as using a top-level class instance. This is currently
-less important, as the desugarer can handle these cases. To explain, consider:
-
-    g :: ∀ a. Eq a => a -> Bool
-    {-# SPECIALISE g @[e] #-}
-
-  Typechecking 'g' will result in [W] Eq [e]. Were we to simplify this to
-  [W] Eq e, we would have difficulty generating a RULE for the specialisation:
-
-    $sg :: Eq e => [e] -> Bool
-
-    RULE ∀ e (d :: Eq [e]). g @[e] d = $sg @e (??? :: Eq e)
-      -- Can't fill in ??? because we can't run instances in reverse.
-
-    RULE ∀ e (d :: Eq e). g @[e] ($fEqList @e d) = $sg @e d
-      -- Bad RULE matching template: matches on the structure of a dictionary
-
-  Moreover, there is no real benefit to any of this, because the specialiser
-  can't do anything useful from the knowledge that a dictionary for 'Eq [e]' is
-  constructed from a dictionary for 'Eq e' using the 'Eq' instance for lists.
-
-Here, it would make sense to also use the "solve completely" mechanism in the
-typechecker to avoid producing evidence terms that we can't "run in reverse".
-However, the current implementation tackles this issue in the desugarer, as is
-explained in Note [prepareSpecLHS] in GHC.HsToCore.Binds.
-So, for the time being at least, in TcSSpecPrag mode, we don't attempt to "fully solve"
-constraints when we use a top-level instance. This might change in the future,
-were we to decide to attempt to address [Shortcoming] in Note [prepareSpecLHS]
-in GHC.HsToCore.Binds.
 
 Note [Handling old-form SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1039,10 +975,10 @@ tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
             <- tcRuleBndrs skol_info rule_bndrs $
                tcInferRho spec_e
 
-         -- (2) Solve the resulting wanteds in TcSSpecPrag mode.
+         -- (2) Solve the resulting wanteds
        ; ev_binds_var <- newTcEvBinds
        ; spec_e_wanted <- setTcLevel rhs_tclvl $
-                          runTcSSpecPrag ev_binds_var $
+                          runTcSWithEvBinds ev_binds_var  $
                           solveWanteds spec_e_wanted
        ; spec_e_wanted <- liftZonkM $ zonkWC spec_e_wanted
 

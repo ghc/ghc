@@ -599,7 +599,7 @@ substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
      = tyCoFVsOfCo fv_co (const True) emptyVarSet $! acc
      | otherwise
      , let fv_expr = lookupIdSubst subst fv
-     = exprFVs fv_expr (const True) emptyVarSet $! acc
+     = exprLocalFVs fv_expr (const True) emptyVarSet $! acc
 
 ------------------
 -- | Drop free vars from the breakpoint if they have a non-variable substitution.
