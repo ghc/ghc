@@ -70,7 +70,8 @@ import GHC.Internal.Show
 import GHC.Internal.Stack.Types
 import GHC.Internal.IO.Unsafe
 import {-# SOURCE #-} GHC.Internal.Stack (prettyCallStackLines, prettyCallStack, prettySrcLoc, withFrozenCallStack)
-import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectBacktraces)
+import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectExceptionAnnotation)
+import GHC.Internal.Exception.Context (SomeExceptionAnnotation(..))
 import GHC.Internal.Exception.Type
 
 -- | Throw an exception.  Exceptions may be thrown from purely
@@ -166,8 +167,8 @@ toExceptionWithBacktrace :: (HasCallStack, Exception e)
                          => e -> IO SomeException
 toExceptionWithBacktrace e
   | backtraceDesired e = do
-      bt <- collectBacktraces
-      return (addExceptionContext bt (toException e))
+      SomeExceptionAnnotation ea <- collectExceptionAnnotation
+      return (addExceptionContext ea (toException e))
   | otherwise = return (toException e)
 
 -- | This is thrown when the user calls 'error'. The @String@ is the
