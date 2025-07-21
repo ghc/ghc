@@ -1,0 +1,15 @@
+name: "Test"
+on:
+  pull_request:
+  push:
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: cachix/install-nix-action@v31
+    - run: nix build
+    - run: nix flake check
+    - run: nix develop git+https://gitlab.haskell.org/ghc/ghc.nix
+
+

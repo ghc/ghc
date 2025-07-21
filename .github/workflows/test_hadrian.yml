@@ -6,86 +6,113 @@ on:
   pull_request:
     branches: [ master ]
 
+
 jobs:
-  hadrian-ghc-in-ghci:
-    runs-on: ubuntu-latest
-    container:
-      image: haskell:9.12.2
-      options: --user root
-    env:
-      GHC_FLAGS: -Werror
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+  # hadrian-ghc-in-ghci:
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: soulomoon/ghc-build-env:latest
+  #     options: --user root
+  #   env:
+  #     GHC_FLAGS: -Werror
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   steps:
+  #     - name: Checkout remote branch
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ghc/ghc
+  #         ref: master
+  #         submodules: recursive
 
-      - name: Setup GHC Environment
-        uses: ./.github/actions/setup-ghc-env
+  #     - name: Setup GHC Environment
+  #       uses: ./.github/actions/setup-ghc-env
 
-      - name: Test GHC-in-GHCi
-        run: |
-          export CORES="$(mk/detect-cpu-count.sh)"
-          echo ":q" | HADRIAN_ARGS=-j$CORES hadrian/ghci -j$CORES | tail -n5 | grep "Ok,"
+  #     - name: Test GHC-in-GHCi
+  #       run: |
+  #         export CORES="$(mk/detect-cpu-count.sh)"
+  #         echo ":q" | HADRIAN_ARGS=-j$CORES hadrian/ghci -j$CORES | tail -n5 | grep "Ok,"
 
-  hadrian-build-test:
-    runs-on: ubuntu-latest
-    container:
-      image: haskell:9.12.2
-      options: --user root
-    env:
-      GHC_FLAGS: -Werror
-      BIGNUM_BACKEND: gmp
-      BIN_DIST_NAME: ghc-aarch64-linux-deb10-validate
-      BUILD_FLAVOUR: validate
-      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
-      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
-      TEST_ENV: aarch64-linux-deb10-validate
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+  # hadrian-build-test:
+  #   runs-on: ubuntu-latest
+  #   # Uncomment to make this job depend on the first job
+  #   # needs: hadrian-ghc-in-ghci
+  #   container:
+  #     image: soulomoon/ghc-build-env:latest
+  #     # options: --user root
+  #   env:
+  #     GHC_FLAGS: -Werror
+  #     BIGNUM_BACKEND: gmp
+  #     BIN_DIST_NAME: ghc-aarch64-linux-deb10-validate
+  #     BUILD_FLAVOUR: validate
+  #     CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+  #     INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+  #     TEST_ENV: aarch64-linux-deb10-validate
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   steps:
+  #     - name: Checkout remote branch
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ghc/ghc
+  #         ref: master
+  #         submodules: recursive
 
-      - name: Setup GHC Environment
-        uses: ./.github/actions/setup-ghc-env
+  #     - name: Setup GHC Environment
+  #       uses: ./.github/actions/setup-ghc-env
 
-      - name: Run Hadrian build test
-        shell: bash
-        run: |
-          export CORES="$(mk/detect-cpu-count.sh)"
-          . .gitlab/ci.sh test_hadrian
+  #     - name: Run Hadrian build test
+  #       shell: bash
+  #       run: |
+  #         export CORES="$(mk/detect-cpu-count.sh)"
+  #         . .gitlab/ci.sh test_hadrian
 
   hadrian-build-build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        # You can add multiple configurations here if needed
+        config: [default]
     container:
-      image: haskell:9.12.2
-      options: --user root
+      image: soulomoon/ghc-build-env:latest
+      # options: --user root
     env:
-      GHC_FLAGS: -Werror
-      BIGNUM_BACKEND: gmp
+      # GHC_FLAGS: -Werror
+      # BIGNUM_BACKEND: gmp
       BIN_DIST_NAME: ghc-aarch64-linux-deb10-validate
       BUILD_FLAVOUR: validate
-      CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
-      INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      # CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      # INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
       TEST_ENV: aarch64-linux-deb10-validate
     defaults:
       run:
         shell: bash
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      # - name: Checkout
+      #   uses: actions/checkout@v4
+      # - uses: cachix/install-nix-action@v31
 
-      - name: Setup GHC Environment
-        uses: ./.github/actions/setup-ghc-env
+      - name: Setup Cabal
+        shell: bash
+        run: |
+          # git reset --hard
+          git clean -xdf
+          # git submodule foreach git clean -xdf
+          git submodule update --init
+          # cabal update
+          # cabal install happy-1.20.1.1 --overwrite-policy=always
+          # cabal install alex
+          # nix develop git+https://gitlab.haskell.org/ghc/ghc.nix
+          # export PATH="/home/ghcbuild/.local/bin:$PATH"
+          . .gitlab/ci.sh setup
+          . .gitlab/ci.sh configure
+
+
+      # - name: Setup GHC Environment
+      #   uses: ./.github/actions/setup-ghc-env
 
       - name: Run Hadrian build test
         shell: bash

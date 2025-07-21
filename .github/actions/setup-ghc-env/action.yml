@@ -4,27 +4,27 @@ description: 'Set up the common GHC build environment'
 runs:
   using: 'composite'
   steps:
-    - name: Install system dependencies
-      shell: bash
-      run: |
-        apt-get update
-        apt-get install build-essential git autoconf python3 libgmp-dev libnuma-dev libncurses-dev -y
+    # - name: Install system dependencies
+    #   shell: bash
+    #   run: |
+    #     apt-get update
+    #     apt-get install build-essential git autoconf python3 libgmp-dev libnuma-dev libncurses-dev -y
 
     - name: Setup Cabal
       shell: bash
       run: |
+        git reset --hard
+        git clean -xdf
+        git submodule foreach git clean -xdf
+        git submodule update --init
         cabal update
-        cabal v2-install alex happy
+        cabal install happy-1.20.1.1 --overwrite-policy=always
+        cabal install alex
+        export PATH="/home/ghcbuild/.local/bin:$PATH"
+        . .gitlab/ci.sh setup
+        . .gitlab/ci.sh configure
 
-    - name: Setup CI environment
-      shell: bash
-      run: bash .gitlab/ci.sh setup
-
-    - name: Configure build
-      shell: bash
-      run: bash .gitlab/ci.sh configure
-
-    - name: Setup Hadrian project
-      shell: bash
-      run: |
-        echo 'package hadrian' > hadrian/cabal.project.local
+    # - name: Setup Hadrian project
+    #   shell: bash
+    #   run: |
+    #     echo 'package hadrian' > hadrian/cabal.project.local
