@@ -1481,6 +1481,7 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
             vcat [ text "relevant_con:" <+> ppr relevant_con
                  , text "res_ty:" <+> ppr res_ty
                  , text "ds_res_ty:" <+> ppr ds_res_ty
+                 , text "ds_expr:" <+> ppr ds_expr
                  ]
 
         ; return (ds_expr, ds_res_ty, RecordUpdCtxt relevant_cons upd_fld_names ex_tvs) }
