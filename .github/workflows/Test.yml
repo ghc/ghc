@@ -3,13 +3,53 @@ on:
   pull_request:
   push:
 jobs:
-  tests:
+  hadrian-build-build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        # You can add multiple configurations here if needed
+        config: [default]
+    container:
+      image: soulomoon/ghc-build-env:latest
+      # options: --user root
+    env:
+      # GHC_FLAGS: -Werror
+      # BIGNUM_BACKEND: gmp
+      BIN_DIST_NAME: ghc-aarch64-linux-deb10-validate
+      BUILD_FLAVOUR: validate
+      # CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      # INSTALL_CONFIGURE_ARGS: --enable-strict-ghc-toolchain-check
+      TEST_ENV: aarch64-linux-deb10-validate
+    defaults:
+      run:
+        shell: bash
     steps:
-    - uses: actions/checkout@v4
-    - uses: cachix/install-nix-action@v31
-    - run: nix build
-    - run: nix flake check
-    - run: nix develop git+https://gitlab.haskell.org/ghc/ghc.nix
+      # - name: Checkout
+      #   uses: actions/checkout@v4
+      # - uses: cachix/install-nix-action@v31
+
+      - name: Setup Cabal
+        shell: bash
+        run: |
+          # git reset --hard
+          git clean -xdf
+          # git submodule foreach git clean -xdf
+          git submodule update --init
+          # cabal update
+          # cabal install happy-1.20.1.1 --overwrite-policy=always
+          # cabal install alex
+          # nix develop git+https://gitlab.haskell.org/ghc/ghc.nix
+          # export PATH="/home/ghcbuild/.local/bin:$PATH"
+          . .gitlab/ci.sh setup
+          . .gitlab/ci.sh configure
 
 
+      # - name: Setup GHC Environment
+      #   uses: ./.github/actions/setup-ghc-env
+
+      - name: Run Hadrian build test
+        shell: bash
+        run: |
+          export CORES="$(mk/detect-cpu-count.sh)"
+          . .gitlab/ci.sh build_hadrian
