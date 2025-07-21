@@ -1,5 +1,5 @@
 RepPolyDoBind.hs:26:3: error: [GHC-55287]
-    • The first argument of the rebindable syntax operator ‘(>>=)’
+    • The expression ‘undefined’
         arising from a do statement
       does not have a fixed runtime representation.
       Its type is:
