@@ -642,13 +642,12 @@ interpretBCO (Capability* cap)
         ASSERT(get_itbl((StgClosure*)bco)->type == BCO);
 
         StgWord16* instrs = (StgWord16*)(bco->instrs->payload);
-        StgWord16 bci = instrs[0];
+        int bciPtr = 0;
+        StgWord16 bci = BCO_NEXT;
 
         /* A breakpoint instruction (BRK_FUN or BRK_ALTS) is always the first
          * instruction in a BCO */
         if ((bci & 0xFF) == bci_BRK_FUN) {
-            // Define rest of variables used by BCO_* Macros
-            int bciPtr = 0;
 
             W_ arg1_brk_array, arg4_info_index;
             arg1_brk_array      = BCO_GET_LARGE_ARG;
