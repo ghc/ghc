@@ -130,7 +130,7 @@ module GHC.Tc.Utils.TcType (
   pSizeZero, pSizeOne,
   pSizeType, pSizeTypeX, pSizeTypes,
   pSizeClassPred, pSizeClassPredX,
-  pSizeTyConApp,
+  pSizeTyConApp, pSizeHead,
   noMoreTyVars, allDistinctTyVars,
   TypeSize, sizeType, sizeTypes, scopedSort,
   isTerminatingClass, isStuckTypeFamily,
@@ -2363,6 +2363,13 @@ pSizeTyFamApp :: TyCon -> PatersonSize
 pSizeTyFamApp tc
  | isStuckTypeFamily tc = pSizeZero
  | otherwise            = PS_TyFam tc
+
+pSizeHead :: PredType -> PatersonSize
+-- Getting the size of an instance head is a bit horrible
+-- because of the special treament for class predicates
+pSizeHead pred = case classifyPredType pred of
+                      ClassPred cls tys -> pSizeClassPred cls tys
+                      _                 -> pSizeType pred
 
 pSizeClassPred :: Class -> [Type] -> PatersonSize
 pSizeClassPred = pSizeClassPredX emptyVarSet

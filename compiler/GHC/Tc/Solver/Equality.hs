@@ -10,6 +10,8 @@ module GHC.Tc.Solver.Equality(
 
 import GHC.Prelude
 
+import {-# SOURCE #-} GHC.Tc.Solver.Solve( trySolveImplication )
+
 import GHC.Tc.Solver.Irred( solveIrred )
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
 import GHC.Tc.Solver.Rewrite
@@ -468,7 +470,7 @@ can_eq_nc_forall :: CtEvidence -> EqRel
 -- See Note [Solving forall equalities]
 
 can_eq_nc_forall ev eq_rel s1 s2
- | CtWanted (WantedCt { ctev_dest = orig_dest }) <- ev
+ | CtWanted (WantedCt { ctev_dest = orig_dest, ctev_loc = loc }) <- ev
  = do { let (bndrs1, phi1, bndrs2, phi2) = split_foralls s1 s2
             flags1 = binderFlags bndrs1
             flags2 = binderFlags bndrs2
@@ -479,11 +481,11 @@ can_eq_nc_forall ev eq_rel s1 s2
                           , ppr flags1, ppr flags2 ]
                 ; canEqHardFailure ev s1 s2 }
 
-        else do {
-        traceTcS "Creating implication for polytype equality" (ppr ev)
-      ; let free_tvs     = tyCoVarsOfTypes [s1,s2]
-            empty_subst1 = mkEmptySubst $ mkInScopeSet free_tvs
-      ; skol_info <- mkSkolemInfo (UnifyForAllSkol phi1)
+        else
+   do { let free_tvs       = tyCoVarsOfTypes [s1,s2]
+            empty_subst1   = mkEmptySubst $ mkInScopeSet free_tvs
+            skol_info_anon = UnifyForAllSkol phi1
+      ; skol_info <- mkSkolemInfo skol_info_anon
       ; (subst1, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst1 $
                               binderVars bndrs1
 
@@ -522,16 +524,34 @@ can_eq_nc_forall ev eq_rel s1 s2
 
             init_subst2 = mkEmptySubst (substInScopeSet subst1)
 
+      ; traceTcS "Generating wanteds" (ppr s1 $$ ppr s2)
+
       -- Generate the constraints that live in the body of the implication
       -- See (SF5) in Note [Solving forall equalities]
       ; (lvl, (all_co, wanteds)) <- pushLevelNoWorkList (ppr skol_info)   $
                                     unifyForAllBody ev (eqRelRole eq_rel) $ \uenv ->
                                     go uenv skol_tvs init_subst2 bndrs1 bndrs2
 
-      ; emitTvImplicationTcS lvl (getSkolemInfo skol_info) skol_tvs wanteds
+      -- Solve the implication right away, using `trySolveImplication`
+      -- See (SF6) in Note [Solving forall equalities]
+      ; traceTcS "Trying to solve the implication" (ppr s1 $$ ppr s2 $$ ppr wanteds)
+      ; ev_binds_var <- newNoTcEvBinds
+      ; solved <- trySolveImplication $
+                  (implicationPrototype (ctLocEnv loc))
+                      { ic_tclvl = lvl
+                      , ic_binds = ev_binds_var
+                      , ic_info  = skol_info_anon
+                      , ic_warn_inaccessible = False
+                      , ic_skols = skol_tvs
+                      , ic_given = []
+                      , ic_wanted = emptyWC { wc_simple = wanteds } }
 
-      ; setWantedEq orig_dest all_co
-      ; stopWith ev "Deferred polytype equality" } }
+      ; if solved
+        then do { zonked_all_co <- zonkCo all_co
+                      -- ToDo: explain this zonk
+                ; setWantedEq orig_dest zonked_all_co
+                ; stopWith ev "Polytype equality: solved" }
+        else canEqSoftFailure IrredShapeReason ev s1 s2 } }
 
  | otherwise
  = do { traceTcS "Omitting decomposition of given polytype equality" $
@@ -556,7 +576,8 @@ can_eq_nc_forall ev eq_rel s1 s2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To solve an equality between foralls
    [W] (forall a. t1) ~ (forall b. t2)
-the basic plan is simple: just create the implication constraint
+the basic plan is simple: use `trySolveImplication` to solve the
+implication constraint
    [W] forall a. { t1 ~ (t2[a/b]) }
 
 The evidence we produce is a ForAllCo; see the typing rule for
@@ -601,6 +622,21 @@ There are lots of wrinkles of course:
    especially Refl ones.  We use the `unifyForAllBody` wrapper for `uType`,
    because we want to /gather/ the equality constraint (to put in the implication)
    rather than /emit/ them into the monad, as `wrapUnifierTcS` does.
+
+(SF6) We solve the implication on the spot, using `trySolveImplication`.  In
+   the past we instead generated an `Implication` to be solved later.  Nice in
+   some ways but it added complexity:
+      - We needed a `wl_implics` field of `WorkList` to collect
+        these emitted implications
+      - The types of `solveSimpleWanteds` and friends were more complicated
+      - Trickily, an `EvFun` had to contain an `EvBindsVar` ref-cell, which made
+        `evVarsOfTerm` harder.  Now an `EvFun` just contains the bindings.
+   The disadvantage of solve-on-the-spot is that if we fail we are simply
+   left with an unsolved (forall a. blah) ~ (forall b. blah), and it may
+   not be clear /why/ we couldn't solve it.  But on balance the error messages
+   improve: it is easier to undertand that
+       (forall a. a->a) ~ (forall b. b->Int)
+   is insoluble than it is to understand a message about matching `a` with `Int`.
 -}
 
 {- Note [Unwrap newtypes first]
@@ -834,18 +870,26 @@ canTyConApp ev eq_rel both_generative (ty1,tc1,tys1) (ty2,tc2,tys2)
   = do { inerts <- getInertSet
        ; if can_decompose inerts
          then canDecomposableTyConAppOK ev eq_rel tc1 (ty1,tys1) (ty2,tys2)
-         else canEqSoftFailure ev eq_rel ty1 ty2 }
+         else assert (eq_rel == ReprEq) $
+              canEqSoftFailure ReprEqReason ev ty1 ty2 }
 
   -- See Note [Skolem abstract data] in GHC.Core.Tycon
   | tyConSkolem tc1 || tyConSkolem tc2
   = do { traceTcS "canTyConApp: skolem abstract" (ppr tc1 $$ ppr tc2)
        ; finishCanWithIrred AbstractTyConReason ev }
 
-  | otherwise  -- Different TyCons
-  = if both_generative -- See (TC2) and (TC3) in
-                       -- Note [Canonicalising TyCon/TyCon equalities]
-    then canEqHardFailure ev ty1 ty2
-    else canEqSoftFailure ev eq_rel ty1 ty2
+  -- Different TyCons
+  | NomEq <- eq_rel
+  = canEqHardFailure ev ty1 ty2
+
+  -- Different TyCons, eq_rel = ReprEq
+  -- See (TC2) and (TC3) in
+  -- Note [Canonicalising TyCon/TyCon equalities]
+  | both_generative
+  = canEqHardFailure ev ty1 ty2
+
+  | otherwise
+  = canEqSoftFailure ReprEqReason ev ty1 ty2
   where
      -- See Note [Decomposing TyConApp equalities]
      -- and Note [Decomposing newtype equalities]
@@ -1417,20 +1461,18 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
 
 -- | Call canEqSoftFailure when canonicalizing an equality fails, but if the
 -- equality is representational, there is some hope for the future.
-canEqSoftFailure :: CtEvidence -> EqRel -> TcType -> TcType
+canEqSoftFailure :: CtIrredReason -> CtEvidence -> TcType -> TcType
                  -> TcS (StopOrContinue (Either IrredCt a))
-canEqSoftFailure ev NomEq ty1 ty2
-  = canEqHardFailure ev ty1 ty2
-canEqSoftFailure ev ReprEq ty1 ty2
+canEqSoftFailure reason ev ty1 ty2
   = do { (redn1, rewriters1) <- rewrite ev ty1
        ; (redn2, rewriters2) <- rewrite ev ty2
             -- We must rewrite the types before putting them in the
             -- inert set, so that we are sure to kick them out when
             -- new equalities become available
-       ; traceTcS "canEqSoftFailure with ReprEq" $
+       ; traceTcS "canEqSoftFailure" $
          vcat [ ppr ev, ppr redn1, ppr redn2 ]
        ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped redn1 redn2
-       ; finishCanWithIrred ReprEqReason new_ev }
+       ; finishCanWithIrred reason new_ev }
 
 -- | Call when canonicalizing an equality fails with utterly no hope.
 canEqHardFailure :: CtEvidence -> TcType -> TcType
@@ -2681,7 +2723,7 @@ tryInertEqs :: EqCt -> SolverStage ()
 tryInertEqs work_item@(EqCt { eq_ev = ev, eq_eq_rel = eq_rel })
   = Stage $
     do { inerts <- getInertCans
-       ; if | Just (ev_i, swapped) <- inertsCanDischarge inerts work_item
+       ; if | Just (ev_i, swapped) <- inertsEqsCanDischarge inerts work_item
             -> do { setEvBindIfWanted ev EvCanonical $
                     evCoercion (maybeSymCo swapped $
                                 downgradeRole (eqRelRole eq_rel)
@@ -2692,10 +2734,10 @@ tryInertEqs work_item@(EqCt { eq_ev = ev, eq_eq_rel = eq_rel })
             | otherwise
             -> continueWith () }
 
-inertsCanDischarge :: InertCans -> EqCt
-                   -> Maybe ( CtEvidence  -- The evidence for the inert
-                            , SwapFlag )  -- Whether we need mkSymCo
-inertsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
+inertsEqsCanDischarge :: InertCans -> EqCt
+                      -> Maybe ( CtEvidence  -- The evidence for the inert
+                               , SwapFlag )  -- Whether we need mkSymCo
+inertsEqsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
                                 , eq_ev = ev_w, eq_eq_rel = eq_rel })
   | (ev_i : _) <- [ ev_i | EqCt { eq_ev = ev_i, eq_rhs = rhs_i
                                 , eq_eq_rel = eq_rel }
@@ -2741,7 +2783,7 @@ inertsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
              -- Prefer the one that has no rewriters
              -- See (CE4) in Note [Combining equalities]
 
-inertsCanDischarge _ _ = Nothing
+inertsEqsCanDischarge _ _ = Nothing
 
 
 
