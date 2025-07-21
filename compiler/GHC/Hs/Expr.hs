@@ -674,11 +674,11 @@ type instance XXExpr GhcTc = XXExprGhcTc
 --   See Note [Handling overloaded and rebindable constructs] in `GHC.Rename.Expr`
 data SrcCodeOrigin
   = OrigExpr (HsExpr GhcRn)                -- ^ The source, user written, expression
-  | OrigStmt (ExprLStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
-  | OrigPat  (LPat GhcRn)                  -- ^ Used for failable patterns that trigger MonadFail constraints
+  | OrigStmt (ExprStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
+  | OrigPat  (Pat GhcRn)                  -- ^ Used for failable patterns that trigger MonadFail constraints
 
 data XXExprGhcRn
-  = ExpandedThingRn { xrn_orig     :: SrcCodeOrigin       -- The original source thing to be used for error messages
+  = ExpandedThingRn { xrn_orig     :: SrcCodeOrigin   -- The original source thing to be used for error messages
                     , xrn_expanded :: HsExpr GhcRn    -- The compiler generated expanded thing
                     }
 
@@ -706,7 +706,7 @@ mkExpandedExpr oExpr eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigExpr oExpr
 --   and the two components of the expansion: original do stmt and
 --   expanded expression
 mkExpandedStmt
-  :: ExprLStmt GhcRn      -- ^ source statement
+  :: ExprStmt GhcRn      -- ^ source statement
   -> HsDoFlavour          -- ^ source statement do flavour
   -> HsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'

@@ -75,7 +75,7 @@ expand_do_stmts _ (stmt@(L _ (XStmtLR ApplicativeStmt{})): _) =
 
 expand_do_stmts _ [] = pprPanic "expand_do_stmts: impossible happened. Empty stmts" empty
 
-expand_do_stmts flav [stmt@(L sloc (LastStmt _ body@(L body_loc _) _ ret_expr))]
+expand_do_stmts flav [L sloc stmt@(LastStmt _ body@(L body_loc _) _ ret_expr)]
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (5) below
 -- last statement of a list comprehension, needs to explicitly return it
 -- See `checkLastStmt` and `Syntax.Expr.StmtLR.LastStmt`
@@ -90,7 +90,7 @@ expand_do_stmts flav [stmt@(L sloc (LastStmt _ body@(L body_loc _) _ ret_expr))]
    = do let expansion = L body_loc (genHsApp ret body)
         return $ L sloc (mkExpandedStmt stmt flav (HsPar noExtField expansion))
 
-expand_do_stmts doFlavour (stmt@(L loc (LetStmt _ bs)) : lstmts) =
+expand_do_stmts doFlavour (L loc stmt@(LetStmt _ bs) : lstmts) =
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (3) below
 --                      stmts ~~> stmts'
 --    ------------------------------------------------
@@ -99,7 +99,7 @@ expand_do_stmts doFlavour (stmt@(L loc (LetStmt _ bs)) : lstmts) =
      let expansion = genHsLet bs (genPopErrCtxtExpr expand_stmts_expr)
      return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 
-expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
+expand_do_stmts doFlavour (L loc stmt@(BindStmt xbsrn pat e) : lstmts)
   | SyntaxExprRn bind_op <- xbsrn_bindOp xbsrn
   , fail_op              <- xbsrn_failOp xbsrn
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (2) below
@@ -117,7 +117,7 @@ expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
   | otherwise
   = pprPanic "expand_do_stmts: The impossible happened, missing bind operator from renamer" (text "stmt" <+> ppr  stmt)
 
-expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ e (SyntaxExprRn then_op) _)) : lstmts) =
+expand_do_stmts doFlavour (L loc stmt@(BodyStmt _ e (SyntaxExprRn then_op) _) : lstmts) =
 -- See Note [BodyStmt] in Language.Haskell.Syntax.Expr
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (1) below
 --              stmts ~~> stmts'
@@ -214,7 +214,7 @@ mk_fail_block doFlav pat e (Just (SyntaxExprRn fail_op)) =
 
           fail_op_expr :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
           fail_op_expr dflags pat fail_op
-            = mkExpandedPatRn pat $ genHsApp fail_op (mk_fail_msg_expr dflags pat)
+            = mkExpandedPatRn (unLoc pat) $ genHsApp fail_op (mk_fail_msg_expr dflags pat)
 
           mk_fail_msg_expr :: DynFlags -> LPat GhcRn -> LHsExpr GhcRn
           mk_fail_msg_expr dflags pat
@@ -489,5 +489,5 @@ mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
 genPopErrCtxtExpr :: LHsExpr GhcRn -> LHsExpr GhcRn
 genPopErrCtxtExpr (L loc a) = L loc (mkPopErrCtxtExpr a)
 
-mkExpandedPatRn :: LPat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
+mkExpandedPatRn :: Pat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
 mkExpandedPatRn pat e = XExpr (ExpandedThingRn (OrigPat pat) e)
