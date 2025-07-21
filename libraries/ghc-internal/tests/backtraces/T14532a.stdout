@@ -1,0 +1,10 @@
+ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+functionThatThrows
+
+MyBacktraces
+ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+functionThatErrors
+
+MyBacktraces

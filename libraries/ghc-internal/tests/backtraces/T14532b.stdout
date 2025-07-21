@@ -1,0 +1,22 @@
+ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Error in Exception Handler
+
+While handling Main Error
+
+My custom Backtraces:
+HasCallStack backtrace:
+  throwIO, called at T14532b.hs:31:12 in main:Main
+
+
+ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Error in Exception Handler
+
+While handling Main Error
+
+My custom Backtraces:
+HasCallStack backtrace:
+  error, called at T14532b.hs:40:12 in main:Main
+
+
