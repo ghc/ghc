@@ -12,7 +12,7 @@ import GHC.Internal.IO.Unsafe (unsafePerformIO)
 import GHC.Internal.Exception.Context
 import GHC.Internal.Ptr
 import GHC.Internal.Data.Maybe (fromMaybe)
-import GHC.Internal.Stack.Types as GHC.Stack (CallStack)
+import GHC.Internal.Stack.Types as GHC.Stack (CallStack, HasCallStack)
 import qualified GHC.Internal.Stack as HCS
 import qualified GHC.Internal.ExecutionStack.Internal as ExecStack
 import qualified GHC.Internal.Stack.CloneStack as CloneStack
@@ -86,6 +86,37 @@ setBacktraceMechanismState bm enabled = do
     _ <- atomicModifyIORef'_ enabledBacktraceMechanismsRef (setBacktraceMechanismEnabled bm enabled)
     return ()
 
+-- | How to collect 'ExceptionAnnotation's on throwing 'Exception's.
+--
+data CollectExceptionAnnotationMechanism = CollectExceptionAnnotationMechanism
+  { ceaCollectExceptionAnnotationMechanism :: HasCallStack => IO SomeExceptionAnnotation
+  }
+
+defaultCollectExceptionAnnotationMechanism :: CollectExceptionAnnotationMechanism
+defaultCollectExceptionAnnotationMechanism = CollectExceptionAnnotationMechanism
+  { ceaCollectExceptionAnnotationMechanism = SomeExceptionAnnotation `fmap` collectBacktraces
+  }
+
+collectExceptionAnnotationMechanismRef :: IORef CollectExceptionAnnotationMechanism
+collectExceptionAnnotationMechanismRef =
+    unsafePerformIO $ newIORef defaultCollectExceptionAnnotationMechanism
+{-# NOINLINE collectExceptionAnnotationMechanismRef #-}
+
+-- | Returns the current callback for collecting 'ExceptionAnnotation's on throwing 'Exception's.
+--
+getCollectExceptionAnnotationMechanism :: IO CollectExceptionAnnotationMechanism
+getCollectExceptionAnnotationMechanism = readIORef collectExceptionAnnotationMechanismRef
+
+-- | Set the callback for collecting an 'ExceptionAnnotation'.
+--
+setCollectExceptionAnnotation :: ExceptionAnnotation a => (HasCallStack => IO a) -> IO ()
+setCollectExceptionAnnotation collector = do
+  let cea = CollectExceptionAnnotationMechanism
+        { ceaCollectExceptionAnnotationMechanism = fmap SomeExceptionAnnotation collector
+        }
+  _ <- atomicModifyIORef'_ collectExceptionAnnotationMechanismRef (const cea)
+  return ()
+
 -- | A collection of backtraces.
 data Backtraces =
     Backtraces {
@@ -123,6 +154,14 @@ displayBacktraces bts = concat
 
 instance ExceptionAnnotation Backtraces where
     displayExceptionAnnotation = displayBacktraces
+
+-- | Collect 'SomeExceptionAnnotation' based on the configuration of the
+-- global 'CollectExceptionAnnotationMechanism'.
+--
+collectExceptionAnnotation :: HasCallStack => IO SomeExceptionAnnotation
+collectExceptionAnnotation = HCS.withFrozenCallStack $ do
+  cea <- getCollectExceptionAnnotationMechanism
+  ceaCollectExceptionAnnotationMechanism cea
 
 -- | Collect a set of 'Backtraces'.
 collectBacktraces :: (?callStack :: CallStack) => IO Backtraces
