@@ -12,3 +12,5 @@ instance Alt [] where
   (<!>) = (++)
 
 newtype L a = L [a] deriving (Functor, Alt)
+
+newtype T f a = T (f a) deriving (Functor, Alt)

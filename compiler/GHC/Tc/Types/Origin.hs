@@ -24,6 +24,7 @@ module GHC.Tc.Types.Origin (
   isWantedSuperclassOrigin,
   ClsInstOrQC(..), NakedScFlag(..), NonLinearPatternReason(..),
   HsImplicitLiftSplice(..),
+  StandaloneDeriv,
 
   TypedThing(..), TyVarBndrs(..),
 
@@ -568,9 +569,9 @@ data CtOrigin
       ClsInstOrQC   -- Whether class instance or quantified constraint
       NakedScFlag
 
-  | DerivClauseOrigin   -- Typechecking a deriving clause (as opposed to
-                        -- standalone deriving).
-  | DerivOriginDC DataCon Int Bool
+  | DerivOrigin StandaloneDeriv
+      -- Typechecking a `deriving` clause, or a standalone `deriving` declaration
+  | DerivOriginDC DataCon Int StandaloneDeriv
       -- Checking constraints arising from this data con and field index. The
       -- Bool argument in DerivOriginDC and DerivOriginCoerce is True if
       -- standalong deriving (with a wildcard constraint) is being used. This
@@ -578,14 +579,10 @@ data CtOrigin
       -- the argument is True, then don't recommend "use standalone deriving",
       -- but rather "fill in the wildcard constraint yourself").
       -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Infer
-  | DerivOriginCoerce Id Type Type Bool
-                        -- DerivOriginCoerce id ty1 ty2: Trying to coerce class method `id` from
-                        -- `ty1` to `ty2`.
-  | StandAloneDerivOrigin -- Typechecking stand-alone deriving. Useful for
-                          -- constraints coming from a wildcard constraint,
-                          -- e.g., deriving instance _ => Eq (Foo a)
-                          -- See Note [Inferring the instance context]
-                          -- in GHC.Tc.Deriv.Infer
+  | DerivOriginCoerce Id Type Type StandaloneDeriv
+      -- DerivOriginCoerce id ty1 ty2: Trying to coerce class method `id` from
+      -- `ty1` to `ty2`.
+
   | DefaultOrigin       -- Typechecking a default decl
   | DoOrigin            -- Arising from a do expression
   | DoPatOrigin (LPat GhcRn) -- Arising from a failable pattern in
@@ -658,6 +655,14 @@ data NonLinearPatternReason
   | PatternSynonymReason
   | ViewPatternReason
   | OtherPatternReason
+
+type StandaloneDeriv = Bool
+  -- False <=> a `deriving` clause on a data/newtype declaration
+  --           e.g.  data T a = MkT a deriving( Eq )
+  -- True <=> a standalone `deriving` clause with a wildcard constraint
+  --          e.g   deriving instance _ => Eq (T a)
+  -- See Note [Inferring the instance context]
+  -- in GHC.Tc.Deriv.Infer
 
 -- | The number of superclass selections needed to get this Given.
 -- If @d :: C ty@   has @ScDepth=2@, then the evidence @d@ will look
@@ -929,8 +934,9 @@ pprCtO TupleOrigin           = text "a tuple"
 pprCtO NegateOrigin          = text "a use of syntactic negation"
 pprCtO (ScOrigin IsClsInst _) = text "the superclasses of an instance declaration"
 pprCtO (ScOrigin (IsQC {}) _) = text "the head of a quantified constraint"
-pprCtO DerivClauseOrigin     = text "the 'deriving' clause of a data type declaration"
-pprCtO StandAloneDerivOrigin = text "a 'deriving' declaration"
+pprCtO (DerivOrigin standalone)
+  | standalone               = text "a 'deriving' declaration"
+  | otherwise                = text "the 'deriving' clause of a data type declaration"
 pprCtO DefaultOrigin         = text "a 'default' declaration"
 pprCtO DoOrigin              = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"

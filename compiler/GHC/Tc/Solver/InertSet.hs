@@ -154,17 +154,6 @@ So we arrange to put these particular class constraints in the wl_eqs.
   NB: since we do not currently apply the substitution to the
   inert_solved_dicts, the knot-tying still seems a bit fragile.
   But this makes it better.
-
-Note [Residual implications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The wl_implics in the WorkList are the residual implication
-constraints that are generated while solving or canonicalising the
-current worklist.  Specifically, when canonicalising
-   (forall a. t1 ~ forall a. t2)
-from which we get the implication
-   (forall a. t1 ~ t2)
-See GHC.Tc.Solver.Monad.deferTcSForAllEq
-
 -}
 
 -- See Note [WorkList priorities]
@@ -186,8 +175,6 @@ data WorkList
          -- in GHC.Tc.Types.Constraint for more details.
 
        , wl_rest :: [Ct]
-
-       , wl_implics :: Bag Implication  -- See Note [Residual implications]
     }
 
 isNominalEqualityCt :: Ct -> Bool
@@ -202,15 +189,12 @@ isNominalEqualityCt ct
 
 appendWorkList :: WorkList -> WorkList -> WorkList
 appendWorkList
-    (WL { wl_eqs_N = eqs1_N, wl_eqs_X = eqs1_X, wl_rw_eqs = rw_eqs1
-        , wl_rest = rest1, wl_implics = implics1 })
-    (WL { wl_eqs_N = eqs2_N, wl_eqs_X = eqs2_X, wl_rw_eqs = rw_eqs2
-        , wl_rest = rest2, wl_implics = implics2 })
+    (WL { wl_eqs_N = eqs1_N, wl_eqs_X = eqs1_X, wl_rw_eqs = rw_eqs1, wl_rest = rest1 })
+    (WL { wl_eqs_N = eqs2_N, wl_eqs_X = eqs2_X, wl_rw_eqs = rw_eqs2, wl_rest = rest2 })
    = WL { wl_eqs_N   = eqs1_N   ++ eqs2_N
         , wl_eqs_X   = eqs1_X   ++ eqs2_X
         , wl_rw_eqs  = rw_eqs1  ++ rw_eqs2
-        , wl_rest    = rest1    ++ rest2
-        , wl_implics = implics1 `unionBags`   implics2 }
+        , wl_rest    = rest1    ++ rest2 }
 
 workListSize :: WorkList -> Int
 workListSize (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs, wl_rest = rest })
@@ -268,9 +252,6 @@ extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
 extendWorkListNonEq ct wl = wl { wl_rest = ct : wl_rest wl }
 
-extendWorkListImplic :: Implication -> WorkList -> WorkList
-extendWorkListImplic implic wl = wl { wl_implics = implic `consBag` wl_implics wl }
-
 extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic about what kind of constraint
 extendWorkListCt ct wl
@@ -294,18 +275,18 @@ extendWorkListCts :: Cts -> WorkList -> WorkList
 extendWorkListCts cts wl = foldr extendWorkListCt wl cts
 
 isEmptyWorkList :: WorkList -> Bool
-isEmptyWorkList (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs
-                    , wl_rest = rest, wl_implics = implics })
-  = null eqs_N && null eqs_X && null rw_eqs && null rest && isEmptyBag implics
+isEmptyWorkList (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
+                    , wl_rw_eqs = rw_eqs, wl_rest = rest })
+  = null eqs_N && null eqs_X && null rw_eqs && null rest
 
 emptyWorkList :: WorkList
 emptyWorkList = WL { wl_eqs_N = [], wl_eqs_X = []
-                   , wl_rw_eqs = [], wl_rest = [], wl_implics = emptyBag }
+                   , wl_rw_eqs = [], wl_rest = [] }
 
 -- Pretty printing
 instance Outputable WorkList where
-  ppr (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs
-          , wl_rest = rest, wl_implics = implics })
+  ppr (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
+          , wl_rw_eqs = rw_eqs, wl_rest = rest })
    = text "WL" <+> (braces $
      vcat [ ppUnless (null eqs_N) $
             text "Eqs_N =" <+> vcat (map ppr eqs_N)
@@ -315,9 +296,6 @@ instance Outputable WorkList where
             text "RwEqs =" <+> vcat (map ppr rw_eqs)
           , ppUnless (null rest) $
             text "Non-eqs =" <+> vcat (map ppr rest)
-          , ppUnless (isEmptyBag implics) $
-            ifPprDebug (text "Implics =" <+> vcat (map ppr (bagToList implics)))
-                       (text "(Implics omitted)")
           ])
 
 {- *********************************************************************

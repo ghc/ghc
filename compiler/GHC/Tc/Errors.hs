@@ -623,7 +623,8 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     -- report2: we suppress these if there are insolubles elsewhere in the tree
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
-              , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
+              , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr)
+              , ("Quantified",      is_qc,           False, mkGroupReporter mkQCErr) ]
 
     -- report3: suppressed errors should be reported as categorized by either report1
     -- or report2. Keep this in sync with the suppress function above
@@ -686,6 +687,9 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
 
     is_irred _ (IrredPred {}) = True
     is_irred _ _              = False
+
+    is_qc _ (ForAllPred {}) = True
+    is_qc _ _               = False
 
      -- See situation (1) of Note [Suppressing confusing errors]
     is_ww_fundep item _ = is_ww_fundep_item item
@@ -2214,6 +2218,15 @@ Warn of loopy local equalities that were dropped.
 ************************************************************************
 -}
 
+mkQCErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
+mkQCErr ctxt items
+  | item1 :| _ <- tryFilter (not . ei_suppress) items
+    -- Ignore multiple qc-errors on the same line
+  = do { let msg = mkPlainMismatchMsg $
+                   CouldNotDeduce (getUserGivens ctxt) (item1 :| []) Nothing
+       ; return $ important ctxt msg }
+
+
 mkDictErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
 mkDictErr ctxt orig_items
   = do { inst_envs <- tcGetInstEnvs
@@ -2231,8 +2244,8 @@ mkDictErr ctxt orig_items
        ; return $
            SolverReport
              { sr_important_msg = SolverReportWithCtxt ctxt err
-             , sr_supplementary =
-                [ SupplementaryImportErrors imps | imps <- maybeToList (NE.nonEmpty imp_errs) ]
+             , sr_supplementary = [ SupplementaryImportErrors imps
+                                  | imps <- maybeToList (NE.nonEmpty imp_errs) ]
              , sr_hints = hints
              }
         }

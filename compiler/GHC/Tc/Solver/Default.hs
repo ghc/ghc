@@ -1188,8 +1188,8 @@ tryDefaultGroup wanteds (Proposal assignments)
                ; new_wanteds <- sequence [ new_wtd_ct wtd
                                          | CtWanted wtd <- map ctEvidence wanteds
                                          ]
-               ; residual_wc <- solveSimpleWanteds (listToBag new_wanteds)
-               ; return $ if isEmptyWC residual_wc then Just (tvs, subst) else Nothing }
+               ; residual <- solveSimpleWanteds (listToBag new_wanteds)
+               ; return $ if isEmptyBag residual then Just (tvs, subst) else Nothing }
 
           | otherwise
           = return Nothing

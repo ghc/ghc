@@ -1432,13 +1432,13 @@ See Note [Eta reduction for data families] in GHC.Core.Coercion.Axiom
 -- EarlyDerivSpec from it.
 mk_eqn_from_mechanism :: DerivSpecMechanism -> DerivM EarlyDerivSpec
 mk_eqn_from_mechanism mechanism
-  = do DerivEnv { denv_overlap_mode = overlap_mode
-                , denv_tvs          = tvs
-                , denv_cls          = cls
-                , denv_inst_tys     = inst_tys
-                , denv_ctxt         = deriv_ctxt
-                , denv_skol_info    = skol_info
-                , denv_warn         = warn } <- ask
+  = do env@(DerivEnv { denv_overlap_mode = overlap_mode
+                     , denv_tvs          = tvs
+                     , denv_cls          = cls
+                     , denv_inst_tys     = inst_tys
+                     , denv_ctxt         = deriv_ctxt
+                     , denv_skol_info    = skol_info
+                     , denv_warn         = warn }) <- ask
        user_ctxt <- askDerivUserTypeCtxt
        doDerivInstErrorChecks1 mechanism
        loc       <- lift getSrcSpanM
@@ -1446,7 +1446,7 @@ mk_eqn_from_mechanism mechanism
        case deriv_ctxt of
         InferContext wildcard ->
           do { (inferred_constraints, tvs', inst_tys', mechanism')
-                 <- inferConstraints mechanism
+                 <- inferConstraints mechanism env
              ; return $ InferTheta $ DS
                    { ds_loc = loc
                    , ds_name = dfun_name, ds_tvs = tvs'
