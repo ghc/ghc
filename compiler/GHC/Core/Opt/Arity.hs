@@ -55,7 +55,7 @@ import GHC.Core.Utils
 import GHC.Core.DataCon
 import GHC.Core.TyCon     ( tyConArity )
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
-import GHC.Core.Predicate ( isDictTy, isEvVar, isCallStackPredTy, isCallStackTy )
+import GHC.Core.Predicate ( isDictTy, isEvId, isCallStackPredTy, isCallStackTy )
 import GHC.Core.Multiplicity
 
 -- We have two sorts of substitution:
@@ -2791,7 +2791,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
          arity = idArity fun
 
     ---------------
-    ok_lam v = isTyVar v || isEvVar v
+    ok_lam v = isTyVar v || isEvId v
     -- See Note [Eta reduction makes sense], point (2)
 
     ---------------

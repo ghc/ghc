@@ -554,3 +554,6 @@ test('T26051',   [ grep_errmsg(r'\$wspecMe')
                     , only_ways(['optasm'])],
      multimod_compile,
      ['T26051', '-O2 -ddump-spec -dsuppress-uniques -dno-typeable-binds -dppr-cols=1000'])
+test('T26115', [grep_errmsg(r'DFun')], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('T26116', normal, compile, ['-O -ddump-rules'])
+test('T26117', [grep_errmsg(r'==')], compile, ['-O -ddump-simpl -dsuppress-uniques'])

@@ -10,13 +10,13 @@ module GHC.Tc.Solver.InertSet (
     extendWorkListCts, extendWorkListCtList,
     extendWorkListEq, extendWorkListChildEqs,
     extendWorkListRewrittenEqs,
-    appendWorkList, extendWorkListImplic,
+    appendWorkList,
     workListSize,
 
     -- * The inert set
     InertSet(..),
     InertCans(..),
-    emptyInert,
+    emptyInertSet, emptyInertCans,
 
     noGivenNewtypeReprEqs, updGivenEqs,
     prohibitedSuperClassSolve,
@@ -26,12 +26,11 @@ module GHC.Tc.Solver.InertSet (
     foldTyEqs, delEq, findEq,
     partitionInertEqs, partitionFunEqs,
     filterInertEqs, filterFunEqs,
-    inertGivens,
     foldFunEqs, addEqToCans,
 
     -- * Inert Dicts
     updDicts, delDict, addDict, filterDicts, partitionDicts,
-    addSolvedDict,
+    addSolvedDict, lookupSolvedDict, lookupInertDict,
 
     -- * Inert Irreds
     InertIrreds, delIrred, addIrreds, addIrred, foldIrreds,
@@ -69,7 +68,7 @@ import GHC.Core.Reduction
 import GHC.Core.Predicate
 import qualified GHC.Core.TyCo.Rep as Rep
 import GHC.Core.TyCon
-import GHC.Core.Class( classTyCon )
+import GHC.Core.Class( Class, classTyCon )
 import GHC.Builtin.Names( eqPrimTyConKey, heqTyConKey, eqTyConKey, coercibleTyConKey )
 import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
@@ -343,6 +342,10 @@ data InertSet
               -- Canonical Given, Wanted
               -- Sometimes called "the inert set"
 
+       , inert_givens :: InertCans
+              -- A subset of inert_cans, containing only Givens
+              -- Used to initialise inert_cans when recursing inside implications
+
        , inert_cycle_breakers :: CycleBreakerVarStack
 
        , inert_famapp_cache :: FunEqMap Reduction
@@ -360,14 +363,26 @@ data InertSet
               -- Always a dictionary solved by an instance decl; never an implict parameter
               -- See Note [Solved dictionaries]
               -- and Note [Do not add superclasses of solved dictionaries]
+
+       , inert_safehask :: DictMap DictCt
+              -- Failed dictionary resolution due to Safe Haskell overlapping
+              -- instances restriction. We keep this separate from inert_dicts
+              -- as it doesn't cause compilation failure, just safe inference
+              -- failure.
+              --
+              -- ^ See Note [Safe Haskell Overlapping Instances Implementation]
+              -- in GHC.Tc.Solver
        }
 
 instance Outputable InertSet where
   ppr (IS { inert_cans = ics
+          , inert_safehask = safehask
           , inert_solved_dicts = solved_dicts })
       = vcat [ ppr ics
              , ppUnless (null dicts) $
-               text "Solved dicts =" <+> vcat (map ppr dicts) ]
+               text "Solved dicts =" <+> vcat (map ppr dicts)
+             , ppUnless (isEmptyTcAppMap safehask) $
+               text "Safe Haskell unsafe overlap =" <+> pprBag (dictsToBag safehask) ]
          where
            dicts = bagToList (dictsToBag solved_dicts)
 
@@ -378,16 +393,19 @@ emptyInertCans given_eq_lvl
        , inert_given_eq_lvl = given_eq_lvl
        , inert_given_eqs    = False
        , inert_dicts        = emptyDictMap
-       , inert_safehask     = emptyDictMap
        , inert_insts        = []
        , inert_irreds       = emptyBag }
 
-emptyInert :: TcLevel -> InertSet
-emptyInert given_eq_lvl
-  = IS { inert_cans           = emptyInertCans given_eq_lvl
+emptyInertSet :: TcLevel -> InertSet
+emptyInertSet given_eq_lvl
+  = IS { inert_cans           = empty_cans
+       , inert_givens         = empty_cans
        , inert_cycle_breakers = emptyBag :| []
        , inert_famapp_cache   = emptyFunEqs
-       , inert_solved_dicts   = emptyDictMap }
+       , inert_solved_dicts   = emptyDictMap
+       , inert_safehask       = emptyDictMap }
+  where
+    empty_cans = emptyInertCans given_eq_lvl
 
 {- Note [Solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -690,7 +708,7 @@ should update inert_given_eq_lvl?
    conservatively assume that there are some.
 
    This initialisation in done in `runTcSWithEvBinds`, which passes
-   the current TcLevl to `emptyInert`.
+   the current TcLevel to `emptyInertSet`.
 
 Historical note: prior to #24938 we also ignored Given equalities that
 did not mention an "outer" type variable.  But that is wrong, as #24938
@@ -1254,15 +1272,6 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
 
        , inert_insts :: [QCInst]
 
-       , inert_safehask :: DictMap DictCt
-              -- Failed dictionary resolution due to Safe Haskell overlapping
-              -- instances restriction. We keep this separate from inert_dicts
-              -- as it doesn't cause compilation failure, just safe inference
-              -- failure.
-              --
-              -- ^ See Note [Safe Haskell Overlapping Instances Implementation]
-              -- in GHC.Tc.Solver
-
        , inert_irreds :: InertIrreds
               -- Irreducible predicates that cannot be made canonical,
               --     and which don't interact with others (e.g.  (c a))
@@ -1290,7 +1299,6 @@ instance Outputable InertCans where
   ppr (IC { inert_eqs = eqs
           , inert_funeqs = funeqs
           , inert_dicts = dicts
-          , inert_safehask = safehask
           , inert_irreds = irreds
           , inert_given_eq_lvl = ge_lvl
           , inert_given_eqs = given_eqs
@@ -1305,8 +1313,6 @@ instance Outputable InertCans where
           <+> pprBag (foldFunEqs consBag funeqs emptyBag)
       , ppUnless (isEmptyTcAppMap dicts) $
         text "Dictionaries =" <+> pprBag (dictsToBag dicts)
-      , ppUnless (isEmptyTcAppMap safehask) $
-        text "Safe Haskell unsafe overlap =" <+> pprBag (dictsToBag safehask)
       , ppUnless (isEmptyBag irreds) $
         text "Irreds =" <+> pprBag irreds
       , ppUnless (null insts) $
@@ -1442,6 +1448,17 @@ filterFunEqs f = mapMaybeTcAppMap g
                    Inert Dicts
 *                                                                      *
 ********************************************************************* -}
+
+-- | Look up a dictionary inert.
+lookupInertDict :: InertCans -> Class -> [Type] -> Maybe DictCt
+lookupInertDict (IC { inert_dicts = dicts }) cls tys
+  = findDict dicts cls tys
+
+-- | Look up a solved inert.
+lookupSolvedDict :: InertSet -> Class -> [Type] -> Maybe CtEvidence
+-- Returns just if exactly this predicate type exists in the solved.
+lookupSolvedDict (IS { inert_solved_dicts = solved }) cls tys
+  = fmap dictCtEvidence (findDict solved cls tys)
 
 updDicts :: (DictMap DictCt -> DictMap DictCt) -> InertCans -> InertCans
 updDicts upd ics = ics { inert_dicts = upd (inert_dicts ics) }
@@ -1616,7 +1633,6 @@ kickOutRewritableLHS ko_spec new_fr@(_, new_role)
                              , inert_insts    = old_insts })
   = (kicked_out, inert_cans_in)
   where
-    -- inert_safehask stays unchanged; is that right?
     inert_cans_in = ics { inert_eqs      = tv_eqs_in
                         , inert_dicts    = dicts_in
                         , inert_funeqs   = feqs_in
@@ -1872,8 +1888,9 @@ noGivenNewtypeReprEqs tc (IS { inert_cans = inerts })
       | otherwise
       = False
 
-    might_help_qc (QCI { qci_body = pred })
-      | ClassPred cls [_, t1, t2] <- classifyPredType pred
+    might_help_qc (QCI { qci_ev = ev, qci_body = pred })
+      | isGiven ev
+      , ClassPred cls [_, t1, t2] <- classifyPredType pred
       , cls `hasKey` coercibleTyConKey
       = headed_by_tc t1 t2
       | otherwise
@@ -1965,6 +1982,9 @@ solveOneFromTheOther :: Ct  -- Inert    (Dict or Irred)
 -- We can always solve one from the other: even if both are wanted,
 -- although we don't rewrite wanteds with wanteds, we can combine
 -- two wanteds into one by solving one from the other
+--
+-- Compare the corresponding function for equalities:
+--      GHC.Tc.Solver.Equality.inertEqsCanDischarge
 
 solveOneFromTheOther ct_i ct_w
   | CtWanted {} <- ev_w
@@ -1973,32 +1993,39 @@ solveOneFromTheOther ct_i ct_w
   = -- Inert must be Given
     KeepWork
 
-  | CtWanted {} <- ev_w
+  | CtWanted (WantedCt { ctev_rewriters = rw_w }) <- ev_w
   = -- Inert is Given or Wanted
     case ev_i of
       CtGiven {} -> KeepInert
         -- work is Wanted; inert is Given: easy choice.
 
-      CtWanted {} -- Both are Wanted
+      CtWanted (WantedCt { ctev_rewriters = rw_i }) -- Both are Wanted
         -- If only one has no pending superclasses, use it
         -- Otherwise we can get infinite superclass expansion (#22516)
         -- in silly cases like   class C T b => C a b where ...
-        | not is_psc_i, is_psc_w     -> KeepInert
-        | is_psc_i,     not is_psc_w -> KeepWork
+        | Just res <- better (not is_psc_i) (not is_psc_w)
+        -> res
+
+        -- If only one has an empty rewriter set, use it
+        -- c.f. GHC.Tc.Solver.Equality.inertsCanDischarge, and especially
+        --      (CE4) in Note [Combining equalities]
+        | Just res <- better (isEmptyRewriterSet rw_i) (isEmptyRewriterSet rw_w)
+        -> res
 
         -- If only one is a WantedSuperclassOrigin (arising from expanding
         -- a Wanted class constraint), keep the other: wanted superclasses
         -- may be unexpected by users
-        | not is_wsc_orig_i, is_wsc_orig_w     -> KeepInert
-        | is_wsc_orig_i,     not is_wsc_orig_w -> KeepWork
+        | Just res <- better (not is_wsc_orig_i) (not is_wsc_orig_w)
+        -> res
 
-        -- otherwise, just choose the lower span
+        -- Otherwise, just choose the lower span
         -- reason: if we have something like (abs 1) (where the
         -- Num constraint cannot be satisfied), it's better to
         -- get an error about abs than about 1.
         -- This test might become more elaborate if we see an
         -- opportunity to improve the error messages
         | ((<) `on` ctLocSpan) loc_i loc_w -> KeepInert
+
         | otherwise                        -> KeepWork
 
   -- From here on the work-item is Given
@@ -2021,6 +2048,15 @@ solveOneFromTheOther ct_i ct_w
   | otherwise   -- Both are Given, levels differ
   = different_level_strategy
   where
+     better :: Bool -> Bool -> Maybe InteractResult
+     -- (better inert-is-good wanted-is-good) returns
+     --   Just KeepWork  if wanted is strictly better than inert
+     --   Just KeepInert if inert is strictly better than wanted
+     --   Nothing if they are the same
+     better True False = Just KeepInert
+     better False True = Just KeepWork
+     better _     _    = Nothing
+
      ev_i  = ctEvidence ct_i
      ev_w  = ctEvidence ct_w
 
@@ -2125,43 +2161,3 @@ Wrong!  The level-check ensures that the inner implicit parameter wins.
 that this chain of events won't happen, but that's very fragile.)
 -}
 
-{- *********************************************************************
-*                                                                      *
-               Extracting Givens from the inert set
-*                                                                      *
-********************************************************************* -}
-
-
--- | Extract only Given constraints from the inert set.
-inertGivens :: InertSet -> InertSet
-inertGivens is@(IS { inert_cans = cans }) =
-  is { inert_cans = givens_cans
-     , inert_solved_dicts = emptyDictMap
-     }
-  where
-
-    isGivenEq :: EqCt -> Bool
-    isGivenEq eq = isGiven (ctEvidence (CEqCan eq))
-    isGivenDict :: DictCt -> Bool
-    isGivenDict dict = isGiven (ctEvidence (CDictCan dict))
-    isGivenIrred :: IrredCt -> Bool
-    isGivenIrred irred = isGiven (ctEvidence (CIrredCan irred))
-
-    -- Filter the inert constraints for Givens
-    (eq_givens_list, _) = partitionInertEqs isGivenEq (inert_eqs cans)
-    (funeq_givens_list, _) = partitionFunEqs isGivenEq (inert_funeqs cans)
-    dict_givens = filterDicts isGivenDict (inert_dicts cans)
-    safehask_givens = filterDicts isGivenDict (inert_safehask cans)
-    irreds_givens = filterBag isGivenIrred (inert_irreds cans)
-
-    eq_givens = foldr addInertEqs emptyTyEqs eq_givens_list
-    funeq_givens = foldr addFunEqs emptyFunEqs funeq_givens_list
-
-    givens_cans =
-      cans
-        { inert_eqs      = eq_givens
-        , inert_funeqs   = funeq_givens
-        , inert_dicts    = dict_givens
-        , inert_safehask = safehask_givens
-        , inert_irreds   = irreds_givens
-        }

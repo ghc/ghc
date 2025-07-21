@@ -28,7 +28,8 @@ module GHC.Tc.Types.Evidence (
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
-  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable,
+  mkEvCast, mkEvScSelectors, evTypeable,
+  nestedEvIdsOfTerm, evTermFVs,
 
   evTermCoercion, evTermCoercion_maybe,
   EvCallStack(..),
@@ -61,7 +62,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon ( DataCon, dataConWrapId )
 import GHC.Core.Class (Class, classSCSelId )
-import GHC.Core.FVs   ( exprSomeFreeVars )
+import GHC.Core.FVs
 import GHC.Core.InstEnv ( CanonicalEvidence(..) )
 
 import GHC.Types.Unique.DFM
@@ -75,6 +76,7 @@ import GHC.Types.Basic
 
 import GHC.Builtin.Names
 
+import GHC.Utils.FV
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -355,11 +357,13 @@ data EvBindsVar
       --     (dictionaries etc)
       -- Some Given, some Wanted
 
-      ebv_tcvs :: IORef CoVarSet
-      -- The free Given coercion vars needed by Wanted coercions that
-      -- are solved by filling in their HoleDest in-place. Since they
-      -- don't appear in ebv_binds, we keep track of their free
-      -- variables so that we can report unused given constraints
+      ebv_tcvs :: IORef [TcCoercion]
+      -- When we solve a Wanted by filling in a CoercionHole, it is as
+      -- if we were adding an evidence binding
+      --       co_hole := coercion
+      -- We keep all these RHS coercions in a list, alongside `ebv_binds`,
+      --  so that we can report unused given constraints,
+      --  in GHC.Tc.Solver.neededEvVars
       -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
     }
 
@@ -367,7 +371,7 @@ data EvBindsVar
 
       -- See above for comments on ebv_uniq, ebv_tcvs
       ebv_uniq :: Unique,
-      ebv_tcvs :: IORef CoVarSet
+      ebv_tcvs :: IORef [TcCoercion]
     }
 
 instance Data.Data TcEvBinds where
@@ -504,8 +508,8 @@ data EvTerm
   | EvFun     -- /\as \ds. let binds in v
       { et_tvs   :: [TyVar]
       , et_given :: [EvVar]
-      , et_binds :: TcEvBinds -- This field is why we need an EvFun
-                              -- constructor, and can't just use EvExpr
+      , et_binds :: Bag EvBind -- This field is why we need an EvFun
+                               -- constructor, and can't just use EvExpr
       , et_body  :: EvVar }
 
   deriving Data.Data
@@ -701,11 +705,9 @@ implicit parameter is not important, see (CS5) below) are solved as follows:
         [W] d2 :: (?stk :: CallStack)    CtOrigin = IPOccOrigin
 
    That is, `d` is a call-stack that has the `foo` call-site pushed on top of
-   `d2`, which can now be solved normally (as in (1) above).  This is done in two
-   places:
-     - In GHC.Tc.Solver.Dict.canDictNC we do the pushing.
-     - In GHC.Tc.Solver.Types.findDict we arrrange /not/ to solve a plan-PUSH
-       constraint by forcing a "miss" in the lookup in the inert set
+   `d2`, which can now be solved normally (as in (1) above).  This is done as follows:
+     - In GHC.Tc.Solver.Dict.canDictCt we do the pushing.
+     - We only look up canonical constraints in the inert set
 
 3. For a CallStack constraint, we choose how to solve it based on its CtOrigin:
 
@@ -863,47 +865,41 @@ evTermCoercion tm = case evTermCoercion_maybe tm of
 *                                                                      *
 ********************************************************************* -}
 
-relevantEvVar :: Var -> Bool
--- Just returns /local/ free evidence variables; i.e ones with Internal Names
+isNestedEvId :: Var -> Bool
+-- Just returns /nested/ free evidence variables; i.e ones with Internal Names
 -- Top-level ones (DFuns, dictionary selectors and the like) don't count
-relevantEvVar v = isInternalName (varName v)
+-- Evidence variables are always Ids; do not pick TyVars
+isNestedEvId v = isId v && isInternalName (varName v)
 
-evVarsOfTerm :: EvTerm -> VarSet
-evVarsOfTerm (EvExpr e)         = exprSomeFreeVars relevantEvVar e
-evVarsOfTerm (EvTypeable _ ev)  = evVarsOfTypeable ev
-evVarsOfTerm (EvFun {})         = emptyVarSet -- See Note [Free vars of EvFun]
+nestedEvIdsOfTerm :: EvTerm -> VarSet
+-- Returns only EvIds satisfying relevantEvId
+nestedEvIdsOfTerm tm = fvVarSet (filterFV isNestedEvId (evTermFVs tm))
 
-evVarsOfTerms :: [EvTerm] -> VarSet
-evVarsOfTerms = mapUnionVarSet evVarsOfTerm
+evTermFVs :: EvTerm -> FV
+evTermFVs (EvExpr e)         = exprFVs e
+evTermFVs (EvTypeable _ ev)  = evFVsOfTypeable ev
+evTermFVs (EvFun { et_tvs = tvs, et_given = given, et_binds = binds, et_body = v })
+  = addBndrsFV bndrs fvs
+  where
+    fvs = foldr (unionFV . evTermFVs . eb_rhs) (unitFV v) binds
+    bndrs = foldr ((:) . eb_lhs) (tvs ++ given) binds
 
-evVarsOfTypeable :: EvTypeable -> VarSet
-evVarsOfTypeable ev =
+evTermFVss :: [EvTerm] -> FV
+evTermFVss = mapUnionFV evTermFVs
+
+evFVsOfTypeable :: EvTypeable -> FV
+evFVsOfTypeable ev =
   case ev of
-    EvTypeableTyCon _ e      -> mapUnionVarSet evVarsOfTerm e
-    EvTypeableTyApp e1 e2    -> evVarsOfTerms [e1,e2]
-    EvTypeableTrFun em e1 e2 -> evVarsOfTerms [em,e1,e2]
-    EvTypeableTyLit e        -> evVarsOfTerm e
+    EvTypeableTyCon _ e      -> mapUnionFV evTermFVs e
+    EvTypeableTyApp e1 e2    -> evTermFVss [e1,e2]
+    EvTypeableTrFun em e1 e2 -> evTermFVss [em,e1,e2]
+    EvTypeableTyLit e        -> evTermFVs e
 
-
-{- Note [Free vars of EvFun]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Finding the free vars of an EvFun is made tricky by the fact the
-bindings et_binds may be a mutable variable.  Fortunately, we
-can just squeeze by.  Here's how.
-
-* evVarsOfTerm is used only by GHC.Tc.Solver.neededEvVars.
-* Each EvBindsVar in an et_binds field of an EvFun is /also/ in the
-  ic_binds field of an Implication
-* So we can track usage via the processing for that implication,
-  (see Note [Tracking redundant constraints] in GHC.Tc.Solver).
-  We can ignore usage from the EvFun altogether.
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
                   Pretty printing
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 instance Outputable HsWrapper where
   ppr co_fn = pprHsWrapper co_fn (no_parens (text "<>"))
