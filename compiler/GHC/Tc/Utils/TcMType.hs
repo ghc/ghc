@@ -2444,14 +2444,11 @@ checkTypeHasFixedRuntimeRep prov ty =
   unless (typeHasFixedRuntimeRep ty)
     (addDetailedDiagnostic $ TcRnTypeDoesNotHaveFixedRuntimeRep ty prov)
 
-{-
-%************************************************************************
-%*                                                                      *
+{- **********************************************************************
+*                                                                       *
              Error messages
 *                                                                       *
-*************************************************************************
-
--}
+********************************************************************** -}
 
 -- See Note [Naughty quantification candidates]
 naughtyQuantification :: TcType   -- original type user wanted to quantify

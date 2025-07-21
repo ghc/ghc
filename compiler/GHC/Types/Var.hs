@@ -1074,7 +1074,7 @@ idInfo :: HasDebugCallStack => Id -> IdInfo
 idInfo (Id { id_info = info }) = info
 idInfo other                   = pprPanic "idInfo" (ppr other)
 
-idDetails :: Id -> IdDetails
+idDetails :: HasCallStack => Id -> IdDetails
 idDetails (Id { id_details = details }) = details
 idDetails other                         = pprPanic "idDetails" (ppr other)
 

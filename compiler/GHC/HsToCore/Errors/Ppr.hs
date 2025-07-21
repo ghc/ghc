@@ -7,7 +7,7 @@
 
 module GHC.HsToCore.Errors.Ppr where
 
-import GHC.Core.Predicate (isEvVar)
+import GHC.Core.Predicate (isEvId)
 import GHC.Core.Type
 import GHC.Driver.Flags
 import GHC.Hs
@@ -147,7 +147,7 @@ instance Diagnostic DsMessage where
 
            pp_bndr b
             | isTyVar b = text "type variable" <+> quotes (ppr b)
-            | isEvVar b = text "constraint"    <+> quotes (ppr (varType b))
+            | isEvId  b = text "constraint"    <+> quotes (ppr (varType b))
             | otherwise = text "variable"      <+> quotes (ppr b)
     DsLazyPatCantBindVarsOfUnliftedType unlifted_bndrs
       -> mkSimpleDecorated $
