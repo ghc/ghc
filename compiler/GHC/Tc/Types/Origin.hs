@@ -783,10 +783,7 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ (WithUserRdr _ name))) = OccurrenceOf name
-exprCtOrigin e@(HsGetField _ _ (L _ _)) = ExpansionOrigin (OrigExpr e)
-                                        -- GetFieldOrigin (field_label $ unLoc $ dfoLabel f)
 exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin l
-exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
 exprCtOrigin (HsOverLit _ lit)    = LiteralOrigin lit
 exprCtOrigin (HsLit {})           = Shouldn'tHappenOrigin "concrete literal"
@@ -796,18 +793,15 @@ exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
 exprCtOrigin (NegApp _ e _)       = lexprCtOrigin e
 exprCtOrigin (HsPar _ e)          = lexprCtOrigin e
-exprCtOrigin e@(HsProjection _ _) = ExpansionOrigin (OrigExpr e)
 exprCtOrigin (SectionL _ _ _)     = SectionOrigin
 exprCtOrigin (SectionR _ _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {})   = Shouldn'tHappenOrigin "explicit tuple"
 exprCtOrigin ExplicitSum{}        = Shouldn'tHappenOrigin "explicit sum"
 exprCtOrigin (HsCase _ _ matches) = matchesCtOrigin matches
-exprCtOrigin (HsIf {})           = IfThenElseOrigin
 exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e
 exprCtOrigin (HsDo {})           = DoStmtOrigin
 exprCtOrigin (RecordCon {})      = Shouldn'tHappenOrigin "record construction"
-exprCtOrigin (RecordUpd{})       = RecordUpdOrigin
 exprCtOrigin (ExprWithTySig {})  = ExprSigOrigin
 exprCtOrigin (ArithSeq {})       = Shouldn'tHappenOrigin "arithmetic sequence"
 exprCtOrigin (HsPragE _ _ e)     = lexprCtOrigin e
@@ -822,6 +816,11 @@ exprCtOrigin (HsHole _)          = Shouldn'tHappenOrigin "hole expression"
 exprCtOrigin (HsForAll {})       = Shouldn'tHappenOrigin "forall telescope"    -- See Note [Types in terms]
 exprCtOrigin (HsQual {})         = Shouldn'tHappenOrigin "constraint context"  -- See Note [Types in terms]
 exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -- See Note [Types in terms]
+exprCtOrigin e@(ExplicitList {})  = ExpansionOrigin (OrigExpr e)
+exprCtOrigin e@(HsIf {})          = ExpansionOrigin (OrigExpr e)
+exprCtOrigin e@(HsProjection _ _) = ExpansionOrigin (OrigExpr e)
+exprCtOrigin e@(RecordUpd{})      = ExpansionOrigin (OrigExpr e)
+exprCtOrigin e@(HsGetField{})     = ExpansionOrigin (OrigExpr e)
 exprCtOrigin (XExpr (ExpandedThingRn o _)) = ExpansionOrigin o
 exprCtOrigin (XExpr (PopErrCtxt e)) = exprCtOrigin e
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
@@ -868,8 +867,10 @@ pprCtOrigin (ExpansionOrigin o)
         OrigExpr (HsGetField _ _ (L _ f)) ->
           hsep [text "selecting the field", quotes (ppr f)]
         OrigExpr (HsOverLabel _ l) ->
-          hsep [text "the overloaded label" ,quotes (char '#' <> ppr l)]
-        OrigExpr e@(RecordUpd{}) -> hsep [text "a record update" <+> quotes (ppr e) ]
+          hsep [text "the overloaded label" , quotes (char '#' <> ppr l)]
+        OrigExpr (RecordUpd{}) -> text "a record update"
+        OrigExpr (ExplicitList{}) -> text "an overloaded list"
+        OrigExpr (HsIf{}) -> text "an if-then-else expression"
         OrigExpr e -> text "the expression" <+> (ppr e)
 
 pprCtOrigin (GivenSCOrigin sk d blk)
@@ -1088,7 +1089,11 @@ pprCtO (WantedSuperclassOrigin {})  = text "a superclass constraint"
 pprCtO (InstanceSigOrigin {})       = text "a type signature in an instance"
 pprCtO (AmbiguityCheckOrigin {})    = text "a type ambiguity check"
 pprCtO (ImpedanceMatching {})       = text "combining required constraints"
-pprCtO (NonLinearPatternOrigin _ pat) = hsep [text "a non-linear pattern" <+> quotes (ppr pat)]
+pprCtO (NonLinearPatternOrigin _ pat) = hsep [text "a non-linear pattern", quotes (ppr pat)]
+pprCtO (ExpansionOrigin (OrigExpr (HsOverLabel _ l))) = hsep [text "the overloaded label", quotes (char '#' <> ppr l)]
+pprCtO (ExpansionOrigin (OrigExpr (RecordUpd{}))) = text "a record update"
+pprCtO (ExpansionOrigin (OrigExpr (ExplicitList{}))) = text "an overloaded list"
+pprCtO (ExpansionOrigin (OrigExpr (HsIf{}))) = text "an if-then-else expression"
 pprCtO (ExpansionOrigin (OrigExpr e)) = text "an expression" <+> ppr e
 pprCtO (ExpansionOrigin (OrigStmt{})) = text "a do statement"
 pprCtO (ExpansionOrigin (OrigPat{})) = text "a pattern"

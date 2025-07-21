@@ -22,7 +22,7 @@ import GHC.Tc.Instance.Typeable
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.CtLoc
-import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, CtOrigin(GetFieldOrigin) )
+import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, CtOrigin(ExpansionOrigin) )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst, FamInstEnvs )
 import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
@@ -61,7 +61,7 @@ import GHC.Data.Maybe ( expectJust )
 
 import GHC.Unit.Module.Warnings
 
-import GHC.Hs.Extension
+import GHC.Hs
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import GHC.Types.Id.Info
@@ -1327,7 +1327,7 @@ warnIncompleteRecSel dflags sel_id ct_loc
 
     -- GHC.Tc.Gen.App.tcInstFun arranges that the CtOrigin of (r.x) is GetFieldOrigin,
     -- despite the expansion to (getField @"x" r)
-    isGetFieldOrigin (GetFieldOrigin {}) = True
+    isGetFieldOrigin (ExpansionOrigin (OrigExpr (HsGetField {}))) = True
     isGetFieldOrigin _                   = False
 
 lookupHasFieldLabel
