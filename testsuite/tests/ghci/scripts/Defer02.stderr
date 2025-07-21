@@ -71,8 +71,8 @@ Defer01.hs:49:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
 (deferred type error)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:168:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:88:42 in ghc-internal:GHC.Internal.Exception
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
 *** Exception: Defer01.hs:13:5: error: [GHC-83865]
@@ -82,8 +82,8 @@ HasCallStack backtrace:
 (deferred type error)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:168:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:88:42 in ghc-internal:GHC.Internal.Exception
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
 *** Exception: Defer01.hs:17:9: error: [GHC-39999]
@@ -93,8 +93,8 @@ HasCallStack backtrace:
 (deferred type error)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:168:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:88:42 in ghc-internal:GHC.Internal.Exception
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
 <interactive>:10:11: error: [GHC-83865]
@@ -113,8 +113,8 @@ HasCallStack backtrace:
 (deferred type error)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:168:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:88:42 in ghc-internal:GHC.Internal.Exception
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
 *** Exception: Defer01.hs:30:5: error: [GHC-83865]
@@ -127,8 +127,8 @@ HasCallStack backtrace:
 (deferred type error)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:168:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:88:42 in ghc-internal:GHC.Internal.Exception
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
 *** Exception: Defer01.hs:33:8: error: [GHC-25897]
@@ -146,8 +146,8 @@ HasCallStack backtrace:
 (deferred type error)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:168:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:88:42 in ghc-internal:GHC.Internal.Exception
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
 *** Exception: Defer01.hs:38:17: error: [GHC-83865]
@@ -161,8 +161,8 @@ HasCallStack backtrace:
 (deferred type error)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:168:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:88:42 in ghc-internal:GHC.Internal.Exception
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
 *** Exception: Defer01.hs:42:5: error: [GHC-39999]
@@ -172,8 +172,8 @@ HasCallStack backtrace:
 (deferred type error)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:168:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:88:42 in ghc-internal:GHC.Internal.Exception
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
 <interactive>:16:8: error: [GHC-18872]
@@ -192,7 +192,7 @@ HasCallStack backtrace:
 (deferred type error)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:168:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:88:42 in ghc-internal:GHC.Internal.Exception
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
