@@ -35,11 +35,11 @@ import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor
 import GHC.Tc.Deriv.Generics
 import GHC.Tc.Errors.Types
-import GHC.Tc.Types.Constraint (WantedConstraints, mkNonCanonical)
+import GHC.Tc.Types.Constraint (WantedConstraints, mkNonCanonical, mkSimpleWC)
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Unify (tcSubTypeSigma)
+import GHC.Tc.Utils.Unify (tcSubTypeSigma, buildImplicationFor)
 import GHC.Tc.Zonk.Type
 
 import GHC.Core.Class
@@ -55,23 +55,24 @@ import GHC.Unit.Module (getModule)
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface (mi_fix)
 
-import GHC.Types.Fixity.Env (lookupFixity)
 import GHC.Iface.Load   (loadInterfaceForName)
+
+import GHC.Types.Fixity.Env (lookupFixity)
 import GHC.Types.Name
 import GHC.Types.SrcLoc
-import GHC.Utils.Misc
 import GHC.Types.Var.Set
+import GHC.Types.Id( idName )
 
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH (liftClassKey)
 
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Unique (sameUnique)
 
 import Control.Monad.Trans.Reader
-import Data.Foldable (traverse_)
 import Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.List.SetOps (assocMaybe)
@@ -92,12 +93,9 @@ isStandaloneDeriv = asks (go . denv_ctxt)
 -- | Is GHC processing a standalone deriving declaration with an
 -- extra-constraints wildcard as the context?
 -- (e.g., @deriving instance _ => Eq (Foo a)@)
-isStandaloneWildcardDeriv :: DerivM Bool
-isStandaloneWildcardDeriv = asks (go . denv_ctxt)
-  where
-    go :: DerivContext -> Bool
-    go (InferContext wildcard) = isJust wildcard
-    go (SupplyContext {})      = False
+isStandaloneWildcardDeriv :: DerivContext -> Bool
+isStandaloneWildcardDeriv (InferContext wildcard) = isJust wildcard
+isStandaloneWildcardDeriv (SupplyContext {})      = False
 
 -- | Return 'InstDeclCtxt' if processing with a standalone @deriving@
 -- declaration or 'DerivClauseCtxt' if processing a @deriving@ clause.
@@ -109,12 +107,8 @@ askDerivUserTypeCtxt = asks (go . denv_ctxt)
     go (InferContext Just{})  = InstDeclCtxt True
     go (InferContext Nothing) = DerivClauseCtxt
 
--- | @'mkDerivOrigin' wc@ returns 'StandAloneDerivOrigin' if @wc@ is 'True',
--- and 'DerivClauseOrigin' if @wc@ is 'False'. Useful for error-reporting.
 mkDerivOrigin :: Bool -> CtOrigin
-mkDerivOrigin standalone_wildcard
-  | standalone_wildcard = StandAloneDerivOrigin
-  | otherwise           = DerivClauseOrigin
+mkDerivOrigin standalone = DerivOrigin standalone
 
 -- | Contains all of the information known about a derived instance when
 -- determining what its @EarlyDerivSpec@ should be.
@@ -563,11 +557,19 @@ data PredSpec
     SimplePredSpec
       { sps_pred :: TcPredType
         -- ^ The constraint to emit as a wanted
+        -- Usually just a simple predicate like (Eq a) or (ki ~# Type),
+        -- but can be a forall-constraint:
+        --   * in the case of GHC.Tc.Deriv.Infer.inferConstraintsCoerceBased
+        --   * if a class has quantified-constraint superclasses,
+        --       via `mkDirectThetaSpec` in `inferConstraints`
+
       , sps_origin :: CtOrigin
         -- ^ The origin of the constraint
+
       , sps_type_or_kind :: TypeOrKind
         -- ^ Whether the constraint is a type or kind
       }
+
   | -- | A special 'PredSpec' that is only used by @DeriveAnyClass@. This
     -- will check if @stps_ty_actual@ is a subtype of (i.e., more polymorphic
     -- than) @stps_ty_expected@ in the constraint solving machinery, emitting an
@@ -677,8 +679,8 @@ captureThetaSpecConstraints ::
                   -- @deriving@ declaration
   -> ThetaSpec    -- ^ The specs from which constraints will be created
   -> TcM (TcLevel, WantedConstraints)
-captureThetaSpecConstraints user_ctxt theta =
-  pushTcLevelM $ mk_wanteds theta
+captureThetaSpecConstraints user_ctxt theta
+  = pushTcLevelM $ mk_wanteds theta
   where
     -- Create the constraints we need to solve. For stock and newtype
     -- deriving, these constraints will be simple wanted constraints
@@ -689,34 +691,62 @@ captureThetaSpecConstraints user_ctxt theta =
     mk_wanteds :: ThetaSpec -> TcM WantedConstraints
     mk_wanteds preds
       = do { (_, wanteds) <- captureConstraints $
-                             traverse_ emit_constraints preds
+                             mapM_ (emitPredSpecConstraints user_ctxt) preds
            ; pure wanteds }
 
-    -- Emit the appropriate constraints depending on what sort of
-    -- PredSpec we are dealing with.
-    emit_constraints :: PredSpec -> TcM ()
-    emit_constraints ps =
-      case ps of
-        -- For constraints like (C a, Ord b), emit the
-        -- constraints directly as simple wanted constraints.
-        SimplePredSpec { sps_pred = wanted
-                       , sps_origin = orig
-                       , sps_type_or_kind = t_or_k
-                       } -> do
-          ev <- newWanted orig (Just t_or_k) wanted
-          emitSimple (mkNonCanonical ev)
+emitPredSpecConstraints :: UserTypeCtxt -> PredSpec -> TcM ()
+--- Emit the appropriate constraints depending on what sort of
+-- PredSpec we are dealing with.
+emitPredSpecConstraints _ (SimplePredSpec { sps_pred = wanted_pred
+                                          , sps_origin = orig
+                                          , sps_type_or_kind = t_or_k })
+  -- For constraints like (C a) or (Ord b), emit the
+  -- constraints directly as simple wanted constraints.
+  | isRhoTy wanted_pred
+  = do { ev <- newWanted orig (Just t_or_k) wanted_pred
+       ; emitSimple (mkNonCanonical ev) }
 
-        -- For DeriveAnyClass, check if ty_actual is a subtype of
-        -- ty_expected, which emits an implication constraint as a
-        -- side effect. See
-        -- Note [Gathering and simplifying constraints for DeriveAnyClass].
-        -- in GHC.Tc.Deriv.Infer.
-        SubTypePredSpec { stps_ty_actual   = ty_actual
-                        , stps_ty_expected = ty_expected
-                        , stps_origin      = orig
-                        } -> do
-          _ <- tcSubTypeSigma orig user_ctxt ty_actual ty_expected
-          return ()
+  | otherwise
+    -- Forall-predicates, can come from
+    --     * GHC.Tc.Deriv.Infer.inferConstraintsCoerceBased.
+    --     * Quantified constraints in superclasses
+    --     (See comments with sps_pred.)
+    -- For these forall-predicates we want to emit an /implication/-constraint,
+    -- and NOT a /forall/-constraint. Why?  Because forall-constraints are solved
+    -- all-or-nothing, but here when we are trying to infer the context for an
+    -- instance decl, we need that half-solved implication.  See the rather
+    -- exotic test T20815 and Note [Inferred contexts from method constraints]
+    --
+    -- See also (WFA3) in Note [Solving a Wanted forall-constraint] in GHC.Tc.Solver.Solve
+  = do { let (_,_,head_ty) = tcSplitQuantPredTy wanted_pred  -- Yuk
+             skol_info_anon
+               = case orig of
+                   DerivOriginCoerce meth _ _ _ -> MethSkol (idName meth) False
+                   DerivOrigin _                -> InstSkol (IsQC orig) (pSizeHead head_ty)
+                   _ -> pprPanic "emitPredSpecConstraints" (ppr orig $$ ppr wanted_pred)
+                        -- We only get a polymorphic wanted_pred from limited places
+                        -- Computing `skol_info_anon` is a bit messy, but arises from
+                        -- the fact that SimplePredSpec is not really simple!
+
+       ; skol_info <- mkSkolemInfo skol_info_anon
+       ; (_wrapper, tv_prs, givens, wanted_rho) <- topSkolemise skol_info wanted_pred
+         -- _wrapper: we ignore the evidence from all these constraints
+       ; (tc_lvl, ev) <- pushTcLevelM $ newWanted orig (Just t_or_k) wanted_rho
+       ; let skol_tvs = map (binderVar . snd) tv_prs
+       ; (implic, _) <- buildImplicationFor tc_lvl skol_info_anon skol_tvs
+                               givens (mkSimpleWC [ev])
+       ; emitImplications implic }
+
+emitPredSpecConstraints user_ctxt
+  (SubTypePredSpec { stps_ty_actual   = ty_actual
+                   , stps_ty_expected = ty_expected
+                   , stps_origin      = orig })
+-- For DeriveAnyClass, check if ty_actual is a subtype of ty_expected,
+-- which emits an implication constraint as a side effect. See
+-- Note [Gathering and simplifying constraints for DeriveAnyClass]
+-- in GHC.Tc.Deriv.Infer.
+  = do { _ <- tcSubTypeSigma orig user_ctxt ty_actual ty_expected
+       ; return () }
 
 {-
 ************************************************************************

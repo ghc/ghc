@@ -746,8 +746,12 @@ zonk_bind (XHsBindsLR (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
     runZonkBndrT (zonkTyBndrsX    tyvars  ) $ \ new_tyvars   ->
     runZonkBndrT (zonkEvBndrsX    evs     ) $ \ new_evs      ->
     runZonkBndrT (zonkTcEvBinds_s ev_binds) $ \ new_ev_binds ->
-  do { (new_val_bind, new_exports) <- mfix $ \ ~(new_val_binds, _) ->
-       runZonkBndrT (extendIdZonkEnvRec $ collectHsBindsBinders CollNoDictBinders new_val_binds) $ \ _ ->
+  do { (new_val_bind, new_exports) <- mfix $ \ ~(new_val_binds, new_exports) ->
+       let new_bndrs = collectHsBindsBinders CollNoDictBinders new_val_binds
+                       ++ map abe_poly new_exports
+       -- Tie the knot with the `abe_poly` binders too, since they
+       -- may be mentioned in the `abe_prags` of the `exports`
+       in runZonkBndrT (extendIdZonkEnvRec new_bndrs) $ \ _ ->
        do { new_val_binds <- mapM zonk_val_bind val_binds
           ; new_exports   <- mapM zonk_export exports
           ; return (new_val_binds, new_exports)
@@ -854,6 +858,7 @@ zonkLTcSpecPrags ps
            ; skol_tvs_ref <- lift $ newTcRef []
            ; setZonkType (SkolemiseFlexi skol_tvs_ref) $
                -- SkolemiseFlexi: see Note [Free tyvars on rule LHS]
+
              runZonkBndrT (zonkCoreBndrsX bndrs)       $ \ bndrs' ->
              do { spec_e' <- zonkLExpr spec_e
                 ; skol_tvs <- lift $ readTcRef skol_tvs_ref
@@ -1759,7 +1764,7 @@ zonkEvTerm (EvFun { et_tvs = tvs, et_given = evs
                   , et_binds = ev_binds, et_body = body_id })
   = runZonkBndrT (zonkTyBndrsX tvs)       $ \ new_tvs      ->
     runZonkBndrT (zonkEvBndrsX evs)       $ \ new_evs      ->
-    runZonkBndrT (zonkTcEvBinds ev_binds) $ \ new_ev_binds ->
+    runZonkBndrT (zonkEvBinds ev_binds)   $ \ new_ev_binds ->
   do { new_body_id  <- zonkIdOcc body_id
      ; return (EvFun { et_tvs = new_tvs, et_given = new_evs
                      , et_binds = new_ev_binds, et_body = new_body_id }) }

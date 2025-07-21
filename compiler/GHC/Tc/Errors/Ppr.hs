@@ -4197,8 +4197,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
                = empty
 
     drv_fixes = case orig of
-                   DerivClauseOrigin                  -> [drv_fix False]
-                   StandAloneDerivOrigin              -> [drv_fix True]
+                   DerivOrigin standalone             -> [drv_fix standalone]
                    DerivOriginDC _ _       standalone -> [drv_fix standalone]
                    DerivOriginCoerce _ _ _ standalone -> [drv_fix standalone]
                    _                                  -> []

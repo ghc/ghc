@@ -6,6 +6,8 @@
 --
 -- The ticket #14605 has a much longer example that
 -- also fails; it does not use ImpredicativeTypes
+--
+-- The error message is not great; but it's an obscure program
 
 module T14605 where
 
