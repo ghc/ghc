@@ -12,17 +12,7 @@ import qualified GHC.Internal.Stack.CloneStack as CloneStack
 
 import System.IO.Unsafe
 import Unsafe.Coerce
-
-{-# NOINLINE decodeAnnotationFrames #-}
-decodeAnnotationFrames :: IO [String]
-decodeAnnotationFrames = do
-  stack <- CloneStack.cloneMyStack
-  decoded <- Decode.decodeStack stack
-  pure
-      [ show a
-      | AnnFrame _ (Box ann) <- ssc_stack decoded
-      , StackAnnotation a <- [unsafeCoerce ann]
-      ]
+import GHC.Exts.Heap.Closures (GenStgStackClosure)
 
 {-# NOINLINE printAnnotationStack #-}
 printAnnotationStack :: [String] -> IO ()
@@ -47,8 +37,8 @@ baz = annotateCallStackM $ do
   decodeAnnotationFrames >>= printAnnotationStack
 
 bar :: IO ()
-bar = annotateCallStackM $ annotateStackM "bar" $ do
-  putStrLn "Some more ork in bar"
+bar = annotateCallStackM $ annotateStringM "bar" $ do
+  putStrLn "Some more work in bar"
   print (fib 21)
   decodeAnnotationFrames >>= printAnnotationStack
 
@@ -56,3 +46,23 @@ fib :: Int -> Int
 fib n
   | n <= 1 = 1
   | otherwise = fib (n - 1) + fib (n - 2)
+
+{-# NOINLINE decodeAnnotationFrames #-}
+decodeAnnotationFrames :: IO [String]
+decodeAnnotationFrames = do
+  stack <- CloneStack.cloneMyStack
+  decoded <- Decode.decodeStack stack
+  pure $ unwindStack decoded
+
+unwindStack :: GenStgStackClosure Box -> [String]
+unwindStack stack_closure =
+  [ ann
+  | a <- ssc_stack stack_closure
+  , ann <- case a of
+          AnnFrame _ (Box ann) ->
+            [ displayStackAnnotation a
+            | SomeStackAnnotation a <- [unsafeCoerce ann]
+            ]
+          UnderflowFrame _ underflow_stack_closure -> unwindStack underflow_stack_closure
+          _ -> []
+  ]
