@@ -290,6 +290,7 @@ Library
         GHC.Internal.Stable
         GHC.Internal.StableName
         GHC.Internal.Stack
+        GHC.Internal.Stack.Annotation
         GHC.Internal.Stack.CCS
         GHC.Internal.Stack.Types
         GHC.Internal.Stats
