@@ -14,7 +14,7 @@ hello x y = annotateShow (x,y) $
 
 {-# NOINLINE decodeAndPrintAnnotationFrames #-}
 decodeAndPrintAnnotationFrames :: a -> a
-decodeAndPrintAnnotationFrames a = unsafePerformIO $ do
+decodeAndPrintAnnotationFrames !a = unsafePerformIO $ do
   stack <- GHC.Stack.CloneStack.cloneMyStack
   decoded <- GHC.Exts.Stack.Decode.decodeStack stack
   print [ displayStackAnnotation a

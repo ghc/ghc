@@ -1,6 +1,4 @@
-
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -ddump-to-file -ddump-stg-final -ddump-simpl -dsuppress-all #-}
 import Control.Monad
 import GHC.Stack.Types
 import Control.Exception
@@ -9,20 +7,7 @@ import GHC.Stack.Annotation.Experimental
 
 main :: IO ()
 main = do
-  setBacktraceMechanismState IPEBacktrace True
-  -- foo baz
   bar
-
-foo :: HasCallStack => IO () -> IO ()
-foo act = annotateCallStackM $ do
-  putStrLn "Start some work"
-  act
-  putStrLn "Finish some work"
-
-baz :: HasCallStack => IO ()
-baz = annotateCallStackM $ do
-  print (fib 20)
-  throwIO $ ErrorCall "baz is interrupted"
 
 bar :: IO ()
 bar = annotateCallStackM $ annotateStringM "bar" $ do
