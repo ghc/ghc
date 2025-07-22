@@ -77,8 +77,9 @@ jobs:
         # You can add multiple configurations here if needed
         config: [default]
     container:
-      image: soulomoon/ghc-build-env:latest
-      # options: --user root
+      # image: soulomoon/ghc-build-env:latest
+      image: registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12:latest
+      options: --user root
     env:
       # GHC_FLAGS: -Werror
       # BIGNUM_BACKEND: gmp
@@ -91,17 +92,17 @@ jobs:
       run:
         shell: bash
     steps:
-      # - name: Checkout
-      #   uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       # - uses: cachix/install-nix-action@v31
 
       - name: Setup Cabal
         shell: bash
         run: |
           # git reset --hard
-          git clean -xdf
+          # git clean -xdf
           # git submodule foreach git clean -xdf
-          git submodule update --init
+          # git submodule update --init
           # cabal update
           # cabal install happy-1.20.1.1 --overwrite-policy=always
           # cabal install alex
@@ -119,3 +120,4 @@ jobs:
         run: |
           export CORES="$(mk/detect-cpu-count.sh)"
           . .gitlab/ci.sh build_hadrian
+          # . .gitlab/ci.sh test_hadrian
