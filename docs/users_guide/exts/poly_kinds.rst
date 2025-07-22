@@ -9,10 +9,10 @@ Kind polymorphism
 
     :implies: :extension:`PolyKinds`, :extension:`DataKinds`, :extension:`KindSignatures`
     :since: 8.0.1
-    :status: Deprecated
+    :status: Deprecated since 9.12.1
 
-    The extension :extension:`TypeInType` is now deprecated: its sole effect is
-    to switch on :extension:`PolyKinds`
+    The extension :extension:`TypeInType` is deprecated since GHC 9.12.1:
+    its sole effect is to switch on :extension:`PolyKinds`
     (and hence :extension:`KindSignatures`) and :extension:`DataKinds`.
 
 .. extension:: PolyKinds
