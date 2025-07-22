@@ -1836,7 +1836,7 @@ newPolyBndrs dest_lvl
       ; return (env', new_bndrs) }
   where
     -- See Note [le_subst and le_env]
-    add_subst env (v, v') = extendIdSubst env v (mkVarApps (Var v') abs_vars)
+    add_subst env (v, v') = extendIdSubst env v (mkAbsVarApps (Var v') abs_vars)
     add_id env (v, v')    = extendVarEnv env v ((v':abs_vars), mkAbsVarApps (Var v') abs_vars)
 
     mk_poly_bndr bndr uniq

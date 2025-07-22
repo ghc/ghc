@@ -3116,7 +3116,7 @@ type AbsVars       = [AbsVar]
 type TaggedAbsVars t = [TaggedBndr t]
 
 mkPolyAbsLams :: (b -> AbsVar, Var -> b -> b)
-          -> [b] -> Expr b -> Expr b
+              -> [b] -> Expr b -> Expr b
 -- `mkPolyAbsLams` is polymorphic in (get,set) so that we can
 -- use it for both CoreExpr and LevelledExpr
 {-# INLINE mkPolyAbsLams #-}
