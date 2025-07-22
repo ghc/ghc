@@ -24,7 +24,7 @@ import Foreign
 
 -- | Read an InfoTable from the heap into a haskell type.
 -- WARNING: This code assumes it is passed a pointer to a "standard" info
--- table. If tables_next_to_code is enabled, it will look 1 byte before the
+-- table. If tables_next_to_code is disabled, it will look 1 word before the
 -- start for the entry field.
 peekItbl :: Ptr StgInfoTable -> IO StgInfoTable
 peekItbl a0 = do

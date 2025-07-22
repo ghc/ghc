@@ -15,6 +15,7 @@
 
 module GHC.Exts.Stack.Decode
   ( decodeStack,
+    decodeStackWithIpe,
   )
 where
 
@@ -36,6 +37,7 @@ import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
 import GHC.Exts.Heap.InfoTable
 import GHC.Exts.Stack.Constants
+import qualified GHC.Internal.InfoProv.Types as IPE
 import GHC.Stack.CloneStack
 import GHC.Word
 import Prelude
@@ -150,14 +152,17 @@ foreign import prim "getSmallBitmapzh" getSmallBitmap# :: SmallBitmapGetter
 
 foreign import prim "getRetFunSmallBitmapzh" getRetFunSmallBitmap# :: SmallBitmapGetter
 
-foreign import prim "getInfoTableAddrzh" getInfoTableAddr# :: StackSnapshot# -> Word# -> Addr#
+foreign import prim "getInfoTableAddrszh" getInfoTableAddrs# :: StackSnapshot# -> Word# -> (# Addr#, Addr# #)
 
 foreign import prim "getStackInfoTableAddrzh" getStackInfoTableAddr# :: StackSnapshot# -> Addr#
 
-getInfoTableOnStack :: StackSnapshot# -> WordOffset -> IO StgInfoTable
+-- | Get the 'StgInfoTable' of the stack frame.
+-- Additionally, provides 'IPE.InfoProv' for the 'StgInfoTable' if there is any.
+getInfoTableOnStack :: StackSnapshot# -> WordOffset -> IO (StgInfoTable, Maybe IPE.InfoProv)
 getInfoTableOnStack stackSnapshot# index =
-  let infoTablePtr = Ptr (getInfoTableAddr# stackSnapshot# (wordOffsetToWord# index))
-   in peekItbl infoTablePtr
+  let !(# itbl_struct#, itbl_ptr# #) = getInfoTableAddrs# stackSnapshot# (wordOffsetToWord# index)
+   in
+    (,) <$> peekItbl (Ptr itbl_struct#) <*> IPE.lookupIPE (Ptr itbl_ptr#)
 
 getInfoTableForStack :: StackSnapshot# -> IO StgInfoTable
 getInfoTableForStack stackSnapshot# =
@@ -276,18 +281,49 @@ decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
       (bitmapWordPointerness size bitmap)
 
 unpackStackFrame :: StackFrameLocation -> IO StackFrame
-unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
-  info <- getInfoTableOnStack stackSnapshot# index
+unpackStackFrame stackFrameLoc = do
+  unpackStackFrameTo stackFrameLoc
+    (\ info nextChunk -> do
+      stackClosure <- decodeStack nextChunk
+      pure $
+        UnderflowFrame
+          { info_tbl = info,
+            nextChunk = stackClosure
+          }
+    )
+    (\ frame _ -> pure frame)
+
+unpackStackFrameWithIpe :: StackFrameLocation -> IO [(StackFrame, Maybe IPE.InfoProv)]
+unpackStackFrameWithIpe stackFrameLoc = do
+  unpackStackFrameTo stackFrameLoc
+    (\ _ nextChunk -> do
+      decodeStackWithIpe nextChunk
+    )
+    (\ frame mIpe -> pure [(frame, mIpe)])
+
+unpackStackFrameTo ::
+  StackFrameLocation ->
+  (StgInfoTable -> StackSnapshot -> IO a) ->
+  (StackFrame -> Maybe IPE.InfoProv -> IO a) ->
+  IO a
+unpackStackFrameTo (StackSnapshot stackSnapshot#, index) unpackUnderflowFrame finaliseStackFrame = do
+  (info, m_info_prov) <- getInfoTableOnStack stackSnapshot# index
   unpackStackFrame' info
+    unpackUnderflowFrame
+    (`finaliseStackFrame` m_info_prov)
   where
-    unpackStackFrame' :: StgInfoTable -> IO StackFrame
-    unpackStackFrame' info =
+    unpackStackFrame' ::
+      StgInfoTable ->
+      (StgInfoTable -> StackSnapshot -> IO a) ->
+      (StackFrame -> IO a) ->
+      IO a
+    unpackStackFrame' info unpackUnderflowFrame mkStackFrameResult =
       case tipe info of
         RET_BCO -> do
           let bco' = getClosureBox stackSnapshot# (index + offsetStgClosurePayload)
           -- The arguments begin directly after the payload's one element
           bcoArgs' <- decodeLargeBitmap getBCOLargeBitmap# stackSnapshot# index (offsetStgClosurePayload + 1)
-          pure
+          mkStackFrameResult
             RetBCO
               { info_tbl = info,
                 bco = bco',
@@ -296,14 +332,14 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
         RET_SMALL ->
           let payload' = decodeSmallBitmap getSmallBitmap# stackSnapshot# index offsetStgClosurePayload
           in
-            pure $
+            mkStackFrameResult $
               RetSmall
                 { info_tbl = info,
                   stack_payload = payload'
                 }
         RET_BIG -> do
           payload' <- decodeLargeBitmap getLargeBitmap# stackSnapshot# index offsetStgClosurePayload
-          pure $
+          mkStackFrameResult $
             RetBig
               { info_tbl = info,
                 stack_payload = payload'
@@ -315,7 +351,7 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
             if isArgGenBigRetFunType stackSnapshot# index == True
               then decodeLargeBitmap getRetFunLargeBitmap# stackSnapshot# index offsetStgRetFunFramePayload
               else pure $ decodeSmallBitmap getRetFunSmallBitmap# stackSnapshot# index offsetStgRetFunFramePayload
-          pure $
+          mkStackFrameResult $
             RetFun
               { info_tbl = info,
                 retFunSize = retFunSize',
@@ -325,31 +361,26 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
         UPDATE_FRAME ->
           let updatee' = getClosureBox stackSnapshot# (index + offsetStgUpdateFrameUpdatee)
           in
-            pure $
+            mkStackFrameResult $
               UpdateFrame
                 { info_tbl = info,
                   updatee = updatee'
                 }
         CATCH_FRAME -> do
           let handler' = getClosureBox stackSnapshot# (index + offsetStgCatchFrameHandler)
-          pure $
+          mkStackFrameResult $
             CatchFrame
               { info_tbl = info,
                 handler = handler'
               }
         UNDERFLOW_FRAME -> do
           let nextChunk' = getUnderflowFrameNextChunk stackSnapshot# index
-          stackClosure <- decodeStack nextChunk'
-          pure $
-            UnderflowFrame
-              { info_tbl = info,
-                nextChunk = stackClosure
-              }
-        STOP_FRAME -> pure $ StopFrame {info_tbl = info}
+          unpackUnderflowFrame info nextChunk'
+        STOP_FRAME -> mkStackFrameResult $ StopFrame {info_tbl = info}
         ATOMICALLY_FRAME -> do
           let atomicallyFrameCode' = getClosureBox stackSnapshot# (index + offsetStgAtomicallyFrameCode)
               result' = getClosureBox stackSnapshot# (index + offsetStgAtomicallyFrameResult)
-          pure $
+          mkStackFrameResult $
             AtomicallyFrame
               { info_tbl = info,
                 atomicallyFrameCode = atomicallyFrameCode',
@@ -360,7 +391,7 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
               first_code' = getClosureBox stackSnapshot# (index + offsetStgCatchRetryFrameRunningFirstCode)
               alt_code' = getClosureBox stackSnapshot# (index + offsetStgCatchRetryFrameAltCode)
           in
-            pure $
+            mkStackFrameResult $
               CatchRetryFrame
                 { info_tbl = info,
                   running_alt_code = running_alt_code',
@@ -371,7 +402,7 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
           let catchFrameCode' = getClosureBox stackSnapshot# (index + offsetStgCatchSTMFrameCode)
               handler' = getClosureBox stackSnapshot# (index + offsetStgCatchSTMFrameHandler)
           in
-            pure $
+            mkStackFrameResult $
               CatchStmFrame
                 { info_tbl = info,
                   catchFrameCode = catchFrameCode',
@@ -380,7 +411,7 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
         ANN_FRAME ->
           let annotation = getClosureBox stackSnapshot# (index + offsetStgAnnFrameAnn)
            in
-             pure $
+             mkStackFrameResult $
                AnnFrame
                 { info_tbl = info,
                   annotation = annotation
@@ -410,19 +441,27 @@ type StackFrameLocation = (StackSnapshot, WordOffset)
 --
 -- See /Note [Decoding the stack]/.
 decodeStack :: StackSnapshot -> IO StgStackClosure
-decodeStack (StackSnapshot stack#) = do
+decodeStack snapshot@(StackSnapshot stack#) = do
+  (stackInfo, ssc_stack) <- decodeStackWithFrameUnpack unpackStackFrame snapshot
+  pure
+    GenStgStackClosure
+      { ssc_info = stackInfo,
+        ssc_stack_size = getStackFields stack#,
+        ssc_stack = ssc_stack
+      }
+
+decodeStackWithIpe :: StackSnapshot -> IO [(StackFrame, Maybe IPE.InfoProv)]
+decodeStackWithIpe snapshot =
+  concat . snd <$> decodeStackWithFrameUnpack unpackStackFrameWithIpe snapshot
+
+decodeStackWithFrameUnpack :: (StackFrameLocation -> IO a) -> StackSnapshot -> IO (StgInfoTable, [a])
+decodeStackWithFrameUnpack unpackFrame (StackSnapshot stack#) = do
   info <- getInfoTableForStack stack#
   case tipe info of
     STACK -> do
-      let stack_size' = getStackFields stack#
-          sfls = stackFrameLocations stack#
-      stack' <- mapM unpackStackFrame sfls
-      pure $
-        GenStgStackClosure
-          { ssc_info = info,
-            ssc_stack_size = stack_size',
-            ssc_stack = stack'
-          }
+      let sfls = stackFrameLocations stack#
+      stack' <- mapM unpackFrame sfls
+      pure (info, stack')
     _ -> error $ "Expected STACK closure, got " ++ show info
   where
     stackFrameLocations :: StackSnapshot# -> [StackFrameLocation]
