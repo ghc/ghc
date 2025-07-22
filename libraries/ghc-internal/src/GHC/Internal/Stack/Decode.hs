@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-#if MIN_TOOL_VERSION_ghc(9,13,0)
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -13,19 +12,33 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
-module GHC.Exts.Stack.Decode
-  ( decodeStack,
-    decodeStackWithIpe,
+module GHC.Internal.Stack.Decode (
+  decodeStack,
+  decodeStackWithIpe,
+  prettyStackFrameWithIpe,
+  -- * StackEntry
+  StackEntry(..),
+  prettyStackEntry,
+  decode,
   )
 where
 
-import Control.Monad
-import Data.Bits
-import Data.Maybe
-import Foreign
-import GHC.Exts
-import GHC.Exts.Heap.ClosureTypes
-import GHC.Exts.Heap.Closures
+import GHC.Internal.Base
+import GHC.Internal.Show
+import GHC.Internal.Real
+import GHC.Internal.Word
+import GHC.Internal.Num
+import GHC.Internal.Data.Bits
+import GHC.Internal.Data.Functor
+import GHC.Internal.Data.List
+import GHC.Internal.Data.Tuple
+import GHC.Internal.Foreign.Ptr
+import GHC.Internal.Foreign.Storable
+import GHC.Internal.Exts
+import GHC.Internal.Unsafe.Coerce
+
+import GHC.Internal.ClosureTypes
+import GHC.Internal.Heap.Closures
   ( Box (..),
     StackFrame,
     GenStackFrame (..),
@@ -34,13 +47,12 @@ import GHC.Exts.Heap.Closures
     StackField,
     GenStackField(..)
   )
-import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
-import GHC.Exts.Heap.InfoTable
-import GHC.Exts.Stack.Constants
-import qualified GHC.Internal.InfoProv.Types as IPE
-import GHC.Stack.CloneStack
-import GHC.Word
-import Prelude
+import GHC.Internal.Heap.Constants (wORD_SIZE_IN_BITS)
+import GHC.Internal.Heap.InfoTable
+import GHC.Internal.Stack.Annotation
+import GHC.Internal.Stack.Constants
+import GHC.Internal.Stack.CloneStack
+import GHC.Internal.InfoProv.Types (InfoProv (..), lookupIPE)
 
 {- Note [Decoding the stack]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -157,12 +169,12 @@ foreign import prim "getInfoTableAddrszh" getInfoTableAddrs# :: StackSnapshot# -
 foreign import prim "getStackInfoTableAddrzh" getStackInfoTableAddr# :: StackSnapshot# -> Addr#
 
 -- | Get the 'StgInfoTable' of the stack frame.
--- Additionally, provides 'IPE.InfoProv' for the 'StgInfoTable' if there is any.
-getInfoTableOnStack :: StackSnapshot# -> WordOffset -> IO (StgInfoTable, Maybe IPE.InfoProv)
+-- Additionally, provides 'InfoProv' for the 'StgInfoTable' if there is any.
+getInfoTableOnStack :: StackSnapshot# -> WordOffset -> IO (StgInfoTable, Maybe InfoProv)
 getInfoTableOnStack stackSnapshot# index =
   let !(# itbl_struct#, itbl_ptr# #) = getInfoTableAddrs# stackSnapshot# (wordOffsetToWord# index)
    in
-    (,) <$> peekItbl (Ptr itbl_struct#) <*> IPE.lookupIPE (Ptr itbl_ptr#)
+    (,) <$> peekItbl (Ptr itbl_struct#) <*> lookupIPE (Ptr itbl_ptr#)
 
 getInfoTableForStack :: StackSnapshot# -> IO StgInfoTable
 getInfoTableForStack stackSnapshot# =
@@ -293,7 +305,7 @@ unpackStackFrame stackFrameLoc = do
     )
     (\ frame _ -> pure frame)
 
-unpackStackFrameWithIpe :: StackFrameLocation -> IO [(StackFrame, Maybe IPE.InfoProv)]
+unpackStackFrameWithIpe :: StackFrameLocation -> IO [(StackFrame, Maybe InfoProv)]
 unpackStackFrameWithIpe stackFrameLoc = do
   unpackStackFrameTo stackFrameLoc
     (\ _ nextChunk -> do
@@ -302,22 +314,21 @@ unpackStackFrameWithIpe stackFrameLoc = do
     (\ frame mIpe -> pure [(frame, mIpe)])
 
 unpackStackFrameTo ::
+  forall a .
   StackFrameLocation ->
   (StgInfoTable -> StackSnapshot -> IO a) ->
-  (StackFrame -> Maybe IPE.InfoProv -> IO a) ->
+  (StackFrame -> Maybe InfoProv -> IO a) ->
   IO a
 unpackStackFrameTo (StackSnapshot stackSnapshot#, index) unpackUnderflowFrame finaliseStackFrame = do
   (info, m_info_prov) <- getInfoTableOnStack stackSnapshot# index
   unpackStackFrame' info
-    unpackUnderflowFrame
     (`finaliseStackFrame` m_info_prov)
   where
     unpackStackFrame' ::
       StgInfoTable ->
-      (StgInfoTable -> StackSnapshot -> IO a) ->
       (StackFrame -> IO a) ->
       IO a
-    unpackStackFrame' info unpackUnderflowFrame mkStackFrameResult =
+    unpackStackFrame' info mkStackFrameResult =
       case tipe info of
         RET_BCO -> do
           let bco' = getClosureBox stackSnapshot# (index + offsetStgClosurePayload)
@@ -450,7 +461,7 @@ decodeStack snapshot@(StackSnapshot stack#) = do
         ssc_stack = ssc_stack
       }
 
-decodeStackWithIpe :: StackSnapshot -> IO [(StackFrame, Maybe IPE.InfoProv)]
+decodeStackWithIpe :: StackSnapshot -> IO [(StackFrame, Maybe InfoProv)]
 decodeStackWithIpe snapshot =
   concat . snd <$> decodeStackWithFrameUnpack unpackStackFrameWithIpe snapshot
 
@@ -473,6 +484,16 @@ decodeStackWithFrameUnpack unpackFrame (StackSnapshot stack#) = do
         go Nothing = []
         go (Just r) = r : go (advanceStackFrameLocation r)
 
-#else
-module GHC.Exts.Stack.Decode where
-#endif
+prettyStackFrameWithIpe :: (StackFrame, Maybe InfoProv) -> Maybe String
+prettyStackFrameWithIpe (frame, mipe) =
+  case frame of
+    AnnFrame _ (Box ann) ->
+      Just $ displayStackAnnotation (unsafeCoerce ann :: SomeStackAnnotation)
+    _ ->
+      (prettyStackEntry . toStackEntry) <$> mipe
+
+
+-- TODO @fendor: deprecate
+prettyStackEntry :: StackEntry -> String
+prettyStackEntry (StackEntry {moduleName=mod_nm, functionName=fun_nm, srcLoc=loc}) =
+  mod_nm ++ "." ++ fun_nm ++ " (" ++ loc ++ ")"
