@@ -207,6 +207,19 @@ See also Note [Width of parameters] for some more motivation.
 // Perhaps confusingly this still reads a full word, merely the offset is in bytes.
 #define ReadSpB(n)       (*((StgWord*)   SafeSpBP(n)))
 
+/*
+ * SLIDE "n" words "by" words
+ * a_1 ... a_n, b_1 ... b_by, k
+ *           =>
+ * a_1 ... a_n, k
+ */
+#define SpSlide(n, by)          \
+    while(n-- > 0) {            \
+        SpW(n+by) = ReadSpW(n); \
+    }                           \
+    Sp_addW(by);                \
+
+
 /* Note [PUSH_L underflow]
    ~~~~~~~~~~~~~~~~~~~~~~~
 BCOs can be nested, resulting in nested BCO stack frames where the inner most
@@ -844,7 +857,6 @@ eval_obj:
              debugBelch("\n\n");
             );
 
-//    IF_DEBUG(sanity,checkStackChunk(Sp, cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size));
     IF_DEBUG(sanity,checkStackFrame(Sp));
 
     switch ( get_itbl(obj)->type ) {
@@ -1086,11 +1098,31 @@ do_return_pointer:
         // Returning to an interpreted continuation: put the object on
         // the stack, and start executing the BCO.
         INTERP_TICK(it_retto_BCO);
-        Sp_subW(1);
-        SpW(0) = (W_)tagged_obj;
-        obj = (StgClosure*)ReadSpW(2);
+        obj = (StgClosure*)ReadSpW(1);
         ASSERT(get_itbl(obj)->type == BCO);
-        goto run_BCO_return_pointer;
+
+        // Heap check
+        if (doYouWantToGC(cap)) {
+            Sp_subW(2);
+            SpW(1) = (W_)tagged_obj;
+            SpW(0) = (W_)&stg_ret_p_info;
+            RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
+        }
+        else {
+
+          // Stack checks aren't necessary at return points, the stack use
+          // is aggregated into the enclosing function entry point.
+
+          // Make sure stack is headed by a ctoi R1p frame when returning a pointer
+          ASSERT(ReadSpW(0) == (W_)&stg_ctoi_R1p_info);
+
+          // Add the return frame on top of the args
+          Sp_subW(2);
+          SpW(1) = (W_)tagged_obj;
+          SpW(0) = (W_)&stg_ret_p_info;
+        }
+
+        goto run_BCO;
 
     default:
     do_return_unrecognised:
@@ -1159,8 +1191,9 @@ do_return_nonpointer:
 
         // get the offset of the header of the next stack frame
         offset = stack_frame_sizeW((StgClosure *)Sp);
+        StgClosure* next_frame = (StgClosure*)(SafeSpWP(offset));
 
-        switch (get_itbl((StgClosure*)(SafeSpWP(offset)))->type) {
+        switch (get_itbl(next_frame)->type) {
 
         case RET_BCO:
             // Returning to an interpreted continuation: pop the return frame
@@ -1168,8 +1201,59 @@ do_return_nonpointer:
             // executing the BCO.
             INTERP_TICK(it_retto_BCO);
             obj = (StgClosure*)ReadSpW(offset+1);
+
             ASSERT(get_itbl(obj)->type == BCO);
-            goto run_BCO_return_nonpointer;
+
+            // Heap check
+            if (doYouWantToGC(cap)) {
+                RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
+            }
+            else {
+              // Stack checks aren't necessary at return points, the stack use
+              // is aggregated into the enclosing function entry point.
+
+#if defined(PROFILING)
+              /*
+                 Restore the current cost centre stack if a tuple is being returned.
+
+                 When a "simple" unlifted value is returned, the cccs is restored with
+                 an stg_restore_cccs frame on the stack, for example:
+
+                     ...
+                     stg_ctoi_D1
+                     <CCCS>
+                     stg_restore_cccs
+
+                 But stg_restore_cccs cannot deal with tuples, which may have more
+                 things on the stack. Therefore we store the CCCS inside the
+                 stg_ctoi_t frame.
+
+                 If we have a tuple being returned, the stack looks like this:
+
+                     ...
+                     <CCCS>           <- to restore, Sp offset <next frame + 4 words>
+                     tuple_BCO
+                     tuple_info
+                     cont_BCO
+                     stg_ctoi_t       <- next frame
+                     tuple_data_1
+                     ...
+                     tuple_data_n
+                     tuple_info
+                     tuple_BCO
+                     stg_ret_t        <- Sp
+               */
+
+              if(SpW(0) == (W_)&stg_ret_t_info) {
+                  cap->r.rCCCS = (CostCentreStack*)ReadSpW(stack_frame_sizeW((StgClosure *)Sp) + 4);
+              }
+#endif
+
+              /* Keep the stg_ret_*_info header (i.e. don't drop it)
+               * See Note [The Stack when running a Case Continuation BCO]
+               */
+              goto run_BCO;
+            }
 
         default:
         {
@@ -1336,8 +1420,8 @@ do_apply:
     // Ok, we now have a bco (obj), and its arguments are all on the
     // stack.  We can start executing the byte codes.
     //
-    // The stack is in one of two states.  First, if this BCO is a
-    // function:
+    // The stack is in one of two states. First, if this BCO is a
+    // function
     //
     //    |     ....      |
     //    +---------------+
@@ -1374,68 +1458,6 @@ do_apply:
     //
     // Sadly we have three different kinds of stack/heap/cswitch check
     // to do:
-
-
-run_BCO_return_pointer:
-    // Heap check
-    if (doYouWantToGC(cap)) {
-        Sp_subW(1); SpW(0) = (W_)&stg_ret_p_info;
-        RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
-    }
-    // Stack checks aren't necessary at return points, the stack use
-    // is aggregated into the enclosing function entry point.
-
-    goto run_BCO;
-
-run_BCO_return_nonpointer:
-    // Heap check
-    if (doYouWantToGC(cap)) {
-        RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
-    }
-    // Stack checks aren't necessary at return points, the stack use
-    // is aggregated into the enclosing function entry point.
-
-#if defined(PROFILING)
-    /*
-       Restore the current cost centre stack if a tuple is being returned.
-
-       When a "simple" unlifted value is returned, the cccs is restored with
-       an stg_restore_cccs frame on the stack, for example:
-
-           ...
-           stg_ctoi_D1
-           <CCCS>
-           stg_restore_cccs
-
-       But stg_restore_cccs cannot deal with tuples, which may have more
-       things on the stack. Therefore we store the CCCS inside the
-       stg_ctoi_t frame.
-
-       If we have a tuple being returned, the stack looks like this:
-
-           ...
-           <CCCS>           <- to restore, Sp offset <next frame + 4 words>
-           tuple_BCO
-           tuple_info
-           cont_BCO
-           stg_ctoi_t       <- next frame
-           tuple_data_1
-           ...
-           tuple_data_n
-           tuple_info
-           tuple_BCO
-           stg_ret_t        <- Sp
-     */
-
-    if(SpW(0) == (W_)&stg_ret_t_info) {
-        cap->r.rCCCS = (CostCentreStack*)ReadSpW(stack_frame_sizeW((StgClosure *)Sp) + 4);
-    }
-#endif
-
-    if (SpW(0) != (W_)&stg_ret_t_info) {
-      Sp_addW(1);
-    }
-    goto run_BCO;
 
 run_BCO_fun:
     IF_DEBUG(sanity,
@@ -1981,15 +2003,7 @@ run_BCO:
         case bci_SLIDE: {
             W_ n  = BCO_GET_LARGE_ARG;
             W_ by = BCO_GET_LARGE_ARG;
-            /*
-             * a_1 ... a_n, b_1 ... b_by, k
-             *           =>
-             * a_1 ... a_n, k
-             */
-            while(n-- > 0) {
-                SpW(n+by) = ReadSpW(n);
-            }
-            Sp_addW(by);
+            SpSlide(n, by);
             INTERP_TICK(it_slides);
             goto nextInsn;
         }
