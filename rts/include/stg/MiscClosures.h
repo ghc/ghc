@@ -526,6 +526,17 @@ RTS_FUN_DECL(stg_paniczh);
 RTS_FUN_DECL(stg_keepAlivezh);
 RTS_FUN_DECL(stg_absentErrorzh);
 
+RTS_FUN_DECL(getUnderflowFrameNextChunkzh);
+RTS_FUN_DECL(getWordzh);
+RTS_FUN_DECL(isArgGenBigRetFunTypezh);
+RTS_FUN_DECL(getLargeBitmapzh);
+RTS_FUN_DECL(getBCOLargeBitmapzh);
+RTS_FUN_DECL(getRetFunLargeBitmapzh);
+RTS_FUN_DECL(getSmallBitmapzh);
+RTS_FUN_DECL(getRetFunSmallBitmapzh);
+RTS_FUN_DECL(getInfoTableAddrszh);
+RTS_FUN_DECL(getStackInfoTableAddrzh);
+
 RTS_FUN_DECL(stg_newPromptTagzh);
 RTS_FUN_DECL(stg_promptzh);
 RTS_FUN_DECL(stg_control0zh);
