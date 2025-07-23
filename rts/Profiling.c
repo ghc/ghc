@@ -411,7 +411,7 @@ void enterFunCCS (StgRegTable *reg, CostCentreStack *ccsfn)
     }
 
     // common case 2: the function stack is empty, or just CAF
-    if (ccsfn->cc->is_caf) {
+    if (ccsfn->cc == NULL || ccsfn->cc->is_caf) {
         return;
     }
 
