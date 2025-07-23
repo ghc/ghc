@@ -1,6 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.23.0.0 *TBA*
+  * Remove deprecated, unstable heap representation details from `GHC.Exts` ([CLC proposal #212](https://github.com/haskell/core-libraries-committee/issues/212))
   * Add `Data.List.NonEmpty.mapMaybe`. ([CLC proposal #337](https://github.com/haskell/core-libraries-committee/issues/337))
   * Fix issues with toRational for types capable to represent infinite and not-a-number values ([CLC proposal #338](https://github.com/haskell/core-libraries-committee/issues/338))
   * Modify the implementation of `Data.List.sortOn` to use `(>)` instead of `compare`. ([CLC proposal #332](https://github.com/haskell/core-libraries-committee/issues/332))
