@@ -6,10 +6,13 @@ x :: Int = 14
 11  succ x = (-) (x - 2) (x + 1)
              ^^^^^^^^^^^^^^^^^^^
 12  
-Stopped in T9.top, T26042g.hs:8:10-21
+Stopped in T9., T26042g.hs:(6,3)-(8,21)
 _result :: Int = _
+5  top = do
+   vv
+6    case succ 14 of
 7      5 -> 5
 8      _ -> 6 + other 55
-            ^^^^^^^^^^^^
+                        ^^
 9  
 171
