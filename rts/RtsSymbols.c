@@ -951,7 +951,6 @@ extern char **environ;
       SymI_HasProto(lookupIPE)                                          \
       SymI_HasProto(sendCloneStackMessage)                              \
       SymI_HasProto(cloneStack)                                         \
-      SymI_HasProto(decodeClonedStack)                                  \
       SymI_HasProto(getUnderflowFrameNextChunkzh)                       \
       SymI_HasProto(getWordzh)                                          \
       SymI_HasProto(isArgGenBigRetFunTypezh)                            \
