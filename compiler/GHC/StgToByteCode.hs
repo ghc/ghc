@@ -63,7 +63,7 @@ import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
                               assertNonVoidIds, assertNonVoidStgArgs )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
-import GHC.Runtime.Interpreter ( interpreterProfiled )
+import GHC.Runtime.Interpreter ( interpreterProfiled, readIModModBreaks )
 import GHC.Data.Bitmap
 import GHC.Data.FlatBag as FlatBag
 import GHC.Data.OrdList
@@ -99,6 +99,7 @@ import GHC.CoreToIface
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT(..))
 import Control.Monad.Trans.State  (StateT(..))
+import Data.Array ((!))
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -393,26 +394,26 @@ schemeR_wrk fvs nm original_body (args, body)
 -- | Introduce break instructions for ticked expressions.
 -- If no breakpoint information is available, the instruction is omitted.
 schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
-schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_id fvs) rhs) = do
-  code <- schemeE d 0 p rhs
-  mb_current_mod_breaks <- getCurrentModBreaks
-  case mb_current_mod_breaks of
-    -- if we're not generating ModBreaks for this module for some reason, we
-    -- can't store breakpoint occurrence information.
-    Nothing -> pure code
-    Just current_mod_breaks -> do
-      platform <- profilePlatform <$> getProfile
-      let idOffSets = getVarOffSets platform d p fvs
-          ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-          toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
-          toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-          breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty tick_id
+schemeER_wrk d p (StgTick bp@(Breakpoint tick_ty tick_id fvs) rhs) = do
+  platform <- profilePlatform <$> getProfile
 
-      let info_mod = modBreaks_module current_mod_breaks
-      infox <- newBreakInfo breakInfo
+  -- When we find a tick we update the "last breakpoint location".
+  -- We use it when constructing step-out BRK_FUNs in doCase
+  -- See Note [Debugger: Stepout internal break locs]
+  code <- withBreakTick bp $ schemeE d 0 p rhs
 
-      let breakInstr = BRK_FUN (InternalBreakpointId info_mod infox)
-      return $ breakInstr `consOL` code
+  let idOffSets = getVarOffSets platform d p fvs
+      ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+      toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+      toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+      breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty (Right tick_id)
+
+  mibi <- newBreakInfo breakInfo
+
+  return $ case mibi of
+    Nothing  -> code
+    Just ibi -> BRK_FUN ibi `consOL` code
+
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
@@ -1325,19 +1326,35 @@ doCase d s p scrut bndr alts
            | ubx_tuple_frame    = SLIDE 0 3 `consOL` alt_final1
            | otherwise          = SLIDE 0 1 `consOL` alt_final1
 
-         -- When entering a case continuation BCO, the stack is always headed
-         -- by the stg_ret frame and the stg_ctoi frame that returned to it.
-         -- See Note [Stack layout when entering run_BCO]
-         --
-         -- Right after the breakpoint instruction, a case continuation BCO
-         -- drops the stg_ret and stg_ctoi frame headers (see alt_final1,
-         -- alt_final2), leaving the stack with the scrutinee followed by the
-         -- free variables (with depth==d_bndr)
-         alt_final
-           | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
-                                -- See Note [Debugger: BRK_ALTS]
-                                = BRK_ALTS False `consOL` alt_final2
-           | otherwise          = alt_final2
+     -- When entering a case continuation BCO, the stack is always headed
+     -- by the stg_ret frame and the stg_ctoi frame that returned to it.
+     -- See Note [Stack layout when entering run_BCO]
+     --
+     -- Right after the breakpoint instruction, a case continuation BCO
+     -- drops the stg_ret and stg_ctoi frame headers (see alt_final1,
+     -- alt_final2), leaving the stack with the scrutinee followed by the
+     -- free variables (with depth==d_bndr)
+     alt_final <- getLastBreakTick >>= \case
+       Just (Breakpoint tick_ty tick_id fvs)
+         | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
+         -- Construct an internal breakpoint to put at the start of this case
+         -- continuation BCO, for step-out.
+         -- See Note [Debugger: Stepout internal break locs]
+         -> do
+          internal_tick_loc <- makeCaseInternalBreakLoc tick_id
+
+          -- same fvs available in the case expression are available in the case continuation
+          let idOffSets = getVarOffSets platform d p fvs
+              ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+              toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+              toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+              breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty (Left internal_tick_loc)
+
+          mibi <- newBreakInfo breakInfo
+          return $ case mibi of
+            Nothing  -> alt_final2
+            Just ibi -> BRK_FUN ibi `consOL` alt_final2
+       _ -> pure alt_final2
 
      add_bco_name <- shouldAddBcoName
      let
@@ -1357,72 +1374,122 @@ doCase d s p scrut bndr alts
                   _     -> panic "schemeE(StgCase).push_alts"
             in return (PUSH_ALTS alt_bco scrut_rep `consOL` scrut_code)
 
+-- | Come up with an 'InternalBreakLoc' from the location of the given 'BreakpointId'.
+-- See also Note [Debugger: Stepout internal break locs]
+makeCaseInternalBreakLoc :: BreakpointId -> BcM InternalBreakLoc
+makeCaseInternalBreakLoc bid = do
+  hug         <- hsc_HUG <$> getHscEnv
+  curr_mod    <- getCurrentModule
+  mb_mod_brks <- getCurrentModBreaks
+
+  InternalBreakLoc <$> case bid of
+    BreakpointId{bi_tick_mod, bi_tick_index}
+      | bi_tick_mod == curr_mod
+      , Just these_mbs <- mb_mod_brks
+      -> do
+        return $ modBreaks_locs these_mbs ! bi_tick_index
+      | otherwise
+      -> do
+        other_mbs <- liftIO $ readIModModBreaks hug bi_tick_mod
+        return $ modBreaks_locs other_mbs ! bi_tick_index
+
 {-
-Note [Debugger: BRK_ALTS]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-As described in Note [Debugger: Step-out] in rts/Interpreter.c, to implement
-the stepping-out debugger feature we traverse the stack at runtime, identify
-the first continuation BCO, and explicitly enable that BCO's breakpoint thus
-ensuring that we stop exactly when we return to the continuation.
+Note [Debugger: Stepout internal break locs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step-out tells the interpreter to run until the current function
+returns to where it was called from, and stop there.
 
-However, case continuation BCOs (produced by PUSH_ALTS and which merely compute
-which case alternative BCO to enter next) contain no user-facing breakpoint
-ticks (BRK_FUN). While we could in principle add breakpoints in case continuation
-BCOs, there are a few reasons why this is not an attractive option:
+This is achieved by enabling the BRK_FUN found on the first RET_BCO
+frame on the stack (See [Note Debugger: Step-out]).
 
-  1) It's not useful to a user stepping through the program to always have a
-  breakpoint after the scrutinee is evaluated but before the case alternative
-  is selected. The source span associated with such a breakpoint would also be
-  slightly awkward to choose.
+Case continuation BCOs (which select an alternative branch) must
+therefore be headed by a BRK_FUN. An example:
 
-  2) It's not easy to add a breakpoint tick before the case alternatives because in
-  essentially all internal representations they are given as a list of Alts
-  rather than an expression.
+    f x = case g x of <--- end up here
+        1 -> ...
+        2 -> ...
 
-To provide the debugger a way to break in a case continuation
-despite the BCOs' lack of BRK_FUNs, we introduce an alternative
-type of breakpoint, represented by the BRK_ALTS instruction,
-at the start of every case continuation BCO. For instance,
+    g y = ... <--- step out from here
 
-    case x of
-      0# -> ...
-      _  -> ...
+- `g` will return a value to the case continuation BCO in `f`
+- The case continuation BCO will receive the value returned from g
+- Match on it and push the alternative continuation for that branch
+- And then enter that alternative.
 
-will produce a continuation of the form (N.B. the below bytecode
-is simplified):
+If we step-out of `g`, the first RET_BCO on the stack is the case
+continuation of `f` -- execution should stop at its start, before
+selecting an alternative. (One might ask, "why not enable the breakpoint
+in the alternative instead?", because the alternative continuation is
+only pushed to the stack *after* it is selected by the case cont. BCO)
 
-    PUSH_ALTS P
-      BRK_ALTS 0
-      TESTEQ_I 0 lblA
-      PUSH_BCO
-        BRK_FUN 0
-        -- body of 0# alternative
-      ENTER
+However, the case cont. BCO is not associated with any source-level
+tick, it is merely the glue code which selects alternatives which do
+have source level ticks. Therefore, we have to come up at code
+generation time with a breakpoint location ('InternalBreakLoc') to
+display to the user when it is stopped there.
 
-      lblA:
-      PUSH_BCO
-        BRK_FUN 1
-        -- body of wildcard alternative
-      ENTER
+Our solution is to use the last tick seen just before reaching the case
+continuation. This is robust because a case continuation will thus
+always have a relevant breakpoint location:
 
-When enabled (by its single boolean operand), the BRK_ALTS instruction causes
-the program to break at the next encountered breakpoint (implemented
-by setting the TSO's TSO_STOP_NEXT_BREAKPOINT flag). Since the case
-continuation BCO will ultimately jump to one of the alternatives (each of
-which having its own BRK_FUN) we are guaranteed to stop in the taken alternative.
+    - The source location will be the last source-relevant expression
+      executed before the continuation is pushed
 
-It's important that BRK_ALTS (just like BRK_FUN) is the first instruction of
-the BCO, since that's where the debugger will look to enable it at runtime.
+    - So the source location will point to the thing you've just stepped
+      out of
 
-KNOWN ISSUES:
--------------
-This implementation of BRK_ALTS that modifies the first argument of the
-bytecode to enable it does not allow multi-threaded debugging because the BCO
-object is shared across threads and enabling the breakpoint in one will enable
-it in all other threads too. This will have to change to support multi-threads
-debugging.
+    - Doing :step-local from there will put you on the selected
+      alternative (which at the source level may also be the e.g. next
+      line in a do-block)
 
-The progress towards multi-threaded debugging is tracked by #26064
+Examples, using angle brackets (<<...>>) to denote the breakpoint span:
+
+    f x = case <<g x>> {- step in here -} of
+        1 -> ...
+        2 -> ...>
+
+    g y = <<...>> <--- step out from here
+
+    ...
+
+    f x = <<case g x of <--- end up here, whole case highlighted
+        1 -> ...
+        2 -> ...>>
+
+    doing :step-local ...
+
+    f x = case g x of
+        1 -> <<...>> <--- stop in the alternative
+        2 -> ...
+
+A second example based on T26042d2, where the source is a do-block IO
+action, optimised to a chain of `case expressions`.
+
+    main = do
+      putStrLn "hello1"
+      <<f>> <--- step-in here
+      putStrLn "hello3"
+      putStrLn "hello4"
+
+    f = do
+      <<putStrLn "hello2.1">> <--- step-out from here
+      putStrLn "hello2.2"
+
+    ...
+
+    main = do
+      putStrLn "hello1"
+      <<f>> <--- end up here again, the previously executed expression
+      putStrLn "hello3"
+      putStrLn "hello4"
+
+    doing step/step-local ...
+
+    main = do
+      putStrLn "hello1"
+      f
+      <<putStrLn "hello3">> <--- straight to the next line
+      putStrLn "hello4"
 -}
 
 -- -----------------------------------------------------------------------------
@@ -2625,6 +2692,7 @@ data BcM_Env
         { bcm_hsc_env    :: !HscEnv
         , bcm_module     :: !Module -- current module (for breakpoints)
         , modBreaks      :: !(Maybe ModBreaks)
+        , last_bp_tick   :: !(Maybe StgTickish)
         }
 
 data BcM_State
@@ -2643,7 +2711,7 @@ newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (r, BcM_State))
 
 runBc :: HscEnv -> Module -> Maybe ModBreaks -> BcM r -> IO (r, BcM_State)
 runBc hsc_env this_mod mbs (BcM m)
-   = m (BcM_Env hsc_env this_mod mbs) (BcM_State 0 0 IntMap.empty)
+   = m (BcM_Env hsc_env this_mod mbs Nothing) (BcM_State 0 0 IntMap.empty)
 
 instance HasDynFlags BcM where
     getDynFlags = hsc_dflags <$> getHscEnv
@@ -2673,14 +2741,19 @@ getLabelsBc n = BcM $ \_ st ->
   let ctr = nextlabel st
    in return (coerce [ctr .. ctr+n-1], st{nextlabel = ctr+n})
 
-newBreakInfo :: CgBreakInfo -> BcM Int
-newBreakInfo info = BcM $ \_ st ->
-  let ix = breakInfoIdx st
-      st' = st
-        { breakInfo = IntMap.insert ix info (breakInfo st)
-        , breakInfoIdx = ix + 1
-        }
-  in return (ix, st')
+newBreakInfo :: CgBreakInfo -> BcM (Maybe InternalBreakpointId)
+newBreakInfo info = BcM $ \env st -> do
+  -- if we're not generating ModBreaks for this module for some reason, we
+  -- can't store breakpoint occurrence information.
+  case modBreaks env of
+    Nothing -> pure (Nothing, st)
+    Just modBreaks -> do
+      let ix = breakInfoIdx st
+          st' = st
+            { breakInfo = IntMap.insert ix info (breakInfo st)
+            , breakInfoIdx = ix + 1
+            }
+      return (Just $ InternalBreakpointId (modBreaks_module modBreaks) ix, st')
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \env st -> return (bcm_module env, st)
@@ -2688,12 +2761,20 @@ getCurrentModule = BcM $ \env st -> return (bcm_module env, st)
 getCurrentModBreaks :: BcM (Maybe ModBreaks)
 getCurrentModBreaks = BcM $ \env st -> return (modBreaks env, st)
 
+withBreakTick :: StgTickish -> BcM a -> BcM a
+withBreakTick bp (BcM act) = BcM $ \env st ->
+  act env{last_bp_tick=Just bp} st
+
+getLastBreakTick :: BcM (Maybe StgTickish)
+getLastBreakTick = BcM $ \env st ->
+  pure (last_bp_tick env, st)
+
 tickFS :: FastString
 tickFS = fsLit "ticked"
 
 -- Dehydrating CgBreakInfo
 
-dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> BreakpointId -> CgBreakInfo
+dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> Either InternalBreakLoc BreakpointId -> CgBreakInfo
 dehydrateCgBreakInfo ty_vars idOffSets tick_ty bid =
           CgBreakInfo
             { cgb_tyvars = map toIfaceTvBndr ty_vars
