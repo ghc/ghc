@@ -297,6 +297,18 @@ allocate_NONUPD (Capability *cap, int n_words)
     return allocate(cap, stg_max(sizeofW(StgHeader)+MIN_PAYLOAD_SIZE, n_words));
 }
 
+STATIC_INLINE int
+is_ctoi_nontuple_frame(const StgPtr frame_head) {
+  return (
+      (W_)frame_head == (W_)&stg_ctoi_R1p_info ||
+      (W_)frame_head == (W_)&stg_ctoi_R1n_info ||
+      (W_)frame_head == (W_)&stg_ctoi_F1_info ||
+      (W_)frame_head == (W_)&stg_ctoi_D1_info ||
+      (W_)frame_head == (W_)&stg_ctoi_L1_info ||
+      (W_)frame_head == (W_)&stg_ctoi_V_info
+    );
+}
+
 int rts_stop_on_exception = 0;
 
 /* ---------------------------------------------------------------------------
@@ -1245,7 +1257,7 @@ do_return_nonpointer:
                */
 
               if(SpW(0) == (W_)&stg_ret_t_info) {
-                  cap->r.rCCCS = (CostCentreStack*)ReadSpW(stack_frame_sizeW((StgClosure *)Sp) + 4);
+                  cap->r.rCCCS = (CostCentreStack*)ReadSpW(offset + 4);
               }
 #endif
 
@@ -1541,7 +1553,7 @@ run_BCO:
 
     switch (bci & 0xFF) {
 
-        /* check for a breakpoint on the beginning of a let binding */
+        /* check for a breakpoint on the beginning of a BCO */
         case bci_BRK_FUN:
         {
             W_ arg1_brk_array, arg2_info_mod_name, arg3_info_mod_id, arg4_info_index;
@@ -1594,6 +1606,20 @@ run_BCO:
             {
                breakPoints = (StgArrBytes *) BCO_PTR(arg1_brk_array);
 
+               W_ stack_head = ReadSpW(0);
+
+               // See Note [Stack layout when entering run_BCO blah]
+               // When the BRK_FUN is at the start of a case continuation BCO,
+               // the stack contains the frame returning the value at the start.
+               int is_case_cont_BCO =
+                       stack_head == (W_)&stg_ret_t_info
+                    || stack_head == (W_)&stg_ret_v_info
+                    || stack_head == (W_)&stg_ret_p_info
+                    || stack_head == (W_)&stg_ret_n_info
+                    || stack_head == (W_)&stg_ret_f_info
+                    || stack_head == (W_)&stg_ret_d_info
+                    || stack_head == (W_)&stg_ret_l_info;
+
                // stop the current thread if either `stop_next_breakpoint` is
                // true OR if the ignore count for this particular breakpoint is zero
                StgInt ignore_count = ((StgInt*)breakPoints->payload)[arg4_info_index];
@@ -1602,36 +1628,84 @@ run_BCO:
                   // decrement and write back ignore count
                   ((StgInt*)breakPoints->payload)[arg4_info_index] = --ignore_count;
                }
-               else if (stop_next_breakpoint == true || ignore_count == 0)
+               else if (
+                  /* Doing step-in (but don't stop at case continuation BCOs,
+                   * those are only useful when stepping out) */
+                  (stop_next_breakpoint == true && !is_case_cont_BCO)
+                  /* Or breakpoint is explicitly enabled */
+                  || ignore_count == 0)
                {
                   // make sure we don't automatically stop at the
                   // next breakpoint
                   rts_stop_next_breakpoint = 0;
                   cap->r.rCurrentTSO->flags &= ~TSO_STOP_NEXT_BREAKPOINT;
 
-                  // allocate memory for a new AP_STACK, enough to
-                  // store the top stack frame plus an
-                  // stg_apply_interp_info pointer and a pointer to
-                  // the BCO
-                  size_words = BCO_BITMAP_SIZE(obj) + 2;
-                  new_aps = (StgAP_STACK *) allocate(cap, AP_STACK_sizeW(size_words));
-                  new_aps->size = size_words;
-                  new_aps->fun = &stg_dummy_ret_closure;
+                  // TODO: WRITE NOTE
+                  if (is_case_cont_BCO) {
 
-                  // fill in the payload of the AP_STACK
-                  new_aps->payload[0] = (StgClosure *)&stg_apply_interp_info;
-                  new_aps->payload[1] = (StgClosure *)obj;
+                    // TODO: WRITE NOTE
+                    // A case cont. BCO is headed by a ret_frame with the returned value
+                    // We need the frame here if we are going to yield to construct a well formed stack
+                    // Then, just afterwards, we SLIDE the header off. This is generated code (see StgToByteCode)
+                    int size_returned_frame =
+                        (stack_head == (W_)&stg_ret_t_info)
+                        ? 2 /* ret_t + tuple_BCO */
+                          + /* Sp(2) is call_info which records the offset to the next frame
+                             * See also Note [unboxed tuple bytecodes and tuple_BCO] */
+                          ((ReadSpW(2) & 0xFF))
+                        : 2; /* ret_* + return value */
 
-                  // copy the contents of the top stack frame into the AP_STACK
-                  for (i = 2; i < size_words; i++)
-                  {
-                     new_aps->payload[i] = (StgClosure *)ReadSpW(i-2);
+                    StgPtr cont_frame_head
+                        = (StgPtr)(SpW(size_returned_frame));
+                    ASSERT(obj == UNTAG_CLOSURE((StgClosure*)ReadSpW(size_returned_frame+1)));
+
+                    // stg_ctoi_*
+                    int size_cont_frame_head =
+                        is_ctoi_nontuple_frame(cont_frame_head)
+                        ? 2 // info+bco
+#if defined(PROFILING)
+                        : 5;  // or info+bco+tuple_info+tuple_BCO+CCS
+#else
+                        : 4;  // or info+bco+tuple_info+tuple_BCO
+#endif
+
+                    // Continuation stack is already well formed,
+                    // so just copy it whole to the AP_STACK
+                    size_words = size_returned_frame
+                               + size_cont_frame_head
+                               + BCO_BITMAP_SIZE(obj) /* payload of cont_frame */;
+                    new_aps = (StgAP_STACK *) allocate(cap, AP_STACK_sizeW(size_words));
+                    new_aps->size = size_words;
+                    new_aps->fun = &stg_dummy_ret_closure;
+
+                    // (1) Fill in the payload of the AP_STACK:
+                    for (i = 0; i < size_words; i++) {
+                       new_aps->payload[i] = (StgClosure *)ReadSpW(i);
+                    }
+                  }
+                  else {
+                    // (1) Allocate memory for a new AP_STACK, enough to store
+                    // the top stack frame plus an stg_apply_interp_info pointer
+                    // and a pointer to the BCO
+                    size_words = BCO_BITMAP_SIZE(obj) + 2;
+                    new_aps = (StgAP_STACK *) allocate(cap, AP_STACK_sizeW(size_words));
+                    new_aps->size = size_words;
+                    new_aps->fun = &stg_dummy_ret_closure;
+
+                    // (1.1) the continuation frame
+                    new_aps->payload[0] = (StgClosure *)&stg_apply_interp_info;
+                    new_aps->payload[1] = (StgClosure *)obj;
+
+                    // (1.2.1) copy the args/free vars of the top stack frame into the AP_STACK
+                    for (i = 2; i < size_words; i++) {
+                       new_aps->payload[i] = (StgClosure *)ReadSpW(i-2);
+                    }
                   }
 
                   // No write barrier is needed here as this is a new allocation
                   SET_HDR(new_aps,&stg_AP_STACK_info,cap->r.rCCCS);
 
-                  // Arrange the stack to call the breakpoint IO action, and
+                  // (2) Arrange the stack to call the breakpoint IO action, and
                   // continue execution of this BCO when the IO action returns.
                   //
                   // ioAction :: Addr#       -- the breakpoint info module
@@ -1644,12 +1718,27 @@ run_BCO:
                   ioAction = (StgClosure *) deRefStablePtr (
                       rts_breakpoint_io_action);
 
-                  Sp_subW(13);
-                  SpW(12) = (W_)obj;
-                  SpW(11) = (W_)&stg_apply_interp_info;
+                  // (2.1) Construct the continuation to which we'll return in
+                  // this thread after the `rts_breakpoint_io_action` returns.
+                  //
+                  // For case continuation BCOs, the continuation that re-runs
+                  // it is always ready at the start of the BCO. It gets
+                  // dropped soon after if we don't stop there by SLIDEing.
+                  // See Note [TODO]
+                  if (!is_case_cont_BCO) {
+                    Sp_subW(2); // stg_apply_interp_info + StgBCO*
+
+                    // (2.1.2) Write the continuation frame (above the stg_ret
+                    // frame if one exists)
+                    SpW(1) = (W_)obj;
+                    SpW(0) = (W_)&stg_apply_interp_info;
+                  }
+
+                  // (2.2) The `rts_breakpoint_io_action` call
+                  Sp_subW(11);
                   SpW(10) = (W_)new_aps;
-                  SpW(9) = (W_)False_closure;         // True <=> an exception
-                  SpW(8) = (W_)&stg_ap_ppv_info;
+                  SpW(9)  = (W_)False_closure;         // True <=> an exception
+                  SpW(8)  = (W_)&stg_ap_ppv_info;
                   SpW(7)  = (W_)arg4_info_index;
                   SpW(6)  = (W_)&stg_ap_n_info;
                   SpW(5)  = (W_)BCO_LIT(arg3_info_mod_id);
