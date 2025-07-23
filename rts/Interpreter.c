@@ -284,6 +284,18 @@ allocate_NONUPD (Capability *cap, int n_words)
     return allocate(cap, stg_max(sizeofW(StgHeader)+MIN_PAYLOAD_SIZE, n_words));
 }
 
+STATIC_INLINE int
+is_ret_bco_frame(const StgPtr frame_head) {
+  return ( (W_)frame_head == (W_)&stg_ret_t_info
+        || (W_)frame_head == (W_)&stg_ret_v_info
+        || (W_)frame_head == (W_)&stg_ret_p_info
+        || (W_)frame_head == (W_)&stg_ret_n_info
+        || (W_)frame_head == (W_)&stg_ret_f_info
+        || (W_)frame_head == (W_)&stg_ret_d_info
+        || (W_)frame_head == (W_)&stg_ret_l_info
+      );
+}
+
 int rts_stop_on_exception = 0;
 
 /* ---------------------------------------------------------------------------
@@ -626,8 +638,13 @@ interpretBCO (Capability* cap)
       StgPtr restoreStackPointer = Sp;
 
       /* The first BCO on the stack is the one we are already stopped at.
-       * Skip it. */
-      Sp = SafeSpWP(stack_frame_sizeW((StgClosure *)Sp));
+       * Skip it. In the case of returning to a case cont. BCO, there are two
+       * frames to skip before we reach the first continuation frame.
+       * */
+      int to_skip = is_ret_bco_frame((StgPtr)SpW(0)) ? 2 : 1;
+      for (int i = 0; i < to_skip; i++) {
+        Sp = SafeSpWP(stack_frame_sizeW((StgClosure *)Sp));
+      }
 
       /* Traverse upwards until continuation BCO, or the end */
       while ((type = get_itbl((StgClosure*)Sp)->type) != RET_BCO
@@ -778,7 +795,6 @@ eval_obj:
              debugBelch("\n\n");
             );
 
-//    IF_DEBUG(sanity,checkStackChunk(Sp, cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size));
     IF_DEBUG(sanity,checkStackFrame(Sp));
 
     switch ( get_itbl(obj)->type ) {
@@ -1020,11 +1036,33 @@ do_return_pointer:
         // Returning to an interpreted continuation: put the object on
         // the stack, and start executing the BCO.
         INTERP_TICK(it_retto_BCO);
-        Sp_subW(1);
-        SpW(0) = (W_)tagged_obj;
-        obj = (StgClosure*)ReadSpW(2);
+        obj = (StgClosure*)ReadSpW(1);
         ASSERT(get_itbl(obj)->type == BCO);
-        goto run_BCO_return_pointer;
+
+        // Heap check
+        if (doYouWantToGC(cap)) {
+            Sp_subW(2);
+            SpW(1) = (W_)tagged_obj;
+            SpW(0) = (W_)&stg_ret_p_info;
+            RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
+        }
+        else {
+
+          // Stack checks aren't necessary at return points, the stack use
+          // is aggregated into the enclosing function entry point.
+
+          // Make sure stack is headed by a ctoi R1p frame when returning a pointer
+          ASSERT(ReadSpW(0) == (W_)&stg_ctoi_R1p_info);
+
+          // Add the return frame on top of the args
+          Sp_subW(2);
+          SpW(1) = (W_)tagged_obj;
+          SpW(0) = (W_)&stg_ret_p_info;
+        }
+
+        /* Keep the ret frame and the ctoi frame for run_BCO.
+         * See Note [Stack layout when entering run_BCO] */
+        goto run_BCO;
 
     default:
     do_return_unrecognised:
@@ -1093,8 +1131,9 @@ do_return_nonpointer:
 
         // get the offset of the header of the next stack frame
         offset = stack_frame_sizeW((StgClosure *)Sp);
+        StgClosure* next_frame = (StgClosure*)(SafeSpWP(offset));
 
-        switch (get_itbl((StgClosure*)(SafeSpWP(offset)))->type) {
+        switch (get_itbl(next_frame)->type) {
 
         case RET_BCO:
             // Returning to an interpreted continuation: pop the return frame
@@ -1102,8 +1141,58 @@ do_return_nonpointer:
             // executing the BCO.
             INTERP_TICK(it_retto_BCO);
             obj = (StgClosure*)ReadSpW(offset+1);
+
             ASSERT(get_itbl(obj)->type == BCO);
-            goto run_BCO_return_nonpointer;
+
+            // Heap check
+            if (doYouWantToGC(cap)) {
+                RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
+            }
+            else {
+              // Stack checks aren't necessary at return points, the stack use
+              // is aggregated into the enclosing function entry point.
+
+#if defined(PROFILING)
+              /*
+                 Restore the current cost centre stack if a tuple is being returned.
+
+                 When a "simple" unlifted value is returned, the cccs is restored with
+                 an stg_restore_cccs frame on the stack, for example:
+
+                     ...
+                     stg_ctoi_D1
+                     <CCCS>
+                     stg_restore_cccs
+
+                 But stg_restore_cccs cannot deal with tuples, which may have more
+                 things on the stack. Therefore we store the CCCS inside the
+                 stg_ctoi_t frame.
+
+                 If we have a tuple being returned, the stack looks like this:
+
+                     ...
+                     <CCCS>           <- to restore, Sp offset <next frame + 4 words>
+                     tuple_BCO
+                     tuple_info
+                     cont_BCO
+                     stg_ctoi_t       <- next frame
+                     tuple_data_1
+                     ...
+                     tuple_data_n
+                     tuple_info
+                     tuple_BCO
+                     stg_ret_t        <- Sp
+               */
+
+              if(SpW(0) == (W_)&stg_ret_t_info) {
+                  cap->r.rCCCS = (CostCentreStack*)ReadSpW(offset + 4);
+              }
+#endif
+
+              /* Keep the ret frame and the ctoi frame for run_BCO.
+               * See Note [Stack layout when entering run_BCO] */
+              goto run_BCO;
+            }
 
         default:
         {
@@ -1266,111 +1355,90 @@ do_apply:
             RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
     }
 
-    // ------------------------------------------------------------------------
-    // Ok, we now have a bco (obj), and its arguments are all on the
-    // stack.  We can start executing the byte codes.
-    //
-    // The stack is in one of two states.  First, if this BCO is a
-    // function:
-    //
-    //    |     ....      |
-    //    +---------------+
-    //    |     arg2      |
-    //    +---------------+
-    //    |     arg1      |
-    //    +---------------+
-    //
-    // Second, if this BCO is a continuation:
-    //
-    //    |     ....      |
-    //    +---------------+
-    //    |     fv2       |
-    //    +---------------+
-    //    |     fv1       |
-    //    +---------------+
-    //    |     BCO       |
-    //    +---------------+
-    //    | stg_ctoi_ret_ |
-    //    +---------------+
-    //    |    retval     |
-    //    +---------------+
-    //
-    // where retval is the value being returned to this continuation.
-    // In the event of a stack check, heap check, or context switch,
-    // we need to leave the stack in a sane state so the garbage
-    // collector can find all the pointers.
-    //
-    //  (1) BCO is a function:  the BCO's bitmap describes the
-    //      pointerhood of the arguments.
-    //
-    //  (2) BCO is a continuation: BCO's bitmap describes the
-    //      pointerhood of the free variables.
-    //
-    // Sadly we have three different kinds of stack/heap/cswitch check
-    // to do:
+/*
+Note [Stack layout when entering run_BCO]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have a bco (obj), and its arguments are all on the stack. We can start
+executing the byte codes.
 
+The stack is in one of two states. First, if this BCO is a
+function (in run_BCO_fun or run_BCO)
 
-run_BCO_return_pointer:
-    // Heap check
-    if (doYouWantToGC(cap)) {
-        Sp_subW(1); SpW(0) = (W_)&stg_ret_p_info;
-        RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
-    }
-    // Stack checks aren't necessary at return points, the stack use
-    // is aggregated into the enclosing function entry point.
+   |     ....      |
+   +---------------+
+   |     arg2      |
+   +---------------+
+   |     arg1      |
+   +---------------+
 
-    goto run_BCO;
+Second, if this BCO is a case cont., as per Note [Case continuation BCOs] (only
+in run_BCO):
 
-run_BCO_return_nonpointer:
-    // Heap check
-    if (doYouWantToGC(cap)) {
-        RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
-    }
-    // Stack checks aren't necessary at return points, the stack use
-    // is aggregated into the enclosing function entry point.
+   |     ....      |
+   +---------------+
+   |     fv2       |
+   +---------------+
+   |     fv1       |
+   +---------------+
+   |     BCO       |
+   +---------------+
+   | stg_ctoi_ret_ |
+   +---------------+
+   |    retval     |
+   +---------------+
+   | stg_ret_..... |
+   +---------------+
 
-#if defined(PROFILING)
-    /*
-       Restore the current cost centre stack if a tuple is being returned.
+where retval is the value being returned to this continuation.
+In the event of a stack check, heap check, context switch,
+or breakpoint, we need to leave the stack in a sane state so
+the garbage collector can find all the pointers.
 
-       When a "simple" unlifted value is returned, the cccs is restored with
-       an stg_restore_cccs frame on the stack, for example:
+ (1) BCO is a function:  the BCO's bitmap describes the
+     pointerhood of the arguments.
 
-           ...
-           stg_ctoi_D1
-           <CCCS>
-           stg_restore_cccs
+ (2) BCO is a continuation: BCO's bitmap describes the
+     pointerhood of the free variables.
 
-       But stg_restore_cccs cannot deal with tuples, which may have more
-       things on the stack. Therefore we store the CCCS inside the
-       stg_ctoi_t frame.
+To reconstruct a valid stack state for yielding (such that when we return to
+the interpreter we end up in the same place from where we yielded), we need to
+differentiate the two cases again:
 
-       If we have a tuple being returned, the stack looks like this:
+  (1) For function BCOs, the arguments are directly on top of the stack, so it
+  suffices to add a `stg_apply_interp_info` frame header using the BCO that is
+  being applied to these arguments (i.e. the `obj` being run)
 
-           ...
-           <CCCS>           <- to restore, Sp offset <next frame + 4 words>
-           tuple_BCO
-           tuple_info
-           cont_BCO
-           stg_ctoi_t       <- next frame
-           tuple_data_1
-           ...
-           tuple_data_n
-           tuple_info
-           tuple_BCO
-           stg_ret_t        <- Sp
-     */
+  (2) For continuation BCOs, the stack is already consistent -- that's why we
+  keep the ret and ctoi frame on top of the stack when we start executing it.
 
-    if(SpW(0) == (W_)&stg_ret_t_info) {
-        cap->r.rCCCS = (CostCentreStack*)ReadSpW(stack_frame_sizeW((StgClosure *)Sp) + 4);
-    }
-#endif
+  We couldn't reconstruct a valid stack that resumes the case continuation
+  execution just from the return and free vars values alone because we wouldn't
+  know what kind of result it was (are we returning a pointer, non pointer int,
+  a tuple? etc.); especially considering some frames have different sizes,
+  notably unboxed tuple return frames (see Note [unboxed tuple bytecodes and tuple_BCO]).
 
-    if (SpW(0) != (W_)&stg_ret_t_info) {
-      Sp_addW(1);
-    }
-    goto run_BCO;
+  For consistency, the first instructions in a case continuation BCO, right
+  after a possible BRK_FUN heading it, are two SLIDEs to remove the stg_ret_
+  and stg_ctoi_ frame headers, leaving only the return value followed by the
+  free vars. Theses slides use statically known offsets computed in StgToByteCode.hs.
+  Following the continuation BCO diagram above, SLIDING would result in:
 
+   |     ....      |
+   +---------------+
+   |     fv2       |
+   +---------------+
+   |     fv1       |
+   +---------------+
+   |    retval     |
+   +---------------+
+*/
+
+// Ok, we now have a bco (obj), and its arguments are all on the stack as
+// described by Note [Stack layout when entering run_BCO].
+// We can start executing the byte codes.
+//
+// Sadly we have three different kinds of stack/heap/cswitch check
+// to do:
 run_BCO_fun:
     IF_DEBUG(sanity,
              Sp_subW(2);
@@ -1400,6 +1468,7 @@ run_BCO_fun:
 
     // Now, actually interpret the BCO... (no returning to the
     // scheduler again until the stack is in an orderly state).
+    // See also Note [Stack layout when entering run_BCO]
 run_BCO:
     INTERP_TICK(it_BCO_entries);
     {
@@ -1453,7 +1522,7 @@ run_BCO:
 
     switch (bci & 0xFF) {
 
-        /* check for a breakpoint on the beginning of a let binding */
+        /* check for a breakpoint on the beginning of a BCO */
         case bci_BRK_FUN:
         {
             W_ arg1_brk_array, arg2_info_mod_name, arg3_info_mod_id, arg4_info_index;
@@ -1506,6 +1575,13 @@ run_BCO:
             {
                breakPoints = (StgArrBytes *) BCO_PTR(arg1_brk_array);
 
+               StgPtr stack_head = (StgPtr)SpW(0);
+
+               // When the BRK_FUN is at the start of a case continuation BCO,
+               // the stack is headed by the frame returning the value at the start.
+               // See Note [Stack layout when entering run_BCO]
+               int is_case_cont_BCO = is_ret_bco_frame(stack_head);
+
                // stop the current thread if either `stop_next_breakpoint` is
                // true OR if the ignore count for this particular breakpoint is zero
                StgInt ignore_count = ((StgInt*)breakPoints->payload)[arg4_info_index];
@@ -1514,36 +1590,80 @@ run_BCO:
                   // decrement and write back ignore count
                   ((StgInt*)breakPoints->payload)[arg4_info_index] = --ignore_count;
                }
-               else if (stop_next_breakpoint == true || ignore_count == 0)
+               else if (
+                  /* Doing step-in (but don't stop at case continuation BCOs,
+                   * those are only useful when stepping out) */
+                  (stop_next_breakpoint == true && !is_case_cont_BCO)
+                  /* Or breakpoint is explicitly enabled */
+                  || ignore_count == 0)
                {
                   // make sure we don't automatically stop at the
                   // next breakpoint
                   rts_stop_next_breakpoint = 0;
                   cap->r.rCurrentTSO->flags &= ~TSO_STOP_NEXT_BREAKPOINT;
 
-                  // allocate memory for a new AP_STACK, enough to
-                  // store the top stack frame plus an
-                  // stg_apply_interp_info pointer and a pointer to
-                  // the BCO
-                  size_words = BCO_BITMAP_SIZE(obj) + 2;
-                  new_aps = (StgAP_STACK *) allocate(cap, AP_STACK_sizeW(size_words));
-                  new_aps->size = size_words;
-                  new_aps->fun = &stg_dummy_ret_closure;
+                  /* To yield execution we need to come up with a consistent AP_STACK
+                   * to store in the :history data structure.
+                   */
+                  if (is_case_cont_BCO) {
 
-                  // fill in the payload of the AP_STACK
-                  new_aps->payload[0] = (StgClosure *)&stg_apply_interp_info;
-                  new_aps->payload[1] = (StgClosure *)obj;
+                    // If the BCO is a case cont. then the stack is headed by the
+                    // stg_ret and a stg_ctoi frames which caused this same BCO
+                    // to be run. This stack is already well-formed, so it
+                    // needs only to be copied to the AP_STACK.
+                    // See Note [Stack layout when entering run_BCO]
 
-                  // copy the contents of the top stack frame into the AP_STACK
-                  for (i = 2; i < size_words; i++)
-                  {
-                     new_aps->payload[i] = (StgClosure *)ReadSpW(i-2);
+                    // stg_ret_*
+                    int size_returned_frame = stack_frame_sizeW((StgClosure *)Sp);
+
+                    ASSERT(obj == UNTAG_CLOSURE((StgClosure*)ReadSpW(size_returned_frame+1)));
+
+                    // stg_ctoi_*
+                    int size_cont_frame_head = stack_frame_sizeW((StgClosure*)SafeSpWP(size_returned_frame));
+
+                    // Continuation stack is already well formed,
+                    // so just copy it whole to the AP_STACK
+                    size_words = size_returned_frame
+                               + size_cont_frame_head;
+                    new_aps = (StgAP_STACK *) allocate(cap, AP_STACK_sizeW(size_words));
+                    new_aps->size = size_words;
+                    new_aps->fun = &stg_dummy_ret_closure;
+
+                    // (1) Fill in the payload of the AP_STACK:
+                    for (i = 0; i < size_words; i++) {
+                       new_aps->payload[i] = (StgClosure *)ReadSpW(i);
+                    }
+                  }
+                  else {
+
+                    // The BCO is a function, therefore the arguments are
+                    // directly on top of the stack.
+                    // To construct a valid stack chunk simply add an
+                    // stg_apply_interp and the current BCO to the stack.
+                    // See also Note [Stack layout when entering run_BCO]
+
+                    // (1) Allocate memory for a new AP_STACK, enough to store
+                    // the top stack frame plus an stg_apply_interp_info pointer
+                    // and a pointer to the BCO
+                    size_words = BCO_BITMAP_SIZE(obj) + 2;
+                    new_aps = (StgAP_STACK *) allocate(cap, AP_STACK_sizeW(size_words));
+                    new_aps->size = size_words;
+                    new_aps->fun = &stg_dummy_ret_closure;
+
+                    // (1.1) the continuation frame
+                    new_aps->payload[0] = (StgClosure *)&stg_apply_interp_info;
+                    new_aps->payload[1] = (StgClosure *)obj;
+
+                    // (1.2.1) copy the args/free vars of the top stack frame into the AP_STACK
+                    for (i = 2; i < size_words; i++) {
+                       new_aps->payload[i] = (StgClosure *)ReadSpW(i-2);
+                    }
                   }
 
                   // No write barrier is needed here as this is a new allocation
                   SET_HDR(new_aps,&stg_AP_STACK_info,cap->r.rCCCS);
 
-                  // Arrange the stack to call the breakpoint IO action, and
+                  // (2) Arrange the stack to call the breakpoint IO action, and
                   // continue execution of this BCO when the IO action returns.
                   //
                   // ioAction :: Addr#       -- the breakpoint info module
@@ -1556,12 +1676,27 @@ run_BCO:
                   ioAction = (StgClosure *) deRefStablePtr (
                       rts_breakpoint_io_action);
 
-                  Sp_subW(13);
-                  SpW(12) = (W_)obj;
-                  SpW(11) = (W_)&stg_apply_interp_info;
+                  // (2.1) Construct the continuation to which we'll return in
+                  // this thread after the `rts_breakpoint_io_action` returns.
+                  //
+                  // For case cont. BCOs, the continuation to re-run this BCO
+                  // is already first on the stack. For function BCOs we need
+                  // to add an `stg_apply_interp` apply to the current BCO.
+                  // See Note [Stack layout when entering run_BCO]
+                  if (!is_case_cont_BCO) {
+                    Sp_subW(2); // stg_apply_interp_info + StgBCO*
+
+                    // (2.1.2) Write the continuation frame (above the stg_ret
+                    // frame if one exists)
+                    SpW(1) = (W_)obj;
+                    SpW(0) = (W_)&stg_apply_interp_info;
+                  }
+
+                  // (2.2) The `rts_breakpoint_io_action` call
+                  Sp_subW(11);
                   SpW(10) = (W_)new_aps;
-                  SpW(9) = (W_)False_closure;         // True <=> an exception
-                  SpW(8) = (W_)&stg_ap_ppv_info;
+                  SpW(9)  = (W_)False_closure;         // True <=> an exception
+                  SpW(8)  = (W_)&stg_ap_ppv_info;
                   SpW(7)  = (W_)arg4_info_index;
                   SpW(6)  = (W_)&stg_ap_n_info;
                   SpW(5)  = (W_)BCO_LIT(arg3_info_mod_id);
