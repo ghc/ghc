@@ -132,8 +132,12 @@ Library
                    stm,
                    rts,
                    ghc-boot   == @ProjectVersionMunged@,
-                   ghc-heap   == @ProjectVersionMunged@,
+                   ghc-internal >= 9.1001.0 && <=@ProjectVersionForLib@.0,
                    ghci == @ProjectVersionMunged@
+
+    if flag(bootstrap)
+      build-depends:
+        ghc-heap             >=9.10.1 && <=@ProjectVersionMunged@
 
     if flag(bootstrap)
       Build-Depends:
