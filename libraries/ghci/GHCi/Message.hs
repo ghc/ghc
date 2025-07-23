@@ -37,7 +37,11 @@ import GHCi.ResolvedBCO
 
 import GHC.LanguageExtensions
 import GHC.InfoProv
+#if MIN_VERSION_ghc_internal(9,1500,0)
 import qualified GHC.Exts.Heap as Heap
+#else
+import qualified GHC.Exts.Heap as Heap
+#endif
 import GHC.ForeignSrcLang
 import GHC.Fingerprint
 import GHC.Conc (pseq, par)
@@ -218,7 +222,7 @@ data Message a where
                    -> [RemoteRef (TH.Q ())]
                    -> Message (QResult ())
 
-  -- | Remote interface to GHC.Exts.Heap.getClosureData. This is used by
+  -- | Remote interface to GHC.Internal.Heap.getClosureData. This is used by
   -- the GHCi debugger to inspect values in the heap for :print and
   -- type reconstruction.
   GetClosure
@@ -518,9 +522,11 @@ instance Binary (FunPtr a) where
   put = put . castFunPtrToPtr
   get = castPtrToFunPtr <$> get
 
+#if MIN_VERSION_ghc_internal(9,1500,0)
 instance Binary Heap.HalfWord where
   put x = put (fromIntegral x :: Word32)
   get = fromIntegral <$> (get :: Get Word32)
+#endif
 
 -- Binary instances to support the GetClosure message
 instance Binary Heap.StgTSOProfInfo
