@@ -33,21 +33,20 @@ library
   default-extensions: NoImplicitPrelude
 
   exposed-modules:  GHC.Exts.Heap
+                    GHC.Exts.Heap.Closures
                     GHC.Exts.Heap.ClosureTypes
+                    GHC.Exts.Heap.Constants
+                    GHC.Exts.Heap.InfoTable
+                    GHC.Exts.Heap.InfoTable.Types
+                    GHC.Exts.Heap.InfoTableProf
                     GHC.Exts.Heap.Utils
                     GHC.Exts.Heap.FFIClosures
                     GHC.Exts.Heap.FFIClosures_ProfilingDisabled
                     GHC.Exts.Heap.FFIClosures_ProfilingEnabled
+                    GHC.Exts.Heap.ProfInfo.Types
                     GHC.Exts.Heap.ProfInfo.PeekProfInfo
                     GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled
                     GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
+                    GHC.Exts.Stack.Constants
                     GHC.Exts.Stack
-  reexported-modules:
-                    ghc-internal:GHC.Internal.Heap.Closures        as GHC.Exts.Heap.Closures,
-                    ghc-internal:GHC.Internal.Heap.Constants       as GHC.Exts.Heap.Constants,
-                    ghc-internal:GHC.Internal.Heap.InfoTable       as GHC.Exts.Heap.InfoTable,
-                    ghc-internal:GHC.Internal.Heap.InfoTable.Types as GHC.Exts.Heap.InfoTable.Types,
-                    ghc-internal:GHC.Internal.Heap.InfoTableProf   as GHC.Exts.Heap.InfoTableProf,
-                    ghc-internal:GHC.Internal.Heap.ProfInfo.Types  as GHC.Exts.Heap.ProfInfo.Types,
-                    ghc-internal:GHC.Internal.Stack.Constants      as GHC.Exts.Stack.Constants,
-                    ghc-internal:GHC.Internal.Stack.Decode         as GHC.Exts.Stack.Decode,
+                    GHC.Exts.Stack.Decode

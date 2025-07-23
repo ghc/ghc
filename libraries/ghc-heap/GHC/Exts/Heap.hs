@@ -62,14 +62,14 @@ module GHC.Exts.Heap (
     ) where
 
 import Prelude
+import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.ClosureTypes
-import GHC.Internal.Heap.Closures
-import GHC.Internal.Heap.Constants
-import GHC.Internal.Heap.ProfInfo.Types
+import GHC.Exts.Heap.Constants
+import GHC.Exts.Heap.ProfInfo.Types
 #if defined(PROFILING)
-import GHC.Internal.Heap.InfoTableProf
+import GHC.Exts.Heap.InfoTableProf
 #else
-import GHC.Internal.Heap.InfoTable
+import GHC.Exts.Heap.InfoTable
 #endif
 import GHC.Exts.Heap.Utils
 import qualified GHC.Exts.Heap.FFIClosures as FFIClosures

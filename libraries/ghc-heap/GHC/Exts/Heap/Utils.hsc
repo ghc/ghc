@@ -7,8 +7,8 @@ module GHC.Exts.Heap.Utils (
 #include "Rts.h"
 
 import Prelude -- See note [Why do we import Prelude here?]
-import GHC.Internal.Heap.Constants
-import GHC.Internal.Heap.InfoTable
+import GHC.Exts.Heap.Constants
+import GHC.Exts.Heap.InfoTable
 
 import Data.Char
 import Data.List (intercalate)

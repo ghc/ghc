@@ -108,7 +108,6 @@ import Data.ByteString (ByteString)
 import Foreign hiding (void)
 #if MIN_VERSION_ghc_internal(9,1500,0)
 import qualified GHC.Internal.Heap.Closures as Heap
-import qualified GHC.Internal.Heap.InfoTable.Types as Heap
 #else
 import qualified GHC.Exts.Heap as Heap
 #endif

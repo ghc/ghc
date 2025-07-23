@@ -12,8 +12,8 @@ import Prelude
 import Foreign
 import GHC.Exts
 import GHC.Exts.Heap.ProfInfo.PeekProfInfo
-import GHC.Internal.Heap.ProfInfo.Types
-import GHC.Internal.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..))
+import GHC.Exts.Heap.ProfInfo.Types
+import GHC.Exts.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..))
 
 data TSOFields = TSOFields {
     tso_what_next :: WhatNext,

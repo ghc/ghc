@@ -6,7 +6,7 @@ import Control.Concurrent.STM
 import Control.Exception
 import GHC.Conc
 import GHC.Exts.Heap
-import GHC.Internal.Heap.ClosuresTypes
+import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.InfoTable.Types
 import GHC.Exts.Stack.Decode
