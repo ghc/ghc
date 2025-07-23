@@ -38,7 +38,8 @@ import GHC.Types.SourceText
 import GHC.Utils.Outputable
 
 import Data.Data hiding (Fixity)
-import qualified Data.ByteString as B
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS
 import GHC.TypeLits
 
 -- | Should source spans be removed from output.
@@ -115,7 +116,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                             text "FastString:"
                         <+> text (normalize_newlines . show $ s)
 
-            bytestring :: B.ByteString -> SDoc
+            bytestring :: ByteString -> SDoc
             bytestring = text . normalize_newlines . show
 
             list_epaLocation :: [EpaLocation] -> SDoc
@@ -177,7 +178,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               _            -> parens $ text "NoSourceText"
             sourceText (SourceText src) = case bs of
               BlankSrcSpan     -> parens $ text "SourceText" <+> text "blanked"
-              _                -> parens $ text "SourceText" <+> ftext src
+              _                -> parens $ text "SourceText" <+> text (BS.unpack src)
 
             epaLocation :: EpaLocation -> SDoc
             epaLocation (EpaSpan s) = parens $ text "EpaSpan" <+> srcSpan s

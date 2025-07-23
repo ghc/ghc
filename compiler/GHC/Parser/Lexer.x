@@ -103,6 +103,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 -- bytestring
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS
 
 -- containers
 import Data.Map (Map)
@@ -1190,7 +1191,7 @@ skip_one_varid f span buf len _buf2
 
 skip_one_varid_src :: (SourceText -> FastString -> Token) -> Action
 skip_one_varid_src f span buf len _buf2
-  = return (L span $! f (SourceText $ lexemeToFastString (stepOn buf) (len-1))
+  = return (L span $! f (mkSourceText $ lexemeToString (stepOn buf) (len-1))
                         (lexemeToFastString (stepOn buf) (len-1)))
 
 skip_two_varid :: (FastString -> Token) -> Action
@@ -1599,8 +1600,8 @@ mkHdkCommentSection loc n mkDS = (HdkCommentSection n ds, ITdocComment ds loc)
 rulePrag :: Action
 rulePrag span buf len _buf2 = do
   setExts (.|. xbit InRulePragBit)
-  let !src = lexemeToFastString buf len
-  return (L span (ITrules_prag (SourceText src)))
+  let !src = lexemeToString buf len
+  return (L span (ITrules_prag (mkSourceText src)))
 
 -- When 'UsePosPragsBit' is not set, it is expected that we emit a token instead
 -- of updating the position in 'PState'
@@ -1609,8 +1610,8 @@ linePrag span buf len buf2 = do
   usePosPrags <- getBit UsePosPragsBit
   if usePosPrags
     then begin line_prag2 span buf len buf2
-    else let !src = lexemeToFastString buf len
-         in return (L span (ITline_prag (SourceText src)))
+    else let !src = lexemeToString buf len
+         in return (L span (ITline_prag (mkSourceText src)))
 
 -- When 'UsePosPragsBit' is not set, it is expected that we emit a token instead
 -- of updating the position in 'PState'
@@ -1619,8 +1620,8 @@ columnPrag span buf len buf2 = do
   usePosPrags <- getBit UsePosPragsBit
   if usePosPrags
     then begin column_prag span buf len buf2
-    else let !src = lexemeToFastString buf len
-         in return (L span (ITcolumn_prag (SourceText src)))
+    else let !src = lexemeToString buf len
+         in return (L span (ITcolumn_prag (mkSourceText src)))
 
 endPrag :: Action
 endPrag span _buf _len _buf2 = do
@@ -1883,12 +1884,12 @@ tok_integral
   -> Action
 tok_integral mk_token transval offset translen (radix,char_to_int) span buf len _buf2 = do
   numericUnderscores <- getBit NumericUnderscoresBit  -- #14473
-  let src = lexemeToFastString buf len
-  when ((not numericUnderscores) && ('_' `elem` unpackFS src)) $ do
+  let src = lexemeToString buf len
+  when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
     let msg = PsErrNumUnderscores NumUnderscore_Integral
     addError $ mkPlainErrorMsgEnvelope (mkSrcSpanPs (last_loc pState)) msg
-  return $ L span $ mk_token (SourceText src)
+  return $ L span $ mk_token (mkSourceText src)
        $! transval $ parseUnsignedInteger
        (offsetBytes offset buf) (subtract translen len) radix char_to_int
 
@@ -1929,7 +1930,7 @@ tok_num :: (Integer -> Integer)
         -> Int -> Int
         -> (Integer, (Char->Int)) -> Action
 tok_num = tok_integral $ \case
-    st@(SourceText (unconsFS -> Just ('-',_))) -> itint st (const True)
+    st@(SourceText (BS.uncons -> Just ('-',_))) -> itint st (const True)
     st@(SourceText _)       -> itint st (const False)
     st@NoSourceText         -> itint st (< 0)
   where
@@ -2168,7 +2169,7 @@ tok_string span buf len _buf2 = do
     else
       pure $ L span (ITstring src (mkFastString s))
   where
-    src = SourceText $ lexemeToFastString buf len
+    src = mkSourceText $ lexemeToString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
 
 {- Note [Lexing multiline strings]
@@ -2201,7 +2202,7 @@ tok_string_multi startSpan startBuf _len _buf2 = do
   -- build the values pertaining to the entire multiline string, including delimiters
   let span = mkPsSpan startLoc endLoc
   let len = byteDiff startBuf endBuf
-  let src = SourceText $ lexemeToFastString startBuf len
+  let src = mkSourceText $ lexemeToString startBuf len
 
   -- load the content of the multiline string
   let contentLen = byteDiff contentStartBuf contentEndBuf
@@ -2264,7 +2265,7 @@ tok_quoted_label span buf len _buf2 = do
   pure $ L span (ITlabelvarid src (mkFastString s))
   where
     -- skip leading '#'
-    src = SourceText . mkFastString . drop 1 $ lexemeToString buf len
+    src = mkSourceText . drop 1 $ lexemeToString buf len
 
 
 tok_char :: Action
@@ -2277,7 +2278,7 @@ tok_char span buf len _buf2 = do
       then ITprimchar src c
       else ITchar src c
   where
-    src = SourceText $ lexemeToFastString buf len
+    src = mkSourceText $ lexemeToString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
 
 
@@ -3466,42 +3467,42 @@ ignoredPrags = Map.fromList (map ignored pragmas)
 oneWordPrags = Map.fromList [
      ("rules", rulePrag),
      ("inline",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (Inline (SourceText s)) FunLike))),
+         strtoken (\s -> (ITinline_prag (mkSourceText s) (Inline (mkSourceText s)) FunLike))),
      ("inlinable",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (Inlinable (SourceText s)) FunLike))),
+         strtoken (\s -> (ITinline_prag (mkSourceText s) (Inlinable (mkSourceText s)) FunLike))),
      ("inlineable",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (Inlinable (SourceText s)) FunLike))),
+         strtoken (\s -> (ITinline_prag (mkSourceText s) (Inlinable (mkSourceText s)) FunLike))),
                                     -- Spelling variant
      ("notinline",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (NoInline (SourceText s)) FunLike))),
-     ("opaque", fstrtoken (\s -> ITopaque_prag (SourceText s))),
-     ("specialize", fstrtoken (\s -> ITspec_prag (SourceText s))),
-     ("source", fstrtoken (\s -> ITsource_prag (SourceText s))),
-     ("warning", fstrtoken (\s -> ITwarning_prag (SourceText s))),
-     ("deprecated", fstrtoken (\s -> ITdeprecated_prag (SourceText s))),
-     ("scc", fstrtoken (\s -> ITscc_prag (SourceText s))),
-     ("unpack", fstrtoken (\s -> ITunpack_prag (SourceText s))),
-     ("nounpack", fstrtoken (\s -> ITnounpack_prag (SourceText s))),
-     ("ann", fstrtoken (\s -> ITann_prag (SourceText s))),
-     ("minimal", fstrtoken (\s -> ITminimal_prag (SourceText s))),
-     ("overlaps", fstrtoken (\s -> IToverlaps_prag (SourceText s))),
-     ("overlappable", fstrtoken (\s -> IToverlappable_prag (SourceText s))),
-     ("overlapping", fstrtoken (\s -> IToverlapping_prag (SourceText s))),
-     ("incoherent", fstrtoken (\s -> ITincoherent_prag (SourceText s))),
-     ("ctype", fstrtoken (\s -> ITctype (SourceText s))),
-     ("complete", fstrtoken (\s -> ITcomplete_prag (SourceText s))),
+         strtoken (\s -> (ITinline_prag (mkSourceText s) (NoInline (mkSourceText s)) FunLike))),
+     ("opaque", strtoken (\s -> ITopaque_prag (mkSourceText s))),
+     ("specialize", strtoken (\s -> ITspec_prag (mkSourceText s))),
+     ("source", strtoken (\s -> ITsource_prag (mkSourceText s))),
+     ("warning", strtoken (\s -> ITwarning_prag (mkSourceText s))),
+     ("deprecated", strtoken (\s -> ITdeprecated_prag (mkSourceText s))),
+     ("scc", strtoken (\s -> ITscc_prag (mkSourceText s))),
+     ("unpack", strtoken (\s -> ITunpack_prag (mkSourceText s))),
+     ("nounpack", strtoken (\s -> ITnounpack_prag (mkSourceText s))),
+     ("ann", strtoken (\s -> ITann_prag (mkSourceText s))),
+     ("minimal", strtoken (\s -> ITminimal_prag (mkSourceText s))),
+     ("overlaps", strtoken (\s -> IToverlaps_prag (mkSourceText s))),
+     ("overlappable", strtoken (\s -> IToverlappable_prag (mkSourceText s))),
+     ("overlapping", strtoken (\s -> IToverlapping_prag (mkSourceText s))),
+     ("incoherent", strtoken (\s -> ITincoherent_prag (mkSourceText s))),
+     ("ctype", strtoken (\s -> ITctype (mkSourceText s))),
+     ("complete", strtoken (\s -> ITcomplete_prag (mkSourceText s))),
      ("column", columnPrag)
      ]
 
 twoWordPrags = Map.fromList [
      ("inline conlike",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (Inline (SourceText s)) ConLike))),
+         strtoken (\s -> (ITinline_prag (mkSourceText s) (Inline (mkSourceText s)) ConLike))),
      ("notinline conlike",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (NoInline (SourceText s)) ConLike))),
+         strtoken (\s -> (ITinline_prag (mkSourceText s) (NoInline (mkSourceText s)) ConLike))),
      ("specialize inline",
-         fstrtoken (\s -> (ITspec_inline_prag (SourceText s) True))),
+         strtoken (\s -> (ITspec_inline_prag (mkSourceText s) True))),
      ("specialize notinline",
-         fstrtoken (\s -> (ITspec_inline_prag (SourceText s) False)))
+         strtoken (\s -> (ITspec_inline_prag (mkSourceText s) False)))
      ]
 
 dispatch_pragmas :: Map String Action -> Action

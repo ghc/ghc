@@ -138,6 +138,7 @@ import GHC.Types.ForeignCall
 import GHC.Unit.Module.Warnings
 
 import GHC.Data.Maybe
+import qualified Data.ByteString.Char8 as BS
 import Data.Data (Data)
 import Data.List (concatMap)
 import Data.Foldable (toList)
@@ -1087,9 +1088,7 @@ ppOverlapPragma mb =
     Just (L _ (Incoherent s))   -> maybe_stext s "{-# INCOHERENT #-}"
     Just (L _ (NonCanonical s)) -> maybe_stext s "{-# INCOHERENT #-}" -- No surface syntax for NONCANONICAL yet
   where
-    maybe_stext NoSourceText     alt = text alt
-    maybe_stext (SourceText src) _   = ftext src <+> text "#-}"
-
+    maybe_stext src alt = pprWithSourceTextThen src (text alt) (text "#-}")
 
 instance (OutputableBndrId p) => Outputable (InstDecl (GhcPass p)) where
     ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
@@ -1401,8 +1400,10 @@ type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 instance OutputableBndrId p
         => Outputable (WarnDecls (GhcPass p)) where
     ppr (Warnings ext decls)
-      = ftext src <+> vcat (punctuate semi (map ppr decls)) <+> text "#-}"
-      where src = case ghcPass @p of
+      = bsToSDoc bs <+> vcat (punctuate semi (map ppr decls)) <+> text "#-}"
+      where
+        bsToSDoc = text . BS.unpack
+        bs = case ghcPass @p of
               GhcPs | (_, SourceText src) <- ext -> src
               GhcRn | SourceText src <- ext -> src
               GhcTc | SourceText src <- ext -> src

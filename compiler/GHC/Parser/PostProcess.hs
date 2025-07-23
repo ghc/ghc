@@ -162,6 +162,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Monad (unlessM)
+import qualified Data.ByteString.Char8 as BS
 import Data.Either
 import Data.List        ( findIndex )
 import Data.Foldable
@@ -3170,8 +3171,8 @@ parseCImport cconv safety nm str sourceText =
              ((mk Nothing <$> cimp nm) +++
               (do h <- munch1 hdr_char
                   skipSpaces
-                  let src = mkFastString h
-                  mk (Just (Header (SourceText src) src))
+--                  let src = mkFastString h
+                  mk (Just (Header (mkSourceText h) (mkFastString h)))
                       <$> cimp nm))
          ]
        skipSpaces
@@ -3605,7 +3606,7 @@ mkLHsOpTy prom x op y =
   in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
 
 mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> TokRarrow -> HsMultAnnOf (LHsExpr GhcPs) GhcPs
-mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) arr
+mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (BS.unpack -> "1")) _ 1))))) arr
   -- See #18888 for the use of (SourceText "1") above
   = HsLinearAnn (EpPct1 pct1 (EpArrow arr))
   where
@@ -3615,7 +3616,7 @@ mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpac
 mkMultExpr pct t arr = HsExplicitMult (pct, EpArrow arr) t
 
 mkMultAnn :: EpToken "%" -> LHsType GhcPs -> EpArrowOrColon -> HsMultAnn GhcPs
-mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) ep
+mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (BS.unpack -> "1")) 1))) ep
   -- See #18888 for the use of (SourceText "1") above
   = HsLinearAnn (EpPct1 pct1 ep)
   where

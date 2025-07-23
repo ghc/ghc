@@ -132,7 +132,7 @@ data SyntaxExprTc = SyntaxExprTc { syn_expr      :: HsExpr GhcTc
 -- | This is used for rebindable-syntax pieces that are too polymorphic
 -- for tcSyntaxOp (trS_fmap and the mzip in ParStmt)
 noExpr :: HsExpr (GhcPass p)
-noExpr = HsLit noExtField (HsString (SourceText $ fsLit "noExpr") (fsLit "noExpr"))
+noExpr = HsLit noExtField (HsString (mkSourceText "noExpr") (fsLit "noExpr"))
 
 noSyntaxExpr :: forall p. IsPass p => SyntaxExpr (GhcPass p)
                               -- Before renaming, and sometimes after
@@ -919,10 +919,9 @@ ppr_expr (HsOverLabel s l) = case ghcPass @p of
                GhcRn -> helper s
                GhcTc -> dataConCantHappen s
     where helper s =
-            char '#' <> case s of
-                          NoSourceText -> ppr l
-                          SourceText src -> ftext src
-ppr_expr (HsPragE _ prag e)  = sep [ppr prag, ppr_lexpr e]
+            char '#' <> pprWithSourceText s (ppr l)
+
+ppr_expr (HsPragE _ prag e) = sep [ppr prag, ppr_lexpr e]
 
 ppr_expr (OpApp _ e1 op e2)
   | Just pp_op <- ppr_infix_expr (unLoc op)
