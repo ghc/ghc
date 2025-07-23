@@ -14,15 +14,7 @@ main
 -- we go straight to `main`.
 :stepout
 :list
--- stepping out from here will stop in the thunk (TODO: WHY?)
-:stepout
-:list
-
--- bring us back to main from the thunk (why were we stopped there?...)
-:stepout
-:list
-
--- and finally out
+-- stepping out from here will exit main
 :stepout
 
 -- this test is also run with optimisation to make sure the IO bindings inline and we can stop at them
