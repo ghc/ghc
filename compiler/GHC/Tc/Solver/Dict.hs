@@ -87,14 +87,15 @@ solveDict dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
   = assertPpr (ctEvRewriteRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
     do { simpleStage $ traceTcS "solveDict" (ppr dict_ct)
 
+       -- Look in the inert dictionaries
        ; tryInertDicts dict_ct
+
+       -- Try top-level instances
        ; tryInstances dict_ct
 
        -- Try fundeps /after/ tryInstances:
        --     see (DFL2) in Note [Do fundeps last]
---       ; doLocalFunDepImprovement dict_ct
-           -- doLocalFunDepImprovement does StartAgain if there
-           -- are any fundeps: see (DFL1) in Note [Do fundeps last]
+       ; doDictFunDepImprovement dict_ct
 
        ; simpleStage (updInertDicts dict_ct)
        ; stopWithStage (dictCtEvidence dict_ct) "Kept inert DictCt" }
