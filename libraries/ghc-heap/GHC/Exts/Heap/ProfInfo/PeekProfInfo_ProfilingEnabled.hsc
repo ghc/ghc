@@ -25,7 +25,7 @@ import           Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import           Foreign
 import           Foreign.C.String
 import           GHC.Exts
-import           GHC.Exts.Heap.ProfInfo.Types
+import           GHC.Internal.Heap.ProfInfo.Types
 import           Prelude
 
 -- Use Int based containers for pointers (addresses) for better performance.

@@ -35,7 +35,6 @@ import GHC.Internal.Data.Tuple
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Exts
-import GHC.Internal.Unsafe.Coerce
 
 import GHC.Internal.ClosureTypes
 import GHC.Internal.Heap.Closures
@@ -478,9 +477,3 @@ decodeStackWithFrameUnpack unpackFrame (StackSnapshot stack#) = do
 prettyStackFrameWithIpe :: (StackFrame, Maybe InfoProv) -> Maybe String
 prettyStackFrameWithIpe (_frame, mipe) =
   (prettyStackEntry . toStackEntry) <$> mipe
-
-
--- TODO @fendor: deprecate
-prettyStackEntry :: StackEntry -> String
-prettyStackEntry (StackEntry {moduleName=mod_nm, functionName=fun_nm, srcLoc=loc}) =
-  mod_nm ++ "." ++ fun_nm ++ " (" ++ loc ++ ")"

@@ -7,7 +7,6 @@ module GHC.Internal.Exception.Backtrace where
 
 import GHC.Internal.Base
 import GHC.Internal.Data.OldList
-import GHC.Internal.Data.Functor
 import GHC.Internal.Data.Maybe
 import GHC.Internal.IORef
 import GHC.Internal.IO.Unsafe (unsafePerformIO)
@@ -15,7 +14,6 @@ import GHC.Internal.Exception.Context
 import GHC.Internal.Ptr
 import GHC.Internal.Stack.Types as GHC.Stack (CallStack)
 import qualified GHC.Internal.Stack as HCS
-import qualified GHC.Internal.ExecutionStack as ExecStack
 import qualified GHC.Internal.ExecutionStack.Internal as ExecStack
 import qualified GHC.Internal.Stack.CloneStack as CloneStack
 import qualified GHC.Internal.Stack.Decode as Decode

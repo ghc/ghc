@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE TypeApplications           #-}
@@ -48,7 +49,11 @@ import GHCi.ResolvedBCO ( BCOByteArray(..), mkBCOByteArray )
 
 import Foreign
 import Data.ByteString (ByteString)
+#if MIN_VERSION_ghc_internal(9,1500,0)
+import qualified GHC.Internal.Heap.InfoTable.Types as Heap
+#else
 import qualified GHC.Exts.Heap as Heap
+#endif
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Unit.Module
 

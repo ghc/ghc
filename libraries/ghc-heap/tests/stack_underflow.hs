@@ -5,10 +5,10 @@ module Main where
 import Control.Monad
 import Data.Bool (Bool (True))
 import GHC.Exts.Heap
-import GHC.Exts.Heap.ClosureTypes
+import GHC.Internal.Heap.ClosuresTypes
 import GHC.Exts.Heap.Closures
-import GHC.Exts.Heap.InfoTable.Types
-import GHC.Exts.Stack.Decode
+import GHC.Internal.Heap.InfoTable.Types
+import GHC.Internal.Stack.Decode
 import GHC.Stack (HasCallStack)
 import GHC.Stack.CloneStack
 import TestUtils

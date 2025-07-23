@@ -106,7 +106,12 @@ import Control.Monad.Catch as MC (mask)
 import Data.Binary
 import Data.ByteString (ByteString)
 import Foreign hiding (void)
+#if MIN_VERSION_ghc_internal(9,1500,0)
+import qualified GHC.Internal.Heap.Closures as Heap
+import qualified GHC.Internal.Heap.InfoTable.Types as Heap
+#else
 import qualified GHC.Exts.Heap as Heap
+#endif
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Directory
 import System.Process

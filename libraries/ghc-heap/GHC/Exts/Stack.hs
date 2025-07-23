@@ -9,9 +9,9 @@ module GHC.Exts.Stack
   )
 where
 
-import GHC.Exts.Heap.Closures
-import GHC.Exts.Stack.Constants
-import GHC.Exts.Stack.Decode
+import GHC.Internal.Heap.Closures
+import GHC.Internal.Stack.Constants
+import GHC.Internal.Stack.Decode
 import Prelude
 
 -- | Get the size of the `StackFrame` in words.

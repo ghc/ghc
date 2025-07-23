@@ -73,7 +73,13 @@ import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Ppr
 import GHC.Utils.Panic
 import GHC.Char
+#if MIN_VERSION_ghc_internal(9,1500,0)
+import GHC.Internal.ClosureTypes
+import GHC.Internal.Heap.Closures
+import GHC.Internal.Heap.InfoTable
+#else
 import GHC.Exts.Heap
+#endif
 import GHC.Runtime.Heap.Layout ( roundUpTo )
 import GHC.IO (throwIO)
 
@@ -793,7 +799,11 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                   int max_depth <> text " steps")
     clos <- trIO $ GHCi.getClosure interp a
     ipe  <- trIO $ GHCi.whereFrom interp a
+#if __GLASGOW_HASKELL__ >= 915
     return (Suspension (tipe (getClosureInfoTbl clos)) my_ty a Nothing ipe)
+#else
+    return (Suspension (tipe (info clos)) my_ty a Nothing ipe)
+#endif
   go !max_depth my_ty old_ty a = do
     let monomorphic = not(isTyVarTy my_ty)
     -- This ^^^ is a convention. The ancestor tests for
@@ -891,8 +901,11 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
       _ -> do
          traceTR (text "Unknown closure:" <+>
                   text (show (fmap (const ()) clos)))
+#if __GLASGOW_HASKELL__ >= 915
          return (Suspension (tipe (getClosureInfoTbl clos)) my_ty a Nothing ipe)
-
+#else
+         return (Suspension (tipe (info clos)) my_ty a Nothing ipe)
+#endif
   -- insert NewtypeWraps around newtypes
   expandNewtypes = foldTerm idTermFold { fTerm = worker } where
    worker ty dc hval tt
