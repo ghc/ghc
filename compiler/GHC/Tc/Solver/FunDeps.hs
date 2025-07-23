@@ -10,6 +10,8 @@ module GHC.Tc.Solver.FunDeps (
 
 import GHC.Prelude
 
+import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
+
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
@@ -295,7 +297,7 @@ as the fundeps.
 #7875 is a case in point.
 -}
 
-doDictFunDepImprovement :: DictCt -> SolverStage Void
+doDictFunDepImprovement :: DictCt -> SolverStage ()
 -- (doDictFunDepImprovement inst_envs cts)
 --   * Generate the fundeps from interacting the
 --     top-level `inst_envs` with the constraints `cts`
@@ -306,13 +308,26 @@ doDictFunDepImprovement :: DictCt -> SolverStage Void
 -- are any fundeps: see (DFL1) in Note [Do fundeps last]
 
 doDictFunDepImprovement dict_ct
-  = do { inst_envs <- getInstEnvs
-       ; imp_res1 <- do_dict_local_fds dict_ct
-       ; if noImprovement imp_res1
-         then do { imp_res2 <- do_one_top inst_envs dict_ct
-                 ; return (imp_res `plusImprovements` imp_res2) }
-         else      return (imp_res `plusImprovements` imp_res1) }
+  = Stage $
+    -- Local dictionaries
+    do { inst_envs <- getInstEnvs
+       ; imp1 <- solveFunDeps (do_dict_local_fds dict_ct)
+       ; if imp1 then start_again else
+    -- Top-level instances dictionaries
+    do { imp2 <- solveFunDeps (do_one_top inst_envs dict_ct)
+       ; if imp2 then start_again
+                 else continueWith () } }
+  where
+    start_again = startAgainWith (CDictCan dict_ct)
 
+solveFunDeps :: TcS ImprovementResult -> TcS Bool
+solveFunDeps generate_eqs
+  = do { (eqs, imp1) <- generate_eqs
+       ; if isEmptyBag eqs
+         then return imp1
+         else do { imp2 <- nestFunDepsTcS $
+                           solveWanteds eqs
+                 ; return (imp1 || imp2) } }
 
 do_one_top :: InstEnvs -> DictCt -> TcS ImprovementResult
 do_one_top inst_envs (DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
@@ -340,7 +355,6 @@ do_dict_local_fds :: DictCt -> TcS ImprovementResult
 -- Using functional dependencies, interact the DictCt with the
 -- inert Givens and Wanteds, to produce new equalities
 do_dict_local_fds dict_ct@(DictCt { di_cls = cls, di_ev = wanted_ev })
-    -- locals contains all the Givens and earlier Wanteds
   = do { inerts <- getInertCans
        ; foldM do_interaction noopImprovement $
          findDictsByClass locals cls }

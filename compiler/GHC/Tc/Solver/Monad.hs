@@ -1353,6 +1353,30 @@ nestTcS (TcS thing_inside)
 
        ; return res }
 
+nestFunDepsTcS :: TcS a -> TcS Bool
+nestFunDepsTcS (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var
+                        , tcs_unif_lvl = unif_lvl_var }) ->
+    do { inerts <- TcM.readTcRef inerts_var
+       ; new_inert_var    <- TcM.newTcRef inerts
+       ; new_wl_var       <- TcM.newTcRef emptyWorkList
+       ; new_unif_lvl_var <- TcM.newTcRef Nothing
+       ; let nest_env = env { tcs_inerts   = new_inert_var
+                            , tcs_worklist = new_wl_var
+                            , tcs_unif_lvl = new_unif_lvl_var }
+
+       ; (inner_lvl, res) <- TcM.pushTcLevelM $
+                             thing_inside nest_env
+
+       ; mb_lvl <- TcM.readTcRef new_unif_lvl_var
+       ; case mb_lvl of
+           Just lvl | lvl < inner_lvl
+                    -> do { setUnificationFlag lvl
+                          ; return True }
+           _  -> return False   -- No unifications (except of vars
+                                -- generated in the fundep stuff itself)
+       }
+
 emitImplicationTcS :: TcLevel -> SkolemInfoAnon
                    -> [TcTyVar]        -- Skolems
                    -> [EvVar]          -- Givens
