@@ -1266,6 +1266,48 @@ tryTcS (TcS thing_inside)
                             , tcs_inerts   = new_inert_var
                             , tcs_worklist = new_wl_var }
 
+nestFunDepsTcS :: TcS a -> TcS Bool
+nestFunDepsTcS (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var
+                        , tcs_unif_lvl = unif_lvl_var }) ->
+    do { inerts <- TcM.readTcRef inerts_var
+       ; new_inert_var    <- TcM.newTcRef inerts
+       ; new_wl_var       <- TcM.newTcRef emptyWorkList
+       ; new_unif_lvl_var <- TcM.newTcRef Nothing
+       ; let nest_env = env { tcs_inerts   = new_inert_var
+                            , tcs_worklist = new_wl_var
+                            , tcs_unif_lvl = new_unif_lvl_var }
+
+       ; (inner_lvl, res) <- TcM.pushTcLevelM $
+                             thing_inside nest_env
+
+       ; mb_lvl <- TcM.readTcRef new_unif_lvl_var
+       ; case mb_lvl of
+           Just lvl | lvl < inner_lvl
+                    -> do { setUnificationFlag lvl
+                          ; return True }
+           _  -> return False   -- No unifications (except of vars
+                                -- generated in the fundep stuff itself)
+       }
+
+emitImplicationTcS :: TcLevel -> SkolemInfoAnon
+                   -> [TcTyVar]        -- Skolems
+                   -> [EvVar]          -- Givens
+                   -> Cts              -- Wanteds
+                   -> TcS TcEvBinds
+-- Add an implication to the TcS monad work-list
+emitImplicationTcS new_tclvl skol_info skol_tvs givens wanteds
+  = do { let wc = emptyWC { wc_simple = wanteds }
+       ; imp <- wrapTcS $
+                do { ev_binds_var <- TcM.newTcEvBinds
+                   ; imp <- TcM.newImplication
+                   ; return (imp { ic_tclvl  = new_tclvl
+                                 , ic_skols  = skol_tvs
+                                 , ic_given  = givens
+                                 , ic_wanted = wc
+                                 , ic_binds  = ev_binds_var
+                                 , ic_info   = skol_info }) }
+
        ; TcM.traceTc "tryTcS {" $
          vcat [ text "old_ev_binds:" <+> ppr old_ev_binds_var
               , text "new_ev_binds:" <+> ppr new_ev_binds_var
