@@ -253,8 +253,11 @@ mkBreakpointOccurrences = do
       let imod = modBreaks_module $ imodBreaks_modBreaks ibrks
       IntMap.foldrWithKey (\info_ix cgi bmp -> do
           let ibi = InternalBreakpointId imod info_ix
-          let BreakpointId tick_mod tick_ix = cgb_tick_id cgi
-          extendModuleEnvWith (IntMap.unionWith (S.<>)) bmp tick_mod (IntMap.singleton tick_ix [ibi])
+          case cgb_tick_id cgi of
+            Right (BreakpointId tick_mod tick_ix)
+              -> extendModuleEnvWith (IntMap.unionWith (S.<>)) bmp tick_mod (IntMap.singleton tick_ix [ibi])
+            Left _
+              -> bmp
         ) bmp0 (imodBreaks_breakInfo ibrks)
 
 --------------------------------------------------------------------------------
@@ -287,7 +290,7 @@ getCurrentBreakModule = do
         Nothing -> pure Nothing
         Just ibi -> do
           brks <- readIModBreaks hug ibi
-          return $ Just $ bi_tick_mod $ getBreakSourceId ibi brks
+          return $ Just $ getBreakSourceMod ibi brks
       ix ->
           Just <$> getHistoryModule hug (resumeHistory r !! (ix-1))
 
