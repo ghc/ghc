@@ -1783,6 +1783,7 @@ dsEvBind (EvBind { eb_lhs = v, eb_rhs = r, eb_info = info }) = do
 
 dsEvTerm :: EvTerm -> DsM CoreExpr
 dsEvTerm (EvExpr e)          = return e
+dsEvTerm (EvCastExpr e co _) = return (Cast e co)
 dsEvTerm (EvTypeable ty ev)  = dsEvTypeable ty ev
 dsEvTerm (EvFun { et_tvs = tvs, et_given = given
                 , et_binds = ev_binds, et_body = wanted_id })

@@ -502,6 +502,8 @@ mkGivenEvBind ev tm = EvBind { eb_info = EvBindGiven, eb_lhs = ev, eb_rhs = tm }
 data EvTerm
   = EvExpr EvExpr
 
+  | EvCastExpr EvExpr TcCastCoercion TcType
+
   | EvTypeable Type EvTypeable   -- Dictionary for (Typeable ty)
 
   | EvFun     -- /\as \ds. let binds in v
@@ -530,10 +532,10 @@ evCoercion co = EvExpr (Coercion co)
 -- | d |> co
 evCast :: EvExpr -> TcCoercion -> EvTerm
 evCast et tc | isReflCo tc = EvExpr et
-             | otherwise   = evCastCo et (CCoercion tc)
+             | otherwise   = EvExpr (Cast et (CCoercion tc))
 
-evCastCo :: EvExpr -> TcCastCoercion -> EvTerm
-evCastCo et tc = EvExpr (Cast et tc)
+evCastCo :: EvExpr -> TcCoercion -> TcType -> EvTerm
+evCastCo et co co_res_ty = EvCastExpr et (CCoercion co) co_res_ty
 
 -- Dictionary instance application
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
@@ -889,6 +891,7 @@ findNeededEvVars ev_binds seeds
 
 evVarsOfTerm :: EvTerm -> VarSet
 evVarsOfTerm (EvExpr e)         = exprSomeFreeVars isEvVar e
+evVarsOfTerm (EvCastExpr e co _ty) = exprSomeFreeVars isEvVar (Cast e co) -- TODO safe to ignore ty here?
 evVarsOfTerm (EvTypeable _ ev)  = evVarsOfTypeable ev
 evVarsOfTerm (EvFun {})         = emptyVarSet -- See Note [Free vars of EvFun]
 
@@ -985,6 +988,7 @@ instance Outputable EvBind where
 
 instance Outputable EvTerm where
   ppr (EvExpr e)         = ppr e
+  ppr (EvCastExpr e co ty) = text "EvCastExpr" <+> ppr e <+> ppr co <+> ppr ty
   ppr (EvTypeable ty ev) = ppr ev <+> dcolon <+> text "Typeable" <+> ppr ty
   ppr (EvFun { et_tvs = tvs, et_given = gs, et_binds = bs, et_body = w })
       = hang (text "\\" <+> sep (map pprLamBndr (tvs ++ gs)) <+> arrow)

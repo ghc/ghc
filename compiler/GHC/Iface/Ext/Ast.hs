@@ -30,6 +30,7 @@ import GHC.Types.Avail            ( Avails )
 import GHC.Data.Bag               ( Bag, bagToList )
 import GHC.Types.Basic
 import GHC.Data.BooleanFormula
+import GHC.Core                   ( Expr(Cast) )
 import GHC.Core.Class             ( className, classSCSelIds )
 import GHC.Core.ConLike           ( conLikeName )
 import GHC.Core.FVs
@@ -674,6 +675,7 @@ instance ToHie (Context (Located (WithUserRdr Name))) where
 
 evVarsOfTermList :: EvTerm -> [EvId]
 evVarsOfTermList (EvExpr e)         = exprSomeFreeVarsList isEvVar e
+evVarsOfTermList (EvCastExpr e co _ty) = exprSomeFreeVarsList isEvVar (Cast e co) -- TODO really
 evVarsOfTermList (EvTypeable _ ev)  =
   case ev of
     EvTypeableTyCon _ e   -> concatMap evVarsOfTermList e
