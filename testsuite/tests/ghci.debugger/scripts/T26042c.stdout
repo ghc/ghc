@@ -8,17 +8,14 @@ _result ::
 10  foo True  i = return i
                   ^^^^^^^^
 11  foo False _ = do
-Stopped in Main.main, T26042c.hs:6:3-9
+Stopped in Main., T26042c.hs:5:3-26
 _result ::
   GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
         () #) = _
-a :: Int = _
+4  main = do
 5    a <- foo False undefined
+     ^^^^^^^^^^^^^^^^^^^^^^^^
 6    print a
-     ^^^^^^^
-7    print a
 14
 14
-not stopped at a breakpoint
-not stopped at a breakpoint
