@@ -1,5 +1,5 @@
-module GHC.Exts.Heap.InfoTable
-    ( module GHC.Exts.Heap.InfoTable.Types
+module GHC.Internal.Heap.InfoTable
+    ( module GHC.Internal.Heap.InfoTable.Types
     , itblSize
     , peekItbl
     , pokeItbl
@@ -7,13 +7,22 @@ module GHC.Exts.Heap.InfoTable
 
 #include "Rts.h"
 
-import Prelude -- See note [Why do we import Prelude here?]
-import GHC.Exts.Heap.InfoTable.Types
+import GHC.Internal.Base
+import GHC.Internal.Real
+import GHC.Internal.Enum
+
+import GHC.Internal.Heap.InfoTable.Types
 #if !defined(TABLES_NEXT_TO_CODE)
-import GHC.Exts.Heap.Constants
-import Data.Maybe
+import GHC.Internal.Heap.Constants
+import GHC.Internal.Data.Functor ((<$>))
+import GHC.Internal.Data.Maybe
+import GHC.Internal.Num (negate)
+#else
+import GHC.Internal.Data.Either
+import GHC.Internal.Foreign.Marshal.Array
 #endif
-import Foreign
+import GHC.Internal.Foreign.Ptr
+import GHC.Internal.Foreign.Storable
 
 -------------------------------------------------------------------------
 -- Profiling specific code
@@ -24,7 +33,7 @@ import Foreign
 
 -- | Read an InfoTable from the heap into a haskell type.
 -- WARNING: This code assumes it is passed a pointer to a "standard" info
--- table. If tables_next_to_code is enabled, it will look 1 byte before the
+-- table. If tables_next_to_code is disabled, it will look 1 word before the
 -- start for the entry field.
 peekItbl :: Ptr StgInfoTable -> IO StgInfoTable
 peekItbl a0 = do

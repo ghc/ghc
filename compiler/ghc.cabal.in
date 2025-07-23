@@ -132,7 +132,7 @@ Library
                    stm,
                    rts,
                    ghc-boot   == @ProjectVersionMunged@,
-                   ghc-heap   == @ProjectVersionMunged@,
+                   ghc-heap   >=9.10.1 && <=@ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
 
     if flag(bootstrap)
