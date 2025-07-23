@@ -1140,43 +1140,34 @@ doCase d s p scrut bndr alts
         -- When an alt is entered, it assumes the returned value is
         -- on top of the itbl; see Note [Return convention for non-tuple values]
         -- for details.
-        ret_frame_size_b :: StackDepth
-        ret_frame_size_b | ubx_tuple_frame =
-                             (if profiling then 5 else 4) * wordSize platform
-                         | otherwise = 2 * wordSize platform
+        ret_frame_size_w :: WordOff
+        ret_frame_size_w | ubx_tuple_frame =
+                             if profiling then 5 else 4
+                         | otherwise = 2
 
         -- The stack space used to save/restore the CCCS when profiling
         save_ccs_size_b | profiling &&
                           not ubx_tuple_frame = 2 * wordSize platform
                         | otherwise = 0
 
-        -- The size of the return frame info table pointer if one exists
-        unlifted_itbl_size_b :: StackDepth
-        unlifted_itbl_size_b | ubx_tuple_frame = wordSize platform
-                             | otherwise       = 0
-
         (bndr_size, call_info, args_offsets)
            | ubx_tuple_frame =
                let bndr_reps = typePrimRep (idType bndr)
                    (call_info, args_offsets) =
                        layoutNativeCall profile NativeTupleReturn 0 id bndr_reps
-               in ( wordsToBytes platform (nativeCallSize call_info)
+               in ( nativeCallSize call_info
                   , call_info
                   , args_offsets
                   )
-           | otherwise = ( wordsToBytes platform (idSizeW platform bndr)
+           | otherwise = ( idSizeW platform bndr
                          , voidTupleReturnInfo
                          , []
                          )
 
-        -- depth of stack after the return value has been pushed
+        -- Depth of stack after the return value has been pushed
+        -- This is the stack depth at the continuation.
         d_bndr =
-            d + ret_frame_size_b + bndr_size
-
-        -- depth of stack after the extra info table for an unlifted return
-        -- has been pushed, if any.  This is the stack depth at the
-        -- continuation.
-        d_alts = d + ret_frame_size_b + bndr_size + unlifted_itbl_size_b
+            d + wordsToBytes platform bndr_size
 
         -- Env in which to compile the alts, not including
         -- any vars bound by the alts themselves
@@ -1188,13 +1179,13 @@ doCase d s p scrut bndr alts
         -- given an alt, return a discr and code for it.
         codeAlt :: CgStgAlt -> BcM (Discr, BCInstrList)
         codeAlt GenStgAlt{alt_con=DEFAULT,alt_bndrs=_,alt_rhs=rhs}
-           = do rhs_code <- schemeE d_alts s p_alts rhs
+           = do rhs_code <- schemeE d_bndr s p_alts rhs
                 return (NoDiscr, rhs_code)
 
         codeAlt alt@GenStgAlt{alt_con=_, alt_bndrs=bndrs, alt_rhs=rhs}
            -- primitive or nullary constructor alt: no need to UNPACK
            | null real_bndrs = do
-                rhs_code <- schemeE d_alts s p_alts rhs
+                rhs_code <- schemeE d_bndr s p_alts rhs
                 return (my_discr alt, rhs_code)
            | isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty =
              let bndr_ty = idPrimRepU . fromNonVoid
@@ -1206,7 +1197,7 @@ doCase d s p scrut bndr alts
                                     bndr_ty
                                     (assertNonVoidIds bndrs)
 
-                 stack_bot = d_alts
+                 stack_bot = d_bndr
 
                  p' = UniqMap.addListToUniqMap p_alts
                         [ (arg, tuple_start -
@@ -1223,7 +1214,7 @@ doCase d s p scrut bndr alts
                          (addIdReps (assertNonVoidIds real_bndrs))
                  size = WordOff tot_wds
 
-                 stack_bot = d_alts + wordsToBytes platform size
+                 stack_bot = d_bndr + wordsToBytes platform size
 
                  -- convert offsets from Sp into offsets into the virtual stack
                  p' = UniqMap.addListToUniqMap p_alts
@@ -1323,22 +1314,37 @@ doCase d s p scrut bndr alts
      alt_stuff <- mapM codeAlt alts
      alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
 
-     let alt_final1
-           | ubx_tuple_frame    = SLIDE 0 2 `consOL` alt_final0
-           | otherwise          = alt_final0
+     let
+
+         -- drop the stg_ctoi_*_info header...
+         alt_final1 = SLIDE bndr_size ret_frame_size_w `consOL` alt_final0
+
+         -- after dropping the stg_ret_*_info header
+         alt_final2
+           | ubx_tuple_frame    = SLIDE 0 3 `consOL` alt_final1
+           | otherwise          = SLIDE 0 1 `consOL` alt_final1
+
+         -- When entering a case continuation BCO, the stack is always headed
+         -- by the stg_ret frame and the stg_ctoi frame that returned to it.
+         -- See Note [Stack layout when entering run_BCO]
+         --
+         -- Right after the breakpoint instruction, a case continuation BCO
+         -- drops the stg_ret and stg_ctoi frame headers (see alt_final1,
+         -- alt_final2), leaving the stack with the scrutinee followed by the
+         -- free variables (with depth==d_bndr)
          alt_final
            | gopt Opt_InsertBreakpoints (hsc_dflags hsc_env)
                                 -- See Note [Debugger: BRK_ALTS]
-                                = BRK_ALTS False `consOL` alt_final1
-           | otherwise          = alt_final1
+                                = BRK_ALTS False `consOL` alt_final2
+           | otherwise          = alt_final2
 
      add_bco_name <- shouldAddBcoName
      let
          alt_bco_name = getName bndr
          alt_bco = mkProtoBCO platform add_bco_name alt_bco_name alt_final (Left alts)
                        0{-no arity-} bitmap_size bitmap True{-is alts-}
-     scrut_code <- schemeE (d + ret_frame_size_b + save_ccs_size_b)
-                           (d + ret_frame_size_b + save_ccs_size_b)
+     scrut_code <- schemeE (d + wordsToBytes platform ret_frame_size_w + save_ccs_size_b)
+                           (d + wordsToBytes platform ret_frame_size_w + save_ccs_size_b)
                            p scrut
      if ubx_tuple_frame
        then do let tuple_bco = tupleBCO platform call_info args_offsets
