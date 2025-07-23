@@ -793,7 +793,11 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                   int max_depth <> text " steps")
     clos <- trIO $ GHCi.getClosure interp a
     ipe  <- trIO $ GHCi.whereFrom interp a
+#if MIN_VERSION_ghc_heap(9,15,0)
     return (Suspension (tipe (getClosureInfoTbl clos)) my_ty a Nothing ipe)
+#else
+    return (Suspension (tipe (info clos)) my_ty a Nothing ipe)
+#endif
   go !max_depth my_ty old_ty a = do
     let monomorphic = not(isTyVarTy my_ty)
     -- This ^^^ is a convention. The ancestor tests for
@@ -891,8 +895,11 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
       _ -> do
          traceTR (text "Unknown closure:" <+>
                   text (show (fmap (const ()) clos)))
+#if MIN_VERSION_ghc_heap(9,15,0)
          return (Suspension (tipe (getClosureInfoTbl clos)) my_ty a Nothing ipe)
-
+#else
+         return (Suspension (tipe (info clos)) my_ty a Nothing ipe)
+#endif
   -- insert NewtypeWraps around newtypes
   expandNewtypes = foldTerm idTermFold { fTerm = worker } where
    worker ty dc hval tt
