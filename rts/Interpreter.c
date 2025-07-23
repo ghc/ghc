@@ -358,16 +358,11 @@ to the continuation.
 To achieve this, when the flag is set as the interpreter is re-entered:
   (1) Traverse the stack until a RET_BCO frame is found or we otherwise hit the
       bottom (STOP_FRAME).
-  (2) Look for a breakpoint instruction heading the BCO instructions (a
+  (2) Look for a BRK_FUN instruction heading the BCO instructions (a
       breakpoint, when present, is always the first instruction in a BCO)
 
-      (2a) For PUSH_ALT BCOs, the breakpoint instruction will be BRK_ALTS
-          (as explained in Note [Debugger: BRK_ALTS]) and it can be enabled by
-          setting its first operand to 1.
-
-      (2b) Otherwise, the instruction will be BRK_FUN and the breakpoint can be
-           enabled by setting the associated BreakArray at the associated tick
-           index to 0.
+      The breakpoint can be enabled by setting the associated BreakArray at the
+      associated internal breakpoint index to 0.
 
 By simply enabling the breakpoint heading the continuation we can ensure that
 when it is returned to we will stop there without additional work -- it
@@ -662,8 +657,8 @@ interpretBCO (Capability* cap)
         int bciPtr = 0;
         StgWord16 bci = BCO_NEXT;
 
-        /* A breakpoint instruction (BRK_FUN or BRK_ALTS) is always the first
-         * instruction in a BCO */
+        /* A breakpoint instruction (BRK_FUN) can only be the first instruction
+         * in a BCO */
         if ((bci & 0xFF) == bci_BRK_FUN) {
 
             W_ arg1_brk_array, arg4_info_index;
@@ -677,10 +672,6 @@ interpretBCO (Capability* cap)
 
             // ACTIVATE the breakpoint by tick index
             ((StgInt*)breakPoints->payload)[arg4_info_index] = 0;
-        }
-        else if ((bci & 0xFF) == bci_BRK_ALTS) {
-            // ACTIVATE BRK_ALTS by setting its only argument to ON
-            instrs[1] = 1;
         }
         // else: if there is no BRK instruction perhaps we should keep
         // traversing; that said, the continuation should always have a BRK
@@ -1723,17 +1714,6 @@ run_BCO:
 
             // continue normal execution of the byte code instructions
             goto nextInsn;
-        }
-
-        /* See Note [Debugger: BRK_ALTS] */
-        case bci_BRK_ALTS:
-        {
-          StgWord16 active = BCO_NEXT;
-          if (active) {
-            cap->r.rCurrentTSO->flags |= TSO_STOP_NEXT_BREAKPOINT;
-          }
-
-          goto nextInsn;
         }
 
         case bci_STKCHECK: {

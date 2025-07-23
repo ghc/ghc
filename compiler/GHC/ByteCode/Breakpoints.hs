@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DerivingStrategies #-}
 
 -- | Breakpoint information constructed during ByteCode generation.
 --
@@ -15,6 +16,7 @@ module GHC.ByteCode.Breakpoints
 
     -- ** Internal breakpoint identifier
   , InternalBreakpointId(..), BreakInfoIndex
+  , InternalBreakLoc(..)
 
     -- * Operations
 
@@ -23,7 +25,7 @@ module GHC.ByteCode.Breakpoints
 
     -- ** Source-level information operations
   , getBreakLoc, getBreakVars, getBreakDecls, getBreakCCS
-  , getBreakSourceId
+  , getBreakSourceId, getBreakSourceMod
 
     -- * Utils
   , seqInternalModBreaks
@@ -165,7 +167,7 @@ data CgBreakInfo
    { cgb_tyvars  :: ![IfaceTvBndr] -- ^ Type variables in scope at the breakpoint
    , cgb_vars    :: ![Maybe (IfaceIdBndr, Word)]
    , cgb_resty   :: !IfaceType
-   , cgb_tick_id :: !BreakpointId
+   , cgb_tick_id :: !(Either InternalBreakLoc BreakpointId)
      -- ^ This field records the original breakpoint tick identifier for this
      -- internal breakpoint info. It is used to convert a breakpoint
      -- *occurrence* index ('InternalBreakpointId') into a *definition* index
@@ -173,8 +175,17 @@ data CgBreakInfo
      --
      -- The modules of breakpoint occurrence and breakpoint definition are not
      -- necessarily the same: See Note [Breakpoint identifiers].
+     --
+     -- If there is no original tick identifier (that is, the breakpoint was
+     -- created during code generation), instead refer directly to the SrcSpan
+     -- we want to use for it.
    }
 -- See Note [Syncing breakpoint info] in GHC.Runtime.Eval
+
+-- | Breakpoints created during code generation don't have a source-level tick
+-- location. Instead, we come up with one ourselves.
+newtype InternalBreakLoc = InternalBreakLoc SrcSpan
+  deriving newtype (Eq, Show, NFData, Outputable)
 
 -- | Get an internal breakpoint info by 'InternalBreakpointId'
 getInternalBreak :: InternalBreakpointId -> InternalModBreaks -> CgBreakInfo
@@ -196,27 +207,36 @@ assert_modules_match ibi_mod imbs_mod =
 
 -- | Get the source module and tick index for this breakpoint
 -- (as opposed to the module where this breakpoint occurs, which is in 'InternalBreakpointId')
-getBreakSourceId :: InternalBreakpointId -> InternalModBreaks -> BreakpointId
+getBreakSourceId :: InternalBreakpointId -> InternalModBreaks -> Either InternalBreakLoc BreakpointId
 getBreakSourceId (InternalBreakpointId ibi_mod ibi_ix) imbs =
   assert_modules_match ibi_mod (imodBreaks_module imbs) $
     let cgb = imodBreaks_breakInfo imbs IM.! ibi_ix
      in cgb_tick_id cgb
 
+-- | Get the source module for this breakpoint (where the breakpoint is defined)
+getBreakSourceMod :: InternalBreakpointId -> InternalModBreaks -> Module
+getBreakSourceMod (InternalBreakpointId ibi_mod ibi_ix) imbs =
+  assert_modules_match ibi_mod (imodBreaks_module imbs) $
+    let cgb = imodBreaks_breakInfo imbs IM.! ibi_ix
+     in case cgb_tick_id cgb of
+      Left InternalBreakLoc{} -> imodBreaks_module imbs
+      Right BreakpointId{bi_tick_mod} -> bi_tick_mod
+
 -- | Get the source span for this breakpoint
 getBreakLoc :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO SrcSpan
-getBreakLoc = getBreakXXX modBreaks_locs
+getBreakLoc = getBreakXXX modBreaks_locs (\(InternalBreakLoc x) -> x)
 
 -- | Get the vars for this breakpoint
 getBreakVars :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO [OccName]
-getBreakVars = getBreakXXX modBreaks_vars
+getBreakVars = getBreakXXX modBreaks_vars (const [])
 
 -- | Get the decls for this breakpoint
 getBreakDecls :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO [String]
-getBreakDecls = getBreakXXX modBreaks_decls
+getBreakDecls = getBreakXXX modBreaks_decls (const [])
 
 -- | Get the decls for this breakpoint
-getBreakCCS :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO (String, String)
-getBreakCCS = getBreakXXX modBreaks_ccs
+getBreakCCS :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO (Maybe (String, String))
+getBreakCCS = getBreakXXX (fmap Just . modBreaks_ccs) (const Nothing)
 
 -- | Internal utility to access a ModBreaks field at a particular breakpoint index
 --
@@ -228,14 +248,17 @@ getBreakCCS = getBreakXXX modBreaks_ccs
 -- 'ModBreaks'. When the tick module is different, we need to look up the
 -- 'ModBreaks' in the HUG for that other module.
 --
+-- When there is no tick module (the breakpoint was generated at codegen), use
+-- the function on internal mod breaks.
+--
 -- To avoid cyclic dependencies, we instead receive a function that looks up
 -- the 'ModBreaks' given a 'Module'
-getBreakXXX :: (ModBreaks -> Array BreakTickIndex a) -> (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO a
-getBreakXXX view lookupModule (InternalBreakpointId ibi_mod ibi_ix) imbs =
+getBreakXXX :: (ModBreaks -> Array BreakTickIndex a) -> (InternalBreakLoc -> a) -> (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO a
+getBreakXXX view viewInternal lookupModule (InternalBreakpointId ibi_mod ibi_ix) imbs =
   assert_modules_match ibi_mod (imodBreaks_module imbs) $ do
     let cgb = imodBreaks_breakInfo imbs IM.! ibi_ix
     case cgb_tick_id cgb of
-      BreakpointId{bi_tick_mod, bi_tick_index}
+      Right BreakpointId{bi_tick_mod, bi_tick_index}
         | bi_tick_mod == ibi_mod
         -> do
           let these_mbs = imodBreaks_modBreaks imbs
@@ -244,6 +267,8 @@ getBreakXXX view lookupModule (InternalBreakpointId ibi_mod ibi_ix) imbs =
         -> do
           other_mbs <- lookupModule bi_tick_mod
           return $ view other_mbs ! bi_tick_index
+      Left l ->
+          return $ viewInternal l
 
 --------------------------------------------------------------------------------
 -- Instances
