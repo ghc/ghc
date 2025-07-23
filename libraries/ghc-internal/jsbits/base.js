@@ -1245,7 +1245,7 @@ function h$mkdir(path, path_offset, mode) {
 
 // It is required by Google Closure Compiler to be at least defined if
 // somewhere it is used
-var h$stg_cloneMyStackzh, h$stg_decodeStackzh,
+var h$stg_cloneMyStackzh,
     h$advanceStackFrameLocationzh, h$getStackFieldszh, h$getStackClosurezh,
     h$getWordzh, h$getStackInfoTableAddrzh, h$getRetFunSmallBitmapzh, h$getRetFunLargeBitmapzh,
     h$isArgGenBigRetFunTypezh,
@@ -1253,7 +1253,6 @@ var h$stg_cloneMyStackzh, h$stg_decodeStackzh,
     h$getInfoTableAddrszh,
     h$getLargeBitmapzh, h$getSmallBitmapzh, h$getBCOLargeBitmapzh
 h$stg_cloneMyStackzh
-  = h$stg_decodeStackzh
   = h$advanceStackFrameLocationzh
   = h$getStackFieldszh = h$getStackClosurezh
   = h$getWordzh, h$getStackInfoTableAddrzh = h$getRetFunSmallBitmapzh = h$getRetFunLargeBitmapzh
