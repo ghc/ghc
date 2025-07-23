@@ -362,6 +362,14 @@ withBreakAction opts breakMVar statusMVar mtid act
          info_mod_uid <- BS.packCString (Ptr info_mod_uid#)
          pure (Just (EvalBreakpoint info_mod info_mod_uid (I# infox#)))
      putMVar statusMVar $ EvalBreak apStack_r breakpoint resume_r ccs
+
+     -- Block until this thread is resumed (by the thread which took the
+     -- `ResumeContext` from the `statusMVar`).
+     --
+     -- The `onBreak` function must have been called from `rts/Interpreter.c`
+     -- when interpreting a `BRK_FUN`. After taking from the MVar, the function
+     -- returns to the continuation on the stack which is where the interpreter
+     -- was stopped.
      takeMVar breakMVar
 
    resetBreakAction stablePtr = do
