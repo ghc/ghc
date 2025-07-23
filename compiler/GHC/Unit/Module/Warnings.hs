@@ -250,17 +250,13 @@ instance Outputable InWarningCategory where
 
 instance Outputable (WarningTxt pass) where
     ppr (WarningTxt mcat lsrc ws)
-      = case lsrc of
-            NoSourceText   -> pp_ws ws
-            SourceText src -> ftext src <+> ctg_doc <+> pp_ws ws <+> text "#-}"
+      = pprWithSourceTextThen lsrc (pp_ws ws) $ ctg_doc <+> pp_ws ws <+> text "#-}"
         where
           ctg_doc = maybe empty (\ctg -> ppr ctg) mcat
 
 
     ppr (DeprecatedTxt lsrc  ds)
-      = case lsrc of
-          NoSourceText   -> pp_ws ds
-          SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
+      = pprWithSourceTextThen lsrc (pp_ws ds) $ pp_ws ds <+> text "#-}"
 
 pp_ws :: [LocatedE (WithHsDocIdentifiers StringLiteral pass)] -> SDoc
 pp_ws [l] = ppr $ unLoc l

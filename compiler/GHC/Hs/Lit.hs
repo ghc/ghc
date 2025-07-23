@@ -23,14 +23,14 @@ module GHC.Hs.Lit
 
 import GHC.Prelude
 
+import qualified Data.ByteString.Char8 as BS
+
 import {-# SOURCE #-} GHC.Hs.Expr( pprExpr )
 
-import GHC.Data.FastString (unpackFS)
 import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
 import GHC.Core.Type
-import GHC.Utils.Misc (split)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
 import GHC.Hs.Extension
@@ -220,7 +220,7 @@ instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsMultilineString st s) =
       case st of
         NoSourceText -> pprHsString s
-        SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
+        SourceText src -> vcat $ (text . BS.unpack) <$> BS.lines src
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))

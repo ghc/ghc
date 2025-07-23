@@ -29,7 +29,7 @@ import Language.Haskell.Syntax.ImpExp
 
 import GHC.Prelude
 
-import GHC.Types.SourceText   ( SourceText(..) )
+import GHC.Types.SourceText   ( SourceText(..), pprWithSourceTextThen )
 import GHC.Types.SrcLoc
 import GHC.Types.Name
 import GHC.Types.PkgQual
@@ -199,9 +199,7 @@ instance (OutputableBndrId p
                                 GhcPs | XImportDeclPass { ideclSourceText = mst } <- ext -> mst
                                 GhcRn | XImportDeclPass { ideclSourceText = mst } <- ext -> mst
                                 GhcTc -> dataConCantHappen ext
-            in case mSrcText of
-                  NoSourceText   -> text "{-# SOURCE #-}"
-                  SourceText src -> ftext src <+> text "#-}"
+            in pprWithSourceTextThen mSrcText (text "{-# SOURCE #-}") $ text "#-}"
         ppr_imp _ NotBoot = empty
 
         pp_spec Nothing             = empty
