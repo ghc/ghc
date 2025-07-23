@@ -89,7 +89,6 @@ stage0Packages = do
              , ghc
              , ghcBoot
              , ghcBootThNext
-             , ghcHeap
              , ghcPkg
              , ghcPlatform
              , ghcToolchain
@@ -151,6 +150,7 @@ stage1Packages = do
         , ghc
         , ghcBignum
         , ghcBootTh
+        , ghcHeap
         , ghcCompact
         , ghcExperimental
         , ghcInternal

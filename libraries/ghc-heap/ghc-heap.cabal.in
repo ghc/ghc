@@ -26,16 +26,9 @@ library
                   , rts              == 1.0.*
                   , containers       >= 0.6.2.1 && < 0.9
 
-  if impl(ghc >= 9.9)
-    build-depends:  ghc-internal     >= 9.900 && < @ProjectVersionForLib@.99999
-  else
-    build-depends:  ghc-prim         > 0.2 && < 0.14
+  build-depends:  ghc-internal >= @ProjectVersionForLib@.0 && < @ProjectVersionForLib@.99999
 
   ghc-options:      -Wall
-  if !os(ghcjs)
-    cmm-sources:      cbits/HeapPrim.cmm
-                      cbits/Stack.cmm
-  c-sources:        cbits/Stack_c.c
 
   default-extensions: NoImplicitPrelude
 
