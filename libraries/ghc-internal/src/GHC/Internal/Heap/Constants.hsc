@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module GHC.Exts.Heap.Constants
+module GHC.Internal.Heap.Constants
     ( wORD_SIZE
     , tAG_MASK
     , wORD_SIZE_IN_BITS
@@ -8,8 +8,9 @@ module GHC.Exts.Heap.Constants
 
 #include "MachDeps.h"
 
-import Prelude -- See note [Why do we import Prelude here?]
-import Data.Bits
+import GHC.Internal.Data.Bits
+import GHC.Internal.Int
+import GHC.Internal.Num
 
 wORD_SIZE, tAG_MASK, wORD_SIZE_IN_BITS :: Int
 wORD_SIZE = #const SIZEOF_HSWORD

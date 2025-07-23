@@ -1,11 +1,13 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module GHC.Exts.Stack.Constants where
+module GHC.Internal.Stack.Constants where
 
-#if MIN_TOOL_VERSION_ghc(9,13,0)
-
-import           Prelude
+import GHC.Internal.Base
+import GHC.Internal.Enum
+import GHC.Internal.Num
+import GHC.Internal.Show
+import GHC.Internal.Real
 
 #include "Rts.h"
 #undef BLOCK_SIZE
@@ -131,4 +133,3 @@ bytesToWords b =
 bytesInWord :: Int
 bytesInWord = (#const SIZEOF_VOID_P)
 
-#endif

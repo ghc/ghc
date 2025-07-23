@@ -1,5 +1,5 @@
-module GHC.Exts.Heap.InfoTableProf
-    ( module GHC.Exts.Heap.InfoTable.Types
+module GHC.Internal.Heap.InfoTableProf
+    ( module GHC.Internal.Heap.InfoTable.Types
     , itblSize
     , peekItbl
     , pokeItbl
@@ -11,13 +11,22 @@ module GHC.Exts.Heap.InfoTableProf
 #define PROFILING
 #include "Rts.h"
 
-import Prelude -- See note [Why do we import Prelude here?]
-import GHC.Exts.Heap.InfoTable.Types
+import GHC.Internal.Base
+import GHC.Internal.Real
+import GHC.Internal.Enum
+
+import GHC.Internal.Heap.InfoTable.Types
 #if !defined(TABLES_NEXT_TO_CODE)
-import GHC.Exts.Heap.Constants
-import Data.Maybe
+import GHC.Internal.Heap.Constants
+import GHC.Internal.Data.Functor ((<$>))
+import GHC.Internal.Data.Maybe
+import GHC.Internal.Num (negate)
+#else
+import GHC.Internal.Data.Either
+import GHC.Internal.Foreign.Marshal.Array
 #endif
-import Foreign
+import GHC.Internal.Foreign.Ptr
+import GHC.Internal.Foreign.Storable
 
 -- | Read an InfoTable from the heap into a haskell type.
 -- WARNING: This code assumes it is passed a pointer to a "standard" info

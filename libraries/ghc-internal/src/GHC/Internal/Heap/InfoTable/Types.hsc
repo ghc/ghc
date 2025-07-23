@@ -2,7 +2,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module GHC.Exts.Heap.InfoTable.Types
+module GHC.Internal.Heap.InfoTable.Types
     ( StgInfoTable(..)
     , EntryFunPtr
     , HalfWord(..)
@@ -11,10 +11,17 @@ module GHC.Exts.Heap.InfoTable.Types
 
 #include "Rts.h"
 
-import Prelude -- See note [Why do we import Prelude here?]
-import GHC.Generics
-import GHC.Exts.Heap.ClosureTypes
-import Foreign
+import GHC.Internal.Base
+import GHC.Internal.Generics
+import GHC.Internal.ClosureTypes
+import GHC.Internal.Foreign.Ptr
+import GHC.Internal.Foreign.Storable
+import GHC.Internal.Enum
+import GHC.Internal.Num
+import GHC.Internal.Word
+import GHC.Internal.Show
+import GHC.Internal.Real
+import GHC.Internal.Data.Either
 
 type ItblCodes = Either [Word8] [Word32]
 
