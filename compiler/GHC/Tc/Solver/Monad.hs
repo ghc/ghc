@@ -557,7 +557,11 @@ updSolvedDicts what dict_ct@(DictCt { di_cls = cls, di_tys = tys, di_ev = ev })
     -- See Note [Using isCallStackTy in mightMentionIP].
     is_tyConTy :: (Type -> Bool) -> Name -> TcS (Type -> Bool)
     is_tyConTy is_eq tc_name
-      = do { (mb_tc, _) <- wrapTcS $ TcM.tryTc $ TcM.tcLookupTyCon tc_name
+      = do {  mb_tc <- wrapTcS $ do
+                mod <- tcg_mod <$> TcM.getGblEnv
+                if moduleUnit mod `elem` [primUnit, ghcInternalUnit, bignumUnit]
+                then return Nothing
+                else Just <$> TcM.tcLookupTyCon tc_name
            ; case mb_tc of
               Just tc ->
                 return $ \ ty -> not (typesAreApart ty (mkTyConTy tc))
