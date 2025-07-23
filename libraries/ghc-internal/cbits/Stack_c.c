@@ -30,7 +30,7 @@ StgStack *getUnderflowFrameStack(StgStack *stack, StgWord offset) {
 const StgInfoTable *getItbl(StgClosure *closure) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
   return get_itbl(closure);
-};
+}
 
 StgWord getBitmapSize(StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));

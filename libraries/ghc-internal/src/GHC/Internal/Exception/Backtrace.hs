@@ -16,6 +16,7 @@ import GHC.Internal.Stack.Types as GHC.Stack (CallStack, HasCallStack)
 import qualified GHC.Internal.Stack as HCS
 import qualified GHC.Internal.ExecutionStack.Internal as ExecStack
 import qualified GHC.Internal.Stack.CloneStack as CloneStack
+import qualified GHC.Internal.Stack.Decode as CloneStack
 import qualified GHC.Internal.Stack.CCS as CCS
 
 -- | How to collect a backtrace when an exception is thrown.
