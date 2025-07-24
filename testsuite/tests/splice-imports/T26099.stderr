@@ -1,0 +1,7 @@
+T26099.hs:6:20: error: [GHC-76329]
+    • GHC internal error: ‘T’ is not in scope during type checking, but it passed the renamer
+      tcl_env of environment: []
+    • In an expression type signature: T
+      In the expression: undefined :: T
+      In the untyped splice: $(undefined :: T)
+

@@ -1,0 +1,16 @@
+[1 of 2] Compiling LevelImportExportsA ( LevelImportExportsA.hs, LevelImportExportsA.o )
+[2 of 2] Compiling LevelImportExports ( LevelImportExports.hs, LevelImportExports.o )
+             exports: {orphan_like: d782846a1400edbc60b505e4f025acb9 , imported avails: {implicit: 6531054ab328b5b1bec357965c8441d8}}
+             T 7d8db51ddccb5680e8a569f74077518c
+             a b37b557ad4078a37ca99462284a8039e]
+  orphan hash: 693e9af84d3dfcc71e640e005bdc5e2e
+--
+exports:
+  LevelImportExportsA.a
+  LevelImportExportsA.T
+defaults:
+--
+  Deprecated exports:
+trusted: none
+require own pkg trusted: False
+docs:
