@@ -48,3 +48,7 @@ test('SI35',
 test('SI36', [extra_files(["SI36_A.hs", "SI36_B1.hs", "SI36_B2.hs", "SI36_B3.hs", "SI36_C1.hs", "SI36_C2.hs", "SI36_C3.hs"])], multimod_compile_fail, ['SI36', '-v0'])
 test('T26087', [], multimod_compile_fail, ['T26087A', ''])
 test('T26088', [], multimod_compile_fail, ['T26088A', '-v0'])
+test('T26090', [], multimod_compile_fail, ['T26090', '-v0'])
+test('ModuleExport', [], multimod_compile_fail, ['ModuleExport', '-v0'])
+test('LevelImportExports', [], makefile_test, [])
+test('DodgyLevelExport', [], multimod_compile, ['DodgyLevelExport', '-v0 -Wdodgy-exports'])
