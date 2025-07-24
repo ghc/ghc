@@ -1,0 +1,6 @@
+[1 of 2] Compiling LevelImportExportsA ( LevelImportExportsA.hs, LevelImportExportsA.o )
+[2 of 2] Compiling LevelImportExports ( LevelImportExports.hs, LevelImportExports.o )
+exports:
+  LevelImportExportsA.a
+  LevelImportExportsA.T
+defaults:
