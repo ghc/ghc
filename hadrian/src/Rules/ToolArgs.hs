@@ -160,7 +160,7 @@ toolTargets = [ cabalSyntax
               , ghcPlatform
               , ghcToolchain
               , ghcToolchainBin
-              , ghcHeap
+              -- , ghcHeap -- # depends on ghcInternal library
               , ghci
               , ghcPkg  -- # executable
               , haddock -- # depends on ghc library
