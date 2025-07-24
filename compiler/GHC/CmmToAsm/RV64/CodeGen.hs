@@ -423,7 +423,7 @@ getRegisterReg platform (CmmGlobal mid) =
 -- General things for putting together code sequences
 
 -- | Compute an expression into any register
-getSomeReg :: HasCallStack => CmmExpr -> NatM (Reg, Format, InstrBlock)
+getSomeReg :: CmmExpr -> NatM (Reg, Format, InstrBlock)
 getSomeReg expr = do
   r <- getRegister expr
   res@(reg, fmt, _) <- case r of
@@ -438,7 +438,7 @@ getSomeReg expr = do
 --
 -- If the initial expression is not a floating-point expression, finally move
 -- the result into a floating-point register.
-getFloatReg :: (HasCallStack) => CmmExpr -> NatM (Reg, Format, InstrBlock)
+getFloatReg :: CmmExpr -> NatM (Reg, Format, InstrBlock)
 getFloatReg expr = do
   r <- getRegister expr
   case r of
