@@ -488,7 +488,7 @@ naturalAndNot :: Natural -> Natural -> Natural
 {-# NOINLINE naturalAndNot #-}
 naturalAndNot (NS n) (NS m) = NS (n `and#` not# m)
 naturalAndNot (NS n) (NB m) = NS (n `and#` not# (bigNatToWord# m))
-naturalAndNot (NB n) (NS m) = NS (bigNatToWord# n `and#` not# m)
+naturalAndNot (NB n) (NS m) = NB (bigNatAndNotWord# n m)
 naturalAndNot (NB n) (NB m) = naturalFromBigNat# (bigNatAndNot n m)
 
 naturalOr :: Natural -> Natural -> Natural
