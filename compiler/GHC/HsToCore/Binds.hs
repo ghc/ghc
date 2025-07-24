@@ -1608,7 +1608,11 @@ ds_hs_wrapper hs_wrap
     go (WpEvLam ev)      k = k $ Lam ev
     go (WpTyLam tv)      k = k $ Lam tv
     go (WpCast co)       k = assert (coercionRole co == Representational) $
-                             k $ \e -> mkCastDs e co
+                              do { zap_casts <- hasZapCasts <$> getDynFlags
+                                 ; if zap_casts
+                                   then k $ \e -> mkCastDs_may_zap e co
+                                   else k $ \e -> mkCastDs e co
+                                 }
     go (WpEvApp tm)      k = do { core_tm <- dsEvTerm tm
                                 ; k $ \e -> e `App` core_tm }
     go (WpLet ev_binds)  k = dsTcEvBinds ev_binds $ \bs ->
