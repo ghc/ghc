@@ -19,6 +19,7 @@ import GHC.Platform.ArchOS
 
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Program
+import GHC.Toolchain.Library
 
 import GHC.Toolchain.Tools.Cc
 import GHC.Toolchain.Tools.Cxx
@@ -56,10 +57,13 @@ data Target = Target
     -- , tgtHasThreadedRts :: Bool -- We likely just need this when bootstrapping
     , tgtUseLibffiForAdjustors :: Bool
     -- ^ We need to know whether or not to include libffi headers, and generate additional code for it
-
-      -- Target support
     , tgtHasLibm :: Bool
     -- ^ Does this target have a libm library that should always be linked against?
+
+    -- RTS capabilities
+    , tgtRTSWithLibdw :: Maybe Library
+    -- ^ Whether this target RTS is built with libdw support (for DWARF
+    -- unwinding), and if yes, the 'Library' configuration.
 
       -- C toolchain
     , tgtCCompiler :: Cc
@@ -126,6 +130,7 @@ instance Show Target where
     , ", tgtTablesNextToCode = " ++ show tgtTablesNextToCode
     , ", tgtUseLibffiForAdjustors = " ++ show tgtUseLibffiForAdjustors
     , ", tgtHasLibm = " ++ show tgtHasLibm
+    , ", tgtRTSWithLibdw = " ++ show tgtRTSWithLibdw
     , ", tgtCCompiler = " ++ show tgtCCompiler
     , ", tgtCxxCompiler = " ++ show tgtCxxCompiler
     , ", tgtCPreprocessor = " ++ show tgtCPreprocessor

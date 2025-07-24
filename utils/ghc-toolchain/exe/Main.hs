@@ -62,6 +62,12 @@ data Opts = Opts
     -- see #23857 and #22550 for the very unfortunate story.
     , optLd        :: ProgOpt
     , optUnregisterised :: Maybe Bool
+
+    -- dwarf unwinding
+    , optDwarfUnwind :: Maybe Bool
+    , optLibdwIncludes :: Maybe FilePath
+    , optLibdwLibraries :: Maybe FilePath
+
     , optTablesNextToCode :: Maybe Bool
     , optUseLibFFIForAdjustors :: Maybe Bool
     , optLdOverride :: Maybe Bool
@@ -112,6 +118,9 @@ emptyOpts = Opts
     , optOtool     = po0
     , optInstallNameTool = po0
     , optUnregisterised = Nothing
+    , optDwarfUnwind = Nothing
+    , optLibdwIncludes = Nothing
+    , optLibdwLibraries = Nothing
     , optTablesNextToCode = Nothing
     , optUseLibFFIForAdjustors = Nothing
     , optLdOverride = Nothing
@@ -157,12 +166,17 @@ _optOutput = Lens optOutput (\x o -> o {optOutput=x})
 _optTargetPrefix :: Lens Opts (Maybe String)
 _optTargetPrefix = Lens optTargetPrefix (\x o -> o {optTargetPrefix=x})
 
-_optLocallyExecutable, _optUnregisterised, _optTablesNextToCode, _optUseLibFFIForAdjustors, _optLdOvveride :: Lens Opts (Maybe Bool)
+_optLocallyExecutable, _optUnregisterised, _optTablesNextToCode, _optUseLibFFIForAdjustors, _optLdOvveride, _optDwarfUnwind :: Lens Opts (Maybe Bool)
 _optLocallyExecutable = Lens optLocallyExecutable (\x o -> o {optLocallyExecutable=x})
 _optUnregisterised = Lens optUnregisterised (\x o -> o {optUnregisterised=x})
+_optDwarfUnwind = Lens optDwarfUnwind (\x o -> o {optDwarfUnwind=x})
 _optTablesNextToCode = Lens optTablesNextToCode (\x o -> o {optTablesNextToCode=x})
 _optUseLibFFIForAdjustors = Lens optUseLibFFIForAdjustors (\x o -> o {optUseLibFFIForAdjustors=x})
 _optLdOvveride = Lens optLdOverride (\x o -> o {optLdOverride=x})
+
+_optLibdwIncludes, _optLibdwLibraries :: Lens Opts (Maybe FilePath)
+_optLibdwIncludes = Lens optLibdwIncludes (\x o -> o {optLibdwIncludes=x})
+_optLibdwLibraries = Lens optLibdwLibraries (\x o -> o {optLibdwLibraries=x})
 
 _optVerbosity :: Lens Opts Int
 _optVerbosity = Lens optVerbosity (\x o -> o {optVerbosity=x})
@@ -185,6 +199,7 @@ options =
     , enableDisable "libffi-adjustors" "the use of libffi for adjustors, even on platforms which have support for more efficient, native adjustor implementations." _optUseLibFFIForAdjustors
     , enableDisable "ld-override" "override gcc's default linker" _optLdOvveride
     , enableDisable "locally-executable" "the use of a target prefix which will be added to all tool names when searching for toolchain components" _optLocallyExecutable
+    , enableDisable "dwarf-unwind" "Enable DWARF unwinding support in the runtime system via elfutils' libdw" _optDwarfUnwind
     ] ++
     concat
     [ progOpts "cc" "C compiler" _optCc
@@ -206,6 +221,9 @@ options =
     , progOpts "ld" "linker" _optLd
     , progOpts "otool" "otool utility" _optOtool
     , progOpts "install-name-tool" "install-name-tool utility" _optInstallNameTool
+    ] ++
+    [ Option [] ["libdw-includes"] (ReqArg (set _optLibdwIncludes . Just) "PATH") "Look for libdw headers in this extra path"
+    , Option [] ["libdw-libraries"] (ReqArg (set _optLibdwLibraries . Just) "PATH") "Look for the libdw library in this extra path"
     ]
   where
     progOpts :: String -> String -> Lens Opts ProgOpt -> [OptDescr (Opts -> Opts)]
@@ -487,6 +505,9 @@ mkTarget opts = do
     tgtSupportsIdentDirective <- checkIdentDirective cc
     tgtSupportsGnuNonexecStack <- checkGnuNonexecStack archOs cc
     tgtHasLibm <- checkTargetHasLibm cc
+    tgtRTSWithLibdw <- case optDwarfUnwind opts of
+      Just True -> checkTargetHasLibdw cc (optLibdwIncludes opts) (optLibdwLibraries opts)
+      _         -> pure Nothing
 
     -- code generator configuration
     tgtUnregisterised <- determineUnregisterised archOs (optUnregisterised opts)
@@ -528,6 +549,7 @@ mkTarget opts = do
                    , tgtTablesNextToCode
                    , tgtUseLibffiForAdjustors = tgtUseLibffi
                    , tgtHasLibm
+                   , tgtRTSWithLibdw
                    , tgtSymbolsHaveLeadingUnderscore
                    , tgtSupportsSubsectionsViaSymbols
                    , tgtSupportsIdentDirective

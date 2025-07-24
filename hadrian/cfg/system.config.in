@@ -99,9 +99,6 @@ use-system-ffi    = @UseSystemLibFFI@
 ffi-include-dir   = @FFIIncludeDir@
 ffi-lib-dir       = @FFILibDir@
 
-libdw-include-dir   = @LibdwIncludeDir@
-libdw-lib-dir       = @LibdwLibDir@
-
 libnuma-include-dir   = @LibNumaIncludeDir@
 libnuma-lib-dir       = @LibNumaLibDir@
 
@@ -111,7 +108,6 @@ libzstd-lib-dir       = @LibZstdLibDir@
 # Optional Dependencies:
 #=======================
 
-use-lib-dw        = @UseLibdw@
 use-lib-zstd      = @UseLibZstd@
 static-lib-zstd   = @UseStaticLibZstd@
 use-lib-numa      = @UseLibNuma@
