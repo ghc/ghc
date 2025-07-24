@@ -1,0 +1,4 @@
+DodgyLevelExport.hs:2:27: warning: [GHC-75356] [-Wdodgy-exports (in -Wextra)]
+    The export item ‘T(..)’ suggests that
+    ‘T’ has (in-scope) constructors or record fields, but it has none
+

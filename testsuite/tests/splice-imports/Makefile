@@ -24,5 +24,9 @@ SI10_oneshot:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c InstanceA.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c SI10.hs
 
+LevelImportExports:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -haddock LevelImportExports.hs
+	"$(TEST_HC)" --show-iface LevelImportExports.hi | grep -A3 "^exports:"
+
 clean:
 	rm -f *.o *.hi

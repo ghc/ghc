@@ -23,6 +23,7 @@ import GHC.Rename.Module
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Unbound ( reportUnboundName )
+import GHC.Rename.Splice
 import GHC.Unit.Module
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.Warnings
@@ -312,7 +313,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
     ; addDiagnostic
         (TcRnMissingExportList $ moduleName _this_mod)
     ; let avails =
-            map fix_faminst . gresToAvailInfo
+            map fix_faminst . gresToAvailInfo . mapMaybe pickLevelZeroGRE
               . filter isLocalGRE . globalRdrEnvElts $ rdr_env
     ; return (Nothing, emptyDefaultEnv, avails, []) }
   where
@@ -384,6 +385,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
       = do { let { exportValid    = (mod `elem` imported_modules)
                                   || (moduleName this_mod == mod)
                  ; gre_prs        = pickGREsModExp mod (globalRdrEnvElts rdr_env)
+                                    -- NB: this filters out non level 0 exports
                  ; new_gres       = [ gre'
                                     | (gre, _) <- gre_prs
                                     , gre' <- expand_tyty_gre gre ]
@@ -451,6 +453,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                let avail = availFromGRE gre
                    name = greName gre
 
+               checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
                occs' <- check_occs occs ie [gre]
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
@@ -499,6 +502,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                     occs' <- check_occs occs ie [gre]
                     return (Just avail, occs', exp_dflts)
 
+               checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
                                     dont_warn_export
@@ -526,6 +530,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    all_gres = par : all_kids
                    all_names = map greName all_gres
 
+               checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
                occs' <- check_occs occs ie all_gres
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
@@ -563,6 +568,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    all_gres = par : all_kids
                    all_names = map greName all_gres
 
+               checkThLocalNameNoLift (ieLWrappedUserRdrName l name)
                occs' <- check_occs occs ie all_gres
                (export_warn_spans', dont_warn_export', warn_txt_rn)
                  <- process_warning export_warn_spans
@@ -589,17 +595,19 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     lookup_ie_kids_all :: IE GhcPs -> LIEWrappedName GhcPs -> GlobalRdrElt
                   -> RnM [GlobalRdrElt]
-    lookup_ie_kids_all ie (L _ rdr) gre =
+    lookup_ie_kids_all ie (L _loc rdr) gre =
       do { let name = greName gre
                gres = findChildren kids_env name
-         ; addUsedKids (ieWrappedName rdr) gres
-         ; when (null gres) $
+         -- We only choose level 0 exports when filling in part of an export list implicitly.
+         ; let kids_0 = mapMaybe pickLevelZeroGRE gres
+         ; addUsedKids (ieWrappedName rdr) kids_0
+         ; when (null kids_0) $
             if isTyConName name
             then addTcRnDiagnostic (TcRnDodgyExports gre)
             else -- This occurs when you export T(..), but
                  -- only import T abstractly, or T is a synonym.
                  addErr (TcRnExportHiddenComponents ie)
-         ; return gres }
+         ; return kids_0 }
 
     -------------
 
@@ -695,6 +703,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     addUsedKids :: RdrName -> [GlobalRdrElt] -> RnM ()
     addUsedKids parent_rdr kid_gres
       = addUsedGREs ExportDeprecationWarnings (pickGREs parent_rdr kid_gres)
+
+
+ieLWrappedUserRdrName :: LIEWrappedName GhcPs -> Name -> LIdOccP GhcRn
+ieLWrappedUserRdrName l n = fmap (\rdr -> WithUserRdr rdr n) $ ieLWrappedName l
 
 -- | In what namespaces should we go looking for an import/export item
 -- that is out of scope, for suggestions in error messages?
@@ -800,6 +812,7 @@ lookupChildrenExport parent_gre rdr_items = mapAndReportM doOne rdr_items
                  ; return (L l (IEName noExtField (L (l2l l) ub)), gre)}
             FoundChild child@(GRE { gre_name = child_nm, gre_par = par }) ->
               do { checkPatSynParent spec_parent par child_nm
+                 ; checkThLocalNameNoLift (ieLWrappedUserRdrName n child_nm)
                  ; return (replaceLWrappedName n child_nm, child)
                  }
             IncorrectParent p c gs -> failWithDcErr (parentGRE_name p) (greName c) gs

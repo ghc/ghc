@@ -69,7 +69,7 @@ module GHC.Types.Name.Reader (
         lookupGRE_Name,
         lookupGRE_FieldLabel,
         getGRE_NameQualifier_maybes,
-        transformGREs, pickGREs, pickGREsModExp,
+        transformGREs, pickGREs, pickGREsModExp, pickLevelZeroGRE,
 
         -- * GlobalRdrElts
         availFromGRE,
@@ -144,7 +144,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Binary
 
 import Control.DeepSeq
-import Control.Monad ( guard )
+import Control.Monad ( guard , (>=>) )
 import Data.Data
 import Data.List ( sort )
 import qualified Data.List.NonEmpty as NE
@@ -641,7 +641,7 @@ greParent = gre_par
 greInfo :: GlobalRdrElt -> GREInfo
 greInfo = gre_info
 
-greLevels :: GlobalRdrElt -> Set.Set ImportLevel
+greLevels :: GlobalRdrEltX info -> Set.Set ImportLevel
 greLevels g =
   if gre_lcl g then Set.singleton NormalLevel
                else Set.fromList (bagToList (fmap (is_level . is_decl) (gre_imp g)))
@@ -1604,7 +1604,14 @@ pickGREsModExp :: ModuleName -> [GlobalRdrEltX info] -> [(GlobalRdrEltX info,Glo
 --
 -- Used only for the 'module M' item in export list;
 --   see 'GHC.Tc.Gen.Export.exports_from_avail'
-pickGREsModExp mod gres = mapMaybe (pickBothGRE mod) gres
+-- This function also only chooses GREs which are at level zero.
+pickGREsModExp mod gres = mapMaybe (pickLevelZeroGRE >=> pickBothGRE mod) gres
+
+pickLevelZeroGRE :: GlobalRdrEltX info -> Maybe (GlobalRdrEltX info)
+pickLevelZeroGRE gre =
+  if NormalLevel `Set.member` greLevels gre
+    then Just gre
+    else Nothing
 
 -- | isBuiltInSyntax filter out names for built-in syntax They
 -- just clutter up the environment (esp tuples), and the
