@@ -1236,9 +1236,9 @@ getRegister' config plat expr =
           genericVectorShuffle :: (Int -> Width -> Format) -> Int -> Width -> [Int] -> NatM Register
           genericVectorShuffle toDstFormat length w idxs = do
             -- Our strategy:
-            --   - Gather elemens of v1 on the right positions
-            --   - Gather elemenrs of v2 of the right positions
-            --   - Merge v1 and v2 with an adequate bitmask (v0)
+            --   - Gather elements of v1 on the right positions -> v1'
+            --   - Gather elements of v2 of the right positions -> v2'
+            --   - Merge v1' and v2' with an adequate bitmask (v0)
             lbl_selVec_v1 <- getNewLabelNat
             lbl_selVec_v2 <- getNewLabelNat
             lbl_mask <- getNewLabelNat
