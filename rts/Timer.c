@@ -43,8 +43,10 @@ static StgWord timer_disabled;
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
+#if defined(THREADED_RTS)
 /* ticks left before next next forced eventlog flush */
 static int ticks_to_eventlog_flush = 0;
+#endif
 
 
 /*
@@ -118,7 +120,7 @@ handle_tick(int unused STG_UNUSED)
           contextSwitchAllCapabilities(); /* schedule a context switch */
       }
   }
-
+#if defined(THREADED_RTS)
   if (eventLogStatus() == EVENTLOG_RUNNING
       && RtsFlags.TraceFlags.eventlogFlushTicks > 0) {
       ticks_to_eventlog_flush--;
@@ -127,6 +129,7 @@ handle_tick(int unused STG_UNUSED)
           flushEventLog(NULL);
       }
   }
+#endif
 
   /*
    * If we've been inactive for idleGCDelayTime (set by +RTS

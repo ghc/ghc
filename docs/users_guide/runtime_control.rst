@@ -1361,7 +1361,8 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     :since: 9.2
 
     When enabled, the eventlog will be flushed periodically every
-    ⟨seconds⟩. This can be useful in live-monitoring situations where the
+    ⟨seconds⟩ (only available with :ghc-flag:`-threaded`).
+    This can be useful in live-monitoring situations where the
     eventlog is consumed in real-time by another process.
 
 .. rts-flag:: -v [⟨flags⟩]

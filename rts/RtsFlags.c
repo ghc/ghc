@@ -248,7 +248,9 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.user          = false;
     RtsFlags.TraceFlags.ticky         = false;
     RtsFlags.TraceFlags.trace_output  = NULL;
+#  if defined(THREADED_RTS)
     RtsFlags.TraceFlags.eventlogFlushTime = 0;
+#  endif
     RtsFlags.TraceFlags.nullWriter = false;
 #endif
 
@@ -448,8 +450,10 @@ usage_text[] = {
 #  endif
 "               -x    disable an event class, for any flag above",
 "             the initial enabled event classes are 'sgpu'",
+#  if defined(THREADED_RTS)
 " --eventlog-flush-interval=<secs>",
 "             Periodically flush the eventlog at the specified interval.",
+#  endif
 #endif
 
 "",
@@ -1052,12 +1056,14 @@ error = true;
                   else if (!strncmp("eventlog-flush-interval=",
                                &rts_argv[arg][2], 24)) {
                       OPTION_SAFE;
+                      THREADED_BUILD_ONLY(
                       double intervalSeconds = parseDouble(rts_argv[arg]+26, &error);
                       if (error) {
                           errorBelch("bad value for --eventlog-flush-interval");
                       }
                       RtsFlags.TraceFlags.eventlogFlushTime =
                           fsecondsToTime(intervalSeconds);
+                      ) break;
                   }
                   else if (strequal("copying-gc",
                                &rts_argv[arg][2])) {
@@ -1963,6 +1969,7 @@ static void normaliseRtsOpts (void)
         RtsFlags.ProfFlags.heapProfileIntervalTicks = 0;
     }
 
+#if defined(THREADED_RTS)
     if (RtsFlags.TraceFlags.eventlogFlushTime > 0 && RtsFlags.MiscFlags.tickInterval != 0) {
         RtsFlags.TraceFlags.eventlogFlushTicks =
             RtsFlags.TraceFlags.eventlogFlushTime /
@@ -1970,6 +1977,7 @@ static void normaliseRtsOpts (void)
     } else {
         RtsFlags.TraceFlags.eventlogFlushTicks = 0;
     }
+#endif
 
     if (RtsFlags.GcFlags.stkChunkBufferSize >
         RtsFlags.GcFlags.stkChunkSize / 2) {
