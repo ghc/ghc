@@ -449,6 +449,8 @@ filter p = List.filter p . toList
 -- something of type @'Maybe' b@. If this is 'Nothing', no element
 -- is added on to the result list. If it is @'Just' b@, then @b@ is
 -- included in the result list.
+--
+-- @since 4.23.0.0
 mapMaybe :: (a -> Maybe b) -> NonEmpty a -> [b]
 mapMaybe f (x :| xs) = maybe id (:) (f x) $ List.mapMaybe f xs
 
