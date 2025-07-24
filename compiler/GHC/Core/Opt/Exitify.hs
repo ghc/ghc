@@ -38,6 +38,7 @@ Now `t` is no longer in a recursive function, and good things happen!
 import GHC.Prelude
 import GHC.Builtin.Uniques
 import GHC.Core
+import GHC.Core.Opt.Arity( mkNewJoinPointBinding )
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -49,7 +50,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Basic( JoinPointHood(..) )
 
-import GHC.Utils.Monad.State.Strict
+import qualified GHC.Utils.Monad.State.Strict as S
 import GHC.Utils.Misc( mapSnd, count )
 
 import GHC.Data.FastString
@@ -105,7 +106,7 @@ exitifyProgram binds = map goTopLvl binds
 
 
 -- | State Monad used inside `exitify`
-type ExitifyM =  State [(JoinId, CoreExpr)]
+type ExitifyM =  S.State [(JoinId, CoreExpr)]
 
 -- | Given a recursive group of a joinrec, identifies “exit paths” and binds them as
 --   join-points outside the joinrec.
@@ -121,7 +122,7 @@ exitifyRec in_scope pairs
     -- Which are the recursive calls?
     recursive_calls = mkVarSet $ map fst pairs
 
-    (pairs',exits) = (`runState` []) $
+    (pairs',exits) = (`S.runState` []) $
         forM ann_pairs $ \(x,rhs) -> do
             -- go past the lambdas of the join point
             let (args, body) = collectNAnnBndrs (idJoinArity x) rhs
@@ -262,28 +263,27 @@ exitifyRec in_scope pairs
         captures_join_points = any isJoinId abs_vars
 
 
--- Picks a new unique, which is disjoint from
---  * the free variables of the whole joinrec
---  * any bound variables (captured)
---  * any exit join points created so far.
-mkExitJoinId :: InScopeSet -> Type -> JoinArity -> ExitifyM JoinId
-mkExitJoinId in_scope ty join_arity = do
-    fs <- get
-    let avoid = in_scope `extendInScopeSetList` (map fst fs)
-                         `extendInScopeSet` exit_id_tmpl -- just cosmetics
-    return (uniqAway avoid exit_id_tmpl)
-  where
-    exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique ManyTy ty
-                    `asJoinId` join_arity
-
 addExit :: InScopeSet -> JoinArity -> CoreExpr -> ExitifyM JoinId
-addExit in_scope join_arity rhs = do
-    -- Pick a suitable name
-    let ty = exprType rhs
-    v <- mkExitJoinId in_scope ty join_arity
-    fs <- get
-    put ((v,rhs):fs)
-    return v
+addExit in_scope join_arity rhs
+  = do { fs <- S.get
+       ; let ty = exprType rhs
+             avoid = in_scope `extendInScopeSetList` (map fst fs)
+                              `extendInScopeSet` exit_id1 -- just cosmetics
+               -- avoid: pick a new unique, that is disjoint from
+               --  * the free variables of the whole joinrec
+               --  * any bound variables (captured)
+               --  * any exit join points created so far (in `fs`)
+
+             exit_id1 = mkSysLocal (fsLit "exit") initExitJoinUnique ManyTy ty
+             exit_id2 = uniqAway avoid exit_id1
+
+             bind_pr@(exit_id3,_) = mkNewJoinPointBinding exit_id2 join_arity rhs
+               -- NB: mkNewJoinPointBinding does eta-expansion if needed,
+               --     to make sure that the join-point binding has the
+               --     right number of lambdas all lined up at the top
+
+       ; S.put (bind_pr : fs)
+       ; return exit_id3 }
 
 {-
 Note [Interesting expression]

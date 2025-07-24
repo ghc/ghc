@@ -42,7 +42,7 @@ import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, Id
 import GHC.Types.Var      ( isNonCoVarId, setTyVarUnfolding, tyVarOccInfo )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Demand( etaConvertDmdSig, topSubDmd )
+import GHC.Types.Demand( topSubDmd )
 import GHC.Types.Tickish
 import GHC.Types.Basic
 
@@ -998,12 +998,7 @@ joinPointBinding_maybe bndr rhs
   = Just (bndr, rhs)
 
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
-  , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
-  , let str_sig   = idDmdSig bndr
-        str_arity = count isId bndrs  -- Strictness demands are for Ids only
-        join_bndr = bndr `asJoinId`        join_arity
-                         `setIdDmdSig` etaConvertDmdSig str_arity str_sig
-  = Just (join_bndr, mkLams bndrs body)
+  = Just (mkNewJoinPointBinding bndr join_arity rhs)
 
   | otherwise
   = Nothing

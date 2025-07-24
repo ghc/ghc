@@ -39,7 +39,7 @@ module GHC.Core.Opt.Arity
 
 
    -- ** Join points
-   , etaExpandToJoinPoint, etaExpandToJoinPointRule
+   , etaExpandToJoinPoint, etaExpandToJoinPointRule, mkNewJoinPointBinding
 
    -- ** Coercions and casts
    , pushCoArg, pushCoArgs, pushCoValArg, pushCoTyArg
@@ -3168,6 +3168,16 @@ more elaborate stuff, but it'd involve substitution etc.
 ********************************************************************* -}
 
 -------------------
+mkNewJoinPointBinding :: Id -> JoinArity -> CoreExpr -> (Id, CoreExpr)
+mkNewJoinPointBinding bndr join_arity rhs
+  = (join_bndr, mkLams join_lam_bndrs join_body)
+  where
+    (join_lam_bndrs, join_body) = etaExpandToJoinPoint join_arity rhs
+    str_sig   = idDmdSig bndr
+    str_arity = count isId join_lam_bndrs  -- Strictness demands are for Ids only
+    join_bndr = bndr `asJoinId`    join_arity
+                     `setIdDmdSig` etaConvertDmdSig str_arity str_sig
+
 -- | Split an expression into the given number of binders and a body,
 -- eta-expanding if necessary. Counts value *and* type binders.
 etaExpandToJoinPoint :: JoinArity -> CoreExpr -> ([CoreBndr], CoreExpr)

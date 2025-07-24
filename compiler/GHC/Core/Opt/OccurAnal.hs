@@ -742,20 +742,26 @@ Wrinkles (W1) and (W2) are very similar to Note [Binder swap] (BS3).
 Note [Finding join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's the occurrence analyser's job to find bindings that we can turn into join
-points, but it doesn't perform that transformation right away. Rather, it marks
-the eligible bindings as part of their occurrence data, leaving it to the
-simplifier (or to simpleOptPgm) to actually change the binder's 'IdDetails'.
-The simplifier then eta-expands the RHS if needed and then updates the
-occurrence sites. Dividing the work this way means that the occurrence analyser
+points, but it doesn't /perform/ that transformation right away. Rather:
+
+* The occurrence analyser marks the eligible bindings as part of their
+  occurrence data. To track potential join points, we use the 'occ_tail' field of
+  OccInfo. A value of `AlwaysTailCalled n` indicates that every occurrence of
+  the variable is a tail call with `n` arguments (counting both value and type
+  arguments). Otherwise `occ_tail` will be 'NoTailCallInfo'. The tail call info
+  flows bottom-up with the rest of `OccInfo` until it goes on the binder.
+
+* The simplifier (or simpleOptPgm) then
+  * Spots join points from that AlwaysTailCalled OccInfo
+  * Eta-expands the RHS if needed
+  * Changes the binder's `IdDetails`
+  * Updates the occurrence sites
+  The first three steps are done by GHC.Core.Opt.SimpleOpt.joinPointBinding_maybe.
+
+Dividing the work this way means that the occurrence analyser
 still only takes one pass, yet one can always tell the difference between a
 function call and a jump by looking at the occurrence (because the same pass
 changes the 'IdDetails' and propagates the binders to their occurrence sites).
-
-To track potential join points, we use the 'occ_tail' field of OccInfo. A value
-of `AlwaysTailCalled n` indicates that every occurrence of the variable is a
-tail call with `n` arguments (counting both value and type arguments). Otherwise
-'occ_tail' will be 'NoTailCallInfo'. The tail call info flows bottom-up with the
-rest of 'OccInfo' until it goes on the binder.
 
 Note [Join arity prediction based on joinRhsArity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

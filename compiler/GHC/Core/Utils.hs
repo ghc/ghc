@@ -3121,25 +3121,20 @@ mkPolyAbsLams :: (b -> AbsVar, Var -> b -> b)
 -- use it for both CoreExpr and LevelledExpr
 {-# INLINE mkPolyAbsLams #-}
 mkPolyAbsLams (get,set) bndrs body
-  = go emptyVarSet [] bndrs
+  = go bndrs
   where
-    go _ tv_binds []
-      = mkLets (reverse tv_binds) body
-    go tvs tv_binds (bndr:bndrs)
+    go [] = body
+    go (bndr:bndrs)
       | Just ty <- tyVarUnfolding_maybe var
-      = go (tvs `extendVarSet` var) (NonRec bndr (Type ty) : tv_binds) bndrs
+      = Let (NonRec bndr (Type ty)) $
+        go bndrs
       | otherwise
-      = Lam bndr' (go tvs tv_binds bndrs)
+      = Lam bndr' (go bndrs)
       where
         var = get bndr
-        var' = updateVarType (expandTyVarUnfoldings tvs) $
-               zap_unfolding var
-        bndr' | isEmptyVarSet tvs = bndr
-              | otherwise         = set var' bndr
-
         -- zap: We are going to lambda-abstract, so nuke any IdInfo
-        zap_unfolding var | isId var  = setIdInfo var vanillaIdInfo
-                          | otherwise = var
+        bndr' | isId var  = set (setIdInfo var vanillaIdInfo) bndr
+              | otherwise = bndr
 
 mkCoreAbsLams :: AbsVars -> CoreExpr -> CoreExpr
 -- Specialise for CoreExpr

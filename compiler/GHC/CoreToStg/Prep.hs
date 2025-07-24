@@ -819,21 +819,17 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- For example
 --      f (g x)   ===>   ([v = g x], f v)
 
-cpeRhsE env (Type ty)
-  = return (emptyFloats, Type (cpSubstTy env ty))
-cpeRhsE env (Coercion co)
-  = return (emptyFloats, Coercion (cpSubstCo env co))
-cpeRhsE env expr@(Lit lit)
-  | LitNumber LitNumBigNat i <- lit
-    = cpeBigNatLit env i
-  | otherwise = return (emptyFloats, expr)
+cpeRhsE env (Type ty)      = return (emptyFloats, Type (cpSubstTy env ty))
+cpeRhsE env (Coercion co)  = return (emptyFloats, Coercion (cpSubstCo env co))
 cpeRhsE env expr@(Var {})  = cpeApp env expr
 cpeRhsE env expr@(App {})  = cpeApp env expr
 
+cpeRhsE env expr@(Lit lit)
+  = case lit of
+      LitNumber LitNumBigNat i -> cpeBigNatLit env i
+      _                        -> return (emptyFloats, expr)
+
 cpeRhsE env (Let bind body)
-  | isTypeBind bind
-  = cpeRhsE env body
-  | otherwise
   = do { (env', bind_floats, maybe_bind') <- cpeBind NotTopLevel env bind
        ; (body_floats, body') <- cpeRhsE env' body
        ; let expr' = case maybe_bind' of Just bind' -> Let bind' body'
