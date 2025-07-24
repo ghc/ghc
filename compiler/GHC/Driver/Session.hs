@@ -3508,7 +3508,8 @@ compilerInfo dflags
        ("LLVM llvm-as command", queryCmdMaybe id tgtLlvmAs),
        ("LLVM llvm-as flags", queryFlagsMaybe id tgtLlvmAs),
        ("Tables next to code", queryBool tgtTablesNextToCode),
-       ("Leading underscore", queryBool tgtSymbolsHaveLeadingUnderscore)
+       ("Leading underscore", queryBool tgtSymbolsHaveLeadingUnderscore),
+       ("RTS expects libdw", queryBool (isJust . tgtRTSWithLibdw))
       ] ++
       [("Project version",             projectVersion dflags),
        ("Project Git commit id",       cProjectGitCommitId),

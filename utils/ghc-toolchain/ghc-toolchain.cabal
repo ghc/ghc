@@ -12,6 +12,7 @@ library
     exposed-modules:
                       GHC.Toolchain,
                       GHC.Toolchain.Lens,
+                      GHC.Toolchain.Library,
                       GHC.Toolchain.Monad,
                       GHC.Toolchain.PlatformDetails,
                       GHC.Toolchain.Prelude,
