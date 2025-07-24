@@ -5,6 +5,7 @@
   * Fix issues with toRational for types capable to represent infinite and not-a-number values ([CLC proposal #338](https://github.com/haskell/core-libraries-committee/issues/338))
   * Modify the implementation of `Data.List.sortOn` to use `(>)` instead of `compare`. ([CLC proposal #332](https://github.com/haskell/core-libraries-committee/issues/332))
   * `GHC.Exts.IOPort#` and its related operations have been removed  ([CLC #213](https://github.com/haskell/core-libraries-committee/issues/213))
+  * Fix bug where `naturalAndNot` was incorrectly truncating results ([CLC proposal #350](github.com/haskell/core-libraries-committee/issues/350))
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1
