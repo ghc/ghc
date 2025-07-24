@@ -4,6 +4,7 @@
 
 - Expose backendName
 - Add `naturalSetBit[#]` (#21173), `naturalClearBit[#]` (#21175), `naturalComplementBit[#]` (#21181)
+- Fix bug where `naturalAndNot` was incorrectly truncating results (#26230)
 
 ## 1.2
 

@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.21.2.0 *Sept 2024*
+  * Fix bug where `naturalAndNot` was incorrectly truncating results ([CLC proposal #350](github.com/haskell/core-libraries-committee/issues/350))
+
 ## 4.21.1.0 *Sept 2024*
   * Fix incorrect results of `integerPowMod` when the base is 0 and the exponent is negative, and `integerRecipMod` when the modulus is zero ([#26017](https://gitlab.haskell.org/ghc/ghc/-/issues/26017)).
 
