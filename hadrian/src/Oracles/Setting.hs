@@ -54,8 +54,6 @@ data Setting = CursesIncludeDir
              | GmpLibDir
              | IconvIncludeDir
              | IconvLibDir
-             | LibdwIncludeDir
-             | LibdwLibDir
              | LibnumaIncludeDir
              | LibnumaLibDir
              | LibZstdIncludeDir
@@ -94,8 +92,6 @@ setting key = lookupSystemConfig $ case key of
     GmpLibDir          -> "gmp-lib-dir"
     IconvIncludeDir    -> "iconv-include-dir"
     IconvLibDir        -> "iconv-lib-dir"
-    LibdwIncludeDir    -> "libdw-include-dir"
-    LibdwLibDir        -> "libdw-lib-dir"
     LibnumaIncludeDir  -> "libnuma-include-dir"
     LibnumaLibDir      -> "libnuma-lib-dir"
     LibZstdIncludeDir  -> "libzstd-include-dir"

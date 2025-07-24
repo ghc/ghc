@@ -90,7 +90,6 @@ lib/settings : config.mk
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
-	@echo ',("RTS expects libdw", "$(GhcRtsWithLibdw)")' >> $@
 	@echo ',("Relative Global Package DB", "package.conf.d")' >> $@
 	@echo ',("base unit-id", "$(BaseUnitId)")' >> $@
 	@echo "]" >> $@

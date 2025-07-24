@@ -120,6 +120,7 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
     ENABLE_GHC_TOOLCHAIN_ARG([tables-next-to-code], [$TablesNextToCode])
     ENABLE_GHC_TOOLCHAIN_ARG([ld-override], [$enable_ld_override])
     ENABLE_GHC_TOOLCHAIN_ARG([libffi-adjustors], [$UseLibffiForAdjustors])
+    ENABLE_GHC_TOOLCHAIN_ARG([dwarf-unwind], [$enable_dwarf_unwind])
 
     dnl We store USER_* variants of all user-specified flags to pass them over to ghc-toolchain.
     ADD_GHC_TOOLCHAIN_ARG_CHOOSE([cc-opt], [$USER_CONF_CC_OPTS_STAGE2], [$USER_CFLAGS])
@@ -130,6 +131,8 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
     ADD_GHC_TOOLCHAIN_ARG([hs-cpp-opt], [$USER_HS_CPP_ARGS])
     ADD_GHC_TOOLCHAIN_ARG([js-cpp-opt], [$USER_JS_CPP_ARGS])
     ADD_GHC_TOOLCHAIN_ARG([cmm-cpp-opt], [$USER_CMM_CPP_ARGS])
+    ADD_GHC_TOOLCHAIN_ARG([libdw-includes], [$LibdwIncludeDir])
+    ADD_GHC_TOOLCHAIN_ARG([libdw-libraries], [$LibdwLibDir])
 
     INVOKE_GHC_TOOLCHAIN()
 

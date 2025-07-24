@@ -29,11 +29,11 @@ AC_DEFUN([FP_FIND_LIBDW],
   AC_ARG_ENABLE(dwarf-unwind,
     [AS_HELP_STRING([--enable-dwarf-unwind],
       [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])],
-    [],
-    [enable_dwarf_unwind=no])
+    [FP_CAPITALIZE_YES_NO(["$enableval"], [enable_dwarf_unwind])],
+    [enable_dwarf_unwind=NO])
 
   UseLibdw=NO
-  if test "$enable_dwarf_unwind" != "no" ; then
+  if test "$enable_dwarf_unwind" != "NO" ; then
     CFLAGS2="$CFLAGS"
     CFLAGS="$LIBDW_CFLAGS $CFLAGS"
     LDFLAGS2="$LDFLAGS"
@@ -43,7 +43,7 @@ AC_DEFUN([FP_FIND_LIBDW],
       [AC_CHECK_LIB(dw, dwfl_attach_state,
         [UseLibdw=YES])])
 
-    if test "x:$enable_dwarf_unwind:$UseLibdw" = "x:yes:NO" ; then
+    if test "x:$enable_dwarf_unwind:$UseLibdw" = "x:YES:NO" ; then
       AC_MSG_ERROR([Cannot find system libdw (required by --enable-dwarf-unwind)])
     fi
 
