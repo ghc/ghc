@@ -6,6 +6,7 @@ module GHC.Toolchain.PlatformDetails
     , checkIdentDirective
     , checkGnuNonexecStack
     , checkTargetHasLibm
+    , checkTargetHasLibdw
     ) where
 
 import Data.List (isInfixOf)
@@ -17,6 +18,7 @@ import GHC.Toolchain.Prelude
 import GHC.Toolchain.Utils
 import GHC.Toolchain.Target
 import GHC.Toolchain.Program
+import GHC.Toolchain.Library
 import GHC.Toolchain.Tools.Cc
 import GHC.Toolchain.Tools.Nm
 
@@ -156,25 +158,66 @@ checkGnuNonexecStack archOs =
                    ]
 
 checkTargetHasLibm :: Cc -> M Bool
-checkTargetHasLibm cc0 = testCompile "whether target has libm" prog cc
-  where
-    cc = cc0 & _ccProgram % _prgFlags %++ "-lm"
-    prog = unlines
-        [ "char atan (void);"
-        , "int"
-        , "main (void)"
-        , "{"
-        , "return atan ();"
-        , "  ;"
-        , "  return 0;"
-        , "}"
-        ]
+checkTargetHasLibm cc = testLib cc "m" "atan" Nothing
+
+checkTargetHasLibdw :: Cc -> Maybe FilePath -> Maybe FilePath -> M (Maybe Library)
+checkTargetHasLibdw cc mincludeDir mlibDir = do
+  b1 <- testHeader cc "elfutils/libdwfl.h" mincludeDir
+  b2 <- testLib cc "dw" "dwfl_attach_state" mlibDir
+  return $
+    if b1 && b2
+    then Just
+      Library{ libName = "dw"
+             , includePath = mincludeDir, libraryPath = mlibDir}
+    else Nothing
+
+
+--------------------------------------------------------------------------------
+-- Utilities
+--------------------------------------------------------------------------------
 
 asmStmt :: String -> String
 asmStmt s = "__asm__(\"" ++ foldMap escape s ++ "\");"
   where
     escape '"' = "\\\""
     escape c   = [c]
+
+-- | Check whether a lib is found and can be linked against.
+-- Like @AC_CHECK_LIB@.
+testLib :: Cc
+        -> String         -- ^ Lib name
+        -> String         -- ^ Lib symbol
+        -> Maybe FilePath -- ^ Library dir (-L)
+        -> M Bool
+testLib cc0 libname symbol mlibDir = testCompile ("whether target has lib" ++ libname) prog cc2
+  where
+    cc1 = cc0 & _ccProgram % _prgFlags %++ ("-l" ++ libname)
+    cc2 | Just libDir <- mlibDir
+        = cc1 & _ccProgram % _prgFlags %++ ("-L" ++ libDir)
+        | otherwise = cc1
+    prog = unlines
+        [ "char " ++ symbol ++ " (void);"
+        , "int"
+        , "main (void)"
+        , "{"
+        , "return " ++ symbol ++ " ();"
+        , "  ;"
+        , "  return 0;"
+        , "}"
+        ]
+
+-- | Like @AC_CHECK_HEADER@
+testHeader :: Cc
+           -> String         -- ^ Header to check for
+           -> Maybe FilePath -- ^ Extra path
+           -> M Bool
+testHeader cc0 header mincludeDir = testCompile ("whether target has <" ++ header ++ ">") prog cc1
+  where
+    cc1 | Just includeDir <- mincludeDir
+        = cc0 & _ccProgram % _prgFlags %++ ("-I" ++ includeDir)
+        | otherwise = cc0
+    prog = unlines
+        [ "#include <" ++ header ++ ">" ]
 
 -- | Try compiling a program, returning 'True' if successful.
 testCompile :: String -> String -> Cc -> M Bool

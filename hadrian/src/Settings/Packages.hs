@@ -8,6 +8,7 @@ import Packages
 import Settings
 import Settings.Builders.Common (wayCcArgs)
 
+import qualified GHC.Toolchain.Library as Lib
 import GHC.Toolchain.Target
 import GHC.Platform.ArchOS
 import Data.Version.Extra
@@ -300,8 +301,8 @@ rtsPackageArgs = package rts ? do
     useSystemFfi   <- getFlag UseSystemFfi
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
-    libdwIncludeDir   <- getSetting LibdwIncludeDir
-    libdwLibraryDir   <- getSetting LibdwLibDir
+    libdwIncludeDir   <- queryTarget (Lib.includePath <=< tgtRTSWithLibdw)
+    libdwLibraryDir   <- queryTarget (Lib.libraryPath <=< tgtRTSWithLibdw)
     libnumaIncludeDir <- getSetting LibnumaIncludeDir
     libnumaLibraryDir <- getSetting LibnumaLibDir
     libzstdIncludeDir <- getSetting LibZstdIncludeDir
@@ -425,7 +426,7 @@ rtsPackageArgs = package rts ? do
           , flag UseLibpthread              `cabalFlag` "need-pthread"
           , flag UseLibbfd                  `cabalFlag` "libbfd"
           , flag NeedLibatomic              `cabalFlag` "need-atomic"
-          , flag UseLibdw                   `cabalFlag` "libdw"
+          , useLibdw                        `cabalFlag` "libdw"
           , flag UseLibnuma                 `cabalFlag` "libnuma"
           , flag UseLibzstd                 `cabalFlag` "libzstd"
           , flag StaticLibzstd              `cabalFlag` "static-libzstd"
@@ -435,7 +436,7 @@ rtsPackageArgs = package rts ? do
           , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
-              [ cabalExtraDirs libdwIncludeDir libdwLibraryDir
+              [ useLibdw ? cabalExtraDirs (fromMaybe "" libdwIncludeDir) (fromMaybe "" libdwLibraryDir)
               , cabalExtraDirs libnumaIncludeDir libnumaLibraryDir
               , cabalExtraDirs libzstdIncludeDir libzstdLibraryDir
               , useSystemFfi ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
@@ -449,7 +450,7 @@ rtsPackageArgs = package rts ? do
         , builder HsCpp ? pure
           [ "-DTOP="             ++ show top ]
 
-        , builder HsCpp ? flag UseLibdw ? arg "-DUSE_LIBDW" ]
+        , builder HsCpp ? useLibdw ? arg "-DUSE_LIBDW" ]
 
 -- Compile various performance-critical pieces *without* -fPIC -dynamic
 -- even when building a shared library.  If we don't do this, then the

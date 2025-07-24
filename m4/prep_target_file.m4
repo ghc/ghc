@@ -78,6 +78,22 @@ AC_DEFUN([PREP_MAYBE_PROGRAM],[
     AC_SUBST([$1MaybeProg])
 ])
 
+# PREP_MAYBE_LIBRARY
+# =========================
+#
+# Introduce a substitution [$1MaybeProg] with
+# * Nothing, if $$1 is empty or "NO"
+# * Just the library otherwise
+AC_DEFUN([PREP_MAYBE_LIBRARY],[
+    if test -z "$$1" || test "$$1" = "NO"; then
+        $1MaybeLibrary=Nothing
+    else
+        PREP_LIST([$2])
+        $1MaybeLibrary="Just (Library { libName = \"$2\", includePath = \"$3\", libraryPath = \"$4\" })"
+    fi
+    AC_SUBST([$1MaybeLibrary])
+])
+
 # PREP_MAYBE_STRING
 # =========================
 #
@@ -180,6 +196,10 @@ AC_DEFUN([PREP_TARGET_FILE],[
     PREP_LIST([CONF_CXX_OPTS_STAGE2])
     PREP_LIST([CONF_CC_OPTS_STAGE2])
 
+    PREP_MAYBE_STRING([LibdwIncludeDir])
+    PREP_MAYBE_STRING([LibdwLibDir])
+    PREP_MAYBE_LIBRARY([UseLibdw], [dw], [$LibdwIncludeDirMaybeStr], [$LibdwLibDirMaybeStr])
+
     dnl Host target
     PREP_BOOLEAN([ArSupportsAtFile_STAGE0])
     PREP_BOOLEAN([ArSupportsDashL_STAGE0])
@@ -188,7 +208,6 @@ AC_DEFUN([PREP_TARGET_FILE],[
     PREP_LIST([CONF_CPP_OPTS_STAGE0])
     PREP_LIST([CONF_CXX_OPTS_STAGE0])
     PREP_LIST([CONF_GCC_LINKER_OPTS_STAGE0])
-
 
     if test -z "$MergeObjsCmd"; then
       MergeObjsCmdMaybe=Nothing

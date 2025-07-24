@@ -7,7 +7,7 @@ module Oracles.Flag (
     targetRTSLinkerOnlySupportsSharedLibs,
     targetSupportsThreadedRts,
     targetSupportsSMP,
-    useLibffiForAdjustors,
+    useLibffiForAdjustors, useLibdw,
     arSupportsDashL,
     arSupportsAtFile
     ) where
@@ -29,7 +29,6 @@ data Flag = CrossCompiling
           | UseSystemFfi
           | BootstrapThreadedRts
           | BootstrapEventLoggingRts
-          | UseLibdw
           | UseLibnuma
           | UseLibzstd
           | StaticLibzstd
@@ -53,7 +52,6 @@ flag f = do
             UseSystemFfi         -> "use-system-ffi"
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
             BootstrapEventLoggingRts -> "bootstrap-event-logging-rts"
-            UseLibdw             -> "use-lib-dw"
             UseLibnuma           -> "use-lib-numa"
             UseLibzstd           -> "use-lib-zstd"
             StaticLibzstd        -> "static-lib-zstd"
@@ -147,3 +145,6 @@ targetSupportsSMP = do
 
 useLibffiForAdjustors :: Action Bool
 useLibffiForAdjustors = queryTargetTarget tgtUseLibffiForAdjustors
+
+useLibdw :: Action Bool
+useLibdw = queryTargetTarget (isJust . tgtRTSWithLibdw)
