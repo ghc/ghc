@@ -58,6 +58,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Rules
 import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCo.FVs
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
@@ -1666,7 +1667,12 @@ ds_hs_wrapper wrap = go wrap
     go (WpEvLam ev)      k = k $ Lam ev
     go (WpTyLam tv)      k = k $ Lam tv
     go (WpCast co)       k = assert (coercionRole co == Representational) $
-                             k $ \e -> mkCastDs e co
+                              do { zap_casts <- hasZapCasts <$> getDynFlags
+                                 ; k $ \e ->  -- AMG TODO: clean this up if it helps T5030
+                                       if zap_casts
+                                        then (if isReflCo co then e else mkCastZ e (coercionRKind co) (shallowCoVarsOfCo co))
+                                        else mkCastDs e co
+                                 }
     go (WpEvApp tm)      k = do { core_tm <- dsEvTerm tm
                                 ; k $ \e -> e `App` core_tm }
     go (WpLet ev_binds)  k = dsTcEvBinds ev_binds $ \bs ->
