@@ -12,6 +12,7 @@ module GHC.CmmToAsm.RV64.CodeGen
 where
 
 import Control.Monad
+import Data.Bifunctor (bimap)
 import Data.Maybe
 import Data.Word
 import GHC.Cmm
@@ -55,7 +56,6 @@ import GHC.Types.SrcLoc (srcSpanFile, srcSpanStartCol, srcSpanStartLine)
 import GHC.Types.Tickish (GenTickish (..))
 import GHC.Types.Unique.DSM
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1247,7 +1247,7 @@ getRegister' config plat expr =
             (reg_y, format_y, code_y) <- getSomeReg y
 
             let (idxs_v1, idxs_v2) =
-                  mapTuple reverse
+                  bimap reverse reverse
                     $ foldl'
                       ( \(acc1, acc2) i ->
                           if i < length then (Just i : acc1, Nothing : acc2) else (Nothing : acc1, Just (i - length) : acc2)
@@ -1300,9 +1300,6 @@ getRegister' config plat expr =
                     COMMENT (text "Merge the vector selections"),
                     VMERGE (OpReg dstFormat dst) (OpReg format_x gathered_x) (OpReg format_y gathered_y) (OpReg maskFormat v0Reg)
                   ]
-
-          mapTuple :: (a -> b) -> (a, a) -> (b, b)
-          mapTuple f (x, y) = (f x, f y)
 
           selVecData :: Width -> [Maybe Int] -> [CmmStatic]
           selVecData w idxs =
