@@ -88,7 +88,6 @@ lib/settings : config.mk
 	@echo '[("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit")' >> $@
 	@echo ',("target RTS linker only supports shared libraries", "$(TargetRTSLinkerOnlySupportsSharedLibs)")' >> $@
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
-	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Relative Global Package DB", "package.conf.d")' >> $@
 	@echo ',("base unit-id", "$(BaseUnitId)")' >> $@
