@@ -1235,6 +1235,11 @@ getRegister' config plat expr =
             --   - Gather elements of v1 on the right positions -> v1'
             --   - Gather elements of v2 of the right positions -> v2'
             --   - Merge v1' and v2' with an adequate bitmask (v0)
+            --
+            -- We create three supporting data section entries / structures:
+            --   - A mapping vector that describes the mapping of v1 -> v1'
+            --   - The same for v2 -> v2'
+            --   - the mask vector used to merge v1' and v2'
             lbl_selVec_v1 <- getNewLabelNat
             lbl_selVec_v2 <- getNewLabelNat
             lbl_mask <- getNewLabelNat
@@ -1255,7 +1260,6 @@ getRegister' config plat expr =
                 -- Finally, the mask must be 0 where v1 should be taken and 1 for v2.
                 -- That's why we do an implicit negation here by focussing on v2.
                 maskVecData = maskData idxs_v2
-                -- Longest vector length is 64, so 8bit (0 - 255) is sufficient
                 selVecFormat = intVecFormat length w
                 dstFormat = toDstFormat length w
                 addrFormat = intFormat W64
