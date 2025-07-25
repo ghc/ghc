@@ -266,7 +266,6 @@ annExpr e {- debugIsOn -} = ANN (text . show $ e)
 -- This seems to be PIC compatible; at least `scanelf` (pax-utils) does not
 -- complain.
 
-
 -- | Generate jump to jump table target
 --
 -- The index into the jump table is calulated by evaluating @expr@. The
@@ -427,11 +426,11 @@ getSomeReg :: CmmExpr -> NatM (Reg, Format, InstrBlock)
 getSomeReg expr = do
   r <- getRegister expr
   res@(reg, fmt, _) <- case r of
-        Any rep code -> do
-          newReg <- getNewRegNat rep
-          pure (newReg, rep, code newReg)
-        Fixed rep reg code ->
-          pure (reg, rep, code)
+    Any rep code -> do
+      newReg <- getNewRegNat rep
+      pure (newReg, rep, code newReg)
+    Fixed rep reg code ->
+      pure (reg, rep, code)
   pure $ assertFmtReg fmt reg res
 
 -- | Compute an expression into any floating-point register
@@ -866,13 +865,10 @@ getRegister' config plat expr =
         MO_AlignmentCheck align wordWidth -> do
           reg <- getRegister' config plat e
           addAlignmentCheck align wordWidth reg
-
         MO_V_Broadcast length w -> vectorBroadcast (intVecFormat length w) e
         MO_VF_Broadcast length w -> vectorBroadcast (floatVecFormat length w) e
-
         MO_VS_Neg length w -> vectorNegation (intVecFormat length w)
         MO_VF_Neg length w -> vectorNegation (floatVecFormat length w)
-
         x -> pprPanic ("getRegister' (monadic CmmMachOp): " ++ show x) (pdoc plat expr)
       where
         -- In the case of 16- or 8-bit values we need to sign-extend to 32-bits
@@ -1373,7 +1369,6 @@ getRegister' config plat expr =
         MO_Shl w -> intOp False w (\d x y -> unitOL $ annExpr expr (SLL d x y))
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ annExpr expr (SRL d x y))
         MO_S_Shr w -> intOp True w (\d x y -> unitOL $ annExpr expr (SRA d x y))
-
         -- Vector operations
         MO_VF_Extract _length w -> vecExtract ((scalarFormatFormat . floatScalarFormat) w)
         MO_V_Extract _length w -> vecExtract ((scalarFormatFormat . intScalarFormat) w)
@@ -2135,8 +2130,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
     -- See Note [RISC-V vector C calling convention]
     passArguments _gpRegs _fpRegs [] ((_r, format, _hint, _code_r) : _args) _stackSpaceWords _accumRegs _accumCode
       | isVecFormat format =
-      panic "C call: no free vector argument registers. We only support 16 vector arguments (registers v8 - v23)."
-
+          panic "C call: no free vector argument registers. We only support 16 vector arguments (registers v8 - v23)."
     passArguments _ _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
 
     readResults :: [Reg] -> [Reg] -> [Reg] -> [LocalReg] -> [Reg] -> InstrBlock -> NatM InstrBlock
