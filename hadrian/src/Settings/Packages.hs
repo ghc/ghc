@@ -25,10 +25,6 @@ packageArgs = do
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
         cross = flag CrossCompiling
 
-        -- Check if the bootstrap compiler has the same version as the one we
-        -- are building. This is used to build cross-compilers
-        bootCross = (==) <$> ghcVersionStage (stage0InTree) <*> ghcVersionStage Stage1
-
         compilerStageOption f = buildingCompilerStage' . f =<< expr flavour
 
     cursesIncludeDir <- getSetting CursesIncludeDir
@@ -128,39 +124,9 @@ packageArgs = do
 
         --------------------------------- ghci ---------------------------------
         , package ghci ? mconcat
-          [
-          -- The use case here is that we want to build @iserv-proxy@ for the
-          -- cross compiler. That one needs to be compiled by the bootstrap
-          -- compiler as it needs to run on the host. Hence @iserv@ needs
-          -- @GHCi.TH@, @GHCi.Message@, @GHCi.Run@, and @GHCi.Server@ from
-          -- @ghci@. And those are behind the @-finternal-interpreter@ flag.
-          --
-          -- But it may not build if we have made some changes to ghci's
-          -- dependencies (see #16051).
-          --
-          -- To fix this properly Hadrian would need to:
-          --   * first build a compiler for the build platform (stage1 is enough)
-          --   * use it as a bootstrap compiler to build the stage1 cross-compiler
-          --
-          -- The issue is that "configure" would have to be executed twice (for
-          -- the build platform and for the cross-platform) and Hadrian would
-          -- need to be fixed to support two different stage1 compilers.
-          --
-          -- The workaround we use is to check if the bootstrap compiler has
-          -- the same version as the one we are building. In this case we can
-          -- avoid the first step above and directly build with
-          -- `-finternal-interpreter`.
-          --
-          -- TODO: Note that in that case we also do not need to build most of
-          -- the Stage1 libraries, as we already know that the bootstrap
-          -- compiler comes with the same versions as the one we are building.
-          --
-            builder (Cabal Setup) ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
+          [ builder (Cabal Setup) ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
           , builder (Cabal Flags) ? mconcat
-            [ ifM stage0
-                (andM [cross, bootCross] `cabalFlag` "internal-interpreter")
-                (arg "internal-interpreter")
-            , stage0 `cabalFlag` "bootstrap"
+            [ stage0 `cabalFlag` "bootstrap"
             ]
 
           ]

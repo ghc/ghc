@@ -260,7 +260,11 @@ sandboxIO opts io = do
 --
 rethrow :: EvalOpts -> IO a -> IO a
 rethrow EvalOpts{..} io =
+#if MIN_VERSION_base(4,21,0)
   catchNoPropagate io $ \(ExceptionWithContext cx se) -> do
+#else
+  catch io $ \se -> do
+#endif
     -- If -fbreak-on-error, we break unconditionally,
     --  but with care of not breaking twice
     if breakOnError && not breakOnException
@@ -271,7 +275,11 @@ rethrow EvalOpts{..} io =
                Just UserInterrupt -> return ()
                -- In any other case, we don't want to break
                _ -> poke exceptionFlag 0
+#if MIN_VERSION_base(4,21,0)
     rethrowIO (ExceptionWithContext cx se)
+#else
+    throwIO se
+#endif
 
 --
 -- While we're waiting for the sandbox thread to return a result, if

@@ -17,11 +17,6 @@ cabal-version:  >=1.10
 build-type:     Simple
 extra-source-files: changelog.md
 
-Flag internal-interpreter
-    Description: Build with internal interpreter support.
-    Default: False
-    Manual: True
-
 Flag bootstrap
         Description:
           Enabled when building the stage1 compiler in order to vendor the in-tree
@@ -56,23 +51,19 @@ library
         TupleSections
         UnboxedTuples
 
-    if flag(internal-interpreter)
-        CPP-Options: -DHAVE_INTERNAL_INTERPRETER
+    if !arch(javascript)
         exposed-modules:
-            GHCi.Run
-            GHCi.Debugger
-            GHCi.CreateBCO
-            GHCi.ObjLink
-            GHCi.Signals
-            GHCi.StaticPtrTable
-            GHCi.TH
-            GHCi.Server
-
-        if !arch(javascript)
-          exposed-modules:
-            GHCi.InfoTable
+          GHCi.InfoTable
 
     exposed-modules:
+        GHCi.Run
+        GHCi.Debugger
+        GHCi.CreateBCO
+        GHCi.ObjLink
+        GHCi.Signals
+        GHCi.StaticPtrTable
+        GHCi.TH
+        GHCi.Server
         GHCi.BreakArray
         GHCi.BinaryArray
         GHCi.Message
