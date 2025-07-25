@@ -1,11 +1,15 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE MultiWayIf #-}
 module GHC.Toolchain.Target
   (
     -- * A Toolchain Target
     Target(..), targetPlatformTriple
 
   , WordSize(..), wordSize2Bytes
+
+    -- ** Queries
+  , tgtSupportsSMP
 
     -- ** Lenses
   , _tgtCC, _tgtCxx, _tgtCpp, _tgtHsCpp
@@ -150,6 +154,34 @@ instance Show Target where
     , ", tgtInstallNameTool = " ++ show tgtInstallNameTool
     , "}"
     ]
+
+--------------------------------------------------------------------------------
+-- Queries
+--------------------------------------------------------------------------------
+
+tgtSupportsSMP :: Target -> Bool
+tgtSupportsSMP Target{..} = do
+  let goodArch =
+        isARM (archOS_arch tgtArchOs)
+          || archOS_arch tgtArchOs `elem`
+              [ ArchX86
+              , ArchX86_64
+              , ArchPPC
+              , ArchPPC_64 ELF_V1
+              , ArchPPC_64 ELF_V2
+              , ArchAArch64
+              , ArchS390X
+              , ArchRISCV64
+              , ArchLoongArch64 ]
+
+  if   -- The THREADED_RTS requires `BaseReg` to be in a register and the
+       -- Unregisterised mode doesn't allow that.
+     | tgtUnregisterised    -> False
+       -- We don't support load/store barriers pre-ARMv7. See #10433.
+     | ArchARM ver _ _ <- archOS_arch tgtArchOs
+     , ver < ARMv7          -> False
+     | goodArch             -> True
+     | otherwise            -> False
 
 --------------------------------------------------------------------------------
 -- Lenses
