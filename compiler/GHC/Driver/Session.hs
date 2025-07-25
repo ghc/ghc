@@ -3547,6 +3547,7 @@ compilerInfo dflags
        -- If true, we require that the 'id' field in installed package info
        -- match what is passed to the @-this-unit-id@ flag for modules
        -- built in it
+       ("Support SMP", queryBool tgtSupportsSMP),
        ("Requires unified installed package IDs", "YES"),
        -- Whether or not we support the @-this-package-key@ flag.  Prefer
        -- "Uses unit IDs" over it. We still say yes even if @-this-package-key@
