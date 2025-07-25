@@ -86,7 +86,6 @@ WrapperBinsDir=${bindir}
 lib/settings : config.mk
 	@rm -f $@
 	@echo '[("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit")' >> $@
-	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Relative Global Package DB", "package.conf.d")' >> $@
 	@echo ',("base unit-id", "$(BaseUnitId)")' >> $@

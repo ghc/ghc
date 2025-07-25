@@ -25,7 +25,6 @@ import Utilities
 
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
-import Settings.Program (ghcWithInterpreter)
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -484,7 +483,6 @@ generateSettings settingsFile = do
 
     settings <- traverse sequence $
         [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
         , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)

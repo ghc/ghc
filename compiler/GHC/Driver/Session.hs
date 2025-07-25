@@ -3528,6 +3528,10 @@ compilerInfo dflags
        ("target os string",            stringEncodeOS (platformOS (targetPlatform dflags))),
        ("target arch string",          stringEncodeArch (platformArch (targetPlatform dflags))),
        ("target word size in bits",    show (platformWordSizeInBits (targetPlatform dflags))),
+       -- keep "duplicate" of "Have interpreter" for backwards compatibility,
+       -- since we used to show both...
+       -- These should really be called "Has internal interpreter"
+       ("Use interpreter",             showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
        ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
        ("Object splitting supported",  showBool False),
        ("Have native code generator",  showBool $ platformNcgSupported platform),

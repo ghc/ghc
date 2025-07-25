@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -146,8 +147,6 @@ initSettings top_dir = do
         pure (ld_r_path, map Option ld_r_args)
       iserv_prog   = libexec "ghc-iserv"
 
-  ghcWithInterpreter <- getBooleanSetting "Use interpreter"
-
   baseUnitId <- getSetting_raw "base unit-id"
 
   return $ Settings
@@ -227,7 +226,7 @@ initSettings top_dir = do
     , sTargetPlatform = platform
     , sPlatformMisc = PlatformMisc
       { platformMisc_targetPlatformString = targetPlatformTriple target
-      , platformMisc_ghcWithInterpreter = ghcWithInterpreter
+      , platformMisc_ghcWithInterpreter = ghcWithInternalInterpreter
       , platformMisc_libFFI = tgtUseLibffiForAdjustors target
       , platformMisc_llvmTarget = tgtLlvmTarget target
       , platformMisc_targetRTSLinkerOnlySupportsSharedLibs = tgtRTSLinkerOnlySupportsSharedLibs target
@@ -253,3 +252,13 @@ getTargetPlatform Target{..} = Platform
     , platformHasLibm = tgtHasLibm
     , platform_constants = Nothing -- will be filled later when loading (or building) the RTS unit
     }
+
+
+-- | Do we have an internal interpreter?
+ghcWithInternalInterpreter :: Bool
+#if defined(HAVE_INTERNAL_INTERPRETER)
+ghcWithInternalInterpreter = True
+#else
+ghcWithInternalInterpreter = False
+#endif
+
