@@ -55,7 +55,7 @@ module GHC.Tc.Utils.Monad(
   getRdrEnvs, getImports,
   getFixityEnv, extendFixityEnv,
   getDeclaredDefaultTys,
-  addDependentFiles,
+  addDependentFiles, addDependentDirectories,
 
   -- * Error management
   getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
@@ -273,6 +273,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         let { type_env_var = hsc_type_env_vars hsc_env };
 
         dependent_files_var <- newIORef [] ;
+        dependent_dirs_var <- newIORef [] ;
         static_wc_var       <- newIORef emptyWC ;
         cc_st_var           <- newIORef newCostCentreState ;
         th_topdecls_var      <- newIORef [] ;
@@ -368,6 +369,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_safe_infer     = infer_var,
                 tcg_safe_infer_reasons = infer_reasons_var,
                 tcg_dependent_files = dependent_files_var,
+                tcg_dependent_dirs  = dependent_dirs_var,
                 tcg_tc_plugin_solvers   = [],
                 tcg_tc_plugin_rewriters = emptyUFM,
                 tcg_defaulting_plugins  = [],
@@ -955,6 +957,12 @@ addDependentFiles fs = do
   ref <- fmap tcg_dependent_files getGblEnv
   dep_files <- readTcRef ref
   writeTcRef ref (fs ++ dep_files)
+
+addDependentDirectories :: [FilePath] -> TcRn ()
+addDependentDirectories ds = do
+  ref <- fmap tcg_dependent_dirs getGblEnv
+  dep_dirs <- readTcRef ref
+  writeTcRef ref (ds ++ dep_dirs)
 
 {-
 ************************************************************************

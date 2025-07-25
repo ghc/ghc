@@ -34,6 +34,7 @@ module Language.Haskell.TH.Syntax (
     ModName (..),
     addCorePlugin,
     addDependentFile,
+    addDependentDirectory,
     addForeignFile,
     addForeignFilePath,
     addForeignSource,

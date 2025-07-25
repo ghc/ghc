@@ -1717,6 +1717,7 @@ module Language.Haskell.TH.Syntax where
     qRunIO :: forall a. GHC.Internal.Types.IO a -> m a
     qGetPackageRoot :: m GHC.Internal.IO.FilePath
     qAddDependentFile :: GHC.Internal.IO.FilePath -> m ()
+    qAddDependentDirectory :: GHC.Internal.IO.FilePath -> m ()
     qAddTempFile :: GHC.Internal.Base.String -> m GHC.Internal.IO.FilePath
     qAddTopDecls :: [Dec] -> m ()
     qAddForeignFilePath :: ForeignSrcLang -> GHC.Internal.Base.String -> m ()
@@ -1728,7 +1729,7 @@ module Language.Haskell.TH.Syntax where
     qExtsEnabled :: m [Extension]
     qPutDoc :: DocLoc -> GHC.Internal.Base.String -> m ()
     qGetDoc :: DocLoc -> m (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
-    {-# MINIMAL qNewName, qReport, qRecover, qLookupName, qReify, qReifyFixity, qReifyType, qReifyInstances, qReifyRoles, qReifyAnnotations, qReifyModule, qReifyConStrictness, qLocation, qGetPackageRoot, qAddDependentFile, qAddTempFile, qAddTopDecls, qAddForeignFilePath, qAddModFinalizer, qAddCorePlugin, qGetQ, qPutQ, qIsExtEnabled, qExtsEnabled, qPutDoc, qGetDoc #-}
+    {-# MINIMAL qNewName, qReport, qRecover, qLookupName, qReify, qReifyFixity, qReifyType, qReifyInstances, qReifyRoles, qReifyAnnotations, qReifyModule, qReifyConStrictness, qLocation, qGetPackageRoot, qAddDependentFile, qAddDependentDirectory, qAddTempFile, qAddTopDecls, qAddForeignFilePath, qAddModFinalizer, qAddCorePlugin, qGetQ, qPutQ, qIsExtEnabled, qExtsEnabled, qPutDoc, qGetDoc #-}
   type Quote :: (* -> *) -> Constraint
   class GHC.Internal.Base.Monad m => Quote m where
     newName :: GHC.Internal.Base.String -> m Name
@@ -1781,6 +1782,7 @@ module Language.Haskell.TH.Syntax where
   type VarStrictType :: *
   type VarStrictType = VarBangType
   addCorePlugin :: GHC.Internal.Base.String -> Q ()
+  addDependentDirectory :: GHC.Internal.IO.FilePath -> Q ()
   addDependentFile :: GHC.Internal.IO.FilePath -> Q ()
   addForeignFile :: ForeignSrcLang -> GHC.Internal.Base.String -> Q ()
   addForeignFilePath :: ForeignSrcLang -> GHC.Internal.IO.FilePath -> Q ()

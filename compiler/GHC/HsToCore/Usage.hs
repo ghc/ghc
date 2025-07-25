@@ -75,14 +75,15 @@ data UsageConfig = UsageConfig
 
 mkUsageInfo :: UsageConfig -> Plugins -> FinderCache -> UnitEnv
             -> Module -> ImportedMods -> [ImportUserSpec] -> NameSet
-            -> [FilePath] -> [(Module, Fingerprint)] -> [Linkable] -> PkgsLoaded
+            -> [FilePath] -> [FilePath] -> [(Module, Fingerprint)] -> [Linkable] -> PkgsLoaded
             -> IfG [Usage]
 mkUsageInfo uc plugins fc unit_env
   this_mod dir_imp_mods imp_decls used_names
-  dependent_files merged needed_links needed_pkgs
+  dependent_files dependent_dirs merged needed_links needed_pkgs
   = do
     eps <- liftIO $ readIORef (euc_eps (ue_eps unit_env))
-    hashes <- liftIO $ mapM getFileHash dependent_files
+    file_hashes <- liftIO $ mapM getFileHash dependent_files
+    dirs_hashes <- liftIO $ mapM getDirHash dependent_dirs
     let hu = ue_unsafeHomeUnit unit_env
         hug = ue_home_unit_graph unit_env
     -- Dependencies on object files due to TH and plugins
@@ -93,7 +94,11 @@ mkUsageInfo uc plugins fc unit_env
     let usages = mod_usages ++ [ UsageFile { usg_file_path = mkFastString f
                                            , usg_file_hash = hash
                                            , usg_file_label = Nothing }
-                               | (f, hash) <- zip dependent_files hashes ]
+                               | (f, hash) <- zip dependent_files file_hashes ]
+                            ++ [ UsageDirectory { usg_dir_path = mkFastString d
+                                                , usg_dir_hash = hash
+                                                , usg_dir_label = Nothing }
+                               | (d, hash) <- zip dependent_dirs dirs_hashes]
                             ++ [ UsageMergedRequirement
                                     { usg_mod = mod,
                                       usg_mod_hash = hash
