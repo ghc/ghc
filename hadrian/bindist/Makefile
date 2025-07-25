@@ -86,7 +86,6 @@ WrapperBinsDir=${bindir}
 lib/settings : config.mk
 	@rm -f $@
 	@echo '[("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit")' >> $@
-	@echo ',("target RTS linker only supports shared libraries", "$(TargetRTSLinkerOnlySupportsSharedLibs)")' >> $@
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Relative Global Package DB", "package.conf.d")' >> $@

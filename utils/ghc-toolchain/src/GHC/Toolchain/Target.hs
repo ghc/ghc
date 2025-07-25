@@ -9,7 +9,7 @@ module GHC.Toolchain.Target
   , WordSize(..), wordSize2Bytes
 
     -- ** Queries
-  , tgtSupportsSMP
+  , tgtSupportsSMP, tgtRTSLinkerOnlySupportsSharedLibs
 
     -- ** Lenses
   , _tgtCC, _tgtCxx, _tgtCpp, _tgtHsCpp
@@ -182,6 +182,26 @@ tgtSupportsSMP Target{..} = do
      , ver < ARMv7          -> False
      | goodArch             -> True
      | otherwise            -> False
+
+-- | Does the target RTS linker only support loading shared libraries?
+-- If true, this has several implications:
+-- 1. The GHC driver must not do loadArchive/loadObj etc and must
+--    always do loadDLL, regardless of whether host GHC is dynamic or
+--    not.
+-- 2. The GHC driver will always enable -dynamic-too when compiling
+--    vanilla way with TH codegen requirement.
+-- 3. ghci will always enforce dynamic ways even if -dynamic or
+--    -dynamic-too is not explicitly passed.
+-- 4. Cabal must not build ghci objects since it's not supported by
+--    the target.
+-- 5. The testsuite driver will use dyn way for TH/ghci tests even
+--    when host GHC is static.
+-- 6. TH/ghci doesn't work if stage1 is built without shared libraries
+--    (e.g. quickest/fully_static).
+tgtRTSLinkerOnlySupportsSharedLibs :: Target -> Bool
+tgtRTSLinkerOnlySupportsSharedLibs Target{tgtArchOs} =
+  archOS_arch tgtArchOs `elem`
+    [ ArchWasm32 ]
 
 --------------------------------------------------------------------------------
 -- Lenses
