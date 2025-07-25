@@ -121,27 +121,7 @@ targetSupportsThreadedRts = do
 
 -- | Does the target support the -N RTS flag?
 targetSupportsSMP :: Action Bool
-targetSupportsSMP = do
-  unreg <- queryTargetTarget tgtUnregisterised
-  armVer <- targetArmVersion
-  goodArch <- (||) <$>
-              anyTargetArch [ ArchX86
-                            , ArchX86_64
-                            , ArchPPC
-                            , ArchPPC_64 ELF_V1
-                            , ArchPPC_64 ELF_V2
-                            , ArchAArch64
-                            , ArchS390X
-                            , ArchRISCV64
-                            , ArchLoongArch64 ] <*> isArmTarget
-  if   -- The THREADED_RTS requires `BaseReg` to be in a register and the
-       -- Unregisterised mode doesn't allow that.
-     | unreg                -> return False
-       -- We don't support load/store barriers pre-ARMv7. See #10433.
-     | Just ver <- armVer
-     , ver < ARMv7          -> return False
-     | goodArch             -> return True
-     | otherwise            -> return False
+targetSupportsSMP = queryTargetTarget Toolchain.tgtSupportsSMP
 
 useLibffiForAdjustors :: Action Bool
 useLibffiForAdjustors = queryTargetTarget tgtUseLibffiForAdjustors
