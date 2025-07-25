@@ -103,7 +103,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 -- bytestring
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Short as SBS
 
 -- containers
 import Data.Map (Map)
@@ -1930,7 +1930,8 @@ tok_num :: (Integer -> Integer)
         -> Int -> Int
         -> (Integer, (Char->Int)) -> Action
 tok_num = tok_integral $ \case
-    st@(SourceText (BS.uncons -> Just ('-',_))) -> itint st (const True)
+    -- 0x2D is the ASCII code for a hyphen character '-'
+    st@(SourceText sbs) | SBS.length sbs > 0 && (sbs `SBS.index` 0) == 0x2D -> itint st (const True)
     st@(SourceText _)       -> itint st (const False)
     st@NoSourceText         -> itint st (< 0)
   where

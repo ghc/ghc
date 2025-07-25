@@ -61,6 +61,8 @@ import qualified Control.Monad.Reader as Reader
 import Control.Monad.RWS (MonadReader, RWST, evalRWST, tell, modify, get, gets, ask)
 import Control.Monad.Trans (lift)
 import Data.Data ( Data )
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Short as SBS
 import Data.Dynamic
 import Data.Foldable
 import Data.Functor.Const
@@ -664,13 +666,17 @@ class (Typeable a) => ExactPrint a where
 -- Start of utility functions
 -- ---------------------------------------------------------------------
 
+
+unpackSBS :: SBS.ShortByteString -> String
+unpackSBS = BS.unpack . SBS.fromShort
+
 printSourceText :: (Monad m, Monoid w) => SourceText -> String -> EP w m ()
 printSourceText (NoSourceText) txt   =  printStringAdvance txt >> return ()
-printSourceText (SourceText   txt) _ =  printStringAdvance (unpackFS txt) >> return ()
+printSourceText (SourceText   txt) _ =  printStringAdvance (unpackSBS txt) >> return ()
 
 printSourceTextAA :: (Monad m, Monoid w) => SourceText -> String -> EP w m ()
-printSourceTextAA (NoSourceText) txt   = printStringAdvanceA  txt >> return ()
-printSourceTextAA (SourceText   txt) _ = printStringAdvanceA  (unpackFS txt) >> return ()
+printSourceTextAA (NoSourceText) txt   = printStringAdvanceA txt >> return ()
+printSourceTextAA (SourceText   txt) _ = printStringAdvanceA (unpackSBS txt) >> return ()
 
 -- ---------------------------------------------------------------------
 
@@ -755,7 +761,7 @@ printStringAtAAC capture (EpaDelta ss d cs) s = do
 
 markExternalSourceTextE :: (Monad m, Monoid w) => EpaLocation -> SourceText -> String -> EP w m EpaLocation
 markExternalSourceTextE l NoSourceText txt   = printStringAtAA l txt
-markExternalSourceTextE l (SourceText txt) _ = printStringAtAA l (unpackFS txt)
+markExternalSourceTextE l (SourceText txt) _ = printStringAtAA l (unpackSBS txt)
 
 -- ---------------------------------------------------------------------
 
@@ -833,12 +839,12 @@ markEpUniToken (EpUniTok aa isUnicode)  = do
 markAnnOpen' :: (Monad m, Monoid w)
   => Maybe EpaLocation -> SourceText -> String -> EP w m (Maybe EpaLocation)
 markAnnOpen' ms NoSourceText txt   = printStringAtMLoc' ms txt
-markAnnOpen' ms (SourceText txt) _ = printStringAtMLoc' ms $ unpackFS txt
+markAnnOpen' ms (SourceText txt) _ = printStringAtMLoc' ms $ unpackSBS txt
 
 markAnnOpen'' :: (Monad m, Monoid w)
   => EpaLocation -> SourceText -> String -> EP w m EpaLocation
 markAnnOpen'' el NoSourceText txt   = printStringAtAA el txt
-markAnnOpen'' el (SourceText txt) _ = printStringAtAA el $ unpackFS txt
+markAnnOpen'' el (SourceText txt) _ = printStringAtAA el $ unpackSBS txt
 
 -- ---------------------------------------------------------------------
 
@@ -1600,7 +1606,7 @@ instance ExactPrint (SourceText, WarningCategory) where
   exact (st, WarningCategory wc) = do
       case st of
           NoSourceText -> printStringAdvance $ "\"" ++ (unpackFS wc) ++ "\""
-          SourceText src -> printStringAdvance $ (unpackFS src)
+          SourceText src -> printStringAdvance $ (unpackSBS src)
       return (st, WarningCategory wc)
 
 -- ---------------------------------------------------------------------
@@ -1976,7 +1982,7 @@ instance ExactPrint FastString where
   setAnnotationAnchor a _ _ _ = a
 
   -- TODO: https://ghc.haskell.org/trac/ghc/ticket/10313 applies.
-  -- exact fs = printStringAdvance (show (unpackFS fs))
+  -- exact fs = printStringAdvance (show (unpackSBS fs))
   exact fs = printStringAdvance (unpackFS fs) >> return fs
 
 -- ---------------------------------------------------------------------
@@ -1988,7 +1994,7 @@ instance ExactPrint (RuleDecls GhcPs) where
     o' <-
       case src of
         NoSourceText      -> printStringAtAA o "{-# RULES"
-        SourceText srcTxt -> printStringAtAA o (unpackFS srcTxt)
+        SourceText srcTxt -> printStringAtAA o (unpackSBS srcTxt)
     rules' <- markAnnotated rules
     c' <- markEpToken c
     return (HsRules ((o',c'),src) rules')
@@ -2854,7 +2860,7 @@ instance ExactPrint (HsExpr GhcPs) where
     printStringAdvanceA "#" >> return ()
     case src of
       NoSourceText   -> printStringAdvanceA (unpackFS l)  >> return ()
-      SourceText txt -> printStringAdvanceA (unpackFS txt) >> return ()
+      SourceText txt -> printStringAdvanceA (unpackSBS txt) >> return ()
     return x
 
   exact x@(HsIPVar _ (HsIPName n))
@@ -2866,7 +2872,7 @@ instance ExactPrint (HsExpr GhcPs) where
                 HsFractional (FL { fl_text = src }) -> src
                 HsIsString src _          -> src
     case str of
-      SourceText s -> printStringAdvance (unpackFS s) >> return ()
+      SourceText s -> printStringAdvance (unpackSBS s) >> return ()
       NoSourceText -> withPpr x >> return ()
     return x
 
@@ -4425,7 +4431,7 @@ exactBang ((o,c,tk), mt) str = do
       NoSourceText -> return (o,c)
       SourceText src -> do
         debugM $ "HsBangTy: src=" ++ showAst src
-        o' <- printStringAtAA o (unpackFS src)
+        o' <- printStringAtAA o (unpackSBS src)
         c' <- markEpToken c
         return (o',c')
   tk' <-
@@ -4767,7 +4773,7 @@ instance ExactPrint (HsOverLit GhcPs) where
                 HsIsString src _ -> src
     in
       case str of
-        SourceText s -> printStringAdvance (unpackFS s) >> return ol
+        SourceText s -> printStringAdvance (unpackSBS s) >> return ol
         NoSourceText -> return ol
 
 -- ---------------------------------------------------------------------
@@ -4796,11 +4802,11 @@ hsLit2String lit =
 
 toSourceTextWithSuffix :: (Show a) => SourceText -> a -> String -> String
 toSourceTextWithSuffix (NoSourceText)    alt suffix = show alt ++ suffix
-toSourceTextWithSuffix (SourceText txt) _alt suffix = unpackFS txt ++ suffix
+toSourceTextWithSuffix (SourceText txt) _alt suffix = unpackSBS txt ++ suffix
 
 sourceTextToString :: SourceText -> String -> String
 sourceTextToString NoSourceText alt   = alt
-sourceTextToString (SourceText txt) _ = unpackFS txt
+sourceTextToString (SourceText txt) _ = unpackSBS txt
 
 -- ---------------------------------------------------------------------
 
