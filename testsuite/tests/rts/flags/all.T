@@ -57,6 +57,14 @@ test('T12870h',
     multimod_compile_and_run,
     ['T12870g', '-rtsopts=ignoreAll -with-rtsopts="-G3"'])
 
-test('T20006', [extra_run_opts('+RTS --eventlog-flush-interval=1')],
-    compile_and_run,
-    [''])
+test('T20006a',
+    [extra_files(['T20006.hs']), extra_run_opts('+RTS --eventlog-flush-interval=1'),
+        only_ways(['threaded1', 'threaded2'])],
+    multimod_compile_and_run,
+    ['T20006', ''])
+
+test('T20006b',
+    [extra_files(['T20006.hs']), extra_run_opts('+RTS --eventlog-flush-interval=1'),
+        expect_fail_for(['normal'])],
+    multimod_compile_and_run,
+    ['T20006', ''])
