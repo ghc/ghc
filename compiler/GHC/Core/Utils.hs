@@ -3115,26 +3115,56 @@ type AbsVar        = Var
 type AbsVars       = [AbsVar]
 type TaggedAbsVars t = [TaggedBndr t]
 
-mkPolyAbsLams :: (b -> AbsVar, Var -> b -> b)
-              -> [b] -> Expr b -> Expr b
+mkPolyAbsLams :: forall b. (b -> AbsVar, Var -> b -> b)
+                        -> [b] -> Expr b -> Expr b
 -- `mkPolyAbsLams` is polymorphic in (get,set) so that we can
 -- use it for both CoreExpr and LevelledExpr
 {-# INLINE mkPolyAbsLams #-}
-mkPolyAbsLams (get,set) bndrs body
-  = go bndrs
+mkPolyAbsLams (getter,setter) bndrs body
+  = go emptyVarSet [] bndrs
   where
-    go [] = body
-    go (bndr:bndrs)
+    go :: TyVarSet   -- Earlier TyVar bndrs that have TyVarUnfoldings
+       -> [Bind b]   -- Accumulated impedence-matching bindings (reversed)
+       -> [b]        -- Binders, bs
+       -> Expr b     -- The resulting lambda
+    go _ binds [] = mkLets (reverse binds) body
+
+    go unf_tvs binds (bndr:bndrs)
+
       | Just ty <- tyVarUnfolding_maybe var
-      = Let (NonRec bndr (Type ty)) $
-        go bndrs
+      = go (unf_tvs `extendVarSet` var) (NonRec bndr (Type ty) : binds) bndrs
+
+      | isTyVar var, change_ty
+      , let binds' | isDeadBinder var = binds
+                   | otherwise        = NonRec bndr (Type (mkTyVarTy var1)) : binds
+      = Lam (setter var1 bndr) (go unf_tvs binds' bndrs)
+
+      | isId var, change_ty || change_unf
+      , let binds' | isDeadBinder var = binds
+                   | otherwise        = NonRec bndr (Var id2) : binds
+      = Lam (setter id2 bndr) (go unf_tvs binds' bndrs)
+
       | otherwise
-      = Lam bndr' (go bndrs)
+      = Lam bndr  (go unf_tvs binds bndrs)
       where
-        var = get bndr
-        -- zap: We are going to lambda-abstract, so nuke any IdInfo
-        bndr' | isId var  = set (setIdInfo var vanillaIdInfo) bndr
-              | otherwise = bndr
+        var    = getter bndr
+        var_ty = varType var
+
+        (change_ty, var1) = update_type var
+        (change_unf, id2) = zap_unfolding var1  -- Only used for Ids
+
+        -- zap_unfolding: We are going to lambda-abstract, so nuke any IdInfo
+        zap_unfolding var | isId var, hasSomeUnfolding (idUnfolding var)
+                          = (True, setIdInfo var vanillaIdInfo)
+                          | otherwise
+                          = (False, var)
+
+        -- update_type: expand unfoldings of any tyvars in `unf_tvs`
+        update_type var | not (isEmptyVarSet unf_tvs)
+                        , anyFreeVarsOfType (`elemVarSet` unf_tvs) var_ty
+                        = (True, setVarType var (expandTyVarUnfoldings unf_tvs var_ty))
+                        | otherwise
+                        = (False, var)
 
 mkCoreAbsLams :: AbsVars -> CoreExpr -> CoreExpr
 -- Specialise for CoreExpr

@@ -1095,7 +1095,8 @@ simplBinder !env bndr
   | otherwise     = simplIdBndr    env bndr
 
 ---------------
-simplTyVarBndr :: SimplEnv -> InTyVar -> SimplM (SimplEnv, OutTyVar)
+simplTyVarBndr :: HasDebugCallStack
+               => SimplEnv -> InTyVar -> SimplM (SimplEnv, OutTyVar)
 simplTyVarBndr env tv
   = do  { let (env', tv1) = substTyVarBndr env tv
         ; seqTyVar tv1 `seq` return (env', tv1) }
@@ -1387,7 +1388,7 @@ substTy env ty = Type.substTy (getTCvSubst env) ty
 substTyVar :: SimplEnv -> TyVar -> Type
 substTyVar env tv = Type.substTyVar (getTCvSubst env) tv
 
-substTyVarBndr :: SimplEnv -> TyVar -> (SimplEnv, TyVar)
+substTyVarBndr :: HasDebugCallStack => SimplEnv -> TyVar -> (SimplEnv, TyVar)
 substTyVarBndr env tv
   = case Type.substTyVarBndr (getTCvSubst env) tv of
         (Subst in_scope' _ tv_env' cv_env', tv')

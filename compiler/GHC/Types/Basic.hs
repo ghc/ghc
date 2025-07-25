@@ -73,7 +73,7 @@ module GHC.Types.Basic (
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker, isManyOccs,
         isNoOccInfo, strongLoopBreaker, weakLoopBreaker,
 
-        TyCoOccInfo(..), plusTyCoOccInfo, isOneTyCoOcc,
+        TyCoOccInfo(..), plusTyCoOccInfo, isOneTyCoOcc, isDeadTyCoOcc,
 
         InsideLam(..),
         BranchCount, oneBranch,
@@ -1394,6 +1394,10 @@ instance Outputable TyCoOccInfo where
 isOneTyCoOcc :: TyCoOccInfo -> Bool
 isOneTyCoOcc TyCoOne = True
 isOneTyCoOcc _       = False
+
+isDeadTyCoOcc :: TyCoOccInfo -> Bool
+isDeadTyCoOcc TyCoDead = True
+isDeadTyCoOcc _        = False
 
 plusTyCoOccInfo :: TyCoOccInfo -> TyCoOccInfo -> TyCoOccInfo
 plusTyCoOccInfo TyCoDead occ = occ

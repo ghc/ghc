@@ -1312,6 +1312,7 @@ data ArgOcc = NoOcc     -- Doesn't occur at all; or a type argument
             | ScrutOcc  -- See Note [ScrutOcc]
                  (DataConEnv [ArgOcc])
                      -- [ArgOcc]: how the sub-components are used
+                     -- /including/ (existential) tyvar binders
 
 deadArgOcc :: ArgOcc -> Bool
 deadArgOcc (ScrutOcc {}) = False
@@ -2717,24 +2718,27 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
     -- Ignore `_wf` here; see Note [ConVal work-free-ness] (2)
   , not (ignoreDataCon env dc)        -- See Note [NoSpecConstr]
   , Just arg_occs <- mb_scrut dc
-  = do { let (ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) args
-             con_str, matched_str :: [StrictnessMark]
-             -- con_str corresponds 1-1 with the /value/ arguments
-             -- matched_str corresponds 1-1 with /all/ arguments
+  = do { let -- `con_str` corresponds 1-1 with the /value/ arguments
+             -- `all_str` corresponds 1-1 with /all/ arguments
+             con_str, all_str :: [StrictnessMark]
              con_str = dataConRepStrictness dc
-             matched_str = match_vals con_str rest_args
-      --  ; pprTraceM "bangs" (ppr (length rest_args == length con_str) $$
-      --       ppr dc $$
-      --       ppr con_str $$
-      --       ppr rest_args $$
-      --       ppr (map isTypeArg rest_args))
-       ; prs <- zipWith3M (argToPat env in_scope val_env) rest_args arg_occs matched_str
-       ; let args' = map sndOf3 prs :: [CoreArg]
-       ; assertPpr (length con_str == length (filter isRuntimeArg rest_args))
-            ( ppr con_str $$ ppr rest_args $$
-              ppr (length con_str) $$ ppr (length rest_args)
-            ) $ return ()
-       ; return (True, mkConApp dc (ty_args ++ args'), concat (map thdOf3 prs)) }
+             all_str = match_vals con_str args
+
+             -- `arg_occs` corresponnds 1-1 with the binders of a data con
+             -- pattern, which omits the universal tyvars. We extend with
+             -- `UnkOcc` for the universals to get `all_arg_occs`
+             all_arg_occs :: [ArgOcc]
+             all_arg_occs = map (const UnkOcc) (dataConUnivTyVars dc) ++ arg_occs
+
+       ; triples :: [(Bool, CoreArg, [Id])] <- zipWith3M (argToPat env in_scope val_env)
+                                                         args all_arg_occs all_str
+
+       ; let args'   = map sndOf3 triples :: [CoreArg]
+             cbv_ids = concat (map thdOf3 triples) :: [Id]
+
+       ; assertPpr (length con_str == valArgCount args)
+                   (ppr dc $$ ppr args $$ ppr arg_occs) $
+         return (True, mkConApp dc args', cbv_ids) }
   where
     mb_scrut dc = case arg_occ of
                 ScrutOcc bs | Just occs <- lookupUFM bs dc
@@ -2743,6 +2747,8 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
                             -> Just (repeat UnkOcc)
                             | otherwise
                             -> Nothing
+
+    match_vals :: [StrictnessMark] -> [CoreExpr] -> [StrictnessMark]
     match_vals bangs (arg:args)
       | isTypeArg arg
       = NotMarkedStrict : match_vals bangs args
@@ -2828,6 +2834,8 @@ mkTyPat :: InScopeSet -> Type -> Type
 -- The tyvars `a` and `b` might have been in scope at the call site,
 -- but not at the definition site.  We want a call pattern
 --            f @a @a (K @a) a
+-- Here we are silently relying on non-shadowing; it's no good if a
+-- /different/ `b` is in scope at the definition site!
 mkTyPat in_scope ty
   = expandSomeTyVarUnfoldings not_in_scope ty
   where

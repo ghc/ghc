@@ -133,12 +133,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Basic
 
 -- Imported and re-exported
-import GHC.Types.Var( Id, CoVar, JoinId,
-            InId,  InVar,
-            OutId, OutVar,
-            idInfo, idDetails, setIdDetails, globaliseId, idMult,
-            isId, isLocalId, isGlobalId, isExportedId,
-            setIdMult, updateIdTypeAndMult, updateIdTypeButNotMult, updateIdTypeAndMultM)
+import GHC.Types.Var
 import qualified GHC.Types.Var as Var
 
 import GHC.Core ( CoreExpr, CoreRule, Unfolding(..), IdUnfoldingFun
@@ -233,12 +228,6 @@ setIdUnique = Var.setVarUnique
 setIdType :: Id -> Type -> Id
 setIdType id ty = seqType ty `seq` Var.setVarType id ty
 
-setIdExported :: Id -> Id
-setIdExported = Var.setIdExported
-
-setIdNotExported :: Id -> Id
-setIdNotExported = Var.setIdNotExported
-
 localiseId :: Id -> Id
 -- Make an Id with the same unique and type as the
 -- incoming Id, but with an *Internal* Name and *LocalId* flavour
@@ -249,9 +238,6 @@ localiseId id
   = Var.mkLocalVar (idDetails id) (localiseName name) (Var.idMult id) (idType id) (idInfo id)
   where
     name = idName id
-
-lazySetIdInfo :: Id -> IdInfo -> Id
-lazySetIdInfo = Var.lazySetIdInfo
 
 setIdInfo :: Id -> IdInfo -> Id
 setIdInfo id info = info `seq` (lazySetIdInfo id info)
@@ -624,9 +610,12 @@ isImplicitId id
 idIsFrom :: Module -> Id -> Bool
 idIsFrom mod id = nameIsLocalOrFrom mod (idName id)
 
-isDeadBinder :: Id -> Bool
-isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
-                  | otherwise = False   -- TyVars count as not dead
+isDeadBinder :: Var -> Bool
+-- This predicate works on any Var, not just Ids
+-- So this module isn't the ideal place for it; but moving it
+-- elsewhere just gives silly module loops
+isDeadBinder bndr | isId bndr = isDeadOcc     (idOccInfo bndr)
+                  | otherwise = isDeadTyCoOcc (tyVarOccInfo bndr)
 
 {-
 ************************************************************************
