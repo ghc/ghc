@@ -484,7 +484,6 @@ generateSettings settingsFile = do
 
     settings <- traverse sequence $
         [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
         , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
         , ("Relative Global Package DB", pure rel_pkg_db)
