@@ -146,7 +146,6 @@ initSettings top_dir = do
         pure (ld_r_path, map Option ld_r_args)
       iserv_prog   = libexec "ghc-iserv"
 
-  targetRTSLinkerOnlySupportsSharedLibs <- getBooleanSetting "target RTS linker only supports shared libraries"
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
 
   baseUnitId <- getSetting_raw "base unit-id"
@@ -231,7 +230,7 @@ initSettings top_dir = do
       , platformMisc_ghcWithInterpreter = ghcWithInterpreter
       , platformMisc_libFFI = tgtUseLibffiForAdjustors target
       , platformMisc_llvmTarget = tgtLlvmTarget target
-      , platformMisc_targetRTSLinkerOnlySupportsSharedLibs = targetRTSLinkerOnlySupportsSharedLibs
+      , platformMisc_targetRTSLinkerOnlySupportsSharedLibs = tgtRTSLinkerOnlySupportsSharedLibs target
       }
 
     , sRawSettings    = settingsList
