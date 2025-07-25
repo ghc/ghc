@@ -603,6 +603,7 @@ data TcGblEnv
           -- decls.
 
         tcg_dependent_files :: TcRef [FilePath], -- ^ dependencies from addDependentFile
+        tcg_dependent_dirs  :: TcRef [FilePath], -- ^ dependencies from addDependentDirectory
 
         tcg_th_topdecls :: TcRef [LHsDecl GhcPs],
         -- ^ Top-level declarations from addTopDecls

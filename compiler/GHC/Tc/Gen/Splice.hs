@@ -173,8 +173,6 @@ import GHC.Parser.HaddockLex (lexHsDoc)
 import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
 
-
-
 {-
 Note [Template Haskell state diagram]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1524,6 +1522,11 @@ instance TH.Quasi TcM where
     dep_files <- readTcRef ref
     writeTcRef ref (fp:dep_files)
 
+  qAddDependentDirectory dp = do
+    ref <- fmap tcg_dependent_dirs getGblEnv
+    dep_dirs <- readTcRef ref
+    writeTcRef ref (dp:dep_dirs)
+
   qAddTempFile suffix = do
     dflags <- getDynFlags
     logger <- getLogger
@@ -1928,6 +1931,7 @@ handleTHMessage msg = case msg of
   ReifyConStrictness nm -> wrapTHResult $ TH.qReifyConStrictness nm
   GetPackageRoot -> wrapTHResult $ TH.qGetPackageRoot
   AddDependentFile f -> wrapTHResult $ TH.qAddDependentFile f
+  AddDependentDirectory d -> wrapTHResult $ TH.qAddDependentDirectory d
   AddTempFile s -> wrapTHResult $ TH.qAddTempFile s
   AddModFinalizer r -> do
     interp <- hscInterp <$> getTopEnv
