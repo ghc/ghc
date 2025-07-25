@@ -199,6 +199,9 @@ lengthFZS (FastZString bs) = BS.length bs
 mkFastZStringString :: String -> FastZString
 mkFastZStringString str = FastZString (BSC.pack str)
 
+mkFastZStringBytes :: ByteString -> FastZString
+mkFastZStringBytes = FastZString
+
 -- -----------------------------------------------------------------------------
 
 {-| A 'FastString' is a Modified UTF-8 encoded string together with a unique ID.

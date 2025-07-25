@@ -162,7 +162,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Monad (unlessM)
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Short as SBS
 import Data.Either
 import Data.List        ( findIndex )
 import Data.Foldable
@@ -3606,7 +3606,8 @@ mkLHsOpTy prom x op y =
   in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
 
 mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> TokRarrow -> HsMultAnnOf (LHsExpr GhcPs) GhcPs
-mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (BS.unpack -> "1")) _ 1))))) arr
+mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (SBS.unpack -> [0x31])) _ 1))))) arr
+  -- 0x31 is the ASCII symbol for the number one ('1')
   -- See #18888 for the use of (SourceText "1") above
   = HsLinearAnn (EpPct1 pct1 (EpArrow arr))
   where
@@ -3616,7 +3617,8 @@ mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (BS.un
 mkMultExpr pct t arr = HsExplicitMult (pct, EpArrow arr) t
 
 mkMultAnn :: EpToken "%" -> LHsType GhcPs -> EpArrowOrColon -> HsMultAnn GhcPs
-mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (BS.unpack -> "1")) 1))) ep
+mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (SBS.unpack -> [0x31])) 1))) ep
+  -- 0x31 is the ASCII symbol for the number one ('1')
   -- See #18888 for the use of (SourceText "1") above
   = HsLinearAnn (EpPct1 pct1 ep)
   where

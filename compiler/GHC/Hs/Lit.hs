@@ -23,7 +23,7 @@ module GHC.Hs.Lit
 
 import GHC.Prelude
 
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Short as SBS
 
 import {-# SOURCE #-} GHC.Hs.Expr( pprExpr )
 
@@ -220,7 +220,8 @@ instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsMultilineString st s) =
       case st of
         NoSourceText -> pprHsString s
-        SourceText src -> vcat $ (text . BS.unpack) <$> BS.lines src
+        -- 0x0A (10) is the new line character (\n) 
+        SourceText src -> vcat $ pprShortByteString <$> SBS.split 0x0A src
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))
