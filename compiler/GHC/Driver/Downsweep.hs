@@ -1010,7 +1010,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
     -- #16331 - when no "internal interpreter" is available but we
     -- need to process some TemplateHaskell or QuasiQuotes, we automatically
     -- turn on -fexternal-interpreter.
-    ext_interp_enable ms = not ghciSupported && internalInterpreter
+    ext_interp_enable ms = not internalInterpreterSupported && internalInterpreter
       where
        lcl_dflags   = ms_hspp_opts ms
        internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)

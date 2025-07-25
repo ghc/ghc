@@ -2,7 +2,7 @@
 
 module GHC.Utils.Constants
   ( debugIsOn
-  , ghciSupported
+  , internalInterpreterSupported
   , isWindowsHost
   , isDarwinHost
   )
@@ -22,11 +22,11 @@ branch of the conditional, thereby dropping debug code altogether when
 the flags are off.
 -}
 
-ghciSupported :: Bool
+internalInterpreterSupported :: Bool
 #if defined(HAVE_INTERNAL_INTERPRETER)
-ghciSupported = True
+internalInterpreterSupported = True
 #else
-ghciSupported = False
+internalInterpreterSupported = False
 #endif
 
 debugIsOn :: Bool
