@@ -426,7 +426,8 @@ def req_fma_cpu( name, opts ):
 
     # RISC-V: We imply float and double extensions (rv64g), so we only have to
     # check for vector support.
-    if not(have_cpu_feature('avx') or have_cpu_feature('zvl128b')):
+    # AArch64: Always expect FMA support.
+    if not (have_cpu_feature('avx') or arch('aarch64') or have_cpu_feature('zvl128b')):
         opts.skip = True
 
 def ignore_stdout(name, opts):

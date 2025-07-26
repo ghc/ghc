@@ -1400,12 +1400,23 @@ getRegister' config plat expr =
     -- Generic ternary case.
     CmmMachOp op [x, y, z] ->
       case op of
-        -- Floating-point fused multiply-add operations
+        -- Floating-point fused multiply-add operations:
         --
-        -- x86 fmadd    x * y + z <=> RISCV64 fmadd : d =   r1 * r2 + r3
-        -- x86 fmsub    x * y - z <=> RISCV64 fnmsub: d =   r1 * r2 - r3
-        -- x86 fnmadd - x * y + z <=> RISCV64 fmsub : d = - r1 * r2 + r3
-        -- x86 fnmsub - x * y - z <=> RISCV64 fnmadd: d = - r1 * r2 - r3
+        -- x86 fmadd    x * y + z <=> RISCV64 fmadd :  d =   r1 * r2 + r3
+        -- x86 fmsub    x * y - z <=> RISCV64 fmsub:   d =   r1 * r2 - r3
+        -- x86 fnmadd - x * y + z <=> RISCV64 fnmsub:  d = - r1 * r2 + r3
+        -- x86 fnmsub - x * y - z <=> RISCV64 fnmadd:  d = - r1 * r2 - r3
+        --
+        -- Vector fused multiply-add operations (what x86 exactly does doesn't
+        -- matter here, we care about the abstract spec):
+        --
+        -- FMAdd    x * y + z <=> RISCV64 vfmadd :  d =   r1 * r2 + r3
+        -- FMSub    x * y - z <=> RISCV64 vfmsub:   d =   r1 * r2 - r3
+        -- FNMAdd - x * y + z <=> RISCV64 vfnmsub:  d = - r1 * r2 + r3
+        -- FNMSub - x * y - z <=> RISCV64 vfnmadd:  d = - r1 * r2 - r3
+        --
+        -- For both formats, the instruction selection happens in the
+        -- pretty-printer.
         MO_FMA var length w
           | length == 1 ->
               float3Op w (\d n m a -> unitOL $ FMA var d n m a)
@@ -1414,12 +1425,10 @@ getRegister' config plat expr =
               (reg_y, format_y, code_y) <- getSomeReg y
               (reg_z, format_z, code_z) <- getSomeReg z
               let targetFormat = VecFormat length (floatScalarFormat w)
-                  negate_z = if var `elem` [FNMAdd, FNMSub] then unitOL (VNEG (OpReg format_z reg_z) (OpReg format_z reg_z)) else nilOL
               pure $ Any targetFormat $ \dst ->
                 code_x
                   `appOL` code_y
                   `appOL` code_z
-                  `appOL` negate_z
                   `snocOL` annExpr
                     expr
                     (VMV (OpReg targetFormat dst) (OpReg format_x reg_x))

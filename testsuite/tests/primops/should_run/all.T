@@ -63,16 +63,12 @@ test('UnliftedTVar2', normal, compile_and_run, [''])
 test('UnliftedWeakPtr', normal, compile_and_run, [''])
 
 test('FMA_Primops'
-    , [ when(have_cpu_feature('fma'), extra_hc_opts('-mfma'))
-      , js_skip # JS backend doesn't have an FMA implementation
-      , when(arch('wasm32'), skip)
+    , [ req_fma_cpu, extra_hc_opts('-mfma')
       , when(have_llvm(), extra_ways(["optllvm"]))
       ]
      , compile_and_run, [''])
 test('FMA_ConstantFold'
-    , [ when(have_cpu_feature('fma'), extra_hc_opts('-mfma'))
-      , js_skip # JS backend doesn't have an FMA implementation
-      , when(arch('wasm32'), skip)
+    , [ req_fma_cpu, extra_hc_opts('-mfma')
       , expect_broken(21227)
       , when(have_llvm(), extra_ways(["optllvm"]))
       ]
@@ -85,9 +81,7 @@ test('T23071',
      [''])
 test('T22710', normal, compile_and_run, [''])
 test('T24496'
-    , [ when(have_cpu_feature('fma'), extra_hc_opts('-mfma'))
-      , js_skip # JS backend doesn't have an FMA implementation
-      , when(arch('wasm32'), skip)
+    , [ req_fma_cpu, extra_hc_opts('-mfma')
       , when(have_llvm(), extra_ways(["optllvm"]))
       ]
     , compile_and_run, ['-O'])
