@@ -7,4 +7,4 @@ test('T4491',
       # the TH way
       only_ways([config.ghc_th_way]),
      ],
-     compile_and_run, [''])
+     compile_and_run, ['-package template-haskell'])

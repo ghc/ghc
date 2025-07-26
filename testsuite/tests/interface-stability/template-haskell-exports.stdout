@@ -1375,7 +1375,7 @@ module Language.Haskell.TH.Quote where
   quoteFile :: QuasiQuoter -> QuasiQuoter
 
 module Language.Haskell.TH.Syntax where
-  -- Safety: Safe
+  -- Safety: Trustworthy
   type AnnLookup :: *
   data AnnLookup = AnnLookupModule Module | AnnLookupName Name
   type AnnTarget :: *
