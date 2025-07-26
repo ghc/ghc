@@ -192,6 +192,9 @@ module Language.Haskell.TH.Syntax (
     nothingName,
     rightName,
     trueName,
+    -- * Notes
+    -- ** Unresolved Infix
+    -- $infix
 )
 where
 
@@ -387,3 +390,69 @@ dataToPatQ = dataToQa id litP conP
                     return (ConP n [] ps')
                 _ -> error $ "Can't construct a pattern from name "
                           ++ showName n
+
+{-
+Note [Unresolved infix]
+~~~~~~~~~~~~~~~~~~~~~~~
+-}
+{- $infix #infix#
+
+When implementing antiquotation for quasiquoters, one often wants
+to parse strings into expressions:
+
+> parse :: String -> Maybe Exp
+
+But how should we parse @a + b * c@? If we don't know the fixities of
+@+@ and @*@, we don't know whether to parse it as @a + (b * c)@ or @(a
++ b) * c@.
+
+In cases like this, use 'UInfixE', 'UInfixP', 'UInfixT', or 'PromotedUInfixT',
+which stand for \"unresolved infix expression / pattern / type / promoted
+constructor\", respectively. When the compiler is given a splice containing a
+tree of @UInfixE@ applications such as
+
+> UInfixE
+>   (UInfixE e1 op1 e2)
+>   op2
+>   (UInfixE e3 op3 e4)
+
+it will look up and the fixities of the relevant operators and
+reassociate the tree as necessary.
+
+  * trees will not be reassociated across 'ParensE', 'ParensP', or 'ParensT',
+    which are of use for parsing expressions like
+
+    > (a + b * c) + d * e
+
+  * 'InfixE', 'InfixP', 'InfixT', and 'PromotedInfixT' expressions are never
+    reassociated.
+
+  * The 'UInfixE' constructor doesn't support sections. Sections
+    such as @(a *)@ have no ambiguity, so 'InfixE' suffices. For longer
+    sections such as @(a + b * c -)@, use an 'InfixE' constructor for the
+    outer-most section, and use 'UInfixE' constructors for all
+    other operators:
+
+    > InfixE
+    >   Just (UInfixE ...a + b * c...)
+    >   op
+    >   Nothing
+
+    Sections such as @(a + b +)@ and @((a + b) +)@ should be rendered
+    into 'Exp's differently:
+
+    > (+ a + b)   ---> InfixE Nothing + (Just $ UInfixE a + b)
+    >                    -- will result in a fixity error if (+) is left-infix
+    > (+ (a + b)) ---> InfixE Nothing + (Just $ ParensE $ UInfixE a + b)
+    >                    -- no fixity errors
+
+  * Quoted expressions such as
+
+    > [| a * b + c |] :: Q Exp
+    > [p| a : b : c |] :: Q Pat
+    > [t| T + T |] :: Q Type
+
+    will never contain 'UInfixE', 'UInfixP', 'UInfixT', 'PromotedUInfixT',
+    'InfixT', 'PromotedInfixT, 'ParensE', 'ParensP', or 'ParensT' constructors.
+
+-}
