@@ -15,6 +15,7 @@ import GHC.CmmToAsm.RV64.Instr
 import GHC.CmmToAsm.RV64.Regs
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
+import GHC.Data.OrdList
 import GHC.Platform
 import GHC.Platform.Reg
 import GHC.Prelude hiding (EQ)
@@ -23,7 +24,6 @@ import GHC.Types.Basic (Alignment, alignmentBytes, mkAlignment)
 import GHC.Types.Unique (getUnique, pprUniqueAlways)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.OrdList
 
 pprNatCmmDecl :: forall doc. (IsDoc doc) => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
 pprNatCmmDecl config (CmmData section dats) =
@@ -830,7 +830,7 @@ pprInstr platform instr = case instr of
   VMV o1 o2 -> pprPanic "RV64.pprInstr - invalid VMV instruction" (text "VMV" <+> pprOp platform o1 <> comma <+> pprOp platform o2)
   VID op | isVectorRegOp op -> op1 (text "\tvid.v") op
   VID op -> pprPanic "RV64.pprInstr - VID can only target registers." (pprOp platform op)
-  VMSEQ o1 o2 o3 | allVectorRegOps [o1, o2] && isIntOp o3 && isImmOp o3-> op3 (text "\tvmseq.vi") o1 o2 o3
+  VMSEQ o1 o2 o3 | allVectorRegOps [o1, o2] && isIntOp o3 && isImmOp o3 -> op3 (text "\tvmseq.vi") o1 o2 o3
   VMSEQ o1 o2 o3 | allVectorRegOps [o1, o2] && isIntOp o3 -> op3 (text "\tvmseq.vx") o1 o2 o3
   VMSEQ o1 o2 o3 -> pprPanic "RV64.pprInstr - VMSEQ wrong operands." (pprOps platform [o1, o2, o3])
   VMERGE o1 o2 o3 o4 | allVectorRegOps [o1, o2, o3, o4] -> op4 (text "\tvmerge.vvm") o1 o2 o3 o4
