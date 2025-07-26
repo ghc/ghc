@@ -2049,10 +2049,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
   let code =
         call_target_code -- compute the label (possibly into a register)
           `appOL` moveStackDown stackSpaceWords
-          `snocOL` COMMENT ((text . show) (map (\(a, b, _c, _d) -> (a, b)) arg_regs''))
-          `snocOL` COMMENT ((text . show) stackSpaceWords <+> (text . show) passRegs)
           `appOL` passArgumentsCode -- put the arguments into x0, ...
-          `snocOL` COMMENT (text "CCALL")
           `snocOL` BL call_target_reg passRegs -- branch and link (C calls aren't tail calls, but return)
           `appOL` readResultsCode -- parse the results into registers
           `appOL` moveStackUp stackSpaceWords
@@ -2139,7 +2136,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
               `snocOL` ann (text "Pass vector argument: " <> ppr r) mov
       passArguments gpRegs fpRegs vRegs args stackSpaceWords (vReg : accumRegs) accumCode'
 
-    -- No more free vector argument registers , and we want to pass a vector argument.
+    -- No more free vector argument registers, and we want to pass a vector argument.
     -- See Note [RISC-V vector C calling convention]
     passArguments _gpRegs _fpRegs [] ((_r, format, _hint, _code_r) : _args) _stackSpaceWords _accumRegs _accumCode
       | isVecFormat format =
@@ -2695,7 +2692,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       VFMIN {} -> 2
       VFMAX {} -> 2
       VRGATHER {} -> 2
-      VFMA {} -> 3
+      VFMA {} -> 2
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1
       BCOND {} -> long_bc_jump_size
