@@ -127,10 +127,10 @@ test('floatx4_arith', [], compile_and_run, [''])
 test('doublex2_arith', [], compile_and_run, [''])
 test('floatx4_shuffle', [], compile_and_run, [''])
 test('doublex2_shuffle', [], compile_and_run, [''])
-test('floatx4_fma', [ unless(have_cpu_feature('fma'), skip)
+test('floatx4_fma', [ req_fma_cpu
                     , extra_hc_opts('-mfma')
                     ], compile_and_run, [''])
-test('doublex2_fma', [ unless(have_cpu_feature('fma'), skip)
+test('doublex2_fma', [ req_fma_cpu
                      , extra_hc_opts('-mfma')
                      ], compile_and_run, [''])
 test('int8x16_arith', [], compile_and_run, [''])
