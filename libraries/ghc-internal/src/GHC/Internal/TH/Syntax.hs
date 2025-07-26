@@ -847,12 +847,6 @@ addTempFile suffix = Q (qAddTempFile suffix)
 addTopDecls :: [Dec] -> Q ()
 addTopDecls ds = Q (qAddTopDecls ds)
 
--- |
-addForeignFile :: ForeignSrcLang -> String -> Q ()
-addForeignFile = addForeignSource
-{-# DEPRECATED addForeignFile
-               "Use 'Language.Haskell.TH.Syntax.addForeignSource' instead"
-  #-} -- deprecated in 8.6
 
 -- | Emit a foreign file which will be compiled and linked to the object for
 -- the current module. Currently only languages that can be compiled with
