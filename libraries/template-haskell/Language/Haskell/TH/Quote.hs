@@ -17,12 +17,12 @@ module Language.Haskell.TH.Quote
   ( QuasiQuoter(..)
   , quoteFile
   -- * For backwards compatibility
-  ,dataToQa, dataToExpQ, dataToPatQ
+  , dataToQa, dataToExpQ, dataToPatQ
   ) where
 
 import GHC.Boot.TH.Syntax
 import GHC.Boot.TH.Quote
-import GHC.Boot.TH.Lift
+import Language.Haskell.TH.Syntax (dataToQa, dataToExpQ, dataToPatQ)
 
 
 -- | 'quoteFile' takes a 'QuasiQuoter' and lifts it into one that read

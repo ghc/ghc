@@ -9,8 +9,8 @@ T2386:
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -c T2386.hs
 
 T7445:
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -c T7445a.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -c T7445.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -package template-haskell -v0 -c T7445a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -package template-haskell -v0 -c T7445.hs
 
 HC_OPTS = -XTemplateHaskell -package template-haskell
 
