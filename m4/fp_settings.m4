@@ -85,6 +85,19 @@ AC_DEFUN([FP_SETTINGS],
         SettingsWindresCommand="$WindresCmd"
     fi
 
+    # Fallback values for LLVM tools. See #26209.
+    if test -z "$LlcCmd"; then
+        LlcCmd="llc"
+    fi
+
+    if test -z "$OptCmd"; then
+        OptCmd="opt"
+    fi
+
+    if test -z "$LlvmAsCmd"; then
+        LlvmAsCmd="clang"
+    fi
+
     # LLVM backend tools
     SettingsLlcCommand="$LlcCmd"
     SettingsOptCommand="$OptCmd"

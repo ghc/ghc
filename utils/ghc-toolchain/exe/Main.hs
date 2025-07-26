@@ -458,9 +458,9 @@ mkTarget opts = do
       throwE "Neither a object-merging tool (e.g. ld -r) nor an ar that supports -L is available"
 
     -- LLVM toolchain
-    llc <- optional $ findProgram "llc" (optLlc opts) ["llc"]
-    opt <- optional $ findProgram "opt" (optOpt opts) ["opt"]
-    llvmAs <- optional $ findProgram "llvm assembler" (optLlvmAs opts) ["clang"]
+    llc <- findProgram "llc" (optLlc opts) ["llc"] <|> return (Program "llc" [])
+    opt <- findProgram "opt" (optOpt opts) ["opt"] <|> return (Program "opt" [])
+    llvmAs <- findProgram "llvm assembler" (optLlvmAs opts) ["clang"] <|> return (Program "clang" [])
 
     -- Windows-specific utilities
     windres <-
@@ -515,9 +515,9 @@ mkTarget opts = do
                    , tgtRanlib = ranlib
                    , tgtNm = nm
                    , tgtMergeObjs = mergeObjs
-                   , tgtLlc = llc
-                   , tgtOpt = opt
-                   , tgtLlvmAs = llvmAs
+                   , tgtLlc = Just llc
+                   , tgtOpt = Just opt
+                   , tgtLlvmAs = Just llvmAs
                    , tgtWindres = windres
                    , tgtOtool = otool
                    , tgtInstallNameTool = installNameTool
