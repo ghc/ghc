@@ -804,8 +804,8 @@ pprInstr platform instr = case instr of
         let fma = case variant of
               FMAdd -> text "\tfmadd" <> dot <> floatPrecission d
               FMSub -> text "\tfmsub" <> dot <> floatPrecission d
-              FNMAdd -> text "\tfnmadd" <> dot <> floatPrecission d
-              FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
+              FNMAdd -> text "\tfnmsub" <> dot <> floatPrecission d
+              FNMSub -> text "\tfnmadd" <> dot <> floatPrecission d
          in op4 fma d r1 r2 r3
   VFMA variant o1@(OpReg fmt _reg) o2 o3
     | VecFormat _l fmt' <- fmt ->
@@ -815,8 +815,8 @@ pprInstr platform instr = case instr of
             fma = case variant of
               FMAdd -> text "madd"
               FMSub -> text "msub" -- TODO: Works only for floats!
-              FNMAdd -> text "nmadd" -- TODO: Works only for floats!
-              FNMSub -> text "nmsub"
+              FNMAdd -> text "nmsub" -- TODO: Works only for floats!
+              FNMSub -> text "nmadd"
          in op3 (tab <> prefix <> fma <> dot <> suffix) o1 o2 o3
   VFMA _variant o1 _o2 _o3 -> pprPanic "RV64.pprInstr - VFMA can only target registers." (pprOp platform o1)
   VMV o1@(OpReg fmt _reg) o2
