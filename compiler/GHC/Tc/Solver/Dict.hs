@@ -15,13 +15,13 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Tc.Errors.Types
-import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Class( matchEqualityInst )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.EvTerm( evCallStack )
+import GHC.Tc.Solver.FunDeps( doDictFunDepImprovement )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Solver.Types
@@ -45,7 +45,7 @@ import GHC.Types.Id( mkTemplateLocals )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 
-import GHC.Utils.Monad ( concatMapM, foldlM )
+import GHC.Utils.Monad ( concatMapM )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc

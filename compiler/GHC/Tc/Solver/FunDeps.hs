@@ -5,7 +5,6 @@
 module GHC.Tc.Solver.FunDeps (
   unifyAndEmitFunDepWanteds,
   doDictFunDepImprovement,
-  ImprovementResult, noImprovement
   ) where
 
 import GHC.Prelude
@@ -25,7 +24,7 @@ import GHC.Tc.Utils.Unify( UnifyEnv(..) )
 import GHC.Tc.Utils.Monad    as TcM
 
 import GHC.Core.Type
-import GHC.Core.InstEnv     ( InstEnvs, ClsInst(..) )
+import GHC.Core.InstEnv     ( ClsInst(..) )
 import GHC.Core.Coercion.Axiom( TypeEqn )
 
 import GHC.Types.Name
@@ -308,72 +307,38 @@ doDictFunDepImprovement :: DictCt -> SolverStage ()
 -- are any fundeps: see (DFL1) in Note [Do fundeps last]
 
 doDictFunDepImprovement dict_ct
-  = Stage $
-    -- Local dictionaries
-    do { inst_envs <- getInstEnvs
-       ; imp1 <- solveFunDeps (do_dict_local_fds dict_ct)
-       ; if imp1 then start_again else
-    -- Top-level instances dictionaries
-    do { imp2 <- solveFunDeps (do_one_top inst_envs dict_ct)
-       ; if imp2 then start_again
-                 else continueWith () } }
-  where
-    start_again = startAgainWith (CDictCan dict_ct)
+  = do { doDictFunDepImprovementLocal dict_ct
+       ; doDictFunDepImprovementTop   dict_ct }
 
-solveFunDeps :: TcS ImprovementResult -> TcS Bool
-solveFunDeps generate_eqs
-  = do { (eqs, imp1) <- generate_eqs
-       ; if isEmptyBag eqs
-         then return imp1
-         else do { imp2 <- nestFunDepsTcS $
-                           solveWanteds eqs
-                 ; return (imp1 || imp2) } }
-
-do_one_top :: InstEnvs -> DictCt -> TcS ImprovementResult
-do_one_top inst_envs (DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
-  = unifyFunDepWanteds ev eqns
-  where
-    eqns :: [FunDepEqn (CtLoc, RewriterSet)]
-    eqns = improveFromInstEnv inst_envs mk_ct_loc cls xis
-
-    dict_pred      = mkClassPred cls xis
-    dict_loc       = ctEvLoc ev
-    dict_origin    = ctLocOrigin dict_loc
-    dict_rewriters = ctEvRewriters ev
-
-    mk_ct_loc :: ClsInst  -- The instance decl
-              -> (CtLoc, RewriterSet)
-    mk_ct_loc ispec
-      = (dict_loc { ctl_origin = new_orig }, dict_rewriters)
-      where
-        inst_pred = mkClassPred cls (is_tys ispec)
-        inst_loc  = getSrcSpan (is_dfun ispec)
-        new_orig  = FunDepOrigin2 dict_pred dict_origin
-                                  inst_pred inst_loc
-
-do_dict_local_fds :: DictCt -> TcS ImprovementResult
+doDictFunDepImprovementLocal :: DictCt -> SolverStage ()
 -- Using functional dependencies, interact the DictCt with the
 -- inert Givens and Wanteds, to produce new equalities
-do_dict_local_fds dict_ct@(DictCt { di_cls = cls, di_ev = wanted_ev })
-  = do { inerts <- getInertCans
-       ; foldM do_interaction noopImprovement $
-         findDictsByClass locals cls }
+doDictFunDepImprovementLocal dict_ct@(DictCt { di_cls = cls, di_ev = wanted_ev })
+  = Stage $
+    do { inerts <- getInertCans
+
+       ; imp <- solveFunDeps $
+                foldM do_interaction emptyCts $
+                findDictsByClass (inert_dicts inerts) cls
+
+       ; if imp then startAgainWith (CDictCan dict_ct)
+                else continueWith () }
   where
     wanted_pred = ctEvPred wanted_ev
     wanted_loc  = ctEvLoc  wanted_ev
 
-    do_interaction :: (Cts,Bool) -> DictCt -> TcS (Cts,Bool)
-    do_interaction (new_eqs, unifs) (DictCt { di_ev = all_ev }) -- This can be Given or Wanted
+    do_interaction :: Cts -> DictCt -> TcS Cts
+    do_interaction new_eqs1 (DictCt { di_ev = all_ev }) -- This can be Given or Wanted
       = do { traceTcS "doLocalFunDepImprovement" $
              vcat [ ppr wanted_ev
                   , pprCtLoc wanted_loc, ppr (isGivenLoc wanted_loc)
                   , pprCtLoc all_loc, ppr (isGivenLoc all_loc)
                   , pprCtLoc deriv_loc, ppr (isGivenLoc deriv_loc) ]
 
-           ; (new_eqs1, unifs1) <- unifyFunDepWanteds wanted_ev $
-                                   improveFromAnother (deriv_loc, all_rewriters)
-                                                      all_pred wanted_pred
-           ; return (new_eqs1 `unionBags` new_eqs, unifs1 || unifs) }
+           ; new_eqs2 <- unifyFunDepWanteds_new wanted_ev $
+                         improveFromAnother (deriv_loc, all_rewriters)
+                                            all_pred wanted_pred
+           ; return (new_eqs1 `unionBags` new_eqs2) }
       where
         all_pred  = ctEvPred all_ev
         all_loc   = ctEvLoc all_ev
@@ -389,6 +354,40 @@ do_dict_local_fds dict_ct@(DictCt { di_cls = cls, di_ev = wanted_ev })
                                      (ctLocOrigin all_loc)
                                      (ctLocSpan all_loc)
 
+doDictFunDepImprovementTop :: DictCt -> SolverStage ()
+doDictFunDepImprovementTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
+  = Stage $
+    do { inst_envs <- getInstEnvs
+
+       ; let eqns :: [FunDepEqn (CtLoc, RewriterSet)]
+             eqns = improveFromInstEnv inst_envs mk_ct_loc cls xis
+       ; imp <- solveFunDeps $
+                unifyFunDepWanteds_new ev eqns
+
+       ; if imp then startAgainWith (CDictCan dict_ct)
+                else continueWith () }
+  where
+    dict_pred      = mkClassPred cls xis
+    dict_loc       = ctEvLoc ev
+    dict_origin    = ctLocOrigin dict_loc
+    dict_rewriters = ctEvRewriters ev
+
+    mk_ct_loc :: ClsInst  -- The instance decl
+              -> (CtLoc, RewriterSet)
+    mk_ct_loc ispec
+      = (dict_loc { ctl_origin = new_orig }, dict_rewriters)
+      where
+        inst_pred = mkClassPred cls (is_tys ispec)
+        inst_loc  = getSrcSpan (is_dfun ispec)
+        new_orig  = FunDepOrigin2 dict_pred dict_origin
+                                  inst_pred inst_loc
+
+
+solveFunDeps :: TcS Cts -> TcS Bool
+solveFunDeps generate_eqs
+  = nestFunDepsTcS $
+    do { eqs <- generate_eqs
+       ; solveSimpleWanteds eqs }
 
 {-
 ************************************************************************
@@ -398,27 +397,19 @@ do_dict_local_fds dict_ct@(DictCt { di_cls = cls, di_ev = wanted_ev })
 ************************************************************************
 -}
 
-type ImprovementResult = (Cts, Bool)
-  -- The Cts are the new equality constraints
-  -- The Bool is True if we unified any meta-ty-vars on when
-  --  generating those new equality constraints
-
-noopImprovement :: ImprovementResult
-noopImprovement = (emptyBag, False)
-
-noImprovement :: ImprovementResult -> Bool
-noImprovement (cts,unifs) = not unifs && isEmptyBag cts
-
-plusImprovements :: ImprovementResult -> ImprovementResult -> ImprovementResult
-plusImprovements (cts1,unif1) (cts2,unif2)
-  = (cts1 `unionBags` cts2, unif1 || unif2)
-
-
 unifyAndEmitFunDepWanteds :: CtEvidence  -- The work item
                           -> [FunDepEqn (CtLoc, RewriterSet)]
                           -> TcS Bool   -- True <=> some unification happened
 unifyAndEmitFunDepWanteds ev fd_eqns
-  = do { (new_eqs, unifs)  <- unifyFunDepWanteds ev fd_eqns
+  | null fd_eqns
+  = return False
+  | otherwise
+  = do { (fresh_tvs_s, new_eqs, unified_tvs) <- wrapUnifierX ev Nominal do_fundeps
+
+       -- Figure out if a "real" unification happened: See Note [unifyFunDeps]
+       ; let unif_happened = any is_old_tv unified_tvs
+             fresh_tvs     = mkVarSet (concat fresh_tvs_s)
+             is_old_tv tv  = not (tv `elemVarSet` fresh_tvs)
 
        ;   -- Emit the deferred constraints
            -- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
@@ -429,24 +420,7 @@ unifyAndEmitFunDepWanteds ev fd_eqns
        ; unless (isEmptyBag new_eqs) $
          updWorkListTcS (extendWorkListChildEqs ev new_eqs)
 
-       ; return unifs }
-
-unifyFunDepWanteds :: CtEvidence  -- The work item
-                  -> [FunDepEqn (CtLoc, RewriterSet)]
-                  -> TcS ImprovementResult
-
-unifyFunDepWanteds _ [] = return noopImprovement -- common case noop
--- See Note [FunDep and implicit parameter reactions]
-
-unifyFunDepWanteds ev fd_eqns
-  = do { (fresh_tvs_s, cts, unified_tvs) <- wrapUnifierX ev Nominal do_fundeps
-
-       -- Figure out if a "real" unification happened: See Note [unifyFunDeps]
-       ; let unif_happened = any is_old_tv unified_tvs
-             fresh_tvs     = mkVarSet (concat fresh_tvs_s)
-             is_old_tv tv  = not (tv `elemVarSet` fresh_tvs)
-
-       ; return (cts, unif_happened) }
+       ; return unif_happened }
   where
     do_fundeps :: UnifyEnv -> TcM [[TcTyVar]]
     do_fundeps env = mapM (do_one env) fd_eqns
@@ -457,6 +431,29 @@ unifyFunDepWanteds ev fd_eqns
                      -- (reverse eqs): See Note [Reverse order of fundep equations]
            ; uPairsTcM env_one eqs'
            ; return fresh_tvs }
+      where
+        env_one = uenv { u_rewriters = u_rewriters uenv S.<> rewriters
+                       , u_loc       = loc }
+
+unifyFunDepWanteds_new :: CtEvidence  -- The work item
+                       -> [FunDepEqn (CtLoc, RewriterSet)]
+                       -> TcS Cts
+-- See Note [FunDep and implicit parameter reactions]
+unifyFunDepWanteds_new _ []
+  = return emptyCts -- common case noop
+
+unifyFunDepWanteds_new ev fd_eqns
+  = do { (_, cts) <- unifyForAllBody ev Nominal do_fundeps
+       ; return cts }
+  where
+    do_fundeps :: UnifyEnv -> TcM ()
+    do_fundeps env = mapM_ (do_one env) fd_eqns
+
+    do_one :: UnifyEnv -> FunDepEqn (CtLoc, RewriterSet) -> TcM ()
+    do_one uenv (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
+      = do { (_, eqs') <- instantiateFunDepEqn tvs (reverse eqs)
+                          -- (reverse eqs): See Note [Reverse order of fundep equations]
+           ; uPairsTcM env_one eqs' }
       where
         env_one = uenv { u_rewriters = u_rewriters uenv S.<> rewriters
                        , u_loc       = loc }

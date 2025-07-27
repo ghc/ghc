@@ -19,9 +19,8 @@ module GHC.Tc.Solver.Monad (
     runTcS, runTcSEarlyAbort, runTcSWithEvBinds, runTcSInerts,
     failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     runTcSEqualities,
-    nestTcS, nestImplicTcS, tryTcS,
+    nestTcS, nestImplicTcS, tryTcS, nestFunDepsTcS,
     setEvBindsTcS, setTcLevelTcS,
-    emitFunDepWanteds,
 
     selectNextWorkItem,
     getWorkList,
@@ -45,7 +44,7 @@ module GHC.Tc.Solver.Monad (
     panicTcS, traceTcS, tryEarlyAbortTcS,
     traceFireTcS, bumpStepCountTcS, csTraceTcS,
     wrapErrTcS, wrapWarnTcS,
-    resetUnificationFlag, setUnificationFlag,
+    getUnificationFlag,
 
     -- Evidence creation and transformation
     MaybeNew(..), freshGoals, isFresh, getEvExpr,
@@ -466,7 +465,7 @@ kickOutAfterUnification tv_list = case nonEmpty tv_list of
        ; let min_tv_lvl = foldr1 minTcLevel (NE.map tcTyVarLevel tvs)
        ; ambient_lvl <- getTcLevel
        ; when (ambient_lvl `strictlyDeeperThan` min_tv_lvl) $
-         setUnificationFlag min_tv_lvl
+         setUnificationFlagTo min_tv_lvl
 
        ; traceTcS "kickOutAfterUnification" (ppr tvs $$ text "n_kicked =" <+> ppr n_kicked)
        ; return n_kicked }
@@ -1266,48 +1265,6 @@ tryTcS (TcS thing_inside)
                             , tcs_inerts   = new_inert_var
                             , tcs_worklist = new_wl_var }
 
-nestFunDepsTcS :: TcS a -> TcS Bool
-nestFunDepsTcS (TcS thing_inside)
-  = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var
-                        , tcs_unif_lvl = unif_lvl_var }) ->
-    do { inerts <- TcM.readTcRef inerts_var
-       ; new_inert_var    <- TcM.newTcRef inerts
-       ; new_wl_var       <- TcM.newTcRef emptyWorkList
-       ; new_unif_lvl_var <- TcM.newTcRef Nothing
-       ; let nest_env = env { tcs_inerts   = new_inert_var
-                            , tcs_worklist = new_wl_var
-                            , tcs_unif_lvl = new_unif_lvl_var }
-
-       ; (inner_lvl, res) <- TcM.pushTcLevelM $
-                             thing_inside nest_env
-
-       ; mb_lvl <- TcM.readTcRef new_unif_lvl_var
-       ; case mb_lvl of
-           Just lvl | lvl < inner_lvl
-                    -> do { setUnificationFlag lvl
-                          ; return True }
-           _  -> return False   -- No unifications (except of vars
-                                -- generated in the fundep stuff itself)
-       }
-
-emitImplicationTcS :: TcLevel -> SkolemInfoAnon
-                   -> [TcTyVar]        -- Skolems
-                   -> [EvVar]          -- Givens
-                   -> Cts              -- Wanteds
-                   -> TcS TcEvBinds
--- Add an implication to the TcS monad work-list
-emitImplicationTcS new_tclvl skol_info skol_tvs givens wanteds
-  = do { let wc = emptyWC { wc_simple = wanteds }
-       ; imp <- wrapTcS $
-                do { ev_binds_var <- TcM.newTcEvBinds
-                   ; imp <- TcM.newImplication
-                   ; return (imp { ic_tclvl  = new_tclvl
-                                 , ic_skols  = skol_tvs
-                                 , ic_given  = givens
-                                 , ic_wanted = wc
-                                 , ic_binds  = ev_binds_var
-                                 , ic_info   = skol_info }) }
-
        ; TcM.traceTc "tryTcS {" $
          vcat [ text "old_ev_binds:" <+> ppr old_ev_binds_var
               , text "new_ev_binds:" <+> ppr new_ev_binds_var
@@ -1328,6 +1285,40 @@ emitImplicationTcS new_tclvl skol_info skol_tvs givens wanteds
                  ; TcM.traceTc "tryTcS update" (ppr (inert_solved_dicts new_inerts))
 
                  ; return True } }
+
+nestFunDepsTcS :: TcS a -> TcS Bool
+nestFunDepsTcS (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var
+                        , tcs_unif_lvl = unif_lvl_var }) ->
+    do { inerts <- TcM.readTcRef inerts_var
+       ; new_inert_var    <- TcM.newTcRef inerts
+       ; new_wl_var       <- TcM.newTcRef emptyWorkList
+       ; new_unif_lvl_var <- TcM.newTcRef Nothing
+       ; let nest_env = env { tcs_inerts   = new_inert_var
+                            , tcs_worklist = new_wl_var
+                            , tcs_unif_lvl = new_unif_lvl_var }
+
+       ; (inner_lvl, _res) <- TcM.pushTcLevelM $
+                              thing_inside nest_env
+
+       -- Figure out whether the fundeps did any useful unifications,
+       -- and if so update the tcs_unif_lvl
+       ; mb_new_lvl <- TcM.readTcRef new_unif_lvl_var
+       ; case mb_new_lvl of
+           Just new_lvl
+             | inner_lvl `deeperThanOrSame` new_lvl
+             -> -- Some useful unifications took place
+                do { mb_old_lvl <- TcM.readTcRef unif_lvl_var
+                   ; case mb_old_lvl of
+                       Just old_lvl | new_lvl `deeperThanOrSame` old_lvl
+                                    -> return ()
+                       _ -> TcM.writeTcRef unif_lvl_var (Just new_lvl)
+                   ; return True }
+
+           _  -> return False   -- No unifications (except of vars
+                                -- generated in the fundep stuff itself)
+       }
+
 
 updateInertsWith :: InertSet -> InertSet -> InertSet
 -- Update the current inert set with bits from a nested solve,
@@ -1849,11 +1840,11 @@ produced the same Derived constraint.)
 -}
 
 
-resetUnificationFlag :: TcS Bool
+getUnificationFlag :: TcS Bool
 -- We are at ambient level i
 -- If the unification flag = Just i, reset it to Nothing and return True
 -- Otherwise leave it unchanged and return False
-resetUnificationFlag
+getUnificationFlag
   = TcS $ \env ->
     do { let ref = tcs_unif_lvl env
        ; ambient_lvl <- TcM.getTcLevel
@@ -1869,10 +1860,10 @@ resetUnificationFlag
                          -> do { TcM.writeTcRef ref Nothing
                                ; return True } }
 
-setUnificationFlag :: TcLevel -> TcS ()
+setUnificationFlagTo :: TcLevel -> TcS ()
 -- (setUnificationFlag i) sets the unification level to (Just i)
 -- unless it already is (Just j) where j <= i
-setUnificationFlag lvl
+setUnificationFlagTo lvl
   = TcS $ \env ->
     do { let ref = tcs_unif_lvl env
        ; mb_lvl <- TcM.readTcRef ref
