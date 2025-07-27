@@ -102,7 +102,7 @@ For OverLitVal
 
  -- Note [Literal source text],[Pragma source text]
 data SourceText
-   = SourceText !ByteString
+   = SourceText {-# UNPACK #-} !ByteString
    | NoSourceText
       -- ^ For when code is generated, e.g. TH,
       -- deriving. The pretty printer will then make
