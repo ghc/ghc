@@ -15,7 +15,6 @@ module GHC.Tc.Solver.Solve (
 import GHC.Prelude
 
 import GHC.Tc.Solver.Dict
-import GHC.Tc.Solver.FunDeps( doDictFunDepImprovement )
 import GHC.Tc.Solver.Equality( solveEquality )
 import GHC.Tc.Solver.Irred( solveIrred )
 import GHC.Tc.Solver.Rewrite( rewrite, rewriteType )
@@ -59,7 +58,6 @@ import GHC.Driver.Session
 import Control.Monad
 
 import Data.List( deleteFirstsBy )
-import Data.Maybe ( mapMaybe )
 import qualified Data.Semigroup as S
 import Data.Void( Void )
 
@@ -123,7 +121,7 @@ simplify_loop n limit definitely_redo_implications
        ; traceTcS "simplify_loop: wc =" (ppr wc)
 
        ; (n_unifs1, simples1) <- reportUnifications $  -- See Note [Superclass iteration]
-                               solveSimpleWanteds simples
+                                 solveSimpleWanteds simples
                 -- Any insoluble constraints are in 'simples' and so get rewritten
                 -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
 
@@ -134,7 +132,7 @@ simplify_loop n limit definitely_redo_implications
                         ; return (wc { wc_simple = simples1
                                      , wc_impl   = implics1 }) }
 
-       ; unif_happened <- resetUnificationFlag
+       ; unif_happened <- getUnificationFlag
        ; csTraceTcS $ text "unif_happened" <+> ppr unif_happened
          -- Note [The Unification Level Flag] in GHC.Tc.Solver.Monad
        ; maybe_simplify_again (n+1) limit unif_happened wc2 }
@@ -154,8 +152,7 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
          --   Just action => Do this action
          result <- firstJustsM [ check_limit
                                , check_unif_happened
-                               , try_expanding_superclasses
-                               , try_fundeps ]
+                               , try_expanding_superclasses ]
        ; case result of
            Nothing      -> return wc
            Just NA_Stop -> return wc
@@ -205,22 +202,6 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
 
       | otherwise
       = return Nothing
-
-    try_fundeps :: TcS (Maybe NextAction)
-    try_fundeps
-      = do { (new_eqs, unifs1) <- doDictFunDepImprovement simples
-           ; if null new_eqs && not unifs1
-             then return Nothing
-             else
-        -- We solve new_eqs immediately, hoping to get some unifications
-        -- If instead we just added them to `wc` we'll iterate and (in case when
-        -- that doesn't solve it) we'll add the same constraint again... loop!
-        do { traceTcS "try_fundeps" (ppr unifs1 $$ ppr new_eqs)
-           ; (n_unifs2, _wc) <- reportUnifications $
-                                solveSimpleWanteds new_eqs
-           ; if (unifs1 || n_unifs2 > 0)
-             then return (Just (NA_TryAgain wc True))
-             else return Nothing } }
 
 {- Note [Superclass iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1082,11 +1063,12 @@ solveSimpleWanteds simples
     go :: Int -> IntWithInf -> Cts -> TcS (Int, Cts)
     -- See Note [The solveSimpleWanteds loop]
     go n limit wc
+      | isEmptyBag wc
+      = return (n,wc)
+
       | n `intGtLimit` limit
       = failTcS $ TcRnSimplifierTooManyIterations
                          simples limit (emptyWC { wc_simple = wc })
-      | isEmptyBag wc
-      = return (n,wc)
       | otherwise
       = do { -- Solve
              wc1 <- solve_simple_wanteds wc
