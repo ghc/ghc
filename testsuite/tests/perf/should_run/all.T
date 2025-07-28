@@ -432,3 +432,22 @@ test('SpecTyFamRun', [ grep_errmsg(r'foo')
                     , collect_stats('bytes allocated', 5)],
      multimod_compile_and_run,
      ['SpecTyFamRun', '-O2'])
+
+
+# Below this line, run tests only with profiling ways.
+prun_ways = (['prof'] if have_profiling() else []) + (['profdyn'] if have_dynamic_prof() else [])
+
+# Options to use when comparing .prof files
+test_opts_dot_prof = [ only_ways(['prof', 'profdyn'])
+            , extra_ways(prun_ways) if prun_ways else skip]
+
+
+test('T26147',
+     [ collect_stats('all', 5),
+       pre_cmd('./genT26147'),
+       extra_files(['genT26147']),
+       extra_run_opts('+RTS -p'),
+       test_opts_dot_prof,
+     ],
+     compile_and_run,
+     ['-v0 -prof -fprof-auto-top'])
