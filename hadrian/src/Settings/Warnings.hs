@@ -43,7 +43,9 @@ ghcWarningsArgs = do
         , package base         ? pure [ "-Wno-trustworthy-safe" ]
         , package binary       ? pure [ "-Wno-deprecations" ]
         , package bytestring   ? pure [ "-Wno-inline-rule-shadowing" ]
-        , package compiler     ? pure [ "-Wcpp-undef" ]
+        , package compiler     ? pure [ "-Wcpp-undef"
+                                      , "-Wno-deprecations"
+                                      ]
         , package directory    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
                                       ]
@@ -63,6 +65,7 @@ ghcWarningsArgs = do
                                       , "-Wno-redundant-constraints"
                                       , "-Wno-simplifiable-class-constraints"
                                       , "-Wno-deriving-typeable" ]
+        , package osString     ? pure [ "-Wno-unused-imports" ]
         , package pretty       ? pure [ "-Wno-unused-imports" ]
         , package primitive    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" ]
