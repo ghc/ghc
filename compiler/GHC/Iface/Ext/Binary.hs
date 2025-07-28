@@ -285,6 +285,8 @@ fromHieName :: NameCache -> HieName -> IO Name
 fromHieName nc hie_name = do
 
   case hie_name of
+    ExternalName mod occ _ | Just name <- isKnownOrigName_maybe mod occ -> return name
+
     ExternalName mod occ span -> updateNameCache nc mod occ $ \cache -> do
       case lookupOrigNameCache cache mod occ of
         Just name -> pure (cache, name)
