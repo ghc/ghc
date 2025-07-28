@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+NUMFUN=1000
+
+cat > T26147.hs << EOF
+module Main where
+
+main :: IO ()
+main = do
+  costCenter1 0
+
+EOF
+
+for i in $(seq $NUMFUN); do
+  cat >> T26147.hs << EOF
+
+costCenter${i} :: Int -> IO ()
+costCenter${i} n = do
+  putStrLn $ "Test value: " ++ show n
+  costCenter$((i + 1)) (n+1)
+EOF
+done
+
+cat >> T26147.hs << EOF
+
+costCenter$((i + 1)) :: Int -> IO ()
+costCenter$((i + 1)) n = do
+  putStrLn $ "Test value: " ++ show n
+EOF
