@@ -20,6 +20,7 @@ module GHC.Utils.Encoding.UTF8
     , utf8PrevChar
     , utf8CharStart
     , utf8UnconsByteString
+    , utf8UnconsShortByteString
       -- * Decoding strings
     , utf8DecodeByteString
     , utf8DecodeShortByteString
@@ -46,6 +47,8 @@ import Foreign
 import GHC.IO
 import GHC.Encoding.UTF8
 
+import Control.Monad.ST
+import Data.Array.Byte (ByteArray(..))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import Data.ByteString.Short.Internal (ShortByteString(..))
@@ -95,6 +98,22 @@ utf8UnconsByteString (BS.PS fptr offset len)
       withForeignPtr fptr $ \ptr -> do
         let (c,n) = utf8DecodeCharPtr (ptr `plusPtr` offset)
         return $ Just (c, BS.PS fptr (offset + n) (len - n))
+
+utf8UnconsShortByteString :: ShortByteString -> Maybe (Char, ShortByteString)
+utf8UnconsShortByteString sbs =
+  let ba@(ByteArray ba0#) = unShortByteString sbs
+      len# = I# $ sizeofByteArray# ba0#
+  in  if (I# len#) < 1
+      then Nothing
+      else
+        let (# c#, n# #) = utf8DecodeCharByteArray ba0#
+            size# = len# -# n#
+            copyInST :: ST s ShortByteString
+            copyInST = ST $ \s0 -> case newByteArray# size# s0 of
+              (# s1, mba# #) -> case copyByteArray# ba0# n# mba# 0# size# s1 of
+                s2 -> case unsafeFreezeByteArray# mba# s2 of
+                 (# s3, ba1 #) -> (# s3, ShortByteString (ByteArray ba1#) #)
+        in  ( Char# c#, runST copyInST )
 
 utf8CompareShortByteString :: ShortByteString -> ShortByteString -> Ordering
 utf8CompareShortByteString (SBS a1) (SBS a2) = utf8CompareByteArray# a1 a2

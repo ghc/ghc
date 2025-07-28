@@ -149,6 +149,13 @@ instance Binary SourceText where
 -- | Efficiently convert a 'ShortByteString' to an 'SDoc' value.
 -- Will only copy the underlying 'ByteArray' if it is /unpinned/.
 pprShortByteString :: ShortByteString -> SDoc
+pprShortByteString = text . utf8DecodeShortByteString
+
+
+{-
+-- | Efficiently convert a 'ShortByteString' to an 'SDoc' value.
+-- Will only copy the underlying 'ByteArray' if it is /unpinned/.
+pprShortByteString :: ShortByteString -> SDoc
 pprShortByteString sbs =
     let !(ByteArray ba#) = unShortByteString sbs
         !len@(I# len#) = SBS.length sbs
@@ -157,6 +164,7 @@ pprShortByteString sbs =
           (# s1, mba# #) -> case copyByteArray# ba# 0# mba# 0# len# s1 of
             s2 -> (# s2, PtrString (Ptr (mutableByteArrayContents# mba#)) len #) 
     in  ptext $ runST copyInST
+-}
 {-
 pprShortByteString sbs =
     let !(ByteArray ba#) = unShortByteString sbs
@@ -219,7 +227,7 @@ pprWithSourceTextThen (SourceText src) _ e = pprShortByteString src <+> e
 
 -- Use ByteString as an intermediary to handle unicode.
 mkSourceText :: String -> SourceText
-mkSourceText = SourceText . SBS.toShort . BS.pack
+mkSourceText = SourceText . utf8EncodeShortByteString
 
 -- | Note that this function relies on the assertion that the output of @show x@
 -- will never contain unicode characters. All characters must be ASCII characters.
@@ -252,11 +260,12 @@ mkIntegralLit i = IL { il_text = safeShowToSourceText i_integer
 
 negateIntegralLit :: IntegralLit -> IntegralLit
 negateIntegralLit (IL text neg value)
-  -- 0x2D is the ASCII code for a hyphen character '-'
   = case text of
-      SourceText (SBS.uncons -> Just (0x2D,src)) -> IL (SourceText src)                  False    (negate value)
-      SourceText src                             -> IL (SourceText (0x2D `SBS.cons` src)) True     (negate value)
-      NoSourceText                               -> IL NoSourceText          (not neg) (negate value)
+      SourceText (utf8UnconsShortByteString -> Just ('-',src))
+                     -> IL (SourceText src)                  False    (negate value)
+                                       --TODO: this cons is not UTF8 approved!
+      SourceText src -> IL (SourceText ('-' `SBS.cons` src)) True     (negate value)
+      NoSourceText   -> IL NoSourceText                     (not neg) (negate value)
 
 -- | Fractional Literal
 --
@@ -324,10 +333,11 @@ negateFractionalLit :: FractionalLit -> FractionalLit
 negateFractionalLit (FL text neg i e eb)
   -- 0x2D is the ASCII code for a hyphen character '-'
   = case text of
-      SourceText (SBS.uncons -> Just (0x2D,src))
-                             -> FL (SourceText src)                   False (negate i) e eb
-      SourceText       src   -> FL (SourceText (0x2D `SBS.cons` src)) True  (negate i) e eb
-      NoSourceText           -> FL NoSourceText (not neg) (negate i) e eb
+      SourceText (utf8UnconsShortByteString -> Just ('-',src))
+                     --TODO: this cons is not UTF8 approved!
+                     -> FL (SourceText src)                  False    (negate i) e eb
+      SourceText src -> FL (SourceText ('-' `SBS.cons` src)) True     (negate i) e eb
+      NoSourceText   -> FL NoSourceText                     (not neg) (negate i) e eb
 
 -- | The integer should already be negated if it's negative.
 integralFractionalLit :: Bool -> Integer -> FractionalLit
