@@ -766,7 +766,7 @@ instance Binary TyVarScope where
 data HieName
   = ExternalName !Module !OccName !SrcSpan
   | LocalName !OccName !SrcSpan
-  | KnownKeyName !Unique
+  | KnownKeyName !Unique !Module !OccName
   deriving (Eq)
 
 instance Ord HieName where
@@ -774,7 +774,7 @@ instance Ord HieName where
     -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
   compare (LocalName a b) (LocalName c d) = compare a c S.<> leftmost_smallest b d
     -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
-  compare (KnownKeyName a) (KnownKeyName b) = nonDetCmpUnique a b
+  compare (KnownKeyName a _ _) (KnownKeyName b _ _) = nonDetCmpUnique a b
     -- Not actually non deterministic as it is a KnownKey
   compare ExternalName{} _ = LT
   compare LocalName{} ExternalName{} = GT
@@ -784,20 +784,18 @@ instance Ord HieName where
 instance Outputable HieName where
   ppr (ExternalName m n sp) = text "ExternalName" <+> ppr m <+> ppr n <+> ppr sp
   ppr (LocalName n sp) = text "LocalName" <+> ppr n <+> ppr sp
-  ppr (KnownKeyName u) = text "KnownKeyName" <+> ppr u
+  ppr (KnownKeyName u _ _) = text "KnownKeyName" <+> ppr u
 
 hieNameOcc :: HieName -> OccName
 hieNameOcc (ExternalName _ occ _) = occ
 hieNameOcc (LocalName occ _) = occ
-hieNameOcc (KnownKeyName u) =
-  case lookupKnownKeyName u of
-    Just n -> nameOccName n
-    Nothing -> pprPanic "hieNameOcc:unknown known-key unique"
-                        (ppr u)
+hieNameOcc (KnownKeyName _ _ occ) = occ
 
 toHieName :: Name -> HieName
 toHieName name
   | isKnownKeyName name = KnownKeyName (nameUnique name)
+                                       (nameModule name)
+                                       (nameOccName name)
   | isExternalName name = ExternalName (nameModule name)
                                        (nameOccName name)
                                        (removeBufSpan $ nameSrcSpan name)

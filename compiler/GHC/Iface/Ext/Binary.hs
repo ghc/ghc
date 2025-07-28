@@ -302,7 +302,7 @@ fromHieName nc hie_name = do
       -- don't update the NameCache for local names
       pure $ mkInternalName uniq occ span
 
-    KnownKeyName u -> case lookupKnownKeyName u of
+    KnownKeyName u _ _ -> case lookupKnownKeyName u of
       Nothing -> pprPanic "fromHieName:unknown known-key unique"
                           (ppr u)
       Just n -> pure n
@@ -316,9 +316,10 @@ putHieName bh (ExternalName mod occ span) = do
 putHieName bh (LocalName occName span) = do
   putByte bh 1
   put_ bh (occName, BinSrcSpan span)
-putHieName bh (KnownKeyName uniq) = do
+putHieName bh (KnownKeyName uniq mod occ) = do
   putByte bh 2
-  put_ bh $ unpkUnique uniq
+  let (c, i) = unpkUnique uniq
+  put_ bh (c, i, mod, occ)
 
 getHieName :: ReadBinHandle -> IO HieName
 getHieName bh = do
@@ -331,6 +332,6 @@ getHieName bh = do
       (occ, span) <- get bh
       return $ LocalName occ $ unBinSrcSpan span
     2 -> do
-      (c,i) <- get bh
-      return $ KnownKeyName $ mkUnique c i
+      (c, i, mod, occ) <- get bh
+      return $ KnownKeyName (mkUnique c i) mod occ
     _ -> panic "GHC.Iface.Ext.Binary.getHieName: invalid tag"
