@@ -19,14 +19,12 @@ import GHC.Prelude
 import GHC.Settings.Config
 import GHC.Utils.Binary
 import GHC.Data.FastString
-import GHC.Builtin.Utils
 import GHC.Iface.Type
 import GHC.Unit.Module            ( ModuleName, Module )
 import GHC.Types.Name
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Types.SrcLoc
 import GHC.Types.Avail
-import GHC.Types.Unique
 import qualified GHC.Utils.Outputable as O ( (<>) )
 import GHC.Utils.Panic
 import GHC.Core.ConLike           ( ConLike(..) )
@@ -766,7 +764,6 @@ instance Binary TyVarScope where
 data HieName
   = ExternalName !Module !OccName !SrcSpan
   | LocalName !OccName !SrcSpan
-  | KnownKeyName !Unique
   deriving (Eq)
 
 instance Ord HieName where
@@ -774,34 +771,28 @@ instance Ord HieName where
     -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
   compare (LocalName a b) (LocalName c d) = compare a c S.<> leftmost_smallest b d
     -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
-  compare (KnownKeyName a) (KnownKeyName b) = nonDetCmpUnique a b
-    -- Not actually non deterministic as it is a KnownKey
   compare ExternalName{} _ = LT
   compare LocalName{} ExternalName{} = GT
-  compare LocalName{} _ = LT
-  compare KnownKeyName{} _ = GT
 
 instance Outputable HieName where
   ppr (ExternalName m n sp) = text "ExternalName" <+> ppr m <+> ppr n <+> ppr sp
   ppr (LocalName n sp) = text "LocalName" <+> ppr n <+> ppr sp
-  ppr (KnownKeyName u) = text "KnownKeyName" <+> ppr u
 
 hieNameOcc :: HieName -> OccName
 hieNameOcc (ExternalName _ occ _) = occ
 hieNameOcc (LocalName occ _) = occ
-hieNameOcc (KnownKeyName u) =
-  case lookupKnownKeyName u of
-    Just n -> nameOccName n
-    Nothing -> pprPanic "hieNameOcc:unknown known-key unique"
-                        (ppr u)
 
 toHieName :: Name -> HieName
-toHieName name
-  | isKnownKeyName name = KnownKeyName (nameUnique name)
-  | isExternalName name = ExternalName (nameModule name)
-                                       (nameOccName name)
-                                       (removeBufSpan $ nameSrcSpan name)
-  | otherwise = LocalName (nameOccName name) (removeBufSpan $ nameSrcSpan name)
+toHieName name =
+  case nameModule_maybe name of
+    Nothing -> LocalName occName span
+    Just m -> ExternalName m occName span
+  where
+    occName :: OccName
+    occName = nameOccName name
+
+    span :: SrcSpan
+    span = removeBufSpan $ nameSrcSpan name
 
 
 {- Note [Capture Entity Information]

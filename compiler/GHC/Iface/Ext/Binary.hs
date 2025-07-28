@@ -17,7 +17,6 @@ where
 
 import GHC.Prelude
 
-import GHC.Builtin.Utils
 import GHC.Settings.Utils         ( maybeRead )
 import GHC.Settings.Config        ( cProjectVersion )
 import GHC.Utils.Binary
@@ -28,10 +27,8 @@ import GHC.Iface.Binary           ( putAllTables )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import qualified GHC.Utils.Binary as Binary
-import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import qualified Data.Array        as A
@@ -290,6 +287,9 @@ fromHieName nc hie_name = do
   case hie_name of
     ExternalName mod occ span -> updateNameCache nc mod occ $ \cache -> do
       case lookupOrigNameCache cache mod occ of
+        -- Note that this may be a wired-in name (provided that the NameCache
+        -- was initialized with known-key names, which is always the case if you
+        -- use `newNameCache`).
         Just name -> pure (cache, name)
         Nothing   -> do
           uniq <- takeUniqFromNameCache nc
@@ -302,11 +302,6 @@ fromHieName nc hie_name = do
       -- don't update the NameCache for local names
       pure $ mkInternalName uniq occ span
 
-    KnownKeyName u -> case lookupKnownKeyName u of
-      Nothing -> pprPanic "fromHieName:unknown known-key unique"
-                          (ppr u)
-      Just n -> pure n
-
 -- ** Reading and writing `HieName`'s
 
 putHieName :: WriteBinHandle -> HieName -> IO ()
@@ -316,9 +311,6 @@ putHieName bh (ExternalName mod occ span) = do
 putHieName bh (LocalName occName span) = do
   putByte bh 1
   put_ bh (occName, BinSrcSpan span)
-putHieName bh (KnownKeyName uniq) = do
-  putByte bh 2
-  put_ bh $ unpkUnique uniq
 
 getHieName :: ReadBinHandle -> IO HieName
 getHieName bh = do
@@ -330,7 +322,4 @@ getHieName bh = do
     1 -> do
       (occ, span) <- get bh
       return $ LocalName occ $ unBinSrcSpan span
-    2 -> do
-      (c,i) <- get bh
-      return $ KnownKeyName $ mkUnique c i
     _ -> panic "GHC.Iface.Ext.Binary.getHieName: invalid tag"

@@ -229,10 +229,7 @@ writeInterfaceFile filename iface = do
   return ()
 
 freshNameCache :: IO NameCache
-freshNameCache =
-  initNameCache
-    'a' -- ??
-    []
+freshNameCache = newNameCache
 
 -- | Read a Haddock (@.haddock@) interface file. Return either an
 -- 'InterfaceFile' or an error message.
