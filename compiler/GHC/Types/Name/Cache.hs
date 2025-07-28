@@ -101,9 +101,14 @@ OrigNameCache at all?  Good question; after all,
   3) Loading of interface files encodes names via Uniques, as detailed in
      Note [Symbol table representation of names] in GHC.Iface.Binary
 
-It turns out that we end up looking up built-in syntax in the cache when we
-generate Haddock documentation. E.g. if we don't find tuple data constructors
-there, hyperlinks won't work as expected. Test case: haddockHtmlTest (Bug923.hs)
+
+However note that:
+  1) It turns out that we end up looking up built-in syntax in the cache when
+     we generate Haddock documentation. E.g. if we don't find tuple data
+     constructors there, hyperlinks won't work as expected. Test case:
+     haddockHtmlTest (Bug923.hs)
+  2) HIE de-serialization relies on wired-in names, including built-in syntax,
+     being present in the OrigNameCache.
 -}
 
 -- | The NameCache makes sure that there is just one Unique assigned for
