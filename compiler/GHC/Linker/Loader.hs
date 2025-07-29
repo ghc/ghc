@@ -72,6 +72,7 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
+import GHC.Types.Error (Message(..))
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1638,7 +1639,7 @@ addEnvPaths name list
 maybePutSDoc :: Logger -> SDoc -> IO ()
 maybePutSDoc logger s
     = when (logVerbAtLeast logger 2) $
-          logMsg logger
+          logMsg logger $ Message
               MCInteractive
               $ withPprStyle defaultUserStyle s
 

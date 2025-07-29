@@ -313,7 +313,7 @@ ghcExit logger val
 
 fatalErrorMsg :: Logger -> SDoc -> IO ()
 fatalErrorMsg logger msg =
-    logMsg logger MCFatal $ withPprStyle defaultErrStyle msg
+    logMsg logger $ Message MCFatal (withPprStyle defaultErrStyle msg)
 
 compilationProgressMsg :: Logger -> SDoc -> IO ()
 compilationProgressMsg logger msg = do
@@ -474,11 +474,11 @@ printOutputForUser logger name_ppr_ctx msg
   = logOutput logger (withUserStyle name_ppr_ctx AllTheWay msg)
 
 logInfo :: Logger -> SDoc -> IO ()
-logInfo logger msg = logMsg logger MCInfo msg
+logInfo logger = logMsg logger . Message MCInfo
 
 -- | Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
 logOutput :: Logger -> SDoc -> IO ()
-logOutput logger msg = logMsg logger MCOutput msg
+logOutput logger = logMsg logger . Message MCOutput
 
 
 prettyPrintGhcErrors :: ExceptionMonad m => Logger -> m a -> m a
