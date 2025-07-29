@@ -18,6 +18,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.ForeignSrcLang
 import GHC.Data.FastString
+import GHC.Core.Lint ( lintMessage )
 
 import GHC.CmmToAsm     ( nativeCodeGen )
 import GHC.CmmToLlvm    ( llvmCodeGen )
@@ -55,7 +56,6 @@ import GHC.Utils.Panic.Plain ( pgmError )
 import GHC.Unit
 import GHC.Unit.Finder      ( mkStubPaths )
 
-import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
 import GHC.Types.ForeignStubs
 import GHC.Types.Unique.DSM
@@ -109,10 +109,7 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                   (text "CmmLint"<+>brackets (ppr this_mod))
                   (const ()) $ do
                 { case cmmLint (targetPlatform dflags) cmm of
-                        Just err -> do { logMsg logger
-                                                   MCInfo -- See Note [MCInfo for Lint] in "GHC.Core.Lint"
-                                                   noSrcSpan
-                                                   $ withPprStyle defaultDumpStyle err
+                        Just err -> do { lintMessage logger err
                                        ; ghcExit logger 1
                                        }
                         Nothing  -> return ()

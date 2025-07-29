@@ -2343,8 +2343,7 @@ failIfM msg = do
     env <- getLclEnv
     let full_msg = (if_loc env <> colon) $$ nest 2 msg
     logger <- getLogger
-    liftIO (logMsg logger MCFatal
-             noSrcSpan $ withPprStyle defaultErrStyle full_msg)
+    liftIO $ fatalErrorMsg logger full_msg
     failM
 
 --------------------
@@ -2376,10 +2375,7 @@ forkM doc thing_inside
                       logger <- getLogger
                       let msg = hang (text "forkM failed:" <+> doc)
                                    2 (text (show exn))
-                      liftIO $ logMsg logger
-                                         MCFatal
-                                         noSrcSpan
-                                         $ withPprStyle defaultErrStyle msg
+                      liftIO $ fatalErrorMsg logger msg
                 ; traceIf (text "} ending fork (badly)" <+> doc)
                 ; pgmError "Cannot continue after interface file error" }
     }

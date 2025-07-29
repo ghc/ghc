@@ -26,6 +26,7 @@ module GHC.Core.Lint (
     -- ** Debug output
     EndPassConfig (..),
     endPassIO,
+    lintMessage,
     displayLintResults, dumpPassResult
  ) where
 
@@ -309,17 +310,18 @@ path does not result in allocation in the hot path. This can be surprisingly
 impactful. Changing `lint_app` reduced allocations for one test program I was
 looking at by ~4%.
 
-Note [MCInfo for Lint]
-~~~~~~~~~~~~~~~~~~~~~~
-When printing a Lint message, use the MCInfo severity so that the
-message is printed on stderr rather than stdout (#13342).
-
 ************************************************************************
 *                                                                      *
                  Beginning and ending passes
 *                                                                      *
 ************************************************************************
 -}
+
+lintMessage :: Logger -> SDoc -> IO ()
+lintMessage logger =
+  -- Note: Use logInfo when printing a Lint message, so that the message is
+  -- printed on stderr rather than stdout (#13342).
+  logInfo logger . withPprStyle defaultDumpStyle
 
 -- | Configuration for boilerplate operations at the end of a
 -- compilation pass producing Core.
@@ -436,8 +438,7 @@ displayLintResults :: Logger
                    -> IO ()
 displayLintResults logger display_warnings pp_what pp_pgm (warns, errs)
   | not (isEmptyBag errs)
-  = do { logMsg logger Err.MCInfo noSrcSpan  -- See Note [MCInfo for Lint]
-           $ withPprStyle defaultDumpStyle
+  = do { lintMessage logger
            (vcat [ lint_banner "errors" pp_what, Err.pprMessageBag errs
                  , text "*** Offending Program ***"
                  , pp_pgm
@@ -447,8 +448,7 @@ displayLintResults logger display_warnings pp_what pp_pgm (warns, errs)
   | not (isEmptyBag warns)
   , log_enable_debug (logFlags logger)
   , display_warnings
-  = logMsg logger Err.MCInfo noSrcSpan  -- See Note [MCInfo for Lint]
-      $ withPprStyle defaultDumpStyle
+  = lintMessage logger
         (lint_banner "warnings" pp_what $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
 
   | otherwise = return ()
