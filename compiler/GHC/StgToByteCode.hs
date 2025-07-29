@@ -748,12 +748,21 @@ doTailCall init_d s p fn args = do
 
   where
   do_pushes !d [] reps = do
-        assert (null reps) return ()
-        (push_fn, sz) <- pushAtom d p (StgVarArg fn)
         platform <- profilePlatform <$> getProfile
-        assert (sz == wordSize platform) return ()
-        let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
-        return (push_fn `appOL` (slide `appOL` unitOL ENTER))
+        assert (null reps) return ()
+        case lookupBCEnv_maybe fn p of
+          Just d_v
+            | d - d_v == 0  -- shortcut; the first thing on the stack is what we want to enter,
+            , d_v <= init_d -- and it is between init_d and sequel (which will be dropped)
+            -> do
+              let slide = mkSlideB platform (d - init_d + wordSize platform)
+                                            (init_d - s - wordSize platform)
+              return (slide `appOL` unitOL ENTER)
+          _ -> do
+              (push_fn, sz) <- pushAtom d p (StgVarArg fn)
+              assert (sz == wordSize platform) return ()
+              let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
+              return (push_fn `appOL` (slide `appOL` unitOL ENTER))
   do_pushes !d args reps = do
       let (push_apply, n, rest_of_reps) = findPushSeq reps
           (these_args, rest_of_args) = splitAt n args
