@@ -22,6 +22,7 @@
 #include "ProfilerReportJson.h"
 #include "Printer.h"
 #include "Capability.h"
+#include "rts/prof/IndexTable.h"
 
 #include <fs_rts.h>
 #include <string.h>
@@ -33,11 +34,11 @@
 /*
  * Profiling allocation arena.
  */
-#if defined(DEBUG)
+// #if defined(DEBUG)
 Arena *prof_arena;
-#else
-static Arena *prof_arena;
-#endif
+// #else
+// static Arena *prof_arena;
+// #endif
 
 /*
  * Global variables used to assign unique IDs to cc's, ccs's, and
@@ -119,9 +120,6 @@ static  CostCentreStack * checkLoop       ( CostCentreStack *ccs,
 static  void              sortCCSTree     ( CostCentreStack *ccs );
 static  CostCentreStack * pruneCCSTree    ( CostCentreStack *ccs );
 static  CostCentreStack * actualPush      ( CostCentreStack *, CostCentre * );
-static  CostCentreStack * isInIndexTable  ( IndexTable *, CostCentre * );
-static  IndexTable *      addToIndexTable ( IndexTable *, CostCentreStack *,
-                                            CostCentre *, bool );
 static  void              ccsSetSelected  ( CostCentreStack *ccs );
 static  void              aggregateCCCosts( CostCentreStack *ccs );
 static  void              registerCC      ( CostCentre *cc );
@@ -552,6 +550,7 @@ pushCostCentre (CostCentreStack *ccs, CostCentre *cc)
                 // not in the IndexTable, now we take the lock:
                 ACQUIRE_LOCK(&ccs_mutex);
 
+                // TODO @fendor: this check can never succeed
                 if (ccs->indexTable != ixtable)
                 {
                     // someone modified ccs->indexTable while
@@ -595,6 +594,7 @@ pushCostCentre (CostCentreStack *ccs, CostCentre *cc)
     return ret;
 }
 
+// ALSO LINEAR
 static CostCentreStack *
 checkLoop (CostCentreStack *ccs, CostCentre *cc)
 {
@@ -621,13 +621,13 @@ static CostCentreStack *
 actualPush_ (CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs)
 {
     /* assign values to each member of the structure */
+    new_ccs->indexTable = 0;
     new_ccs->ccsID = CCS_ID++;
     new_ccs->cc = cc;
     new_ccs->prevStack = ccs;
     new_ccs->root = ccs->root;
     new_ccs->depth = ccs->depth + 1;
 
-    new_ccs->indexTable = EMPTY_TABLE;
 
     /* Initialise the various _scc_ counters to zero
      */
@@ -650,38 +650,6 @@ actualPush_ (CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs)
 
     /* return a pointer to the new stack */
     return new_ccs;
-}
-
-
-static CostCentreStack *
-isInIndexTable(IndexTable *it, CostCentre *cc)
-{
-    while (it!=EMPTY_TABLE)
-    {
-        if (it->cc == cc)
-            return it->ccs;
-        else
-            it = it->next;
-    }
-
-    /* otherwise we never found it so return EMPTY_TABLE */
-    return EMPTY_TABLE;
-}
-
-
-static IndexTable *
-addToIndexTable (IndexTable *it, CostCentreStack *new_ccs,
-                 CostCentre *cc, bool back_edge)
-{
-    IndexTable *new_it;
-
-    new_it = arenaAlloc(prof_arena, sizeof(IndexTable));
-
-    new_it->cc = cc;
-    new_it->ccs = new_ccs;
-    new_it->next = it;
-    new_it->back_edge = back_edge;
-    return new_it;
 }
 
 /* -----------------------------------------------------------------------------
@@ -744,9 +712,11 @@ countTickss_(CostCentreStack const *ccs, ProfilerTotals *totals)
         totals->total_alloc += ccs->mem_alloc;
         totals->total_prof_ticks += ccs->time_ticks;
     }
-    for (IndexTable *i = ccs->indexTable; i != NULL; i = i->next) {
-        if (!i->back_edge) {
-            countTickss_(i->ccs, totals);
+    for ( IndexTableIter *i = indexTableIterator(ccs->indexTable)
+        ; indexTableIterNext(i) != 0
+        ; ) {
+        if (!indexTableIterItem(i)->back_edge) {
+            countTickss_(indexTableIterItem(i)->ccs, totals);
         }
     }
 }
@@ -767,18 +737,19 @@ countTickss(CostCentreStack const *ccs)
 static void
 inheritCosts(CostCentreStack *ccs)
 {
-    IndexTable *i;
 
     if (ignoreCCS(ccs)) { return; }
 
     ccs->inherited_ticks += ccs->time_ticks;
     ccs->inherited_alloc += ccs->mem_alloc;
 
-    for (i = ccs->indexTable; i != NULL; i = i->next)
-        if (!i->back_edge) {
-            inheritCosts(i->ccs);
-            ccs->inherited_ticks += i->ccs->inherited_ticks;
-            ccs->inherited_alloc += i->ccs->inherited_alloc;
+    for ( IndexTableIter *i = indexTableIterator(ccs->indexTable)
+        ; indexTableIterNext(i) != 0
+        ; )
+        if (!indexTableIterItem(i)->back_edge) {
+            inheritCosts(indexTableIterItem(i)->ccs);
+            ccs->inherited_ticks += indexTableIterItem(i)->ccs->inherited_ticks;
+            ccs->inherited_alloc += indexTableIterItem(i)->ccs->inherited_alloc;
         }
 
     return;
@@ -787,14 +758,14 @@ inheritCosts(CostCentreStack *ccs)
 static void
 aggregateCCCosts( CostCentreStack *ccs )
 {
-    IndexTable *i;
-
     ccs->cc->mem_alloc += ccs->mem_alloc;
     ccs->cc->time_ticks += ccs->time_ticks;
 
-    for (i = ccs->indexTable; i != 0; i = i->next) {
-        if (!i->back_edge) {
-            aggregateCCCosts(i->ccs);
+    for ( IndexTableIter *i = indexTableIterator(ccs->indexTable)
+        ; indexTableIterNext(i) != 0
+        ; ) {
+        if (!indexTableIterItem(i)->back_edge) {
+            aggregateCCCosts(indexTableIterItem(i)->ccs);
         }
     }
 }
@@ -806,19 +777,22 @@ aggregateCCCosts( CostCentreStack *ccs )
 static CostCentreStack *
 pruneCCSTree (CostCentreStack *ccs)
 {
-    CostCentreStack *ccs1;
-    IndexTable *i, **prev;
+    // CostCentreStack *ccs1;
+    // IndexTable *i, **prev;
 
-    prev = &ccs->indexTable;
-    for (i = ccs->indexTable; i != 0; i = i->next) {
-        if (i->back_edge) { continue; }
+    // prev = &ccs->indexTable;
+    for ( IndexTableIter *i = indexTableIterator(ccs->indexTable)
+        ; indexTableIterNext(i) != 0
+        ; ) {
+        if (indexTableIterItem(i)->back_edge) { continue; }
 
-        ccs1 = pruneCCSTree(i->ccs);
-        if (ccs1 == NULL) {
-            *prev = i->next;
-        } else {
-            prev = &(i->next);
-        }
+        // TODO: @fendor implement pruning
+        // ccs1 = pruneCCSTree(indexTableIterItem(i)->ccs);
+        // if (ccs1 == NULL) {
+        //     *prev = i->next;
+        // } else {
+        //     prev = &(i->next);
+        // }
     }
 
     if ( (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL
@@ -833,59 +807,62 @@ pruneCCSTree (CostCentreStack *ccs)
     }
 }
 
-static IndexTable*
-insertIndexTableInSortedList(IndexTable* tbl, IndexTable* sortedList)
-{
-    StgWord tbl_ticks = tbl->ccs->scc_count;
-    char*   tbl_label = tbl->ccs->cc->label;
+// static IndexTable*
+// insertIndexTableInSortedList(IndexTable* tbl, IndexTable* sortedList)
+// {
+//     StgWord tbl_ticks = tbl->ccs->scc_count;
+//     char*   tbl_label = tbl->ccs->cc->label;
 
-    IndexTable *prev   = NULL;
-    IndexTable *cursor = sortedList;
+//     IndexTable *prev   = NULL;
+//     IndexTable *cursor = sortedList;
 
-    while (cursor != NULL) {
-        StgWord cursor_ticks = cursor->ccs->scc_count;
-        char*   cursor_label = cursor->ccs->cc->label;
+//     while (cursor != NULL) {
+//         StgWord cursor_ticks = cursor->ccs->scc_count;
+//         char*   cursor_label = cursor->ccs->cc->label;
 
-        if (tbl_ticks > cursor_ticks ||
-                (tbl_ticks == cursor_ticks && strcmp(tbl_label, cursor_label) < 0)) {
-            if (prev == NULL) {
-                tbl->next = sortedList;
-                return tbl;
-            } else {
-                prev->next = tbl;
-                tbl->next = cursor;
-                return sortedList;
-            }
-        } else {
-            prev   = cursor;
-            cursor = cursor->next;
-        }
-    }
+//         if (tbl_ticks > cursor_ticks ||
+//                 (tbl_ticks == cursor_ticks && strcmp(tbl_label, cursor_label) < 0)) {
+//             if (prev == NULL) {
+//                 tbl->next = sortedList;
+//                 return tbl;
+//             } else {
+//                 prev->next = tbl;
+//                 tbl->next = cursor;
+//                 return sortedList;
+//             }
+//         } else {
+//             prev   = cursor;
+//             cursor = cursor->next;
+//         }
+//     }
 
-    prev->next = tbl;
-    return sortedList;
-}
+//     prev->next = tbl;
+//     return sortedList;
+// }
 
 static void
 sortCCSTree(CostCentreStack *ccs)
 {
     if (ccs->indexTable == NULL) return;
 
-    for (IndexTable *tbl = ccs->indexTable; tbl != NULL; tbl = tbl->next)
-        if (!tbl->back_edge)
-            sortCCSTree(tbl->ccs);
+    for ( IndexTableIter *iter = indexTableIterator(ccs->indexTable)
+        ; indexTableIterNext(iter) != 0
+        ; )
+        if (!indexTableIterItem(iter)->back_edge)
+            sortCCSTree(indexTableIterItem(iter)->ccs);
 
     IndexTable *sortedList    = ccs->indexTable;
-    IndexTable *nonSortedList = sortedList->next;
-    sortedList->next = NULL;
+    // TODO @fendor: reimplement sorting
+    // IndexTable *nonSortedList = sortedList->next;
+    // sortedList->next = NULL;
 
-    while (nonSortedList != NULL)
-    {
-        IndexTable *nonSortedTail = nonSortedList->next;
-        nonSortedList->next = NULL;
-        sortedList = insertIndexTableInSortedList(nonSortedList, sortedList);
-        nonSortedList = nonSortedTail;
-    }
+    // while (nonSortedList != NULL)
+    // {
+    //     IndexTable *nonSortedTail = nonSortedList->next;
+    //     nonSortedList->next = NULL;
+    //     sortedList = insertIndexTableInSortedList(nonSortedList, sortedList);
+    //     nonSortedList = nonSortedTail;
+    // }
 
     ccs->indexTable = sortedList;
 }

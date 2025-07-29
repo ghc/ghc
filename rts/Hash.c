@@ -36,7 +36,7 @@
                             /* Also the minimum size of a hash table */
 #define HDIRSIZE    1024    /* Size of the segment directory */
                             /* Maximum hash table size is HSEGSIZE * HDIRSIZE */
-#define HLOAD       5       /* Maximum average load of a single hash bucket */
+#define HLOAD       1       /* Maximum average load of a single hash bucket */
 
 #define HCHUNK      (1024 * sizeof(W_) / sizeof(HashList))
                             /* Number of HashList cells to allocate in one go */
@@ -76,12 +76,27 @@ struct strhashtable { struct hashtable table; };
  * next bucket to be split, re-hash using the larger table.
  * -------------------------------------------------------------------------- */
 int
-hashWord(const HashTable *table, StgWord key)
+hashAddress(const HashTable *table, StgWord key)
 {
     int bucket;
 
     /* Strip the boring zero bits */
-    key >>= sizeof(StgWord);
+    key /= sizeof(StgWord);
+
+    /* Mod the size of the hash table (a power of 2) */
+    bucket = key & table->mask1;
+
+    if (bucket < table->split) {
+        /* Mod the size of the expanded hash table (also a power of 2) */
+        bucket = key & table->mask2;
+    }
+    return bucket;
+}
+
+int
+hashWord(const HashTable *table, StgWord key)
+{
+    int bucket;
 
     /* Mod the size of the hash table (a power of 2) */
     bucket = key & table->mask1;
@@ -169,14 +184,14 @@ expand(HashTable *table, HashFunction f)
         return;
 
     /* Calculate indices of bucket to split */
-    oldsegment = table->split / HSEGSIZE;
-    oldindex = table->split % HSEGSIZE;
+    oldsegment = table->split / HSEGSIZE; // 0
+    oldindex = table->split % HSEGSIZE; // 0
 
-    newbucket = table->max + table->split;
+    newbucket = table->max + table->split; // 1024
 
     /* And the indices of the new bucket */
-    newsegment = newbucket / HSEGSIZE;
-    newindex = newbucket % HSEGSIZE;
+    newsegment = newbucket / HSEGSIZE; // 1
+    newindex = newbucket % HSEGSIZE; // 0
 
     if (newindex == 0)
         allocSegment(table, newsegment);
@@ -239,9 +254,16 @@ lookupHashTable_(const HashTable *table, StgWord key,
 }
 
 void *
+lookupHashTable_indexTable_(const HashTable *table, StgWord key,
+                 HashFunction f)
+{
+    return lookupHashTable_inlined(table, key, f, compareWord);
+}
+
+void *
 lookupHashTable(const HashTable *table, StgWord key)
 {
-    return lookupHashTable_inlined(table, key, hashWord, compareWord);
+    return lookupHashTable_inlined(table, key, hashAddress, compareWord);
 }
 
 void *
@@ -371,7 +393,7 @@ insertHashTable_(HashTable *table, StgWord key,
 void
 insertHashTable(HashTable *table, StgWord key, const void *data)
 {
-    insertHashTable_inlined(table, key, data, hashWord);
+    insertHashTable_inlined(table, key, data, hashAddress);
 }
 
 void
@@ -422,7 +444,7 @@ removeHashTable_(HashTable *table, StgWord key, const void *data,
 void *
 removeHashTable(HashTable *table, StgWord key, const void *data)
 {
-    return removeHashTable_inlined(table, key, data, hashWord, compareWord);
+    return removeHashTable_inlined(table, key, data, hashAddress, compareWord);
 }
 
 void *
@@ -515,6 +537,52 @@ mapHashTableKeys(HashTable *table, void *data, MapHashFnKeys fn)
     }
 }
 
+void initHashIterator(HashTable *table, struct HashIterator_* iter) {
+  /* The last bucket with something in it is table->max + table->split - 1 */
+  long segment = (table->max + table->split - 1) / HSEGSIZE;
+  long index = (table->max + table->split - 1) % HSEGSIZE;
+  iter->table = table;
+  iter->segment = segment;
+  iter->index = index;
+  iter->data = NULL;
+}
+
+struct HashIterator_* hashTableIterator(HashTable *table) {
+    struct HashIterator_* iter;
+    iter = stgMallocBytes(sizeof(HashIterator),"hashTableIterator");
+    initHashIterator(table, iter);
+    return iter;
+}
+
+const void *hashIteratorItem(struct HashIterator_* iter) {
+  return iter->data;
+}
+
+int hashIteratorNext(struct HashIterator_* iter) {
+    long segment = iter->segment;
+    long index = iter->index;
+
+    while (segment >= 0) {
+        while (index >= 0) {
+            for (HashList *hl = iter->table->dir[segment][index]; hl != NULL; hl = hl->next) {
+              iter->segment = segment;
+              /* make sure we advance the index */
+              iter->index = index - 1;
+              iter->data = hl->data;
+              return 1;
+            }
+            index--;
+        }
+        segment--;
+        index = HSEGSIZE - 1;
+    }
+    return 0;
+}
+
+void freeHashIterator(struct HashIterator_* iter) {
+  stgFree(iter);
+}
+
 void
 iterHashTable(HashTable *table, void *data, IterHashFn fn)
 {
@@ -535,6 +603,7 @@ iterHashTable(HashTable *table, void *data, IterHashFn fn)
         index = HSEGSIZE - 1;
     }
 }
+
 
 /* -----------------------------------------------------------------------------
  * When we initialize a hash table, we set up the first segment as well,

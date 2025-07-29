@@ -231,6 +231,7 @@ void _warnFail(const char *filename, unsigned int linenum);
 
 /* Profiling information */
 #include "rts/prof/CCS.h"
+#include "rts/prof/IndexTable.h"
 #include "rts/prof/Heap.h"
 #include "rts/prof/LDV.h"
 

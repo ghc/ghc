@@ -14,6 +14,7 @@
 #include "RtsUtils.h"
 #include "ProfilerReport.h"
 #include "Profiling.h"
+#include "rts/prof/IndexTable.h"
 
 static  uint32_t          numDigits       ( StgInt i );
 static  void              findCCSMaxLens  ( CostCentreStack const *ccs,
@@ -189,7 +190,7 @@ static void
 findCCSMaxLens(CostCentreStack const *ccs, uint32_t indent, uint32_t *max_label_len,
                uint32_t *max_module_len, uint32_t *max_src_len, uint32_t *max_id_len) {
     CostCentre *cc;
-    IndexTable *i;
+    IndexTableIter *i;
 
     cc = ccs->cc;
 
@@ -198,13 +199,16 @@ findCCSMaxLens(CostCentreStack const *ccs, uint32_t indent, uint32_t *max_label_
     *max_src_len = stg_max(*max_src_len, strlen_utf8(cc->srcloc));
     *max_id_len = stg_max(*max_id_len, numDigits(ccs->ccsID));
 
-    for (i = ccs->indexTable; i != 0; i = i->next) {
-        if (!i->back_edge) {
-            findCCSMaxLens(i->ccs, indent+1,
+    for ( i = indexTableIterator(ccs->indexTable)
+        ; indexTableIterNext(i) != 0
+        ; ) {
+        if (!indexTableIterItem(i)->back_edge) {
+            findCCSMaxLens(indexTableIterItem(i)->ccs, indent+1,
                     max_label_len, max_module_len, max_src_len, max_id_len);
         }
     }
 }
+
 
 static void
 logCCS(FILE *prof_file, CostCentreStack const *ccs, ProfilerTotals totals,
@@ -213,7 +217,7 @@ logCCS(FILE *prof_file, CostCentreStack const *ccs, ProfilerTotals totals,
        uint32_t max_src_len, uint32_t max_id_len)
 {
     CostCentre *cc;
-    IndexTable *i;
+    IndexTableIter *i;
 
     cc = ccs->cc;
 
@@ -248,9 +252,11 @@ logCCS(FILE *prof_file, CostCentreStack const *ccs, ProfilerTotals totals,
         fprintf(prof_file, "\n");
     }
 
-    for (i = ccs->indexTable; i != 0; i = i->next) {
-        if (!i->back_edge) {
-            logCCS(prof_file, i->ccs, totals, indent+1,
+    for ( i = indexTableIterator(ccs->indexTable)
+        ; indexTableIterNext(i) != 0
+        ; ) {
+        if (!indexTableIterItem(i)->back_edge) {
+            logCCS(prof_file, indexTableIterItem(i)->ccs, totals, indent+1,
                    max_label_len, max_module_len, max_src_len, max_id_len);
         }
     }

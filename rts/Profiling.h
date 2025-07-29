@@ -11,9 +11,9 @@
 #include <stdio.h>
 
 #include "Rts.h"
-#if defined(DEBUG)
+// #if defined(DEBUG)
 #include "Arena.h"
-#endif
+// #endif
 
 #include "BeginPrivate.h"
 
@@ -49,9 +49,9 @@ void fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
 bool ignoreCCS (CostCentreStack const *ccs);
 bool ignoreCC (CostCentre const *cc);
 
-#if defined(DEBUG)
 extern Arena *prof_arena;
 
+#if defined(DEBUG)
 void debugCCS( CostCentreStack *ccs );
 #endif
 

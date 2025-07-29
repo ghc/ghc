@@ -99,27 +99,6 @@ void startProfTimer     ( void );
 /* Constants used to set is_caf flag on CostCentres */
 #define CC_IS_CAF      true
 #define CC_NOT_CAF     false
-/* -----------------------------------------------------------------------------
- * Data Structures
- * ---------------------------------------------------------------------------*/
-
-// IndexTable is the list of children of a CCS. (Alternatively it is a
-// cache of the results of pushing onto a CCS, so that the second and
-// subsequent times we push a certain CC on a CCS we get the same
-// result).
-
-typedef struct IndexTable_ {
-    // Just a linked list of (cc, ccs) pairs, where the `ccs` is the result of
-    // pushing `cc` to the owner of the index table (another CostCentreStack).
-    CostCentre *cc;
-    CostCentreStack *ccs;
-    struct IndexTable_ *next;
-    // back_edge is true when `cc` is already in the stack, so pushing it
-    // truncates or drops (see RECURSION_DROPS and RECURSION_TRUNCATES in
-    // Profiling.c).
-    bool back_edge;
-} IndexTable;
-
 
 /* -----------------------------------------------------------------------------
    Pre-defined cost centres and cost centre stacks

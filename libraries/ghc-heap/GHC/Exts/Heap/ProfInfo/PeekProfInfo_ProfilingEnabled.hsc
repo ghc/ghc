@@ -138,21 +138,21 @@ peekCostCentre costCenterCacheRef ptr = do
 
 peekIndexTable :: AddressSet -> IORef (AddressMap CostCentre) -> Ptr indexTable -> IO (Maybe IndexTable)
 peekIndexTable _ _ ptr | ptr == nullPtr = return Nothing
-peekIndexTable loopBreakers costCenterCacheRef ptr = do
-        it_cc_ptr <- (#peek struct IndexTable_, cc) ptr
-        it_cc' <- peekCostCentre costCenterCacheRef it_cc_ptr
-        it_ccs_ptr <- (#peek struct IndexTable_, ccs) ptr
-        it_ccs' <- peekCostCentreStack loopBreakers costCenterCacheRef it_ccs_ptr
-        it_next_ptr <- (#peek struct IndexTable_, next) ptr
-        it_next' <- peekIndexTable loopBreakers costCenterCacheRef it_next_ptr
-        it_back_edge' <- (#peek struct IndexTable_, back_edge) ptr
+peekIndexTable _ _ _ = pure Nothing
+        -- it_cc_ptr <- (#peek struct IndexTable_, cc) ptr
+        -- it_cc' <- peekCostCentre costCenterCacheRef it_cc_ptr
+        -- it_ccs_ptr <- (#peek struct IndexTable_, ccs) ptr
+        -- it_ccs' <- peekCostCentreStack loopBreakers costCenterCacheRef it_ccs_ptr
+        -- it_next_ptr <- (#peek struct IndexTable_, next) ptr
+        -- it_next' <- peekIndexTable loopBreakers costCenterCacheRef it_next_ptr
+        -- it_back_edge' <- (#peek struct IndexTable_, back_edge) ptr
 
-        return $ Just IndexTable {
-            it_cc = it_cc',
-            it_ccs = it_ccs',
-            it_next = it_next',
-            it_back_edge = it_back_edge'
-        }
+        -- return $ Just IndexTable {
+        --     it_cc = it_cc',
+        --     it_ccs = it_ccs',
+        --     it_next = it_next',
+        --     it_back_edge = it_back_edge'
+        -- }
 
 -- | casts a @Ptr@ to an @Int@
 ptrToInt :: Ptr a -> Int

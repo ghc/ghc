@@ -16,7 +16,6 @@ for i in $(seq $NUMFUN); do
 
 costCenter${i} :: Int -> IO ()
 costCenter${i} n = do
-  putStrLn $ "Test value: " ++ show n
   costCenter$((i + 1)) (n+1)
 EOF
 done
@@ -25,5 +24,7 @@ cat >> T26147.hs << EOF
 
 costCenter$((i + 1)) :: Int -> IO ()
 costCenter$((i + 1)) n = do
-  putStrLn $ "Test value: " ++ show n
+  if n < $NUMFUN * 30
+    then costCenter1 n
+    else putStrLn $ "Test value: " ++ show n
 EOF

@@ -322,6 +322,7 @@ library
                         rts/Utils.h
                         rts/prof/CCS.h
                         rts/prof/Heap.h
+                        rts/prof/IndexTable.h
                         rts/prof/LDV.h
                         rts/storage/Block.h
                         rts/storage/ClosureMacros.h
@@ -436,6 +437,7 @@ library
                  ProfilerReport.c
                  ProfilerReportJson.c
                  Profiling.c
+                 IndexTable.c
                  IPE.c
                  Proftimer.c
                  RaiseAsync.c
