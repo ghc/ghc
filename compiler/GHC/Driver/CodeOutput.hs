@@ -55,7 +55,6 @@ import GHC.Utils.Panic.Plain ( pgmError )
 import GHC.Unit
 import GHC.Unit.Finder      ( mkStubPaths )
 
-import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
 import GHC.Types.ForeignStubs
 import GHC.Types.Unique.DSM
@@ -111,7 +110,6 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                 { case cmmLint (targetPlatform dflags) cmm of
                         Just err -> do { logMsg logger
                                                    MCInfo -- See Note [MCInfo for Lint] in "GHC.Core.Lint"
-                                                   noSrcSpan
                                                    $ withPprStyle defaultDumpStyle err
                                        ; ghcExit logger 1
                                        }

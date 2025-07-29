@@ -365,16 +365,15 @@ we aren't using annotations heavily.
 msg :: MessageClass -> SDoc -> CoreM ()
 msg msg_class doc = do
     logger <- getLogger
-    loc    <- getSrcSpanM
     name_ppr_ctx <- getNamePprCtx
     let sty = case msg_class of
-                MCDiagnostic _ _ _ -> err_sty
+                MCDiagnostic _ _ _ _ -> err_sty
                 MCDump             -> dump_sty
                 _                  -> user_sty
         err_sty  = mkErrStyle name_ppr_ctx
         user_sty = mkUserStyle name_ppr_ctx AllTheWay
         dump_sty = mkDumpStyle name_ppr_ctx
-    liftIO $ logMsg logger msg_class loc (withPprStyle sty doc)
+    liftIO $ logMsg logger msg_class (withPprStyle sty doc)
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()

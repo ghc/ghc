@@ -94,7 +94,6 @@ import GHC.Types.SourceFile
 import GHC.Types.SafeHaskell
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
-import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 import GHC.Types.PkgQual
 
@@ -1105,7 +1104,7 @@ For some background on this choice see #15269.
 showIface :: Logger -> DynFlags -> UnitState -> NameCache -> FilePath -> IO ()
 showIface logger dflags unit_state name_cache filename = do
    let profile = targetProfile dflags
-       printer = logMsg logger MCOutput noSrcSpan . withPprStyle defaultDumpStyle
+       printer = logMsg logger MCOutput . withPprStyle defaultDumpStyle
 
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
@@ -1119,7 +1118,7 @@ showIface logger dflags unit_state name_cache filename = do
                                    neverQualifyModules
                                    neverQualifyPackages
                                    alwaysPrintPromTick
-   logMsg logger MCDump noSrcSpan
+   logMsg logger MCDump
       $ withPprStyle (mkDumpStyle name_ppr_ctx)
       $ pprModIface unit_state iface
 

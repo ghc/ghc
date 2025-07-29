@@ -833,10 +833,10 @@ resetLastErrorLocations = do
 
 ghciLogAction :: IORef [(FastString, Int)] -> LogAction -> LogAction
 ghciLogAction lastErrLocations old_log_action
-              dflags msg_class srcSpan msg = do
-    old_log_action dflags msg_class srcSpan msg
+              dflags msg_class msg = do
+    old_log_action dflags msg_class msg
     case msg_class of
-        MCDiagnostic SevError _reason _code -> case srcSpan of
+        MCDiagnostic srcSpan SevError _reason _code -> case srcSpan of
             RealSrcSpan rsp _ -> modifyIORef lastErrLocations
                 (++ [(srcLocFile (realSrcSpanStart rsp), srcLocLine (realSrcSpanStart rsp))])
             _ -> return ()

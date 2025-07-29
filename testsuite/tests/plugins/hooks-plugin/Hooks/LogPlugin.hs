@@ -19,6 +19,6 @@ hooksP opts hsc_env = do
   return hsc_env'
 
 logHook :: LogAction -> LogAction
-logHook action logFlags messageClass srcSpan msgDoc = do
+logHook action logFlags messageClass msgDoc = do
   putStrLn "Log hook called"
-  action logFlags messageClass srcSpan msgDoc
+  action logFlags messageClass msgDoc
