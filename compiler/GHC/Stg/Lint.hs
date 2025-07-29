@@ -148,7 +148,7 @@ lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised w
       Nothing  ->
         return ()
       Just msg -> do
-        logMsg logger Err.MCInfo noSrcSpan   -- See Note [MCInfo for Lint] in "GHC.Core.Lint"
+        logMsg logger Err.MCInfo             -- See Note [MCInfo for Lint] in "GHC.Core.Lint"
           $ withPprStyle defaultDumpStyle
           (vcat [ text "*** Stg Lint ErrMsgs: in" <+>
                         text whodunit <+> text "***",

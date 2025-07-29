@@ -46,19 +46,19 @@ printMessages logger msg_opts opts = mapM_ (printMessage logger msg_opts opts) .
     sortMessages = sortMsgBag (Just opts) . getMessages
 
 printMessage :: forall a. (Diagnostic a) => Logger -> DiagnosticOpts a -> DiagOpts -> MsgEnvelope a -> IO ()
-printMessage logger msg_opts opts message
-  | log_diags_as_json = do
-      decorated <- decorateDiagnostic logflags messageClass location doc
-      let
-        rendered :: String
-        rendered = renderWithContext (log_default_user_context logflags) decorated
+printMessage logger msg_opts opts message = do
+  decorated <- decorateDiagnostic logflags messageClass location doc
+  if log_diags_as_json then do
+    let
+      rendered :: String
+      rendered = renderWithContext (log_default_user_context logflags) decorated
 
-        jsonMessage :: JsonDoc
-        jsonMessage = jsonDiagnostic rendered message
+      jsonMessage :: JsonDoc
+      jsonMessage = jsonDiagnostic rendered message
 
-      logJsonMsg logger messageClass jsonMessage
-
-  | otherwise = logMsg logger messageClass location doc
+    logJsonMsg logger messageClass jsonMessage
+  else do
+    logMsg logger messageClass decorated
   where
     logflags :: LogFlags
     logflags = logFlags logger
@@ -67,7 +67,7 @@ printMessage logger msg_opts opts message
     doc = updSDocContext (\_ -> ctx) (messageWithHints diagnostic)
 
     messageClass :: MessageClass
-    messageClass = UnsafeMCDiagnostic severity (errMsgReason message) (diagnosticCode diagnostic)
+    messageClass = UnsafeMCDiagnostic location severity (errMsgReason message) (diagnosticCode diagnostic)
 
     style :: PprStyle
     style = mkErrStyle (errMsgContext message)
@@ -95,6 +95,23 @@ printMessage logger msg_opts opts message
 
     log_diags_as_json :: Bool
     log_diags_as_json = log_diagnostics_as_json (logFlags logger)
+
+decorateDiagnostic :: LogFlags -> MessageClass -> SrcSpan -> SDoc -> IO SDoc
+decorateDiagnostic logflags msg_class srcSpan msg = addCaret
+  where
+    -- Pretty print the warning flag, if any (#10752)
+    message :: SDoc
+    message = mkLocMessageWarningGroups (log_show_warn_groups logflags) msg_class srcSpan msg
+
+    addCaret :: IO SDoc
+    addCaret = do
+      caretDiagnostic <-
+          if log_show_caret logflags
+          then getCaretDiagnostic msg_class srcSpan
+          else pure empty
+      return $ getPprStyle $ \style ->
+        withPprStyle (setStyleColoured True style)
+          (message $+$ caretDiagnostic $+$ blankLine)
 
 -- | Given a bag of diagnostics, turn them into an exception if
 -- any has 'SevError', or print them out otherwise.

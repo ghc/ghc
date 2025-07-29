@@ -507,7 +507,7 @@ classifyLdInput logger platform f
   | isObjectFilename platform f = return (Just (Objects [f]))
   | isDynLibFilename platform f = return (Just (DLLPath f))
   | otherwise          = do
-        logMsg logger MCInfo noSrcSpan
+        logMsg logger MCInfo
             $ withPprStyle defaultUserStyle
             (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
@@ -1640,7 +1640,6 @@ maybePutSDoc logger s
     = when (logVerbAtLeast logger 2) $
           logMsg logger
               MCInteractive
-              noSrcSpan
               $ withPprStyle defaultUserStyle s
 
 maybePutStr :: Logger -> String -> IO ()

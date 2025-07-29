@@ -492,7 +492,7 @@ data MessageClass
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | UnsafeMCDiagnostic Severity ResolvedDiagnosticReason (Maybe DiagnosticCode)
+  | UnsafeMCDiagnostic SrcSpan Severity ResolvedDiagnosticReason (Maybe DiagnosticCode)
     -- ^ Diagnostics from the compiler. This constructor is very powerful as
     -- it allows the construction of a 'MessageClass' with a completely
     -- arbitrary permutation of 'Severity' and 'DiagnosticReason'. As such,
@@ -508,8 +508,8 @@ data MessageClass
     -- should always have a 'DiagnosticCode'. See Note [Diagnostic codes].
 
 {-# COMPLETE MCOutput, MCFatal, MCInteractive, MCDump, MCInfo, MCDiagnostic #-}
-pattern MCDiagnostic :: Severity -> ResolvedDiagnosticReason -> Maybe DiagnosticCode -> MessageClass
-pattern MCDiagnostic severity reason code <- UnsafeMCDiagnostic severity reason code
+pattern MCDiagnostic :: SrcSpan -> Severity -> ResolvedDiagnosticReason -> Maybe DiagnosticCode -> MessageClass
+pattern MCDiagnostic span severity reason code <- UnsafeMCDiagnostic span severity reason code
 
 {-
 Note [Suppressing Messages]
@@ -654,7 +654,7 @@ mkLocMessageWarningGroups
   -> SDoc
 mkLocMessageWarningGroups show_warn_groups msg_class locn msg
   = case msg_class of
-    MCDiagnostic severity reason code -> formatDiagnostic show_warn_groups locn severity reason code msg
+    MCDiagnostic span severity reason code -> formatDiagnostic show_warn_groups span severity reason code msg
     _ -> sdocOption sdocColScheme $ \col_scheme ->
       let
           msg_colour = getMessageClassColour msg_class col_scheme
@@ -779,7 +779,7 @@ formatLocMessageWarningGroups locn msg_title code_doc warning_flag_doc msg
                         msg)
 
 getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
-getMessageClassColour (MCDiagnostic severity _reason _code)   = getSeverityColour severity
+getMessageClassColour (MCDiagnostic _span severity _reason _code) = getSeverityColour severity
 getMessageClassColour MCFatal                                 = Col.sFatal
 getMessageClassColour _                                       = const mempty
 
