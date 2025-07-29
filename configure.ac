@@ -351,15 +351,23 @@ fi
 
 dnl ** Building a cross compiler?
 dnl --------------------------------------------------------------
-CrossCompiling=NO
-# If 'host' and 'target' differ, then this means we are building a cross-compiler.
-if test "$target" != "$host" ; then
-    CrossCompiling=YES
-    cross_compiling=yes   # This tells configure that it can accept just 'target',
-                          # otherwise you get
-                          #   configure: error: cannot run C compiled programs.
-                          #   If you meant to cross compile, use `--host'.
+dnl We allow the user to override this since the target/host check
+dnl can get this wrong in some particular cases. See #26236.
+if test -z "$CrossCompiling" ; then
+    CrossCompiling=NO
+    # If 'host' and 'target' differ, then this means we are building a cross-compiler.
+    if test "$target" != "$host" ; then
+        CrossCompiling=YES
+    fi
 fi
+if test "$CrossCompiling" = "YES"; then
+    # This tells configure that it can accept just 'target',
+    # otherwise you get
+    #   configure: error: cannot run C compiled programs.
+    #   If you meant to cross compile, use `--host'.
+    cross_compiling=yes
+fi
+
 if test "$BuildPlatform" != "$HostPlatform" ; then
    AC_MSG_ERROR([
 You've selected:
