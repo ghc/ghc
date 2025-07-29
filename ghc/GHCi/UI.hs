@@ -836,7 +836,7 @@ ghciLogAction lastErrLocations old_log_action
               dflags msg = do
     old_log_action dflags msg
     case msg of
-        Message (MCDiagnostic srcSpan SevError _reason _code) _ -> case srcSpan of
+        MCDiagnostic srcSpan SevError _reason _code _ -> case srcSpan of
             RealSrcSpan rsp _ -> modifyIORef lastErrLocations
                 (++ [(srcLocFile (realSrcSpanStart rsp), srcLocLine (realSrcSpanStart rsp))])
             _ -> return ()

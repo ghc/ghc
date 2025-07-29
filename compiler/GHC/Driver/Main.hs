@@ -1843,7 +1843,8 @@ markUnsafeInfer tcg_env whyUnsafe = do
     badInst ins | checkOverlap (overlapMode (is_flag ins))
                 = [formatLocMessage (nameSrcSpan $ getName $ is_dfun ins) $
                       ppr (overlapMode $ is_flag ins) <+>
-                      text "overlap mode isn't allowed in Safe Haskell"]
+                      text "overlap mode isn't allowed in Safe Haskell"
+                      ]
                 | otherwise = []
 
 -- | Figure out the final correct safe haskell mode

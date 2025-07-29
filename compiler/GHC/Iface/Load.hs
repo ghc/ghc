@@ -96,7 +96,6 @@ import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
 import GHC.Types.TyThing
 import GHC.Types.PkgQual
-import GHC.Types.Error (Message(..))
 
 import GHC.Unit.External
 import GHC.Unit.Module
@@ -1118,7 +1117,7 @@ showIface logger dflags unit_state name_cache filename = do
                                    neverQualifyModules
                                    neverQualifyPackages
                                    alwaysPrintPromTick
-   logMsg logger $ Message MCDump
+   logMsg logger $ MCDump
       $ withPprStyle (mkDumpStyle name_ppr_ctx)
       $ pprModIface unit_state iface
 

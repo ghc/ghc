@@ -26,8 +26,7 @@ module GHC.Types.Error
 
    -- * Classifying Messages
 
-   , Message (..)
-   , MessageClass (MCDiagnostic, ..)
+   , Message (MCDiagnostic, ..)
    , Severity (..)
    , Diagnostic (..)
    , UnknownDiagnostic (..)
@@ -478,27 +477,25 @@ data MsgEnvelope e = MsgEnvelope
       -- See Note [Warnings controlled by multiple flags]
    } deriving (Functor, Foldable, Traversable)
 
-data Message = Message MessageClass SDoc
-
 -- | The class for a diagnostic message. The main purpose is to classify a
 -- message within GHC, to distinguish it from a debug/dump message vs a proper
 -- diagnostic, for which we include a 'DiagnosticReason'.
-data MessageClass
-  = MCOutput
-  | MCFatal
-  | MCInteractive
+data Message
+  = MCOutput SDoc
+  | MCFatal SDoc
+  | MCInteractive SDoc
 
-  | MCDump
+  | MCDump SDoc
     -- ^ Log message intended for compiler developers
     -- No file\/line\/column stuff
 
-  | MCInfo
+  | MCInfo SDoc
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | UnsafeMCDiagnostic SrcSpan Severity ResolvedDiagnosticReason (Maybe DiagnosticCode)
+  | UnsafeMCDiagnostic SrcSpan Severity ResolvedDiagnosticReason (Maybe DiagnosticCode) SDoc
     -- ^ Diagnostics from the compiler. This constructor is very powerful as
-    -- it allows the construction of a 'MessageClass' with a completely
+    -- it allows the construction of a 'Message' with a completely
     -- arbitrary permutation of 'Severity' and 'DiagnosticReason'. As such,
     -- users are encouraged to use higher level primitives
     -- instead. Use this constructor directly only if you need to construct
@@ -512,8 +509,8 @@ data MessageClass
     -- should always have a 'DiagnosticCode'. See Note [Diagnostic codes].
 
 {-# COMPLETE MCOutput, MCFatal, MCInteractive, MCDump, MCInfo, MCDiagnostic #-}
-pattern MCDiagnostic :: SrcSpan -> Severity -> ResolvedDiagnosticReason -> Maybe DiagnosticCode -> MessageClass
-pattern MCDiagnostic span severity reason code <- UnsafeMCDiagnostic span severity reason code
+pattern MCDiagnostic :: SrcSpan -> Severity -> ResolvedDiagnosticReason -> Maybe DiagnosticCode -> SDoc -> Message
+pattern MCDiagnostic span severity reason code doc <- UnsafeMCDiagnostic span severity reason code doc
 
 {-
 Note [Suppressing Messages]
@@ -642,15 +639,17 @@ pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 -- warning groups (if applicable).
 mkLocMessageWarningGroups
   :: Bool                               -- ^ Print warning groups (if applicable)?
-  -> MessageClass                       -- ^ What kind of message?
+  -> Message                            -- ^ message
   -> SrcSpan                            -- ^ location
-  -> SDoc                               -- ^ message
   -> SDoc
-mkLocMessageWarningGroups show_warn_groups msg_class locn msg
-  = case msg_class of
-    MCDiagnostic span severity reason code -> formatDiagnostic show_warn_groups span severity reason code msg
-    MCFatal -> formatFatalLocMessage locn msg
-    _ -> formatLocMessage locn msg
+mkLocMessageWarningGroups show_warn_groups msg locn
+  = case msg of
+    MCDiagnostic span severity reason code doc -> formatDiagnostic show_warn_groups span severity reason code doc
+    MCFatal doc -> formatFatalLocMessage locn doc
+    MCOutput doc -> formatLocMessage locn doc
+    MCInteractive doc -> formatLocMessage locn doc
+    MCDump doc -> formatLocMessage locn doc
+    MCInfo doc -> formatLocMessage locn doc
 
 formatFatalLocMessage :: SrcSpan -> SDoc -> SDoc
 formatFatalLocMessage locn msg = sdocOption sdocColScheme $ \col_scheme ->
@@ -769,12 +768,11 @@ formatLocMessageWarningGroups locn msg_title code_doc warning_flag_doc msg
                    code_doc <+> warning_flag_doc
 
       in coloured (Col.sMessage col_scheme)
-                  (hang (coloured (Col.sHeader col_scheme) header) 4
-                        msg)
+                  $ hang (coloured (Col.sHeader col_scheme) header) 4 msg
 
-getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
-getMessageClassColour (MCDiagnostic _span severity _reason _code) = getSeverityColour severity
-getMessageClassColour MCFatal                                 = fatalColour
+getMessageClassColour :: Message -> Col.Scheme -> Col.PprColour
+getMessageClassColour (MCDiagnostic _span severity _reason _code _) = getSeverityColour severity
+getMessageClassColour (MCFatal _)                             = fatalColour
 getMessageClassColour _                                       = const mempty
 
 fatalColour :: Col.Scheme -> Col.PprColour
@@ -786,9 +784,9 @@ getSeverityColour severity = case severity of
   SevWarning -> Col.sWarning
   SevIgnore -> const mempty
 
-getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
+getCaretDiagnostic :: Message -> SrcSpan -> IO SDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
-getCaretDiagnostic msg_class (RealSrcSpan span _) =
+getCaretDiagnostic msg (RealSrcSpan span _) =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
   where
     getSrcLine fn i =
@@ -821,7 +819,7 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
     caretDiagnostic Nothing = empty
     caretDiagnostic (Just srcLineWithNewline) =
       sdocOption sdocColScheme$ \col_scheme ->
-      let sevColour = getMessageClassColour msg_class col_scheme
+      let sevColour = getMessageClassColour msg col_scheme
           marginColour = Col.sMargin col_scheme
       in
       coloured marginColour (text marginSpace) <>

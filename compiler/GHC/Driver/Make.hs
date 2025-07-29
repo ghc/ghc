@@ -1447,11 +1447,11 @@ withDeferredDiagnostics f = do
     let deferDiagnostics _dflags !msg = do
           let action = logMsg logger msg
           case msg of
-            Message (MCDiagnostic _ SevWarning _reason _code) _
+            MCDiagnostic _ SevWarning _reason _code _
               -> atomicModifyIORef' warnings $ \(!i) -> (action: i, ())
-            Message (MCDiagnostic _ SevError _reason _code) _
+            MCDiagnostic _ SevError _reason _code _
               -> atomicModifyIORef' errors   $ \(!i) -> (action: i, ())
-            Message MCFatal _
+            MCFatal _
               -> atomicModifyIORef' fatals   $ \(!i) -> (action: i, ())
             _ -> action
 

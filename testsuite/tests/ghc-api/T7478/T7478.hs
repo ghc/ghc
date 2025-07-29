@@ -24,7 +24,7 @@ compileInGhc targets handlerOutput = do
     flags0 <- getSessionDynFlags
     let flags = flags0 {verbosity = 1 }
     setSessionDynFlags flags
-    let collectSrcError _flags (Message MCOutput msg)
+    let collectSrcError _flags (MCOutput msg)
           = handlerOutput $ GHC.showSDocForUser flags emptyUnitState alwaysQualify msg
         collectSrcError _ _
           = return ()

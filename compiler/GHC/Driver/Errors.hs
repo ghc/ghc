@@ -47,7 +47,7 @@ printMessages logger msg_opts opts = mapM_ (printMessage logger msg_opts opts) .
 
 printMessage :: forall a. (Diagnostic a) => Logger -> DiagnosticOpts a -> DiagOpts -> MsgEnvelope a -> IO ()
 printMessage logger msg_opts opts message = do
-  decorated <- decorateDiagnostic logflags messageClass location doc
+  decorated <- decorateDiagnostic logflags (messageClass doc) location
   if log_diags_as_json then do
     let
       rendered :: String
@@ -56,9 +56,9 @@ printMessage logger msg_opts opts message = do
       jsonMessage :: JsonDoc
       jsonMessage = jsonDiagnostic rendered message
 
-    logJsonMsg logger messageClass jsonMessage
+    logJsonMsg logger (messageClass decorated) jsonMessage
   else do
-    logMsg logger (Message messageClass decorated)
+    logMsg logger (messageClass decorated)
   where
     logflags :: LogFlags
     logflags = logFlags logger
@@ -66,7 +66,7 @@ printMessage logger msg_opts opts message = do
     doc :: SDoc
     doc = updSDocContext (\_ -> ctx) (messageWithHints diagnostic)
 
-    messageClass :: MessageClass
+    messageClass :: SDoc -> Message
     messageClass = UnsafeMCDiagnostic location severity (errMsgReason message) (diagnosticCode diagnostic)
 
     style :: PprStyle
@@ -96,18 +96,18 @@ printMessage logger msg_opts opts message = do
     log_diags_as_json :: Bool
     log_diags_as_json = log_diagnostics_as_json (logFlags logger)
 
-decorateDiagnostic :: LogFlags -> MessageClass -> SrcSpan -> SDoc -> IO SDoc
-decorateDiagnostic logflags msg_class srcSpan msg = addCaret
+decorateDiagnostic :: LogFlags -> Message -> SrcSpan -> IO SDoc
+decorateDiagnostic logflags msg srcSpan = addCaret
   where
     -- Pretty print the warning flag, if any (#10752)
     message :: SDoc
-    message = mkLocMessageWarningGroups (log_show_warn_groups logflags) msg_class srcSpan msg
+    message = mkLocMessageWarningGroups (log_show_warn_groups logflags) msg srcSpan
 
     addCaret :: IO SDoc
     addCaret = do
       caretDiagnostic <-
           if log_show_caret logflags
-          then getCaretDiagnostic msg_class srcSpan
+          then getCaretDiagnostic msg srcSpan
           else pure empty
       return $ getPprStyle $ \style ->
         withPprStyle (setStyleColoured True style)
