@@ -58,7 +58,7 @@ printMessage logger msg_opts opts message = do
 
     logJsonMsg logger messageClass jsonMessage
   else do
-    logMsg logger messageClass decorated
+    logMsg logger (Message messageClass decorated)
   where
     logflags :: LogFlags
     logflags = logFlags logger

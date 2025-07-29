@@ -178,8 +178,7 @@ setLogFlags logger flags = logger { logFlags = flags }
 ---------------------------------------------------------------
 
 type LogAction = LogFlags
-              -> MessageClass
-              -> SDoc
+              -> Message
               -> IO ()
 
 type LogJsonAction = LogFlags
@@ -339,8 +338,8 @@ makeThreadSafe logger = do
         with_lock :: forall a. IO a -> IO a
         with_lock act = withMVar lock (const act)
 
-        log action logflags msg_class doc =
-            with_lock (action logflags msg_class doc)
+        log action logflags message =
+            with_lock (action logflags message)
 
         dmp action logflags sty opts str fmt doc =
             with_lock (action logflags sty opts str fmt doc)
@@ -380,15 +379,15 @@ defaultLogAction = defaultLogActionWithHandles stdout stderr
 -- | The default 'LogAction' parametrized over the standard output and standard error handles.
 -- Allows clients to replicate the log message formatting of GHC with custom handles.
 defaultLogActionWithHandles :: Handle {-^ Handle for standard output -} -> Handle {-^ Handle for standard errors -} -> LogAction
-defaultLogActionWithHandles out err logflags msg_class msg
-  = case msg_class of
-      MCOutput                     -> printOut msg
-      MCDump                       -> printOut (msg $$ blankLine)
-      MCInteractive                -> putStrSDoc msg
-      MCInfo                       -> printErrs msg
-      MCFatal                      -> printErrs msg
-      MCDiagnostic _ SevIgnore _ _ -> pure () -- suppress the message
-      MCDiagnostic _span _sev _rea _code -> printErrs msg
+defaultLogActionWithHandles out err logflags message
+  = case message of
+      Message MCOutput msg -> printOut msg
+      Message MCDump msg -> printOut (msg $$ blankLine)
+      Message MCInteractive msg -> putStrSDoc msg
+      Message MCInfo msg -> printErrs msg
+      Message MCFatal msg -> printErrs msg
+      Message (MCDiagnostic _ SevIgnore _ _) _ -> pure () -- suppress the message
+      Message (MCDiagnostic _span _sev _rea _code) msg -> printErrs msg
     where
       printOut   = defaultLogActionHPrintDoc  logflags False out
       printErrs  = defaultLogActionHPrintDoc  logflags False err
@@ -442,7 +441,7 @@ dumpSDocWithStyle dumps log_action sty logflags flag hdr doc =
         let (doc', msg_class)
               | null hdr  = (doc, MCOutput)
               | otherwise = (mkDumpDoc hdr doc, MCDump)
-        log_action logflags msg_class (withPprStyle sty doc')
+        log_action logflags (Message msg_class (withPprStyle sty doc'))
 
 
 -- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
@@ -532,8 +531,8 @@ defaultTraceAction logflags title doc x =
 
 
 -- | Log something
-logMsg :: Logger -> MessageClass -> SDoc -> IO ()
-logMsg logger mc msg = putLogMsg logger (logFlags logger) mc msg
+logMsg :: Logger -> Message -> IO ()
+logMsg logger = putLogMsg logger (logFlags logger)
 
 logJsonMsg :: Logger -> MessageClass -> JsonDoc -> IO ()
 logJsonMsg logger mc = putJsonLogMsg logger (logFlags logger) mc
@@ -548,7 +547,7 @@ logTraceMsg logger hdr doc a = putTraceMsg logger (logFlags logger) hdr doc a
 
 -- | Log a dump message (not a dump file)
 logDumpMsg :: Logger -> String -> SDoc -> IO ()
-logDumpMsg logger hdr doc = logMsg logger MCDump
+logDumpMsg logger hdr doc = logMsg logger $ Message MCDump
   (withPprStyle defaultDumpStyle
   (mkDumpDoc hdr doc))
 

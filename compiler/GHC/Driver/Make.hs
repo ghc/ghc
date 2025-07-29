@@ -1444,14 +1444,14 @@ withDeferredDiagnostics f = do
     fatals <- liftIO $ newIORef []
     logger <- getLogger
 
-    let deferDiagnostics _dflags !msgClass !msg = do
-          let action = logMsg logger msgClass msg
-          case msgClass of
-            MCDiagnostic _ SevWarning _reason _code
+    let deferDiagnostics _dflags !msg = do
+          let action = logMsg logger msg
+          case msg of
+            Message (MCDiagnostic _ SevWarning _reason _code) _
               -> atomicModifyIORef' warnings $ \(!i) -> (action: i, ())
-            MCDiagnostic _ SevError _reason _code
+            Message (MCDiagnostic _ SevError _reason _code) _
               -> atomicModifyIORef' errors   $ \(!i) -> (action: i, ())
-            MCFatal
+            Message MCFatal _
               -> atomicModifyIORef' fatals   $ \(!i) -> (action: i, ())
             _ -> action
 

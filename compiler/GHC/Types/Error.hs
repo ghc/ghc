@@ -26,6 +26,7 @@ module GHC.Types.Error
 
    -- * Classifying Messages
 
+   , Message (..)
    , MessageClass (MCDiagnostic, ..)
    , Severity (..)
    , Diagnostic (..)
@@ -476,6 +477,8 @@ data MsgEnvelope e = MsgEnvelope
       --
       -- See Note [Warnings controlled by multiple flags]
    } deriving (Functor, Foldable, Traversable)
+
+data Message = Message MessageClass SDoc
 
 -- | The class for a diagnostic message. The main purpose is to classify a
 -- message within GHC, to distinguish it from a debug/dump message vs a proper
