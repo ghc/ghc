@@ -515,6 +515,51 @@ mapHashTableKeys(HashTable *table, void *data, MapHashFnKeys fn)
     }
 }
 
+void initHashIterator(HashTable *table, struct HashIterator_* iter) {
+  /* The last bucket with something in it is table->max + table->split - 1 */
+  long segment = (table->max + table->split - 1) / HSEGSIZE;
+  long index = (table->max + table->split - 1) % HSEGSIZE;
+  iter->table = table;
+  iter->segment = segment;
+  iter->index = index;
+  iter->data = NULL;
+}
+
+struct HashIterator_* hashTableIterator(HashTable *table) {
+    struct HashIterator_* iter;
+    iter = stgMallocBytes(sizeof(HashIterator),"hashTableIterator");
+    initHashIterator(table, iter);
+    return iter;
+}
+
+const void *hashIteratorItem(struct HashIterator_* iter) {
+  return iter->data;
+}
+
+int hashIteratorNext(struct HashIterator_* iter) {
+    long segment = iter->segment;
+    long index = iter->index;
+
+    while (segment >= 0) {
+        while (index >= 0) {
+            for (HashList *hl = iter->table->dir[segment][index]; hl != NULL; hl = hl->next) {
+              iter->segment = segment;
+              iter->index = index;
+              iter->data = hl->data;
+              return 1;
+            }
+            index--;
+        }
+        segment--;
+        index = HSEGSIZE - 1;
+    }
+    return 0;
+}
+
+void freeHashIterator(struct HashIterator_* iter) {
+  stgFree(iter);
+}
+
 void
 iterHashTable(HashTable *table, void *data, IterHashFn fn)
 {
@@ -535,6 +580,7 @@ iterHashTable(HashTable *table, void *data, IterHashFn fn)
         index = HSEGSIZE - 1;
     }
 }
+
 
 /* -----------------------------------------------------------------------------
  * When we initialize a hash table, we set up the first segment as well,

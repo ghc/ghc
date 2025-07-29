@@ -6,6 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include <stdio.h>
 #if defined(PROFILING)
 
 #include "rts/PosixSource.h"
@@ -14,6 +15,7 @@
 #include "RtsUtils.h"
 #include "ProfilerReportJson.h"
 #include "Profiling.h"
+#include "rts/prof/IndexTable.h"
 
 #include <string.h>
 
@@ -232,12 +234,14 @@ logCostCentreStack(FILE *prof_file, CostCentreStack const *ccs)
 
     bool need_comma = false;
     fprintf(prof_file, "\"children\": [");
-    for (IndexTable *i = ccs->indexTable; i != 0; i = i->next) {
-        if (!i->back_edge) {
+    for ( IndexTableIter *i = indexTableIterator(ccs->indexTable)
+        ; indexTableIterNext(i) != 0
+        ; ) {
+        if (!indexTableIterItem(i)->back_edge) {
             if (need_comma) {
                 fprintf(prof_file, ",");
             }
-            logCostCentreStack(prof_file, i->ccs);
+            logCostCentreStack(prof_file, indexTableIterItem(i)->ccs);
             need_comma = true;
         }
     }
