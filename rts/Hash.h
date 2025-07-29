@@ -42,6 +42,21 @@ void mapHashTable(HashTable *table, void *data, MapHashFn fn);
 void mapHashTableKeys(HashTable *table, void *data, MapHashFnKeys fn);
 void iterHashTable(HashTable *table, void *data, IterHashFn);
 
+struct HashIterator_ {
+  HashTable *table;
+  long segment;
+  long index;
+  const void* data;
+};
+typedef struct HashIterator_ HashIterator;
+
+void initHashIterator(HashTable *, struct HashIterator_*);
+struct HashIterator_* hashTableIterator(HashTable *table);
+const void *hashIteratorItem(struct HashIterator_* iter);
+int hashIteratorNext(struct HashIterator_* iter);
+void freeHashIterator(struct HashIterator_* iter);
+
+
 /* Hash table access where the keys are C strings (the strings are
  * assumed to be allocated by the caller, and mustn't be deallocated
  * until the corresponding hash table entry has been removed).
@@ -73,6 +88,7 @@ typedef int CompareFunction(StgWord key1, StgWord key2);
 // Helper for implementing hash functions
 int hashBuffer(const HashTable *table, const void *buf, size_t len);
 
+int hashAddress(const HashTable *table, StgWord key);
 int hashWord(const HashTable *table, StgWord key);
 int hashStr(const HashTable *table, StgWord w);
 void        insertHashTable_ ( HashTable *table, StgWord key,

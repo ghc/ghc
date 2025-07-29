@@ -46,7 +46,7 @@ STATIC_INLINE int hashLock(const HashTable *table, StgWord w)
     Lock *l = (Lock *)w;
     StgWord key = l->inode ^ (l->inode >> 32) ^ l->device ^ (l->device >> 32);
     // Just xor all 32-bit words of inode and device, hope this is good enough.
-    return hashWord(table, key);
+    return hashAddress(table, key);
 }
 
 void

@@ -24,7 +24,7 @@ static Mutex spt_lock;
 STATIC_INLINE int hashFingerprint(const HashTable *table, StgWord key) {
   const StgWord64* ptr = (StgWord64*) key;
   // Take half of the key to compute the hash.
-  return hashWord(table, *(ptr + 1));
+  return hashAddress(table, *(ptr + 1));
 }
 
 /// Comparison function for the SPT.
