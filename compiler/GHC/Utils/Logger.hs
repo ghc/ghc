@@ -24,7 +24,6 @@ module GHC.Utils.Logger
     -- * Logger setup
     , initLogger
     , LogAction
-    , LogJsonAction
     , DumpAction
     , TraceAction
     , DumpFormat (..)
@@ -32,8 +31,6 @@ module GHC.Utils.Logger
     -- ** Hooks
     , popLogHook
     , pushLogHook
-    , popJsonLogHook
-    , pushJsonLogHook
     , popDumpHook
     , pushDumpHook
     , popTraceHook
@@ -55,11 +52,9 @@ module GHC.Utils.Logger
     , putLogMsg
     , defaultLogAction
     , defaultLogActionWithHandles
-    , defaultLogJsonAction
     , defaultLogActionHPrintDoc
     , defaultLogActionHPutStrDoc
     , logMsg
-    , logJsonMsg
     , logDumpMsg
 
     -- * Dumping
@@ -86,8 +81,8 @@ import GHC.Types.Error
 
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.Outputable
-import GHC.Utils.Json
 import GHC.Utils.Panic
+import GHC.Utils.Json (renderJSON)
 
 import GHC.Data.EnumSet (EnumSet)
 import qualified GHC.Data.EnumSet as EnumSet
@@ -181,11 +176,6 @@ type LogAction = LogFlags
               -> Message
               -> IO ()
 
-type LogJsonAction = LogFlags
-                   -> Message
-                   -> JsonDoc
-                   -> IO ()
-
 type DumpAction = LogFlags
                -> PprStyle
                -> DumpFlag
@@ -223,9 +213,6 @@ data Logger = Logger
     { log_hook   :: [LogAction -> LogAction]
         -- ^ Log hooks stack
 
-    , json_log_hook :: [LogJsonAction -> LogJsonAction]
-        -- ^ Json log hooks stack
-
     , dump_hook  :: [DumpAction -> DumpAction]
         -- ^ Dump hooks stack
 
@@ -261,7 +248,6 @@ initLogger = do
     dumps <- newMVar Map.empty
     return $ Logger
         { log_hook        = []
-        , json_log_hook   = []
         , dump_hook       = []
         , trace_hook      = []
         , generated_dumps = dumps
@@ -272,10 +258,6 @@ initLogger = do
 -- | Log something
 putLogMsg :: Logger -> LogAction
 putLogMsg logger = foldr ($) defaultLogAction (log_hook logger)
-
--- | Log a JsonDoc
-putJsonLogMsg :: Logger -> LogJsonAction
-putJsonLogMsg logger = foldr ($) defaultLogJsonAction (json_log_hook logger)
 
 -- | Dump something
 putDumpFile :: Logger -> DumpAction
@@ -300,15 +282,6 @@ popLogHook :: Logger -> Logger
 popLogHook logger = case log_hook logger of
     []   -> panic "popLogHook: empty hook stack"
     _:hs -> logger { log_hook = hs }
-
--- | Push a json log hook
-pushJsonLogHook :: (LogJsonAction -> LogJsonAction) -> Logger -> Logger
-pushJsonLogHook h logger = logger { json_log_hook = h:json_log_hook logger }
-
-popJsonLogHook :: Logger -> Logger
-popJsonLogHook logger = case json_log_hook logger of
-    []   -> panic "popJsonLogHook: empty hook stack"
-    _:hs -> logger { json_log_hook = hs}
 
 -- | Push a dump hook
 pushDumpHook :: (DumpAction -> DumpAction) -> Logger -> Logger
@@ -353,22 +326,6 @@ makeThreadSafe logger = do
            $ pushTraceHook trc
            $ logger
 
-defaultLogJsonAction :: LogJsonAction
-defaultLogJsonAction logflags msg_class jsdoc =
-  case msg_class of
-      MCOutput _                   -> printOut msg
-      MCDump _                     -> printOut (msg $$ blankLine)
-      MCInteractive _              -> putStrSDoc msg
-      MCInfo _                     -> printErrs msg
-      MCFatal _                    -> printErrs msg
-      MCDiagnostic _ SevIgnore _ _ _ -> pure () -- suppress the message
-      MCDiagnostic _span _sev _rea _code _ -> printErrs msg
-  where
-    printOut   = defaultLogActionHPrintDoc  logflags False stdout
-    printErrs  = defaultLogActionHPrintDoc  logflags False stderr
-    putStrSDoc = defaultLogActionHPutStrDoc logflags False stdout
-    msg = renderJSON jsdoc
-
 -- | The default 'LogAction' prints to 'stdout' and 'stderr'.
 --
 -- To replicate the default log action behaviour with different @out@ and @err@
@@ -386,8 +343,12 @@ defaultLogActionWithHandles out err logflags message
       MCInteractive msg -> putStrSDoc msg
       MCInfo msg -> printErrs msg
       MCFatal msg -> printErrs msg
-      MCDiagnostic _ SevIgnore _ _ _ -> pure () -- suppress the message
-      MCDiagnostic _span _sev _rea _code msg -> printErrs msg
+      MCDiagnostic _ SevIgnore _ _ -> pure () -- suppress the message
+      UnsafeMCDiagnostic _span _severity _reason _code doc json -> do
+        if log_diagnostics_as_json logflags then do
+          printErrs (renderJSON json)
+        else do
+          printErrs doc
     where
       printOut   = defaultLogActionHPrintDoc  logflags False out
       printErrs  = defaultLogActionHPrintDoc  logflags False err
@@ -533,9 +494,6 @@ defaultTraceAction logflags title doc x =
 -- | Log something
 logMsg :: Logger -> Message -> IO ()
 logMsg logger = putLogMsg logger (logFlags logger)
-
-logJsonMsg :: Logger -> Message -> JsonDoc -> IO ()
-logJsonMsg logger mc = putJsonLogMsg logger (logFlags logger) mc
 
 -- | Dump something
 logDumpFile :: Logger -> PprStyle -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
