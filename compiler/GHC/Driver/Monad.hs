@@ -47,7 +47,6 @@ import GHC.Utils.Exception
 import GHC.Utils.Error
 import GHC.Utils.Logger
 
-import GHC.Types.Error ( Message )
 import GHC.Types.SourceError
 
 import Control.Monad
