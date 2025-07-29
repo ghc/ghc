@@ -1104,7 +1104,7 @@ For some background on this choice see #15269.
 showIface :: Logger -> DynFlags -> UnitState -> NameCache -> FilePath -> IO ()
 showIface logger dflags unit_state name_cache filename = do
    let profile = targetProfile dflags
-       printer = logMsg logger MCOutput noSrcSpan . withPprStyle defaultDumpStyle
+       printer = logOutput logger . withPprStyle defaultDumpStyle
 
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.

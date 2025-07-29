@@ -1162,7 +1162,7 @@ getHCFilePackages filename =
 linkDynLibCheck :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
 linkDynLibCheck logger tmpfs dflags unit_env o_files dep_units = do
   when (haveRtsOptsFlags dflags) $
-    logMsg logger MCInfo noSrcSpan
+    logInfo logger
       $ withPprStyle defaultUserStyle
       (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
       text "    Call hs_init_ghc() from your main() function to set these options.")
