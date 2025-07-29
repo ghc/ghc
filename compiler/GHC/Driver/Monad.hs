@@ -23,8 +23,6 @@ module GHC.Driver.Monad (
         modifyLogger,
         pushLogHookM,
         popLogHookM,
-        pushJsonLogHookM,
-        popJsonLogHookM,
         putLogMsgM,
         putMsgM,
         withTimingM,
@@ -121,12 +119,6 @@ pushLogHookM = modifyLogger . pushLogHook
 -- | Pop a log hook from the stack
 popLogHookM :: GhcMonad m => m ()
 popLogHookM  = modifyLogger popLogHook
-
-pushJsonLogHookM :: GhcMonad m => (LogJsonAction -> LogJsonAction) -> m ()
-pushJsonLogHookM = modifyLogger . pushJsonLogHook
-
-popJsonLogHookM :: GhcMonad m => m ()
-popJsonLogHookM = modifyLogger popJsonLogHook
 
 -- | Put a log message
 putMsgM :: GhcMonad m => SDoc -> m ()

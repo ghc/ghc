@@ -369,7 +369,7 @@ msg msg = do
     logger <- getLogger
     name_ppr_ctx <- getNamePprCtx
     let m = case msg of
-                InternalMCDiagnostic span severity reason code doc -> InternalMCDiagnostic span severity reason code (err_sty doc)
+                InternalMCDiagnostic span severity reason code doc json -> InternalMCDiagnostic span severity reason code (err_sty doc) json
                 MCDump doc -> MCDump (dump_sty doc)
                 MCOutput doc -> MCOutput (user_sty doc)
                 MCFatal doc -> MCFatal (user_sty doc)
