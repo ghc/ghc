@@ -373,7 +373,7 @@ msg msg_class doc = do
         err_sty  = mkErrStyle name_ppr_ctx
         user_sty = mkUserStyle name_ppr_ctx AllTheWay
         dump_sty = mkDumpStyle name_ppr_ctx
-    liftIO $ logMsg logger msg_class (withPprStyle sty doc)
+    liftIO $ logMsg logger (Message msg_class (withPprStyle sty doc))
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()
