@@ -70,7 +70,6 @@ module GHC.Types.Error
    , mapDecoratedSDoc
 
    , pprMessageBag
-   , mkLocMessageWarningGroups
    , formatLocMessage
    , formatFatalLocMessage
    , formatDiagnostic
@@ -493,7 +492,7 @@ data Message
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | UnsafeMCDiagnostic SrcSpan Severity ResolvedDiagnosticReason (Maybe DiagnosticCode) SDoc
+  | UnsafeMCDiagnostic SrcSpan Severity ResolvedDiagnosticReason (Maybe DiagnosticCode) SDoc JsonDoc
     -- ^ Diagnostics from the compiler. This constructor is very powerful as
     -- it allows the construction of a 'Message' with a completely
     -- arbitrary permutation of 'Severity' and 'DiagnosticReason'. As such,
@@ -509,8 +508,8 @@ data Message
     -- should always have a 'DiagnosticCode'. See Note [Diagnostic codes].
 
 {-# COMPLETE MCOutput, MCFatal, MCInteractive, MCDump, MCInfo, MCDiagnostic #-}
-pattern MCDiagnostic :: SrcSpan -> Severity -> ResolvedDiagnosticReason -> Maybe DiagnosticCode -> SDoc -> Message
-pattern MCDiagnostic span severity reason code doc <- UnsafeMCDiagnostic span severity reason code doc
+pattern MCDiagnostic :: SrcSpan -> Severity -> ResolvedDiagnosticReason -> Maybe DiagnosticCode -> Message
+pattern MCDiagnostic span severity reason code <- UnsafeMCDiagnostic span severity reason code _diagnostic _json
 
 {-
 Note [Suppressing Messages]
@@ -635,25 +634,9 @@ showMsgEnvelope err =
 pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 
--- | Make an error message with location info, specifying whether to show
--- warning groups (if applicable).
-mkLocMessageWarningGroups
-  :: Bool                               -- ^ Print warning groups (if applicable)?
-  -> Message                            -- ^ message
-  -> SrcSpan                            -- ^ location
-  -> SDoc
-mkLocMessageWarningGroups show_warn_groups msg locn
-  = case msg of
-    MCDiagnostic span severity reason code doc -> formatDiagnostic show_warn_groups span severity reason code doc
-    MCFatal doc -> formatFatalLocMessage locn doc
-    MCOutput doc -> formatLocMessage locn doc
-    MCInteractive doc -> formatLocMessage locn doc
-    MCDump doc -> formatLocMessage locn doc
-    MCInfo doc -> formatLocMessage locn doc
-
 formatFatalLocMessage :: SrcSpan -> SDoc -> SDoc
 formatFatalLocMessage locn msg = sdocOption sdocColScheme $ \col_scheme ->
-      let msg_title = coloured (fatalColour col_scheme) $ text "fatal"
+      let msg_title = coloured (Col.sFatal col_scheme) $ text "fatal"
       in formatLocMessageWarningGroups locn msg_title empty empty msg
 
 formatLocMessage :: SrcSpan -> SDoc -> SDoc
@@ -770,23 +753,15 @@ formatLocMessageWarningGroups locn msg_title code_doc warning_flag_doc msg
       in coloured (Col.sMessage col_scheme)
                   $ hang (coloured (Col.sHeader col_scheme) header) 4 msg
 
-getMessageClassColour :: Message -> Col.Scheme -> Col.PprColour
-getMessageClassColour (MCDiagnostic _span severity _reason _code _) = getSeverityColour severity
-getMessageClassColour (MCFatal _)                             = fatalColour
-getMessageClassColour _                                       = const mempty
-
-fatalColour :: Col.Scheme -> Col.PprColour
-fatalColour = Col.sFatal
-
 getSeverityColour :: Severity -> Col.Scheme -> Col.PprColour
 getSeverityColour severity = case severity of
   SevError -> Col.sError
   SevWarning -> Col.sWarning
   SevIgnore -> const mempty
 
-getCaretDiagnostic :: Message -> SrcSpan -> IO SDoc
+getCaretDiagnostic :: Severity -> SrcSpan -> IO SDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
-getCaretDiagnostic msg (RealSrcSpan span _) =
+getCaretDiagnostic severity (RealSrcSpan span _) =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
   where
     getSrcLine fn i =
@@ -819,7 +794,7 @@ getCaretDiagnostic msg (RealSrcSpan span _) =
     caretDiagnostic Nothing = empty
     caretDiagnostic (Just srcLineWithNewline) =
       sdocOption sdocColScheme$ \col_scheme ->
-      let sevColour = getMessageClassColour msg col_scheme
+      let sevColour = getSeverityColour severity col_scheme
           marginColour = Col.sMargin col_scheme
       in
       coloured marginColour (text marginSpace) <>
