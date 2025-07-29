@@ -368,7 +368,7 @@ msg msg = do
     name_ppr_ctx <- getNamePprCtx
     let m = case msg of
                 MCDump doc -> MCDump (dump_sty doc)
-                MCDiagnostic span severity reason code doc -> UnsafeMCDiagnostic span severity reason code (err_sty doc)
+                UnsafeMCDiagnostic span severity reason code doc diagnostic -> UnsafeMCDiagnostic span severity reason code (err_sty doc) diagnostic
                 MCOutput doc -> MCOutput (user_sty doc)
                 MCFatal doc -> MCFatal (user_sty doc)
                 MCInteractive doc -> MCInteractive (user_sty doc)

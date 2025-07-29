@@ -47,27 +47,21 @@ printMessages logger msg_opts opts = mapM_ (printMessage logger msg_opts opts) .
 
 printMessage :: forall a. (Diagnostic a) => Logger -> DiagnosticOpts a -> DiagOpts -> MsgEnvelope a -> IO ()
 printMessage logger msg_opts opts message = do
-  decorated <- decorateDiagnostic logflags (messageClass doc) location
-  if log_diags_as_json then do
-    let
-      rendered :: String
-      rendered = renderWithContext (log_default_user_context logflags) decorated
+  decorated <- decorateDiagnostic logflags location severity reason code doc
+  let
+    rendered :: String
+    rendered = renderWithContext (log_default_user_context logflags) decorated
 
-      jsonMessage :: JsonDoc
-      jsonMessage = jsonDiagnostic rendered message
+    jsonMessage :: JsonDoc
+    jsonMessage = jsonDiagnostic rendered message
 
-    logJsonMsg logger (messageClass decorated) jsonMessage
-  else do
-    logMsg logger (messageClass decorated)
+  logMsg logger $ UnsafeMCDiagnostic location severity reason code decorated jsonMessage
   where
     logflags :: LogFlags
     logflags = logFlags logger
 
     doc :: SDoc
     doc = updSDocContext (\_ -> ctx) (messageWithHints diagnostic)
-
-    messageClass :: SDoc -> Message
-    messageClass = UnsafeMCDiagnostic location severity (errMsgReason message) (diagnosticCode diagnostic)
 
     style :: PprStyle
     style = mkErrStyle (errMsgContext message)
@@ -84,6 +78,12 @@ printMessage logger msg_opts opts message = do
     severity :: Severity
     severity = errMsgSeverity message
 
+    reason :: ResolvedDiagnosticReason
+    reason = errMsgReason message
+
+    code :: Maybe DiagnosticCode
+    code = diagnosticCode diagnostic
+
     messageWithHints :: a -> SDoc
     messageWithHints e =
       let main_msg = formatBulleted $ diagnosticMessage msg_opts e
@@ -93,21 +93,18 @@ printMessage logger msg_opts opts message = do
                hs  -> main_msg $$ hang (text "Suggested fixes:") 2
                                        (formatBulleted  $ mkDecorated . map ppr $ hs)
 
-    log_diags_as_json :: Bool
-    log_diags_as_json = log_diagnostics_as_json (logFlags logger)
-
-decorateDiagnostic :: LogFlags -> Message -> SrcSpan -> IO SDoc
-decorateDiagnostic logflags msg srcSpan = addCaret
+decorateDiagnostic :: LogFlags -> SrcSpan -> Severity -> ResolvedDiagnosticReason -> Maybe DiagnosticCode -> SDoc -> IO SDoc
+decorateDiagnostic logflags span severity reason code doc = addCaret
   where
     -- Pretty print the warning flag, if any (#10752)
     message :: SDoc
-    message = mkLocMessageWarningGroups (log_show_warn_groups logflags) msg srcSpan
+    message = formatDiagnostic (log_show_warn_groups logflags) span severity reason code doc
 
     addCaret :: IO SDoc
     addCaret = do
       caretDiagnostic <-
           if log_show_caret logflags
-          then getCaretDiagnostic msg srcSpan
+          then getCaretDiagnostic severity span
           else pure empty
       return $ getPprStyle $ \style ->
         withPprStyle (setStyleColoured True style)
