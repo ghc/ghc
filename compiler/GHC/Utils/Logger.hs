@@ -62,8 +62,6 @@ module GHC.Utils.Logger
     , logJsonMsg
     , logDumpMsg
 
-    , decorateDiagnostic
-
     -- * Dumping
     , defaultDumpAction
     , putDumpFile
@@ -85,7 +83,6 @@ where
 import GHC.Prelude
 import GHC.Driver.Flags
 import GHC.Types.Error
-import GHC.Types.SrcLoc
 
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.Outputable
@@ -182,7 +179,6 @@ setLogFlags logger flags = logger { logFlags = flags }
 
 type LogAction = LogFlags
               -> MessageClass
-              -> SrcSpan
               -> SDoc
               -> IO ()
 
@@ -343,8 +339,8 @@ makeThreadSafe logger = do
         with_lock :: forall a. IO a -> IO a
         with_lock act = withMVar lock (const act)
 
-        log action logflags msg_class loc doc =
-            with_lock (action logflags msg_class loc doc)
+        log action logflags msg_class doc =
+            with_lock (action logflags msg_class doc)
 
         dmp action logflags sty opts str fmt doc =
             with_lock (action logflags sty opts str fmt doc)
@@ -366,8 +362,8 @@ defaultLogJsonAction logflags msg_class jsdoc =
       MCInteractive                -> putStrSDoc msg
       MCInfo                       -> printErrs msg
       MCFatal                      -> printErrs msg
-      MCDiagnostic SevIgnore _ _   -> pure () -- suppress the message
-      MCDiagnostic _sev _rea _code -> printErrs msg
+      MCDiagnostic _ SevIgnore _ _   -> pure () -- suppress the message
+      MCDiagnostic _span _sev _rea _code -> printErrs msg
   where
     printOut   = defaultLogActionHPrintDoc  logflags False stdout
     printErrs  = defaultLogActionHPrintDoc  logflags False stderr
@@ -384,70 +380,19 @@ defaultLogAction = defaultLogActionWithHandles stdout stderr
 -- | The default 'LogAction' parametrized over the standard output and standard error handles.
 -- Allows clients to replicate the log message formatting of GHC with custom handles.
 defaultLogActionWithHandles :: Handle {-^ Handle for standard output -} -> Handle {-^ Handle for standard errors -} -> LogAction
-defaultLogActionWithHandles out err logflags msg_class srcSpan msg
+defaultLogActionWithHandles out err logflags msg_class msg
   = case msg_class of
       MCOutput                     -> printOut msg
       MCDump                       -> printOut (msg $$ blankLine)
       MCInteractive                -> putStrSDoc msg
       MCInfo                       -> printErrs msg
       MCFatal                      -> printErrs msg
-      MCDiagnostic SevIgnore _ _   -> pure () -- suppress the message
-      MCDiagnostic _sev _rea _code -> decorateDiagnostic logflags msg_class srcSpan msg >>= printErrs
+      MCDiagnostic _ SevIgnore _ _ -> pure () -- suppress the message
+      MCDiagnostic _span _sev _rea _code -> printErrs msg
     where
       printOut   = defaultLogActionHPrintDoc  logflags False out
       printErrs  = defaultLogActionHPrintDoc  logflags False err
       putStrSDoc = defaultLogActionHPutStrDoc logflags False out
-
--- This function is used by `defaultLogActionWithHandles` for non-JSON output,
--- and also by `GHC.Driver.Errors.printMessages` to produce the `rendered`
--- message on `-fdiagnostics-as-json`.
---
--- We would want to eventually consolidate this.  However, this is currently
--- not feasible for the following reasons:
---
--- 1. Some parts of the compiler sidestep `printMessages`, for that reason we
---    can not decorate the message in `printMessages`.
---
--- 2. GHC uses two different code paths for JSON and non-JSON diagnostics.  For
---    that reason we can not decorate the message in `defaultLogActionWithHandles`.
---
---    See also Note [JSON Error Messages]:
---
---      `jsonLogAction` should be removed along with -ddump-json
---
--- Also note that (1) is the reason why some parts of the compiler produce
--- diagnostics that don't respect `-fdiagnostics-as-json`.
---
--- The plan as I see it is as follows:
---
---  1. Refactor all places in the compiler that report diagnostics to go
---     through `GHC.Driver.Errors.printMessages`.
---
---     (It's easy to find all those places by looking for who creates
---     MCDiagnostic, either directly or via `mkMCDiagnostic` or
---     `errorDiagnostic`.)
---
---  2. Get rid of `-ddump-json`, `jsonLogAction` and consolidate message
---     decoration at one place (either `printMessages` or
---     `defaultLogActionWithHandles`)
---
--- This story is tracked by #24113.
-decorateDiagnostic :: LogFlags -> MessageClass -> SrcSpan -> SDoc -> IO SDoc
-decorateDiagnostic logflags msg_class srcSpan msg = addCaret
-    where
-      -- Pretty print the warning flag, if any (#10752)
-      message :: SDoc
-      message = mkLocMessageWarningGroups (log_show_warn_groups logflags) msg_class srcSpan msg
-
-      addCaret :: IO SDoc
-      addCaret = do
-        caretDiagnostic <-
-            if log_show_caret logflags
-            then getCaretDiagnostic msg_class srcSpan
-            else pure empty
-        return $ getPprStyle $ \style ->
-          withPprStyle (setStyleColoured True style)
-            (message $+$ caretDiagnostic $+$ blankLine)
 
 -- | Like 'defaultLogActionHPutStrDoc' but appends an extra newline.
 defaultLogActionHPrintDoc :: LogFlags -> Bool -> Handle -> SDoc -> IO ()
@@ -497,7 +442,7 @@ dumpSDocWithStyle dumps log_action sty logflags flag hdr doc =
         let (doc', msg_class)
               | null hdr  = (doc, MCOutput)
               | otherwise = (mkDumpDoc hdr doc, MCDump)
-        log_action logflags msg_class noSrcSpan (withPprStyle sty doc')
+        log_action logflags msg_class (withPprStyle sty doc')
 
 
 -- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
@@ -587,8 +532,8 @@ defaultTraceAction logflags title doc x =
 
 
 -- | Log something
-logMsg :: Logger -> MessageClass -> SrcSpan -> SDoc -> IO ()
-logMsg logger mc loc msg = putLogMsg logger (logFlags logger) mc loc msg
+logMsg :: Logger -> MessageClass -> SDoc -> IO ()
+logMsg logger mc msg = putLogMsg logger (logFlags logger) mc msg
 
 logJsonMsg :: Logger -> MessageClass -> JsonDoc -> IO ()
 logJsonMsg logger mc = putJsonLogMsg logger (logFlags logger) mc
@@ -603,7 +548,7 @@ logTraceMsg logger hdr doc a = putTraceMsg logger (logFlags logger) hdr doc a
 
 -- | Log a dump message (not a dump file)
 logDumpMsg :: Logger -> String -> SDoc -> IO ()
-logDumpMsg logger hdr doc = logMsg logger MCDump noSrcSpan
+logDumpMsg logger hdr doc = logMsg logger MCDump
   (withPprStyle defaultDumpStyle
   (mkDumpDoc hdr doc))
 

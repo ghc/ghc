@@ -283,7 +283,7 @@ unsafePprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan      = s
                                , errMsgReason    = reason })
   = withErrStyle name_ppr_ctx $
       mkLocMessage
-        (UnsafeMCDiagnostic sev reason (diagnosticCode e))
+        (UnsafeMCDiagnostic s sev reason (diagnosticCode e))
         s
         (formatBulleted $ diagnosticMessage opts e)
 
@@ -314,7 +314,7 @@ ghcExit logger val
 
 fatalErrorMsg :: Logger -> SDoc -> IO ()
 fatalErrorMsg logger msg =
-    logMsg logger MCFatal noSrcSpan $ withPprStyle defaultErrStyle msg
+    logMsg logger MCFatal $ withPprStyle defaultErrStyle msg
 
 compilationProgressMsg :: Logger -> SDoc -> IO ()
 compilationProgressMsg logger msg = do
@@ -475,11 +475,11 @@ printOutputForUser logger name_ppr_ctx msg
   = logOutput logger (withUserStyle name_ppr_ctx AllTheWay msg)
 
 logInfo :: Logger -> SDoc -> IO ()
-logInfo logger msg = logMsg logger MCInfo noSrcSpan msg
+logInfo logger msg = logMsg logger MCInfo msg
 
 -- | Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
 logOutput :: Logger -> SDoc -> IO ()
-logOutput logger msg = logMsg logger MCOutput noSrcSpan msg
+logOutput logger msg = logMsg logger MCOutput msg
 
 
 prettyPrintGhcErrors :: ExceptionMonad m => Logger -> m a -> m a

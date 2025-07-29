@@ -94,7 +94,6 @@ import GHC.Types.SourceFile
 import GHC.Types.SafeHaskell
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
-import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 import GHC.Types.PkgQual
 
@@ -1118,7 +1117,7 @@ showIface logger dflags unit_state name_cache filename = do
                                    neverQualifyModules
                                    neverQualifyPackages
                                    alwaysPrintPromTick
-   logMsg logger MCDump noSrcSpan
+   logMsg logger MCDump
       $ withPprStyle (mkDumpStyle name_ppr_ctx)
       $ pprModIface unit_state iface
 

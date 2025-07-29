@@ -1641,7 +1641,6 @@ maybePutSDoc logger s
     = when (logVerbAtLeast logger 2) $
           logMsg logger
               MCInteractive
-              noSrcSpan
               $ withPprStyle defaultUserStyle s
 
 maybePutStr :: Logger -> String -> IO ()
