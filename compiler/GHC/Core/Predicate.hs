@@ -24,7 +24,7 @@ module GHC.Core.Predicate (
   classMethodTy, classMethodInstTy,
 
   -- Implicit parameters
-  isIPLikePred, mightMentionIP, isIPTyCon, isIPClass, decomposeIPPred,
+  couldBeIPLike, mightMentionIP, isIPTyCon, isIPClass, decomposeIPPred,
   isCallStackTy, isCallStackPred, isCallStackPredTy,
   isExceptionContextPred, isExceptionContextTy,
   isIPPred_maybe,
