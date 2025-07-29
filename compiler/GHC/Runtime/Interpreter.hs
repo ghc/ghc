@@ -86,7 +86,7 @@ import GHC.Data.FastString
 
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
-import GHC.Types.Error
+import qualified GHC.Types.Error as Error
 
 import GHC.Utils.Panic
 import GHC.Utils.Exception as Ex
@@ -439,7 +439,7 @@ handleSeqHValueStatus interp unit_env logger eval_status =
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
-      let put loc = logMsg logger MCOutput ("*** Ignoring breakpoint" <+> brackets (ppr loc))
+      let put loc = logMsg logger $ Error.MCOutput ("*** Ignoring breakpoint" <+> brackets (ppr loc))
       let nothing_case = put noSrcSpan
       case maybe_break of
         Nothing -> nothing_case

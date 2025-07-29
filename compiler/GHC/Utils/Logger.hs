@@ -80,7 +80,7 @@ where
 
 import GHC.Prelude
 import GHC.Driver.Flags
-import GHC.Types.Error ( MessageClass (..), Severity (..) )
+import GHC.Types.Error ( Message (..), Severity (..) )
 
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.Outputable
@@ -180,7 +180,7 @@ type LogAction = LogFlags
               -> IO ()
 
 type LogJsonAction = LogFlags
-                   -> MessageClass
+                   -> Message
                    -> JsonDoc
                    -> IO ()
 
@@ -354,13 +354,13 @@ makeThreadSafe logger = do
 defaultLogJsonAction :: LogJsonAction
 defaultLogJsonAction logflags msg_class jsdoc =
   case msg_class of
-      MCOutput                     -> printOut msg
-      MCDump                       -> printOut (msg $$ blankLine)
-      MCInteractive                -> putStrSDoc msg
-      MCInfo                       -> printErrs msg
-      MCFatal                      -> printErrs msg
-      MCDiagnostic _ SevIgnore _ _   -> pure () -- suppress the message
-      MCDiagnostic _span _sev _rea _code -> printErrs msg
+      MCOutput _                   -> printOut msg
+      MCDump _                     -> printOut (msg $$ blankLine)
+      MCInteractive _              -> putStrSDoc msg
+      MCInfo _                     -> printErrs msg
+      MCFatal _                    -> printErrs msg
+      MCDiagnostic _ SevIgnore _ _ _ -> pure () -- suppress the message
+      MCDiagnostic _span _sev _rea _code _ -> printErrs msg
   where
     printOut   = defaultLogActionHPrintDoc  logflags False stdout
     printErrs  = defaultLogActionHPrintDoc  logflags False stderr
@@ -379,13 +379,13 @@ defaultLogAction = defaultLogActionWithHandles stdout stderr
 defaultLogActionWithHandles :: Handle {-^ Handle for standard output -} -> Handle {-^ Handle for standard errors -} -> LogAction
 defaultLogActionWithHandles out err logflags message
   = case message of
-      Message MCOutput msg -> printOut msg
-      Message MCDump msg -> printOut (msg $$ blankLine)
-      Message MCInteractive msg -> putStrSDoc msg
-      Message MCInfo msg -> printErrs msg
-      Message MCFatal msg -> printErrs msg
-      Message (MCDiagnostic _ SevIgnore _ _) _ -> pure () -- suppress the message
-      Message (MCDiagnostic _span _sev _rea _code) msg -> printErrs msg
+      MCOutput msg -> printOut msg
+      MCDump msg -> printOut (msg $$ blankLine)
+      MCInteractive msg -> putStrSDoc msg
+      MCInfo msg -> printErrs msg
+      MCFatal msg -> printErrs msg
+      MCDiagnostic _ SevIgnore _ _ _ -> pure () -- suppress the message
+      MCDiagnostic _span _sev _rea _code msg -> printErrs msg
     where
       printOut   = defaultLogActionHPrintDoc  logflags False out
       printErrs  = defaultLogActionHPrintDoc  logflags False err
@@ -436,10 +436,10 @@ dumpSDocWithStyle dumps log_action sty logflags flag hdr doc =
 
     -- write the dump to stdout
     writeDump Nothing = do
-        let (doc', msg_class)
-              | null hdr  = (doc, MCOutput)
-              | otherwise = (mkDumpDoc hdr doc, MCDump)
-        log_action logflags (Message msg_class (withPprStyle sty doc'))
+        let message
+              | null hdr  = MCOutput (withPprStyle sty doc)
+              | otherwise = MCDump (withPprStyle sty $ mkDumpDoc hdr doc)
+        log_action logflags message
 
 
 -- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
@@ -532,7 +532,7 @@ defaultTraceAction logflags title doc x =
 logMsg :: Logger -> Message -> IO ()
 logMsg logger = putLogMsg logger (logFlags logger)
 
-logJsonMsg :: Logger -> MessageClass -> JsonDoc -> IO ()
+logJsonMsg :: Logger -> Message -> JsonDoc -> IO ()
 logJsonMsg logger mc = putJsonLogMsg logger (logFlags logger) mc
 
 -- | Dump something
@@ -545,7 +545,7 @@ logTraceMsg logger hdr doc a = putTraceMsg logger (logFlags logger) hdr doc a
 
 -- | Log a dump message (not a dump file)
 logDumpMsg :: Logger -> String -> SDoc -> IO ()
-logDumpMsg logger hdr doc = logMsg logger $ Message MCDump
+logDumpMsg logger hdr doc = logMsg logger $ MCDump
   (withPprStyle defaultDumpStyle
   (mkDumpDoc hdr doc))
 

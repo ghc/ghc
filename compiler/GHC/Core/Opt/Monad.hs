@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-x-InternalMCDiagnostic #-}
 {-
 (c) The AQUA Project, Glasgow University, 1993-1998
 
@@ -363,18 +364,22 @@ we aren't using annotations heavily.
 ************************************************************************
 -}
 
-msg :: MessageClass -> SDoc -> CoreM ()
-msg msg_class doc = do
+msg :: Message -> CoreM ()
+msg msg = do
     logger <- getLogger
     name_ppr_ctx <- getNamePprCtx
-    let sty = case msg_class of
-                MCDiagnostic _ _ _ _ -> err_sty
-                MCDump             -> dump_sty
-                _                  -> user_sty
-        err_sty  = mkErrStyle name_ppr_ctx
-        user_sty = mkUserStyle name_ppr_ctx AllTheWay
-        dump_sty = mkDumpStyle name_ppr_ctx
-    liftIO $ logMsg logger (Message msg_class (withPprStyle sty doc))
+    let m = case msg of
+                InternalMCDiagnostic span severity reason code doc -> InternalMCDiagnostic span severity reason code (err_sty doc)
+                MCDump doc -> MCDump (dump_sty doc)
+                MCOutput doc -> MCOutput (user_sty doc)
+                MCFatal doc -> MCFatal (user_sty doc)
+                MCInteractive doc -> MCInteractive (user_sty doc)
+                MCInfo doc -> MCInfo (user_sty doc)
+
+        err_sty  = withPprStyle $ mkErrStyle name_ppr_ctx
+        user_sty = withPprStyle $ mkUserStyle name_ppr_ctx AllTheWay
+        dump_sty = withPprStyle $ mkDumpStyle name_ppr_ctx
+    liftIO $ logMsg logger m
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()
@@ -382,7 +387,7 @@ putMsgS = putMsg . text
 
 -- | Output a message to the screen
 putMsg :: SDoc -> CoreM ()
-putMsg = msg MCInfo
+putMsg = msg . MCInfo
 
 diagnostic :: DiagnosticReason -> SDoc -> CoreM ()
 diagnostic reason doc = do
@@ -407,7 +412,7 @@ fatalErrorMsgS = fatalErrorMsg . text
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsg :: SDoc -> CoreM ()
-fatalErrorMsg = msg MCFatal
+fatalErrorMsg = msg . MCFatal
 
 -- | Output a string debugging message at verbosity level of @-v@ or higher
 debugTraceMsgS :: String -> CoreM ()
@@ -415,4 +420,4 @@ debugTraceMsgS = debugTraceMsg . text
 
 -- | Outputs a debugging message at verbosity level of @-v@ or higher
 debugTraceMsg :: SDoc -> CoreM ()
-debugTraceMsg = msg MCDump
+debugTraceMsg = msg . MCDump

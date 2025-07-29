@@ -14,7 +14,7 @@ module GHC.Utils.Error (
         -- * Messages
         Diagnostic(..),
         MsgEnvelope(..),
-        MessageClass(..),
+        Message(..),
         SDoc,
         DecoratedSDoc(unDecorated),
         Messages,
@@ -329,7 +329,7 @@ ghcExit logger val
 
 fatalErrorMsg :: Logger -> SDoc -> IO ()
 fatalErrorMsg logger msg =
-    logMsg logger $ Message MCFatal (withPprStyle defaultErrStyle msg)
+    logMsg logger $ MCFatal (withPprStyle defaultErrStyle msg)
 
 compilationProgressMsg :: Logger -> SDoc -> IO ()
 compilationProgressMsg logger msg = do
@@ -490,11 +490,11 @@ printOutputForUser logger name_ppr_ctx msg
   = logOutput logger (withUserStyle name_ppr_ctx AllTheWay msg)
 
 logInfo :: Logger -> SDoc -> IO ()
-logInfo logger = logMsg logger . Message MCInfo
+logInfo logger = logMsg logger . MCInfo
 
 -- | Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
 logOutput :: Logger -> SDoc -> IO ()
-logOutput logger = logMsg logger . Message MCOutput
+logOutput logger = logMsg logger . MCOutput
 
 
 prettyPrintGhcErrors :: ExceptionMonad m => Logger -> m a -> m a
