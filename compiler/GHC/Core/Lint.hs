@@ -436,7 +436,7 @@ displayLintResults :: Logger
                    -> IO ()
 displayLintResults logger display_warnings pp_what pp_pgm (warns, errs)
   | not (isEmptyBag errs)
-  = do { logMsg logger Err.MCInfo noSrcSpan  -- See Note [MCInfo for Lint]
+  = do { logMsg logger Err.MCInfo            -- See Note [MCInfo for Lint]
            $ withPprStyle defaultDumpStyle
            (vcat [ lint_banner "errors" pp_what, Err.pprMessageBag errs
                  , text "*** Offending Program ***"
@@ -447,7 +447,7 @@ displayLintResults logger display_warnings pp_what pp_pgm (warns, errs)
   | not (isEmptyBag warns)
   , log_enable_debug (logFlags logger)
   , display_warnings
-  = logMsg logger Err.MCInfo noSrcSpan  -- See Note [MCInfo for Lint]
+  = logMsg logger Err.MCInfo            -- See Note [MCInfo for Lint]
       $ withPprStyle defaultDumpStyle
         (lint_banner "warnings" pp_what $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
 

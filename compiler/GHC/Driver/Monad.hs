@@ -47,7 +47,6 @@ import GHC.Utils.Exception
 import GHC.Utils.Error
 import GHC.Utils.Logger
 
-import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 
 import Control.Monad
@@ -136,10 +135,10 @@ putMsgM doc = do
     liftIO $ putMsg logger doc
 
 -- | Put a log message
-putLogMsgM :: GhcMonad m => MessageClass -> SrcSpan -> SDoc -> m ()
-putLogMsgM msg_class loc doc = do
+putLogMsgM :: GhcMonad m => MessageClass -> SDoc -> m ()
+putLogMsgM msg_class doc = do
     logger <- getLogger
-    liftIO $ logMsg logger msg_class loc doc
+    liftIO $ logMsg logger msg_class doc
 
 -- | Time an action
 withTimingM :: GhcMonad m => SDoc -> (b -> ()) -> m b -> m b

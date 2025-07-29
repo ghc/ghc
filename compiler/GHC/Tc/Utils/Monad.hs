@@ -2344,7 +2344,7 @@ failIfM msg = do
     let full_msg = (if_loc env <> colon) $$ nest 2 msg
     logger <- getLogger
     liftIO (logMsg logger MCFatal
-             noSrcSpan $ withPprStyle defaultErrStyle full_msg)
+             $ withPprStyle defaultErrStyle full_msg)
     failM
 
 --------------------
@@ -2378,7 +2378,6 @@ forkM doc thing_inside
                                    2 (text (show exn))
                       liftIO $ logMsg logger
                                          MCFatal
-                                         noSrcSpan
                                          $ withPprStyle defaultErrStyle msg
                 ; traceIf (text "} ending fork (badly)" <+> doc)
                 ; pgmError "Cannot continue after interface file error" }
