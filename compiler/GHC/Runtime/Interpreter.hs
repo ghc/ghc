@@ -439,7 +439,7 @@ handleSeqHValueStatus interp unit_env logger eval_status =
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
-      let put loc = logMsg logger MCOutput loc ("*** Ignoring breakpoint" <+> brackets (ppr loc))
+      let put loc = logMsg logger MCOutput ("*** Ignoring breakpoint" <+> brackets (ppr loc))
       let nothing_case = put noSrcSpan
       case maybe_break of
         Nothing -> nothing_case

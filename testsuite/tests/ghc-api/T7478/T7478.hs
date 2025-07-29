@@ -24,11 +24,11 @@ compileInGhc targets handlerOutput = do
     flags0 <- getSessionDynFlags
     let flags = flags0 {verbosity = 1 }
     setSessionDynFlags flags
-    let collectSrcError handlerOutput _flags MCOutput _srcspan msg
+    let collectSrcError _flags MCOutput msg
           = handlerOutput $ GHC.showSDocForUser flags emptyUnitState alwaysQualify msg
-        collectSrcError _ _ _ _ _
+        collectSrcError _ _ _
           = return ()
-    pushLogHookM (const (collectSrcError handlerOutput))
+    pushLogHookM (const collectSrcError)
     -- Set up targets.
     oldTargets <- getTargets
     let oldFiles = map fileFromTarget oldTargets
