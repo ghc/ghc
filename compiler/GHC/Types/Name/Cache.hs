@@ -144,7 +144,7 @@ extendOrigNameCache nc mod occ name
 
 -- | Initialize a new name cache
 newNameCache :: IO NameCache
-newNameCache = newNameCacheWith 'r' knownKeysOrigNameCache
+newNameCache = newNameCacheWith 'r'
 
 -- | This is a version of `newNameCache` that lets you supply your
 -- own unique tag and set of known key names. This can go wrong if the tag
@@ -152,8 +152,8 @@ newNameCache = newNameCacheWith 'r' knownKeysOrigNameCache
 -- an example.
 --
 -- Use `newNameCache` when possible.
-newNameCacheWith :: Char -> OrigNameCache -> IO NameCache
-newNameCacheWith c nc = NameCache c <$> newMVar nc
+newNameCacheWith :: Char -> IO NameCache
+newNameCacheWith c nc = NameCache c <$> newMVar (initOrigNames [])
 
 -- | This takes a tag for uniques to be generated and the list of knownKeyNames
 -- These must be initialized properly to ensure that names generated from this
@@ -161,12 +161,12 @@ newNameCacheWith c nc = NameCache c <$> newMVar nc
 --
 -- Use `newNameCache` or `newNameCacheWith` instead
 {-# DEPRECATED initNameCache "Use newNameCache or newNameCacheWith instead" #-}
-initNameCache :: Char -> [Name] -> IO NameCache
-initNameCache c names = newNameCacheWith c (initOrigNames names)
+initNameCache :: Char -> IO NameCache
+initNameCache c names = newNameCacheWith c
 
 -- | An empty namecache initialized to the default namecache
 newEmptyNameCache :: IO NameCache
-newEmptyNameCache = newNameCacheWith 'r' (initOrigNames [])
+newEmptyNameCache = newNameCacheWith 'r'
 
 initOrigNames :: [Name] -> OrigNameCache
 initOrigNames names = foldl' extendOrigNameCache' emptyModuleEnv names
