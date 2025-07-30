@@ -109,6 +109,8 @@ data FinderOpts = FinderOpts
   , finder_hieSuf :: OsString
   , finder_hiDir :: Maybe OsPath
   , finder_hiSuf :: OsString
+  , finder_bytecodeDir :: Maybe OsPath
+  , finder_bytecodeSuf :: OsString
   , finder_dynHiSuf :: OsString
   , finder_objectDir :: Maybe OsPath
   , finder_objectSuf :: OsString

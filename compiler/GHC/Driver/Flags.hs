@@ -375,7 +375,7 @@ impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
                 ,(Opt_DoLinearCoreLinting, turnOn, Opt_DoCoreLinting)
                 ,(Opt_Strictness, turnOn, Opt_WorkerWrapper)
                 ,(Opt_WriteIfSimplifiedCore, turnOn, Opt_WriteInterface)
-                ,(Opt_ByteCodeAndObjectCode, turnOn, Opt_WriteIfSimplifiedCore)
+                ,(Opt_ByteCodeAndObjectCode, turnOn, Opt_WriteByteCode)
                 ,(Opt_InfoTableMap, turnOn, Opt_InfoTableMapWithStack)
                 ,(Opt_InfoTableMap, turnOn, Opt_InfoTableMapWithFallback)
                 ] ++ validHoleFitsImpliedGFlags
@@ -706,6 +706,7 @@ data GeneralFlag
    | Opt_ExposeOverloadedUnfoldings
    | Opt_KeepAutoRules -- ^ Keep auto-generated rules even if they seem to have become useless
    | Opt_WriteInterface -- ^ Forces .hi files to be written even with -fno-code
+   | Opt_WriteByteCode -- ^ Forces bytecode files to be written
    | Opt_WriteSelfRecompInfo
    | Opt_WriteSelfRecompFlags -- ^ Include detailed flag information for self-recompilation debugging
    | Opt_WriteHie -- ^ Generate .hie files
