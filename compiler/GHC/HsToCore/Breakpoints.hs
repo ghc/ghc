@@ -23,6 +23,7 @@ module GHC.HsToCore.Breakpoints
 
 import GHC.Prelude
 import Data.Array
+import Data.Coerce
 
 import GHC.HsToCore.Ticks (Tick (..))
 import GHC.Data.SizedSeq
@@ -30,6 +31,7 @@ import GHC.Types.SrcLoc (SrcSpan)
 import GHC.Types.Name (OccName)
 import GHC.Types.Tickish (BreakTickIndex, BreakpointId(..))
 import GHC.Unit.Module (Module)
+import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import Data.List (intersperse)
 
@@ -106,3 +108,19 @@ The breakpoint is in the function called "baz" that is declared in a `let`
 or `where` clause of a declaration called "bar", which itself is declared
 in a `let` or `where` clause of the top-level function called "foo".
 -}
+
+instance Binary ModBreaks where
+  get bh =
+    ModBreaks
+      <$> (coerce (get bh :: IO (Array BreakTickIndex BinSrcSpan)))
+      <*> get bh
+      <*> get bh
+      <*> get bh
+      <*> get bh
+
+  put_ bh ModBreaks {..} =
+    put_ bh (coerce modBreaks_locs :: Array BreakTickIndex BinSrcSpan)
+      *> put_ bh modBreaks_vars
+      *> put_ bh modBreaks_decls
+      *> put_ bh modBreaks_ccs
+      *> put_ bh modBreaks_module
