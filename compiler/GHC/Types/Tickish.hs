@@ -4,6 +4,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module GHC.Types.Tickish (
   GenTickish(..),
@@ -44,6 +45,7 @@ import GHC.Utils.Panic
 import Language.Haskell.Syntax.Extension ( NoExtField )
 
 import Data.Data
+import GHC.Utils.Binary
 import GHC.Utils.Outputable (Outputable (ppr), text, (<+>))
 
 {- *********************************************************************
@@ -201,6 +203,11 @@ instance Outputable BreakpointId where
 instance NFData BreakpointId where
   rnf BreakpointId{bi_tick_mod, bi_tick_index} =
     rnf bi_tick_mod `seq` rnf bi_tick_index
+
+instance Binary BreakpointId where
+  get bh = BreakpointId <$> get bh <*> get bh
+
+  put_ bh BreakpointId {..} = put_ bh bi_tick_mod *> put_ bh bi_tick_index
 
 --------------------------------------------------------------------------------
 

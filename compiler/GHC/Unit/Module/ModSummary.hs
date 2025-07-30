@@ -17,11 +17,13 @@ module GHC.Unit.Module.ModSummary
    , msHsFilePath
    , msObjFilePath
    , msDynObjFilePath
+   , msBytecodeFilePath
    , msHsFileOsPath
    , msHiFileOsPath
    , msDynHiFileOsPath
    , msObjFileOsPath
    , msDynObjFileOsPath
+   , msBytecodeFileOsPath
    , msDeps
    , isBootSummary
    , isTemplateHaskellOrQQNonBoot
@@ -75,6 +77,8 @@ data ModSummary
           -- ^ Timestamp of object, if we have one
         ms_dyn_obj_date     :: !(Maybe UTCTime),
           -- ^ Timestamp of dynamic object, if we have one
+        ms_bytecode_date :: Maybe UTCTime,
+          -- ^ Timestamp of bytecode object, if we have one
         ms_iface_date   :: Maybe UTCTime,
           -- ^ Timestamp of hi file, if we have one
           -- See Note [When source is considered modified] and #9243
@@ -148,19 +152,21 @@ ms_home_imps = home_imps . ms_imps
 -- The ModLocation is stable over successive up-sweeps in GHCi, wheres
 -- the ms_hs_hash and imports can, of course, change
 
-msHsFilePath, msDynHiFilePath, msHiFilePath, msObjFilePath, msDynObjFilePath :: ModSummary -> FilePath
+msHsFilePath, msDynHiFilePath, msHiFilePath, msObjFilePath, msDynObjFilePath, msBytecodeFilePath :: ModSummary -> FilePath
 msHsFilePath  ms = expectJust (ml_hs_file  (ms_location ms))
 msHiFilePath  ms = ml_hi_file  (ms_location ms)
 msDynHiFilePath ms = ml_dyn_hi_file (ms_location ms)
 msObjFilePath ms = ml_obj_file (ms_location ms)
 msDynObjFilePath ms = ml_dyn_obj_file (ms_location ms)
+msBytecodeFilePath ms = ml_bytecode_file (ms_location ms)
 
-msHsFileOsPath, msDynHiFileOsPath, msHiFileOsPath, msObjFileOsPath, msDynObjFileOsPath :: ModSummary -> OsPath
+msHsFileOsPath, msDynHiFileOsPath, msHiFileOsPath, msObjFileOsPath, msDynObjFileOsPath, msBytecodeFileOsPath :: ModSummary -> OsPath
 msHsFileOsPath  ms = expectJust (ml_hs_file_ospath  (ms_location ms))
 msHiFileOsPath  ms = ml_hi_file_ospath  (ms_location ms)
 msDynHiFileOsPath ms = ml_dyn_hi_file_ospath (ms_location ms)
 msObjFileOsPath ms = ml_obj_file_ospath (ms_location ms)
 msDynObjFileOsPath ms = ml_dyn_obj_file_ospath (ms_location ms)
+msBytecodeFileOsPath ms = ml_bytecode_file_ospath (ms_location ms)
 
 -- | Did this 'ModSummary' originate from a hs-boot file?
 isBootSummary :: ModSummary -> IsBootInterface
