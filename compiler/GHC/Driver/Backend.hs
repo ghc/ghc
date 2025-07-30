@@ -69,6 +69,7 @@ module GHC.Driver.Backend
      -- * Properties of back ends
    , backendDescription
    , backendWritesFiles
+   , backendWritesBytecodeFiles
    , backendPipelineOutput
    , backendCanReuseLoadedCode
    , backendGeneratesCode
@@ -89,7 +90,6 @@ module GHC.Driver.Backend
    , backendSupportsBreakpoints
    , backendForcesOptimization0
    , backendNeedsFullWays
-   , backendSpecialModuleSource
    , backendSupportsHpc
    , backendSupportsCImport
    , backendSupportsCExport
@@ -430,7 +430,10 @@ backendDescription (Named NoBackend)   = "no code generated"
 -- | This flag tells the compiler driver whether the back
 -- end will write files: interface files and object files.
 -- It is typically true for "real" back ends that generate
--- code into the filesystem.  (That means, not the interpreter.)
+-- code into the filesystem.  (That means, not the bytecode backend.)
+--
+-- NOTE: The bytecode backend does generate files now, but this field is used
+-- in the compiler as a proxy for "is a backend which generates normal object files".
 backendWritesFiles :: Backend -> Bool
 backendWritesFiles (Named NCG)         = True
 backendWritesFiles (Named LLVM)        = True
@@ -438,6 +441,15 @@ backendWritesFiles (Named ViaC)        = True
 backendWritesFiles (Named JavaScript)  = True
 backendWritesFiles (Named Bytecode) = False
 backendWritesFiles (Named NoBackend)   = False
+
+-- | Whether the back end by default will produce bytecode files.
+backendWritesBytecodeFiles :: Backend -> Bool
+backendWritesBytecodeFiles (Named NCG)         = False
+backendWritesBytecodeFiles (Named LLVM)        = False
+backendWritesBytecodeFiles (Named ViaC)        = False
+backendWritesBytecodeFiles (Named JavaScript)  = False
+backendWritesBytecodeFiles (Named Bytecode) = True
+backendWritesBytecodeFiles (Named NoBackend)   = False
 
 -- | When the back end does write files, this value tells
 -- the compiler in what manner of file the output should go:
@@ -691,18 +703,6 @@ backendNeedsFullWays (Named JavaScript)  = False
 backendNeedsFullWays (Named Bytecode) = True
 backendNeedsFullWays (Named NoBackend)   = False
 
--- | This flag is also special for the interpreter: if a
--- message about a module needs to be shown, do we know
--- anything special about where the module came from?  The
--- Boolean argument is a `recomp` flag.
-backendSpecialModuleSource :: Backend -> Bool -> Maybe String
-backendSpecialModuleSource (Named NCG)         = const Nothing
-backendSpecialModuleSource (Named LLVM)        = const Nothing
-backendSpecialModuleSource (Named ViaC)        = const Nothing
-backendSpecialModuleSource (Named JavaScript)  = const Nothing
-backendSpecialModuleSource (Named Bytecode) = \b -> if b then Just "interpreted" else Nothing
-backendSpecialModuleSource (Named NoBackend)   = const (Just "nothing")
-
 -- | This flag says whether the back end supports Haskell
 -- Program Coverage (HPC). If not, the compiler driver
 -- will ignore the `-fhpc` option (and will issue a
@@ -712,6 +712,7 @@ backendSupportsHpc (Named NCG)         = True
 backendSupportsHpc (Named LLVM)        = True
 backendSupportsHpc (Named ViaC)        = True
 backendSupportsHpc (Named JavaScript)  = False
+-- TODO: @terrorjack thinks that the bytecode backend should support HPC now since (!13493)
 backendSupportsHpc (Named Bytecode) = False
 backendSupportsHpc (Named NoBackend)   = True
 

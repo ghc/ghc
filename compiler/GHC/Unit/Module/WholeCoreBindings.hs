@@ -48,12 +48,8 @@ The lifecycle of a WholeCoreBindings typically proceeds as follows:
 
 2. `initWholeCoreBindings` turns a WholeCoreBindings into a proper BCOs linkable. This step combines together
    all the necessary information from a ModIface, ModDetails and WholeCoreBindings in order to
-   create the linkable. The linkable created is a "LazyBCOs" linkable, which
-   was introduced just for initWholeCoreBindings, so that the bytecode can be generated lazily.
-   Using the `BCOs` constructor directly here leads to the bytecode being forced
-   too eagerly.
-
-3. Then when bytecode is needed, the LazyBCOs value is inspected and unpacked and
+   create the linkable.
+3. Then when bytecode is needed, the BCOs value is inspected and unpacked and
    the linkable is used as before.
 
 The flag `-fwrite-if-simplified-core` determines whether the extra information is written

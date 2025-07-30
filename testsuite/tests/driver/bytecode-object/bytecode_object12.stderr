@@ -1,0 +1,3 @@
+when making flags consistent: warning: [GHC-74335] [-Winconsistent-flags (in -Wdefault)]
+    Byte-code linking does not currently support linking an executable, enabling -no-link
+
