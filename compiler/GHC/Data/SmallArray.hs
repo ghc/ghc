@@ -29,7 +29,9 @@ import GHC.Exts
 import GHC.Prelude
 import GHC.IO
 import GHC.ST
+import GHC.Utils.Binary
 import Control.DeepSeq
+import Data.Foldable
 
 data SmallArray a = SmallArray (SmallArray# a)
 
@@ -166,3 +168,17 @@ listToArray (I# size) index_of value_of xs = runST $ ST \s ->
     (# s', ma #) -> case write_elems ma xs s' of
       s'' -> case unsafeFreezeSmallArray# ma s'' of
         (# s''', a #) -> (# s''', SmallArray a #)
+
+instance (Binary a) => Binary (SmallArray a) where
+  get bh = do
+    len <- get bh
+    ma <- newSmallArrayIO len undefined
+    for_ [0 .. len - 1] $ \i -> do
+      a <- get bh
+      writeSmallArrayIO ma i a
+    unsafeFreezeSmallArrayIO ma
+
+  put_ bh sa = do
+    let len = sizeofSmallArray sa
+    put_ bh len
+    for_ [0 .. len - 1] $ \i -> put_ bh $ sa `indexSmallArray` i
