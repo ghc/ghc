@@ -125,6 +125,7 @@ import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 import {-# SOURCE #-} GHC.Types.Name (Name)
 import GHC.Data.FastString
 import GHC.Data.TrieMap
+import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
 import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
@@ -133,6 +134,8 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
+import GHCi.FFI
+import GHCi.Message
 
 import Control.DeepSeq
 import Control.Monad            ( when, (<$!>), unless, forM_, void )
@@ -140,8 +143,10 @@ import Foreign hiding (bit, setBit, clearBit, shiftL, shiftR, void)
 import Data.Array
 import Data.Array.IO
 import Data.Array.Unsafe
+import qualified Data.Binary as Binary
 import Data.ByteString (ByteString, copy)
 import Data.Coerce
+import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short.Internal as SBS
@@ -928,6 +933,12 @@ instance Binary Bool where
 instance Binary Char where
     put_  bh c = put_ bh (fromIntegral (ord c) :: Word32)
     get  bh   = do x <- get bh; return $! (chr (fromIntegral (x :: Word32)))
+
+instance Binary Word where
+    put_ bh i = put_ bh (fromIntegral i :: Word64)
+    get  bh = do
+        x <- get bh
+        return $! (fromIntegral (x :: Word64))
 
 instance Binary Int where
     put_ bh i = put_ bh (fromIntegral i :: Int64)
@@ -1849,6 +1860,18 @@ instance Binary ByteString where
   put_ bh f = putBS bh f
   get bh = getBS bh
 
+instance Binary LBS.ByteString where
+  put_ bh lbs = do
+    put_ bh (fromIntegral (LBS.length lbs) :: Int)
+    let f bs acc =
+          ( BS.unsafeUseAsCStringLen bs $
+              \(ptr, l) -> putPrim bh l $ \op -> copyBytes op (castPtr ptr) l
+          )
+            *> acc
+    LBS.foldrChunks f (pure ()) lbs
+
+  get bh = LBS.fromStrict <$> get bh
+
 instance Binary FastString where
   put_ bh f =
     case findUserDataWriter (Proxy :: Proxy FastString) bh of
@@ -2106,6 +2129,7 @@ instance Binary BinSrcSpan where
             _ -> do s <- get bh
                     return $ BinSrcSpan (UnhelpfulSpan s)
 
+deriving via BinSrcSpan instance Binary SrcSpan
 
 {-
 Note [Source Location Wrappers]
@@ -2163,3 +2187,40 @@ instance Binary a => Binary (FingerprintWithValue a) where
 instance NFData a => NFData (FingerprintWithValue a) where
   rnf (FingerprintWithValue fp mflags)
     = rnf fp `seq` rnf mflags `seq` ()
+
+instance Binary ConInfoTable where
+  get bh = Binary.decode <$> get bh
+
+  put_ bh = put_ bh . Binary.encode
+
+instance Binary FFIType where
+  get bh = do
+    t <- getByte bh
+    evaluate $ case t of
+      0 -> FFIVoid
+      1 -> FFIPointer
+      2 -> FFIFloat
+      3 -> FFIDouble
+      4 -> FFISInt8
+      5 -> FFISInt16
+      6 -> FFISInt32
+      7 -> FFISInt64
+      8 -> FFIUInt8
+      9 -> FFIUInt16
+      10 -> FFIUInt32
+      11 -> FFIUInt64
+      _ -> panic "Binary FFIType: invalid byte"
+
+  put_ bh t = putByte bh $ case t of
+    FFIVoid -> 0
+    FFIPointer -> 1
+    FFIFloat -> 2
+    FFIDouble -> 3
+    FFISInt8 -> 4
+    FFISInt16 -> 5
+    FFISInt32 -> 6
+    FFISInt64 -> 7
+    FFIUInt8 -> 8
+    FFIUInt16 -> 9
+    FFIUInt32 -> 10
+    FFIUInt64 -> 11
