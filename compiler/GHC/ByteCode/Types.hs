@@ -35,6 +35,7 @@ import GHC.Data.FastString
 import GHC.Data.FlatBag
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Builtin.PrimOps
 import GHC.Types.SptEntry
@@ -295,4 +296,9 @@ instance Outputable UnlinkedBCO where
       = sep [text "BCO", ppr nm, text "with",
              ppr (sizeFlatBag lits), text "lits",
              ppr (sizeFlatBag ptrs), text "ptrs" ]
+
+instance Binary FFIInfo where
+  get bh = FFIInfo <$> get bh <*> get bh
+
+  put_ bh FFIInfo {..} = put_ bh ffiInfoArgs *> put_ bh ffiInfoRet
 
