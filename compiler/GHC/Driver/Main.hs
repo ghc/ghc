@@ -55,8 +55,8 @@ module GHC.Driver.Main
     , hscInteractive
     , mkCgInteractiveGuts
     , CgInteractiveGuts
-    , generateByteCode
-    , generateFreshByteCode
+    , generateAndWriteByteCodeLinkable
+    , generateFreshByteCodeLinkable
 
     -- * Running passes separately
     , hscRecompStatus
@@ -103,7 +103,6 @@ module GHC.Driver.Main
     , ioMsgMaybe
     , showModuleIndex
     , writeInterfaceOnlyMode
-    , loadByteCode
     , genModDetails
     ) where
 
@@ -115,6 +114,7 @@ import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Env
+import GHC.Driver.ByteCode
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Errors
 import GHC.Driver.Messager
@@ -290,12 +290,10 @@ import Data.List.NonEmpty (NonEmpty ((:|)))
 import GHC.Unit.Module.WholeCoreBindings
 import GHC.Types.TypeEnv
 import System.IO
-import {-# SOURCE #-} GHC.Driver.Pipeline
 import Data.Time
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
-import GHC.Platform.Ways
 import GHC.Stg.EnforceEpt.TagSig (seqTagSig)
 import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
@@ -304,6 +302,8 @@ import GHC.Cmm.Config (CmmConfig)
 import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
+
+import GHC.ByteCode.Serialize
 
 {- **********************************************************************
 %*                                                                      *
@@ -862,25 +862,29 @@ hscRecompStatus
               return $ HscRecompNeeded $ Just $ mi_iface_hash $ checked_iface
 
            | otherwise -> do
-               -- Do need linkable
-               -- 1. Just check whether we have bytecode/object linkables and then
-               -- we will decide if we need them or not.
-               bc_linkable <- checkByteCode checked_iface mod_summary (homeMod_bytecode old_linkable)
+               -- Check the status of all the linkable types we might need.
+               -- 1. The in-memory linkable we had at hand.
+               bc_in_memory_linkable <- checkByteCodeInMemory hsc_env mod_summary (homeMod_bytecode old_linkable)
+               -- 2. The bytecode object file
+               bc_obj_linkable <- checkByteCodeFromObject hsc_env mod_summary
+               -- 3. Bytecode from an interface's whole core bindings.
+               bc_core_linkable <- checkByteCodeFromIfaceCoreBindings hsc_env checked_iface mod_summary
+               -- 4. The object file.
                obj_linkable <- liftIO $ checkObjects lcl_dflags (homeMod_object old_linkable) mod_summary
-               trace_if (hsc_logger hsc_env) (vcat [text "BCO linkable", nest 2 (ppr bc_linkable), text "Object Linkable", ppr obj_linkable])
+               trace_if (hsc_logger hsc_env)
+                (vcat [text "BCO linkable", nest 2 (ppr bc_in_memory_linkable)
+                      , text "BCO obj linkable", ppr bc_obj_linkable
+                      , text "BCO core linkable", ppr bc_core_linkable
+                      , text "Object Linkable", ppr obj_linkable])
 
-               let just_bc = justBytecode <$> bc_linkable
-                   just_o  = justObjects  <$> obj_linkable
-                   _maybe_both_os = case (bc_linkable, obj_linkable) of
-                               (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
-                               -- If missing object code, just say we need to recompile because of object code.
-                               (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
-                               -- If just missing byte code, just use the object code
-                               -- so you should use -fprefer-byte-code with -fwrite-if-simplified-core or you'll
-                               -- end up using bytecode on recompilation
-                               (_, UpToDateItem {} ) -> just_o
+               let just_o = justObjects <$> obj_linkable
 
-                   definitely_both_os = case (bc_linkable, obj_linkable) of
+                   bytecode_or_object_code
+                      | gopt Opt_WriteByteCode lcl_dflags = justBytecode <$> definitely_bc
+                      | otherwise = (justBytecode <$> maybe_bc) `choose` just_o
+
+
+                   definitely_both_os = case (bc_result, obj_linkable) of
                                (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
                                -- If missing object code, just say we need to recompile because of object code.
                                (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
@@ -889,18 +893,31 @@ hscRecompStatus
                                -- end up using bytecode on recompilation
                                (OutOfDateItem reason _,  _ ) -> OutOfDateItem reason Nothing
 
---               pprTraceM "recomp" (ppr just_bc <+> ppr just_o)
+                   -- When -fwrite-byte-code, we definitely need to have up-to-date bytecode.
+                   definitely_bc = bc_obj_linkable `prefer` bc_in_memory_linkable
+
+                   -- If not -fwrite-byte-code, then we could use core bindings or object code if that's available.
+                   maybe_bc = bc_in_memory_linkable `choose`
+                              bc_obj_linkable `choose`
+                              bc_core_linkable
+
+                   bc_result = if gopt Opt_WriteByteCode lcl_dflags
+                                -- If the byte-code artifact needs to be produced, then we certainly need bytecode.
+                                then definitely_bc
+                                else maybe_bc
+
+               trace_if (hsc_logger hsc_env)
+                (vcat [text "definitely_bc", ppr definitely_bc
+                      , text "maybe_bc", ppr maybe_bc
+                      , text "definitely_both_os", ppr definitely_both_os
+                      , text "just_o", ppr just_o])
                -- 2. Decide which of the products we will need
-               let recomp_linkable_result = case () of
-                     _ | backendCanReuseLoadedCode (backend lcl_dflags) ->
-                           case bc_linkable of
-                             -- If bytecode is available for Interactive then don't load object code
-                             UpToDateItem _ -> just_bc
-                             _ -> case obj_linkable of
-                                     -- If o is availabe, then just use that
-                                     UpToDateItem _ -> just_o
-                                     _ -> outOfDateItemBecause MissingBytecode Nothing
+               let recomp_linkable_result = if
+                        --MP : This is a bad proxy for "We are only producing bytecode"
+                        | backendCanReuseLoadedCode (backend lcl_dflags) -> bytecode_or_object_code
+
                         -- Need object files for making object files
+                        -- MP: This is a bad proxy for "We are only producing object code"
                         | backendWritesFiles (backend lcl_dflags) ->
                            if gopt Opt_ByteCodeAndObjectCode lcl_dflags
                              -- We say we are going to write both, so recompile unless we have both
@@ -912,10 +929,24 @@ hscRecompStatus
                case recomp_linkable_result of
                  UpToDateItem linkable -> do
                    msg $ UpToDate
-                   return $ HscUpToDate checked_iface $ linkable
+                   return $ HscUpToDate checked_iface linkable
                  OutOfDateItem reason _ -> do
                    msg $ NeedsRecompile reason
                    return $ HscRecompNeeded $ Just $ mi_iface_hash $ checked_iface
+
+-- | Prefer requires both arguments to be up-to-date.
+-- but prefers to use the second argument.
+prefer :: MaybeValidated a -> MaybeValidated a -> MaybeValidated a
+prefer (UpToDateItem _) (UpToDateItem l2) = UpToDateItem l2
+prefer r1 _ = r1
+
+-- | Disjunction, choose either argument, but prefer the first one.
+-- Report the failure of the first argument.
+choose :: MaybeValidated a -> MaybeValidated a -> MaybeValidated a
+choose (UpToDateItem l1) _ = UpToDateItem l1
+choose _ (UpToDateItem l2) = UpToDateItem l2
+choose l1 _ = l1
+
 
 -- | Check that the .o files produced by compilation are already up-to-date
 -- or not.
@@ -952,16 +983,43 @@ checkObjects dflags mb_old_linkable summary = do
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
 -- no need to check that again here
-checkByteCode :: ModIface -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
-checkByteCode iface mod_sum mb_old_linkable =
+checkByteCodeInMemory :: HscEnv -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
+checkByteCodeInMemory hsc_env mod_sum mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
       | not (linkableIsNativeCodeOnly old_linkable)
+      -- If `-fwrite-byte-code` is enabled, then check that the .gbc file is
+      -- up-to-date with the linkable we have in our hand.
+      -- If ms_bytecode_date is Nothing, then the .gbc file does not exist yet.
+      -- Otherwise, check that the date matches the linkable date exactly.
+      , if gopt Opt_WriteByteCode (hsc_dflags hsc_env)
+          then maybe False (linkableTime old_linkable ==) (ms_bytecode_date mod_sum)
+          else True
       -> return $ (UpToDateItem old_linkable)
-    _ -> loadByteCode iface mod_sum
+    _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
-loadByteCode :: ModIface -> ModSummary -> IO (MaybeValidated Linkable)
-loadByteCode iface mod_sum = do
+-- | Load bytecode from a ".gbc" object file if it exists and is up-to-date
+checkByteCodeFromObject :: HscEnv -> ModSummary -> IO (MaybeValidated Linkable)
+checkByteCodeFromObject hsc_env mod_sum = do
+  let
+    obj_fn = ml_bytecode_file (ms_location mod_sum)
+    obj_date = ms_bytecode_date mod_sum
+    if_date = ms_iface_date mod_sum
+  case (,) <$> obj_date <*> if_date of
+    Just (obj_date, if_date)
+      | obj_date >= if_date -> do
+          -- Don't force this if we reuse the linkable already loaded into memory, but we have to check
+          -- that the one we have on disk would be suitable as well.
+          linkable <- unsafeInterleaveIO $ do
+            bco <- readBinByteCode hsc_env obj_fn
+            return $ mkByteCodeObjectLinkable obj_date bco
+          return $ UpToDateItem linkable
+    _ -> return $ outOfDateItemBecause MissingBytecode Nothing
+
+-- | Attempt to load bytecode from whole core bindings in the interface if they exist.
+-- This is a legacy code-path, these days it should be preferred to use the bytecode object linkable.
+checkByteCodeFromIfaceCoreBindings :: HscEnv -> ModIface -> ModSummary -> IO (MaybeValidated Linkable)
+checkByteCodeFromIfaceCoreBindings _hsc_env iface mod_sum = do
     let
       this_mod   = ms_mod mod_sum
       if_date    = fromJust $ ms_iface_date mod_sum
@@ -990,26 +1048,6 @@ initModDetails hsc_env iface =
     -- in make mode, since this HMI will go into the HPT.
     genModDetails hsc_env iface
 
--- | Modify flags such that objects are compiled for the interpreter's way.
--- This is necessary when building foreign objects for Template Haskell, since
--- those are object code built outside of the pipeline, which means they aren't
--- subject to the mechanism in 'enableCodeGenWhen' that requests dynamic build
--- outputs for dependencies when the interpreter used for TH is dynamic but the
--- main outputs aren't.
--- Furthermore, the HPT only stores one set of objects with different names for
--- bytecode linking in 'HomeModLinkable', so the usual hack for switching
--- between ways in 'get_link_deps' doesn't work.
-compile_for_interpreter :: HscEnv -> (HscEnv -> IO a) -> IO a
-compile_for_interpreter hsc_env use =
-  use (hscUpdateFlags update hsc_env)
-  where
-    update dflags = dflags {
-      targetWays_ = adapt_way interpreterDynamic WayDyn $
-                    adapt_way interpreterProfiled WayProf $
-                    targetWays_ dflags
-      }
-
-    adapt_way want = if want (hscInterp hsc_env) then addWay else removeWay
 
 -- | Assemble 'WholeCoreBindings' if the interface contains Core bindings.
 iface_core_bindings :: ModIface -> ModLocation -> Maybe WholeCoreBindings
@@ -1046,8 +1084,8 @@ loadIfaceByteCode hsc_env iface location type_env =
   compile <$> iface_core_bindings iface location
   where
     compile decls = do
-      (bcos, fos) <- compileWholeCoreBindings hsc_env type_env decls
-      linkable $ BCOs bcos :| [DotO fo ForeignObject | fo <- fos]
+      bco <- compileWholeCoreBindings hsc_env type_env decls
+      linkable $ pure $ BCOs bco
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file location)
@@ -1067,8 +1105,8 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
       Just <$> compile wcb
   where
     compile decls = do
-      ~(bcos, fos) <- unsafeInterleaveIO $ compileWholeCoreBindings hsc_env type_env decls
-      linkable $ NE.singleton (LazyBCOs bcos fos)
+      bco <- unsafeInterleaveIO $ compileWholeCoreBindings hsc_env type_env decls
+      linkable $ NE.singleton (BCOs bco)
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file location)
@@ -1084,7 +1122,7 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
 -- mutable state that would generate bytecode on demand, so we have to call this
 -- function even when we don't know that we'll need the bytecode.
 --
--- In addition, the laziness has to be hidden inside 'LazyBCOs' because
+-- In addition, the laziness has to be hidden inside 'BCOs' because
 -- 'Linkable' is used too generally, so that looking at the constructor to
 -- decide whether to discard it when linking native code would force the thunk
 -- otherwise, incurring a significant performance penalty.
@@ -1109,9 +1147,9 @@ initWholeCoreBindings hsc_env iface details (Linkable utc_time this_mod uls) = d
     go hsc_env' = \case
       CoreBindings wcb -> do
         add_iface_to_hpt iface details hsc_env
-        ~(bco, fos) <- unsafeInterleaveIO $
+        bco <- unsafeInterleaveIO $
                        compileWholeCoreBindings hsc_env' type_env wcb
-        pure (LazyBCOs bco fos)
+        pure (BCOs bco)
       l -> pure l
 
     type_env = md_types details
@@ -1134,7 +1172,7 @@ compileWholeCoreBindings ::
   HscEnv ->
   TypeEnv ->
   WholeCoreBindings ->
-  IO (CompiledByteCode, [FilePath])
+  IO ByteCodeObject
 compileWholeCoreBindings hsc_env type_env wcb = do
   core_binds <- typecheck
   (stubs, foreign_files) <- decode_foreign
@@ -1159,7 +1197,7 @@ compileWholeCoreBindings hsc_env type_env wcb = do
                       (typeEnvTyCons type_env) stubs foreign_files
                       Nothing []
       trace_if logger (text "Generating ByteCode for" <+> ppr wcb_module)
-      generateByteCode hsc_env cgi_guts wcb_mod_location
+      mkByteCodeObject hsc_env wcb_module wcb_mod_location cgi_guts
 
     WholeCoreBindings {wcb_module, wcb_mod_location, wcb_foreign} = wcb
 
@@ -2114,16 +2152,28 @@ hscInteractive :: HscEnv
                -> CgInteractiveGuts
                -> ModLocation
                -> IO (Maybe FilePath, CompiledByteCode) -- ^ .c stub path (if any) and ByteCode
-hscInteractive hsc_env cgguts mod_loc = do
+hscInteractive hsc_env cgguts location = do
+    comp_bc <- hscGenerateByteCode hsc_env cgguts location
+
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
     let tmpfs  = hsc_tmpfs hsc_env
+    ------------------ Create f-x-dynamic C-side stuff -----
+    (_istub_h_exists, istub_c_exists)
+        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) (cgi_module cgguts) location (cgi_foreign cgguts)
+    return (istub_c_exists, comp_bc)
+
+
+-- | Generate 'CompiledByteCode' (only) for a given module.
+hscGenerateByteCode :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO CompiledByteCode
+hscGenerateByteCode hsc_env cgguts location = do
+    let dflags = hsc_dflags hsc_env
+    let logger = hsc_logger hsc_env
     let CgInteractiveGuts{ -- This is the last use of the ModGuts in a compilation.
                 -- From now on, we just use the bits we need.
                cgi_module   = this_mod,
                cgi_binds    = core_binds,
                cgi_tycons   = tycons,
-               cgi_foreign  = foreign_stubs,
                cgi_modBreaks = mod_breaks,
                cgi_spt_entries = spt_entries } = cgguts
 
@@ -2132,7 +2182,7 @@ hscInteractive hsc_env cgguts mod_loc = do
     let cp_pgm_cfg :: CorePrepPgmConfig
         cp_pgm_cfg = initCorePrepPgmConfig (hsc_dflags hsc_env)
                                            (interactiveInScope $ hsc_IC hsc_env)
-    binds_to_prep <- addImplicitBinds cp_pgm_cfg mod_loc tycons core_binds
+    binds_to_prep <- addImplicitBinds cp_pgm_cfg location tycons core_binds
 
     -------------------
     -- PREPARE FOR CODE GENERATION
@@ -2146,44 +2196,61 @@ hscInteractive hsc_env cgguts mod_loc = do
     -- omit it here
     (stg_binds_with_deps, _infotable_prov, _caf_ccs__caf_cc_stacks, _ignore_stg_cg_infos)
       <- {-# SCC "CoreToStg" #-}
-          myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) True this_mod mod_loc prepd_binds
+          myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) True this_mod location prepd_binds
 
     let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
     -----------------  Generate byte code ------------------
-    comp_bc <- byteCodeGen hsc_env this_mod stg_binds tycons mod_breaks spt_entries
+    byteCodeGen hsc_env this_mod stg_binds tycons mod_breaks spt_entries
 
-    ------------------ Create f-x-dynamic C-side stuff -----
-    (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod mod_loc foreign_stubs
-    return (istub_c_exists, comp_bc)
+-- | Generate a byte code object linkable and write it to a file if `-fwrite-byte-code` is enabled.
+generateAndWriteByteCode :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO ByteCodeObject
+generateAndWriteByteCode hsc_env cgguts mod_location = do
+  comp_bc <- mkByteCodeObject hsc_env (cgi_module cgguts) mod_location cgguts
+  let dflags   = hsc_dflags hsc_env
+  -- See Note [-fwrite-byte-code is not the default]
+  when (gopt Opt_WriteByteCode dflags) $ do
+    let bc_path = ml_bytecode_file mod_location
+    writeBinByteCode bc_path comp_bc
+  return comp_bc
 
--- | Compile Core bindings and foreign inputs that were loaded from an
--- interface, to produce bytecode and potential foreign objects for the purpose
--- of linking splices.
-generateByteCode :: HscEnv
-  -> CgInteractiveGuts
-  -> ModLocation
-  -> IO (CompiledByteCode, [FilePath])
-generateByteCode hsc_env cgguts mod_location = do
-  (hasStub, comp_bc) <- hscInteractive hsc_env cgguts mod_location
-  compile_for_interpreter hsc_env $ \ i_env -> do
-    stub_o <- traverse (compileForeign i_env LangC) hasStub
-    foreign_files_o <- traverse (uncurry (compileForeign i_env)) (cgi_foreign_files cgguts)
-    pure (comp_bc, maybeToList stub_o ++ foreign_files_o)
+{-
+Note [-fwrite-byte-code is not the default]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-generateFreshByteCode :: HscEnv
+`-fwrite-byte-code` is not enabled by default because previously using `-fbyte-code` would
+not write anything at all to disk. For example, GHCi would not write anything to the directory
+it was invoked in. Therefore it was the backwards compatible thing to do to not write anything and
+make user's opt into writing the files.
+
+-}
+
+-- | Generate a 'ByteCodeObject' and write it to disk if `-fwrite-byte-code` is enabled.
+generateAndWriteByteCodeLinkable :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO Linkable
+generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
+  bco_object <- generateAndWriteByteCode hsc_env cgguts mod_location
+  -- Either, get the same time as the .gbc file if it exists, or just the current time.
+  -- It's important the time of the linkable matches the time of the .gbc file for recompilation
+  -- checking.
+  bco_time <- maybe getCurrentTime pure =<< modificationTimeIfExists (ml_bytecode_file mod_location)
+  return $ mkByteCodeObjectLinkable bco_time bco_object
+
+mkByteCodeObject :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ByteCodeObject
+mkByteCodeObject hsc_env mod mod_location cgguts = do
+  bcos <- hscGenerateByteCode hsc_env cgguts mod_location
+  objs <- outputAndCompileForeign hsc_env mod mod_location (cgi_foreign_files cgguts) (cgi_foreign cgguts)
+  return $! ByteCodeObject mod bcos objs
+
+-- | Generate a fresh 'ByteCodeObject' for a given module but do not write it to disk.
+generateFreshByteCodeLinkable :: HscEnv
   -> ModuleName
   -> CgInteractiveGuts
   -> ModLocation
   -> IO Linkable
-generateFreshByteCode hsc_env mod_name cgguts mod_location = do
+generateFreshByteCodeLinkable hsc_env mod_name cgguts mod_location = do
   bco_time <- getCurrentTime
-  (bcos, fos) <- generateByteCode hsc_env cgguts mod_location
-  return $!
-    Linkable bco_time
-    (mkHomeModule (hsc_home_unit hsc_env) mod_name)
-    (BCOs bcos :| [DotO fo ForeignObject | fo <- fos])
+  bco_object <- mkByteCodeObject hsc_env (mkHomeModule (hsc_home_unit hsc_env) mod_name) mod_location cgguts
+  return $ mkByteCodeObjectLinkable bco_time bco_object
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)
@@ -2254,7 +2321,9 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
           ml_obj_file_ospath = panic "hscCompileCmmFile: no obj file",
           ml_dyn_obj_file_ospath = panic "hscCompileCmmFile: no dyn obj file",
           ml_dyn_hi_file_ospath  = panic "hscCompileCmmFile: no dyn obj file",
-          ml_hie_file_ospath = panic "hscCompileCmmFile: no hie file"}
+          ml_hie_file_ospath = panic "hscCompileCmmFile: no hie file",
+          ml_bytecode_file_ospath = panic "hscCompileCmmFile: no bytecode file"
+          }
 
 -------------------- Stuff for new code gen ---------------------
 
@@ -2486,7 +2555,9 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
               ml_obj_file_ospath  = panic "hsDeclsWithLocation:ml_obj_file_ospath",
               ml_dyn_obj_file_ospath = panic "hsDeclsWithLocation:ml_dyn_obj_file_ospath",
               ml_dyn_hi_file_ospath = panic "hsDeclsWithLocation:ml_dyn_hi_file_ospath",
-              ml_hie_file_ospath  = panic "hsDeclsWithLocation:ml_hie_file_ospath" }
+              ml_hie_file_ospath  = panic "hsDeclsWithLocation:ml_hie_file_ospath",
+              ml_bytecode_file_ospath = panic "hsDeclsWithLocation:ml_bytecode_file_ospath"
+              }
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
 
     {- Simplify -}
@@ -2506,7 +2577,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
             -- Get the *tidied* cls_insts and fam_insts
 
     {- Generate byte code & foreign stubs -}
-    linkable <- liftIO $ generateFreshByteCode hsc_env
+    linkable <- liftIO $ generateFreshByteCodeLinkable hsc_env
       (moduleName this_mod)
       (mkCgInteractiveGuts tidy_cg)
       iNTERACTIVELoc
@@ -2733,7 +2804,9 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
             ml_obj_file_ospath  = panic "hscCompileCoreExpr':ml_obj_file_ospath",
             ml_dyn_obj_file_ospath = panic "hscCompileCoreExpr': ml_obj_file_ospath",
             ml_dyn_hi_file_ospath  = panic "hscCompileCoreExpr': ml_dyn_hi_file_ospath",
-            ml_hie_file_ospath  = panic "hscCompileCoreExpr':ml_hie_file_ospath" }
+            ml_hie_file_ospath  = panic "hscCompileCoreExpr':ml_hie_file_ospath",
+            ml_bytecode_file_ospath = panic "hscCompileCoreExpr':ml_bytecode_file_ospath"
+            }
 
   -- Ensure module uniqueness by giving it a name like "GhciNNNN".
   -- This uniqueness is needed by the JS linker. Without it we break the 1-1
@@ -2778,7 +2851,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
       {- load it -}
       bco_time <- getCurrentTime
       (mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
-        Linkable bco_time this_mod $ NE.singleton $ BCOs bcos
+        Linkable bco_time this_mod $ NE.singleton $ BCOs (ByteCodeObject this_mod bcos [])
       -- Get the foreign reference to the name we should have just loaded.
       mhvs <- lookupFromLoadedEnv interp (idName binding_id)
       {- Get the HValue for the root -}

@@ -1301,14 +1301,9 @@ dynCompileExpr expr = do
 
 showModule :: GhcMonad m => ModuleNodeInfo -> m String
 showModule mni = do
-    let mod = moduleNodeInfoModule mni
     withSession $ \hsc_env -> do
         let dflags = hsc_dflags hsc_env
-        interpreted <- liftIO $
-          HUG.lookupHug (hsc_HUG hsc_env) (moduleUnitId mod) (moduleName mod) >>= pure . \case
-            Nothing       -> panic "missing linkable"
-            Just mod_info -> isJust (homeModInfoByteCode mod_info)  && isNothing (homeModInfoObject mod_info)
-        return (showSDoc dflags $ showModMsg dflags interpreted (ModuleNode [] mni))
+        return (showSDoc dflags $ showModMsg dflags (ModuleNode [] mni))
 
 moduleIsBootOrNotObjectLinkable :: GhcMonad m => Module -> m Bool
 moduleIsBootOrNotObjectLinkable mod = withSession $ \hsc_env -> liftIO $

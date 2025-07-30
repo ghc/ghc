@@ -59,7 +59,7 @@ data LinkDepsOpts = LinkDepsOpts
   , ldWays        :: !Ways                          -- ^ Enabled ways
   , ldFinderCache :: !FinderCache
   , ldFinderOpts  :: !FinderOpts
-  , ldLoadByteCode :: !(Module -> IO (Maybe Linkable))
+  , ldLoadByteCode :: !(Module -> ModLocation -> IO (Maybe Linkable))
   , ldGetDependencies :: !([Module] -> IO ([Module], UniqDSet UnitId))
   }
 
@@ -161,8 +161,15 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
            case ue_homeUnit unit_env of
             Nothing -> no_obj mod
             Just home_unit -> do
-              from_bc <- ldLoadByteCode opts mod
-              maybe (fallback_no_bytecode home_unit mod) pure from_bc
+
+              let fc = ldFinderCache opts
+              let fopts = ldFinderOpts opts
+              mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
+              case mb_stuff of
+                Found loc _ -> do
+                  from_bc <- ldLoadByteCode opts mod loc
+                  maybe (fallback_no_bytecode home_unit mod) pure from_bc
+                _ -> fallback_no_bytecode home_unit mod
         where
 
             fallback_no_bytecode home_unit mod = do
@@ -200,7 +207,6 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
               DotA fp    -> panic ("adjust_ul DotA " ++ show fp)
               DotDLL fp  -> panic ("adjust_ul DotDLL " ++ show fp)
               BCOs {}    -> pure part
-              LazyBCOs{} -> pure part
               CoreBindings WholeCoreBindings {wcb_module} ->
                 pprPanic "Unhydrated core bindings" (ppr wcb_module)
 
