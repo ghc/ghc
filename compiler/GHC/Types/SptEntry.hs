@@ -5,7 +5,10 @@ where
 
 import GHC.Types.Name          ( Name )
 import GHC.Fingerprint.Type    ( Fingerprint )
+import GHC.Prelude
+import GHC.Utils.Binary
 import GHC.Utils.Outputable
+import GHC.Utils.Panic.Plain
 
 -- | An entry to be inserted into a module's static pointer table.
 -- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
