@@ -10,6 +10,7 @@ module GHC.Unit.Module.Location
     , ml_obj_file
     , ml_dyn_obj_file
     , ml_hie_file
+    , ml_bytecode_file
     )
    , pattern ModLocation
    , addBootSuffix
@@ -74,11 +75,15 @@ data ModLocation
                 -- unit with a .a file)
 
         ml_dyn_obj_file_ospath :: OsPath,
-                -- ^ Where the .dy file is, whether or not it exists
+                -- ^ Where the .dyn_o file is, whether or not it exists
                 -- yet.
 
-        ml_hie_file_ospath  :: OsPath
+        ml_hie_file_ospath  :: OsPath,
                 -- ^ Where the .hie file is, whether or not it exists
+                -- yet.
+
+        ml_bytecode_file_ospath :: OsPath
+                -- ^ Where the .gbc file is, whether or not it exists
                 -- yet.
   } deriving Show
 
@@ -125,7 +130,7 @@ mkFileSrcSpan mod_loc
 
 {-# COMPLETE ModLocation #-}
 
-pattern ModLocation :: Maybe FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> ModLocation
+pattern ModLocation :: Maybe FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> ModLocation
 pattern ModLocation
   { ml_hs_file
   , ml_hi_file
@@ -133,6 +138,7 @@ pattern ModLocation
   , ml_obj_file
   , ml_dyn_obj_file
   , ml_hie_file
+  , ml_bytecode_file
   } <- OsPathModLocation
     { ml_hs_file_ospath = (fmap unsafeDecodeUtf -> ml_hs_file)
     , ml_hi_file_ospath = (unsafeDecodeUtf -> ml_hi_file)
@@ -140,8 +146,9 @@ pattern ModLocation
     , ml_obj_file_ospath = (unsafeDecodeUtf -> ml_obj_file)
     , ml_dyn_obj_file_ospath = (unsafeDecodeUtf -> ml_dyn_obj_file)
     , ml_hie_file_ospath = (unsafeDecodeUtf -> ml_hie_file)
+    , ml_bytecode_file_ospath = (unsafeDecodeUtf -> ml_bytecode_file)
     } where
-      ModLocation ml_hs_file ml_hi_file ml_dyn_hi_file ml_obj_file ml_dyn_obj_file ml_hie_file
+      ModLocation ml_hs_file ml_hi_file ml_dyn_hi_file ml_obj_file ml_dyn_obj_file ml_hie_file ml_bytecode_file
         = OsPathModLocation
           { ml_hs_file_ospath = fmap unsafeEncodeUtf ml_hs_file
           , ml_hi_file_ospath = unsafeEncodeUtf ml_hi_file
@@ -149,4 +156,5 @@ pattern ModLocation
           , ml_obj_file_ospath = unsafeEncodeUtf ml_obj_file
           , ml_dyn_obj_file_ospath = unsafeEncodeUtf ml_dyn_obj_file
           , ml_hie_file_ospath = unsafeEncodeUtf ml_hie_file
+          , ml_bytecode_file_ospath = unsafeEncodeUtf ml_bytecode_file
           }

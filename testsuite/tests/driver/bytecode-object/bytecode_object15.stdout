@@ -1,0 +1,6 @@
+[1 of 1] Compiling BytecodeTest     ( BytecodeTest.hs, BytecodeTest.gbc )[main]
+Ok, one module loaded.
+Leaving GHCi.
+Testing recompilation in GHCi...
+Ok, one module loaded.
+Leaving GHCi.

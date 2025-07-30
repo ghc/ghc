@@ -860,6 +860,19 @@ Options affecting code generation
     then any modules which are required to be compiled for Template Haskell evaluation
     will generate byte-code rather than object code.
 
+.. ghc-flag:: -fwrite-byte-code
+    :shortdesc: Write byte-code object files
+    :type: dynamic
+    :category: codegen
+
+    Write byte-code files (``.gbc``) when byte-code is generated.
+    These files can be used to avoid recompiling modules when using the byte-code
+    interpreter.
+
+    By default when using :ghc-flag:`-fbyte-code` no byte-code files are written.
+    This flag is implied by :ghc-flag:`-fbyte-code-and-object-code`.
+
+
 
 .. _options-linker:
 

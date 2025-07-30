@@ -23,6 +23,10 @@ MultiModulesRecompDefsWithCore:
 	./genMultiLayerModulesCore
 	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -e "" -fwrite-if-simplified-core MultiLayerModules
 
+MultiModulesRecompDefsWithBytecodeFiles:
+	./genMultiLayerModulesCore
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -e "" -fwrite-byte-code MultiLayerModules
+
 MultiModulesDefsWithCore:
 	./genMultiLayerModulesCore
 

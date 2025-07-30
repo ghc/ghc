@@ -1486,7 +1486,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
   dyn_obj_timestamp <- modificationTimeIfExists (ml_dyn_obj_file nms_location)
   hi_timestamp <- modificationTimeIfExists (ml_hi_file nms_location)
   hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
-
+  bytecode_timestamp <- modificationTimeIfExists (ml_bytecode_file nms_location)
   extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
   (implicit_sigs, _inst_deps) <- implicitRequirementsShallow (hscSetActiveUnitId (moduleUnitId nms_mod) hsc_env) pi_theimps
 
@@ -1509,6 +1509,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
         , ms_hie_date = hie_timestamp
         , ms_obj_date = obj_timestamp
         , ms_dyn_obj_date = dyn_obj_timestamp
+        , ms_bytecode_date = bytecode_timestamp
         }
 
 data PreprocessedImports

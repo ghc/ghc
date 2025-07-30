@@ -48,7 +48,7 @@ batchMsgWith extra hsc_env_start mod_index recomp node =
         showMsg msg reason =
             compilationProgressMsg logger $
             (showModuleIndex mod_index <>
-            msg <+> showModMsg dflags (recompileRequired recomp) node)
+            msg <+> showModMsg dflags node)
                 <> extra hsc_env mod_index recomp node
                 <> reason
 
