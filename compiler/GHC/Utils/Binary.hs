@@ -929,6 +929,12 @@ instance Binary Char where
     put_  bh c = put_ bh (fromIntegral (ord c) :: Word32)
     get  bh   = do x <- get bh; return $! (chr (fromIntegral (x :: Word32)))
 
+instance Binary Word where
+    put_ bh i = put_ bh (fromIntegral i :: Word64)
+    get  bh = do
+        x <- get bh
+        return $! (fromIntegral (x :: Word64))
+
 instance Binary Int where
     put_ bh i = put_ bh (fromIntegral i :: Int64)
     get  bh = do
