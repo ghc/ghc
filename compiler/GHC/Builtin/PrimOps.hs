@@ -53,10 +53,12 @@ import GHC.Types.Unique  ( Unique )
 
 import GHC.Unit.Types    ( Unit )
 
+import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Data.FastString
+import GHC.Data.SmallArray
 
 {-
 ************************************************************************
@@ -929,3 +931,12 @@ primOpIsReallyInline = \case
   DataToTagSmallOp -> False
   DataToTagLargeOp -> False
   p                -> not (primOpOutOfLine p)
+
+instance Binary PrimOp where
+  get bh = (allThePrimOpsArr `indexSmallArray`) <$> get bh
+
+  put_ bh = put_ bh . primOpTag
+
+allThePrimOpsArr :: SmallArray PrimOp
+{-# NOINLINE allThePrimOpsArr #-}
+allThePrimOpsArr = listToArray (maxPrimOpTag + 1) primOpTag id allThePrimOps

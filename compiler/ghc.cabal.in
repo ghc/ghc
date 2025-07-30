@@ -230,6 +230,7 @@ Library
         GHC.ByteCode.InfoTable
         GHC.ByteCode.Instr
         GHC.ByteCode.Linker
+        GHC.ByteCode.Serialize
         GHC.ByteCode.Types
         GHC.Cmm
         GHC.Cmm.BlockId
@@ -492,6 +493,7 @@ Library
         GHC.Driver.Backend.Internal
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
+        GHC.Driver.ByteCode
         GHC.Driver.CmdLine
         GHC.Driver.CodeOutput
         GHC.Driver.Config

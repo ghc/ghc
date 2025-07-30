@@ -170,8 +170,6 @@ import GHC.Linker.Static.Utils
 import Data.Bifunctor
 import Data.Function
 import Data.List (sort)
-import Data.List.NonEmpty ( NonEmpty (..) )
-import qualified Data.List.NonEmpty as NE
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -787,8 +785,8 @@ summaryNodeSummary = node_payload
 -- * Misc utilities
 --------------------------------------------------------------------------------
 
-showModMsg :: DynFlags -> Bool -> ModuleGraphNode -> SDoc
-showModMsg dflags _ (LinkNode {}) =
+showModMsg :: DynFlags -> ModuleGraphNode -> SDoc
+showModMsg dflags (LinkNode {}) =
       let staticLink = case ghcLink dflags of
                           LinkStaticLib -> True
                           _ -> False
@@ -797,33 +795,36 @@ showModMsg dflags _ (LinkNode {}) =
           arch_os   = platformArchOS platform
           exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)
       in text exe_file
-showModMsg _ _ (UnitNode _deps uid) = ppr uid
-showModMsg _ _ (InstantiationNode _uid indef_unit) =
+showModMsg _ (UnitNode _deps uid) = ppr uid
+showModMsg _ (InstantiationNode _uid indef_unit) =
   ppr $ instUnitInstanceOf indef_unit
-showModMsg dflags recomp (ModuleNode _ mni) =
+showModMsg dflags (ModuleNode _ mni) =
   if gopt Opt_HideSourcePaths dflags
       then text mod_str
       else hsep $
          [ text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' ')
          , char '('
          , text (moduleNodeInfoSource mni) <> char ','
-         , moduleNodeInfoExtraMessage dflags recomp mni, char ')' ]
+         , moduleNodeInfoExtraMessage mni, char ')' ]
   where
     mod_str  = moduleNameString (moduleName (moduleNodeInfoModule mni)) ++
                moduleNodeInfoBootString mni
 
 -- | Extra information about a 'ModuleNodeInfo' to display in the progress message.
-moduleNodeInfoExtraMessage :: DynFlags -> Bool -> ModuleNodeInfo -> SDoc
-moduleNodeInfoExtraMessage dflags recomp (ModuleNodeCompile mod_summary) =
+moduleNodeInfoExtraMessage :: ModuleNodeInfo -> SDoc
+moduleNodeInfoExtraMessage (ModuleNodeCompile mod_summary) =
     let dyn_file = normalise $ msDynObjFilePath mod_summary
         obj_file = normalise $ msObjFilePath mod_summary
-        files    = obj_file
-                   :| [ dyn_file | gopt Opt_BuildDynamicToo dflags ]
-                   ++ [ "interpreted" | gopt Opt_ByteCodeAndObjectCode dflags ]
-    in case backendSpecialModuleSource (backend dflags) recomp of
-              Just special -> text special
-              Nothing -> foldr1 (\ofile rest -> ofile <> comma <+> rest) (NE.map text files)
-moduleNodeInfoExtraMessage _ _ (ModuleNodeFixed {}) = text "fixed"
+        bc_file  = normalise $ msBytecodeFilePath mod_summary
+        dflags   = ms_hspp_opts mod_summary
+        bc_message = if gopt Opt_WriteByteCode dflags then bc_file else "interpreted"
+        files    = [ obj_file | backendWritesFiles (backend dflags) ]
+                   ++ [ dyn_file | backendWritesFiles (backend dflags) && gopt Opt_BuildDynamicToo dflags ]
+                   ++ [ bc_message | (backendWritesFiles (backend dflags) && gopt Opt_ByteCodeAndObjectCode dflags) || backendWritesBytecodeFiles (backend dflags) ]
+    in case files of
+         [] -> text "nothing"
+         _  -> hsep $ punctuate comma (map text files)
+moduleNodeInfoExtraMessage (ModuleNodeFixed {}) = text "fixed"
 
 
 -- | The source location of the module node to show to the user.
