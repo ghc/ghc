@@ -41,6 +41,7 @@ where
 import GHC.Prelude
 
 import GHC.Settings
+import GHC.Utils.Misc
 
 import GHC.Platform
 import GHC.Platform.Ways
@@ -113,7 +114,6 @@ import Data.Maybe
 import Data.Either
 import Control.Concurrent.MVar
 import qualified Control.Monad.Catch as MC
-import qualified Data.List.NonEmpty as NE
 
 import System.FilePath
 import System.Directory
@@ -131,6 +131,7 @@ import qualified GHC.Runtime.Interpreter as GHCi
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Map.Strict as M
 import Foreign.Ptr (nullPtr)
+import GHC.ByteCode.Serialize
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -639,13 +640,35 @@ initLinkDepsOpts hsc_env = opts
             }
     dflags = hsc_dflags hsc_env
 
-    ldLoadByteCode mod = do
+    ldLoadByteCode mod locn = do
+      bytecode_linkable <-  findBytecodeLinkableMaybe hsc_env mod locn
+      case bytecode_linkable of
+        Nothing -> findWholeCoreBindings hsc_env mod
+        Just bco -> return (Just bco)
+
+findWholeCoreBindings :: HscEnv -> Module -> IO (Maybe Linkable)
+findWholeCoreBindings hsc_env mod = do
       _ <- initIfaceLoad hsc_env $
              loadInterface (text "get_reachable_nodes" <+> parens (ppr mod))
                  mod ImportBySystem
       EPS {eps_iface_bytecode} <- hscEPS hsc_env
       sequence (lookupModuleEnv eps_iface_bytecode mod)
 
+
+findBytecodeLinkableMaybe :: HscEnv -> Module -> ModLocation -> IO (Maybe Linkable)
+findBytecodeLinkableMaybe hsc_env mod locn = do
+  let bytecode_fn = ml_bytecode_file locn
+  maybe_bytecode_time <- modificationTimeIfExists bytecode_fn
+  case maybe_bytecode_time of
+    Nothing -> return Nothing
+    Just bytecode_time -> do
+      -- Also load the interface, for reasons to do with recompilation avoidance.
+      -- See Note [Recompilation avoidance with bytecode objects]
+      _ <- initIfaceLoad hsc_env $
+             loadInterface (text "get_reachable_nodes" <+> parens (ppr mod))
+                 mod ImportBySystem
+      bco <- readBinByteCode hsc_env bytecode_fn
+      return $ Just $ mkModuleByteCodeLinkable bytecode_time bco
 
 get_reachable_nodes :: HscEnv -> [Module] -> IO ([Module], UniqDSet UnitId)
 get_reachable_nodes hsc_env mods
@@ -821,7 +844,7 @@ loadObjects
 loadObjects interp hsc_env pls objs = do
         let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
-            wanted_objs              = concatMap linkableFiles new_objs
+            wanted_objs              = concatMap linkableObjs new_objs
 
         if interpreterDynamic interp
             then do pls2 <- dynLoadObjs interp hsc_env pls1 wanted_objs
@@ -938,11 +961,8 @@ dynLinkBCOs interp pls keep_spec bcos = do
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
 
-            parts :: [LinkablePart]
-            parts = concatMap (NE.toList . linkableParts) new_bcos
-
             cbcs :: [CompiledByteCode]
-            cbcs = concatMap linkablePartAllBCOs parts
+            cbcs = concatMap linkableBCOs new_bcos
 
 
             le1 = linker_env pls
