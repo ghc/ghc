@@ -65,9 +65,6 @@ initSettings top_dir = do
     Nothing -> throwE $ SettingsError_BadData $
       "Can't parse as Target " ++ show targetFile
   let mySettings = Map.fromList settingsList
-      getBooleanSetting :: String -> ExceptT SettingsError m Bool
-      getBooleanSetting key = either pgmError pure $
-        getRawBooleanSetting settingsFile mySettings key
 
   -- see Note [topdir: How GHC finds its files]
   -- NB: top_dir is assumed to be in standard Unix
@@ -79,10 +76,7 @@ initSettings top_dir = do
         getRawSetting settingsFile mySettings key
       getSetting_topDir top key = either pgmError pure $
         getRawFilePathSetting top settingsFile mySettings key
-      getSetting_toolDir top tool key =
-        expandToolDir tool <$> getSetting_topDir top key
       getSetting key = getSetting_topDir top_dir key
-      getToolSetting key = getSetting_toolDir top_dir mtool_dir key
 
       expandDirVars top tool = expandToolDir tool . expandTopDir top
 
@@ -131,12 +125,8 @@ initSettings top_dir = do
   let ghc_usage_msg_path  = installed "ghc-usage.txt"
       ghci_usage_msg_path = installed "ghci-usage.txt"
 
-  -- For all systems, unlit, split, mangle are GHC utilities
-  -- architecture-specific stuff is done when building Config.hs
-  unlit_path <- getToolSetting "unlit command"
-
-  -- Other things being equal, 'as' is simply 'gcc'
-  let (cc_link, cc_link_args) = getTool (ccLinkProgram . tgtCCompilerLink)
+      -- Other things being equal, 'as' is simply 'gcc'
+      (cc_link, cc_link_args) = getTool (ccLinkProgram . tgtCCompilerLink)
       as_prog      = cc_prog
       as_args      = map Option cc_args
       ld_prog      = cc_link
@@ -146,6 +136,9 @@ initSettings top_dir = do
         let (ld_r_path, ld_r_args) = getTool (mergeObjsProgram . const ld_r_prog)
         pure (ld_r_path, map Option ld_r_args)
       iserv_prog   = libexec "ghc-iserv"
+      unlit_prog   = libexec (if (tgtLocallyExecutable target)
+                                  then "unlit" -- not a cross compiler
+                                  else targetPlatformTriple target ++ "-unlit")
 
   baseUnitId <- getSetting_raw "base unit-id"
 
@@ -180,7 +173,7 @@ initSettings top_dir = do
       , toolSettings_arSupportsDashL  = arSupportsDashL  $ tgtAr target
       , toolSettings_cmmCppSupportsG0 = cmmCppSupportsG0 $ tgtCmmCPreprocessor target
 
-      , toolSettings_pgm_L       = unlit_path
+      , toolSettings_pgm_L       = unlit_prog
       , toolSettings_pgm_P       = (hs_cpp_prog, map Option hs_cpp_args)
       , toolSettings_pgm_JSP     = (js_cpp_prog, map Option js_cpp_args)
       , toolSettings_pgm_CmmP    = (cmmCpp_prog, map Option cmmCpp_args)

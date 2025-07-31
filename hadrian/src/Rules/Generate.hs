@@ -8,7 +8,6 @@ import Development.Shake.FilePath
 import Data.Char (isSpace)
 import qualified Data.Set as Set
 import Base
-import qualified Context
 import Expression
 import Hadrian.Oracles.TextFile (lookupSystemConfig, getTargetTarget)
 import Oracles.Flag hiding (arSupportsAtFile, arSupportsDashL)
@@ -460,7 +459,6 @@ ghcWrapper stage  = do
 
 generateSettings :: FilePath -> Expr String
 generateSettings settingsFile = do
-    ctx <- getContext
     stage <- getStage
 
     package_db_path <- expr $ do
@@ -482,8 +480,7 @@ generateSettings settingsFile = do
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
 
     settings <- traverse sequence $
-        [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
+        [ ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)
         ]

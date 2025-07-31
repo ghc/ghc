@@ -85,8 +85,7 @@ WrapperBinsDir=${bindir}
 # N.B. this is duplicated from includes/ghc.mk.
 lib/settings : config.mk
 	@rm -f $@
-	@echo '[("unlit command", "$$topdir/../bin/$(CrossCompilePrefix)unlit")' >> $@
-	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
+	@echo '[("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Relative Global Package DB", "package.conf.d")' >> $@
 	@echo ',("base unit-id", "$(BaseUnitId)")' >> $@
 	@echo "]" >> $@

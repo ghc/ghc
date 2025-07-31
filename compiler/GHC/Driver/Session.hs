@@ -3502,6 +3502,7 @@ compilerInfo dflags
        ("target has .ident directive", queryBool tgtSupportsIdentDirective),
        ("target has subsections via symbols", queryBool tgtSupportsSubsectionsViaSymbols),
        ("target RTS linker only supports shared libraries", queryBool tgtRTSLinkerOnlySupportsSharedLibs),
+       ("unlit command", toolSettings_pgm_L (toolSettings dflags)),
        ("Unregisterised", queryBool tgtUnregisterised),
        ("LLVM target", query tgtLlvmTarget),
        ("LLVM llc command", queryCmdMaybe id tgtLlc),
