@@ -140,6 +140,10 @@ static enum ObjectFileFormat identifyObjectFile_(char* buf, size_t sz)
     if (sz > 4 && ((uint32_t*)buf)[0] == 0xfeedfacf) {
         return MachO64;
     }
+    // BigObj COFF files ...
+    if (sz > 8 && ((uint64_t*)buf)[0] == 0x86640002ffff0000) {
+        return COFFAmd64;
+    }
     return NotObject;
 }
 
