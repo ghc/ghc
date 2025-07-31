@@ -910,6 +910,7 @@ getRegister' config plat expr =
               code_x
                 `appOL` code_x'
                 `snocOL` annExpr expr (SRA (OpReg w dst) (OpReg w reg_x') (OpImm (ImmInteger n)))
+                `appOL` truncateReg w w dst
           )
     CmmMachOp (MO_S_Shr w) [x, y] -> do
       (reg_x, format_x, code_x) <- getSomeReg x
@@ -923,6 +924,7 @@ getRegister' config plat expr =
                 `appOL` code_x'
                 `appOL` code_y
                 `snocOL` annExpr expr (SRA (OpReg w dst) (OpReg w reg_x') (OpReg w reg_y))
+                `appOL` truncateReg w w dst
           )
     CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)]
       | w == W8,
