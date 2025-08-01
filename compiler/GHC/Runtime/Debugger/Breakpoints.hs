@@ -257,6 +257,8 @@ mkBreakpointOccurrences = do
             Right (BreakpointId tick_mod tick_ix)
               -> extendModuleEnvWith (IntMap.unionWith (S.<>)) bmp tick_mod (IntMap.singleton tick_ix [ibi])
             Left _
+              -- Do not include internal breakpoints in the visible breakpoint
+              -- occurrences!
               -> bmp
         ) bmp0 (imodBreaks_breakInfo ibrks)
 

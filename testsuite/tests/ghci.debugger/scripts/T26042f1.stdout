@@ -9,5 +9,7 @@ x :: Int = _
                   ^^
 22  {-# OPAQUE t #-}
 7248
+it :: Int = 7248
 Not stopped at a breakpoint; nothing to list
 Not stopped at a breakpoint; nothing to list
+it :: Int = 7248

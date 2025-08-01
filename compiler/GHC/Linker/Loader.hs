@@ -1712,10 +1712,8 @@ allocateCCS interp ce mbss
               let count = maybe 0 ((+1) . fst) $ IM.lookupMax imodBreaks_breakInfo
               let ccs = IM.map
                     (\info ->
-                      case cgb_tick_id info of
-                        Right bi -> fromMaybe (toRemotePtr nullPtr)
-                          (M.lookup bi ccss)
-                        Left InternalBreakLoc{} -> toRemotePtr nullPtr
+                        fromMaybe (toRemotePtr nullPtr)
+                          (M.lookup (either internalBreakLoc id (cgb_tick_id info)) ccss)
                     )
                     imodBreaks_breakInfo
               assertPpr (count == length ccs)
