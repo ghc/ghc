@@ -208,6 +208,13 @@ import GHC.Lexeme ( startsVarSym, startsVarId )
 -- This module completely re-exports 'GHC.Boot.TH.Syntax',
 -- and exports additionally functions that depend on filepath.
 
+-- |
+addForeignFile :: ForeignSrcLang -> String -> Q ()
+addForeignFile = addForeignSource
+{-# DEPRECATED addForeignFile
+               "Use 'Language.Haskell.TH.Syntax.addForeignSource' instead"
+  #-} -- deprecated in 8.6
+
 -- | The input is a filepath, which if relative is offset by the package root.
 makeRelativeToProject :: FilePath -> Q FilePath
 makeRelativeToProject fp | isRelative fp = do

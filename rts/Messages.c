@@ -187,6 +187,10 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
         return 0;
     }
 
+    if(bh_info == &stg_WHITEHOLE_info){
+      fprintf(stderr, "\noh nooo %xll\n", ((StgInd*)bh)->indirectee);
+    }
+
     // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
     // or a value.
     StgClosure *p;
