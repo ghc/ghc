@@ -7,12 +7,15 @@ main
 -- stepout of foo True to caller (ie bar)
 :stepout
 :list
+:show bindings
 -- stepout of bar (to branch of foo False, where bar was called)
 :stepout
 :list
+:show bindings
 -- stepout to right after the call to foo False in main
 :stepout
 :list
+:show bindings
 
 -- done
 :continue

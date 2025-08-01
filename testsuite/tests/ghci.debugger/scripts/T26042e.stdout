@@ -7,7 +7,7 @@ y :: [a1] -> Int = _
 11    let !z = y x
       ^^^^^^^^^^^^
 12    let !t = y ['b']
-Stopped in T7., T26042e.hs:18:3-17
+Stopped in T7.main, T26042e.hs:18:3-17
 _result :: IO () = _
 17  main = do
 18    let !(x, y) = a

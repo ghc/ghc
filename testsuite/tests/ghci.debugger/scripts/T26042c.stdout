@@ -8,7 +8,7 @@ _result ::
 10  foo True  i = return i
                   ^^^^^^^^
 11  foo False _ = do
-Stopped in Main., T26042c.hs:5:3-26
+Stopped in Main.main, T26042c.hs:5:3-26
 _result ::
   GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,

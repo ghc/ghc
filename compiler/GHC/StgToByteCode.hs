@@ -63,7 +63,7 @@ import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
                               assertNonVoidIds, assertNonVoidStgArgs )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
-import GHC.Runtime.Interpreter ( interpreterProfiled, readIModModBreaks )
+import GHC.Runtime.Interpreter ( interpreterProfiled )
 import GHC.Data.Bitmap
 import GHC.Data.FlatBag as FlatBag
 import GHC.Data.OrdList
@@ -99,7 +99,7 @@ import GHC.CoreToIface
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT(..))
 import Control.Monad.Trans.State  (StateT(..))
-import Data.Array ((!))
+import Data.Bifunctor (Bifunctor(..))
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -402,11 +402,16 @@ schemeER_wrk d p (StgTick bp@(Breakpoint tick_ty tick_id fvs) rhs) = do
   -- See Note [Debugger: Stepout internal break locs]
   code <- withBreakTick bp $ schemeE d 0 p rhs
 
-  let idOffSets = getVarOffSets platform d p fvs
+  -- As per Note [Stack layout when entering run_BCO], the breakpoint AP_STACK
+  -- as we yield from the interpreter is headed by a stg_apply_interp + BCO to be a valid stack.
+  -- Therefore, the var offsets are offset by 2 words
+  let idOffSets = map (fmap (second (+2))) $
+                  getVarOffSets platform d p fvs
       ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
       toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
       toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-      breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty (Right tick_id)
+      breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
+                    (Right tick_id)
 
   mibi <- newBreakInfo breakInfo
 
@@ -416,21 +421,15 @@ schemeER_wrk d p (StgTick bp@(Breakpoint tick_ty tick_id fvs) rhs) = do
 
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
+-- | Get the offset in words into this breakpoint's AP_STACK which contains the matching Id
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
 getVarOffSets platform depth env = map getOffSet
   where
     getOffSet id = case lookupBCEnv_maybe id env of
-        Nothing     -> Nothing
-        Just offset ->
-            -- michalt: I'm not entirely sure why we need the stack
-            -- adjustment by 2 here. I initially thought that there's
-            -- something off with getIdValFromApStack (the only user of this
-            -- value), but it looks ok to me. My current hypothesis is that
-            -- this "adjustment" is needed due to stack manipulation for
-            -- BRK_FUN in Interpreter.c In any case, this is used only when
-            -- we trigger a breakpoint.
-            let !var_depth_ws = bytesToWords platform (depth - offset) + 2
-            in Just (id, var_depth_ws)
+      Nothing     -> Nothing
+      Just offset ->
+          let !var_depth_ws = bytesToWords platform (depth - offset)
+          in Just (id, var_depth_ws)
 
 fvsToEnv :: BCEnv -> CgStgRhs -> [Id]
 -- Takes the free variables of a right-hand side, and
@@ -1141,10 +1140,17 @@ doCase d s p scrut bndr alts
         -- When an alt is entered, it assumes the returned value is
         -- on top of the itbl; see Note [Return convention for non-tuple values]
         -- for details.
-        ret_frame_size_w :: WordOff
-        ret_frame_size_w | ubx_tuple_frame =
-                             if profiling then 5 else 4
-                         | otherwise = 2
+        ctoi_frame_header_w :: WordOff
+        ctoi_frame_header_w
+          | ubx_tuple_frame =
+              if profiling then 5 else 4
+          | otherwise = 2
+
+        -- The size of the ret_*_info frame header, whose frame returns the
+        -- value to the case continuation frame (ctoi_*_info)
+        ret_info_header_w :: WordOff
+          | ubx_tuple_frame = 3
+          | otherwise = 1
 
         -- The stack space used to save/restore the CCCS when profiling
         save_ccs_size_b | profiling &&
@@ -1318,12 +1324,10 @@ doCase d s p scrut bndr alts
      let
 
          -- drop the stg_ctoi_*_info header...
-         alt_final1 = SLIDE bndr_size ret_frame_size_w `consOL` alt_final0
+         alt_final1 = SLIDE bndr_size ctoi_frame_header_w `consOL` alt_final0
 
          -- after dropping the stg_ret_*_info header
-         alt_final2
-           | ubx_tuple_frame    = SLIDE 0 3 `consOL` alt_final1
-           | otherwise          = SLIDE 0 1 `consOL` alt_final1
+         alt_final2 = SLIDE 0 ret_info_header_w `consOL` alt_final1
 
      -- When entering a case continuation BCO, the stack is always headed
      -- by the stg_ret frame and the stg_ctoi frame that returned to it.
@@ -1340,14 +1344,21 @@ doCase d s p scrut bndr alts
          -- continuation BCO, for step-out.
          -- See Note [Debugger: Stepout internal break locs]
          -> do
-          internal_tick_loc <- makeCaseInternalBreakLoc tick_id
 
-          -- same fvs available in the case expression are available in the case continuation
-          let idOffSets = getVarOffSets platform d p fvs
+          -- same fvs available in the surrounding tick are available in the case continuation
+
+          -- The variable offsets into the yielded AP_STACK are adjusted
+          -- differently because a case continuation AP_STACK has the
+          -- additional stg_ret and stg_ctoi frame headers
+          -- (as per Note [Stack layout when entering run_BCO]):
+          let firstVarOff = ret_info_header_w+bndr_size+ctoi_frame_header_w
+              idOffSets = map (fmap (second (+firstVarOff))) $
+                          getVarOffSets platform d p fvs
               ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
               toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
               toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-              breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty (Left internal_tick_loc)
+              breakInfo = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
+                            (Left (InternalBreakLoc tick_id))
 
           mibi <- newBreakInfo breakInfo
           return $ case mibi of
@@ -1360,8 +1371,8 @@ doCase d s p scrut bndr alts
          alt_bco_name = getName bndr
          alt_bco = mkProtoBCO platform add_bco_name alt_bco_name alt_final (Left alts)
                        0{-no arity-} bitmap_size bitmap True{-is alts-}
-     scrut_code <- schemeE (d + wordsToBytes platform ret_frame_size_w + save_ccs_size_b)
-                           (d + wordsToBytes platform ret_frame_size_w + save_ccs_size_b)
+     scrut_code <- schemeE (d + wordsToBytes platform ctoi_frame_header_w + save_ccs_size_b)
+                           (d + wordsToBytes platform ctoi_frame_header_w + save_ccs_size_b)
                            p scrut
      if ubx_tuple_frame
        then do let tuple_bco = tupleBCO platform call_info args_offsets
@@ -1372,25 +1383,6 @@ doCase d s p scrut bndr alts
                   [rep] -> rep
                   _     -> panic "schemeE(StgCase).push_alts"
             in return (PUSH_ALTS alt_bco scrut_rep `consOL` scrut_code)
-
--- | Come up with an 'InternalBreakLoc' from the location of the given 'BreakpointId'.
--- See also Note [Debugger: Stepout internal break locs]
-makeCaseInternalBreakLoc :: BreakpointId -> BcM InternalBreakLoc
-makeCaseInternalBreakLoc bid = do
-  hug         <- hsc_HUG <$> getHscEnv
-  curr_mod    <- getCurrentModule
-  mb_mod_brks <- getCurrentModBreaks
-
-  InternalBreakLoc <$> case bid of
-    BreakpointId{bi_tick_mod, bi_tick_index}
-      | bi_tick_mod == curr_mod
-      , Just these_mbs <- mb_mod_brks
-      -> do
-        return $ modBreaks_locs these_mbs ! bi_tick_index
-      | otherwise
-      -> do
-        other_mbs <- liftIO $ readIModModBreaks hug bi_tick_mod
-        return $ modBreaks_locs other_mbs ! bi_tick_index
 
 {-
 Note [Debugger: Stepout internal break locs]
@@ -1436,6 +1428,8 @@ always have a relevant breakpoint location:
 
     - So the source location will point to the thing you've just stepped
       out of
+
+    - The variables available are the same as the ones bound just before entering
 
     - Doing :step-local from there will put you on the selected
       alternative (which at the source level may also be the e.g. next
@@ -2756,9 +2750,6 @@ newBreakInfo info = BcM $ \env st -> do
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \env st -> return (bcm_module env, st)
-
-getCurrentModBreaks :: BcM (Maybe ModBreaks)
-getCurrentModBreaks = BcM $ \env st -> return (modBreaks env, st)
 
 withBreakTick :: StgTickish -> BcM a -> BcM a
 withBreakTick bp (BcM act) = BcM $ \env st ->
