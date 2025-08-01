@@ -8,7 +8,7 @@ _result ::
 10  foo True  i = return i
                   ^^^^^^^^
 11  foo False _ = do
-Stopped in Main., T26042b.hs:20:3-17
+Stopped in Main.bar, T26042b.hs:20:3-17
 _result ::
   GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
@@ -17,7 +17,11 @@ _result ::
 20    y <- foo True t
       ^^^^^^^^^^^^^^^
 21    return y
-Stopped in Main., T26042b.hs:14:3-18
+_result ::
+  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+        Int #) = _
+Stopped in Main.foo, T26042b.hs:14:3-18
 _result ::
   GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
@@ -26,7 +30,11 @@ _result ::
 14    n <- bar (x + y)
       ^^^^^^^^^^^^^^^^
 15    return n
-Stopped in Main., T26042b.hs:5:3-26
+_result ::
+  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+        Int #) = _
+Stopped in Main.main, T26042b.hs:5:3-26
 _result ::
   GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
@@ -35,5 +43,9 @@ _result ::
 5    a <- foo False undefined
      ^^^^^^^^^^^^^^^^^^^^^^^^
 6    print a
+_result ::
+  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
+  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
+        () #) = _
 14
 14
