@@ -1621,7 +1621,7 @@ toBreakIdAndLocation (Just inf) = do
   brks <- liftIO $ readIModBreaks hug inf
   let bi = getBreakSourceId inf brks
   return $ listToMaybe [ id_loc | id_loc@(_,loc) <- IntMap.assocs (breaks st),
-                                  Right (breakId loc) == bi ]
+                                  breakId loc == bi ]
 
 printStoppedAtBreakInfo :: GHC.GhcMonad m => Resume -> [Name] -> m ()
 printStoppedAtBreakInfo res names = do
