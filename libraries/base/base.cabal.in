@@ -271,8 +271,6 @@ Library
         , Type.Reflection
         , Type.Reflection.Unsafe
         , Unsafe.Coerce
-          -- TODO: remove
-        , GHC.IOPort
 
     if os(windows)
         exposed-modules:

@@ -3233,43 +3233,6 @@ primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
 
 
 ------------------------------------------------------------------------
-section "Synchronized I/O Ports"
-        {Operations on 'IOPort#'s. }
-------------------------------------------------------------------------
-
-primtype IOPort# s a
-        { A shared I/O port is almost the same as an 'MVar#'.
-        The main difference is that IOPort has no deadlock detection or
-        deadlock breaking code that forcibly releases the lock. }
-
-primop  NewIOPortOp "newIOPort#"  GenPrimOp
-   State# s -> (# State# s, IOPort# s a_levpoly #)
-   {Create new 'IOPort#'; initially empty.}
-   with
-   out_of_line = True
-   effect = ReadWriteEffect
-
-primop  ReadIOPortOp "readIOPort#" GenPrimOp
-   IOPort# s a_levpoly -> State# s -> (# State# s, a_levpoly #)
-   {If 'IOPort#' is empty, block until it becomes full.
-   Then remove and return its contents, and set it empty.
-   Throws an 'IOPortException' if another thread is already
-   waiting to read this 'IOPort#'.}
-   with
-   out_of_line      = True
-   effect = ReadWriteEffect
-
-primop  WriteIOPortOp "writeIOPort#" GenPrimOp
-   IOPort# s a_levpoly -> a_levpoly -> State# s -> (# State# s, Int# #)
-   {If 'IOPort#' is full, immediately return with integer 0,
-    throwing an 'IOPortException'.
-    Otherwise, store value arg as 'IOPort#''s new contents,
-    and return with integer 1. }
-   with
-   out_of_line      = True
-   effect = ReadWriteEffect
-
-------------------------------------------------------------------------
 section "Delay/wait operations"
 ------------------------------------------------------------------------
 
@@ -3713,7 +3676,6 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 --   sameMutVar# :: MutVar# s a -> MutVar# s a -> Int#
 --   sameTVar# :: TVar# s a -> TVar# s a -> Int#
 --   sameMVar# :: MVar# s a -> MVar# s a -> Int#
---   sameIOPort# :: IOPort# s a -> IOPort# s a -> Int#
 --   eqStableName# :: StableName# a -> StableName# b -> Int#
 --
 -- These operations are all specialisations of unsafePtrEquality#.

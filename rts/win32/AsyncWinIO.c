@@ -147,7 +147,7 @@
   * Create a thread to execute "runner"
 
   We never truly shut down the IO Manager. While this means we
-  might block forever on the IOPort if the IO Manager is no longer
+  might block forever on the MVar if the IO Manager is no longer
   needed we consider this cheap compared to the complexity of
   properly handling pausing and resuming of the manager.
 

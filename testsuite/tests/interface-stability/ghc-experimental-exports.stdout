@@ -4543,9 +4543,6 @@ module GHC.PrimOps where
   type role FunPtr phantom
   type FunPtr :: * -> *
   data FunPtr a = FunPtr Addr#
-  type role IOPort# nominal representational
-  type IOPort# :: forall {l :: Levity}. * -> TYPE (BoxedRep l) -> UnliftedType
-  data IOPort# a b
   type Int :: *
   data Int = I# Int#
   type Int# :: TYPE IntRep
@@ -5441,7 +5438,6 @@ module GHC.PrimOps where
   newArrayArray# :: forall s. Int# -> State# s -> (# State# s, MutableArrayArray# s #)
   newBCO# :: forall a d. ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# d -> (# State# d, BCO #)
   newByteArray# :: forall d. Int# -> State# d -> (# State# d, MutableByteArray# d #)
-  newIOPort# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). State# d -> (# State# d, IOPort# d a #)
   newMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). State# d -> (# State# d, MVar# d a #)
   newMutVar# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. a -> State# d -> (# State# d, MutVar# d a #)
   newPinnedByteArray# :: forall d. Int# -> State# d -> (# State# d, MutableByteArray# d #)
@@ -5657,7 +5653,6 @@ module GHC.PrimOps where
   readFloatX4OffAddr# :: forall d. Addr# -> Int# -> State# d -> (# State# d, FloatX4# #)
   readFloatX8Array# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, FloatX8# #)
   readFloatX8OffAddr# :: forall d. Addr# -> Int# -> State# d -> (# State# d, FloatX8# #)
-  readIOPort# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). IOPort# d a -> State# d -> (# State# d, a #)
   readInt16Array# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Int16# #)
   readInt16ArrayAsInt16X16# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Int16X16# #)
   readInt16ArrayAsInt16X32# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Int16X32# #)
@@ -5859,7 +5854,6 @@ module GHC.PrimOps where
   sameArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). Array# a -> Array# a -> Int#
   sameArrayArray# :: ArrayArray# -> ArrayArray# -> Int#
   sameByteArray# :: ByteArray# -> ByteArray# -> Int#
-  sameIOPort# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). IOPort# s a -> IOPort# s a -> Int#
   sameMVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MVar# s a -> MVar# s a -> Int#
   sameMutVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MutVar# s a -> MutVar# s a -> Int#
   sameMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MutableArray# s a -> MutableArray# s a -> Int#
@@ -6121,7 +6115,6 @@ module GHC.PrimOps where
   writeFloatX4OffAddr# :: forall d. Addr# -> Int# -> FloatX4# -> State# d -> State# d
   writeFloatX8Array# :: forall d. MutableByteArray# d -> Int# -> FloatX8# -> State# d -> State# d
   writeFloatX8OffAddr# :: forall d. Addr# -> Int# -> FloatX8# -> State# d -> State# d
-  writeIOPort# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). IOPort# d a -> a -> State# d -> (# State# d, Int# #)
   writeInt16Array# :: forall d. MutableByteArray# d -> Int# -> Int16# -> State# d -> State# d
   writeInt16ArrayAsInt16X16# :: forall d. MutableByteArray# d -> Int# -> Int16X16# -> State# d -> State# d
   writeInt16ArrayAsInt16X32# :: forall d. MutableByteArray# d -> Int# -> Int16X32# -> State# d -> State# d
