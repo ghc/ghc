@@ -11,7 +11,7 @@ _result ::
 12    putStrLn "hello2.2"
 hello2.1
 hello2.2
-Stopped in Main., T26042d2.hs:6:3
+Stopped in Main.main, T26042d2.hs:6:3
 _result ::
   GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
