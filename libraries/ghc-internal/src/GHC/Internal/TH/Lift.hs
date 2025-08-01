@@ -33,7 +33,6 @@ import GHC.Internal.TH.Syntax
 import qualified GHC.Internal.TH.Lib as Lib (litE)  -- See wrinkle (W4) of Note [Tracking dependencies on primitives]
 
 import GHC.Internal.Data.Either
-import GHC.Internal.Type.Reflection
 import GHC.Internal.Data.Bool
 import GHC.Internal.Base hiding (NonEmpty(..), Type, Module, inline)
 import GHC.Internal.Data.Foldable
