@@ -177,15 +177,17 @@ data CgBreakInfo
      -- necessarily the same: See Note [Breakpoint identifiers].
      --
      -- If there is no original tick identifier (that is, the breakpoint was
-     -- created during code generation), instead refer directly to the SrcSpan
-     -- we want to use for it.
+     -- created during code generation), we re-use the BreakpointId of something else.
+     -- It would also be reasonable to have an @Either something BreakpointId@
+     -- for @cgb_tick_id@, but currently we can always re-use a source-level BreakpointId.
+     -- In the case of step-out, see Note [Debugger: Stepout internal break locs]
    }
 -- See Note [Syncing breakpoint info] in GHC.Runtime.Eval
 
 -- | Breakpoints created during code generation don't have a source-level tick
--- location. Instead, we come up with one ourselves.
-newtype InternalBreakLoc = InternalBreakLoc SrcSpan
-  deriving newtype (Eq, Show, NFData, Outputable)
+-- location. Instead, we re-use an existing one.
+newtype InternalBreakLoc = InternalBreakLoc { internalBreakLoc :: BreakpointId }
+  deriving newtype (Eq, NFData, Outputable)
 
 -- | Get an internal breakpoint info by 'InternalBreakpointId'
 getInternalBreak :: InternalBreakpointId -> InternalModBreaks -> CgBreakInfo
@@ -207,36 +209,34 @@ assert_modules_match ibi_mod imbs_mod =
 
 -- | Get the source module and tick index for this breakpoint
 -- (as opposed to the module where this breakpoint occurs, which is in 'InternalBreakpointId')
-getBreakSourceId :: InternalBreakpointId -> InternalModBreaks -> Either InternalBreakLoc BreakpointId
+getBreakSourceId :: InternalBreakpointId -> InternalModBreaks -> BreakpointId
 getBreakSourceId (InternalBreakpointId ibi_mod ibi_ix) imbs =
   assert_modules_match ibi_mod (imodBreaks_module imbs) $
     let cgb = imodBreaks_breakInfo imbs IM.! ibi_ix
-     in cgb_tick_id cgb
+     in either internalBreakLoc id (cgb_tick_id cgb)
 
 -- | Get the source module for this breakpoint (where the breakpoint is defined)
 getBreakSourceMod :: InternalBreakpointId -> InternalModBreaks -> Module
 getBreakSourceMod (InternalBreakpointId ibi_mod ibi_ix) imbs =
   assert_modules_match ibi_mod (imodBreaks_module imbs) $
     let cgb = imodBreaks_breakInfo imbs IM.! ibi_ix
-     in case cgb_tick_id cgb of
-      Left InternalBreakLoc{} -> imodBreaks_module imbs
-      Right BreakpointId{bi_tick_mod} -> bi_tick_mod
+     in either (bi_tick_mod . internalBreakLoc) bi_tick_mod (cgb_tick_id cgb)
 
 -- | Get the source span for this breakpoint
 getBreakLoc :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO SrcSpan
-getBreakLoc = getBreakXXX modBreaks_locs (\(InternalBreakLoc x) -> x)
+getBreakLoc = getBreakXXX modBreaks_locs
 
 -- | Get the vars for this breakpoint
 getBreakVars :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO [OccName]
-getBreakVars = getBreakXXX modBreaks_vars (const [])
+getBreakVars = getBreakXXX modBreaks_vars
 
 -- | Get the decls for this breakpoint
 getBreakDecls :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO [String]
-getBreakDecls = getBreakXXX modBreaks_decls (const [])
+getBreakDecls = getBreakXXX modBreaks_decls
 
 -- | Get the decls for this breakpoint
-getBreakCCS :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO (Maybe (String, String))
-getBreakCCS = getBreakXXX (fmap Just . modBreaks_ccs) (const Nothing)
+getBreakCCS :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO ((String, String))
+getBreakCCS = getBreakXXX modBreaks_ccs
 
 -- | Internal utility to access a ModBreaks field at a particular breakpoint index
 --
@@ -253,12 +253,12 @@ getBreakCCS = getBreakXXX (fmap Just . modBreaks_ccs) (const Nothing)
 --
 -- To avoid cyclic dependencies, we instead receive a function that looks up
 -- the 'ModBreaks' given a 'Module'
-getBreakXXX :: (ModBreaks -> Array BreakTickIndex a) -> (InternalBreakLoc -> a) -> (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO a
-getBreakXXX view viewInternal lookupModule (InternalBreakpointId ibi_mod ibi_ix) imbs =
+getBreakXXX :: (ModBreaks -> Array BreakTickIndex a) -> (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO a
+getBreakXXX view lookupModule (InternalBreakpointId ibi_mod ibi_ix) imbs =
   assert_modules_match ibi_mod (imodBreaks_module imbs) $ do
     let cgb = imodBreaks_breakInfo imbs IM.! ibi_ix
-    case cgb_tick_id cgb of
-      Right BreakpointId{bi_tick_mod, bi_tick_index}
+    case either internalBreakLoc id (cgb_tick_id cgb) of
+      BreakpointId{bi_tick_mod, bi_tick_index}
         | bi_tick_mod == ibi_mod
         -> do
           let these_mbs = imodBreaks_modBreaks imbs
@@ -267,8 +267,6 @@ getBreakXXX view viewInternal lookupModule (InternalBreakpointId ibi_mod ibi_ix)
         -> do
           other_mbs <- lookupModule bi_tick_mod
           return $ view other_mbs ! bi_tick_index
-      Left l ->
-          return $ viewInternal l
 
 --------------------------------------------------------------------------------
 -- Instances
