@@ -6,7 +6,7 @@ x :: Int = 14
 11  succ x = (-) (x - 2) (x + 1)
              ^^^^^^^^^^^^^^^^^^^
 12  
-Stopped in T9., T26042g.hs:(6,3)-(8,21)
+Stopped in T9.top, T26042g.hs:(6,3)-(8,21)
 _result :: Int = _
 5  top = do
    vv
