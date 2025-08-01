@@ -4,10 +4,12 @@ top
 :list
 -- out of t
 :stepout
+:show bindings
 :list
 -- out of g
 :stepout
 :list
+:show bindings
 -- out of f
 :stepout
 
