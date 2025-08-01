@@ -1972,9 +1972,17 @@ genCCall target dest_regs arg_regs = do
               (val, fmt_val, code_val) <- getSomeReg val_reg
               let instrs = case ord of
                       MemOrderRelaxed -> unitOL $ ann moDescr (ST fmt_val (OpReg w val) (OpAddr $ AddrReg p))
-                      -- implement with AMSWAPDB
-                      MemOrderRelease -> unitOL $ ann moDescr (AMSWAPDB fmt_val (OpReg w zeroReg) (OpReg w val) (OpReg w p))
-                      MemOrderSeqCst  -> unitOL $ ann moDescr (AMSWAPDB fmt_val (OpReg w zeroReg) (OpReg w val) (OpReg w p))
+                      -- AMSWAP_DB* insns implentment a fully functional synchronization barrier, like DBAR 0x0.
+                      -- This is terrible. And AMSWAPDB only supports ISA version greater than LA64V1_0. So,
+                      -- implement with DBAR
+                      MemOrderRelease -> toOL [
+                                                ann moDescr (DBAR HintRelease),
+                                                ST fmt_val (OpReg w val) (OpAddr $ AddrReg p)
+                                              ]
+                      MemOrderSeqCst  -> toOL [
+                                                ann moDescr (DBAR HintSeqcst),
+                                                ST fmt_val (OpReg w val) (OpAddr $ AddrReg p)
+                                              ]
                       _ ->  panic $ "Unexpected MemOrderAcquire on an AtomicWrite" ++ show mo
                   moDescr = (text . show) mo
                   code =
