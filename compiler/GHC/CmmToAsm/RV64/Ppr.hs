@@ -507,9 +507,12 @@ pprInstr platform instr = case instr of
   OR o1 o2 o3 -> op3 (text "\tor") o1 o2 o3
   SRA o1 o2 o3 | isImmOp o3 -> op3 (text "\tsrai") o1 o2 o3
   SRA o1 o2 o3 -> op3 (text "\tsra") o1 o2 o3
+  SRAW o1 o2 o3 -> op3 (text "\tsraw") o1 o2 o3
   XOR o1 o2 o3 -> op3 (text "\txor") o1 o2 o3
+  SLLW o1 o2 o3 -> op3 (text "\tsllw") o1 o2 o3
   SLL o1 o2 o3 -> op3 (text "\tsll") o1 o2 o3
   SRL o1 o2 o3 -> op3 (text "\tsrl") o1 o2 o3
+  SRLW o1 o2 o3 -> op3 (text "\tsrlw") o1 o2 o3
   MOV o1 o2
     | isFloatOp o1 && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.d") o1 o2 -- fmv.d rd, rs is pseudo op fsgnj.d rd, rs, rs
     | isFloatOp o1 && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfmv.s") o1 o2 -- fmv.s rd, rs is pseudo op fsgnj.s rd, rs, rs

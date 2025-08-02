@@ -556,6 +556,38 @@ opRegWidth w = pprPanic "opRegWidth" (text "Unsupported width" <+> ppr w)
 -- the way we load it, not through a register.
 --
 
+-- Note [Sub-double word shifts]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- To be aligned with the BCO primops interpreter and other backends, we have
+-- to immitate the behaviour of C compilers (the interpreter directly applies C
+-- operators) for shifts.
+--
+-- Unfortunately, the behaviour is not covered by the C standards for many
+-- cases we have to deal with. Citing "C11 §6.5.7 Shift Operators":
+--
+-- "If the value of the right operand is negative or is greater than or equal
+-- to the width of the promoted left operand, the behavior is undefined."
+-- (https://port70.net/~nsz/c/c11/n1570.html#6.5.7)
+--
+-- It turns out, that GCC and Clang simply use the word-sized instruction
+-- variants and then truncate when the second operand's width is bigger than the
+-- first ones (in the bounds ouf W8 to W64.) So, the left operand is implicitly
+-- promoted to W32 and then shifted by the pro- or demoted W32 right operand.
+--
+-- E.g.:
+--
+-- uint8_t uncheckedShiftLInt8zh(uint8_t a, int64_t b) {
+--   return a << b;
+-- }
+--
+-- ==>
+--
+-- sllw    a0, a0, a1
+-- zext.b  a0, a0
+-- ret
+
+
 getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
 -- OPTIMIZATION WARNING: CmmExpr rewrites
 -- 1. Rewrite: Reg + (-n) => Reg - n
@@ -875,16 +907,20 @@ getRegister' config plat expr =
 
     -- 2. Shifts. x << n, x >> n.
     CmmMachOp (MO_Shl w) [x, CmmLit (CmmInt n _)] | fitsIn12bitImm n -> do
+      -- See Note [Sub-double word shifts]
+      let op = if w <= W32 then SLLW else SLL
       (reg_x, _format_x, code_x) <- getSomeReg x
       return
         $ Any
           (intFormat w)
           ( \dst ->
               code_x
-                `snocOL` annExpr expr (SLL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
+                `snocOL` annExpr expr (op (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
                 `appOL` truncateReg w w dst
           )
     CmmMachOp (MO_S_Shr w) [x, CmmLit (CmmInt n _)] | fitsIn12bitImm n -> do
+      -- See Note [Sub-double word shifts]
+      let op = if w <= W32 then SRAW else SRA
       (reg_x, format_x, code_x) <- getSomeReg x
       (reg_x', code_x') <- signExtendReg (formatToWidth format_x) w reg_x
       return
@@ -893,10 +929,12 @@ getRegister' config plat expr =
           ( \dst ->
               code_x
                 `appOL` code_x'
-                `snocOL` annExpr expr (SRA (OpReg w dst) (OpReg w reg_x') (OpImm (ImmInteger n)))
+                `snocOL` annExpr expr (op (OpReg w dst) (OpReg w reg_x') (OpImm (ImmInteger n)))
                 `appOL` truncateReg w w dst
           )
     CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)] | fitsIn12bitImm n -> do
+      -- See Note [Sub-double word shifts]
+      let op = if w <= W32 then SRLW else SRL
       (reg_x, format_x, code_x) <- getSomeReg x
       return
         $ Any
@@ -904,7 +942,7 @@ getRegister' config plat expr =
           ( \dst ->
               code_x
                 `appOL` truncateReg (formatToWidth format_x) w reg_x
-                `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
+                `snocOL` annExpr expr (op (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
                 `appOL` truncateReg w w dst
           )
     -- 3. Logic &&, ||
@@ -1042,8 +1080,12 @@ getRegister' config plat expr =
         MO_And w -> bitOp w (\d x y -> unitOL $ annExpr expr (AND d x y))
         MO_Or w -> bitOp w (\d x y -> unitOL $ annExpr expr (OR d x y))
         MO_Xor w -> bitOp w (\d x y -> unitOL $ annExpr expr (XOR d x y))
+        -- See Note [Sub-double word shifts] for the w <= W32 shift cases
+        MO_Shl w | w <= W32 -> intOp False w (\d x y -> unitOL $ annExpr expr (SLLW d x y))
         MO_Shl w -> intOp False w (\d x y -> unitOL $ annExpr expr (SLL d x y))
+        MO_U_Shr w | w <= W32 -> intOp False w (\d x y -> unitOL $ annExpr expr (SRLW d x y))
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ annExpr expr (SRL d x y))
+        MO_S_Shr w | w <= W32 -> intOp True w (\d x y -> unitOL $ annExpr expr (SRAW d x y))
         MO_S_Shr w -> intOp True w (\d x y -> unitOL $ annExpr expr (SRA d x y))
         op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ pprMachOp op <+> text "in" <+> pdoc plat expr
 
@@ -2125,9 +2167,12 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       AND {} -> 1
       OR {} -> 1
       SRA {} -> 1
+      SRAW {} -> 1
       XOR {} -> 1
       SLL {} -> 1
+      SLLW {} -> 1
       SRL {} -> 1
+      SRLW {} -> 1
       MOV {} -> 2
       ORI {} -> 1
       XORI {} -> 1

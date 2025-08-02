@@ -89,9 +89,12 @@ regUsageOfInstr platform instr = case instr of
   AND dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   OR dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   SRA dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SRAW dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   XOR dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   SLL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SLLW dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   SRL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SRLW dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   MOV dst src -> usage (regOp src, regOp dst)
   -- ORI's third operand is always an immediate
   ORI dst src1 _ -> usage (regOp src1, regOp dst)
@@ -188,9 +191,12 @@ patchRegsOfInstr instr env = case instr of
   AND o1 o2 o3 -> AND (patchOp o1) (patchOp o2) (patchOp o3)
   OR o1 o2 o3 -> OR (patchOp o1) (patchOp o2) (patchOp o3)
   SRA o1 o2 o3 -> SRA (patchOp o1) (patchOp o2) (patchOp o3)
+  SRAW o1 o2 o3 -> SRAW (patchOp o1) (patchOp o2) (patchOp o3)
   XOR o1 o2 o3 -> XOR (patchOp o1) (patchOp o2) (patchOp o3)
   SLL o1 o2 o3 -> SLL (patchOp o1) (patchOp o2) (patchOp o3)
+  SLLW o1 o2 o3 -> SLLW (patchOp o1) (patchOp o2) (patchOp o3)
   SRL o1 o2 o3 -> SRL (patchOp o1) (patchOp o2) (patchOp o3)
+  SRLW o1 o2 o3 -> SRLW (patchOp o1) (patchOp o2) (patchOp o3)
   MOV o1 o2 -> MOV (patchOp o1) (patchOp o2)
   -- o3 cannot be a register for ORI (always an immediate)
   ORI o1 o2 o3 -> ORI (patchOp o1) (patchOp o2) (patchOp o3)
@@ -535,14 +541,26 @@ data Instr
     --
     -- @rd = rs1 << rs2@
     SLL Operand Operand Operand
+  | -- | Logical left shift on 32bit (result sign-extended to 64bit)
+    --
+    -- @rd = rs1 << rs2@
+    SLLW Operand Operand Operand
   | -- | Logical right shift (zero extened, integer only)
     --
     -- @rd = rs1 >> rs2@
     SRL Operand Operand Operand
+  | -- | Logical right shift on 32bit (zero extened, integer only)
+    --
+    -- @rd = rs1 >> rs2@
+    SRLW Operand Operand Operand
   | -- | Arithmetic right shift (sign-extened, integer only)
     --
     -- @rd = rs1 >> rs2@
     SRA Operand Operand Operand
+  | -- | Arithmetic right shift on 32bit (sign-extened, integer only)
+    --
+    -- @rd = rs1 >> rs2@
+    SRAW Operand Operand Operand
   | -- | Store to memory (both, integer and floating point)
     STR Format Operand Operand
   | -- | Load from memory (sign-extended, integer and floating point)
@@ -660,9 +678,12 @@ instrCon i =
     DIVU {} -> "DIVU"
     AND {} -> "AND"
     SRA {} -> "SRA"
+    SRAW {} -> "SRAW"
     XOR {} -> "XOR"
     SLL {} -> "SLL"
+    SLLW {} -> "SLLW"
     SRL {} -> "SRL"
+    SRLW {} -> "SRLW"
     MOV {} -> "MOV"
     ORI {} -> "ORI"
     XORI {} -> "ORI"
