@@ -1,0 +1,9 @@
+T26255b.hs:46:58: error: [GHC-83865]
+    • Couldn't match expected type: [Proxy era0]
+                  with actual type: Proxy BarEra
+    • In the second argument of ‘($)’, namely
+        ‘fromEraName (Proxy :: Proxy "Bar")’
+      In the second argument of ‘($)’, namely
+        ‘head $ fromEraName (Proxy :: Proxy "Bar")’
+      In the second argument of ‘($)’, namely
+        ‘eraName $ head $ fromEraName (Proxy :: Proxy "Bar")’

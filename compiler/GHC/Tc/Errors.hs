@@ -600,11 +600,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     -- (see GHC.Tc.Utils.insolublWantedCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
-                 -- (Handles TypeError and Unsatisfiable)
-
-              , ("implicit lifting", is_implicit_lifting, True, mkImplicitLiftingReporter)
-              , given_eq_spec
+    report1 = [ given_eq_spec
               , ("insoluble2",      utterly_wrong,  True, mkGroupReporter mkEqErr)
               , ("skolem eq1",      very_wrong,     True, mkSkolReporter)
               , ("FixedRuntimeRep", is_FRR,         True, mkGroupReporter mkFRRErr)
@@ -618,6 +614,15 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                   -- See Note [Equalities with heterogeneous kinds] in GHC.Tc.Solver.Equality
               , ("Homo eqs",      is_homo_equality,  True,  mkGroupReporter mkEqErr)
               , ("Other eqs",     is_equality,       True,  mkGroupReporter mkEqErr)
+
+              -- Put custom type errors after solid equality errors.  In #26255 we
+              -- had a custom error (T <= F alpha) which was suppressing a far more
+              -- informative (K Int ~ [K alpha]). That mismatch between K and [] is
+              -- definitely wrong; and if it was fixed we'd know alpha:=Int, and hence
+              -- perhaps be able to solve T <= F alpha, by reducing F Int.
+              , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
+                 -- (Handles TypeError and Unsatisfiable)
+              , ("implicit lifting", is_implicit_lifting, True, mkImplicitLiftingReporter)
               ]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
