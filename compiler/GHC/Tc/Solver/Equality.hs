@@ -193,12 +193,8 @@ zonkEqTypes ev eq_rel ty1 ty2
         then tycon tc1 tys1 tys2
         else bale_out ty1 ty2
 
-    go ty1 ty2
-      | Just (ty1a, ty1b) <- tcSplitAppTyNoView_maybe ty1
-      , Just (ty2a, ty2b) <- tcSplitAppTyNoView_maybe ty2
-      = do { res_a <- go ty1a ty2a
-           ; res_b <- go ty1b ty2b
-           ; return $ combine_rev mkAppTy res_b res_a }
+    -- If you are temppted to add a case for AppTy/AppTy, be careful
+    -- See Note [zonkEqTypes and the PKTI]
 
     go ty1@(LitTy lit1) (LitTy lit2)
       | lit1 == lit2
@@ -273,6 +269,32 @@ zonkEqTypes ev eq_rel ty1 ty2
     combine_rev f (Right tys) (Left elt) = Left (f <$> elt     <*> pure tys)
     combine_rev f (Right tys) (Right ty) = Right (f ty tys)
 
+
+{- Note [zonkEqTypes and the PKTI]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Because `zonkEqTypes` does /partial/ zonking, we need to be very careful
+to maintain the Purely Kinded Type Invariant: see GHC.Tc.Gen/HsType
+HsNote [The Purely Kinded Type Invariant (PKTI)].
+
+In #26256 we try to solve this equality constraint:
+   Int :-> Maybe Char ~# k0 Int (m0 Char)
+where m0 and k0 are unification variables, and
+   m0 :: Type -> Type
+It happens that m0 was already unified
+   m0 := (w0 :: kappa)
+where kappa is another unification variable that is also already unified:
+   kappa := Type->Type.
+So the original type satisifed the PKTI, but a partially-zonked form
+   k0 Int (w0 Char)
+does not!! (This a bit reminiscent of Note [mkAppTyM].)
+
+The solution I have adopted is simply to make `zonkEqTypes` bale out on `AppTy`.
+After all, it's only supposed to be a quick hack to see if two types are already
+equal; if we bale out we'll just get into the "proper" canonicaliser.
+
+The only tricky thing about this approach is that it relies on /omitting/
+code -- for the AppTy/AppTy case!  Hence this Note
+-}
 
 {- *********************************************************************
 *                                                                      *
