@@ -103,6 +103,9 @@ Note the following points:
   See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
   for the precise rules.
 
+
+.. _strict-bindings:
+
 Strict bindings
 ~~~~~~~~~~~~~~~
 

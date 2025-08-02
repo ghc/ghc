@@ -213,6 +213,8 @@ With ``-XStrict``::
    -- inferred unrestricted
    let ~(x, y) = u in …
 
+(See :ref:`strict-bindings`).
+
 Data types
 ----------
 By default, all fields in algebraic data types are linear (even if
