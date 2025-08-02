@@ -33,3 +33,14 @@ f = show (undefined :: c)
 -- blows up at run time once type checks
 g :: String
 g = f @A @B
+
+{-
+[W] Show c, Num int, C int A, C int B, C int c
+Superclasses
+   C_FD int ~ A
+   C_FD int ~ B
+   C_FD int ~ c
+-->
+   C_FD int ~ B
+   B ~ A
+-}

@@ -1741,8 +1741,8 @@ unify_ty env ty1 ty2 kco
   where
     mb_tc_app1 = splitTyConApp_maybe ty1
     mb_tc_app2 = splitTyConApp_maybe ty2
-    mb_sat_fam_app1 = isSatFamApp ty1
-    mb_sat_fam_app2 = isSatFamApp ty2
+    mb_sat_fam_app1 = isSatTyFamApp ty1
+    mb_sat_fam_app2 = isSatTyFamApp ty2
 
 unify_ty _ _ _ _ = surelyApart
 
@@ -1800,16 +1800,6 @@ unify_tys env orig_xs orig_ys
     go _ _ = surelyApart
       -- Possibly different saturations of a polykinded tycon
       -- See Note [Polykinded tycon applications]
-
----------------------------------
-isSatFamApp :: Type -> Maybe (TyCon, [Type])
--- Return the argument if we have a saturated type family application
--- Why saturated?  See (ATF4) in Note [Apartness and type families]
-isSatFamApp (TyConApp tc tys)
-  |  isTypeFamilyTyCon tc
-  && not (tys `lengthExceeds` tyConArity tc)  -- Not over-saturated
-  = Just (tc, tys)
-isSatFamApp _ = Nothing
 
 ---------------------------------
 uVarOrFam :: UMEnv -> CanEqLHS -> InType -> OutCoercion -> UM ()
@@ -1927,7 +1917,7 @@ uVarOrFam env ty1 ty2 kco
            | otherwise                            -> maybeApart MARTypeFamily
 
       -- Check for equality  F tys1 ~ F tys2
-      | Just (tc2, tys2) <- isSatFamApp ty2
+      | Just (tc2, tys2) <- isSatTyFamApp ty2
       , tc1 == tc2
       = go_fam_fam substs tc1 tys1 tys2 kco
 
