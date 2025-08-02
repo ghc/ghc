@@ -2090,6 +2090,7 @@ isRigidTy ty
   | Just (tc,_) <- tcSplitTyConApp_maybe ty = isGenerativeTyCon tc Nominal
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | isForAllTy ty                           = True
+  | Just {} <- isLitTy ty                   = True
   | otherwise                               = False
 
 {-

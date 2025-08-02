@@ -903,75 +903,6 @@ isWantedCt = isWanted . ctEvidence
 isGivenCt :: Ct -> Bool
 isGivenCt = isGiven . ctEvidence
 
-{- Note [Custom type errors in constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When GHC reports a type-error about an unsolved-constraint, we check
-to see if the constraint contains any custom-type errors, and if so
-we report them.  Here are some examples of constraints containing type
-errors:
-
-TypeError msg           -- The actual constraint is a type error
-
-TypError msg ~ Int      -- Some type was supposed to be Int, but ended up
-                        -- being a type error instead
-
-Eq (TypeError msg)      -- A class constraint is stuck due to a type error
-
-F (TypeError msg) ~ a   -- A type function failed to evaluate due to a type err
-
-It is also possible to have constraints where the type error is nested deeper,
-for example see #11990, and also:
-
-Eq (F (TypeError msg))  -- Here the type error is nested under a type-function
-                        -- call, which failed to evaluate because of it,
-                        -- and so the `Eq` constraint was unsolved.
-                        -- This may happen when one function calls another
-                        -- and the called function produced a custom type error.
--}
-
--- | A constraint is considered to be a custom type error, if it contains
--- custom type errors anywhere in it.
--- See Note [Custom type errors in constraints]
-getUserTypeErrorMsg :: PredType -> Maybe ErrorMsgType
-getUserTypeErrorMsg pred = msum $ userTypeError_maybe pred
-                                  : map getUserTypeErrorMsg (subTys pred)
-  where
-   -- Richard thinks this function is very broken. What is subTys
-   -- supposed to be doing? Why are exactly-saturated tyconapps special?
-   -- What stops this from accidentally ripping apart a call to TypeError?
-    subTys t = case splitAppTys t of
-                 (t,[]) ->
-                   case splitTyConApp_maybe t of
-                              Nothing     -> []
-                              Just (_,ts) -> ts
-                 (t,ts) -> t : ts
-
--- | Is this an user error message type, i.e. either the form @TypeError err@ or
--- @Unsatisfiable err@?
-isTopLevelUserTypeError :: PredType -> Bool
-isTopLevelUserTypeError pred =
-  isJust (userTypeError_maybe pred) || isJust (isUnsatisfiableCt_maybe pred)
-
--- | Does this constraint contain an user error message?
---
--- That is, the type is either of the form @Unsatisfiable err@, or it contains
--- a type of the form @TypeError msg@, either at the top level or nested inside
--- the type.
-containsUserTypeError :: PredType -> Bool
-containsUserTypeError pred =
-  isJust (getUserTypeErrorMsg pred) || isJust (isUnsatisfiableCt_maybe pred)
-
--- | Is this type an unsatisfiable constraint?
--- If so, return the error message.
-isUnsatisfiableCt_maybe :: Type -> Maybe ErrorMsgType
-isUnsatisfiableCt_maybe t
-  | Just (tc, [msg]) <- splitTyConApp_maybe t
-  , tc `hasKey` unsatisfiableClassNameKey
-  = Just msg
-  | otherwise
-  = Nothing
-
 isPendingScDict :: Ct -> Bool
 isPendingScDict (CDictCan dict_ct) = isPendingScDictCt dict_ct
 isPendingScDict _                  = False
@@ -1413,6 +1344,93 @@ variable masquerading as expression holes IS treated as truly
 insoluble, so that it trumps other errors during error reporting.
 Yuk!
 
+-}
+
+{- *********************************************************************
+*                                                                      *
+          Custom type errors: Unsatisfiable and TypeError
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Custom type errors in constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When GHC reports a type-error about an unsolved-constraint, we check
+to see if the constraint contains any custom-type errors, and if so
+we report them.  Here are some examples of constraints containing type
+errors:
+
+  TypeError msg           -- The actual constraint is a type error
+
+  TypError msg ~ Int      -- Some type was supposed to be Int, but ended up
+                          -- being a type error instead
+
+  Eq (TypeError msg)      -- A class constraint is stuck due to a type error
+
+  F (TypeError msg) ~ a   -- A type function failed to evaluate due to a type err
+
+It is also possible to have constraints where the type error is nested deeper,
+for example see #11990, and also:
+
+  Eq (F (TypeError msg))  -- Here the type error is nested under a type-function
+                          -- call, which failed to evaluate because of it,
+                          -- and so the `Eq` constraint was unsolved.
+                          -- This may happen when one function calls another
+                          -- and the called function produced a custom type error.
+
+A good use-case is described in "Detecting the undetectable"
+   https://blog.csongor.co.uk/report-stuck-families/
+which features
+   type family Assert (err :: Constraint) (break :: Type -> Type) (a :: k) :: k where
+     Assert _ Dummy _ = Any
+     Assert _ _ k = k
+and an unsolved constraint like
+   Assert (TypeError ...) (F ty1) ty1 ~ ty2
+that reports that (F ty1) remains stuck.
+-}
+
+-- | A constraint is considered to be a custom type error, if it contains
+-- custom type errors anywhere in it.
+-- See Note [Custom type errors in constraints]
+getUserTypeErrorMsg :: PredType -> Maybe ErrorMsgType
+getUserTypeErrorMsg pred = msum $ userTypeError_maybe pred
+                                  : map getUserTypeErrorMsg (subTys pred)
+  where
+   -- Richard thinks this function is very broken. What is subTys
+   -- supposed to be doing? Why are exactly-saturated tyconapps special?
+   -- What stops this from accidentally ripping apart a call to TypeError?
+    subTys t = case splitAppTys t of
+                 (t,[]) ->
+                   case splitTyConApp_maybe t of
+                              Nothing     -> []
+                              Just (_,ts) -> ts
+                 (t,ts) -> t : ts
+
+-- | Is this an user error message type, i.e. either the form @TypeError err@ or
+-- @Unsatisfiable err@?
+isTopLevelUserTypeError :: PredType -> Bool
+isTopLevelUserTypeError pred =
+  isJust (userTypeError_maybe pred) || isJust (isUnsatisfiableCt_maybe pred)
+
+-- | Does this constraint contain an user error message?
+--
+-- That is, the type is either of the form @Unsatisfiable err@, or it contains
+-- a type of the form @TypeError msg@, either at the top level or nested inside
+-- the type.
+containsUserTypeError :: PredType -> Bool
+containsUserTypeError pred =
+  isJust (getUserTypeErrorMsg pred) || isJust (isUnsatisfiableCt_maybe pred)
+
+-- | Is this type an unsatisfiable constraint?
+-- If so, return the error message.
+isUnsatisfiableCt_maybe :: Type -> Maybe ErrorMsgType
+isUnsatisfiableCt_maybe t
+  | Just (tc, [msg]) <- splitTyConApp_maybe t
+  , tc `hasKey` unsatisfiableClassNameKey
+  = Just msg
+  | otherwise
+  = Nothing
+
+{-
 ************************************************************************
 *                                                                      *
                 Implication constraints
