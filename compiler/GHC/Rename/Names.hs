@@ -391,7 +391,7 @@ rnImportDecl this_mod
 
     let imp_mod = mi_module iface
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
-        imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only, is_implicit = implicit,
+        imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
                                   is_dloc = locA loc, is_as = qual_mod_name,
                                   is_pkg_qual = pkg_qual, is_isboot = want_boot,
                                   is_level = convImportLevel import_level }
@@ -2105,7 +2105,6 @@ data ImportMap = ImportMap
     -- ^ See [The ImportMap]
     -- If loc :-> gres, then
     --   'loc' = the end loc of the bestImport of each GRE in 'gres'
-  , im_implicitImports :: Map ModuleName [GlobalRdrElt]
   , im_generatedImports :: Map ModuleName [GlobalRdrElt]
   }
 
@@ -2113,12 +2112,10 @@ mkImportMap :: [GlobalRdrElt] -> ImportMap
 -- For each of a list of used GREs, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-mkImportMap = foldr insertImportMap $ ImportMap Map.empty Map.empty Map.empty
+mkImportMap = foldr insertImportMap $ ImportMap Map.empty Map.empty
 
 insertImportMap :: GlobalRdrElt -> ImportMap -> ImportMap
 insertImportMap gre@(GRE { gre_imp = imp_specs }) importMap
-  | is_implicit best_imp_spec =
-      importMap{im_implicitImports = insertElem (moduleName $ is_mod best_imp_spec) gre $ im_implicitImports importMap}
   | RealSrcSpan importSpan _ <- is_dloc best_imp_spec =
       importMap{im_imports = insertElem importSpan gre $ im_imports importMap}
   | UnhelpfulSpan UnhelpfulGenerated <- is_dloc best_imp_spec =
@@ -2141,7 +2138,6 @@ lookupImportMap (L srcSpan ImportDecl{ideclName = L _ modName}) importMap =
   fromMaybe [] $
     -- should match logic in insertImportMap
     case locA srcSpan of
-      _ | Just gres <- modName `Map.lookup` im_implicitImports importMap -> Just gres
       RealSrcSpan realSrcSpan _ -> realSrcSpan `Map.lookup` im_imports importMap
       UnhelpfulSpan UnhelpfulGenerated -> modName `Map.lookup` im_generatedImports importMap
       _ -> Nothing
