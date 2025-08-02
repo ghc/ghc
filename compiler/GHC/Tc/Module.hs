@@ -217,7 +217,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
           withDefaultingPlugins hsc_env $
           withHoleFitPlugins hsc_env $
 
-          tcRnModuleTcRnM hsc_env mod_sum parsedModule pair
+          tcRnModuleTcRnM hsc_env mod_sum parsedModule this_mod
 
   | otherwise
   = return (err_msg `addMessage` emptyMessages, Nothing)
@@ -229,13 +229,12 @@ tcRnModule hsc_env mod_sum save_rn_syntax
     err_msg = mkPlainErrorMsgEnvelope loc $
               TcRnModMissingRealSrcSpan this_mod
 
-    pair :: (Module, SrcSpan)
-    pair@(this_mod,_)
-      | Just (L mod_loc mod) <- hsmodName this_module
-      = (mkHomeModule home_unit mod, locA mod_loc)
+    this_mod
+      | Just (L _ mod) <- hsmodName this_module
+      = mkHomeModule home_unit mod
 
       | otherwise   -- 'module M where' is omitted
-      = (mkHomeModule home_unit mAIN_NAME, srcLocSpan (srcSpanStart loc))
+      = mkHomeModule home_unit mAIN_NAME
 
 
 
@@ -243,7 +242,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
 tcRnModuleTcRnM :: HscEnv
                 -> ModSummary
                 -> HsParsedModule
-                -> (Module, SrcSpan)
+                -> Module
                 -> TcRn TcGblEnv
 -- Factored out separately from tcRnModule so that a Core plugin can
 -- call the type checker directly
@@ -254,7 +253,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                        maybe_mod export_ies import_decls local_decls)),
                    hpm_src_files = src_files
                 })
-                (this_mod, prel_imp_loc)
+                this_mod
  = setSrcSpan loc $
    do { let { explicit_mod_hdr = isJust maybe_mod
             ; hsc_src          = ms_hsc_src mod_sum }
@@ -268,8 +267,7 @@ tcRnModuleTcRnM hsc_env mod_sum
         $ do
         { -- Deal with imports; first add implicit prelude
           implicit_prelude <- xoptM LangExt.ImplicitPrelude
-        ; let { prel_imports = mkPrelImports (moduleName this_mod) prel_imp_loc
-                               implicit_prelude import_decls }
+        ; let { prel_imports = mkPrelImports (moduleName this_mod) implicit_prelude import_decls }
 
         ; when (notNull prel_imports) $ do
             addDiagnostic TcRnImplicitImportOfPrelude

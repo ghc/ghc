@@ -34,7 +34,7 @@ T23738_fail_pun.hs:38:15: error: [GHC-09591]
 T23738_fail_pun.hs:43:11: error: [GHC-09591]
     • Illegal punned variable occurrence in a required type argument.
       The name ‘+’ could refer to:
-        ‘+’ imported from ‘Prelude’ at T23738_fail_pun.hs:4:8-22
+        ‘+’ imported from ‘Prelude’
             (and originally defined in ‘GHC.Internal.Num’)
         ‘+’ imported from ‘GHC.TypeLits’ at T23738_fail_pun.hs:7:1-19
             (and originally defined in ‘GHC.Internal.TypeNats’)

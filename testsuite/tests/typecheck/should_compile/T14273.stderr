@@ -31,27 +31,27 @@ T14273.hs:7:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         a :: a (bound at T14273.hs:7:17)
         k :: String (bound at T14273.hs:10:1)
         otherwise :: Bool
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
         False :: Bool
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Types’))
         True :: Bool
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Types’))
         LT :: Ordering
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Types’))
         EQ :: Ordering
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Types’))
         GT :: Ordering
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Types’))
         () :: () (bound at <wired into compiler>)
         pi :: forall a. Floating a => a
           with pi @Double
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Float’))
 
 T14273.hs:13:10: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]

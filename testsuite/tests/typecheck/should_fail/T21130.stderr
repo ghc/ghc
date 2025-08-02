@@ -8,15 +8,15 @@ T21130.hs:10:6: error: [GHC-88464]
       Valid hole fits include
         head :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
           with head @Int
-          (imported from ‘Prelude’ at T21130.hs:2:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.List’))
         last :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
           with last @Int
-          (imported from ‘Prelude’ at T21130.hs:2:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.List’))
         read :: forall a. Read a => String -> a
           with read @Int
-          (imported from ‘Prelude’ at T21130.hs:2:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Text.Read’))
 
 T21130.hs:10:8: error: [GHC-39999]

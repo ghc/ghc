@@ -1,6 +1,6 @@
 T18740a.hs:3:5: error: [GHC-01928]
     • Illegal term-level use of the type constructor ‘Int’
-    • imported from ‘Prelude’ at T18740a.hs:1:8-14
+    • imported from ‘Prelude’
       (and originally defined in ‘GHC.Internal.Types’)
     • In the expression: Int
       In an equation for ‘x’: x = Int

@@ -6,35 +6,35 @@ subsumption_sort_hole_fits.hs:2:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdef
         f :: [String] (bound at subsumption_sort_hole_fits.hs:2:1)
       Valid hole fits include
         lines :: String -> [String]
-          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Data.OldList’))
         words :: String -> [String]
-          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Data.OldList’))
         read :: forall a. Read a => String -> a
           with read @[String]
-          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Text.Read’))
         repeat :: forall a. a -> [a]
           with repeat @String
-          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.List’))
         mempty :: forall a. Monoid a => a
           with mempty @(String -> [String])
-          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
         fail :: forall (m :: * -> *) a.
                 (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
                 String -> m a
           with fail @[] @String
-          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @[] @String
-          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
         pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @[] @String
-          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
 

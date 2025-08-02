@@ -7,6 +7,6 @@ T15321.hs:9:9: error: [GHC-88464]
                 (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
                 String -> m a
           with fail @GHC.Internal.TH.Syntax.Q @GHC.Internal.TH.Syntax.Exp
-          (imported from ‘Prelude’ at T15321.hs:3:8-13
+          (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))
 

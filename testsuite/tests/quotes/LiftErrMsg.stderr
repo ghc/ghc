@@ -3,7 +3,7 @@ LiftErrMsg.hs:14:11: error: [GHC-28914]
     • Could not be resolved by implicit lifting due to the following error:
         No instance for: ‘Lift (a2 -> a2)’
     • Available from the imports:
-      • imported from ‘Prelude’ at LiftErrMsg.hs:3:8-17
+      • imported from ‘Prelude’
     • In the expression: [| id |]
       In an equation for ‘test’: test = [| id |]
 
@@ -12,7 +12,7 @@ LiftErrMsg.hs:17:13: error: [GHC-28914]
     • Could not be resolved by implicit lifting due to the following error:
         No instance for: ‘Lift (a1 -> a1)’
     • Available from the imports:
-      • imported from ‘Prelude’ at LiftErrMsg.hs:3:8-17
+      • imported from ‘Prelude’
     • In the expression: [| (id, id) |]
       In an equation for ‘test2’: test2 = [| (id, id) |]
 
@@ -21,7 +21,7 @@ LiftErrMsg.hs:17:17: error: [GHC-28914]
     • Could not be resolved by implicit lifting due to the following error:
         No instance for: ‘Lift (a0 -> a0)’
     • Available from the imports:
-      • imported from ‘Prelude’ at LiftErrMsg.hs:3:8-17
+      • imported from ‘Prelude’
     • In the expression: [| (id, id) |]
       In an equation for ‘test2’: test2 = [| (id, id) |]
 

@@ -2634,7 +2634,7 @@
    [])
   [(L
     (EpAnn
-     (EpaSpan { DumpRenamedAst.hs:4:8-21 })
+     (EpaSpan { <generated> })
      (AnnListItem
       [])
      (EpaComments
@@ -2657,7 +2657,7 @@
       (True))
      (L
       (EpAnn
-       (EpaSpan { DumpRenamedAst.hs:4:8-21 })
+       (EpaSpan { <generated> })
        (AnnListItem
         [])
        (EpaComments

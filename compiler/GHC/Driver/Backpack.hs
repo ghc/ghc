@@ -850,7 +850,6 @@ hsModuleToModSummary :: [NodeKey]
 hsModuleToModSummary home_keys pn hsc_src modname
                      hsmod = do
     let imps = hsmodImports (unLoc hsmod)
-        loc  = getLoc hsmod
     hsc_env <- getSession
     -- Sort of the same deal as in GHC.Driver.Pipeline's getLocation
     -- Use the PACKAGE NAME to find the location
@@ -879,8 +878,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
     let (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
         implicit_prelude = xopt LangExt.ImplicitPrelude dflags
-        implicit_imports = mkPrelImports modname loc
-                                         implicit_prelude imps
+        implicit_imports = mkPrelImports modname implicit_prelude imps
 
         rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) modname
         convImport (L _ i) = (convImportLevel (ideclLevelSpec i), rn_pkg_qual (ideclPkgQual i), reLoc $ ideclName i)
