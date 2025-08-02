@@ -86,7 +86,6 @@ data XImportDeclPass = XImportDeclPass
 
 {- Note [Implicit imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 GHC generates an `ImportDecl` to represent the invisible `import Prelude`
 that appears in any file that omits `import Prelude`, setting
 this field to indicate that the import doesn't appear in the

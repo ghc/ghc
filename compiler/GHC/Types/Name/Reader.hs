@@ -1984,7 +1984,7 @@ data ImpDeclSpec
         is_as       :: !ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
         is_pkg_qual :: !PkgQual,    -- ^ Was this a package import?
         is_qual     :: !Bool,       -- ^ Was this import qualified?
-        is_implicit :: !Bool,       -- ^ Was this import implicit? See Note [Implicit imports]
+        is_implicit :: !Bool,       -- ^ Was this import implicit? See Note [Implicit imports] in GHC.Hs.ImpExp
         is_dloc     :: !SrcSpan,    -- ^ The location of the entire import declaration
         is_isboot   :: !IsBootInterface, -- ^ Was this a SOURCE import?
         is_level    :: !ImportLevel -- ^ Was this import level modified? splice/quote +-1
