@@ -132,7 +132,7 @@ module GHC.Core.Type (
         kindBoxedRepLevity_maybe,
         mightBeLiftedType, mightBeUnliftedType,
         definitelyLiftedType, definitelyUnliftedType,
-        isAlgType, isDataFamilyAppType,
+        isAlgType, isDataFamilyApp, isSatTyFamApp,
         isPrimitiveType, isStrictType, isTerminatingType,
         isLevityTy, isLevityVar,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
@@ -2291,6 +2291,21 @@ isFamFreeTy (ForAllTy _ ty)   = isFamFreeTy ty
 isFamFreeTy (CastTy ty _)     = isFamFreeTy ty
 isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 
+-- | Check whether a type is a data family type
+isDataFamilyApp :: Type -> Bool
+isDataFamilyApp ty = case tyConAppTyCon_maybe ty of
+                           Just tc -> isDataFamilyTyCon tc
+                           _       -> False
+
+isSatTyFamApp :: Type -> Maybe (TyCon, [Type])
+-- Return the argument if we have a saturated type family application
+-- Why saturated?  See (ATF4) in Note [Apartness and type families]
+isSatTyFamApp (TyConApp tc tys)
+  |  isTypeFamilyTyCon tc
+  && not (tys `lengthExceeds` tyConArity tc)  -- Not over-saturated
+  = Just (tc, tys)
+isSatTyFamApp _ = Nothing
+
 buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
               -> [Role] -> KnotTied Type -> TyCon
 -- This function is here because here is where we have
@@ -2457,12 +2472,6 @@ isAlgType ty
       Just (tc, ty_args) -> assert (ty_args `lengthIs` tyConArity tc )
                             isAlgTyCon tc
       _other             -> False
-
--- | Check whether a type is a data family type
-isDataFamilyAppType :: Type -> Bool
-isDataFamilyAppType ty = case tyConAppTyCon_maybe ty of
-                           Just tc -> isDataFamilyTyCon tc
-                           _       -> False
 
 -- | Computes whether an argument (or let right hand side) should
 -- be computed strictly or lazily, based only on its type.

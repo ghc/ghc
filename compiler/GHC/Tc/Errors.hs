@@ -439,10 +439,9 @@ reportBadTelescope _ _ skol_info skols
 -- See Note [Constraints to ignore].
 ignoreConstraint :: Ct -> Bool
 ignoreConstraint ct
-  | AssocFamPatOrigin <- ctOrigin ct
-  = True
-  | otherwise
-  = False
+  = case ctOrigin ct of
+      AssocFamPatOrigin         -> True  -- See (CIG1)
+      _                         -> False
 
 -- | Makes an error item from a constraint, calculating whether or not
 -- the item should be suppressed. See Note [Wanteds rewrite Wanteds]
@@ -538,15 +537,15 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
        ; when (null simples) $ reportMultiplicityCoercionErrs ctxt_for_insols mult_co_errs
 
           -- See Note [Suppressing confusing errors]
-       ; let (suppressed_items, items0) = partition suppress tidy_items
+       ; let (suppressed_items, reportable_items) = partition suppressItem tidy_items
        ; traceTc "reportWanteds suppressed:" (ppr suppressed_items)
-       ; (ctxt1, items1) <- tryReporters ctxt_for_insols report1 items0
+       ; (ctxt1, items1) <- tryReporters ctxt_for_insols report1 reportable_items
 
          -- Now all the other constraints.  We suppress errors here if
          -- any of the first batch failed, or if the enclosing context
          -- says to suppress
        ; let ctxt2 = ctxt1 { cec_suppress = cec_suppress ctxt || cec_suppress ctxt1 }
-       ; (ctxt3, leftovers) <- tryReporters ctxt2 report2 items1
+       ; (_, leftovers) <- tryReporters ctxt2 report2 items1
        ; massertPpr (null leftovers)
            (text "The following unsolved Wanted constraints \
                  \have not been reported to the user:"
@@ -557,12 +556,16 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
             -- wanted insoluble here; but do suppress inner insolubles
             -- if there's a *given* insoluble here (= inaccessible code)
 
-            -- Only now, if there are no errors, do we report suppressed ones
-            -- See Note [Suppressing confusing errors]
-            -- We don't need to update the context further because of the
-            -- whenNoErrs guard
-       ; whenNoErrs $
-         do { (_, more_leftovers) <- tryReporters ctxt3 report3 suppressed_items
+         -- If there are no other errors to report, report suppressed errors.
+         -- See Note [Suppressing confusing errors].  NB: with -fdefer-type-errors
+         -- we might have reported warnings only from `reportable_items`, but we
+         -- still want to suppress the `suppressed_items`.
+       ; when (null reportable_items) $
+         do { (_, more_leftovers) <- tryReporters ctxt_for_insols (report1++report2)
+                                                  suppressed_items
+                 -- ctxt_for_insols: the suppressed errors can be Int~Bool, which
+                 -- will have made the incoming `ctxt` be True; don't make that
+                 -- suppress the Int~Bool error!
             ; massertPpr (null more_leftovers) (ppr more_leftovers) } }
  where
     env       = cec_tidy ctxt
@@ -585,29 +588,42 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
           DE_Multiplicity mult_co loc
             -> (es1, es2, es3, (mult_co, loc):es4)
 
-      -- See Note [Suppressing confusing errors]
-    suppress :: ErrorItem -> Bool
-    suppress item
-      | Wanted <- ei_flavour item
-      = is_ww_fundep_item item
-      | otherwise
-      = False
-
     -- report1: ones that should *not* be suppressed by
     --          an insoluble somewhere else in the tree
     -- It's crucial that anything that is considered insoluble
     -- (see GHC.Tc.Utils.insolublWantedCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
-                 -- (Handles TypeError and Unsatisfiable)
+    report1 = [ -- We put implicit lifting errors first, because are solid errors
+                -- See "Implicit lifting" in GHC.Tc.Gen.Splice
+                -- Note [Lifecycle of an untyped splice, and PendingRnSplice]
+                ("implicit lifting", is_implicit_lifting, True, mkImplicitLiftingReporter)
 
-              , ("implicit lifting", is_implicit_lifting, True, mkImplicitLiftingReporter)
+              -- Next, solid equality errors
               , given_eq_spec
               , ("insoluble2",      utterly_wrong,  True, mkGroupReporter mkEqErr)
               , ("skolem eq1",      very_wrong,     True, mkSkolReporter)
               , ("FixedRuntimeRep", is_FRR,         True, mkGroupReporter mkFRRErr)
               , ("skolem eq2",      skolem_eq,      True, mkSkolReporter)
+
+              -- Next, custom type errors
+              -- See Note [Custom type errors in constraints] in GHC.Tc.Types.Constraint
+              --
+              -- Put custom type errors /after/ solid equality errors.  In #26255 we
+              -- had a custom error (T <= F alpha) which was suppressing a far more
+              -- informative (K Int ~ [K alpha]). That mismatch between K and [] is
+              -- definitely wrong; and if it was fixed we'd know alpha:=Int, and hence
+              -- perhaps be able to solve T <= F alpha, by reducing F Int.
+              --
+              -- But put custom type errors /before/ "non-tv eq", because if we have
+              --     () ~ TypeError blah
+              -- we want to report it as a custom error, /not/ as a mis-match
+              -- between TypeError and ()!  Also see the Assert example
+              -- in Note [Custom type errors in constraints]
+              , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
+                 -- (Handles TypeError and Unsatisfiable)
+
+              -- "non-tv-eq": equalities (ty1 ~ ty2) where ty1 is not a tyvar
               , ("non-tv eq",       non_tv_eq,      True, mkSkolReporter)
 
                   -- The only remaining equalities are alpha ~ ty,
@@ -617,6 +633,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                   -- See Note [Equalities with heterogeneous kinds] in GHC.Tc.Solver.Equality
               , ("Homo eqs",      is_homo_equality,  True,  mkGroupReporter mkEqErr)
               , ("Other eqs",     is_equality,       True,  mkGroupReporter mkEqErr)
+
               ]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
@@ -624,11 +641,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr)
               , ("Quantified",      is_qc,           False, mkGroupReporter mkQCErr) ]
-
-    -- report3: suppressed errors should be reported as categorized by either report1
-    -- or report2. Keep this in sync with the suppress function above
-    report3 = [ ("wanted/wanted fundeps", is_ww_fundep, True, mkGroupReporter mkEqErr)
-              ]
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
     is_dict, is_equality, is_ip, is_FRR, is_irred :: ErrorItem -> Pred -> Bool
@@ -690,10 +702,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     is_qc _ (ForAllPred {}) = True
     is_qc _ _               = False
 
-     -- See situation (1) of Note [Suppressing confusing errors]
-    is_ww_fundep item _ = is_ww_fundep_item item
-    is_ww_fundep_item = isWantedWantedFunDepOrigin . errorItemOrigin
-
     given_eq_spec  -- See Note [Given errors]
       | has_gadt_match_here
       = ("insoluble1a", is_given_eq, True,  mkGivenErrorReporter)
@@ -719,6 +727,16 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
       = has_gadt_match implics
 
 ---------------
+suppressItem :: ErrorItem -> Bool
+ -- See Note [Suppressing confusing errors]
+suppressItem item
+  | Wanted <- ei_flavour item
+  , let orig = errorItemOrigin item
+  = isWantedSuperclassOrigin orig       -- See (SCE1)
+    || isWantedWantedFunDepOrigin orig  -- See (SCE2)
+  | otherwise
+  = False
+
 isSkolemTy :: TcLevel -> Type -> Bool
 -- The type is a skolem tyvar
 isSkolemTy tc_lvl ty
@@ -741,9 +759,25 @@ isTyFun_maybe ty = case tcSplitTyConApp_maybe ty of
 Certain errors we might encounter are potentially confusing to users.
 If there are any other errors to report, at all, we want to suppress these.
 
-Which errors (only 1 case right now):
+Which errors are suppressed?
 
-1) Errors which arise from the interaction of two Wanted fun-dep constraints.
+(SCE1) Superclasses of Wanteds.  These are generated only in case they trigger functional
+   dependencies.  If such a constraint is unsolved, then its "parent" constraint must
+   also be unsolved, and is much more informative to the user.  Example (#26255):
+        class (MinVersion <= F era) => Era era where { ... }
+        f :: forall era. EraFamily era -> IO ()
+        f = ..blah...   -- [W] Era era
+   Here we have simply omitted "Era era =>" from f's type.  But we'll end up with
+   /two/ Wanted constraints:
+        [W] d1 :  Era era
+        [W] d2 : MinVersion <= F era  -- Superclass of d1
+   We definitely want to report d1 and not d2!  Happily it's easy to filter out those
+   superclass-Wanteds, becuase their Origin betrays them.
+
+   See test T18851 for an example of how it is (just, barely) possible for the /only/
+   errors to be superclass-of-Wanted constraints.
+
+(SCE2) Errors which arise from the interaction of two Wanted fun-dep constraints.
    Example:
 
      class C a b | a -> b where
@@ -786,7 +820,7 @@ they will remain unfilled, and might have been used to rewrite another constrain
 
 Currently, the constraints to ignore are:
 
-1) Constraints generated in order to unify associated type instance parameters
+(CIG1) Constraints generated in order to unify associated type instance parameters
    with class parameters. Here are two illustrative examples:
 
      class C (a :: k) where
@@ -813,6 +847,9 @@ Currently, the constraints to ignore are:
    with this origin are dropped entirely during error message reporting.
 
    If there is any trouble, checkValidFamInst bleats, aborting compilation.
+
+(Note: Aug 25: this seems a rather tricky corner;
+               c.f. Note [Suppressing confusing errors])
 
 Note [Implementation of Unsatisfiable constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

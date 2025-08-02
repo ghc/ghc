@@ -363,7 +363,7 @@ pmTopNormaliseType (TySt _ inert) typ = {-# SCC "pmTopNormaliseType" #-} do
     eq_src_ty ty tys = maybe ty id (find is_closed_or_data_family tys)
 
     is_closed_or_data_family :: Type -> Bool
-    is_closed_or_data_family ty = pmIsClosedType ty || isDataFamilyAppType ty
+    is_closed_or_data_family ty = pmIsClosedType ty || isDataFamilyApp ty
 
     -- For efficiency, represent both lists as difference lists.
     -- comb performs the concatenation, for both lists.
