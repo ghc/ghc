@@ -780,6 +780,10 @@ COFF_OBJ_TYPE getObjectType ( char* image, pathchar* fileName )
  *************/
 COFF_HEADER_INFO* getHeaderInfo ( ObjectCode* oc )
 {
+   if((size_t) oc->fileSize < sizeof(IMAGE_FILE_HEADER)) {
+      errorBelch ("Supposed COFF file smaller than minimum header size.\n");
+      return NULL;
+   }
    COFF_OBJ_TYPE coff_type = getObjectType (oc->image, OC_INFORMATIVE_FILENAME(oc));
 
    COFF_HEADER_INFO* info
@@ -813,6 +817,11 @@ COFF_HEADER_INFO* getHeaderInfo ( ObjectCode* oc )
          stgFree (info);
          info = NULL;
          errorBelch ("Unknown COFF %d type in getHeaderInfo.", coff_type);
+         if(oc->archiveMemberName) {
+             errorBelch ("Archive %" PATH_FMT ".\n", oc->archiveMemberName);
+         }
+        errorBelch ("In %" PATH_FMT ".\n", oc->fileName);
+
         }
         break;
    }

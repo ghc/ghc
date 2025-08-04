@@ -1744,31 +1744,41 @@ ocRunFini_MachO ( ObjectCode *oc )
 /*
  * Figure out by how much to shift the entire Mach-O file in memory
  * when loading so that its single segment ends up 16-byte-aligned
+ *
+ * Returns 1 and sets misalignment_out to the detected misalignment if
+ * we successfully parsed the file.
+ *
+ * If we can't parse the file we set misalignment_out to 0 and return 0
  */
 int
-machoGetMisalignment( FILE * f )
+machoGetMisalignment( FILE * f, int* misalignment_out )
 {
     MachOHeader header;
     int misalignment;
+    *misalignment_out = 0;
 
     {
         size_t n = fread(&header, sizeof(header), 1, f);
         if (n != 1) {
-            barf("machoGetMisalignment: can't read the Mach-O header");
+            debugBelch("machoGetMisalignment: can't read the Mach-O header");
+            return 0;
         }
     }
     fseek(f, -sizeof(header), SEEK_CUR);
 
     if(header.magic != MH_MAGIC_64) {
-        barf("Bad magic. Expected: %08x, got: %08x.",
+        debugBelch("Bad magic. Expected: %08x, got: %08x.",
              MH_MAGIC_64, header.magic);
+        return 0;
     }
 
     misalignment = (header.sizeofcmds + sizeof(header))
                     & 0xF;
 
     IF_DEBUG(linker, debugBelch("mach-o misalignment %d\n", misalignment));
-    return misalignment ? (16 - misalignment) : 0;
+    misalignment = misalignment ? (16 - misalignment) : 0;
+    *misalignment_out = misalignment;
+    return 1;
 }
 
 #endif /* darwin_HOST_OS || ios_HOST_OS */

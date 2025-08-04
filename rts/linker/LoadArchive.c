@@ -110,51 +110,6 @@ static bool loadFatArchive(char input[static 20], FILE* f, pathchar* path)
 }
 #endif
 
-enum ObjectFileFormat {
-    NotObject,
-    COFFAmd64,
-    COFFI386,
-    COFFAArch64,
-    ELF,
-    MachO32,
-    MachO64,
-};
-
-static enum ObjectFileFormat identifyObjectFile_(char* buf, size_t sz)
-{
-    if (sz > 2 && ((uint16_t*)buf)[0] == 0x8664) {
-        return COFFAmd64;
-    }
-    if (sz > 2 && ((uint16_t*)buf)[0] == 0x014c) {
-        return COFFI386;
-    }
-    if (sz > 2 && ((uint16_t*)buf)[0] == 0xaa64) {
-        return COFFAArch64;
-    }
-    if (sz > 4 && memcmp(buf, "\x7f" "ELF", 4) == 0) {
-        return ELF;
-    }
-    if (sz > 4 && ((uint32_t*)buf)[0] == 0xfeedface) {
-        return MachO32;
-    }
-    if (sz > 4 && ((uint32_t*)buf)[0] == 0xfeedfacf) {
-        return MachO64;
-    }
-    // BigObj COFF files ...
-    if (sz > 8 && ((uint64_t*)buf)[0] == 0x86640002ffff0000) {
-        return COFFAmd64;
-    }
-    return NotObject;
-}
-
-static enum ObjectFileFormat identifyObjectFile(FILE *f)
-{
-    char buf[32];
-    ssize_t sz = fread(buf, 1, 32, f);
-    CHECK(fseek(f, -sz, SEEK_CUR) == 0);
-    return identifyObjectFile_(buf, sz);
-}
-
 static bool readThinArchiveMember(int n, int memberSize, pathchar* path,
         char* fileName, char* image)
 {
@@ -547,9 +502,11 @@ HsInt loadArchive_ (pathchar *path)
         }
 
         DEBUG_LOG("Found member file `%s'\n", fileName);
-
         bool is_symbol_table = strcmp("", fileName) == 0;
-        enum ObjectFileFormat object_fmt = is_symbol_table ? NotObject : identifyObjectFile(f);
+
+/////////////////////////////////////////////////
+// We found the member file. Load it into memory.
+/////////////////////////////////////////////////
 
 #if defined(OBJFORMAT_PEi386)
         /*
@@ -569,17 +526,20 @@ HsInt loadArchive_ (pathchar *path)
 #endif // windows
 
         DEBUG_LOG("\tthisFileNameSize = %d\n", (int)thisFileNameSize);
-        DEBUG_LOG("\tisObject = %d\n", object_fmt);
 
-        if ((!is_symbol_table && isThin) || object_fmt != NotObject) {
-            DEBUG_LOG("Member is an object file...loading...\n");
+        if (!is_symbol_table && !isImportLib)
+        {
+            DEBUG_LOG("Member might be an object file...loading...\n");
 
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
             if (RTS_LINKER_USE_MMAP)
                 image = mmapAnonForLinker(memberSize);
             else {
                 /* See loadObj() */
-                misalignment = machoGetMisalignment(f);
+                if(!machoGetMisalignment(f, &misalignment)) {
+                    DEBUG_LOG("Failed to load member as mach-o file. Skipping.\n");
+                    continue;
+                }
                 image = stgMallocBytes(memberSize + misalignment,
                                         "loadArchive(image)");
                 image += misalignment;
@@ -613,18 +573,22 @@ HsInt loadArchive_ (pathchar *path)
             pathprintf(archiveMemberName, size+1, WSTR("%" PATH_FMT "(#%d:%.*s)"),
                        path, memberIdx, (int)thisFileNameSize, fileName);
 
+///////////////////////////////////////////////////////////////
+// Verfiy the object file is valid, and load it if appropriate.
+///////////////////////////////////////////////////////////////
+
+            // Prepare headers, doesn't load any data yet.
             ObjectCode *oc = mkOc(STATIC_OBJECT, path, image, memberSize, false, archiveMemberName,
                                   misalignment);
-#if defined(OBJFORMAT_MACHO)
-            ASSERT(object_fmt == MachO32 || object_fmt == MachO64);
-            ocInit_MachO( oc );
-#endif
-#if defined(OBJFORMAT_ELF)
-            ASSERT(object_fmt == ELF);
-            ocInit_ELF( oc );
-#endif
-
             stgFree(archiveMemberName);
+
+            if(!verifyAndInitOc( oc ))
+            {
+                freeObjectCode( oc );
+                IF_DEBUG(linker, ocDebugBelch(oc, "Faild to verify ... skipping."));
+                continue;
+            }
+
 
             if (0 == loadOc(oc)) {
                 stgFree(fileName);
