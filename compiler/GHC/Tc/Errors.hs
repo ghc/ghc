@@ -599,11 +599,32 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     -- (see GHC.Tc.Utils.insolublWantedCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ given_eq_spec
+    report1 = [ -- We put implicit lifting errors first, because are solid errors
+                -- See "Implicit lifting" in GHC.Tc.Gen.Splice
+                -- Note [Lifecycle of an untyped splice, and PendingRnSplice]
+                ("implicit lifting", is_implicit_lifting, True, mkImplicitLiftingReporter)
+
+                -- Next, solid equality errors
+              , given_eq_spec
               , ("insoluble2",      utterly_wrong,  True, mkGroupReporter mkEqErr)
               , ("skolem eq1",      very_wrong,     True, mkSkolReporter)
               , ("FixedRuntimeRep", is_FRR,         True, mkGroupReporter mkFRRErr)
               , ("skolem eq2",      skolem_eq,      True, mkSkolReporter)
+
+              -- Put custom type errors after solid equality errors.  In #26255 we
+              -- had a custom error (T <= F alpha) which was suppressing a far more
+              -- informative (K Int ~ [K alpha]). That mismatch between K and [] is
+              -- definitely wrong; and if it was fixed we'd know alpha:=Int, and hence
+              -- perhaps be able to solve T <= F alpha, by reducing F Int.
+              --
+              -- Custom errors should precede "non-tv eq", becuase if we have
+              --     () ~ TypeError blah
+              -- we want to report it as a custom error, /not/ as a mis-match
+              -- between TypeError and ()!
+              , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
+                 -- (Handles TypeError and Unsatisfiable)
+
+              -- "non-tv-eq": equalities (ty1 ~ ty2) where ty1 is not a tyvar
               , ("non-tv eq",       non_tv_eq,      True, mkSkolReporter)
 
                   -- The only remaining equalities are alpha ~ ty,
@@ -614,14 +635,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
               , ("Homo eqs",      is_homo_equality,  True,  mkGroupReporter mkEqErr)
               , ("Other eqs",     is_equality,       True,  mkGroupReporter mkEqErr)
 
-              -- Put custom type errors after solid equality errors.  In #26255 we
-              -- had a custom error (T <= F alpha) which was suppressing a far more
-              -- informative (K Int ~ [K alpha]). That mismatch between K and [] is
-              -- definitely wrong; and if it was fixed we'd know alpha:=Int, and hence
-              -- perhaps be able to solve T <= F alpha, by reducing F Int.
-              , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
-                 -- (Handles TypeError and Unsatisfiable)
-              , ("implicit lifting", is_implicit_lifting, True, mkImplicitLiftingReporter)
               ]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
