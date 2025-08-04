@@ -23,7 +23,8 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     tmpl <- (top -/-) <$> expr (templateHscPath stage0Boot)
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
-            , notM isWinTarget ? notM (flag CrossCompiling) ? arg "--cross-safe"
+            -- eventlog-socket uses directive not safe for cross compilation
+            -- , notM isWinTarget ? notM (flag CrossCompiling) ? arg "--cross-safe"
             , pure $ map ("-I" ++) (words gmpDir)
             , map ("--cflag=" ++) <$> getCFlags
             , map ("--lflag=" ++) <$> getLFlags

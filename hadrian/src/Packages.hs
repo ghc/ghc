@@ -12,6 +12,7 @@ module Packages (
     runGhc, semaphoreCompat, stm, templateHaskell, thLift, thQuasiquoter, terminfo, text, time, timeout,
     transformers, unlit, unix, win32, xhtml,
     lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
+    eventlogSocket, eventlogSocketControl,
     ghcPackages, isGhcPackage,
 
     -- * Package information
@@ -42,6 +43,7 @@ ghcPackages =
     , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell, thLift, thQuasiquoter
     , terminfo, text, time, transformers, unlit, unix, win32, xhtml, fileio
     , timeout
+    , eventlogSocketControl, eventlogSocket
     , lintersCommon
     , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace ]
 
@@ -59,7 +61,8 @@ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, count
   osString, parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell, thLift, thQuasiquoter,
   terminfo, text, time, transformers, unlit, unix, win32, xhtml,
   timeout,
-  lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace
+  lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
+  eventlogSocket, eventlogSocketControl
     :: Package
 array               = lib  "array"
 base                = lib  "base"
@@ -134,6 +137,8 @@ unlit               = util "unlit"
 unix                = lib  "unix"
 win32               = lib  "Win32"
 xhtml               = lib  "xhtml"
+eventlogSocket      = lib "eventlog-socket" `setPath` "eventlog-socket/eventlog-socket"
+eventlogSocketControl = lib "eventlog-socket-control" `setPath` "eventlog-socket/eventlog-socket-control"
 
 lintersCommon       = lib     "linters-common"      `setPath` "linters/linters-common"
 lintNotes           = linter  "lint-notes"

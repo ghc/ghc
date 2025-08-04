@@ -123,3 +123,6 @@
 [submodule "libraries/libffi-clib"]
 	path = libraries/libffi-clib
 	url = https://gitlab.haskell.org/ghc/libffi-clib.git
+[submodule "eventlog-socket"]
+	path = eventlog-socket
+	url = https://github.com/well-typed/eventlog-socket.git
