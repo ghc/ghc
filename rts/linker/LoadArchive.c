@@ -24,7 +24,9 @@
 #include <string.h>
 #include <stddef.h>
 #include <ctype.h>
+#include <sys/types.h>
 #include <fs_rts.h>
+#include <stdio.h>
 
 #define FAIL(...) do {\
    errorBelch("loadArchive: "__VA_ARGS__); \
@@ -32,7 +34,6 @@
 } while (0)
 
 #define DEBUG_LOG(...) IF_DEBUG(linker, debugBelch("loadArchive: " __VA_ARGS__))
-
 
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 /* Read 4 bytes and convert to host byte order */
@@ -110,56 +111,8 @@ static bool loadFatArchive(char input[static 20], FILE* f, pathchar* path)
 }
 #endif
 
-enum ObjectFileFormat {
-    NotObject,
-    COFFAmd64,
-    COFFI386,
-    COFFAArch64,
-    ELF,
-    MachO32,
-    MachO64,
-};
-
-static enum ObjectFileFormat identifyObjectFile_(char* buf, size_t sz)
+STATIC_INLINE pathchar* thinArchiveMemberPath(pathchar* path, char* fileName)
 {
-    if (sz > 2 && ((uint16_t*)buf)[0] == 0x8664) {
-        return COFFAmd64;
-    }
-    if (sz > 2 && ((uint16_t*)buf)[0] == 0x014c) {
-        return COFFI386;
-    }
-    if (sz > 2 && ((uint16_t*)buf)[0] == 0xaa64) {
-        return COFFAArch64;
-    }
-    if (sz > 4 && memcmp(buf, "\x7f" "ELF", 4) == 0) {
-        return ELF;
-    }
-    if (sz > 4 && ((uint32_t*)buf)[0] == 0xfeedface) {
-        return MachO32;
-    }
-    if (sz > 4 && ((uint32_t*)buf)[0] == 0xfeedfacf) {
-        return MachO64;
-    }
-    // BigObj COFF files ...
-    if (sz > 8 && ((uint64_t*)buf)[0] == 0x86640002ffff0000) {
-        return COFFAmd64;
-    }
-    return NotObject;
-}
-
-static enum ObjectFileFormat identifyObjectFile(FILE *f)
-{
-    char buf[32];
-    ssize_t sz = fread(buf, 1, 32, f);
-    CHECK(fseek(f, -sz, SEEK_CUR) == 0);
-    return identifyObjectFile_(buf, sz);
-}
-
-static bool readThinArchiveMember(int n, int memberSize, pathchar* path,
-        char* fileName, char* image)
-{
-    bool has_succeeded = false;
-    FILE* member = NULL;
     pathchar *pathCopy, *dirName, *memberPath, *objFileName;
     memberPath = NULL;
     /* Allocate and setup the dirname of the archive.  We'll need
@@ -173,15 +126,29 @@ static bool readThinArchiveMember(int n, int memberSize, pathchar* path,
     objFileName = mkPath(fileName);
     pathprintf(memberPath, memberLen, WSTR("%" PATH_FMT "%" PATH_FMT), dirName,
             objFileName);
-    stgFree(objFileName);
+
+    stgFree(pathCopy);
     stgFree(dirName);
+    stgFree(objFileName);
+    return memberPath;
+}
+
+STATIC_INLINE bool readThinArchiveMember(int memberSize, pathchar* path,
+        char* fileName, char* image)
+{
+    bool has_succeeded = false;
+    FILE* member = NULL;
+    pathchar *memberPath;
+    //Fully resolved path.
+    memberPath = thinArchiveMemberPath(path, fileName);
+
     member = pathopen(memberPath, WSTR("rb"));
     if (!member) {
         errorBelch("loadObj: can't read thin archive `%" PATH_FMT "'",
                    memberPath);
         goto inner_fail;
     }
-    n = fread(image, 1, memberSize, member);
+    int n = fread(image, 1, memberSize, member);
     if (n != memberSize) {
         errorBelch("loadArchive: error whilst reading `%s'",
                    fileName);
@@ -192,7 +159,6 @@ static bool readThinArchiveMember(int n, int memberSize, pathchar* path,
 inner_fail:
     fclose(member);
     stgFree(memberPath);
-    stgFree(pathCopy);
     return has_succeeded;
 }
 
@@ -379,7 +345,6 @@ HsInt loadArchive_ (pathchar *path)
     int memberIdx = 0;
     FILE *f = NULL;
     size_t thisFileNameSize = (size_t) -1; /* shut up bogus GCC warning */
-    int misalignment = 0;
 
     DEBUG_LOG("start\n");
     DEBUG_LOG("Loading archive `%" PATH_FMT "'\n", path);
@@ -387,8 +352,7 @@ HsInt loadArchive_ (pathchar *path)
     /* Check that we haven't already loaded this archive.
        Ignore requests to load multiple times */
     if (isAlreadyLoaded(path)) {
-        IF_DEBUG(linker,
-                 debugBelch("ignoring repeated load of %" PATH_FMT "\n", path));
+        DEBUG_LOG("ignoring repeated load of %" PATH_FMT "\n", path);
         return 1; /* success */
     }
 
@@ -407,6 +371,9 @@ HsInt loadArchive_ (pathchar *path)
         FAIL("failed to identify archive format of %" PATH_FMT ".", path);
     }
     bool isThin = archive_fmt == ThinArchive;
+    if(isThin) {
+        DEBUG_LOG("Found thin archive.\n");
+    }
 
     DEBUG_LOG("loading archive contents\n");
 
@@ -547,9 +514,25 @@ HsInt loadArchive_ (pathchar *path)
         }
 
         DEBUG_LOG("Found member file `%s'\n", fileName);
-
         bool is_symbol_table = strcmp("", fileName) == 0;
-        enum ObjectFileFormat object_fmt = is_symbol_table ? NotObject : identifyObjectFile(f);
+#if defined(OBJFORMAT_MACHO)
+        if (!is_symbol_table) {
+            /* Darwin ranlib symbol tables are named __.SYMDEF*
+             * There is no good documentation for this. Your best bets are
+             * probably the LLVM and Apple cctools sources.
+            */
+            if (strncmp(fileName, "__.SYMDEF", sizeof("__.SYMDEF")) == 0 ||
+                strncmp(fileName, "__.SYMDEF SORTED", sizeof("__.SYMDEF SORTED")) == 0 ||
+                strncmp(fileName, "__.SYMDEF_64", sizeof("__.SYMDEF_64")) == 0 ||
+                strncmp(fileName, "__.SYMDEF_64 SORTED", sizeof("__.SYMDEF_64 SORTED")) == 0) {
+                is_symbol_table = true;
+            }
+        }
+#endif
+
+/////////////////////////////////////////////////
+// We found the member file. Load it into memory.
+/////////////////////////////////////////////////
 
 #if defined(OBJFORMAT_PEi386)
         /*
@@ -562,39 +545,70 @@ HsInt loadArchive_ (pathchar *path)
         * for sections. So on windows, just try to load it all.
         *
         * Linker members (e.g. filename / are skipped since they are not needed)
+        *
+        * AK: The gist of it is really that we need to:
+        * + Load .dll members as objects if they are *not* an import lib.
+        * + Load .dll members as import libs if they are ... import libs.
+        *
+        * There seems to be no good place to make this decision so i've put the
+        * ugly import lib detection code here, keeping the rest of the verification/loading
+        * logic relatively tidy. We basically read parts of the member file to get
+        * the header and then reuse the PE linkers type detection logic.
+        *
+        * We read at least sizeof(ANON_OBJECT_HEADER) bytes, but at most
+        * sizeof(ANON_OBJECT_HEADER_BIGOBJ). Members might be megabytes in size
+        * and we really only need at most the size of the largest header to determine
+        * the type.
         */
-        bool isImportLib = thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".dll", 4) == 0;
-#else
-        bool isImportLib = false;
-#endif // windows
+        bool mb_peImportLib = thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".dll", 4) == 0;
+        bool importLib = false;
+        if (mb_peImportLib) {
 
-        DEBUG_LOG("\tthisFileNameSize = %d\n", (int)thisFileNameSize);
-        DEBUG_LOG("\tisObject = %d\n", object_fmt);
-
-        if ((!is_symbol_table && isThin) || object_fmt != NotObject) {
-            DEBUG_LOG("Member is an object file...loading...\n");
-
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
-            if (RTS_LINKER_USE_MMAP)
-                image = mmapAnonForLinker(memberSize);
+            char buf[sizeof(ANON_OBJECT_HEADER_BIGOBJ)];
+            // Too small to be a import lib
+            if(memberSize < sizeof(ANON_OBJECT_HEADER)) { importLib = false;}
+            // Read & Check the header
             else {
-                /* See loadObj() */
-                misalignment = machoGetMisalignment(f);
-                image = stgMallocBytes(memberSize + misalignment,
-                                        "loadArchive(image)");
-                image += misalignment;
+                if (isThin)
+                {   if (!readThinArchiveMember(
+                            stg_min(sizeof(ANON_OBJECT_HEADER_BIGOBJ), memberSize),
+                            path, fileName, buf))
+                    { goto fail; }
+                }
+                else {
+                    ssize_t sz = fread(buf, 1, sizeof(ANON_OBJECT_HEADER_BIGOBJ), f);
+                    CHECK(fseek(f, -sz, SEEK_CUR) == 0);
+                }
+                importLib = getObjectType(buf, path) == COFF_IMPORT_LIB;
             }
+            if(importLib) { DEBUG_LOG("\tfound import lib.\n"); };
+        }
+
+#endif // windows
+        DEBUG_LOG("\tthisFileNameSize = %d\n", (int)thisFileNameSize);
+
+        if (!is_symbol_table
+#if defined(OBJFORMAT_PEi386)
+            && !importLib
+#endif
+        )
+        {
+            ASSERT(!isGnuIndex);
+            DEBUG_LOG("Member might be an object file...loading...\n");
+#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(RTS_LINKER_USE_MMAP)
+            image = mmapAnonForLinker(memberSize);
+#else
+#error "Only MMAP based loading supported on Apple platforms"
+#endif // defined(RTS_LINKER_USE_MMAP)
 
 #else // not darwin
             image = stgMallocBytes(memberSize, "loadArchive(image)");
 #endif
             if (isThin) {
-                if (!readThinArchiveMember(n, memberSize, path, fileName, image)) {
-                    goto fail;
+                if (!readThinArchiveMember(memberSize, path, fileName, image)) {
+                    FAIL("Failed to read thin member %" PATH_FMT"\n", path);
                 }
-                // Unlike for regular archives for thin archives we can only identify the object format
-                // after having read the file pointed to.
-                object_fmt = identifyObjectFile_(image, memberSize);
             }
             else
             {
@@ -613,21 +627,26 @@ HsInt loadArchive_ (pathchar *path)
             pathprintf(archiveMemberName, size+1, WSTR("%" PATH_FMT "(#%d:%.*s)"),
                        path, memberIdx, (int)thisFileNameSize, fileName);
 
-            ObjectCode *oc = mkOc(STATIC_OBJECT, path, image, memberSize, false, archiveMemberName,
-                                  misalignment);
-#if defined(OBJFORMAT_MACHO)
-            ASSERT(object_fmt == MachO32 || object_fmt == MachO64);
-            ocInit_MachO( oc );
-#endif
-#if defined(OBJFORMAT_ELF)
-            ASSERT(object_fmt == ELF);
-            ocInit_ELF( oc );
-#endif
+///////////////////////////////////////////////////////////////
+// Verfiy the object file is valid, and load it if appropriate.
+///////////////////////////////////////////////////////////////
 
+            // Prepare headers, doesn't load any data yet.
+            ObjectCode *oc = mkOc(STATIC_OBJECT, path, image, memberSize, false, archiveMemberName);
             stgFree(archiveMemberName);
 
+            if(!verifyAndInitOc( oc ))
+            {
+                errorBelch("Failed to verify %" PATH_FMT " , aborting.\n", path);
+                freeObjectCode( oc );
+                continue;
+            }
+
+
             if (0 == loadOc(oc)) {
+                ocBelch(oc, "Failed to load OC %" PATH_FMT " , aborting.\n", path);
                 stgFree(fileName);
+                freeObjectCode( oc );
                 fclose(f);
                 return 0;
             } else {
@@ -654,8 +673,8 @@ while reading filename from `%" PATH_FMT "'", path);
             gnuFileIndex[memberSize] = '/';
             gnuFileIndexSize = memberSize;
         }
-        else if (isImportLib) {
 #if defined(OBJFORMAT_PEi386)
+        else if (importLib) {
             if (checkAndLoadImportLibrary(path, fileName, f)) {
                 DEBUG_LOG("Member is an import file section... "
                           "Corresponding DLL has been loaded...\n");
@@ -668,8 +687,8 @@ while reading filename from `%" PATH_FMT "'", path);
                     FAIL("error whilst seeking by %zd in `%" PATH_FMT "'",
                     memberSize, path);
             }
-#endif
         }
+#endif
         else {
             DEBUG_LOG("`%s' does not appear to be an object file\n",
                       fileName);
@@ -698,7 +717,7 @@ while reading filename from `%" PATH_FMT "'", path);
         }
         memberIdx ++;
         DEBUG_LOG("reached end of archive loading while loop\n");
-    }
+    } // while(1)
     retcode = 1;
 fail:
     if (f != NULL)
@@ -742,4 +761,3 @@ bool isArchive (pathchar *path)
     }
     return strncmp(ARCHIVE_HEADER, buffer, sizeof(ARCHIVE_HEADER)-1) == 0;
 }
-

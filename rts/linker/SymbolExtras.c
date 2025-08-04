@@ -63,14 +63,10 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
 
       // round up to the nearest 4
       int aligned = (oc->fileSize + 3) & ~3;
-      int misalignment = oc->misalignment;
 
-      oc->image -= misalignment;
       oc->image = stgReallocBytes( oc->image,
-                               misalignment +
                                aligned + extras_size,
                                "ocAllocateExtras" );
-      oc->image += misalignment;
 
       oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
     } else if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
