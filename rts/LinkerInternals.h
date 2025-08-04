@@ -264,10 +264,6 @@ struct _ObjectCode {
     /* non-zero if the object file was mmap'd, otherwise malloc'd */
     int        imageMapped;
 
-    /* record by how much image has been deliberately misaligned
-       after allocation, so that we can use realloc */
-    int        misalignment;
-
     /* The address of __cxa_finalize; set when at least one finalizer was
      * register and therefore we must call __cxa_finalize before unloading.
      * See Note [Resolving __dso_handle]. */
@@ -390,6 +386,11 @@ extern Elf_Word shndx_table_uninit_label;
                OC_INFORMATIVE_FILENAME(oc), \
                ##__VA_ARGS__)
 
+#define ocBelch(oc, s, ...) \
+    errorBelch("%s(%" PATH_FMT ": " s, \
+               __func__, \
+               OC_INFORMATIVE_FILENAME(oc), \
+               ##__VA_ARGS__)
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
@@ -487,11 +488,16 @@ HsInt loadArchive_ (pathchar *path);
 HsInt isAlreadyLoaded( pathchar *path );
 OStatus getObjectLoadStatus_ (pathchar *path);
 ObjectCode *lookupObjectByPath(pathchar *path);
+
+/* Verify an objects is an a format that can be loaded and initialize the oc struct if required. */
+HsInt verifyAndInitOc( ObjectCode *oc );
+
+//Expects the oc to be verified already.
 HsInt loadOc( ObjectCode* oc );
 ObjectCode* mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
-                  bool mapped, pathchar *archiveMemberName,
-                  int misalignment
+                  bool mapped, pathchar *archiveMemberName
                   );
+
 
 void initSegment(Segment *s, void *start, size_t size, SegmentProt prot, int n_sections);
 void freeSegments(ObjectCode *oc);
