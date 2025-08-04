@@ -1,6 +1,0 @@
-T21391.hs:25:45: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
-    In the use of
-      instance NFData (a -> b) -- Defined in ‘Control.DeepSeq’
-    arising from a use of ‘rnf’
-    Deprecated: "NFData is not well-defined on function types. https://github.com/haskell/deepseq/issues/16"
-
