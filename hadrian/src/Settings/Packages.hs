@@ -106,6 +106,14 @@ packageArgs = do
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
 
+        , package eventlogSocket ? mconcat
+          [ builder (Cabal Flags) ? mconcat
+            [
+            -- Add support for eventlog-socket commands
+              arg "+control"
+            ]
+          ]
+
         ---------------------------------- ghc ---------------------------------
         , package ghc ? mconcat
           [ builder Ghc ? mconcat
@@ -115,6 +123,7 @@ packageArgs = do
           , builder (Cabal Flags) ? mconcat
             [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage1]] `cabalFlag` "interpreter"
             , andM [expr (ghcWithInterpreter stage), notM (expr cross)] `cabalFlag` "internal-interpreter"
+            , notStage0 `cabalFlag` "eventlog-socket"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.
