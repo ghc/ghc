@@ -93,6 +93,17 @@ import Data.List ( isPrefixOf, partition, intercalate )
 import Prelude
 import qualified Data.List.NonEmpty as NE
 
+#if defined(EVENTLOG_SOCKET)
+import qualified GHC.Eventlog.Socket
+#endif
+
+startEventlogSocketFromEnv :: IO ()
+#if defined(EVENTLOG_SOCKET)
+startEventlogSocketFromEnv = GHC.Eventlog.Socket.startFromEnv
+#else
+startEventlogSocketFromEnv = pure ()
+#endif
+
 -----------------------------------------------------------------------------
 -- ToDo:
 
@@ -107,6 +118,8 @@ import qualified Data.List.NonEmpty as NE
 
 main :: IO ()
 main = do
+   startEventlogSocketFromEnv
+
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
 
