@@ -437,6 +437,7 @@
 */
 
 #include "Rts.h"
+#include "rts/Messages.h"
 
 #if defined(mingw32_HOST_OS)
 
@@ -780,6 +781,12 @@ COFF_OBJ_TYPE getObjectType ( char* image, pathchar* fileName )
  *************/
 COFF_HEADER_INFO* getHeaderInfo ( ObjectCode* oc )
 {
+   //No guarantee it's a valid file/oc at this point as we call
+   //getHeaderInfo during verify.
+   if((size_t) oc->fileSize < sizeof(IMAGE_FILE_HEADER)) {
+      IF_DEBUG(linker, ocBelch (oc, "Supposed COFF file smaller than minimum header size.\n"));
+      return NULL;
+   }
    COFF_OBJ_TYPE coff_type = getObjectType (oc->image, OC_INFORMATIVE_FILENAME(oc));
 
    COFF_HEADER_INFO* info
@@ -808,11 +815,23 @@ COFF_HEADER_INFO* getHeaderInfo ( ObjectCode* oc )
          info->numberOfSections     = hdr->NumberOfSections;
         }
         break;
+       case COFF_IMPORT_LIB:
+        {
+         errorBelch ("Unexpected COFF_IMPORT_LIB in getHeaderInfo.\n");
+         stgFree(info);
+         info = NULL;
+         break;
+        }
        default:
         {
          stgFree (info);
          info = NULL;
          errorBelch ("Unknown COFF %d type in getHeaderInfo.", coff_type);
+         if(oc->archiveMemberName) {
+             errorBelch ("Archive %" PATH_FMT ".\n", oc->archiveMemberName);
+         }
+        errorBelch ("In %" PATH_FMT ".\n", oc->fileName);
+
         }
         break;
    }

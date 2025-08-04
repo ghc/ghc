@@ -1,4 +1,5 @@
 #include "Rts.h"
+#include "rts/Linker.h"
 
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 
@@ -199,10 +200,13 @@ ocAllocateExtras_MachO(ObjectCode* oc)
 int
 ocVerifyImage_MachO(ObjectCode * oc)
 {
-    char *image = (char*) oc->image;
-    MachOHeader *header = (MachOHeader*) image;
-
     IF_DEBUG(linker, debugBelch("ocVerifyImage_MachO: start\n"));
+    char *image = (char*) oc->image;
+    if (oc->fileSize < (int) sizeof(MachOHeader)) {
+        IF_DEBUG(linker, errorBelch("Tried loading machO smaller than header size.\n"));
+        return 0;
+    }
+    MachOHeader *header = (MachOHeader*) image;
 
     if(header->magic != MH_MAGIC_64) {
         errorBelch("Could not load image %s: bad magic!\n"
@@ -1772,36 +1776,6 @@ ocRunFini_MachO ( ObjectCode *oc )
     }
 
     return 1;
-}
-
-/*
- * Figure out by how much to shift the entire Mach-O file in memory
- * when loading so that its single segment ends up 16-byte-aligned
- */
-int
-machoGetMisalignment( FILE * f )
-{
-    MachOHeader header;
-    int misalignment;
-
-    {
-        size_t n = fread(&header, sizeof(header), 1, f);
-        if (n != 1) {
-            barf("machoGetMisalignment: can't read the Mach-O header");
-        }
-    }
-    fseek(f, -sizeof(header), SEEK_CUR);
-
-    if(header.magic != MH_MAGIC_64) {
-        barf("Bad magic. Expected: %08x, got: %08x.",
-             MH_MAGIC_64, header.magic);
-    }
-
-    misalignment = (header.sizeofcmds + sizeof(header))
-                    & 0xF;
-
-    IF_DEBUG(linker, debugBelch("mach-o misalignment %d\n", misalignment));
-    return misalignment ? (16 - misalignment) : 0;
 }
 
 #endif /* darwin_HOST_OS || ios_HOST_OS */

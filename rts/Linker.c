@@ -1250,7 +1250,7 @@ void freeObjectCode (ObjectCode *oc)
 
 ObjectCode*
 mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
-      bool mapped, pathchar *archiveMemberName, int misalignment ) {
+      bool mapped, pathchar *archiveMemberName ) {
    ObjectCode* oc;
 
 
@@ -1304,7 +1304,6 @@ mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
    oc->bssEnd            = NULL;
    oc->imageMapped       = mapped;
 
-   oc->misalignment      = misalignment;
    oc->initializersRan   = false;
    oc->cxa_finalize      = NULL;
    oc->extraInfos        = NULL;
@@ -1363,7 +1362,6 @@ preloadObjectFile (pathchar *path)
    int r;
    void *image;
    ObjectCode *oc;
-   int misalignment = 0;
 
    r = pathstat(path, &st);
    if (r == -1) {
@@ -1421,26 +1419,7 @@ preloadObjectFile (pathchar *path)
        return NULL;
    }
 
-#  if defined(darwin_HOST_OS)
-
-    // In a Mach-O .o file, all sections can and will be misaligned
-    // if the total size of the headers is not a multiple of the
-    // desired alignment. This is fine for .o files that only serve
-    // as input for the static linker, but it's not fine for us,
-    // as SSE (used by gcc for floating point) and Altivec require
-    // 16-byte alignment.
-    // We calculate the correct alignment from the header before
-    // reading the file, and then we misalign image on purpose so
-    // that the actual sections end up aligned again.
-   misalignment = machoGetMisalignment(f);
-   image = stgMallocBytes(fileSize + misalignment, "loadObj(image)");
-   image += misalignment;
-
-# else /* !defined(darwin_HOST_OS) */
-
    image = stgMallocBytes(fileSize, "loadObj(image)");
-
-#endif /* !defined(darwin_HOST_OS) */
 
    int n;
    n = fread ( image, 1, fileSize, f );
@@ -1456,16 +1435,13 @@ preloadObjectFile (pathchar *path)
    IF_DEBUG(linker, debugBelch("loadObj: preloaded image at %p\n", (void *) image));
 
    /* FIXME (AP): =mapped= parameter unconditionally set to true */
-   oc = mkOc(STATIC_OBJECT, path, image, fileSize, true, NULL, misalignment);
+   oc = mkOc(STATIC_OBJECT, path, image, fileSize, true, NULL);
 
-#if defined(OBJFORMAT_MACHO)
-   if (ocVerifyImage_MachO( oc ))
-       ocInit_MachO( oc );
-#endif
-#if defined(OBJFORMAT_ELF)
-   if(ocVerifyImage_ELF( oc ))
-       ocInit_ELF( oc );
-#endif
+   if (!verifyAndInitOc(oc)) {
+       ocDebugBelch(oc, "loadObj: Failed to verify oc.\n");
+       freeObjectCode(oc);
+       return NULL;
+   }
    return oc;
 }
 
@@ -1522,26 +1498,41 @@ HsInt loadObj (pathchar *path)
    return r;
 }
 
+// Call the relevant VerifyImage_* and ocInit_* functions.
+// Return 1 on success.
+HsInt verifyAndInitOc (ObjectCode* oc)
+{
+    int r;
+
+    /* verify the in-memory image */
+#if defined(OBJFORMAT_ELF)
+    r = ocVerifyImage_ELF ( oc );
+    if(r) {
+        ocInit_ELF( oc );
+    }
+#elif defined(OBJFORMAT_PEi386)
+    r = ocVerifyImage_PEi386 ( oc );
+#elif defined(OBJFORMAT_MACHO)
+    r = ocVerifyImage_MachO ( oc );
+    if(r) {
+        ocInit_MachO( oc );
+    }
+#else
+    barf("loadObj: no verify method");
+#endif
+    if (!r) {
+        IF_DEBUG(linker, ocDebugBelch(oc, "ocVerifyImage_* failed\n"));
+        return r;
+    }
+    return 1;
+}
+
+// Precondition: oc already verified.
 HsInt loadOc (ObjectCode* oc)
 {
    int r;
 
    IF_DEBUG(linker, ocDebugBelch(oc, "start\n"));
-
-   /* verify the in-memory image */
-#  if defined(OBJFORMAT_ELF)
-   r = ocVerifyImage_ELF ( oc );
-#  elif defined(OBJFORMAT_PEi386)
-   r = ocVerifyImage_PEi386 ( oc );
-#  elif defined(OBJFORMAT_MACHO)
-   r = ocVerifyImage_MachO ( oc );
-#  else
-   barf("loadObj: no verify method");
-#  endif
-   if (!r) {
-       IF_DEBUG(linker, ocDebugBelch(oc, "ocVerifyImage_* failed\n"));
-       return r;
-   }
 
    /* Note [loadOc orderings]
       ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1604,7 +1595,7 @@ HsInt loadOc (ObjectCode* oc)
            oc->status = OBJECT_LOADED;
        }
    }
-   IF_DEBUG(linker, ocDebugBelch(oc, "done\n"));
+   IF_DEBUG(linker, ocDebugBelch(oc, "loadOc:done\n"));
 
    return 1;
 }
