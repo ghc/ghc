@@ -214,7 +214,7 @@ mk_fail_block doFlav pat e (Just (SyntaxExprRn fail_op)) =
 
           fail_op_expr :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
           fail_op_expr dflags pat fail_op
-            = mkExpandedPatRn pat $ genHsApp fail_op (mk_fail_msg_expr dflags pat)
+            = mkExpandedPatRn (unLoc pat) $ genHsApp fail_op (mk_fail_msg_expr dflags pat)
 
           mk_fail_msg_expr :: DynFlags -> LPat GhcRn -> LHsExpr GhcRn
           mk_fail_msg_expr dflags pat
@@ -489,5 +489,5 @@ mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
 genPopErrCtxtExpr :: LHsExpr GhcRn -> LHsExpr GhcRn
 genPopErrCtxtExpr (L loc a) = L loc (mkPopErrCtxtExpr a)
 
-mkExpandedPatRn :: LPat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
+mkExpandedPatRn :: Pat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
 mkExpandedPatRn pat e = XExpr (ExpandedThingRn (OrigPat pat) e)

@@ -675,7 +675,7 @@ type instance XXExpr GhcTc = XXExprGhcTc
 data SrcCodeOrigin
   = OrigExpr (HsExpr GhcRn)                -- ^ The source, user written, expression
   | OrigStmt (ExprLStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
-  | OrigPat  (LPat GhcRn)                  -- ^ Used for failable patterns that trigger MonadFail constraints
+  | OrigPat  (Pat GhcRn)                  -- ^ Used for failable patterns that trigger MonadFail constraints
 
 data XXExprGhcRn
   = ExpandedThingRn { xrn_orig     :: SrcCodeOrigin       -- The original source thing to be used for error messages
