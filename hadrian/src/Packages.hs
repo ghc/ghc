@@ -11,7 +11,7 @@ module Packages (
     libffi, mtl, osString, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, semaphoreCompat, stm, templateHaskell, terminfo, text, time, timeout,
     transformers, unlit, unix, win32, xhtml,
-    lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
+    lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace, eventlogSocket,
     ghcPackages, isGhcPackage,
 
     -- * Package information
@@ -41,7 +41,7 @@ ghcPackages =
     , hp2ps, hpc, hpcBin, integerGmp, iserv, libffi, mtl, osString
     , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell
     , terminfo, text, time, transformers, unlit, unix, win32, xhtml, fileio
-    , timeout
+    , timeout, eventlogSocket
     , lintersCommon
     , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace ]
 
@@ -133,6 +133,7 @@ unlit               = util "unlit"
 unix                = lib  "unix"
 win32               = lib  "Win32"
 xhtml               = lib  "xhtml"
+eventlogSocket      = lib "eventlog-socket" `setPath` "eventlog-socket"
 
 lintersCommon       = lib     "linters-common"      `setPath` "linters/linters-common"
 lintNotes           = linter  "lint-notes"

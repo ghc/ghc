@@ -92,6 +92,10 @@ import Data.List ( isPrefixOf, partition, intercalate )
 import Prelude
 import qualified Data.List.NonEmpty as NE
 
+#if defined(EVENTLOG_SOCKET)
+import GHC.Eventlog.Socket
+#endif
+
 -----------------------------------------------------------------------------
 -- ToDo:
 
@@ -106,6 +110,16 @@ import qualified Data.List.NonEmpty as NE
 
 main :: IO ()
 main = do
+#if defined(EVENTLOG_SOCKET)
+   hPutStrLn stderr "Instrumented"
+   eventlog_socket_env <- lookupEnv "GHC_EVENTLOG_SOCKET"
+   case eventlog_socket_env of
+      Just sock_path -> do
+        hPutStrLn stderr ("Starting eventlog socket on " ++ sock_path)
+        startWait sock_path
+      Nothing -> hPutStrLn stderr "Not starting socket as GHC_EVENTLOG_SOCKET is not set"
+
+#endif
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
 

@@ -108,6 +108,7 @@ stage0Packages = do
              , semaphoreCompat -- depends on
              , time -- depends on win32
              , unlit
+             , eventlogSocket
              , if windowsHost then win32 else unix
              -- We must use the in-tree `Win32` as the version
              -- bundled with GHC 9.6 is too old for `semaphore-compat`.

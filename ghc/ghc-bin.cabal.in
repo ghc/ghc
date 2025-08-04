@@ -22,6 +22,11 @@ Flag internal-interpreter
     Default: False
     Manual: True
 
+Flag eventlog-socket
+    Description: Build with support for eventlog-socket
+    Default: False
+    Manual: True
+
 Flag threaded
     Description: Link the ghc executable against the threaded RTS
     Default: True
@@ -88,6 +93,10 @@ Executable ghc
 
     if flag(threaded)
       ghc-options: -threaded
+
+    if flag(eventlog-socket)
+      build-depends: eventlog-socket
+      CPP-OPTIONS: -DEVENTLOG_SOCKET
 
     Other-Extensions:
         CPP
