@@ -1415,7 +1415,9 @@ preloadObjectFile (pathchar *path)
     // We calculate the correct alignment from the header before
     // reading the file, and then we misalign image on purpose so
     // that the actual sections end up aligned again.
-   misalignment = machoGetMisalignment(f);
+   machoGetMisalignment(f, &misalignment);
+   //machoGetMisalignment might fail to parse the header, but in that
+   //case so will verifyAndInitOc so we leave cleanup to after verifyAndInitOc.
    image = stgMallocBytes(fileSize + misalignment, "loadObj(image)");
    image += misalignment;
 
@@ -1441,14 +1443,11 @@ preloadObjectFile (pathchar *path)
    /* FIXME (AP): =mapped= parameter unconditionally set to true */
    oc = mkOc(STATIC_OBJECT, path, image, fileSize, true, NULL, misalignment);
 
-#if defined(OBJFORMAT_MACHO)
-   if (ocVerifyImage_MachO( oc ))
-       ocInit_MachO( oc );
-#endif
-#if defined(OBJFORMAT_ELF)
-   if(ocVerifyImage_ELF( oc ))
-       ocInit_ELF( oc );
-#endif
+   if (!verifyAndInitOc(oc)) {
+       freeObjectCode(oc);
+       debugBelch("loadObj: Failed to verify oc.\n");
+       return NULL;
+   }
    return oc;
 }
 
@@ -1505,26 +1504,43 @@ HsInt loadObj (pathchar *path)
    return r;
 }
 
+// Call the relevant VeriffyImage_* and ocInit_* functions.
+// Return 1 on success.
+HsInt verifyAndInitOc (ObjectCode* oc)
+{
+    int r;
+
+     IF_DEBUG(linker, ocDebugBelch(oc, "start\n"));
+
+    /* verify the in-memory image */
+#if defined(OBJFORMAT_ELF)
+    r = ocVerifyImage_ELF ( oc );
+    if(r) {
+        ocInit_ELF( oc );
+    }
+#elif defined(OBJFORMAT_PEi386)
+    r = ocVerifyImage_PEi386 ( oc );
+#elif defined(OBJFORMAT_MACHO)
+    r = ocVerifyImage_MachO ( oc );
+    if(r) {
+        ocInit_MachO( oc );
+    }
+#else
+    barf("loadObj: no verify method");
+#endif
+    if (!r) {
+        IF_DEBUG(linker, ocDebugBelch(oc, "ocVerifyImage_* failed\n"));
+        return r;
+    }
+    return 1;
+}
+
+// Precondition: oc already verified.
 HsInt loadOc (ObjectCode* oc)
 {
    int r;
 
    IF_DEBUG(linker, ocDebugBelch(oc, "start\n"));
-
-   /* verify the in-memory image */
-#  if defined(OBJFORMAT_ELF)
-   r = ocVerifyImage_ELF ( oc );
-#  elif defined(OBJFORMAT_PEi386)
-   r = ocVerifyImage_PEi386 ( oc );
-#  elif defined(OBJFORMAT_MACHO)
-   r = ocVerifyImage_MachO ( oc );
-#  else
-   barf("loadObj: no verify method");
-#  endif
-   if (!r) {
-       IF_DEBUG(linker, ocDebugBelch(oc, "ocVerifyImage_* failed\n"));
-       return r;
-   }
 
    /* Note [loadOc orderings]
       ~~~~~~~~~~~~~~~~~~~~~~~

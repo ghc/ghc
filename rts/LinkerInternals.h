@@ -485,11 +485,17 @@ HsInt loadArchive_ (pathchar *path);
 HsInt isAlreadyLoaded( pathchar *path );
 OStatus getObjectLoadStatus_ (pathchar *path);
 ObjectCode *lookupObjectByPath(pathchar *path);
+
+/* Verify an objects is an a format that can be loaded and initialize the oc struct if required. */
+HsInt verifyAndInitOc( ObjectCode *oc );
+
+//Expects the oc to be verified already.
 HsInt loadOc( ObjectCode* oc );
 ObjectCode* mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
                   bool mapped, pathchar *archiveMemberName,
                   int misalignment
                   );
+
 
 void initSegment(Segment *s, void *start, size_t size, SegmentProt prot, int n_sections);
 void freeSegments(ObjectCode *oc);
