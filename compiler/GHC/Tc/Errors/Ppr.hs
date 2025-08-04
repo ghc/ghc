@@ -107,7 +107,6 @@ import GHC.Data.List.SetOps ( nubOrdBy )
 import GHC.Data.Maybe
 import GHC.Data.Pair
 import GHC.Settings.Constants (mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE)
-import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -3166,7 +3165,6 @@ instance Diagnostic TcRnMessage where
           ++ [ImportSuggestion occ $ CouldAddTypeKeyword mod_name]
         BadImportAvailDataCon par  -> [ImportSuggestion occ $ ImportDataCon (Just (mod_name, patsyns_enabled)) par]
         BadImportNotExportedSubordinates{} -> noHints
-        BadImportNonTypeSubordinates{} -> noHints
     TcRnImportLookup{}
       -> noHints
     TcRnUnusedImport{}
@@ -5642,41 +5640,15 @@ pprImportLookup = \case
         where
           tycon_occ = rdrNameOcc $ ieName ie
           tycon = parenSymOcc tycon_occ (ppr tycon_occ)
-      BadImportNotExportedSubordinates gre unavailable1 ->
+      BadImportNotExportedSubordinates ns ->
         withContext
-          [ what <+> text "called" <+> parent_name <+> text "is exported, but it does not export"
-          , text "any" <+> what_children <+> text "called" <+> unavailable_names <> dot
+          [ text "an item called" <+> quotes sub <+> text "is exported, but it does not export any children"
+          , text "(constructors, class methods or field names) called"
+          <+> pprWithCommas (quotes . ppr) ns <> dot
           ]
           where
-            unavailable = NE.toList unavailable1
-            parent_name = (quotes . pprPrefixOcc . nameOccName . gre_name) gre
-            unavailable_names = pprWithCommas (quotes . ppr) unavailable
-            any_names p = any (p . unpackFS) unavailable
-            what = case greInfo gre of
-              IAmTyCon ClassFlavour -> text "a class"
-              IAmTyCon _            -> text "a data type"
-              _                     -> text "an item"
-            what_children = unquotedListWith (text "or") $ case greInfo gre of
-              IAmTyCon ClassFlavour ->
-                [text "class methods"    | any_names okVarOcc ] ++
-                [text "associated types" | any_names okTcOcc ]
-              IAmTyCon _ ->
-                [text "constructors"  | any_names okConOcc ] ++
-                [text "record fields" | any_names okVarOcc ]
-              _ -> [text "children"]
-      BadImportNonTypeSubordinates gre nontype1 ->
-        withContext
-          [ what <+> text "called" <+> parent_name <+> text "is exported,"
-          , sep [ text "but its subordinate item" <> plural nontype <+> nontype_names
-                , isOrAre nontype <+> text "not in the type namespace." ] ]
-          where
-            nontype = NE.toList nontype1
-            parent_name = (quotes . pprPrefixOcc . nameOccName . gre_name) gre
-            nontype_names = pprWithCommas (quotes . pprPrefixOcc . nameOccName . gre_name) nontype
-            what = case greInfo gre of
-              IAmTyCon ClassFlavour -> text "a class"
-              IAmTyCon _            -> text "a data type"
-              _                     -> text "an item"
+            sub_occ = rdrNameOcc $ ieName ie
+            sub = parenSymOcc sub_occ (ppr sub_occ)
       BadImportAvailDataCon dataType_occ ->
         withContext
           [ text "an item called" <+> quotes datacon

@@ -217,7 +217,6 @@ import GHC.Exception.Type (SomeException)
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
-import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable (Typeable)
 import GHC.Unit.Module.Warnings (WarningCategory, WarningTxt)
@@ -5694,9 +5693,7 @@ data BadImportKind
   -- @import Data.Maybe (Just)@ instead of @import Data.Maybe (Maybe(Just))@
   | BadImportAvailDataCon OccName
   -- | The parent does not export the given children.
-  | BadImportNotExportedSubordinates !GlobalRdrElt (NonEmpty FastString)
-  -- | Incorrect @type@ keyword when importing subordinates that aren't types.
-  | BadImportNonTypeSubordinates !GlobalRdrElt (NonEmpty GlobalRdrElt)
+  | BadImportNotExportedSubordinates [OccName]
   -- | Incorrect @type@ keyword when importing something which isn't a type.
   | BadImportAvailVar
   deriving Generic

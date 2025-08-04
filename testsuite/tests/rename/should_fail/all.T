@@ -227,8 +227,3 @@ test('T23570b', [extra_files(['T23570_aux.hs'])], multimod_compile, ['T23570b', 
 test('T17594b', req_th, compile_fail, [''])
 test('T14032c', normal, compile_fail, [''])
 test('T14032f', normal, compile_fail, [''])
-test('T22581a', [extra_files(['T22581a_helper.hs'])], multimod_compile_fail, ['T22581a', '-v0'])
-test('T22581b', [extra_files(['T22581b_helper.hs'])], multimod_compile_fail, ['T22581b', '-v0'])
-test('T25984b', normal, compile_fail, [''])
-test('T25991b1', [extra_files(['T25991b_helper.hs'])], multimod_compile_fail, ['T25991b1', '-v0'])
-test('T25991b2', [extra_files(['T25991b_helper.hs'])], multimod_compile_fail, ['T25991b2', '-v0'])

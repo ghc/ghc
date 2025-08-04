@@ -1,2 +1,0 @@
-:set -XExplicitNamespaces
-import Data.Functor.Product (Product(type Pair))
