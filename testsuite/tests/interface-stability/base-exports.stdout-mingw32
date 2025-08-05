@@ -34,6 +34,7 @@ module Control.Applicative where
   liftA :: forall (f :: * -> *) a b. Applicative f => (a -> b) -> f a -> f b
   liftA3 :: forall (f :: * -> *) a b c d. Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
   optional :: forall (f :: * -> *) a. Alternative f => f a -> f (GHC.Internal.Maybe.Maybe a)
+  thenA :: forall (f :: * -> *) a b. Applicative f => f a -> f b -> f b
 
 module Control.Arrow where
   -- Safety: Safe
@@ -483,6 +484,7 @@ module Control.Monad where
   replicateM_ :: forall (m :: * -> *) a. GHC.Internal.Base.Applicative m => GHC.Internal.Types.Int -> m a -> m ()
   sequence :: forall (t :: * -> *) (m :: * -> *) a. (GHC.Internal.Data.Traversable.Traversable t, Monad m) => t (m a) -> m (t a)
   sequence_ :: forall (t :: * -> *) (m :: * -> *) a. (GHC.Internal.Data.Foldable.Foldable t, Monad m) => t (m a) -> m ()
+  thenM :: forall (m :: * -> *) a b. Monad m => m a -> m b -> m b
   unless :: forall (f :: * -> *). GHC.Internal.Base.Applicative f => GHC.Internal.Types.Bool -> f () -> f ()
   void :: forall (f :: * -> *) a. Functor f => f a -> f ()
   when :: forall (f :: * -> *). GHC.Internal.Base.Applicative f => GHC.Internal.Types.Bool -> f () -> f ()

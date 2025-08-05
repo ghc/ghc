@@ -71,6 +71,8 @@ module GHC.Internal.Control.Monad
 
     , ap
 
+    , thenM
+
     -- ** Strict monadic functions
 
     , (<$!>)

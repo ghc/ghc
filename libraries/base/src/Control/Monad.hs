@@ -57,6 +57,7 @@ module Control.Monad
      liftM4,
      liftM5,
      ap,
+     thenM,
      -- **  Strict monadic functions
      (<$!>)
      ) where

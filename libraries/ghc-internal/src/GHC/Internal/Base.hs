@@ -1223,6 +1223,9 @@ class Functor f => Applicative f where
 --
 -- As such this function may be used to implement a `Functor` instance from an `Applicative` one.
 --
+-- This function can be used to define `fmap = liftA`, if `Applicative` is already
+-- defined for a data type.
+--
 -- ==== __Examples__
 -- Using the Applicative instance for Lists:
 --
@@ -1233,7 +1236,6 @@ class Functor f => Applicative f where
 --
 -- >>> liftA (+1) (Just 3)
 -- Just 4
-
 liftA :: Applicative f => (a -> b) -> f a -> f b
 liftA f a = pure f <*> a
 -- Caution: since this may be used for `fmap`, we can't use the obvious
@@ -1252,6 +1254,18 @@ liftA3 f a b c = liftA2 f a b <*> c
 {-# SPECIALISE liftA3 :: (a1->a2->a3->r) -> IO a1 -> IO a2 -> IO a3 -> IO r #-}
 {-# SPECIALISE liftA3 :: (a1->a2->a3->r) ->
                                 Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe r #-}
+
+-- | Sequence two `Applicative` actions, discarding the result of the first one.
+--
+-- Defined as `thenA fa fb = (id <$ fa) <*> fb`.
+--
+-- This can be used to explicitly define `(*>) = thenA`, which is the default
+-- definition.
+--
+-- @since 4.23.0.0
+thenA :: Applicative f => f a -> f b -> f b
+thenA fa fb = (id <$ fa) <*> fb
+{-# INLINEABLE thenA #-}
 
 -- | The 'join' function is the conventional monad join operator. It
 -- is used to remove one level of monadic structure, projecting its
@@ -1453,11 +1467,17 @@ similar problems in nofib.
 
 -- | Promote a function to a monad.
 -- This is equivalent to 'fmap' but specialised to Monads.
+--
+-- This function can be used to define `fmap = liftM`, if `Monad` is already
+-- defined for a data type.
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
 liftM f m1              = do { x1 <- m1; return (f x1) }
 
 -- | Promote a function to a monad, scanning the monadic arguments from
 -- left to right.
+--
+-- This function can be used to define `liftA2 = liftM2`, if `Monad` is already
+-- defined for a data type.
 --
 -- ==== __Examples__
 --
@@ -1514,6 +1534,9 @@ is equivalent to
 
 > liftM<n> f x1 x2 ... xn
 
+This function can be used to define `(<*>) = ap`, if `Monad` is already
+defined for a data type.
+
 ==== __Examples__
 
 >>> pure (\x y z -> x + y * z) `ap` Just 1 `ap` Just 5 `ap` Just 10
@@ -1526,6 +1549,17 @@ ap m1 m2          = do { x1 <- m1; x2 <- m2; return (x1 x2) }
 {-# INLINABLE ap #-}
 {-# SPECIALISE ap :: IO (a -> b) -> IO a -> IO b #-}
 {-# SPECIALISE ap :: Maybe (a -> b) -> Maybe a -> Maybe b #-}
+
+-- | Sequence two monadic actions, discarding the result of the first one.
+--
+-- Defined as `thenM ma mb = ma >>= const mb`.
+--
+-- This can be used to define `(*>) = thenM`.
+--
+-- @since 4.23.0.0
+thenM :: (Monad m) => m a -> m b -> m b
+thenM ma mb = ma >>= const mb
+{-# INLINEABLE thenM #-}
 
 -- instances for Prelude types
 

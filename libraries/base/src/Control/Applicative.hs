@@ -49,6 +49,7 @@ module Control.Applicative (
     liftA, liftA3,
     optional,
     asum,
+    thenA,
     ) where
 
 import GHC.Internal.Control.Category hiding ((.), id)

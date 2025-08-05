@@ -45,7 +45,7 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
                           atomicModifyIORef, atomicModifyIORef' )
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
-import Control.Monad
+import Control.Monad    ( MonadPlus )
 import Control.Monad.Trans.Reader
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import GHC.Utils.Monad
