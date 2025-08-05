@@ -1,0 +1,21 @@
+.. _release-9-16-1:
+
+Version 9.16.1
+==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections. See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.14>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+Compiler
+~~~~~~~~
+
+- Code coverage's (:ghc-flag:`-fhpc`) treatment of record fields now extends
+  beyond record fields accessed via :extension:`RecordWildCards` and
+  :extension:`NamedFieldPuns`, and also handles access to nested record fields.
+  That is, in a pattern such as ``Foo{bar = Bar{baz = b}}`` both ``bar`` and
+  ``baz`` will now be marked as covered if ``b`` is evaluated. Note that this
+  currently only works when record fields (or values contained within them) are
+  bound to variables. The very similar pattern ``Foo{bar = Bar{baz = 42}}``
+  will will not yet mark ``bar`` or ``baz`` as covered.
