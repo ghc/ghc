@@ -1925,6 +1925,14 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
             dflags = hsc_dflags hsc_env
             logger = hsc_logger hsc_env
 
+        -------------------
+        -- ADD IMPLICIT BINDINGS
+        -- NB: we must feed mkImplicitBinds through corePrep too
+        -- so that they are suitably cloned and eta-expanded
+        let cp_pgm_cfg :: CorePrepPgmConfig
+            cp_pgm_cfg = initCorePrepPgmConfig (hsc_dflags hsc_env)
+                                               (interactiveInScope $ hsc_IC hsc_env)
+        binds_with_implicits <- addImplicitBinds cp_pgm_cfg mod_loc (cg_tycons cgguts) core_binds
 
         -------------------
         -- INSERT LATE COST CENTRES, based on the provided flags.
@@ -1957,7 +1965,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
               }
 
         (late_cc_binds, late_cc_state) <-
-          addLateCostCenters logger late_cc_config core_binds
+          addLateCostCenters logger late_cc_config binds_with_implicits
 
         when (dopt Opt_D_dump_late_cc dflags || dopt Opt_D_verbose_core2core dflags) $
           putDumpFileMaybe logger Opt_D_dump_late_cc "LateCC" FormatCore (vcat (map ppr late_cc_binds))
@@ -1972,7 +1980,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
               cg_foreign_files = foreign_files,
               cg_dep_pkgs      = dependencies,
               cg_spt_entries   = spt_entries,
-              cg_binds         = late_binds,
+              cg_binds         = binds_to_prep,
               cg_ccs           = late_local_ccs
             }
           , _
@@ -1996,15 +2004,6 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
           tmpfs  = hsc_tmpfs hsc_env
           llvm_config = hsc_llvm_config hsc_env
           profile = targetProfile dflags
-
-        -------------------
-        -- ADD IMPLICIT BINDINGS
-        -- NB: we must feed mkImplicitBinds through corePrep too
-        -- so that they are suitably cloned and eta-expanded
-        let cp_pgm_cfg :: CorePrepPgmConfig
-            cp_pgm_cfg = initCorePrepPgmConfig (hsc_dflags hsc_env)
-                                               (interactiveInScope $ hsc_IC hsc_env)
-        binds_to_prep <- addImplicitBinds cp_pgm_cfg mod_loc tycons late_binds
 
         -------------------
         -- PREPARE FOR CODE GENERATION
