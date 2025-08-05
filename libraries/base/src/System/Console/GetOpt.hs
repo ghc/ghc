@@ -315,7 +315,7 @@ arguments:
 >    module Opts1 where
 >
 >    import System.Console.GetOpt
->    import GHC.Internal.Data.Maybe ( fromMaybe )
+>    import Data.Maybe ( fromMaybe )
 >
 >    data Flag
 >     = Verbose  | Version
@@ -356,7 +356,7 @@ A different approach is to group the option values in a record of type
 >    module Opts2 where
 >
 >    import System.Console.GetOpt
->    import GHC.Internal.Data.Maybe ( fromMaybe )
+>    import Data.Maybe ( fromMaybe )
 >
 >    data Options = Options
 >     { optVerbose     :: Bool
