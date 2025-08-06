@@ -24,20 +24,23 @@ hs_pdep64(StgWord64 src, StgWord64 mask)
   return result;
 }
 
+// When dealing with values of bit-width shorter than uint64_t, ensure to
+// cast the return value to correctly truncate the undefined upper bits.
+// This is *VERY* important when GHC is using the LLVM backend!
 StgWord
 hs_pdep32(StgWord src, StgWord mask)
 {
-  return hs_pdep64(src, mask);
+  return (StgWord) ((StgWord32) hs_pdep64(src, mask));
 }
 
 StgWord
 hs_pdep16(StgWord src, StgWord mask)
 {
-  return hs_pdep64(src, mask);
+  return (StgWord) ((StgWord16) hs_pdep64(src, mask));
 }
 
 StgWord
 hs_pdep8(StgWord src, StgWord mask)
 {
-  return hs_pdep64(src, mask);
+  return (StgWord) ((StgWord8) hs_pdep64(src, mask));
 }

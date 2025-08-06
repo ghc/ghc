@@ -24,6 +24,7 @@ module Main
     ( main
     ) where
 
+import Data.Bits (Bits((.&.), bit))
 import Data.Word
 import Data.Int
 import GHC.Natural
@@ -408,6 +409,33 @@ instance TestPrimop (Word# -> Int# -> Word#) where
   testPrimop s l r = Property s $ \(uWord -> a1) (uInt -> a2) -> (wWord (l a1 a2)) === wWord (r a1 a2)
   -}
 
+-- | A special data-type for representing functions where,
+-- since only some number of the lower bits are defined,
+-- testing for strict equality in the undefined upper bits is not appropriate!
+-- Without using this data-type, false-positive failures will be reported
+-- when the undefined bit regions do not match, even though the equality of bits
+-- in this undefined region has no bearing on correctness.
+data LowerBitsAreDefined =
+    LowerBitsAreDefined
+    { definedLowerWidth :: Word
+    -- ^ The (strictly-non-negative) number of least-significant bits
+    -- for which the attached function is defined.
+    , undefinedBehavior :: (Word# -> Word#)
+    -- ^ Function with undefined behavior for some of its most significant bits.
+    }
+
+instance TestPrimop LowerBitsAreDefined where
+  testPrimop s l r = Property s $ \ (uWord#-> x0) ->
+    let -- Create a mask to unset all bits in the undefined area,
+        -- leaving set bits only in the area of defined behavior.
+        -- Since the upper bits are undefined,
+        -- if the function defines behavior for the lower N bits,
+        -- then /only/ the lower N bits are preserved,
+        -- and the upper WORDSIZE - N bits are discarded.
+        mask = bit (fromEnum (definedLowerWidth r)) - 1
+        valL = wWord# (undefinedBehavior l x0) .&. mask
+        valR = wWord# (undefinedBehavior r x0) .&. mask
+    in  valL === valR
 
 twoNonZero :: (a -> a -> b) -> a -> NonZero a -> b
 twoNonZero f x (NonZero y) = f x y
@@ -655,13 +683,13 @@ testPrimops = Group "primop"
   , testPrimop "ctz32#" Primop.ctz32# Wrapper.ctz32#
   , testPrimop "ctz64#" Primop.ctz64# Wrapper.ctz64#
   , testPrimop "ctz#" Primop.ctz# Wrapper.ctz#
-  , testPrimop "byteSwap16#" Primop.byteSwap16# Wrapper.byteSwap16#
-  , testPrimop "byteSwap32#" Primop.byteSwap32# Wrapper.byteSwap32#
+  , testPrimop "byteSwap16#" (16 `LowerBitsAreDefined` Primop.byteSwap16#) (16 `LowerBitsAreDefined` Wrapper.byteSwap16#)
+  , testPrimop "byteSwap32#" (32 `LowerBitsAreDefined` Primop.byteSwap32#) (32 `LowerBitsAreDefined` Wrapper.byteSwap32#)
   , testPrimop "byteSwap64#" Primop.byteSwap64# Wrapper.byteSwap64#
   , testPrimop "byteSwap#" Primop.byteSwap# Wrapper.byteSwap#
-  , testPrimop "bitReverse8#" Primop.bitReverse8# Wrapper.bitReverse8#
-  , testPrimop "bitReverse16#" Primop.bitReverse16# Wrapper.bitReverse16#
-  , testPrimop "bitReverse32#" Primop.bitReverse32# Wrapper.bitReverse32#
+  , testPrimop "bitReverse8#" (8 `LowerBitsAreDefined` Primop.bitReverse8#) (8 `LowerBitsAreDefined` Wrapper.bitReverse8#)
+  , testPrimop "bitReverse16#" (16 `LowerBitsAreDefined` Primop.bitReverse16#) (16 `LowerBitsAreDefined` Wrapper.bitReverse16#)
+  , testPrimop "bitReverse32#" (32 `LowerBitsAreDefined` Primop.bitReverse32#) (32 `LowerBitsAreDefined` Wrapper.bitReverse32#)
   , testPrimop "bitReverse64#" Primop.bitReverse64# Wrapper.bitReverse64#
   , testPrimop "bitReverse#" Primop.bitReverse# Wrapper.bitReverse#
   , testPrimop "narrow8Int#" Primop.narrow8Int# Wrapper.narrow8Int#

@@ -230,23 +230,22 @@ genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
     statement $ Expr $ Call StdCall fptr (argVars' ++ argSuffix) []
   | otherwise = panic $ "prefetch locality level integer must be between 0 and 3, given: " ++ (show localityInt)
 
--- Handle PopCnt, Clz, Ctz, and BSwap that need to only convert arg
--- and return types
-genCall t@(PrimTarget (MO_PopCnt w)) dsts args =
-    genCallSimpleCast w t dsts args
-
-genCall t@(PrimTarget (MO_Pdep w)) dsts args =
-    genCallSimpleCast2 w t dsts args
-genCall t@(PrimTarget (MO_Pext w)) dsts args =
-    genCallSimpleCast2 w t dsts args
-genCall t@(PrimTarget (MO_Clz w)) dsts args =
-    genCallSimpleCast w t dsts args
-genCall t@(PrimTarget (MO_Ctz w)) dsts args =
-    genCallSimpleCast w t dsts args
-genCall t@(PrimTarget (MO_BSwap w)) dsts args =
-    genCallSimpleCast w t dsts args
-genCall t@(PrimTarget (MO_BRev w)) dsts args =
-    genCallSimpleCast w t dsts args
+-- Handle Clz, Ctz, BRev, BSwap, Pdep, Pext, and PopCnt that need to only
+-- convert arg and return types
+genCall (PrimTarget op@(MO_Clz w)) [dst] args =
+    genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_Ctz w)) [dst] args =
+    genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_BRev w)) [dst] args =
+    genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_BSwap w)) [dst] args =
+    genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_Pdep w)) [dst] args =
+    genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_Pext w)) [dst] args =
+    genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_PopCnt w)) [dst] args =
+    genCallSimpleCast w op dst args
 
 genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
@@ -640,63 +639,28 @@ genCallExtract _ _ _ _ =
 -- since GHC only really has i32 and i64 types and things like Word8 are backed
 -- by an i32 and just present a logical i8 range. So we must handle conversions
 -- from i32 to i8 explicitly as LLVM is strict about types.
-genCallSimpleCast :: Width -> ForeignTarget -> [CmmFormal] -> [CmmActual]
-              -> LlvmM StmtData
-genCallSimpleCast w t@(PrimTarget op) [dst] args = do
-    let width = widthToLlvmInt w
-        dstTy = cmmToLlvmType $ localRegType dst
+genCallSimpleCast :: Width -> CallishMachOp -> CmmFormal -> [CmmActual]
+                  -> LlvmM StmtData
+genCallSimpleCast specW op dst args = do
+    let width   = widthToLlvmInt specW
+        argsW   = const width <$> args
+        dstType = cmmToLlvmType $ localRegType dst
+        signage = cmmPrimOpRetValSignage op
 
-    fname                       <- cmmPrimOpFunctions op
-    (fptr, _, top3)             <- getInstrinct fname width [width]
-
-    (dstV, _dst_ty)             <- getCmmReg (CmmLocal dst)
-
-    let (_, arg_hints) = foreignTargetHints t
-    let args_hints = zip args arg_hints
-    (argsV, stmts2, top2)       <- arg_vars args_hints ([], nilOL, [])
-    (argsV', stmts4)            <- castVars Signed $ zip argsV [width]
-    (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
-    (retVs', stmts5)            <- castVars (cmmPrimOpRetValSignage op) [(retV,dstTy)]
-    let retV'                    = singletonPanic "genCallSimpleCast" retVs'
-    let s2                       = Store retV' dstV Nothing []
-
-    let stmts = stmts2 `appOL` stmts4 `snocOL`
-                s1 `appOL` stmts5 `snocOL` s2
-    return (stmts, top2 ++ top3)
-genCallSimpleCast _ _ dsts _ =
-    panic ("genCallSimpleCast: " ++ show (length dsts) ++ " dsts")
-
--- Handle simple function call that only need simple type casting, of the form:
---   truncate arg >>= \a -> call(a) >>= zext
---
--- since GHC only really has i32 and i64 types and things like Word8 are backed
--- by an i32 and just present a logical i8 range. So we must handle conversions
--- from i32 to i8 explicitly as LLVM is strict about types.
-genCallSimpleCast2 :: Width -> ForeignTarget -> [CmmFormal] -> [CmmActual]
-              -> LlvmM StmtData
-genCallSimpleCast2 w t@(PrimTarget op) [dst] args = do
-    let width = widthToLlvmInt w
-        dstTy = cmmToLlvmType $ localRegType dst
-
-    fname                       <- cmmPrimOpFunctions op
-    (fptr, _, top3)             <- getInstrinct fname width (const width <$> args)
-
-    (dstV, _dst_ty)             <- getCmmReg (CmmLocal dst)
-
-    let (_, arg_hints) = foreignTargetHints t
-    let args_hints = zip args arg_hints
-    (argsV, stmts2, top2)       <- arg_vars args_hints ([], nilOL, [])
-    (argsV', stmts4)            <- castVars Signed $ zip argsV (const width <$> argsV)
-    (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
-    (retVs', stmts5)             <- castVars (cmmPrimOpRetValSignage op) [(retV,dstTy)]
-    let retV'                    = singletonPanic "genCallSimpleCast2" retVs'
-    let s2                       = Store retV' dstV Nothing []
+    fname                 <- cmmPrimOpFunctions op
+    (fptr, _, top3)       <- getInstrinct fname width argsW
+    (dstV, _dst_ty)       <- getCmmReg (CmmLocal dst)
+    let (_, arg_hints)     = foreignTargetHints $ PrimTarget op
+    let args_hints         = zip args arg_hints
+    (argsV, stmts2, top2) <- arg_vars args_hints ([], nilOL, [])
+    (argsV', stmts4)      <- castVars signage $ zip argsV argsW
+    (retV, s1)            <- doExpr width $ Call StdCall fptr argsV' []
+    (retV', stmts5)       <- castVar signage retV dstType
+    let s2                 = Store retV' dstV Nothing []
 
     let stmts = stmts2 `appOL` stmts4 `snocOL`
-                s1 `appOL` stmts5 `snocOL` s2
+                s1 `snocOL` stmts5 `snocOL` s2
     return (stmts, top2 ++ top3)
-genCallSimpleCast2 _ _ dsts _ =
-    panic ("genCallSimpleCast2: " ++ show (length dsts) ++ " dsts")
 
 -- | Create a function pointer from a target.
 getFunPtrW :: (LMString -> LlvmType) -> ForeignTarget
@@ -811,11 +775,47 @@ castVar signage v t | getVarType v == t
             Signed      -> LM_Sext
             Unsigned    -> LM_Zext
 
-
 cmmPrimOpRetValSignage :: CallishMachOp -> Signage
 cmmPrimOpRetValSignage mop = case mop of
-    MO_Pdep _   -> Unsigned
-    MO_Pext _   -> Unsigned
+    -- Some bit-wise operations /must/ always treat the input and output values
+    -- as 'Unsigned' in order to return the expected result values when pre/post-
+    -- operation bit-width truncation and/or extension occur. For example,
+    -- consider the Bit-Reverse operation:
+    --
+    -- If the result of a Bit-Reverse is treated as signed,
+    -- an positive input can result in an negative output, i.e.:
+    --
+    --   identity(0x03) = 0x03 = 00000011
+    --   breverse(0x03) = 0xC0 = 11000000
+    --
+    -- Now if an extension is performed after the operation to
+    -- promote a smaller bit-width value into a larger bit-width
+    -- type, it is expected that the /bit-wise/ operations will
+    -- not be treated /numerically/ as signed.
+    --
+    -- To illustrate the difference, consider how a signed extension
+    -- for the type i16 to i32 differs for out values above:
+    --   ext_zeroed(i32, breverse(0x03)) = 0x00C0 = 0000000011000000
+    --   ext_signed(i32, breverse(0x03)) = 0xFFC0 = 1111111111000000
+    --
+    -- Here we can see that the former output is the expected result
+    -- of a bit-wise operation which needs to be promoted to a larger
+    -- bit-width type. The latter output is not desirable when we must
+    -- constraining a value into a range of i16 within an i32 type.
+    --
+    -- Hence we always treat the "signage" as unsigned for Bit-Reverse!
+    --
+    -- The same reasoning applied to Bit-Reverse above applies to the other
+    -- bit-wise operations; do not sign extend a possibly negated number!
+    MO_BRev   _ -> Unsigned
+    MO_BSwap  _ -> Unsigned
+    MO_Clz    _ -> Unsigned
+    MO_Ctz    _ -> Unsigned
+    MO_Pdep   _ -> Unsigned
+    MO_Pext   _ -> Unsigned
+    MO_PopCnt _ -> Unsigned
+
+    -- All other cases, default to preserving the numeric sign when extending.
     _           -> Signed
 
 -- | Decide what C function to use to implement a CallishMachOp

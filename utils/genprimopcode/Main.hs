@@ -10,6 +10,7 @@ module Main where
 import Parser
 import Syntax
 
+import Control.Applicative (asum)
 import Data.Char
 import Data.List (union, intersperse, intercalate, nub, sort)
 import Data.Maybe ( catMaybes, mapMaybe )
@@ -116,9 +117,15 @@ desugarVectorSpec i              = case vecOptions i of
 main :: IO ()
 main = getArgs >>= \args ->
        if length args /= 1 || head args `notElem` known_args
-       then error ("usage: genprimopcode command < primops.txt > ...\n"
+       then error ("Usage: genprimopcode command < primops.txt > ...\n"
                    ++ "   where command is one of\n"
                    ++ unlines (map ("            "++) known_args)
+                   ++ unlines
+                        [ ""
+                        , "Nota Bene:  Be sure to manually run primops.txt through the C Pre-Processor"
+                        , "            before sending the input stream to STDIN, i.e:"
+                        , ""
+                        , "                cpp -P -w primops.txt | genprimopcode command" ]
                   )
        else
        do hSetEncoding stdin  utf8 -- The input file is in UTF-8. Set the encoding explicitly.
@@ -312,6 +319,7 @@ gen_hs_source (Info defaults entries) =
            opt (OptionVector _)    = ""
            opt (OptionFixity mf) = "fixity = " ++ show mf
            opt (OptionEffect eff) = "effect = " ++ show eff
+           opt (OptionDefinedBits bc) = "defined_bits = " ++ show bc
            opt (OptionCanFailWarnFlag wf) = "can_fail_warning = " ++ show wf
 
            hdr s@(Section {})                                    = sec s
@@ -638,6 +646,7 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
          getAltRhs (OptionVector _) = "True"
          getAltRhs (OptionFixity mf) = show mf
          getAltRhs (OptionEffect eff) = show eff
+         getAltRhs (OptionDefinedBits bc) = show bc
          getAltRhs (OptionCanFailWarnFlag wf) = show wf
 
          mkAlt po
@@ -753,7 +762,12 @@ gen_foundation_tests (Info _ entries)
       = let testPrimOpHow = if is_divLikeOp po
               then "testPrimopDivLike"
               else "testPrimop"
-        in Just $ intercalate " " [testPrimOpHow, "\"" ++ poName ++ "\"", wrap "Primop" poName, wrap "Wrapper" poName]
+            qualOp qualification =
+              let qName = wrap qualification poName
+              in  case mb_defined_bits po of
+                    Nothing -> qName
+                    Just bs -> concat ["(", show bs, " `LowerBitsAreDefined` ", qName, ")"]
+        in Just $ intercalate " " [testPrimOpHow, "\"" ++ poName ++ "\"", qualOp "Primop", qualOp "Wrapper"]
       | otherwise = Nothing
 
 
@@ -770,6 +784,16 @@ gen_foundation_tests (Info _ entries)
     testableTyCon _ = False
     divableTyCons = ["Int#", "Word#", "Word8#", "Word16#", "Word32#", "Word64#"
                     ,"Int8#", "Int16#", "Int32#", "Int64#"]
+
+    mb_defined_bits :: Entry -> Maybe Word
+    mb_defined_bits op@(PrimOpSpec{}) =
+      let opOpts = opts op
+          getDefBits :: Option -> Maybe Word
+          getDefBits (OptionDefinedBits x) = x
+          getDefBits _ = Nothing
+      in  asum $ getDefBits <$> opOpts
+    mb_defined_bits _ = Nothing
+
 
 ------------------------------------------------------------------
 -- Create PrimOpInfo text from PrimOpSpecs -----------------------
