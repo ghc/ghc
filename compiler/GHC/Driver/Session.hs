@@ -1145,8 +1145,8 @@ dynamic_flags_deps = [
       $ noArgM  $ \d -> do
         deprecate $ "use -pgml-supports-no-pie instead"
         pure $ alterToolSettings (\s -> s { toolSettings_ccSupportsNoPie = True }) d)
-  , make_ord_flag defFlag "pgms"
-      (HasArg (\_ -> addWarn "Object splitting was removed in GHC 8.8"))
+  , make_dep_flag defFlag "pgms"
+      (HasArg (\_ -> return ())) "Object splitting was removed in GHC 8.8"
   , make_ord_flag defFlag "pgma"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_a   = (f,[]) }
   , make_ord_flag defFlag "pgml"
