@@ -107,7 +107,6 @@ import GHC.Core.Type
 
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel, isMarkedCbv )
 import GHC.Types.CostCentre ( isCurrentCCS )
-import GHC.Types.Error      ( DiagnosticReason(WarningWithoutFlag) )
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
@@ -116,7 +115,7 @@ import GHC.Types.SrcLoc
 
 import GHC.Utils.Logger
 import GHC.Utils.Outputable
-import GHC.Utils.Error      ( mkLocMessage, DiagOpts )
+import GHC.Utils.Error      ( DiagOpts )
 import qualified GHC.Utils.Error as Err
 
 import GHC.Unit.Module            ( Module )
@@ -540,7 +539,7 @@ addErr diag_opts errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
     mk_msg (loc:_) = let (l,hdr) = dumpLoc loc
-                     in  mkLocMessage (Err.mkMCDiagnostic diag_opts WarningWithoutFlag Nothing)
+                     in  Err.mkLintWarning diag_opts
                                       l (hdr $$ msg)
     mk_msg []      = msg
 
