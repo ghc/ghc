@@ -76,6 +76,7 @@ data Option
    | OptionFixity (Maybe Fixity)  -- fixity = infix{,l,r} <int> | Nothing
    | OptionEffect PrimOpEffect    -- effect = NoEffect | DoNotSpeculate | CanFail | ThrowsException | ReadWriteEffect | FallibleReadWriteEffect
    | OptionCanFailWarnFlag PrimOpCanFailWarnFlag -- can_fail_warning = DoNotWarnCanFail | WarnIfEffectIsCanFail | YesWarnCanFail
+   | OptionDefinedBits (Maybe Word) -- defined_bits = Just 16 | Nothing
      deriving Show
 
 -- categorises primops
@@ -196,6 +197,7 @@ get_attrib_name (OptionVector _) = "vector"
 get_attrib_name (OptionFixity _) = "fixity"
 get_attrib_name (OptionEffect _) = "effect"
 get_attrib_name (OptionCanFailWarnFlag _) = "can_fail_warning"
+get_attrib_name (OptionDefinedBits _) = "defined_bits"
 
 lookup_attrib :: String -> [Option] -> Maybe Option
 lookup_attrib _ [] = Nothing

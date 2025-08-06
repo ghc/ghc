@@ -230,23 +230,25 @@ genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
     statement $ Expr $ Call StdCall fptr (argVars' ++ argSuffix) []
   | otherwise = panic $ "prefetch locality level integer must be between 0 and 3, given: " ++ (show localityInt)
 
--- Handle PopCnt, Clz, Ctz, and BSwap that need to only convert arg
--- and return types
-genCall t@(PrimTarget (MO_PopCnt w)) dsts args =
-    genCallSimpleCast w t dsts args
+-- Handle PopCnt, Clz, Ctz, BRev, and BSwap that need to only convert arg and return types
+genCall (PrimTarget op@(MO_PopCnt w)) [dst] args =
+    genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_Clz w)) [dst] args =
+    genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_Ctz w)) [dst] args =
+    genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_BRev w)) [dst] args =
+    genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_BSwap w)) [dst] args =
+    genCallSimpleCast w op dst args
 
-genCall t@(PrimTarget (MO_Pdep w)) dsts args =
-    genCallSimpleCast2 w t dsts args
-genCall t@(PrimTarget (MO_Pext w)) dsts args =
-    genCallSimpleCast2 w t dsts args
-genCall t@(PrimTarget (MO_Clz w)) dsts args =
-    genCallSimpleCast w t dsts args
-genCall t@(PrimTarget (MO_Ctz w)) dsts args =
-    genCallSimpleCast w t dsts args
-genCall t@(PrimTarget (MO_BSwap w)) dsts args =
-    genCallSimpleCast w t dsts args
-genCall t@(PrimTarget (MO_BRev w)) dsts args =
-    genCallSimpleCast w t dsts args
+-- Handle Pdep and Pext that (may) require using a type with a larger bit-width
+-- than the specified but width. This register width-extension is particualarly
+-- necessary for W8 and W16.
+genCall (PrimTarget op@(MO_Pdep w)) [dst] args =
+    genCallCastWithMinWidthOf W32 w op dst args
+genCall (PrimTarget op@(MO_Pext w)) [dst] args =
+    genCallCastWithMinWidthOf W32 w op dst args
 
 genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
@@ -640,63 +642,35 @@ genCallExtract _ _ _ _ =
 -- since GHC only really has i32 and i64 types and things like Word8 are backed
 -- by an i32 and just present a logical i8 range. So we must handle conversions
 -- from i32 to i8 explicitly as LLVM is strict about types.
-genCallSimpleCast :: Width -> ForeignTarget -> [CmmFormal] -> [CmmActual]
-              -> LlvmM StmtData
-genCallSimpleCast w t@(PrimTarget op) [dst] args = do
-    let width = widthToLlvmInt w
-        dstTy = cmmToLlvmType $ localRegType dst
+genCallSimpleCast :: Width -> CallishMachOp -> CmmFormal -> [CmmActual]
+                  -> LlvmM StmtData
+genCallSimpleCast w = genCallCastWithMinWidthOf w w
 
-    fname                       <- cmmPrimOpFunctions op
-    (fptr, _, top3)             <- getInstrinct fname width [width]
+-- Handle extension case that the element should be extend to a larger bit-width
+-- for the operation and subsequently truncated, of the form:
+--   extend arg >>= \a -> call(a) >>= truncate
+genCallCastWithMinWidthOf :: Width -> Width -> CallishMachOp -> CmmFormal
+                          -> [CmmActual] -> LlvmM StmtData
+genCallCastWithMinWidthOf minW specW op dst args = do
+    let width   = widthToLlvmInt $ max minW specW
+        argsW   = const width <$> args
+        dstType = cmmToLlvmType $ localRegType dst
+        signage = cmmPrimOpRetValSignage op
 
-    (dstV, _dst_ty)             <- getCmmReg (CmmLocal dst)
+    fname                 <- cmmPrimOpFunctions op
+    (fptr, _, top3)       <- getInstrinct fname width argsW
+    (dstV, _dst_ty)       <- getCmmReg (CmmLocal dst)
+    let (_, arg_hints)     = foreignTargetHints $ PrimTarget op
+    let args_hints         = zip args arg_hints
+    (argsV, stmts2, top2) <- arg_vars args_hints ([], nilOL, [])
+    (argsV', stmts4)      <- castVars signage $ zip argsV argsW
+    (retV, s1)            <- doExpr width $ Call StdCall fptr argsV' []
+    (retV', stmts5)       <- castVar signage retV dstType
+    let s2                 = Store retV' dstV Nothing []
 
-    let (_, arg_hints) = foreignTargetHints t
-    let args_hints = zip args arg_hints
-    (argsV, stmts2, top2)       <- arg_vars args_hints ([], nilOL, [])
-    (argsV', stmts4)            <- castVars Signed $ zip argsV [width]
-    (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
-    (retVs', stmts5)            <- castVars (cmmPrimOpRetValSignage op) [(retV,dstTy)]
-    let retV'                    = singletonPanic "genCallSimpleCast" retVs'
-    let s2                       = Store retV' dstV Nothing []
-
-    let stmts = stmts2 `appOL` stmts4 `snocOL`
-                s1 `appOL` stmts5 `snocOL` s2
+    let stmts = stmts2 `appOL` stmts4 `snocOL` s1 `snocOL`
+                stmts5 `snocOL` s2
     return (stmts, top2 ++ top3)
-genCallSimpleCast _ _ dsts _ =
-    panic ("genCallSimpleCast: " ++ show (length dsts) ++ " dsts")
-
--- Handle simple function call that only need simple type casting, of the form:
---   truncate arg >>= \a -> call(a) >>= zext
---
--- since GHC only really has i32 and i64 types and things like Word8 are backed
--- by an i32 and just present a logical i8 range. So we must handle conversions
--- from i32 to i8 explicitly as LLVM is strict about types.
-genCallSimpleCast2 :: Width -> ForeignTarget -> [CmmFormal] -> [CmmActual]
-              -> LlvmM StmtData
-genCallSimpleCast2 w t@(PrimTarget op) [dst] args = do
-    let width = widthToLlvmInt w
-        dstTy = cmmToLlvmType $ localRegType dst
-
-    fname                       <- cmmPrimOpFunctions op
-    (fptr, _, top3)             <- getInstrinct fname width (const width <$> args)
-
-    (dstV, _dst_ty)             <- getCmmReg (CmmLocal dst)
-
-    let (_, arg_hints) = foreignTargetHints t
-    let args_hints = zip args arg_hints
-    (argsV, stmts2, top2)       <- arg_vars args_hints ([], nilOL, [])
-    (argsV', stmts4)            <- castVars Signed $ zip argsV (const width <$> argsV)
-    (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
-    (retVs', stmts5)             <- castVars (cmmPrimOpRetValSignage op) [(retV,dstTy)]
-    let retV'                    = singletonPanic "genCallSimpleCast2" retVs'
-    let s2                       = Store retV' dstV Nothing []
-
-    let stmts = stmts2 `appOL` stmts4 `snocOL`
-                s1 `appOL` stmts5 `snocOL` s2
-    return (stmts, top2 ++ top3)
-genCallSimpleCast2 _ _ dsts _ =
-    panic ("genCallSimpleCast2: " ++ show (length dsts) ++ " dsts")
 
 -- | Create a function pointer from a target.
 getFunPtrW :: (LMString -> LlvmType) -> ForeignTarget
@@ -811,11 +785,42 @@ castVar signage v t | getVarType v == t
             Signed      -> LM_Sext
             Unsigned    -> LM_Zext
 
-
 cmmPrimOpRetValSignage :: CallishMachOp -> Signage
 cmmPrimOpRetValSignage mop = case mop of
+    -- If the result of a Bit-Reverse is treated as signed,
+    -- an positive input can result in an negative output, i.e.:
+    --
+    --   identity(0x03) = 0x03 = 00000011
+    --   breverse(0x03) = 0xC0 = 11000000
+    --
+    -- Now if an extension is performed after the operation to
+    -- promote a smaller bit-width value into a larger bit-width
+    -- type, it is expected that the /bit-wise/ operations will
+    -- not be treated /numerically/ as signed.
+    --
+    -- To illustrate the difference, consider how a signed extension
+    -- for the type i16 to i32 differs for out values above:
+    --   ext_zeroed(i32, breverse(0x03)) = 0x00C0 = 0000000011000000
+    --   ext_signed(i32, breverse(0x03)) = 0xFFC0 = 1111111111000000
+    --
+    -- Here we can see that the former output is the expected result
+    -- of a bit-wise operation which needs to be promoted to a larger
+    -- bit-width type. The latter output is not desirable when we must
+    -- constraining a value into a range of i16 within an i32 type.
+    --
+    -- Hence we always treat the "signage" as unsigned for Bit-Reverse!
+    MO_BRev _   -> Unsigned
+
+    -- The same reasoning applied to Bit-Reverse above applies to ther other
+    -- bit-wise operations; do not sign extend a possibly negated number!
+    MO_BSwap  _ -> Unsigned
+    MO_Clz    _ -> Unsigned
+    MO_Ctz    _ -> Unsigned
     MO_Pdep _   -> Unsigned
     MO_Pext _   -> Unsigned
+    MO_PopCnt _ -> Unsigned
+
+    -- All other cases, default to preserving the numeric sign when extending.
     _           -> Signed
 
 -- | Decide what C function to use to implement a CallishMachOp
@@ -954,8 +959,25 @@ cmmPrimOpFunctions mop = do
           W256 -> fsLit "llvm.x86.bmi.pdep.256"
           W512 -> fsLit "llvm.x86.bmi.pdep.512"
       | otherwise -> case w of
-          W8   -> fsLit "hs_pdep8"
-          W16  -> fsLit "hs_pdep16"
+          -- Due to the down-casting and up-casting of the operand before and
+          -- after the Pdep operation, respectively, LLVM will provide a an
+          -- incorrect result after the entire operation is complete.
+          -- This is caused by the definition of hs_pdep64 in "cbits/pdep.c".
+          -- The defined C operation takes a (64-bit) 'StgWord64' as input/output.
+          -- The result will incorrectly consider upper bits when it should not
+          -- because those upper bits are outside the value's "logical range,"
+          -- despite being present in the "actual range."
+          -- The function "hs_pdep32" works correctly for the type 'StgWord'
+          -- as input/output for the logical range of "i32." Attempting to use a
+          -- smaller logical range of "i16" or "i8" will produce incorrect results.
+          -- Hence, the call is made to "hs_pdep32" and truncated afterwards.
+          --
+          -- TODO: Determine if the definition(s) of "hs_pdep8" and "hs_pdep16"
+          -- can be specialized to return the correct results when cast using
+          -- a call to 'genCallSimpleCast', removing the need for the function
+          -- 'genCallCastWithMinWidthOf'.
+          W8   -> fsLit "hs_pdep32"
+          W16  -> fsLit "hs_pdep32"
           W32  -> fsLit "hs_pdep32"
           W64  -> fsLit "hs_pdep64"
           W128 -> fsLit "hs_pdep128"
@@ -971,8 +993,11 @@ cmmPrimOpFunctions mop = do
           W256 -> fsLit "llvm.x86.bmi.pext.256"
           W512 -> fsLit "llvm.x86.bmi.pext.512"
       | otherwise -> case w of
-          W8   -> fsLit "hs_pext8"
-          W16  -> fsLit "hs_pext16"
+          -- Same issue for "i16" and "i8" values as the Pdep operation above,
+          -- see that commentary for more details as to why "hs_pext32" is called
+          -- for bit-widths of 'W8' and 'W16'.
+          W8   -> fsLit "hs_pext32"
+          W16  -> fsLit "hs_pext32"
           W32  -> fsLit "hs_pext32"
           W64  -> fsLit "hs_pext64"
           W128 -> fsLit "hs_pext128"
