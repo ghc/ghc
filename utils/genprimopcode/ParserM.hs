@@ -116,6 +116,7 @@ data Token = TEOF
            | TCanFail
            | TThrowsException
            | TReadWriteEffect
+           | TDefinedBits
            | TCanFailWarnFlag
            | TDoNotWarnCanFail
            | TWarnIfEffectIsCanFail
