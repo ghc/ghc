@@ -148,6 +148,7 @@ defaults
    vector           = []
    deprecated_msg   = {}      -- A non-empty message indicates deprecation
    div_like         = False   -- Second argument expected to be non zero - used for tests
+   defined_bits     = Nothing -- The number of bits the operation is defined for (if not all bits)
 
 -- Note [When do out-of-line primops go in primops.txt.pp]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1065,8 +1066,10 @@ primop   CtzOp     "ctz#"   GenPrimOp   Word# -> Word#
 
 primop   BSwap16Op   "byteSwap16#"   GenPrimOp   Word# -> Word#
     {Swap bytes in the lower 16 bits of a word. The higher bytes are undefined. }
+    with defined_bits = 16
 primop   BSwap32Op   "byteSwap32#"   GenPrimOp   Word# -> Word#
     {Swap bytes in the lower 32 bits of a word. The higher bytes are undefined. }
+    with defined_bits = 32
 primop   BSwap64Op   "byteSwap64#"   GenPrimOp   Word64# -> Word64#
     {Swap bytes in a 64 bits of a word.}
 primop   BSwapOp     "byteSwap#"     GenPrimOp   Word# -> Word#
@@ -1074,10 +1077,13 @@ primop   BSwapOp     "byteSwap#"     GenPrimOp   Word# -> Word#
 
 primop   BRev8Op    "bitReverse8#"   GenPrimOp   Word# -> Word#
     {Reverse the order of the bits in a 8-bit word.}
+    with defined_bits = 8
 primop   BRev16Op   "bitReverse16#"   GenPrimOp   Word# -> Word#
     {Reverse the order of the bits in a 16-bit word.}
+    with defined_bits = 16
 primop   BRev32Op   "bitReverse32#"   GenPrimOp   Word# -> Word#
     {Reverse the order of the bits in a 32-bit word.}
+    with defined_bits = 32
 primop   BRev64Op   "bitReverse64#"   GenPrimOp   Word64# -> Word64#
     {Reverse the order of the bits in a 64-bit word.}
 primop   BRevOp     "bitReverse#"     GenPrimOp   Word# -> Word#
