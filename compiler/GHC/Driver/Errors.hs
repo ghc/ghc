@@ -20,8 +20,8 @@ import GHC.Utils.Logger
 reportError :: Logger -> NamePprCtx -> DiagOpts -> SrcSpan -> SDoc -> IO ()
 reportError logger nameContext opts span doc = do
   let
-    message :: MsgEnvelope DiagnosticMessage
-    message = mkErrorMsgEnvelope span nameContext DiagnosticMessage {
+    message :: MsgEnvelope GenericDiagnosticMessage
+    message = mkErrorMsgEnvelope span nameContext GenericDiagnosticMessage {
         diagMessage = mkDecorated [doc]
       , diagReason = ErrorWithoutFlag
       , diagHints = []
@@ -31,8 +31,8 @@ reportError logger nameContext opts span doc = do
 reportDiagnostic :: Logger -> NamePprCtx -> DiagOpts -> SrcSpan -> DiagnosticReason -> SDoc -> IO ()
 reportDiagnostic logger nameContext opts span reason doc = do
   let
-    message :: MsgEnvelope DiagnosticMessage
-    message = mkMsgEnvelope opts span nameContext DiagnosticMessage {
+    message :: MsgEnvelope GenericDiagnosticMessage
+    message = mkMsgEnvelope opts span nameContext GenericDiagnosticMessage {
         diagMessage = mkDecorated [doc]
       , diagReason = reason
       , diagHints = []

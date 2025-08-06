@@ -34,7 +34,7 @@ module GHC.Types.Error
    , mkSimpleUnknownDiagnostic
    , mkUnknownDiagnostic
    , embedUnknownDiagnostic
-   , DiagnosticMessage (..)
+   , GenericDiagnosticMessage (..)
    , DiagnosticReason (WarningWithFlag, ..)
    , ResolvedDiagnosticReason(..)
    , mkPlainDiagnostic
@@ -279,7 +279,7 @@ class (Outputable (DiagnosticHint a), HasDefaultDiagnosticOpts (DiagnosticOpts a
   --
   -- 1. The message might be from a plugin that does not supply codes.
   -- 2. The message might not yet have been assigned a code. See the
-  --    'Diagnostic' instance for 'DiagnosticMessage'.
+  --    'Diagnostic' instance for 'GenericDiagnosticMessage'.
   --
   -- Ideally, case (2) would not happen, but because
   -- some errors in GHC still use the old system of just writing the
@@ -338,45 +338,45 @@ pprDiagnostic e = vcat [ ppr (diagnosticReason e)
 
 
 -- | A generic 'Diagnostic' message, without any further classification or
--- provenance: By looking at a 'DiagnosticMessage' we don't know neither
+-- provenance: By looking at a 'GenericDiagnosticMessage' we don't know neither
 -- /where/ it was generated nor how to interpret its payload (as it's just a
 -- structured document). All we can do is to print it out and look at its
 -- 'DiagnosticReason'.
-data DiagnosticMessage = DiagnosticMessage
+data GenericDiagnosticMessage = GenericDiagnosticMessage
   { diagMessage :: !DecoratedSDoc
   , diagReason  :: !DiagnosticReason
   , diagHints   :: [GhcHint]
   }
 
-instance Diagnostic DiagnosticMessage where
-  type DiagnosticOpts DiagnosticMessage = NoDiagnosticOpts
+instance Diagnostic GenericDiagnosticMessage where
+  type DiagnosticOpts GenericDiagnosticMessage = NoDiagnosticOpts
   diagnosticMessage _ = diagMessage
   diagnosticReason  = diagReason
   diagnosticHints   = diagHints
   diagnosticCode _  = Nothing
 
 -- | Helper function to use when no hints can be provided. Currently this function
--- can be used to construct plain 'DiagnosticMessage' and add hints to them, but
+-- can be used to construct plain 'GenericDiagnosticMessage' and add hints to them, but
 -- once #18516 will be fully executed, the main usage of this function would be in
 -- the implementation of the 'diagnosticHints' typeclass method, to report the fact
 -- that a particular 'Diagnostic' has no hints.
 noHints :: [GhcHint]
 noHints = mempty
 
-mkPlainDiagnostic :: DiagnosticReason -> [GhcHint] -> SDoc -> DiagnosticMessage
-mkPlainDiagnostic rea hints doc = DiagnosticMessage (mkSimpleDecorated doc) rea hints
+mkPlainDiagnostic :: DiagnosticReason -> [GhcHint] -> SDoc -> GenericDiagnosticMessage
+mkPlainDiagnostic rea hints doc = GenericDiagnosticMessage (mkSimpleDecorated doc) rea hints
 
--- | Create an error 'DiagnosticMessage' holding just a single 'SDoc'
-mkPlainError :: [GhcHint] -> SDoc -> DiagnosticMessage
-mkPlainError hints doc = DiagnosticMessage (mkSimpleDecorated doc) ErrorWithoutFlag hints
+-- | Create an error 'GenericDiagnosticMessage' holding just a single 'SDoc'
+mkPlainError :: [GhcHint] -> SDoc -> GenericDiagnosticMessage
+mkPlainError hints doc = GenericDiagnosticMessage (mkSimpleDecorated doc) ErrorWithoutFlag hints
 
--- | Create a 'DiagnosticMessage' from a list of bulleted SDocs and a 'DiagnosticReason'
-mkDecoratedDiagnostic :: DiagnosticReason -> [GhcHint] -> [SDoc] -> DiagnosticMessage
-mkDecoratedDiagnostic rea hints docs = DiagnosticMessage (mkDecorated docs) rea hints
+-- | Create a 'GenericDiagnosticMessage' from a list of bulleted SDocs and a 'DiagnosticReason'
+mkDecoratedDiagnostic :: DiagnosticReason -> [GhcHint] -> [SDoc] -> GenericDiagnosticMessage
+mkDecoratedDiagnostic rea hints docs = GenericDiagnosticMessage (mkDecorated docs) rea hints
 
--- | Create an error 'DiagnosticMessage' from a list of bulleted SDocs
-mkDecoratedError :: [GhcHint] -> [SDoc] -> DiagnosticMessage
-mkDecoratedError hints docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag hints
+-- | Create an error 'GenericDiagnosticMessage' from a list of bulleted SDocs
+mkDecoratedError :: [GhcHint] -> [SDoc] -> GenericDiagnosticMessage
+mkDecoratedError hints docs = GenericDiagnosticMessage (mkDecorated docs) ErrorWithoutFlag hints
 
 -- | The reason /why/ a 'Diagnostic' was emitted in the first place.
 -- Diagnostic messages are born within GHC with a very precise reason, which
@@ -624,7 +624,7 @@ jsonDiagnostic rendered m = JSObject $ [
               [ ("category", JSString $ unpackFS cat)
               ]
 
-instance Show (MsgEnvelope DiagnosticMessage) where
+instance Show (MsgEnvelope GenericDiagnosticMessage) where
     show = showMsgEnvelope
 
 -- | Shows an 'MsgEnvelope'. Only use this for debugging.
