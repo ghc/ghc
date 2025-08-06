@@ -56,6 +56,7 @@ words :-
     <0>         "CanFail"           { mkT TCanFail }
     <0>         "ThrowsException"   { mkT TThrowsException }
     <0>         "ReadWriteEffect"   { mkT TReadWriteEffect }
+    <0>         "defined_bits"      { mkT TDefinedBits }
     <0>         "can_fail_warning"  { mkT TCanFailWarnFlag }
     <0>         "DoNotWarnCanFail"  { mkT TDoNotWarnCanFail }
     <0>         "WarnIfEffectIsCanFail" { mkT TWarnIfEffectIsCanFail }

@@ -50,6 +50,7 @@ import AccessOps
     CanFail         { TCanFail }
     ThrowsException { TThrowsException }
     ReadWriteEffect { TReadWriteEffect }
+    defined_bits     { TDefinedBits }
     can_fail_warning { TCanFailWarnFlag }
     DoNotWarnCanFail { TDoNotWarnCanFail }
     WarnIfEffectIsCanFail { TWarnIfEffectIsCanFail }
@@ -81,13 +82,14 @@ pOptions : pOption pOptions { $1 : $2 }
          | {- empty -}      { [] }
 
 pOption :: { Option }
-pOption : lowerName '=' false               { OptionFalse  $1 }
-        | lowerName '=' true                { OptionTrue   $1 }
-        | lowerName '=' pStuffBetweenBraces { OptionString $1 $3 }
-        | lowerName '=' integer             { OptionInteger $1 $3 }
-        | vector    '=' pVectorTemplate     { OptionVector $3 }
-        | fixity    '=' pInfix              { OptionFixity $3 }
-        | effect    '=' pEffect             { OptionEffect $3 }
+pOption : lowerName        '=' false                  { OptionFalse   $1     }
+        | lowerName        '=' true                   { OptionTrue    $1     }
+        | lowerName        '=' pStuffBetweenBraces    { OptionString  $1  $3 }
+        | lowerName        '=' integer                { OptionInteger $1  $3 }
+        | vector           '=' pVectorTemplate        { OptionVector      $3 }
+        | fixity           '=' pInfix                 { OptionFixity      $3 }
+        | effect           '=' pEffect                { OptionEffect      $3 }
+        | defined_bits     '=' pGoodBits              { OptionDefinedBits $3 }
         | can_fail_warning '=' pPrimOpCanFailWarnFlag { OptionCanFailWarnFlag $3 }
 
 pInfix :: { Maybe Fixity }
@@ -101,6 +103,10 @@ pEffect : NoEffect                { NoEffect }
         | CanFail                 { CanFail }
         | ThrowsException         { ThrowsException }
         | ReadWriteEffect         { ReadWriteEffect }
+
+pGoodBits :: { Maybe Word }
+pGoodBits : integer { Just $ toEnum $1 }
+          | nothing { Nothing }
 
 pPrimOpCanFailWarnFlag :: { PrimOpCanFailWarnFlag }
 pPrimOpCanFailWarnFlag : DoNotWarnCanFail { DoNotWarnCanFail }

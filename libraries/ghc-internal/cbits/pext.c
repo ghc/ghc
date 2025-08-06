@@ -1,13 +1,13 @@
 #include "Rts.h"
 #include "MachDeps.h"
 
-StgWord64
-hs_pext64(StgWord64 src, StgWord64 mask)
+static StgWord64
+hs_pext(const unsigned char bit_width, const StgWord64 src, const StgWord64 mask)
 {
   uint64_t result = 0;
   int offset = 0;
 
-  for (int bit = 0; bit != sizeof(uint64_t) * 8; ++bit) {
+  for (int bit = 0; bit != bit_width; ++bit) {
     const uint64_t src_bit = (src >> bit) & 1;
     const uint64_t mask_bit = (mask >> bit) & 1;
 
@@ -20,20 +20,29 @@ hs_pext64(StgWord64 src, StgWord64 mask)
   return result;
 }
 
-StgWord
-hs_pext32(StgWord src, StgWord mask)
+StgWord64
+hs_pext64(const StgWord64 src, const StgWord64 mask)
 {
-  return hs_pext64(src, mask);
+  return hs_pext(64, src, mask);
+}
+
+// When dealing with values of bit-width shorter than uint64_t, ensure to
+// cast the return value to correctly truncate the undefined upper bits.
+// This is *VERY* important when GHC is using the LLVM backend!
+StgWord
+hs_pext32(const StgWord src, const StgWord mask)
+{
+  return (StgWord) ((StgWord32) hs_pext(32, src, mask));
 }
 
 StgWord
-hs_pext16(StgWord src, StgWord mask)
+hs_pext16(const StgWord src, const StgWord mask)
 {
-  return hs_pext64(src, mask);
+  return (StgWord) ((StgWord16) hs_pext(16, src, mask));
 }
 
 StgWord
-hs_pext8(StgWord src, StgWord mask)
+hs_pext8(const StgWord src, const StgWord mask)
 {
-  return hs_pext64(src, mask);
+  return (StgWord) ((StgWord8) hs_pext(8, src, mask));
 }
