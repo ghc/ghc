@@ -32,7 +32,7 @@ module GHC.Utils.Error (
         emptyMessages, mkDecorated, mkLocMessage,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope,
         mkErrorMsgEnvelope,
-        mkMCDiagnostic, diagReasonSeverity,
+        mkLintWarning, diagReasonSeverity,
 
         mkPlainError,
         mkPlainDiagnostic,
@@ -160,12 +160,10 @@ diag_reason_severity opts reason = fmap ResolvedDiagnosticReason $ case reason o
   ErrorWithoutFlag
     -> (SevError, reason)
 
--- | Make a 'MessageClass' for a given 'DiagnosticReason', consulting the
--- 'DiagOpts'.
-mkMCDiagnostic :: DiagOpts -> DiagnosticReason -> Maybe DiagnosticCode -> MessageClass
-mkMCDiagnostic opts reason code = MCDiagnostic sev reason' code
+mkLintWarning :: DiagOpts -> SrcSpan -> SDoc -> SDoc
+mkLintWarning opts span = formatDiagnostic True span severity reason Nothing
   where
-    (sev, reason') = diag_reason_severity opts reason
+    (severity, reason) = diag_reason_severity opts WarningWithoutFlag
 
 --
 -- Creating MsgEnvelope(s)
