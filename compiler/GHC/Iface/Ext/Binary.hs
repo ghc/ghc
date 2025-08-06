@@ -288,7 +288,7 @@ fromHieName nc hie_name = do
     ExternalName mod occ span -> updateNameCache nc mod occ $ \cache -> do
       case lookupOrigNameCache cache mod occ of
         -- Note that this may be a wired-in name (provided that the NameCache
-        -- was initialized with know-key names, which is always the case if you
+        -- was initialized with known-key names, which is always the case if you
         -- use `newNameCache`).
         Just name -> pure (cache, name)
         Nothing   -> do
