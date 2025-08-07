@@ -907,6 +907,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_SpecialiseAggressively
    , Opt_CrossModuleSpecialise
    , Opt_StaticArgumentTransformation
+   , Opt_PolymorphicSpecialisation
    , Opt_CSE
    , Opt_StgCSE
    , Opt_StgLiftLams
