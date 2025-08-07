@@ -25,6 +25,7 @@ import GHC.Linker.Types
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
+import GHC.Types.Error (formatFatalLocMessage)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -231,7 +232,7 @@ splice point about what we would prefer.
 -}
 
 dieWith :: LinkDepsOpts -> SrcSpan -> SDoc -> IO a
-dieWith opts span msg = throwProgramError opts (mkLocMessage MCFatal span msg)
+dieWith opts span msg = throwProgramError opts (formatFatalLocMessage span msg)
 
 throwProgramError :: LinkDepsOpts -> SDoc -> IO a
 throwProgramError opts doc = throwGhcExceptionIO (ProgramError (renderWithContext (ldPprOpts opts) doc))
