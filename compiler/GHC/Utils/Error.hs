@@ -1,7 +1,5 @@
 {-# LANGUAGE ViewPatterns    #-}
 
-{-# OPTIONS_GHC -Wno-x-InternalMCDiagnostic #-}
-
 {-
 (c) The AQUA Project, Glasgow University, 1994-1998
 
@@ -32,7 +30,7 @@ module GHC.Utils.Error (
 
         -- ** Construction
         DiagOpts (..), emptyDiagOpts, diag_wopt, diag_fatal_wopt,
-        emptyMessages, mkDecorated, mkLocMessage,
+        emptyMessages, mkDecorated,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope,
         mkErrorMsgEnvelope,
         mkLintWarning, diagReasonSeverity,
@@ -300,9 +298,8 @@ internalPprMessage opts (MsgEnvelope { errMsgSpan        = s
                                     , errMsgContext    = name_ppr_ctx
                                     , errMsgReason     = reason })
   = withErrStyle name_ppr_ctx $
-      mkLocMessage
-        (InternalMCDiagnostic s sev reason (diagnosticCode e))
-        s
+      formatDiagnostic True
+        s sev reason (diagnosticCode e)
         (formatBulleted $ diagnosticMessage opts e)
 
 sortMsgBag :: Maybe DiagOpts -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
