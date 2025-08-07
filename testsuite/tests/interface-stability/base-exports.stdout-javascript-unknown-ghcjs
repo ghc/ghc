@@ -315,7 +315,7 @@ module Control.Exception.Backtrace where
   type BacktraceMechanism :: *
   data BacktraceMechanism = CostCentreBacktrace | HasCallStackBacktrace | ExecutionBacktrace | IPEBacktrace
   type Backtraces :: *
-  data Backtraces = Backtraces {btrCostCentre :: GHC.Internal.Maybe.Maybe (GHC.Internal.Ptr.Ptr GHC.Internal.Stack.CCS.CostCentreStack), btrHasCallStack :: GHC.Internal.Maybe.Maybe GHC.Internal.Stack.Types.CallStack, btrExecutionStack :: GHC.Internal.Maybe.Maybe [GHC.Internal.ExecutionStack.Internal.Location], btrIpe :: GHC.Internal.Maybe.Maybe [GHC.Internal.Stack.CloneStack.StackEntry]}
+  data Backtraces = ...
   collectBacktraces :: (?callStack::GHC.Internal.Stack.Types.CallStack) => GHC.Types.IO Backtraces
   displayBacktraces :: Backtraces -> GHC.Internal.Base.String
   getBacktraceMechanismState :: BacktraceMechanism -> GHC.Types.IO GHC.Types.Bool
@@ -5187,7 +5187,6 @@ module GHC.Constants where
 
 module GHC.Desugar where
   -- Safety: Safe
-  (>>>) :: forall (arr :: * -> * -> *) a b c. GHC.Internal.Control.Arrow.Arrow arr => arr a b -> arr b c -> arr a c
   type AnnotationWrapper :: *
   data AnnotationWrapper = forall a. GHC.Internal.Data.Data.Data a => AnnotationWrapper a
   toAnnotationWrapper :: forall a. GHC.Internal.Data.Data.Data a => a -> AnnotationWrapper
