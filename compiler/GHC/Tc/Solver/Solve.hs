@@ -1011,9 +1011,17 @@ solveSimpleGivens givens
 solveSimpleWanteds :: Cts -> TcS Cts
 -- The result is not necessarily zonked
 solveSimpleWanteds simples
-  = do { traceTcS "solveSimpleWanteds {" (ppr simples)
+  = do { mode   <- getTcSMode
        ; dflags <- getDynFlags
+       ; inerts <- getInertSet
+
+       ; traceTcS "solveSimpleWanteds {" $
+         vcat [ text "Mode:" <+> ppr mode
+              , text "Inerts:" <+> ppr inerts
+              , text "Wanteds to solve:" <+> ppr simples ]
+
        ; (n,wc) <- go 1 (solverIterations dflags) simples
+
        ; traceTcS "solveSimpleWanteds end }" $
              vcat [ text "iterations =" <+> ppr n
                   , text "residual =" <+> ppr wc ]
@@ -1663,19 +1671,28 @@ runTcPluginsGiven
 -- 'solveSimpleWanteds' should feed the updated wanteds back into the
 -- main solver.
 runTcPluginsWanted :: Cts -> TcS (Bool, Cts)
-runTcPluginsWanted simples1
-  | isEmptyBag simples1
-  = return (False, simples1)
+runTcPluginsWanted wanted
+  | isEmptyBag wanted
+  = return (False, wanted)
   | otherwise
   = do { solvers <- getTcPluginSolvers
-       ; if null solvers then return (False, simples1) else
+       ; if null solvers then return (False, wanted) else
 
-    do { given <- getInertGivens
-       ; wanted <- TcS.zonkSimples simples1    -- Plugin requires zonked inputs
+    do { -- Find the set of Givens to give to the plugin.
+         -- If TcSMode = TcSShortCut, we are solving with
+         -- no Givens so don't return any (#26258)!
+         -- See Note [Shortcut solving] in GHC.Tc.Solver.Dict
+         mode <- getTcSMode
+       ; given <- case mode of
+                     TcSShortCut -> return []
+                     _           -> getInertGivens
 
-       ; traceTcS "Running plugins (" (vcat [ text "Given:" <+> ppr given
-                                            , text "Wanted:" <+> ppr wanted ])
-       ; p <- runTcPluginSolvers solvers (given, bagToList wanted)
+         -- Plugin requires zonked input wanteds
+       ; zonked_wanted <- TcS.zonkSimples wanted
+
+       ; traceTcS "Running plugins {" (vcat [ text "Given:" <+> ppr given
+                                            , text "Wanted:" <+> ppr zonked_wanted ])
+       ; p <- runTcPluginSolvers solvers (given, bagToList zonked_wanted)
        ; let (_, solved_wanted)   = pluginSolvedCts p
              (_, unsolved_wanted) = pluginInputCts p
              new_wanted     = pluginNewCts p
@@ -1683,9 +1700,6 @@ runTcPluginsWanted simples1
              all_new_wanted = listToBag new_wanted       `andCts`
                               listToBag unsolved_wanted  `andCts`
                               listToBag insols
-
--- SLPJ: I'm deeply suspicious of this
---       ; updInertCans (removeInertCts $ solved_givens)
 
        ; mapM_ setEv solved_wanted
 
