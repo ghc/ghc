@@ -1250,6 +1250,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CfgBlocklayout)      -- Experimental
 
     , ([1,2],   Opt_Specialise)
+    , ([1,2],   Opt_PolymorphicSpecialisation)
     , ([1,2],   Opt_CrossModuleSpecialise)
     , ([1,2],   Opt_InlineGenerics)
     , ([1,2],   Opt_Strictness)

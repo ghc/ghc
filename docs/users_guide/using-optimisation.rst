@@ -1325,10 +1325,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     :reverse: -fno-polymorphic-specialisation
     :category:
 
-    :default: off
-
-    Warning, this feature is highly experimental and may lead to incorrect runtime
-    results. Use at your own risk (:ghc-ticket:`23469`, :ghc-ticket:`23109`, :ghc-ticket:`21229`, :ghc-ticket:`23445`).
+    :default: on
 
     Enable specialisation of function calls to known dictionaries with free type variables.
     The created specialisation will abstract over the type variables free in the dictionary.
