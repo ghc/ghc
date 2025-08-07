@@ -305,6 +305,8 @@ import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
 
+import GHC.ByteCode.Serialize
+
 {- **********************************************************************
 %*                                                                      *
                 Initialisation
@@ -2169,7 +2171,8 @@ generateByteCode :: HscEnv
   -> ModLocation
   -> IO (CompiledByteCode, [FilePath])
 generateByteCode hsc_env cgguts mod_location = do
-  (hasStub, comp_bc) <- hscInteractive hsc_env cgguts mod_location
+  (hasStub, comp_bc') <- hscInteractive hsc_env cgguts mod_location
+  comp_bc <- testBinByteCode hsc_env comp_bc'
   compile_for_interpreter hsc_env $ \ i_env -> do
     stub_o <- traverse (compileForeign i_env LangC) hasStub
     foreign_files_o <- traverse (uncurry (compileForeign i_env)) (cgi_foreign_files cgguts)
