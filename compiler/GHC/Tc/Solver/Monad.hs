@@ -1306,21 +1306,25 @@ nestFunDepsTcS (TcS thing_inside)
                             , tcs_worklist = new_wl_var
                             , tcs_unif_lvl = new_unif_lvl_var }
 
+       ; TcM.traceTc "nestFunDepsTcS {" empty
        ; (inner_lvl, _res) <- TcM.pushTcLevelM $
                               thing_inside nest_env
+           -- Increase the level so that unification variables allocated by
+           -- the fundep-creation itself don't count as useful unifications
+       ; TcM.traceTc "nestFunDepsTcS }" empty
 
        -- Figure out whether the fundeps did any useful unifications,
        -- and if so update the tcs_unif_lvl
        ; mb_new_lvl <- TcM.readTcRef new_unif_lvl_var
        ; case mb_new_lvl of
-           Just new_lvl
-             | inner_lvl `deeperThanOrSame` new_lvl
+           Just unif_lvl
+             | inner_lvl `deeperThanOrSame` unif_lvl
              -> -- Some useful unifications took place
                 do { mb_old_lvl <- TcM.readTcRef unif_lvl_var
                    ; case mb_old_lvl of
-                       Just old_lvl | new_lvl `deeperThanOrSame` old_lvl
+                       Just old_lvl | unif_lvl `deeperThanOrSame` old_lvl
                                     -> return ()
-                       _ -> TcM.writeTcRef unif_lvl_var (Just new_lvl)
+                       _ -> TcM.writeTcRef unif_lvl_var (Just unif_lvl)
                    ; return True }
 
            _  -> return False   -- No unifications (except of vars

@@ -126,7 +126,7 @@ simplify_loop n limit definitely_redo_implications
                 -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
 
        ; wc2 <- if not definitely_redo_implications  -- See Note [Superclass iteration]
-                   && n_unifs1 == 0                    -- for this conditional
+                   && n_unifs1 == 0                  -- for this conditional
                 then return (wc { wc_simple = simples1 })  -- Short cut
                 else do { implics1 <- solveNestedImplications implics
                         ; return (wc { wc_simple = simples1

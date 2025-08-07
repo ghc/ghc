@@ -313,7 +313,13 @@ doDictFunDepImprovement dict_ct
 doDictFunDepImprovementLocal :: DictCt -> SolverStage ()
 -- Using functional dependencies, interact the DictCt with the
 -- inert Givens and Wanteds, to produce new equalities
-doDictFunDepImprovementLocal dict_ct@(DictCt { di_cls = cls, di_ev = wanted_ev })
+doDictFunDepImprovementLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
+  | isGiven work_ev
+  = -- If work_ev is Given, there could in principle be some inert Wanteds
+    -- but in practice there never are because we solve Givens first
+    nopStage ()
+
+  | otherwise
   = Stage $
     do { inerts <- getInertCans
 
@@ -324,35 +330,44 @@ doDictFunDepImprovementLocal dict_ct@(DictCt { di_cls = cls, di_ev = wanted_ev }
        ; if imp then startAgainWith (CDictCan dict_ct)
                 else continueWith () }
   where
-    wanted_pred = ctEvPred wanted_ev
-    wanted_loc  = ctEvLoc  wanted_ev
+    work_pred     = ctEvPred work_ev
+    work_loc      = ctEvLoc  work_ev
+    work_is_given = isGiven work_ev
 
     do_interaction :: Cts -> DictCt -> TcS Cts
-    do_interaction new_eqs1 (DictCt { di_ev = all_ev }) -- This can be Given or Wanted
+    do_interaction new_eqs1 (DictCt { di_ev = inert_ev }) -- This can be Given or Wanted
+      | work_is_given && isGiven inert_ev
+        -- Do not create FDs from Given/Given interactions
+        -- See Note [No Given/Given fundeps]
+        -- It is possible for work_ev to be Given when inert_ev is Wanted:
+        -- this can happen if a Given is kicked out by a unification
+      = return new_eqs1
+
+      | otherwise
       = do { traceTcS "doLocalFunDepImprovement" $
-             vcat [ ppr wanted_ev
-                  , pprCtLoc wanted_loc, ppr (isGivenLoc wanted_loc)
-                  , pprCtLoc all_loc, ppr (isGivenLoc all_loc)
+             vcat [ ppr work_ev
+                  , pprCtLoc work_loc, ppr (isGivenLoc work_loc)
+                  , pprCtLoc inert_loc, ppr (isGivenLoc inert_loc)
                   , pprCtLoc deriv_loc, ppr (isGivenLoc deriv_loc) ]
 
-           ; new_eqs2 <- unifyFunDepWanteds_new wanted_ev $
-                         improveFromAnother (deriv_loc, all_rewriters)
-                                            all_pred wanted_pred
+           ; new_eqs2 <- unifyFunDepWanteds_new work_ev $
+                         improveFromAnother (deriv_loc, inert_rewriters)
+                                            inert_pred work_pred
            ; return (new_eqs1 `unionBags` new_eqs2) }
       where
-        all_pred  = ctEvPred all_ev
-        all_loc   = ctEvLoc all_ev
-        all_rewriters = ctEvRewriters all_ev
-        deriv_loc = wanted_loc { ctl_depth  = deriv_depth
+        inert_pred  = ctEvPred inert_ev
+        inert_loc   = ctEvLoc inert_ev
+        inert_rewriters = ctEvRewriters inert_ev
+        deriv_loc = work_loc { ctl_depth  = deriv_depth
                                , ctl_origin = deriv_origin }
-        deriv_depth = ctl_depth wanted_loc `maxSubGoalDepth`
-                      ctl_depth all_loc
-        deriv_origin = FunDepOrigin1 wanted_pred
-                                     (ctLocOrigin wanted_loc)
-                                     (ctLocSpan wanted_loc)
-                                     all_pred
-                                     (ctLocOrigin all_loc)
-                                     (ctLocSpan all_loc)
+        deriv_depth = ctl_depth work_loc `maxSubGoalDepth`
+                      ctl_depth inert_loc
+        deriv_origin = FunDepOrigin1 work_pred
+                                     (ctLocOrigin work_loc)
+                                     (ctLocSpan work_loc)
+                                     inert_pred
+                                     (ctLocOrigin inert_loc)
+                                     (ctLocSpan inert_loc)
 
 doDictFunDepImprovementTop :: DictCt -> SolverStage ()
 doDictFunDepImprovementTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
@@ -388,6 +403,69 @@ solveFunDeps generate_eqs
   = nestFunDepsTcS $
     do { eqs <- generate_eqs
        ; solveSimpleWanteds eqs }
+
+{- Note [No Given/Given fundeps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not create constraints from:
+* Given/Given interactions via functional dependencies or type family
+  injectivity annotations.
+* Given/instance fundep interactions via functional dependencies or
+  type family injectivity annotations.
+
+In this Note, all these interactions are called just "fundeps".
+
+We ingore such fundeps for several reasons:
+
+1. These fundeps will never serve a purpose in accepting more
+   programs: Given constraints do not contain metavariables that could
+   be unified via exploring fundeps. They *could* be useful in
+   discovering inaccessible code. However, the constraints will be
+   Wanteds, and as such will cause errors (not just warnings) if they
+   go unsolved. Maybe there is a clever way to get the right
+   inaccessible code warnings, but the path forward is far from
+   clear. #12466 has further commentary.
+
+2. Furthermore, here is a case where a Given/instance interaction is actively
+   harmful (from dependent/should_compile/RaeJobTalk):
+
+       type family a == b :: Bool
+       type family Not a = r | r -> a where
+         Not False = True
+         Not True  = False
+
+       [G] Not (a == b) ~ True
+
+   Reacting this Given with the equations for Not produces
+
+      [W] a == b ~ False
+
+   This is indeed a true consequence, and would make sense as a fresh Given.
+   But we don't have a way to produce evidence for fundeps, as a Wanted it
+   is /harmful/: we can't prove it, and so we'll report an error and reject
+   the program. (Previously fundeps gave rise to Deriveds, which
+   carried no evidence, so it didn't matter that they could not be proved.)
+
+3. #20922 showed a subtle different problem with Given/instance fundeps.
+      type family ZipCons (as :: [k]) (bssx :: [[k]]) = (r :: [[k]]) | r -> as bssx where
+        ZipCons (a ': as) (bs ': bss) = (a ': bs) ': ZipCons as bss
+        ...
+
+      tclevel = 4
+      [G] ZipCons is1 iss ~ (i : is2) : jss
+
+   (The tclevel=4 means that this Given is at level 4.)  The fundep tells us that
+   'iss' must be of form (is2 : beta[4]) where beta[4] is a fresh unification
+   variable; we don't know what type it stands for. So we would emit
+      [W] iss ~ is2 : beta
+
+   Again we can't prove that equality; and worse we'll rewrite iss to
+   (is2:beta) in deeply nested constraints inside this implication,
+   where beta is untouchable (under other equality constraints), leading
+   to other insoluble constraints.
+
+The bottom line: since we have no evidence for them, we should ignore Given/Given
+and Given/instance fundeps entirely.
+-}
 
 {-
 ************************************************************************
