@@ -897,13 +897,21 @@ for it, so TcS carries a mutable location where the binding can be
 added.  This is initialised from the innermost implication constraint.
 -}
 
--- | See Note [TcSMode]
+-- | The mode for the constraint solving monad.
+--
+-- See Note [TcSMode], where each constructor is documented
 data TcSMode
   = TcSVanilla    -- ^ Normal constraint solving
   | TcSPMCheck    -- ^ Used when doing patterm match overlap checks
   | TcSEarlyAbort -- ^ Abort early on insoluble constraints
   | TcSShortCut   -- ^ Fully solve all constraints, without using local Givens
   deriving (Eq)
+
+instance Outputable TcSMode where
+  ppr TcSVanilla    = text "TcSVanilla"
+  ppr TcSPMCheck    = text "TcSPMCheck"
+  ppr TcSEarlyAbort = text "TcSEarlyAbort"
+  ppr TcSShortCut   = text "TcSShortcut"
 
 {- Note [TcSMode]
 ~~~~~~~~~~~~~~~~~

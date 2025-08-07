@@ -496,11 +496,15 @@ We could use the Eq [a] superclass of the Ord [a], or we could use the top-level
 instance `Eq a => Eq [a]`.   But if we did the latter we'd be stuck with an
 insoluble constraint (Eq a).
 
-So the ShortCutSolving rule is this:
+-----------------------------------
+So the ShortCutSolving plan is this:
    If we could solve a constraint from a local Given,
-   try first to /completely/ solve the constraint using only top-level instances.
+       try first to /completely/ solve the constraint
+       using only top-level instances,
+       /without/ using any local Givens.
    - If that succeeds, use it
    - If not, use the local Given
+-----------------------------------
 
 An example that succeeds:
 
@@ -555,7 +559,7 @@ The moving parts are relatively simple:
   - `matchLocalInst`, which would otherwise consult Given quantified constraints
   - `GHC.Tc.Solver.Instance.Class.matchInstEnv`: when short-cut solving, don't
     pick overlappable top-level instances
-
+  - `GHC.Tc.Solver.Solve.runTcPluginsWanted`: don't pass any Givens to the plugin
 
 Some wrinkles:
 
