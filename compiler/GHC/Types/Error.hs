@@ -70,8 +70,9 @@ module GHC.Types.Error
    , mapDecoratedSDoc
 
    , pprMessageBag
-   , mkLocMessage
    , mkLocMessageWarningGroups
+   , formatLocMessage
+   , formatFatalLocMessage
    , formatDiagnostic
    , getCaretDiagnostic
 
@@ -538,9 +539,6 @@ the "SevIgnore one" for a number of reasons:
 
 
 -- | Used to describe warnings and errors
---   o The message has a file\/line\/column heading,
---     plus "warning:" or "error:",
---     added by mkLocMessage
 --   o With 'SevIgnore' the message is suppressed
 --   o Output is intended for end users
 data Severity
@@ -637,13 +635,6 @@ showMsgEnvelope err =
 pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 
-mkLocMessage
-  :: MessageClass                       -- ^ What kind of message?
-  -> SrcSpan                            -- ^ location
-  -> SDoc                               -- ^ message
-  -> SDoc
-mkLocMessage = mkLocMessageWarningGroups True
-
 -- | Make an error message with location info, specifying whether to show
 -- warning groups (if applicable).
 mkLocMessageWarningGroups
@@ -655,16 +646,16 @@ mkLocMessageWarningGroups
 mkLocMessageWarningGroups show_warn_groups msg_class locn msg
   = case msg_class of
     MCDiagnostic span severity reason code -> formatDiagnostic show_warn_groups span severity reason code msg
-    _ -> sdocOption sdocColScheme $ \col_scheme ->
-      let
-          msg_colour = getMessageClassColour msg_class col_scheme
+    MCFatal -> formatFatalLocMessage locn msg
+    _ -> formatLocMessage locn msg
 
-          msg_title = coloured msg_colour $
-            case msg_class of
-              MCFatal                     -> text "fatal"
-              _                           -> empty
-
+formatFatalLocMessage :: SrcSpan -> SDoc -> SDoc
+formatFatalLocMessage locn msg = sdocOption sdocColScheme $ \col_scheme ->
+      let msg_title = coloured (fatalColour col_scheme) $ text "fatal"
       in formatLocMessageWarningGroups locn msg_title empty empty msg
+
+formatLocMessage :: SrcSpan -> SDoc -> SDoc
+formatLocMessage span = formatLocMessageWarningGroups span empty empty empty
 
 formatDiagnostic
   :: Bool                               -- ^ Print warning groups?
@@ -780,8 +771,11 @@ formatLocMessageWarningGroups locn msg_title code_doc warning_flag_doc msg
 
 getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
 getMessageClassColour (MCDiagnostic _span severity _reason _code) = getSeverityColour severity
-getMessageClassColour MCFatal                                 = Col.sFatal
+getMessageClassColour MCFatal                                 = fatalColour
 getMessageClassColour _                                       = const mempty
+
+fatalColour :: Col.Scheme -> Col.PprColour
+fatalColour = Col.sFatal
 
 getSeverityColour :: Severity -> Col.Scheme -> Col.PprColour
 getSeverityColour severity = case severity of

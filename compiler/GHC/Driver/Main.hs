@@ -1834,7 +1834,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
                          ]
     badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer
     badFlag df (ext,loc,on,_)
-        | on df     = [mkLocMessage MCOutput (loc df) $
+        | on df     = [formatLocMessage (loc df) $
                             text "-X" <> ppr ext <+> text "is not allowed in Safe Haskell"]
         | otherwise = []
     badInsts insts = concatMap badInst insts
@@ -1843,7 +1843,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
     checkOverlap _             = True
 
     badInst ins | checkOverlap (overlapMode (is_flag ins))
-                = [mkLocMessage MCOutput (nameSrcSpan $ getName $ is_dfun ins) $
+                = [formatLocMessage (nameSrcSpan $ getName $ is_dfun ins) $
                       ppr (overlapMode $ is_flag ins) <+>
                       text "overlap mode isn't allowed in Safe Haskell"]
                 | otherwise = []

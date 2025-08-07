@@ -864,7 +864,7 @@ wrapDocLoc doc = do
   if logHasDumpFlag logger Opt_D_ppr_debug
     then do
       loc <- getSrcSpanM
-      return (mkLocMessage MCOutput loc doc)
+      return (formatLocMessage loc doc)
     else
       return doc
 
