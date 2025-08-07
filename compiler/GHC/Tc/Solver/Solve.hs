@@ -120,13 +120,13 @@ simplify_loop n limit definitely_redo_implications
                             , int (lengthBag simples) <+> text "simples to solve" ])
        ; traceTcS "simplify_loop: wc =" (ppr wc)
 
-       ; (n_unifs1, simples1) <- reportUnifications $  -- See Note [Superclass iteration]
-                                 solveSimpleWanteds simples
+       ; (unif_happened, simples1) <- reportUnifications $  -- See Note [Superclass iteration]
+                                      solveSimpleWanteds simples
                 -- Any insoluble constraints are in 'simples' and so get rewritten
                 -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
 
-       ; wc2 <- if not definitely_redo_implications  -- See Note [Superclass iteration]
-                   && n_unifs1 == 0                  -- for this conditional
+       ; wc2 <- if not (definitely_redo_implications  -- See Note [Superclass iteration]
+                        || unif_happened)             -- for this conditional
                 then return (wc { wc_simple = simples1 })  -- Short cut
                 else do { implics1 <- solveNestedImplications implics
                         ; return (wc { wc_simple = simples1
@@ -1071,15 +1071,16 @@ solveSimpleWanteds simples
                          simples limit (emptyWC { wc_simple = wc })
       | otherwise
       = do { -- Solve
-             wc1 <- solve_simple_wanteds wc
+             (unif_happened, wc1) <- reportUnifications $
+                                     solve_simple_wanteds wc
 
              -- Run plugins
              -- NB: runTcPluginsWanted has a fast path for empty wc1,
              --     which is the common case
            ; (rerun_plugin, wc2) <- runTcPluginsWanted wc1
 
-           ; if rerun_plugin
-             then do { traceTcS "solveSimple going round again:" (ppr rerun_plugin)
+           ; if unif_happened || rerun_plugin
+             then do { traceTcS "solveSimple going round again:" empty
                      ; go (n+1) limit wc2 }   -- Loop
              else return (n, wc2) }           -- Done
 

@@ -397,12 +397,12 @@ doDictFunDepImprovementTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = 
         new_orig  = FunDepOrigin2 dict_pred dict_origin
                                   inst_pred inst_loc
 
-
 solveFunDeps :: TcS Cts -> TcS Bool
 solveFunDeps generate_eqs
-  = nestFunDepsTcS $
-    do { eqs <- generate_eqs
-       ; solveSimpleWanteds eqs }
+  = do { (unif_happened, _res) <- nestFunDepsTcS $
+                                  do { eqs <- generate_eqs
+                                     ; solveSimpleWanteds eqs }
+       ; return unif_happened }
 
 {- Note [No Given/Given fundeps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

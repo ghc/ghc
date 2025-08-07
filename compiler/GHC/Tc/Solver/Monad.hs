@@ -451,9 +451,14 @@ kickOutRewritable ko_spec new_fr
                          , text "Residual inerts =" <+> ppr ics' ]) } }
 
 kickOutAfterUnification :: [TcTyVar] -> TcS ()
-kickOutAfterUnification tv_list = case nonEmpty tv_list of
-    Nothing -> return ()
-    Just tvs -> do
+kickOutAfterUnification tv_list
+  = case nonEmpty tv_list of
+      Nothing  -> return ()
+      Just tvs -> setUnificationFlagTo min_tv_lvl
+         where
+           min_tv_lvl = foldr1 minTcLevel (NE.map tcTyVarLevel tvs)
+
+{-
        { let tv_set = mkVarSet tv_list
 
        ; n_kicked <- kickOutRewritable (KOAfterUnify tv_set) (Given, NomEq)
@@ -469,6 +474,7 @@ kickOutAfterUnification tv_list = case nonEmpty tv_list of
 
        ; traceTcS "kickOutAfterUnification" (ppr tvs $$ text "n_kicked =" <+> ppr n_kicked)
        ; return n_kicked }
+-}
 
 kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
 -- See Wrinkle (URW2) in Note [Unify only if the rewriter set is empty]
@@ -1294,43 +1300,23 @@ tryTcS (TcS thing_inside)
 
                  ; return True } }
 
-nestFunDepsTcS :: TcS a -> TcS Bool
+nestFunDepsTcS :: TcS a -> TcS (Bool, a)
 nestFunDepsTcS (TcS thing_inside)
-  = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var
-                        , tcs_unif_lvl = unif_lvl_var }) ->
+  = reportUnifications $
+    TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
+    TcM.pushTcLevelM_  $
+         -- pushTcLevelTcM: increase the level so that unification variables
+         -- allocated by the fundep-creation itself don't count as useful unifications
     do { inerts <- TcM.readTcRef inerts_var
        ; new_inert_var    <- TcM.newTcRef inerts
        ; new_wl_var       <- TcM.newTcRef emptyWorkList
-       ; new_unif_lvl_var <- TcM.newTcRef Nothing
        ; let nest_env = env { tcs_inerts   = new_inert_var
-                            , tcs_worklist = new_wl_var
-                            , tcs_unif_lvl = new_unif_lvl_var }
+                            , tcs_worklist = new_wl_var }
 
        ; TcM.traceTc "nestFunDepsTcS {" empty
-       ; (inner_lvl, _res) <- TcM.pushTcLevelM $
-                              thing_inside nest_env
-           -- Increase the level so that unification variables allocated by
-           -- the fundep-creation itself don't count as useful unifications
+       ; res <- thing_inside nest_env
        ; TcM.traceTc "nestFunDepsTcS }" empty
-
-       -- Figure out whether the fundeps did any useful unifications,
-       -- and if so update the tcs_unif_lvl
-       ; mb_new_lvl <- TcM.readTcRef new_unif_lvl_var
-       ; case mb_new_lvl of
-           Just unif_lvl
-             | inner_lvl `deeperThanOrSame` unif_lvl
-             -> -- Some useful unifications took place
-                do { mb_old_lvl <- TcM.readTcRef unif_lvl_var
-                   ; case mb_old_lvl of
-                       Just old_lvl | unif_lvl `deeperThanOrSame` old_lvl
-                                    -> return ()
-                       _ -> TcM.writeTcRef unif_lvl_var (Just unif_lvl)
-                   ; return True }
-
-           _  -> return False   -- No unifications (except of vars
-                                -- generated in the fundep stuff itself)
-       }
-
+       ; return res }
 
 updateInertsWith :: InertSet -> InertSet -> InertSet
 -- Update the current inert set with bits from a nested solve,
@@ -1410,30 +1396,6 @@ getTcEvBindsMap ev_binds_var
 setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcS ()
 setTcEvBindsMap ev_binds_var binds
   = wrapTcS $ TcM.setTcEvBindsMap ev_binds_var binds
-
-unifyTyVar :: TcTyVar -> TcType -> TcS ()
--- Unify a meta-tyvar with a type
--- We keep track of how many unifications have happened in tcs_unified,
---
--- We should never unify the same variable twice!
-unifyTyVar tv ty
-  = assertPpr (isMetaTyVar tv) (ppr tv) $
-    TcS $ \ env ->
-    do { TcM.traceTc "unifyTyVar" (ppr tv <+> text ":=" <+> ppr ty)
-       ; TcM.liftZonkM $ TcM.writeMetaTyVar tv ty
-       ; TcM.updTcRef (tcs_unified env) (+1) }
-
-reportUnifications :: TcS a -> TcS (Int, a)
--- Record how many unifications are done by thing_inside
--- We could return a Bool instead of an Int;
--- all that matters is whether it is no-zero
-reportUnifications (TcS thing_inside)
-  = TcS $ \ env ->
-    do { inner_unified <- TcM.newTcRef 0
-       ; res <- thing_inside (env { tcs_unified = inner_unified })
-       ; n_unifs <- TcM.readTcRef inner_unified
-       ; TcM.updTcRef (tcs_unified env) (+ n_unifs)
-       ; return (n_unifs, res) }
 
 getDefaultInfo ::  TcS (DefaultEnv, Bool)
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
@@ -1852,6 +1814,43 @@ produced the same Derived constraint.)
 -}
 
 
+unifyTyVar :: TcTyVar -> TcType -> TcS ()
+-- Unify a meta-tyvar with a type
+-- We keep track of how many unifications have happened in tcs_unified,
+--
+-- We should never unify the same variable twice!
+unifyTyVar tv ty
+  = assertPpr (isMetaTyVar tv) (ppr tv) $
+    do { liftZonkTcS (TcM.writeMetaTyVar tv ty)  -- Produces a trace message
+       ; setUnificationFlagTo (tcTyVarLevel tv) }
+
+reportUnifications :: TcS a -> TcS (Bool, a)
+-- Record whether any unifications are done by thing_inside
+-- Remember to propagate the information to the enclosing context
+reportUnifications (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_unif_lvl = outer_ul_var }) ->
+    do { inner_ul_var <- TcM.newTcRef Nothing
+
+       ; res <- thing_inside (env { tcs_unif_lvl = inner_ul_var })
+
+       ; ambient_lvl  <- TcM.getTcLevel
+       ; mb_inner_lvl <- TcM.readTcRef inner_ul_var
+
+       ; case mb_inner_lvl of
+           Just unif_lvl
+             | ambient_lvl `deeperThanOrSame` unif_lvl
+             -> -- Some useful unifications took place
+                do { mb_outer_lvl <- TcM.readTcRef outer_ul_var
+                   ; case mb_outer_lvl of
+                       Just outer_unif_lvl | outer_unif_lvl `strictlyDeeperThan` unif_lvl
+                         -> -- Update, because outer_unif_lv > unif_lvl
+                            TcM.writeTcRef outer_ul_var (Just unif_lvl)
+                       _ -> return ()
+                   ; return (True, res) }
+
+           _  -> -- No useful unifications
+                 return (False, res) }
+
 getUnificationFlag :: TcS Bool
 -- We are at ambient level i
 -- If the unification flag = Just i, reset it to Nothing and return True
@@ -2234,7 +2233,7 @@ unifyForAllBody ev role unify_body
   = do { (res, cts, unified) <- wrapUnifierX ev role unify_body
 
        -- Kick out any inert constraint that we have unified
-       ; _ <- kickOutAfterUnification unified
+       ; kickOutAfterUnification unified
 
        ; return (res, cts) }
 
@@ -2263,7 +2262,7 @@ wrapUnifierTcS ev role do_unifications
          updWorkListTcS (extendWorkListChildEqs ev cts)
 
        -- And kick out any inert constraint that we have unified
-       ; _ <- kickOutAfterUnification unified
+       ; kickOutAfterUnification unified
 
        ; return (res, cts, unified) }
 
