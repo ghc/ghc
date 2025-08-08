@@ -44,7 +44,7 @@ module GHC.Tc.Solver.Monad (
     panicTcS, traceTcS, tryEarlyAbortTcS,
     traceFireTcS, bumpStepCountTcS, csTraceTcS,
     wrapErrTcS, wrapWarnTcS,
-    getUnificationFlag,
+    getUnificationFlag, traceUnificationFlag,
 
     -- Evidence creation and transformation
     MaybeNew(..), freshGoals, isFresh, getEvExpr,
@@ -454,7 +454,8 @@ kickOutAfterUnification :: [TcTyVar] -> TcS ()
 kickOutAfterUnification tv_list
   = case nonEmpty tv_list of
       Nothing  -> return ()
-      Just tvs -> setUnificationFlagTo min_tv_lvl
+      Just tvs -> do { traceTcS "kickOutAfterUnification" (ppr min_tv_lvl $$ ppr tv_list)
+                     ; setUnificationFlagTo min_tv_lvl }
          where
            min_tv_lvl = foldr1 minTcLevel (NE.map tcTyVarLevel tvs)
 
@@ -1841,15 +1842,30 @@ reportUnifications (TcS thing_inside)
              | ambient_lvl `deeperThanOrSame` unif_lvl
              -> -- Some useful unifications took place
                 do { mb_outer_lvl <- TcM.readTcRef outer_ul_var
+                   ; TcM.traceTc "reportUnifications" $
+                     vcat [ text "ambient =" <+> ppr ambient_lvl
+                          , text "unif_lvl =" <+> ppr unif_lvl
+                          , text "mb_outer =" <+> ppr mb_outer_lvl ]
                    ; case mb_outer_lvl of
-                       Just outer_unif_lvl | outer_unif_lvl `strictlyDeeperThan` unif_lvl
-                         -> -- Update, because outer_unif_lv > unif_lvl
+                       Just outer_unif_lvl | unif_lvl `deeperThanOrSame` outer_unif_lvl
+                         -> -- No need to update: outer_unif_lvl is already shallower
+                            return ()
+                       _ -> -- Update the outer level
                             TcM.writeTcRef outer_ul_var (Just unif_lvl)
-                       _ -> return ()
                    ; return (True, res) }
 
            _  -> -- No useful unifications
                  return (False, res) }
+
+traceUnificationFlag :: String -> TcS ()
+traceUnificationFlag str
+  = TcS $ \env ->
+    do { ambient_lvl <- TcM.getTcLevel
+       ; mb_lvl <- TcM.readTcRef (tcs_unif_lvl env)
+       ; TcM.traceTc ("trace-uni-flag: " ++ str) $
+         vcat [ text "ambient =" <+> ppr ambient_lvl
+              , text "mb_lvl =" <+> ppr mb_lvl ]
+       ; return () }
 
 getUnificationFlag :: TcS Bool
 -- We are at ambient level i
@@ -1880,8 +1896,11 @@ setUnificationFlagTo lvl
        ; mb_lvl <- TcM.readTcRef ref
        ; case mb_lvl of
            Just unif_lvl | lvl `deeperThanOrSame` unif_lvl
-                         -> return ()
-           _ -> TcM.writeTcRef ref (Just lvl) }
+                         -> do { TcM.traceTc "set-uni-flag skip" $
+                                 vcat [ text "lvl" <+> ppr lvl, text "unif_lvl" <+> ppr unif_lvl ]
+                               ; return () }
+           _ -> do { TcM.traceTc "set-uni-flag" (ppr lvl)
+                   ; TcM.writeTcRef ref (Just lvl) } }
 
 
 {- *********************************************************************
@@ -2271,14 +2290,16 @@ wrapUnifierX :: CtEvidence -> Role
              -> TcS (a, Bag Ct, [TcTyVar])
 wrapUnifierX ev role do_unifications
   = do { unif_count_ref <- getUnifiedRef
+       ; given_eq_lvl <- getInnermostGivenEqLevel
        ; wrapTcS $
          do { defer_ref   <- TcM.newTcRef emptyBag
             ; unified_ref <- TcM.newTcRef []
-            ; let env = UE { u_role      = role
-                           , u_rewriters = ctEvRewriters ev
-                           , u_loc       = ctEvLoc ev
-                           , u_defer     = defer_ref
-                           , u_unified   = Just unified_ref}
+            ; let env = UE { u_role         = role
+                           , u_given_eq_lvl = given_eq_lvl
+                           , u_rewriters    = ctEvRewriters ev
+                           , u_loc          = ctEvLoc ev
+                           , u_defer        = defer_ref
+                           , u_unified      = Just unified_ref}
               -- u_rewriters: the rewriter set and location from
               -- the parent constraint `ev` are inherited in any
               -- new constraints spat out by the unifier

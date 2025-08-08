@@ -1071,8 +1071,10 @@ solveSimpleWanteds simples
                          simples limit (emptyWC { wc_simple = wc })
       | otherwise
       = do { -- Solve
-             (unif_happened, wc1) <- reportUnifications $
+             traceUnificationFlag "solveSimpleWanteds1"
+           ; (unif_happened, wc1) <- reportUnifications $
                                      solve_simple_wanteds wc
+           ; traceUnificationFlag "solveSimpleWanteds2"
 
              -- Run plugins
              -- NB: runTcPluginsWanted has a fast path for empty wc1,

@@ -323,9 +323,11 @@ doDictFunDepImprovementLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
   = Stage $
     do { inerts <- getInertCans
 
+       ; traceTcS "doDictFunDepImprovementLocal {" (ppr dict_ct)
        ; imp <- solveFunDeps $
                 foldM do_interaction emptyCts $
                 findDictsByClass (inert_dicts inerts) cls
+       ; traceTcS "doDictFunDepImprovementLocal }" (text "imp =" <+> ppr imp)
 
        ; if imp then startAgainWith (CDictCan dict_ct)
                 else continueWith () }
@@ -344,15 +346,13 @@ doDictFunDepImprovementLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
       = return new_eqs1
 
       | otherwise
-      = do { traceTcS "doLocalFunDepImprovement" $
-             vcat [ ppr work_ev
-                  , pprCtLoc work_loc, ppr (isGivenLoc work_loc)
-                  , pprCtLoc inert_loc, ppr (isGivenLoc inert_loc)
-                  , pprCtLoc deriv_loc, ppr (isGivenLoc deriv_loc) ]
-
-           ; new_eqs2 <- unifyFunDepWanteds_new work_ev $
+      = do { new_eqs2 <- unifyFunDepWanteds_new work_ev $
                          improveFromAnother (deriv_loc, inert_rewriters)
                                             inert_pred work_pred
+
+           ; traceTcS "doDictFunDepImprovementLocal item" $
+             vcat [ ppr work_ev, ppr new_eqs2 ]
+
            ; return (new_eqs1 `unionBags` new_eqs2) }
       where
         inert_pred  = ctEvPred inert_ev
@@ -374,10 +374,12 @@ doDictFunDepImprovementTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = 
   = Stage $
     do { inst_envs <- getInstEnvs
 
+       ; traceTcS "doDictFunDepImprovementTop {" (ppr dict_ct)
        ; let eqns :: [FunDepEqn (CtLoc, RewriterSet)]
              eqns = improveFromInstEnv inst_envs mk_ct_loc cls xis
        ; imp <- solveFunDeps $
                 unifyFunDepWanteds_new ev eqns
+       ; traceTcS "doDictFunDepImprovementTop }" (text "imp =" <+> ppr imp)
 
        ; if imp then startAgainWith (CDictCan dict_ct)
                 else continueWith () }
