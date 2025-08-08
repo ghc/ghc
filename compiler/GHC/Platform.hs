@@ -361,7 +361,7 @@ lookupPlatformConstants include_dirs = find_constants include_dirs
             Just <$> parseConstantsHeader p
           False -> return Nothing
 
-    find_constants []     = return Nothing
+    find_constants []     = putStrLn "No include_dirs left to look for DerivedConstants.h in" >> return Nothing
     find_constants (x:xs) = try_parse x >>= \case
         Nothing -> find_constants xs
         Just c  -> return (Just c)
