@@ -2,6 +2,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module GHC.Driver.Session.Units (initMake, initMulti) where
 
 -- The official GHC API
@@ -183,7 +185,7 @@ checkUnitCycles dflags graph = processSCCs (HUG.hugSCCs graph)
 
     processSCCs [] = return ()
     processSCCs (AcyclicSCC _: other_sccs) = processSCCs other_sccs
-    processSCCs (NECyclicSCC uids: _) = throwGhcException $ CmdLineError $ showSDoc dflags (cycle_err uids)
+    processSCCs (CyclicSCC uids: _) = throwGhcException $ CmdLineError $ showSDoc dflags (cycle_err uids)
 
 
     cycle_err uids =
@@ -195,8 +197,8 @@ checkUnitCycles dflags graph = processSCCs (HUG.hugSCCs graph)
                     (map (\uid -> text "-" <+> ppr uid <+> text "depends on") start)
                     ++ [text "-" <+> ppr final]
       where
-        start = NE.init uids
-        final = NE.last uids
+        start = init uids
+        final = last uids
 
 -- | Check that we don't have multiple units with the same UnitId.
 checkDuplicateUnits :: DynFlags -> [(FilePath, DynFlags)] -> Ghc ()
