@@ -42,7 +42,7 @@ import GHC.Types.Id(  idType )
 import GHC.Types.Var( EvVar, tyVarKind )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Basic ( IntWithInf, intGtLimit )
+import GHC.Types.Basic ( IntWithInf, mulWithInf, intGtLimit )
 import GHC.Types.Unique.Set( nonDetStrictFoldUniqSet )
 
 import GHC.Data.Bag
@@ -1043,49 +1043,55 @@ solveSimpleGivens givens
 
 solveSimpleWanteds :: Cts -> TcS Cts
 -- The result is not necessarily zonked
-solveSimpleWanteds simples
+solveSimpleWanteds wc
   = do { mode   <- getTcSMode
        ; dflags <- getDynFlags
        ; inerts <- getInertSet
+       ; let iteration_count_flag = solverIterations dflags
 
        ; traceTcS "solveSimpleWanteds {" $
          vcat [ text "Mode:" <+> ppr mode
               , text "Inerts:" <+> ppr inerts
-              , text "Wanteds to solve:" <+> ppr simples ]
+              , text "Wanteds to solve:" <+> ppr wc ]
 
-       ; (n,wc) <- go 1 (solverIterations dflags) simples
+       ; wc1 <- iterateToFixpoint iteration_count_flag
+                  (do_solve_and_plugins iteration_count_flag) wc
 
        ; traceTcS "solveSimpleWanteds end }" $
-             vcat [ text "iterations =" <+> ppr n
-                  , text "residual =" <+> ppr wc ]
-       ; return wc }
+             vcat [ text "residual =" <+> ppr wc1 ]
+       ; return wc1 }
   where
-    go :: Int -> IntWithInf -> Cts -> TcS (Int, Cts)
-    -- See Note [The solveSimpleWanteds loop]
-    go n limit wc
+    do_solve_and_plugins :: IntWithInf -> Cts -> TcS (Bool,Cts)
+    do_solve_and_plugins icf wc
+      = do { wc1 <- iterateToFixpoint (icf `mulWithInf` 10)
+                              do_solve wc
+           ; runTcPluginsWanted wc1 }
+
+    do_solve :: Cts -> TcS (Bool,Cts)
+    -- Try this repeatedly, until no unifications happen
+    -- This is potentially quadratic, because we might solve just one
+    -- constraint in each iteration but that seems inevitable
+    do_solve wc = reportUnifications (solve_simple_wanteds wc)
+
+
+iterateToFixpoint :: IntWithInf -> (Cts -> TcS (Bool,Cts)) -> Cts -> TcS Cts
+-- See Note [The solveSimpleWanteds loop]
+iterateToFixpoint limit do_it wc_orig
+  = go 1 wc_orig
+  where
+    go n wc
       | isEmptyBag wc
-      = return (n,wc)
+      = return wc
 
       | n `intGtLimit` limit
       = failTcS $ TcRnSimplifierTooManyIterations
-                         simples limit (emptyWC { wc_simple = wc })
+                         wc_orig limit (emptyWC { wc_simple = wc })
+
       | otherwise
-      = do { -- Solve
-             traceUnificationFlag "solveSimpleWanteds1"
-           ; (unif_happened, wc1) <- reportUnifications $
-                                     solve_simple_wanteds wc
-           ; traceUnificationFlag "solveSimpleWanteds2"
-
-             -- Run plugins
-             -- NB: runTcPluginsWanted has a fast path for empty wc1,
-             --     which is the common case
-           ; (rerun_plugin, wc2) <- runTcPluginsWanted wc1
-
-           ; if unif_happened || rerun_plugin
-             then do { traceTcS "solveSimple going round again:" empty
-                     ; go (n+1) limit wc2 }   -- Loop
-             else return (n, wc2) }           -- Done
-
+      = do { (something_happened, wc1) <- do_it wc
+           ; if something_happened
+             then go (n+1) wc1
+             else return wc1 }
 
 solve_simple_wanteds :: Cts -> TcS Cts
 -- Try solving these constraints
