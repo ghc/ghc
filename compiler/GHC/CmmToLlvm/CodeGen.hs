@@ -243,7 +243,7 @@ genCall (PrimTarget op@(MO_BSwap w)) [dst] args =
     genCallSimpleCast w op dst args
 
 -- Handle Pdep and Pext that (may) require using a type with a larger bit-width
--- than the specified but width. This register width-extension is particualarly
+-- than the specified bit width. This register width-extension is particualarly
 -- necessary for W8 and W16.
 genCall (PrimTarget op@(MO_Pdep w)) [dst] args =
     genCallCastWithMinWidthOf W32 w op dst args
