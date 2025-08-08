@@ -180,12 +180,21 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
         bh_info != &stg_CAF_BLACKHOLE_info &&
         bh_info != &__stg_EAGER_BLACKHOLE_info &&
         bh_info != &stg_WHITEHOLE_info) {
-        // if it is a WHITEHOLE, then a thread is in the process of
-        // trying to BLACKHOLE it.  But we know that it was once a
-        // BLACKHOLE, so there is at least a valid pointer in the
-        // payload, so we can carry on.
         return 0;
     }
+
+    // If we see a WHITEHOLE then we should wait for it to turn into a BLACKHOLE.
+    // Otherwise we might look at the indirectee and segfault.
+    // See "Exception handling" in Note [Thunks, blackholes, and indirections]
+    // We might be looking at a *fresh* THUNK being WHITEHOLE-d so we can't
+    // guarantee that the indirectee is a valid pointer.
+#if defined(THREADED_RTS)
+    if (bh_info == &stg_WHITEHOLE_info) {
+      while(ACQUIRE_LOAD(&bh->header.info) == &stg_WHITEHOLE_info) {
+        busy_wait_nop();
+      }
+    }
+#endif
 
     // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
     // or a value.
