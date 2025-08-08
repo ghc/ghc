@@ -333,6 +333,10 @@
  * `AP_STACK` closure recording the aborted execution state.
  * See `RaiseAsync.c:raiseAsync` for details.
  *
+ * This can combine with indirection shortcutting during GC to replace a BLACKHOLE
+ * with a fresh THUNK. We should be very careful here since the THUNK will have an
+ * undefined value in the indirectee field. Looking at the indirectee field can then
+ * lead to a segfault such as #26205.
  *
  * CAFs
  * ----
