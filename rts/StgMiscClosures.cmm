@@ -588,6 +588,9 @@ retry:
 
         MessageBlackHole_tso(msg) = CurrentTSO;
         MessageBlackHole_bh(msg) = node;
+        // Ensure that the link field is a valid closure,
+        // since we might turn this into an indirection in wakeBlockingQueue()
+        MessageBlackHole_link(msg) = stg_END_TSO_QUEUE_closure;
         SET_HDR(msg, stg_MSG_BLACKHOLE_info, CCS_SYSTEM);
         // messageBlackHole has appropriate memory barriers when this object is exposed.
         // See Note [Heap memory barriers].
