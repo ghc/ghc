@@ -109,8 +109,7 @@ static void *itimer_thread_func(void *_handle_tick)
 
     // Relaxed is sufficient: If we don't see that exited was set in one iteration we will
     // see it next time.
-    TSAN_ANNOTATE_BENIGN_RACE(&exited, "itimer_thread_func");
-    while (!RELAXED_LOAD(&exited)) {
+    while (!RELAXED_LOAD_ALWAYS(&exited)) {
         if (poll(pollfds, 2, -1) == -1) {
             // While the RTS attempts to mask signals, some foreign libraries
             // may rely on signal delivery may unmask them. Consequently we may
@@ -144,8 +143,7 @@ static void *itimer_thread_func(void *_handle_tick)
         }
 
         // first try a cheap test
-        TSAN_ANNOTATE_BENIGN_RACE(&stopped, "itimer_thread_func");
-        if (RELAXED_LOAD(&stopped)) {
+        if (RELAXED_LOAD_ALWAYS(&stopped)) {
             OS_ACQUIRE_LOCK(&mutex);
             // should we really stop?
             if (stopped) {
