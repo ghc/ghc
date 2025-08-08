@@ -862,11 +862,9 @@ ppr_expr (HsOverLabel s l) = case ghcPass @p of
 ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
 ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
-
-ppr_expr (HsPragE _ prag e) = sep [ppr prag, ppr_lexpr e]
-
-ppr_expr e@(HsApp {})        = ppr_apps e []
-ppr_expr e@(HsAppType {})    = ppr_apps e []
+ppr_expr (HsPragE _ prag e)  = sep [ppr prag, ppr_lexpr e]
+ppr_expr e@(HsApp {})        = pprApp e
+ppr_expr e@(HsAppType {})    = pprApp e
 
 ppr_expr (OpApp _ e1 op e2)
   | Just pp_op <- ppr_infix_expr (unLoc op)
@@ -1134,21 +1132,22 @@ ppr_infix_hs_expansion :: HsThingRn -> Maybe SDoc
 ppr_infix_hs_expansion (OrigExpr e) = ppr_infix_expr e
 ppr_infix_hs_expansion _            = Nothing
 
-ppr_apps :: (OutputableBndrId p)
-         => HsExpr (GhcPass p)
-         -> [Either (LHsExpr (GhcPass p)) (LHsWcType (NoGhcTc (GhcPass p)))]
-         -> SDoc
-ppr_apps (HsApp _ (L _ fun) arg)        args
-  = ppr_apps fun (Left arg : args)
-ppr_apps (HsAppType _ (L _ fun) arg)    args
-  = ppr_apps fun (Right arg : args)
-ppr_apps fun args = hang (ppr_expr fun) 2 (fsep (map pp args))
+pprApp :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
+pprApp app
+  = go app []  -- Collect arguments and print all at once
   where
-    pp (Left arg)                             = ppr arg
-    -- pp (Right (LHsWcTypeX (HsWC { hswc_body = L _ arg })))
-    --   = char '@' <> pprHsType arg
-    pp (Right arg)
-      = text "@" <> ppr arg
+    go fun args
+      = case fun of
+          HsApp _     (L _ fun') arg -> go fun' (Left arg  : args)
+          HsAppType _ (L _ fun') arg -> go fun' (Right arg : args)
+          _                          -> ppr_app fun args
+
+    ppr_app fun args = hang (ppr_expr fun)
+                          2 (pprDeeper (fsep (map pp args)))
+           -- pprDeeper: go deeper as we step inside an argument
+
+    pp (Left arg)  = ppr arg
+    pp (Right arg) = text "@" <> ppr arg
 
 pprDebugParendExpr :: (OutputableBndrId p)
                    => PprPrec -> LHsExpr (GhcPass p) -> SDoc

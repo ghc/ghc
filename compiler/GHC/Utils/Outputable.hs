@@ -522,23 +522,23 @@ pprDeeper d = SDoc $ \ctx -> case sdocStyle ctx of
   _ -> runSDoc d ctx
 
 
--- | Truncate a list that is longer than the current depth.
+-- | Truncate a list that is longer than the default depth
 pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
 pprDeeperList f ds
   | null ds   = f []
   | otherwise = SDoc work
  where
-  work ctx@SDC{sdocStyle=PprUser q depth c}
-   | DefaultDepth <- depth
-   = work (ctx { sdocStyle = PprUser q (PartWay (sdocDefaultDepth ctx)) c })
-   | PartWay 0 <- depth
-   = Pretty.text "..."
-   | PartWay n <- depth
-   = let
+  work ctx@SDC{ sdocStyle=PprUser _ (PartWay {}) _ }
+   = let   -- Only do this depth-limitation in User style
+           -- when PartWay is on.  Why not for DefaultDepth?
+           -- I have no idea; seems like a bug to me.
         go _ [] = []
-        go i (d:ds) | i >= n    = [text "...."]
-                    | otherwise = d : go (i+1) ds
-     in runSDoc (f (go 0 ds)) ctx{sdocStyle = PprUser q (PartWay (n-1)) c}
+        go i (d:ds) | i >= default_depth = [text "...."]
+                    | otherwise     = d : go (i+1) ds
+     in runSDoc (f (go 0 ds)) ctx
+   where
+     default_depth = sdocDefaultDepth ctx
+
   work other_ctx = runSDoc (f ds) other_ctx
 
 pprSetDepth :: Depth -> SDoc -> SDoc
