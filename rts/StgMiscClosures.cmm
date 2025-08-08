@@ -31,6 +31,7 @@ import CLOSURE ENT_VIA_NODE_ctr;
 import CLOSURE RtsFlags;
 import CLOSURE stg_BLOCKING_QUEUE_CLEAN_info;
 import CLOSURE stg_BLOCKING_QUEUE_DIRTY_info;
+import CLOSURE stg_END_TSO_QUEUE_closure;
 import CLOSURE stg_IND_info;
 import CLOSURE stg_MSG_BLACKHOLE_info;
 import CLOSURE stg_TSO_info;
@@ -588,6 +589,9 @@ retry:
 
         MessageBlackHole_tso(msg) = CurrentTSO;
         MessageBlackHole_bh(msg) = node;
+        // Ensure that the link field is a valid closure,
+        // since we might turn this into an indirection in wakeBlockingQueue()
+        MessageBlackHole_link(msg) = stg_END_TSO_QUEUE_closure;
         SET_HDR(msg, stg_MSG_BLACKHOLE_info, CCS_SYSTEM);
         // messageBlackHole has appropriate memory barriers when this object is exposed.
         // See Note [Heap memory barriers].
