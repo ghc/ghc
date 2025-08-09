@@ -8,7 +8,7 @@ Do And If Then Else
 
     :since: 7.0.1
 
-    :status: Included in :extension:`Haskell2010`
+    :status: Included in :extension:`GHC2024`, :extension:`GHC2021`, :extension:`Haskell2010`
 
     Allow semicolons in ``if`` expressions.
 
