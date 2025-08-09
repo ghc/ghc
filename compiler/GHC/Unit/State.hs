@@ -1251,8 +1251,10 @@ instance Outputable UnusableUnitReason where
     ppr IgnoredWithFlag = text "[ignored with flag]"
     ppr (BrokenDependencies uids)   = brackets (text "broken" <+> ppr uids)
     ppr (CyclicDependencies uids)   = brackets (text "cyclic" <+> ppr uids)
-    ppr (IgnoredDependencies uids)  = brackets (text "ignored" <+> ppr uids)
-    ppr (ShadowedDependencies uids) = brackets (text "shadowed" <+> ppr uids)
+    ppr (IgnoredDependencies uids)  = brackets (text "unusable because the -ignore-package flag was used to " ++
+                                                  "ignore at least one of its dependencies:") $$
+                                        nest 2 (hsep (map ppr uids))
+    ppr (ShadowedDependencies uids) = brackets (text "unusable due to shadowed" <+> ppr uids)
 
 type UnusableUnits = UniqMap UnitId (UnitInfo, UnusableUnitReason)
 
@@ -1640,10 +1642,17 @@ mkUnitState logger dflags cfg = do
   -- Sanity check. If the rtsWayUnitId is not in the database, then we have a
   -- problem.  The RTS is effectively missing.
   unless (null pkgs1 || gopt Opt_NoRts dflags || anyUniqMap (== rtsWayUnitId dflags) wired_map) $ do
-    pprPanic "mkUnitState" $ ppr ( length pkgs1
-                                , gopt Opt_NoRts dflags
-                                , anyUniqMap (== rtsWayUnitId dflags) wired_map
-                                , wired_map) <> text "; The RTS for " <> ppr (rtsWayUnitId dflags) <> text " is missing from the package database.  Please check your installation."
+    pprPanic "mkUnitState" $
+      ppr ( length pkgs1
+          , gopt Opt_NoRts dflags
+          , anyUniqMap (== rtsWayUnitId dflags) wired_map
+          , wired_map)
+      <> text "; The RTS for " <> ppr (rtsWayUnitId dflags)
+      <> text " is missing from the package database while building unit "
+      <> ppr (homeUnitId_ dflags)
+      <> text " (home units: " <> ppr (Set.toList (unitConfigHomeUnits cfg)) <> text ")."
+      <> text " Please check your installation."
+      <> text " If this target doesn't need the RTS (e.g. building a shared library), you can add -no-rts to the relevant package's ghc-options in cabal.project to bypass this check."
 
   let pkgs3 = if gopt Opt_NoRts dflags && not (anyUniqMap (== ghcInternalUnitId) wired_map)
               then pkgs2
