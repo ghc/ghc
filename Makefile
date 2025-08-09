@@ -60,25 +60,6 @@ define HADRIAN_SETTINGS
 ]
 endef
 
-define run_and_log
-@set -e; \
-LOGDIR=$(@D)/../logs; \
-mkdir -p "$$LOGDIR"; \
-STDOUT_LOG="$$LOGDIR/$(notdir $@).stdout.log"; \
-STDERR_LOG="$$LOGDIR/$(notdir $@).stderr.log"; \
-echo "+ $(1)"; \
-( { $(1); } >"$$STDOUT_LOG" 2>"$$STDERR_LOG" ) || { \
-  if [ -s "$$STDERR_LOG" ]; then \
-    cat "$$STDERR_LOG"; \
-    echo "See logs: $$STDERR_LOG (stderr), $$STDOUT_LOG (stdout)"; \
-  elif [ -s "$$STDOUT_LOG" ]; then \
-    cat "$$STDOUT_LOG"; \
-    echo "See logs: $$STDERR_LOG (stderr), $$STDOUT_LOG (stdout)"; \
-  fi; \
-  exit 1; \
-}
-endef
-
 # Handle CPUS and THREADS
 CPUS_DETECT_SCRIPT := ./mk/detect-cpu-count.sh
 CPUS := $(shell if [ -x $(CPUS_DETECT_SCRIPT) ]; then $(CPUS_DETECT_SCRIPT); else echo 2; fi)
@@ -186,11 +167,11 @@ $(abspath _build/stage0/bin/cabal): _build/stage0/bin/cabal
 # We need an absolute path here otherwise cabal will consider the path relative to `the project directory
 _build/stage0/bin/cabal: BUILD_ARGS=-j -w $(GHC0) --disable-tests --project-dir libraries/Cabal --builddir=$(abspath _build/stage0)
 _build/stage0/bin/cabal:
-	@echo ">>> Building Cabal..."
+	@echo "::group::Building Cabal..."
 	@mkdir -p _build/stage0/bin _build/logs
 	cabal build $(BUILD_ARGS) cabal-install:exe:cabal
 	cp -rfp $(shell cabal list-bin -v0 $(BUILD_ARGS) cabal-install:exe:cabal) _build/stage0/bin/cabal
-	@echo ">>> Cabal built successfully."
+	@echo "::endgroup::"
 
 # --- Stage 1 build ---
 
@@ -199,20 +180,25 @@ _build/stage1/%: private GHC=$(GHC0)
 
 .PHONY: $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES))
 $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES)) &: $(CABAL) | _build/booted
+	@echo "::group::Building stage1 executables ($(STAGE1_EXECUTABLES))..."
 	# Force cabal to replan
 	rm -rf _build/stage1/cache
-	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
-		$(CABAL_BUILD) $(STAGE1_TARGETS))
+	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' $(CABAL_BUILD) $(STAGE1_TARGETS)
+	@echo "::endgroup::"
 
 _build/stage1/lib/settings: _build/stage1/bin/ghc-toolchain-bin
+	@echo "::group::Creating settings for $(TARGET_TRIPLE)..."
 	@mkdir -p $(@D)
-	$(call run_and_log, _build/stage1/bin/ghc-toolchain-bin --triple $(TARGET_TRIPLE) --output-settings -o $@ --cc $(CC) --cxx $(CXX))
+	_build/stage1/bin/ghc-toolchain-bin --triple $(TARGET_TRIPLE) --output-settings -o $@ --cc $(CC) --cxx $(CXX)
+	@echo "::endgroup::"
 
 _build/stage1/lib/package.conf.d/package.cache: _build/stage1/bin/ghc-pkg _build/stage1/lib/settings
+	@echo "::group::Creating stage1 package cache..."
 	@mkdir -p _build/stage1/lib/package.conf.d
 	@rm -rf _build/stage1/lib/package.conf.d/*
 	cp -rfp _build/stage1/packagedb/host/*/* _build/stage1/lib/package.conf.d
 	_build/stage1/bin/ghc-pkg recache
+	@echo "::endgroup::"
 
 _build/stage1/lib/template-hsc.h: utils/hsc2hs/data/template-hsc.h
 	@mkdir -p $(@D)
@@ -228,22 +214,26 @@ _build/stage2/%: private GHC=$(realpath _build/stage1/bin/ghc)
 
 .PHONY: $(addprefix _build/stage2/bin/,$(STAGE2_EXECUTABLES))
 $(addprefix _build/stage2/bin/,$(STAGE2_EXECUTABLES)) &: $(CABAL) stage1
+	@echo "::group::Building stage2 executables ($(STAGE2_EXECUTABLES))..."
 	# Force cabal to replan
 	rm -rf _build/stage2/cache
-	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
+	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
 		PATH=$(PWD)/_build/stage1/bin:$(PATH) \
-		$(CABAL_BUILD) --ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" -W $(GHC0) $(STAGE2_TARGETS) )
+		$(CABAL_BUILD) --ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" -W $(GHC0) $(STAGE2_TARGETS)
+	@echo "::endgroup::"
 
 # Do we want to build these with the stage2 GHC or the stage1 GHC?
 # Traditionally we build them with the stage1 ghc, but we could just as well
 # build them with the stage2 ghc; seems like a better/cleaner idea to me (moritz).
 .PHONY: $(addprefix _build/stage2/bin/,$(STAGE2_UTIL_EXECUTABLES))
 $(addprefix _build/stage2/bin/,$(STAGE2_UTIL_EXECUTABLES)) &: $(CABAL) stage1
+	@echo "::group::Building stage2 utilities ($(STAGE2_UTIL_EXECUTABLES))..."
 	# Force cabal to replan
 	rm -rf _build/stage2/cache
-	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
+	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
 		PATH=$(PWD)/_build/stage1/bin:$(PATH) \
-		$(CABAL_BUILD) --ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" -W $(GHC0) $(STAGE2_UTIL_TARGETS) )
+		$(CABAL_BUILD) --ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" -W $(GHC0) $(STAGE2_UTIL_TARGETS)
+	@echo "::endgroup::"
 
 
 # # We use PATH=... here to ensure all the build-tool-depends (deriveConstants, genapply, genprimopcode, ...) are
@@ -279,10 +269,12 @@ _build/stage2/lib/settings: _build/stage1/lib/settings
 	cp -rfp _build/stage1/lib/settings _build/stage2/lib/settings
 
 _build/stage2/lib/package.conf.d/package.cache: _build/stage2/bin/ghc-pkg _build/stage2/lib/settings
+	@echo "::group::Creating stage2 package cache..."
 	@mkdir -p _build/stage2/lib/package.conf.d
 	@rm -rf _build/stage2/lib/package.conf.d/*
 	cp -rfp _build/stage2/packagedb/host/*/* _build/stage2/lib/package.conf.d
 	_build/stage2/bin/ghc-pkg recache
+	@echo "::endgroup::"
 
 _build/stage2/lib/template-hsc.h: utils/hsc2hs/data/template-hsc.h
 	@mkdir -p $(@D)
@@ -293,7 +285,7 @@ stage2: $(addprefix _build/stage2/bin/,$(STAGE2_EXECUTABLES)) _build/stage2/lib/
 
 # Target for creating the final binary distribution directory
 _build/bindist: stage2 driver/ghc-usage.txt driver/ghci-usage.txt
-	@echo "Creating binary distribution in _build/bindist"
+	@echo "::group::Creating binary distribution in _build/bindist"
 	@mkdir -p _build/bindist/bin
 	@mkdir -p _build/bindist/lib
 	# Copy executables from stage2 bin
@@ -305,54 +297,58 @@ _build/bindist: stage2 driver/ghc-usage.txt driver/ghci-usage.txt
 	@cp -rfp driver/ghci-usage.txt _build/bindist/lib/
 	@echo "FIXME: Changing 'Support SMP' from YES to NO in settings file"
 	@sed 's/("Support SMP","YES")/("Support SMP","NO")/' -i.bck _build/bindist/lib/settings
-	@echo "Binary distribution created."
+	@echo "::endgroup::"
 
 # --- Configuration ---
 
 $(GHC1) $(GHC2): | hackage
 hackage: _build/packages/hackage.haskell.org/01-index.tar.gz
 _build/packages/hackage.haskell.org/01-index.tar.gz: | $(CABAL)
+	@echo "::group::Updating Hackage index..."
 	@mkdir -p $(@D)
 	$(CABAL) $(CABAL_ARGS) update --index-state 2025-04-22T01:25:40Z
+	@echo "::endgroup::"
 
 # booted depends on successful source preparation
 _build/booted:
-	@echo ">>> Running ./boot script..."
+	@echo "::group::Running ./boot script..."
 	@mkdir -p _build/logs
-	./boot |& tee _build/logs/boot.log
-	@echo ">>> Running ./configure script..."
-	$(call run_and_log, ./configure)
+	./boot
+	@echo "::endgroup::"
+	@echo "::group::Running ./configure script..."
+	./configure
+	@echo "::endgroup::"
 	touch $@
 
 # --- Clean Targets ---
 clean:
-	@echo ">>> Cleaning build artifacts..."
+	@echo "::group::Cleaning build artifacts..."
 	rm -rf _build
-	@echo ">>> Build artifacts cleaned."
+	@echo "::endgroup::"
 
 clean-stage1:
-	@echo ">>> Cleaning stage1 build artifacts..."
+	@echo "::group::Cleaning stage1 build artifacts..."
 	rm -rf _build/stage1
-	@echo ">>> Stage1 build artifacts cleaned."
+	@echo "::endgroup::"
 
 clean-stage2:
-	@echo ">>> Cleaning stage2 build artifacts..."
+	@echo "::group::Cleaning stage2 build artifacts..."
 	rm -rf _build/stage2
-	@echo ">>> Stage2 build artifacts cleaned."
+	@echo "::endgroup::"
 
 distclean: clean
-	@echo ">>> Cleaning all generated files (distclean)..."
+	@echo "::group::Cleaning all generated files (distclean)..."
 	rm -rf autom4te.cache
 	rm -f config.status config.log config.h configure aclocal.m4
 	rm -rf build-aux/config.guess build-aux/config.sub build-aux/install-sh build-aux/missing build-aux/compile depcomp
 	find . -name 'Makefile.in' -delete
 	rm -f $(CONFIGURED_FILES)
-	@echo ">>> All generated files cleaned."
+	@echo "::endgroup::"
 
 
 # --- Test Target ---
 test: _build/bindist
-	@echo ">>> Running tests with THREADS=${THREADS}" >&2
+	@echo "::group::Running tests with THREADS=${THREADS}" >&2
 	TEST_HC=`pwd`/_build/bindist/bin/ghc \
 	TEST_CC=$(CC) \
 	TEST_CXX=$(CXX) \
@@ -360,6 +356,7 @@ test: _build/bindist
 	SUMMARY_FILE=`pwd`/_build/test-summary.txt \
 	JUNIT_FILE=`pwd`/_build/test-junit.xml \
 	make -C testsuite/tests test THREADS=${THREADS}
+	@echo "::endgroup::" >&2
 
 # Inform Make that these are not actual files if they get deleted by other means
 .PHONY: clean distclean test all
