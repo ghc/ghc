@@ -25,7 +25,7 @@ override CABAL_ARGS += \
 	--logs-dir=_build/$(STAGE)/logs
 
 override CABAL_BUILD_ARGS += \
-	-j -v -w $(GHC) --with-gcc=$(CC) \
+	-j -w $(GHC) --with-gcc=$(CC) \
 	--project-file=cabal.project.$(STAGE) \
 	--builddir=_build/$(STAGE) \
 	--ghc-options="-fhide-source-paths"
