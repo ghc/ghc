@@ -3,6 +3,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -----------------------------------------------------------------------------
 --
@@ -88,7 +89,7 @@ import System.Exit
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
-import Data.List ( isPrefixOf, partition, intercalate, unsnoc )
+import Data.List ( isPrefixOf, partition, intercalate )
 import Prelude
 import qualified Data.List.NonEmpty as NE
 
@@ -115,7 +116,8 @@ main = do
     argv0 <- getArgs
 
     let (minusB_args, argv1) = partition ("-B" `isPrefixOf`) argv0
-        mbMinusB = drop 2 . snd <$> unsnoc minusB_args
+        mbMinusB | null minusB_args = Nothing
+                 | otherwise = Just (drop 2 (last minusB_args))
 
     let argv2 = map (mkGeneralLocated "on the commandline") argv1
 
