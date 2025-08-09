@@ -220,7 +220,7 @@ $(addprefix _build/stage2/bin/,$(STAGE2_EXECUTABLES)) &: $(CABAL) stage1
 	rm -rf _build/stage2/cache
 	HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
 		PATH=$(PWD)/_build/stage1/bin:$(PATH) \
-		$(CABAL_BUILD) --ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" -W $(GHC0) $(STAGE2_TARGETS)
+		$(CABAL_BUILD) --ghc-options="-ghcversion-file=$(abspath ./rts/include/ghcversion.h)" -W $(GHC0) $(STAGE2_TARGETS) -j1
 	@echo "::endgroup::"
 
 # Do we want to build these with the stage2 GHC or the stage1 GHC?
