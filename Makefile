@@ -27,7 +27,8 @@ override CABAL_ARGS += \
 override CABAL_BUILD_ARGS += \
 	-j -v -w $(GHC) --with-gcc=$(CC) \
 	--project-file=cabal.project.$(STAGE) \
-	--builddir=_build/$(STAGE)
+	--builddir=_build/$(STAGE) \
+	--ghc-options="-fhide-source-paths"
 
 # just some defaults
 STAGE ?= stage1
@@ -165,7 +166,7 @@ $(abspath _build/stage0/bin/cabal): _build/stage0/bin/cabal
 # This just builds cabal-install, which is used to build the rest of the project.
 
 # We need an absolute path here otherwise cabal will consider the path relative to `the project directory
-_build/stage0/bin/cabal: BUILD_ARGS=-j -w $(GHC0) --disable-tests --project-dir libraries/Cabal --builddir=$(abspath _build/stage0)
+_build/stage0/bin/cabal: BUILD_ARGS=-j -w $(GHC0) --disable-tests --project-dir libraries/Cabal --builddir=$(abspath _build/stage0) --ghc-options="-fhide-source-paths"
 _build/stage0/bin/cabal:
 	@echo "::group::Building Cabal..."
 	@mkdir -p _build/stage0/bin _build/logs
