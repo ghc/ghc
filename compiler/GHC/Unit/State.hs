@@ -1251,8 +1251,8 @@ instance Outputable UnusableUnitReason where
     ppr IgnoredWithFlag = text "[ignored with flag]"
     ppr (BrokenDependencies uids)   = brackets (text "broken" <+> ppr uids)
     ppr (CyclicDependencies uids)   = brackets (text "cyclic" <+> ppr uids)
-    ppr (IgnoredDependencies uids)  = brackets (text "unusable because the -ignore-package flag was used to " ++
-                                                  "ignore at least one of its dependencies:") $$
+    ppr (IgnoredDependencies uids)  = brackets (text $ "unusable because the -ignore-package flag was used to " ++
+                                                       "ignore at least one of its dependencies:") $$
                                         nest 2 (hsep (map ppr uids))
     ppr (ShadowedDependencies uids) = brackets (text "unusable due to shadowed" <+> ppr uids)
 
