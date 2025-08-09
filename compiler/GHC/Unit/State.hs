@@ -1648,8 +1648,8 @@ mkUnitState logger dflags cfg = do
         , nest 2 $ vcat
             [ text "pkgs1_count =" <+> ppr (length pkgs1)
             , text "Opt_NoRts   =" <+> ppr (gopt Opt_NoRts dflags)
-            , text "ghcLink     =" <+> ppr (ghcLink dflags)
-            , text "platform    =" <+> ppr (targetPlatform dflags)
+            , text "ghcLink     =" <+> text (show (ghcLink dflags))
+            , text "platform    =" <+> text (show (targetPlatform dflags))
             , text "rtsWayUnitId=" <+> ppr (rtsWayUnitId dflags)
             , text "has_rts     =" <+> ppr (anyUniqMap (== rtsWayUnitId dflags) wired_map)
             , text "wired_map   =" <+> ppr wired_map
