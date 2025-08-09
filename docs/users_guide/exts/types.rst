@@ -30,3 +30,4 @@ Types
     type_errors
     defer_type_errors
     roles
+    relaxed_poly_rec

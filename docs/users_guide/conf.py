@@ -35,8 +35,6 @@ nitpick_ignore = [
     ("envvar", "TMPDIR"),
 
     ("c:type", "bool"),
-
-    ("extension", "RelaxedPolyRec"),
 ]
 
 rst_prolog = """
