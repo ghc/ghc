@@ -1643,10 +1643,20 @@ mkUnitState logger dflags cfg = do
   -- problem.  The RTS is effectively missing.
   unless (null pkgs1 || gopt Opt_NoRts dflags || anyUniqMap (== rtsWayUnitId dflags) wired_map) $ do
     pprPanic "mkUnitState" $
-      ppr ( length pkgs1
-          , gopt Opt_NoRts dflags
-          , anyUniqMap (== rtsWayUnitId dflags) wired_map
-          , wired_map)
+      vcat
+        [ text "debug details:"
+        , nest 2 $ vcat
+            [ text "pkgs1_count =" <+> ppr (length pkgs1)
+            , text "Opt_NoRts   =" <+> ppr (gopt Opt_NoRts dflags)
+            , text "ghcLink     =" <+> ppr (ghcLink dflags)
+            , text "platform    =" <+> ppr (targetPlatform dflags)
+            , text "rtsWayUnitId=" <+> ppr (rtsWayUnitId dflags)
+            , text "has_rts     =" <+> ppr (anyUniqMap (== rtsWayUnitId dflags) wired_map)
+            , text "wired_map   =" <+> ppr wired_map
+            , text "pkgs1 units (pre-wiring):" $$ nest 2 (pprWithCommas (\p -> ppr (unitId p) <+> parens (ppr (unitPackageName p))) pkgs1)
+            , text "pkgs2 units (post-wiring):" $$ nest 2 (pprWithCommas (\p -> ppr (unitId p) <+> parens (ppr (unitPackageName p))) pkgs2)
+            ]
+        ]
       <> text "; The RTS for " <> ppr (rtsWayUnitId dflags)
       <> text " is missing from the package database while building unit "
       <> ppr (homeUnitId_ dflags)
@@ -1823,7 +1833,8 @@ mkModuleNameProvidersMap logger cfg pkg_map closure vis_map =
     --      (e.g., hidden packages, causing #14717)
     --
     --    * Folding on pkg_map is awkward because if we have an
-    --      Backpack instantiation, we need to possibly add a
+    --      Backpack instantiation, we need to
+    --      possibly add a
     --      package from pkg_map multiple times to the actual
     --      ModuleNameProvidersMap.  Also, we don't really want
     --      definite package instantiations to show up in the
