@@ -215,7 +215,7 @@ _build/stage1/bin/wrapped-ghc: _build/stage1/bin/ghc
 	echo "ghc $$@" >&2
 	DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 	exec "$$DIR/ghc" "$$@"
-SH
+	SH
 	@chmod +x $@
 	@echo "::endgroup::"
 
