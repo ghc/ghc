@@ -1,7 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Log the ghc invocation to stderr
-echo "ghc $@" >&2
+
+# Echo the invocation, expanding any @response-file arguments inline for readability
+expand_and_echo() {
+  local -a expanded=()
+  local arg file
+  for arg in "$@"; do
+    if [[ "$arg" == @* ]]; then
+      file="${arg#@}"
+      if [[ -f "$file" ]]; then
+        # Disable pathname expansion during splitting
+        set -f
+        local -a rf_words=()
+        # Split response file contents on IFS (spaces/newlines)
+        # Note: this doesn't fully emulate GHC's parser w.r.t quotes, but is good enough for logging
+        read -r -a rf_words <<< "$(tr '\n' ' ' < "$file")"
+        set +f
+        if (( ${#rf_words[@]} > 0 )); then
+          expanded+=("${rf_words[@]}")
+        fi
+      else
+        expanded+=("$arg")
+      fi
+    else
+      expanded+=("$arg")
+    fi
+  done
+  local joined=""
+  if (( ${#expanded[@]} > 0 )); then
+    printf -v joined '%s ' "${expanded[@]}"
+    joined="${joined% }"
+  fi
+  echo "ghc ${joined}" >&2
+}
+
+expand_and_echo "$@"
+
 # Resolve the directory of this script and exec the real ghc next to it
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec "$DIR/ghc" "$@"
