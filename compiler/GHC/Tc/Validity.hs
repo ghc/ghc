@@ -31,6 +31,7 @@ import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
+import GHC.Tc.Utils.Env (tcLookupId)
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Zonk.TcType
@@ -60,6 +61,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Error
 import GHC.Types.Basic   ( TypeOrKind(..), UnboxedTupleOrSum(..)
                          , unboxedTupleOrSumExtension )
+import GHC.Types.Id (isNaughtyRecordSelector)
+import GHC.Types.FieldLabel (flSelector)
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -1718,8 +1721,17 @@ checkHasFieldInst cls tys@[_k_ty, _r_rep, _a_rep, lbl_ty, r_ty, _a_ty] =
       | otherwise -> case isStrLitTy lbl_ty of
        Just lbl
          | let lbl_str = FieldLabelString lbl
-         , isJust (lookupTyConFieldLabel lbl_str tc)
-         -> add_err $ IllegalHasFieldInstanceTyConHasField tc lbl_str
+         , Just fl <- lookupTyConFieldLabel lbl_str tc
+         -> do
+            -- GHC does not provide HasField instances for naughty record selectors
+            -- (see Note [Naughty record selectors] in GHC.Tc.TyCl.Utils),
+            -- so don't prevent the user from writing such instances.
+            -- See GHC.Tc.Instance.Class.matchHasField.
+            -- Test case: T26295.
+            sel_id <- tcLookupId $ flSelector fl
+            if isNaughtyRecordSelector sel_id
+            then return ()
+            else add_err $ IllegalHasFieldInstanceTyConHasField tc lbl_str
          | otherwise
          -> return ()
        Nothing
