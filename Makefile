@@ -205,13 +205,27 @@ _build/stage1/lib/template-hsc.h: utils/hsc2hs/data/template-hsc.h
 	@mkdir -p $(@D)
 	cp -rfp $< $@
 
+# Create a wrapper around the stage1 ghc that logs invocations and delegates to the real ghc
+_build/stage1/bin/wrapped-ghc: _build/stage1/bin/ghc
+	@echo "::group::Creating wrapped-ghc (stage1 wrapper)..."
+	@mkdir -p $(@D)
+	@cat > $@ <<'SH'
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo "ghc $$@" >&2
+	DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	exec "$$DIR/ghc" "$$@"
+SH
+	@chmod +x $@
+	@echo "::endgroup::"
+
 .PHONY: stage1
-stage1: $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES)) _build/stage1/lib/settings _build/stage1/lib/package.conf.d/package.cache _build/stage1/lib/template-hsc.h
+stage1: $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES)) _build/stage1/bin/wrapped-ghc _build/stage1/lib/settings _build/stage1/lib/package.conf.d/package.cache _build/stage1/lib/template-hsc.h
 
 # --- Stage 2 build ---
 
 _build/stage2/%: private STAGE=stage2
-_build/stage2/%: private GHC=$(realpath _build/stage1/bin/ghc)
+_build/stage2/%: private GHC=$(realpath _build/stage1/bin/wrapped-ghc)
 
 .PHONY: $(addprefix _build/stage2/bin/,$(STAGE2_EXECUTABLES))
 $(addprefix _build/stage2/bin/,$(STAGE2_EXECUTABLES)) &: $(CABAL) stage1
