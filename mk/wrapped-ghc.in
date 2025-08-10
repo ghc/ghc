@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Log the ghc invocation to stderr
+echo "ghc $@" >&2
+# Resolve the directory of this script and exec the real ghc next to it
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$DIR/ghc" "$@"

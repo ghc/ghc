@@ -206,16 +206,10 @@ _build/stage1/lib/template-hsc.h: utils/hsc2hs/data/template-hsc.h
 	cp -rfp $< $@
 
 # Create a wrapper around the stage1 ghc that logs invocations and delegates to the real ghc
-_build/stage1/bin/wrapped-ghc: _build/stage1/bin/ghc
+_build/stage1/bin/wrapped-ghc: mk/wrapped-ghc.in _build/stage1/bin/ghc
 	@echo "::group::Creating wrapped-ghc (stage1 wrapper)..."
 	@mkdir -p $(@D)
-	@cat > $@ <<'SH'
-	#!/usr/bin/env bash
-	set -euo pipefail
-	echo "ghc $$@" >&2
-	DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-	exec "$$DIR/ghc" "$$@"
-	SH
+	@cp -fp mk/wrapped-ghc.in $@
 	@chmod +x $@
 	@echo "::endgroup::"
 
