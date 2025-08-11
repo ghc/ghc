@@ -204,28 +204,44 @@ instance Monoid HsWrapper where
   mempty = WpHole
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
-WpHole <.> c = c
-c <.> WpHole = c
-c1 <.> c2    = c1 `WpCompose` c2
+WpHole    <.> c         = c
+c         <.> WpHole    = c
+WpCast c1 <.> WpCast c2 = WpCast (c1 `mkTransCo` c2)
+  -- If we can represent the HsWrapper as a cast, try to do so: this may avoid
+  -- unnecessary eta-expansion (see 'mkWpFun').
+c1        <.> c2        = c1 `WpCompose` c2
 
--- | Smart constructor to create a 'WpFun' 'HsWrapper'.
+-- | Smart constructor to create a 'WpFun' 'HsWrapper', which avoids introducing
+-- a lambda abstraction if the two supplied wrappers are either identities or
+-- casts.
 --
--- PRECONDITION: the "from" type of the first wrapper must have a syntactically
--- fixed RuntimeRep (see Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete).
+-- PRECONDITION: either:
+--
+--  1. both of the 'HsWrapper's are identities or casts, or
+--  2. both the "from" and "to" types of the first wrapper have a syntactically
+--     fixed RuntimeRep (see Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete).
 mkWpFun :: HsWrapper -> HsWrapper
         -> Scaled TcTypeFRR -- ^ the "from" type of the first wrapper
-                            -- MUST have a fixed RuntimeRep
         -> TcType           -- ^ Either "from" type or "to" type of the second wrapper
                             --   (used only when the second wrapper is the identity)
         -> HsWrapper
-  -- NB: we can't check that the argument type has a fixed RuntimeRep with an assertion,
-  -- because of [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep]
-  -- in GHC.Tc.Utils.Concrete.
 mkWpFun WpHole       WpHole       _             _  = WpHole
 mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mk_wp_fun_co w (mkRepReflCo t1) co2)
 mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mk_wp_fun_co w (mkSymCo co1)    (mkRepReflCo t2))
 mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mk_wp_fun_co w (mkSymCo co1)    co2)
-mkWpFun co1          co2          t1            _  = WpFun co1 co2 t1
+mkWpFun w_arg        w_res        t1            _  =
+  -- In this case, we will desugar to a lambda
+  --
+  --   \x. w_res[ e w_arg[x] ]
+  --
+  -- To satisfy Note [Representation polymorphism invariants] in GHC.Core,
+  -- it must be the case that both the lambda bound variable x and the function
+  -- argument w_arg[x] have a fixed runtime representation, i.e. that both the
+  -- "from" and "to" types of the first wrapper "w_arg" have a fixed runtime representation.
+  --
+  -- Unfortunately, we can't check this with an assertion here, because of
+  -- [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
+  WpFun w_arg w_res t1
 
 mkWpEta :: [Id] -> HsWrapper -> HsWrapper
 -- (mkWpEta [x1, x2] wrap) [e]

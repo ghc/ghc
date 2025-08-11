@@ -112,6 +112,7 @@ test('RepPolyWrappedVar', normal, compile_fail, [''])
 test('RepPolyWrappedVar2', [js_skip], compile, [''])
 test('UnliftedNewtypesCoerceFail', normal, compile_fail, [''])
 test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
+test('NoEtaRequired', normal, compile, [''])
 
 ###############################################################################
 ## The following tests require rewriting in RuntimeReps,                     ##

@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveTraversable   #-}
 {-# LANGUAGE DerivingStrategies  #-}
 {-# LANGUAGE LambdaCase          #-}
@@ -18,6 +19,7 @@ module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
   tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeDS,
+  addSubTypeCtxt,
   tcSubTypeAmbiguity, tcSubMult,
   checkConstraints, checkTvConstraints,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
@@ -25,9 +27,10 @@ module GHC.Tc.Utils.Unify (
   -- Skolemisation
   DeepSubsumptionFlag(..), getDeepSubsumptionFlag, isRhoTyDS,
   tcSkolemise, tcSkolemiseCompleteSig, tcSkolemiseExpectedType,
+  deeplyInstantiate,
 
   -- Various unifications
-  unifyType, unifyKind, unifyInvisibleType, unifyExpectedType,
+  unifyType, unifyKind, unifyInvisibleType,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
   swapOverTyVars, touchabilityTest, checkTopShape, lhsPriority,
   UnifyEnv(..), updUEnvLoc, setUEnvRole,
@@ -57,7 +60,7 @@ module GHC.Tc.Utils.Unify (
 
   simpleUnifyCheck, UnifyCheckCaller(..), SimpleUnifyResult(..),
 
-  fillInferResult,
+  fillInferResult, fillInferResultDS
   ) where
 
 import GHC.Prelude
@@ -796,12 +799,14 @@ matchExpectedFunTys :: forall a.
 -- Postcondition:
 --   If exp_ty is Check {}, then [ExpPatType] and ExpRhoType results are all Check{}
 --   If exp_ty is Infer {}, then [ExpPatType] and ExpRhoType results are all Infer{}
-matchExpectedFunTys herald _ arity (Infer inf_res) thing_inside
+matchExpectedFunTys herald _ctxt arity (Infer inf_res) thing_inside
   = do { arg_tys <- mapM (new_infer_arg_ty herald) [1 .. arity]
        ; res_ty  <- newInferExpType
        ; result  <- thing_inside (map ExpFunPatTy arg_tys) res_ty
        ; arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) arg_tys
        ; res_ty  <- readExpType res_ty
+         -- NB: mkScaledFunTys arg_tys res_ty does not contain any foralls
+         -- (even nested ones), so no need to instantiate.
        ; co <- fillInferResult (mkScaledFunTys arg_tys res_ty) inf_res
        ; return (mkWpCastN co, result) }
 
@@ -1223,7 +1228,21 @@ unification variable.  We discard the evidence.
 
 -}
 
-
+-- | A version of 'fillInferResult' that also performs deep instantiation
+-- when deep subsumption is enabled.
+--
+-- See also Note [Instantiation of InferResult].
+fillInferResultDS :: CtOrigin -> TcRhoType -> InferResult -> TcM HsWrapper
+fillInferResultDS ct_orig rho inf_res
+  = do { massertPpr (isRhoTy rho) $
+           vcat [ text "fillInferResultDS: input type is not a rho-type"
+                , text "ty:" <+> ppr rho ]
+       ; ds_flag <- getDeepSubsumptionFlag
+       ; case ds_flag of
+              Shallow -> mkWpCastN <$> fillInferResult rho inf_res
+              Deep    -> do { (inst_wrap, rho') <- deeplyInstantiate ct_orig rho
+                            ; co <- fillInferResult rho' inf_res
+                            ; return (mkWpCastN co <.> inst_wrap) } }
 
 {-
 ************************************************************************
@@ -1290,27 +1309,34 @@ tcWrapResultO :: CtOrigin -> HsExpr GhcRn -> HsExpr GhcTc -> TcSigmaType -> ExpR
 tcWrapResultO orig rn_expr expr actual_ty res_ty
   = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
                                       , text "Expected:" <+> ppr res_ty ])
-       ; wrap <- tcSubTypeNC orig GenSigCtxt (Just $ HsExprRnThing rn_expr) actual_ty res_ty
+       ; wrap <- tcSubType orig GenSigCtxt (Just $ HsExprRnThing rn_expr) actual_ty res_ty
        ; return (mkHsWrap wrap expr) }
 
-tcWrapResultMono :: HsExpr GhcRn -> HsExpr GhcTc
-                 -> TcRhoType   -- Actual -- a rho-type not a sigma-type
-                 -> ExpRhoType  -- Expected
-                 -> TcM (HsExpr GhcTc)
--- A version of tcWrapResult to use when the actual type is a
+-- | A version of 'tcWrapResult' to use when the actual type is a
 -- rho-type, so nothing to instantiate; just go straight to unify.
--- It means we don't need to pass in a CtOrigin
+-- It means we don't need to pass in a CtOrigin.
+tcWrapResultMono :: HasDebugCallStack
+                 => HsExpr GhcRn -> HsExpr GhcTc
+                 -> TcRhoType   -- ^ Actual; a rho-type, not a sigma-type
+                 -> ExpRhoType  -- ^ Expected
+                 -> TcM (HsExpr GhcTc)
 tcWrapResultMono rn_expr expr act_ty res_ty
-  = assertPpr (isRhoTy act_ty) (ppr act_ty $$ ppr rn_expr) $
-    do { co <- unifyExpectedType rn_expr act_ty res_ty
+  = do { co <- tcSubTypeMono rn_expr act_ty res_ty
        ; return (mkHsWrapCo co expr) }
 
-unifyExpectedType :: HsExpr GhcRn
-                  -> TcRhoType   -- Actual -- a rho-type not a sigma-type
-                  -> ExpRhoType  -- Expected
-                  -> TcM TcCoercionN
-unifyExpectedType rn_expr act_ty exp_ty
-  = case exp_ty of
+-- | A version of 'tcSubType' to use when the actual type is a rho-type,
+-- so that no instantiation is needed.
+tcSubTypeMono :: HasDebugCallStack
+              => HsExpr GhcRn
+              -> TcRhoType   -- ^ Actual; a rho-type, not a sigma-type
+              -> ExpRhoType  -- ^ Expected
+              -> TcM TcCoercionN
+tcSubTypeMono rn_expr act_ty exp_ty
+  = assertPpr (isDeepRhoTy act_ty)
+      (vcat [ text "Actual type is not a (deep) rho-type."
+            , text "act_ty:" <+> ppr act_ty
+            , text "rn_expr:" <+> ppr rn_expr]) $
+    case exp_ty of
       Infer inf_res -> fillInferResult act_ty inf_res
       Check exp_ty  -> unifyType (Just $ HsExprRnThing rn_expr) act_ty exp_ty
 
@@ -1331,46 +1357,39 @@ tcSubTypePat _ _ (Infer inf_res) ty_expected
        ; return (mkWpCastN (mkSymCo co)) }
 
 ---------------
-tcSubType :: CtOrigin -> UserTypeCtxt
-          -> TcSigmaType  -- ^ Actual
-          -> ExpRhoType   -- ^ Expected
-          -> TcM HsWrapper
--- Checks that 'actual' is more polymorphic than 'expected'
-tcSubType orig ctxt ty_actual ty_expected
-  = addSubTypeCtxt ty_actual ty_expected $
-    do { traceTc "tcSubType" (vcat [pprUserTypeCtxt ctxt, ppr ty_actual, ppr ty_expected])
-       ; tcSubTypeNC orig ctxt Nothing ty_actual ty_expected }
 
----------------
+-- | A subtype check that performs deep subsumption.
+-- See also 'tcSubTypeMono', for when no instantiation is required.
 tcSubTypeDS :: HsExpr GhcRn
             -> TcRhoType   -- Actual type -- a rho-type not a sigma-type
             -> TcRhoType   -- Expected type
                            -- DeepSubsumption <=> when checking, this type
                            --                     is deeply skolemised
             -> TcM HsWrapper
--- Similar signature to unifyExpectedType; does deep subsumption
 -- Only one call site, in GHC.Tc.Gen.App.tcApp
 tcSubTypeDS rn_expr act_rho exp_rho
-  = tc_sub_type_deep (unifyExprType rn_expr) orig GenSigCtxt act_rho exp_rho
+  = tc_sub_type_deep Top (unifyExprType rn_expr) orig GenSigCtxt act_rho exp_rho
   where
     orig = exprCtOrigin rn_expr
 
 ---------------
-tcSubTypeNC :: CtOrigin          -- ^ Used when instantiating
-            -> UserTypeCtxt      -- ^ Used when skolemising
-            -> Maybe TypedThing -- ^ The expression that has type 'actual' (if known)
-            -> TcSigmaType       -- ^ Actual type
-            -> ExpRhoType        -- ^ Expected type
-            -> TcM HsWrapper
-tcSubTypeNC inst_orig ctxt m_thing ty_actual res_ty
+
+-- | Checks that the 'actual' type is more polymorphic than the 'expected' type.
+tcSubType :: CtOrigin          -- ^ Used when instantiating
+          -> UserTypeCtxt      -- ^ Used when skolemising
+          -> Maybe TypedThing -- ^ The expression that has type 'actual' (if known)
+          -> TcSigmaType       -- ^ Actual type
+          -> ExpRhoType        -- ^ Expected type
+          -> TcM HsWrapper
+tcSubType inst_orig ctxt m_thing ty_actual res_ty
   = case res_ty of
       Check ty_expected -> tc_sub_type (unifyType m_thing) inst_orig ctxt
                                        ty_actual ty_expected
 
       Infer inf_res -> do { (wrap, rho) <- topInstantiate inst_orig ty_actual
                                    -- See Note [Instantiation of InferResult]
-                          ; co <- fillInferResult rho inf_res
-                          ; return (mkWpCastN co <.> wrap) }
+                          ; inst <- fillInferResultDS inst_orig rho inf_res
+                          ; return (inst <.> wrap) }
 
 ---------------
 tcSubTypeSigma :: CtOrigin       -- where did the actual type arise / why are we
@@ -1388,9 +1407,9 @@ tcSubTypeAmbiguity :: UserTypeCtxt   -- Where did this type arise
                    -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- See Note [Ambiguity check and deep subsumption]
 tcSubTypeAmbiguity ctxt ty_actual ty_expected
-  = tc_sub_type_ds Shallow (unifyType Nothing)
-                           (AmbiguityCheckOrigin ctxt)
-                           ctxt ty_actual ty_expected
+  = tc_sub_type_ds Top Shallow (unifyType Nothing)
+                             (AmbiguityCheckOrigin ctxt)
+                             ctxt ty_actual ty_expected
 
 ---------------
 addSubTypeCtxt :: TcType -> ExpType -> TcM a -> TcM a
@@ -1411,8 +1430,9 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
 
 {- Note [Instantiation of InferResult]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We now always instantiate before filling in InferResult, so that
-the result is a TcRhoType: see #17173 for discussion.
+When typechecking expressions (not types, not patterns), we always instantiate
+before filling in InferResult, so that the result is a TcRhoType.
+See #17173 for discussion.
 
 For example:
 
@@ -1444,6 +1464,9 @@ For example:
 There is one place where we don't want to instantiate eagerly,
 namely in GHC.Tc.Module.tcRnExpr, which implements GHCi's :type
 command. See Note [Implementing :type] in GHC.Tc.Module.
+
+This also means that, if DeepSubsumption is enabled, we should also instantiate
+deeply; we do this by using fillInferResultDS.
 -}
 
 ---------------
@@ -1464,16 +1487,17 @@ tc_sub_type :: (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
 ----------------------
 tc_sub_type unify inst_orig ctxt ty_actual ty_expected
   = do { ds_flag <- getDeepSubsumptionFlag
-       ; tc_sub_type_ds ds_flag unify inst_orig ctxt ty_actual ty_expected }
+       ; tc_sub_type_ds Top ds_flag unify inst_orig ctxt ty_actual ty_expected }
 
 ----------------------
-tc_sub_type_ds :: DeepSubsumptionFlag
+tc_sub_type_ds :: Position p -- ^ position in the type (for error messages only)
+               -> DeepSubsumptionFlag
                -> (TcType -> TcType -> TcM TcCoercionN)
                -> CtOrigin -> UserTypeCtxt -> TcSigmaType
                -> TcSigmaType -> TcM HsWrapper
 -- tc_sub_type_ds is the main subsumption worker function
 -- It takes an explicit DeepSubsumptionFlag
-tc_sub_type_ds ds_flag unify inst_orig ctxt ty_actual ty_expected
+tc_sub_type_ds pos ds_flag unify inst_orig ctxt ty_actual ty_expected
   | definitely_poly ty_expected   -- See Note [Don't skolemise unnecessarily]
   , isRhoTyDS ds_flag ty_actual
   = do { traceTc "tc_sub_type (drop to equality)" $
@@ -1490,7 +1514,7 @@ tc_sub_type_ds ds_flag unify inst_orig ctxt ty_actual ty_expected
        ; (sk_wrap, inner_wrap)
             <- tcSkolemise ds_flag ctxt ty_expected $ \sk_rho ->
                case ds_flag of
-                 Deep    -> tc_sub_type_deep unify inst_orig ctxt ty_actual sk_rho
+                 Deep    -> tc_sub_type_deep pos unify inst_orig ctxt ty_actual sk_rho
                  Shallow -> tc_sub_type_shallow unify inst_orig ty_actual sk_rho
 
        ; return (sk_wrap <.> inner_wrap) }
@@ -1656,7 +1680,7 @@ The effects are in these main places:
    see the call to tcDeeplySkolemise in tcSkolemiseScoped.
 
 4. In GHC.Tc.Gen.App.tcApp we call tcSubTypeDS to match the result
-   type. Without deep subsumption, unifyExpectedType would be sufficent.
+   type. Without deep subsumption, tcSubTypeMono would be sufficent.
 
 In all these cases note that the deep skolemisation must be done /first/.
 Consider (1)
@@ -1669,8 +1693,10 @@ Wrinkles:
 (DS1) Note that we /always/ use shallow subsumption in the ambiguity check.
       See Note [Ambiguity check and deep subsumption].
 
-(DS2) Deep subsumption requires deep instantiation too.
-      See Note [The need for deep instantiation]
+(DS2) When doing deep subsumption, we must be careful not to needlessly
+      drop down to unification, e.g. in cases such as:
+        (Bool -> ∀ d. d->d)   <=   alpha beta gamma
+      See Note [FunTy vs non-FunTy case in tc_sub_type_deep].
 
 (DS3) The interaction between deep subsumption and required foralls
       (forall a -> ty) is a bit subtle.  See #24696 and
@@ -1700,6 +1726,69 @@ In general,
 ToDo: this eta-abstraction plays fast and loose with termination,
       because it can introduce extra lambdas.  Maybe add a `seq` to
       fix this
+
+Note [FunTy vs FunTy case in tc_sub_type_deep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The goal of tc_sub_type_deep is to produce an HsWrapper that "proves" that the
+actual type is a subtype of the expected type. The most important case is how
+we deal with function arrows. Suppose we have:
+
+  ty_actual   = act_arg -> act_res
+  ty_expected = exp_arg -> exp_res
+
+To produce fun_wrap :: (act_arg -> act_res) ~> (exp_arg -> exp_res), we use
+the fact that the function arrow is contravariant in its argument type and
+covariant in its result type. Thus we recursively perform subtype checks
+on the argument types (with actual/expected switched) and the result types,
+to get:
+
+  arg_wrap :: exp_arg ~> act_arg   -- NB: expected/actual have switched sides
+  res_wrap :: act_res ~> exp_res
+
+Then fun_wrap = mkWpFun arg_wrap res_wrap.
+
+Wrinkle [Representation-polymorphism checking during subtyping]
+
+  Inserting a WpFun HsWrapper amounts to impedance matching in deep subsumption
+  via eta-expansion:
+
+    f  ==>  \ (x :: exp_arg) -> res_wrap [ f (arg_wrap [x]) ]
+
+  As we produce a lambda, we must enforce the representation polymorphism
+  invariants described in Note [Representation polymorphism invariants] in GHC.Core.
+  That is, we must ensure that both x (the lambda binder) and (arg_wrap [x]) (the function argument)
+  have a fixed runtime representation.
+
+  Note however that desugaring mkWpFun does not always introduce a lambda: if
+  both the argument and result HsWrappers are casts, then a FunCo cast suffices,
+  in which case we should not perform representation-polymorphism checking.
+
+  This means that, in the FunTy/FunTy case of tc_sub_type_deep, we can skip
+  the representation-polymorphism checks if the produced argument and result
+  wrappers are identities or casts.
+  It is important to do so, otherwise we reject valid programs.
+
+    Here's a contrived example (there are undoubtedly more natural examples)
+    (see testsuite/tests/rep-poly/NoEtaRequired):
+
+      type Id :: k -> k
+      type family Id a where
+
+      type T :: TYPE r -> TYPE (Id r)
+      type family T a where
+
+      test :: forall r (a :: TYPE r). a :~~: T a -> ()
+      test HRefl =
+        let
+          f :: (a -> a) -> ()
+          f _ = ()
+          g :: T a -> T a
+          g = undefined
+        in f g
+
+    We don't need to eta-expand `g` to make `f g` typecheck; a cast suffices.
+    Hence we should not perform representation-polymorphism checks; they would
+    fail here.
 
 Note [Setting the argument context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1751,30 +1840,31 @@ complains.
 The easiest solution was to use tcEqMult in tc_sub_type_deep, and
 insist on equality. This is only in the DeepSubsumption code anyway.
 
-Note [The need for deep instantiation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [FunTy vs non-FunTy case in tc_sub_type_deep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this, without Quick Look, but with Deep Subsumption:
    f :: ∀a b c. a b c -> Int
    g :: Bool -> ∀d. d -> d
-Consider the application (f g).  We need to do the subsumption test
+To typecheck the application (f g), we need to do the subsumption test
 
-  (Bool -> ∀ d. d->d)   <=   (alpha beta gamma)
+  (Bool -> ∀ d. d->d)   <=   alpha beta gamma
 
-where alpha, beta, gamma are the unification variables that instantiate a,b,c,
-respectively.  We must not drop down to unification, or we will reject the call.
-Rather we must deeply instantiate the LHS to get
+where alpha, beta, gamma are the unification variables that instantiate a,b,c
+(respectively). We must not drop down to unification, or we will reject the call.
+Instead, we should only unify alpha := (->), in which case we end up with the
+usual FunTy vs FunTy case of Note [FunTy vs FunTy case in tc_sub_type_deep]:
 
-  (Bool -> delta -> delta)   <=   (alpha beta gamma)
+  (Bool -> ∀ d. d->d)   <=   beta -> gamma
 
-and now we can unify to get
+which is straightforwardly solved by beta := Bool, using covariance in the return
+type of the function arrow, and instantiating the forall before unifying with gamma.
 
-   alpha = (->)
-   beta = Bool
-   gamma = delta -> delta
+The conclusion is this: when doing a deep subtype check (in tc_sub_type_deep),
+if the LHS is a FunTy and the RHS is a rho-type which is not a FunTy,
+then unify the RHS with a FunTy and continue by performing a sub-type check on
+the LHS vs the new RHS. And vice-versa (if it's the RHS that is a FunTy).
 
-Hence the call to `deeplyInstantiate` in `tc_sub_type_deep`.
-
-See typecheck/should_compile/T11305 for an example of when this is important.
+See T11305 and T26225 for examples of when this is important.
 
 Note [Deep subsumption and required foralls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1837,12 +1927,17 @@ getDeepSubsumptionFlag :: TcM DeepSubsumptionFlag
 getDeepSubsumptionFlag = do { ds <- xoptM LangExt.DeepSubsumption
                             ; if ds then return Deep else return Shallow }
 
+-- | 'tc_sub_type_deep' is where the actual work happens for deep subsumption.
+--
+-- Given @ty_actual@ (a sigma-type) and @ty_expected@ (deeply skolemised, i.e.
+-- a deep rho type), it returns an 'HsWrapper' @wrap :: ty_actual ~> ty_expected@.
 tc_sub_type_deep :: HasDebugCallStack
-                 => (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
-                 -> CtOrigin       -- Used when instantiating
-                 -> UserTypeCtxt   -- Used when skolemising
-                 -> TcSigmaType    -- Actual; a sigma-type
-                 -> TcRhoType      -- Expected; deeply skolemised
+                 => Position p     -- ^ Position in the type (for error messages only)
+                 -> (TcType -> TcType -> TcM TcCoercionN) -- ^ How to unify
+                 -> CtOrigin       -- ^ Used when instantiating
+                 -> UserTypeCtxt   -- ^ Used when skolemising
+                 -> TcSigmaType    -- ^ Actual; a sigma-type
+                 -> TcRhoType      -- ^ Expected; deeply skolemised
                  -> TcM HsWrapper
 
 -- If wrap = tc_sub_type_deep t1 t2
@@ -1850,62 +1945,160 @@ tc_sub_type_deep :: HasDebugCallStack
 -- Here is where the work actually happens!
 -- Precondition: ty_expected is deeply skolemised
 
-tc_sub_type_deep unify inst_orig ctxt ty_actual ty_expected
+tc_sub_type_deep pos unify inst_orig ctxt ty_actual ty_expected
   = assertPpr (isDeepRhoTy ty_expected) (ppr ty_expected) $
     do { traceTc "tc_sub_type_deep" $
          vcat [ text "ty_actual   =" <+> ppr ty_actual
               , text "ty_expected =" <+> ppr ty_expected ]
        ; go ty_actual ty_expected }
   where
-    -- NB: 'go' is not recursive, except for doing coreView
-    go ty_a ty_e | Just ty_a' <- coreView ty_a = go ty_a' ty_e
-                 | Just ty_e' <- coreView ty_e = go ty_a  ty_e'
 
-    go (TyVarTy tv_a) ty_e
-      = do { lookup_res <- isFilledMetaTyVar_maybe tv_a
+    -- 'unwrap' removes top-level type synonyms & looks through filled meta-tyvars
+    unwrap :: TcType -> TcM TcType
+    unwrap ty
+      | Just ty' <- coreView ty
+      = unwrap ty'
+    unwrap ty@(TyVarTy tv)
+      = do { lookup_res <- isFilledMetaTyVar_maybe tv
            ; case lookup_res of
-               Just ty_a' ->
-                 do { traceTc "tc_sub_type_deep following filled meta-tyvar:"
-                        (ppr tv_a <+> text "-->" <+> ppr ty_a')
-                    ; tc_sub_type_deep unify inst_orig ctxt ty_a' ty_e }
-               Nothing -> just_unify ty_actual ty_expected }
+                 Just ty' -> unwrap ty'
+                 Nothing  -> return ty }
+    unwrap ty = return ty
 
-    go ty_a@(FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
-       ty_e@(FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
-      | isVisibleFunArg af1, isVisibleFunArg af2
-      = if (isTauTy ty_a && isTauTy ty_e)       -- Short cut common case to avoid
-        then just_unify ty_actual ty_expected   -- unnecessary eta expansion
-        else
-        -- This is where we do the co/contra thing, and generate a WpFun, which in turn
-        -- causes eta-expansion, which we don't like; hence encouraging NoDeepSubsumption
-        do { arg_wrap  <- tc_sub_type_ds Deep unify given_orig GenSigCtxt exp_arg act_arg
-                          -- GenSigCtxt: See Note [Setting the argument context]
-           ; res_wrap  <- tc_sub_type_deep unify inst_orig ctxt act_res exp_res
-           ; tcEqMult inst_orig act_mult exp_mult
-             -- See Note [Multiplicity in deep subsumption]
-           ; return (mkWpFun arg_wrap res_wrap (Scaled exp_mult exp_arg) exp_res) }
-                     -- arg_wrap :: exp_arg ~> act_arg
-                     -- res_wrap :: act-res ~> exp_res
-      where
-        given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
+    go, go1 :: TcType -> TcType -> TcM HsWrapper
+    go ty_a ty_e =
+      do { ty_a' <- unwrap ty_a
+         ; ty_e' <- unwrap ty_e
+         ; go1 ty_a' ty_e' }
 
-    go ty_a ty_e
+    -- If ty_actual is not a rho-type, instantiate it first; otherwise
+    -- unification has no chance of succeeding.
+    go1 ty_a ty_e
       | let (tvs, theta, _) = tcSplitSigmaTy ty_a
       , not (null tvs && null theta)
       = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
-           ; body_wrap <- tc_sub_type_deep unify inst_orig ctxt in_rho ty_e
+           ; body_wrap <- go in_rho ty_e
            ; return (body_wrap <.> in_wrap) }
 
-      | otherwise   -- Revert to unification
-      = do { -- It's still possible that ty_actual has nested foralls. Instantiate
-             -- these, as there's no way unification will succeed with them in.
-             -- See Note [The need for deep instantiation]
-             (inst_wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
-           ; unify_wrap         <- just_unify rho_a ty_expected
-           ; return (unify_wrap <.> inst_wrap) }
+    -- Main case: FunTy vs FunTy. go_fun does the work.
+    go1 (FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
+        (FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
+      | isVisibleFunArg af1
+      , isVisibleFunArg af2
+      = go_fun af1 act_mult act_arg act_res
+               af2 exp_mult exp_arg exp_res
+
+    -- See Note [FunTy vs non-FunTy case in tc_sub_type_deep]
+    go1 (FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }) ty_e
+      | isVisibleFunArg af1
+      = do { exp_mult <- newMultiplicityVar
+           ; exp_arg  <- newOpenFlexiTyVarTy -- NB: no FRR check needed; we might not need to eta-expand
+           ; exp_res  <- newOpenFlexiTyVarTy
+           ; let exp_funTy = FunTy { ft_af = af1, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res }
+           ; unify_wrap <- just_unify exp_funTy ty_e
+           ; fun_wrap <- go_fun af1 act_mult act_arg act_res af1 exp_mult exp_arg exp_res
+           ; return $ unify_wrap <.> fun_wrap
+             -- unify_wrap :: exp_funTy ~> ty_e
+             -- fun_wrap :: ty_a ~> exp_funTy
+           }
+    go1 ty_a (FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
+      | isVisibleFunArg af2
+      = do { act_mult <- newMultiplicityVar
+           ; act_arg  <- newOpenFlexiTyVarTy -- NB: no FRR check needed; we might not need to eta-expand
+           ; act_res  <- newOpenFlexiTyVarTy
+           ; let act_funTy = FunTy { ft_af = af2, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }
+
+           ; unify_wrap <- just_unify ty_a act_funTy
+           ; fun_wrap <- go_fun af2 act_mult act_arg act_res af2 exp_mult exp_arg exp_res
+           ; return $ fun_wrap <.> unify_wrap
+             -- unify_wrap :: ty_a ~> act_funTy
+             -- fun_wrap :: act_funTy ~> ty_e
+           }
+
+    -- Otherwise, revert to unification.
+    go1 ty_a ty_e = just_unify ty_a ty_e
 
     just_unify ty_a ty_e = do { cow <- unify ty_a ty_e
                               ; return (mkWpCastN cow) }
+
+    -- FunTy/FunTy case: this is where we insert any necessary eta-expansions.
+    go_fun :: FunTyFlag -> Mult -> TcType -> TcType -- actual FunTy
+           -> FunTyFlag -> Mult -> TcType -> TcType -- expected FunTy
+           -> TcM HsWrapper
+    go_fun act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res
+      -- See Note [FunTy vs FunTy case in tc_sub_type_deep]
+      = do { arg_wrap  <- tc_sub_type_ds (Argument pos) Deep unify given_orig GenSigCtxt exp_arg act_arg
+                          -- GenSigCtxt: See Note [Setting the argument context]
+           ; res_wrap  <- tc_sub_type_deep (Result pos) unify inst_orig ctxt act_res exp_res
+
+             -- See Note [Multiplicity in deep subsumption]
+           ; tcEqMult inst_orig act_mult exp_mult
+
+           ; mkWpFun_FRR pos
+               act_af act_mult act_arg act_res
+               exp_af exp_mult exp_arg exp_res
+               arg_wrap res_wrap
+           }
+      where
+        given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
+
+-- | Like 'mkWpFun', except that it performs representation-polymorphism
+-- checks on the argument type.
+mkWpFun_FRR
+  :: Position p
+  -> FunTyFlag -> Type -> TcType -> Type --   actual FunTy
+  -> FunTyFlag -> Type -> TcType -> Type -- expected FunTy
+  -> HsWrapper -- ^ exp_arg ~> act_arg
+  -> HsWrapper -- ^ act_res ~> exp_res
+  -> TcM HsWrapper -- ^ act_funTy ~> exp_funTy
+mkWpFun_FRR pos act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res arg_wrap res_wrap
+  | needs_eta
+  -- See Wrinkle [Representation-polymorphism checking during subtyping]
+  = do { (exp_arg_co,  exp_arg_frr) <- hasFixedRuntimeRep (FRRDeepSubsumption True pos) exp_arg
+       ; (act_arg_co, _act_arg_frr) <- hasFixedRuntimeRep (FRRDeepSubsumption False pos) act_arg
+       ; let
+            exp_arg_fun_co =
+              mkFunCo Nominal exp_af
+                 (mkReflCo Nominal exp_mult)
+                 (mkSymCo exp_arg_co)
+                 (mkReflCo Nominal exp_res)
+            act_arg_fun_co =
+              mkFunCo Nominal act_af
+                 (mkReflCo Nominal act_mult)
+                 act_arg_co
+                 (mkReflCo Nominal act_res)
+            arg_wrap_frr =
+              mkWpCastN (mkSymCo exp_arg_co) <.> arg_wrap <.> mkWpCastN act_arg_co
+               --  exp_arg_co :: exp_arg ~> exp_arg_frr
+               --  act_arg_co :: act_arg ~> act_arg_frr
+               --  arg_wrap :: exp_arg ~> act_arg
+               --  arg_wrap_frr :: exp_arg_frr ~> act_arg_frr
+
+       -- NB: because of the needs_eta guard, we know that mkWpFun will
+       -- return (WpFun ...); so we might as well just use the WpFun constructor.
+       ; return $
+            mkWpCastN exp_arg_fun_co
+              <.>
+            WpFun arg_wrap_frr res_wrap (Scaled exp_mult exp_arg_frr)
+              <.>
+            mkWpCastN act_arg_fun_co }
+  | otherwise
+  = return $
+      mkWpFun arg_wrap res_wrap (Scaled exp_mult exp_arg) exp_res
+        -- NB: because of 'needs_eta', this will never actually be a WpFun.
+        -- mkWpFun will turn it into a WpHole or WpCast, which is why
+        -- we can skip the hasFixedRuntimeRep checks in this case.
+        -- See Wrinkle [Representation-polymorphism checking during subtyping]
+  where
+    needs_eta :: Bool
+    needs_eta =
+      not (hole_or_cast arg_wrap)
+        ||
+      not (hole_or_cast res_wrap)
+    hole_or_cast :: HsWrapper -> Bool
+    hole_or_cast WpHole = True
+    hole_or_cast (WpCast {}) = True
+    hole_or_cast _ = False
 
 -----------------------
 deeplySkolemise :: SkolemInfo -> TcSigmaType

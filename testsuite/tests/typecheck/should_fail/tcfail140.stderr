@@ -1,4 +1,3 @@
-
 tcfail140.hs:11:7: error: [GHC-83865]
     • Couldn't match expected type ‘t1 -> t’ with actual type ‘Int’
     • The function ‘f’ is applied to two visible arguments,
@@ -17,13 +16,13 @@ tcfail140.hs:13:10: error: [GHC-83865]
         rot :: p -> t (bound at tcfail140.hs:13:1)
 
 tcfail140.hs:15:15: error: [GHC-83865]
-    • Couldn't match expected type ‘a -> b’ with actual type ‘Int’
+    • Couldn't match expected type ‘t -> b’ with actual type ‘Int’
     • In the first argument of ‘map’, namely ‘(3 `f`)’
       In the expression: map (3 `f`) xs
       In an equation for ‘bot’: bot xs = map (3 `f`) xs
     • Relevant bindings include
-        xs :: [a] (bound at tcfail140.hs:15:5)
-        bot :: [a] -> [b] (bound at tcfail140.hs:15:1)
+        xs :: [t] (bound at tcfail140.hs:15:5)
+        bot :: [t] -> [b] (bound at tcfail140.hs:15:1)
 
 tcfail140.hs:17:8: error: [GHC-27346]
     • The data constructor ‘Just’ should have 1 argument, but has been given none
@@ -36,3 +35,4 @@ tcfail140.hs:20:1: error: [GHC-83865]
     • Couldn't match expected type ‘Int’ with actual type ‘t0 -> Bool’
     • The equation for ‘g’ has two visible arguments,
         but its type ‘Int -> Int’ has only one
+

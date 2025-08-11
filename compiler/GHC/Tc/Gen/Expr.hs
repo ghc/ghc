@@ -1063,7 +1063,8 @@ tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
     tc_syn_arg _ (SynFun {}) _
       = pprPanic "tcSynArgA hits a SynFun" (ppr orig)
     tc_syn_arg res_ty (SynType the_ty) thing_inside
-      = do { wrap   <- tcSubType orig GenSigCtxt res_ty the_ty
+      = do { wrap   <- addSubTypeCtxt res_ty the_ty $
+                       tcSubType orig GenSigCtxt Nothing res_ty the_ty
            ; result <- thing_inside []
            ; return (result, wrap) }
 

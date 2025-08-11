@@ -1,9 +1,10 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 
 -- | Describes the provenance of types as they flow through the type-checker.
 -- The datatypes here are mainly used for error message generation.
@@ -40,7 +41,7 @@ module GHC.Tc.Types.Origin (
   mkFRRUnboxedTuple, mkFRRUnboxedSum,
 
   -- ** FixedRuntimeRep origin for rep-poly 'Id's
-  RepPolyId(..), Polarity(..), Position(..),
+  RepPolyId(..), Polarity(..), Position(..), mkArgPos,
 
   -- ** Arrow command FixedRuntimeRep origin
   FRRArrowContext(..), pprFRRArrowContext,
@@ -79,7 +80,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Stack
 import GHC.Utils.Monad
-import GHC.Utils.Misc( HasDebugCallStack )
+import GHC.Utils.Misc( HasDebugCallStack, nTimes )
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
@@ -1198,7 +1199,7 @@ data FixedRuntimeRepContext
   -- See 'FRRArrowContext' for more details.
   | FRRArrow !FRRArrowContext
 
-  -- | A representation-polymorphic check arising from a call
+  -- | A representation-polymorphism check arising from a call
   -- to 'matchExpectedFunTys' or 'matchActualFunTy'.
   --
   -- See 'ExpectedFunTyOrigin' for more details.
@@ -1206,6 +1207,13 @@ data FixedRuntimeRepContext
       !ExpectedFunTyOrigin
       !Int
         -- ^ argument position (1-indexed)
+
+  -- | A representation-polymorphism check arising from eta-expansion
+  -- performed as part of deep subsumption.
+  | forall p. FRRDeepSubsumption
+      { frrDSExpected :: Bool
+      , frrDSPosition :: Position p
+      }
 
 -- | The description of a representation-polymorphic 'Id'.
 data RepPolyId
@@ -1244,8 +1252,8 @@ pprFixedRuntimeRepContext (FRRRecordUpdate lbl _arg)
 pprFixedRuntimeRepContext (FRRBinder binder)
   = sep [ text "The binder"
         , quotes (ppr binder) ]
-pprFixedRuntimeRepContext (FRRRepPolyId nm id what)
-  = pprFRRRepPolyId id nm what
+pprFixedRuntimeRepContext (FRRRepPolyId nm id pos)
+  = text "The" <+> ppr pos <+> text "of" <+> pprRepPolyId id nm
 pprFixedRuntimeRepContext FRRPatBind
   = text "The pattern binding"
 pprFixedRuntimeRepContext FRRPatSynArg
@@ -1287,6 +1295,13 @@ pprFixedRuntimeRepContext (FRRArrow arrowContext)
   = pprFRRArrowContext arrowContext
 pprFixedRuntimeRepContext (FRRExpectedFunTy funTyOrig arg_pos)
   = pprExpectedFunTyOrigin funTyOrig arg_pos
+pprFixedRuntimeRepContext (FRRDeepSubsumption is_exp pos)
+  = hsep [ text "The", what, text "type of the"
+         , ppr (Argument pos)
+         , text "of the eta-expansion"
+         ]
+  where
+    what = if is_exp then text "expected" else text "actual"
 
 instance Outputable FixedRuntimeRepContext where
   ppr = pprFixedRuntimeRepContext
@@ -1315,34 +1330,117 @@ data ArgPos
 *                                                                      *
 ********************************************************************* -}
 
+{- Note [Positional information in representation-polymorphism errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider an invalid instantiation of the 'catch#' primop:
+
+  catch#
+    :: forall {q :: RuntimeRep} {k :: Levity} (a :: TYPE q)
+              (b :: TYPE (BoxedRep k)).
+       (State# RealWorld -> (# State# RealWorld, a #))
+       -> (b -> State# RealWorld -> (# State# RealWorld, a #))
+       -> State# RealWorld
+       -> (# State# RealWorld, a #)
+
+  boo :: forall r (a :: TYPE r). ...
+  boo = catch# @a
+
+The instantiation is invalid because we insist that the quantified RuntimeRep
+type variable 'q' be instantiated to a concrete RuntimeRep, as per
+Note [Representation-polymorphism checking built-ins] in GHC.Tc.Utils.Concrete.
+
+We report this as the following error message:
+
+  The result of the first argument of the primop ‘catch#’ does not have a fixed runtime representation.
+  Its type is: (a :: TYPE r).
+
+The positional information in this message, namely "The result of the first argument",
+is produced by using the 'Position' datatype. In this case:
+
+  pos :: Position Neg
+  pos = Result (Argument Top)
+  ppr pos = "result of the first argument"
+
+Other examples:
+
+  pos2 :: Position Neg
+  pos2 = Argument (Result (Result Top))
+  ppr pos2 = "3rd argument"
+
+  pos3 :: Position Pos
+  pos3 = Argument (Result (Argument (Result Top)))
+  ppr pos3 = "2nd argument of the 2nd argument"
+
+It's useful to keep track at the type-level whether we are in a positive or
+negative position in the type, as for primops we can usually tolerate
+representation-polymorphism in positive positions, but not in negative ones;
+for example
+
+  ($) :: forall {r} (a :: Type) (b :: TYPE r). (a -> b) -> a -> b
+
+
+This positional information is (currently) used to report representation-polymorphism
+errors in precisely the following two situations:
+
+  1. Representation-polymorphic Ids with no binding, as described in
+     Note [Representation-polymorphic Ids with no binding] in GHC.Tc.Utils.Concrete.
+
+     This uses the 'FRRRepPolyId' constructor of 'FixedRuntimeRepContext'.
+
+  2. When inserting eta-expansions for deep subsumption.
+     See Wrinkle [Representation-polymorphism checking during subtyping] in
+     Note [FunTy vs FunTy case in tc_sub_type_deep] in GHC.Tc.Utils.Unify.
+
+     This uses the 'FRRDeepSubsumption' constructor of 'FixedRuntimeRepContext'.
+-}
+
+-- | Are we in a positive (covariant) or negative (contravariant) position?
+--
+-- See Note [Positional information in representation-polymorphism errors].
 data Polarity = Pos | Neg
 
+-- | Flip the 'Polarity': turn positive into negative and vice-versa.
 type FlipPolarity :: Polarity -> Polarity
-type family FlipPolarity p where
+type family FlipPolarity p = r | r -> p where
   FlipPolarity Pos = Neg
   FlipPolarity Neg = Pos
 
 -- | A position in which a type variable appears in a type;
 -- in particular, whether it appears in a positive or a negative position.
+--
+-- See Note [Positional information in representation-polymorphism errors].
 type Position :: Polarity -> Hs.Type
 data Position p where
-  -- | In the @i@-th argument of a function arrow
-  Argument :: Int -> Position (FlipPolarity p) -> Position p
+  -- | In the argument of a function arrow
+  Argument :: Position p -> Position (FlipPolarity p)
   -- | In the result of a function arrow
   Result   :: Position p -> Position p
   -- | At the top level of a type
   Top      :: Position Pos
+deriving stock instance Show (Position p)
+instance Outputable (Position p) where
+  ppr = go 1
+    where
+      go :: Int -> Position q -> SDoc
+      go i (Argument (Result pos)) = go (i+1) (Argument pos)
+      go i (Argument pos) = speakNth i <+> text "argument" <+> aux 1 pos
+      go i (Result (Result pos)) = go i (Result pos)
+      go i (Result pos) = text "result" <+> aux i pos
+      go _ Top = text "top-level"
 
-pprFRRRepPolyId :: RepPolyId -> Name -> Position Neg -> SDoc
-pprFRRRepPolyId id nm (Argument i pos) =
-  text "The" <+> what <+> speakNth i <+> text "argument of" <+> pprRepPolyId id nm
+      aux :: Int -> Position q -> SDoc
+      aux i pos = case pos of { Top -> empty; _ -> text "of the" <+> go i pos }
+
+-- | @'mkArgPos' i p@ makes the 'Position' @p@ relative to the @ith@ argument.
+--
+-- Example: @ppr (mkArgPos 3 (Result Top)) == "in the result of the 3rd argument"@.
+mkArgPos :: Int -> Position p -> Position (FlipPolarity p)
+mkArgPos i = go
   where
-    what = case pos of
-      Top       -> empty
-      Result {} -> text "return type of the"
-      _         -> text "nested return type inside the"
-pprFRRRepPolyId id nm (Result {}) =
-  text "The result of" <+> pprRepPolyId id nm
+    go :: Position p -> Position (FlipPolarity p)
+    go Top = Argument $ nTimes (i-1) Result Top
+    go (Result p) = Result $ go p
+    go (Argument p) = Argument $ go p
 
 pprRepPolyId :: RepPolyId -> Name -> SDoc
 pprRepPolyId id nm = id_desc <+> quotes (ppr nm)

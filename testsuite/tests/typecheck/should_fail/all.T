@@ -432,7 +432,7 @@ test('T12124', normal, compile_fail, [''])
 test('T12430', normal, compile_fail, [''])
 test('T12589', normal, compile_fail, [''])
 test('T12529', normal, compile_fail, [''])
-test('T12563', normal, compile_fail, [''])
+test('T12563', normal, compile, ['']) # Turns out we can accept this one after all!
 test('T12648', normal, compile_fail, [''])
 test('T12729', normal, compile_fail, [''])
 test('T12785b', normal, compile_fail, [''])

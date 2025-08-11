@@ -99,7 +99,7 @@ computePrimOpConcTyVarsFromType nm tyvars arg_tys _res_ty = mkNameEnv concs
       | tv `elem` [ runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar
                   , levity1TyVar, levity2TyVar ]
       = listToMaybe $
-          mapMaybe (\ (i,arg) -> Argument i <$> positiveKindPos_maybe tv arg)
+          mapMaybe (\ (i,arg) -> mkArgPos i <$> positiveKindPos_maybe tv arg)
             (zip [1..] arg_tys)
       | otherwise
       = Nothing
@@ -124,7 +124,7 @@ negativeKindPos_maybe tv ty
       )
   where
     recur (pos, scaled_ty)
-      = Argument pos <$> positiveKindPos_maybe tv (scaledThing scaled_ty)
+      = mkArgPos pos <$> positiveKindPos_maybe tv (scaledThing scaled_ty)
     -- (assumes we don't have any function types nested inside other types)
 
 -- | Does this type variable appear in a kind in a positive position in the
@@ -145,7 +145,7 @@ positiveKindPos_maybe tv ty
       )
   where
     recur (pos, scaled_ty)
-      = Argument pos <$> negativeKindPos_maybe tv (scaledThing scaled_ty)
+      = mkArgPos pos <$> negativeKindPos_maybe tv (scaledThing scaled_ty)
     -- (assumes we don't have any function types nested inside other types)
     finish ty
       | tv `elemVarSet` tyCoVarsOfType (typeKind ty)

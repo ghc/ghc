@@ -803,7 +803,7 @@ idConcreteTvs id
   = mkNameEnv
     [(tyVarName a_rep, ConcreteFRR $ FixedRuntimeRepOrigin (mkTyVarTy a)
                                    $ FRRRepPolyId unsafeCoercePrimName RepPolyFunction
-                                   $ Argument 1 Top)]
+                                   $ mkArgPos 1 Top)]
 
   | otherwise
   = idDetailsConcreteTvs $ idDetails id
