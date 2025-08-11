@@ -946,7 +946,7 @@ Terms are eagerly instantiated. This means that if you say
 
 then `id` gets instantiated to have type alpha -> alpha. The variable
 alpha is then unconstrained and regeneralized. So we may well end up with
-  x = /\x. id @a
+  x = /\a. id @a
 But we cannot do this in types, as we have no type-level lambda.
 
 So, we must be careful only to instantiate at the last possible moment, when
@@ -954,9 +954,15 @@ we're sure we're never going to want the lost polymorphism again. This is done
 in calls to `tcInstInvisibleTyBinders`; a particular case in point is in
 `checkExpectedKind`.
 
+For example, suppose we have:
+    Actual:  ∀ k2 k. k -> k2   -> k
+  Expected:  ∀    k. k -> Type -> k
+We must very delicately instantiate just k2 to kappa, and then unify
+  (∀ k. k -> Type -> k) ~ (∀ k. k -> kappa -> k)
+
 Otherwise, we are careful /not/ to instantiate.  For example:
-* at a variable  in `tcTyVar`
-* in `tcInferLHsTypeUnsaturated`, which is used by :kind in GHCi.
+  * at a variable  in `tcTyVar`
+  * in `tcInferLHsTypeUnsaturated`, which is used by :kind in GHCi.
 
 ************************************************************************
 *                                                                      *
@@ -1977,6 +1983,8 @@ checkExpKind :: HsType GhcRn -> TcType -> TcKind -> ExpKind -> TcM TcType
 checkExpKind rn_ty ty ki (Check ki') =
   checkExpectedKind rn_ty ty ki ki'
 checkExpKind _rn_ty ty ki (Infer cell) = do
+  -- NB: do not instantiate.
+  -- See Note [Do not always instantiate eagerly in types]
   co <- fillInferResult ki cell
   pure (ty `mkCastTy` co)
 

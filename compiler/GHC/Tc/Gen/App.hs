@@ -430,7 +430,8 @@ tcApp rn_expr exp_res_ty
                          -- Step 5.2: typecheck the arguments, and monomorphise
                          --           any un-unified instantiation variables
                        ; tc_args <- tcValArgs DoQL inst_args
-                         -- Step 5.3: typecheck the arguments
+                         -- Step 5.3: zonk to expose the polymophism hidden under
+                         --           QuickLook instantiation variables in `app_res_rho`
                        ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
                          -- Step 5.4: subsumption check against the expected type
                        ; res_wrap <- checkResultTy rn_expr tc_head inst_args
@@ -463,6 +464,8 @@ finishApp tc_head@(tc_fun,_) tc_args app_res_rho res_wrap
        ; traceTc "End tcApp }" (ppr tc_fun)
        ; return (mkHsWrap res_wrap res_expr) }
 
+-- | Connect up the inferred type of an application with the expected type.
+-- This is usually just a unification, but with deep subsumption there is more to do.
 checkResultTy :: HsExpr GhcRn
               -> (HsExpr GhcTc, AppCtxt)  -- Head
               -> [HsExprArg p]            -- Arguments, just error messages
@@ -470,11 +473,29 @@ checkResultTy :: HsExpr GhcRn
                             --   expose foralls, but maybe not deeply instantiated
               -> ExpRhoType -- Expected type; this is deeply skolemised
               -> TcM HsWrapper
--- Connect up the inferred type of the application with the expected type
--- This is usually just a unification, but with deep subsumption there is more to do
-checkResultTy _ _ _ app_res_rho (Infer inf_res)
-  = do { co <- fillInferResult app_res_rho inf_res
-       ; return (mkWpCastN co) }
+checkResultTy rn_expr _fun _inst_args app_res_rho (Infer inf_res)
+  = fillInferResultDS (exprCtOrigin rn_expr) app_res_rho inf_res
+  -- See Note [Deeply instantiate in checkResultTy when inferring]
+
+{- Note [Deeply instantiate in checkResultTy when inferring]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To accept the following program (T26225b) with -XDeepSubsumption, we need to
+deeply instantiate when inferring in checkResultTy:
+
+  f :: Int -> (forall a. a->a)
+  g :: Int -> Bool -> Bool
+
+  test b =
+    case b of
+      True  -> f
+      False -> g
+
+If we don't deeply instantiate in the branches of the case expression, we will
+try to unify the type of 'f' with that of 'g', which fails. If we instead
+deeply instantiate 'f', we will fill the 'InferResult' with 'Int -> alpha -> alpha'
+which then successfully unifies with the type of 'g' when we come to fill the
+'InferResult' hole a second time for the second case branch.
+-}
 
 checkResultTy rn_expr (tc_fun, fun_ctxt) inst_args app_res_rho (Check res_ty)
 -- Unify with expected type from the context
@@ -502,8 +523,6 @@ checkResultTy rn_expr (tc_fun, fun_ctxt) inst_args app_res_rho (Check res_ty)
              -- Even though both app_res_rho and res_ty are rho-types,
              -- they may have nested polymorphism, so if deep subsumption
              -- is on we must call tcSubType.
-             -- Zonk app_res_rho first, because QL may have instantiated some
-             -- delta variables to polytypes, and tcSubType doesn't expect that
              do { wrap <- tcSubTypeDS rn_expr app_res_rho res_ty
                 ; traceTc "checkResultTy 2 }" (ppr app_res_rho $$ ppr res_ty)
                 ; return wrap } }

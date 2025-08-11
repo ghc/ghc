@@ -1950,7 +1950,7 @@ seqId = pcRepPolyId seqName ty concs info
           Case (Var x) x openBetaTy [Alt DEFAULT [] (Var y)]
 
     concs = mkRepPolyIdConcreteTyVars
-        [ ((openBetaTy, Argument 2 Top), runtimeRep2TyVar)]
+        [ ((openBetaTy, mkArgPos 2 Top), runtimeRep2TyVar)]
 
     arity = 2
 
@@ -2009,7 +2009,7 @@ oneShotId = pcRepPolyId oneShotName ty concs info
     arity = 2
 
     concs = mkRepPolyIdConcreteTyVars
-        [((openAlphaTy, Argument 2 Top), runtimeRep1TyVar)]
+        [((openAlphaTy, mkArgPos 2 Top), runtimeRep1TyVar)]
 
 ----------------------------------------------------------------------
 {- Note [Wired-in Ids for rebindable syntax]
@@ -2054,7 +2054,7 @@ leftSectionId = pcRepPolyId leftSectionName ty concs info
     arity = 2
 
     concs = mkRepPolyIdConcreteTyVars
-            [((openAlphaTy, Argument 2 Top), runtimeRep1TyVar)]
+            [((openAlphaTy, mkArgPos 2 Top), runtimeRep1TyVar)]
 
 -- See Note [Left and right sections] in GHC.Rename.Expr
 -- See Note [Wired-in Ids for rebindable syntax]
@@ -2088,8 +2088,8 @@ rightSectionId = pcRepPolyId rightSectionName ty concs info
 
     concs =
       mkRepPolyIdConcreteTyVars
-        [ ((openAlphaTy, Argument 3 Top), runtimeRep1TyVar)
-        , ((openBetaTy , Argument 2 Top), runtimeRep2TyVar)]
+        [ ((openAlphaTy, mkArgPos 3 Top), runtimeRep1TyVar)
+        , ((openBetaTy , mkArgPos 2 Top), runtimeRep2TyVar)]
 
 --------------------------------------------------------------------------------
 
@@ -2119,7 +2119,7 @@ coerceId = pcRepPolyId coerceName ty concs info
           [Alt (DataAlt coercibleDataCon) [eq] (Cast (Var x) (mkCoVarCo eq))]
 
     concs = mkRepPolyIdConcreteTyVars
-            [((mkTyVarTy av, Argument 1 Top), rv)]
+            [((mkTyVarTy av, mkArgPos 1 Top), rv)]
 
 {-
 Note [seqId magic]
