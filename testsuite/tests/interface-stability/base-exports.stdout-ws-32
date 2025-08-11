@@ -3286,9 +3286,6 @@ module GHC.Base where
     {-# MINIMAL fmap #-}
   type IO :: * -> *
   newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
-  type role IOPort# nominal representational
-  type IOPort# :: forall {l :: Levity}. * -> TYPE (BoxedRep l) -> UnliftedType
-  data IOPort# a b
   type IP :: Symbol -> * -> Constraint
   class IP x a | x -> a where
     ip :: a
@@ -4175,7 +4172,6 @@ module GHC.Base where
   newArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. Int# -> a -> State# d -> (# State# d, MutableArray# d a #)
   newBCO# :: forall a d. ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# d -> (# State# d, BCO #)
   newByteArray# :: forall d. Int# -> State# d -> (# State# d, MutableByteArray# d #)
-  newIOPort# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). State# d -> (# State# d, IOPort# d a #)
   newMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). State# d -> (# State# d, MVar# d a #)
   newMutVar# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. a -> State# d -> (# State# d, MutVar# d a #)
   newPinnedByteArray# :: forall d. Int# -> State# d -> (# State# d, MutableByteArray# d #)
@@ -4394,7 +4390,6 @@ module GHC.Base where
   readFloatX4OffAddr# :: forall d. Addr# -> Int# -> State# d -> (# State# d, FloatX4# #)
   readFloatX8Array# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, FloatX8# #)
   readFloatX8OffAddr# :: forall d. Addr# -> Int# -> State# d -> (# State# d, FloatX8# #)
-  readIOPort# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). IOPort# d a -> State# d -> (# State# d, a #)
   readInt16Array# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Int16# #)
   readInt16ArrayAsInt16X16# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Int16X16# #)
   readInt16ArrayAsInt16X32# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Int16X32# #)
@@ -4594,7 +4589,6 @@ module GHC.Base where
   runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
   sameArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). Array# a -> Array# a -> Int#
   sameByteArray# :: ByteArray# -> ByteArray# -> Int#
-  sameIOPort# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). IOPort# s a -> IOPort# s a -> Int#
   sameMVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MVar# s a -> MVar# s a -> Int#
   sameMutVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MutVar# s a -> MutVar# s a -> Int#
   sameMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MutableArray# s a -> MutableArray# s a -> Int#
@@ -4827,7 +4821,6 @@ module GHC.Base where
   writeFloatX4OffAddr# :: forall d. Addr# -> Int# -> FloatX4# -> State# d -> State# d
   writeFloatX8Array# :: forall d. MutableByteArray# d -> Int# -> FloatX8# -> State# d -> State# d
   writeFloatX8OffAddr# :: forall d. Addr# -> Int# -> FloatX8# -> State# d -> State# d
-  writeIOPort# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). IOPort# d a -> a -> State# d -> (# State# d, Int# #)
   writeInt16Array# :: forall d. MutableByteArray# d -> Int# -> Int16# -> State# d -> State# d
   writeInt16ArrayAsInt16X16# :: forall d. MutableByteArray# d -> Int# -> Int16X16# -> State# d -> State# d
   writeInt16ArrayAsInt16X32# :: forall d. MutableByteArray# d -> Int# -> Int16X32# -> State# d -> State# d
@@ -5456,9 +5449,6 @@ module GHC.Exts where
   type role FunPtr phantom
   type FunPtr :: * -> *
   data FunPtr a = FunPtr Addr#
-  type role IOPort# nominal representational
-  type IOPort# :: forall {l :: Levity}. * -> TYPE (BoxedRep l) -> UnliftedType
-  data IOPort# a b
   type Int :: *
   data Int = I# Int#
   type Int# :: TYPE IntRep
@@ -6263,7 +6253,6 @@ module GHC.Exts where
   newArrayArray# :: forall s. Int# -> State# s -> (# State# s, MutableArrayArray# s #)
   newBCO# :: forall a d. ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# d -> (# State# d, BCO #)
   newByteArray# :: forall d. Int# -> State# d -> (# State# d, MutableByteArray# d #)
-  newIOPort# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). State# d -> (# State# d, IOPort# d a #)
   newMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). State# d -> (# State# d, MVar# d a #)
   newMutVar# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. a -> State# d -> (# State# d, MutVar# d a #)
   newPinnedByteArray# :: forall d. Int# -> State# d -> (# State# d, MutableByteArray# d #)
@@ -6479,7 +6468,6 @@ module GHC.Exts where
   readFloatX4OffAddr# :: forall d. Addr# -> Int# -> State# d -> (# State# d, FloatX4# #)
   readFloatX8Array# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, FloatX8# #)
   readFloatX8OffAddr# :: forall d. Addr# -> Int# -> State# d -> (# State# d, FloatX8# #)
-  readIOPort# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). IOPort# d a -> State# d -> (# State# d, a #)
   readInt16Array# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Int16# #)
   readInt16ArrayAsInt16X16# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Int16X16# #)
   readInt16ArrayAsInt16X32# :: forall d. MutableByteArray# d -> Int# -> State# d -> (# State# d, Int16X32# #)
@@ -6681,7 +6669,6 @@ module GHC.Exts where
   sameArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). Array# a -> Array# a -> Int#
   sameArrayArray# :: ArrayArray# -> ArrayArray# -> Int#
   sameByteArray# :: ByteArray# -> ByteArray# -> Int#
-  sameIOPort# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). IOPort# s a -> IOPort# s a -> Int#
   sameMVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MVar# s a -> MVar# s a -> Int#
   sameMutVar# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MutVar# s a -> MutVar# s a -> Int#
   sameMutableArray# :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)). MutableArray# s a -> MutableArray# s a -> Int#
@@ -6913,7 +6900,6 @@ module GHC.Exts where
   writeFloatX4OffAddr# :: forall d. Addr# -> Int# -> FloatX4# -> State# d -> State# d
   writeFloatX8Array# :: forall d. MutableByteArray# d -> Int# -> FloatX8# -> State# d -> State# d
   writeFloatX8OffAddr# :: forall d. Addr# -> Int# -> FloatX8# -> State# d -> State# d
-  writeIOPort# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). IOPort# d a -> a -> State# d -> (# State# d, Int# #)
   writeInt16Array# :: forall d. MutableByteArray# d -> Int# -> Int16# -> State# d -> State# d
   writeInt16ArrayAsInt16X16# :: forall d. MutableByteArray# d -> Int# -> Int16X16# -> State# d -> State# d
   writeInt16ArrayAsInt16X32# :: forall d. MutableByteArray# d -> Int# -> Int16X32# -> State# d -> State# d
@@ -8081,16 +8067,6 @@ module GHC.IOArray where
   unsafeReadIOArray :: forall i e. IOArray i e -> GHC.Internal.Types.Int -> GHC.Internal.Types.IO e
   unsafeWriteIOArray :: forall i e. IOArray i e -> GHC.Internal.Types.Int -> e -> GHC.Internal.Types.IO ()
   writeIOArray :: forall i e. GHC.Internal.Ix.Ix i => IOArray i e -> i -> e -> GHC.Internal.Types.IO ()
-
-module GHC.IOPort where
-  -- Safety: None
-  type IOPort :: * -> *
-  data IOPort a = IOPort (GHC.Internal.Prim.IOPort# GHC.Internal.Prim.RealWorld a)
-  doubleReadException :: GHC.Internal.Exception.Type.SomeException
-  newEmptyIOPort :: forall a. GHC.Internal.Types.IO (IOPort a)
-  newIOPort :: forall a. a -> GHC.Internal.Types.IO (IOPort a)
-  readIOPort :: forall a. IOPort a -> GHC.Internal.Types.IO a
-  writeIOPort :: forall a. IOPort a -> a -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
 
 module GHC.IORef where
   -- Safety: None
@@ -11695,7 +11671,6 @@ instance GHC.Internal.Classes.Eq GHC.Internal.IO.Handle.HandlePosn -- Defined in
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance forall i e. GHC.Internal.Classes.Eq (GHC.Internal.IOArray.IOArray i e) -- Defined in ‘GHC.Internal.IOArray’
-instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.IOPort.IOPort a) -- Defined in ‘GHC.Internal.IOPort’
 instance GHC.Internal.Classes.Eq GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
 instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
 instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.BigNat.BigNat -- Defined in ‘GHC.Internal.Bignum.BigNat’
@@ -12317,7 +12292,6 @@ instance GHC.Internal.Exception.Type.Exception GHC.Internal.Control.Exception.Ba
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Control.Exception.Base.TypeError -- Defined in ‘GHC.Internal.Control.Exception.Base’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Data.Dynamic.Dynamic -- Defined in ‘GHC.Internal.Data.Dynamic’
 instance [safe] GHC.Internal.Exception.Type.Exception ghc-internal-9.1300.0:GHC.Internal.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘ghc-internal-9.1300.0:GHC.Internal.IO.Handle.Lock.Common’
-instance GHC.Internal.Exception.Type.Exception GHC.Internal.IOPort.IOPortException -- Defined in ‘GHC.Internal.IOPort’
 instance GHC.Internal.Exception.Type.Exception System.Timeout.Timeout -- Defined in ‘System.Timeout’
 instance forall a k (b :: k). GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.Floating (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
@@ -13145,7 +13119,6 @@ instance [safe] GHC.Internal.Show.Show ghc-internal-9.1300.0:GHC.Internal.IO.Han
 instance GHC.Internal.Show.Show GHC.Internal.IO.Handle.HandlePosn -- Defined in ‘GHC.Internal.IO.Handle’
 instance GHC.Internal.Show.Show GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
 instance GHC.Internal.Show.Show GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
-instance GHC.Internal.Show.Show GHC.Internal.IOPort.IOPortException -- Defined in ‘GHC.Internal.IOPort’
 instance GHC.Internal.Show.Show GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
 instance GHC.Internal.Show.Show GHC.RTS.Flags.CCFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.RTS.Flags.ConcFlags -- Defined in ‘GHC.RTS.Flags’

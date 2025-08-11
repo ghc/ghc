@@ -109,7 +109,6 @@ import GHC.Internal.Base
 import GHC.Internal.Conc.Bound
 import GHC.Internal.Conc.Sync
 import GHC.Internal.IO
-import GHC.Internal.IOPort
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Bits
@@ -170,7 +169,7 @@ import {-# SOURCE #-} GHC.Internal.Debug.Trace (traceEventIO)
 --    fact that something else has finished the remainder of their queue or must
 --    have a guarantee to never block.  In this implementation we strive to
 --    never block.   This is achieved by not having the worker threads call out
---    to any user code, and to have the IOPort synchronization primitive never
+--    to any user code, and to have the MVar synchronization primitive never
 --    block.   This means if the port is full the message is lost, however we
 --    have an invariant that the port can never be full and have a waiting
 --    receiver.  As such, dropping the message does not change anything as there
@@ -541,11 +540,9 @@ withOverlappedEx :: forall a.
                  -> CompletionCallback (IOResult a)
                  -> IO (IOResult a)
 withOverlappedEx mgr fname h async offset startCB completionCB = do
-    signal <- newEmptyIOPort :: IO (IOPort (IOResult a))
-    let signalReturn a = failIfFalse_ (dbgMsg "signalReturn") $
-                            writeIOPort signal (IOSuccess a)
-        signalThrow ex = failIfFalse_ (dbgMsg "signalThrow") $
-                            writeIOPort signal (IOFailed ex)
+    signal <- newEmptyMVar :: IO (MVar (IOResult a))
+    let signalReturn a = putMVar signal (IOSuccess a)
+        signalThrow ex = putMVar signal (IOFailed ex)
     mask_ $ do
       let completionCB' e b = do
             result <- completionCB e b
@@ -689,7 +686,7 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
                              registerAlertableWait delay
                         return $ IOFailed Nothing
         let runner = do debugIO $ (dbgMsg ":: waiting ") ++ " | "  ++ show lpol
-                        res <- readIOPort signal `catch` cancel
+                        res <- readMVar signal `catch` cancel
                         debugIO $ dbgMsg ":: signaled "
                         case res of
                           IOFailed err -> FFI.throwWinErr fname (maybe 0 fromIntegral err)
@@ -722,7 +719,7 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
                                     let err' = fromIntegral err
                                     debugIO $ dbgMsg $ ":: done callback: " ++ show err' ++ " - " ++ show numBytes
                                     completionCB err' (fromIntegral numBytes)
-              else readIOPort signal
+              else readMVar signal
           CbError err  -> do
             reqs3 <- removeRequest
             debugIO $ "-1.. " ++ show reqs3 ++ " requests queued."
@@ -742,10 +739,10 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
                     -- Uses an inline definition of threadDelay to prevent an import
                     -- cycle.
                     let usecs = 250 -- 0.25ms
-                    m <- newEmptyIOPort
+                    m <- newEmptyMVar
                     reg <- registerTimeout mgr usecs $
-                                writeIOPort m () >> return ()
-                    readIOPort m `onException` unregisterTimeout mgr reg
+                                putMVar m () >> return ()
+                    readMVar m `onException` unregisterTimeout mgr reg
                 | otherwise = sleepBlock 1 -- 1 ms
             waitForCompletion :: HANDLE -> Ptr FFI.OVERLAPPED -> IO (CbResult Int)
             waitForCompletion fhndl lpol = do

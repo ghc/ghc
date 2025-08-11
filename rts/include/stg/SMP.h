@@ -227,8 +227,6 @@ EXTERN_INLINE void busy_wait_nop(void);
  *   - takeMVar#, tryTakeMVar#
  *   - putMVar#, tryPutMVar#
  *   - readMVar#, tryReadMVar#
- *   - readIOPort#
- *   - writeIOPort#
  *   - addCFinalizerToWeak#
  *   - finalizeWeak#
  *   - deRefWeak#

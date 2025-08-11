@@ -263,14 +263,6 @@ data GenClosure b
     , value      :: !b              -- ^ Pointer to closure
     }
 
-    -- | An @IOPort#@, with a queue of thread state objects blocking on them
-  | IOPortClosure
-        { info       :: !StgInfoTable
-        , queueHead  :: !b              -- ^ Pointer to head of queue
-        , queueTail  :: !b              -- ^ Pointer to tail of queue
-        , value      :: !b              -- ^ Pointer to closure
-        }
-
     -- | A @MutVar#@
   | MutVarClosure
         { info       :: !StgInfoTable
@@ -407,7 +399,6 @@ getClosureInfoTbl_maybe closure = case closure of
   MutArrClosure{info} ->Just info
   SmallMutArrClosure{info} ->Just info
   MVarClosure{info} ->Just info
-  IOPortClosure{info} ->Just info
   MutVarClosure{info} ->Just info
   BlockingQueueClosure{info} ->Just info
   WeakClosure{info} ->Just info
@@ -456,7 +447,6 @@ getClosurePtrArgs_maybe closure = case closure of
   MutArrClosure{} -> Nothing
   SmallMutArrClosure{} -> Nothing
   MVarClosure{} -> Nothing
-  IOPortClosure{} -> Nothing
   MutVarClosure{} -> Nothing
   BlockingQueueClosure{} -> Nothing
   WeakClosure{} -> Nothing
@@ -645,7 +635,6 @@ allClosures (MutArrClosure {..}) = mccPayload
 allClosures (SmallMutArrClosure {..}) = mccPayload
 allClosures (MutVarClosure {..}) = [var]
 allClosures (MVarClosure {..}) = [queueHead,queueTail,value]
-allClosures (IOPortClosure {..}) = [queueHead,queueTail,value]
 allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer] ++ Data.Foldable.toList weakLink

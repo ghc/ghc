@@ -25,10 +25,9 @@
       * `GHC.TypeNats.Internal`
       * `GHC.ExecutionStack.Internal`.
   * Deprecate `GHC.JS.Prim.Internal.Build`, as per [CLC #329](https://github.com/haskell/core-libraries-committee/issues/329)
-
   * Fix incorrect results of `integerPowMod` when the base is 0 and the exponent is negative, and `integerRecipMod` when the modulus is zero ([#26017](https://gitlab.haskell.org/ghc/ghc/-/issues/26017)).
   * Fix the rewrite rule for `scanl'` not being strict in the first element of the output list ([#26143](https://gitlab.haskell.org/ghc/ghc/-/issues/26143)).
-
+  * `GHC.Exts.IOPort#` and its related operations have been removed  ([CLC #213](https://github.com/haskell/core-libraries-committee/issues/213))
 
 ## 4.21.0.0 *December 2024*
   * Shipped with GHC 9.12.1
