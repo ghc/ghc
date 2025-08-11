@@ -1,5 +1,5 @@
 //#OPTIONS:CPP
-//#OPTIONS:EMCC:EXPORTED_RUNTIME_METHODS=addFunction,removeFunction,getEmptyTableSlot
+//#OPTIONS:EMCC:EXPORTED_RUNTIME_METHODS=addFunction,removeFunction,getEmptyTableSlot,HEAP8
 
 // #define GHCJS_TRACE_META 1
 
