@@ -275,11 +275,13 @@ mkCast expr co
   = assertPpr (coercionRole co == Representational)
               (text "coercion" <+> ppr co <+> text "passed to mkCast"
                <+> ppr expr <+> text "has wrong role" <+> ppr (coercionRole co)) $
-    warnPprTrace (not (coercionLKind co `eqType` exprType expr))
-          "Trying to coerce" (text "(" <> ppr expr
-          $$ text "::" <+> ppr (exprType expr) <> text ")"
-          $$ ppr co $$ ppr (coercionType co)
-          $$ callStackDoc) $
+    warnPprTrace (not (coercionLKind co `eqType` exprType expr)) "Bad cast"
+      (vcat [ text "Coercion LHS kind does not match enclosed expression type"
+            , text "co:" <+> ppr co
+            , text "coercionLKind:" <+> ppr (coercionLKind co)
+            , text "exprType:" <+> ppr (exprType expr)
+            , text "expr:" <+> ppr expr
+            , callStackDoc ]) $
     case expr of
       Cast expr co2 -> mkCast expr (mkTransCo co2 co)
       Tick t expr   -> Tick t (mkCast expr co)
