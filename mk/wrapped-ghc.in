@@ -1,37 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Echo the invocation, expanding any @response-file arguments inline for readability
+# Echo the invocation, expanding any @response-file arguments inline by cat-ing them
 expand_and_echo() {
-  local -a expanded=()
-  local arg file
-  for arg in "$@"; do
-    if [[ "$arg" == @* ]]; then
-      file="${arg#@}"
-      if [[ -f "$file" ]]; then
-        # Disable pathname expansion during splitting
-        set -f
-        local -a rf_words=()
-        # Split response file contents on IFS (spaces/newlines)
-        # Note: this doesn't fully emulate GHC's parser w.r.t quotes, but is good enough for logging
-        read -r -a rf_words <<< "$(tr '\n' ' ' < "$file")"
-        set +f
-        if (( ${#rf_words[@]} > 0 )); then
-          expanded+=("${rf_words[@]}")
+  {
+    printf 'ghc'
+    local arg file
+    for arg in "$@"; do
+      if [[ "$arg" == @* ]]; then
+        file="${arg#@}"
+        if [[ -f "$file" ]]; then
+          printf ' '
+          tr '\n' ' ' < "$file"
+          continue
         fi
-      else
-        expanded+=("$arg")
       fi
-    else
-      expanded+=("$arg")
-    fi
-  done
-  local joined=""
-  if (( ${#expanded[@]} > 0 )); then
-    printf -v joined '%s ' "${expanded[@]}"
-    joined="${joined% }"
-  fi
-  echo "ghc ${joined}" >&2
+      printf ' %s' "$arg"
+    done
+    printf '\n'
+  } >&2
 }
 
 expand_and_echo "$@"
