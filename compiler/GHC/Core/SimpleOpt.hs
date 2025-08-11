@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -212,6 +214,12 @@ simpleOptPgm opts this_mod binds rules =
 ----------------------
 type SimpleClo = (SimpleOptEnv, InExpr)
 
+data SimpleContItem = ApplyToArg SimpleClo | CastIt OutCoercion
+
+instance Outputable SimpleContItem where
+  ppr (ApplyToArg (_, arg)) = text "ARG" <+> ppr arg
+  ppr (CastIt co) = text "CAST" <+> ppr co
+
 data SimpleOptEnv
   = SOE { soe_opts :: {-# UNPACK #-} !SimpleOpts
              -- ^ Simplifier options
@@ -268,32 +276,26 @@ simple_opt_clo in_scope (e_env, e)
   = simple_opt_expr (soeSetInScope in_scope e_env) e
 
 simple_opt_expr :: HasDebugCallStack => SimpleOptEnv -> InExpr -> OutExpr
-simple_opt_expr env expr
-  = go expr
+simple_opt_expr env expr = go expr
   where
-    rec_ids      = soe_rec_ids env
     subst        = soe_subst env
     in_scope     = substInScopeSet subst
     in_scope_env = ISE in_scope alwaysActiveUnfoldingFun
 
     ---------------
-    go (Var v)
-       | Just clo <- lookupVarEnv (soe_inl env) v
-       = simple_opt_clo in_scope clo
-       | otherwise
-       = lookupIdSubst (soe_subst env) v
+    go e@(App {})  = simple_app env e []
+    go e@(Var {})  = simple_app env e []
+    go e@(Cast {}) = simple_app env e []
+    go e@(Lam {})  = simple_app env e []
 
-    go (App e1 e2)      = simple_app env e1 [(env,e2)]
     go (Type ty)        = Type     (substTyUnchecked subst ty)
     go (Coercion co)    = Coercion (go_co co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)      = mk_cast (go e) (go_co co)
     go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
                              (env', Nothing)   -> simple_opt_expr env' body
                              (env', Just bind) -> Let bind (simple_opt_expr env' body)
 
-    go lam@(Lam {})     = go_lam env [] lam
     go (Case e b ty as)
       | isDeadBinder b
       , Just (_, [], con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
@@ -331,6 +333,82 @@ simple_opt_expr env expr
       where
         (env', bndrs') = subst_opt_bndrs env bndrs
 
+mk_cast :: CoreExpr -> CoercionR -> CoreExpr
+-- Like GHC.Core.Utils.mkCast, but does a full reflexivity check.
+-- mkCast doesn't do that because the Simplifier does (in simplCast)
+-- But in SimpleOpt it's nice to kill those nested casts (#18112)
+mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCo` co2)
+mk_cast (Tick t e)   co         = Tick t (mk_cast e co)
+mk_cast e co | isReflexiveCo co = e
+             | otherwise        = Cast e co
+
+----------------------
+-- simple_app collects arguments for beta reduction
+simple_app :: HasDebugCallStack => SimpleOptEnv -> InExpr -> [SimpleContItem] -> CoreExpr
+
+simple_app env (Var v) as
+  | Just (env', e) <- lookupVarEnv (soe_inl env) v
+  = simple_app (soeSetInScope (soeInScope env) env') e as
+
+  | let unf = idUnfolding v
+  , isCompulsoryUnfolding unf
+  , isAlwaysActive (idInlineActivation v)
+    -- Make sure to inline Ids with compulsory unfoldings.
+    -- See Note [Unfold compulsory unfoldings in RULE LHSs]
+    --
+    -- NB: this is also necessary for the plan described in
+    -- Note [Desugaring unlifted newtypes]. Test cases: T17021, T21650_{a,b}.
+  , Just rhs <- maybeUnfoldingTemplate unf -- Always succeeds if isCompulsoryUnfolding does
+  = simple_app (soeZapSubst env) rhs as
+
+simple_app env (Var v) []
+  = lookupIdSubst (soe_subst env) v
+
+simple_app env (App e1 e2) as
+  = simple_app env e1 (ApplyToArg (env, e2) : as)
+
+simple_app env e0@(Lam {}) as0@(_:_)
+  = do_beta env (zapLambdaBndrs e0 n_args) as0
+    -- Be careful to zap the lambda binders if necessary
+    -- c.f. the Lam case of simplExprF1 in GHC.Core.Opt.Simplify
+    -- Lacking this zap caused #19347, when we had a redex
+    --   (\ a b. K a b) e1 e2
+  where
+    n_args = count (\case {ApplyToArg {} -> True; CastIt {} -> False}) as0
+
+    do_beta :: SimpleOptEnv -> InExpr -> [SimpleContItem] -> OutExpr
+    do_beta env (Lam b body) (ApplyToArg a:as)
+      | -- simpl binder before looking at its type
+        -- See Note [Dark corner with representation polymorphism]
+        needsCaseBinding (idType b') (snd a)
+        -- This arg must not be inlined (side-effects) and cannot be let-bound,
+        -- due to the let-can-float invariant. So simply case-bind it here.
+      , let a' = simple_opt_clo (soeInScope env) a
+      = mkDefaultCase a' b' $ do_beta env' body as
+
+      | (env'', mb_pr) <- simple_bind_pair env' b (Just b') a NotTopLevel
+      = wrapLet mb_pr $ do_beta env'' body as
+      where (env', b') = subst_opt_bndr env b
+
+    do_beta env e@(Lam b body) as@(CastIt co:rest)
+      -- See Note [Desugaring unlifted newtypes]
+      | isNonCoVarId b
+      , Just (b', body') <- pushCoercionIntoLambda (soe_subst env) b body co
+      = do_beta (soeZapSubst env) (Lam b' body') rest
+        -- soeZapSubst: pushCoercionIntoLambda applies the substitution
+      | otherwise
+      = rebuild_app env (simple_opt_expr env e) as
+
+    do_beta env (Cast e co) as =
+      do_beta env e (add_cast env co as)
+
+    do_beta env body as
+      = simple_app env body as
+
+simple_app env e@(Lam {}) []
+  = go_lam env [] e
+  where
+    rec_ids      = soe_rec_ids env
     ----------------------
     -- go_lam tries eta reduction
     -- It is quite important that it does so. I tried removing this code and
@@ -348,66 +426,6 @@ simple_opt_expr env expr
          bs = reverse bs'
          e' = simple_opt_expr env e
 
-mk_cast :: CoreExpr -> CoercionR -> CoreExpr
--- Like GHC.Core.Utils.mkCast, but does a full reflexivity check.
--- mkCast doesn't do that because the Simplifier does (in simplCast)
--- But in SimpleOpt it's nice to kill those nested casts (#18112)
-mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCo` co2)
-mk_cast (Tick t e)   co         = Tick t (mk_cast e co)
-mk_cast e co | isReflexiveCo co = e
-             | otherwise        = Cast e co
-
-----------------------
--- simple_app collects arguments for beta reduction
-simple_app :: HasDebugCallStack => SimpleOptEnv -> InExpr -> [SimpleClo] -> CoreExpr
-
-simple_app env (Var v) as
-  | Just (env', e) <- lookupVarEnv (soe_inl env) v
-  = simple_app (soeSetInScope (soeInScope env) env') e as
-
-  | let unf = idUnfolding v
-  , isCompulsoryUnfolding unf
-  , isAlwaysActive (idInlineActivation v)
-    -- See Note [Unfold compulsory unfoldings in RULE LHSs]
-  , Just rhs <- maybeUnfoldingTemplate unf
-    -- Always succeeds if isCompulsoryUnfolding does
-  = simple_app (soeZapSubst env) rhs as
-
-  | otherwise
-  , let out_fn = lookupIdSubst (soe_subst env) v
-  = finish_app env out_fn as
-
-simple_app env (App e1 e2) as
-  = simple_app env e1 ((env, e2) : as)
-
-simple_app env e@(Lam {}) as@(_:_)
-  = do_beta env (zapLambdaBndrs e n_args) as
-    -- Be careful to zap the lambda binders if necessary
-    -- c.f. the Lam case of simplExprF1 in GHC.Core.Opt.Simplify
-    -- Lacking this zap caused #19347, when we had a redex
-    --   (\ a b. K a b) e1 e2
-    -- where (as it happens) the eta-expanded K is produced by
-    -- Note [Typechecking data constructors] in GHC.Tc.Gen.Head
-  where
-    n_args = length as
-
-    do_beta env (Lam b body) (a:as)
-      | -- simpl binder before looking at its type
-        -- See Note [Dark corner with representation polymorphism]
-        needsCaseBinding (idType b') (snd a)
-        -- This arg must not be inlined (side-effects) and cannot be let-bound,
-        -- due to the let-can-float invariant. So simply case-bind it here.
-      , let a' = simple_opt_clo (soeInScope env) a
-      = mkDefaultCase a' b' $ do_beta env' body as
-
-      | (env'', mb_pr) <- simple_bind_pair env' b (Just b') a NotTopLevel
-      = wrapLet mb_pr $ do_beta env'' body as
-
-      where (env', b') = subst_opt_bndr env b
-
-    do_beta env body as
-      = simple_app env body as
-
 simple_app env (Tick t e) as
   -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
   | t `tickishScopesLike` SoftScope
@@ -424,28 +442,74 @@ simple_app env (Let bind body) args
   = case simple_opt_bind env bind NotTopLevel of
       (env', Nothing)   -> simple_app env' body args
       (env', Just bind')
-        | isJoinBind bind' -> finish_app env expr' args
+        | isJoinBind bind' -> rebuild_app env expr' args
         | otherwise        -> Let bind' (simple_app env' body args)
         where
           expr' = Let bind' (simple_opt_expr env' body)
 
+simple_app env (Cast e co) as
+  = simple_app env e (add_cast env co as)
+
 simple_app env e as
-  = finish_app env (simple_opt_expr env e) as
+  = rebuild_app env (simple_opt_expr env e) as
 
-finish_app :: HasDebugCallStack
-           => SimpleOptEnv -> OutExpr -> [SimpleClo] -> OutExpr
--- See Note [Eliminate casts in function position]
-finish_app env (Cast (Lam x e) co) as@(_:_)
-  | not (isTyVar x) && not (isCoVar x)
-  , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
-  , Just (x',e') <- pushCoercionIntoLambda (soeInScope env) x e co
-  = simple_app (soeZapSubst env) (Lam x' e') as
+add_cast :: SimpleOptEnv -> InCoercion -> [SimpleContItem] -> [SimpleContItem]
+add_cast env co1 as
+  | isReflCo co1'
+  = as
+  | otherwise
+  = case as of
+      CastIt co2:rest -> CastIt (co1' `mkTransCo` co2):rest
+      _               -> CastIt co1':as
+  where
+    co1' = optCoercion (so_co_opts (soe_opts env)) (soe_subst env) co1
 
-finish_app env fun args
-  = foldl mk_app fun args
+rebuild_app :: HasDebugCallStack
+            => SimpleOptEnv -> OutExpr -> [SimpleContItem] -> OutExpr
+rebuild_app env fun args = foldl mk_app fun args
   where
     in_scope = soeInScope env
-    mk_app fun arg = App fun (simple_opt_clo in_scope arg)
+    mk_app out_fun = \case
+      ApplyToArg arg -> App out_fun (simple_opt_clo in_scope arg)
+      CastIt co      -> mk_cast out_fun co
+
+{- Note [Desugaring unlifted newtypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must take special care to desugar applications of unlifted newtypes. For
+example, if we have (see tests T17021 and T21650_{a,b}):
+
+  {-# LANGUAGE UnliftedNewtypes #-}
+
+  type family Id a where Id a = a
+
+  type N :: forall (r :: RuntimeRep). TYPE (Id r) -> TYPE (Id r)
+  newtype N a = MkN a
+    -- so that MkN :: forall (r :: RuntimeRep) (a :: TYPE (Id r)). a -> N @r a
+
+Now, a saturated application of `MkN` such as `MkN 3#` will contain a cast
+"in between" `MkN` and its argument, thus:
+   ((MkN @IntRep @(Int# |> kco)) |> co) 3#
+where
+   kco :: TYPE IntRep ~ TYPE (Id IntRep)
+   co  :: (Int# |> kco) -> N @IntRep (Int# |> kco)  ~   Int# -> N @IntRep Int#
+The cast `co` ensures that the value application to 3# is at a known, concrete
+`RuntimeRep`, here `IntRep`. See Note [Representation polymorphism invariants] in GHC.Core.
+
+Now imagine inlining `MkN`.  We get:
+  ( (\ @r @(a :: TYPE (Id r)) (x :: a) -> x |> some_co ) @IntRep @(Int# |> kco) )
+    |> co ) arg
+
+All by itself that term doesn't satisfy Note [Representation polymorphism invariants],
+/but/ it does after beta-reduction. The difficulty is that `|> co` gets in the
+way of beta reduction. What we really must do here is push the coercion **into**
+the lambda, using 'pushCoercionIntoLambda'.
+
+TL;DR: To avoid the rest of the compiler pipeline seeing these bad lambas, we
+rely on the simple optimiser to both inline the newtype unfolding and
+subsequently deal with the resulting lambdas (either beta-reducing them
+altogether or pushing coercions into them so that they satisfy the
+representation-polymorphism invariants).
+-}
 
 ----------------------
 simple_opt_bind :: SimpleOptEnv -> InBind -> TopLevelFlag
@@ -672,8 +736,8 @@ After inlining MkN we'll get
 where co :: (F Float -> N Float) ~ (Float# ~ N Float)
 
 But to actually beta-reduce that lambda, we need to push the 'co'
-inside the `\x` with pushCoecionIntoLambda.  Hence the extra
-equation for Cast-of-Lam in finish_app.
+inside the `\x` with pushCoercionIntoLambda.  Hence the extra
+equation for Cast-of-Lam in simple_app.
 
 This is regrettably delicate.
 
@@ -1588,7 +1652,7 @@ exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
     -- this implies that x is not in scope in gamma (makes this code simpler)
     , not (isTyVar x) && not (isCoVar x)
     , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
-    , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e co
+    , Just (x',e') <- pushCoercionIntoLambda (mkEmptySubst in_scope_set) x e co
     , let res = Just (x',e',ts)
     = --pprTrace "exprIsLambda_maybe:Cast" (vcat [ppr casted_e,ppr co,ppr res)])
       res

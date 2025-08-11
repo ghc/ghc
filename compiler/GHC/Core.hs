@@ -16,7 +16,7 @@ module GHC.Core (
         InId, InBind, InExpr, InAlt, InArg, InType, InKind,
                InBndr, InVar, InCoercion, InTyVar, InCoVar, InTyCoVar,
         OutId, OutBind, OutExpr, OutAlt, OutArg, OutType, OutKind,
-               OutBndr, OutVar, OutCoercion, OutTyVar, OutCoVar,
+               OutBndr, OutVar, OutCoercion, OutCoercionR, OutTyVar, OutCoVar,
                OutTyCoVar, MOutCoercion,
 
         -- ** 'Expr' construction
@@ -1121,14 +1121,15 @@ type InArg      = CoreArg
 type InCoercion = Coercion
 
 -- Post-cloning or substitution
-type OutBndr     = CoreBndr
-type OutType     = Type
-type OutKind     = Kind
-type OutCoercion = Coercion
-type OutBind     = CoreBind
-type OutExpr     = CoreExpr
-type OutAlt      = CoreAlt
-type OutArg      = CoreArg
+type OutBndr      = CoreBndr
+type OutType      = Type
+type OutKind      = Kind
+type OutCoercion  = Coercion
+type OutCoercionR = CoercionR
+type OutBind      = CoreBind
+type OutExpr      = CoreExpr
+type OutAlt       = CoreAlt
+type OutArg       = CoreArg
 type MOutCoercion = MCoercion
 
 

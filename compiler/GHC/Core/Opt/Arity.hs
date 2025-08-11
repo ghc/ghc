@@ -2971,6 +2971,9 @@ pushCoValArg co
   , typeHasFixedRuntimeRep new_arg_ty
     -- We can't push the coercion inside if it would give rise to
     -- a representation-polymorphic argument.
+    --
+    -- See Note [Representation polymorphism invariants] in GHC.Core
+    -- test: typecheck/should_run/EtaExpandLevPoly
 
   = assertPpr (isFunTy tyL && isFunTy tyR)
      (vcat [ text "co:" <+> ppr co
@@ -2990,12 +2993,12 @@ pushCoValArg co
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
-    :: HasDebugCallStack => InScopeSet -> Var -> CoreExpr -> CoercionR -> Maybe (Var, CoreExpr)
+    :: HasDebugCallStack => Subst -> InVar -> InExpr -> OutCoercionR -> Maybe (OutVar, OutExpr)
 -- This implements the Push rule from the paper on coercions
 --    (\x. e) |> co
 -- ===>
 --    (\x'. e |> co')
-pushCoercionIntoLambda in_scope x e co
+pushCoercionIntoLambda subst x e co
     | assert (not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
     , Just {}              <- splitFunTy_maybe s1s2
@@ -3008,15 +3011,16 @@ pushCoercionIntoLambda in_scope x e co
           -- Should we optimize the coercions here?
           -- Otherwise they might not match too well
           x' = x `setIdType` t1 `setIdMult` w1
-          in_scope' = in_scope `extendInScopeSet` x'
-          subst = extendIdSubst (mkEmptySubst in_scope')
-                                x
-                                (mkCast (Var x') (mkSymCo co1))
+          in_scope' = substInScopeSet subst `extendInScopeSet` x'
+          subst' =
+            extendIdSubst (setInScope subst in_scope')
+              x
+              (mkCast (Var x') (mkSymCo co1))
             -- We substitute x' for x, except we need to preserve types.
             -- The types are as follows:
             --   x :: s1,  x' :: t1,  co1 :: s1 ~# t1,
             -- so we extend the substitution with x |-> (x' |> sym co1).
-      in Just (x', substExpr subst e `mkCast` co2)
+      in Just (x', substExpr subst' e `mkCast` co2)
     | otherwise
     = Nothing
 

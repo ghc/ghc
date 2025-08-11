@@ -1696,10 +1696,10 @@ simplCast env body co0 cont0
                       -- False: (mkTransCo co1 co2) is not fully optimised
                       -- See Note [Avoid re-simplifying coercions]
 
-        addCoerce co opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
+        addCoerce co co_is_opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
           | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
           = {-#SCC "addCoerce-pushCoTyArg" #-}
-            do { tail' <- addCoerceM m_co' opt tail
+            do { tail' <- addCoerceM m_co' co_is_opt tail
                ; return (ApplyToTy { sc_arg_ty  = arg_ty'
                                    , sc_cont    = tail'
                                    , sc_hole_ty = coercionLKind co }) }
@@ -1709,16 +1709,15 @@ simplCast env body co0 cont0
         -- where   co :: (s1->s2) ~ (t1->t2)
         --         co1 :: t1 ~ s1
         --         co2 :: s2 ~ t2
-        addCoerce co opt cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                          , sc_dup = dup, sc_cont = tail
-                                          , sc_hole_ty = fun_ty })
-          | not opt  -- pushCoValArg duplicates the coercion, so optimise first
-          = addCoerce (optOutCoercion (zapSubstEnv env) co opt) True cont
+        addCoerce co co_is_opt cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
+                                                , sc_dup = dup, sc_cont = tail
+                                                , sc_hole_ty = fun_ty })
+          | not co_is_opt  -- pushCoValArg duplicates the coercion, so optimise first
+          = addCoerce (optOutCoercion (zapSubstEnv env) co co_is_opt) True cont
 
           | Just (m_co1, m_co2) <- pushCoValArg co
-          , fixed_rep m_co1
           = {-#SCC "addCoerce-pushCoValArg" #-}
-            do { tail' <- addCoerceM m_co2 opt tail
+            do { tail' <- addCoerceM m_co2 co_is_opt tail
                ; case m_co1 of {
                    MRefl -> return (cont { sc_cont = tail'
                                          , sc_hole_ty = coercionLKind co }) ;
@@ -1737,19 +1736,11 @@ simplCast env body co0 cont0
                                     , sc_cont = tail'
                                     , sc_hole_ty = coercionLKind co }) } } }
 
-        addCoerce co opt cont
+        addCoerce co co_is_opt cont
           | isReflCo co = return cont  -- Having this at the end makes a huge
                                        -- difference in T12227, for some reason
                                        -- See Note [Optimising reflexivity]
-          | otherwise = return (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
-
-        fixed_rep :: MCoercionR -> Bool
-        fixed_rep MRefl    = True
-        fixed_rep (MCo co) = typeHasFixedRuntimeRep $ coercionRKind co
-          -- Without this check, we can get an argument which does not
-          -- have a fixed runtime representation.
-          -- See Note [Representation polymorphism invariants] in GHC.Core
-          -- test: typecheck/should_run/EtaExpandLevPoly
+          | otherwise = return (CastIt { sc_co = co, sc_opt = co_is_opt, sc_cont = cont })
 
 simplLazyArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
              -> DupFlag
