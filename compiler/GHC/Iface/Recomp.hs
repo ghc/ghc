@@ -304,7 +304,7 @@ check_old_iface hsc_env mod_summary maybe_iface
 
         loadIface read_dflags iface_path = do
              let ncu        = hsc_NC hsc_env
-             read_result <- readIface logger read_dflags ncu (ms_mod mod_summary) iface_path
+             read_result <- readIface (hsc_hooks hsc_env) logger read_dflags ncu (ms_mod mod_summary) iface_path
              case read_result of
                  Failed err -> do
                      let msg = readInterfaceErrorDiagnostic err

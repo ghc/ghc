@@ -519,7 +519,7 @@ loopFixedModule key loc done = do
         -- part of the compiler.
         lookupIfaceByModuleHsc hsc_env (mnkToModule key) >>= \case
           Just iface -> return (M.Succeeded iface)
-          Nothing -> readIface (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule key) (ml_hi_file loc)
+          Nothing -> readIface (hsc_hooks hsc_env) (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule key) (ml_hi_file loc)
       case read_result of
         M.Succeeded iface -> do
           -- Computer information about this node

@@ -1616,7 +1616,7 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
     executeCompileNodeFixed hsc_env MakeEnv{diag_wrapper, env_messager} mod loc =
       wrapAction diag_wrapper hsc_env $ do
         forM_ env_messager $ \hscMessage -> hscMessage hsc_env (k, n) UpToDate (ModuleNode [] (ModuleNodeFixed mod loc))
-        read_result <- readIface (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule mod) (ml_hi_file loc)
+        read_result <- readIface (hsc_hooks hsc_env) (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule mod) (ml_hi_file loc)
         case read_result of
           M.Failed interface_err ->
             let mn = mnkModuleName mod

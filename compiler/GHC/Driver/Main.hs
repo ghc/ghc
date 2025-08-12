@@ -1299,7 +1299,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           -- when compiling gHC_PRIM without generating code (e.g. with
           -- Haddock), we still want the virtual interface in the cache
           if ms_mod summary == gHC_PRIM
-            then return $ HscUpdate (getGhcPrimIface hsc_env)
+            then return $ HscUpdate (getGhcPrimIface (hsc_hooks hsc_env))
             else return $ HscUpdate iface
 
 
@@ -1314,7 +1314,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
         -- when compiling gHC_PRIM without generating code (e.g. with
         -- Haddock), we still want the virtual interface in the cache
         if ms_mod summary == gHC_PRIM
-          then return $ HscUpdate (getGhcPrimIface hsc_env)
+          then return $ HscUpdate (getGhcPrimIface (hsc_hooks hsc_env))
           else return $ HscUpdate iface
 
 {-
