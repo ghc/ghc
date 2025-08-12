@@ -153,7 +153,7 @@ executable hadrian
                        , TypeOperators
     other-extensions:    MultiParamTypeClasses
                        , TypeFamilies
-    build-depends:       Cabal                >= 3.13    && < 3.15
+    build-depends:       Cabal                >= 3.13    && < 3.17
                        , base                 >= 4.11    && < 5
                        , bytestring           >= 0.10    && < 0.13
                        , containers           >= 0.5     && < 0.9
