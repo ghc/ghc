@@ -134,12 +134,13 @@ runUniqueDSM ds (UDSM f) =
     DUniqResult uq us -> (uq, us)
 
 -- | Set the tag of uniques generated from this deterministic unique supply
-newTagDUniqSupply :: Char -> DUniqSupply -> DUniqSupply
+newTagDUniqSupply :: UniqueTag -> DUniqSupply -> DUniqSupply
 newTagDUniqSupply c (DUS w) = DUS $ getKey $ newTagUnique (mkUniqueGrimily w) c
 
 -- | Get the tag uniques generated from this deterministic unique supply would have
-getTagDUniqSupply :: DUniqSupply -> Char
+getTagDUniqSupply :: DUniqSupply -> UniqueTag
 getTagDUniqSupply (DUS w) = fst $ unpkUnique (mkUniqueGrimily w)
+
 
 -- | Get a unique from a monad that can access a unique supply.
 --
@@ -201,7 +202,7 @@ instance Monad m => MonadGetUnique (UniqDSMT m) where
 -- | Set the tag of the running @UniqDSMT@ supply to the given tag and run an action with it.
 -- All uniques produced in the given action will use this tag, until the tag is changed
 -- again.
-setTagUDSMT :: Monad m => Char {-^ Tag -} -> UniqDSMT m a -> UniqDSMT m a
+setTagUDSMT :: Monad m => UniqueTag {-^ Tag -} -> UniqDSMT m a -> UniqDSMT m a
 setTagUDSMT tag (UDSMT act) = UDSMT $ \us -> do
   let origtag = getTagDUniqSupply us
       new_us  = newTagDUniqSupply tag us
