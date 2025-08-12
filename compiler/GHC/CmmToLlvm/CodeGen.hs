@@ -240,12 +240,22 @@ genCall (PrimTarget op@(MO_BRev w)) [dst] args =
     genCallSimpleCast w op dst args
 genCall (PrimTarget op@(MO_BSwap w)) [dst] args =
     genCallSimpleCast w op dst args
-genCall (PrimTarget op@(MO_Pdep w)) [dst] args =
-    genCallSimpleCast w op dst args
-genCall (PrimTarget op@(MO_Pext w)) [dst] args =
-    genCallSimpleCast w op dst args
 genCall (PrimTarget op@(MO_PopCnt w)) [dst] args =
     genCallSimpleCast w op dst args
+-- Check if the Intel BMI are enabled, and if the bit-width is less than 'W32'.
+-- If so, we truncate to the 'W32' call the 32-bit intrinsic operation because
+-- LLVM does not expose a call to 'PDep' and 'PExt' operations for bit-widths
+-- of 'W8 and 'W16'.
+genCall (PrimTarget op@(MO_Pdep w)) [dst] args = do
+    cfg <- getConfig
+    if   llvmCgBmiVersion cfg >= Just BMI2
+    then genCallMinimumTruncationCast W32 w op dst args
+    else genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_Pext w)) [dst] args = do
+    cfg <- getConfig
+    if   llvmCgBmiVersion cfg >= Just BMI2
+    then genCallMinimumTruncationCast W32 w op dst args
+    else genCallSimpleCast w op dst args
 
 genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
@@ -641,8 +651,12 @@ genCallExtract _ _ _ _ =
 -- from i32 to i8 explicitly as LLVM is strict about types.
 genCallSimpleCast :: Width -> CallishMachOp -> CmmFormal -> [CmmActual]
                   -> LlvmM StmtData
-genCallSimpleCast specW op dst args = do
-    let width   = widthToLlvmInt specW
+genCallSimpleCast w = genCallMinimumTruncationCast w w
+
+genCallMinimumTruncationCast :: Width -> Width -> CallishMachOp -> CmmFormal
+                             -> [CmmActual] -> LlvmM StmtData
+genCallMinimumTruncationCast minW specW op dst args = do
+    let width   = widthToLlvmInt $ max minW specW
         argsW   = const width <$> args
         dstType = cmmToLlvmType $ localRegType dst
         signage = cmmPrimOpRetValSignage op
@@ -945,17 +959,24 @@ cmmPrimOpFunctions mop = do
       W256 -> fsLit "llvm.cttz.i256"
       W512 -> fsLit "llvm.cttz.i512"
     MO_Pdep w
+      -- If the Intel BMI are enabled, then we will be calling the intrinsic operation
+      -- through the LLVM binding, unless however the bit-width is 'W8' or 'W16'.
+      -- In these cases, we truncate to the 'W32' bit-width and /directly/ call the
+      -- 32-bit BMI operation. This is necessary because the LLVM does not expose a
+      -- call to the 'PDep' and 'PExt' operation for bit-diths of 'W8 and 'W16'.
+      -- Hence the necessity to to call the BMI intrinsic operation directlky from
+      -- outside the LLVM.
       | isBmi2Enabled -> case w of
-          W8   -> fsLit "llvm.x86.bmi.pdep.8"
-          W16  -> fsLit "llvm.x86.bmi.pdep.16"
+          W8   -> fsLit "llvm.x86.bmi.pdep.32"
+          W16  -> fsLit "llvm.x86.bmi.pdep.32"
           W32  -> fsLit "llvm.x86.bmi.pdep.32"
           W64  -> fsLit "llvm.x86.bmi.pdep.64"
           W128 -> fsLit "llvm.x86.bmi.pdep.128"
           W256 -> fsLit "llvm.x86.bmi.pdep.256"
           W512 -> fsLit "llvm.x86.bmi.pdep.512"
       | otherwise -> case w of
-          W8   -> fsLit "hs_pdep8"
-          W16  -> fsLit "hs_pdep16"
+          W8   -> fsLit "hs_pdep32"
+          W16  -> fsLit "hs_pdep32"
           W32  -> fsLit "hs_pdep32"
           W64  -> fsLit "hs_pdep64"
           W128 -> fsLit "hs_pdep128"
@@ -963,8 +984,10 @@ cmmPrimOpFunctions mop = do
           W512 -> fsLit "hs_pdep512"
     MO_Pext w
       | isBmi2Enabled -> case w of
-          W8   -> fsLit "llvm.x86.bmi.pext.8"
-          W16  -> fsLit "llvm.x86.bmi.pext.16"
+          -- See the 'Mo_Pdep' commentary above as to why we call 'pext.32'
+          -- instead of calling 'pext.8' or 'pext.16' operations.
+          W8   -> fsLit "llvm.x86.bmi.pext.32"
+          W16  -> fsLit "llvm.x86.bmi.pext.32"
           W32  -> fsLit "llvm.x86.bmi.pext.32"
           W64  -> fsLit "llvm.x86.bmi.pext.64"
           W128 -> fsLit "llvm.x86.bmi.pext.128"
