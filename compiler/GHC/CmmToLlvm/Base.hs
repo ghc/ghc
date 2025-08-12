@@ -281,7 +281,7 @@ data LlvmEnv = LlvmEnv
   , envConfig    :: !LlvmCgConfig    -- ^ Configuration for LLVM code gen
   , envLogger    :: !Logger          -- ^ Logger
   , envOutput    :: BufHandle        -- ^ Output buffer
-  , envTag       :: !Char            -- ^ Tag for creating unique values
+  , envTag       :: !UniqueTag       -- ^ Tag for creating unique values
   , envFreshMeta :: MetaId           -- ^ Supply of fresh metadata IDs
   , envUniqMeta  :: UniqFM Unique MetaId   -- ^ Global metadata nodes
   , envFunMap    :: LlvmEnvMap       -- ^ Global functions so far, with type
@@ -344,7 +344,7 @@ runLlvm logger cfg ver out us m = do
                       , envConfig    = cfg
                       , envLogger    = logger
                       , envOutput    = out
-                      , envTag       = 'n'
+                      , envTag       = LlvmCodeGenTag
                       , envFreshMeta = MetaId 0
                       , envUniqMeta  = emptyUFM
                       }

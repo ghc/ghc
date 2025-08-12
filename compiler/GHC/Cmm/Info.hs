@@ -68,7 +68,7 @@ cmmToRawCmm :: Logger -> Profile -> CgStream CmmGroupSRTs a
             -> IO (CgStream RawCmmGroup a)
 cmmToRawCmm logger profile cmms
   = do { let do_one :: [CmmDeclSRTs] -> UniqDSMT IO [RawCmmDecl]
-             do_one cmm = setTagUDSMT 'i' $ do
+             do_one cmm = setTagUDSMT IfaceTag $ do
                -- NB. strictness fixes a space leak.  DO NOT REMOVE.
                withTimingSilent logger (text "Cmm -> Raw Cmm") (\x -> seqList x ()) $ do
                  liftUniqDSM $
