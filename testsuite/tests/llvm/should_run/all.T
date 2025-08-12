@@ -18,3 +18,8 @@ test('T22033', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile_a
 test('T25730', [req_c, unless(arch('x86_64'), skip), normalise_errmsg_fun(ignore_llvm_and_vortex)], compile_and_run, ['T25730C.c'])
   # T25730C.c contains Intel instrinsics, so only run this test on x86
 test('T20645', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex), when(have_llvm(), extra_ways(["optllvm"]))], compile_and_run, [''])
+# T26065.c tests LLVM linking of Intel instrinsics, so only run this test on x86
+test('T26065', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex), when(have_llvm(), extra_ways(["optllvm"])),
+                unless((arch('x86_64') or arch('i386')) and have_cpu_feature('bmi2'),skip)],
+                compile_and_run, ['-mbmi2'])
+
