@@ -240,12 +240,25 @@ genCall (PrimTarget op@(MO_BRev w)) [dst] args =
     genCallSimpleCast w op dst args
 genCall (PrimTarget op@(MO_BSwap w)) [dst] args =
     genCallSimpleCast w op dst args
-genCall (PrimTarget op@(MO_Pdep w)) [dst] args =
-    genCallSimpleCast w op dst args
-genCall (PrimTarget op@(MO_Pext w)) [dst] args =
-    genCallSimpleCast w op dst args
 genCall (PrimTarget op@(MO_PopCnt w)) [dst] args =
     genCallSimpleCast w op dst args
+{- Note [LLVM PDep/PExt intrinsics]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since x86 PDep/PExt instructions only exist for 32/64 bit widths
+we use the 32bit variant to compute the 8/16bit primops.
+To do so we extend/truncate the argument/result around the
+call.
+-}
+genCall (PrimTarget op@(MO_Pdep w)) [dst] args = do
+    cfg <- getConfig
+    if  llvmCgBmiVersion cfg >= Just BMI2
+        then genCallMinimumTruncationCast W32 w op dst args
+        else genCallSimpleCast w op dst args
+genCall (PrimTarget op@(MO_Pext w)) [dst] args = do
+    cfg <- getConfig
+    if  llvmCgBmiVersion cfg >= Just BMI2
+        then genCallMinimumTruncationCast W32 w op dst args
+        else genCallSimpleCast w op dst args
 
 genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
@@ -641,8 +654,15 @@ genCallExtract _ _ _ _ =
 -- from i32 to i8 explicitly as LLVM is strict about types.
 genCallSimpleCast :: Width -> CallishMachOp -> CmmFormal -> [CmmActual]
                   -> LlvmM StmtData
-genCallSimpleCast specW op dst args = do
-    let width   = widthToLlvmInt specW
+genCallSimpleCast w = genCallMinimumTruncationCast w w
+
+-- Given the minimum machine bit-width to use and the logical bit-width of the
+-- value range, perform a type-cast truncation and extension before and after the
+-- specified operation, respectively.
+genCallMinimumTruncationCast :: Width -> Width -> CallishMachOp -> CmmFormal
+                             -> [CmmActual] -> LlvmM StmtData
+genCallMinimumTruncationCast minW specW op dst args = do
+    let width   = widthToLlvmInt $ max minW specW
         argsW   = const width <$> args
         dstType = cmmToLlvmType $ localRegType dst
         signage = cmmPrimOpRetValSignage op
@@ -945,9 +965,10 @@ cmmPrimOpFunctions mop = do
       W256 -> fsLit "llvm.cttz.i256"
       W512 -> fsLit "llvm.cttz.i512"
     MO_Pdep w
+      -- See Note [LLVM PDep/PExt intrinsics]
       | isBmi2Enabled -> case w of
-          W8   -> fsLit "llvm.x86.bmi.pdep.8"
-          W16  -> fsLit "llvm.x86.bmi.pdep.16"
+          W8   -> fsLit "llvm.x86.bmi.pdep.32"
+          W16  -> fsLit "llvm.x86.bmi.pdep.32"
           W32  -> fsLit "llvm.x86.bmi.pdep.32"
           W64  -> fsLit "llvm.x86.bmi.pdep.64"
           W128 -> fsLit "llvm.x86.bmi.pdep.128"
@@ -963,8 +984,9 @@ cmmPrimOpFunctions mop = do
           W512 -> fsLit "hs_pdep512"
     MO_Pext w
       | isBmi2Enabled -> case w of
-          W8   -> fsLit "llvm.x86.bmi.pext.8"
-          W16  -> fsLit "llvm.x86.bmi.pext.16"
+          -- See Note [LLVM PDep/PExt intrinsics]
+          W8   -> fsLit "llvm.x86.bmi.pext.32"
+          W16  -> fsLit "llvm.x86.bmi.pext.32"
           W32  -> fsLit "llvm.x86.bmi.pext.32"
           W64  -> fsLit "llvm.x86.bmi.pext.64"
           W128 -> fsLit "llvm.x86.bmi.pext.128"
