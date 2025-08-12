@@ -123,7 +123,7 @@ data CoreReader = CoreReader {
         cr_name_ppr_ctx        :: NamePprCtx,
         cr_loc                 :: SrcSpan,   -- Use this for log/error messages so they
                                              -- are at least tagged with the right source file
-        cr_uniq_tag            :: !Char      -- Tag for creating unique values
+        cr_uniq_tag            :: !UniqueTag -- Tag for creating unique values
 }
 
 -- Note: CoreWriter used to be defined with data, rather than newtype.  If it
@@ -182,7 +182,7 @@ instance MonadUnique CoreM where
 
 runCoreM :: HscEnv
          -> RuleBase
-         -> Char -- ^ Mask
+         -> UniqueTag -- ^ Mask
          -> Module
          -> NamePprCtx
          -> SrcSpan
@@ -267,7 +267,7 @@ getSrcSpanM = read cr_loc
 addSimplCount :: SimplCount -> CoreM ()
 addSimplCount count = write (CoreWriter { cw_simpl_count = count })
 
-getUniqTag :: CoreM Char
+getUniqTag :: CoreM UniqueTag
 getUniqTag = read cr_uniq_tag
 
 -- Convenience accessors for useful fields of HscEnv

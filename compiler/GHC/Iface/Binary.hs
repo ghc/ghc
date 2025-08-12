@@ -709,7 +709,7 @@ putName BinSymbolTable{
                bin_symtab_next = symtab_next }
         bh name
   | isKnownKeyName name
-  , let (c, u) = unpkUnique (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
+  , let (c, u) = unpkUniqueGrimly (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
   = -- assert (u < 2^(22 :: Int))
     put_ bh (0x80000000
              .|. (fromIntegral (ord c) `shiftL` 22)
@@ -737,13 +737,13 @@ getSymtabName symtab bh = do
 
       0x80000000 ->
         let
-          tag = chr (fromIntegral ((i .&. 0x3FC00000) `shiftR` 22))
+          tag = fromIntegral ((i .&. 0x3FC00000) `shiftR` 22)
           ix  = fromIntegral i .&. 0x003FFFFF
-          u   = mkUnique tag ix
+          u   = mkUniqueIntGrimily (tag .|. ix)
         in
           return $! case lookupKnownKeyName u of
                       Nothing -> pprPanic "getSymtabName:unknown known-key unique"
-                                          (ppr i $$ ppr u $$ char tag $$ ppr ix)
+                                          (ppr i $$ ppr u $$ char (chr tag) $$ ppr ix)
                       Just n  -> n
 
       _ -> pprPanic "getSymtabName:unknown name tag" (ppr i)

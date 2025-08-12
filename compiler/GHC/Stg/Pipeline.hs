@@ -62,7 +62,7 @@ data StgPipelineOpts = StgPipelineOpts
     -- -fexternal-dynamic-refs flag. See GHC.Stg.Utils.allowTopLevelConApp.
   }
 
-newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
+newtype StgM a = StgM { _unStgM :: ReaderT UniqueTag IO a }
   deriving (Functor, Applicative, Monad, MonadIO)
 
 instance MonadUnique StgM where
@@ -71,7 +71,7 @@ instance MonadUnique StgM where
   getUniqueM = StgM $ do { tag <- ask
                          ; liftIO $! uniqFromTag tag}
 
-runStgM :: Char -> StgM a -> IO a
+runStgM :: UniqueTag -> StgM a -> IO a
 runStgM mask (StgM m) = runReaderT m mask
 
 stg2stg :: Logger
@@ -85,7 +85,7 @@ stg2stg logger extra_vars opts this_mod binds
         ; stg_linter False "StgFromCore" binds
         ; showPass logger "Stg2Stg"
         -- Do the main business!
-        ; binds' <- runStgM 'g' $
+        ; binds' <- runStgM StgPTag $
             foldM (do_stg_pass this_mod) binds (stgPipeline_phases opts)
 
           -- Dependency sort the program as last thing. The program needs to be

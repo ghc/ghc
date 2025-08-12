@@ -107,7 +107,7 @@ cpsTop logger platform cfg dus proc =
              -- TODO(#25273): Use the deterministic UniqDSM (ie `runUniqueDSM`) instead
              -- of UniqSM (see `initUs_`) to guarantee deterministic objects
              -- when doing thread sanitization.
-            us <- mkSplitUniqSupply 'u'
+            us <- mkSplitUniqSupply TsanTag
             return $ initUs_ us $
               annotateTSAN platform g
           else return g

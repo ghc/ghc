@@ -115,7 +115,7 @@ However note that:
 -- each original name; i.e. (module-name, occ-name) pair and provides
 -- something of a lookup mechanism for those names.
 data NameCache = NameCache
-  { nsUniqChar :: {-# UNPACK #-} !Char
+  { nsUniqChar :: {-# UNPACK #-} !UniqueTag
   , nsNames    :: {-# UNPACK #-} !(MVar OrigNameCache)
   }
 
@@ -148,7 +148,7 @@ extendOrigNameCache nc mod occ name
 
 -- | Initialize a new name cache
 newNameCache :: IO NameCache
-newNameCache = newNameCacheWith 'r' knownKeysOrigNameCache
+newNameCache = newNameCacheWith HscTag knownKeysOrigNameCache
 
 -- | This is a version of `newNameCache` that lets you supply your
 -- own unique tag and set of known key names. This can go wrong if the tag
@@ -156,8 +156,8 @@ newNameCache = newNameCacheWith 'r' knownKeysOrigNameCache
 -- an example.
 --
 -- Use `newNameCache` when possible.
-newNameCacheWith :: Char -> OrigNameCache -> IO NameCache
-newNameCacheWith c nc = NameCache c <$> newMVar nc
+newNameCacheWith :: UniqueTag -> OrigNameCache -> IO NameCache
+newNameCacheWith ut nc = NameCache ut <$> newMVar nc
 
 -- | This takes a tag for uniques to be generated and the list of knownKeyNames
 -- These must be initialized properly to ensure that names generated from this
@@ -165,7 +165,7 @@ newNameCacheWith c nc = NameCache c <$> newMVar nc
 --
 -- Use `newNameCache` or `newNameCacheWith` instead
 {-# DEPRECATED initNameCache "Use newNameCache or newNameCacheWith instead" #-}
-initNameCache :: Char -> [Name] -> IO NameCache
+initNameCache :: UniqueTag -> [Name] -> IO NameCache
 initNameCache c names = newNameCacheWith c (initOrigNames names)
 
 initOrigNames :: [Name] -> OrigNameCache
