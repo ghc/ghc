@@ -50,6 +50,7 @@ import GHC.Core.Opt.Stats ( SimplCount, zeroSimplCount, plusSimplCount )
 
 import GHC.Types.Annotations
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique ( uniqueTag )
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Error
@@ -123,7 +124,8 @@ data CoreReader = CoreReader {
         cr_name_ppr_ctx        :: NamePprCtx,
         cr_loc                 :: SrcSpan,   -- Use this for log/error messages so they
                                              -- are at least tagged with the right source file
-        cr_uniq_tag            :: !Char      -- Tag for creating unique values
+        cr_uniq_tag            :: {-# UNPACK #-} !Char -- Tag for creating unique values
+                                                       -- See Note [Performance implications of UniqueTag]
 }
 
 -- Note: CoreWriter used to be defined with data, rather than newtype.  If it
@@ -174,15 +176,15 @@ instance MonadPlus CoreM
 instance MonadUnique CoreM where
     getUniqueSupplyM = do
         tag <- read cr_uniq_tag
-        liftIO $! mkSplitUniqSupply tag
+        liftIO $! mkSplitUniqSupplyGrimly tag
 
     getUniqueM = do
         tag <- read cr_uniq_tag
-        liftIO $! uniqFromTag tag
+        liftIO $! uniqFromTagGrimly tag
 
 runCoreM :: HscEnv
          -> RuleBase
-         -> Char -- ^ Mask
+         -> UniqueTag -- ^ Mask
          -> Module
          -> NamePprCtx
          -> SrcSpan
@@ -197,7 +199,7 @@ runCoreM hsc_env rule_base tag mod name_ppr_ctx loc m
             cr_module = mod,
             cr_name_ppr_ctx = name_ppr_ctx,
             cr_loc = loc,
-            cr_uniq_tag = tag
+            cr_uniq_tag = uniqueTag tag
         }
 
     extract :: (a, CoreWriter) -> (a, SimplCount)

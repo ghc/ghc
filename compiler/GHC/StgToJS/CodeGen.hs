@@ -169,7 +169,7 @@ genUnits m ss spt_entries foreign_stubs = do
                                   NoStubs            -> (empty, empty)
                                   ForeignStubs hdr c -> (getCHeader hdr, getCStub c)
             unique_deps = map mkUniqueDep (lines $ renderWithContext defaultSDocContext f_hdr)
-            mkUniqueDep (tag:xs) = mkUnique tag (read xs)
+            mkUniqueDep (tag:xs) = mkUniqueGrimilyWithTag tag (read xs)
             mkUniqueDep []       = panic "mkUniqueDep"
 
         let syms = [moduleExportsSymbol m]

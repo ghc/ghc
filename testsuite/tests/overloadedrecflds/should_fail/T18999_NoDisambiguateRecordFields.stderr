@@ -1,11 +1,11 @@
 T18999_NoDisambiguateRecordFields.hs:6:13: error: [GHC-87543]
     Ambiguous occurrence ‘not’.
     It could refer to
-       either the field ‘not’ of record ‘Foo’,
-              defined at T18999_NoDisambiguateRecordFields.hs:4:18,
-           or ‘Prelude.not’,
+       either ‘Prelude.not’,
               imported from ‘Prelude’
-              (and originally defined in ‘GHC.Internal.Classes’).
+              (and originally defined in ‘GHC.Internal.Classes’),
+           or the field ‘not’ of record ‘Foo’,
+              defined at T18999_NoDisambiguateRecordFields.hs:4:18.
 
 T18999_NoDisambiguateRecordFields.hs:8:11: error: [GHC-56428]
     Ambiguous record field ‘not’.

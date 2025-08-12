@@ -130,7 +130,7 @@ getHiVirtualRegFromLo :: VirtualReg -> VirtualReg
 getHiVirtualRegFromLo reg
  = case reg of
         -- makes a pseudo-unique with tag 'H'
-        VirtualRegI u   -> VirtualRegHi (newTagUnique u 'H')
+        VirtualRegI u   -> VirtualRegHi (newTagUnique u VirtualRegTag)
         _               -> panic "Reg.getHiVirtualRegFromLo"
 
 getHiVRegFromLo :: Reg -> Reg

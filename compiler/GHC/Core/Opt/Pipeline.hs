@@ -61,6 +61,7 @@ import GHC.Types.Basic
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Name.Ppr
 import GHC.Types.Var ( Var )
+import GHC.Types.Unique.Supply ( UniqueTag(..) )
 
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
@@ -80,7 +81,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_rdr_env = rdr_env })
   = do { hpt_rule_base <- home_pkg_rules
        ; let builtin_passes = getCoreToDo dflags hpt_rule_base extra_vars
-             uniq_tag = 's'
+             uniq_tag = SimplTag
 
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_tag mod
                                     name_ppr_ctx loc $

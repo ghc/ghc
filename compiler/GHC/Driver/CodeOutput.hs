@@ -59,6 +59,7 @@ import GHC.Unit.Finder      ( mkStubPaths )
 import GHC.Types.CostCentre
 import GHC.Types.ForeignStubs
 import GHC.Types.Unique.DSM
+import GHC.Types.Unique.Supply ( UniqueTag(..) )
 
 import System.Directory
 import System.FilePath
@@ -123,7 +124,7 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                   ; emitInitializerDecls this_mod stubs
                   ; return (stubs, a) }
 
-        ; let dus1 = newTagDUniqSupply 'n' dus0
+        ; let dus1 = newTagDUniqSupply CodeGenTag dus0
         ; (stubs, a) <- case backendCodeOutput (backend dflags) of
                  NcgCodeOutput  -> outputAsm logger dflags this_mod location filenm dus1
                                              final_stream
@@ -210,7 +211,7 @@ outputAsm logger dflags this_mod location filenm dus cmm_stream = do
   {-# SCC "OutputAsm" #-} doOutput filenm $
     \h -> {-# SCC "NativeCodeGen" #-}
       fmap fst $
-      runUDSMT dus $ setTagUDSMT 'n' $
+      runUDSMT dus $ setTagUDSMT CodeGenTag $
       nativeCodeGen logger (toolSettings dflags) ncg_config location h cmm_stream
 
 {-

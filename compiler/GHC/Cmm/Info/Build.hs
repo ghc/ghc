@@ -35,6 +35,7 @@ import GHC.Utils.Panic
 import GHC.Runtime.Heap.Layout
 import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
+import GHC.Types.Unique ( UniqueTag(..) )
 
 import Control.Monad
 import Data.Map.Strict (Map)
@@ -887,7 +888,7 @@ doSRTs cfg moduleSRTInfo dus0 procs data_ = do
 
   let origtag = getTagDUniqSupply dus0
       profile = cmmProfile cfg
-      dus1    = newTagDUniqSupply 'u' dus0
+      dus1    = newTagDUniqSupply SrtTag dus0
 
   -- Ignore the original grouping of decls, and combine all the
   -- CAFEnvs into a single CAFEnv.

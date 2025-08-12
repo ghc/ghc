@@ -77,14 +77,14 @@ import GHC.Utils.Word64 (word64ToInt)
 knownUniqueName :: Unique -> Maybe Name
 knownUniqueName u =
     case tag of
-      'z' -> Just $ getUnboxedSumName n
-      '4' -> Just $ getTupleTyConName Boxed n
-      '5' -> Just $ getTupleTyConName Unboxed n
-      '7' -> Just $ getTupleDataConName Boxed n
-      '8' -> Just $ getTupleDataConName Unboxed n
-      'j' -> Just $ getCTupleSelIdName n
-      'k' -> Just $ getCTupleTyConName n
-      'm' -> Just $ getCTupleDataConName n
+      SumTag -> Just $ getUnboxedSumName n
+      BoxedTupleTyConTag -> Just $ getTupleTyConName Boxed n
+      UnboxedTupleTyConTag-> Just $ getTupleTyConName Unboxed n
+      BoxedTupleDataTag -> Just $ getTupleDataConName Boxed n
+      UnboxedTupleDataTag -> Just $ getTupleDataConName Unboxed n
+      CTupleSelTag -> Just $ getCTupleSelIdName n
+      CTupleTag -> Just $ getCTupleTyConName n
+      CTupleDataTag -> Just $ getCTupleDataConName n
       _   -> Nothing
   where
     (tag, n') = unpkUnique u
@@ -121,13 +121,13 @@ mkSumTyConUnique arity =
     assertPpr (arity <= 0x7ff) (ppr arity) $
               -- 0x7ff since we only have 11 bits to encode the
               -- alternative
-    mkUniqueInt 'z' (arity `shiftL` 13 .|. 0x1ffc)
+    mkUniqueInt SumTag (arity `shiftL` 13 .|. 0x1ffc)
 
 -- | Inverse of 'mkSumTyConUnique'
 isSumTyConUnique :: Unique -> Maybe Arity
 isSumTyConUnique u =
   case (tag, n .&. 0x1ffc) of
-    ('z', 0x1ffc) -> Just (word64ToInt n `shiftR` 13)
+    (SumTag, 0x1ffc) -> Just (word64ToInt n `shiftR` 13)
     _ -> Nothing
   where
     (tag, n) = unpkUnique u
@@ -137,7 +137,7 @@ mkSumDataConUnique alt arity
   | alt >= arity
   = panic ("mkSumDataConUnique: " ++ show alt ++ " >= " ++ show arity)
   | otherwise
-  = mkUniqueInt 'z' (arity `shiftL` 13 + alt `shiftL` 2) {- skip the tycon -}
+  = mkUniqueInt SumTag (arity `shiftL` 13 + alt `shiftL` 2) {- skip the tycon -}
 
 getUnboxedSumName :: Int -> Name
 getUnboxedSumName n
@@ -224,23 +224,23 @@ selector Uniques takes inspiration from the encoding for unboxed sum Uniques.
 -}
 
 mkCTupleTyConUnique :: Arity -> Unique
-mkCTupleTyConUnique a = mkUniqueInt 'k' (2*a)
+mkCTupleTyConUnique a = mkUniqueInt CTupleTag (2*a)
 
 mkCTupleDataConUnique :: Arity -> Unique
-mkCTupleDataConUnique a = mkUniqueInt 'm' (3*a)
+mkCTupleDataConUnique a = mkUniqueInt CTupleDataTag (3*a)
 
 mkCTupleSelIdUnique :: ConTagZ -> Arity -> Unique
 mkCTupleSelIdUnique sc_pos arity
   | sc_pos >= arity
   = panic ("mkCTupleSelIdUnique: " ++ show sc_pos ++ " >= " ++ show arity)
   | otherwise
-  = mkUniqueInt 'j' (arity `shiftL` cTupleSelIdArityBits + sc_pos)
+  = mkUniqueInt CTupleSelTag (arity `shiftL` cTupleSelIdArityBits + sc_pos)
 
 -- | Inverse of 'mkCTupleTyConUnique'
 isCTupleTyConUnique :: Unique -> Maybe Arity
 isCTupleTyConUnique u =
   case (tag, i) of
-    ('k', 0) -> Just arity
+    (CTupleTag, 0) -> Just arity
     _        -> Nothing
   where
     (tag, n) = unpkUnique u
@@ -288,19 +288,19 @@ cTupleSelIdPosBitmask = 0xff
 -- Normal tuples
 
 mkTupleDataConUnique :: Boxity -> Arity -> Unique
-mkTupleDataConUnique Boxed          a = mkUniqueInt '7' (3*a)    -- may be used in C labels
-mkTupleDataConUnique Unboxed        a = mkUniqueInt '8' (3*a)
+mkTupleDataConUnique Boxed          a = mkUniqueInt BoxedTupleDataTag (3*a)    -- may be used in C labels
+mkTupleDataConUnique Unboxed        a = mkUniqueInt UnboxedTupleDataTag (3*a)
 
 mkTupleTyConUnique :: Boxity -> Arity -> Unique
-mkTupleTyConUnique Boxed           a  = mkUniqueInt '4' (2*a)
-mkTupleTyConUnique Unboxed         a  = mkUniqueInt '5' (2*a)
+mkTupleTyConUnique Boxed           a  = mkUniqueInt BoxedTupleTyConTag (2*a)
+mkTupleTyConUnique Unboxed         a  = mkUniqueInt UnboxedTupleTyConTag (2*a)
 
 -- | Inverse of 'mkTupleTyConUnique'
 isTupleTyConUnique :: Unique -> Maybe (Boxity, Arity)
 isTupleTyConUnique u =
   case (tag, i) of
-    ('4', 0) -> Just (Boxed,   arity)
-    ('5', 0) -> Just (Unboxed, arity)
+    (BoxedTupleTyConTag, 0)   -> Just (Boxed,   arity)
+    (UnboxedTupleTyConTag, 0) -> Just (Unboxed, arity)
     _        -> Nothing
   where
     (tag,   n) = unpkUnique u
@@ -311,8 +311,8 @@ isTupleTyConUnique u =
 isTupleDataConLikeUnique :: Unique -> Maybe (Boxity, Arity)
 isTupleDataConLikeUnique u =
   case tag of
-    '7' -> Just (Boxed,   arity)
-    '8' -> Just (Unboxed, arity)
+    BoxedTupleDataTag   -> Just (Boxed,   arity)
+    UnboxedTupleDataTag -> Just (Unboxed, arity)
     _ -> Nothing
   where
     (tag,   n) = unpkUnique u
@@ -397,50 +397,51 @@ mkPrimOpIdUnique       :: Int -> Unique
 mkPrimOpWrapperUnique  :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
 
-mkAlphaTyVarUnique   i = mkUniqueInt '1' i
-mkPreludeClassUnique i = mkUniqueInt '2' i
+mkAlphaTyVarUnique   i = mkUniqueInt AlphaTyVarTag i
+mkPreludeClassUnique i = mkUniqueInt PreludeClassTag i
 
 --------------------------------------------------
-mkPrimOpIdUnique op         = mkUniqueInt '9' (2*op)
-mkPrimOpWrapperUnique op    = mkUniqueInt '9' (2*op+1)
-mkPreludeMiscIdUnique  i    = mkUniqueInt '0' i
+mkPrimOpIdUnique op         = mkUniqueInt PrimOpTag (2*op)
+mkPrimOpWrapperUnique op    = mkUniqueInt PrimOpTag (2*op+1)
+mkPreludeMiscIdUnique  i    = mkUniqueInt PreludeMiscIdTag i
 
 mkPseudoUniqueE, mkBuiltinUnique :: Int -> Unique
 
-mkBuiltinUnique i = mkUniqueInt 'B' i
-mkPseudoUniqueE i = mkUniqueInt 'E' i -- used in NCG spiller to create spill VirtualRegs
+mkBuiltinUnique i = mkUniqueInt BuiltinTag i
+mkPseudoUniqueE i = mkUniqueInt PseudoTag i -- used in NCG spiller to create spill VirtualRegs
 
 mkRegSingleUnique, mkRegPairUnique, mkRegSubUnique, mkRegClassUnique :: Int -> Unique
-mkRegSingleUnique = mkUniqueInt 'R'
-mkRegSubUnique    = mkUniqueInt 'S'
-mkRegPairUnique   = mkUniqueInt 'P'
-mkRegClassUnique  = mkUniqueInt 'L'
+mkRegSingleUnique = mkUniqueInt RegSingleTag
+mkRegSubUnique    = mkUniqueInt RegSubTag
+mkRegPairUnique   = mkUniqueInt RegPairTag
+mkRegClassUnique  = mkUniqueInt RegClassTag
 
 mkCostCentreUnique :: Int -> Unique
-mkCostCentreUnique = mkUniqueInt 'C'
+mkCostCentreUnique = mkUniqueInt CostCentreTag
 
 varNSUnique, dataNSUnique, tvNSUnique, tcNSUnique :: Unique
-varNSUnique    = mkUnique 'i' 0
-dataNSUnique   = mkUnique 'd' 0
-tvNSUnique     = mkUnique 'v' 0
-tcNSUnique     = mkUnique 'c' 0
+varNSUnique    = mkUnique VarNSTag 0
+dataNSUnique   = mkUnique DataNSTag 0
+tvNSUnique     = mkUnique TvNSTag 0
+tcNSUnique     = mkUnique TcNSTag 0
 
 mkFldNSUnique :: FastString -> Unique
-mkFldNSUnique fs = mkUniqueInt 'f' (uniqueOfFS fs)
+mkFldNSUnique fs = mkUniqueInt FldNSTag (uniqueOfFS fs)
 
 isFldNSUnique :: Unique -> Bool
 isFldNSUnique uniq = case unpkUnique uniq of
-  (tag, _) -> tag == 'f'
+  (FldNSTag, _) -> True
+  _ -> False
 
 initExitJoinUnique :: Unique
-initExitJoinUnique = mkUnique 's' 0
+initExitJoinUnique = mkUnique SimplTag 0
 
 --------------------------------------------------
 -- Wired-in type constructor keys occupy *two* slots:
 -- See Note [Related uniques for wired-in things]
 
 mkPreludeTyConUnique   :: Int -> Unique
-mkPreludeTyConUnique i = mkUniqueInt '3' (2*i)
+mkPreludeTyConUnique i = mkUniqueInt PreludeTyConTag (2*i)
 
 tyConRepNameUnique :: Unique -> Unique
 tyConRepNameUnique  u = incrUnique u
@@ -450,7 +451,7 @@ tyConRepNameUnique  u = incrUnique u
 -- See Note [Related uniques for wired-in things]
 
 mkPreludeDataConUnique :: Int -> Unique
-mkPreludeDataConUnique i = mkUniqueInt '6' (3*i)    -- Must be alphabetic
+mkPreludeDataConUnique i = mkUniqueInt PreludeDataConTag (3*i)    -- Must be alphabetic
 
 dataConTyRepNameUnique, dataConWorkerUnique :: Unique -> Unique
 dataConWorkerUnique  u = incrUnique u
@@ -476,7 +477,7 @@ dataConTyRepNameUnique u = stepUnique u 2
 -- A little delicate!
 
 mkBoxingTyConUnique :: Int -> Unique
-mkBoxingTyConUnique i = mkUniqueInt 'b' (5*i)
+mkBoxingTyConUnique i = mkUniqueInt BoxingTyConTag (5*i)
 
 boxingDataConUnique :: Unique -> Unique
 boxingDataConUnique u = stepUnique u 2

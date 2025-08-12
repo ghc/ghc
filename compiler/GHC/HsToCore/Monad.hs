@@ -309,7 +309,7 @@ lookupCompleteMatch type_env hsc_env (CompleteMatch { cmConLikes = nms, cmResult
 
 runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages DsMessage, Maybe a)
 runDs hsc_env (ds_gbl, ds_lcl) thing_inside
-  = do { res    <- initTcRnIf 'd' hsc_env ds_gbl ds_lcl
+  = do { res    <- initTcRnIf DsTag hsc_env ds_gbl ds_lcl
                               (tryM thing_inside)
        ; msgs   <- readIORef (ds_msgs ds_gbl)
        ; let final_res

@@ -203,7 +203,7 @@ lookupLabel name = do
   return $
      case lookupUFM env name of
         Just (LabelN l) -> l
-        _other          -> mkBlockId (newTagUnique (getUnique name) 'L')
+        _other          -> mkBlockId (newTagUnique (getUnique name) BlockIdTag)
 
 
 -- | Lookup the location of a named variable.

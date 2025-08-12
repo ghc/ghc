@@ -143,7 +143,7 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
                | otherwise       = unpackHObj res_hty
 
   header_bits = maybe mempty idTag maybe_target
-  idTag i = let (tag, u) = unpkUnique (getUnique i)
+  idTag i = let (tag, u) = unpkUniqueGrimly (getUnique i)
             in  CHeader (char tag <> word64 u)
 
   normal_args = map (\(nm,_ty,_,_) -> nm) arg_info

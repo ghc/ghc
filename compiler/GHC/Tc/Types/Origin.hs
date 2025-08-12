@@ -354,7 +354,7 @@ unkSkolAnon = UnkSkol callStack
 -- shares a certain 'Unique'.
 mkSkolemInfo :: MonadIO m => SkolemInfoAnon -> m SkolemInfo
 mkSkolemInfo sk_anon = do
-  u <- liftIO $! uniqFromTag 's'
+  u <- liftIO $! uniqFromTag SkolemTag
   return (SkolemInfo u sk_anon)
 
 getSkolemInfo :: SkolemInfo -> SkolemInfoAnon

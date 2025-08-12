@@ -23,6 +23,7 @@ Haskell).
 module GHC.Types.Unique (
         -- * Main data types
         Unique, Uniquable(..),
+        UniqueTag(..), uniqueTag, charToUniqueTag,
         uNIQUE_BITS,
 
         -- ** Constructors, destructors and operations on 'Unique's
@@ -33,14 +34,16 @@ module GHC.Types.Unique (
 
         mkTag,
         mkUniqueGrimily,
+        mkUniqueGrimilyWithTag,
         mkUniqueIntGrimily,
         getKey,
         mkUnique, unpkUnique,
+        unpkUniqueGrimly,
         mkUniqueInt,
         eqUnique, ltUnique,
         incrUnique, stepUnique,
 
-        newTagUnique,
+        newTagUnique, newTagUniqueGrimly,
         nonDetCmpUnique,
         isValidKnownKeyUnique,
 
@@ -56,6 +59,7 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic.Plain (panic)
 import GHC.Utils.Word64 (intToWord64, word64ToInt)
 
 -- just for implementing a fast [0,61) -> Char function
@@ -79,13 +83,40 @@ A `Unique` in GHC is a 64 bit value composed of two pieces:
 * A "tag", of width `UNIQUE_TAG_BITS`, in the high order bits
 * A number, of width `uNIQUE_BITS`, which fills up the remainder of the Word64
 
-The tag is typically an ASCII character.  It is typically used to make it easier
+The tag is typically stored as an ASCII character.  It is typically used to make it easier
 to distinguish uniques constructed by different parts of the compiler.
-There is a (potentially incomplete) list of unique tags used given in
-GHC.Builtin.Uniques. See Note [Uniques for wired-in prelude things and known tags]
+To ensure that we assign distinct tags for each purpose, we represent tags in the compiler
+via the UniqueTag ADT.
+
+The bidirectional mapping from the UniqueTag ADT to the corresponding character is witnessed
+by the uniqueTag and charToUniqueTag functions.
+See Note [Uniques for wired-in prelude things and known tags]
 
 `mkUnique` constructs a `Unique` from its pieces
-  mkUnique :: Char -> Word64 -> Unique
+  mkUnique :: UniqueTag -> Word64 -> Unique
+
+Note [Performance implications of UniqueTag]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The UniqueTag ADT is meant to be ephemeral and eliminated by the simplifier,
+so for long term storage (i.e. in monadic environments or data structures) we
+want to store the raw 'Char's. Working with the raw tags is done via the *Grimly
+class of functions
+
+For instance, if we are generating a unique for a concrete tag, we should use
+functions like `mkUniqueInt` which take a `UniqueTag` which will be eliminated by inlining.
+
+However, if the unique is unknown and comes from a stored location, we should prefer using
+the 'Char' directly. This avoids multiple conversions using `uniqueTag` at runtime.
+
+For instance, instead of `env_ut :: UniqueTag` and
+
+newUnique
+  = do { env <- getEnv
+       ; let tag = env_ut env
+       ; liftIO $! uniqFromTag tag }
+
+Prefer `env_ut :: Char` and
+       ; liftIO $! uniqFromTagGrimly tag }
 
 -}
 
@@ -98,6 +129,162 @@ GHC.Builtin.Uniques. See Note [Uniques for wired-in prelude things and known tag
 -- These are sometimes also referred to as \"keys\" in comments in GHC.
 newtype Unique = MkUnique Word64
 
+data UniqueTag
+  = AlphaTyVarTag
+  | BcoTag
+  | BlockIdTag
+  | BoxedTupleDataTag
+  | BoxedTupleTyConTag
+  | BoxingTyConTag
+  | BuiltinTag
+  | CmmTag
+  | CodeGenTag
+  | CostCentreTag
+  | CTupleDataTag
+  | CTupleSelTag
+  | CTupleTag
+  | DataNSTag
+  | DsTag
+  | FldNSTag
+  | HscTag
+  | IfaceTag
+  | JsTag
+  | LocalTag
+  | PluginTag
+  | PreludeClassTag
+  | PreludeDataConTag
+  | PreludeMiscIdTag
+  | PreludeTyConTag
+  | PrimOpTag
+  | PseudoTag
+  | RegClassTag
+  | RegPairTag
+  | RegSingleTag
+  | RegSubTag
+  | RnIfaceTag
+  | SimplTag
+  | SkolemTag
+  | SrtTag
+  | StgPTag
+  | StgTag
+  | SumTag
+  | TcNSTag
+  | TcTag
+  | TsanTag
+  | TvNSTag
+  | UnboxedTupleDataTag
+  | UnboxedTupleTyConTag
+  | UniqueRenamerTag
+  | VarNSTag
+  | VirtualRegTag
+  | NullTag
+  deriving (Eq, Show, Enum, Bounded)
+
+uniqueTag :: UniqueTag -> Char
+uniqueTag AlphaTyVarTag        = '1'
+uniqueTag BcoTag               = 'I'
+uniqueTag BlockIdTag           = 'L'
+uniqueTag BoxedTupleDataTag    = '7'
+uniqueTag BoxedTupleTyConTag   = '4'
+uniqueTag BoxingTyConTag       = 'b'
+uniqueTag BuiltinTag           = 'B'
+uniqueTag CmmTag               = 'c'
+uniqueTag CodeGenTag           = 'n'
+uniqueTag CostCentreTag        = 'C'
+uniqueTag CTupleDataTag        = 'm'
+uniqueTag CTupleSelTag         = 'j'
+uniqueTag CTupleTag            = 'k'
+uniqueTag DataNSTag            = 'd'
+uniqueTag DsTag                = 'D'
+uniqueTag FldNSTag             = 'f'
+uniqueTag HscTag               = 'r'
+uniqueTag IfaceTag             = 'i'
+uniqueTag JsTag                = 'J'
+uniqueTag LocalTag             = 'X'
+uniqueTag PluginTag            = 'p'
+uniqueTag PreludeClassTag      = '2'
+uniqueTag PreludeDataConTag    = '6'
+uniqueTag PreludeMiscIdTag     = '0'
+uniqueTag PreludeTyConTag      = '3'
+uniqueTag PrimOpTag            = '9'
+uniqueTag PseudoTag            = 'E'
+uniqueTag RegClassTag          = 'A'
+uniqueTag RegPairTag           = 'P'
+uniqueTag RegSingleTag         = 'R'
+uniqueTag RegSubTag            = 'S'
+uniqueTag RnIfaceTag           = 'M'
+uniqueTag SimplTag             = 's'
+uniqueTag SkolemTag            = 'K'
+uniqueTag SrtTag               = 'u'
+uniqueTag StgPTag              = 'g'
+uniqueTag StgTag               = 't'
+uniqueTag SumTag               = 'z'
+uniqueTag TcNSTag              = 'N'
+uniqueTag TcTag                = 'a'
+uniqueTag TsanTag              = 'T'
+uniqueTag TvNSTag              = 'v'
+uniqueTag UnboxedTupleDataTag  = '8'
+uniqueTag UnboxedTupleTyConTag = '5'
+uniqueTag UniqueRenamerTag     = 'Q'
+uniqueTag VarNSTag             = 'V'
+uniqueTag VirtualRegTag        = 'H'
+uniqueTag NullTag              = chr 0
+{-# INLINE uniqueTag #-}
+
+charToUniqueTag :: Char -> UniqueTag
+charToUniqueTag '0' = PreludeMiscIdTag
+charToUniqueTag '1' = AlphaTyVarTag
+charToUniqueTag '2' = PreludeClassTag
+charToUniqueTag '3' = PreludeTyConTag
+charToUniqueTag '4' = BoxedTupleTyConTag
+charToUniqueTag '5' = UnboxedTupleTyConTag
+charToUniqueTag '6' = PreludeDataConTag
+charToUniqueTag '7' = BoxedTupleDataTag
+charToUniqueTag '8' = UnboxedTupleDataTag
+charToUniqueTag '9' = PrimOpTag
+charToUniqueTag 'a' = TcTag
+charToUniqueTag 'A' = RegClassTag
+charToUniqueTag 'b' = BoxingTyConTag
+charToUniqueTag 'B' = BuiltinTag
+charToUniqueTag 'c' = CmmTag
+charToUniqueTag 'C' = CostCentreTag
+charToUniqueTag 'd' = DataNSTag
+charToUniqueTag 'D' = DsTag
+charToUniqueTag 'E' = PseudoTag
+charToUniqueTag 'f' = FldNSTag
+charToUniqueTag 'g' = StgPTag
+charToUniqueTag 'H' = VirtualRegTag
+charToUniqueTag 'i' = IfaceTag
+charToUniqueTag 'I' = BcoTag
+charToUniqueTag 'j' = CTupleSelTag
+charToUniqueTag 'J' = JsTag
+charToUniqueTag 'k' = CTupleTag
+charToUniqueTag 'K' = SkolemTag
+charToUniqueTag 'L' = BlockIdTag
+charToUniqueTag 'm' = CTupleDataTag
+charToUniqueTag 'M' = RnIfaceTag
+charToUniqueTag 'n' = CodeGenTag
+charToUniqueTag 'N' = TcNSTag
+charToUniqueTag 'p' = PluginTag
+charToUniqueTag 'P' = RegPairTag
+charToUniqueTag 'Q' = UniqueRenamerTag
+charToUniqueTag 'r' = HscTag
+charToUniqueTag 'R' = RegSingleTag
+charToUniqueTag 's' = SimplTag
+charToUniqueTag 'S' = RegSubTag
+charToUniqueTag 't' = StgTag
+charToUniqueTag 'T' = TsanTag
+charToUniqueTag 'u' = SrtTag
+charToUniqueTag 'v' = TvNSTag
+charToUniqueTag 'V' = VarNSTag
+charToUniqueTag 'X' = LocalTag
+charToUniqueTag 'z' = SumTag
+charToUniqueTag c
+  | ord c == 0 = NullTag
+  | otherwise = panic $ "charToUniqueTag: unknown tag for char " ++ show c
+{-# INLINE charToUniqueTag #-}
+
+
 {-# INLINE uNIQUE_BITS #-}
 uNIQUE_BITS :: Int
 uNIQUE_BITS = 64 - UNIQUE_TAG_BITS
@@ -107,14 +294,16 @@ Now come the functions which construct uniques from their pieces, and vice versa
 The stuff about unique *supplies* is handled further down this module.
 -}
 
-unpkUnique      :: Unique -> (Char, Word64)        -- The reverse
+unpkUnique :: Unique -> (UniqueTag, Word64)        -- The reverse
+unpkUniqueGrimly :: Unique -> (Char, Word64)        -- The reverse
 
 mkUniqueGrimily :: Word64 -> Unique                -- A trap-door for UniqSupply
 getKey          :: Unique -> Word64                -- for Var
 
 incrUnique   :: Unique -> Unique
 stepUnique   :: Unique -> Word64 -> Unique
-newTagUnique :: Unique -> Char -> Unique
+newTagUnique :: Unique -> UniqueTag -> Unique
+newTagUniqueGrimly :: Unique -> Char -> Unique
 
 mkUniqueGrimily = MkUnique
 
@@ -125,7 +314,7 @@ incrUnique (MkUnique i) = MkUnique (i + 1)
 stepUnique (MkUnique i) n = MkUnique (i + n)
 
 mkLocalUnique :: Word64 -> Unique
-mkLocalUnique i = mkUnique 'X' i
+mkLocalUnique i = mkUnique LocalTag i
 
 minLocalUnique :: Unique
 minLocalUnique = mkLocalUnique 0
@@ -134,7 +323,9 @@ maxLocalUnique :: Unique
 maxLocalUnique = mkLocalUnique uniqueMask
 
 -- newTagUnique changes the "domain" of a unique to a different char
-newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
+newTagUnique u c = newTagUniqueGrimly u (uniqueTag c)
+
+newTagUniqueGrimly u c = mkUniqueGrimilyWithTag c i where (_,i) = unpkUniqueGrimly u
 
 -- | Bitmask that has zeros for the tag bits and ones for the rest.
 uniqueMask :: Word64
@@ -153,21 +344,31 @@ mkTag c = intToWord64 (ord c) `shiftL` uNIQUE_BITS
 
 -- and as long as the Char fits in 8 bits, which we assume anyway!
 
-mkUnique :: Char -> Word64 -> Unique       -- Builds a unique from pieces
--- EXPORTED and used only in GHC.Builtin.Uniques
-mkUnique c i
+mkUniqueGrimilyWithTag :: Char -> Word64 -> Unique       -- Builds a unique from pieces
+mkUniqueGrimilyWithTag c i
   = MkUnique (tag .|. bits)
   where
     tag  = mkTag c
     bits = i .&. uniqueMask
 
-mkUniqueInt :: Char -> Int -> Unique
+{-# INLINE mkUniqueGrimilyWithTag #-}
+
+mkUnique :: UniqueTag -> Word64 -> Unique       -- Builds a unique from pieces
+mkUnique c i = mkUniqueGrimilyWithTag (uniqueTag c) i
+
+{-# INLINE mkUnique #-}
+
+mkUniqueInt :: UniqueTag -> Int -> Unique
 mkUniqueInt c i = mkUnique c (intToWord64 i)
+
+{-# INLINE mkUniqueInt #-}
 
 mkUniqueIntGrimily :: Int -> Unique
 mkUniqueIntGrimily = MkUnique . intToWord64
 
-unpkUnique (MkUnique u)
+{-# INLINE mkUniqueIntGrimily #-}
+
+unpkUniqueGrimly (MkUnique u)
   = let
         -- The potentially truncating use of fromIntegral here is safe
         -- because the argument is just the tag bits after shifting.
@@ -175,6 +376,12 @@ unpkUnique (MkUnique u)
         i   = u .&. uniqueMask
     in
     (tag, i)
+{-# INLINE unpkUniqueGrimly #-}
+
+
+unpkUnique u = case unpkUniqueGrimly u of
+  (c, i) -> ( charToUniqueTag c, i)
+{-# INLINE unpkUnique #-}
 
 -- | The interface file symbol-table encoding assumes that known-key uniques fit
 -- in 30-bits; verify this.
@@ -182,7 +389,7 @@ unpkUnique (MkUnique u)
 -- See Note [Symbol table representation of names] in "GHC.Iface.Binary" for details.
 isValidKnownKeyUnique :: Unique -> Bool
 isValidKnownKeyUnique u =
-    case unpkUnique u of
+    case unpkUniqueGrimly u of
       (c, x) -> ord c < 0xff && x <= (1 `shiftL` 22)
 
 {-
@@ -305,7 +512,7 @@ showUnique :: Unique -> String
 showUnique uniq
   = tagStr ++ w64ToBase62 u
   where
-    (tag, u) = unpkUnique uniq
+    (tag, u) = unpkUniqueGrimly uniq
     -- Avoid emitting non-printable characters in pretty uniques.
     -- See #25989.
     tagStr

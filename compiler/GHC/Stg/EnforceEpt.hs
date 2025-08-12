@@ -17,7 +17,7 @@ import GHC.Types.Name
 import GHC.Stg.Syntax
 import GHC.Types.Basic ( CbvMark (..) )
 import GHC.Types.Demand (isDeadEndAppSig)
-import GHC.Types.Unique.Supply (mkSplitUniqSupply)
+import GHC.Types.Unique.Supply (mkSplitUniqSupply, UniqueTag(StgTag))
 import GHC.Types.RepType (dataConRuntimeRepStrictness)
 import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
@@ -326,7 +326,7 @@ enforceEpt ppr_opts !for_bytecode logger this_mod stg_binds = do
     let export_tag_info = collectExportInfo stg_binds_w_tags
 
     -- Rewrite STG to uphold the strict field invariant
-    us_t <- mkSplitUniqSupply 't'
+    us_t <- mkSplitUniqSupply StgTag
     let rewritten_binds = {-# SCC "StgEptRewrite" #-} rewriteTopBinds this_mod us_t stg_binds_w_tags :: [TgStgTopBinding]
 
     return (rewritten_binds,export_tag_info)

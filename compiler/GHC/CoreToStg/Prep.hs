@@ -244,7 +244,7 @@ corePrepPgm logger cp_cfg pgm_cfg
                (\a -> a `seqList` ()) $ do
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
 
-    us <- mkSplitUniqSupply 's'
+    us <- mkSplitUniqSupply StgTag
     let
         floats = initUs_ us $
                  corePrepTopBinds initialCorePrepEnv binds
@@ -258,7 +258,7 @@ corePrepPgm logger cp_cfg pgm_cfg
 corePrepExpr :: Logger -> CorePrepConfig -> CoreExpr -> IO CoreExpr
 corePrepExpr logger config expr = do
     withTiming logger (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
-      us <- mkSplitUniqSupply 's'
+      us <- mkSplitUniqSupply StgTag
       let initialCorePrepEnv = mkInitialCorePrepEnv config
       let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
       putDumpFileMaybe logger Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
