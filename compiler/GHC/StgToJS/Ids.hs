@@ -130,7 +130,7 @@ makeIdentForId i num id_type current_module = name ident
         -- unique suffix for non-exported Ids
       , if exported
           then mempty
-          else let (c,u) = unpkUnique (getUnique i)
+          else let (c,u) = unpkUniqueGrimly (getUnique i)
                in mconcat [BSC.pack ['_',c,'_'], word64BS u]
       ]
 

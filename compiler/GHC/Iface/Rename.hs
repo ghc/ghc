@@ -34,6 +34,7 @@ import GHC.Types.Var
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Shape
+import GHC.Types.Unique.Supply
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -194,7 +195,7 @@ initRnIface hsc_env iface insts nsubst do_this = do
             sh_if_errs = errs_var
         }
     -- Modeled off of 'initTc'
-    res <- initTcRnIf 'c' hsc_env env () $ tryM do_this
+    res <- initTcRnIf RnIfaceTag hsc_env env () $ tryM do_this
     msgs <- readIORef errs_var
     case res of
         Left _                               -> return (Left msgs)

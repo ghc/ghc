@@ -613,7 +613,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi) = do
       debugTraceMsg (hsc_logger hsc_env) 1 $
           text "Warning: _result has been evaluated, some bindings have been lost"
 
-   us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
+   us <- mkSplitUniqSupply BcoTag -- Dodgy; will give the same uniques every time
    let tv_subst     = newTyVars us free_tvs
        (filtered_ids, occs'') = unzip         -- again, sync the occ-names
           [ (id, occ) | (id, Just _hv, occ) <- zip3 ids mb_hValues occs' ]
