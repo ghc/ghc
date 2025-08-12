@@ -11,7 +11,7 @@ import Control.Monad.Catch
 import Control.Monad
 import Data.Array
 import Data.Function
-import Data.List
+import qualified Data.List as List
 import Data.Maybe
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as S
@@ -51,16 +51,16 @@ findBreakByLine :: Int {-^ Line number -} -> TickArray -> Maybe (BreakTickIndex,
 findBreakByLine line arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
-    listToMaybe (sortBy (leftmostLargestRealSrcSpan `on` snd)  comp)   `mplus`
-    listToMaybe (sortBy (compare `on` snd) incomp) `mplus`
-    listToMaybe (sortBy (flip compare `on` snd) ticks)
+    listToMaybe (List.sortBy (leftmostLargestRealSrcSpan `on` snd)  comp)   `mplus`
+    listToMaybe (List.sortBy (compare `on` snd) incomp) `mplus`
+    listToMaybe (List.sortBy (flip compare `on` snd) ticks)
   where
         ticks = arr ! line
 
         starts_here = [ (ix,pan) | (ix, pan) <- ticks,
                         srcSpanStartLine pan == line ]
 
-        (comp, incomp) = partition ends_here starts_here
+        (comp, incomp) = List.partition ends_here starts_here
             where ends_here (_,pan) = srcSpanEndLine pan == line
 
 -- | Find a breakpoint in the 'TickArray' of a module, given a line number and a column coordinate.
@@ -68,8 +68,8 @@ findBreakByCoord :: (Int, Int) -> TickArray -> Maybe (BreakTickIndex, RealSrcSpa
 findBreakByCoord (line, col) arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
-    listToMaybe (sortBy (flip compare `on` snd) contains ++
-                 sortBy (compare `on` snd) after_here)
+    listToMaybe (List.sortBy (flip compare `on` snd) contains ++
+                 List.sortBy (compare `on` snd) after_here)
   where
         ticks = arr ! line
 
@@ -88,7 +88,7 @@ enclosingTickSpan :: TickArray -> SrcSpan -> RealSrcSpan
 enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
 enclosingTickSpan ticks (RealSrcSpan src _) =
   assert (inRange (bounds ticks) line) $
-    Data.List.minimumBy leftmostLargestRealSrcSpan $ enclosing_spans
+    List.minimumBy leftmostLargestRealSrcSpan $ enclosing_spans
   where
     line = srcSpanStartLine src
     enclosing_spans = [ pan | (_,pan) <- ticks ! line
@@ -144,7 +144,7 @@ resolveFunctionBreakpoint inp = do
     lookupModuleInGraph mod_str = do
         graph <- getModuleGraph
         let hmods = ms_mod <$> mgModSummaries graph
-        pure $ find ((== mod_str) . moduleNameString . moduleName) hmods
+        pure $ List.find ((== mod_str) . moduleNameString . moduleName) hmods
 
     -- Check validity of an identifier to set a breakpoint:
     --  1. The module of the identifier must exist
@@ -165,7 +165,7 @@ resolveFunctionBreakpoint inp = do
             mb_modbreaks <- getModBreak modl
             let found = case mb_modbreaks of
                   Nothing -> False
-                  Just mb -> fun_str `elem` (intercalate "." <$> elems (modBreaks_decls mb))
+                  Just mb -> fun_str `elem` (List.intercalate "." <$> elems (modBreaks_decls mb))
             if found
               then pure Nothing
               else pure $ Just $ text "No breakpoint found for" <+> quotes (text fun_str)
@@ -182,7 +182,7 @@ findBreakForBind str_name modbreaks = filter (not . enclosed) ticks
   where
     ticks = [ (index, span)
             | (index, decls) <- assocs (modBreaks_decls modbreaks),
-              str_name == intercalate "." decls,
+              str_name == List.intercalate "." decls,
               RealSrcSpan span _ <- [modBreaks_locs modbreaks ! index] ]
     enclosed (_,sp0) = any subspan ticks
       where subspan (_,sp) = sp /= sp0 &&
