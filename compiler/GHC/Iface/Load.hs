@@ -895,6 +895,7 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
       mhome_unit  = hsc_home_unit_maybe hsc_env
       dflags     = hsc_dflags hsc_env
       logger     = hsc_logger hsc_env
+      hooks      = hsc_hooks hsc_env
 
 
   trace_if logger (sep [hsep [text "Reading",
@@ -905,59 +906,51 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
                            ppr mod <> semi],
                      nest 4 (text "reason:" <+> doc_str)])
 
-  -- Check for GHC.Prim, and return its static interface
-  -- See Note [GHC.Prim] in primops.txt.pp.
-  -- TODO: make this check a function
-  if mod `installedModuleEq` gHC_PRIM
-      then do
-          let iface = getGhcPrimIface hsc_env
-          return (Succeeded (iface, panic "GHC.Prim ModLocation (findAndReadIface)"))
-      else do
-          -- Look for the file
-          mb_found <- liftIO (findExactModule hsc_env mod hi_boot_file)
-          case mb_found of
-              InstalledFound loc -> do
-                  -- See Note [Home module load error]
-                  if HUG.memberHugUnitId (moduleUnit mod) (hsc_HUG hsc_env)
-                      && not (isOneShot (ghcMode dflags))
-                    then return (Failed (HomeModError mod loc))
-                    else do
-                        r <- read_file logger name_cache unit_state dflags wanted_mod (ml_hi_file loc)
-                        case r of
-                          Failed err
-                            -> return (Failed $ BadIfaceFile err)
-                          Succeeded (iface,_fp)
-                            -> do
-                                r2 <- load_dynamic_too_maybe logger name_cache unit_state
-                                                         (setDynamicNow dflags) wanted_mod
-                                                         iface loc
-                                case r2 of
-                                  Failed sdoc -> return (Failed sdoc)
-                                  Succeeded {} -> return $ Succeeded (iface, loc)
-              err -> do
-                  trace_if logger (text "...not found")
-                  return $ Failed $ cannotFindInterface
-                                      unit_state
-                                      mhome_unit
-                                      profile
-                                      (moduleName mod)
-                                      err
+  -- Look for the file
+  mb_found <- liftIO (findExactModule hsc_env mod hi_boot_file)
+  case mb_found of
+      InstalledFound loc -> do
+          -- See Note [Home module load error]
+          if HUG.memberHugUnitId (moduleUnit mod) (hsc_HUG hsc_env)
+              && not (isOneShot (ghcMode dflags))
+            then return (Failed (HomeModError mod loc))
+            else do
+                r <- read_file hooks logger name_cache unit_state dflags wanted_mod (ml_hi_file loc)
+                case r of
+                  Failed err
+                    -> return (Failed $ BadIfaceFile err)
+                  Succeeded (iface,_fp)
+                    -> do
+                        r2 <- load_dynamic_too_maybe hooks logger name_cache unit_state
+                                                 (setDynamicNow dflags) wanted_mod
+                                                 iface loc
+                        case r2 of
+                          Failed sdoc -> return (Failed sdoc)
+                          Succeeded {} -> return $ Succeeded (iface, loc)
+      err -> do
+          trace_if logger (text "...not found")
+          return $ Failed $ cannotFindInterface
+                              unit_state
+                              mhome_unit
+                              profile
+                              (moduleName mod)
+                              err
 
 -- | Check if we need to try the dynamic interface for -dynamic-too
-load_dynamic_too_maybe :: Logger -> NameCache -> UnitState -> DynFlags
+load_dynamic_too_maybe :: Hooks -> Logger -> NameCache -> UnitState -> DynFlags
                        -> Module -> ModIface -> ModLocation
                        -> IO (MaybeErr MissingInterfaceError ())
-load_dynamic_too_maybe logger name_cache unit_state dflags wanted_mod iface loc
+load_dynamic_too_maybe hooks logger name_cache unit_state dflags wanted_mod iface loc
   -- Indefinite interfaces are ALWAYS non-dynamic.
   | not (moduleIsDefinite (mi_module iface)) = return (Succeeded ())
-  | gopt Opt_BuildDynamicToo dflags = load_dynamic_too logger name_cache unit_state dflags wanted_mod iface loc
+  | gopt Opt_BuildDynamicToo dflags = load_dynamic_too hooks logger name_cache unit_state dflags wanted_mod iface loc
   | otherwise = return (Succeeded ())
 
-load_dynamic_too :: Logger -> NameCache -> UnitState -> DynFlags
+load_dynamic_too :: Hooks -> Logger -> NameCache -> UnitState -> DynFlags
                  -> Module -> ModIface -> ModLocation
                  -> IO (MaybeErr MissingInterfaceError ())
-load_dynamic_too logger name_cache unit_state dflags wanted_mod iface loc = do
-  read_file logger name_cache unit_state dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
+load_dynamic_too hooks logger name_cache unit_state dflags wanted_mod iface loc = do
+  read_file hooks logger name_cache unit_state dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
     Succeeded (dynIface, _)
      | mi_mod_hash iface == mi_mod_hash dynIface
      -> return (Succeeded ())
@@ -971,10 +964,10 @@ load_dynamic_too logger name_cache unit_state dflags wanted_mod iface loc = do
 
 
 
-read_file :: Logger -> NameCache -> UnitState -> DynFlags
+read_file :: Hooks -> Logger -> NameCache -> UnitState -> DynFlags
           -> Module -> FilePath
           -> IO (MaybeErr ReadInterfaceError (ModIface, FilePath))
-read_file logger name_cache unit_state dflags wanted_mod file_path = do
+read_file hooks logger name_cache unit_state dflags wanted_mod file_path = do
 
   -- Figure out what is recorded in mi_module.  If this is
   -- a fully definite interface, it'll match exactly, but
@@ -985,7 +978,7 @@ read_file logger name_cache unit_state dflags wanted_mod file_path = do
             (_, Just indef_mod) ->
               instModuleToModule unit_state
                 (uninstantiateInstantiatedModule indef_mod)
-  read_result <- readIface logger dflags name_cache wanted_mod' file_path
+  read_result <- readIface hooks logger dflags name_cache wanted_mod' file_path
   case read_result of
     Failed err      -> return (Failed err)
     Succeeded iface -> return (Succeeded (iface, file_path))
@@ -1012,13 +1005,14 @@ flagsToIfCompression dflags
 -- Failed err    <=> file not found, or unreadable, or illegible
 -- Succeeded iface <=> successfully found and parsed
 readIface
-  :: Logger
+  :: Hooks
+  -> Logger
   -> DynFlags
   -> NameCache
   -> Module
   -> FilePath
   -> IO (MaybeErr ReadInterfaceError ModIface)
-readIface logger dflags name_cache wanted_mod file_path = do
+readIface hooks logger dflags name_cache wanted_mod file_path = do
   trace_if logger (text "readIFace" <+> text file_path)
   let profile = targetProfile dflags
   res <- tryMost $ readBinIface profile name_cache CheckHiWay QuietBinIFace file_path
@@ -1028,9 +1022,14 @@ readIface logger dflags name_cache wanted_mod file_path = do
         -- critical for correctness of recompilation checking
         -- (it lets us tell when -this-unit-id has changed.)
         | wanted_mod == actual_mod
-                        -> return (Succeeded iface)
+                        -> return (Succeeded final_iface)
         | otherwise     -> return (Failed err)
         where
+          final_iface
+            -- Check for GHC.Prim, and return its static interface
+            -- See Note [GHC.Prim] in primops.txt.pp.
+            | wanted_mod == gHC_PRIM = getGhcPrimIface hooks
+            | otherwise              = iface
           actual_mod = mi_module iface
           err = HiModuleNameMismatchWarn file_path wanted_mod actual_mod
 
@@ -1245,8 +1244,8 @@ instance Outputable WhereFrom where
 -- This is a helper function that takes into account the hook allowing ghc-prim
 -- interface to be extended via the ghc-api. Afaik it was introduced for GHCJS
 -- so that it can add its own primitive types.
-getGhcPrimIface :: HscEnv -> ModIface
-getGhcPrimIface hsc_env =
-  case ghcPrimIfaceHook (hsc_hooks hsc_env) of
+getGhcPrimIface :: Hooks -> ModIface
+getGhcPrimIface hooks =
+  case ghcPrimIfaceHook hooks of
     Nothing -> ghcPrimIface
     Just h  -> h
