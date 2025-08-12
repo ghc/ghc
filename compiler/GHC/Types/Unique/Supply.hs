@@ -15,9 +15,11 @@ module GHC.Types.Unique.Supply (
 
         -- ** Operations on supplies
         uniqFromSupply, uniqsFromSupply, -- basic ops
-        takeUniqFromSupply, uniqFromTag,
+        takeUniqFromSupply,
+        uniqFromTag, uniqFromTagGrimly,
+        UniqueTag(..),
 
-        mkSplitUniqSupply,
+        mkSplitUniqSupply, mkSplitUniqSupplyGrimly,
         splitUniqSupply, listSplitUniqSupply,
 
         -- * Unique supply monad and its abstraction
@@ -200,7 +202,11 @@ data UniqSupply
                    UniqSupply UniqSupply
                                 -- when split => these two supplies
 
-mkSplitUniqSupply :: Char -> IO UniqSupply
+mkSplitUniqSupply  :: UniqueTag -> IO UniqSupply
+mkSplitUniqSupply ut = mkSplitUniqSupplyGrimly (uniqueTag ut)
+{-# INLINE mkSplitUniqSupply #-}
+
+mkSplitUniqSupplyGrimly :: Char -> IO UniqSupply
 -- ^ Create a unique supply out of thin air.
 -- The "tag" (Char) supplied is mostly cosmetic, making it easier
 -- to figure out where a Unique was born. See Note [Uniques and tags].
@@ -213,11 +219,11 @@ mkSplitUniqSupply :: Char -> IO UniqSupply
 
 -- See Note [How the unique supply works]
 -- See Note [Optimising the unique supply]
-mkSplitUniqSupply c
+mkSplitUniqSupplyGrimly ut
   = unsafeDupableInterleaveIO (IO mk_supply)
 
   where
-     !tag = mkTag c
+     !tag = mkTag ut
 
         -- Here comes THE MAGIC: see Note [How the unique supply works]
         -- This is one of the most hammered bits in the whole compiler
@@ -279,11 +285,16 @@ initUniqSupply counter inc = do
     poke ghc_unique_counter64 counter
     poke ghc_unique_inc       inc
 
-uniqFromTag :: Char -> IO Unique
-uniqFromTag !tag
+uniqFromTag :: UniqueTag -> IO Unique
+uniqFromTag !ut = uniqFromTagGrimly (uniqueTag ut)
+
+{-# INLINE uniqFromTag #-}
+
+uniqFromTagGrimly :: Char -> IO Unique
+uniqFromTagGrimly !tag
   = do { uqNum <- genSym
-       ; return $! mkUnique tag uqNum }
-{-# NOINLINE uniqFromTag #-} -- We'll unbox everything, but we don't want to inline it
+       ; return $! mkUniqueGrimilyWithTag tag uqNum }
+{-# NOINLINE uniqFromTagGrimly #-} -- We'll unbox everything, but we don't want to inline it
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
 -- ^ Build two 'UniqSupply' from a single one, each of which

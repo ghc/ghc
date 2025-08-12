@@ -237,6 +237,7 @@ import GHC.Types.Name.Ppr
 import GHC.Types.Unique.FM ( UniqFM, emptyUFM, sequenceUFMList )
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique (uniqueTag)
 import GHC.Types.Annotations
 import GHC.Types.Basic( TopLevelFlag(..), TypeOrKind(..) )
 import GHC.Types.CostCentre.State
@@ -431,7 +432,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_errs       = errs_var
                 }
 
-      ; maybe_res <- initTcRnIf 'a' hsc_env gbl_env lcl_env $
+      ; maybe_res <- initTcRnIf TcTag hsc_env gbl_env lcl_env $
                      do { r <- tryM do_this
                         ; case r of
                           Right res -> return (Just res)
@@ -465,14 +466,14 @@ initTcInteractive hsc_env thing_inside
   where
     interactive_src_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
 
-initTcRnIf :: Char              -- ^ Tag for unique supply
+initTcRnIf :: UniqueTag              -- ^ Tag for unique supply
            -> HscEnv
            -> gbl -> lcl
            -> TcRnIf gbl lcl a
            -> IO a
 initTcRnIf uniq_tag hsc_env gbl_env lcl_env thing_inside
    = do { let { env = Env { env_top = hsc_env,
-                            env_ut  = uniq_tag,
+                            env_ut  = uniqueTag uniq_tag,
                             env_gbl = gbl_env,
                             env_lcl = lcl_env} }
 
@@ -814,13 +815,13 @@ newUnique :: TcRnIf gbl lcl Unique
 newUnique
  = do { env <- getEnv
       ; let tag = env_ut env
-      ; liftIO $! uniqFromTag tag }
+      ; liftIO $! uniqFromTagGrimly tag }
 
 newUniqueSupply :: TcRnIf gbl lcl UniqSupply
 newUniqueSupply
  = do { env <- getEnv
       ; let tag = env_ut env
-      ; liftIO $! mkSplitUniqSupply tag }
+      ; liftIO $! mkSplitUniqSupplyGrimly tag }
 
 cloneLocalName :: Name -> TcM Name
 -- Make a fresh Internal name with the same OccName and SrcSpan
@@ -2402,7 +2403,7 @@ initIfaceLoad hsc_env do_this
                         if_doc = text "initIfaceLoad",
                         if_rec_types = emptyKnotVars
                     }
-      initTcRnIf 'i' (hsc_env { hsc_type_env_vars = emptyKnotVars }) gbl_env () do_this
+      initTcRnIf IfaceTag (hsc_env { hsc_type_env_vars = emptyKnotVars }) gbl_env () do_this
 
 -- | This is used when we are doing to call 'typecheckModule' on an 'ModIface',
 -- if it's part of a loop with some other modules then we need to use their
@@ -2413,7 +2414,7 @@ initIfaceLoadModule hsc_env this_mod do_this
                         if_doc = text "initIfaceLoadModule",
                         if_rec_types = readTcRef <$> knotVarsWithout this_mod (hsc_type_env_vars hsc_env)
                     }
-      initTcRnIf 'i' hsc_env gbl_env () do_this
+      initTcRnIf IfaceTag hsc_env gbl_env () do_this
 
 initIfaceCheck :: SDoc -> HscEnv -> IfG a -> IO a
 -- Used when checking the up-to-date-ness of the old Iface
@@ -2423,7 +2424,7 @@ initIfaceCheck doc hsc_env do_this
                         if_doc = text "initIfaceCheck" <+> doc,
                         if_rec_types = readTcRef <$> hsc_type_env_vars hsc_env
                     }
-      initTcRnIf 'i' hsc_env gbl_env () do_this
+      initTcRnIf IfaceTag hsc_env gbl_env () do_this
 
 initIfaceLcl :: Module -> SDoc -> IsBootInterface -> IfL a -> IfM lcl a
 initIfaceLcl mod loc_doc hi_boot_file thing_inside

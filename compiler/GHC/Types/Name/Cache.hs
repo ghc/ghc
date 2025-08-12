@@ -27,6 +27,7 @@ import GHC.Prelude
 import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique (uniqueTag)
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Builtin.Utils
@@ -115,7 +116,7 @@ However note that:
 -- each original name; i.e. (module-name, occ-name) pair and provides
 -- something of a lookup mechanism for those names.
 data NameCache = NameCache
-  { nsUniqChar :: {-# UNPACK #-} !Char
+  { nsUniqChar :: {-# UNPACK #-} !Char -- See Note [Performance implications of UniqueTag]
   , nsNames    :: {-# UNPACK #-} !(MVar OrigNameCache)
   }
 
@@ -123,7 +124,7 @@ data NameCache = NameCache
 type OrigNameCache   = ModuleEnv (OccEnv Name)
 
 takeUniqFromNameCache :: NameCache -> IO Unique
-takeUniqFromNameCache (NameCache c _) = uniqFromTag c
+takeUniqFromNameCache (NameCache c _) = uniqFromTagGrimly c
 
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ = lookup_infinite <|> lookup_normal
@@ -148,7 +149,7 @@ extendOrigNameCache nc mod occ name
 
 -- | Initialize a new name cache
 newNameCache :: IO NameCache
-newNameCache = newNameCacheWith 'r' knownKeysOrigNameCache
+newNameCache = newNameCacheWith HscTag knownKeysOrigNameCache
 
 -- | This is a version of `newNameCache` that lets you supply your
 -- own unique tag and set of known key names. This can go wrong if the tag
@@ -156,8 +157,9 @@ newNameCache = newNameCacheWith 'r' knownKeysOrigNameCache
 -- an example.
 --
 -- Use `newNameCache` when possible.
-newNameCacheWith :: Char -> OrigNameCache -> IO NameCache
-newNameCacheWith c nc = NameCache c <$> newMVar nc
+newNameCacheWith :: UniqueTag -> OrigNameCache -> IO NameCache
+newNameCacheWith ut nc = NameCache (uniqueTag ut) <$> newMVar nc
+{-# INLINE newNameCacheWith #-}
 
 -- | This takes a tag for uniques to be generated and the list of knownKeyNames
 -- These must be initialized properly to ensure that names generated from this
@@ -165,7 +167,7 @@ newNameCacheWith c nc = NameCache c <$> newMVar nc
 --
 -- Use `newNameCache` or `newNameCacheWith` instead
 {-# DEPRECATED initNameCache "Use newNameCache or newNameCacheWith instead" #-}
-initNameCache :: Char -> [Name] -> IO NameCache
+initNameCache :: UniqueTag -> [Name] -> IO NameCache
 initNameCache c names = newNameCacheWith c (initOrigNames names)
 
 initOrigNames :: [Name] -> OrigNameCache
