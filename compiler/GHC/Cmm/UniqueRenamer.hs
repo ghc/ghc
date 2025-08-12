@@ -84,8 +84,7 @@ renameDetUniq uq = do
   case lookupUFM m uq of
     Nothing -> do
       new_w <- gets supply -- New deterministic unique in this `DetRnM`
-      let --(_tag, _) = unpkUnique uq
-          det_uniq = mkUnique 'Q' new_w
+      let det_uniq = mkUnique UniqueRenamerTag new_w
       modify (\DetUniqFM{mapping, supply} ->
         -- Update supply and mapping
         DetUniqFM

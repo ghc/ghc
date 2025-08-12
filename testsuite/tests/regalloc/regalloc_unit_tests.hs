@@ -97,7 +97,7 @@ main = do
 -- | TODO: Make this an IORef along the lines of Data.Unique.newUnique to add
 -- stronger guarantees a UniqSupply won't be accidentally reused
 unitTestUniqSupply :: IO UniqSupply
-unitTestUniqSupply = mkSplitUniqSupply 't'
+unitTestUniqSupply = mkSplitUniqSupply StgTag
 
 
 newtype RegAllocTestException = RegAllocTestException String

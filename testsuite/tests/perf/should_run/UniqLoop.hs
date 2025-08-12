@@ -8,7 +8,7 @@ import Data.Word
 
 -- Generate a lot of uniques
 main = do
-    us <- mkSplitUniqSupply 'v'
+    us <- mkSplitUniqSupply TvNSTag
     seq (churn us 10000000) (return ())
 
 churn :: UniqSupply -> Word64 -> Word64
