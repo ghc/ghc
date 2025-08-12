@@ -84,11 +84,11 @@ import Data.Coerce (coerce)
 #if MIN_VERSION_rts(1,0,3)
 import qualified Data.ByteString.Char8 as BS
 #endif
-import Data.Map (Map)
 import Data.IntMap (IntMap)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
-import qualified GHC.Data.FiniteMap as Map
+import GHC.Types.Unique.Map (UniqMap)
+import qualified GHC.Types.Unique.Map as UniqMap
 import Data.Ord
 import Data.Either ( partitionEithers )
 
@@ -209,7 +209,7 @@ type StackDepth = ByteOff
 
 -- | Maps Ids to their stack depth. This allows us to avoid having to mess with
 -- it after each push/pop.
-type BCEnv = Map Id StackDepth -- To find vars on the stack
+type BCEnv = UniqMap Id StackDepth -- To find vars on the stack
 
 {-
 ppBCEnv :: BCEnv -> SDoc
@@ -379,7 +379,7 @@ schemeR_wrk fvs nm original_body (args, body)
          sum_szsb_args  = sum szsb_args
          -- Make a stack offset for each argument or free var -- they should
          -- appear contiguous in the stack, in order.
-         p_init    = Map.fromList (zip all_args (mkStackOffsets 0 szsb_args))
+         p_init    = UniqMap.listToUniqMap (zip all_args (mkStackOffsets 0 szsb_args))
 
          -- make the arg bitmap
          bits = argBits platform (reverse (map (idArgRep platform) all_args))
@@ -442,7 +442,7 @@ fvsToEnv :: BCEnv -> CgStgRhs -> [Id]
 -- it, have to agree about this layout
 
 fvsToEnv p rhs =  [v | v <- dVarSetElems $ freeVarsOfRhs rhs,
-                       v `Map.member` p]
+                       v `UniqMap.elemUniqMap` p]
 
 -- -----------------------------------------------------------------------------
 -- schemeE
@@ -533,7 +533,7 @@ schemeE d s p (StgLet _xlet
         alloc_code <- mkConAppCode d s p data_con args
         platform <- targetPlatform <$> getDynFlags
         let !d2 = d + wordSize platform
-        body_code <- schemeE d2 s (Map.insert x d2 p) body
+        body_code <- schemeE d2 s (UniqMap.addToUniqMap p x d2) body
         return (alloc_code `appOL` body_code)
 -- General case for let.  Generates correct, if inefficient, code in
 -- all situations.
@@ -557,7 +557,7 @@ schemeE d s p (StgLet _ext binds body) = do
          -- after the closures have been allocated in the heap (but not
          -- filled in), and pointers to them parked on the stack.
          offsets = mkStackOffsets d (genericReplicate n_binds (wordSize platform))
-         p' = Map.insertList (zipEqual xs offsets) p
+         p' = UniqMap.addListToUniqMap p $ zipEqual xs offsets
          d' = d + wordsToBytes platform n_binds
 
          -- ToDo: don't build thunks for things with no free variables
@@ -1180,7 +1180,7 @@ doCase d s p scrut bndr alts
 
         -- Env in which to compile the alts, not including
         -- any vars bound by the alts themselves
-        p_alts = Map.insert bndr d_bndr p
+        p_alts = UniqMap.addToUniqMap p bndr d_bndr
 
         bndr_ty = idType bndr
         isAlgCase = isAlgType bndr_ty
@@ -1208,12 +1208,11 @@ doCase d s p scrut bndr alts
 
                  stack_bot = d_alts
 
-                 p' = Map.insertList
+                 p' = UniqMap.addListToUniqMap p_alts
                         [ (arg, tuple_start -
                                 wordsToBytes platform (nativeCallSize call_info) +
                                 offset)
                         | (NonVoid arg, offset) <- args_offsets]
-                        p_alts
              in do
                rhs_code <- schemeE stack_bot s p' rhs
                return (NoDiscr, rhs_code)
@@ -1227,10 +1226,9 @@ doCase d s p scrut bndr alts
                  stack_bot = d_alts + wordsToBytes platform size
 
                  -- convert offsets from Sp into offsets into the virtual stack
-                 p' = Map.insertList
+                 p' = UniqMap.addListToUniqMap p_alts
                         [ (arg, stack_bot - ByteOff offset)
                         | (NonVoid arg, offset) <- args_offsets ]
-                        p_alts
 
              in do
              massert isAlgCase
@@ -1312,12 +1310,13 @@ doCase d s p scrut bndr alts
           -- NB: unboxed tuple cases bind the scrut binder to the same offset
           -- as one of the alt binders, so we have to remove any duplicates here:
           -- 'toAscList' takes care of sorting the result, which was previously done after the application of 'filter'.
-          rel_slots = IntSet.toAscList $ IntSet.fromList $ Map.elems $ Map.mapMaybeWithKey spread p
-          spread id offset | isUnboxedTupleType (idType id) ||
-                             isUnboxedSumType (idType id) = Nothing
-                           | isFollowableArg (idArgRep platform id) = Just (fromIntegral rel_offset)
-                           | otherwise                      = Nothing
-                where rel_offset = bytesToWords platform (d - offset)
+          rel_slots = IntSet.toAscList $ UniqMap.nonDetFoldUniqMap go IntSet.empty p
+          go (var, offset) !acc
+            | isUnboxedTupleType (idType var) || isUnboxedSumType (idType var)
+            = acc
+            | isFollowableArg (idArgRep platform var)
+            = fromIntegral (bytesToWords platform (d - offset)) `IntSet.insert` acc
+            | otherwise = acc
 
         bitmap = intsToReverseBitmap platform bitmap_size' pointers
 
@@ -2546,7 +2545,7 @@ instance Outputable Discr where
 
 
 lookupBCEnv_maybe :: Id -> BCEnv -> Maybe ByteOff
-lookupBCEnv_maybe = Map.lookup
+lookupBCEnv_maybe v env = UniqMap.lookupUniqMap env v
 
 idSizeW :: Platform -> Id -> WordOff
 idSizeW platform = WordOff . argRepSizeW platform . idArgRep platform
