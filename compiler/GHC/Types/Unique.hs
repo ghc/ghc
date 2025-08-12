@@ -23,6 +23,7 @@ Haskell).
 module GHC.Types.Unique (
         -- * Main data types
         Unique, Uniquable(..),
+        UniqueTag(..), uniqueTag,
         uNIQUE_BITS,
 
         -- ** Constructors, destructors and operations on 'Unique's
@@ -97,6 +98,106 @@ GHC.Builtin.Uniques. See Note [Uniques for wired-in prelude things and known tag
 -- These are sometimes also referred to as \"keys\" in comments in GHC.
 newtype Unique = MkUnique Word64
 
+data UniqueTag = PluginTag
+               | SkolemTag
+               | JsTag
+               | SimplTag
+               | StgTag
+               | CmmTag
+               | HscTag
+               | TsanTag
+               | TcTag
+               | IfaceTag
+               | RnIfaceTag
+               | DsTag
+               | StgPTag
+               | BcoTag
+               | LocalTag
+               | SumTag
+               | TupleTag
+               | CTupleTag
+               | CTupleDataTag
+               | CTupleSelTag
+               | BoxedTupleDataTag
+               | UnboxedTupleDataTag
+               | BoxedTupleTyConTag
+               | UnboxedTupleTyConTag
+               | AlphaTyVarTag
+               | PreludeClassTag
+               | PrimOpTag
+               | PreludeMiscIdTag
+               | BuiltinTag
+               | PseudoTag
+               | RegSingleTag
+               | RegSubTag
+               | RegPairTag
+               | RegClassTag
+               | CostCentreTag
+               | VarNSTag
+               | DataNSTag
+               | TvNSTag
+               | TcNSTag
+               | FldNSTag
+               | PreludeTyConTag
+               | PreludeDataConTag
+               | BoxingTyConTag
+               | VirtualRegTag
+               | LlvmCodeGenTag
+               | UniqueRenamerTag
+               | BlockIdTag
+
+uniqueTag :: UniqueTag -> Char
+uniqueTag PluginTag           = 'p'
+uniqueTag JsTag               = 'j'
+uniqueTag SkolemTag           = 's' -- TODO: conflicts with SimplTag
+uniqueTag SimplTag            = 's' -- TODO: conflicts with SkolemTag
+uniqueTag StgTag              = 't'
+uniqueTag CmmTag              = 'c' -- TODO: conflicts with RnIfaceTag and TcNSTag
+uniqueTag HscTag              = 'r'
+uniqueTag TsanTag             = 'u'
+uniqueTag TcTag               = 'a'
+uniqueTag IfaceTag            = 'i' -- TODO: conflicts with VarNSTag
+uniqueTag RnIfaceTag          = 'c' -- TODO: conflicts with CmmTag and TcNSTag
+uniqueTag DsTag               = 'd' -- TODO: conflicts with DataNSTag
+uniqueTag StgPTag             = 'g'
+uniqueTag BcoTag              = 'I'
+uniqueTag LocalTag            = 'X'
+uniqueTag SumTag              = 'z'
+uniqueTag TupleTag            = 'k' -- TODO: conflicts with CTupleTag  
+uniqueTag CTupleTag           = 'k' -- TODO: conflicts with TupleTag
+uniqueTag CTupleDataTag       = 'm'
+uniqueTag CTupleSelTag        = 'j'
+uniqueTag BoxedTupleDataTag   = '7'
+uniqueTag UnboxedTupleDataTag = '8'
+uniqueTag BoxedTupleTyConTag  = '4'
+uniqueTag UnboxedTupleTyConTag = '5'
+uniqueTag AlphaTyVarTag       = '1'
+uniqueTag PreludeClassTag     = '2'
+uniqueTag PrimOpTag           = '9'
+uniqueTag PreludeMiscIdTag    = '0'
+uniqueTag BuiltinTag          = 'B'
+uniqueTag PseudoTag           = 'E'
+uniqueTag RegSingleTag        = 'R'
+uniqueTag RegSubTag           = 'S'
+uniqueTag RegPairTag          = 'P'
+uniqueTag RegClassTag         = 'L'
+uniqueTag CostCentreTag       = 'C'
+uniqueTag VarNSTag            = 'i' -- TODO: conflicts with IfaceTag
+uniqueTag DataNSTag           = 'd' -- TODO: conflicts with DsTag
+uniqueTag TvNSTag             = 'v'
+uniqueTag TcNSTag             = 'c' -- TODO: conflicts with CmmTag and RnIfaceTag
+uniqueTag FldNSTag            = 'f'
+uniqueTag PreludeTyConTag     = '3'
+uniqueTag PreludeDataConTag   = '6'
+uniqueTag BoxingTyConTag      = 'b'
+uniqueTag VirtualRegTag       = 'H'
+uniqueTag LlvmCodeGenTag      = 'n'
+uniqueTag UniqueRenamerTag    = 'Q'
+uniqueTag BlockIdTag          = 'L'
+
+{-# INLINE uniqueTag #-}
+
+
 {-# INLINE uNIQUE_BITS #-}
 uNIQUE_BITS :: Int
 uNIQUE_BITS = 64 - UNIQUE_TAG_BITS
@@ -113,7 +214,7 @@ getKey          :: Unique -> Word64                -- for Var
 
 incrUnique   :: Unique -> Unique
 stepUnique   :: Unique -> Word64 -> Unique
-newTagUnique :: Unique -> Char -> Unique
+newTagUnique :: Unique -> UniqueTag -> Unique
 
 mkUniqueGrimily = MkUnique
 
@@ -124,7 +225,7 @@ incrUnique (MkUnique i) = MkUnique (i + 1)
 stepUnique (MkUnique i) n = MkUnique (i + n)
 
 mkLocalUnique :: Word64 -> Unique
-mkLocalUnique i = mkUnique 'X' i
+mkLocalUnique i = mkUnique LocalTag i
 
 minLocalUnique :: Unique
 minLocalUnique = mkLocalUnique 0
@@ -152,15 +253,15 @@ mkTag c = intToWord64 (ord c) `shiftL` uNIQUE_BITS
 
 -- and as long as the Char fits in 8 bits, which we assume anyway!
 
-mkUnique :: Char -> Word64 -> Unique       -- Builds a unique from pieces
+mkUnique :: UniqueTag -> Word64 -> Unique       -- Builds a unique from pieces
 -- EXPORTED and used only in GHC.Builtin.Uniques
 mkUnique c i
   = MkUnique (tag .|. bits)
   where
-    tag  = mkTag c
+    tag  = mkTag $ uniqueTag c
     bits = i .&. uniqueMask
 
-mkUniqueInt :: Char -> Int -> Unique
+mkUniqueInt :: UniqueTag -> Int -> Unique
 mkUniqueInt c i = mkUnique c (intToWord64 i)
 
 mkUniqueIntGrimily :: Int -> Unique
