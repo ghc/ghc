@@ -59,12 +59,12 @@ test('T12870h',
 
 test('T20006a',
     [extra_files(['T20006.hs']), extra_run_opts('+RTS --eventlog-flush-interval=1'),
-        only_ways(['threaded1', 'threaded2'])],
+        only_ways(threaded_ways)],
     multimod_compile_and_run,
     ['T20006', ''])
 
 test('T20006b',
     [extra_files(['T20006.hs']), extra_run_opts('+RTS --eventlog-flush-interval=1'),
-        expect_fail_for(['normal'])],
+        expect_fail_for([way for way in all_ways if way not in threaded_ways])],
     multimod_compile_and_run,
     ['T20006', ''])
