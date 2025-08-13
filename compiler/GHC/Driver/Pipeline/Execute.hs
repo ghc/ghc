@@ -603,7 +603,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               mlinkable <-
                 if gopt Opt_ByteCodeAndObjectCode dflags
                   then do
-                    bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
+                    bc <- generateAndWriteByteCodeLinkable hsc_env (mkCgInteractiveGuts cgguts) mod_location
                     return $ emptyHomeModInfoLinkable { homeMod_bytecode = Just bc }
 
                   else return emptyHomeModInfoLinkable
@@ -620,7 +620,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
             do
               final_iface <- mkFullIface hsc_env partial_iface Nothing Nothing NoStubs []
               hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
-              bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
+              bc <- generateAndWriteByteCodeLinkable hsc_env (mkCgInteractiveGuts cgguts) mod_location
               return ([], final_iface, emptyHomeModInfoLinkable { homeMod_bytecode = Just bc } , panic "interpreter")
 
 
@@ -732,6 +732,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   hie_date <- modificationTimeIfExists hie_file
   o_mod <- modificationTimeIfExists o_file
   dyn_o_mod <- modificationTimeIfExists dyn_o_file
+  bytecode_date <- modificationTimeIfExists (ml_bytecode_file location)
 
   -- Tell the finder cache about this module
   mod <- do
@@ -753,6 +754,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
                                 ms_parsed_mod   = Nothing,
                                 ms_iface_date   = hi_date,
                                 ms_hie_date     = hie_date,
+                                ms_bytecode_date = bytecode_date,
                                 ms_textual_imps = imps,
                                 ms_srcimps      = src_imps }
 

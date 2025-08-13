@@ -56,7 +56,8 @@ module GHC.Driver.Main
     , mkCgInteractiveGuts
     , CgInteractiveGuts
     , generateByteCode
-    , generateFreshByteCode
+    , generateAndWriteByteCodeLinkable
+    , generateFreshByteCodeLinkable
 
     -- * Running passes separately
     , hscRecompStatus
@@ -849,14 +850,15 @@ hscRecompStatus
         return $ HscRecompNeeded $ fmap mi_iface_hash mb_checked_iface
       UpToDateItem checked_iface -> do
         let lcl_dflags = ms_hspp_opts mod_summary
+        mod_details <- initModDetails hsc_env checked_iface
         if | not (backendGeneratesCode (backend lcl_dflags)) -> do
                -- No need for a linkable, we're good to go
                msg UpToDate
-               return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
+               return $ HscUpToDate (HomeModInfo checked_iface mod_details emptyHomeModInfoLinkable)
            | not (backendGeneratesCodeForHsBoot (backend lcl_dflags))
            , IsBoot <- isBootSummary mod_summary -> do
                msg UpToDate
-               return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
+               return $ HscUpToDate (HomeModInfo checked_iface mod_details emptyHomeModInfoLinkable)
 
            -- Always recompile with the JS backend when TH is enabled until
            -- #23013 is fixed.
@@ -870,7 +872,7 @@ hscRecompStatus
                -- Do need linkable
                -- 1. Just check whether we have bytecode/object linkables and then
                -- we will decide if we need them or not.
-               bc_linkable <- checkByteCode checked_iface mod_summary (homeMod_bytecode old_linkable)
+               bc_linkable <- checkByteCode hsc_env checked_iface mod_details mod_summary (homeMod_bytecode old_linkable)
                obj_linkable <- liftIO $ checkObjects lcl_dflags (homeMod_object old_linkable) mod_summary
                trace_if (hsc_logger hsc_env) (vcat [text "BCO linkable", nest 2 (ppr bc_linkable), text "Object Linkable", ppr obj_linkable])
 
@@ -917,7 +919,7 @@ hscRecompStatus
                case recomp_linkable_result of
                  UpToDateItem linkable -> do
                    msg $ UpToDate
-                   return $ HscUpToDate checked_iface $ linkable
+                   return $ HscUpToDate (HomeModInfo checked_iface mod_details linkable)
                  OutOfDateItem reason _ -> do
                    msg $ NeedsRecompile reason
                    return $ HscRecompNeeded $ Just $ mi_iface_hash $ checked_iface
@@ -957,23 +959,59 @@ checkObjects dflags mb_old_linkable summary = do
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
 -- no need to check that again here
-checkByteCode :: ModIface -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
-checkByteCode iface mod_sum mb_old_linkable =
+checkByteCode :: HscEnv -> ModIface -> ModDetails -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
+checkByteCode hsc_env iface mod_details mod_sum mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
       | not (linkableIsNativeCodeOnly old_linkable)
       -> return $ (UpToDateItem old_linkable)
-    _ -> loadByteCode iface mod_sum
+    _ -> do
+      load_result <- loadByteCodeFromCoreBindings hsc_env iface mod_details mod_sum
+      case load_result of
+        Just linkable -> return $ UpToDateItem linkable
+        Nothing -> loadByteCode hsc_env iface mod_details mod_sum
 
-loadByteCode :: ModIface -> ModSummary -> IO (MaybeValidated Linkable)
-loadByteCode iface mod_sum = do
+-- | First attempt to use the bytecode object linkable if it exists.
+-- If that doesn't exist, then try to load bytecode from whole core bindings.
+loadByteCode :: HscEnv -> ModIface -> ModDetails -> ModSummary -> IO (MaybeValidated Linkable)
+loadByteCode hsc_env iface mod_details mod_sum = do
+  obj_result <- loadByteCodeFromObject hsc_env mod_sum
+  case obj_result of
+    Just linkable -> return $ UpToDateItem linkable
+    Nothing -> do
+      core_result <- loadByteCodeFromCoreBindings hsc_env iface mod_details mod_sum
+      case core_result of
+        Just linkable -> return $ UpToDateItem linkable
+        Nothing -> return $ outOfDateItemBecause MissingBytecode Nothing
+
+-- | Load bytecode from a ".gbc" object file if it exists and is up-to-date
+loadByteCodeFromObject :: HscEnv -> ModSummary -> IO (Maybe Linkable)
+loadByteCodeFromObject hsc_env mod_sum = do
+  let
+    obj_fn = ml_bytecode_file (ms_location mod_sum)
+    obj_date = ms_bytecode_date mod_sum
+    if_date = ms_iface_date mod_sum
+  case (,) <$> obj_date <*> if_date of
+    Just (obj_date, if_date)
+      | obj_date >= if_date -> do
+        bco <- readBinByteCode hsc_env obj_fn
+        Just <$> loadByteCodeObjectLinkable hsc_env obj_date (ms_location mod_sum) bco
+    _ -> return Nothing
+
+-- | Attempt to load bytecode from whole core bindings in the interface if they exist.
+-- This is a legacy code-path, these days it should be preferred to use the bytecode object linkable.
+loadByteCodeFromCoreBindings :: HscEnv -> ModIface -> ModDetails -> ModSummary -> IO (Maybe Linkable)
+loadByteCodeFromCoreBindings hsc_env iface mod_details mod_sum = do
     let
       this_mod   = ms_mod mod_sum
       if_date    = fromJust $ ms_iface_date mod_sum
     case iface_core_bindings iface (ms_location mod_sum) of
       Just fi -> do
-          return (UpToDateItem (Linkable if_date this_mod (NE.singleton (CoreBindings fi))))
-      _ -> return $ outOfDateItemBecause MissingBytecode Nothing
+        ~(bco, fos) <- unsafeInterleaveIO $
+                       compileWholeCoreBindings hsc_env (md_types mod_details) fi
+        let bco' = LazyBCOs bco fos
+        return (Just (Linkable if_date this_mod (NE.singleton bco')))
+      _ -> return Nothing
 
 --------------------------------------------------------------
 -- Compilers
@@ -2120,15 +2158,27 @@ hscInteractive :: HscEnv
                -> ModLocation
                -> IO (Maybe FilePath, CompiledByteCode) -- ^ .c stub path (if any) and ByteCode
 hscInteractive hsc_env cgguts location = do
+    comp_bc <- hscGenerateByteCode hsc_env cgguts location
+
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
     let tmpfs  = hsc_tmpfs hsc_env
+    ------------------ Create f-x-dynamic C-side stuff -----
+    (_istub_h_exists, istub_c_exists)
+        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) (cgi_module cgguts) location (cgi_foreign cgguts)
+    return (istub_c_exists, comp_bc)
+
+
+-- | Generate byte code (only) for a given module.
+hscGenerateByteCode :: HscEnv -> CgInteractiveGuts -> ModLocation ->IO CompiledByteCode
+hscGenerateByteCode hsc_env cgguts location = do
+    let dflags = hsc_dflags hsc_env
+    let logger = hsc_logger hsc_env
     let CgInteractiveGuts{ -- This is the last use of the ModGuts in a compilation.
                 -- From now on, we just use the bits we need.
                cgi_module   = this_mod,
                cgi_binds    = core_binds,
                cgi_tycons   = tycons,
-               cgi_foreign  = foreign_stubs,
                cgi_modBreaks = mod_breaks,
                cgi_spt_entries = spt_entries } = cgguts
 
@@ -2156,40 +2206,73 @@ hscInteractive hsc_env cgguts location = do
     let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
     -----------------  Generate byte code ------------------
-    comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks spt_entries
+    byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks spt_entries
 
-    ------------------ Create f-x-dynamic C-side stuff -----
-    (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location foreign_stubs
-    return (istub_c_exists, comp_bc)
 
--- | Compile Core bindings and foreign inputs that were loaded from an
--- interface, to produce bytecode and potential foreign objects for the purpose
--- of linking splices.
+
 generateByteCode :: HscEnv
   -> CgInteractiveGuts
   -> ModLocation
   -> IO (CompiledByteCode, [FilePath])
 generateByteCode hsc_env cgguts mod_location = do
-  (hasStub, comp_bc') <- hscInteractive hsc_env cgguts mod_location
-  comp_bc <- testBinByteCode hsc_env comp_bc'
-  compile_for_interpreter hsc_env $ \ i_env -> do
-    stub_o <- traverse (compileForeign i_env LangC) hasStub
-    foreign_files_o <- traverse (uncurry (compileForeign i_env)) (cgi_foreign_files cgguts)
-    pure (comp_bc, maybeToList stub_o ++ foreign_files_o)
+  comp_bc' <- hscGenerateByteCode hsc_env cgguts mod_location
+  fos      <- outputAndCompileForeign hsc_env (cgi_module cgguts) mod_location (cgi_foreign_files cgguts) (cgi_foreign cgguts)
+  pure (comp_bc', fos)
 
-generateFreshByteCode :: HscEnv
+-- | Generate a byte code object linkable and write it to a file if `-fwrite-bytecode` is enabled.
+generateAndWriteByteCode :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO ByteCodeObject
+generateAndWriteByteCode hsc_env cgguts mod_location = do
+  comp_bc <- mkByteCodeObject hsc_env (cgi_module cgguts) mod_location cgguts
+  let dflags   = hsc_dflags hsc_env
+  when (gopt Opt_WriteByteCode dflags) $ do
+    let bc_path = ml_bytecode_file mod_location
+    writeBinByteCode hsc_env bc_path comp_bc
+  return comp_bc
+
+generateAndWriteByteCodeLinkable :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO Linkable
+generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
+  bco_time <- getCurrentTime
+  bco_object <- generateAndWriteByteCode hsc_env cgguts mod_location
+  loadByteCodeObjectLinkable hsc_env bco_time mod_location bco_object
+
+-- | Write foreign sources and foreign stubs to temporary files and compile them.
+outputAndCompileForeign :: HscEnv -> Module -> ModLocation -> [(ForeignSrcLang, FilePath)] ->  ForeignStubs -> IO [FilePath]
+outputAndCompileForeign hsc_env mod_name location foreign_files foreign_stubs = do
+  let dflags   = hsc_dflags hsc_env
+      logger   = hsc_logger hsc_env
+      tmpfs    = hsc_tmpfs hsc_env
+  (_, has_stub) <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) mod_name location foreign_stubs
+  compile_for_interpreter hsc_env $ \ i_env -> do
+    stub_o <- traverse (compileForeign i_env LangC) has_stub
+    foreign_files_o <- traverse (uncurry (compileForeign i_env)) foreign_files
+    pure (maybeToList stub_o ++ foreign_files_o)
+
+-- | Write the foreign sources and foreign stubs of a bytecode object to temporary files and compile them.
+loadByteCodeObject :: HscEnv -> ModLocation -> ByteCodeObject
+                             -> IO (CompiledByteCode, [FilePath])
+loadByteCodeObject hsc_env location (ByteCodeObject mod cbc foreign_srcs foreign_stubs) = do
+  fos <- outputAndCompileForeign hsc_env mod location foreign_srcs foreign_stubs
+  return (cbc, fos)
+
+loadByteCodeObjectLinkable :: HscEnv -> UTCTime -> ModLocation -> ByteCodeObject -> IO Linkable
+loadByteCodeObjectLinkable hsc_env linkable_time location bco = do
+  (cbc, fos) <- loadByteCodeObject hsc_env location bco
+  return $! Linkable linkable_time (bco_module bco) (BCOs cbc :| [DotO fo ForeignObject | fo <- fos])
+
+mkByteCodeObject :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ByteCodeObject
+mkByteCodeObject hsc_env mod mod_location cgguts = do
+  bcos <- hscGenerateByteCode hsc_env cgguts mod_location
+  return $! ByteCodeObject mod bcos (cgi_foreign_files cgguts) (cgi_foreign cgguts)
+
+generateFreshByteCodeLinkable :: HscEnv
   -> ModuleName
   -> CgInteractiveGuts
   -> ModLocation
   -> IO Linkable
-generateFreshByteCode hsc_env mod_name cgguts mod_location = do
+generateFreshByteCodeLinkable hsc_env mod_name cgguts mod_location = do
   bco_time <- getCurrentTime
-  (bcos, fos) <- generateByteCode hsc_env cgguts mod_location
-  return $!
-    Linkable bco_time
-    (mkHomeModule (hsc_home_unit hsc_env) mod_name)
-    (BCOs bcos :| [DotO fo ForeignObject | fo <- fos])
+  bco_object <- mkByteCodeObject hsc_env (mkHomeModule (hsc_home_unit hsc_env) mod_name) mod_location cgguts
+  loadByteCodeObjectLinkable hsc_env bco_time mod_location bco_object
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)
@@ -2260,7 +2343,9 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
           ml_obj_file_ospath = panic "hscCompileCmmFile: no obj file",
           ml_dyn_obj_file_ospath = panic "hscCompileCmmFile: no dyn obj file",
           ml_dyn_hi_file_ospath  = panic "hscCompileCmmFile: no dyn obj file",
-          ml_hie_file_ospath = panic "hscCompileCmmFile: no hie file"}
+          ml_hie_file_ospath = panic "hscCompileCmmFile: no hie file",
+          ml_bytecode_file_ospath = panic "hscCompileCmmFile: no bytecode file"
+          }
 
 -------------------- Stuff for new code gen ---------------------
 
@@ -2492,7 +2577,9 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
               ml_obj_file_ospath  = panic "hsDeclsWithLocation:ml_obj_file_ospath",
               ml_dyn_obj_file_ospath = panic "hsDeclsWithLocation:ml_dyn_obj_file_ospath",
               ml_dyn_hi_file_ospath = panic "hsDeclsWithLocation:ml_dyn_hi_file_ospath",
-              ml_hie_file_ospath  = panic "hsDeclsWithLocation:ml_hie_file_ospath" }
+              ml_hie_file_ospath  = panic "hsDeclsWithLocation:ml_hie_file_ospath",
+              ml_bytecode_file_ospath = panic "hsDeclsWithLocation:ml_bytecode_file_ospath"
+              }
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
 
     {- Simplify -}
@@ -2512,7 +2599,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
             -- Get the *tidied* cls_insts and fam_insts
 
     {- Generate byte code & foreign stubs -}
-    linkable <- liftIO $ generateFreshByteCode hsc_env
+    linkable <- liftIO $ generateFreshByteCodeLinkable hsc_env
       (moduleName this_mod)
       (mkCgInteractiveGuts tidy_cg)
       iNTERACTIVELoc
@@ -2754,7 +2841,9 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
             ml_obj_file_ospath  = panic "hscCompileCoreExpr':ml_obj_file_ospath",
             ml_dyn_obj_file_ospath = panic "hscCompileCoreExpr': ml_obj_file_ospath",
             ml_dyn_hi_file_ospath  = panic "hscCompileCoreExpr': ml_dyn_hi_file_ospath",
-            ml_hie_file_ospath  = panic "hscCompileCoreExpr':ml_hie_file_ospath" }
+            ml_hie_file_ospath  = panic "hscCompileCoreExpr':ml_hie_file_ospath",
+            ml_bytecode_file_ospath = panic "hscCompileCoreExpr':ml_bytecode_file_ospath"
+            }
 
   -- Ensure module uniqueness by giving it a name like "GhciNNNN".
   -- This uniqueness is needed by the JS linker. Without it we break the 1-1

@@ -619,7 +619,7 @@ getVerbFlags dflags
   | otherwise             = []
 
 setObjectDir, setHiDir, setHieDir, setStubDir, setDumpDir, setOutputDir,
-         setDynObjectSuf, setDynHiSuf,
+         setDynObjectSuf, setDynHiSuf, setBytecodeDir, setBytecodeSuf,
          setDylibInstallName,
          setObjectSuf, setHiSuf, setHieSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, setPgmJSP, setPgmCmmP, addOptl, addOptc, addOptcxx, addOptP,
@@ -633,6 +633,7 @@ setOutputFile, setDynOutputFile, setOutputHi, setDynOutputHi, setDumpPrefixForce
 setObjectDir  f d = d { objectDir  = Just f}
 setHiDir      f d = d { hiDir      = Just f}
 setHieDir     f d = d { hieDir     = Just f}
+setBytecodeDir f d = d { bytecodeDir = Just f}
 setStubDir    f d = d { stubDir    = Just f
                       , includePaths = addGlobalInclude (includePaths d) [f] }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
@@ -652,6 +653,7 @@ setHiSuf        f d = d { hiSuf_        = f}
 setHieSuf       f d = d { hieSuf        = f}
 setDynHiSuf     f d = d { dynHiSuf_     = f}
 setHcSuf        f d = d { hcSuf         = f}
+setBytecodeSuf  f d = d { bytecodeSuf   = f}
 
 setOutputFile    f d = d { outputFile_    = f}
 setDynOutputFile f d = d { dynOutputFile_ = f}
@@ -1256,9 +1258,11 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "hcsuf"             (hasArg setHcSuf)
   , make_ord_flag defGhcFlag "hisuf"             (hasArg setHiSuf)
   , make_ord_flag defGhcFlag "hiesuf"            (hasArg setHieSuf)
+  , make_ord_flag defGhcFlag "gbcsuf"            (hasArg setBytecodeSuf)
   , make_ord_flag defGhcFlag "dynhisuf"          (hasArg setDynHiSuf)
   , make_ord_flag defGhcFlag "hidir"             (hasArg setHiDir)
   , make_ord_flag defGhcFlag "hiedir"            (hasArg setHieDir)
+  , make_ord_flag defGhcFlag "gbcdir"            (hasArg setBytecodeDir)
   , make_ord_flag defGhcFlag "tmpdir"            (hasArg setTmpDir)
   , make_ord_flag defGhcFlag "stubdir"           (hasArg setStubDir)
   , make_ord_flag defGhcFlag "dumpdir"           (hasArg setDumpDir)
@@ -2597,6 +2601,7 @@ fFlagsDeps = [
   flagSpec "keep-cafs"                        Opt_KeepCAFs,
   flagSpec "link-rts"                         Opt_LinkRts,
   flagSpec "byte-code-and-object-code"        Opt_ByteCodeAndObjectCode,
+  flagSpec "write-byte-code"                  Opt_WriteByteCode,
   flagSpec "prefer-byte-code"                 Opt_UseBytecodeRatherThanObjects,
   flagSpec "object-determinism"               Opt_ObjectDeterminism,
   flagSpec' "compact-unwind"                  Opt_CompactUnwind
