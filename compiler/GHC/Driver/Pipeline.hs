@@ -279,8 +279,8 @@ compileOne' mHscMessage
          -- was set), force it to generate byte-code. This is NOT transitive and
          -- only applies to direct targets.
          | loadAsByteCode
-         = ( interpreterBackend
-           , gopt_set (lcl_dflags { backend = interpreterBackend }) Opt_ForceRecomp
+         = ( bytecodeBackend
+           , gopt_set (lcl_dflags { backend = bytecodeBackend }) Opt_ForceRecomp
            )
 
          | otherwise

@@ -1926,7 +1926,7 @@ dynamic_flags_deps = [
                   d { ghcLink=NoLink }) >> setBackend noBackend))
   , make_ord_flag defFlag "fbyte-code"
       (noArgM $ \dflags -> do
-        setBackend interpreterBackend
+        setBackend bytecodeBackend
         pure $ flip gopt_unset Opt_ByteCodeAndObjectCode (gopt_set dflags Opt_ByteCode))
   , make_ord_flag defFlag "fobject-code"     $ noArgM $ \dflags -> do
       setBackend $ platformDefaultBackend (targetPlatform dflags)
