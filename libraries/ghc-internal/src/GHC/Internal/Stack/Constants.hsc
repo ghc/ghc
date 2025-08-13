@@ -90,6 +90,14 @@ offsetStgRetFunFramePayload = byteOffsetToWordOffset (#const OFFSET_StgRetFun_pa
 sizeStgRetFunFrame :: Int
 sizeStgRetFunFrame = bytesToWords (#const SIZEOF_StgRetFun)
 
+sizeStgAnnFrame :: Int
+sizeStgAnnFrame = bytesToWords $
+  (#const SIZEOF_StgAnnFrame_NoHdr) + (#size StgHeader)
+
+offsetStgAnnFrameAnn :: WordOffset
+offsetStgAnnFrameAnn = byteOffsetToWordOffset $
+  (#const OFFSET_StgAnnFrame_ann) + (#size StgHeader)
+
 offsetStgBCOFrameInstrs :: ByteOffset
 offsetStgBCOFrameInstrs = (#const OFFSET_StgBCO_instrs) + (#size StgHeader)
 

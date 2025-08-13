@@ -1427,6 +1427,7 @@ module GHC.Prim where
   andWord16# :: Word16# -> Word16# -> Word16#
   andWord32# :: Word32# -> Word32# -> Word32#
   andWord8# :: Word8# -> Word8# -> Word8#
+  annotateStack# :: forall {q :: GHC.Internal.Types.RuntimeRep} b d (a :: TYPE q). b -> (State# d -> (# State# d, a #)) -> State# d -> (# State# d, a #)
   anyToAddr# :: forall a. a -> State# RealWorld -> (# State# RealWorld, Addr# #)
   asinDouble# :: Double# -> Double#
   asinFloat# :: Float# -> Float#
@@ -2961,6 +2962,7 @@ module GHC.PrimopWrappers where
   andWord16# :: GHC.Internal.Prim.Word16# -> GHC.Internal.Prim.Word16# -> GHC.Internal.Prim.Word16#
   andWord32# :: GHC.Internal.Prim.Word32# -> GHC.Internal.Prim.Word32# -> GHC.Internal.Prim.Word32#
   andWord8# :: GHC.Internal.Prim.Word8# -> GHC.Internal.Prim.Word8# -> GHC.Internal.Prim.Word8#
+  annotateStack# :: forall b s a_reppoly. b -> (GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, a_reppoly #)) -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, a_reppoly #)
   anyToAddr# :: forall a. a -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, GHC.Internal.Prim.Addr# #)
   asinDouble# :: GHC.Internal.Prim.Double# -> GHC.Internal.Prim.Double#
   asinFloat# :: GHC.Internal.Prim.Float# -> GHC.Internal.Prim.Float#

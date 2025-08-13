@@ -574,6 +574,10 @@ data GenStackFrame b =
       , bco                 :: !b -- ^ always a BCOClosure
       , bcoArgs             :: ![GenStackField b]
       }
+  | AnnFrame
+      { info_tbl            :: !StgInfoTable
+      , annotation          :: !b
+      }
   deriving (Foldable, Functor, Generic, Show, Traversable)
 
 data PrimType

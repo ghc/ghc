@@ -21,6 +21,8 @@ module GHC.Exts.Stack.Constants (
   offsetStgRetFunFrameSize,
   offsetStgRetFunFramePayload,
   sizeStgRetFunFrame,
+  sizeStgAnnFrame,
+  offsetStgAnnFrameAnn,
   offsetStgBCOFrameInstrs,
   offsetStgBCOFrameLiterals,
   offsetStgBCOFramePtrs,

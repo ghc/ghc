@@ -88,8 +88,9 @@ const StgWord16 closure_flags[] = {
  [SMALL_MUT_ARR_PTRS_FROZEN_CLEAN] =  (_HNF|     _NS|          _UPT     ),
  [COMPACT_NFDATA]       =  (_HNF|     _NS                               ),
  [CONTINUATION]         =  (_HNF|     _NS|         _UPT                 ),
+ [ANN_FRAME]            =  (     _BTM|                             _FRM ),
 };
 
-#if N_CLOSURE_TYPES != 65
+#if N_CLOSURE_TYPES != 66
 #error Closure types changed: update ClosureFlags.c!
 #endif

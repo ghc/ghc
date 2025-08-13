@@ -440,6 +440,14 @@ unpackStackFrameTo (StackSnapshot stackSnapshot#, index) unpackUnderflowFrame fi
                   catchFrameCode = catchFrameCode',
                   handler = handler'
                 }
+        ANN_FRAME ->
+          let annotation = getClosureBox stackSnapshot# (index + offsetStgAnnFrameAnn)
+           in
+             mkStackFrameResult  $
+               AnnFrame
+                { info_tbl = info,
+                  annotation = annotation
+                }
         x -> error $ "Unexpected closure type on stack: " ++ show x
 
 -- | Unbox 'Int#' from 'Int'
