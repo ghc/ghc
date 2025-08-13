@@ -58,6 +58,7 @@ import Data.Typeable
 import GHC.Exts
 import GHC.IO
 import GHC.Internal.Stack
+import GHC.Internal.Stack.Annotation
 
 -- Note [User-defined stack annotations for better stack traces]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -128,29 +129,8 @@ import GHC.Internal.Stack
 -- in both pure and impure code, prefer 'throw' and 'throwIO' variants over 'error'.
 
 -- ----------------------------------------------------------------------------
--- StackAnnotation
--- ----------------------------------------------------------------------------
-
--- | 'StackAnnotation's are types which can be pushed onto the call stack
--- as the payload of 'AnnFrame' stack frames.
---
-class StackAnnotation a where
-  displayStackAnnotation :: a -> String
-
--- ----------------------------------------------------------------------------
 -- Annotations
 -- ----------------------------------------------------------------------------
-
--- |
--- The @SomeStackAnnotation@ type is the root of the stack annotation type hierarchy.
--- When the call stack is annotated with a value of type @a@, behind the scenes it is
--- encapsulated in a @SomeStackAnnotation@.
---
-data SomeStackAnnotation where
-  SomeStackAnnotation :: forall a. (Typeable a, StackAnnotation a) => a -> SomeStackAnnotation
-
-instance StackAnnotation SomeStackAnnotation where
-  displayStackAnnotation (SomeStackAnnotation a) = displayStackAnnotation a
 
 data StringAnnotation where
   StringAnnotation :: String -> StringAnnotation
@@ -175,7 +155,7 @@ instance Show CallStackAnnotation where
 instance StackAnnotation CallStackAnnotation where
   displayStackAnnotation (CallStackAnnotation cs) = case getCallStack cs of
     [] -> "<unknown source location>"
-    ((_,srcLoc):_) -> prettySrcLoc srcLoc
+    ((fnName,srcLoc):_) -> fnName ++ ", called at " ++ prettySrcLoc srcLoc
 
 -- ----------------------------------------------------------------------------
 -- Annotate the CallStack with custom data

@@ -10949,10 +10949,6 @@ module System.Mem.Experimental where
 
 
 -- Instances:
-instance GHC.Stack.Annotation.Experimental.StackAnnotation GHC.Stack.Annotation.Experimental.CallStackAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
-instance GHC.Stack.Annotation.Experimental.StackAnnotation GHC.Stack.Annotation.Experimental.ShowAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
-instance GHC.Stack.Annotation.Experimental.StackAnnotation GHC.Stack.Annotation.Experimental.SomeStackAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
-instance GHC.Stack.Annotation.Experimental.StackAnnotation GHC.Stack.Annotation.Experimental.StringAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
 instance GHC.Internal.Base.Alternative GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Alternative [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Alternative GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
@@ -11151,3 +11147,7 @@ instance GHC.Internal.Show.Show GHC.Internal.IO.SubSystem.IoSubSystem -- Defined
 instance GHC.Internal.Show.Show GHC.Stack.Annotation.Experimental.CallStackAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
 instance GHC.Internal.Show.Show GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
 instance GHC.Internal.Show.Show GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
+instance GHC.Internal.Stack.Annotation.StackAnnotation GHC.Stack.Annotation.Experimental.CallStackAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
+instance GHC.Internal.Stack.Annotation.StackAnnotation GHC.Stack.Annotation.Experimental.ShowAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
+instance GHC.Internal.Stack.Annotation.StackAnnotation GHC.Stack.Annotation.Experimental.StringAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
+instance GHC.Internal.Stack.Annotation.StackAnnotation GHC.Internal.Stack.Annotation.SomeStackAnnotation -- Defined in ‘GHC.Internal.Stack.Annotation’
