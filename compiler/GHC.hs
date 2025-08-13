@@ -30,7 +30,7 @@ module GHC (
 
         -- * Flags and settings
         DynFlags(..), GeneralFlag(..), Severity(..), Backend, gopt,
-        ncgBackend, llvmBackend, viaCBackend, interpreterBackend, noBackend,
+        ncgBackend, llvmBackend, viaCBackend, bytecodeBackend, noBackend,
         GhcMode(..), GhcLink(..),
         parseDynamicFlags, parseTargetFiles,
         getSessionDynFlags,
