@@ -1,6 +1,7 @@
 -- Vendored from filepath v1.4.2.2
 
 {-# LANGUAGE PatternGuards #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -- This template expects CPP definitions for:
 --     MODULE_NAME = Posix | Windows
@@ -104,7 +105,7 @@ module System.FilePath.Posix
 
 import Data.Char(toLower, toUpper, isAsciiLower, isAsciiUpper)
 import Data.Maybe(isJust)
-import Data.List(stripPrefix, isSuffixOf, uncons, unsnoc)
+import Data.List(stripPrefix, isSuffixOf)
 
 import System.Environment(getEnv)
 
@@ -203,20 +204,14 @@ isExtSeparator = (== extSeparator)
 splitSearchPath :: String -> [FilePath]
 splitSearchPath = f
     where
-    f xs = let (pre, post) = break isSearchPathSeparator xs
-           in case uncons post of
-             Nothing     -> g pre
-             Just (_, t) -> g pre ++ f t
+    f xs = case break isSearchPathSeparator xs of
+           (pre, []    ) -> g pre
+           (pre, _:post) -> g pre ++ f post
 
-    g x = case uncons x of
-      Nothing -> ["." | isPosix]
-      Just (h, t)
-        | h == '"'
-        , Just{} <- uncons t -- >= 2
-        , isWindows
-        , Just (i, l) <- unsnoc t
-        , l == '"' -> [i]
-        | otherwise -> [x]
+    g "" = ["." | isPosix]
+    g ('\"':x@(_:_)) | isWindows && last x == '\"' = [init x]
+    g x = [x]
+
 
 -- | Get a list of 'FilePath's in the $PATH variable.
 getSearchPath :: IO [FilePath]
@@ -239,17 +234,12 @@ getSearchPath = fmap splitSearchPath (getEnv "PATH")
 -- > splitExtension "file/path.txt.bob.fred" == ("file/path.txt.bob",".fred")
 -- > splitExtension "file/path.txt/" == ("file/path.txt/","")
 splitExtension :: FilePath -> (String, String)
-splitExtension x = case unsnoc nameDot of
-  -- Imagine x = "no-dots", then nameDot = ""
-  Nothing -> (x, mempty)
-  Just (initNameDot, _)
-    -- Imagine x = "\\shared.with.dots\no-dots"
-    | isWindows && null (dropDrive nameDot) -> (x, mempty)
-    -- Imagine x = "dir.with.dots/no-dots"
-    | any isPathSeparator ext -> (x, mempty)
-    | otherwise -> (initNameDot, extSeparator : ext)
-  where
-    (nameDot, ext) = breakEnd isExtSeparator x
+splitExtension x = case nameDot of
+                       "" -> (x,"")
+                       _ -> (dir ++ init nameDot, extSeparator : ext)
+    where
+        (dir,file) = splitFileName_ x
+        (nameDot,ext) = breakEnd isExtSeparator file
 
 -- | Get the extension of a file, returns @\"\"@ for no extension, @.ext@ otherwise.
 --
@@ -605,13 +595,9 @@ replaceBaseName pth nam = combineAlways a (nam <.> ext)
 -- > hasTrailingPathSeparator "test" == False
 -- > hasTrailingPathSeparator "test/" == True
 hasTrailingPathSeparator :: FilePath -> Bool
-hasTrailingPathSeparator = isJust . getTrailingPathSeparator
+hasTrailingPathSeparator "" = False
+hasTrailingPathSeparator x = isPathSeparator (last x)
 
-getTrailingPathSeparator :: FilePath -> Maybe Char
-getTrailingPathSeparator x = case unsnoc x of
-  Just (_, lastX)
-    | isPathSeparator lastX -> Just lastX
-  _ -> Nothing
 
 hasLeadingPathSeparator :: FilePath -> Bool
 hasLeadingPathSeparator "" = False
@@ -634,12 +620,12 @@ addTrailingPathSeparator x = if hasTrailingPathSeparator x then x else x ++ [pat
 -- > Windows:  dropTrailingPathSeparator "\\" == "\\"
 -- > Posix:    not (hasTrailingPathSeparator (dropTrailingPathSeparator x)) || isDrive x
 dropTrailingPathSeparator :: FilePath -> FilePath
-dropTrailingPathSeparator x = case getTrailingPathSeparator x of
-  Just lastX
-    | not (isDrive x)
-    -> let x' = dropWhileEnd isPathSeparator x
-        in if null x' then [lastX] else x'
-  _ -> x
+dropTrailingPathSeparator x =
+    if hasTrailingPathSeparator x && not (isDrive x)
+    then let x' = dropWhileEnd isPathSeparator x
+         in if null x' then [last x] else x'
+    else x
+
 
 -- | Get the directory name, move up one level.
 --
@@ -878,37 +864,28 @@ makeRelative root path
 -- > Posix:   normalise "bob/fred/." == "bob/fred/"
 -- > Posix:   normalise "//home" == "/home"
 normalise :: FilePath -> FilePath
-normalise filepath =
-  result <>
-  (if addPathSeparator
-       then [pathSeparator]
-       else mempty)
-  where
-    (drv,pth) = splitDrive filepath
+normalise path = result ++ [pathSeparator | addPathSeparator]
+    where
+        (drv,pth) = splitDrive path
+        result = joinDrive' (normaliseDrive drv) (f pth)
 
-    result = joinDrive' (normaliseDrive drv) (f pth)
+        joinDrive' "" "" = "."
+        joinDrive' d p = joinDrive d p
 
-    joinDrive' d p
-      = if null d && null p
-           then "."
-           else joinDrive d p
+        addPathSeparator = isDirPath pth
+            && not (hasTrailingPathSeparator result)
+            && not (isRelativeDrive drv)
 
-    addPathSeparator = isDirPath pth
-      && not (hasTrailingPathSeparator result)
-      && not (isRelativeDrive drv)
+        isDirPath xs = hasTrailingPathSeparator xs
+            || not (null xs) && last xs == '.' && hasTrailingPathSeparator (init xs)
 
-    isDirPath xs = hasTrailingPathSeparator xs || case unsnoc xs of
-      Nothing -> False
-      Just (initXs, lastXs) -> lastXs == '.' && hasTrailingPathSeparator initXs
+        f = joinPath . dropDots . propSep . splitDirectories
 
-    f = joinPath . dropDots . propSep . splitDirectories
+        propSep (x:xs) | all isPathSeparator x = [pathSeparator] : xs
+                       | otherwise = x : xs
+        propSep [] = []
 
-    propSep (x:xs)
-      | all isPathSeparator x = [pathSeparator] : xs
-      | otherwise             = x : xs
-    propSep [] = []
-
-    dropDots = filter ("." /=)
+        dropDots = filter ("." /=)
 
 normaliseDrive :: FilePath -> FilePath
 normaliseDrive "" = ""
