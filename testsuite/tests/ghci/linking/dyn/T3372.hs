@@ -44,7 +44,7 @@ newGhcServer = do (libdir:_) <- getArgs
   where ghc action libdir = GHC.runGhc (Just libdir) (init >> action)
         init = do df <- GHC.getSessionDynFlags
                   GHC.setSessionDynFlags df{GHC.ghcMode    = GHC.CompManager,
-                                            GHC.backend    = GHC.interpreterBackend,
+                                            GHC.backend    = GHC.bytecodeBackend,
                                             GHC.ghcLink    = GHC.LinkInMemory,
                                             GHC.verbosity  = 0}
 
