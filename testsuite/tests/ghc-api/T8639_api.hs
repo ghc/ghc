@@ -11,7 +11,7 @@ main
  = do { [libdir] <- getArgs
       ; runGhc (Just libdir) $ do
            flags <- getSessionDynFlags
-           setSessionDynFlags (flags{ backend = interpreterBackend, ghcLink = LinkInMemory})
+           setSessionDynFlags (flags{ backend = bytecodeBackend, ghcLink = LinkInMemory})
            target <- guessTarget "T8639_api_a.hs" Nothing Nothing
            setTargets [target]
            load LoadAllTargets
