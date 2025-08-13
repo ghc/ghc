@@ -11,9 +11,9 @@ import GHC.Internal.IORef
 import GHC.Internal.IO.Unsafe (unsafePerformIO)
 import GHC.Internal.Exception.Context
 import GHC.Internal.Ptr
-import GHC.Internal.Stack.Types as GHC.Stack (CallStack)
+import GHC.Internal.Data.Maybe (fromMaybe)
+import GHC.Internal.Stack.Types as GHC.Stack (CallStack, HasCallStack)
 import qualified GHC.Internal.Stack as HCS
-import qualified GHC.Internal.ExecutionStack as ExecStack
 import qualified GHC.Internal.ExecutionStack.Internal as ExecStack
 import qualified GHC.Internal.Stack.CloneStack as CloneStack
 import qualified GHC.Internal.Stack.CCS as CCS
@@ -86,13 +86,44 @@ setBacktraceMechanismState bm enabled = do
     _ <- atomicModifyIORef'_ enabledBacktraceMechanismsRef (setBacktraceMechanismEnabled bm enabled)
     return ()
 
+-- | How to collect 'ExceptionAnnotation's on throwing 'Exception's.
+--
+data CollectExceptionAnnotationMechanism = CollectExceptionAnnotationMechanism
+  { ceaCollectExceptionAnnotationMechanism :: HasCallStack => IO SomeExceptionAnnotation
+  }
+
+defaultCollectExceptionAnnotationMechanism :: CollectExceptionAnnotationMechanism
+defaultCollectExceptionAnnotationMechanism = CollectExceptionAnnotationMechanism
+  { ceaCollectExceptionAnnotationMechanism = SomeExceptionAnnotation `fmap` collectBacktraces
+  }
+
+collectExceptionAnnotationMechanismRef :: IORef CollectExceptionAnnotationMechanism
+collectExceptionAnnotationMechanismRef =
+    unsafePerformIO $ newIORef defaultCollectExceptionAnnotationMechanism
+{-# NOINLINE collectExceptionAnnotationMechanismRef #-}
+
+-- | Returns the current callback for collecting 'ExceptionAnnotation's on throwing 'Exception's.
+--
+getCollectExceptionAnnotationMechanism :: IO CollectExceptionAnnotationMechanism
+getCollectExceptionAnnotationMechanism = readIORef collectExceptionAnnotationMechanismRef
+
+-- | Set the callback for collecting an 'ExceptionAnnotation'.
+--
+setCollectExceptionAnnotation :: ExceptionAnnotation a => (HasCallStack => IO a) -> IO ()
+setCollectExceptionAnnotation collector = do
+  let cea = CollectExceptionAnnotationMechanism
+        { ceaCollectExceptionAnnotationMechanism = fmap SomeExceptionAnnotation collector
+        }
+  _ <- atomicModifyIORef'_ collectExceptionAnnotationMechanismRef (const cea)
+  return ()
+
 -- | A collection of backtraces.
 data Backtraces =
     Backtraces {
         btrCostCentre :: Maybe (Ptr CCS.CostCentreStack),
         btrHasCallStack :: Maybe HCS.CallStack,
-        btrExecutionStack :: Maybe [ExecStack.Location],
-        btrIpe :: Maybe [CloneStack.StackEntry]
+        btrExecutionStack :: Maybe ExecStack.StackTrace,
+        btrIpe :: Maybe CloneStack.StackSnapshot
     }
 
 -- | Render a set of backtraces to a human-readable string.
@@ -109,8 +140,10 @@ displayBacktraces bts = concat
 
     -- The unsafePerformIO here is safe as we don't currently unload cost-centres.
     displayCc   = unlines . map (indent 2) . unsafePerformIO . CCS.ccsToStrings
-    displayExec = unlines . map (indent 2 . flip ExecStack.showLocation "")
-    displayIpe  = unlines . map (indent 2 . CloneStack.prettyStackEntry)
+    displayExec = unlines . map (indent 2 . flip ExecStack.showLocation "") . fromMaybe [] . ExecStack.stackFrames
+    -- The unsafePerformIO here is safe as 'StackSnapshot' makes sure neither the stack frames nor
+    -- references closures can be garbage collected.
+    displayIpe  = unlines . map (indent 2 . CloneStack.prettyStackEntry) . unsafePerformIO . CloneStack.decode
     displayHsc  = unlines . map (indent 2 . prettyCallSite) . HCS.getCallStack
       where prettyCallSite (f, loc) = f ++ ", called at " ++ HCS.prettySrcLoc loc
 
@@ -121,6 +154,14 @@ displayBacktraces bts = concat
 
 instance ExceptionAnnotation Backtraces where
     displayExceptionAnnotation = displayBacktraces
+
+-- | Collect 'SomeExceptionAnnotation' based on the configuration of the
+-- global 'CollectExceptionAnnotationMechanism'.
+--
+collectExceptionAnnotation :: HasCallStack => IO SomeExceptionAnnotation
+collectExceptionAnnotation = HCS.withFrozenCallStack $ do
+  cea <- getCollectExceptionAnnotationMechanism
+  ceaCollectExceptionAnnotationMechanism cea
 
 -- | Collect a set of 'Backtraces'.
 collectBacktraces :: (?callStack :: CallStack) => IO Backtraces
@@ -140,12 +181,11 @@ collectBacktraces' enabled = HCS.withFrozenCallStack $ do
         Just `fmap` CCS.getCurrentCCS ()
 
     exec <- collect ExecutionBacktrace $ do
-        ExecStack.getStackTrace
+        ExecStack.collectStackTrace
 
     ipe <- collect IPEBacktrace $ do
         stack <- CloneStack.cloneMyStack
-        stackEntries <- CloneStack.decode stack
-        return (Just stackEntries)
+        return (Just stack)
 
     hcs <- collect HasCallStackBacktrace $ do
         return (Just ?callStack)
