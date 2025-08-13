@@ -97,37 +97,37 @@ Note [Unique layout for unboxed sums]
 
 Sum arities start from 2. The encoding is a bit funny: we break up the
 integral part into bitfields for the arity, an alternative index (which is
-taken to be 0xfc in the case of the TyCon), and, in the case of a datacon, a
-tag (used to identify the sum's TypeRep binding).
+taken to be 0x1ffc in the case of the TyCon), and, in the case of a datacon,
+a tag (used to identify the sum's TypeRep binding).
 
 This layout is chosen to remain compatible with the usual unique allocation
 for wired-in data constructors described in GHC.Types.Unique
 
 TyCon for sum of arity k:
-  00000000 kkkkkkkk 11111100
+  kkkkkkkk kkk11111 11111100
 
 TypeRep of TyCon for sum of arity k:
-  00000000 kkkkkkkk 11111101
+  kkkkkkkk kkk11111 11111101
 
 DataCon for sum of arity k and alternative n (zero-based):
-  00000000 kkkkkkkk nnnnnn00
+  kkkkkkkk kkknnnnn nnnnnn00
 
 TypeRep for sum DataCon of arity k and alternative n (zero-based):
-  00000000 kkkkkkkk nnnnnn10
+  kkkkkkkk kkknnnnn nnnnnn10
 -}
 
 mkSumTyConUnique :: Arity -> Unique
 mkSumTyConUnique arity =
-    assertPpr (arity <= 0x3f) (ppr arity) $
-              -- 0x3f since we only have 6 bits to encode the
+    assertPpr (arity <= 0x7ff) (ppr arity) $
+              -- 0x7ff since we only have 11 bits to encode the
               -- alternative
-    mkUniqueInt 'z' (arity `shiftL` 8 .|. 0xfc)
+    mkUniqueInt 'z' (arity `shiftL` 13 .|. 0x1ffc)
 
 -- | Inverse of 'mkSumTyConUnique'
 isSumTyConUnique :: Unique -> Maybe Arity
 isSumTyConUnique u =
-  case (tag, n .&. 0xfc) of
-    ('z', 0xfc) -> Just (word64ToInt n `shiftR` 8)
+  case (tag, n .&. 0x1ffc) of
+    ('z', 0x1ffc) -> Just (word64ToInt n `shiftR` 13)
     _ -> Nothing
   where
     (tag, n) = unpkUnique u
@@ -137,11 +137,11 @@ mkSumDataConUnique alt arity
   | alt >= arity
   = panic ("mkSumDataConUnique: " ++ show alt ++ " >= " ++ show arity)
   | otherwise
-  = mkUniqueInt 'z' (arity `shiftL` 8 + alt `shiftL` 2) {- skip the tycon -}
+  = mkUniqueInt 'z' (arity `shiftL` 13 + alt `shiftL` 2) {- skip the tycon -}
 
 getUnboxedSumName :: Int -> Name
 getUnboxedSumName n
-  | n .&. 0xfc == 0xfc
+  | n .&. 0x1ffc == 0x1ffc
   = case tag of
       0x0 -> tyConName $ sumTyCon arity
       0x1 -> getRep $ sumTyCon arity
@@ -155,8 +155,8 @@ getUnboxedSumName n
   | otherwise
   = pprPanic "getUnboxedSumName" (ppr n)
   where
-    arity = n `shiftR` 8
-    alt = (n .&. 0xfc) `shiftR` 2
+    arity = n `shiftR` 13
+    alt = (n .&. 0x1ffc) `shiftR` 2
     tag = 0x3 .&. n
     getRep tycon =
         fromMaybe (pprPanic "getUnboxedSumName(getRep)" (ppr tycon))
