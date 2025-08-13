@@ -9,6 +9,8 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
+#include "ghcplatform.h"
+#include "ghcversion.h"
 
 #include "RtsUtils.h"
 #include "Ticky.h"
@@ -369,20 +371,28 @@ void printRtsInfo(const RtsConfig rts_config) {
     /* The first entry is just a hack to make it easy to get the
      * commas right */
     printf(" [(\"GHC RTS\", \"YES\")\n");
-    mkRtsInfoPair("GHC version",             ProjectVersion);
+    mkRtsInfoPair("GHC version",             __GLASGOW_HASKELL_FULL_VERSION__);
     mkRtsInfoPair("RTS way",                 RtsWay);
-    mkRtsInfoPair("Host platform",           HostPlatform);
-    mkRtsInfoPair("Host architecture",       HostArch);
-    mkRtsInfoPair("Host OS",                 HostOS);
-    mkRtsInfoPair("Host vendor",             HostVendor);
+    mkRtsInfoPair("Host platform",           HOST_ARCH "-" HOST_VENDOR "-" HOST_OS);
+    mkRtsInfoPair("Host architecture",       HOST_ARCH);
+    mkRtsInfoPair("Host OS",                 HOST_OS);
+    mkRtsInfoPair("Host vendor",             HOST_VENDOR);
     mkRtsInfoPair("Word size",               TOSTRING(WORD_SIZE_IN_BITS));
     // TODO(@Ericson2314) This is a joint property of the RTS and generated
     // code. The compiler will soon be multi-target so it doesn't make sense to
     // say the target is <ABI adj>, unless we are talking about the host
     // platform of the compiler / ABI used by a compiler plugin. This is *not*
     // that, so I think a rename is in order to avoid confusion.
-    mkRtsInfoPair("Compiler unregisterised", GhcUnregisterised);
-    mkRtsInfoPair("Tables next to code",     TablesNextToCode);
+#if defined(UnregisterisedCompiler)
+    mkRtsInfoPair("Compiler unregisterised", "YES");
+#else
+    mkRtsInfoPair("Compiler unregisterised", "NO");
+#endif
+#if defined(TABLES_NEXT_TO_CODE)
+    mkRtsInfoPair("Tables next to code",     "YES");
+#else
+    mkRtsInfoPair("Tables next to code",     "NO");
+#endif
     mkRtsInfoPair("Flag -with-rtsopts",      /* See #15261 */
         rts_config.rts_opts != NULL ? rts_config.rts_opts : "");
     selectIOManager(); /* resolve the io-manager, accounting for flags  */
