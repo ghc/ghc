@@ -7,6 +7,9 @@ Utility functions on @Core@ syntax
 -}
 
 -- | Commonly useful utilities for manipulating the Core language
+
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 module GHC.Core.Utils (
         -- * Constructing expressions
         mkCast, mkCastMCo, mkPiMCo,
@@ -114,7 +117,8 @@ import GHC.Utils.Misc
 
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
-import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL, unsnoc )
+import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
+import qualified Data.List as Partial ( init, last )
 import Data.Ord            ( comparing )
 import Control.Monad       ( guard )
 import qualified Data.Set as Set
@@ -1893,10 +1897,10 @@ app_ok fun_ok primop_ok fun args
 
       PrimOpId op _
         | primOpIsDiv op
-        , Just (initArgs, Lit divisor) <- unsnoc args
+        , Lit divisor <- Partial.last args
             -- there can be 2 args (most div primops) or 3 args
             -- (WordQuotRem2Op), hence the use of last/init
-        -> not (isZeroLit divisor) && all (expr_ok fun_ok primop_ok) initArgs
+        -> not (isZeroLit divisor) && all (expr_ok fun_ok primop_ok) (Partial.init args)
               -- Special case for dividing operations that fail
               -- In general they are NOT ok-for-speculation
               -- (which primop_ok will catch), but they ARE OK
