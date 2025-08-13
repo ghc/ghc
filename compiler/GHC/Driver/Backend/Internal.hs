@@ -28,6 +28,6 @@ data BackendName
    | LLVM          -- ^ Names the LLVM backend.
    | ViaC          -- ^ Names the Via-C backend.
    | JavaScript    -- ^ Names the JS backend.
-   | Interpreter   -- ^ Names the ByteCode interpreter.
+   | Bytecode      -- ^ Names the ByteCode interpreter.
    | NoBackend     -- ^ Names the `-fno-code` backend.
  deriving (Eq, Show)

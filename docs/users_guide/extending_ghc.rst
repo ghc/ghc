@@ -1719,7 +1719,7 @@ constructor from version 9.4 with the corresponding value from 9.6:
 +-----------------+------------------------+
 | ``ViaC``        | ``viaCBackend``        |
 +-----------------+------------------------+
-| ``Interpreter`` | ``interpreterBackend`` |
+| ``Interpreter`` | ``bytecodeBackend``    |
 +-----------------+------------------------+
 | ``NoBackend``   | ``noBackend``          |
 +-----------------+------------------------+
