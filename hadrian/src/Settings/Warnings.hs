@@ -77,6 +77,8 @@ ghcWarningsArgs = do
                                       -- https://github.com/haskell/parsec/issues/194
                                       ]
 
+        , package filepath     ? pure [ "-Wno-x-partial" ]
+
         , package cabal        ? pure [ "-Wno-deriving-typeable", "-Wno-incomplete-record-selectors" ]
              -- The -Wno-incomplete-record-selectors is due to
              -- https://github.com/haskell/cabal/issues/10402
