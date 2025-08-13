@@ -81,7 +81,7 @@ hashWord(const HashTable *table, StgWord key)
     int bucket;
 
     /* Strip the boring zero bits */
-    key >>= sizeof(StgWord);
+    key /= sizeof(StgWord);
 
     /* Mod the size of the hash table (a power of 2) */
     bucket = key & table->mask1;
