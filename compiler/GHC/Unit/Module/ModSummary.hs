@@ -75,6 +75,8 @@ data ModSummary
           -- ^ Timestamp of object, if we have one
         ms_dyn_obj_date     :: !(Maybe UTCTime),
           -- ^ Timestamp of dynamic object, if we have one
+        ms_bytecode_date :: Maybe UTCTime,
+          -- ^ Timestamp of bytecode object, if we have one
         ms_iface_date   :: Maybe UTCTime,
           -- ^ Timestamp of hi file, if we have one
           -- See Note [When source is considered modified] and #9243

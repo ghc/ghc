@@ -15,7 +15,7 @@
 -- See Note [ModBreaks vs InternalModBreaks] and Note [Breakpoint identifiers]
 module GHC.HsToCore.Breakpoints
   ( -- * ModBreaks
-    mkModBreaks, ModBreaks(..)
+    mkModBreaks, ModBreaks(..), modBreaks_locs
 
     -- ** Re-exports BreakpointId
   , BreakpointId(..), BreakTickIndex
@@ -33,6 +33,7 @@ import GHC.Unit.Module (Module)
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import Data.List (intersperse)
+import Data.Coerce
 
 --------------------------------------------------------------------------------
 -- ModBreaks
@@ -51,7 +52,7 @@ import Data.List (intersperse)
 -- and 'modBreaks_decls'.
 data ModBreaks
    = ModBreaks
-   { modBreaks_locs   :: !(Array BreakTickIndex SrcSpan)
+   { modBreaks_locs_   :: !(Array BreakTickIndex BinSrcSpan)
         -- ^ An array giving the source span of each breakpoint.
    , modBreaks_vars   :: !(Array BreakTickIndex [OccName])
         -- ^ An array giving the names of the free variables at each breakpoint.
@@ -66,6 +67,9 @@ data ModBreaks
         -- We also cache this here for internal sanity checks.
    }
 
+modBreaks_locs :: ModBreaks -> Array BreakTickIndex SrcSpan
+modBreaks_locs = coerce . modBreaks_locs_
+
 -- | Initialize memory for breakpoint data that is shared between the bytecode
 -- generator and the interpreter.
 --
@@ -78,7 +82,7 @@ mkModBreaks :: Bool {-^ Whether the interpreter is profiled and thus if we shoul
 mkModBreaks interpreterProfiled modl extendedMixEntries
   = let count = fromIntegral $ sizeSS extendedMixEntries
         entries = ssElts extendedMixEntries
-        locsTicks  = listArray (0,count-1) [ tick_loc  t | t <- entries ]
+        locsTicks  = listArray (0,count-1) [ BinSrcSpan (tick_loc  t) | t <- entries ]
         varsTicks  = listArray (0,count-1) [ tick_ids  t | t <- entries ]
         declsTicks = listArray (0,count-1) [ tick_path t | t <- entries ]
         ccs
@@ -92,7 +96,7 @@ mkModBreaks interpreterProfiled modl extendedMixEntries
                 ]
           | otherwise = listArray (0, -1) []
      in ModBreaks
-      { modBreaks_locs   = locsTicks
+      { modBreaks_locs_   = locsTicks
       , modBreaks_vars   = varsTicks
       , modBreaks_decls  = declsTicks
       , modBreaks_ccs    = ccs
@@ -112,7 +116,7 @@ instance Binary ModBreaks where
   get bh = ModBreaks <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh
 
   put_ bh ModBreaks {..} =
-    put_ bh modBreaks_locs
+    put_ bh modBreaks_locs_
       *> put_ bh modBreaks_vars
       *> put_ bh modBreaks_decls
       *> put_ bh modBreaks_ccs

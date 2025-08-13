@@ -2129,7 +2129,6 @@ instance Binary BinSrcSpan where
             _ -> do s <- get bh
                     return $ BinSrcSpan (UnhelpfulSpan s)
 
-deriving via BinSrcSpan instance Binary SrcSpan
 
 {-
 Note [Source Location Wrappers]

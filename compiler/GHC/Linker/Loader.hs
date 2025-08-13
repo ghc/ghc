@@ -39,6 +39,7 @@ where
 import GHC.Prelude
 
 import GHC.Settings
+import GHC.Utils.Misc
 
 import GHC.Platform
 import GHC.Platform.Ways
@@ -48,6 +49,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.ByteCode
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Finder
 
@@ -129,6 +131,7 @@ import qualified GHC.Runtime.Interpreter as GHCi
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Map.Strict as M
 import Foreign.Ptr (nullPtr)
+import GHC.ByteCode.Serialize
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -628,13 +631,35 @@ initLinkDepsOpts hsc_env = opts
             }
     dflags = hsc_dflags hsc_env
 
-    ldLoadByteCode mod = do
+    ldLoadByteCode mod locn = do
+      bco <-  findBytecodeLinkableMaybe hsc_env mod locn
+      case bco of
+        Nothing -> findWholeCoreBindings hsc_env mod
+        Just bco -> return (Just bco)
+
+findWholeCoreBindings :: HscEnv -> Module -> IO (Maybe Linkable)
+findWholeCoreBindings hsc_env mod = do
       _ <- initIfaceLoad hsc_env $
              loadInterface (text "get_reachable_nodes" <+> parens (ppr mod))
                  mod ImportBySystem
       EPS {eps_iface_bytecode} <- hscEPS hsc_env
       sequence (lookupModuleEnv eps_iface_bytecode mod)
 
+
+findBytecodeLinkableMaybe :: HscEnv -> Module -> ModLocation -> IO (Maybe Linkable)
+findBytecodeLinkableMaybe hsc_env mod locn = do
+  let bytecode_fn = ml_bytecode_file locn
+  maybe_bytecode_time <- modificationTimeIfExists bytecode_fn
+  case maybe_bytecode_time of
+    Nothing -> return Nothing
+    Just bytecode_time -> do
+      -- Also load the interface, for reasons to do with recompilation avoidance.
+      -- See Note [Recompilation avoidance with bytecode objects]
+      _ <- initIfaceLoad hsc_env $
+             loadInterface (text "get_reachable_nodes" <+> parens (ppr mod))
+                 mod ImportBySystem
+      bco <- readBinByteCode hsc_env bytecode_fn
+      Just <$> loadByteCodeObjectLinkable hsc_env bytecode_time locn bco
 
 get_reachable_nodes :: HscEnv -> [Module] -> IO ([Module], UniqDSet UnitId)
 get_reachable_nodes hsc_env mods
