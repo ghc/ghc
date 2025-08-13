@@ -228,16 +228,7 @@ Thread and scheduling events
                     values)
 
    The indicated thread has stopped running for the reason given by ``status``.
-
-
-.. event-type:: THREAD_RUNNABLE
-
-   :tag: 3
-   :length: fixed
-   :field ThreadId: thread id
-
-   The indicated thread is has been marked as ready to run.
-
+   
 
 .. event-type:: MIGRATE_THREAD
 
