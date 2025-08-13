@@ -16,7 +16,7 @@ main = do
         let dflags1 =
               dflags0
                 { ghcMode = CompManager,
-                  backend = interpreterBackend,
+                  backend = bytecodeBackend,
                   ghcLink = LinkInMemory
                 }
         logger <- getLogger
