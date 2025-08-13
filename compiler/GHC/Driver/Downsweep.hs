@@ -916,7 +916,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
                    else (,) <$> (new_temp_file (hiSuf_ dflags) (dynHiSuf_ dflags))
                             <*> (new_temp_file (objectSuf_ dflags) (dynObjectSuf_ dflags))
                let new_dflags = case enable_spec of
-                                  EnableByteCode -> dflags { backend = interpreterBackend }
+                                  EnableByteCode -> dflags { backend = bytecodeBackend }
                                   EnableObject   -> dflags { backend = defaultBackendOf ms }
                                   EnableByteCodeAndObject -> (gopt_set dflags Opt_ByteCodeAndObjectCode) { backend = defaultBackendOf ms}
                let ms' = ms
