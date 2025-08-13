@@ -27,22 +27,20 @@ import GHC.Utils.Panic
 import GHC.Utils.TmpFs
 import System.FilePath
 import GHC.Unit.Types
-import GHC.Unit.Module.WholeCoreBindings
-import GHC.Types.ForeignStubs
-import GHC.ForeignSrcLang
 import GHC.Driver.DynFlags
 import System.Directory
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import Data.Traversable
+import GHC.Utils.Logger
+import GHC.Linker.Types
 
 -- | The on-disk representation of a bytecode object
 data OnDiskByteCodeObject = OnDiskByteCodeObject { odbco_module :: Module
                                                  , odbco_compiled_byte_code :: CompiledByteCode
-                                                 , odbco_foreign :: IfaceForeign }
+                                                 , odbco_foreign :: [ByteString]  -- ^ Contents of object files
+                                                 }
 
--- | The in-memory representation of a bytecode object
-data ByteCodeObject = ByteCodeObject { bco_module :: Module
-                                      , bco_compiled_byte_code :: CompiledByteCode
-                                      , bco_foreign_sources :: [(ForeignSrcLang, FilePath)]
-                                      , bco_foreign_stubs :: ForeignStubs }
 
 instance Binary OnDiskByteCodeObject where
   get bh = do
@@ -58,21 +56,33 @@ instance Binary OnDiskByteCodeObject where
 
 decodeOnDiskByteCodeObject :: HscEnv -> OnDiskByteCodeObject -> IO ByteCodeObject
 decodeOnDiskByteCodeObject hsc_env odbco = do
-  (a,b) <- decodeIfaceForeign (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)) (odbco_foreign odbco)
+  foreign_contents <- writeObjectFiles (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)) (odbco_foreign odbco)
   pure $ ByteCodeObject {
     bco_module = odbco_module odbco,
     bco_compiled_byte_code = odbco_compiled_byte_code odbco,
-    bco_foreign_stubs = a,
-    bco_foreign_sources = b
+    bco_foreign_contents = foreign_contents
    }
 
-encodeOnDiskByteCodeObject :: HscEnv -> ByteCodeObject -> IO OnDiskByteCodeObject
-encodeOnDiskByteCodeObject hsc_env bco = do
-  iface_foreign <- encodeIfaceForeign (hsc_logger hsc_env) (hsc_dflags hsc_env) (bco_foreign_stubs bco) (bco_foreign_sources bco)
+readObjectFile :: FilePath -> IO ByteString
+readObjectFile f = BS.readFile f
+
+readObjectFiles :: [FilePath] -> IO [ByteString]
+readObjectFiles fs = mapM readObjectFile fs
+
+writeObjectFiles ::  Logger -> TmpFs -> TempDir -> [ByteString] -> IO [FilePath]
+writeObjectFiles logger tmpfs tmp_dir files =
+  for files $ \file -> do
+    f <- newTempName logger tmpfs tmp_dir TFL_GhcSession "o"
+    BS.writeFile f file
+    pure f
+
+encodeOnDiskByteCodeObject :: ByteCodeObject -> IO OnDiskByteCodeObject
+encodeOnDiskByteCodeObject bco = do
+  foreign_contents <- readObjectFiles (bco_foreign_contents bco)
   pure $ OnDiskByteCodeObject {
     odbco_module = bco_module bco,
     odbco_compiled_byte_code = bco_compiled_byte_code bco,
-    odbco_foreign = iface_foreign
+    odbco_foreign = foreign_contents
    }
 
 testBinByteCode :: HscEnv -> ByteCodeObject -> IO ByteCodeObject
@@ -83,7 +93,7 @@ testBinByteCode hsc_env cbc = withSystemTempDirectory "ghc-bbc" $ \tmpdir -> do
 roundtripBinByteCode ::
   HscEnv -> FilePath -> ByteCodeObject -> IO ByteCodeObject
 roundtripBinByteCode hsc_env f cbc = do
-  writeBinByteCode hsc_env f cbc
+  writeBinByteCode f cbc
   readBinByteCode hsc_env f
 
 readBinByteCode :: HscEnv -> FilePath -> IO ByteCodeObject
@@ -94,12 +104,12 @@ readBinByteCode hsc_env f = do
   decodeOnDiskByteCodeObject hsc_env odbco
 
 
-writeBinByteCode :: HscEnv -> FilePath -> ByteCodeObject -> IO ()
-writeBinByteCode hsc_env f cbc = do
+writeBinByteCode :: FilePath -> ByteCodeObject -> IO ()
+writeBinByteCode f cbc = do
   createDirectoryIfMissing True (takeDirectory f)
   bh' <- openBinMem (1024 * 1024)
   bh <- addBinNameWriter bh'
-  odbco <- encodeOnDiskByteCodeObject hsc_env cbc
+  odbco <- encodeOnDiskByteCodeObject cbc
   putWithUserData QuietBinIFace NormalCompression bh odbco
   writeBinMem bh f
 

@@ -1,0 +1,5 @@
+GHCi, version 9.15.20250811: https://www.haskell.org/ghc/  :? for help
+Ok, one module loaded.
+ghci> 8
+42
+ghci> Leaving GHCi.

@@ -1,0 +1,4 @@
+Testing GHCi startup with interface file but no bytecode file (without -fwrite-byte-code)...
+GHCi, version 9.15.20250811: https://www.haskell.org/ghc/  :? for help
+Ok, one module loaded.
+ghci> Leaving GHCi.

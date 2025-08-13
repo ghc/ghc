@@ -47,6 +47,8 @@ module GHC.Linker.Types
    , linkableFilterByteCode
    , linkableFilterNative
    , partitionLinkables
+
+   , ByteCodeObject(..)
    )
 where
 
@@ -327,8 +329,18 @@ data LinkablePart
       [FilePath]
       -- ^ Objects containing foreign stubs and files
 
-  | BCOs CompiledByteCode
+  | BCOs ByteCodeObject
     -- ^ A byte-code object, lives only in memory.
+
+
+-- | The in-memory representation of a bytecode object
+data ByteCodeObject = ByteCodeObject { bco_module :: Module
+                                      , bco_compiled_byte_code :: CompiledByteCode
+                                      , bco_foreign_contents :: [FilePath]  -- ^ Path to object files
+                                      }
+
+instance Outputable ByteCodeObject where
+  ppr (ByteCodeObject mod _cbc _fos) = text "ByteCodeObject" <+> ppr mod
 
 instance Outputable LinkablePart where
   ppr (DotO path sort)   = text "DotO" <+> text path <+> pprSort sort
@@ -350,7 +362,7 @@ linkableIsNativeCodeOnly l = all isNativeCode (NE.toList (linkableParts l))
 --
 -- This excludes the LazyBCOs and the CoreBindings parts
 linkableBCOs :: Linkable -> [CompiledByteCode]
-linkableBCOs l = [ cbc | BCOs cbc <- NE.toList (linkableParts l) ]
+linkableBCOs l = [ bco_compiled_byte_code bco | BCOs bco <- NE.toList (linkableParts l) ]
 
 -- | List the native linkable parts (.o/.so/.dll) of a linkable
 linkableNativeParts :: Linkable -> [LinkablePart]
@@ -423,14 +435,14 @@ linkablePartObjectPaths = \case
   DotDLL _ -> []
   CoreBindings {} -> []
   LazyBCOs _ fos -> fos
-  BCOs {} -> []
+  BCOs bco -> bco_foreign_contents bco
 
 -- | Retrieve the compiled byte-code from the linkable part.
 --
 -- Contrary to linkableBCOs, this includes byte-code from LazyBCOs.
 linkablePartAllBCOs :: LinkablePart -> [CompiledByteCode]
 linkablePartAllBCOs = \case
-  BCOs bco    -> [bco]
+  BCOs bco    -> [bco_compiled_byte_code bco]
   LazyBCOs bcos _ -> [bcos]
   _           -> []
 
@@ -445,12 +457,13 @@ linkablePartNative = \case
   u@DotA {} -> [u]
   u@DotDLL {} -> [u]
   LazyBCOs _ os -> [DotO f ForeignObject | f <- os]
+  BCOs bco -> [DotO f ForeignObject | f <- bco_foreign_contents bco]
   _ -> []
 
 linkablePartByteCode :: LinkablePart -> [LinkablePart]
 linkablePartByteCode = \case
   u@BCOs {}  -> [u]
-  LazyBCOs bcos _ -> [BCOs bcos]
+  LazyBCOs bcos _ -> [BCOs (ByteCodeObject (error "todo")bcos [])]
   _ -> []
 
 -- | Transform the 'LinkablePart' list in this 'Linkable' to contain only
