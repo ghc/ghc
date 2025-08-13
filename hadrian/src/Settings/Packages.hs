@@ -287,15 +287,6 @@ ghcInternalArgs = package ghcInternal ? do
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
-    projectVersion <- getSetting ProjectVersion
-    buildPlatform  <- queryBuild targetPlatformTriple
-    buildArch      <- queryBuild queryArch
-    buildOs        <- queryBuild queryOS
-    buildVendor    <- queryBuild queryVendor
-    targetPlatform <- queryTarget targetPlatformTriple
-    targetArch     <- queryTarget queryArch
-    targetOs       <- queryTarget queryOS
-    targetVendor   <- queryTarget queryVendor
     ghcUnreg       <- queryTarget tgtUnregisterised
     ghcEnableTNC   <- queryTarget tgtTablesNextToCode
     rtsWays        <- getRtsWays
@@ -363,25 +354,11 @@ rtsPackageArgs = package rts ? do
 
           , inputs ["**/RtsMessages.c", "**/Trace.c"] ?
             pure
-              ["-DProjectVersion=" ++ show projectVersion
-              , "-DRtsWay=\"rts_" ++ show way ++ "\""
+              [ "-DRtsWay=\"rts_" ++ show way ++ "\""
               ]
 
           , input "**/RtsUtils.c" ? pure
-            [ "-DProjectVersion="            ++ show projectVersion
-              -- the RTS' host is the compiler's target (the target should be
-              -- per stage ideally...)
-            , "-DHostPlatform="              ++ show targetPlatform
-            , "-DHostArch="                  ++ show targetArch
-            , "-DHostOS="                    ++ show targetOs
-            , "-DHostVendor="                ++ show targetVendor
-            , "-DBuildPlatform="             ++ show buildPlatform
-            , "-DBuildArch="                 ++ show buildArch
-            , "-DBuildOS="                   ++ show buildOs
-            , "-DBuildVendor="               ++ show buildVendor
-            , "-DGhcUnregisterised="         ++ show (yesNo ghcUnreg)
-            , "-DTablesNextToCode="          ++ show (yesNo ghcEnableTNC)
-            , "-DRtsWay=\"rts_" ++ show way ++ "\""
+            [ "-DRtsWay=\"rts_" ++ show way ++ "\""
             ]
 
           -- We're after pure performance here. So make sure fast math and

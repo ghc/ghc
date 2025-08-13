@@ -8,6 +8,7 @@
 
 // external headers
 #include "Rts.h"
+#include "ghcversion.h"
 
 // internal headers
 #include "Trace.h"
@@ -503,7 +504,7 @@ void traceOSProcessInfo_(void) {
 #endif
         {
             char buf[256];
-            snprintf(buf, sizeof(buf), "GHC-%s %s", ProjectVersion, RtsWay);
+            snprintf(buf, sizeof(buf), "GHC-%s %s", __GLASGOW_HASKELL_FULL_VERSION__, RtsWay);
             postCapsetStrEvent(EVENT_RTS_IDENTIFIER,
                                CAPSET_OSPROCESS_DEFAULT,
                                buf);
