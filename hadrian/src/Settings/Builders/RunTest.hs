@@ -86,6 +86,16 @@ data TestCompilerArgs = TestCompilerArgs{
  ,   pkgConfCacheFile :: FilePath }
    deriving (Eq, Show)
 
+-- | Some archs like wasm32/js used to report have_llvm=True because
+-- they are based on LLVM related toolchains like wasi-sdk/emscripten,
+-- but these targets don't really support the LLVM backend, and the
+-- optllvm test way doesn't work. We used to special-case wasm32/js to
+-- avoid auto-adding optllvm way in testsuite/config/ghc, but this is
+-- still problematic if someone writes a new LLVM-related test and
+-- uses something like when(have_llvm(), extra_ways(["optllvm"])). So
+-- better just enforce have_llvm=False for these targets here.
+allowHaveLLVM :: String -> Bool
+allowHaveLLVM = not . (`elem` ["wasm32", "javascript"])
 
 -- | If the tree is in-compiler then we already know how we will build it so
 -- don't build anything in order to work out what we will build.
@@ -129,7 +139,7 @@ inTreeCompilerArgs stg = do
 
     llc_cmd   <- queryTargetTarget tgtLlc
     llvm_as_cmd <- queryTargetTarget tgtLlvmAs
-    let have_llvm = all isJust [llc_cmd, llvm_as_cmd]
+    let have_llvm = allowHaveLLVM arch && all isJust [llc_cmd, llvm_as_cmd]
 
     top         <- topDirectory
 
@@ -176,7 +186,7 @@ outOfTreeCompilerArgs = do
     let debugged = "debug" `isInfixOf` rtsWay
 
     llc_cmd   <- getTestSetting TestLLC
-    have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
+    have_llvm <- (allowHaveLLVM arch &&) <$> liftIO (isJust <$> findExecutable llc_cmd)
     profiled <- getBooleanSetting TestGhcProfiled
 
     pkgConfCacheFile <- getTestSetting TestGhcPackageDb <&> (</> "package.cache")
