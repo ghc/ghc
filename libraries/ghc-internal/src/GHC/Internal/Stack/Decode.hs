@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GHCForeignImportPrim #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -23,6 +24,7 @@ module GHC.Internal.Stack.Decode (
   StackEntry(..),
   -- * Pretty printing
   prettyStackEntry,
+  prettyStackFrameWithIpe,
   )
 where
 
@@ -39,6 +41,7 @@ import GHC.Internal.Data.Tuple
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Exts
+import GHC.Internal.Unsafe.Coerce
 
 import GHC.Internal.ClosureTypes
 import GHC.Internal.Heap.Closures
@@ -52,6 +55,7 @@ import GHC.Internal.Heap.Closures
   )
 import GHC.Internal.Heap.Constants (wORD_SIZE_IN_BITS)
 import GHC.Internal.Heap.InfoTable
+import GHC.Internal.Stack.Annotation
 import GHC.Internal.Stack.Constants
 import GHC.Internal.Stack.CloneStack
 import GHC.Internal.InfoProv.Types (InfoProv (..), ipLoc, lookupIPE)
@@ -559,6 +563,16 @@ decodeStackWithFrameUnpack unpackFrame (StackSnapshot stack#) = do
 -- ----------------------------------------------------------------------------
 -- Pretty printing functions for stack entries, stack frames and provenance info
 -- ----------------------------------------------------------------------------
+
+prettyStackFrameWithIpe :: (StackFrame, Maybe InfoProv) -> Maybe String
+prettyStackFrameWithIpe (frame, mipe) =
+  case frame of
+    AnnFrame {annotation = Box someStackAnno } ->
+      case unsafeCoerce someStackAnno of
+        SomeStackAnnotation ann ->
+          Just $ displayStackAnnotation ann
+    _ ->
+      (prettyStackEntry . toStackEntry) <$> mipe
 
 prettyStackEntry :: StackEntry -> String
 prettyStackEntry (StackEntry {moduleName=mod_nm, functionName=fun_nm, srcLoc=loc}) =

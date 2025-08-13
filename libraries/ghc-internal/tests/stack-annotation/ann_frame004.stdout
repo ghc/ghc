@@ -1,17 +1,17 @@
 Stack annotations:
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:21:17 in main:Main
-- ann_frame004.hs:13:10 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
+- annotateCallStack, called at ann_frame004.hs:13:10 in main:Main
 - bar
-- ann_frame004.hs:12:7 in main:Main
+- annotateCallStackIO, called at ann_frame004.hs:12:7 in main:Main
