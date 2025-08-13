@@ -819,6 +819,7 @@ moduleNodeInfoExtraMessage dflags recomp (ModuleNodeCompile mod_summary) =
         obj_file = normalise $ msObjFilePath mod_summary
         files    = obj_file
                    :| [ dyn_file | gopt Opt_BuildDynamicToo dflags ]
+                   -- MP: change here.
                    ++ [ "interpreted" | gopt Opt_ByteCodeAndObjectCode dflags ]
     in case backendSpecialModuleSource (backend dflags) recomp of
               Just special -> text special

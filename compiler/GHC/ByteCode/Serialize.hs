@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module GHC.ByteCode.Serialize
-  ( testBinByteCode,
+  ( testBinByteCode, writeBinByteCode, readBinByteCode, ByteCodeObject(..)
   )
 where
 
@@ -26,29 +26,81 @@ import GHC.Utils.Exception
 import GHC.Utils.Panic
 import GHC.Utils.TmpFs
 import System.FilePath
+import GHC.Unit.Types
+import GHC.Unit.Module.WholeCoreBindings
+import GHC.Types.ForeignStubs
+import GHC.ForeignSrcLang
+import GHC.Driver.DynFlags
+import System.Directory
 
-testBinByteCode :: HscEnv -> CompiledByteCode -> IO CompiledByteCode
+-- | The on-disk representation of a bytecode object
+data OnDiskByteCodeObject = OnDiskByteCodeObject { odbco_module :: Module
+                                                 , odbco_compiled_byte_code :: CompiledByteCode
+                                                 , odbco_foreign :: IfaceForeign }
+
+-- | The in-memory representation of a bytecode object
+data ByteCodeObject = ByteCodeObject { bco_module :: Module
+                                      , bco_compiled_byte_code :: CompiledByteCode
+                                      , bco_foreign_sources :: [(ForeignSrcLang, FilePath)]
+                                      , bco_foreign_stubs :: ForeignStubs }
+
+instance Binary OnDiskByteCodeObject where
+  get bh = do
+    odbco_module <- get bh
+    odbco_compiled_byte_code <- get bh
+    odbco_foreign <- get bh
+    pure OnDiskByteCodeObject {..}
+
+  put_ bh OnDiskByteCodeObject {..} = do
+    put_ bh odbco_module
+    put_ bh odbco_compiled_byte_code
+    put_ bh odbco_foreign
+
+decodeOnDiskByteCodeObject :: HscEnv -> OnDiskByteCodeObject -> IO ByteCodeObject
+decodeOnDiskByteCodeObject hsc_env odbco = do
+  (a,b) <- decodeIfaceForeign (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)) (odbco_foreign odbco)
+  pure $ ByteCodeObject {
+    bco_module = odbco_module odbco,
+    bco_compiled_byte_code = odbco_compiled_byte_code odbco,
+    bco_foreign_stubs = a,
+    bco_foreign_sources = b
+   }
+
+encodeOnDiskByteCodeObject :: HscEnv -> ByteCodeObject -> IO OnDiskByteCodeObject
+encodeOnDiskByteCodeObject hsc_env bco = do
+  iface_foreign <- encodeIfaceForeign (hsc_logger hsc_env) (hsc_dflags hsc_env) (bco_foreign_stubs bco) (bco_foreign_sources bco)
+  pure $ OnDiskByteCodeObject {
+    odbco_module = bco_module bco,
+    odbco_compiled_byte_code = bco_compiled_byte_code bco,
+    odbco_foreign = iface_foreign
+   }
+
+testBinByteCode :: HscEnv -> ByteCodeObject -> IO ByteCodeObject
 testBinByteCode hsc_env cbc = withSystemTempDirectory "ghc-bbc" $ \tmpdir -> do
   let f = tmpdir </> "ghc-bbc"
   roundtripBinByteCode hsc_env f cbc
 
 roundtripBinByteCode ::
-  HscEnv -> FilePath -> CompiledByteCode -> IO CompiledByteCode
+  HscEnv -> FilePath -> ByteCodeObject -> IO ByteCodeObject
 roundtripBinByteCode hsc_env f cbc = do
-  writeBinByteCode f cbc
+  writeBinByteCode hsc_env f cbc
   readBinByteCode hsc_env f
 
-readBinByteCode :: HscEnv -> FilePath -> IO CompiledByteCode
+readBinByteCode :: HscEnv -> FilePath -> IO ByteCodeObject
 readBinByteCode hsc_env f = do
   bh' <- readBinMem f
   bh <- addBinNameReader hsc_env bh'
-  getWithUserData (hsc_NC hsc_env) bh
+  odbco <- getWithUserData (hsc_NC hsc_env) bh
+  decodeOnDiskByteCodeObject hsc_env odbco
 
-writeBinByteCode :: FilePath -> CompiledByteCode -> IO ()
-writeBinByteCode f cbc = do
+
+writeBinByteCode :: HscEnv -> FilePath -> ByteCodeObject -> IO ()
+writeBinByteCode hsc_env f cbc = do
+  createDirectoryIfMissing True (takeDirectory f)
   bh' <- openBinMem (1024 * 1024)
   bh <- addBinNameWriter bh'
-  putWithUserData QuietBinIFace NormalCompression bh cbc
+  odbco <- encodeOnDiskByteCodeObject hsc_env cbc
+  putWithUserData QuietBinIFace NormalCompression bh odbco
   writeBinMem bh f
 
 instance Binary CompiledByteCode where

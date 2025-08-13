@@ -804,6 +804,7 @@ summariseRequirement pn mod_name = do
         ms_dyn_obj_date = Nothing,
         ms_iface_date = hi_timestamp,
         ms_hie_date = hie_timestamp,
+        ms_bytecode_date = Nothing,
         ms_srcimps = [],
         ms_textual_imps = ((,,) NormalLevel NoPkgQual . noLoc) <$> extra_sig_imports,
         ms_parsed_mod = Just (HsParsedModule {
@@ -922,6 +923,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
             ms_hs_hash = fingerprint0,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
             ms_dyn_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
+            ms_bytecode_date = Nothing,
             ms_iface_date = hi_timestamp,
             ms_hie_date = hie_timestamp
           }

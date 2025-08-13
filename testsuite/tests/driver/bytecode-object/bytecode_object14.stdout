@@ -1,0 +1,5 @@
+Testing recompilation in GHCi after touching .hi file...
+GHCi, version 9.15.20250811: https://www.haskell.org/ghc/  :? for help
+[1 of 1] Compiling BytecodeTest     ( BytecodeTest.hs, interpreted )[main] [Missing bytecode]
+Ok, one module loaded.
+ghci> Leaving GHCi.

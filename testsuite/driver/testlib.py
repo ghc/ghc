@@ -549,12 +549,10 @@ only_ghci = only_ways([WayName('ghci'), WayName('ghci-opt')])
 # -----
 
 def valid_way( way: WayName ) -> bool:
-    if way in {'ghci', 'ghci-opt'}:
+    if way in {'ghci', 'ghci-opt', 'ghci-ext'}:
         return config.have_RTS_linker
-    if way in {'ghci-ext'}:
-        return config.have_ext_interp
-    if way in {'ghci-ext-prof'}:
-        return config.have_ext_interp and config.have_profiling
+    if way == 'ghci-ext-prof':
+        return config.have_RTS_linker and config.have_profiling
     return True
 
 def extra_ways( ways: List[WayName] ):

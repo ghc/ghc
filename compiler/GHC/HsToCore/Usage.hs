@@ -187,7 +187,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
           -- home package ifaces in the PIT.
           miface <- lookupIfaceByModule hug pit m
           case miface of
-            Nothing -> pprPanic "mkObjectUsage" (ppr m)
+            Nothing -> pprPanic "linkableToUsage" (ppr m)
             Just iface ->
               return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) (mi_iface_hash iface)
 

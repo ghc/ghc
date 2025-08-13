@@ -275,6 +275,7 @@ data DynFlags = DynFlags {
   dylibInstallName      :: Maybe String,
   hiDir                 :: Maybe String,
   hieDir                :: Maybe String,
+  bytecodeDir           :: Maybe String,
   stubDir               :: Maybe String,
   dumpDir               :: Maybe String,
 
@@ -282,6 +283,7 @@ data DynFlags = DynFlags {
   hcSuf                 :: String,
   hiSuf_                :: String,
   hieSuf                :: String,
+  bytecodeSuf           :: String,
 
   dynObjectSuf_         :: String,
   dynHiSuf_             :: String,
@@ -604,6 +606,7 @@ defaultDynFlags mySettings =
         dylibInstallName        = Nothing,
         hiDir                   = Nothing,
         hieDir                  = Nothing,
+        bytecodeDir             = Nothing,
         stubDir                 = Nothing,
         dumpDir                 = Nothing,
 
@@ -611,6 +614,7 @@ defaultDynFlags mySettings =
         hcSuf                   = phaseInputExt HCc,
         hiSuf_                  = "hi",
         hieSuf                  = "hie",
+        bytecodeSuf             = "gbc",
 
         dynObjectSuf_           = "dyn_" ++ phaseInputExt StopLn,
         dynHiSuf_               = "dyn_hi",
