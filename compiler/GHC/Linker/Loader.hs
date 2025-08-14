@@ -535,7 +535,7 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
       return pls
 
     DLL dll_unadorned -> do
-      maybe_errstr <- loadDLL interp (platformSOName platform dll_unadorned)
+      maybe_errstr <- loadDLLs interp [platformSOName platform dll_unadorned]
       case maybe_errstr of
          Right _ -> maybePutStrLn logger "done"
          Left mm | platformOS platform /= OSDarwin ->
@@ -545,14 +545,14 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
            -- since (apparently) some things install that way - see
            -- ticket #8770.
            let libfile = ("lib" ++ dll_unadorned) <.> "so"
-           err2 <- loadDLL interp libfile
+           err2 <- loadDLLs interp [libfile]
            case err2 of
              Right _ -> maybePutStrLn logger "done"
              Left _  -> preloadFailed mm lib_paths lib_spec
       return pls
 
     DLLPath dll_path -> do
-      do maybe_errstr <- loadDLL interp dll_path
+      do maybe_errstr <- loadDLLs interp [dll_path]
          case maybe_errstr of
             Right _ -> maybePutStrLn logger "done"
             Left mm -> preloadFailed mm lib_paths lib_spec
@@ -892,7 +892,7 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
-    m <- loadDLL interp soFile
+    m <- loadDLLs interp [soFile]
     case m of
       Right _ -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
       Left err -> linkFail msg (text err)
@@ -1222,11 +1222,11 @@ loadPackage interp hsc_env pkg
         loadFrameworks interp platform pkg
         -- See Note [Crash early load_dyn and locateLib]
         -- Crash early if can't load any of `known_dlls`
-        mapM_ (load_dyn interp hsc_env True) known_extra_dlls
-        loaded_dlls <- mapMaybeM (load_dyn interp hsc_env True) known_hs_dlls
+        _ <- load_dyn interp hsc_env True known_extra_dlls
+        loaded_dlls <- load_dyn interp hsc_env True known_hs_dlls
         -- For remaining `dlls` crash early only when there is surely
         -- no package's DLL around ... (not is_dyn)
-        mapM_ (load_dyn interp hsc_env (not is_dyn) . platformSOName platform) dlls
+        _ <- load_dyn interp hsc_env (not is_dyn) $ map (platformSOName platform) dlls
 #else
         let loaded_dlls = []
 #endif
@@ -1300,12 +1300,12 @@ restriction very easily.
 -- we have already searched the filesystem; the strings passed to load_dyn
 -- can be passed directly to loadDLL.  They are either fully-qualified
 -- ("/usr/lib/libfoo.so"), or unqualified ("libfoo.so").  In the latter case,
--- loadDLL is going to search the system paths to find the library.
-load_dyn :: Interp -> HscEnv -> Bool -> FilePath -> IO (Maybe (RemotePtr LoadedDLL))
-load_dyn interp hsc_env crash_early dll = do
-  r <- loadDLL interp dll
+-- loadDLLs is going to search the system paths to find the library.
+load_dyn :: Interp -> HscEnv -> Bool -> [FilePath] -> IO [RemotePtr LoadedDLL]
+load_dyn interp hsc_env crash_early dlls = do
+  r <- loadDLLs interp dlls
   case r of
-    Right loaded_dll -> pure (Just loaded_dll)
+    Right loaded_dlls -> pure loaded_dlls
     Left err ->
       if crash_early
         then cmdLineErrorIO err
@@ -1314,7 +1314,7 @@ load_dyn interp hsc_env crash_early dll = do
             $ reportDiagnostic logger
                 neverQualify diag_opts
                   noSrcSpan (WarningWithFlag Opt_WarnMissedExtraSharedLib) $ withPprStyle defaultUserStyle (note err)
-          pure Nothing
+          pure []
   where
     diag_opts = initDiagOpts (hsc_dflags hsc_env)
     logger = hsc_logger hsc_env
@@ -1370,7 +1370,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
     --   then  look in library-dirs and inplace GCC for a static library (libfoo.a)
     --   then  try "gcc --print-file-name" to search gcc's search path
     --       for a dynamic library (#5289)
-    --   otherwise, assume loadDLL can find it
+    --   otherwise, assume loadDLLs can find it
     --
     --   The logic is a bit complicated, but the rationale behind it is that
     --   loading a shared library for us is O(1) while loading an archive is
