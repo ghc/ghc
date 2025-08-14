@@ -1805,6 +1805,49 @@ genCCall target dest_regs arg_regs = do
       where
         shift = (widthToInt w)
 
+    PrimTarget (MO_BSwap w)
+      | w `elem` [W16, W32, W64],
+      [arg_reg] <- arg_regs,
+      [dest_reg] <- dest_regs -> do
+      platform <- getPlatform
+      (reg_x, _, code_x) <- getSomeReg arg_reg
+      let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
+      case w of
+        W64 -> return ( code_x `appOL` toOL
+                      [
+                        REVBD (OpReg w dst_reg) (OpReg w reg_x)
+                      ])
+        W32 -> return ( code_x `appOL` toOL
+                      [
+                        REVB2W (OpReg w dst_reg) (OpReg w reg_x)
+                      ])
+        _ -> return ( code_x `appOL` toOL
+                      [
+                        REVB2H (OpReg w dst_reg) (OpReg w reg_x)
+                      ])
+      | otherwise -> unsupported (MO_BSwap w)
+
+    PrimTarget (MO_BRev w)
+      | w `elem` [W8, W16, W32, W64],
+      [arg_reg] <- arg_regs,
+      [dest_reg] <- dest_regs -> do
+      platform <- getPlatform
+      (reg_x, _, code_x) <- getSomeReg arg_reg
+      let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
+      case w of
+        W8 -> return ( code_x `appOL` toOL
+                     [
+                       BITREV4B (OpReg W32 reg_x) (OpReg W32 reg_x),
+                       AND (OpReg W64 dst_reg) (OpReg W64 reg_x) (OpImm (ImmInt 255))
+                     ])
+        W16 -> return ( code_x `appOL` toOL
+                      [
+                        BITREV (OpReg W64 reg_x) (OpReg W64 reg_x),
+                        SRL (OpReg W64 dst_reg) (OpReg W64 reg_x) (OpImm (ImmInt 48))
+                      ])
+        _ -> return ( code_x `snocOL` BITREV (OpReg w dst_reg) (OpReg w reg_x))
+      | otherwise -> unsupported (MO_BRev w)
+
     -- mop :: CallishMachOp (see GHC.Cmm.MachOp)
     PrimTarget mop -> do
       -- We'll need config to construct forien targets
@@ -1939,8 +1982,6 @@ genCCall target dest_regs arg_regs = do
         MO_PopCnt w         -> mkCCall (popCntLabel w)
         MO_Pdep w           -> mkCCall (pdepLabel w)
         MO_Pext w           -> mkCCall (pextLabel w)
-        MO_BSwap w          -> mkCCall (bSwapLabel w)
-        MO_BRev w           -> mkCCall (bRevLabel w)
 
     -- or a possibly side-effecting machine operation
         mo@(MO_AtomicRead w ord)

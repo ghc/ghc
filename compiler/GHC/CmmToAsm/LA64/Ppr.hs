@@ -802,8 +802,9 @@ pprInstr platform instr = case instr of
     -- BITREV.{W/D}
   BITREV4B o1 o2 -> op2 (text "\tbitrev.4b") o1 o2
   BITREV8B o1 o2 -> op2 (text "\tbitrev.8b") o1 o2
-  BITREVW o1 o2 -> op2 (text "\tbitrev.w") o1 o2
-  BITREVD o1 o2 -> op2 (text "\tbitrev.d") o1 o2
+  BITREV o1 o2
+    | OpReg W32 _ <- o2 -> op2 (text "\tbitrev.w") o1 o2
+    | OpReg W64 _ <- o2 -> op2 (text "\tbitrev.d") o1 o2
     -- BSTRINS.{W/D}
   BSTRINS II64 o1 o2 o3 o4 -> op4 (text "\tbstrins.d") o1 o2 o3 o4
   BSTRINS II32 o1 o2 o3 o4 -> op4 (text "\tbstrins.w") o1 o2 o3 o4

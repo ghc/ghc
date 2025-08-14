@@ -126,8 +126,7 @@ regUsageOfInstr platform instr = case instr of
   REVHD  dst src1          -> usage (regOp src1, regOp dst)
   BITREV4B dst src1        -> usage (regOp src1, regOp dst)
   BITREV8B dst src1        -> usage (regOp src1, regOp dst)
-  BITREVW dst src1         -> usage (regOp src1, regOp dst)
-  BITREVD dst src1         -> usage (regOp src1, regOp dst)
+  BITREV dst src1          -> usage (regOp src1, regOp dst)
   BSTRINS _ dst src1 src2 src3  -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   BSTRPICK _ dst src1 src2 src3 -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   MASKEQZ dst src1 src2         -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -309,8 +308,7 @@ patchRegsOfInstr instr env = case instr of
     REVHD  o1 o2          -> REVHD  (patchOp o1)  (patchOp o2)
     BITREV4B o1 o2         -> BITREV4B  (patchOp o1)  (patchOp o2)
     BITREV8B o1 o2         -> BITREV8B  (patchOp o1)  (patchOp o2)
-    BITREVW o1 o2          -> BITREVW  (patchOp o1)  (patchOp o2)
-    BITREVD o1 o2          -> BITREVD  (patchOp o1)  (patchOp o2)
+    BITREV o1 o2           -> BITREV  (patchOp o1)  (patchOp o2)
     BSTRINS f o1 o2 o3 o4  -> BSTRINS f (patchOp o1)  (patchOp o2)  (patchOp o3)  (patchOp o4)
     BSTRPICK f o1 o2 o3 o4 -> BSTRPICK f (patchOp o1)  (patchOp o2)  (patchOp o3)  (patchOp o4)
     MASKEQZ o1 o2 o3       -> MASKEQZ  (patchOp o1)  (patchOp o2)  (patchOp o3)
@@ -700,8 +698,7 @@ data Instr
     | REVHD Operand Operand
     | BITREV4B Operand Operand
     | BITREV8B Operand Operand
-    | BITREVW Operand Operand
-    | BITREVD Operand Operand
+    | BITREV Operand Operand
     | BSTRINS Format Operand Operand Operand Operand
     | BSTRPICK Format Operand Operand Operand Operand
     | MASKEQZ Operand Operand Operand
@@ -824,8 +821,7 @@ instrCon i =
       REVHD{} -> "REVHD"
       BITREV4B{} -> "BITREV4B"
       BITREV8B{} -> "BITREV8B"
-      BITREVW{} -> "BITREVW"
-      BITREVD{} -> "BITREVD"
+      BITREV{} -> "BITREV"
       BSTRINS{} -> "BSTRINS"
       BSTRPICK{} -> "BSTRPICK"
       MASKEQZ{} -> "MASKEQZ"
