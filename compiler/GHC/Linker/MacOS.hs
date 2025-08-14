@@ -162,7 +162,7 @@ loadFramework interp extraPaths rootname
      -- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
 
-     -- Try to call loadDLL for each candidate path.
+     -- Try to call loadDLLs for each candidate path.
      --
      -- See Note [macOS Big Sur dynamic libraries]
      findLoadDLL [] errs =
@@ -170,7 +170,7 @@ loadFramework interp extraPaths rootname
        -- has no built-in paths for frameworks: give up
        return $ Just errs
      findLoadDLL (p:ps) errs =
-       do { dll <- loadDLL interp (p </> fwk_file)
+       do { dll <- loadDLLs interp [p </> fwk_file]
           ; case dll of
               Right _  -> return Nothing
               Left err -> findLoadDLL ps ((p ++ ": " ++ err):errs)

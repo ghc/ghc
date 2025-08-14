@@ -12,7 +12,7 @@
 -- dynamic linker.
 module GHCi.ObjLink
   ( initObjLinker, ShouldRetainCAFs(..)
-  , loadDLL
+  , loadDLLs
   , loadArchive
   , loadObj
   , unloadObj
@@ -43,6 +43,10 @@ import Control.Exception (catch, evaluate)
 import GHC.Wasm.Prim
 #endif
 
+#if defined(wasm32_HOST_ARCH)
+import Data.List (intercalate)
+#endif
+
 -- ---------------------------------------------------------------------------
 -- RTS Linker Interface
 -- ---------------------------------------------------------------------------
@@ -67,20 +71,25 @@ data ShouldRetainCAFs
 initObjLinker :: ShouldRetainCAFs -> IO ()
 initObjLinker _ = pure ()
 
-loadDLL :: String -> IO (Either String (Ptr LoadedDLL))
-loadDLL f =
+-- Batch load multiple DLLs at once via dyld to enable a single
+-- dependency resolution and more parallel compilation. We pass a
+-- NUL-delimited JSString to avoid array marshalling on wasm.
+loadDLLs :: [String] -> IO (Either String [Ptr LoadedDLL])
+loadDLLs fs =
   m `catch` \(err :: JSException) ->
-    pure $ Left $ "loadDLL failed for " <> f <> ": " <> show err
+    pure $ Left $ "loadDLLs failed: " <> show err
   where
+    packed :: JSString
+    packed = toJSString (intercalate ['\0'] fs)
     m = do
-      evaluate =<< js_loadDLL (toJSString f)
-      pure $ Right nullPtr
+      evaluate =<< js_loadDLLs packed
+      pure $ Right (replicate (length fs) nullPtr)
 
 -- See Note [Variable passing in JSFFI] for where
 -- __ghc_wasm_jsffi_dyld comes from
 
-foreign import javascript safe "__ghc_wasm_jsffi_dyld.loadDLL($1)"
-  js_loadDLL :: JSString -> IO ()
+foreign import javascript safe "__ghc_wasm_jsffi_dyld.loadDLLs($1)"
+  js_loadDLLs :: JSString -> IO ()
 
 loadArchive :: String -> IO ()
 loadArchive f = throwIO $ ErrorCall $ "loadArchive: unsupported on wasm for " <> f
@@ -240,6 +249,16 @@ resolveObjs :: IO Bool
 resolveObjs = do
    r <- c_resolveObjs
    return (r /= 0)
+
+loadDLLs :: [String] -> IO (Either String [Ptr LoadedDLL])
+loadDLLs = go []
+  where
+    go acc [] = pure (Right (reverse acc))
+    go acc (p:ps) = do
+      r <- loadDLL p
+      case r of
+        Left err -> pure (Left err)
+        Right h  -> go (h:acc) ps
 
 -- ---------------------------------------------------------------------------
 -- Foreign declarations to RTS entry points which does the real work;
