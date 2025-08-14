@@ -89,7 +89,7 @@ data Message a where
   LookupSymbol :: String -> Message (Maybe (RemotePtr ()))
   LookupSymbolInDLL :: RemotePtr LoadedDLL -> String -> Message (Maybe (RemotePtr ()))
   LookupClosure :: String -> Message (Maybe HValueRef)
-  LoadDLL :: String -> Message (Either String (RemotePtr LoadedDLL))
+  LoadDLLs :: [String] -> Message (Either String [RemotePtr LoadedDLL])
   LoadArchive :: String -> Message () -- error?
   LoadObj :: String -> Message () -- error?
   UnloadObj :: String -> Message () -- error?
@@ -448,7 +448,7 @@ data BreakModule
 -- that type isn't available here.
 data BreakUnitId
 
--- | A dummy type that tags pointers returned by 'LoadDLL'.
+-- | A dummy type that tags pointers returned by 'LoadDLLs'.
 data LoadedDLL
 
 -- SomeException can't be serialized because it contains dynamic
@@ -564,7 +564,7 @@ getMessage = do
       1  -> Msg <$> return InitLinker
       2  -> Msg <$> LookupSymbol <$> get
       3  -> Msg <$> LookupClosure <$> get
-      4  -> Msg <$> LoadDLL <$> get
+      4  -> Msg <$> LoadDLLs <$> get
       5  -> Msg <$> LoadArchive <$> get
       6  -> Msg <$> LoadObj <$> get
       7  -> Msg <$> UnloadObj <$> get
@@ -610,7 +610,7 @@ putMessage m = case m of
   InitLinker                  -> putWord8 1
   LookupSymbol str            -> putWord8 2  >> put str
   LookupClosure str           -> putWord8 3  >> put str
-  LoadDLL str                 -> putWord8 4  >> put str
+  LoadDLLs strs               -> putWord8 4  >> put strs
   LoadArchive str             -> putWord8 5  >> put str
   LoadObj str                 -> putWord8 6  >> put str
   UnloadObj str               -> putWord8 7  >> put str

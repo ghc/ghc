@@ -57,7 +57,7 @@ run m = case m of
 #if defined(javascript_HOST_ARCH)
   LoadObj p                   -> withCString p loadJS
   InitLinker                  -> notSupportedJS m
-  LoadDLL {}                  -> notSupportedJS m
+  LoadDLLs {}                 -> notSupportedJS m
   LoadArchive {}              -> notSupportedJS m
   UnloadObj {}                -> notSupportedJS m
   AddLibrarySearchPath {}     -> notSupportedJS m
@@ -69,7 +69,7 @@ run m = case m of
   LookupClosure str           -> lookupJSClosure str
 #else
   InitLinker -> initObjLinker RetainCAFs
-  LoadDLL str -> fmap toRemotePtr <$> loadDLL str
+  LoadDLLs strs -> fmap (map toRemotePtr) <$> loadDLLs strs
   LoadArchive str -> loadArchive str
   LoadObj str -> loadObj str
   UnloadObj str -> unloadObj str

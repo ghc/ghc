@@ -9,7 +9,7 @@
 //    iserv (GHCi.Server.defaultServer). This part only runs in
 //    nodejs.
 // 2. Dynamic linker: provide RTS linker interfaces like
-//    loadDLL/lookupSymbol etc which are imported by wasm iserv. This
+//    loadDLLs/lookupSymbol etc which are imported by wasm iserv. This
 //    part can run in browsers as well.
 //
 // When GHC starts external interpreter for the wasm target, it starts
@@ -50,7 +50,7 @@
 //
 // *** What works right now and what doesn't work yet?
 //
-// loadDLL & bytecode interpreter work. Template Haskell & ghci work.
+// loadDLLs & bytecode interpreter work. Template Haskell & ghci work.
 // Profiled dynamic code works. Compiled code and bytecode can all be
 // loaded, though the side effects are constrained to what's supported
 // by wasi preview1: we map the full host filesystem into wasm cause
@@ -777,17 +777,17 @@ class DyLD {
     return this.#rpc.findSystemLibrary(f);
   }
 
-  // When we do loadDLL, we first perform "downsweep" which return a
+  // When we do loadDLLs, we first perform "downsweep" which return a
   // toposorted array of dependencies up to itself, then sequentially
   // load the downsweep result.
   //
   // The rationale of a separate downsweep phase, instead of a simple
-  // recursive loadDLL function is: V8 delegates async
+  // recursive loadDLLs function is: V8 delegates async
   // WebAssembly.compile to a background worker thread pool. To
   // maintain consistent internal linker state, we *must* load each so
   // file sequentially, but it's okay to kick off compilation asap,
   // store the Promise in downsweep result and await for the actual
-  // WebAssembly.Module in loadDLL logic. This way we can harness some
+  // WebAssembly.Module in loadDLLs logic. This way we can harness some
   // background parallelism.
   async #downsweep(p) {
     const toks = p.split("/");
@@ -828,8 +828,26 @@ class DyLD {
     return acc;
   }
 
-  // The real stuff
-  async loadDLL(p) {
+  // Batch load multiple DLLs in one go.
+  // Accepts a NUL-delimited string of paths to avoid array marshalling.
+  // Each path can be absolute or a soname; dependency resolution is
+  // performed across the full set to enable maximal parallel compile
+  // while maintaining sequential instantiation order.
+  async loadDLLs(packed) {
+    // Normalize input to an array of strings. When called from Haskell
+    // we pass a single JSString containing NUL-separated paths.
+    const paths = (typeof packed === "string"
+      ? (packed.length === 0 ? [] : packed.split("\0"))
+      : [packed] // tolerate an accidental single path object
+    ).filter((s) => s.length > 0).reverse();
+
+    // Compute a single downsweep plan for the whole batch.
+    // Note: #downsweep mutates #loadedSos to break cycles and dedup.
+    const plan = [];
+    for (const p of paths) {
+      plan.push(...(await this.#downsweep(p)));
+    }
+
     for (const {
       memSize,
       memP2Align,
@@ -837,7 +855,7 @@ class DyLD {
       tableP2Align,
       modp,
       soname,
-    } of await this.#downsweep(p)) {
+    } of plan) {
       const import_obj = {
         wasi_snapshot_preview1: this.#wasi.wasiImport,
         env: {
@@ -1131,7 +1149,7 @@ export async function main({ rpc, libdir, ghciSoPath, args }) {
       rpc,
     });
     await dyld.addLibrarySearchPath(libdir);
-    await dyld.loadDLL(ghciSoPath);
+    await dyld.loadDLLs(ghciSoPath);
 
     const reader = rpc.readStream.getReader();
     const writer = rpc.writeStream.getWriter();
