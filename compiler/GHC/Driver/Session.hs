@@ -1925,9 +1925,9 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setBackend noBackend))
   , make_ord_flag defFlag "fbyte-code"
-      (noArgM $ \dflags -> do
+      (NoArg $ do
         setBackend bytecodeBackend
-        pure $ flip gopt_unset Opt_ByteCodeAndObjectCode (gopt_set dflags Opt_ByteCode))
+        upd $ \dflags -> flip gopt_unset Opt_ByteCodeAndObjectCode (gopt_set dflags Opt_ByteCode))
   , make_ord_flag defFlag "fobject-code"     $ noArgM $ \dflags -> do
       setBackend $ platformDefaultBackend (targetPlatform dflags)
       dflags' <- liftEwM getCmdLineState
@@ -3185,10 +3185,8 @@ parseReexportedModule str
 -- If we're linking a binary, then only backends that produce object
 -- code are allowed (requests for other target types are ignored).
 setBackend :: Backend -> DynP ()
-setBackend l = upd $ \ dfs ->
-  if ghcLink dfs /= LinkBinary || backendWritesFiles l
-  then dfs{ backend = l }
-  else dfs
+setBackend l = do
+  upd $ \ dfs -> dfs{ backend = l }
 
 -- Changes the target only if we're compiling object code.  This is
 -- used by -fasm and -fllvm, which switch from one to the other, but
@@ -3706,6 +3704,11 @@ makeDynFlagsConsistent dflags
         -- way (-prof, -static, or -dynamic).
         setGeneralFlag' Opt_ExternalInterpreter $
         addWay' WayDyn dflags
+
+ | LinkBinary <- ghcLink dflags
+ , gopt Opt_ByteCode dflags
+    = loop (dflags { ghcLink = NoLink })
+           "Byte-code linking does not currently support linking an executable, enabling -no-link"
 
  | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)

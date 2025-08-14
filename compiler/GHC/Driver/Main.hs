@@ -105,7 +105,6 @@ module GHC.Driver.Main
     , showModuleIndex
     , hscAddSptEntries
     , writeInterfaceOnlyMode
-    , loadByteCode
     , genModDetails
     ) where
 
@@ -869,25 +868,24 @@ hscRecompStatus
               return $ HscRecompNeeded $ Just $ mi_iface_hash $ checked_iface
 
            | otherwise -> do
-               -- Do need linkable
-               -- 1. Just check whether we have bytecode/object linkables and then
-               -- we will decide if we need them or not.
-               bc_linkable <- checkByteCode hsc_env checked_iface mod_details mod_summary (homeMod_bytecode old_linkable)
+               -- Check the status of all the linkable types we might need.
+               -- 1. The in-memory linkable we had at hand.
+               bc_in_memory_linkable <- checkByteCodeInMemory hsc_env mod_summary (homeMod_bytecode old_linkable)
+               -- 2. The bytecode object file
+               bc_obj_linkable <- checkByteCodeFromObject hsc_env mod_summary
+               -- 3. Bytecode from an interface whole core bindings.
+               bc_core_linkable <- checkByteCodeFromCoreBindings hsc_env checked_iface mod_details mod_summary
+               -- 4. The object file.
                obj_linkable <- liftIO $ checkObjects lcl_dflags (homeMod_object old_linkable) mod_summary
-               trace_if (hsc_logger hsc_env) (vcat [text "BCO linkable", nest 2 (ppr bc_linkable), text "Object Linkable", ppr obj_linkable])
+               trace_if (hsc_logger hsc_env)
+                (vcat [text "BCO linkable", nest 2 (ppr bc_in_memory_linkable)
+                      , text "BCO obj linkable", ppr bc_obj_linkable
+                      , text "BCO core linkable", ppr bc_core_linkable
+                      , text "Object Linkable", ppr obj_linkable])
 
-               let just_bc = justBytecode <$> bc_linkable
-                   just_o  = justObjects  <$> obj_linkable
-                   _maybe_both_os = case (bc_linkable, obj_linkable) of
-                               (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
-                               -- If missing object code, just say we need to recompile because of object code.
-                               (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
-                               -- If just missing byte code, just use the object code
-                               -- so you should use -fprefer-byte-code with -fwrite-if-simplified-core or you'll
-                               -- end up using bytecode on recompilation
-                               (_, UpToDateItem {} ) -> just_o
+               let just_o  = justObjects  <$> obj_linkable
 
-                   definitely_both_os = case (bc_linkable, obj_linkable) of
+                   definitely_both_os = case (definitely_bc, obj_linkable) of
                                (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
                                -- If missing object code, just say we need to recompile because of object code.
                                (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
@@ -896,17 +894,21 @@ hscRecompStatus
                                -- end up using bytecode on recompilation
                                (OutOfDateItem reason _,  _ ) -> OutOfDateItem reason Nothing
 
+                   -- When -fwrite-byte-code, we definitely need to have up-to-date bytecode.
+                   definitely_bc =  bc_obj_linkable `prefer` bc_in_memory_linkable
+
+                   -- If not -fwrite-byte-code, then we could use core bindings or object code if that's available.
+                   maybe_bc = ((bc_obj_linkable `choose` bc_core_linkable) `prefer` bc_in_memory_linkable)
+                              `choose` obj_linkable
+
 --               pprTraceM "recomp" (ppr just_bc <+> ppr just_o)
                -- 2. Decide which of the products we will need
                let recomp_linkable_result = case () of
                      _ | backendCanReuseLoadedCode (backend lcl_dflags) ->
-                           case bc_linkable of
-                             -- If bytecode is available for Interactive then don't load object code
-                             UpToDateItem _ -> just_bc
-                             _ -> case obj_linkable of
-                                     -- If o is availabe, then just use that
-                                     UpToDateItem _ -> just_o
-                                     _ -> outOfDateItemBecause MissingBytecode Nothing
+                           if gopt Opt_WriteByteCode lcl_dflags
+                              -- If the byte-code artifact needs to be produced, then we certainly need bytecode.
+                              then justBytecode <$> definitely_bc
+                              else justBytecode <$> maybe_bc
                         -- Need object files for making object files
                         | backendWritesFiles (backend lcl_dflags) ->
                            if gopt Opt_ByteCodeAndObjectCode lcl_dflags
@@ -923,6 +925,20 @@ hscRecompStatus
                  OutOfDateItem reason _ -> do
                    msg $ NeedsRecompile reason
                    return $ HscRecompNeeded $ Just $ mi_iface_hash $ checked_iface
+
+-- | Prefer requires both arguments to be up-to-date.
+-- but prefers to use the second argument.
+prefer :: MaybeValidated Linkable -> MaybeValidated Linkable -> MaybeValidated Linkable
+prefer (UpToDateItem _) (UpToDateItem l2) = UpToDateItem l2
+prefer r1 _ = r1
+
+-- | Disjunction, choose either argument, but prefer the first one.
+-- Report the failure of the first argument.
+choose :: MaybeValidated Linkable -> MaybeValidated Linkable -> MaybeValidated Linkable
+choose (UpToDateItem l1) _ = UpToDateItem l1
+choose _ (UpToDateItem l2) = UpToDateItem l2
+choose l1 _ = l1
+
 
 -- | Check that the .o files produced by compilation are already up-to-date
 -- or not.
@@ -959,34 +975,24 @@ checkObjects dflags mb_old_linkable summary = do
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
 -- no need to check that again here
-checkByteCode :: HscEnv -> ModIface -> ModDetails -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
-checkByteCode hsc_env iface mod_details mod_sum mb_old_linkable =
+checkByteCodeInMemory :: HscEnv -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
+checkByteCodeInMemory hsc_env mod_sum mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
       | not (linkableIsNativeCodeOnly old_linkable)
+      -- If `-fwrite-byte-code` is enabled, then check that the .gbc file is
+      -- up-to-date with the linkable we have in our hand.
+      -- If ms_bytecode_date is Nothing, then the .gbc file does not exist yet.
+      -- Otherwise, check that the date matches the linkable date exactly.
+      , if gopt Opt_WriteByteCode (hsc_dflags hsc_env)
+          then maybe False (linkableTime old_linkable ==) (ms_bytecode_date mod_sum)
+          else True
       -> return $ (UpToDateItem old_linkable)
-    _ -> do
-      load_result <- loadByteCodeFromCoreBindings hsc_env iface mod_details mod_sum
-      case load_result of
-        Just linkable -> return $ UpToDateItem linkable
-        Nothing -> loadByteCode hsc_env iface mod_details mod_sum
-
--- | First attempt to use the bytecode object linkable if it exists.
--- If that doesn't exist, then try to load bytecode from whole core bindings.
-loadByteCode :: HscEnv -> ModIface -> ModDetails -> ModSummary -> IO (MaybeValidated Linkable)
-loadByteCode hsc_env iface mod_details mod_sum = do
-  obj_result <- loadByteCodeFromObject hsc_env mod_sum
-  case obj_result of
-    Just linkable -> return $ UpToDateItem linkable
-    Nothing -> do
-      core_result <- loadByteCodeFromCoreBindings hsc_env iface mod_details mod_sum
-      case core_result of
-        Just linkable -> return $ UpToDateItem linkable
-        Nothing -> return $ outOfDateItemBecause MissingBytecode Nothing
+    _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 -- | Load bytecode from a ".gbc" object file if it exists and is up-to-date
-loadByteCodeFromObject :: HscEnv -> ModSummary -> IO (Maybe Linkable)
-loadByteCodeFromObject hsc_env mod_sum = do
+checkByteCodeFromObject :: HscEnv -> ModSummary -> IO (MaybeValidated Linkable)
+checkByteCodeFromObject hsc_env mod_sum = do
   let
     obj_fn = ml_bytecode_file (ms_location mod_sum)
     obj_date = ms_bytecode_date mod_sum
@@ -994,14 +1000,18 @@ loadByteCodeFromObject hsc_env mod_sum = do
   case (,) <$> obj_date <*> if_date of
     Just (obj_date, if_date)
       | obj_date >= if_date -> do
-        bco <- readBinByteCode hsc_env obj_fn
-        Just <$> loadByteCodeObjectLinkable hsc_env obj_date (ms_location mod_sum) bco
-    _ -> return Nothing
+          -- Don't force this if we reuse the linkable already loaded into memory, but we have to check
+          -- that the one we have on disk would be suitable as well.
+          linkable <- unsafeInterleaveIO $ do
+            bco <- readBinByteCode hsc_env obj_fn
+            loadByteCodeObjectLinkable hsc_env obj_date (ms_location mod_sum) bco
+          return $ UpToDateItem linkable
+    _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 -- | Attempt to load bytecode from whole core bindings in the interface if they exist.
 -- This is a legacy code-path, these days it should be preferred to use the bytecode object linkable.
-loadByteCodeFromCoreBindings :: HscEnv -> ModIface -> ModDetails -> ModSummary -> IO (Maybe Linkable)
-loadByteCodeFromCoreBindings hsc_env iface mod_details mod_sum = do
+checkByteCodeFromCoreBindings :: HscEnv -> ModIface -> ModDetails -> ModSummary -> IO (MaybeValidated Linkable)
+checkByteCodeFromCoreBindings hsc_env iface mod_details mod_sum = do
     let
       this_mod   = ms_mod mod_sum
       if_date    = fromJust $ ms_iface_date mod_sum
@@ -1010,8 +1020,8 @@ loadByteCodeFromCoreBindings hsc_env iface mod_details mod_sum = do
         ~(bco, fos) <- unsafeInterleaveIO $
                        compileWholeCoreBindings hsc_env (md_types mod_details) fi
         let bco' = LazyBCOs bco fos
-        return (Just (Linkable if_date this_mod (NE.singleton bco')))
-      _ -> return Nothing
+        return $ UpToDateItem (Linkable if_date this_mod (NE.singleton bco'))
+      _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 --------------------------------------------------------------
 -- Compilers
@@ -2231,8 +2241,11 @@ generateAndWriteByteCode hsc_env cgguts mod_location = do
 
 generateAndWriteByteCodeLinkable :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO Linkable
 generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
-  bco_time <- getCurrentTime
   bco_object <- generateAndWriteByteCode hsc_env cgguts mod_location
+  -- Either, get the same time as the .gbc file if it exists, or just the current time.
+  -- It's important the time of the linkable matches the time of the .gbc file for recompilation
+  -- checking.
+  bco_time <- maybe getCurrentTime pure =<< modificationTimeIfExists (ml_bytecode_file mod_location)
   loadByteCodeObjectLinkable hsc_env bco_time mod_location bco_object
 
 -- | Write foreign sources and foreign stubs to temporary files and compile them.
