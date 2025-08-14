@@ -62,3 +62,5 @@ test('ManyUbxSums',
      ['ManyUbxSums',
         [('ManyUbxSums_Addr.hs','')]
         , '-v0 -dstg-lint -dcmm-lint'])
+
+test('UbxSumUnpackedSize', normal, compile_and_run, ['-O'])
