@@ -63,33 +63,33 @@ layout_tests = sequence_
       assert_layout "layout1"
         [ ubxtup [ intTy, intPrimTy ]
         , ubxtup [ intPrimTy, intTy ] ]
-        [ WordSlot, PtrLiftedSlot, WordSlot ]
+        [ Word8Slot, PtrLiftedSlot, WordSlot ]
 
     layout2 =
       assert_layout "layout2"
         [ ubxtup [ intTy ]
         , intTy ]
-        [ WordSlot, PtrLiftedSlot ]
+        [ Word8Slot, PtrLiftedSlot ]
 
     layout3 =
       assert_layout "layout3"
         [ ubxtup [ intTy, intPrimTy, intTy, intPrimTy ]
         , ubxtup [ intPrimTy, intTy, intPrimTy, intTy ] ]
-        [ WordSlot, PtrLiftedSlot, PtrLiftedSlot, WordSlot, WordSlot ]
+        [ Word8Slot, PtrLiftedSlot, PtrLiftedSlot, WordSlot, WordSlot ]
 
     layout4 =
       assert_layout "layout4"
         [ ubxtup [ floatPrimTy, floatPrimTy ]
         , ubxtup [ intPrimTy, intPrimTy ] ]
-        [ WordSlot, WordSlot, WordSlot, FloatSlot, FloatSlot ]
+        [ Word8Slot, WordSlot, WordSlot, FloatSlot, FloatSlot ]
 
     layout5 =
       assert_layout "layout5"
         [ ubxtup [ intPrimTy, intPrimTy ]
         , ubxtup [ floatPrimTy, floatPrimTy ] ]
-        [ WordSlot, WordSlot, WordSlot, FloatSlot, FloatSlot ]
+        [ Word8Slot, WordSlot, WordSlot, FloatSlot, FloatSlot ]
 
     enum_layout =
       assert_layout "enum"
         (replicate 10 (ubxtup []))
-        [ WordSlot ]
+        [ Word8Slot ]

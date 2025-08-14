@@ -404,7 +404,6 @@ import GHC.Stg.Syntax
 import GHC.Stg.Utils
 import GHC.Stg.Make
 import GHC.Core.Type
-import GHC.Builtin.Types.Prim (intPrimTy)
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
@@ -681,15 +680,15 @@ elimCase rho args bndr (MultiValAlt _) [GenStgAlt{ alt_con   = _
 
 elimCase rho args@(tag_arg : real_args) bndr (MultiValAlt _) alts
   | isUnboxedSumBndr bndr
-  = do tag_bndr <- mkId (mkFastString "tag") tagTy
+  = do tag_bndr <- mkId (mkFastString "tag") (tagTyArg tag_arg)
           -- this won't be used but we need a binder anyway
        let rho1 = extendRho rho bndr (MultiVal args)
            scrut' = case tag_arg of
                       StgVarArg v     -> StgApp v []
                       StgLitArg l     -> StgLit l
-
-       alts' <- unariseSumAlts rho1 real_args alts
-       return (StgCase scrut' tag_bndr tagAltTy alts')
+           alt_ty = (tagAltTyArg tag_arg)
+       alts' <- unariseSumAlts rho1 alt_ty real_args alts
+       return (StgCase scrut' tag_bndr alt_ty alts')
 
 elimCase _ args bndr alt_ty alts
   = pprPanic "elimCase - unhandled case"
@@ -732,8 +731,9 @@ unariseAlts rho (MultiValAlt _) bndr [GenStgAlt{ alt_con    = DEFAULT
 unariseAlts rho (MultiValAlt _) bndr alts
   | isUnboxedSumBndr bndr
   = do (rho_sum_bndrs, scrt_bndrs@(tag_bndr : real_bndrs)) <- unariseConArgBinder rho bndr
-       alts' <- unariseSumAlts rho_sum_bndrs (map StgVarArg real_bndrs) alts
-       let inner_case = StgCase (StgApp tag_bndr []) tag_bndr tagAltTy alts'
+       let alt_ty = tagAltTy tag_bndr
+       alts' <- unariseSumAlts rho_sum_bndrs alt_ty (map StgVarArg real_bndrs) alts
+       let inner_case = StgCase (StgApp tag_bndr []) tag_bndr alt_ty alts'
        return [GenStgAlt{ alt_con   = DataAlt (tupleDataCon Unboxed (length scrt_bndrs))
                         , alt_bndrs = scrt_bndrs
                         , alt_rhs   = inner_case
@@ -753,21 +753,23 @@ unariseAlt rho alt@GenStgAlt{alt_con=_,alt_bndrs=xs,alt_rhs=e}
 -- | Make alternatives that match on the tag of a sum
 -- (i.e. generate LitAlts for the tag)
 unariseSumAlts :: UnariseEnv
+               -> AltType
                -> [StgArg] -- sum components _excluding_ the tag bit.
                -> [StgAlt] -- original alternative with sum LHS
                -> UniqSM [StgAlt]
-unariseSumAlts env args alts
-  = do alts' <- mapM (unariseSumAlt env args) alts
+unariseSumAlts env tag_slot args alts
+  = do alts' <- mapM (unariseSumAlt env tag_slot args) alts
        return (mkDefaultLitAlt alts')
 
 unariseSumAlt :: UnariseEnv
+              -> AltType
               -> [StgArg] -- sum components _excluding_ the tag bit.
               -> StgAlt   -- original alternative with sum LHS
               -> UniqSM StgAlt
-unariseSumAlt rho _ GenStgAlt{alt_con=DEFAULT,alt_bndrs=_,alt_rhs=e}
+unariseSumAlt rho _ _ GenStgAlt{alt_con=DEFAULT,alt_bndrs=_,alt_rhs=e}
   = GenStgAlt DEFAULT mempty <$> unariseExpr rho e
 
-unariseSumAlt rho args alt@GenStgAlt{ alt_con   = DataAlt sumCon
+unariseSumAlt rho tag_slot args alt@GenStgAlt{ alt_con   = DataAlt sumCon
                                 , alt_bndrs = bs
                                 , alt_rhs   = e
                                 }
@@ -776,10 +778,18 @@ unariseSumAlt rho args alt@GenStgAlt{ alt_con   = DataAlt sumCon
               [b] -> mapSumIdBinders b args e rho
               -- Sums must have one binder
               _ -> pprPanic "unariseSumAlt2" (ppr args $$ pprPanicAlt alt)
-       let lit_case   = LitAlt (LitNumber LitNumInt (fromIntegral (dataConTag sumCon)))
+       let num_ty =
+            case tag_slot of
+              PrimAlt Word8Rep  -> LitNumWord8
+              PrimAlt Word16Rep -> LitNumWord16
+              PrimAlt Word32Rep -> LitNumWord32
+              PrimAlt WordRep   -> LitNumWord
+              _ -> pprPanic "unariseSumAlt: unexpected tag slot type" (ppr tag_slot)
+
+           lit_case   = LitAlt (LitNumber num_ty (fromIntegral (dataConTag sumCon)))
        GenStgAlt lit_case mempty <$> unariseExpr rho' e'
 
-unariseSumAlt _ scrt alt
+unariseSumAlt _ _ scrt alt
   = pprPanic "unariseSumAlt3" (ppr scrt $$ pprPanicAlt alt)
 
 --------------------------------------------------------------------------------
@@ -865,12 +875,6 @@ mapSumIdBinders alt_bndr args rhs rho0
 
       typed_id_args = map StgVarArg typed_ids
 
-      -- pprTrace "mapSumIdBinders"
-      --           (text "fld_reps" <+> ppr fld_reps $$
-      --           text "id_args" <+> ppr id_arg_exprs $$
-      --           text "rhs" <+> ppr rhs $$
-      --           text "rhs_with_casts" <+> ppr rhs_with_casts
-      --           ) $
     if isMultiValBndr alt_bndr
       then return (extendRho rho0 alt_bndr (MultiVal typed_id_args), rhs_with_casts rhs)
       else assert (typed_id_args `lengthIs` 1) $
@@ -921,13 +925,19 @@ mkUbxSum
      )
 mkUbxSum dc ty_args args0 us
   = let
-      _ :| sum_slots = ubxSumRepType ty_args
+      tag_slot :| sum_slots = ubxSumRepType ty_args
       -- drop tag slot
       field_slots = (mapMaybe (repSlotTy . stgArgRep) args0)
       tag = dataConTag dc
       layout'  = layoutUbxSum sum_slots field_slots
 
-      tag_arg  = StgLitArg (LitNumber LitNumInt (fromIntegral tag))
+      tag_arg =
+        case tag_slot of
+          Word8Slot  -> StgLitArg (LitNumber LitNumWord8 (fromIntegral tag))
+          Word16Slot -> StgLitArg (LitNumber LitNumWord16 (fromIntegral tag))
+          Word32Slot -> StgLitArg (LitNumber LitNumWord32 (fromIntegral tag))
+          WordSlot   -> StgLitArg (LitNumber LitNumWord (fromIntegral tag))
+          _          -> pprPanic "mkUbxSum: unexpected tag slot type" (ppr tag_slot)
       arg_idxs = IM.fromList (zipEqual layout' args0)
 
       ((_idx,_idx_map,_us,wrapper),slot_args)
@@ -990,6 +1000,9 @@ ubxSumRubbishArg :: SlotTy -> StgArg
 ubxSumRubbishArg PtrLiftedSlot   = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
 ubxSumRubbishArg PtrUnliftedSlot = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
 ubxSumRubbishArg WordSlot        = StgLitArg (LitNumber LitNumWord 0)
+ubxSumRubbishArg Word8Slot       = StgLitArg (LitNumber LitNumWord8 0)
+ubxSumRubbishArg Word16Slot      = StgLitArg (LitNumber LitNumWord16 0)
+ubxSumRubbishArg Word32Slot      = StgLitArg (LitNumber LitNumWord32 0)
 ubxSumRubbishArg Word64Slot      = StgLitArg (LitNumber LitNumWord64 0)
 ubxSumRubbishArg FloatSlot       = StgLitArg (LitFloat 0)
 ubxSumRubbishArg DoubleSlot      = StgLitArg (LitDouble 0)
@@ -1166,11 +1179,18 @@ isUnboxedTupleBndr = isUnboxedTupleType . idType
 mkTuple :: [StgArg] -> StgExpr
 mkTuple args = StgConApp (tupleDataCon Unboxed (length args)) NoNumber args []
 
-tagAltTy :: AltType
-tagAltTy = PrimAlt IntRep
+tagAltTyArg :: StgArg -> AltType
+tagAltTyArg a
+  | [pr] <- typePrimRep (stgArgType a) = PrimAlt pr
+  | otherwise = pprPanic "tagAltTyArg" (ppr a)
 
-tagTy :: Type
-tagTy = intPrimTy
+tagAltTy :: Id -> AltType
+tagAltTy i
+  | [pr] <- typePrimRep (idType i) = PrimAlt pr
+  | otherwise = pprPanic "tagAltTy" (ppr $ idType i)
+
+tagTyArg :: StgArg -> Type
+tagTyArg x = stgArgType x
 
 voidArg :: StgArg
 voidArg = StgVarArg voidPrimId

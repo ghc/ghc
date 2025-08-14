@@ -115,6 +115,9 @@ slotCmmType platform = \case
    PtrUnliftedSlot -> gcWord platform
    PtrLiftedSlot   -> gcWord platform
    WordSlot        -> bWord platform
+   Word8Slot       -> b8
+   Word16Slot      -> b16
+   Word32Slot      -> b32
    Word64Slot      -> b64
    FloatSlot       -> f32
    DoubleSlot      -> f64
