@@ -1,0 +1,32 @@
+
+### u_ba
+U_Bool False True False True False True False True
+size: 3
+
+### u_e1a
+U_E1 E1_1 127 (-128) 127 (-128) 127 (-128) 127
+size: 3
+
+### u_e1b
+U_E1 E1_254 (-128) 127 (-128) 127 (-128) 127 (-128)
+size: 3
+
+### u_e1c
+U_E1 E1_1 126 127 0 1 2 3 4
+size: 3
+
+### u_e1d
+U_E1 E1_254 126 127 0 1 2 3 4
+size: 3
+
+### u_e2a
+U_E2 E2_1 127 (-128) 127 (-128) 127 (-128) 127
+size: 3
+
+### u_maybe
+U_Maybe Nothing (Just False) Nothing (Just True) Nothing (Just False) Nothing (Just True)
+size: 11
+
+### u_maybeW32
+U_MaybeW32 NothingW32 (JustW32 0) NothingW32 (JustW32 4294967295) NothingW32 (JustW32 0) NothingW32 (JustW32 4294967295)
+size: 17
