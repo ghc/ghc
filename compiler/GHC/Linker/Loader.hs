@@ -534,9 +534,10 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
       return pls
 
     DLL dll_unadorned -> do
-      maybe_errstr <- loadDLL interp (platformSOName platform dll_unadorned)
-      case maybe_errstr of
-         Right _ -> maybePutStrLn logger "done"
+      res_e <- loadDLLs interp [platformSOName platform dll_unadorned]
+      case res_e of
+         Right [_] -> maybePutStrLn logger "done"
+         Right _   -> preloadFailed "unexpected LoadDLLs response" lib_paths lib_spec
          Left mm | platformOS platform /= OSDarwin ->
            preloadFailed mm lib_paths lib_spec
          Left mm | otherwise -> do
@@ -544,17 +545,19 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
            -- since (apparently) some things install that way - see
            -- ticket #8770.
            let libfile = ("lib" ++ dll_unadorned) <.> "so"
-           err2 <- loadDLL interp libfile
-           case err2 of
-             Right _ -> maybePutStrLn logger "done"
-             Left _  -> preloadFailed mm lib_paths lib_spec
+           err2_e <- loadDLLs interp [libfile]
+           case err2_e of
+             Right [_] -> maybePutStrLn logger "done"
+             Right _   -> preloadFailed mm lib_paths lib_spec
+             Left _    -> preloadFailed mm lib_paths lib_spec
       return pls
 
     DLLPath dll_path -> do
-      do maybe_errstr <- loadDLL interp dll_path
-         case maybe_errstr of
-            Right _ -> maybePutStrLn logger "done"
-            Left mm -> preloadFailed mm lib_paths lib_spec
+      do res_e <- loadDLLs interp [dll_path]
+         case res_e of
+            Right [_] -> maybePutStrLn logger "done"
+            Left mm   -> preloadFailed mm lib_paths lib_spec
+            _         -> preloadFailed "unexpected LoadDLLs response" lib_paths lib_spec
          return pls
 
     Framework framework ->
@@ -891,10 +894,11 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
-    m <- loadDLL interp soFile
-    case m of
-      Right _ -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
-      Left err -> linkFail msg (text err)
+    res <- loadDLLs interp [soFile]
+    case res of
+      Right [_] -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
+      Left err  -> linkFail msg (text err)
+      _         -> linkFail msg (text "unexpected LoadDLLs response")
   where
     msg = "GHC.Linker.Loader.dynLoadObjs: Loading temp shared object failed"
 
@@ -1222,7 +1226,12 @@ loadPackage interp hsc_env pkg
         -- See Note [Crash early load_dyn and locateLib]
         -- Crash early if can't load any of `known_dlls`
         mapM_ (load_dyn interp hsc_env True) known_extra_dlls
-        loaded_dlls <- mapMaybeM (load_dyn interp hsc_env True) known_hs_dlls
+        -- Batch-load Haskell package DLLs to allow downstream
+        -- interpreters/linkers to parallelize work (#25407).
+        res_loaded_dlls <- loadDLLs interp known_hs_dlls
+        loaded_dlls <- case res_loaded_dlls of
+          Right ds -> pure ds
+          Left e   -> cmdLineErrorIO e
         -- For remaining `dlls` crash early only when there is surely
         -- no package's DLL around ... (not is_dyn)
         mapM_ (load_dyn interp hsc_env (not is_dyn) . platformSOName platform) dlls
@@ -1302,9 +1311,9 @@ restriction very easily.
 -- loadDLL is going to search the system paths to find the library.
 load_dyn :: Interp -> HscEnv -> Bool -> FilePath -> IO (Maybe (RemotePtr LoadedDLL))
 load_dyn interp hsc_env crash_early dll = do
-  r <- loadDLL interp dll
-  case r of
-    Right loaded_dll -> pure (Just loaded_dll)
+  rs <- loadDLLs interp [dll]
+  case rs of
+    Right [loaded_dll] -> pure (Just loaded_dll)
     Left err ->
       if crash_early
         then cmdLineErrorIO err
@@ -1314,6 +1323,9 @@ load_dyn interp hsc_env crash_early dll = do
                 neverQualify diag_opts
                   noSrcSpan (WarningWithFlag Opt_WarnMissedExtraSharedLib) $ withPprStyle defaultUserStyle (note err)
           pure Nothing
+    _ ->
+      if crash_early then cmdLineErrorIO "unexpected LoadDLLs response"
+      else pure Nothing
   where
     diag_opts = initDiagOpts (hsc_dflags hsc_env)
     logger = hsc_logger hsc_env
