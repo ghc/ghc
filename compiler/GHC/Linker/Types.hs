@@ -494,7 +494,7 @@ data LibrarySpec
    | DLL String         -- "Unadorned" name of a .DLL/.so
                         --  e.g.    On unix     "qt"  denotes "libqt.so"
                         --          On Windows  "burble"  denotes "burble.DLL" or "libburble.dll"
-                        --  loadDLL is platform-specific and adds the lib/.so/.DLL
+                        --  loadDLLs is platform-specific and adds the lib/.so/.DLL
                         --  suffixes platform-dependently
 
    | DLLPath FilePath   -- Absolute or relative pathname to a dynamic library
