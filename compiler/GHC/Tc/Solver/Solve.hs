@@ -887,7 +887,7 @@ Wrinkles:
 
   Plainly the (C a) constraint is unused; but the expanded decl will look like
         $dmop2 :: C a => a -> a
-        $dmop2 = op1 . op2
+        $dmop2 = op1 . op1
 
         $fCList :: forall a. C a => C [a]
         $fCList @a (d::C a) = MkC (\(x:a).x) ($dmop2 @a d)
@@ -902,10 +902,12 @@ Wrinkles:
    It's a bit of a palaver, but not really difficult.
    All the logic is localised in `neededEvVars`.
 
-
-
------ Reporting redundant constraints
-
+   But NOTE that this only applies to /vanilla/ default methods.
+   For /generic/ default methods, like
+            class D a where { op1 :: blah
+                            ; default op1 :: Eq a => blah2 }
+   the (Eq a) constraint really is needed (e.g. class NFData and #25992).
+   Hence the `Bool` field of `MethSkol` indicates a /vanilla/ default method.
 
 ----- Examples
 
