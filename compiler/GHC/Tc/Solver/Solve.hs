@@ -902,10 +902,12 @@ Wrinkles:
    It's a bit of a palaver, but not really difficult.
    All the logic is localised in `neededEvVars`.
 
-
-
------ Reporting redundant constraints
-
+   But NOTE that this only applies to /vanilla/ default methods.
+   For /generic/ default methods, like
+            class D a where { op1 :: blah
+                            ; default op1 :: Eq a => blah2 }
+   the (Eq a) constraint really is needed (e.g. class NFData and #25992).
+   Hence the `Bool` field of `MethSkol` indicates a /vanilla/ default method.
 
 ----- Examples
 

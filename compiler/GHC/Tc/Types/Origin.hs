@@ -291,8 +291,8 @@ data SkolemInfoAnon
        PatersonSize     -- Head has the given PatersonSize
 
   | MethSkol Name Bool  -- Bound by the type of class method op
-                        -- True  <=> it's a default method
-                        -- False <=> it's a user-written method
+                        -- True  <=> it's a vanilla default method
+                        -- False <=> it's a user-written, or generic-default, method
 
   | FamInstSkol         -- Bound at a family instance decl
   | PatSkol             -- An existential type variable bound by a pattern for
