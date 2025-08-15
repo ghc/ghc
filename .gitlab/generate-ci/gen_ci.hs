@@ -446,7 +446,7 @@ opsysVariables _ FreeBSD14 = mconcat
     -- Prefer to use the system's clang-based toolchain and not gcc
   , "CC" =: "cc"
   , "CXX" =: "c++"
-  , "GHC_VERSION" =: "9.6.4"
+  , "FETCH_GHC_VERSION" =: "9.10.1"
   , "CABAL_INSTALL_VERSION" =: "3.10.3.0"
   ]
 opsysVariables arch (Linux distro) = distroVariables arch distro
@@ -478,7 +478,7 @@ opsysVariables _ (Windows {}) = mconcat
   , "LANG" =: "en_US.UTF-8"
   , "CABAL_INSTALL_VERSION" =: "3.10.2.0"
   , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
-  , "GHC_VERSION" =: "9.10.1"
+  , "FETCH_GHC_VERSION" =: "9.10.1"
   ]
 opsysVariables _ _ = mempty
 
