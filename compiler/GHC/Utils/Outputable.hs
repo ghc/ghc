@@ -528,18 +528,21 @@ pprDeeperList f ds
   | null ds   = f []
   | otherwise = SDoc work
  where
-  work ctx@SDC{ sdocStyle=PprUser _ (PartWay {}) _ }
-   = let   -- Only do this depth-limitation in User style
-           -- when PartWay is on.  Why not for DefaultDepth?
-           -- I have no idea; seems like a bug to me.
-        go _ [] = []
-        go i (d:ds) | i >= default_depth = [text "...."]
-                    | otherwise     = d : go (i+1) ds
-     in runSDoc (f (go 0 ds)) ctx
-   where
-     default_depth = sdocDefaultDepth ctx
+  -- Trim the list to the length of the remaining depth count
+  work ctx@SDC{ sdocStyle=PprUser _ depth _ }
+   | Just list_elts_to_print
+        <- case depth of
+              DefaultDepth -> Just (sdocDefaultDepth ctx)
+              PartWay n    -> Just n
+              AllTheWay    -> Nothing
+   = runSDoc (f (trim list_elts_to_print ds)) ctx
 
   work other_ctx = runSDoc (f ds) other_ctx
+
+trim :: Int -> [SDoc] -> [SDoc]
+trim _ []     = []
+trim 0 _      = [text "...."]
+trim n (d:ds) = d : trim (n-1) ds
 
 pprSetDepth :: Depth -> SDoc -> SDoc
 pprSetDepth depth doc = SDoc $ \ctx ->
