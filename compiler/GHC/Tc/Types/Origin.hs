@@ -290,10 +290,13 @@ data SkolemInfoAnon
        PatersonSize     -- Head has the given PatersonSize
 
   | MethSkol Name Bool  -- Bound by the type of class method op
-                        -- True  <=> it's a default method
-                        -- False <=> it's a user-written method
+                        -- True  <=> it's a vanilla default method
+                        -- False <=> it's a user-written, or generic-default, method
+                        -- See (TRC5) in Note [Tracking redundant constraints]
+                        --            in GHC.Tc.Solver.Solve
 
   | FamInstSkol         -- Bound at a family instance decl
+
   | PatSkol             -- An existential type variable bound by a pattern for
       ConLike           -- a data constructor with an existential type.
       HsMatchContextRn
