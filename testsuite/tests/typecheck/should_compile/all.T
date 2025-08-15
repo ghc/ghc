@@ -944,3 +944,4 @@ test('T26020a', [extra_files(['T26020a_help.hs'])], multimod_compile, ['T26020a'
 test('T25992', normal, compile, [''])
 test('T14010', normal, compile, [''])
 test('T26256a', normal, compile, [''])
+test('T25992a', normal, compile, [''])
