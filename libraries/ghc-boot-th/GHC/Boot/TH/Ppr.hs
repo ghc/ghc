@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE LambdaCase #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 -- | contains a prettyprinter for the
 -- Template Haskell datatypes
 
@@ -13,7 +14,7 @@ import GHC.Boot.TH.PprLib
 import GHC.Boot.TH.Syntax
 import Data.Word ( Word8 )
 import Data.Char ( toLower, chr )
-import Data.List ( intersperse, unsnoc )
+import Data.List ( intersperse )
 import GHC.Show  ( showMultiLineString )
 import GHC.Lexeme( isVarSymChar )
 import Data.Ratio ( numerator, denominator )
@@ -214,10 +215,9 @@ pprExp i (MDoE m ss_) = parensIf (i > noPrec) $
     pprStms [s] = ppr s
     pprStms ss  = braces (semiSep ss)
 
+pprExp _ (CompE []) = text "<<Empty CompExp>>"
 -- This will probably break with fixity declarations - would need a ';'
-pprExp _ (CompE ss) = case unsnoc ss of
-  Nothing -> text "<<Empty CompExp>>"
-  Just (ss', s) ->
+pprExp _ (CompE ss) =
     if null ss'
        -- If there are no statements in a list comprehension besides the last
        -- one, we simply treat it like a normal list.
@@ -226,6 +226,8 @@ pprExp _ (CompE ss) = case unsnoc ss of
         <+> bar
         <+> commaSep ss'
          <> text "]"
+  where s = last ss
+        ss' = init ss
 pprExp _ (ArithSeqE d) = ppr d
 pprExp _ (ListE es) = brackets (commaSep es)
 pprExp i (SigE e t) = parensIf (i > noPrec) $ pprExp sigPrec e
