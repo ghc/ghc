@@ -197,9 +197,6 @@ function set_toolchain_paths() {
       CABAL="$toolchain/bin/cabal$exe"
       HAPPY="$toolchain/bin/happy$exe"
       ALEX="$toolchain/bin/alex$exe"
-      if [ "$(uname)" = "FreeBSD" ]; then
-        GHC=/usr/local/bin/ghc
-      fi
       ;;
     nix)
       if [[ ! -f toolchain.sh ]]; then
@@ -275,14 +272,35 @@ function setup() {
 }
 
 function fetch_ghc() {
+  local should_fetch=false
+  
   if [ ! -e "$GHC" ]; then
+    should_fetch=true
+  elif [ -n "${GHC_VERSION:-}" ]; then
+    local current_version
+    if current_version=$($GHC --numeric-version 2>/dev/null); then
+      if [ "$current_version" != "$GHC_VERSION" ]; then
+        info "GHC version mismatch: found $current_version, expected $GHC_VERSION"
+        should_fetch=true
+      fi
+    fi
+  fi
+  
+  if [ "$should_fetch" = true ]; then
       local v="$GHC_VERSION"
       if [[ -z "$v" ]]; then
           fail "neither GHC nor GHC_VERSION are not set"
       fi
 
       start_section fetch-ghc "Fetch GHC"
-      url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
+      case "$(uname)" in
+        FreeBSD)
+          url="https://downloads.haskell.org/ghcup/unofficial-bindists/ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
+          ;;
+        *)
+          url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
+          ;;
+      esac
       info "Fetching GHC binary distribution from $url..."
       curl "$url" > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
       $TAR -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
