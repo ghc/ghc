@@ -317,7 +317,7 @@ rnImportDecl this_mod
                                      , ideclSafe = mod_safe
                                      , ideclLevelSpec = import_level
                                      , ideclQualified = qual_style
-                                     , ideclExt = XImportDeclPass { ideclImplicit = implicit }
+                                     , ideclExt = XImportDeclPass { ideclGenerated = implicit }
                                      , ideclAs = as_mod, ideclImportList = imp_details }), import_reason)
   = setSrcSpanA loc $ do
 
@@ -1922,25 +1922,27 @@ type ImportDeclUsage
 warnUnusedImportDecls :: TcGblEnv -> HscSource -> RnM ()
 warnUnusedImportDecls gbl_env hsc_src
   = do { uses <- readMutVar (tcg_used_gres gbl_env)
-       ; let user_imports = filterOut
-                              (ideclImplicit . ideclExt . unLoc)
-                              (tcg_rn_imports gbl_env)
-                -- This whole function deals only with *user* imports
-                -- both for warning about unnecessary ones, and for
-                -- deciding the minimal ones
+       ; let imports = tcg_rn_imports gbl_env
              rdr_env = tcg_rdr_env gbl_env
 
-       ; let usage :: [ImportDeclUsage]
-             usage = findImportUsage user_imports uses
+        -- We should only warn for unnecessary *user* imports, but deciding
+        -- minimal imports should take generated imports into account
+       ; let usageUserImports = findImportUsage (excludeGenerated imports) uses
+             usageAllImports = findImportUsage imports uses
 
        ; traceRn "warnUnusedImportDecls" $
                        (vcat [ text "Uses:" <+> ppr uses
-                             , text "Import usage" <+> ppr usage])
+                             , text "Usage all user imports: " <+> ppr usageUserImports
+                             , text "Usage all imports: " <+> ppr usageAllImports])
 
-       ; mapM_ (warnUnusedImport rdr_env) usage
+       ; mapM_ (warnUnusedImport rdr_env) usageUserImports
 
        ; whenGOptM Opt_D_dump_minimal_imports $
-         printMinimalImports hsc_src usage }
+         printMinimalImports hsc_src usageAllImports }
+
+-- | Exclude generated imports
+excludeGenerated :: [LImportDecl GhcRn] -> [LImportDecl GhcRn]
+excludeGenerated = filterOut (ideclGenerated . ideclExt . unLoc)
 
 findImportUsage :: [LImportDecl GhcRn]
                 -> [GlobalRdrElt]
@@ -2208,8 +2210,10 @@ x,y to avoid name-shadowing warnings.  Example (#9061)
 
 Note [Printing minimal imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To print the minimal imports we walk over the user-supplied import
-decls, and simply trim their import lists.  NB that
+To print the minimal imports we walk over all import decls (both user-supplied
+and generated), trim their import lists, then filter out generated decls.
+
+NB that
 
   * We do *not* change the 'qualified' or 'as' parts!
 
@@ -2301,7 +2305,7 @@ classifyGREs = partition (not . isRecFldGRE)
 printMinimalImports :: HscSource -> [ImportDeclUsage] -> RnM ()
 -- See Note [Printing minimal imports]
 printMinimalImports hsc_src imports_w_usage
-  = do { imports' <- getMinimalImports imports_w_usage
+  = do { imports' <- excludeGenerated <$> getMinimalImports imports_w_usage
        ; this_mod <- getModule
        ; dflags   <- getDynFlags
        ; liftIO $ withFile (mkFilename dflags this_mod) WriteMode $ \h ->

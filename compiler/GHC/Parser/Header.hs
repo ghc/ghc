@@ -100,12 +100,12 @@ getImports popts implicit_prelude buf filename source_filename = do
                 mod = mb_mod `orElse` L (noAnnSrcSpan main_loc) mAIN_NAME
                 (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
-                implicit_imports = mkPrelImports (unLoc mod) implicit_prelude imps
+                generated_imports = mkPrelImports (unLoc mod) implicit_prelude imps
                 convImport (L _ (i :: ImportDecl GhcPs)) = (convImportLevel (ideclLevelSpec i), ideclPkgQual i, reLoc $ ideclName i)
                 convImport_src (L _ (i :: ImportDecl GhcPs)) = (reLoc $ ideclName i)
               in
               return (map convImport_src src_idecls
-                     , map convImport (implicit_imports ++ ord_idecls)
+                     , map convImport (generated_imports ++ ord_idecls)
                      , reLoc mod)
 
 
@@ -146,7 +146,7 @@ mkPrelImports this_mod implicit_prelude import_decls
         = L loc $ ImportDecl { ideclExt       = XImportDeclPass
                                                     { ideclAnn = noAnn
                                                     , ideclSourceText = NoSourceText
-                                                    , ideclImplicit  = True   -- Implicit!
+                                                    , ideclGenerated  = True   -- Generated!
                                                     },
                                 ideclName      = L loc pRELUDE_NAME,
                                 ideclPkgQual   = NoRawPkgQual,

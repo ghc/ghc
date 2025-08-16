@@ -80,16 +80,18 @@ type instance XCImportDecl  GhcTc = DataConCantHappen
 data XImportDeclPass = XImportDeclPass
     { ideclAnn        :: EpAnn EpAnnImportDecl
     , ideclSourceText :: SourceText -- Note [Pragma source text] in "GHC.Types.SourceText"
-    , ideclImplicit   :: Bool -- ^ See Note [Implicit imports]
+    , ideclGenerated   :: Bool -- ^ See Note [Generated imports]
     }
     deriving (Data)
 
-{- Note [Implicit imports]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Generated imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC generates an `ImportDecl` to represent the invisible `import Prelude`
 that appears in any file that omits `import Prelude`, setting
 this field to indicate that the import doesn't appear in the
-original source. True => implicit import (of Prelude)
+original source.
+
+Plugins may also introduce generated imports.
 -}
 
 type instance XXImportDecl  (GhcPass _) = DataConCantHappen
@@ -165,8 +167,8 @@ instance (OutputableBndrId p
       where
         pp_implicit ext =
             let implicit = case ghcPass @p of
-                            GhcPs | XImportDeclPass { ideclImplicit = implicit } <- ext -> implicit
-                            GhcRn | XImportDeclPass { ideclImplicit = implicit } <- ext -> implicit
+                            GhcPs | XImportDeclPass { ideclGenerated = implicit } <- ext -> implicit
+                            GhcRn | XImportDeclPass { ideclGenerated = implicit } <- ext -> implicit
                             GhcTc -> dataConCantHappen ext
             in if implicit then text "(implicit)"
                            else empty

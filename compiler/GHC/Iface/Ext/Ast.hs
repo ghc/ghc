@@ -348,7 +348,7 @@ enrichHie ts (hsGrp, imports, exports, docs, modName) ev_bs insts tcs tte =
     modName <- toHie (IEC Export <$> modName)
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
-    imps <- toHie $ filter (not . ideclImplicit . ideclExt . unLoc) imports
+    imps <- toHie $ filter (not . ideclGenerated . ideclExt . unLoc) imports
     exps <- toHie $ fmap (map $ IEC Export . fst) exports
     docs <- toHie docs
     -- Add Instance bindings
