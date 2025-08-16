@@ -17,7 +17,7 @@ import GHC.Platform.Ways
 import GHC.Unit.Env
 
 import GHC.Data.FastString
-import qualified Data.Set as Set
+import GHC.Types.Unique.Set
 
 -- | The 'FinderCache' maps modules to the result of
 -- searching for that module. It records the results of searching for
@@ -101,7 +101,7 @@ data FinderOpts = FinderOpts
       -- that have a similar name.
   , finder_workingDirectory :: Maybe OsPath
   , finder_thisPackageName  :: Maybe FastString
-  , finder_hiddenModules    :: Set.Set ModuleName
+  , finder_hiddenModules    :: !(UniqSet ModuleName)
   , finder_reexportedModules :: M.Map ModuleName ModuleName -- Reverse mapping, if you are looking for this name then look for this module.
   , finder_hieDir :: Maybe OsPath
   , finder_hieSuf :: OsString

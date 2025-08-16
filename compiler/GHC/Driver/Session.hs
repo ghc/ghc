@@ -293,6 +293,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import GHC.Types.Unique.Set
 import Data.Word
 import System.FilePath
 import Text.ParserCombinators.ReadP hiding (char)
@@ -3153,7 +3154,7 @@ setPackageName p d = d { thisPackageName =  Just p }
 
 addHiddenModule :: String -> DynP ()
 addHiddenModule p =
-  upd (\s -> s{ hiddenModules  = Set.insert (mkModuleName p) (hiddenModules s) })
+  upd (\s -> s{ hiddenModules  = addOneToUniqSet (hiddenModules s) (mkModuleName p) })
 
 addReexportedModule :: String -> DynP ()
 addReexportedModule p =

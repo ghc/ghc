@@ -109,13 +109,14 @@ import GHC.Unit.Module.ModDetails
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import GHC.Types.Unique.Set
 
 import Control.Concurrent.MVar
 import Control.Monad
 import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.Maybe
-import Data.List (sortOn, groupBy, sortBy)
+import Data.List (sort, sortOn, groupBy, sortBy)
 import qualified Data.List as List
 import System.FilePath
 
@@ -313,14 +314,15 @@ warnUnknownModules hsc_env dflags mod_graph = do
   where
     diag_opts = initDiagOpts dflags
 
-    unit_mods = Set.fromList (map ms_mod_name
+    unit_mods :: UniqSet ModuleName
+    unit_mods = mkUniqSet (map ms_mod_name
                   (filter (\ms -> ms_unitid ms == homeUnitId_ dflags)
                        (mgModSummaries mod_graph)))
 
     reexported_mods = reexportedModules dflags
     hidden_mods     = hiddenModules dflags
 
-    hidden_warns = hidden_mods `Set.difference` unit_mods
+    hidden_warns = hidden_mods `minusUniqSet` unit_mods
 
     lookupModule mn = findImportedModule hsc_env mn NoPkgQual
 
@@ -337,7 +339,7 @@ warnUnknownModules hsc_env dflags mod_graph = do
     final_msgs hidden_warns reexported_warns
           =
         unionManyMessages $
-          [warn (DriverUnknownHiddenModules (homeUnitId_ dflags) (Set.toList hidden_warns)) | not (Set.null hidden_warns)]
+          [warn (DriverUnknownHiddenModules (homeUnitId_ dflags) (sort $ nonDetEltsUniqSet hidden_warns)) | not (isEmptyUniqSet hidden_warns)]
           ++ [warn (DriverUnknownReexportedModules (homeUnitId_ dflags) reexported_warns) | not (null reexported_warns)]
 
 -- | Describes which modules of the module graph need to be loaded.
