@@ -143,6 +143,7 @@ import System.Directory
 import GHC.Foreign (withCString, peekCString)
 
 import qualified Data.Set as Set
+import GHC.Types.Unique.Set
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -261,7 +262,7 @@ data DynFlags = DynFlags {
   -- Note [Filepaths and Multiple Home Units]
   workingDirectory      :: Maybe FilePath,
   thisPackageName       :: Maybe String, -- ^ What the package is called, use with multiple home units
-  hiddenModules         :: Set.Set ModuleName,
+  hiddenModules         :: !(UniqSet ModuleName),
   reexportedModules     :: [ReexportedModule],
 
   -- ways
@@ -597,7 +598,7 @@ defaultDynFlags mySettings =
 
         workingDirectory        = Nothing,
         thisPackageName         = Nothing,
-        hiddenModules           = Set.empty,
+        hiddenModules           = emptyUniqSet,
         reexportedModules       = [],
 
         objectDir               = Nothing,
