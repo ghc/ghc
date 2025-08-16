@@ -17,18 +17,18 @@
 -- > static void hs_hpc_init_Main(void) {
 -- >
 -- >   static StgWord64 k0[2] = {16252233372134256ULL,7370534374096082ULL};
--- >   extern StgPtr Main_r2wb_closure;
+-- >   extern StgClosure Main_r2wb_closure;
 -- >   hs_spt_insert(k0, &Main_r2wb_closure);
 -- >
 -- >   static StgWord64 k1[2] = {12545634534567898ULL,5409674567544151ULL};
--- >   extern StgPtr Main_r2wc_closure;
+-- >   extern StgClosure Main_r2wc_closure;
 -- >   hs_spt_insert(k1, &Main_r2wc_closure);
 -- >
 -- > }
 --
 -- where the constants are fingerprints produced from the static forms.
 --
--- The linker must find the definitions matching the @extern StgPtr <name>@
+-- The linker must find the definitions matching the @extern StgClosure <name>@
 -- declarations. For this to work, the identifiers of static pointers need to be
 -- exported. This is done in 'GHC.Core.Opt.SetLevels.newLvlVar'.
 --
@@ -256,7 +256,7 @@ sptModuleInitCode platform this_mod entries
     init_fn_body = vcat
         [  text "static StgWord64 k" <> int i <> text "[2] = "
            <> pprFingerprint fp <> semi
-        $$ text "extern StgPtr "
+        $$ text "extern StgClosure "
            <> (pprCLabel platform $ mkClosureLabel (idName n) (idCafInfo n)) <> semi
         $$ text "hs_spt_insert" <> parens
              (hcat $ punctuate comma
