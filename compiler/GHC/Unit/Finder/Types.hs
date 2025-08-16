@@ -12,6 +12,7 @@ import GHC.Prelude
 import GHC.Unit
 import GHC.Data.OsPath
 import qualified Data.Map as M
+import GHC.Types.Unique.Map
 import GHC.Fingerprint
 import GHC.Platform.Ways
 import GHC.Unit.Env
@@ -102,7 +103,7 @@ data FinderOpts = FinderOpts
   , finder_workingDirectory :: Maybe OsPath
   , finder_thisPackageName  :: Maybe FastString
   , finder_hiddenModules    :: !(UniqSet ModuleName)
-  , finder_reexportedModules :: M.Map ModuleName ModuleName -- Reverse mapping, if you are looking for this name then look for this module.
+  , finder_reexportedModules :: !(UniqMap ModuleName ModuleName) -- Reverse mapping, if you are looking for this name then look for this module.
   , finder_hieDir :: Maybe OsPath
   , finder_hieSuf :: OsString
   , finder_hiDir :: Maybe OsPath

@@ -65,6 +65,7 @@ import Control.Applicative ((<|>))
 import Control.Monad
 import Data.Time
 import qualified Data.Map as M
+import GHC.Types.Unique.Map
 import GHC.Driver.Env
 import GHC.Driver.Config.Finder
 import GHC.Types.Unique.Set
@@ -194,7 +195,7 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
     home_pkg_import (uid, opts)
       -- If the module is reexported, then look for it as if it was from the perspective
       -- of that package which reexports it.
-      | Just real_mod_name <- mod_name `M.lookup` finder_reexportedModules opts =
+      | Just real_mod_name <- lookupUniqMap (finder_reexportedModules opts) mod_name =
         findImportedModuleNoHsc fc opts ue (Just $ DefiniteHomeUnit uid Nothing) real_mod_name NoPkgQual
       | elementOfUniqSet mod_name (finder_hiddenModules opts) =
         return (mkHomeHidden uid)
