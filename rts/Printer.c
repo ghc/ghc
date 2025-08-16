@@ -45,11 +45,18 @@ void printPtr( StgPtr p )
     const char *raw;
     raw = lookupGHCName(p);
     if (raw != NULL) {
-        debugBelch("<%s>", raw);
-        debugBelch("[%p]", p);
-    } else {
-        debugBelch("%p", p);
+        debugBelch("<%s>[%p]", raw, p);
+        return;
     }
+
+    StgPtr p0 = (StgPtr)UNTAG_CLOSURE((StgClosure *)p);
+    raw = lookupGHCName(p0);
+    if (raw != NULL) {
+        debugBelch("<%s>[%p+%td]", raw, p0, p - p0);
+        return;
+    }
+
+    debugBelch("%p", p);
 }
 
 void printObj( StgClosure *obj )
