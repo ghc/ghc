@@ -2041,10 +2041,13 @@ bestImport iss = NE.head $ NE.sortBy best iss
     -- Less means better
     -- Unqualified always wins over qualified; then
     -- import-all wins over import-some; then
+    -- generated wins over user-specified; then
     -- earlier declaration wins over later
     best (ImpSpec { is_item = item1, is_decl = d1 })
          (ImpSpec { is_item = item2, is_decl = d2 })
-      = (is_qual d1 `compare` is_qual d2) S.<> best_item item1 item2 S.<>
+      = (is_qual d1 `compare` is_qual d2) S.<>
+        best_item item1 item2 S.<>
+        compareGenerated (is_dloc d1) (is_dloc d2) S.<>
         SrcLoc.leftmost_smallest (is_dloc d1) (is_dloc d2)
 
     best_item :: ImpItemSpec -> ImpItemSpec -> Ordering
@@ -2054,6 +2057,11 @@ bestImport iss = NE.head $ NE.sortBy best iss
     best_item (ImpSome { is_explicit = e1 })
               (ImpSome { is_explicit = e2 }) = e1 `compare` e2
      -- False < True, so if e1 is explicit and e2 is not, we get GT
+
+    compareGenerated UnhelpfulSpan{} UnhelpfulSpan{} = EQ
+    compareGenerated UnhelpfulSpan{} RealSrcSpan{} = LT
+    compareGenerated RealSrcSpan{} UnhelpfulSpan{} = GT
+    compareGenerated RealSrcSpan{} RealSrcSpan{} = EQ
 
 {- Note [Choosing the best import declaration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
