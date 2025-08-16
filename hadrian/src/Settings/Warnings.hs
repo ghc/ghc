@@ -78,6 +78,9 @@ ghcWarningsArgs = do
                                       ]
 
         , package filepath     ? pure [ "-Wno-x-partial" ]
+        , package hpc          ? pure [ "-Wno-x-partial" ]
+        , package hpcBin       ? pure [ "-Wno-x-partial" ]
+        , package hsc2hs       ? pure [ "-Wno-x-partial" ]
 
         , package cabal        ? pure [ "-Wno-deriving-typeable", "-Wno-incomplete-record-selectors" ]
              -- The -Wno-incomplete-record-selectors is due to
