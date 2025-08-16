@@ -13,6 +13,7 @@
 #include "Rts.h"
 #include "rts/Bytecodes.h"  /* for InstrPtr */
 
+#include "rts/Types.h"
 #include "sm/Storage.h"
 #include "sm/GCThread.h"
 #include "Hash.h"
@@ -45,11 +46,24 @@ void printPtr( StgPtr p )
     const char *raw;
     raw = lookupGHCName(p);
     if (raw != NULL) {
-        debugBelch("<%s>", raw);
-        debugBelch("[%p]", p);
-    } else {
-        debugBelch("%p", p);
+        debugBelch("<%s>[%p]", raw, p);
+        return;
     }
+
+    StgPtr p0 = (StgPtr)UNTAG_CLOSURE((StgClosure *)p);
+    raw = lookupGHCName(p0);
+    if (raw != NULL) {
+        debugBelch("<%s>[%p+%td]", raw, p0, p - p0);
+        return;
+    }
+
+    InfoProvEnt ipe;
+    if (lookupIPE((StgInfoTable*)p0, &ipe)) {
+        debugBelch("<%s>[%p+%td]", ipe.prov.table_name, p0, p - p0);
+        return;
+    }
+
+    debugBelch("%p", p);
 }
 
 void printObj( StgClosure *obj )
