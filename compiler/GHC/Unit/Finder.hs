@@ -67,7 +67,7 @@ import Data.Time
 import qualified Data.Map as M
 import GHC.Driver.Env
 import GHC.Driver.Config.Finder
-import qualified Data.Set as Set
+import GHC.Types.Unique.Set
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified System.OsPath as OsPath
 import qualified Data.List.NonEmpty as NE
@@ -196,7 +196,7 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
       -- of that package which reexports it.
       | Just real_mod_name <- mod_name `M.lookup` finder_reexportedModules opts =
         findImportedModuleNoHsc fc opts ue (Just $ DefiniteHomeUnit uid Nothing) real_mod_name NoPkgQual
-      | mod_name `Set.member` finder_hiddenModules opts =
+      | elementOfUniqSet mod_name (finder_hiddenModules opts) =
         return (mkHomeHidden uid)
       | otherwise =
         findHomePackageModule fc opts uid mod_name
@@ -794,4 +794,3 @@ findObjectLinkable mod obj_fn obj_time =
   pure (Linkable obj_time mod (NE.singleton (DotO obj_fn ModuleObject)))
   -- We used to look for _stub.o files here, but that was a bug (#706)
   -- Now GHC merges the stub.o into the main .o (#3687)
-
