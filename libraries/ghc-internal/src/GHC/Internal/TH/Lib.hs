@@ -21,6 +21,7 @@
 module GHC.Internal.TH.Lib where
 
 import GHC.Internal.TH.Syntax hiding (Role, InjectivityAnn)
+import GHC.Internal.TH.Monad
 import qualified GHC.Internal.TH.Syntax as TH
 
 #ifdef BOOTSTRAP_TH

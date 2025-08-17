@@ -18,7 +18,7 @@ module GHC.Tc.Types.TH (
 
 import GHC.Prelude
 import GHCi.RemoteTypes
-import qualified GHC.Boot.TH.Syntax as TH
+import qualified GHC.Boot.TH.Monad  as TH
 import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
 import GHC.Tc.Types.TcRef

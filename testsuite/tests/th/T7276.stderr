@@ -4,7 +4,7 @@ T7276.hs:6:5: error: [GHC-87897]
     • Couldn't match type ‘[GHC.Internal.TH.Syntax.Dec]’
                      with ‘GHC.Internal.TH.Syntax.Exp’
       Expected: GHC.Internal.TH.Lib.ExpQ
-        Actual: GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Lib.Decs
+        Actual: GHC.Internal.TH.Monad.Q GHC.Internal.TH.Lib.Decs
     • In the expression: [d| y = 3 |]
       In the untyped splice: $([d| y = 3 |])
 (deferred type error)

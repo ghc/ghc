@@ -68,7 +68,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Splice
 import GHC.Tc.Zonk.Type
 
 import GHCi.RemoteTypes ( ForeignRef )
-import qualified GHC.Boot.TH.Syntax as TH (Q)
+import qualified GHC.Boot.TH.Monad  as TH (Q)
 
 import qualified GHC.LanguageExtensions as LangExt
 import qualified Data.Set as Set

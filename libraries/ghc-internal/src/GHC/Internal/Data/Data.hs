@@ -143,6 +143,7 @@ import GHC.Internal.Arr               -- So we can give Data instance for Array
 import qualified GHC.Internal.Generics as Generics (Fixity(..))
 import GHC.Internal.Generics hiding (Fixity(..))
                              -- So we can give Data instance for U1, V1, ...
+import qualified GHC.Internal.TH.Syntax as TH
 
 ------------------------------------------------------------------------------
 --
@@ -1353,3 +1354,63 @@ deriving instance Data DecidedStrictness
 
 -- | @since base-4.12.0.0
 deriving instance Data a => Data (Down a)
+
+----------------------------------------------------------------------------
+-- Data instances for GHC.Internal.TH.Syntax
+
+deriving instance Data TH.AnnLookup
+deriving instance Data TH.AnnTarget
+deriving instance Data TH.Bang
+deriving instance Data TH.BndrVis
+deriving instance Data TH.Body
+deriving instance Data TH.Bytes
+deriving instance Data TH.Callconv
+deriving instance Data TH.Clause
+deriving instance Data TH.Con
+deriving instance Data TH.Dec
+deriving instance Data TH.DecidedStrictness
+deriving instance Data TH.DerivClause
+deriving instance Data TH.DerivStrategy
+deriving instance Data TH.DocLoc
+deriving instance Data TH.Exp
+deriving instance Data TH.FamilyResultSig
+deriving instance Data TH.Fixity
+deriving instance Data TH.FixityDirection
+deriving instance Data TH.Foreign
+deriving instance Data TH.FunDep
+deriving instance Data TH.Guard
+deriving instance Data TH.Info
+deriving instance Data TH.InjectivityAnn
+deriving instance Data TH.Inline
+deriving instance Data TH.Lit
+deriving instance Data TH.Loc
+deriving instance Data TH.Match
+deriving instance Data TH.ModName
+deriving instance Data TH.Module
+deriving instance Data TH.ModuleInfo
+deriving instance Data TH.Name
+deriving instance Data TH.NameFlavour
+deriving instance Data TH.NameSpace
+deriving instance Data TH.NamespaceSpecifier
+deriving instance Data TH.OccName
+deriving instance Data TH.Overlap
+deriving instance Data TH.Pat
+deriving instance Data TH.PatSynArgs
+deriving instance Data TH.PatSynDir
+deriving instance Data TH.Phases
+deriving instance Data TH.PkgName
+deriving instance Data TH.Pragma
+deriving instance Data TH.Range
+deriving instance Data TH.Role
+deriving instance Data TH.RuleBndr
+deriving instance Data TH.RuleMatch
+deriving instance Data TH.Safety
+deriving instance Data TH.SourceStrictness
+deriving instance Data TH.SourceUnpackedness
+deriving instance Data TH.Specificity
+deriving instance Data TH.Stmt
+deriving instance Data TH.TyLit
+deriving instance Data TH.TySynEqn
+deriving instance Data TH.Type
+deriving instance Data TH.TypeFamilyHead
+deriving instance Data flag => Data (TH.TyVarBndr flag)

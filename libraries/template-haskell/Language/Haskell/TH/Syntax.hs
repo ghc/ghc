@@ -202,6 +202,7 @@ where
 
 import GHC.Boot.TH.Lift
 import GHC.Boot.TH.Syntax
+import GHC.Boot.TH.Monad
 import System.FilePath
 import Data.Data hiding (Fixity(..))
 import Data.List.NonEmpty (NonEmpty(..))

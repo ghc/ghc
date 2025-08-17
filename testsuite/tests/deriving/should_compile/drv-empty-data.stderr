@@ -55,7 +55,7 @@ Derived class instances:
   instance GHC.Internal.TH.Lift.Lift (DrvEmptyData.Void a) where
     GHC.Internal.TH.Lift.lift z = GHC.Internal.Base.pure (case z of {})
     GHC.Internal.TH.Lift.liftTyped z
-      = GHC.Internal.TH.Syntax.unsafeCodeCoerce
+      = GHC.Internal.TH.Monad.unsafeCodeCoerce
           (GHC.Internal.Base.pure (case z of {}))
   
   $tVoid :: GHC.Internal.Data.Data.DataType

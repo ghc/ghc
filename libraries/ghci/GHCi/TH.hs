@@ -111,6 +111,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import GHC.Internal.Desugar (AnnotationWrapper(..))
 import qualified GHC.Boot.TH.Syntax as TH
+import qualified GHC.Boot.TH.Monad as TH
 import Unsafe.Coerce
 
 -- | Create a new instance of 'QState'

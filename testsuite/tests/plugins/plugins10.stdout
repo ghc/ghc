@@ -9,6 +9,7 @@ interfacePlugin: GHC.Internal.Prim.Ext
 interfacePlugin: GHC.Internal.TH.Quote
 interfacePlugin: GHC.Internal.TH.Syntax
 typeCheckPlugin (rn)
+interfacePlugin: GHC.Internal.TH.Monad
 interfacePlugin: GHC.Internal.Stack.Types
 interfacePlugin: GHC.Internal.Exception.Context
 typeCheckPlugin (tc)
