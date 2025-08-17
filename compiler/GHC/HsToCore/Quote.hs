@@ -245,14 +245,14 @@ first generate a polymorphic definition and then just apply the wrapper at the e
 
   [| \x -> x |]
 ====>
-  gensym (unpackString "x"#) `bindQ` \ x1::String ->
-  lam (pvar x1) (var x1)
+  newName (unpackString "x"#) >>= \ x1::Name ->
+  lamE (varP x1) (varE x1)
 
 
   [| \x -> $(f [| x |]) |]
 ====>
-  gensym (unpackString "x"#) `bindQ` \ x1::String ->
-  lam (pvar x1) (f (var x1))
+  newName (unpackString "x"#) >>= \ x1::Name ->
+  lamE (varP x1) (f (varE x1))
 -}
 
 

@@ -30,7 +30,7 @@ templateHaskellNames :: [Name]
 -- Should stay in sync with the import list of GHC.HsToCore.Quote
 
 templateHaskellNames = [
-    returnQName, bindQName, sequenceQName, newNameName, liftName, liftTypedName,
+    sequenceQName, newNameName, liftName, liftTypedName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameG_fldName,
     mkNameLName,
     mkNameSName, mkNameQName,
@@ -240,12 +240,10 @@ overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
 modNameTyConName       = thTc (fsLit "ModName")        modNameTyConKey
 quasiQuoterTyConName   = mk_known_key_name tcName qqLib (fsLit "QuasiQuoter") quasiQuoterTyConKey
 
-returnQName, bindQName, sequenceQName, newNameName, liftName,
+sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_fldName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeCodeName,
     unsafeCodeCoerceName, liftTypedName, mkModNameName, mkNameQName :: Name
-returnQName    = thFun (fsLit "returnQ")   returnQIdKey
-bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thMonadFun (fsLit "sequenceQ") sequenceQIdKey
 newNameName    = thMonadFun (fsLit "newName")   newNameIdKey
 mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
@@ -812,12 +810,10 @@ dataNamespaceSpecifierDataConKey = mkPreludeDataConUnique 215
 -- IdUniques available: 200-499
 -- If you want to change this, make sure you check in GHC.Builtin.Names
 
-returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
+sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_fldIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
     mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeCodeIdKey,
     unsafeCodeCoerceIdKey, liftTypedIdKey, mkModNameIdKey, mkNameQIdKey :: Unique
-returnQIdKey        = mkPreludeMiscIdUnique 200
-bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
 liftIdKey           = mkPreludeMiscIdUnique 203
 newNameIdKey         = mkPreludeMiscIdUnique 204
