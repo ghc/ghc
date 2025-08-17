@@ -8,7 +8,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-orphans -Wno-x-partial #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -- Fine if this comes from make/Hadrian or the pre-built base.
 #include <ghcplatform.h>

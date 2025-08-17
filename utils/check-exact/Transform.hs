@@ -8,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.Haskell.GHC.ExactPrint.Transform
@@ -96,7 +97,6 @@ import GHC.Data.FastString
 import GHC.Types.SrcLoc
 
 import Data.Data
-import Data.List (unsnoc)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
@@ -213,9 +213,8 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (AnnSig (EpUniTok dca u) mp md) ns (
   where
     -- we want DPs for the distance from the end of the ns to the
     -- AnnDColon, and to the start of the ty
-    rd = case unsnoc ns of
-      Nothing -> error "unexpected empty list in 'ns' variable"
-      Just (_, L (EpAnn anc' _ _) _) -> epaLocationRealSrcSpan anc'
+    rd = case last ns of
+      L (EpAnn anc' _ _) _ -> epaLocationRealSrcSpan anc'
     dca' = case dca of
           EpaSpan ss@(RealSrcSpan r _) -> (EpaDelta ss (ss2delta (ss2posEnd rd) r) [])
           _                            -> dca
@@ -296,7 +295,7 @@ setEntryDP (L (EpAnn (EpaSpan ss@(RealSrcSpan r _)) an cs) a) dp
               where
                 cs'' = setPriorComments cs []
                 csd = L (EpaDelta ss dp NoComments) c:commentOrigDeltas cs'
-                lc = NE.last (L ca c :| cs')
+                lc = last $ (L ca c:cs')
                 delta = case getLoc lc of
                           EpaSpan (RealSrcSpan rr _) -> ss2delta (ss2pos rr) r
                           EpaSpan _ -> (SameLine 0)

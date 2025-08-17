@@ -4,6 +4,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module Utils
   -- (
@@ -37,7 +38,7 @@ import GHC.Base (NonEmpty(..))
 import GHC.Parser.Lexer (allocateComments)
 
 import Data.Data hiding ( Fixity )
-import Data.List (sortBy, partition, unsnoc)
+import Data.List (sortBy, partition)
 import qualified Data.Map.Strict as Map
 
 import Debug.Trace
@@ -734,9 +735,8 @@ ghead  info []    = error $ "ghead "++info++" []"
 ghead _info (h:_) = h
 
 glast :: String -> [a] -> a
-glast info xs = case unsnoc xs of
-  Nothing       -> error $ "glast " ++ info ++ " []"
-  Just (_, lst) -> lst
+glast  info []    = error $ "glast " ++ info ++ " []"
+glast _info h     = last h
 
 gtail :: String -> [a] -> [a]
 gtail  info []    = error $ "gtail " ++ info ++ " []"
