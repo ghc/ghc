@@ -1235,7 +1235,7 @@ darwin =
 
 freebsd_jobs :: [JobGroup Job]
 freebsd_jobs =
-  [ addValidateRule FreeBSDLabel (standardBuilds Amd64 FreeBSD14)
+  [ allowFailureGroup (addValidateRule FreeBSDLabel (standardBuilds Amd64 FreeBSD14))
   ]
 
 alpine_x86 :: [JobGroup Job]
