@@ -398,7 +398,7 @@ module Language.Haskell.TH where
   type SumArity = GHC.Internal.Types.Int
   type role TExp nominal
   type TExp :: forall (r :: GHC.Internal.Types.RuntimeRep). TYPE r -> *
-  newtype TExp a = GHC.Internal.TH.Syntax.TExp {unType :: Exp}
+  newtype TExp a = GHC.Internal.TH.Monad.TExp {unType :: Exp}
   type TExpQ :: forall (r :: GHC.Internal.Types.RuntimeRep). TYPE r -> *
   type TExpQ a = Q (TExp a)
   type TyLit :: *
@@ -653,7 +653,7 @@ module Language.Haskell.TH where
   roleAnnotD :: forall (m :: * -> *). Quote m => Name -> [GHC.Internal.TH.Lib.Role] -> m Dec
   ruleVar :: forall (m :: * -> *). Quote m => Name -> m RuleBndr
   runIO :: forall a. GHC.Internal.Types.IO a -> Q a
-  runQ :: forall (m :: * -> *) a. GHC.Internal.TH.Syntax.Quasi m => Q a -> m a
+  runQ :: forall (m :: * -> *) a. GHC.Internal.TH.Monad.Quasi m => Q a -> m a
   safe :: Safety
   sectionL :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp
   sectionR :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp
@@ -734,8 +734,8 @@ module Language.Haskell.TH where
 
 module Language.Haskell.TH.CodeDo where
   -- Safety: Safe-Inferred
-  (>>) :: forall (m :: * -> *) a b. GHC.Internal.Base.Monad m => m a -> GHC.Internal.TH.Syntax.Code m b -> GHC.Internal.TH.Syntax.Code m b
-  (>>=) :: forall (m :: * -> *) a b. GHC.Internal.Base.Monad m => m a -> (a -> GHC.Internal.TH.Syntax.Code m b) -> GHC.Internal.TH.Syntax.Code m b
+  (>>) :: forall (m :: * -> *) a b. GHC.Internal.Base.Monad m => m a -> GHC.Internal.TH.Monad.Code m b -> GHC.Internal.TH.Monad.Code m b
+  (>>=) :: forall (m :: * -> *) a b. GHC.Internal.Base.Monad m => m a -> (a -> GHC.Internal.TH.Monad.Code m b) -> GHC.Internal.TH.Monad.Code m b
 
 module Language.Haskell.TH.LanguageExtensions where
   -- Safety: Safe
@@ -880,23 +880,23 @@ module Language.Haskell.TH.LanguageExtensions where
 module Language.Haskell.TH.Lib where
   -- Safety: Safe
   type BangQ :: *
-  type BangQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Bang
+  type BangQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Bang
   type BangTypeQ :: *
-  type BangTypeQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.BangType
+  type BangTypeQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.BangType
   type BodyQ :: *
-  type BodyQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Body
+  type BodyQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Body
   type ClauseQ :: *
-  type ClauseQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Clause
+  type ClauseQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Clause
   type CodeQ :: forall (r :: GHC.Internal.Types.RuntimeRep). TYPE r -> *
-  type CodeQ = GHC.Internal.TH.Syntax.Code GHC.Internal.TH.Syntax.Q
+  type CodeQ = GHC.Internal.TH.Monad.Code GHC.Internal.TH.Monad.Q
   type ConQ :: *
-  type ConQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Con
+  type ConQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Con
   type CxtQ :: *
-  type CxtQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Cxt
+  type CxtQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Cxt
   type DecQ :: *
-  type DecQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
+  type DecQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec
   type DecsQ :: *
-  type DecsQ = GHC.Internal.TH.Syntax.Q [GHC.Internal.TH.Syntax.Dec]
+  type DecsQ = GHC.Internal.TH.Monad.Q [GHC.Internal.TH.Syntax.Dec]
   type DefaultBndrFlag :: * -> Constraint
   class DefaultBndrFlag flag where
     defaultBndrFlag :: flag
@@ -904,55 +904,55 @@ module Language.Haskell.TH.Lib where
   type DerivClause :: *
   data DerivClause = DerivClause (GHC.Internal.Maybe.Maybe DerivStrategy) GHC.Internal.TH.Syntax.Cxt
   type DerivClauseQ :: *
-  type DerivClauseQ = GHC.Internal.TH.Syntax.Q DerivClause
+  type DerivClauseQ = GHC.Internal.TH.Monad.Q DerivClause
   type DerivStrategy :: *
   data DerivStrategy = StockStrategy | AnyclassStrategy | NewtypeStrategy | ViaStrategy GHC.Internal.TH.Syntax.Type
   type DerivStrategyQ :: *
-  type DerivStrategyQ = GHC.Internal.TH.Syntax.Q DerivStrategy
+  type DerivStrategyQ = GHC.Internal.TH.Monad.Q DerivStrategy
   type ExpQ :: *
-  type ExpQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Exp
+  type ExpQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Exp
   type FamilyResultSigQ :: *
-  type FamilyResultSigQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.FamilyResultSig
+  type FamilyResultSigQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.FamilyResultSig
   type FieldExpQ :: *
-  type FieldExpQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.FieldExp
+  type FieldExpQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.FieldExp
   type FieldPatQ :: *
-  type FieldPatQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.FieldPat
+  type FieldPatQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.FieldPat
   type GuardQ :: *
-  type GuardQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Guard
+  type GuardQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Guard
   type InfoQ :: *
-  type InfoQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Info
+  type InfoQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Info
   type KindQ :: *
-  type KindQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Kind
+  type KindQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Kind
   type MatchQ :: *
-  type MatchQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Match
+  type MatchQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Match
   type Overlap :: *
   data Overlap = Overlappable | Overlapping | Overlaps | Incoherent
   type PatQ :: *
-  type PatQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Pat
+  type PatQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Pat
   type PatSynArgsQ :: *
-  type PatSynArgsQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.PatSynArgs
+  type PatSynArgsQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.PatSynArgs
   type PatSynDirQ :: *
-  type PatSynDirQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.PatSynDir
+  type PatSynDirQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.PatSynDir
   type PredQ :: *
-  type PredQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Pred
+  type PredQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Pred
   type RangeQ :: *
-  type RangeQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Range
+  type RangeQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Range
   type RuleBndrQ :: *
-  type RuleBndrQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.RuleBndr
+  type RuleBndrQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.RuleBndr
   type SourceStrictnessQ :: *
-  type SourceStrictnessQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.SourceStrictness
+  type SourceStrictnessQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.SourceStrictness
   type SourceUnpackednessQ :: *
-  type SourceUnpackednessQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.SourceUnpackedness
+  type SourceUnpackednessQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.SourceUnpackedness
   type StmtQ :: *
-  type StmtQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Stmt
+  type StmtQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Stmt
   type StrictTypeQ :: *
-  type StrictTypeQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.StrictType
+  type StrictTypeQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.StrictType
   type TExpQ :: forall (r :: GHC.Internal.Types.RuntimeRep). TYPE r -> *
-  type TExpQ a = GHC.Internal.TH.Syntax.Q (GHC.Internal.TH.Syntax.TExp a)
+  type TExpQ a = GHC.Internal.TH.Monad.Q (GHC.Internal.TH.Monad.TExp a)
   type TyLitQ :: *
-  type TyLitQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.TyLit
+  type TyLitQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.TyLit
   type TySynEqnQ :: *
-  type TySynEqnQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.TySynEqn
+  type TySynEqnQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.TySynEqn
   type TyVarBndrSpec :: *
   type TyVarBndrSpec = GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity
   type TyVarBndrUnit :: *
@@ -960,262 +960,262 @@ module Language.Haskell.TH.Lib where
   type TyVarBndrVis :: *
   type TyVarBndrVis = GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis
   type TypeQ :: *
-  type TypeQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Type
+  type TypeQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Type
   type VarBangTypeQ :: *
-  type VarBangTypeQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.VarBangType
+  type VarBangTypeQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.VarBangType
   type VarStrictTypeQ :: *
-  type VarStrictTypeQ = GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.VarStrictType
-  anyclassStrategy :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m DerivStrategy
-  appE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  type VarStrictTypeQ = GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.VarStrictType
+  anyclassStrategy :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m DerivStrategy
+  appE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   appK :: GHC.Internal.TH.Syntax.Kind -> GHC.Internal.TH.Syntax.Kind -> GHC.Internal.TH.Syntax.Kind
-  appKindT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Type
-  appT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
-  appTypeE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Exp
-  appsE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp
-  arithSeqE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Range -> m GHC.Internal.TH.Syntax.Exp
+  appKindT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Type
+  appT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  appTypeE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Exp
+  appsE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp
+  arithSeqE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Range -> m GHC.Internal.TH.Syntax.Exp
   arrowK :: GHC.Internal.TH.Syntax.Kind
-  arrowT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type
-  asP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
-  bang :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness -> m GHC.Internal.TH.Syntax.SourceStrictness -> m GHC.Internal.TH.Syntax.Bang
-  bangP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
-  bangType :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Bang -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.BangType
-  bindS :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Stmt
+  arrowT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type
+  asP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
+  bang :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness -> m GHC.Internal.TH.Syntax.SourceStrictness -> m GHC.Internal.TH.Syntax.Bang
+  bangP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
+  bangType :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Bang -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.BangType
+  bindS :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Stmt
   bndrInvis :: GHC.Internal.TH.Syntax.BndrVis
   bndrReq :: GHC.Internal.TH.Syntax.BndrVis
   bytesPrimL :: GHC.Internal.TH.Syntax.Bytes -> GHC.Internal.TH.Syntax.Lit
   cApi :: GHC.Internal.TH.Syntax.Callconv
   cCall :: GHC.Internal.TH.Syntax.Callconv
-  caseE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> [m GHC.Internal.TH.Syntax.Match] -> m GHC.Internal.TH.Syntax.Exp
+  caseE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> [m GHC.Internal.TH.Syntax.Match] -> m GHC.Internal.TH.Syntax.Exp
   charL :: GHC.Internal.Types.Char -> GHC.Internal.TH.Syntax.Lit
   charPrimL :: GHC.Internal.Types.Char -> GHC.Internal.TH.Syntax.Lit
-  charTyLit :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Types.Char -> m GHC.Internal.TH.Syntax.TyLit
-  classD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> [GHC.Internal.TH.Syntax.FunDep] -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
-  classP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Type] -> m GHC.Internal.TH.Syntax.Pred
-  clause :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Body -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Clause
-  closedTypeFamilyD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.TH.Syntax.FamilyResultSig -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.InjectivityAnn -> [m GHC.Internal.TH.Syntax.TySynEqn] -> m GHC.Internal.TH.Syntax.Dec
-  compE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Exp
-  conE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Exp
+  charTyLit :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Types.Char -> m GHC.Internal.TH.Syntax.TyLit
+  classD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> [GHC.Internal.TH.Syntax.FunDep] -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
+  classP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Type] -> m GHC.Internal.TH.Syntax.Pred
+  clause :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Body -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Clause
+  closedTypeFamilyD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.TH.Syntax.FamilyResultSig -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.InjectivityAnn -> [m GHC.Internal.TH.Syntax.TySynEqn] -> m GHC.Internal.TH.Syntax.Dec
+  compE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Exp
+  conE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Exp
   conK :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Kind
-  conP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
-  conT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type
-  condE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  constrainedE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  conP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
+  conT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type
+  condE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  constrainedE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   constraintK :: GHC.Internal.TH.Syntax.Kind
-  cxt :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Pred] -> m GHC.Internal.TH.Syntax.Cxt
-  dataD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [m GHC.Internal.TH.Syntax.Con] -> [m DerivClause] -> m GHC.Internal.TH.Syntax.Dec
-  dataD_doc :: GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.Q (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Kind) -> [(GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Con, GHC.Internal.Maybe.Maybe GHC.Internal.Base.String, [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String])] -> [GHC.Internal.TH.Syntax.Q DerivClause] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
-  dataFamilyD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Dec
-  dataInstD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Type] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [m GHC.Internal.TH.Syntax.Con] -> [m DerivClause] -> m GHC.Internal.TH.Syntax.Dec
-  dataInstD_doc :: GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe [GHC.Internal.TH.Syntax.Q (GHC.Internal.TH.Syntax.TyVarBndr ())] -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Type -> GHC.Internal.Maybe.Maybe (GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Kind) -> [(GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Con, GHC.Internal.Maybe.Maybe GHC.Internal.Base.String, [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String])] -> [GHC.Internal.TH.Syntax.Q DerivClause] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
-  defaultD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Type] -> m GHC.Internal.TH.Syntax.Dec
-  defaultSigD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
-  derivClause :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe DerivStrategy -> [m GHC.Internal.TH.Syntax.Pred] -> m DerivClause
-  doE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Exp
+  cxt :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Pred] -> m GHC.Internal.TH.Syntax.Cxt
+  dataD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [m GHC.Internal.TH.Syntax.Con] -> [m DerivClause] -> m GHC.Internal.TH.Syntax.Dec
+  dataD_doc :: GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Monad.Q (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Kind) -> [(GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Con, GHC.Internal.Maybe.Maybe GHC.Internal.Base.String, [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String])] -> [GHC.Internal.TH.Monad.Q DerivClause] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec
+  dataFamilyD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Dec
+  dataInstD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Type] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [m GHC.Internal.TH.Syntax.Con] -> [m DerivClause] -> m GHC.Internal.TH.Syntax.Dec
+  dataInstD_doc :: GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe [GHC.Internal.TH.Monad.Q (GHC.Internal.TH.Syntax.TyVarBndr ())] -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Type -> GHC.Internal.Maybe.Maybe (GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Kind) -> [(GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Con, GHC.Internal.Maybe.Maybe GHC.Internal.Base.String, [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String])] -> [GHC.Internal.TH.Monad.Q DerivClause] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec
+  defaultD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Type] -> m GHC.Internal.TH.Syntax.Dec
+  defaultSigD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
+  derivClause :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Maybe.Maybe DerivStrategy -> [m GHC.Internal.TH.Syntax.Pred] -> m DerivClause
+  doE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Exp
   doublePrimL :: GHC.Internal.Real.Rational -> GHC.Internal.TH.Syntax.Lit
-  dyn :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
-  equalP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Pred
-  equalityT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type
-  explBidir :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Clause] -> m GHC.Internal.TH.Syntax.PatSynDir
-  fieldExp :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Exp -> m (GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Exp)
-  fieldPat :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.FieldPat
+  dyn :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
+  equalP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Pred
+  equalityT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type
+  explBidir :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Clause] -> m GHC.Internal.TH.Syntax.PatSynDir
+  fieldExp :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Exp -> m (GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Exp)
+  fieldPat :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.FieldPat
   floatPrimL :: GHC.Internal.Real.Rational -> GHC.Internal.TH.Syntax.Lit
-  forImpD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Callconv -> GHC.Internal.TH.Syntax.Safety -> GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
-  forallC :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity] -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Con -> m GHC.Internal.TH.Syntax.Con
-  forallE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  forallT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity] -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
-  forallVisE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  forallVisT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
-  fromE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  fromR :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Range
-  fromThenE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  fromThenR :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Range
-  fromThenToE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  fromThenToR :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Range
-  fromToE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  fromToR :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Range
-  funD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Clause] -> m GHC.Internal.TH.Syntax.Dec
-  funD_doc :: GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Clause] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String] -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
+  forImpD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Callconv -> GHC.Internal.TH.Syntax.Safety -> GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
+  forallC :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity] -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Con -> m GHC.Internal.TH.Syntax.Con
+  forallE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  forallT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity] -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  forallVisE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  forallVisT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  fromE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  fromR :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Range
+  fromThenE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  fromThenR :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Range
+  fromThenToE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  fromThenToR :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Range
+  fromToE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  fromToR :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Range
+  funD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Clause] -> m GHC.Internal.TH.Syntax.Dec
+  funD_doc :: GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Clause] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String] -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec
   funDep :: [GHC.Internal.TH.Syntax.Name] -> [GHC.Internal.TH.Syntax.Name] -> GHC.Internal.TH.Syntax.FunDep
-  gadtC :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.Name] -> [m GHC.Internal.TH.Syntax.StrictType] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Con
-  getFieldE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
-  guardedB :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp)] -> m GHC.Internal.TH.Syntax.Body
-  implBidir :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.PatSynDir
-  implicitParamBindD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Dec
-  implicitParamT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
-  implicitParamVarE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
+  gadtC :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [GHC.Internal.TH.Syntax.Name] -> [m GHC.Internal.TH.Syntax.StrictType] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Con
+  getFieldE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
+  guardedB :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp)] -> m GHC.Internal.TH.Syntax.Body
+  implBidir :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.PatSynDir
+  implicitParamBindD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Dec
+  implicitParamT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  implicitParamVarE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
   inferR :: GHC.Internal.TH.Lib.Role
   inferredSpec :: GHC.Internal.TH.Syntax.Specificity
-  infixApp :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  infixC :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m (GHC.Internal.TH.Syntax.Bang, GHC.Internal.TH.Syntax.Type) -> GHC.Internal.TH.Syntax.Name -> m (GHC.Internal.TH.Syntax.Bang, GHC.Internal.TH.Syntax.Type) -> m GHC.Internal.TH.Syntax.Con
-  infixE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe (m GHC.Internal.TH.Syntax.Exp) -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.Maybe.Maybe (m GHC.Internal.TH.Syntax.Exp) -> m GHC.Internal.TH.Syntax.Exp
-  infixLD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Types.Int -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Dec
-  infixND :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Types.Int -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Dec
-  infixP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
-  infixPatSyn :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.PatSynArgs
-  infixRD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Types.Int -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Dec
-  infixT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  infixApp :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  infixC :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m (GHC.Internal.TH.Syntax.Bang, GHC.Internal.TH.Syntax.Type) -> GHC.Internal.TH.Syntax.Name -> m (GHC.Internal.TH.Syntax.Bang, GHC.Internal.TH.Syntax.Type) -> m GHC.Internal.TH.Syntax.Con
+  infixE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Maybe.Maybe (m GHC.Internal.TH.Syntax.Exp) -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.Maybe.Maybe (m GHC.Internal.TH.Syntax.Exp) -> m GHC.Internal.TH.Syntax.Exp
+  infixLD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Types.Int -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Dec
+  infixND :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Types.Int -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Dec
+  infixP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
+  infixPatSyn :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.PatSynArgs
+  infixRD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Types.Int -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Dec
+  infixT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
   injectivityAnn :: GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.Name] -> GHC.Internal.TH.Lib.InjectivityAnn
-  instanceD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
-  instanceWithOverlapD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe Overlap -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
+  instanceD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
+  instanceWithOverlapD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Maybe.Maybe Overlap -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
   intPrimL :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
   integerL :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
   interruptible :: GHC.Internal.TH.Syntax.Safety
-  invisP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Pat
-  isStrict :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Strict
+  invisP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Pat
+  isStrict :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Strict
   javaScript :: GHC.Internal.TH.Syntax.Callconv
-  kiSigD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Dec
+  kiSigD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Dec
   kindSig :: GHC.Internal.TH.Syntax.Kind -> GHC.Internal.TH.Syntax.FamilyResultSig
-  kindedBndrTV :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.BndrVis -> m GHC.Internal.TH.Syntax.Kind -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)
-  kindedInvisTV :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Specificity -> m GHC.Internal.TH.Syntax.Kind -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)
+  kindedBndrTV :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.BndrVis -> m GHC.Internal.TH.Syntax.Kind -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)
+  kindedInvisTV :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Specificity -> m GHC.Internal.TH.Syntax.Kind -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)
   kindedTV :: forall flag. DefaultBndrFlag flag => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Kind -> GHC.Internal.TH.Syntax.TyVarBndr flag
-  labelE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
-  lam1E :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  lamCaseE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Match] -> m GHC.Internal.TH.Syntax.Exp
-  lamCasesE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Clause] -> m GHC.Internal.TH.Syntax.Exp
-  lamE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  letE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  letS :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Stmt
-  listE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp
+  labelE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
+  lam1E :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  lamCaseE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Match] -> m GHC.Internal.TH.Syntax.Exp
+  lamCasesE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Clause] -> m GHC.Internal.TH.Syntax.Exp
+  lamE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  letE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  letS :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Stmt
+  listE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp
   listK :: GHC.Internal.TH.Syntax.Kind
-  listP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
-  listT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type
-  litE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Lit -> m GHC.Internal.TH.Syntax.Exp
-  litP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Lit -> m GHC.Internal.TH.Syntax.Pat
-  litT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.TyLit -> m GHC.Internal.TH.Syntax.Type
-  match :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Body -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Match
-  mdoE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Exp
+  listP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
+  listT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type
+  litE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Lit -> m GHC.Internal.TH.Syntax.Exp
+  litP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Lit -> m GHC.Internal.TH.Syntax.Pat
+  litT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.TyLit -> m GHC.Internal.TH.Syntax.Type
+  match :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Body -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Match
+  mdoE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Exp
   mkBytes :: GHC.Internal.ForeignPtr.ForeignPtr GHC.Internal.Word.Word8 -> GHC.Internal.Types.Word -> GHC.Internal.Types.Word -> GHC.Internal.TH.Syntax.Bytes
   moduleAnnotation :: GHC.Internal.TH.Syntax.AnnTarget
-  mulArrowT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type
-  multiIfE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp)] -> m GHC.Internal.TH.Syntax.Exp
-  newtypeD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Con -> [m DerivClause] -> m GHC.Internal.TH.Syntax.Dec
-  newtypeD_doc :: GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.Q (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Kind) -> (GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Con, GHC.Internal.Maybe.Maybe GHC.Internal.Base.String, [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String]) -> [GHC.Internal.TH.Syntax.Q DerivClause] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
-  newtypeInstD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Type] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Con -> [m DerivClause] -> m GHC.Internal.TH.Syntax.Dec
-  newtypeInstD_doc :: GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe [GHC.Internal.TH.Syntax.Q (GHC.Internal.TH.Syntax.TyVarBndr ())] -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Type -> GHC.Internal.Maybe.Maybe (GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Kind) -> (GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Con, GHC.Internal.Maybe.Maybe GHC.Internal.Base.String, [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String]) -> [GHC.Internal.TH.Syntax.Q DerivClause] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
-  newtypeStrategy :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m DerivStrategy
-  noBindS :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Stmt
+  mulArrowT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type
+  multiIfE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp)] -> m GHC.Internal.TH.Syntax.Exp
+  newtypeD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Con -> [m DerivClause] -> m GHC.Internal.TH.Syntax.Dec
+  newtypeD_doc :: GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Monad.Q (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Kind) -> (GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Con, GHC.Internal.Maybe.Maybe GHC.Internal.Base.String, [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String]) -> [GHC.Internal.TH.Monad.Q DerivClause] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec
+  newtypeInstD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Type] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Con -> [m DerivClause] -> m GHC.Internal.TH.Syntax.Dec
+  newtypeInstD_doc :: GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe [GHC.Internal.TH.Monad.Q (GHC.Internal.TH.Syntax.TyVarBndr ())] -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Type -> GHC.Internal.Maybe.Maybe (GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Kind) -> (GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Con, GHC.Internal.Maybe.Maybe GHC.Internal.Base.String, [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String]) -> [GHC.Internal.TH.Monad.Q DerivClause] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec
+  newtypeStrategy :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m DerivStrategy
+  noBindS :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Stmt
   noSig :: GHC.Internal.TH.Syntax.FamilyResultSig
-  noSourceStrictness :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.SourceStrictness
-  noSourceUnpackedness :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness
+  noSourceStrictness :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.SourceStrictness
+  noSourceUnpackedness :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness
   nominalR :: GHC.Internal.TH.Lib.Role
-  normalB :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Body
-  normalC :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.BangType] -> m GHC.Internal.TH.Syntax.Con
-  normalG :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Guard
-  normalGE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp)
-  notStrict :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Strict
-  numTyLit :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Bignum.Integer.Integer -> m GHC.Internal.TH.Syntax.TyLit
-  openTypeFamilyD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.TH.Syntax.FamilyResultSig -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.InjectivityAnn -> m GHC.Internal.TH.Syntax.Dec
-  parS :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [[m GHC.Internal.TH.Syntax.Stmt]] -> m GHC.Internal.TH.Syntax.Stmt
-  parensE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  parensP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
-  parensT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
-  patG :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Guard
-  patGE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Exp -> m (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp)
-  patSynD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.PatSynArgs -> m GHC.Internal.TH.Syntax.PatSynDir -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Dec
-  patSynD_doc :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.PatSynArgs -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.PatSynDir -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Pat -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String] -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
-  patSynSigD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
+  normalB :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Body
+  normalC :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.BangType] -> m GHC.Internal.TH.Syntax.Con
+  normalG :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Guard
+  normalGE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp)
+  notStrict :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Strict
+  numTyLit :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Bignum.Integer.Integer -> m GHC.Internal.TH.Syntax.TyLit
+  openTypeFamilyD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.TH.Syntax.FamilyResultSig -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.InjectivityAnn -> m GHC.Internal.TH.Syntax.Dec
+  parS :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [[m GHC.Internal.TH.Syntax.Stmt]] -> m GHC.Internal.TH.Syntax.Stmt
+  parensE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  parensP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
+  parensT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  patG :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Guard
+  patGE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Exp -> m (GHC.Internal.TH.Syntax.Guard, GHC.Internal.TH.Syntax.Exp)
+  patSynD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.PatSynArgs -> m GHC.Internal.TH.Syntax.PatSynDir -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Dec
+  patSynD_doc :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.PatSynArgs -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.PatSynDir -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Pat -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String] -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec
+  patSynSigD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
   phantomR :: GHC.Internal.TH.Lib.Role
-  plainBndrTV :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.BndrVis -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)
-  plainInvisTV :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Specificity -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)
+  plainBndrTV :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.BndrVis -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)
+  plainInvisTV :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Specificity -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)
   plainTV :: forall flag. DefaultBndrFlag flag => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.TyVarBndr flag
-  pragAnnD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.AnnTarget -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Dec
-  pragCompleteD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.Name] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Dec
-  pragInlD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Inline -> GHC.Internal.TH.Syntax.RuleMatch -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
-  pragLineD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Types.Int -> GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Dec
-  pragRuleD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.String -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
-  pragSpecD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
-  pragSpecED :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
-  pragSpecInlD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Inline -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
-  pragSpecInlED :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Inline -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
-  pragSpecInstD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
-  prefixPatSyn :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.Name] -> m GHC.Internal.TH.Syntax.PatSynArgs
+  pragAnnD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.AnnTarget -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Dec
+  pragCompleteD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [GHC.Internal.TH.Syntax.Name] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Dec
+  pragInlD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Inline -> GHC.Internal.TH.Syntax.RuleMatch -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
+  pragLineD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Types.Int -> GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Dec
+  pragRuleD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
+  pragSpecD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
+  pragSpecED :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
+  pragSpecInlD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Inline -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
+  pragSpecInlED :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m GHC.Internal.TH.Syntax.RuleBndr] -> m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.Inline -> GHC.Internal.TH.Syntax.Phases -> m GHC.Internal.TH.Syntax.Dec
+  pragSpecInstD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
+  prefixPatSyn :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [GHC.Internal.TH.Syntax.Name] -> m GHC.Internal.TH.Syntax.PatSynArgs
   prim :: GHC.Internal.TH.Syntax.Callconv
-  projectionE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.NonEmpty GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
-  promotedConsT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type
-  promotedInfixT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
-  promotedNilT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type
-  promotedT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type
-  promotedTupleT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Types.Int -> m GHC.Internal.TH.Syntax.Type
-  promotedUInfixT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  projectionE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.NonEmpty GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
+  promotedConsT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type
+  promotedInfixT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  promotedNilT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type
+  promotedT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type
+  promotedTupleT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Types.Int -> m GHC.Internal.TH.Syntax.Type
+  promotedUInfixT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
   rationalL :: GHC.Internal.Real.Rational -> GHC.Internal.TH.Syntax.Lit
-  recC :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.VarBangType] -> m GHC.Internal.TH.Syntax.Con
-  recConE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m (GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Exp)] -> m GHC.Internal.TH.Syntax.Exp
-  recGadtC :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.Name] -> [m GHC.Internal.TH.Syntax.VarStrictType] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Con
-  recP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.FieldPat] -> m GHC.Internal.TH.Syntax.Pat
-  recS :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Stmt
-  recUpdE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> [m (GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Exp)] -> m GHC.Internal.TH.Syntax.Exp
-  recordPatSyn :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.Name] -> m GHC.Internal.TH.Syntax.PatSynArgs
+  recC :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.VarBangType] -> m GHC.Internal.TH.Syntax.Con
+  recConE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [m (GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Exp)] -> m GHC.Internal.TH.Syntax.Exp
+  recGadtC :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [GHC.Internal.TH.Syntax.Name] -> [m GHC.Internal.TH.Syntax.VarStrictType] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Con
+  recP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.FieldPat] -> m GHC.Internal.TH.Syntax.Pat
+  recS :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Stmt
+  recUpdE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> [m (GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Exp)] -> m GHC.Internal.TH.Syntax.Exp
+  recordPatSyn :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [GHC.Internal.TH.Syntax.Name] -> m GHC.Internal.TH.Syntax.PatSynArgs
   representationalR :: GHC.Internal.TH.Lib.Role
-  roleAnnotD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Lib.Role] -> m GHC.Internal.TH.Syntax.Dec
-  ruleVar :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.RuleBndr
+  roleAnnotD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Lib.Role] -> m GHC.Internal.TH.Syntax.Dec
+  ruleVar :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.RuleBndr
   safe :: GHC.Internal.TH.Syntax.Safety
-  sectionL :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  sectionR :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  sigD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
-  sigE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Exp
-  sigP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Pat
-  sigT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Type
-  sourceLazy :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.SourceStrictness
-  sourceNoUnpack :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness
-  sourceStrict :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.SourceStrictness
-  sourceUnpack :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness
+  sectionL :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  sectionR :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  sigD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
+  sigE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Exp
+  sigP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Pat
+  sigT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Kind -> m GHC.Internal.TH.Syntax.Type
+  sourceLazy :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.SourceStrictness
+  sourceNoUnpack :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness
+  sourceStrict :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.SourceStrictness
+  sourceUnpack :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness
   specifiedSpec :: GHC.Internal.TH.Syntax.Specificity
-  standaloneDerivD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
-  standaloneDerivWithStrategyD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe DerivStrategy -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
+  standaloneDerivD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
+  standaloneDerivWithStrategyD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Maybe.Maybe DerivStrategy -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
   starK :: GHC.Internal.TH.Syntax.Kind
-  staticE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  staticE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   stdCall :: GHC.Internal.TH.Syntax.Callconv
-  stockStrategy :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m DerivStrategy
-  strTyLit :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.TyLit
-  strictType :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Strict -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.StrictType
-  stringE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
+  stockStrategy :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m DerivStrategy
+  strTyLit :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.TyLit
+  strictType :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Strict -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.StrictType
+  stringE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
   stringL :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Lit
   stringPrimL :: [GHC.Internal.Word.Word8] -> GHC.Internal.TH.Syntax.Lit
-  thisModule :: GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Module
-  tildeP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
-  tupE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp
-  tupP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
+  thisModule :: GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Module
+  tildeP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
+  tupE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp
+  tupP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
   tupleK :: GHC.Internal.Types.Int -> GHC.Internal.TH.Syntax.Kind
-  tupleT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Types.Int -> m GHC.Internal.TH.Syntax.Type
-  tySynD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
-  tySynEqn :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Maybe.Maybe [GHC.Internal.TH.Syntax.TyVarBndr ()] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.TySynEqn
-  tySynInstD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.TySynEqn -> m GHC.Internal.TH.Syntax.Dec
+  tupleT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Types.Int -> m GHC.Internal.TH.Syntax.Type
+  tySynD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
+  tySynEqn :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Maybe.Maybe [GHC.Internal.TH.Syntax.TyVarBndr ()] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.TySynEqn
+  tySynInstD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.TySynEqn -> m GHC.Internal.TH.Syntax.Dec
   tyVarSig :: GHC.Internal.TH.Syntax.TyVarBndr () -> GHC.Internal.TH.Syntax.FamilyResultSig
   typeAnnotation :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.AnnTarget
-  typeDataD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [m GHC.Internal.TH.Syntax.Con] -> m GHC.Internal.TH.Syntax.Dec
-  typeDataD_doc :: GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.Q (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Kind) -> [(GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Con, GHC.Internal.Maybe.Maybe GHC.Internal.Base.String, [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String])] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
-  typeE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Exp
-  typeP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Pat
-  typedBracketE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  typedRuleVar :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.RuleBndr
-  typedSpliceE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  uInfixE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
-  uInfixP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
-  uInfixT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
-  unboundVarE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Exp
-  unboxedSumE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.SumAlt -> GHC.Internal.TH.Syntax.SumArity -> m GHC.Internal.TH.Syntax.Exp
-  unboxedSumP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> GHC.Internal.TH.Syntax.SumAlt -> GHC.Internal.TH.Syntax.SumArity -> m GHC.Internal.TH.Syntax.Pat
-  unboxedSumT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.SumArity -> m GHC.Internal.TH.Syntax.Type
-  unboxedTupE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp
-  unboxedTupP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
-  unboxedTupleT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Types.Int -> m GHC.Internal.TH.Syntax.Type
-  unidir :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.PatSynDir
-  unpacked :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Strict
+  typeDataD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [m GHC.Internal.TH.Syntax.Con] -> m GHC.Internal.TH.Syntax.Dec
+  typeDataD_doc :: GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Monad.Q (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Kind) -> [(GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Con, GHC.Internal.Maybe.Maybe GHC.Internal.Base.String, [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String])] -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec
+  typeE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Exp
+  typeP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Pat
+  typedBracketE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  typedRuleVar :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.RuleBndr
+  typedSpliceE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  uInfixE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  uInfixP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
+  uInfixT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  unboundVarE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Exp
+  unboxedSumE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.Syntax.SumAlt -> GHC.Internal.TH.Syntax.SumArity -> m GHC.Internal.TH.Syntax.Exp
+  unboxedSumP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> GHC.Internal.TH.Syntax.SumAlt -> GHC.Internal.TH.Syntax.SumArity -> m GHC.Internal.TH.Syntax.Pat
+  unboxedSumT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.SumArity -> m GHC.Internal.TH.Syntax.Type
+  unboxedTupE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp
+  unboxedTupP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
+  unboxedTupleT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Types.Int -> m GHC.Internal.TH.Syntax.Type
+  unidir :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.PatSynDir
+  unpacked :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Strict
   unsafe :: GHC.Internal.TH.Syntax.Safety
-  valD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Body -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
+  valD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Body -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
   valueAnnotation :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.AnnTarget
-  varBangType :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.BangType -> m GHC.Internal.TH.Syntax.VarBangType
-  varE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Exp
+  varBangType :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.BangType -> m GHC.Internal.TH.Syntax.VarBangType
+  varE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Exp
   varK :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Kind
-  varP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Pat
-  varStrictType :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.StrictType -> m GHC.Internal.TH.Syntax.VarStrictType
-  varT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type
-  viaStrategy :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type -> m DerivStrategy
-  viewP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
-  wildCardT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Type
-  wildP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat
-  withDecDoc :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Dec
-  withDecsDoc :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q [GHC.Internal.TH.Syntax.Dec] -> GHC.Internal.TH.Syntax.Q [GHC.Internal.TH.Syntax.Dec]
+  varP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Pat
+  varStrictType :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.StrictType -> m GHC.Internal.TH.Syntax.VarStrictType
+  varT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type
+  viaStrategy :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> m DerivStrategy
+  viewP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
+  wildCardT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type
+  wildP :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Pat
+  withDecDoc :: GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec
+  withDecsDoc :: GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q [GHC.Internal.TH.Syntax.Dec] -> GHC.Internal.TH.Monad.Q [GHC.Internal.TH.Syntax.Dec]
   wordPrimL :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
 
 module Language.Haskell.TH.Ppr where
@@ -1367,10 +1367,10 @@ module Language.Haskell.TH.PprLib where
 module Language.Haskell.TH.Quote where
   -- Safety: Safe
   type QuasiQuoter :: *
-  data QuasiQuoter = QuasiQuoter {quoteExp :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Exp, quotePat :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Pat, quoteType :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q GHC.Internal.TH.Syntax.Type, quoteDec :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Q [GHC.Internal.TH.Syntax.Dec]}
-  dataToExpQ :: forall (m :: * -> *) a. (GHC.Internal.TH.Syntax.Quote m, GHC.Internal.Data.Data.Data a) => (forall b. GHC.Internal.Data.Data.Data b => b -> GHC.Internal.Maybe.Maybe (m GHC.Internal.TH.Syntax.Exp)) -> a -> m GHC.Internal.TH.Syntax.Exp
-  dataToPatQ :: forall (m :: * -> *) a. (GHC.Internal.TH.Syntax.Quote m, GHC.Internal.Data.Data.Data a) => (forall b. GHC.Internal.Data.Data.Data b => b -> GHC.Internal.Maybe.Maybe (m GHC.Internal.TH.Syntax.Pat)) -> a -> m GHC.Internal.TH.Syntax.Pat
-  dataToQa :: forall (m :: * -> *) a k q. (GHC.Internal.TH.Syntax.Quote m, GHC.Internal.Data.Data.Data a) => (GHC.Internal.TH.Syntax.Name -> k) -> (GHC.Internal.TH.Syntax.Lit -> m q) -> (k -> [m q] -> m q) -> (forall b. GHC.Internal.Data.Data.Data b => b -> GHC.Internal.Maybe.Maybe (m q)) -> a -> m q
+  data QuasiQuoter = QuasiQuoter {quoteExp :: GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Exp, quotePat :: GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Pat, quoteType :: GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Type, quoteDec :: GHC.Internal.Base.String -> GHC.Internal.TH.Monad.Q [GHC.Internal.TH.Syntax.Dec]}
+  dataToExpQ :: forall (m :: * -> *) a. (GHC.Internal.TH.Monad.Quote m, GHC.Internal.Data.Data.Data a) => (forall b. GHC.Internal.Data.Data.Data b => b -> GHC.Internal.Maybe.Maybe (m GHC.Internal.TH.Syntax.Exp)) -> a -> m GHC.Internal.TH.Syntax.Exp
+  dataToPatQ :: forall (m :: * -> *) a. (GHC.Internal.TH.Monad.Quote m, GHC.Internal.Data.Data.Data a) => (forall b. GHC.Internal.Data.Data.Data b => b -> GHC.Internal.Maybe.Maybe (m GHC.Internal.TH.Syntax.Pat)) -> a -> m GHC.Internal.TH.Syntax.Pat
+  dataToQa :: forall (m :: * -> *) a k q. (GHC.Internal.TH.Monad.Quote m, GHC.Internal.Data.Data.Data a) => (GHC.Internal.TH.Syntax.Name -> k) -> (GHC.Internal.TH.Syntax.Lit -> m q) -> (k -> [m q] -> m q) -> (forall b. GHC.Internal.Data.Data.Data b => b -> GHC.Internal.Maybe.Maybe (m q)) -> a -> m q
   defaultQuasiQuoter :: QuasiQuoter
   namedDefaultQuasiQuoter :: GHC.Internal.Base.String -> QuasiQuoter
   quoteFile :: QuasiQuoter -> QuasiQuoter
@@ -1927,15 +1927,15 @@ instance GHC.Boot.TH.Ppr.Ppr GHC.Boot.TH.Ppr.TypeArg -- Defined in ‘GHC.Boot.T
 instance GHC.Boot.TH.Ppr.PprFlag GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘GHC.Boot.TH.Ppr’
 instance GHC.Boot.TH.Ppr.PprFlag GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Boot.TH.Ppr’
 instance GHC.Boot.TH.Ppr.PprFlag () -- Defined in ‘GHC.Boot.TH.Ppr’
-instance GHC.Internal.Base.Applicative GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Base.Applicative GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
 instance [safe] GHC.Internal.Base.Applicative GHC.Boot.TH.PprLib.PprM -- Defined in ‘GHC.Boot.TH.PprLib’
-instance GHC.Internal.Base.Functor GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Base.Functor GHC.Internal.TH.Syntax.TyVarBndr -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Base.Functor GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
 instance [safe] GHC.Internal.Base.Functor GHC.Boot.TH.PprLib.PprM -- Defined in ‘GHC.Boot.TH.PprLib’
-instance GHC.Internal.Base.Monad GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Base.Monad GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
 instance [safe] GHC.Internal.Base.Monad GHC.Boot.TH.PprLib.PprM -- Defined in ‘GHC.Boot.TH.PprLib’
-instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.TH.Syntax.Q a) -- Defined in ‘GHC.Internal.TH.Syntax’
-instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.TH.Syntax.Q a) -- Defined in ‘GHC.Internal.TH.Syntax’
+instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.TH.Monad.Q a) -- Defined in ‘GHC.Internal.TH.Monad’
+instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.TH.Monad.Q a) -- Defined in ‘GHC.Internal.TH.Monad’
 instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Syntax’
@@ -2051,65 +2051,9 @@ instance forall flag. GHC.Internal.Classes.Ord flag => GHC.Internal.Classes.Ord 
 instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Ord GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.LanguageExtensions’
-instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Control.Monad.IO.Class.MonadIO GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Body -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Bytes -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Callconv -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Clause -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Con -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DerivClause -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DerivStrategy -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DocLoc -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.FamilyResultSig -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Fixity -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.FixityDirection -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Foreign -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.FunDep -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Guard -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Info -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.InjectivityAnn -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Inline -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.ModName -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Module -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.ModuleInfo -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Name -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.NameFlavour -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.NameSpace -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.NamespaceSpecifier -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.OccName -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Overlap -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Pat -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.PatSynArgs -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.PatSynDir -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Phases -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.PkgName -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Pragma -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Range -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Role -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.RuleBndr -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Safety -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.TyLit -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.TySynEqn -- Defined in ‘GHC.Internal.TH.Syntax’
-instance forall flag. GHC.Internal.Data.Data.Data flag => GHC.Internal.Data.Data.Data (GHC.Internal.TH.Syntax.TyVarBndr flag) -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
+instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
+instance GHC.Internal.Control.Monad.IO.Class.MonadIO GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.TH.Syntax.TyVarBndr -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.TH.Syntax.TyVarBndr -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Enum.Bounded GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.LanguageExtensions’
@@ -2302,7 +2246,7 @@ instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.SourceStrictness -- De
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.TH.Lift’
-instance forall a. GHC.Internal.TH.Lift.Lift (GHC.Internal.TH.Syntax.TExp a) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a. GHC.Internal.TH.Lift.Lift (GHC.Internal.TH.Monad.TExp a) -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a b. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b) => GHC.Internal.TH.Lift.Lift (a, b) -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a b c. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c) => GHC.Internal.TH.Lift.Lift (a, b, c) -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a b c d. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d) => GHC.Internal.TH.Lift.Lift (a, b, c, d) -- Defined in ‘GHC.Internal.TH.Lift’
@@ -2340,10 +2284,10 @@ instance forall a b c d e f g. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lif
 instance GHC.Internal.TH.Lift.Lift (# #) -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Char# -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Word# -- Defined in ‘GHC.Internal.TH.Lift’
-instance GHC.Internal.TH.Syntax.Quasi GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.TH.Syntax.Quasi GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.TH.Syntax.Quote GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.TH.Syntax’
-instance GHC.Internal.TH.Syntax.Quote GHC.Internal.TH.Syntax.Q -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.TH.Monad.Quasi GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.TH.Monad’
+instance GHC.Internal.TH.Monad.Quasi GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
+instance GHC.Internal.TH.Monad.Quote GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.TH.Monad’
+instance GHC.Internal.TH.Monad.Quote GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
 instance [safe] Language.Haskell.TH.Lib.DefaultBndrFlag GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘Language.Haskell.TH.Lib’
 instance [safe] Language.Haskell.TH.Lib.DefaultBndrFlag GHC.Internal.TH.Syntax.Specificity -- Defined in ‘Language.Haskell.TH.Lib’
 instance [safe] Language.Haskell.TH.Lib.DefaultBndrFlag () -- Defined in ‘Language.Haskell.TH.Lib’

@@ -144,6 +144,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 -- THSyntax gives access to internal functions and data types
 import qualified GHC.Boot.TH.Syntax as TH
+import qualified GHC.Boot.TH.Monad  as TH
 import qualified GHC.Boot.TH.Ppr    as TH
 
 #if defined(HAVE_INTERNAL_INTERPRETER)

@@ -20,6 +20,7 @@ module GHC.Internal.TH.Quote(
     ) where
 
 import GHC.Internal.TH.Syntax
+import GHC.Internal.TH.Monad
 import GHC.Internal.Base hiding (Type)
 
 

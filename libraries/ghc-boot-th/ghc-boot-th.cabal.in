@@ -60,9 +60,11 @@ Library
         exposed-modules:
             GHC.Boot.TH.Lib
             GHC.Boot.TH.Syntax
+            GHC.Boot.TH.Monad
         other-modules:
             GHC.Internal.TH.Lib
             GHC.Internal.TH.Syntax
+            GHC.Internal.TH.Monad
             GHC.Internal.ForeignSrcLang
             GHC.Internal.LanguageExtensions
             GHC.Internal.Lexeme
@@ -74,4 +76,5 @@ Library
             GHC.Boot.TH.Lib,
             GHC.Boot.TH.Lift,
             GHC.Boot.TH.Quote,
-            GHC.Boot.TH.Syntax
+            GHC.Boot.TH.Syntax,
+            GHC.Boot.TH.Monad

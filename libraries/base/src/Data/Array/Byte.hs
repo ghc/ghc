@@ -32,6 +32,7 @@ import GHC.Internal.Show (intToDigit)
 import GHC.Internal.ST (ST(..), runST)
 import GHC.Internal.Word (Word8(..))
 import GHC.Internal.TH.Syntax
+import GHC.Internal.TH.Monad
 import GHC.Internal.TH.Lift
 import GHC.Internal.ForeignPtr
 import Prelude
