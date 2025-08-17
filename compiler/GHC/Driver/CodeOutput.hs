@@ -23,6 +23,7 @@ import GHC.CmmToAsm     ( nativeCodeGen )
 import GHC.CmmToLlvm    ( llvmCodeGen )
 
 import GHC.CmmToC           ( cmmToC )
+import GHC.Cmm.GenericOpt   ( cmmToCmm )
 import GHC.Cmm.Lint         ( cmmLint )
 import GHC.Cmm
 import GHC.Cmm.CLabel
@@ -32,6 +33,7 @@ import GHC.StgToCmm.CgUtils (CgStream)
 import GHC.Driver.DynFlags
 import GHC.Driver.Config.Finder    ( initFinderOpts   )
 import GHC.Driver.Config.CmmToAsm  ( initNCGConfig    )
+import GHC.CmmToAsm.Config         ( NCGConfig(..)    )
 import GHC.Driver.Config.CmmToLlvm ( initLlvmCgConfig )
 import GHC.Driver.LlvmConfigCache  (LlvmConfigCache)
 import GHC.Driver.Ppr
@@ -130,7 +132,7 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
         ; (stubs, a) <- case backendCodeOutput (backend dflags) of
                  NcgCodeOutput  -> outputAsm logger dflags this_mod location filenm dus1
                                              final_stream
-                 ViaCCodeOutput -> outputC logger dflags filenm dus1 final_stream pkg_deps
+                 ViaCCodeOutput -> outputC logger dflags this_mod filenm dus1 final_stream pkg_deps
                  LlvmCodeOutput -> outputLlvm logger llvm_config dflags filenm dus1 final_stream
                  JSCodeOutput   -> outputJS logger llvm_config dflags filenm final_stream
         ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
@@ -165,13 +167,14 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 
 outputC :: Logger
         -> DynFlags
+        -> Module
         -> FilePath
         -> DUniqSupply -- ^ The deterministic uniq supply to run the CgStream
                        -- See Note [Deterministic Uniques in the CG]
         -> CgStream RawCmmGroup a
         -> Set UnitId
         -> IO a
-outputC logger dflags filenm dus cmm_stream unit_deps =
+outputC logger dflags this_mod filenm dus cmm_stream unit_deps =
   withTiming logger (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
     let pkg_names = map unitIdString (Set.toAscList unit_deps)
     doOutput filenm $ \ h -> fmap fst $ runUDSMT dus $ do
@@ -179,8 +182,19 @@ outputC logger dflags filenm dus cmm_stream unit_deps =
         hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
         hPutStr h "#include \"Stg.h\"\n"
       let platform = targetPlatform dflags
+          ncg_config = (initNCGConfig dflags this_mod)
+                        { -- The C compiler does its own PIC handling
+                          ncgPIC = False
+                        , ncgExternalDynamicRefs = False
+                          -- Enforce the simple constant foldings do
+                          -- get run, otherwise we won't fix #24900
+                        , ncgDoConstantFolding = True
+                        }
           writeC cmm = do
-            let doc = cmmToC platform cmm
+            -- Run the generic Cmm optimization pass to improve C backend output.
+            -- See GHC.Cmm.GenericOpt.cmmToCmm.
+            let cmm' = map (fst . cmmToCmm ncg_config) cmm
+                doc  = cmmToC platform cmm'
             putDumpFileMaybe logger Opt_D_dump_c_backend
                           "C backend output"
                           FormatC

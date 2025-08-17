@@ -66,8 +66,6 @@ import GHC.Float
 -- --------------------------------------------------------------------------
 -- Now do some real work
 --
--- for fun, we could call cmmToCmm over the tops...
---
 
 cmmToC :: Platform -> RawCmmGroup -> SDoc
 cmmToC platform tops = (vcat $ intersperse blankLine $ map (pprTop platform) tops) $$ blankLine
