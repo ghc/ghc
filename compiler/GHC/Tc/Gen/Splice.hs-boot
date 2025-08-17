@@ -12,6 +12,7 @@ import GHC.Hs.Extension ( GhcRn, GhcPs, GhcTc )
 
 import GHC.Hs ( HsQuote, HsExpr, LHsExpr, LHsType, LPat, LHsDecl, ThModFinalizers, HsUntypedSpliceResult, HsTypedSpliceResult, HsTypedSplice )
 import qualified GHC.Boot.TH.Syntax as TH
+import qualified GHC.Boot.TH.Monad as TH
 
 tcTypedSplice :: HsTypedSpliceResult
               -> HsTypedSplice GhcRn

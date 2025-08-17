@@ -181,26 +181,30 @@ templateHaskellNames = [
     -- Quasiquoting
     quasiQuoterTyConName, quoteDecName, quoteTypeName, quoteExpName, quotePatName]
 
-thSyn, thLib, qqLib, liftLib :: Module
+thSyn, thMonad, thLib, qqLib, liftLib :: Module
 thSyn = mkTHModule (fsLit "GHC.Internal.TH.Syntax")
+thMonad = mkTHModule (fsLit "GHC.Internal.TH.Monad")
 thLib = mkTHModule (fsLit "GHC.Internal.TH.Lib")
 qqLib = mkTHModule (fsLit "GHC.Internal.TH.Quote")
 liftLib = mkTHModule (fsLit "GHC.Internal.TH.Lift")
 
+
 mkTHModule :: FastString -> Module
 mkTHModule m = mkModule ghcInternalUnit (mkModuleNameFS m)
 
-libFun, libTc, thFun, thTc, thCls, thCon, liftFun :: FastString -> Unique -> Name
+libFun, libTc, thFun, thTc, thCon, liftFun, thMonadTc, thMonadCls, thMonadFun :: FastString -> Unique -> Name
 libFun = mk_known_key_name varName  thLib
 libTc  = mk_known_key_name tcName   thLib
 thFun  = mk_known_key_name varName  thSyn
 thTc   = mk_known_key_name tcName   thSyn
-thCls  = mk_known_key_name clsName  thSyn
 thCon  = mk_known_key_name dataName thSyn
 liftFun = mk_known_key_name varName liftLib
+thMonadTc  = mk_known_key_name tcName thMonad
+thMonadCls = mk_known_key_name clsName thMonad
+thMonadFun = mk_known_key_name varName thMonad
 
-thFld :: FastString -> FastString -> Unique -> Name
-thFld con = mk_known_key_name (fieldName con) thSyn
+thMonadFld :: FastString -> FastString -> Unique -> Name
+thMonadFld con = mk_known_key_name (fieldName con) thSyn
 
 qqFld :: FastString -> Unique -> Name
 qqFld = mk_known_key_name (fieldName (fsLit "QuasiQuoter")) qqLib
@@ -210,14 +214,14 @@ liftClassName :: Name
 liftClassName = mk_known_key_name clsName liftLib (fsLit "Lift") liftClassKey
 
 quoteClassName :: Name
-quoteClassName = thCls (fsLit "Quote") quoteClassKey
+quoteClassName = thMonadCls (fsLit "Quote") quoteClassKey
 
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
     codeTyConName, injAnnTyConName, overlapTyConName, decsTyConName,
     modNameTyConName, quasiQuoterTyConName :: Name
-qTyConName             = thTc (fsLit "Q")              qTyConKey
+qTyConName             = thMonadTc (fsLit "Q")         qTyConKey
 nameTyConName          = thTc (fsLit "Name")           nameTyConKey
 fieldExpTyConName      = thTc (fsLit "FieldExp")       fieldExpTyConKey
 patTyConName           = thTc (fsLit "Pat")            patTyConKey
@@ -230,7 +234,7 @@ matchTyConName         = thTc (fsLit "Match")          matchTyConKey
 clauseTyConName        = thTc (fsLit "Clause")         clauseTyConKey
 funDepTyConName        = thTc (fsLit "FunDep")         funDepTyConKey
 predTyConName          = thTc (fsLit "Pred")           predTyConKey
-codeTyConName          = thTc (fsLit "Code")           codeTyConKey
+codeTyConName          = thMonadTc (fsLit "Code")      codeTyConKey
 injAnnTyConName        = thTc (fsLit "InjectivityAnn") injAnnTyConKey
 overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
 modNameTyConName       = thTc (fsLit "ModName")        modNameTyConKey
@@ -242,8 +246,8 @@ returnQName, bindQName, sequenceQName, newNameName, liftName,
     unsafeCodeCoerceName, liftTypedName, mkModNameName, mkNameQName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
-sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
-newNameName    = thFun (fsLit "newName")   newNameIdKey
+sequenceQName  = thMonadFun (fsLit "sequenceQ") sequenceQIdKey
+newNameName    = thMonadFun (fsLit "newName")   newNameIdKey
 mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
 mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
@@ -253,9 +257,9 @@ mkNameLName    = thFun (fsLit "mkNameL")    mkNameLIdKey
 mkNameQName    = thFun (fsLit "mkNameQ")    mkNameQIdKey
 mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
 mkModNameName  = thFun (fsLit "mkModName")  mkModNameIdKey
-unTypeName     = thFld (fsLit "TExp") (fsLit "unType") unTypeIdKey
-unTypeCodeName    = thFun (fsLit "unTypeCode") unTypeCodeIdKey
-unsafeCodeCoerceName = thFun (fsLit "unsafeCodeCoerce") unsafeCodeCoerceIdKey
+unTypeName     = thMonadFld (fsLit "TExp") (fsLit "unType") unTypeIdKey
+unTypeCodeName    = thMonadFun (fsLit "unTypeCode") unTypeCodeIdKey
+unsafeCodeCoerceName = thMonadFun (fsLit "unsafeCodeCoerce") unsafeCodeCoerceIdKey
 liftName       = liftFun (fsLit "lift")      liftIdKey
 liftStringName = liftFun (fsLit "liftString")  liftStringIdKey
 liftTypedName = liftFun (fsLit "liftTyped") liftTypedIdKey

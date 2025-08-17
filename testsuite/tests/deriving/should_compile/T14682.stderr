@@ -21,7 +21,7 @@ Derived class instances:
              (GHC.Internal.TH.Lift.lift a1))
           (GHC.Internal.TH.Lift.lift a2)
     GHC.Internal.TH.Lift.liftTyped (T14682.Foo a1 a2)
-      = GHC.Internal.TH.Syntax.unsafeCodeCoerce
+      = GHC.Internal.TH.Monad.unsafeCodeCoerce
           (GHC.Internal.TH.Lib.appE
              (GHC.Internal.TH.Lib.appE
                 (GHC.Internal.TH.Lib.conE 'T14682.Foo)

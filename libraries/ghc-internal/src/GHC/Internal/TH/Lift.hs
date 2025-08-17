@@ -30,6 +30,7 @@ module GHC.Internal.TH.Lift
   where
 
 import GHC.Internal.TH.Syntax
+import GHC.Internal.TH.Monad
 import qualified GHC.Internal.TH.Lib as Lib (litE)  -- See wrinkle (W4) of Note [Tracking dependencies on primitives]
 
 import GHC.Internal.Data.Either

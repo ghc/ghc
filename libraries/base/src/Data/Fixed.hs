@@ -91,7 +91,7 @@ import GHC.Internal.TypeLits (KnownNat, natVal)
 import GHC.Internal.Read
 import GHC.Internal.Text.ParserCombinators.ReadPrec
 import GHC.Internal.Text.Read.Lex
-import qualified GHC.Internal.TH.Syntax as TH
+import qualified GHC.Internal.TH.Monad as TH
 import qualified GHC.Internal.TH.Lift as TH
 import Data.Typeable
 import Prelude
