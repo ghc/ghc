@@ -849,15 +849,14 @@ hscRecompStatus
         return $ HscRecompNeeded $ fmap mi_iface_hash mb_checked_iface
       UpToDateItem checked_iface -> do
         let lcl_dflags = ms_hspp_opts mod_summary
-        mod_details <- initModDetails hsc_env checked_iface
         if | not (backendGeneratesCode (backend lcl_dflags)) -> do
                -- No need for a linkable, we're good to go
                msg UpToDate
-               return $ HscUpToDate (HomeModInfo checked_iface mod_details emptyHomeModInfoLinkable)
+               return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
            | not (backendGeneratesCodeForHsBoot (backend lcl_dflags))
            , IsBoot <- isBootSummary mod_summary -> do
                msg UpToDate
-               return $ HscUpToDate (HomeModInfo checked_iface mod_details emptyHomeModInfoLinkable)
+               return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
 
            -- Always recompile with the JS backend when TH is enabled until
            -- #23013 is fixed.
@@ -874,7 +873,7 @@ hscRecompStatus
                -- 2. The bytecode object file
                bc_obj_linkable <- checkByteCodeFromObject hsc_env mod_summary
                -- 3. Bytecode from an interface whole core bindings.
-               bc_core_linkable <- checkByteCodeFromCoreBindings hsc_env checked_iface mod_details mod_summary
+               bc_core_linkable <- checkByteCodeFromCoreBindings hsc_env checked_iface mod_summary
                -- 4. The object file.
                obj_linkable <- liftIO $ checkObjects lcl_dflags (homeMod_object old_linkable) mod_summary
                trace_if (hsc_logger hsc_env)
@@ -885,7 +884,7 @@ hscRecompStatus
 
                let just_o  = justObjects  <$> obj_linkable
 
-                   definitely_both_os = case (definitely_bc, obj_linkable) of
+                   definitely_both_os = case (bc_result, obj_linkable) of
                                (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
                                -- If missing object code, just say we need to recompile because of object code.
                                (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
@@ -898,17 +897,26 @@ hscRecompStatus
                    definitely_bc =  bc_obj_linkable `prefer` bc_in_memory_linkable
 
                    -- If not -fwrite-byte-code, then we could use core bindings or object code if that's available.
-                   maybe_bc = ((bc_obj_linkable `choose` bc_core_linkable) `prefer` bc_in_memory_linkable)
-                              `choose` obj_linkable
+                   maybe_bc = bc_in_memory_linkable `choose`
+                              bc_obj_linkable `choose`
+                              bc_core_linkable `choose`
+                              obj_linkable
 
+                   bc_result = if gopt Opt_WriteByteCode lcl_dflags
+                                -- If the byte-code artifact needs to be produced, then we certainly need bytecode.
+                                then definitely_bc
+                                else maybe_bc
+
+               trace_if (hsc_logger hsc_env)
+                (vcat [text "definitely_bc", ppr definitely_bc
+                      , text "maybe_bc", ppr maybe_bc
+                      , text "definitely_both_os", ppr definitely_both_os
+                      , text "just_o", ppr just_o])
 --               pprTraceM "recomp" (ppr just_bc <+> ppr just_o)
                -- 2. Decide which of the products we will need
                let recomp_linkable_result = case () of
                      _ | backendCanReuseLoadedCode (backend lcl_dflags) ->
-                           if gopt Opt_WriteByteCode lcl_dflags
-                              -- If the byte-code artifact needs to be produced, then we certainly need bytecode.
-                              then justBytecode <$> definitely_bc
-                              else justBytecode <$> maybe_bc
+                           justBytecode <$> bc_result
                         -- Need object files for making object files
                         | backendWritesFiles (backend lcl_dflags) ->
                            if gopt Opt_ByteCodeAndObjectCode lcl_dflags
@@ -921,7 +929,7 @@ hscRecompStatus
                case recomp_linkable_result of
                  UpToDateItem linkable -> do
                    msg $ UpToDate
-                   return $ HscUpToDate (HomeModInfo checked_iface mod_details linkable)
+                   return $ HscUpToDate checked_iface linkable
                  OutOfDateItem reason _ -> do
                    msg $ NeedsRecompile reason
                    return $ HscRecompNeeded $ Just $ mi_iface_hash $ checked_iface
@@ -1010,18 +1018,19 @@ checkByteCodeFromObject hsc_env mod_sum = do
 
 -- | Attempt to load bytecode from whole core bindings in the interface if they exist.
 -- This is a legacy code-path, these days it should be preferred to use the bytecode object linkable.
-checkByteCodeFromCoreBindings :: HscEnv -> ModIface -> ModDetails -> ModSummary -> IO (MaybeValidated Linkable)
-checkByteCodeFromCoreBindings hsc_env iface mod_details mod_sum = do
+checkByteCodeFromCoreBindings :: HscEnv -> ModIface -> ModSummary -> IO (MaybeValidated Linkable)
+checkByteCodeFromCoreBindings _hsc_env iface mod_sum = do
     let
       this_mod   = ms_mod mod_sum
       if_date    = fromJust $ ms_iface_date mod_sum
     case iface_core_bindings iface (ms_location mod_sum) of
       Just fi -> do
-        ~(bco, fos) <- unsafeInterleaveIO $
-                       compileWholeCoreBindings hsc_env (md_types mod_details) fi
-        let bco' = LazyBCOs bco fos
-        return $ UpToDateItem (Linkable if_date this_mod (NE.singleton bco'))
+        return $ UpToDateItem (Linkable if_date this_mod (NE.singleton (CoreBindings fi)))
       _ -> return $ outOfDateItemBecause MissingBytecode Nothing
+
+--  970           let fi = WholeCoreBindings extra_decls this_mod (ms_location mod_sum)
+-- 971                    (mi_foreign iface)
+-- 972           return (UpToDateItem (Linkable if_date this_mod (NE.singleton (CoreBindings fi))))
 
 --------------------------------------------------------------
 -- Compilers
