@@ -56,22 +56,18 @@ import GHC.Utils.Misc
 import GHC.Data.Graph.Directed
 import GHC.Data.Maybe
 
-import GHC.Types.Unique
 import qualified GHC.CmmToAsm.CFG.Dominators as Dom
 import GHC.CmmToAsm.CFG.Weight
-import GHC.Data.Word64Map.Strict (Word64Map)
-import GHC.Data.Word64Set (Word64Set)
 import Data.IntMap.Strict (IntMap)
 import Data.IntSet (IntSet)
 
 import qualified Data.IntMap.Strict as IM
-import qualified GHC.Data.Word64Map.Strict as WM
 import qualified Data.Map as M
 import qualified Data.IntSet as IS
-import qualified GHC.Data.Word64Set as WS
 import qualified Data.Set as S
 import Data.Tree
 import Data.Bifunctor
+import Data.Coerce
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -92,7 +88,6 @@ import Data.Array.Base (unsafeRead, unsafeWrite)
 
 import Control.Monad
 import GHC.Data.UnionFind
-import Data.Word
 
 type Prob = Double
 
@@ -849,10 +844,8 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
             fmap (setFromList . mapKeys ) cfg :: LabelMap LabelSet
 
 
-    --TODO - This should be a no op: Export constructors? Use unsafeCoerce? ...
-    rooted = ( fromBlockId root
-              , toWord64Map $ fmap toWord64Set graph) :: (Word64, Word64Map Word64Set)
-    tree = fmap toBlockId $ Dom.domTree rooted :: Tree BlockId
+    rooted = coerce (root, graph)
+    tree = coerce (Dom.domTree rooted) :: Tree BlockId
 
     -- Map from Nodes to their dominators
     domMap :: LabelMap LabelSet
@@ -898,11 +891,6 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
           loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
       in  map (\n -> (n, loopCount n)) $ nodes :: [(BlockId, Int)]
 
-    toWord64Set :: LabelSet -> Word64Set
-    toWord64Set s = WS.fromList . map fromBlockId . setElems $ s
-    toWord64Map :: LabelMap a -> Word64Map a
-    toWord64Map m = WM.fromList $ map (\(x,y) -> (fromBlockId x,y)) $ mapToList m
-
     mkDomMap :: Tree BlockId -> LabelMap LabelSet
     mkDomMap root = mapFromList $ go setEmpty root
       where
@@ -915,12 +903,6 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
             in  entries ++ concatMap
                             (\n -> go (setInsert (rootLabel n) parents) n)
                             leaves
-
-    fromBlockId :: BlockId -> Word64
-    fromBlockId = getKey . getUnique
-
-    toBlockId :: Word64 -> BlockId
-    toBlockId = mkBlockId . mkUniqueGrimily
 
 -- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
 newtype BlockNode (e :: Extensibility) (x :: Extensibility) = BN (BlockId,[BlockId])

@@ -7,9 +7,9 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module GHC.Cmm.Dataflow.Label
-    ( Label
-    , LabelMap
-    , LabelSet
+    ( Label(..)
+    , LabelMap(..)
+    , LabelSet(..)
     , FactBase
     , lookupFact
     , mkHooplLabel
