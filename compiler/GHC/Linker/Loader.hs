@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -1128,33 +1129,57 @@ loadPackages interp hsc_env new_pkgs = do
 
 loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
 loadPackages' interp hsc_env new_pks pls = do
-    pkgs' <- link (pkgs_loaded pls) new_pks
-    return $! pls { pkgs_loaded = pkgs'
+  (reverse -> pkgs_info_list, pkgs_almost_loaded) <-
+    downsweep
+      ([], pkgs_loaded pls)
+      new_pks
+  let link_one pkgs new_pkg_info = do
+        (hs_cls, extra_cls, loaded_dlls) <-
+          loadPackage
+            interp
+            hsc_env
+            new_pkg_info
+        evaluate $
+          adjustUDFM
+            ( \old_pkg_info ->
+                old_pkg_info
+                  { loaded_pkg_hs_objs = hs_cls,
+                    loaded_pkg_non_hs_objs = extra_cls,
+                    loaded_pkg_hs_dlls = loaded_dlls
                   }
+            )
+            pkgs
+            (Packages.unitId new_pkg_info)
+  pkgs_loaded' <- foldlM link_one pkgs_almost_loaded pkgs_info_list
+  evaluate $ pls {pkgs_loaded = pkgs_loaded'}
   where
-     link :: PkgsLoaded -> [UnitId] -> IO PkgsLoaded
-     link pkgs new_pkgs =
-         foldM link_one pkgs new_pkgs
+    downsweep = foldlM downsweep_one
 
-     link_one pkgs new_pkg
-        | new_pkg `elemUDFM` pkgs   -- Already linked
-        = return pkgs
-
-        | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
-        = do { let deps = unitDepends pkg_cfg
-               -- Link dependents first
-             ; pkgs' <- link pkgs deps
-                -- Now link the package itself
-             ; (hs_cls, extra_cls, loaded_dlls) <- loadPackage interp hsc_env pkg_cfg
-             ; let trans_deps = unionManyUniqDSets [ addOneToUniqDSet (loaded_pkg_trans_deps loaded_pkg_info) dep_pkg
-                                                   | dep_pkg <- deps
-                                                   , Just loaded_pkg_info <- pure (lookupUDFM pkgs' dep_pkg)
-                                                   ]
-             ; return (addToUDFM pkgs' new_pkg (LoadedPkgInfo new_pkg hs_cls extra_cls loaded_dlls trans_deps)) }
-
-        | otherwise
-        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
-
+    downsweep_one (pkgs_info_list, pkgs) new_pkg
+      | new_pkg `elemUDFM` pkgs = pure (pkgs_info_list, pkgs)
+      | Just new_pkg_info <- lookupUnitId (hsc_units hsc_env) new_pkg = do
+          let new_pkg_deps = unitDepends new_pkg_info
+          (pkgs_info_list', pkgs') <- downsweep (pkgs_info_list, pkgs) new_pkg_deps
+          let new_pkg_trans_deps =
+                unionManyUniqDSets
+                  [ addOneToUniqDSet (loaded_pkg_trans_deps loaded_pkg_info) dep_pkg
+                  | dep_pkg <- new_pkg_deps,
+                    loaded_pkg_info <- maybeToList $ pkgs' `lookupUDFM` dep_pkg
+                  ]
+          pure
+            ( new_pkg_info : pkgs_info_list',
+              addToUDFM pkgs' new_pkg $
+                LoadedPkgInfo
+                  { loaded_pkg_uid = new_pkg,
+                    loaded_pkg_hs_objs = [],
+                    loaded_pkg_non_hs_objs = [],
+                    loaded_pkg_hs_dlls = [],
+                    loaded_pkg_trans_deps = new_pkg_trans_deps
+                  }
+            )
+      | otherwise =
+          throwGhcExceptionIO
+            (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
 loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ([LibrarySpec], [LibrarySpec], [RemotePtr LoadedDLL])
 loadPackage interp hsc_env pkg
