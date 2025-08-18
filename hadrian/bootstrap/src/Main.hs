@@ -84,7 +84,7 @@ main2 meta plan = do
                         return
                             ( Hackage
                             , Just $ fromIntegral (I.riRevision relInfo)
-                            , P.sha256FromByteString $ I.getSHA256 $ I.riCabal relInfo
+                            , P.sha256FromByteString $ I.getSHA256 $ I.riCabalHash relInfo
                             )
 
                     Nothing -> case P.uType unit of
@@ -230,3 +230,4 @@ findHadrianExe plan = listToMaybe
     , pkgname == P.PkgName (fromString "hadrian")
     , Map.keys (P.uComps unit) == [P.CompNameExe (fromString "hadrian")]
     ]
+
