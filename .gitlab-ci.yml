@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 6e9f8f17086e56e83adae4a8a9d63e2fec3cb6c7
+  DOCKER_REV: 3618852f42dc1d3d8552fd2b173c482170f76ba6
 
   # Sequential version number of all cached things.
   # Bump to invalidate GitLab CI cache.
@@ -104,10 +104,10 @@ workflow:
 # which versions of GHC to allow bootstrap with
 .bootstrap_matrix : &bootstrap_matrix
   matrix:
-    - GHC_VERSION: 9.8.1
-      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12-ghc9_8:$DOCKER_REV"
     - GHC_VERSION: 9.10.1
       DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12-ghc9_10:$DOCKER_REV"
+    - GHC_VERSION: 9.12.2
+      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12-ghc9_12:$DOCKER_REV"
 
 # Allow linters to fail on draft MRs.
 # This must be explicitly transcluded in lint jobs which
