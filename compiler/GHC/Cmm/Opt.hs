@@ -396,25 +396,25 @@ cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt 1 rep))]
 
 -- Now look for multiplication/division by powers of 2 (integers).
 
-cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n _))]
+cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n w))]
   = case mop of
         MO_Mul rep
-           | Just p <- exactLog2 n ->
+           | Just p <- widthBoundedExactLog2 False w n ->
                  Just $! (cmmMachOpFold platform (MO_Shl rep) [x, CmmLit (CmmInt p $ wordWidth platform)])
         MO_U_Quot rep
-           | Just p <- exactLog2 n ->
+           | Just p <- widthBoundedExactLog2 False w n ->
                  Just $! (cmmMachOpFold platform (MO_U_Shr rep) [x, CmmLit (CmmInt p $ wordWidth platform)])
         MO_U_Rem rep
-           | Just _ <- exactLog2 n ->
+           | Just _ <- widthBoundedExactLog2 False w n ->
                  Just $! (cmmMachOpFold platform (MO_And rep) [x, CmmLit (CmmInt (n - 1) rep)])
         MO_S_Quot rep
-           | Just p <- exactLog2 n,
+           | Just p <- widthBoundedExactLog2 True w n,
              CmmReg _ <- x ->   -- We duplicate x in signedQuotRemHelper, hence require
                                 -- it is a reg.  FIXME: remove this restriction.
                 Just $! (cmmMachOpFold platform (MO_S_Shr rep)
                   [signedQuotRemHelper rep p, CmmLit (CmmInt p $ wordWidth platform)])
         MO_S_Rem rep
-           | Just p <- exactLog2 n,
+           | Just p <- widthBoundedExactLog2 True w n,
              CmmReg _ <- x ->   -- We duplicate x in signedQuotRemHelper, hence require
                                 -- it is a reg.  FIXME: remove this restriction.
                 -- We replace (x `rem` 2^p) by (x - (x `quot` 2^p) * 2^p).
@@ -449,6 +449,14 @@ cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n _))]
         x1 = CmmMachOp shr [x, CmmLit (CmmInt bits $ wordWidth platform)]
         x2 = if p == 1 then x1 else
              CmmMachOp (MO_And rep) [x1, CmmLit (CmmInt (n-1) rep)]
+    -- Determine if the input is an exact power of 2 AND within the logical range
+    -- of values permited by the bit-width. Without this check, the bit shifting
+    -- operations to multiply/divide by oowers of 2 may be unsound and result in
+    -- incorrect runtime results.
+    widthBoundedExactLog2 :: Bool -> Width -> Integer -> Maybe Integer
+    widthBoundedExactLog2 signed rep v = case exactLog2 v of
+      Just p | p >= fromIntegral (widthInBits rep - fromEnum signed) -> Nothing
+      m -> m
 
 -- ToDo (#7116): optimise floating-point multiplication, e.g. x*2.0 -> x+x
 -- Unfortunately this needs a unique supply because x might not be a
