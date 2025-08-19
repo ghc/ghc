@@ -818,9 +818,10 @@ pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
 pprLExpr (L _ e) = pprExpr e
 
 pprExpr :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
-pprExpr e | isAtomicHsExpr e || isQuietHsExpr e =            ppr_expr e
-          | otherwise                           = pprDeeper (ppr_expr e)
+pprExpr e | isAtomicHsExpr e =            ppr_expr e
+          | otherwise        = pprDeeper (ppr_expr e)
 
+{-
 isQuietHsExpr :: HsExpr id -> Bool
 -- Parentheses do display something, but it gives little info and
 -- if we go deeper when we go inside them then we get ugly things
@@ -831,6 +832,7 @@ isQuietHsExpr (HsApp {})        = True
 isQuietHsExpr (HsAppType {})    = True
 isQuietHsExpr (OpApp {})        = True
 isQuietHsExpr _ = False
+-}
 
 pprBinds :: (OutputableBndrId idL, OutputableBndrId idR)
          => HsLocalBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
@@ -861,12 +863,10 @@ ppr_expr (HsOverLabel s l) = case ghcPass @p of
                           SourceText src -> ftext src
 ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
-ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
-
-ppr_expr (HsPragE _ prag e) = sep [ppr prag, ppr_lexpr e]
-
-ppr_expr e@(HsApp {})        = ppr_apps e []
-ppr_expr e@(HsAppType {})    = ppr_apps e []
+ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)  -- No pprDeeper here
+ppr_expr (HsPragE _ prag e)  = sep [ppr prag, ppr_lexpr e]
+ppr_expr e@(HsApp {})        = pprApp e
+ppr_expr e@(HsAppType {})    = pprApp e
 
 ppr_expr (OpApp _ e1 op e2)
   | Just pp_op <- ppr_infix_expr (unLoc op)
@@ -1134,21 +1134,21 @@ ppr_infix_hs_expansion :: HsThingRn -> Maybe SDoc
 ppr_infix_hs_expansion (OrigExpr e) = ppr_infix_expr e
 ppr_infix_hs_expansion _            = Nothing
 
-ppr_apps :: (OutputableBndrId p)
-         => HsExpr (GhcPass p)
-         -> [Either (LHsExpr (GhcPass p)) (LHsWcType (NoGhcTc (GhcPass p)))]
-         -> SDoc
-ppr_apps (HsApp _ (L _ fun) arg)        args
-  = ppr_apps fun (Left arg : args)
-ppr_apps (HsAppType _ (L _ fun) arg)    args
-  = ppr_apps fun (Right arg : args)
-ppr_apps fun args = hang (ppr_expr fun) 2 (fsep (map pp args))
+pprApp :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
+pprApp app
+  = go app []  -- Collect arguments and print all at once
   where
-    pp (Left arg)                             = ppr arg
-    -- pp (Right (LHsWcTypeX (HsWC { hswc_body = L _ arg })))
-    --   = char '@' <> pprHsType arg
-    pp (Right arg)
-      = text "@" <> ppr arg
+    go fun args
+      = case fun of
+          HsApp _     (L _ fun') arg -> go fun' (Left arg  : args)
+          HsAppType _ (L _ fun') arg -> go fun' (Right arg : args)
+          _                          -> ppr_app fun args
+
+    ppr_app fun args = hang (ppr_expr fun)
+                          2 (fsep (map pp args))
+
+    pp (Left arg)  = pprLExpr arg
+    pp (Right arg) = text "@" <> ppr arg
 
 pprDebugParendExpr :: (OutputableBndrId p)
                    => PprPrec -> LHsExpr (GhcPass p) -> SDoc
