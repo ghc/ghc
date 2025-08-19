@@ -35,11 +35,11 @@ import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor
 import GHC.Tc.Deriv.Generics
 import GHC.Tc.Errors.Types
-import GHC.Tc.Types.Constraint (WantedConstraints, mkNonCanonical, mkSimpleWC)
+import GHC.Tc.Types.Constraint (WantedConstraints, mkNonCanonical)
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Unify (tcSubTypeSigma, buildImplicationFor)
+import GHC.Tc.Utils.Unify (tcSubTypeSigma)
 import GHC.Tc.Zonk.Type
 
 import GHC.Core.Class
@@ -61,7 +61,6 @@ import GHC.Types.Fixity.Env (lookupFixity)
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
-import GHC.Types.Id( idName )
 
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH (liftClassKey)
@@ -700,42 +699,8 @@ emitPredSpecConstraints :: UserTypeCtxt -> PredSpec -> TcM ()
 emitPredSpecConstraints _ (SimplePredSpec { sps_pred = wanted_pred
                                           , sps_origin = orig
                                           , sps_type_or_kind = t_or_k })
-  -- For constraints like (C a) or (Ord b), emit the
-  -- constraints directly as simple wanted constraints.
-  | isRhoTy wanted_pred
   = do { ev <- newWanted orig (Just t_or_k) wanted_pred
        ; emitSimple (mkNonCanonical ev) }
-
-  | otherwise
-    -- Forall-predicates, can come from
-    --     * GHC.Tc.Deriv.Infer.inferConstraintsCoerceBased.
-    --     * Quantified constraints in superclasses
-    --     (See comments with sps_pred.)
-    -- For these forall-predicates we want to emit an /implication/-constraint,
-    -- and NOT a /forall/-constraint. Why?  Because forall-constraints are solved
-    -- all-or-nothing, but here when we are trying to infer the context for an
-    -- instance decl, we need that half-solved implication.  See the rather
-    -- exotic test T20815 and Note [Inferred contexts from method constraints]
-    --
-    -- See also (WFA3) in Note [Solving a Wanted forall-constraint] in GHC.Tc.Solver.Solve
-  = do { let (_,_,head_ty) = tcSplitQuantPredTy wanted_pred  -- Yuk
-             skol_info_anon
-               = case orig of
-                   DerivOriginCoerce meth _ _ _ -> MethSkol (idName meth) False
-                   DerivOrigin _                -> InstSkol (IsQC orig) (pSizeHead head_ty)
-                   _ -> pprPanic "emitPredSpecConstraints" (ppr orig $$ ppr wanted_pred)
-                        -- We only get a polymorphic wanted_pred from limited places
-                        -- Computing `skol_info_anon` is a bit messy, but arises from
-                        -- the fact that SimplePredSpec is not really simple!
-
-       ; skol_info <- mkSkolemInfo skol_info_anon
-       ; (_wrapper, tv_prs, givens, wanted_rho) <- topSkolemise skol_info wanted_pred
-         -- _wrapper: we ignore the evidence from all these constraints
-       ; (tc_lvl, ev) <- pushTcLevelM $ newWanted orig (Just t_or_k) wanted_rho
-       ; let skol_tvs = map (binderVar . snd) tv_prs
-       ; (implic, _) <- buildImplicationFor tc_lvl skol_info_anon skol_tvs
-                               givens (mkSimpleWC [ev])
-       ; emitImplications implic }
 
 emitPredSpecConstraints user_ctxt
   (SubTypePredSpec { stps_ty_actual   = ty_actual

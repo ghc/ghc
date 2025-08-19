@@ -529,7 +529,7 @@ data EvTerm
   | EvFun     -- /\as \ds. let binds in v
       { et_tvs   :: [TyVar]
       , et_given :: [EvVar]
-      , et_binds :: Bag EvBind -- This field is why we need an EvFun
+      , et_binds :: TcEvBinds  -- This field is why we need an EvFun
                                -- constructor, and can't just use EvExpr
       , et_body  :: EvVar }
 
@@ -950,11 +950,7 @@ nestedEvIdsOfTerm tm = fvVarSet (filterFV isNestedEvId (evTermFVs tm))
 evTermFVs :: EvTerm -> FV
 evTermFVs (EvExpr e)         = exprFVs e
 evTermFVs (EvTypeable _ ev)  = evFVsOfTypeable ev
-evTermFVs (EvFun { et_tvs = tvs, et_given = given, et_binds = binds, et_body = v })
-  = addBndrsFV bndrs fvs
-  where
-    fvs = foldr (unionFV . evTermFVs . eb_rhs) (unitFV v) binds
-    bndrs = foldr ((:) . eb_lhs) (tvs ++ given) binds
+evTermFVs (EvFun {})         = emptyFV -- See Note [Free vars of EvFun]
 
 evTermFVss :: [EvTerm] -> FV
 evTermFVss = mapUnionFV evTermFVs
@@ -966,6 +962,20 @@ evFVsOfTypeable ev =
     EvTypeableTyApp e1 e2    -> evTermFVss [e1,e2]
     EvTypeableTrFun em e1 e2 -> evTermFVss [em,e1,e2]
     EvTypeableTyLit e        -> evTermFVs e
+
+{- Note [Free vars of EvFun]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Finding the free vars of an EvFun is made tricky by the fact the
+bindings et_binds may be a mutable variable.  Fortunately, we
+can just squeeze by.  Here's how.
+
+* evTermFVs is used only by GHC.Tc.Solver.neededEvVars.
+* Each EvBindsVar in an et_binds field of an EvFun is /also/ in the
+  ic_binds field of an Implication
+* So we can track usage via the processing for that implication,
+  (see Note [Tracking redundant constraints] in GHC.Tc.Solver).
+  We can ignore usage from the EvFun altogether.
+-}
 
 {- *********************************************************************
 *                                                                      *

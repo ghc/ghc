@@ -27,10 +27,10 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc( mkGivenLoc )
 import GHC.Tc.Solver.InertSet
-import GHC.Tc.Solver.Monad
-import GHC.Tc.Utils.Monad   as TcM
-import GHC.Tc.Zonk.TcType   as TcM
 import GHC.Tc.Solver.Monad  as TcS
+import qualified GHC.Tc.Utils.TcMType as TcM
+import qualified GHC.Tc.Utils.Monad   as TcM
+import qualified GHC.Tc.Zonk.TcType   as TcM
 
 import GHC.Core.Predicate
 import GHC.Core.Reduction
@@ -72,10 +72,10 @@ simplifyWantedsTcM :: [CtEvidence] -> TcM WantedConstraints
 -- Discard the evidence binds
 -- Postcondition: fully zonked
 simplifyWantedsTcM wanted
-  = do { traceTc "simplifyWantedsTcM {" (ppr wanted)
+  = do { TcM.traceTc "simplifyWantedsTcM {" (ppr wanted)
        ; (result, _) <- runTcS (solveWanteds (mkSimpleWC wanted))
        ; result <- TcM.liftZonkM $ TcM.zonkWC result
-       ; traceTc "simplifyWantedsTcM }" (ppr result)
+       ; TcM.traceTc "simplifyWantedsTcM }" (ppr result)
        ; return result }
 
 solveWanteds :: WantedConstraints -> TcS WantedConstraints
@@ -125,11 +125,21 @@ simplify_loop n limit definitely_redo_implications
                 -- Any insoluble constraints are in 'simples' and so get rewritten
                 -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
 
+       -- simples1 are all Wanteds
+       ; let simples2 :: Cts
+             qcis     :: Bag QCInst
+             (simples2, qcis) = partitionBagWith is_qci simples1
+             is_qci (CQuantCan qci) = Right qci
+             is_qci ct              = Left ct
+
+       ; extra_implics <- mapBagM wantedQciToImplic qcis
+
        ; wc2 <- if not definitely_redo_implications  -- See Note [Superclass iteration]
                    && unifs1 == 0                    -- for this conditional
+                   && isEmptyBag qcis
                 then return (wc { wc_simple = simples1 })  -- Short cut
-                else do { implics1 <- solveNestedImplications implics
-                        ; return (wc { wc_simple = simples1
+                else do { implics1 <- solveNestedImplications (implics `unionBags` extra_implics)
+                        ; return (wc { wc_simple = simples2
                                      , wc_impl   = implics1 }) }
 
        ; unif_happened <- resetUnificationFlag
@@ -1330,15 +1340,16 @@ solveForAllNC ev tvs theta body_pred
 --
 -- Precondition: the constraint has already been rewritten by the inert set.
 solveForAll :: QCInst -> SolverStage Void
-solveForAll qci@(QCI { qci_ev = ev, qci_tvs = tvs, qci_theta = theta, qci_body = pred })
+solveForAll qci@(QCI { qci_ev = ev })
   = case ev of
       CtGiven {} ->
         -- See Note [Solving a Given forall-constraint]
         do { simpleStage (addInertForAll qci)
            ; stopWithStage ev "Given forall-constraint" }
-      CtWanted wtd ->
+      CtWanted {} ->
         do { tryInertQCs qci
-           ; solveWantedForAll qci tvs theta pred wtd }
+           ; simpleStage (addInertForAll qci)
+           ; stopWithStage ev "Wanted forall-constraint" }
 
 tryInertQCs :: QCInst -> SolverStage ()
 tryInertQCs qc
@@ -1362,74 +1373,60 @@ try_inert_qcs (QCI { qci_ev = ev_w }) inerts =
       | otherwise
       = Nothing
 
--- | Solve a (canonical) Wanted quantified constraint by emitting an implication.
--- See Note [Solving a Wanted forall-constraint]
-solveWantedForAll :: QCInst -> [TcTyVar] -> TcThetaType -> PredType
-                  -> WantedCtEvidence -> SolverStage Void
-solveWantedForAll qci tvs theta body_pred
-                  wtd@(WantedCt { ctev_dest = dest, ctev_loc = ct_loc
-                                , ctev_rewriters = rewriters })
-  = Stage $
-    TcS.setSrcSpan (getCtLocEnvLoc loc_env) $
-         -- This setSrcSpan is important: the emitImplicationTcS uses that
-         -- TcLclEnv for the implication, and that in turn sets the location
-         -- for the Givens when solving the constraint (#21006)
-
+wantedQciToImplic :: QCInst   -- Definitely a Wanted
+                  -> TcS Implication
+wantedQciToImplic (QCI { qci_ev = CtWanted ev, qci_tvs = tvs, qci_theta = theta, qci_body = pred })
+  | WantedCt { ctev_dest = dest, ctev_rewriters = rewriters, ctev_loc = loc } <- ev
+  , let is_qc = IsQC (ctLocOrigin loc)
+        empty_subst = mkEmptySubst $ mkInScopeSet $
+                      tyCoVarsOfTypes (pred:theta) `delVarSetList` tvs
+  = TcS.setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
+    -- This setSrcSpan is important: the TcM.newImplication uses that
+    -- TcLclEnv for the implication, and that in turn sets the location
+    -- for the Givens when solving the constraint (#21006)
     do { -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
          --           in GHC.Tc.Utils.TcType
          -- Very like the code in tcSkolDFunType
-         rec { skol_info <- mkSkolemInfo skol_info_anon
+       ; rec { skol_info <- mkSkolemInfo skol_info_anon
              ; (subst, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst tvs
-             ; let inst_pred  = substTy    subst body_pred
+             ; let inst_pred  = substTy    subst pred
                    inst_theta = substTheta subst theta
-                   skol_info_anon = InstSkol is_qc (pSizeHead inst_pred) }
+                   skol_info_anon = InstSkol is_qc (get_size inst_pred) }
 
-        ; given_ev_vars <- mapM newEvVar inst_theta
-        ; (lvl, (w_id, wanteds))
-              <- pushLevelNoWorkList (ppr skol_info) $
-                 do { let ct_loc' = setCtLocOrigin ct_loc (ScOrigin is_qc NakedSc)
-                          -- Set the thing to prove to have a ScOrigin, so we are
-                          -- careful about its termination checks.
-                          -- See (QC-INV) in Note [Solving a Wanted forall-constraint]
-                    ; wanted_ev <- newWantedNC ct_loc' rewriters inst_pred
-                          -- NB: inst_pred can be an equality
-                    ; return ( wantedCtEvEvId wanted_ev
-                             , unitBag (mkNonCanonical $ CtWanted wanted_ev)) }
+       ; given_ev_vars <- mapM TcS.newEvVar inst_theta
+       ; (lvl, wanted_ev)
+             <- pushLevelNoWorkList (ppr skol_info) $
+                do { let loc' = setCtLocOrigin loc (ScOrigin is_qc NakedSc)
+                         -- Set the thing to prove to have a ScOrigin, so we are
+                         -- careful about its termination checks.
+                         -- See (QC-INV) in Note [Solving a Wanted forall-constraint]
+                   ; newWantedEvVarNC loc' rewriters inst_pred }
 
-
-       -- Try to solve the constraint completely
-       ; traceTcS "solveForAll {" (ppr skol_tvs $$ ppr given_ev_vars $$ ppr wanteds $$ ppr w_id)
        ; ev_binds_var <- TcS.newTcEvBinds
-       ; solved <- trySolveImplication $
-                   (implicationPrototype loc_env)
-                      { ic_tclvl = lvl
-                      , ic_binds = ev_binds_var
-                      , ic_info  = skol_info_anon
-                      , ic_warn_inaccessible = False
-                      , ic_skols = skol_tvs
-                      , ic_given = given_ev_vars
-                      , ic_wanted = emptyWC { wc_simple = wanteds } }
-       ; traceTcS "solveForAll }" (ppr solved)
+       ; new_imp <- wrapTcS TcM.newImplication
+       ; let imp = new_imp { ic_tclvl  = lvl
+                           , ic_skols  = skol_tvs
+                           , ic_given  = given_ev_vars
+                           , ic_wanted = mkSimpleWC [CtWanted wanted_ev]
+                           , ic_binds  = ev_binds_var
+                           , ic_info   = skol_info_anon }
 
-       -- See if we succeeded in solving it completely
-       ; if not solved
-         then do { -- Not completely solved; abandon that attempt and add the
-                   -- original constraint to the inert set
-                   addInertForAll qci
-                 ; stopWith (CtWanted wtd) "Wanted forall-constraint:unsolved" }
+      ; setWantedEvTerm dest EvCanonical $
+        EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
+              , et_binds = TcEvBinds ev_binds_var
+              , et_body = wantedCtEvEvId wanted_ev }
 
-         else do { -- Completely solved; build an evidence term
-                   evbs <- TcS.getTcEvBindsMap ev_binds_var
-                 ; setWantedEvTerm dest EvCanonical $
-                   EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
-                         , et_binds = evBindMapBinds evbs, et_body = w_id }
-                 ; stopWith (CtWanted wtd) "Wanted forall-constraint:solved" } }
+      ; return imp }
   where
-    loc_env = ctLocEnv ct_loc
-    is_qc = IsQC (ctLocOrigin ct_loc)
+    -- Getting the size of the head is a bit horrible
+    -- because of the special treament for class predicates
+    get_size pred = case classifyPredType pred of
+                      ClassPred cls tys -> pSizeClassPred cls tys
+                      _                 -> pSizeType pred
 
-    empty_subst = mkEmptySubst $ mkInScopeSet $
-                  tyCoVarsOfTypes (body_pred:theta) `delVarSetList` tvs
+wantedQciToImplic qci@(QCI { qci_ev = CtGiven {} })
+  = pprPanic "wantedQciToImplic: found a Given" (ppr qci)
+
 
 
 {- Note [Solving a Wanted forall-constraint]

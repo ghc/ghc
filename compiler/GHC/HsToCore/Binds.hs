@@ -1724,7 +1724,7 @@ dsEvTerm (EvExpr e)          = return e
 dsEvTerm (EvTypeable ty ev)  = dsEvTypeable ty ev
 dsEvTerm (EvFun { et_tvs = tvs, et_given = given
                 , et_binds = ev_binds, et_body = wanted_id })
-  = do { dsEvBinds ev_binds $ \ds_ev_binds ->
+  = do { dsTcEvBinds ev_binds $ \ds_ev_binds ->
          return $ (mkLams (tvs ++ given) $
                    mkCoreLets ds_ev_binds $
                    Var wanted_id) }
