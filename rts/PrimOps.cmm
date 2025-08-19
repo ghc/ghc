@@ -1211,27 +1211,16 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
     gcptr trec, outer, arg;
 
     trec = StgTSO_trec(CurrentTSO);
-    if (running_alt_code != 1) {
-      // When exiting the lhs code of catchRetry# lhs rhs, we need to cleanup
-      // the nested transaction.
-      // See Note [catchRetry# implementation]
-      outer  = StgTRecHeader_enclosing_trec(trec);
-      (r) = ccall stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr");
-      if (r != 0) {
-          // Succeeded in first branch
-          StgTSO_trec(CurrentTSO) = outer;
-          return (ret);
-      } else {
-          // Did not commit: abort and restart.
-          StgTSO_trec(CurrentTSO) = outer;
-          jump stg_abort();
-      }
-    }
-    else {
-      // nothing to do in the rhs code of catchRetry# lhs rhs, it's already
-      // using the parent transaction (not a nested one).
-      // See Note [catchRetry# implementation]
-      return (ret);
+    outer  = StgTRecHeader_enclosing_trec(trec);
+    (r) = ccall stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr");
+    if (r != 0) {
+        // Succeeded (either first branch or second branch)
+        StgTSO_trec(CurrentTSO) = outer;
+        return (ret);
+    } else {
+        // Did not commit: abort and restart.
+        StgTSO_trec(CurrentTSO) = outer;
+        jump stg_abort();
     }
 }
 
@@ -1464,26 +1453,21 @@ retry_pop_stack:
     outer  = StgTRecHeader_enclosing_trec(trec);
 
     if (frame_type == CATCH_RETRY_FRAME) {
-        // The retry reaches a CATCH_RETRY_FRAME before the ATOMICALLY_FRAME
-
+        // The retry reaches a CATCH_RETRY_FRAME before the atomic frame
+        ASSERT(outer != NO_TREC);
+        // Abort the transaction attempting the current branch
+        ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
+        ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
         if (!StgCatchRetryFrame_running_alt_code(frame) != 0) {
-            // Retrying in the lhs of catchRetry# lhs rhs, i.e. in a nested
-            // transaction. See Note [catchRetry# implementation]
-
-            // check that we have a parent transaction
-            ASSERT(outer != NO_TREC);
-
-            // Abort the nested transaction
-            ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
-            ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
-
-            // As we are retrying in the lhs code, we must now try the rhs code
-            StgTSO_trec(CurrentTSO) = outer;
+            // Retry in the first branch: try the alternative
+            ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", outer "ptr");
+            StgTSO_trec(CurrentTSO) = trec;
             StgCatchRetryFrame_running_alt_code(frame) = 1 :: CInt; // true;
             R1 = StgCatchRetryFrame_alt_code(frame);
             jump stg_ap_v_fast [R1];
         } else {
-            // Retry in the rhs code: propagate the retry
+            // Retry in the alternative code: propagate the retry
+            StgTSO_trec(CurrentTSO) = outer;
             Sp = Sp + SIZEOF_StgCatchRetryFrame;
             goto retry_pop_stack;
         }
