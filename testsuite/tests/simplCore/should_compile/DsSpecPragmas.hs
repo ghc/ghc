@@ -20,6 +20,11 @@ import Data.Proxy
 
 f1 :: ( Num a, Eq b ) => a -> b -> Int
 f1 _ _ = 111
+
+-- Make sure we can specialise on one constraint,
+-- while leaving the other alone
+{-# SPECIALISE f1 :: Eq e => Word -> e -> Int #-}
+
 -- Make sure we don't generate a rule with an LHS of the form
 --
 --  forall @e (d :: Eq e). f1 @[e] ($fEqList d) = ...

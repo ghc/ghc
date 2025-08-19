@@ -34,7 +34,7 @@ module GHC.Tc.Solver.Monad (
     QCInst(..),
 
     -- TcSMode
-    TcSMode(..), getTcSMode, setTcSMode,
+    TcSMode(..), getTcSMode, setTcSMode, vanillaTcSMode,
 
     -- The pipeline
     StopOrContinue(..), continueWith, stopWith,
@@ -79,7 +79,7 @@ module GHC.Tc.Solver.Monad (
     getInertSet, setInertSet,
     getUnsolvedInerts,
     removeInertCts, getPendingGivenScs,
-    insertFunEq, addInertForAll,
+    insertFunEq, addInertQCI,
     updInertDicts, updInertIrreds,
     emitWorkNC, emitWork,
     lookupInertDict,
@@ -196,9 +196,11 @@ import GHC.Types.Unique.Set( elementOfUniqSet )
 import GHC.Types.Id
 import GHC.Types.Basic (allImportLevels)
 import GHC.Types.ThLevelIndex (thLevelIndexFromImportLevel)
+import GHC.Types.SrcLoc
 
 import GHC.Unit.Module
 import qualified GHC.Rename.Env as TcM
+import GHC.Rename.Env
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -213,12 +215,11 @@ import GHC.Exts (oneShot)
 import Control.Monad
 import Data.Foldable hiding ( foldr1 )
 import Data.IORef
+import Data.Maybe( catMaybes )
 import Data.List ( mapAccumL )
 import Data.List.NonEmpty ( nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as S
-import GHC.Types.SrcLoc
-import GHC.Rename.Env
 import GHC.LanguageExtensions as LangExt
 
 #if defined(DEBUG)
@@ -331,13 +332,13 @@ stopWithStage ev s = Stage (stopWith ev s)
 
 {- *********************************************************************
 *                                                                      *
-                   Inert instances: inert_insts
+                   Inert instances: inert_qcis
 *                                                                      *
 ********************************************************************* -}
 
-addInertForAll :: QCInst -> TcS ()
--- Add a local Given instance, typically arising from a type signature
-addInertForAll new_qci
+addInertQCI :: QCInst -> TcS ()
+-- Add a local quantified constraint, typically arising from a type signature
+addInertQCI new_qci
   = do { ics  <- getInertCans
        ; ics1 <- add_qci ics
 
@@ -356,14 +357,14 @@ addInertForAll new_qci
   where
     add_qci :: InertCans -> TcS InertCans
     -- See Note [Do not add duplicate quantified instances]
-    add_qci ics@(IC { inert_insts = qcis })
+    add_qci ics@(IC { inert_qcis = qcis })
       | any same_qci qcis
       = do { traceTcS "skipping duplicate quantified instance" (ppr new_qci)
            ; return ics }
 
       | otherwise
       = do { traceTcS "adding new inert quantified instance" (ppr new_qci)
-           ; return (ics { inert_insts = new_qci : qcis }) }
+           ; return (ics { inert_qcis = new_qci : qcis }) }
 
     same_qci old_qci = tcEqType (ctEvPred (qci_ev old_qci))
                                 (ctEvPred (qci_ev new_qci))
@@ -703,11 +704,11 @@ getPendingGivenScs = do { lvl <- getTcLevel
                         ; updRetInertCans (get_sc_pending lvl) }
 
 get_sc_pending :: TcLevel -> InertCans -> ([Ct], InertCans)
-get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
+get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_qcis = insts })
   = assertPpr (all isGivenCt sc_pending) (ppr sc_pending)
        -- When getPendingScDics is called,
        -- there are never any Wanteds in the inert set
-    (sc_pending, ic { inert_dicts = dicts', inert_insts = insts' })
+    (sc_pending, ic { inert_dicts = dicts', inert_qcis = insts' })
   where
     sc_pending = sc_pend_insts ++ map CDictCan sc_pend_dicts
 
@@ -752,11 +753,11 @@ getUnsolvedInerts :: TcS Cts    -- All simple constraints
 --                     (because they come from the inert set)
 --                 the unsolved implics may not be
 getUnsolvedInerts
- = do { IC { inert_eqs     = tv_eqs
-           , inert_funeqs  = fun_eqs
-           , inert_irreds  = irreds
-           , inert_dicts   = idicts
-           , inert_insts   = qcis
+ = do { IC { inert_eqs    = tv_eqs
+           , inert_funeqs = fun_eqs
+           , inert_irreds = irreds
+           , inert_dicts  = idicts
+           , inert_qcis   = qcis
            } <- getInertCans
 
       ; let unsolved_tv_eqs  = foldTyEqs  (add_if_unsolved CEqCan)    tv_eqs emptyCts
@@ -898,38 +899,54 @@ added.  This is initialised from the innermost implication constraint.
 -}
 
 -- | The mode for the constraint solving monad.
---
--- See Note [TcSMode], where each constructor is documented
 data TcSMode
-  = TcSVanilla    -- ^ Normal constraint solving
-  | TcSPMCheck    -- ^ Used when doing patterm match overlap checks
-  | TcSEarlyAbort -- ^ Abort early on insoluble constraints
-  | TcSShortCut   -- ^ Fully solve all constraints, without using local Givens
-  deriving (Eq)
+  = TcSMode -- See Note [TcSMode], where each field is documented
+            { tcsmResumable        :: Bool
+                   -- ^ Do not restore type-equality cycles
+            , tcsmEarlyAbort       :: Bool
+                   -- ^ Abort early on insoluble constraints
+            , tcsmSkipOverlappable :: Bool
+                   -- ^ Do not select an OVERLAPPABLE instance
+            , tcsmFullySolveQCIs   :: Bool
+                   -- ^ Fully solve quantified constraints
+            }
+
+vanillaTcSMode :: TcSMode
+vanillaTcSMode = TcSMode { tcsmResumable        = False
+                         , tcsmEarlyAbort       = False
+                         , tcsmSkipOverlappable = False
+                         , tcsmFullySolveQCIs   = False }
 
 instance Outputable TcSMode where
-  ppr TcSVanilla    = text "TcSVanilla"
-  ppr TcSPMCheck    = text "TcSPMCheck"
-  ppr TcSEarlyAbort = text "TcSEarlyAbort"
-  ppr TcSShortCut   = text "TcSShortcut"
+  ppr (TcSMode { tcsmResumable = pm, tcsmEarlyAbort = ea
+               , tcsmSkipOverlappable = so, tcsmFullySolveQCIs = fs })
+    = text "TcSMode" <> (braces $ cat $ punctuate comma $ catMaybes $
+                         [ pp_one pm "Resumable", pp_one ea "EarlyAbort"
+                         , pp_one so "SkipOverlappable", pp_one fs "FullySolveQCIs" ])
+      -- We get something like TcSMode{EarlyAbort,FullySolveQCIs},
+      -- mentioning just the flags that are on
+    where
+      pp_one True s  = Just (text s)
+      pp_one False _ = Nothing
 
 {- Note [TcSMode]
 ~~~~~~~~~~~~~~~~~
 The constraint solver can operate in different modes:
 
-* TcSVanilla: Normal constraint solving mode. This is the default.
+* `tcsmResumable`: Used by the pattern match overlap checker.  The idea is that
+  the returned InertSet will later be resumed, so we do not want to restore
+  type-equality cycles See also Note [Type equality cycles] in GHC.Tc.Solver.Equality
 
-* TcSPMCheck: Used by the pattern match overlap checker.
-  Like TcSVanilla, but the idea is that the returned InertSet will
-  later be resumed, so we do not want to restore type-equality cycles
-  See also Note [Type equality cycles] in GHC.Tc.Solver.Equality
-
-* TcSEarlyAbort: Abort (fail in the monad) as soon as we come across an
+* `tcsmEarlyAbort`: Abort (fail in the monad) as soon as we come across an
   insoluble constraint. This is used to fail-fast when checking for hole-fits.
   See Note [Speeding up valid hole-fits].
 
-* TcSShortCut: Solve constraints fully or not at all. This is described in
-  Note [Shortcut solving] in GHC.Tc.Solver.Dict
+* `tcsmSkipOverlappable`: don't use OVERLAPPABLE instances.  Used by the
+  short-cut solver.  See Note [Shortcut solving] in GHC.Tc.Solver.Dict
+
+* `tcsmFullSolveQCIs`: fully solve quantified constraints, or leave them alone.
+  Used (only) for SPECIALISE pragmas;
+  see (NFS1) in Note [Handling new-form SPECIALISE pragmas] in GHC.Tc.Gen.Sig
 -}
 
 data TcSEnv
@@ -1028,7 +1045,7 @@ panicTcS doc = pprPanic "GHC.Tc.Solver.Monad" doc
 tryEarlyAbortTcS :: TcS ()
 -- Abort (fail in the monad) if the mode is TcSEarlyAbort
 tryEarlyAbortTcS
-  = mkTcS (\env -> when (tcs_mode env == TcSEarlyAbort) TcM.failM)
+  = mkTcS (\env -> when (tcsmEarlyAbort (tcs_mode env)) TcM.failM)
 
 -- | Emit a warning within the 'TcS' monad at the location given by the 'CtLoc'.
 ctLocWarnTcS :: CtLoc -> TcRnMessage -> TcS ()
@@ -1098,7 +1115,9 @@ runTcS tcs
 runTcSEarlyAbort :: TcS a -> TcM a
 runTcSEarlyAbort tcs
   = do { ev_binds_var <- TcM.newTcEvBinds
-       ; runTcSWithEvBinds' TcSEarlyAbort ev_binds_var tcs }
+       ; runTcSWithEvBinds' mode ev_binds_var tcs }
+  where
+    mode = vanillaTcSMode { tcsmEarlyAbort = True }
 
 -- | This can deal only with equality constraints.
 runTcSEqualities :: TcS a -> TcM a
@@ -1109,18 +1128,19 @@ runTcSEqualities thing_inside
 -- | A variant of 'runTcS' that takes and returns an 'InertSet' for
 -- later resumption of the 'TcS' session.
 runTcSInerts :: InertSet -> TcS a -> TcM (a, InertSet)
-runTcSInerts inerts tcs = do
-  ev_binds_var <- TcM.newTcEvBinds
-  runTcSWithEvBinds' TcSPMCheck ev_binds_var $ do
-    setInertSet inerts
-    a <- tcs
-    new_inerts <- getInertSet
-    return (a, new_inerts)
+runTcSInerts inerts tcs
+  = do { ev_binds_var <- TcM.newTcEvBinds
+       ; runTcSWithEvBinds' (vanillaTcSMode { tcsmResumable = True })
+                             ev_binds_var $
+         do { setInertSet inerts
+            ; a <- tcs
+            ; new_inerts <- getInertSet
+            ; return (a, new_inerts) } }
 
 runTcSWithEvBinds :: EvBindsVar
                   -> TcS a
                   -> TcM a
-runTcSWithEvBinds = runTcSWithEvBinds' TcSVanilla
+runTcSWithEvBinds = runTcSWithEvBinds' vanillaTcSMode
 
 runTcSWithEvBinds' :: TcSMode
                    -> EvBindsVar
@@ -1155,11 +1175,10 @@ runTcSWithEvBinds' mode ev_binds_var thing_inside
 
        -- Restore tyvar cycles: see Note [Type equality cycles] in
        --                       GHC.Tc.Solver.Equality
-       -- But /not/ in TCsPMCheck mode: see Note [TcSMode]
-       ; case mode of
-            TcSPMCheck -> return ()
-            _ -> do { inert_set <- TcM.readTcRef inert_var
-                    ; restoreTyVarCycles inert_set }
+       -- But /not/ when tcsmResumable is set: see Note [TcSMode]
+       ; unless (tcsmResumable mode) $
+         do { inert_set <- TcM.readTcRef inert_var
+            ; restoreTyVarCycles inert_set }
 
 #if defined(DEBUG)
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
@@ -1266,7 +1285,8 @@ tryShortCutTcS :: TcS Bool -> TcS Bool
 -- Use only by the short-cut solver;
 --   see Note [Shortcut solving] in GHC.Tc.Solver.Dict
 tryShortCutTcS (TcS thing_inside)
-  = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var
+  = TcS $ \ env@(TcSEnv { tcs_mode = mode
+                        , tcs_inerts = inerts_var
                         , tcs_ev_binds = old_ev_binds_var }) ->
     do { -- Initialise a fresh inert set, with no Givens and no Wanteds
          --    (i.e. empty `inert_cans`)
@@ -1282,7 +1302,7 @@ tryShortCutTcS (TcS thing_inside)
 
        ; new_wl_var       <- TcM.newTcRef emptyWorkList
        ; new_ev_binds_var <- TcM.cloneEvBindsVar old_ev_binds_var
-       ; let nest_env = env { tcs_mode     = TcSShortCut
+       ; let nest_env = env { tcs_mode     = mode { tcsmSkipOverlappable = True }
                             , tcs_ev_binds = new_ev_binds_var
                             , tcs_inerts   = new_inert_var
                             , tcs_worklist = new_wl_var }
@@ -1901,8 +1921,8 @@ instFlexiXTcM subst (tv:tvs)
 matchGlobalInst :: DynFlags -> Class -> [Type] -> CtLoc -> TcS TcM.ClsInstResult
 matchGlobalInst dflags cls tys loc
   = do { mode <- getTcSMode
-       ; let short_cut = mode == TcSShortCut
-       ; wrapTcS $ TcM.matchGlobalInst dflags short_cut cls tys (Just loc) }
+       ; let skip_overlappable = tcsmSkipOverlappable mode
+       ; wrapTcS $ TcM.matchGlobalInst dflags skip_overlappable cls tys (Just loc) }
 
 tcInstSkolTyVarsX :: SkolemInfo -> Subst -> [TyVar] -> TcS (Subst, [TcTyVar])
 tcInstSkolTyVarsX skol_info subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX skol_info subst tvs

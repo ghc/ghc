@@ -4,6 +4,10 @@
     forall (@e) ($dEq :: Eq [e]) ($dNum :: Num Word).
       f1 @Word @[e] $dNum $dEq
       = \ _ [Occ=Dead] _ [Occ=Dead] -> I# 111#
+"USPEC f1 @Word @_"
+    forall (@e) ($dEq :: Eq e) ($dNum :: Num Word).
+      f1 @Word @e $dNum $dEq
+      = \ _ [Occ=Dead] _ [Occ=Dead] -> I# 111#
 "USPEC f1_qc @_ @(g e) @Word"
     forall (@e)
            (@(g :: * -> *))

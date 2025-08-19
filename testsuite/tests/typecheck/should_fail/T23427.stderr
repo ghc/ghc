@@ -1,8 +1,7 @@
-
 T23427.hs:10:7: error: [GHC-39999]
     • Could not deduce ‘C t0’
-        arising when matching required constraints
-        in a group involving ‘doTail’
+        arising from matching required constraints
+        in a binding group involving ‘doTail’
       from the context: C a
         bound by the type signature for:
                    indent :: forall a. C a => a -> a
@@ -17,9 +16,10 @@ T23427.hs:10:7: error: [GHC-39999]
 
 T23427.hs:15:1: error: [GHC-39999]
     Could not deduce ‘Fractional a’
-      arising when matching required constraints
-      in a group involving ‘x’
+      arising from matching required constraints
+      in a binding group involving ‘x’
     from the context: Num a
       bound by the inferred type for ‘x’:
                  forall a. Num a => a
       at T23427.hs:15:1-19
+
