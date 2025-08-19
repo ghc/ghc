@@ -1,4 +1,3 @@
-
 T8518.hs:14:18: error: [GHC-83865]
     • Couldn't match expected type: Z c -> B c -> t0
                   with actual type: F c
@@ -10,7 +9,7 @@ T8518.hs:14:18: error: [GHC-83865]
             = rpt (4 :: Int) c z b
             where
                 rpt 0 c' z' b' = fromJust (fst <$> (continue c' z' b'))
-                rpt i c' z' b' = let ... in rpt (i - 1) c''
+                rpt i c' z' b' = let c'' = ... in rpt (i - 1) c''
     • Relevant bindings include
         b :: B c (bound at T8518.hs:14:14)
         z :: Z c (bound at T8518.hs:14:12)
@@ -27,6 +26,7 @@ T8518.hs:17:9: error: [GHC-83865]
             = rpt (4 :: Int) c z b
             where
                 rpt 0 c' z' b' = fromJust (fst <$> (continue c' z' b'))
-                rpt i c' z' b' = let ... in rpt (i - 1) c''
+                rpt i c' z' b' = let c'' = ... in rpt (i - 1) c''
     • Relevant bindings include
         rpt :: t1 -> t2 -> F t2 (bound at T8518.hs:17:9)
+

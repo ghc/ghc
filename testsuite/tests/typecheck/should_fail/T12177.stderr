@@ -1,4 +1,3 @@
-
 T12177.hs:3:19: error: [GHC-88464]
     • Found hole: _ :: p3
       Where: ‘p3’ is a rigid type variable bound by
@@ -18,9 +17,10 @@ T12177.hs:5:37: error: [GHC-88464]
                at T12177.hs:5:1-37
     • In the expression: \ z -> _
       In the expression: \ x -> \ z -> _
-      In the expression: \ z -> \ x -> \ z -> ...
+      In the expression: \ z -> \ x -> \ z -> _
     • Relevant bindings include
         z :: p5 (bound at T12177.hs:5:32)
         x :: p4 (bound at T12177.hs:5:26)
         y :: p2 (bound at T12177.hs:5:14)
         baz :: p1 -> p2 -> p3 -> p4 -> p5 -> p6 (bound at T12177.hs:5:1)
+

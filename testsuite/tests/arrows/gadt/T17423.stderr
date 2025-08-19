@@ -1,4 +1,3 @@
-
 T17423.hs:19:13: error: [GHC-64525]
     • Proc patterns cannot use existential or GADT data constructors
     • In the pattern: DecoBool i c
@@ -10,4 +9,5 @@ T17423.hs:19:13: error: [GHC-64525]
           decoBoolDialog
             = proc (DecoBool i c) -> do i1 <- id -< i
                                         c1 <- id -< c
-                                        ....
+                                        returnA -< DecoBool i1 c1
+

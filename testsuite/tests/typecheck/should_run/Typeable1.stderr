@@ -1,4 +1,3 @@
-
 Typeable1.hs:22:5: error: [GHC-40564] [-Winaccessible-code (in -Wdefault), Werror=inaccessible-code]
     • Inaccessible code in
         a pattern with pattern synonym:
@@ -19,7 +18,9 @@ Typeable1.hs:22:5: error: [GHC-40564] [-Winaccessible-code (in -Wdefault), Werro
            App x y <- pure $ typeOf x
            print (x, y)
            App x y <- pure x
-           ....
+           print (x, y)
+           ...
     • Relevant bindings include
         y :: TypeRep b2 (bound at Typeable1.hs:19:11)
         x :: TypeRep a2 (bound at Typeable1.hs:19:9)
+

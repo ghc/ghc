@@ -257,7 +257,7 @@ pprTermM y p t = pprDeeper `liftM` ppr_termM y p t
 ppr_termM y p Term{dc=Left dc_tag, subTerms=tt} = do
   tt_docs <- mapM (y app_prec) tt
   return $ cparen (not (null tt) && p >= app_prec)
-                  (text dc_tag <+> pprDeeperList fsep tt_docs)
+                  (text dc_tag <+> pprDeeper (fsep tt_docs))
 
 ppr_termM y p Term{dc=Right dc, subTerms=tt}
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
@@ -274,7 +274,7 @@ ppr_termM y p Term{dc=Right dc, subTerms=tt}
     show_tm tt_docs
       | null tt_docs = ppr dc
       | otherwise    = cparen (p >= app_prec) $
-                       sep [ppr dc, nest 2 (pprDeeperList fsep tt_docs)]
+                       sep [ppr dc, nest 2 (pprDeeper (fsep tt_docs))]
 
 ppr_termM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
 ppr_termM y p RefWrap{wrapped_term=t}  = do

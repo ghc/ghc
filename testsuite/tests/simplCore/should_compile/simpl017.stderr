@@ -8,13 +8,13 @@ simpl017.hs:55:5: error: [GHC-83865]
         ‘(do let ix :: [E m i] -> m i
                  ix [i] = runE i
                  {-# INLINE f #-}
-                 ....
+                 ...
              return f)’
       In the expression:
         E (do let ix :: [E m i] -> m i
                   ix [i] = runE i
                   {-# INLINE f #-}
-                  ....
+                  ...
               return f)
     • Relevant bindings include
         f :: [E m i] -> E' v0 m a (bound at simpl017.hs:54:9)

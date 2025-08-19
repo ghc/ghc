@@ -812,29 +812,85 @@ instance (OutputableBndrId p) => Outputable (HsExpr (GhcPass p)) where
     ppr expr = pprExpr expr
 
 -----------------------
--- pprExpr, pprLExpr, pprBinds call pprDeeper;
--- the underscore versions do not
-pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
-pprLExpr (L _ e) = pprExpr e
-
-pprExpr :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
-pprExpr e | isAtomicHsExpr e || isQuietHsExpr e =            ppr_expr e
-          | otherwise                           = pprDeeper (ppr_expr e)
-
-isQuietHsExpr :: HsExpr id -> Bool
--- Parentheses do display something, but it gives little info and
--- if we go deeper when we go inside them then we get ugly things
--- like (...)
-isQuietHsExpr (HsPar {})        = True
--- applications don't display anything themselves
-isQuietHsExpr (HsApp {})        = True
-isQuietHsExpr (HsAppType {})    = True
-isQuietHsExpr (OpApp {})        = True
-isQuietHsExpr _ = False
+-- pprExpr, pprLExpr, pprBinds call pprDeeper
+-- ppr_expr, ppr_lexpr do not
+-- We generally recurse through the former
 
 pprBinds :: (OutputableBndrId idL, OutputableBndrId idR)
          => HsLocalBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
 pprBinds b = pprDeeper (ppr b)
+
+pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
+pprLExpr (L _ e) = pprExpr e
+
+pprExpr :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
+-- pprExpr does a couple of special cases before calling
+-- pprDeeper and calling ppr_expr for the main dispatch
+
+-- HsPar: print parens before trimming with pprDeeper
+-- So for      f (case x of (a,b) -> blah) x
+-- we'll get   f (...) x
+-- and not     f ... x
+pprExpr (HsPar _ e) = parens (pprLExpr e)
+
+-- HsApp/HsAppType: always try to print the head of the application,
+-- so we get      f (g ...) (h ...)
+-- rather than    f (...) (...)
+pprExpr e@(HsApp {})     = pprApp e
+pprExpr e@(HsAppType {}) = pprApp e
+
+-- Now trim with pprDeeper, unless the expression is atomic
+-- in which case replacing "x" with "..." is silly
+pprExpr e
+  | isAtomicHsExpr e = ppr_expr e
+  | otherwise        = pprDeeper (ppr_expr e)
+
+-----------------------
+pprApp :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
+-- Pretty-print an application (f e1 .. en)
+--
+-- If we have reached the depth limit, we don't want to print
+--       "f (...) (...) (....)"
+-- Instead we print "f ..."
+-- But if there is just one (value) argument we print
+--    f x, or perhaps f (...)   by calling pprLExpr on the argument
+--
+-- Crucially (#26330) we also increase the depth count as we step into
+-- each argument, so that deeply-nested function calls get trimmed
+pprApp app
+  = go app []  -- Collect arguments and print all at once
+  where
+    go fun args
+      = case fun of
+          HsApp _     (L _ fun') arg -> go fun' (Left arg  : args)
+          HsAppType _ (L _ fun') arg -> go fun' (Right arg : args)
+          _                          -> ppr_app fun args
+
+    ppr_app fun args
+      -- Special case: (f x) should print as (f x)
+      --               even if depth has run out
+      | [Left (L _ arg)] <- args
+      , isAtomicHsExpr arg
+      = pprExpr fun <+> ppr_expr arg
+
+      -- Function is not atomic, say ((case blah) x y z)
+      -- If we have reached the depth limit just print "..."
+      -- If not, just recurse
+      | not (isAtomicHsExpr fun)
+      = pprDeeper (hang (pprExpr fun)
+                      2 (fsep $ map pp args))
+
+      | otherwise
+      = hang (ppr_expr fun)    -- Function is atomic
+           2 (pprDeeper $ fsep $ map pp args)
+        -- If we have reached the depth limit, print "f ...",
+        -- rather than "f (...) x (...)", with all the arguments
+        -- NB: if there are 1000 arguments and we have /not/ reached the depth limit
+        --     we will print them all, which is perhaps sub-optimal.  We could deal
+        --     with that if it bites us; but arity-1000 functions are rather rare
+
+    pp (Left arg)  = ppr_lexpr arg  -- We already gone deeper in ppr_app
+    pp (Right arg) = text "@" <> ppr arg
 
 -----------------------
 ppr_lexpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
@@ -842,7 +898,15 @@ ppr_lexpr e = ppr_expr (unLoc e)
 
 ppr_expr :: forall p. (OutputableBndrId p)
          => HsExpr (GhcPass p) -> SDoc
+ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
+ppr_expr e@(HsApp {})        = pprApp e
+ppr_expr e@(HsAppType {})    = pprApp e
+
 ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
+ppr_expr (HsIPVar _ v)       = ppr v
+ppr_expr (HsLit _ lit)       = ppr lit
+ppr_expr (HsOverLit _ lit)   = ppr lit
+
 ppr_expr (HsHole x) = case (ghcPass @p, x) of
   (GhcPs, HoleVar (L _ v)) -> pprPrefixOcc v
   (GhcRn, HoleVar (L _ v)) -> pprPrefixOcc v
@@ -850,7 +914,6 @@ ppr_expr (HsHole x) = case (ghcPass @p, x) of
   (GhcPs, HoleError) -> pprPrefixOcc unnamedHoleRdrName
   (GhcRn, HoleError) -> pprPrefixOcc unnamedHoleRdrName
   (GhcTc, (HoleError, _)) -> pprPrefixOcc unnamedHoleRdrName
-ppr_expr (HsIPVar _ v)       = ppr v
 ppr_expr (HsOverLabel s l) = case ghcPass @p of
                GhcPs -> helper s
                GhcRn -> helper s
@@ -859,14 +922,7 @@ ppr_expr (HsOverLabel s l) = case ghcPass @p of
             char '#' <> case s of
                           NoSourceText -> ppr l
                           SourceText src -> ftext src
-ppr_expr (HsLit _ lit)       = ppr lit
-ppr_expr (HsOverLit _ lit)   = ppr lit
-ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
-
-ppr_expr (HsPragE _ prag e) = sep [ppr prag, ppr_lexpr e]
-
-ppr_expr e@(HsApp {})        = ppr_apps e []
-ppr_expr e@(HsAppType {})    = ppr_apps e []
+ppr_expr (HsPragE _ prag e)  = sep [ppr prag, ppr_lexpr e]
 
 ppr_expr (OpApp _ e1 op e2)
   | Just pp_op <- ppr_infix_expr (unLoc op)
@@ -1133,22 +1189,6 @@ ppr_infix_expr_tc (HsRecSelTc f)            = Just (pprInfixOcc f)
 ppr_infix_hs_expansion :: HsThingRn -> Maybe SDoc
 ppr_infix_hs_expansion (OrigExpr e) = ppr_infix_expr e
 ppr_infix_hs_expansion _            = Nothing
-
-ppr_apps :: (OutputableBndrId p)
-         => HsExpr (GhcPass p)
-         -> [Either (LHsExpr (GhcPass p)) (LHsWcType (NoGhcTc (GhcPass p)))]
-         -> SDoc
-ppr_apps (HsApp _ (L _ fun) arg)        args
-  = ppr_apps fun (Left arg : args)
-ppr_apps (HsAppType _ (L _ fun) arg)    args
-  = ppr_apps fun (Right arg : args)
-ppr_apps fun args = hang (ppr_expr fun) 2 (fsep (map pp args))
-  where
-    pp (Left arg)                             = ppr arg
-    -- pp (Right (LHsWcTypeX (HsWC { hswc_body = L _ arg })))
-    --   = char '@' <> pprHsType arg
-    pp (Right arg)
-      = text "@" <> ppr arg
 
 pprDebugParendExpr :: (OutputableBndrId p)
                    => PprPrec -> LHsExpr (GhcPass p) -> SDoc

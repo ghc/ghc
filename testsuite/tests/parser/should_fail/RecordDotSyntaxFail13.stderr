@@ -1,4 +1,3 @@
-
 RecordDotSyntaxFail13.hs:26:11: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘Foo -> Int’
         arising from a functional dependency between:
@@ -9,5 +8,6 @@ RecordDotSyntaxFail13.hs:26:11: error: [GHC-18872]
     • In the second argument of ‘($)’, namely ‘a {foo}’
       In a stmt of a 'do' block: print $ a {foo}
       In the expression:
-        do let a = ...
+        do let a = Foo {foo = 12}
            print $ a {foo}
+

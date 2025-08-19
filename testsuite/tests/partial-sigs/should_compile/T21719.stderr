@@ -1,4 +1,3 @@
-
 T21719.hs:29:27: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for
         ‘MonadCheckedThrow m1’
@@ -11,7 +10,7 @@ T21719.hs:29:27: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
           foo
             = do qux
                    do _ <- baz
-                      ....
+                      pure 5
             where
                 baz :: (CanThrow Foo, _) => _
                 baz = throwChecked Foo
@@ -28,8 +27,9 @@ T21719.hs:29:33: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
           foo
             = do qux
                    do _ <- baz
-                      ....
+                      pure 5
             where
                 baz :: (CanThrow Foo, _) => _
                 baz = throwChecked Foo
     • Relevant bindings include foo :: m Int (bound at T21719.hs:24:1)
+

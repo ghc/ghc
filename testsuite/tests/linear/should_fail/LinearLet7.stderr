@@ -2,6 +2,6 @@ LinearLet7.hs:6:14: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
         arising from multiplicity of ‘g’
     • In a pattern binding: g = \ y -> g y
-      In the expression: let %1 g = \ y -> ... in g x
-      In an equation for ‘f’: f x = let %1 g = ... in g x
+      In the expression: let %1 g = \ y -> g y in g x
+      In an equation for ‘f’: f x = let %1 g = \ y -> ... in g x
 

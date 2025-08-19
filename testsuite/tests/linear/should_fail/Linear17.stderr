@@ -1,4 +1,3 @@
-
 Linear17.hs:17:3: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
         arising from multiplicity of ‘x’
@@ -8,13 +7,14 @@ Linear17.hs:17:3: error: [GHC-18872]
            (y, z) <- ((), ())
            () <- y
            () <- z
-           ....
+           ()
       In an equation for ‘incorrectDo1’:
           incorrectDo1
             = do x <- ()
                  (y, z) <- ((), ())
                  () <- y
-                 ....
+                 () <- z
+                 ...
 
 Linear17.hs:25:6: error: [GHC-18872]
     • Couldn't match type ‘Many’ with ‘One’
@@ -36,10 +36,12 @@ Linear17.hs:30:3: error: [GHC-18872]
            (y, z) <- (x, x)
            () <- y
            () <- z
-           ....
+           ()
       In an equation for ‘incorrectDo3’:
           incorrectDo3
             = do x <- ()
                  (y, z) <- (x, x)
                  () <- y
-                 ....
+                 () <- z
+                 ...
+

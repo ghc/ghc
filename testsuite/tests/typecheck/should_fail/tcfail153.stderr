@@ -1,4 +1,3 @@
-
 tcfail153.hs:6:7: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘Bool’
       Expected: [a]
@@ -12,7 +11,8 @@ tcfail153.hs:6:7: error: [GHC-25897]
           f x
             = g x
             where
-                g y = if y then [] else [...]
+                g y = if y then [] else [y]
     • Relevant bindings include
         x :: a (bound at tcfail153.hs:6:3)
         f :: a -> [a] (bound at tcfail153.hs:6:1)
+

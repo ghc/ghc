@@ -26,7 +26,7 @@ T9662.hs:49:8: error: [GHC-25897]
             = backpermute
                 (modify
                    (atom :. atom :. atom :. atom)
-                   (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))
+                   (\ (sh :. k :. m :. n) -> (... :. n :. k)))
                 id
     • Relevant bindings include
         test :: Shape (((sh :. k) :. m) :. n)

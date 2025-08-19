@@ -12,7 +12,8 @@ T26176.hs:18:7: error: [GHC-83865]
                 a = b
                 b :: SNat (FA t)
                 b = undefined
-                ....
+                c :: SNat 3
+                ...
     • Relevant bindings include
         b :: SNat (FA t) (bound at T26176.hs:21:3)
         d :: SNat (FB t) (bound at T26176.hs:27:3)
@@ -33,7 +34,8 @@ T26176.hs:24:7: error: [GHC-83865]
                 a = b
                 b :: SNat (FA t)
                 b = undefined
-                ....
+                c :: SNat 3
+                ...
     • Relevant bindings include
         d :: SNat (FB t) (bound at T26176.hs:27:3)
         x :: p0 t (bound at T26176.hs:29:3)

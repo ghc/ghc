@@ -1,4 +1,3 @@
-
 DoExpansion3.hs:15:20: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘[Char]’ with ‘Int’
       Expected: Int
@@ -41,6 +40,7 @@ DoExpansion3.hs:33:3: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault
            putStrLn $ a + ""
       In an equation for ‘gggg5’:
           gggg5
-            = do let z :: Int = ...
-                 let a = ...
+            = do let z :: Int = 3
+                 let a = 1
                  putStrLn $ a + ""
+

@@ -11,16 +11,16 @@ RecordDotSyntaxFail8.hs:37:3: error: [GHC-39999]
     • In the first argument of ‘($)’, namely ‘print’
       In a stmt of a 'do' block: print $ ....baz.quux
       In the expression:
-        do let a = ...
+        do let a = Foo {foo = ...}
            print $ ....quux
 
 RecordDotSyntaxFail8.hs:37:11: error: [GHC-39999]
     • No instance for ‘HasField "quux" Quux a0’
         arising from selecting the field ‘quux’
-    • In the second argument of ‘($)’, namely ‘....baz.quux’
+    • In the second argument of ‘($)’, namely ‘....bar.baz.quux’
       In a stmt of a 'do' block: print $ ....baz.quux
       In the expression:
-        do let a = ...
+        do let a = Foo {foo = ...}
            print $ ....quux
     Suggested fix:
       NB: There is no field selector ‘quux :: Quux

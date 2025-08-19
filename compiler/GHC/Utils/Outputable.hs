@@ -103,6 +103,7 @@ module GHC.Utils.Outputable (
         updSDocContext,
         SDocContext (..), sdocWithContext,
         defaultSDocContext, traceSDocContext,
+        defaultSDocDepth, defaultSDocCols,
         getPprStyle, withPprStyle, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, dumpStyle,
@@ -452,6 +453,12 @@ instance IsString SDoc where
 instance Outputable SDoc where
   ppr = id
 
+defaultSDocDepth :: Int
+defaultSDocDepth = 6
+
+defaultSDocCols :: Int
+defaultSDocCols = 100
+
 -- | Default pretty-printing options
 defaultSDocContext :: SDocContext
 defaultSDocContext = SDC
@@ -459,8 +466,8 @@ defaultSDocContext = SDC
   , sdocColScheme                   = Col.defaultScheme
   , sdocLastColour                  = Col.colReset
   , sdocShouldUseColor              = False
-  , sdocDefaultDepth                = 5
-  , sdocLineLength                  = 100
+  , sdocDefaultDepth                = defaultSDocDepth
+  , sdocLineLength                  = defaultSDocCols
   , sdocCanUseUnicode               = False
   , sdocPrintErrIndexLinks          = False
   , sdocHexWordLiterals             = False
@@ -523,24 +530,29 @@ pprDeeper d = SDoc $ \ctx -> case sdocStyle ctx of
   _ -> runSDoc d ctx
 
 
--- | Truncate a list that is longer than the current depth.
+-- | Trim the list to the length of the remaining depth count
 pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
 pprDeeperList f ds
   | null ds   = f []
   | otherwise = SDoc work
  where
-  work ctx@SDC{sdocStyle=PprUser q depth c}
-   | DefaultDepth <- depth
-   = work (ctx { sdocStyle = PprUser q (PartWay (sdocDefaultDepth ctx)) c })
-   | PartWay 0 <- depth
-   = Pretty.text "..."
-   | PartWay n <- depth
-   = let
-        go _ [] = []
-        go i (d:ds) | i >= n    = [text "...."]
-                    | otherwise = d : go (i+1) ds
-     in runSDoc (f (go 0 ds)) ctx{sdocStyle = PprUser q (PartWay (n-1)) c}
+  work ctx@SDC{ sdocStyle=PprUser q depth c }
+   | Just n_remaining
+        <- case depth of
+              DefaultDepth -> Just (sdocDefaultDepth ctx)
+              PartWay n    -> Just n
+              AllTheWay    -> Nothing
+   = runSDoc (f (trim n_remaining ds))
+                -- Trim the length of the list
+             (ctx { sdocStyle = PprUser q (PartWay (n_remaining - 1)) c  })
+                -- ..and go deeper as we step inside the list elements
+
   work other_ctx = runSDoc (f ds) other_ctx
+
+trim :: Int -> [SDoc] -> [SDoc]
+trim _ []     = []
+trim 0 _      = [text "..."]
+trim n (d:ds) = d : trim (n-1) ds
 
 pprSetDepth :: Depth -> SDoc -> SDoc
 pprSetDepth depth doc = SDoc $ \ctx ->

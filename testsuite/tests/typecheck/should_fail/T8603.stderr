@@ -11,6 +11,6 @@ T8603.hs:33:17: error: [GHC-18872]
         has only one
       In a stmt of a 'do' block: prize <- lift uniform [1, 2, 3]
       In the expression:
-        do prize <- lift uniform [1, 2, ....]
+        do prize <- lift uniform [1, 2, 3]
            return False
 

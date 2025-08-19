@@ -711,8 +711,8 @@ defaultDynFlags mySettings =
         ghciBrowserPlaywrightLaunchOpts = Nothing,
 
         flushOut = defaultFlushOut,
-        pprUserLength = 5,
-        pprCols = 100,
+        pprUserLength = defaultSDocDepth,
+        pprCols = defaultSDocCols,
         useUnicode = False,
         useColor = Auto,
         canUseColor = False,

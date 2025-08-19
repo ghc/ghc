@@ -1,4 +1,3 @@
-
 T11339.hs:15:5: error: [GHC-16675]
     • Overloaded signature conflicts with monomorphism restriction
         t :: forall (f :: * -> *). Applicative f => (a -> f b) -> f t
@@ -12,4 +11,8 @@ T11339.hs:15:5: error: [GHC-16675]
                 Bazaar {getBazaar = t} = left sell s
                 sell :: a -> Bazaar a b b
                 sell w = Bazaar ($ w)
-                ....
+                pins ::
+                  ((a -> Const [Identity a] b) -> Const [Identity a] t)
+                  -> [Identity a]
+                ...
+

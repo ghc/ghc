@@ -1,0 +1,7 @@
+T26330.hs:9:12: error: [GHC-83865]
+    • Couldn't match expected type ‘Bool’ with actual type ‘Int’
+    • In the first argument of ‘woo’, namely
+        ‘(wam (id (id (id (id (id (id ...)))))))’
+      In the expression: woo (wam (id (id (id (id (id ...))))))
+      In an equation for ‘f’: f x = woo (wam (id (id (id (id ...)))))
+
