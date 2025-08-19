@@ -660,9 +660,22 @@ assembleI platform i = case i of
                                  tick_addr <- addr tick_mod
                                  info_addr <- addr info_mod
                                  np <- addr cc
+                                 let -- cast that checks that round-tripping through
+                                     -- Word32 doesn't change the value
+                                     toW32 x = let r = fromIntegral x :: Word32
+                                                in if fromIntegral r == x
+                                                  then r
+                                                  else pprPanic "schemeER_wrk: breakpoint tick/info index too large!" (ppr x)
+                                     tick32 = toW32 tickx
+                                     tick_hi = fromIntegral (tick32 `shiftR` 16)
+                                     tick_lo = fromIntegral (tick32 .&. 0xffff)
+                                     info32 = toW32 infox
+                                     info_hi = fromIntegral (info32 `shiftR` 16)
+                                     info_lo = fromIntegral (info32 .&. 0xffff)
                                  emit bci_BRK_FUN [ Op p1
                                                   , Op tick_addr, Op info_addr
-                                                  , SmallOp tickx, SmallOp infox
+                                                  , SmallOp tick_hi, SmallOp tick_lo
+                                                  , SmallOp info_hi, SmallOp info_lo
                                                   , Op np
                                                   ]
 

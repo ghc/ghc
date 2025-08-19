@@ -1286,8 +1286,8 @@ run_BCO:
             arg1_brk_array      = BCO_GET_LARGE_ARG;
             arg2_tick_mod       = BCO_GET_LARGE_ARG;
             arg3_info_mod       = BCO_GET_LARGE_ARG;
-            arg4_tick_index     = BCO_NEXT;
-            arg5_info_index     = BCO_NEXT;
+            arg4_tick_index     = BCO_READ_NEXT_32;
+            arg5_info_index     = BCO_READ_NEXT_32;
 #if defined(PROFILING)
             arg6_cc             = BCO_GET_LARGE_ARG;
 #else

@@ -87,12 +87,12 @@ disInstr ( StgBCO *bco, int pc )
       case bci_BRK_FUN:
          debugBelch ("BRK_FUN  " );  printPtr( ptrs[instrs[pc]] );
          debugBelch (" %d ", instrs[pc+1]); printPtr( ptrs[instrs[pc+2]] );
-         CostCentre* cc = (CostCentre*)literals[instrs[pc+5]];
+         CostCentre* cc = (CostCentre*)literals[instrs[pc+7]];
          if (cc) {
            debugBelch(" %s", cc->label);
          }
          debugBelch("\n");
-         pc += 6;
+         pc += 8;
          break;
       case bci_SWIZZLE: {
          W_     stkoff = BCO_GET_LARGE_ARG;
