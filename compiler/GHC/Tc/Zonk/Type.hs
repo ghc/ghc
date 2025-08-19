@@ -1764,7 +1764,7 @@ zonkEvTerm (EvFun { et_tvs = tvs, et_given = evs
                   , et_binds = ev_binds, et_body = body_id })
   = runZonkBndrT (zonkTyBndrsX tvs)       $ \ new_tvs      ->
     runZonkBndrT (zonkEvBndrsX evs)       $ \ new_evs      ->
-    runZonkBndrT (zonkEvBinds ev_binds)   $ \ new_ev_binds ->
+    runZonkBndrT (zonkTcEvBinds ev_binds) $ \ new_ev_binds ->
   do { new_body_id  <- zonkIdOcc body_id
      ; return (EvFun { et_tvs = new_tvs, et_given = new_evs
                      , et_binds = new_ev_binds, et_body = new_body_id }) }

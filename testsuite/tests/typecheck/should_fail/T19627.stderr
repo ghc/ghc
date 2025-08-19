@@ -18,3 +18,24 @@ T19627.hs:108:3: error: [GHC-05617]
                   Not (p a b) -> b <#- a
       In the class declaration for ‘Lol’
 
+T19627.hs:108:3: error: [GHC-05617]
+    • Could not deduce ‘Not (Not (p0 a1 b1)) ~ p0 a1 b1’
+        arising from a superclass required to satisfy ‘Prop (p0 a1 b1)’,
+        arising (via a quantified constraint) from a superclass constraint
+      from the context: Lol p
+        bound by the type signature for:
+                   apartR :: forall (p :: * -> * -> *) a b.
+                             Lol p =>
+                             Not (p a b) -> b <#- a
+        at T19627.hs:108:3-34
+      or from: (Prop a1, Prop b1)
+        bound by a quantified constraint at T19627.hs:108:3-34
+      The type variable ‘p0’ is ambiguous
+    • In the ambiguity check for ‘apartR’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      When checking the class method:
+        apartR :: forall (p :: * -> * -> *) a b.
+                  Lol p =>
+                  Not (p a b) -> b <#- a
+      In the class declaration for ‘Lol’
+
