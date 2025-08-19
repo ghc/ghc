@@ -39,7 +39,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Solver( reportUnsolvedEqualities, pushLevelAndSolveEqualitiesX
                     , emitResidualConstraints )
 import GHC.Tc.Solver.Solve( solveWanteds )
-import GHC.Tc.Solver.Monad( runTcS, runTcSWithEvBinds )
+import GHC.Tc.Solver.Monad( runTcS, setTcSMode, TcSMode(..), vanillaTcSMode, runTcSWithEvBinds )
 import GHC.Tc.Validity ( checkValidType )
 
 import GHC.Tc.Utils.Monad
@@ -741,7 +741,7 @@ Note that
   the same (Eq p) dictionary. Reason: we don't want to force them to be visibly
   equal at the call site.
 
-* The `spec_bnrs`, which are lambda-bound in the specialised function `$sf`,
+* The `spec_bndrs`, which are lambda-bound in the specialised function `$sf`,
   are a subset of `rule_bndrs`.
 
     spec_bndrs = @p (d2::Eq p) (x::Int) (y::p)
@@ -759,7 +759,8 @@ This is done in three parts.
 
     (1) Typecheck the expression, capturing its constraints
 
-    (2) Solve these constraints
+    (2) Solve these constraints.  When doing so, switch on `tcsmFullySolveQCIs`;
+        see wrinkle (NFS1) below.
 
     (3) Compute the constraints to quantify over, using `getRuleQuantCts` on
         the unsolved constraints returned by (2).
@@ -794,6 +795,28 @@ This is done in three parts.
     (3) Then we build the specialised function $sf, and concoct a RULE
         of the form:
            forall @a @b d1 d2 d3. f d1 d2 d3 = $sf d1 d2 d3
+
+(NFS1) Consider
+    f :: forall f a. (Ix a, forall x. Eq x => Eq (f x)) => a -> f a
+    {-# SPECIALISE f :: forall f. (forall x. Eq x => Eq (f x)) => Int -> f Int #-}
+  This SPECIALISE is treated like an expression with a type signature, so
+  we instantiate the constraints, simplify them and re-generalise.  From the
+  instantiation we get  [W] d :: (forall x. Eq a => Eq (f x))
+  and we want to generalise over that.  We do not want to attempt to solve it
+  and then get stuck, and emit an error message.  If we can't solve it, it is
+  much, much better to leave it alone.
+
+  We still need to simplify quantified constraints that can be /fully solved/
+  from instances, otherwise we would never be able to specialise them
+  away. Example: {-# SPECIALISE f @[] @a #-}.  So:
+
+  * The constraint solver has a mode flag `tcsmFullySolveQCIs` that says
+    "fully solve quantified constraint, or leave them alone
+  * When simplifying constraints in a SPECIALISE pragma, we switch on this
+    flag the `SpecPragE` case of `tcSpecPrag`.
+
+  You might worry about the wasted work from failed attempts to fully-solve, but
+  it is seldom repeated (because the constraint solver seldom iterates much).
 
 Note [Handling old-form SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -977,8 +1000,10 @@ tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
 
          -- (2) Solve the resulting wanteds
        ; ev_binds_var <- newTcEvBinds
-       ; spec_e_wanted <- setTcLevel rhs_tclvl $
+       ; spec_e_wanted <- setTcLevel rhs_tclvl            $
                           runTcSWithEvBinds ev_binds_var  $
+                          setTcSMode (vanillaTcSMode { tcsmFullySolveQCIs = True }) $
+                               -- tcsmFullySolveQCIs: see (NFS1)
                           solveWanteds spec_e_wanted
        ; spec_e_wanted <- liftZonkM $ zonkWC spec_e_wanted
 

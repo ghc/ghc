@@ -371,7 +371,7 @@ emptyInertCans given_eq_lvl
        , inert_given_eq_lvl = given_eq_lvl
        , inert_given_eqs    = False
        , inert_dicts        = emptyDictMap
-       , inert_insts        = []
+       , inert_qcis         = []
        , inert_irreds       = emptyBag }
 
 emptyInertSet :: TcLevel -> InertSet
@@ -1248,7 +1248,8 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- All fully rewritten (modulo flavour constraints)
               --     wrt inert_eqs
 
-       , inert_insts :: [QCInst]
+       , inert_qcis :: [QCInst] -- See Note [Quantified constraints]
+                                -- in GHC.Tc.Solver.Solve
 
        , inert_irreds :: InertIrreds
               -- Irreducible predicates that cannot be made canonical,
@@ -1280,7 +1281,7 @@ instance Outputable InertCans where
           , inert_irreds = irreds
           , inert_given_eq_lvl = ge_lvl
           , inert_given_eqs = given_eqs
-          , inert_insts = insts })
+          , inert_qcis = insts })
 
     = braces $ vcat
       [ ppUnless (isEmptyDVarEnv eqs) $
@@ -1604,18 +1605,18 @@ data WhereToLook = LookEverywhere | LookOnlyUnderFamApps
 kickOutRewritableLHS :: KickOutSpec -> CtFlavourRole -> InertCans -> (Cts, InertCans)
 -- See Note [kickOutRewritable]
 kickOutRewritableLHS ko_spec new_fr@(_, new_role)
-                     ics@(IC { inert_eqs      = tv_eqs
-                             , inert_dicts    = dictmap
-                             , inert_funeqs   = funeqmap
-                             , inert_irreds   = irreds
-                             , inert_insts    = old_insts })
+                     ics@(IC { inert_eqs     = tv_eqs
+                             , inert_dicts   = dictmap
+                             , inert_funeqs  = funeqmap
+                             , inert_irreds  = irreds
+                             , inert_qcis    = old_insts })
   = (kicked_out, inert_cans_in)
   where
-    inert_cans_in = ics { inert_eqs      = tv_eqs_in
-                        , inert_dicts    = dicts_in
-                        , inert_funeqs   = feqs_in
-                        , inert_irreds   = irs_in
-                        , inert_insts    = insts_in }
+    inert_cans_in = ics { inert_eqs     = tv_eqs_in
+                        , inert_dicts   = dicts_in
+                        , inert_funeqs  = feqs_in
+                        , inert_irreds  = irs_in
+                        , inert_qcis    = insts_in }
 
     kicked_out :: Cts
     kicked_out = (fmap CDictCan dicts_out `andCts` fmap CIrredCan irs_out)
@@ -1856,9 +1857,9 @@ noGivenNewtypeReprEqs :: TyCon -> InertSet -> Bool
 -- True <=> there is no Given looking like (N tys1 ~ N tys2)
 -- See Note [Decomposing newtype equalities] (EX3) in GHC.Tc.Solver.Equality
 noGivenNewtypeReprEqs tc (IS { inert_cans = inerts })
-  | IC { inert_irreds = irreds, inert_insts = quant_cts } <- inerts
+  | IC { inert_irreds = irreds, inert_qcis = quant_cts } <- inerts
   = not (anyBag might_help_irred irreds || any might_help_qc quant_cts)
-    -- Look in both inert_irreds /and/ inert_insts (#26020)
+    -- Look in both inert_irreds /and/ inert_qcis (#26020)
   where
     might_help_irred (IrredCt { ir_ev = ev })
       | EqPred ReprEq t1 t2 <- classifyPredType (ctEvPred ev)

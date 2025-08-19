@@ -1790,7 +1790,8 @@ will be able to report a more informative error:
 type ApproxWC = ( Bag Ct          -- Free quantifiable constraints
                 , TcTyCoVarSet )  -- Free vars of non-quantifiable constraints
                                   -- due to shape, or enclosing equality
-
+   -- Why do we need that TcTyCoVarSet of non-quantifiable constraints?
+   -- See (DP1) in Note [decideAndPromoteTyVars] in GHC.Tc.Solver
 approximateWC :: Bool -> WantedConstraints -> Bag Ct
 approximateWC include_non_quantifiable cts
   = fst (approximateWCX include_non_quantifiable cts)
@@ -1858,7 +1859,8 @@ approximateWCX include_non_quantifiable wc
 
            IrredPred {}  -> True  -- See Wrinkle (W2)
 
-           ForAllPred {} -> False  -- Never quantify these
+           ForAllPred {} -> warnPprTrace True "Unexpected ForAllPred" (ppr pred) $
+                            False  -- See Wrinkle (W4)
 
     -- See Note [Quantifying over equality constraints]
     quantify_equality NomEq  ty1 ty2 = quant_fun ty1 || quant_fun ty2
@@ -1922,6 +1924,21 @@ Wrinkle (W3)
   we /do/ want to float out of equalities (#12797).  Hence we just union the two
   returned lists.
 
+Wrinkle (W4)
+  In #26376 we had constraints
+    [W] d1 : Functor f[tau:1]
+    [W] d2 : Functor p[tau:1]
+    [W] d3 : forall a. Functor (p[tau:1]) a   -- A quantified constraint
+  We certainly don't want to /quantify/ over d3; but we /do/ want to
+  quantify over `p`, so it would be a mistake to make the function monomorphic
+  in `p` just because `p` is mentioned in this quantified constraint.
+
+  Happily this problem cannot happen any more.  That quantified constraint `d3`
+  dates from a time when we flirted with an all-or-nothing strategy for
+  quantified constraints Nowadays we'll never see this: we'll have simplified
+  that quantified constraint into a implication constraint.  (Exception:
+  SPECIALISE pragmas: see (WFA4) in Note [Solving a Wanted forall-constraint].
+  But there we don't use approximateWC.)
 
 ------ Historical note -----------
 There used to be a second caveat, driven by #8155

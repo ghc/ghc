@@ -20,7 +20,8 @@ module GHC.Tc.Types.Origin (
   -- * CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
   isVisibleOrigin, toInvisibleOrigin,
-  pprCtOrigin, isGivenOrigin, isWantedWantedFunDepOrigin,
+  pprCtOrigin, pprCtOriginBriefly,
+  isGivenOrigin, isWantedWantedFunDepOrigin,
   isWantedSuperclassOrigin,
   ClsInstOrQC(..), NakedScFlag(..), NonLinearPatternReason(..),
   HsImplicitLiftSplice(..),
@@ -372,7 +373,7 @@ pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural 
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)
 pprSkolInfo (InstSkol IsClsInst sz) = vcat [ text "the instance declaration"
                                            , whenPprDebug (braces (ppr sz)) ]
-pprSkolInfo (InstSkol (IsQC {}) sz) = vcat [ text "a quantified context"
+pprSkolInfo (InstSkol (IsQC {}) sz) = vcat [ text "a quantified constraint"
                                            , whenPprDebug (braces (ppr sz)) ]
 pprSkolInfo (MethSkol name d) = text "the" <+> ppWhen d (text "default")
                                            <+> text "method declaration for" <+> ppr name
@@ -672,8 +673,9 @@ type StandaloneDeriv = Bool
 -- like @sc_sel (sc_sel dg)@, where @dg@ is a Given.
 type ScDepth = Int
 
-data ClsInstOrQC = IsClsInst
-                 | IsQC CtOrigin
+data ClsInstOrQC
+  = IsClsInst
+  | IsQC PredType CtOrigin  -- The PredType is the forall-constraint we are trying to solve
 
 data NakedScFlag = NakedSc | NotNakedSc
       --   The NakedScFlag affects only GHC.Tc.Solver.InertSet.prohibitedSuperClassSolve
@@ -722,9 +724,6 @@ isWantedSuperclassOrigin _                           = False
 
 instance Outputable CtOrigin where
   ppr = pprCtOrigin
-
-ctoHerald :: SDoc
-ctoHerald = text "arising from"
 
 -- | Extract a suitable CtOrigin from a HsExpr
 lexprCtOrigin :: LHsExpr GhcRn -> CtOrigin
@@ -795,8 +794,11 @@ lGRHSCtOrigin :: NonEmpty (LGRHS GhcRn (LHsExpr GhcRn)) -> CtOrigin
 lGRHSCtOrigin (L _ (GRHS _ _ (L _ e)) :| []) = exprCtOrigin e
 lGRHSCtOrigin _ = Shouldn'tHappenOrigin "multi-way GRHS"
 
+ctoHerald :: SDoc
+ctoHerald = text "arising from"
+
 pprCtOrigin :: CtOrigin -> SDoc
--- "arising from ..."
+
 pprCtOrigin (GivenOrigin sk)
   = ctoHerald <+> ppr sk
 
@@ -805,8 +807,9 @@ pprCtOrigin (GivenSCOrigin sk d blk)
          , whenPprDebug (braces (text "given-sc:" <+> ppr d <> comma <> ppr blk)) ]
 
 pprCtOrigin (SpecPragOrigin ctxt)
-  = case ctxt of
-       FunSigCtxt n _ -> text "for" <+> quotes (ppr n)
+  = ctoHerald <+>
+    case ctxt of
+       FunSigCtxt n _ -> text "a SPECIALISE pragma for" <+> quotes (ppr n)
        SpecInstCtxt   -> text "a SPECIALISE INSTANCE pragma"
        _              -> text "a SPECIALISE pragma"  -- Never happens I think
 
@@ -828,7 +831,7 @@ pprCtOrigin (InjTFOrigin1 pred1 orig1 loc1 pred2 orig2 loc2)
                , hang (quotes (ppr pred2)) 2 (pprCtOrigin orig2 <+> text "at" <+> ppr loc2) ])
 
 pprCtOrigin AssocFamPatOrigin
-  = text "when matching a family LHS with its class instance head"
+  = ctoHerald <+> text "matching a family LHS with its class instance head"
 
 pprCtOrigin (TypeEqOrigin { uo_actual = t1, uo_expected =  t2, uo_visible = vis })
   = hang (ctoHerald <+> text "a type equality" <> whenPprDebug (brackets (ppr vis)))
@@ -872,13 +875,13 @@ pprCtOrigin (ProvCtxtOrigin PSB{ psb_id = (L _ name) })
        2 (text "the signature of" <+> quotes (ppr name))
 
 pprCtOrigin (InstProvidedOrigin mod cls_inst)
-  = vcat [ text "arising when attempting to show that"
+  = vcat [ ctoHerald <+> text "attempting to show that"
          , ppr cls_inst
          , text "is provided by" <+> quotes (ppr mod)]
 
 pprCtOrigin (ImpedanceMatching x)
-  = vcat [ text "arising when matching required constraints"
-         , text "in a group involving" <+> quotes (ppr x)]
+  = vcat [ ctoHerald <+> text "matching required constraints"
+         , text "in a binding group involving" <+> quotes (ppr x)]
 
 pprCtOrigin (CycleBreakerOrigin orig)
   = pprCtOrigin orig
@@ -903,87 +906,91 @@ pprCtOrigin (ScOrigin IsClsInst nkd)
   = vcat [ ctoHerald <+> text "the superclasses of an instance declaration"
          , whenPprDebug (braces (text "sc-origin:" <> ppr nkd)) ]
 
-pprCtOrigin (ScOrigin (IsQC orig) nkd)
-  = vcat [ ctoHerald <+> text "the head of a quantified constraint"
-         , whenPprDebug (braces (text "sc-origin:" <> ppr nkd))
-         , pprCtOrigin orig ]
+pprCtOrigin (ScOrigin (IsQC pred orig) nkd)
+  = vcat [ whenPprDebug (text "IsQC" <> braces (text "sc-origin:" <> ppr nkd) <+> ppr pred)
+         , hang (text "arising (via a quantified constraint) from")
+              2 (pprCtOriginBriefly orig) ]
+           -- Print `orig` briefly with pprCtOriginBriefly.  We'll print it more
+           -- voluminously later: see GHC.Tc.Errors.Ppr.pprQCOriginExtra
 
 pprCtOrigin (NonLinearPatternOrigin reason pat)
   = hang (ctoHerald <+> text "a non-linear pattern" <+> quotes (ppr pat))
        2 (pprNonLinearPatternReason reason)
 
 pprCtOrigin simple_origin
-  = ctoHerald <+> pprCtO simple_origin
+  = ctoHerald <+> pprCtOriginBriefly simple_origin
 
--- | Short one-liners
-pprCtO :: HasDebugCallStack => CtOrigin -> SDoc
-pprCtO (OccurrenceOf name)   = hsep [text "a use of", quotes (ppr name)]
-pprCtO (OccurrenceOfRecSel name) = hsep [text "a use of", quotes (ppr name)]
-pprCtO AppOrigin             = text "an application"
-pprCtO (IPOccOrigin name)    = hsep [text "a use of implicit parameter", quotes (ppr name)]
-pprCtO (OverLabelOrigin l)   = hsep [text "the overloaded label"
+-- | Print CtOrigin briefly, with a one-liner
+pprCtOriginBriefly :: CtOrigin -> SDoc
+pprCtOriginBriefly = ppr_br  -- ppr_br is a local function with a short name!
+
+ppr_br :: CtOrigin -> SDoc
+ppr_br (OccurrenceOf name)   = hsep [text "a use of", quotes (ppr name)]
+ppr_br (OccurrenceOfRecSel name) = hsep [text "a use of", quotes (ppr name)]
+ppr_br AppOrigin             = text "an application"
+ppr_br (IPOccOrigin name)    = hsep [text "a use of implicit parameter", quotes (ppr name)]
+ppr_br (OverLabelOrigin l)   = hsep [text "the overloaded label"
                                     ,quotes (char '#' <> ppr l)]
-pprCtO RecordUpdOrigin       = text "a record update"
-pprCtO ExprSigOrigin         = text "an expression type signature"
-pprCtO PatSigOrigin          = text "a pattern type signature"
-pprCtO PatOrigin             = text "a pattern"
-pprCtO ViewPatOrigin         = text "a view pattern"
-pprCtO (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
-pprCtO (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
-pprCtO SectionOrigin         = text "an operator section"
-pprCtO (GetFieldOrigin f)    = hsep [text "selecting the field", quotes (ppr f)]
-pprCtO AssocFamPatOrigin     = text "the LHS of a family instance"
-pprCtO TupleOrigin           = text "a tuple"
-pprCtO NegateOrigin          = text "a use of syntactic negation"
-pprCtO (ScOrigin IsClsInst _) = text "the superclasses of an instance declaration"
-pprCtO (ScOrigin (IsQC {}) _) = text "the head of a quantified constraint"
-pprCtO (DerivOrigin standalone)
+ppr_br RecordUpdOrigin       = text "a record update"
+ppr_br ExprSigOrigin         = text "an expression type signature"
+ppr_br PatSigOrigin          = text "a pattern type signature"
+ppr_br PatOrigin             = text "a pattern"
+ppr_br ViewPatOrigin         = text "a view pattern"
+ppr_br (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
+ppr_br (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
+ppr_br SectionOrigin         = text "an operator section"
+ppr_br (GetFieldOrigin f)    = hsep [text "selecting the field", quotes (ppr f)]
+ppr_br AssocFamPatOrigin     = text "the LHS of a family instance"
+ppr_br TupleOrigin           = text "a tuple"
+ppr_br NegateOrigin          = text "a use of syntactic negation"
+ppr_br (ScOrigin IsClsInst _) = text "the superclasses of an instance declaration"
+ppr_br (ScOrigin (IsQC {}) _) = text "the head of a quantified constraint"
+ppr_br (DerivOrigin standalone)
   | standalone               = text "a 'deriving' declaration"
   | otherwise                = text "the 'deriving' clause of a data type declaration"
-pprCtO DefaultOrigin         = text "a 'default' declaration"
-pprCtO DoOrigin              = text "a do statement"
-pprCtO MCompOrigin           = text "a statement in a monad comprehension"
-pprCtO ProcOrigin            = text "a proc expression"
-pprCtO ArrowCmdOrigin        = text "an arrow command"
-pprCtO AnnOrigin             = text "an annotation"
-pprCtO (ExprHoleOrigin Nothing)    = text "an expression hole"
-pprCtO (ExprHoleOrigin (Just occ)) = text "a use of" <+> quotes (ppr occ)
-pprCtO (TypeHoleOrigin occ)  = text "a use of wildcard" <+> quotes (ppr occ)
-pprCtO PatCheckOrigin        = text "a pattern-match completeness check"
-pprCtO ListOrigin            = text "an overloaded list"
-pprCtO IfThenElseOrigin      = text "an if-then-else expression"
-pprCtO StaticOrigin          = text "a static form"
-pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
-pprCtO (OmittedFieldOrigin Nothing) = text "an omitted anonymous field"
-pprCtO (OmittedFieldOrigin (Just fl)) = hsep [text "omitted field" <+> quotes (ppr fl)]
-pprCtO BracketOrigin         = text "a quotation bracket"
-pprCtO (ImplicitLiftOrigin isp) = text "an implicit lift of" <+> quotes (ppr (implicit_lift_lid isp))
+ppr_br DefaultOrigin         = text "a 'default' declaration"
+ppr_br DoOrigin              = text "a do statement"
+ppr_br MCompOrigin           = text "a statement in a monad comprehension"
+ppr_br ProcOrigin            = text "a proc expression"
+ppr_br ArrowCmdOrigin        = text "an arrow command"
+ppr_br AnnOrigin             = text "an annotation"
+ppr_br (ExprHoleOrigin Nothing)    = text "an expression hole"
+ppr_br (ExprHoleOrigin (Just occ)) = text "a use of" <+> quotes (ppr occ)
+ppr_br (TypeHoleOrigin occ)  = text "a use of wildcard" <+> quotes (ppr occ)
+ppr_br PatCheckOrigin        = text "a pattern-match completeness check"
+ppr_br ListOrigin            = text "an overloaded list"
+ppr_br IfThenElseOrigin      = text "an if-then-else expression"
+ppr_br StaticOrigin          = text "a static form"
+ppr_br (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
+ppr_br (OmittedFieldOrigin Nothing) = text "an omitted anonymous field"
+ppr_br (OmittedFieldOrigin (Just fl)) = hsep [text "omitted field" <+> quotes (ppr fl)]
+ppr_br BracketOrigin            = text "a quotation bracket"
+ppr_br (ImplicitLiftOrigin isp) = text "an implicit lift of" <+> quotes (ppr (implicit_lift_lid isp))
 
 -- These ones are handled by pprCtOrigin, but we nevertheless sometimes
--- get here via callStackOriginFS, when doing ambiguity checks
--- A bit silly, but no great harm
-pprCtO (GivenOrigin {})             = text "a given constraint"
-pprCtO (GivenSCOrigin {})           = text "the superclass of a given constraint"
-pprCtO (SpecPragOrigin {})          = text "a SPECIALISE pragma"
-pprCtO (FunDepOrigin1 {})           = text "a functional dependency"
-pprCtO (FunDepOrigin2 {})           = text "a functional dependency"
-pprCtO (InjTFOrigin1 {})            = text "an injective type family"
-pprCtO (TypeEqOrigin {})            = text "a type equality"
-pprCtO (KindEqOrigin {})            = text "a kind equality"
-pprCtO (DerivOriginDC {})           = text "a deriving clause"
-pprCtO (DerivOriginCoerce {})       = text "a derived method"
-pprCtO (DoPatOrigin {})             = text "a do statement"
-pprCtO (MCompPatOrigin {})          = text "a monad comprehension pattern"
-pprCtO (Shouldn'tHappenOrigin note) = text note
-pprCtO (ProvCtxtOrigin {})          = text "a provided constraint"
-pprCtO (InstProvidedOrigin {})      = text "a provided constraint"
-pprCtO (CycleBreakerOrigin orig)    = pprCtO orig
-pprCtO (FRROrigin {})               = text "a representation-polymorphism check"
-pprCtO (WantedSuperclassOrigin {})  = text "a superclass constraint"
-pprCtO (InstanceSigOrigin {})       = text "a type signature in an instance"
-pprCtO (AmbiguityCheckOrigin {})    = text "a type ambiguity check"
-pprCtO (ImpedanceMatching {})       = text "combining required constraints"
-pprCtO (NonLinearPatternOrigin _ pat) = hsep [text "a non-linear pattern" <+> quotes (ppr pat)]
+-- we call pprCtOriginBriefly directly (e.g. in callStackOriginFS)
+ppr_br (GivenOrigin {})             = text "a given constraint"
+ppr_br (GivenSCOrigin {})           = text "the superclass of a given constraint"
+ppr_br (SpecPragOrigin {})          = text "a SPECIALISE pragma"
+ppr_br (FunDepOrigin1 {})           = text "a functional dependency"
+ppr_br (FunDepOrigin2 {})           = text "a functional dependency"
+ppr_br (InjTFOrigin1 {})            = text "an injective type family"
+ppr_br (TypeEqOrigin {})            = text "a type equality"
+ppr_br (KindEqOrigin {})            = text "a kind equality"
+ppr_br (DerivOriginDC {})           = text "a deriving clause"
+ppr_br (DerivOriginCoerce m _ _ _)  = text "the coercion of derived method" <+> quotes (ppr m)
+ppr_br (DoPatOrigin {})             = text "a do statement"
+ppr_br (MCompPatOrigin {})          = text "a monad comprehension pattern"
+ppr_br (Shouldn'tHappenOrigin note) = text note
+ppr_br (ProvCtxtOrigin {})          = text "a provided constraint"
+ppr_br (InstProvidedOrigin {})      = text "a provided constraint"
+ppr_br (CycleBreakerOrigin orig)    = ppr_br orig
+ppr_br (FRROrigin {})               = text "a representation-polymorphism check"
+ppr_br (WantedSuperclassOrigin {})  = text "a superclass constraint"
+ppr_br (InstanceSigOrigin {})       = text "a type signature in an instance"
+ppr_br (AmbiguityCheckOrigin {})    = text "a type ambiguity check"
+ppr_br (ImpedanceMatching {})       = text "combining required constraints"
+ppr_br (NonLinearPatternOrigin _ pat) = hsep [text "a non-linear pattern" <+> quotes (ppr pat)]
 
 pprNonLinearPatternReason :: HasDebugCallStack => NonLinearPatternReason -> SDoc
 pprNonLinearPatternReason LazyPatternReason = parens (text "non-variable lazy pattern aren't linear")
@@ -1016,7 +1023,7 @@ isPushCallStackOrigin_maybe orig               = Just orig_fs
   --      the result of prettty-printing the CtOrigin; a bit messy,
   --      but we can perhaps improve it in the light of user feedback
   where
-    orig_fs = mkFastString (showSDocUnsafe (pprCtO orig))
+    orig_fs = mkFastString (showSDocUnsafe (pprCtOriginBriefly orig))
 
 {-
 ************************************************************************

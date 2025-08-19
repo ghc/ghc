@@ -1832,10 +1832,14 @@ updTcEvBinds old_var new_var
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
 addTcEvBind (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) ev_bind
-  = do { traceTc "addTcEvBind" $ ppr u $$
-                                 ppr ev_bind
-       ; bnds <- readTcRef ev_ref
-       ; writeTcRef ev_ref (extendEvBinds bnds ev_bind) }
+  = do { bnds <- readTcRef ev_ref
+       ; let bnds' = extendEvBinds bnds ev_bind
+       ; traceTc "addTcEvBind" $
+         vcat [ text "EvBindsVar:" <+> ppr u
+              , text "ev_bind:" <+> ppr ev_bind
+              , text "bnds:" <+> ppr bnds
+              , text "bnds':" <+> ppr bnds' ]
+       ; writeTcRef ev_ref bnds' }
 addTcEvBind (CoEvBindsVar { ebv_uniq = u }) ev_bind
   = pprPanic "addTcEvBind CoEvBindsVar" (ppr ev_bind $$ ppr u)
 

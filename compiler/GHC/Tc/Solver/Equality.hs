@@ -2957,7 +2957,7 @@ lookup_eq_in_qcis work_ct eq_rel lhs rhs
     do { ev_binds_var <- getTcEvBindsVar
        ; ics <- getInertCans
        ; if isWanted ev                       -- Never look up Givens in quantified constraints
-         && not (null (inert_insts ics))      -- Shortcut common case
+         && not (null (inert_qcis ics))       -- Shortcut common case
          && not (isCoEvBindsVar ev_binds_var) -- See Note [Instances in no-evidence implications]
          then try_for_qci
          else continueWith () }

@@ -1,12 +1,15 @@
 T7148a.hs:19:50: error: [GHC-10283]
     • Couldn't match representation of type ‘b’
                                with that of ‘Result a b’
-        arising from the coercion of the method ‘coerce’
-          from type ‘forall b. Proxy b -> a -> Result a b’
-            to type ‘forall b.
-                     Proxy b -> IS_NO_LONGER a -> Result (IS_NO_LONGER a) b’
+        arising (via a quantified constraint) from
+          the coercion of derived method ‘coerce’
+      When trying to solve the quantified constraint
+        forall b.
+        Coercible
+          (Proxy b -> a -> Result a b) (Proxy b -> IS_NO_LONGER a -> b)
+        arising from the coercion of derived method ‘coerce’
       ‘b’ is a rigid type variable bound by
-        the method declaration for coerce
+        a quantified constraint
         at T7148a.hs:19:50-56
     • When deriving the instance for (Convert (IS_NO_LONGER a))
 

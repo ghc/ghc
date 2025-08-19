@@ -1028,15 +1028,15 @@ findInferredDiff annotated_theta inferred_theta
        ; let given_loc = mkGivenLoc topTcLevel (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
              given_cts = mkGivens given_loc given_ids
 
-       ; (residual, _) <- runTcS $
-                          do { _ <- solveSimpleGivens given_cts
-                             ; solveSimpleWanteds (listToBag (map mkNonCanonical wanteds)) }
+       ; (residual_wc, _) <- runTcS $
+                             do { _ <- solveSimpleGivens given_cts
+                                ; solveSimpleWanteds (listToBag (map mkNonCanonical wanteds)) }
          -- NB: There are no meta tyvars fromn this level annotated_theta
          -- because we have either promoted them or unified them
          -- See `Note [Quantification and partial signatures]` Wrinkle 2
 
        ; return (map (box_pred . ctPred) $
-                 bagToList residual) }
+                 bagToList (wc_simple residual_wc)) }
   where
      box_pred :: PredType -> PredType
      box_pred pred = case classifyPredType pred of

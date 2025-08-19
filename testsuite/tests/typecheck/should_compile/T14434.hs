@@ -14,4 +14,5 @@ instance {-# OVERLAPPABLE #-} ToString a where
 toStringX :: (ToString a) => a -> String
 toStringX = toString
   -- Here we do /not/ want to solve the ToString
-  -- constraint with the local instance
+  -- constraint with the local instance OVERLAPPABLE instance
+  -- Rather, we want to use the (ToString a) passed into toStringX
