@@ -544,6 +544,7 @@ Library
     -- See /usr/ports/Mk/Uses/iconv.mk
     if os(freebsd)
         cc-options: -DLIBICONV_PLUG
+        extra-libraries: c, m
 
     if arch(javascript)
         exposed-modules:
