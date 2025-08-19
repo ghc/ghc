@@ -1,5 +1,4 @@
-
-TH_StaticPointers02.hs:11:34: [GHC-12219] error:
+TH_StaticPointers02.hs:11:34: error: [GHC-12219]
     • static forms cannot be used in splices: static 'a'
     • In the untyped splice:
         $(case staticKey (static 'a') of
@@ -8,5 +7,6 @@ TH_StaticPointers02.hs:11:34: [GHC-12219] error:
                    w0i = ...
                    w1i = ...
                  in
-                   [| fmap (\ p -> deRefStaticPtr p :: Char) $ unsafeLookupStaticPtr
+                   [| fmap ... $ unsafeLookupStaticPtr
                         $ Fingerprint (fromIntegral w0i) (fromIntegral w1i) |])
+

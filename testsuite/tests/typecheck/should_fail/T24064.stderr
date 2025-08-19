@@ -1,4 +1,3 @@
-
 T24064.hs:42:3: error: [GHC-25897]
     • Could not deduce ‘m ~ X e0’
       from the context: (C2 m, F2 m ~ Y)
@@ -22,5 +21,6 @@ T24064.hs:42:3: error: [GHC-25897]
             = do fun1
                  fun2
                  g fun3
-                 ....
+                 fun4 undefined
     • Relevant bindings include test :: m () (bound at T24064.hs:41:1)
+

@@ -1,4 +1,3 @@
-
 T4093b.hs:31:13: error: [GHC-25897]
     • Could not deduce ‘e ~ C’
       from the context: (EitherCO e (A C O n) (A O O n) ~ A e O n,
@@ -31,7 +30,10 @@ T4093b.hs:31:13: error: [GHC-25897]
                   n C O
                   -> EitherCO e (A C O n) (A O O n) -> EitherCO e (A C O n) (A O O n)
                 f n _ = (JustC n, NothingC)
-                ....
+                l ::
+                  n O C
+                  -> EitherCO e (A C O n) (A O O n) -> EitherCO e (A C C n) (A O C n)
+                ...
     • Relevant bindings include
         f :: n C O
              -> EitherCO e (A C O n) (A O O n) -> EitherCO e (A C O n) (A O O n)
@@ -41,3 +43,4 @@ T4093b.hs:31:13: error: [GHC-25897]
           (bound at T4093b.hs:34:5)
         b :: Block n e x (bound at T4093b.hs:25:17)
         blockToNodeList :: Block n e x -> A e x n (bound at T4093b.hs:25:1)
+

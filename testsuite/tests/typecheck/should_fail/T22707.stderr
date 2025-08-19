@@ -10,8 +10,7 @@ T22707.hs:6:59: error: [GHC-25897]
       In the second argument of ‘($)’, namely
         ‘\ xa -> evalCont (t1 c) >>== \ ati1 -> return ati1 xa’
       In the second argument of ‘runCont’, namely
-        ‘(ati1tti2
-            $ \ xa -> evalCont (t1 c) >>== \ ati1 -> return ati1 xa)’
+        ‘(ati1tti2 $ \ xa -> evalCont (t1 c) >>== \ ati1 -> return ...)’
     • Relevant bindings include
         ati1tti2 :: (a -> i1) -> i2 (bound at T22707.hs:6:16)
         c :: Cont (i2 -> o) i1 a (bound at T22707.hs:6:4)
