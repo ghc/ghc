@@ -116,6 +116,7 @@ import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Env
+import GHC.Driver.ByteCode
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Errors
 import GHC.Driver.Messager
@@ -290,12 +291,10 @@ import Data.List.NonEmpty (NonEmpty ((:|)))
 import GHC.Unit.Module.WholeCoreBindings
 import GHC.Types.TypeEnv
 import System.IO
-import {-# SOURCE #-} GHC.Driver.Pipeline
 import Data.Time
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
-import GHC.Platform.Ways
 import GHC.Stg.EnforceEpt.TagSig (seqTagSig)
 import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
@@ -884,6 +883,11 @@ hscRecompStatus
 
                let just_o  = justObjects  <$> obj_linkable
 
+                   bytecode_or_object_code
+                      | gopt Opt_WriteByteCode lcl_dflags = justBytecode <$> definitely_bc
+                      | otherwise = (justBytecode <$> maybe_bc) `choose` just_o
+
+
                    definitely_both_os = case (bc_result, obj_linkable) of
                                (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
                                -- If missing object code, just say we need to recompile because of object code.
@@ -899,8 +903,7 @@ hscRecompStatus
                    -- If not -fwrite-byte-code, then we could use core bindings or object code if that's available.
                    maybe_bc = bc_in_memory_linkable `choose`
                               bc_obj_linkable `choose`
-                              bc_core_linkable `choose`
-                              obj_linkable
+                              bc_core_linkable
 
                    bc_result = if gopt Opt_WriteByteCode lcl_dflags
                                 -- If the byte-code artifact needs to be produced, then we certainly need bytecode.
@@ -915,8 +918,8 @@ hscRecompStatus
 --               pprTraceM "recomp" (ppr just_bc <+> ppr just_o)
                -- 2. Decide which of the products we will need
                let recomp_linkable_result = case () of
-                     _ | backendCanReuseLoadedCode (backend lcl_dflags) ->
-                           justBytecode <$> bc_result
+                     _ | backendCanReuseLoadedCode (backend lcl_dflags) -> bytecode_or_object_code
+
                         -- Need object files for making object files
                         | backendWritesFiles (backend lcl_dflags) ->
                            if gopt Opt_ByteCodeAndObjectCode lcl_dflags
@@ -936,13 +939,13 @@ hscRecompStatus
 
 -- | Prefer requires both arguments to be up-to-date.
 -- but prefers to use the second argument.
-prefer :: MaybeValidated Linkable -> MaybeValidated Linkable -> MaybeValidated Linkable
+prefer :: MaybeValidated a -> MaybeValidated a -> MaybeValidated a
 prefer (UpToDateItem _) (UpToDateItem l2) = UpToDateItem l2
 prefer r1 _ = r1
 
 -- | Disjunction, choose either argument, but prefer the first one.
 -- Report the failure of the first argument.
-choose :: MaybeValidated Linkable -> MaybeValidated Linkable -> MaybeValidated Linkable
+choose :: MaybeValidated a -> MaybeValidated a -> MaybeValidated a
 choose (UpToDateItem l1) _ = UpToDateItem l1
 choose _ (UpToDateItem l2) = UpToDateItem l2
 choose l1 _ = l1
@@ -1052,26 +1055,6 @@ initModDetails hsc_env iface =
     -- in make mode, since this HMI will go into the HPT.
     genModDetails hsc_env iface
 
--- | Modify flags such that objects are compiled for the interpreter's way.
--- This is necessary when building foreign objects for Template Haskell, since
--- those are object code built outside of the pipeline, which means they aren't
--- subject to the mechanism in 'enableCodeGenWhen' that requests dynamic build
--- outputs for dependencies when the interpreter used for TH is dynamic but the
--- main outputs aren't.
--- Furthermore, the HPT only stores one set of objects with different names for
--- bytecode linking in 'HomeModLinkable', so the usual hack for switching
--- between ways in 'get_link_deps' doesn't work.
-compile_for_interpreter :: HscEnv -> (HscEnv -> IO a) -> IO a
-compile_for_interpreter hsc_env use =
-  use (hscUpdateFlags update hsc_env)
-  where
-    update dflags = dflags {
-      targetWays_ = adapt_way interpreterDynamic WayDyn $
-                    adapt_way interpreterProfiled WayProf $
-                    targetWays_ dflags
-      }
-
-    adapt_way want = if want (hscInterp hsc_env) then addWay else removeWay
 
 -- | Assemble 'WholeCoreBindings' if the interface contains Core bindings.
 iface_core_bindings :: ModIface -> ModLocation -> Maybe WholeCoreBindings
@@ -2256,30 +2239,6 @@ generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
   -- checking.
   bco_time <- maybe getCurrentTime pure =<< modificationTimeIfExists (ml_bytecode_file mod_location)
   loadByteCodeObjectLinkable hsc_env bco_time mod_location bco_object
-
--- | Write foreign sources and foreign stubs to temporary files and compile them.
-outputAndCompileForeign :: HscEnv -> Module -> ModLocation -> [(ForeignSrcLang, FilePath)] ->  ForeignStubs -> IO [FilePath]
-outputAndCompileForeign hsc_env mod_name location foreign_files foreign_stubs = do
-  let dflags   = hsc_dflags hsc_env
-      logger   = hsc_logger hsc_env
-      tmpfs    = hsc_tmpfs hsc_env
-  (_, has_stub) <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) mod_name location foreign_stubs
-  compile_for_interpreter hsc_env $ \ i_env -> do
-    stub_o <- traverse (compileForeign i_env LangC) has_stub
-    foreign_files_o <- traverse (uncurry (compileForeign i_env)) foreign_files
-    pure (maybeToList stub_o ++ foreign_files_o)
-
--- | Write the foreign sources and foreign stubs of a bytecode object to temporary files and compile them.
-loadByteCodeObject :: HscEnv -> ModLocation -> ByteCodeObject
-                             -> IO (CompiledByteCode, [FilePath])
-loadByteCodeObject hsc_env location (ByteCodeObject mod cbc foreign_srcs foreign_stubs) = do
-  fos <- outputAndCompileForeign hsc_env mod location foreign_srcs foreign_stubs
-  return (cbc, fos)
-
-loadByteCodeObjectLinkable :: HscEnv -> UTCTime -> ModLocation -> ByteCodeObject -> IO Linkable
-loadByteCodeObjectLinkable hsc_env linkable_time location bco = do
-  (cbc, fos) <- loadByteCodeObject hsc_env location bco
-  return $! Linkable linkable_time (bco_module bco) (BCOs cbc :| [DotO fo ForeignObject | fo <- fos])
 
 mkByteCodeObject :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ByteCodeObject
 mkByteCodeObject hsc_env mod mod_location cgguts = do

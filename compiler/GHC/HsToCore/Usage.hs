@@ -187,7 +187,9 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
           -- home package ifaces in the PIT.
           miface <- lookupIfaceByModule hug pit m
           case miface of
-            Nothing -> pprPanic "mkObjectUsage" (ppr m)
+            -- TODO: MP: This is wrong, a placeholder for now.
+            -- We need to work out what to do for bytecode linkables which are not loaded into HPT
+            Nothing -> return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) fingerprint0
             Just iface ->
               return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) (mi_iface_hash iface)
 
