@@ -1177,14 +1177,13 @@ nestImplicTcS ev_binds_var inner_tclvl (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = old_inert_var }) ->
     do { inerts <- TcM.readTcRef old_inert_var
 
-       -- Initialise the inert_cans from the inert_givens of the parent
-       -- so that the child is not polluted with the parent's inert Wanteds
+       -- resetInertcans: initialise the inert_cans from the inert_givens of the
+       -- parent so that the child is not polluted with the parent's inert Wanteds
        -- See Note [trySolveImplication] in GHC.Tc.Solver.Solve
        -- All other InertSet fields are inherited
-       ; let nest_inert = inerts { inert_cycle_breakers = pushCycleBreakerVarStack
-                                                            (inert_cycle_breakers inerts)
-                                 , inert_cans = (inert_givens inerts)
-                                                   { inert_given_eqs = False } }
+       ; let nest_inert = pushCycleBreakerVarStack $
+                          resetInertCans           $
+                          inerts
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
@@ -1201,6 +1200,26 @@ nestImplicTcS ev_binds_var inner_tclvl (TcS thing_inside)
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
        ; checkForCyclicBinds ev_binds
 #endif
+       ; return res }
+
+nestFunDepsTcS :: TcS a -> TcS (Bool, a)
+nestFunDepsTcS (TcS thing_inside)
+  = reportUnifications $
+    TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
+    TcM.pushTcLevelM_  $
+         -- pushTcLevelTcM: increase the level so that unification variables
+         -- allocated by the fundep-creation itself don't count as useful unifications
+    do { inerts <- TcM.readTcRef inerts_var
+       ; let nest_inerts = resetInertCans inerts
+                 -- resetInertCasns: like nestImplicTcS
+       ; new_inert_var <- TcM.newTcRef nest_inerts
+       ; new_wl_var    <- TcM.newTcRef emptyWorkList
+       ; let nest_env = env { tcs_inerts   = new_inert_var
+                            , tcs_worklist = new_wl_var }
+
+       ; TcM.traceTc "nestFunDepsTcS {" empty
+       ; res <- thing_inside nest_env
+       ; TcM.traceTc "nestFunDepsTcS }" empty
        ; return res }
 
 nestTcS :: TcS a -> TcS a
@@ -1272,24 +1291,6 @@ tryShortCutTcS (TcS thing_inside)
                  ; TcM.traceTc "tryTcS update" (ppr (inert_solved_dicts new_inerts))
 
                  ; return True } }
-
-nestFunDepsTcS :: TcS a -> TcS (Bool, a)
-nestFunDepsTcS (TcS thing_inside)
-  = reportUnifications $
-    TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
-    TcM.pushTcLevelM_  $
-         -- pushTcLevelTcM: increase the level so that unification variables
-         -- allocated by the fundep-creation itself don't count as useful unifications
-    do { inerts <- TcM.readTcRef inerts_var
-       ; new_inert_var    <- TcM.newTcRef inerts
-       ; new_wl_var       <- TcM.newTcRef emptyWorkList
-       ; let nest_env = env { tcs_inerts   = new_inert_var
-                            , tcs_worklist = new_wl_var }
-
-       ; TcM.traceTc "nestFunDepsTcS {" empty
-       ; res <- thing_inside nest_env
-       ; TcM.traceTc "nestFunDepsTcS }" empty
-       ; return res }
 
 updateInertsWith :: InertSet -> InertSet -> InertSet
 -- Update the current inert set with bits from a nested solve,
