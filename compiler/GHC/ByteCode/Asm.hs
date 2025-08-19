@@ -843,16 +843,18 @@ assembleI platform i = case i of
 
   BRK_FUN ibi@(InternalBreakpointId info_mod infox) -> do
     p1 <- ptr $ BCOPtrBreakArray info_mod
-    let -- cast that checks that round-tripping through Word16 doesn't change the value
-        toW16 x = let r = fromIntegral x :: Word16
-                  in if fromIntegral r == x
+    let -- cast that checks that round-tripping through Word32 doesn't change the value
+        infoW32 = let r = fromIntegral infox :: Word32
+                   in if fromIntegral r == infox
                     then r
-                    else pprPanic "schemeER_wrk: breakpoint tick/info index too large!" (ppr x)
+                    else pprPanic "schemeER_wrk: breakpoint tick/info index too large!" (ppr infox)
+        ix_hi = fromIntegral (infoW32 `shiftR` 16)
+        ix_lo = fromIntegral (infoW32 .&. 0xffff)
     info_addr        <- lit1 $ BCONPtrFS $ moduleNameFS $ moduleName info_mod
     info_unitid_addr <- lit1 $ BCONPtrFS $ unitIdFS     $ moduleUnitId info_mod
     np               <- lit1 $ BCONPtrCostCentre ibi
     emit_ bci_BRK_FUN [ Op p1, Op info_addr, Op info_unitid_addr
-                      , SmallOp (toW16 infox), Op np ]
+                      , SmallOp ix_hi, SmallOp ix_lo, Op np ]
 
   BRK_ALTS active -> emit_ bci_BRK_ALTS [SmallOp (if active then 1 else 0)]
 
