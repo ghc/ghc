@@ -588,22 +588,24 @@ solving fails and we use the superclass of C:
 The moving parts are relatively simple:
 
 * To attempt to solve the constraint completely, we just recursively
-  call the constraint solver. See the use of `tryTcS` in
+  call the constraint solver. See the use of `tryShortCutTcS` in
   `tcShortCutSolver`.
 
-* When this attempted recursive solving, we set a special mode
-  `TcSShortCut`, which signals that we are trying to solve using only
-  top-level instances.  We switch on `TcSShortCut` mode in
-  `tryShortCutSolver`.
+* When this attempted recursive solving, in `tryShortCutTcS`, we
+  - start with an empty inert set: no Givens and no Wanteds
+  - set a special mode  `TcSShortCut`, which signals that we are trying to solve
+    using only top-level instances.
 
-* When in TcSShortCut mode, we behave specially in a few places:
-  - `tryInertDicts`, where we would otherwise look for a Given to solve our Wanted
-  - `GHC.Tc.Solver.Monad.lookupInertDict` similarly
-  - `noMatchableGivenDicts`, which also consults the Givens
-  - `matchLocalInst`, which would otherwise consult Given quantified constraints
-  - `GHC.Tc.Solver.Instance.Class.matchInstEnv`: when short-cut solving, don't
-    pick overlappable top-level instances
-  - `GHC.Tc.Solver.Solve.runTcPluginsWanted`: don't pass any Givens to the plugin
+* When in TcSShortCut mode, since there are no Givens we can short-circuit;
+  these are all just optimisations:
+      - `tryInertDicts`
+      - `GHC.Tc.Solver.Monad.lookupInertDict`
+      - `noMatchableGivenDicts`
+      - `matchLocalInst`
+      - `GHC.Tc.Solver.Solve.runTcPluginsWanted`
+
+* In `GHC.Tc.Solver.Instance.Class.matchInstEnv`: when short-cut solving,
+  don't pick overlappable top-level instances
 
 Some wrinkles:
 
@@ -770,14 +772,14 @@ tryInertDicts dict_ct
 
 try_inert_dicts :: TcSMode -> InertCans -> DictCt -> TcS (StopOrContinue ())
 try_inert_dicts mode inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys })
-  | not (mode == TcSShortCut)   -- Ignore the inerts (esp Givens) in short-cut mode
-                                -- See Note [Shortcut solving]
+  | not (mode == TcSShortCut)   -- Optimisation: ignore the inerts (esp Givens) in
+                                -- short-cut mode. See Note [Shortcut solving]
   , Just dict_i <- lookupInertDict inerts cls tys
   , let ev_i  = dictCtEvidence dict_i
         loc_i = ctEvLoc ev_i
         loc_w = ctEvLoc ev_w
   = -- There is a matching dictionary in the inert set
-    do { -- First to try to solve it /completely/ from top level instances
+    do { -- For a Wanted, first to try to solve it /completely/ from top level instances
          -- See Note [Shortcut solving]
        ; short_cut_worked <- tryShortCutSolver (isGiven ev_i) dict_w
 
@@ -833,11 +835,7 @@ tryShortCutSolver try_short_cut dict_w@(DictCt { di_ev = ev_w })
             , gopt Opt_SolveConstantDicts dflags
               -- Enabled by the -fsolve-constant-dicts flag
 
-            -> tryTcS $  -- tryTcS tries to completely solve some contraints
-               -- Inherit the current solved_dicts, so that one invocation of
-               -- tryShortCutSolver can benefit from the work of earlier invocations
-               -- See wrinkle (SCS3) of Note [Shortcut solving]
-               setTcSMode TcSShortCut $
+            -> tryShortCutTcS $  -- tryTcS tries to completely solve some contraints
                do { residual <- solveSimpleWanteds (unitBag (CDictCan dict_w))
                   ; return (isEmptyBag residual) }
 
@@ -977,7 +975,7 @@ matchClassInst dflags mode inerts clas tys loc
 noMatchableGivenDicts :: TcSMode -> InertSet -> CtLoc -> Class -> [TcType] -> Bool
 noMatchableGivenDicts mode inerts@(IS { inert_cans = inert_cans }) loc_w clas tys
   | TcSShortCut <- mode
-  = True  -- In TcSShortCut mode we behave as if there were no Givens at all
+  = True  -- Optimisation: in TcSShortCut mode there are no Givens
   | otherwise
   = not $ anyBag matchable_given $
     findDictsByClass (inert_dicts inert_cans) clas
@@ -1153,8 +1151,7 @@ matchLocalInst :: TcPredType -> CtLoc -> TcS ClsInstResult
 -- Look up the predicate in Given quantified constraints,
 -- which are effectively just local instance declarations.
 matchLocalInst body_pred loc
-  = do { -- In TcSShortCut mode we do not look at Givens;
-         -- c.f. tryInertDicts
+  = do { -- Optimisation: in TcSShortCut mode there are no Givens (c.f. tryInertDicts)
          mode <- getTcSMode
        ; case mode of
            { TcSShortCut -> do { traceTcS "matchLocalInst:TcSShortCut" (ppr body_pred)
