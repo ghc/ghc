@@ -143,7 +143,7 @@ import Data.Maybe
 
 import GHC.Iface.Env    ( lookupNameCache )
 import GHC.Prelude
-import GHC.Utils.Monad  ( mapMaybeM )
+import GHC.Utils.Monad  ( MonadIO, mapMaybeM )
 import GHC.ThToHs       ( thRdrNameGuesses )
 import GHC.Tc.Utils.Env ( lookupGlobal )
 import GHC.Types.Name.Cache ( NameCache )
@@ -178,7 +178,22 @@ instance MonadThings CoreM where
 -- exactly. Qualified or unqualified TH names will be dynamically bound
 -- to names in the module being compiled, if possible. Exact TH names
 -- will be bound to the name they represent, exactly.
-thNameToGhcName :: TH.Name -> CoreM (Maybe Name)
+--
+-- 'thNameToGhcName' can be used in 'CoreM', 'Hsc' and 'TcM' monads.
+--
+-- 'thNameToGhcName' is recommended way to lookup 'Name's in GHC plugins.
+--
+-- @
+-- {-# LANGUAGE TemplateHaskellQuotes #-}
+--
+-- getNames :: Hsc (Maybe Name, Maybe Name)
+-- getNames = do
+--   class_Eq <- thNameToGhcName ''Eq
+--   fun_eq   <- thNameToGhcName '(==)
+--   return (classEq, fun_eq)
+-- @
+--
+thNameToGhcName :: (MonadIO m, HasHscEnv m) => TH.Name -> m (Maybe Name)
 thNameToGhcName th_name = do
   hsc_env <- getHscEnv
   liftIO $ thNameToGhcNameIO (hsc_NC hsc_env) th_name

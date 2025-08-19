@@ -2,6 +2,7 @@
 module GHC.Driver.Env
    ( Hsc(..)
    , HscEnv (..)
+   , HasHscEnv (..)
    , hsc_mod_graph
    , setModuleGraph
    , hscUpdateFlags
@@ -49,7 +50,7 @@ import GHC.Driver.Errors ( printOrThrowDiagnostics )
 import GHC.Driver.Errors.Types ( GhcMessage )
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Diagnostic (initDiagOpts, initPrintConfig)
-import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..) )
+import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..), HasHscEnv (..) )
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
