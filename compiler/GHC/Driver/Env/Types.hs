@@ -3,6 +3,7 @@
 module GHC.Driver.Env.Types
   ( Hsc(..)
   , HscEnv(..)
+  , HasHscEnv(..)
   ) where
 
 import GHC.Driver.Errors.Types ( GhcMessage )
@@ -33,6 +34,9 @@ import GHC.Driver.Env.KnotVars
 newtype Hsc a = Hsc (HscEnv -> Messages GhcMessage -> IO (a, Messages GhcMessage))
     deriving (Functor, Applicative, Monad, MonadIO)
       via ReaderT HscEnv (StateT (Messages GhcMessage) IO)
+
+instance HasHscEnv Hsc where
+    getHscEnv = Hsc $ \e w -> return (e, w)
 
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
@@ -109,3 +113,5 @@ data HscEnv
                 -- ^ LLVM configuration cache.
  }
 
+class HasHscEnv m where
+    getHscEnv :: m HscEnv

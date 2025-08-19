@@ -368,9 +368,6 @@ clearDiagnostics = Hsc $ \_ _ -> return ((), emptyMessages)
 logDiagnostics :: Messages GhcMessage -> Hsc ()
 logDiagnostics w = Hsc $ \_ w0 -> return ((), w0 `unionMessages` w)
 
-getHscEnv :: Hsc HscEnv
-getHscEnv = Hsc $ \e w -> return (e, w)
-
 handleWarnings :: Hsc ()
 handleWarnings = do
     diag_opts <- initDiagOpts <$> getDynFlags
