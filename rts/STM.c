@@ -1505,30 +1505,3 @@ void stmWriteTVar(Capability *cap,
 }
 
 /*......................................................................*/
-
-
-
-/*
-
-Note [catchRetry# implementation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-catchRetry# creates a nested transaction for its lhs:
-- if the lhs transaction succeeds:
-    - the lhs transaction is committed
-    - its read-variables are merged with those of the parent transaction
-    - the rhs code is ignored
-- if the lhs transaction retries:
-    - the lhs transaction is aborted
-    - its read-variables are merged with those of the parent transaction
-    - the rhs code is executed directly in the parent transaction (see #26028).
-
-So note that:
-- lhs code uses a nested transaction
-- rhs code doesn't use a nested transaction
-
-We have to take which case we're in into account (using the running_alt_code
-field of the catchRetry frame) in catchRetry's entry code, in retry#
-implementation, and also when an async exception is received (to cleanup the
-right number of transactions).
-
-*/
