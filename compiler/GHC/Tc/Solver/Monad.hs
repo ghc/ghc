@@ -19,7 +19,7 @@ module GHC.Tc.Solver.Monad (
     runTcS, runTcSEarlyAbort, runTcSWithEvBinds, runTcSInerts,
     failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     runTcSEqualities,
-    nestTcS, nestImplicTcS, tryTcS,
+    nestTcS, nestImplicTcS, tryShortCutTcS,
     setEvBindsTcS, setTcLevelTcS,
     emitFunDepWanteds,
 
@@ -1259,20 +1259,31 @@ nestTcS (TcS thing_inside)
 
        ; return res }
 
-tryTcS :: TcS Bool -> TcS Bool
+tryShortCutTcS :: TcS Bool -> TcS Bool
 -- Like nestTcS, but
---   (a) be a no-op if the nested computation returns Nothing
+--   (a) be a no-op if the nested computation returns False
 --   (b) if (but only if) success, propagate nested bindings to the caller
 -- Use only by the short-cut solver;
 --   see Note [Shortcut solving] in GHC.Tc.Solver.Dict
-tryTcS (TcS thing_inside)
+tryShortCutTcS (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var
                         , tcs_ev_binds = old_ev_binds_var }) ->
-    do { old_inerts       <- TcM.readTcRef inerts_var
-       ; new_inert_var    <- TcM.newTcRef old_inerts
+    do { -- Initialise a fresh inert set, with no Givens and no Wanteds
+         --    (i.e. empty `inert_cans`)
+         -- But inherit all the InertSet cache fields; in particular
+         --  * the given_eq_lvl, so we don't accidentally unify a
+         --    unification variable from outside a GADT match
+         --  * the `solved_dicts`; see wrinkle (SCS3) of Note [Shortcut solving]
+         --  * the `famapp_cache`; similarly
+         old_inerts <- TcM.readTcRef inerts_var
+       ; let given_eq_lvl = inert_given_eq_lvl (inert_cans old_inerts)
+             new_inerts   = old_inerts { inert_cans = emptyInertCans given_eq_lvl }
+       ; new_inert_var <- TcM.newTcRef new_inerts
+
        ; new_wl_var       <- TcM.newTcRef emptyWorkList
        ; new_ev_binds_var <- TcM.cloneEvBindsVar old_ev_binds_var
-       ; let nest_env = env { tcs_ev_binds = new_ev_binds_var
+       ; let nest_env = env { tcs_mode     = TcSShortCut
+                            , tcs_ev_binds = new_ev_binds_var
                             , tcs_inerts   = new_inert_var
                             , tcs_worklist = new_wl_var }
 
