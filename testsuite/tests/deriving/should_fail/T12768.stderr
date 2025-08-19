@@ -1,13 +1,12 @@
 T12768.hs:9:33: error: [GHC-39999]
     • Could not deduce ‘D [a]’
-        arising from the coercion of the method ‘op’
-          from type ‘D [a] => [a] -> [a]’ to type ‘D (N a) => N a -> N a’
+        arising (via a quantified constraint) from
+          the coercion of derived method ‘op’
       from the context: C a
         bound by the deriving clause for ‘C (N a)’ at T12768.hs:9:33
-      or from: D (N a)
-        bound by the method declaration for op at T12768.hs:9:33
-      Possible fix:
-        use a standalone 'deriving instance' declaration,
-          so you can specify the instance context yourself
+      or from: D (N a) bound by a quantified constraint at T12768.hs:9:33
+      When trying to solve the quantified constraint
+        D (N a) => (Coercible ([a] -> [a]) (N a -> N a), D [a])
+        arising from the coercion of derived method ‘op’
     • When deriving the instance for (C (N a))
 

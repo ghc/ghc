@@ -12,7 +12,7 @@
 
 bkpfail11.out/sig/sig-HyoWTHt34SDIRGEX0vZ8iN/../A.hi:1:1: error: [GHC-39999]
     • No instance for ‘GHC.Internal.Show.Show X’
-        arising when attempting to show that
+        arising from attempting to show that
         instance [safe] GHC.Internal.Show.Show T
           -- Defined at bkpfail11.bkp:5:18
         is provided by ‘mod:A’

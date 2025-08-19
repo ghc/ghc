@@ -4118,7 +4118,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
   =
     vcat
       [ no_inst_msg
-      , nest 2 extra_note
+      , extra_note
       , mb_patsyn_prov `orElse` empty
       , ppWhen (has_ambigs && not (null unifiers && null useful_givens))
         (vcat [ ppUnless lead_with_ambig $
@@ -4130,8 +4130,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
       , ppWhen (isNothing mb_patsyn_prov) $
             -- Don't suggest fixes for the provided context of a pattern
             -- synonym; the right fix is to bind more in the pattern
-        show_fixes (ctxtFixes has_ambigs pred implics
-                    ++ drv_fixes ++ naked_sc_fixes)
+        show_fixes (ctxt_fixes ++ drv_fixes ++ naked_sc_fixes)
       , ppWhen (not (null candidates))
         (hang (text "There are instances for similar types:")
             2 (vcat (map ppr candidates)))
@@ -4184,17 +4183,25 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
                    , text "does not provide the constraint" <+> pprParendType pred ])
       | otherwise = Nothing
 
-    extra_note | any isFunTy (filterOutInvisibleTypes (classTyCon clas) tys)
-               = text "(maybe you haven't applied a function to enough arguments?)"
-               | className clas == typeableClassName  -- Avoid mysterious "No instance for (Typeable T)
-               , [_,ty] <- tys                        -- Look for (Typeable (k->*) (T k))
-               , Just (tc,_) <- tcSplitTyConApp_maybe ty
-               , not (isTypeFamilyTyCon tc)
-               = hang (text "GHC can't yet do polykinded")
-                    2 (text "Typeable" <+>
-                       parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
-               | otherwise
-               = empty
+    extra_note
+      -- Flag up partially applied uses of (->)
+      | any isFunTy (filterOutInvisibleTypes (classTyCon clas) tys)
+      = text "(maybe you haven't applied a function to enough arguments?)"
+
+      -- Clarify the mysterious "No instance for (Typeable T)
+      | className clas == typeableClassName
+      , [_,ty] <- tys     -- Look for (Typeable (k->*) (T k))
+      , Just (tc,_) <- tcSplitTyConApp_maybe ty
+      , not (isTypeFamilyTyCon tc)
+      = hang (text "GHC can't yet do polykinded")
+           2 (text "Typeable" <+>
+              parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
+
+      | otherwise
+      = empty
+
+    ----------- Possible fixes ----------------
+    ctxt_fixes = ctxtFixes has_ambigs pred implics
 
     drv_fixes = case orig of
                    DerivOrigin standalone             -> [drv_fix standalone]
@@ -4213,9 +4220,9 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
     -- superclass constraints caught by the subtleties described by
     -- Note [Recursive superclasses] in GHC.TyCl.Instance
     naked_sc_fixes
-      | ScOrigin _ NakedSc <- orig  -- A superclass wanted with no instance decls used yet
-      , any non_tyvar_preds useful_givens  -- Some non-tyvar givens
-      = [vcat [ text "If the constraint looks soluble from a superclass of the instance context,"
+      | ScOrigin IsClsInst NakedSc <- orig  -- A superclass wanted with no instance decls used yet
+      , any non_tyvar_preds useful_givens   -- Some non-tyvar givens
+      = [vcat [ text "if the constraint looks soluble from a superclass of the instance context,"
               , text "read 'Undecidable instances and loopy superclasses' in the user manual" ]]
       | otherwise = []
 
@@ -4246,7 +4253,7 @@ pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item match
        -- simply report back the whole given
        -- context. Accelerate Smart.hs showed this problem.
          sep [ text "There exists a (perhaps superclass) match:"
-             , nest 2 (vcat (pp_givens useful_givens))]
+             , nest 2 (vcat (pp_from_givens useful_givens))]
 
     ,  ppWhen (null $ NE.tail matches) $
        parens (vcat [ ppUnless (null tyCoVars) $
@@ -4377,6 +4384,7 @@ pprMismatchMsg ctxt
                  , mismatch_whenMatching = mb_match_txt
                  , mismatch_mb_same_occ  = same_occ_info })
   =  vcat [ addArising (errorItemCtLoc item) msg
+          , pprQCOriginExtra item
           , ea_extra
           , maybe empty (pprWhenMatching ctxt) mb_match_txt
           , maybe empty pprSameOccInfo same_occ_info ]
@@ -4429,9 +4437,10 @@ pprMismatchMsg ctxt
                   , teq_mismatch_actual   = act   --   the mis-match
                   , teq_mismatch_what     = mb_thing
                   , teq_mb_same_occ       = mb_same_occ })
-  = addArising ct_loc $
-    pprWithInvisibleBitsWhen ppr_invis_bits msg
-    $$ maybe empty pprSameOccInfo mb_same_occ
+  = vcat [ addArising ct_loc $
+           pprWithInvisibleBitsWhen ppr_invis_bits msg
+           $$ maybe empty pprSameOccInfo mb_same_occ
+         , pprQCOriginExtra item ]
   where
 
     msg | Just (torc, rep) <- sORTKind_maybe exp
@@ -4547,45 +4556,56 @@ pprMismatchMsg ctxt
     starts_with_vowel []    = False
 
 pprMismatchMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extra)
-  = main_msg $$
-     case supplementary of
-      Left infos
-        -> vcat (map (pprExpectedActualInfo ctxt) infos)
-      Right other_msg
-        -> other_msg
+  = vcat [ main_msg
+         , pprQCOriginExtra item
+         , ea_supplementary ]
   where
     main_msg
-      | null useful_givens
-      = addArising ct_loc (no_instance_msg <+> missing)
-      | otherwise
-      = vcat (addArising ct_loc (no_deduce_msg <+> missing)
-              : pp_givens useful_givens)
+      | null useful_givens = addArising ct_loc no_instance_msg
+      | otherwise          = vcat ( addArising ct_loc no_deduce_msg
+                                  : pp_from_givens useful_givens)
 
-    supplementary = case mb_extra of
-      Nothing
-        -> Left []
-      Just (CND_Extra level ty1 ty2)
-        -> mk_supplementary_ea_msg ctxt level ty1 ty2 orig
+    ea_supplementary = case mb_extra of
+      Nothing                        -> empty
+      Just (CND_Extra level ty1 ty2) -> mk_supplementary_ea_msg ctxt level ty1 ty2 orig
+
     ct_loc = errorItemCtLoc item
     orig   = ctLocOrigin ct_loc
     wanteds = map errorItemPred (item:others)
 
     no_instance_msg =
       case wanteds of
-        [wanted] | Just (tc, _) <- splitTyConApp_maybe wanted
-                 -- Don't say "no instance" for a constraint such as "c" for a type variable c.
-                 , isClassTyCon tc -> text "No instance for"
-        _ -> text "Could not solve:"
+        [wanted] | -- Guard: don't say "no instance" for a constraint
+                   -- such as "c" for a type variable c.
+                   Just (tc, _) <- splitTyConApp_maybe wanted
+                 , isClassTyCon tc
+                 -> text "No instance for" <+> quotes (ppr wanted)
+        _        -> text "Could not solve:" <+> pprTheta wanteds
 
     no_deduce_msg =
       case wanteds of
-        [_wanted] -> text "Could not deduce"
-        _         -> text "Could not deduce:"
+        [wanted] -> text "Could not deduce" <+> quotes (ppr wanted)
+        _        -> text "Could not deduce:" <+> pprTheta wanteds
 
-    missing =
-      case wanteds of
-        [wanted] -> quotes (ppr wanted)
-        _        -> pprTheta wanteds
+pprQCOriginExtra :: ErrorItem -> SDoc
+-- When we were originally trying to solve a quantified constraint like
+--    (forall a. Eq a => Eq (c a))
+-- add a note to say so, so the overall error looks like
+--    Cannot deduce Eq (c a)
+--       from (Eq a)
+--    when trying to solve (forall a. Eq a => Eq (c a))
+-- Without this, the error is very inscrutable
+-- See (WFA3) in Note [Solving a Wanted forall-constraint],
+--            in GHC.Tc.Solver.Solve
+pprQCOriginExtra item
+  | ScOrigin (IsQC pred orig) _ <- orig
+  = hang (text "When trying to solve the quantified constraint")
+       2 (vcat [ ppr pred
+               , text "arising from" <+> pprCtOriginBriefly orig ])
+  | otherwise
+  = empty
+  where
+    orig = ctLocOrigin (errorItemCtLoc item)
 
 pprKindMismatchMsg :: TypedThing -> Type -> Type -> SDoc
 pprKindMismatchMsg thing exp act
@@ -4890,10 +4910,7 @@ pprWhenMatching ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
   where
     sub_t_or_k = mb_sub_t_or_k `orElse` TypeLevel
     sub_whats  = text (levelString sub_t_or_k) <> char 's'
-    supplementary =
-      case mk_supplementary_ea_msg ctxt sub_t_or_k cty1 cty2 sub_o of
-        Left infos -> vcat $ map (pprExpectedActualInfo ctxt) infos
-        Right msg  -> msg
+    supplementary = mk_supplementary_ea_msg ctxt sub_t_or_k cty1 cty2 sub_o
 
 pprTyVarInfo :: SolverReportErrCtxt -> TyVarInfo -> SDoc
 pprTyVarInfo ctxt (TyVarInfo { thisTyVar = tv1, otherTy = mb_tv2, thisTyVarIsUntouchable = mb_implic })
@@ -5276,8 +5293,8 @@ usefulContext implics pred
     implausible_info _                             = False
     -- Do not suggest adding constraints to an *inferred* type signature
 
-pp_givens :: [Implication] -> [SDoc]
-pp_givens givens
+pp_from_givens :: [Implication] -> [SDoc]
+pp_from_givens givens
    = case givens of
          []     -> []
          (g:gs) ->      ppr_given (text "from the context:") g
@@ -5447,13 +5464,15 @@ skolsSpan skol_tvs = foldr1WithDefault noSrcSpan combineSrcSpans (map getSrcSpan
 **********************************************************************-}
 
 mk_supplementary_ea_msg :: SolverReportErrCtxt -> TypeOrKind
-                        -> Type -> Type -> CtOrigin -> Either [ExpectedActualInfo] SDoc
+                        -> Type -> Type -> CtOrigin -> SDoc
 mk_supplementary_ea_msg ctxt level ty1 ty2 orig
   | TypeEqOrigin { uo_expected = exp, uo_actual = act } <- orig
   , not (ea_looks_same ty1 ty2 exp act)
-  = mk_ea_msg ctxt Nothing level orig
+  = case mk_ea_msg ctxt Nothing level orig of
+      Left infos -> vcat $ map (pprExpectedActualInfo ctxt) infos
+      Right msg  -> msg
   | otherwise
-  = Left []
+  = empty
 
 ea_looks_same :: Type -> Type -> Type -> Type -> Bool
 -- True if the faulting types (ty1, ty2) look the same as

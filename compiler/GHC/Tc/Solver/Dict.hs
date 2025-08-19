@@ -767,14 +767,11 @@ and Given/instance fundeps entirely.
 tryInertDicts :: DictCt -> SolverStage ()
 tryInertDicts dict_ct
   = Stage $ do { inerts <- getInertCans
-               ; mode   <- getTcSMode
-               ; try_inert_dicts mode inerts dict_ct }
+               ; try_inert_dicts inerts dict_ct }
 
-try_inert_dicts :: TcSMode -> InertCans -> DictCt -> TcS (StopOrContinue ())
-try_inert_dicts mode inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys })
-  | not (mode == TcSShortCut)   -- Optimisation: ignore the inerts (esp Givens) in
-                                -- short-cut mode. See Note [Shortcut solving]
-  , Just dict_i <- lookupInertDict inerts cls tys
+try_inert_dicts :: InertCans -> DictCt -> TcS (StopOrContinue ())
+try_inert_dicts inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys })
+  | Just dict_i <- lookupInertDict inerts cls tys
   , let ev_i  = dictCtEvidence dict_i
         loc_i = ctEvLoc ev_i
         loc_w = ctEvLoc ev_w
@@ -837,7 +834,7 @@ tryShortCutSolver try_short_cut dict_w@(DictCt { di_ev = ev_w })
 
             -> tryShortCutTcS $  -- tryTcS tries to completely solve some contraints
                do { residual <- solveSimpleWanteds (unitBag (CDictCan dict_w))
-                  ; return (isEmptyBag residual) }
+                  ; return (isEmptyWC residual) }
 
             | otherwise
             -> return False }
@@ -868,8 +865,7 @@ try_instances inerts work_item@(DictCt { di_ev = ev, di_cls = cls
 
   | otherwise  -- Wanted, but not cached
    = do { dflags <- getDynFlags
-        ; mode   <- getTcSMode
-        ; lkup_res <- matchClassInst dflags mode inerts cls xis dict_loc
+        ; lkup_res <- matchClassInst dflags inerts cls xis dict_loc
         ; case lkup_res of
                OneInst { cir_what = what }
                   -> do { let is_local_given = case what of { LocalInstance -> True; _ -> False }
@@ -927,10 +923,10 @@ checkInstanceOK loc what pred
        | otherwise
        = loc
 
-matchClassInst :: DynFlags -> TcSMode -> InertSet
+matchClassInst :: DynFlags -> InertSet
                -> Class -> [Type]
                -> CtLoc -> TcS ClsInstResult
-matchClassInst dflags mode inerts clas tys loc
+matchClassInst dflags inerts clas tys loc
 -- First check whether there is an in-scope Given that could
 -- match this constraint.  In that case, do not use any instance
 -- whether top level, or local quantified constraints.
@@ -941,7 +937,7 @@ matchClassInst dflags mode inerts clas tys loc
         -- It is always safe to unpack constraint tuples
         -- And if we don't do so, we may never solve it at all
         -- See Note [Solving tuple constraints]
-  , not (noMatchableGivenDicts mode inerts loc clas tys)
+  , not (noMatchableGivenDicts inerts loc clas tys)
   = do { traceTcS "Delaying instance application" $
            vcat [ text "Work item:" <+> pprClassPred clas tys ]
        ; return NotSure }
@@ -972,11 +968,8 @@ matchClassInst dflags mode inerts clas tys loc
 -- potentially, match the given class constraint. This is used when checking to see if a
 -- Given might overlap with an instance. See Note [Instance and Given overlap]
 -- in GHC.Tc.Solver.Dict
-noMatchableGivenDicts :: TcSMode -> InertSet -> CtLoc -> Class -> [TcType] -> Bool
-noMatchableGivenDicts mode inerts@(IS { inert_cans = inert_cans }) loc_w clas tys
-  | TcSShortCut <- mode
-  = True  -- Optimisation: in TcSShortCut mode there are no Givens
-  | otherwise
+noMatchableGivenDicts :: InertSet -> CtLoc -> Class -> [TcType] -> Bool
+noMatchableGivenDicts inerts@(IS { inert_cans = inert_cans }) loc_w clas tys
   = not $ anyBag matchable_given $
     findDictsByClass (inert_dicts inert_cans) clas
   where
@@ -1151,19 +1144,12 @@ matchLocalInst :: TcPredType -> CtLoc -> TcS ClsInstResult
 -- Look up the predicate in Given quantified constraints,
 -- which are effectively just local instance declarations.
 matchLocalInst body_pred loc
-  = do { -- Optimisation: in TcSShortCut mode there are no Givens (c.f. tryInertDicts)
-         mode <- getTcSMode
-       ; case mode of
-           { TcSShortCut -> do { traceTcS "matchLocalInst:TcSShortCut" (ppr body_pred)
-                               ; return NoInstance }
-           ; _other ->
-
-    do { -- Look in the inert set for a matching Given quantified constraint
+  = do { -- Look in the inert set for a matching Given quantified constraint
          inerts@(IS { inert_cans = ics }) <- getInertSet
-       ; case match_local_inst inerts (inert_insts ics) of
-          { ([], []) -> do { traceTcS "No local instance for" (ppr body_pred)
-                           ; return NoInstance }
-          ; (matches, unifs) ->
+       ; case match_local_inst inerts (inert_qcis ics) of
+            { ([], []) -> do { traceTcS "No local instance for" (ppr body_pred)
+                             ; return NoInstance }
+            ; (matches, unifs) ->
 
     do { -- Find the best match
          -- See Note [Use only the best matching quantified constraint]
@@ -1190,7 +1176,7 @@ matchLocalInst body_pred loc
                          , text "matches:" <+> ppr matches
                          , text "unifs:" <+> ppr unifs
                          , text "best_match:" <+> ppr mb_best ]
-               ; return NotSure }}}}}}}
+               ; return NotSure }}}}}
   where
     body_pred_tv_set = tyCoVarsOfType body_pred
 

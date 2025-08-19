@@ -12,7 +12,7 @@
 
 bkpfail43.out/p/p-HVmFlcYSefiK5n1aDP1v7x/../A.hi:1:1: error: [GHC-39999]
     • No instance for ‘GHC.Internal.Show.Show (a -> b)’
-        arising when attempting to show that
+        arising from attempting to show that
         instance [safe] GHC.Internal.Show.Show (a -> b)
           -- Defined at bkpfail43.bkp:3:18
         is provided by ‘q:A’
