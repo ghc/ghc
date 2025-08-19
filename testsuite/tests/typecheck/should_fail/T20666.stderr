@@ -1,11 +1,10 @@
-
 T20666.hs:13:10: error: [GHC-39999]
     • Could not deduce ‘Show (T c)’
         arising from the superclasses of an instance declaration
       from the context: (D d, c ~ S d)
         bound by the instance declaration at T20666.hs:13:10-31
       Possible fix:
-        If the constraint looks soluble from a superclass of the instance context,
+        if the constraint looks soluble from a superclass of the instance context,
         read 'Undecidable instances and loopy superclasses' in the user manual
     • In the instance declaration for ‘C1 c’
 
@@ -15,6 +14,7 @@ T20666.hs:17:10: error: [GHC-39999]
       from the context: (D d, c ~ S d, c' ~ c)
         bound by the instance declaration at T20666.hs:17:10-40
       Possible fix:
-        If the constraint looks soluble from a superclass of the instance context,
+        if the constraint looks soluble from a superclass of the instance context,
         read 'Undecidable instances and loopy superclasses' in the user manual
     • In the instance declaration for ‘C2 c'’
+

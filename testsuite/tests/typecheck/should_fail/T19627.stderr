@@ -17,4 +17,3 @@ T19627.hs:108:3: error: [GHC-05617]
                   Lol p =>
                   Not (p a b) -> b <#- a
       In the class declaration for ‘Lol’
-
