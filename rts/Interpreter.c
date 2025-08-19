@@ -665,7 +665,7 @@ interpretBCO (Capability* cap)
             arg1_brk_array      = BCO_GET_LARGE_ARG;
             /* info_mod_name = */ BCO_GET_LARGE_ARG;
             /* info_mod_id   = */ BCO_GET_LARGE_ARG;
-            arg4_info_index     = BCO_NEXT;
+            arg4_info_index     = BCO_READ_NEXT_32;
 
             StgPtr* ptrs = (StgPtr*)(&bco->ptrs->payload[0]);
             StgArrBytes* breakPoints = (StgArrBytes *) BCO_PTR(arg1_brk_array);
@@ -1535,7 +1535,7 @@ run_BCO:
             arg1_brk_array      = BCO_GET_LARGE_ARG;
             arg2_info_mod_name  = BCO_GET_LARGE_ARG;
             arg3_info_mod_id    = BCO_GET_LARGE_ARG;
-            arg4_info_index     = BCO_NEXT;
+            arg4_info_index     = BCO_READ_NEXT_32;
 #if defined(PROFILING)
             arg5_cc             = BCO_GET_LARGE_ARG;
 #else

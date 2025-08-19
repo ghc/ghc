@@ -89,7 +89,7 @@ disInstr ( StgBCO *bco, int pc )
          p1           = BCO_GET_LARGE_ARG;
          info_mod     = BCO_GET_LARGE_ARG;
          info_unit_id = BCO_GET_LARGE_ARG;
-         info_wix     = BCO_NEXT;
+         info_wix     = BCO_READ_NEXT_32;
          np           = BCO_GET_LARGE_ARG;
          debugBelch ("BRK_FUN " );  printPtr( ptrs[p1] );
          debugBelch(" %" FMT_Word, literals[info_mod] );
