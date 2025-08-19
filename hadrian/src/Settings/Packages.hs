@@ -36,6 +36,8 @@ packageArgs = do
     cursesLibraryDir <- getSetting CursesLibDir
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
+    libzstdIncludeDir <- getSetting LibZstdIncludeDir
+    libzstdLibraryDir <- getSetting LibZstdLibDir
     stageVersion <- readVersion <$> (expr $ ghcVersionStage stage)
 
     mconcat
@@ -74,7 +76,9 @@ packageArgs = do
           , builder (Cabal Setup) ? mconcat
             [ arg "--disable-library-for-ghci"
             , anyTargetOs [OSOpenBSD] ? arg "--ld-options=-E"
-            , compilerStageOption ghcProfiled ? arg "--ghc-pkg-option=--force" ]
+            , compilerStageOption ghcProfiled ? arg "--ghc-pkg-option=--force"
+            , cabalExtraDirs libzstdIncludeDir libzstdLibraryDir
+            ]
 
           , builder (Cabal Flags) ? mconcat
             -- For the ghc library, internal-interpreter only makes
