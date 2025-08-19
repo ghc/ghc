@@ -52,7 +52,7 @@ Language
 
   That will break the combination of :extension:`OverloadedRecordUpdate` with :extension:`RebindableSyntax`.
 
-* Multiline strings are now accepted in foreign imports. (#25157)
+* Multiline strings are now accepted in ``foreign import``\ s. (#25157)
 
 * GHC now does a better job at inferring types in calls to ``coerce``: instead of
   complaining about ambiguous type variables, GHC will consider that such type
@@ -73,7 +73,7 @@ Language
 * The ``-Wdata-kinds-tc`` warning has been deprecated, and the use of promoted
   data types in kinds is now an error (rather than a warning) unless the
   :extension:`DataKinds` extension is enabled. For example, the following code
-  will be rejected unless :extension:`DataKinds` is on:
+  will be rejected unless :extension:`DataKinds` is on: ::
 
     import Data.Kind (Type)
     import GHC.TypeNats (Nat)
@@ -143,14 +143,14 @@ Compiler
   were accessed using the generated record selector functions, marking the fields
   as covered in coverage reports (:ghc-ticket:`17834`).
 
-- SIMD support in the X86 native code generator has been extended with 128-bit
+- SIMD support in the x86 native code generator has been extended with 128-bit
   integer operations.  Also, ``shuffleFloatX4#`` and ``shuffleDoubleX2#`` no longer
   require ``-mavx``.
 
 GHCi
 ~~~~
 
-- :ghci-cmd:`:info` now outputs type declarations with @-binders that are
+- :ghci-cmd:`:info` now outputs type declarations with ``@``-binders that are
   considered semantically significant. See the documentation for :ghci-cmd:`:info`
   itself for a more detailed explanation.
 
@@ -176,40 +176,40 @@ Cmm
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
-* The `UnknownDiagnostic` constructor now takes an additional type argument
+* The ``UnknownDiagnostic`` constructor now takes an additional type argument
   for the type of hints corresponding to the diagnostic, and an additional
   value-level argument used for existential wrapping of the hints of the inner
   diagnostic.
 
 * Changes to the HPT and HUG interface:
 
-  - `addToHpt` and `addListToHPT` were moved from `GHC.Unit.Home.ModInfo` to `GHC.Unit.Home.PackageTable` and deprecated in favour of `addHomeModInfoToHpt` and `addHomeModInfosToHpt`.
-  - `UnitEnvGraph` and operations `unitEnv_lookup_maybe`, `unitEnv_foldWithKey, `unitEnv_singleton`, `unitEnv_adjust`, `unitEnv_insert`, `unitEnv_new` were moved from `GHC.Unit.Env` to `GHC.Unit.Home.Graph`.
-  - The HomePackageTable (HPT) is now exported from `GHC.Unit.Home.PackageTable`,
+  - ``addToHpt`` and ``addListToHPT`` were moved from ``GHC.Unit.Home.ModInfo`` to ``GHC.Unit.Home.PackageTable`` and deprecated in favour of ``addHomeModInfoToHpt`` and ``addHomeModInfosToHpt``.
+  - ``UnitEnvGraph`` and operations ``unitEnv_lookup_maybe``, ``unitEnv_foldWithKey, ``unitEnv_singleton``, ``unitEnv_adjust``, ``unitEnv_insert``, ``unitEnv_new`` were moved from ``GHC.Unit.Env`` to ``GHC.Unit.Home.Graph``.
+  - The HomePackageTable (HPT) is now exported from ``GHC.Unit.Home.PackageTable``,
     and is now backed by an IORef to avoid by construction very bad memory leaks.
     This means the API to the HPT now is for the most part in IO. For instance,
-    `emptyHomePackageTable` and `addHomeModInfoToHpt` are now in IO.
-  - `mkHomeUnitEnv` was moved to `GHC.Unit.Home.PackageTable`, and now takes two
-    extra explicit arguments. To restore previous behaviour, pass `emptyUnitState`
-    and `Nothing` as the first two arguments additionally.
-  - `hugElts` was removed. Users should prefer `allUnits` to get the keys of the
-    HUG (the typical use case), or `traverse` or `unitEnv_foldWithKey` in other
+    ``emptyHomePackageTable`` and ``addHomeModInfoToHpt`` are now in IO.
+  - ``mkHomeUnitEnv`` was moved to ``GHC.Unit.Home.PackageTable``, and now takes two
+    extra explicit arguments. To restore previous behaviour, pass ``emptyUnitState``
+    and ``Nothing`` as the first two arguments additionally.
+  - ``hugElts`` was removed. Users should prefer ``allUnits`` to get the keys of the
+    HUG (the typical use case), or ``traverse`` or ``unitEnv_foldWithKey`` in other
     cases.
 
-* Changes to `Language.Haskell.Syntax.Expr`
+* Changes to ``Language.Haskell.Syntax.Expr``
 
-  - The `ParStmtBlock` list argument of the `ParStmt` constructor of `StmtLR` is now `NonEmpty`.
+  - The ``ParStmtBlock`` list argument of the ``ParStmt`` constructor of ``StmtLR`` is now ``NonEmpty``.
 
-* As part of the implementation of `GHC proposal 493 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0493-specialise-expressions.rst>`_,
-  the `SpecSig` constructor of `Sig` has been deprecated. It is replaced by
-  the constructor `SpecSigE` which supports expressions at the head, rather than
+* As part of the implementation of ``GHC proposal 493 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0493-specialise-expressions.rst>``_,
+  the ``SpecSig`` constructor of ``Sig`` has been deprecated. It is replaced by
+  the constructor ``SpecSigE`` which supports expressions at the head, rather than
   a lone variable.
 
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 
-* The functions `getClosureInfoTbl_maybe`, `getClosureInfoTbl`,
-  `getClosurePtrArgs` and `getClosurePtrArgs_maybe` have been added to allow
+* The functions ``getClosureInfoTbl_maybe``, ``getClosureInfoTbl``,
+  ``getClosurePtrArgs`` and ``getClosurePtrArgs_maybe`` have been added to allow
   reading of the relevant Closure attributes without reliance on incomplete
   selectors.
 
