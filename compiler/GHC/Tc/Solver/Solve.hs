@@ -1681,8 +1681,9 @@ runTcPluginsWanted wanted
        ; if null solvers then return (False, wanted) else
 
     do { -- Find the set of Givens to give to the plugin.
-         -- If TcSMode = TcSShortCut, we are solving with
-         -- no Givens so don't return any (#26258)!
+         -- Optimisation: if TcSMode = TcSShortCut, we are solving with
+         -- no Givens so don't bother to look (#26258 was a bug in an earlier
+         -- version when we left the Givens in the inert set)
          -- See Note [Shortcut solving] in GHC.Tc.Solver.Dict
          mode <- getTcSMode
        ; given <- case mode of
