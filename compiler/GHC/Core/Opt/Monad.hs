@@ -16,7 +16,7 @@ module GHC.Core.Opt.Monad (
     mapDynFlagsCoreM, dropSimplCount,
 
     -- ** Reading from the monad
-    getHscEnv, getModule,
+    getModule,
     initRuleEnv, getExternalRuleBase,
     getDynFlags, getPackageFamInstEnv,
     getInteractiveContext,
@@ -243,8 +243,8 @@ liftIOWithCount what = liftIO what >>= (\(count, x) -> addSimplCount count >> re
 ************************************************************************
 -}
 
-getHscEnv :: CoreM HscEnv
-getHscEnv = read cr_hsc_env
+instance HasHscEnv CoreM where
+    getHscEnv = read cr_hsc_env
 
 getHomeRuleBase :: CoreM RuleBase
 getHomeRuleBase = read cr_rule_base

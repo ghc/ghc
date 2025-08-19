@@ -2641,8 +2641,8 @@ runBc hsc_env this_mod mbs (BcM m)
 instance HasDynFlags BcM where
     getDynFlags = hsc_dflags <$> getHscEnv
 
-getHscEnv :: BcM HscEnv
-getHscEnv = BcM $ \env st -> return (bcm_hsc_env env, st)
+instance HasHscEnv BcM where
+    getHscEnv = BcM $ \env st -> return (bcm_hsc_env env, st)
 
 getProfile :: BcM Profile
 getProfile = targetProfile <$> getDynFlags
