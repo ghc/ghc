@@ -197,7 +197,7 @@ _build/stage1/lib/package.conf.d/package.cache: _build/stage1/bin/ghc-pkg _build
 	@echo "::group::Creating stage1 package cache..."
 	@mkdir -p _build/stage1/lib/package.conf.d
 	@rm -rf _build/stage1/lib/package.conf.d/*
-	cp -rfp _build/stage1/packagedb/host/*/* _build/stage1/lib/package.conf.d
+	ln -s $(abspath ./_build/stage2/packagedb/host/ghc-9.13) _build/stage1/lib/package.conf.d
 	_build/stage1/bin/ghc-pkg recache
 	@echo "::endgroup::"
 
