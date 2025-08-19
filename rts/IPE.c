@@ -313,38 +313,41 @@ void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode *node) {
         barf("An IPE buffer list node has been compressed, but the "
              "decompression library (zstd) is not available.");
 #else
+        // Decompress string table
         size_t compressed_sz = ZSTD_findFrameCompressedSize(
-            node->string_table,
+            node->string_table_block->string_table,
             node->string_table_size
         );
-        char *decompressed_strings = stgMallocBytes(
-            node->string_table_size,
+        IpeStringTableBlock *decompressed_strings = stgMallocBytes(
+            sizeof(IpeStringTableBlock) + node->string_table_size,
             "updateIpeMap: decompressed_strings"
         );
+        decompressed_strings->magic = IPE_MAGIC_WORD;
         ZSTD_decompress(
-            decompressed_strings,
+            decompressed_strings->string_table,
             node->string_table_size,
-            node->string_table,
+            node->string_table_block->string_table,
             compressed_sz
         );
-        node->string_table = (const char *) decompressed_strings;
+        node->string_table_block = decompressed_strings;
 
         // Decompress the IPE data
         compressed_sz = ZSTD_findFrameCompressedSize(
-            node->entries,
+            node->entries_block->entries,
             node->entries_size
         );
-        void *decompressed_entries = stgMallocBytes(
-            node->entries_size,
+        IpeBufferEntryBlock *decompressed_entries = stgMallocBytes(
+            sizeof(IpeBufferEntryBlock) + node->entries_size,
             "updateIpeMap: decompressed_entries"
         );
+        decompressed_entries->magic = IPE_MAGIC_WORD;
         ZSTD_decompress(
-            decompressed_entries,
+            decompressed_entries->entries,
             node->entries_size,
-            node->entries,
+            node->entries_block->entries,
             compressed_sz
         );
-        node->entries = decompressed_entries;
+        node->entries_block = decompressed_entries;
 #endif // HAVE_LIBZSTD == 0
 
     }
