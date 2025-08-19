@@ -255,7 +255,7 @@ data BCInstr
                       (RemotePtr ModuleName) -- breakpoint tick module
                       !Word16                -- breakpoint tick index
                       (RemotePtr ModuleName) -- breakpoint info module
-                      !Word16                -- breakpoint info index
+                      !Int                   -- breakpoint info index
                       (RemotePtr CostCentre)
 
 -- -----------------------------------------------------------------------------

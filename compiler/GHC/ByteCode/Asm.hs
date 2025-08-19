@@ -655,15 +655,23 @@ assembleI platform i = case i of
     _                    -> unsupported_width
 
   BRK_FUN arr tick_mod tickx info_mod infox cc ->
-                              do p1 <- ptr (BCOPtrBreakArray arr)
-                                 tick_addr <- addr tick_mod
-                                 info_addr <- addr info_mod
-                                 np <- addr cc
-                                 emit bci_BRK_FUN [ Op p1
-                                                  , Op tick_addr, Op info_addr
-                                                  , SmallOp tickx, SmallOp infox
-                                                  , Op np
-                                                  ]
+                             do p1 <- ptr (BCOPtrBreakArray arr)
+                                tick_addr <- addr tick_mod
+                                info_addr <- addr info_mod
+                                np <- addr cc
+                                let
+                                  infow32 :: Word32 = let r = fromIntegral infox
+                                            in if fromIntegral r == infox
+                                              then r
+                                              else pprPanic "schemeER_wrk: breakpoint tick/info index too large! (exceeds 32 bits)" (ppr infox)
+                                  ix_hi :: Word16 = fromIntegral (infow32 `shiftR` 16)
+                                  ix_lo :: Word16 = fromIntegral (infow32 .&. 0xffff)
+
+                                emit bci_BRK_FUN [ Op p1
+                                                 , Op tick_addr, Op info_addr
+                                                 , SmallOp tickx, SmallOp ix_hi, SmallOp ix_lo
+                                                 , Op np
+                                                 ]
 
   where
     unsupported_width = panic "GHC.ByteCode.Asm: Unsupported Width"
