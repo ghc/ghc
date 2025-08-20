@@ -466,8 +466,8 @@ instance  Fractional Float  where
     recip x             =  1.0 / x
 
 rationalToFloat :: Integer -> Integer -> Float
-{-# NOINLINE [0] rationalToFloat #-}
--- Re NOINLINE pragma, see Note [realToFrac natural-to-float]
+{-# INLINE [0] rationalToFloat #-}
+-- Re INLINE pragma, see Note [realToFrac natural-to-float]
 rationalToFloat n 0
     | n == 0        = 0/0
     | n < 0         = (-1)/0
@@ -718,8 +718,8 @@ instance  Fractional Double  where
     recip x             =  1.0 / x
 
 rationalToDouble :: Integer -> Integer -> Double
-{-# NOINLINE [0] rationalToDouble #-}
--- Re NOINLINE pragma, see Note [realToFrac natural-to-float]
+{-# INLINE [0] rationalToDouble #-}
+-- Re INLINE pragma, see Note [realToFrac natural-to-float]
 rationalToDouble n 0
     | n == 0        = 0/0
     | n < 0         = (-1)/0
@@ -1673,7 +1673,11 @@ Now we'd have a BUILTIN constant folding rule for rationalToFloat; but
 to allow that rule to fire reliably we should delay inlining rationalToFloat
 until stage 0.  (It may get an inlining from CPR analysis.)
 
-Hence the NOINLINE[0] rationalToFloat, and similarly rationalToDouble.
+Hence the INLINE[0] rationalToFloat, and similarly for rationalToDouble.
+This activation means:
+
+  - we don't inline until phase 0 (solving the above)
+  - we do inline starting at phase 0 (because we do want it inlining in the end)
 -}
 
 -- Utils

@@ -4,6 +4,7 @@
   * Remove deprecated, unstable heap representation details from `GHC.Exts` ([CLC proposal #212](https://github.com/haskell/core-libraries-committee/issues/212))
   * Add `Data.List.NonEmpty.mapMaybe`. ([CLC proposal #337](https://github.com/haskell/core-libraries-committee/issues/337))
   * Fix issues with toRational for types capable to represent infinite and not-a-number values ([CLC proposal #338](https://github.com/haskell/core-libraries-committee/issues/338))
+  * Ensure that `rationalToFloat` and `rationalToDouble` always inline in the end. ([CLC proposal #356](https://github.com/haskell/core-libraries-committee/issues/356))
   * Modify the implementation of `Data.List.sortOn` to use `(>)` instead of `compare`. ([CLC proposal #332](https://github.com/haskell/core-libraries-committee/issues/332))
   * `GHC.Exts.IOPort#` and its related operations have been removed  ([CLC #213](https://github.com/haskell/core-libraries-committee/issues/213))
   * Add `thenA` and `thenM`. ([CLC proposal #351](https://github.com/haskell/core-libraries-committee/issues/351))
