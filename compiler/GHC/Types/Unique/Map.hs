@@ -58,6 +58,7 @@ import GHC.Prelude
 import GHC.Types.Unique.FM
 
 import GHC.Types.Unique
+import GHC.Utils.Binary
 import GHC.Utils.Outputable
 
 import Data.Semigroup as Semi ( Semigroup(..) )
@@ -67,6 +68,7 @@ import Data.Data
 import Control.DeepSeq
 
 import Data.Set (Set, fromList)
+import Data.List (sortOn)
 
 -- | Maps indexed by 'Uniquable' keys
 newtype UniqMap k a = UniqMap { getUniqMap :: UniqFM k (k, a) }
@@ -88,6 +90,12 @@ instance (Outputable k, Outputable a) => Outputable (UniqMap k a) where
 
 instance (NFData k, NFData a) => NFData (UniqMap k a) where
   rnf (UniqMap fm) = seqEltsUFM rnf fm
+
+-- Deterministic Binary instance. Keys are serialized in ascending order
+-- according to their Ord instance to ensure stable output.
+instance (Ord k, Binary k, Binary a, Uniquable k) => Binary (UniqMap k a) where
+  put_ bh m = put_ bh $ sortOn fst $ nonDetUniqMapToList m
+  get bh    = listToUniqMap <$> get bh
 
 liftC :: (a -> a -> a) -> (k, a) -> (k, a) -> (k, a)
 liftC f (_, v) (k', v') = (k', f v v')
