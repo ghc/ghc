@@ -4,12 +4,12 @@ module Main where
 
 import TestUtils
 import qualified Data.Map.Strict as M
-import qualified Data.Set as S
-import Data.Either
 import Data.Maybe
-import Data.Bifunctor (first)
-import GHC.Plugins (moduleNameString, nameStableString, nameOccName, occNameString, isDerivedOccName)
-import GHC.Iface.Ext.Types
+import qualified Data.Set as S
+import GHC.Plugins
+import qualified GHC.Types.Unique.Map as UM
+
+
 -- data EntityInfo
 --   =
 --   EntityVariable
@@ -40,7 +40,7 @@ points :: [(Int,Int)]
 points = [(16,1), (18,9), (20,1), (22,6), (24,6), (26,7), (28,2), (30,9), (32,13), (33,13), (35,6), (37,30)]
 
 getIdentifierEntityInfo :: HieFile -> Identifier -> S.Set EntityInfo
-getIdentifierEntityInfo hf (Right ident) = M.findWithDefault S.empty ident (hie_entity_infos hf)
+getIdentifierEntityInfo hf (Right ident) = fromMaybe S.empty $ UM.lookupUniqMap (hie_entity_infos hf) ident
 getIdentifierEntityInfo hf (Left _) = S.empty
 
 isNotDerived :: (Identifier, a) -> Bool

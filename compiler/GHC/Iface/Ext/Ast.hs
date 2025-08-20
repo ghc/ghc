@@ -69,6 +69,7 @@ import qualified Data.Array as A
 import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
+import GHC.Types.Unique.Map
 import Data.Data                  ( Data, Typeable )
 import Data.Foldable              ( toList )
 import Data.Functor.Identity      ( Identity(..) )
@@ -276,7 +277,7 @@ lookupAndInsertEntityName name = do
 insertEntityInfo :: Name -> S.Set EntityInfo -> HieM ()
 insertEntityInfo ident info = do
   lift $ modify' $ \s ->
-    s { entity_infos = M.insertWith S.union ident info (entity_infos s) }
+    s { entity_infos = addToUniqMap_C S.union (entity_infos s) ident info }
 
 initState :: HieState
 initState = HieState emptyNameEnv emptyDVarEnv mempty mempty

@@ -40,6 +40,7 @@ import GHC.Types.Var              ( isTyVar, isFUNArg )
 import qualified Data.Array as A
 import qualified Data.Map as M
 import qualified Data.Set as S
+import GHC.Types.Unique.Map (UniqMap)
 import Data.ByteString            ( ByteString )
 import Data.Data                  ( Data )
 import Data.Semigroup             ( Semigroup(..) )
@@ -96,11 +97,7 @@ data HieFile = HieFile
     -- ^ Entity information for each `Name` in the `hie_asts`
     }
 
-type NameEntityInfo = M.Map Name (S.Set EntityInfo)
-
-instance Binary NameEntityInfo where
-  put_ bh m = put_ bh $ M.toList m
-  get bh = fmap M.fromList (get bh)
+type NameEntityInfo = UniqMap Name (S.Set EntityInfo)
 
 instance Binary HieFile where
   put_ bh hf = do
