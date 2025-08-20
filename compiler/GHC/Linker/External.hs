@@ -22,5 +22,12 @@ runLink logger tmpfs cfg args = traceSystoolCommand logger "linker" $ do
   -- Vista
   mb_env <- getGccEnv all_args
 
+  let (dedupable_args, other_args) = partition optionIsDeduplicatable all_args
+      deduped_args = (Set.toList $ Set.fromList dedupable_args) ++ other_args
+
   runSomethingResponseFile logger tmpfs (linkerTempDir cfg) (linkerFilter cfg)
     "Linker" (linkerProgram cfg) all_args mb_env
+
+optionIsDeduplicatable :: Option -> Bool
+optionIsDeduplicatable (FileOption "L" _ ) = True
+optionIsDeduplicatable _ = False
