@@ -14,6 +14,7 @@
 module GHC.Utils.Fingerprint (
         readHexFingerprint,
         fingerprintByteString,
+        WithFingerprint(..),
         -- * Re-exported from GHC.Fingerprint
         Fingerprint(..), fingerprint0,
         fingerprintFingerprints,
@@ -33,6 +34,12 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
 
 import GHC.Fingerprint
+
+-- | An item, with its fingerprint, which can be lazily computed if needed.
+data WithFingerprint a = WithFingerprint {
+    fingerprintItem :: !a,
+    fingerprint :: Fingerprint
+}
 
 -- useful for parsing the output of 'md5sum', should we want to do that.
 readHexFingerprint :: String -> Fingerprint

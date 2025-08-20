@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module GHC.ByteCode.Serialize
-  ( testBinByteCode, writeBinByteCode, readBinByteCode, ByteCodeObject(..)
+  ( testBinByteCode, writeBinByteCode, readBinByteCode, ByteCodeObject(..), computeBytecodeFingerprint, computeWithBytecodeFingerprint
   )
 where
 
@@ -32,15 +32,19 @@ import GHC.Types.ForeignStubs
 import GHC.ForeignSrcLang
 import GHC.Driver.DynFlags
 import System.Directory
+import GHC.Iface.Type
+import System.IO.Unsafe (unsafePerformIO)
+import GHC.Utils.Fingerprint (WithFingerprint(..), Fingerprint)
+import GHC.Iface.Recomp.Binary (fingerprintBinMem, putNameLiterally)
 
 -- | The on-disk representation of a bytecode object
 data OnDiskByteCodeObject = OnDiskByteCodeObject { odbco_module :: Module
-                                                 , odbco_compiled_byte_code :: CompiledByteCode
+                                                 , odbco_compiled_byte_code :: WithFingerprint CompiledByteCode
                                                  , odbco_foreign :: IfaceForeign }
 
 -- | The in-memory representation of a bytecode object
 data ByteCodeObject = ByteCodeObject { bco_module :: Module
-                                      , bco_compiled_byte_code :: CompiledByteCode
+                                      , bco_compiled_byte_code :: WithFingerprint CompiledByteCode
                                       , bco_foreign_sources :: [(ForeignSrcLang, FilePath)]
                                       , bco_foreign_stubs :: ForeignStubs }
 
@@ -204,6 +208,11 @@ putViaBinName :: WriteBinHandle -> Name -> IO ()
 putViaBinName bh nm = case findUserDataWriter Proxy bh of
   BinaryWriter f -> f bh $ BinName nm
 
+putBinNameLiterally :: WriteBinHandle -> BinName -> IO ()
+putBinNameLiterally bh (BinName nm)
+  | isExternalName nm = putByte bh 0 *> putNameLiterally bh nm
+  | otherwise = putByte bh 1 *> put_ bh (occNameFS (occName nm))
+
 addBinNameWriter :: WriteBinHandle -> IO WriteBinHandle
 addBinNameWriter bh' =
   evaluate
@@ -255,3 +264,23 @@ addBinNameReader HscEnv {..} bh' = do
 -- by OccName alone. When deserializing, we check a global cached
 -- mapping from OccName to Unique, and create the real Name with the
 -- right Unique if it's already deserialized at least once.
+
+-- | A version of 'computeFingerprint' that works for 'CompiledBytecode', the special
+-- variant is needed because 'CompiledByteCode' contains 'BinName's, which are not
+-- serializable by the normal 'Binary' instance.
+computeBytecodeFingerprint :: CompiledByteCode -> Fingerprint
+computeBytecodeFingerprint a = unsafePerformIO $ do
+    bh <- fmap set_user_data $ openBinMem (3*1024) -- just less than a block
+    put_ bh a
+    fingerprintBinMem bh
+  where
+    set_user_data bh = setWriterUserData bh $ mkWriterUserData
+      [ mkSomeBinaryWriter $ mkWriter putIfaceType
+      , mkSomeBinaryWriter $ mkWriter putBinNameLiterally
+      , mkSomeBinaryWriter $ simpleBindingNameWriter $ mkWriter putNameLiterally
+      , mkSomeBinaryWriter $ mkWriter putFS
+      ]
+
+computeWithBytecodeFingerprint :: CompiledByteCode -> WithFingerprint CompiledByteCode
+computeWithBytecodeFingerprint a = WithFingerprint a (computeBytecodeFingerprint a)
+

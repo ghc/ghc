@@ -1888,6 +1888,16 @@ instance Binary Fingerprint where
   put_ h (Fingerprint w1 w2) = do put_ h w1; put_ h w2
   get  h = do w1 <- get h; w2 <- get h; return (Fingerprint w1 w2)
 
+instance Binary a => Binary (WithFingerprint a) where
+  put_ bh (WithFingerprint item fp) = do
+    put_ bh item
+    put_ bh fp
+
+  get bh = do
+    item <- get bh
+    fp <- get bh
+    return $ WithFingerprint item fp
+
 instance Binary ModuleName where
   put_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)

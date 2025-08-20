@@ -253,7 +253,7 @@ import GHC.Types.TyThing
 import GHC.Types.Unique.Supply (uniqFromTag)
 import GHC.Types.Unique.Set
 
-import GHC.Utils.Fingerprint ( Fingerprint )
+import GHC.Utils.Fingerprint ( Fingerprint, WithFingerprint(..) )
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -1092,7 +1092,7 @@ loadIfaceByteCode hsc_env iface location type_env =
   where
     compile decls = do
       (bcos, fos) <- compileWholeCoreBindings hsc_env type_env decls
-      linkable $ BCOs bcos :| [DotO fo ForeignObject | fo <- fos]
+      linkable $ BCOs (WithFingerprint bcos (mi_iface_hash iface)) :| [DotO fo ForeignObject | fo <- fos]
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file location)
@@ -1113,7 +1113,7 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
   where
     compile decls = do
       ~(bcos, fos) <- unsafeInterleaveIO $ compileWholeCoreBindings hsc_env type_env decls
-      linkable $ NE.singleton (LazyBCOs bcos fos)
+      linkable $ NE.singleton (LazyBCOs (WithFingerprint bcos (mi_iface_hash iface)) fos)
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file location)
@@ -1156,7 +1156,7 @@ initWholeCoreBindings hsc_env iface details (Linkable utc_time this_mod uls) = d
         add_iface_to_hpt iface details hsc_env
         ~(bco, fos) <- unsafeInterleaveIO $
                        compileWholeCoreBindings hsc_env' type_env wcb
-        pure (LazyBCOs bco fos)
+        pure (LazyBCOs (WithFingerprint bco (mi_iface_hash iface)) fos)
       l -> pure l
 
     type_env = md_types details
@@ -2243,7 +2243,7 @@ generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
 mkByteCodeObject :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ByteCodeObject
 mkByteCodeObject hsc_env mod mod_location cgguts = do
   bcos <- hscGenerateByteCode hsc_env cgguts mod_location
-  return $! ByteCodeObject mod bcos (cgi_foreign_files cgguts) (cgi_foreign cgguts)
+  return $! ByteCodeObject mod (computeWithBytecodeFingerprint bcos) (cgi_foreign_files cgguts) (cgi_foreign cgguts)
 
 generateFreshByteCodeLinkable :: HscEnv
   -> ModuleName
@@ -2869,7 +2869,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
       {- load it -}
       bco_time <- getCurrentTime
       (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
-        Linkable bco_time this_mod $ NE.singleton $ BCOs bcos
+        Linkable bco_time this_mod $ NE.singleton $ BCOs (computeWithBytecodeFingerprint bcos)
       {- Get the HValue for the root -}
       return (expectJust $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)
 

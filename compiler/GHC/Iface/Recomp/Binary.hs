@@ -6,6 +6,8 @@ module GHC.Iface.Recomp.Binary
     fingerprintBinMem
   , computeFingerprint
   , putNameLiterally
+  , WithFingerprint(..)
+  , computeWithFingerprint
   ) where
 
 import GHC.Prelude
@@ -42,6 +44,14 @@ computeFingerprint put_nonbinding_name a = unsafePerformIO $ do
       , mkSomeBinaryWriter $ simpleBindingNameWriter $ mkWriter putNameLiterally
       , mkSomeBinaryWriter $ mkWriter putFS
       ]
+
+
+computeWithFingerprint :: (Binary a)
+                       => (WriteBinHandle -> Name -> IO ())
+                       -> a
+                       -> WithFingerprint a
+computeWithFingerprint put_nonbinding_name a = WithFingerprint a (computeFingerprint put_nonbinding_name a)
+
 
 -- | Used when we want to fingerprint a structure without depending on the
 -- fingerprints of external Names that it refers to.

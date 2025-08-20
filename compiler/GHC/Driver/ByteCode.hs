@@ -23,6 +23,7 @@ import Data.Time
 import GHC.Platform.Ways
 
 import GHC.ByteCode.Serialize
+import GHC.Utils.Fingerprint (WithFingerprint(..))
 
 -- | Write foreign sources and foreign stubs to temporary files and compile them.
 outputAndCompileForeign :: HscEnv -> Module -> ModLocation -> [(ForeignSrcLang, FilePath)] ->  ForeignStubs -> IO [FilePath]
@@ -59,7 +60,7 @@ compile_for_interpreter hsc_env use =
 
 -- | Write the foreign sources and foreign stubs of a bytecode object to temporary files and compile them.
 loadByteCodeObject :: HscEnv -> ModLocation -> ByteCodeObject
-                             -> IO (CompiledByteCode, [FilePath])
+                             -> IO (WithFingerprint CompiledByteCode, [FilePath])
 loadByteCodeObject hsc_env location (ByteCodeObject mod cbc foreign_srcs foreign_stubs) = do
   fos <- outputAndCompileForeign hsc_env mod location foreign_srcs foreign_stubs
   return (cbc, fos)

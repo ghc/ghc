@@ -163,6 +163,7 @@ import Control.DeepSeq (NFData(rnf))
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Utils.Exception
+import GHC.Utils.Fingerprint (WithFingerprint(..))
 import GHC.Exts (oneShot)
 
 {-
@@ -1066,6 +1067,9 @@ instance (Outputable elt) => Outputable (IM.IntMap elt) where
 
 instance Outputable Fingerprint where
     ppr (Fingerprint w1 w2) = text (printf "%016x%016x" w1 w2)
+
+instance (Outputable a) => Outputable (WithFingerprint a) where
+    ppr (WithFingerprint item fp) = text "WithFingerprint" <> parens (ppr fp) <+> ppr item
 
 instance Outputable a => Outputable (SCC a) where
    ppr (AcyclicSCC v) = text "NONREC" $$ (nest 3 (ppr v))

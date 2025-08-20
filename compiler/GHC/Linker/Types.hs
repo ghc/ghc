@@ -74,6 +74,7 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.Maybe (mapMaybe)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
+import GHC.Utils.Fingerprint (WithFingerprint(..))
 
 
 {- **********************************************************************
@@ -321,13 +322,13 @@ data LinkablePart
       -- Definitions]
 
   | LazyBCOs
-      CompiledByteCode
+      (WithFingerprint CompiledByteCode)
       -- ^ Some BCOs generated on-demand when forced. This is used for
       -- WholeCoreBindings, see Note [Interface Files with Core Definitions]
       [FilePath]
       -- ^ Objects containing foreign stubs and files
 
-  | BCOs CompiledByteCode
+  | BCOs (WithFingerprint CompiledByteCode)
     -- ^ A byte-code object, lives only in memory.
 
 instance Outputable LinkablePart where
@@ -350,7 +351,7 @@ linkableIsNativeCodeOnly l = all isNativeCode (NE.toList (linkableParts l))
 --
 -- This excludes the LazyBCOs and the CoreBindings parts
 linkableBCOs :: Linkable -> [CompiledByteCode]
-linkableBCOs l = [ cbc | BCOs cbc <- NE.toList (linkableParts l) ]
+linkableBCOs l = [ fingerprintItem cbc | BCOs cbc <- NE.toList (linkableParts l) ]
 
 -- | List the native linkable parts (.o/.so/.dll) of a linkable
 linkableNativeParts :: Linkable -> [LinkablePart]
@@ -430,8 +431,8 @@ linkablePartObjectPaths = \case
 -- Contrary to linkableBCOs, this includes byte-code from LazyBCOs.
 linkablePartAllBCOs :: LinkablePart -> [CompiledByteCode]
 linkablePartAllBCOs = \case
-  BCOs bco    -> [bco]
-  LazyBCOs bcos _ -> [bcos]
+  BCOs bco    -> [fingerprintItem bco]
+  LazyBCOs bcos _ -> [fingerprintItem bcos]
   _           -> []
 
 linkableFilter :: (LinkablePart -> [LinkablePart]) -> Linkable -> Maybe Linkable
