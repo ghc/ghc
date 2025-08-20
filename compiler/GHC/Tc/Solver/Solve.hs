@@ -1400,7 +1400,7 @@ wantedQciToImplic (QCI { qci_ev = CtWanted ev, qci_tvs = tvs, qci_theta = theta,
                          -- Set the thing to prove to have a ScOrigin, so we are
                          -- careful about its termination checks.
                          -- See (QC-INV) in Note [Solving a Wanted forall-constraint]
-                   ; newWantedEvVarNC loc' rewriters inst_pred }
+                   ; newWantedNC loc' rewriters inst_pred }
 
        ; ev_binds_var <- TcS.newTcEvBinds
        ; new_imp <- wrapTcS TcM.newImplication
