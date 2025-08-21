@@ -357,6 +357,16 @@ data Usage
         -- contents don't change.  This previously lead to odd
         -- recompilation behaviors; see #8114
   }
+  -- | A BCO was used to compile the file which came from a .gbc file.
+  | UsageBCO {
+        usg_bco_hash :: Fingerprint
+        -- ^ The hash of the BCO.
+        , usg_bco_mod_name :: ModuleName
+        -- ^ The name of the module that the BCO was compiled from.
+        , usg_bco_mod_unit_id :: UnitId
+        -- ^ The unit id of the module that the BCO was compiled from.
+  -- | A BCO which the module depends on for TH evaluation
+  }
   | UsageHomeModuleInterface {
         usg_mod_name :: ModuleName
         -- ^ Name of the module
@@ -397,6 +407,7 @@ instance NFData Usage where
   rnf (UsageFile file hash label) = rnf file `seq` rnf hash `seq` rnf label `seq` ()
   rnf (UsageMergedRequirement mod hash) = rnf mod `seq` rnf hash `seq` ()
   rnf (UsageHomeModuleInterface mod uid hash) = rnf mod `seq` rnf uid `seq` rnf hash `seq` ()
+  rnf (UsageBCO hash mod uid) = rnf hash `seq` rnf mod `seq` rnf uid `seq` ()
 
 instance Binary Usage where
     put_ bh usg@UsagePackageModule{} = do
@@ -431,6 +442,12 @@ instance Binary Usage where
         put_ bh (usg_unit_id  usg)
         put_ bh (usg_iface_hash usg)
 
+    put_ bh usg@UsageBCO{} = do
+        putByte bh 5
+        put_ bh (usg_bco_hash usg)
+        put_ bh (usg_bco_mod_name usg)
+        put_ bh (usg_bco_mod_unit_id usg)
+
     get bh = do
         h <- getByte bh
         case h of
@@ -462,6 +479,11 @@ instance Binary Usage where
             uid <- get bh
             hash <- get bh
             return UsageHomeModuleInterface { usg_mod_name = mod, usg_unit_id = uid, usg_iface_hash = hash }
+          5 -> do
+            hash <- get bh
+            mod <- get bh
+            uid <- get bh
+            return UsageBCO { usg_bco_hash = hash, usg_bco_mod_name = mod, usg_bco_mod_unit_id = uid }
           i -> error ("Binary.get(Usage): " ++ show i)
 
 -- | Records the imports that we depend on from a home module,

@@ -179,9 +179,21 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
 
     fing mmsg fn = UsageFile (mkFastString fn) <$> lookupFileCache fc fn <*> pure mmsg
 
+    partToUsage :: Module -> LinkablePart -> IO Usage
     partToUsage m part =
-      case linkablePartPath part of
+      case part of
+        BCOs origin bco -> return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) (_ bco)
+        {-
+        DotO fp _ _     -> fing (Just (msg m)) fp
+        DotA fp         -> fing (Just (msg m)) fp
+        DotDLL fp       -> fing (Just (msg m)) fp
+        LazyBCOs bco _  -> fing (Just (msg m)) fp
+        CoreBindings {} -> fing (Just (msg m)) fp
+        -}
+
+{-
         Just fn -> fing (Just (msg m)) fn
+
         Nothing ->  do
           -- This should only happen for home package things but oneshot puts
           -- home package ifaces in the PIT.
@@ -192,6 +204,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
             Nothing -> return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) fingerprint0
             Just iface ->
               return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) (mi_iface_hash iface)
+              -}
 
     librarySpecToUsage :: LibrarySpec -> IO [Usage]
     librarySpecToUsage (Objects os) = traverse (fing Nothing) os

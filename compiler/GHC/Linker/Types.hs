@@ -33,6 +33,7 @@ module GHC.Linker.Types
    , Linkable(..)
    , LinkablePart(..)
    , LinkableObjectSort (..)
+   , LinkableBCOOrigin (..)
    , linkableIsNativeCodeOnly
    , linkableObjs
    , linkableLibs
@@ -74,7 +75,7 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.Maybe (mapMaybe)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
-import GHC.Utils.Fingerprint (WithFingerprint(..))
+import GHC.Utils.Fingerprint (WithFingerprint(..), Fingerprint)
 
 
 {- **********************************************************************
@@ -257,6 +258,7 @@ data Linkable = Linkable
       -- ^ Time at which this linkable was built
       -- (i.e. when the bytecodes were produced,
       --       or the mod date on the files)
+  , linkableFingerprint :: Fingerprint
 
   , linkableModule   :: !Module
       -- ^ The linkable module itself
@@ -281,8 +283,8 @@ unionLinkableSet = plusModuleEnv_C go
       | otherwise = l2
 
 instance Outputable Linkable where
-  ppr (Linkable when_made mod parts)
-     = (text "Linkable" <+> parens (text (show when_made)) <+> ppr mod)
+  ppr (Linkable when_made fp mod parts)
+     = (text "Linkable" <+> parens (text (show when_made) <+> ppr fp) <+> ppr fp <+> ppr mod)
        $$ nest 3 (ppr parts)
 
 type ObjFile = FilePath
@@ -322,14 +324,20 @@ data LinkablePart
       -- Definitions]
 
   | LazyBCOs
-      (WithFingerprint CompiledByteCode)
+      LinkableBCOOrigin
+      CompiledByteCode
       -- ^ Some BCOs generated on-demand when forced. This is used for
       -- WholeCoreBindings, see Note [Interface Files with Core Definitions]
       [FilePath]
       -- ^ Objects containing foreign stubs and files
 
-  | BCOs (WithFingerprint CompiledByteCode)
-    -- ^ A byte-code object, lives only in memory.
+  | BCOs LinkableBCOOrigin CompiledByteCode
+
+
+-- | Where the BCO came from, used for recompilation checking
+data LinkableBCOOrigin = InMemory -- ^ In-memory, it will not exist for recompilation checking
+                       | GBCFile Fingerprint  -- ^ A GBC file which we depend on
+                       | WCBFile Fingerprint  -- ^ An interface file which we depend on
 
 instance Outputable LinkablePart where
   ppr (DotO path sort)   = text "DotO" <+> text path <+> pprSort sort
@@ -339,7 +347,7 @@ instance Outputable LinkablePart where
         ForeignObject -> brackets (text "foreign")
   ppr (DotA path)       = text "DotA" <+> text path
   ppr (DotDLL path)     = text "DotDLL" <+> text path
-  ppr (BCOs bco)        = text "BCOs" <+> ppr bco
+  ppr (BCOs _ bco)        = text "BCOs" <+> ppr bco
   ppr (LazyBCOs{})      = text "LazyBCOs"
   ppr (CoreBindings {}) = text "CoreBindings"
 
@@ -351,7 +359,7 @@ linkableIsNativeCodeOnly l = all isNativeCode (NE.toList (linkableParts l))
 --
 -- This excludes the LazyBCOs and the CoreBindings parts
 linkableBCOs :: Linkable -> [CompiledByteCode]
-linkableBCOs l = [ fingerprintItem cbc | BCOs cbc <- NE.toList (linkableParts l) ]
+linkableBCOs l = [ cbc | BCOs _ cbc <- NE.toList (linkableParts l) ]
 
 -- | List the native linkable parts (.o/.so/.dll) of a linkable
 linkableNativeParts :: Linkable -> [LinkablePart]
@@ -413,7 +421,7 @@ linkablePartNativePaths = \case
   DotA fn         -> [fn]
   DotDLL fn       -> [fn]
   CoreBindings {} -> []
-  LazyBCOs _ fos  -> fos
+  LazyBCOs _ _ fos  -> fos
   BCOs {}         -> []
 
 -- | Return the paths of all object files (.o) contained in this 'LinkablePart'.
@@ -423,7 +431,7 @@ linkablePartObjectPaths = \case
   DotA _ -> []
   DotDLL _ -> []
   CoreBindings {} -> []
-  LazyBCOs _ fos -> fos
+  LazyBCOs _ _ fos -> fos
   BCOs {} -> []
 
 -- | Retrieve the compiled byte-code from the linkable part.
@@ -431,8 +439,8 @@ linkablePartObjectPaths = \case
 -- Contrary to linkableBCOs, this includes byte-code from LazyBCOs.
 linkablePartAllBCOs :: LinkablePart -> [CompiledByteCode]
 linkablePartAllBCOs = \case
-  BCOs bco    -> [fingerprintItem bco]
-  LazyBCOs bcos _ -> [fingerprintItem bcos]
+  BCOs _ bco    -> [bco]
+  LazyBCOs _ bcos _ -> [bcos]
   _           -> []
 
 linkableFilter :: (LinkablePart -> [LinkablePart]) -> Linkable -> Maybe Linkable
@@ -445,13 +453,13 @@ linkablePartNative = \case
   u@DotO {}  -> [u]
   u@DotA {} -> [u]
   u@DotDLL {} -> [u]
-  LazyBCOs _ os -> [DotO f ForeignObject | f <- os]
+  LazyBCOs _ _ os -> [DotO f ForeignObject | f <- os]
   _ -> []
 
 linkablePartByteCode :: LinkablePart -> [LinkablePart]
 linkablePartByteCode = \case
   u@BCOs {}  -> [u]
-  LazyBCOs bcos _ -> [BCOs bcos]
+  LazyBCOs origin bcos _ -> [BCOs origin bcos]
   _ -> []
 
 -- | Transform the 'LinkablePart' list in this 'Linkable' to contain only

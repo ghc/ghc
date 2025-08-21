@@ -72,6 +72,8 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.Deps
+import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.ModInfo
 
 import Control.Monad
 import Control.Monad.Trans.State
@@ -448,6 +450,7 @@ checkPlugins plugins self_recomp = liftIO $ do
 recompPlugins :: Plugins -> IO PluginRecompile
 recompPlugins plugins = mconcat <$> mapM pluginRecompile' (pluginsWithArgs plugins)
 
+
 fingerprintPlugins :: Plugins -> IO Fingerprint
 fingerprintPlugins plugins = fingerprintPluginRecompile <$> recompPlugins plugins
 
@@ -719,6 +722,25 @@ needInterface mod continue
         Nothing -> return $ NeedsRecompile MustCompile
         Just iface -> liftIO $ continue iface
 
+needBCOFingerprint :: Module -> (Fingerprint -> IO RecompileRequired)
+                   -> IfG RecompileRequired
+needBCOFingerprint mod continue
+  = do
+    logger <- getLogger
+    hsc_env <- getTopEnv
+    liftIO $ trace_hi_diffs logger (text "Checking BCO fingerprint for module" <+> ppr mod)
+    mhmi <- liftIO $ HUG.lookupHugByModule mod (hsc_HUG hsc_env)
+    -- 1. Look in the HUG to see if we have the relevant BCO
+    case mhmi of
+      Just info -> do
+        let bco = homeModInfoByteCode info
+        liftIO $ continue (fingerprint (bco_compiled_byte_code bco))
+      Nothing -> do
+        -- 2. If it's not in the HUG, then look for the BCO object on disk.
+        liftIO $ readBinByteCodeFingerprint (moduleUnit mod)
+
+    -- 2. If it's not in the HUG, then look for the BCO object on disk.
+
 tryGetModIface :: String -> Module -> IfG (Maybe ModIface)
 tryGetModIface doc_msg mod
   = do  -- Load the imported interface if possible
@@ -814,6 +836,12 @@ checkModUsage fc UsageFile{ usg_file_path = file,
    handler = if debugIsOn
       then \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
       else \_ -> return recomp -- if we can't find the file, just recompile, don't fail
+checkModUsage fc UsageBCO{ usg_bco_hash = old_hash, usg_bco_mod_name = mod_name, usg_bco_mod_unit_id = uid } = do
+  let mod = mkModule (RealUnit (Definite uid)) mod_name
+  logger <- getLogger
+  needBCOFingerprint mod $ \iface -> do
+    let reason = ModuleChanged (moduleName mod)
+    checkModuleFingerprint logger reason old_hash (mi_mod_hash iface)
 
 -- | We are importing a module whose exports have changed.
 -- Does this require recompilation?

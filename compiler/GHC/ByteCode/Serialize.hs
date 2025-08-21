@@ -3,7 +3,13 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module GHC.ByteCode.Serialize
-  ( testBinByteCode, writeBinByteCode, readBinByteCode, ByteCodeObject(..), computeBytecodeFingerprint, computeWithBytecodeFingerprint
+  ( testBinByteCode
+  , writeBinByteCode
+  , readBinByteCode
+  , readBinByteCodeFingerprint
+  , ByteCodeObject(..)
+  , computeBytecodeFingerprint
+  , computeWithBytecodeFingerprint
   )
 where
 
@@ -94,8 +100,25 @@ readBinByteCode :: HscEnv -> FilePath -> IO ByteCodeObject
 readBinByteCode hsc_env f = do
   bh' <- readBinMem f
   bh <- addBinNameReader hsc_env bh'
+  -- Here we read the fingerprint, but we don't need to do anything with it
+  -- It is included as the first word in the file so we can read it without reading the whole file
+  _  <- get @Fingerprint bh
   odbco <- getWithUserData (hsc_NC hsc_env) bh
   decodeOnDiskByteCodeObject hsc_env odbco
+
+-- | Read just the fingerprint of the bytecode object
+-- This is placed as the first word so you can inspect the fingerprint without reading the whole file
+-- The file is assumed to exist and be large enough to read the fingerprint
+readBinByteCodeFingerprint :: FilePath -> IO Fingerprint
+readBinByteCodeFingerprint f = do
+ -- Read as much as the header needs
+ bh <- readBinMemN 16 f
+ case bh of
+  Just bh -> do
+ -- Read the fingerprint
+    fp <- get bh
+    pure fp
+  Nothing -> panic "readBinByteCodeFingerprint: file too small"
 
 
 writeBinByteCode :: HscEnv -> FilePath -> ByteCodeObject -> IO ()
@@ -104,6 +127,7 @@ writeBinByteCode hsc_env f cbc = do
   bh' <- openBinMem (1024 * 1024)
   bh <- addBinNameWriter bh'
   odbco <- encodeOnDiskByteCodeObject hsc_env cbc
+  put_ bh (fingerprint (bco_compiled_byte_code cbc))
   putWithUserData QuietBinIFace NormalCompression bh odbco
   writeBinMem bh f
 
@@ -226,9 +250,9 @@ addBinNameWriter bh' =
         | otherwise -> do
             putByte bh 1
             put_ bh
-              $ occNameFS (occName nm)
+              $ occNameFS (occName nm) -- a
               `appendFS` mkFastString
-                (show $ nameUnique nm)
+                (show $ nameUnique nm) -- 1234
 
 addBinNameReader :: HscEnv -> ReadBinHandle -> IO ReadBinHandle
 addBinNameReader HscEnv {..} bh' = do
@@ -240,7 +264,7 @@ addBinNameReader HscEnv {..} bh' = do
         nm <- get bh
         pure $ BinName nm
       1 -> do
-        occ <- mkVarOccFS <$> get bh
+        occ <- mkVarOccFS <$> get bh -- a1234
         u <- takeUniqFromNameCache hsc_NC
         nm' <- evaluate $ mkInternalName u occ noSrcSpan
         fmap BinName $ atomicModifyIORef' env_ref $ \env ->

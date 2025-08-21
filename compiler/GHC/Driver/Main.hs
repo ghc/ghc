@@ -1092,7 +1092,7 @@ loadIfaceByteCode hsc_env iface location type_env =
   where
     compile decls = do
       (bcos, fos) <- compileWholeCoreBindings hsc_env type_env decls
-      linkable $ BCOs (WithFingerprint bcos (mi_iface_hash iface)) :| [DotO fo ForeignObject | fo <- fos]
+      linkable $ BCOs (WCBFile (mi_iface_hash iface)) bcos :| [DotO fo ForeignObject | fo <- fos]
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file location)
@@ -1113,7 +1113,7 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
   where
     compile decls = do
       ~(bcos, fos) <- unsafeInterleaveIO $ compileWholeCoreBindings hsc_env type_env decls
-      linkable $ NE.singleton (LazyBCOs (WithFingerprint bcos (mi_iface_hash iface)) fos)
+      linkable $ NE.singleton (LazyBCOs (WCBFile (mi_iface_hash iface)) bcos fos)
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file location)
@@ -1156,7 +1156,7 @@ initWholeCoreBindings hsc_env iface details (Linkable utc_time this_mod uls) = d
         add_iface_to_hpt iface details hsc_env
         ~(bco, fos) <- unsafeInterleaveIO $
                        compileWholeCoreBindings hsc_env' type_env wcb
-        pure (LazyBCOs (WithFingerprint bco (mi_iface_hash iface)) fos)
+        pure (LazyBCOs (WCBFile (mi_iface_hash iface)) bco fos)
       l -> pure l
 
     type_env = md_types details
@@ -2868,8 +2868,9 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
 
       {- load it -}
       bco_time <- getCurrentTime
+      let (WithFingerprint bco fp) = computeWithBytecodeFingerprint bcos
       (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
-        Linkable bco_time this_mod $ NE.singleton $ BCOs (computeWithBytecodeFingerprint bcos)
+        Linkable bco_time this_mod $ NE.singleton $ BCOs (WCBFile fp) bco
       {- Get the HValue for the root -}
       return (expectJust $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)
 

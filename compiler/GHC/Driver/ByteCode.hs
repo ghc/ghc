@@ -68,4 +68,4 @@ loadByteCodeObject hsc_env location (ByteCodeObject mod cbc foreign_srcs foreign
 loadByteCodeObjectLinkable :: HscEnv -> UTCTime -> ModLocation -> ByteCodeObject -> IO Linkable
 loadByteCodeObjectLinkable hsc_env linkable_time location bco = do
   ~(cbc, fos) <- loadByteCodeObject hsc_env location bco
-  return $! Linkable linkable_time (bco_module bco) (BCOs cbc :| [DotO fo ForeignObject | fo <- fos])
+  return $! Linkable linkable_time (fingerprint cbc) (bco_module bco) (BCOs (GBCFile (fingerprint cbc)) (fingerprintItem cbc) :| [DotO fo ForeignObject | fo <- fos])
