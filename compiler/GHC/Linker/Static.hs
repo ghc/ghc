@@ -112,16 +112,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                   rpath = if useXLinkerRPath dflags (platformOS platform)
                           then ["-Xlinker", "-rpath", "-Xlinker", libpath]
                           else []
-                  -- Solaris 11's linker does not support -rpath-link option. It silently
-                  -- ignores it and then complains about next option which is -l<some
-                  -- dir> as being a directory and not expected object file, E.g
-                  -- ld: elf error: file
-                  -- /tmp/ghc-src/libraries/base/dist-install/build:
-                  -- elf_begin: I/O error: region read: Is a directory
-                  rpathlink = if (platformOS platform) == OSSolaris2
-                              then []
-                              else ["-Xlinker", "-rpath-link", "-Xlinker", l]
-              in ["-L" ++ l] ++ rpathlink ++ rpath
+              in ["-L" ++ l] ++ rpath
          | osMachOTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
            ways_ `hasWay` WayDyn &&
