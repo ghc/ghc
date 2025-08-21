@@ -83,6 +83,7 @@ import GHC.Data.Word64Map.Strict (Word64Map)
 import qualified GHC.Data.Word64Map.Strict as M
 import GHC.Data.TrieMap
 
+import Data.Coerce
 import Data.Word (Word64)
 
 
@@ -164,7 +165,7 @@ setFoldr k z (LS s) = S.foldr (\v a -> k (mkHooplLabel v) a) z s
 
 {-# INLINE setElems #-}
 setElems :: LabelSet -> [Label]
-setElems (LS s) = map mkHooplLabel (S.elems s)
+setElems (LS s) = coerce $ S.elems s
 
 {-# INLINE setFromList #-}
 setFromList :: [Label] -> LabelSet
@@ -272,7 +273,7 @@ mapKeys (LM m) = map (mkHooplLabel . fst) (M.toList m)
 
 {-# INLINE mapToList #-}
 mapToList :: LabelMap b -> [(Label, b)]
-mapToList (LM m) = [(mkHooplLabel k, v) | (k, v) <- M.toList m]
+mapToList (LM m) = coerce $ M.toList m
 
 {-# INLINE mapFromList #-}
 mapFromList :: [(Label, v)] -> LabelMap v
