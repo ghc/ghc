@@ -2324,9 +2324,9 @@ Wrinkles:
      e |> Refl
   or
     e |> g1 |> g2
-  because both of these will be optimised by Simplify.simplRule. In the
-  former case such optimisation benign, because the rule will match more
-  terms; but in the latter we may lose a binding of 'g1' or 'g2', and
+  because both of these will be optimised by GHC.Core.Opt.Simplify.Iteration.simplRules.
+  In the former case such optimisation is benign, because the rule will match
+  more terms; but in the latter we may lose a binding of 'g1' or 'g2', and
   end up with a rule LHS that doesn't bind the template variables
   (#10602).
 

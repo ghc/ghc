@@ -850,7 +850,7 @@ bound on the LHS:
     RULE forall (c :: a~b). f (x |> c) = e
   Now, if that binding is inlined, so that a=b=Int, we'd get
     RULE forall (c :: Int~Int). f (x |> c) = e
-  and now when we simplify the LHS (Simplify.simplRule) we
+  and now when we simplify the LHS (GHC.Core.Opt.Simplify.Iteration.simplRules),
   optCoercion (look at the CoVarCo case) will turn that 'c' into Refl:
     RULE forall (c :: Int~Int). f (x |> <Int>) = e
   and then perhaps drop it altogether.  Now 'c' is unbound.

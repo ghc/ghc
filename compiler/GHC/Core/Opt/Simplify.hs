@@ -65,8 +65,9 @@ simplifyExpr :: Logger
              -> SimplifyExprOpts
              -> CoreExpr
              -> IO CoreExpr
--- simplifyExpr is called by the driver to simplify an
--- expression typed in at the interactive prompt
+-- ^ Simplify an expression using 'simplExprGently'.
+--
+-- See 'simplExprGently' for details.
 simplifyExpr logger euc opts expr
   = withTiming logger (text "Simplify [expr]") (const ()) $
     do  { eps <- eucEPS euc ;
@@ -94,23 +95,17 @@ simplifyExpr logger euc opts expr
         }
 
 simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
--- Simplifies an expression
---      does occurrence analysis, then simplification
---      and repeats (twice currently) because one pass
---      alone leaves tons of crud.
--- Used (a) for user expressions typed in at the interactive prompt
---      (b) the LHS and RHS of a RULE
---      (c) Template Haskell splices
+-- ^ Simplifies an expression by doing occurrence analysis, then simplification,
+-- and repeating (twice currently), because one pass alone leaves tons of crud.
+--
+-- Used only:
+--
+--   1. for user expressions typed in at the interactive prompt (see 'GHC.Driver.Main.hscStmt'),
+--   2. for Template Haskell splices (see 'GHC.Tc.Gen.Splice.runMeta').
 --
 -- The name 'Gently' suggests that the SimplMode is InitialPhase,
--- and in fact that is so.... but the 'Gently' in simplExprGently doesn't
--- enforce that; it just simplifies the expression twice
-
--- It's important that simplExprGently does eta reduction; see
--- Note [Simplify rule LHS] above.  The
--- simplifier does indeed do eta reduction (it's in GHC.Core.Opt.Simplify.completeLam)
--- but only if -O is on.
-
+-- and in fact that is so.... but the 'Gently' in 'simplExprGently' doesn't
+-- enforce that; it just simplifies the expression twice.
 simplExprGently env expr = do
     expr1 <- simplExpr env (occurAnalyseExpr expr)
     simplExpr env (occurAnalyseExpr expr1)
