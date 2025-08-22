@@ -611,6 +611,17 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
               , ("FixedRuntimeRep", is_FRR,         True, mkGroupReporter mkFRRErr)
               , ("skolem eq2",      skolem_eq,      True, mkSkolReporter)
 
+              -- Next, family applications like (F t1 t2 ~ rigid_ty)
+              -- These can be solved by doing a type-family reduction for F
+              -- which probably means fixing a unfication variable in t1/t2
+              -- See discussion in #26255, where F had an injectivity annotation,
+              -- and we had   [W] F alpha ~ "foo"
+              -- The real error is that the "foo" should be "bar", because there is
+              --    type instance F Int = "bar"
+              -- We could additionally filter on the injectivty annotation, but
+              -- currenlty we don't.
+              , ("fam app",         is_fam_app_eq,  True, mkGroupReporter mkEqErr)
+
               -- Put custom type errors after solid equality errors.  In #26255 we
               -- had a custom error (T <= F alpha) which was suppressing a far more
               -- informative (K Int ~ [K alpha]). That mismatch between K and [] is
@@ -667,6 +678,10 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
 
     -- Representation-polymorphism errors, to be reported using mkFRRErr.
     is_FRR item _ = isJust $ fixedRuntimeRepOrigin_maybe item
+
+    -- Things like (F t1 t2 ~N Maybe s)
+    is_fam_app_eq _ (EqPred NomEq ty1 ty2) = isJust (isSatTyFamApp ty1) && isRigidTy ty2
+    is_fam_app_eq _ _                      = False
 
     -- Things like (a ~N b) or (a  ~N  F Bool)
     skolem_eq _ (EqPred NomEq ty1 _) = isSkolemTy tc_lvl ty1
