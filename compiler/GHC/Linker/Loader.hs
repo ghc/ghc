@@ -1134,25 +1134,26 @@ loadPackages' interp hsc_env new_pks pls = do
     downsweep
       ([], pkgs_loaded pls)
       new_pks
-  let link_one pkgs new_pkg_info = do
-        (hs_cls, extra_cls, loaded_dlls) <-
-          loadPackage
-            interp
-            hsc_env
-            new_pkg_info
-        evaluate $
-          adjustUDFM
-            ( \old_pkg_info ->
-                old_pkg_info
-                  { loaded_pkg_hs_objs = hs_cls,
-                    loaded_pkg_non_hs_objs = extra_cls,
-                    loaded_pkg_hs_dlls = loaded_dlls
-                  }
+  loaded_pkgs_info_list <- loadPackage interp hsc_env pkgs_info_list
+  evaluate $
+    pls
+      { pkgs_loaded =
+          foldl'
+            ( \pkgs (new_pkg_info, (hs_cls, extra_cls, loaded_dlls)) ->
+                adjustUDFM
+                  ( \old_pkg_info ->
+                      old_pkg_info
+                        { loaded_pkg_hs_objs = hs_cls,
+                          loaded_pkg_non_hs_objs = extra_cls,
+                          loaded_pkg_hs_dlls = loaded_dlls
+                        }
+                  )
+                  pkgs
+                  (Packages.unitId new_pkg_info)
             )
-            pkgs
-            (Packages.unitId new_pkg_info)
-  pkgs_loaded' <- foldlM link_one pkgs_almost_loaded pkgs_info_list
-  evaluate $ pls {pkgs_loaded = pkgs_loaded'}
+            pkgs_almost_loaded
+            (zip pkgs_info_list loaded_pkgs_info_list)
+      }
   where
     -- The downsweep process takes an initial 'PkgsLoaded' and uses it
     -- to memoize new packages to load when recursively downsweeping
@@ -1197,23 +1198,23 @@ loadPackages' interp hsc_env new_pks pls = do
           throwGhcExceptionIO
             (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
-loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ([LibrarySpec], [LibrarySpec], [RemotePtr LoadedDLL])
-loadPackage interp hsc_env pkg
+loadPackage :: Interp -> HscEnv -> [UnitInfo] -> IO [([LibrarySpec], [LibrarySpec], [RemotePtr LoadedDLL])]
+loadPackage interp hsc_env pkgs
    = do
         let dflags    = hsc_dflags hsc_env
         let logger    = hsc_logger hsc_env
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic interp
-            dirs | is_dyn    = map ST.unpack $ Packages.unitLibraryDynDirs pkg
-                 | otherwise = map ST.unpack $ Packages.unitLibraryDirs pkg
+            dirs | is_dyn    = [map ST.unpack $ Packages.unitLibraryDynDirs pkg | pkg <- pkgs]
+                 | otherwise = [map ST.unpack $ Packages.unitLibraryDirs pkg | pkg <- pkgs]
 
-        let hs_libs   = map ST.unpack $ Packages.unitLibraries pkg
+        let hs_libs   = [map ST.unpack $ Packages.unitLibraries pkg | pkg <- pkgs]
             -- The FFI GHCi import lib isn't needed as
             -- GHC.Linker.Loader + rts/Linker.c link the
             -- interpreted references to FFI to the compiled FFI.
             -- We therefore filter it out so that we don't get
             -- duplicate symbol errors.
-            hs_libs'  =  filter ("HSffi" /=) hs_libs
+            hs_libs'  =  filter ("HSffi" /=) <$> hs_libs
 
         -- Because of slight differences between the GHC dynamic linker and
         -- the native system linker some packages have to link with a
@@ -1222,53 +1223,62 @@ loadPackage interp hsc_env pkg
         -- libs do not exactly match the .so/.dll equivalents. So if the
         -- package file provides an "extra-ghci-libraries" field then we use
         -- that instead of the "extra-libraries" field.
-            extdeplibs = map ST.unpack (if null (Packages.unitExtDepLibsGhc pkg)
+            extdeplibs = [map ST.unpack (if null (Packages.unitExtDepLibsGhc pkg)
                                       then Packages.unitExtDepLibsSys pkg
-                                      else Packages.unitExtDepLibsGhc pkg)
-            linkerlibs = [ lib | '-':'l':lib <- (map ST.unpack $ Packages.unitLinkerOptions pkg) ]
-            extra_libs = extdeplibs ++ linkerlibs
+                                      else Packages.unitExtDepLibsGhc pkg) | pkg <- pkgs]
+            linkerlibs = [[ lib | '-':'l':lib <- (map ST.unpack $ Packages.unitLinkerOptions pkg) ] | pkg <- pkgs]
+            extra_libs = zipWith (++) extdeplibs linkerlibs
 
         -- See Note [Fork/Exec Windows]
         gcc_paths <- getGCCPaths logger dflags (platformOS platform)
-        dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
+        dirs_env <- traverse (addEnvPaths "LIBRARY_PATH") dirs
 
         hs_classifieds
-           <- mapM (locateLib interp hsc_env True  dirs_env gcc_paths) hs_libs'
+           <- sequenceA [mapM (locateLib interp hsc_env True  dirs_env_ gcc_paths) hs_libs'_ | (dirs_env_, hs_libs'_) <- zip dirs_env hs_libs' ]
         extra_classifieds
-           <- mapM (locateLib interp hsc_env False dirs_env gcc_paths) extra_libs
-        let classifieds = hs_classifieds ++ extra_classifieds
+           <- sequenceA [mapM (locateLib interp hsc_env False dirs_env_ gcc_paths) extra_libs_ | (dirs_env_, extra_libs_) <- zip dirs_env extra_libs]
+        let classifieds = zipWith (++) hs_classifieds extra_classifieds
 
         -- Complication: all the .so's must be loaded before any of the .o's.
-        let known_hs_dlls    = [ dll | DLLPath dll <- hs_classifieds ]
-            known_extra_dlls = [ dll | DLLPath dll <- extra_classifieds ]
-            known_dlls       = known_hs_dlls ++ known_extra_dlls
+        let known_hs_dlls    = [[ dll | DLLPath dll <- hs_classifieds_ ] | hs_classifieds_ <- hs_classifieds]
+            known_extra_dlls = [ dll | extra_classifieds_ <- extra_classifieds, DLLPath dll <- extra_classifieds_ ]
+            known_dlls       = concat known_hs_dlls ++ known_extra_dlls
 #if defined(CAN_LOAD_DLL)
-            dlls       = [ dll  | DLL dll        <- classifieds ]
+            dlls       = [ dll  | classifieds_ <- classifieds, DLL dll      <- classifieds_ ]
 #endif
-            objs       = [ obj  | Objects objs    <- classifieds
-                                , obj <- objs ]
-            archs      = [ arch | Archive arch   <- classifieds ]
+            objs       = [ obj  | classifieds_ <- classifieds, Objects objs <- classifieds_
+                                , obj <- objs]
+            archs      = [ arch | classifieds_ <- classifieds, Archive arch <- classifieds_ ]
 
         -- Add directories to library search paths
         let dll_paths  = map takeDirectory known_dlls
-            all_paths  = nub $ map normalise $ dll_paths ++ dirs
+            all_paths  = nub $ map normalise $ dll_paths ++ concat dirs
         all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
         pathCache <- mapM (addLibrarySearchPath interp) all_paths_env
 
         maybePutSDoc logger
-            (text "Loading unit " <> pprUnitInfoForUser pkg <> text " ... ")
+            (text "Loading units " <> vcat (map pprUnitInfoForUser pkgs) <> text " ... ")
 
 #if defined(CAN_LOAD_DLL)
-        loadFrameworks interp platform pkg
+        forM_ pkgs $ loadFrameworks interp platform
         -- See Note [Crash early load_dyn and locateLib]
         -- Crash early if can't load any of `known_dlls`
         _ <- load_dyn interp hsc_env True known_extra_dlls
-        loaded_dlls <- load_dyn interp hsc_env True known_hs_dlls
+
+        -- We pass [[FilePath]] of dlls to load and flattens the list
+        -- before doing a LoadDLLs. The returned list of RemotePtrs
+        -- would need to be regrouped to the same shape of the input
+        -- [[FilePath]], each group's [RemotePtr LoadedDLL]
+        -- corresponds to the DLL handles of a Haskell unit.
+        let regroup :: [[a]] -> [b] -> [[b]]
+            regroup [] _ = []
+            regroup (l:ls) xs = xs0: regroup ls xs1 where (xs0, xs1) = splitAt (length l) xs
+        loaded_dlls <- regroup known_hs_dlls <$> load_dyn interp hsc_env True (concat known_hs_dlls)
         -- For remaining `dlls` crash early only when there is surely
         -- no package's DLL around ... (not is_dyn)
         _ <- load_dyn interp hsc_env (not is_dyn) $ map (platformSOName platform) dlls
 #else
-        let loaded_dlls = []
+        let loaded_dlls = replicate (length pkgs) []
 #endif
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link
@@ -1288,9 +1298,9 @@ loadPackage interp hsc_env pkg
         if succeeded ok
            then do
              maybePutStrLn logger "done."
-             return (hs_classifieds, extra_classifieds, loaded_dlls)
-           else let errmsg = text "unable to load unit `"
-                             <> pprUnitInfoForUser pkg <> text "'"
+             pure $ zip3 hs_classifieds extra_classifieds loaded_dlls
+           else let errmsg = text "unable to load units `"
+                             <> vcat (map pprUnitInfoForUser pkgs) <> text "'"
                  in throwGhcExceptionIO (InstallationError (showSDoc dflags errmsg))
 
 {-
