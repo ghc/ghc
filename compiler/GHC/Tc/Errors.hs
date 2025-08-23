@@ -443,7 +443,6 @@ ignoreConstraint :: Ct -> Bool
 ignoreConstraint ct
   = case ctOrigin ct of
       AssocFamPatOrigin         -> True  -- See (CIG1)
-      WantedSuperclassOrigin {} -> True  -- See (CIG2)
       _                         -> False
 
 -- | Makes an error item from a constraint, calculating whether or not
@@ -540,7 +539,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
        ; when (null simples) $ reportMultiplicityCoercionErrs ctxt_for_insols mult_co_errs
 
           -- See Note [Suppressing confusing errors]
-       ; let (suppressed_items, items0) = partition suppress tidy_items
+       ; let (suppressed_items, items0) = partition suppressItem tidy_items
        ; traceTc "reportWanteds suppressed:" (ppr suppressed_items)
        ; (ctxt1, items1) <- tryReporters ctxt_for_insols report1 items0
 
@@ -548,7 +547,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
          -- any of the first batch failed, or if the enclosing context
          -- says to suppress
        ; let ctxt2 = ctxt1 { cec_suppress = cec_suppress ctxt || cec_suppress ctxt1 }
-       ; (ctxt3, leftovers) <- tryReporters ctxt2 report2 items1
+       ; (_, leftovers) <- tryReporters ctxt2 report2 items1
        ; massertPpr (null leftovers)
            (text "The following unsolved Wanted constraints \
                  \have not been reported to the user:"
@@ -559,12 +558,15 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
             -- wanted insoluble here; but do suppress inner insolubles
             -- if there's a *given* insoluble here (= inaccessible code)
 
-            -- Only now, if there are no errors, do we report suppressed ones
-            -- See Note [Suppressing confusing errors]
-            -- We don't need to update the context further because of the
-            -- whenNoErrs guard
+         -- Only now, if there are no errors, do we report suppressed ones
+         -- See Note [Suppressing confusing errors]. We don't need to update
+         -- the context further because of the whenNoErrs guard
        ; whenNoErrs $
-         do { (_, more_leftovers) <- tryReporters ctxt3 report3 suppressed_items
+         do { (_, more_leftovers) <- tryReporters ctxt_for_insols (report1++report2)
+                                                  suppressed_items
+                 -- ctxt_for_insols: the suppressed errors can be Int~Bool, which
+                 -- will have made the incoming `ctxt` be True; don't make that suppress
+                 -- the Int~Bool error!
             ; massertPpr (null more_leftovers) (ppr more_leftovers) } }
  where
     env       = cec_tidy ctxt
@@ -586,14 +588,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
             -> (es1, es2, err : es3, es4)
           DE_Multiplicity mult_co loc
             -> (es1, es2, es3, (mult_co, loc):es4)
-
-      -- See Note [Suppressing confusing errors]
-    suppress :: ErrorItem -> Bool
-    suppress item
-      | Wanted <- ei_flavour item
-      = is_ww_fundep_item item
-      | otherwise
-      = False
 
     -- report1: ones that should *not* be suppressed by
     --          an insoluble somewhere else in the tree
@@ -655,11 +649,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr)
               , ("Quantified",      is_qc,           False, mkGroupReporter mkQCErr) ]
-
-    -- report3: suppressed errors should be reported as categorized by either report1
-    -- or report2. Keep this in sync with the suppress function above
-    report3 = [ ("wanted/wanted fundeps", is_ww_fundep, True, mkGroupReporter mkEqErr)
-              ]
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
     is_dict, is_equality, is_ip, is_FRR, is_irred :: ErrorItem -> Pred -> Bool
@@ -728,10 +717,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     is_qc _ (ForAllPred {}) = True
     is_qc _ _               = False
 
-     -- See situation (1) of Note [Suppressing confusing errors]
-    is_ww_fundep item _ = is_ww_fundep_item item
-    is_ww_fundep_item = isWantedWantedFunDepOrigin . errorItemOrigin
-
     given_eq_spec  -- See Note [Given errors]
       | has_gadt_match_here
       = ("insoluble1a", is_given_eq, True,  mkGivenErrorReporter)
@@ -757,6 +742,16 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
       = has_gadt_match implics
 
 ---------------
+suppressItem :: ErrorItem -> Bool
+ -- See Note [Suppressing confusing errors]
+suppressItem item
+  | Wanted <- ei_flavour item
+  , let orig = errorItemOrigin item
+  = isWantedSuperclassOrigin orig       -- See (SCE1)
+    || isWantedWantedFunDepOrigin orig  -- See (SCE2)
+  | otherwise
+  = False
+
 isSkolemTy :: TcLevel -> Type -> Bool
 -- The type is a skolem tyvar
 isSkolemTy tc_lvl ty
@@ -781,7 +776,23 @@ If there are any other errors to report, at all, we want to suppress these.
 
 Which errors (only 1 case right now):
 
-1) Errors which arise from the interaction of two Wanted fun-dep constraints.
+(SCE1) Superclasses of Wanteds.  These are generated on in case they trigger functional
+   dependencies.  If such a constraint is unsolved, then its "parent" constraint must
+   also be unsolved, and is much more informative to the user.  Example (#26255):
+        class (MinVersion <= F era) => Era era where { ... }
+        f :: forall era. EraFamily era -> IO ()
+        f = ..blah...   -- [W] Era era
+   Here we have simply omitted "Era era =>" from f's type.  But we'll end up with
+   /two/ Wanted constraints:
+        [W] d1 :  Era era
+        [W] d2 : MinVersion <= F era  -- Superclass of d1
+   We definitely want to report d1 and not d2!  Happily it's easy to filter out those
+   superclass-Wanteds, becuase their Origin betrays them.
+
+   See test T18851 for an example of how it is (just, barely) possible for the /only/
+   errors to be superclass-of-Wanted constraints.
+
+(SCE2) Errors which arise from the interaction of two Wanted fun-dep constraints.
    Example:
 
      class C a b | a -> b where
@@ -852,18 +863,8 @@ Currently, the constraints to ignore are:
 
    If there is any trouble, checkValidFamInst bleats, aborting compilation.
 
-(CIG2) Superclasses of Wanteds.  These are generated on in case they trigger functional
-   dependencies.  If such a constraint is unsolved, then its "parent" constraint must
-   also be unsolved, and is much more informative to the user.  Example (#26255):
-        class (MinVersion <= F era) => Era era where { ... }
-        f :: forall era. EraFamily era -> IO ()
-        f = ..blah...   -- [W] Era era
-   Here we have simply omitted "Era era =>" from f's type.  But we'll end up with
-   /two/ Wanted constraints:
-        [W] d1 :  Era era
-        [W] d2 : MinVersion <= F era  -- Superclass of d1
-   We definitely want to report d1 and not d2!  Happily it's easy to filter out those
-   superclass-Wanteds, becuase their Origin betrays them.
+(Note: Aug 25: this seems a rather tricky corner;
+               c.f. Note [Suppressing confusing errors])
 
 Note [Implementation of Unsatisfiable constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
