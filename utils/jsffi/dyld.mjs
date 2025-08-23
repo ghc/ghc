@@ -793,8 +793,36 @@ class DyLD {
       // Writer::createStartFunction().
       if (instance.exports.__wasm_apply_data_relocs) {
           instance.exports.__wasm_apply_data_relocs();
-      }
+        }
+      };
+
       instance.exports._initialize();
+
+      // rts init must be deferred until ghc-internal symbols are
+      // exported. We hard code this hack for now.
+      if (/libHSrts-\d+(\.\d+)*/i.test(soname)) {
+        this.rts_init = init;
+        continue;
+      }
+      if (/libHSghc-internal-\d+(\.\d+)*/i.test(soname)) {
+        this.rts_init();
+        delete this.rts_init;
+
+        // At this point the RTS symbols in linear memory are fixed
+        // and constructors are run, especially the one in JSFFI.c
+        // that does GHC RTS initialization for any code that links
+        // JSFFI.o. Luckily no Haskell computation or gc has taken
+        // place yet, so we must set keepCAFs=1 right now! Otherwise,
+        // any BCO created by later TH splice or ghci expression may
+        // refer to any CAF that's not reachable from GC roots (here
+        // our only entry point is defaultServer) and the CAF could
+        // have been GC'ed! (#26106)
+        //
+        // We call it here instead of in RTS C code, since we only
+        // want keepCAFs=1 for ghci, not user code.
+        this.exportFuncs.setKeepCAFs();
+      }
+      init();
     }
   }
 
