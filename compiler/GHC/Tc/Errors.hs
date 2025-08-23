@@ -50,6 +50,8 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Types.Unique( hasKey )
+import GHC.Builtin.Names( errorMessageTypeErrorFamKey )
 import qualified GHC.Types.Unique.Map as UM
 
 import GHC.Unit.Module
@@ -439,10 +441,10 @@ reportBadTelescope _ _ skol_info skols
 -- See Note [Constraints to ignore].
 ignoreConstraint :: Ct -> Bool
 ignoreConstraint ct
-  | AssocFamPatOrigin <- ctOrigin ct
-  = True
-  | otherwise
-  = False
+  = case ctOrigin ct of
+      AssocFamPatOrigin         -> True  -- See (CIG1)
+      WantedSuperclassOrigin {} -> True  -- See (CIG2)
+      _                         -> False
 
 -- | Makes an error item from a constraint, calculating whether or not
 -- the item should be suppressed. See Note [Wanteds rewrite Wanteds]
@@ -612,14 +614,14 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
               , ("skolem eq2",      skolem_eq,      True, mkSkolReporter)
 
               -- Next, family applications like (F t1 t2 ~ rigid_ty)
-              -- These can be solved by doing a type-family reduction for F
+              -- These could be solved by doing a type-family reduction for F
               -- which probably means fixing a unfication variable in t1/t2
               -- See discussion in #26255, where F had an injectivity annotation,
               -- and we had   [W] F alpha ~ "foo"
               -- The real error is that the "foo" should be "bar", because there is
               --    type instance F Int = "bar"
-              -- We could additionally filter on the injectivty annotation, but
-              -- currenlty we don't.
+              -- We could additionally filter on the injectivty annotation,
+              -- but currently we don't.
               , ("fam app",         is_fam_app_eq,  True, mkGroupReporter mkEqErr)
 
               -- Put custom type errors after solid equality errors.  In #26255 we
@@ -680,8 +682,11 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     is_FRR item _ = isJust $ fixedRuntimeRepOrigin_maybe item
 
     -- Things like (F t1 t2 ~N Maybe s)
-    is_fam_app_eq _ (EqPred NomEq ty1 ty2) = isJust (isSatTyFamApp ty1) && isRigidTy ty2
-    is_fam_app_eq _ _                      = False
+    -- But only proper type families; not (TypeError t1 t2 ~N blah)
+    is_fam_app_eq _ (EqPred NomEq ty1 ty2)
+       | Just (tc,_) <- isSatTyFamApp ty1
+       = not (tc `hasKey` errorMessageTypeErrorFamKey) && isRigidTy ty2
+    is_fam_app_eq _ _  = False
 
     -- Things like (a ~N b) or (a  ~N  F Bool)
     skolem_eq _ (EqPred NomEq ty1 _) = isSkolemTy tc_lvl ty1
@@ -819,7 +824,7 @@ they will remain unfilled, and might have been used to rewrite another constrain
 
 Currently, the constraints to ignore are:
 
-1) Constraints generated in order to unify associated type instance parameters
+(CIG1) Constraints generated in order to unify associated type instance parameters
    with class parameters. Here are two illustrative examples:
 
      class C (a :: k) where
@@ -846,6 +851,10 @@ Currently, the constraints to ignore are:
    with this origin are dropped entirely during error message reporting.
 
    If there is any trouble, checkValidFamInst bleats, aborting compilation.
+
+(CIG2) Superclasses of Wanteds.  These are generated on in case they trigger functional
+   dependencies.  If such a constraint is unsolved, then its "parent" constraint must
+   also be unsolved, and is much more informative to the user (#26255).
 
 Note [Implementation of Unsatisfiable constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
