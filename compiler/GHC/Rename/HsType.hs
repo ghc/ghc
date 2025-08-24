@@ -547,15 +547,7 @@ rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
        ; this_mod <- getModule
        ; when (nameIsLocalOrFrom this_mod name) $
          checkThLocalTyName name
-       ; when (isDataConName name && not (isKindName name)) $
-           -- Any use of a promoted data constructor name (that is not
-           -- specifically exempted by isKindName) is illegal without the use
-           -- of DataKinds. See Note [Checking for DataKinds] in
-           -- GHC.Tc.Validity.
-           checkDataKinds env tv
-       ; when (isDataConName name && not (isPromoted ip)) $
-         -- NB: a prefix symbolic operator such as (:) is represented as HsTyVar.
-            addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Prefix name)
+       ; checkPromotedDataConName env tv Prefix ip name
        ; return (HsTyVar noAnn ip (L loc $ WithUserRdr rdr_name name), unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
@@ -567,8 +559,7 @@ rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
         ; (ty1', fvs2) <- rnLHsTyKi env ty1
         ; (ty2', fvs3) <- rnLHsTyKi env ty2
         ; res_ty <- mkHsOpTyRn prom (fmap (WithUserRdr op_rdr) l_op') fix ty1' ty2'
-        ; when (isDataConName op_name && not (isPromoted prom)) $
-            addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Infix op_name)
+        ; checkPromotedDataConName env ty Infix prom op_name
         ; return (res_ty, plusFVs [fvs1, fvs2, fvs3]) }
 
 rnHsTyKi env (HsParTy _ ty)
@@ -1669,6 +1660,30 @@ checkDataKinds env thing
   where
     type_or_kind | isRnKindLevel env = KindLevel
                  | otherwise         = TypeLevel
+
+-- | If a 'Name' is that of a promoted data constructor, perform various
+-- validity checks on it.
+checkPromotedDataConName ::
+  RnTyKiEnv ->
+  -- | The type that the 'Name' belongs to. This will always be an 'HsTyVar'
+  -- (for 'Prefix' names) or an 'HsOpTy' (for 'Infix' names).
+  HsType GhcPs ->
+  -- | Whether the type is written 'Prefix' or 'Infix'.
+  LexicalFixity ->
+  -- | Whether the name was written with an explicit promotion tick or not.
+  PromotionFlag ->
+  -- | The name to check.
+  Name ->
+  TcM ()
+checkPromotedDataConName env ty fixity ip name
+  = do when (isDataConName name && not (isKindName name)) $
+         -- Any use of a promoted data constructor name (that is not
+         -- specifically exempted by isKindName) is illegal without the use
+         -- of DataKinds. See Note [Checking for DataKinds] in
+         -- GHC.Tc.Validity.
+         checkDataKinds env ty
+       when (isDataConName name && not (isPromoted ip)) $
+         addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor fixity name)
 
 warnUnusedForAll :: OutputableBndrFlag flag 'Renamed
                  => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()

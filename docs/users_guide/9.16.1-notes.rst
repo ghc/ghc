@@ -11,6 +11,11 @@ for specific guidance on migrating programs to this release.
 Language
 ~~~~~~~~
 
+- Fix a bug introduced in GHC 9.10 where GHC would erroneously accept infix uses
+  of promoted data constructors without enabling :extension:`DataKinds`. As a
+  result, you may need to enable :extension:`DataKinds` in code that did not
+  previously require it.
+
 Compiler
 ~~~~~~~~
 
