@@ -16,11 +16,11 @@ module GHC.Num
    ( Num(..)
    , subtract
    , quotRemInteger
-   , module GHC.Num.Integer
-   , module GHC.Num.Natural
+   , module GHC.Internal.Bignum.Integer
+   , module GHC.Internal.Bignum.Natural
    )
 where
 
 import GHC.Internal.Num
-import GHC.Num.Integer
-import GHC.Num.Natural
+import GHC.Internal.Bignum.Integer
+import GHC.Internal.Bignum.Natural
