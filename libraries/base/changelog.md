@@ -13,6 +13,7 @@
   * Add `thenA` and `thenM`. ([CLC proposal #351](https://github.com/haskell/core-libraries-committee/issues/351))
   * Fix bug where `naturalAndNot` was incorrectly truncating results ([CLC proposal #350](github.com/haskell/core-libraries-committee/issues/350))
   * generalize `deleteBy` and `deleteFirstsBy` ([CLC proposal 372](https://github.com/haskell/core-libraries-committee/issues/372))
+  * GHC.Num.{BigNat, Integer, Natural} are no longer exposed. Users should import them from `ghc-bignum` instead. ([CLC proposal #359](github.com/haskell/core-libraries-committee/issues/359))
   * Remove extra laziness from `Data.Bifunctor.Bifunctor` instances for all tuples to have the same laziness as their `Data.Functor.Functor` counterparts (i.e. they became more strict than before) ([CLC proposal #339](https://github.com/haskell/core-libraries-committee/issues/339))
   * Adjust the strictness of `Data.List.iterate'` to be more reasonable: every element of the output list is forced to WHNF when the `(:)` containing it is forced. ([CLC proposal #335)](https://github.com/haskell/core-libraries-committee/issues/335)
   * Add `nubOrd` / `nubOrdBy` to `Data.List` and `Data.List.NonEmpty`. ([CLC proposal #336](https://github.com/haskell/core-libraries-committee/issues/336))

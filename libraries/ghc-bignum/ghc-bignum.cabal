@@ -10,10 +10,8 @@ bug-reports:         https://gitlab.haskell.org/ghc/ghc/issues/new
 category:            Numeric, Algebra, GHC
 build-type:          Simple
 description:
-    This package used to provide the low-level implementation of the standard
+    This package provides the low-level implementation of the standard
     'BigNat', 'Natural' and 'Integer' types.
-    Use `base:GHC.Num.{Integer,Natural,BigNat}` instead or other modules from
-    `ghc-internal`.
 
 extra-source-files:
     changelog.md
@@ -40,13 +38,6 @@ library
     , GHC.Internal.Bignum.Backend          as GHC.Num.Backend
     , GHC.Internal.Bignum.Backend.Selected as GHC.Num.Backend.Selected
     , GHC.Internal.Bignum.Backend.Native   as GHC.Num.Backend.Native
-    -- reexport from base
-    -- We can't reexport these modules from ghc-internal otherwise we get
-    -- ambiguity between:
-    --   ghc-bignum:GHC.Num.X
-    --   base:GHC.Num.X
-    -- we should probably just deprecate ghc-bignum and encourage users to use
-    -- exports from base instead.
-    , GHC.Num.BigNat
-    , GHC.Num.Natural
-    , GHC.Num.Integer
+    , GHC.Internal.Bignum.BigNat           as GHC.Num.BigNat
+    , GHC.Internal.Bignum.Natural          as GHC.Num.Natural
+    , GHC.Internal.Bignum.Integer          as GHC.Num.Integer

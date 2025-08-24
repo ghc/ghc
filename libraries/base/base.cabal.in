@@ -219,9 +219,6 @@ Library
         , GHC.MVar
         , GHC.Natural
         , GHC.Num
-        , GHC.Num.Integer
-        , GHC.Num.Natural
-        , GHC.Num.BigNat
         , GHC.OldList
         , GHC.OverloadedLabels
         , GHC.Profiling
