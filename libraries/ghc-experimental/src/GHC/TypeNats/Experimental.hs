@@ -12,7 +12,7 @@ module GHC.TypeNats.Experimental (
 ) where
 
 import GHC.Internal.TypeNats
-import GHC.Num.Natural (naturalLog2)
+import GHC.Internal.Bignum.Natural (naturalLog2)
 
 plusSNat :: SNat n -> SNat m -> SNat (n + m)
 plusSNat (UnsafeSNat n) (UnsafeSNat m) = UnsafeSNat (n + m)
