@@ -27,7 +27,7 @@ import qualified GHC.Internal.Data.Foldable as F
 import GHC.Internal.Data.Maybe (fromMaybe)
 import Data.Semigroup
 import GHC.Internal.Exts
-import GHC.Num.Integer (Integer(..))
+import GHC.Internal.Bignum.Integer (Integer(..))
 import GHC.Internal.Show (intToDigit)
 import GHC.Internal.ST (ST(..), runST)
 import GHC.Internal.Word (Word8(..))

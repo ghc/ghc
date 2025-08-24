@@ -8,7 +8,7 @@ module System.CPUTime.Utils
     ) where
 
 import GHC.Internal.Foreign.C.Types
-import GHC.Num.Integer (Integer)
+import GHC.Internal.Bignum.Integer (Integer)
 import GHC.Internal.Real (fromIntegral)
 
 cClockToInteger :: CClock -> Integer
