@@ -1849,7 +1849,7 @@ uVarOrFam env ty1 ty2 kco
                         = False
 
         occurs_check = um_unif env &&
-                       occursCheck (um_tv_env substs) tv1 rhs_fvs
+                       tyVarOccursCheck (um_tv_env substs) tv1 rhs_fvs
           -- Occurs check, only when unifying
           -- see Note [Infinitary substitutions]
           -- Make sure you include `kco` in rhs_tvs #14846
@@ -1883,9 +1883,10 @@ uVarOrFam env ty1 ty2 kco
       -- Now check if we can bind the (F tys) to the RHS
       -- This can happen even when matching: see (ATF7)
       | BindMe <- um_bind_fam_fun env tc1 tys1 rhs
-      = -- ToDo: do we need an occurs check here?
-        do { extendFamEnv tc1 tys1 rhs
-           ; maybeApart MARTypeFamily }
+      = if tyFamOccursCheck substs tc1 tys1 rhs
+        then maybeApart MARInfinite
+        else do { extendFamEnv tc1 tys1 rhs
+                ; maybeApart MARTypeFamily }
 
       -- Swap in case of (F a b) ~ (G c d e)
       -- Maybe um_bind_fam_fun is False of (F a b) but true of (G c d e)
@@ -1939,8 +1940,45 @@ uVarOrFam env ty1 ty2 kco
        rhs2 = mkTyConApp tc tys1 `mkCastTy` kco
 
 
-occursCheck :: TvSubstEnv -> TyVar -> TyCoVarSet -> Bool
-occursCheck env tv1 tvs
+tyFamOccursCheck :: UMState -> TyCon -> [Type] -> Type -> Bool
+-- Does (F tys) occur in `ty`, after applying the ambient substitution
+-- Ignore any (F tys) under a forall, because that can't lead to a loop
+tyFamOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env })
+                 target_tc target_tys ty
+  = go ty
+  where
+    go :: Type -> Bool
+    go ty | Just ty' <- coreView ty = go ty'
+    go (TyVarTy tv) | Just ty' <- lookupVarEnv tv_env tv
+                    = go ty'
+                    | otherwise
+                    = go (tyVarKind tv)
+    go (AppTy ty1 ty2)          = go ty1 || go ty2
+    go (LitTy {})               = False
+    go (FunTy _ w arg res)      = go w || go arg || go res
+    go (TyConApp tc tys)        = go_tc tc tys
+    go (ForAllTy (Bndr tv _) _) = go (tyVarKind tv) -- No need to look in the body
+
+    go (CastTy ty  _co) = go ty  -- ToDo: should we worry about `co`?
+    go (CoercionTy _co) = False  -- ToDo: should we worry about `co`?
+
+    go_tc tc tys
+      | isTypeFamilyTyCon tc
+      , Just ty' <- lookupFamEnv fam_env tc (take arity tys)
+      = go ty' || any go (drop arity tys)
+
+      | tc == target_tc
+      , tys `lengthAtLeast` arity  -- Saturated, or over-saturated
+      , and (zipWith tcEqType target_tys tys)
+      = True
+
+      | otherwise
+      = any go tys
+      where
+        arity = tyConArity tc
+
+tyVarOccursCheck :: TvSubstEnv -> TyVar -> TyCoVarSet -> Bool
+tyVarOccursCheck env tv1 tvs
   = anyVarSet bad tvs
   where
     bad tv | Just ty <- lookupVarEnv env tv
