@@ -33,6 +33,7 @@ module GHC.Internal.Encoding.UTF8
     , utf8DecodeForeignPtr
       -- * Counting characters
     , utf8CountCharsByteArray#
+    , utf8CountCharsForeignPtr
       -- * Comparison
     , utf8CompareByteArray#
       -- * Encoding strings
@@ -231,6 +232,17 @@ utf8CountCharsByteArray# ba = go 0# 0#
       | isTrue# (i# >=# len#) = I# n#
       | otherwise =
           case utf8DecodeCharByteArray# ba i# of
+            (# _, nBytes# #) -> go (i# +# nBytes#) (n# +# 1#)
+
+utf8CountCharsForeignPtr :: ForeignPtr Word8 -> Int -> Int -> Int
+utf8CountCharsForeignPtr fp offset (I# len#) = unsafeDupablePerformIO $ do
+  let !(Ptr addr#) = unsafeForeignPtrToPtr fp `plusPtr` offset
+  go addr# 0# 0#
+  where
+    go a# i# n#
+      | isTrue# (i# >=# len#) = I# n#
+      | otherwise =
+          case utf8DecodeCharAddr# a# i# of
             (# _, nBytes# #) -> go (i# +# nBytes#) (n# +# 1#)
 
 {-# INLINE utf8EncodeChar #-}

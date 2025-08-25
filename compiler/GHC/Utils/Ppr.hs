@@ -70,8 +70,8 @@ module GHC.Utils.Ppr (
         -- * Constructing documents
 
         -- ** Converting values into documents
-        char, text, ftext, ptext, ztext, sizedText, zeroWidthText, emptyText,
-        int, integer, float, double, rational, hex,
+        char, text, ftext, ptext, ztext, utf8text, sizedText, zeroWidthText,
+        emptyText, int, integer, float, double, rational, hex,
 
         -- ** Simple derived documents
         semi, comma, colon, space, equals,
@@ -324,6 +324,9 @@ ptext s = textBeside_ (LStr s) (lengthPS s) Empty
 
 ztext :: FastZString -> Doc
 ztext s = textBeside_ (ZStr s) (lengthFZS s) Empty
+
+utf8text :: ByteString -> Doc
+utf8text bs = textBeside_ (Str (utf8DecodeByteString bs)) (utf8CountCharsByteString bs) Empty
 
 -- | Some text with any width. (@text s = sizedText (length s) s@)
 sizedText :: Int -> String -> Doc

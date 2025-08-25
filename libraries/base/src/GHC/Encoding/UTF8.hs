@@ -34,6 +34,7 @@ module GHC.Encoding.UTF8
      utf8DecodeForeignPtr,
      -- *  Counting characters
      utf8CountCharsByteArray#,
+     utf8CountCharsForeignPtr,
      -- *  Comparison
      utf8CompareByteArray#,
      -- *  Encoding strings

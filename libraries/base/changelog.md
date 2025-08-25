@@ -7,6 +7,7 @@
   * Modify the implementation of `Data.List.sortOn` to use `(>)` instead of `compare`. ([CLC proposal #332](https://github.com/haskell/core-libraries-committee/issues/332))
   * `GHC.Exts.IOPort#` and its related operations have been removed  ([CLC #213](https://github.com/haskell/core-libraries-committee/issues/213))
   * Fix bug where `naturalAndNot` was incorrectly truncating results ([CLC proposal #350](github.com/haskell/core-libraries-committee/issues/350))
+  * Added export of `utf8CountCharsForeignPtr` to `GHC.Encoding.UTF8`
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1

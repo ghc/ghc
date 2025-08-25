@@ -26,6 +26,7 @@ module GHC.Utils.Encoding.UTF8
     , utf8DecodeForeignPtr
     , utf8DecodeByteArray#
       -- * Counting characters
+    , utf8CountCharsByteString
     , utf8CountCharsShortByteString
     , utf8CountCharsByteArray#
       -- * Comparison
@@ -63,6 +64,9 @@ utf8CharStart p = go p
                  if w >= 0x80 && w < 0xC0
                         then go (p `plusPtr` (-1))
                         else return p
+
+utf8CountCharsByteString :: ByteString -> Int
+utf8CountCharsByteString (BS.PS fptr offset len) = utf8CountCharsForeignPtr fptr offset len
 
 utf8CountCharsShortByteString :: ShortByteString -> Int
 utf8CountCharsShortByteString (SBS ba) = utf8CountCharsByteArray# ba
