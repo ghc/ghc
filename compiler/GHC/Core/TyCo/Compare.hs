@@ -229,6 +229,8 @@ tcEqTyConApps tc1 args1 tc2 args2
   = tc1 == tc2 && tcEqTyConAppArgs args1 args2
 
 tcEqTyConAppArgs :: [Type] -> [Type] -> Bool
+-- Args do not have to have equal length;
+-- we discard the excess of the longer one
 tcEqTyConAppArgs args1 args2
   = and (zipWith tcEqTypeNoKindCheck args1 args2)
     -- No kind check necessary: if both arguments are well typed, then
