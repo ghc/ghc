@@ -3342,8 +3342,9 @@ mapCheck f xs
 -- | Options describing how to deal with a type equality
 -- in the eager unifier. See 'checkTyEqRhs'
 data TyEqFlags m a
-  -- | LHS is a type family application; we are not unifying.
-  = TEFTyFam
+  = -- | TFTyFam: LHS is a type family application
+    -- Invariant: we are not unifying; see `notUnifying_TEFTask`
+    TEFTyFam
     { tefTyFam_occursCheck :: CheckTyEqProblem
        -- ^ The 'CheckTyEqProblem' to report for occurs-check failures
        -- (soluble or insoluble)
@@ -3352,7 +3353,8 @@ data TyEqFlags m a
     , tef_fam_app :: TyEqFamApp m a
         -- ^ How to deal with type family applications
     }
-  -- | LHS is a 'TyVar'.
+
+  -- | TEFTyVar: LHS is a 'TyVar'.
   | TEFTyVar
     -- NB: this constructor does not actually store a 'TyVar', in order to
     -- support being called from 'makeTypeConcrete' (which works as if we
