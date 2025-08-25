@@ -124,7 +124,7 @@ tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
 
 tcPolyLExpr (L loc expr) res_ty
   = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+    updErrCtxt expr $  -- Note [Error contexts in generated code]
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
@@ -142,7 +142,7 @@ tcPolyExpr e (Check ty)  = tcPolyExprCheck e (Left ty)
 tcPolyLExprSig :: LHsExpr GhcRn -> TcCompleteSig -> TcM (LHsExpr GhcTc)
 tcPolyLExprSig (L loc expr) sig
   = setSrcSpanA loc $
-    -- No addExprCtxt.  For (e :: ty) we don't want generate
+    -- No updErrCtxt.  For (e :: ty) we don't want generate
     --    In the expression e
     --    In the expression e :: ty
     -- We have already got an error-context for (e::ty), so when we
@@ -236,7 +236,7 @@ tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 -- Infer a *rho*-type. The return type is always instantiated.
 tcInferRho (L loc expr)
   = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+    updErrCtxt expr $  -- Note [Error contexts in generated code]
     do { (expr', rho) <- tcInfer (tcExpr expr)
        ; return (L loc expr', rho) }
 
@@ -263,7 +263,7 @@ tcMonoLExpr, tcMonoLExprNC
 
 tcMonoLExpr (L loc expr) res_ty
   = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+    updErrCtxt expr $  -- Note [Error contexts in generated code]
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 
@@ -751,12 +751,11 @@ tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
 tcXExpr (PopErrCtxt e) res_ty
   = do popErrCtxt $ -- See Part 3 of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-         addExprCtxt e $
+         updErrCtxt e $
          tcExpr e res_ty
 
 tcXExpr (ExpandedThingRn o e) res_ty
-   = setInGeneratedCode o $
-     -- e is the expanded expression of o, so we need to set the error ctxt to generated
+   = -- e is the expanded expression of o, so we need to set the error ctxt to generated
      -- see Note [Error Context Stack] in `GHC.Tc.Type.LclEnv`
         mkExpandedTc o <$> -- necessary for hpc ticks
           tcExpr e res_ty

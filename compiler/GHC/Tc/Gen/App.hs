@@ -177,7 +177,7 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 -- False <=> don't instantiate -- return a sigma-type
 tcInferSigma inst (L loc rn_expr)
   = setSrcSpanA loc     $
-    addExprCtxt rn_expr $
+    updErrCtxt rn_expr $
     do { (_, app_res_sigma) <- tcExprSigma inst rn_expr
        ; return app_res_sigma }
 
@@ -957,7 +957,7 @@ addArgCtxt arg_no fun (L arg_loc arg) thing_inside
                                     , text "arg_loc" <+> ppr arg_loc])
        ; if in_generated_code
          then do setSrcSpanA arg_loc $
-                   addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
+                   updErrCtxt arg     $  -- Auto-suppressed if arg_loc is generated
                    thing_inside
          else do setSrcSpanA arg_loc                    $
                    addErrCtxt (FunAppCtxt (FunAppCtxtExpr fun arg) arg_no) $

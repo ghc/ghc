@@ -26,7 +26,7 @@ module GHC.Tc.Gen.Head
        , nonBidirectionalErr
 
        , pprArgInst
-       , addExprCtxt, addFunResCtxt ) where
+       , updErrCtxt, addExprCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
@@ -1100,6 +1100,10 @@ mis-match in the number of value arguments.
              Misc utility functions
 *                                                                      *
 ********************************************************************* -}
+
+updErrCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
+updErrCtxt (XExpr (ExpandedThingRn o _)) thing_inside = setInGeneratedCode o thing_inside
+updErrCtxt e thing_inside = addExprCtxt e thing_inside
 
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside

@@ -36,7 +36,7 @@ module GHC.Tc.Types.LclEnv (
 
 import GHC.Prelude
 
-import GHC.Hs ( SrcCodeOrigin )
+import GHC.Hs ( SrcCodeOrigin (..), HsStmtContext (..), HsExpr (RecordUpd))
 import GHC.Tc.Utils.TcType ( TcLevel )
 import GHC.Tc.Errors.Types ( TcRnMessage )
 
@@ -44,7 +44,7 @@ import GHC.Core.UsageEnv ( UsageEnv )
 
 import GHC.Types.Name.Reader ( LocalRdrEnv )
 import GHC.Types.Name.Env ( NameEnv )
-import GHC.Types.SrcLoc ( RealSrcSpan )
+import GHC.Types.SrcLoc ( RealSrcSpan, unLoc )
 import GHC.Types.Basic ( TopLevelFlag )
 
 import GHC.Types.Error ( Messages )
@@ -113,6 +113,16 @@ data ErrCtxtStack
   = UserCodeCtxt { lcl_err_ctxt :: [ErrCtxt] } -- ^ Trail of error messages
   | GeneratedCodeCtxt { src_code_origin :: SrcCodeOrigin -- ^ Original, user written code
                       , lcl_err_ctxt ::  [ErrCtxt] } -- ^ Trail of error messages
+
+errCtxtFromStack :: ErrCtxtStack -> [ErrCtxt]
+errCtxtFromStack (UserCodeCtxt ctxt) = ctxt
+errCtxtFromStack (GeneratedCodeCtxt (OrigExpr (RecordUpd{})) ctxt) = ctxt
+errCtxtFromStack (GeneratedCodeCtxt (OrigExpr oe) ctxt) =
+  (False, \env -> return (env, ExprCtxt oe)) : ctxt
+errCtxtFromStack (GeneratedCodeCtxt (OrigStmt s f) ctxt) =
+  (False, \env -> return (env, StmtErrCtxt (HsDoStmt f) (unLoc s))) : ctxt
+errCtxtFromStack (GeneratedCodeCtxt _ ctxt) = ctxt
+
 
 -- | Are we in a generated context?
 isGeneratedCodeCtxt :: ErrCtxtStack -> Bool
@@ -203,7 +213,7 @@ getLclEnvLoc :: TcLclEnv -> RealSrcSpan
 getLclEnvLoc = tcl_loc . tcl_lcl_ctxt
 
 getLclEnvErrCtxt :: TcLclEnv -> [ErrCtxt]
-getLclEnvErrCtxt = lcl_err_ctxt . tcl_ctxt . tcl_lcl_ctxt
+getLclEnvErrCtxt = errCtxtFromStack . tcl_ctxt . tcl_lcl_ctxt
 
 setLclEnvErrCtxt :: [ErrCtxt] -> TcLclEnv -> TcLclEnv
 setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = modify_err_ctxt_stack (\ _ -> ctxt) (tcl_ctxt env) })
