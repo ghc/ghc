@@ -20,3 +20,4 @@ test('T14931', [test_opts, unless(have_dynamic(), skip)],
 test('T15108', [test_opts], compile, ['-O -prof -fprof-auto'])
 test('T19894', [test_opts, extra_files(['T19894'])], multimod_compile, ['Main', '-v0 -O2 -prof -fprof-auto -iT19894'])
 test('T20938', [test_opts], compile, ['-O -prof'])
+test('T26056', [test_opts], compile, ['-O -prof'])
