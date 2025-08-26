@@ -26,7 +26,7 @@ where
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferRho )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferExpr )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
@@ -220,7 +220,7 @@ tcInferPat :: FixedRuntimeRepContext
            -> TcM a
            -> TcM ((LPat GhcTc, a), TcSigmaTypeFRR)
 tcInferPat frr_orig ctxt pat thing_inside
-  = tcInferFRR frr_orig $ \ exp_ty ->
+  = runInferSigmaFRR frr_orig $ \ exp_ty ->
     tc_lpat (unrestricted exp_ty) penv pat thing_inside
  where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
@@ -694,15 +694,17 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
          -- restriction need to be put in place, if any, for linear view
          -- patterns to desugar to type-correct Core.
 
-        ; (expr',expr_ty) <- tcInferRho expr
-               -- Note [View patterns and polymorphism]
+        ; (expr', expr_rho)    <- tcInferExpr IIF_ShallowRho expr
+               -- IIF_ShallowRho: do not perform deep instantiation, regardless of
+               -- DeepSubsumption (Note [View patterns and polymorphism])
+               -- But we must do top-instantiation to expose the arrow to matchActualFunTy
 
          -- Expression must be a function
         ; let herald = ExpectedFunTyViewPat $ unLoc expr
         ; (expr_wrap1, Scaled _mult inf_arg_ty, inf_res_sigma)
-            <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc expr) (1,expr_ty) expr_ty
+            <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc expr) (1,expr_rho) expr_rho
                -- See Note [View patterns and polymorphism]
-               -- expr_wrap1 :: expr_ty "->" (inf_arg_ty -> inf_res_sigma)
+               -- expr_wrap1 :: expr_rho "->" (inf_arg_ty -> inf_res_sigma)
 
          -- Check that overall pattern is more polymorphic than arg type
         ; expr_wrap2 <- tc_sub_type penv (scaledThing pat_ty) inf_arg_ty
@@ -715,18 +717,18 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; pat_ty <- readExpType h_pat_ty
         ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
                               (Scaled w pat_ty) inf_res_sigma
-          -- expr_wrap2' :: (inf_arg_ty -> inf_res_sigma) "->"
-          --                (pat_ty -> inf_res_sigma)
-          -- NB: pat_ty comes from matchActualFunTy, so it has a
-          -- fixed RuntimeRep, as needed to call mkWpFun.
-        ; let
+              -- expr_wrap2' :: (inf_arg_ty -> inf_res_sigma) "->"
+              --                (pat_ty -> inf_res_sigma)
+              -- NB: pat_ty comes from matchActualFunTy, so it has a
+              -- fixed RuntimeRep, as needed to call mkWpFun.
+
               expr_wrap = expr_wrap2' <.> expr_wrap1
 
         ; return $ (ViewPat pat_ty (mkLHsWrap expr_wrap expr') pat', res) }
 
 {- Note [View patterns and polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this exotic example:
+Consider this exotic example (test T26331a):
    pair :: forall a. Bool -> a -> forall b. b -> (a,b)
 
    f :: Int -> blah
@@ -735,11 +737,15 @@ Consider this exotic example:
 The expression (pair True) should have type
     pair True :: Int -> forall b. b -> (Int,b)
 so that it is ready to consume the incoming Int. It should be an
-arrow type (t1 -> t2); hence using (tcInferRho expr).
+arrow type (t1 -> t2); and we must not instantiate that `forall b`,
+/even with DeepSubsumption/.  Hence using `IIF_ShallowRho`; this is the only
+place where `IIF_ShallowRho` is used.
 
 Then, when taking that arrow apart we want to get a *sigma* type
 (forall b. b->(Int,b)), because that's what we want to bind 'x' to.
 Fortunately that's what matchActualFunTy returns anyway.
+
+Another example is #26331.
 -}
 
 -- Type signatures in patterns
@@ -768,8 +774,7 @@ Fortunately that's what matchActualFunTy returns anyway.
                                      penv pats thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat coi
-                         (ListPat elt_ty pats') pat_ty, res)
-}
+                         (ListPat elt_ty pats') pat_ty, res) }
 
   TuplePat _ pats boxity -> do
         { let arity = length pats

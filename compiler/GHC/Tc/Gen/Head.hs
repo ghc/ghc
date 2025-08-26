@@ -556,7 +556,7 @@ tcInferAppHead (fun,ctxt)
     do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
-            Nothing -> tcInfer (tcExpr fun) }
+            Nothing -> runInferRho (tcExpr fun) }
 
 tcInferAppHead_maybe :: HsExpr GhcRn
                      -> TcM (Maybe (HsExpr GhcTc, TcSigmaType))

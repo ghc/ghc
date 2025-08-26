@@ -62,7 +62,6 @@ import GHC.Tc.Gen.Match
 import GHC.Tc.Utils.Unify( checkConstraints, tcSubTypeSigma )
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Gen.Expr
-import GHC.Tc.Gen.App( tcInferSigma )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Export
 import GHC.Tc.Types.Evidence
@@ -2629,10 +2628,11 @@ tcRnExpr hsc_env mode rdr_expr
     failIfErrsM ;
 
     -- Typecheck the expression
-    ((tclvl, res_ty), lie)
+    ((tclvl, (_tc_expr, res_ty)), lie)
           <- captureTopConstraints $
              pushTcLevelM          $
-             tcInferSigma inst rn_expr ;
+             (if inst then tcInferRho rn_expr
+                      else tcInferSigma rn_expr);
 
     -- Generalise
     uniq <- newUnique ;
