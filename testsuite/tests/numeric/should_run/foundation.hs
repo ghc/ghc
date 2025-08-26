@@ -24,7 +24,7 @@ module Main
     ( main
     ) where
 
-import Data.Bits (Bits((.&.), bit))
+import Data.Bits (Bits((.&.), bit), finiteBitSize)
 import Data.Word
 import Data.Int
 import GHC.Natural
@@ -132,6 +132,52 @@ newtype NonZero a = NonZero { getNonZero :: a }
 
 instance (Arbitrary a, Num a, Eq a) => Arbitrary (NonZero a) where
   arbitrary = nonZero
+
+-- | A newtype for shift amounts that are bounded by word size
+newtype BoundedShift a = BoundedShift { getBoundedShift :: Int }
+  deriving (Eq,Ord,Show)
+
+-- | Generate shift amounts bounded by the word size for each type
+boundedShift8 :: Gen (BoundedShift Int8)
+boundedShift8 = do
+  x <- arbitrary
+  return $ BoundedShift (abs x `mod` 8)
+
+boundedShift16 :: Gen (BoundedShift Int16)
+boundedShift16 = do
+  x <- arbitrary
+  return $ BoundedShift (abs x `mod` 16)
+
+boundedShift32 :: Gen (BoundedShift Int32)
+boundedShift32 = do
+  x <- arbitrary
+  return $ BoundedShift (abs x `mod` 32)
+
+boundedShift64 :: Gen (BoundedShift Int64)
+boundedShift64 = do
+  x <- arbitrary
+  return $ BoundedShift (abs x `mod` 64)
+
+boundedShiftWord :: Gen (BoundedShift Int)
+boundedShiftWord = do
+  x <- arbitrary
+  return $ BoundedShift (abs x `mod` finiteBitSize (undefined :: Word))
+
+-- Arbitrary instances for BoundedShift types to work with lambda patterns
+instance Arbitrary (BoundedShift Int8) where
+  arbitrary = boundedShift8
+
+instance Arbitrary (BoundedShift Int16) where
+  arbitrary = boundedShift16
+
+instance Arbitrary (BoundedShift Int32) where
+  arbitrary = boundedShift32
+
+instance Arbitrary (BoundedShift Int64) where
+  arbitrary = boundedShift64
+
+instance Arbitrary (BoundedShift Int) where
+  arbitrary = boundedShiftWord
 
 instance Arbitrary Natural where
     arbitrary = integralDownsize . (`mod` 10000) . abs <$> arbitraryInt64
@@ -395,6 +441,10 @@ class TestPrimop f where
   testPrimopDivLike :: String -> f -> f -> Test
   testPrimopDivLike _ _ _ = error "Div testing not supported for this type."
 
+  -- | Special test method for shift operations that bounds the shift amount
+  testPrimopShift :: String -> f -> f -> Test
+  testPrimopShift _ _ _ = error "Shift testing not supported for this type."
+
 {-
 instance TestPrimop (Int# -> Int# -> Int#) where
   testPrimop s l r = Property s $ \(uInt -> a1) (uInt -> a2) -> (wInt (l a1 a2)) === wInt (r a1 a2)
@@ -460,9 +510,9 @@ testPrimops = Group "primop"
   , testPrimopDivLike "quotInt8#" Primop.quotInt8# Wrapper.quotInt8#
   , testPrimopDivLike "remInt8#" Primop.remInt8# Wrapper.remInt8#
   , testPrimopDivLike "quotRemInt8#" Primop.quotRemInt8# Wrapper.quotRemInt8#
-  , testPrimop "uncheckedShiftLInt8#" Primop.uncheckedShiftLInt8# Wrapper.uncheckedShiftLInt8#
-  , testPrimop "uncheckedShiftRAInt8#" Primop.uncheckedShiftRAInt8# Wrapper.uncheckedShiftRAInt8#
-  , testPrimop "uncheckedShiftRLInt8#" Primop.uncheckedShiftRLInt8# Wrapper.uncheckedShiftRLInt8#
+  , testPrimopShift "uncheckedShiftLInt8#" Primop.uncheckedShiftLInt8# Wrapper.uncheckedShiftLInt8#
+  , testPrimopShift "uncheckedShiftRAInt8#" Primop.uncheckedShiftRAInt8# Wrapper.uncheckedShiftRAInt8#
+  , testPrimopShift "uncheckedShiftRLInt8#" Primop.uncheckedShiftRLInt8# Wrapper.uncheckedShiftRLInt8#
   , testPrimop "int8ToWord8#" Primop.int8ToWord8# Wrapper.int8ToWord8#
   , testPrimop "eqInt8#" Primop.eqInt8# Wrapper.eqInt8#
   , testPrimop "geInt8#" Primop.geInt8# Wrapper.geInt8#
@@ -482,8 +532,8 @@ testPrimops = Group "primop"
   , testPrimop "orWord8#" Primop.orWord8# Wrapper.orWord8#
   , testPrimop "xorWord8#" Primop.xorWord8# Wrapper.xorWord8#
   , testPrimop "notWord8#" Primop.notWord8# Wrapper.notWord8#
-  , testPrimop "uncheckedShiftLWord8#" Primop.uncheckedShiftLWord8# Wrapper.uncheckedShiftLWord8#
-  , testPrimop "uncheckedShiftRLWord8#" Primop.uncheckedShiftRLWord8# Wrapper.uncheckedShiftRLWord8#
+  , testPrimopShift "uncheckedShiftLWord8#" Primop.uncheckedShiftLWord8# Wrapper.uncheckedShiftLWord8#
+  , testPrimopShift "uncheckedShiftRLWord8#" Primop.uncheckedShiftRLWord8# Wrapper.uncheckedShiftRLWord8#
   , testPrimop "word8ToInt8#" Primop.word8ToInt8# Wrapper.word8ToInt8#
   , testPrimop "eqWord8#" Primop.eqWord8# Wrapper.eqWord8#
   , testPrimop "geWord8#" Primop.geWord8# Wrapper.geWord8#
@@ -500,9 +550,9 @@ testPrimops = Group "primop"
   , testPrimopDivLike "quotInt16#" Primop.quotInt16# Wrapper.quotInt16#
   , testPrimopDivLike "remInt16#" Primop.remInt16# Wrapper.remInt16#
   , testPrimopDivLike "quotRemInt16#" Primop.quotRemInt16# Wrapper.quotRemInt16#
-  , testPrimop "uncheckedShiftLInt16#" Primop.uncheckedShiftLInt16# Wrapper.uncheckedShiftLInt16#
-  , testPrimop "uncheckedShiftRAInt16#" Primop.uncheckedShiftRAInt16# Wrapper.uncheckedShiftRAInt16#
-  , testPrimop "uncheckedShiftRLInt16#" Primop.uncheckedShiftRLInt16# Wrapper.uncheckedShiftRLInt16#
+  , testPrimopShift "uncheckedShiftLInt16#" Primop.uncheckedShiftLInt16# Wrapper.uncheckedShiftLInt16#
+  , testPrimopShift "uncheckedShiftRAInt16#" Primop.uncheckedShiftRAInt16# Wrapper.uncheckedShiftRAInt16#
+  , testPrimopShift "uncheckedShiftRLInt16#" Primop.uncheckedShiftRLInt16# Wrapper.uncheckedShiftRLInt16#
   , testPrimop "int16ToWord16#" Primop.int16ToWord16# Wrapper.int16ToWord16#
   , testPrimop "eqInt16#" Primop.eqInt16# Wrapper.eqInt16#
   , testPrimop "geInt16#" Primop.geInt16# Wrapper.geInt16#
@@ -522,8 +572,8 @@ testPrimops = Group "primop"
   , testPrimop "orWord16#" Primop.orWord16# Wrapper.orWord16#
   , testPrimop "xorWord16#" Primop.xorWord16# Wrapper.xorWord16#
   , testPrimop "notWord16#" Primop.notWord16# Wrapper.notWord16#
-  , testPrimop "uncheckedShiftLWord16#" Primop.uncheckedShiftLWord16# Wrapper.uncheckedShiftLWord16#
-  , testPrimop "uncheckedShiftRLWord16#" Primop.uncheckedShiftRLWord16# Wrapper.uncheckedShiftRLWord16#
+  , testPrimopShift "uncheckedShiftLWord16#" Primop.uncheckedShiftLWord16# Wrapper.uncheckedShiftLWord16#
+  , testPrimopShift "uncheckedShiftRLWord16#" Primop.uncheckedShiftRLWord16# Wrapper.uncheckedShiftRLWord16#
   , testPrimop "word16ToInt16#" Primop.word16ToInt16# Wrapper.word16ToInt16#
   , testPrimop "eqWord16#" Primop.eqWord16# Wrapper.eqWord16#
   , testPrimop "geWord16#" Primop.geWord16# Wrapper.geWord16#
@@ -540,9 +590,9 @@ testPrimops = Group "primop"
   , testPrimopDivLike "quotInt32#" Primop.quotInt32# Wrapper.quotInt32#
   , testPrimopDivLike "remInt32#" Primop.remInt32# Wrapper.remInt32#
   , testPrimopDivLike "quotRemInt32#" Primop.quotRemInt32# Wrapper.quotRemInt32#
-  , testPrimop "uncheckedShiftLInt32#" Primop.uncheckedShiftLInt32# Wrapper.uncheckedShiftLInt32#
-  , testPrimop "uncheckedShiftRAInt32#" Primop.uncheckedShiftRAInt32# Wrapper.uncheckedShiftRAInt32#
-  , testPrimop "uncheckedShiftRLInt32#" Primop.uncheckedShiftRLInt32# Wrapper.uncheckedShiftRLInt32#
+  , testPrimopShift "uncheckedShiftLInt32#" Primop.uncheckedShiftLInt32# Wrapper.uncheckedShiftLInt32#
+  , testPrimopShift "uncheckedShiftRAInt32#" Primop.uncheckedShiftRAInt32# Wrapper.uncheckedShiftRAInt32#
+  , testPrimopShift "uncheckedShiftRLInt32#" Primop.uncheckedShiftRLInt32# Wrapper.uncheckedShiftRLInt32#
   , testPrimop "int32ToWord32#" Primop.int32ToWord32# Wrapper.int32ToWord32#
   , testPrimop "eqInt32#" Primop.eqInt32# Wrapper.eqInt32#
   , testPrimop "geInt32#" Primop.geInt32# Wrapper.geInt32#
@@ -562,8 +612,8 @@ testPrimops = Group "primop"
   , testPrimop "orWord32#" Primop.orWord32# Wrapper.orWord32#
   , testPrimop "xorWord32#" Primop.xorWord32# Wrapper.xorWord32#
   , testPrimop "notWord32#" Primop.notWord32# Wrapper.notWord32#
-  , testPrimop "uncheckedShiftLWord32#" Primop.uncheckedShiftLWord32# Wrapper.uncheckedShiftLWord32#
-  , testPrimop "uncheckedShiftRLWord32#" Primop.uncheckedShiftRLWord32# Wrapper.uncheckedShiftRLWord32#
+  , testPrimopShift "uncheckedShiftLWord32#" Primop.uncheckedShiftLWord32# Wrapper.uncheckedShiftLWord32#
+  , testPrimopShift "uncheckedShiftRLWord32#" Primop.uncheckedShiftRLWord32# Wrapper.uncheckedShiftRLWord32#
   , testPrimop "word32ToInt32#" Primop.word32ToInt32# Wrapper.word32ToInt32#
   , testPrimop "eqWord32#" Primop.eqWord32# Wrapper.eqWord32#
   , testPrimop "geWord32#" Primop.geWord32# Wrapper.geWord32#
@@ -579,9 +629,9 @@ testPrimops = Group "primop"
   , testPrimop "timesInt64#" Primop.timesInt64# Wrapper.timesInt64#
   , testPrimopDivLike "quotInt64#" Primop.quotInt64# Wrapper.quotInt64#
   , testPrimopDivLike "remInt64#" Primop.remInt64# Wrapper.remInt64#
-  , testPrimop "uncheckedIShiftL64#" Primop.uncheckedIShiftL64# Wrapper.uncheckedIShiftL64#
-  , testPrimop "uncheckedIShiftRA64#" Primop.uncheckedIShiftRA64# Wrapper.uncheckedIShiftRA64#
-  , testPrimop "uncheckedIShiftRL64#" Primop.uncheckedIShiftRL64# Wrapper.uncheckedIShiftRL64#
+  , testPrimopShift "uncheckedIShiftL64#" Primop.uncheckedIShiftL64# Wrapper.uncheckedIShiftL64#
+  , testPrimopShift "uncheckedIShiftRA64#" Primop.uncheckedIShiftRA64# Wrapper.uncheckedIShiftRA64#
+  , testPrimopShift "uncheckedIShiftRL64#" Primop.uncheckedIShiftRL64# Wrapper.uncheckedIShiftRL64#
   , testPrimop "int64ToWord64#" Primop.int64ToWord64# Wrapper.int64ToWord64#
   , testPrimop "eqInt64#" Primop.eqInt64# Wrapper.eqInt64#
   , testPrimop "geInt64#" Primop.geInt64# Wrapper.geInt64#
@@ -600,8 +650,8 @@ testPrimops = Group "primop"
   , testPrimop "or64#" Primop.or64# Wrapper.or64#
   , testPrimop "xor64#" Primop.xor64# Wrapper.xor64#
   , testPrimop "not64#" Primop.not64# Wrapper.not64#
-  , testPrimop "uncheckedShiftL64#" Primop.uncheckedShiftL64# Wrapper.uncheckedShiftL64#
-  , testPrimop "uncheckedShiftRL64#" Primop.uncheckedShiftRL64# Wrapper.uncheckedShiftRL64#
+  , testPrimopShift "uncheckedShiftL64#" Primop.uncheckedShiftL64# Wrapper.uncheckedShiftL64#
+  , testPrimopShift "uncheckedShiftRL64#" Primop.uncheckedShiftRL64# Wrapper.uncheckedShiftRL64#
   , testPrimop "word64ToInt64#" Primop.word64ToInt64# Wrapper.word64ToInt64#
   , testPrimop "eqWord64#" Primop.eqWord64# Wrapper.eqWord64#
   , testPrimop "geWord64#" Primop.geWord64# Wrapper.geWord64#
@@ -632,9 +682,9 @@ testPrimops = Group "primop"
   , testPrimop "<=#" (Primop.<=#) (Wrapper.<=#)
   , testPrimop "chr#" Primop.chr# Wrapper.chr#
   , testPrimop "int2Word#" Primop.int2Word# Wrapper.int2Word#
-  , testPrimop "uncheckedIShiftL#" Primop.uncheckedIShiftL# Wrapper.uncheckedIShiftL#
-  , testPrimop "uncheckedIShiftRA#" Primop.uncheckedIShiftRA# Wrapper.uncheckedIShiftRA#
-  , testPrimop "uncheckedIShiftRL#" Primop.uncheckedIShiftRL# Wrapper.uncheckedIShiftRL#
+  , testPrimopShift "uncheckedIShiftL#" Primop.uncheckedIShiftL# Wrapper.uncheckedIShiftL#
+  , testPrimopShift "uncheckedIShiftRA#" Primop.uncheckedIShiftRA# Wrapper.uncheckedIShiftRA#
+  , testPrimopShift "uncheckedIShiftRL#" Primop.uncheckedIShiftRL# Wrapper.uncheckedIShiftRL#
   , testPrimop "plusWord#" Primop.plusWord# Wrapper.plusWord#
   , testPrimop "addWordC#" Primop.addWordC# Wrapper.addWordC#
   , testPrimop "subWordC#" Primop.subWordC# Wrapper.subWordC#
@@ -649,8 +699,8 @@ testPrimops = Group "primop"
   , testPrimop "or#" Primop.or# Wrapper.or#
   , testPrimop "xor#" Primop.xor# Wrapper.xor#
   , testPrimop "not#" Primop.not# Wrapper.not#
-  , testPrimop "uncheckedShiftL#" Primop.uncheckedShiftL# Wrapper.uncheckedShiftL#
-  , testPrimop "uncheckedShiftRL#" Primop.uncheckedShiftRL# Wrapper.uncheckedShiftRL#
+  , testPrimopShift "uncheckedShiftL#" Primop.uncheckedShiftL# Wrapper.uncheckedShiftL#
+  , testPrimopShift "uncheckedShiftRL#" Primop.uncheckedShiftRL# Wrapper.uncheckedShiftRL#
   , testPrimop "word2Int#" Primop.word2Int# Wrapper.word2Int#
   , testPrimop "gtWord#" Primop.gtWord# Wrapper.gtWord#
   , testPrimop "geWord#" Primop.geWord# Wrapper.geWord#
@@ -709,6 +759,7 @@ instance TestPrimop (Char# -> Int#) where
 instance TestPrimop (Int# -> Int# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt#-> x0) (uInt#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
   testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt#-> x0) (uInt#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
+  testPrimopShift s l r = Property s $ \ (uInt#-> x0) (BoundedShift shift :: BoundedShift Int) -> wInt# (l x0 (uInt# shift)) === wInt# (r x0 (uInt# shift))
 
 instance TestPrimop (Int# -> Int# -> (# Int#,Int# #)) where
   testPrimop s l r = Property s $ \ (uInt#-> x0) (uInt#-> x1) -> WTUP2(wInt#,wInt#, (l x0 x1)) === WTUP2(wInt#,wInt#, (r x0 x1))
@@ -741,6 +792,7 @@ instance TestPrimop (Int# -> Word#) where
 
 instance TestPrimop (Int16# -> Int# -> Int16#) where
   testPrimop s l r = Property s $ \ (uInt16#-> x0) (uInt#-> x1) -> wInt16# (l x0 x1) === wInt16# (r x0 x1)
+  testPrimopShift s l r = Property s $ \ (uInt16#-> x0) (BoundedShift shift :: BoundedShift Int16) -> wInt16# (l x0 (uInt# shift)) === wInt16# (r x0 (uInt# shift))
 
 instance TestPrimop (Int16# -> Int16# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt16#-> x0) (uInt16#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -765,6 +817,7 @@ instance TestPrimop (Int16# -> Word16#) where
 
 instance TestPrimop (Int32# -> Int# -> Int32#) where
   testPrimop s l r = Property s $ \ (uInt32#-> x0) (uInt#-> x1) -> wInt32# (l x0 x1) === wInt32# (r x0 x1)
+  testPrimopShift s l r = Property s $ \ (uInt32#-> x0) (BoundedShift shift :: BoundedShift Int32) -> wInt32# (l x0 (uInt# shift)) === wInt32# (r x0 (uInt# shift))
 
 instance TestPrimop (Int32# -> Int32# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt32#-> x0) (uInt32#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -789,6 +842,7 @@ instance TestPrimop (Int32# -> Word32#) where
 
 instance TestPrimop (Int64# -> Int# -> Int64#) where
   testPrimop s l r = Property s $ \ (uInt64#-> x0) (uInt#-> x1) -> wInt64# (l x0 x1) === wInt64# (r x0 x1)
+  testPrimopShift s l r = Property s $ \ (uInt64#-> x0) (BoundedShift shift :: BoundedShift Int64) -> wInt64# (l x0 (uInt# shift)) === wInt64# (r x0 (uInt# shift))
 
 instance TestPrimop (Int64# -> Int64# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt64#-> x0) (uInt64#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -809,6 +863,7 @@ instance TestPrimop (Int64# -> Word64#) where
 
 instance TestPrimop (Int8# -> Int# -> Int8#) where
   testPrimop s l r = Property s $ \ (uInt8#-> x0) (uInt#-> x1) -> wInt8# (l x0 x1) === wInt8# (r x0 x1)
+  testPrimopShift s l r = Property s $ \ (uInt8#-> x0) (BoundedShift shift :: BoundedShift Int8) -> wInt8# (l x0 (uInt# shift)) === wInt8# (r x0 (uInt# shift))
 
 instance TestPrimop (Int8# -> Int8# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt8#-> x0) (uInt8#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -833,6 +888,7 @@ instance TestPrimop (Int8# -> Word8#) where
 
 instance TestPrimop (Word# -> Int# -> Word#) where
   testPrimop s l r = Property s $ \ (uWord#-> x0) (uInt#-> x1) -> wWord# (l x0 x1) === wWord# (r x0 x1)
+  testPrimopShift s l r = Property s $ \ (uWord#-> x0) (BoundedShift shift :: BoundedShift Int) -> wWord# (l x0 (uInt# shift)) === wWord# (r x0 (uInt# shift))
 
 instance TestPrimop (Word# -> Word# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord#-> x0) (uWord#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -870,6 +926,7 @@ instance TestPrimop (Word# -> Word8#) where
 
 instance TestPrimop (Word16# -> Int# -> Word16#) where
   testPrimop s l r = Property s $ \ (uWord16#-> x0) (uInt#-> x1) -> wWord16# (l x0 x1) === wWord16# (r x0 x1)
+  testPrimopShift s l r = Property s $ \ (uWord16#-> x0) (BoundedShift shift :: BoundedShift Int16) -> wWord16# (l x0 (uInt# shift)) === wWord16# (r x0 (uInt# shift))
 
 instance TestPrimop (Word16# -> Word16# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord16#-> x0) (uWord16#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -894,6 +951,7 @@ instance TestPrimop (Word16# -> Word16#) where
 
 instance TestPrimop (Word32# -> Int# -> Word32#) where
   testPrimop s l r = Property s $ \ (uWord32#-> x0) (uInt#-> x1) -> wWord32# (l x0 x1) === wWord32# (r x0 x1)
+  testPrimopShift s l r = Property s $ \ (uWord32#-> x0) (BoundedShift shift :: BoundedShift Int32) -> wWord32# (l x0 (uInt# shift)) === wWord32# (r x0 (uInt# shift))
 
 instance TestPrimop (Word32# -> Word32# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord32#-> x0) (uWord32#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -918,6 +976,7 @@ instance TestPrimop (Word32# -> Word32#) where
 
 instance TestPrimop (Word64# -> Int# -> Word64#) where
   testPrimop s l r = Property s $ \ (uWord64#-> x0) (uInt#-> x1) -> wWord64# (l x0 x1) === wWord64# (r x0 x1)
+  testPrimopShift s l r = Property s $ \ (uWord64#-> x0) (BoundedShift shift :: BoundedShift Int64) -> wWord64# (l x0 (uInt# shift)) === wWord64# (r x0 (uInt# shift))
 
 instance TestPrimop (Word64# -> Word64# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord64#-> x0) (uWord64#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -938,6 +997,7 @@ instance TestPrimop (Word64# -> Word64#) where
 
 instance TestPrimop (Word8# -> Int# -> Word8#) where
   testPrimop s l r = Property s $ \ (uWord8#-> x0) (uInt#-> x1) -> wWord8# (l x0 x1) === wWord8# (r x0 x1)
+  testPrimopShift s l r = Property s $ \ (uWord8#-> x0) (BoundedShift shift :: BoundedShift Int8) -> wWord8# (l x0 (uInt# shift)) === wWord8# (r x0 (uInt# shift))
 
 instance TestPrimop (Word8# -> Word8# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord8#-> x0) (uWord8#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)

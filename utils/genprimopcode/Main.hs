@@ -705,11 +705,15 @@ gen_foundation_tests (Info _ entries)
 
     mkInstances inst_ty =
       let test_lambda = "\\ " ++ intercalate " " (zipWith mkArg [0::Int ..] (arg_tys)) ++ " -> " ++ mk_body "l" ++ " === " ++ mk_body "r"
+          shift_lambda = "\\ " ++ mkArg (0::Int) (head arg_tys) ++ " (BoundedShift shift :: BoundedShift " ++ shiftBoundType (head arg_tys) ++ ") -> " ++ mk_shift_body "l" ++ " === " ++ mk_shift_body "r"
       in  unlines $
       [ "instance TestPrimop (" ++ pprTy inst_ty ++ ") where"
       , "  testPrimop s l r = Property s $ " ++ test_lambda ]
       ++ (if mb_divable_tys
           then ["  testPrimopDivLike s l r = Property s $ twoNonZero $ " ++ test_lambda]
+          else [])
+      ++ (if mb_shiftable_tys
+          then ["  testPrimopShift s l r = Property s $ " ++ shift_lambda]
           else [])
       where
         arg_tys = args inst_ty
@@ -718,7 +722,14 @@ gen_foundation_tests (Info _ entries)
             [ty1,ty2] -> ty1 == ty2 && ty1 `elem` divableTyCons
             _         -> False
 
+        -- eg SomeType# -> Int# -> SomeType#
+        mb_shiftable_tys = case arg_tys of
+            [ty1,"Int#"] -> let res_type = getResultType inst_ty
+                            in ty1 == res_type && ty1 `elem` shiftableTyCons
+            _            -> False
+
         mk_body s = res_ty inst_ty (" (" ++ s ++ " " ++ intercalate " " vs ++ ")")
+        mk_shift_body s = res_ty inst_ty (" (" ++ s ++ " x0 (uInt# shift))")
 
         vs = zipWith (\n _ -> "x" ++ show n) [0::Int ..] (arg_tys)
 
@@ -761,6 +772,8 @@ gen_foundation_tests (Info _ entries)
       , (testable (ty po))
       = let testPrimOpHow = if is_divLikeOp po
               then "testPrimopDivLike"
+              else if is_shiftLikeOp po
+              then "testPrimopShift"
               else "testPrimop"
             qualOp qualification =
               let qName = wrap qualification poName
@@ -784,6 +797,27 @@ gen_foundation_tests (Info _ entries)
     testableTyCon _ = False
     divableTyCons = ["Int#", "Word#", "Word8#", "Word16#", "Word32#", "Word64#"
                     ,"Int8#", "Int16#", "Int32#", "Int64#"]
+    shiftableTyCons = ["Int#", "Word#", "Word8#", "Word16#", "Word32#", "Word64#"
+                      ,"Int8#", "Int16#", "Int32#", "Int64#"]
+
+    shiftBoundType :: String -> String
+    shiftBoundType "Int8#"   = "Int8"
+    shiftBoundType "Int16#"  = "Int16"
+    shiftBoundType "Int32#"  = "Int32"
+    shiftBoundType "Int64#"  = "Int64"
+    shiftBoundType "Word8#"  = "Int8"   -- Word8 uses Int8 bound
+    shiftBoundType "Word16#" = "Int16"  -- Word16 uses Int16 bound
+    shiftBoundType "Word32#" = "Int32"  -- Word32 uses Int32 bound
+    shiftBoundType "Word64#" = "Int64"  -- Word64 uses Int64 bound
+    shiftBoundType "Int#"    = "Int"
+    shiftBoundType "Word#"   = "Int"    -- Word uses Int bound
+    shiftBoundType t         = error $ "shiftBoundType: unknown type " ++ t
+
+    getResultType :: Ty -> String
+    getResultType (TyF _ t2) = getResultType t2
+    getResultType (TyApp (TyCon c) []) = c
+    getResultType (TyUTup _) = ""  -- Unboxed tuples can't be shift operations
+    getResultType t = error $ "getResultType: unexpected type " ++ pprTy t
 
     mb_defined_bits :: Entry -> Maybe Word
     mb_defined_bits op@(PrimOpSpec{}) =
