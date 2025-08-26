@@ -148,6 +148,7 @@ defaults
    vector           = []
    deprecated_msg   = {}      -- A non-empty message indicates deprecation
    div_like         = False   -- Second argument expected to be non zero - used for tests
+   shift_like       = False   -- Second argument expected to be atmost first argument's word size -1 - used for tests
    defined_bits     = Nothing -- The number of bits the operation is defined for (if not all bits)
 
 -- Note [When do out-of-line primops go in primops.txt.pp]
@@ -312,8 +313,16 @@ primop Int8QuotRemOp "quotRemInt8#" GenPrimOp Int8# -> Int8# -> (# Int8#, Int8# 
     div_like = True
 
 primop Int8SllOp "uncheckedShiftLInt8#"  GenPrimOp Int8# -> Int# -> Int8#
+  with
+    shift_like = True
+
 primop Int8SraOp "uncheckedShiftRAInt8#" GenPrimOp Int8# -> Int# -> Int8#
+  with
+    shift_like = True
+
 primop Int8SrlOp "uncheckedShiftRLInt8#" GenPrimOp Int8# -> Int# -> Int8#
+  with
+    shift_like = True
 
 primop Int8ToWord8Op "int8ToWord8#" GenPrimOp Int8# -> Word8#
    with code_size = 0
@@ -372,7 +381,12 @@ primop Word8XorOp "xorWord8#" GenPrimOp Word8# -> Word8# -> Word8#
 primop Word8NotOp "notWord8#" GenPrimOp Word8# -> Word8#
 
 primop Word8SllOp "uncheckedShiftLWord8#"  GenPrimOp Word8# -> Int# -> Word8#
+  with
+    shift_like = True
+
 primop Word8SrlOp "uncheckedShiftRLWord8#" GenPrimOp Word8# -> Int# -> Word8#
+  with
+    shift_like = True
 
 primop Word8ToInt8Op "word8ToInt8#" GenPrimOp Word8# -> Int8#
    with code_size = 0
@@ -422,8 +436,16 @@ primop Int16QuotRemOp "quotRemInt16#" GenPrimOp Int16# -> Int16# -> (# Int16#, I
     div_like = True
 
 primop Int16SllOp "uncheckedShiftLInt16#"  GenPrimOp Int16# -> Int# -> Int16#
+  with
+    shift_like = True
+
 primop Int16SraOp "uncheckedShiftRAInt16#" GenPrimOp Int16# -> Int# -> Int16#
+  with
+    shift_like = True
+
 primop Int16SrlOp "uncheckedShiftRLInt16#" GenPrimOp Int16# -> Int# -> Int16#
+  with
+    shift_like = True
 
 primop Int16ToWord16Op "int16ToWord16#" GenPrimOp Int16# -> Word16#
    with code_size = 0
@@ -482,7 +504,12 @@ primop Word16XorOp "xorWord16#" GenPrimOp Word16# -> Word16# -> Word16#
 primop Word16NotOp "notWord16#" GenPrimOp Word16# -> Word16#
 
 primop Word16SllOp "uncheckedShiftLWord16#"  GenPrimOp Word16# -> Int# -> Word16#
+  with
+    shift_like = True
+
 primop Word16SrlOp "uncheckedShiftRLWord16#" GenPrimOp Word16# -> Int# -> Word16#
+  with
+    shift_like = True
 
 primop Word16ToInt16Op "word16ToInt16#" GenPrimOp Word16# -> Int16#
    with code_size = 0
@@ -532,8 +559,16 @@ primop Int32QuotRemOp "quotRemInt32#" GenPrimOp Int32# -> Int32# -> (# Int32#, I
     div_like = True
 
 primop Int32SllOp "uncheckedShiftLInt32#"  GenPrimOp Int32# -> Int# -> Int32#
+  with
+    shift_like = True
+
 primop Int32SraOp "uncheckedShiftRAInt32#" GenPrimOp Int32# -> Int# -> Int32#
+  with
+    shift_like = True
+
 primop Int32SrlOp "uncheckedShiftRLInt32#" GenPrimOp Int32# -> Int# -> Int32#
+  with
+    shift_like = True
 
 primop Int32ToWord32Op "int32ToWord32#" GenPrimOp Int32# -> Word32#
    with code_size = 0
@@ -592,7 +627,12 @@ primop Word32XorOp "xorWord32#" GenPrimOp Word32# -> Word32# -> Word32#
 primop Word32NotOp "notWord32#" GenPrimOp Word32# -> Word32#
 
 primop Word32SllOp "uncheckedShiftLWord32#"  GenPrimOp Word32# -> Int# -> Word32#
+  with
+    shift_like = True
+
 primop Word32SrlOp "uncheckedShiftRLWord32#" GenPrimOp Word32# -> Int# -> Word32#
+  with
+    shift_like = True
 
 primop Word32ToInt32Op "word32ToInt32#" GenPrimOp Word32# -> Int32#
    with code_size = 0
@@ -637,8 +677,16 @@ primop Int64RemOp "remInt64#" GenPrimOp Int64# -> Int64# -> Int64#
     div_like = True
 
 primop Int64SllOp "uncheckedIShiftL64#"  GenPrimOp Int64# -> Int# -> Int64#
+  with
+    shift_like = True
+
 primop Int64SraOp "uncheckedIShiftRA64#" GenPrimOp Int64# -> Int# -> Int64#
+  with
+    shift_like = True
+
 primop Int64SrlOp "uncheckedIShiftRL64#" GenPrimOp Int64# -> Int# -> Int64#
+  with
+    shift_like = True
 
 primop Int64ToWord64Op "int64ToWord64#" GenPrimOp Int64# -> Word64#
    with code_size = 0
@@ -692,7 +740,12 @@ primop Word64XorOp "xor64#" GenPrimOp Word64# -> Word64# -> Word64#
 primop Word64NotOp "not64#" GenPrimOp Word64# -> Word64#
 
 primop Word64SllOp "uncheckedShiftL64#"  GenPrimOp Word64# -> Int# -> Word64#
+  with
+    shift_like = True
+
 primop Word64SrlOp "uncheckedShiftRL64#" GenPrimOp Word64# -> Int# -> Word64#
+  with
+    shift_like = True
 
 primop Word64ToInt64Op "word64ToInt64#" GenPrimOp Word64# -> Int64#
    with code_size = 0
@@ -865,12 +918,20 @@ primop   WordToDoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
 primop   IntSllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
          {Shift left.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
+  with
+    shift_like = True
+
 primop   IntSraOp   "uncheckedIShiftRA#" GenPrimOp Int# -> Int# -> Int#
          {Shift right arithmetic.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
+  with
+    shift_like = True
+
 primop   IntSrlOp   "uncheckedIShiftRL#" GenPrimOp Int# -> Int# -> Int#
          {Shift right logical.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
+  with
+    shift_like = True
 
 ------------------------------------------------------------------------
 section "Word#"
@@ -946,9 +1007,14 @@ primop   WordNotOp   "not#"   GenPrimOp   Word# -> Word#
 primop   WordSllOp   "uncheckedShiftL#"   GenPrimOp   Word# -> Int# -> Word#
          {Shift left logical.   Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
+  with
+    shift_like = True
+
 primop   WordSrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
          {Shift right logical.   Result undefined if shift  amount is not
           in the range 0 to word size - 1 inclusive.}
+  with
+    shift_like = True
 
 primop   WordToIntOp   "word2Int#"   GenPrimOp   Word# -> Int#
    with code_size = 0
