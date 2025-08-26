@@ -16,7 +16,6 @@
 
 module GHC.Tc.Gen.App
        ( tcApp
-       , tcInferSigma
        , tcExprPrag ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
@@ -167,26 +166,6 @@ Note [Instantiation variables are short lived]
 
 {- *********************************************************************
 *                                                                      *
-              tcInferSigma
-*                                                                      *
-********************************************************************* -}
-
-tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
--- Used only to implement :type; see GHC.Tc.Module.tcRnExpr
--- True  <=> instantiate -- return a rho-type
--- False <=> don't instantiate -- return a sigma-type
-tcInferSigma inst (L loc rn_expr)
-  = addExprCtxt rn_expr $
-    setSrcSpanA loc     $
-    do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
-       ; do_ql <- wantQuickLook rn_fun
-       ; (tc_fun, fun_sigma) <- tcInferAppHead fun
-       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, fun_ctxt) fun_sigma rn_args
-       ; _ <- tcValArgs do_ql inst_args
-       ; return app_res_sigma }
-
-{- *********************************************************************
-*                                                                      *
               Typechecking n-ary applications
 *                                                                      *
 ********************************************************************* -}
@@ -219,7 +198,7 @@ using the application chain route, and we can just recurse to tcExpr.
 
 A "head" has three special cases (for which we can infer a polytype
 using tcInferAppHead_maybe); otherwise is just any old expression (for
-which we can infer a rho-type (via tcInfer).
+which we can infer a rho-type (via runInferExpr).
 
 There is no special treatment for HsHole (HsVar ...), HsOverLit, etc, because
 we can't get a polytype from them.
@@ -403,13 +382,22 @@ tcApp rn_expr exp_res_ty
        -- Step 2: Infer the type of `fun`, the head of the application
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; let tc_head = (tc_fun, fun_ctxt)
+             -- inst_final: top-instantiate the result type of the application,
+             -- EXCEPT if we are trying to infer a sigma-type
+             inst_final = case exp_res_ty of
+                             Check {} -> True
+                             Infer (IR {ir_inst=iif}) ->
+                                case iif of
+                                  IIF_ShallowRho -> True
+                                  IIF_DeepRho    -> True
+                                  IIF_Sigma      -> False
 
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
        ; (inst_args, app_res_rho)
               <- setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
                                          -- Note [tcApp: typechecking applications]
-                 tcInstFun do_ql True tc_head fun_sigma rn_args
+                 tcInstFun do_ql inst_final tc_head fun_sigma rn_args
 
        ; case do_ql of
             NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
@@ -420,6 +408,7 @@ tcApp rn_expr exp_res_ty
                                                    app_res_rho exp_res_ty
                          -- Step 4.2: typecheck the  arguments
                        ; tc_args <- tcValArgs NoQL inst_args
+
                          -- Step 4.3: wrap up
                        ; finishApp tc_head tc_args app_res_rho res_wrap }
 
@@ -427,15 +416,18 @@ tcApp rn_expr exp_res_ty
 
                          -- Step 5.1: Take a quick look at the result type
                        ; quickLookResultType app_res_rho exp_res_ty
+
                          -- Step 5.2: typecheck the arguments, and monomorphise
                          --           any un-unified instantiation variables
                        ; tc_args <- tcValArgs DoQL inst_args
+
                          -- Step 5.3: zonk to expose the polymorphism hidden under
                          --           QuickLook instantiation variables in `app_res_rho`
                        ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
+
                          -- Step 5.4: subsumption check against the expected type
                        ; res_wrap <- checkResultTy rn_expr tc_head inst_args
-                                                   app_res_rho exp_res_ty
+                                                    app_res_rho exp_res_ty
                          -- Step 5.5: wrap up
                        ; finishApp tc_head tc_args app_res_rho res_wrap } }
 
@@ -470,32 +462,12 @@ checkResultTy :: HsExpr GhcRn
               -> (HsExpr GhcTc, AppCtxt)  -- Head
               -> [HsExprArg p]            -- Arguments, just error messages
               -> TcRhoType  -- Inferred type of the application; zonked to
-                            --   expose foralls, but maybe not deeply instantiated
+                            --   expose foralls, but maybe not /deeply/ instantiated
               -> ExpRhoType -- Expected type; this is deeply skolemised
               -> TcM HsWrapper
 checkResultTy rn_expr _fun _inst_args app_res_rho (Infer inf_res)
-  = fillInferResultDS (exprCtOrigin rn_expr) app_res_rho inf_res
-  -- See Note [Deeply instantiate in checkResultTy when inferring]
-
-{- Note [Deeply instantiate in checkResultTy when inferring]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To accept the following program (T26225b) with -XDeepSubsumption, we need to
-deeply instantiate when inferring in checkResultTy:
-
-  f :: Int -> (forall a. a->a)
-  g :: Int -> Bool -> Bool
-
-  test b =
-    case b of
-      True  -> f
-      False -> g
-
-If we don't deeply instantiate in the branches of the case expression, we will
-try to unify the type of 'f' with that of 'g', which fails. If we instead
-deeply instantiate 'f', we will fill the 'InferResult' with 'Int -> alpha -> alpha'
-which then successfully unifies with the type of 'g' when we come to fill the
-'InferResult' hole a second time for the second case branch.
--}
+  = fillInferResult (exprCtOrigin rn_expr) app_res_rho inf_res
+    -- fillInferResult does deep instantiation if DeepSubsumption is on
 
 checkResultTy rn_expr (tc_fun, fun_ctxt) inst_args app_res_rho (Check res_ty)
 -- Unify with expected type from the context
@@ -651,18 +623,16 @@ quickLookKeys = [dollarIdKey, leftSectionKey, rightSectionKey]
 ********************************************************************* -}
 
 tcInstFun :: QLFlag
-          -> Bool   -- False <=> Instantiate only /inferred/ variables at the end
+          -> Bool   -- False <=> Instantiate only /top-level, inferred/ variables;
                     --           so may return a sigma-type
-                    -- True  <=> Instantiate all type variables at the end:
-                    --           return a rho-type
-                    -- The /only/ call site that passes in False is the one
-                    --    in tcInferSigma, which is used only to implement :type
-                    -- Otherwise we do eager instantiation; in Fig 5 of the paper
+                    -- True  <=> Instantiate /top-level, invisible/ type variables;
+                    --           always return a rho-type (but not a deep-rho type)
+                    -- Generally speaking we pass in True; in Fig 5 of the paper
                     --    |-inst returns a rho-type
           -> (HsExpr GhcTc, AppCtxt)
           -> TcSigmaType -> [HsExprArg 'TcpRn]
           -> TcM ( [HsExprArg 'TcpInst]
-                 , TcSigmaType )
+                 , TcSigmaType )   -- Does not instantiate trailing invisible foralls
 -- This crucial function implements the |-inst judgement in Fig 4, plus the
 -- modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
@@ -704,13 +674,9 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
           _               -> False
 
     inst_fun :: [HsExprArg 'TcpRn] -> ForAllTyFlag -> Bool
-    -- True <=> instantiate a tyvar with this ForAllTyFlag
+    -- True <=> instantiate a tyvar that has this ForAllTyFlag
     inst_fun [] | inst_final  = isInvisibleForAllTyFlag
                 | otherwise   = const False
-                -- Using `const False` for `:type` avoids
-                -- `forall {r1} (a :: TYPE r1) {r2} (b :: TYPE r2). a -> b`
-                -- turning into `forall a {r2} (b :: TYPE r2). a -> b`.
-                -- See #21088.
     inst_fun (EValArg {} : _) = isInvisibleForAllTyFlag
     inst_fun _                = isInferredForAllTyFlag
 

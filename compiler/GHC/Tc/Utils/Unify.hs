@@ -27,7 +27,7 @@ module GHC.Tc.Utils.Unify (
   -- Skolemisation
   DeepSubsumptionFlag(..), getDeepSubsumptionFlag, isRhoTyDS,
   tcSkolemise, tcSkolemiseCompleteSig, tcSkolemiseExpectedType,
-  deeplyInstantiate,
+  dsInstantiate,
 
   -- Various unifications
   unifyType, unifyKind, unifyInvisibleType,
@@ -40,7 +40,6 @@ module GHC.Tc.Utils.Unify (
 
   --------------------------------
   -- Holes
-  tcInfer,
   matchExpectedListTy,
   matchExpectedTyConApp,
   matchExpectedAppTy,
@@ -60,7 +59,7 @@ module GHC.Tc.Utils.Unify (
 
   simpleUnifyCheck, UnifyCheckCaller(..), SimpleUnifyResult(..),
 
-  fillInferResult, fillInferResultDS
+  fillInferResult, fillInferResultNoInst
   ) where
 
 import GHC.Prelude
@@ -801,13 +800,13 @@ matchExpectedFunTys :: forall a.
 --   If exp_ty is Infer {}, then [ExpPatType] and ExpRhoType results are all Infer{}
 matchExpectedFunTys herald _ctxt arity (Infer inf_res) thing_inside
   = do { arg_tys <- mapM (new_infer_arg_ty herald) [1 .. arity]
-       ; res_ty  <- newInferExpType
+       ; res_ty  <- newInferExpType (ir_inst inf_res)
        ; result  <- thing_inside (map ExpFunPatTy arg_tys) res_ty
        ; arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) arg_tys
        ; res_ty  <- readExpType res_ty
          -- NB: mkScaledFunTys arg_tys res_ty does not contain any foralls
          -- (even nested ones), so no need to instantiate.
-       ; co <- fillInferResult (mkScaledFunTys arg_tys res_ty) inf_res
+       ; co <- fillInferResultNoInst (mkScaledFunTys arg_tys res_ty) inf_res
        ; return (mkWpCastN co, result) }
 
 matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
@@ -914,10 +913,10 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
            ; co <- unifyType Nothing (mkScaledFunTys more_arg_tys res_ty) fun_ty
            ; return (mkWpCastN co, result) }
 
-new_infer_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled ExpSigmaTypeFRR)
+new_infer_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled ExpRhoTypeFRR)
 new_infer_arg_ty herald arg_pos -- position for error messages only
   = do { mult     <- newFlexiTyVarTy multiplicityTy
-       ; inf_hole <- newInferExpTypeFRR (FRRExpectedFunTy herald arg_pos)
+       ; inf_hole <- newInferExpTypeFRR IIF_DeepRho (FRRExpectedFunTy herald arg_pos)
        ; return (mkScaled mult inf_hole) }
 
 new_check_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled TcType)
@@ -1075,18 +1074,6 @@ matchExpectedAppTy orig_ty
 *
 ********************************************************************** -}
 
-{- Note [inferResultToType]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-expTypeToType and inferResultType convert an InferResult to a monotype.
-It must be a monotype because if the InferResult isn't already filled in,
-we fill it in with a unification variable (hence monotype).  So to preserve
-order-independence we check for mono-type-ness even if it *is* filled in
-already.
-
-See also Note [TcLevel of ExpType] in GHC.Tc.Utils.TcType, and
-Note [fillInferResult].
--}
-
 -- | Fill an 'InferResult' with the given type.
 --
 -- If @co = fillInferResult t1 infer_res@, then @co :: t1 ~# t2@,
@@ -1098,14 +1085,14 @@ Note [fillInferResult].
 --    The stored type @t2@ is at the same level as given by the
 --    'ir_lvl' field.
 --  - FRR invariant.
---    Whenever the 'ir_frr' field is not @Nothing@, @t2@ is guaranteed
+--    Whenever the 'ir_frr' field is `IFRR_Check`, @t2@ is guaranteed
 --    to have a syntactically fixed RuntimeRep, in the sense of
 --    Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
-fillInferResult :: TcType -> InferResult -> TcM TcCoercionN
-fillInferResult act_res_ty (IR { ir_uniq = u
-                               , ir_lvl  = res_lvl
-                               , ir_frr  = mb_frr
-                               , ir_ref  = ref })
+fillInferResultNoInst :: TcType -> InferResult -> TcM TcCoercionN
+fillInferResultNoInst act_res_ty (IR { ir_uniq = u
+                                     , ir_lvl  = res_lvl
+                                     , ir_frr  = mb_frr
+                                     , ir_ref  = ref })
   = do { mb_exp_res_ty <- readTcRef ref
        ; case mb_exp_res_ty of
             Just exp_res_ty
@@ -1126,7 +1113,7 @@ fillInferResult act_res_ty (IR { ir_uniq = u
                        ppr u <> colon <+> ppr act_res_ty <+> char '~' <+> ppr exp_res_ty
                      ; cur_lvl <- getTcLevel
                      ; unless (cur_lvl `sameDepthAs` res_lvl) $
-                       ensureMonoType act_res_ty
+                       ensureMonoType act_res_ty -- See (FIR1)
                      ; unifyType Nothing act_res_ty exp_res_ty }
             Nothing
                -> do { traceTc "Filling inferred ExpType" $
@@ -1140,16 +1127,28 @@ fillInferResult act_res_ty (IR { ir_uniq = u
                      -- fixed RuntimeRep (if necessary, i.e. 'mb_frr' is not 'Nothing').
                      ; (frr_co, act_res_ty) <-
                          case mb_frr of
-                           Nothing       -> return (mkNomReflCo act_res_ty, act_res_ty)
-                           Just frr_orig -> hasFixedRuntimeRep frr_orig act_res_ty
+                           IFRR_Any            -> return (mkNomReflCo act_res_ty, act_res_ty)
+                           IFRR_Check frr_orig -> hasFixedRuntimeRep frr_orig act_res_ty
 
                      -- Compose the two coercions.
                      ; let final_co = prom_co `mkTransCo` frr_co
 
                      ; writeTcRef ref (Just act_res_ty)
 
-                     ; return final_co }
-     }
+                     ; return final_co } }
+
+fillInferResult :: CtOrigin -> TcType -> InferResult -> TcM HsWrapper
+-- See Note [Instantiation of InferResult]
+fillInferResult ct_orig res_ty ires@(IR { ir_inst = iif })
+  = case iif of
+       IIF_Sigma      -> do { co <- fillInferResultNoInst res_ty ires
+                            ; return (mkWpCastN co) }
+       IIF_ShallowRho -> do { (wrap, res_ty') <- topInstantiate ct_orig res_ty
+                            ; co <- fillInferResultNoInst res_ty' ires
+                            ; return (mkWpCastN co <.> wrap) }
+       IIF_DeepRho     -> do { (wrap, res_ty') <- dsInstantiate ct_orig res_ty
+                             ; co <- fillInferResultNoInst res_ty' ires
+                             ; return (mkWpCastN co <.> wrap) }
 
 {- Note [fillInferResult]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1210,39 +1209,96 @@ For (2), we simply look to see if the hole is filled already.
   - if it is filled, we simply unify with the type that is
     already there
 
-There is one wrinkle.  Suppose we have
-   case e of
-      T1 -> e1 :: (forall a. a->a) -> Int
-      G2 -> e2
-where T1 is not GADT or existential, but G2 is a GADT.  Then suppose the
-T1 alternative fills the hole with (forall a. a->a) -> Int, which is fine.
-But now the G2 alternative must not *just* unify with that else we'd risk
-allowing through (e2 :: (forall a. a->a) -> Int).  If we'd checked G2 first
-we'd have filled the hole with a unification variable, which enforces a
-monotype.
+(FIR1) There is one wrinkle.  Suppose we have
+             case e of
+                T1 -> e1 :: (forall a. a->a) -> Int
+                G2 -> e2
+    where T1 is not GADT or existential, but G2 is a GADT.  Then suppose the
+    T1 alternative fills the hole with (forall a. a->a) -> Int, which is fine.
+    But now the G2 alternative must not *just* unify with that else we'd risk
+    allowing through (e2 :: (forall a. a->a) -> Int).  If we'd checked G2 first
+    we'd have filled the hole with a unification variable, which enforces a
+    monotype.
 
-So if we check G2 second, we still want to emit a constraint that restricts
-the RHS to be a monotype. This is done by ensureMonoType, and it works
-by simply generating a constraint (alpha ~ ty), where alpha is a fresh
+    So if we check G2 second, we still want to emit a constraint that restricts
+    the RHS to be a monotype. This is done by ensureMonoType, and it works
+    by simply generating a constraint (alpha ~ ty), where alpha is a fresh
 unification variable.  We discard the evidence.
 
--}
+Note [Instantiation of InferResult]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When typechecking expressions (not types, not patterns), we always almost
+always instantiate before filling in `InferResult`, so that the result is a
+TcRhoType. This behaviour is controlled by the `ir_inst :: InferInstFlag`
+field of `InferResult`.
 
--- | A version of 'fillInferResult' that also performs deep instantiation
--- when deep subsumption is enabled.
---
--- See also Note [Instantiation of InferResult].
-fillInferResultDS :: CtOrigin -> TcRhoType -> InferResult -> TcM HsWrapper
-fillInferResultDS ct_orig rho inf_res
-  = do { massertPpr (isRhoTy rho) $
-           vcat [ text "fillInferResultDS: input type is not a rho-type"
-                , text "ty:" <+> ppr rho ]
-       ; ds_flag <- getDeepSubsumptionFlag
-       ; case ds_flag of
-              Shallow -> mkWpCastN <$> fillInferResult rho inf_res
-              Deep    -> do { (inst_wrap, rho') <- deeplyInstantiate ct_orig rho
-                            ; co <- fillInferResult rho' inf_res
-                            ; return (mkWpCastN co <.> inst_wrap) } }
+If we do instantiate (ir_inst = IIF_DeepRho), and DeepSubsumption is enabled,
+we instantiate deeply. See `tcInferResult`.
+
+Usually this field is `IIF_DeepRho` meaning "return a (possibly deep) rho-type".
+Why is this the common case?  See #17173 for discussion.  Here are some examples
+of why:
+
+1. Consider
+    f x = (*)
+   We want to instantiate the type of (*) before returning, else we
+   will infer the type
+     f :: forall {a}. a -> forall b. Num b => b -> b -> b
+   This is surely confusing for users.
+
+   And worse, the monomorphism restriction won't work properly. The MR is
+   dealt with in simplifyInfer, and simplifyInfer has no way of
+   instantiating. This could perhaps be worked around, but it may be
+   hard to know even when instantiation should happen.
+
+2. Another reason.  Consider
+       f :: (?x :: Int) => a -> a
+       g y = let ?x = 3::Int in f
+   Here want to instantiate f's type so that the ?x::Int constraint
+  gets discharged by the enclosing implicit-parameter binding.
+
+3. Suppose one defines plus = (+). If we instantiate lazily, we will
+   infer plus :: forall a. Num a => a -> a -> a. However, the monomorphism
+   restriction compels us to infer
+      plus :: Integer -> Integer -> Integer
+   (or similar monotype). Indeed, the only way to know whether to apply
+   the monomorphism restriction at all is to instantiate
+
+HOWEVER, not always! Here are places where we want `IIF_Sigma` meaning
+"return a sigma-type":
+
+* IIF_Sigma: In GHC.Tc.Module.tcRnExpr, which implements GHCi's :type
+  command, we want to return a completely uninstantiated type.
+  See Note [Implementing :type] in GHC.Tc.Module.
+
+* IIF_Sigma: In types we can't lambda-abstract, so we must be careful not to instantiate
+  at all. See calls to `runInferHsType`
+
+* IIF_Sigma: in patterns we don't want to instantiate at all. See the use of
+  `runInferSigmaFRR` in GHC.Tc.Gen.Pat
+
+* IIF_ShallowRho: in the expression part of a view pattern, we must top-instantiate
+  but /not/ deeply instantiate (#26331). See Note [View patterns and polymorphism]
+  in GHC.Tc.Gen.Pat.  This the only place we use IIF_ShallowRho.
+
+Why do we want to deeply instantiate, ever?  Why isn't top-instantiation enough?
+Answer: to accept the following program (T26225b) with -XDeepSubsumption, we
+need to deeply instantiate when inferring in checkResultTy:
+
+  f :: Int -> (forall a. a->a)
+  g :: Int -> Bool -> Bool
+
+  test b =
+    case b of
+      True  -> f
+      False -> g
+
+If we don't deeply instantiate in the branches of the case expression, we will
+try to unify the type of 'f' with that of 'g', which fails. If we instead
+deeply instantiate 'f', we will fill the 'InferResult' with 'Int -> alpha -> alpha'
+which then successfully unifies with the type of 'g' when we come to fill the
+'InferResult' hole a second time for the second case branch.
+-}
 
 {-
 ************************************************************************
@@ -1337,7 +1393,7 @@ tcSubTypeMono rn_expr act_ty exp_ty
             , text "act_ty:" <+> ppr act_ty
             , text "rn_expr:" <+> ppr rn_expr]) $
     case exp_ty of
-      Infer inf_res -> fillInferResult act_ty inf_res
+      Infer inf_res -> fillInferResultNoInst act_ty inf_res
       Check exp_ty  -> unifyType (Just $ HsExprRnThing rn_expr) act_ty exp_ty
 
 ------------------------
@@ -1351,7 +1407,7 @@ tcSubTypePat inst_orig ctxt (Check ty_actual) ty_expected
   = tc_sub_type unifyTypeET inst_orig ctxt ty_actual ty_expected
 
 tcSubTypePat _ _ (Infer inf_res) ty_expected
-  = do { co <- fillInferResult ty_expected inf_res
+  = do { co <- fillInferResultNoInst ty_expected inf_res
                -- In patterns we do not instantatiate
 
        ; return (mkWpCastN (mkSymCo co)) }
@@ -1377,7 +1433,7 @@ tcSubTypeDS rn_expr act_rho exp_rho
 -- | Checks that the 'actual' type is more polymorphic than the 'expected' type.
 tcSubType :: CtOrigin          -- ^ Used when instantiating
           -> UserTypeCtxt      -- ^ Used when skolemising
-          -> Maybe TypedThing -- ^ The expression that has type 'actual' (if known)
+          -> Maybe TypedThing  -- ^ The expression that has type 'actual' (if known)
           -> TcSigmaType       -- ^ Actual type
           -> ExpRhoType        -- ^ Expected type
           -> TcM HsWrapper
@@ -1386,10 +1442,7 @@ tcSubType inst_orig ctxt m_thing ty_actual res_ty
       Check ty_expected -> tc_sub_type (unifyType m_thing) inst_orig ctxt
                                        ty_actual ty_expected
 
-      Infer inf_res -> do { (wrap, rho) <- topInstantiate inst_orig ty_actual
-                                   -- See Note [Instantiation of InferResult]
-                          ; inst <- fillInferResultDS inst_orig rho inf_res
-                          ; return (inst <.> wrap) }
+      Infer inf_res -> fillInferResult inst_orig ty_actual inf_res
 
 ---------------
 tcSubTypeSigma :: CtOrigin       -- where did the actual type arise / why are we
@@ -1427,47 +1480,6 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
            ; (tidy_env, ty_expected) <- zonkTidyTcType tidy_env ty_expected
            ; return (tidy_env, SubTypeCtxt ty_expected ty_actual) }
 
-
-{- Note [Instantiation of InferResult]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When typechecking expressions (not types, not patterns), we always instantiate
-before filling in InferResult, so that the result is a TcRhoType.
-See #17173 for discussion.
-
-For example:
-
-1. Consider
-    f x = (*)
-   We want to instantiate the type of (*) before returning, else we
-   will infer the type
-     f :: forall {a}. a -> forall b. Num b => b -> b -> b
-   This is surely confusing for users.
-
-   And worse, the monomorphism restriction won't work properly. The MR is
-   dealt with in simplifyInfer, and simplifyInfer has no way of
-   instantiating. This could perhaps be worked around, but it may be
-   hard to know even when instantiation should happen.
-
-2. Another reason.  Consider
-       f :: (?x :: Int) => a -> a
-       g y = let ?x = 3::Int in f
-   Here want to instantiate f's type so that the ?x::Int constraint
-  gets discharged by the enclosing implicit-parameter binding.
-
-3. Suppose one defines plus = (+). If we instantiate lazily, we will
-   infer plus :: forall a. Num a => a -> a -> a. However, the monomorphism
-   restriction compels us to infer
-      plus :: Integer -> Integer -> Integer
-   (or similar monotype). Indeed, the only way to know whether to apply
-   the monomorphism restriction at all is to instantiate
-
-There is one place where we don't want to instantiate eagerly,
-namely in GHC.Tc.Module.tcRnExpr, which implements GHCi's :type
-command. See Note [Implementing :type] in GHC.Tc.Module.
-
-This also means that, if DeepSubsumption is enabled, we should also instantiate
-deeply; we do this by using fillInferResultDS.
--}
 
 ---------------
 tc_sub_type :: (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
@@ -2133,7 +2145,17 @@ deeplySkolemise skol_info ty
       = return (idHsWrapper, [], [], substTy subst ty)
         -- substTy is a quick no-op on an empty substitution
 
+dsInstantiate :: CtOrigin -> TcType -> TcM (HsWrapper, Type)
+-- Do topInstantiate or deeplyInstantiate, depending on -XDeepSubsumption
+dsInstantiate orig ty
+  = do { ds_flag <- getDeepSubsumptionFlag
+       ; case ds_flag of
+           Shallow -> topInstantiate    orig ty
+           Deep    -> deeplyInstantiate orig ty }
+
 deeplyInstantiate :: CtOrigin -> TcType -> TcM (HsWrapper, Type)
+-- Instantiate invisible foralls, even ones nested
+-- (to the right) under arrows
 deeplyInstantiate orig ty
   = go init_subst ty
   where

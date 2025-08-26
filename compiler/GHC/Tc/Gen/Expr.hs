@@ -19,7 +19,7 @@ module GHC.Tc.Gen.Expr
        ( tcCheckPolyExpr, tcCheckPolyExprNC,
          tcCheckMonoExpr, tcCheckMonoExprNC,
          tcMonoExpr, tcMonoExprNC,
-         tcInferRho, tcInferRhoNC,
+         tcInferExpr, tcInferSigma, tcInferRho, tcInferRhoNC,
          tcPolyLExpr, tcPolyExpr, tcExpr, tcPolyLExprSig,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
@@ -233,17 +233,24 @@ tcPolyExprCheck expr res_ty
 *                                                                      *
 ********************************************************************* -}
 
+tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
+tcInferSigma = tcInferExpr IIF_Sigma
+
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 -- Infer a *rho*-type. The return type is always instantiated.
-tcInferRho (L loc expr)
-  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
+tcInferRho   = tcInferExpr   IIF_DeepRho
+tcInferRhoNC = tcInferExprNC IIF_DeepRho
+
+tcInferExpr, tcInferExprNC :: InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
+tcInferExpr iif (L loc expr)
+  = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
     addExprCtxt expr $  -- Note [Error contexts in generated code]
-    do { (expr', rho) <- tcInfer (tcExpr expr)
+    do { (expr', rho) <- runInfer iif IFRR_Any (tcExpr expr)
        ; return (L loc expr', rho) }
 
-tcInferRhoNC (L loc expr)
-  = setSrcSpanA loc $
-    do { (expr', rho) <- tcInfer (tcExpr expr)
+tcInferExprNC iif (L loc expr)
+  = setSrcSpanA loc  $
+    do { (expr', rho) <- runInfer iif IFRR_Any (tcExpr expr)
        ; return (L loc expr', rho) }
 
 ---------------
@@ -878,7 +885,7 @@ tcInferTupArgs boxity args
          ; return (Missing (Scaled mult arg_ty), arg_ty) }
   tc_infer_tup_arg i (Present x lexpr@(L l expr))
     = do { (expr', arg_ty) <- case boxity of
-             Unboxed -> tcInferFRR (FRRUnboxedTuple i) (tcPolyExpr expr)
+             Unboxed -> runInferRhoFRR (FRRUnboxedTuple i) (tcPolyExpr expr)
              Boxed   -> do { arg_ty <- newFlexiTyVarTy liftedTypeKind
                            ; L _ expr' <- tcCheckPolyExpr lexpr arg_ty
                            ; return (expr', arg_ty) }
