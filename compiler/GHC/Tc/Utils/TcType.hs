@@ -29,7 +29,7 @@ module GHC.Tc.Utils.TcType (
   TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcInvisTVBinder, TcReqTVBinder,
   TcTyCon, MonoTcTyCon, PolyTcTyCon, TcTyConBinder, KnotTied,
 
-  ExpType(..), ExpKind, InferResult(..),
+  ExpType(..), ExpKind, InferResult(..), InferInstFlag(..), InferFRRFlag(..),
   ExpTypeFRR, ExpSigmaType, ExpSigmaTypeFRR,
   ExpRhoType,
   mkCheckExpType,
@@ -408,8 +408,12 @@ data InferResult
        , ir_lvl  :: TcLevel
          -- ^ See Note [TcLevel of ExpType] in GHC.Tc.Utils.TcMType
 
-       , ir_frr  :: Maybe FixedRuntimeRepContext
+       , ir_frr  :: InferFRRFlag
          -- ^ See Note [FixedRuntimeRep context in ExpType] in GHC.Tc.Utils.TcMType
+
+       , ir_inst :: InferInstFlag
+         -- ^ True <=> when DeepSubsumption is on, deeply instantiate before filling,
+         -- See Note [Instantiation of InferResult] in GHC.Tc.Utils.Unify
 
        , ir_ref  :: IORef (Maybe TcType) }
          -- ^ The type that fills in this hole should be a @Type@,
@@ -419,14 +423,27 @@ data InferResult
          -- @rr@ must be concrete, in the sense of Note [Concrete types]
          -- in GHC.Tc.Utils.Concrete.
 
-type ExpSigmaType    = ExpType
+data InferFRRFlag
+  = IFRR_Check                -- Check that the result type has a fixed runtime rep
+      FixedRuntimeRepContext  -- Typically used for function arguments and lambdas
+
+  | IFRR_Any                  -- No need to check for fixed runtime-rep
+
+data InferInstFlag
+  = IIF_Inst   -- Instantiate before filling, deeply if DeepSubsumption is on
+               -- Typically used when inferring the type of an expression
+
+  | IIF_None   -- Don't instantiaite at all, regardless of DeepSubsumption
+               -- Typically used when inferring the type of a pattern
+
+type ExpSigmaType = ExpType
 
 -- | An 'ExpType' which has a fixed RuntimeRep.
 --
 -- For a 'Check' 'ExpType', the stored 'TcType' must have
 -- a fixed RuntimeRep. For an 'Infer' 'ExpType', the 'ir_frr'
--- field must be of the form @Just frr_orig@.
-type ExpTypeFRR      = ExpType
+-- field must be of the form @IFRR_Check frr_orig@.
+type ExpTypeFRR = ExpType
 
 -- | Like 'TcSigmaTypeFRR', but for an expected type.
 --
@@ -447,12 +464,16 @@ instance Outputable ExpType where
   ppr (Infer ir) = ppr ir
 
 instance Outputable InferResult where
-  ppr (IR { ir_uniq = u, ir_lvl = lvl, ir_frr = mb_frr })
-    = text "Infer" <> mb_frr_text <> braces (ppr u <> comma <> ppr lvl)
+  ppr (IR { ir_uniq = u, ir_lvl = lvl, ir_frr = mb_frr, ir_inst = inst })
+    = text "Infer" <> parens (pp_inst <> pp_frr)
+                   <> braces (ppr u <> comma <> ppr lvl)
     where
-      mb_frr_text = case mb_frr of
-        Just _  -> text "FRR"
-        Nothing -> empty
+     pp_inst = case inst of
+                IIF_None -> text "NoInst"
+                IIF_Inst -> text "Inst"
+     pp_frr = case mb_frr of
+                IFRR_Check {} -> text ",FRR"
+                IFRR_Any      -> empty
 
 -- | Make an 'ExpType' suitable for checking.
 mkCheckExpType :: TcType -> ExpType

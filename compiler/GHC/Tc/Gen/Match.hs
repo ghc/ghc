@@ -1034,7 +1034,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
 
         ; tcExtendIdEnv tup_ids $ do
         { ((stmts', (ret_op', tup_rets)), stmts_ty)
-                <- tcInfer $ \ exp_ty ->
+                <- tcInferExpr $ \ exp_ty ->
                    tcStmtsAndThen ctxt tcDoStmt stmts exp_ty $ \ inner_res_ty ->
                    do { tup_rets <- zipWithM tcCheckId tup_names
                                       (map mkCheckExpType tup_elt_tys)
@@ -1172,7 +1172,7 @@ tcApplicativeStmts
 tcApplicativeStmts ctxt pairs rhs_ty thing_inside
  = do { body_ty <- newFlexiTyVarTy liftedTypeKind
       ; let arity = length pairs
-      ; ts <- replicateM (arity-1) $ newInferExpType
+      ; ts <- replicateM (arity-1) $ newInferExpType IIF_Inst
       ; exp_tys <- replicateM arity $ newFlexiTyVarTy liftedTypeKind
       ; pat_tys <- replicateM arity $ newFlexiTyVarTy liftedTypeKind
       ; let fun_ty = mkVisFunTysMany pat_tys body_ty

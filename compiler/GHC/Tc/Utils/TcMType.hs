@@ -65,7 +65,7 @@ module GHC.Tc.Utils.TcMType (
   -- Expected types
   ExpType(..), ExpSigmaType, ExpRhoType,
   mkCheckExpType, newInferExpType, newInferExpTypeFRR,
-  tcInfer, tcInferFRR,
+  tcInferExpr, tcInferPat, tcInferType, tcInferFRRExpr, tcInferFRRPat,
   readExpType, readExpType_maybe, readScaledExpType,
   expTypeToType, scaledExpTypeToType,
   checkingExpType_maybe, checkingExpType,
@@ -438,30 +438,29 @@ See test case T21325.
 
 -- actual data definition is in GHC.Tc.Utils.TcType
 
-newInferExpType :: TcM ExpType
-newInferExpType = new_inferExpType Nothing
+newInferExpType :: InferInstFlag -> TcM ExpType
+newInferExpType iif = new_inferExpType iif IFRR_Any
 
-newInferExpTypeFRR :: FixedRuntimeRepContext -> TcM ExpTypeFRR
-newInferExpTypeFRR frr_orig
+newInferExpTypeFRR :: InferInstFlag -> FixedRuntimeRepContext -> TcM ExpTypeFRR
+newInferExpTypeFRR iif frr_orig
   = do { th_lvl <- getThLevel
-       ; if
-          -- See [Wrinkle: Typed Template Haskell]
-          -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-          | TypedBrack _ <- th_lvl
-          -> new_inferExpType Nothing
+       ; let mb_frr = case th_lvl of
+                        TypedBrack {} -> IFRR_Any
+                        _             -> IFRR_Check frr_orig
+               -- mb_frr: see [Wrinkle: Typed Template Haskell]
+               -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
 
-          | otherwise
-          -> new_inferExpType (Just frr_orig) }
+       ; new_inferExpType iif mb_frr }
 
-new_inferExpType :: Maybe FixedRuntimeRepContext -> TcM ExpType
-new_inferExpType mb_frr_orig
+new_inferExpType :: InferInstFlag -> InferFRRFlag -> TcM ExpType
+new_inferExpType iif ifrr
   = do { u <- newUnique
        ; tclvl <- getTcLevel
        ; traceTc "newInferExpType" (ppr u <+> ppr tclvl)
        ; ref <- newMutVar Nothing
        ; return (Infer (IR { ir_uniq = u, ir_lvl = tclvl
-                           , ir_ref = ref
-                           , ir_frr = mb_frr_orig })) }
+                           , ir_inst = iif, ir_frr  = ifrr
+                           , ir_ref  = ref })) }
 
 -- | Extract a type out of an ExpType, if one exists. But one should always
 -- exist. Unless you're quite sure you know what you're doing.
@@ -539,18 +538,29 @@ Note [fillInferResult] in GHC.Tc.Utils.Unify.
 --
 -- Use 'tcInferFRR' if you require the type to have a fixed
 -- runtime representation.
-tcInfer :: (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
-tcInfer = tc_infer Nothing
+tcInferExpr :: (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
+tcInferExpr = tc_infer IIF_Inst IFRR_Any
 
--- | Like 'tcInfer', except it ensures that the resulting type
+tcInferPat :: (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
+tcInferPat = tc_infer IIF_None IFRR_Any
+
+tcInferType :: (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
+-- Used for kind-checking types, where we never want deep instantiation,
+-- nor FRR checkes
+tcInferType = tc_infer IIF_None IFRR_Any
+
+-- | Like 'tcInferExpr', except it ensures that the resulting type
 -- has a syntactically fixed RuntimeRep as per Note [Fixed RuntimeRep] in
 -- GHC.Tc.Utils.Concrete.
-tcInferFRR :: FixedRuntimeRepContext -> (ExpSigmaTypeFRR -> TcM a) -> TcM (a, TcSigmaTypeFRR)
-tcInferFRR frr_orig = tc_infer (Just frr_orig)
+tcInferFRRExpr :: FixedRuntimeRepContext -> (ExpSigmaTypeFRR -> TcM a) -> TcM (a, TcSigmaTypeFRR)
+tcInferFRRExpr frr_orig = tc_infer IIF_Inst (Just frr_orig)
 
-tc_infer :: Maybe FixedRuntimeRepContext -> (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
-tc_infer mb_frr tc_check
-  = do { res_ty <- new_inferExpType mb_frr
+tcInferFRRPat :: FixedRuntimeRepContext -> (ExpSigmaTypeFRR -> TcM a) -> TcM (a, TcSigmaTypeFRR)
+tcInferFRRPat frr_orig = tc_infer IIF_None (Just frr_orig)
+
+tc_infer :: InferInstFlag -> Maybe FixedRuntimeRepContext -> (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
+tc_infer iif mb_frr tc_check
+  = do { res_ty <- new_inferExpType iif mb_frr
        ; result <- tc_check res_ty
        ; res_ty <- readExpType res_ty
        ; return (result, res_ty) }

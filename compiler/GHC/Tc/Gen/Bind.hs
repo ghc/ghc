@@ -1305,8 +1305,8 @@ tcMonoBinds is_rec sig_fn no_gen
     do  { mult <- newMultiplicityVar
 
         ; ((co_fn, matches'), rhs_ty')
-            <- tcInferFRR (FRRBinder name) $ \ exp_ty ->
-                 -- tcInferFRR: the type of a let-binder must have
+            <- tcInferFRRExpr (FRRBinder name) $ \ exp_ty ->
+                 -- tcInferFRRExpr: the type of a let-binder must have
                  -- a fixed runtime rep. See #23176
                tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
                  -- We extend the error context even for a non-recursive
@@ -1333,8 +1333,8 @@ tcMonoBinds is_rec sig_fn no_gen
   = addErrCtxt (PatMonoBindsCtxt pat grhss) $
     do { mult <- tcMultAnnOnPatBind mult_ann
 
-       ; (grhss', pat_ty) <- tcInferFRR FRRPatBind $ \ exp_ty ->
-                          -- tcInferFRR: the type of each let-binder must have
+       ; (grhss', pat_ty) <- tcInferFRRExpr FRRPatBind $ \ exp_ty ->
+                          -- tcInferFRRExpr: the type of each let-binder must have
                           -- a fixed runtime rep. See #23176
                              tcGRHSsPat mult grhss exp_ty
 
@@ -1522,7 +1522,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_a
             -- See Note [Typechecking pattern bindings]
         ; ((pat', nosig_mbis), pat_ty)
             <- addErrCtxt (PatMonoBindsCtxt pat grhss) $
-               tcInferFRR FRRPatBind $ \ exp_ty ->
+               tcInferFRRPat FRRPatBind $ \ exp_ty ->
                tcLetPat inst_sig_fun no_gen pat (Scaled mult exp_ty) $
                  -- The above inferred type get an unrestricted multiplicity. It may be
                  -- worth it to try and find a finer-grained multiplicity here

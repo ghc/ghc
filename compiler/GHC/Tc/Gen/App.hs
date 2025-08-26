@@ -219,7 +219,7 @@ using the application chain route, and we can just recurse to tcExpr.
 
 A "head" has three special cases (for which we can infer a polytype
 using tcInferAppHead_maybe); otherwise is just any old expression (for
-which we can infer a rho-type (via tcInfer).
+which we can infer a rho-type (via tcInferExpr).
 
 There is no special treatment for HsHole (HsVar ...), HsOverLit, etc, because
 we can't get a polytype from them.
@@ -474,7 +474,7 @@ checkResultTy :: HsExpr GhcRn
               -> ExpRhoType -- Expected type; this is deeply skolemised
               -> TcM HsWrapper
 checkResultTy rn_expr _fun _inst_args app_res_rho (Infer inf_res)
-  = fillInferResultDS (exprCtOrigin rn_expr) app_res_rho inf_res
+  = fillInferResult (exprCtOrigin rn_expr) app_res_rho inf_res
   -- See Note [Deeply instantiate in checkResultTy when inferring]
 
 {- Note [Deeply instantiate in checkResultTy when inferring]

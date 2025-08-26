@@ -1063,9 +1063,8 @@ tc_infer_lhs_type mode (L span ty)
 -- | Infer the kind of a type and desugar. This is the "up" type-checker,
 -- as described in Note [Bidirectional type checking]
 tc_infer_hs_type :: TcTyMode -> HsType GhcRn -> TcM (TcType, TcKind)
-
 tc_infer_hs_type mode rn_ty
-  = tcInfer $ \exp_kind -> tcHsType mode rn_ty exp_kind
+  = tcInferType $ \exp_kind -> tcHsType mode rn_ty exp_kind
 
 {-
 Note [Typechecking HsCoreTys]
@@ -1985,7 +1984,7 @@ checkExpKind rn_ty ty ki (Check ki') =
 checkExpKind _rn_ty ty ki (Infer cell) = do
   -- NB: do not instantiate.
   -- See Note [Do not always instantiate eagerly in types]
-  co <- fillInferResult ki cell
+  co <- fillInferResultNoInst ki cell
   pure (ty `mkCastTy` co)
 
 ---------------------------

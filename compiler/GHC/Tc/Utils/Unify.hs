@@ -40,7 +40,7 @@ module GHC.Tc.Utils.Unify (
 
   --------------------------------
   -- Holes
-  tcInfer,
+  tcInferExpr, tcInferType, tcInferPat,
   matchExpectedListTy,
   matchExpectedTyConApp,
   matchExpectedAppTy,
@@ -60,7 +60,7 @@ module GHC.Tc.Utils.Unify (
 
   simpleUnifyCheck, UnifyCheckCaller(..), SimpleUnifyResult(..),
 
-  fillInferResult, fillInferResultDS
+  fillInferResult, fillInferResultNoInst
   ) where
 
 import GHC.Prelude
@@ -801,13 +801,13 @@ matchExpectedFunTys :: forall a.
 --   If exp_ty is Infer {}, then [ExpPatType] and ExpRhoType results are all Infer{}
 matchExpectedFunTys herald _ctxt arity (Infer inf_res) thing_inside
   = do { arg_tys <- mapM (new_infer_arg_ty herald) [1 .. arity]
-       ; res_ty  <- newInferExpType
+       ; res_ty  <- newInferExpType (ir_inst inf_res)
        ; result  <- thing_inside (map ExpFunPatTy arg_tys) res_ty
        ; arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) arg_tys
        ; res_ty  <- readExpType res_ty
          -- NB: mkScaledFunTys arg_tys res_ty does not contain any foralls
          -- (even nested ones), so no need to instantiate.
-       ; co <- fillInferResult (mkScaledFunTys arg_tys res_ty) inf_res
+       ; co <- fillInferResultNoInst (mkScaledFunTys arg_tys res_ty) inf_res
        ; return (mkWpCastN co, result) }
 
 matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
@@ -917,7 +917,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
 new_infer_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled ExpSigmaTypeFRR)
 new_infer_arg_ty herald arg_pos -- position for error messages only
   = do { mult     <- newFlexiTyVarTy multiplicityTy
-       ; inf_hole <- newInferExpTypeFRR (FRRExpectedFunTy herald arg_pos)
+       ; inf_hole <- newInferExpTypeFRR IIF_Inst (FRRExpectedFunTy herald arg_pos)
        ; return (mkScaled mult inf_hole) }
 
 new_check_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled TcType)
@@ -1098,14 +1098,14 @@ Note [fillInferResult].
 --    The stored type @t2@ is at the same level as given by the
 --    'ir_lvl' field.
 --  - FRR invariant.
---    Whenever the 'ir_frr' field is not @Nothing@, @t2@ is guaranteed
+--    Whenever the 'ir_frr' field is `IFRR_Check`, @t2@ is guaranteed
 --    to have a syntactically fixed RuntimeRep, in the sense of
 --    Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
-fillInferResult :: TcType -> InferResult -> TcM TcCoercionN
-fillInferResult act_res_ty (IR { ir_uniq = u
-                               , ir_lvl  = res_lvl
-                               , ir_frr  = mb_frr
-                               , ir_ref  = ref })
+fillInferResultNoInst :: TcType -> InferResult -> TcM TcCoercionN
+fillInferResultNoInst act_res_ty (IR { ir_uniq = u
+                                     , ir_lvl  = res_lvl
+                                     , ir_frr  = mb_frr
+                                     , ir_ref  = ref })
   = do { mb_exp_res_ty <- readTcRef ref
        ; case mb_exp_res_ty of
             Just exp_res_ty
@@ -1140,16 +1140,26 @@ fillInferResult act_res_ty (IR { ir_uniq = u
                      -- fixed RuntimeRep (if necessary, i.e. 'mb_frr' is not 'Nothing').
                      ; (frr_co, act_res_ty) <-
                          case mb_frr of
-                           Nothing       -> return (mkNomReflCo act_res_ty, act_res_ty)
-                           Just frr_orig -> hasFixedRuntimeRep frr_orig act_res_ty
+                           IFRR_Any            -> return (mkNomReflCo act_res_ty, act_res_ty)
+                           IFRR_Check frr_orig -> hasFixedRuntimeRep frr_orig act_res_ty
 
                      -- Compose the two coercions.
                      ; let final_co = prom_co `mkTransCo` frr_co
 
                      ; writeTcRef ref (Just act_res_ty)
 
-                     ; return final_co }
-     }
+                     ; return final_co } }
+
+fillInferResult :: CtOrigin -> TcType -> InferResult -> TcM TcCoercionN
+fillInferResult ct_orig res_ty ires@(IR { ir_inst = iif })
+  = case iif of
+       IIF_None -> fillInferResultNoInst res_ty irs
+       IIF_Inst -> do { ds_flag <- getDeepSubsumptionFlag
+                      ; (wrap, res_ty') <- case ds_flag of
+                           Shallow -> topInstantiate    ct_orig res_ty
+                           Deep    -> deeplyInstantiate ct_orig res_ty
+                      ; co <- fillInferResultNoInst res_ty' ires
+                      ; return (mkWpCastN co <.> wrap) }
 
 {- Note [fillInferResult]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1225,24 +1235,7 @@ So if we check G2 second, we still want to emit a constraint that restricts
 the RHS to be a monotype. This is done by ensureMonoType, and it works
 by simply generating a constraint (alpha ~ ty), where alpha is a fresh
 unification variable.  We discard the evidence.
-
 -}
-
--- | A version of 'fillInferResult' that also performs deep instantiation
--- when deep subsumption is enabled.
---
--- See also Note [Instantiation of InferResult].
-fillInferResultDS :: CtOrigin -> TcRhoType -> InferResult -> TcM HsWrapper
-fillInferResultDS ct_orig rho inf_res
-  = do { massertPpr (isRhoTy rho) $
-           vcat [ text "fillInferResultDS: input type is not a rho-type"
-                , text "ty:" <+> ppr rho ]
-       ; ds_flag <- getDeepSubsumptionFlag
-       ; case ds_flag of
-              Shallow -> mkWpCastN <$> fillInferResult rho inf_res
-              Deep    -> do { (inst_wrap, rho') <- deeplyInstantiate ct_orig rho
-                            ; co <- fillInferResult rho' inf_res
-                            ; return (mkWpCastN co <.> inst_wrap) } }
 
 {-
 ************************************************************************
@@ -1337,7 +1330,7 @@ tcSubTypeMono rn_expr act_ty exp_ty
             , text "act_ty:" <+> ppr act_ty
             , text "rn_expr:" <+> ppr rn_expr]) $
     case exp_ty of
-      Infer inf_res -> fillInferResult act_ty inf_res
+      Infer inf_res -> fillInferResultNoInst act_ty inf_res
       Check exp_ty  -> unifyType (Just $ HsExprRnThing rn_expr) act_ty exp_ty
 
 ------------------------
@@ -1351,7 +1344,7 @@ tcSubTypePat inst_orig ctxt (Check ty_actual) ty_expected
   = tc_sub_type unifyTypeET inst_orig ctxt ty_actual ty_expected
 
 tcSubTypePat _ _ (Infer inf_res) ty_expected
-  = do { co <- fillInferResult ty_expected inf_res
+  = do { co <- fillInferResultNoInst ty_expected inf_res
                -- In patterns we do not instantatiate
 
        ; return (mkWpCastN (mkSymCo co)) }
@@ -1388,7 +1381,7 @@ tcSubType inst_orig ctxt m_thing ty_actual res_ty
 
       Infer inf_res -> do { (wrap, rho) <- topInstantiate inst_orig ty_actual
                                    -- See Note [Instantiation of InferResult]
-                          ; inst <- fillInferResultDS inst_orig rho inf_res
+                          ; inst <- fillInferResult inst_orig rho inf_res
                           ; return (inst <.> wrap) }
 
 ---------------
@@ -1466,7 +1459,7 @@ namely in GHC.Tc.Module.tcRnExpr, which implements GHCi's :type
 command. See Note [Implementing :type] in GHC.Tc.Module.
 
 This also means that, if DeepSubsumption is enabled, we should also instantiate
-deeply; we do this by using fillInferResultDS.
+deeply; we do this by using fillInferResult.
 -}
 
 ---------------

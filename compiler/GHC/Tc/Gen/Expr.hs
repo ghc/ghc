@@ -238,12 +238,12 @@ tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 tcInferRho (L loc expr)
   = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
     addExprCtxt expr $  -- Note [Error contexts in generated code]
-    do { (expr', rho) <- tcInfer (tcExpr expr)
+    do { (expr', rho) <- tcInferExpr (tcExpr expr)
        ; return (L loc expr', rho) }
 
 tcInferRhoNC (L loc expr)
   = setSrcSpanA loc $
-    do { (expr', rho) <- tcInfer (tcExpr expr)
+    do { (expr', rho) <- tcInferExpr (tcExpr expr)
        ; return (L loc expr', rho) }
 
 ---------------
@@ -878,7 +878,7 @@ tcInferTupArgs boxity args
          ; return (Missing (Scaled mult arg_ty), arg_ty) }
   tc_infer_tup_arg i (Present x lexpr@(L l expr))
     = do { (expr', arg_ty) <- case boxity of
-             Unboxed -> tcInferFRR (FRRUnboxedTuple i) (tcPolyExpr expr)
+             Unboxed -> tcInferFRRExpr (FRRUnboxedTuple i) (tcPolyExpr expr)
              Boxed   -> do { arg_ty <- newFlexiTyVarTy liftedTypeKind
                            ; L _ expr' <- tcCheckPolyExpr lexpr arg_ty
                            ; return (expr', arg_ty) }

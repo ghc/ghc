@@ -220,7 +220,7 @@ tcInferPat :: FixedRuntimeRepContext
            -> TcM a
            -> TcM ((LPat GhcTc, a), TcSigmaTypeFRR)
 tcInferPat frr_orig ctxt pat thing_inside
-  = tcInferFRR frr_orig $ \ exp_ty ->
+  = tcInferFRRPat frr_orig $ \ exp_ty ->
     tc_lpat (unrestricted exp_ty) penv pat thing_inside
  where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
