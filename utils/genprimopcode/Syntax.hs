@@ -54,17 +54,23 @@ is_primtype (PrimTypeSpec {}) = True
 is_primtype _ = False
 
 is_divLikeOp :: Entry -> Bool
-is_divLikeOp entry = case entry of
-   PrimOpSpec{} -> has_div_like
-   PseudoOpSpec{} -> has_div_like
-   PrimVecOpSpec{} -> has_div_like
-   PrimTypeSpec{} -> False
-   PrimVecTypeSpec{} -> False
-   Section{} -> False
-   where
-      has_div_like = case lookup_attrib "div_like" (opts entry) of
-         Just (OptionTrue{}) -> True
-         _ -> False
+is_divLikeOp = is_likeOp "div_like"
+
+is_shiftLikeOp :: Entry -> Bool
+is_shiftLikeOp = is_likeOp "shift_like"
+
+is_likeOp :: String -> Entry -> Bool
+is_likeOp attrName entry = case entry of
+  PrimOpSpec {} -> has_attr
+  PseudoOpSpec {} -> has_attr
+  PrimVecOpSpec {} -> has_attr
+  PrimTypeSpec {} -> False
+  PrimVecTypeSpec {} -> False
+  Section {} -> False
+  where
+    has_attr = case lookup_attrib attrName (opts entry) of
+      Just (OptionTrue {}) -> True
+      _ -> False
 
 -- a binding of property to value
 data Option
