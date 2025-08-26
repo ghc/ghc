@@ -430,7 +430,7 @@ tcApp rn_expr exp_res_ty
                          -- Step 5.2: typecheck the arguments, and monomorphise
                          --           any un-unified instantiation variables
                        ; tc_args <- tcValArgs DoQL inst_args
-                         -- Step 5.3: zonk to expose the polymophism hidden under
+                         -- Step 5.3: zonk to expose the polymorphism hidden under
                          --           QuickLook instantiation variables in `app_res_rho`
                        ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
                          -- Step 5.4: subsumption check against the expected type
