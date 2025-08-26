@@ -195,6 +195,7 @@ instance TH.Quasi GHCiQ where
   qLocation = fromMaybe noLoc . qsLocation <$> getState
   qGetPackageRoot        = ghcCmd GetPackageRoot
   qAddDependentFile file = ghcCmd (AddDependentFile file)
+  qAddDependentDirectory dir = ghcCmd (AddDependentDirectory dir)
   qAddTempFile suffix = ghcCmd (AddTempFile suffix)
   qAddTopDecls decls = ghcCmd (AddTopDecls decls)
   qAddForeignFilePath lang fp = ghcCmd (AddForeignFilePath lang fp)

@@ -38,6 +38,7 @@ data FinderCache = FinderCache { flushFinderCaches :: UnitEnv -> IO ()
                                , lookupFileCache   :: FilePath -> IO Fingerprint
                                -- ^ Look for the hash of a file in the cache. This should add it to the
                                -- cache. If the file doesn't exist, raise an IOException.
+                               , lookupDirCache    :: FilePath -> IO Fingerprint
                                }
 
 data InstalledFindResult

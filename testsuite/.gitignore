@@ -1523,6 +1523,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/th/T8633
 /tests/th/TH_Depends
 /tests/th/TH_Depends_external.txt
+/tests/th/TH_Depends_external/dummy.txt
 /tests/th/TH_StringPrimL
 /tests/th/TH_import_loop/ModuleA.hi-boot
 /tests/th/TH_import_loop/ModuleA.o-boot

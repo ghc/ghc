@@ -31,6 +31,9 @@ module GHC.Unit.Finder (
 
     findObjectLinkableMaybe,
     findObjectLinkable,
+
+    -- important that GHC.HsToCore.Usage uses the same hashing method for usage dirs as is used here.
+    getDirHash,
   ) where
 
 import GHC.Prelude
@@ -69,7 +72,9 @@ import GHC.Types.Unique.Map
 import GHC.Driver.Env
 import GHC.Driver.Config.Finder
 import GHC.Types.Unique.Set
+import qualified Data.List as L(sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
+import qualified System.Directory as SD
 import qualified System.OsPath as OsPath
 import qualified Data.List.NonEmpty as NE
 
@@ -108,10 +113,12 @@ initFinderCache :: IO FinderCache
 initFinderCache = do
   mod_cache <- newIORef emptyInstalledModuleEnv
   file_cache <- newIORef M.empty
+  dir_cache <- newIORef M.empty
   let flushFinderCaches :: UnitEnv -> IO ()
       flushFinderCaches ue = do
         atomicModifyIORef' mod_cache $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
         atomicModifyIORef' file_cache $ \_ -> (M.empty, ())
+        atomicModifyIORef' dir_cache  $ \_ -> (M.empty, ())
        where
         is_ext mod _ = not (isUnitEnvInstalledModule ue mod)
 
@@ -138,7 +145,26 @@ initFinderCache = do
              atomicModifyIORef' file_cache $ \c -> (M.insert key hash c, ())
              return hash
            Just fp -> return fp
+      lookupDirCache :: FilePath -> IO Fingerprint
+      lookupDirCache key = do
+         c <- readIORef dir_cache
+         case M.lookup key c of
+           Nothing -> do
+             hash <- getDirHash key
+             atomicModifyIORef' dir_cache $ \c -> (M.insert key hash c, ())
+             return hash
+           Just fp -> return fp
   return FinderCache{..}
+
+-- | This function computes a shallow hash of a directory, so really just what files and directories are directly inside it.
+-- It does not look at the contents of the files, or the contents of the directories it contains.
+getDirHash :: FilePath -> IO Fingerprint
+getDirHash dir = do
+  contents <- SD.listDirectory dir
+  let hashes  = fingerprintString <$> contents
+  let s_hashes = L.sort hashes
+  let hash    = fingerprintFingerprints s_hashes
+  return hash
 
 -- -----------------------------------------------------------------------------
 -- The three external entry points

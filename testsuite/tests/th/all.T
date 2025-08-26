@@ -214,6 +214,7 @@ test('T5434', [], multimod_compile,
      ['T5434', '-v0 -Wall ' + config.ghc_th_way_flags])
 test('T5508', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_Depends', [only_ways(['normal'])], makefile_test, ['TH_Depends'])
+test('TH_Depends_Dir', [only_ways(['normal']), js_skip], makefile_test, ['TH_Depends_Dir'])
 test('T5597', [], multimod_compile, ['T5597', '-v0 ' + config.ghc_th_way_flags])
 test('T5665', [], multimod_compile, ['T5665', '-v0 ' + config.ghc_th_way_flags])
 test('T5700', [], multimod_compile,
