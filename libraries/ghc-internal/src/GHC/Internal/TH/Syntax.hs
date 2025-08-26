@@ -132,6 +132,9 @@ class (MonadIO m, MonadFail m) => Quasi m where
   -- | See 'addDependentFile'.
   qAddDependentFile :: FilePath -> m ()
 
+  -- | See 'addDependentDirectory'.
+  qAddDependentDirectory :: FilePath -> m ()
+
   -- | See 'addTempFile'.
   qAddTempFile :: String -> m FilePath
 
@@ -202,6 +205,7 @@ instance Quasi IO where
   qExtsEnabled          = badIO "extsEnabled"
   qPutDoc _ _           = badIO "putDoc"
   qGetDoc _             = badIO "getDoc"
+  qAddDependentDirectory _ = badIO "AddDependentDirectory"
 
 instance Quote IO where
   newName = newNameIO
@@ -819,6 +823,24 @@ getPackageRoot :: Q FilePath
 getPackageRoot = Q qGetPackageRoot
 
 
+-- | Record external directories that runIO is using (dependent upon).
+-- The compiler can then recognize that it should re-compile the Haskell file
+-- when a directory changes.
+--
+-- Notes:
+--
+--   * ghc -M does not know about these dependencies - it does not execute TH.
+--
+--   * The dependency is shallow, based only on the direct content.
+--     Basically, it only sees a list of names. It does not look at directory
+--     metadata, recurse into subdirectories, or look at file contents. As
+--     long as the list of names remains the same, the directory is considered
+--     unchanged.
+--
+--   * The state of the directory is read at the interface generation time,
+--     not at the time of the function call.
+addDependentDirectory :: FilePath -> Q ()
+addDependentDirectory dp = Q (qAddDependentDirectory dp)
 
 -- | Record external files that runIO is using (dependent upon).
 -- The compiler can then recognize that it should re-compile the Haskell file
@@ -830,7 +852,11 @@ getPackageRoot = Q qGetPackageRoot
 --
 --   * ghc -M does not know about these dependencies - it does not execute TH.
 --
---   * The dependency is based on file content, not a modification time
+--   * The dependency is based on file content, not a modification time or
+--     any other metadata associated with the file (e.g. permissions).
+--
+--   * The state of the file is read at the interface generation time,
+--     not at the time of the function call.
 addDependentFile :: FilePath -> Q ()
 addDependentFile fp = Q (qAddDependentFile fp)
 
@@ -952,32 +978,33 @@ instance MonadIO Q where
   liftIO = runIO
 
 instance Quasi Q where
-  qNewName            = newName
-  qReport             = report
-  qRecover            = recover
-  qReify              = reify
-  qReifyFixity        = reifyFixity
-  qReifyType          = reifyType
-  qReifyInstances     = reifyInstances
-  qReifyRoles         = reifyRoles
-  qReifyAnnotations   = reifyAnnotations
-  qReifyModule        = reifyModule
-  qReifyConStrictness = reifyConStrictness
-  qLookupName         = lookupName
-  qLocation           = location
-  qGetPackageRoot     = getPackageRoot
-  qAddDependentFile   = addDependentFile
-  qAddTempFile        = addTempFile
-  qAddTopDecls        = addTopDecls
-  qAddForeignFilePath = addForeignFilePath
-  qAddModFinalizer    = addModFinalizer
-  qAddCorePlugin      = addCorePlugin
-  qGetQ               = getQ
-  qPutQ               = putQ
-  qIsExtEnabled       = isExtEnabled
-  qExtsEnabled        = extsEnabled
-  qPutDoc             = putDoc
-  qGetDoc             = getDoc
+  qNewName               = newName
+  qReport                = report
+  qRecover               = recover
+  qReify                 = reify
+  qReifyFixity           = reifyFixity
+  qReifyType             = reifyType
+  qReifyInstances        = reifyInstances
+  qReifyRoles            = reifyRoles
+  qReifyAnnotations      = reifyAnnotations
+  qReifyModule           = reifyModule
+  qReifyConStrictness    = reifyConStrictness
+  qLookupName            = lookupName
+  qLocation              = location
+  qGetPackageRoot        = getPackageRoot
+  qAddDependentFile      = addDependentFile
+  qAddDependentDirectory = addDependentDirectory
+  qAddTempFile           = addTempFile
+  qAddTopDecls           = addTopDecls
+  qAddForeignFilePath    = addForeignFilePath
+  qAddModFinalizer       = addModFinalizer
+  qAddCorePlugin         = addCorePlugin
+  qGetQ                  = getQ
+  qPutQ                  = putQ
+  qIsExtEnabled          = isExtEnabled
+  qExtsEnabled           = extsEnabled
+  qPutDoc                = putDoc
+  qGetDoc                = getDoc
 
 
 ----------------------------------------------------

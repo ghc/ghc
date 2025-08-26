@@ -194,6 +194,7 @@ data RecompReason
   | ModuleChangedRaw ModuleName
   | ModuleChangedIface ModuleName
   | FileChanged FilePath
+  | DirChanged FilePath
   | CustomReason String
   | FlagsChanged
   | LinkFlagsChanged
@@ -230,6 +231,7 @@ instance Outputable RecompReason where
     ModuleRemoved (_st, _uid, m)   -> ppr m <+> text "removed"
     ModuleAdded (_st, _uid, m)     -> ppr m <+> text "added"
     FileChanged fp           -> text fp <+> text "changed"
+    DirChanged dp            -> text "Contents of" <+> text dp <+> text "changed"
     CustomReason s           -> text s
     FlagsChanged             -> text "Flags changed"
     LinkFlagsChanged         -> text "Flags changed"
@@ -814,6 +816,22 @@ checkModUsage fc UsageFile{ usg_file_path = file,
    handler = if debugIsOn
       then \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
       else \_ -> return recomp -- if we can't find the file, just recompile, don't fail
+
+checkModUsage fc UsageDirectory{ usg_dir_path = dir,
+                                 usg_dir_hash = old_hash,
+                                 usg_dir_label = mlabel } =
+  liftIO $
+    handleIO handler $ do
+      new_hash <- lookupDirCache fc $ unpackFS dir
+      if (old_hash /= new_hash)
+         then return recomp
+         else return UpToDate
+ where
+   reason  = DirChanged $ unpackFS dir
+   recomp  = needsRecompileBecause $ fromMaybe reason $ fmap CustomReason mlabel
+   handler = if debugIsOn
+      then \e -> pprTrace "UsageDirectory" (text (show e)) $ return recomp
+      else \_ -> return recomp -- if we can't find the dir, just recompile, don't fail
 
 -- | We are importing a module whose exports have changed.
 -- Does this require recompilation?

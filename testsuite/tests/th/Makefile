@@ -43,6 +43,46 @@ TH_Depends:
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -v0 TH_Depends
 	./TH_Depends
 
+.PHONY: TH_Depends_Dir
+TH_Depends_Dir:
+	rm -rf TRIGGER_RECOMP
+	rm -rf DONT_TRIGGER_RECOMP
+	$(RM) TH_Depends_Dir TH_Depends_Dir.exe
+	$(RM) TH_Depends_Dir.o TH_Depends_Dir.hi
+	$(RM) TH_Depends_Dir_External.o TH_Depends_Dir_External.hi
+
+	mkdir TRIGGER_RECOMP
+	mkdir DONT_TRIGGER_RECOMP
+
+# First build with an empty dependent directory
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -package directory -package template-haskell -v0 TH_Depends_Dir
+	./TH_Depends_Dir
+	
+# Create a file in the dependent directory to trigger recompilation
+	sleep 2
+	echo "dummy" > TRIGGER_RECOMP/dummy.txt
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -package directory -package template-haskell -v0 TH_Depends_Dir
+	./TH_Depends_Dir
+	
+# Remove the file to check that recompilation is triggered
+	sleep 2
+	$(RM) TRIGGER_RECOMP/dummy.txt
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -package directory -package template-haskell -v0 TH_Depends_Dir
+	./TH_Depends_Dir
+
+# Should not trigger recompilation
+	sleep 2
+	echo "dummy" > DONT_TRIGGER_RECOMP/dummy.txt
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -package directory -package template-haskell -v0 TH_Depends_Dir
+	./TH_Depends_Dir
+
+# Should trigger a recompilation. Note that we should also see the change
+# in the non-dependent directory now, since it is still rechecked as long
+# as we recompile, it just doesn't *trigger* a recompilation.
+	sleep 2
+	rm -rf TRIGGER_RECOMP
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -package directory -package template-haskell -v0 TH_Depends_Dir
+	./TH_Depends_Dir
 
 T8333:
 	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(ghcThWayFlags) T8333.hs < /dev/null

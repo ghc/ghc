@@ -357,6 +357,23 @@ data Usage
         -- contents don't change.  This previously lead to odd
         -- recompilation behaviors; see #8114
   }
+  | UsageDirectory {
+        usg_dir_path  :: FastString,
+        -- ^ External dir dependency. From TH addDependentFile.
+        -- Should be absolute.
+        usg_dir_hash  :: Fingerprint,
+        -- ^ 'Fingerprint' of the directories contents.
+
+        usg_dir_label :: Maybe String
+        -- ^ An optional string which is used in recompilation messages if
+        -- dir in question has changed.
+
+        -- Note: We do a very shallow check indeed, just what the contents of
+        -- the directory are, aka what files and directories are within it.
+        -- If those files/directories have their own contents changed, then
+        -- we won't spot it here. If you do want to spot that, the caller
+        -- should recursively add them to their useage.
+  }
   | UsageHomeModuleInterface {
         usg_mod_name :: ModuleName
         -- ^ Name of the module
@@ -395,6 +412,7 @@ instance NFData Usage where
   rnf (UsagePackageModule mod hash safe) = rnf mod `seq` rnf hash `seq` rnf safe `seq` ()
   rnf (UsageHomeModule mod uid hash entities exports safe) = rnf mod `seq` rnf uid `seq` rnf hash `seq` rnf entities `seq` rnf exports `seq` rnf safe `seq` ()
   rnf (UsageFile file hash label) = rnf file `seq` rnf hash `seq` rnf label `seq` ()
+  rnf (UsageDirectory dir hash label) = rnf dir `seq` rnf hash `seq` rnf label `seq` ()
   rnf (UsageMergedRequirement mod hash) = rnf mod `seq` rnf hash `seq` ()
   rnf (UsageHomeModuleInterface mod uid hash) = rnf mod `seq` rnf uid `seq` rnf hash `seq` ()
 
@@ -431,6 +449,12 @@ instance Binary Usage where
         put_ bh (usg_unit_id  usg)
         put_ bh (usg_iface_hash usg)
 
+    put_ bh usg@UsageDirectory{} = do
+        putByte bh 5
+        put_ bh (usg_dir_path usg)
+        put_ bh (usg_dir_hash usg)
+        put_ bh (usg_dir_label usg)
+
     get bh = do
         h <- getByte bh
         case h of
@@ -462,6 +486,12 @@ instance Binary Usage where
             uid <- get bh
             hash <- get bh
             return UsageHomeModuleInterface { usg_mod_name = mod, usg_unit_id = uid, usg_iface_hash = hash }
+          5 -> do
+            dp    <- get bh
+            hash  <- get bh
+            label <- get bh
+            return UsageDirectory { usg_dir_path = dp, usg_dir_hash = hash, usg_dir_label = label }
+
           i -> error ("Binary.get(Usage): " ++ show i)
 
 -- | Records the imports that we depend on from a home module,
