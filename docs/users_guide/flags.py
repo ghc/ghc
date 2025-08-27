@@ -236,8 +236,10 @@ class Flag(GenericFlag):
         reverse = self.options.get('reverse')
         if reverse is not None and reverse != '':
             # Make this also addressable via the reverse flag
+            # Strip leading hyphen to avoid double hyphen in anchor ID
+            clean_name = name[1:] if name.startswith('-') else name
             self.env.domaindata['std']['objects']['ghc-flag', reverse] = \
-                self.env.docname, 'ghc-flag-%s' % name
+                self.env.docname, 'ghc-flag-%s' % clean_name
 
 # This class inherits from Sphinx's internal GenericObject, which drives
 # the add_object_type() utility function. We want to keep that tooling,
