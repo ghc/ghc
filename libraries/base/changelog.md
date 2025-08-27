@@ -16,6 +16,7 @@
   * Adjust the strictness of `Data.List.iterate'` to be more reasonable: every element of the output list is forced to WHNF when the `(:)` containing it is forced. ([CLC proposal #335)](https://github.com/haskell/core-libraries-committee/issues/335)
   * Add `nubOrd` / `nubOrdBy` to `Data.List` and `Data.List.NonEmpty`. ([CLC proposal #336](https://github.com/haskell/core-libraries-committee/issues/336))
   * Add `Semigroup` and `Monoid` instances for `Control.Monad.ST.Lazy`. ([CLC proposal #374](https://github.com/haskell/core-libraries-committee/issues/374))
+  * Add a new module `System.IO.OS` with operations for obtaining operating-system handles (file descriptors, Windows handles). ([CLC proposal #369](https://github.com/haskell/core-libraries-committee/issues/369))
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1
