@@ -13,6 +13,83 @@ Compiler
 
 - Fixed re-exports of ``MkSolo`` and ``MkSolo#`` (:ghc-ticket:`25182`)
 - Fixed the behavior of ``Language.Haskell.TH.mkName "FUN"`` (:ghc-ticket:`25174`)
+- Fixed miscompilation involving ``zonkEqTypes`` on ``AppTy/AppTy`` (:ghc-ticket:`26256`)
+- Fixed CprAnal to detect recursive newtypes (:ghc-ticket:`25944`)
+- Fixed specialisation of incoherent instances (:ghc-ticket:`25883`)
+- Fixed bytecode generation for ``tagToEnum# <LITERAL>`` (:ghc-ticket:`25975`)
+- Fixed panic with EmptyCase and RequiredTypeArguments (:ghc-ticket:`25004`)
+- Fixed ``tyConStupidTheta`` to handle ``PromotedDataCon`` (:ghc-ticket:`25739`)
+- Fixed unused import warnings for duplicate record fields (:ghc-ticket:`24035`)
+- Fixed lexing of ``"\^\"`` (:ghc-ticket:`25937`)
+- Fixed string gap collapsing (:ghc-ticket:`25784`)
+- Fixed lexing of comments in multiline strings (:ghc-ticket:`25609`)
+- Made unexpected LLVM versions a warning rather than an error (:ghc-ticket:`25915`)
+- Disabled ``-fprof-late-overloaded-calls`` for join points to avoid invalid transformations
+- Fixed bugs in ``integerRecipMod`` and ``integerPowMod`` (:ghc-ticket:`26017`)
+- Fixed ``naturalAndNot`` for NB/NS case (:ghc-ticket:`26230`)
+- Fixed ``ds_ev_typeable`` to use ``mkTrAppChecked`` (:ghc-ticket:`25998`)
+- Fixed GHC settings to always unescape escaped spaces (:ghc-ticket:`25204`)
+- Fixed issue with HasCallStack constraint caching (:ghc-ticket:`25529`)
+- Fixed archive member size writing logic in ``GHC.SysTools.Ar`` (:ghc-ticket:`26120`, :ghc-ticket:`22586`)
+
+Runtime System
+~~~~~~~~~~~~~~
+
+- Fixed ``MessageBlackHole.link`` to always be a valid closure
+- Fixed handling of WHITEHOLE in ``messageBlackHole`` (:ghc-ticket:`26205`)
+- Fixed ``rts_clearMemory`` logic when sanity checks are enabled (:ghc-ticket:`26011`)
+- Fixed underflow frame lookups in the bytecode interpreter (:ghc-ticket:`25750`)
+- Fixed overflows and reentrancy in interpreter statistics calculation (:ghc-ticket:`25756`)
+- Fixed INTERP_STATS profiling code (:ghc-ticket:`25695`)
+- Removed problematic ``n_free`` variable from nonmovingGC (:ghc-ticket:`26186`)
+- Fixed incorrect format specifiers in era profiling
+- Improved documentation of SLIDE and PACK bytecode instructions
+- Eliminated redundant ``SLIDE x 0`` bytecode instructions
+- Fixed compile issues on powerpc64 ELF v1
+
+Code Generation
+~~~~~~~~~~~~~~~
+
+- Fixed LLVM built-in variable predicate (was checking ``$llvm`` instead of ``@llvm``)
+- Fixed linkage of built-in arrays for LLVM (:ghc-ticket:`25769`)
+- Fixed code generation for SSE vector operations (:ghc-ticket:`25859`)
+- Fixed ``bswap64`` code generation on i386 (:ghc-ticket:`25601`)
+- Fixed sub-word arithmetic right shift on AArch64 (:ghc-ticket:`26061`)
+- Fixed LLVM vector literal emission to include type information
+- Fixed LLVM version detection
+- Fixed typo in ``padLiveArgs`` that caused segfaults (:ghc-ticket:`25770`, :ghc-ticket:`25773`)
+- Fixed constant-folding for Word->Float bitcasts
+- Added surface syntax for Word/Float bitcast operations
+- Fixed ``MOVD`` format in x86 NCG for ``unpackInt64X2#``
+- Added ``-finter-module-far-jumps`` flag for AArch64
+- Fixed RV64 J instruction handling for non-local jumps (:ghc-ticket:`25738`)
+- Reapplied division by constants optimization
+- Fixed TNTC to set CmmProc entry_label properly (:ghc-ticket:`25565`)
+
+Linker
+~~~~~~
+
+- Improved efficiency of proddable blocks structure (:ghc-ticket:`26009`)
+- Fixed Windows DLL loading to avoid redundant ``LoadLibraryEx`` calls (:ghc-ticket:`26009`)
+- Fixed incorrect use of ``break`` in nested for loop (:ghc-ticket:`26052`)
+- Fixed linker to not fail due to ``RTLD_NOW`` (:ghc-ticket:`25943`)
+- Dropped obsolete Windows XP compatibility checks
+
+GHCi
+~~~~
+
+- Fixed ``mkTopLevEnv`` to use ``loadInterfaceForModule`` instead of ``loadSrcInterface`` (:ghc-ticket:`25951`)
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+- Added explicit export lists to all remaining template-haskell modules
+
+Build system
+~~~~~~~~~~~~~~~~
+
+- Exposed all of Backtraces' internals for ghc-internal (:ghc-ticket:`26049`)
+- Fixed cross-compilation configuration override (:ghc-ticket:`26236`)
 
 Included libraries
 ~~~~~~~~~~~~~~~~~~
