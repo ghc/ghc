@@ -50,6 +50,7 @@ import qualified Data.ByteString.Short as SBS
 import Data.Data
 import Data.Function (on)
 import Data.String (fromString)
+import GHC.Utils.Encoding.UTF8
 --import Data.Word (Word8)
 --import Foreign.Marshal.Alloc (allocaBytes)
 --import Foreign.Storable (Storable(..))
@@ -58,6 +59,7 @@ import GHC.Ptr
 import GHC.Real (Ratio(..))
 import GHC.ST
 import GHC.Types.SrcLoc
+import GHC.Utils.Encoding.UTF8
 
 {-
 Note [Pragma source text]
@@ -151,70 +153,6 @@ instance Binary SourceText where
 pprShortByteString :: ShortByteString -> SDoc
 pprShortByteString = text . utf8DecodeShortByteString
 
-
-{-
--- | Efficiently convert a 'ShortByteString' to an 'SDoc' value.
--- Will only copy the underlying 'ByteArray' if it is /unpinned/.
-pprShortByteString :: ShortByteString -> SDoc
-pprShortByteString sbs =
-    let !(ByteArray ba#) = unShortByteString sbs
-        !len@(I# len#) = SBS.length sbs
-        copyInST :: ST s PtrString
-        copyInST = ST $ \s0 -> case newByteArray# len# s0 of
-          (# s1, mba# #) -> case copyByteArray# ba# 0# mba# 0# len# s1 of
-            s2 -> (# s2, PtrString (Ptr (mutableByteArrayContents# mba#)) len #) 
-    in  ptext $ runST copyInST
--}
-{-
-pprShortByteString sbs =
-    let !(ByteArray ba#) = unShortByteString sbs
-        !len@(I# len#) = SBS.length sbs
-        !size@(I# size#) = len + 1 -- One extra cell for the null terminator
-        copyInST :: ST s PtrString
-        copyInST = ST $ \s0 -> case newByteArray# size# s0 of
-          (# s1, mba# #) -> case copyByteArray# ba# 0# mba# 0# len# s1 of
-            s2 -> case writeWord8Array# mba# len# 0#Word8 s2 of
-              s3 -> (# s3, PtrString (Ptr (mutableByteArrayContents# mba#)) size #) 
-    in  ptext $ runST copyInST 
--}
-{-
-pprShortByteString sbs =
-    let !(ByteArray ba#) = unShortByteString sbs
-        !len@(I# len#) = SBS.length sbs
-        !pStr
-          | isTrue# (isByteArrayPinned# ba#) = PtrString (Ptr (byteArrayContents# ba#)) len
-          | otherwise =
-            let !size@(I# size#) = len + 1 -- One extra cell for the null terminator
-                copyInST :: ST s PtrString
-                copyInST = ST $ \s0 -> case newByteArray# size# s0 of
-                  (# s1, mba# #) -> case copyByteArray# ba# 0# mba# 0# len# s1 of
-                    s2 -> case writeWord8Array# mba# len# 0#Word8 s2 of
-                      s3 -> (# s3, PtrString (Ptr (mutableByteArrayContents# mba#)) size #) 
-            in  runST copyInST
-    in  ptext pStr 
--}
-
-{-
-            in  unsafeHandlePointer . allocaBytes pad $ \p -> do
-                    stToIO $ copyByteArrayToAddr ba 0 p len
-                    let p' = p `plusPtr` len 
-                    poke p' (0x00 :: Word8) -- add a null termination character (for safety)
-                    pure p
--}
-  where
---      copyInST (Int# size#) = 
---            s3 -> case unsafeFreezeByteArray# mba# s3 of
---              (# s4, new# #) -> 
-{-    
-      copyByteArrayToAddr :: ByteArray -> Int -> Ptr Word8 -> Int -> ST RealWorld ()
-      copyByteArrayToAddr (ByteArray src#) (I# src_off#) (Ptr dst#) (I# len#) =
-        ST $ \s -> case copyByteArrayToAddr# src# src_off# dst# len# s of
-                 s' -> (# s', () #)
-
-      unsafeHandlePointer :: IO (Ptr Word8) -> Ptr Word8
-      unsafeHandlePointer (IO act) = case runRW# act of (# _, res #) -> res
--}
-    
 -- | Special combinator for showing string literals.
 pprWithSourceText :: SourceText -> SDoc -> SDoc
 pprWithSourceText NoSourceText     d = d
@@ -259,13 +197,12 @@ mkIntegralLit i = IL { il_text = safeShowToSourceText i_integer
     i_integer = toInteger i
 
 negateIntegralLit :: IntegralLit -> IntegralLit
-negateIntegralLit (IL text neg value)
-  = case text of
-      SourceText (utf8UnconsShortByteString -> Just ('-',src))
-                     -> IL (SourceText src)                  False    (negate value)
-                                       --TODO: this cons is not UTF8 approved!
-      SourceText src -> IL (SourceText ('-' `SBS.cons` src)) True     (negate value)
-      NoSourceText   -> IL NoSourceText                     (not neg) (negate value)
+negateIntegralLit (IL text neg value) =
+  let text' = case text of
+        NoSourceText         -> NoSourceText
+        SourceText src | neg -> SourceText $    1 `SBS.drop` src -- remove the hyphen
+        SourceText src       -> SourceText $ 0x2D `SBS.cons` src -- prepend a hyphen (0x2D = ASCII '-')
+  in  IL text' (not neg) (negate value)
 
 -- | Fractional Literal
 --
@@ -330,14 +267,12 @@ mkTHFractionalLit r =  FL { fl_text = safeShowToSourceText (realToFrac r::Double
                            , fl_exp_base = Base10 }
 
 negateFractionalLit :: FractionalLit -> FractionalLit
-negateFractionalLit (FL text neg i e eb)
-  -- 0x2D is the ASCII code for a hyphen character '-'
-  = case text of
-      SourceText (utf8UnconsShortByteString -> Just ('-',src))
-                     --TODO: this cons is not UTF8 approved!
-                     -> FL (SourceText src)                  False    (negate i) e eb
-      SourceText src -> FL (SourceText ('-' `SBS.cons` src)) True     (negate i) e eb
-      NoSourceText   -> FL NoSourceText                     (not neg) (negate i) e eb
+negateFractionalLit (FL text neg i e eb) =
+  let text' = case text of
+        NoSourceText         -> NoSourceText
+        SourceText src | neg -> SourceText $    1 `SBS.drop` src -- remove the hyphen
+        SourceText src       -> SourceText $ 0x2D `SBS.cons` src -- prepend a hyphen (0x2D = ASCII '-')
+  in  FL text' (not neg) (negate i) e eb
 
 -- | The integer should already be negated if it's negative.
 integralFractionalLit :: Bool -> Integer -> FractionalLit
@@ -373,7 +308,6 @@ instance Ord IntegralLit where
 instance Outputable IntegralLit where
   ppr (IL (SourceText src) _ _) = pprShortByteString src
   ppr (IL NoSourceText _ value) = text (show value)
-
 
 -- | Compare fractional lits with small exponents for value equality but
 --   large values for syntactic equality.
