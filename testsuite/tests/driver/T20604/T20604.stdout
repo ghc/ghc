@@ -1,11 +1,5 @@
 A1
 A
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/ghc-prim-0.12.0-inplace/libHSghc-prim-0.12.0-inplace.a" 019a1208b8742850eeb197adcf0445f3
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/ghc-bignum-1.3-inplace/libHSghc-bignum-1.3-inplace.a" ca54044c2ea501531ac3016a72a9d92b
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/ghc-internal-9.1002.0-inplace/libHSghc-internal-9.1002.0-inplace.a" 1c2b59e426d6ae9172eb46d890155e19
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/base-4.20.2.0-inplace/libHSbase-4.20.2.0-inplace.a" 820a64d9cb81281e10660ded650e973f
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/ghc-boot-th-9.10.2.20250728-inplace/libHSghc-boot-th-9.10.2.20250728-inplace.a" 47565629d3614763d649bde91000bf42
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/array-0.5.8.0-inplace/libHSarray-0.5.8.0-inplace.a" 7fb37d6d03900a689d24212e83d3f729
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/deepseq-1.5.0.0-inplace/libHSdeepseq-1.5.0.0-inplace.a" 316be3ed9f3b5e893b2eb9924f8bb698
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/pretty-1.1.3.6-inplace/libHSpretty-1.1.3.6-inplace.a" ab975b458837cd4dd7a38be2c7e71603
-addDependentFile "/home/zubin/ghcs/unicode-lex/_build_devel2/stage1/lib/../lib/x86_64-linux-ghc-9.10.2.20250728/template-haskell-2.22.0.0-inplace/libHStemplate-haskell-2.22.0.0-inplace.a" 8520e0f59701ce4073df664d176ade9c
+addDependentFile "/home/zubin/ghcs/exprType/_build_release/stage1/lib/../lib/x86_64-linux-ghc-9.12.2.20250917-inplace/libHSghc-prim-0.13.0-inplace-ghc9.12.2.20250917.so" 8803d0bdafc63e06222615bea8dc353d
+addDependentFile "/home/zubin/ghcs/exprType/_build_release/stage1/lib/../lib/x86_64-linux-ghc-9.12.2.20250917-inplace/libHSghc-bignum-1.3-inplace-ghc9.12.2.20250917.so" f17f0d2b06181c46da6178e187b358e0
+addDependentFile "/home/zubin/ghcs/exprType/_build_release/stage1/lib/../lib/x86_64-linux-ghc-9.12.2.20250917-inplace/libHSghc-internal-9.1202.0-inplace-ghc9.12.2.20250917.so" ec33682bace30c3a503fa37c72640d1c

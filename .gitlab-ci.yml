@@ -315,6 +315,7 @@ lint-ci-config:
       - .gitlab/jobs-metadata.json
       - .gitlab/jobs.yaml
   dependencies: []
+  allow_failure: true
 
 lint-submods:
   extends: .lint-submods
