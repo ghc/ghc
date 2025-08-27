@@ -970,7 +970,7 @@ pragBrackets doc = text "{-#" <+> doc <+> text "#-}"
 -- | Using SourceText in case the pragma was spelled differently or used mixed
 -- case
 pragSrcBrackets :: SourceText -> String -> SDoc -> SDoc
-pragSrcBrackets src alt doc = pprWithSourceText src (text alt) <+> doc <+> text "#-}" 
+pragSrcBrackets src alt doc = pprWithSourceText src (text alt) <+> doc <+> text "#-}"
 
 pprVarSig :: (OutputableBndr id) => [id] -> SDoc -> SDoc
 pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]

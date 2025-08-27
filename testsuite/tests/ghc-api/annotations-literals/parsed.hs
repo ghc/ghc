@@ -13,6 +13,7 @@ import GHC
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Unit.Types (GenUnit(..), Definite(..))
+import GHC.Utils.Encoding.UTF8
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Data.Bag (filterBag,isEmptyBag)
@@ -49,30 +50,30 @@ testOneFile libdir fileName = do
 
      doHsLit :: HsLit GhcPs -> [String]
      doHsLit (HsChar       (SourceText src) c)
-       = ["HsChar [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsChar [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doHsLit (HsCharPrim   (SourceText src) c)
-       = ["HsCharPrim [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsCharPrim [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doHsLit (HsString     (SourceText src) c)
-       = ["HsString [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsString [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doHsLit (HsStringPrim (SourceText src) c)
-       = ["HsStringPrim [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsStringPrim [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doHsLit (HsInt  _     (IL (SourceText src) _ c))
-       = ["HsInt [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsInt [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doHsLit (HsIntPrim (SourceText src) c)
-       = ["HsIntPrim [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsIntPrim [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doHsLit (HsWordPrim   (SourceText src) c)
-       = ["HsWordPrim [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsWordPrim [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doHsLit (HsInt64Prim  (SourceText src) c)
-       = ["HsInt64Prim [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsInt64Prim [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doHsLit (HsWord64Prim (SourceText src) c)
-       = ["HsWord64Prim [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsWord64Prim [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doHsLit _ = []
 
      doOverLit :: OverLitVal -> [String]
      doOverLit (HsIntegral  (IL (SourceText src) _ c))
-       = ["HsIntegral [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsIntegral [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doOverLit (HsIsString  (SourceText src) c)
-       = ["HsIsString [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsIsString [" ++ utf8DecodeShortByteString src ++ "] " ++ show c]
      doOverLit _ = []
 
 pp a = showPprUnsafe a

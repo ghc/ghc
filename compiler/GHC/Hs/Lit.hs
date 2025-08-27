@@ -220,7 +220,7 @@ instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsMultilineString st s) =
       case st of
         NoSourceText -> pprHsString s
-        -- 0x0A (10) is the new line character (\n) 
+        -- 0x0A (10) is the new line character (\n)
         SourceText src -> vcat $ pprShortByteString <$> SBS.split 0x0A src
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
