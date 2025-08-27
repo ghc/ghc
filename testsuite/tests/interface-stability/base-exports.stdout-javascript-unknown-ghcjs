@@ -10086,6 +10086,17 @@ module System.IO.Error where
   userError :: GHC.Internal.Base.String -> IOError
   userErrorType :: IOErrorType
 
+module System.IO.OS where
+  -- Safety: Safe
+  withFileDescriptorReadingBiased :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
+  withFileDescriptorReadingBiasedRaw :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
+  withFileDescriptorWritingBiased :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
+  withFileDescriptorWritingBiasedRaw :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
+  withWindowsHandleReadingBiased :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Ptr.Ptr () -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
+  withWindowsHandleReadingBiasedRaw :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Ptr.Ptr () -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
+  withWindowsHandleWritingBiased :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Ptr.Ptr () -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
+  withWindowsHandleWritingBiasedRaw :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Ptr.Ptr () -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
+
 module System.IO.Unsafe where
   -- Safety: Unsafe
   unsafeDupablePerformIO :: forall a. GHC.Internal.Types.IO a -> a

@@ -328,6 +328,7 @@ Library
         GHC.Internal.System.Exit
         GHC.Internal.System.IO
         GHC.Internal.System.IO.Error
+        GHC.Internal.System.IO.OS
         GHC.Internal.System.Mem
         GHC.Internal.System.Mem.StableName
         GHC.Internal.System.Posix.Internals

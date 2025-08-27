@@ -23,6 +23,7 @@
   * `GHC.Conc.catchSTM` and `GHC.Conc.Sync.catchSTM` now attach `WhileHandling` annotation to exceptions thrown from the handler. ([GHC #25365](https://gitlab.haskell.org/ghc/ghc/-/issues/25365))
   * Remove `GHC.JS.Prim.Internal.Build`, as per [CLC #329](https://github.com/haskell/core-libraries-committee/issues/329)
   * Export `labelThread` from `Control.Concurrent`.([CLC proposal #376](https://github.com/haskell/core-libraries-committee/issues/376))
+  * Add a new module `System.IO.OS` with operations for obtaining operating-system handles (file descriptors, Windows handles). ([CLC proposal #369](https://github.com/haskell/core-libraries-committee/issues/369))
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1
