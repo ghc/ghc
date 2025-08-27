@@ -133,51 +133,34 @@ newtype NonZero a = NonZero { getNonZero :: a }
 instance (Arbitrary a, Num a, Eq a) => Arbitrary (NonZero a) where
   arbitrary = nonZero
 
--- | A newtype for shift amounts that are bounded by word size
-newtype BoundedShift a = BoundedShift { getBoundedShift :: Int }
-  deriving (Eq,Ord,Show)
+-- | A newtype for shift amounts that are bounded by @word_size - 1@
+newtype BoundedShift a = BoundedShift {getBoundedShift :: Int}
+  deriving (Eq, Ord, Show)
 
--- | Generate shift amounts bounded by the word size for each type
-boundedShift8 :: Gen (BoundedShift Int8)
-boundedShift8 = do
-  x <- arbitrary
-  return $ BoundedShift (abs x `mod` 8)
-
-boundedShift16 :: Gen (BoundedShift Int16)
-boundedShift16 = do
-  x <- arbitrary
-  return $ BoundedShift (abs x `mod` 16)
-
-boundedShift32 :: Gen (BoundedShift Int32)
-boundedShift32 = do
-  x <- arbitrary
-  return $ BoundedShift (abs x `mod` 32)
-
-boundedShift64 :: Gen (BoundedShift Int64)
-boundedShift64 = do
-  x <- arbitrary
-  return $ BoundedShift (abs x `mod` 64)
-
-boundedShiftWord :: Gen (BoundedShift Int)
-boundedShiftWord = do
-  x <- arbitrary
-  return $ BoundedShift (abs x `mod` finiteBitSize (undefined :: Word))
-
--- Arbitrary instances for BoundedShift types to work with lambda patterns
 instance Arbitrary (BoundedShift Int8) where
-  arbitrary = boundedShift8
+  arbitrary = do
+    x <- arbitrary
+    return $ BoundedShift (abs x `mod` 8)
 
 instance Arbitrary (BoundedShift Int16) where
-  arbitrary = boundedShift16
+  arbitrary = do
+    x <- arbitrary
+    return $ BoundedShift (abs x `mod` 8)
 
 instance Arbitrary (BoundedShift Int32) where
-  arbitrary = boundedShift32
+  arbitrary = do
+    x <- arbitrary
+    return $ BoundedShift (abs x `mod` 8)
 
 instance Arbitrary (BoundedShift Int64) where
-  arbitrary = boundedShift64
+  arbitrary = do
+    x <- arbitrary
+    return $ BoundedShift (abs x `mod` 8)
 
 instance Arbitrary (BoundedShift Int) where
-  arbitrary = boundedShiftWord
+  arbitrary = do
+    x <- arbitrary
+    return $ BoundedShift (abs x `mod` finiteBitSize (undefined :: Word))
 
 instance Arbitrary Natural where
     arbitrary = integralDownsize . (`mod` 10000) . abs <$> arbitraryInt64
