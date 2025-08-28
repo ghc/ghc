@@ -1251,8 +1251,10 @@ instance Outputable UnusableUnitReason where
     ppr IgnoredWithFlag = text "[ignored with flag]"
     ppr (BrokenDependencies uids)   = brackets (text "broken" <+> ppr uids)
     ppr (CyclicDependencies uids)   = brackets (text "cyclic" <+> ppr uids)
-    ppr (IgnoredDependencies uids)  = brackets (text "ignored" <+> ppr uids)
-    ppr (ShadowedDependencies uids) = brackets (text "shadowed" <+> ppr uids)
+    ppr (IgnoredDependencies uids)  = brackets (text $ "unusable because the -ignore-package flag was used to " ++
+                                                       "ignore at least one of its dependencies:") $$
+                                        nest 2 (hsep (map ppr uids))
+    ppr (ShadowedDependencies uids) = brackets (text "unusable due to shadowed" <+> ppr uids)
 
 type UnusableUnits = UniqMap UnitId (UnitInfo, UnusableUnitReason)
 
@@ -1640,10 +1642,27 @@ mkUnitState logger dflags cfg = do
   -- Sanity check. If the rtsWayUnitId is not in the database, then we have a
   -- problem.  The RTS is effectively missing.
   unless (null pkgs1 || gopt Opt_NoRts dflags || anyUniqMap (== rtsWayUnitId dflags) wired_map) $ do
-    pprPanic "mkUnitState" $ ppr ( length pkgs1
-                                , gopt Opt_NoRts dflags
-                                , anyUniqMap (== rtsWayUnitId dflags) wired_map
-                                , wired_map) <> text "; The RTS for " <> ppr (rtsWayUnitId dflags) <> text " is missing from the package database.  Please check your installation."
+    pprPanic "mkUnitState" $
+      vcat
+        [ text "debug details:"
+        , nest 2 $ vcat
+            [ text "pkgs1_count =" <+> ppr (length pkgs1)
+            , text "Opt_NoRts   =" <+> ppr (gopt Opt_NoRts dflags)
+            , text "ghcLink     =" <+> text (show (ghcLink dflags))
+            , text "platform    =" <+> text (show (targetPlatform dflags))
+            , text "rtsWayUnitId=" <+> ppr (rtsWayUnitId dflags)
+            , text "has_rts     =" <+> ppr (anyUniqMap (== rtsWayUnitId dflags) wired_map)
+            , text "wired_map   =" <+> ppr wired_map
+            , text "pkgs1 units (pre-wiring):" $$ nest 2 (pprWithCommas (\p -> ppr (unitId p) <+> parens (ppr (unitPackageName p))) pkgs1)
+            , text "pkgs2 units (post-wiring):" $$ nest 2 (pprWithCommas (\p -> ppr (unitId p) <+> parens (ppr (unitPackageName p))) pkgs2)
+            ]
+        ]
+      <> text "; The RTS for " <> ppr (rtsWayUnitId dflags)
+      <> text " is missing from the package database while building unit "
+      <> ppr (homeUnitId_ dflags)
+      <> text " (home units: " <> ppr (Set.toList (unitConfigHomeUnits cfg)) <> text ")."
+      <> text " Please check your installation."
+      <> text " If this target doesn't need the RTS (e.g. building a shared library), you can add -no-rts to the relevant package's ghc-options in cabal.project to bypass this check."
 
   let pkgs3 = if gopt Opt_NoRts dflags && not (anyUniqMap (== ghcInternalUnitId) wired_map)
               then pkgs2
@@ -1814,7 +1833,8 @@ mkModuleNameProvidersMap logger cfg pkg_map closure vis_map =
     --      (e.g., hidden packages, causing #14717)
     --
     --    * Folding on pkg_map is awkward because if we have an
-    --      Backpack instantiation, we need to possibly add a
+    --      Backpack instantiation, we need to
+    --      possibly add a
     --      package from pkg_map multiple times to the actual
     --      ModuleNameProvidersMap.  Also, we don't really want
     --      definite package instantiations to show up in the

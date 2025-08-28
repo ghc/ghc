@@ -327,7 +327,7 @@ flag thread-sanitizer
   manual: True
 
 common rts-base-config
-    ghc-options: -this-unit-id rts -ghcversion-file=include/ghcversion.h -optc-DFS_NAMESPACE=rts
+    ghc-options: -ghcversion-file=include/ghcversion.h -optc-DFS_NAMESPACE=rts
     cmm-options:
 
     include-dirs: include .
