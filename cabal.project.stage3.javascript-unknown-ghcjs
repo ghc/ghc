@@ -1,5 +1,6 @@
 package-dbs: clear, global
 
+
 packages:
   rts-headers
   rts-fs
@@ -10,7 +11,6 @@ packages:
   libraries/ghc-experimental
   libraries/base
   compiler
-  ghc
   libraries/ghc-platform
   libraries/ghc-compact
   libraries/ghc-bignum
@@ -53,18 +53,6 @@ packages:
 
   utils/genprimopcode
   utils/deriveConstants
-  utils/ghc-pkg
-  utils/hsc2hs
-  utils/unlit
-  utils/ghc-toolchain
-
-  libraries/haskeline
-  libraries/terminfo
-  utils/hp2ps
-  utils/hpc
-  utils/ghc-iserv
-  utils/genapply
-  utils/runghc
 
 -- project-rts
 benchmarks: False
@@ -73,11 +61,42 @@ allow-boot-library-installs: True
 active-repositories: :none
 
 constraints:
-  -- we do not want to use the rts-headers from stage1
-  rts-headers source, rts-fs source
-  -- All build dependencies should be installed, i.e. from stage1.
-  -- I cannot write build:* but ghc-internal is enough to do the job.
-  , build:any.ghc-internal installed
+  build:any.ghc-internal installed,
+  -- for some reason cabal things these are already installed for the target,
+  -- although they only exist in the build compiler package db
+  Cabal source,
+  Cabal-syntax source,
+  array source,
+  base source,
+  binary source,
+  bytestring source,
+  containers source,
+  deepseq source,
+  directory source,
+  exceptions source,
+  file-io source,
+  filepath source,
+  ghc-bignum source,
+  hpc source,
+  integer-gmp source,
+  mtl source,
+  os-string source,
+  parsec source,
+  pretty source,
+  process source,
+  rts source,
+  rts-headers source,
+  rts-fs source,
+  stm source,
+  system-cxx-std-lib source,
+  template-haskell source,
+  text source,
+  time source,
+  transformers source,
+  unix source,
+  xhtml source,
+  Win32 source
+
 
 package *
   library-vanilla: True
@@ -131,13 +150,6 @@ tests: False
 allow-boot-library-installs: True
 active-repositories: :none
 
-package *
-  library-vanilla: True
-  shared: False
-  executable-profiling: False
-  executable-dynamic: False
-  executable-static: False
-
 package rts-headers
   ghc-options: -no-rts
 
@@ -166,22 +178,8 @@ program-options
 benchmarks: False
 tests: False
 
-package *
-  library-vanilla: True
-  shared: False
-  executable-profiling: False
-  executable-dynamic: False
-  executable-static: False
-
-package ghc-bin
-  flags: +internal-interpreter -threaded
-
 package hsc2hs
   flags: +in-ghc-tree
-
-package haskeline
-  flags: -terminfo
-
 
 program-options
   ghc-options: -fhide-source-paths -j

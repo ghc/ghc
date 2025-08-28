@@ -92,6 +92,15 @@ EMCXX ?= em++
 EMAR ?= emar
 EMRANLIB ?= emranlib
 
+EXTRA_LIB_DIRS ?=
+EXTRA_INCLUDE_DIRS ?=
+
+MUSL_EXTRA_LIB_DIRS ?=
+MUSL_EXTRA_INCLUDE_DIRS ?=
+
+JS_EXTRA_LIB_DIRS ?=
+JS_EXTRA_INCLUDE_DIRS ?=
+
 # :exploding-head: It turns out override doesn't override the command-line
 # value but it overrides Make's normal behavior of ignoring assignments to
 # command-line variables. This allows the += operations to append to whatever
@@ -104,7 +113,9 @@ override CABAL_ARGS += \
 
 override CABAL_BUILD_ARGS += \
 	-j -w $(GHC) --with-gcc=$(CC) \
-	--project-file=cabal.project.$(STAGE) \
+	--project-file=cabal.project.$(STAGE)$(if $(TARGET),".$(TARGET)",) \
+	$(foreach lib,$(EXTRA_LIB_DIRS),--extra-lib-dirs=$(lib)) \
+	$(foreach include,$(EXTRA_INCLUDE_DIRS),--extra-include-dirs=$(include)) \
 	--builddir=_build/$(STAGE)/$(TARGET) \
 	--ghc-options="-fhide-source-paths"
 
@@ -237,7 +248,7 @@ STAGE2_UTIL_EXECUTABLES := \
 	runghc \
 	unlit
 
-STAGE2_TARGET_LIBS := \
+STAGE3_LIBS := \
 	Cabal \
 	Cabal-syntax \
 	array \
@@ -250,6 +261,7 @@ STAGE2_TARGET_LIBS := \
 	exceptions \
 	file-io \
 	filepath \
+	ghc-bignum \
 	hpc \
 	integer-gmp \
 	mtl \
@@ -405,49 +417,131 @@ _build/stage2/lib/template-hsc.h: utils/hsc2hs/data/template-hsc.h
 .PHONY: stage2
 stage2: $(addprefix _build/stage2/bin/,$(STAGE2_EXECUTABLES)) _build/stage2/lib/settings _build/stage2/lib/package.conf.d/package.cache _build/stage2/lib/template-hsc.h
 
-.PHONY: stage2-javascript-unknown-ghcjs
-stage2-javascript-unknown-ghcjs: javascript-unknown-ghcjs-libs _build/stage2/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d/package.cache
+# --- Stage 3 javascript build ---
 
-_build/stage2/lib/targets/javascript-unknown-ghcjs/lib/settings: _build/stage1/bin/ghc-toolchain-bin
+.PHONY: stage3-javascript-unknown-ghcjs
+stage3-javascript-unknown-ghcjs: javascript-unknown-ghcjs-libs _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d/package.cache
+
+_build/stage3/lib/targets/javascript-unknown-ghcjs/lib:
+	@mkdir -p $@
+	@mkdir -p _build/stage2/lib/targets/
+	@ln -sf ../../../stage3/lib/targets/javascript-unknown-ghcjs _build/stage2/lib/targets/javascript-unknown-ghcjs
+
+_build/stage3/lib/targets/javascript-unknown-ghcjs/lib/settings: _build/stage3/lib/targets/javascript-unknown-ghcjs/lib _build/stage1/bin/ghc-toolchain-bin
 	@mkdir -p $(@D)
-	$(call run_and_log, emconfigure _build/stage1/bin/ghc-toolchain-bin --triple javascript-unknown-ghcjs --output-settings -o $@ --cc $(EMCC) --cxx $(EMCXX) --ar $(EMAR) --ranlib $(EMRANLIB))
+	$(call run_and_log, _build/stage1/bin/ghc-toolchain-bin --triple javascript-unknown-ghcjs --output-settings -o $@ --cc $(EMCC) --cxx $(EMCXX) --ar $(EMAR) --ranlib $(EMRANLIB))
 
-_build/stage2/bin/javascript-unknown-ghcjs-ghc-pkg: _build/stage2/bin/ghc-pkg
+_build/stage3/bin/javascript-unknown-ghcjs-ghc-pkg: _build/stage2/bin/ghc-pkg
 	@mkdir -p $(@D)
-	ln -sf ghc-pkg $@
+	@ln -sf ../../stage2/bin/ghc-pkg $@
 
-_build/stage2/bin/javascript-unknown-ghcjs-ghc: _build/stage2/bin/ghc
+_build/stage3/bin/javascript-unknown-ghcjs-ghc: _build/stage2/bin/ghc
 	@mkdir -p $(@D)
-	ln -sf ghc $@
+	@ln -sf ../../stage2/bin/ghc $@
 
-_build/stage2/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d:
+_build/stage3/bin/javascript-unknown-ghcjs-hsc2hs: _build/stage2/bin/hsc2hs
+	@mkdir -p $(@D)
+	@ln -sf ../../stage2/bin/hsc2hs $@
+
+_build/stage3/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d: _build/stage3/lib/targets/javascript-unknown-ghcjs/lib
 	@mkdir -p $@
 
-_build/stage2/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d/package.cache: _build/stage2/bin/javascript-unknown-ghcjs-ghc-pkg _build/stage2/lib/targets/javascript-unknown-ghcjs/lib/settings javascript-unknown-ghcjs-libs
+_build/stage3/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d/package.cache: _build/stage3/bin/javascript-unknown-ghcjs-ghc-pkg _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/settings javascript-unknown-ghcjs-libs
 	@mkdir -p $(@D)
 	@rm -rf $(@D)/*
-	cp -rfp _build/stage2/javascript-unknown-ghcjs/packagedb/host/*/* $(@D)
-	_build/stage2/bin/javascript-unknown-ghcjs-ghc-pkg recache
+	cp -rfp _build/stage3/javascript-unknown-ghcjs/packagedb/host/*/* $(@D)
+	_build/stage3/bin/javascript-unknown-ghcjs-ghc-pkg recache
 
-_build/stage2/lib/targets/javascript-unknown-ghcjs/bin/unlit: _build/stage2/bin/unlit
+# ghc-toolchain borks unlit
+_build/stage3/lib/targets/javascript-unknown-ghcjs/bin/unlit: _build/stage2/bin/unlit
 	@mkdir -p $(@D)
 	cp -rfp $< $@
 
 .PHONY: javascript-unknown-ghcjs-libs
 javascript-unknown-ghcjs-libs: private TARGET=javascript-unknown-ghcjs
-javascript-unknown-ghcjs-libs: private GHC=$(abspath _build/stage2/bin/javascript-unknown-ghcjs-ghc)
+javascript-unknown-ghcjs-libs: private GHC=$(abspath _build/stage3/bin/javascript-unknown-ghcjs-ghc)
 javascript-unknown-ghcjs-libs: private GHC2=$(abspath _build/stage2/bin/ghc)
-javascript-unknown-ghcjs-libs: private STAGE=stage2
+javascript-unknown-ghcjs-libs: private STAGE=stage3
 javascript-unknown-ghcjs-libs: private CC=emcc
-javascript-unknown-ghcjs-libs: _build/stage2/bin/javascript-unknown-ghcjs-ghc-pkg _build/stage2/bin/javascript-unknown-ghcjs-ghc _build/stage2/lib/targets/javascript-unknown-ghcjs/lib/settings _build/stage2/lib/targets/javascript-unknown-ghcjs/bin/unlit _build/stage2/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d
+javascript-unknown-ghcjs-libs: _build/stage3/bin/javascript-unknown-ghcjs-ghc-pkg _build/stage3/bin/javascript-unknown-ghcjs-ghc _build/stage3/bin/javascript-unknown-ghcjs-hsc2hs _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/settings _build/stage3/lib/targets/javascript-unknown-ghcjs/bin/unlit _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d
 	# Force cabal to replan
-	rm -rf _build/stage2/javascript-unknown-ghcjs/cache
+	rm -rf _build/stage3/javascript-unknown-ghcjs/cache
 	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
-		PATH=$(PWD)/_build/stage2/bin:$(PATH) \
-		$(CABAL_BUILD) -W $(GHC2) --happy-options="--template=$(abspath _build/stage2/src/happy-lib-2.1.5/data/)" rts:nonthreaded-nodebug )
+		PATH=$(PWD)/_build/stage2/bin:$(PWD)/_build/stage3/bin:$(PATH) \
+		$(CABAL_BUILD) -W $(GHC2) --happy-options="--template=$(abspath _build/stage2/src/happy-lib-2.1.5/data/)" --with-hsc2hs=javascript-unknown-ghcjs-hsc2hs --hsc2hs-options='-x' --configure-option='--host=javascript-unknown-ghcjs' \
+		$(foreach lib,$(JS_EXTRA_LIB_DIRS),--extra-lib-dirs=$(lib)) \
+		$(foreach include,$(JS_EXTRA_INCLUDE_DIRS),--extra-include-dirs=$(include)) \
+		rts:nonthreaded-nodebug )
 	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
-		PATH=$(PWD)/_build/stage2/bin:$(PATH) \
-		$(CABAL_BUILD) -W $(GHC2) --happy-options="--template=$(abspath _build/stage2/src/happy-lib-2.1.5/data/)" $(STAGE2_TARGET_LIBS) )
+		PATH=$(PWD)/_build/stage2/bin:$(PWD)/_build/stage3/bin:$(PATH) \
+		$(CABAL_BUILD) -W $(GHC2) --happy-options="--template=$(abspath _build/stage2/src/happy-lib-2.1.5/data/)" --with-hsc2hs=javascript-unknown-ghcjs-hsc2hs --hsc2hs-options='-x' --configure-option='--host=javascript-unknown-ghcjs' \
+		$(foreach lib,$(JS_EXTRA_LIB_DIRS),--extra-lib-dirs=$(lib)) \
+		$(foreach include,$(JS_EXTRA_INCLUDE_DIRS),--extra-include-dirs=$(include)) \
+		$(STAGE3_LIBS) )
+
+# --- Stage 3 musl build ---
+
+.PHONY: stage3-x86_64-unknown-linux-musl
+stage3-x86_64-unknown-linux-musl: x86_64-unknown-linux-musl-libs _build/stage3/lib/targets/x86_64-unknown-linux-musl/lib/package.conf.d/package.cache
+
+_build/stage3/lib/targets/x86_64-unknown-linux-musl/lib:
+	@mkdir -p $@
+	@mkdir -p _build/stage2/lib/targets/
+	@ln -sf ../../../stage3/lib/targets/x86_64-unknown-linux-musl _build/stage2/lib/targets/x86_64-unknown-linux-musl
+
+_build/stage3/lib/targets/x86_64-unknown-linux-musl/lib/settings: _build/stage3/lib/targets/x86_64-unknown-linux-musl/lib _build/stage1/bin/ghc-toolchain-bin
+	@mkdir -p $(@D)
+	$(call run_and_log, _build/stage1/bin/ghc-toolchain-bin --triple x86_64-unknown-linux-musl --output-settings -o $@ --cc x86_64-unknown-linux-musl-cc --cxx x86_64-unknown-linux-musl-c++ --ar x86_64-unknown-linux-musl-ar --ranlib x86_64-unknown-linux-musl-ranlib --ld x86_64-unknown-linux-musl-ld)
+
+_build/stage3/bin/x86_64-unknown-linux-musl-ghc-pkg: _build/stage2/bin/ghc-pkg
+	@mkdir -p $(@D)
+	@ln -sf ../../stage2/bin/ghc-pkg $@
+
+_build/stage3/bin/x86_64-unknown-linux-musl-ghc: _build/stage2/bin/ghc
+	@mkdir -p $(@D)
+	@ln -sf ../../stage2/bin/ghc $@
+
+_build/stage3/bin/x86_64-unknown-linux-musl-hsc2hs: _build/stage2/bin/hsc2hs
+	@mkdir -p $(@D)
+	@ln -sf ../../stage2/bin/hsc2hs $@
+
+_build/stage3/lib/targets/x86_64-unknown-linux-musl/lib/package.conf.d: _build/stage3/lib/targets/x86_64-unknown-linux-musl/lib
+	@mkdir -p $@
+
+_build/stage3/lib/targets/x86_64-unknown-linux-musl/lib/package.conf.d/package.cache: _build/stage3/bin/x86_64-unknown-linux-musl-ghc-pkg _build/stage3/lib/targets/x86_64-unknown-linux-musl/lib/settings x86_64-unknown-linux-musl-libs
+	@mkdir -p $(@D)
+	@rm -rf $(@D)/*
+	cp -rfp _build/stage3/x86_64-unknown-linux-musl/packagedb/host/*/* $(@D)
+	_build/stage3/bin/x86_64-unknown-linux-musl-ghc-pkg recache
+
+# ghc-toolchain borks unlit
+_build/stage3/lib/targets/x86_64-unknown-linux-musl/bin/unlit: _build/stage2/bin/unlit
+	@mkdir -p $(@D)
+	cp -rfp $< $@
+
+.PHONY: x86_64-unknown-linux-musl-libs
+x86_64-unknown-linux-musl-libs: private TARGET=x86_64-unknown-linux-musl
+x86_64-unknown-linux-musl-libs: private GHC=$(abspath _build/stage3/bin/x86_64-unknown-linux-musl-ghc)
+x86_64-unknown-linux-musl-libs: private GHC2=$(abspath _build/stage2/bin/ghc)
+x86_64-unknown-linux-musl-libs: private STAGE=stage3
+x86_64-unknown-linux-musl-libs: private CC=x86_64-unknown-linux-musl-cc
+x86_64-unknown-linux-musl-libs: _build/stage3/bin/x86_64-unknown-linux-musl-ghc-pkg _build/stage3/bin/x86_64-unknown-linux-musl-ghc _build/stage3/bin/x86_64-unknown-linux-musl-hsc2hs _build/stage3/lib/targets/x86_64-unknown-linux-musl/lib/settings _build/stage3/lib/targets/x86_64-unknown-linux-musl/bin/unlit _build/stage3/lib/targets/x86_64-unknown-linux-musl/lib/package.conf.d
+	# Force cabal to replan
+	rm -rf _build/stage3/x86_64-unknown-linux-musl/cache
+	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
+		PATH=$(PWD)/_build/stage2/bin:$(PWD)/_build/stage3/bin:$(PATH) \
+		$(CABAL_BUILD) -W $(GHC2) --happy-options="--template=$(abspath _build/stage2/src/happy-lib-2.1.5/data/)" --with-hsc2hs=x86_64-unknown-linux-musl-hsc2hs --hsc2hs-options='-x' --with-ld=x86_64-unknown-linux-musl-ld --configure-option='--host=x86_64-unknown-linux-musl' \
+		$(foreach lib,$(MUSL_EXTRA_LIB_DIRS),--extra-lib-dirs=$(lib)) \
+		$(foreach include,$(MUSL_EXTRA_INCLUDE_DIRS),--extra-include-dirs=$(include)) \
+		rts:nonthreaded-nodebug )
+	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
+		PATH=$(PWD)/_build/stage2/bin:$(PWD)/_build/stage3/bin:$(PATH) \
+		$(CABAL_BUILD) -W $(GHC2) --happy-options="--template=$(abspath _build/stage2/src/happy-lib-2.1.5/data/)" --with-hsc2hs=x86_64-unknown-linux-musl-hsc2hs --hsc2hs-options='-x' --with-ld=x86_64-unknown-linux-musl-ld --configure-option='--host=x86_64-unknown-linux-musl' \
+		$(foreach lib,$(MUSL_EXTRA_LIB_DIRS),--extra-lib-dirs=$(lib)) \
+		$(foreach include,$(MUSL_EXTRA_INCLUDE_DIRS),--extra-include-dirs=$(include)) \
+		$(STAGE3_LIBS) )
+
+# --- Bindist ---
 
 # Target for creating the final binary distribution directory
 _build/bindist: stage2 driver/ghc-usage.txt driver/ghci-usage.txt
@@ -502,6 +596,12 @@ clean-stage2:
 	rm -rf _build/stage2
 	@echo "::endgroup::"
 
+clean-stage3:
+	@echo ">>> Cleaning stage3 build artifacts..."
+	rm -rf _build/stage3
+	rm -rf _build/stage2/lib/targets
+	@echo ">>> Stage3 build artifacts cleaned."
+
 distclean: clean
 	@echo "::group::Cleaning all generated files (distclean)..."
 	rm -rf autom4te.cache
@@ -525,4 +625,4 @@ test: _build/bindist
 	@echo "::endgroup::" >&2
 
 # Inform Make that these are not actual files if they get deleted by other means
-.PHONY: clean distclean test all
+.PHONY: clean distclean test all configure clean-stage1 clean-stage2 clean-stage3
