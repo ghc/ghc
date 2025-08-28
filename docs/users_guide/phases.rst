@@ -1045,6 +1045,23 @@ for example).
     when linking against this package.
     See :ref:`shared object name mangling <building-packages>` for details.
 
+.. ghc-flag:: -bytecodelib
+    :shortdesc: Generate a bytecode library
+    :type: dynamic
+    :category: linking
+
+    Generate a bytecode library. A bytecode library is a collection of bytecode
+    artifacts and a library for foreign sources.
+
+    This mode can be used to package bytecode together for a library.
+
+    When used in one-shot mode, the arguments are expected to be bytecode files (.gbc files)
+    and any additional foreign object files needed to create the library.
+
+
+
+
+
 .. ghc-flag:: -dynload
     :shortdesc: Selects one of a number of modes for finding shared libraries at runtime.
     :type: dynamic

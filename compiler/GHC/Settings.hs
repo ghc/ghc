@@ -11,6 +11,7 @@ module GHC.Settings
   , PlatformMisc (..)
   -- * Accessors
   , dynLibSuffix
+  , bytecodeLibSuffix
   , sProgramName
   , sProjectVersion
   , sGhcUsagePath
@@ -194,6 +195,9 @@ data GhcNameVersion = GhcNameVersion
 -- | Dynamic library suffix
 dynLibSuffix :: GhcNameVersion -> String
 dynLibSuffix (GhcNameVersion name ver) = '-':name ++ ver
+
+bytecodeLibSuffix :: String
+bytecodeLibSuffix = "bytecodelib"
 
 -----------------------------------------------------------------------------
 -- Accessors from 'Settings'
