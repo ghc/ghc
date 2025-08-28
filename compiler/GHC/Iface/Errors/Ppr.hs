@@ -42,6 +42,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Iface.Errors.Types
+import qualified Data.List as List
 
 defaultIfaceMessageOpts :: IfaceMessageOpts
 defaultIfaceMessageOpts = IfaceMessageOpts { ifaceShowTriedFiles = False
@@ -174,14 +175,12 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
           looks_like_srcpkgid =
      -- Unsafely coerce a unit id (i.e. an installed package component
      -- identifier) into a PackageId and see if it means anything.
-           case cands of
-             (pkg:pkgs) ->
-              parens (text "This unit ID looks like the source package ID;" $$
-                      text "the real unit ID is" <+> quotes (ftext (unitIdFS (unitId pkg))) $$
-                     (if null pkgs then empty
-                                  else text "and" <+> int (length pkgs) <+> text "other candidate" <> plural pkgs))
+           case List.sortOn unitPackageNameString cands of
              -- Todo: also check if it looks like a package name!
              [] -> empty
+             pkgs ->
+              parens (text "This unit-id looks like a source package name-version;" <+>
+                      text "candidates real unit-ids are:" $$ vcat (map (quotes . ftext . unitIdFS . unitId)  pkgs))
 
       in hsep [ text "no unit id matching" <+> quotes (ppr pkg)
               , text "was found"] $$ looks_like_srcpkgid
@@ -336,8 +335,8 @@ hiModuleNameMismatchWarn requested_mod read_mod
             ]
         ]
  | otherwise =
-  -- ToDo: This will fail to have enough qualification when the package IDs
-  -- are the same
+  -- Display fully qualified unit names by enabling ppr-debug
+  updSDocContext (\ctx -> ctx { sdocPprDebug = True}) $
   withPprStyle (mkUserStyle alwaysQualify AllTheWay) $
     -- we want the Modules below to be qualified with package names,
     -- so reset the NamePprCtx setting.
@@ -345,7 +344,6 @@ hiModuleNameMismatchWarn requested_mod read_mod
          , ppr requested_mod
          , text "differs from name found in the interface file"
          , ppr read_mod
-         , parens (text "if these names look the same, try again with -dppr-debug")
          ]
 
 dynamicHashMismatchError :: Module -> ModLocation -> SDoc

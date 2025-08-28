@@ -43,6 +43,7 @@ module GHC.Unit.Module.ModIface
       , mi_hash_fn
       )
    , pattern ModIface
+   , get_mi_mod_info
    , set_mi_mod_info
    , set_mi_module
    , set_mi_sig_of
@@ -977,6 +978,9 @@ completePublicModIface decls abi_hashes cache partial = partial
   , mi_abi_hashes_  = abi_hashes
   , mi_caches_ = cache
   }
+
+get_mi_mod_info :: ModIface_ phase -> IfaceModInfo
+get_mi_mod_info iface = mi_mod_info_ iface
 
 set_mi_mod_info :: IfaceModInfo -> ModIface_ phase -> ModIface_ phase
 set_mi_mod_info val iface = clear_mi_hi_bytes $ iface { mi_mod_info_ = val }

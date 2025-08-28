@@ -37,6 +37,8 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Platform
 import GHC.Platform.Host
 
+import GHC.Builtin.PrimOps (primOpPrimModule, primOpWrappersModule)
+
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
@@ -58,6 +60,7 @@ import GHC.Types.PkgQual
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Misc        ( split )
 import GHC.Utils.Monad       ( liftIO )
 import GHC.Utils.Binary        ( openBinMem, put_ )
 import GHC.Utils.Logger
@@ -83,12 +86,14 @@ import GHC.Driver.Session.Units
 
 -- Standard Haskell libraries
 import System.IO
+import System.FilePath
+import System.Directory
 import System.Environment
 import System.Exit
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
-import Data.List ( isPrefixOf, partition, intercalate )
+import Data.List ( isPrefixOf, isSuffixOf, partition, intercalate )
 import Prelude
 import qualified Data.List.NonEmpty as NE
 
@@ -112,13 +117,50 @@ main = do
    configureHandleEncoding
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
+    prog0 <- getProgName
     argv0 <- getArgs
 
-    let (minusB_args, argv1) = partition ("-B" `isPrefixOf`) argv0
+    -- either pass @--target=...@ to select the target, or use a symbolic
+    -- or (copy of the executable) name that ends with @-ghc@. E.g.
+    -- x86_64-unknown-linux-ghc would select the x86_64-unknown-linux target.
+    let (target_args, argv1) = partition ("-target=" `isPrefixOf`) argv0
+        mbTarget | not (null target_args) = Just (drop 8 (last target_args))
+                 | "-ghc" `isSuffixOf` prog0
+                 , parts <- split '-' prog0
+                 , length parts > 2 = Just (take (length prog0 - 4) prog0)
+                 | otherwise = Nothing
+
+
+    let (minusB_args, argv1') = partition ("-B" `isPrefixOf`) argv1
         mbMinusB | null minusB_args = Nothing
                  | otherwise = Just (drop 2 (last minusB_args))
 
-    let argv2 = map (mkGeneralLocated "on the commandline") argv1
+    let (list_targets_args, argv1'') = partition (== "-list-targets") argv1'
+        list_targets = not (null list_targets_args)
+
+    -- find top directory for the given target. Or default to usual topdir.
+    targettopdir <- Just <$> do
+      topdir <- findTopDir mbMinusB
+      let targets_dir = topdir </> "targets"
+      -- list targets when asked
+      when list_targets $ do
+        putStrLn $ "Installed targets (in " ++ targets_dir ++ "):"
+        doesDirectoryExist targets_dir >>= \case
+          True -> do
+                    ds <- listDirectory targets_dir
+                    forM_ ds (\d -> putStrLn $ "  - " ++ d)
+          False -> pure ()
+        exitSuccess
+      -- otherwise select the appropriate target
+      case mbTarget of
+        Nothing -> pure topdir
+        Just target -> do
+          let r = targets_dir </> target </> "lib"
+          doesDirectoryExist r >>= \case
+            True -> pure r
+            False -> throwGhcException (UsageError $ "Couldn't find specific target `" ++ target ++ "' in `" ++ r ++ "'")
+
+    let argv2 = map (mkGeneralLocated "on the commandline") argv1''
 
     -- 2. Parse the "mode" flags (--make, --interactive etc.)
     (mode, units, argv3, flagWarnings) <- parseModeFlags argv2
@@ -134,13 +176,15 @@ main = do
     case mode of
         Left preStartupMode ->
             do case preStartupMode of
-                   ShowSupportedExtensions   -> showSupportedExtensions mbMinusB
+                   ShowSupportedExtensions   -> showSupportedExtensions targettopdir
                    ShowVersion               -> showVersion
                    ShowNumVersion            -> putStrLn cProjectVersion
                    ShowOptions isInteractive -> showOptions isInteractive
+                   PrintPrimModule           -> liftIO $ putStrLn primOpPrimModule
+                   PrintPrimWrappersModule   -> liftIO $ putStrLn primOpWrappersModule
         Right postStartupMode ->
             -- start our GHC session
-            GHC.runGhc mbMinusB $ do
+            GHC.runGhc targettopdir $ do
 
             dflags <- GHC.getSessionDynFlags
 

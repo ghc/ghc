@@ -1,0 +1,21 @@
+cabal-version: 2.0
+name: system-cxx-std-lib
+version: 1.0
+license: BSD-3-Clause
+synopsis:             A placeholder for the system's C++ standard library implementation.
+description:          Building against C++ libraries requires that the C++ standard
+                      library be included when linking. Typically when compiling a C++
+                      project this is done automatically by the C++ compiler. However,
+                      as GHC uses the C compiler for linking, users needing the C++
+                      standard library must declare this dependency explicitly.
+                      .
+                      This "virtual" package can be used to depend upon the host system's
+                      C++ standard library implementation in a platform agnostic manner.
+category:             System
+build-type: Simple
+
+library
+  -- empty library: this is just a placeholder for GHC to use to inject C++
+  -- standard libraries when linking with the C toolchain, or to directly use
+  -- the C++ toolchain to link.
+  

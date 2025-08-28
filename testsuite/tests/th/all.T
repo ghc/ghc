@@ -325,7 +325,7 @@ test('T10047', only_ways(['ghci']), ghci_script, ['T10047.script'])
 test('T10019', only_ways(['ghci']), ghci_script, ['T10019.script'])
 test('T10267', [], multimod_compile_fail,
      ['T10267', '-fno-max-valid-hole-fits -dsuppress-uniques -v0 ' + config.ghc_th_way_flags])
-test('T10279', normal, compile_fail, ['-v0'])
+test('T10279', [normalise_version('ghc-internal'), extra_files(['T10279h.hs'])], multimod_compile_fail, ['T10279', '-v0'])
 test('T10306', normal, compile, ['-v0'])
 test('T10596', normal, compile, ['-v0'])
 test('T10598_TH', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])

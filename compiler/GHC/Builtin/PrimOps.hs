@@ -25,7 +25,9 @@ module GHC.Builtin.PrimOps (
 
         getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
 
-        PrimCall(..)
+        PrimCall(..),
+
+        primOpPrimModule, primOpWrappersModule
     ) where
 
 import GHC.Prelude
@@ -170,6 +172,12 @@ primOpDocs :: [(FastString, String)]
 
 primOpDeprecations :: [(OccName, FastString)]
 #include "primop-deprecations.hs-incl"
+
+primOpPrimModule :: String
+#include "primop-prim-module.hs-incl"
+
+primOpWrappersModule :: String
+#include "primop-wrappers-module.hs-incl"
 
 {-
 ************************************************************************

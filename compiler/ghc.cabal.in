@@ -32,25 +32,9 @@ extra-source-files:
     GHC/Builtin/primops.txt.pp
     Unique.h
     CodeGen.Platform.h
-    -- Shared with rts via hard-link at configure time. This is safer
-    -- for Windows, where symlinks don't work out of the box, so we
-    -- can't just commit some in git.
-    Bytecodes.h
-    ClosureTypes.h
-    FunTypes.h
-    MachRegs.h
-    MachRegs/arm32.h
-    MachRegs/arm64.h
-    MachRegs/loongarch64.h
-    MachRegs/ppc.h
-    MachRegs/riscv64.h
-    MachRegs/s390x.h
-    MachRegs/wasm32.h
-    MachRegs/x86.h
-
 
 custom-setup
-    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.14, directory, process, filepath, containers
+    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.16, directory, process, filepath, containers
 
 Flag internal-interpreter
     Description: Build with internal interpreter support.
@@ -67,6 +51,7 @@ Flag dynamic-system-linker
 Flag build-tool-depends
     Description: Use build-tool-depends
     Default: True
+    Manual: True
 
 Flag with-libzstd
     Default: False
@@ -95,11 +80,6 @@ Library
     Default-Language: GHC2021
     Exposed: False
     Includes: Unique.h
-              -- CodeGen.Platform.h -- invalid as C, skip
-              -- shared with rts via symlink
-              Bytecodes.h
-              ClosureTypes.h
-              FunTypes.h
 
     if flag(build-tool-depends)
       build-tool-depends: alex:alex >= 3.2.6, happy:happy >= 1.20.0, genprimopcode:genprimopcode, deriveConstants:deriveConstants
@@ -131,6 +111,7 @@ Library
                    semaphore-compat,
                    stm,
                    rts,
+                   rts-headers,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
@@ -353,7 +334,6 @@ Library
         GHC.CmmToLlvm.Ppr
         GHC.CmmToLlvm.Regs
         GHC.CmmToLlvm.Version
-        GHC.CmmToLlvm.Version.Bounds
         GHC.CmmToLlvm.Version.Type
         GHC.Cmm.Dominators
         GHC.Cmm.Reducibility

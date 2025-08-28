@@ -205,14 +205,13 @@ libraryDirsForWay ws
   | otherwise        = map ST.unpack . unitLibraryDirs
 
 unitHsLibs :: GhcNameVersion -> Ways -> UnitInfo -> [String]
-unitHsLibs namever ways0 p = map (mkDynName . addSuffix . ST.unpack) (unitLibraries p)
+unitHsLibs namever ways0 p = map (mkDynName . ST.unpack) (unitLibraries p)
   where
         ways1 = removeWay WayDyn ways0
         -- the name of a shared library is libHSfoo-ghc<version>.so
         -- we leave out the _dyn, because it is superfluous
 
         tag     = waysTag (fullWays ways1)
-        rts_tag = waysTag ways1
 
         mkDynName x
          | not (ways0 `hasWay` WayDyn) = x
@@ -225,19 +224,3 @@ unitHsLibs namever ways0 p = map (mkDynName . addSuffix . ST.unpack) (unitLibrar
          | otherwise
             = panic ("Don't understand library name " ++ x)
 
-        -- Add _thr and other rts suffixes to packages named
-        -- `rts` or `rts-1.0`. Why both?  Traditionally the rts
-        -- package is called `rts` only.  However the tooling
-        -- usually expects a package name to have a version.
-        -- As such we will gradually move towards the `rts-1.0`
-        -- package name, at which point the `rts` package name
-        -- will eventually be unused.
-        --
-        -- This change elevates the need to add custom hooks
-        -- and handling specifically for the `rts` package.
-        addSuffix rts@"HSrts"       = rts       ++ (expandTag rts_tag)
-        addSuffix rts@"HSrts-1.0.3" = rts       ++ (expandTag rts_tag)
-        addSuffix other_lib         = other_lib ++ (expandTag tag)
-
-        expandTag t | null t = ""
-                    | otherwise = '_':t

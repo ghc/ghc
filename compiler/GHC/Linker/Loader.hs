@@ -49,6 +49,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Finder
+import GHC.Driver.DynFlags (rtsWayUnitId)
 
 import GHC.Tc.Utils.Monad
 
@@ -174,8 +175,8 @@ getLoaderState :: Interp -> IO (Maybe LoaderState)
 getLoaderState interp = readMVar (loader_state (interpLoader interp))
 
 
-emptyLoaderState :: LoaderState
-emptyLoaderState = LoaderState
+emptyLoaderState :: DynFlags -> LoaderState
+emptyLoaderState dflags = LoaderState
    { linker_env = LinkerEnv
      { closure_env = emptyNameEnv
      , itbl_env    = emptyNameEnv
@@ -195,7 +196,14 @@ emptyLoaderState = LoaderState
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = unitUDFM rtsUnitId (LoadedPkgInfo rtsUnitId [] [] [] emptyUniqDSet)
+  where init_pkgs = let addToUDFM' (k, v) m = addToUDFM m k v
+                    in foldr addToUDFM' emptyUDFM [
+                      (rtsUnitId, (LoadedPkgInfo rtsUnitId [] [] [] emptyUniqDSet))
+                    -- FIXME? Should this be the rtsWayUnitId of the current ghc, or the one
+                    --        for the target build? I think target-build seems right, but I'm
+                    --        not fully convinced.
+                    , (rtsWayUnitId dflags, (LoadedPkgInfo (rtsWayUnitId dflags) [] [] [] emptyUniqDSet))
+                    ]
 
 extendLoadedEnv :: Interp -> [(Name,ForeignHValue)] -> IO ()
 extendLoadedEnv interp new_bindings =
@@ -335,7 +343,7 @@ initLoaderState interp hsc_env = do
 reallyInitLoaderState :: Interp -> HscEnv -> IO LoaderState
 reallyInitLoaderState interp hsc_env = do
   -- Initialise the linker state
-  let pls0 = emptyLoaderState
+  let pls0 = emptyLoaderState (hsc_dflags hsc_env)
 
   case platformArch (targetPlatform (hsc_dflags hsc_env)) of
     -- FIXME: we don't initialize anything with the JS interpreter.

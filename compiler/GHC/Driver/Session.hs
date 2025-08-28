@@ -1312,6 +1312,8 @@ dynamic_flags_deps = [
         (NoArg (unSetGeneralFlag Opt_AutoLinkPackages))
   , make_ord_flag defGhcFlag "no-hs-main"
         (NoArg (setGeneralFlag Opt_NoHsMain))
+  , make_ord_flag defGhcFlag "no-rts"
+        (NoArg (setGeneralFlag Opt_NoRts))
   , make_ord_flag defGhcFlag "fno-state-hack"
         (NoArg (setGeneralFlag Opt_G_NoStateHack))
   , make_ord_flag defGhcFlag "fno-opt-coercion"
@@ -2336,7 +2338,6 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnMisplacedPragmas -> warnSpec x
   Opt_WarnUnsafe -> warnSpec' x setWarnUnsafe
   Opt_WarnUnsupportedCallingConventions -> warnSpec x
-  Opt_WarnUnsupportedLlvmVersion -> warnSpec x
   Opt_WarnMissedExtraSharedLib -> warnSpec x
   Opt_WarnUntickedPromotedConstructors -> warnSpec x
   Opt_WarnUnusedDoBind -> warnSpec x

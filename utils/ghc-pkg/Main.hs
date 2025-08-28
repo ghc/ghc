@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -151,6 +152,7 @@ data Flag
   | FlagVerbosity (Maybe String)
   | FlagUnitId
   | FlagShowUnitIds
+  | FlagTarget String
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -198,7 +200,9 @@ flags = [
   Option [] ["ipid", "unit-id"] (NoArg FlagUnitId)
         "interpret package arguments as unit IDs (e.g. installed package IDs)",
   Option ['v'] ["verbose"] (OptArg FlagVerbosity "Verbosity")
-        "verbosity level (0-2, default 1)"
+        "verbosity level (0-2, default 1)",
+  Option [] ["target"] (ReqArg FlagTarget "TARGET")
+        "run against the specified target (this has no effect if --global-package-db is specified)"
   ]
 
 data Verbosity = Silent | Normal | Verbose
@@ -267,6 +271,10 @@ usageHeader prog = substProg prog $
   "    Generate a graph of the package dependencies in a form suitable\n" ++
   "    for input for the graphviz tools.  For example, to generate a PDF\n" ++
   "    of the dependency graph: ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf\n" ++
+  "\n" ++
+  "  $p mermaid\n" ++
+  "    Generate a graph of the package dependencies in Mermaid format\n" ++
+  "    suitable for embedding in Markdown files.\n" ++
   "\n" ++
   "  $p find-module {module}\n" ++
   "    List registered packages exposing module {module} in the global\n" ++
@@ -464,6 +472,8 @@ runit verbosity cli nonopts = do
                                  (Just (Substring pkgarg_str m)) Nothing
     ["dot"] -> do
         showPackageDot verbosity cli
+    ["mermaid"] -> do
+        showPackageMermaid verbosity cli
     ["find-module", mod_name] -> do
         let match = maybe (==mod_name) id (substringCheck mod_name)
         listPackages verbosity cli Nothing (Just match)
@@ -587,6 +597,29 @@ readFromSettingsFile settingsFile f = do
       Right archOS -> Right archOS
       Left e -> Left e
 
+-- | Get the cross target.
+--
+-- This is either extracted from the '--target' flag or inferred
+-- from the current program name.
+getTarget :: [Flag] -> IO (Maybe String)
+getTarget my_flags = do
+  case [ t | FlagTarget t <- my_flags ] of
+    [] -> do
+      -- when no target is specified on the command line, infer it from the program name.
+      -- e.g. x86_64-unknown-linux-ghc-pkg
+      progN <- getProgName
+      if | "-ghc-pkg" `isSuffixOf` progN
+         , parts <- split '-' progN
+         , length parts > 3 -> pure (Just (take (length progN - 8) progN))
+         | otherwise -> pure Nothing
+    ts -> pure (Just (last ts))
+ where
+  split :: Char -> String -> [String]
+  split c s = case rest of
+                  []     -> [chunk]
+                  _:rest -> chunk : split c rest
+    where (chunk, rest) = break (==c) s
+
 getPkgDatabases :: Verbosity
                 -> GhcPkg.DbOpenMode mode DbModifySelector
                 -> Bool    -- use the user db
@@ -616,7 +649,12 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
         [] -> do mb_dir <- getBaseDir
                  case mb_dir of
                    Nothing  -> die err_msg
-                   Just dir -> do
+                   Just dir' -> do
+                     mt <- getTarget my_flags
+                     dir <- case mt of
+                              Nothing -> pure dir'
+                              Just target -> pure (dir' </> "targets" </> target </> "lib")
+
                      -- Look for where it is given in the settings file, if marked there.
                      let settingsFile = dir </> "settings"
                      exists_settings_file <- doesFileExist settingsFile
@@ -1642,6 +1680,27 @@ showPackageDot verbosity myflags = do
                    let to = display (mungedId dep)
                  ]
   putStrLn "}"
+
+showPackageMermaid :: Verbosity -> [Flag] -> IO ()
+showPackageMermaid verbosity myflags = do
+  (_, GhcPkg.DbOpenReadOnly, flag_db_stack) <-
+    getPkgDatabases verbosity GhcPkg.DbOpenReadOnly
+      False{-use user-} True{-use cache-} False{-expand vars-} myflags
+
+  let all_pkgs = allPackagesInStack flag_db_stack
+      ipix  = PackageIndex.fromList all_pkgs
+
+  putStrLn "```mermaid"
+  putStrLn "graph TD"
+  mapM_ putStrLn [ "  " ++ from ++ " --> " ++ to
+                 | p <- all_pkgs,
+                   let from = display (mungedId p),
+                   key <- depends p,
+                   Just dep <- [PackageIndex.lookupUnitId ipix key],
+                   let to = display (mungedId dep)
+                 ]
+  putStrLn "```"
+
 
 -- -----------------------------------------------------------------------------
 -- Prints the highest (hidden or exposed) version of a package

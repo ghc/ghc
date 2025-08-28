@@ -78,9 +78,6 @@ rtsDependencies = do
 
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
-    let fixed = ("compiler" -/-) <$>
-                  [ "GHC/CmmToLlvm/Version/Bounds.hs"
-                  ]
     stage   <- getStage
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
     let buildSpecific = (ghcPath -/-) <$>
@@ -102,10 +99,12 @@ compilerDependencies = do
                   , "primop-vector-uniques.hs-incl"
                   , "primop-docs.hs-incl"
                   , "primop-deprecations.hs-incl"
+                  , "primop-prim-module.hs-incl"
+                  , "primop-wrappers-module.hs-incl"
                   , "GHC/Platform/Constants.hs"
                   , "GHC/Settings/Config.hs"
                   ]
-    pure $ fixed ++ buildSpecific
+    pure buildSpecific
 
 generatedDependencies :: Expr [FilePath]
 generatedDependencies = do
@@ -388,10 +387,6 @@ templateRules = do
     , packageUnitIds Stage1
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
     , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
-    ]
-  templateRule "compiler/GHC/CmmToLlvm/Version/Bounds.hs" $ mconcat
-    [ interpolateVar "LlvmMinVersion" $ replaceEq '.' ',' <$> setting LlvmMinVersion
-    , interpolateVar "LlvmMaxVersion" $ replaceEq '.' ',' <$> setting LlvmMaxVersion
     ]
   bindistRules
 
