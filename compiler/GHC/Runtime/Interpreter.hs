@@ -41,6 +41,7 @@ module GHC.Runtime.Interpreter
   , loadDLLs
   , loadArchive
   , loadObj
+  , loadBytecodeLibrary
   , unloadObj
   , addLibrarySearchPath
   , removeLibrarySearchPath
@@ -571,6 +572,11 @@ loadArchive :: Interp -> String -> IO ()
 loadArchive interp path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
   interpCmd interp (LoadArchive path')
+
+loadBytecodeLibrary :: Interp -> String -> IO ()
+loadBytecodeLibrary interp path = do
+  path' <- canonicalizePath path -- Note [loadObj and relative paths]
+  putStrLn $ "I would load bytecode library but I'm not implemented yet" ++ path'
 
 loadObj :: Interp -> String -> IO ()
 loadObj interp path = do

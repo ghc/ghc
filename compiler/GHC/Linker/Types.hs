@@ -504,9 +504,13 @@ data LibrarySpec
 
    | Framework String   -- Only used for darwin, but does no harm
 
+   | BytecodeLibrary FilePath
+      -- ^ A bytecode library file (.bytecode)
+
 instance Outputable LibrarySpec where
   ppr (Objects objs) = text "Objects" <+> ppr (map (text @SDoc) objs)
   ppr (Archive a) = text "Archive" <+> text a
   ppr (DLL s) = text "DLL" <+> text s
   ppr (DLLPath f) = text "DLLPath" <+> text f
   ppr (Framework s) = text "Framework" <+> text s
+  ppr (BytecodeLibrary f) = text "BytecodeLibrary" <+> text f

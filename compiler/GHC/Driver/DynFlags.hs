@@ -809,6 +809,7 @@ data GhcLink
   | LinkInMemory        -- ^ Use the in-memory dynamic linker (works for both
                         --   bytecode and object code).
   | LinkDynLib          -- ^ Link objects into a dynamic lib (DLL on Windows, DSO on ELF platforms)
+  | LinkBytecodeLib     -- ^ Link bytecode objects into a bytecode lib
   | LinkStaticLib       -- ^ Link objects into a static lib
   | LinkMergedObj       -- ^ Link objects into a merged "GHCi object"
   deriving (Eq, Show)

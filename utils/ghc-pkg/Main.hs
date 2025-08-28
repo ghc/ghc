@@ -1447,6 +1447,7 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.unitExtDepLibsGhc  = map ST.pack $ extraGHCiLibraries pkg,
        GhcPkg.unitLibraryDirs    = map ST.pack $ libraryDirs pkg,
        GhcPkg.unitLibraryDynDirs = map ST.pack $ libraryDynDirs pkg,
+       GhcPkg.unitLibraryBytecodeDirs = map ST.pack $ libraryBytecodeDirs pkg,
        GhcPkg.unitExtDepFrameworks = map ST.pack $ frameworks pkg,
        GhcPkg.unitExtDepFrameworkDirs = map ST.pack $ frameworkDirs pkg,
        GhcPkg.unitLinkerOptions  = map ST.pack $ ldOptions pkg,
