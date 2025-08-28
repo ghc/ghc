@@ -133,7 +133,7 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                  ViaCCodeOutput -> outputC logger dflags filenm dus1 final_stream pkg_deps
                  LlvmCodeOutput -> outputLlvm logger llvm_config dflags filenm dus1 final_stream
                  JSCodeOutput   -> outputJS logger llvm_config dflags filenm final_stream
-        ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
+        ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod (ml_hs_file_ospath $ location) stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
@@ -269,7 +269,7 @@ outputForeignStubs
     -> DynFlags
     -> UnitState
     -> Module
-    -> ModLocation
+    -> Maybe OsPath -- ^ Source file location
     -> ForeignStubs
     -> IO (Bool,         -- Header file created
            Maybe FilePath) -- C file created

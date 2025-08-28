@@ -1015,7 +1015,7 @@ checkByteCodeFromObject hsc_env mod_sum = do
           -- that the one we have on disk would be suitable as well.
           linkable <- unsafeInterleaveIO $ do
             bco <- readBinByteCode hsc_env obj_fn
-            loadByteCodeObjectLinkable hsc_env obj_date (ms_location mod_sum) bco
+            loadByteCodeObjectLinkable hsc_env obj_date (ml_hs_file_ospath $ ms_location mod_sum) bco
           return $ UpToDateItem linkable
     _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
@@ -2163,7 +2163,7 @@ hscInteractive hsc_env cgguts location = do
     let tmpfs  = hsc_tmpfs hsc_env
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) (cgi_module cgguts) location (cgi_foreign cgguts)
+        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) (cgi_module cgguts) (ml_hs_file_ospath $ location) (cgi_foreign cgguts)
     return (istub_c_exists, comp_bc)
 
 
@@ -2214,7 +2214,7 @@ generateByteCode :: HscEnv
   -> IO (CompiledByteCode, [FilePath])
 generateByteCode hsc_env cgguts mod_location = do
   comp_bc' <- hscGenerateByteCode hsc_env cgguts mod_location
-  fos      <- outputAndCompileForeign hsc_env (cgi_module cgguts) mod_location (cgi_foreign_files cgguts) (cgi_foreign cgguts)
+  fos      <- outputAndCompileForeign hsc_env (cgi_module cgguts) (ml_hs_file_ospath $ mod_location) (cgi_foreign_files cgguts) (cgi_foreign cgguts)
   pure (comp_bc', fos)
 
 -- | Generate a byte code object linkable and write it to a file if `-fwrite-bytecode` is enabled.
@@ -2234,7 +2234,7 @@ generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
   -- It's important the time of the linkable matches the time of the .gbc file for recompilation
   -- checking.
   bco_time <- maybe getCurrentTime pure =<< modificationTimeIfExists (ml_bytecode_file mod_location)
-  loadByteCodeObjectLinkable hsc_env bco_time mod_location bco_object
+  loadByteCodeObjectLinkable hsc_env bco_time (ml_hs_file_ospath $ mod_location) bco_object
 
 mkByteCodeObject :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ByteCodeObject
 mkByteCodeObject hsc_env mod mod_location cgguts = do
@@ -2250,7 +2250,7 @@ generateFreshByteCodeLinkable :: HscEnv
 generateFreshByteCodeLinkable hsc_env mod_name cgguts mod_location = do
   bco_time <- getCurrentTime
   bco_object <- mkByteCodeObject hsc_env (mkHomeModule (hsc_home_unit hsc_env) mod_name) mod_location cgguts
-  loadByteCodeObjectLinkable hsc_env bco_time mod_location bco_object
+  loadByteCodeObjectLinkable hsc_env bco_time (ml_hs_file_ospath $ mod_location) bco_object
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)

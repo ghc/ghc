@@ -6,7 +6,8 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.CodeOutput
 import GHC.Driver.Env
-import GHC.Runtime.Interpreter
+import GHC.Runtime.Interpreter.Types
+    ( interpreterDynamic, interpreterProfiled )
 import GHC.ByteCode.Types
 
 import GHC.Linker.Types
@@ -23,9 +24,11 @@ import Data.Time
 import GHC.Platform.Ways
 
 import GHC.ByteCode.Serialize
+import System.OsPath
 
 -- | Write foreign sources and foreign stubs to temporary files and compile them.
-outputAndCompileForeign :: HscEnv -> Module -> ModLocation -> [(ForeignSrcLang, FilePath)] ->  ForeignStubs -> IO [FilePath]
+outputAndCompileForeign :: HscEnv -> Module -> Maybe OsPath  -- ^ Source file location
+                        -> [(ForeignSrcLang, FilePath)] ->  ForeignStubs -> IO [FilePath]
 outputAndCompileForeign hsc_env mod_name location foreign_files foreign_stubs = do
   let dflags   = hsc_dflags hsc_env
       logger   = hsc_logger hsc_env
@@ -58,11 +61,11 @@ compile_for_interpreter hsc_env use =
     adapt_way want = if want (hscInterp hsc_env) then addWay else removeWay
 
 -- | Write the foreign sources and foreign stubs of a bytecode object to temporary files and compile them.
-loadByteCodeObject :: HscEnv -> ModLocation -> ByteCodeObject
+loadByteCodeObject :: HscEnv -> Maybe OsPath -> ByteCodeObject
                              -> IO (CompiledByteCode, [FilePath])
 loadByteCodeObject hsc_env location (ByteCodeObject mod cbc foreign_contents) = do
   return (cbc, foreign_contents)
 
-loadByteCodeObjectLinkable :: HscEnv -> UTCTime -> ModLocation -> ByteCodeObject -> IO Linkable
+loadByteCodeObjectLinkable :: HscEnv -> UTCTime -> Maybe OsPath -> ByteCodeObject -> IO Linkable
 loadByteCodeObjectLinkable hsc_env linkable_time location bco = do
   return $! Linkable linkable_time (bco_module bco) (pure (BCOs bco))

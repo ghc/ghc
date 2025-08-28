@@ -1,3 +1,3 @@
 module Bytecode where
 
-bytecode = "bytecode"
+bytecode = "bytecode from a package"

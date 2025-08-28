@@ -13,7 +13,8 @@ category: none
 author: simonmar@microsoft.com
 exposed: True
 exposed-modules: Bytecode
-import-dirs:
-library-dirs:
+import-dirs: ${pkgroot}/outdir
+library-dirs: ${pkgroot}/outdir
 include-dirs:
+bytecode-library-dirs: ${pkgroot}/outdir
 hs-libraries: testpkg-1.2.3.4-XXX
