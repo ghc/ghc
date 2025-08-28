@@ -112,7 +112,7 @@ See also Note [Width of parameters] for some more motivation.
 #else
 #error Cannot cope with WORD_SIZE_IN_BITS being nether 32 nor 64
 #endif
-#define BCO_GET_LARGE_ARG ((bci & bci_FLAG_LARGE_ARGS) ? BCO_READ_NEXT_WORD : BCO_NEXT)
+#define BCO_GET_LARGE_ARG ((bci & bci_FLAG_LARGE_ARGS) ? BCO_READ_NEXT_32 : BCO_NEXT_32)
 
 #define BCO_PTR(n)    (W_)ptrs[n]
 #define BCO_LIT(n)    literals[n]

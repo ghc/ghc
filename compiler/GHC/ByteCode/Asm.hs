@@ -539,20 +539,21 @@ largeArgInstr bci = bci_FLAG_LARGE_ARGS .|. bci
 
 {-# INLINE largeArg #-}
 largeArg :: PlatformWordSize -> Word64 -> RunAsm ()
-largeArg wsize w = case wsize of
-   PW8 ->  do writeIsn (fromIntegral (w `shiftR` 48))
-              writeIsn (fromIntegral (w `shiftR` 32))
-              writeIsn (fromIntegral (w `shiftR` 16))
-              writeIsn (fromIntegral w)
-   PW4 -> assertPpr (w < fromIntegral (maxBound :: Word32))
+largeArg _wsize w = --case wsize of
+  --  PW8 ->  do writeIsn (fromIntegral (w `shiftR` 48))
+  --             writeIsn (fromIntegral (w `shiftR` 32))
+  --             writeIsn (fromIntegral (w `shiftR` 16))
+  --             writeIsn (fromIntegral w)
+  --  PW4 ->
+          assertPpr (w <= fromIntegral (maxBound :: Word32))
                     (text "largeArg too big:" <+> ppr w) $ do
           writeIsn (fromIntegral (w `shiftR` 16))
           writeIsn (fromIntegral w)
 
 largeArg16s :: PlatformWordSize -> Word
-largeArg16s pwordsize = case pwordsize of
-   PW8 -> 4
-   PW4 -> 2
+largeArg16s _pwordsize = 2 --case pwordsize of
+  --  PW8 -> 4
+  --  PW4 -> 2
 
 data OneOrTwo a = OnlyOne a | OnlyTwo a a deriving (Functor)
 

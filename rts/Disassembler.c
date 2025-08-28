@@ -61,7 +61,7 @@ disInstr ( StgBCO *bco, int pc )
 #else
 #error Cannot cope with WORD_SIZE_IN_BITS being nether 32 nor 64
 #endif
-#define BCO_GET_LARGE_ARG ((instr & bci_FLAG_LARGE_ARGS) ? BCO_READ_NEXT_WORD : BCO_NEXT)
+#define BCO_GET_LARGE_ARG ((instr & bci_FLAG_LARGE_ARGS) ? BCO_READ_NEXT_32 : BCO_NEXT_32)
 // For brevity
 #define BELCH_INSTR_NAME(OP_NAME) \
    case bci_ ## OP_NAME: \
