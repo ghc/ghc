@@ -88,7 +88,7 @@ bytecode_object14:
 	@echo "Testing recompilation in GHCi after touching .hi file..."
 	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
 
-# Test recompilation by generating .gbc via , then starting GHCi again
+# Test recompilation by generating .gbc via GHCi , then starting GHCi again
 bytecode_object15:
 	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
 	@[ -f BytecodeTest.gbc ] || (echo "ERROR: Expected BytecodeTest.gbc file not found"; echo "Files in current directory:"; ls -la; exit 1)
@@ -126,6 +126,33 @@ bytecode_object18:
 bytecode_object19:
 	@echo "Testing GHCi with .gbc file removal and reload..."
 	@cat bytecode_object19.script | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs
+
+# Test that -bytecodelib and -o pkg.bytecode in --make mode produces a bytecodelib
+bytecode_object20:
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make -bytecodelib -o pkg.bytecode BytecodeTest.hs -fbyte-code -fwrite-byte-code
+	@[ -f pkg.bytecode ] || (echo "ERROR: Expected pkg.bytecode file not found"; echo "Files in current directory:"; ls -la; exit 1)
+
+# Test that -bytecodelib without -fbyte-code results in an error
+bytecode_object21:
+	! "$(TEST_HC)" $(TEST_HC_OPTS) --make -bytecodelib -o pkg.bytecode BytecodeTest.hs
+
+# Test that you can link together .gbc files with -c and -bytecodelib
+bytecode_object22:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c BytecodeTest.hs -fbyte-code -fwrite-byte-code
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c -bytecodelib -o linked.bytecode BytecodeTest.gbc
+	@[ -f linked.bytecode ] || (echo "ERROR: Expected linked.bytecode file not found"; echo "Files in current directory:"; ls -la; exit 1)
+
+# Test that linking a bytecode library again doesn't trigger recompilation
+bytecode_object23:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -bytecodelib -o linked.bytecode BytecodeTest.hs -fwrite-byte-code -fbyte-code -fwrite-interface
+	"$(TEST_HC)" $(TEST_HC_OPTS) -bytecodelib -o linked.bytecode BytecodeTest.hs -fwrite-byte-code -fbyte-code -fwrite-interface
+
+# Test that changing ByteCode.hs causes bytecode library to be recompiled
+bytecode_object24:
+	@echo "Testing that bytecode library is recompiled when BytecodeTest.hs changes..."
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -bytecodelib -o linked.bytecode BytecodeTest.hs -fwrite-byte-code -fbyte-code -fwrite-interface
+	@echo "new_defn = ()" >> BytecodeTest.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -bytecodelib -o linked.bytecode BytecodeTest.hs -fwrite-byte-code -fbyte-code -fwrite-interface
 
 # Test that bytecode generation works with foreign functions
 bytecode_object25:

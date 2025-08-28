@@ -7,6 +7,15 @@
 -}
 module GHC.ByteCode.Serialize
   ( writeBinByteCode, readBinByteCode, ModuleByteCode(..)
+  , BytecodeLibX(..)
+  , BytecodeLib
+  , OnDiskBytecodeLib
+  , InterpreterLibrary(..)
+  , InterpreterLibraryContents(..)
+  , writeBytecodeLib
+  , readBytecodeLib
+  , decodeOnDiskModuleByteCode
+  , decodeOnDiskBytecodeLib
   )
 where
 
@@ -38,6 +47,7 @@ import Data.Traversable
 import GHC.Utils.Logger
 import GHC.Linker.Types
 import System.IO.Unsafe (unsafeInterleaveIO)
+import GHC.Utils.Outputable
 
 {- Note [Overview of persistent bytecode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -88,6 +98,78 @@ data OnDiskModuleByteCode = OnDiskModuleByteCode { odgbc_module :: Module
                                                  , odgbc_foreign :: [ByteString]  -- ^ Contents of object files
                                                  }
 
+type OnDiskBytecodeLib = BytecodeLibX (Maybe InterpreterLibraryContents)
+
+instance Outputable a => Outputable (BytecodeLibX a) where
+  ppr (BytecodeLib {..}) = vcat [
+    (text "BytecodeLib" <+> ppr bytecodeLibUnitId),
+    (text "Files" <+> ppr bytecodeLibFiles),
+    (text "Foreign" <+> ppr bytecodeLibForeign) ]
+
+type BytecodeLib = BytecodeLibX (Maybe InterpreterLibrary)
+
+-- | A bytecode library is a collection of CompiledByteCode objects and a .so file containing the combination of foreign stubs
+data BytecodeLibX a = BytecodeLib {
+    bytecodeLibUnitId :: UnitId,
+    bytecodeLibFiles :: [CompiledByteCode],
+    bytecodeLibForeign :: a -- A library file containing the combination of foreign stubs. (Ie arising from CApiFFI)
+}
+
+data InterpreterLibrary = InterpreterSharedObject { getSharedObjectFilePath :: FilePath, getSharedObjectDir :: FilePath, getSharedObjectLibName :: String }
+                         | InterpreterStaticObjects { getStaticObjects :: [FilePath] }
+
+
+instance Outputable InterpreterLibrary where
+  ppr (InterpreterSharedObject path dir name) = text "SharedObject" <+> text path <+> text dir <+> text name
+  ppr (InterpreterStaticObjects paths) = text "StaticObjects" <+> text (show paths)
+
+
+data InterpreterLibraryContents = InterpreterLibrarySharedContents { interpreterLibraryContents :: ByteString }
+                                | InterpreterLibraryStaticContents { interpreterLibraryStaticContents :: [ByteString] }
+
+instance Binary InterpreterLibraryContents where
+  get bh = do
+    t <- getByte bh
+    case t of
+      0 -> InterpreterLibrarySharedContents <$> get bh
+      1 -> InterpreterLibraryStaticContents <$> get bh
+      _ -> panic "Binary InterpreterLibraryContents: invalid byte"
+  put_ bh (InterpreterLibrarySharedContents contents) = do
+    putByte bh 0
+    put_ bh contents
+  put_ bh (InterpreterLibraryStaticContents contents) = do
+    putByte bh 1
+    put_ bh contents
+
+instance Binary OnDiskBytecodeLib where
+  get bh = do
+    bytecodeLibUnitId <- get bh
+    bytecodeLibFiles <- get bh
+    bytecodeLibForeign <- get bh
+    pure BytecodeLib {..}
+
+  put_ bh BytecodeLib {..} = do
+    put_ bh bytecodeLibUnitId
+    put_ bh bytecodeLibFiles
+    put_ bh bytecodeLibForeign
+
+
+
+writeBytecodeLib :: BytecodeLib -> FilePath -> IO ()
+writeBytecodeLib lib path = do
+  odbco <- encodeBytecodeLib lib
+  createDirectoryIfMissing True (takeDirectory path)
+  bh' <- openBinMem (1024 * 1024)
+  bh <- addBinNameWriter bh'
+  putWithUserData QuietBinIFace NormalCompression bh odbco
+  writeBinMem bh path
+
+readBytecodeLib :: HscEnv -> FilePath -> IO OnDiskBytecodeLib
+readBytecodeLib hsc_env path = do
+  bh' <- readBinMem path
+  bh <- addBinNameReader hsc_env bh'
+  res <- getWithUserData (hsc_NC hsc_env) bh
+  pure res
 
 instance Binary OnDiskModuleByteCode where
   get bh = do
@@ -118,6 +200,24 @@ decodeOnDiskModuleByteCode hsc_env odbco = do
     gbc_foreign_files = foreign_files
    }
 
+decodeOnDiskBytecodeLib :: HscEnv -> OnDiskBytecodeLib -> IO BytecodeLib
+decodeOnDiskBytecodeLib hsc_env odbco = do
+  foreign_contents <- traverse (writeInterpreterLibraryFile (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)))  (bytecodeLibForeign odbco)
+  pure $ BytecodeLib {
+    bytecodeLibUnitId = bytecodeLibUnitId odbco,
+    bytecodeLibFiles = bytecodeLibFiles odbco,
+    bytecodeLibForeign = foreign_contents
+   }
+
+encodeBytecodeLib :: BytecodeLib -> IO OnDiskBytecodeLib
+encodeBytecodeLib (BytecodeLib {..}) = do
+  foreign_contents <- traverse readInterpreterLibraryFile bytecodeLibForeign
+  pure $ BytecodeLib {
+    bytecodeLibUnitId = bytecodeLibUnitId,
+    bytecodeLibFiles = bytecodeLibFiles,
+    bytecodeLibForeign = foreign_contents
+   }
+
 readObjectFile :: FilePath -> IO ByteString
 readObjectFile f = BS.readFile f
 
@@ -132,6 +232,23 @@ writeObjectFiles logger tmpfs tmp_dir files =
     BS.writeFile f file
     pure f
 
+writeInterpreterLibraryFile :: Logger -> TmpFs -> TempDir -> InterpreterLibraryContents -> IO InterpreterLibrary
+writeInterpreterLibraryFile logger tmpfs tmp_dir (InterpreterLibrarySharedContents contents) = do
+  (soFile, libdir, libname)  <- newTempLibName logger tmpfs tmp_dir TFL_GhcSession "so"
+  BS.writeFile soFile contents
+  pure (InterpreterSharedObject soFile libdir libname)
+writeInterpreterLibraryFile logger tmpfs tmp_dir (InterpreterLibraryStaticContents contents) = do
+  object_files <- writeObjectFiles logger tmpfs tmp_dir contents
+  pure (InterpreterStaticObjects object_files)
+
+readInterpreterLibraryFile :: InterpreterLibrary -> IO InterpreterLibraryContents
+readInterpreterLibraryFile (InterpreterSharedObject path _ _) = do
+  contents <- BS.readFile path
+  pure (InterpreterLibrarySharedContents contents)
+readInterpreterLibraryFile (InterpreterStaticObjects paths) = do
+  contents <- readObjectFiles paths
+  pure (InterpreterLibraryStaticContents contents)
+
 -- | Prepare an in-memory 'ModuleByteCode' for writing to disk.
 encodeOnDiskModuleByteCode :: ModuleByteCode -> IO OnDiskModuleByteCode
 encodeOnDiskModuleByteCode bco = do
@@ -145,10 +262,14 @@ encodeOnDiskModuleByteCode bco = do
 -- | Read a 'ModuleByteCode' from a file.
 readBinByteCode :: HscEnv -> FilePath -> IO ModuleByteCode
 readBinByteCode hsc_env f = do
+  odbco <- readOnDiskModuleByteCode hsc_env f
+  decodeOnDiskModuleByteCode hsc_env odbco
+
+readOnDiskModuleByteCode :: HscEnv -> FilePath -> IO OnDiskModuleByteCode
+readOnDiskModuleByteCode hsc_env f = do
   bh' <- readBinMem f
   bh <- addBinNameReader hsc_env bh'
-  odbco <- getWithUserData (hsc_NC hsc_env) bh
-  decodeOnDiskModuleByteCode hsc_env odbco
+  getWithUserData (hsc_NC hsc_env) bh
 
 -- | Write a 'ModuleByteCode' to a file.
 writeBinByteCode :: FilePath -> ModuleByteCode -> IO ()

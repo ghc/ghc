@@ -412,6 +412,17 @@ data DriverMessage where
   -}
   DriverNoConfiguredLLVMToolchain :: DriverMessage
 
+  {- |
+  DriverMissingLinkableForModule is an error that occurs if a module is missing a linkable
+  which is needed for creating a library.
+
+
+    Test cases: bytecode-object22
+
+  -}
+
+  DriverMissingLinkableForModule :: ![Module] -> DriverMessage
+
 deriving instance Generic DriverMessage
 
 data DriverMessageOpts =
