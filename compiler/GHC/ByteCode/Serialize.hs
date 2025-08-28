@@ -9,6 +9,7 @@ module GHC.ByteCode.Serialize
   , writeBytecodeLib
   , readBytecodeLib
   , mkBytecodeLib
+  , decodeOnDiskByteCodeObject
   )
 where
 

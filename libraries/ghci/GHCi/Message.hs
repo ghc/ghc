@@ -86,6 +86,7 @@ data Message a where
   LookupClosure :: String -> Message (Maybe HValueRef)
   LoadDLL :: String -> Message (Either String (RemotePtr LoadedDLL))
   LoadArchive :: String -> Message () -- error?
+  LoadBytecode :: String -> Message ()
   LoadObj :: String -> Message () -- error?
   UnloadObj :: String -> Message () -- error?
   AddLibrarySearchPath :: String -> Message (RemotePtr ())
@@ -593,6 +594,7 @@ getMessage = do
       38 -> Msg <$> (ResumeSeq <$> get)
       39 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
       40 -> Msg <$> (WhereFrom <$> get)
+      41 -> Msg <$> (LoadBytecode <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put

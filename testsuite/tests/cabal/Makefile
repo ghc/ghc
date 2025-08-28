@@ -300,9 +300,8 @@ PKGCONF08=bytecode.package.conf
 LOCAL_GHC_PKG08 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF08)
 pkg_bytecode :
 	$(LOCAL_GHC_PKG08) init $(PKGCONF08)
-	@echo "bytecode-library-dirs: \$${pkgroot}" >> bytecode.pkg
-	@echo "import-dirs: \$${pkgroot}" >> bytecode.pkg
-	@echo "library-dirs: \$${pkgroot}" >> bytecode.pkg
+	mkdir outdir
+	mv Bytecode.hs outdir/
+	cd outdir && $(TEST_HC) -bytecodelib -hisuf=dyn_hi -dynamic -o testpkg-1.2.3.4-XXX.bytecode Bytecode.hs -fbyte-code -fwrite-interface -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX
 	$(LOCAL_GHC_PKG08) register --force bytecode.pkg
-	$(TEST_HC) -bytecodelib -o testpkg-1.2.3.4-XXX.bytecode Bytecode.hs -fbyte-code -fwrite-interface -fwrite-byte-code
-	$(TEST_HC) --interactive -package testpkg -package-db $(PKGCONF08)
+	cat bytecode.script | $(TEST_HC) --interactive -package testpkg -package-db $(PKGCONF08)

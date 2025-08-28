@@ -1,6 +1,6 @@
-Reading package info from "bytecode.pkg" ... done.
 [1 of 2] Compiling Bytecode         ( Bytecode.hs, interpreted )
 [2 of 2] Linking testpkg-1.2.3.4-XXX.bytecode
+Reading package info from "bytecode.pkg" ... done.
 GHCi, version 9.15.20250811: https://www.haskell.org/ghc/  :? for help
-I would load bytecode library but I'm not implemented yet/tmp/nix-shell-4063774-0/ghctest-8522p1jo/test   spaces/testsuite/tests/cabal/pkg_bytecode.run/testpkg-1.2.3.4-XXX.bytecode
+ghci> ghci> "bytecode from a package"
 ghci> Leaving GHCi.
