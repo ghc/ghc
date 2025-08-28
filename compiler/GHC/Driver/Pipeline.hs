@@ -50,6 +50,8 @@ import GHC.Platform
 
 import GHC.Utils.Monad ( MonadIO(liftIO), mapMaybeM )
 
+import GHC.Builtin.Names
+
 import GHC.Driver.Main
 import GHC.Driver.Env hiding ( Hsc )
 import GHC.Driver.Errors

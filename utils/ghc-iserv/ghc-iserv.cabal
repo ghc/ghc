@@ -1,9 +1,9 @@
--- WARNING: iserv.cabal is automatically generated from iserv.cabal.in by
--- ../../configure.  Make sure you are editing iserv.cabal.in, not
--- iserv.cabal.
+-- WARNING: ghc-iserv.cabal is automatically generated from ghc-iserv.cabal.in
+-- by ../../configure.  Make sure you are editing ghc-iserv.cabal.in, not
+-- ghc-iserv.cabal.
 
-Name: iserv
-Version: @ProjectVersion@
+Name: ghc-iserv
+Version: 9.13
 Copyright: XXX
 License: BSD3
 -- XXX License-File: LICENSE
@@ -23,7 +23,7 @@ Category: Development
 build-type: Simple
 cabal-version: >=1.10
 
-Executable iserv
+Executable ghc-iserv
     Default-Language: Haskell2010
     ghc-options: -no-hs-main
     Main-Is: Main.hs
@@ -34,9 +34,9 @@ Executable iserv
                    base       >= 4   && < 5,
                    binary     >= 0.7 && < 0.11,
                    bytestring >= 0.10 && < 0.13,
-                   containers >= 0.5 && < 0.9,
+                   containers >= 0.5 && < 0.8,
                    deepseq    >= 1.4 && < 1.6,
-                   ghci       == @ProjectVersionMunged@
+                   ghci       == 9.13
 
     if os(windows)
         Cpp-Options: -DWINDOWS
