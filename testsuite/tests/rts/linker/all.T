@@ -157,8 +157,7 @@ test('T7072',
                 ],
 	makefile_test, ['T7072'])
 
-test('T20494', [req_rts_linker, when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
-     makefile_test, ['T20494'])
+test('T20494', [req_rts_linker], makefile_test, ['T20494'])
 
 test('T20918',
      [extra_files(['T20918_v.cc']),
