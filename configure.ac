@@ -48,7 +48,7 @@ AC_CONFIG_FILES([
     libraries/template-haskell/template-haskell.cabal:libraries/template-haskell/template-haskell.cabal.in
     libraries/ghci/ghci.cabal:libraries/ghci/ghci.cabal.in
     utils/ghc-pkg/ghc-pkg.cabal:utils/ghc-pkg/ghc-pkg.cabal.in
-    utils/iserv/iserv.cabal:utils/iserv/iserv.cabal.in
+    utils/ghc-iserv/ghc-iserv.cabal:utils/ghc-iserv/ghc-iserv.cabal.in
     utils/runghc/runghc.cabal:utils/runghc/runghc.cabal.in
     libraries/ghc-internal/ghc-internal.cabal:libraries/ghc-internal/ghc-internal.cabal.in
     libraries/ghc-experimental/ghc-experimental.cabal:libraries/ghc-experimental/ghc-experimental.cabal.in
