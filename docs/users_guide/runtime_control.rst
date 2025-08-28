@@ -308,24 +308,6 @@ Miscellaneous RTS options
     undue memory usage shown in reporting tools, so with this flag it can
     be turned off.
 
-.. rts-flag:: --io-manager=(name)
-
-    Select the I/O manager to use. On some combinations of platform and
-    threaded/non-threaded RTS way there is a choice of more than one
-    implementation of I/O manager. This flag lets you override the default
-    and select one by name.
-
-    Currently the available I/O managers are:
-
-    ================ ========= ============
-     Name            Platforms RTS way
-    ================ ========= ============
-    ``select``       Posix     Non-threaded
-    ``mio``          All       Threaded
-    ``win32-legacy`` Windows   Non-threaded
-    ``winio``        Windows   All
-    ================ ========= ============
-
 .. rts-flag:: -xp
 
     On 64-bit machines, the runtime linker usually needs to map object code
@@ -1423,6 +1405,148 @@ and can be controlled by the following flags.
     library. These functions allow to inspect the state of the Tix data structures
     during runtime, so that the executable can write Tix files to disk itself.
 
+.. _rts-options-io:
+
+Selecting and configuring I/O managers
+--------------------------------------
+
+In GHC, the I/O manager is a component that manages I/O on behalf of Haskell
+threads, allowing them to perform and wait on I/O. In particular, the I/O
+managers enable multiplexing: using fewer system threads than there are Haskell
+threads performing and waiting on I/O. This is important for efficiency when
+there are lots of Haskell threads performing I/O, especially in network
+applications.
+
+Waiting on I/O and waiting on time are closely linked: I/O managers also manage
+timers, such as those underlying APIs like ``threadDelay``.
+
+Operating system APIs for multiplexed I/O, asynchronous I/O or event-based I/O
+vary between platforms. Consequently, there are multiple I/O manager
+implementations, relying on these different OS APIs. Furthermore, some I/O
+managers are implemented in C within the RTS, and while other I/O managers are
+implemented predominantly in Haskell (in the base library) with support from
+the RTS. Historically the selection of OS platform and threaded or non-threaded
+RTS determined the I/O manager implementation. This is no longer the case. The
+I/O manager can now be chosen at RTS startup time, though choices remain
+limited.
+
+Currently the available I/O managers are:
+
+================ ========= ============
+ Name            Platforms RTS way
+================ ========= ============
+``select``       Posix     Non-threaded
+``poll``         Posix     Non-threaded
+``mio``          All       Threaded
+``win32-legacy`` Windows   Non-threaded
+``winio``        Windows   Both
+================ ========= ============
+
+.. rts-flag:: --io-manager=(name)
+
+    Select the I/O manager to use. On some combinations of platform and
+    threaded/non-threaded RTS way there is a choice of more than one
+    implementation of I/O manager. This flag lets you override the default
+    and select one by name. The available names are the ones from the table
+    above.
+
+Some I/O managers have additional configuration, detailed below.
+
+The ``select`` I/O manager
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+This I/O manager based on the classic Posix ``select()`` API. It supports
+waiting on I/O readiness on non-blocking file descriptors (i.e. not disk files).
+It is implemented within the RTS and is currently available only in the
+non-threaded RTS.
+
+It scales poorly for I/O readiness notification: costing O(n) in the number of
+file descriptors that are being waited on simultaneously. It scales poorly for
+timers: most timer operations cost O(n) in the number of simultaneous timers.
+This is because it uses a linked list for timers.
+
+This I/O manager is highly portable and its code is very mature: it is the I/O
+manager that has been used by GHC in the single-threaded RTS on Posix platforms
+since time immemorial.
+
+Timer resolution: on 64bit platforms it supports microsecond precision timers
+while on 32bit platforms it only supports millisecond precision. Timer accuracy
+is determined primarily by the OS (and may be a lot worse than the precision).
+
+Limitation: on most platforms where it is available this I/O manager can only
+support 1024 open files. More specifically it supports file descriptors with
+numerical value up to 1024 but no higher. It will terminate the RTS (and thus
+typically the process) if this limit is exceeded.
+
+The ``poll`` I/O manager
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+This I/O manager based on the classic Posix ``poll()`` API. It supports waiting
+on I/O readiness on non-blocking file descriptors (i.e. not disk files). It is
+implemented within the RTS and is currently available only in the non-threaded
+RTS.
+
+It scales poorly for I/O readiness notification: costing O(n) in the number of
+threads that are waiting on I/O simultaneously. It scales well for timers:
+most timer operations cost O(log n) in the number of simultaneous timers. This
+is because it uses a heap data structure for timers.
+
+Timer resolution: this I/O manager supports nanosecond precision timers on
+Linux and FreeBSD, where it actually uses the non-standard ``ppoll()`` system
+call. On all other Posix platforms (where it uses standard Posix ``poll()``) it
+supports millisecond precision timers.
+
+Limitation: this I/O manager supports a limited number of Haskell threads
+waiting on I/O readiness simultaneously, but the limit is more flexible than
+for the ``select`` I/O manager. The number of Haskell threads that can
+simultaneously be waiting on I/O readiness is limited by the prevailing Posix
+"ulimit" of the process for the maximum number of open file descriptors. This
+limit can be adjusted using OS facilities (e.g. the ``ulimit`` command).
+Exceeding this limit will cause the RTS (and thus typically the process) to
+terminate.
+
+The ``mio`` I/O manager
+~~~~~~~~~~~~~~~~~~~~~~~
+This I/O manager is based on several platform-specific APIs. It supports
+waiting on I/O readiness on non-blocking file descriptors (i.e. not disk files).
+It is implemented predominantly in Haskell with some support in the RTS. It is
+available on every platform but only in the multi-threaded RTS.
+
+It has multiple backends covering different platform-specific APIs: ``epoll()``
+on Linux and ``kqueue()`` on FreeBSD and OSX, plus a classic portable ``poll()``
+backend for all other platforms, including Windows.
+
+The ``epoll`` and ``kqueue`` backends offer good performance and scaling for
+threads waiting on I/O readiness, while the ``poll`` backend offers poor
+scaling. The backend in use is determined by the platform and cannot be chosen
+at runtime.
+
+All the backends offer good performance and scaling for threads waiting on
+timers.
+
+The ``win32-legacy`` I/O manager
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This I/O manager is based on classic Windows APIs. It supports asynchronous I/O
+for disk files, but not waiting on I/O readiness on non-blocking file. It is
+implemented within the RTS and is available only in the non-threaded RTS.
+
+It is very mature: it is the I/O manager that has been used by GHC in the
+single-threaded RTS on Windows since time immemorial.
+
+The ``winio`` I/O manager
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This I/O manager is based on modern Windows APIs, including Windows I/O
+completion ports (IOCP). It supports asynchronous I/O for network sockets and
+disk files. It is implemented mostly in Haskell with some support within the
+RTS and is available in the non-threaded and threaded RTS.
+
+.. rts-flag:: --io-manager-threads=(n)
+
+    Specify the maximum size of the thread pool. This defaults to the number
+    of CPU cores on the system. The actual size of the thread pool is
+    determined dynamically based on demand. This parameter is just the maximum
+    size.
 
 RTS options for hackers, debuggers, and over-interested souls
 -------------------------------------------------------------

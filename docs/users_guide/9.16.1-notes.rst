@@ -34,6 +34,26 @@ GHCi
 Runtime system
 ~~~~~~~~~~~~~~
 
+- Add a new `poll` I/O manager, based on the classic unix `poll()` API. It is
+  available in the single-threaded RTS on posix platforms. The `select` I/O
+  manager remains the default for this combination for now, but this default
+  may change in future releases. The new I/O manager can be selected via the
+  runtime flag :rts-flag:`--io-manager=(name)`.
+
+  Compared to the `select` I/O manager, this one has slightly less severe
+  restrictions on the number of sockets/pipes that can be waited on, though
+  it still scales poorly for waiting on socket/pipe readiness. It does however
+  scale much better for thread timers (such as `threadDelay`), and improves
+  timer precision on 32bit Linux and 32bit FreeBSD from milliseconds to
+  microseconds.
+
+  This I/O manager introduces new infrastructure for I/O managers that is
+  intended to be used in future for a new generation of in-RTS I/O managers,
+  using more scalable platform-specific APIs (such as epoll, io_uring and
+  kqueue). This first one, based on `poll()`, is merely intended to be
+  portable.
+
+
 Cmm
 ~~~
 
