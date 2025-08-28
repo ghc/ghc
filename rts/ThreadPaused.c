@@ -15,6 +15,7 @@
 #include "RaiseAsync.h"
 #include "Trace.h"
 #include "Threads.h"
+#include "Messages.h"
 #include "sm/NonMovingMark.h"
 
 #include <string.h> // for memmove()
@@ -314,52 +315,66 @@ threadPaused(Capability *cap, StgTSO *tso)
                 continue;
             }
 
-            // an EAGER_BLACKHOLE or CAF_BLACKHOLE gets turned into a
-            // BLACKHOLE here.
+            // If we have a frame that is already eagerly blackholed, we
+            // shouldn't overwrite its payload: There may already be a blocking
+            // queue (see #26324).
+            if(frame_info == &stg_bh_upd_frame_info) {
+                // eager black hole: we do nothing
+
+                // it should be a black hole that we own
+                ASSERT(bh_info == &stg_BLACKHOLE_info ||
+                       bh_info == &__stg_EAGER_BLACKHOLE_info ||
+                       bh_info == &stg_CAF_BLACKHOLE_info);
+                ASSERT(blackHoleOwner(bh) == tso || blackHoleOwner(bh) == NULL);
+            } else {
+                // lazy black hole
+
 #if defined(THREADED_RTS)
-            // first we turn it into a WHITEHOLE to claim it, and if
-            // successful we write our TSO and then the BLACKHOLE info pointer.
-            cur_bh_info = (const StgInfoTable *)
-                cas((StgVolatilePtr)&bh->header.info,
-                    (StgWord)bh_info,
-                    (StgWord)&stg_WHITEHOLE_info);
+                // first we turn it into a WHITEHOLE to claim it, and if
+                // successful we write our TSO and then the BLACKHOLE info pointer.
+                cur_bh_info = (const StgInfoTable *)
+                    cas((StgVolatilePtr)&bh->header.info,
+                        (StgWord)bh_info,
+                        (StgWord)&stg_WHITEHOLE_info);
 
-            if (cur_bh_info != bh_info) {
-                bh_info = cur_bh_info;
+                if (cur_bh_info != bh_info) {
+                    bh_info = cur_bh_info;
 #if defined(PROF_SPIN)
-                NONATOMIC_ADD(&whitehole_threadPaused_spin, 1);
+                    NONATOMIC_ADD(&whitehole_threadPaused_spin, 1);
 #endif
-                busy_wait_nop();
-                goto retry;
-            }
-#endif
-
-            IF_NONMOVING_WRITE_BARRIER_ENABLED {
-                if (ip_THUNK(INFO_PTR_TO_STRUCT(bh_info))) {
-                    // We are about to replace a thunk with a blackhole.
-                    // Add the free variables of the closure we are about to
-                    // overwrite to the update remembered set.
-                    // N.B. We caught the WHITEHOLE case above.
-                    updateRemembSetPushThunkEager(cap,
-                                                  THUNK_INFO_PTR_TO_STRUCT(bh_info),
-                                                  (StgThunk *) bh);
+                    busy_wait_nop();
+                    goto retry;
                 }
+#endif
+                ASSERT(bh_info != &stg_WHITEHOLE_info);
+
+                IF_NONMOVING_WRITE_BARRIER_ENABLED {
+                    if (ip_THUNK(INFO_PTR_TO_STRUCT(bh_info))) {
+                        // We are about to replace a thunk with a blackhole.
+                        // Add the free variables of the closure we are about to
+                        // overwrite to the update remembered set.
+                        // N.B. We caught the WHITEHOLE case above.
+                        updateRemembSetPushThunkEager(cap,
+                                                    THUNK_INFO_PTR_TO_STRUCT(bh_info),
+                                                    (StgThunk *) bh);
+                    }
+                }
+
+                // zero out the slop so that the sanity checker can tell
+                // where the next closure is. N.B. We mustn't do this until we have
+                // pushed the free variables to the update remembered set above.
+                OVERWRITING_CLOSURE_SIZE(bh, closure_sizeW_(bh, INFO_PTR_TO_STRUCT(bh_info)));
+
+                // The payload of the BLACKHOLE points to the TSO
+                RELEASE_STORE(&((StgInd *)bh)->indirectee, (StgClosure *)tso);
+                SET_INFO_RELEASE(bh,&stg_BLACKHOLE_info);
+
+                // .. and we need a write barrier, since we just mutated the closure:
+                recordClosureMutated(cap,bh);
+
+                // We pretend that bh has just been created.
+                LDV_RECORD_CREATE(bh);
             }
-
-            // zero out the slop so that the sanity checker can tell
-            // where the next closure is. N.B. We mustn't do this until we have
-            // pushed the free variables to the update remembered set above.
-            OVERWRITING_CLOSURE_SIZE(bh, closure_sizeW_(bh, INFO_PTR_TO_STRUCT(bh_info)));
-
-            // The payload of the BLACKHOLE points to the TSO
-            RELEASE_STORE(&((StgInd *)bh)->indirectee, (StgClosure *)tso);
-            SET_INFO_RELEASE(bh,&stg_BLACKHOLE_info);
-
-            // .. and we need a write barrier, since we just mutated the closure:
-            recordClosureMutated(cap,bh);
-
-            // We pretend that bh has just been created.
-            LDV_RECORD_CREATE(bh);
 
             frame = (StgClosure *) ((StgUpdateFrame *)frame + 1);
             if (prev_was_update_frame) {
