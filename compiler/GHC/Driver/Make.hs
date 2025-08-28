@@ -1859,12 +1859,7 @@ executeLinkNode hug kn@(k, _) uid deps = do
                              let hsc_env' = setHUG hug lcl_hsc_env
                              wrapAction diag_wrapper hsc_env' $ do
                                link (ghcLink dflags)
-                                 (hsc_logger hsc_env')
-                                 (hsc_tmpfs hsc_env')
-                                 (hsc_FC hsc_env')
-                                 (hsc_hooks hsc_env')
-                                 dflags
-                                 (hsc_unit_env hsc_env')
+                                 hsc_env'
                                  True -- We already decided to link
                                  msg'
                                  (hsc_HPT hsc_env')

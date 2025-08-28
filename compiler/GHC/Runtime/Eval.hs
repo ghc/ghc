@@ -64,7 +64,7 @@ import GHCi.RemoteTypes
 import GHC.ByteCode.Types
 
 import GHC.Linker.Loader as Loader
-import GHC.Linker.Types (LinkedBreaks (..))
+import GHC.Linker.Types
 
 import GHC.Hs
 
