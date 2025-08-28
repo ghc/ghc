@@ -39,7 +39,7 @@ GHC1 = _build/stage1/bin/ghc
 GHC2 = _build/stage2/bin/ghc
 
 define GHC_INFO
-$(shell sh -c "$(GHC0) --info | $(GHC0) -e 'getContents >>= foldMap putStrLn . lookup \"$1\" . read'")
+$(shell $(GHC0) --info | grep -oP '"$1",\s*"\K[^"]+')
 endef
 
 TARGET_PLATFORM := $(call GHC_INFO,target platform string)
@@ -179,12 +179,17 @@ STAGE2_UTIL_EXECUTABLES := \
 # export CABAL := $(shell cabal update 2>&1 >/dev/null && cabal build cabal-install -v0 --disable-tests --project-dir libraries/Cabal && cabal list-bin -v0 --project-dir libraries/Cabal cabal-install:exe:cabal)
 $(abspath _build/stage0/bin/cabal): _build/stage0/bin/cabal
 
-.PHONY: _build/stage0/bin/cabal
+# --- Stage 0 build ---
+
+# This just builds cabal-install, which is used to build the rest of the project.
+
+# We need an absolute path here otherwise cabal will consider the path relative to `the project directory
+_build/stage0/bin/cabal: BUILD_ARGS=-j -w $(GHC0) --disable-tests --project-dir libraries/Cabal --builddir=$(abspath _build/stage0)
 _build/stage0/bin/cabal:
 	@echo ">>> Building Cabal..."
 	@mkdir -p _build/stage0/bin _build/logs
-	$(call run_and_log, cabal build -j -w $(GHC0) --disable-tests --project-dir libraries/Cabal --builddir=_build/stage0/cabal cabal-install:exe:cabal)
-	cp -rfp $(shell cabal list-bin -v0 -j -w $(GHC0) --project-dir libraries/Cabal --builddir=_build/stage0/cabal cabal-install:exe:cabal) _build/stage0/bin/cabal
+	cabal build $(BUILD_ARGS) cabal-install:exe:cabal
+	cp -rfp $(shell cabal list-bin -v0 $(BUILD_ARGS) cabal-install:exe:cabal) _build/stage0/bin/cabal
 	@echo ">>> Cabal built successfully."
 
 # --- Stage 1 build ---
@@ -195,7 +200,7 @@ _build/stage1/%: private GHC=$(GHC0)
 .PHONY: $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES))
 $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES)) &: $(CABAL) | _build/booted
 	# Force cabal to replan
-	rm -rf _build/stage2/cache
+	rm -rf _build/stage1/cache
 	$(call run_and_log, HADRIAN_SETTINGS='$(HADRIAN_SETTINGS)' \
 		$(CABAL_BUILD) $(STAGE1_TARGETS))
 
@@ -357,4 +362,4 @@ test: _build/bindist
 	make -C testsuite/tests test THREADS=${THREADS}
 
 # Inform Make that these are not actual files if they get deleted by other means
-.PHONY: clean distclean test all configure
+.PHONY: clean distclean test all
