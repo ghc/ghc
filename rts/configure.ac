@@ -560,7 +560,7 @@ dnl
 if $DERIVE_CONSTANTS \
   --gen-header \
   -o include/DerivedConstants.h \
-  --target-os "$BuildOS_CPP" \
+  --target-os "$HostOS_CPP" \
   --gcc-program "$CC" \
   --nm-program "$NM" \
   --objdump-program "$OBJDUMP" \

@@ -22,13 +22,6 @@ packages:
   libraries/template-haskell
   libraries/hpc
   libraries/system-cxx-std-lib
-  ghc
-  utils/ghc-pkg
-  utils/hsc2hs
-  utils/unlit
-  utils/genprimopcode
-  utils/deriveConstants
-  utils/ghc-toolchain
   libraries/array
   libraries/binary
   libraries/bytestring
@@ -50,19 +43,31 @@ packages:
   libraries/unix
   libraries/xhtml
   libraries/Win32
+
   libraries/Cabal/Cabal-syntax
   libraries/Cabal/Cabal
   https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz
   https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
   https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
 
-  libraries/haskeline
-  libraries/terminfo
-  utils/hp2ps
-  utils/hpc
-  utils/ghc-iserv
-  utils/genapply
-  utils/runghc
+  utils/genprimopcode
+  utils/deriveConstants
+
+if !arch(javascript)
+  packages:
+    ghc
+    utils/ghc-pkg
+    utils/hsc2hs
+    utils/unlit
+    utils/ghc-toolchain
+
+    libraries/haskeline
+    libraries/terminfo
+    utils/hp2ps
+    utils/hpc
+    utils/ghc-iserv
+    utils/genapply
+    utils/runghc
 
 
 -- project-rts
@@ -70,6 +75,40 @@ benchmarks: False
 tests: False
 allow-boot-library-installs: True
 active-repositories: :none
+
+if arch(javascript)
+  constraints:
+    Cabal source,
+    Cabal-syntax source,
+    array source,
+    base source,
+    binary source,
+    bytestring source,
+    containers source,
+    deepseq source,
+    directory source,
+    exceptions source,
+	file-io source,
+    filepath source,
+    hpc source,
+    integer-gmp source,
+    mtl source,
+	os-string source,
+    parsec source,
+    pretty source,
+    process source,
+    rts source,
+    rts-headers source,
+	rts-fs source,
+    stm source,
+    system-cxx-std-lib source,
+    template-haskell source,
+    text source,
+    time source,
+    transformers source,
+    unix source,
+    xhtml source,
+	Win32 source
 
 constraints:
   -- we do not want to use the rts-headers from stage1
