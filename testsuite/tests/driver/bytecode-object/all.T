@@ -1,6 +1,5 @@
-bytecode_opts = [extra_files(['BytecodeTest.hs'])
-                , filter_stdout_lines(r'ghci>.*')
-                ]
+bytecode_opts = [extra_files(['BytecodeTest.hs'])]
+
 
 test('bytecode_object1', bytecode_opts, makefile_test, ['bytecode_object1'])
 test('bytecode_object2', bytecode_opts, makefile_test, ['bytecode_object2'])
@@ -21,4 +20,9 @@ test('bytecode_object16', bytecode_opts, makefile_test, ['bytecode_object16'])
 test('bytecode_object17', bytecode_opts, makefile_test, ['bytecode_object17'])
 test('bytecode_object18', bytecode_opts, makefile_test, ['bytecode_object18'])
 test('bytecode_object19', bytecode_opts, makefile_test, ['bytecode_object19'])
+test('bytecode_object20', bytecode_opts, makefile_test, ['bytecode_object20'])
+test('bytecode_object21', bytecode_opts, makefile_test, ['bytecode_object21'])
+test('bytecode_object22', bytecode_opts, makefile_test, ['bytecode_object22'])
+test('bytecode_object23', bytecode_opts, makefile_test, ['bytecode_object23'])
+test('bytecode_object24', bytecode_opts + [copy_files], makefile_test, ['bytecode_object24'])
 test('bytecode_object25', bytecode_opts + [extra_files(['BytecodeForeign.hs', 'BytecodeForeign.c'])], makefile_test, ['bytecode_object25'])

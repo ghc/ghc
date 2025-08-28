@@ -1,0 +1,5 @@
+Testing that bytecode library is recompiled when BytecodeTest.hs changes...
+[1 of 2] Compiling BytecodeTest     ( BytecodeTest.hs, interpreted )
+[2 of 2] Linking linked.bytecode
+[1 of 2] Compiling BytecodeTest     ( BytecodeTest.hs, interpreted ) [Source file changed]
+[2 of 2] Linking linked.bytecode [Objects changed]

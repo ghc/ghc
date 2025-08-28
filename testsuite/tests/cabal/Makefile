@@ -73,8 +73,8 @@ LOCAL_GHC_PKG04 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF04)
 ghcpkg04 :
 	rm -rf $(PKGCONF04)
 	$(LOCAL_GHC_PKG04) init $(PKGCONF04)
-	$(LOCAL_GHC_PKG04) register --force test.pkg >/dev/null 2>&1 
-	$(LOCAL_GHC_PKG04) update --force test5.pkg >/dev/null 2>&1 
+	$(LOCAL_GHC_PKG04) register --force test.pkg >/dev/null 2>&1
+	$(LOCAL_GHC_PKG04) update --force test5.pkg >/dev/null 2>&1
 	$(LOCAL_GHC_PKG04) expose testpkg-1.2.3.4  >/dev/null 2>&1
 	@: # testpkg-1.2.3.4 and newtestpkg-2.0 are both exposed now
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONF04) -c ghcpkg04.hs || true
@@ -89,8 +89,8 @@ ghcpkg05 :
 	rm -rf $(PKGCONF05a) $(PKGCONF05b)
 	$(LOCAL_GHC_PKG05a) init $(PKGCONF05a)
 	$(LOCAL_GHC_PKG05b) init $(PKGCONF05b)
-	$(LOCAL_GHC_PKG05a) register --force test2.pkg >/dev/null 2>&1 
-	$(LOCAL_GHC_PKG05b) register --force test3.pkg >/dev/null 2>&1 
+	$(LOCAL_GHC_PKG05a) register --force test2.pkg >/dev/null 2>&1
+	$(LOCAL_GHC_PKG05b) register --force test3.pkg >/dev/null 2>&1
 	$(LOCAL_GHC_PKG05b) check || true
 	$(LOCAL_GHC_PKG05b) list
 	$(LOCAL_GHC_PKG05b) expose testpkg-2.0
@@ -106,7 +106,7 @@ LOCAL_GHC_PKG06 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF06)
 ghcpkg06 :
 	rm -rf $(PKGCONF06)
 	$(LOCAL_GHC_PKG06) init $(PKGCONF06)
-	$(LOCAL_GHC_PKG06) register --force test.pkg >/dev/null 2>&1 
+	$(LOCAL_GHC_PKG06) register --force test.pkg >/dev/null 2>&1
 	if $(LOCAL_GHC_PKG06) register testdup.pkg; then false else true; fi
 	$(LOCAL_GHC_PKG06) register --force testdup.pkg
 
@@ -295,3 +295,14 @@ T13703:
 	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf register --force test13703b.pkg 2>/dev/null
 	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf field z-p-z-q lib-name
 	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf field z-p-z-r lib-name
+
+PKGCONF08=bytecode.package.conf
+LOCAL_GHC_PKG08 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF08)
+pkg_bytecode :
+	$(LOCAL_GHC_PKG08) init $(PKGCONF08)
+	@echo "bytecode-library-dirs: \$${pkgroot}" >> bytecode.pkg
+	@echo "import-dirs: \$${pkgroot}" >> bytecode.pkg
+	@echo "library-dirs: \$${pkgroot}" >> bytecode.pkg
+	$(LOCAL_GHC_PKG08) register --force bytecode.pkg
+	$(TEST_HC) -bytecodelib -o testpkg-1.2.3.4-XXX.bytecode Bytecode.hs -fbyte-code -fwrite-interface -fwrite-byte-code
+	$(TEST_HC) --interactive -package testpkg -package-db $(PKGCONF08)
