@@ -35,6 +35,7 @@ module GHC.Linker.Loader
    , modifyLoaderState
    , initLinkDepsOpts
    , getGccSearchDirectory
+   , mkDynLoadLib
    )
 where
 
@@ -865,10 +866,10 @@ loadObjects interp hsc_env pls objs = do
                             return (pls2, Failed)
 
 
--- | Create a shared library containing the given object files and load it.
-dynLoadObjs :: Interp -> HscEnv -> LoaderState -> [FilePath] -> IO LoaderState
-dynLoadObjs _      _       pls                           []   = return pls
-dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
+-- | Create a shared library containing the given object files
+mkDynLoadLib :: HscEnv -> (Ways -> Ways) -> [(FilePath, String)] ->[UnitId] -> [FilePath] -> IO (Maybe (FilePath, FilePath, String))
+mkDynLoadLib      _  _  _ _  []   = return Nothing
+mkDynLoadLib hsc_env modify_ways temp_sos dep_uids objs = do
     let unit_env = hsc_unit_env hsc_env
     let dflags   = hsc_dflags hsc_env
     let logger   = hsc_logger hsc_env
@@ -919,24 +920,35 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
                       -- Likewise if loading if the profiled way then need to
                       -- add WayProf.
                       targetWays_ = let ws = Set.singleton WayDyn
-                                     in if interpreterProfiled interp
-                                        then addWay WayProf ws
-                                        else ws,
+                                     in modify_ways ws,
                       outputFile_ = Just soFile
                   }
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib logger tmpfs dflags2 unit_env objs (loaded_pkg_uid <$> eltsUDFM pkgs_loaded)
+    linkDynLib logger tmpfs dflags2 unit_env objs dep_uids
 
-    -- if we got this far, extend the lifetime of the library file
-    changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
-    m <- loadDLLs interp [soFile]
-    case m of
-      Right _ -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
-      Left err -> linkFail msg (text err)
+    return (Just (soFile, libPath, libName))
+
+-- | Load a shared library containing the given object files
+dynLoadObjs :: Interp -> HscEnv -> LoaderState -> [FilePath] -> IO LoaderState
+dynLoadObjs interp hsc_env pls objs = do
+  mdynlib <- mkDynLoadLib hsc_env modify_ways (temp_sos pls) (map loaded_pkg_uid $ eltsUDFM (pkgs_loaded pls)) objs
+  case mdynlib of
+     Nothing -> return pls
+     Just (soFile, libPath, libName) -> do
+       -- if we got this far, extend the lifetime of the library file
+       changeTempFilesLifetime (hsc_tmpfs hsc_env) TFL_GhcSession [soFile]
+       m <- loadDLLs interp [soFile]
+       case m of
+         Right _ -> return $! pls { temp_sos = (libPath, libName) : temp_sos pls }
+         Left err -> linkFail msg (text err)
   where
     msg = "GHC.Linker.Loader.dynLoadObjs: Loading temp shared object failed"
+
+    modify_ways = if interpreterProfiled interp
+                        then addWay WayProf
+                        else id
 
 rmDupLinkables :: LinkableSet    -- Already loaded
                -> [Linkable]    -- New linkables
