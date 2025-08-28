@@ -2166,7 +2166,7 @@ hscInteractive hsc_env cgguts location = do
     let tmpfs  = hsc_tmpfs hsc_env
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) (cgi_module cgguts) location (cgi_foreign cgguts)
+        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) (cgi_module cgguts) (ml_hs_file_ospath $ location) (cgi_foreign cgguts)
     return (istub_c_exists, comp_bc)
 
 
@@ -2244,7 +2244,7 @@ generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
 mkModuleByteCode :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ModuleByteCode
 mkModuleByteCode hsc_env mod mod_location cgguts = do
   bcos <- hscGenerateByteCode hsc_env cgguts mod_location
-  objs <- outputAndCompileForeign hsc_env mod mod_location (cgi_foreign_files cgguts) (cgi_foreign cgguts)
+  objs <- outputAndCompileForeign hsc_env mod (ml_hs_file_ospath $ mod_location) (cgi_foreign_files cgguts) (cgi_foreign cgguts)
   return $! ModuleByteCode mod bcos objs
 
 -- | Generate a fresh 'ModuleByteCode' for a given module but do not write it to disk.

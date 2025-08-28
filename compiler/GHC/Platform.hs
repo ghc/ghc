@@ -45,6 +45,7 @@ module GHC.Platform
    -- * Shared libraries
    , platformSOName
    , platformHsSOName
+   , platformHsBytecodeLibraryName
    , platformSOExt
    , genericPlatform
    )
@@ -300,6 +301,9 @@ platformSOName platform root = case platformOS platform of
 
 platformHsSOName :: Platform -> FilePath -> FilePath
 platformHsSOName platform root = ("lib" ++ root) <.> platformSOExt platform
+
+platformHsBytecodeLibraryName :: FilePath -> FilePath
+platformHsBytecodeLibraryName root = ("lib" ++ root) <.> "bytecode"
 
 platformSOExt :: Platform -> FilePath
 platformSOExt platform

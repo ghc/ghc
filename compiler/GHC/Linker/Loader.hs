@@ -109,7 +109,7 @@ import qualified Data.Set as Set
 import Data.Char (isSpace)
 import qualified Data.Foldable as Foldable
 import Data.IORef
-import Data.List (intercalate, isPrefixOf, nub, partition)
+import Data.List (intercalate, isPrefixOf, nub, partition, zip4)
 import Data.Maybe
 import Data.Either
 import Control.Concurrent.MVar
@@ -132,6 +132,7 @@ import qualified Data.IntMap.Strict as IM
 import qualified Data.Map.Strict as M
 import Foreign.Ptr (nullPtr)
 import GHC.ByteCode.Serialize
+import GHC.Data.Maybe (expectJust)
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -431,7 +432,7 @@ loadCmdLineLibs'' interp hsc_env pls =
       maybePutStr logger (unlines $ map ("  "++) gcc_paths)
 
       libspecs
-        <- mapM (locateLib interp hsc_env False lib_paths_env gcc_paths) minus_ls
+        <- mapM (locateLib interp hsc_env False [] lib_paths_env gcc_paths) minus_ls
 
       -- (d) Link .o files from the command-line
       classified_ld_inputs <- mapM (classifyLdInput logger platform)
@@ -536,6 +537,7 @@ preloadLib
 preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
   maybePutStr logger ("Loading object " ++ showLS lib_spec ++ " ... ")
   case lib_spec of
+    BytecodeLibrary _bco -> panic "TODO: MP preloadLib BytecodeLibrary"
     Objects static_ishs -> do
       (b, pls1) <- preload_statics lib_paths static_ishs
       maybePutStrLn logger (if b  then "done" else "not found")
@@ -925,7 +927,11 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib logger tmpfs dflags2 unit_env objs (loaded_pkg_uid <$> eltsUDFM pkgs_loaded)
+    -- Loading bytecode for mypkg
+    --- -l mypkg
+    -- This thinks we are creating shared library for main but we actually are for mypkg
+    -- MP: LinkingForInterpreter is broken here for tests, recompPluginPackage
+    linkDynLib LinkingHomePackage logger tmpfs dflags2 unit_env objs (map loaded_pkg_uid $ eltsUDFM pkgs_loaded)
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
@@ -1157,6 +1163,7 @@ showLS (Archive nm)   = "(static archive) " ++ nm
 showLS (DLL nm)       = "(dynamic) " ++ nm
 showLS (DLLPath nm)   = "(dynamic) " ++ nm
 showLS (Framework nm) = "(framework) " ++ nm
+showLS (BytecodeLibrary nm) = "(bytecode) " ++ nm
 
 -- | Load exactly the specified packages, and their dependents (unless of
 -- course they are already loaded).  The dependents are loaded
@@ -1185,26 +1192,7 @@ loadPackages' interp hsc_env new_pks pls = do
     downsweep
       ([], pkgs_loaded pls)
       new_pks
-  loaded_pkgs_info_list <- loadPackage interp hsc_env pkgs_info_list
-  evaluate $
-    pls
-      { pkgs_loaded =
-          foldl'
-            ( \pkgs (new_pkg_info, (hs_cls, extra_cls, loaded_dlls)) ->
-                adjustUDFM
-                  ( \old_pkg_info ->
-                      old_pkg_info
-                        { loaded_pkg_hs_objs = hs_cls,
-                          loaded_pkg_non_hs_objs = extra_cls,
-                          loaded_pkg_hs_dlls = loaded_dlls
-                        }
-                  )
-                  pkgs
-                  (Packages.unitId new_pkg_info)
-            )
-            pkgs_almost_loaded
-            (zip pkgs_info_list loaded_pkgs_info_list)
-      }
+  loadPackage interp hsc_env pkgs_info_list (pls { pkgs_loaded = pkgs_almost_loaded })
   where
     -- The downsweep process takes an initial 'PkgsLoaded' and uses it
     -- to memoize new packages to load when recursively downsweeping
@@ -1249,8 +1237,9 @@ loadPackages' interp hsc_env new_pks pls = do
           throwGhcExceptionIO
             (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
-loadPackage :: Interp -> HscEnv -> [UnitInfo] -> IO [([LibrarySpec], [LibrarySpec], [RemotePtr LoadedDLL])]
-loadPackage interp hsc_env pkgs
+
+loadPackage :: Interp -> HscEnv -> [UnitInfo] -> LoaderState -> IO LoaderState
+loadPackage interp hsc_env pkgs pls
    = do
         let dflags    = hsc_dflags hsc_env
         let logger    = hsc_logger hsc_env
@@ -1258,6 +1247,8 @@ loadPackage interp hsc_env pkgs
             is_dyn    = interpreterDynamic interp
             dirs | is_dyn    = [map ST.unpack $ Packages.unitLibraryDynDirs pkg | pkg <- pkgs]
                  | otherwise = [map ST.unpack $ Packages.unitLibraryDirs pkg | pkg <- pkgs]
+            -- Directory to find bytecode libraries
+            bc_dirs = [map ST.unpack $ Packages.unitLibraryBytecodeDirs pkg | pkg <- pkgs]
 
         let hs_libs   = [map ST.unpack $ Packages.unitLibraries pkg | pkg <- pkgs]
             -- The FFI GHCi import lib isn't needed as
@@ -1285,9 +1276,9 @@ loadPackage interp hsc_env pkgs
         dirs_env <- traverse (addEnvPaths "LIBRARY_PATH") dirs
 
         hs_classifieds
-           <- sequenceA [mapM (locateLib interp hsc_env True  dirs_env_ gcc_paths) hs_libs'_ | (dirs_env_, hs_libs'_) <- zip dirs_env hs_libs' ]
+           <- sequenceA [mapM (locateLib interp hsc_env True bc_dir_  dirs_env_ gcc_paths) hs_libs'_ | (bc_dir_, dirs_env_, hs_libs'_) <- zip3 bc_dirs dirs_env hs_libs' ]
         extra_classifieds
-           <- sequenceA [mapM (locateLib interp hsc_env False dirs_env_ gcc_paths) extra_libs_ | (dirs_env_, extra_libs_) <- zip dirs_env extra_libs]
+           <- sequenceA [mapM (locateLib interp hsc_env False [] dirs_env_ gcc_paths) extra_libs_ | (dirs_env_, extra_libs_) <- zip dirs_env extra_libs]
         let classifieds = zipWith (++) hs_classifieds extra_classifieds
 
         -- Complication: all the .so's must be loaded before any of the .o's.
@@ -1300,6 +1291,8 @@ loadPackage interp hsc_env pkgs
             objs       = [ obj  | classifieds_ <- classifieds, Objects objs <- classifieds_
                                 , obj <- objs]
             archs      = [ arch | classifieds_ <- classifieds, Archive arch <- classifieds_ ]
+
+            bytecodes = [ bc | classifieds_ <- classifieds, BytecodeLibrary bc <- classifieds_ ]
 
         -- Add directories to library search paths
         let dll_paths  = map takeDirectory known_dlls
@@ -1336,6 +1329,7 @@ loadPackage interp hsc_env pkgs
         -- step to resolve everything.
         mapM_ (loadObj interp) objs
         mapM_ (loadArchive interp) archs
+        pls' <- foldM (loadBytecodeLibrary hsc_env interp) pls bytecodes
 
         maybePutStr logger "linking ... "
         ok <- resolveObjs interp
@@ -1349,10 +1343,26 @@ loadPackage interp hsc_env pkgs
         if succeeded ok
            then do
              maybePutStrLn logger "done."
-             pure $ zip3 hs_classifieds extra_classifieds loaded_dlls
+             pure $ foldl' (\pls (new_pkg, hs_cls, extra_cls, loaded_dlls) ->
+                               pls { pkgs_loaded = adjustUDFM (\old_pkg_info -> old_pkg_info { loaded_pkg_hs_objs = hs_cls, loaded_pkg_non_hs_objs = extra_cls, loaded_pkg_hs_dlls = loaded_dlls }) (pkgs_loaded pls) (unitId new_pkg) }
+                           ) pls' (zip4 pkgs hs_classifieds extra_classifieds loaded_dlls)
            else let errmsg = text "unable to load units `"
                              <> vcat (map pprUnitInfoForUser pkgs) <> text "'"
                  in throwGhcExceptionIO (InstallationError (showSDoc dflags errmsg))
+
+
+loadBytecodeLibrary :: HscEnv -> Interp -> LoaderState -> FilePath -> IO LoaderState
+loadBytecodeLibrary hsc_env interp pls path = do
+  path' <- canonicalizePath path -- Note [loadObj and relative paths]
+  -- 0. Get the modification time of the module
+  mod_time <- expectJust <$> modificationTimeIfExists path'
+  -- 1. Read the bytecode library
+  (BytecodeLib bcos) <- readBytecodeLib hsc_env path'
+  bcos' <- mapM (decodeOnDiskModuleByteCode hsc_env) bcos
+  let linkables = map (mkModuleByteCodeLinkable mod_time) bcos'
+  (pls', _) <- loadModuleLinkables interp hsc_env pls KeepExternalDefinitions linkables
+  return pls'
+
 
 {-
 Note [Crash early load_dyn and locateLib]
@@ -1451,9 +1461,10 @@ locateLib
   -> Bool
   -> [FilePath]
   -> [FilePath]
+  -> [FilePath]
   -> String
   -> IO LibrarySpec
-locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
+locateLib interp hsc_env is_hs bc_dirs lib_dirs gcc_dirs lib0
   | not is_hs
     -- For non-Haskell libraries (e.g. gmp, iconv):
     --   first look in library-dirs for a dynamic library (on User paths only)
@@ -1493,18 +1504,37 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
     assumeDll
 
   | loading_dynamic_hs_libs -- search for .so libraries first.
-  = findHSDll     `orElse`
+  , prefer_bytecode
+  = findBytecodeLib `orElse`
+    findHSDll     `orElse`
     findDynObject `orElse`
+    assumeDll
+
+  -- Don't prefer bytecode libraries
+  | loading_dynamic_hs_libs -- search for .so libraries first.
+  , not prefer_bytecode
+  =
+    findHSDll     `orElse`
+    findDynObject `orElse`
+    findBytecodeLib `orElse`
+    assumeDll
+  | prefer_bytecode
+    -- use HSfoo.{o,p_o} if it exists, otherwise fallback to libHSfoo{,_p}.a
+  = findBytecodeLib `orElse`
+    findObject  `orElse`
+    findArchive `orElse`
     assumeDll
 
   | otherwise
     -- use HSfoo.{o,p_o} if it exists, otherwise fallback to libHSfoo{,_p}.a
   = findObject  `orElse`
     findArchive `orElse`
+    findBytecodeLib `orElse`
     assumeDll
 
    where
      dflags = hsc_dflags hsc_env
+     prefer_bytecode = gopt Opt_UseBytecodeRatherThanObjects dflags
      logger = hsc_logger hsc_env
      diag_opts = initDiagOpts dflags
      dirs   = lib_dirs ++ gcc_dirs
@@ -1543,6 +1573,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
 
      hs_dyn_lib_name = lib ++ lib_tag ++ dynLibSuffix (ghcNameVersion dflags)
      hs_dyn_lib_file = platformHsSOName platform hs_dyn_lib_name
+     hs_bytecode_lib_file = lib <.> "bytecode"
 
 #if defined(CAN_LOAD_DLL)
      so_name     = platformSOName platform lib
@@ -1564,6 +1595,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
      findArchive   = let local name = liftM (fmap Archive) $ findFile dirs name
                      in  apply (map local arch_files)
      findHSDll     = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
+     findBytecodeLib = liftM (fmap BytecodeLibrary) $ findFile bc_dirs hs_bytecode_lib_file
 #if defined(CAN_LOAD_DLL)
      findDll    re = let dirs' = if re == user then lib_dirs else gcc_dirs
                      in liftM (fmap DLLPath) $ findFile dirs' dyn_lib_file

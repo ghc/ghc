@@ -572,6 +572,7 @@ loadArchive interp path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
   interpCmd interp (LoadArchive path')
 
+
 loadObj :: Interp -> String -> IO ()
 loadObj interp path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]

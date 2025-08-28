@@ -40,6 +40,7 @@ module GHC.Linker.Types
    , linkableFiles
    , linkableBCOs
    , linkablePartBCOs
+   , linkableModuleByteCodes
    , linkableNativeParts
    , linkablePartitionParts
    , linkablePartPath
@@ -158,7 +159,7 @@ data LoaderState = LoaderState
         -- ^ And the currently-loaded compiled modules (home package)
 
     , pkgs_loaded :: !PkgsLoaded
-        -- ^ The currently-loaded packages; always object code
+        -- ^ The currently-loaded packages;
         -- haskell libraries, system libraries, transitive dependencies
 
     , temp_sos :: ![(FilePath, String)]
@@ -362,6 +363,9 @@ linkableIsNativeCodeOnly l = all isNativeCode (NE.toList (linkableParts l))
 linkableBCOs :: Linkable -> [CompiledByteCode]
 linkableBCOs l = [ gbc_compiled_byte_code gbc | DotGBC gbc <- NE.toList (linkableParts l) ]
 
+linkableModuleByteCodes :: Linkable -> [ModuleByteCode]
+linkableModuleByteCodes l = [ mbc | DotGBC mbc <- NE.toList (linkableParts l) ]
+
 -- | List the native linkable parts (.o/.so/.dll) of a linkable
 linkableNativeParts :: Linkable -> [LinkablePart]
 linkableNativeParts l = NE.filter isNativeCode (linkableParts l)
@@ -505,9 +509,13 @@ data LibrarySpec
 
    | Framework String   -- Only used for darwin, but does no harm
 
+   | BytecodeLibrary FilePath
+      -- ^ A bytecode library file (.bytecode)
+
 instance Outputable LibrarySpec where
   ppr (Objects objs) = text "Objects" <+> ppr (map (text @SDoc) objs)
   ppr (Archive a) = text "Archive" <+> text a
   ppr (DLL s) = text "DLL" <+> text s
   ppr (DLLPath f) = text "DLLPath" <+> text f
   ppr (Framework s) = text "Framework" <+> text s
+  ppr (BytecodeLibrary f) = text "BytecodeLibrary" <+> text f

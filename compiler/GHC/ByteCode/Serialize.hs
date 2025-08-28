@@ -7,6 +7,11 @@
 -}
 module GHC.ByteCode.Serialize
   ( writeBinByteCode, readBinByteCode, ModuleByteCode(..)
+  , BytecodeLib(..)
+  , writeBytecodeLib
+  , readBytecodeLib
+  , mkBytecodeLib
+  , decodeOnDiskModuleByteCode
   )
 where
 
@@ -89,6 +94,48 @@ data OnDiskModuleByteCode = OnDiskModuleByteCode { odgbc_module :: Module
                                                  }
 
 
+-- A bytecode library is just a concatenation of bytecode objects
+data BytecodeLib = BytecodeLib {
+    bytecodeLibFiles :: [OnDiskModuleByteCode]
+}
+
+instance Binary BytecodeLib where
+  get bh = do
+    bytecodeLibFiles <- get bh
+    pure BytecodeLib {..}
+
+  put_ bh BytecodeLib {..} = do
+    put_ bh bytecodeLibFiles
+
+
+writeBytecodeLib :: BytecodeLib -> FilePath -> IO ()
+writeBytecodeLib lib path = do
+  createDirectoryIfMissing True (takeDirectory path)
+  bh' <- openBinMem (1024 * 1024)
+  bh <- addBinNameWriter bh'
+  putWithUserData QuietBinIFace NormalCompression bh lib
+  writeBinMem bh path
+
+readBytecodeLib :: HscEnv -> FilePath -> IO BytecodeLib
+readBytecodeLib hsc_env path = do
+  bh' <- readBinMem path
+  bh <- addBinNameReader hsc_env bh'
+  getWithUserData (hsc_NC hsc_env) bh
+
+-- | Given on-disk and in-memory bytecode objects, create a bytecode library
+-- TODO, create without materialising everything into memory
+mkBytecodeLib :: HscEnv
+              -> [FilePath]  -- ^ .gbc files
+              -> [ModuleByteCode]  -- ^ In-memory bytecode objects
+              -> IO BytecodeLib
+mkBytecodeLib hsc_env gbc_files in_mem_bcos = do
+  on_disk_bcos <- mapM (readOnDiskModuleByteCode hsc_env) gbc_files
+  in_mem_bcos  <- mapM encodeOnDiskModuleByteCode in_mem_bcos
+  pure BytecodeLib {
+    bytecodeLibFiles = on_disk_bcos ++ in_mem_bcos
+  }
+
+
 instance Binary OnDiskModuleByteCode where
   get bh = do
     odgbc_module <- get bh
@@ -145,10 +192,14 @@ encodeOnDiskModuleByteCode bco = do
 -- | Read a 'ModuleByteCode' from a file.
 readBinByteCode :: HscEnv -> FilePath -> IO ModuleByteCode
 readBinByteCode hsc_env f = do
+  odbco <- readOnDiskModuleByteCode hsc_env f
+  decodeOnDiskModuleByteCode hsc_env odbco
+
+readOnDiskModuleByteCode :: HscEnv -> FilePath -> IO OnDiskModuleByteCode
+readOnDiskModuleByteCode hsc_env f = do
   bh' <- readBinMem f
   bh <- addBinNameReader hsc_env bh'
-  odbco <- getWithUserData (hsc_NC hsc_env) bh
-  decodeOnDiskModuleByteCode hsc_env odbco
+  getWithUserData (hsc_NC hsc_env) bh
 
 -- | Write a 'ModuleByteCode' to a file.
 writeBinByteCode :: FilePath -> ModuleByteCode -> IO ()

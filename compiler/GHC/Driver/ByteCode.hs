@@ -7,6 +7,7 @@ import GHC.Driver.Session
 import GHC.Driver.CodeOutput
 import GHC.Driver.Env
 import GHC.Runtime.Interpreter
+
 import GHC.Tc.Utils.Monad
 
 import GHC.Unit
@@ -17,9 +18,11 @@ import {-# SOURCE #-} GHC.Driver.Pipeline
 
 import GHC.Platform.Ways
 
+import System.OsPath
 
 -- | Write foreign sources and foreign stubs to temporary files and compile them.
-outputAndCompileForeign :: HscEnv -> Module -> ModLocation -> [(ForeignSrcLang, FilePath)] ->  ForeignStubs -> IO [FilePath]
+outputAndCompileForeign :: HscEnv -> Module -> Maybe OsPath  -- ^ Source file location
+                        -> [(ForeignSrcLang, FilePath)] ->  ForeignStubs -> IO [FilePath]
 outputAndCompileForeign hsc_env mod_name location foreign_files foreign_stubs = do
   let dflags   = hsc_dflags hsc_env
       logger   = hsc_logger hsc_env
