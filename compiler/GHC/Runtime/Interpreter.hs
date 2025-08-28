@@ -41,7 +41,6 @@ module GHC.Runtime.Interpreter
   , loadDLLs
   , loadArchive
   , loadObj
-  , loadBytecodeLibrary
   , unloadObj
   , addLibrarySearchPath
   , removeLibrarySearchPath
@@ -78,6 +77,9 @@ import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
 import GHC.ByteCode.Breakpoints
+import GHC.ByteCode.Serialize
+import GHC.Driver.Env
+import GHC.Driver.ByteCode
 
 import GHC.ByteCode.Types
 import GHC.Linker.Types
@@ -117,6 +119,7 @@ import qualified GHC.InfoProv as InfoProv
 import GHC.Builtin.Names
 import GHC.Types.Name
 import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Utils.Misc
 
 -- Standard libraries
 import GHC.Exts
@@ -573,10 +576,6 @@ loadArchive interp path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
   interpCmd interp (LoadArchive path')
 
-loadBytecodeLibrary :: Interp -> String -> IO ()
-loadBytecodeLibrary interp path = do
-  path' <- canonicalizePath path -- Note [loadObj and relative paths]
-  putStrLn $ "I would load bytecode library but I'm not implemented yet" ++ path'
 
 loadObj :: Interp -> String -> IO ()
 loadObj interp path = do

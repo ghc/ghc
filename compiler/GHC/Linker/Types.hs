@@ -158,7 +158,7 @@ data LoaderState = LoaderState
         -- ^ And the currently-loaded compiled modules (home package)
 
     , pkgs_loaded :: !PkgsLoaded
-        -- ^ The currently-loaded packages; always object code
+        -- ^ The currently-loaded packages;
         -- haskell libraries, system libraries, transitive dependencies
 
     , temp_sos :: ![(FilePath, String)]

@@ -7,6 +7,11 @@ import GHC.Driver.Session
 import GHC.Driver.CodeOutput
 import GHC.Driver.Env
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Interpreter.Types
+    ( interpreterDynamic, interpreterProfiled )
+import GHC.ByteCode.Types
+
+import GHC.Linker.Types
 import GHC.Tc.Utils.Monad
 
 import GHC.Unit
@@ -17,9 +22,12 @@ import {-# SOURCE #-} GHC.Driver.Pipeline
 
 import GHC.Platform.Ways
 
+import GHC.ByteCode.Serialize
+import System.OsPath
 
 -- | Write foreign sources and foreign stubs to temporary files and compile them.
-outputAndCompileForeign :: HscEnv -> Module -> ModLocation -> [(ForeignSrcLang, FilePath)] ->  ForeignStubs -> IO [FilePath]
+outputAndCompileForeign :: HscEnv -> Module -> Maybe OsPath  -- ^ Source file location
+                        -> [(ForeignSrcLang, FilePath)] ->  ForeignStubs -> IO [FilePath]
 outputAndCompileForeign hsc_env mod_name location foreign_files foreign_stubs = do
   let dflags   = hsc_dflags hsc_env
       logger   = hsc_logger hsc_env
@@ -50,3 +58,15 @@ compile_for_interpreter hsc_env use =
       }
 
     adapt_way want = if want (hscInterp hsc_env) then addWay else removeWay
+<<<<<<< HEAD
+=======
+
+-- | Write the foreign sources and foreign stubs of a bytecode object to temporary files and compile them.
+loadByteCodeObject :: ByteCodeObject
+                   -> IO (CompiledByteCode, [FilePath])
+loadByteCodeObject (ByteCodeObject _mod cbc foreign_contents) = do
+  return (cbc, foreign_contents)
+
+loadByteCodeObjectLinkable :: UTCTime -> ByteCodeObject -> IO Linkable
+loadByteCodeObjectLinkable linkable_time bco = do
+>>>>>>> 7b4de00e644 (Load bytecode objects into the linker when they are loaded.)

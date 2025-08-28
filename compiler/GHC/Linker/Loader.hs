@@ -132,6 +132,7 @@ import qualified Data.IntMap.Strict as IM
 import qualified Data.Map.Strict as M
 import Foreign.Ptr (nullPtr)
 import GHC.ByteCode.Serialize
+import GHC.Data.Maybe (expectJust)
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1252,6 +1253,32 @@ loadPackages' interp hsc_env new_pks pls = do
 
 loadPackage :: Interp -> HscEnv -> [UnitInfo] -> IO [([LibrarySpec], [LibrarySpec], [RemotePtr LoadedDLL])]
 loadPackage interp hsc_env pkgs
+    pls' <- link pls new_pks
+    return $! pls'
+  where
+     link :: LoaderState -> [UnitId] -> IO LoaderState
+     link pkgs new_pkgs =
+         foldM link_one pkgs new_pkgs
+
+     link_one :: LoaderState -> UnitId -> IO LoaderState
+     link_one pkgs new_pkg
+        | new_pkg `elemUDFM` (pkgs_loaded pkgs)   -- Already linked
+        = return pkgs
+
+        | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
+        = do { let deps = unitDepends pkg_cfg
+               -- Link dependents first
+             ; pkgs' <- link pkgs deps
+                -- Now link the package itself
+             ; loadPackage interp hsc_env pkg_cfg pkgs'
+             }
+
+        | otherwise
+        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
+
+
+loadPackage :: Interp -> HscEnv -> UnitInfo -> LoaderState -> IO LoaderState
+loadPackage interp hsc_env pkg pls
    = do
         let dflags    = hsc_dflags hsc_env
         let logger    = hsc_logger hsc_env
@@ -1341,7 +1368,7 @@ loadPackage interp hsc_env pkgs
         -- step to resolve everything.
         mapM_ (loadObj interp) objs
         mapM_ (loadArchive interp) archs
-        mapM_ (loadBytecodeLibrary interp) bytecodes
+        pls' <- foldM (loadBytecodeLibrary hsc_env interp) pls bytecodes
 
         maybePutStr logger "linking ... "
         ok <- resolveObjs interp
@@ -1359,6 +1386,21 @@ loadPackage interp hsc_env pkgs
            else let errmsg = text "unable to load units `"
                              <> vcat (map pprUnitInfoForUser pkgs) <> text "'"
                  in throwGhcExceptionIO (InstallationError (showSDoc dflags errmsg))
+
+
+loadBytecodeLibrary :: HscEnv -> Interp -> LoaderState -> FilePath -> IO LoaderState
+loadBytecodeLibrary hsc_env interp pls path = do
+  path' <- canonicalizePath path -- Note [loadObj and relative paths]
+  -- TODO: see loadModuleLinkables in GHC/Linker/Loader.hs
+  -- 0. Get the modification time of the module
+  mod_time <- expectJust <$> modificationTimeIfExists path'
+  -- 1. Read the bytecode library
+  (BytecodeLib bcos) <- readBytecodeLib hsc_env path'
+  bcos' <- mapM (decodeOnDiskByteCodeObject hsc_env) bcos
+  linkables <- mapM (loadByteCodeObjectLinkable hsc_env mod_time Nothing) bcos'
+  (pls', _) <- loadModuleLinkables interp hsc_env  pls linkables
+  return pls'
+
 
 {-
 Note [Crash early load_dyn and locateLib]

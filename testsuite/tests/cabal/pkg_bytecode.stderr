@@ -1,6 +1,6 @@
-testpkg-1.2.3.4: cannot find any of ["Bytecode.hi","Bytecode.p_hi","Bytecode.dyn_hi","Bytecode.p_dyn_hi"] (ignoring)
 testpkg-1.2.3.4: cannot find any of ["libtestpkg-1.2.3.4-XXX.a","libtestpkg-1.2.3.4-XXX_p.a","libtestpkg-1.2.3.4-XXX-ghc9.15.20250811.so","libtestpkg-1.2.3.4-XXX_p-ghc9.15.20250811.so","libtestpkg-1.2.3.4-XXX-ghc9.15.20250811.dylib","libtestpkg-1.2.3.4-XXX_p-ghc9.15.20250811.dylib","testpkg-1.2.3.4-XXX-ghc9.15.20250811.dll","testpkg-1.2.3.4-XXX_p-ghc9.15.20250811.dll"] on library path (ignoring)
-hs_classifieds [BytecodeLibrary ./testpkg-1.2.3.4-XXX.bytecode]
+hs_classifieds
+  [BytecodeLibrary ./outdir/testpkg-1.2.3.4-XXX.bytecode]
 hs_classifieds
   [DLLPath /home/matt/ghc-bytecode/_new/stage1/lib/../lib/x86_64-linux-ghc-9.15.20250811/libHSghc-internal-9.1500.0-inplace-ghc9.15.20250811.so]
 hs_classifieds

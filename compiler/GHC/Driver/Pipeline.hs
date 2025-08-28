@@ -425,6 +425,13 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
                   return Succeeded
           else do
 
+        -- TODO: This is very awkward.
+
+        -- 1. Ban using --make mode to create -bytecodelib, since then you would not need in-memory linkables
+        -- 2. Make Linkable and ByteCodeObject more similar, so that you can translate between them.
+        --         * Either store .o files in ByteCodeObject <-- MP thinks this way
+        --         * or Store ForeignStubs/ForeignSrcs in Linkable
+        -- 3. Store ByteCodeObject in Linkable directly
         let hackyMPtodo l = [ ByteCodeObject (linkableModule l) cbc [] NoStubs | cbc <- linkableBCOs l ]
 
         let linkObjectLinkable action =

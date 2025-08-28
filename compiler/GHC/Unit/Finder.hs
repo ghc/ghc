@@ -808,16 +808,16 @@ mkBytecodePath fopts basename mod_basename = bytecode_basename <.> bytecodesuf
 mkStubPaths
   :: FinderOpts
   -> ModuleName
-  -> ModLocation
   -> Maybe OsPath
-mkStubPaths fopts mod location = do
+  -> Maybe OsPath
+mkStubPaths fopts mod hs_file_location = do
   stub_basename <- in_stub_dir <|> src_basename
   pure (stub_basename `mappend` os "_stub" <.> os "h")
   where
     in_stub_dir = (</> mod_basename) <$> (finder_stubDir fopts)
 
     mod_basename = unsafeEncodeUtf $ moduleNameSlashes mod
-    src_basename = OsPath.dropExtension <$> ml_hs_file_ospath location
+    src_basename = OsPath.dropExtension <$> hs_file_location
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here,

@@ -2160,7 +2160,7 @@ hscInteractive hsc_env cgguts location = do
     let tmpfs  = hsc_tmpfs hsc_env
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) (cgi_module cgguts) location (cgi_foreign cgguts)
+        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) (cgi_module cgguts) (ml_hs_file_ospath $ location) (cgi_foreign cgguts)
     return (istub_c_exists, comp_bc)
 
 
