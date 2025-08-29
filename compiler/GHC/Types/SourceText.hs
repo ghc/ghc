@@ -341,7 +341,7 @@ instance Outputable FractionalLit where
 data StringLiteral = StringLiteral
                        { sl_st :: SourceText, -- literal raw source.
                                               -- See Note [Literal source text]
-                         sl_fs :: FastString, -- literal string value
+                         sl_fs :: {-# UNPACK #-} !ShortByteString, -- literal string value encoded as a UTF8 short bytestring
                          sl_tc :: Maybe NoCommentsLocation
                                                     -- Location of
                                                     -- possible
@@ -355,4 +355,4 @@ instance Eq StringLiteral where
   (StringLiteral _ a _) == (StringLiteral _ b _) = a == b
 
 instance Outputable StringLiteral where
-  ppr sl = pprWithSourceText (sl_st sl) (doubleQuotes $ ftext $ sl_fs sl)
+  ppr sl = pprWithSourceText (sl_st sl) (doubleQuotes . pprShortByteString $ sl_fs sl)

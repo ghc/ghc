@@ -61,6 +61,8 @@ import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.TyCon
 
+import GHC.Data.FastString (fastStringToShortByteString)
+
 import GHC.Types.Avail
 import GHC.Types.Id
 import GHC.Types.Fixity
@@ -271,7 +273,7 @@ ghcPrimWarns = WarnSome
   []
   where
     mk_txt msg =
-      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText msg Nothing) []]
+      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText (fastStringToShortByteString msg) Nothing) []]
     mk_decl_dep (occ, msg) = (occ, mk_txt msg)
 
 ghcPrimFixities :: [(OccName,Fixity)]

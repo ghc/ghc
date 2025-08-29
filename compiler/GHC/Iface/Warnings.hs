@@ -6,6 +6,7 @@ where
 
 import GHC.Prelude
 
+import GHC.Data.FastString (mkFastStringShortByteString)
 import GHC.Hs
 
 import GHC.Iface.Syntax
@@ -30,5 +31,5 @@ toIfaceStringLiteralWithNames :: WithHsDocIdentifiers StringLiteral GhcRn -> (If
 toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
 
 toIfaceStringLiteral :: StringLiteral -> IfaceStringLiteral
-toIfaceStringLiteral (StringLiteral sl fs _) = IfStringLiteral sl fs
+toIfaceStringLiteral (StringLiteral sl fs _) = IfStringLiteral sl $ mkFastStringShortByteString fs
 

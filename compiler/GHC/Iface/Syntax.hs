@@ -667,7 +667,7 @@ fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDo
 fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLoc names)
 
 fromIfaceStringLiteral :: IfaceStringLiteral -> StringLiteral
-fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st fs Nothing
+fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st (fastStringToShortByteString fs) Nothing
 
 
 {-

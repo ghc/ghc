@@ -1169,7 +1169,7 @@ rep_sccFun nm Nothing loc = do
 
 rep_sccFun nm (Just (L _ str)) loc = do
   nm1 <- lookupLOcc nm
-  str1 <- coreStringLit (sl_fs str)
+  str1 <- coreStringLit . mkFastStringShortByteString $ sl_fs str
   scc <- repPragSCCFunNamed nm1 str1
   return [(loc, scc)]
 

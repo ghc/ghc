@@ -26,6 +26,7 @@ import Data.Word
 
 import Data.ByteString ( ByteString )
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 
 import qualified GHC.LanguageExtensions as LangExt
 }
@@ -134,10 +135,10 @@ advanceSrcLocBS !loc bs = case utf8UnconsByteString bs of
 lexStringLiteral :: P (LocatedN RdrName) -- ^ A precise identifier parser
                  -> Located StringLiteral
                  -> Located (WithHsDocIdentifiers StringLiteral GhcPs)
-lexStringLiteral identParser (L l sl@(StringLiteral _ fs _))
+lexStringLiteral identParser (L l sl@(StringLiteral _ sbs _))
   = L l (WithHsDocIdentifiers sl idents)
   where
-    bs = bytesFS fs
+    bs = SBS.fromShort sbs
 
     idents = mapMaybe (uncurry (validateIdentWith identParser)) plausibleIdents
 

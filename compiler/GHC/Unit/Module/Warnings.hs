@@ -267,12 +267,12 @@ pp_ws ws
 
 
 pprWarningTxtForMsg :: WarningTxt p -> SDoc
-pprWarningTxtForMsg (WarningTxt _ _ ws)
-                     = doubleQuotes (vcat (map (ftext . sl_fs . hsDocString . unLoc) ws))
-pprWarningTxtForMsg (DeprecatedTxt _ ds)
-                     = text "Deprecated:" <+>
-                       doubleQuotes (vcat (map (ftext . sl_fs . hsDocString . unLoc) ds))
-
+pprWarningTxtForMsg warn =
+  let pprWarn = doubleQuotes . vcat . map (pprShortByteString . sl_fs . hsDocString . unLoc)
+  in  case warn of
+        DeprecatedTxt _ ds -> text "Deprecated:" <+>
+                              pprWarn ds
+        WarningTxt  _ _ ws -> pprWarn ws
 
 -- | Warning information from a module
 data Warnings pass

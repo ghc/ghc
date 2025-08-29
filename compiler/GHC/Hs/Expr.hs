@@ -1300,7 +1300,7 @@ instance Outputable (HsPragE (GhcPass p)) where
     pprWithSourceText st (text "{-# SCC")
      -- no doublequotes if stl empty, for the case where the SCC was written
      -- without quotes.
-    <+> pprWithSourceText stl (ftext lbl) <+> text "#-}"
+    <+> pprWithSourceText stl (pprShortByteString lbl) <+> text "#-}"
 
 
 {- *********************************************************************
@@ -2468,7 +2468,7 @@ lamCaseKeyword LamCases  = text "\\cases"
 
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
 pprExternalSrcLoc (StringLiteral _ src _,(n1,n2),(n3,n4))
-  = ppr (src,(n1,n2),(n3,n4))
+  = ppr (pprShortByteString src,(n1,n2),(n3,n4))
 
 instance Outputable HsArrowMatchContext where
   ppr ProcExpr                  = text "ProcExpr"

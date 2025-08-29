@@ -158,6 +158,7 @@ import GHC.Data.OrdList
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
 import GHC.Data.Maybe
+import GHC.Utils.Encoding.UTF8
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Monad (unlessM)
@@ -3123,7 +3124,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
     -- If 'cid' is missing, the function name 'v' is used instead as symbol
     -- name (cf section 8.5.1 in Haskell 2010 report).
     mkCImport = do
-      let e = unpackFS entity
+      let e = utf8DecodeShortByteString entity
       case parseCImport (reLoc cconv) (reLoc safety) (mkExtName (unLoc v)) e (L loc esrc) of
         Nothing         -> addFatalError $ mkPlainErrorMsgEnvelope loc $
                              PsErrMalformedEntityString
@@ -3136,9 +3137,9 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
     -- the entity string. If it is missing, we use the function name instead.
     mkOtherImport = returnSpec importSpec
       where
-        entity'    = if nullFS entity
+        entity'    = if SBS.null entity
                         then mkExtName (unLoc v)
-                        else entity
+                        else mkFastStringShortByteString entity
         funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
         importSpec = CImport (L (l2l loc) esrc) (reLoc cconv) (reLoc safety) Nothing funcTarget
 
@@ -3222,8 +3223,8 @@ mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
    ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
                  , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv)) }
   where
-    entity' | nullFS entity = mkExtName (unLoc v)
-            | otherwise     = entity
+    entity' | SBS.null entity = mkExtName (unLoc v)
+            | otherwise       = mkFastStringShortByteString entity
 
 -- Supplying the ext_name in a foreign decl is optional; if it
 -- isn't there, the Haskell name is assumed. Note that no transformation

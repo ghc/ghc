@@ -449,7 +449,7 @@ rnImportDecl this_mod
 renameRawPkgQual :: UnitEnv -> ModuleName -> RawPkgQual -> PkgQual
 renameRawPkgQual unit_env mn = \case
   NoRawPkgQual -> NoPkgQual
-  RawPkgQual p -> renamePkgQual unit_env mn (Just (sl_fs p))
+  RawPkgQual p -> renamePkgQual unit_env mn (Just (mkFastStringShortByteString (sl_fs p)))
 
 -- | Rename raw package imports
 renamePkgQual :: UnitEnv -> ModuleName -> Maybe FastString -> PkgQual

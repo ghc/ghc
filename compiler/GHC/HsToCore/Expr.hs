@@ -70,6 +70,7 @@ import GHC.Types.Tickish
 import GHC.Unit.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
+import GHC.Data.FastString (mkFastStringShortByteString)
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 
@@ -405,7 +406,7 @@ dsExpr (HsPragE _ (HsPragSCC _ cc) expr)
          then do
             mod_name <- getModule
             count <- goptM Opt_ProfCountEntries
-            let nm = sl_fs cc
+            let nm = mkFastStringShortByteString $ sl_fs cc
             flavour <- mkExprCCFlavour <$> getCCIndexDsM nm
             Tick (ProfNote (mkUserCC nm mod_name (getLocA expr) flavour) count True)
                  <$> dsLExpr expr
