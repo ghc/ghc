@@ -4,16 +4,9 @@
 
   * Introduce `dataToCodeQ` and `liftDataTyped`, typed variants of `dataToExpQ` and `liftData` respectively.
 
-  * As part of the implementation of [GHC proposal 493](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0493-specialise-expressions.rst),
-    the ``SpecialiseP`` constructor of `Pragma`, as well as the helper functions
-    `pragSpecD` and `pragSpecInlD`, have been deprecated.
-
-    They are replaced, respectively, by `SpecialiseEP`, `pragSpecED` and
-    `pragSpecInlED`.
-  
   * Remove the `Language.Haskell.TH.Lib.Internal` module. This module has long been deprecated, and exposes compiler internals.
     Users should use `Language.Haskell.TH.Lib` instead, which exposes a more stable version of this API.
-    
+
   * Remove `addrToByteArrayName` and `addrToByteArray` from `Language.Haskell.TH.Syntax`. These were part of the implementation of the `Lift ByteArray` instance and were accidentally exported because this module lacked an explicit export list. They have no usages on Hackage.
 
 ## 2.23.0.0

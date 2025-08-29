@@ -443,16 +443,14 @@ varStrictType :: Quote m => Name -> m StrictType -> m VarStrictType
 varStrictType = varBangType
 
 --------------------------------------------------------------------------------
--- * Specialisation pragmas (deprecated)
+-- * Specialisation pragmas (backwards compatibility)
 
-{-# DEPRECATED pragSpecD "Please use 'pragSpecED' instead. 'pragSpecD' will be removed in GHC 9.18." #-}
 pragSpecD :: Quote m => Name -> m Type -> Phases -> m Dec
 pragSpecD n ty phases
   = do
       ty1    <- ty
       pure $ PragmaD $ SpecialiseP n ty1 Nothing phases
 
-{-# DEPRECATED pragSpecInlD "Please use 'pragSpecInlED' instead. 'pragSpecInlD' will be removed in GHC 9.18." #-}
 pragSpecInlD :: Quote m => Name -> m Type -> Inline -> Phases -> m Dec
 pragSpecInlD n ty inline phases
   = do

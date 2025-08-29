@@ -1,4 +1,5 @@
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
@@ -156,7 +157,7 @@ module Language.Haskell.TH.Syntax (
     PatSynType,
     Phases (..),
     PkgName (..),
-    Pragma (..),
+    Pragma (SpecialiseP, ..),
     Quasi (..),
     Range (..),
     Role (..),
@@ -387,3 +388,12 @@ dataToPatQ = dataToQa id litP conP
                     return (ConP n [] ps')
                 _ -> error $ "Can't construct a pattern from name "
                           ++ showName n
+
+--------------------------------------------------------------------------------
+-- Back-compat for Specialise pragmas
+
+-- | Old-form specialise pragma @{ {\-\# SPECIALISE [INLINE] [phases] (var :: ty) #-} }@.
+--
+-- Subsumed by the more general 'SpecialiseEP' constructor.
+pattern SpecialiseP :: Name -> Type -> (Maybe Inline) -> Phases -> Pragma
+pattern SpecialiseP nm ty inl phases = SpecialiseEP Nothing [] (SigE (VarE nm) ty) inl phases
