@@ -93,9 +93,10 @@ module GHC.Core.Coercion (
         liftCoSubst, liftCoSubstTyVar, liftCoSubstWith, liftCoSubstWithEx,
         emptyLiftingContext, extendLiftingContext, extendLiftingContextAndInScope,
         liftCoSubstVarBndrUsing, isMappedByLC, extendLiftingContextCvSubst,
+        updateLCSubst,
 
         mkSubstLiftingContext, liftingContextSubst, zapLiftingContext,
-        substForAllCoBndrUsingLC, lcLookupCoVar, lcInScopeSet,
+        lcLookupCoVar, lcInScopeSet,
 
         LiftCoEnv, LiftingContext(..), liftEnvSubstLeft, liftEnvSubstRight,
         substRightCo, substLeftCo, swapLiftCoEnv, lcSubstLeft, lcSubstRight,
@@ -2136,15 +2137,11 @@ extendLiftingContextEx lc@(LC subst env) ((v,ty):rest)
 zapLiftingContext :: LiftingContext -> LiftingContext
 zapLiftingContext (LC subst _) = LC (zapSubst subst) emptyVarEnv
 
--- | Like 'substForAllCoBndr', but works on a lifting context
-substForAllCoBndrUsingLC :: SwapFlag
-                         -> (Coercion -> Coercion)
-                         -> LiftingContext -> TyCoVar -> Coercion
-                         -> (LiftingContext, TyCoVar, Coercion)
-substForAllCoBndrUsingLC sym sco (LC subst lc_env) tv co
-  = (LC subst' lc_env, tv', co')
+updateLCSubst :: LiftingContext -> (Subst -> (Subst, a)) -> (LiftingContext, a)
+-- Lift a Subst-update function over LiftingContext
+updateLCSubst (LC subst lc_env) upd = (LC subst' lc_env, res)
   where
-    (subst', tv', co') = substForAllCoBndrUsing sym sco subst tv co
+    (subst', res) = upd subst
 
 -- | The \"lifting\" operation which substitutes coercions for type
 --   variables in a type to produce a coercion.

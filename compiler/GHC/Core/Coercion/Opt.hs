@@ -358,12 +358,12 @@ opt_co4' env sym rep r (AppCo co1 co2)
             (opt_co4 env sym False Nominal co2)
 
 opt_co4' env sym rep r (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
-                                , fco_kind = k_co, fco_body = co })
-  = case optForAllCoBndr env sym tv k_co of
-      (env', tv', k_co') -> mkForAllCo tv' visL' visR' k_co' $
-                            opt_co4 env' sym rep r co
+                                 , fco_kind = k_co, fco_body = co })
+  = mkForAllCo tv' visL' visR' k_co' $
+    opt_co4 env' sym rep r co
      -- Use the "mk" functions to check for nested Refls
   where
+    !(env', tv', k_co') = optForAllCoBndr env sym tv k_co
     !(visL', visR') = swapSym sym (visL, visR)
 
 opt_co4' env sym rep r (FunCo _r afl afr cow co1 co2)
@@ -1401,10 +1401,68 @@ and these two imply
 
 -}
 
+{- Note [Optimising ForAllCo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If sym=NotSwapped, optimising ForAllCo is relatively easy:
+   opt env (ForAllCo tcv kco bodyco)
+     = ForAllCo tcv' (opt env kco) (opt env' bodyco)
+     where
+       (env', tcv') = substBndr env tcv
+
+Just apply the substitution to the kind of the binder, deal with
+shadowing etc, and recurse.  Remember in (ForAllCo tcv kco bodyco)
+    varKind tcv = coercionLKind kco
+
+But if sym=Swapped, things are trickier.  Here is an identity that helps:
+   Sym (ForAllCo (tv:k1) (kco:k1~k2) bodyco)
+   = ForAllCo (tv:k2) (Sym kco : k2~k1)
+              (Sym (bodyco[tv:->tv:k2 |> Sym kco]))
+
+* We re-type tv:k1 to become tv:k2.
+* We push Sym into kco
+* We push Sym into bodyco
+* BUT we must /also/ remember to replace all occurrences of
+      of tv:k1 in bodyco by (tv:k2 |> Sym kco)
+  This mirrors what happens in the typing rule for ForAllCo
+  See Note [ForAllCo] in GHC.Core.TyCo.Rep
+
+-}
 optForAllCoBndr :: LiftingContext -> SwapFlag
-                -> TyCoVar -> Coercion -> (LiftingContext, TyCoVar, Coercion)
-optForAllCoBndr env sym
-  = substForAllCoBndrUsingLC sym (opt_co4 env sym False Nominal) env
+                -> TyCoVar -> Coercion
+                -> (LiftingContext, TyCoVar, Coercion)
+-- See Note [Optimising ForAllCo]
+optForAllCoBndr env sym tcv kco
+  = (env', tcv', kco')
+  where
+    kco' = opt_co4 env sym False Nominal kco  -- Push sym into kco
+    (env', tcv') = updateLCSubst env upd_subst
+
+    upd_subst :: Subst -> (Subst, TyCoVar)
+    upd_subst subst
+      | isTyVar tcv = upd_subst_tv subst
+      | otherwise   = upd_subst_cv subst
+
+    upd_subst_tv subst
+      | notSwapped sym || isReflCo kco' = (subst1, tv1)
+      | otherwise                       = (subst2, tv2)
+      where
+        -- subst1,tv1: apply the substitution to the binder and its kind
+        -- NB: varKind tv = coercionLKind kco
+        (subst1, tv1) = substTyVarBndr subst tcv
+        -- In the Swapped case, we re-kind the type variable, AND
+        -- override the substitution for the original variable to the
+        -- re-kinded one, suitably casted
+        tv2    = tv1 `setTyVarKind` coercionLKind kco'
+        subst2 = (extendTvSubst subst1 tcv (mkTyVarTy tv2 `CastTy` kco'))
+                 `extendSubstInScope` tv2
+
+    upd_subst_cv subst   -- ToDo: probably not right yet
+      | notSwapped sym || isReflCo kco' = (subst1, cv1)
+      | otherwise                       = (subst2, cv2)
+      where
+        (subst1, cv1) = substCoVarBndr subst tcv
+        cv2    = cv1 `setTyVarKind` coercionLKind kco'
+        subst2 = subst1 `extendSubstInScope` cv2
 
 
 {- **********************************************************************
