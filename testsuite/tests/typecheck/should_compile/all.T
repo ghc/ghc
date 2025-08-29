@@ -945,3 +945,5 @@ test('T26256a', normal, compile, [''])
 test('T25992a', normal, compile, [''])
 test('T26346', normal, compile, [''])
 test('T26358', expect_broken(26358), compile, [''])
+test('T26345', normal, compile, [''])
+
