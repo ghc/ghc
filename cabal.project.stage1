@@ -16,13 +16,13 @@ packages:
   libraries/filepath
   libraries/ghc-platform
   libraries/ghc-boot
-  libraries/ghc-boot-th
+  libraries/ghc-boot-th-next
   libraries/ghc-heap
   libraries/ghci
   libraries/os-string
   libraries/process
   libraries/semaphore-compat
-  libraries/time
+--  libraries/time
   libraries/unix
   libraries/Win32
   libraries/Cabal/Cabal-syntax
@@ -47,13 +47,21 @@ package *
   executable-dynamic: False
   executable-static: False
 
-package ghc-boot-th
+package ghc
   flags: +bootstrap
 
+package ghci
+  flags: +bootstrap
+
+package ghc-boot
+  flags: +bootstrap
+
+package ghc-boot-th-next
+  flags: +bootstrap
+
+-- TODO: What is this? Why do we need _in-ghc-tree_ here?
 package hsc2hs
   flags: +in-ghc-tree
-
-allow-newer: ghc-boot-th
 
 constraints:
   template-haskell <= 2.22

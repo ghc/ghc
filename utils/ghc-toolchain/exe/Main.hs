@@ -111,8 +111,6 @@ emptyOpts = Opts
     , optOpt       = po0
     , optLlvmAs    = po0
     , optWindres   = po0
-    , optOtool     = po0
-    , optInstallNameTool = po0
     , optLd        = po0
     , optOtool     = po0
     , optInstallNameTool = po0
@@ -147,9 +145,9 @@ _optLlc     = Lens optLlc     (\x o -> o {optLlc=x})
 _optOpt     = Lens optOpt     (\x o -> o {optOpt=x})
 _optLlvmAs  = Lens optLlvmAs  (\x o -> o {optLlvmAs=x})
 _optWindres = Lens optWindres (\x o -> o {optWindres=x})
-_optOtool = Lens optOtool (\x o -> o {optOtool =x})
+_optLd      = Lens optLd (\x o -> o {optLd=x})
+_optOtool   = Lens optOtool (\x o -> o {optOtool=x})
 _optInstallNameTool = Lens optInstallNameTool (\x o -> o {optInstallNameTool=x})
-_optLd = Lens optLd (\x o -> o {optLd= x})
 
 _optTriple :: Lens Opts (Maybe String)
 _optTriple = Lens optTriple (\x o -> o {optTriple=x})
@@ -488,12 +486,14 @@ mkTarget opts = do
             return (Just windres)
           _ -> return Nothing
 
-    otool <-
+    -- Darwin-specific utilities
+    (otool, installNameTool) <-
         case archOS_OS archOs of
           OSDarwin -> do
             otool <- findProgram "otool" (optOtool opts) ["otool"]
-            return (Just otool)
-          _ -> return Nothing
+            installNameTool <- findProgram "install_name_tool" (optInstallNameTool opts) ["install_name_tool"]
+            return (Just otool, Just installNameTool)
+          _ -> return (Nothing, Nothing)
 
     install_name_tool <-
         case archOS_OS archOs of
@@ -543,7 +543,7 @@ mkTarget opts = do
                    , tgtLlvmAs = Just llvmAs
                    , tgtWindres = windres
                    , tgtOtool = otool
-                   , tgtInstallNameTool = install_name_tool
+                   , tgtInstallNameTool = installNameTool
                    , tgtWordSize
                    , tgtEndianness
                    , tgtUnregisterised

@@ -3,7 +3,7 @@
 -- ghc-iserv.cabal.
 
 Name: ghc-iserv
-Version: 9.13
+Version: 9.14
 Copyright: XXX
 License: BSD3
 -- XXX License-File: LICENSE
@@ -34,9 +34,9 @@ Executable ghc-iserv
                    base       >= 4   && < 5,
                    binary     >= 0.7 && < 0.11,
                    bytestring >= 0.10 && < 0.13,
-                   containers >= 0.5 && < 0.8,
+                   containers >= 0.5 && < 0.9,
                    deepseq    >= 1.4 && < 1.6,
-                   ghci       == 9.13
+                   ghci       == 9.14
 
     if os(windows)
         Cpp-Options: -DWINDOWS

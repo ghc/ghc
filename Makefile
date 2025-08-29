@@ -883,7 +883,7 @@ _build/packages/hackage.haskell.org/01-index.tar.gz: | $(CABAL)
 	$(CABAL) $(CABAL_ARGS) update --index-state 2025-04-22T01:25:40Z
 
 # booted depends on successful source preparation
-_build/booted:
+_build/booted: libraries/ghc-boot-th-next/.synth-stamp
 	@echo "::group::Running ./boot script..."
 	@mkdir -p _build/logs
 	./boot |& tee _build/logs/boot.log
@@ -896,6 +896,9 @@ _build/booted:
 clean:
 	@echo "::group::Cleaning build artifacts..."
 	rm -rf _build
+	rm -f libraries/ghc-boot-th-next/ghc-boot-th-next.cabal
+	rm -f libraries/ghc-boot-th-next/ghc-boot-th-next.cabal.in
+	rm -f libraries/ghc-boot-th-next/.synth-stamp
 	@echo "::endgroup::"
 
 clean-stage1:
@@ -921,7 +924,29 @@ distclean: clean
 	rm -rf build-aux/config.guess build-aux/config.sub build-aux/install-sh build-aux/missing build-aux/compile depcomp
 	find . -name 'Makefile.in' -delete
 	rm -f $(CONFIGURED_FILES)
+	rm -rf libraries/ghc-boot-th-next/ghc-boot-th-next.cabal
+	rm -f libraries/ghc-boot-th-next/ghc-boot-th-next.cabal.in
+	rm -f libraries/ghc-boot-th-next/.synth-stamp
 	@echo "::endgroup::"
+
+# --- Synthesis Targets ---
+# This is such a hack 😱
+.PHONY: synth-ghc-boot-th-next
+synth-ghc-boot-th-next:
+	@echo "::group::Synthesizing ghc-boot-th-next (copy & sed from ghc-boot-th)..."
+	@mkdir -p libraries/ghc-boot-th-next
+	@src=libraries/ghc-boot-th/ghc-boot-th.cabal.in; \
+	 dst=libraries/ghc-boot-th-next/ghc-boot-th-next.cabal.in; \
+	 if [ ! -f $$src ]; then echo "Source $$src not found" >&2; exit 1; fi; \
+	 cp -f $$src $$dst.tmp; \
+	 sed -e 's/^name:[[:space:]]*ghc-boot-th$$/name:           ghc-boot-th-next/' \
+	     -e 's/ ghc-boot-th/ ghc-boot-th-next/g' \
+	     $$dst.tmp > $$dst; \
+	 rm -f $$dst.tmp; \
+	 touch libraries/ghc-boot-th-next/.synth-stamp
+	@echo "::endgroup::"
+
+libraries/ghc-boot-th-next/.synth-stamp: synth-ghc-boot-th-next
 
 
 # --- Test Target ---

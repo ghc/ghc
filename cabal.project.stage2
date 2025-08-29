@@ -89,7 +89,7 @@ package *
 -- Maybe we should fix this with some import
 if os(linux)
   package rts
-    ghc-options: "-optc-DProjectVersion=\"913\""
+    ghc-options: "-optc-DProjectVersion=\"914\""
     ghc-options: "-optc-DRtsWay=\"v\""
     ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
     ghc-options: "-optc-DHostArch=\"x86_64\""
@@ -106,7 +106,7 @@ if os(linux)
 
 if os(darwin)
   package rts
-    ghc-options: "-optc-DProjectVersion=\"913\""
+    ghc-options: "-optc-DProjectVersion=\"914\""
     ghc-options: "-optc-DRtsWay=\"v\""
     ghc-options: "-optc-DHostPlatform=\"aarch64-apple-darwin\""
     ghc-options: "-optc-DHostArch=\"aarch64\""

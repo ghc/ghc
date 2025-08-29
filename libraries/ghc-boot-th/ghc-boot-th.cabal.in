@@ -56,7 +56,7 @@ Library
         cpp-options: -DBOOTSTRAP_TH
         build-depends:
             ghc-prim
-        hs-source-dirs: @SourceRoot@ ../ghc-internal/src
+        hs-source-dirs: ../ghc-boot-th ../ghc-internal/src
         exposed-modules:
             GHC.Boot.TH.Lib
             GHC.Boot.TH.Syntax
