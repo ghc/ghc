@@ -696,7 +696,7 @@ gen_wired_in_deprecations (Info _ entries)
 
 gen_foundation_tests :: Info -> String
 gen_foundation_tests (Info _ entries)
-  = "tests =\n  [ "
+  = "testPrimops = Group \"primop\"\n  [ "
     ++ intercalate "\n  , " (catMaybes $ map mkTest entries)
     ++ "\n  ]\n"
     ++ "\n" ++ intercalate "\n" (map mkInstances testable_tys)
