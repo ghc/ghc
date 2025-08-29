@@ -559,11 +559,7 @@ expandTypeSynonyms ty
     go_co _ (HoleCo h)
       = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
 
-      -- the "False" and "const" are to accommodate the type of
-      -- substForAllCoBndrUsing, which is general enough to
-      -- handle coercion optimization (which sometimes swaps the
-      -- order of a coercion)
-    go_cobndr subst = substForAllCoBndrUsing NotSwapped (go_co subst) subst
+    go_cobndr subst = substForAllCoBndrUsing (go_co subst) subst
 
 {- Notes on type synonyms
 ~~~~~~~~~~~~~~~~~~~~~~~~~
