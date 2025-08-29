@@ -705,7 +705,7 @@ gen_foundation_tests (Info _ entries)
 
     mkInstances inst_ty =
       let test_lambda = "\\ " ++ intercalate " " (zipWith mkArg [0::Int ..] (arg_tys)) ++ " -> " ++ mk_body "l" ++ " === " ++ mk_body "r"
-          shift_lambda = "\\ " ++ mkArg (0::Int) (head arg_tys) ++ " (BoundedShiftAmount shift :: BoundedShiftAmount " ++ shiftBoundType (head arg_tys) ++ ") -> " ++ mk_shift_body "l" ++ " === " ++ mk_shift_body "r"
+          shift_lambda = "\\ " ++ mkArg (0::Int) (head arg_tys) ++ " (BoundedShiftAmount @" ++ shiftBoundType (head arg_tys) ++ " shift) -> " ++ mk_shift_body "l" ++ " === " ++ mk_shift_body "r"
       in  unlines $
       [ "instance TestPrimop (" ++ pprTy inst_ty ++ ") where"
       , "  testPrimop s l r = Property s $ " ++ test_lambda ]
