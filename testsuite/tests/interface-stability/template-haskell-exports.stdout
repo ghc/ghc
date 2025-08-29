@@ -347,7 +347,7 @@ module Language.Haskell.TH where
     ppr_list :: [a] -> GHC.Boot.TH.PprLib.Doc
     {-# MINIMAL ppr #-}
   type Pragma :: *
-  data Pragma = InlineP Name Inline RuleMatch Phases | OpaqueP Name | SpecialiseP Name Type (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseEP (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseInstP Type | RuleP GHC.Internal.Base.String (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases | AnnP AnnTarget Exp | LineP GHC.Internal.Types.Int GHC.Internal.Base.String | CompleteP [Name] (GHC.Internal.Maybe.Maybe Name) | SCCP Name (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
+  data Pragma = InlineP Name Inline RuleMatch Phases | OpaqueP Name | SpecialiseEP (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseInstP Type | RuleP GHC.Internal.Base.String (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases | AnnP AnnTarget Exp | LineP GHC.Internal.Types.Int GHC.Internal.Base.String | CompleteP [Name] (GHC.Internal.Maybe.Maybe Name) | SCCP Name (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
   type Pred :: *
   type Pred = Type
   type PredQ :: *
@@ -381,6 +381,7 @@ module Language.Haskell.TH where
   data SourceUnpackedness = NoSourceUnpackedness | SourceNoUnpack | SourceUnpack
   type SourceUnpackednessQ :: *
   type SourceUnpackednessQ = Q SourceUnpackedness
+  pattern SpecialiseP :: Name -> Type -> GHC.Internal.Maybe.Maybe Inline -> Phases -> Pragma
   type Specificity :: *
   data Specificity = SpecifiedSpec | InferredSpec
   type Stmt :: *
@@ -1693,7 +1694,7 @@ module Language.Haskell.TH.Syntax where
   type PkgName :: *
   newtype PkgName = PkgName GHC.Internal.Base.String
   type Pragma :: *
-  data Pragma = InlineP Name Inline RuleMatch Phases | OpaqueP Name | SpecialiseP Name Type (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseEP (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseInstP Type | RuleP GHC.Internal.Base.String (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases | AnnP AnnTarget Exp | LineP GHC.Internal.Types.Int GHC.Internal.Base.String | CompleteP [Name] (GHC.Internal.Maybe.Maybe Name) | SCCP Name (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
+  data Pragma = InlineP Name Inline RuleMatch Phases | OpaqueP Name | SpecialiseEP (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseInstP Type | RuleP GHC.Internal.Base.String (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases | AnnP AnnTarget Exp | LineP GHC.Internal.Types.Int GHC.Internal.Base.String | CompleteP [Name] (GHC.Internal.Maybe.Maybe Name) | SCCP Name (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
   type Pred :: *
   type Pred = Type
   type role Q nominal
@@ -1748,6 +1749,7 @@ module Language.Haskell.TH.Syntax where
   data SourceStrictness = NoSourceStrictness | SourceLazy | SourceStrict
   type SourceUnpackedness :: *
   data SourceUnpackedness = NoSourceUnpackedness | SourceNoUnpack | SourceUnpack
+  pattern SpecialiseP :: Name -> Type -> GHC.Internal.Maybe.Maybe Inline -> Phases -> Pragma
   type Specificity :: *
   data Specificity = SpecifiedSpec | InferredSpec
   type Stmt :: *

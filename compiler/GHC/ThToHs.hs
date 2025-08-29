@@ -915,12 +915,6 @@ cvtPragmaD (OpaqueP nm)
                     srcTxt = SourceText $ fsLit "{-# OPAQUE"
        ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
 
-cvtPragmaD (SpecialiseP nm ty inline phases)
-  = do { nm' <- vNameN nm
-       ; ty' <- cvtSigType ty
-       ; let ip = cvtInlinePhases inline phases
-       ; returnJustLA $ Hs.SigD noExtField $ SpecSig noAnn nm' [ty'] ip }
-
 cvtPragmaD (SpecialiseInstP ty)
   = do { ty' <- cvtSigType ty
        ; returnJustLA $ Hs.SigD noExtField $

@@ -646,13 +646,6 @@ instance Ppr Pragma where
      <+> text "#-}"
     ppr (OpaqueP n)
        = text "{-# OPAQUE" <+> pprName' Applied n <+> text "#-}"
-    ppr (SpecialiseP n ty inline phases)
-       =   text "{-# SPECIALISE"
-       <+> maybe empty ppr inline
-       <+> ppr phases
-       <+> sep [ pprName' Applied n <+> dcolon
-               , nest 2 $ ppr ty ]
-       <+> text "#-}"
     ppr (SpecialiseEP ty_bndrs tm_bndrs spec_e inline phases)
        = sep [ text "{-# SPECIALISE"
                  <+> maybe empty ppr inline
