@@ -145,17 +145,17 @@ instance Arbitrary (BoundedShiftAmount Int8) where
 instance Arbitrary (BoundedShiftAmount Int16) where
   arbitrary = do
     x <- arbitrary
-    return $ BoundedShiftAmount (abs x `mod` 8)
+    return $ BoundedShiftAmount (abs x `mod` 16)
 
 instance Arbitrary (BoundedShiftAmount Int32) where
   arbitrary = do
     x <- arbitrary
-    return $ BoundedShiftAmount (abs x `mod` 8)
+    return $ BoundedShiftAmount (abs x `mod` 32)
 
 instance Arbitrary (BoundedShiftAmount Int64) where
   arbitrary = do
     x <- arbitrary
-    return $ BoundedShiftAmount (abs x `mod` 8)
+    return $ BoundedShiftAmount (abs x `mod` 64)
 
 instance Arbitrary (BoundedShiftAmount Int) where
   arbitrary = do
