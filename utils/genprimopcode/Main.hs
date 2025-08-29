@@ -705,7 +705,7 @@ gen_foundation_tests (Info _ entries)
 
     mkInstances inst_ty =
       let test_lambda = "\\ " ++ intercalate " " (zipWith mkArg [0::Int ..] (arg_tys)) ++ " -> " ++ mk_body "l" ++ " === " ++ mk_body "r"
-          shift_lambda = "\\ " ++ mkArg (0::Int) (head arg_tys) ++ " (BoundedShiftAmount @" ++ shiftBoundType (head arg_tys) ++ " shift) -> " ++ mk_shift_body "l" ++ " === " ++ mk_shift_body "r"
+          shift_lambda = "\\ " ++ mkArg (0::Int) (head arg_tys) ++ " (BoundedShiftAmount @" ++ dropMagicHash (head arg_tys) ++ " shift) -> " ++ mk_shift_body "l" ++ " === " ++ mk_shift_body "r"
       in  unlines $
       [ "instance TestPrimop (" ++ pprTy inst_ty ++ ") where"
       , "  testPrimop s l r = Property s $ " ++ test_lambda ]
@@ -800,18 +800,8 @@ gen_foundation_tests (Info _ entries)
     shiftableTyCons = ["Int#", "Word#", "Word8#", "Word16#", "Word32#", "Word64#"
                       ,"Int8#", "Int16#", "Int32#", "Int64#"]
 
-    shiftBoundType :: String -> String
-    shiftBoundType "Int8#"   = "Int8"
-    shiftBoundType "Int16#"  = "Int16"
-    shiftBoundType "Int32#"  = "Int32"
-    shiftBoundType "Int64#"  = "Int64"
-    shiftBoundType "Word8#"  = "Int8"   -- Word8 uses Int8 bound
-    shiftBoundType "Word16#" = "Int16"  -- Word16 uses Int16 bound
-    shiftBoundType "Word32#" = "Int32"  -- Word32 uses Int32 bound
-    shiftBoundType "Word64#" = "Int64"  -- Word64 uses Int64 bound
-    shiftBoundType "Int#"    = "Int"
-    shiftBoundType "Word#"   = "Int"    -- Word uses Int bound
-    shiftBoundType t         = error $ "shiftBoundType: unknown type " ++ t
+    dropMagicHash :: String -> String
+    dropMagicHash = takeWhile (not . (== '#'))
 
     getResultType :: Ty -> String
     getResultType (TyF _ t2) = getResultType t2

@@ -853,7 +853,7 @@ instance TestPrimop (Int8# -> Word8#) where
 
 instance TestPrimop (Word# -> Int# -> Word#) where
   testPrimop s l r = Property s $ \ (uWord#-> x0) (uInt#-> x1) -> wWord# (l x0 x1) === wWord# (r x0 x1)
-  testPrimopShift s l r = Property s $ \ (uWord#-> x0) (BoundedShiftAmount @Int shift) -> wWord# (l x0 (uInt# shift)) === wWord# (r x0 (uInt# shift))
+  testPrimopShift s l r = Property s $ \ (uWord#-> x0) (BoundedShiftAmount @Word shift) -> wWord# (l x0 (uInt# shift)) === wWord# (r x0 (uInt# shift))
 
 instance TestPrimop (Word# -> Word# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord#-> x0) (uWord#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -891,7 +891,7 @@ instance TestPrimop (Word# -> Word8#) where
 
 instance TestPrimop (Word16# -> Int# -> Word16#) where
   testPrimop s l r = Property s $ \ (uWord16#-> x0) (uInt#-> x1) -> wWord16# (l x0 x1) === wWord16# (r x0 x1)
-  testPrimopShift s l r = Property s $ \ (uWord16#-> x0) (BoundedShiftAmount @Int16 shift) -> wWord16# (l x0 (uInt# shift)) === wWord16# (r x0 (uInt# shift))
+  testPrimopShift s l r = Property s $ \ (uWord16#-> x0) (BoundedShiftAmount @Word16 shift) -> wWord16# (l x0 (uInt# shift)) === wWord16# (r x0 (uInt# shift))
 
 instance TestPrimop (Word16# -> Word16# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord16#-> x0) (uWord16#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -916,7 +916,7 @@ instance TestPrimop (Word16# -> Word16#) where
 
 instance TestPrimop (Word32# -> Int# -> Word32#) where
   testPrimop s l r = Property s $ \ (uWord32#-> x0) (uInt#-> x1) -> wWord32# (l x0 x1) === wWord32# (r x0 x1)
-  testPrimopShift s l r = Property s $ \ (uWord32#-> x0) (BoundedShiftAmount @Int32 shift) -> wWord32# (l x0 (uInt# shift)) === wWord32# (r x0 (uInt# shift))
+  testPrimopShift s l r = Property s $ \ (uWord32#-> x0) (BoundedShiftAmount @Word32 shift) -> wWord32# (l x0 (uInt# shift)) === wWord32# (r x0 (uInt# shift))
 
 instance TestPrimop (Word32# -> Word32# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord32#-> x0) (uWord32#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -941,7 +941,7 @@ instance TestPrimop (Word32# -> Word32#) where
 
 instance TestPrimop (Word64# -> Int# -> Word64#) where
   testPrimop s l r = Property s $ \ (uWord64#-> x0) (uInt#-> x1) -> wWord64# (l x0 x1) === wWord64# (r x0 x1)
-  testPrimopShift s l r = Property s $ \ (uWord64#-> x0) (BoundedShiftAmount @Int64 shift) -> wWord64# (l x0 (uInt# shift)) === wWord64# (r x0 (uInt# shift))
+  testPrimopShift s l r = Property s $ \ (uWord64#-> x0) (BoundedShiftAmount @Word64 shift) -> wWord64# (l x0 (uInt# shift)) === wWord64# (r x0 (uInt# shift))
 
 instance TestPrimop (Word64# -> Word64# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord64#-> x0) (uWord64#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
@@ -962,7 +962,7 @@ instance TestPrimop (Word64# -> Word64#) where
 
 instance TestPrimop (Word8# -> Int# -> Word8#) where
   testPrimop s l r = Property s $ \ (uWord8#-> x0) (uInt#-> x1) -> wWord8# (l x0 x1) === wWord8# (r x0 x1)
-  testPrimopShift s l r = Property s $ \ (uWord8#-> x0) (BoundedShiftAmount @Int8 shift) -> wWord8# (l x0 (uInt# shift)) === wWord8# (r x0 (uInt# shift))
+  testPrimopShift s l r = Property s $ \ (uWord8#-> x0) (BoundedShiftAmount @Word8 shift) -> wWord8# (l x0 (uInt# shift)) === wWord8# (r x0 (uInt# shift))
 
 instance TestPrimop (Word8# -> Word8# -> Int#) where
   testPrimop s l r = Property s $ \ (uWord8#-> x0) (uWord8#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
