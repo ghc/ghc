@@ -13,6 +13,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE MagicHash #-}
@@ -24,7 +25,7 @@ module Main
     ( main
     ) where
 
-import Data.Bits (Bits((.&.), bit), finiteBitSize)
+import Data.Bits (Bits((.&.), bit), FiniteBits, finiteBitSize)
 import Data.Word
 import Data.Int
 import GHC.Natural
@@ -133,34 +134,15 @@ newtype NonZero a = NonZero { getNonZero :: a }
 instance (Arbitrary a, Num a, Eq a) => Arbitrary (NonZero a) where
   arbitrary = nonZero
 
--- | A newtype for shift amounts that are bounded by @word_size - 1@
+-- | A newtype for shift amounts that are bounded by @wordSize - 1@
 newtype BoundedShiftAmount a = BoundedShiftAmount {getBoundedShiftAmount :: Int}
   deriving (Eq, Ord, Show)
 
-instance Arbitrary (BoundedShiftAmount Int8) where
+instance (FiniteBits a) => Arbitrary (BoundedShiftAmount a) where
   arbitrary = do
     x <- arbitrary
-    return $ BoundedShiftAmount (abs x `mod` 8)
-
-instance Arbitrary (BoundedShiftAmount Int16) where
-  arbitrary = do
-    x <- arbitrary
-    return $ BoundedShiftAmount (abs x `mod` 16)
-
-instance Arbitrary (BoundedShiftAmount Int32) where
-  arbitrary = do
-    x <- arbitrary
-    return $ BoundedShiftAmount (abs x `mod` 32)
-
-instance Arbitrary (BoundedShiftAmount Int64) where
-  arbitrary = do
-    x <- arbitrary
-    return $ BoundedShiftAmount (abs x `mod` 64)
-
-instance Arbitrary (BoundedShiftAmount Int) where
-  arbitrary = do
-    x <- arbitrary
-    return $ BoundedShiftAmount (abs x `mod` finiteBitSize (undefined :: Word))
+    let widthBits = finiteBitSize (undefined :: a)
+    pure $ BoundedShiftAmount (abs x `mod` widthBits)
 
 instance Arbitrary Natural where
     arbitrary = integralDownsize . (`mod` 10000) . abs <$> arbitraryInt64
@@ -742,7 +724,7 @@ instance TestPrimop (Char# -> Int#) where
 instance TestPrimop (Int# -> Int# -> Int#) where
   testPrimop s l r = Property s $ \ (uInt#-> x0) (uInt#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
   testPrimopDivLike s l r = Property s $ twoNonZero $ \ (uInt#-> x0) (uInt#-> x1) -> wInt# (l x0 x1) === wInt# (r x0 x1)
-  testPrimopShift s l r = Property s $ \ (uInt#-> x0) (BoundedShiftAmount shift :: BoundedShiftAmount Int) -> wInt# (l x0 (uInt# shift)) === wInt# (r x0 (uInt# shift))
+  testPrimopShift s l r = Property s $ \ (uInt#-> x0) (BoundedShiftAmount @Int shift) -> wInt# (l x0 (uInt# shift)) === wInt# (r x0 (uInt# shift))
 
 instance TestPrimop (Int# -> Int# -> (# Int#,Int# #)) where
   testPrimop s l r = Property s $ \ (uInt#-> x0) (uInt#-> x1) -> WTUP2(wInt#,wInt#, (l x0 x1)) === WTUP2(wInt#,wInt#, (r x0 x1))
