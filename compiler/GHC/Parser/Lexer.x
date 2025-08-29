@@ -103,6 +103,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 -- bytestring
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as SBS
 
 -- containers
@@ -110,6 +111,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 -- compiler
+import GHC.Utils.Encoding.UTF8
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -916,11 +918,11 @@ data Token
                                          -- have a string literal as a label
                                          -- Note [Literal source text] in "GHC.Types.SourceText"
 
-  | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstringMulti SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITrational FractionalLit
+  | ITchar         SourceText Char            -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstring       SourceText ShortByteString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstringMulti  SourceText ShortByteString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITinteger      IntegralLit                -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITrational     FractionalLit              -- Note [Literal source text] in "GHC.Types.SourceText"
 
   | ITprimchar   SourceText Char     -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITprimstring SourceText ByteString -- Note [Literal source text] in "GHC.Types.SourceText"
@@ -2168,7 +2170,7 @@ tok_string span buf len _buf2 = do
         addError err
       pure $ L span (ITprimstring src (unsafeMkByteString s))
     else
-      pure $ L span (ITstring src (mkFastString s))
+      pure $ L span (ITstring src (utf8EncodeShortByteString s))
   where
     src = mkSourceText $ lexemeToString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
@@ -2212,7 +2214,7 @@ tok_string_multi startSpan startBuf _len _buf2 = do
       lexMultilineString contentLen contentStartBuf
 
   setInput i'
-  pure $ L span $ ITstringMulti src (mkFastString s)
+  pure $ L span $ ITstringMulti src (utf8EncodeShortByteString s)
   where
     goContent i0 =
       case Lexer.String.alexScan i0 Lexer.String.string_multi_content of
