@@ -67,19 +67,10 @@ is_divLikeOp entry = case entry of
          _ -> False
 
 is_shiftLikeOp :: Entry -> Bool
-is_shiftLikeOp entry = case entry of
-   PrimOpSpec{} -> has_shift_like
-   PseudoOpSpec{} -> has_shift_like
-   PrimVecOpSpec{} -> has_shift_like
-   PrimTypeSpec{} -> False
-   PrimVecTypeSpec{} -> False
-   Section{} -> False
-   where
-      has_shift_like = case entry of
-         PrimOpSpec { name = n } -> "Shift" `Data.List.isInfixOf` n
-         PseudoOpSpec { name = n } -> "Shift" `Data.List.isInfixOf` n
-         PrimVecOpSpec { name = n } -> "Shift" `Data.List.isInfixOf` n
-         _ -> False
+is_shiftLikeOp (PrimOpSpec {name = n}) = "Shift" `Data.List.isInfixOf` n
+is_shiftLikeOp (PseudoOpSpec {name = n}) = "Shift" `Data.List.isInfixOf` n
+is_shiftLikeOp (PrimVecOpSpec {name = n}) = "Shift" `Data.List.isInfixOf` n
+is_shiftLikeOp _ = False
 
 -- a binding of property to value
 data Option
