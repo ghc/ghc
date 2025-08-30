@@ -312,7 +312,7 @@ toIfaceCoercionX fr co
       = IfaceForAllCo (toIfaceBndr tv)
                       visL
                       visR
-                      (toIfaceCoercionX fr' k)
+                      (go_mco k)
                       (toIfaceCoercionX fr' co)
                           where
                             fr' = fr `delVarSet` tv

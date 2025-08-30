@@ -39,7 +39,7 @@ module GHC.Core.TyCo.Rep (
         UnivCoProvenance(..),
         CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
-        MCoercion(..), MCoercionR, MCoercionN,
+        MCoercion(..), MCoercionR, MCoercionN, KindMCoercion,
 
         -- * Functions over types
         mkNakedTyConTy, mkTyVarTy, mkTyVarTys,
@@ -806,6 +806,34 @@ tcMkScaledFunTy (Scaled mult arg) res = tcMkVisFunTy mult arg res
 %************************************************************************
 -}
 
+type CoercionN = Coercion       -- always Nominal
+type CoercionR = Coercion       -- always Representational
+type CoercionP = Coercion       -- always Phantom
+
+type MCoercionN = MCoercion     -- alwyas Nominal
+type MCoercionR = MCoercion     -- always Representational
+
+{- Note [KindCoercion]
+~~~~~~~~~~~~~~~~~~~~~~
+A KindCoercion  kco :: k1 ~r k2  is a Coercion with these properties:
+   (a) It is Nominal; that is r=Nominal
+   (b) Both (k1::Type) and (k2::Type); it is homogeneous
+
+The coercion in (a) ForAllCo and (b) CastTy is a KindCoercion.
+
+The invariants of KindCoercion allow `isReflKindCo` to elminate GRefl,
+whereas isReflCo cannot.  In particular, consider a KindCoercion
+     kco = GRefl r k (MCo kk)) :: k ~ (k |> kk)
+Since `kco`is a KindCoercion, we know that
+     r = Nominal
+     k :: Type  and   (k |> kk) :: Type
+Hence kk must be Refl. And hence kco = GRefl N k MRefl, which is
+the same as Refl.  See `isReflKindCo`.
+-}
+
+type KindCoercion  = CoercionN    -- See Note [KindCoercion]
+type KindMCoercion = MCoercionN   -- See Note [KindCoercion]
+
 -- | A 'Coercion' is concrete evidence of the equality/convertibility
 -- of two types.
 
@@ -829,7 +857,7 @@ data Coercion
 
   -- GRefl :: "e" -> _ -> Maybe N -> e
   -- See Note [Generalized reflexive coercion]
-  | GRefl Role Type MCoercionN  -- See Note [Refl invariant]
+  | GRefl Role Type KindMCoercion  -- See Note [Refl invariant]
           -- Use (Refl ty), not (GRefl Nominal ty MRefl)
           -- Use (GRefl Representational _ _), not (SubCo (GRefl Nominal _ _))
 
@@ -853,7 +881,7 @@ data Coercion
       , fco_visL :: !ForAllTyFlag -- Visibility of coercionLKind
       , fco_visR :: !ForAllTyFlag -- Visibility of coercionRKind
                                   -- See (FC7) of Note [ForAllCo]
-      , fco_kind :: KindCoercion
+      , fco_kind :: KindMCoercion -- See (FC8) of Note [ForAllCo]
       , fco_body :: Coercion }
          -- ForAllCo :: _ -> N -> e -> e
 
@@ -911,6 +939,15 @@ data Coercion
                                      -- Only present during typechecking
   deriving Data.Data
 
+-- | A semantically more meaningful type to represent what may or may not be a
+-- useful 'Coercion'.
+data MCoercion
+  = MRefl
+    -- A trivial Reflexivity coercion
+  | MCo Coercion
+    -- Other coercions
+  deriving Data.Data
+
 data CoSel  -- See Note [SelCo]
   = SelTyCon Int Role  -- Decomposes (T co1 ... con); zero-indexed
                        -- Invariant: Given: SelCo (SelTyCon i r) co
@@ -931,11 +968,6 @@ data FunSel  -- See Note [SelCo]
   | SelArg   -- Argument of function
   | SelRes   -- Result of function
   deriving( Eq, Data.Data, Ord )
-
-type CoercionN = Coercion       -- always nominal
-type CoercionR = Coercion       -- always representational
-type CoercionP = Coercion       -- always phantom
-type KindCoercion = CoercionN   -- always nominal
 
 instance Outputable Coercion where
   ppr = pprCo
@@ -979,17 +1011,6 @@ instance NFData CoSel where
   rnf (SelTyCon n r) = rnf n `seq` rnf r `seq` ()
   rnf SelForAll      = ()
   rnf (SelFun fs)    = rnf fs `seq` ()
-
--- | A semantically more meaningful type to represent what may or may not be a
--- useful 'Coercion'.
-data MCoercion
-  = MRefl
-    -- A trivial Reflexivity coercion
-  | MCo Coercion
-    -- Other coercions
-  deriving Data.Data
-type MCoercionR = MCoercion
-type MCoercionN = MCoercion
 
 instance Outputable MCoercion where
   ppr MRefl    = text "MRefl"
@@ -1277,6 +1298,14 @@ Several things to note here
 (FC7) Invariant: in a ForAllCo, if fco_tcv is a CoVar, then
          fco_visL = fco_visR = coreTyLamForAllTyFlag
   c.f. (FT2) in Note [ForAllTy]
+
+(FC8) We /represent/ a ForAllCo { fco_tcv = tcv, fco_kind = kmco } as follows:
+      * The tcv::TyCoVar has a kind (like any Var), say tcv::ki
+      * The kind-coercion `kmco` is a KindMCoercion:
+        - If kmco = MRefl, then the coercion in the typing rule is (Refl ki)
+        - If kmco = MCo kco, then the coercion in the typing rule is `co`,
+                             /and/ ki = coercionLKind kco
+      So in the common MRefl case, the kind of `tcv` plays a useful role.
 
 Note [Predicate coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1937,11 +1966,14 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (FunCo { fco_mult = cw, fco_arg = c1, fco_res = c2 })
        = go_co env cw `mappend` go_co env c1 `mappend` go_co env c2
 
-    go_co env (ForAllCo tv _vis1 _vis2 kind_co co)
-      = go_co env kind_co `mappend` go_ty env (varType tv)
-                          `mappend` go_co env' co
+    go_co env (ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = co })
+      = go_mco env kind_co `mappend` go_ty env (varType tcv)
+                           `mappend` go_co env' co
       where
-        env' = tycobinder env tv Inferred
+        env' = tycobinder env tcv Inferred
+
+    go_mco _   MRefl    = mempty
+    go_mco env (MCo co) = go_co env co
 
 -- | A view function that looks through nothing.
 noView :: Type -> Maybe Type
@@ -1983,18 +2015,19 @@ typesSize tys = foldr ((+) . typeSize) 0 tys
 
 coercionSize :: Coercion -> Int
 coercionSize (Refl ty)             = typeSize ty
-coercionSize (GRefl _ ty MRefl)    = typeSize ty
-coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
+coercionSize (GRefl _ ty mco)      = typeSize ty + mCoercionSize mco
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)        = coercionSize co + coercionSize arg
 coercionSize (ForAllCo { fco_kind = h, fco_body = co })
-                                   = 1 + coercionSize co + coercionSize h
+                                   = 1 + coercionSize co + mCoercionSize h
 coercionSize (FunCo _ _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2
                                                          + coercionSize w
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomCo _ cs)      = 1 + sum (map coercionSize cs)
-coercionSize (UnivCo { uco_lty = t1, uco_rty = t2 })  = 1 + typeSize t1 + typeSize t2
+coercionSize (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
+                                 = 1 + typeSize t1 + typeSize t2
+                                     + sum (map coercionSize deps)
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (SelCo _ co)        = 1 + coercionSize co
@@ -2002,6 +2035,10 @@ coercionSize (LRCo  _ co)        = 1 + coercionSize co
 coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
 coercionSize (KindCo co)         = 1 + coercionSize co
 coercionSize (SubCo co)          = 1 + coercionSize co
+
+mCoercionSize :: MCoercion -> Int
+mCoercionSize MRefl    = 0
+mCoercionSize (MCo co) = coercionSize co
 
 {-
 ************************************************************************

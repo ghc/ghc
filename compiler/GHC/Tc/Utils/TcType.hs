@@ -176,7 +176,6 @@ module GHC.Tc.Utils.TcType (
   substTyUnchecked, substTysUnchecked, substScaledTyUnchecked,
   substThetaUnchecked,
   substTyWithUnchecked,
-  substCoUnchecked, substCoWithUnchecked,
   substTheta,
 
   isUnliftedType,

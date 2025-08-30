@@ -1576,9 +1576,12 @@ tcIfaceCo = go
     go (IfaceFunCo r w c1 c2)    = mkFunCoNoFTF r <$> go w <*> go c1 <*> go c2
     go (IfaceTyConAppCo r tc cs) = TyConAppCo r <$> tcIfaceTyCon tc <*> mapM go cs
     go (IfaceAppCo c1 c2)        = AppCo <$> go c1 <*> go c2
-    go (IfaceForAllCo tv visL visR k c) = do { k' <- go k
-                                      ; bindIfaceBndr tv $ \ tv' ->
-                                        ForAllCo tv' visL visR k' <$> go c }
+    go (IfaceForAllCo tcv visL visR k co)
+      = do { k' <- go_mco k
+           ; bindIfaceBndr tcv $ \ tv' ->
+        do { co' <- go co
+           ; return (ForAllCo { fco_tcv = tv', fco_visL = visL, fco_visR = visR
+                              , fco_kind = k', fco_body = co' }) } }
     go (IfaceCoVarCo n)           = CoVarCo <$> go_var n
     go (IfaceUnivCo p r t1 t2 ds) = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2
                                        ; ds' <- mapM go ds

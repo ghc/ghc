@@ -689,7 +689,7 @@ rnIfaceCo (IfaceAxiomCo ax cos)         = IfaceAxiomCo ax <$> mapM rnIfaceCo cos
 rnIfaceCo (IfaceKindCo c)               = IfaceKindCo <$> rnIfaceCo c
 rnIfaceCo (IfaceForAllCo bndr visL visR co1 co2)
     = (\bndr' co1' co2' -> IfaceForAllCo bndr' visL visR co1' co2')
-      <$> rnIfaceBndr bndr <*> rnIfaceCo co1 <*> rnIfaceCo co2
+      <$> rnIfaceBndr bndr <*> rnIfaceMCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceUnivCo s r t1 t2 deps)
     = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2 <*> mapM rnIfaceCo deps
 
