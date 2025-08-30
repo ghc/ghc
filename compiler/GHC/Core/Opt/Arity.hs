@@ -2367,8 +2367,7 @@ mkEtaForAllMCo (Bndr tcv vis) ty mco
             | otherwise                    -> mk_fco (mkRepReflCo ty)
       MCo co                               -> mk_fco co
   where
-    mk_fco co = MCo (mkForAllCo tcv vis coreTyLamForAllTyFlag
-                                (mkNomReflCo (varType tcv)) co)
+    mk_fco co = MCo (mkForAllCo tcv vis coreTyLamForAllTyFlag MRefl co)
     -- coreTyLamForAllTyFlag: See Note [The EtaInfo mechanism], particularly
     -- the (EtaInfo Invariant).  (sym co) wraps a lambda that always has
     -- a ForAllTyFlag of coreTyLamForAllTyFlag; see Note [Required foralls in Core]
@@ -2808,11 +2807,10 @@ tryEtaReduce rec_ids bndrs body eval_sd
        | Just tv <- getTyVar_maybe arg_ty
        , bndr == tv  = case splitForAllForAllTyBinder_maybe fun_ty of
            Just (Bndr _ vis, _) -> Just (fco, [])
-             where !fco = mkForAllCo tv vis coreTyLamForAllTyFlag kco co
+             where !fco = mkForAllCo tv vis coreTyLamForAllTyFlag MRefl co
                    -- The lambda we are eta-reducing always has visibility
                    -- 'coreTyLamForAllTyFlag' which may or may not match
                    -- the visibility on the inner function (#24014)
-                   kco = mkNomReflCo (tyVarKind tv)
            Nothing -> pprPanic "tryEtaReduce: type arg to non-forall type"
                                (text "fun:" <+> ppr bndr
                                 $$ text "arg:" <+> ppr arg_ty

@@ -1206,10 +1206,11 @@ wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
     boxer = Boxer $ \ subst ->
             do { (rep_ids, rep_expr)
                     <- case box_rep of
-                         UnitBox -> do { rep_id <- newLocal (fsLit "cowrap_bx") (linear $ TcType.substTy subst rep_ty)
+                         UnitBox -> do { rep_id <- newLocal (fsLit "cowrap_bx")
+                                                       (linear $ TcType.substTy subst rep_ty)
                                        ; return ([rep_id], Var rep_id) }
                          Boxer boxer -> boxer subst
-               ; let sco = substCoUnchecked subst co
+               ; let sco = substCo subst co
                ; return (rep_ids, rep_expr `Cast` mkSymCo sco) }
 
 ------------------------

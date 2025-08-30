@@ -132,7 +132,7 @@ data IfaceBndr          -- Local (non-top-level) binders
   deriving (Eq, Ord)
 
 
-type IfaceIdBndr  = (IfaceType, IfLclName, IfaceType)
+type IfaceIdBndr  = (IfaceType, IfLclName, IfaceType)  -- (multiplicity, name, type)
 type IfaceTvBndr  = (IfLclName, IfaceKind)
 
 ifaceTvBndrName :: IfaceTvBndr -> IfLclName
@@ -479,7 +479,7 @@ data IfaceCoercion
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
-  | IfaceForAllCo     IfaceBndr !ForAllTyFlag !ForAllTyFlag IfaceCoercion IfaceCoercion
+  | IfaceForAllCo     IfaceBndr !ForAllTyFlag !ForAllTyFlag IfaceMCoercion IfaceCoercion
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomCo      IfaceAxiomRule [IfaceCoercion]
        -- ^ There are only a fixed number of CoAxiomRules, so it suffices
@@ -1454,10 +1454,9 @@ pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPartMust tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllMust tvs ctxt sdoc
 
-pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)]
+pprIfaceForAllCoPart :: [(IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag)]
                      -> SDoc -> SDoc
-pprIfaceForAllCoPart tvs sdoc
-  = sep [ pprIfaceForAllCo tvs, sdoc ]
+pprIfaceForAllCoPart tvs sdoc = sep [ pprIfaceForAllCo tvs, sdoc ]
 
 ppr_iface_forall_part :: ShowForAllFlag
                       -> [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
@@ -1494,11 +1493,11 @@ ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ vis) : bndrs) vis1
   | otherwise              = (all_bndrs, [])
 ppr_itv_bndrs [] _ = ([], [])
 
-pprIfaceForAllCo :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
+pprIfaceForAllCo :: [(IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
 pprIfaceForAllCo []  = empty
 pprIfaceForAllCo tvs = text "forall" <+> pprIfaceForAllCoBndrs tvs <> dot
 
-pprIfaceForAllCoBndrs :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
+pprIfaceForAllCoBndrs :: [(IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
 pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
 
 pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
@@ -1513,10 +1512,17 @@ pprIfaceForAllBndr bndr =
     -- See Note [Suppressing binder signatures]
     suppress_sig = SuppressBndrSig False
 
-pprIfaceForAllCoBndr :: (IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag) -> SDoc
-pprIfaceForAllCoBndr (tv, kind_co, visL, visR)
-  = parens (ppr tv <> pp_vis <+> dcolon <+> pprIfaceCoercion kind_co)
+pprIfaceForAllCoBndr :: (IfaceBndr, IfaceMCoercion, ForAllTyFlag, ForAllTyFlag) -> SDoc
+pprIfaceForAllCoBndr (tcv, kind_mco, visL, visR)
+  = parens (ppr (ifaceBndrName tcv) <> pp_vis
+            <+> text "::~" <+> pprIfaceCoercion kind_co)
+    -- We print (tcv ::~ kind_co), with the "::~" reminding us the type of tcv
+    -- isn't kind_co; rather it's (coercionLKind kind_co).  We used "::" previously
+    -- which grievously confused me.
   where
+    kind_co = case kind_mco of
+                   IfaceMRefl  -> IfaceReflCo (ifaceBndrType tcv)
+                   IfaceMCo co -> co
     pp_vis | visL == coreTyLamForAllTyFlag
            , visR == coreTyLamForAllTyFlag
            = empty
@@ -2069,10 +2075,8 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
   where
     (tvs, inner_co) = split_co co
 
-    split_co (IfaceForAllCo (IfaceTvBndr (name, _)) visL visR kind_co co')
-      = let (tvs, co'') = split_co co' in ((name,kind_co,visL,visR):tvs,co'')
-    split_co (IfaceForAllCo (IfaceIdBndr (_, name, _)) visL visR kind_co co')
-      = let (tvs, co'') = split_co co' in ((name,kind_co,visL,visR):tvs,co'')
+    split_co (IfaceForAllCo bndr visL visR kind_co co')
+      = let (tvs, co'') = split_co co' in ((bndr,kind_co,visL,visR):tvs,co'')
     split_co co' = ([], co')
 
 -- Why these three? See Note [Free TyVars and CoVars in IfaceType]

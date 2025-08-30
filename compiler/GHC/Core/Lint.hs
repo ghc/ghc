@@ -2424,15 +2424,19 @@ lintCoercion co@(ForAllCo {})
     go :: [OutTyCoVar]   -- Binders in reverse order
        -> InCoercion -> LintM Role
     go tcvs co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
-                         , fco_kind = kind_co, fco_body = body_co })
+                         , fco_kind = kind_mco, fco_body = body_co })
       | not (isTyCoVar tcv)
       = failWithL (text "Non tyco binder in ForAllCo:" <+> ppr co)
 
       | otherwise
-      = do { lk <- lintStarCoercion kind_co
+      = do { mb_lk <- case kind_mco of
+                     MRefl -> return Nothing
+                     MCo kind_co -> Just <$> lintStarCoercion kind_co
            ; lintTyCoBndr tcv $ \tcv' ->
-        do { ensureEqTys (varType tcv') lk $
-             text "Kind mis-match in ForallCo" <+> ppr co
+        do { case mb_lk of
+                Nothing -> return ()
+                Just lk -> ensureEqTys (varType tcv') lk $
+                           text "Kind mis-match in ForallCo" <+> ppr co
 
            -- I'm not very sure about this part, because it traverses body_co
            -- but at least it's on a cold path (a ForallCo for a CoVar)
