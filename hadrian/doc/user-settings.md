@@ -19,14 +19,18 @@ A build _flavour_ is a collection of build settings that fully define a GHC buil
 data Flavour = Flavour {
     -- | Flavour name, to select this flavour from command line.
     name :: String,
-    -- | Use these command line arguments.
-    args :: Args,
+    -- | Use these extra command line arguments.
+    -- This can't depend on the result of configuring a package (ie, using readContextData)
+    extraArgs :: Args,
     -- | Build these packages.
     packages :: Stage -> Action [Package],
     -- | Bignum backend: 'native', 'gmp', 'ffi', etc.
     bignumBackend :: String,
     -- | Check selected bignum backend against native backend
     bignumCheck :: Bool,
+    -- | Build the @text@ package with @simdutf@ support. Disabled by
+    -- default due to packaging difficulties described in #20724.
+    textWithSIMDUTF :: Bool,
     -- | Build libraries these ways.
     libraryWays :: Ways,
     -- | Build RTS these ways.
@@ -45,11 +49,18 @@ data Flavour = Flavour {
     -- | Build the GHC executable against the threaded runtime system.
     ghcThreaded :: Stage -- ^ stage of the /built/ compiler
                 -> Bool,
+
+    ghcSplitSections :: Bool, -- ^ Whether to enable split sections
     -- | Whether to build docs and which ones
     --   (haddocks, user manual, haddock manual)
     ghcDocs :: Action DocTargets,
+
+    -- | Whether to uses hashes or inplace for unit ids
+    hashUnitIds :: Bool,
+
     -- | Whether to generate .hie files
     ghcHieFiles :: Stage -> Bool
+
     }
 ```
 Hadrian provides several built-in flavours (`default`, `quick`, and a few
