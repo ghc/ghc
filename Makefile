@@ -79,7 +79,7 @@
 #       submodules.
 
 SHELL := bash
-.SHELLFLAGS := -eu -o pipefail -O globstar -c
+.SHELLFLAGS := -eu -o pipefail -c
 
 VERBOSE ?= 0
 
@@ -95,6 +95,8 @@ EMCC ?= emcc
 EMCXX ?= em++
 EMAR ?= emar
 EMRANLIB ?= emranlib
+
+GHC_CONFIGURE_ARGS ?=
 
 EXTRA_LIB_DIRS ?=
 EXTRA_INCLUDE_DIRS ?=
@@ -143,6 +145,7 @@ define GHC_INFO
 $(shell sh -c "$(GHC) --info | $(GHC0) -e 'getContents >>= foldMap putStrLn . lookup \"$1\" . read'")
 endef
 
+HOST_PLATFORM   = $(call GHC_INFO,Host platform)
 TARGET_PLATFORM = $(call GHC_INFO,target platform string)
 TARGET_ARCH     = $(call GHC_INFO,target arch)
 TARGET_OS       = $(call GHC_INFO,target os)
@@ -632,8 +635,9 @@ stage2: $(addprefix _build/stage2/bin/,$(STAGE2_EXECUTABLES)) _build/stage2/lib/
 
 # --- Stage 3 generic ---
 
-_build/stage3/lib/targets/%:
-	@mkdir -p $@
+_build/stage2/lib/targets/%:
+	@mkdir -p _build/stage3/lib/targets/$(@F)
+	@rm -f _build/stage2/lib/targets/$(@F)
 	@mkdir -p _build/stage2/lib/targets/
 	@ln -sf ../../../stage3/lib/targets/$(@F) _build/stage2/lib/targets/$(@F)
 
@@ -672,7 +676,7 @@ endef
 .PHONY: stage3-javascript-unknown-ghcjs
 stage3-javascript-unknown-ghcjs: _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/settings javascript-unknown-ghcjs-libs _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d/package.cache
 
-_build/stage3/lib/targets/javascript-unknown-ghcjs/lib/settings: _build/stage3/lib/targets/javascript-unknown-ghcjs _build/stage1/bin/ghc-toolchain-bin
+_build/stage3/lib/targets/javascript-unknown-ghcjs/lib/settings: _build/stage2/lib/targets/javascript-unknown-ghcjs _build/stage1/bin/ghc-toolchain-bin
 	@mkdir -p $(@D)
 	_build/stage1/bin/ghc-toolchain-bin $(GHC_TOOLCHAIN_ARGS) --triple javascript-unknown-ghcjs --output-settings -o $@ --cc $(EMCC) --cxx $(EMCXX) --ar $(EMAR) --ranlib $(EMRANLIB)
 
@@ -697,7 +701,7 @@ javascript-unknown-ghcjs-libs: _build/stage3/bin/javascript-unknown-ghcjs-ghc-pk
 .PHONY: stage3-x86_64-musl-linux
 stage3-x86_64-musl-linux: x86_64-musl-linux-libs _build/stage3/lib/targets/x86_64-musl-linux/lib/package.conf.d/package.cache
 
-_build/stage3/lib/targets/x86_64-musl-linux/lib/settings: _build/stage3/lib/targets/x86_64-musl-linux _build/stage1/bin/ghc-toolchain-bin
+_build/stage3/lib/targets/x86_64-musl-linux/lib/settings: _build/stage2/lib/targets/x86_64-musl-linux _build/stage1/bin/ghc-toolchain-bin
 	@mkdir -p $(@D)
 	_build/stage1/bin/ghc-toolchain-bin $(GHC_TOOLCHAIN_ARGS) --triple x86_64-musl-linux --output-settings -o $@ --cc x86_64-unknown-linux-musl-cc --cxx x86_64-unknown-linux-musl-c++ --ar x86_64-unknown-linux-musl-ar --ranlib x86_64-unknown-linux-musl-ranlib --ld x86_64-unknown-linux-musl-ld
 
@@ -722,7 +726,7 @@ x86_64-musl-linux-libs: _build/stage3/bin/x86_64-musl-linux-ghc-pkg _build/stage
 .PHONY: stage3-wasm32-unknown-wasi
 stage3-wasm32-unknown-wasi: wasm32-unknown-wasi-libs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/package.conf.d/package.cache _build/stage3/lib/targets/wasm32-unknown-wasi/lib/dyld.mjs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/post-link.mjs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/prelude.mjs
 
-_build/stage3/lib/targets/wasm32-unknown-wasi/lib/settings: _build/stage3/lib/targets/wasm32-unknown-wasi _build/stage1/bin/ghc-toolchain-bin
+_build/stage3/lib/targets/wasm32-unknown-wasi/lib/settings: _build/stage2/lib/targets/wasm32-unknown-wasi _build/stage1/bin/ghc-toolchain-bin
 	@mkdir -p $(@D)
 	PATH=/home/hasufell/.ghc-wasm/wasi-sdk/bin:$(PATH) _build/stage1/bin/ghc-toolchain-bin $(GHC_TOOLCHAIN_ARGS) --triple wasm32-unknown-wasi --output-settings -o $@ --cc wasm32-wasi-clang --cxx wasm32-wasi-clang++ --ar ar --ranlib ranlib --ld wasm-ld --merge-objs wasm-ld --merge-objs-opt="-r" --disable-ld-override --disable-tables-next-to-code $(foreach opt,$(WASM_CC_OPTS),--cc-opt=$(opt)) $(foreach opt,$(WASM_CXX_OPTS),--cxx-opt=$(opt))
 
@@ -731,11 +735,6 @@ _build/stage3/lib/targets/wasm32-unknown-wasi/lib/package.conf.d/package.cache: 
 	@rm -rf $(@D)/*
 	cp -rfp _build/stage3/wasm32-unknown-wasi/packagedb/host/*/* $(@D)
 	_build/stage3/bin/wasm32-unknown-wasi-ghc-pkg recache
-
-# ghc-toolchain borks unlit
-_build/stage3/lib/targets/wasm32-unknown-wasi/bin/unlit: _build/stage2/bin/unlit
-	@mkdir -p $(@D)
-	cp -rfp $< $@
 
 .PHONY: wasm32-unknown-wasi-libs
 wasm32-unknown-wasi-libs: private GHC=$(abspath _build/stage3/bin/wasm32-unknown-wasi-ghc)
@@ -815,14 +814,14 @@ _build/bindist: stage2 driver/ghc-usage.txt driver/ghci-usage.txt
 	@cp -rfp _build/stage2/bin/* $@/bin/
 	# Copy libraries and settings from stage2 lib
 	@cp -rfp _build/stage2/lib/{package.conf.d,settings,template-hsc.h} $@/lib/
-	@mkdir -p $@/lib/x86_64-linux
+	@mkdir -p $@/lib/$(HOST_PLATFORM)
 	@cd $@/lib/package.conf.d ; \
 		for pkg in *.conf ; do \
 		  pkgname=`echo $${pkg} | sed 's/-[0-9.]*\(-[0-9a-zA-Z]*\)\?\.conf//'` ; \
 		  pkgnamever=`echo $${pkg} | sed 's/\.conf//'` ; \
-		  mkdir -p $(CURDIR)/$@/lib/x86_64-linux/$${pkg%.conf} ; \
-		  cp -rfp $(CURDIR)/_build/stage2/build/host/x86_64-linux/ghc-*/$${pkg%.conf}/build/* $(CURDIR)/$@/lib/x86_64-linux/$${pkg%.conf} ; \
-		  $(call patchpackageconf,$${pkgname},$${pkg},../../..,x86_64-linux,$${pkgnamever}) ; \
+		  mkdir -p $(CURDIR)/$@/lib/$(HOST_PLATFORM)/$${pkg%.conf} ; \
+		  cp -rfp $(CURDIR)/_build/stage2/build/host/*/ghc-*/$${pkg%.conf}/build/* $(CURDIR)/$@/lib/$(HOST_PLATFORM)/$${pkg%.conf} ; \
+		  $(call patchpackageconf,$${pkgname},$${pkg},../../..,$(HOST_PLATFORM),$${pkgnamever}) ; \
 		done
 	# Copy driver usage files
 	@cp -rfp driver/ghc-usage.txt $@/lib/
@@ -844,7 +843,7 @@ _build/bindist/ghc.tar.gz: _build/bindist
 		lib/package.conf.d \
 		lib/settings \
 		lib/template-hsc.h \
-		lib/x86_64-linux
+		lib/$(HOST_PLATFORM)
 
 _build/bindist/lib/targets/%: _build/bindist driver/ghc-usage.txt driver/ghci-usage.txt stage3-%
 	@echo "::group::Creating binary distribution in $@"
@@ -880,15 +879,15 @@ $(GHC1) $(GHC2): | hackage
 hackage: _build/packages/hackage.haskell.org/01-index.tar.gz
 _build/packages/hackage.haskell.org/01-index.tar.gz: | $(CABAL)
 	@mkdir -p $(@D)
-	$(CABAL) $(CABAL_ARGS) update --index-state 2025-04-22T01:25:40Z
+	$(CABAL) $(CABAL_ARGS) update --index-state @1745256340
 
 # booted depends on successful source preparation
 _build/booted: libraries/ghc-boot-th-next/.synth-stamp
 	@echo "::group::Running ./boot script..."
 	@mkdir -p _build/logs
-	./boot |& tee _build/logs/boot.log
+	./boot
 	@echo ">>> Running ./configure script..."
-	./configure
+	./configure $(GHC_CONFIGURE_ARGS)
 	touch $@
 	@echo "::endgroup::"
 

@@ -2,7 +2,7 @@
 AC_PREREQ([2.69])
 AC_INIT([ghc-builder], [0.1.0], [your-email@example.com])
 AC_CONFIG_SRCDIR([.]) # A representative .in file
-AC_CONFIG_AUX_DIR([build-aux]) # Recommended place for config.guess, config.sub
+#AC_CONFIG_AUX_DIR([build-aux]) # Recommended place for config.guess, config.sub
 AC_CONFIG_MACRO_DIR([m4])      # For any custom m4 macros
 # AM_INIT_AUTOMAKE([-Wall -Werror foreign]) # Using some automake conventions
 

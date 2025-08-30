@@ -34,7 +34,7 @@ extra-source-files:
     CodeGen.Platform.h
 
 custom-setup
-    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.16, directory, process, filepath, containers
+    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.18, directory, process, filepath, containers
 
 Flag internal-interpreter
     Description: Build with internal interpreter support.

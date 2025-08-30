@@ -259,9 +259,6 @@ flag libm
 flag librt
   default: False
   manual: True
-flag libdl
-  default: False
-  manual: True
 flag libffi-adjustors
   default: False
   manual: True
@@ -555,8 +552,6 @@ common rts-link-options
        extra-libraries: m
     if flag(librt)
        extra-libraries: rt
-    if flag(libdl)
-       extra-libraries: dl
     if os(windows)
        extra-libraries:
           wsock32 gdi32 winmm

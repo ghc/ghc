@@ -178,9 +178,11 @@ dnl Check for libraries
 dnl ################################################################
 
 dnl ** check whether we need -ldl to get dlopen()
-AC_CHECK_LIB([dl], [dlopen])
+AC_CHECK_LIB([dl], [dlopen], [HAVE_LIBDL=1])
 dnl ** check whether we have dlinfo
 AC_CHECK_FUNCS([dlinfo])
+
+FP_CHECK_PTHREAD_LIB
 
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests
@@ -520,6 +522,16 @@ cat $srcdir/rts.buildinfo.in \
     || exit 1
 rm -f external-symbols.flags
 ]
+
+AS_IF(
+  [test "$HAVE_LIBDL" = 1],
+  [EXTRA_LIBS="$EXTRA_LIBS dl"])
+AS_IF(
+  [test "$UseLibpthread" = "YES"]
+  [EXTRA_LIBS="$EXTRA_LIBS pthread"])
+AS_IF(
+  [test "x$EXTRA_LIBS" != "x"]
+  [echo "extra-libraries: $EXTRA_LIBS" >> rts.buildinfo])
 
 dnl --------------------------------------------------------------
 dnl Generate derived constants
