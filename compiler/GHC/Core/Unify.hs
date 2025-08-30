@@ -2414,14 +2414,15 @@ ty_co_match menv subst (FunTy { ft_mult = w, ft_arg = ty1, ft_res = ty2 })
     --     not doing so caused #21205.
 
 ty_co_match menv subst (ForAllTy (Bndr tv1 vis1t) ty1)
-                       (ForAllCo tv2 vis1c vis2c kind_co2 co2)
+                       (ForAllCo tv2 vis1c vis2c kind_mco2 co2)
                        lkco rkco
   | isTyVar tv1 && isTyVar tv2
   , vis1t == vis1c && vis1c == vis2c -- Is this necessary?
       -- Is this visibility check necessary?  @rae says: yes, I think the
       -- check is necessary, if we're caring about visibility (and we are).
       -- But ty_co_match is a dark and not important corner.
-  = do { subst1 <- ty_co_match menv subst (tyVarKind tv1) kind_co2
+  = do { subst1 <- ty_co_match menv subst (tyVarKind tv1)
+                               (forAllCoKindCo tv2 kind_mco2)
                                ki_ki_co ki_ki_co
        ; let rn_env0 = me_env menv
              rn_env1 = rnBndr2 rn_env0 tv1 tv2
@@ -2522,6 +2523,6 @@ pushRefl co =
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRoleListX r tc) tys))
     Just (ForAllTy (Bndr tv vis) ty, r)
       -> Just (ForAllCo { fco_tcv = tv, fco_visL = vis, fco_visR = vis
-                        , fco_kind = mkNomReflCo (varType tv)
+                        , fco_kind = MRefl
                         , fco_body = mkReflCo r ty })
     _ -> Nothing
