@@ -51,7 +51,6 @@ module GHC.Core.TyCo.FVs
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type( partitionInvisibleTypes, coreView, rewriterView )
-import {-# SOURCE #-} GHC.Core.Coercion( coercionLKind )
 
 import GHC.Builtin.Types.Prim( funTyFlagTyCon )
 
@@ -641,8 +640,10 @@ tyCoVarsOfCoList :: Coercion -> [TyCoVar]
 tyCoVarsOfCoList co = fvVarList $ tyCoFVsOfCo co
 
 tyCoFVsOfMCo :: MCoercion -> FV
-tyCoFVsOfMCo MRefl    = emptyFV
-tyCoFVsOfMCo (MCo co) = tyCoFVsOfCo co
+tyCoFVsOfMCo mco fv_cand in_scope acc
+  = case mco of
+       MRefl  -> emptyFV fv_cand in_scope acc
+       MCo co -> tyCoFVsOfCo co fv_cand in_scope acc
 
 tyCoFVsOfCo :: Coercion -> FV
 -- Extracts type and coercion variables from a coercion
@@ -655,7 +656,7 @@ tyCoFVsOfCo (TyConAppCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand
 tyCoFVsOfCo (AppCo co arg) fv_cand in_scope acc
   = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
 tyCoFVsOfCo (ForAllCo { fco_tcv = tv, fco_kind = kind_co, fco_body = co }) fv_cand in_scope acc
-  = (tyCoFVsVarBndr tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfCo kind_co) fv_cand in_scope acc
+  = (tyCoFVsVarBndr tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfMCo kind_co) fv_cand in_scope acc
 tyCoFVsOfCo (FunCo { fco_mult = w, fco_arg = co1, fco_res = co2 }) fv_cand in_scope acc
   = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2 `unionFV` tyCoFVsOfCo w) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
@@ -693,6 +694,10 @@ almostDevoidCoVarOfCo :: CoVar -> Coercion -> Bool
 almostDevoidCoVarOfCo cv co =
   almost_devoid_co_var_of_co co cv
 
+almost_devoid_co_var_of_mco :: MCoercion -> CoVar -> Bool
+almost_devoid_co_var_of_mco MRefl    _  = True
+almost_devoid_co_var_of_mco (MCo co) cv = almost_devoid_co_var_of_co co cv
+
 almost_devoid_co_var_of_co :: Coercion -> CoVar -> Bool
 almost_devoid_co_var_of_co (Refl {}) _ = True   -- covar is allowed in Refl and
 almost_devoid_co_var_of_co (GRefl {}) _ = True  -- GRefl, so we don't look into
@@ -703,7 +708,7 @@ almost_devoid_co_var_of_co (AppCo co arg) cv
   = almost_devoid_co_var_of_co co cv
   && almost_devoid_co_var_of_co arg cv
 almost_devoid_co_var_of_co (ForAllCo { fco_tcv = v, fco_kind = kind_co, fco_body = co }) cv
-  = almost_devoid_co_var_of_co kind_co cv
+  = almost_devoid_co_var_of_mco kind_co cv
   && (v == cv || almost_devoid_co_var_of_co co cv)
 almost_devoid_co_var_of_co (FunCo { fco_mult = w, fco_arg = co1, fco_res = co2 }) cv
   =  almost_devoid_co_var_of_co w   cv
@@ -1032,7 +1037,7 @@ tyConsOfType ty
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
      go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
      go_co (ForAllCo { fco_kind = kind_co, fco_body = co })
-                                   = go_co kind_co `unionUniqSets` go_co co
+                                   = go_mco kind_co `unionUniqSets` go_co co
      go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
                                    = go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
      go_co (AxiomCo ax args)       = go_ax ax `unionUniqSets` go_cos args
@@ -1230,14 +1235,14 @@ occCheckExpand vs_to_avoid ty
     go_co cxt (SubCo co)                = do { co' <- go_co cxt co
                                              ; return (SubCo co') }
 
-    go_co cxt@(as, env) co@(ForAllCo { fco_tcv = tv, fco_kind = kind_co, fco_body = body_co })
-      = do { kind_co' <- go_co cxt kind_co
-           ; let tv' = setVarType tv $
-                       coercionLKind kind_co'
-                 env' = extendVarEnv env tv tv'
-                 as'  = as `delVarSet` tv
+    go_co cxt@(as, env) co@(ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = body_co })
+      = do { ki' <- go cxt (varType tcv)
+           ; let tcv' = setVarType tcv ki'
+                 env' = extendVarEnv env tcv tcv'
+                 as'  = as `delVarSet` tcv
+           ; kind_co' <- go_mco cxt kind_co
            ; body' <- go_co (as', env') body_co
-           ; return (co { fco_tcv = tv', fco_kind = kind_co', fco_body = body' }) }
+           ; return (co { fco_tcv = tcv', fco_kind = kind_co', fco_body = body' }) }
 
     go_co cxt co@(FunCo { fco_mult = w, fco_arg = co1 ,fco_res = co2 })
       = do { co1' <- go_co cxt co1
