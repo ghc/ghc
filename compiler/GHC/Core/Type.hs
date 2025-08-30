@@ -210,7 +210,7 @@ module GHC.Core.Type (
         substTyAddInScope,
         substTyUnchecked, substTysUnchecked, substScaledTyUnchecked, substScaledTysUnchecked,
         substThetaUnchecked, substTyWithUnchecked,
-        substCo, substCoUnchecked, substCoWithUnchecked,
+        substCo, substCoWithInScope,
         substTyVarBndr, substTyVarBndrs, substTyVar, substTyVars,
         substVarBndr, substVarBndrs,
         substTyCoBndr, substTyVarToTyVar,
@@ -530,10 +530,13 @@ expandTypeSynonyms ty
       = mkTyConAppCo r tc (map (go_co subst) args)
     go_co subst (AppCo co arg)
       = mkAppCo (go_co subst co) (go_co subst arg)
-    go_co subst (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
+    go_co subst (ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
                           , fco_kind = kind_co, fco_body = co })
-      = let (subst', tv', kind_co') = go_cobndr subst tv kind_co in
-        mkForAllCo tv' visL visR kind_co' (go_co subst' co)
+      = mkForAllCo tcv' visL visR
+                   (go_mco subst kind_co)
+                   (go_co subst' co)
+      where
+        (subst', tcv') = substVarBndr subst tcv
     go_co subst (FunCo r afl afr w co1 co2)
       = mkFunCo2 r afl afr (go_co subst w) (go_co subst co1) (go_co subst co2)
     go_co subst (CoVarCo cv)
@@ -558,8 +561,6 @@ expandTypeSynonyms ty
       = mkSubCo (go_co subst co)
     go_co _ (HoleCo h)
       = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
-
-    go_cobndr subst = substForAllCoBndrUsing (go_co subst) subst
 
 {- Notes on type synonyms
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -971,7 +972,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
       = mkTyConAppCo r tc <$> go_cos env cos
     go_co !env (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
                          , fco_kind = kind_co, fco_body = co })
-      = do { kind_co' <- go_co env kind_co
+      = do { kind_co' <- go_mco env kind_co
            ; tycobinder env tv visL $ \env' tv' ->  do
            ; co' <- go_co env' co
            ; return $ mkForAllCo tv' visL visR kind_co' co' }
