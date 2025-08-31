@@ -63,4 +63,4 @@ test('ManyUbxSums',
         [('ManyUbxSums_Addr.hs','')]
         , '-v0 -dstg-lint -dcmm-lint'])
 
-test('UbxSumUnpackedSize', normal, compile_and_run, ['-O'])
+test('UbxSumUnpackedSize', [js_broken(22374)], compile_and_run, ['-O'])
