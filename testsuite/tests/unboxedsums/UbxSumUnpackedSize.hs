@@ -143,6 +143,9 @@ data U_E2 = U_E2 {-# UNPACK #-} !E2
                  {-# UNPACK #-} !Int8
     deriving (Show)
 
+{-
+  disabled to reduce memory consumption of test
+
 data U_E3 = U_E3 {-# UNPACK #-} !E3
                  {-# UNPACK #-} !Int8
                  {-# UNPACK #-} !Int8
@@ -162,6 +165,7 @@ data U_Mixed = U_Mixed {-# UNPACK #-} !E1
                        {-# UNPACK #-} !Bool
                        {-# UNPACK #-} !Bool
     deriving (Show)
+-}
 
 data U_Maybe = U_Maybe {-# UNPACK #-} !(Maybe Bool)
                        {-# UNPACK #-} !(Maybe Bool)
@@ -209,7 +213,7 @@ u_e1d = U_E1 E1_254 126 127 0 1 2 3 4
 u_e2a :: U_E2
 u_e2a = U_E2 minBound maxBound minBound maxBound
              minBound maxBound minBound maxBound
-
+{-
 u_e3a :: U_E3
 u_e3a = U_E3 minBound maxBound minBound maxBound
              minBound maxBound minBound maxBound
@@ -217,6 +221,7 @@ u_e3a = U_E3 minBound maxBound minBound maxBound
 u_mixed :: U_Mixed
 u_mixed = U_Mixed maxBound minBound maxBound minBound
                   maxBound minBound maxBound minBound
+-}
 
 u_maybe :: U_Maybe
 u_maybe = U_Maybe Nothing (Just False) Nothing (Just True)
@@ -243,7 +248,7 @@ main = do
     test "u_e1c"      u_e1c
     test "u_e1d"      u_e1d
     test "u_e2a"      u_e2a
-    test "u_e3a"      u_e3a
-    test "u_mixed"    u_mixed
+    -- test "u_e3a"      u_e3a
+    -- test "u_mixed"    u_mixed
     test "u_maybe"    u_maybe
     test "u_maybeW32" u_maybeW32

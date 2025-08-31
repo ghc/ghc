@@ -23,14 +23,6 @@ size: 3
 U_E2 E2_1 127 (-128) 127 (-128) 127 (-128) 127
 size: 3
 
-### u_e3a
-U_E3 E3_1 127 (-128) 127 (-128) 127 (-128) 127
-size: 4
-
-### u_mixed
-U_Mixed E1_254 (-128) E2_255 (-32768) 32767 (-32768) True False
-size: 4
-
 ### u_maybe
 U_Maybe Nothing (Just False) Nothing (Just True) Nothing (Just False) Nothing (Just True)
 size: 11
