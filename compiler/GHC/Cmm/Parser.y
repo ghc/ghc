@@ -60,7 +60,7 @@ bar
   x = R1;  // the calling convention is explicit: better be careful
            // that this works on all platforms!
 
-  jump %ENTRY_CODE(Sp(0))
+  jump %ENTRY_CODE(Sp(0))[];
 }
 
 Here is a list of rules for high-level and low-level code.  If you
