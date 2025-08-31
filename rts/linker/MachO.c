@@ -64,7 +64,7 @@ static bool fitsBits(size_t bits, int64_t value);
 static int64_t decodeAddend(ObjectCode * oc, Section * section,
                      MachORelocationInfo * ri);
 static void encodeAddend(ObjectCode * oc, Section * section,
-                  MachORelocationInfo * ri, int64_t addend);
+                  MachORelocationInfo * ri, int64_t addend, MachOSymbol * symbol);
 
 /* Global Offset Table logic */
 static bool isGotLoad(MachORelocationInfo * ri);
@@ -361,15 +361,21 @@ fitsBits(size_t bits, int64_t value) {
 
 static void
 encodeAddend(ObjectCode * oc, Section * section,
-             MachORelocationInfo * ri, int64_t addend) {
+             MachORelocationInfo * ri, int64_t addend, MachOSymbol * symbol) {
     uint32_t * p = (uint32_t*)((uint8_t*)section->start + ri->r_address);
 
     checkProddableBlock(&oc->proddables, (void*)p, 1 << ri->r_length);
 
+    const char *symbol_name = symbol && symbol->name ? (char*)symbol->name : "<unknown>";
+    const char *file_name = oc->fileName ? (char*)oc->fileName : "<unknown>";
+
     switch (ri->r_type) {
         case ARM64_RELOC_UNSIGNED: {
-            if(!fitsBits(8 << ri->r_length, addend))
-                barf("Relocation out of range for UNSIGNED");
+            if(!fitsBits(8 << ri->r_length, addend)) {
+                const char *library_info = OC_INFORMATIVE_FILENAME(oc);
+                barf("Relocation out of range for UNSIGNED in %s: symbol '%s', addend 0x%llx, address 0x%llx, library: %s",
+                     file_name, symbol_name, (long long)addend, (long long)ri->r_address, library_info ? (char*)library_info : "<unknown>");
+            }
             switch (ri->r_length) {
                 case 0: *(uint8_t*)p  = (uint8_t)addend; break;
                 case 1: *(uint16_t*)p = (uint16_t)addend; break;
@@ -382,8 +388,11 @@ encodeAddend(ObjectCode * oc, Section * section,
             return;
         }
         case ARM64_RELOC_SUBTRACTOR: {
-            if(!fitsBits(8 << ri->r_length, addend))
-                barf("Relocation out of range for SUBTRACTOR");
+            if(!fitsBits(8 << ri->r_length, addend)) {
+                const char *library_info = OC_INFORMATIVE_FILENAME(oc);
+                barf("Relocation out of range for SUBTRACTOR in %s: symbol '%s', addend 0x%llx, address 0x%llx, library: %s",
+                     file_name, symbol_name, (long long)addend, (long long)ri->r_address, library_info ? (char*)library_info : "<unknown>");
+            }
             switch (ri->r_length) {
                 case 0: *(uint8_t*)p  = (uint8_t)addend; break;
                 case 1: *(uint16_t*)p = (uint16_t)addend; break;
@@ -400,8 +409,11 @@ encodeAddend(ObjectCode * oc, Section * section,
              * do not need the last two bits of the value. If the value >> 2
              * still exceeds 26bits, we won't be able to reach it.
              */
-            if(!fitsBits(26, addend >> 2))
-                barf("Relocation target for BRACH26 out of range.");
+            if(!fitsBits(26, addend >> 2)) {
+                const char *library_info = OC_INFORMATIVE_FILENAME(oc);
+                barf("Relocation target for BRANCH26 out of range in %s: symbol '%s', addend 0x%llx (0x%llx >> 2), address 0x%llx, library: %s",
+                     file_name, symbol_name, (long long)addend, (long long)(addend >> 2), (long long)ri->r_address, library_info ? (char*)library_info : "<unknown>");
+            }
             *p = (*p & 0xFC000000) | ((uint32_t)(addend >> 2) & 0x03FFFFFF);
             return;
         }
@@ -412,8 +424,12 @@ encodeAddend(ObjectCode * oc, Section * section,
              * with the PAGEOFF12 relocation allows to address a relative range
              * of +-4GB.
              */
-            if(!fitsBits(21, addend >> 12))
-                barf("Relocation target for PAGE21 out of range.");
+            if(!fitsBits(21, addend >> 12)) {
+                const char *reloc_type = (ri->r_type == ARM64_RELOC_PAGE21) ? "PAGE21" : "GOT_LOAD_PAGE21";
+                const char *library_info = OC_INFORMATIVE_FILENAME(oc);
+                barf("Relocation target for %s out of range in %s: symbol '%s', addend 0x%llx (0x%llx >> 12), address 0x%llx, library: %s",
+                     reloc_type, file_name, symbol_name, (long long)addend, (long long)(addend >> 12), (long long)ri->r_address, library_info ? (char*)library_info : "<unknown>");
+            }
             *p = (*p & 0x9F00001F) | (uint32_t)((addend << 17) & 0x60000000)
                                    | (uint32_t)((addend >> 9)  & 0x00FFFFE0);
             return;
@@ -423,8 +439,11 @@ encodeAddend(ObjectCode * oc, Section * section,
             /* Store an offset into a page (4k). Depending on the instruction
              * the bits are stored at slightly different positions.
              */
-            if(!fitsBits(12, addend))
-                barf("Relocation target for PAGEOFF12 out or range.");
+            if(!fitsBits(12, addend)) {
+                const char *library_info = OC_INFORMATIVE_FILENAME(oc);
+                barf("Relocation target for PAGEOFF12 out of range in %s: symbol '%s', addend 0x%llx, address 0x%llx, library: %s",
+                     file_name, symbol_name, (long long)addend, (long long)ri->r_address, library_info ? (char*)library_info : "<unknown>");
+            }
 
             int shift = 0;
             if(isLoadStore(p)) {
@@ -589,7 +608,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                 MachOSymbol* symbol = &oc->info->macho_symbols[ri->r_symbolnum];
                 int64_t addend = decodeAddend(oc, section, ri);
                 uint64_t value = symbol_value(oc, symbol);
-                encodeAddend(oc, section, ri, value + addend);
+                encodeAddend(oc, section, ri, value + addend, symbol);
                 break;
             }
             case ARM64_RELOC_SUBTRACTOR:
@@ -623,7 +642,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
 
                 // combine with addend and store
                 int64_t addend = decodeAddend(oc, section, ri);
-                encodeAddend(oc, section, ri, addend - sub_value + add_value);
+                encodeAddend(oc, section, ri, addend - sub_value + add_value, symbol1);
 
                 // skip next relocation: we've already handled it
                 i += 1;
@@ -664,7 +683,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                         }
                     }
                 }
-                encodeAddend(oc, section, ri, value - pc + addend);
+                encodeAddend(oc, section, ri, value - pc + addend, symbol);
                 break;
             }
             case ARM64_RELOC_PAGE21:
@@ -676,7 +695,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                 uint64_t pc = (uint64_t)section->start + ri->r_address;
                 uint64_t value = (uint64_t)(isGotLoad(ri) ? symbol->got_addr : symbol->addr);
                 ASSERT(!isGotLoad(ri) || (symbol->got_addr != 0));
-                encodeAddend(oc, section, ri, ((value + addend + explicit_addend) & (-4096)) - (pc & (-4096)));
+                encodeAddend(oc, section, ri, ((value + addend + explicit_addend) & (-4096)) - (pc & (-4096)), symbol);
 
                 // reset, just in case.
                 explicit_addend = 0;
@@ -690,7 +709,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                     barf("explicit_addend and addend can't be set at the same time.");
                 uint64_t value = (uint64_t)(isGotLoad(ri) ? symbol->got_addr : symbol->addr);
                 ASSERT(!isGotLoad(ri) || (symbol->got_addr != 0));
-                encodeAddend(oc, section, ri, 0xFFF & (value + addend + explicit_addend));
+                encodeAddend(oc, section, ri, 0xFFF & (value + addend + explicit_addend), symbol);
 
                 // reset, just in case.
                 explicit_addend = 0;
