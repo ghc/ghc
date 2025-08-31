@@ -47,7 +47,7 @@ main = do
   getGhcFieldOrDefault fields "TargetRTSLinkerOnlySupportsSharedLibs" "target RTS linker only supports shared libraries" "NO"
   getGhcFieldOrDefault fields "GhcDynamic" "GHC Dynamic" "NO"
   getGhcFieldOrDefault fields "GhcProfiled" "GHC Profiled" "NO"
-  getGhcFieldOrDefault fields "LeadingUnderscore" "Leading underscore" "NO"
+  getGhcFieldOrDefault fields "GhcLeadingUnderscore" "Leading underscore" "NO"
   getGhcFieldOrDefault fields "GhcTablesNextToCode" "Tables next to code" "NO"
   getGhcFieldProgWithDefault fields "AR" "ar command" "ar"
   getGhcFieldProgWithDefault fields "LLC" "LLVM llc command" "llc"
