@@ -2,8 +2,11 @@
 #include <stdio.h>
 #include <errno.h>
 
-// Prints the state of the signal handlers to stdout
-int main()
+// Prints the state of the signal handlers to stdout.
+// NOTE: We intentionally start at signal 1 (not 0). Signal number 0 is not a
+// real signal; passing 0 to sigismember/sigaction is undefined behaviour and
+// on Darwin was observed to yield memory corruption / junk bytes in output.
+int main(void)
 {
     int open = 0, i;
     sigset_t blockedsigs;
@@ -11,7 +14,7 @@ int main()
     printf("ChildInfo { masked = [");
 
     sigprocmask(SIG_BLOCK, NULL, &blockedsigs);
-    for(i = 0; i < NSIG; ++i)
+    for(i = 1; i < NSIG; ++i)
     {
         int ret = sigismember(&blockedsigs, i);
         if(ret >= 0)
@@ -26,7 +29,7 @@ int main()
     printf("], handlers = [");
 
     open = 0;
-    for(i = 0; i < NSIG; ++i)
+    for(i = 1; i < NSIG; ++i)
     {
         struct sigaction old;
         if(sigaction(i, NULL, &old) >= 0)
