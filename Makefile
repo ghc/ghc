@@ -415,6 +415,7 @@ RTS_H := \
       stg/Regs.h \
       stg/SMP.h \
       stg/Ticky.h \
+      stg/MachRegsForHost.h \
       stg/Types.h
 
 RTS_H_DIRS := \
@@ -777,16 +778,19 @@ _build/stage3/lib/targets/wasm32-unknown-wasi/lib/ghc-interp.js:
 # $4 = host triple
 # $5 = package name and version (ex: bytestring-0.13)
 #
+# NOTE: We must make sure we keep sub-folder structures alive.  There might be
+#       references to $5/build/FOO, we must keep /FOO at the end.  One thing not
+#       retaining this that will break are pubilc sublibraries.
+#
+# FIXME: cabal should just be able to create .conf file properly relocated.  And
+#        allow us to install them into a pre-defined package-db, this would
+#        eliminate this nonsense.
 define patchpackageconf
 	sed -i \
 		-e "s|haddock-interfaces:.*|haddock-interfaces: \"\$${pkgroot}/$3/html/libraries/$5/$1.haddock\"|" \
 		-e "s|haddock-html:.*|haddock-html: \"\$${pkgroot}/$3/html/libraries/$5\"|" \
-        -e "s|import-dirs:.*|import-dirs: \"\$${pkgroot}/../lib/$4/$5\"|" \
-		-e "s|library-dirs:.*|library-dirs: \"\$${pkgroot}/../lib/$4/$5\"|" \
-		-e "s|library-dirs-static:.*|library-dirs-static: \"\$${pkgroot}/../lib/$4/$5\"|" \
-		-e "s|dynamic-library-dirs:.*|dynamic-library-dirs: \"\$${pkgroot}/../lib/$4\"|" \
 		-e "s|data-dir:.*|data-dir: \"\$${pkgroot}/../lib/$4/$5\"|" \
-		-e "s|include-dirs:.*|include-dirs: \"\$${pkgroot}/../lib/$4/$5/include\"|" \
+		-e "s|$(CURDIR)/_build/stage2/build/host/.*/ghc-.*/$5/build|\$${pkgroot}/../lib/$4/$5|" \
 		-e "s|^    $(CURDIR).*||" \
 		$2
 endef
