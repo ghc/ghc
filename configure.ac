@@ -8,10 +8,10 @@ AC_CONFIG_MACRO_DIR([m4])      # For any custom m4 macros
 
 # --- Define GHC Build Options ---
 # Usage: ./configure ProjectVersion=X.Y ...
-AC_ARG_WITH([project-version], [AS_HELP_STRING([--with-project-version=VER], [GHC version (default: 9.13)])], [ProjectVersion="$withval"], [ProjectVersion="9.13"])
+AC_ARG_WITH([project-version], [AS_HELP_STRING([--with-project-version=VER], [GHC version (default: 9.14)])], [ProjectVersion="$withval"], [ProjectVersion="9.14"])
 AC_ARG_WITH([project-version-int], [AS_HELP_STRING([--with-project-version-int=VER], [GHC version as int (default: 913)])], [ProjectVersionInt="$withval"], [ProjectVersionInt="913"])
-AC_ARG_WITH([project-version-munged], [AS_HELP_STRING([--with-project-version-munged=VER], [GHC version "munged" (default: 9.13)])], [ProjectVersionMunged="$withval"], [ProjectVersionMunged="9.13"])
-AC_ARG_WITH([project-version-for-lib], [AS_HELP_STRING([--with-project-version-for-lib=VER], [GHC version for libraries (default: 9.1300)])], [ProjectVersionForLib="$withval"], [ProjectVersionForLib="9.1300"])
+AC_ARG_WITH([project-version-munged], [AS_HELP_STRING([--with-project-version-munged=VER], [GHC version "munged" (default: 9.14)])], [ProjectVersionMunged="$withval"], [ProjectVersionMunged="9.14"])
+AC_ARG_WITH([project-version-for-lib], [AS_HELP_STRING([--with-project-version-for-lib=VER], [GHC version for libraries (default: 9.1400)])], [ProjectVersionForLib="$withval"], [ProjectVersionForLib="9.1400"])
 AC_ARG_WITH([project-patch-level], [AS_HELP_STRING([--with-project-patch-level=VER], [GHC patchlevel version (default: 0)])], [ProjectPatchLevel="$withval"], [ProjectPatchLevel="0"])
 AC_ARG_WITH([project-patch-level1], [AS_HELP_STRING([--with-project-patch-level1=VER], [GHC patchlevel1 version (default: 0)])], [ProjectPatchLevel1="$withval"], [ProjectPatchLevel1="0"])
 AC_ARG_WITH([project-patch-level2], [AS_HELP_STRING([--with-project-patch-level2=VER], [GHC patchlevel2 version (default: 0)])], [ProjectPatchLevel2="$withval"], [ProjectPatchLevel2="0"])

@@ -570,8 +570,8 @@ _build/stage1/lib/package.conf.d/package.cache: _build/stage1/bin/ghc-pkg _build
 	@echo "::group::Creating stage1 package cache..."
 	@mkdir -p _build/stage1/lib/package.conf.d
 # 	@mkdir -p _build/stage2/packagedb/host
-# 	ln -s $(abspath ./_build/stage2/packagedb/host/ghc-9.13) _build/stage1/lib/package.conf.d
-# 	_build/stage1/bin/ghc-pkg init $(abspath ./_build/stage2/packagedb/host/ghc-9.13)
+# 	ln -s $(abspath ./_build/stage2/packagedb/host/ghc-9.14) _build/stage1/lib/package.conf.d
+# 	_build/stage1/bin/ghc-pkg init $(abspath ./_build/stage2/packagedb/host/ghc-9.14)
 	@echo "::endgroup::"
 
 _build/stage1/lib/template-hsc.h: utils/hsc2hs/data/template-hsc.h
