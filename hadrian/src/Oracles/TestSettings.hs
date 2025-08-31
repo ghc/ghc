@@ -73,7 +73,7 @@ testSetting key = do
         TestLLC                   -> "LLC"
         TestTEST_CC               -> "TEST_CC"
         TestTEST_CC_OPTS          -> "TEST_CC_OPTS"
-        TestLeadingUnderscore     -> "LeadingUnderscore"
+        TestLeadingUnderscore     -> "GhcLeadingUnderscore"
         TestGhcPackageDb          -> "GhcGlobalPackageDb"
         TestGhcLibDir             -> "GhcLibdir"
 
