@@ -3,6 +3,7 @@ module Main where
 import GHC.Exts.Heap.Closures
 import Control.Exception (evaluate)
 import Data.Word (Word32)
+import Data.Int (Int8, Int16)
 
 -- this should get a Word8 tag
 data E1
@@ -123,41 +124,41 @@ data U_Bool = U_Bool {-# UNPACK #-} !Bool
     deriving (Show)
 
 data U_E1 = U_E1 {-# UNPACK #-} !E1
-                 {-# UNPACK #-} !E1
-                 {-# UNPACK #-} !E1
-                 {-# UNPACK #-} !E1
-                 {-# UNPACK #-} !E1
-                 {-# UNPACK #-} !E1
-                 {-# UNPACK #-} !E1
-                 {-# UNPACK #-} !E1
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
     deriving (Show)
 
 data U_E2 = U_E2 {-# UNPACK #-} !E2
-                 {-# UNPACK #-} !E2
-                 {-# UNPACK #-} !E2
-                 {-# UNPACK #-} !E2
-                 {-# UNPACK #-} !E2
-                 {-# UNPACK #-} !E2
-                 {-# UNPACK #-} !E2
-                 {-# UNPACK #-} !E2
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
     deriving (Show)
 
 data U_E3 = U_E3 {-# UNPACK #-} !E3
-                 {-# UNPACK #-} !E3
-                 {-# UNPACK #-} !E3
-                 {-# UNPACK #-} !E3
-                 {-# UNPACK #-} !E3
-                 {-# UNPACK #-} !E3
-                 {-# UNPACK #-} !E3
-                 {-# UNPACK #-} !E3
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
+                 {-# UNPACK #-} !Int8
     deriving (Show)
 
 data U_Mixed = U_Mixed {-# UNPACK #-} !E1
-                       {-# UNPACK #-} !E1
+                       {-# UNPACK #-} !Int8
                        {-# UNPACK #-} !E2
-                       {-# UNPACK #-} !E2
-                       {-# UNPACK #-} !E3
-                       {-# UNPACK #-} !E3
+                       {-# UNPACK #-} !Int16
+                       {-# UNPACK #-} !Int16
+                       {-# UNPACK #-} !Int16
                        {-# UNPACK #-} !Bool
                        {-# UNPACK #-} !Bool
     deriving (Show)
@@ -200,12 +201,10 @@ u_e1b = U_E1 maxBound minBound maxBound minBound
              maxBound minBound maxBound minBound
 
 u_e1c :: U_E1
-u_e1c = U_E1 E1_1 E1_2 E1_3 E1_4
-             E1_5 E1_6 E1_7 E1_8
+u_e1c = U_E1 E1_1 126 127 0 1 2 3 4
 
 u_e1d :: U_E1
-u_e1d = U_E1 E1_1 E1_16 E1_32 E1_64
-             E1_127 E1_128 E1_250 E1_254
+u_e1d = U_E1 E1_254 126 127 0 1 2 3 4
 
 u_e2a :: U_E2
 u_e2a = U_E2 minBound maxBound minBound maxBound
