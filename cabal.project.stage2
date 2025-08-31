@@ -81,6 +81,7 @@ constraints:
 
 package *
   library-vanilla: True
+  library-for-ghci: True
   shared: False
   executable-profiling: False
   executable-dynamic: False
@@ -133,6 +134,7 @@ active-repositories: :none
 
 package *
   library-vanilla: True
+  library-for-ghci: True
   shared: False
   executable-profiling: False
   executable-dynamic: False
@@ -168,6 +170,7 @@ tests: False
 
 package *
   library-vanilla: True
+  library-for-ghci: True
   shared: False
   executable-profiling: False
   executable-dynamic: False
