@@ -1189,11 +1189,11 @@ repRuleMatch ConLike = dataCon conLikeDataConName
 repRuleMatch FunLike = dataCon funLikeDataConName
 
 repPhases :: Activation -> MetaM (Core TH.Phases)
-repPhases (ActiveBefore _ i) = do { MkC arg <- coreIntLit i
-                                  ; dataCon' beforePhaseDataConName [arg] }
-repPhases (ActiveAfter _ i)  = do { MkC arg <- coreIntLit i
-                                  ; dataCon' fromPhaseDataConName [arg] }
-repPhases _                  = dataCon allPhasesDataConName
+repPhases (ActiveBefore i) = do { MkC arg <- coreIntLit i
+                                ; dataCon' beforePhaseDataConName [arg] }
+repPhases (ActiveAfter i)  = do { MkC arg <- coreIntLit i
+                                ; dataCon' fromPhaseDataConName [arg] }
+repPhases _                = dataCon allPhasesDataConName
 
 rep_complete_sig :: [LocatedN Name]
                  -> Maybe (LocatedN Name)

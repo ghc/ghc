@@ -734,13 +734,14 @@ instance NoAnn AnnSpecSig where
 data ActivationAnn
   = ActivationAnn {
       aa_openc  :: EpToken "[",
+      aa_phase  :: SourceText,
       aa_closec :: EpToken "]",
       aa_tilde  :: Maybe (EpToken "~"),
       aa_val    :: Maybe EpaLocation
     } deriving (Data, Eq)
 
 instance NoAnn ActivationAnn where
-  noAnn = ActivationAnn noAnn noAnn noAnn noAnn
+  noAnn = ActivationAnn noAnn NoSourceText noAnn noAnn noAnn
 
 
 -- | Optional namespace specifier for fixity signatures,

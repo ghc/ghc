@@ -29,7 +29,7 @@ import GHC.Core.FVs( exprFreeIds )
 import GHC.Types.Id
 import GHC.Types.Var.Env( InScopeSet, lookupInScope )
 import GHC.Types.Var.Set
-import GHC.Types.Basic  ( Arity, RecFlag(..), isActive )
+import GHC.Types.Basic  ( Arity, RecFlag(..) )
 import GHC.Utils.Logger
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -124,7 +124,7 @@ activeUnfolding mode id
   | isCompulsoryUnfolding (realIdUnfolding id)
   = True   -- Even sm_inline can't override compulsory unfoldings
   | otherwise
-  = isActive (sm_phase mode) (idInlineActivation id)
+  =  isActive (sm_phase mode) (idInlineActivation id)
   && sm_inline mode
       -- `or` isStableUnfolding (realIdUnfolding id)
       -- Inline things when

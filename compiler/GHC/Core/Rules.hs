@@ -1902,7 +1902,7 @@ ruleCheckProgram :: RuleOpts                    -- ^ Rule options
                  -> (Id -> [CoreRule])          -- ^ Rules for an Id
                  -> CoreProgram                 -- ^ Bindings to check in
                  -> SDoc                        -- ^ Resulting check message
-ruleCheckProgram ropts phase rule_pat rules binds
+ruleCheckProgram ropts curr_phase rule_pat rules binds
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
   | otherwise
@@ -1912,9 +1912,9 @@ ruleCheckProgram ropts phase rule_pat rules binds
          ]
   where
     line = text (replicate 20 '-')
-    env = RuleCheckEnv { rc_is_active = isActive phase
-                       , rc_id_unf    = idUnfolding     -- Not quite right
-                                                        -- Should use activeUnfolding
+    is_active = isActiveInPhase curr_phase
+    env = RuleCheckEnv { rc_is_active = is_active
+                       , rc_id_unf    = whenActiveUnfoldingFun is_active
                        , rc_pattern   = rule_pat
                        , rc_rules     = rules
                        , rc_ropts     = ropts

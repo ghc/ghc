@@ -2010,25 +2010,27 @@ instance ExactPrint (RuleDecl GhcPs) where
 
 markActivation :: (Monad m, Monoid w)
   => ActivationAnn -> Activation -> EP w m ActivationAnn
-markActivation (ActivationAnn o c t v) act = do
+markActivation (ActivationAnn o src c t v) act = do
   case act of
-    ActiveBefore src phase -> do
+    ActiveBefore phase -> do
       o' <- markEpToken o --  '['
       t' <- mapM markEpToken t -- ~
       v' <- mapM (\val -> printStringAtAA val (toSourceTextWithSuffix src (show phase) "")) v
       c' <- markEpToken c -- ']'
-      return (ActivationAnn o' c' t' v')
-    ActiveAfter src phase -> do
+      return (ActivationAnn o' src c' t' v')
+    ActiveAfter phase -> do
       o' <- markEpToken o --  '['
       v' <- mapM (\val -> printStringAtAA val (toSourceTextWithSuffix src (show phase) "")) v
       c' <- markEpToken c -- ']'
-      return (ActivationAnn o' c' t v')
+      return (ActivationAnn o' src c' t v')
     NeverActive -> do
       o' <- markEpToken o --  '['
       t' <- mapM markEpToken t -- ~
       c' <- markEpToken c -- ']'
-      return (ActivationAnn o' c' t' v)
-    _ -> return (ActivationAnn o c t v)
+      return (ActivationAnn o' src c' t' v)
+
+    -- Other activations don't have corresponding source syntax
+    _ -> return (ActivationAnn o src c t v)
 
 -- ---------------------------------------------------------------------
 

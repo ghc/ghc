@@ -19,18 +19,23 @@ import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith, exprIsConApp_ma
 import GHC.Core.Predicate
 import GHC.Core.Class( classMethods )
 import GHC.Core.Coercion( Coercion )
-import GHC.Core.Opt.Monad
+import GHC.Core.DataCon (dataConTyCon)
+
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
 import GHC.Core.Make      ( mkLitRubbish )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
+import GHC.Core.Subst (substTickish)
+import GHC.Core.TyCon (tyConClass_maybe)
 import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
                           , mkCast, exprType, exprIsHNF
                           , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
+import GHC.Core.Opt.Monad
+import GHC.Core.Opt.Simplify.Env ( SimplPhase(..), isActive )
 
 import GHC.Builtin.Types  ( unboxedUnitTy )
 
@@ -64,9 +69,6 @@ import GHC.Core.Unfold
 
 import Data.List( partition )
 -- import Data.List.NonEmpty ( NonEmpty (..) )
-import GHC.Core.Subst (substTickish)
-import GHC.Core.TyCon (tyConClass_maybe)
-import GHC.Core.DataCon (dataConTyCon)
 
 {-
 ************************************************************************
@@ -1609,7 +1611,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     fn_unf    = realIdUnfolding fn  -- Ignore loop-breaker-ness here
     inl_prag  = idInlinePragma fn
     inl_act   = inlinePragmaActivation inl_prag
-    is_active = isActive (beginPhase inl_act) :: Activation -> Bool
+    is_active :: Activation -> Bool
+    is_active = isActive (SimplPhaseRange (beginPhase inl_act) (endPhase inl_act))
          -- is_active: inl_act is the activation we are going to put in the new
          --   SPEC rule; so we want to see if it is covered by another rule with
          --   that same activation.

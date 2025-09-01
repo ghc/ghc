@@ -537,6 +537,7 @@ test('T25389', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeab
 test('T24359a', normal, compile, ['-O -ddump-rules'])
 test('T24606', [grep_errmsg(r'fAlternativeRWST')], compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-idinfo -dsuppress-coercions -dsuppress-coercion-types'])
 test('T25713', [grep_errmsg('W:::')], compile, ['-O -ddump-simpl'])
+test('T26323b', normal, compile, ['-O'])
 
 test('T25883', normal, compile_grep_core, [''])
 test('T25883b', normal, compile_grep_core, [''])

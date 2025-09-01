@@ -12,6 +12,7 @@ module GHC.Core.Opt.Simplify.Env (
 
         -- * Environments
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
+        SimplPhase(..), isActive,
         seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
         seOptCoercionOpts, sePhase, sePlatform, sePreInline,
@@ -145,7 +146,7 @@ here is between "freely set by the caller" and "internally managed by the pass".
 Note that it doesn't matter for the decision procedure wheter a value is altered
 throughout an iteration of the Simplify pass: The fields sm_phase, sm_inline,
 sm_rules, sm_cast_swizzle and sm_eta_expand are updated locally (See the
-definitions of `updModeForStableUnfoldings` and `updModeForRules` in
+definitions of `updModeForStableUnfoldings` and `updModeForRule{LHS,RHS}` in
 GHC.Core.Opt.Simplify.Utils) but they are still part of `SimplMode` as the
 caller of the Simplify pass needs to provide the initial values for those fields.
 
@@ -250,7 +251,7 @@ seNames env = sm_names (seMode env)
 seOptCoercionOpts :: SimplEnv -> OptCoercionOpts
 seOptCoercionOpts env = sm_co_opt_opts (seMode env)
 
-sePhase :: SimplEnv -> CompilerPhase
+sePhase :: SimplEnv -> SimplPhase
 sePhase env = sm_phase (seMode env)
 
 sePlatform :: SimplEnv -> Platform
@@ -270,7 +271,7 @@ seUnfoldingOpts env = sm_uf_opts (seMode env)
 
 -- See Note [The environments of the Simplify pass]
 data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
-  { sm_phase        :: !CompilerPhase
+  { sm_phase        :: !SimplPhase    -- ^ The phase of the simplifier
   , sm_names        :: ![String]      -- ^ Name(s) of the phase
   , sm_rules        :: !Bool          -- ^ Whether RULES are enabled
   , sm_inline       :: !Bool          -- ^ Whether inlining is enabled
@@ -288,13 +289,76 @@ data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
   , sm_co_opt_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
   }
 
+-- | See Note [SimplPhase]
+data SimplPhase
+  -- | A simplifier phase: InitialPhase, Phase 2, Phase 1, Phase 0, FinalPhase
+  = SimplPhase CompilerPhase
+  -- | Simplifying the RHS of a rule or of a stable unfolding: the range of
+  -- phases of the activation of the rule/stable unfolding.
+  --
+  -- _Invariant:_ 'simplStartPhase' is not a later phase than 'simplEndPhase'.
+  -- Equivalently, 'SimplPhaseRange' is always a non-empty interval of phases.
+  --
+  -- See Note [What is active in the RHS of a RULE?] in GHC.Core.Opt.Simplify.Utils.
+  | SimplPhaseRange
+      { simplStartPhase :: CompilerPhase
+      , simplEndPhase   :: CompilerPhase
+      }
+
+  deriving Eq
+
+instance Outputable SimplPhase where
+  ppr (SimplPhase p) = ppr p
+  ppr (SimplPhaseRange s e) = brackets $ ppr s <> text "..." <> ppr e
+
+-- | Is this activation active in this simplifier phase?
+--
+-- For a phase range, @isActive simpl_phase_range act@ is true if and only if
+-- @act@ is active throughout the entire range, as per
+-- Note [What is active in the RHS of a RULE?] in GHC.Core.Opt.Simplify.Utils.
+--
+-- See Note [SimplPhase].
+isActive :: SimplPhase -> Activation -> Bool
+isActive (SimplPhase p) act = isActiveInPhase p act
+isActive (SimplPhaseRange start end) act =
+  -- To check whether the activation is active throughout the whole phase range,
+  -- it's sufficient to check the endpoints of the phase range, because an
+  -- activation can never have gaps (all activations are phase intervals).
+  isActiveInPhase start act && isActiveInPhase end act
+
+{- Note [SimplPhase]
+~~~~~~~~~~~~~~~~~~~~
+In general, the simplifier is invoked in successive phases:
+
+  InitialPhase, Phase 2, Phase 1, Phase 0, FinalPhase
+
+This allows us to control which rules, specialisations and inlinings are
+active at any given point. For example,
+
+  {-# RULE "myRule" [1] lhs = rhs #-}
+
+starts being active in Phase 1, and stays active thereafter. Thus it is active
+in Phase 1, Phase 0, FinalPhase, but not active in InitialPhase or Phase 2.
+
+This simplifier phase is stored in the sm_phase field of SimplMode, usin
+the 'SimplPhase' constructor. This allows us to determine which rules/inlinings
+are active.
+
+When we invoke the simplifier on the RHS of a rule, such as 'rhs' above, instead
+of setting the simplifier mode to a single phase, we use a phase range
+corresponding to the range of phases in which the rule is active, with the
+'SimplPhaseRange' constructor. This allows us to check whether other rules or
+inlinings are active throughout the whole activation of the rule.
+See Note [What is active in the RHS of a RULE?] in GHC.Core.Opt.Simplify.Utils.
+-}
+
 instance Outputable SimplMode where
-    ppr (SimplMode { sm_phase = p , sm_names = ss
+    ppr (SimplMode { sm_phase = phase , sm_names = ss
                    , sm_rules = r, sm_inline = i
                    , sm_cast_swizzle = cs
                    , sm_eta_expand = eta, sm_case_case = cc })
        = text "SimplMode" <+> braces (
-         sep [ text "Phase =" <+> ppr p <+>
+         sep [ text "Phase =" <+> ppr phase <+>
                brackets (text (concat $ intersperse "," ss)) <> comma
              , pp_flag i   (text "inline") <> comma
              , pp_flag r   (text "rules") <> comma
@@ -312,9 +376,8 @@ data FloatEnable  -- Controls local let-floating
   | FloatNestedOnly    -- Local let-floating for nested (NotTopLevel) bindings only
   | FloatEnabled       -- Do local let-floating on all bindings
 
-{-
-Note [Local floating]
-~~~~~~~~~~~~~~~~~~~~~
+{- Note [Local floating]
+~~~~~~~~~~~~~~~~~~~~~~~~
 The Simplifier can perform local let-floating: it floats let-bindings
 out of the RHS of let-bindings.  See
   Let-floating: moving bindings to give faster programs (ICFP'96)
