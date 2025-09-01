@@ -234,11 +234,13 @@ STAGE1_EXECUTABLES := \
 STAGE2_TARGETS := \
 	ghc-bin:ghc
 
+# rts:threaded-nodebug need it for compiling Setup.hs
 STAGE2_UTIL_TARGETS := \
 	$(STAGE_UTIL_TARGETS) \
 	ghc-iserv:ghc-iserv \
 	rts:nonthreaded-debug \
 	rts:nonthreaded-nodebug \
+	rts:threaded-nodebug \
 	hp2ps:hp2ps \
 	hpc-bin:hpc \
 	runghc:runghc \
