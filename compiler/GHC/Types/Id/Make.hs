@@ -67,7 +67,6 @@ import GHC.Core.Class
 import GHC.Core.DataCon
 
 import GHC.Types.Literal
-import GHC.Types.SourceText
 import GHC.Types.RepType ( countFunRepArgs, typePrimRep )
 import GHC.Types.Name.Set
 import GHC.Types.Name
@@ -1926,8 +1925,7 @@ seqId = pcRepPolyId seqName ty concs info
                        `setArityInfo`      arity
 
     inline_prag
-         = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter
-                 NoSourceText 0
+         = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter 0
                   -- Make 'seq' not inline-always, so that simpleOptExpr
                   -- (see GHC.Core.Subst.simple_app) won't inline 'seq' on the
                   -- LHS of rules.  That way we can have rules for 'seq';

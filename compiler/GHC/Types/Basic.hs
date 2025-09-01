@@ -84,11 +84,13 @@ module GHC.Types.Basic (
         DefMethSpec(..),
         SwapFlag(..), flipSwap, unSwap, notSwapped, isSwapped, pickSwap,
 
-        CompilerPhase(..), PhaseNum, beginPhase, nextPhase, laterPhase,
+        CompilerPhase(..),
+        PhaseNum, nextPhase, laterPhase,
 
-        Activation(..), isActive, competesWith,
+        Activation(..), isActiveInPhase, competesWith,
         isNeverActive, isAlwaysActive, activeInFinalPhase, activeInInitialPhase,
         activateAfterInitial, activateDuringFinal, activeAfter,
+        beginPhase, endPhase, laterThanPhase,
 
         RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), noUserInlineSpec,
@@ -1464,52 +1466,76 @@ The CompilerPhase says which phase the simplifier is running in:
 The phase sequencing is done by GHC.Opt.Simplify.Driver
 -}
 
--- | Phase Number
-type PhaseNum = Int  -- Compilation phase
-                     -- Phases decrease towards zero
-                     -- Zero is the last phase
+-- | Compilation phase number, as can be written by users in INLINE pragmas,
+-- SPECIALISE pragmas, and RULES.
+--
+--   - phases decrease towards zero
+--   - zero is the last phase
+--
+-- Does not include GHC internal "initial" and "final" phases; see 'CompilerPhase'.
+type PhaseNum = Int
 
+-- | Compilation phase number, including the user-specifiable 'PhaseNum'
+-- and the GHC internal "initial" and "final" phases.
 data CompilerPhase
-  = InitialPhase    -- The first phase -- number = infinity!
-  | Phase PhaseNum  -- User-specificable phases
-  | FinalPhase      -- The last phase  -- number = -infinity!
-  deriving Eq
+  = InitialPhase    -- ^ The first phase; number = infinity!
+  | Phase PhaseNum  -- ^ User-specifiable phases
+  | FinalPhase      -- ^ The last phase; number = -infinity!
+  deriving (Eq, Data)
 
 instance Outputable CompilerPhase where
    ppr (Phase n)    = int n
-   ppr InitialPhase = text "InitialPhase"
-   ppr FinalPhase   = text "FinalPhase"
+   ppr InitialPhase = text "initial"
+   ppr FinalPhase   = text "final"
 
--- See Note [Pragma source text]
+-- | An activation is a range of phases throughout which something is active
+-- (like an INLINE pragma, SPECIALISE pragma, or RULE).
 data Activation
   = AlwaysActive
-  | ActiveBefore SourceText PhaseNum  -- Active only *strictly before* this phase
-  | ActiveAfter  SourceText PhaseNum  -- Active in this phase and later
-  | FinalActive                       -- Active in final phase only
+  -- | Active only *strictly before* this phase
+  | ActiveBefore PhaseNum
+  -- | Active in this phase and later phases
+  | ActiveAfter  PhaseNum
+  -- | Active in the final phase only
+  | FinalActive
   | NeverActive
   deriving( Eq, Data )
     -- Eq used in comparing rules in GHC.Hs.Decls
 
 beginPhase :: Activation -> CompilerPhase
--- First phase in which the Activation is active
--- or FinalPhase if it is never active
+-- ^ First phase in which the 'Activation' is active,
+-- or 'FinalPhase' if it is never active
 beginPhase AlwaysActive      = InitialPhase
 beginPhase (ActiveBefore {}) = InitialPhase
-beginPhase (ActiveAfter _ n) = Phase n
+beginPhase (ActiveAfter n)   = Phase n
 beginPhase FinalActive       = FinalPhase
 beginPhase NeverActive       = FinalPhase
 
+endPhase :: Activation -> CompilerPhase
+-- ^ Last phase in which the 'Activation' is active,
+-- or 'InitialPhase' if it is never active
+endPhase AlwaysActive       = FinalPhase
+endPhase (ActiveBefore n)   =
+  if nextPhase InitialPhase == Phase n
+  then InitialPhase
+  else Phase $ n + 1
+endPhase (ActiveAfter {})   = FinalPhase
+endPhase FinalActive        = FinalPhase
+endPhase NeverActive        = InitialPhase
+
 activeAfter :: CompilerPhase -> Activation
--- (activeAfter p) makes an Activation that is active in phase p and after
--- Invariant: beginPhase (activeAfter p) = p
+-- ^ @activeAfter p@ makes an 'Activation' that is active in phase @p@ and after
+--
+-- Invariant: @beginPhase (activeAfter p) = p@
 activeAfter InitialPhase = AlwaysActive
-activeAfter (Phase n)    = ActiveAfter NoSourceText n
+activeAfter (Phase n)    = ActiveAfter n
 activeAfter FinalPhase   = FinalActive
 
 nextPhase :: CompilerPhase -> CompilerPhase
--- Tells you the next phase after this one
--- Currently we have just phases [2,1,0,FinalPhase,FinalPhase,...]
--- Where FinalPhase means GHC's internal simplification steps
+-- ^ Tells you the next phase after this one
+--
+-- Currently we have just phases @[2,1,0,FinalPhase,FinalPhase,...]@,
+-- where FinalPhase means GHC's internal simplification steps
 -- after all rules have run
 nextPhase InitialPhase = Phase 2
 nextPhase (Phase 0)    = FinalPhase
@@ -1517,37 +1543,45 @@ nextPhase (Phase n)    = Phase (n-1)
 nextPhase FinalPhase   = FinalPhase
 
 laterPhase :: CompilerPhase -> CompilerPhase -> CompilerPhase
--- Returns the later of two phases
+-- ^ Returns the later of two phases
 laterPhase (Phase n1)   (Phase n2)   = Phase (n1 `min` n2)
 laterPhase InitialPhase p2           = p2
 laterPhase FinalPhase   _            = FinalPhase
 laterPhase p1           InitialPhase = p1
 laterPhase _            FinalPhase   = FinalPhase
 
+-- | @p1 `laterThanOrEqualPhase` p2@ computes whether @p1@ happens (strictly)
+-- after @p2@.
+laterThanPhase :: CompilerPhase -> CompilerPhase -> Bool
+p1 `laterThanPhase` p2 = toNum p1 < toNum p2
+  where
+    toNum :: CompilerPhase -> Int
+    toNum InitialPhase = maxBound
+    toNum (Phase i)    = i
+    toNum FinalPhase   = minBound
+
 activateAfterInitial :: Activation
--- Active in the first phase after the initial phase
+-- ^ Active in the first phase after the initial phase
 activateAfterInitial = activeAfter (nextPhase InitialPhase)
 
 activateDuringFinal :: Activation
--- Active in the final simplification phase (which is repeated)
+-- ^ Active in the final simplification phase (which is repeated)
 activateDuringFinal = FinalActive
 
-isActive :: CompilerPhase -> Activation -> Bool
-isActive InitialPhase act = activeInInitialPhase act
-isActive (Phase p)    act = activeInPhase p act
-isActive FinalPhase   act = activeInFinalPhase act
+isActiveInPhase :: CompilerPhase -> Activation -> Bool
+isActiveInPhase InitialPhase act = activeInInitialPhase act
+isActiveInPhase (Phase p)    act = activeInPhase p act
+isActiveInPhase FinalPhase   act = activeInFinalPhase act
 
 activeInInitialPhase :: Activation -> Bool
-activeInInitialPhase AlwaysActive      = True
-activeInInitialPhase (ActiveBefore {}) = True
-activeInInitialPhase _                 = False
+activeInInitialPhase act = beginPhase act == InitialPhase
 
 activeInPhase :: PhaseNum -> Activation -> Bool
-activeInPhase _ AlwaysActive       = True
-activeInPhase _ NeverActive        = False
-activeInPhase _ FinalActive        = False
-activeInPhase p (ActiveAfter  _ n) = p <= n
-activeInPhase p (ActiveBefore _ n) = p >  n
+activeInPhase _ AlwaysActive     = True
+activeInPhase _ NeverActive      = False
+activeInPhase _ FinalActive      = False
+activeInPhase p (ActiveAfter  n) = p <= n
+activeInPhase p (ActiveBefore n) = p >  n
 
 activeInFinalPhase :: Activation -> Bool
 activeInFinalPhase AlwaysActive     = True
@@ -1562,25 +1596,19 @@ isNeverActive _           = False
 isAlwaysActive AlwaysActive = True
 isAlwaysActive _            = False
 
-competesWith :: Activation -> Activation -> Bool
+-- | @act1 `competesWith` act2@ returns whether @act1@ is active in the phase
+-- when @act2@ __becomes__ active.
+--
+-- This answers the question: might @act1@ fire first?
+--
+-- NB: this is not the same as computing whether @act1@ and @act2@ are
+-- ever active at the same time.
+--
 -- See Note [Competing activations]
-competesWith AlwaysActive      _                = True
-
-competesWith NeverActive       _                = False
-competesWith _                 NeverActive      = False
-
-competesWith FinalActive       FinalActive      = True
-competesWith FinalActive       _                = False
-
-competesWith (ActiveBefore {})  AlwaysActive      = True
-competesWith (ActiveBefore {})  FinalActive       = False
-competesWith (ActiveBefore {})  (ActiveBefore {}) = True
-competesWith (ActiveBefore _ a) (ActiveAfter _ b) = a < b
-
-competesWith (ActiveAfter {})  AlwaysActive      = False
-competesWith (ActiveAfter {})  FinalActive       = True
-competesWith (ActiveAfter {})  (ActiveBefore {}) = False
-competesWith (ActiveAfter _ a) (ActiveAfter _ b) = a >= b
+competesWith :: Activation -> Activation -> Bool
+competesWith NeverActive  _           = False
+competesWith _            NeverActive = False -- See Wrinkle [Never active rules]
+competesWith act1         act2        = isActiveInPhase (beginPhase act2) act1
 
 {- Note [Competing activations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1595,8 +1623,20 @@ It's too conservative to ensure that the two are never simultaneously
 active.  For example, a rule might be always active, and an inlining
 might switch on in phase 2.  We could switch off the rule, but it does
 no harm.
--}
 
+  Wrinkle [Never active rules]
+
+    Rules can be declared as "never active" by users, using the syntax:
+
+      {-# RULE "blah" [~] ... #-}
+
+        (This feature exists solely for compiler plugins, by making it possible
+        to define a RULE that is never run by GHC, but is nevertheless parsed,
+        typechecked etc, so that it is available to the plugin.)
+
+    We should not warn about competing rules, so make sure that 'competesWith'
+    always returns 'False' when its second argument is 'NeverActive'.
+-}
 
 {- *********************************************************************
 *                                                                      *
@@ -1855,26 +1895,36 @@ setInlinePragmaRuleMatchInfo :: InlinePragma -> RuleMatchInfo -> InlinePragma
 setInlinePragmaRuleMatchInfo prag info = prag { inl_rule = info }
 
 instance Outputable Activation where
-   ppr AlwaysActive       = empty
-   ppr NeverActive        = brackets (text "~")
-   ppr (ActiveBefore _ n) = brackets (char '~' <> int n)
-   ppr (ActiveAfter  _ n) = brackets (int n)
-   ppr FinalActive        = text "[final]"
+   ppr AlwaysActive     = empty
+   ppr NeverActive      = brackets (text "~")
+   ppr (ActiveBefore n) = brackets (char '~' <> int n)
+   ppr (ActiveAfter  n) = brackets (int n)
+   ppr FinalActive      = text "[final]"
+
+instance Binary CompilerPhase where
+  put_ bh InitialPhase = putByte bh 0
+  put_ bh (Phase i)    = do { putByte bh 1; put_ bh i }
+  put_ bh FinalPhase   = putByte bh 2
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return InitialPhase
+      1 -> do { p <- get bh; return (Phase p) }
+      _ -> return FinalPhase
 
 instance Binary Activation where
     put_ bh NeverActive =
             putByte bh 0
-    put_ bh FinalActive =
+    put_ bh FinalActive = do
             putByte bh 1
     put_ bh AlwaysActive =
             putByte bh 2
-    put_ bh (ActiveBefore src aa) = do
+    put_ bh (ActiveBefore aa) = do
             putByte bh 3
-            put_ bh src
             put_ bh aa
-    put_ bh (ActiveAfter src ab) = do
+    put_ bh (ActiveAfter ab) = do
             putByte bh 4
-            put_ bh src
             put_ bh ab
     get bh = do
             h <- getByte bh
@@ -1882,19 +1932,21 @@ instance Binary Activation where
               0 -> return NeverActive
               1 -> return FinalActive
               2 -> return AlwaysActive
-              3 -> do src <- get bh
-                      aa <- get bh
-                      return (ActiveBefore src aa)
-              _ -> do src <- get bh
-                      ab <- get bh
-                      return (ActiveAfter src ab)
-
+              3 -> do aa <- get bh
+                      return (ActiveBefore aa)
+              _ -> do ab <- get bh
+                      return (ActiveAfter ab)
+instance NFData CompilerPhase where
+  rnf = \case
+    InitialPhase -> ()
+    FinalPhase -> ()
+    Phase i -> rnf i
 instance NFData Activation where
   rnf = \case
     AlwaysActive -> ()
     NeverActive -> ()
-    ActiveBefore src aa -> rnf src `seq` rnf aa
-    ActiveAfter src ab -> rnf src `seq` rnf ab
+    ActiveBefore aa -> rnf aa
+    ActiveAfter ab -> rnf ab
     FinalActive -> ()
 
 instance Outputable RuleMatchInfo where
