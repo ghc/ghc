@@ -301,6 +301,7 @@ STAGE3_LIBS := \
 	file-io \
 	filepath \
 	ghc-bignum \
+	ghci \
 	hpc \
 	integer-gmp \
 	mtl \
@@ -564,7 +565,7 @@ _build/stage1/%: private GHC=$(GHC0)
 
 .PHONY: $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES))
 $(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES)) &: private TARGET_PLATFORM=
-$(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES)) &: $(CABAL) | _build/booted
+$(addprefix _build/stage1/bin/,$(STAGE1_EXECUTABLES)) &: $(CABAL) configure rts/configure libraries/ghc-internal/configure
 	@echo "::group::Building stage1 executables ($(STAGE1_EXECUTABLES))..."
 	# Force cabal to replan
 	rm -rf _build/stage1/cache
@@ -678,6 +679,25 @@ _build/stage3/lib/targets/%/bin/unlit: _build/stage2/bin/unlit
 	@mkdir -p $(@D)
 	cp -rfp $< $@
 
+_build/stage3/lib/targets/%/lib/dyld.mjs:
+	@mkdir -p $(@D)
+	@cp -f utils/jsffi/dyld.mjs $@
+	@chmod +x $@
+
+_build/stage3/lib/targets/%/lib/post-link.mjs:
+	@mkdir -p $(@D)
+	@cp -f utils/jsffi/post-link.mjs $@
+	@chmod +x $@
+
+_build/stage3/lib/targets/%/lib/prelude.mjs:
+	@mkdir -p $(@D)
+	@cp -f utils/jsffi/prelude.mjs $@
+	@chmod +x $@
+
+_build/stage3/lib/targets/%/lib/ghc-interp.js:
+	@mkdir -p $(@D)
+	@cp -f ghc-interp.js $@
+
 # $1 = TIPLET
 define build_cross
 	HADRIAN_SETTINGS='$(call HADRIAN_SETTINGS)' \
@@ -691,7 +711,7 @@ endef
 # --- Stage 3 javascript build ---
 
 .PHONY: stage3-javascript-unknown-ghcjs
-stage3-javascript-unknown-ghcjs: _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/settings javascript-unknown-ghcjs-libs _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d/package.cache
+stage3-javascript-unknown-ghcjs: _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/settings javascript-unknown-ghcjs-libs _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/package.conf.d/package.cache _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/dyld.mjs _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/post-link.mjs _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/prelude.mjs _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/ghc-interp.js
 
 _build/stage3/lib/targets/javascript-unknown-ghcjs/lib/settings: _build/stage2/lib/targets/javascript-unknown-ghcjs _build/stage1/bin/ghc-toolchain-bin
 	@mkdir -p $(@D)
@@ -741,7 +761,7 @@ x86_64-musl-linux-libs: _build/stage3/bin/x86_64-musl-linux-ghc-pkg _build/stage
 # --- Stage 3 wasm build ---
 
 .PHONY: stage3-wasm32-unknown-wasi
-stage3-wasm32-unknown-wasi: wasm32-unknown-wasi-libs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/package.conf.d/package.cache _build/stage3/lib/targets/wasm32-unknown-wasi/lib/dyld.mjs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/post-link.mjs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/prelude.mjs
+stage3-wasm32-unknown-wasi: wasm32-unknown-wasi-libs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/package.conf.d/package.cache _build/stage3/lib/targets/wasm32-unknown-wasi/lib/dyld.mjs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/post-link.mjs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/prelude.mjs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/ghc-interp.js
 
 _build/stage3/lib/targets/wasm32-unknown-wasi/lib/settings: _build/stage2/lib/targets/wasm32-unknown-wasi _build/stage1/bin/ghc-toolchain-bin
 	@mkdir -p $(@D)
@@ -762,25 +782,6 @@ wasm32-unknown-wasi-libs: private CROSS_EXTRA_LIB_DIRS=$(WASM_EXTRA_LIB_DIRS)
 wasm32-unknown-wasi-libs: private CROSS_EXTRA_INCLUDE_DIRS=$(WASM_EXTRA_INCLUDE_DIRS)
 wasm32-unknown-wasi-libs: _build/stage3/bin/wasm32-unknown-wasi-ghc-pkg _build/stage3/bin/wasm32-unknown-wasi-ghc _build/stage3/bin/wasm32-unknown-wasi-hsc2hs _build/stage3/lib/targets/wasm32-unknown-wasi/lib/settings _build/stage3/lib/targets/wasm32-unknown-wasi/bin/unlit _build/stage3/lib/targets/wasm32-unknown-wasi/lib/package.conf.d
 	$(call build_cross,wasm32-unknown-wasi)
-
-_build/stage3/lib/targets/wasm32-unknown-wasi/lib/dyld.mjs:
-	@mkdir -p $(@D)
-	@cp -f utils/jsffi/dyld.mjs $@
-	@chmod +x $@
-
-_build/stage3/lib/targets/wasm32-unknown-wasi/lib/post-link.mjs:
-	@mkdir -p $(@D)
-	@cp -f utils/jsffi/post-link.mjs $@
-	@chmod +x $@
-
-_build/stage3/lib/targets/wasm32-unknown-wasi/lib/prelude.mjs:
-	@mkdir -p $(@D)
-	@cp -f utils/jsffi/prelude.mjs $@
-	@chmod +x $@
-
-_build/stage3/lib/targets/wasm32-unknown-wasi/lib/ghc-interp.js:
-	@mkdir -p $(@D)
-	@cp -f ghc-interp.js $@
 
 # --- Bindist ---
 
@@ -902,7 +903,7 @@ _build/packages/hackage.haskell.org/01-index.tar.gz: | $(CABAL)
 	$(CABAL) $(CABAL_ARGS) update --index-state @1745256340
 
 # booted depends on successful source preparation
-_build/booted: libraries/ghc-boot-th-next/.synth-stamp
+configure rts/configure libraries/ghc-internal/configure: configure.ac rts/configure.ac libraries/ghc-internal/configure.ac libraries/ghc-boot-th-next/.synth-stamp
 	@echo "::group::Running ./boot script..."
 	@mkdir -p _build/logs
 	./boot
@@ -1015,4 +1016,4 @@ test: _build/bindist testsuite-timeout
 	@echo "::endgroup::"
 
 # Inform Make that these are not actual files if they get deleted by other means
-.PHONY: clean clean-stage1 clean-stage2 clean-stage3 distclean test all configure
+.PHONY: clean clean-stage1 clean-stage2 clean-stage3 distclean test all

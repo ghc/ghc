@@ -162,6 +162,7 @@ if os(darwin)
     ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
     ghc-options: "-optc-DFS_NAMESPACE=rts"
     flags: +tables-next-to-code +leading-underscore
+    ld-options: -undefined warning
 
 
 program-options
