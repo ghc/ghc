@@ -2458,7 +2458,11 @@ tryInlining env logger var cont
       | not (logHasDumpFlag logger Opt_D_verbose_core2core)
       = when (isExternalName (idName var)) $
             log_inlining $
-                sep [text "Inlining done:", nest 4 (ppr var)]
+              sep [text "Inlining done:", nest 4 (ppr var)]
+            --  $$ nest 2 (vcat
+            --       [ text "Simplifier phase:" <+> ppr (sePhase env)
+            --       , text "Unfolding activation:" <+> ppr (idInlineActivation var)
+            --       ])
       | otherwise
       = log_inlining $
            sep [text "Inlining done: " <> ppr var,
@@ -2645,6 +2649,8 @@ tryRules env rules fn args
       = log_rule Opt_D_dump_rule_rewrites "Rule fired" $ vcat
           [ text "Rule:" <+> ftext (ruleName rule)
           , text "Module:" <+>  printRuleModule rule
+        --, text "Simplifier phase:" <+> ppr (sePhase env)
+        --, text "Rule activation:" <+> ppr (ruleActivation rule)
           , text "Full arity:" <+>  ppr (ruleArity rule)
           , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
           , text "After: " <+> pprCoreExpr rule_rhs ]
@@ -4790,9 +4796,12 @@ simplRules env mb_new_id rules bind_cxt
                  rhs_cont = case bind_cxt of  -- See Note [Rules and unfolding for join points]
                                 BC_Let {}      -> mkBoringStop rhs_ty
                                 BC_Join _ cont -> assertPpr join_ok bad_join_msg cont
-                 lhs_env = updMode updModeForRules env'
-                 rhs_env = updMode (updModeForStableUnfoldings act) env'
-                           -- See Note [Simplifying the RHS of a RULE]
+
+    -- See Note [Simplifying rules] and Note [What is active in the RHS of a RULE?]
+    -- in GHC.Core.Opt.Simplify.Utils.
+                 lhs_env = updMode updModeForRuleLHS env'
+                 rhs_env = updMode (updModeForRuleRHS act) env'
+
                  -- Force this to avoid retaining reference to old Id
                  !fn_name' = case mb_new_id of
                               Just id -> idName id
@@ -4816,12 +4825,3 @@ simplRules env mb_new_id rules bind_cxt
                           , ru_rhs   = occurAnalyseExpr rhs' }) }
                             -- Remember to occ-analyse, to drop dead code.
                             -- See Note [OccInfo in unfoldings and rules] in GHC.Core
-
-{- Note [Simplifying the RHS of a RULE]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We can simplify the RHS of a RULE much as we do the RHS of a stable
-unfolding.  We used to use the much more conservative updModeForRules
-for the RHS as well as the LHS, but that seems more conservative
-than necesary.  Allowing some inlining might, for example, eliminate
-a binding.
--}

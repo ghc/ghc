@@ -10,7 +10,7 @@ import GHC.Prelude
 import GHC.Core.Rules ( RuleBase )
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Opt.Simplify ( SimplifyExprOpts(..), SimplifyOpts(..) )
-import GHC.Core.Opt.Simplify.Env ( FloatEnable(..), SimplMode(..) )
+import GHC.Core.Opt.Simplify.Env ( FloatEnable(..), SimplMode(..), SimplPhase(..) )
 import GHC.Core.Opt.Simplify.Monad ( TopEnvConfig(..) )
 
 import GHC.Driver.Config ( initOptCoercionOpts )
@@ -59,7 +59,7 @@ initSimplifyOpts dflags extra_vars iterations mode hpt_rule_base = let
 initSimplMode :: DynFlags -> CompilerPhase -> String -> SimplMode
 initSimplMode dflags phase name = SimplMode
   { sm_names = [name]
-  , sm_phase = phase
+  , sm_phase = SimplPhase phase
   , sm_rules = gopt Opt_EnableRewriteRules dflags
   , sm_eta_expand = gopt Opt_DoLambdaEtaExpansion dflags
   , sm_cast_swizzle = True

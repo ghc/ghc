@@ -44,7 +44,6 @@ import GHC.Iface.Env    ( newGlobalBinder )
 
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Name.Reader
-import GHC.Types.SourceText
 import GHC.Types.Fixity
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
@@ -379,7 +378,7 @@ mkBindsRep dflags gk loc dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
                max_fields = maximum $ 0 :| map dataConSourceArity datacons
 
            inline1 f = L loc'' . InlineSig noAnn (L loc' f)
-                     $ alwaysInlinePragma { inl_act = ActiveAfter NoSourceText 1 }
+                     $ alwaysInlinePragma { inl_act = ActiveAfter 1 }
 
         -- The topmost M1 (the datatype metadata) has the exact same type
         -- across all cases of a from/to definition, and can be factored out

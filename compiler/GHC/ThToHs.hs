@@ -998,8 +998,8 @@ cvtRuleMatch TH.FunLike = Hs.FunLike
 
 cvtPhases :: TH.Phases -> Activation -> Activation
 cvtPhases AllPhases       dflt = dflt
-cvtPhases (FromPhase i)   _    = ActiveAfter NoSourceText i
-cvtPhases (BeforePhase i) _    = ActiveBefore NoSourceText i
+cvtPhases (FromPhase i)   _    = ActiveAfter  i
+cvtPhases (BeforePhase i) _    = ActiveBefore i
 
 cvtRuleBndr :: TH.RuleBndr -> CvtM (Hs.LRuleBndr GhcPs)
 cvtRuleBndr (RuleVar n)

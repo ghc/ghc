@@ -921,10 +921,8 @@ mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl
     -- The phase /after/ the rule is first active
     get_rule_phase rule = nextPhase (beginPhase (ruleActivation rule))
 
-{-
-Note [Demand on the worker]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Demand on the worker]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the original function is called once, according to its demand info, then
 so is the worker. This is important so that the occurrence analyser can
 attach OneShot annotations to the worker’s lambda binders.

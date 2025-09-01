@@ -1949,7 +1949,7 @@ rule    :: { LRuleDecl GhcPs }
                                    , rd_bndrs = ruleBndrsOrDef $3
                                    , rd_lhs = $4, rd_rhs = $6 }) }
 
--- Rules can be specified to be NeverActive, unlike inline/specialize pragmas
+-- Rules can be specified to be never active, unlike inline/specialize pragmas
 rule_activation :: { (ActivationAnn, Maybe Activation) }
         -- See Note [%shift: rule_activation -> {- empty -}]
         : {- empty -} %shift                    { (noAnn, Nothing) }
@@ -1973,14 +1973,14 @@ rule_activation_marker :: { (Maybe (EpToken "~")) }
 
 rule_explicit_activation :: { ( ActivationAnn
                               , Activation) }  -- In brackets
-        : '[' INTEGER ']'       { ( ActivationAnn (epTok $1) (epTok $3) Nothing (Just (glR $2))
-                                  , ActiveAfter  (getINTEGERs $2) (fromInteger (il_value (getINTEGER $2)))) }
+        : '[' INTEGER ']'       { ( ActivationAnn (epTok $1) (getINTEGERs $2) (epTok $3) Nothing (Just (glR $2))
+                                  , ActiveAfter  (fromInteger (il_value (getINTEGER $2)))) }
         | '[' rule_activation_marker INTEGER ']'
-                                { ( ActivationAnn (epTok $1) (epTok $4) $2 (Just (glR $3))
-                                  , ActiveBefore (getINTEGERs $3) (fromInteger (il_value (getINTEGER $3)))) }
+                                { ( ActivationAnn (epTok $1) (getINTEGERs $3) (epTok $4) $2 (Just (glR $3))
+                                  , ActiveBefore (fromInteger (il_value (getINTEGER $3)))) }
         | '[' rule_activation_marker ']'
-                                { ( ActivationAnn (epTok $1) (epTok $3) $2 Nothing
-                                  , NeverActive) }
+                                { ( ActivationAnn (epTok $1) NoSourceText (epTok $3) $2 Nothing
+                                  , NeverActive ) }
 
 rule_foralls :: { Maybe (RuleBndrs GhcPs) }
         : 'forall' rule_vars '.' 'forall' rule_vars '.'
@@ -2825,11 +2825,11 @@ activation :: { (ActivationAnn,Maybe Activation) }
         | explicit_activation                   { (fst $1,Just (snd $1)) }
 
 explicit_activation :: { (ActivationAnn, Activation) }  -- In brackets
-        : '[' INTEGER ']'       { (ActivationAnn (epTok $1) (epTok  $3) Nothing (Just (glR $2))
-                                  ,ActiveAfter  (getINTEGERs $2) (fromInteger (il_value (getINTEGER $2)))) }
+        : '[' INTEGER ']'       { (ActivationAnn (epTok $1) (getINTEGERs $2) (epTok  $3) Nothing (Just (glR $2))
+                                  ,ActiveAfter   (fromInteger (il_value (getINTEGER $2)))) }
         | '[' rule_activation_marker INTEGER ']'
-                                { (ActivationAnn (epTok $1) (epTok $4) $2 (Just (glR $3))
-                                  ,ActiveBefore (getINTEGERs $3) (fromInteger (il_value (getINTEGER $3)))) }
+                                { (ActivationAnn (epTok $1) (getINTEGERs $3) (epTok $4) $2 (Just (glR $3))
+                                  ,ActiveBefore  (fromInteger (il_value (getINTEGER $3)))) }
 
 -----------------------------------------------------------------------------
 -- Expressions
