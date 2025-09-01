@@ -153,8 +153,8 @@ define HADRIAN_SETTINGS
 [ ("hostPlatformArch",    "$(TARGET_ARCH)") \
 , ("hostPlatformOS",      "$(TARGET_OS)") \
 , ("cProjectGitCommitId", "$(GIT_COMMIT_ID)") \
-, ("cProjectVersion",     "9.13") \
-, ("cProjectVersionInt",  "913") \
+, ("cProjectVersion",     "9.14") \
+, ("cProjectVersionInt",  "914") \
 , ("cProjectPatchLevel",  "0") \
 , ("cProjectPatchLevel1", "0") \
 , ("cProjectPatchLevel2", "0") \
@@ -948,17 +948,51 @@ synth-ghc-boot-th-next:
 
 libraries/ghc-boot-th-next/.synth-stamp: synth-ghc-boot-th-next
 
+# Default: skip performance tests (can override with SKIP_PERF_TESTS=NO)
+SKIP_PERF_TESTS ?= YES
+export SKIP_PERF_TESTS
+
+# --- Test Suite Helper Tool Paths & Flags (Hadrian parity light) ---
+# We approximate Hadrian's test invocation without depending on Hadrian.
+# Bindist places test tools in _build/bindist/bin (created by the bindist target).
+TEST_TOOLS_DIR := _build/bindist/bin
+TEST_GHC       := $(abspath $(TEST_TOOLS_DIR)/ghc)
+TEST_GHC_PKG   := $(abspath $(TEST_TOOLS_DIR)/ghc-pkg)
+TEST_HP2PS     := $(abspath $(TEST_TOOLS_DIR)/hp2ps)
+TEST_HPC       := $(abspath $(TEST_TOOLS_DIR)/hpc)
+TEST_RUN_GHC   := $(abspath $(TEST_TOOLS_DIR)/runghc)
+
+# Canonical GHC flags used by the testsuite (mirrors testsuite/mk/test.mk & Hadrian runTestGhcFlags)
+CANONICAL_TEST_HC_OPTS = \
+	-dcore-lint -dstg-lint -dcmm-lint -no-user-package-db -fno-dump-with-ways \
+	-fprint-error-index-links=never -rtsopts -fno-warn-missed-specialisations \
+	-fshow-warning-groups -fdiagnostics-color=never -fno-diagnostics-show-caret \
+	-Werror=compat -dno-debug-output
+
+# Build timeout utility (needed for some tests) if not already built.
+.PHONY: testsuite-timeout
+testsuite-timeout:
+	$(MAKE) -C testsuite/timeout
+
 
 # --- Test Target ---
-test: _build/bindist
-	@echo "::group::Running tests with THREADS=${THREADS}" >&2
-	TEST_HC=`pwd`/_build/bindist/bin/ghc \
-	TEST_CC=$(CC) \
-	TEST_CXX=$(CXX) \
-	METRICS_FILE=`pwd`/_build/test-perf.csv \
-	SUMMARY_FILE=`pwd`/_build/test-summary.txt \
-	JUNIT_FILE=`pwd`/_build/test-junit.xml \
-	make -C testsuite/tests test THREADS=${THREADS}
+test: _build/bindist testsuite-timeout
+	@echo "::group::Running tests with THREADS=$(THREADS)" >&2
+	# If any required tool is missing, testsuite logic will skip related tests.
+	TEST_HC='$(TEST_GHC)' \
+	GHC_PKG='$(TEST_GHC_PKG)' \
+	HP2PS_ABS='$(TEST_HP2PS)' \
+	HPC='$(TEST_HPC)' \
+	RUNGHC='$(TEST_RUN_GHC)' \
+	TEST_CC='$(CC)' \
+	TEST_CXX='$(CXX)' \
+	TEST_HC_OPTS='$(CANONICAL_TEST_HC_OPTS)' \
+	METRICS_FILE='$(CURDIR)/_build/test-perf.csv' \
+	SUMMARY_FILE='$(CURDIR)/_build/test-summary.txt' \
+	JUNIT_FILE='$(CURDIR)/_build/test-junit.xml' \
+	SKIP_PERF_TESTS='$(SKIP_PERF_TESTS)' \
+	THREADS='$(THREADS)' \
+	$(MAKE) -C testsuite/tests test
 	@echo "::endgroup::"
 
 # Inform Make that these are not actual files if they get deleted by other means
