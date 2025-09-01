@@ -22,7 +22,6 @@ $(do
       [ ".global \"_mydata\""
       , "_mydata:"
       , ".ascii \"Hello world\\0\""
-      , ".section .note.GNU-stack,\"\",@progbits"
       ]
 #else
       [ ".global \"mydata\""
