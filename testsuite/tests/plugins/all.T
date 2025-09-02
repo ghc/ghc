@@ -355,7 +355,8 @@ test('test-echo-in-line-many-args',
 test('plugins-external',
      [extra_files(['shared-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C shared-plugin package.plugins01 TOP={top}'),
-      when(opsys('mingw32') or (opsys('linux') and not ghc_dynamic()), expect_broken(20706))],
+      unless(ghc_dynamic(), skip),
+      when(opsys('mingw32'), expect_broken(20706))],
      makefile_test, [])
 
 test('test-phase-hooks-plugin',
