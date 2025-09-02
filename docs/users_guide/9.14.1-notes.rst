@@ -25,6 +25,14 @@ Language
   This deprecation is controlled by the newly introduced ``-Wdeprecated-pragmas``
   flag in ``-Wdefault``.
 
+* Visible ``GADT`` syntax can now be used in GADT data constructors (:ghc-ticket:`25127`) ::
+
+      data KindVal a where
+          K :: forall k.
+            forall (a::k) ->   -- now allowed!
+            k ->
+            KindVal a
+
 * ``-Wincomplete-record-selectors`` is now part of `-Wall`, as specified
   by `GHC Proposal 516: add warning for incomplete record selectors <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0516-incomplete-record-selectors.rst>`_.
   Hence, if a library is compiled with ``-Werror``, compilation may now fail. Solution: fix the library.
@@ -99,6 +107,9 @@ Language
 
   See :ref:`visible-forall-in-gadts` for details.
 
+- Explicit level import support, allowing ``import`` declarations to explicitly
+  state which compilation stages they are are visible to.
+
 Compiler
 ~~~~~~~~
 
@@ -147,8 +158,13 @@ Compiler
   integer operations.  Also, ``shuffleFloatX4#`` and ``shuffleDoubleX2#`` no longer
   require ``-mavx``.
 
+- Initial native code generator support for the LoongArch CPU architecture.
+
+
 GHCi
 ~~~~
+
+- Multiple home unit support in GHCi
 
 - :ghci-cmd:`:info` now outputs type declarations with ``@``-binders that are
   considered semantically significant. See the documentation for :ghci-cmd:`:info`
@@ -156,6 +172,8 @@ GHCi
 
 - GHCi errors and warnings now have their own numeric error codes that are
   displayed alongside the error.
+
+- Many performance and correctness improvements in the bytecode interpreter.
 
 Runtime system
 ~~~~~~~~~~~~~~
@@ -223,7 +241,6 @@ Cmm
   <https://github.com/haskell/core-libraries-committee/issues/289>`__.
   Downstream consumers of these flags are encouraged to migrate to the
   ``ghc-experimental`` versions.
-
 
 
 ``template-haskell`` library
