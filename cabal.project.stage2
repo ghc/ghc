@@ -1,5 +1,9 @@
 package-dbs: clear, global
 
+-- Import configure/generated feature toggles (dynamic, etc.) if present.
+-- A default file is kept in-tree; configure will overwrite with substituted values.
+import: cabal.project.stage2.settings
+
 packages:
   rts-headers
   rts-fs
@@ -67,6 +71,7 @@ packages:
   utils/runghc
 
 -- project-rts
+-- project-ghc
 benchmarks: False
 tests: False
 allow-boot-library-installs: True
@@ -82,9 +87,9 @@ constraints:
 package *
   library-vanilla: True
   library-for-ghci: True
-  shared: False
+  -- shared/executable-dynamic now controlled by Makefile (DYNAMIC variable)
+  -- so we do not pin them here; default (static) remains when DYNAMIC=0.
   executable-profiling: False
-  executable-dynamic: False
   executable-static: False
 
 -- Maybe we should fix this with some import
@@ -132,13 +137,7 @@ tests: False
 allow-boot-library-installs: True
 active-repositories: :none
 
-package *
-  library-vanilla: True
-  library-for-ghci: True
-  shared: False
-  executable-profiling: False
-  executable-dynamic: False
-  executable-static: False
+-- (removed duplicate global package * stanza; first one applies already)
 
 package rts-headers
   ghc-options: -no-rts
@@ -164,18 +163,6 @@ package text
 program-options
   ghc-options: -fhide-source-paths -j
 
--- project-ghc
-benchmarks: False
-tests: False
-
-package *
-  library-vanilla: True
-  library-for-ghci: True
-  shared: False
-  executable-profiling: False
-  executable-dynamic: False
-  executable-static: False
-
 package ghc-bin
   flags: +internal-interpreter -threaded
 
@@ -184,7 +171,6 @@ package hsc2hs
 
 package haskeline
   flags: -terminfo
-
 
 program-options
   ghc-options: -fhide-source-paths -j

@@ -83,6 +83,18 @@ SHELL := bash
 
 VERBOSE ?= 0
 
+# Enable dynamic runtime/linking support when DYNAMIC=1 is passed on the make
+# command line. This will build shared libraries, a dynamic RTS (defining
+# -DDYNAMIC) and allow tests requiring dynamic linking (e.g. plugins-external)
+# to run. The default remains static to keep rebuild cost low.
+DYNAMIC ?= 0
+
+# If using autoconf feature toggles you can instead run:
+#   ./configure --enable-dynamic --enable-profiling --enable-debug
+# which generates cabal.project.stage2.settings (imported by cabal.project.stage2).
+# The legacy DYNAMIC=1 path still appends flags directly; if both are used the
+# configure-generated settings file (import) and these args should agree.
+
 ROOT_DIR := $(patsubst %/,%,$(dir $(realpath $(lastword $(MAKEFILE_LIST)))))
 
 GHC0 ?= ghc-9.8.4
@@ -129,6 +141,10 @@ override CABAL_BUILD_ARGS += \
 	$(foreach include,$(EXTRA_INCLUDE_DIRS),--extra-include-dirs=$(include)) \
 	--builddir=_build/$(STAGE)/$(TARGET_PLATFORM) \
 	--ghc-options="-fhide-source-paths"
+
+ifeq ($(DYNAMIC),1)
+GHC_CONFIGURE_ARGS += --enable-dynamic
+endif
 
 GHC_TOOLCHAIN_ARGS ?= --disable-ld-override
 

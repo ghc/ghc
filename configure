@@ -612,6 +612,8 @@ ac_unique_file="."
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 PYTHON
+CONSTRAINTS
+ALL_PACKAGES
 SourceRoot
 Suffix
 ProjectPatchLevel2
@@ -670,6 +672,7 @@ with_project_version_for_lib
 with_project_patch_level
 with_project_patch_level1
 with_project_patch_level2
+enable_dynamic
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1288,6 +1291,12 @@ if test -n "$ac_init_help"; then
    esac
   cat <<\_ACEOF
 
+Optional Features:
+  --disable-option-checking  ignore unrecognized --enable/--with options
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-dynamic        Build shared libraries and enable dynamic RTS
+
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
@@ -1840,6 +1849,118 @@ Suffix=""
 SourceRoot="."
 
 
+# --- Feature toggle (dynamic only) for imported project settings ---
+# Check whether --enable-dynamic was given.
+if test ${enable_dynamic+y}
+then :
+  enableval=$enable_dynamic; enable_dynamic=$enableval
+else case e in #(
+  e) enable_dynamic=no ;;
+esac
+fi
+
+
+# Initialize accumulation variables
+ALL_PACKAGES=""
+CONSTRAINTS=""
+
+# Provide defaults first (static)
+
+  if test "x$ALL_PACKAGES" = "x"
+then :
+
+    ALL_PACKAGES="shared: False"
+
+else case e in #(
+  e)
+    as_fn_append ALL_PACKAGES "
+shared: False"
+   ;;
+esac
+fi
+
+
+  if test "x$ALL_PACKAGES" = "x"
+then :
+
+    ALL_PACKAGES="executable-dynamic: False"
+
+else case e in #(
+  e)
+    as_fn_append ALL_PACKAGES "
+executable-dynamic: False"
+   ;;
+esac
+fi
+
+
+if test "x$enable_dynamic" = "xyes"
+then :
+
+        # Override (we rebuild list to avoid mixing static+dynamic lines)
+        ALL_PACKAGES=""
+
+  if test "x$ALL_PACKAGES" = "x"
+then :
+
+    ALL_PACKAGES="shared: True"
+
+else case e in #(
+  e)
+    as_fn_append ALL_PACKAGES "
+shared: True"
+   ;;
+esac
+fi
+
+
+  if test "x$ALL_PACKAGES" = "x"
+then :
+
+    ALL_PACKAGES="executable-dynamic: True"
+
+else case e in #(
+  e)
+    as_fn_append ALL_PACKAGES "
+executable-dynamic: True"
+   ;;
+esac
+fi
+
+
+  if test "x$CONSTRAINTS" = "x"
+then :
+
+    CONSTRAINTS="rts +dynamic"
+
+else case e in #(
+  e)
+    as_fn_append CONSTRAINTS "
+rts +dynamic"
+   ;;
+esac
+fi
+
+
+fi
+
+# Indent with two spaces for substitution blocks (uniform handling)
+ALL_PACKAGES=`printf '%b' "$ALL_PACKAGES"`
+CONSTRAINTS=`printf '%b' "$CONSTRAINTS"`
+ALL_PACKAGES_INDENTED=`printf '%s' "$ALL_PACKAGES" | sed 's/^/  /'`
+CONSTRAINTS_INDENTED=`printf '%s' "$CONSTRAINTS" | sed 's/^/  /'`
+ALL_PACKAGES="$ALL_PACKAGES_INDENTED"
+if test "x$CONSTRAINTS" = "x"
+then :
+  CONSTRAINTS="  -- (none)"
+else case e in #(
+  e) CONSTRAINTS="$CONSTRAINTS_INDENTED" ;;
+esac
+fi
+
+
+
+
 # --- Define Programs ---
 # We don't need to check for CC, MAKE_SET, and others for now, we only want substitution.
 # AC_PROG_CC
@@ -1900,7 +2021,7 @@ fi
 
 # --- Files to generate ---
 # config.status will create these files by substituting @VAR@ placeholders.
-ac_config_files="$ac_config_files ghc/ghc-bin.cabal:ghc/ghc-bin.cabal.in compiler/ghc.cabal:compiler/ghc.cabal.in libraries/ghc-boot/ghc-boot.cabal:libraries/ghc-boot/ghc-boot.cabal.in libraries/ghc-boot-th/ghc-boot-th.cabal:libraries/ghc-boot-th/ghc-boot-th.cabal.in libraries/ghc-boot-th-next/ghc-boot-th-next.cabal:libraries/ghc-boot-th-next/ghc-boot-th-next.cabal.in libraries/ghc-heap/ghc-heap.cabal:libraries/ghc-heap/ghc-heap.cabal.in libraries/template-haskell/template-haskell.cabal:libraries/template-haskell/template-haskell.cabal.in libraries/ghci/ghci.cabal:libraries/ghci/ghci.cabal.in utils/ghc-pkg/ghc-pkg.cabal:utils/ghc-pkg/ghc-pkg.cabal.in utils/ghc-iserv/ghc-iserv.cabal:utils/ghc-iserv/ghc-iserv.cabal.in utils/runghc/runghc.cabal:utils/runghc/runghc.cabal.in libraries/ghc-internal/ghc-internal.cabal:libraries/ghc-internal/ghc-internal.cabal.in libraries/ghc-experimental/ghc-experimental.cabal:libraries/ghc-experimental/ghc-experimental.cabal.in libraries/base/base.cabal:libraries/base/base.cabal.in rts/include/ghcversion.h:rts/include/ghcversion.h.in"
+ac_config_files="$ac_config_files ghc/ghc-bin.cabal:ghc/ghc-bin.cabal.in compiler/ghc.cabal:compiler/ghc.cabal.in libraries/ghc-boot/ghc-boot.cabal:libraries/ghc-boot/ghc-boot.cabal.in libraries/ghc-boot-th/ghc-boot-th.cabal:libraries/ghc-boot-th/ghc-boot-th.cabal.in libraries/ghc-boot-th-next/ghc-boot-th-next.cabal:libraries/ghc-boot-th-next/ghc-boot-th-next.cabal.in libraries/ghc-heap/ghc-heap.cabal:libraries/ghc-heap/ghc-heap.cabal.in libraries/template-haskell/template-haskell.cabal:libraries/template-haskell/template-haskell.cabal.in libraries/ghci/ghci.cabal:libraries/ghci/ghci.cabal.in utils/ghc-pkg/ghc-pkg.cabal:utils/ghc-pkg/ghc-pkg.cabal.in utils/ghc-iserv/ghc-iserv.cabal:utils/ghc-iserv/ghc-iserv.cabal.in utils/runghc/runghc.cabal:utils/runghc/runghc.cabal.in libraries/ghc-internal/ghc-internal.cabal:libraries/ghc-internal/ghc-internal.cabal.in libraries/ghc-experimental/ghc-experimental.cabal:libraries/ghc-experimental/ghc-experimental.cabal.in libraries/base/base.cabal:libraries/base/base.cabal.in rts/include/ghcversion.h:rts/include/ghcversion.h.in cabal.project.stage2.settings:cabal.project.stage2.settings.in"
 
 
 cat >confcache <<\_ACEOF
@@ -2619,6 +2740,7 @@ do
     "libraries/ghc-experimental/ghc-experimental.cabal") CONFIG_FILES="$CONFIG_FILES libraries/ghc-experimental/ghc-experimental.cabal:libraries/ghc-experimental/ghc-experimental.cabal.in" ;;
     "libraries/base/base.cabal") CONFIG_FILES="$CONFIG_FILES libraries/base/base.cabal:libraries/base/base.cabal.in" ;;
     "rts/include/ghcversion.h") CONFIG_FILES="$CONFIG_FILES rts/include/ghcversion.h:rts/include/ghcversion.h.in" ;;
+    "cabal.project.stage2.settings") CONFIG_FILES="$CONFIG_FILES cabal.project.stage2.settings:cabal.project.stage2.settings.in" ;;
 
   *) as_fn_error $? "invalid argument: '$ac_config_target'" "$LINENO" 5;;
   esac

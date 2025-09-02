@@ -29,6 +29,38 @@ AC_SUBST([ProjectPatchLevel2])
 AC_SUBST([Suffix],[""])
 AC_SUBST([SourceRoot],["."])
 
+# --- Feature toggle (dynamic only) for imported project settings ---
+AC_ARG_ENABLE([dynamic],
+        [AS_HELP_STRING([--enable-dynamic],[Build shared libraries and enable dynamic RTS])],
+        [enable_dynamic=$enableval],[enable_dynamic=no])
+
+# Initialize accumulation variables
+ALL_PACKAGES=""
+CONSTRAINTS=""
+
+# Provide defaults first (static)
+APPEND_PKG_FIELD([shared: False])
+APPEND_PKG_FIELD([executable-dynamic: False])
+
+AS_IF([test "x$enable_dynamic" = "xyes"], [
+        # Override (we rebuild list to avoid mixing static+dynamic lines)
+        ALL_PACKAGES=""
+        APPEND_PKG_FIELD([shared: True])
+        APPEND_PKG_FIELD([executable-dynamic: True])
+        APPEND_CONSTRAINT([rts +dynamic])
+])
+
+# Indent with two spaces for substitution blocks (uniform handling)
+ALL_PACKAGES=`printf '%b' "$ALL_PACKAGES"`
+CONSTRAINTS=`printf '%b' "$CONSTRAINTS"`
+ALL_PACKAGES_INDENTED=`printf '%s' "$ALL_PACKAGES" | sed 's/^/  /'`
+CONSTRAINTS_INDENTED=`printf '%s' "$CONSTRAINTS" | sed 's/^/  /'`
+ALL_PACKAGES="$ALL_PACKAGES_INDENTED"
+AS_IF([test "x$CONSTRAINTS" = "x"], [CONSTRAINTS="  -- (none)"], [CONSTRAINTS="$CONSTRAINTS_INDENTED"])
+
+AC_SUBST([ALL_PACKAGES])
+AC_SUBST([CONSTRAINTS])
+
 # --- Define Programs ---
 # We don't need to check for CC, MAKE_SET, and others for now, we only want substitution.
 # AC_PROG_CC
@@ -55,6 +87,7 @@ AC_CONFIG_FILES([
     libraries/ghc-experimental/ghc-experimental.cabal:libraries/ghc-experimental/ghc-experimental.cabal.in
     libraries/base/base.cabal:libraries/base/base.cabal.in
     rts/include/ghcversion.h:rts/include/ghcversion.h.in
+    cabal.project.stage2.settings:cabal.project.stage2.settings.in
 ])
 
 AC_OUTPUT

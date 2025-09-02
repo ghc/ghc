@@ -594,6 +594,9 @@ common rts-global-build-flags
     if !flag(smp)
        ghc-options: -DNOSMP
        cpp-options: -DNOSMP
+    if flag(dynamic)
+       ghc-options: -DDYNAMIC
+       cpp-options: -DDYNAMIC
     if flag(thread-sanitizer)
       cc-options: -fsanitize=thread
       ld-options: -fsanitize=thread
