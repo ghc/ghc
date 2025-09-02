@@ -763,6 +763,7 @@ setTopSessionDynFlags dflags = do
               , jsInterpUnitEnv     = hsc_unit_env hsc_env
               , jsInterpFinderOpts  = initFinderOpts dflags
               , jsInterpFinderCache = hsc_FC hsc_env
+              , jsInterpRtsWays     = ways dflags
               }
          return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader lookup_cache))
 

@@ -64,6 +64,7 @@ module GHC.Driver.DynFlags (
 
         --
         baseUnitId,
+        rtsWayUnitId',
         rtsWayUnitId,
 
 
@@ -1475,16 +1476,19 @@ versionedFilePath platform = uniqueSubdir platform
 baseUnitId :: DynFlags -> UnitId
 baseUnitId dflags = unitSettings_baseUnitId (unitSettings dflags)
 
+rtsWayUnitId' :: Ways -> UnitId
+rtsWayUnitId' ways | ways `hasWay` WayThreaded
+                   , ways `hasWay` WayDebug
+                   = stringToUnitId "rts:threaded-debug"
+                   | ways `hasWay` WayThreaded
+                   = stringToUnitId "rts:threaded-nodebug"
+                   | ways `hasWay` WayDebug
+                   = stringToUnitId "rts:nonthreaded-debug"
+                   | otherwise
+                   = stringToUnitId "rts:nonthreaded-nodebug"
+
 rtsWayUnitId :: DynFlags -> UnitId
-rtsWayUnitId dflags | ways dflags `hasWay` WayThreaded
-                    , ways dflags `hasWay` WayDebug
-                    = stringToUnitId "rts:threaded-debug"
-                    | ways dflags `hasWay` WayThreaded
-                    = stringToUnitId "rts:threaded-nodebug"
-                    | ways dflags `hasWay` WayDebug
-                    = stringToUnitId "rts:nonthreaded-debug"
-                    | otherwise
-                    = stringToUnitId "rts:nonthreaded-nodebug"
+rtsWayUnitId dflags = rtsWayUnitId' (ways dflags)
 
 -- SDoc
 -------------------------------------------
