@@ -65,6 +65,7 @@ import GHC.Core.Map.Expr ( eqCoreExpr )
 import GHC.Core.Opt.Arity( etaExpandToJoinPointRule )
 import GHC.Core.Make     ( mkCoreLams )
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr )
+import GHC.Core.Rules.Config (roBuiltinRules)
 
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
 import GHC.Builtin.Types    ( anyTypeOfKind )
@@ -708,10 +709,8 @@ matchRule :: HasDebugCallStack
 
 matchRule opts rule_env _is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })
--- Built-in rules can't be switched off, it seems
-  = case match_fn opts rule_env fn args of
-        Nothing   -> Nothing
-        Just expr -> Just expr
+  | not (roBuiltinRules opts) = Nothing
+  | otherwise                 = match_fn opts rule_env fn args
 
 matchRule _ rule_env is_active _ args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops

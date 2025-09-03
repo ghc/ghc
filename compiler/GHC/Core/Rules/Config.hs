@@ -14,6 +14,10 @@ data RuleOpts = RuleOpts
    , roExcessRationalPrecision :: !Bool
      -- ^ Cut down precision of Rational values to that of Float/Double if disabled
    , roBignumRules             :: !Bool
-     -- ^ Enable rules for bignums
+     -- ^ Enable built-in bignum rules (requires roBuiltinRules to be True too)
+     --
+     -- See Note [Built-in bignum rules] in GHC.Core.Opt.ConstantFold
+   , roBuiltinRules            :: !Bool
+     -- ^ Enable or disable all builtin rules (including bignum rules)
    }
 

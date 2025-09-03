@@ -592,6 +592,8 @@ data GeneralFlag
    | Opt_NoLlvmMangler                  -- hidden flag
    | Opt_FastLlvm                       -- hidden flag
    | Opt_NoTypeableBinds
+   | Opt_NoBuiltinRules
+   | Opt_NoBignumRules
 
    | Opt_DistinctConstructorTables
    | Opt_InfoTableMap
@@ -973,6 +975,8 @@ codeGenFlags = EnumSet.fromList
    , Opt_ExposeAllUnfoldings
    , Opt_ExposeOverloadedUnfoldings
    , Opt_NoTypeableBinds
+   , Opt_NoBuiltinRules
+   , Opt_NoBignumRules
    , Opt_ObjectDeterminism
    , Opt_Haddock
 

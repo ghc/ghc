@@ -1225,6 +1225,18 @@ Other
     compiler will panic if you try to use Typeable instances of things that you
     built with this flag.
 
+.. ghc-flag:: -dno-builtin-rules
+    :shortdesc: Disable all built-in rewrite rules
+    :type: dynamic
+
+    This disables all the built-in rewrite rules. Mostly useful for debugging.
+
+.. ghc-flag:: -dno-bignum-rules
+    :shortdesc: Disable bignum built-in rewrite rules
+    :type: dynamic
+
+    This disables bignum built-in rewrite rules. Mostly useful for debugging.
+
 .. ghc-flag:: -dtag-inference-checks
     :shortdesc: Affirm tag inference results are correct at runtime.
     :type: dynamic

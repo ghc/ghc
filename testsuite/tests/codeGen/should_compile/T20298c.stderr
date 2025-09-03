@@ -1,0 +1,13 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 11, types: 4, coercions: 0, joins: 0/0}
+
+foo2 = IS 10#
+
+foo1 = IS 20#
+
+foo = + $fNumInteger foo2 foo1
+
+
+

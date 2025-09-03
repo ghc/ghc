@@ -2173,6 +2173,43 @@ builtinRules
 -- there is no benefit to inlining these yet, despite this, GHC produces
 -- unfoldings for this regardless since the floated list entries look small.
 
+
+
+{- Note [Built-in bignum rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have some built-in rules for operations on bignum types (Integer, Natural,
+BigNat). These rules implement the same kind of constant folding as we have for
+Int#/Word#/etc. primops. See builtinBignumRules.
+
+These rules are built-in because they can't be expressed as regular rules for
+now. The reason is that due to the let-can-float invariant (see Note [Core
+let-can-float invariant] in GHC.Core), GHC is too conservative with some bignum
+operations and they don't match rules. For example:
+
+  case integerAdd 1 x of r { _ -> integerAdd 1 r }
+
+doesn't constant-fold into `integerAdd 2 x` with a regular rule. That's because
+GHC never floats in `integerAdd 1 x` to form `integerAdd 1 (integerAdd 1 x)`
+because of the let-can-float invariant (it doesn't know if `integerAdd`
+terminates).
+
+In the built-in rule for `integerAdd` we can access the unfolding of `r` and we
+can perform the appropriate substitution.
+
+To support constant-folding, Bignum operations are not allowed to inline. As a
+consequence, some codes that would benefit from inlining of bignum operations
+don't. An idea to fix this was to only have built-in rules for BigNat#
+operations and to allow Integer and Natural operations to inline. However these
+operations are often too big to inline and we end up with broken
+constant-folding and still no inlining. This issue is tracked in #20361
+
+Bignum built-in rules can be disabled independently of other built-in rules by
+passing the -dno-bignum-rules flag or programmatically with the `roBignumRules` field of
+RuleOpts.
+
+-}
+
+-- | Built-in bignum rules (see Note [Built-in bignum rules])
 builtinBignumRules :: [CoreRule]
 builtinBignumRules =
   [ -- conversions

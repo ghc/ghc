@@ -1660,6 +1660,10 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
   , make_ord_flag defGhcFlag "dno-typeable-binds"
         (NoArg (setGeneralFlag Opt_NoTypeableBinds))
+  , make_ord_flag defGhcFlag "dno-builtin-rules"
+        (NoArg (setGeneralFlag Opt_NoBuiltinRules))
+  , make_ord_flag defGhcFlag "dno-bignum-rules"
+        (NoArg (setGeneralFlag Opt_NoBignumRules))
   , make_ord_flag defGhcFlag "ddump-debug"
         (setDumpFlag Opt_D_dump_debug)
   , make_dep_flag defGhcFlag "ddump-json"

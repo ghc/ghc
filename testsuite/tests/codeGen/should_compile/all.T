@@ -145,3 +145,7 @@ test('T25166', [req_cmm], makefile_test, [])
 test('T25177', normal, compile, ['-O2 -dno-typeable-binds -ddump-simpl -dsuppress-all -dsuppress-uniques -v0'])
 
 test('T16351', normal, compile, ['-O2 -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+
+test('T20298a', normal, compile, ['-O2 -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+test('T20298b', normal, compile, ['-O2 -dno-bignum-rules -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+test('T20298c', normal, compile, ['-O2 -dno-builtin-rules -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])

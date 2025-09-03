@@ -15,5 +15,6 @@ initRuleOpts dflags = RuleOpts
   { roPlatform                = targetPlatform dflags
   , roNumConstantFolding      = gopt Opt_NumConstantFolding dflags
   , roExcessRationalPrecision = gopt Opt_ExcessPrecision dflags
-  , roBignumRules             = True
+  , roBignumRules             = not (gopt Opt_NoBignumRules dflags)
+  , roBuiltinRules            = not (gopt Opt_NoBuiltinRules dflags)
   }
