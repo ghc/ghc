@@ -149,6 +149,9 @@ package rts-fs
 package rts
   ghc-options: -no-rts
 
+package ghc-internal
+  ghc-options: -no-rts
+
 package ghc
   flags: +build-tool-depends +internal-interpreter
 
