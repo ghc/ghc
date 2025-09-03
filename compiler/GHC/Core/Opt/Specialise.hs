@@ -2668,8 +2668,8 @@ specHeader subst (bndr:bndrs) (SpecDict dict_arg : args)
   = do { -- Make up a fresh binder to use in the RULE
          -- It might turn into a dict binding (via bindAuxiliaryDict) which we
          -- then float, so we use cloneIdBndr to get a completely fresh binder
-         us <- getUniqueSupplyM
-       ; let (subst1, bndr') = Core.cloneIdBndr subst us (zapIdOccInfo bndr)
+         u <- getUniqueM
+       ; let (subst1, bndr') = Core.cloneBndr subst u (zapIdOccInfo bndr)
                  -- zapIdOccInfo: see Note [Zap occ info in rule binders]
 
          -- Extend the substitution to map bndr :-> dict_arg, for use in the RHS

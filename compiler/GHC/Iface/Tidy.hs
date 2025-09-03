@@ -644,8 +644,8 @@ chooseExternalVars opts mod tcs binds imp_id_rules
   binders          = map fst $ flattenBinds binds
   binder_set       = mkVarSet binders
 
-  avoids   = [ getOccName name | bndr <- binders,
-                               , let name = idName bndr,
+  avoids   = [ getOccName name | bndr <- binders
+                               , let name = idName bndr
                                ,  isExternalName name ]
           ++ [ getOccName thing | tc <- tcs
                                 , thing <- implicitTyConThings tc ]
