@@ -100,7 +100,6 @@ constraints:
 
 package *
   library-vanilla: True
-  library-for-ghci: True
   shared: False
   executable-profiling: False
   executable-dynamic: False
