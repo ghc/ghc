@@ -895,6 +895,26 @@ _build/bindist/ghc-%.tar.gz: _build/bindist/lib/targets/% _build/bindist/ghc.tar
 		$(foreach exe,$(BINDIST_EXECTUABLES),bin/$${triple}-$(exe)) \
 		lib/targets/$${triple}
 
+_build/bindist/cabal.tar.gz: _build/stage0/bin/cabal
+	@mkdir -p _build/bindist/bin
+	@cp $^ _build/bindist/bin/cabal
+	@tar czf $@ \
+		--directory=_build/bindist \
+		bin/cabal
+
+_build/bindist/haskell-toolchain.tar.gz: _build/bindist/cabal.tar.gz _build/bindist/ghc.tar.gz _build/bindist/ghc-javascript-unknown-ghcjs.tar.gz
+	@tar czf $@ \
+		--directory=_build/bindist \
+		$(foreach exe,$(BINDIST_EXECTUABLES),bin/$(exe)) \
+		lib/ghc-usage.txt \
+		lib/ghci-usage.txt \
+		lib/package.conf.d \
+		lib/settings \
+		lib/template-hsc.h \
+		lib/$(HOST_PLATFORM) \
+		$(foreach exe,$(BINDIST_EXECTUABLES),bin/javascript-unknown-ghcjs-$(exe)) \
+		lib/targets/javascript-unknown-ghcjs \
+		bin/cabal
 
 # --- Configuration ---
 
