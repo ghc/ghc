@@ -129,7 +129,7 @@ def fetch_artifacts(release: str, pipeline_id: int,
                 for f in doc_files:
                     subprocess.run(['tar', '-xf', f, '-C', dest])
                     logging.info(f'extracted docs {f} to {dest}')
-                index_path = destdir / 'docs' / 'index.html'
+                index_path = destdir / 'index.html'
                 index_path.replace(dest / 'index.html')
                 pdfs = list(destdir.glob('*.pdf'))
                 for f in pdfs:
@@ -165,3 +165,4 @@ def main():
     gl = gitlab.Gitlab.from_config(args.profile)
     fetch_artifacts(args.release, args.pipeline,
                     dest_dir=args.output, gl=gl)
+main()

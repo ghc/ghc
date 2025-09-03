@@ -22,9 +22,6 @@ Compiler
 - Fix GHC.SysTools.Ar archive member size writing logic that was emitting wrong
   archive member sizes in headers. (:ghc-ticket:`26120`, :ghc-ticket:`22586`)
 
-- Fix multiple bugs in name resolution of subordinate import lists related to
-  type namespace specifiers and hiding clauses. (:ghc-ticket:`22581`, :ghc-ticket:`25983`, :ghc-ticket:`25984`, :ghc-ticket:`25991`)
-
 - Use mkTrAppChecked in ds_ev_typeable to avoid false negatives for type
   equality involving function types. (:ghc-ticket:`25998`)
 
@@ -39,6 +36,9 @@ Compiler
 
 - Introduce a separate argument limit for forced specs via SPEC argument with
   warning when limit is exceeded. (:ghc-ticket:`25197`)
+
+- Fix compiler crash in the renamer with certain programs referencing out of
+  scope record fields (:ghc-ticket:`25056`)
 
 Build system and packaging
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -79,6 +79,8 @@ WebAssembly backend
 Runtime system
 ~~~~~~~~~~~~~~
 
+- rts: Fix a segfault involving STM (:ghc-ticket:`26205`).
+
 - rts: Implement WEAK EXTERNAL undef redirection by target symbol name.
 
 - rts: Handle API set symbol versioning conflicts.
@@ -97,11 +99,11 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
-- base: Expose Backtraces constructor and fields. (:ghc-ticket:`26049`)
-
 - base: Note strictness changes made in 4.16.0.0. (:ghc-ticket:`25886`)
 
 - Fix bugs in ``integerRecipMod`` and ``integerPowMod`` return values. (:ghc-ticket:`26017`)
+
+- Fix incorrect results for ``naturalAndNot`` (:ghc-ticket:`26230`)
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
@@ -111,9 +113,6 @@ Runtime system
 
 Build tools
 ~~~~~~~~~~~
-
-- configure: Drop probing of ld.gold since `gold` has been dropped from
-  binutils-2.44. (:ghc-ticket:`25716`)
 
 - get-win32-tarballs.py: List tarball files to be downloaded if we cannot find
   them. (:ghc-ticket:`25929`)
