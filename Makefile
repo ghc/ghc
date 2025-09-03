@@ -990,8 +990,7 @@ distclean: clean
 
 # --- Synthesis Targets ---
 # This is such a hack 😱
-.PHONY: synth-ghc-boot-th-next
-synth-ghc-boot-th-next:
+libraries/ghc-boot-th-next/.synth-stamp:
 	@echo "::group::Synthesizing ghc-boot-th-next (copy & sed from ghc-boot-th)..."
 	@mkdir -p libraries/ghc-boot-th-next
 	@src=libraries/ghc-boot-th/ghc-boot-th.cabal.in; \
@@ -1002,10 +1001,8 @@ synth-ghc-boot-th-next:
 	     -e 's/ ghc-boot-th/ ghc-boot-th-next/g' \
 	     $$dst.tmp > $$dst; \
 	 rm -f $$dst.tmp; \
-	 touch libraries/ghc-boot-th-next/.synth-stamp
+	 touch $@
 	@echo "::endgroup::"
-
-libraries/ghc-boot-th-next/.synth-stamp: synth-ghc-boot-th-next
 
 # Default: skip performance tests (can override with SKIP_PERF_TESTS=NO)
 SKIP_PERF_TESTS ?= YES
