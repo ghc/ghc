@@ -178,7 +178,7 @@ dnl Check for libraries
 dnl ################################################################
 
 dnl ** check whether we need -ldl to get dlopen()
-AC_CHECK_LIB([dl], [dlopen], [HAVE_LIBDL=1])
+AC_SEARCH_LIBS([dlopen], [dl])
 dnl ** check whether we have dlinfo
 AC_CHECK_FUNCS([dlinfo])
 
@@ -523,14 +523,9 @@ cat $srcdir/rts.buildinfo.in \
 rm -f external-symbols.flags
 ]
 
+AC_SUBST([EXTRA_LIBS],[` printf " %s " "$LIBS" | sed -E 's/ -l([[^ ]]*)/\1 /g' `])
 AS_IF(
-  [test "$HAVE_LIBDL" = 1],
-  [EXTRA_LIBS="$EXTRA_LIBS dl"])
-AS_IF(
-  [test "$UseLibpthread" = "YES"]
-  [EXTRA_LIBS="$EXTRA_LIBS pthread"])
-AS_IF(
-  [test "x$EXTRA_LIBS" != "x"]
+  [test "`echo $EXTRA_LIBS | sed 's/ //'`" != ""],
   [echo "extra-libraries: $EXTRA_LIBS" >> rts.buildinfo])
 
 dnl --------------------------------------------------------------
