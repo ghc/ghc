@@ -31,7 +31,7 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
-import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs, hasFixedRuntimeRep_syntactic )
+import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
@@ -40,7 +40,7 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Zonk.TcType
 
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConTyCon )
+import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
@@ -425,7 +425,7 @@ quickLookResultType :: TcRhoType -> ExpRhoType -> TcM ()
 -- This function implements the shaded bit of rule APP-Downarrow in
 -- Fig 5 of the QL paper: "A quick look at impredicativity" (ICFP'20).
 quickLookResultType app_res_rho (Check exp_rho) = qlUnify app_res_rho exp_rho
-quickLookResultType  _           _              = return ()
+quickLookResultType _           _               = return ()
 
 -- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
 -- in order to implement the plan of Note [Typechecking data constructors].
@@ -446,11 +446,9 @@ finishApp :: (HsExpr GhcTc, AppCtxt) -> [HsExprArg 'TcpTc]
           -> TcM (HsExpr GhcTc)
 -- Do final checks and wrap up the result
 finishApp tc_head@(tc_fun,_) tc_args app_res_rho res_wrap
-  = do { -- Horrible newtype check
-       ; rejectRepPolyNewtypes tc_head app_res_rho
-
+  = do {
        -- Reconstruct, with a horrible special case for tagToEnum#.
-       ; res_expr <- if isTagToEnum tc_fun
+         res_expr <- if isTagToEnum tc_fun
                      then tcTagToEnum tc_head tc_args app_res_rho
                      else return (rebuildHsApps tc_head tc_args)
        ; traceTc "End tcApp }" (ppr tc_fun)
@@ -749,8 +747,23 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
 
     -- Rule IRESULT from Fig 4 of the QL paper; no more arguments
     go1 _pos acc fun_ty []
-       = do { traceTc "tcInstFun:ret" (ppr fun_ty)
-            ; return (reverse acc, fun_ty) }
+       | XExpr (ConLikeTc (RealDataCon dc)) <- tc_fun
+       , isNewDataCon dc
+       , [Scaled _ arg_ty] <- dataConOrigArgTys dc
+       , n_val_args == 0
+       -- If we're dealing with an unsaturated representation-polymorphic
+       -- UnliftedNewype, then perform a representation-polymorphism check.
+       -- See Note [Representation-polymorphism checks for unsaturated unlifted newtypes]
+       -- in GHC.Tc.Utils.Concrete.
+       , not $ typeHasFixedRuntimeRep arg_ty
+       = do { (wrap_co, arg_ty, res_ty) <-
+                  matchActualFunTy (FRRRepPolyUnliftedNewtype dc)
+                    (Just $ HsExprTcThing tc_fun)
+                    (n_val_args, fun_sigma) fun_ty
+             ; let acc' = addArgWrap (mkWpCastN wrap_co) acc
+             ; return (reverse acc', tcMkScaledFunTy arg_ty res_ty) }
+      | otherwise
+      = return (reverse acc, fun_ty)
 
     -- Rule ITVDQ from the GHC Proposal #281
     go1 pos acc fun_ty ((EValArg { ea_arg = arg }) : rest_args)
@@ -2400,108 +2413,6 @@ tcTagToEnum (tc_fun, fun_ctxt) tc_args res_ty
         isTypeDataTyCon tc    = addErrTc (TcRnTagToEnumResTyTypeData ty')
       | isEnumerationTyCon tc = return ()
       | otherwise             = addErrTc (TcRnTagToEnumResTyNotAnEnum ty')
-
-
-{- *********************************************************************
-*                                                                      *
-           Horrible hack for rep-poly unlifted newtypes
-*                                                                      *
-********************************************************************* -}
-
-{- Note [Eta-expanding rep-poly unlifted newtypes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Any occurrence of a newtype constructor must appear at a known representation.
-If the newtype is applied to an argument, then we are done: by (I2) in
-Note [Representation polymorphism invariants], the argument has a known
-representation, and we are done. So we are left with the situation of an
-unapplied newtype constructor. For example:
-
-  type N :: TYPE r -> TYPE r
-  newtype N a = MkN a
-
-  ok :: N Int# -> N Int#
-  ok = MkN
-
-  bad :: forall r (a :: TYPE r). N (# Int, r #) -> N (# Int, r #)
-  bad = MkN
-
-The difficulty is that, unlike the situation described in
-Note [Representation-polymorphism checking built-ins] in GHC.Tc.Utils.Concrete,
-it is not necessarily the case that we simply need to check the instantiation
-of a single variable. Consider for example:
-
-  type RR :: Type -> Type -> RuntimeRep
-  type family RR a b where ...
-
-  type T :: forall a -> forall b -> TYPE (RR a b)
-  type family T a b where ...
-
-  type M :: forall a -> forall b -> TYPE (RR a b)
-  newtype M a b = MkM (T a b)
-
-Now, suppose we instantiate MkM, say with two types X, Y from the environment:
-
-  foo :: T X Y -> M X Y
-  foo = MkM @X @Y
-
-we need to check that we can eta-expand MkM, for which we need to know the
-representation of its argument, which is "RR X Y".
-
-To do this, in "rejectRepPolyNewtypes", we perform a syntactic representation-
-polymorphism check on the instantiated argument of the newtype, and reject
-the definition if the representation isn't concrete (in the sense of Note [Concrete types]
-in GHC.Tc.Utils.Concrete).
-
-For example, we would accept "ok" above, as "IntRep" is a concrete RuntimeRep.
-However, we would reject "foo", because "RR X Y" is not a concrete RuntimeRep.
-If we wanted to accept "foo" (performing a PHASE 2 check (in the sense of
-Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete), we would have to
-significantly re-engineer unlifted newtypes in GHC. Currently, "MkM" has type:
-
-  MkM :: forall a b. T a b %1 -> M a b
-
-However, we should only be able to use MkM when we know the representation of
-T a b (which is RR a b). This means that MkM should instead have type:
-
-  MkM :: forall {must_be_conc} a b (co :: RR a b ~# must_be_conc)
-      .  T a b |> GRefl Nominal (TYPE co) %1 -> M a b
-
-where "must_be_conc" is a skolem type variable that must be instantiated to a
-concrete type, just as in Note [Representation-polymorphism checking built-ins]
-in GHC.Tc.Utils.Concrete. This means that any instantiation of "MkM", such as
-"MkM @X @Y" from "foo", would create a fresh concrete metavariable "gamma[conc]"
-and emit a Wanted constraint
-
-  [W] co :: RR X Y ~# gamma[conc]
-
-However, this all seems like a lot of work for a feature that no one is asking for,
-so we decided to keep the much simpler syntactic check. Note that one possible
-advantage of this approach is that we should be able to stop skipping
-representation-polymorphism checks in the output of the desugarer; see (C) in
-Wrinkle [Representation-polymorphic lambdas] in Note [Typechecking data constructors].
--}
-
--- | Reject any unsaturated use of an unlifted newtype constructor
--- if the representation of its argument isn't known.
---
--- See Note [Eta-expanding rep-poly unlifted newtypes].
-rejectRepPolyNewtypes :: (HsExpr GhcTc, AppCtxt)
-                      -> TcRhoType
-                      -> TcM ()
-rejectRepPolyNewtypes (fun,_) app_res_rho = case fun of
-
-  XExpr (ConLikeTc (RealDataCon con))
-    -- Check that this is an unsaturated occurrence of a
-    -- representation-polymorphic newtype constructor.
-    | isNewDataCon con
-    , not $ tcHasFixedRuntimeRep $ dataConTyCon con
-    , Just (_rem_arg_af, _rem_arg_mult, rem_arg_ty, _nt_res_ty)
-        <- splitFunTy_maybe app_res_rho
-    -> do { let frr_ctxt = FRRRepPolyUnliftedNewtype con
-          ; hasFixedRuntimeRep_syntactic frr_ctxt rem_arg_ty }
-
-  _ -> return ()
-
 
 {- *********************************************************************
 *                                                                      *

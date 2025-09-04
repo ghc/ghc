@@ -832,8 +832,13 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
              mk_dmd str | isBanged str = evalDmd
                         | otherwise    = topDmd
 
-             wrap_prag = dataConWrapperInlinePragma
-                         `setInlinePragmaActivation` activateDuringFinal
+             wrap_prag
+               | new_tycon
+               -- See Note [Desugaring unlifted newtypes] in GHC.Core.SimpleOpt.
+               = dataConWrapperInlinePragma
+               | otherwise
+               = dataConWrapperInlinePragma
+                    `setInlinePragmaActivation` activateDuringFinal
                          -- See Note [Activation for data constructor wrappers]
 
              -- The wrapper will usually be inlined (see wrap_unf), so its
@@ -849,7 +854,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
                       | otherwise        = mkDataConUnfolding wrap_rhs
              wrap_rhs = mkCoreTyLams wrap_tvbs $
                         mkCoreLams wrap_args $
-                        wrapFamInstBody tycon res_ty_args $
+                        wrapFamInstBody tycon res_ty_args non_wrap_arg_ty $
                         wrap_body
 
        ; return (DCR { dcr_wrap_id = wrap_id
@@ -871,7 +876,20 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
-    wrap_arg_tys = (map unrestricted $ stupid_theta ++ theta) ++ orig_arg_tys
+    wrap_arg_tys
+      | new_tycon
+      -- See Wrinkle [Unlifted newtypes with wrappers]
+      -- in Note [Desugaring unlifted newtypes] in GHC.Core.SimpleOpt.
+      = map unrestricted stupid_theta
+      | otherwise
+      = (map unrestricted $ stupid_theta ++ theta) ++ orig_arg_tys
+    non_wrap_arg_ty
+      | new_tycon
+      , [arg_ty] <- map unrestricted theta ++ orig_arg_tys
+      = Just arg_ty
+      | otherwise
+      = Nothing
+
     wrap_arity   = count isCoVar ex_tvs + length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
@@ -1771,12 +1789,27 @@ unwrapNewTypeBody tycon args result_expr
 -- instance of the representation type, to the corresponding instance of the
 -- family instance type.
 -- See Note [Wrappers for data instance tycons]
-wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
-wrapFamInstBody tycon args body
+wrapFamInstBody :: TyCon -> [Type] -> Maybe (Scaled Type) -> CoreExpr -> CoreExpr
+wrapFamInstBody tycon args mb_fun_arg body
   | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCast body (mkSymCo (mkUnbranchedAxInstCo Representational co_con args []))
+  = mkCast body (mkSymCo $ mkFun (mkUnbranchedAxInstCo Representational co_con args []))
   | otherwise
   = body
+  where
+    -- When dealing with a newtype instance, cast the partially applied newtype
+    -- constructor and not its application, to avoid creating a lambda abstraction
+    -- whose binder doesn't have a fixed RuntimeRep.
+    --
+    -- See Wrinkle [Unlifted newtypes with wrappers]
+    -- in Note [Desugaring unlifted newtypes] in GHC.Core.SimpleOpt.
+    mkFun =
+      case mb_fun_arg of
+        Nothing -> id
+        Just (Scaled m ty) ->
+          let af = case typeTypeOrConstraint ty of
+                     TypeLike -> FTF_T_T
+                     ConstraintLike -> FTF_C_T
+          in mkFunCo Representational af (mkNomReflCo m) (mkRepReflCo ty)
 
 {-
 ************************************************************************

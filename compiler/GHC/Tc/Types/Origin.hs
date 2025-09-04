@@ -1114,13 +1114,6 @@ data FixedRuntimeRepContext
       !RepPolyId
       !(Position Neg)
 
-  -- | A partial application of the constructor of a representation-polymorphic
-  -- unlifted newtype in which the argument type does not have a fixed
-  -- runtime representation.
-  --
-  -- Test cases: UnliftedNewtypesLevityBinder, UnliftedNewtypesCoerceFail.
-  | FRRRepPolyUnliftedNewtype !DataCon
-
   -- | Pattern binds must have a fixed runtime representation.
   --
   -- Test case: RepPolyInferPatBind.
@@ -1257,9 +1250,6 @@ pprFixedRuntimeRepContext (FRRDataConPatArg con i)
       = text "newtype constructor pattern"
       | otherwise
       = text "data constructor pattern in" <+> speakNth i <+> text "position"
-pprFixedRuntimeRepContext (FRRRepPolyUnliftedNewtype dc)
-  = vcat [ text "Unsaturated use of a representation-polymorphic unlifted newtype."
-         , text "The argument of the newtype constructor" <+> quotes (ppr dc) ]
 pprFixedRuntimeRepContext (FRRUnboxedTuple i)
   = text "The" <+> speakNth i <+> text "component of the unboxed tuple"
 pprFixedRuntimeRepContext (FRRUnboxedTupleSection i)
@@ -1578,6 +1568,13 @@ data ExpectedFunTyOrigin
       !(HsExpr GhcRn)
        -- ^ the entire lambda-case expression
 
+  -- | A partial application of the constructor of a representation-polymorphic
+  -- unlifted newtype in which the argument type does not have a fixed
+  -- runtime representation.
+  --
+  -- Test cases: UnliftedNewtypesLevityBinder, UnliftedNewtypesCoerceFail.
+  | FRRRepPolyUnliftedNewtype !DataCon
+
 pprExpectedFunTyOrigin :: ExpectedFunTyOrigin
                        -> Int -- ^ argument position (starting at 1)
                        -> SDoc
@@ -1603,6 +1600,9 @@ pprExpectedFunTyOrigin funTy_origin i =
       -> text "The" <+> speakNth i <+> text "pattern in the equation" <> plural alts
      <+> text "for" <+> quotes (ppr fun)
     ExpectedFunTyLam lam_variant _ -> binder_of $ lamCaseKeyword lam_variant
+    FRRRepPolyUnliftedNewtype dc ->
+      vcat [ text "Unsaturated use of a representation-polymorphic unlifted newtype."
+           , text "The argument of the newtype constructor" <+> quotes (ppr dc) ]
   where
     the_arg_of :: SDoc
     the_arg_of = text "The" <+> speakNth i <+> text "argument of"
@@ -1625,6 +1625,8 @@ pprExpectedFunTyHerald (ExpectedFunTyLam lam_variant expr)
                      <+> quotes (pprSetDepth (PartWay 1) (ppr expr))
                -- The pprSetDepth makes the lambda abstraction print briefly
         , text "has" ]
+pprExpectedFunTyHerald (FRRRepPolyUnliftedNewtype dc)
+  = text "The unlifted newtype" <+> quotes (ppr dc) <+> text "expects"
 
 {- *******************************************************************
 *                                                                    *

@@ -445,7 +445,7 @@ UnliftedNewtypes:
 Test cases: T18481, UnliftedNewtypesLevityBinder
 
 (4) is handled differently than (1) (2) and (3);
-see Note [Eta-expanding rep-poly unlifted newtypes].
+see Note [Representation-polymorphism checks for unsaturated unlifted newtypes].
 
 Note [Representation-polymorphism checking built-ins]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -496,8 +496,8 @@ type of catch# occurs in negative position but not directly as the type of
 an argument.
 
 NB: we specifically *DO NOT* handle representation-polymorphic unlifted newtypes
-with this mechanism. See Note [Eta-expanding rep-poly unlifted newtypes] for an
-overview of representation-polymorphism checks for those.
+with this mechanism. See Note [Representation-polymorphism checks for unsaturated unlifted newtypes]
+for an overview of representation-polymorphism checks for those.
 
 To achieve this goal, for these these three kinds of `hasNoBinding` functions:
 
@@ -602,6 +602,70 @@ Examples:
 
   does not allow the RuntimeRep argument to be specified by a visible type
   application.
+
+Note [Representation-polymorphism checks for unsaturated unlifted newtypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Any occurrence of a newtype constructor must appear at a known representation.
+If the newtype is applied to an argument, then we are done: by (I2) in
+Note [Representation polymorphism invariants], the argument has a known
+representation. So we are left with the situation of an unapplied newtype
+constructor. For example:
+
+  {-# LANGUAGE UnliftedNewtypes #-}
+
+  type N :: TYPE r -> TYPE r
+  newtype N a = MkN a
+
+  ok :: N Int# -> N Int#
+  ok = MkN
+
+  bad :: forall r (a :: TYPE r). N (# Int, r #) -> N (# Int, r #)
+  bad = MkN
+
+The difficulty is that, unlike the situation described in
+Note [Representation-polymorphism checking built-ins] in GHC.Tc.Utils.Concrete,
+it is difficult to solve this using the mechanism of concrete type variables.
+Consider for example:
+
+  type RR :: Type -> Type -> RuntimeRep
+  type family RR a b where { RR Int Bool = LiftedRep }
+
+  type T :: forall a -> forall b -> TYPE (RR a b)
+  type family T a b where { T Int Bool = Char }
+
+  type M :: forall a -> forall b -> TYPE (RR a b)
+  newtype M a b = MkM (T a b)
+
+Now, suppose we instantiate MkM:
+
+  ok2 :: T Int Bool -> M Int Bool
+  ok2 = MkM @Int @Bool
+
+This should be accepted: the newtype constructor turns into a lambda, and we
+can give the lambda binder a type that does not violate the
+representation-polymorphism invariants:
+
+  ok2 :: T Int Bool -> M Int Bool
+  ok2 = ( \ (x :: T Int Bool |> frr_arg_co) -> x |> nt_co ) |> outer_co
+
+  The only thing to understand here is that we insert a cast by frr_arg_co
+  in order to ensure that the lambda binder has a syntactically fixed RuntimeRep.
+  All the other coercions just fall out from making everything else line up.
+
+If we wanted to accept this program by the method of Note [Representation-polymorphism checking built-ins],
+we would have to give 'MkM' some horrid type which quantifies over a coercion
+variable, perhaps something like:
+
+  forall r[conc] a b. forall (co :: RR a b ~ r). T a b |> TYPE co -> M a b
+
+Instead, we add a special case at the end of 'tcInstFun' (grep 'FRRRepPolyUnliftedNewtype'),
+when the head of the application is a representation-polymorphic unlifted
+newtypes and we don't have any value arguments, which calls 'matchActualFunTy'
+just like when we perform a representation-polymorphism check and we do have a
+value argument.
+
+This plan allows us to reject 'bad' while accepting both 'ok' and 'ok2'.
+Tested in T21650_{a,b}.
 -}
 
 -- | Given a type @ty :: ki@, this function ensures that @ty@
