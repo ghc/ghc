@@ -805,6 +805,13 @@ RTS_SUBLIBS := \
 # $4 = host triple
 # $5 = package name and version (ex: bytestring-0.13)
 #
+# NOTE: We must make sure we keep sub-folder structures alive.  There might be
+#       references to $5/build/FOO, we must keep /FOO at the end.  One thing not
+#       retaining this that will break are pubilc sublibraries.
+#
+# FIXME: cabal should just be able to create .conf file properly relocated.  And
+#        allow us to install them into a pre-defined package-db, this would
+#        eliminate this nonsense.
 define patchpackageconf
     case $5 in \
 		rts-*-nonthreaded-nodebug) \

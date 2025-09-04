@@ -104,6 +104,23 @@ package *
   executable-profiling: False
   executable-dynamic: False
   executable-static: False
+  -- library-for-ghci will cause a `ld -r` call to create pre-linked objects.
+  -- This helps the internal linker when trying to link (.a) archives with massive
+  -- displacements. In that case the displacement can be in excess of what
+  -- is possible to relocate, and the linker fails. Pre-linking the objects helps with
+  -- this (and linking performance, as we need to process fewer relocations).
+  -- 
+  -- For some cross targets like JavaScript, this will fail as the $LD -r invocation
+  -- might not be properly supported.
+  --
+  --   fs.o: file not recognized: file format not recognized
+  --
+  -- Thus for cross compilers, we outright disable this here. The primary offending
+  -- library is libHSghc, which can easily be 150MB+
+  --
+  -- TODO: this is rather fragile, and should be fixed properly by making pre-linked
+  --             objects of have GHC pre-link excessively large archives on-demand.
+  library-for-ghci: False
 
 if os(wasi)
   package *
@@ -161,8 +178,6 @@ if os(darwin)
     ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
     ghc-options: "-optc-DFS_NAMESPACE=rts"
     flags: +tables-next-to-code +leading-underscore
-    ld-options: -undefined warning
-
 
 program-options
   ghc-options: -fhide-source-paths -j

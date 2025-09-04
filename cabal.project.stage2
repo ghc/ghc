@@ -149,6 +149,37 @@ package rts-fs
 package rts
   ghc-options: -no-rts
 
+-- We end up injecting the following depednency:
+--
+--   ghc-internal
+--    '- rts:<sublib>
+--     '- rts
+--
+-- Because the ghc-internal package depends on the
+-- rts implementation (in the sublib), however GHC
+-- is responsible for dependency injecting the right
+-- implementation.
+--
+-- During the bootsrap phase of building GHC, there
+-- is a race condition where ghc-bin depends on
+-- the rts:<sublib> and also on ghc-internal, hence
+-- we can occationally end up in the state where we
+-- try to build the ghc-internal library, while the
+-- rts:<sublib> isn't yet built.
+--
+-- Modelling this in cabal properly is hard. Relying
+-- on chance to build it in the right sequence is
+-- also bad. Disabling this check outright in ghc
+-- is bad because under all circumstances (except
+-- bootstrapping) this is an essential dependency that
+-- must exist.
+--
+-- MAYBE: a better option is to push this check to
+--        the link time only. However we then don't
+--        have the ghc-internal available earlier
+--        throughout the session. See
+--          GHC.Unit.State:mkUnitState
+--
 package ghc-internal
   ghc-options: -no-rts
 
