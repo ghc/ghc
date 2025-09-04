@@ -1176,11 +1176,11 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
       | isHsThingRnExpr o
       , isHsThingRnExpr o'
       = exp x x'
-    exp (HsVar _ i) (HsVar _ i') =  i == i'
-    exp (XExpr (ConLikeTc c _ _)) (XExpr (ConLikeTc c' _ _)) = c == c'
-    -- the instance for IPName derives using the id, so this works if the
-    -- above does
-    exp (HsIPVar _ i) (HsIPVar _ i') = i == i'
+    exp (HsVar _ i) (HsVar _ i') = i == i'
+    exp (HsIPVar _ i) (HsIPVar _ i') =
+      -- the instance for IPName derives using the id, so follow the HsVar case
+      i == i'
+    exp (XExpr (ConLikeTc c)) (XExpr (ConLikeTc c')) = c == c'
     exp (HsOverLit _ l) (HsOverLit _ l') =
         -- Overloaded lits are equal if they have the same type
         -- and the data is the same.
@@ -1240,13 +1240,18 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     --        equating different ways of writing a coercion)
     wrap WpHole WpHole = True
     wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
-    wrap (WpFun w1 w2 _ _) (WpFun w1' w2' _ _) = wrap w1 w1' && wrap w2 w2'
+    wrap (WpFun m1 w1 w2 _ _) (WpFun m2 w1' w2' _ _) = sub_mult m1 m2 && wrap w1 w1' && wrap w2 w2'
     wrap (WpCast co)       (WpCast co')        = co `eqCoercion` co'
     wrap (WpEvApp et1)     (WpEvApp et2)       = et1 `ev_term` et2
     wrap (WpTyApp t)       (WpTyApp t')        = eqType t t'
     -- Enhancement: could implement equality for more wrappers
     --   if it seems useful (lams and lets)
     wrap _ _ = False
+
+    sub_mult :: SubMultCo -> SubMultCo -> Bool
+    sub_mult (EqMultCo co1) (EqMultCo co2) = co1 `eqCoercion` co2
+    sub_mult (OneSubMult m1) (OneSubMult m2) = eqType m1 m2
+    sub_mult _ _ = False
 
     ---------
     ev_term :: EvTerm -> EvTerm -> Bool

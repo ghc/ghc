@@ -718,7 +718,9 @@ lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty uf
   | isStableUnfolding uf
   , Just rhs <- maybeUnfoldingTemplate uf
-  = do { ty <- fst <$> (if isCompulsoryUnfolding uf
+  = noMultiplicityChecks $ -- Skip linearity checking for unfoldings
+                           -- See Note [Linting linearity]
+  do { ty <- fst <$> (if isCompulsoryUnfolding uf
                         then noFixedRuntimeRepChecks $ lintRhs bndr rhs
             --               ^^^^^^^^^^^^^^^^^^^^^^^
             -- See Note [Checking for representation polymorphism]
@@ -1110,12 +1112,13 @@ lintJoinBndrType body_ty bndr
   | JoinPoint arity <- idJoinPointHood bndr
   , let bndr_ty = idType bndr
   , (bndrs, res) <- splitPiTys bndr_ty
-  = checkL (length bndrs >= arity
-            && body_ty `eqType` mkPiTys (drop arity bndrs) res) $
-    hang (text "Join point returns different type than body")
-       2 (vcat [ text "Join bndr:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
-               , text "Join arity:" <+> ppr arity
-               , text "Body type:" <+> ppr body_ty ])
+  = do let msg =
+             hang (text "Join point returns different type than body")
+                2 (vcat [ text "Join bndr:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
+                        , text "Join arity:" <+> ppr arity
+                        , text "Body type:" <+> ppr body_ty ])
+       checkL (length bndrs >= arity) msg
+       ensureEqTys body_ty (mkPiTys (drop arity bndrs) res) msg
   | otherwise
   = return ()
 
@@ -2224,7 +2227,9 @@ lintCoreRule _ _ (BuiltinRule {})
 
 lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                    , ru_args = args, ru_rhs = rhs })
-  = lintBinders LambdaBind bndrs $ \ _ ->
+  = noMultiplicityChecks $ -- Skip linearity checking for rules
+                           -- See Note [Linting linearity]
+    lintBinders LambdaBind bndrs $ \ _ ->
     do { (lhs_ty, _) <- lintCoreArgs (fun_ty, zeroUE) args
        ; (rhs_ty, _) <- case idJoinPointHood fun of
                      JoinPoint join_arity
@@ -3142,6 +3147,10 @@ Concretely, "ignore linearity in Lint" specifically means two things:
 * In `ensureEqTypes`, use `eqTypeIgnoringMultiplicity`
 * In `ensureSubMult`, do nothing
 
+Note that we also skip linearity checking when linting unfoldings and rules,
+because we run the (simple) optimiser on both of those before feeding them to
+Core Lint, which can break linearity.
+
 Here are some examples of how the optimiser can break linearity checking.  Other
 examples are documented in the linear-type implementation wiki page
 [https://gitlab.haskell.org/ghc/ghc/-/wikis/linear-types/implementation#core-to-core-passes]
@@ -3364,13 +3373,21 @@ setReportUnsat ru thing_inside
 
 -- See Note [Checking for representation polymorphism]
 noFixedRuntimeRepChecks :: LintM a -> LintM a
-noFixedRuntimeRepChecks thing_inside
-  = LintM $ \env errs ->
-    let env' = env { le_flags = (le_flags env) { lf_check_fixed_rep = False } }
-    in unLintM thing_inside env' errs
+noFixedRuntimeRepChecks =
+  updLintFlags $ \ flags -> flags { lf_check_fixed_rep = False }
+
+noMultiplicityChecks :: LintM a -> LintM a
+noMultiplicityChecks =
+  updLintFlags $ \ flags -> flags { lf_check_linearity = False }
 
 getLintFlags :: LintM LintFlags
 getLintFlags = LintM $ \ env errs -> fromBoxedLResult (Just (le_flags env), errs)
+
+updLintFlags :: (LintFlags -> LintFlags) -> LintM a -> LintM a
+updLintFlags upd_flags thing_inside
+  = LintM $ \env errs ->
+    let env' = env { le_flags = upd_flags (le_flags env) }
+    in unLintM thing_inside env' errs
 
 checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()

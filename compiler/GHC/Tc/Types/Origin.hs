@@ -1200,6 +1200,7 @@ data FixedRuntimeRepContext
   | forall p. FRRDeepSubsumption
       { frrDSExpected :: Bool
       , frrDSPosition :: Position p
+      , frrAppHead    :: Maybe (HsExpr GhcTc)
       }
 
 -- | The description of a representation-polymorphic 'Id'.
@@ -1282,13 +1283,17 @@ pprFixedRuntimeRepContext (FRRArrow arrowContext)
   = pprFRRArrowContext arrowContext
 pprFixedRuntimeRepContext (FRRExpectedFunTy funTyOrig arg_pos)
   = pprExpectedFunTyOrigin funTyOrig arg_pos
-pprFixedRuntimeRepContext (FRRDeepSubsumption is_exp pos)
+pprFixedRuntimeRepContext (FRRDeepSubsumption is_exp pos mb_fun)
   = hsep [ text "The", what, text "type of the"
          , ppr (Argument pos)
-         , text "of the eta-expansion"
+         , text "of" <+> ppr_fun
          ]
   where
     what = if is_exp then text "expected" else text "actual"
+    ppr_fun =
+      case mb_fun of
+        Nothing  -> text "the eta expansion"
+        Just fun -> quotes (ppr fun)
 
 instance Outputable FixedRuntimeRepContext where
   ppr = pprFixedRuntimeRepContext

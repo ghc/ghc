@@ -678,19 +678,9 @@ ds_app (XExpr (WrapExpr hs_wrap fun)) hs_args core_args
                                   ; return (core_wrap core_fun) }
                  ; return (mkCoreApps core_fun all_args) } }
 
-ds_app (XExpr (ConLikeTc con tvs tys)) _hs_args core_args
--- Desugar desugars 'ConLikeTc': it eta-expands
--- data constructors to make linear types work.
--- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
+ds_app (XExpr (ConLikeTc con)) _hs_args core_args
   = do { ds_con <- dsHsConLike con
-       ; ids    <- newSysLocalsDs tys
-           -- NB: these 'Id's may be representation-polymorphic;
-           -- see Wrinkle [Representation-polymorphic lambda] in
-           -- Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
-       ; let core_fun = mkLams tvs $ mkLams ids $
-                        ds_con `mkTyApps` mkTyVarTys tvs
-                               `mkVarApps` ids
-       ; return (mkApps core_fun core_args) }
+       ; return (mkApps ds_con core_args) }
 
 ds_app (XExpr (HsRecSelTc (FieldOcc { foLabel = L _ sel_id }))) _hs_args core_args
   = ds_app_rec_sel sel_id sel_id core_args

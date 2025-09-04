@@ -64,7 +64,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.Subst    as Core
 import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
-import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCo.Compare( eqType, eqTypeIgnoringMultiplicity )
 
 import GHC.Types.Demand
 import GHC.Types.Cpr( CprSig, mkCprSig, botCpr )
@@ -3066,7 +3066,7 @@ push_data_con :: TyCon -> [Type] -> DataCon -> [CoreExpr]
               -> CoercionR -> Role                  -- Coercion and its role
               -> (DataCon, [Type], [CoreExpr])
 push_data_con to_tc to_tc_arg_tys dc dc_args co role
-  = assertPpr (eqType from_ty dc_app_ty)     dump_doc $
+  = assertPpr (eqTypeIgnoringMultiplicity from_ty dc_app_ty) dump_doc $
     assertPpr (equalLength val_args arg_tys) dump_doc $
     assertPpr (role == coercionRole co)      dump_doc $
     assertPpr (isInjectiveTyCon to_tc role)  dump_doc $

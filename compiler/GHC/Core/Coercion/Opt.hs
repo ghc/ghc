@@ -14,7 +14,7 @@ import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
-import GHC.Core.TyCo.Compare( eqType, eqForAllVis )
+import GHC.Core.TyCo.Compare( eqForAllVis, eqTypeIgnoringMultiplicity )
 import GHC.Core.Coercion
 import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
 import GHC.Core.TyCon
@@ -383,7 +383,7 @@ opt_co4' env sym rep r (CoVarCo cv)
   = -- pprTrace "CoVarCo" (ppr cv $$ ppr co) $
     opt_co4 (zapLiftingContext env) sym rep r co
 
-  | ty1 `eqType` ty2   -- See Note [Optimise CoVarCo to Refl]
+  | ty1 `eqTypeIgnoringMultiplicity` ty2   -- See Note [Optimise CoVarCo to Refl]
   = mkReflCo (chooseRole rep r) ty1
 
   | otherwise
@@ -620,7 +620,19 @@ opt_univ env sym prov deps role ty1 ty2
         deps' = map (opt_co1 env sym) deps
         (ty1'', ty2'') = swapSym sym (ty1', ty2')
     in
-    mkUnivCo prov deps' role ty1'' ty2''
+      -- We only Lint multiplicities in the output of the typechecker, as
+      -- described in Note [Linting linearity] in GHC.Core.Lint. This means
+      -- we can use 'eqTypeIgnoringMultiplicity' instea of 'eqType' below.
+      --
+      -- In particular, this gets rid of 'SubMultProv' coercions that were
+      -- introduced for typechecking multiplicities of data constructors, as
+      -- described in Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
+      if ty1'' `eqTypeIgnoringMultiplicity` ty2''
+      then mkReflCo role ty2''
+      else
+        UnivCo { uco_prov = prov, uco_role = role
+               , uco_lty = ty1'', uco_rty = ty2''
+               , uco_deps = deps' }
 
 {-
 opt_univ env PhantomProv cvs _r ty1 ty2
@@ -697,7 +709,7 @@ opt_trans :: HasDebugCallStack => InScopeSet -> NormalCo -> NormalCo -> NormalCo
 -- opt_trans just allows us to add some debug tracing
 -- Usually it just goes to opt_trans'
 opt_trans is co1 co2
-  = -- (if coercionRKind co1 `eqType` coercionLKind co2
+  = -- (if coercionRKind co1 `eqTypeIgnoringMultiplicity` coercionLKind co2
     --  then (\x -> x) else
     --  pprTrace "opt_trans" (vcat [ text "co1" <+> ppr co1
     --                             , text "co2" <+> ppr co2
@@ -756,7 +768,7 @@ opt_trans2 _ co1 co2
 opt_trans_rule :: HasDebugCallStack => InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
 
 opt_trans_rule _ in_co1 in_co2
-  | assertPpr (coercionRKind in_co1 `eqType` coercionLKind in_co2)
+  | assertPpr (coercionRKind in_co1 `eqTypeIgnoringMultiplicity` coercionLKind in_co2)
               (vcat [ text "in_co1" <+> ppr in_co1
                    , text "in_co2" <+> ppr in_co2
                    , text "in_co1 kind" <+> ppr (coercionKind in_co1)
@@ -960,7 +972,7 @@ opt_trans_rule _ co1 co2        -- Identity rule
   | let ty1 = coercionLKind co1
         r   = coercionRole co1
         ty2 = coercionRKind co2
-  , ty1 `eqType` ty2
+  , ty1 `eqTypeIgnoringMultiplicity` ty2
   = fireTransRule "RedTypeDirRefl" co1 co2 $
     mkReflCo r ty2
 
@@ -1238,7 +1250,7 @@ matchNewtypeBranch sym axr co
 compatible_co :: Coercion -> Coercion -> Bool
 -- Check whether (co1 . co2) will be well-kinded
 compatible_co co1 co2
-  = x1 `eqType` x2
+  = x1 `eqTypeIgnoringMultiplicity` x2
   where
     x1 = coercionRKind co1
     x2 = coercionLKind co2
@@ -1494,7 +1506,7 @@ optForAllCoBndr env sym tcv k_mco
 mk_trans_co :: HasDebugCallStack => Coercion -> Coercion -> Coercion
 -- Do assertion checking in mk_trans_co
 mk_trans_co co1 co2
-  = assertPpr (coercionRKind co1 `eqType` coercionLKind co2)
+  = assertPpr (coercionRKind co1 `eqTypeIgnoringMultiplicity` coercionLKind co2)
               (vcat [ text "co1" <+> ppr co1
                     , text "co2" <+> ppr co2
                     , text "co1 kind" <+> ppr (coercionKind co1)
@@ -1509,7 +1521,7 @@ mk_coherence_right_co r ty co co2
 
 assertGRefl :: HasDebugCallStack => Type -> Coercion -> r -> r
 assertGRefl ty co res
-  = assertPpr (typeKind ty `eqType` coercionLKind co)
+  = assertPpr (typeKind ty `eqTypeIgnoringMultiplicity` coercionLKind co)
               (vcat [ pp_ty "ty" ty
                     , pp_co "co" co
                     , callStackDoc ]) $

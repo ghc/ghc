@@ -4807,6 +4807,7 @@ simplRules env mb_new_id rules bind_cxt
 
            ; args' <- mapM (simplExpr lhs_env) args
            ; rhs'  <- simplExprC rhs_env rhs rhs_cont
+
            ; return (rule { ru_bndrs = bndrs'
                           , ru_fn    = fn_name'
                           , ru_args  = args'

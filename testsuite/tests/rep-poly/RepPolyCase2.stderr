@@ -1,8 +1,0 @@
-
-RepPolyCase2.hs:33:7: error: [GHC-55287]
-    • The scrutinee of the case statement
-      does not have a fixed runtime representation.
-      Its type is:
-        Unbox Int :: TYPE (Rep Int)
-    • In the expression: case unbox (3 :: Int) of _ -> ()
-      In an equation for ‘x’: x _ = case unbox (3 :: Int) of _ -> ()

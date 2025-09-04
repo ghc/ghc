@@ -727,7 +727,7 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
       ; pat_ty <- readExpType exp_pat_ty
       ; let view_expr_wrap2' =
               mkWpFun view_expr_wrap2 idHsWrapper
-                (Scaled w_pat pat_ty) view_res_ty
+                (EqMultCo $ mkNomReflCo w_pat, pat_ty) view_res_ty
             -- view_expr_wrap2' ::  (view_arg_ty -> view_res_ty)
             --                  ~~> (pat_ty -> view_res_ty)
             -- This satisfies WpFun-FRR-INVARIANT:

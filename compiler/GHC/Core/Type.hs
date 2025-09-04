@@ -1111,7 +1111,7 @@ splitAppTy ty = splitAppTy_maybe ty `orElse` pprPanic "splitAppTy" (ppr ty)
 -------------
 splitAppTyNoView_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
--- any coreView stuff is already done
+-- any 'coreView' stuff is already done.
 splitAppTyNoView_maybe (AppTy ty1 ty2)
   = Just (ty1, ty2)
 
@@ -1128,7 +1128,8 @@ splitAppTyNoView_maybe (TyConApp tc tys)
 splitAppTyNoView_maybe _other = Nothing
 
 tcSplitAppTyNoView_maybe :: Type -> Maybe (Type,Type)
--- ^ Just like splitAppTyNoView_maybe, but does not split (c => t)
+-- ^ Just like 'splitAppTyNoView_maybe', but does not split @(c => t)@.
+--
 -- See Note [Decomposing fat arrow c=>t]
 tcSplitAppTyNoView_maybe ty
   | FunTy { ft_af = af } <- ty

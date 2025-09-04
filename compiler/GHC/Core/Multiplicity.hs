@@ -277,32 +277,25 @@ backwards compatibility. Consider
 
 We have
 
-    map :: (a -> b) -> f a -> f b
-    Just :: a %1 -> Just a
+    map :: (a -> b) -> [a] -> [b]
+    Just :: a %1 -> Maybe a
 
 Types don't match, we should get a type error. But this is legal Haskell 98
 code! Bad! Bad! Bad!
 
-It could be solved with subtyping, but subtyping doesn't combine well with
-polymorphism. Instead, we generalise the type of Just, when used as term:
+This problem could be solved with subtyping, but subtyping doesn't combine well
+with polymorphism. The "polymorphism" approach is to behave as if 'Just', when
+used as a term, had the type:
+    Just :: forall {m :: Multiplicity}. a %m -> Maybe a
+We can then achieve subtyping via subsumption, like we do for deep subsumption.
 
-   Just :: forall {p}. a %p-> Just a
-
-This is solely a concern for higher-order code like this: when called fully
-applied linear constructors are more general than constructors with unrestricted
-fields. In particular, linear constructors can always be eta-expanded to their
-Haskell 98 type. This is explained in the paper (but there, we had a different
-strategy to resolve this type mismatch in higher-order code. It turned out to be
-insufficient, which is explained in the wiki page as well as the proposal).
-
-We only generalise linear fields this way: fields with multiplicity Many, or
-other multiplicity expressions are exclusive to -XLinearTypes, hence don't have
-backward compatibility implications.
-
-The implementation is described in Note [Typechecking data constructors]
+The precise details of how we use subsumption to typecheck partial applications
+of data constructors are explained in Note [Typechecking data constructors]
 in GHC.Tc.Gen.Head.
 
-More details in the proposal.
+Only linear fields are concerned by this extra complication. Fields with
+multiplicity Many – or other multiplicity expressions – are exclusive to
+-XLinearTypes, hence don't have backward compatibility implications.
 -}
 
 {-

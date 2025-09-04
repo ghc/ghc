@@ -2085,7 +2085,7 @@ ppr_co _ (IfaceHoleCo covar)    = braces (ppr covar)
 ppr_co _ (IfaceUnivCo prov role ty1 ty2 ds)
   = text "Univ" <> (parens $
       sep [ ppr role <+> ppr prov <> ppr ds
-          , dcolon <+>  ppr ty1 <> comma <+> ppr ty2 ])
+          , dcolon <+> ppr ty1 <> text "~#" <+> ppr ty2 ])
 
 ppr_co ctxt_prec (IfaceInstCo co ty)
   = maybeParen ctxt_prec appPrec $
@@ -2500,6 +2500,7 @@ instance Binary IfaceCoercion where
   put_ _  (IfaceHoleCo cv)
        = pprPanic "Can't serialise IfaceHoleCo" (ppr cv)
            -- See Note [Holes in IfaceCoercion]
+
 
   get bh = do
       tag <- getByte bh

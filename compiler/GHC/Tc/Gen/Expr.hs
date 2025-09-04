@@ -19,7 +19,9 @@ module GHC.Tc.Gen.Expr
        ( tcCheckPolyExpr, tcCheckPolyExprNC,
          tcCheckMonoExpr, tcCheckMonoExprNC,
          tcMonoExpr, tcMonoExprNC,
-         tcInferExpr, tcInferSigma, tcInferRho, tcInferRhoNC,
+         tcInferExpr, tcInferSigma,
+         tcInferRho, tcInferRhoNC,
+         tcInferRhoFRR, tcInferRhoFRRNC,
          tcPolyLExpr, tcPolyExpr, tcExpr, tcPolyLExprSig,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
@@ -215,9 +217,9 @@ tcPolyExprCheck expr res_ty
     inner_skolemise Shallow rho_ty thing_inside
       = -- We have already done shallow skolemisation, so nothing further to do
         thing_inside rho_ty
-    inner_skolemise Deep rho_ty thing_inside
+    inner_skolemise deep rho_ty thing_inside
       = -- Try deep skolemisation
-        do { (wrap, expr') <- tcSkolemise Deep ctxt rho_ty thing_inside
+        do { (wrap, expr') <- tcSkolemise deep ctxt rho_ty thing_inside
            ; return (mkHsWrap wrap expr') }
 
     ctxt = case res_ty of
@@ -239,16 +241,25 @@ tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 tcInferRho   = tcInferExpr   IIF_DeepRho
 tcInferRhoNC = tcInferExprNC IIF_DeepRho
 
+tcInferRhoFRR, tcInferRhoFRRNC :: FixedRuntimeRepContext -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
+-- Infer a *rho*-type. The return type is always instantiated.
+tcInferRhoFRR   frr = tc_infer_expr    (IFRR_Check frr) IIF_DeepRho
+tcInferRhoFRRNC frr = tc_infer_expr_NC (IFRR_Check frr) IIF_DeepRho
+
 tcInferExpr, tcInferExprNC :: InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
-tcInferExpr iif (L loc expr)
+tcInferExpr   = tc_infer_expr    IFRR_Any
+tcInferExprNC = tc_infer_expr_NC IFRR_Any
+
+tc_infer_expr, tc_infer_expr_NC :: InferFRRFlag -> InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
+tc_infer_expr ifrr iif (L loc expr)
   = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
     addExprCtxt expr $  -- Note [Error contexts in generated code]
-    do { (expr', rho) <- runInfer iif IFRR_Any (tcExpr expr)
+    do { (expr', rho) <- runInfer iif ifrr (tcExpr expr)
        ; return (L loc expr', rho) }
 
-tcInferExprNC iif (L loc expr)
+tc_infer_expr_NC ifrr iif (L loc expr)
   = setSrcSpanA loc  $
-    do { (expr', rho) <- runInfer iif IFRR_Any (tcExpr expr)
+    do { (expr', rho) <- runInfer iif ifrr (tcExpr expr)
        ; return (L loc expr', rho) }
 
 ---------------
@@ -505,9 +516,7 @@ tcExpr (HsCase ctxt scrut matches) res_ty
           --     case id        of {..}
           --     case (\v -> v) of {..}
           -- This design choice is discussed in #17790
-        ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRho scrut
-
-        ; hasFixedRuntimeRep_syntactic FRRCase scrut_ty
+        ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase scrut
         ; matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
         ; return (HsCase ctxt scrut' matches') }
 
@@ -1004,7 +1013,7 @@ tcSynArgE orig op sigma_ty syn_ty thing_inside
                           ; return (result, arg_tc_ty, res_tc_ty, arg_mult) }}
 
            ; let fun_wrap = mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
-                              (Scaled op_mult arg_ty) res_ty
+                              (EqMultCo $ mkNomReflCo op_mult, arg_ty) res_ty
                -- NB: arg_ty comes from matchExpectedFunTys, so it has a
                -- fixed RuntimeRep, as needed to call mkWpFun.
            ; return (result, match_wrapper <.> fun_wrap) }

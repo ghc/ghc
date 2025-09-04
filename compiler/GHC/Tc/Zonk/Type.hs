@@ -1100,14 +1100,8 @@ zonkExpr (XExpr (ExpandedThingTc thing e))
   = do e' <- zonkExpr e
        return $ XExpr (ExpandedThingTc thing e')
 
-
-zonkExpr (XExpr (ConLikeTc con tvs tys))
-  = XExpr . ConLikeTc con tvs <$> mapM zonk_scale tys
-  where
-    zonk_scale (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX m <*> pure ty
-    -- Only the multiplicity can contain unification variables
-    -- The tvs come straight from the data-con, and so are strictly redundant
-    -- See Wrinkles of Note [Typechecking data constructors] in GHC.Tc.Gen.Head
+zonkExpr e@(XExpr (ConLikeTc {}))
+  = return e
 
 zonkExpr (XExpr (HsRecSelTc (FieldOcc occ (L l v))))
   = do { v' <- zonkIdOcc v
@@ -1238,11 +1232,16 @@ zonkCoFn (WpSubType w)     = do { w' <- zonkCoFn w
 zonkCoFn (WpCompose c1 c2) = do { c1' <- zonkCoFn c1
                                 ; c2' <- zonkCoFn c2
                                 ; return (WpCompose c1' c2') }
-zonkCoFn (WpFun c1 c2 t1 t2) = do { c1' <- zonkCoFn c1
-                                  ; c2' <- zonkCoFn c2
-                                  ; t1' <- noBinders $ zonkScaledTcTypeToTypeX t1
-                                  ; t2' <- noBinders $ zonkTcTypeToTypeX t2
-                                  ; return (WpFun c1' c2' t1' t2') }
+zonkCoFn (WpFun w arg res t1 t2) =
+  do { w' <- noBinders $
+               case w of
+                 EqMultCo co -> EqMultCo <$> zonkCoToCo co
+                 OneSubMult w -> OneSubMult <$> zonkTcTypeToTypeX w
+     ; arg' <- zonkCoFn arg
+     ; res' <- zonkCoFn res
+     ; t1' <- noBinders $ zonkTcTypeToTypeX t1
+     ; t2' <- noBinders $ zonkTcTypeToTypeX t2
+     ; return (WpFun w' arg' res' t1' t2') }
 zonkCoFn (WpCast co)   = WpCast  <$> noBinders (zonkCoToCo co)
 zonkCoFn (WpEvLam ev)  = WpEvLam <$> zonkEvBndrX ev
 zonkCoFn (WpEvApp arg) = WpEvApp <$> noBinders (zonkEvTerm arg)

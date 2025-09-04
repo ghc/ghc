@@ -1616,8 +1616,8 @@ ds_hs_wrapper hs_wrap
     go (WpCompose c1 c2) k = go c1 $ \w1 ->
                              go c2 $ \w2 ->
                              k (w1 . w2)
-    go (WpFun c1 c2 st _) k = -- See Note [Desugaring WpFun]
-                              do { x <- newSysLocalDs st
+    go (WpFun w_co c1 c2 t _) k = -- See Note [Desugaring WpFun]
+                              do { x <- newSysLocalDs (mkScaled (subMultCoRKind w_co) t)
                                  ; go c1 $ \w1 ->
                                    go c2 $ \w2 ->
                                    let app f a = mkCoreApp (text "dsHsWrapper") f a
