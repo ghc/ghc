@@ -775,7 +775,15 @@ matchExpectedFunTys herald _ arity (Infer inf_res) thing_inside
        ; result  <- thing_inside (map ExpFunPatTy arg_tys) res_ty
        ; arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) arg_tys
        ; res_ty  <- readExpType res_ty
-       ; co <- fillInferResult (mkScaledFunTys arg_tys res_ty) inf_res
+         -- Remarks:
+         --  1. use tcMkScaledFunTys rather than mkScaledFunTys, as we might
+         --     have res_ty :: kappa[tau] for a meta ty-var kappa, in which case
+         --     mkScaledFunTys would crash. See #26277.
+         --  2. tcMkScaledFunTys arg_tys res_ty does not contain any foralls
+         --     (even nested ones), so no need to instantiate.
+         --  NOTE: we do not backport fillInferResultNoInst so this stays
+         --  fillInferResult on the backported patch
+       ; co <- fillInferResult (tcMkScaledFunTys arg_tys res_ty) inf_res
        ; return (mkWpCastN co, result) }
 
 matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
