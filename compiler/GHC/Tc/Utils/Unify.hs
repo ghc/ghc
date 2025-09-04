@@ -2246,22 +2246,23 @@ unifyType :: Maybe TypedThing  -- ^ If present, the thing that has type ty1
 unifyType thing ty1 ty2
   = unifyTypeAndEmit TypeLevel origin ty1 ty2
   where
-    origin = TypeEqOrigin { uo_actual   = ty1
-                          , uo_expected = ty2
-                          , uo_thing    = thing
-                          , uo_visible  = True }
+    origin = TypeEqOrigin { uo_actual    = ty1
+                          , uo_expected  = ty2
+                          , uo_thing     = thing
+                          , uo_invisible = Nothing }
 
-unifyInvisibleType :: TcTauType -> TcTauType    -- ty1 (actual), ty2 (expected)
+unifyInvisibleType :: InvisibleBit
+                   -> TcTauType -> TcTauType    -- ty1 (actual), ty2 (expected)
                    -> TcM TcCoercionN           -- :: ty1 ~# ty2
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
-unifyInvisibleType ty1 ty2
+unifyInvisibleType invis ty1 ty2
   = unifyTypeAndEmit TypeLevel origin ty1 ty2
   where
-    origin = TypeEqOrigin { uo_actual   = ty1
-                          , uo_expected = ty2
-                          , uo_thing    = Nothing
-                          , uo_visible  = False }  -- This is the "invisible" bit
+    origin = TypeEqOrigin { uo_actual    = ty1
+                          , uo_expected  = ty2
+                          , uo_thing     = Nothing
+                          , uo_invisible = Just invis }  -- This is the "invisible" bit
 
 unifyTypeET :: TcTauType -> TcTauType -> TcM CoercionN
 -- Like unifyType, but swap expected and actual in error messages
@@ -2269,20 +2270,20 @@ unifyTypeET :: TcTauType -> TcTauType -> TcM CoercionN
 unifyTypeET ty1 ty2
   = unifyTypeAndEmit TypeLevel origin ty1 ty2
   where
-    origin = TypeEqOrigin { uo_actual   = ty2   -- NB swapped
-                          , uo_expected = ty1   -- NB swapped
-                          , uo_thing    = Nothing
-                          , uo_visible  = True }
+    origin = TypeEqOrigin { uo_actual    = ty2   -- NB swapped
+                          , uo_expected  = ty1   -- NB swapped
+                          , uo_thing     = Nothing
+                          , uo_invisible = Nothing  }
 
 
 unifyKind :: Maybe TypedThing -> TcKind -> TcKind -> TcM CoercionN
 unifyKind mb_thing ty1 ty2
   = unifyTypeAndEmit KindLevel origin ty1 ty2
   where
-    origin = TypeEqOrigin { uo_actual   = ty1
-                          , uo_expected = ty2
-                          , uo_thing    = mb_thing
-                          , uo_visible  = True }
+    origin = TypeEqOrigin { uo_actual    = ty1
+                          , uo_expected  = ty2
+                          , uo_thing     = mb_thing
+                          , uo_invisible = Nothing }
 
 unifyTypeAndEmit :: TypeOrKind -> CtOrigin -> TcType -> TcType -> TcM CoercionN
 -- Make a ref-cell, unify, emit the collected constraints
@@ -2539,7 +2540,8 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
       = do { traceTc "u_tc_arg" (ppr role $$ ppr ty1 $$ ppr ty2)
            ; uType env_arg ty1 ty2 }
       where
-        env_arg = env { u_loc = adjustCtLoc is_vis False (u_loc env)
+        mb_invis = if is_vis then Nothing else Just InvisibleKind
+        env_arg = env { u_loc = adjustCtLoc mb_invis False (u_loc env)
                       , u_role = role }
 
     ------------------
@@ -2551,7 +2553,8 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
         -- the former have smaller kinds, and hence simpler error messages
         -- c.f. GHC.Tc.Solver.Equality.can_eq_app
         -- Example: test T8603
-        do { let env_arg = env { u_loc = adjustCtLoc vis False (u_loc env) }
+        do { let mb_invis = if vis then Nothing else Just InvisibleKind
+                 env_arg = env { u_loc = adjustCtLoc mb_invis False (u_loc env) }
            ; co_t <- uType env_arg t1 t2
            ; co_s <- uType env s1 s2
            ; return $ mkAppCo co_s co_t }
@@ -3139,10 +3142,10 @@ matchExpectedFunKind hs_ty n k = go n k
       = do { arg_kinds <- newMetaKindVars n
            ; res_kind  <- newMetaKindVar
            ; let new_fun = mkVisFunTysMany arg_kinds res_kind
-                 origin  = TypeEqOrigin { uo_actual   = k
-                                        , uo_expected = new_fun
-                                        , uo_thing    = Just hs_ty
-                                        , uo_visible  = True
+                 origin  = TypeEqOrigin { uo_actual    = k
+                                        , uo_expected  = new_fun
+                                        , uo_thing     = Just hs_ty
+                                        , uo_invisible = Nothing
                                         }
            ; unifyTypeAndEmit KindLevel origin k new_fun }
 

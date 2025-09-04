@@ -53,6 +53,8 @@ import GHC.Types.Var.Env
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+import GHC.Base ( Multiplicity(..) )
 import GHC.Types.Basic ( PprPrec(..), topPrec, sigPrec, opPrec
                        , funPrec, appPrec, maybeParen )
 
@@ -243,8 +245,8 @@ debug_ppr_ty prec (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = re
   where
     arr = pprArrowWithMultiplicity af $
           case mult of
-            OneTy  -> Left True
-            ManyTy -> Left False
+            OneTy  -> Left One
+            ManyTy -> Left Many
             _      -> Right (debug_ppr_ty appPrec mult)
 
 debug_ppr_ty prec (TyConApp tc tys)
@@ -343,8 +345,10 @@ pprTypeApp tc tys
 pprWithInvisibleBitsWhen :: Bool -> SDoc -> SDoc
 pprWithInvisibleBitsWhen b
   = updSDocContext $ \ctx ->
-      if b then ctx { sdocPrintExplicitKinds   = True
+      if b then ctx { sdocPrintExplicitKinds       = True
                     , sdocPrintExplicitRuntimeReps = True }
+  -- NB: not turning on LinearTypes by default here.
+  -- See pprWithInvisibleBits, which can enable LinearTypes for pretty-printing.
            else ctx
 
 -- | This variant preserves any use of TYPE in a type, effectively

@@ -98,7 +98,8 @@ module GHC.Tc.Utils.TcType (
   -- Re-exported from GHC.Core.TyCo.Compare
   -- mainly just for back-compat reasons
   eqType, eqTypes, nonDetCmpType, eqTypeX,
-  pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, mayLookIdentical,
+  pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck,
+  mayLookIdentical, pprWithInvisibleBits, InvisibleBit(..), InvisibleBits,
   tcEqTyConApps, eqForAllVis, eqVarBndrs,
 
   ---------------------------------

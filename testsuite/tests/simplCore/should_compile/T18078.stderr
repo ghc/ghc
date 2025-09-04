@@ -10,7 +10,7 @@ T18078.unN1 = \ (ds :: N) -> ds
 -- RHS size: {terms: 1, types: 0, coercions: 4, joins: 0/0}
 unN :: N -> Int -> Int
 [GblId[[RecSel]], Arity=1, Str=<1L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
-unN = T18078.unN1 `cast` (<N>_R %<Many>_N ->_R T18078.N:N :: (N -> N) ~R# (N -> Int -> Int))
+unN = T18078.unN1 `cast` (<N>_R ->_R T18078.N:N :: (N -> N) ~R# (N -> Int -> Int))
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18078.$trModule4 :: GHC.Internal.Prim.Addr#
