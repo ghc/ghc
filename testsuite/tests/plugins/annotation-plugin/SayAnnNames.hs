@@ -19,13 +19,14 @@ pass :: ModGuts -> CoreM ModGuts
 pass g = do
           dflags <- getDynFlags
           mapM_ (printAnn dflags g) (mg_binds g) >> return g
-  where printAnn :: DynFlags -> ModGuts -> CoreBind -> CoreM CoreBind
-        printAnn dflags guts bndr@(NonRec b _) = do
+  where printAnn :: DynFlags -> ModGuts -> CoreBind -> CoreM ()
+        printAnn dflags guts (NonRec b _) = lookupAnn dflags guts b
+        printAnn dflags guts (Rec ps) = mapM_ (lookupAnn dflags guts . fst) ps
+
+        lookupAnn dflags guts b = do
           anns <- annotationsOn guts b :: CoreM [SomeAnn]
           unless (null anns) $ putMsgS $
             "Annotated binding found: " ++  showSDoc dflags (ppr b)
-          return bndr
-        printAnn _ _ bndr = return bndr
 
 annotationsOn :: Data a => ModGuts -> CoreBndr -> CoreM [a]
 annotationsOn guts bndr = do

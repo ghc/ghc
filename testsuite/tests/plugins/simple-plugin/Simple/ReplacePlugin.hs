@@ -51,5 +51,6 @@ fixGuts rep guts = pure $ guts { mg_binds = fmap fix_bind (mg_binds guts) }
       Tick t e      -> Tick t (fix_expr e)
       Type t        -> Type t
       Coercion c    -> Coercion c
+      Let b body    -> Let (fix_bind b) (fix_expr body)
 
     fix_alt (Alt c bs e) = Alt c bs (fix_expr e)

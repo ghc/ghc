@@ -48,7 +48,7 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon       ( tyConDataCons )
 import GHC.Core
 import GHC.Core.FVs       ( exprsSomeFreeVarsList, exprFreeVars )
-import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
+import GHC.Core.SimpleOpt ( simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
 import GHC.Core.Coercion
@@ -200,27 +200,18 @@ deSugar hsc_env
 
      do {       -- Add export flags to bindings
           keep_alive <- readIORef keep_var
-        ; let (rules_for_locals, rules_for_imps) = partition isLocalRule all_rules
+        ; let (rules_for_locals, ds_rules_for_imps) = partition isLocalRule all_rules
               final_prs = addExportFlagsAndRules bcknd export_set keep_alive
                                                  rules_for_locals (fromOL all_prs)
 
-              final_pgm = combineEvBinds ds_ev_binds final_prs
+              ds_binds = combineEvBinds ds_ev_binds final_prs
         -- Notice that we put the whole lot in a big Rec, even the foreign binds
         -- When compiling PrelFloat, which defines data Float = F# Float#
         -- we want F# to be in scope in the foreign marshalling code!
         -- You might think it doesn't matter, but the simplifier brings all top-level
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
-        ; endPassHscEnvIO hsc_env name_ppr_ctx CoreDesugar final_pgm rules_for_imps
-        ; let simpl_opts = initSimpleOpts dflags
-        ; let (ds_binds, ds_rules_for_imps, occ_anald_binds)
-                = simpleOptPgm simpl_opts mod final_pgm rules_for_imps
-                         -- The simpleOptPgm gets rid of type
-                         -- bindings plus any stupid dead code
-        ; putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
-            FormatCore (pprCoreBindings occ_anald_binds $$ pprRules ds_rules_for_imps )
-
-        ; endPassHscEnvIO hsc_env name_ppr_ctx CoreDesugarOpt ds_binds ds_rules_for_imps
+        ; endPassHscEnvIO hsc_env name_ppr_ctx CoreDesugar ds_binds ds_rules_for_imps
 
         ; let pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
               home_unit = hsc_home_unit hsc_env

@@ -58,8 +58,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
   | CoreDesugar    -- Right after desugaring, no simple optimisation yet!
-  | CoreDesugarOpt -- CoreDesugarXXX: Not strictly a core-to-core pass, but produces
-                       --                 Core output, and hence useful to pass to endPass
+  | CoreDesugarOpt -- Simple optimisation after desugaring
 
   | CoreTidy
   | CorePrep
