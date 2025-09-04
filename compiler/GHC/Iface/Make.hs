@@ -37,7 +37,6 @@ import GHC.Iface.Ext.Fields
 
 import GHC.CoreToIface
 
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
@@ -326,11 +325,12 @@ mkIface_ hsc_env
     let home_unit    = hsc_home_unit hsc_env
         semantic_mod = homeModuleNameInstantiation home_unit (moduleName this_mod)
         entities = typeEnvElts type_env
-        show_linear_types = xopt LangExt.LinearTypes (hsc_dflags hsc_env)
 
-        simplified_core = if gopt Opt_WriteIfSimplifiedCore dflags then Just (IfaceSimplifiedCore [ toIfaceTopBind b | b <- core_prog ] emptyIfaceForeign)
-                                                                   else Nothing
-        decls  = [ tyThingToIfaceDecl show_linear_types entity
+        simplified_core =
+          if gopt Opt_WriteIfSimplifiedCore dflags
+          then Just (IfaceSimplifiedCore [ toIfaceTopBind b | b <- core_prog ] emptyIfaceForeign)
+          else Nothing
+        decls  = [ tyThingToIfaceDecl entity
                  | entity <- entities,
                    let name = getName entity,
                    not (isImplicitTyThing entity),

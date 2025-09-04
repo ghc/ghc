@@ -582,7 +582,7 @@ ensureMonoType res_ty
   = return ()
   | otherwise
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; _co <- unifyInvisibleType res_ty mono_ty
+       ; _co <- unifyInvisibleType InvisibleKind res_ty mono_ty
        ; return () }
 
 promoteTcType :: TcLevel -> TcType -> TcM (TcCoercionN, TcType)
@@ -608,7 +608,7 @@ promoteTcType dest_lvl ty
                 -- where alpha and rr are fresh and from level dest_lvl
       = do { rr      <- newMetaTyVarTyAtLevel dest_lvl runtimeRepTy
            ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (mkTYPEapp rr)
-           ; co <- unifyInvisibleType ty prom_ty
+           ; co <- unifyInvisibleType InvisibleKind ty prom_ty
            ; return (co, prom_ty) }
 
 {- Note [Promoting a type]

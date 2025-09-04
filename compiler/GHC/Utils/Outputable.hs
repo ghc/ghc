@@ -512,6 +512,7 @@ traceSDocContext = defaultSDocContext
   , sdocPrintExplicitRuntimeReps    = True
   , sdocPrintExplicitForalls        = True
   , sdocPrintEqualityRelations      = True
+  , sdocLinearTypes                 = True
   }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc

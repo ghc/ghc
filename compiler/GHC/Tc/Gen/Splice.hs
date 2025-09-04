@@ -838,7 +838,7 @@ tcUntypedSplice (QuoteWrapper _ m_var) splice_name (HsQuasiQuote (HsQuasiQuoteEx
    qTy <- mkTyConTy <$> tcLookupTyCon qTyConName
    quote_ty <- untypedSpliceResultType flavour m_var
    splice_ty <- untypedSpliceResultType flavour qTy
-   res_co <- unifyInvisibleType splice_ty quote_ty
+   res_co <- unifyInvisibleType InvisibleKind splice_ty quote_ty
 
    -- 3. Lookup the relevant field selector from QuasiQuoter
    sel <- tcLookupId qq_sel_name
@@ -2377,7 +2377,7 @@ reifyDataCon isGadtDataCon tys dc
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'
                          ; ex_tvs'' <- case to_invis_bndrs ex_tvs' of
-                             Nothing  -> noTH DataConVisibleForall (dataConDisplayType False dc)
+                             Nothing  -> noTH DataConVisibleForall (dataConWrapperType dc)
                              Just tvs -> reifyTyVarBndrs tvs
                          ; return (TH.ForallC ex_tvs'' cxt main_con) }
        ; assert (r_arg_tys `equalLength` dcdBangs)

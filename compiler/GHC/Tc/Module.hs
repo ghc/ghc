@@ -1857,10 +1857,10 @@ checkMainType tcg_env
        ; main_id   <- tcLookupId main_name
        ; (io_ty,_) <- getIOType
        ; let main_ty   = idType main_id
-             eq_orig   = TypeEqOrigin { uo_actual   = main_ty
-                                      , uo_expected = io_ty
-                                      , uo_thing    = Nothing
-                                      , uo_visible  = True }
+             eq_orig   = TypeEqOrigin { uo_actual    = main_ty
+                                      , uo_expected  = io_ty
+                                      , uo_thing     = Nothing
+                                      , uo_invisible = Nothing }
        ; (_, lie)  <- captureTopConstraints       $
                       setMainCtxt main_name io_ty $
                       tcSubTypeSigma eq_orig ctxt main_ty io_ty
@@ -3138,8 +3138,7 @@ ppr_datacons debug type_env
   = ppr_things "DATA CONSTRUCTORS" ppr_dc wanted_dcs
       -- The filter gets rid of class data constructors
   where
-    ppr_dc dc = sdocOption sdocLinearTypes (\show_linear_types ->
-                ppr dc <+> dcolon <+> ppr (dataConDisplayType show_linear_types dc))
+    ppr_dc dc = ppr dc <+> dcolon <+> ppr (dataConWrapperType dc)
     all_dcs    = typeEnvDataCons type_env
     wanted_dcs | debug     = all_dcs
                | otherwise = filterOut is_cls_dc all_dcs

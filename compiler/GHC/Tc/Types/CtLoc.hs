@@ -136,29 +136,34 @@ mkKindEqLoc s1 s2 ctloc
 adjustCtLocTyConBinder :: TyConBinder -> CtLoc -> CtLoc
 -- Adjust the CtLoc when decomposing a type constructor
 adjustCtLocTyConBinder tc_bndr loc
-  = adjustCtLoc is_vis is_kind loc
+  = adjustCtLoc mb_invis_kind is_kind loc
   where
-    is_vis  = isVisibleTyConBinder tc_bndr
+    mb_invis_kind =
+      if isVisibleTyConBinder tc_bndr
+      then Nothing
+      else Just InvisibleKind
     is_kind = isNamedTyConBinder tc_bndr
 
-adjustCtLoc :: Bool    -- True <=> A visible argument
+adjustCtLoc :: Maybe InvisibleBit
             -> Bool    -- True <=> A kind argument
             -> CtLoc -> CtLoc
 -- Adjust the CtLoc when decomposing a type constructor, application, etc
-adjustCtLoc is_vis is_kind loc
+adjustCtLoc mb_invis is_kind loc
   = loc2
   where
     loc1 | is_kind   = toKindLoc loc
          | otherwise = loc
-    loc2 | is_vis    = loc1
-         | otherwise = toInvisibleLoc loc1
+    loc2 =
+      case mb_invis of
+        Nothing    -> loc1
+        Just invis -> toInvisibleLoc invis loc1
 
 -- | Take a CtLoc and moves it to the kind level
 toKindLoc :: CtLoc -> CtLoc
 toKindLoc loc = loc { ctl_t_or_k = Just KindLevel }
 
-toInvisibleLoc :: CtLoc -> CtLoc
-toInvisibleLoc loc = updateCtLocOrigin loc toInvisibleOrigin
+toInvisibleLoc :: InvisibleBit -> CtLoc -> CtLoc
+toInvisibleLoc invis loc = updateCtLocOrigin loc (toInvisibleOrigin invis)
 
 mkGivenLoc :: TcLevel -> SkolemInfoAnon -> CtLocEnv -> CtLoc
 mkGivenLoc tclvl skol_info env

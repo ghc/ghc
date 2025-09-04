@@ -819,7 +819,10 @@ can_eq_app ev s1 t1 s2 t2
             -- Unify arguments t1/t2 before function s1/s2, because
             -- the former have smaller kinds, and hence simpler error messages
             -- c.f. GHC.Tc.Utils.Unify.uType (go_app)
-            do { let arg_env = updUEnvLoc uenv (adjustCtLoc (isNextArgVisible s1) False)
+            do { let mb_invis = if isNextArgVisible s1
+                                then Nothing
+                                else Just InvisibleKind
+                     arg_env = updUEnvLoc uenv (adjustCtLoc mb_invis False)
                ; co_t <- uType arg_env t1 t2
                ; co_s <- uType uenv s1 s2
                ; return (mkAppCo co_s co_t) }
@@ -1089,7 +1092,7 @@ This gives rise to 2 equalities in the solver worklist
     (2) [W] t1::k_fresh ~ t2::k1
 
 We would like to solve (1) before looking at (2), so that we don't end
-up in the complexities of canEqLHSHetero.  To do this:
+up in the complexities of canEqCanLHSHetero.  To do this:
 
 * `canDecomposableTyConAppOK` calls `uType` on the arguments
   /left-to-right/.  See the call to zipWith4M in that function.
@@ -1457,9 +1460,12 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
        ; case ev of
            CtWanted (WantedCt { ctev_dest = dest })
              -> do { (co, _, _) <- wrapUnifierTcS ev Nominal $ \ uenv ->
-                        do { let mult_env = uenv `updUEnvLoc` toInvisibleLoc
+                        do { let mult_env = uenv `updUEnvLoc` toInvisibleLoc InvisibleMultiplicity
                                                  `setUEnvRole` funRole role SelMult
                            ; mult <- uType mult_env m1 m2
+                             -- TODO: it would be good to set an environment for
+                             -- RuntimeRep mismatches, but it's difficult to do so because
+                             -- we don't explicit call uType on the RuntimeReps here.
                            ; arg  <- uType (uenv `setUEnvRole` funRole role SelArg) a1 a2
                            ; res  <- uType (uenv `setUEnvRole` funRole role SelRes) r1 r2
                            ; return (mkNakedFunCo role af mult arg res) }
@@ -2714,7 +2720,7 @@ But it's not so simple:
 
   That first argument is invisible in the source program (aside from
   visible type application), so we'd much prefer to get the error from
-  the second. We track visibility in the uo_visible field of a TypeEqOrigin.
+  the second. We track visibility in the uo_invisible field of a TypeEqOrigin.
   We use this to prioritise visible errors (see GHC.Tc.Errors.tryReporters,
   the partition on isVisibleOrigin).
 
