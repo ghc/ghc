@@ -262,9 +262,6 @@ flag librt
 flag libffi-adjustors
   default: False
   manual: True
-flag need-pthread
-  default: False
-  manual: True
 flag libbfd
   default: False
   manual: True
@@ -559,8 +556,6 @@ common rts-link-options
           psapi
        cpp-options: -D_WIN32_WINNT=0x06010000
        cc-options: -D_WIN32_WINNT=0x06010000
-    if flag(need-pthread)
-       extra-libraries: pthread
     if flag(need-atomic)
        extra-libraries: atomic
     if flag(libbfd)
