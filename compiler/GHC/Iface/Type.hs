@@ -76,7 +76,9 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  , manyDataConTyCon
                                  , liftedRepTyCon, liftedDataConTyCon
                                  , sumTyCon )
-import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy, funTyFlagTyCon )
+import GHC.Base ( Multiplicity(..) )
+import GHC.Core.Multiplicity ( pprArrowWithMultiplicity )
+import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
 import GHC.Core.TyCo.Rep( CoSel, UnivCoProvenance(..) )
 import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
@@ -1120,24 +1122,15 @@ pprPrecIfaceType prec ty =
   hideNonStandardTypes (ppr_ty prec) ty
 
 pprTypeArrow :: FunTyFlag -> IfaceMult -> SDoc
-pprTypeArrow af mult
-  = pprArrow (mb_conc, pprPrecIfaceType) af mult
+pprTypeArrow af mult = pprArrowWithMultiplicity af ppr_mult
   where
-    mb_conc (IfaceTyConApp tc _) = Just tc
-    mb_conc _                    = Nothing
-
-pprArrow :: (a -> Maybe IfaceTyCon, PprPrec -> a -> SDoc)
-         -> FunTyFlag -> a -> SDoc
--- Prints a thin arrow (->) with its multiplicity
--- Used for both FunTy and FunCo, hence higher order arguments
-pprArrow (mb_conc, ppr_mult) af mult
-  | isFUNArg af
-  = case mb_conc mult of
-      Just tc | tc `ifaceTyConHasKey` manyDataConKey -> arrow
-              | tc `ifaceTyConHasKey` oneDataConKey  -> lollipop
-      _ -> text "%" <> ppr_mult appPrec mult <+> arrow
-  | otherwise
-  = ppr (funTyFlagTyCon af)
+    ppr_mult = case mult of
+      IfaceTyConApp tc IA_Nil
+        | tc `ifaceTyConHasKey` manyDataConKey
+        -> Left Many
+        | tc `ifaceTyConHasKey` oneDataConKey
+        -> Left One
+      _ -> Right $ pprPrecIfaceType appPrec mult
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty ctxt_prec ty
@@ -2059,9 +2052,14 @@ ppr_co ctxt_prec (IfaceFunCo r co_mult co1 co2)
     ppr_fun_tail co_mult1 other_co
       = [ppr_arrow co_mult1 <> ppr_role r <+> pprIfaceCoercion other_co]
 
-    ppr_arrow = pprArrow (mb_conc, ppr_co) visArgTypeLike
-    mb_conc (IfaceTyConAppCo _ tc _) = Just tc
-    mb_conc _                        = Nothing
+    ppr_arrow = pprArrowWithMultiplicity visArgTypeLike . ppr_mult
+    ppr_mult (IfaceReflCo (IfaceTyConApp tc IA_Nil))
+      | tc `ifaceTyConHasKey` manyDataConKey
+      = Left Many
+      | tc `ifaceTyConHasKey` oneDataConKey
+      = Left One
+    ppr_mult w =
+      Right $ ppr_co appPrec w
 
 ppr_co _         (IfaceTyConAppCo r tc cos)
   = parens (pprIfaceCoTcApp topPrec tc cos) <> ppr_role r

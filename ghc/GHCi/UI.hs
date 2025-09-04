@@ -2122,7 +2122,7 @@ sigAndLocDoc str tyThing =
   let tyThingTyDoc :: TyThing -> SDoc
       tyThingTyDoc = \case
         AnId i                      -> pprSigmaType $ varType i
-        AConLike (RealDataCon dc)   -> pprSigmaType $ dataConDisplayType False dc
+        AConLike (RealDataCon dc)   -> pprSigmaType $ dataConWrapperType dc
         AConLike (PatSynCon patSyn) -> pprPatSynType patSyn
         ATyCon tyCon                -> pprSigmaType $ GHC.tyConKind tyCon
         ACoAxiom _                  -> empty

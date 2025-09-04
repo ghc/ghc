@@ -37,6 +37,7 @@ module GHC.Core.Multiplicity
 import GHC.Prelude
 
 import GHC.Utils.Outputable
+import GHC.Base (Multiplicity(..))
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Types.Var( isFUNArg )
@@ -381,19 +382,37 @@ submult OneTy OneTy  = Submult
 submult OneTy _    = Submult
 submult _     _    = Unknown
 
-pprArrowWithMultiplicity :: FunTyFlag -> Either Bool SDoc -> SDoc
--- Pretty-print a multiplicity arrow.  The multiplicity itself
--- is described by the (Either Bool SDoc)
---    Left False   -- Many
---    Left True    -- One
---    Right doc    -- Something else
--- In the Right case, the doc is in parens if not atomic
-pprArrowWithMultiplicity af pp_mult
+pprArrowWithMultiplicity :: FunTyFlag -> Either Multiplicity SDoc -> SDoc
+-- ^ Prints a thin arrow (->) with its multiplicity.
+--
+-- The multiplicity itself is described by the @Either Multiplicity SDoc@
+-- argument:
+--
+--    - Left Many: ->
+--    - Left One : ⊸
+--    - Right w  : %w ->
+--
+-- In the Right case, the 'SDoc' should be in parens (if not atomic).
+pprArrowWithMultiplicity af mult
   | isFUNArg af
-  = case pp_mult of
-      Left False -> arrow
-      Left True  -> lollipop
-      Right doc  -> text "%" <> doc <+> arrow
+  = getPprStyle $ \sty ->
+    getPprDebug $ \debug ->
+    sdocOption sdocLinearTypes $ \ show_linear_types ->
+      case mult of
+        Left w ->
+          case w of
+            Many -> arrow
+            One ->
+              if show_linear_types || dumpStyle sty || debug
+              then lollipop
+              else arrow
+        Right w ->
+          -- With -XLinearTypes disabled, we usually default away multiplicities.
+          -- However, consider "(forall m. a %m -> b) -> ()". We don't default
+          -- away the 'forall m' because it does not appear at the top-level.
+          -- Hence we should display the multiplicity, as displaying
+          -- "(forall m. a -> b) -> ()" would be jolly confusing.
+            text "%" <> w <+> arrow
   | otherwise
   = ppr (funTyFlagTyCon af)
 

@@ -2,6 +2,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
@@ -20,7 +21,7 @@ module GHC.Tc.Types.Origin (
 
   -- * CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
-  isVisibleOrigin, toInvisibleOrigin,
+  invisibleOrigin_maybe, isVisibleOrigin, toInvisibleOrigin,
   pprCtOrigin, pprCtOriginBriefly,
   isGivenOrigin, isWantedWantedFunDepOrigin,
   isWantedSuperclassOrigin,
@@ -88,6 +89,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Kind as Hs
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.Maybe (isNothing)
 
 {- *********************************************************************
 *                                                                      *
@@ -413,10 +415,9 @@ pprSigSkolInfo ctxt ty
 
 pprPatSkolInfo :: ConLike -> SDoc
 pprPatSkolInfo (RealDataCon dc)
-  = sdocOption sdocLinearTypes (\show_linear_types ->
-      sep [ text "a pattern with constructor:"
+  =  sep [ text "a pattern with constructor:"
           , nest 2 $ ppr dc <+> dcolon
-            <+> pprType (dataConDisplayType show_linear_types dc) <> comma ])
+            <+> pprType (dataConWrapperType dc) <> comma ]
             -- pprType prints forall's regardless of -fprint-explicit-foralls
             -- which is what we want here, since we might be saying
             -- type variable 't' is bound by ...
@@ -530,14 +531,14 @@ data CtOrigin
                                    -- function or instance
 
 
-  | TypeEqOrigin { uo_actual   :: TcType
-                 , uo_expected :: TcType
-                 , uo_thing    :: Maybe TypedThing
+  | TypeEqOrigin { uo_actual    :: TcType
+                 , uo_expected  :: TcType
+                 , uo_thing     :: Maybe TypedThing
                        -- ^ The thing that has type "actual"
-                 , uo_visible  :: Bool
-                       -- ^ Is at least one of the three elements above visible?
-                       -- (Errors from the polymorphic subsumption check are considered
-                       -- visible.) Only used for prioritizing error messages.
+                 , uo_invisible :: Maybe InvisibleBit
+                    -- ^ Does this equality arise from an invisible component?
+                    -- (Errors from the polymorphic subsumption check are considered
+                    -- visible.) Only used for prioritizing error messages.
                  }
 
   | KindEqOrigin
@@ -693,15 +694,19 @@ instance Outputable NakedScFlag where
 -- TypeEqOrigins. This is used when choosing which error of
 -- several to report
 isVisibleOrigin :: CtOrigin -> Bool
-isVisibleOrigin (TypeEqOrigin { uo_visible = vis }) = vis
-isVisibleOrigin (KindEqOrigin _ _ sub_orig _)       = isVisibleOrigin sub_orig
-isVisibleOrigin _                                   = True
+isVisibleOrigin = isNothing . invisibleOrigin_maybe
+
+invisibleOrigin_maybe :: CtOrigin -> Maybe InvisibleBit
+invisibleOrigin_maybe = \case
+  TypeEqOrigin { uo_invisible = mb_invis } -> mb_invis
+  KindEqOrigin _ _ sub_orig _ -> invisibleOrigin_maybe sub_orig
+  _ -> Nothing
 
 -- Converts a visible origin to an invisible one, if possible. Currently,
 -- this works only for TypeEqOrigin
-toInvisibleOrigin :: CtOrigin -> CtOrigin
-toInvisibleOrigin orig@(TypeEqOrigin {}) = orig { uo_visible = False }
-toInvisibleOrigin orig                   = orig
+toInvisibleOrigin :: InvisibleBit -> CtOrigin -> CtOrigin
+toInvisibleOrigin invis_bit orig@(TypeEqOrigin {}) = orig { uo_invisible = Just invis_bit }
+toInvisibleOrigin _         orig                   = orig
 
 isGivenOrigin :: CtOrigin -> Bool
 isGivenOrigin (GivenOrigin {})       = True
@@ -834,8 +839,8 @@ pprCtOrigin (InjTFOrigin1 pred1 orig1 loc1 pred2 orig2 loc2)
 pprCtOrigin AssocFamPatOrigin
   = ctoHerald <+> text "matching a family LHS with its class instance head"
 
-pprCtOrigin (TypeEqOrigin { uo_actual = t1, uo_expected =  t2, uo_visible = vis })
-  = hang (ctoHerald <+> text "a type equality" <> whenPprDebug (brackets (ppr vis)))
+pprCtOrigin (TypeEqOrigin { uo_actual = t1, uo_expected =  t2, uo_invisible = invis })
+  = hang (ctoHerald <+> text "a type equality" <> whenPprDebug (brackets (ppr invis)))
        2 (sep [ppr t1, char '~', ppr t2])
 
 pprCtOrigin (KindEqOrigin t1 t2 _ _)
