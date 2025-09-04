@@ -286,8 +286,8 @@ why we still do redundant checks.
 -- We don't need to check the current module, this is done in
 -- tcExtendLocalFamInstEnv.
 -- See Note [The type family instance consistency story].
-checkFamInstConsistency :: ModuleEnv FamInstEnv -> [Module] -> TcM ()
-checkFamInstConsistency hpt_fam_insts directlyImpMods
+checkFamInstConsistency :: [Module] -> TcM ()
+checkFamInstConsistency directlyImpMods
   = do { (eps, hug) <- getEpsAndHug
        ; traceTc "checkFamInstConsistency" (ppr directlyImpMods)
        ; let { -- Fetch the iface of a given module.  Must succeed as
@@ -317,6 +317,7 @@ checkFamInstConsistency hpt_fam_insts directlyImpMods
              -- See Note [Order of type family consistency checks]
              }
 
+       ; hpt_fam_insts <- liftIO $ HUG.allFamInstances hug
        ; debug_consistent_set <- mapM (\x -> (\y -> (x, length y)) <$> modConsistent x) directlyImpMods
        ; traceTc "init_consistent_set" (ppr debug_consistent_set)
        ; let init_consistent_set = map fst (reverse (sortOn snd debug_consistent_set))
