@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE BlockArguments    #-}
+{-# LANGUAGE MultiWayIf        #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -666,12 +667,19 @@ renderLinkerStats s =
 
 
 getPackageArchives :: StgToJSConfig -> UnitEnv -> [UnitId] -> IO [FilePath]
-getPackageArchives cfg unit_env units =
-  filterM doesFileExist [ ST.unpack p </> "lib" ++ ST.unpack l ++ profSuff <.> "a"
-                        | u <- units
-                        , p <- getInstalledPackageLibDirs ue_state u
-                        , l <- getInstalledPackageHsLibs  ue_state u
-                        ]
+getPackageArchives cfg unit_env units = do
+  fmap concat $ forM units $ \u -> do
+    let archives = [ ST.unpack p </> "lib" ++ ST.unpack l ++ profSuff <.> "a"
+                   | p <- getInstalledPackageLibDirs ue_state u
+                   , l <- getInstalledPackageHsLibs  ue_state u
+                   ]
+    foundArchives <- filterM doesFileExist archives
+    if | not (null archives)
+       , null foundArchives
+       -> do
+         throwGhcExceptionIO (InstallationError $ "Could not find any library archives for unit-id: " <> (showPprUnsafe u))
+       | otherwise
+       -> pure foundArchives
   where
     ue_state = ue_homeUnitState unit_env
 
