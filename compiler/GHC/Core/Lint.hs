@@ -876,9 +876,9 @@ lintCoreExpr :: InExpr -> LintM (OutType, UsageEnv)
 -- See Note [GHC Formalism]
 
 lintCoreExpr (Var var)
-  = do {  var_pair@(var_ty, _) <- lintIdOcc var 0
+  = do { var_pair <- lintIdOcc var 0
            -- See Note [Linting representation-polymorphic builtins]
-       ; checkRepPolyBuiltin (Var var) [] var_ty
+       ; checkRepPolyBuiltin (Var var) []
            --checkDataToTagPrimOpTyCon (Var var) []
        ; return var_pair }
 
@@ -981,10 +981,10 @@ lintCoreExpr e@(App _ _)
 
   | otherwise
   = do { fun_pair <- lintCoreFun fun (length args)
-       ; app_pair@(app_ty, _) <- lintCoreArgs fun_pair args
+       ; app_pair <- lintCoreArgs fun_pair args
 
        -- See Note [Linting representation-polymorphic builtins]
-       ; checkRepPolyBuiltin fun args app_ty
+       ; checkRepPolyBuiltin fun args
        ; --checkDataToTagPrimOpTyCon fun args
 
        ; return app_pair}
@@ -1186,53 +1186,18 @@ checkDataToTagPrimOpTyCon _ _ = pure ()
 -}
 
 -- | Check representation-polymorphic invariants in an application of a
--- built-in function or newtype constructor.
+-- built-in function.
 --
 -- See Note [Linting representation-polymorphic builtins].
 checkRepPolyBuiltin :: CoreExpr   -- ^ the function (head of the application) we are checking
                     -> [CoreArg]  -- ^ the arguments to the application
-                    -> OutType -- ^ the instantiated type of the overall application
                     -> LintM ()
-checkRepPolyBuiltin (Var fun_id) args app_ty
+checkRepPolyBuiltin (Var fun_id) args
   = do { do_rep_poly_checks <- lf_check_fixed_rep <$> getLintFlags
        ; when (do_rep_poly_checks && hasNoBinding fun_id) $
-           if
-             -- (2) representation-polymorphic unlifted newtypes
-             | Just dc <- isDataConId_maybe fun_id
-             , isNewDataCon dc
-             -> if tcHasFixedRuntimeRep $ dataConTyCon dc
-                then return ()
-                else checkRepPolyNewtypeApp dc args app_ty
-
-             -- (1) representation-polymorphic builtins
-             | otherwise
-             -> checkRepPolyBuiltinApp fun_id args
+           checkRepPolyBuiltinApp fun_id args
        }
-checkRepPolyBuiltin _ _ _ = return ()
-
-checkRepPolyNewtypeApp :: DataCon -> [CoreArg] -> OutType -> LintM ()
-checkRepPolyNewtypeApp nt args app_ty
-  -- If the newtype is saturated, we're OK.
-  | any isValArg args
-  = return ()
-  -- Otherwise, check we can eta-expand.
-  | otherwise
-  = case getRuntimeArgTys app_ty of
-      (Scaled _ first_val_arg_ty, _):_
-        | not $ typeHasFixedRuntimeRep first_val_arg_ty
-        -> failWithL (err_msg first_val_arg_ty)
-      _ -> return ()
-
-  where
-
-      err_msg :: Type -> SDoc
-      err_msg bad_arg_ty
-        = vcat [ text "Cannot eta expand unlifted newtype constructor" <+> quotes (ppr nt) <> dot
-               , text "Its argument type does not have a fixed runtime representation:"
-               , nest 2 $ ppr_ty_ki bad_arg_ty ]
-
-      ppr_ty_ki :: Type -> SDoc
-      ppr_ty_ki ty = bullet <+> ppr ty <+> dcolon <+> ppr (typeKind ty)
+checkRepPolyBuiltin _ _ = return ()
 
 checkRepPolyBuiltinApp :: Id -> [CoreArg] -> LintM ()
 checkRepPolyBuiltinApp fun_id args = checkL (null not_concs) err_msg
@@ -3274,23 +3239,10 @@ we would again not be able to perform eta-expansion. (This is a bit more theoret
 as in user programs the typechecker will insert these type applications when
 instantiating, but it can still arise when constructing Core expressions).
 
-For 2, whenever we have an unlifted newtype such as
-
-  type RR :: Type -> RuntimeRep
-  type family RR a
-
-  type F :: forall (a :: Type) -> TYPE (RR a)
-  type family F a
-
-  type N :: forall (a :: Type) -> TYPE (RR a)
-  newtype N a = MkN (F a)
-
-and an unsaturated occurrence
-
-  MkN @ty -- NB: no value argument!
-
-we check that the (instantiated) argument type has a fixed runtime representation.
-This is done in the function "checkRepPolyNewtypeApp".
+For 2, we rely on the simple optimiser to inline the compulsory unfoldings of
+unlifted newtypes, and beta-reduce away any lambda abstractions that run afoul
+of the representation-polymorphism invariants.
+See Note [Desugaring unlifted newtypes] in GHC.Core.SimpleOpt.
 -}
 
 instance Applicative LintM where

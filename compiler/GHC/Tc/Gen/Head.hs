@@ -367,11 +367,6 @@ splitHsApps e = go e (top_ctxt 0 e) []
 -- | Rebuild an application: takes a type-checked application head
 -- expression together with arguments in the form of typechecked 'HsExprArg's
 -- and returns a typechecked application of the head to the arguments.
---
--- This performs a representation-polymorphism check to ensure that
--- representation-polymorphic unlifted newtypes have been eta-expanded.
---
--- See Note [Eta-expanding rep-poly unlifted newtypes].
 rebuildHsApps :: (HsExpr GhcTc, AppCtxt)
                       -- ^ the function being applied
               -> [HsExprArg 'TcpTc]

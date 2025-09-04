@@ -125,18 +125,8 @@ perPassFlags dflags pass
                { lf_check_global_ids = check_globals
                , lf_check_inline_loop_breakers = check_lbs
                , lf_check_static_ptrs = check_static_ptrs
-               , lf_check_linearity = check_linearity
-               , lf_check_fixed_rep = check_fixed_rep }
+               , lf_check_linearity = check_linearity }
   where
-    -- In the output of the desugarer, before optimisation,
-    -- we have eta-expanded data constructors with representation-polymorphic
-    -- bindings; so we switch off the representation-polymorphism checks.
-    -- The very simple optimiser will beta-reduce them away.
-    -- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Utils.Concrete
-    check_fixed_rep = case pass of
-                        CoreDesugar -> False
-                        _           -> True
-
     -- See Note [Checking for global Ids]
     check_globals = case pass of
                       CoreTidy -> False

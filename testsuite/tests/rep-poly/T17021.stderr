@@ -1,9 +1,0 @@
-
-T17021.hs:18:5: error: [GHC-55287]
-    • The argument ‘42’ of ‘MkT’
-      does not have a fixed runtime representation.
-      Its kind is:
-        TYPE (Id LiftedRep)
-      (Use -fprint-explicit-coercions to see the full type.)
-    • In the expression: MkT 42
-      In an equation for ‘f’: f = MkT 42

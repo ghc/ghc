@@ -512,6 +512,24 @@ rely on the simple optimiser to both inline the newtype unfolding and
 subsequently deal with the resulting lambdas (either beta-reducing them
 altogether or pushing coercions into them so that they satisfy the
 representation-polymorphism invariants).
+
+Wrinkle [Unlifted newtypes with wrappers]
+
+  Usually, newtype constructors don't have wrappers; they only have a worker.
+  However, newtype family instances and newtypes with a stupid theta have a
+  wrapper in addition to a worker.
+
+  To avoid running into the above issue with **both** the wrapper and the worker,
+  we make sure that the wrapper unfolding does not have such bad lambdas, by
+  simply omitting the (last) value argument. That is, instead of:
+
+    $WMkN = \ @r @a x -> $wMkN @r @a x
+
+  we set the unfolding to be:
+
+    $WMkN = \ @r @a -> $wMkN @r @a
+
+  This is done in GHC.Types.Id.Make.mkDataConRep.
 -}
 
 ----------------------
