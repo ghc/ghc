@@ -339,8 +339,11 @@ mk_cast :: CoreExpr -> CoercionR -> CoreExpr
 -- But in SimpleOpt it's nice to kill those nested casts (#18112)
 mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCo` co2)
 mk_cast (Tick t e)   co         = Tick t (mk_cast e co)
-mk_cast e co | isReflexiveCo co = e
-             | otherwise        = Cast e co
+mk_cast e co
+  | isReflexiveCo co
+  = e
+  | otherwise
+  = Cast e co
 
 ----------------------
 -- simple_app collects arguments for beta reduction

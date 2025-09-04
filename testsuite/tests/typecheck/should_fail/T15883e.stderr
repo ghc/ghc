@@ -1,7 +1,5 @@
 T15883e.hs:16:1: error: [GHC-91028]
-    • Couldn't match type ‘d0’ with ‘forall a. a’
-      Expected: d0 -> Foo LiftedRep
-        Actual: (forall a. a) -> Foo LiftedRep
+    • Couldn't match expected type ‘forall a. a’ with actual type ‘d0’
       Cannot instantiate unification variable ‘d0’
       with a type involving polytypes: forall a. a
     • In the first argument of ‘z’, namely ‘MkFoo’
@@ -12,9 +10,7 @@ T15883e.hs:16:1: error: [GHC-91028]
         To see the code I am typechecking, use -ddump-deriv
 
 T15883e.hs:16:1: error: [GHC-91028]
-    • Couldn't match type ‘b0’ with ‘forall a. a’
-      Expected: b0 -> Foo LiftedRep
-        Actual: (forall a. a) -> Foo LiftedRep
+    • Couldn't match expected type ‘forall a. a’ with actual type ‘b0’
       Cannot instantiate unification variable ‘b0’
       with a type involving polytypes: forall a. a
     • In the first argument of ‘z’, namely ‘MkFoo’

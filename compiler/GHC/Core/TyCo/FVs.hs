@@ -1292,4 +1292,3 @@ occCheckExpand vs_to_avoid ty
            ; ty2' <- go cxt ty2
            ; cos' <- mapM (go_co cxt) cos
            ; return (co { uco_lty = ty1', uco_rty = ty2', uco_deps = cos' }) }
-

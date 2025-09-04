@@ -1,7 +1,9 @@
 MkT :: a -> T a
-MkT :: a -> T a
+MkT :: a %1 -> T a
 type T :: * -> *
 data T a where
   MkT :: a %1 -> a -> T a
   	-- Defined at <interactive>:6:1
-MkT :: forall a b m n r. a -> b -> m -> n -> r -> T a b m n r
+MkT
+  :: forall a b m n r.
+     a %1 -> b %1 -> m %1 -> n %1 -> r %1 -> T a b m n r

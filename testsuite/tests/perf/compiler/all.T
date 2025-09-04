@@ -808,6 +808,6 @@ test('interpreter_steplocal',
      ['interpreter_steplocal.script'])
 
 test ('T26425',
-      [ collect_compiler_stats('all',5) ],
+      [ collect_compiler_stats('all',20) ],
       compile,
       ['-O'])

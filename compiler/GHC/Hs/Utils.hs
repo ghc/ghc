@@ -491,7 +491,7 @@ mkHsCharPrimLit :: Char -> HsLit (GhcPass p)
 mkHsCharPrimLit c = HsChar NoSourceText c
 
 mkConLikeTc :: ConLike -> HsExpr GhcTc
-mkConLikeTc con = XExpr (ConLikeTc con [] [])
+mkConLikeTc con = XExpr (ConLikeTc con)
 
 {-
 ************************************************************************

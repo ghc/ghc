@@ -696,8 +696,8 @@ instance ToHie (LocatedA HsWrapper) where
         (WpLet bs)      -> toHie $ EvBindContext (mkScope osp) (getRealSpanA osp) (L osp bs)
         (WpCompose a b) -> concatM $
           [toHie (L osp a), toHie (L osp b)]
-        (WpFun a b _ _) -> concatM $
-          [toHie (L osp a), toHie (L osp b)]
+        (WpFun _mult_co arg_wrap res_wrap _arg_ty _res_ty) -> concatM $
+          [toHie (L osp arg_wrap), toHie (L osp res_wrap)]
         (WpEvLam a) ->
           toHie $ C (EvidenceVarBind EvWrapperBind (mkScope osp) (getRealSpanA osp))
                 $ L osp a
@@ -1343,7 +1343,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
                , toHie (L mspan w) ]
           ExpandedThingTc _ e
             -> [ toHie (L mspan e) ]
-          ConLikeTc con _ _
+          ConLikeTc con
             -> [ toHie $ C Use $ L mspan $ conLikeName con ]
           HsTick _ expr
             -> [ toHie expr

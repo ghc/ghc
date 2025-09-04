@@ -1573,6 +1573,8 @@ data UnivCoProvenance
       -- ^ From a plugin, which asserts that this coercion is sound.
       --   The string and the variable set are for the use by the plugin.
 
+  | SubMultProv -- ^ A submultiplicity coercion
+
   deriving (Eq, Ord, Data.Data)
   -- Why Ord?  See Note [Ord instance of IfaceType] in GHC.Iface.Type
 
@@ -1580,6 +1582,7 @@ instance Outputable UnivCoProvenance where
   ppr PhantomProv          = text "(phantom)"
   ppr (ProofIrrelProv {})  = text "(proof irrel)"
   ppr (PluginProv str)     = parens (text "plugin" <+> brackets (text str))
+  ppr SubMultProv          = text "(sub-mult)"
 
 instance NFData UnivCoProvenance where
   rnf p = p `seq` ()
@@ -1588,6 +1591,7 @@ instance Binary UnivCoProvenance where
   put_ bh PhantomProv    = putByte bh 1
   put_ bh ProofIrrelProv = putByte bh 2
   put_ bh (PluginProv a) = putByte bh 3 >> put_ bh a
+  put_ bh SubMultProv    = putByte bh 4
   get bh = do
       tag <- getByte bh
       case tag of
@@ -1595,6 +1599,7 @@ instance Binary UnivCoProvenance where
            2 -> return ProofIrrelProv
            3 -> do a <- get bh
                    return $ PluginProv a
+           4 -> return SubMultProv
            _ -> panic ("get UnivCoProvenance " ++ show tag)
 
 

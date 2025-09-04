@@ -32,11 +32,7 @@ class ArrowChoice a where
     (|||) :: a b d -> a c d -> a (Either b c) d
 
 instance ArrowChoice (->) where
---    This doesn't work as |p| is inferred to be |-o| because of |Left|.
---    Then GHC complains that |f| is not the same type before it realises
---    that the overall type must be (->)
---    f +++ g = (Left `comp` f) ||| (Right `comp` g)
-    f +++ g = (comp @(->) Left f) ||| (comp @(->) Right g)
+    f +++ g = (Left `comp` f) ||| (Right `comp` g)
     (|||) = either
 
 

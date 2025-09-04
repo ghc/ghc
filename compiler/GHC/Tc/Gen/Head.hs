@@ -72,7 +72,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error
 
-import GHC.Builtin.Types( multiplicityTy )
 import GHC.Builtin.Names
 
 import GHC.Driver.DynFlags
@@ -195,7 +194,7 @@ type family XETAType (p :: TcPass) where  -- Type arguments
   XETAType _      = Type
 
 type family XEVAType (p :: TcPass) where   -- Value arguments
-  XEVAType 'TcpInst = Scaled TcSigmaType
+  XEVAType 'TcpInst = Scaled TcSigmaTypeFRR
   XEVAType _        = NoExtField
 
 data QLFlag = DoQL | NoQL
@@ -926,34 +925,8 @@ tcInferConLike (PatSynCon ps)    = tcInferPatSyn  ps
 
 tcInferDataCon :: DataCon -> TcM (HsExpr GhcTc, TcSigmaType)
 -- See Note [Typechecking data constructors]
-tcInferDataCon con
-  = do { let tvbs  = dataConUserTyVarBinders con
-             tvs   = binderVars tvbs
-             theta = dataConOtherTheta con
-             args  = dataConOrigArgTys con
-             res   = dataConOrigResTy con
-             stupid_theta = dataConStupidTheta con
-
-       ; scaled_arg_tys <- mapM linear_to_poly args
-
-       ; let full_theta  = stupid_theta ++ theta
-             all_arg_tys = map unrestricted full_theta ++ scaled_arg_tys
-                -- We are building the type of the data con wrapper, so the
-                -- type must precisely match the construction in
-                -- GHC.Core.DataCon.dataConWrapperType.
-                -- See Note [Instantiating stupid theta]
-                -- in GHC.Core.DataCon.
-
-       ; return ( XExpr (ConLikeTc (RealDataCon con) tvs all_arg_tys)
-                , mkForAllTys tvbs $ mkPhiTy full_theta $
-                  mkScaledFunTys scaled_arg_tys res ) }
-  where
-    linear_to_poly :: Scaled Type -> TcM (Scaled Type)
-    -- linear_to_poly implements point (3,4)
-    -- of Note [Typechecking data constructors]
-    linear_to_poly (Scaled OneTy ty) = do { mul_var <- newFlexiTyVarTy multiplicityTy
-                                          ; return (Scaled mul_var ty) }
-    linear_to_poly scaled_ty         = return scaled_ty
+tcInferDataCon con =
+  return (XExpr (ConLikeTc $ RealDataCon con), idType $ dataConWrapId con)
 
 tcInferPatSyn :: PatSyn -> TcM (HsExpr GhcTc, TcSigmaType)
 tcInferPatSyn ps
@@ -967,96 +940,107 @@ nonBidirectionalErr = TcRnPatSynNotBidirectional
 {- Note [Typechecking data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As per Note [Polymorphisation of linear fields] in
-GHC.Core.Multiplicity, linear fields of data constructors get a
-polymorphic multiplicity when the data constructor is used as a term:
+GHC.Core.Multiplicity, when we use a data constructor as a term, we want to
+consider its field to have polymorphic multiplicities. That is,
+Note [Data constructors are linear by default] says:
+
+    Just :: a. a %1 -> Maybe a
+
+    data D a = MkD Int a
+    MkD :: Int %1 -> a %1 -> D a
+
+but we want:
 
     Just :: forall {p} a. a %p -> Maybe a
+    MkD :: forall {p1} {p2} Int %p1 -> a %p2 -> D a
 
-So at an occurrence of a data constructor we do the following:
+This is particularly important for partial applications, e.g. 'map Just' or
+'map (MkD 3)'. To achieve this, we treat this as a subsumption problem, and
+use the subsumption mechanism that exists for typechecking applications.
 
-1. Typechecking, in tcInferDataCon.
+Here is how it works.  First, a quick refresher on deep subsumption. Given
+    f :: Int -> forall a. a -> a
+    g :: (forall b. Int -> b -> b) -> ()
+consider the application `g f`, where f’s type doesn’t match the type
+that `g` expects.  We solve this using deep subsumption, by eta-expanding `f`:
+    g (/\b. \x:Int. f x @b)
+See Note [Deep subsumption] in GHC.Tc.Utils.Unify)
 
-  a. Get the original type of the constructor, say
-     K :: forall (r :: RuntimeRep) (a :: TYPE r). a %1 -> T r a
-     Note the %1: it is linear
+How does this apply to data constructors?
+    data D a = MkD Int a
+    MkD :: Int %1 -> a %1 -> D a
+    h :: (a -> D a) -> ()
+We can typecheck `h (MkD 3)` by saying that
+    a %1-> D a   <=    a -> D a
 
-  b. We are going to return a ConLikeTc, thus:
-     XExpr (ConLikeTc K [r,a] [Scaled p a])
-      :: forall (r :: RuntimeRep) (a :: TYPE r). a %p -> T r a
-   where 'p' is a fresh multiplicity unification variable.
+That is, the linear type is "more polymorphic than" the non-linear one.
+We can witness this by doing deep subsumption, which generates this:
+    h (\ y -> MkD 3 y)
+The typing rule for lambda turns the linear arrow on `MkD` into whatever
+linearity the caller needs.
 
-   To get the returned ConLikeTc, we allocate a fresh multiplicity
-   variable for each linear argument, and store the type, scaled by
-   the fresh multiplicity variable in the ConLikeTc; along with
-   the type of the ConLikeTc. This is done by linear_to_poly.
+However, it's wasteful to introduce a lambda abstraction here: after all,
+we are just making up for Note [Data constructors are linear by default]. If
+we had given data constructors a multiplicity-polymorphic type from the get go,
+we wouldn't have needed to introduce these lambdas. Indeed, introducing lambda
+abstractions comes with its own raft of subtle implications (e.g. loss of sharing),
+as explained in Note [Desugaring WpFun]. We avoid these issues by generating a
+cast instead of a WpFun HsWrapper, using an unsafe coercion which coercions from
+One to Many: see the calls to 'mkSubMultFunCo' in 'mkWpFun', and the use of
+'OneSubMult' in GHC.Tc.utils.Unify.tc_sub_type_deep.
+These coercions only serve to lint the output of the typechecker as per
+Note [Linting linearity] in GHC.Core.Lint; these coercions get eliminated during
+coercion optimisation (see GHC.Core.Coercion.Opt.opt_univ).
 
-   If the argument is not linear (perhaps explicitly declared as
-   non-linear by the user), don't bother with this.
+Bottom line: when typechecking a data constructor application, when doing the
+subtype check wrt the context of that application, use deep subsumption,
+treating linear arrows as if they were multiplicity-polymorphic. You can
+see this happening in the 'go_fun' case of GHC.Tc.Utils.Unify.tc_sub_type_deep.
 
-2. Desugaring, in dsConLike.
+Notice that this is only needed for /partially applied/ data constructors.
+Moreover, we only generalise linear fields this way: fields with multiplicity
+Many, or other multiplicity expressions are exclusive to -XLinearTypes, hence
+don't have backward compatibility implications.
 
-  a. The (ConLikeTc K [r,a] [Scaled p a]) is desugared to
-     (/\r (a :: TYPE r). \(x %p :: a). K @r @a x)
-   which has the desired type given in the previous bullet.
+See the LinearEtaExpansions test which contains many tricky test cases, with
+commentary.
 
-   The 'p' is the multiplicity unification variable, which
-   will by now have been unified to something, or defaulted in
-   `GHC.Tc.Zonk.Type.commitFlexi`. So it won't just be an
-   (unbound) variable.
+[Historical note]
 
-   So a saturated application (K e), where e::Int will desugar to
-     (/\r (a :: TYPE r). ..etc..)
-        @LiftedRep @Int e
-   and all those lambdas will beta-reduce away in the simple optimiser
-   (see Wrinkle [Representation-polymorphic lambdas] below).
+  In the original implementation (from GHC 9.0 and up until GHC 9.14), and as
+  described in GHC proposal #111, we instead generalised ALL occurrences of
+  data constructors, even fully applied occurrences. For example, "Just 3"
+  would turn into "(\ x -> Just x) 3", later beta-reduced by the simplifier.
 
-   But for an /unsaturated/ application, such as `map (K @LiftedRep @Int) xs`,
-   beta reduction will leave (\x %Many :: Int. K x), which is the type `map`
-   expects whereas if we had just plain K, with its linear type, we'd
-   get a type mismatch. That's why we do this funky desugaring.
+  However, this caused problems, as it was liable to introduce lambda
+  abstractions whose binder did not have a fixed runtime representation,
+  in particular in conjunction with -XUnliftedNewtypes. For example (#17201):
 
-Wrinkles
+    {-# LANGUAGE TypeFamilies, UnliftedNewtypes #-}
 
-  [ConLikeTc arguments]
+    type N :: TYPE r -> TYPE r
+    newtype N a = MkN a
 
-    Note that the [TcType] argument to ConLikeTc is strictly redundant; those are
-    the type variables from the dataConUserTyVarBinders of the data constructor.
-    Similarly in the [Scaled TcType] field of ConLikeTc, the types come directly
-    from the data constructor.  The only bit that /isn't/ redundant is the
-    fresh multiplicity variables!
+  Given an expression such as 'MkN False', we would eta-expand 'MkN', which
+  resulted in:
 
-    So an alternative would be to define ConLikeTc like this:
-        | ConLikeTc [TcType]    -- Just the multiplicity variables
-    But then the desugarer would need to repeat some of the work done here.
-    So for now at least ConLikeTc records this strictly-redundant info.
+    ( ( /\r /\(a :: TYPE r) \(x :: a) -> MkN x ) @LiftedRep @Bool False
 
-  [Representation-polymorphic lambdas]
+  in which the binder (x :: a :: TYPE r) does not have a fixed RuntimeRep
+  (see Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete). We would then have
+  to rely on the simple optimiser beta-reducing this away before it caused
+  problems. However, this eta-expansion is completely needless, as MkN
+  appears fully saturated.
 
-    The lambda expression we produce in (4) can have representation-polymorphic
-    arguments, as indeed in (/\r (a :: TYPE r). \(x %p :: a). K @r @a x),
-    we have a lambda-bound variable x :: (a :: TYPE r).
-    This goes against the representation polymorphism invariants given in
-    Note [Representation polymorphism invariants] in GHC.Core. The trick is that
-    this this lambda will always be instantiated in a way that upholds the invariants.
-    This is achieved as follows:
+  See also #17021, a similar example in which the representation is hidden
+  under a type family application. In this example, it was even more difficult
+  to get the optimiser to take care of the lambda; much better to avoid
+  unnecessarily eta-expanding altogether.
 
-      A. Any arguments to such lambda abstractions are guaranteed to have
-         a fixed runtime representation. This is enforced in 'tcApp' by
-         'matchActualFunTy'.
-
-      B. If there are fewer arguments than there are bound term variables,
-         we will ensure that the appropriate type arguments are instantiated
-         concretely, such as 'r' in
-
-         ( /\r (a :: TYPE r). \ (x %p :: a). K @r @a x) @IntRep @Int#
-           :: Int# -> T IntRep Int#
-
-         See Note [Representation-polymorphic Ids with no binding] in GHC.Tc.Utils.Concrete
-
-      C. In the output of the desugarer in (4) above, we have a representation
-         polymorphic lambda, which Lint would normally reject. So for that one
-         pass, we switch off Lint's representation-polymorphism checks; see
-         the `lf_check_fixed_rep` flag in `LintFlags`.
+  The proposal incorrectly stated that "eta expansion is not sufficient to
+  restore backwards compatibility", but this is incorrect: if one does a full
+  subtype check like with deep subsumption, then the eta-expansion approach
+  works. This did require fixing some bugs in deep subsumption (#26225).
 -}
 
 {-

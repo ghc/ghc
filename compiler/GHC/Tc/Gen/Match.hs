@@ -39,7 +39,7 @@ where
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoFRRNC
                                        , tcMonoExprNC, tcExpr
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr, tcPolyLExpr )
@@ -522,9 +522,9 @@ tcGuardStmt ctxt (BindStmt _ pat rhs) res_ty thing_inside
           -- The multiplicity of x in u must be the same as the multiplicity at
           -- which the rhs has been consumed. When solving #18738, we want these
           -- two multiplicity to still be the same.
-          (rhs', rhs_ty) <- tcScalingUsage ManyTy $ tcInferRhoNC rhs
+          (rhs', rhs_ty) <- tcScalingUsage ManyTy $
+                            tcInferRhoFRRNC FRRBindStmtGuard rhs
                                    -- Stmt has a context already
-        ; hasFixedRuntimeRep_syntactic FRRBindStmtGuard rhs_ty
         ; (pat', thing)  <- tcCheckPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
                                          pat (unrestricted rhs_ty) $
                             thing_inside res_ty

@@ -1,18 +1,32 @@
+RepPolyRule3.hs:17:11: warning: [GHC-69441]
+    RULE left-hand side too complicated to desugar
+      Optimised lhs: ((g @WordRep @a)
+                      `cast` (GRefl representational a (TYPE RepPolyRule3.D:R:F[1])_N
+                              ->_R <a>_R
+                              :: Coercible (a -> a) (a -> a)))
+                       x
+      Orig lhs: ((g @WordRep @a)
+                 `cast` (GRefl representational a (TYPE RepPolyRule3.D:R:F[1])_N
+                         ->_R <a>_R
+                         :: Coercible (a -> a) (a -> a)))
+                  (x
+                   `cast` (Sub (Sym (GRefl nominal a (TYPE RepPolyRule3.D:R:F[1])_N)
+                                ; GRefl nominal a (TYPE RepPolyRule3.D:R:F[1])_N)
+                           :: Coercible a a))
 
-RepPolyRule3.hs:17:57: error: [GHC-55287]
-    • The argument ‘x’ of ‘g’
-      does not have a fixed runtime representation.
-      Its kind is:
-        TYPE (F WordRep)
-      (Use -fprint-explicit-coercions to see the full type.)
-    • In the expression: g x
-      When checking the rewrite rule "g_id"
+RepPolyRule3.hs:23:11: warning: [GHC-69441]
+    RULE left-hand side too complicated to desugar
+      Optimised lhs: ((h @WordRep @a)
+                      `cast` (GRefl representational a (TYPE RepPolyRule3.D:R:F[1])_N
+                              ->_R <a>_R
+                              :: Coercible (a -> a) (a -> a)))
+                       x
+      Orig lhs: ((h @WordRep @a)
+                 `cast` (GRefl representational a (TYPE RepPolyRule3.D:R:F[1])_N
+                         ->_R <a>_R
+                         :: Coercible (a -> a) (a -> a)))
+                  (x
+                   `cast` (Sub (Sym (GRefl nominal a (TYPE RepPolyRule3.D:R:F[1])_N)
+                                ; GRefl nominal a (TYPE RepPolyRule3.D:R:F[1])_N)
+                           :: Coercible a a))
 
-RepPolyRule3.hs:23:52: error: [GHC-55287]
-    • The argument ‘x’ of ‘h’
-      does not have a fixed runtime representation.
-      Its kind is:
-        TYPE (F WordRep)
-      (Use -fprint-explicit-coercions to see the full type.)
-    • In the expression: h x
-      When checking the rewrite rule "h_id"

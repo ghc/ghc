@@ -16,7 +16,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Core.Coercion
 import GHC.Core.ConLike
-import GHC.Core.DataCon
+import GHC.Core.DataCon (dataConWrapperType)
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
@@ -151,7 +151,7 @@ hsExprType (HsForAll x _ _) = dataConCantHappen x
 hsExprType (HsFunArr x _ _ _) = dataConCantHappen x
 hsExprType (XExpr (WrapExpr wrap e)) = hsWrapperType wrap $ hsExprType e
 hsExprType (XExpr (ExpandedThingTc _ e))  = hsExprType e
-hsExprType (XExpr (ConLikeTc con _ _)) = conLikeType con
+hsExprType (XExpr (ConLikeTc con)) = conLikeType con
 hsExprType (XExpr (HsTick _ e)) = lhsExprType e
 hsExprType (XExpr (HsBinTick _ _ e)) = lhsExprType e
 hsExprType (XExpr (HsRecSelTc (FieldOcc _ id))) = idType (unLoc id)
@@ -164,7 +164,7 @@ arithSeqInfoType asi = mkListTy $ case asi of
   FromThenTo x _ _ -> lhsExprType x
 
 conLikeType :: ConLike -> Type
-conLikeType (RealDataCon con)  = dataConNonlinearType con
+conLikeType (RealDataCon con)  = dataConWrapperType con
 conLikeType (PatSynCon patsyn) = case patSynBuilder patsyn of
     Just (_, ty, _) -> ty
     Nothing         -> pprPanic "conLikeType: Unidirectional pattern synonym in expression position"
@@ -193,10 +193,11 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
     go WpHole              = id
     go (WpSubType w)       = go w
     go (w1 `WpCompose` w2) = go w1 . go w2
-    go (WpFun _ w2 (Scaled m exp_arg) _) = liftPRType $ \t ->
+    go (WpFun mult_co _ w2 exp_arg _) = liftPRType $ \t ->
       let act_res = funResultTy t
           exp_res = hsWrapperType w2 act_res
-      in mkFunctionType m exp_arg exp_res
+          mult = subMultCoRKind mult_co
+      in mkFunctionType mult exp_arg exp_res
     go (WpCast co)        = liftPRType $ \_ -> coercionRKind co
     go (WpEvLam v)        = liftPRType $ mkInvisFunTy (idType v)
     go (WpEvApp _)        = liftPRType $ funResultTy

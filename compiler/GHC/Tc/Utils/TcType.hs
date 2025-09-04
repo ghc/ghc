@@ -370,7 +370,7 @@ type TcThetaType    = ThetaType
 type TcSigmaType    = TcType
 
 -- | A 'TcSigmaTypeFRR' is a 'TcSigmaType' which has a syntactically
---  fixed 'RuntimeRep' in the sense of Note [Fixed RuntimeRep]
+-- fixed 'RuntimeRep' in the sense of Note [Fixed RuntimeRep]
 -- in GHC.Tc.Utils.Concrete.
 --
 -- In particular, this means that:
@@ -383,9 +383,11 @@ type TcSigmaType    = TcType
 -- See Note [Return arguments with a fixed RuntimeRep.
 type TcSigmaTypeFRR = TcSigmaType
     -- TODO: consider making this a newtype.
-type TcRhoTypeFRR = TcRhoType
+type TcRhoTypeFRR   = TcRhoType
 
 type TcRhoType      = TcType  -- Note [TcRhoType]
+-- | A 'TcRhoType' which has a syntactically fixed 'RuntimeRep', in the sense of
+-- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 type TcTauType      = TcType
 type TcKind         = Kind
 type TcTyVarSet     = TyVarSet

@@ -6,7 +6,7 @@ import GHC.Tc.Utils.TcType ( TcType, TcRhoType, TcSigmaType, TcSigmaTypeFRR
                            , ExpType, ExpRhoType, ExpSigmaType )
 import GHC.Tc.Types        ( TcM )
 import GHC.Tc.Types.BasicTypes( TcCompleteSig )
-import GHC.Tc.Types.Origin ( CtOrigin )
+import GHC.Tc.Types.Origin ( CtOrigin, FixedRuntimeRepContext )
 import GHC.Core.Type ( Mult )
 import GHC.Hs.Extension ( GhcRn, GhcTc )
 
@@ -32,6 +32,8 @@ tcExpr     :: HsExpr GhcRn -> ExpRhoType   -> TcM (HsExpr GhcTc)
 
 tcInferRho, tcInferRhoNC ::
           LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
+tcInferRhoFRR, tcInferRhoFRRNC ::
+  FixedRuntimeRepContext -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 
 tcInferExpr :: InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
 

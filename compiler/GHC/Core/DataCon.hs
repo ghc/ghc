@@ -31,9 +31,7 @@ module GHC.Core.DataCon (
         dataConRepType, dataConInstSig, dataConFullSig,
         dataConName, dataConIdentity, dataConTag, dataConTagZ,
         dataConTyCon, dataConOrigTyCon,
-        dataConWrapperType,
-        dataConNonlinearType,
-        dataConDisplayType,
+        dataConWrapperType, dataConNonlinearType,
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
         dataConConcreteTyVars,
         dataConUserTyVars, dataConUserTyVarBinders,
@@ -1538,30 +1536,13 @@ MkT :: a %1 -> T a (with -XLinearTypes)
 or
 MkT :: a  -> T a (with -XNoLinearTypes)
 
-There are three different methods to retrieve a type of a datacon.
-They differ in how linear fields are handled.
-
-1. dataConWrapperType:
-The type of the wrapper in Core.
+The type of the wrapper in Core is given by dataConWrapperType.
 For example, dataConWrapperType for Maybe is a %1 -> Just a.
 
-2. dataConNonlinearType:
-The type of the constructor, with linear arrows replaced by unrestricted ones.
-Used when we don't want to introduce linear types to user (in holes
-and in types in hie used by haddock).
-
-3. dataConDisplayType (takes a boolean indicating if -XLinearTypes is enabled):
-The type we'd like to show in error messages, :info and -ddump-types.
-Ideally, it should reflect the type written by the user;
-the function returns a type with arrows that would be required
-to write this constructor under the current setting of -XLinearTypes.
-In principle, this type can be different from the user's source code
-when the value of -XLinearTypes has changed, but we don't
-expect this to cause much trouble.
-
-Due to internal plumbing in checkValidDataCon, we can't just return a Doc.
-The multiplicity of arrows returned by dataConDisplayType and
-dataConDisplayType is used only for pretty-printing.
+However, we might not want to show these linear types in error messages, e.g.
+if the user has not enabled LinearTypes, or in haddock.
+This is handled by the sdocLinearTypes option: linear arrows are displayed
+as regular arrows if sdocLinearTypes is False.
 -}
 
 dataConWrapperType :: DataCon -> Type
@@ -1589,8 +1570,11 @@ dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
     res_ty
 
 dataConNonlinearType :: DataCon -> Type
--- Just like dataConWrapperType, but with the
--- linearity on the arguments all zapped to Many
+-- ^ Just like 'dataConWrapperType', but with the
+-- linearity on the arguments all zapped to Many.
+--
+-- Only used temporarily as a stop-gap for hole fit suggestions
+-- until #26338 is fixed.
 dataConNonlinearType (MkData { dcUserTyVarBinders = user_tvbs,
                                dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                                dcOrigResTy = res_ty,
@@ -1601,12 +1585,6 @@ dataConNonlinearType (MkData { dcUserTyVarBinders = user_tvbs,
     res_ty
   where
     arg_tys' = map (\(Scaled w t) -> Scaled (case w of OneTy -> ManyTy; _ -> w) t) arg_tys
-
-dataConDisplayType :: Bool -> DataCon -> Type
-dataConDisplayType show_linear_types dc
-  = if show_linear_types
-    then dataConWrapperType dc
-    else dataConNonlinearType dc
 
 -- | Finds the instantiated types of the arguments required to construct a
 -- 'DataCon' representation

@@ -9,6 +9,7 @@ module GHC.Tc.Types.Evidence (
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpForAllCast,
   mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta, mkWpSubType,
+  SubMultCo(..), mkSubMultFunCo, subMultCoRKind,
   collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper,
   pprHsWrapper, hsWrapDictBinders,
@@ -62,6 +63,7 @@ import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Core.Predicate
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep (UnivCoProvenance(..))
 import GHC.Core.TyCon
 import GHC.Core.Make    ( mkWildCase, mkRuntimeErrorApp, tYPE_ERROR_ID )
 import GHC.Core.Class   ( classTyCon )
@@ -74,7 +76,7 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Name( isInternalName )
 import GHC.Types.Var
-import GHC.Types.Id( idScaledType, idType )
+import GHC.Types.Id( idType )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
@@ -222,60 +224,89 @@ And then, because of Note [Representation polymorphism invariants]:
 Hence WpFun-FRR-INVARIANT.
 -}
 
+-- | 'HsWrapper's are produced by the typechecker to insert pieces of Core syntax.
+--
+-- For example:
+--
+--   - User writes: @id False@.
+--     Typechecker elaborates to @id \@Bool False@ using 'WpTyApp'.
+--   - User writes: @compare True False@.
+--     Typechecker elaborates to @compare $dOrdBool True False@ using 'WpEvApp'.
+--
+-- A wrapper can be thought of as a function @CoreExpr -> CoreExpr@ which
+-- transforms Core syntax by elaboration; we usually write this as
+-- @expr ↦ wrap[expr]@. We often write a wrapper as an "expression with a hole",
+-- e.g. @WpTyApp Int@ is @<hole> \@Int@.
+--
+-- NOTATION @~~>@: if @wrap[ e::t1 ] :: t2@, we write the type of @wrap@
+-- as @wrap :: t1 ~~> t2@.
 data HsWrapper
-  -- NOTATION (~~>):
-  --    We write          wrap :: t1 ~~> t2
-  --    if       wrap[ e::t1 ] :: t2
-  = WpHole                      -- The identity coercion
+  -- | The identity 'HsWrapper' (similar to the 'Refl' coercion).
+  = WpHole
 
+  -- | @WpSubType wp@ is the same as @wp@, but with extra invariants.
+  -- See Note [Deep subsumption and WpSubType] (DSST1)
   | WpSubType HsWrapper
-       -- (WpSubType wp) is the same as `wp`, but with extra invariants
-       -- See Note [Deep subsumption and WpSubType] (DSST1)
 
+  -- | @(wrap1 `WpCompose` wrap2)[e] = wrap1[ wrap2[ e ]]@
+  --
+  -- Hence  @(\\a. <hole>) `WpCompose` (\\b. <hole>) = (\\a b. <hole>)@
+  -- But    @(<hole> a) `WpCompose` (<hole> b) = (<hole> b a)@
+  --
+  -- If @wrap1 :: t2 ~> t3@ and @wrap2 :: t1 ~~> t2@,
+  -- then @(wrap1 `WpCompose` wrap2) :: t1 ~~> t3@
   | WpCompose HsWrapper HsWrapper
-       -- (wrap1 `WpCompose` wrap2)[e] = wrap1[ wrap2[ e ]]
-       --
-       -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
-       -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
-       --
-       -- If wrap1 :: t2 ~~> t3
-       --    wrap2 :: t1 ~~> t2
-       --- Then (wrap1 `WpCompose` wrap2) :: t1 ~~> t3
 
-  | WpFun HsWrapper HsWrapper (Scaled TcTypeFRR) TcType
-       -- (WpFun wrap1 wrap2 (w, t1) t2)[e] = \(x:_w exp_arg). wrap2[ e wrap1[x] ]
-       --
-       -- INVARIANT: both input and output types of `wrap1` have a fixed runtime-rep
-       --            See Note [WpFun-FRR-INVARIANT]
-       --
-       -- Typing rules:
-       -- If    e     :: act_arg -> act_res
-       --       wrap1 :: exp_arg ~~> act_arg
-       --       wrap2 :: act_res ~~> exp_res
-       -- then   WpFun wrap1 wrap2 :: (act_arg -> act_res) ~~> (exp_arg -> exp_res)
-       -- This isn't the same as for mkFunCo, but it has to be this way
-       -- because we can't use 'sym' to flip around these HsWrappers
-       --
-       -- NB: a WpFun is always for a (->) function arrow, never (=>)
+  -- | @(WpFun mult_co arg_wrap res_wrap t1 t2)[e] = \(x :: exp_arg). res_wrap[ e arg_wrap[x] ]@
+  --
+  -- INVARIANT: both input and output types of `arg_wrap` have a fixed runtime-rep
+  --            See Note [WpFun-FRR-INVARIANT]
+  --
+  -- Typing rules: given:
+  --  - @mult_co  :: act_mult ~ exp_mult@
+  --  - @arg_wrap :: exp_arg ~~> act_arg@
+  --  - @res_wrap :: act_res ~~> exp_res@
+  -- then @WpFun mult_co arg_wrap res_wrap :: (act_arg %act_mult -> arg_res) ~~> (exp_arg %exp_mult -> exp_res)@.
+  --
+  -- This isn't the same as for @mkFunCo@, but it has to be this way
+  -- because we can't use @mkSymCo@ to flip around these @HsWrapper@s.
+  --
+  -- NB: a 'WpFun' is always for type-like function arrows; no constraints.
+  --
+  -- Use 'mkWpFun' to construct such a wrapper.
+  | WpFun
+     { mult_co  :: SubMultCo
+     , arg_wrap :: HsWrapper
+     , res_wrap :: HsWrapper
+     , arg_type :: TcTypeFRR
+         -- ^ The "from" type of the argument wrapper
+     , res_type :: TcType
+         -- ^ Either the "from" or the "to" type of the result wrapper
+     }
 
-  | WpCast TcCoercionR        -- A cast:  [] `cast` co
-                              -- Guaranteed not the identity coercion
-                              -- At role Representational
+  -- | A cast:  @<hole> `cast` co@
+  | WpCast TcCoercionR
+    -- ^ Invariants:
+    --
+    --    - 'Representational' role.
+    --    - Never the identity coercion.
 
-        -- Evidence abstraction and application
-        -- (both dictionaries and coercions)
-        -- Both WpEvLam and WpEvApp abstract and apply values
-        --      of kind CONSTRAINT rep
-  | WpEvLam EvVar               -- \d. []       the 'd' is an evidence variable
-  | WpEvApp EvTerm              -- [] d         the 'd' is evidence for a constraint
+  -- | Evidence abstraction @\d. <hole>@, where @d@ is an evidence variable
+  | WpEvLam EvVar
+  -- | @<hole> d, where @d@ is evidence for a constraint
+  | WpEvApp EvTerm
 
-        -- Kind and Type abstraction and application
-  | WpTyLam TyVar       -- \a. []  the 'a' is a type/kind variable (not coercion var)
-  | WpTyApp KindOrType  -- [] t    the 't' is a type (not coercion)
+  -- | Type abstraction @\a. <hole>@, where @a@ is a type/kind variable (not a coercion variable)
+  | WpTyLam TyVar
+  -- | Type application @<hole> t@, where @t@ is a type/kind (not a coercion)
+  | WpTyApp KindOrType
 
+  -- | Evidence bindings: @let binds in <hole>@.
+  --
+  -- The set of evidence bindings should be non-empty (or possibly non-empty),
+  -- so that the identity 'HsWrapper' is always exactly 'WpHole'.
+  | WpLet TcEvBinds
 
-  | WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
-                                -- so that the identity coercion is always exactly WpHole
   deriving Data.Data
 
 -- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
@@ -311,25 +342,82 @@ WpCast c1 <.> WpCast c2 = WpCast (c2 `mkTransCo` c1)
   -- This is thus the same as WpCast (c2 ; c1) and not WpCast (c1 ; c2).
 c1        <.> c2        = c1 `WpCompose` c2
 
+-- | A sub-multiplicity coercion.
+--
+-- Used only to get multiplicities to line up when typechecking partial
+-- applications of data constructors, as per Note [Typechecking data constructors]
+-- in GHC.Tc.Gen.Head.
+--
+--  See Note [Multiplicity in deep subsumption]
+data SubMultCo
+  -- | Equality of multiplicities
+  = EqMultCo TcCoercionN
+  -- | One is a submultiplicity of any other multiplicity.
+  | OneSubMult Mult
+  deriving Data.Data
+
+instance Outputable SubMultCo where
+  ppr (EqMultCo co) = ppr co
+  ppr (OneSubMult w) = parens $ text "One ⊆" <+> ppr w
+
+subMultCoRKind :: SubMultCo -> Mult
+subMultCoRKind (EqMultCo co) = coercionRKind co
+subMultCoRKind (OneSubMult w) = w
+
+-- | Like 'mkFunCo2' except that it allows for sub-multiplicity instead of
+-- a multiplicity coercion.
+mkSubMultFunCo :: FunTyFlag -> FunTyFlag
+               -> SubMultCo   -- ^ act_mult ~~> exp_mult
+               -> TcCoercionR -- ^ act_arg  ~~> exp_arg
+               -> TcCoercionR -- ^ act_res  ~~> exp_res
+               -> TcCoercionR
+mkSubMultFunCo act_af exp_af (EqMultCo w_co) arg_co res_co =
+  mkFunCo2 Representational act_af exp_af
+    w_co
+    arg_co
+    res_co
+mkSubMultFunCo act_af exp_af (OneSubMult w2) arg_co res_co =
+  mkUnivCo SubMultProv [] Representational
+    (mkFunTy act_af OneTy act_arg act_res)
+    (mkFunTy exp_af w2    act_arg act_res)
+    `mkTransCo`
+  mkFunCo2 Representational act_af exp_af
+    (mkNomReflCo w2)
+    arg_co
+    res_co
+  where
+    act_arg = coercionLKind arg_co
+    act_res = coercionLKind res_co
+
+-- | Smart constructor to create a 'WpFun' 'HsWrapper', which avoids introducing
+-- a lambda abstraction if the two supplied wrappers are either identities or
+-- casts.
+--
+-- PRECONDITION: same as Note [WpFun-FRR-INVARIANT]
 mkWpFun :: HsWrapper -> HsWrapper
-        -> Scaled TcTypeFRR -- ^ the "from" type of the first wrapper
+        -> (SubMultCo, TcTypeFRR) -- ^ the "from" type of the first wrapper
         -> TcType           -- ^ Either "from" type or "to" type of the second wrapper
                             --   (used only when the second wrapper is the identity)
         -> HsWrapper
--- ^ Smart constructor for `WpFun`
--- Just removes clutter and optimises some common cases.
---
--- PRECONDITION: same as Note [WpFun-FRR-INVARIANT]
---
 -- Unfortunately, we can't check PRECONDITION with an assertion here, because of
 -- [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-mkWpFun w1 w2 st1@(Scaled m1 t1) t2
+mkWpFun w1 w2 (wp_mult, t1) t2
   = case (w1,w2) of
-      (WpHole,     WpHole)     -> WpHole
-      (WpHole,     WpCast co2) -> WpCast (mk_wp_fun_co m1 (mkRepReflCo t1) co2)
-      (WpCast co1, WpHole)     -> WpCast (mk_wp_fun_co m1 (mkSymCo co1)    (mkRepReflCo t2))
-      (WpCast co1, WpCast co2) -> WpCast (mk_wp_fun_co m1 (mkSymCo co1)    co2)
-      (_,          _)          -> WpFun w1 w2 st1 t2
+      (WpHole,     WpHole)
+        -> mkWpCastR (mk_wp_fun_co (mkRepReflCo t1) (mkRepReflCo t2))
+      (WpHole,     WpCast co2)
+        -> WpCast    (mk_wp_fun_co (mkRepReflCo t1) co2)
+      (WpCast co1, WpHole)
+        -> WpCast    (mk_wp_fun_co (mkSymCo co1)    (mkRepReflCo t2))
+      (WpCast co1, WpCast co2)
+        -> WpCast    (mk_wp_fun_co (mkSymCo co1)    co2)
+      (_,          _)
+        -> WpFun { mult_co = wp_mult
+                 , arg_wrap = w1, res_wrap = w2
+                 , arg_type = t1, res_type = t2 }
+  where
+    mk_wp_fun_co = mkSubMultFunCo FTF_T_T FTF_T_T wp_mult
+      -- FTF_T_T: WpFun is always (->)
 
 mkWpSubType :: HsWrapper -> HsWrapper
 -- See (DSST2) in Note [Deep subsumption and WpSubType]
@@ -345,14 +433,16 @@ mkWpEta :: Type -> [Id] -> HsWrapper -> HsWrapper
 mkWpEta orig_fun_ty xs wrap = go orig_fun_ty xs
   where
     go _      []       = wrap
-    go fun_ty (id:ids) = WpFun idHsWrapper (go res_ty ids) (idScaledType id) res_ty
-                       where
-                         res_ty = funResultTy fun_ty
-
-mk_wp_fun_co :: Mult -> TcCoercionR -> TcCoercionR -> TcCoercionR
-mk_wp_fun_co mult arg_co res_co
-  = mkNakedFunCo Representational FTF_T_T (multToCo mult) arg_co res_co
-    -- FTF_T_T: WpFun is always (->)
+    go fun_ty (id:ids) =
+      WpFun
+        { mult_co  = EqMultCo $ mkNomReflCo (idMult id)
+        , arg_wrap = idHsWrapper
+        , res_wrap = go res_ty ids
+        , arg_type = idType id
+        , res_type = res_ty
+        }
+      where
+        res_ty = funResultTy fun_ty
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
@@ -425,7 +515,7 @@ hsWrapDictBinders wrap = go wrap
  where
    go (WpEvLam dict_id)   = unitBag dict_id
    go (w1 `WpCompose` w2) = go w1 `unionBags` go w2
-   go (WpFun _ w _ _)     = go w
+   go (WpFun {res_wrap})  = go res_wrap
    go WpHole              = emptyBag
    go (WpSubType {})      = emptyBag  -- See Note [Deep subsumption and WpSubType]
    go (WpCast  {})        = emptyBag
@@ -473,9 +563,10 @@ optSubTypeHsWrapper wrap
     opt1 (WpEvLam ev)           ws = opt_ev_lam ev ws
     opt1 (WpTyLam tv)           ws = opt_ty_lam tv ws
     opt1 (WpLet binds)          ws = pushWpLet binds ws
-    opt1 (WpFun w1 w2 sty1 ty2) ws = opt_fun w1 w2 sty1 ty2 ws
     opt1 w@(WpTyApp {})         ws = w : ws
     opt1 w@(WpEvApp {})         ws = w : ws
+    opt1 (WpFun mult_co arg_wrap res_wrap arg_ty res_ty) ws
+      = opt_fun mult_co arg_wrap res_wrap arg_ty res_ty ws
 
     -----------------
     -- (WpTyLam a <.> WpTyApp a <.> w) = w
@@ -526,8 +617,8 @@ optSubTypeHsWrapper wrap
                  | otherwise        = WpCast co : ws
 
     ------------------
-    opt_fun w1 w2 sty1 ty2 ws
-      = case mkWpFun (opt w1) (opt w2) sty1 ty2 of
+    opt_fun mult_co arg_wrap res_wrap ty1 ty2 ws
+      = case mkWpFun (opt arg_wrap) (opt res_wrap) (mult_co, ty1) ty2 of
           WpHole    -> ws
           WpCast co -> opt_co co ws
           w         -> w : ws
@@ -539,7 +630,7 @@ optSubTypeHsWrapper wrap
     not_in _  WpHole                   = True
     not_in v (WpCast co)               = not (anyFreeVarsOfCo (== v) co)
     not_in v (WpTyApp ty)              = not (anyFreeVarsOfType (== v) ty)
-    not_in v (WpFun w1 w2 _ _)         = not_in v w1 && not_in v w2
+    not_in v (WpFun w_co w1 w2 _ _)    = not_in_submult v w_co && not_in v w1 && not_in v w2
     not_in v (WpSubType w)             = not_in v w
     not_in v (WpCompose w1 w2)         = not_in v w1 && not_in v w2
     not_in v (WpEvApp (EvExpr e))      = not (v `elemVarSet` exprFreeVars e)
@@ -548,6 +639,13 @@ optSubTypeHsWrapper wrap
     not_in _ (WpTyLam {}) = False    -- Give  up; conservative
     not_in _ (WpEvLam {}) = False    -- Ditto
     not_in _ (WpLet {})   = False    -- Ditto
+
+    not_in_submult :: TyVar -> SubMultCo -> Bool
+    not_in_submult v = \case
+      EqMultCo co -> not (anyFreeVarsOfCo (== v) co)
+      OneSubMult w -> not (anyFreeVarsOfType (== v) w)
+
+
 
 pushWpLet :: TcEvBinds -> [HsWrapper] -> [HsWrapper]
 -- See if we can transform
@@ -1270,8 +1368,9 @@ pprHsWrapper wrap pp_thing_inside
     help it WpHole             = it
     help it (WpCompose w1 w2)  = help (help it w2) w1
     help it (WpSubType w)      = no_parens $ text "subtype" <> braces (help it w False)
-    help it (WpFun f1 f2 (Scaled w t1) _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
-                                            help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
+    help it (WpFun w arg_wrap res_wrap t1 _t2)
+      = add_parens $ text "\\(x" <> dcolon <> brackets (ppr $ subMultCoRKind w) <> ppr t1 <> text ")." <+>
+                     help (\_ -> it True <+> help (\_ -> text "x") arg_wrap True) res_wrap False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
     help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]

@@ -42,11 +42,9 @@ import GHC.Types.Var
 
 import GHC.Utils.Misc          ( HasDebugCallStack )
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Data.FastString     ( FastString, fsLit )
 
 import Control.Monad      ( void )
-import Data.Functor       ( ($>) )
 
 
 {- Note [Concrete overview]
@@ -479,7 +477,7 @@ There are three cases, all for `hasNoBinding` Ids:
 
   This primop pushes a "catch frame" on the stack, which must "know"
   the return convention of `k`.  So `k` must be concrete, so we know
-  what kind of catch-frame to push. (See #21868 for more details.
+  what kind of catch-frame to push. (See #21868 for more details).
 
   So again we want to ensure that `r` is instantiated with a concrete RuntimeRep.
 
@@ -611,7 +609,7 @@ Examples:
 -- @ki ~ concrete_tv@ for a concrete metavariable @concrete_tv@.
 --
 -- Returns a coercion @co :: ty ~# concrete_ty@ as evidence.
--- If @ty@ obviously has a fixed 'RuntimeRep', e.g @ki = IntRep@,
+-- If @ty@ obviously has a fixed 'RuntimeRep', e.g @ki = TYPE IntRep@,
 -- then this function immediately returns 'MRefl',
 -- without emitting any constraints.
 hasFixedRuntimeRep :: HasDebugCallStack
@@ -656,7 +654,7 @@ hasFixedRuntimeRep_syntactic frr_ctxt ty
   = void $ checkFRR_with ensure_conc frr_ctxt ty
     where
       ensure_conc :: FixedRuntimeRepOrigin -> TcKind -> TcM TcMCoercionN
-      ensure_conc frr_orig ki = ensureConcrete frr_orig ki $> MRefl
+      ensure_conc frr_orig ki = ensureConcrete frr_orig ki >> pure MRefl
 
 -- | Internal function to check whether the given type has a fixed 'RuntimeRep'.
 --
@@ -672,7 +670,7 @@ checkFRR_with :: HasDebugCallStack
                    -- ^ The type @ty@ to check (the check itself only looks at its kind).
               -> TcM (TcCoercionN, TcTypeFRR)
                   -- ^ Returns @(co, frr_ty)@ with @co :: ty ~# frr_ty@
-                  -- and @frr_@ty has a fixed 'RuntimeRep'.
+                  -- and @frr_ty@ has a fixed 'RuntimeRep'.
 checkFRR_with check_kind frr_ctxt ty
   = do { th_lvl <- getThLevel
        ; if
@@ -710,14 +708,14 @@ checkFRR_with check_kind frr_ctxt ty
 -- it creates a new concrete metavariable @concrete_tv@
 -- and emits an equality constraint @ki ~# concrete_tv@,
 -- to be handled by the constraint solver.
---
--- Precondition: @ki@ must be of the form @TYPE rep@ or @CONSTRAINT rep@.
 unifyConcrete_kind :: HasDebugCallStack
                    => FastString -- ^ name to use when creating concrete metavariables
                    -> ConcreteTvOrigin
                    -> TcKind
                    -> TcM TcCoercionN
 unifyConcrete_kind occ_fs conc_orig ki
+  -- Preserve the invariant that if the input kind is of the form @TYPE rep@
+  -- or @CONSTRAINT rep@, then so is the output kind (RHS kind of the output coercion).
   | Just (torc, rep) <- sORTKind_maybe ki
   = do { let tc = case torc of
                     TypeLike -> tYPETyCon
@@ -725,9 +723,7 @@ unifyConcrete_kind occ_fs conc_orig ki
        ; rep_co <- unifyConcrete occ_fs conc_orig rep
        ; return $ mkTyConAppCo Nominal tc [rep_co] }
   | otherwise
-  = pprPanic "unifyConcrete_kind: kind is not of the form 'TYPE rep' or 'CONSTRAINT rep'" $
-      ppr ki <+> dcolon <+> ppr (typeKind ki)
-
+  = unifyConcrete occ_fs conc_orig ki
 
 -- | Ensure the given type can be unified with
 -- a concrete type, in the sense of Note [Concrete types].

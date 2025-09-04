@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -30,16 +31,15 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
-import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
+import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs, hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
-import GHC.Tc.Utils.Concrete( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Zonk.TcType
 
-import GHC.Core.ConLike (ConLike(..))
+import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConTyCon )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
@@ -118,11 +118,11 @@ Note [Instantiation variables are short lived]
 * Ordinary unification variables always stand for monotypes; only instantiation
   variables can be unified with a polytype (by `qlUnify`).
 
-* When we start typechecking the argments of the call, in tcValArgs, we will
+* When we start typechecking the arguments of the call, in tcValArgs, we will
   (a) monomorphise any un-filled-in instantiation variables
-      (see Note [Monomorphise instantiation variables])
+      (see Note [Monomorphise instantiation variables]),
   (b) zonk the argument type to reveal any polytypes before typechecking that
-      argument (see calls to `zonkTcType` and "Crucial step" in tcValArg)..
+      argument (see calls to `zonkTcType` and "Crucial step" in tcValArg).
   See Section 4.3 "Applications and instantiation" of the paper.
 
   TL;DR: instantiation variables are short-lived. So it is fine for them
@@ -395,7 +395,8 @@ tcApp rn_expr exp_res_ty
                          -- See Note [Unify with expected type before typechecking arguments]
                        ; res_wrap <- checkResultTy rn_expr tc_head inst_args
                                                    app_res_rho exp_res_ty
-                         -- Step 4.2: typecheck the  arguments
+
+                         -- Step 4.2: typecheck the arguments
                        ; tc_args <- tcValArgs NoQL inst_args
 
                          -- Step 4.3: wrap up
@@ -426,6 +427,20 @@ quickLookResultType :: TcRhoType -> ExpRhoType -> TcM ()
 quickLookResultType app_res_rho (Check exp_rho) = qlUnify app_res_rho exp_rho
 quickLookResultType  _           _              = return ()
 
+-- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
+-- in order to implement the plan of Note [Typechecking data constructors].
+getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
+getDeepSubsumptionFlag_DataConHead app_head =
+  do { user_ds <- xoptM LangExt.DeepSubsumption
+     ; return $
+         if | user_ds
+            -> Deep DeepSub
+            | XExpr (ConLikeTc (RealDataCon {})) <- app_head
+            -> Deep TopSub
+            | otherwise
+            -> Shallow
+    }
+
 finishApp :: (HsExpr GhcTc, AppCtxt) -> [HsExprArg 'TcpTc]
           -> TcRhoType -> HsWrapper
           -> TcM (HsExpr GhcTc)
@@ -450,9 +465,10 @@ checkResultTy :: HsExpr GhcRn
                             --   expose foralls, but maybe not /deeply/ instantiated
               -> ExpRhoType -- Expected type; this is deeply skolemised
               -> TcM HsWrapper
-checkResultTy rn_expr _fun _inst_args app_res_rho (Infer inf_res)
-  = fillInferResult (exprCtOrigin rn_expr) app_res_rho inf_res
-    -- fillInferResult does deep instantiation if DeepSubsumption is on
+checkResultTy rn_expr (fun, _) _inst_args app_res_rho (Infer inf_res)
+  = do { ds_flag <- getDeepSubsumptionFlag_DataConHead fun
+       ; fillInferResult ds_flag (exprCtOrigin rn_expr) app_res_rho inf_res
+       }
 
 checkResultTy rn_expr (tc_fun, fun_ctxt) inst_args app_res_rho (Check res_ty)
 -- Unify with expected type from the context
@@ -461,7 +477,7 @@ checkResultTy rn_expr (tc_fun, fun_ctxt) inst_args app_res_rho (Check res_ty)
 -- Match up app_res_rho: the result type of rn_expr
 --     with res_ty:  the expected result type
  = perhaps_add_res_ty_ctxt $
-   do { ds_flag <- getDeepSubsumptionFlag
+   do { ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
       ; traceTc "checkResultTy {" $
           vcat [ text "tc_fun:" <+> ppr tc_fun
                , text "app_res_rho:" <+> ppr app_res_rho
@@ -476,12 +492,16 @@ checkResultTy rn_expr (tc_fun, fun_ctxt) inst_args app_res_rho (Check res_ty)
                 ; traceTc "checkResultTy 1 }" (ppr co)
                 ; return (mkWpCastN co) }
 
-          Deep ->   -- Deep subsumption
+          Deep ds_reason ->   -- Deep subsumption
              -- Even though both app_res_rho and res_ty are rho-types,
              -- they may have nested polymorphism, so if deep subsumption
              -- is on we must call tcSubType.
-             do { wrap <- tcSubTypeDS rn_expr app_res_rho res_ty
-                ; traceTc "checkResultTy 2 }" (ppr app_res_rho $$ ppr res_ty)
+             do { wrap <- tcSubTypeDS tc_fun ds_reason rn_expr app_res_rho res_ty
+                ; traceTc "checkResultTy 2 }" $
+                   vcat [ text "app_res_rho:" <+> ppr app_res_rho
+                        , text "res_ty:" <+> ppr res_ty
+                        , text "wrap:" <+> ppr wrap
+                        ]
                 ; return wrap } }
   where
     -- perhaps_add_res_ty_ctxt: Inside an expansion, the addFunResCtxt stuff is
@@ -560,7 +580,7 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
                                        , text "args:" <+> ppr inst_args
                                        , text "mult:" <+> ppr mult])
 
-       ; ds_flag <- getDeepSubsumptionFlag
+       ; ds_flag <- getDeepSubsumptionFlag_DataConHead (fst tc_head)
        ; (wrap, arg')
             <- tcScalingUsage mult  $
                tcSkolemise ds_flag GenSigCtxt exp_arg_ty $ \ exp_arg_rho ->
@@ -627,7 +647,9 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
                                    , text "fun_ctxt" <+> ppr fun_ctxt
                                    , text "args:" <+> ppr rn_args
                                    , text "do_ql" <+> ppr do_ql ])
-       ; go 1 [] fun_sigma rn_args }
+       ; res@(_, fun_ty) <- go 1 [] fun_sigma rn_args
+       ; traceTc "tcInstFun:ret" (ppr fun_ty)
+       ; return res }
   where
     fun_orig = case fun_ctxt of
       VAExpansion (OrigStmt{}) _ _  -> DoOrigin
@@ -643,7 +665,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
       = idConcreteTvs fun_id
       -- Recall that DataCons are represented using ConLikeTc at GhcTc stage,
       -- see Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
-      | XExpr (ConLikeTc (RealDataCon dc) _ _) <- tc_fun
+      | XExpr (ConLikeTc (RealDataCon dc)) <- tc_fun
       = dataConConcreteTyVars dc
       | otherwise
       = noConcreteTyVars
@@ -800,11 +822,14 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
                 -- In an application (f x), we need 'x' to have a fixed runtime
                 -- representation; matchActualFunTy checks that when
                 -- taking apart the arrow type (a -> Int).
+                --
+                -- TODO: example from T26072
                 matchActualFunTy herald
                   (Just $ HsExprTcThing tc_fun)
                   (n_val_args, fun_sigma) fun_ty
 
-           ; arg' <- quickLookArg do_ql ctxt arg arg_ty
+           ; ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
+           ; arg' <- quickLookArg ds_flag do_ql ctxt arg arg_ty
            ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
            ; go (pos+1) acc' res_ty rest_args }
 
@@ -1803,15 +1828,16 @@ This turned out to be more subtle than I expected.  Wrinkles:
 
 -}
 
-quickLookArg :: QLFlag -> AppCtxt
+quickLookArg :: DeepSubsumptionFlag
+             -> QLFlag -> AppCtxt
              -> LHsExpr GhcRn          -- ^ Argument
              -> Scaled TcSigmaTypeFRR  -- ^ Type expected by the function
              -> TcM (HsExprArg 'TcpInst)
 -- See Note [Quick Look at value arguments]
-quickLookArg NoQL ctxt larg orig_arg_ty
+quickLookArg _ NoQL ctxt larg orig_arg_ty
   = skipQuickLook ctxt larg orig_arg_ty
-quickLookArg DoQL ctxt larg orig_arg_ty
-  = do { is_rho <- tcIsDeepRho (scaledThing orig_arg_ty)
+quickLookArg ds_flag DoQL ctxt larg orig_arg_ty
+  = do { is_rho <- tcIsDeepRho ds_flag (scaledThing orig_arg_ty)
        ; traceTc "qla" (ppr orig_arg_ty $$ ppr is_rho)
        ; if not is_rho
          then skipQuickLook ctxt larg orig_arg_ty
@@ -1828,29 +1854,29 @@ whenQL :: QLFlag -> ZonkM () -> TcM ()
 whenQL DoQL thing_inside = liftZonkM thing_inside
 whenQL NoQL _            = return ()
 
-tcIsDeepRho :: TcType -> TcM Bool
+tcIsDeepRho :: DeepSubsumptionFlag -> TcType -> TcM Bool
 -- This top-level zonk step, which is the reason we need a local 'go' loop,
 -- is subtle. See Section 9 of the QL paper
 
-tcIsDeepRho ty
-  = do { ds_flag <- getDeepSubsumptionFlag
-       ; go ds_flag ty }
+tcIsDeepRho ds_flag = go
   where
-    go ds_flag ty
-      | isSigmaTy ty = return False
+    go ty
+      | isSigmaTy ty
+      = return False
 
       | Just kappa <- getTyVar_maybe ty
       , isQLInstTyVar kappa
       = do { info <- readMetaTyVar kappa
            ; case info of
-               Indirect arg_ty' -> go ds_flag arg_ty'
+               Indirect arg_ty' -> go arg_ty'
                Flexi            -> return True }
 
-      | Deep <- ds_flag
+      | Deep {} <- ds_flag
       , Just (_, res_ty) <- tcSplitFunTy_maybe ty
-      = go ds_flag res_ty
+      = go res_ty
 
-      | otherwise = return True
+      | otherwise
+      = return True
 
 isGuardedTy :: TcType -> Bool
 isGuardedTy ty
@@ -2084,7 +2110,7 @@ foldQLInstVars check_tv ty
 *                                                                      *
 ********************************************************************* -}
 
-qlUnify :: TcType -> TcType -> TcM ()
+qlUnify ::  TcType -> TcType -> TcM ()
 -- Unify ty1 with ty2:
 --   * It can unify both instantiation variables (possibly with polytypes),
 --     and ordinary unification variables (but only with monotypes)
@@ -2098,8 +2124,29 @@ qlUnify ty1 ty2
   = do { traceTc "qlUnify" (ppr ty1 $$ ppr ty2)
        ; go ty1 ty2 }
   where
-    go :: TcType -> TcType
-       -> TcM ()
+    go :: TcType -> TcType -> TcM ()
+
+    -- Decompose (arg1 -> res1) ~ (arg2 -> res2)
+    -- and         (c1 => res1) ~   (c2 => res2)
+    -- But for the latter we only learn instantiation info from res1~res2
+    go (FunTy { ft_af = af1, ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_af = af2, ft_arg = arg2, ft_res = res2 })
+      | af1 == af2 -- Match the arrow TyCon
+      = do { when (isVisibleFunArg af1) (go arg1 arg2)
+
+        -- NB: we do not unify the multiplicities; that would be too strong.
+        -- We might only require mult1 ⩽ mult2, as in Note [Multiplicity in deep subsumption].
+        -- ; when (isFUNArg af1)        (go mult1 mult2)
+
+           ; go res1 res2 }
+
+    -- Make sure to not unify "kappa := (a %1 -> b)". See (UQL5).
+    go (FunTy { ft_mult = OneTy }) _ = return ()
+    go _ (FunTy { ft_mult = OneTy }) = return ()
+      -- NB: we do want to be able to unify "kappa := a => b", as that's
+      -- the main point of QuickLook (allowing meta-variables to be unified
+      -- with qualified types).
+
     go (TyVarTy tv) ty2
       | isMetaTyVar tv = go_kappa tv ty2
     go ty1 (TyVarTy tv)
@@ -2123,25 +2170,11 @@ qlUnify ty1 ty2
       , tys1 `equalLength` tys2
       = zipWithM_ go tys1 tys2
 
-    -- Decompose (arg1 -> res1) ~ (arg2 -> res2)
-    -- and         (c1 => res1) ~   (c2 => res2)
-    -- But for the latter we only learn instantiation info from res1~res2
-    -- We look at the multiplicity too, although the chances of getting
-    -- impredicative instantiation info from there seems...remote.
-    go (FunTy { ft_af = af1, ft_arg = arg1, ft_res = res1, ft_mult = mult1 })
-       (FunTy { ft_af = af2, ft_arg = arg2, ft_res = res2, ft_mult = mult2 })
-      | af1 == af2 -- Match the arrow TyCon
-      = do { when (isVisibleFunArg af1) (go arg1 arg2)
-           ; when (isFUNArg af1)        (go mult1 mult2)
-           ; go res1 res2 }
-
-    -- ToDo: c.f. Tc.Utils.unify.uType,
-    -- which does not split FunTy here
-    -- Also NB tcSplitAppTyNoView here, which does not split (c => t)
-    go  (AppTy t1a t1b) ty2
+    -- Don't allow unifying (a => b) with the AppTy 'arr[tau] a b'.
+    -- To ensure this, use 'tcSplitAppTyNoView_maybe' which does not split (=>).
+    go (AppTy t1a t1b) ty2
       | Just (t2a, t2b) <- tcSplitAppTyNoView_maybe ty2
       = do { go t1a t2a; go t1b t2b }
-
     go ty1 (AppTy t2a t2b)
       | Just (t1a, t1b) <- tcSplitAppTyNoView_maybe ty1
       = do { go t1a t2a; go t1b t2b }
@@ -2244,6 +2277,33 @@ That is the entire point of qlUnify!   Wrinkles:
 
   It's just not worth the trouble, we think (for now at least).
 
+(UQL5) qlUnify must be careful about linear function arrows. Suppose for example
+  we have a program like:
+
+    data A = MkA Int Bool
+      -- As per Note [Data constructors are linear by default],
+      -- this means that MkA :: Int %1 -> Bool -> A
+
+    foo :: Maybe (Bool -> A) -> ()
+    foo _ ()
+    bar = foo just_pap
+      where
+        just_pap = Just $ B 3
+
+  Here, when typechecking the application 'B A', we will get a call to qlUnify:
+
+    qlUnify
+      (Bool %1 -> A)
+      𝜈[tau:qlinst]
+
+  We want to hold off on unifying 𝜈 := Bool %1 -> A: instead, we want to accept
+  the program with the more lenient subtype check
+
+    Bool %Many -> A  ⩽  𝜈
+
+  The general principle is: treat linear arrows %1 -> similar to foralls and
+  constraint arrows =>, so that (UQL4) applies to them as well.
+  See Note [Multiplicity in deep subsumption].
 
 Sadly discarded design alternative
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2430,7 +2490,7 @@ rejectRepPolyNewtypes :: (HsExpr GhcTc, AppCtxt)
                       -> TcM ()
 rejectRepPolyNewtypes (fun,_) app_res_rho = case fun of
 
-  XExpr (ConLikeTc (RealDataCon con) _ _)
+  XExpr (ConLikeTc (RealDataCon con))
     -- Check that this is an unsaturated occurrence of a
     -- representation-polymorphic newtype constructor.
     | isNewDataCon con
