@@ -1853,8 +1853,8 @@ where we eta-expanded that (:).  But now foldr expects an argument
 with ->{Many} and gets an argument with ->{m1} or ->{m2}, and Lint
 complains.
 
-The easiest solution was to use tcEqMult in tc_sub_type_deep, and
-insist on equality. This is only in the DeepSubsumption code anyway.
+The easiest solution was to unify the multiplicities in tc_sub_type_deep,
+insisting on equality. This is only in the DeepSubsumption code anyway.
 
 Note [FunTy vs non-FunTy case in tc_sub_type_deep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2047,10 +2047,7 @@ tc_sub_type_deep pos unify inst_orig ctxt ty_actual ty_expected
                           -- GenSigCtxt: See Note [Setting the argument context]
            ; res_wrap  <- tc_sub_type_deep (Result pos) unify inst_orig ctxt act_res exp_res
 
-             -- See Note [Multiplicity in deep subsumption]
-           ; tcEqMult inst_orig act_mult exp_mult
-
-           ; mkWpFun_FRR pos
+           ; mkWpFun_FRR unify pos
                act_af act_mult act_arg act_res
                exp_af exp_mult exp_arg exp_res
                arg_wrap res_wrap
@@ -2058,20 +2055,32 @@ tc_sub_type_deep pos unify inst_orig ctxt ty_actual ty_expected
       where
         given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
 
--- | Like 'mkWpFun', except that it performs representation-polymorphism
--- checks on the argument type.
+-- | Like 'mkWpFun', except that it performs the necessary
+-- representation-polymorphism checks on the argument type in the case that
+-- we introduce a lambda abstraction.
 mkWpFun_FRR
-  :: Position p
+  :: (TcType -> TcType -> TcM TcCoercionN) -- ^ how to unify
+  -> Position p
   -> FunTyFlag -> Type -> TcType -> Type --   actual FunTy
   -> FunTyFlag -> Type -> TcType -> Type -- expected FunTy
   -> HsWrapper -- ^ exp_arg ~> act_arg
   -> HsWrapper -- ^ act_res ~> exp_res
   -> TcM HsWrapper -- ^ act_funTy ~> exp_funTy
-mkWpFun_FRR pos act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res arg_wrap res_wrap
-  | needs_eta
-  -- See Wrinkle [Representation-polymorphism checking during subtyping]
-  = do { (exp_arg_co,  exp_arg_frr) <- hasFixedRuntimeRep (FRRDeepSubsumption True pos) exp_arg
-       ; (act_arg_co, _act_arg_frr) <- hasFixedRuntimeRep (FRRDeepSubsumption False pos) act_arg
+mkWpFun_FRR unify pos act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res arg_wrap res_wrap
+  = do { ((exp_arg_co, exp_arg_frr), (act_arg_co, _act_arg_frr)) <-
+            if needs_frr_checks
+              -- See Wrinkle [Representation-polymorphism checking during subtyping]
+            then do { exp_frr_wrap <- hasFixedRuntimeRep (frr_ctxt True ) exp_arg
+                    ; act_frr_wrap <- hasFixedRuntimeRep (frr_ctxt False) act_arg
+                    ; return (exp_frr_wrap, act_frr_wrap) }
+            else return ((mkNomReflCo exp_arg, exp_arg), (mkNomReflCo act_arg, act_arg))
+
+         -- Enforce equality of multiplicities (not the more natural sub-multiplicity).
+         -- See Note [Multiplicity in deep subsumption]
+       ; act_arg_mult_co <- unify act_mult exp_mult
+           -- NB: don't use tcEqMult: that would require the evidence for
+           -- equality to be Refl, but it might well not be (#26332).
+
        ; let
             exp_arg_fun_co =
               mkFunCo Nominal exp_af
@@ -2080,7 +2089,7 @@ mkWpFun_FRR pos act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res 
                  (mkReflCo Nominal exp_res)
             act_arg_fun_co =
               mkFunCo Nominal act_af
-                 (mkReflCo Nominal act_mult)
+                 act_arg_mult_co
                  act_arg_co
                  (mkReflCo Nominal act_res)
             arg_wrap_frr =
@@ -2090,24 +2099,16 @@ mkWpFun_FRR pos act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res 
                --  arg_wrap :: exp_arg ~> act_arg
                --  arg_wrap_frr :: exp_arg_frr ~> act_arg_frr
 
-       -- NB: because of the needs_eta guard, we know that mkWpFun will
-       -- return (WpFun ...); so we might as well just use the WpFun constructor.
        ; return $
             mkWpCastN exp_arg_fun_co
               <.>
-            WpFun arg_wrap_frr res_wrap (Scaled exp_mult exp_arg_frr)
+            mkWpFun arg_wrap_frr res_wrap (Scaled exp_mult exp_arg_frr) exp_res
               <.>
-            mkWpCastN act_arg_fun_co }
-  | otherwise
-  = return $
-      mkWpFun arg_wrap res_wrap (Scaled exp_mult exp_arg) exp_res
-        -- NB: because of 'needs_eta', this will never actually be a WpFun.
-        -- mkWpFun will turn it into a WpHole or WpCast, which is why
-        -- we can skip the hasFixedRuntimeRep checks in this case.
-        -- See Wrinkle [Representation-polymorphism checking during subtyping]
+            mkWpCastN act_arg_fun_co
+       }
   where
-    needs_eta :: Bool
-    needs_eta =
+    needs_frr_checks :: Bool
+    needs_frr_checks =
       not (hole_or_cast arg_wrap)
         ||
       not (hole_or_cast res_wrap)
@@ -2115,6 +2116,12 @@ mkWpFun_FRR pos act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res 
     hole_or_cast WpHole = True
     hole_or_cast (WpCast {}) = True
     hole_or_cast _ = False
+    frr_ctxt :: Bool -> FixedRuntimeRepContext
+    frr_ctxt is_exp_ty =
+      FRRDeepSubsumption
+        { frrDSExpected = is_exp_ty
+        , frrDSPosition = pos
+        }
 
 -----------------------
 deeplySkolemise :: SkolemInfo -> TcSigmaType
