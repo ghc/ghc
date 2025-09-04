@@ -43,8 +43,13 @@ editCoreBinding early modName pgm = do
     pure $ go pgm
   where
     go :: [CoreBind] -> [CoreBind]
-    go (b@(NonRec v e) : bs)
-      | occNameString (getOccName v) == "testBinding" && exprType e `eqType` intTy =
-          NonRec v (mkUncheckedIntExpr $ bool 222222 111111 early) : bs
-    go (b:bs) = b : go bs
+    go (Rec ps : bs) = Rec (map (uncurry (go_bind (,))) ps) : go bs
+    go (NonRec v e : bs) = go_bind NonRec v e : go bs
     go [] = []
+
+    go_bind c v e
+      | occNameString (getOccName v) == "testBinding"
+      , exprType e `eqType` intTy
+      = c v (mkUncheckedIntExpr $ bool 222222 111111 early)
+      | otherwise
+      = c v e
