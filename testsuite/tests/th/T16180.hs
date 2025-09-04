@@ -23,10 +23,19 @@ $(do
       , "_mydata:"
       , ".ascii \"Hello world\\0\""
       ]
+#elif defined(mingw32_HOST_OS)
+      [ ".global \"mydata\""
+      , "mydata:"
+      , ".ascii \"Hello world\\0\""
+      ]
 #else
       [ ".global \"mydata\""
       , "mydata:"
       , ".ascii \"Hello world\\0\""
+        -- make recent linkers happy by explicitly not requiring an executable
+        -- stack. Without this section we get:
+        --    warning: <file>: missing .note.GNU-stack section implies executable stack
+      , ".section .note.GNU-stack,\"\",@progbits"
       ]
 #endif
    return [])
