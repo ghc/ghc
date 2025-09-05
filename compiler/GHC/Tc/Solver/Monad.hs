@@ -19,7 +19,7 @@ module GHC.Tc.Solver.Monad (
     runTcS, runTcSEarlyAbort, runTcSWithEvBinds, runTcSInerts,
     failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     runTcSEqualities,
-    nestTcS, nestImplicTcS, tryShortCutTcS, nestFunDepsTcS
+    nestTcS, nestImplicTcS, tryShortCutTcS, nestFunDepsTcS,
     setEvBindsTcS, setTcLevelTcS,
 
     selectNextWorkItem,
