@@ -1,6 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, DeriveGeneric,
     TupleSections, RecordWildCards, InstanceSigs, CPP #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+-- Suppress deprecation warnings only when we must import deprecated symbols
+-- (i.e. when ghc-internal isn't available yet).
+#ifndef HAVE_GHC_INTERNAL
+{-# OPTIONS_GHC -Wno-warnings-deprecations #-}
+#endif
 
 -- |
 -- Running TH splices
@@ -109,7 +114,12 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
+-- Prefer the non-deprecated internal path when available.
+#ifdef HAVE_GHC_INTERNAL
 import GHC.Internal.Desugar (AnnotationWrapper(..))
+#else
+import GHC.Desugar (AnnotationWrapper(..))
+#endif
 import qualified GHC.Boot.TH.Syntax as TH
 import Unsafe.Coerce
 

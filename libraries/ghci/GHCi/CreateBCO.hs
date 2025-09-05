@@ -6,6 +6,10 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP #-}
+-- Only needed when we don't have ghc-internal (and must import deprecated names)
+#ifndef HAVE_GHC_INTERNAL
+{-# OPTIONS_GHC -Wno-warnings-deprecations #-}
+#endif
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -26,8 +30,13 @@ import Data.Array.Base
 import Foreign hiding (newArray)
 import Unsafe.Coerce (unsafeCoerce)
 import GHC.Arr          ( Array(..) )
-import GHC.Exts   hiding ( BCO, mkApUpd0#, newBCO# )
+-- When ghc-internal is available prefer the non-deprecated exports.
+#ifdef HAVE_GHC_INTERNAL
+import GHC.Exts hiding ( BCO, mkApUpd0#, newBCO# )
 import GHC.Internal.Base ( BCO, mkApUpd0#, newBCO# )
+#else
+import GHC.Exts
+#endif
 import GHC.IO
 import Control.Exception ( ErrorCall(..) )
 
