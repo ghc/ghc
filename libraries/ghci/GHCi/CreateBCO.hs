@@ -6,6 +6,10 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-warnings-deprecations #-}
+-- TODO We want to import GHC.Internal.Base (BCO, mkApUpd0#, newBCO#) instead
+-- of from GHC.Exts when we can require of the bootstrap compiler to have
+-- ghc-internal.
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -26,8 +30,7 @@ import Data.Array.Base
 import Foreign hiding (newArray)
 import Unsafe.Coerce (unsafeCoerce)
 import GHC.Arr          ( Array(..) )
-import GHC.Exts   hiding ( BCO, mkApUpd0#, newBCO# )
-import GHC.Internal.Base ( BCO, mkApUpd0#, newBCO# )
+import GHC.Exts
 import GHC.IO
 import Control.Exception ( ErrorCall(..) )
 
