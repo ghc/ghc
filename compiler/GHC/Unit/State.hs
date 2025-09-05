@@ -66,6 +66,7 @@ module GHC.Unit.State (
         pprUnitInfoForUser,
         pprModuleMap,
         pprWithUnitState,
+        pprRawUnitIds,
 
         -- * Utils
         unwireUnit)
@@ -2269,3 +2270,7 @@ pprWithUnitState :: UnitState -> SDoc -> SDoc
 pprWithUnitState state = updSDocContext (\ctx -> ctx
    { sdocUnitIdForUser = \fs -> pprUnitIdForUser state (UnitId fs)
    })
+
+-- | Print raw unit-ids, without removing the hash
+pprRawUnitIds :: SDoc -> SDoc
+pprRawUnitIds = updSDocContext (\ctx -> ctx { sdocUnitIdForUser = ftext })
