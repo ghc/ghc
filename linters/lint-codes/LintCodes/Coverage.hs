@@ -10,11 +10,13 @@ module LintCodes.Coverage
 
 -- base
 import Data.Char
-  ( isAlphaNum, isDigit, isSpace )
+  ( isAlphaNum, isDigit, isSpace, toUpper )
 import Data.Maybe
   ( mapMaybe )
 import Data.List
   ( dropWhileEnd )
+import System.Info
+  ( os )
 
 -- bytestring
 import qualified Data.ByteString as ByteString
@@ -28,7 +30,7 @@ import qualified Data.Set as Set
 
 -- directory
 import System.Directory
-  ( doesDirectoryExist, listDirectory )
+  ( doesDirectoryExist, listDirectory, makeAbsolute )
 
 -- filepath
 import System.FilePath
@@ -63,7 +65,12 @@ getCoveredCodes =
   do { top <- dropWhileEnd isSpace
           <$> readProcess "git" ["rev-parse", "--show-toplevel"] ""
        -- TODO: would be better to avoid using git entirely.
-     ; let testRoot = top </> "testsuite" </> "tests"
+
+       -- When run inside an MSYS shell, git may return a Unix-style path
+       -- like /c/Blah. System.Directory doesn't like that, so we make sure
+       -- to turn that into C:/Blah. See #25178.
+     ; top' <- fixupMsysDrive top
+     ; let testRoot = top' </> "testsuite" </> "tests"
      ; traverseFilesFrom includeFile diagnosticCodesIn testRoot
      }
 
@@ -158,3 +165,14 @@ traverseFilesFrom include_file parse_contents = go
            { Left  _   -> mempty
            ; Right txt -> parse_contents txt
            } } } }
+
+-- | On Windows, change MSYS-style @/c/Blah@ to @C:/Blah@. See #25178.
+fixupMsysDrive :: FilePath -> IO FilePath
+fixupMsysDrive fp = do
+  fixedUp <-
+    if | os == "mingw32" || os == "win32"
+       , ('/':drv:'/':rest) <- fp
+       -> return $ toUpper drv : ':':'/':rest
+       | otherwise
+       -> return fp
+  makeAbsolute fixedUp
