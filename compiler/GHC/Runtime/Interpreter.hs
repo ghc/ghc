@@ -84,7 +84,6 @@ import GHC.Linker.Types
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
-import GHC.Types.SrcLoc
 import GHC.Types.Basic
 
 import GHC.Utils.Panic
@@ -99,6 +98,9 @@ import GHC.Unit.Env
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run
 #endif
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Control.Concurrent
 import Control.Monad
@@ -429,7 +431,7 @@ handleSeqHValueStatus interp unit_env eval_status =
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
 
       let put x = putStrLn ("*** Ignoring breakpoint " ++ (showSDocUnsafe x))
-      let nothing_case = put $ brackets . ppr $ mkGeneralSrcSpan (fsLit "<unknown>")
+      let nothing_case = put $ brackets . ppr $ mkGeneralSrcSpan (encodeUTF8 "<unknown>")
       case maybe_break of
         Nothing -> nothing_case
           -- Nothing case - should not occur!

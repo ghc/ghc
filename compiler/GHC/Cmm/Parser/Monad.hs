@@ -30,7 +30,7 @@ import Control.Monad
 import GHC.Parser.Lexer
 import GHC.Parser.Errors.Types
 import GHC.Types.Error ( MsgEnvelope )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Unit.Types
 import GHC.Unit.Home
 

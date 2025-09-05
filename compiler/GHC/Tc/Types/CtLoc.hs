@@ -27,7 +27,7 @@ import GHC.Tc.Types.Origin
 
 import GHC.Tc.Utils.TcType
 
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Name.Reader
 import GHC.Types.Basic( IntWithInf, mkIntWithInf, TypeOrKind(..) )
 

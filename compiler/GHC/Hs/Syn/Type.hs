@@ -24,7 +24,7 @@ import GHC.Hs
 import GHC.Tc.Types.Evidence
 import GHC.Types.Id
 import GHC.Types.Var( VarBndr(..) )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 

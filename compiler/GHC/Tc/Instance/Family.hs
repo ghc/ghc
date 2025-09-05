@@ -36,7 +36,7 @@ import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Var.Set

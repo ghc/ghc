@@ -153,13 +153,11 @@ import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           listTyConName, listTyConKey, sumDataCon,
                           unrestrictedFunTyCon , listTyCon_RDR, unitDataCon )
 import GHC.Types.ForeignCall
-import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
 import GHC.Data.OrdList
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
 import GHC.Data.Maybe
-import GHC.Utils.Encoding.UTF8
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Monad (unlessM)
@@ -173,6 +171,9 @@ import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
@@ -482,7 +483,7 @@ valid_anchor _ = False
 -- If the decl list for where binds is empty, the anchor ends up
 -- invalid. In this case, use the parent one
 patch_anchor :: RealSrcSpan -> EpaLocation -> EpaLocation
-patch_anchor r EpaDelta{} = EpaSpan (RealSrcSpan r Strict.Nothing)
+patch_anchor r EpaDelta{} = EpaSpan (RealSrcSpan r Nothing)
 patch_anchor r1 (EpaSpan (RealSrcSpan r0 mb)) = EpaSpan (RealSrcSpan r mb)
   where
     r = if srcSpanStartLine r0 < 0 then r1 else r0
@@ -1289,7 +1290,7 @@ checkImportDecl :: Maybe (EpToken "qualified")
                      , (Maybe EpAnnLevel, ImportDeclLevelStyle))
 checkImportDecl mPre mPost preLevel postLevel = do
   let whenJust mg f = maybe (pure ()) f mg
-      tokenSpan tok = RealSrcSpan (epaLocationRealSrcSpan $ getEpTokenLoc tok) Strict.Nothing
+      tokenSpan tok = RealSrcSpan (epaLocationRealSrcSpan $ getEpTokenLoc tok) Nothing
 
   importQualifiedPostEnabled <- getBit ImportQualifiedPostBit
 
@@ -1626,7 +1627,7 @@ isFunLhs e = go e [] [] []
 
 mkBangTy :: EpaLocation -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy tok_loc strictness lty =
-  XHsType (HsBangTy (noAnn, noAnn, tok_loc) (HsSrcBang NoSourceText NoSrcUnpack strictness) lty)
+  XHsType (HsBangTy (noAnn, noAnn, tok_loc) (HsSrcBang Source.CodeSnippetAbsent NoSrcUnpack strictness) lty)
 
 -- | Result of parsing @{-\# UNPACK \#-}@ or @{-\# NOUNPACK \#-}@.
 data UnpackednessPragma =
@@ -1644,7 +1645,7 @@ addUnpackednessP (L lprag (UnpackednessPragma anns prag unpk)) ty = do
     --
     -- Otherwise, wrap the type in a new HsBangTy constructor.
     addUnpackedness (o,c) (L _ (XHsType (HsBangTy (_,_,tl) bang t)))
-      | HsSrcBang NoSourceText NoSrcUnpack strictness <- bang
+      | HsSrcBang Source.CodeSnippetAbsent NoSrcUnpack strictness <- bang
       = XHsType (HsBangTy (o,c,tl) (HsSrcBang prag unpk strictness) t)
     addUnpackedness (o,c) t
       = XHsType (HsBangTy (o,c,noAnn) (HsSrcBang prag unpk NoSrcStrict) t)
@@ -3125,7 +3126,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
     -- If 'cid' is missing, the function name 'v' is used instead as symbol
     -- name (cf section 8.5.1 in Haskell 2010 report).
     mkCImport = do
-      let e = utf8DecodeShortByteString entity
+      let e = decodeUTF8 entity
       case parseCImport (reLoc cconv) (reLoc safety) (mkExtName (unLoc v)) e (L loc esrc) of
         Nothing         -> addFatalError $ mkPlainErrorMsgEnvelope loc $
                              PsErrMalformedEntityString
@@ -3138,9 +3139,9 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
     -- the entity string. If it is missing, we use the function name instead.
     mkOtherImport = returnSpec importSpec
       where
-        entity'    = if SBS.null entity
+        entity'    = if entity == mempty
                         then mkExtName (unLoc v)
-                        else mkFastStringShortByteString entity
+                        else mkFastStringTextUTF8 entity
         funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
         importSpec = CImport (L (l2l loc) esrc) (reLoc cconv) (reLoc safety) Nothing funcTarget
 
@@ -3204,7 +3205,7 @@ parseCImport cconv safety nm str sourceText =
                                              return False)
                                _ -> return True
                      cid' <- cid
-                     return (CFunction (StaticTarget NoSourceText cid'
+                     return (CFunction (StaticTarget Source.CodeSnippetAbsent cid'
                                         Nothing isFun)))
           where
             cid = return nm +++
@@ -3224,8 +3225,8 @@ mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
    ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
                  , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv)) }
   where
-    entity' | SBS.null entity = mkExtName (unLoc v)
-            | otherwise       = mkFastStringShortByteString entity
+    entity' | mempty == entity = mkExtName (unLoc v)
+            | otherwise        = mkFastStringTextUTF8 entity
 
 -- Supplying the ext_name in a foreign decl is optional; if it
 -- isn't there, the Haskell name is assumed. Note that no transformation
@@ -3607,7 +3608,7 @@ mkLHsOpTy prom x op y =
   in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
 
 mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> TokRarrow -> HsMultAnnOf (LHsExpr GhcPs) GhcPs
-mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (SBS.unpack -> [0x31])) _ 1))))) arr
+mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (Source.CodeSnippet (SBS.unpack . bytesUTF8 -> [0x31])) _ 1))))) arr
   -- 0x31 is the ASCII symbol for the number one ('1')
   -- See #18888 for the use of (SourceText "1") above
   = HsLinearAnn (EpPct1 pct1 (EpArrow arr))
@@ -3618,7 +3619,7 @@ mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (SBS.u
 mkMultExpr pct t arr = HsExplicitMult (pct, EpArrow arr) t
 
 mkMultAnn :: EpToken "%" -> LHsType GhcPs -> EpArrowOrColon -> HsMultAnn GhcPs
-mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (SBS.unpack -> [0x31])) 1))) ep
+mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (Source.CodeSnippet (SBS.unpack . bytesUTF8 -> [0x31])) 1))) ep
   -- 0x31 is the ASCII symbol for the number one ('1')
   -- See #18888 for the use of (SourceText "1") above
   = HsLinearAnn (EpPct1 pct1 ep)

@@ -65,8 +65,6 @@ import GHC.Types.Id (idType, setIdType)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (mkVarUnqual)
 import GHC.Types.Name.Set (emptyNameSet)
-import GHC.Types.SourceText (SourceText (..))
-import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 import GHC.Types.Unique (getUnique)
 import GHC.Types.Var
@@ -80,7 +78,10 @@ import GHC.Utils.Misc
   , filterOut
   )
 import GHC.Utils.Panic.Plain (assert)
+
 import Language.Haskell.Syntax.Basic (FieldLabelString (..))
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 
 import Haddock.GhcUtils (defaultRuntimeRepVars, mkEmptySigType, orderedFVs)
 import Haddock.Interface.RenameType
@@ -178,7 +179,7 @@ tyThingToLHsDecl prr t = case t of
                       $ snd
                       $ classTvsFds cl
                 , tcdSigs =
-                    noLocA (MinimalSig (noAnn, NoSourceText) . noLocA $ classMinimalDef cl)
+                    noLocA (MinimalSig (noAnn, Source.CodeSnippetAbsent) . noLocA $ classMinimalDef cl)
                       : [ noLocA tcdSig
                         | clsOp <- classOpItems cl
                         , tcdSig <- synifyTcIdSig vs clsOp
@@ -1044,9 +1045,9 @@ synifyPatSynType ps =
         (mkScaledFunTys arg_tys res_ty)
 
 synifyTyLit :: TyLit -> HsTyLit GhcRn
-synifyTyLit (NumTyLit n) = HsNumTy NoSourceText n
-synifyTyLit (StrTyLit s) = HsStrTy NoSourceText s
-synifyTyLit (CharTyLit c) = HsCharTy NoSourceText c
+synifyTyLit (NumTyLit n) = HsNumTy Source.CodeSnippetAbsent n
+synifyTyLit (StrTyLit s) = HsStrTy Source.CodeSnippetAbsent s
+synifyTyLit (CharTyLit c) = HsCharTy Source.CodeSnippetAbsent c
 
 synifyKindSig :: Kind -> LHsKind GhcRn
 synifyKindSig k = synifyType WithinType [] k

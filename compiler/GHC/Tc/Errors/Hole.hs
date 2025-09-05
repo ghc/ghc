@@ -69,7 +69,6 @@ import Control.Monad    ( filterM, replicateM, foldM )
 import Data.List        ( partition, sort, sortOn, nubBy )
 import Data.Graph       ( graphFromEdges, topSort )
 
-
 import GHC.Tc.Solver    ( simplifyTopWanteds )
 import GHC.Tc.Solver.Monad ( runTcSEarlyAbort )
 import GHC.Tc.Utils.Unify ( tcSubTypeSigma )
@@ -84,14 +83,14 @@ import GHC.Builtin.Utils (knownKeyNames)
 import GHC.Tc.Errors.Hole.FitTypes
 import GHC.Tc.Errors.Hole.Plugin
 import qualified Data.Set as Set
-import GHC.Types.SrcLoc
-import GHC.Data.FastString (NonDetFastString(..))
+import GHC.Data.FastString (NonDetFastString(..), mkFastStringTextUTF8)
 import GHC.Types.Unique.Map
 
 import GHC.Data.EnumSet (EnumSet)
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
+import Language.Haskell.Textual.Location
 
 {-
 Note [Valid hole fits include ...]
@@ -490,8 +489,8 @@ addHoleFitDocs fits =
      Nothing ->
        Left $ case nameSrcLoc name of
          -- Nondeterminism is fine, this is used only to display a warning
-         RealSrcLoc r _ -> NonDetFastString $ srcLocFile r
-         UnhelpfulLoc s -> NonDetFastString s
+         RealSrcLoc r _ -> NonDetFastString . mkFastStringTextUTF8 $ srcLocFile r
+         UnhelpfulLoc s -> NonDetFastString $ mkFastStringTextUTF8 s
    report mods = do
      { let warning =
              text "WARNING: Couldn't find any documentation for the following modules:" $+$

@@ -61,7 +61,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.SourceFile
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
 
 import GHC.Types.CompleteMatch

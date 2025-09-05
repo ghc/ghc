@@ -33,7 +33,7 @@ import GHC.Utils.Panic
 import GHC.Driver.DynFlags ( DynFlags, getDynFlags )
 import GHC.Driver.Ppr (showPpr)
 
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Basic
 import qualified GHC.LanguageExtensions as LangExt
 

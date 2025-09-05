@@ -60,7 +60,7 @@ import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Cmm.DebugBlock
 import GHC.Cmm.Expr             (LocalReg (..), isWord64)
 
-import GHC.Data.FastString      ( FastString )
+import GHC.Data.FastString      ( FastString, mkFastStringTextUTF8 )
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSM
 import GHC.Types.Unique         ( Unique )
@@ -72,6 +72,8 @@ import GHC.Utils.Monad.State.Strict (State (..), runState, state)
 import GHC.Utils.Misc
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.CFG.Weight
+
+import Language.Haskell.Textual.UTF8 (TextUTF8)
 
 -- | A Native Code Generator implementation is parametrised over
 -- * The type of static data (typically related to 'CmmStatics')
@@ -356,13 +358,14 @@ getConfig = NatM $ \st -> (natm_config st, st)
 getPlatform :: NatM Platform
 getPlatform = ncgPlatform <$> getConfig
 
-getFileId :: FastString -> NatM Int
-getFileId f = NatM $ \st ->
-  case lookupUFM (natm_fileid st) f of
-    Just (_,n) -> (n, st)
-    Nothing    -> let n = 1 + sizeUFM (natm_fileid st)
-                      fids = addToUFM (natm_fileid st) f (f,n)
-                  in n `seq` fids `seq` (n, st { natm_fileid = fids  })
+getFileId :: TextUTF8 -> NatM Int
+getFileId txt = NatM $ \st ->
+  let f = mkFastStringTextUTF8 txt
+  in  case lookupUFM (natm_fileid st) f of
+        Just (_,n) -> (n, st)
+        Nothing    -> let n = 1 + sizeUFM (natm_fileid st)
+                          fids = addToUFM (natm_fileid st) f (f,n)
+                      in n `seq` fids `seq` (n, st { natm_fileid = fids  })
 
 getDebugBlock :: Label -> NatM (Maybe DebugBlock)
 getDebugBlock l = NatM $ \st -> (mapLookup l (natm_debug_map st), st)

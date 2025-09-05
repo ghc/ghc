@@ -87,7 +87,6 @@ import GHC.Utils.Logger
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Data.FastString     ( mkFastString )
 import GHC.Data.StringBuffer   ( hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
 
@@ -98,9 +97,8 @@ import GHC.Runtime.Loader      ( initializePlugins )
 
 import GHC.Types.Basic       ( SuccessFlag(..), ForeignSrcLang(..) )
 import GHC.Types.Error       ( singleMessage, getMessages, mkSimpleUnknownDiagnostic, defaultDiagnosticOpts )
-import GHC.Types.ForeignStubs (ForeignStubs (NoStubs))
+import GHC.Types.ForeignStubs ( ForeignStubs (NoStubs) )
 import GHC.Types.Target
-import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
 
@@ -112,11 +110,14 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 ( encodeUTF8 )
+
 import System.Directory
 import System.FilePath
 import System.IO
 import Control.Monad
-import qualified Control.Monad.Catch as MC (handle)
+import qualified Control.Monad.Catch as MC ( handle )
 import Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.List.NonEmpty as NE
@@ -154,7 +155,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   runPipeline (hsc_hooks hsc_env) preprocess_pipeline
 
   where
-    srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
+    srcspan = srcLocSpan $ mkSrcLoc (encodeUTF8 input_fn) 1 1
     handler (ProgramError msg) =
       return $ Left $ singleMessage $
         mkPlainErrorMsgEnvelope srcspan $

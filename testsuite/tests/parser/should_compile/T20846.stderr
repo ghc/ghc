@@ -51,7 +51,7 @@
        ((,)
         (EpaSpan { T20846.hs:3:1-6 })
         (Nothing))
-       (NoSourceText))
+       (Source.CodeSnippetAbsent))
       (FixitySig
        (NoNamespaceSpecifier)
        [(L

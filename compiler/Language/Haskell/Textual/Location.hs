@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveTraversable  #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE TypeFamilies       #-}
 
@@ -9,10 +10,16 @@
 
 -- | This module contains types that relate to the positions of things
 -- in source files, and allow tagging of those things with locations
-module GHC.Types.SrcLoc (
+module Language.Haskell.Textual.Location (
         -- * SrcLoc
         RealSrcLoc,             -- Abstract
         SrcLoc(..),
+        -- ** Accessors
+        srcSpanFile,
+        srcSpanSLine,
+        srcSpanSCol,
+        srcSpanELine,
+        srcSpanECol,
 
         -- ** Constructing SrcLoc
         mkSrcLoc, mkRealSrcLoc, mkGeneralSrcLoc,
@@ -49,20 +56,17 @@ module GHC.Types.SrcLoc (
         srcSpanStart, srcSpanEnd,
         realSrcSpanStart, realSrcSpanEnd,
         srcSpanFileName_maybe,
-        pprUserRealSpan, pprUnhelpfulSpanReason,
-        pprUserSpan,
-        unhelpfulSpanFS,
+        unhelpfulSpanText,
         srcSpanToRealSrcSpan,
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
-        srcSpanFile,
         srcSpanStartLine, srcSpanEndLine,
         srcSpanStartCol, srcSpanEndCol,
 
         -- ** Predicates on SrcSpan
-        isGoodSrcSpan, isOneLineSpan, isZeroWidthSpan,
-        containsSpan, isNoSrcSpan,
+        isGoodSrcSpan, isOneLineSpan, isOneLineRealSpan,
+        isZeroWidthSpan, containsSpan, isNoSrcSpan, 
 
         -- ** Predicates on RealSrcSpan
         isPointRealSpan,
@@ -87,8 +91,6 @@ module GHC.Types.SrcLoc (
         -- ** Deconstructing Located
         getLoc, unLoc,
         unRealSrcSpan, getRealSrcSpan,
-        pprLocated,
-        pprLocatedAlways,
 
         -- ** Combining and comparing Located values
         eqLocated, cmpLocated, cmpBufSpan,
@@ -115,21 +117,21 @@ module GHC.Types.SrcLoc (
         DeltaPos(..), deltaPos, getDeltaLine,
     ) where
 
-import GHC.Prelude
+import Prelude
 
 import GHC.Utils.Misc
-import GHC.Utils.Json
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Data.FastString
-import qualified GHC.Data.Strict as Strict
+--import GHC.Utils.Json
+--import GHC.Utils.Panic
+--import GHC.Data.FastString
 
 import Control.DeepSeq
+import Data.Bits
 import Data.Data
 import Data.List (sortBy, intercalate)
 import Data.Function (on)
 import qualified Data.Map as Map
 import qualified Data.Semigroup as S
+import Language.Haskell.Textual.UTF8
 
 {-
 ************************************************************************
@@ -146,9 +148,9 @@ this is the obvious stuff:
 --
 -- Represents a single point within a file
 data RealSrcLoc
-  = SrcLoc      LexicalFastString       -- A precise location (file name)
-                {-# UNPACK #-} !Int     -- line number, begins at 1
-                {-# UNPACK #-} !Int     -- column number, begins at 1
+  = SrcLoc      TextUTF8           -- A precise location (file name)
+                {-# UNPACK #-} !Int -- line number, begins at 1
+                {-# UNPACK #-} !Int -- column number, begins at 1
   deriving (Eq, Ord)
 
 -- | 0-based offset identifying the raw location in the 'StringBuffer'.
@@ -228,8 +230,8 @@ newtype BufPos = BufPos { bufPos :: Int }
 
 -- | Source Location
 data SrcLoc
-  = RealSrcLoc !RealSrcLoc !(Strict.Maybe BufPos)  -- See Note [Why Maybe BufPos]
-  | UnhelpfulLoc !FastString     -- Just a general indication
+  = RealSrcLoc !RealSrcLoc !(Maybe BufPos)  -- See Note [Why Maybe BufPos]
+  | UnhelpfulLoc !TextUTF8     -- Just a general indication
   deriving (Eq, Show)
 
 {-
@@ -240,33 +242,33 @@ data SrcLoc
 ************************************************************************
 -}
 
-mkSrcLoc :: FastString -> Int -> Int -> SrcLoc
-mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col) Strict.Nothing
+mkSrcLoc :: TextUTF8 -> Int -> Int -> SrcLoc
+mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col) Nothing
 
-mkRealSrcLoc :: FastString -> Int -> Int -> RealSrcLoc
-mkRealSrcLoc x line col = SrcLoc (LexicalFastString x) line col
+mkRealSrcLoc :: TextUTF8 -> Int -> Int -> RealSrcLoc
+mkRealSrcLoc x line col = SrcLoc x line col
 
 -- | Indentation level is 1-indexed, so the leftmost column is 1.
 leftmostColumn :: Int
 leftmostColumn = 1
 
-getBufPos :: SrcLoc -> Strict.Maybe BufPos
+getBufPos :: SrcLoc -> Maybe BufPos
 getBufPos (RealSrcLoc _ mbpos) = mbpos
-getBufPos (UnhelpfulLoc _) = Strict.Nothing
+getBufPos (UnhelpfulLoc _) = Nothing
 
 -- | Built-in "bad" 'SrcLoc' values for particular locations
 noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
-noSrcLoc          = UnhelpfulLoc (fsLit "<no location info>")
-generatedSrcLoc   = UnhelpfulLoc (fsLit "<compiler-generated code>")
-interactiveSrcLoc = UnhelpfulLoc (fsLit "<interactive>")
+noSrcLoc          = UnhelpfulLoc "<no location info>"
+generatedSrcLoc   = UnhelpfulLoc "<compiler-generated code>"
+interactiveSrcLoc = UnhelpfulLoc "<interactive>"
 
 -- | Creates a "bad" 'SrcLoc' that has no detailed information about its location
-mkGeneralSrcLoc :: FastString -> SrcLoc
+mkGeneralSrcLoc :: TextUTF8 -> SrcLoc
 mkGeneralSrcLoc = UnhelpfulLoc
 
 -- | Gives the filename of the 'RealSrcLoc'
-srcLocFile :: RealSrcLoc -> FastString
-srcLocFile (SrcLoc (LexicalFastString fname) _ _) = fname
+srcLocFile :: RealSrcLoc -> TextUTF8
+srcLocFile (SrcLoc fname _ _) = fname
 
 -- | Raises an error when used on a "bad" 'SrcLoc'
 srcLocLine :: RealSrcLoc -> Int
@@ -312,12 +314,6 @@ lookupSrcSpan :: SrcSpan -> Map.Map RealSrcSpan a -> Maybe a
 lookupSrcSpan (RealSrcSpan l _) = Map.lookup l
 lookupSrcSpan (UnhelpfulSpan _) = const Nothing
 
-instance Outputable RealSrcLoc where
-    ppr (SrcLoc (LexicalFastString src_path) src_line src_col)
-      = hcat [ pprFastFilePath src_path <> colon
-             , int src_line <> colon
-             , int src_col ]
-
 -- I don't know why there is this style-based difference
 --        if userStyle sty || debugStyle sty then
 --            hcat [ pprFastFilePath src_path, char ':',
@@ -327,10 +323,6 @@ instance Outputable RealSrcLoc where
 --        else
 --            hcat [text "{-# LINE ", int src_line, space,
 --                  char '\"', pprFastFilePath src_path, text " #-}"]
-
-instance Outputable SrcLoc where
-    ppr (RealSrcLoc l _) = ppr l
-    ppr (UnhelpfulLoc s)  = ftext s
 
 instance Data RealSrcSpan where
   -- don't traverse?
@@ -366,7 +358,7 @@ span of (1,1)-(1,1) is zero characters long.
 -- | Real Source Span
 data RealSrcSpan
   = RealSrcSpan'
-        { srcSpanFile     :: !FastString,
+        { srcSpanFile     :: !TextUTF8,
           srcSpanSLine    :: {-# UNPACK #-} !Int,
           srcSpanSCol     :: {-# UNPACK #-} !Int,
           srcSpanELine    :: {-# UNPACK #-} !Int,
@@ -390,7 +382,7 @@ instance Semigroup BufSpan where
 -- A 'SrcSpan' identifies either a specific portion of a text file
 -- or a human-readable description of a location.
 data SrcSpan =
-    RealSrcSpan !RealSrcSpan !(Strict.Maybe BufSpan)  -- See Note [Why Maybe BufPos]
+    RealSrcSpan !RealSrcSpan !(Maybe BufSpan)  -- See Note [Why Maybe BufPos]
   | UnhelpfulSpan !UnhelpfulSpanReason
 
   deriving (Eq, Show) -- Show is used by GHC.Parser.Lexer, because we
@@ -401,11 +393,11 @@ data UnhelpfulSpanReason
   | UnhelpfulWiredIn
   | UnhelpfulInteractive
   | UnhelpfulGenerated
-  | UnhelpfulOther !FastString
+  | UnhelpfulOther !TextUTF8
   deriving (Eq, Show)
 
 removeBufSpan :: SrcSpan -> SrcSpan
-removeBufSpan (RealSrcSpan s _) = RealSrcSpan s Strict.Nothing
+removeBufSpan (RealSrcSpan s _) = RealSrcSpan s Nothing
 removeBufSpan s = s
 
 {- Note [Why Maybe BufPos]
@@ -428,20 +420,6 @@ For example, it is not uncommon to whip up source locations for e.g. error
 messages, constructing a SrcSpan without a BufSpan.
 -}
 
-instance ToJson SrcSpan where
-  json (UnhelpfulSpan {} ) = JSNull --JSObject [( "type", "unhelpful")]
-  json (RealSrcSpan rss _) = json rss
-
-instance ToJson RealSrcSpan where
-  json (RealSrcSpan'{..}) = JSObject [ ("file", JSString (unpackFS srcSpanFile)),
-                                       ("start", start),
-                                       ("end", end)
-                                     ]
-    where start = JSObject [ ("line", JSInt srcSpanSLine),
-                             ("column", JSInt srcSpanSCol) ]
-          end = JSObject [ ("line", JSInt srcSpanELine),
-                           ("column", JSInt srcSpanECol) ]
-
 instance NFData RealSrcSpan where
   rnf (RealSrcSpan' file line col endLine endCol) = rnf file `seq` rnf line `seq` rnf col `seq` rnf endLine `seq` rnf endCol
 
@@ -456,9 +434,9 @@ instance NFData UnhelpfulSpanReason where
   rnf (UnhelpfulGenerated) = ()
   rnf (UnhelpfulOther a1) = rnf a1
 
-getBufSpan :: SrcSpan -> Strict.Maybe BufSpan
+getBufSpan :: SrcSpan -> Maybe BufSpan
 getBufSpan (RealSrcSpan _ mbspan) = mbspan
-getBufSpan (UnhelpfulSpan _) = Strict.Nothing
+getBufSpan (UnhelpfulSpan _) = Nothing
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
 noSrcSpan, generatedSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
@@ -476,7 +454,7 @@ isNoSrcSpan (UnhelpfulSpan UnhelpfulNoLocationInfo) = True
 isNoSrcSpan _                                       = False
 
 -- | Create a "bad" 'SrcSpan' that has not location information
-mkGeneralSrcSpan :: FastString -> SrcSpan
+mkGeneralSrcSpan :: TextUTF8 -> SrcSpan
 mkGeneralSrcSpan = UnhelpfulSpan . UnhelpfulOther
 
 -- | Create a 'SrcSpan' corresponding to a single point
@@ -485,7 +463,7 @@ srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan (UnhelpfulOther str)
 srcLocSpan (RealSrcLoc l mb) = RealSrcSpan (realSrcLocSpan l) (fmap (\b -> BufSpan b b) mb)
 
 realSrcLocSpan :: RealSrcLoc -> RealSrcSpan
-realSrcLocSpan (SrcLoc (LexicalFastString file) line col) = RealSrcSpan' file line col line col
+realSrcLocSpan (SrcLoc file line col) = RealSrcSpan' file line col line col
 
 -- | Create a 'SrcSpan' between two points in a file
 mkRealSrcSpan :: RealSrcLoc -> RealSrcLoc -> RealSrcSpan
@@ -523,7 +501,7 @@ combineSrcSpans (RealSrcSpan span1 mbspan1) (RealSrcSpan span2 mbspan2)
   | srcSpanFile span1 == srcSpanFile span2
       = RealSrcSpan (combineRealSrcSpans span1 span2) (liftA2 combineBufSpans mbspan1 mbspan2)
   | otherwise = UnhelpfulSpan $
-      UnhelpfulOther (fsLit "<combineSrcSpans: files differ>")
+      UnhelpfulOther "<combineSrcSpans: files differ>"
 
 -- | Combines two 'SrcSpan' into one that spans at least all the characters
 -- within both spans. Assumes the "file" part is the same in both inputs
@@ -623,12 +601,12 @@ srcSpanEndCol RealSrcSpan'{ srcSpanECol=c } = c
 
 -- | Returns the location at the start of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanStart :: SrcSpan -> SrcLoc
-srcSpanStart (UnhelpfulSpan r) = UnhelpfulLoc (unhelpfulSpanFS r)
+srcSpanStart (UnhelpfulSpan r) = UnhelpfulLoc (unhelpfulSpanText r)
 srcSpanStart (RealSrcSpan s b) = RealSrcLoc (realSrcSpanStart s) (fmap bufSpanStart b)
 
 -- | Returns the location at the end of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanEnd :: SrcSpan -> SrcLoc
-srcSpanEnd (UnhelpfulSpan r) = UnhelpfulLoc (unhelpfulSpanFS r)
+srcSpanEnd (UnhelpfulSpan r) = UnhelpfulLoc (unhelpfulSpanText r)
 srcSpanEnd (RealSrcSpan s b) = RealSrcLoc (realSrcSpanEnd s) (fmap bufSpanEnd b)
 
 realSrcSpanStart :: RealSrcSpan -> RealSrcLoc
@@ -642,7 +620,7 @@ realSrcSpanEnd s = mkRealSrcLoc (srcSpanFile s)
                                 (srcSpanEndCol s)
 
 -- | Obtains the filename for a 'SrcSpan' if it is "good"
-srcSpanFileName_maybe :: SrcSpan -> Maybe FastString
+srcSpanFileName_maybe :: SrcSpan -> Maybe TextUTF8
 srcSpanFileName_maybe (RealSrcSpan s _) = Just (srcSpanFile s)
 srcSpanFileName_maybe (UnhelpfulSpan _) = Nothing
 
@@ -681,71 +659,13 @@ instance Show RealSrcSpan where
     = "SrcSpanMultiLine " ++ show file ++ " "
                           ++ intercalate " " (map show [sl,sc,el,ec])
 
-
-instance Outputable RealSrcSpan where
-    ppr span = pprUserRealSpan True span
-
--- I don't know why there is this style-based difference
---      = getPprStyle $ \ sty ->
---        if userStyle sty || debugStyle sty then
---           text (showUserRealSpan True span)
---        else
---           hcat [text "{-# LINE ", int (srcSpanStartLine span), space,
---                 char '\"', pprFastFilePath $ srcSpanFile span, text " #-}"]
-
-instance Outputable SrcSpan where
-    ppr span = pprUserSpan True span
-
-instance Outputable UnhelpfulSpanReason where
-    ppr = pprUnhelpfulSpanReason
-
--- I don't know why there is this style-based difference
---      = getPprStyle $ \ sty ->
---        if userStyle sty || debugStyle sty then
---           pprUserSpan True span
---        else
---           case span of
---           UnhelpfulSpan _ -> panic "Outputable UnhelpfulSpan"
---           RealSrcSpan s -> ppr s
-
-unhelpfulSpanFS :: UnhelpfulSpanReason -> FastString
-unhelpfulSpanFS r = case r of
+unhelpfulSpanText :: UnhelpfulSpanReason -> TextUTF8
+unhelpfulSpanText r = case r of
   UnhelpfulOther s        -> s
-  UnhelpfulNoLocationInfo -> fsLit "<no location info>"
-  UnhelpfulWiredIn        -> fsLit "<wired into compiler>"
-  UnhelpfulInteractive    -> fsLit "<interactive>"
-  UnhelpfulGenerated      -> fsLit "<generated>"
-
-pprUnhelpfulSpanReason :: UnhelpfulSpanReason -> SDoc
-pprUnhelpfulSpanReason r = ftext (unhelpfulSpanFS r)
-
-pprUserSpan :: Bool -> SrcSpan -> SDoc
-pprUserSpan _         (UnhelpfulSpan r) = pprUnhelpfulSpanReason r
-pprUserSpan show_path (RealSrcSpan s _) = pprUserRealSpan show_path s
-
-pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
-pprUserRealSpan show_path span@(RealSrcSpan' src_path line col _ _)
-  | isPointRealSpan span
-  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
-         , int line <> colon
-         , int col ]
-
-pprUserRealSpan show_path span@(RealSrcSpan' src_path line scol _ ecol)
-  | isOneLineRealSpan span
-  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
-         , int line <> colon
-         , int scol
-         , ppUnless (ecol - scol <= 1) (char '-' <> int (ecol - 1)) ]
-            -- For single-character or point spans, we just
-            -- output the starting column number
-
-pprUserRealSpan show_path (RealSrcSpan' src_path sline scol eline ecol)
-  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
-         , parens (int sline <> comma <> int scol)
-         , char '-'
-         , parens (int eline <> comma <> int ecol') ]
- where
-   ecol' = if ecol == 0 then ecol else ecol - 1
+  UnhelpfulNoLocationInfo -> "<no location info>"
+  UnhelpfulWiredIn        -> "<wired into compiler>"
+  UnhelpfulInteractive    -> "<interactive>"
+  UnhelpfulGenerated      -> "<generated>"
 
 {-
 ************************************************************************
@@ -774,7 +694,7 @@ noLoc :: e -> Located e
 noLoc e = L noSrcSpan e
 
 mkGeneralLocated :: String -> e -> Located e
-mkGeneralLocated s e = L (mkGeneralSrcSpan (fsLit s)) e
+mkGeneralLocated s e = L (mkGeneralSrcSpan (encodeUTF8 s)) e
 
 combineLocs :: Located a -> Located b -> SrcSpan
 combineLocs a b = combineSrcSpans (getLoc a) (getLoc b)
@@ -800,35 +720,11 @@ cmpLocated a b = unLoc a `compare` unLoc b
 -- Precondition: both operands have an associated 'BufSpan'.
 cmpBufSpan :: HasDebugCallStack => Located a -> Located a -> Ordering
 cmpBufSpan (L l1 _) (L l2  _)
-  | Strict.Just a <- getBufSpan l1
-  , Strict.Just b <- getBufSpan l2
+  | Just a <- getBufSpan l1
+  , Just b <- getBufSpan l2
   = compare a b
 
-  | otherwise = panic "cmpBufSpan: no BufSpan"
-
-instance (Outputable e) => Outputable (Located e) where
-  ppr (L l e) = -- GenLocated:
-                -- Print spans without the file name etc
-                whenPprDebug (braces (pprUserSpan False l))
-             $$ ppr e
-instance (Outputable e) => Outputable (GenLocated RealSrcSpan e) where
-  ppr (L l e) = -- GenLocated:
-                -- Print spans without the file name etc
-                whenPprDebug (braces (pprUserSpan False (RealSrcSpan l Strict.Nothing)))
-             $$ ppr e
-
-
-pprLocated :: (Outputable l, Outputable e) => GenLocated l e -> SDoc
-pprLocated (L l e) =
-                -- Print spans without the file name etc
-                whenPprDebug (braces (ppr l))
-             $$ ppr e
-
--- | Always prints the location, even without -dppr-debug
-pprLocatedAlways :: (Outputable l, Outputable e) => GenLocated l e -> SDoc
-pprLocatedAlways (L l e) =
-     braces (ppr l)
-  $$ ppr e
+  | otherwise = EQ
 
 {-
 ************************************************************************
@@ -853,7 +749,7 @@ compareSrcSpanBy _   (UnhelpfulSpan _) (UnhelpfulSpan _) = EQ
 
 -- | Determines whether a span encloses a given line and column index
 spans :: SrcSpan -> (Int, Int) -> Bool
-spans (UnhelpfulSpan _) _ = panic "spans UnhelpfulSpan"
+spans (UnhelpfulSpan _) _ = False
 spans (RealSrcSpan span _) (l,c) = realSrcSpanStart span <= loc && loc <= realSrcSpanEnd span
    where loc = mkRealSrcLoc (srcSpanFile span) l c
 
@@ -911,7 +807,7 @@ psSpanEnd :: PsSpan -> PsLoc
 psSpanEnd (PsSpan r b) = PsLoc (realSrcSpanEnd r) (bufSpanEnd b)
 
 mkSrcSpanPs :: PsSpan -> SrcSpan
-mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Strict.Just b)
+mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Just b)
 
 -- ---------------------------------------------------------------------
 -- The following section contains basic types related to exact printing.
@@ -968,14 +864,3 @@ deltaPos l c = case l of
 getDeltaLine :: DeltaPos -> Int
 getDeltaLine (SameLine _) = 0
 getDeltaLine (DifferentLine r _) = r
-
-instance Outputable NoComments where
-  ppr NoComments = text "NoComments"
-
-instance (Outputable a) => Outputable (EpaLocation' a) where
-  ppr (EpaSpan r) = text "EpaSpan" <+> ppr r
-  ppr (EpaDelta s d cs) = text "EpaDelta" <+> ppr s <+> ppr d <+> ppr cs
-
-instance Outputable DeltaPos where
-  ppr (SameLine c) = text "SameLine" <+> ppr c
-  ppr (DifferentLine l c) = text "DifferentLine" <+> ppr l <+> ppr c

@@ -128,7 +128,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.PkgQual
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set

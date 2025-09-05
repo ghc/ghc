@@ -34,7 +34,6 @@ import GHC.Driver.Flags (DumpFlag(..))
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
-import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -46,6 +45,9 @@ import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Tickish
 import GHC.Types.ProfAuto
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (decodeUTF8, encodeUTF8)
 
 import Control.Monad
 import Data.List (isSuffixOf, intersperse)
@@ -149,8 +151,8 @@ guessSourceFile binds orig_file =
                                srcSpanFileName_maybe (locA pos) : rest) [] binds
      in
      case top_pos of
-        (file_name:_) | ".hsc" `isSuffixOf` unpackFS file_name
-                      -> unpackFS file_name
+        (file_name:_) | ".hsc" `isSuffixOf` decodeUTF8 file_name
+                      -> decodeUTF8 file_name
         _ -> orig_file
 
 
@@ -1198,7 +1200,7 @@ isGoodTickSrcSpan pos = do
   file_name <- getFileName
   tickish <- tickishType `liftM` getEnv
   let need_same_file = tickSameFileOnly tickish
-      same_file      = Just file_name == srcSpanFileName_maybe pos
+      same_file      = Just (fastStringToTextUTF8 file_name) == srcSpanFileName_maybe pos
   isBL <- isBlackListed pos
   return (isGoodSrcSpan' pos && not isBL && (not need_same_file || same_file))
 
@@ -1346,7 +1348,7 @@ mkBinTickBoxHpc boxLabel pos e = do
   return $ L pos' $ XExpr $ HsTick tick (L pos' (XExpr binTick))
 
 hpcSrcSpan :: SrcSpan
-hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
+hpcSrcSpan = mkGeneralSrcSpan (encodeUTF8 "Haskell Program Coverage internals")
 
 matchesOneOfMany :: [LMatch GhcTc body] -> Bool
 matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1

@@ -43,7 +43,7 @@ import GHC.Core.Type (Type)
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name (Name, NameSpace, OccName (occNameFS), isSymOcc, nameOccName)
 import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec)
-import GHC.Types.SrcLoc (SrcSpan)
+import Language.Haskell.Textual.Location (SrcSpan)
 import GHC.Types.Basic (Activation, RuleName)
 import GHC.Parser.Errors.Basic
 import GHC.Utils.Outputable

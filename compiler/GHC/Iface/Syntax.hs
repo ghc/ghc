@@ -77,7 +77,7 @@ import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.SourceText
 import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
@@ -667,7 +667,7 @@ fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDo
 fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLoc names)
 
 fromIfaceStringLiteral :: IfaceStringLiteral -> StringLiteral
-fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st (fastStringToShortByteString fs) Nothing
+fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st (fastStringToTextUTF8 fs) Nothing
 
 
 {-

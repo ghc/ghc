@@ -55,7 +55,7 @@ import GHC.Types.Hint
   ( GhcHint (SuggestExtension, RemindFieldSelectorSuppressed, ImportSuggestion, SuggestSimilarNames)
   , LanguageExtensionHint (SuggestSingleExtension)
   , ImportSuggestion(..), SimilarName(..), HowInScope(..) )
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 

@@ -107,7 +107,6 @@ import GHC.Types.Name      hiding ( varName )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Var.Env
-import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DSet
@@ -128,6 +127,9 @@ import GHC.Tc.Utils.Monad
 
 import GHC.IfaceToCore
 import GHC.ByteCode.Breakpoints
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Control.Monad
 import Data.Dynamic
@@ -323,7 +325,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
     EvalBreak apStack_ref Nothing resume_ctxt ccs -> do
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
       apStack_fhv     <- liftIO $ mkFinalizedHValue interp apStack_ref
-      let span = mkGeneralSrcSpan (fsLit "<unknown>")
+      let span = mkGeneralSrcSpan (encodeUTF8 "<unknown>")
       (hsc_env1, names) <- liftIO $
         bindLocalsAtBreakpoint hsc_env apStack_fhv span Nothing
       let
@@ -517,7 +519,7 @@ moveHist fn = do
         let
           update_ic apStack mb_info = do
             span <- case mb_info of
-                      Nothing  -> return $ mkGeneralSrcSpan (fsLit "<unknown>")
+                      Nothing  -> return $ mkGeneralSrcSpan (encodeUTF8 "<unknown>")
                       Just ibi -> liftIO $ do
                         let hug = hsc_HUG hsc_env
                         brks <- readIModBreaks hug ibi

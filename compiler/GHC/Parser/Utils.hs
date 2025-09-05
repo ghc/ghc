@@ -9,8 +9,8 @@ where
 import GHC.Prelude
 import GHC.Hs
 import GHC.Data.StringBuffer
-import GHC.Data.FastString
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, initParserState)
 import GHC.Parser.Lexer (ParserOpts)
@@ -53,6 +53,6 @@ isDecl pflags stmt =
 parseThing :: Lexer.P thing -> ParserOpts -> String -> Lexer.ParseResult thing
 parseThing parser opts stmt = do
   let buf = stringToStringBuffer stmt
-      loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
+      loc = mkRealSrcLoc (encodeUTF8 "<interactive>") 1 1
 
   Lexer.unP parser (Lexer.initParserState opts buf loc)

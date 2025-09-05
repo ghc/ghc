@@ -10,7 +10,6 @@ import GHC.Hs.Doc
 import GHC.Parser.Lexer
 import GHC.Parser.Lexer.Interface (adjustChar)
 import GHC.Parser.Annotation
-import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Strict as Strict
@@ -20,6 +19,9 @@ import GHC.Utils.Encoding
 import GHC.Hs.Extension
 
 import qualified GHC.Data.EnumSet as EnumSet
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 
 import Data.Maybe
 import Data.Word
@@ -138,16 +140,16 @@ lexStringLiteral :: P (LocatedN RdrName) -- ^ A precise identifier parser
 lexStringLiteral identParser (L l sl@(StringLiteral _ sbs _))
   = L l (WithHsDocIdentifiers sl idents)
   where
-    bs = SBS.fromShort sbs
+    bs = SBS.fromShort $ bytesUTF8 sbs
 
     idents = mapMaybe (uncurry (validateIdentWith identParser)) plausibleIdents
 
     plausibleIdents :: [(SrcSpan,ByteString)]
     plausibleIdents = case l of
-      RealSrcSpan span _ -> [(RealSrcSpan span' Strict.Nothing, tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) bs]
+      RealSrcSpan span _ -> [(RealSrcSpan span' Nothing, tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) bs]
       UnhelpfulSpan reason -> [(UnhelpfulSpan reason, tok) | (_, tok) <- alexScanTokens fakeLoc bs]
 
-    fakeLoc = mkRealSrcLoc nilFS 0 0
+    fakeLoc = mkRealSrcLoc mempty 0 0
 
 -- | Lex identifiers from a docstring.
 lexHsDoc :: P (LocatedN RdrName)      -- ^ A precise identifier parser
@@ -164,11 +166,11 @@ lexHsDoc identParser doc =
 
     plausibleIdents :: LHsDocStringChunk -> [(SrcSpan,ByteString)]
     plausibleIdents (L (RealSrcSpan span _) (HsDocStringChunk s))
-      = [(RealSrcSpan span' Strict.Nothing, tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) s]
+      = [(RealSrcSpan span' Nothing, tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) s]
     plausibleIdents (L (UnhelpfulSpan reason) (HsDocStringChunk s))
       = [(UnhelpfulSpan reason, tok) | (_, tok) <- alexScanTokens fakeLoc s] -- preserve the original reason
 
-    fakeLoc = mkRealSrcLoc nilFS 0 0
+    fakeLoc = mkRealSrcLoc mempty 0 0
 
 validateIdentWith :: P (LocatedN RdrName) -> SrcSpan -> ByteString -> Maybe (Located RdrName)
 validateIdentWith identParser mloc str0 =
@@ -182,7 +184,7 @@ validateIdentWith identParser mloc str0 =
       buffer = stringBufferFromByteString str0
       realSrcLc = case mloc of
         RealSrcSpan loc _ -> realSrcSpanStart loc
-        UnhelpfulSpan _ -> mkRealSrcLoc nilFS 0 0
+        UnhelpfulSpan _ -> mkRealSrcLoc mempty 0 0
       pstate = initParserState pflags buffer realSrcLc
   in case unP identParser pstate of
     POk _ name -> Just $ case mloc of

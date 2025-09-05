@@ -10,6 +10,7 @@ module GHC.Data.Strict (
     Maybe(Nothing, Just),
     fromMaybe,
     GHC.Data.Strict.maybe,
+    makeMaybeStrict,
     Pair(And),
     -- Not used at the moment:
     --
@@ -18,6 +19,8 @@ module GHC.Data.Strict (
   ) where
 
 import GHC.Prelude hiding (Maybe(..), Either(..))
+
+import qualified Data.Maybe as Default
 
 import Control.Applicative
 import Data.Semigroup
@@ -30,6 +33,9 @@ data Maybe a = Nothing | Just !a
 instance NFData a => NFData (Maybe a) where
   rnf Nothing = ()
   rnf (Just x) = rnf x
+
+makeMaybeStrict :: Default.Maybe a -> Maybe a
+makeMaybeStrict = Default.maybe Nothing (\x -> Just x)
 
 fromMaybe :: a -> Maybe a -> a
 fromMaybe d Nothing = d

@@ -287,7 +287,6 @@ import GHC.Unit.Home
 import GHC.Types.Literal
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Types.SrcLoc
 import GHC.Types.Tickish  ( GenTickish(SourceNote) )
 import GHC.Utils.Error
 import GHC.Data.StringBuffer
@@ -298,6 +297,9 @@ import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Data.Bag     ( Bag, emptyBag, unitBag, isEmptyBag )
 import GHC.Types.Var
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Control.Monad
 import Data.Array
@@ -1618,7 +1620,7 @@ parseCmmFile :: CmmParserConfig
 parseCmmFile cmmpConfig this_mod home_unit filename = do
   buf <- hGetStringBuffer filename
   let
-        init_loc = mkRealSrcLoc (mkFastString filename) 1 1
+        init_loc = mkRealSrcLoc (encodeUTF8 filename) 1 1
         init_state = (initParserState (cmmpParserOpts cmmpConfig) buf init_loc) { lex_state = [0] }
                 -- reset the lex_state: the Lexer monad leaves some stuff
                 -- in there we don't want.

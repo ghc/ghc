@@ -44,7 +44,7 @@ import GHC.Types.Var
 import GHC.Types.Id( mkTemplateLocals )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Builtin.Names( srcLocDataConName, pushCallStackName, emptyCallStackName )
 
@@ -56,6 +56,7 @@ import GHC.Utils.Misc
 import GHC.Unit.Module
 
 import GHC.Data.Bag
+import GHC.Data.FastString ( mkFastStringTextUTF8 )
 
 import GHC.Driver.DynFlags
 
@@ -197,7 +198,7 @@ evCallStack pred (EvCsPushCall fs loc tm)
              mkSrcLoc l = mkCoreConWrapApps srcLocDataCon <$>
                           sequence [ mkStringExprFS (unitFS $ moduleUnit m)
                                    , mkStringExprFS (moduleNameFS $ moduleName m)
-                                   , mkStringExprFS (srcSpanFile l)
+                                   , mkStringExprFS (mkFastStringTextUTF8 $ srcSpanFile l)
                                    , return $ mkIntExprInt platform (srcSpanStartLine l)
                                    , return $ mkIntExprInt platform (srcSpanStartCol l)
                                    , return $ mkIntExprInt platform (srcSpanEndLine l)

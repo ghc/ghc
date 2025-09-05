@@ -8,6 +8,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ViewPatterns #-}
+
 module GHC.Driver.Downsweep
   ( downsweep
   , downsweepThunk
@@ -52,10 +53,7 @@ import GHC.Rename.Names
 import GHC.Tc.Utils.Backpack
 import GHC.Runtime.Context
 
-import Language.Haskell.Syntax.ImpExp
-
 import GHC.Data.Graph.Directed
-import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
 import qualified GHC.Data.Maybe as M
 import GHC.Data.OsPath     ( unsafeEncodeUtf )
@@ -77,7 +75,6 @@ import GHC.Types.Error
 import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
-import GHC.Types.SrcLoc
 import GHC.Types.Unique.Map
 import GHC.Types.PkgQual
 import GHC.Types.Basic
@@ -92,6 +89,10 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Module.Deps
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Module.Stage
+
+import Language.Haskell.Syntax.ImpExp
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Data.Either ( rights, partitionEithers, lefts )
 import qualified Data.Map as Map
@@ -743,7 +744,7 @@ getRootSummary excl_mods old_summary_map hsc_env target
     where
       Target {targetId, targetContents = maybe_buf, targetUnitId = uid} = target
       home_unit = ue_unitHomeUnit uid (hsc_unit_env hsc_env)
-      rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
+      rootLoc = mkGeneralSrcSpan (encodeUTF8 "<command line>")
       dflags = homeUnitEnv_dflags (ue_findHomeUnitEnv uid (hsc_unit_env hsc_env))
 
 -- | Execute 'getRootSummary' for the 'Target's using the parallelism pipeline
@@ -808,7 +809,7 @@ checkHomeUnitsClosed ue
   where
     home_id_set = HUG.allUnits $ ue_home_unit_graph ue
     bad_unit_ids = upwards_closure Set.\\ home_id_set {- Remove all home units reached, keep only bad nodes -}
-    rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
+    rootLoc = mkGeneralSrcSpan (encodeUTF8 "<command line>")
 
     downwards_closure :: Graph (Node UnitId UnitId)
     downwards_closure = graphFromEdgedVerticesUniq graphNodes

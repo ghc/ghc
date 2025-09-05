@@ -23,8 +23,6 @@ module GHC.Hs.Lit
 
 import GHC.Prelude
 
-import qualified Data.ByteString.Short as SBS
-
 import {-# SOURCE #-} GHC.Hs.Expr( pprExpr )
 
 import GHC.Types.Basic (PprPrec(..), topPrec )
@@ -37,6 +35,8 @@ import GHC.Hs.Extension
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.UTF8
 
 {-
 ************************************************************************
@@ -46,22 +46,22 @@ import Language.Haskell.Syntax.Lit
 ************************************************************************
 -}
 
-type instance XHsChar       (GhcPass _) = SourceText
-type instance XHsCharPrim   (GhcPass _) = SourceText
-type instance XHsString     (GhcPass _) = SourceText
-type instance XHsMultilineString (GhcPass _) = SourceText
-type instance XHsStringPrim (GhcPass _) = SourceText
+type instance XHsChar       (GhcPass _) = Source.CodeSnippet
+type instance XHsCharPrim   (GhcPass _) = Source.CodeSnippet
+type instance XHsString     (GhcPass _) = Source.CodeSnippet
+type instance XHsMultilineString (GhcPass _) = Source.CodeSnippet
+type instance XHsStringPrim (GhcPass _) = Source.CodeSnippet
 type instance XHsInt        (GhcPass _) = NoExtField
-type instance XHsIntPrim    (GhcPass _) = SourceText
-type instance XHsWordPrim   (GhcPass _) = SourceText
-type instance XHsInt8Prim   (GhcPass _) = SourceText
-type instance XHsInt16Prim  (GhcPass _) = SourceText
-type instance XHsInt32Prim  (GhcPass _) = SourceText
-type instance XHsInt64Prim  (GhcPass _) = SourceText
-type instance XHsWord8Prim  (GhcPass _) = SourceText
-type instance XHsWord16Prim (GhcPass _) = SourceText
-type instance XHsWord32Prim (GhcPass _) = SourceText
-type instance XHsWord64Prim (GhcPass _) = SourceText
+type instance XHsIntPrim    (GhcPass _) = Source.CodeSnippet
+type instance XHsWordPrim   (GhcPass _) = Source.CodeSnippet
+type instance XHsInt8Prim   (GhcPass _) = Source.CodeSnippet
+type instance XHsInt16Prim  (GhcPass _) = Source.CodeSnippet
+type instance XHsInt32Prim  (GhcPass _) = Source.CodeSnippet
+type instance XHsInt64Prim  (GhcPass _) = Source.CodeSnippet
+type instance XHsWord8Prim  (GhcPass _) = Source.CodeSnippet
+type instance XHsWord16Prim (GhcPass _) = Source.CodeSnippet
+type instance XHsWord32Prim (GhcPass _) = Source.CodeSnippet
+type instance XHsWord64Prim (GhcPass _) = Source.CodeSnippet
 type instance XHsFloatPrim  (GhcPass _) = NoExtField
 type instance XHsDoublePrim (GhcPass _) = NoExtField
 
@@ -70,7 +70,7 @@ type instance XXLit         GhcRn = DataConCantHappen
 type instance XXLit         GhcTc = HsLitTc
 
 data HsLitTc
-  = HsInteger SourceText Integer Type
+  = HsInteger Source.CodeSnippet Integer Type
       -- ^ Genuinely an integer; arises only
       -- from TRANSLATION (overloaded
       -- literals are done with HsOverLit)
@@ -212,16 +212,16 @@ Equivalently it's True if
      that happens to be in scope isn't the standard one
 -}
 
--- Instance specific to GhcPs, need the SourceText
+-- Instance specific to GhcPs, need the Source.CodeSnippet
 instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
     ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
     ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
     ppr (HsMultilineString st s) =
       case st of
-        NoSourceText -> pprHsString s
+        Source.CodeSnippetAbsent -> pprHsString s
         -- 0x0A (10) is the new line character (\n)
-        SourceText src -> vcat $ pprShortByteString <$> SBS.split 0x0A src
+        Source.CodeSnippet src -> vcat $ ppr <$> linesUTF8 src
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))

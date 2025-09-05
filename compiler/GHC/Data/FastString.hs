@@ -60,6 +60,10 @@ module GHC.Data.FastString
         -- * ShortText
         fastStringToShortText,
 
+        -- * UTF8Chunk
+        fastStringToTextUTF8,
+        mkFastStringTextUTF8,
+
         -- * FastZString
         FastZString,
         hPutFZS,
@@ -149,6 +153,8 @@ import GHC.Conc.Sync    (sharedCAF)
 import GHC.Exts
 import GHC.IO
 
+import Language.Haskell.Textual.UTF8
+
 -- | Gives the Modified UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS, fastStringToByteString :: FastString -> ByteString
 {-# INLINE[1] bytesFS #-}
@@ -162,6 +168,12 @@ fastStringToShortByteString = fs_sbs
 
 fastStringToShortText :: FastString -> ShortText
 fastStringToShortText = ShortText . fs_sbs
+
+fastStringToTextUTF8 :: FastString -> TextUTF8
+fastStringToTextUTF8 = unsafeFromShortByteString . fs_sbs
+
+mkFastStringTextUTF8 :: TextUTF8 -> FastString
+mkFastStringTextUTF8 = mkFastStringShortByteString . bytesUTF8
 
 fastZStringToByteString :: FastZString -> ByteString
 fastZStringToByteString (FastZString bs) = bs
@@ -198,9 +210,6 @@ lengthFZS (FastZString bs) = BS.length bs
 
 mkFastZStringString :: String -> FastZString
 mkFastZStringString str = FastZString (BSC.pack str)
-
-mkFastZStringBytes :: ByteString -> FastZString
-mkFastZStringBytes = FastZString
 
 -- -----------------------------------------------------------------------------
 

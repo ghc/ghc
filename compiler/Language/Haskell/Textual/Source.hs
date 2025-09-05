@@ -1,41 +1,89 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module Language.Haskell.Syntax.Extension
+{-# LANGUAGE ViewPatterns #-}
+
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE ViewPatterns #-}
 
--- | Source text
---
--- Keeping Source Text for source to source conversions
---
-module GHC.Types.SourceText
-   ( SourceText
-   , mkSourceText
-   , pprWithSourceText
-   , pprWithSourceTextThen
+
+
+{- |
+Intended to be imported qualified like so:
+
+@
+import Language.Haskell.Syntax.Expr qualified as Source
+
+Source.CodeSnippet
+
+Source.LiteralIntegral
+Source.LiteralFractional
+Source.LiteralString
+
+@
+-}
+
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+
+\section[HsBinds]{Abstract syntax: top-level bindings and signatures}
+
+Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
+-}
+
+-- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
+module Language.Haskell.Textual.Source
+   (
+   -- * CodeSnippet
+     CodeSnippet (..)
+   , mkCodeSnippet
 
    -- * Literals
-   , Source.IntegralLit(..)
-   , Source.FractionalLit(..)
-   , Source.StringLiteral(..)
-   , Source.negateIntegralLit
-   , Source.negateFractionalLit
-   , Source.mkIntegralLit
-   , Source.mkTHFractionalLit, Source.rationalFromFractionalLit
-   , Source.integralFractionalLit, Source.mkSourceFractionalLit
-   , Source.FractionalExponentBase(..)
+   -- ** Integral
+   , IntegralLit(..)
+   , mkIntegralLit
+   , negateIntegralLit
+   -- ** Fractional
+   , FractionalLit(..)
+   , FractionalExponentBase(..)
+   , mkRationalWithExponentBase
+   -- *** Construction
+   , mkFractionalLit           -- Used by the pm checker.
+   , mkSourceFractionalLit
+   , mkTHFractionalLit
+   , fractionalLitFromRational -- Used by the pm checker.
+   , integralFractionalLit
+   -- *** Transformation
+   , negateFractionalLit
+   -- *** Extraction
+   , rationalFromFractionalLit
+   -- ** String
+   , StringLiteral(..)
+   ) where
 
-   -- Used by the pm checker.
-   , Source.fractionalLitFromRational
-   , Source.mkFractionalLit
-   )
-where
 
-import GHC.Prelude
-import GHC.Utils.Outputable
-import qualified Language.Haskell.Textual.Source as Source
+import Prelude
+
+import Control.DeepSeq
+import qualified Data.ByteString.Short as SBS
+import Data.Data
+import Data.Function (on)
+--import Data.Monoid
+import Data.String (IsString(..))
+import Data.Ratio ((%))
+import Language.Haskell.Textual.Location (NoCommentsLocation)
+import Language.Haskell.Textual.UTF8
 
 {-
 Note [Pragma source text]
@@ -53,7 +101,7 @@ will all generate ITspec_prag token for the start of the pragma.
 
 In order to be able to do source to source conversions, the original
 source text for the token needs to be preserved, hence the
-`SourceText` field.
+`CodeSnippet` field.
 
 So the lexer will then generate
 
@@ -91,78 +139,44 @@ For OverLitVal
   HsIsString      "\x41nd" == "And"
 -}
 
-type SourceText = Source.CodeSnippet
-
-mkSourceText :: String -> Source.CodeSnippet
-mkSourceText = Source.mkCodeSnippet
-
-pprWithSourceText :: Source.CodeSnippet -> SDoc -> SDoc
-pprWithSourceText = pprWithCodeSnippet
-
-pprWithSourceTextThen :: Source.CodeSnippet -> SDoc -> SDoc -> SDoc
-pprWithSourceTextThen = pprWithCodeSnippetThen
-
-{-
  -- Note [Literal source text],[Pragma source text]
-data SourceText
-   = SourceText {-# UNPACK #-} !ShortByteString
-   | Source.CodeSnippetAbsent
+data CodeSnippet
+   = CodeSnippet {-# UNPACK #-} !TextUTF8
+   | CodeSnippetAbsent
       -- ^ For when code is generated, e.g. TH,
       -- deriving. The pretty printer will then make
       -- its own representation of the item.
    deriving (Data, Show, Eq )
 
-instance Outputable SourceText where
-  ppr Source.CodeSnippetAbsent   = text "Source.CodeSnippetAbsent"
-  ppr (SourceText s) = text "SourceText" <+> pprShortByteString s
-
-instance NFData SourceText where
-    rnf = \case
-        SourceText s -> rnf s
-        Source.CodeSnippetAbsent -> ()
-
-instance Binary SourceText where
-  put_ bh Source.CodeSnippetAbsent = putByte bh 0
-  put_ bh (SourceText s) = do
+{-
+instance Binary CodeSnippet where
+  put_ bh CodeSnippetAbsent = putByte bh 0
+  put_ bh (CodeSnippet s) = do
         putByte bh 1
         put_ bh s
 
   get bh = do
     h <- getByte bh
     case h of
-      0 -> return Source.CodeSnippetAbsent
+      0 -> return CodeSnippetAbsent
       1 -> do
         s <- get bh
-        return (SourceText s)
-      _ -> panic $ "Binary SourceText:" ++ show h
+        return (CodeSnippet s)
+      _ -> panic $ "Binary CodeSnippet:" ++ show h
 -}
 
-{-
--- | Efficiently convert a 'ShortByteString' to an 'SDoc' value.
--- Will only copy the underlying 'ByteArray' if it is /unpinned/.
-pprShortByteString :: ShortByteString -> SDoc
-pprShortByteString = text . utf8DecodeShortByteString
+instance NFData CodeSnippet where
+    rnf = \case
+        CodeSnippet s -> rnf s
+        CodeSnippetAbsent -> ()
 
--- | Special combinator for showing string literals.
-pprWithSourceText :: SourceText -> SDoc -> SDoc
-pprWithSourceText Source.CodeSnippetAbsent     d = d
-pprWithSourceText (SourceText src) _ = pprShortByteString src
-
--- | Special combinator for showing string literals.
-pprWithSourceTextThen :: SourceText -> SDoc -> SDoc -> SDoc
-pprWithSourceTextThen Source.CodeSnippetAbsent     d _ = d
-pprWithSourceTextThen (SourceText src) _ e = pprShortByteString src <+> e
--}
-
-{-
--- Use ByteString as an intermediary to handle unicode.
-mkCodeSnippet :: String -> Source.CodeSnippet
-mkCodeSnippet = Source.CodeSnippet . utf8EncodeShortByteString
+mkCodeSnippet :: String -> CodeSnippet
+mkCodeSnippet = CodeSnippet . encodeUTF8
 
 -- | Note that this function relies on the assertion that the output of @show x@
 -- will never contain unicode characters. All characters must be ASCII characters.
-safeShowToCodeSnippet :: Show a => a -> Source.CodeSnippet
-safeShowToCodeSnippet = Source.CodeSnippet . fromString . show
+safeShowToCodeSnippet :: Show a => a -> CodeSnippet
+safeShowToCodeSnippet = CodeSnippet . fromString . show
 
 ------------------------------------------------
 -- Literals
@@ -174,11 +188,17 @@ safeShowToCodeSnippet = Source.CodeSnippet . fromString . show
 -- required for NegativeLiterals extension to correctly parse `-0::Double`
 -- as negative zero. See also #13211.
 data IntegralLit = IL
-   { il_text  :: Source.CodeSnippet
+   { il_text  :: CodeSnippet
    , il_neg   :: Bool -- See Note [Negative zero] in GHC.Rename.Pat
    , il_value :: Integer
    }
    deriving (Data, Show)
+
+instance Eq IntegralLit where
+  (==) = (==) `on` il_value
+
+instance Ord IntegralLit where
+  compare = compare `on` il_value
 
 mkIntegralLit :: Integral a => a -> IntegralLit
 mkIntegralLit i = IL { il_text = safeShowToCodeSnippet i_integer
@@ -190,11 +210,7 @@ mkIntegralLit i = IL { il_text = safeShowToCodeSnippet i_integer
 
 negateIntegralLit :: IntegralLit -> IntegralLit
 negateIntegralLit (IL text neg value) =
-  let text' = case text of
-        Source.CodeSnippetAbsent         -> Source.CodeSnippetAbsent
-        Source.CodeSnippet src | neg -> Source.CodeSnippet $    1 `SBS.drop` src -- remove the hyphen
-        Source.CodeSnippet src       -> Source.CodeSnippet $ 0x2D `SBS.cons` src -- prepend a hyphen (0x2D = ASCII '-')
-  in  IL text' (not neg) (negate value)
+  IL (negateNumericCodeSnipet neg text) (not neg) (negate value)
 
 -- | Fractional Literal
 --
@@ -210,7 +226,7 @@ negateIntegralLit (IL text neg value) =
 -- denotes  -5300
 
 data FractionalLit = FL
-    { fl_text :: Source.CodeSnippet     -- ^ How the value was written in the source
+    { fl_text :: CodeSnippet     -- ^ How the value was written in the source
     , fl_neg :: Bool                        -- See Note [Negative zero]
     , fl_signi :: Rational                  -- The significand component of the literal
     , fl_exp :: Integer                     -- The exponent component of the literal
@@ -219,13 +235,27 @@ data FractionalLit = FL
     deriving (Data, Show)
   -- The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on
 
+-- | Be wary of using this instance to compare for equal *values* when exponents are
+-- large. The same value expressed in different syntactic form won't compare as equal when
+-- any of the exponents is >= 100.
+instance Eq FractionalLit where
+  (==) fl1 fl2 = case compare fl1 fl2 of
+          EQ -> True
+          _  -> False
+
+-- | Be wary of using this instance to compare for equal *values* when exponents are
+-- large. The same value expressed in different syntactic form won't compare as equal when
+-- any of the exponents is >= 100.
+instance Ord FractionalLit where
+  compare = compareFractionalLit
+
 -- See Note [FractionalLit representation] in GHC.HsToCore.Match.Literal
 data FractionalExponentBase
   = Base2 -- Used in hex fractional literals
   | Base10
   deriving (Eq, Ord, Data, Show)
 
-mkFractionalLit :: Source.CodeSnippet -> Bool -> Rational -> Integer -> FractionalExponentBase
+mkFractionalLit :: CodeSnippet -> Bool -> Rational -> Integer -> FractionalExponentBase
                 -> FractionalLit
 mkFractionalLit = FL
 
@@ -234,7 +264,7 @@ mkRationalWithExponentBase i e feb = i * (eb ^^ e)
   where eb = case feb of Base2 -> 2 ; Base10 -> 10
 
 fractionalLitFromRational :: Rational -> FractionalLit
-fractionalLitFromRational r =  FL { fl_text = Source.CodeSnippetAbsent
+fractionalLitFromRational r =  FL { fl_text = CodeSnippetAbsent
                            , fl_neg = r < 0
                            , fl_signi = r
                            , fl_exp = 0
@@ -260,17 +290,13 @@ mkTHFractionalLit r =  FL { fl_text = safeShowToCodeSnippet (realToFrac r::Doubl
 
 negateFractionalLit :: FractionalLit -> FractionalLit
 negateFractionalLit (FL text neg i e eb) =
-  let text' = case text of
-        Source.CodeSnippetAbsent         -> Source.CodeSnippetAbsent
-        Source.CodeSnippet src | neg -> Source.CodeSnippet $    1 `SBS.drop` src -- remove the hyphen
-        Source.CodeSnippet src       -> Source.CodeSnippet $ 0x2D `SBS.cons` src -- prepend a hyphen (0x2D = ASCII '-')
-  in  FL text' (not neg) (negate i) e eb
+  FL (negateNumericCodeSnipet neg text) (not neg) (negate i) e eb
 
 -- | The integer should already be negated if it's negative.
 integralFractionalLit :: Bool -> Integer -> FractionalLit
 integralFractionalLit neg i = FL { fl_text = safeShowToCodeSnippet i
                                  , fl_neg = neg
-                                 , fl_signi = i :% 1
+                                 , fl_signi = i % 1
                                  , fl_exp = 0
                                  , fl_exp_base = Base10 }
 
@@ -278,7 +304,15 @@ integralFractionalLit neg i = FL { fl_text = safeShowToCodeSnippet i
 mkSourceFractionalLit :: String -> Bool -> Integer -> Integer
                       -> FractionalExponentBase
                       -> FractionalLit
-mkSourceFractionalLit !str !b !r !i !ff = FL (Source.CodeSnippet $ fromString str) b (r :% 1) i ff
+mkSourceFractionalLit !str !b !r !i !ff = FL (CodeSnippet $ fromString str) b (r % 1) i ff
+
+negateNumericCodeSnipet :: Bool -> CodeSnippet -> CodeSnippet
+negateNumericCodeSnipet neg = \case
+    CodeSnippetAbsent     -> CodeSnippetAbsent
+    CodeSnippet src | neg -> build $    1 `SBS.drop` bytesUTF8 src -- remove the hyphen
+    CodeSnippet src       -> build $ 0x2D `SBS.cons` bytesUTF8 src -- prepend a hyphen (0x2D = ASCII '-')
+  where
+    build = CodeSnippet . unsafeFromShortByteString
 
 {- Note [fractional exponent bases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -287,19 +321,8 @@ the form 0x0.3p10 the exponent is given on base 2 rather than
 base 10. These are the only options, hence the sum type. See also #15646.
 -}
 
-
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
-
-instance Eq IntegralLit where
-  (==) = (==) `on` il_value
-
-instance Ord IntegralLit where
-  compare = compare `on` il_value
-
-instance Outputable IntegralLit where
-  ppr (IL (Source.CodeSnippet src) _ _) = ppr src
-  ppr (IL Source.CodeSnippetAbsent _ value) = text (show value)
 
 -- | Compare fractional lits with small exponents for value equality but
 --   large values for syntactic equality.
@@ -309,31 +332,12 @@ compareFractionalLit fl1 fl2
     = rationalFromFractionalLit fl1 `compare` rationalFromFractionalLit fl2
   | otherwise = (compare `on` (\x -> (fl_signi x, fl_exp x, fl_exp_base x))) fl1 fl2
 
--- | Be wary of using this instance to compare for equal *values* when exponents are
--- large. The same value expressed in different syntactic form won't compare as equal when
--- any of the exponents is >= 100.
-instance Eq FractionalLit where
-  (==) fl1 fl2 = case compare fl1 fl2 of
-          EQ -> True
-          _  -> False
-
--- | Be wary of using this instance to compare for equal *values* when exponents are
--- large. The same value expressed in different syntactic form won't compare as equal when
--- any of the exponents is >= 100.
-instance Ord FractionalLit where
-  compare = compareFractionalLit
-
-instance Outputable FractionalLit where
-  ppr (fl@(FL {})) =
-    pprWithCodeSnippet (fl_text fl) $
-      rational $ mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl)
-
 -- | A String Literal in the source, including its original raw format for use by
 -- source to source manipulation tools.
 data StringLiteral = StringLiteral
-                       { sl_st :: Source.CodeSnippet, -- literal raw source.
+                       { sl_st :: CodeSnippet, -- literal raw source.
                                               -- See Note [Literal source text]
-                         sl_fs :: {-# UNPACK #-} !ShortByteString, -- literal string value encoded as a UTF8 short bytestring
+                         sl_fs :: {-# UNPACK #-} !TextUTF8, -- literal string value encoded as a UTF8 short bytestring
                          sl_tc :: Maybe NoCommentsLocation
                                                     -- Location of
                                                     -- possible
@@ -345,7 +349,3 @@ data StringLiteral = StringLiteral
 
 instance Eq StringLiteral where
   (StringLiteral _ a _) == (StringLiteral _ b _) = a == b
-
-instance Outputable StringLiteral where
-  ppr sl = pprWithCodeSnippet (sl_st sl) (doubleQuotes . ppr $ sl_fs sl)
--}

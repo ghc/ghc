@@ -9,7 +9,7 @@ module GHC.Iface.Ext.Debug where
 
 import GHC.Prelude
 
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 

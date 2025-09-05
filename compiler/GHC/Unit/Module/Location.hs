@@ -23,9 +23,9 @@ where
 import GHC.Prelude
 
 import GHC.Data.OsPath
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 import GHC.Utils.Outputable
-import GHC.Data.FastString (mkFastString)
 
 import qualified System.OsString as OsString
 
@@ -116,7 +116,7 @@ addBootSuffixLocnOut locn
 mkFileSrcSpan :: ModLocation -> SrcSpan
 mkFileSrcSpan mod_loc
   = case ml_hs_file mod_loc of
-      Just file_path -> mkGeneralSrcSpan (mkFastString file_path)
+      Just file_path -> mkGeneralSrcSpan (encodeUTF8 file_path)
       Nothing        -> interactiveSrcSpan   -- Presumably
 
 -- ----------------------------------------------------------------------------

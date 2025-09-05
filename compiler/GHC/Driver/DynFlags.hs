@@ -113,7 +113,7 @@ import GHC.Types.Basic ( IntWithInf, treatZeroAsInf )
 import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.ProfAuto
 import GHC.Types.SafeHaskell
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
 import GHC.Utils.CliOption

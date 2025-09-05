@@ -5,6 +5,8 @@ module GHC.Utils.Json where
 import GHC.Prelude
 
 import GHC.Utils.Outputable
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 import Data.Char
 import Numeric
 
@@ -62,3 +64,17 @@ instance ToJson String where
 
 instance ToJson Int where
   json = JSInt
+
+instance ToJson SrcSpan where
+  json (UnhelpfulSpan {} ) = JSNull --JSObject [( "type", "unhelpful")]
+  json (RealSrcSpan rss _) = json rss
+
+instance ToJson RealSrcSpan where
+  json span = JSObject [ ("file", JSString (decodeUTF8 $ srcSpanFile span)),
+                         ("start", start), ("end", end) ]
+    where start = JSObject
+            [ ("line"  , JSInt $ srcSpanSLine span),
+              ("column", JSInt $ srcSpanSCol  span) ]
+          end = JSObject
+            [ ("line"  , JSInt $ srcSpanELine span),
+              ("column", JSInt $ srcSpanECol  span) ]

@@ -38,7 +38,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Var.Set
 import GHC.Utils.Outputable
 import Language.Haskell.Syntax.BooleanFormula ( BooleanFormula, mkTrue )

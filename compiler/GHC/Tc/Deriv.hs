@@ -55,7 +55,7 @@ import GHC.Types.Name.Set as NameSet
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Unit.Module.Warnings
 import GHC.Builtin.Names

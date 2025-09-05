@@ -22,7 +22,7 @@ import GHC.Cmm.Reg (GlobalArgRegs(..))
 
 import GHC.Parser.Lexer
 import GHC.Cmm.Parser.Monad
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique.FM
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
@@ -329,7 +329,7 @@ setLine code (PsSpan span _) buf len = do
 
 setFile :: Int -> Action
 setFile code (PsSpan span _) buf len = do
-  let file = lexemeToFastString (stepOn buf) (len-2)
+  let file = fastStringToTextUTF8 $ lexemeToFastString (stepOn buf) (len-2)
   liftP $ do
     setSrcLoc (mkRealSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
     popLexState >> pushLexState code

@@ -139,7 +139,7 @@ import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to a
 import GHC.Types.Var    ( TyVarBinder, TyVar,binderVar, binderVars
                         , mkTyVar, mkTyVarBinder, mkTyVarBinders )
 import GHC.Types.Name
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique
 
 import GHC.Builtin.Uniques

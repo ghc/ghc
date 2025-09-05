@@ -84,7 +84,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.SourceFile
 import GHC.Types.TypeEnv
 import GHC.Types.Unique

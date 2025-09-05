@@ -26,11 +26,12 @@ module GHC.Hs.ImpExp
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.ImpExp
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 
 import GHC.Prelude
 
-import GHC.Types.SourceText   ( SourceText(..), pprWithSourceTextThen )
-import GHC.Types.SrcLoc
+import GHC.Types.SourceText   (SourceText, pprWithSourceTextThen )
 import GHC.Types.Name
 import GHC.Types.PkgQual
 
@@ -80,7 +81,7 @@ type instance XCImportDecl  GhcTc = DataConCantHappen
 data XImportDeclPass = XImportDeclPass
     { ideclAnn        :: EpAnn EpAnnImportDecl
     , ideclSourceText :: SourceText -- Note [Pragma source text] in "GHC.Types.SourceText"
-    , ideclGenerated   :: Bool -- ^ See Note [Generated imports]
+    , ideclGenerated  :: Bool -- ^ See Note [Generated imports]
     }
     deriving (Data)
 
@@ -137,7 +138,7 @@ instance HasLoc EpAnnLevel where
 
 simpleImportDecl :: ModuleName -> ImportDecl GhcPs
 simpleImportDecl mn = ImportDecl {
-      ideclExt        = XImportDeclPass noAnn NoSourceText False,
+      ideclExt        = XImportDeclPass noAnn Source.CodeSnippetAbsent False,
       ideclName       = noLocA mn,
       ideclPkgQual    = NoRawPkgQual,
       ideclSource     = NotBoot,

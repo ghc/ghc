@@ -30,11 +30,12 @@ import GHC hiding (EpaComment)
 import qualified GHC
 import GHC.Types.Name
 import GHC.Types.Name.Reader
-import GHC.Types.SrcLoc
 import GHC.Driver.Ppr
-import GHC.Data.FastString
 import GHC.Base (NonEmpty(..))
 import GHC.Parser.Lexer (allocateComments)
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 
 import Data.Data hiding ( Fixity )
 import Data.List (sortBy, partition)
@@ -166,12 +167,12 @@ rs _ = badRealSrcSpan
 range2rs :: (Pos,Pos) -> RealSrcSpan
 range2rs (s,e) = mkRealSrcSpan (mkLoc s) (mkLoc e)
   where
-    mkLoc (l,c) = mkRealSrcLoc (fsLit "ghc-exactprint") l c
+    mkLoc (l,c) = mkRealSrcLoc (encodeUTF8 "ghc-exactprint") l c
 
 badRealSrcSpan :: RealSrcSpan
 badRealSrcSpan = mkRealSrcSpan bad bad
   where
-    bad = mkRealSrcLoc (fsLit "ghc-exactprint-nospan") 0 0
+    bad = mkRealSrcLoc (encodeUTF8 "ghc-exactprint-nospan") 0 0
 
 spanLength :: RealSrcSpan -> Int
 spanLength = (-) <$> srcSpanEndCol <*> srcSpanStartCol

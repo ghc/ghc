@@ -14,7 +14,6 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Types.Basic ( TypeOrConstraint(..), neverInlinePragma )
-import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Iface.Env( newGlobalBinder )
 import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
 import GHC.Tc.Utils.Env
@@ -42,6 +41,8 @@ import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFing
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString ( FastString, mkFastString, fsLit )
+
+import qualified Language.Haskell.Textual.Source as Source
 
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class (lift)
@@ -658,11 +659,11 @@ mkTyConRepTyConRHS :: TypeableStuff -> TyConTodo
                    -> LHsExpr GhcTc
 mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
   =           nlHsDataCon trTyConDataCon
-    `nlHsApp` nlHsLit (HsWord64Prim NoSourceText (toInteger high))
-    `nlHsApp` nlHsLit (HsWord64Prim NoSourceText (toInteger low))
+    `nlHsApp` nlHsLit (HsWord64Prim Source.CodeSnippetAbsent (toInteger high))
+    `nlHsApp` nlHsLit (HsWord64Prim Source.CodeSnippetAbsent (toInteger low))
     `nlHsApp` mod_rep_expr todo
     `nlHsApp` trNameLit (mkFastString tycon_str)
-    `nlHsApp` nlHsLit (HsIntPrim NoSourceText (toInteger n_kind_vars))
+    `nlHsApp` nlHsLit (HsIntPrim Source.CodeSnippetAbsent (toInteger n_kind_vars))
     `nlHsApp` kind_rep
   where
     n_kind_vars = length $ filter isNamedTyConBinder (tyConBinders tycon)

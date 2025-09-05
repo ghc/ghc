@@ -90,7 +90,7 @@ import GHC.Data.Bag
 import GHC.Data.FastString
 
 import qualified Data.Data as Data
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import Data.IORef( IORef )
 import GHC.Types.Unique.Set
 import GHC.Core.Multiplicity

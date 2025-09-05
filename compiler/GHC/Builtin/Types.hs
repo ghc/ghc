@@ -190,7 +190,6 @@ import GHC.Core.Map.Type  ( TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap 
 import qualified GHC.Core.TyCo.Rep as TyCoRep ( Type(TyConApp) )
 
 import GHC.Types.TyThing
-import GHC.Types.SourceText
 import GHC.Types.Var ( VarBndr (Bndr), tyVarName )
 import GHC.Types.RepType
 import GHC.Types.Name.Reader
@@ -216,6 +215,8 @@ import GHC.Data.BooleanFormula ( mkAnd )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+
+import qualified Language.Haskell.Textual.Source as Source
 
 import qualified Data.ByteString.Short as SBS
 import qualified Data.ByteString.Short.Internal as SBS (unsafeIndex)
@@ -725,7 +726,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 (mkDataConWorkId wrk_name data_con)
                 NoDataConRep    -- Wired-in types are too simple to need wrappers
 
-    no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
+    no_bang = HsSrcBang Source.CodeSnippetAbsent NoSrcUnpack NoSrcStrict
 
     wrk_name = mkDataConWorkerName data_con wrk_key
 
@@ -2297,8 +2298,8 @@ charTy = mkTyConTy charTyCon
 
 charTyCon :: TyCon
 charTyCon   = pcTyCon charTyConName
-                   (Just (CType NoSourceText Nothing
-                                  (NoSourceText,fsLit "HsChar")))
+                   (Just (CType Source.CodeSnippetAbsent Nothing
+                                  (Source.CodeSnippetAbsent,fsLit "HsChar")))
                    [] [charDataCon]
 charDataCon :: DataCon
 charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
@@ -2319,7 +2320,7 @@ intTy = mkTyConTy intTyCon
 
 intTyCon :: TyCon
 intTyCon = pcTyCon intTyConName
-               (Just (CType NoSourceText Nothing (NoSourceText,fsLit "HsInt")))
+               (Just (CType Source.CodeSnippetAbsent Nothing (Source.CodeSnippetAbsent,fsLit "HsInt")))
                  [] [intDataCon]
 intDataCon :: DataCon
 intDataCon = pcDataCon intDataConName [] [intPrimTy] intTyCon
@@ -2329,7 +2330,7 @@ wordTy = mkTyConTy wordTyCon
 
 wordTyCon :: TyCon
 wordTyCon = pcTyCon wordTyConName
-            (Just (CType NoSourceText Nothing (NoSourceText, fsLit "HsWord")))
+            (Just (CType Source.CodeSnippetAbsent Nothing (Source.CodeSnippetAbsent, fsLit "HsWord")))
                [] [wordDataCon]
 wordDataCon :: DataCon
 wordDataCon = pcDataCon wordDataConName [] [wordPrimTy] wordTyCon
@@ -2339,8 +2340,8 @@ word8Ty = mkTyConTy word8TyCon
 
 word8TyCon :: TyCon
 word8TyCon = pcTyCon word8TyConName
-                     (Just (CType NoSourceText Nothing
-                            (NoSourceText, fsLit "HsWord8"))) []
+                     (Just (CType Source.CodeSnippetAbsent Nothing
+                            (Source.CodeSnippetAbsent, fsLit "HsWord8"))) []
                      [word8DataCon]
 word8DataCon :: DataCon
 word8DataCon = pcDataCon word8DataConName [] [word8PrimTy] word8TyCon
@@ -2350,8 +2351,8 @@ floatTy = mkTyConTy floatTyCon
 
 floatTyCon :: TyCon
 floatTyCon   = pcTyCon floatTyConName
-                      (Just (CType NoSourceText Nothing
-                             (NoSourceText, fsLit "HsFloat"))) []
+                      (Just (CType Source.CodeSnippetAbsent Nothing
+                             (Source.CodeSnippetAbsent, fsLit "HsFloat"))) []
                       [floatDataCon]
 floatDataCon :: DataCon
 floatDataCon = pcDataCon         floatDataConName [] [floatPrimTy] floatTyCon
@@ -2361,8 +2362,8 @@ doubleTy = mkTyConTy doubleTyCon
 
 doubleTyCon :: TyCon
 doubleTyCon = pcTyCon doubleTyConName
-                      (Just (CType NoSourceText Nothing
-                             (NoSourceText,fsLit "HsDouble"))) []
+                      (Just (CType Source.CodeSnippetAbsent Nothing
+                             (Source.CodeSnippetAbsent,fsLit "HsDouble"))) []
                       [doubleDataCon]
 
 doubleDataCon :: DataCon
@@ -2557,8 +2558,8 @@ boolTy = mkTyConTy boolTyCon
 
 boolTyCon :: TyCon
 boolTyCon = pcTyCon boolTyConName
-                    (Just (CType NoSourceText Nothing
-                           (NoSourceText, fsLit "HsBool")))
+                    (Just (CType Source.CodeSnippetAbsent Nothing
+                           (Source.CodeSnippetAbsent, fsLit "HsBool")))
                     [] [falseDataCon, trueDataCon]
 
 falseDataCon, trueDataCon :: DataCon

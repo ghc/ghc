@@ -10,7 +10,6 @@ import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as BS
 import Data.List (isPrefixOf, isSuffixOf)
 import GHC.Data.Bag (bagToList)
-import GHC.Data.FastString (mkFastString, mkFastStringShortByteString)
 import GHC.Data.StringBuffer (StringBuffer, atEnd)
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer as Lexer
@@ -25,7 +24,6 @@ import GHC.Parser.Lexer as Lexer
   )
 import qualified GHC.Types.Error as E
 import GHC.Types.SourceText
-import GHC.Types.SrcLoc
 import GHC.Utils.Error (pprLocMsgEnvelopeDefault)
 import GHC.Utils.Outputable (SDocContext, text, ($$))
 import qualified GHC.Utils.Outputable as Outputable
@@ -33,6 +31,9 @@ import GHC.Utils.Panic (panic)
 
 import Haddock.Backends.Hyperlinker.Types as T
 import Haddock.GhcUtils
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 -- | Turn source code string into a stream of more descriptive tokens.
 --
@@ -56,7 +57,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
   where
     initState = initParserState parserOpts buf start
     buf = stringBufferFromByteString bs
-    start = mkRealSrcLoc (mkFastString fpath) 1 1
+    start = mkRealSrcLoc (encodeUTF8 fpath) 1 1
     go
       :: Bool
       -- \^ are we currently in a pragma?
@@ -121,7 +122,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
               L _ (ITstring _ file) <- tryP wrappedLexer
               L spF ITclose_prag <- tryP wrappedLexer
 
-              let newLoc = mkRealSrcLoc (mkFastStringShortByteString file) (fromIntegral line - 1) (srcSpanEndCol spF)
+              let newLoc = mkRealSrcLoc file (fromIntegral line - 1) (srcSpanEndCol spF)
               (bEnd'', _) <- lift getInput
               lift $ setInput (bEnd'', newLoc)
 

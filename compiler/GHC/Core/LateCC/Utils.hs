@@ -21,7 +21,7 @@ import GHC.Core.Utils
 import GHC.Data.FastString
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Tickish
 
 -- | Insert cost centres into the 'CoreProgram' using the provided environment,

@@ -52,7 +52,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique.Map
 import GHC.Types.Var hiding (varName)
 import GHC.Unit.Env

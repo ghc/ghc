@@ -34,6 +34,7 @@ import GHC.Prelude
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Expr( LHsExpr )
+import qualified Language.Haskell.Textual.Source as Source
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprLExpr, pprFunBind, pprPatBind )
 import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
@@ -48,7 +49,7 @@ import GHC.Core.Type
 import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Types.SourceText
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Var
 import GHC.Types.Name
 
@@ -741,7 +742,7 @@ data ActivationAnn
     } deriving (Data, Eq)
 
 instance NoAnn ActivationAnn where
-  noAnn = ActivationAnn noAnn NoSourceText noAnn noAnn noAnn
+  noAnn = ActivationAnn noAnn Source.CodeSnippetAbsent noAnn noAnn noAnn
 
 
 -- | Optional namespace specifier for fixity signatures,

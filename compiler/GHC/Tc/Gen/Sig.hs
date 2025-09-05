@@ -70,7 +70,7 @@ import GHC.Types.Id  ( idName, idType, setInlinePragma
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Builtin.Names( mkUnboundName )
 import GHC.Unit.Module( Module, getModule )

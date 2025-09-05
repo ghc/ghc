@@ -34,9 +34,7 @@ import GHC.Hs
 import GHC.Builtin.Names
 
 import GHC.Types.Error
-import GHC.Types.SrcLoc
 import GHC.Types.SourceError
-import GHC.Types.SourceText
 import GHC.Types.PkgQual
 import GHC.Types.Basic (ImportLevel(..), convImportLevel)
 
@@ -49,7 +47,10 @@ import GHC.Utils.Exception as Exception
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
 import GHC.Data.FastString
-import qualified GHC.Data.Strict as Strict
+
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Control.Monad
 import System.IO
@@ -80,7 +81,7 @@ getImports :: ParserOpts   -- ^ Parser options
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
 getImports popts implicit_prelude buf filename source_filename = do
-  let loc  = mkRealSrcLoc (mkFastString filename) 1 1
+  let loc  = mkRealSrcLoc (encodeUTF8 filename) 1 1
   case unP parseHeader (initParserState popts buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
@@ -95,7 +96,7 @@ getImports popts implicit_prelude buf filename source_filename = do
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
                 imps = hsmodImports hsmod
-                main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename)
+                main_loc = srcLocSpan (mkSrcLoc (encodeUTF8 source_filename)
                                        1 1)
                 mod = mb_mod `orElse` L (noAnnSrcSpan main_loc) mAIN_NAME
                 (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
@@ -145,7 +146,7 @@ mkPrelImports this_mod implicit_prelude import_decls
       preludeImportDecl
         = L loc $ ImportDecl { ideclExt       = XImportDeclPass
                                                     { ideclAnn = noAnn
-                                                    , ideclSourceText = NoSourceText
+                                                    , ideclSourceText = Source.CodeSnippetAbsent
                                                     , ideclGenerated  = True   -- Generated!
                                                     },
                                 ideclName      = L loc pRELUDE_NAME,
@@ -198,7 +199,7 @@ lazyGetToks popts filename handle = do
   let prag_state = initPragState popts buf loc
   unsafeInterleaveIO $ lazyLexBuf handle prag_state False blockSize
  where
-  loc  = mkRealSrcLoc (mkFastString filename) 1 1
+  loc  = mkRealSrcLoc (encodeUTF8 filename) 1 1
 
   lazyLexBuf :: Handle -> PState -> Bool -> Int -> IO [Located Token]
   lazyLexBuf handle state eof size =
@@ -235,7 +236,7 @@ getToks :: ParserOpts -> FilePath -> StringBuffer -> [Located Token]
 getToks popts filename buf = lexAll pstate
  where
   pstate = initPragState popts buf loc
-  loc  = mkRealSrcLoc (mkFastString filename) 1 1
+  loc  = mkRealSrcLoc (encodeUTF8 filename) 1 1
 
   lexAll state = case unP (lexer False return) state of
                    POk _      t@(L _ ITeof) -> [t]
@@ -364,7 +365,7 @@ toArgs starting_loc orig_str
   advance_src_loc_many = foldl' advanceSrcLoc
 
   locate :: RealSrcLoc -> RealSrcLoc -> a -> Located a
-  locate begin end x = L (RealSrcSpan (mkRealSrcSpan begin end) Strict.Nothing) x
+  locate begin end x = L (RealSrcSpan (mkRealSrcSpan begin end) Nothing) x
 
   toArgs' :: RealSrcLoc -> String -> Either String [Located String]
   -- Remove outer quotes:

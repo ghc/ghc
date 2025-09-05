@@ -22,7 +22,7 @@ import GHC.Runtime.Interpreter
 
 import GHC.Linker.Types
 
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 

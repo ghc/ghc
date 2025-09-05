@@ -88,7 +88,7 @@ import GHC.Core.TyCon
 import GHC.Builtin.Names( rOOT_MAIN )
 import GHC.Types.Basic  ( TopLevelFlag(..), TupleSort(..), tupleSortBoxity )
 import GHC.Types.TyThing ( tyThingGREInfo )
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet

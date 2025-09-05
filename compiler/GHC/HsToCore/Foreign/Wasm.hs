@@ -39,13 +39,13 @@ import GHC.Types.ForeignCall
 import GHC.Types.ForeignStubs
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.SourceText
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Var
 import GHC.Unit
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import Language.Haskell.Syntax.Basic
+import qualified Language.Haskell.Textual.Source as Source
 
 data Synchronicity = Sync | Async
   deriving (Eq)
@@ -441,7 +441,7 @@ importBindingRHS mUnitId cfun_name tvs arg_tys orig_res_ty res_trans = do
   let cfun_fcall =
         CCall
           ( CCallSpec
-              (StaticTarget NoSourceText cfun_name mUnitId True)
+              (StaticTarget Source.CodeSnippetAbsent cfun_name mUnitId True)
               CCallConv
               -- Same even for foreign import javascript unsafe, for
               -- the sake of re-entrancy.

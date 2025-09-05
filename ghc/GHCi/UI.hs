@@ -85,7 +85,6 @@ import GHC.Iface.Syntax ( showToHeader )
 import GHC.Builtin.Names
 import GHC.Builtin.Types( stringTyCon_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName, greName, globalRdrEnvElts)
-import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Parser.Header ( toArgs )
 import qualified GHC.Parser.Header as Header
@@ -112,9 +111,11 @@ import GHC.Types.Name.Set
 import GHC.Utils.Panic hiding ( showException, try )
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
-import qualified GHC.Data.Strict as Strict
 import GHC.Types.Error
 import qualified GHC.Unit.Home.Graph as HUG
+
+import Language.Haskell.Textual.Location as SrcLoc
+import Language.Haskell.Textual.UTF8 (decodeUTF8, encodeUTF8)
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -842,7 +843,7 @@ ghciLogAction lastErrLocations old_log_action
     case msg_class of
         MCDiagnostic SevError _reason _code -> case srcSpan of
             RealSrcSpan rsp _ -> modifyIORef lastErrLocations
-                (++ [(srcLocFile (realSrcSpanStart rsp), srcLocLine (realSrcSpanStart rsp))])
+                (++ [(mkFastStringTextUTF8 (srcLocFile (realSrcSpanStart rsp)), srcLocLine (realSrcSpanStart rsp))])
             _ -> return ()
         _ -> return ()
 
@@ -1420,7 +1421,7 @@ checkInputForLayout stmt getStmt = do
    let dflags = xopt_set dflags' LangExt.AlternativeLayoutRule
    st0 <- getGHCiState
    let buf'   =  stringToStringBuffer stmt
-       loc    = mkRealSrcLoc (fsLit (progname st0)) (line_number st0) 1
+       loc    = mkRealSrcLoc (encodeUTF8 (progname st0)) (line_number st0) 1
        pstate = Lexer.initParserState (initParserOpts dflags) buf' loc
    case Lexer.unP goToEnd pstate of
      (Lexer.POk _ False) -> return $ Just stmt
@@ -1868,7 +1869,7 @@ toCmdArgs s = case getCmd s of
 toArgsNoLoc :: String -> Either String [String]
 toArgsNoLoc str = map unLoc <$> toArgs fake_loc str
   where
-    fake_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
+    fake_loc = mkRealSrcLoc (encodeUTF8 "<interactive>") 1 1
     -- this should never be seen, because it's discarded with the `map unLoc`
 
 toArgsNoLocWithErrorHandler :: GhciMonad m => String -> ([String] -> m ()) -> m ()
@@ -2658,11 +2659,11 @@ parseSpanArg s = do
         [] -> Right ""
         _  -> skipWs1 s4
 
-    let fs    = mkFastString fp
-        span' = mkRealSrcSpan (mkRealSrcLoc fs sl sc)
+    let utf8  = encodeUTF8 fp
+        span' = mkRealSrcSpan (mkRealSrcLoc utf8 sl sc)
                               -- End column of RealSrcSpan is the column
                               -- after the end of the span.
-                              (mkRealSrcLoc fs el (ec + 1))
+                              (mkRealSrcLoc utf8 el (ec + 1))
 
     return (span',trailer)
   where
@@ -2696,7 +2697,7 @@ parseSpanArg s = do
 -- @<filename>:(<line>,<col>)-(<line-end>,<col-end>)@
 -- while simply unpacking 'UnhelpfulSpan's
 showSrcSpan :: SrcSpan -> String
-showSrcSpan (UnhelpfulSpan s)  = unpackFS (unhelpfulSpanFS s)
+showSrcSpan (UnhelpfulSpan s)   = decodeUTF8 (unhelpfulSpanText s)
 showSrcSpan (RealSrcSpan spn _) = showRealSrcSpan spn
 
 -- | Variant of 'showSrcSpan' for 'RealSrcSpan's
@@ -2705,7 +2706,7 @@ showRealSrcSpan spn = concat [ fp, ":(", show sl, ",", show sc
                              , ")-(", show el, ",", show ec, ")"
                              ]
   where
-    fp = unpackFS (srcSpanFile spn)
+    fp = decodeUTF8 (srcSpanFile spn)
     sl = srcSpanStartLine spn
     sc = srcSpanStartCol  spn
     el = srcSpanEndLine   spn
@@ -4228,7 +4229,7 @@ stepOutCmd _ = withSandboxOnly ":stepout" $ do
     Just loc -> do
       md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
       current_toplevel_decl <- flip enclosingTickSpan loc <$> getTickArray md
-      doContinue (GHC.StepOut (Just (RealSrcSpan current_toplevel_decl Strict.Nothing)))
+      doContinue (GHC.StepOut (Just (RealSrcSpan current_toplevel_decl Nothing)))
 
 stepLocalCmd :: GhciMonad m => String -> m ()
 stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
@@ -4246,7 +4247,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
         Just loc -> do
            md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
            current_toplevel_decl <- flip enclosingTickSpan loc <$> getTickArray md
-           doContinue (GHC.LocalStep (RealSrcSpan current_toplevel_decl Strict.Nothing))
+           doContinue (GHC.LocalStep (RealSrcSpan current_toplevel_decl Nothing))
 
 stepModuleCmd :: GhciMonad m => String -> m ()
 stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
@@ -4521,7 +4522,7 @@ findBreakAndSet md lookupTickTree = do
       setBreakFlag bi True
       (alreadySet, nm) <-
             recordBreak $ BreakLocation
-                    { breakLoc = RealSrcSpan pan Strict.Nothing
+                    { breakLoc = RealSrcSpan pan Nothing
                     , breakId = bi
                     , onBreakCmd = ""
                     , breakEnabled = True
@@ -4637,7 +4638,7 @@ listModuleLine modl line = do
    case this of
      Just (GHC.ModuleNodeCompile summ) -> do
            let filename = expectJust (ml_hs_file (GHC.ms_location summ))
-               loc = mkRealSrcLoc (mkFastString (filename)) line 0
+               loc = mkRealSrcLoc (encodeUTF8 filename) line 0
            listAround (realSrcLocSpan loc) False
 
      _ -> panic "listModuleLine"
@@ -4653,7 +4654,7 @@ listModuleLine modl line = do
 -- console encoding, of course.
 listAround :: MonadIO m => RealSrcSpan -> Bool -> m ()
 listAround pan do_highlight = do
-      contents <- liftIO $ BS.readFile (unpackFS file)
+      contents <- liftIO $ BS.readFile (decodeUTF8 file)
       -- Drop carriage returns to avoid duplicates, see #9367.
       let ls  = BS.split '\n' $ BS.filter (/= '\r') contents
           ls' = take (line2 - line1 + 1 + pad_before + pad_after) $

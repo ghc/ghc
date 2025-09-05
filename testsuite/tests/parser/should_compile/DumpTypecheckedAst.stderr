@@ -86,7 +86,7 @@
                   []))
                 (HsLit
                  (NoExtField)
-                 {HsWord{64}Prim (1374752024144278257) (NoSourceText)}))))
+                 {HsWord{64}Prim (1374752024144278257) (Source.CodeSnippetAbsent)}))))
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -96,7 +96,7 @@
                 []))
               (HsLit
                (NoExtField)
-               {HsWord{64}Prim (13654949607623281177) (NoSourceText)}))))
+               {HsWord{64}Prim (13654949607623281177) (Source.CodeSnippetAbsent)}))))
            (L
             (EpAnn
              (EpaSpan { <no location info> })
@@ -154,7 +154,7 @@
               (HsLit
                (NoExtField)
                (HsStringPrim
-                (NoSourceText)
+                (Source.CodeSnippetAbsent)
                 "T")))))))))
        (L
         (EpAnn
@@ -165,7 +165,7 @@
           []))
         (HsLit
          (NoExtField)
-         {HsInt{64}Prim (1) (NoSourceText)}))))
+         {HsInt{64}Prim (1) (Source.CodeSnippetAbsent)}))))
      (L
       (EpAnn
        (EpaSpan { <no location info> })
@@ -268,7 +268,7 @@
                   []))
                 (HsLit
                  (NoExtField)
-                 {HsWord{64}Prim (10715337633704422415) (NoSourceText)}))))
+                 {HsWord{64}Prim (10715337633704422415) (Source.CodeSnippetAbsent)}))))
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -278,7 +278,7 @@
                 []))
               (HsLit
                (NoExtField)
-               {HsWord{64}Prim (12411373583424111944) (NoSourceText)}))))
+               {HsWord{64}Prim (12411373583424111944) (Source.CodeSnippetAbsent)}))))
            (L
             (EpAnn
              (EpaSpan { <no location info> })
@@ -336,7 +336,7 @@
               (HsLit
                (NoExtField)
                (HsStringPrim
-                (NoSourceText)
+                (Source.CodeSnippetAbsent)
                 "'MkT")))))))))
        (L
         (EpAnn
@@ -347,7 +347,7 @@
           []))
         (HsLit
          (NoExtField)
-         {HsInt{64}Prim (3) (NoSourceText)}))))
+         {HsInt{64}Prim (3) (Source.CodeSnippetAbsent)}))))
      (L
       (EpAnn
        (EpaSpan { <no location info> })
@@ -450,7 +450,7 @@
                   []))
                 (HsLit
                  (NoExtField)
-                 {HsWord{64}Prim (14073232900889011755) (NoSourceText)}))))
+                 {HsWord{64}Prim (14073232900889011755) (Source.CodeSnippetAbsent)}))))
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -460,7 +460,7 @@
                 []))
               (HsLit
                (NoExtField)
-               {HsWord{64}Prim (2739668351064589274) (NoSourceText)}))))
+               {HsWord{64}Prim (2739668351064589274) (Source.CodeSnippetAbsent)}))))
            (L
             (EpAnn
              (EpaSpan { <no location info> })
@@ -518,7 +518,7 @@
               (HsLit
                (NoExtField)
                (HsStringPrim
-                (NoSourceText)
+                (Source.CodeSnippetAbsent)
                 "Peano")))))))))
        (L
         (EpAnn
@@ -529,7 +529,7 @@
           []))
         (HsLit
          (NoExtField)
-         {HsInt{64}Prim (0) (NoSourceText)}))))
+         {HsInt{64}Prim (0) (Source.CodeSnippetAbsent)}))))
      (L
       (EpAnn
        (EpaSpan { <no location info> })
@@ -632,7 +632,7 @@
                   []))
                 (HsLit
                  (NoExtField)
-                 {HsWord{64}Prim (13760111476013868540) (NoSourceText)}))))
+                 {HsWord{64}Prim (13760111476013868540) (Source.CodeSnippetAbsent)}))))
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -642,7 +642,7 @@
                 []))
               (HsLit
                (NoExtField)
-               {HsWord{64}Prim (12314848029315386153) (NoSourceText)}))))
+               {HsWord{64}Prim (12314848029315386153) (Source.CodeSnippetAbsent)}))))
            (L
             (EpAnn
              (EpaSpan { <no location info> })
@@ -700,7 +700,7 @@
               (HsLit
                (NoExtField)
                (HsStringPrim
-                (NoSourceText)
+                (Source.CodeSnippetAbsent)
                 "'Zero")))))))))
        (L
         (EpAnn
@@ -711,7 +711,7 @@
           []))
         (HsLit
          (NoExtField)
-         {HsInt{64}Prim (0) (NoSourceText)}))))
+         {HsInt{64}Prim (0) (Source.CodeSnippetAbsent)}))))
      (L
       (EpAnn
        (EpaSpan { <no location info> })
@@ -814,7 +814,7 @@
                   []))
                 (HsLit
                  (NoExtField)
-                 {HsWord{64}Prim (1143980031331647856) (NoSourceText)}))))
+                 {HsWord{64}Prim (1143980031331647856) (Source.CodeSnippetAbsent)}))))
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -824,7 +824,7 @@
                 []))
               (HsLit
                (NoExtField)
-               {HsWord{64}Prim (14802086722010293686) (NoSourceText)}))))
+               {HsWord{64}Prim (14802086722010293686) (Source.CodeSnippetAbsent)}))))
            (L
             (EpAnn
              (EpaSpan { <no location info> })
@@ -882,7 +882,7 @@
               (HsLit
                (NoExtField)
                (HsStringPrim
-                (NoSourceText)
+                (Source.CodeSnippetAbsent)
                 "'Succ")))))))))
        (L
         (EpAnn
@@ -893,7 +893,7 @@
           []))
         (HsLit
          (NoExtField)
-         {HsInt{64}Prim (0) (NoSourceText)}))))
+         {HsInt{64}Prim (0) (Source.CodeSnippetAbsent)}))))
      (L
       (EpAnn
        (EpaSpan { <no location info> })
@@ -1835,7 +1835,7 @@
             (HsLit
              (NoExtField)
              (HsStringPrim
-              (NoSourceText)
+              (Source.CodeSnippetAbsent)
               "main")))))))))
      (L
       (EpAnn
@@ -1877,7 +1877,7 @@
           (HsLit
            (NoExtField)
            (HsStringPrim
-            (NoSourceText)
+            (Source.CodeSnippetAbsent)
             "DumpTypecheckedAst")))))))))))
 ,(L
   (EpAnn

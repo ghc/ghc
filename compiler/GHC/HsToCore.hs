@@ -81,7 +81,7 @@ import GHC.Types.ForeignStubs
 import GHC.Types.Avail
 import GHC.Types.Basic
 import GHC.Types.Var.Set
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.SourceFile
 import GHC.Types.TypeEnv
 import GHC.Types.Name

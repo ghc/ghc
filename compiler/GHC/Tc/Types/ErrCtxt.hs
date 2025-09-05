@@ -23,7 +23,7 @@ import GHC.Tc.Zonk.Monad     ( ZonkM )
 
 import GHC.Types.Basic       ( TyConFlavour )
 import GHC.Types.Name        ( Name )
-import GHC.Types.SrcLoc      ( SrcSpan )
+import Language.Haskell.Textual.Location      ( SrcSpan )
 import GHC.Types.Var         ( Id, TyCoVar )
 import GHC.Types.Var.Env     ( TidyEnv )
 

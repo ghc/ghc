@@ -26,7 +26,7 @@ import GHC.Iface.Ext.Types
 import GHC.Iface.Binary           ( putAllTables )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Unique.FM
 import qualified GHC.Utils.Binary as Binary
 import GHC.Utils.Panic

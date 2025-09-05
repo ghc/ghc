@@ -21,7 +21,7 @@ import GHC.Prelude
 
 import GHC.Driver.Flags ( DumpFlag(Opt_D_dump_tc_trace) )
 
-import GHC.Types.SrcLoc ( SrcSpan )
+import Language.Haskell.Textual.Location ( SrcSpan )
 
 import GHC.Tc.Types.BasicTypes ( TcBinderStack )
 import GHC.Tc.Utils.TcType   ( TcLevel )

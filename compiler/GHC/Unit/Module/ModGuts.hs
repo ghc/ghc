@@ -35,7 +35,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name.Set (NameSet)
 import GHC.Types.SafeHaskell
 import GHC.Types.SourceFile ( HscSource(..), hscSourceToIsBoot )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.CostCentre
 
 import Data.Set (Set)

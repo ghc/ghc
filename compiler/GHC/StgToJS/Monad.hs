@@ -34,7 +34,6 @@ import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Stg.Syntax
 
-import GHC.Types.SrcLoc
 import GHC.Types.Id
 import GHC.Types.Unique.FM
 import GHC.Types.ForeignCall
@@ -42,6 +41,9 @@ import GHC.Types.ForeignCall
 import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Data.FastString
 import GHC.Data.FastMutInt
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (decodeUTF8)
 
 import qualified Data.Map  as M
 import qualified Data.Set  as S
@@ -111,7 +113,7 @@ emitForeign mbSpan pat safety cconv arg_tys res_ty = modifyGroup mod_group
     spanTxt = case mbSpan of
                 -- TODO: Is there a better way to concatenate FastStrings?
                 Just sp -> mkFastString $
-                  unpackFS (srcSpanFile sp) ++
+                  decodeUTF8 (srcSpanFile sp) ++
                   " " ++
                   show (srcSpanStartLine sp, srcSpanStartCol sp) ++
                   "-" ++

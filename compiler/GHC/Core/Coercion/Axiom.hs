@@ -54,7 +54,7 @@ import GHC.Utils.Panic
 import GHC.Data.Pair
 import GHC.Types.Basic
 import Data.Typeable ( Typeable )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import qualified Data.Data as Data
 import Data.Array
 import Data.List ( mapAccumL )

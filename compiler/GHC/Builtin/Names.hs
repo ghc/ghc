@@ -131,7 +131,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Unique
 import GHC.Builtin.Uniques
 import GHC.Types.Name
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Data.FastString
 import GHC.Data.List.Infinite (Infinite (..))
 import qualified GHC.Data.List.Infinite as Inf

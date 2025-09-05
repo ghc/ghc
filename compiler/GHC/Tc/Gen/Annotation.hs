@@ -25,7 +25,7 @@ import GHC.Hs
 
 import GHC.Types.Name
 import GHC.Types.Annotations
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import Control.Monad ( when )
 

@@ -196,7 +196,6 @@ import GHC.Types.Unique.Set( elementOfUniqSet )
 import GHC.Types.Id
 import GHC.Types.Basic (allImportLevels)
 import GHC.Types.ThLevelIndex (thLevelIndexFromImportLevel)
-import GHC.Types.SrcLoc
 
 import GHC.Unit.Module
 import qualified GHC.Rename.Env as TcM
@@ -229,6 +228,8 @@ import GHC.Data.Graph.Directed
 
 import qualified Data.Set as Set
 import GHC.Unit.Module.Graph
+
+import Language.Haskell.Textual.Location
 
 {- *********************************************************************
 *                                                                      *

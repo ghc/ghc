@@ -46,7 +46,7 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon       ( TyCon(tyConName) )
 
 
-import GHC.Types.SrcLoc        ( noSrcSpan )
+import Language.Haskell.Textual.Location        ( noSrcSpan )
 import GHC.Types.Name    ( Name, nameModule, nameModule_maybe )
 import GHC.Types.Id      ( idType )
 import GHC.Types.PkgQual

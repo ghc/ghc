@@ -31,20 +31,20 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
 
-import GHC.Types.SrcLoc( SrcSpan, noSrcSpan )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id.Make
-import GHC.Types.SourceText
 import GHC.Types.Unique.Supply
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Language.Haskell.Textual.Location( SrcSpan, noSrcSpan )
+import qualified Language.Haskell.Textual.Source as Source
 
 mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
 -- ^ Monadic because it makes a Name for the coercion TyCon
@@ -374,7 +374,7 @@ buildClass tycon_name binders roles fds sc_theta at_items sig_stuff mindef unary
         ; traceIf (text "buildClass" <+> ppr tycon)
         ; return result }
   where
-    no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
+    no_bang = HsSrcBang Source.CodeSnippetAbsent NoSrcUnpack NoSrcStrict
 
     mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
     mk_op_item rec_clas (op_name, _, dm_spec)

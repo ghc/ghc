@@ -936,7 +936,6 @@ Library
         GHC.Types.SourceFile
         GHC.Types.SourceText
         GHC.Types.SptEntry
-        GHC.Types.SrcLoc
         GHC.Types.Target
         GHC.Types.Tickish
         GHC.Types.TypeEnv
@@ -1036,6 +1035,9 @@ Library
         Language.Haskell.Syntax.Pat
         Language.Haskell.Syntax.Specificity
         Language.Haskell.Syntax.Type
+        Language.Haskell.Textual.Location
+        Language.Haskell.Textual.Source
+        Language.Haskell.Textual.UTF8
 
     autogen-modules: GHC.Platform.Constants
                      GHC.Settings.Config

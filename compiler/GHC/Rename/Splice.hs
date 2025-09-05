@@ -34,11 +34,11 @@ import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
 import GHC.Types.Error
 import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, maxPrec )
-import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Types.ThLevelIndex
 import GHC.Utils.Outputable
 import GHC.Unit.Module
-import GHC.Types.SrcLoc
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 import GHC.Rename.HsType ( rnLHsType )
 
 import Control.Monad    ( unless, when )
@@ -407,7 +407,7 @@ mkQuasiQuoteExpr flavour quoter (L q_span' quote)
   where
     q_span = noAnnSrcSpan (locA q_span')
     quoterExpr = L (l2l quoter) $! mkHsVar          $! quoter
-    quoteExpr  = L q_span $! HsLit noExtField $! HsString NoSourceText quote
+    quoteExpr  = L q_span $! HsLit noExtField $! HsString Source.CodeSnippetAbsent quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName
                        UntypedPatSplice  -> quotePatName

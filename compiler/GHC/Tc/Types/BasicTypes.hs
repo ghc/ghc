@@ -30,7 +30,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Types.Id
 import GHC.Types.Basic
 import GHC.Types.Var
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Name
 import GHC.Types.TyThing
 import GHC.Types.Name.Env

@@ -25,7 +25,7 @@ import GHC.Data.Maybe
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
 import GHC.HsToCore.Monad

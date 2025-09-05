@@ -9,7 +9,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Monad
 import GHC.Types.Name.Set
 import GHC.Types.Var
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 
 import Data.Data
 

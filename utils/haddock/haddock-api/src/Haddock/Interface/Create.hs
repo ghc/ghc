@@ -57,7 +57,7 @@ import GHC.Types.Avail
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SafeHaskell
-import qualified GHC.Types.SrcLoc as SrcLoc
+import qualified Language.Haskell.Textual.Location as SrcLoc
 import qualified GHC.Types.Unique.Map as UniqMap
 import GHC.Unit.Module.Deps (dep_orphs)
 import GHC.Unit.Module.ModIface

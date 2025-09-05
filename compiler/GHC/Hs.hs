@@ -59,7 +59,7 @@ import GHC.Hs.Instances () -- For Data instances
 -- others:
 import GHC.Utils.Outputable
 import GHC.Types.Fixity         ( Fixity )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Unit.Module.Warnings
 
 -- libraries:

@@ -26,7 +26,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Types.ForeignStubs
 import GHC.Types.HpcInfo
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import Control.Monad
 import Data.Time

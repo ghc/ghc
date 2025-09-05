@@ -68,7 +68,7 @@ import GHC.Core.Type
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Basic
 import GHC.Types.Error
 

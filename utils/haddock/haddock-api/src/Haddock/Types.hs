@@ -60,7 +60,7 @@ import GHC.Types.Fixity (Fixity (..))
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName (..))
-import GHC.Types.SrcLoc (srcSpanToRealSrcSpan)
+import Language.Haskell.Textual.Location (srcSpanToRealSrcSpan)
 import GHC.Types.Var (Specificity)
 import GHC.Utils.Outputable
 

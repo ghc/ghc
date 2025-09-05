@@ -39,7 +39,7 @@ import GHC.Core.UsageEnv ( UsageEnv )
 
 import GHC.Types.Name.Reader ( LocalRdrEnv )
 import GHC.Types.Name.Env ( NameEnv )
-import GHC.Types.SrcLoc ( RealSrcSpan )
+import Language.Haskell.Textual.Location ( RealSrcSpan )
 import GHC.Types.Basic ( TopLevelFlag )
 
 import GHC.Types.Error ( Messages )

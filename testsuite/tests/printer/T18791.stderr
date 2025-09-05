@@ -125,7 +125,7 @@
                 (EpaDelta { <no location info> } (SameLine 0) [])
                 (NoEpTok)
                 (EpaDelta { <no location info> } (SameLine 0) []))
-               (NoSourceText))
+               (Source.CodeSnippetAbsent))
               (NoSrcUnpack)
               (NoSrcStrict)
               (HsUnannotated

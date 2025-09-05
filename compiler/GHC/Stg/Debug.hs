@@ -9,25 +9,27 @@ module GHC.Stg.Debug
 
 import GHC.Prelude
 
-import GHC.Stg.Syntax
-
-import GHC.Types.Unique.DFM
-import GHC.Types.Id
-import GHC.Types.Tickish
 import GHC.Core.DataCon
-import GHC.Types.IPE
-import GHC.Unit.Module
-import GHC.Types.Name   ( getName, getOccName, occNameFS, nameSrcSpan)
 import GHC.Data.FastString
+import GHC.Stg.Syntax
+import GHC.Types.IPE
+import GHC.Types.Id
+import GHC.Types.Name   ( getName, getOccName, occNameFS, nameSrcSpan)
+import GHC.Types.Tickish
+import GHC.Types.Unique.DFM
+import GHC.Unit.Module
+import GHC.Utils.Monad.State.Strict
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (decodeUTF8)
 
 import Control.Monad (when)
 import Control.Monad.Trans.Reader
-import GHC.Utils.Monad.State.Strict
 import Control.Monad.Trans.Class
-import GHC.Types.SrcLoc
 import Control.Applicative
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
+
 
 data SpanWithLabel = SpanWithLabel RealSrcSpan LexicalFastString
 
@@ -45,8 +47,8 @@ withSpan (new_s, new_l) act = local maybe_replace act
   where
     maybe_replace r@R{ rModLocation = cur_mod, rSpan = Just (SpanWithLabel old_s _old_l) }
       -- prefer spans from the current module
-      | Just (unpackFS $ srcSpanFile old_s) == ml_hs_file cur_mod
-      , Just (unpackFS $ srcSpanFile new_s) /= ml_hs_file cur_mod
+      | Just (decodeUTF8 $ srcSpanFile old_s) == ml_hs_file cur_mod
+      , Just (decodeUTF8 $ srcSpanFile new_s) /= ml_hs_file cur_mod
       = r
     maybe_replace r
       = r { rSpan = Just (SpanWithLabel new_s new_l) }
@@ -141,7 +143,7 @@ collectAlt alt = do e' <- collectExpr $ alt_rhs alt
 -- than looking at the parent context like 'withSpan'
 quickSourcePos :: FastString -> StgExpr -> Maybe SpanWithLabel
 quickSourcePos cur_mod (StgTick (SourceNote ss m) e)
-  | srcSpanFile ss == cur_mod = Just (SpanWithLabel ss m)
+  | srcSpanFile ss == fastStringToTextUTF8 cur_mod = Just (SpanWithLabel ss m)
   | otherwise = quickSourcePos cur_mod e
 quickSourcePos _ _ = Nothing
 

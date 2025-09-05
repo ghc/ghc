@@ -39,20 +39,15 @@ module GHC.Utils.Encoding.UTF8
     , utf8EncodedLength
     ) where
 
-
 import Prelude
 
 import Foreign
 import GHC.IO
 import GHC.Encoding.UTF8
-import GHC.Exts
 
-import Control.Monad.ST
-import Data.Array.Byte (ByteArray(..))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import Data.ByteString.Short.Internal (ShortByteString(..))
-import qualified Data.ByteString.Short.Internal as SBS
 
 -- | Find the start of the codepoint preceding the codepoint at the given
 -- 'Ptr'. This is undefined if there is no previous valid codepoint.

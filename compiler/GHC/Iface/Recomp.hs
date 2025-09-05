@@ -59,7 +59,7 @@ import GHC.Types.Basic ( ImportLevel(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique.Set
 import GHC.Types.Fixity.Env
 import GHC.Types.Unique.Map

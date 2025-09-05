@@ -31,7 +31,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Unit.Module.ModSummary
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Driver.Main
 import GHC.Driver.Downsweep
 import GHC.Tc.Types

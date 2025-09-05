@@ -70,7 +70,7 @@ import GHC.Core.Utils     (exprType)
 import GHC.Core.Make      (mkListExpr, mkCharExpr, mkImpossibleExpr)
 
 import GHC.Data.FastString
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Data.Maybe
 import GHC.Core.ConLike
 import GHC.Core.DataCon

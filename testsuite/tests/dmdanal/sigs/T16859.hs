@@ -1,7 +1,7 @@
 module T16859 where
 
 import GHC.Types.Name (OccName)
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique
 
 data NameSort = Internal | External

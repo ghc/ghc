@@ -6,7 +6,7 @@
 import Data.List (sortBy, intercalate, isPrefixOf)
 import Data.Data
 import Control.Monad.IO.Class
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC hiding (moduleName)
 import GHC.Hs.Dump
 import GHC.Driver.Env

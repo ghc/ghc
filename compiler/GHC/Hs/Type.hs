@@ -124,7 +124,7 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
 import GHC.Hs.Doc
 import GHC.Types.Basic
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Utils.Misc (count)
 

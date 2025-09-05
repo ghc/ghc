@@ -88,7 +88,7 @@ import GHC.Builtin.Names ( makeStaticName, unsafeEqualityProofIdKey, unsafeReflD
 import GHC.Builtin.PrimOps
 
 import GHC.Types.Var
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name

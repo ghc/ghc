@@ -40,7 +40,7 @@ import GHC.Builtin.Types
 import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
 import GHC.Types.Basic( Arity )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc

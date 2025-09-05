@@ -20,7 +20,7 @@ import GHC.Prelude
 
 import GHC.Hs
 
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.SourceFile
 
 import GHC.Unit.Types

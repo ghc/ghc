@@ -103,7 +103,6 @@ import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Core.DataCon as DataCon
 
-import GHC.Types.SrcLoc
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -146,6 +145,9 @@ import qualified GHC.LanguageExtensions as LangExt
 import qualified GHC.Boot.TH.Syntax as TH
 import qualified GHC.Boot.TH.Monad  as TH
 import qualified GHC.Boot.TH.Ppr    as TH
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (decodeUTF8)
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import Unsafe.Coerce    ( unsafeCoerce )
@@ -1490,7 +1492,7 @@ instance TH.Quasi TcM where
                         UnhelpfulSpan _ -> pprPanic "qLocation: Unhelpful location"
                                                     (ppr l)
                         RealSrcSpan s _ -> return s
-                 ; return (TH.Loc { TH.loc_filename = unpackFS (srcSpanFile r)
+                 ; return (TH.Loc { TH.loc_filename = decodeUTF8 (srcSpanFile r)
                                   , TH.loc_module   = moduleNameString (moduleName m)
                                   , TH.loc_package  = unitString (moduleUnit m)
                                   , TH.loc_start = (srcSpanStartLine r, srcSpanStartCol r)

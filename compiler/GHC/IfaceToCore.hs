@@ -102,10 +102,8 @@ import GHC.Data.List.SetOps
 
 import GHC.Types.Annotations
 import GHC.Types.SourceFile
-import GHC.Types.SourceText
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
 import GHC.Types.CompleteMatch
-import GHC.Types.SrcLoc
 import GHC.Types.Avail
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.FM
@@ -132,6 +130,9 @@ import GHC.Parser.Annotation (noLocA)
 import GHC.Hs.Extension ( GhcRn )
 
 import GHC.Fingerprint
+
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 
 import Control.Monad
 import GHC.Driver.Env.KnotVars
@@ -1123,8 +1124,9 @@ tc_ax_branch prev_branches
     ; tc_rhs   <- tcIfaceType rhs
     ; eta_tvs  <- bindIfaceTyVars eta_tv_bndrs return
     ; this_mod <- getIfModule
-    ; let loc = mkGeneralSrcSpan (fsLit "module " `appendFS`
-                                  moduleNameFS (moduleName this_mod))
+    ; let loc = mkGeneralSrcSpan . fastStringToTextUTF8 $
+            fsLit "module " `appendFS`
+            moduleNameFS (moduleName this_mod)
           br = CoAxBranch { cab_loc     = loc
                           , cab_tvs     = binderVars tvs
                           , cab_eta_tvs = eta_tvs
@@ -1237,7 +1239,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                                       ; return (HsUnpack (Just co)) }
 
     src_strict :: IfaceSrcBang -> HsSrcBang
-    src_strict (IfSrcBang unpk bang) = HsSrcBang NoSourceText unpk bang
+    src_strict (IfSrcBang unpk bang) = HsSrcBang Source.CodeSnippetAbsent unpk bang
 
 tcIfaceEqSpec :: IfaceEqSpec -> IfL [EqSpec]
 tcIfaceEqSpec spec

@@ -123,7 +123,6 @@ import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Utils.Misc ( readSignificandExponentPair, readHexSignificandExponentPair )
 
-import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..))
 import GHC.Hs.Doc
@@ -138,6 +137,10 @@ import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer.Interface
 import qualified GHC.Parser.Lexer.String as Lexer.String
 import GHC.Parser.String
+
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 }
 
 -- -----------------------------------------------------------------------------
@@ -918,11 +921,11 @@ data Token
                                          -- have a string literal as a label
                                          -- Note [Literal source text] in "GHC.Types.SourceText"
 
-  | ITchar         SourceText Char            -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstring       SourceText ShortByteString -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstringMulti  SourceText ShortByteString -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITinteger      IntegralLit                -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITrational     FractionalLit              -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITchar         SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstring       SourceText TextUTF8   -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstringMulti  SourceText TextUTF8   -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITinteger      IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITrational     FractionalLit         -- Note [Literal source text] in "GHC.Types.SourceText"
 
   | ITprimchar   SourceText Char     -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITprimstring SourceText ByteString -- Note [Literal source text] in "GHC.Types.SourceText"
@@ -1933,9 +1936,11 @@ tok_num :: (Integer -> Integer)
         -> (Integer, (Char->Int)) -> Action
 tok_num = tok_integral $ \case
     -- 0x2D is the ASCII code for a hyphen character '-'
-    st@(SourceText sbs) | SBS.length sbs > 0 && (sbs `SBS.index` 0) == 0x2D -> itint st (const True)
-    st@(SourceText _)       -> itint st (const False)
-    st@NoSourceText         -> itint st (< 0)
+    st@(Source.CodeSnippet utf8) |
+      let sbs = bytesUTF8 utf8
+      in  SBS.length sbs > 0 && (sbs `SBS.index` 0) == 0x2D -> itint st (const True)
+    st@(Source.CodeSnippet _)       -> itint st (const False)
+    st@Source.CodeSnippetAbsent         -> itint st (< 0)
   where
     itint :: SourceText -> (Integer -> Bool) -> Integer -> Token
     itint !st is_negative !val = ITinteger ((IL st $! is_negative val) val)
@@ -2097,7 +2102,7 @@ setLineAndFile code (PsSpan span _) buf len _buf2 = do
               -- filenames and it does not remove duplicate
               -- backslashes after the drive letter (should it?).
   resetAlrLastLoc file
-  setSrcLoc (mkRealSrcLoc file (fromIntegral linenum - 1) (srcSpanEndCol span))
+  setSrcLoc (mkRealSrcLoc (fastStringToTextUTF8 file) (fromIntegral linenum - 1) (srcSpanEndCol span))
       -- subtract one: the line number refers to the *following* line
   addSrcFile file
   _ <- popLexState
@@ -2119,7 +2124,7 @@ alrInitialLoc :: FastString -> RealSrcSpan
 alrInitialLoc file = mkRealSrcSpan loc loc
     where -- This is a hack to ensure that the first line in a file
           -- looks like it is after the initial location:
-          loc = mkRealSrcLoc file (-1) (-1)
+          loc = mkRealSrcLoc (fastStringToTextUTF8 file) (-1) (-1)
 
 -- -----------------------------------------------------------------------------
 -- Options, includes and language pragmas.
@@ -2170,7 +2175,7 @@ tok_string span buf len _buf2 = do
         addError err
       pure $ L span (ITprimstring src (unsafeMkByteString s))
     else
-      pure $ L span (ITstring src (utf8EncodeShortByteString s))
+      pure $ L span (ITstring src (encodeUTF8 s))
   where
     src = mkSourceText $ lexemeToString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
@@ -2214,7 +2219,7 @@ tok_string_multi startSpan startBuf _len _buf2 = do
       lexMultilineString contentLen contentStartBuf
 
   setInput i'
-  pure $ L span $ ITstringMulti src (utf8EncodeShortByteString s)
+  pure $ L span $ ITstringMulti src (encodeUTF8 s)
   where
     goContent i0 =
       case Lexer.String.alexScan i0 Lexer.String.string_multi_content of
@@ -2384,7 +2389,7 @@ warnTab srcspan _buf _len _buf2 = do
 
 warnThen :: PsMessage -> Action -> Action
 warnThen warning action srcspan buf len buf2 = do
-    addPsMessage (RealSrcSpan (psRealSpan srcspan) Strict.Nothing) warning
+    addPsMessage (RealSrcSpan (psRealSpan srcspan) Nothing) warning
     action srcspan buf len buf2
 
 -- -----------------------------------------------------------------------------
@@ -2550,7 +2555,7 @@ failMsgP f = do
 
 failLocMsgP :: RealSrcLoc -> RealSrcLoc -> (SrcSpan -> MsgEnvelope PsMessage) -> P a
 failLocMsgP loc1 loc2 f =
-  addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2) Strict.Nothing))
+  addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2) Nothing))
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
@@ -3067,7 +3072,7 @@ getPsMessages p =
         Strict.Nothing -> ws
         Strict.Just tf ->
           let msg = mkPlainMsgEnvelope diag_opts
-                          (RealSrcSpan tf Strict.Nothing)
+                          (RealSrcSpan tf Nothing)
                           (PsWarnTab (tab_count p))
           in msg `addMessage` ws
   in (ws', errors p)
@@ -3538,7 +3543,7 @@ warn_unknown_prag prags span buf len buf2 = do
   let uppercase    = map toUpper
       unknown_prag = uppercase (clean_pragma (lexemeToString buf len))
       suggestions  = map uppercase (Map.keys prags)
-  addPsMessage (RealSrcSpan (psRealSpan span) Strict.Nothing) $
+  addPsMessage (RealSrcSpan (psRealSpan span) Nothing) $
     PsWarnUnrecognisedPragma unknown_prag suggestions
   nested_comment span buf len buf2
 
@@ -3556,8 +3561,8 @@ warn_unknown_prag prags span buf len buf2 = do
 -- 'EpToken' values for the opening and closing bordering on the start
 -- and end of the span
 mkParensEpToks :: RealSrcSpan -> (EpToken "(", EpToken ")")
-mkParensEpToks ss = (EpTok (EpaSpan (RealSrcSpan lo Strict.Nothing)),
-                    EpTok (EpaSpan (RealSrcSpan lc Strict.Nothing)))
+mkParensEpToks ss = (EpTok (EpaSpan (RealSrcSpan lo Nothing)),
+                     EpTok (EpaSpan (RealSrcSpan lc Nothing)))
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
@@ -3572,8 +3577,8 @@ mkParensEpToks ss = (EpTok (EpaSpan (RealSrcSpan lo Strict.Nothing)),
 -- 'EpaLocation' values for the opening and closing bordering on the start
 -- and end of the span
 mkParensLocs :: RealSrcSpan -> (EpaLocation, EpaLocation)
-mkParensLocs ss = (EpaSpan (RealSrcSpan lo Strict.Nothing),
-                    EpaSpan (RealSrcSpan lc Strict.Nothing))
+mkParensLocs ss = (EpaSpan (RealSrcSpan lo Nothing),
+                   EpaSpan (RealSrcSpan lc Nothing))
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss

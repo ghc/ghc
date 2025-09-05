@@ -97,7 +97,8 @@ import GHC.Types.Name.Occurrence
 import GHC.Unit.Module
 import GHC.Unit.Home
 import GHC.Types.FieldLabel
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 import GHC.Types.Unique
 import GHC.Utils.Misc
 import GHC.Data.Maybe
@@ -851,7 +852,7 @@ pprNameDefnLoc name
        RealSrcLoc s _ -> text "at" <+> ppr s
        UnhelpfulLoc s
          | isInternalName name || isSystemName name
-         -> text "at" <+> ftext s
+         -> text "at" <+> text (decodeUTF8 s)
          | otherwise
          -> text "in" <+> quotes (ppr (nameModule name))
 

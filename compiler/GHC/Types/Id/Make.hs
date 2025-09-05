@@ -89,6 +89,7 @@ import GHC.Utils.Panic
 
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
+
 import Data.List        ( zipWith4 )
 
 -- A bit of a shame we must import these here

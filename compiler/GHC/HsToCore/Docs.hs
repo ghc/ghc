@@ -16,7 +16,7 @@ import GHC.Hs.Type
 import GHC.Hs.Utils
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Tc.Types
 import GHC.Parser.Annotation
 

@@ -55,7 +55,7 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types (GhcMessage(..), DriverMessage (DriverNoConfiguredLLVMToolchain))
 import GHC.Driver.CmdLine (warnsToMessages)
-import GHC.Types.SrcLoc (noLoc, noSrcSpan)
+import Language.Haskell.Textual.Location (noLoc, noSrcSpan)
 
 {-
 ************************************************************************

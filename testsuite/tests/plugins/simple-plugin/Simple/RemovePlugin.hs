@@ -10,7 +10,7 @@ import Language.Haskell.Syntax.Extension
 import GHC.Hs.Expr
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Hs
 import GHC.Hs.Binds
 import GHC.Types.Name.Occurrence

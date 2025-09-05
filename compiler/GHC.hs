@@ -413,7 +413,6 @@ import GHC.Data.Maybe
 import GHC.Types.Id
 import GHC.Types.Name      hiding ( varName )
 import GHC.Types.Avail
-import GHC.Types.SrcLoc
 import GHC.Types.TyThing.Ppr  ( pprFamInst )
 import GHC.Types.Annotations
 import GHC.Types.Name.Set
@@ -440,6 +439,9 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Settings
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Control.Applicative ((<|>))
 import Control.Concurrent
@@ -1678,7 +1680,7 @@ getModuleSourceAndFlags m = do
 getTokenStream :: ModSummary -> IO [Located Token]
 getTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
-  let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
+  let startLoc = mkRealSrcLoc (encodeUTF8 sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
     PFailed pst -> throwErrors (GhcPsMessage <$> getPsErrorMessages pst)
@@ -1689,7 +1691,7 @@ getTokenStream mod = do
 getRichTokenStream :: ModSummary -> IO [(Located Token, String)]
 getRichTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
-  let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
+  let startLoc = mkRealSrcLoc (encodeUTF8 sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
     PFailed pst -> throwErrors (GhcPsMessage <$> getPsErrorMessages pst)
@@ -1932,7 +1934,7 @@ parser :: String         -- ^ Haskell module source text (full Unicode is suppor
 
 parser str dflags filename =
    let
-       loc  = mkRealSrcLoc (mkFastString filename) 1 1
+       loc  = mkRealSrcLoc (encodeUTF8 filename) 1 1
        buf  = stringToStringBuffer str
    in
    case unP Parser.parseModule (initParserState (initParserOpts dflags) buf loc) of

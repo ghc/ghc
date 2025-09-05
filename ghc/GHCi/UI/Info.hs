@@ -46,11 +46,12 @@ import           GHC.Tc.Types
 import           GHC.Types.Name.Reader
 import           GHC.Types.Name.Set
 import           GHC.Utils.Outputable
-import           GHC.Types.SrcLoc
 import           GHC.Types.Var
-import qualified GHC.Data.Strict as Strict
 
 import           GHCi.UI.Exception
+
+import           Language.Haskell.Textual.Location
+import           Language.Haskell.Textual.UTF8 (decodeUTF8)
 
 -- | Info about a module. This information is generated every time a
 -- module is loaded.
@@ -108,7 +109,7 @@ spanInfoFromRealSrcSpan' s = spanInfoFromRealSrcSpan s Nothing Nothing
 
 -- | Convenience wrapper around 'srcSpanFile' which results in a 'FilePath'
 srcSpanFilePath :: RealSrcSpan -> FilePath
-srcSpanFilePath = unpackFS . srcSpanFile
+srcSpanFilePath = decodeUTF8 . srcSpanFile
 
 -- | Try to find the location of the given identifier at the given
 -- position in the module.
@@ -143,7 +144,7 @@ findNameUses infos span0 string =
     locToSpans (modinfo,name',span') =
         stripSurrounding (span' : map toSrcSpan spans)
       where
-        toSrcSpan s = RealSrcSpan (spaninfoSrcSpan s) Strict.Nothing
+        toSrcSpan s = RealSrcSpan (spaninfoSrcSpan s) Nothing
         spans = filter ((== Just name') . fmap getName . spaninfoVar)
                        (modinfoSpans modinfo)
 

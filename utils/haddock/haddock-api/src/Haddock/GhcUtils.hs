@@ -49,8 +49,6 @@ import qualified GHC.Data.StringBuffer as S
 import GHC.Driver.Session
 import GHC.HsToCore.Docs hiding (sigNameNoLoc)
 import GHC.Types.Name
-import GHC.Types.SrcLoc (advanceSrcLoc)
-import GHC.Types.SourceText (SourceText(..))
 import GHC.Types.Var
   ( Specificity
   , TyVarBinder
@@ -67,6 +65,9 @@ import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (panic)
 
 import Haddock.Types (DocName, DocNameI, ExportInfo, XRecCond, HsTypeDocNameIExt(..))
+
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location (advanceSrcLoc)
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName
@@ -201,7 +202,7 @@ hsConDeclFieldToHsTypeNoMult (CDF _ unp str _ t doc) = case doc of
   _ -> mkBang unp str t
   where
     mkBang NoSrcUnpack NoSrcStrict ty = ty
-    mkBang u s ty = noLocA (XHsType (HsBangTy (HsSrcBang NoSourceText u s) ty))
+    mkBang u s ty = noLocA (XHsType (HsBangTy (HsSrcBang Source.CodeSnippetAbsent u s) ty))
 
 getGADTConType :: ConDecl DocNameI -> LHsSigType DocNameI
 -- The full type of a GADT data constructor We really only get this in

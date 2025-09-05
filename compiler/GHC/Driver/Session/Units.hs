@@ -24,7 +24,7 @@ import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.State  ( emptyUnitState )
 import qualified GHC.Unit.State as State
 
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.SourceError
 
 import GHC.Utils.Misc

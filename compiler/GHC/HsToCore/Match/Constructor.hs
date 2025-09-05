@@ -31,7 +31,7 @@ import GHC.Utils.Misc
 import GHC.Types.Id
 import GHC.Types.Name.Env
 import GHC.Types.FieldLabel ( flSelector )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import Control.Monad(liftM)

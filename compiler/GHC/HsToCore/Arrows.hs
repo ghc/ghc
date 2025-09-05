@@ -47,7 +47,7 @@ import GHC.Builtin.Names
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.Var.Set
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Data.List.SetOps( assocMaybe )
 import Data.Foldable (toList)
 import Data.List (mapAccumL)

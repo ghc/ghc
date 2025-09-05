@@ -8,7 +8,7 @@ import GHC.Data.FastString
 import GHC.Builtin.Uniques
 import GHC.Builtin.Names
 import GHC.Types.Name
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 [f1,f2,f3,f4,f5] = map mkVarOcc ["a", "b","c","d","e"]
 

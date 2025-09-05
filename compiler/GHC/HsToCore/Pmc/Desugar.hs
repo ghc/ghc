@@ -28,7 +28,7 @@ import GHC.Core.ConLike
 import GHC.Types.Name
 import GHC.Builtin.Types
 import GHC.Builtin.Names (rationalTyConName, toListName)
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.DataCon

@@ -44,7 +44,7 @@ import GHC.HsToCore.Pmc.Solver.Types
 import GHC.Data.OrdList
 import GHC.Types.Id
 import GHC.Types.Var (EvVar)
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Core.ConLike
 import GHC.Core.Type

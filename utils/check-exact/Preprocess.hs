@@ -16,32 +16,33 @@ module Preprocess
 
 import qualified GHC            as GHC hiding (parseModule)
 
-import qualified Control.Monad.IO.Class as GHC
-import qualified GHC.Data.FastString   as GHC
-import qualified GHC.Data.StringBuffer as GHC
+import qualified Control.Monad.IO.Class   as GHC
+import qualified GHC.Data.StringBuffer    as GHC
 import qualified GHC.Driver.Config.Parser as GHC
-import qualified GHC.Driver.Env        as GHC
-import qualified GHC.Driver.Errors.Types as GHC
-import qualified GHC.Driver.Phases     as GHC
-import qualified GHC.Driver.Pipeline   as GHC
-import qualified GHC.Parser.Lexer      as GHC
-import qualified GHC.Settings          as GHC
-import qualified GHC.Types.Error       as GHC
-import qualified GHC.Types.SourceError as GHC
-import qualified GHC.Types.SourceFile  as GHC
-import qualified GHC.Types.SrcLoc      as GHC
-import qualified GHC.Utils.Error       as GHC
-import qualified GHC.Utils.Fingerprint as GHC
-import qualified GHC.Utils.Outputable  as GHC
-import GHC.Types.SrcLoc (mkSrcSpan, mkSrcLoc)
-import GHC.Data.FastString (mkFastString)
+import qualified GHC.Driver.Env           as GHC
+import qualified GHC.Driver.Errors.Types  as GHC
+import qualified GHC.Driver.Phases        as GHC
+import qualified GHC.Driver.Pipeline      as GHC
+import qualified GHC.Parser.Lexer         as GHC
+import qualified GHC.Settings             as GHC
+import qualified GHC.Types.Error          as GHC
+import qualified GHC.Types.SourceError    as GHC
+import qualified GHC.Types.SourceFile     as GHC
+import qualified GHC.Utils.Error          as GHC
+import qualified GHC.Utils.Fingerprint    as GHC
+import qualified GHC.Utils.Outputable     as GHC
+
+import Language.Haskell.Textual.Location (BufPos(..), BufSpan(..), PsSpan(..),
+                                          mkRealSrcLoc, mkSrcSpan, mkSrcLoc)
+import Language.Haskell.Textual.UTF8
+
+-- import GHC.Data.FastString (mkFastString)
 
 import Data.List (isPrefixOf)
 import Data.Maybe
 import Types
 import Utils
 import qualified Data.Set as Set
-
 
 -- import Debug.Trace
 --
@@ -72,12 +73,12 @@ checkLine line s
   |  "{-# LINE" `isPrefixOf` s =
        let (pragma, res) = getPragma s
            size   = length pragma
-           mSrcLoc = mkSrcLoc (mkFastString "LINE")
+           mSrcLoc = mkSrcLoc (encodeUTF8 "LINE")
            ss     = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (size+1))
        in (res, Just $ mkLEpaComment pragma (GHC.spanAsAnchor ss) (GHC.realSrcSpan ss))
   -- Deal with shebang/cpp directives too
   |  "#!" `isPrefixOf` s =
-    let mSrcLoc = mkSrcLoc (mkFastString "SHEBANG")
+    let mSrcLoc = mkSrcLoc (encodeUTF8 "SHEBANG")
         ss = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (length s))
     in
     ("",Just $ mkLEpaComment s (GHC.spanAsAnchor ss) (GHC.realSrcSpan ss))
@@ -102,7 +103,7 @@ getCppTokensAsComments :: GHC.GhcMonad m
                        -> m [GHC.LEpaComment]
 getCppTokensAsComments cppOptions sourceFile = do
   source <- GHC.liftIO $ GHC.hGetStringBuffer sourceFile
-  let startLoc = GHC.mkRealSrcLoc (GHC.mkFastString sourceFile) 1 1
+  let startLoc = mkRealSrcLoc (encodeUTF8 sourceFile) 1 1
   (_txt,strSrcBuf,flags2') <- getPreprocessedSrcDirectPrim cppOptions sourceFile
   let flags2 = GHC.initParserOpts flags2'
   -- hash-ifdef tokens
@@ -270,18 +271,18 @@ getPreprocessorAsComments srcFile = do
 
   let mkTok (lineNum,line) = (GHC.L l (GHC.ITlineComment line (makeBufSpan l)),line)
        where
-         start = GHC.mkSrcLoc (GHC.mkFastString srcFile) lineNum 1
-         end   = GHC.mkSrcLoc (GHC.mkFastString srcFile) lineNum (length line)
+         start = GHC.mkSrcLoc (encodeUTF8 srcFile) lineNum 1
+         end   = GHC.mkSrcLoc (encodeUTF8 srcFile) lineNum (length line)
          l = GHC.mkSrcSpan start end
 
   let toks = map mkTok directives
   return toks
 
-makeBufSpan :: GHC.SrcSpan -> GHC.PsSpan
+makeBufSpan :: GHC.SrcSpan -> PsSpan
 makeBufSpan ss = pspan
   where
-    bl = GHC.BufPos 0
-    pspan = GHC.PsSpan (GHC.realSrcSpan ss) (GHC.BufSpan bl bl)
+    bl = BufPos 0
+    pspan = PsSpan (GHC.realSrcSpan ss) (BufSpan bl bl)
 
 -- ---------------------------------------------------------------------
 

@@ -47,7 +47,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Basic
 import GHC.Types.Error
 import qualified GHC.Types.Unique.Map as UM
@@ -73,7 +73,6 @@ import GHC.Utils.FV ( fvVarList, unionFV )
 import GHC.Data.Bag
 import GHC.Data.List.SetOps ( equivClasses, nubOrdBy )
 import GHC.Data.Maybe
-import qualified GHC.Data.Strict as Strict
 
 import Control.Monad      ( unless, when, foldM, forM_ )
 import Data.Foldable      ( toList )
@@ -1396,7 +1395,7 @@ mkErrorReport tcl_env msg mb_ctxt supp hints
            err_info = ErrInfo (fromMaybe [] mb_context) (Just (hfdc, supp)) hints
            detailed_msg = mkDetailedMessage err_info msg
        ; mkTcRnMessage
-           (RealSrcSpan (ctl_loc tcl_env) Strict.Nothing)
+           (RealSrcSpan (ctl_loc tcl_env) Nothing)
            (TcRnMessageWithInfo unit_state $ detailed_msg) }
 
 {- Note [Always warn with -fdefer-type-errors]

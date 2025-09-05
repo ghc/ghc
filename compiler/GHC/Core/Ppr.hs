@@ -46,7 +46,6 @@ import GHC.Core.Coercion
 import GHC.Types.Basic
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import GHC.Types.SrcLoc ( pprUserRealSpan )
 import GHC.Types.Tickish
 
 {-

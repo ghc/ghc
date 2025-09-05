@@ -23,7 +23,7 @@ import GHC.Iface.Type
 import GHC.Unit.Module            ( ModuleName, Module )
 import GHC.Types.Name
 import GHC.Utils.Outputable hiding ( (<>) )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Avail
 import qualified GHC.Utils.Outputable as O ( (<>) )
 import GHC.Utils.Panic

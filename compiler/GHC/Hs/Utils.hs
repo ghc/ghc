@@ -146,7 +146,6 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Types.Basic
-import GHC.Types.SrcLoc
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 
@@ -155,6 +154,9 @@ import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 
 import Control.Arrow ( first )
 import Data.Foldable ( toList )
@@ -479,16 +481,16 @@ mkHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
 mkHsOpApp e1 op e2 = OpApp noExtField e1 (noLocA (mkHsVar (noLocA op))) e2
 
 mkHsString :: String -> HsLit (GhcPass p)
-mkHsString s = HsString NoSourceText (mkFastString s)
+mkHsString s = HsString Source.CodeSnippetAbsent (mkFastString s)
 
 mkHsStringFS :: FastString -> HsLit (GhcPass p)
-mkHsStringFS s = HsString NoSourceText s
+mkHsStringFS s = HsString Source.CodeSnippetAbsent s
 
 mkHsStringPrimLit :: FastString -> HsLit (GhcPass p)
-mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)
+mkHsStringPrimLit fs = HsStringPrim Source.CodeSnippetAbsent (bytesFS fs)
 
 mkHsCharPrimLit :: Char -> HsLit (GhcPass p)
-mkHsCharPrimLit c = HsChar NoSourceText c
+mkHsCharPrimLit c = HsChar Source.CodeSnippetAbsent c
 
 mkConLikeTc :: ConLike -> HsExpr GhcTc
 mkConLikeTc con = XExpr (ConLikeTc con [] [])

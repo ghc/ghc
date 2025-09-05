@@ -77,7 +77,6 @@ import GHC.Rename.Utils( mkRnSyntaxExpr )
 import GHC.Types.Id.Make( mkDictFunId )
 import GHC.Types.Basic ( TypeOrKind(..), Arity, VisArity )
 import GHC.Types.SourceText
-import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Name
@@ -94,6 +93,9 @@ import GHC.Utils.Unique (sameUnique)
 import GHC.Unit.State
 import GHC.Unit.External
 import GHC.Unit.Module.Warnings
+
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location as SrcLoc
 
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
@@ -963,9 +965,9 @@ getOverlapFlag overlap_mode_prag
 
               overlap_mode
                 | Just m <- overlap_mode_prag = m
-                | incoherent_ok               = Incoherent NoSourceText
-                | overlap_ok                  = Overlaps   NoSourceText
-                | otherwise                   = NoOverlap  NoSourceText
+                | incoherent_ok               = Incoherent Source.CodeSnippetAbsent
+                | overlap_ok                  = Overlaps   Source.CodeSnippetAbsent
+                | otherwise                   = NoOverlap  Source.CodeSnippetAbsent
 
               -- final_overlap_mode: the `-fspecialise-incoherents` flag controls the
               -- meaning of the `Incoherent` overlap mode: as either an Incoherent overlap

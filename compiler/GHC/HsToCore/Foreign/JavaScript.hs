@@ -34,7 +34,6 @@ import GHC.Types.Id
 import GHC.Types.Id.Make
 import GHC.Types.Literal
 import GHC.Types.ForeignStubs
-import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
@@ -63,6 +62,8 @@ import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Encoding
+
+import qualified Language.Haskell.Textual.Source as Source
 
 dsJsFExport
   :: Id                 -- Either the exported Id,
@@ -647,6 +648,6 @@ mkJsCall :: Unique -> FastString -> [CoreExpr] -> Type -> CoreExpr
 mkJsCall u tgt args t = mkFCall u ccall args t
   where
     ccall = CCall $ CCallSpec
-              (StaticTarget NoSourceText tgt (Just ghcInternalUnit) True)
+              (StaticTarget Source.CodeSnippetAbsent tgt (Just ghcInternalUnit) True)
               JavaScriptCallConv
               PlayRisky

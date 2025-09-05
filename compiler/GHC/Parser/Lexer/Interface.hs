@@ -22,7 +22,7 @@ import Data.Char (GeneralCategory (..), generalCategory, ord)
 import Data.Word (Word8)
 import GHC.Data.StringBuffer (StringBuffer, atEnd, nextChar, prevChar)
 import GHC.Exts
-import GHC.Types.SrcLoc (PsLoc, advancePsLoc)
+import Language.Haskell.Textual.Location (PsLoc, advancePsLoc)
 
 data AlexInput = AI !PsLoc !StringBuffer deriving (Show)
 

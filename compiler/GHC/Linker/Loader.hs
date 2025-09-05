@@ -71,7 +71,7 @@ import GHC.SysTools
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 

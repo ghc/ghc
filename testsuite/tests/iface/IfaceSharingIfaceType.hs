@@ -8,7 +8,7 @@ import GHC.Builtin.Uniques
 import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Types.Name
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Iface.Type
 import GHC.CoreToIface
 import GHC.Core.TyCo.Rep

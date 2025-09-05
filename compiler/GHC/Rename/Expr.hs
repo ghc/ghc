@@ -61,7 +61,6 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import GHC.Types.SourceText
-import GHC.Types.SrcLoc
 
 import GHC.Utils.Misc
 import qualified GHC.Data.List.NonEmpty as NE
@@ -76,6 +75,8 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 
 import Control.Monad
 import qualified Data.Foldable as Partial (maximum)
@@ -358,7 +359,7 @@ rnExpr (HsOverLabel src v)
                 , fvs ) }
   where
     hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
-                HsTyLit noExtField (HsStrTy NoSourceText v)
+                HsTyLit noExtField (HsStrTy Source.CodeSnippetAbsent v)
 
 rnExpr (HsLit x lit) | Just (src, s) <- stringLike lit
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings

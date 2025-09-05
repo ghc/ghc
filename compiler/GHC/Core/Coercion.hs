@@ -152,7 +152,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Data.FastString
 import GHC.Data.Pair
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 import GHC.Data.List.SetOps

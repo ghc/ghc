@@ -38,15 +38,13 @@ import GHC.Base (NonEmpty(..))
 import GHC.Core.Coercion.Axiom (Role(..))
 import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
-import qualified GHC.Data.Strict as Strict
 import GHC.TypeLits
 import GHC.Types.Basic hiding (EP)
 import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.Name.Reader
 import GHC.Types.PkgQual
-import GHC.Types.SourceText
-import GHC.Types.SrcLoc
+--import GHC.Types.SourceText
 import GHC.Types.Var
 import GHC.Unit.Module.Warnings
 import GHC.Utils.Misc
@@ -54,6 +52,10 @@ import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Textual.Source (FractionalLit(..), IntegralLit(..), StringLiteral(..))
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (decodeUTF8)
 
 import Control.Monad (forM, when, unless)
 import Control.Monad.Identity (Identity(..))
@@ -61,7 +63,6 @@ import qualified Control.Monad.Reader as Reader
 import Control.Monad.RWS (MonadReader, RWST, evalRWST, tell, modify, get, gets, ask)
 import Control.Monad.Trans (lift)
 import Data.Data ( Data )
-import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Short as SBS
 import Data.Dynamic
 import Data.Foldable
@@ -666,17 +667,13 @@ class (Typeable a) => ExactPrint a where
 -- Start of utility functions
 -- ---------------------------------------------------------------------
 
+printSourceCodeSnippet :: (Monad m, Monoid w) => Source.CodeSnippet -> String -> EP w m ()
+printSourceCodeSnippet   (Source.CodeSnippetAbsent) txt    = printStringAdvance  txt >> return ()
+printSourceCodeSnippet   (Source.CodeSnippet    txt) _ = printStringAdvance  (decodeUTF8 txt) >> return ()
 
-unpackSBS :: SBS.ShortByteString -> String
-unpackSBS = BS.unpack . SBS.fromShort
-
-printSourceText :: (Monad m, Monoid w) => SourceText -> String -> EP w m ()
-printSourceText (NoSourceText) txt   =  printStringAdvance txt >> return ()
-printSourceText (SourceText   txt) _ =  printStringAdvance (unpackSBS txt) >> return ()
-
-printSourceTextAA :: (Monad m, Monoid w) => SourceText -> String -> EP w m ()
-printSourceTextAA (NoSourceText) txt   = printStringAdvanceA txt >> return ()
-printSourceTextAA (SourceText   txt) _ = printStringAdvanceA (unpackSBS txt) >> return ()
+printSourceCodeSnippetAA :: (Monad m, Monoid w) => Source.CodeSnippet -> String -> EP w m ()
+printSourceCodeSnippetAA (Source.CodeSnippetAbsent) txt    = printStringAdvanceA txt >> return ()
+printSourceCodeSnippetAA (Source.CodeSnippet    txt) _ = printStringAdvanceA (decodeUTF8 txt) >> return ()
 
 -- ---------------------------------------------------------------------
 
@@ -702,7 +699,7 @@ printStringAtRsC capture pa str = do
   debugM $ "printStringAtRsC:p'=" ++ showAst p'
   debugM $ "printStringAtRsC: (EpaDelta p' [])=" ++ showAst (EpaDelta noSrcSpan p' NoComments)
   debugM $ "printStringAtRsC: (EpaDelta p' (map comment2LEpaComment cs'))=" ++ showAst (EpaDelta noSrcSpan p' (map comment2LEpaComment cs'))
-  return (EpaDelta (RealSrcSpan pa Strict.Nothing) p' (map comment2LEpaComment cs'))
+  return (EpaDelta (RealSrcSpan pa Nothing) p' (map comment2LEpaComment cs'))
 
 printStringAtRs' :: (Monad m, Monoid w) => RealSrcSpan -> String -> EP w m ()
 printStringAtRs' pa str = printStringAtRsC NoCaptureComments pa str >> return ()
@@ -759,9 +756,9 @@ printStringAtAAC capture (EpaDelta ss d cs) s = do
 
 -- ---------------------------------------------------------------------
 
-markExternalSourceTextE :: (Monad m, Monoid w) => EpaLocation -> SourceText -> String -> EP w m EpaLocation
-markExternalSourceTextE l NoSourceText txt   = printStringAtAA l txt
-markExternalSourceTextE l (SourceText txt) _ = printStringAtAA l (unpackSBS txt)
+markExternalSourceTextE :: (Monad m, Monoid w) => EpaLocation -> Source.CodeSnippet -> String -> EP w m EpaLocation
+markExternalSourceTextE l Source.CodeSnippetAbsent txt   = printStringAtAA l txt
+markExternalSourceTextE l (Source.CodeSnippet txt) _ = printStringAtAA l (decodeUTF8 txt)
 
 -- ---------------------------------------------------------------------
 
@@ -837,14 +834,14 @@ markEpUniToken (EpUniTok aa isUnicode)  = do
 -- ---------------------------------------------------------------------
 
 markAnnOpen' :: (Monad m, Monoid w)
-  => Maybe EpaLocation -> SourceText -> String -> EP w m (Maybe EpaLocation)
-markAnnOpen' ms NoSourceText txt   = printStringAtMLoc' ms txt
-markAnnOpen' ms (SourceText txt) _ = printStringAtMLoc' ms $ unpackSBS txt
+  => Maybe EpaLocation -> Source.CodeSnippet -> String -> EP w m (Maybe EpaLocation)
+markAnnOpen'  ms Source.CodeSnippetAbsent txt   = printStringAtMLoc' ms txt
+markAnnOpen'  ms (Source.CodeSnippet txt) _ = printStringAtMLoc' ms $ decodeUTF8 txt
 
 markAnnOpen'' :: (Monad m, Monoid w)
-  => EpaLocation -> SourceText -> String -> EP w m EpaLocation
-markAnnOpen'' el NoSourceText txt   = printStringAtAA el txt
-markAnnOpen'' el (SourceText txt) _ = printStringAtAA el $ unpackSBS txt
+  => EpaLocation -> Source.CodeSnippet -> String -> EP w m EpaLocation
+markAnnOpen'' el Source.CodeSnippetAbsent txt   = printStringAtAA    el txt
+markAnnOpen'' el (Source.CodeSnippet txt) _ = printStringAtAA    el $ decodeUTF8 txt
 
 -- ---------------------------------------------------------------------
 
@@ -1599,14 +1596,14 @@ instance ExactPrint InWarningCategory where
       L l' (_,wc') <- markAnnotated (L l (source, wc))
       return (InWarningCategory tkIn' source (L l' wc'))
 
-instance ExactPrint (SourceText, WarningCategory) where
+instance ExactPrint (Source.CodeSnippet, WarningCategory) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
   exact (st, WarningCategory wc) = do
       case st of
-          NoSourceText -> printStringAdvance $ "\"" ++ (unpackFS wc) ++ "\""
-          SourceText src -> printStringAdvance $ (unpackSBS src)
+          Source.CodeSnippetAbsent -> printStringAdvance $ "\"" ++ (unpackFS wc) ++ "\""
+          Source.CodeSnippet src -> printStringAdvance $ (decodeUTF8 src)
       return (st, WarningCategory wc)
 
 -- ---------------------------------------------------------------------
@@ -1625,7 +1622,7 @@ instance ExactPrint (ImportDecl GhcPs) where
     -- "{-# SOURCE" and "#-}"
     importDeclAnnPragma' <-
       case msrc of
-        SourceText _txt -> do
+        Source.CodeSnippet _txt -> do
           debugM $ "ImportDecl sourcetext"
           case importDeclAnnPragma an of
             Just (mo, mc) -> do
@@ -1636,7 +1633,7 @@ instance ExactPrint (ImportDecl GhcPs) where
               _ <- markAnnOpen' Nothing msrc "{-# SOURCE"
               printStringAtLsDelta (SameLine 1) "#-}"
               return Nothing
-        NoSourceText -> return (importDeclAnnPragma an)
+        Source.CodeSnippetAbsent -> return (importDeclAnnPragma an)
     -- pre level
     ann0' <- case st of
         LevelStylePre _ -> markLensFun' ann0 limportDeclAnnLevel (\mt -> mapM markEpAnnLevel mt)
@@ -1653,7 +1650,7 @@ instance ExactPrint (ImportDecl GhcPs) where
         _ -> return ann1
     ann3 <-
       case mpkg of
-       RawPkgQual (StringLiteral src' v _) ->
+       RawPkgQual (Source.StringLiteral src' v _) ->
          printStringAtMLocL ann2 limportDeclAnnPackage (sourceTextToString src' (show v))
        _ -> return ann2
     modname' <- markAnnotated modname
@@ -1966,14 +1963,14 @@ exactNsSpec (DataNamespaceSpecifier data_) = do
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint StringLiteral where
+instance ExactPrint Source.StringLiteral where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (StringLiteral src fs mcomma) = do
-    printSourceTextAA src (show (unpackFS fs))
+  exact (Source.StringLiteral src txt mcomma) = do
+    printSourceCodeSnippetAA src (show (decodeUTF8 txt))
     mcomma' <- mapM (\r -> printStringAtNC r ",") mcomma
-    return (StringLiteral src fs mcomma')
+    return (Source.StringLiteral src txt mcomma')
 
 -- ---------------------------------------------------------------------
 
@@ -1993,8 +1990,8 @@ instance ExactPrint (RuleDecls GhcPs) where
   exact (HsRules ((o,c), src) rules) = do
     o' <-
       case src of
-        NoSourceText      -> printStringAtAA o "{-# RULES"
-        SourceText srcTxt -> printStringAtAA o (unpackSBS srcTxt)
+        Source.CodeSnippetAbsent   -> printStringAtAA o "{-# RULES"
+        Source.CodeSnippet txt -> printStringAtAA o (decodeUTF8 txt)
     rules' <- markAnnotated rules
     c' <- markEpToken c
     return (HsRules ((o',c'),src) rules')
@@ -2861,8 +2858,8 @@ instance ExactPrint (HsExpr GhcPs) where
   exact x@(HsOverLabel src l) = do
     printStringAdvanceA "#" >> return ()
     case src of
-      NoSourceText   -> printStringAdvanceA (unpackFS l)  >> return ()
-      SourceText txt -> printStringAdvanceA (unpackSBS txt) >> return ()
+      Source.CodeSnippetAbsent   -> printStringAdvanceA (unpackFS l)     >> return ()
+      Source.CodeSnippet txt -> printStringAdvanceA (decodeUTF8 txt) >> return ()
     return x
 
   exact x@(HsIPVar _ (HsIPName n))
@@ -2874,8 +2871,8 @@ instance ExactPrint (HsExpr GhcPs) where
                 HsFractional (FL { fl_text = src }) -> src
                 HsIsString src _          -> src
     case str of
-      SourceText s -> printStringAdvance (unpackSBS s) >> return ()
-      NoSourceText -> withPpr x >> return ()
+      Source.CodeSnippet s -> printStringAdvance (decodeUTF8 s) >> return ()
+      Source.CodeSnippetAbsent -> withPpr x >> return ()
     return x
 
   exact (HsLit an lit) = do
@@ -3191,7 +3188,7 @@ instance ExactPrint (HsPragE GhcPs) where
 
   exact (HsPragSCC (AnnPragma o c s l1 l2 t m,st) sl) = do
     o' <- markAnnOpen'' o st  "{-# SCC"
-    l1' <- printStringAtAA l1 (sourceTextToString (sl_st sl) (unpackFS $ sl_fs sl))
+    l1' <- printStringAtAA l1 (sourceTextToString (sl_st sl) (decodeUTF8 $ sl_fs sl))
     c' <- markEpToken c
     return (HsPragSCC (AnnPragma o' c' s l1' l2 t m,st) sl)
 
@@ -4020,9 +4017,9 @@ instance ExactPrint (HsType GhcPs) where
     return (HsExplicitTupleTy (sq', o', c') prom tys')
   exact (HsTyLit a lit) = do
     case lit of
-      (HsNumTy src v) -> printSourceText src (show v)
-      (HsStrTy src v) -> printSourceText src (show v)
-      (HsCharTy src v) -> printSourceText src (show v)
+      (HsNumTy  src v) -> printSourceCodeSnippet src (show v)
+      (HsStrTy  src v) -> printSourceCodeSnippet src (show v)
+      (HsCharTy src v) -> printSourceCodeSnippet src (show v)
     return (HsTyLit a lit)
   exact t@(HsWildCardTy _) = printStringAdvance "_" >> return t
   exact x = error $ "missing match for HsType:" ++ showAst x
@@ -4430,10 +4427,10 @@ exactBang :: (Monoid w, Monad m) => XConDeclField GhcPs -> SrcStrictness -> EP w
 exactBang ((o,c,tk), mt) str = do
   (o',c') <-
     case mt of
-      NoSourceText -> return (o,c)
-      SourceText src -> do
+      Source.CodeSnippetAbsent -> return (o,c)
+      Source.CodeSnippet src -> do
         debugM $ "HsBangTy: src=" ++ showAst src
-        o' <- printStringAtAA o (unpackSBS src)
+        o' <- printStringAtAA o (decodeUTF8 src)
         c' <- markEpToken c
         return (o',c')
   tk' <-
@@ -4461,7 +4458,7 @@ instance ExactPrint (LocatedP CType) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (SourceText, RuleName) where
+instance ExactPrint (Source.CodeSnippet, RuleName) where
   -- We end up at the right place from the Located wrapper
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
@@ -4775,8 +4772,8 @@ instance ExactPrint (HsOverLit GhcPs) where
                 HsIsString src _ -> src
     in
       case str of
-        SourceText s -> printStringAdvance (unpackSBS s) >> return ol
-        NoSourceText -> return ol
+        Source.CodeSnippet s -> printStringAdvance (decodeUTF8 s) >> return ol
+        Source.CodeSnippetAbsent -> return ol
 
 -- ---------------------------------------------------------------------
 
@@ -4802,13 +4799,13 @@ hsLit2String lit =
     HsFloatPrim  _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl "#"
     HsDoublePrim _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl "##"
 
-toSourceTextWithSuffix :: (Show a) => SourceText -> a -> String -> String
-toSourceTextWithSuffix (NoSourceText)    alt suffix = show alt ++ suffix
-toSourceTextWithSuffix (SourceText txt) _alt suffix = unpackSBS txt ++ suffix
+toSourceTextWithSuffix :: (Show a) => Source.CodeSnippet -> a -> String -> String
+toSourceTextWithSuffix (Source.CodeSnippetAbsent)    alt suffix = show alt ++ suffix
+toSourceTextWithSuffix (Source.CodeSnippet txt) _alt suffix = decodeUTF8 txt ++ suffix
 
-sourceTextToString :: SourceText -> String -> String
-sourceTextToString NoSourceText alt   = alt
-sourceTextToString (SourceText txt) _ = unpackSBS txt
+sourceTextToString :: Source.CodeSnippet -> String -> String
+sourceTextToString Source.CodeSnippetAbsent alt   = alt
+sourceTextToString (Source.CodeSnippet txt) _ = decodeUTF8 txt
 
 -- ---------------------------------------------------------------------
 

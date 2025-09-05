@@ -62,8 +62,8 @@
 --
 --      The remaining files define properties of the primops
 --      by pattern matching, for example:
---        primOpFixity IntAddOp = Just (Fixity NoSourceText 6 InfixL)
---        primOpFixity IntSubOp = Just (Fixity NoSourceText 6 InfixL)
+--        primOpFixity IntAddOp = Just (Fixity Source.CodeSnippetAbsent 6 InfixL)
+--        primOpFixity IntSubOp = Just (Fixity Source.CodeSnippetAbsent 6 InfixL)
 --        ...
 --      This includes fixity, has-side-effects, commutability,
 --      IDs used to generate Uniques etc.

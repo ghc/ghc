@@ -94,7 +94,7 @@ import GHC.Types.SourceFile
 import GHC.Types.SafeHaskell
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.TyThing
 import GHC.Types.PkgQual
 

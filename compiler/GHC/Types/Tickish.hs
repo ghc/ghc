@@ -36,7 +36,7 @@ import GHC.Core.Type
 import GHC.Unit.Module
 
 import GHC.Types.CostCentre
-import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
+import Language.Haskell.Textual.Location ( RealSrcSpan, containsSpan )
 import GHC.Types.Var
 
 import GHC.Utils.Panic

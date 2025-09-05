@@ -11,7 +11,7 @@ module GHCi.UI.Print
 import qualified GHC
 import GHC.Types.Name.Reader
 import GHC.Types.SourceError
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Error
 import GHC.Driver.Monad
 import GHC.Driver.Env

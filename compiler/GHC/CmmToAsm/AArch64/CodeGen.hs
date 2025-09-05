@@ -44,7 +44,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Graph
 import GHC.Types.Tickish ( GenTickish(..) )
-import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
+import Language.Haskell.Textual.Location  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 import GHC.Types.Unique.DSM
 
 -- The rest:

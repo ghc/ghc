@@ -218,7 +218,6 @@ import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
-import qualified GHC.Data.Strict as Strict
 import qualified Data.Set as Set
 
 import GHC.Types.Error
@@ -230,7 +229,6 @@ import GHC.Types.SafeHaskell
 import GHC.Types.Id
 import GHC.Types.TypeEnv
 import GHC.Types.Var.Env
-import GHC.Types.SrcLoc
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Ppr
@@ -243,6 +241,9 @@ import GHC.Types.CostCentre.State
 import GHC.Types.SourceFile
 
 import qualified GHC.LanguageExtensions as LangExt
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Data.IORef
 import Control.Monad
@@ -463,7 +464,7 @@ initTcInteractive hsc_env thing_inside
            (realSrcLocSpan interactive_src_loc)
            thing_inside
   where
-    interactive_src_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
+    interactive_src_loc = mkRealSrcLoc (encodeUTF8 "<interactive>") 1 1
 
 initTcRnIf :: Char              -- ^ Tag for unique supply
            -> HscEnv
@@ -1067,7 +1068,7 @@ addDependentDirectories ds = do
 
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
-getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (getLclEnvLoc env) Strict.Nothing) }
+getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (getLclEnvLoc env) Nothing) }
 
 -- See Note [Error contexts in generated code]
 inGeneratedCode :: TcRn Bool

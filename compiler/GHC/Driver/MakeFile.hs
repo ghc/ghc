@@ -29,7 +29,7 @@ import GHC.Data.OsPath (unsafeDecodeUtf)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SourceError
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.PkgQual
 import Data.List (partition)
 import GHC.Utils.TmpFs

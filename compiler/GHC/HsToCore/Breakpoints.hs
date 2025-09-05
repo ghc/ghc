@@ -26,7 +26,7 @@ import Data.Array
 
 import GHC.HsToCore.Ticks (Tick (..))
 import GHC.Data.SizedSeq
-import GHC.Types.SrcLoc (SrcSpan)
+import Language.Haskell.Textual.Location (SrcSpan)
 import GHC.Types.Name (OccName)
 import GHC.Types.Tickish (BreakTickIndex, BreakpointId(..))
 import GHC.Unit.Module (Module)

@@ -46,7 +46,6 @@ import GHC hiding (Failed, Succeeded)
 import GHC.Tc.Utils.Monad
 import GHC.Iface.Recomp
 
-import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceFile
 import GHC.Types.Unique.FM
@@ -77,6 +76,9 @@ import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.Data.ShortText as ST
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Data.List ( partition )
 import System.Exit
@@ -116,7 +118,7 @@ doBackpack [src_filename] = do
     -- TODO: Preprocessing not implemented
 
     buf <- liftIO $ hGetStringBuffer src_filename
-    let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
+    let loc = mkRealSrcLoc (encodeUTF8 src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (initParserState (initParserOpts dflags) buf loc) of
         PFailed pst -> throwErrors (GhcPsMessage <$> getPsErrorMessages pst)
         POk _ pkgname_bkp -> do
@@ -788,7 +790,7 @@ summariseRequirement pn mod_name = do
     src_hash <- liftIO $ getFileHash (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
-    let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
+    let loc = srcLocSpan (mkSrcLoc (encodeUTF8 (bkp_filename env)) 1 1)
 
     let fc = hsc_FC hsc_env
     mod <- liftIO $ addHomeModuleToFinder fc home_unit mod_name location HsigFile

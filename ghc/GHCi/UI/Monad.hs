@@ -43,7 +43,7 @@ import GHC.Types.Name.Occurrence
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Driver.Env
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.SafeHaskell
 import GHC.Driver.Make (ModIfaceCache(..))
 import GHC.Unit

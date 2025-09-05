@@ -50,19 +50,20 @@ import Preprocess
 import Data.Functor (void)
 
 import qualified GHC hiding (parseModule)
-import qualified Control.Monad.IO.Class as GHC
-import qualified GHC.Data.FastString    as GHC
-import qualified GHC.Data.StringBuffer  as GHC
+import qualified Control.Monad.IO.Class   as GHC
+import qualified GHC.Data.StringBuffer    as GHC
 import qualified GHC.Driver.Config.Parser as GHC
-import qualified GHC.Driver.Errors.Types as GHC
-import qualified GHC.Driver.Session     as GHC
-import qualified GHC.Parser             as GHC
-import qualified GHC.Parser.Header      as GHC
-import qualified GHC.Parser.Lexer       as GHC
-import qualified GHC.Parser.PostProcess as GHC
-import qualified GHC.Types.SrcLoc       as GHC
+import qualified GHC.Driver.Errors.Types  as GHC
+import qualified GHC.Driver.Session       as GHC
+import qualified GHC.Parser               as GHC
+import qualified GHC.Parser.Header        as GHC
+import qualified GHC.Parser.Lexer         as GHC
+import qualified GHC.Parser.PostProcess   as GHC
 
 import qualified GHC.LanguageExtensions as LangExt
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 -- ---------------------------------------------------------------------
 
@@ -99,7 +100,7 @@ parseWithECP dflags fileName parser s =
 runParser :: GHC.P a -> GHC.DynFlags -> FilePath -> String -> GHC.ParseResult a
 runParser parser flags filename str = GHC.unP parser parseState
     where
-      location = GHC.mkRealSrcLoc (GHC.mkFastString filename) 1 1
+      location = mkRealSrcLoc (encodeUTF8 filename) 1 1
       buffer = GHC.stringToStringBuffer str
       parseState = GHC.initParserState (GHC.initParserOpts flags) buffer location
 

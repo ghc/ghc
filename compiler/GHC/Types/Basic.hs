@@ -146,6 +146,8 @@ import Data.Maybe
 import qualified Data.Semigroup as Semi
 
 import Language.Haskell.Syntax.ImpExp
+import qualified Language.Haskell.Textual.Source as Source
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1837,7 +1839,7 @@ inlineSpecSource spec = case spec of
                             Inlinable y      -> y
                             NoInline  z      -> z
                             Opaque    q      -> q
-                            NoUserInlinePrag -> NoSourceText
+                            NoUserInlinePrag -> Source.CodeSnippetAbsent
 
 -- A DFun has an always-active inline activation so that
 -- exprIsConApp_maybe can "see" its unfolding

@@ -56,7 +56,7 @@ import GHC.Core
 import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Types.Id
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

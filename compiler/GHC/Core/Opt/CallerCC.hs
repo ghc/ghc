@@ -29,7 +29,7 @@ import GHC.Types.CostCentre.State
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Tickish
 import GHC.Unit.Module.ModGuts
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Var
 import GHC.Unit.Types
 import GHC.Data.FastString

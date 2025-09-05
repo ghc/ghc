@@ -74,7 +74,7 @@ import GHC.Unit.Module
 import GHC.Builtin.Names
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Tickish
 import GHC.Utils.Misc
 import GHC.Driver.DynFlags

@@ -34,7 +34,7 @@ module GHC.ByteCode.Breakpoints
   where
 
 import GHC.Prelude
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Name.Occurrence
 import Control.DeepSeq
 import Data.IntMap.Strict (IntMap)

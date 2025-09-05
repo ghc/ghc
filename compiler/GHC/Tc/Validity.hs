@@ -68,7 +68,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName )
 import GHC.Types.SourceFile
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.TyThing ( TyThing(..) )
 import GHC.Types.Unique.Set( isEmptyUniqSet )
 

@@ -5,7 +5,7 @@ import GHC.Data.FastString
 import GHC
 import GHC.Data.StringBuffer
 import GHC.Parser.Lexer
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import Data.Foldable (toList)
 
 main :: IO ()

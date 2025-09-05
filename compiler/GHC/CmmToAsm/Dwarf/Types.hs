@@ -38,10 +38,12 @@ import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Types.Unique
 import GHC.Platform.Reg
-import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 
 import GHC.CmmToAsm.Dwarf.Constants
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (decodeUTF8)
 
 import qualified Data.ByteString as BS
 import qualified GHC.Utils.Monad.State.Strict as S
@@ -215,7 +217,7 @@ pprDwarfInfoOpen platform _ (DwarfBlock _ label (Just marker)) =
   $$ pprWord platform (pprAsmLabel platform $ mkAsmTempEndLabel marker)
 pprDwarfInfoOpen _ _ (DwarfSrcNote ss) =
   pprAbbrev DwAbbrGhcSrcNote
-  $$ pprString' (ftext $ srcSpanFile ss)
+  $$ pprString' (text . decodeUTF8 $ srcSpanFile ss)
   $$ pprData4 (fromIntegral $ srcSpanStartLine ss)
   $$ pprHalf (fromIntegral $ srcSpanStartCol ss)
   $$ pprData4 (fromIntegral $ srcSpanEndLine ss)

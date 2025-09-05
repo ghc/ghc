@@ -73,7 +73,7 @@ import GHC.Types.Avail
 import GHC.Types.FieldLabel
 import GHC.Types.Hint
 import GHC.Types.SourceFile
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Basic  ( TopLevelFlag(..), TyConFlavour (..), convImportLevel )
 import GHC.Types.SourceText
 import GHC.Types.Id
@@ -449,7 +449,7 @@ rnImportDecl this_mod
 renameRawPkgQual :: UnitEnv -> ModuleName -> RawPkgQual -> PkgQual
 renameRawPkgQual unit_env mn = \case
   NoRawPkgQual -> NoPkgQual
-  RawPkgQual p -> renamePkgQual unit_env mn (Just (mkFastStringShortByteString (sl_fs p)))
+  RawPkgQual p -> renamePkgQual unit_env mn (Just (mkFastStringTextUTF8 (sl_fs p)))
 
 -- | Rename raw package imports
 renamePkgQual :: UnitEnv -> ModuleName -> Maybe FastString -> PkgQual

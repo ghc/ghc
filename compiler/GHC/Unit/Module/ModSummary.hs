@@ -40,7 +40,7 @@ import GHC.Unit.Types
 import GHC.Unit.Module
 
 import GHC.Types.SourceFile ( HscSource(..), hscSourceString )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Target
 import GHC.Types.PkgQual
 import GHC.Types.Basic

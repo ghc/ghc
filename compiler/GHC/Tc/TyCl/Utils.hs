@@ -63,9 +63,9 @@ import GHC.Rename.Utils (genHsVar, genLHsApp, genLHsLit, genWildPat, wrapGenSpan
 
 import GHC.Types.Basic
 import GHC.Types.FieldLabel
-import GHC.Types.SrcLoc
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 import GHC.Types.SourceFile
-import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader ( mkRdrUnqual )
@@ -982,7 +982,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
         inst_tys = dataConResRepTyArgs dc
 
     unit_rhs = mkLHsTupleExpr [] noExtField
-    msg_lit = HsStringPrim NoSourceText (bytesFS (field_label lbl))
+    msg_lit = HsStringPrim Source.CodeSnippetAbsent (bytesFS (field_label lbl))
 
 {-
 Note [Polymorphic selectors]

@@ -53,7 +53,7 @@ import GHC.Types.SourceText
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Env
 import GHC.Types.Name (Name)
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Hs.Doc
@@ -65,6 +65,7 @@ import GHC.Utils.Binary
 import GHC.Unicode
 
 import Language.Haskell.Syntax.Extension
+import qualified Language.Haskell.Textual.Source as Source
 
 import Data.Data
 import Data.List (isPrefixOf)
@@ -126,7 +127,7 @@ data InWarningCategory
     } deriving Data
 
 fromWarningCategory :: WarningCategory -> InWarningCategory
-fromWarningCategory wc = InWarningCategory noAnn NoSourceText (noLocA wc)
+fromWarningCategory wc = InWarningCategory noAnn Source.CodeSnippetAbsent (noLocA wc)
 
 
 -- See Note [Warning categories]
@@ -268,7 +269,7 @@ pp_ws ws
 
 pprWarningTxtForMsg :: WarningTxt p -> SDoc
 pprWarningTxtForMsg warn =
-  let pprWarn = doubleQuotes . vcat . map (pprShortByteString . sl_fs . hsDocString . unLoc)
+  let pprWarn = doubleQuotes . vcat . map (ppr . sl_fs . hsDocString . unLoc)
   in  case warn of
         DeprecatedTxt _ ds -> text "Deprecated:" <+>
                               pprWarn ds

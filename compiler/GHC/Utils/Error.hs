@@ -72,7 +72,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
 import GHC.Types.Error
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Unit.Module.Warnings
 
 import System.Exit      ( ExitCode(..), exitWith )

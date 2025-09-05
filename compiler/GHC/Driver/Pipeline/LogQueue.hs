@@ -18,7 +18,7 @@ import GHC.Prelude
 import Control.Concurrent
 import Data.IORef
 import GHC.Types.Error
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Logger
 import qualified Data.IntMap as IM
 import Control.Concurrent.STM

@@ -68,7 +68,7 @@ import GHC.Types.Name.Reader
 import GHC.Builtin.Names
 import GHC.Types.Hint ( UntickedPromotedThing(..) )
 import GHC.Types.Name
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
 import GHC.Types.Error

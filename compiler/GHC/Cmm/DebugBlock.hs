@@ -39,17 +39,19 @@ import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Reg ( pprGlobalReg, pprGlobalRegUse )
 import GHC.Cmm.Utils
-import GHC.Data.FastString ( LexicalFastString, nilFS, mkFastString )
+import GHC.Data.FastString (LexicalFastString)
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Utils.Misc      ( seqList )
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Data.Maybe
 import Data.List     ( nubBy )
@@ -162,7 +164,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
       rangeRating (span, _)
         | srcSpanFile span == thisFile = 1
         | otherwise                    = 2 :: Int
-      thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
+      thisFile = maybe mempty encodeUTF8 $ ml_hs_file modLoc
 
       -- Returns block tree for this scope as well as all nested
       -- scopes. Note that if there are multiple blocks in the (exact)

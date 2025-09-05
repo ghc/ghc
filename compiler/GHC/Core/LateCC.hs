@@ -17,7 +17,7 @@ import GHC.Core.Seq
 import qualified GHC.Data.Strict as Strict
 import GHC.Core.Utils
 import GHC.Tc.Utils.TcType
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.Outputable

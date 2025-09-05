@@ -156,7 +156,7 @@ import GHC.Types.Avail
 import GHC.Types.Var
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Types.CostCentre.State

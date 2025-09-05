@@ -32,7 +32,7 @@ import GHC.Tc.Errors.Ppr
 import GHC.Tc.Errors.Types
 
 import GHC.Types.Error.Codes
-import GHC.Types.SrcLoc (interactiveSrcSpan)
+import Language.Haskell.Textual.Location (interactiveSrcSpan)
 import GHC.TypeLits
 
 import GHC.Unit.State

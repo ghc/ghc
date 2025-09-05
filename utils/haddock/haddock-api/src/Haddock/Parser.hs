@@ -13,13 +13,14 @@ module Haddock.Parser
   , parseIdent
   ) where
 
-import GHC.Data.FastString (fsLit)
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer (ParseResult (PFailed, POk), ParserOpts, initParserState, unP)
 import GHC.Types.Name.Occurrence (occNameString)
 import GHC.Types.Name.Reader (RdrName (..))
-import GHC.Types.SrcLoc (GenLocated (..), mkRealSrcLoc)
+
+import Language.Haskell.Textual.Location (GenLocated (..), mkRealSrcLoc)
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import qualified Documentation.Haddock.Parser as P
 import Documentation.Haddock.Types
@@ -44,7 +45,7 @@ parseIdent parserOpts ns str0 =
           Just (wrap (NsRdrName ns name))
     PFailed{} -> Nothing
   where
-    realSrcLc = mkRealSrcLoc (fsLit "<unknown file>") 0 0
+    realSrcLc = mkRealSrcLoc (encodeUTF8 "<unknown file>") 0 0
     pstate str = initParserState parserOpts (stringToStringBuffer str) realSrcLc
     (wrap, str1) = case str0 of
       '(' : s@(c : _)

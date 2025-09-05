@@ -30,17 +30,19 @@ import GHC.Core.DataCon
 
 import GHC.Data.Bag
 import GHC.Data.FastString
+import GHC.TypeLits
 import GHC.Types.Name.Set
 import GHC.Types.Name
-import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Types.SourceText
 import GHC.Utils.Outputable
 
 import Data.Data hiding (Fixity)
 import Data.ByteString (ByteString)
-import GHC.TypeLits
 
+import qualified Language.Haskell.Textual.Source as Source
+
+import Language.Haskell.Textual.Location
 -- | Should source spans be removed from output.
 data BlankSrcSpan = BlankSrcSpan | BlankSrcSpanFile | NoBlankSrcSpan
                   deriving (Eq,Show)
@@ -172,12 +174,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                                , generic s ]
 
             sourceText :: SourceText -> SDoc
-            sourceText NoSourceText = case bs of
-              BlankSrcSpan -> parens $ text "SourceText" <+> text "blanked"
-              _            -> parens $ text "NoSourceText"
-            sourceText (SourceText src) = case bs of
-              BlankSrcSpan     -> parens $ text "SourceText" <+> text "blanked"
-              _                -> parens $ text "SourceText" <+> pprShortByteString src
+            sourceText Source.CodeSnippetAbsent = case bs of
+              BlankSrcSpan -> parens $ text "CodeSnippet" <+> text "blanked"
+              _            -> parens $ text "Source.CodeSnippetAbsent"
+            sourceText (Source.CodeSnippet src) = case bs of
+              BlankSrcSpan     -> parens $ text "CodeSnippet" <+> text "blanked"
+              _                -> parens $ text "CodeSnippet" <+> ppr src
 
             epaLocation :: EpaLocation -> SDoc
             epaLocation (EpaSpan s) = parens $ text "EpaSpan" <+> srcSpan s

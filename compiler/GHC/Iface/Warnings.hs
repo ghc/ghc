@@ -6,13 +6,13 @@ where
 
 import GHC.Prelude
 
-import GHC.Data.FastString (mkFastStringShortByteString)
+import GHC.Data.FastString (mkFastStringTextUTF8)
 import GHC.Hs
 
 import GHC.Iface.Syntax
 
 import GHC.Types.SourceText
-import GHC.Types.SrcLoc ( unLoc )
+import Language.Haskell.Textual.Location ( unLoc )
 
 import GHC.Unit.Module.Warnings
 
@@ -31,5 +31,4 @@ toIfaceStringLiteralWithNames :: WithHsDocIdentifiers StringLiteral GhcRn -> (If
 toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
 
 toIfaceStringLiteral :: StringLiteral -> IfaceStringLiteral
-toIfaceStringLiteral (StringLiteral sl fs _) = IfStringLiteral sl $ mkFastStringShortByteString fs
-
+toIfaceStringLiteral (StringLiteral sl fs _) = IfStringLiteral sl $ mkFastStringTextUTF8 fs

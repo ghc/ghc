@@ -80,7 +80,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.TypeEnv
 import GHC.Types.Basic
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique.FM
 import GHC.Types.TyThing
 

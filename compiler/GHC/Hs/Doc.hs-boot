@@ -3,7 +3,7 @@ module GHC.Hs.Doc where
 
 -- See #21592 for progress on removing this boot file.
 
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Hs.DocString
 import Data.Kind
 

@@ -147,7 +147,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Avail
 import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Types.Annotations
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.SourceFile
 import qualified GHC.LanguageExtensions as LangExt
 

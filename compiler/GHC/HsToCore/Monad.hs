@@ -97,7 +97,7 @@ import GHC.Types.SourceFile
 import GHC.Types.Id
 import GHC.Types.Var (EvVar)
 import GHC.Types.Var.Set( VarSet, emptyVarSet, extendVarSetList )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
@@ -115,7 +115,6 @@ import GHC.Tc.Utils.Env (lookupGlobal)
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import qualified GHC.Data.Strict as Strict
 
 import Data.IORef
 
@@ -396,7 +395,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
                                                           else Nothing) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
                              NotBoot
-        real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
+        real_span = realSrcLocSpan (mkRealSrcLoc (fastStringToTextUTF8 (moduleNameFS (moduleName mod))) 1 1)
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
                            , ds_gbl_rdr_env  = rdr_env
@@ -488,7 +487,7 @@ getUnspecables = dsl_unspecables <$> getLclEnv
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv
-                  ; return (RealSrcSpan (dsl_loc env) Strict.Nothing) }
+                  ; return (RealSrcSpan (dsl_loc env) Nothing) }
 
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
 putSrcSpanDs (UnhelpfulSpan {}) thing_inside

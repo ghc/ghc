@@ -30,7 +30,7 @@ import GHC.Core.Type
 import GHC.Builtin.Types
 import GHC.HsToCore.Match
 import GHC.Builtin.Names
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Tc.Utils.TcType

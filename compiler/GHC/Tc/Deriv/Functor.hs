@@ -32,7 +32,7 @@ import GHC.Hs
 import GHC.Utils.Panic
 import GHC.Builtin.Names
 import GHC.Types.Name.Reader
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Monad.State.Strict
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Utils.TcType

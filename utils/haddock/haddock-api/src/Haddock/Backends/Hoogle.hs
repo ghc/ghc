@@ -34,7 +34,6 @@ import GHC.Core.InstEnv
 import qualified GHC.Driver.DynFlags as DynFlags
 import GHC.Driver.Ppr
 import GHC.Plugins (TopLevelFlag (..))
-import GHC.Types.SourceText
 import GHC.Unit.State
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
@@ -45,6 +44,8 @@ import Documentation.Haddock.Markup
 import Haddock.GhcUtils
 import Haddock.Types hiding (Version)
 import Haddock.Utils hiding (out)
+
+import qualified Language.Haskell.Textual.Source as Source
 
 prefix :: [String]
 prefix =
@@ -269,7 +270,7 @@ ppInstance dflags unit_state x =
       x
         { is_flag =
             OverlapFlag
-              { overlapMode = NoOverlap NoSourceText
+              { overlapMode = NoOverlap Source.CodeSnippetAbsent
               , isSafeOverlap = False
               }
         }

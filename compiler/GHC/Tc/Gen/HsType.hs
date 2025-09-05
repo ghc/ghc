@@ -118,7 +118,6 @@ import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Builtin.Types
 import GHC.Types.Basic
-import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Utils.Misc
@@ -135,6 +134,9 @@ import qualified GHC.Data.List.Infinite as Inf
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Data.Bag( unitBag )
+
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 
 import Data.Function ( on )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
@@ -4778,6 +4780,6 @@ tyLitFromLit (HsChar x char) = Just (HsCharTy x char)
 tyLitFromLit _ = Nothing
 
 tyLitFromOverloadedLit :: OverLitVal -> Maybe (HsTyLit GhcRn)
-tyLitFromOverloadedLit (HsIntegral n) = Just $ HsNumTy NoSourceText (il_value n)
-tyLitFromOverloadedLit (HsIsString _ s) = Just $ HsStrTy NoSourceText s
+tyLitFromOverloadedLit (HsIntegral   n) = Just $ HsNumTy Source.CodeSnippetAbsent (il_value n)
+tyLitFromOverloadedLit (HsIsString _ s) = Just $ HsStrTy Source.CodeSnippetAbsent s
 tyLitFromOverloadedLit HsFractional{} = Nothing

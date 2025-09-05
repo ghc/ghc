@@ -121,6 +121,8 @@ import GHC.Prelude
 
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.UTF8
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
 import GHC.Data.FastString
@@ -129,7 +131,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
@@ -1936,7 +1938,7 @@ instance Binary BinSrcSpan where
           h <- getByte bh
           case h of
             0 -> do BinSpan ss <- get bh
-                    return $ BinSrcSpan (RealSrcSpan ss Strict.Nothing)
+                    return $ BinSrcSpan (RealSrcSpan ss Nothing)
             _ -> do s <- get bh
                     return $ BinSrcSpan (UnhelpfulSpan s)
 
@@ -2004,3 +2006,23 @@ instance Binary a => Binary (FingerprintWithValue a) where
 instance NFData a => NFData (FingerprintWithValue a) where
   rnf (FingerprintWithValue fp mflags)
     = rnf fp `seq` rnf mflags `seq` ()
+
+instance Binary TextUTF8 where
+  put_ bh = putSBS bh . bytesUTF8
+
+  get = fmap unsafeFromShortByteString . getSBS
+
+instance Binary Source.CodeSnippet where
+  put_ bh Source.CodeSnippetAbsent = putByte bh 0
+  put_ bh (Source.CodeSnippet s) = do
+        putByte bh 1
+        put_ bh s
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return Source.CodeSnippetAbsent
+      1 -> do
+        s <- get bh
+        return (Source.CodeSnippet s)
+      _ -> panic $ "Binary Source.CodeSnippet:" ++ show h

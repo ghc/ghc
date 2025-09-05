@@ -18,7 +18,7 @@ import Data.IORef
 import GHC.Types.CostCentre.State
 import GHC.Types.Error
 import GHC.Types.Name.Env
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Name.Reader (GlobalRdrEnv)

@@ -27,7 +27,7 @@ import GHC.Types.Fixity.Env
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Fixity
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Utils.Outputable
 

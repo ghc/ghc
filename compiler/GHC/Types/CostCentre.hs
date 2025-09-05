@@ -33,11 +33,13 @@ import GHC.Types.Name
 import GHC.Unit.Module
 import GHC.Types.Unique
 import GHC.Utils.Outputable
-import GHC.Types.SrcLoc
 import GHC.Data.FastString
 import GHC.Types.CostCentre.State
-import Control.DeepSeq
 
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
+
+import Control.DeepSeq
 import Data.Data
 
 -----------------------------------------------------------------------------
@@ -414,7 +416,7 @@ instance NFData IndexedCCFlavour where
 getAllCAFsCC :: Module -> (CostCentre, CostCentreStack)
 getAllCAFsCC this_mod =
     let
-      span = mkGeneralSrcSpan (mkFastString "<entire-module>") -- XXX do better
+      span = mkGeneralSrcSpan (encodeUTF8 "<entire-module>") -- XXX do better
       all_cafs_cc  = mkAllCafsCC this_mod span
       all_cafs_ccs = mkSingletonCCS all_cafs_cc
     in

@@ -52,7 +52,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.SourceText
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Tickish (CoreTickish)
 import GHC.Types.Unique.Set (UniqSet)
 import GHC.Types.ThLevelIndex
@@ -1341,7 +1341,7 @@ instance Outputable (HsPragE (GhcPass p)) where
     pprWithSourceText st (text "{-# SCC")
      -- no doublequotes if stl empty, for the case where the SCC was written
      -- without quotes.
-    <+> pprWithSourceText stl (pprShortByteString lbl) <+> text "#-}"
+    <+> pprWithSourceText stl (ppr lbl) <+> text "#-}"
 
 
 {- *********************************************************************
@@ -2509,7 +2509,7 @@ lamCaseKeyword LamCases  = text "\\cases"
 
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
 pprExternalSrcLoc (StringLiteral _ src _,(n1,n2),(n3,n4))
-  = ppr (pprShortByteString src,(n1,n2),(n3,n4))
+  = ppr (ppr src,(n1,n2),(n3,n4))
 
 instance Outputable HsArrowMatchContext where
   ppr ProcExpr                  = text "ProcExpr"

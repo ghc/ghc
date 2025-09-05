@@ -72,7 +72,7 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Data.FastString
 

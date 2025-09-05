@@ -79,7 +79,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Builtin.Types
 import GHC.Builtin.Names

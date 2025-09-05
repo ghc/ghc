@@ -88,6 +88,12 @@ module GHC.Utils.Outputable (
 
         pprModuleName,
 
+        pprWithCodeSnippet, pprWithCodeSnippetThen,
+
+        pprUnhelpfulSpanReason, pprUserRealSpan, pprUserSpan,
+
+        pprLocated, pprLocatedAlways,
+        
         -- * Controlling the style in which output is printed
         PprStyle(..), NamePprCtx(..),
         QueryQualifyName, QueryQualifyModule, QueryQualifyPackage, QueryPromotionTick,
@@ -166,6 +172,11 @@ import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Utils.Exception
 import GHC.Exts (oneShot)
+
+import Language.Haskell.Textual.Source (FractionalLit(..), IntegralLit(..), StringLiteral(..))
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 
 {-
 ************************************************************************
@@ -1100,12 +1111,143 @@ instance Outputable Extension where
 instance Outputable ModuleName where
   ppr = pprModuleName
 
+instance Outputable TextUTF8 where
+  ppr = text . decodeUTF8
+
+instance Outputable Source.CodeSnippet where
+  ppr Source.CodeSnippetAbsent      = text "Source.CodeSnippetAbsent"
+  ppr (Source.CodeSnippet utf8) = text "CodeSnippet" <+> ppr utf8
+
+-- | Special combinator for showing string literals.
+pprWithCodeSnippet :: Source.CodeSnippet -> SDoc -> SDoc
+pprWithCodeSnippet Source.CodeSnippetAbsent     d = d
+pprWithCodeSnippet (Source.CodeSnippet src) _ = ppr src
+
+-- | Special combinator for showing string literals.
+pprWithCodeSnippetThen :: Source.CodeSnippet -> SDoc -> SDoc -> SDoc
+pprWithCodeSnippetThen Source.CodeSnippetAbsent     d _ = d
+pprWithCodeSnippetThen (Source.CodeSnippet src) _ e = ppr src <+> e
 
 pprModuleName :: IsLine doc => ModuleName -> doc
 pprModuleName (ModuleName nm) =
     docWithStyle (ztext (zEncodeFS nm)) (\_ -> ftext nm)
 {-# SPECIALIZE pprModuleName :: ModuleName -> SDoc #-}
 {-# SPECIALIZE pprModuleName :: ModuleName -> HLine #-} -- see Note [SPECIALIZE to HDoc]
+
+instance Outputable Source.IntegralLit where
+  ppr (IL (Source.CodeSnippet src) _ _) = ppr src
+  ppr (IL Source.CodeSnippetAbsent _ value) = text (show value)
+
+instance Outputable Source.FractionalLit where
+  ppr (fl@(FL {})) =
+    pprWithCodeSnippet (fl_text fl) $
+      rational $ Source.mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl)
+
+instance Outputable Source.StringLiteral where
+  ppr sl = pprWithCodeSnippet (sl_st sl) (doubleQuotes . ppr $ sl_fs sl)
+
+instance Outputable RealSrcLoc where
+    ppr sLoc
+      = hcat [ ppr (srcLocFile sLoc) <> colon
+             , int (srcLocLine sLoc) <> colon
+             , int (srcLocCol  sLoc) ]
+
+instance Outputable SrcLoc where
+    ppr (RealSrcLoc l _) = ppr l
+    ppr (UnhelpfulLoc s) = ppr s
+
+instance Outputable RealSrcSpan where
+    ppr span = pprUserRealSpan True span
+
+-- I don't know why there is this style-based difference
+--      = getPprStyle $ \ sty ->
+--        if userStyle sty || debugStyle sty then
+--           text (showUserRealSpan True span)
+--        else
+--           hcat [text "{-# LINE ", int (srcSpanStartLine span), space,
+--                 char '\"', pprFastFilePath $ srcSpanFile span, text " #-}"]
+
+instance Outputable SrcSpan where
+    ppr span = pprUserSpan True span
+
+instance Outputable UnhelpfulSpanReason where
+    ppr = pprUnhelpfulSpanReason
+
+-- I don't know why there is this style-based difference
+--      = getPprStyle $ \ sty ->
+--        if userStyle sty || debugStyle sty then
+--           pprUserSpan True span
+--        else
+--           case span of
+--           UnhelpfulSpan _ -> panic "Outputable UnhelpfulSpan"
+--           RealSrcSpan s -> ppr s
+
+pprUnhelpfulSpanReason :: UnhelpfulSpanReason -> SDoc
+pprUnhelpfulSpanReason = ppr . unhelpfulSpanText
+
+pprUserSpan :: Bool -> SrcSpan -> SDoc
+pprUserSpan _         (UnhelpfulSpan r) = pprUnhelpfulSpanReason r
+pprUserSpan show_path (RealSrcSpan s _) = pprUserRealSpan show_path s
+
+pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
+pprUserRealSpan show_path span
+  | isPointRealSpan span
+  = hcat [ ppWhen show_path (ppr (srcSpanFile span) <> colon)
+         , int (srcSpanSLine span) <> colon
+         , int (srcSpanSCol span) ]
+
+pprUserRealSpan show_path span
+  | isOneLineRealSpan span
+  = hcat [ ppWhen show_path (ppr (srcSpanFile span) <> colon)
+         , int (srcSpanSLine span) <> colon
+         , int (srcSpanSCol span)
+         , ppUnless ((srcSpanECol span) - (srcSpanSCol span) <= 1) (char '-' <> int ((srcSpanECol span) - 1)) ]
+            -- For single-character or point spans, we just
+            -- output the starting column number
+
+pprUserRealSpan show_path span
+  = hcat [ ppWhen show_path (ppr (srcSpanFile span) <> colon)
+         , parens (int (srcSpanSLine span) <> comma <> int (srcSpanSCol span))
+         , char '-'
+         , parens (int (srcSpanELine span) <> comma <> int ecol') ]
+ where
+   ecol' = let e = srcSpanECol span
+           in  if e == 0 then e else e - 1
+
+instance (Outputable e) => Outputable (Located e) where
+  ppr (L l e) = -- GenLocated:
+                -- Print spans without the file name etc
+                whenPprDebug (braces (pprUserSpan False l))
+             $$ ppr e
+                
+instance (Outputable e) => Outputable (GenLocated RealSrcSpan e) where
+  ppr (L l e) = -- GenLocated:
+                -- Print spans without the file name etc
+                whenPprDebug (braces (pprUserSpan False (RealSrcSpan l Nothing)))
+             $$ ppr e
+
+pprLocated :: (Outputable l, Outputable e) => GenLocated l e -> SDoc
+pprLocated (L l e) =
+                -- Print spans without the file name etc
+                whenPprDebug (braces (ppr l))
+             $$ ppr e
+
+-- | Always prints the location, even without -dppr-debug
+pprLocatedAlways :: (Outputable l, Outputable e) => GenLocated l e -> SDoc
+pprLocatedAlways (L l e) =
+     braces (ppr l)
+  $$ ppr e
+
+instance Outputable NoComments where
+  ppr NoComments = text "NoComments"
+
+instance (Outputable a) => Outputable (EpaLocation' a) where
+  ppr (EpaSpan r) = text "EpaSpan" <+> ppr r
+  ppr (EpaDelta s d a) = text "EpaDelta" <+> ppr s <+> ppr d <+> ppr a
+
+instance Outputable DeltaPos where
+  ppr (SameLine c) = text "SameLine" <+> ppr c
+  ppr (DifferentLine l c) = text "DifferentLine" <+> ppr l <+> ppr c
 
 -----------------------------------------------------------------------
 -- The @OutputableP@ class

@@ -62,7 +62,7 @@ import GHC.Types.Basic  ( VisArity, TyConFlavour(..), TypeOrKind(..), RuleName )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
 import GHC.Types.Hint (SigLike(..))
 import GHC.Types.Unique.Set
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 
 import GHC.Driver.DynFlags
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)

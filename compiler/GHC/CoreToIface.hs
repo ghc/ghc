@@ -80,7 +80,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Tickish
 import GHC.Types.Demand ( isNopSig )
 import GHC.Types.Cpr ( topCprSig )
-import GHC.Types.SrcLoc (unLoc)
+import Language.Haskell.Textual.Location (unLoc)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

@@ -25,7 +25,7 @@ import GHC.Unit.Module
 import GHC.Unit.Module.Graph
 import GHC.Unit.State
 import GHC.Types.Hint
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import Data.Version
 
 import Language.Haskell.Syntax.Decls (RuleDecl(..))

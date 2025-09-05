@@ -20,7 +20,7 @@ import GHC.Hs.Expr ()   -- instance Outputable
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName,ImpDeclSpec (..), rdrNameOcc, rdrNameSpace)
-import GHC.Types.SrcLoc (SrcSpan(..), srcSpanStartLine)
+import Language.Haskell.Textual.Location (SrcSpan(..), srcSpanStartLine)
 import GHC.Unit.Module.Imported (ImportedModsVal(..))
 import GHC.Unit.Types
 import GHC.Utils.Outputable

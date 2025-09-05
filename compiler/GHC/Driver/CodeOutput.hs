@@ -45,7 +45,6 @@ import qualified GHC.Data.Stream as Stream
 
 import GHC.Utils.TmpFs
 
-
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Logger

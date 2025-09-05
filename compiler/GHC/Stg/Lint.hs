@@ -112,7 +112,7 @@ import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
 import GHC.Types.RepType
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Utils.Logger
 import GHC.Utils.Outputable

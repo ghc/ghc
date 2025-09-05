@@ -23,7 +23,7 @@ import Data.List.NonEmpty ( NonEmpty (..), init, last )
 import GHC.Prelude hiding ( init, last )
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
-import GHC.Types.SrcLoc (unLoc)
+import Language.Haskell.Textual.Location (unLoc)
 import GHC.Utils.Outputable
 import GHC.Parser.Annotation ( SrcSpanAnnL )
 import GHC.Hs.Extension (GhcPass (..), OutputableBndrId)

@@ -31,7 +31,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Utils.Outputable hiding ((<>))
-import GHC.Types.SrcLoc (GenLocated(..), unLoc)
+import Language.Haskell.Textual.Location (GenLocated(..), unLoc)
 import GHC.Utils.Panic
 import GHC.Parser.Annotation
 

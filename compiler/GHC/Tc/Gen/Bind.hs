@@ -76,7 +76,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.SourceFile
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Utils.Misc
 import GHC.Types.Basic
@@ -638,7 +638,7 @@ funBindTicks loc fun_id mod sigs
       -- by the renamer
   , let cc_str
           | Just cc_str <- mb_cc_str
-          = mkFastStringShortByteString . sl_fs $ unLoc cc_str
+          = mkFastStringTextUTF8 . sl_fs $ unLoc cc_str
           | otherwise
           = getOccFS (Var.varName fun_id)
         cc_name = concatFS [moduleNameFS (moduleName mod), fsLit ".", cc_str]

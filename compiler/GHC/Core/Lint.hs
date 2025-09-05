@@ -74,7 +74,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Tickish
 import GHC.Types.Unique.FM ( isNullUFM, sizeUFM )
 import GHC.Types.RepType

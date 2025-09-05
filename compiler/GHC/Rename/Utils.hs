@@ -54,9 +54,8 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Core.DataCon
-import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.SourceFile
-import GHC.Types.SourceText ( SourceText(..), IntegralLit )
+import GHC.Types.SourceText ( IntegralLit )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Unit.Module.ModIface
@@ -73,6 +72,9 @@ import GHC.Unit.Module
 import GHC.Unit.Module.Warnings  ( WarningTxt(..) )
 import GHC.Iface.Load
 import qualified GHC.LanguageExtensions as LangExt
+
+import Language.Haskell.Textual.Location as SrcLoc
+import qualified Language.Haskell.Textual.Source as Source
 
 import qualified Data.List.NonEmpty as NE
 import Data.Foldable (for_)
@@ -744,7 +746,7 @@ genHsIntegralLit :: (NoAnn an) => IntegralLit -> LocatedAn an (HsExpr GhcRn)
 genHsIntegralLit = genLHsLit . HsInt noExtField
 
 genHsTyLit :: FastString -> HsType GhcRn
-genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
+genHsTyLit = HsTyLit noExtField . HsStrTy Source.CodeSnippetAbsent
 
 genSimpleConPat :: Name -> [LPat GhcRn] -> LPat GhcRn
 -- The pattern (C p1 .. pn)

@@ -45,7 +45,7 @@ import GHC.Core.Predicate
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Core.PatSyn
 import GHC.Utils.Panic
 import GHC.Utils.Outputable

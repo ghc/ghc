@@ -24,7 +24,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.PkgQual
 import GHC.Types.SafeHaskell
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.TyThing
 import GHC.Types.TypeEnv
 import GHC.Unit.External

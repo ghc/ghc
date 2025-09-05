@@ -66,9 +66,10 @@ import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.InertSet (InertSet, emptyInertSet)
 import GHC.Tc.Utils.TcType (isStringTy, topTcLevel)
 import GHC.Types.CompleteMatch
-import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
+import GHC.Types.SourceText (mkFractionalLit, FractionalLit
                             , fractionalLitFromRational
                             , FractionalExponentBase(..))
+import qualified Language.Haskell.Textual.Source as Source
 import Numeric (fromRat)
 import Data.Foldable (find)
 import Data.Ratio
@@ -671,7 +672,7 @@ coreExprAsPmLit e = case collectArgs e of
     -> do
       let rational = (abs n) :% d
       let neg = if n < 0 then 1 else 0
-      let frac = mkFractionalLit NoSourceText False rational exp' exp_base
+      let frac = mkFractionalLit Source.CodeSnippetAbsent False rational exp' exp_base
       Just $ PmLit (exprType e) (PmLitOverRat neg frac)
 
   (Var x, args)

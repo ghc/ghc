@@ -71,7 +71,7 @@ import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var( EvVar, mkLocalVar )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Basic
 import GHC.Types.Unique.Set( nonDetEltsUniqSet )
 

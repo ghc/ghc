@@ -13,7 +13,7 @@ import System.Environment
 import Data.List (sort)
 import Data.Tree
 import GHC.Types.Name.Cache
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Utils.Outputable                 ( Outputable, renderWithContext, ppr, defaultUserStyle, SDoc )

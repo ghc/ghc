@@ -18,7 +18,6 @@ import GHC.Driver.Session (safeImportsOn)
 import GHC.Iface.Ext.Binary (hie_file_result, readHieFile)
 import GHC.Iface.Ext.Types (HieAST (..), HieASTs (..), HieFile (..), SourcedNodeInfo (..), pattern HiePath)
 import GHC.Parser.Lexer as Lexer
-import GHC.Types.SrcLoc (mkRealSrcLoc, realSrcLocSpan, srcSpanFile)
 import GHC.Unit.Module (Module, moduleName)
 import qualified GHC.Utils.Outputable as Outputable
 import System.Directory
@@ -32,6 +31,9 @@ import Haddock.Backends.Xhtml.Utils (renderToString)
 import Haddock.InterfaceFile
 import Haddock.Types
 import Haddock.Utils (Verbosity, out, verbose, writeUtf8File)
+
+import Language.Haskell.Textual.Location (mkRealSrcLoc, realSrcLocSpan, srcSpanFile)
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 -- | Generate hyperlinked source for given interfaces.
 --
@@ -89,12 +91,12 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
       <$> (readHieFile nc iface.ifaceHieFile)
 
   -- Get the AST and tokens corresponding to the source file we want
-  let fileFs = mkFastString file
+  let fileUTF8 = encodeUTF8 file
       mast
         | M.size asts == 1 = snd <$> M.lookupMin asts
         | otherwise = M.lookup (HiePath (mkFastString file)) asts
       tokens' = parse parserOpts sDocContext file rawSrc
-      ast = fromMaybe (emptyHieAst fileFs) mast
+      ast = fromMaybe (emptyHieAst fileUTF8) mast
       fullAst = recoverFullIfaceTypes sDocContext types ast
 
   -- Warn if we didn't find an AST, but there were still ASTs

@@ -24,7 +24,7 @@ import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Pmc.Types ( Nablas )
 import GHC.Core.Type ( Type )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.Multiplicity

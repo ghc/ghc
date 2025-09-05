@@ -9,7 +9,7 @@ module GHC.Driver.Errors (
 
 import GHC.Driver.Errors.Types
 import GHC.Prelude
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.SourceError
 import GHC.Types.Error
 import GHC.Utils.Json

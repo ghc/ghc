@@ -6,7 +6,7 @@ module M where
 
 import Control.Monad.State
 import GHC.Hs
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import Type.Reflection
 import Data.Data (Data, gmapM)
 

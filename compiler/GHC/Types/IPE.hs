@@ -10,7 +10,7 @@ import GHC.Prelude
 
 import GHC.Types.Name
 import GHC.Data.FastString
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Core.DataCon
 
 import GHC.Types.Unique.DFM

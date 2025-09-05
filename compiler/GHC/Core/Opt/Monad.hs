@@ -51,7 +51,7 @@ import GHC.Core.Opt.Stats ( SimplCount, zeroSimplCount, plusSimplCount )
 import GHC.Types.Annotations
 import GHC.Types.Unique.Supply
 import GHC.Types.Name.Env
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Error
 
 import GHC.Utils.Outputable as Outputable

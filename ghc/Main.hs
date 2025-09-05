@@ -50,7 +50,7 @@ import GHC.Unit.Finder ( findImportedModule, FindResult(..) )
 import GHC.Unit.Types  ( IsBootInterface(..) )
 
 import GHC.Types.Basic     ( failed )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.SourceError
 import GHC.Types.Unique.Supply
 import GHC.Types.PkgQual

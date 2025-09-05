@@ -65,9 +65,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.Name
-import GHC.Types.SourceText
 import GHC.Types.Id.Make ( coerceId )
-import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM ( lookupUFM, listToUFM )
 import GHC.Types.Var.Env
 import GHC.Types.Var
@@ -76,7 +74,7 @@ import GHC.Types.Var.Set
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH
 import GHC.Builtin.PrimOps
-import GHC.Builtin.PrimOps.Ids (primOpId)
+import GHC.Builtin.PrimOps.Ids ( primOpId )
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 
@@ -85,13 +83,16 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Lexeme
 
-import GHC.Data.FastString
-import GHC.Data.Pair
 import GHC.Data.Bag
+import GHC.Data.FastString
 import GHC.Data.Maybe ( expectJust )
 import GHC.Unit.Module
+import GHC.Data.Pair
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Syntax.Basic ( FieldLabelString(..) )
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.Source ( mkIntegralLit )
+import qualified Language.Haskell.Textual.Source as Source
 
 import Data.List  ( find, partition, intersperse )
 
@@ -227,7 +228,7 @@ gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     eq_expr_with_tag_check = nlHsCase
       (nlHsPar (untag_Expr [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
                     (nlHsOpApp (nlHsVar ah_RDR) neInt_RDR (nlHsVar bh_RDR))))
-      [ mkHsCaseAlt (nlLitPat (HsIntPrim NoSourceText 1)) false_Expr
+      [ mkHsCaseAlt (nlLitPat (HsIntPrim Source.CodeSnippetAbsent 1)) false_Expr
       , mkHsCaseAlt nlWildPat (
           nlHsCase
             (nlHsVar a_RDR)
@@ -515,7 +516,7 @@ gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       where
         tag     = get_tag data_con
         tag_lit
-             = noLocA (HsLit noExtField (HsIntPrim NoSourceText (toInteger tag)))
+             = noLocA (HsLit noExtField (HsIntPrim Source.CodeSnippetAbsent (toInteger tag)))
 
     mkInnerEqAlt :: OrdOp -> DataCon -> LMatch GhcPs (LHsExpr GhcPs)
     -- First argument 'a' known to be built with K
@@ -1433,7 +1434,7 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
                         -- redundant test, and annoying warning
       | tag-fIRST_TAG == n_cons-1 = nlWildPat   -- Last constructor
       | otherwise = nlConPat intDataCon_RDR
-                             [nlLitPat (HsIntPrim NoSourceText (toInteger tag))]
+                             [nlLitPat (HsIntPrim Source.CodeSnippetAbsent (toInteger tag))]
       where
         tag = dataConTag dc
 
@@ -2194,7 +2195,7 @@ genAuxBindSpecOriginal loc spec
       = mkHsVarBind loc maxtag_RDR rhs
       where
         rhs = nlHsApp (nlHsVar intDataCon_RDR)
-                      (nlHsLit (HsIntPrim NoSourceText max_tag))
+                      (nlHsLit (HsIntPrim Source.CodeSnippetAbsent max_tag))
         max_tag =  case (tyConDataCons tycon) of
                      data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 

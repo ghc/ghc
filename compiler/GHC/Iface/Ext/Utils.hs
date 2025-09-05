@@ -11,13 +11,12 @@ import GHC.Prelude
 import GHC.Core.Map.Type
 import GHC.Driver.DynFlags    ( DynFlags )
 import GHC.Driver.Ppr
-import GHC.Data.FastString   ( FastString, mkFastString )
+import GHC.Data.FastString   ( FastString, fastStringToTextUTF8, mkFastString, mkFastStringTextUTF8 )
 import GHC.Iface.Type
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Name.Set
 import GHC.Utils.Outputable hiding ( (<>) )
 import qualified GHC.Utils.Outputable as O
-import GHC.Types.SrcLoc
 import GHC.CoreToIface
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
@@ -26,9 +25,10 @@ import GHC.Core.Type
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Parser.Annotation
-import qualified GHC.Data.Strict as Strict
 
 import GHC.Iface.Ext.Types
+
+import Language.Haskell.Textual.Location
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -89,7 +89,7 @@ foldType f (Roll t) = f $ fmap (foldType f) t
 selectPoint :: HieFile -> (Int,Int) -> Maybe (HieAST Int)
 selectPoint hf (sl,sc) = getFirst $
   flip foldMap (M.toList (getAsts $ hie_asts hf)) $ \(HiePath fs,ast) -> First $
-      case selectSmallestContaining (sp fs) ast of
+      case selectSmallestContaining (sp $ fastStringToTextUTF8 fs) ast of
         Nothing -> Nothing
         Just ast' -> Just ast'
  where
@@ -302,7 +302,7 @@ getNameBindingInClass
   -> M.Map HiePath (HieAST a)
   -> Maybe Span
 getNameBindingInClass n sp asts = do
-  ast <- M.lookup (HiePath (srcSpanFile sp)) asts
+  ast <- M.lookup (HiePath (mkFastStringTextUTF8 (srcSpanFile sp))) asts
   clsNode <- selectLargestContainedBy sp ast
   getFirst $ foldMap First $ do
     child <- flattenAst clsNode
@@ -317,7 +317,7 @@ getNameScopeAndBinding
   -> Maybe ([Scope], Maybe Span)
 getNameScopeAndBinding n asts = case nameSrcSpan n of
   RealSrcSpan sp _ -> do -- @Maybe
-    ast <- M.lookup (HiePath (srcSpanFile sp)) asts
+    ast <- M.lookup (HiePath (mkFastStringTextUTF8 (srcSpanFile sp))) asts
     defNode <- selectLargestContainedBy sp ast
     getFirst $ foldMap First $ do -- @[]
       node <- flattenAst defNode
@@ -380,7 +380,7 @@ selectSmallestContaining sp node
 
 definedInAsts :: M.Map HiePath (HieAST a) -> Name -> Bool
 definedInAsts asts n = case nameSrcSpan n of
-  RealSrcSpan sp _ -> M.member (HiePath (srcSpanFile sp)) asts
+  RealSrcSpan sp _ -> M.member (HiePath (mkFastStringTextUTF8 (srcSpanFile sp))) asts
   _ -> False
 
 getEvidenceBindDeps :: ContextInfo -> [Name]
@@ -548,7 +548,7 @@ combineScopes _ ModuleScope = ModuleScope
 combineScopes NoScope x = x
 combineScopes x NoScope = x
 combineScopes (LocalScope a) (LocalScope b) =
-  mkScope $ combineSrcSpans (RealSrcSpan a Strict.Nothing) (RealSrcSpan b Strict.Nothing)
+  mkScope $ combineSrcSpans (RealSrcSpan a Nothing) (RealSrcSpan b Nothing)
 
 mkSourcedNodeInfo :: NodeOrigin -> NodeInfo a -> SourcedNodeInfo a
 mkSourcedNodeInfo org ni = SourcedNodeInfo $ M.singleton org ni

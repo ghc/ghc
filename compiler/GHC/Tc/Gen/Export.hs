@@ -40,7 +40,7 @@ import GHC.Parser.PostProcess ( setRdrNameSpace )
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Types.Unique.Map
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set

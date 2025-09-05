@@ -102,16 +102,16 @@ import Data.Data
 import Data.Function (on)
 import Data.List (sortBy)
 import Data.Semigroup
-import GHC.Data.FastString
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Types.Name
-import GHC.Types.SrcLoc
 import GHC.Hs.DocString
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
-import GHC.Types.SourceText (SourceText (NoSourceText))
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 
 {-
 Note [exact print annotations]
@@ -256,7 +256,9 @@ getEpTokenSrcSpan (EpTok (EpaSpan span)) = span
 getEpTokenBufSpan :: EpToken tok -> Strict.Maybe BufSpan
 getEpTokenBufSpan NoEpTok = Strict.Nothing
 getEpTokenBufSpan (EpTok EpaDelta{}) = Strict.Nothing
-getEpTokenBufSpan (EpTok (EpaSpan span)) = getBufSpan span
+getEpTokenBufSpan (EpTok (EpaSpan span)) = case getBufSpan span of
+  Nothing -> Strict.Nothing
+  Just bs -> Strict.Just bs
 
 getEpTokenLocs :: [EpToken tok] -> [EpaLocation]
 getEpTokenLocs ls = concatMap go ls
@@ -403,7 +405,7 @@ spanAsAnchor :: SrcSpan -> (EpaLocation' a)
 spanAsAnchor ss  = EpaSpan ss
 
 realSpanAsAnchor :: RealSrcSpan -> (EpaLocation' a)
-realSpanAsAnchor s = EpaSpan (RealSrcSpan s Strict.Nothing)
+realSpanAsAnchor s = EpaSpan (RealSrcSpan s Nothing)
 
 noSpanAnchor :: (NoAnn a) => EpaLocation' a
 noSpanAnchor =  EpaDelta noSrcSpan (SameLine 0) noAnn
@@ -914,11 +916,11 @@ realSrcSpan :: SrcSpan -> RealSrcSpan
 realSrcSpan (RealSrcSpan s _) = s
 realSrcSpan _ = mkRealSrcSpan l l -- AZ temporary
   where
-    l = mkRealSrcLoc (fsLit "realSrcSpan") (-1) (-1)
+    l = mkRealSrcLoc (encodeUTF8 "realSrcSpan") (-1) (-1)
 
 srcSpan2e :: SrcSpan -> EpaLocation
 srcSpan2e ss@(RealSrcSpan _ _) = EpaSpan ss
-srcSpan2e span = EpaSpan (RealSrcSpan (realSrcSpan span) Strict.Nothing)
+srcSpan2e span = EpaSpan (RealSrcSpan (realSrcSpan span) Nothing)
 
 getLocAnn :: Located a  -> SrcSpanAnnA
 getLocAnn (L l _) = noAnnSrcSpan l
@@ -1020,10 +1022,10 @@ noComments = EpAnn noSpanAnchor NoEpAnns emptyComments
 
 -- TODO:AZ get rid of this
 placeholderRealSpan :: RealSrcSpan
-placeholderRealSpan = realSrcLocSpan (mkRealSrcLoc (mkFastString "placeholder") (-1) (-1))
+placeholderRealSpan = realSrcLocSpan (mkRealSrcLoc (encodeUTF8 "placeholder") (-1) (-1))
 
 comment :: RealSrcSpan -> EpAnnComments -> EpAnnCO
-comment loc cs = EpAnn (EpaSpan (RealSrcSpan loc Strict.Nothing)) NoEpAnns cs
+comment loc cs = EpAnn (EpaSpan (RealSrcSpan loc Nothing)) NoEpAnns cs
 
 -- ---------------------------------------------------------------------
 -- Utilities for managing comments in an `EpAnn a` structure.
@@ -1173,8 +1175,8 @@ instance NoAnn (EpToken s) where
 instance NoAnn (EpUniToken s t) where
   noAnn = NoEpUniTok
 
-instance NoAnn SourceText where
-  noAnn = NoSourceText
+instance NoAnn Source.CodeSnippet where
+  noAnn = Source.CodeSnippetAbsent
 
 -- ---------------------------------------------------------------------
 

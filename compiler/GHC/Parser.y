@@ -70,7 +70,7 @@ import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOccFS)
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
 import GHC.Types.Fixity
@@ -98,6 +98,8 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            unrestrictedFunTyCon )
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.UTF8 (decodeUTF8)
 
 import qualified Data.Semigroup as Semi
 }
@@ -832,7 +834,7 @@ moduleid :: { LHsModuleId PackageName }
           | unitid ':' modid    { sLL $1 $> $ HsModuleId $1 (reLoc $3) }
 
 pkgname :: { Located PackageName }
-        : STRING     { sL1 $1 $ PackageName (mkFastStringShortByteString (getSTRING $1)) }
+        : STRING     { sL1 $1 $ PackageName (mkFastStringTextUTF8 (getSTRING $1)) }
         | litpkgname { sL1 $1 $ PackageName (unLoc $1) }
 
 litpkgname_segment :: { Located FastString }
@@ -1158,7 +1160,7 @@ importdecl :: { LImportDecl GhcPs }
 maybe_src :: { ((Maybe (EpaLocation,EpToken "#-}"),SourceText),IsBootInterface) }
         : '{-# SOURCE' '#-}'        { ((Just (glR $1,epTok $2),getSOURCE_PRAGs $1)
                                       , IsBoot) }
-        | {- empty -}               { ((Nothing,NoSourceText),NotBoot) }
+        | {- empty -}               { ((Nothing,Source.CodeSnippetAbsent),NotBoot) }
 
 maybe_safe :: { (Maybe (EpToken "safe"),Bool) }
         : 'safe'                                { (Just (epTok $1),True) }
@@ -1171,9 +1173,9 @@ maybe_level :: { (Maybe EpAnnLevel) }
 
 maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
         : STRING  {% do { let { pkgFS = getSTRING $1 }
-                        ; unless (looksLikePackageName (utf8DecodeShortByteString pkgFS)) $
+                        ; unless (looksLikePackageName (decodeUTF8 pkgFS)) $
                              addError $ mkPlainErrorMsgEnvelope (getLoc $1) $
-                               (PsErrInvalidPackageName (mkFastStringShortByteString pkgFS))
+                               (PsErrInvalidPackageName (mkFastStringTextUTF8 pkgFS))
                         ; return (Just (glR $1), RawPkgQual (StringLiteral (getSTRINGs $1) pkgFS Nothing)) } }
         | {- empty -}                           { (Nothing,NoRawPkgQual) }
 
@@ -1672,12 +1674,12 @@ datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs
 
 capi_ctype :: { Maybe (LocatedP CType) }
 capi_ctype : '{-# CTYPE' STRING STRING '#-}'
-                       {% fmap Just $ amsr (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRINGs $2) (mkFastStringShortByteString (getSTRING $2))))
-                                        (getSTRINGs $3, mkFastStringShortByteString (getSTRING $3))))
+                       {% fmap Just $ amsr (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRINGs $2) (mkFastStringTextUTF8 (getSTRING $2))))
+                                        (getSTRINGs $3, mkFastStringTextUTF8 (getSTRING $3))))
                               (AnnPragma (glR $1) (epTok $4) noAnn (glR $2) (glR $3) noAnn noAnn) }
 
            | '{-# CTYPE'        STRING '#-}'
-                       {% fmap Just $ amsr (sLL $1 $> (CType (getCTYPEs $1) Nothing (getSTRINGs $2, mkFastStringShortByteString (getSTRING $2))))
+                       {% fmap Just $ amsr (sLL $1 $> (CType (getCTYPEs $1) Nothing (getSTRINGs $2, mkFastStringTextUTF8 (getSTRING $2))))
                               (AnnPragma (glR $1) (epTok $3) noAnn noAnn (glR $2) noAnn noAnn) }
 
            |           { Nothing }
@@ -1945,7 +1947,7 @@ rule    :: { LRuleDecl GhcPs }
            runPV (unECP $6) >>= \ $6 ->
            amsA' (sLL $1 $> $ HsRule
                                    { rd_ext =((fst $2, epTok $5), getSTRINGs $1)
-                                   , rd_name = L (noAnnSrcSpan $ gl $1) (mkFastStringShortByteString (getSTRING $1))
+                                   , rd_name = L (noAnnSrcSpan $ gl $1) (mkFastStringTextUTF8 (getSTRING $1))
                                    , rd_act = snd $2 `orElse` AlwaysActive
                                    , rd_bndrs = ruleBndrsOrDef $3
                                    , rd_lhs = $4, rd_rhs = $6 }) }
@@ -1980,7 +1982,7 @@ rule_explicit_activation :: { ( ActivationAnn
                                 { ( ActivationAnn (epTok $1) (getINTEGERs $3) (epTok $4) $2 (Just (glR $3))
                                   , ActiveBefore (fromInteger (il_value (getINTEGER $3)))) }
         | '[' rule_activation_marker ']'
-                                { ( ActivationAnn (epTok $1) NoSourceText (epTok $3) $2 Nothing
+                                { ( ActivationAnn (epTok $1) Source.CodeSnippetAbsent (epTok $3) $2 Nothing
                                   , NeverActive ) }
 
 rule_foralls :: { Maybe (RuleBndrs GhcPs) }
@@ -2045,7 +2047,7 @@ maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
 
 warning_category :: { Maybe (LocatedE InWarningCategory) }
         : 'in' STRING                  { Just (reLoc $ sLL $1 $> $ InWarningCategory (epTok $1) (getSTRINGs $2)
-                                                                    (reLoc $ sL1 $2 $ mkWarningCategory (mkFastStringShortByteString (getSTRING $2)))) }
+                                                                    (reLoc $ sL1 $2 $ mkWarningCategory (mkFastStringTextUTF8 (getSTRING $2)))) }
         | {- empty -}                  { Nothing }
 
 warnings :: { OrdList (LWarnDecl GhcPs) }
@@ -2069,7 +2071,7 @@ warning :: { OrdList (LWarnDecl GhcPs) }
         : warning_category namespace_spec namelist strings
                 {% fmap unitOL $ amsA' (L (comb4 $1 $2 $3 $4)
                      (Warning (unLoc $2, fst $ unLoc $4) (unLoc $3)
-                              (WarningTxt $1 NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $4))) }
+                              (WarningTxt $1 Source.CodeSnippetAbsent $ map stringLiteralToHsDocWst $ snd $ unLoc $4))) }
 
 namespace_spec :: { Located NamespaceSpecifier }
   : 'type'      { sL1 $1 $ TypeNamespaceSpecifier (epTok $1) }
@@ -2097,7 +2099,7 @@ deprecations :: { OrdList (LWarnDecl GhcPs) }
 deprecation :: { OrdList (LWarnDecl GhcPs) }
         : namespace_spec namelist strings
              {% fmap unitOL $ amsA' (sL (comb3 $1 $2 $>) $ (Warning (unLoc $1, fst $ unLoc $3) (unLoc $2)
-                                          (DeprecatedTxt NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
+                                          (DeprecatedTxt Source.CodeSnippetAbsent $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
 
 strings :: { Located ((EpToken "[", EpToken "]"),[Located StringLiteral]) }
     : STRING             { sL1 $1 (noAnn,[L (gl $1) (getStringLiteral $1)]) }
@@ -2173,7 +2175,7 @@ fspec :: { Located (TokDcolon
                                              ,(L (getLoc $1)
                                                     (getStringMultiLiteral $1), $2, $4)) }
        |        var '::' sigtype        { sLL $1 $> (epUniTok $2
-                                             ,(noLoc (StringLiteral NoSourceText mempty Nothing), $1, $3)) }
+                                             ,(noLoc (StringLiteral Source.CodeSnippetAbsent mempty Nothing), $1, $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
@@ -2393,9 +2395,9 @@ atype :: { LHsType GhcPs }
         | CHAR                 { sLLa $1 $> $ HsTyLit noExtField $ HsCharTy (getCHARs $1)
                                                                         (getCHAR $1) }
         | STRING               { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
-                                                                     (mkFastStringShortByteString (getSTRING $1)) }
+                                                                     (mkFastStringTextUTF8 (getSTRING $1)) }
         | STRING_MULTI         { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGMULTIs $1)
-                                                                     (mkFastStringShortByteString (getSTRINGMULTI  $1)) }
+                                                                     (mkFastStringTextUTF8 (getSTRINGMULTI  $1)) }
         -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
         -- We let it pass the parser because the renamer can generate a better error message.
         | QVARID                      {% let qname = mkQual tvName (getQVARID $1)
@@ -2763,7 +2765,7 @@ sigdecl :: { LHsDecl GhcPs }
                    ; let (fixText, fixPrec) = case $2 of
                                                 -- If an explicit precedence isn't supplied,
                                                 -- it defaults to maxPrecedence
-                                                Nothing -> (NoSourceText, maxPrecedence)
+                                                Nothing -> (Source.CodeSnippetAbsent, maxPrecedence)
                                                 Just l2 -> (fst $ unLoc l2, snd $ unLoc l2)
                    ; amsA' (sLL $1 $> $ SigD noExtField
                             (FixSig ((glR $1, mbPrecAnn), fixText) (FixitySig (unLoc $3) (fromOL $ unLoc $4)
@@ -2790,7 +2792,7 @@ sigdecl :: { LHsDecl GhcPs }
 
         | '{-# SCC' qvar STRING '#-}'
           {% do { scc <- getSCC $3
-                ; let str_lit = StringLiteral (getSTRINGs $3) (fastStringToShortByteString scc) Nothing
+                ; let str_lit = StringLiteral (getSTRINGs $3) (fastStringToTextUTF8 scc) Nothing
                 ; amsA' (sLL $1 $> (SigD noExtField (SCCFunSig ((glR $1, epTok $4), (getSCC_PRAGs $1)) $2 (Just ( sL1a $3 str_lit))))) }}
 
         | '{-# SPECIALISE' activation rule_foralls infixexp sigtypes_maybe '#-}'
@@ -3009,12 +3011,12 @@ prag_e :: { Located (HsPragE GhcPs) }
                                              (HsPragSCC
                                                 (AnnPragma (glR $1) (epTok $3) noAnn (glR $2) noAnn noAnn noAnn,
                                                 (getSCC_PRAGs $1))
-                                                (StringLiteral (getSTRINGs $2) (fastStringToShortByteString scc) Nothing)))} }
+                                                (StringLiteral (getSTRINGs $2) (fastStringToTextUTF8 scc) Nothing)))} }
       | '{-# SCC' VARID  '#-}'      { sLL $1 $>
                                              (HsPragSCC
                                                (AnnPragma (glR $1) (epTok $3) noAnn (glR $2) noAnn noAnn noAnn,
                                                (getSCC_PRAGs $1))
-                                               (StringLiteral NoSourceText (fastStringToShortByteString (getVARID $2)) Nothing)) }
+                                               (StringLiteral Source.CodeSnippetAbsent (fastStringToTextUTF8 (getVARID $2)) Nothing)) }
 
 fexp    :: { ECP }
         : fexp aexp                  { ECP $
@@ -4120,9 +4122,9 @@ consym :: { LocatedN RdrName }
 literal :: { Located (HsLit GhcPs) }
         : CHAR              { sL1 $1 $ HsChar       (getCHARs $1) $ getCHAR $1 }
         | STRING            { sL1 $1 $ HsString     (getSTRINGs $1)
-                                                    . mkFastStringShortByteString $ getSTRING $1 }
+                                                    . mkFastStringTextUTF8 $ getSTRING $1 }
         | STRING_MULTI      { sL1 $1 $ HsMultilineString (getSTRINGMULTIs $1)
-                                                    . mkFastStringShortByteString $ getSTRINGMULTI $1 }
+                                                    . mkFastStringTextUTF8 $ getSTRINGMULTI $1 }
         | PRIMINTEGER       { sL1 $1 $ HsIntPrim    (getPRIMINTEGERs $1)
                                                     $ getPRIMINTEGER $1 }
         | PRIMWORD          { sL1 $1 $ HsWordPrim   (getPRIMWORDs $1)
@@ -4317,7 +4319,7 @@ hasE (L _ (ITopenTExpQuote HasE))  = True
 hasE _                             = False
 
 getSCC :: Located Token -> P FastString
-getSCC lt = do let s = mkFastStringShortByteString $ getSTRING lt
+getSCC lt = do let s = mkFastStringTextUTF8 $ getSTRING lt
                -- We probably actually want to be more restrictive than this
                if ' ' `elem` unpackFS s
                    then addFatalError $ mkPlainErrorMsgEnvelope (getLoc lt) $ PsErrSpaceInSCC
@@ -4461,9 +4463,9 @@ looksLikeMult :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> Bool
 looksLikeMult ty1 l_op ty2
   | Unqual op_name <- unLoc l_op
   , occNameFS op_name == fsLit "%"
-  , Strict.Just ty1_pos <- getBufSpan (getLocA ty1)
-  , Strict.Just pct_pos <- getBufSpan (getLocA l_op)
-  , Strict.Just ty2_pos <- getBufSpan (getLocA ty2)
+  , Just ty1_pos <- getBufSpan (getLocA ty1)
+  , Just pct_pos <- getBufSpan (getLocA l_op)
+  , Just ty2_pos <- getBufSpan (getLocA ty2)
   , bufSpanEnd ty1_pos /= bufSpanStart pct_pos
   , bufSpanEnd pct_pos == bufSpanStart ty2_pos
   = True

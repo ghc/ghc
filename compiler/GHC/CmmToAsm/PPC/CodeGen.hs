@@ -55,7 +55,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Types.Tickish     ( GenTickish(..) )
-import GHC.Types.SrcLoc      ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
+import Language.Haskell.Textual.Location      ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
 -- The rest:
 import GHC.Data.OrdList

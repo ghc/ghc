@@ -81,7 +81,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Utils.Outputable
 import GHC.Core.Type
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Types.Name
 

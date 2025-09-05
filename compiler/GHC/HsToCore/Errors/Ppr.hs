@@ -17,7 +17,7 @@ import GHC.Types.Basic (pprRuleName)
 import GHC.Types.Error
 import GHC.Types.Error.Codes
 import GHC.Types.Id (idType)
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt

@@ -34,7 +34,6 @@ import GHC.Hs
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Types.ForeignStubs
-import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
@@ -57,6 +56,8 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Encoding
+
+import qualified Language.Haskell.Textual.Source as Source
 
 import Data.Maybe
 import Data.List (nub)
@@ -262,7 +263,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                do nextWrapperNum <- ds_next_wrapper_num <$> getGblEnv
                   wrapperName <- mkWrapperName nextWrapperNum "ghc_wrapper" (unpackFS cName)
                   let fcall' = CCall (CCallSpec
-                                      (StaticTarget NoSourceText
+                                      (StaticTarget Source.CodeSnippetAbsent
                                                     wrapperName mUnitId
                                                     True)
                                       CApiConv safety)

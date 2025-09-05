@@ -23,7 +23,7 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.TyThing
 import GHC.Types.Name.Reader
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Exception
 
 import Data.Word

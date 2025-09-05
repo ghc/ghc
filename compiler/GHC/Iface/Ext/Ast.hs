@@ -42,7 +42,7 @@ import GHC.Types.Id               ( isDataConId_maybe )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe, getName )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.InstEnv
@@ -56,7 +56,6 @@ import GHC.Iface.Make             ( mkIfaceExports )
 import GHC.Utils.Panic
 import GHC.Data.Maybe
 import GHC.Data.FastString
-import qualified GHC.Data.Strict as Strict
 import GHC.Data.Pair
 
 import GHC.Iface.Ext.Types
@@ -256,7 +255,7 @@ getUnlocatedEvBinds file = do
 
       go e@(v,_) (xs,ys) = case nameSrcSpan $ varName v of
         RealSrcSpan spn _
-          | srcSpanFile spn == file ->
+          | srcSpanFile spn == fastStringToTextUTF8 file ->
             let node = Node (mkSourcedNodeInfo org ni) spn []
                 ni = NodeInfo mempty [] $ M.fromList [mkNodeInfo e]
               in (xs,node:ys)
@@ -376,18 +375,18 @@ enrichHie ts (hsGrp, imports, exports, docs, modName) ev_bs insts tcs tte =
           ]
 
         modulify (HiePath file) xs' = do
-
+          let file' = fastStringToTextUTF8 file
           top_ev_asts :: [HieAST Type] <- do
             let
               l :: SrcSpanAnnA
-              l = noAnnSrcSpan (RealSrcSpan (realSrcLocSpan $ mkRealSrcLoc file 1 1) Strict.Nothing)
+              l = noAnnSrcSpan (RealSrcSpan (realSrcLocSpan $ mkRealSrcLoc file' 1 1) Nothing)
             toHie $ EvBindContext ModuleScope Nothing
                   $ L l (EvBinds ev_bs)
 
           (uloc_evs,more_ev_asts) <- getUnlocatedEvBinds file
 
           let xs = mergeSortAsts $ xs' ++ top_ev_asts ++ more_ev_asts
-              span = spanFile file xs
+              span = spanFile file' xs
 
               moduleInfo = SourcedNodeInfo
                              $ M.singleton SourceInfo
@@ -403,7 +402,7 @@ enrichHie ts (hsGrp, imports, exports, docs, modName) ev_bs insts tcs tte =
     asts' <- sequence
           $ M.mapWithKey modulify
           $ M.fromListWith (++)
-          $ map (\x -> (HiePath (srcSpanFile (nodeSpan x)),[x])) flat_asts
+          $ map (\x -> (HiePath (mkFastStringTextUTF8 (srcSpanFile (nodeSpan x))),[x])) flat_asts
 
     let asts = HieASTs $ resolveTyVarScopes asts'
     return asts

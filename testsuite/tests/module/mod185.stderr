@@ -50,7 +50,7 @@
         (Nothing))
        (EpaComments
         []))
-      (NoSourceText)
+      (Source.CodeSnippetAbsent)
       (False))
      (L
       (EpAnn

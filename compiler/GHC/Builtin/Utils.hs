@@ -61,8 +61,6 @@ import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.TyCon
 
-import GHC.Data.FastString (fastStringToShortByteString)
-
 import GHC.Types.Avail
 import GHC.Types.Id
 import GHC.Types.Fixity
@@ -84,7 +82,10 @@ import GHC.Hs.Doc
 import GHC.Unit.Module.ModIface (IfaceExport)
 import GHC.Unit.Module.Warnings
 
+import GHC.Data.FastString ( fastStringToTextUTF8 )
 import GHC.Data.List.SetOps
+
+import qualified Language.Haskell.Textual.Source as Source
 
 import Control.Applicative ((<|>))
 import Data.Maybe
@@ -273,7 +274,8 @@ ghcPrimWarns = WarnSome
   []
   where
     mk_txt msg =
-      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText (fastStringToShortByteString msg) Nothing) []]
+      DeprecatedTxt Source.CodeSnippetAbsent
+        [noLocA $ WithHsDocIdentifiers (StringLiteral Source.CodeSnippetAbsent (fastStringToTextUTF8 msg) Nothing) []]
     mk_decl_dep (occ, msg) = (occ, mk_txt msg)
 
 ghcPrimFixities :: [(OccName,Fixity)]

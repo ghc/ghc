@@ -9,7 +9,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Unit.Module ( ModuleName, mkModuleName )
 
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Utils.Panic
 

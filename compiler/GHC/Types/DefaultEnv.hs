@@ -26,7 +26,7 @@ import GHC.Tc.Utils.TcType (Type)
 import GHC.Types.Name (Name, nameUnique, stableNameCmp)
 import GHC.Types.Name.Env
 import GHC.Types.Unique.FM (lookupUFM_Directly)
-import GHC.Types.SrcLoc (SrcSpan)
+import Language.Haskell.Textual.Location (SrcSpan)
 import GHC.Unit.Module.Warnings (WarningTxt)
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable

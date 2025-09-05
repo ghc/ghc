@@ -14,7 +14,7 @@ where
 
 import GHC.Prelude
 import GHC.Types.Basic
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Name.Reader
 import GHC.Hs.Extension
 import GHC.Hs.Lit

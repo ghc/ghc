@@ -28,9 +28,6 @@ import GHC.Utils.CliOption
 
 import GHC.Driver.Errors (reportError)
 
-import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, mkSrcSpan )
-import GHC.Data.FastString
-
 import GHC.IO.Encoding
 
 #if defined(__IO_MANAGER_WINIO__)
@@ -38,6 +35,9 @@ import GHC.IO.SubSystem ((<!>))
 import GHC.IO.Handle.Windows (handleToHANDLE)
 import GHC.Event.Windows (associateHandle')
 #endif
+
+import Language.Haskell.Textual.Location ( SrcLoc, mkSrcLoc, mkSrcSpan )
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Control.Concurrent
 import Data.Char
@@ -326,9 +326,9 @@ parseError s0 = case breakColon s0 of
                     Just (lineNum, s2) ->
                         case breakIntColon s2 of
                         Just (columnNum, s3) ->
-                            Just (mkSrcLoc (mkFastString filename) lineNum columnNum, s3)
+                            Just (mkSrcLoc (encodeUTF8 filename) lineNum columnNum, s3)
                         Nothing ->
-                            Just (mkSrcLoc (mkFastString filename) lineNum 0, s2)
+                            Just (mkSrcLoc (encodeUTF8 filename) lineNum 0, s2)
                     Nothing -> Nothing
                 Nothing -> Nothing
 

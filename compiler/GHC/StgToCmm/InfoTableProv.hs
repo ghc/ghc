@@ -13,11 +13,12 @@ import GHC.IO (unsafePerformIO)
 import Data.Char
 import GHC.Prelude
 import GHC.Platform
-import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
 import GHC.Types.Unique.DSM
 import GHC.Unit.Module
 import GHC.Utils.Outputable
-import GHC.Data.FastString (fastStringToShortText, unpackFS, LexicalFastString(..))
+import GHC.Data.ShortText (ShortText(..))
+import qualified GHC.Data.ShortText as ST
+import GHC.Data.FastString (unpackFS, LexicalFastString(..))
 
 import GHC.Cmm
 import GHC.Cmm.CLabel
@@ -26,11 +27,10 @@ import GHC.Cmm.Utils
 import GHC.StgToCmm.Config
 import GHC.StgToCmm.Monad
 
-import GHC.Data.ShortText (ShortText)
-import qualified GHC.Data.ShortText as ST
+import Language.Haskell.Textual.Location (srcSpanFile)
+import Language.Haskell.Textual.UTF8 (bytesUTF8)
 
 import Control.Monad.Trans.State.Strict
-
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy as BSL
@@ -261,7 +261,7 @@ toCgIPE platform ctx ipe = do
             case infoTableProv ipe of
               Nothing -> (mempty, "")
               Just (span, _) ->
-                  let file = fastStringToShortText $ srcSpanFile span
+                  let file = ShortText . bytesUTF8 $ srcSpanFile span
                       coords = renderWithContext ctx (pprUserRealSpan False span)
                   in (file, coords)
     label    <- lookupStringTable $ ST.pack label_str

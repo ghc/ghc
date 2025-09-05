@@ -34,7 +34,6 @@ import qualified GHC.Types.Name as Name
 import GHC.Unit.Module
 import GHC.Parser.PostProcess
 import GHC.Types.Name.Occurrence as OccName
-import GHC.Types.SrcLoc
 import GHC.Core.Type as Hs
 import qualified GHC.Core.Coercion as Coercion ( Role(..) )
 import GHC.Builtin.Types
@@ -54,6 +53,9 @@ import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless )
@@ -968,18 +970,18 @@ cvtPragmaD (AnnP target exp)
 -- NB: This is the only place in GHC.ThToHs that makes use of the `setL`
 -- function. See Note [Source locations within TH splices].
 cvtPragmaD (LineP line file)
-  = do { setL (srcLocSpan (mkSrcLoc (fsLit file) line 1))
+  = do { setL (srcLocSpan (mkSrcLoc (encodeUTF8 file) line 1))
        ; return Nothing
        }
 cvtPragmaD (CompleteP cls mty)
   = do { cls'  <- mapM cNameN cls
        ; mty'  <- traverse tconNameN mty
        ; returnJustLA $ Hs.SigD noExtField
-                   $ CompleteMatchSig (noAnn, NoSourceText) cls' mty' }
+                   $ CompleteMatchSig (noAnn, Source.CodeSnippetAbsent) cls' mty' }
 cvtPragmaD (SCCP nm str) = do
   nm' <- vcNameN nm
   str' <- traverse (\s ->
-    returnLA $ StringLiteral NoSourceText (fastStringToShortByteString s) Nothing) (fsLit <$> str)
+    returnLA $ StringLiteral Source.CodeSnippetAbsent (fastStringToTextUTF8 s) Nothing) (fsLit <$> str)
   returnJustLA $ Hs.SigD noExtField
     $ SCCFunSig (noAnn, mkSourceText "{-# SCC") nm' str'
 
@@ -1197,7 +1199,7 @@ cvtl e = wrapLA (cvt e)
                               -- constructor names - see #14627.
                               { s' <- vcName s
                               ; wrapParLA mkHsVar s' }
-    cvt (LabelE s)       = return $ HsOverLabel NoSourceText (fsLit s)
+    cvt (LabelE s)       = return $ HsOverLabel Source.CodeSnippetAbsent (fsLit s)
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExtField n' }
     cvt (GetFieldE exp f) = do { e' <- cvtl exp
                                ; return $ HsGetField noExtField e'
@@ -1449,24 +1451,24 @@ allCharLs xs
     go _  _                     = Nothing
 
 cvtLit :: Lit -> CvtM (HsLit GhcPs)
-cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim NoSourceText i }
-cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim NoSourceText w }
+cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim Source.CodeSnippetAbsent i }
+cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim Source.CodeSnippetAbsent w }
 cvtLit (FloatPrimL f)
   = do { force f; return $ HsFloatPrim noExtField (mkTHFractionalLit f) }
 cvtLit (DoublePrimL f)
   = do { force f; return $ HsDoublePrim noExtField (mkTHFractionalLit f) }
-cvtLit (CharL c)       = do { force c; return $ HsChar NoSourceText c }
-cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim NoSourceText c }
+cvtLit (CharL c)       = do { force c; return $ HsChar Source.CodeSnippetAbsent c }
+cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim Source.CodeSnippetAbsent c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
                             ; force s'
                             ; return $ HsString (quotedSourceText s) s' }
 cvtLit (StringPrimL s) = do { let { !s' = BS.pack s }
-                            ; return $ HsStringPrim NoSourceText s' }
+                            ; return $ HsStringPrim Source.CodeSnippetAbsent s' }
 cvtLit (BytesPrimL (Bytes fptr off sz)) = do
   let bs = unsafePerformIO $ withForeignPtr fptr $ \ptr ->
              BS.packCStringLen (ptr `plusPtr` fromIntegral off, fromIntegral sz)
   force bs
-  return $ HsStringPrim NoSourceText bs
+  return $ HsStringPrim Source.CodeSnippetAbsent bs
 cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
         -- cvtLit should not be called on IntegerL, RationalL
         -- That precondition is established right here in
@@ -1968,9 +1970,9 @@ split_ty_app ty = go ty []
     go f as           = return (f,as)
 
 cvtTyLit :: TH.TyLit -> HsTyLit (GhcPass p)
-cvtTyLit (TH.NumTyLit i) = HsNumTy NoSourceText i
-cvtTyLit (TH.StrTyLit s) = HsStrTy NoSourceText (fsLit s)
-cvtTyLit (TH.CharTyLit c) = HsCharTy NoSourceText c
+cvtTyLit (TH.NumTyLit i) = HsNumTy Source.CodeSnippetAbsent i
+cvtTyLit (TH.StrTyLit s) = HsStrTy Source.CodeSnippetAbsent (fsLit s)
+cvtTyLit (TH.CharTyLit c) = HsCharTy Source.CodeSnippetAbsent c
 
 {- | @cvtOpAppT x op y@ converts @op@ and @y@ and produces the operator
 application @x `op` y@. The produced tree of infix types will be right-biased,

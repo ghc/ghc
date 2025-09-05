@@ -22,9 +22,9 @@ import GHC.Core.Type
 import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Types.Var
+import Language.Haskell.Textual.Location
 
 type OverloadedCallsCCState = Strict.Maybe SrcSpan
 
@@ -169,7 +169,7 @@ overloadedCallsCC =
         SourceNote rss _ -> do
           -- Prefer source notes from the current file
           in_current_file <-
-            maybe False ((== EQ) . lexicalCompareFS (srcSpanFile rss)) <$>
+            maybe False (((srcSpanFile rss) ==) . fastStringToTextUTF8) <$>
               asks lateCCEnv_file
           if not in_current_file then
             act

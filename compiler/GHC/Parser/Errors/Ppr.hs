@@ -22,7 +22,7 @@ import GHC.Types.Basic
 import GHC.Types.Hint
 import GHC.Types.Error
 import GHC.Types.Hint.Ppr (perhapsAsPat)
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Error.Codes
 import GHC.Types.Name.Reader ( opIsAt, rdrNameOcc, mkUnqual )
 import GHC.Types.Name.Occurrence (isSymOcc, occNameFS, varName)

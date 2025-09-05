@@ -264,7 +264,6 @@ import GHC.Types.Error
 import GHC.Types.Name.Reader (RdrName(..))
 import GHC.Types.Name.Occurrence (isVarOcc, occNameString)
 import GHC.Utils.Monad
-import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
 import GHC.Types.Basic ( treatZeroAsInf )
 import GHC.Data.FastString
@@ -282,6 +281,9 @@ import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
 import GHC.Toolchain
 import GHC.Toolchain.Program
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Data.IORef
 import Control.Arrow ((&&&))
@@ -3226,7 +3228,7 @@ setMainIs arg = parse parse_main_f arg
     p_state str = initParserState
               (mkParserOpts mempty emptyDiagOpts False False False True)
               (stringToStringBuffer str)
-              (mkRealSrcLoc (mkFastString []) 1 1)
+              (mkRealSrcLoc mempty 1 1)
 
     parse_main_f (Unqual occ)
       | isVarOcc occ = upd $ \d -> d { mainFunIs = main_f occ }
@@ -3785,7 +3787,7 @@ makeDynFlagsConsistent dflags
         in dflags_c
 
  | otherwise = (dflags, mempty, mempty)
-    where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
+    where loc = mkGeneralSrcSpan (encodeUTF8 "when making flags consistent")
           loop updated_dflags warning
               = case makeDynFlagsConsistent updated_dflags of
                 (dflags', ws, is) -> (dflags', L loc (DriverInconsistentDynFlags warning) : ws, is)

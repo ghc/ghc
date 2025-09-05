@@ -158,7 +158,7 @@ import GHC.Data.FastString
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Core.Ppr ( {- instances -} )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import qualified Data.Semigroup as S
 

@@ -41,7 +41,7 @@ import GHC.Types.Name
 import GHC.Types.Avail
 import GHC.Types.Name.Cache
 import GHC.Types.Unique.Supply
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error

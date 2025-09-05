@@ -75,10 +75,8 @@ import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.Id
 import GHC.Types.SourceFile
-import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.SrcLoc
 
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
@@ -93,6 +91,9 @@ import GHC.Data.List.SetOps
 import GHC.Data.Bag
 import GHC.Data.BooleanFormula ( isUnsatisfied )
 import qualified GHC.LanguageExtensions as LangExt
+
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 
 import Control.Monad
 import Data.Tuple
@@ -1916,7 +1917,7 @@ tcMethods _skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
                                 [ getRuntimeRep meth_tau, meth_tau])
                               nO_METHOD_BINDING_ERROR_ID
         error_msg dflags = L inst_loc'
-                                    (HsLit noExtField (HsStringPrim NoSourceText
+                                    (HsLit noExtField (HsStringPrim Source.CodeSnippetAbsent
                                               (unsafeMkByteString (error_string dflags))))
         meth_tau     = classMethodInstTy sel_id inst_tys
         error_string dflags = showSDoc dflags

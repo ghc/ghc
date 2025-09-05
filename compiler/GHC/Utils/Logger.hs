@@ -85,7 +85,6 @@ where
 import GHC.Prelude
 import GHC.Driver.Flags
 import GHC.Types.Error
-import GHC.Types.SrcLoc
 
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.Outputable
@@ -94,7 +93,9 @@ import GHC.Utils.Panic
 
 import GHC.Data.EnumSet (EnumSet)
 import qualified GHC.Data.EnumSet as EnumSet
-import GHC.Data.FastString
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (decodeUTF8)
 
 import System.Directory
 import System.FilePath  ( takeDirectory, (</>) )
@@ -399,7 +400,7 @@ jsonLogActionWithHandle out logflags msg_class srcSpan msg
                                                 , ("endLine", json $ srcSpanEndLine rss)
                                                 , ("endCol", json $ srcSpanEndCol rss)
                                                 ]
-                   where file = unpackFS $ srcSpanFile rss
+                   where file = decodeUTF8 $ srcSpanFile rss
                  UnhelpfulSpan _ -> JSNull
 
 -- | The default 'LogAction' prints to 'stdout' and 'stderr'.

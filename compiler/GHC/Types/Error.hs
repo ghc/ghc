@@ -100,9 +100,9 @@ import GHC.Data.Bag
 import GHC.IO (catchException)
 import GHC.Utils.Outputable as Outputable
 import qualified GHC.Utils.Ppr.Colour as Col
-import GHC.Types.SrcLoc as SrcLoc
+import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Hint
-import GHC.Data.FastString (unpackFS)
+import GHC.Data.FastString (mkFastStringTextUTF8, unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 
 import GHC.Types.Hint.Ppr () -- Outputable instance
@@ -797,7 +797,7 @@ getSeverityColour severity = case severity of
 getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
 getCaretDiagnostic msg_class (RealSrcSpan span _) =
-  caretDiagnostic <$> getSrcLine (srcSpanFile span) row
+  caretDiagnostic <$> getSrcLine (mkFastStringTextUTF8 (srcSpanFile span)) row
   where
     getSrcLine fn i =
       getLine i (unpackFS fn)

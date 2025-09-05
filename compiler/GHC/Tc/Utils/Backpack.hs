@@ -32,7 +32,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Avail
-import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.Var
 import GHC.Types.Id( idType )
@@ -82,8 +81,10 @@ import GHC.Utils.Misc ( HasDebugCallStack )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Data.FastString
 import GHC.Data.Maybe
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import Control.Monad
 import Data.List (find)
@@ -347,7 +348,7 @@ tcRnCheckUnit hsc_env uid =
           HsigFile -- bogus
           False
           (mainModIs (hsc_HUE hsc_env))
-          (realSrcLocSpan (mkRealSrcLoc (fsLit loc_str) 0 0)) -- bogus
+          (realSrcLocSpan (mkRealSrcLoc (encodeUTF8 loc_str) 0 0)) -- bogus
     $ checkUnit uid
   where
    dflags = hsc_dflags hsc_env
@@ -430,7 +431,7 @@ ifaceDeclNeverExportedRefs _ = []
 {-
 inheritedSigPvpWarning :: WarningTxt
 inheritedSigPvpWarning =
-    WarningTxt (noLoc NoSourceText) [noLoc (StringLiteral NoSourceText (fsLit msg))]
+    WarningTxt (noLoc Source.CodeSnippetAbsent) [noLoc (StringLiteral Source.CodeSnippetAbsent (fsLit msg))]
   where
     msg = "Inherited requirements from non-signature libraries (libraries " ++
           "with modules) should not be used, as this mode of use is not " ++

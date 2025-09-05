@@ -25,7 +25,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
 import GHC.Tc.Errors.Types
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Unique.FM
 import GHC.Types.Avail
 import GHC.Types.Error

@@ -49,7 +49,6 @@ module GHC.Plugins
    , module GHC.Data.FiniteMap
    , module GHC.Utils.Misc
    , module GHC.Serialized
-   , module GHC.Types.SrcLoc
    , module GHC.Utils.Outputable
    , module GHC.Utils.Panic
    , module GHC.Types.Unique.Supply
@@ -64,6 +63,7 @@ module GHC.Plugins
    , module GHC.Parser.Errors.Types
    , module GHC.Types.Error
    , module GHC.Hs
+   , module Language.Haskell.Textual.Location
    , -- * Getting 'Name's
      thNameToGhcName
    , thNameToGhcNameIO
@@ -132,7 +132,7 @@ import GHC.Data.FiniteMap
 -- Common utilities
 import GHC.Utils.Misc
 import GHC.Serialized
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Driver.Ppr

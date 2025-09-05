@@ -78,7 +78,7 @@ import GHC.Data.List.SetOps( removeDups )
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic.Plain
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Literal   ( inCharRange )
 import GHC.Types.GREInfo   ( ConInfo(..), conInfoFields, ConFieldInfo (..) )
 import GHC.Builtin.Types   ( nilDataCon )

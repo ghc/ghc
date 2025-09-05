@@ -29,7 +29,7 @@ import GHC.Prelude
 import GHC.Utils.Binary
 import GHC.Utils.Encoding
 import GHC.Utils.Outputable as Outputable hiding ((<>))
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import Control.DeepSeq
 
 import Data.ByteString (ByteString)

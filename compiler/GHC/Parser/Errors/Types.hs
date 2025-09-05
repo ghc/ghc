@@ -16,7 +16,7 @@ import GHC.Types.Hint
 import GHC.Types.Name.Occurrence (OccName)
 import GHC.Types.Name.Reader
 import Data.List.NonEmpty (NonEmpty)
-import GHC.Types.SrcLoc (PsLoc)
+import Language.Haskell.Textual.Location (PsLoc)
 
 import GHC.Generics ( Generic )
 

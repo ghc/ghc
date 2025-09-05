@@ -49,7 +49,6 @@ import Text.Printf
 import GHC hiding (verbosity, SuccessFlag(..))
 import GHC.Builtin.Names (mkMainModule_)
 import qualified GHC.Data.EnumSet as EnumSet
-import GHC.Data.FastString (unpackFS)
 import GHC.Data.Graph.Directed
 import GHC.Data.Maybe
 import GHC.Driver.Env
@@ -89,6 +88,8 @@ import Haddock.Options hiding (verbosity)
 import Haddock.Types
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
 import qualified Haddock.Compat as Compat
+
+import Language.Haskell.Textual.UTF8 (decodeUTF8)
 
 -- | Create 'Interface's and a link environment by typechecking the list of
 -- modules using the GHC API and processing the resulting syntax trees.
@@ -327,7 +328,7 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
         where
           formatName :: SrcSpan -> HsDecl GhcRn -> String
           formatName loc n = p (getMainDeclBinder emptyOccEnv n) ++ case loc of
-            RealSrcSpan rss _ -> " (" ++ unpackFS (srcSpanFile rss) ++ ":" ++
+            RealSrcSpan rss _ -> " (" ++ decodeUTF8 (srcSpanFile rss) ++ ":" ++
               show (srcSpanStartLine rss) ++ ")"
             _ -> ""
 

@@ -27,13 +27,14 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   , MatchGroup
   , GRHSs )
 import {-# SOURCE #-} Language.Haskell.Syntax.Pat( LPat )
+import Language.Haskell.Syntax.Basic ( Fixity )
 import Language.Haskell.Syntax.BooleanFormula (LBooleanFormula)
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
-import Language.Haskell.Syntax.Basic ( Fixity )
+import Language.Haskell.Textual.Source (StringLiteral)
 
 import GHC.Types.Basic (InlinePragma)
-import GHC.Types.SourceText (StringLiteral)
+--import GHC.Types.SourceText (StringLiteral)
 
 import Data.Bool
 import Data.Maybe

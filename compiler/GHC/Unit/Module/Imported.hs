@@ -12,7 +12,7 @@ import GHC.Unit.Module
 
 import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import Data.Map (Map)
 
 -- | Records the modules directly imported by a module for extracting e.g.

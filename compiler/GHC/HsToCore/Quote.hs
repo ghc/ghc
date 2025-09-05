@@ -72,7 +72,6 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.Data.List.NonEmpty as NE
 
-import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
@@ -90,6 +89,8 @@ import Data.Kind (Constraint)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location as SrcLoc
 
 import Data.ByteString ( unpack )
 import Control.Monad
@@ -1169,7 +1170,7 @@ rep_sccFun nm Nothing loc = do
 
 rep_sccFun nm (Just (L _ str)) loc = do
   nm1 <- lookupLOcc nm
-  str1 <- coreStringLit . mkFastStringShortByteString $ sl_fs str
+  str1 <- coreStringLit . mkFastStringTextUTF8 $ sl_fs str
   scc <- repPragSCCFunNamed nm1 str1
   return [(loc, scc)]
 
@@ -3089,17 +3090,17 @@ repLiteral lit
                  _                -> Nothing
 
 mk_integer :: Integer -> MetaM (HsLit GhcTc)
-mk_integer  i = return $ XLit $ HsInteger NoSourceText i integerTy
+mk_integer  i = return $ XLit $ HsInteger Source.CodeSnippetAbsent i integerTy
 
 mk_rational :: FractionalLit -> MetaM (HsLit GhcTc)
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ XLit $ HsRat r rat_ty
 
 mk_string :: FastString -> MetaM (HsLit GhcRn)
-mk_string s = return $ HsString NoSourceText s
+mk_string s = return $ HsString Source.CodeSnippetAbsent s
 
 mk_char :: Char -> MetaM (HsLit GhcRn)
-mk_char c = return $ HsChar NoSourceText c
+mk_char c = return $ HsChar Source.CodeSnippetAbsent c
 
 repOverloadedLiteral :: HsOverLit GhcRn -> MetaM (Core TH.Lit)
 repOverloadedLiteral (OverLit { ol_val = val})

@@ -6,7 +6,7 @@ import GHC.Tc.Types
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Types.Name
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Tc.Utils.Monad (getGblEnv)
 
 rnLHsDoc :: LHsDoc GhcPs -> RnM (LHsDoc GhcRn)

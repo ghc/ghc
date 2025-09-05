@@ -32,7 +32,7 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Types.Basic ( TypeOrKind(..) )
 import GHC.Types.DefaultEnv ( DefaultEnv, ClassDefaults (..), lookupDefaultEnv, insertDefaultEnv, DefaultProvenance (..) )
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Unit.Types (ghcInternalUnit, moduleUnit)
 

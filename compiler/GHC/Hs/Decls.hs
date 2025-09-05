@@ -111,6 +111,8 @@ import GHC.Prelude
 
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Extension
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprUntypedSplice )
         -- Because Expr imports Decls via HsBracket
@@ -131,7 +133,6 @@ import GHC.Types.Fixity
 import GHC.Utils.Misc (count)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Core.Type
 import GHC.Types.ForeignCall
@@ -1295,7 +1296,7 @@ instance OutputableBndrId p
             dqNeeded = (take 6 src == "static")
                     || isJust mHeader
                     || not isFun
-                    || st /= NoSourceText
+                    || st /= Source.CodeSnippetAbsent
             ce =
                   -- We may need to drop leading spaces first
                   (if take 6 src == "static" then text "static" else empty)
@@ -1399,12 +1400,12 @@ type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 instance OutputableBndrId p
         => Outputable (WarnDecls (GhcPass p)) where
     ppr (Warnings ext decls)
-      = pprShortByteString bs <+> vcat (punctuate semi (map ppr decls)) <+> text "#-}"
+      = ppr bs <+> vcat (punctuate semi (map ppr decls)) <+> text "#-}"
       where
         bs = case ghcPass @p of
-              GhcPs | (_, SourceText src) <- ext -> src
-              GhcRn | SourceText src <- ext -> src
-              GhcTc | SourceText src <- ext -> src
+              GhcPs | (_, Source.CodeSnippet src) <- ext -> src
+              GhcRn | Source.CodeSnippet src <- ext -> src
+              GhcTc | Source.CodeSnippet src <- ext -> src
               _ -> panic "WarnDecls"
 
 instance OutputableBndrId p

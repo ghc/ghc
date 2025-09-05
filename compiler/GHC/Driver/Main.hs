@@ -244,7 +244,6 @@ import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
 import GHC.Types.IPE
 import GHC.Types.SourceFile
-import GHC.Types.SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Cache ( newNameCache )
 import GHC.Types.Name.Reader
@@ -273,6 +272,9 @@ import GHC.Data.Maybe
 
 import GHC.SysTools (initSysTools)
 import GHC.SysTools.BaseDir (findTopDir)
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8 ( encodeUTF8 )
 
 import Data.Data hiding (Fixity, TyCon)
 import Data.Functor ((<&>))
@@ -499,7 +501,7 @@ hscParse' mod_summary
                Just b  -> return b
                Nothing -> liftIO $ hGetStringBuffer src_filename
 
-    let loc = mkRealSrcLoc (mkFastString src_filename) 1 1
+    let loc = mkRealSrcLoc (encodeUTF8 src_filename) 1 1
 
     let diag_opts = initDiagOpts dflags
     when (wopt Opt_WarnUnicodeBidirectionalFormatCharacters dflags) $ do
@@ -679,7 +681,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         outer_mod' = mkHomeModule home_unit mod_name
         inner_mod = homeModuleNameInstantiation home_unit mod_name
         src_filename  = ms_hspp_file mod_summary
-        real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
+        real_loc = realSrcLocSpan $ mkRealSrcLoc (encodeUTF8 src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
     massert (isHomeModule home_unit outer_mod)
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
@@ -2644,7 +2646,7 @@ hscParseThingWithLocation source linenumber parser str = do
                (const ()) $ {-# SCC "Parser" #-} do
 
         let buf = stringToStringBuffer str
-            loc = mkRealSrcLoc (fsLit source) linenumber 1
+            loc = mkRealSrcLoc (encodeUTF8 source) linenumber 1
 
         case unP parser (initParserState (initParserOpts dflags) buf loc) of
             PFailed pst ->

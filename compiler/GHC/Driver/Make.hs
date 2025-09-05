@@ -95,7 +95,7 @@ import GHC.Types.Error
 import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.PkgQual
 
 import GHC.Unit

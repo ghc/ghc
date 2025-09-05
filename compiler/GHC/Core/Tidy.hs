@@ -28,7 +28,7 @@ import GHC.Types.Unique (getUnique)
 import GHC.Types.Unique.FM
 import GHC.Types.Name hiding (tidyNameOcc)
 import GHC.Types.Name.Set
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Tickish
 
 import GHC.Data.Maybe

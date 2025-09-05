@@ -34,7 +34,6 @@ import GHC.Core.Predicate( tyCoVarsOfTypeWellScoped )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 
-import GHC.Types.SourceText
 import GHC.Types.Id.Make
 import GHC.Types.ForeignCall
 import GHC.Types.Basic
@@ -51,6 +50,8 @@ import GHC.Driver.DynFlags
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+import qualified Language.Haskell.Textual.Source as Source
 
 import Data.Maybe
 
@@ -103,7 +104,7 @@ dsCCall lbl args may_gc result_ty
        (ccall_result_ty, res_wrapper) <- boxResult result_ty
        uniq <- newUnique
        let
-           target = StaticTarget NoSourceText lbl Nothing True
+           target = StaticTarget Source.CodeSnippetAbsent lbl Nothing True
            the_fcall    = CCall (CCallSpec target CCallConv may_gc)
            the_prim_app = mkFCall uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)

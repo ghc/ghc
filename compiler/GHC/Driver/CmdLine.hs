@@ -27,7 +27,7 @@ import GHC.Prelude
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Error
 import GHC.Utils.Error
 import GHC.Driver.Errors.Types

@@ -31,7 +31,7 @@ import GHC.Prelude
 import GHC.Utils.Binary
 import GHC.Types.Name
 import GHC.Utils.Outputable as Outputable hiding ((<>))
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.EnumSet (EnumSet)
 import GHC.Types.Avail

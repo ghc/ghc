@@ -12,7 +12,7 @@ module GHC.Hs.Stats ( ppSourceStats ) where
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc

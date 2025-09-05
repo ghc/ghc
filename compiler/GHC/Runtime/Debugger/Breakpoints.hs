@@ -24,13 +24,12 @@ import GHC.Driver.Session.Inspect
 import GHC.Runtime.Eval
 import GHC.Runtime.Eval.Utils
 import GHC.Types.Name
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Unit.Module
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModSummary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import qualified GHC.Data.Strict as Strict
 import qualified Data.IntMap.Strict as IntMap
 import qualified GHC.Unit.Home.Graph as HUG
 import qualified GHC.Unit.Home.PackageTable as HPT
@@ -74,7 +73,7 @@ findBreakByCoord (line, col) arr
         ticks = arr ! line
 
         -- the ticks that span this coordinate
-        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Strict.Nothing `spans` (line,col) ]
+        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Nothing `spans` (line,col) ]
 
         after_here = [ tick | tick@(_,pan) <- ticks,
                               srcSpanStartLine pan == line,

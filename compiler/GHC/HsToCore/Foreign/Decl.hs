@@ -32,7 +32,7 @@ import GHC.Core.Coercion
 
 import GHC.Cmm.CLabel
 import GHC.Types.ForeignCall
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Driver.DynFlags
 import GHC.Platform

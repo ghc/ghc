@@ -83,7 +83,7 @@
         (Nothing))
        (EpaComments
         []))
-      (NoSourceText)
+      (Source.CodeSnippetAbsent)
       (False))
      (L
       (EpAnn
@@ -150,7 +150,7 @@
         (Nothing))
        (EpaComments
         []))
-      (NoSourceText)
+      (Source.CodeSnippetAbsent)
       (False))
      (L
       (EpAnn

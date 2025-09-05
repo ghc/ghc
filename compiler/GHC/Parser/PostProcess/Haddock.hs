@@ -52,7 +52,7 @@ import GHC.Prelude hiding (head, init, last, mod, tail)
 
 import GHC.Hs
 
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import Data.Semigroup
 import Data.Foldable
@@ -251,7 +251,7 @@ instance HasHaddock (Located (HsModule GhcPs)) where
           let modspan =
                 getEpTokenBufSpan (am_mod mod_anns) <>
                 getEpTokenBufSpan (am_sig mod_anns) <>
-                getBufSpan (locA l_name)
+                Strict.makeMaybeStrict (getBufSpan (locA l_name))
           HdkA modspan $ do
             docs <-
               inLocRange (locRangeTo (fmap bufSpanStart modspan)) $
@@ -320,7 +320,7 @@ instance HasHaddock (LocatedLI [LocatedA (IE GhcPs)]) where
 instance HasHaddock (LocatedA (IE GhcPs)) where
   addHaddock (L l_export ie ) =
     extendHdkA (locA l_export) $ liftHdkA $ do
-      docs <- inLocRange (locRangeFrom (getBufPos (srcSpanEnd (locA l_export)))) $
+      docs <- inLocRange (locRangeFrom (Strict.makeMaybeStrict (getBufPos (srcSpanEnd (locA l_export))))) $
         takeHdkComments mkDocPrev
       mb_doc <- selectDocString docs
       let mb_ldoc = lexLHsDocString <$> mb_doc
@@ -771,13 +771,13 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
 onlyTrailingOrLeading :: SrcSpan -> HdkM Bool
 onlyTrailingOrLeading l = peekHdkM $ do
   leading <-
-    inLocRange (locRangeTo (getBufPos (srcSpanStart l))) $
+    inLocRange (locRangeTo (Strict.makeMaybeStrict (getBufPos (srcSpanStart l)))) $
     takeHdkComments mkDocNext
   inner <-
-    inLocRange (locRangeIn (getBufSpan l)) $
+    inLocRange (locRangeIn (Strict.makeMaybeStrict (getBufSpan l))) $
     takeHdkComments (\x -> mkDocNext x <|> mkDocPrev x)
   trailing <-
-    inLocRange (locRangeFrom (getBufPos (srcSpanEnd l))) $
+    inLocRange (locRangeFrom (Strict.makeMaybeStrict (getBufPos (srcSpanEnd l)))) $
     takeHdkComments mkDocPrev
   return $ case (leading, inner, trailing) of
     (_:_, [], []) -> True  -- leading comment only
@@ -1118,7 +1118,7 @@ runHdkA (HdkA _ m) = unHdkM m mempty
 -- See Note [Register keyword location].
 -- See Note [Adding Haddock comments to the syntax tree].
 registerLocHdkA :: SrcSpan -> HdkA ()
-registerLocHdkA l = HdkA (getBufSpan l) (pure ())
+registerLocHdkA l = HdkA (Strict.makeMaybeStrict (getBufSpan l)) (pure ())
 
 -- Let the neighbours know about an item at this location.
 -- A small wrapper over registerLocHdkA.
@@ -1150,7 +1150,7 @@ liftHdkA = HdkA mempty
 -- computations 'left_neighbour' and 'right_neighbour' will not look for
 -- Haddock comments inside the 'l' location span.
 extendHdkA :: SrcSpan -> HdkA a -> HdkA a
-extendHdkA l' (HdkA l m) = HdkA (getBufSpan l' <> l) m
+extendHdkA l' (HdkA l m) = HdkA (Strict.makeMaybeStrict (getBufSpan l') <> l) m
 
 
 {- *********************************************************************
@@ -1253,8 +1253,8 @@ peekHdkM m =
 getPrevNextDoc :: SrcSpan -> HdkM (Maybe (Located HsDocString))
 getPrevNextDoc l = do
   let (l_start, l_end) = (srcSpanStart l, srcSpanEnd l)
-      before_t = locRangeTo (getBufPos l_start)
-      after_t = locRangeFrom (getBufPos l_end)
+      before_t = locRangeTo   . Strict.makeMaybeStrict $ getBufPos l_start
+      after_t  = locRangeFrom . Strict.makeMaybeStrict $ getBufPos l_end
   nextDocs <- inLocRange before_t $ takeHdkComments mkDocNext
   prevDocs <- inLocRange after_t $ takeHdkComments mkDocPrev
   selectDocString (nextDocs ++ prevDocs)

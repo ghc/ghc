@@ -65,7 +65,7 @@ import GHC.Builtin.Types
 
 import GHC.Types.Id
 import GHC.Types.Literal
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 
 import GHC.Data.Maybe
 import GHC.Utils.Misc

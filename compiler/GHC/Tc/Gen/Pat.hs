@@ -61,7 +61,7 @@ import GHC.Core.ConLike
 import GHC.Builtin.Names
 import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Driver.DynFlags
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Var.Set
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable

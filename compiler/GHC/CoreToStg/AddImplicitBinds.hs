@@ -21,7 +21,8 @@ import GHC.Types.Name
 import GHC.Types.Tickish( GenTickish( SourceNote ) )
 import GHC.Types.Id( dataConWrapUnfolding_maybe )
 import GHC.Types.Id.Make( mkDictSelRhs )
-import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
+import Language.Haskell.Textual.Location ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
+import Language.Haskell.Textual.UTF8 (encodeUTF8)
 
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -144,7 +145,7 @@ tick_it generate_debug_info mod_loc name
     tick span  = Tick $ SourceNote span $
                  LexicalFastString $ mkFastString $
                  renderWithContext defaultSDocContext $ ppr name
-    span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
+    span1 file = realSrcLocSpan $ mkRealSrcLoc (encodeUTF8 file) 1 1
 
 
 

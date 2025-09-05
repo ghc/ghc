@@ -208,7 +208,7 @@ import GHC.Types.Name.Env (NameEnv)
 import qualified GHC.Types.Name.Occurrence as OccName
 import GHC.Types.Name.Reader
 import GHC.Types.SourceFile (HsBootOrSig(..))
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.TyThing (TyThing)
 import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar, CoVar, Specificity)
 import GHC.Types.Var.Env (TidyEnv)

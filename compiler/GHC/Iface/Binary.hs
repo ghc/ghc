@@ -46,7 +46,7 @@ import GHC.Data.FastMutInt
 import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Types.Name.Cache
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Platform
 import GHC.Settings.Constants
 import GHC.Iface.Type (IfaceType(..), getIfaceType, putIfaceType, ifaceTypeSharedByte)

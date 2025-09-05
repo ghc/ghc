@@ -60,7 +60,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Var
 import GHC.Types.Var.Env ( lookupVarEnv )
 import GHC.Types.SourceFile (HscSource(..))
-import GHC.Types.SrcLoc
+import Language.Haskell.Textual.Location
 import GHC.Types.Basic
 
 import GHC.Utils.Outputable
