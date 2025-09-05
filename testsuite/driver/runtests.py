@@ -87,6 +87,7 @@ parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsu
 parser.add_argument("--broken-test", action="append", default=[], help="a test name to mark as broken for this run")
 parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
 parser.add_argument("--perf-baseline", type=GitRef, metavar='COMMIT', help="Baseline commit for performance comparsons.")
+parser.add_argument("--skip-uniques-test", action="append", help="skip uniques tests")
 perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
 parser.add_argument("--ignore-perf-failures", choices=['increases','decreases','all'],
@@ -178,6 +179,10 @@ elif args.ignore_perf_failures == 'increases':
     config.ignore_perf_increases = True
 elif args.ignore_perf_failures == 'decreases':
     config.ignore_perf_decreases = True
+
+# force skip uniques if not in a git checkout
+forceSkipUniquesTest = not inside_git_repo()
+config.skip_uniques_test = args.skip_uniques_test or forceSkipUniquesTest
 
 if args.test_env:
     config.test_env = args.test_env
@@ -553,6 +558,10 @@ else:
         print(str_warn('Skipping All Performance Tests') + ' `git` exited with non-zero exit code.')
         print(spacing + 'Git is required because performance test results are compared with ancestor git commits\' results (stored with git notes).')
         print(spacing + 'You can still run the tests without git by specifying an output file with --metrics-file FILE.')
+    if forceSkipUniquesTest and not args.skip_uniques_test:
+        print()
+        print(str_warn('Skipping Uniques Test') + ' `git` exited with non-zero exit code.')
+        print(spacing + 'Git is required because the uniques test checks the source code files.')
 
     # Warn of new metrics.
     new_metrics = [metric for (change, metric, baseline) in t.metrics if change == MetricChange.NewMetric]

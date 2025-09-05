@@ -138,7 +138,7 @@ class TestConfig:
 
         # Are we cross-compiling?
         self.cross = False
-        
+
         # Does the RTS linker only support loading shared libraries?
         self.interp_force_dyn = False
 
@@ -205,6 +205,9 @@ class TestConfig:
 
         # Should we skip performance tests
         self.skip_perf_tests = False
+
+        # Should we skip uniques tests
+        self.skip_uniques_test = False
 
         # Only do performance tests
         self.only_perf_tests = False

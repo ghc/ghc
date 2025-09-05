@@ -1599,6 +1599,7 @@ async def test_common_work(name: TestName, opts,
             and (only_ways is None
                  or (only_ways is not None and way in only_ways)) \
             and (config.cmdline_ways == [] or way in config.cmdline_ways) \
+            and (not (config.skip_uniques_test and name == "uniques")) \
             and (not (config.skip_perf_tests and isStatsTest())) \
             and (not (config.only_perf_tests and not isStatsTest())) \
             and way not in getTestOpts().omit_ways
