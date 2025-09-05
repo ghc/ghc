@@ -346,6 +346,7 @@ hiModuleNameMismatchWarn requested_mod read_mod
          , ppr requested_mod
          , text "differs from name found in the interface file"
          , ppr read_mod
+         , parens (text "if these names look the same, try again with -dppr-debug")
          ]
 
 dynamicHashMismatchError :: Module -> ModLocation -> SDoc
