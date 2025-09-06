@@ -4296,7 +4296,7 @@
       "ac_cv_func_utimensat": "no"
     }
   },
-  "release-x86_64-freebsd14-release": {
+  "release-x86_64-freebsd14-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -4307,7 +4307,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-freebsd14-release.tar.xz",
+        "ghc-x86_64-freebsd14-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4349,8 +4349,8 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-freebsd14-release",
-      "BUILD_FLAVOUR": "release",
+      "BIN_DIST_NAME": "ghc-x86_64-freebsd14-release+no_split_sections",
+      "BUILD_FLAVOUR": "release+no_split_sections",
       "CABAL_INSTALL_VERSION": "3.10.3.0",
       "CC": "cc",
       "CONFIGURE_ARGS": "--with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib --with-system-libffi --with-ffi-includes=/usr/local/include --with-ffi-libraries=/usr/local/lib --with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --enable-strict-ghc-toolchain-check",
@@ -4359,7 +4359,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-freebsd14-release",
+      "TEST_ENV": "x86_64-freebsd14-release+no_split_sections",
       "XZ_OPT": "-9"
     }
   },
