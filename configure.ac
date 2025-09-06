@@ -69,11 +69,19 @@ AC_CHECK_PROGS([PYTHON], [python3 python python2])
 AS_IF([test "x$PYTHON" = x], [AC_MSG_ERROR([Python interpreter not found. Please install Python or set PYTHON environment variable.])])
 AC_SUBST([PYTHON])
 
+# FIXME: For now we keep this check, but just widen it aggressively.
+#        At some point we should just outright remove this.
+LlvmMinVersion=10 # inclusive
+LlvmMaxVersion=100 # not inclusive
+AC_SUBST([LlvmMinVersion])
+AC_SUBST([LlvmMaxVersion])
+
 # --- Files to generate ---
 # config.status will create these files by substituting @VAR@ placeholders.
 AC_CONFIG_FILES([
     ghc/ghc-bin.cabal:ghc/ghc-bin.cabal.in
     compiler/ghc.cabal:compiler/ghc.cabal.in
+    compiler/GHC/CmmToLlvm/Version/Bounds.hs.in:compiler/GHC/CmmToLlvm/Version/Bounds.hs
     libraries/ghc-boot/ghc-boot.cabal:libraries/ghc-boot/ghc-boot.cabal.in
     libraries/ghc-boot-th/ghc-boot-th.cabal:libraries/ghc-boot-th/ghc-boot-th.cabal.in
     libraries/ghc-boot-th-next/ghc-boot-th-next.cabal:libraries/ghc-boot-th-next/ghc-boot-th-next.cabal.in

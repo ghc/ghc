@@ -31,7 +31,7 @@ module GHC.SysTools.Tasks
 import GHC.Prelude
 import GHC.ForeignSrcLang
 
-import GHC.CmmToLlvm.Version (LlvmVersion, parseLlvmVersion)
+import GHC.CmmToLlvm.Version (LlvmVersion, llvmVersionStr, supportedLlvmVersionUpperBound, parseLlvmVersion, supportedLlvmVersionLowerBound)
 
 import GHC.Settings
 
@@ -346,10 +346,14 @@ figureLlvmVersion logger dflags = traceSystoolCommand logger "llc" $ do
                 debugTraceMsg logger 2
                     (text "Error (figuring out LLVM version):" <+>
                       text (show err))
-                -- TODO: review this
                 errorMsg logger $ vcat
                     [ text "Warning:", nest 9 $
-                          text "Couldn't figure out LLVM version!" ]
+                          text "Couldn't figure out LLVM version!" $$
+                          text ("Make sure you have installed LLVM between ["
+                                ++ llvmVersionStr supportedLlvmVersionLowerBound
+                                ++ " and "
+                                ++ llvmVersionStr supportedLlvmVersionUpperBound
+                                ++ ")") ]
                 return Nothing)
 
 -- See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
