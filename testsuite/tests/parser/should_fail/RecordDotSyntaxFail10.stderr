@@ -3,7 +3,7 @@ RecordDotSyntaxFail10.hs:40:11: error: [GHC-39999]
     • In the second argument of ‘($)’, namely ‘a {foo.bar.baz.quux}’
       In a stmt of a 'do' block: print $ a {foo.bar.baz.quux}
       In the expression:
-        do let a = Foo {foo = Bar {bar = ...}}
+        do let a = ...
            let quux = "Expecto patronum!"
            print $ a {foo.bar.baz.quux}
 
