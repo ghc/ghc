@@ -2007,9 +2007,8 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
     swap_and_finish tv can_rhs =
       swapAndFinish ev eq_rel swapped (mkTyVarTy tv) can_rhs
 
-    -- We can unify; go ahead and do so.
+    -- Phew! Finally!  We can unify; go ahead and do so.
     unify tv rhs_redn =
-
       do { -- In the common case where rhs_redn is Refl, we don't need to rewrite
            -- the evidence, even if swapped=IsSwapped.   Suppose the original was
            --     [W] co : Int ~ alpha
