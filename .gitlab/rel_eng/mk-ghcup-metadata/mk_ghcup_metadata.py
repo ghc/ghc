@@ -204,9 +204,9 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     darwin_x86 = mk(darwin("x86_64"))
     darwin_arm64 = mk(darwin("aarch64"))
     windows = mk(windowsArtifact)
-    alpine3_12 = mk(alpine("3_12"))
-    alpine3_20 = mk(alpine("3_20"))
-    alpine3_18_arm64 = mk(alpine("3_18", arch='aarch64'))
+    alpine3_22 = mk(alpine("3_22"))
+    alpine3_22_arm64 = mk(alpine("3_22", arch='aarch64'))
+    alpine3_22_i386 = mk(alpine("3_22", arch='i386'))
     deb9 = mk(debian(9, "x86_64"))
     deb10 = mk(debian(10, "x86_64"))
     deb11 = mk(debian(11, "x86_64"))
@@ -247,10 +247,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
           , "Linux_UnknownLinux" : { "unknown_versioning": rocky8 }
           , "Darwin" : { "unknown_versioning" : darwin_x86 }
           , "Windows" : { "unknown_versioning" :  windows }
-          , "Linux_Alpine" : { "( >= 3.12 && < 3.20 )": alpine3_12
-                             , ">= 3.20": alpine3_20
-                             , "unknown_versioning": alpine3_12 }
-
+          , "Linux_Alpine" : { "unknown_versioning": alpine3_22 }
           }
 
     a32 = { "Linux_Debian": { "( >= 10 && < 12 )": deb10_i386
@@ -258,11 +255,12 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
                             , "unknown_versioning": deb10_i386 }
           , "Linux_Ubuntu": { "unknown_versioning": deb10_i386 }
           , "Linux_Mint" : { "unknown_versioning": deb10_i386 }
+          , "Linux_Alpine" : { "unknown_versioning": alpine3_22_i386 }
           , "Linux_UnknownLinux" : { "unknown_versioning": deb10_i386 }
           }
 
     arm64 = { "Linux_UnknownLinux": { "unknown_versioning": deb10_arm64 }
-            , "Linux_Alpine" : { "unknown_versioning": alpine3_18_arm64 }
+            , "Linux_Alpine" : { "unknown_versioning": alpine3_22_arm64 }
             , "Linux_Debian": { "( >= 10 && < 12 )": deb10_arm64
                               , "( >= 12 )": deb12_arm64
                               , "unknown_versioning": deb10_arm64
