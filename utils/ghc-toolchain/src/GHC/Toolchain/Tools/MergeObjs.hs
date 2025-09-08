@@ -22,7 +22,7 @@ data MergeObjs = MergeObjs { mergeObjsProgram :: Program
 
 findMergeObjs :: ProgOpt -> Cc -> CcLink -> Nm -> M MergeObjs
 findMergeObjs progOpt cc ccLink nm = checking "for linker for merging objects" $ do
-    prog <- findProgram "linker for merging objects" progOpt ["ld.gold", "ld"]
+    prog <- findProgram "linker for merging objects" progOpt ["ld"]
     let mo = prog & _prgFlags %++ "-r"
     checkMergingWorks cc nm mo
     checkForGoldT22266 cc ccLink mo
