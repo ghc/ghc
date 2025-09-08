@@ -198,38 +198,45 @@ handleStateVarWritingBiased (DuplexHandle _ _ writingVar) = writingVar
 {-|
     Yields the result of another operation if that operation succeeded, and
     otherwise throws an exception that signals that the other operation failed
-    because a certain I/O subsystem is not in use.
+    because some Haskell handle does not use an operating-system handle of a
+    required type.
 -}
-requiringSubsystem :: String
-                      -- ^ The name of the required subsystem
-                   -> Maybe a
-                      -- ^ The result of the other operation if it succeeded
-                   -> IO a
-requiringSubsystem subsystemName
-    = maybe (ioException subsystemRequired) return
+requiringOSHandleOfType :: String
+                           -- ^ The name of the operating-system handle type
+                        -> Maybe a
+                           {-^
+                               The result of the other operation if it succeeded
+                           -}
+                        -> IO a
+requiringOSHandleOfType osHandleTypeName
+    = maybe (ioException osHandleOfTypeRequired) return
     where
 
-    subsystemRequired :: IOException
-    subsystemRequired = IOError Nothing
-                                IllegalOperation
-                                ""
-                                (subsystemName ++ " I/O subsystem required")
-                                Nothing
-                                Nothing
+    osHandleOfTypeRequired :: IOException
+    osHandleOfTypeRequired
+        = IOError Nothing
+                  IllegalOperation
+                  ""
+                  ("handle does not use " ++ osHandleTypeName ++ "s")
+                  Nothing
+                  Nothing
 
 {-|
-    Obtains the POSIX file descriptor of a device if the POSIX I/O subsystem is
-    in use, and throws an exception otherwise.
+    Obtains the POSIX file descriptor of a device if the device contains one,
+    and throws an exception otherwise.
 -}
 getFileDescriptor :: Typeable d => d -> IO CInt
-getFileDescriptor = requiringSubsystem "POSIX" . fmap fdFD . cast
+getFileDescriptor = requiringOSHandleOfType "POSIX file descriptor" .
+                    fmap fdFD . cast
 
 {-|
-    Obtains the Windows handle of a device if the Windows I/O subsystem is in
-    use, and throws an exception otherwise.
+    Obtains the Windows handle of a device if the device contains one, and
+    throws an exception otherwise.
 -}
 getWindowsHandle :: Typeable d => d -> IO (Ptr ())
-getWindowsHandle = requiringSubsystem "native" . toMaybeWindowsHandle where
+getWindowsHandle = requiringOSHandleOfType "Windows handle" .
+                   toMaybeWindowsHandle
+    where
 
     toMaybeWindowsHandle :: Typeable d => d -> Maybe (Ptr ())
 #if defined(mingw32_HOST_OS)
@@ -257,7 +264,7 @@ getWindowsHandle = requiringSubsystem "native" . toMaybeWindowsHandle where
     further operations on the handle are blocked to a degree that interference
     with this action is prevented.
 
-    If the I/O subsystem in use is not the POSIX one, an exception is thrown.
+    If the handle does not use POSIX file descriptors, an exception is thrown.
 
     See [below](#with-ref-caveats) for caveats regarding this operation.
 -}
@@ -275,7 +282,7 @@ withFileDescriptorReadingBiased = withOSHandle "withFileDescriptorReadingBiased"
     further operations on the handle are blocked to a degree that interference
     with this action is prevented.
 
-    If the I/O subsystem in use is not the POSIX one, an exception is thrown.
+    If the handle does not use POSIX file descriptors, an exception is thrown.
 
     See [below](#with-ref-caveats) for caveats regarding this operation.
 -}
@@ -293,7 +300,7 @@ withFileDescriptorWritingBiased = withOSHandle "withFileDescriptorWritingBiased"
     operations on the Haskell handle are blocked to a degree that interference
     with this action is prevented.
 
-    If the I/O subsystem in use is not the Windows one, an exception is thrown.
+    If the Haskell handle does not use Windows handles, an exception is thrown.
 
     See [below](#with-ref-caveats) for caveats regarding this operation.
 -}
@@ -311,7 +318,7 @@ withWindowsHandleReadingBiased = withOSHandle "withWindowsHandleReadingBiased"
     operations on the Haskell handle are blocked to a degree that interference
     with this action is prevented.
 
-    If the I/O subsystem in use is not the Windows one, an exception is thrown.
+    If the Haskell handle does not use Windows handles, an exception is thrown.
 
     See [below](#with-ref-caveats) for caveats regarding this operation.
 -}
