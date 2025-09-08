@@ -164,7 +164,7 @@ Compiler
 GHCi
 ~~~~
 
-- Multiple home unit support in GHCi
+- Support for multiple home units in GHCi (:ghc-ticket:`20889`)
 
 - :ghci-cmd:`:info` now outputs type declarations with ``@``-binders that are
   considered semantically significant. See the documentation for :ghci-cmd:`:info`
@@ -175,6 +175,32 @@ GHCi
 
 - Many performance and correctness improvements in the bytecode interpreter.
 
+- Numerous improvements in the GHCi debugger including:
+
+  * Significantly improved performance of the :ghci-cmd:`:steplocal` command (:ghc-ticket:`25779`)
+  * Every ``do`` statement is now a breakpoint, resulting in more predictable and intuitive :ghci-cmd:`:break` behavior
+  * A :ghci-cmd:`:stepout` command is now available, allowing stepping out from
+    functions and bindings when stopped at a breakpoint. Note that this feature
+    is made available as a technology preview and we expect further refinement
+    in future releases.
+  * Improvements in the GHCi debugger API, setting the groundwork for
+    integration with Debug Adapter Protocol (DAP) and other interactive
+    debugging clients
+  * Internal refactorings towards making the debugger multi-thread aware (:ghc-ticket:`26064`)
+
+WebAssembly backend
+~~~~~~~~~~~~~~~~~~~
+
+The WebAssembly backend now supports evaluation via the interpreter, allowing
+both interactive usage via GHCi and TemplateHaskell evaluation. This includes
+usage of ``foreign import javascript``, allowing interactive
+usage within the browser including interaction with the DOM (modulo various
+constraints imposed by WebAsm implementations).
+
+See the blog post on `Tweag's blog
+<https://www.tweag.io/blog/2025-04-17-wasm-ghci-browser/>`_ for more
+information.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -182,14 +208,15 @@ Runtime system
   runtime linker to continue in the presence of unknown symbols. By default this
   flag is not passed, preserving previous behavior.
 
-Cmm
-~~~
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
+
+``ghc-prim`` is now a legacy interface providing access to primitive operations
+and types which are now also exposed via the ``ghc-experimental`` package.
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
