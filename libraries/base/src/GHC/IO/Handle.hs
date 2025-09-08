@@ -116,7 +116,7 @@ import GHC.Internal.IO.Windows.Handle
 import GHC.Internal.IO.Handle.Types
        (
            Handle (FileHandle, DuplexHandle),
-           Handle__
+           Handle__ (Handle__, haDevice)
        )
 import GHC.Internal.IO.Handle.Internals (withHandle_', flushBuffer)
 import GHC.Internal.IO.Exception
@@ -156,10 +156,13 @@ withOSHandle :: String
              -> IO r
 withOSHandle opName handleStateVar getOSHandle handle act
     = mask $ \ withOriginalMaskingState ->
-      withHandle_' opName handle (handleStateVar handle) $ \ handleState -> do
-          osHandle <- getOSHandle handleState
+      withHandleState $ \ handleState@Handle__ {haDevice = dev} -> do
+          osHandle <- getOSHandle dev
           flushBuffer handleState
           withOriginalMaskingState $ act osHandle
+      where
+
+      withHandleState = withHandle_' opName handle (handleStateVar handle)
 {-
     The 'withHandle_'' operation, which we use here, already performs masking.
     Still, we have to employ 'mask', in order do obtain the operation that
