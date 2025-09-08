@@ -76,10 +76,10 @@ module GHC.IO.Handle
      hPutBufNonBlocking,
 
      -- * Obtaining file descriptors and Windows handles
-     withReadingFileDescriptor,
-     withWritingFileDescriptor,
-     withReadingWindowsHandle,
-     withWritingWindowsHandle
+     withFileDescriptorReadingBiased,
+     withFileDescriptorWritingBiased,
+     withWindowsHandleReadingBiased,
+     withWindowsHandleWritingBiased
 
      -- ** Caveats
      -- $with-ref-caveats
@@ -88,6 +88,7 @@ module GHC.IO.Handle
 import GHC.Internal.IO.Handle
 
 import GHC.Internal.Control.Monad (return)
+import GHC.Internal.Control.Concurrent.MVar (MVar)
 import GHC.Internal.Control.Exception (mask)
 import GHC.Internal.Data.Function ((.), ($))
 import GHC.Internal.Data.Functor (fmap)
@@ -112,13 +113,12 @@ import GHC.Internal.IO.Windows.Handle
            toHANDLE
        )
 #endif
-import GHC.Internal.IO.Handle.Types (Handle__)
-import GHC.Internal.IO.Handle.Internals
+import GHC.Internal.IO.Handle.Types
        (
-           wantReadableHandle_,
-           wantWritableHandle,
-           flushBuffer
+           Handle (FileHandle, DuplexHandle),
+           Handle__
        )
+import GHC.Internal.IO.Handle.Internals (withHandle_', flushBuffer)
 import GHC.Internal.IO.Exception
        (
            IOErrorType (IllegalOperation),
@@ -128,46 +128,69 @@ import GHC.Internal.IO.Exception
 import GHC.Internal.Foreign.Ptr (Ptr)
 import GHC.Internal.Foreign.C.Types (CInt)
 
--- * Obtaining file descriptors and Windows handles
+-- * Obtaining POSIX file descriptors and Windows handles
 
 {-|
-    Obtains from a handle an underlying operating-system reference for reading
-    or writing and executes a user-provided action on it. The Haskell-side
-    buffers of the handle are flushed before this action is run. While this
-    action is executed, further operations on the handle are blocked to a degree
-    that interference with this action is prevented.
+    Obtains an operating-system handle that underlies a Haskell handle and
+    executes a user-provided action on it. The Haskell-managed buffers related
+    to the operating-system handle are flushed before the user-provided action
+    is run. While this action is executed, further operations on the Haskell
+    handle are blocked to a degree that interference with this action is
+    prevented.
 
     See [below](#with-ref-caveats) for caveats regarding this operation.
 -}
-withRef :: (Handle -> (Handle__ -> IO a) -> IO a)
-           -- ^ Obtaining of an appropriately prepared handle side from a handle
-        -> (forall d. Typeable d => d -> IO r)
-           -- ^ Conversion of a device into an operating-system reference
-        -> Handle
-           -- ^ The handle to use
-        -> (r -> IO a)
-           -- ^ The action to execute on the operating-system reference
-        -> IO a
-withRef withHandleSide getRef handle act
+withOSHandle :: String
+                -- ^ The name of the overall operation
+             -> (Handle -> MVar Handle__)
+                {-^
+                    Obtaining of the handle state variable that holds the
+                    operating-system handle
+                -}
+             -> (forall d. Typeable d => d -> IO a)
+                -- ^ Conversion of a device into an operating-system handle
+             -> Handle
+                -- ^ The Haskell handle to use
+             -> (a -> IO r)
+                -- ^ The action to execute on the operating-system handle
+             -> IO r
+withOSHandle opName handleStateVar getOSHandle handle act
     = mask $ \ withOriginalMaskingState ->
-      withHandleSide handle $ \ handleSide -> do
-          ref <- getRef handleSide
-          flushBuffer handleSide
-          withOriginalMaskingState $ act ref
+      withHandle_' opName handle (handleStateVar handle) $ \ handleState -> do
+          osHandle <- getOSHandle handleState
+          flushBuffer handleState
+          withOriginalMaskingState $ act osHandle
 {-
-    The public operations that use 'withRef' provide 'withHandleSide' arguments
-    that perform masking. Still, we have to use 'mask' here, in order do obtain
-    the operation that restores the original masking state. The user-provided
-    action should be executed with this original masking state, as there is no
-    inherent reason to generally perform it with masking in place. The masking
-    that the 'withHandleSide' arguments perform is only for safely accessing
-    internal handle data and thus constitutes an implementation detail; it has
-    nothing to do with the user-provided action.
+    The 'withHandle_'' operation, which we use here, already performs masking.
+    Still, we have to employ 'mask', in order do obtain the operation that
+    restores the original masking state. The user-provided action should be
+    executed with this original masking state, as there is no inherent reason to
+    generally perform it with masking in place. The masking that 'withHandle_''
+    performs is only for safely accessing handle state and thus constitutes an
+    implementation detail; it has nothing to do with the user-provided action.
 -}
 {-
-    The order of actions in 'withRef' is such that any exception from 'getRef'
-    is thrown before the flushing of the Haskell-side buffers.
+    The order of actions in 'withOSHandle' is such that any exception from
+    'getOSHandle' is thrown before the flushing of the Haskell-managed buffers.
 -}
+
+{-|
+    Obtains the handle state variable that underlies a handle or specifically
+    the handle state variable for reading if the handle uses different state
+    variables for reading and writing.
+-}
+handleStateVarReadingBiased :: Handle -> MVar Handle__
+handleStateVarReadingBiased (FileHandle _ var)            = var
+handleStateVarReadingBiased (DuplexHandle _ readingVar _) = readingVar
+
+{-|
+    Obtains the handle state variable that underlies a handle or specifically
+    the handle state variable for writing if the handle uses different state
+    variables for reading and writing.
+-}
+handleStateVarWritingBiased :: Handle -> MVar Handle__
+handleStateVarWritingBiased (FileHandle _ var)            = var
+handleStateVarWritingBiased (DuplexHandle _ _ writingVar) = writingVar
 
 {-|
     Yields the result of another operation if that operation succeeded, and
@@ -223,68 +246,76 @@ getWindowsHandle = requiringSubsystem "native" . toMaybeWindowsHandle where
 #endif
 
 {-|
-    Obtains from a handle a POSIX file descriptor for reading and executes a
-    user-provided action on it. The Haskell-side buffers of the handle are
-    flushed before this action is run. While this action is executed, further
-    operations on the handle are blocked to a degree that interference with this
-    action is prevented.
-
-    If the I/O subsystem in use is not the POSIX one, an exception is thrown.
-
-    See [below](#with-ref-caveats) for caveats regarding this operation.
--}
-withReadingFileDescriptor :: Handle -> (CInt -> IO a) -> IO a
-withReadingFileDescriptor
-    = withRef (wantReadableHandle_ "withReadingFileDescriptor")
-              getFileDescriptor
-
-{-|
-    Obtains from a handle a POSIX file descriptor for writing and executes a
-    user-provided action on it. The Haskell-side buffers of the handle are
-    flushed before this action is run. While this action is executed, further
-    operations on the handle are blocked to a degree that interference with this
-    action is prevented.
-
-    If the I/O subsystem in use is not the POSIX one, an exception is thrown.
-
-    See [below](#with-ref-caveats) for caveats regarding this operation.
--}
-withWritingFileDescriptor :: Handle -> (CInt -> IO a) -> IO a
-withWritingFileDescriptor
-    = withRef (wantWritableHandle "withWritingFileDescriptor")
-              getFileDescriptor
-
-{-|
-    Obtains from a Haskell handle a Windows handle for reading and executes a
-    user-provided action on it. The Haskell-side buffers of the Haskell handle
-    are flushed before this action is run. While this action is executed,
+    Obtains the POSIX file descriptor that underlies a handle or specifically
+    the POSIX file descriptor for reading if the handle uses different file
+    descriptors for reading and writing and executes a user-provided action on
+    it. The Haskell-managed buffers related to the file descriptor are flushed
+    before the user-provided action is run. While this action is executed,
     further operations on the handle are blocked to a degree that interference
+    with this action is prevented.
+
+    If the I/O subsystem in use is not the POSIX one, an exception is thrown.
+
+    See [below](#with-ref-caveats) for caveats regarding this operation.
+-}
+withFileDescriptorReadingBiased :: Handle -> (CInt -> IO r) -> IO r
+withFileDescriptorReadingBiased = withOSHandle "withFileDescriptorReadingBiased"
+                                               handleStateVarReadingBiased
+                                               getFileDescriptor
+
+{-|
+    Obtains the POSIX file descriptor that underlies a handle or specifically
+    the POSIX file descriptor for writing if the handle uses different file
+    descriptors for reading and writing and executes a user-provided action on
+    it. The Haskell-managed buffers related to the file descriptor are flushed
+    before the user-provided action is run. While this action is executed,
+    further operations on the handle are blocked to a degree that interference
+    with this action is prevented.
+
+    If the I/O subsystem in use is not the POSIX one, an exception is thrown.
+
+    See [below](#with-ref-caveats) for caveats regarding this operation.
+-}
+withFileDescriptorWritingBiased :: Handle -> (CInt -> IO r) -> IO r
+withFileDescriptorWritingBiased = withOSHandle "withFileDescriptorWritingBiased"
+                                               handleStateVarWritingBiased
+                                               getFileDescriptor
+
+{-|
+    Obtains the Windows handle that underlies a Haskell handle or specifically
+    the Windows handle for reading if the Haskell handle uses different Windows
+    handles for reading and writing and executes a user-provided action on it.
+    The Haskell-managed buffers related to the Windows handle are flushed before
+    the user-provided action is run. While this action is executed, further
+    operations on the Haskell handle are blocked to a degree that interference
     with this action is prevented.
 
     If the I/O subsystem in use is not the Windows one, an exception is thrown.
 
     See [below](#with-ref-caveats) for caveats regarding this operation.
 -}
-withReadingWindowsHandle :: Handle -> (Ptr () -> IO a) -> IO a
-withReadingWindowsHandle
-    = withRef (wantReadableHandle_ "withReadingWindowsHandle")
-              getWindowsHandle
+withWindowsHandleReadingBiased :: Handle -> (Ptr () -> IO r) -> IO r
+withWindowsHandleReadingBiased = withOSHandle "withWindowsHandleReadingBiased"
+                                              handleStateVarReadingBiased
+                                              getWindowsHandle
 
 {-|
-    Obtains from a Haskell handle a Windows handle for writing and executes a
-    user-provided action on it. The Haskell-side buffers of the Haskell handle
-    are flushed before this action is run. While this action is executed,
-    further operations on the handle are blocked to a degree that interference
+    Obtains the Windows handle that underlies a Haskell handle or specifically
+    the Windows handle for writing if the Haskell handle uses different Windows
+    handles for reading and writing and executes a user-provided action on it.
+    The Haskell-managed buffers related to the Windows handle are flushed before
+    the user-provided action is run. While this action is executed, further
+    operations on the Haskell handle are blocked to a degree that interference
     with this action is prevented.
 
     If the I/O subsystem in use is not the Windows one, an exception is thrown.
 
     See [below](#with-ref-caveats) for caveats regarding this operation.
 -}
-withWritingWindowsHandle :: Handle -> (Ptr () -> IO a) -> IO a
-withWritingWindowsHandle
-    = withRef (wantWritableHandle "withWritingWindowsHandle")
-              getWindowsHandle
+withWindowsHandleWritingBiased :: Handle -> (Ptr () -> IO r) -> IO r
+withWindowsHandleWritingBiased = withOSHandle "withWindowsHandleWritingBiased"
+                                              handleStateVarWritingBiased
+                                              getWindowsHandle
 
 -- ** Caveats
 
@@ -305,8 +336,8 @@ withWritingWindowsHandle
 
           - When the computation is later resumed due to another evaluation
             attempt, the blocking of handle operations is reinstantiated, the
-            Haskell-side buffers are flushed again, and the user-provided action
-            is run from the beginning.
+            Haskell-managed buffers are flushed again, and the user-provided
+            action is run from the beginning.
 
         Repeating the previously executed part of the user-provided action
         cannot be avoided apparently. See the @[async]@ note in the source code
