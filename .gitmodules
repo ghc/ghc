@@ -8,8 +8,9 @@
 	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
-	url = https://gitlab.haskell.org/ghc/packages/Cabal.git
+	url = https://github.com/stable-haskell/Cabal.git
 	ignore = untracked
+	branch = stable-haskell/feature/cross-compile
 [submodule "libraries/containers"]
 	path = libraries/containers
 	url = https://gitlab.haskell.org/ghc/packages/containers.git
