@@ -125,7 +125,7 @@ import GHC.Internal.IO.Handle.Types
 import GHC.Internal.IO.Handle.Internals (withHandle_', flushBuffer)
 import GHC.Internal.IO.Exception
        (
-           IOErrorType (IllegalOperation),
+           IOErrorType (InappropriateType),
            IOException (IOError),
            ioException
        )
@@ -221,7 +221,7 @@ requiringOSHandleOfType osHandleTypeName
     osHandleOfTypeRequired :: IOException
     osHandleOfTypeRequired
         = IOError Nothing
-                  IllegalOperation
+                  InappropriateType
                   ""
                   ("handle does not use " ++ osHandleTypeName ++ "s")
                   Nothing
