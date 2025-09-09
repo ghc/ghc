@@ -1,83 +1,67 @@
-allow-boot-library-installs: True
-benchmarks: False
-tests: False
+package-dbs: clear, global
 
--- Disable Hackage, we explicitly include the packages we need.
-active-repositories: :none
 
 packages:
-  -- RTS
   rts-headers
   rts-fs
   rts
 
-  -- Compiler
-  compiler
-
-  -- Internal libraries
+  libraries/ghc-prim
+  libraries/ghc-internal
+  libraries/ghc-experimental
   libraries/base
+  compiler
+  libraries/ghc-platform
+  libraries/ghc-compact
   libraries/ghc-bignum
+  libraries/integer-gmp
   libraries/ghc-boot
   libraries/ghc-boot-th
-  libraries/ghc-compact
-  libraries/ghc-experimental
   libraries/ghc-heap
-  libraries/ghc-internal
-  libraries/ghc-platform
-  libraries/ghc-prim
   libraries/ghci
-  libraries/integer-gmp
-  libraries/system-cxx-std-lib
+  libraries/stm
   libraries/template-haskell
-
-  -- Internal tools
-  utils/genprimopcode
-  utils/deriveConstants
-
-  -- The following are packages available on Hackage but included as submodules
+  libraries/hpc
+  libraries/system-cxx-std-lib
   libraries/array
   libraries/binary
   libraries/bytestring
-  libraries/Cabal/Cabal
-  libraries/Cabal/Cabal-syntax
   libraries/containers/containers
   libraries/deepseq
   libraries/directory
   libraries/exceptions
   libraries/file-io
   libraries/filepath
-  libraries/hpc
-  libraries/libffi-clib
   libraries/mtl
   libraries/os-string
   libraries/parsec
   libraries/pretty
   libraries/process
   libraries/semaphore-compat
-  libraries/stm
   libraries/text
   libraries/time
   libraries/transformers
   libraries/unix
-  libraries/Win32
   libraries/xhtml
-  
-  -- These would be on Hackage but we include them as direct URLs
-  -- (Hackage is disabled by `active-repositories: :none`)
+  libraries/Win32
+
+  libraries/Cabal/Cabal-syntax
+  libraries/Cabal/Cabal
   https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz
   https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
   https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
 
---
--- Constraints
---
+  utils/genprimopcode
+  utils/deriveConstants
+
+-- project-rts
+benchmarks: False
+tests: False
+allow-boot-library-installs: True
+active-repositories: :none
 
 constraints:
-  -- I cannot write build:* but ghc-internal is enough to do the job.
-  -- FIXME: it should be possible to write build:*
-  -- All build dependencies should be installed, i.e. from stage1.
   build:any.ghc-internal installed,
-
   -- for some reason cabal things these are already installed for the target,
   -- although they only exist in the build compiler package db
   Cabal source,
@@ -113,9 +97,6 @@ constraints:
   xhtml source,
   Win32 source
 
---
--- Package level configuration
---
 
 package *
   library-vanilla: True
@@ -123,7 +104,6 @@ package *
   executable-profiling: False
   executable-dynamic: False
   executable-static: False
-  
   -- library-for-ghci will cause a `ld -r` call to create pre-linked objects.
   -- This helps the internal linker when trying to link (.a) archives with massive
   -- displacements. In that case the displacement can be in excess of what
@@ -145,10 +125,93 @@ package *
 if os(wasi)
   package *
     shared: True
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"913\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"wasm32-wasi\""
+    ghc-options: "-optc-DHostArch=\"wasm32\""
+    ghc-options: "-optc-DHostOS=\"unknown\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    ghc-options: "-optl-Wl,--export-dynamic"
+    ghc-options: "-optc-fvisibility=default"
+    ghc-options: "-optc-fvisibility-inlines-hidden"
+    flags: -tables-next-to-code
 
-import: cabal.project.rts
+-- Maybe we should fix this with some import
+if os(linux)
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"913\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
+    ghc-options: "-optc-DHostArch=\"x86_64\""
+    ghc-options: "-optc-DHostOS=\"linux\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    flags: +tables-next-to-code
 
-package libffi-clib
+if os(darwin)
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"913\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"aarch64-apple-darwin\""
+    ghc-options: "-optc-DHostArch=\"aarch64\""
+    ghc-options: "-optc-DHostOS=\"darwin\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    flags: +tables-next-to-code +leading-underscore
+
+if os(freebsd)
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"914\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"x86_64-portbld-freebsd\""
+    ghc-options: "-optc-DHostArch=\"x86_64\""
+    ghc-options: "-optc-DHostOS=\"freebsd\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    flags: +tables-next-to-code +leading-underscore
+
+program-options
+  ghc-options: -fhide-source-paths -j
+
+-- project-boot-libs
+benchmarks: False
+tests: False
+allow-boot-library-installs: True
+active-repositories: :none
+
+package rts-headers
+  ghc-options: -no-rts
+
+package rts-fs
+  ghc-options: -no-rts
+
+package rts
   ghc-options: -no-rts
 
 package ghc
@@ -163,13 +226,15 @@ package ghc-internal
 package text
   flags: -simdutf
 
--- TODO: What is this? Why do we need _in-ghc-tree_ here?
+program-options
+  ghc-options: -fhide-source-paths -j
+
+-- project-ghc
+benchmarks: False
+tests: False
+
 package hsc2hs
   flags: +in-ghc-tree
-
---
--- Program options
---
 
 program-options
   ghc-options: -fhide-source-paths -j
