@@ -894,8 +894,9 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
           parseNmLine line
               = case words line of
                 ('_' : n) : "C" : s : _ -> mkP n s
-                n : "C" : s : _ -> mkP n s
-                [n, "D", _, s] -> mkP n s
+                n : "C" : s : _         -> mkP n s -- in common section
+                n : "B" : _off : s : _  -> mkP n s -- in .bss section
+                [n, "D", _, s]          -> mkP n s
                 [s, "O", "*COM*", _, n] -> mkP n s
                 _ -> Nothing
               where mkP r s = case (stripPrefix prefix r, readHex s) of
