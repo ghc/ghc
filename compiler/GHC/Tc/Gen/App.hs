@@ -794,7 +794,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
       = do { let herald = case fun_ctxt of
                              VAExpansion (OrigStmt{}) _ _ -> ExpectedFunTySyntaxOp DoOrigin tc_fun
                              _ ->  ExpectedFunTyArg (HsExprTcThing tc_fun) (unLoc arg)
-           ; (wrap, arg_ty, res_ty) <-
+           ; (fun_co, arg_ty, res_ty) <-
                 -- NB: matchActualFunTy does the rep-poly check.
                 -- For example, suppose we have f :: forall r (a::TYPE r). a -> Int
                 -- In an application (f x), we need 'x' to have a fixed runtime
@@ -805,7 +805,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
                   (n_val_args, fun_sigma) fun_ty
 
            ; arg' <- quickLookArg do_ql ctxt arg arg_ty
-           ; let acc' = arg' : addArgWrap wrap acc
+           ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
            ; go (pos+1) acc' res_ty rest_args }
 
     new_arg_ty :: LHsExpr GhcRn -> Int -> TcM (Scaled TcType)

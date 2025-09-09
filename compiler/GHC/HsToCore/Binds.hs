@@ -1597,9 +1597,13 @@ dsHsWrapper hs_wrap thing_inside
 ds_hs_wrapper :: HsWrapper
               -> ((CoreExpr -> CoreExpr) -> DsM a)
               -> DsM a
-ds_hs_wrapper wrap = go wrap
+ds_hs_wrapper hs_wrap
+  = go hs_wrap
   where
     go WpHole            k = k $ \e -> e
+    go (WpSubType w)     k = go (optSubTypeHsWrapper w) k
+                             -- See (DSST3) in Note [Deep subsumption and WpSubType]
+                             --             in GHC.Tc.Types.Evidence
     go (WpTyApp ty)      k = k $ \e -> App e (Type ty)
     go (WpEvLam ev)      k = k $ Lam ev
     go (WpTyLam tv)      k = k $ Lam tv
@@ -1612,13 +1616,13 @@ ds_hs_wrapper wrap = go wrap
     go (WpCompose c1 c2) k = go c1 $ \w1 ->
                              go c2 $ \w2 ->
                              k (w1 . w2)
-    go (WpFun c1 c2 st)  k = -- See Note [Desugaring WpFun]
-                             do { x <- newSysLocalDs st
-                                ; go c1 $ \w1 ->
-                                  go c2 $ \w2 ->
-                                  let app f a = mkCoreApp (text "dsHsWrapper") f a
-                                      arg     = w1 (Var x)
-                                  in k (\e -> (Lam x (w2 (app e arg)))) }
+    go (WpFun c1 c2 st _) k = -- See Note [Desugaring WpFun]
+                              do { x <- newSysLocalDs st
+                                 ; go c1 $ \w1 ->
+                                   go c2 $ \w2 ->
+                                   let app f a = mkCoreApp (text "dsHsWrapper") f a
+                                       arg     = w1 (Var x)
+                                   in k (\e -> (Lam x (w2 (app e arg)))) }
 
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> ([CoreBind] -> DsM a) -> DsM a
