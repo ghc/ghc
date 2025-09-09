@@ -10,6 +10,10 @@ main = do
   info <- readProcess ghc ["+RTS", "--info"] ""
   let fields = read info :: [(String,String)]
   getGhcFieldOrFail fields "HostOS" "Host OS"
+  getGhcFieldOrFail fields "WORDSIZE" "Word size"
+  getGhcFieldOrFail fields "TARGETPLATFORM" "Host platform"
+  getGhcFieldOrFail fields "TargetOS_CPP" "Host OS"
+  getGhcFieldOrFail fields "TargetARCH_CPP" "Host architecture"
   getGhcFieldOrFail fields "RTSWay" "RTS way"
 
   -- support for old GHCs (pre 9.13): infer target platform by querying the rts...
