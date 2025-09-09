@@ -217,7 +217,7 @@ handleProc pgm phase_name proc = do
 
     does_not_exist =
       throwGhcExceptionIO $
-        InstallationError (phase_name ++ ": could not execute: " ++ pgm)
+        InstallationError (phase_name ++ ": could not execute: `" ++ pgm ++ "'")
 
 withPipe :: ((Handle, Handle) -> IO a) -> IO a
 withPipe = bracket createPipe $ \ (readEnd, writeEnd) -> do
