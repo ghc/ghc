@@ -142,6 +142,8 @@ generateConfigHs :: String -- ^ ghc's cabal-generated unit-id, which matches its
                  -> String -- ^ ghc-internal's cabal-generated unit-id, which matches its package-id/key
                  -> [(String,String)] -> String
 generateConfigHs cProjectUnitId cGhcInternalUnitId settings = either error id $ do
+    -- cStage = 2 is clearly wrong. As we compile the stage 1 compiler with this
+    -- file as well!
     let getSetting' = getSetting $ (("cStage","2"):) settings
     buildPlatform  <- getSetting' "cBuildPlatformString" "Host platform"
     hostPlatform   <- getSetting' "cHostPlatformString" "Target platform"
