@@ -458,7 +458,7 @@ defaultSDocContext = SDC
   , sdocColScheme                   = Col.defaultScheme
   , sdocLastColour                  = Col.colReset
   , sdocShouldUseColor              = False
-  , sdocDefaultDepth                = 5
+  , sdocDefaultDepth                = 6
   , sdocLineLength                  = 100
   , sdocCanUseUnicode               = False
   , sdocPrintErrIndexLinks          = False
@@ -543,7 +543,7 @@ pprDeeperList f ds
 
 trim :: Int -> [SDoc] -> [SDoc]
 trim _ []     = []
-trim 0 _      = [text "...."]
+trim 0 _      = [text "..."]
 trim n (d:ds) = d : trim (n-1) ds
 
 pprSetDepth :: Depth -> SDoc -> SDoc
