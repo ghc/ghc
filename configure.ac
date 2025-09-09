@@ -423,7 +423,7 @@ AC_ARG_WITH([clang],
 dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
 dnl later CC is copied to CC_STAGE{1,2,3}
 AC_PROG_CC([cc gcc clang])
-AC_PROG_CXX([g++ clang++ c++])
+AC_PROG_CXX([c++ g++ clang++])
 # Work around #24324
 MOVE_TO_FLAGS([CC],[CFLAGS])
 MOVE_TO_FLAGS([CXX],[CXXFLAGS])

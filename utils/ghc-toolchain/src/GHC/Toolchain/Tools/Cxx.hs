@@ -26,7 +26,7 @@ findCxx :: ArchOS
         -> ProgOpt -> M Cxx
 findCxx archOs target progOpt = checking "for C++ compiler" $ do
     -- TODO: We use the search order in configure, but there could be a more optimal one
-    cxxProgram <- findProgram "C++ compiler" progOpt ["g++", "clang++", "c++"]
+    cxxProgram <- findProgram "C++ compiler" progOpt ["c++", "g++", "clang++"]
     cxx        <- cxxSupportsTarget archOs target Cxx{cxxProgram}
     checkCxxWorks cxx
     return cxx
