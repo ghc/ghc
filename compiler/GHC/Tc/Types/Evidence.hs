@@ -12,6 +12,7 @@ module GHC.Tc.Types.Evidence (
   collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper,
   pprHsWrapper, hsWrapDictBinders,
+  optHsWrapper,
 
   -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -73,7 +74,7 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Name( isInternalName )
 import GHC.Types.Var
-import GHC.Types.Id( idScaledType )
+import GHC.Types.Id( idScaledType, idType )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
@@ -149,8 +150,8 @@ data HsWrapper
        --    wrap2 :: t1 ~> t2
        --- Then (wrap1 `WpCompose` wrap2) :: t1 ~> t3
 
-  | WpFun HsWrapper HsWrapper (Scaled TcTypeFRR)
-       -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w exp_arg). wrap2[ e wrap1[x] ]
+  | WpFun HsWrapper HsWrapper (Scaled TcTypeFRR) TcType
+       -- (WpFun wrap1 wrap2 (w, t1) t2)[e] = \(x:_w exp_arg). wrap2[ e wrap1[x] ]
        -- So note that if  e     :: act_arg -> act_res
        --                  wrap1 :: exp_arg ~> act_arg
        --                  wrap2 :: act_res ~> exp_res
@@ -231,11 +232,8 @@ mkWpFun :: HsWrapper -> HsWrapper
         -> TcType           -- ^ Either "from" type or "to" type of the second wrapper
                             --   (used only when the second wrapper is the identity)
         -> HsWrapper
-mkWpFun WpHole       WpHole       _             _  = WpHole
-mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mk_wp_fun_co w (mkRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mk_wp_fun_co w (mkSymCo co1)    (mkRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mk_wp_fun_co w (mkSymCo co1)    co2)
-mkWpFun w_arg        w_res        t1            _  =
+mkWpFun WpHole WpHole _  _  = WpHole
+mkWpFun w_arg  w_res  t1 t2 = WpFun w_arg w_res t1 t2
   -- In this case, we will desugar to a lambda
   --
   --   \x. w_res[ e w_arg[x] ]
@@ -247,15 +245,18 @@ mkWpFun w_arg        w_res        t1            _  =
   --
   -- Unfortunately, we can't check this with an assertion here, because of
   -- [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-  WpFun w_arg w_res t1
 
-mkWpEta :: [Id] -> HsWrapper -> HsWrapper
+mkWpEta :: Type -> [Id] -> HsWrapper -> HsWrapper
 -- (mkWpEta [x1, x2] wrap) [e]
 --   = \x1. \x2.  wrap[e x1 x2]
 -- Just generates a bunch of WpFuns
-mkWpEta xs wrap = foldr eta_one wrap xs
+-- The incoming type is the type of the entire expression
+mkWpEta orig_fun_ty xs wrap = go orig_fun_ty xs
   where
-    eta_one x wrap = WpFun idHsWrapper wrap (idScaledType x)
+    go _      []       = wrap
+    go fun_ty (id:ids) = WpFun idHsWrapper (go res_ty ids) (idScaledType id) res_ty
+                       where
+                         res_ty = funResultTy fun_ty
 
 mk_wp_fun_co :: Mult -> TcCoercionR -> TcCoercionR -> TcCoercionR
 mk_wp_fun_co mult arg_co res_co
@@ -333,7 +334,7 @@ hsWrapDictBinders wrap = go wrap
  where
    go (WpEvLam dict_id)   = unitBag dict_id
    go (w1 `WpCompose` w2) = go w1 `unionBags` go w2
-   go (WpFun _ w _)       = go w
+   go (WpFun _ w _ _)     = go w
    go WpHole              = emptyBag
    go (WpCast  {})        = emptyBag
    go (WpEvApp {})        = emptyBag
@@ -357,6 +358,70 @@ collectHsWrapBinders wrap = go wrap []
     gos (w:ws) = go w ws
 
     add_lam v (vs,w) = (v:vs, w)
+
+
+optHsWrapper :: HsWrapper -> HsWrapper
+optHsWrapper wrap
+  = foldr (<.>) WpHole (norm wrap [])
+  where
+    norm :: HsWrapper -> [HsWrapper] -> [HsWrapper]
+    -- INVARIANT: ws:[HsWrapper] is normalised
+    norm WpHole                 ws = ws
+    norm (w1 `WpCompose` w2)    ws = norm w1 (norm w2 ws)
+    norm (WpCast co)            ws = norm_co co ws
+    norm (WpEvLam ev)           ws = norm_ev_lam ev ws
+    norm (WpTyLam tv)           ws = norm_ty_lam tv ws
+    norm (WpLet binds)          ws = norm_let binds ws
+    norm (WpFun w1 w2 sty1 ty2) ws = norm_fun w1 w2 sty1 ty2 ws
+    norm w@(WpTyApp {})         ws = w : ws
+    norm w@(WpEvApp {})         ws = w : ws
+
+    ------------------
+    norm_let b@(EvBinds bs) ws | isEmptyBag bs = ws
+                               | otherwise     = WpLet b : ws
+    norm_let (TcEvBinds {}) _  = pprPanic "optHsWrapper1" (ppr wrap)
+
+    -----------------
+    norm_ty_lam tv (WpTyApp ty : ws)
+      | Just tv' <- getTyVar_maybe ty
+      , tv==tv'
+      = ws
+    norm_ty_lam tv (WpCast co : ws)
+      = norm_co (mkHomoForAllCo tv co) (norm_ty_lam tv ws)
+    norm_ty_lam tv ws
+      = WpTyLam tv : ws
+
+    -----------------
+    norm_ev_lam ev (WpEvApp ev_tm : ws)
+      | EvExpr (Var ev') <- ev_tm
+      , ev == ev'
+      = ws
+    norm_ev_lam ev (WpCast co : ws)
+      = norm_co fun_co (norm_ev_lam ev ws)
+      where
+        fun_co = mkFunCo Representational FTF_C_T
+                        (mkNomReflCo ManyTy)
+                        (mkRepReflCo (idType ev))
+                        co
+    norm_ev_lam ev ws
+      = WpEvLam ev : ws
+
+    -----------------
+    norm_co co (WpCast co' : ws)     = norm_co (co `mkTransCo` co') ws
+    norm_co co ws | isReflexiveCo co = ws
+                  | otherwise        = WpCast co : ws
+
+    ------------------
+    norm_fun w1 w2 (Scaled w t1) t2 ws
+      = case (optHsWrapper w1, optHsWrapper w2) of
+          (WpHole,     WpHole)     -> ws
+          (WpHole,     WpCast co2) -> co_ify (mkRepReflCo t1) co2
+          (WpCast co1, WpHole)     -> co_ify (mkSymCo co1)    (mkRepReflCo t2)
+          (WpCast co1, WpCast co2) -> co_ify (mkSymCo co1)    co2
+          (w1',        w2')        -> WpFun w1' w2' (Scaled w t1) t2 : ws
+      where
+        co_ify co1 co2 = norm_co (mk_wp_fun_co w co1 co2) ws
+
 
 {-
 ************************************************************************
@@ -997,7 +1062,7 @@ pprHsWrapper wrap pp_thing_inside
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 (Scaled w t1)) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
+    help it (WpFun f1 f2 (Scaled w t1) _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
                                             help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]

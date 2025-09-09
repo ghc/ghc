@@ -2095,7 +2095,7 @@ mkWpFun_FRR pos act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res 
        ; return $
             mkWpCastN exp_arg_fun_co
               <.>
-            WpFun arg_wrap_frr res_wrap (Scaled exp_mult exp_arg_frr)
+            WpFun arg_wrap_frr res_wrap (Scaled exp_mult exp_arg_frr) exp_res
               <.>
             mkWpCastN act_arg_fun_co }
   | otherwise
@@ -2138,9 +2138,9 @@ deeplySkolemise skol_info ty
            ; let tvs     = binderVars bndrs
                  tvs1    = binderVars bndrs1
                  tv_prs1 = map tyVarName tvs `zip` bndrs1
-           ; return ( mkWpEta ids1 (mkWpTyLams tvs1
-                                    <.> mkWpEvLams ev_vars1
-                                    <.> wrap)
+           ; return ( mkWpEta ty ids1 (mkWpTyLams tvs1
+                                      <.> mkWpEvLams ev_vars1
+                                      <.> wrap)
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
                     , mkScaledFunTys arg_tys' rho ) }
@@ -2174,7 +2174,7 @@ deeplyInstantiate orig ty
            ; ids1  <- newSysLocalIds (fsLit "di") arg_tys'
            ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
            ; (wrap2, rho2) <- go subst' rho
-           ; return (mkWpEta ids1 (wrap2 <.> wrap1),
+           ; return (mkWpEta ty ids1 (wrap2 <.> wrap1),
                      mkScaledFunTys arg_tys' rho2) }
 
       | otherwise
