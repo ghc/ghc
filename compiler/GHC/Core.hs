@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE NoPolyKinds #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module GHC.Core (
@@ -36,7 +37,7 @@ module GHC.Core (
 
         mkBinds,
 
-        isId, cmpAltCon, cmpAlt, ltAlt,
+        isId, cmpAltCon, cmpAlt, ltAlt, altsLevity, CaseLevity(..),
 
         -- ** Simple 'Expr' access functions and predicates
         bindersOf, bindersOfBinds, rhssOfBind, rhssOfBinds, rhssOfAlts,
@@ -60,7 +61,7 @@ module GHC.Core (
         unSaturatedOk, needSaturated, boringCxtOk, boringCxtNotOk,
 
         -- ** Predicates and deconstruction on 'Unfolding'
-        expandUnfolding_maybe,
+        expandUnfolding_maybe, expandUnfolding_always,
         maybeUnfoldingTemplate, otherCons,
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
@@ -1787,6 +1788,11 @@ expandUnfolding_maybe (CoreUnfolding { uf_cache = cache, uf_tmpl = rhs })
     = Just rhs
 expandUnfolding_maybe _ = Nothing
 
+-- Expand an unfolding, ignoring if it is expandable or not
+expandUnfolding_always :: Unfolding -> Maybe CoreExpr
+expandUnfolding_always (CoreUnfolding { uf_tmpl = rhs }) = Just rhs
+expandUnfolding_always _ = Nothing
+
 isCompulsoryUnfolding :: Unfolding -> Bool
 isCompulsoryUnfolding (CoreUnfolding { uf_src = src }) = isCompulsorySource src
 isCompulsoryUnfolding _                                = False
@@ -2005,6 +2011,25 @@ cmpAltCon (LitAlt  l1) (LitAlt  l2) = l1 `compare` l2
 cmpAltCon (LitAlt _)   DEFAULT      = GT
 
 cmpAltCon con1 con2 = pprPanic "cmpAltCon" (ppr con1 $$ ppr con2)
+
+data CaseLevity
+  = CaseUnlifted
+  | CaseLifted
+  deriving (Eq)
+
+altCon :: Alt a -> AltCon
+altCon (Alt con _ _) = con
+
+-- | Try to determine the levity of a case-expression (unlifted, lifted) from
+-- its alternatives
+altsLevity :: [Alt a] -> Maybe CaseLevity
+altsLevity = alts_levity . fmap altCon
+  where
+    alts_levity = \case
+      []              -> Nothing
+      (DEFAULT:xs)    -> alts_levity xs
+      (LitAlt {}:_)   -> Just CaseUnlifted
+      (DataAlt {}:_)  -> Just CaseLifted
 
 {-
 ************************************************************************

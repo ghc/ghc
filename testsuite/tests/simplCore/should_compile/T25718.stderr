@@ -1,0 +1,18 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 28, types: 18, coercions: 0, joins: 0/0}
+
+isAsciiChar
+  = \ x -> case x of { C# c# -> tagToEnum# (<# (ord# c#) 256#) }
+
+bar = \ x -> case x of { W8# x# -> True }
+
+word8ToChar
+  = \ x ->
+      case x of { W8# x# -> C# (chr# (word2Int# (word8ToWord# x#))) }
+
+foo = bar
+
+
+

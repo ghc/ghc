@@ -1,0 +1,21 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 19, types: 8, coercions: 0, joins: 0/0}
+
+foo
+  = \ x ->
+      case word8ToWord# x of {
+        __DEFAULT -> True;
+        42## -> False
+      }
+
+bar
+  = \ x ->
+      case and# x 15## of {
+        __DEFAULT -> True;
+        5## -> False
+      }
+
+
+

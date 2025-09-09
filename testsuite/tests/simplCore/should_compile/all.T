@@ -594,3 +594,8 @@ test('T26805', [grep_errmsg(r'fromInteger')], compile, ['-O -dno-typeable-binds 
 test('T26826', normal, compile, ['-O'])
 test('T26903', [grep_errmsg(r'reverse')], compile, ['-O -dno-typeable-binds -ddump-simpl -dsuppress-uniques -dsuppress-all'])
 test('T18032', normal, compile, ['-O -dsuppress-all -dsuppress-uniques -dno-typeable-binds -ddump-simpl'])
+test('T25718', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
+test('T25718a', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
+test('T25718b', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
+test('T25718c', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
+test('T19166', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])

@@ -30,6 +30,7 @@ GHC.Core.Opt.Arity
 GHC.Core.Opt.CallerCC.Types
 GHC.Core.Opt.ConstantFold
 GHC.Core.Opt.OccurAnal
+GHC.Core.Opt.Range
 GHC.Core.PatSyn
 GHC.Core.Ppr
 GHC.Core.Predicate

@@ -3232,18 +3232,19 @@ rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
            Just (rule_rhs, cont') -> simplExprF (zapSubstEnv env) rule_rhs cont'
            Nothing                -> reallyRebuildCase env scrut case_bndr alts cont }
 
---------------------------------------------------
---      3. Primop-related case-rules
---------------------------------------------------
-
-  |Just (scrut', case_bndr', alts') <- caseRules2 scrut case_bndr alts
-  = reallyRebuildCase env scrut' case_bndr' alts' cont
-
   where
     all_dead_bndrs = all isDeadBinder bndrs       -- bndrs are [InId]
     is_plain_seq   = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
 
 rebuildCase env scrut case_bndr alts cont
+--------------------------------------------------
+--      3. Primop-related case-rules
+--------------------------------------------------
+
+  | Just (scrut', case_bndr', alts') <- caseRules2 (sePlatform env) scrut case_bndr alts
+  = reallyRebuildCase env scrut' case_bndr' alts' cont
+
+  | otherwise
   = reallyRebuildCase env scrut case_bndr alts cont
 
 doCaseToLet :: OutExpr          -- Scrutinee

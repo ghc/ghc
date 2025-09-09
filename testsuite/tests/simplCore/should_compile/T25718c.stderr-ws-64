@@ -1,0 +1,129 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 161, types: 140, coercions: 0, joins: 0/0}
+
+narrow8_ge_lb = \ _ -> True
+
+narrow8_le_ub = narrow8_ge_lb
+
+narrow8_gt_ub_false = \ _ -> False
+
+narrow16_ge_lb = narrow8_ge_lb
+
+narrow16_le_ub = narrow8_ge_lb
+
+narrow8w_lt_ub = \ _ -> True
+
+narrow16w_lt_ub = narrow8w_lt_ub
+
+word16_lt_ub = \ _ -> True
+
+word16_ge_ub_false = \ _ -> False
+
+word_to_word8_lt = narrow8w_lt_ub
+
+word_to_word16_lt = narrow8w_lt_ub
+
+word8_to_int8_ge = \ _ -> True
+
+word16_to_int16_ge = word16_lt_ub
+
+int8_to_word8_le = \ _ -> True
+
+int16_to_word16_le = \ _ -> True
+
+word8_add_lt_256 = \ _ _ -> True
+
+word16_alts
+  = \ x ->
+      case word16ToWord# x of {
+        __DEFAULT -> True;
+        42## -> False
+      }
+
+narrow8_alts
+  = \ x ->
+      case narrow8Int# x of {
+        __DEFAULT -> True;
+        42# -> False
+      }
+
+word8_sub_lt_256 = word8_add_lt_256
+
+word16_add_lt_ub = \ _ _ -> True
+
+word16_sub_lt_ub = word16_add_lt_ub
+
+int8_add_ge_lb = \ _ _ -> True
+
+int8_sub_le_ub = int8_add_ge_lb
+
+int16_add_ge_lb = \ _ _ -> True
+
+int16_sub_le_ub = int16_add_ge_lb
+
+narrow32_ge_lb = narrow8_ge_lb
+
+narrow32_le_ub = narrow8_ge_lb
+
+word32_to_int32_ge = \ _ -> True
+
+int32_to_word32_le = \ _ -> True
+
+int32_add_ge_lb = \ _ _ -> True
+
+int32_sub_le_ub = int32_add_ge_lb
+
+word8_and_lt = word8_to_int8_ge
+
+word8_and_alts
+  = \ x ->
+      case word8ToWord# (andWord8# x 15#Word8) of {
+        __DEFAULT -> True;
+        5## -> False
+      }
+
+word16_and_lt = word16_lt_ub
+
+word32_and_lt = word32_to_int32_ge
+
+word64_and_le = \ _ -> True
+
+int_and_ge = narrow8_ge_lb
+
+int_and_alts
+  = \ x ->
+      case andI# x 255# of {
+        __DEFAULT -> True;
+        42# -> False
+      }
+
+narrow32w_lt_ub = narrow8w_lt_ub
+
+word32_lt_ub = word32_to_int32_ge
+
+word32_ge_ub_false = \ _ -> False
+
+word_to_word32_lt = narrow8w_lt_ub
+
+word32_add_lt_ub = \ _ _ -> True
+
+word32_sub_lt_ub = word32_add_lt_ub
+
+narrow32_alts
+  = \ x ->
+      case narrow32Int# x of {
+        __DEFAULT -> True;
+        42# -> False
+      }
+
+word32_alts
+  = \ x ->
+      case word32ToWord# x of {
+        __DEFAULT -> True;
+        42## -> False
+      }
+
+
+

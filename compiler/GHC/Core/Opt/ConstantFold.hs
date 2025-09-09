@@ -44,7 +44,7 @@ import GHC.Core
 import GHC.Core.Make
 import GHC.Core.SimpleOpt (  exprIsConApp_maybe, exprIsLiteral_maybe )
 import GHC.Core.DataCon ( DataCon,dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
-import GHC.Core.Utils  ( cheapEqExpr, exprIsHNF
+import GHC.Core.Utils  ( cheapEqExpr, exprIsHNF, isDefaultAlt
                        , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Multiplicity
 import GHC.Core.Rules.Config
@@ -54,6 +54,7 @@ import GHC.Core.TyCon
    ( TyCon, tyConDataCons_maybe, tyConDataCons, tyConSingleDataCon, tyConFamilySize
    , isEnumerationTyCon, isValidDTT2TyCon, isNewTyCon )
 import GHC.Core.Map.Expr ( eqCoreExpr )
+import GHC.Core.Opt.Range
 
 import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
 import GHC.Builtin.PrimOps.Ids (primOpId)
@@ -76,6 +77,7 @@ import Data.Functor (($>))
 import qualified Data.ByteString as BS
 import Data.Ratio
 import Data.Word
+import Data.Char (ord)
 import Data.Maybe (fromMaybe, fromJust)
 
 {-
@@ -777,60 +779,60 @@ primOpRules nm = \case
 
    -- Relational operators, ordering
 
-   Int8GtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   Int8GeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   Int8LeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   Int8LtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   Int8GtOp   -> mkRelOpRule nm (>)  [ boundsCmp (const rangeInt8) Gt ]
+   Int8GeOp   -> mkRelOpRule nm (>=) [ boundsCmp (const rangeInt8) Ge ]
+   Int8LeOp   -> mkRelOpRule nm (<=) [ boundsCmp (const rangeInt8) Le ]
+   Int8LtOp   -> mkRelOpRule nm (<)  [ boundsCmp (const rangeInt8) Lt ]
 
-   Int16GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   Int16GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   Int16LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   Int16LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   Int16GtOp  -> mkRelOpRule nm (>)  [ boundsCmp (const rangeInt16) Gt ]
+   Int16GeOp  -> mkRelOpRule nm (>=) [ boundsCmp (const rangeInt16) Ge ]
+   Int16LeOp  -> mkRelOpRule nm (<=) [ boundsCmp (const rangeInt16) Le ]
+   Int16LtOp  -> mkRelOpRule nm (<)  [ boundsCmp (const rangeInt16) Lt ]
 
-   Int32GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   Int32GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   Int32LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   Int32LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   Int32GtOp  -> mkRelOpRule nm (>)  [ boundsCmp (const rangeInt32) Gt ]
+   Int32GeOp  -> mkRelOpRule nm (>=) [ boundsCmp (const rangeInt32) Ge ]
+   Int32LeOp  -> mkRelOpRule nm (<=) [ boundsCmp (const rangeInt32) Le ]
+   Int32LtOp  -> mkRelOpRule nm (<)  [ boundsCmp (const rangeInt32) Lt ]
 
-   Int64GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   Int64GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   Int64LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   Int64LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   Int64GtOp  -> mkRelOpRule nm (>)  [ boundsCmp (const rangeInt64) Gt ]
+   Int64GeOp  -> mkRelOpRule nm (>=) [ boundsCmp (const rangeInt64) Ge ]
+   Int64LeOp  -> mkRelOpRule nm (<=) [ boundsCmp (const rangeInt64) Le ]
+   Int64LtOp  -> mkRelOpRule nm (<)  [ boundsCmp (const rangeInt64) Lt ]
 
-   IntGtOp    -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   IntGeOp    -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   IntLeOp    -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   IntLtOp    -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   IntGtOp    -> mkRelOpRule nm (>)  [ boundsCmp rangeInt Gt ]
+   IntGeOp    -> mkRelOpRule nm (>=) [ boundsCmp rangeInt Ge ]
+   IntLeOp    -> mkRelOpRule nm (<=) [ boundsCmp rangeInt Le ]
+   IntLtOp    -> mkRelOpRule nm (<)  [ boundsCmp rangeInt Lt ]
 
-   Word8GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   Word8GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   Word8LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   Word8LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   Word8GtOp  -> mkRelOpRule nm (>)  [ boundsCmp (const rangeWord8) Gt ]
+   Word8GeOp  -> mkRelOpRule nm (>=) [ boundsCmp (const rangeWord8) Ge ]
+   Word8LeOp  -> mkRelOpRule nm (<=) [ boundsCmp (const rangeWord8) Le ]
+   Word8LtOp  -> mkRelOpRule nm (<)  [ boundsCmp (const rangeWord8) Lt ]
 
-   Word16GtOp -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   Word16GeOp -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   Word16LeOp -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   Word16LtOp -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   Word16GtOp -> mkRelOpRule nm (>)  [ boundsCmp (const rangeWord16) Gt ]
+   Word16GeOp -> mkRelOpRule nm (>=) [ boundsCmp (const rangeWord16) Ge ]
+   Word16LeOp -> mkRelOpRule nm (<=) [ boundsCmp (const rangeWord16) Le ]
+   Word16LtOp -> mkRelOpRule nm (<)  [ boundsCmp (const rangeWord16) Lt ]
 
-   Word32GtOp -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   Word32GeOp -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   Word32LeOp -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   Word32LtOp -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   Word32GtOp -> mkRelOpRule nm (>)  [ boundsCmp (const rangeWord32) Gt ]
+   Word32GeOp -> mkRelOpRule nm (>=) [ boundsCmp (const rangeWord32) Ge ]
+   Word32LeOp -> mkRelOpRule nm (<=) [ boundsCmp (const rangeWord32) Le ]
+   Word32LtOp -> mkRelOpRule nm (<)  [ boundsCmp (const rangeWord32) Lt ]
 
-   Word64GtOp -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   Word64GeOp -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   Word64LeOp -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   Word64LtOp -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   Word64GtOp -> mkRelOpRule nm (>)  [ boundsCmp (const rangeWord64) Gt ]
+   Word64GeOp -> mkRelOpRule nm (>=) [ boundsCmp (const rangeWord64) Ge ]
+   Word64LeOp -> mkRelOpRule nm (<=) [ boundsCmp (const rangeWord64) Le ]
+   Word64LtOp -> mkRelOpRule nm (<)  [ boundsCmp (const rangeWord64) Lt ]
 
-   WordGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   WordGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   WordLeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   WordLtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   WordGtOp   -> mkRelOpRule nm (>)  [ boundsCmp rangeWord Gt ]
+   WordGeOp   -> mkRelOpRule nm (>=) [ boundsCmp rangeWord Ge ]
+   WordLeOp   -> mkRelOpRule nm (<=) [ boundsCmp rangeWord Le ]
+   WordLtOp   -> mkRelOpRule nm (<)  [ boundsCmp rangeWord Lt ]
 
-   CharGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   CharGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   CharLeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   CharLtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   CharGtOp   -> mkRelOpRule nm (>)  [ boundsCmp rangeChar Gt ]
+   CharGeOp   -> mkRelOpRule nm (>=) [ boundsCmp rangeChar Ge ]
+   CharLeOp   -> mkRelOpRule nm (<=) [ boundsCmp rangeChar Le ]
+   CharLtOp   -> mkRelOpRule nm (<)  [ boundsCmp rangeChar Lt ]
 
    FloatGtOp  -> mkFloatingRelOpRule nm (>)
    FloatGeOp  -> mkFloatingRelOpRule nm (>=)
@@ -1401,27 +1403,27 @@ litEq is_eq = msum
                    | otherwise = trueValInt  platform
 
 
--- | Check if there is comparison with minBound or maxBound, that is
--- always true or false. For instance, an Int cannot be smaller than its
--- minBound, so we can replace such comparison with False.
-boundsCmp :: Comparison -> RuleM CoreExpr
-boundsCmp op = do
+-- | Perform value range analysis to check if can determine the result
+-- of a comparison statically. For instance, a Word8 converted into a Word is
+-- always smaller than 256.
+boundsCmp :: (Platform -> Range) -> Comparison -> RuleM CoreExpr
+boundsCmp mk_range op = do
   platform <- getPlatform
   [a, b] <- getArgs
-  liftMaybe $ mkRuleFn platform op a b
+  let ty_range = mk_range platform
+  liftMaybe $ value_range_cmp platform op ty_range a b
 
-data Comparison = Gt | Ge | Lt | Le
-
-mkRuleFn :: Platform -> Comparison -> CoreExpr -> CoreExpr -> Maybe CoreExpr
-mkRuleFn platform Gt (Lit lit) _ | isMinBound platform lit = Just $ falseValInt platform
-mkRuleFn platform Le (Lit lit) _ | isMinBound platform lit = Just $ trueValInt  platform
-mkRuleFn platform Ge _ (Lit lit) | isMinBound platform lit = Just $ trueValInt  platform
-mkRuleFn platform Lt _ (Lit lit) | isMinBound platform lit = Just $ falseValInt platform
-mkRuleFn platform Ge (Lit lit) _ | isMaxBound platform lit = Just $ trueValInt  platform
-mkRuleFn platform Lt (Lit lit) _ | isMaxBound platform lit = Just $ falseValInt platform
-mkRuleFn platform Gt _ (Lit lit) | isMaxBound platform lit = Just $ falseValInt platform
-mkRuleFn platform Le _ (Lit lit) | isMaxBound platform lit = Just $ trueValInt  platform
-mkRuleFn _ _ _ _                                           = Nothing
+-- | See Note [Value range analysis] in GHC.Core.Opt.Range
+value_range_cmp :: Platform -> Comparison -> Range -> CoreExpr -> CoreExpr -> Maybe CoreExpr
+value_range_cmp platform cmp ty_range x y =
+  let rx = ty_range `rangeIntersect` valueRange platform x
+      ry = ty_range `rangeIntersect` valueRange platform y
+      to_bool = \case
+        Nothing    -> Nothing
+        Just True  -> Just (trueValInt platform)
+        Just False -> Just (falseValInt platform)
+      res = rangeCmp cmp rx ry
+  in to_bool res
 
 -- | Create an Int literal expression while ensuring the given Integer is in the
 -- target Int range
@@ -3188,8 +3190,8 @@ is_binop op e = case e of
 
 is_op :: PrimOp -> CoreExpr -> Maybe (Arg CoreBndr)
 is_op op e = case e of
- App (OpVal op') x | op == op' -> Just x
- _                             -> Nothing
+ App (PrimOpVar op') x | op == op' -> Just x
+ _                                 -> Nothing
 
 is_add, is_sub, is_mul, is_and, is_or, is_div :: NumOps -> CoreExpr -> Maybe (CoreArg, CoreArg)
 is_add num_ops e = is_binop (numAdd num_ops) e
@@ -3249,12 +3251,12 @@ is_expr_mul num_ops x e = if
 
 -- | Match the application of a binary primop
 pattern BinOpApp :: Arg CoreBndr -> PrimOp -> Arg CoreBndr -> CoreExpr
-pattern BinOpApp x op y = OpVal op `App` x `App` y
+pattern BinOpApp x op y = PrimOpVar op `App` x `App` y
 
 -- | Match a primop
-pattern OpVal:: PrimOp  -> Arg CoreBndr
-pattern OpVal op <- Var (isPrimOpId_maybe -> Just op) where
-   OpVal op = Var (primOpId op)
+pattern PrimOpVar:: PrimOp -> Arg CoreBndr
+pattern PrimOpVar op <- Var (isPrimOpId_maybe -> Just op) where
+   PrimOpVar op = Var (primOpId op)
 
 -- | Match a literal
 pattern L :: Integer -> Arg CoreBndr
@@ -3478,11 +3480,12 @@ caseRules _ _ = Nothing
 --
 -- It's important that occurrence info are present, hence the use of In* types.
 caseRules2
-   :: InExpr  -- ^ Scutinee
-   -> InId    -- ^ Case-binder
-   -> [InAlt] -- ^ Alternatives in standard (increasing) order
+   :: Platform  -- ^ Target platform
+   -> InExpr    -- ^ Scrutinee
+   -> InId      -- ^ Case-binder
+   -> [InAlt]   -- ^ Alternatives in standard (increasing) order
    -> Maybe (InExpr, InId, [InAlt])
-caseRules2 scrut bndr alts
+caseRules2 platform scrut bndr alts
 
   -- case quotRem# x y of
   --    (# q, _ #) -> body
@@ -3506,6 +3509,46 @@ caseRules2 scrut bndr alts
       | dead_q    -> Just $ (BinOpApp x rem  y, r, [Alt DEFAULT [] body])
       | dead_r    -> Just $ (BinOpApp x quot y, q, [Alt DEFAULT [] body])
       | otherwise -> Nothing
+
+  -- filter alternatives that are not in the scrutinee's inferred range
+  -- See (VRA1) in Note [Value range analysis] in GHC.Core.Opt.Range
+  | Just CaseUnlifted <- altsLevity alts
+  , range <- valueRange platform scrut
+  , range /= noRange
+  = let
+      -- filters alternatives that aren't in range
+      alt_in_range = \case
+          Alt DEFAULT _ _                  -> True
+          Alt (LitAlt (LitNumber _ n)) _ _ -> n `inRange` range
+          Alt (LitAlt (LitChar c)) _ _     -> fromIntegral (ord c) `inRange` range
+          Alt (LitAlt LitNullAddr) _ _     -> 0 `inRange` range
+          Alt _ _ _                        -> True -- defaults to True to be safe
+
+      rebuild_alts alt (b,n,alts')
+        -- `n` is the number of remaining alternatives, hence alternatives which
+        -- are in range. If there are as many alternatives in range as the range
+        -- size, it means we can remove the DEFAULT one (it is dead code).
+        --
+        -- Note that this works as written because we use `foldr` below and the
+        -- DEFAULT alternative is always at the head of the list of alternatives
+        -- when it is present (invariant).
+        | isDefaultAlt alt
+        , Just sz <- rangeSize range
+        , n == sz
+        = (True,n,alts')
+
+        -- filter alternatives that aren't in range
+        | not (alt_in_range alt)
+        = (True,n,alts')
+
+        | otherwise
+        = (b,n+1,alt:alts')
+
+      (alts_changed,_nalts,final_alts) = foldr rebuild_alts (False,0,[]) alts
+
+    in case alts_changed of
+        True  -> Just (scrut,bndr,final_alts)
+        False -> Nothing
 
   | otherwise
   = Nothing
@@ -3678,3 +3721,5 @@ an alternative that is unreachable.
 
 You may wonder how this can happen: check out #15436.
 -}
+
+

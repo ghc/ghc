@@ -1631,16 +1631,21 @@ checkCaseAlts e scrut scrut_ty alts
        ; checkL (increasing_tag con_alts) (mkNonIncreasingAltsMsg e)
            -- See GHC.Core Note [Case expression invariants] item (3)
 
-            -- For types Int#, Word# with an infinite (well, large!) number of
-            -- possible values, there should usually be a DEFAULT case
-            -- But (see Note [Empty case alternatives] in GHC.Core) it's ok to
-            -- have *no* case alternatives.
-            -- In effect, this is a kind of partial test. I suppose it's possible
-            -- that we might *know* that 'x' was 1 or 2, in which case
-            --   case x of { 1 -> e1; 2 -> e2 }
-            -- would be fine.
-       ; checkL (isJust maybe_deflt || not is_infinite_ty || null alts)
-                (nonExhaustiveAltsMsg e)
+       -- Historical note: we used to check that primitive types with a large
+       -- number of possible values (e.g. Int#, Word#...) either had:
+       --   * no alternatives (see Note [Empty case alternatives] in GHC.Core)
+       --   * a DEFAULT alternative
+       -- The rationale was that we can't reasonably enumerate all possible
+       -- alternatives hence the need for a DEFAULT alternative. Moreover
+       -- HsToCore introduces a DEFAULT alternative to raise a pattern-match
+       -- error so there must be at least one.
+       --
+       -- However, since we implemented range analysis (see Note [Value range
+       -- analysis] in GHC.Core.Range), we're filtering unreachable
+       -- alternatives, even the DEFAULT one, so this check is no longer valid.
+       -- E.g. DEFAULT alternative is now removed in:
+       --   case x .&. 1 of { DEFAULT -> ..; 0 -> ..; 1 -> ..}
+       -- even if we're matching an Int#.
 
        -- Check that the scrutinee is not a floating-point type
        -- if there are any literal alternatives
@@ -1666,7 +1671,7 @@ checkCaseAlts e scrut scrut_ty alts
            _otherwise -> return ()
         }
   where
-    (con_alts, maybe_deflt) = findDefault alts
+    (con_alts, _maybe_deflt) = findDefault alts
 
         -- Check that successive alternatives have strictly increasing tags
     increasing_tag (alt1 : rest@( alt2 : _)) = alt1 `ltAlt` alt2 && increasing_tag rest
@@ -1677,10 +1682,6 @@ checkCaseAlts e scrut scrut_ty alts
 
     is_lit_alt (Alt (LitAlt _) _  _) = True
     is_lit_alt _                     = False
-
-    is_infinite_ty = case tyConAppTyCon_maybe scrut_ty of
-                        Nothing    -> False
-                        Just tycon -> isPrimTyCon tycon
 
 lintAltExpr :: CoreExpr -> OutType -> LintM UsageEnv
 lintAltExpr expr ann_ty
@@ -3772,10 +3773,6 @@ mkNonDefltMsg e
   = hang (text "Case expression with DEFAULT not at the beginning") 4 (ppr e)
 mkNonIncreasingAltsMsg e
   = hang (text "Case expression with badly-ordered alternatives") 4 (ppr e)
-
-nonExhaustiveAltsMsg :: CoreExpr -> SDoc
-nonExhaustiveAltsMsg e
-  = hang (text "Case expression with non-exhaustive alternatives") 4 (ppr e)
 
 mkBadConMsg :: TyCon -> DataCon -> SDoc
 mkBadConMsg tycon datacon

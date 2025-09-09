@@ -1,0 +1,26 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 29, types: 10, coercions: 0, joins: 0/0}
+
+foo4 = I# 0#
+
+foo3 = I# 1#
+
+foo2 = I# 2#
+
+foo1 = I# 3#
+
+foo
+  = \ x ->
+      case x of { I# x# ->
+      case andI# x# 3# of {
+        0# -> foo4;
+        1# -> foo3;
+        2# -> foo2;
+        3# -> foo1
+      }
+      }
+
+
+

@@ -1,0 +1,18 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 20, types: 6, coercions: 0, joins: 0/0}
+
+foo
+  = \ x ->
+      case ># x 0# of {
+        __DEFAULT -> tagToEnum# (<=# x 0#);
+        1# ->
+          case <=# x 0# of {
+            __DEFAULT -> True;
+            1# -> False
+          }
+      }
+
+
+

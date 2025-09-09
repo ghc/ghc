@@ -478,41 +478,49 @@ divideBranches branches = (lo_branches, mid, hi_branches)
 --------------
 emitCmmLitSwitch :: CmmExpr                    -- Tag to switch on
                -> [(Literal, CmmAGraphScoped)] -- Tagged branches
-               -> CmmAGraphScoped              -- Default branch (always)
+               -> Maybe CmmAGraphScoped        -- Default branch
                -> FCode ()                     -- Emit the code
-emitCmmLitSwitch _scrut [] deflt = emit $ fst deflt
-emitCmmLitSwitch scrut branches@(branch:_) deflt = do
+emitCmmLitSwitch _scrut [] (Just deflt) = emit $ fst deflt
+emitCmmLitSwitch _scrut [] Nothing      = panic "emitCmmLitSwitch: expected DEFAULT branch (no alts)"
+emitCmmLitSwitch scrut branches@(branch:_) mdeflt = do
     scrut' <- assignTemp' scrut
     join_lbl <- newBlockId
-    deflt_lbl <- label_code join_lbl deflt
     branches_lbls <- label_branches join_lbl branches
 
     platform <- getPlatform
     let cmm_ty = cmmExprType platform scrut
         rep = typeWidth cmm_ty
 
-    -- We find the necessary type information in the literals in the branches
-    let (signed,range) = case branch of
-          (LitNumber nt _, _) -> (signed,range)
-            where
-              signed = litNumIsSigned nt
-              range  = case litNumRange platform nt of
-                        (Just mi, Just ma) -> (mi,ma)
-                                              -- unbounded literals (Natural and
-                                              -- Integer) must have been
-                                              -- lowered at this point
-                        partial_bounds     -> pprPanic "Unexpected unbounded literal range"
-                                                       (ppr partial_bounds)
-               -- assuming native word range
-          _ -> (False, (0, platformMaxWord platform))
-
     if isFloatType cmm_ty
-    then emit =<< mk_float_switch rep scrut' deflt_lbl noBound branches_lbls
-    else emit $ mk_discrete_switch
+    then do
+      deflt_lbl <- case mdeflt of
+                    Nothing    -> panic "emitCmmLitSwitch: expected DEFAULT branch (float switch)"
+                    Just deflt -> label_code join_lbl deflt
+      emit =<< mk_float_switch rep scrut' deflt_lbl noBound branches_lbls
+    else do
+      -- We find the necessary type information in the literals in the branches
+      let (signed,range) = case branch of
+            (LitNumber nt _, _) -> (signed,range)
+              where
+                signed = litNumIsSigned nt
+                range  = case litNumRange platform nt of
+                          (Just mi, Just ma) -> (mi,ma)
+                                                -- unbounded literals (Natural and
+                                                -- Integer) must have been
+                                                -- lowered at this point
+                          partial_bounds     -> pprPanic "Unexpected unbounded literal range"
+                                                         (ppr partial_bounds)
+                 -- assuming native word range
+            _ -> (False, (0, platformMaxWord platform))
+
+      mdeflt_lbl <- case mdeflt of
+        Nothing    -> pure Nothing
+        Just deflt -> Just <$> label_code join_lbl deflt
+      emit $ mk_discrete_switch
         signed
         scrut'
         [(litValue lit,l) | (lit,l) <- branches_lbls]
-        (Just deflt_lbl)
+        mdeflt_lbl
         range
     emitLabel join_lbl
 

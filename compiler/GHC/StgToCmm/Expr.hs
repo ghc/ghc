@@ -729,15 +729,13 @@ cgAlts gc_plan bndr (PrimAlt _) alts
         ; tagged_cmms <- cgAltRhss gc_plan bndr alts
 
         ; let bndr_reg = CmmLocal (idToReg platform bndr)
-              deflt = case tagged_cmms of
-                  (DEFAULT,deflt):_ -> deflt
-                  _ -> panic "cgAlts PrimAlt"
-                -- PrimAlts always have a DEFAULT case
-                -- and it always comes first
+              mdeflt = case tagged_cmms of
+                  (DEFAULT,deflt):_ -> Just deflt
+                  _ -> Nothing
 
               tagged_cmms' = [(lit,code)
                              | (LitAlt lit, code) <- tagged_cmms]
-        ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt
+        ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' mdeflt
         ; return AssignedDirectly }
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
