@@ -138,8 +138,8 @@ AC_SUBST([EnableStrictGhcToolchainCheck])
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
-AC_PROG_CC([gcc clang])
-AC_PROG_CXX([g++ clang++ c++])
+AC_PROG_CC([cc gcc clang])
+AC_PROG_CXX([c++ g++ clang++])
 # Work around #24324
 MOVE_TO_FLAGS([CC],[CFLAGS])
 MOVE_TO_FLAGS([CXX],[CXXFLAGS])

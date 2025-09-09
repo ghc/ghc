@@ -40,7 +40,7 @@ findBasicCc :: ProgOpt -> M Cc
 findBasicCc progOpt = checking "for C compiler" $ do
     -- TODO: We keep the candidate order we had in configure, but perhaps
     -- there's a more optimal one
-    ccProgram <- findProgram "C compiler" progOpt ["gcc", "clang", "cc"]
+    ccProgram <- findProgram "C compiler" progOpt ["cc", "gcc", "clang"]
     return $ Cc{ccProgram}
 
 findCc :: ArchOS
