@@ -823,9 +823,11 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
 
     unfoldWrapper :: HsWrapper -> [Type]
     unfoldWrapper = reverse . unfWrp'
-      where unfWrp' (WpTyApp ty) = [ty]
-            unfWrp' (WpCompose w1 w2) = unfWrp' w1 ++ unfWrp' w2
-            unfWrp' _ = []
+      where
+        unfWrp' (WpTyApp ty)      = [ty]
+        unfWrp' (WpSubType w)     = unfWrp' w
+        unfWrp' (WpCompose w1 w2) = unfWrp' w1 ++ unfWrp' w2
+        unfWrp' _                  = []
 
 
     -- The real work happens here, where we invoke the type checker using

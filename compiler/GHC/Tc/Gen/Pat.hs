@@ -699,7 +699,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
          -- Expression must be a function
         ; let herald = ExpectedFunTyViewPat $ unLoc expr
-        ; (expr_wrap1, Scaled _mult inf_arg_ty, inf_res_sigma)
+        ; (expr_co1, Scaled _mult inf_arg_ty, inf_res_sigma)
             <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc expr) (1,expr_rho) expr_rho
                -- See Note [View patterns and polymorphism]
                -- expr_wrap1 :: expr_rho "->" (inf_arg_ty -> inf_res_sigma)
@@ -720,7 +720,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
               -- NB: pat_ty comes from matchActualFunTy, so it has a
               -- fixed RuntimeRep, as needed to call mkWpFun.
 
-              expr_wrap = expr_wrap2' <.> expr_wrap1
+              expr_wrap = expr_wrap2' <.> mkWpCastN expr_co1
 
         ; return $ (ViewPat pat_ty (mkLHsWrap expr_wrap expr') pat', res) }
 

@@ -765,13 +765,13 @@ tcInferOverLit lit@(OverLit { ol_val = val
            thing    = NameThing from_name
            mb_thing = Just thing
            herald   = ExpectedFunTyArg thing (HsLit noExtField hs_lit)
-       ; (wrap2, sarg_ty, res_ty) <- matchActualFunTy herald mb_thing (1, from_ty) from_ty
+       ; (co2, sarg_ty, res_ty) <- matchActualFunTy herald mb_thing (1, from_ty) from_ty
 
        ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)
        -- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
        ; let lit_expr = L (l2l loc) $ mkHsWrapCo co $
                         HsLit noExtField hs_lit
-             from_expr = mkHsWrap (wrap2 <.> wrap1) $
+             from_expr = mkHsWrap (mkWpCastN co2 <.> wrap1) $
                          mkHsVar (L loc from_id)
              witness = HsApp noExtField (L (l2l loc) from_expr) lit_expr
              lit' = OverLit { ol_val = val
