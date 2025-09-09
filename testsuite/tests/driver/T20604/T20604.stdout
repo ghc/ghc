@@ -1,3 +1,4 @@
 A1
 A
-addDependentFile "/home/hsyl20/projects/ghc/merge-ghc-prim/_build/stage1/lib/../lib/x86_64-linux-ghc-9.13.20241220/libHSghc-internal-9.1300.0-inplace-ghc9.13.20241220.so" b035bf4e19d2537a0af5c8861760eaf1
+HSrts-fs-
+HSghc-internal-

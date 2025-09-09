@@ -1,5 +1,5 @@
 setTestOpts(
-  [extra_ways(['sanity', 'compacting_gc']),
+  [extra_ways(['compacting_gc'] + (['sanity'] if debug_rts() else [])),
    js_skip # compact API not supported by the JS backend
   ])
 

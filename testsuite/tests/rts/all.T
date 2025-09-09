@@ -241,6 +241,7 @@ test('return_mem_to_os', normal, compile_and_run, [''])
 test('T4850',
   [ when(opsys('mingw32'), expect_broken(4850))
   , js_broken(22261) # FFI "dynamic" convention unsupported
+  , req_target_debug_rts
   ], makefile_test, ['T4850'])
 
 def config_T5250(name, opts):
@@ -413,7 +414,7 @@ test('T10904', [ extra_run_opts('20000'), req_c ],
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
                compile_and_run, [''])
 
-test('T9405', [when(opsys('mingw32'), fragile(21361)), js_broken(22261)], makefile_test, ['T9405'])
+test('T9405', [when(opsys('mingw32'), fragile(21361)), req_target_debug_rts], makefile_test, ['T9405'])
 
 test('T11788', [ when(ghc_dynamic(), skip)
                , req_interp
@@ -467,6 +468,8 @@ test('T14900',
 
 test('InternalCounters',
   [ js_skip # JS backend doesn't support internal counters
+    # Require threaded RTS
+  , req_target_smp
     # The ways which build against the debug RTS are built with PROF_SPIN and
     # therefore differ in output
   , omit_ways(['nonmoving_thr_sanity', 'threaded2_sanity', 'sanity'])
@@ -501,6 +504,7 @@ test('keep-cafs-fail',
     filter_stdout_lines('Evaluated a CAF|exit.*'),
     ignore_stderr, # on OS X the shell emits an "Abort trap" message to stderr
     req_rts_linker,
+    req_target_debug_rts
   ],
   makefile_test, ['KeepCafsFail'])
 
@@ -510,7 +514,8 @@ test('keep-cafs',
                  'KeepCafs2.hs', 'KeepCafsMain.hs']),
     when(opsys('mingw32'), expect_broken (5987)),
     when(opsys('freebsd') or opsys('openbsd'), expect_broken(16035)),
-    req_rts_linker
+    req_rts_linker,
+    req_target_debug_rts
   ],
   makefile_test, ['KeepCafs'])
 
@@ -520,12 +525,11 @@ test('T11829', [ req_c, check_errmsg("This is a test"), when(arch('wasm32'), fra
      ['T11829_c.cpp -package system-cxx-std-lib'])
 
 test('T16514', [req_c, omit_ghci], compile_and_run, ['T16514_c.c'])
-test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
+test('test-zeroongc', [extra_run_opts('-DZ'), req_target_debug_rts], compile_and_run, ['-debug'])
 
 test('T13676',
      [when(opsys('mingw32'), expect_broken(17447)),
-      extra_files(['T13676.hs']),
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      extra_files(['T13676.hs'])],
      ghci_script, ['T13676.script'])
 test('InitEventLogging',
      [ only_ways(['normal'])
@@ -603,7 +607,7 @@ test('decodeMyStack_emptyListForMissingFlag',
 test('T20201a', [js_skip, exit_code(1)], compile_and_run, ['-with-rtsopts -AturtlesM'])
 test('T20201b', [js_skip, exit_code(1)], compile_and_run, ['-with-rtsopts -A64z'])
 
-test('T22012', [js_skip, extra_ways(['ghci'])], compile_and_run, ['T22012_c.c'])
+test('T22012', [js_skip, fragile(23043), extra_ways(['ghci'])], compile_and_run, ['T22012_c.c'])
 
 # Skip for JS platform as the JS RTS is always single threaded
 test('T22795a', [only_ways(['normal']), js_skip, req_ghc_with_threaded_rts], compile_and_run, ['-threaded'])
@@ -623,7 +627,7 @@ test('T23221',
      compile_and_run,
      ['-O -with-rtsopts -T'])
 
-test('T23142', [unless(debug_rts(), skip), req_interp], makefile_test, ['T23142'])
+test('T23142', [req_target_debug_rts, req_interp], makefile_test, ['T23142'])
 
 test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
 

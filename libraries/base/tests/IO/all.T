@@ -114,7 +114,7 @@ test('countReaders001', js_broken(22261), compile_and_run, [''])
 
 test('concio001', [normal, multi_cpu_race],
      makefile_test, ['test.concio001'])
-test('concio001.thr', [extra_files(['concio001.hs']), multi_cpu_race],
+test('concio001.thr', [extra_files(['concio001.hs']), multi_cpu_race, req_target_threaded_rts],
      makefile_test, ['test.concio001.thr'])
 
 test('T2122', [], compile_and_run, [''])
