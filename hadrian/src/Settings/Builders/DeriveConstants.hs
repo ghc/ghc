@@ -48,4 +48,4 @@ includeCcArgs = do
             , arg "-Irts/include"
             , arg $ "-I" ++ rtsPath </> "include"
             , notM targetSupportsSMP ? arg "-DNOSMP"
-            , arg "-fcommon" ]
+            ]

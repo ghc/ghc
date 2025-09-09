@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 {- ------------------------------------------------------------------------
 
 (c) The GHC Team, 1992-2012
@@ -65,7 +67,17 @@ main = do opts <- parseArgs
                                 "mingw32" -> Windows
                                 _         -> DefaultOS
                          verbose = o_verbose opts
-                         gccFlags = o_gccFlags opts
+                         gccFlags0 = o_gccFlags opts
+                          -- nm applied to COFF files doesn't correctly report
+                          -- the size of global variable symbols (it reports 0)
+                          -- except for Common symbols (probably because the
+                          -- merge algorithm of Common symbols takes symbol size
+                          -- into account). So we force the use of `-fcommon`
+                          -- here.
+                          -- As far as we know, it is only required on Windows
+                          -- but enabling it on other platforms does no harm, so
+                          -- we enable it unconditionally.
+                         gccFlags = "-fcommon" : gccFlags0
                      rs <- case os of
                              JS -> getWantedJS
                              _  -> getWanted verbose os tmpdir gccProg gccFlags nmProg
@@ -751,7 +763,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                               ++ "Workaround: You may want to pass\n"
                               ++ "    --with-nm=$(xcrun --find nm-classic)\n"
                               ++ "to 'configure'.\n"
-             Just x     -> die ("unexpected value round-tripped for CONTROL_GROUP_CONST_291: " ++ show x)
+             Just x     -> die ("unexpected value round-tripped for CONTROL_GROUP_CONST_291: " ++ show x ++ "\n" ++ show m ++ "\n" ++ xs)
 
          mapM (lookupResult m) (wanteds (Just os))
     where headers = ["#define IN_STG_CODE 0",
@@ -841,14 +853,23 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
           -- and returns ("MAX_Vanilla_REG", 11)
           parseNmLine line
               = case words line of
-                ('_' : n) : "C" : s : _ -> mkP n s
-                n : "C" : s : _ -> mkP n s
-                [n, "D", _, s] -> mkP n s
-                [s, "O", "*COM*", _, n] -> mkP n s
+                -- in common section
+                (n : "C" : s : _ )           -> mkP n s -- nm format (ELF, COFF)
+                [s, "O", "*COM*", _, n]      -> mkP n s -- objdump format (ELF)
+                -- in .bss section
+                [n, "B", _, s ]              -> mkP n s -- nm format (ELF)
+                [_, "g", "O", ".bss", s, n]  -> mkP n s -- objdump format (ELF)
+                -- in data section
+                [n, "D", _, s]               -> mkP n s -- nm format (ELF)
+                [_, "g", "O", ".data", s, n] -> mkP n s -- objdump format (ELF)
                 _ -> Nothing
-              where mkP r s = case (stripPrefix prefix r, readHex s) of
+              where mkP r s = case (stripPrefix prefix (strip_ r), readHex s) of
                         (Just name, [(size, "")]) -> Just (name, size)
                         _ -> Nothing
+                    -- strip leading underscore: some platforms (e.g. Darwin) add one
+                    strip_ = \case
+                      ('_':n) -> n
+                      n       -> n
 
           -- On AIX, `nm` isn't able to tell us the symbol size, so we
           -- need to use `objdump --syms`. However, unlike on OpenBSD,
