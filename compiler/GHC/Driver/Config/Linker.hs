@@ -20,8 +20,8 @@ initFrameworkOpts dflags = FrameworkOpts
   }
 
 -- | Initialize linker configuration from DynFlags
-initLinkerConfig :: DynFlags -> LinkerConfig
-initLinkerConfig dflags =
+initLinkerConfig :: DynFlags -> Bool -> LinkerConfig
+initLinkerConfig dflags require_cxx =
   let
     -- see Note [Solaris linker]
     ld_filter = case platformOS (targetPlatform dflags) of
@@ -46,8 +46,13 @@ initLinkerConfig dflags =
     (p,pre_args) = pgm_l dflags
     post_args    = map Option (getOpts dflags opt_l)
 
+    -- sneakily switch to C++ compiler when we need C++ standard lib
+    -- FIXME: ld flags may be totally inappropriate for the C++ compiler?
+    ld_prog      = if require_cxx then pgm_cxx dflags else p
+
+
   in LinkerConfig
-    { linkerProgram     = p
+    { linkerProgram     = ld_prog
     , linkerOptionsPre  = pre_args
     , linkerOptionsPost = post_args
     , linkerTempDir     = tmpDir dflags

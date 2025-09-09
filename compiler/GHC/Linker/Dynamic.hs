@@ -24,6 +24,7 @@ import GHC.Linker.Unit
 import GHC.Linker.External
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
+import GHC.Data.FastString
 
 import Control.Monad (when)
 import System.FilePath
@@ -105,7 +106,8 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
     pkg_framework_opts <- getUnitFrameworkOpts unit_env (map unitId pkgs)
     let framework_opts = getFrameworkOpts (initFrameworkOpts dflags) platform
 
-    let linker_config = initLinkerConfig dflags
+    let require_cxx = any ((==) (PackageName (fsLit "system-cxx-std-lib")) . unitPackageName) pkgs
+    let linker_config = initLinkerConfig dflags require_cxx
 
     case os of
         OSMinGW32 -> do

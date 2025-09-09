@@ -33,6 +33,8 @@ import GHC.Linker.Static.Utils
 import GHC.Driver.Config.Linker
 import GHC.Driver.Session
 
+import GHC.Data.FastString
+
 import System.FilePath
 import System.Directory
 import Control.Monad
@@ -192,7 +194,9 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
       OSMinGW32 | gopt Opt_GenManifest dflags -> maybeCreateManifest logger tmpfs dflags output_fn
       _                                       -> return []
 
-    let linker_config = initLinkerConfig dflags
+    let require_cxx = any ((==) (PackageName (fsLit "system-cxx-std-lib")) . unitPackageName) pkgs
+
+    let linker_config = initLinkerConfig dflags require_cxx
     let link dflags args = do
           runLink logger tmpfs linker_config args
           -- Make sure to honour -fno-use-rpaths if set on darwin as well; see #20004
