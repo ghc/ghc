@@ -79,7 +79,11 @@ module GHC.IO.Handle
      withFileDescriptorReadingBiased,
      withFileDescriptorWritingBiased,
      withWindowsHandleReadingBiased,
-     withWindowsHandleWritingBiased
+     withWindowsHandleWritingBiased,
+     withFileDescriptorReadingBiasedRaw,
+     withFileDescriptorWritingBiasedRaw,
+     withWindowsHandleReadingBiasedRaw,
+     withWindowsHandleWritingBiasedRaw
 
      -- ** Caveats
      -- $with-ref-caveats
@@ -90,7 +94,7 @@ import GHC.Internal.IO.Handle
 import GHC.Internal.Control.Monad (return)
 import GHC.Internal.Control.Concurrent.MVar (MVar)
 import GHC.Internal.Control.Exception (mask)
-import GHC.Internal.Data.Function ((.), ($))
+import GHC.Internal.Data.Function (const, (.), ($))
 import GHC.Internal.Data.Functor (fmap)
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.Data.Bool (otherwise)
@@ -132,11 +136,11 @@ import GHC.Internal.Foreign.C.Types (CInt)
 
 {-|
     Obtains an operating-system handle that underlies a Haskell handle and
-    executes a user-provided action on it. The Haskell-managed buffers related
-    to the operating-system handle are flushed before the user-provided action
-    is run. While this action is executed, further operations on the Haskell
-    handle are blocked to a degree that interference with this action is
-    prevented.
+    executes a user-provided action on it. Before the user-provided action is
+    run, user-defined perparation based on the handle state that contains the
+    operating-system handle is performed. While the user-provided action is
+    executed, further operations on the Haskell handle are blocked to a degree
+    that interference with this action is prevented.
 
     See [below](#with-ref-caveats) for caveats regarding this operation.
 -}
@@ -149,16 +153,18 @@ withOSHandle :: String
                 -}
              -> (forall d. Typeable d => d -> IO a)
                 -- ^ Conversion of a device into an operating-system handle
+             -> (Handle__ -> IO ())
+                -- ^ The preparation
              -> Handle
                 -- ^ The Haskell handle to use
              -> (a -> IO r)
                 -- ^ The action to execute on the operating-system handle
              -> IO r
-withOSHandle opName handleStateVar getOSHandle handle act
+withOSHandle opName handleStateVar getOSHandle prepare handle act
     = mask $ \ withOriginalMaskingState ->
       withHandleState $ \ handleState@Handle__ {haDevice = dev} -> do
           osHandle <- getOSHandle dev
-          flushBuffer handleState
+          prepare handleState
           withOriginalMaskingState $ act osHandle
       where
 
@@ -272,6 +278,7 @@ withFileDescriptorReadingBiased :: Handle -> (CInt -> IO r) -> IO r
 withFileDescriptorReadingBiased = withOSHandle "withFileDescriptorReadingBiased"
                                                handleStateVarReadingBiased
                                                getFileDescriptor
+                                               flushBuffer
 
 {-|
     Obtains the POSIX file descriptor that underlies a handle or specifically
@@ -290,6 +297,7 @@ withFileDescriptorWritingBiased :: Handle -> (CInt -> IO r) -> IO r
 withFileDescriptorWritingBiased = withOSHandle "withFileDescriptorWritingBiased"
                                                handleStateVarWritingBiased
                                                getFileDescriptor
+                                               flushBuffer
 
 {-|
     Obtains the Windows handle that underlies a Haskell handle or specifically
@@ -308,6 +316,7 @@ withWindowsHandleReadingBiased :: Handle -> (Ptr () -> IO r) -> IO r
 withWindowsHandleReadingBiased = withOSHandle "withWindowsHandleReadingBiased"
                                               handleStateVarReadingBiased
                                               getWindowsHandle
+                                              flushBuffer
 
 {-|
     Obtains the Windows handle that underlies a Haskell handle or specifically
@@ -326,17 +335,62 @@ withWindowsHandleWritingBiased :: Handle -> (Ptr () -> IO r) -> IO r
 withWindowsHandleWritingBiased = withOSHandle "withWindowsHandleWritingBiased"
                                               handleStateVarWritingBiased
                                               getWindowsHandle
+                                              flushBuffer
+
+{-|
+    Like 'withFileDescriptorReadingBiased' except that Haskell-managed buffers
+    are not flushed.
+-}
+withFileDescriptorReadingBiasedRaw :: Handle -> (CInt -> IO r) -> IO r
+withFileDescriptorReadingBiasedRaw
+    = withOSHandle "withFileDescriptorReadingBiasedRaw"
+                   handleStateVarReadingBiased
+                   getFileDescriptor
+                   (const $ return ())
+
+{-|
+    Like 'withFileDescriptorWritingBiased' except that Haskell-managed buffers
+    are not flushed.
+-}
+withFileDescriptorWritingBiasedRaw :: Handle -> (CInt -> IO r) -> IO r
+withFileDescriptorWritingBiasedRaw
+    = withOSHandle "withFileDescriptorWritingBiasedRaw"
+                   handleStateVarWritingBiased
+                   getFileDescriptor
+                   (const $ return ())
+
+{-|
+    Like 'withWindowsHandleReadingBiased' except that Haskell-managed buffers
+    are not flushed.
+-}
+withWindowsHandleReadingBiasedRaw :: Handle -> (Ptr () -> IO r) -> IO r
+withWindowsHandleReadingBiasedRaw
+    = withOSHandle "withWindowsHandleReadingBiasedRaw"
+                   handleStateVarReadingBiased
+                   getWindowsHandle
+                   (const $ return ())
+
+{-|
+    Like 'withWindowsHandleWritingBiased' except that Haskell-managed buffers
+    are not flushed.
+-}
+withWindowsHandleWritingBiasedRaw :: Handle -> (Ptr () -> IO r) -> IO r
+withWindowsHandleWritingBiasedRaw
+    = withOSHandle "withWindowsHandleWritingBiasedRaw"
+                   handleStateVarWritingBiased
+                   getWindowsHandle
+                   (const $ return ())
 
 -- ** Caveats
 
 {-$with-ref-caveats
-    #with-ref-caveats#There are the following caveats regarding each of the
-    above operations:
+    #with-ref-caveats#There are the following caveats regarding the above
+    operations:
 
-      * The flushing of buffers can fail if the given handle is readable but not
+      * Flushing of buffers can fail if the given handle is readable but not
         seekable.
 
-      * If the operation is performed as part of an action executed by
+      * If one of these operation is performed as part of an action executed by
         'unsafePerformIO', 'unsafeInterleaveIO', or one of their “dupable”
         variants and the user-provided action receives an asychnchronous
         exception and does not catch it, then the following happens:
