@@ -1233,13 +1233,16 @@ zonk_cmd_top (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
 -------------------------------------------------------------------------
 zonkCoFn :: HsWrapper -> ZonkBndrTcM HsWrapper
 zonkCoFn WpHole   = return WpHole
+zonkCoFn (WpSubType w)     = do { w' <- zonkCoFn w
+                                ; return (WpSubType w') }
 zonkCoFn (WpCompose c1 c2) = do { c1' <- zonkCoFn c1
                                 ; c2' <- zonkCoFn c2
                                 ; return (WpCompose c1' c2') }
-zonkCoFn (WpFun c1 c2 t1)  = do { c1' <- zonkCoFn c1
-                                ; c2' <- zonkCoFn c2
-                                ; t1' <- noBinders $ zonkScaledTcTypeToTypeX t1
-                                ; return (WpFun c1' c2' t1') }
+zonkCoFn (WpFun c1 c2 t1 t2) = do { c1' <- zonkCoFn c1
+                                  ; c2' <- zonkCoFn c2
+                                  ; t1' <- noBinders $ zonkScaledTcTypeToTypeX t1
+                                  ; t2' <- noBinders $ zonkTcTypeToTypeX t2
+                                  ; return (WpFun c1' c2' t1' t2') }
 zonkCoFn (WpCast co)   = WpCast  <$> noBinders (zonkCoToCo co)
 zonkCoFn (WpEvLam ev)  = WpEvLam <$> zonkEvBndrX ev
 zonkCoFn (WpEvApp arg) = WpEvApp <$> noBinders (zonkEvTerm arg)

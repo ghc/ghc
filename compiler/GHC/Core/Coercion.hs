@@ -41,7 +41,8 @@ module GHC.Core.Coercion (
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo,
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
-        mkNakedForAllCo, mkForAllCo, mkForAllVisCos, mkHomoForAllCos,
+        mkNakedForAllCo, mkForAllCo, mkForAllVisCos,
+        mkHomoForAllCo, mkHomoForAllCos,
         mkPhantomCo, mkAxiomCo,
         mkHoleCo, mkUnivCo, mkSubCo,
         mkProofIrrelCo,
@@ -980,7 +981,7 @@ mkForAllCo v visL visR kind_co co
   = mkReflCo r (mkTyCoForAllTy v visL ty)
 
   | otherwise
-  = mkForAllCo_NoRefl v visL visR kind_co co
+  = mk_forall_co v visL visR kind_co co
 
 -- mkForAllVisCos [tv{vis}] constructs a cast
 --   forall tv. res  ~R#   forall tv{vis} res`.
@@ -1000,14 +1001,26 @@ mkHomoForAllCos vs orig_co
   = foldr go orig_co vs
   where
     go :: ForAllTyBinder -> Coercion -> Coercion
-    go (Bndr var vis) = mkForAllCo_NoRefl var vis vis MRefl
+    go (Bndr var vis) co = mk_forall_co var vis vis MRefl co
 
--- | Like 'mkForAllCo', but there is no need to check that the inner coercion isn't Refl;
---   the caller has done that. (For example, it is guaranteed in 'mkHomoForAllCos'.)
--- The kind of the tycovar should be the left-hand kind of the kind coercion.
-mkForAllCo_NoRefl :: TyCoVar -> ForAllTyFlag -> ForAllTyFlag
-                  -> KindMCoercion -> Coercion -> Coercion
-mkForAllCo_NoRefl tcv visL visR kind_co co
+mkHomoForAllCo :: TyVar -> Coercion -> Coercion
+-- Specialised for a single TyVar,
+--    and visibility of coreTyLamForAllTyFlag
+mkHomoForAllCo tv orig_co
+  | Just (ty, r) <- isReflCo_maybe orig_co
+  = mkReflCo r (mkForAllTy (Bndr tv vis) ty)
+  | otherwise
+  = mk_forall_co tv vis vis MRefl orig_co
+  where
+    vis  = coreTyLamForAllTyFlag
+
+-- | `mk_forall_co` just builds a ForAllCo.
+-- With debug on, it checks invariants (e.g. he kind of the tycovar should
+--   be the left-hand kind of the kind coercion).
+-- Callers should have done any isReflCo short-cutting.
+mk_forall_co :: TyCoVar -> ForAllTyFlag -> ForAllTyFlag
+             -> KindMCoercion -> Coercion -> Coercion
+mk_forall_co tcv visL visR kind_co co
   = assertGoodForAllCo tcv visL visR kind_co co $
     assertPpr (not (isReflCo co && isReflMCo kind_co && visL == visR)) (ppr co) $
     ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
@@ -1769,7 +1782,7 @@ mkPiCos r vs co = foldr (mkPiCo r) co vs
 -- | Make a forall 'Coercion', where both types related by the coercion
 -- are quantified over the same variable.
 mkPiCo  :: Role -> Var -> Coercion -> Coercion
-mkPiCo r v co | isTyVar v = mkHomoForAllCos [Bndr v coreTyLamForAllTyFlag] co
+mkPiCo r v co | isTyVar v = mkHomoForAllCo v co
               | isCoVar v = assert (not (v `elemVarSet` tyCoVarsOfCo co)) $
                   -- We didn't call mkForAllCo here because if v does not appear
                   -- in co, the argument coercion will be nominal. But here we

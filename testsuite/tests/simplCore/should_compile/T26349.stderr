@@ -1,0 +1,3 @@
+==================== Tidy Core rules ====================
+"USPEC mapTCMT @(*) @IO @IO @_"
+    forall (@a). mapTCMT @(*) @IO @IO @a = mapTCMT_$smapTCMT @a

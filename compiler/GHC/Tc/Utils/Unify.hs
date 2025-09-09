@@ -148,7 +148,7 @@ matchActualFunTy
       -- (Both are used only for error messages)
   -> TcRhoType
       -- ^ Type to analyse: a TcRhoType
-  -> TcM (HsWrapper, Scaled TcSigmaTypeFRR, TcSigmaType)
+  -> TcM (TcCoercion, Scaled TcSigmaTypeFRR, TcSigmaType)
 -- This function takes in a type to analyse (a RhoType) and returns
 -- an argument type and a result type (splitting apart a function arrow).
 -- The returned argument type is a SigmaType with a fixed RuntimeRep;
@@ -172,13 +172,13 @@ matchActualFunTy herald mb_thing err_info fun_ty
     -- hide the forall inside a meta-variable
     go :: TcRhoType   -- The type we're processing, perhaps after
                       -- expanding type synonyms
-       -> TcM (HsWrapper, Scaled TcSigmaTypeFRR, TcSigmaType)
+       -> TcM (TcCoercion, Scaled TcSigmaTypeFRR, TcSigmaType)
     go ty | Just ty' <- coreView ty = go ty'
 
     go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
       do { hasFixedRuntimeRep_syntactic (FRRExpectedFunTy herald 1) arg_ty
-         ; return (idHsWrapper, Scaled w arg_ty, res_ty) }
+         ; return (mkNomReflCo fun_ty, Scaled w arg_ty, res_ty) }
 
     go ty@(TyVarTy tv)
       | isMetaTyVar tv
@@ -210,7 +210,7 @@ matchActualFunTy herald mb_thing err_info fun_ty
            ; res_ty <- newOpenFlexiTyVarTy
            ; let unif_fun_ty = mkScaledFunTys [arg_ty] res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
-           ; return (mkWpCastN co, arg_ty, res_ty) }
+           ; return (co, arg_ty, res_ty) }
 
     ------------
     mk_ctxt :: TcType -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
@@ -249,8 +249,10 @@ matchActualFunTys :: ExpectedFunTyOrigin -- ^ See Note [Herald for matchExpected
                   -> Arity
                   -> TcSigmaType
                   -> TcM (HsWrapper, [Scaled TcSigmaTypeFRR], TcRhoType)
--- If    matchActualFunTys n ty = (wrap, [t1,..,tn], res_ty)
--- then  wrap : ty ~> (t1 -> ... -> tn -> res_ty)
+-- NB: Called only from `tcSynArgA`, and hence scheduled for destruction
+--
+-- If    matchActualFunTys n fun_ty = (wrap, [t1,..,tn], res_ty)
+-- then  wrap : fun_ty ~>  (t1 -> ... -> tn -> res_ty)
 --       and res_ty is a RhoType
 -- NB: the returned type is top-instantiated; it's a RhoType
 matchActualFunTys herald ct_orig n_val_args_wanted top_ty
@@ -265,15 +267,13 @@ matchActualFunTys herald ct_orig n_val_args_wanted top_ty
     go 0 _ fun_ty = return (idHsWrapper, [], fun_ty)
 
     go n so_far fun_ty
-      = do { (wrap_fun1, arg_ty1, res_ty1) <- matchActualFunTy
-                                                 herald Nothing
-                                                 (n_val_args_wanted, top_ty)
-                                                 fun_ty
-           ; (wrap_res, arg_tys, res_ty)   <- go (n-1) (arg_ty1:so_far) res_ty1
+      = do { (co1, arg_ty1, res_ty1) <- matchActualFunTy herald Nothing
+                                           (n_val_args_wanted, top_ty) fun_ty
+           ; (wrap_res, arg_tys, res_ty) <- go (n-1) (arg_ty1:so_far) res_ty1
            ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res arg_ty1 res_ty
            -- NB: arg_ty1 comes from matchActualFunTy, so it has
-           -- a syntactically fixed RuntimeRep as needed to call mkWpFun.
-           ; return (wrap_fun2 <.> wrap_fun1, arg_ty1:arg_tys, res_ty) }
+           -- a syntactically fixed RuntimeRep
+           ; return (wrap_fun2 <.> mkWpCastN co1, arg_ty1:arg_tys, res_ty) }
 
 {-
 ************************************************************************
@@ -871,6 +871,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
                                          res_ty
            ; let wrap_arg = mkWpCastN arg_co
                  fun_wrap = mkWpFun wrap_arg wrap_res (Scaled mult arg_ty) res_ty
+                 -- mkWpFun: see Note [Smart contructor for WpFun] in GHC.Tc.Types.Evidence
            ; return (fun_wrap, result) }
 
     ----------------------------
@@ -1427,11 +1428,12 @@ tcSubTypeDS :: HsExpr GhcRn
                            -- DeepSubsumption <=> when checking, this type
                            --                     is deeply skolemised
             -> TcM HsWrapper
--- Only one call site, in GHC.Tc.Gen.App.tcApp
+-- Only one call site, in GHC.Tc.Gen.App.checkResultTy
 tcSubTypeDS rn_expr act_rho exp_rho
-  = tc_sub_type_deep Top (unifyExprType rn_expr) orig GenSigCtxt act_rho exp_rho
-  where
-    orig = exprCtOrigin rn_expr
+  = do { wrap <- tc_sub_type_deep Top (unifyExprType rn_expr)
+                                  (exprCtOrigin rn_expr)
+                                  GenSigCtxt act_rho exp_rho
+       ; return (mkWpSubType wrap) }
 
 ---------------
 
@@ -1504,7 +1506,8 @@ tc_sub_type :: (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
 ----------------------
 tc_sub_type unify inst_orig ctxt ty_actual ty_expected
   = do { ds_flag <- getDeepSubsumptionFlag
-       ; tc_sub_type_ds Top ds_flag unify inst_orig ctxt ty_actual ty_expected }
+       ; wrap <- tc_sub_type_ds Top ds_flag unify inst_orig ctxt ty_actual ty_expected
+       ; return (mkWpSubType wrap) }
 
 ----------------------
 tc_sub_type_ds :: Position p -- ^ position in the type (for error messages only)
@@ -2146,9 +2149,9 @@ deeplySkolemise skol_info ty
            ; let tvs     = binderVars bndrs
                  tvs1    = binderVars bndrs1
                  tv_prs1 = map tyVarName tvs `zip` bndrs1
-           ; return ( mkWpEta ids1 (mkWpTyLams tvs1
-                                    <.> mkWpEvLams ev_vars1
-                                    <.> wrap)
+           ; return ( mkWpEta ty ids1 (mkWpTyLams tvs1
+                                      <.> mkWpEvLams ev_vars1
+                                      <.> wrap)
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
                     , mkScaledFunTys arg_tys' rho ) }
@@ -2182,7 +2185,7 @@ deeplyInstantiate orig ty
            ; ids1  <- newSysLocalIds (fsLit "di") arg_tys'
            ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
            ; (wrap2, rho2) <- go subst' rho
-           ; return (mkWpEta ids1 (wrap2 <.> wrap1),
+           ; return (mkWpEta ty ids1 (wrap2 <.> wrap1),
                      mkScaledFunTys arg_tys' rho2) }
 
       | otherwise

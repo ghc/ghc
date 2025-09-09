@@ -8,10 +8,11 @@ module GHC.Tc.Types.Evidence (
   -- * HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpForAllCast,
-  mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta,
+  mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta, mkWpSubType,
   collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper,
   pprHsWrapper, hsWrapDictBinders,
+  optSubTypeHsWrapper,
 
   -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -73,7 +74,7 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Name( isInternalName )
 import GHC.Types.Var
-import GHC.Types.Id( idScaledType )
+import GHC.Types.Id( idScaledType, idType )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
@@ -134,10 +135,111 @@ maybeSymCo NotSwapped co = co
 ************************************************************************
 -}
 
+{- Note [Deep subsumption and WpSubType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When making DeepSubsumption checks, we may end up with hard-to-spot identity wrappers.
+For example (#26349) suppose we have
+    (forall a. Eq a => a->a) -> Int  <=   (forall a. Eq a => a->a) -> Int
+The two types are equal so we should certainly get an identity wrapper.  But we'll get
+tihs wrapper from `tcSubType`:
+    WpFun (WpTyLam a <.> WpEvLam dg <.> WpLet (dw=dg) <.> WpEvApp dw <.> WpTyApp a)
+          WpHole
+That elaborate wrapper is really just a no-op, but it's far from obvious.  If we just
+desugar (HsWrap f wp) straightforwardly we'll get
+   \(g:forall a. Eq a => a -> a).
+       f (/\a. \(dg:Eq a). let dw=dg in g a dw)
+
+To recognise that as just `f`, we'd have to eta-reduce twice.  But eta-reduction
+is not sound in general, so we'll end up retaining the lambdas.  Two bad results:
+
+* Adding DeepSubsumption gratuitiously makes programs less efficient.
+
+* When the subsumption is on the LHS of a rule, or in a SPECIALISE pragma, we
+  may not be able to make a decent RULE at all, and will fail with "LHS of rule
+  is too complicated to desugar" (#26255)
+
+It'd be ideal to solve the problem at the source, by never generating those
+gruesome wrappers in the first place, but we can't do that because:
+
+* The WpTyLam and WpTyApp are introduced independently, not together, in `tcSubType`,
+  so we can't easily cancel them out.   For example, even if we have
+     forall a. t1  <=  forall a. t2
+  there is no guarantee that these are the "same" a.  E.g.
+     forall a b. a -> b -> b   <=   forall x y. y -> x -> x
+  Similarly WpEvLam and WpEvApp
+
+* We have not yet done constraint solving so we don't know what evidence will
+  end up in those WpLet bindings.
+
+TL;DR we must generate the wrapper and then optimise it way if it turns out
+that it is a no-op.  Here's our solution:
+
+(DSST1) Tag the wrappers generated from a subtype check with WpSubType. In normal
+  wrappers the binders of a WpTyLam or WpEvLam can scope over the "hole" of the
+  wrapper -- that is how we introduce type-lambdas and dictionary-lambda into the
+  terms!  But in /subtype/ wrappers, these type/dictionary lambdas only scope over
+  the WpTyApp and WpEvApp nodes in the /same/ wrapper.  That is what justifies us
+  eta-reducing the type/dictionary lambdas.
+
+  In short, (WpSubType wp) means the same as `wp`, but with the added promise that
+  the binders in `wp` do not scope over the hole.
+
+(DSST2) Avoid creating a WpSubType in the common WpHole case, using `mkWpSubType`.
+
+(DSST3) When desugaring, try eta-reduction on the payload of a WpSubType.
+  This is done in `GHC.HsToCore.Binds.dsHsWrapper` by the call to `optSubTypeHsWrapper`.
+
+  We don't attempt to optimise HsWrappers /other than/ subtype wrappers. Why not?
+  Because there aren't any useful optimsations we can do.  (We could collapse
+  adjacent `WpCast`s perhaps, but that'll happen later automatically via `mkCast`.)
+
+  TL;DR:
+    * we /must/ optimise subtype-HsWrappers (that's the point of this Note!)
+    * there is little point in attempting to optimise any other HsWrappers
+
+Note [Smart contructor for WpFun]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In `matchExpectedFunTys` (and the moribund `matchActualFunTys`) we use the smart
+constructor `mkWpFun` to optimise away a `WpFun`.  This is important (T1753b, T15105).
+Suppose we have `type instance F Int = Type`, and we are typechecking this:
+    (\x. True) :: (a :: F Int) -> a
+We cannot desugar this to
+    \(x::a::F Int). True
+because then `x` does not have a fixed runtime representation.
+See Note [Representation polymorphism invariants] in GHC.Core.
+
+So we must cast the entire lambda first.  We want to end up with
+   (\(x::(a |> kco). x) |> (FunCo co <Bool>)
+where
+  kco :: F Int ~ Type    =  ... -- From the type instance
+  co  :: (a |> kco) ~ a  =  GRefl a kco
+Note that we /cast/ the lambda with a /coercion/.  We must not
+/wrap/ it in a /WpFun/ because the latter generates a lambda that won't obey
+the runtime-rep rules.
+
+The check is done by  the `hasFixedRuntimeRep` magic in `matchExpectedFunTys`.
+
+QUESTIONS:
+
+* What happens if we can't build a cast? What error is produced, and how?
+
+* What about mkWpFun (WpCast co) (WpTyLam ...), which might arise from
+      (a :: F Int -> forall b. b->b)
+  Will we generate a cast and then a WpFun. Surely we should?
+  Test case?
+
+* I think it's really only matchExpectedFunTys that is implicated here.
+  (Apart from matchActualFunTys.)  Anything else?
+-}
+
 -- We write    wrap :: t1 ~> t2
 -- if       wrap[ e::t1 ] :: t2
 data HsWrapper
   = WpHole                      -- The identity coercion
+
+  | WpSubType HsWrapper
+       -- (WpSubType wp) is the same as `wp`, but with extra invariants
+       -- See Note [Deep subsumption and WpSubType] (DSST1)
 
   | WpCompose HsWrapper HsWrapper
        -- (wrap1 `WpCompose` wrap2)[e] = wrap1[ wrap2[ e ]]
@@ -149,8 +251,8 @@ data HsWrapper
        --    wrap2 :: t1 ~> t2
        --- Then (wrap1 `WpCompose` wrap2) :: t1 ~> t3
 
-  | WpFun HsWrapper HsWrapper (Scaled TcTypeFRR)
-       -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w exp_arg). wrap2[ e wrap1[x] ]
+  | WpFun HsWrapper HsWrapper (Scaled TcTypeFRR) TcType
+       -- (WpFun wrap1 wrap2 (w, t1) t2)[e] = \(x:_w exp_arg). wrap2[ e wrap1[x] ]
        -- So note that if  e     :: act_arg -> act_res
        --                  wrap1 :: exp_arg ~> act_arg
        --                  wrap2 :: act_res ~> exp_res
@@ -217,45 +319,56 @@ WpCast c1 <.> WpCast c2 = WpCast (c2 `mkTransCo` c1)
   -- This is thus the same as WpCast (c2 ; c1) and not WpCast (c1 ; c2).
 c1        <.> c2        = c1 `WpCompose` c2
 
--- | Smart constructor to create a 'WpFun' 'HsWrapper', which avoids introducing
--- a lambda abstraction if the two supplied wrappers are either identities or
--- casts.
---
--- PRECONDITION: either:
---
---  1. both of the 'HsWrapper's are identities or casts, or
---  2. both the "from" and "to" types of the first wrapper have a syntactically
---     fixed RuntimeRep (see Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete).
 mkWpFun :: HsWrapper -> HsWrapper
         -> Scaled TcTypeFRR -- ^ the "from" type of the first wrapper
         -> TcType           -- ^ Either "from" type or "to" type of the second wrapper
                             --   (used only when the second wrapper is the identity)
         -> HsWrapper
-mkWpFun WpHole       WpHole       _             _  = WpHole
-mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mk_wp_fun_co w (mkRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mk_wp_fun_co w (mkSymCo co1)    (mkRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mk_wp_fun_co w (mkSymCo co1)    co2)
-mkWpFun w_arg        w_res        t1            _  =
-  -- In this case, we will desugar to a lambda
-  --
-  --   \x. w_res[ e w_arg[x] ]
-  --
-  -- To satisfy Note [Representation polymorphism invariants] in GHC.Core,
-  -- it must be the case that both the lambda bound variable x and the function
-  -- argument w_arg[x] have a fixed runtime representation, i.e. that both the
-  -- "from" and "to" types of the first wrapper "w_arg" have a fixed runtime representation.
-  --
-  -- Unfortunately, we can't check this with an assertion here, because of
-  -- [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-  WpFun w_arg w_res t1
+-- ^ Smart constructor to create a 'WpFun' 'HsWrapper'
+-- See Note [Smart contructor for WpFun] for why we need a smart constructor
+--
+-- PRECONDITION: either:
+--
+--     1. Both of the 'HsWrapper's are WpHole or WpCast.
+--        In this we optimise away the WpFun entirely
+-- OR
+--     2. Both the "from" and "to" types of the first wrapper have a syntactically
+--        fixed RuntimeRep (see Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete).
+--        If we retain the WpFun (i.e. not case 1), it will desugar to a lambda
+--            \x. w_res[ e w_arg[x] ]
+--        To satisfy Note [Representation polymorphism invariants] in GHC.Core,
+--        it must be the case that both the lambda bound variable x and the function
+--        argument w_arg[x] have a fixed runtime representation, i.e. that both the
+--        "from" and "to" types of the first wrapper "w_arg" have a fixed runtime
+--        representation.
+--
+-- Unfortunately, we can't check precondition (2) with an assertion here, because of
+-- [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
+mkWpFun w1 w2 st1@(Scaled m1 t1) t2
+  = case (w1,w2) of
+      (WpHole,     WpHole)     -> WpHole
+      (WpHole,     WpCast co2) -> WpCast (mk_wp_fun_co m1 (mkRepReflCo t1) co2)
+      (WpCast co1, WpHole)     -> WpCast (mk_wp_fun_co m1 (mkSymCo co1)    (mkRepReflCo t2))
+      (WpCast co1, WpCast co2) -> WpCast (mk_wp_fun_co m1 (mkSymCo co1)    co2)
+      (_,          _)          -> WpFun w1 w2 st1 t2
 
-mkWpEta :: [Id] -> HsWrapper -> HsWrapper
+mkWpSubType :: HsWrapper -> HsWrapper
+-- See (DSST2) in Note [Deep subsumption and WpSubType]
+mkWpSubType WpHole      = WpHole
+mkWpSubType (WpCast co) = WpCast co
+mkWpSubType w           = WpSubType w
+
+mkWpEta :: Type -> [Id] -> HsWrapper -> HsWrapper
 -- (mkWpEta [x1, x2] wrap) [e]
 --   = \x1. \x2.  wrap[e x1 x2]
 -- Just generates a bunch of WpFuns
-mkWpEta xs wrap = foldr eta_one wrap xs
+-- The incoming type is the type of the entire expression
+mkWpEta orig_fun_ty xs wrap = go orig_fun_ty xs
   where
-    eta_one x wrap = WpFun idHsWrapper wrap (idScaledType x)
+    go _      []       = wrap
+    go fun_ty (id:ids) = WpFun idHsWrapper (go res_ty ids) (idScaledType id) res_ty
+                       where
+                         res_ty = funResultTy fun_ty
 
 mk_wp_fun_co :: Mult -> TcCoercionR -> TcCoercionR -> TcCoercionR
 mk_wp_fun_co mult arg_co res_co
@@ -333,8 +446,9 @@ hsWrapDictBinders wrap = go wrap
  where
    go (WpEvLam dict_id)   = unitBag dict_id
    go (w1 `WpCompose` w2) = go w1 `unionBags` go w2
-   go (WpFun _ w _)       = go w
+   go (WpFun _ w _ _)     = go w
    go WpHole              = emptyBag
+   go (WpSubType {})      = emptyBag  -- See Note [Deep subsumption and WpSubType]
    go (WpCast  {})        = emptyBag
    go (WpEvApp {})        = emptyBag
    go (WpTyLam {})        = emptyBag
@@ -350,6 +464,7 @@ collectHsWrapBinders wrap = go wrap []
     go :: HsWrapper -> [HsWrapper] -> ([Var], HsWrapper)
     go (WpEvLam v)       wraps = add_lam v (gos wraps)
     go (WpTyLam v)       wraps = add_lam v (gos wraps)
+    go (WpSubType w)     wraps = go w wraps
     go (WpCompose w1 w2) wraps = go w1 (w2:wraps)
     go wrap              wraps = ([], foldl' (<.>) wrap wraps)
 
@@ -357,6 +472,162 @@ collectHsWrapBinders wrap = go wrap []
     gos (w:ws) = go w ws
 
     add_lam v (vs,w) = (v:vs, w)
+
+
+optSubTypeHsWrapper :: HsWrapper -> HsWrapper
+-- This optimiser is used only on the payload of WpSubType
+-- It finds cases where the entire wrapper is a no-op
+-- See (DSST3) in Note [Deep subsumption and WpSubType]
+optSubTypeHsWrapper wrap
+  = opt wrap
+  where
+    opt :: HsWrapper -> HsWrapper
+    opt w = foldr (<.>) WpHole (opt1 w [])
+
+    opt1 :: HsWrapper -> [HsWrapper] -> [HsWrapper]
+    -- opt1 w ws = w <.> (foldr <.> WpHole ws)
+    -- INVARIANT: ws::[HsWrapper] is optimised
+    opt1 WpHole                 ws = ws
+    opt1 (WpSubType w)          ws = opt1 w ws
+    opt1 (w1 `WpCompose` w2)    ws = opt1 w1 (opt1 w2 ws)
+    opt1 (WpCast co)            ws = opt_co co ws
+    opt1 (WpEvLam ev)           ws = opt_ev_lam ev ws
+    opt1 (WpTyLam tv)           ws = opt_ty_lam tv ws
+    opt1 (WpLet binds)          ws = pushWpLet binds ws
+    opt1 (WpFun w1 w2 sty1 ty2) ws = opt_fun w1 w2 sty1 ty2 ws
+    opt1 w@(WpTyApp {})         ws = w : ws
+    opt1 w@(WpEvApp {})         ws = w : ws
+
+    -----------------
+    -- (WpTyLam a <.> WpTyApp a <.> w) = w
+    -- i.e.   /\a. <hole> a   -->  <hole>
+    -- This is only valid if whatever fills the hole does not mention 'a'
+    -- But that's guaranteed in subtype-wrappers;
+    -- see (DSST1) in Note [Deep subsumption and WpSubType]
+    opt_ty_lam tv (WpTyApp ty : ws)
+      | Just tv' <- getTyVar_maybe ty
+      , tv==tv'
+      , all (tv `not_in`) ws
+      = ws
+
+    -- (WpTyLam a <.> WpCastCo co <.> w)
+    --    = WpCast (ForAllCo a co) (WpTyLam <.> w)
+    opt_ty_lam tv (WpCast co : ws)
+      = opt_co (mkHomoForAllCo tv co) (opt_ty_lam tv ws)
+
+    opt_ty_lam tv ws
+      = WpTyLam tv : ws
+
+    -----------------
+    -- (WpEvLam ev <.> WpEvAp ev <.> w) = w
+    -- Similar notes to WpTyLam
+    opt_ev_lam ev (WpEvApp ev_tm : ws)
+      | EvExpr (Var ev') <- ev_tm
+      , ev == ev'
+      , all (ev `not_in`) ws
+      = ws
+
+    -- (WpEvLam ev <.> WpCast co <.> w)
+    --    = WpCast (FunCo ev co) (WpEvLam <.> w)
+    opt_ev_lam ev (WpCast co : ws)
+      = opt_co fun_co (opt_ev_lam ev ws)
+      where
+        fun_co = mkFunCo Representational FTF_C_T
+                        (mkNomReflCo ManyTy)
+                        (mkRepReflCo (idType ev))
+                        co
+
+    opt_ev_lam ev ws
+      = WpEvLam ev : ws
+
+    -----------------
+    -- WpCast co <.> WpCast co' <.> ws = WpCast (co;co') ws
+    opt_co co (WpCast co' : ws)     = opt_co (co `mkTransCo` co') ws
+    opt_co co ws | isReflexiveCo co = ws
+                 | otherwise        = WpCast co : ws
+
+    ------------------
+    opt_fun w1 w2 sty1 ty2 ws
+      = case mkWpFun (opt w1) (opt w2) sty1 ty2 of
+          WpHole    -> ws
+          WpCast co -> opt_co co ws
+          w         -> w : ws
+
+    ------------------
+    -- Tiresome check that the lambda-bound type/evidence variable that we
+    -- want to eta-reduce isn't free in the rest of the wrapper
+    not_in :: TyVar -> HsWrapper -> Bool
+    not_in _  WpHole                   = True
+    not_in v (WpCast co)               = not (anyFreeVarsOfCo (== v) co)
+    not_in v (WpTyApp ty)              = not (anyFreeVarsOfType (== v) ty)
+    not_in v (WpFun w1 w2 _ _)         = not_in v w1 && not_in v w2
+    not_in v (WpSubType w)             = not_in v w
+    not_in v (WpCompose w1 w2)         = not_in v w1 && not_in v w2
+    not_in v (WpEvApp (EvExpr e))      = not (v `elemVarSet` exprFreeVars e)
+    not_in _ (WpEvApp (EvTypeable {})) = False  -- Giving up; conservative
+    not_in _ (WpEvApp (EvFun {}))      = False  -- Giving up; conservative
+    not_in _ (WpTyLam {}) = False    -- Give  up; conservative
+    not_in _ (WpEvLam {}) = False    -- Ditto
+    not_in _ (WpLet {})   = False    -- Ditto
+
+pushWpLet :: TcEvBinds -> [HsWrapper] -> [HsWrapper]
+-- See if we can transform
+--    WpLet binds <.> w1 <.> .. <.> wn   -->   w1' <.> .. <.> wn'
+-- by substitution.
+-- We do this just for the narrow case when
+--   - the `binds` are all just v=w, variables only
+--   - the wi are all WpTyApp, WpEvApp, or WpCast
+-- This is just enough to get us the eta-reductions that we seek
+pushWpLet tc_ev_binds ws
+  = case tc_ev_binds of
+      TcEvBinds {} -> pprPanic "pushWpLet" (ppr tc_ev_binds)
+      EvBinds binds
+        | isEmptyBag binds
+        -> ws
+        | Just env <- ev_bind_swizzle binds
+        -> case go env ws of
+              Just ws' -> ws'
+              Nothing  -> bale_out
+        | otherwise
+        -> bale_out
+  where
+    bale_out = WpLet tc_ev_binds : ws
+
+    go :: IdEnv Id -> [HsWrapper] -> Maybe [HsWrapper]
+    go env (WpCast co  : ws) = do { ws' <- go env ws
+                                  ; return (WpCast co  : ws') }
+    go env (WpTyApp ty : ws) = do { ws' <- go env ws
+                                  ; return (WpTyApp ty : ws') }
+    go env (WpEvApp (EvExpr (Var v)) : ws)
+       = do { v'  <- swizzle_id env v
+            ; ws' <- go env ws
+            ; return (WpEvApp (EvExpr (Var v')) : ws') }
+
+    go _ ws = case ws of
+                 []    -> Just []
+                 (_:_) -> Nothing  -- Could not fully eliminate the WpLet
+
+    swizzle_id :: IdEnv Id -> Id -> Maybe Id
+    -- Nothing <=> ran out of fuel
+    -- This is just belt and braces; we should never build bottom evidence
+    swizzle_id env v = go 100 v
+      where
+        go :: Int -> EvId -> Maybe EvId
+        go fuel v
+          | fuel == 0                     = Nothing
+          | Just v' <- lookupVarEnv env v = go (fuel-1) v'
+          | otherwise                     = Just v
+
+    ev_bind_swizzle :: Bag EvBind -> Maybe (IdEnv Id)
+    -- Succeeds only if the bindings are all var-to-var bindings
+    ev_bind_swizzle evbs = foldl' do_one (Just emptyVarEnv) evbs
+      where
+        do_one :: Maybe (IdEnv Id) -> EvBind -> Maybe (IdEnv Id)
+        do_one Nothing _ = Nothing
+        do_one (Just swizzle) (EvBind {eb_lhs = bndr, eb_rhs = rhs})
+          = case rhs of
+               EvExpr (Var v) -> Just (extendVarEnv swizzle bndr v)
+               _              -> Nothing
 
 {-
 ************************************************************************
@@ -1018,8 +1289,9 @@ pprHsWrapper wrap pp_thing_inside
     -- True  <=> appears in function application position
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
-    help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 (Scaled w t1)) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
+    help it (WpCompose w1 w2)  = help (help it w2) w1
+    help it (WpSubType w)      = no_parens $ text "subtype" <> braces (help it w False)
+    help it (WpFun f1 f2 (Scaled w t1) _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
                                             help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]

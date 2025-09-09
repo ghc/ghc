@@ -187,11 +187,13 @@ liftPRType :: (Type -> Type) -> PRType -> PRType
 liftPRType f pty = (f (prTypeType pty), [])
 
 hsWrapperType :: HsWrapper -> Type -> Type
+-- Return the type of (WrapExpr wrap e), given that e :: ty
 hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
   where
     go WpHole              = id
+    go (WpSubType w)       = go w
     go (w1 `WpCompose` w2) = go w1 . go w2
-    go (WpFun _ w2 (Scaled m exp_arg)) = liftPRType $ \t ->
+    go (WpFun _ w2 (Scaled m exp_arg) _) = liftPRType $ \t ->
       let act_res = funResultTy t
           exp_res = hsWrapperType w2 act_res
       in mkFunctionType m exp_arg exp_res
