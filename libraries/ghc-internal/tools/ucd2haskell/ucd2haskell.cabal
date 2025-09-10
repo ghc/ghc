@@ -54,7 +54,7 @@ executable ucd2haskell
   build-depends:
       base                >= 4.7   && < 5
     , bytestring          >= 0.11  && < 0.13
-    , directory           >= 1.3.6 && < 1.3.8
-    , filepath            >= 1.4.2 && < 1.5
+    , directory           >= 1.3.6 && < 1.4
+    , filepath            >= 1.4.2 && < 1.6
     , getopt-generics     >= 0.13  && < 0.14
     , unicode-data-parser >= 0.2.0 && < 0.4
