@@ -65,8 +65,7 @@ for generating a single equality. For instance:
 The constraints ([Wanted] C Int Bool) and [Wanted] C Int alpha
 will generate the following FunDepEqn
      FDEqn { fd_qtvs = []
-           , fd_eqs  = [Pair Bool alpha]
-           , fd_loc = ... }
+           , fd_eqs  = [Pair Bool alpha] }
 However notice that a functional dependency may have more than one variable
 in the RHS which will create more than one pair of types in fd_eqs. Example:
      class C a b c | a -> b c
@@ -74,8 +73,7 @@ in the RHS which will create more than one pair of types in fd_eqs. Example:
      [Wanted] C Int Bool beta
 Will generate:
      FDEqn { fd_qtvs = []
-           , fd_eqs  = [Pair Bool alpha, Pair alpha beta]
-           , fd_loc = ... }
+           , fd_eqs  = [Pair Bool alpha, Pair alpha beta] }
 
 INVARIANT: Corresponding types aren't already equal
 That is, there exists at least one non-identity equality in FDEqs.
@@ -88,7 +86,7 @@ Assume:
    [W] C Int ty
 
 Then `improveFromInstEnv` should return a FDEqn with
-   FDEqn { fd_qtvs = [], fd_eqs = [Pair Bool ty] }
+   FDEqno { fd_qtvs = [], fd_eqs = [Pair Bool ty] }
 
 describing an equality (Bool ~ ty).  To do this we /match/ the instance head
 against the [W], using just the LHS of the fundep; if we match, we return
@@ -132,7 +130,7 @@ Wrinkles:
     which case we need to iterate the solver
 -}
 
-data FunDepEqn loc
+data FunDepEqn
   = FDEqn { fd_qtvs :: [TyVar]   -- Instantiate these type and kind vars
                                  --   to fresh unification vars,
                                  -- Non-empty only for FunDepEqns arising from instance decls
@@ -141,14 +139,12 @@ data FunDepEqn loc
                                    -- Invariant: In each (Pair ty1 ty2), the fd_qtvs may be
                                    -- free in ty1 but not in ty2.  See Wrinkle (1) of
                                    -- Note [Improving against instances]
+          }
 
-          , fd_loc   :: loc  }
-    deriving Functor
-
-instance Outputable (FunDepEqn a) where
+instance Outputable FunDepEqn where
   ppr = pprEquation
 
-pprEquation :: FunDepEqn a -> SDoc
+pprEquation :: FunDepEqn -> SDoc
 pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
   = vcat [text "forall" <+> braces (pprWithCommas ppr qtvs),
           nest 2 (vcat [ ppr t1 <+> text "~" <+> ppr t2
@@ -203,17 +199,16 @@ zipAndComputeFDEqs _ _ _ = []
 
 -- Improve a class constraint from another class constraint
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-improveFromAnother :: loc
-                   -> PredType -- Template item (usually given, or inert)
+improveFromAnother :: PredType -- Template item (usually given, or inert)
                    -> PredType -- Workitem [that can be improved]
-                   -> [FunDepEqn loc]
+                   -> [FunDepEqn]
 -- Post: FDEqs always oriented from the other to the workitem
 --       Equations have empty quantified variables
-improveFromAnother loc pred1 pred2
+improveFromAnother pred1 pred2
   | Just (cls1, tys1) <- getClassPredTys_maybe pred1
   , Just (cls2, tys2) <- getClassPredTys_maybe pred2
   , cls1 == cls2
-  = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_loc = loc }
+  = [ FDEqn { fd_qtvs = [], fd_eqs = eqs }
     | let (cls_tvs, cls_fds) = classTvsFds cls1
     , fd <- cls_fds
     , let (ltys1, rs1) = instFD fd cls_tvs tys1
@@ -222,21 +217,20 @@ improveFromAnother loc pred1 pred2
     , let eqs = zipAndComputeFDEqs eqType rs1 rs2
     , not (null eqs) ]
 
-improveFromAnother _ _ _ = []
+improveFromAnother _ _ = []
 
 
 -- Improve a class constraint from instance declarations
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 improveFromInstEnv :: InstEnvs
-                   -> (ClsInst -> loc)
                    -> Class -> [Type]
-                   -> [FunDepEqn loc] -- Needs to be a FunDepEqn because
-                                      -- of quantified variables
+                   -> [FunDepEqn] -- Needs to be a FunDepEqn because
+                                  -- of quantified variables
 -- See Note [Improving against instances]
 -- Post: Equations oriented from the template (matching instance) to the workitem!
-improveFromInstEnv inst_env mk_loc cls tys
-  = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs, fd_loc = mk_loc ispec }
+improveFromInstEnv inst_env cls tys
+  = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs }
     | fd <- cls_fds             -- Iterate through the fundeps first,
                                 -- because there often are none!
     , let trimmed_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
