@@ -25,22 +25,13 @@ source-repository head
     location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   rts
 
-flag libm
-  default: False
-  manual: True
 flag librt
-  default: False
-  manual: True
-flag libdl
   default: False
   manual: True
 flag use-system-libffi
   default: False
   manual: True
 flag libffi-adjustors
-  default: False
-  manual: True
-flag need-pthread
   default: False
   manual: True
 flag libbfd
@@ -215,13 +206,8 @@ library
          -- that it is ordered correctly with libpthread, since ghc-internal.cabal
          -- also explicitly lists libc. See #19029.
          extra-libraries: c
-      if flag(libm)
-         -- for ldexp()
-         extra-libraries: m
       if flag(librt)
          extra-libraries: rt
-      if flag(libdl)
-         extra-libraries: dl
       if flag(use-system-libffi)
          extra-libraries: ffi
       if os(windows)
@@ -241,9 +227,6 @@ library
          -- and also centralizes the versioning.
          cpp-options: -D_WIN32_WINNT=0x06010000
          cc-options: -D_WIN32_WINNT=0x06010000
-      if flag(need-pthread)
-         -- for pthread_getthreadid_np, pthread_create, ...
-         extra-libraries: pthread
       if flag(need-atomic)
          -- for sub-word-sized atomic operations (#19119)
          extra-libraries: atomic

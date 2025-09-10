@@ -12,22 +12,7 @@ AC_DEFUN([FP_CHECK_PTHREAD_LIB],
   dnl
   dnl Note that it is important that this happens before we AC_CHECK_LIB(thread)
   AC_MSG_CHECKING(whether -lpthread is needed for pthreads)
-  AC_CHECK_FUNC(pthread_create,
-      [
-          AC_MSG_RESULT(no)
-          UseLibpthread=NO
-      ],
-      [
-          AC_CHECK_LIB(pthread, pthread_create,
-              [
-                  AC_MSG_RESULT(yes)
-                  UseLibpthread=YES
-              ],
-              [
-                  AC_MSG_RESULT([no pthreads support found.])
-                  UseLibpthread=NO
-              ])
-      ])
+  AC_SEARCH_LIBS([pthread_create],[pthread])
 ])
 
 # FP_CHECK_PTHREAD_FUNCS
@@ -37,6 +22,7 @@ AC_DEFUN([FP_CHECK_PTHREAD_LIB],
 # `AC_DEFINE`s various C `HAVE_*` macros.
 AC_DEFUN([FP_CHECK_PTHREAD_FUNCS],
 [
+  OLD_LIBS=$LIBS
   dnl Setting thread names
   dnl ~~~~~~~~~~~~~~~~~~~~
   dnl The portability situation here is complicated:
@@ -123,4 +109,5 @@ AC_DEFUN([FP_CHECK_PTHREAD_FUNCS],
   )
 
   AC_CHECK_FUNCS_ONCE([pthread_condattr_setclock])
+  LIBS=$OLD_LIBS
 ])
