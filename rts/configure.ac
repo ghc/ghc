@@ -162,14 +162,7 @@ AC_CHECK_DECLS([program_invocation_short_name], , ,
 [#define _GNU_SOURCE 1
 #include <errno.h>])
 
-dnl ** check for math library
-dnl    Keep that check as early as possible.
-dnl    as we need to know whether we need libm
-dnl    for math functions or not
-dnl    (see https://gitlab.haskell.org/ghc/ghc/issues/3730)
-AS_IF(
-  [test "$CABAL_FLAG_libm" = 1],
-  [AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])])
+AC_SEARCH_LIBS([exp2], [m])
 
 AS_IF([test "$CABAL_FLAG_libbfd" = 1], [FP_WHEN_ENABLED_BFD])
 
