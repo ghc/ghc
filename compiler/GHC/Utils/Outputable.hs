@@ -39,7 +39,7 @@ module GHC.Utils.Outputable (
         spaceIfSingleQuote,
         isEmpty, nest,
         ptext,
-        int, intWithCommas, integer, word64, word, float, double, rational, doublePrec,
+        int, intWithCommas, integer, natural, word64, word, float, double, rational, doublePrec,
         parens, cparen, brackets, braces, quotes, quote, quoteIfPunsEnabled,
         doubleQuotes, angleBrackets,
         semi, comma, colon, dcolon, space, equals, dot, vbar,
@@ -150,6 +150,7 @@ import System.IO        ( Handle )
 import System.FilePath
 import Text.Printf
 import Numeric (showFFloat)
+import Numeric.Natural (Natural)
 import Data.Graph (SCC(..))
 import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty (..))
@@ -684,6 +685,7 @@ docToSDoc d = SDoc (\_ -> d)
 
 ptext    ::               PtrString  -> SDoc
 int      :: IsLine doc => Int        -> doc
+natural  :: IsLine doc => Natural    -> doc
 integer  :: IsLine doc => Integer    -> doc
 word     ::               Integer    -> SDoc
 word64   :: IsLine doc => Word64     -> doc
@@ -695,6 +697,8 @@ rational ::               Rational   -> SDoc
 ptext s     = docToSDoc $ Pretty.ptext s
 {-# INLINE CONLIKE int #-}
 int n       = text $ show n
+{-# INLINE CONLIKE natural #-}
+natural n   = text $ show n
 {-# INLINE CONLIKE integer #-}
 integer n   = text $ show n
 {-# INLINE CONLIKE float #-}
@@ -946,6 +950,9 @@ instance Outputable Int64 where
 
 instance Outputable Int where
     ppr n = int n
+
+instance Outputable Natural where
+    ppr n = natural n
 
 instance Outputable Integer where
     ppr n = integer n
