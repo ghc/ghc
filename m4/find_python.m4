@@ -17,7 +17,7 @@ AC_DEFUN([FIND_PYTHON],[
 
     dnl If still not found, hard error: we require Python >= 3.7
     AS_IF([test -z "$PYTHON"], [
-        AC_MSG_ERROR([Python 3.7 or later is required but no python interpreter was found. Please install Python >= 3.7 and re-run configure.])
+        AC_MSG_WARN([Python 3.7 or later is required but no python interpreter was found. This is needed by the testsuite driver.])
     ])
 
     dnl Query the version string (X.Y.Z) of the selected interpreter
@@ -31,10 +31,10 @@ AC_DEFUN([FIND_PYTHON],[
 
     dnl Enforce minimum version 3.7.0
     AS_IF([test -z "$PythonVersion"], [
-        AC_MSG_ERROR([Failed to determine Python version for $PYTHON])
+        AC_MSG_WARN([Failed to determine Python version for $PYTHON])
     ])
     FP_COMPARE_VERSIONS([$PythonVersion], [-lt], [3.7.0], [
-        AC_MSG_ERROR([Python 3.7 or later is required, but $PYTHON reports $PythonVersion])
+        AC_MSG_WARN([Python 3.7 or later is required, but $PYTHON reports $PythonVersion])
     ])
 
     dnl Canonicalise path for Windows
