@@ -419,7 +419,17 @@ ldOverrideWhitelist a =
     OSMinGW32 -> True
     _ -> False
 
-
+-- | Some targets like wasm32/js are based on LLVM related toolchains
+-- like wasi-sdk/emscripten, but these targets don't really support
+-- the LLVM backend and doesn't invoke llc/opt/llvm-as programs
+-- anyway, so we need to skip these. Otherwise in some build
+-- environments ghc-toolchain may find llc/opt/llvm-as programs for
+-- unsupported targets and configure
+-- --enable-strict-ghc-toolchain-check may fail.
+excludeNoLLVMTarget :: ArchOS -> M (Maybe a) -> M (Maybe a)
+excludeNoLLVMTarget archOS m
+  | archOS_arch archOS `elem` [ArchWasm32, ArchJavaScript] = pure Nothing
+  | otherwise = m
 
 mkTarget :: Opts -> M Target
 mkTarget opts = do
@@ -458,9 +468,9 @@ mkTarget opts = do
       throwE "Neither a object-merging tool (e.g. ld -r) nor an ar that supports -L is available"
 
     -- LLVM toolchain
-    llc <- optional $ findProgram "llc" (optLlc opts) ["llc"]
-    opt <- optional $ findProgram "opt" (optOpt opts) ["opt"]
-    llvmAs <- optional $ findProgram "llvm assembler" (optLlvmAs opts) ["clang"]
+    llc <- excludeNoLLVMTarget archOs $ optional $ findProgram "llc" (optLlc opts) ["llc"]
+    opt <- excludeNoLLVMTarget archOs $ optional $ findProgram "opt" (optOpt opts) ["opt"]
+    llvmAs <- excludeNoLLVMTarget archOs $ optional $ findProgram "llvm assembler" (optLlvmAs opts) ["clang"]
 
     -- Windows-specific utilities
     windres <-
