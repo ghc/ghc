@@ -23,17 +23,14 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin
 
-import GHC.Core.Type
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.Predicate( EqRel(..) )
 import GHC.Core.TyCon
 import GHC.Core.Unify( tcUnifyTyForInjectivity )
-import GHC.Core.InstEnv( ClsInst(..) )
 import GHC.Core.Coercion.Axiom
 
 import GHC.Builtin.Types.Literals( tryInteractTopFam, tryInteractInertFam )
-import GHC.Types.Name
 import GHC.Types.Var.Env
 
 import GHC.Utils.Outputable
@@ -42,7 +39,6 @@ import GHC.Utils.Misc( filterOut )
 
 import GHC.Data.Pair
 
-import qualified Data.Semigroup as S
 
 {- *********************************************************************
 *                                                                      *
@@ -330,7 +326,7 @@ tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
 
        ; traceTcS "tryDictFunDepsLocal {" (ppr dict_ct)
 
-       ; let eqns :: [FunDepEqn (CtLoc, RewriterSet)]
+       ; let eqns :: [FunDepEqn]
              eqns = foldr ((++) . do_interaction) [] $
                     findDictsByClass (inert_dicts inerts) cls
        ; imp <- solveFunDeps work_ev eqns
@@ -342,10 +338,9 @@ tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
                 else continueWith () }
   where
     work_pred     = ctEvPred work_ev
-    work_loc      = ctEvLoc  work_ev
     work_is_given = isGiven work_ev
 
-    do_interaction :: DictCt -> [FunDepEqn (CtLoc, RewriterSet)]
+    do_interaction :: DictCt -> [FunDepEqn]
     do_interaction (DictCt { di_ev = inert_ev }) -- This can be Given or Wanted
       | work_is_given && isGiven inert_ev
         -- Do not create FDs from Given/Given interactions
@@ -355,21 +350,7 @@ tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
       = []
 
       | otherwise
-      = improveFromAnother (deriv_loc, inert_rewriters) inert_pred work_pred
-      where
-        inert_pred  = ctEvPred inert_ev
-        inert_loc   = ctEvLoc inert_ev
-        inert_rewriters = ctEvRewriters inert_ev
-        deriv_loc = work_loc { ctl_depth  = deriv_depth
-                               , ctl_origin = deriv_origin }
-        deriv_depth = ctl_depth work_loc `maxSubGoalDepth`
-                      ctl_depth inert_loc
-        deriv_origin = FunDepOrigin1 work_pred
-                                     (ctLocOrigin work_loc)
-                                     (ctLocSpan work_loc)
-                                     inert_pred
-                                     (ctLocOrigin inert_loc)
-                                     (ctLocSpan inert_loc)
+      = improveFromAnother (ctEvPred inert_ev) work_pred
 
 tryDictFunDepsTop :: DictCt -> SolverStage ()
 tryDictFunDepsTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
@@ -377,28 +358,13 @@ tryDictFunDepsTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
     do { inst_envs <- getInstEnvs
 
        ; traceTcS "tryDictFunDepsTop {" (ppr dict_ct)
-       ; let eqns :: [FunDepEqn (CtLoc, RewriterSet)]
-             eqns = improveFromInstEnv inst_envs mk_ct_loc cls xis
+       ; let eqns :: [FunDepEqn]
+             eqns = improveFromInstEnv inst_envs cls xis
        ; imp <- solveFunDeps ev eqns
        ; traceTcS "tryDictFunDepsTop }" (text "imp =" <+> ppr imp)
 
        ; if imp then startAgainWith (CDictCan dict_ct)
                 else continueWith () }
-  where
-    dict_pred      = mkClassPred cls xis
-    dict_loc       = ctEvLoc ev
-    dict_origin    = ctLocOrigin dict_loc
-    dict_rewriters = ctEvRewriters ev
-
-    mk_ct_loc :: ClsInst  -- The instance decl
-              -> (CtLoc, RewriterSet)
-    mk_ct_loc ispec
-      = (dict_loc { ctl_origin = new_orig }, dict_rewriters)
-      where
-        inst_pred = mkClassPred cls (is_tys ispec)
-        inst_loc  = getSrcSpan (is_dfun ispec)
-        new_orig  = FunDepOrigin2 dict_pred dict_origin
-                                  inst_pred inst_loc
 
 {- Note [No Given/Given fundeps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -605,6 +571,7 @@ improveWantedTopFunEqs fam_tc args ev rhs_ty
          uPairsTcM (bump_depth uenv) (reverse eqns) }
          -- Missing that `reverse` causes T13135 and T13135_simple to loop.
          -- See Note [Reverse order of fundep equations]
+               -- ToDo: is this still a problem?
 
   where
     bump_depth env = env { u_loc = bumpCtLocDepth (u_loc env) }
@@ -782,12 +749,10 @@ improveWantedLocalFunEqs funeqs_for_tc fam_tc args work_ev rhs
                         , text "Candidates:" <+> ppr funeqs_for_tc ]
        ; solveFunDeps work_ev improvement_eqns }
   where
-    work_loc      = ctEvLoc work_ev
-    work_pred     = ctEvPred work_ev
     fam_inj_info  = tyConInjectivityInfo fam_tc
 
     --------------------
-    improvement_eqns :: [FunDepEqn (CtLoc, RewriterSet)]
+    improvement_eqns :: [FunDepEqn]
     improvement_eqns
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
       =    -- Try built-in families, notably for arithmetic
@@ -820,23 +785,11 @@ improveWantedLocalFunEqs funeqs_for_tc fam_tc args work_ev rhs
     do_one_injective _ _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)  -- TyVarLHS
 
     --------------------
-    mk_fd_eqns :: CtEvidence -> [TypeEqn] -> [FunDepEqn (CtLoc, RewriterSet)]
-    mk_fd_eqns inert_ev eqns
+    -- ToDO: fix me
+    mk_fd_eqns :: CtEvidence -> [TypeEqn] -> [FunDepEqn]
+    mk_fd_eqns _inert_ev eqns
       | null eqns  = []
-      | otherwise  = [ FDEqn { fd_qtvs = [], fd_eqs = eqns
-                             , fd_loc   = (loc, inert_rewriters) } ]
-      where
-        initial_loc  -- start with the location of the Wanted involved
-          | isGiven work_ev = inert_loc
-          | otherwise       = work_loc
-        eqn_orig        = InjTFOrigin1 work_pred  (ctLocOrigin work_loc)  (ctLocSpan work_loc)
-                                       inert_pred (ctLocOrigin inert_loc) (ctLocSpan inert_loc)
-        eqn_loc         = setCtLocOrigin initial_loc eqn_orig
-        inert_pred      = ctEvPred inert_ev
-        inert_loc       = ctEvLoc inert_ev
-        inert_rewriters = ctEvRewriters inert_ev
-        loc = eqn_loc { ctl_depth = ctl_depth inert_loc `maxSubGoalDepth`
-                                    ctl_depth work_loc }
+      | otherwise  = [ FDEqn { fd_qtvs = [], fd_eqs = eqns } ]
 
 {- Note [Type inference for type families with injectivity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -927,7 +880,7 @@ solving.
 -}
 
 solveFunDeps :: CtEvidence  -- The work item
-             -> [FunDepEqn (CtLoc, RewriterSet)]
+             -> [FunDepEqn]
              -> TcS Bool
 -- Solve a bunch of type-equality equations, generated by functional dependencies
 -- By "solve" we mean: (only) do unifications.  We do not generate evidence, and
@@ -944,30 +897,31 @@ solveFunDeps work_ev fd_eqns
              <- nestFunDepsTcS $
                 do { (_, eqs) <- unifyForAllBody work_ev Nominal do_fundeps
                    ; solveSimpleWanteds eqs }
+    -- ToDo: why solveSimpleWanteds?  Answer
+    --     (a) don't rely on eager unifier
+    --     (b) F Int alpha ~ Maybe Int   where  type instance F Int x = Maybe x
 
        ; return unif_happened }
   where
     do_fundeps :: UnifyEnv -> TcM ()
     do_fundeps env = mapM_ (do_one env) fd_eqns
 
-    do_one :: UnifyEnv -> FunDepEqn (CtLoc, RewriterSet) -> TcM ()
-    do_one uenv (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
-      = do { (_, eqs') <- instantiateFunDepEqn tvs (reverse eqs)
-                          -- (reverse eqs): See Note [Reverse order of fundep equations]
-           ; uPairsTcM env_one eqs' }
-      where
-        env_one = uenv { u_rewriters = u_rewriters uenv S.<> rewriters
-                       , u_loc       = loc }
+    do_one :: UnifyEnv -> FunDepEqn -> TcM ()
+    do_one uenv eqn = do { eqs <- instantiateFunDepEqn eqn
+                         ; uPairsTcM uenv eqs }
 
-instantiateFunDepEqn :: [TyVar] -> [TypeEqn] -> TcM ([TcTyVar], [TypeEqn])
-instantiateFunDepEqn tvs eqs
+instantiateFunDepEqn :: FunDepEqn -> TcM [TypeEqn]
+instantiateFunDepEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs })
   | null tvs
-  = return ([], eqs)
+  = return rev_eqs
   | otherwise
   = do { TcM.traceTc "emitFunDepWanteds 2" (ppr tvs $$ ppr eqs)
-       ; (tvs', subst) <- instFlexiXTcM emptySubst tvs  -- Takes account of kind substitution
-       ; return (tvs', map (subst_pair subst) eqs) }
+       ; (_, subst) <- instFlexiXTcM emptySubst tvs  -- Takes account of kind substitution
+       ; return (map (subst_pair subst) rev_eqs) }
   where
+    rev_eqs = reverse eqs
+       -- (reverse eqs): See Note [Reverse order of fundep equations]
+
     subst_pair subst (Pair ty1 ty2)
        = Pair (substTyUnchecked subst' ty1) ty2
               -- ty2 does not mention fd_qtvs, so no need to subst it.
