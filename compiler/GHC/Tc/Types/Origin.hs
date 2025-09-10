@@ -21,7 +21,7 @@ module GHC.Tc.Types.Origin (
   -- * CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
   isVisibleOrigin, toInvisibleOrigin,
-  pprCtOrigin, isGivenOrigin, isWantedWantedFunDepOrigin,
+  pprCtOrigin, isGivenOrigin,
   isWantedSuperclassOrigin,
   ClsInstOrQC(..), NakedScFlag(..), NonLinearPatternReason(..),
   HsImplicitLiftSplice(..),
@@ -598,15 +598,9 @@ data CtOrigin
   | ArrowCmdOrigin      -- Arising from an arrow command
   | AnnOrigin           -- An annotation
 
-  | FunDepOrigin1       -- A functional dependency from combining
-        PredType CtOrigin RealSrcSpan      -- This constraint arising from ...
-        PredType CtOrigin RealSrcSpan      -- and this constraint arising from ...
-
-  | FunDepOrigin2       -- A functional dependency from combining
-        PredType CtOrigin   -- This constraint arising from ...
-        PredType SrcSpan    -- and this top-level instance
-        -- We only need a CtOrigin on the first, because the location
-        -- is pinned on the entire error message
+  | FunDepOrigin        -- A functional dependency. We don't need auxiliary info
+                        -- because fundep constraints never show up in errors
+                        -- See Note [Functional dependencies in type inference]
 
   | InjTFOrigin1    -- injective type family equation combining
       PredType CtOrigin RealSrcSpan    -- This constraint arising from ...
@@ -707,14 +701,6 @@ isGivenOrigin (GivenSCOrigin {})     = True
 isGivenOrigin (CycleBreakerOrigin o) = isGivenOrigin o
 isGivenOrigin _                      = False
 
--- See Note [Suppressing confusing errors] in GHC.Tc.Errors
-isWantedWantedFunDepOrigin :: CtOrigin -> Bool
-isWantedWantedFunDepOrigin (FunDepOrigin1 _ orig1 _ _ orig2 _)
-  = not (isGivenOrigin orig1) && not (isGivenOrigin orig2)
-isWantedWantedFunDepOrigin (InjTFOrigin1 _ orig1 _ _ orig2 _)
-  = not (isGivenOrigin orig1) && not (isGivenOrigin orig2)
-isWantedWantedFunDepOrigin _ = False
-
 -- | Did a constraint arise from expanding a Wanted constraint
 -- to look at superclasses?
 isWantedSuperclassOrigin :: CtOrigin -> Bool
@@ -810,18 +796,6 @@ pprCtOrigin (SpecPragOrigin ctxt)
        FunSigCtxt n _ -> text "for" <+> quotes (ppr n)
        SpecInstCtxt   -> text "a SPECIALISE INSTANCE pragma"
        _              -> text "a SPECIALISE pragma"  -- Never happens I think
-
-pprCtOrigin (FunDepOrigin1 pred1 orig1 loc1 pred2 orig2 loc2)
-  = hang (ctoHerald <+> text "a functional dependency between constraints:")
-       2 (vcat [ hang (quotes (ppr pred1)) 2 (pprCtOrigin orig1 <+> text "at" <+> ppr loc1)
-               , hang (quotes (ppr pred2)) 2 (pprCtOrigin orig2 <+> text "at" <+> ppr loc2) ])
-
-pprCtOrigin (FunDepOrigin2 pred1 orig1 pred2 loc2)
-  = hang (ctoHerald <+> text "a functional dependency between:")
-       2 (vcat [ hang (text "constraint" <+> quotes (ppr pred1))
-                    2 (pprCtOrigin orig1 )
-               , hang (text "instance" <+> quotes (ppr pred2))
-                    2 (text "at" <+> ppr loc2) ])
 
 pprCtOrigin (InjTFOrigin1 pred1 orig1 loc1 pred2 orig2 loc2)
   = hang (ctoHerald <+> text "reasoning about an injective type family using constraints:")
@@ -954,6 +928,7 @@ pprCtO PatCheckOrigin        = text "a pattern-match completeness check"
 pprCtO ListOrigin            = text "an overloaded list"
 pprCtO IfThenElseOrigin      = text "an if-then-else expression"
 pprCtO StaticOrigin          = text "a static form"
+pprCtO FunDepOrigin          = text "a functional dependency"  -- Never appears in errors
 pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO (OmittedFieldOrigin Nothing) = text "an omitted anonymous field"
 pprCtO (OmittedFieldOrigin (Just fl)) = hsep [text "omitted field" <+> quotes (ppr fl)]
@@ -966,8 +941,6 @@ pprCtO (ImplicitLiftOrigin isp) = text "an implicit lift of" <+> quotes (ppr (im
 pprCtO (GivenOrigin {})             = text "a given constraint"
 pprCtO (GivenSCOrigin {})           = text "the superclass of a given constraint"
 pprCtO (SpecPragOrigin {})          = text "a SPECIALISE pragma"
-pprCtO (FunDepOrigin1 {})           = text "a functional dependency"
-pprCtO (FunDepOrigin2 {})           = text "a functional dependency"
 pprCtO (InjTFOrigin1 {})            = text "an injective type family"
 pprCtO (TypeEqOrigin {})            = text "a type equality"
 pprCtO (KindEqOrigin {})            = text "a kind equality"
