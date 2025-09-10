@@ -15,5 +15,4 @@ getCodepages:
 .PHONY: genTable
 genTable:
 	ghc --make MakeTable
-	./MakeTable GHC.IO.Encoding.CodePage.Table ../GHC/IO/Encoding/CodePage/Table.hs CPs/*
-
+	./MakeTable GHC.Internal.IO.Encoding.CodePage.Table ../src/GHC/Internal/IO/Encoding/CodePage/Table.hs CPs/*
