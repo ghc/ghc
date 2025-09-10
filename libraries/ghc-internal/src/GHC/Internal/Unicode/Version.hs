@@ -18,8 +18,8 @@ where
 import {-# SOURCE #-} GHC.Internal.Data.Version
 
 -- | Version of Unicode standard used by @base@:
--- [16.0.0](https://www.unicode.org/versions/Unicode16.0.0/).
+-- [17.0.0](https://www.unicode.org/versions/Unicode17.0.0/).
 --
 -- @since base-4.15.0.0
 unicodeVersion :: Version
-unicodeVersion = makeVersion [16, 0, 0]
+unicodeVersion = makeVersion [17, 0, 0]
