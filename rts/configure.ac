@@ -22,7 +22,7 @@ dnl     #define SIZEOF_CHAR 0
 dnl   recently.
 AC_PREREQ([2.69])
 
-AC_CONFIG_FILES([ghcplatform.h.top])
+AC_CONFIG_FILES([ghcplatform.h.top rts.buildinfo])
 
 AC_CONFIG_HEADERS([ghcautoconf.h.autoconf])
 
@@ -158,14 +158,7 @@ AC_CHECK_DECLS([program_invocation_short_name], , ,
 [#define _GNU_SOURCE 1
 #include <errno.h>])
 
-dnl ** check for math library
-dnl    Keep that check as early as possible.
-dnl    as we need to know whether we need libm
-dnl    for math functions or not
-dnl    (see https://gitlab.haskell.org/ghc/ghc/issues/3730)
-AS_IF(
-  [test "$CABAL_FLAG_libm" = 1],
-  [AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])])
+AC_SEARCH_LIBS([exp2], [m])
 
 AS_IF([test "$CABAL_FLAG_libbfd" = 1], [FP_WHEN_ENABLED_BFD])
 
@@ -174,9 +167,12 @@ dnl Check for libraries
 dnl ################################################################
 
 dnl ** check whether we need -ldl to get dlopen()
-AC_CHECK_LIB([dl], [dlopen])
+AC_SEARCH_LIBS([dlopen], [dl])
 dnl ** check whether we have dlinfo
 AC_CHECK_FUNCS([dlinfo])
+
+FP_CHECK_PTHREAD_LIB
+
 
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests
@@ -412,6 +408,11 @@ GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerThreadedDefault], [threaded],
 GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerThreadedDefault], [threaded],
                                 [winio], [IOMGR_DEFAULT_THREADED_WINIO])
 
+dnl ######################################################################
+dnl Generate build-info
+dnl ######################################################################
+
+AC_SUBST([EXTRA_LIBS],[` printf " %s " "$LIBS" | sed -E 's/ -l([[^ ]]*)/\1 /g' `])
 
 dnl ** Write config files
 dnl --------------------------------------------------------------
@@ -460,3 +461,5 @@ cat ghcautoconf.h.autoconf | sed \
    >> include/ghcautoconf.h
 echo "#endif /* __GHCAUTOCONF_H__ */" >> include/ghcautoconf.h
 ]
+
+
