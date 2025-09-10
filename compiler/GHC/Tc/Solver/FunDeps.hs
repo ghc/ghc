@@ -21,7 +21,6 @@ import GHC.Tc.Utils.Monad    as TcM
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
-import GHC.Tc.Types.Origin
 
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
