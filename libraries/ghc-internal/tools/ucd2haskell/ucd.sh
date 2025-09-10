@@ -12,8 +12,8 @@ VERIFY_CHECKSUM=y
 
 # Filename:checksum
 FILES="\
-  ucd/DerivedCoreProperties.txt:39d35161f2954497f69e08bdb9e701493f476a3d30222de20028feda36c1dabd \
-  ucd/UnicodeData.txt:ff58e5823bd095166564a006e47d111130813dcf8bf234ef79fa51a870edb48f"
+  ucd/DerivedCoreProperties.txt:24c7fed1195c482faaefd5c1e7eb821c5ee1fb6de07ecdbaa64b56a99da22c08 \
+  ucd/UnicodeData.txt:2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c"
 
 # Download the files
 

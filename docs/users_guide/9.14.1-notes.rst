@@ -212,6 +212,8 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- Updated to `Unicode 17.0.0 <https://www.unicode.org/versions/Unicode17.0.0>`_.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
