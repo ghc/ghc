@@ -106,7 +106,7 @@ makeSBE :: Map.Map Word8 Char -> String
 makeSBE m = unlines
                 [ "SingleByteCP {"
                 , "     decoderArray = " ++ mkConvArray es
-                , "     , encoderArray = " ++ mkCompactArray (swapMap m)
+                , "     , encoderArray =" ++ mkCompactArray (swapMap m)
                 , "   }"
                 ]
   where
@@ -214,7 +214,7 @@ firstComment files = map ("-- " ++) $
 
 theImports :: [String]
 theImports = map ("import " ++ )
-    ["GHC.Prim", "GHC.Base", "GHC.Word"]
+    ["GHC.Internal.Prim", "GHC.Internal.Base", "GHC.Internal.Word"]
 
 theTypes :: [String]
 theTypes = [ "data ConvArray a = ConvArray Addr#"
@@ -265,5 +265,3 @@ repDualByte c
     | otherwise = showHex' (n `mod` 256) ++ showHex' (n `div` 256)
   where
     n = fromEnum c
-
-
