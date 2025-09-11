@@ -17,7 +17,7 @@ module GHC.Rename.Utils (
         DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
-        wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps', genHsExpApps,
+        wrapGenSpan, wrapNoSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps', genHsExpApps,
         genLHsApp, genAppType,
         genLHsLit, genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
@@ -700,6 +700,12 @@ wrapGenSpan :: (HasAnnotation an) => a -> GenLocated an a
 -- Wrap something in a "generatedSrcSpan"
 -- See Note [Rebindable syntax and XXExprGhcRn]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
+
+wrapNoSpan :: (HasAnnotation an) => a -> GenLocated an a
+-- Wrap something in a "noSrcSpan"
+-- See Note [Rebindable syntax and XXExprGhcRn]
+wrapNoSpan x = L (noAnnSrcSpan noSrcSpan) x
+
 
 -- | Make a 'SyntaxExpr' from a 'Name' (the "rn" is because this is used in the
 -- renamer).

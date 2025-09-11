@@ -57,9 +57,7 @@ DoExpansion2.hs:34:22: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefaul
     • The function ‘getVal’ is applied to two visible arguments,
         but its type ‘Int -> IO String’ has only one
       In the expression: getVal 3 4
-      In the expression:
-        do Just x <- getVal 3 4
-           return x
+      In a stmt of a 'do' block: Just x <- getVal 3 4
 
 DoExpansion2.hs:39:19: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘[Char]’ with ‘Int’

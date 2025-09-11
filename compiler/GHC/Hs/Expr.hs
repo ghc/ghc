@@ -671,15 +671,9 @@ data XXExprGhcRn
                     , xrn_expanded :: HsExpr GhcRn    -- The compiler generated, expanded thing
                     }
 
-  | PopErrCtxt                                     -- A hint for typechecker to pop
-    {-# UNPACK #-} !(HsExpr GhcRn)                 -- the top of the error context stack
-                                                   -- Does not presist post renaming phase
-                                                   -- See Part 3. of Note [Expanding HsDo with XXExprGhcRn]
-                                                   -- in `GHC.Tc.Gen.Do`
   | HsRecSelRn  (FieldOcc GhcRn)   -- ^ Variable pointing to record selector
                            -- See Note [Non-overloaded record field selectors] and
                            -- Note [Record selectors in the AST]
-
 
 -- | Build an expression using the extension constructor `XExpr`,
 --   and the two components of the expansion: original expression and
@@ -892,9 +886,9 @@ ppr_expr (NegApp _ e _) = char '-' <+> pprDebugParendExpr appPrec e
 
 ppr_expr (SectionL _ expr op)
   | Just pp_op <- ppr_infix_expr (unLoc op)
-  = pp_infixly pp_op
+  = text "<SectionL>" <+> pp_infixly pp_op
   | otherwise
-  = pp_prefixly
+  = text "<SectionL>" <+> pp_prefixly
   where
     pp_expr = pprDebugParendExpr opPrec expr
 
@@ -905,9 +899,9 @@ ppr_expr (SectionL _ expr op)
 
 ppr_expr (SectionR _ op expr)
   | Just pp_op <- ppr_infix_expr (unLoc op)
-  = pp_infixly pp_op
+  = text "<SectionR>" <+> pp_infixly pp_op
   | otherwise
-  = pp_prefixly
+  = text "<SectionR>" <+> pp_prefixly
   where
     pp_expr = pprDebugParendExpr opPrec expr
 
@@ -1076,7 +1070,6 @@ instance Outputable SrcCodeOrigin where
 
 instance Outputable XXExprGhcRn where
   ppr (ExpandedThingRn o e) = ifPprDebug (braces $ vcat [ppr o, text ";;" , ppr e]) (ppr o)
-  ppr (PopErrCtxt e)        = ifPprDebug (braces (text "<PopErrCtxt>" <+> ppr e)) (ppr e)
   ppr (HsRecSelRn f)        = pprPrefixOcc f
 
 instance Outputable XXExprGhcTc where
@@ -1122,7 +1115,6 @@ ppr_infix_expr _ = Nothing
 
 ppr_infix_expr_rn :: XXExprGhcRn -> Maybe SDoc
 ppr_infix_expr_rn (ExpandedThingRn thing _) = ppr_infix_hs_expansion thing
-ppr_infix_expr_rn (PopErrCtxt a)            = ppr_infix_expr a
 ppr_infix_expr_rn (HsRecSelRn f)            = Just (pprInfixOcc f)
 
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
@@ -1222,7 +1214,6 @@ hsExprNeedsParens prec = go
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn thing _ )   = hsExpandedNeedsParens thing
-    go_x_rn (PopErrCtxt a)               = hsExprNeedsParens prec a
     go_x_rn (HsRecSelRn{})               = False
 
     hsExpandedNeedsParens :: SrcCodeOrigin -> Bool
@@ -1275,7 +1266,6 @@ isAtomicHsExpr (XExpr x)
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn thing _)   = isAtomicExpandedThingRn thing
-    go_x_rn (PopErrCtxt a)              = isAtomicHsExpr a
     go_x_rn (HsRecSelRn{})              = True
 
     isAtomicExpandedThingRn :: SrcCodeOrigin -> Bool

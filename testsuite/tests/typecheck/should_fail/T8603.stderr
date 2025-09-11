@@ -10,7 +10,5 @@ T8603.hs:33:17: error: [GHC-18872]
                       m a -> t m a’
         has only one
       In the expression: lift uniform [1, 2, 3]
-      In the expression:
-        do prize <- lift uniform [1, 2, 3]
-           return False
+      In a stmt of a 'do' block: prize <- lift uniform [1, 2, 3]
 

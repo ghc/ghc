@@ -77,15 +77,15 @@ expand_do_stmts flav [stmt@(L sloc (LastStmt _ body@(L body_loc _) _ ret_expr))]
 -- See `checkLastStmt` and `Syntax.Expr.StmtLR.LastStmt`
    | NoSyntaxExprRn <- ret_expr
    -- Last statement is just body if we are not in ListComp context. See Syntax.Expr.LastStmt
-   = return $ L sloc (mkExpandedStmt stmt flav (HsPar noExtField body))
+   = return $ L sloc (mkExpandedStmt stmt flav (unLoc body))
 
    | SyntaxExprRn ret <- ret_expr  -- We have unfortunately lost the location on the return function :(
    --
    --    ------------------------------------------------
    --               return e  ~~> return e
    -- to make T18324 work
-   = do let expansion = L body_loc (genHsApp ret body)
-        return $ L sloc (mkExpandedStmt stmt flav (HsPar noExtField expansion))
+   = do let expansion = HsApp noExtField (L body_loc ret) body
+        return $ L sloc (mkExpandedStmt stmt flav expansion)
 
 expand_do_stmts doFlavour (stmt@(L loc (LetStmt _ bs)) : lstmts) =
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (3) below
@@ -93,7 +93,7 @@ expand_do_stmts doFlavour (stmt@(L loc (LetStmt _ bs)) : lstmts) =
 --    ------------------------------------------------
 --       let x = e ; stmts ~~> let x = e in stmts'
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
-     let expansion = genHsLet bs (genPopErrCtxtExpr expand_stmts_expr)
+     let expansion = genHsLet bs expand_stmts_expr
      return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 
 expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
@@ -106,15 +106,15 @@ expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
 --    -------------------------------------------------------
 --       pat <- e ; stmts   ~~> (>>=) e f
   = do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
-       failable_expr <- mk_failable_expr doFlavour pat (genPopErrCtxtExpr expand_stmts_expr) fail_op
+       failable_expr <- mk_failable_expr doFlavour pat expand_stmts_expr fail_op
        let expansion = genHsExpApps bind_op  -- (>>=)
-                       [ genPopErrCtxtExpr e
+                       [ e
                        , failable_expr ]
        return $ L loc (mkExpandedStmt stmt doFlavour expansion)
   | otherwise
   = pprPanic "expand_do_stmts: The impossible happened, missing bind operator from renamer" (text "stmt" <+> ppr  stmt)
 
-expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ e (SyntaxExprRn then_op) _)) : lstmts) =
+expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ (L e_lspan e) (SyntaxExprRn then_op) _)) : lstmts) =
 -- See Note [BodyStmt] in Language.Haskell.Syntax.Expr
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (1) below
 --              stmts ~~> stmts'
@@ -122,8 +122,8 @@ expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ e (SyntaxExprRn then_op) _)) 
 --      e ; stmts ~~> (>>) e stmts'
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      let expansion = genHsExpApps then_op  -- (>>)
-                     [ genPopErrCtxtExpr e
-                     , genPopErrCtxtExpr $ expand_stmts_expr ]
+                     [ L e_lspan (mkExpandedStmt stmt doFlavour e)
+                     , expand_stmts_expr ]
      return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 
 expand_do_stmts doFlavour
@@ -479,13 +479,6 @@ It stores the original statement (with location) and the expanded expression
   the `match_ctxt` is set to a `StmtCtxt` if `GenOrigin` is a `DoExpansionOrigin`.
 -}
 
-
--- | Wrap a located expression with a `PopErrCtxt`
-mkPopErrCtxtExpr :: HsExpr GhcRn -> HsExpr GhcRn
-mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
-
-genPopErrCtxtExpr :: LHsExpr GhcRn -> LHsExpr GhcRn
-genPopErrCtxtExpr (L loc a) = L loc (mkPopErrCtxtExpr a)
 
 mkExpandedPatRn :: Pat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
 mkExpandedPatRn pat e = XExpr (ExpandedThingRn (OrigPat pat) e)

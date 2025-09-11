@@ -831,8 +831,7 @@ exprCtOrigin e@(HsProjection _ _) = ExpansionOrigin (OrigExpr e)
 exprCtOrigin e@(RecordUpd{})      = ExpansionOrigin (OrigExpr e)
 exprCtOrigin e@(HsGetField{})     = ExpansionOrigin (OrigExpr e)
 exprCtOrigin (XExpr (ExpandedThingRn o _)) = ExpansionOrigin o
-exprCtOrigin (XExpr (PopErrCtxt e)) = exprCtOrigin e
-exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
+exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 
 srcCodeOriginCtOrigin :: HsExpr GhcRn -> Maybe SrcCodeOrigin -> CtOrigin
 srcCodeOriginCtOrigin e Nothing = exprCtOrigin e
@@ -1111,7 +1110,7 @@ ppr_br (ExpectedFunTyViewPat{}) = text "a view pattern"
 ppr_br (ExpectedFunTyArg{}) = text "a funtion head"
 ppr_br (ExpectedFunTyMatches{}) = text "a match statement"
 ppr_br (ExpectedFunTyLam{}) = text "a lambda expression"
-ppr_br (FRRRepPolyUnliftedNewtype dc) = text "a unlifted newtype"
+ppr_br (FRRRepPolyUnliftedNewtype{}) = text "a unlifted newtype"
 
 
 pprNonLinearPatternReason :: HasDebugCallStack => NonLinearPatternReason -> SDoc
