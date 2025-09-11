@@ -115,7 +115,7 @@ import Control.Arrow    ( first )
 import Control.Monad
 import Data.Either      ( partitionEithers )
 import Data.Function    ( on )
-import Data.List        ( find, partition, groupBy, sortBy )
+import Data.List        ( find, partition, sortBy )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as Semi
 import System.IO.Unsafe ( unsafePerformIO )
@@ -1559,10 +1559,10 @@ lookupRecUpdFields :: NE.NonEmpty (LHsRecUpdField GhcPs GhcPs)
                    -> RnM (NE.NonEmpty (HsRecUpdParent GhcRn))
 lookupRecUpdFields flds
 -- See Note [Disambiguating record updates] in GHC.Rename.Pat.
-  = do { -- Retrieve the possible GlobalRdrElts that each field could refer to.
+  = do { -- (1) Retrieve the possible GlobalRdrElts that each field could refer to.
        ; gre_env <- getGlobalRdrEnv
        ; fld1_gres NE.:| other_flds_gres <- mapM (lookupFieldGREs gre_env . getFieldUpdLbl) flds
-         -- Take an intersection: we are only interested in constructors
+         -- (2) Take an intersection: we are only interested in constructors
          -- which have all of the fields.
        ; let possible_GREs = intersect_by_cons fld1_gres other_flds_gres
 
@@ -1573,15 +1573,16 @@ lookupRecUpdFields flds
 
        ; case possible_GREs of
 
-          -- There is at least one parent: we can proceed.
+          -- (3) (a) There is at least one parent: we can proceed.
           -- The typechecker might be able to finish disambiguating.
           -- See Note [Type-directed record disambiguation] in GHC.Rename.Pat.
        { p1:ps -> return (p1 NE.:| ps)
 
-          -- There are no possible parents for the record update: compute
-          -- a minimum set of fields which does not belong to any data constructor,
-          -- to report an informative error to the user.
-       ; _ ->
+          -- (3) (b) There are no possible parents for the record update:
+          -- compute a minimal set of fields which does not belong to any
+          -- data constructor, to report an informative error to the user.
+       ; _ -> do
+          hsc_env <- getTopEnv
           let
             -- The constructors which have the first field.
             fld1_cons :: UniqSet ConLikeName
@@ -1591,9 +1592,9 @@ lookupRecUpdFields flds
             -- The field labels of the constructors which have the first field.
             fld1_cons_fields :: UniqFM ConLikeName [FieldLabel]
             fld1_cons_fields
-              = fmap (lkp_con_fields gre_env)
+              = fmap (lkp_con_fields hsc_env gre_env)
               $ getUniqSet fld1_cons
-          in failWithTc $ badFieldsUpd (NE.toList flds) fld1_cons_fields } }
+          failWithTc $ badFieldsUpd (NE.toList flds) fld1_cons_fields } }
 
   where
     intersect_by_cons :: NE.NonEmpty FieldGlobalRdrElt
@@ -1612,13 +1613,22 @@ lookupRecUpdFields flds
       , not $ isEmptyUniqSet both_cons
       ]
 
-    lkp_con_fields :: GlobalRdrEnv -> ConLikeName -> [FieldLabel]
-    lkp_con_fields gre_env con =
+    -- Look up all in-scope fields of a 'ConLike'.
+    lkp_con_fields :: HscEnv -> GlobalRdrEnv -> ConLikeName -> [FieldLabel]
+    lkp_con_fields hsc_env gre_env con =
       [ fl
-      | let nm = conLikeName_Name con
-      , gre      <- maybeToList $ lookupGRE_Name gre_env nm
-      , con_info <- maybeToList $ recFieldConLike_maybe gre
-      , fl       <- conInfoFields con_info ]
+      | let con_nm = conLikeName_Name con
+            gre_info =
+              (greInfo <$> lookupGRE_Name gre_env con_nm)
+                `orElse`
+              lookupGREInfo hsc_env con_nm
+              -- See Wrinkle [Out of scope constructors]
+              -- in Note [Disambiguating record updates] in GHC.Rename.Pat.
+      , IAmConLike con_info <- [ gre_info ]
+      , fl <- conInfoFields con_info
+      , isJust $ lookupGRE_FieldLabel gre_env fl
+             -- Ensure the fields are in scope.
+      ]
 
 {-**********************************************************************
 *                                                                      *
@@ -1642,8 +1652,9 @@ getUpdFieldLbls
 -- aren't really relevant to the problem.
 --
 -- NB: this error message should only be triggered when all the field names
--- are in scope (i.e. each individual field name does belong to some
--- constructor in scope).
+-- are in scope. It's OK if the constructors themselves are not in scope
+-- (see Wrinkle [Out of scope constructors] in Note [Disambiguating record updates]
+-- in GHC.Rename.Pat).
 badFieldsUpd
   :: (OutputableBndrId p)
   => [LHsRecUpdField (GhcPass p) q]
@@ -1676,7 +1687,7 @@ badFieldsUpd rbinds fld1_cons_fields
             in
             -- Fields that don't change the membership status of the set
             -- are redundant and can be dropped.
-            map (fst . head) $ groupBy ((==) `on` snd) growingSets
+            map (fst . NE.head) $ NE.groupBy ((==) `on` snd) growingSets
 
     aMember = assert (not (null members) ) fst (head members)
     (members, nonMembers) = partition (or . snd) membership

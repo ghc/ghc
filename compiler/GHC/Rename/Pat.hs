@@ -1084,14 +1084,31 @@ In a record update, the `lookupRecUpdFields` function tries to determine
 the parent datatype by computing the parents (TyCon/PatSyn) which have
 at least one constructor (DataCon/PatSyn) with all of the fields.
 
-For example, in the (non-overloaded) record update
+To do this, given the (non-empty) set of fields in the record update,
+lookupRecUpdFields proceeds as follows:
 
-    r { fld1 = 3, fld2 = 'x' }
+  (1) For each field, retrieve all the in-scope GREs that it could possibly
+      refer to.
 
-only the TyCon R contains at least one DataCon which has both of the fields
-being updated: in this case, MkR1 and MkR2 have both of the updated fields.
-The TyCon S also has both fields fld1 and fld2, but no single constructor
-has both of those fields, so S is not a valid parent for this record update.
+  (2) Take an intersection to compute the possible parent data constructors.
+      For example, for an update
+
+        r { fld1 = 3, fld2 = 'x' }
+
+      the possible parents for each field are:
+
+        fld1: [MkR1 |-> R.fld1, MkR2 |-> R.fld1, MkS1 |> S.fld1]
+        fld2: [MkR1 |-> R.fld2, MkR2 |-> R.fld2, MkS2 |> S.fld2]
+
+      after intersecting by constructor, we get:
+
+        fld1: [MkR1 |-> R.fld1, MkR2 |-> R.fld1]
+        fld2: [MkR1 |-> R.fld2, MkR2 |-> R.fld2]
+
+      This reflects the fact that only the TyCon R contains at least one DataCon
+      which has both of the fields being updated: MkR1 and MkR2.
+      The TyCon S also has both fields fld1 and fld2, but no single constructor
+      has both of those fields, so S is not a valid parent for this record update.
 
   (3)
     (a)
@@ -1109,15 +1126,16 @@ has both of those fields, so S is not a valid parent for this record update.
       the fields fld1, ..., fld99" and instead report e.g. "No constructor
       has all the fields { fld3, fld17 }".
 
-Wrinkle [Qualified names in record updates]
 
-  Note that we must take into account qualified names in (1), so that a record
-  update such as
+Note that (1) takes into account qualified names, so that a record update such
+as
 
     import qualified M ( R (fld1, fld2) )
     f r = r { M.fld1 = 3 }
 
-  is unambiguous: only R contains the field fld1 in the M namespace.
+is unambiguous, as only R contains the field fld1 with the M qualifier.
+(See however #22122 for issues relating to the usage of exact Names in
+record fields.)
 
   The function that looks up the GREs for the record update is 'lookupFieldGREs',
   which uses 'lookupGRE env (LookupRdrName ...)', ensuring that we correctly
@@ -1125,6 +1143,32 @@ Wrinkle [Qualified names in record updates]
 
   (See however #22122 for issues relating to the usage of exact Names in
   record fields.)
+
+Wrinkle [Out of scope constructors]
+
+  For (3)(b), we have an invalid record update because no constructor has
+  all of the fields of the record update. The 'badFieldsUpd' then tries to
+  compute a minimal set of fields which are not children of any single
+  constructor. The way this is done is explained in
+  Note [Finding the conflicting fields] in GHC.Rename.Env, but in short that
+  function needs a mapping from ConLike to all of its fields to do its business.
+  (You may remark that we did not need such a mapping for step (2).)
+
+  This means we need to look up each constructor and find its fields; this
+  information is stored in the GREInfo field of a constructor GRE.
+  We need this information even if the constructor itself is not in scope, so
+  we proceed as follows:
+
+    1. First look up the constructor in the GlobalRdrEnv, using lookupGRE_Name.
+       This handles constructors defined in the current module being renamed,
+       as well as in-scope imported constructors.
+    2. If that fails (e.g. the field is imported but the constructor is not),
+       then look up the GREInfo of the constructor in the TypeEnv, using
+       lookupGREInfo. This makes sure we give the right error message even when
+       the constructors are not in scope (#26391).
+
+    Note that we do need (1), as (2) does not handle constructors defined in the
+    current module being renamed (as those have not yet been added to the TypeEnv).
 
 Wrinkle [Out of scope constructors]
 
