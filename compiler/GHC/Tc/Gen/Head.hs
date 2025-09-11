@@ -26,7 +26,7 @@ module GHC.Tc.Gen.Head
        , nonBidirectionalErr
 
        , pprArgInst
-       , addExprCtxt, addFunResCtxt ) where
+       , addExprCtxt, addLExprCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
@@ -49,6 +49,7 @@ import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt ( srcCodeOriginErrCtxMsg )
 import GHC.Tc.Types.Constraint( WantedConstraints )
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Types.Evidence
@@ -174,7 +175,7 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
                , eaql_larg    :: LHsExpr GhcRn       -- Original application, for
                                                      -- location and error msgs
                , eaql_rn_fun  :: HsExpr GhcRn  -- Head of the argument if it is an application
-               , eaql_tc_fun  :: (HsExpr GhcTc, SrcSpan) -- Typechecked head
+               , eaql_tc_fun  :: (HsExpr GhcTc, SrcSpan) -- Typechecked head and its location span
                , eaql_fun_ue  :: UsageEnv -- Usage environment of the typechecked head (QLA5)
                , eaql_args    :: [HsExprArg 'TcpInst]    -- Args: instantiated, not typechecked
                , eaql_wanted  :: WantedConstraints
@@ -217,7 +218,7 @@ type family XPass (p :: TcPass) where
 
 mkEValArg :: SrcSpan -> LHsExpr GhcRn -> HsExprArg 'TcpRn
 mkEValArg src_loc e = EValArg { ea_arg = e, ea_loc_span = src_loc
-                           , ea_arg_ty = noExtField }
+                              , ea_arg_ty = noExtField }
 
 mkETypeArg :: SrcSpan -> LHsWcType GhcRn -> HsExprArg 'TcpRn
 mkETypeArg src_loc hs_ty =
@@ -244,18 +245,18 @@ splitHsApps e = go e noSrcSpan []
     go :: HsExpr GhcRn -> SrcSpan -> [HsExprArg 'TcpRn]
        -> TcM ((HsExpr GhcRn, SrcSpan), [HsExprArg 'TcpRn])
     -- Modify the SrcSpan as we walk inwards, so it describes the next argument
-    go (HsPar _ (L l fun))        sloc args = go fun (locA l) (EWrap (EPar sloc)     : args)
-    go (HsPragE _ p (L l fun))    sloc args = go fun (locA l) (EPrag      sloc p     : args)
-    go (HsAppType _ (L l fun) ty) sloc args = go fun (locA l) (mkETypeArg sloc ty    : args)
-    go (HsApp _ (L l fun) arg)    sloc args = go fun (locA l) (mkEValArg  sloc arg   : args)
+    go (HsPar _ (L l fun))        lspan args = go fun (locA l) (EWrap (EPar lspan)     : args)
+    go (HsPragE _ p (L l fun))    lspan args = go fun (locA l) (EPrag      lspan p     : args)
+    go (HsAppType _ (L l fun) ty) lspan args = go fun (locA l) (mkETypeArg lspan ty    : args)
+    go (HsApp _ (L l fun) arg)    lspan args = go fun (locA l) (mkEValArg  lspan arg   : args)
 
     -- See Note [Looking through Template Haskell splices in splitHsApps]
     go e@(HsUntypedSplice splice_res splice) _ args
       = do { fun <- getUntypedSpliceBody splice_res
-           ; go fun sloc' (EWrap (EExpand e) : args) }
+           ; go fun lspan' (EWrap (EExpand e) : args) }
       where
-        sloc' :: SrcSpan
-        sloc' = case splice of
+        lspan' :: SrcSpan
+        lspan' = case splice of
             HsUntypedSpliceExpr _ (L l _) -> locA l -- l :: SrcAnn AnnListItem
             HsQuasiQuote _ _ (L l _)      -> locA l -- l :: SrcAnn NoEpAnns
             (XUntypedSplice (HsImplicitLiftSplice _ _ _ (L l _))) -> locA l
@@ -269,11 +270,10 @@ splitHsApps e = go e noSrcSpan []
                     -- and its hard to say exactly what that is
                : EWrap (EExpand e)
                : args )
-    go (XExpr (PopErrCtxt fun)) sloc args = go fun sloc args
       -- look through PopErrCtxt (cf. T17594f) we do not want to lose the opportunity of calling tcEValArgQL
       -- unlike HsPar, it is okay to forget about the PopErrCtxts as it does not persist over in GhcTc land
 
-    go e sloc args = pure ((e, sloc), args)
+    go e lspan args = pure ((e, lspan), args)
 
 
 -- | Rebuild an application: takes a type-checked application head
@@ -456,8 +456,8 @@ tcInferAppHead :: (HsExpr GhcRn, SrcSpan)
 --     cases are dealt with by splitHsApps.
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
-tcInferAppHead (fun,fun_loc)
-  = setSrcSpan fun_loc $
+tcInferAppHead (fun,fun_lspan)
+  = setSrcSpan fun_lspan $
     do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
@@ -471,9 +471,9 @@ tcInferAppHead_maybe fun =
     case fun of
       HsVar _ nm                  -> Just <$> tcInferId nm
       XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
-      XExpr (ExpandedThingRn o e) -> Just <$> (setInGeneratedCode o $ -- We do not want to instantiate c.f. T19167
-                                                tcExprSigma False e)
-      XExpr (PopErrCtxt e)        -> tcInferAppHead_maybe e
+      XExpr (ExpandedThingRn o e) -> Just <$> (addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $
+                                              -- We do not want to instantiate c.f. T19167
+                                                    tcExprSigma False e)
       ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit             -> Just <$> tcInferOverLit lit
       _                           -> return Nothing
@@ -1109,5 +1109,17 @@ addExprCtxt e thing_inside
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
-      XExpr (PopErrCtxt _) -> thing_inside -- popErrCtxt shouldn't push ctxt. see typechecking let stmts
+      HsPar{} -> thing_inside
+      -- We don't want to say 'In the expression (e)',
+      -- we just want to say 'In the expression, 'e'
+      -- which will be handeled by the recursive call in thing_inside
+      XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) thing_inside
       _ -> addErrCtxt (ExprCtxt e) thing_inside -- no op in generated code
+
+
+addLExprCtxt :: LHsExpr GhcRn -> TcRn a -> TcRn a
+addLExprCtxt (L lspan e) thing_inside
+  | (RealSrcSpan{}) <- locA lspan
+  = addExprCtxt e thing_inside
+  | otherwise
+  = thing_inside
