@@ -1282,6 +1282,7 @@ isNoParent _                   = False
 data Injectivity
   = NotInjective
   | Injective [Bool]   -- 1-1 with tyConTyVars (incl kind vars)
+                       -- INVARIANT: not all False
   deriving( Eq )
 
 -- | Information pertaining to the expansion of a type synonym (@type@)

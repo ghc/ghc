@@ -132,9 +132,10 @@ simplify_loop n limit definitely_redo_implications
 
        ; let wc' = wc1 { wc_impl = wc_impl wc1 `unionBags` implics' }
 
+       -- See Note [When to iterate: unifications]
        ; unif_happened <- getUnificationFlag
        ; csTraceTcS $ text "unif_happened" <+> ppr unif_happened
-         -- Note [The Unification Level Flag] in GHC.Tc.Solver.Monad
+
        ; maybe_simplify_again (n+1) limit unif_happened wc' }
 
 data NextAction
@@ -225,10 +226,59 @@ any new unifications, and iterate the implications only if so.
 
 "RAE": Add comment here about fundeps also using this mechanism. And probably
 update name of Note.
--}
 
-{- Note [Expanding Recursive Superclasses and ExpansionFuel]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [When to iterate the solver: unifications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a deep tree of implication constraints
+   forall[1] a.                              -- Outer-implic
+      C alpha[1]                               -- Simple
+      forall[2] c. ....(C alpha[1])....        -- Implic-1
+      forall[2] b. ....(alpha[1] ~ Int)....    -- Implic-2
+
+The (C alpha) is insoluble until we know alpha.  We solve alpha
+by unifying alpha:=Int somewhere deep inside Implic-2. But then we
+must try to solve the Outer-implic all over again. This time we can
+solve (C alpha) both in Outer-implic, and nested inside Implic-1.
+
+When should we iterate solving a level-n implication?
+Answer: if any unification of a tyvar at level n takes place
+        in the ic_implics of that implication.
+
+* What if a unification takes place at level n-1? Then don't iterate
+  level n, because we'll iterate level n-1, and that will in turn iterate
+  level n.
+
+* What if a unification takes place at level n, in the ic_simples of
+  level n?  No need to track this, because the kick-out mechanism deals
+  with it.  (We can't drop kick-out in favour of iteration, because kick-out
+  works for skolem-equalities, not just unifications.)
+
+So the monad-global `WhatUnifications` flag, kept in `tcs_unif_lvl` keeps
+track of whether any unifications at all have taken place, and if so, what
+is the outermost level that has seen a unification. Seee GHC.Tc.Utils.Unify
+Note [WhatUnifications].
+
+The iteration is done in the simplify_loop/maybe_simplify_again loop.
+
+It is helpful not to iterate unless there is a chance of progress.  #8474 is
+an example:
+
+  * There's a deeply-nested chain of implication constraints.
+       ?x:alpha => ?y1:beta1 => ... ?yn:betan => [W] ?x:Int
+
+  * From the innermost one we get a [W] alpha[1] ~ Int,
+    so we can unify.
+
+  * It's better not to iterate the inner implications, but go all the
+    way out to level 1 before iterating -- because iterating level 1
+    will iterate the inner levels anyway.
+
+(In the olden days when we "floated" these Derived constraints, this was
+much, much more important -- we got exponential behaviour, as each iteration
+produced the same Derived constraint.)
+
+Note [Expanding Recursive Superclasses and ExpansionFuel]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the class declaration (T21909)
 
     class C [a] => C a where

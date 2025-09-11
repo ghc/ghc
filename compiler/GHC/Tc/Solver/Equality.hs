@@ -544,7 +544,7 @@ can_eq_nc_forall ev eq_rel s1 s2
       -- Generate the constraints that live in the body of the implication
       -- See (SF5) in Note [Solving forall equalities]
       ; (lvl, (all_co, wanteds)) <- pushLevelNoWorkList (ppr skol_info)   $
-                                    unifyForAllBody ev (eqRelRole eq_rel) $ \uenv ->
+                                    wrapUnifier ev (eqRelRole eq_rel) $ \uenv ->
                                     go uenv skol_tvs init_subst2 bndrs1 bndrs2
 
       -- Solve the implication right away, using `trySolveImplication`
@@ -634,9 +634,9 @@ There are lots of wrinkles of course:
 
 (SF5) Rather than manually gather the constraints needed in the body of the
    implication, we use `uType`.  That way we can solve some of them on the fly,
-   especially Refl ones.  We use the `unifyForAllBody` wrapper for `uType`,
+   especially Refl ones.  We use the `wrapUnifier` wrapper for `uType`,
    because we want to /gather/ the equality constraint (to put in the implication)
-   rather than /emit/ them into the monad, as `wrapUnifierTcS` does.
+   rather than /emit/ them into the monad, as `wrapUnifierAndEmit` does.
 
 (SF6) We solve the implication on the spot, using `trySolveImplication`.  In
    the past we instead generated an `Implication` to be solved later.  Nice in
@@ -808,7 +808,7 @@ can_eq_app ev s1 t1 s2 t2
   = do { traceTcS "can_eq_app" (vcat [ text "s1:" <+> ppr s1, text "t1:" <+> ppr t1
                                      , text "s2:" <+> ppr s2, text "t2:" <+> ppr t2
                                      , text "vis:" <+> ppr (isNextArgVisible s1) ])
-       ; (co,_,_) <- wrapUnifierTcS ev Nominal $ \uenv ->
+       ; co <- wrapUnifierAndEmit ev Nominal $ \uenv ->
             -- Unify arguments t1/t2 before function s1/s2, because
             -- the former have smaller kinds, and hence simpler error messages
             -- c.f. GHC.Tc.Utils.Unify.uType (go_app)
@@ -966,7 +966,7 @@ then we will just decompose s1~s2, and it might be better to
 do so on the spot.  An important special case is where s1=s2,
 and we get just Refl.
 
-So canDecomposableTyConAppOK uses wrapUnifierTcS etc to short-cut
+So canDecomposableTyConAppOK uses wrapUnifierAndEmit etc to short-cut
 that work.  See also Note [Work-list ordering].
 
 Note [Decomposing TyConApp equalities]
@@ -1090,7 +1090,7 @@ up in the complexities of canEqLHSHetero.  To do this:
 * `uType` keeps the bag of emitted constraints in the same
   left-to-right order.  See the use of `snocBag` in `uType_defer`.
 
-* `wrapUnifierTcS` adds the bag of deferred constraints from
+* `wrapUnifierAndEmit` adds the bag of deferred constraints from
   `do_unifications` to the work-list using `extendWorkListChildEqs`.
 
 * `extendWorkListChildEqs` and `selectWorkItem` together arrange that the
@@ -1394,7 +1394,7 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
              -- new_locs and tc_roles are both infinite, so we are
              -- guaranteed that cos has the same length as tys1 and tys2
              -- See Note [Fast path when decomposing TyConApps]
-             -> do { (co, _, _) <- wrapUnifierTcS ev role $ \uenv ->
+             -> do { co <- wrapUnifierAndEmit ev role $ \uenv ->
                         do { cos <- zipWith4M (u_arg uenv) new_locs tc_roles tys1 tys2
                                     -- zipWith4M: see Note [Work-list ordering]
                            ; return (mkTyConAppCo role tc cos) }
@@ -1449,7 +1449,7 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
                   (ppr ev $$ ppr eq_rel $$ ppr f1 $$ ppr f2)
        ; case ev of
            CtWanted (WantedCt { ctev_dest = dest })
-             -> do { (co, _, _) <- wrapUnifierTcS ev Nominal $ \ uenv ->
+             -> do { co <- wrapUnifierAndEmit ev Nominal $ \ uenv ->
                         do { let mult_env = uenv `updUEnvLoc` toInvisibleLoc
                                                  `setUEnvRole` funRole role SelMult
                            ; mult <- uType mult_env m1 m2
@@ -1694,12 +1694,18 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
               ; finish emptyRewriterSet (givenCtEvCoercion kind_ev) }
 
       CtWanted {}
-         -> do { (kind_co, cts, unifs) <- wrapUnifierTcS ev Nominal $ \uenv ->
-                                          let uenv' = updUEnvLoc uenv (mkKindEqLoc xi1 xi2)
-                                          in unSwap swapped (uType uenv') ki1 ki2
+         -> do { (unifs, (kind_co, cts)) <- reportUnifications $
+                                            wrapUnifier ev Nominal $ \uenv ->
+                                            let uenv' = updUEnvLoc uenv (mkKindEqLoc xi1 xi2)
+                                            in unSwap swapped (uType uenv') ki1 ki2
                       -- mkKindEqLoc: any new constraints, arising from the kind
                       -- unification, say they thay come from unifying xi1~xi2
-               ; if not (null unifs)
+
+               -- Emit any unsolved kind equalities
+               ; unless (isEmptyBag cts) $
+                 updWorkListTcS (extendWorkListChildEqs ev cts)
+
+               ; if unifs
                  then -- Unifications happened, so start again to do the zonking
                       -- Otherwise we might put something in the inert set that isn't inert
                       startAgainWith (mkNonCanonical ev)
@@ -2036,9 +2042,6 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
          -- Ignore 'swapped' because it's Refl!
          ; setEvBindIfWanted new_ev EvCanonical $
            evCoercion (mkNomReflCo final_rhs)
-
-         -- Kick out any constraints that can now be rewritten
-         ; recordUnification tv
 
          ; return (Stop new_ev (text "Solved by unification")) }
 
@@ -2405,7 +2408,7 @@ FamAppBreaker.
 Why TauTvs? See [Why TauTvs] below.
 
 Critically, we emit the two new constraints (the last two above)
-directly instead of calling wrapUnifierTcS. (Otherwise, we'd end up
+directly instead of calling wrapUnifier. (Otherwise, we'd end up
 unifying cbv1 and cbv2 immediately, achieving nothing.)  Next, we
 unify alpha := cbv1 -> cbv2, having eliminated the occurs check. This
 unification happens immediately following a successful call to
