@@ -1170,6 +1170,10 @@ project-version:
   image: nixos/nix:2.25.2
   dependencies: null
   tags:
+    # N.B. we use the OpenCape runners here since this job involves a significant
+    # amount of artifact fetching. This is much more efficient on these runners
+    # as they are near the GitLab box.
+    - opencape
     - x86_64-linux
   variables:
     BUILD_FLAVOUR: default
