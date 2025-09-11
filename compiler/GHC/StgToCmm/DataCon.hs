@@ -107,10 +107,10 @@ cgTopRhsCon cfg id con mn args
             fix_padding (x@(Padding n off) : rest)
               | n == 0                 = fix_padding rest
               | n `elem` [1,2,4,8]     = x : fix_padding rest
-              | n > 8                  = add_pad 8
-              | n > 4                  = add_pad 4
-              | n > 2                  = add_pad 2
-              | otherwise              = add_pad 1
+              | testBit n 0            = add_pad 1
+              | testBit n 1            = add_pad 2
+              | testBit n 2            = add_pad 4
+              | otherwise              = add_pad 8
               where add_pad m = Padding m off : fix_padding (Padding (n-m) (off+m) : rest)
             fix_padding (x : rest)     = x : fix_padding rest
             fix_padding []             = []
