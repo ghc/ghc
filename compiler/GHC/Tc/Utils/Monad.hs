@@ -172,6 +172,7 @@ import GHC.Tc.Types     -- Re-export all
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.TcRef
@@ -418,7 +419,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_lcl_ctxt   = TcLclCtxt {
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
-                tcl_ctxt       = UserCodeCtxt [],
+                tcl_err_ctxt   = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topLevel,
                 tcl_th_bndrs   = emptyNameEnv,
@@ -1077,9 +1078,7 @@ inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- See Note [Error contexts in generated code]
 setSrcSpan (RealSrcSpan loc _) thing_inside
-  = updLclCtxt (\env -> env { tcl_loc = loc
-                            , tcl_ctxt = UserCodeCtxt (lcl_err_ctxt $ tcl_ctxt env)})
-              thing_inside
+  = updLclCtxt (\env -> env { tcl_loc = loc }) thing_inside
 
 setSrcSpan (UnhelpfulSpan _) thing_inside
   = thing_inside
@@ -1346,7 +1345,7 @@ addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 --   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addErrCtxtM ctxt = pushCtxt (False, ctxt)
+addErrCtxtM ctxt = pushCtxt (UserCodeCtxt (False, ctxt))
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
@@ -1360,7 +1359,7 @@ addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 -- and tidying.
 addLandmarkErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addLandmarkErrCtxtM ctxt = pushCtxt (True, ctxt)
+addLandmarkErrCtxtM ctxt = pushCtxt (UserCodeCtxt (True, ctxt))
 
 -- | NB. no op in generated code
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
@@ -1371,9 +1370,7 @@ pushCtxt ctxt = updLclEnv (updCtxt ctxt)
 updCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
 -- Do not update the context if we are in generated code
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
-updCtxt ctxt env
-  | lclEnvInGeneratedCode env = env
-  | otherwise = addLclEnvErrCtxt ctxt env
+updCtxt ctxt env = addLclEnvErrCtxt ctxt env
 
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt thing_inside = updLclEnv (\env -> setLclEnvErrCtxt (pop $ getLclEnvErrCtxt env) env) $
@@ -1834,11 +1831,18 @@ mkErrCtxt env ctxts
  where
    go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
    go _ _ _   [] = return []
-   go dbg n env ((is_landmark, ctxt) : ctxts)
+   go dbg n env (UserCodeCtxt (is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg) <- liftZonkM $ ctxt env
           ; let n' = if is_landmark then n else n+1
           ; rest <- go dbg n' env' ctxts
+          ; return (msg : rest) }
+     | otherwise
+     = go dbg n env ctxts
+   go dbg n env (GeneratedCodeCtxt co : ctxts)
+     | n < mAX_CONTEXTS -- Too verbose || dbg
+     = do { let msg = srcCodeOriginErrCtxMsg co
+          ; rest <- go dbg (n+1) env ctxts
           ; return (msg : rest) }
      | otherwise
      = go dbg n env ctxts

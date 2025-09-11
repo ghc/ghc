@@ -485,11 +485,11 @@ It stores the original statement (with location) and the expanded expression
 
 
 -- | Wrap a located expression with a `PopErrCtxt`
-mkPopErrCtxtExpr :: HsExpr GhcRn -> HsExpr GhcRn
-mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
+-- mkPopErrCtxtExpr :: HsExpr GhcRn -> HsExpr GhcRn
+-- mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
 
 genPopErrCtxtExpr :: LHsExpr GhcRn -> LHsExpr GhcRn
-genPopErrCtxtExpr (L loc a) = L loc (mkPopErrCtxtExpr a)
+genPopErrCtxtExpr x = x
 
 mkExpandedPatRn :: Pat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
 mkExpandedPatRn pat e = XExpr (ExpandedThingRn (OrigPat pat) e)
