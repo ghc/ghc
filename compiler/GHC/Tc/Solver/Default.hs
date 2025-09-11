@@ -543,10 +543,9 @@ defaultEquality ct
             -- This handles cases such as @IO alpha[tau] ~R# IO Int@
             -- by defaulting @alpha := Int@, which is useful in practice
             -- (see Note [Defaulting representational equalities]).
-           ; (co, new_eqs, _unifs) <-
-                wrapUnifierX (ctEvidence ct) Nominal $ \uenv ->
-                -- NB: nominal equality!
-                uType uenv z_ty1 z_ty2
+           ; (co, new_eqs) <- wrapUnifier (ctEvidence ct) Nominal $ \uenv ->
+                              -- NB: nominal equality!
+                              uType uenv z_ty1 z_ty2
 
             -- Only accept this solution if no new equalities are produced
             -- by the unifier.

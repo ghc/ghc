@@ -473,8 +473,8 @@ solveEqualityDict ev cls tys
     do { let (role, t1, t2) = matchEqualityInst cls tys
          -- Unify t1~t2, putting anything that can't be solved
          -- immediately into the work list
-       ; (co, _, _) <- wrapUnifierTcS ev role $ \uenv ->
-                       uType uenv t1 t2
+       ; co <- wrapUnifierAndEmit ev role $ \uenv ->
+               uType uenv t1 t2
          -- Set  d :: (t1~t2) = Eq# co
        ; setWantedEvTerm dest EvCanonical $
          evDictApp cls tys [Coercion co]
