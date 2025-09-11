@@ -401,7 +401,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_lcl_ctxt   = TcLclCtxt {
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
-                tcl_ctxt       = UserCodeCtxt [],
+                tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topLevel,
                 tcl_th_bndrs   = emptyNameEnv,
@@ -983,9 +983,7 @@ inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- See Note [Error contexts in generated code]
 setSrcSpan (RealSrcSpan loc _) thing_inside
-  = updLclCtxt (\env -> env { tcl_loc = loc
-                            , tcl_ctxt = UserCodeCtxt (lcl_err_ctxt $ tcl_ctxt env)})
-              thing_inside
+  = updLclCtxt (\env -> env { tcl_loc = loc }) thing_inside
 
 setSrcSpan (UnhelpfulSpan _) thing_inside
   = thing_inside

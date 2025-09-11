@@ -4,7 +4,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module GHC.Tc.Types.ErrCtxt
-  ( ErrCtxt, ErrCtxtMsg(..)
+  ( ErrCtxt (..), ErrCtxtMsg(..)
   , UserSigType(..), FunAppCtxtFunArg(..)
   , TyConInstFlavour(..)
   )
@@ -50,7 +50,8 @@ import qualified Data.List.NonEmpty as NE
 
 -- | Additional context to include in an error message, e.g.
 -- "In the type signature ...", "In the ambiguity check for ...", etc.
-type ErrCtxt = (Bool, TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg))
+data ErrCtxt = UserCodeCtxt (Bool, TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg))
+             | GeneratedCodeCtxt SrcCodeOrigin
         -- Monadic so that we have a chance
         -- to deal with bound type variables just before error
         -- message construction
