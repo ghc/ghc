@@ -81,15 +81,15 @@ expand_do_stmts flav [stmt@(L sloc (LastStmt _ body@(L body_loc _) _ ret_expr))]
 -- See `checkLastStmt` and `Syntax.Expr.StmtLR.LastStmt`
    | NoSyntaxExprRn <- ret_expr
    -- Last statement is just body if we are not in ListComp context. See Syntax.Expr.LastStmt
-   = return $ L sloc (mkExpandedStmt stmt flav (HsPar noExtField body))
+   = return body
 
    | SyntaxExprRn ret <- ret_expr  -- We have unfortunately lost the location on the return function :(
    --
    --    ------------------------------------------------
    --               return e  ~~> return e
    -- to make T18324 work
-   = do let expansion = L body_loc (genHsApp ret body)
-        return $ L sloc (mkExpandedStmt stmt flav (HsPar noExtField expansion))
+   = do let expansion = L sloc (genHsApp ret body)
+        return expansion
 
 expand_do_stmts doFlavour (stmt@(L loc (LetStmt _ bs)) : lstmts) =
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (3) below
@@ -489,7 +489,8 @@ mkPopErrCtxtExpr :: HsExpr GhcRn -> HsExpr GhcRn
 mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
 
 genPopErrCtxtExpr :: LHsExpr GhcRn -> LHsExpr GhcRn
-genPopErrCtxtExpr (L loc a) = L loc (mkPopErrCtxtExpr a)
+-- genPopErrCtxtExpr (L loc a) = L loc (mkPopErrCtxtExpr a)
+genPopErrCtxtExpr x = x
 
 mkExpandedPatRn :: Pat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
 mkExpandedPatRn pat e = XExpr (ExpandedThingRn (OrigPat pat) e)
