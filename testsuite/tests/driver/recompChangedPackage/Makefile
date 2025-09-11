@@ -17,7 +17,7 @@ recompChangedPackage:
 	(cd q; $(SETUP) register)
 
 	cp PLib1.hs PLib.hs
-	'$(TEST_HC)' -package-db tmp.d Main.hs
+	'$(TEST_HC)' $(EXTRA_HC_OPTS) -package-db tmp.d Main.hs
 	./Main
 
 	# Now add PLib to q.. Main should be recompiled
@@ -33,5 +33,5 @@ recompChangedPackage:
 	(cd q; $(SETUP) copy)
 	(cd q; $(SETUP) register)
 
-	'$(TEST_HC)' -package-db tmp.d Main.hs
+	'$(TEST_HC)' $(EXTRA_HC_OPTS) -package-db tmp.d Main.hs
 	./Main

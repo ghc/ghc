@@ -9,7 +9,7 @@ include $(TOP)/mk/test.mk
 ghcilink001 :
 	$(RM) -rf dir001
 	mkdir dir001
-	"$(TEST_HC)" -c f.c -o dir001/foo.o
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -c f.c -o dir001/foo.o
 	"$(AR)" cqs dir001/libfoo.a dir001/foo.o
 	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -Ldir001 -lfoo TestLink.hs
 
@@ -28,8 +28,8 @@ endif
 ghcilink002 :
 	$(RM) -rf dir002
 	mkdir dir002
-	"$(TEST_HC)" -c -dynamic f.c -o dir002/foo.o
-	"$(TEST_HC)" -no-auto-link-packages -shared -v0 -o dir002/$(call DLL,foo) dir002/foo.o
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -c -dynamic f.c -o dir002/foo.o
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -no-auto-link-packages -shared -v0 -o dir002/$(call DLL,foo) dir002/foo.o
 	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -Ldir002 -lfoo TestLink.hs
 
 # Test 3: ghci -package system-cxx-std-lib
@@ -64,7 +64,7 @@ ghcilink004 :
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF004)
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF004) register $(PKG004) -v0
 	#
-	"$(TEST_HC)" -c f.c -o dir004/foo.o
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -c f.c -o dir004/foo.o
 	"$(AR)" cqs dir004/libfoo.a dir004/foo.o
 	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -package-db $(LOCAL_PKGCONF004) -package test TestLink.hs
 
@@ -92,8 +92,8 @@ ghcilink005 :
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF005)
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF005) register $(PKG005) -v0
 	#
-	"$(TEST_HC)" -c -dynamic f.c -o dir005/foo.o
-	"$(TEST_HC)" -no-auto-link-packages -shared -o dir005/$(call DLL,foo) dir005/foo.o
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -c -dynamic f.c -o dir005/foo.o
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -no-auto-link-packages -shared -o dir005/$(call DLL,foo) dir005/foo.o
 	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -package-db $(LOCAL_PKGCONF005) -package test TestLink.hs
 
 # Test 6:
@@ -120,25 +120,25 @@ ghcilink006 :
 
 .PHONY: T3333
 T3333:
-	"$(TEST_HC)" -c T3333.c -o T3333.o
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -c T3333.c -o T3333.o
 	echo "weak_test 10" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) T3333.hs T3333.o
 
 .PHONY: T11531
 T11531:
-	"$(TEST_HC)" -dynamic -fPIC -c T11531.c -o T11531.o
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -dynamic -fPIC -c T11531.c -o T11531.o
 	- echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) T11531.o T11531.hs 2>&1 |  sed -e '/undefined symbol:/d' 1>&2
 
 .PHONY: T14708
 T14708:
 	$(RM) -rf T14708scratch
 	mkdir T14708scratch
-	"$(TEST_HC)" -c add.c -o T14708scratch/add.o
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -c add.c -o T14708scratch/add.o
 	"$(AR)" cqs T14708scratch/libadd.a T14708scratch/add.o
 	-"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -LT14708scratch -ladd T14708.hs
 
 .PHONY: T15729
 T15729:
-	"$(TEST_HC)" -fPIC -c T15729.c -o bss.o
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -fPIC -c T15729.c -o bss.o
 	echo "main" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) bss.o T15729.hs
 
 .PHONY: big-obj
@@ -148,5 +148,5 @@ big-obj:
 
 .PHONY: T25155
 T25155:
-	'$(TEST_HC)' T25155_iserv_main.c T25155_iserv.hs -package ghci -no-hs-main -v0 -o T25155_iserv
-	'$(TEST_HC)' -fexternal-interpreter -pgmi ./T25155_iserv -v0 T25155.hs
+	'$(TEST_HC)' $(EXTRA_HC_OPTS) T25155_iserv_main.c T25155_iserv.hs -package ghci -no-hs-main -v0 -o T25155_iserv
+	'$(TEST_HC)' $(EXTRA_HC_OPTS) -fexternal-interpreter -pgmi ./T25155_iserv -v0 T25155.hs

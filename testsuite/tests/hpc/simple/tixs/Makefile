@@ -8,7 +8,7 @@ include $(TOP)/mk/test.mk
 
 build-tix:
 	rm -Rf .hpc hpc001.o a.out
-	'$(TEST_HC)' -fhpc hpc001.hs
+	'$(TEST_HC)' $(EXTRA_HC_OPTS) -fhpc hpc001.hs
 	./a.out
 	mv a.out.tix hpc_sample.tix
 

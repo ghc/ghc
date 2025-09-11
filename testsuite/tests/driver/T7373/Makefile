@@ -5,8 +5,8 @@ include $(TOP)/mk/test.mk
 .PHONY: T7373
 T7373:
 	echo '[]' > package.conf
-	cd pkg && '$(TEST_HC)' -v0 --make Setup
-	cd pkg && ./Setup configure -v0 --with-compiler='$(TEST_HC)' --ghc-pkg-options="--global-package-db ../package.conf" --ghc-options="-package-db ../package.conf"
+	cd pkg && '$(TEST_HC)' $(EXTRA_HC_OPTS) -v0 --make Setup
+	cd pkg && ./Setup configure -v0 --with-compiler='$(TEST_HC)' --ghc-pkg-options="--global-package-db ../package.conf" --ghc-options="-package-db ../package.conf $(EXTRA_HC_OPTS)"
 	cd pkg && ./Setup build -v0
 	cd pkg && ./Setup register --inplace -v0
 	# Pretend that B.hs hasn't been compiled yet, by removing the results

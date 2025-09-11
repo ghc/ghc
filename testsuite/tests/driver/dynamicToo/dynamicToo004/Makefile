@@ -21,16 +21,16 @@ dynamicToo004:
 	$(MAKE) -s --no-print-directory clean
 
 	"$(GHC_PKG)" init $(LOCAL_PKGCONF)
-	"$(TEST_HC)" -v0 --make Setup.hs
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -v0 --make Setup.hs
 
 # First make the vanilla pkg1
-	cd pkg1 && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --enable-library-vanilla --disable-shared
+	cd pkg1 && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --ghc-options="$(EXTRA_HC_OPTS)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --enable-library-vanilla --disable-shared
 	cd pkg1 && ../Setup build
 	cd pkg1 && ../Setup register --inplace
 
 # Then the dynamic pkg1. This has different code in A.hs, so we get
 # a different hash.
-	cd pkg1dyn && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --disable-library-vanilla --enable-shared
+	cd pkg1dyn && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --ghc-options="$(EXTRA_HC_OPTS)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --disable-library-vanilla --enable-shared
 	cd pkg1dyn && ../Setup build
 
 # Now merge the dynamic outputs into the registered directory
@@ -39,13 +39,13 @@ dynamicToo004:
 	cp pkg1dyn/dist/build/libHSpkg1* pkg1/dist/build/
 
 # Next compile pkg2 both ways, which will use -dynamic-too
-	cd pkg2 && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --enable-library-vanilla --enable-shared
+	cd pkg2 && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --ghc-options="$(EXTRA_HC_OPTS)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --enable-library-vanilla --enable-shared
 	cd pkg2 && ../Setup build
 	cd pkg2 && ../Setup register --inplace
 
 # And then compile a program using the library both ways
-	"$(TEST_HC)" -package-db $(LOCAL_PKGCONF) --make prog -o progstatic
-	"$(TEST_HC)" -package-db $(LOCAL_PKGCONF) --make prog -o progdynamic -dynamic -osuf dyn_o -hisuf dyn_hi
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -package-db $(LOCAL_PKGCONF) --make prog -o progstatic
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) -package-db $(LOCAL_PKGCONF) --make prog -o progdynamic -dynamic -osuf dyn_o -hisuf dyn_hi
 
 # Both should run, giving their respective outputs
 	echo static

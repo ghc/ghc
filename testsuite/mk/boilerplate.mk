@@ -255,7 +255,7 @@ endif
 # This way we cache the results for different values of $(TEST_HC)
 
 $(TOP)/ghc-config/ghc-config : $(TOP)/ghc-config/ghc-config.hs
-	"$(TEST_HC)" --make -o $@ $<
+	"$(TEST_HC)" $(EXTRA_HC_OPTS) --make -o $@ $<
 
 empty=
 space=$(empty) $(empty)

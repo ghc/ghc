@@ -17,6 +17,7 @@ haddockTest=$(TOP)/../utils/haddock/haddock-test/src/Test/Haddock.hs \
 .PHONY: htmlTest
 htmlTest:
 	'$(TEST_HC)' \
+		$(EXTRA_HC_OPTS) \
 		-odir . \
 		-hidir . \
 		-package Cabal \
@@ -32,6 +33,7 @@ htmlTest:
 .PHONY: latexTest
 latexTest:
 	'$(TEST_HC)' \
+		$(EXTRA_HC_OPTS) \
 		-odir . \
 		-hidir . \
 		-package Cabal \
@@ -47,6 +49,7 @@ latexTest:
 .PHONY: hoogleTest
 hoogleTest:
 	'$(TEST_HC)' \
+		$(EXTRA_HC_OPTS)  \
 		-odir . \
 		-hidir . \
 		-package Cabal \
@@ -62,6 +65,7 @@ hoogleTest:
 .PHONY: hypsrcTest
 hypsrcTest:
 	'$(TEST_HC)' \
+		$(EXTRA_HC_OPTS)  \
 		-odir . \
 		-hidir . \
 		-package Cabal \

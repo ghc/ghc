@@ -6,15 +6,15 @@ LOCAL_PKGCONF=local.package.conf
 
 T19350:
 	echo "Building libhello..."
-	'$(TEST_HC)' -fPIC -c clib/lib.c -o clib/lib.o
-	'$(TEST_HC)' -shared -no-hs-main clib/lib.o -o clib/libhello$(dllext)
+	'$(TEST_HC)' $(EXTRA_HC_OPTS) -fPIC -c clib/lib.c -o clib/lib.o
+	'$(TEST_HC)' $(EXTRA_HC_OPTS) -shared -no-hs-main clib/lib.o -o clib/libhello$(dllext)
 	
 	rm -Rf $(LOCAL_PKGCONF)
 	"$(GHC_PKG)" init $(LOCAL_PKGCONF)
 	
 	echo "Building T19350-lib..."
-	cd lib && '$(TEST_HC)' -package Cabal Setup.hs
-	x="$$(pwd)//clib" && cd lib && ./Setup configure -v0 --extra-lib-dirs="$$x" --extra-lib-dirs="$$x-install" --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --disable-library-vanilla --enable-shared
+	cd lib && '$(TEST_HC)' $(EXTRA_HC_OPTS) -package Cabal Setup.hs
+	x="$$(pwd)//clib" && cd lib && ./Setup configure -v0 --extra-lib-dirs="$$x" --extra-lib-dirs="$$x-install" --with-compiler="$(TEST_HC)" --ghc-options="$(EXTRA_HC_OPTS) " --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --disable-library-vanilla --enable-shared
 	cd lib && ./Setup build
 	cd lib && ./Setup register --inplace
 	

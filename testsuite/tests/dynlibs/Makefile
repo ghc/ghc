@@ -59,7 +59,7 @@ T5373:
 
 .PHONY: T13702
 T13702:
-	'$(TEST_HC)' -v0 -dynamic -rdynamic -fPIC -pie T13702.hs
+	'$(TEST_HC)' $(EXTRA_HC_OPTS) -v0 -dynamic -rdynamic -fPIC -pie T13702.hs
 	./T13702
 
 .PHONY: T18072
