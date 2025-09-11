@@ -4,7 +4,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module GHC.Tc.Types.ErrCtxt
-  ( ErrCtxt, ErrCtxtMsg(..)
+  ( ErrCtxt (..), ErrCtxtMsg(..), srcCodeOriginErrCtxMsg
   , UserSigType(..), FunAppCtxtFunArg(..)
   , TyConInstFlavour(..)
   )
@@ -23,7 +23,7 @@ import GHC.Tc.Zonk.Monad     ( ZonkM )
 
 import GHC.Types.Basic       ( TyConFlavour )
 import GHC.Types.Name        ( Name )
-import GHC.Types.SrcLoc      ( SrcSpan )
+import GHC.Types.SrcLoc      ( SrcSpan, unLoc )
 import GHC.Types.Var         ( Id, TyCoVar )
 import GHC.Types.Var.Env     ( TidyEnv )
 
@@ -50,13 +50,18 @@ import qualified Data.List.NonEmpty as NE
 
 -- | Additional context to include in an error message, e.g.
 -- "In the type signature ...", "In the ambiguity check for ...", etc.
-type ErrCtxt = (Bool, TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg))
+data ErrCtxt = UserCodeCtxt (Bool, TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg))
         -- Monadic so that we have a chance
         -- to deal with bound type variables just before error
         -- message construction
 
         -- Bool:  True <=> this is a landmark context; do not
         --                 discard it when trimming for display
+             | GeneratedCodeCtxt SrcCodeOrigin
+             -- The payload is a SrcCodeOrigin because it is used to generate
+             -- 1. The CtOrigin for CtLoc, and
+             -- 2. ErrCtxtMsg in error messages
+
 
 --------------------------------------------------------------------------------
 -- Error message contexts
@@ -221,3 +226,9 @@ data ErrCtxtMsg
   | MergeSignaturesCtxt !UnitState !ModuleName ![InstantiatedModule]
   -- | While checking that a module implements a Backpack signature.
   | CheckImplementsCtxt !UnitState !Module !InstantiatedModule
+
+
+srcCodeOriginErrCtxMsg :: SrcCodeOrigin -> ErrCtxtMsg
+srcCodeOriginErrCtxMsg (OrigExpr e) = ExprCtxt e
+srcCodeOriginErrCtxMsg (OrigStmt s f) = StmtErrCtxt (HsDoStmt f) (unLoc s)
+srcCodeOriginErrCtxMsg (OrigPat  p) = PatCtxt p
