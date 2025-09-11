@@ -52,6 +52,7 @@ import GHC.Tc.Gen.Bind
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt ( srcCodeOriginErrCtxMsg )
 import GHC.Tc.Types.Evidence
 import GHC.Rename.Env ( irrefutableConLikeTc )
 
@@ -325,6 +326,7 @@ tcMatch tc_body pat_tys rhs_ty match
         add_match_ctxt thing_inside = case ctxt of
             LamAlt LamSingle -> thing_inside
             StmtCtxt (HsDoStmt{}) -> thing_inside -- this is an expanded do stmt
+            RecUpd -> thing_inside -- record update is Expanded out so ignore it
             _          -> addErrCtxt (MatchInCtxt match) thing_inside
 
 -------------
@@ -399,9 +401,9 @@ tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
                   ; return (HsDo res_ty doExpr (L l stmts')) }
           else do { expanded_expr <- expandDoStmts doExpr stmts -- Do expansion on the fly
                   ; let orig = HsDo noExtField doExpr ss
-                  ; setInGeneratedCode (OrigExpr orig) $ do
-                      { e' <- tcMonoLExpr expanded_expr res_ty
-                      ; return (mkExpandedExprTc orig (unLoc e'))}
+                  ; addExpansionErrCtxt (OrigExpr orig) (srcCodeOriginErrCtxMsg (OrigExpr orig)) $
+                    do { e' <- tcMonoLExpr expanded_expr res_ty
+                       ; return (mkExpandedExprTc orig (unLoc e'))}
                   }
         }
 

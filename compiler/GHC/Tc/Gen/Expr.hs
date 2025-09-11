@@ -119,8 +119,7 @@ tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
                            -> TcM (LHsExpr GhcTc)
 
 tcPolyLExpr (L loc expr) res_ty
-  = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
@@ -247,8 +246,7 @@ tcInferExprNC = tc_infer_expr_NC IFRR_Any
 
 tc_infer_expr, tc_infer_expr_NC :: InferFRRFlag -> InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
 tc_infer_expr ifrr iif (L loc expr)
-  = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
     do { (expr', rho) <- runInfer iif ifrr (tcExpr expr)
        ; return (L loc expr', rho) }
 
@@ -274,8 +272,7 @@ tcMonoLExpr, tcMonoLExprNC
     -> TcM (LHsExpr GhcTc)
 
 tcMonoLExpr (L loc expr) res_ty
-  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 
@@ -671,10 +668,10 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
        res_ty
   = assert (notNull rbnds) $
     do  { -- Expand the record update. See Note [Record Updates].
+
         ; (ds_expr, ds_res_ty, err_msg)
             <- expandRecordUpd record_expr possible_parents rbnds res_ty
-        ; addErrCtxt err_msg $
-          setInGeneratedCode (OrigExpr expr) $
+        ; addExpansionErrCtxt (OrigExpr expr) err_msg $
           do { -- Typecheck the expanded expression.
                expr' <- tcExpr ds_expr (Check ds_res_ty)
                -- NB: it's important to use ds_res_ty and not res_ty here.
@@ -729,7 +726,7 @@ tcExpr (HsProjection _ _) _ = panic "GHC.Tc.Gen.Expr: tcExpr: HsProjection: Not 
 -- Here we get rid of it and add the finalizers to the global environment.
 -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
 tcExpr (HsTypedSplice ext splice)   res_ty = tcTypedSplice ext splice res_ty
-tcExpr e@(HsTypedBracket _ext body)    res_ty = tcTypedBracket e body res_ty
+tcExpr e@(HsTypedBracket _ext body) res_ty = tcTypedBracket e body res_ty
 
 tcExpr e@(HsUntypedBracket ps body) res_ty = tcUntypedBracket e body ps res_ty
 tcExpr (HsUntypedSplice splice _)   res_ty
@@ -764,18 +761,9 @@ tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 -}
 
 tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-
-tcXExpr (PopErrCtxt e) res_ty
-  = do popErrCtxt $ -- See Part 3 of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-         addExprCtxt e $
-         tcExpr e res_ty
-
 tcXExpr (ExpandedThingRn o e) res_ty
-   = setInGeneratedCode o $
-     -- e is the expanded expression of o, so we need to set the error ctxt to generated
-     -- see Note [Error Context Stack] in `GHC.Tc.Type.LclEnv`
-        mkExpandedTc o <$> -- necessary for hpc ticks
-          tcExpr e res_ty
+   = mkExpandedTc o <$> -- necessary for hpc ticks
+         tcExpr e res_ty
 
 -- For record selection, same as HsVar case
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
@@ -1491,7 +1479,7 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
              ds_expr = HsLet noExtField let_binds (wrapGenSpan case_expr)
 
              case_expr :: HsExpr GhcRn
-             case_expr = HsCase RecUpd record_expr
+             case_expr = HsCase RecUpd (wrapGenSpan (unLoc record_expr))
                        $ mkMatchGroup (Generated OtherExpansion DoPmc) (wrapGenSpan matches)
              matches :: [LMatch GhcRn (LHsExpr GhcRn)]
              matches = map make_pat (NE.toList relevant_cons)
@@ -1514,7 +1502,6 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
                  , text "ds_res_ty:" <+> ppr ds_res_ty
                  , text "ds_expr:" <+> ppr ds_expr
                  ]
-
         ; return (ds_expr, ds_res_ty, RecordUpdCtxt relevant_cons upd_fld_names ex_tvs) }
 
 

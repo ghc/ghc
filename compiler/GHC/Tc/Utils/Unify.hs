@@ -863,9 +863,9 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
                                    , ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
         do { let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
-           ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos) arg_ty
+           ; (arg_co, arg_ty_frr) <- hasFixedRuntimeRep (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos) arg_ty
            ; let scaled_arg_ty_frr = Scaled mult arg_ty_frr
-           ; (wrap_res, result) <- check (n_req - 1)
+           ; (res_wrap, result) <- check (n_req - 1)
                                          (mkCheckExpFunPatTy scaled_arg_ty_frr : rev_pat_tys)
                                          res_ty
 
