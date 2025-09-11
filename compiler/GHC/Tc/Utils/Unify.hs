@@ -30,13 +30,14 @@ module GHC.Tc.Utils.Unify (
   dsInstantiate,
 
   -- Various unifications
-  unifyType, unifyKind, unifyInvisibleType,
+  uType, unifyType, unifyKind, unifyInvisibleType,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
   swapOverTyVars, touchabilityTest, checkTopShape, lhsPriority,
-  UnifyEnv(..), updUEnvLoc, setUEnvRole,
-  uType,
   mightEqualLater,
   makeTypeConcrete,
+
+  UnifyEnv(..), updUEnvLoc, setUEnvRole,
+  WhatUnifications(..), recordUnification, recordUnificationLevel,
 
   --------------------------------
   -- Holes
@@ -2296,14 +2297,74 @@ unifyTypeAndEmit t_or_k orig ty1 ty2
        ; let env = UE { u_loc = loc, u_role = Nominal
                       , u_given_eq_lvl = cur_lvl
                       , u_rewriters = emptyRewriterSet  -- ToDo: check this
-                      , u_defer = ref, u_unified = Nothing }
+                      , u_defer = ref, u_what = Nothing }
 
        -- The hard work happens here
        ; co <- uType env ty1 ty2
 
+       -- Emit any deferred constraints
        ; cts <- readTcRef ref
-       ; unless (null cts) (emitSimples cts)
+       ; emitSimples cts
+
        ; return co }
+
+
+{- *********************************************************************
+*                                                                      *
+                 WhatUnifications
+*                                                                      *
+**********************************************************************-}
+
+data WhatUnifications
+  = NoUnificationsYet
+  | UnificationsDone TcLevel
+
+{- Note [WhatUnifications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We record, in mutable variable carried by the monad, the `WhatUnifications` flag.
+
+* In the eager unifier (this module) it is held the
+    u_what :: Maybe (TcRef WhatUnificatons)
+  field of `UnifyEnv`
+
+* In TcS monad, it is held in the
+    tcs_unif_lvl :: IORef WhatUnifications
+  field of `TcSEnv`.
+
+In all cases the idea is this:
+
+    ---------------------------------------
+    `WhatUnifications` records the level of the
+     outermost meta-tyvar that we have unified
+    ----------------------------------------
+
+It starts life as `NoUnificationsYet`.  Then when we unify a tyvar at level j,
+we set the flag to `UnificationsDone j`, unless the flag is /already/ set to
+`UnificationsDone i` where i<=j.
+
+Why do all this?
+ * See Note [When to iterate the solver: unifications] in GHC.Tc.Solver.Solve
+-}
+
+recordUnification :: TcRef WhatUnifications -> TcTyVar -> TcM ()
+recordUnification what_ref tv = recordUnificationLevel what_ref (tcTyVarLevel tv)
+
+recordUnificationLevel :: TcRef WhatUnifications -> TcLevel -> TcM ()
+recordUnificationLevel what_ref tv_lvl
+  = do { what <- readTcRef what_ref
+       ; case what of
+           UnificationsDone unif_lvl
+             | tv_lvl `deeperThanOrSame` unif_lvl
+             -> do { traceTc "set-uni-flag: no-op" $
+                     vcat [ text "lvl" <+> ppr tv_lvl, text "unif_lvl" <+> ppr unif_lvl ]
+                   ; return () }
+           _ -> do { traceTc "set-uni-flag" (ppr tv_lvl)
+                   ; writeTcRef what_ref (UnificationsDone tv_lvl) } }
+
+
+instance Outputable WhatUnifications where
+   ppr NoUnificationsYet      = text "NoUniYet"
+   ppr (UnificationsDone lvl) = text "UniDone" <> braces (ppr lvl)
 
 {-
 %************************************************************************
@@ -2320,7 +2381,7 @@ The eager unifier, `uType`, is called by
     via the wrappers `unifyType`, `unifyKind` etc
 
   * The constraint solver (e.g. in GHC.Tc.Solver.Equality),
-    via `GHC.Tc.Solver.Monad.wrapUnifierTcS`.
+    via `GHC.Tc.Solver.Monad.wrapUnifie`.
 
 `uType` runs in the TcM monad, but it carries a UnifyEnv that tells it
 what to do when unifying a variable or deferring a constraint. Specifically,
@@ -2355,7 +2416,7 @@ data UnifyEnv
 
          -- Which variables are unified;
          -- if Nothing, we don't care
-       , u_unified :: Maybe (TcRef [TcTyVar])
+       , u_what :: Maybe (TcRef WhatUnifications)
     }
 
 setUEnvRole :: UnifyEnv -> Role -> UnifyEnv
@@ -2752,10 +2813,7 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref, u_given_eq_lvl = given_eq_lvl })
            -- Only proceed if the kinds match
            -- NB: tv1 should still be unfilled, despite the kind unification
            --     because tv1 is not free in ty2' (or, hence, in its kind)
-         then do { liftZonkM $ writeMetaTyVar tv1 ty2
-                 ; case u_unified env of
-                     Nothing -> return ()
-                     Just uref -> updTcRef uref (tv1 :)
+         then do { unifyTyVar env tv1 ty2
                  ; return (mkNomReflCo ty2) }  -- Unification is always Nominal
 
          else -- The kinds don't match yet, so defer instead.
@@ -2769,6 +2827,14 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref, u_given_eq_lvl = given_eq_lvl })
   where
     ty1 = mkTyVarTy tv1
     defer = unSwap swapped (uType_defer env) ty1 ty2
+
+unifyTyVar :: UnifyEnv -> TcTyVar -> TcType -> TcM ()
+-- Actually do the unification, and record it in WhatUnifications
+unifyTyVar (UE { u_what = mb_what_unifications }) tv ty
+  = do { liftZonkM $ writeMetaTyVar tv ty
+       ; case mb_what_unifications of
+           Nothing -> return ()
+           Just wu -> recordUnification wu tv }
 
 swapOverTyVars :: Bool -> TcTyVar -> TcTyVar -> Bool
 swapOverTyVars is_given tv1 tv2
@@ -3011,8 +3077,14 @@ The most important thing is that we want to put tyvars with
 the deepest level on the left.  The reason to do so differs for
 Wanteds and Givens, but either way, deepest wins!  Simple.
 
-* Wanteds.  Putting the deepest variable on the left maximise the
+* Wanteds.  Putting the deepest variable on the left maximises the
   chances that it's a touchable meta-tyvar which can be solved.
+  It also /crucial/ for skolem escape.  Consider
+      [W] alpha[7] ~ beta[8]
+      [W] beta[8] ~ a[8]       -- `a` is a skolem
+  If we unify alpha[7]:=beta[8], we will then happily unify
+  beta[8]:=a[8].  But that's wrong because now alpha[7]
+  is unified with an inner skolem a[8].  Disaster.
 
 * Givens. Suppose we have something like
      forall a[2]. b[1] ~ a[2] => beta[1] ~ a[2]

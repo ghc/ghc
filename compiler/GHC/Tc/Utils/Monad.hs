@@ -1911,6 +1911,9 @@ emitSimple ct
 
 emitSimples :: Cts -> TcM ()
 emitSimples cts
+  | null cts
+  = return ()
+  | otherwise
   = do { lie_var <- getConstraintVar ;
          updTcRef lie_var (`addSimples` cts) }
 

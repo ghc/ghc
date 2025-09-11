@@ -94,7 +94,7 @@ an equality for the RHS.
 
 Wrinkles:
 
-(1) meta_tvs: sometimes the instance mentions variables in the RHS that
+(IMP1) fd_qtvs: sometimes the instance mentions variables in the RHS that
     are not bound in the LHS.  For example
 
      class C a b | a -> b
@@ -109,7 +109,7 @@ Wrinkles:
     Note that the fd_qtvs can be free in the /first/ component of the Pair,
     but not in the second (which comes from the [W] constraint).
 
-(2) Multi-range fundeps. When these meta_tvs are involved, there is a subtle
+(IMP2) Multi-range fundeps. When these meta_tvs are involved, there is a subtle
     difference between the fundep (a -> b c) and the two fundeps (a->b, a->c).
     Consider
        class D a b c | a -> b c
@@ -125,15 +125,15 @@ Wrinkles:
        FDEqn { fd_qtvs = [x2], fd_eqs = [ Maybe x2 ~ ty ] }
     with two FDEqns, generating two separate unification variables.
 
-(3) improveFromInstEnv doesn't return any equations that already hold.
-    Reason: then we know if any actual improvement has happened, in
-    which case we need to iterate the solver
+(IMP3) improveFromInstEnv doesn't return any equations that already hold.
+    Reason: just an optimisation; the caller does the same thing, but
+    with a bit more ceremony.
 -}
 
 data FunDepEqn
   = FDEqn { fd_qtvs :: [TyVar]   -- Instantiate these type and kind vars
                                  --   to fresh unification vars,
-                                 -- Non-empty only for FunDepEqns arising from instance decls
+                                 -- See (IMP2) in Note [Improving against instances]
 
           , fd_eqs   :: [TypeEqn]  -- Make these pairs of types equal
                                    -- Invariant: In each (Pair ty1 ty2), the fd_qtvs may be
@@ -193,7 +193,8 @@ zipAndComputeFDEqs :: (Type -> Type -> Bool) -- Discard this FDEq if true
 -- Create a list of (Type,Type) pairs from two lists of types,
 -- making sure that the types are not already equal
 zipAndComputeFDEqs discard (ty1:tys1) (ty2:tys2)
- | discard ty1 ty2 = zipAndComputeFDEqs discard tys1 tys2
+ | discard ty1 ty2 = -- See (IMP3) in Note [Improving against instances]
+                     zipAndComputeFDEqs discard tys1 tys2
  | otherwise       = Pair ty1 ty2 : zipAndComputeFDEqs discard tys1 tys2
 zipAndComputeFDEqs _ _ _ = []
 
