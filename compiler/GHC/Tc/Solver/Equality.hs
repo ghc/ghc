@@ -985,7 +985,7 @@ This Note covers the topic for
   * Data families
 For the rest:
   * Type synonyms: are always expanded
-  * Type families: see Note [Decomposing type family applications]
+  * Type families: not decomposed
   * AppTy:         see Note [Decomposing AppTy equalities].
 
 ---- Roles of the decomposed constraints ----
@@ -1100,30 +1100,6 @@ up in the complexities of canEqLHSHetero.  To do this:
 This is not a very big deal.  It reduces the number of solver steps
 in the test RaeJobTalk from 1830 to 1815, a 1% reduction.  But still,
 it doesn't cost anything either.
-
-Note [Decomposing type family applications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Supose we have
-   [G/W]  (F ty1) ~r  (F ty2)
-This is handled by the TyFamLHS/TyFamLHS case of canEqCanLHS2.
-
-We never decompose to
-   [G/W]  ty1 ~r' ty2
-
-Instead
-
-* For Givens we do nothing. Injective type families have no corresponding
-  evidence of their injectivity, so we cannot decompose an
-  injective-type-family Given.
-
-* For Wanteds, for the Nominal role only, we emit new Wanteds rather like
-  functional dependencies, for each injective argument position.
-
-  E.g type family F a b   -- injective in first arg, but not second
-      [W] (F s1 t1) ~N (F s2 t2)
-  Emit new Wanteds
-      [W] s1 ~N s2
-  But retain the existing, unsolved constraint.
 
 Note [Decomposing newtype equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1804,7 +1780,7 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 
   | TyFamLHS _fun_tc1 fun_args1 <- lhs1
   , TyFamLHS _fun_tc2 fun_args2 <- lhs2
-  -- See Note [Decomposing type family applications]
+  -- Don't decompose, but maybe re-orient
   = do { traceTcS "canEqCanLHS2 two type families" (ppr lhs1 $$ ppr lhs2)
        ; tclvl <- getTcLevel
        ; let tvs1 = tyCoVarsOfTypes fun_args1
@@ -2895,7 +2871,7 @@ by unification, there are two cases to consider
      level n.
 
   2. Set the Unification Level Flag to record that a level-n unification has
-     taken place. See Note [The Unification Level Flag] in GHC.Tc.Solver.Monad
+     taken place. See Note [WhatUnifications] in GHC.Tc.Utils.Unify
 
 NB: TouchableSameLevel is just an optimisation for TouchableOuterLevel. Promotion
 would be a no-op, and setting the unification flag unnecessarily would just

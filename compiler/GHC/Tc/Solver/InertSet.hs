@@ -1809,7 +1809,7 @@ new equality, to maintain the inert-set invariants.
 NB: we could in principle avoid kick-out:
   a) When unifying a meta-tyvar from an outer level, because
      then the entire implication will be iterated; see
-     Note [The Unification Level Flag] in GHC.Tc.Solver.Monad.
+     Note [When to iterate the solver: unifications] in GHC.Tc.Solver.Solve
 
   b) For Givens, after a unification.  By (GivenInv) in GHC.Tc.Utils.TcType
      Note [TcLevel invariants], a Given can't include a meta-tyvar from

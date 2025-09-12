@@ -132,7 +132,7 @@ simplify_loop n limit definitely_redo_implications
                         ; return (wc { wc_simple = simples1
                                      , wc_impl   = implics1 }) }
 
-       -- See Note [When to iterate: unifications]
+       -- See Note [When to iterate the solver: unifications]
        ; unif_happened <- getUnificationFlag
        ; csTraceTcS $ text "unif_happened" <+> ppr unif_happened
 
