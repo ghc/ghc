@@ -1,7 +1,3 @@
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-:l
-
 :shell cp Defer03_before.hs Defer03.hs
 
 -- Test :load! and :reload!
