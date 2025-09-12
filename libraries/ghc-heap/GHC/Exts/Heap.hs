@@ -67,10 +67,26 @@ import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Constants
 import GHC.Exts.Heap.ProfInfo.Types
 #if defined(PROFILING)
+import GHC.Exts.Heap.InfoTable () -- See Note [No way-dependent imports]
 import GHC.Exts.Heap.InfoTableProf
 #else
 import GHC.Exts.Heap.InfoTable
+import GHC.Exts.Heap.InfoTableProf () -- See Note [No way-dependent imports]
+
+{-
+Note [No way-dependent imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`ghc -M` currently assumes that the imports for a module are the same
+in every way.  This is arguably a bug, but breaking this assumption by
+importing different things in different ways can cause trouble.  For
+example, this module in the profiling way imports and uses
+GHC.Exts.Heap.InfoTableProf.  When it was not also imported in the
+vanilla way, there were intermittent build failures due to this module
+being compiled in the profiling way before GHC.Exts.Heap.InfoTableProf
+in the profiling way. (#15197)
+-}
 #endif
+
 import GHC.Exts.Heap.Utils
 import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 import qualified GHC.Exts.Heap.ProfInfo.PeekProfInfo as PPI
