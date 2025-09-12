@@ -890,7 +890,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
      * other tasks are waiting for work, we must have a deadlock of
      * some description.
      */
-    if ( emptyRunQueue(cap) && !anyPendingTimeoutsOrIO(cap->iomgr) )
+    if (emptyRunQueue(cap))
     {
 #if defined(THREADED_RTS)
         /*
