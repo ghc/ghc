@@ -510,7 +510,7 @@ gen_wrappers (Info _ entries)
         want_wrapper :: Entry -> Bool
         want_wrapper entry =
           and
-            [ is_primop entry
+            [ (is_primop entry || is_seq_pseudoop entry)
             , not $ name entry `elem` magical_primops
             , not $ is_vector entry
                 -- We currently don't generate wrappers for vector primops.
@@ -519,6 +519,12 @@ gen_wrappers (Info _ entries)
                 -- were LLVM only; but now that this is no longer the case I
                 -- suppose this choice can be revisited?
             ]
+
+        -- We also want a wrapper for the `seq` pseudoop, since GHCi
+        -- expects to find a value binding in PrimopWrappers.
+        is_seq_pseudoop :: Entry -> Bool
+        is_seq_pseudoop (PseudoOpSpec { name = n }) = n == "seq"
+        is_seq_pseudoop _ = False
 
         magical_primops :: [String]
         magical_primops =

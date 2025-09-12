@@ -3571,6 +3571,7 @@ module GHC.PrimopWrappers where
   remWord8# :: GHC.Internal.Prim.Word8# -> GHC.Internal.Prim.Word8# -> GHC.Internal.Prim.Word8#
   resizeMutableByteArray# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.MutableByteArray# s #)
   retry# :: forall a_levpoly. GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, a_levpoly #)
+  seq :: forall a b_reppoly. a -> b_reppoly -> b_reppoly
   setAddrRange# :: GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
   setByteArray# :: forall s. GHC.Internal.Prim.MutableByteArray# s -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
   setOtherThreadAllocationCounter# :: GHC.Internal.Prim.Int64# -> GHC.Internal.Prim.ThreadId# -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
