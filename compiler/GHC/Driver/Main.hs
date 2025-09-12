@@ -120,6 +120,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Messager
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
+import GHC.Driver.Config
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
 import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
@@ -180,6 +181,7 @@ import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
 import GHC.Core.Opt.Pipeline
 import GHC.Core.Opt.Pipeline.Types      ( CoreToDo (..))
+import GHC.Core.SimpleOpt
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
@@ -252,6 +254,7 @@ import GHC.Types.TyThing
 import GHC.Types.Unique.Supply ( uniqFromTag, UniqueTag(BcoTag) )
 import GHC.Types.Unique.Set
 
+import GHC.Utils.Exception
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
 import GHC.Utils.Error
@@ -2772,17 +2775,44 @@ hscCompileCoreExpr hsc_env loc expr =
       Just h  -> h                   hsc_env loc expr
 
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [Linkable], PkgsLoaded)
-hscCompileCoreExpr' hsc_env srcspan ds_expr = do
-  {- Simplify it -}
-  -- Question: should we call SimpleOpt.simpleOptExpr here instead?
-  -- It is, well, simpler, and does less inlining etc.
-  let dflags = hsc_dflags hsc_env
+hscCompileCoreExpr' hsc_env' srcspan ds_expr = do
+  -- Use modified `dflags` and session that sets -O0 and do less work
+  -- throughout the Core -> ByteCode pipeline, even if current session
+  -- enables `-O1` or above. Unless user manually specified
+  -- `-fno-unoptimized-core-for-interpreter`.
+  let dflags' = hsc_dflags hsc_env'
+      unopt = gopt Opt_UnoptimizedCoreForInterpreter dflags'
+      dflags
+        | unopt = updOptLevel 0 dflags'
+        | otherwise = dflags'
+      hsc_env
+        | unopt = hsc_env' {hsc_dflags = dflags}
+        | otherwise = hsc_env'
   let logger = hsc_logger hsc_env
-  let ic = hsc_IC hsc_env
-  let unit_env = hsc_unit_env hsc_env
-  let simplify_expr_opts = initSimplifyExprOpts dflags ic
 
-  simpl_expr <- simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
+  {- Simplify it -}
+  simpl_expr <-
+    if unopt
+      then
+        evaluate $
+          -- When generating bytecode for ghci via `hscParsedStmt`, we
+          -- still need to enable inlining! For `let foo = Foo ...`, the
+          -- ghci debugger expects `:print foo` to show `foo = <Foo> ...`
+          -- without forcing `foo` first, without inlining `foo`
+          -- would remain a top-level thunk instead of a datacon
+          -- closure. We can skip inlining for TH splices though.
+          ( if srcspan == interactiveSrcSpan
+              then simpleOptExpr
+              else simpleOptExprNoInline
+          )
+            (initSimpleOpts dflags)
+            ds_expr
+      else
+        simplifyExpr
+          logger
+          (ue_eps $ hsc_unit_env hsc_env)
+          (initSimplifyExprOpts dflags $ hsc_IC hsc_env)
+          ds_expr
 
   -- Create a unique temporary binding
   --
