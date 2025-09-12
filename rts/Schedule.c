@@ -146,7 +146,6 @@ static void acquireAllCapabilities(Capability *cap, Task *task);
 static void startWorkerTasks (uint32_t from USED_IF_THREADS,
                               uint32_t to USED_IF_THREADS);
 #endif
-static void scheduleCheckBlockedThreads (Capability *cap);
 static void scheduleProcessInbox(Capability **cap);
 static void scheduleDetectDeadlock (Capability **pcap, Task *task);
 static void schedulePushWork(Capability *cap, Task *task);
@@ -301,9 +300,19 @@ schedule (Capability *initialCapability, Task *task)
 
     scheduleDetectDeadlock(&cap,task);
 
+#if !defined(THREADED_RTS)
+    /* scheduleFindWork checks for completed I/O but does not block. If there
+     * is nothing to do now, we block and wait for I/O, timeouts or signals.
+     * Importantly, we only block /after/ checking for deadlocks. See #26408.
+     */
+    if (emptyRunQueue(cap) && anyPendingTimeoutsOrIO(cap->iomgr)) {
+        awaitCompletedTimeoutsOrIO(cap->iomgr);
+    }
+#endif
+
     // Normally, the only way we can get here with no threads to
     // run is if a keyboard interrupt received during
-    // scheduleCheckBlockedThreads() or scheduleDetectDeadlock().
+    // scheduleFindWork() or scheduleDetectDeadlock().
     // Additionally, it is not fatal for the
     // threaded RTS to reach here with no threads to run.
     //
@@ -599,6 +608,8 @@ run_thread:
  * scheduleFindWork()
  *
  * Search for work to do, and handle messages from elsewhere.
+ *
+ * This does *not* block/wait, even in the non-threaded case.
  * -------------------------------------------------------------------------- */
 
 static void
@@ -609,10 +620,17 @@ scheduleFindWork (Capability **pcap)
 #endif
     scheduleProcessInbox(pcap);
 
-    scheduleCheckBlockedThreads(*pcap);
+    /* From here on, the cap can't change. */
+    Capability *cap = *pcap;
+
+#if !defined(THREADED_RTS)
+    if (anyPendingTimeoutsOrIO(cap->iomgr)) {
+        pollCompletedTimeoutsOrIO(cap->iomgr);
+    }
+#endif
 
 #if defined(THREADED_RTS)
-    if (emptyRunQueue(*pcap)) { scheduleActivateSpark(*pcap); }
+    if (emptyRunQueue(cap)) { scheduleActivateSpark(cap); }
 #endif
 }
 
@@ -855,53 +873,6 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 
 #endif /* THREADED_RTS */
 
-}
-
-/* ----------------------------------------------------------------------------
- * Check for blocked threads that can be woken up.
- * ------------------------------------------------------------------------- */
-
-static void
-scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
-{
-#if !defined(THREADED_RTS)
-    /* Check whether there is any completed I/O or expired timers. If so,
-     * process the competions as appropriate, which will typically cause some
-     * waiting threads to be woken up.
-     *
-     * If the run queue is empty, and there are no other threads running, we
-     * can wait indefinitely for something to happen.
-     *
-     * TODO: see if we can rationalise these two awaitCompletedTimeoutsOrIO
-     * calls before and after scheduleDetectDeadlock()
-     *
-     * TODO: this test anyPendingTimeoutsOrIO does not have a proper
-     * implementation the WinIO I/O manager!
-     *
-     * The select() I/O manager uses the sleeping_queue and the blocked_queue,
-     * and the test checks both. The legacy win32 I/O manager only consults
-     * the blocked_queue, but then it puts threads waiting on delay# on the
-     * blocked_queue too, so that's ok.
-     *
-     * The WinIO I/O manager does not use either the sleeping_queue or the
-     * blocked_queue, but it's implementation of anyPendingTimeoutsOrIO still
-     * checks both! Since both queues will _always_ be empty then it will
-     * _always_ return false and so awaitCompletedTimeoutsOrIO will _never_ be
-     * called here for WinIO. This may explain why there is a second call to
-     * awaitCompletedTimeoutsOrIO below for the case of !defined(THREADED_RTS)
-     * && defined(mingw32_HOST_OS).
-     */
-    if (anyPendingTimeoutsOrIO(cap->iomgr))
-    {
-        if (emptyRunQueue(cap)) {
-            // block and wait
-            awaitCompletedTimeoutsOrIO(cap->iomgr);
-        } else {
-            // poll but do not wait
-            pollCompletedTimeoutsOrIO(cap->iomgr);
-        }
-    }
-#endif
 }
 
 /* ----------------------------------------------------------------------------
