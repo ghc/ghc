@@ -163,3 +163,11 @@ census_pinned:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -rtsopts -v0 census_pinned.hs -o census_pinned
 	./census_pinned +RTS -hT -i0 -RTS
 	grep -m1 '^ARR_WORDS' census_pinned.hp
+
+.PHONY: T26408c
+T26408c:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -rtsopts T26408c.hs; \
+	./T26408c +RTS -I0 -T & \
+	sleep 1; \
+	kill -s USR1 $$!; \
+	wait $$!
