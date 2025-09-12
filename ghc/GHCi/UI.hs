@@ -243,6 +243,7 @@ ghciCommands = map mkCmd [
   ("reload!",   keepGoing' reloadModuleDefer,   noCompletion),
   ("run",       keepGoing' runRun,              completeFilename),
   ("script",    keepGoing' scriptCmd,           completeFilename),
+  ("shell",     shellCmd,                       noCompletion),
   ("set",       keepGoing setCmd,               completeSetOptions),
   ("seti",      keepGoing setiCmd,              completeSeti),
   ("show",      keepGoing' showCmd,             completeShowOptions),
@@ -372,6 +373,7 @@ defFullHelpText =
   "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
   "   ::<cmd>                     run the builtin command\n" ++
   "   :!<command>                 run the shell command <command>\n" ++
+  "   :shell <command>            run shell via sh -c <command>\n" ++
   "\n" ++
   " -- Commands for debugging:\n" ++
   "\n" ++
@@ -1670,6 +1672,20 @@ shellEscape str = liftIO $ do
   case exitCode of
     ExitSuccess -> return CmdSuccess
     ExitFailure _ -> return CmdFailure
+
+-- | Like :! but explicitly uses sh -c via callProcess.
+-- This ensures on Windows we invoke the msys2 POSIX shell rather than cmd.exe.
+shellCmd :: String -> InputT GHCi CmdExecOutcome
+shellCmd str = lift $ shellViaPosixSh (dropWhile isSpace str)
+
+shellViaPosixSh :: MonadIO m => String -> m CmdExecOutcome
+shellViaPosixSh cmd = liftIO $ do
+  -- We intentionally use callProcess to avoid going through the platform shell.
+  -- On Windows, "sh" resolves to msys2's sh, matching the desired behavior.
+  r <- MC.try (callProcess "sh" ["-c", cmd])
+  case (r :: Either SomeException ()) of
+    Right () -> return CmdSuccess
+    Left  _  -> return CmdFailure
 
 lookupCommand :: GhciMonad m => String -> m (MaybeCommand)
 lookupCommand "" = do
@@ -4970,4 +4986,3 @@ clearCaches = discardActiveBreakPoints
               >> discardInterfaceCache
               >> disableUnusedPackages
               >> clearHPTs
-
