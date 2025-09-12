@@ -701,6 +701,39 @@ test('T22859',
       omit_ways(llvm_ways + ['nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run, ['-with-rtsopts -A8K'])
 
+# Deadlock detection tests
+# A: check we can detect a partial deadlock that is not a system deadlock
+test('T26408a', [exit_code(1), run_timeout_multiplier(0.1)], compile_and_run, [''])
+# B: check we can detect system deadlock with idle GC turned off (+RTS -I0)
+test('T26408b', [omit_ways(threaded_ways),
+                 extra_run_opts('+RTS -I0 -RTS'),
+                 exit_code(1), run_timeout_multiplier(0.1)],
+                compile_and_run, ['-rtsopts'])
+# C: check we do not falsely detect deadlock when blocked only on signals
+# Skip for win32, wasm and js since this test requires posix signals
+test('T26408c', [when(opsys('mingw32'), skip),
+                 when(arch('wasm32'), skip), js_skip,
+                 run_timeout_multiplier(0.1)],
+                makefile_test, ['T26408c'])
+# D: test manual performDeadlockDetection
+test('T26408d', [extra_run_opts('+RTS -I0 -RTS'),
+                 exit_code(1), run_timeout_multiplier(0.1)],
+                compile_and_run, ['-rtsopts'])
+# E: check we do detect deadlock with idle GC off and a long pause
+test('T26408e', [omit_ways(threaded_ways), js_skip,
+                 extra_run_opts('+RTS -I0 -RTS'),
+                 exit_code(1), run_timeout_multiplier(0.1)],
+                compile_and_run, ['-rtsopts'])
+# F: same as E but with manually performed major GC
+test('T26408f', [omit_ways(threaded_ways), js_skip,
+                 extra_run_opts('+RTS -I0 -RTS'),
+                 exit_code(1), run_timeout_multiplier(0.1)],
+                compile_and_run, ['-rtsopts'])
+# TODO: swap omit_ways(threaded_ways) above for omit_ways(['threaded2']), all_available_io_managers
+# TODO: test with I/O managers for threaded ways with +RTS -N1,
+# but it will be broken for now.
+
+
 # These tests need access to the internal RTS headers.
 # TODO: there is probably some cleaner way to do this, and it should probably
 # be guarded for in-tree tests, since it cannot work against an arbitrary
