@@ -1752,7 +1752,7 @@ pushLevelNoWorkList _ (TcS thing_inside)
 
 {- *********************************************************************
 *                                                                      *
-*              The Unification Level Flag                              *
+*              Tracking unifications in TcS
 *                                                                      *
 ********************************************************************* -}
 
