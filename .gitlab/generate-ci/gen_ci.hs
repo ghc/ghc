@@ -82,7 +82,7 @@ The generated names for the jobs is important as there are a few downstream cons
 of the jobs artifacts. Therefore some care should be taken if changing the generated
 names of jobs to update these other places.
 
-1. Fedora33 jobs are required by head.hackage
+1. fedora42 jobs are required by head.hackage
 2. The fetch-gitlab release utility pulls release artifacts from the
 3. The ghc-head-from script downloads release artifacts based on a pipeline change.
 4. Some subsequent CI jobs have explicit dependencies (for example docs-tarball, perf, perf-nofib)
@@ -118,8 +118,7 @@ data LinuxDistro
   | Debian11Js
   | Debian10
   | Debian9
-  | Fedora33
-  | Fedora38
+  | Fedora42
   | Ubuntu2404LoongArch64
   | Ubuntu2404
   | Ubuntu2204
@@ -319,8 +318,7 @@ distroName Debian12Riscv = "deb12-riscv"
 distroName Debian12Wine  = "deb12-wine"
 distroName Debian10      = "deb10"
 distroName Debian9       = "deb9"
-distroName Fedora33      = "fedora33"
-distroName Fedora38      = "fedora38"
+distroName Fedora42      = "fedora42"
 distroName Ubuntu2404LoongArch64 = "ubuntu24_04-loongarch"
 distroName Ubuntu1804    = "ubuntu18_04"
 distroName Ubuntu2004    = "ubuntu20_04"
@@ -501,14 +499,6 @@ alpineVariables arch = mconcat $
 distroVariables :: Arch -> LinuxDistro -> Variables
 distroVariables arch Alpine312 = alpineVariables arch
 distroVariables arch Alpine322 = alpineVariables arch
-distroVariables _    Fedora33  = mconcat
-  -- LLC/OPT do not work for some reason in our fedora images
-  -- These tests fail with this error: T11649 T5681 T7571 T8131b
-  -- +/opt/llvm/bin/opt: /lib64/libtinfo.so.5: no version information available (required by /opt/llvm/bin/opt)
-  -- +/opt/llvm/bin/llc: /lib64/libtinfo.so.5: no version information available (required by /opt/llvm/bin/llc)
-  [ "LLC" =: "/bin/false"
-  , "OPT" =: "/bin/false"
-  ]
 distroVariables _ _ = mempty
 
 -----------------------------------------------------------------------------
@@ -1207,13 +1197,13 @@ rhel_x86 =
 
 fedora_x86 :: [JobGroup Job]
 fedora_x86 =
-  [ -- Fedora33 job is always built with perf so there's one job in the normal
+  [ -- Fedora42 job is always built with perf so there's one job in the normal
     -- validate pipeline which is built with perf.
-    fastCI (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
+    fastCI (standardBuildsWithConfig Amd64 (Linux Fedora42) releaseConfig)
     -- This job is only for generating head.hackage docs
-  , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
-  , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
-  , disableValidate (standardBuilds Amd64 (Linux Fedora38))
+  , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora42) releaseConfig))
+  , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora42) dwarf)
+  , disableValidate (standardBuilds Amd64 (Linux Fedora42))
   ]
   where
     hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-for-hackage")
@@ -1375,7 +1365,7 @@ platform_mapping = Map.map go combined_result
                 , "x86_64-linux-deb11-validate"
                 , "x86_64-linux-deb12-validate"
                 , "x86_64-linux-deb10-validate+debug_info"
-                , "x86_64-linux-fedora33-release"
+                , "x86_64-linux-fedora42-release"
                 , "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
                 , "x86_64-windows-validate"
                 , "aarch64-linux-deb12-validate"
@@ -1390,13 +1380,13 @@ platform_mapping = Map.map go combined_result
                 , "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
                 , "nightly-x86_64-linux-alpine3_12-validate+fully_static"
                 , "nightly-x86_64-linux-deb10-validate"
-                , "nightly-x86_64-linux-fedora33-release"
+                , "nightly-x86_64-linux-fedora42-release"
                 , "nightly-x86_64-windows-validate"
                 , "release-x86_64-linux-alpine3_12-release+fully_static+no_split_sections"
                 , "release-x86_64-linux-deb10-release"
                 , "release-x86_64-linux-deb11-release"
                 , "release-x86_64-linux-deb12-release"
-                , "release-x86_64-linux-fedora33-release"
+                , "release-x86_64-linux-fedora42-release"
                 , "release-x86_64-windows-release"
                 ]
 
