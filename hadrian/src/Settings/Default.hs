@@ -80,7 +80,6 @@ stageBootPackages = return
 stage0Packages :: Action [Package]
 stage0Packages = do
     cross <- flag CrossCompiling
-    haveCurses <- any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
     return $ [ cabalSyntax
              , cabal
              , compiler
@@ -116,7 +115,11 @@ stage0Packages = do
              -- that confused Hadrian, so we must make those a stage0 package as well.
              -- Once we drop `Win32`/`unix` it should be possible to drop those too.
              ]
-          ++ [ terminfo | not windowsHost, (not cross || haveCurses) ]
+          -- Currently, we have no way to provide paths to [n]curses libs for
+          -- both - build and target - in cross builds. Thus, we only build it
+          -- for upper stages. As we only use stage0 to build upper stages,
+          -- this should be fine.
+          ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                                ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
@@ -136,6 +139,7 @@ stage1Packages = do
     libraries0 <- filter good_stage0_package <$> stage0Packages
     cross      <- flag CrossCompiling
     winTarget  <- isWinTarget
+    haveCurses <- any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
 
     let when c xs = if c then xs else mempty
 
@@ -184,6 +188,10 @@ stage1Packages = do
       , when (winTarget && not cross)
         [ -- See Note [Hadrian's ghci-wrapper package]
           ghciWrapper
+        ]
+      , when (cross && haveCurses)
+        [
+          terminfo
         ]
       ]
 
