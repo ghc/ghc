@@ -58,7 +58,7 @@ getTestSetting key = do
         TestWORDSIZE              -> "WORDSIZE"
         TestTARGETPLATFORM        -> "TARGETPLATFORM"
         TestTargetOS              -> "TargetOS"
-        TestTargetARCH            -> "TargetARCH"
+        TestTargetARCH            -> "TargetARCH_CPP"
         TestRTSWay                -> "RTSWay"
         TestGhcStage              -> "GhcStage"
         TestGhcDebugAssertions    -> "GhcDebugAssertions"
