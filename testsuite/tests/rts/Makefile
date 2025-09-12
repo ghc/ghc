@@ -157,3 +157,11 @@ HSC2HS_OPTS = --cc="$(TEST_CC)" $(addprefix --cflag=,$(TEST_CC_OPTS)) --ld=$(TES
 
 IOManager.hs: IOManager.hsc
 	'$(HSC2HS)' $(HSC2HS_OPTS) $<
+
+.PHONY: T26408c
+T26408c:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -rtsopts T26408c.hs; \
+	./T26408c +RTS -I0 -T & \
+	sleep 1; \
+	kill -s USR1 $$!; \
+	wait $$!
