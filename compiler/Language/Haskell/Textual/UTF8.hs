@@ -1,22 +1,5 @@
-{-
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-                                      -- in module Language.Haskell.Syntax.Extension
-{-# LANGUAGE ViewPatterns #-}
-
-{-# LANGUAGE ExtendedLiterals #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE UnboxedTuples #-}
--}
 
 {- |
 Represents a small chunk of UTF8 text from a source code file.
@@ -29,8 +12,9 @@ module Language.Haskell.Textual.UTF8
    , encodeUTF8
    , unsafeFromShortByteString
    -- ** Deconstruction
-   , decodeUTF8
    , bytesUTF8
+   , decodeUTF8
+   , headUTF8
    -- ** Transformation
    , linesUTF8
    , unlinesUTF8
@@ -47,8 +31,10 @@ import Data.Foldable (toList)
 import Data.String (IsString(..))
 import Data.Word (Word8)
 
--- TODO: This will need to be internalized
-import GHC.Utils.Encoding.UTF8
+-- These is a modules are components of the @base@ package,
+-- hence they do not directly couple the library to GHC.
+import GHC.Base (Char(C#))
+import GHC.Encoding.UTF8
 
 {- |
 A UTF8 encoded ShortByteString representing the textual snippet of code
@@ -87,6 +73,18 @@ encodeUTF8 :: String -> TextUTF8
 encodeUTF8 = TextUTF8 . utf8EncodeShortByteString
 
 {- |
+Extract the first code point from the UTF8 check of text.
+
+_Time:_ $\mathcal{O}\left( 1 \right )$
+-}
+headUTF8 :: TextUTF8 -> Maybe Char
+headUTF8 (TextUTF8 sbs@(SBS ba#))
+  | SBS.length sbs == 0 = Nothing
+  | otherwise =
+    let (# c#, _ #) = utf8DecodeCharByteArray# ba# 0#
+    in  Just $ C# c#
+
+{- |
 Split a UTF8 fragment of text on newline characters (@'\n'@).
 -}
 linesUTF8 :: TextUTF8 -> [TextUTF8]
@@ -108,5 +106,15 @@ Assumes that the shortByteString is already UTF8 encoded.
 unsafeFromShortByteString :: ShortByteString -> TextUTF8
 unsafeFromShortByteString = TextUTF8
 
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- Internal Functionality
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+
 newlineByte :: Word8
 newlineByte = 0x0A -- 0x0A (10) is the new line character (\n)
+
+utf8DecodeShortByteString :: ShortByteString -> [Char]
+utf8DecodeShortByteString (SBS ba#) = utf8DecodeByteArray# ba#
+
+utf8EncodeShortByteString :: String -> ShortByteString
+utf8EncodeShortByteString str = SBS (utf8EncodeByteArray# str)
