@@ -657,6 +657,8 @@ test('T22859',
       omit_ways(llvm_ways)],
      compile_and_run, ['-with-rtsopts -A8K'])
 
+test('T26408', [exit_code(1), run_timeout_multiplier(0.1)], compile_and_run, [''])
+
 # These tests need access to the internal RTS headers.
 # TODO: there is probably some cleaner way to do this, and it should probably
 # be guarded for in-tree tests, since it cannot work against an arbitrary
