@@ -1,6 +1,3 @@
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-
 :unset +s
 :unset +t
 
@@ -17,4 +14,3 @@ z
 -- the full top-level scope of B available, though.  This was
 -- nearly broken in GHC 6.4
 z
-

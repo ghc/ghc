@@ -1,7 +1,3 @@
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-:l
-
 -- example from #7231, modified: the example in the ticket did not
 -- trigger the bug, because a module containing only '"' will fail
 -- in the downsweep, which is before we unload modules.  Hence this

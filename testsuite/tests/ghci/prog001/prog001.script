@@ -1,8 +1,5 @@
 :unset +s
 
-:l shell.hs
-:def shell (\s -> do shell s; return "")
-
 -- first, tidy up:
 :shell rm -f *.hi *.o *~
 :shell cp C1.hs C.hs
