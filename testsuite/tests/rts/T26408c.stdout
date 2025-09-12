@@ -1,0 +1,5 @@
+[1 of 2] Compiling Main             ( T26408c.hs, T26408c.o )
+[2 of 2] Linking T26408c
+waiting on deadlocked threads...
+caught SIGUSR1
+terminated normally, major GCs = 1
