@@ -121,8 +121,8 @@ import GHC.Driver.Errors
 import GHC.Driver.Messager
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
+import GHC.Driver.Config
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
-import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyExprOpts )
 import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
 import GHC.Driver.Config.Core.Lint.Interactive ( lintInteractiveExpr )
 import GHC.Driver.Config.CoreToStg
@@ -181,6 +181,7 @@ import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
 import GHC.Core.Opt.Pipeline
 import GHC.Core.Opt.Pipeline.Types      ( CoreToDo (..))
+import GHC.Core.SimpleOpt
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
@@ -2712,15 +2713,10 @@ hscCompileCoreExpr hsc_env loc expr =
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [Linkable], PkgsLoaded)
 hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   {- Simplify it -}
-  -- Question: should we call SimpleOpt.simpleOptExpr here instead?
-  -- It is, well, simpler, and does less inlining etc.
   let dflags = hsc_dflags hsc_env
   let logger = hsc_logger hsc_env
-  let ic = hsc_IC hsc_env
-  let unit_env = hsc_unit_env hsc_env
-  let simplify_expr_opts = initSimplifyExprOpts dflags ic
 
-  simpl_expr <- simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
+  let simpl_expr = simpleOptExpr (initSimpleOpts dflags) ds_expr
 
   -- Create a unique temporary binding
   --
