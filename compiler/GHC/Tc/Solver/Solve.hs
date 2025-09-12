@@ -132,7 +132,7 @@ simplify_loop n limit definitely_redo_implications
 
        ; let wc' = wc1 { wc_impl = wc_impl wc1 `unionBags` implics' }
 
-       -- See Note [When to iterate: unifications]
+       -- See Note [When to iterate the solver: unifications]
        ; unif_happened <- getUnificationFlag
        ; csTraceTcS $ text "unif_happened" <+> ppr unif_happened
 

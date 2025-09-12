@@ -7,6 +7,9 @@
 
 -- from https://gitlab.haskell.org/ghc/ghc/-/merge_requests/5899#note_407871
 
+-- Sept 25: used to fail but now succeeds, because we don't complain
+--          about insolubles arising solely from fundeps
+
 module T18851c where
 
 -- base
