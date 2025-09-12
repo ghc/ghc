@@ -647,3 +647,5 @@ test('T22859',
       when(arch('wasm32'), skip),
       omit_ways(llvm_ways)],
      compile_and_run, ['-with-rtsopts -A8K'])
+
+test('T26408', [exit_code(1), run_timeout_multiplier(0.1)], compile_and_run, [''])
