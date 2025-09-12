@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr ) where
+module GHC.Core.Opt.Pipeline ( core2core ) where
 
 import GHC.Prelude
 
@@ -27,7 +27,7 @@ import GHC.Core.Ppr     ( pprCoreBindings )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
-import GHC.Core.Opt.Simplify ( simplifyExpr, simplifyPgm )
+import GHC.Core.Opt.Simplify ( simplifyPgm )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.Pipeline.Types

@@ -1,6 +1,5 @@
 module GHC.Driver.Config.Core.Opt.Simplify
-  ( initSimplifyExprOpts
-  , initSimplifyOpts
+  ( initSimplifyOpts
   , initSimplMode
   , initGentleSimplMode
   ) where
@@ -9,7 +8,7 @@ import GHC.Prelude
 
 import GHC.Core.Rules ( RuleBase )
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
-import GHC.Core.Opt.Simplify ( SimplifyExprOpts(..), SimplifyOpts(..) )
+import GHC.Core.Opt.Simplify ( SimplifyOpts(..) )
 import GHC.Core.Opt.Simplify.Env ( FloatEnable(..), SimplMode(..), SimplPhase(..) )
 import GHC.Core.Opt.Simplify.Monad ( TopEnvConfig(..) )
 
@@ -19,25 +18,8 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Driver.Config.Core.Opt.Arity ( initArityOpts )
 import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag(..), gopt )
 
-import GHC.Runtime.Context ( InteractiveContext(..) )
-
 import GHC.Types.Basic ( CompilerPhase(..) )
 import GHC.Types.Var ( Var )
-
-initSimplifyExprOpts :: DynFlags -> InteractiveContext -> SimplifyExprOpts
-initSimplifyExprOpts dflags ic = SimplifyExprOpts
-  { se_fam_inst = snd $ ic_instances ic
-  , se_mode = (initSimplMode dflags InitialPhase "GHCi")
-    { sm_inline = False
-      -- Do not do any inlining, in case we expose some
-      -- unboxed tuple stuff that confuses the bytecode
-      -- interpreter
-    }
-  , se_top_env_cfg = TopEnvConfig
-    { te_history_size = historySize dflags
-    , te_tick_factor = simplTickFactor dflags
-    }
-  }
 
 initSimplifyOpts :: DynFlags -> [Var] -> Int -> SimplMode -> RuleBase -> SimplifyOpts
 initSimplifyOpts dflags extra_vars iterations mode hpt_rule_base = let

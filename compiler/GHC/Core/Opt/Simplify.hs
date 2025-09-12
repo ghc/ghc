@@ -1,8 +1,8 @@
 {-# LANGUAGE CPP #-}
 
 module GHC.Core.Opt.Simplify
-  ( SimplifyExprOpts(..), SimplifyOpts(..)
-  , simplifyExpr, simplifyPgm
+  ( SimplifyOpts(..)
+  , simplifyPgm
   ) where
 
 import GHC.Prelude
@@ -11,20 +11,18 @@ import GHC.Driver.Flags
 
 import GHC.Core
 import GHC.Core.Rules
-import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
-import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
-import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
+import GHC.Core.Ppr     ( pprCoreBindings )
+import GHC.Core.Opt.OccurAnal ( occurAnalysePgm )
+import GHC.Core.Stats   ( coreBindsSize, coreBindsStats )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop )
 import GHC.Core.Lint    ( LintPassResultConfig, dumpPassResult, lintPassResult )
-import GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules )
+import GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplImpRules )
 import GHC.Core.Opt.Simplify.Utils  ( activeRule )
 import GHC.Core.Opt.Simplify.Inline ( activeUnfolding )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Stats ( simplCountN )
-import GHC.Core.FamInstEnv
 
-import GHC.Utils.Error  ( withTiming )
 import GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
@@ -43,72 +41,6 @@ import GHC.Types.Unique.FM
 
 import Control.Monad
 import Data.Foldable ( for_ )
-
-{-
-************************************************************************
-*                                                                      *
-        Gentle simplification
-*                                                                      *
-************************************************************************
--}
-
--- | Configuration record for `simplifyExpr`.
--- The values of this datatype are /only/ driven by the demands of that function.
-data SimplifyExprOpts = SimplifyExprOpts
-  { se_fam_inst :: ![FamInst]
-  , se_mode :: !SimplMode
-  , se_top_env_cfg :: !TopEnvConfig
-  }
-
-simplifyExpr :: Logger
-             -> ExternalUnitCache
-             -> SimplifyExprOpts
-             -> CoreExpr
-             -> IO CoreExpr
--- ^ Simplify an expression using 'simplExprGently'.
---
--- See 'simplExprGently' for details.
-simplifyExpr logger euc opts expr
-  = withTiming logger (text "Simplify [expr]") (const ()) $
-    do  { eps <- eucEPS euc ;
-        ; let fam_envs = ( eps_fam_inst_env eps
-                         , extendFamInstEnvList emptyFamInstEnv $ se_fam_inst opts
-                         )
-              simpl_env = mkSimplEnv (se_mode opts) fam_envs
-              top_env_cfg = se_top_env_cfg opts
-              read_eps_rules = eps_rule_base <$> eucEPS euc
-              read_ruleenv = updExternalPackageRules emptyRuleEnv <$> read_eps_rules
-
-        ; let sz = exprSize expr
-
-        ; (expr', counts) <- initSmpl logger read_ruleenv top_env_cfg sz $
-                             simplExprGently simpl_env expr
-
-        ; Logger.putDumpFileMaybe logger Opt_D_dump_simpl_stats
-                  "Simplifier statistics" FormatText (pprSimplCount counts)
-
-        ; Logger.putDumpFileMaybe logger Opt_D_dump_simpl "Simplified expression"
-                        FormatCore
-                        (pprCoreExpr expr')
-
-        ; return expr'
-        }
-
-simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
--- ^ Simplifies an expression by doing occurrence analysis, then simplification,
--- and repeating (twice currently), because one pass alone leaves tons of crud.
---
--- Used only:
---
---   1. for user expressions typed in at the interactive prompt (see 'GHC.Driver.Main.hscStmt'),
---   2. for Template Haskell splices (see 'GHC.Tc.Gen.Splice.runMeta').
---
--- The name 'Gently' suggests that the SimplMode is InitialPhase,
--- and in fact that is so.... but the 'Gently' in 'simplExprGently' doesn't
--- enforce that; it just simplifies the expression twice.
-simplExprGently env expr = do
-    expr1 <- simplExpr env (occurAnalyseExpr expr)
-    simplExpr env (occurAnalyseExpr expr1)
 
 {-
 ************************************************************************
