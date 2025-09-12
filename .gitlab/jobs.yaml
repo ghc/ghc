@@ -2942,7 +2942,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-fedora33-release": {
+  "nightly-x86_64-linux-fedora42-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -2953,7 +2953,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "ghc-x86_64-linux-fedora42-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2963,14 +2963,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -2996,18 +2996,16 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-release",
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LLC": "/bin/false",
-      "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_ENV": "x86_64-linux-fedora42-release",
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-fedora33-release-hackage": {
+  "nightly-x86_64-linux-fedora42-release-hackage": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -3018,7 +3016,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "ghc-x86_64-linux-fedora42-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3028,14 +3026,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -3061,19 +3059,17 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-release",
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--haddock-for-hackage",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LLC": "/bin/false",
-      "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_ENV": "x86_64-linux-fedora42-release",
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-fedora33-validate+debug_info": {
+  "nightly-x86_64-linux-fedora42-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -3084,7 +3080,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora33-validate+debug_info.tar.xz",
+        "ghc-x86_64-linux-fedora42-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3094,14 +3090,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -3127,77 +3123,75 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-validate+debug_info",
-      "BUILD_FLAVOUR": "validate+debug_info",
-      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LLC": "/bin/false",
-      "OPT": "/bin/false",
-      "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-validate+debug_info",
-      "XZ_OPT": "-9"
-    }
-  },
-  "nightly-x86_64-linux-fedora38-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "8 weeks",
-      "paths": [
-        "ghc-x86_64-linux-fedora38-validate.tar.xz",
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-fedora38-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora38:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": false,
-        "job": "hadrian-ghc-in-ghci"
-      }
-    ],
-    "rules": [
-      {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora38-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora38-validate",
+      "TEST_ENV": "x86_64-linux-fedora42-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-fedora42-validate+debug_info": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings.txt"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-fedora42-validate+debug_info.tar.xz",
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-validate+debug_info",
+      "BUILD_FLAVOUR": "validate+debug_info",
+      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "RUNTEST_ARGS": "",
+      "TEST_ENV": "x86_64-linux-fedora42-validate+debug_info",
       "XZ_OPT": "-9"
     }
   },
@@ -4814,7 +4808,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-fedora33-release": {
+  "release-x86_64-linux-fedora42-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -4825,7 +4819,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "ghc-x86_64-linux-fedora42-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4835,14 +4829,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -4868,19 +4862,17 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-release",
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LLC": "/bin/false",
-      "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-release",
+      "TEST_ENV": "x86_64-linux-fedora42-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-fedora33-release+debug_info": {
+  "release-x86_64-linux-fedora42-release+debug_info": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -4891,7 +4883,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-fedora33-release+debug_info.tar.xz",
+        "ghc-x86_64-linux-fedora42-release+debug_info.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4901,14 +4893,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -4934,19 +4926,17 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release+debug_info",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-release+debug_info",
       "BUILD_FLAVOUR": "release+debug_info",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LLC": "/bin/false",
-      "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-release+debug_info",
+      "TEST_ENV": "x86_64-linux-fedora42-release+debug_info",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-fedora33-release-hackage": {
+  "release-x86_64-linux-fedora42-release-hackage": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -4957,7 +4947,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "ghc-x86_64-linux-fedora42-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4967,14 +4957,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -5000,80 +4990,14 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-release",
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--haddock-for-hackage",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LLC": "/bin/false",
-      "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-release",
-      "XZ_OPT": "-9"
-    }
-  },
-  "release-x86_64-linux-fedora38-release": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "1 year",
-      "paths": [
-        "ghc-x86_64-linux-fedora38-release.tar.xz",
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-fedora38-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora38:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": false,
-        "job": "hadrian-ghc-in-ghci"
-      }
-    ],
-    "rules": [
-      {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora38-release",
-      "BUILD_FLAVOUR": "release",
-      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "IGNORE_PERF_FAILURES": "all",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora38-release",
+      "TEST_ENV": "x86_64-linux-fedora42-release",
       "XZ_OPT": "-9"
     }
   },
@@ -7108,7 +7032,7 @@
       "TEST_ENV": "x86_64-linux-deb9-validate"
     }
   },
-  "x86_64-linux-fedora33-release": {
+  "x86_64-linux-fedora42-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -7119,7 +7043,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "ghc-x86_64-linux-fedora42-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7129,14 +7053,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -7145,7 +7069,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora33-release(\\s|$).*/)) || (($ONLY_JOBS == null) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-release(\\s|$).*/)) || (($ONLY_JOBS == null) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -7162,17 +7086,15 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-release",
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LLC": "/bin/false",
-      "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-release"
+      "TEST_ENV": "x86_64-linux-fedora42-release"
     }
   },
-  "x86_64-linux-fedora33-release-hackage": {
+  "x86_64-linux-fedora42-release-hackage": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -7183,7 +7105,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "ghc-x86_64-linux-fedora42-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7193,14 +7115,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -7209,7 +7131,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora33-release(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-release(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -7226,18 +7148,16 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-release",
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--haddock-for-hackage",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LLC": "/bin/false",
-      "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-release"
+      "TEST_ENV": "x86_64-linux-fedora42-release"
     }
   },
-  "x86_64-linux-fedora33-validate+debug_info": {
+  "x86_64-linux-fedora42-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -7248,7 +7168,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora33-validate+debug_info.tar.xz",
+        "ghc-x86_64-linux-fedora42-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7258,14 +7178,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -7274,7 +7194,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora33-validate\\+debug_info(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -7291,76 +7211,74 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-validate+debug_info",
-      "BUILD_FLAVOUR": "validate+debug_info",
-      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LLC": "/bin/false",
-      "OPT": "/bin/false",
-      "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora33-validate+debug_info"
-    }
-  },
-  "x86_64-linux-fedora38-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "2 weeks",
-      "paths": [
-        "ghc-x86_64-linux-fedora38-validate.tar.xz",
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-fedora38-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora38:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": false,
-        "job": "hadrian-ghc-in-ghci"
-      }
-    ],
-    "rules": [
-      {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora38-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora38-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora38-validate"
+      "TEST_ENV": "x86_64-linux-fedora42-validate"
+    }
+  },
+  "x86_64-linux-fedora42-validate+debug_info": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings.txt"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-fedora42-validate+debug_info.tar.xz",
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-fedora42-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-validate\\+debug_info(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora42-validate+debug_info",
+      "BUILD_FLAVOUR": "validate+debug_info",
+      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "RUNTEST_ARGS": "",
+      "TEST_ENV": "x86_64-linux-fedora42-validate+debug_info"
     }
   },
   "x86_64-linux-rocky8-validate": {
