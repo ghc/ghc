@@ -75,7 +75,7 @@ test('ghci034', normal, ghci_script, ['ghci034.script'])
 test('ghci035', normal, ghci_script, ['ghci035.script'])
 test('ghci036', normal, ghci_script, ['ghci036.script'])
 test('ghci037', req_interp, makefile_test, [])
-test('ghci038', extra_files(['../shell.hs']), ghci_script, ['ghci038.script'])
+test('ghci038', normal, ghci_script, ['ghci038.script'])
 test('ghci039', normal, ghci_script, ['ghci039.script'])
 test('ghci040', normal, ghci_script, ['ghci040.script'])
 test('ghci041', normal, ghci_script, ['ghci041.script'])
@@ -109,7 +109,7 @@ test('ghci061', normal, ghci_script, ['ghci061.script'])
 test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
                  when(config.have_ext_interp, extra_ways(['ghci-ext']))],
 		ghci_script, ['ghci062.script'])
-test('ghci063', [extra_files(['../shell.hs'])], ghci_script, ['ghci063.script'])
+test('ghci063', normal, ghci_script, ['ghci063.script'])
 test('ghci064', normal, ghci_script, ['ghci064.script'])
 test('ghci065', [extra_hc_opts("-haddock")], ghci_script, ['ghci065.script'])
 test('ghci066', normal, ghci_script, ['ghci066.script'])
@@ -117,7 +117,7 @@ test('T2452', [extra_hc_opts("-fno-implicit-import-qualified")],
     ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
 
-test('T1914', [extra_files(['../shell.hs'])], ghci_script, ['T1914.script'])
+test('T1914', normal, ghci_script, ['T1914.script'])
 
 test('T2182ghci', normal, ghci_script, ['T2182ghci.script'])
 test('T2182ghci2', [extra_hc_opts("-XNoImplicitPrelude")], ghci_script, ['T2182ghci2.script'])
@@ -157,14 +157,11 @@ test('T6027ghci', normal, ghci_script, ['T6027ghci.script'])
 
 test('T6007', normal, ghci_script, ['T6007.script'])
 test('T6091', normal, ghci_script, ['T6091.script'])
-test('T6106', [extra_files(['../shell.hs']),
-               pre_cmd('$MAKE -s --no-print-directory T6106_prep')],
+test('T6106', [pre_cmd('$MAKE -s --no-print-directory T6106_prep')],
      ghci_script, ['T6106.script'])
 test('T6105', normal, ghci_script, ['T6105.script'])
 test('T7117', normal, ghci_script, ['T7117.script'])
-test('ghci058', [extra_files(['../shell.hs']),
-                 cmd_prefix('ghciWayFlags=' + config.ghci_way_flags),
-                 when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+test('ghci058', [cmd_prefix('ghciWayFlags=' + config.ghci_way_flags)],
      ghci_script, ['ghci058.script'])
 test('T7587', normal, ghci_script, ['T7587.script'])
 test('T7688', normal, ghci_script, ['T7688.script'])
@@ -188,7 +185,7 @@ test('T8172', when(opsys('mingw32'), normalise_drive_letter),
      ghci_script, ['T8172.script'])
 test('T8215', normal, ghci_script, ['T8215.script'])
 test('T8305', normal, ghci_script, ['T8305.script'])
-test('T8353', extra_files(['../shell.hs', 'Defer03_before.hs']), ghci_script, ['T8353.script'])
+test('T8353', extra_files(['Defer03_before.hs']), ghci_script, ['T8353.script'])
 test('T8357', normal, ghci_script, ['T8357.script'])
 test('T8383', normal, ghci_script, ['T8383.script'])
 test('T8469', normal, ghci_script, ['T8469.script'])
@@ -329,7 +326,7 @@ test('T17549', normal, ghci_script, ['T17549.script'])
 test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code'),
                 req_rts_linker ],
      ghci_script, ['T17669.script'])
-test('T18330', [copy_files, extra_files(['../shell.hs', 'T18330.extra', 'T18330.hs'])
+test('T18330', [copy_files, extra_files(['T18330.extra', 'T18330.hs'])
                , filter_stdout_lines(r'ghci>.*')
                , extra_hc_opts('-v1')]
       , ghci_script, ['T18330.script'])
@@ -365,7 +362,7 @@ test('T25414', normal, ghci_script, ['T25414.script'])
 test('T20627', normal, ghci_script, ['T20627.script'])
 test('T20473a', normal, ghci_script, ['T20473a.script'])
 test('T20473b', normal, ghci_script, ['T20473b.script'])
-test('T20587', [extra_files(['../shell.hs'])], ghci_script,
+test('T20587', normal, ghci_script,
                 ['T20587.script'])
 test('T20909', normal, ghci_script, ['T20909.script'])
 test('T20150', normal, ghci_script, ['T20150.script'])

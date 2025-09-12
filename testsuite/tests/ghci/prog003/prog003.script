@@ -2,13 +2,10 @@
 :unset +t
 -- A small multi-module program, with 4 modules, A, B, C, D.  B & C
 -- depend on D, and A depends on B & C.
--- 
+--
 -- This test will try various combinations of compiled and interpreted
 -- versions of each module, and make sure each combination behaves
 -- sensibly.
-
-:l shell.hs
-:def shell (\s -> do shell s; return "")
 
 -- clean up
 :shell rm -f *.o *.hi
