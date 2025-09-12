@@ -313,10 +313,6 @@ schedule (Capability *initialCapability, Task *task)
     // Additionally, it is not fatal for the
     // threaded RTS to reach here with no threads to run.
     //
-    // Since IOPorts have no deadlock avoidance guarantees you may also reach
-    // this point when blocked on an IO Port.  If this is the case the only
-    // thing that could unblock it is an I/O event.
-    //
     // win32: might be here due to awaitCompletedTimeoutsOrIO() being abandoned
     // as a result of a console event having been delivered or as a result of
     // waiting on an async I/O to complete with WinIO.
