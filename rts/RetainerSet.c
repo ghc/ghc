@@ -237,7 +237,7 @@ printRetainerSetShort(FILE *f, RetainerSet *rs, W_ total_size, uint32_t max_leng
             // size = strlen(tmp);
         }
     }
-    fputs(tmp, f);
+    fprintf(f, "%s\t%" FMT_Word "\n", tmp, total_size);
     traceHeapProfSampleString(tmp, total_size);
 }
 
