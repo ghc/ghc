@@ -2363,7 +2363,7 @@ static bool read_heap_profiling_flag(const char *arg)
         if (!right)
             right = filter + strlen(filter);
 
-        char *selector = stgStrndup(left, right - left + 1); // +1 ???
+        char *selector = stgStrndup(left, right - left);
         switch (property) {
         case 'c': // cost centre label select
             RtsFlags.ProfFlags.ccSelector = selector;
