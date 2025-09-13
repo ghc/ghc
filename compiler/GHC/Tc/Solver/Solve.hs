@@ -126,7 +126,7 @@ simplify_loop n limit definitely_redo_implications
 
        -- Next, solve implications from wc_impl
        ; implics' <- if not (definitely_redo_implications  -- See Note [Superclass iteration]
-                            || unifs1 == 0)                -- for this conditional
+                            || unif_happened)              -- for this conditional
                     then return implics
                     else solveNestedImplications implics
 
@@ -167,7 +167,7 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
              -- Typically if we blow the limit we are going to report some other error
              -- (an unsolved constraint), and we don't want that error to suppress
              -- the iteration limit warning!
-             addErrTcS $ TcRnSimplifierTooManyIterations simples limit wc
+             addErrTcS $ TcRnSimplifierTooManyIterations limit wc
            ; return (Just NA_Stop) }
 
       | otherwise
@@ -1112,36 +1112,39 @@ solveSimpleWanteds simples
        ; traceTcS "solveSimpleWanteds {" $
          vcat [ text "Mode:" <+> ppr mode
               , text "Inerts:" <+> ppr inerts
-              , text "Wanteds to solve:" <+> ppr wc ]
+              , text "Wanteds to solve:" <+> ppr simples ]
 
        ; let wc = emptyWC { wc_simple = simples }
        ; wc' <- iterateToFixpoint max_iter
                   (do_solve_and_plugins max_iter) wc
 
        ; traceTcS "solveSimpleWanteds end }" $
-             vcat [ text "iterations =" <+> ppr n
-                  , text "residual =" <+> wc' ]
+             vcat [ text "residual =" <+> ppr wc' ]
 
        ; return wc' }
   where
     do_solve_and_plugins :: IntWithInf -> WantedConstraints -> TcS (Bool,WantedConstraints)
     do_solve_and_plugins max_iter wc
-      = do { wc1 <- run_simple_solver wc
+      = do { wc1 <- run_simple_solver max_iter wc
            ; (rerun_plugin, simples2) <- runTcPluginsWanted (wc_simple wc1)
            ; return (rerun_plugin, wc1 { wc_simple = simples2 }) }
 
-    run_simple_solver :: WantedConstraints -> TcS (Bool, WantedConstraints)
+    run_simple_solver :: IntWithInf -> WantedConstraints -> TcS WantedConstraints
     -- Run `simple_solver` repeatedly until no more unifications happen
     -- Try this repeatedly, until no unifications happen
     -- This is potentially quadratic, because we might solve just one
     -- constraint in each iteration but that seems inevitable
-    run_simple_solver =  iterateToFixpoint (max_iter `mulWithInf` 10) simple_solver
+    run_simple_solver max_iter
+       =  iterateToFixpoint (max_iter `mulWithInf` 10) simple_solver
 
     simple_solver :: WantedConstraints -> TcS (Bool, WantedConstraints)
     -- Try solving the wc_simple part of these constraints, once
     -- Affects the unification state (of course) but not the inert set
     -- The result is not necessarily zonked
-    solve_simples wc@(WC { wc_simple = simples, wc_implic = implics })
+    simple_solver wc@(WC { wc_simple = simples, wc_impl = implics })
+      | isEmptyBag simples
+      = return (False, wc)
+      | otherwise
       = reportUnifications $
         nestTcS             $
         do { solveSimples simples
@@ -1150,20 +1153,19 @@ solveSimpleWanteds simples
                -- constraints (i.e. QCInsts) in `simples1`
            ; (simples2, extra_implics) <- solveWantedQCIs simples1
            ; return (wc { wc_simple = simples2
-                        , wc_implic = implics `unionBags` extra_implics }) }
+                        , wc_impl   = implics `unionBags` extra_implics }) }
 
-iterateToFixpoint :: IntWithInf -> (Cts -> TcS (Bool,Cts)) -> Cts -> TcS Cts
+iterateToFixpoint :: IntWithInf
+                  -> (WantedConstraints -> TcS (Bool,WantedConstraints))
+                  -> WantedConstraints -> TcS WantedConstraints
 -- See Note [The solveSimpleWanteds loop]
-iterateToFixpoint limit do_it wc_orig
+iterateToFixpoint max_iter do_it wc_orig
   = go 1 wc_orig
   where
+    go :: Int -> WantedConstraints -> TcS WantedConstraints
     go n wc
-      | isEmptyBag wc
-      = return wc
-
-      | n `intGtLimit` limit
-      = failTcS $ TcRnSimplifierTooManyIterations
-                         wc_orig limit (emptyWC { wc_simple = wc })
+      | n `intGtLimit` max_iter
+      = failTcS (TcRnSimplifierTooManyIterations max_iter wc_orig)
 
       | otherwise
       = do { (something_happened, wc1) <- do_it wc
