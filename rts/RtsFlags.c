@@ -112,9 +112,7 @@ static void bad_option (const char *s);
 static void read_debug_flags(const char *arg);
 #endif
 
-#if defined(PROFILING)
 static bool read_heap_profiling_flag(const char *arg);
-#endif
 
 #if defined(TRACING)
 static void read_trace_flags(const char *arg);
@@ -924,11 +922,10 @@ error = true;
 #endif
 
 #if defined(PROFILING)
-# define PROFILING_BUILD_ONLY(x)   x
+# define PROFILING_BUILD_ONLY(_arg, x)   x
 #else
-# define PROFILING_BUILD_ONLY(x) \
-errorBelch("the flag %s requires the program to be built with -prof", \
-           rts_argv[arg]);                                            \
+# define PROFILING_BUILD_ONLY(arg, x) \
+errorBelch("the flag %s requires the program to be built with -prof", arg); \
 error = true;
 #endif
 
@@ -1485,11 +1482,11 @@ error = true;
                       RtsFlags.CcFlags.outputFileNameStem = rts_argv[arg]+3;
                       break;
                   default:
-                      PROFILING_BUILD_ONLY();
+                      PROFILING_BUILD_ONLY(rts_argv[arg],);
 
                 } break;
 #else
-                PROFILING_BUILD_ONLY(
+                PROFILING_BUILD_ONLY(rts_argv[arg],
                 switch (rts_argv[arg][2]) {
                   case 'a':
                     RtsFlags.CcFlags.doCostCentres = COST_CENTRES_ALL;
@@ -1527,43 +1524,25 @@ error = true;
 
               case 'R':
                   OPTION_SAFE;
-                  PROFILING_BUILD_ONLY(
+                  PROFILING_BUILD_ONLY(rts_argv[arg],
                       RtsFlags.ProfFlags.maxRetainerSetSize =
                         atof(rts_argv[arg]+2);
                   ) break;
               case 'L':
                   OPTION_SAFE;
-                  PROFILING_BUILD_ONLY(
+                  PROFILING_BUILD_ONLY(rts_argv[arg],
                       RtsFlags.ProfFlags.ccsLength = atof(rts_argv[arg]+2);
                       if(RtsFlags.ProfFlags.ccsLength <= 0) {
                         bad_option(rts_argv[arg]);
                       }
                   ) break;
               case 'h': /* serial heap profile */
-#if !defined(PROFILING)
-                switch (rts_argv[arg][2]) {
-                  case '\0':
-                    errorBelch("-h is deprecated, use -hT instead.");
-
-                    FALLTHROUGH;
-                  case 'T':
-                    OPTION_UNSAFE;
-                    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
-                    break;
-                  case 'i':
-                    OPTION_UNSAFE;
-                    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_INFO_TABLE;
-                    break;
-                  default:
-                    OPTION_SAFE;
-                    PROFILING_BUILD_ONLY();
-                }
-#else
+#if defined(PROFILING)
                 OPTION_SAFE;
-                PROFILING_BUILD_ONLY(
-                    error = read_heap_profiling_flag(rts_argv[arg]);
-                );
-#endif /* PROFILING */
+#else
+                OPTION_UNSAFE;
+#endif
+                error = read_heap_profiling_flag(rts_argv[arg]);
                 break;
 
               case 'i': /* heap sample interval */
@@ -1840,7 +1819,7 @@ error = true;
                 case 'c': /* Debugging tool: show current cost centre on
                            an exception */
                     OPTION_SAFE;
-                    PROFILING_BUILD_ONLY(
+                    PROFILING_BUILD_ONLY(rts_argv[arg],
                         RtsFlags.ProfFlags.showCCSOnException = true;
                         );
                     unchecked_arg_start++;
@@ -2341,139 +2320,151 @@ static void read_debug_flags(const char* arg)
 }
 #endif
 
-#if defined(PROFILING)
 // Parse a "-h" flag, returning whether the parse resulted in an error.
 static bool read_heap_profiling_flag(const char *arg)
 {
-    // Already parsed "-h"
-
+    // Already parsed arg[0:2] = "-h"
     bool error = false;
-    switch (arg[2]) {
-    case '\0':
-      errorBelch("-h is deprecated, use -hc instead.");
-      FALLTHROUGH;
-    case 'C':
-    case 'c':
-    case 'M':
-    case 'm':
-    case 'D':
-    case 'd':
-    case 'Y':
-    case 'y':
-    case 'i':
-    case 'R':
-    case 'r':
-    case 'B':
-    case 'b':
-    case 'e':
-    case 'T':
-        if (arg[2] != '\0' && arg[3] != '\0') {
-            {
-                const char *left  = strchr(arg, '{');
-                const char *right = strrchr(arg, '}');
+    char property;
+    const char *filter;
+    if (arg[2] != '\0') {
+        property = arg[2];
+        filter = arg + 3;
+    } else {
+#if defined(PROFILING)
+        errorBelch("-h is deprecated, use -hc instead.");
+        property = 'c';
+        filter = arg + 2;
+#else
+        errorBelch("-h is deprecated, use -hT instead.");
+        property = 'T';
+        filter = arg + 2;
+#endif
+    }
+    // here property is initialized, and filter is a pointer inside arg
 
-                // curly braces are optional, for
-                // backwards compat.
-                if (left)
-                    left = left+1;
-                else
-                    left = arg + 3;
+    if (
+#if defined(PROFILING)
+        filter[0] != '\0'
+#else
+        false // Non-profiled builds ignore -hTfoo syntax and treat it as -hT
+#endif
+    ) {
+        // For backwards compat, extract the portion between curly braces, else
+        // use the entire string
+        const char *left = strchr(filter, '{');
+        const char *right = strrchr(filter, '}');
 
-                if (!right)
-                    right = arg + strlen(arg);
+        if (left)
+            left = left + 1;
+        else
+            left = filter;
 
-                char *selector = stgStrndup(left, right - left + 1);
+        if (!right)
+            right = filter + strlen(filter);
 
-                switch (arg[2]) {
-                case 'c': // cost centre label select
-                    RtsFlags.ProfFlags.ccSelector = selector;
-                    break;
-                case 'C':
-                    RtsFlags.ProfFlags.ccsSelector = selector;
-                    break;
-                case 'M':
-                case 'm': // cost centre module select
-                    RtsFlags.ProfFlags.modSelector = selector;
-                    break;
-                case 'D':
-                case 'd': // closure descr select
-                    RtsFlags.ProfFlags.descrSelector = selector;
-                    break;
-                case 'Y':
-                case 'y': // closure type select
-                    RtsFlags.ProfFlags.typeSelector = selector;
-                    break;
-                case 'R':
-                case 'r': // retainer select
-                    RtsFlags.ProfFlags.retainerSelector = selector;
-                    break;
-                case 'B':
-                case 'b': // biography select
-                    RtsFlags.ProfFlags.bioSelector = selector;
-                    break;
-                case 'E':
-                case 'e': // era select
-                    RtsFlags.ProfFlags.eraSelector = strtoul(selector, (char **) NULL, 10);
-                    break;
-                default:
-                    stgFree(selector);
-                }
-            }
+        char *selector = stgStrndup(left, right - left + 1); // +1 ???
+        switch (property) {
+        case 'c': // cost centre label select
+            RtsFlags.ProfFlags.ccSelector = selector;
             break;
+        case 'C':
+            RtsFlags.ProfFlags.ccsSelector = selector;
+            break;
+        case 'M':
+        case 'm': // cost centre module select
+            RtsFlags.ProfFlags.modSelector = selector;
+            break;
+        case 'D':
+        case 'd': // closure descr select
+            RtsFlags.ProfFlags.descrSelector = selector;
+            break;
+        case 'Y':
+        case 'y': // closure type select
+            RtsFlags.ProfFlags.typeSelector = selector;
+            break;
+        case 'R':
+        case 'r': // retainer select
+            RtsFlags.ProfFlags.retainerSelector = selector;
+            break;
+        case 'B':
+        case 'b': // biography select
+            RtsFlags.ProfFlags.bioSelector = selector;
+            break;
+        case 'E':
+        case 'e': // era select
+            RtsFlags.ProfFlags.eraSelector = strtoul(selector, (char **) NULL, 10);
+            break;
+        default:
+            stgFree(selector);
         }
-
+    } else {
         if (RtsFlags.ProfFlags.doHeapProfile != 0) {
             errorBelch("multiple heap profile options");
             error = true;
-            break;
+        } else {
+            switch (property) {
+#if defined(PROFILING)
+            case 'C':
+            case 'c':
+                RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CCS;
+                break;
+            case 'M':
+            case 'm':
+                RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_MOD;
+                break;
+            case 'D':
+            case 'd':
+                RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_DESCR;
+                break;
+            case 'Y':
+            case 'y':
+                RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
+                break;
+            case 'R':
+            case 'r':
+                RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_RETAINER;
+                break;
+            case 'B':
+            case 'b':
+                RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_LDV;
+                break;
+            case 'e':
+                RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_ERA;
+                break;
+#else
+            case 'C':
+            case 'c':
+            case 'M':
+            case 'm':
+            case 'D':
+            case 'd':
+            case 'Y':
+            case 'y':
+            case 'R':
+            case 'r':
+            case 'B':
+            case 'b':
+            case 'e':
+                PROFILING_BUILD_ONLY(arg,);
+                break;
+#endif /* PROFILING*/
+            case 'T':
+                RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
+                break;
+            case 'i':
+                RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_INFO_TABLE;
+                break;
+            default:
+                errorBelch("invalid heap profile option: %s", arg);
+                error = true;
+                break;
+            }
         }
-
-        switch (arg[2]) {
-        case '\0':
-        case 'C':
-        case 'c':
-            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CCS;
-            break;
-        case 'M':
-        case 'm':
-            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_MOD;
-            break;
-        case 'D':
-        case 'd':
-            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_DESCR;
-            break;
-        case 'Y':
-        case 'y':
-            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
-            break;
-        case 'i':
-            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_INFO_TABLE;
-            break;
-        case 'R':
-        case 'r':
-            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_RETAINER;
-            break;
-        case 'B':
-        case 'b':
-            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_LDV;
-            break;
-        case 'T':
-            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
-            break;
-        case 'e':
-            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_ERA;
-            break;
-        }
-        break;
-
-    default:
-        errorBelch("invalid heap profile option: %s", arg);
-        error = true;
     }
 
     return error;
 }
-#endif
 
 #if defined(TRACING)
 static void read_trace_flags(const char *arg)
