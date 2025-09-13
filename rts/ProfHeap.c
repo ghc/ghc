@@ -878,7 +878,7 @@ recordIPEHeapSample(FILE *hp_file, uint64_t table_id, size_t count)
     formatIPELabel(str, sizeof str, table_id);
 
     // Print to heap profile file
-    fputs(str, hp_file);
+    fprintf(hp_file, "%s\t%" FMT_Word "\n", str, (W_)(count * sizeof(W_)));
 
     // Emit the profiling sample (convert count to bytes)
     traceHeapProfSampleString(str, count * sizeof(W_));
@@ -976,7 +976,9 @@ dumpCensus( Census *census )
 
         switch (RtsFlags.ProfFlags.doHeapProfile) {
         case HEAP_BY_CLOSURE_TYPE:
-            fprintf(hp_file, "%s", (char *)ctr->identity);
+            fprintf(hp_file, "%s\t%" FMT_Word "\n",
+                    (char *)ctr->identity,
+                    (W_)(count * sizeof(W_)));
             traceHeapProfSampleString((char *)ctr->identity,
                                       count * sizeof(W_));
             break;
@@ -994,19 +996,26 @@ dumpCensus( Census *census )
         case HEAP_BY_CCS:
             fprint_ccs(hp_file, (CostCentreStack *)ctr->identity,
                        RtsFlags.ProfFlags.ccsLength);
+            fprintf(hp_file, "\t%" FMT_Word "\n",
+                    (W_)(count * sizeof(W_)));
             traceHeapProfSampleCostCentre((CostCentreStack *)ctr->identity,
                                           count * sizeof(W_));
             break;
         case HEAP_BY_ERA:
-            fprintf(hp_file, "%" FMT_Word, (StgWord)ctr->identity);
+        {
             char str_era[100];
-            sprintf(str_era, "%" FMT_Word, (StgWord)ctr->identity);
+            snprintf(str_era, sizeof str_era, "%" FMT_Word,
+                     (StgWord)ctr->identity);
+            fprintf(hp_file, "%s\t%" FMT_Word "\n",
+                    str_era, (W_)(count * sizeof(W_)));
             traceHeapProfSampleString(str_era, count * sizeof(W_));
             break;
+        }
         case HEAP_BY_MOD:
         case HEAP_BY_DESCR:
         case HEAP_BY_TYPE:
-            fprintf(hp_file, "%s", (char *)ctr->identity);
+            fprintf(hp_file, "%s\t%" FMT_Word "\n",
+                    (char *)ctr->identity, (W_)(count * sizeof(W_)));
             traceHeapProfSampleString((char *)ctr->identity,
                                       count * sizeof(W_));
             break;
@@ -1017,29 +1026,28 @@ dumpCensus( Census *census )
             // it might be the distinguished retainer set rs_MANY:
             if (rs == &rs_MANY) {
                 fprintf(hp_file, "MANY");
-                break;
+            } else {
+
+                // Mark this retainer set by negating its id, because it
+                // has appeared in at least one census.  We print the
+                // values of all such retainer sets into the log file at
+                // the end.  A retainer set may exist but not feature in
+                // any censuses if it arose as the intermediate retainer
+                // set for some closure during retainer set calculation.
+                if (rs->id > 0)
+                    rs->id = -(rs->id);
+
+                // report in the unit of bytes: * sizeof(StgWord)
+                printRetainerSetShort(hp_file, rs, (W_)(count * sizeof(W_))
+                                                , RtsFlags.ProfFlags.ccsLength);
             }
-
-            // Mark this retainer set by negating its id, because it
-            // has appeared in at least one census.  We print the
-            // values of all such retainer sets into the log file at
-            // the end.  A retainer set may exist but not feature in
-            // any censuses if it arose as the intermediate retainer
-            // set for some closure during retainer set calculation.
-            if (rs->id > 0)
-                rs->id = -(rs->id);
-
-            // report in the unit of bytes: * sizeof(StgWord)
-            printRetainerSetShort(hp_file, rs, (W_)count * sizeof(W_)
-                                             , RtsFlags.ProfFlags.ccsLength);
+            fprintf(hp_file, "\t%" FMT_Word "\n", (W_)(count * sizeof(W_)));
             break;
         }
 #endif
         default:
             barf("dumpCensus; doHeapProfile");
         }
-
-        fprintf(hp_file, "\t%" FMT_Word "\n", (W_)count * sizeof(W_));
     }
 
     // Print the unallocated data into the 0 band for info table profiling.
