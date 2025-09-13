@@ -1003,6 +1003,11 @@ follows:
     The flags below are marked with ``:noindex:`` to avoid duplicate
     ID warnings from Sphinx.
 
+.. rts-flag:: -hT ⟨type⟩
+    :noindex:
+
+    Restrict the profile to closures with the specified closure types.
+
 .. rts-flag:: -hc ⟨name⟩
     :noindex:
 
@@ -1049,6 +1054,13 @@ follows:
     *Requires* :ghc-flag:`-prof`. Restrict the profile to closures with one of the specified
     biographies, where ⟨bio⟩ is one of ``lag``, ``drag``, ``void``, or
     ``use``.
+
+.. rts-flag:: -hi ⟨addr⟩
+    :noindex:
+
+    Restrict the profile to closures with specified info table addresses. The
+    address should start with ``0x`` and be lowercase hexadecimal, just like the
+    addresses produced by :rts-flag:`-hi`.
 
 For example, the following options will generate a retainer profile
 restricted to ``Branch`` and ``Leaf`` constructors:
