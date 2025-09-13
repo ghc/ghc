@@ -181,6 +181,28 @@ static void dumpCensus( Census *census );
 
 static bool closureSatisfiesConstraints( const StgClosure* p );
 
+static const char *closureTypeIdentity( const StgClosure *p )
+{
+    const StgInfoTable *info = get_itbl(p);
+    switch (info->type) {
+    case CONSTR:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_2_0:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
+    case CONSTR_NOCAF:
+        return GET_CON_DESC(itbl_to_con_itbl(info));
+    default:
+        return closure_type_names[info->type];
+    }
+}
+
+static void formatIPELabel( char *str, size_t size, uint64_t table_id )
+{
+    snprintf(str, size, "0x%" PRIx64, table_id);
+}
+
 /* ----------------------------------------------------------------------------
  * Find the "closure identity", which is a unique pointer representing
  * the band to which this closure's heap space is attributed in the
@@ -215,26 +237,9 @@ closureIdentity( const StgClosure *p )
 #endif
 
     case HEAP_BY_CLOSURE_TYPE:
-    {
-        const StgInfoTable *info;
-        info = get_itbl(p);
-        switch (info->type) {
-        case CONSTR:
-        case CONSTR_1_0:
-        case CONSTR_0_1:
-        case CONSTR_2_0:
-        case CONSTR_1_1:
-        case CONSTR_0_2:
-        case CONSTR_NOCAF:
-            return GET_CON_DESC(itbl_to_con_itbl(info));
-        default:
-            return closure_type_names[info->type];
-        }
-    }
+        return closureTypeIdentity(p);
     case HEAP_BY_INFO_TABLE:
-    {
         return (void *) (p->header.info);
-    }
 
     default:
         barf("closureIdentity");
@@ -664,6 +669,8 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, uint32_t max_length)
     fprintf(fp, "%s", buf);
 }
 
+#endif /* PROFILING */
+
 bool
 strMatchesSelector( const char* str, const char* sel )
 {
@@ -688,8 +695,6 @@ strMatchesSelector( const char* str, const char* sel )
    }
 }
 
-#endif /* PROFILING */
-
 /* -----------------------------------------------------------------------------
  * Figure out whether a closure should be counted in this census, by
  * testing against all the specified constraints.
@@ -697,11 +702,8 @@ strMatchesSelector( const char* str, const char* sel )
 static bool
 closureSatisfiesConstraints( const StgClosure* p )
 {
-#if !defined(PROFILING)
-    (void)p;   /* keep gcc -Wall happy */
-    return true;
-#else
-   bool b;
+    bool b;
+#if defined(PROFILING)
 
    // The CCS has a selected field to indicate whether this closure is
    // deselected by not being mentioned in the module, CC, or CCS
@@ -721,7 +723,8 @@ closureSatisfiesConstraints( const StgClosure* p )
        if (!b) return false;
    }
    if (RtsFlags.ProfFlags.eraSelector) {
-      return (p->header.prof.hp.era == RtsFlags.ProfFlags.eraSelector);
+       b = p->header.prof.hp.era == RtsFlags.ProfFlags.eraSelector;
+       if (!b) return false;
    }
    if (RtsFlags.ProfFlags.retainerSelector) {
        RetainerSet *rs;
@@ -742,8 +745,21 @@ closureSatisfiesConstraints( const StgClosure* p )
        }
        return false;
    }
-   return true;
+#else
+    if (RtsFlags.ProfFlags.closureTypeSelector) {
+        b = strMatchesSelector( closureTypeIdentity(p),
+                                RtsFlags.ProfFlags.closureTypeSelector );
+        if (!b) return false;
+    }
+    if (RtsFlags.ProfFlags.infoTableSelector) {
+        char str[100];
+        formatIPELabel(str, sizeof str, lookupIPEId(p->header.info));
+        b = strMatchesSelector( str,
+                                RtsFlags.ProfFlags.infoTableSelector );
+        if (!b) return false;
+    }
 #endif /* PROFILING */
+    return true;
 }
 
 /* -----------------------------------------------------------------------------
@@ -858,12 +874,11 @@ aggregateCensusInfo( void )
 static void
 recordIPEHeapSample(FILE *hp_file, uint64_t table_id, size_t count)
 {
-    // Print to heap profile file
-    fprintf(hp_file, "0x%" PRIx64, table_id);
-
-    // Create label string for tracing
     char str[100];
-    sprintf(str, "0x%" PRIx64, table_id);
+    formatIPELabel(str, sizeof str, table_id);
+
+    // Print to heap profile file
+    fputs(str, hp_file);
 
     // Emit the profiling sample (convert count to bytes)
     traceHeapProfSampleString(str, count * sizeof(W_));

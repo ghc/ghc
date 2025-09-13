@@ -235,6 +235,9 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.eraSelector        = 0;
 #endif
 
+    RtsFlags.ProfFlags.closureTypeSelector = NULL;
+    RtsFlags.ProfFlags.infoTableSelector   = NULL;
+
 #if defined(TRACING)
     RtsFlags.TraceFlags.tracing       = TRACE_NONE;
     RtsFlags.TraceFlags.timestamp     = false;
@@ -2343,13 +2346,7 @@ static bool read_heap_profiling_flag(const char *arg)
     }
     // here property is initialized, and filter is a pointer inside arg
 
-    if (
-#if defined(PROFILING)
-        filter[0] != '\0'
-#else
-        false // Non-profiled builds ignore -hTfoo syntax and treat it as -hT
-#endif
-    ) {
+    if (filter[0] != '\0') {
         // For backwards compat, extract the portion between curly braces, else
         // use the entire string
         const char *left = strchr(filter, '{');
@@ -2365,6 +2362,7 @@ static bool read_heap_profiling_flag(const char *arg)
 
         char *selector = stgStrndup(left, right - left);
         switch (property) {
+#if defined(PROFILING)
         case 'c': // cost centre label select
             RtsFlags.ProfFlags.ccSelector = selector;
             break;
@@ -2395,6 +2393,31 @@ static bool read_heap_profiling_flag(const char *arg)
         case 'e': // era select
             RtsFlags.ProfFlags.eraSelector = strtoul(selector, (char **) NULL, 10);
             break;
+#else
+        case 'c':
+        case 'C':
+        case 'M':
+        case 'm':
+        case 'D':
+        case 'd':
+        case 'Y':
+        case 'y':
+        case 'R':
+        case 'r':
+        case 'B':
+        case 'b':
+        case 'E':
+        case 'e':
+            PROFILING_BUILD_ONLY(arg,);
+            break;
+        case 'T': /* closure type select */
+            RtsFlags.ProfFlags.closureTypeSelector = selector;
+            break;
+        case 'i': /* info table select */
+            RtsFlags.ProfFlags.infoTableSelector = selector;
+            break;
+
+#endif /* PROFILING */
         default:
             stgFree(selector);
         }
