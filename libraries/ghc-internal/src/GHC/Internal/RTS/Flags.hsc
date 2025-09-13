@@ -312,6 +312,8 @@ data ProfFlags = ProfFlags
     , retainerSelector         :: Maybe String
     , bioSelector              :: Maybe String
     , eraSelector              :: Word -- ^ @since base-4.20.0.0
+    , closureTypeSelector      :: Maybe String
+    , infoTableSelector        :: Maybe String
     } deriving ( Show -- ^ @since base-4.8.0.0
                , Generic -- ^ @since base-4.15.0.0
                )
@@ -613,6 +615,8 @@ getProfFlags = do
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, retainerSelector} ptr)
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, bioSelector} ptr)
             <*> #{peek PROFILING_FLAGS, eraSelector} ptr
+            <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, closureTypeSelector} ptr)
+            <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, infoTableSelector} ptr)
 
 getTraceFlags :: IO TraceFlags
 getTraceFlags = do

@@ -6366,7 +6366,9 @@ module GHC.RTS.Flags.Experimental where
                  ccsSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
                  retainerSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
                  bioSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
-                 eraSelector :: GHC.Internal.Types.Word}
+                 eraSelector :: GHC.Internal.Types.Word,
+                 closureTypeSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
+                 infoTableSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String}
   type RTSFlags :: *
   data RTSFlags = RTSFlags {gcFlags :: GCFlags, concurrentFlags :: ConcFlags, miscFlags :: MiscFlags, debugFlags :: DebugFlags, costCentreFlags :: CCFlags, profilingFlags :: ProfFlags, traceFlags :: TraceFlags, tickyFlags :: TickyFlags, parFlags :: ParFlags, hpcFlags :: HpcFlags}
   type RtsTime :: *

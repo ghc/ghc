@@ -170,6 +170,8 @@ typedef struct _PROFILING_FLAGS {
     const char*         retainerSelector;
     StgWord             eraSelector;
     const char*         bioSelector;
+    const char*         closureTypeSelector;
+    const char*         infoTableSelector;
 
 } PROFILING_FLAGS;
 
