@@ -404,6 +404,8 @@ usage_text[] = {
 "    -hr<cc>...   closures with specified retainers",
 "    -hb<bio>...  closures with specified biographies (lag,drag,void,use)",
 "    -he<era>...  closures with specified era",
+"    -hT<typ>,... specified closure types",
+"    -hi<adr>,... closures with specified info table addresses",
 "",
 "  -R<size>       Set the maximum retainer set size (default: 8)",
 "",
@@ -419,6 +421,9 @@ usage_text[] = {
 "  -h       Heap residency profile (output file <program>.hp)",
 "  -hT      Produce a heap profile grouped by closure type",
 "  -hi      Produce a heap profile grouped by info table address",
+"  A subset of closures may be selected thusly:",
+"    -hT<typ>,... specified closure types",
+"    -hi<adr>,... closures with specified info table addresses",
 "  -po<file>  Override profiling output file name prefix (program name by default)",
 #endif /* PROFILING */
 
