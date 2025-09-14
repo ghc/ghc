@@ -15,7 +15,7 @@ import GHC.Iface.Ext.Utils (emptyNodeInfo, isEvidenceContext)
 import GHC.Types.Name (Name, getOccString, isInternalName, nameModule, nameUnique)
 import GHC.Types.SrcLoc
 import GHC.Types.Unique (getKey)
-import GHC.Unit.Module (ModuleName, moduleNameString)
+import GHC.Unit.Module (Module, ModuleName, moduleNameString)
 import GHC.Utils.Encoding (utf8DecodeByteString)
 import System.FilePath.Posix ((</>))
 import Text.XHtml (Html, HtmlAttr, (!))
@@ -28,7 +28,9 @@ type StyleClass = String
 
 -- | Produce the HTML corresponding to a hyperlinked Haskell source
 render
-  :: Maybe FilePath
+  :: Module
+  -- ^ this module
+  -> Maybe FilePath
   -- ^ path to the CSS file
   -> Maybe FilePath
   -- ^ path to the JS file
@@ -39,12 +41,12 @@ render
   -> [Token]
   -- ^ tokens to render
   -> Html
-render mcss mjs srcs ast tokens = header mcss mjs <> body srcs ast tokens
+render thisModule mcss mjs srcs ast tokens = header mcss mjs <> body thisModule srcs ast tokens
 
-body :: SrcMaps -> HieAST PrintedType -> [Token] -> Html
-body srcs ast tokens = Html.body . Html.pre $ hypsrc
+body :: Module -> SrcMaps -> HieAST PrintedType -> [Token] -> Html
+body thisModule srcs ast tokens = Html.body . Html.pre $ hypsrc
   where
-    hypsrc = renderWithAst srcs ast tokens
+    hypsrc = renderWithAst thisModule srcs ast tokens
 
 header :: Maybe FilePath -> Maybe FilePath -> Html
 header Nothing Nothing = Html.noHtml
@@ -75,9 +77,9 @@ splitTokens ast toks = (before, during, after)
 
 -- | Turn a list of tokens into hyperlinked sources, threading in relevant link
 -- information from the 'HieAST'.
-renderWithAst :: SrcMaps -> HieAST PrintedType -> [Token] -> Html
-renderWithAst srcs Node{..} toks = anchored $ case toks of
-  [tok] | nodeSpan == tkSpan tok -> richToken srcs nodeInfo tok
+renderWithAst :: Module -> SrcMaps -> HieAST PrintedType -> [Token] -> Html
+renderWithAst thisModule srcs Node{..} toks = anchored $ case toks of
+  [tok] | nodeSpan == tkSpan tok -> richToken thisModule srcs nodeInfo tok
   -- NB: the GHC lexer lexes backquoted identifiers and parenthesized operators
   -- as multiple tokens.
   --
@@ -92,6 +94,7 @@ renderWithAst srcs Node{..} toks = anchored $ case toks of
     | realSrcSpanStart s1 == realSrcSpanStart nodeSpan
     , realSrcSpanEnd s2 == realSrcSpanEnd nodeSpan ->
         richToken
+          thisModule
           srcs
           nodeInfo
           ( Token
@@ -104,6 +107,7 @@ renderWithAst srcs Node{..} toks = anchored $ case toks of
     | realSrcSpanStart s1 == realSrcSpanStart nodeSpan
     , realSrcSpanEnd s2 == realSrcSpanEnd nodeSpan ->
         richToken
+          thisModule
           srcs
           nodeInfo
           ( Token
@@ -118,7 +122,7 @@ renderWithAst srcs Node{..} toks = anchored $ case toks of
     go _ [] = mempty
     go [] xs = foldMap renderToken xs
     go (cur : rest) xs =
-      foldMap renderToken before <> renderWithAst srcs cur during <> go rest after
+      foldMap renderToken before <> renderWithAst thisModule srcs cur during <> go rest after
       where
         (before, during, after) = splitTokens cur xs
     anchored c = Map.foldrWithKey anchorOne c (nodeIdentifiers nodeInfo)
@@ -137,8 +141,8 @@ renderToken Token{..}
     tokenSpan = Html.thespan (Html.toHtml tkValue')
 
 -- | Given information about the source position of definitions, render a token
-richToken :: SrcMaps -> NodeInfo PrintedType -> Token -> Html
-richToken srcs details Token{..}
+richToken :: Module -> SrcMaps -> NodeInfo PrintedType -> Token -> Html
+richToken thisModule srcs details Token{..}
   | tkType == TkSpace = renderSpace (srcSpanStartLine tkSpan) tkValue'
   | otherwise = annotate details $ linked content
   where
@@ -155,7 +159,7 @@ richToken srcs details Token{..}
 
     -- If we have name information, we can make links
     linked = case identDet of
-      Just (n, _) -> hyperlink srcs n
+      Just (n, _) -> hyperlink thisModule srcs n
       Nothing -> id
 
 -- | Remove CRLFs from source
@@ -253,8 +257,8 @@ internalAnchorIdent :: Name -> String
 internalAnchorIdent = ("local-" ++) . show . getKey . nameUnique
 
 -- | Generate the HTML hyperlink for an identifier
-hyperlink :: SrcMaps -> Identifier -> Html -> Html
-hyperlink (srcs, srcs') ident = case ident of
+hyperlink :: Module -> SrcMaps -> Identifier -> Html -> Html
+hyperlink thisModule (srcs, srcs') ident = case ident of
   Right name
     | isInternalName name -> internalHyperlink name
     | otherwise -> externalNameHyperlink name
@@ -270,7 +274,7 @@ hyperlink (srcs, srcs') ident = case ident of
     externalNameHyperlink name content = case Map.lookup mdl srcs of
       Just SrcLocal ->
         Html.anchor content
-          ! [Html.href $ hypSrcModuleNameUrl mdl name]
+          ! [Html.href $ hypSrcModuleNameUrl' thisModule mdl name]
       Just (SrcExternal path) ->
         let hyperlinkUrl = hypSrcModuleUrlToNameFormat $ makeHyperlinkUrl path
          in Html.anchor content

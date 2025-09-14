@@ -9,6 +9,7 @@ module Haddock.Backends.Hyperlinker.Utils
   , hypSrcNameUrl
   , hypSrcLineUrl
   , hypSrcModuleNameUrl
+  , hypSrcModuleNameUrl'
   , hypSrcModuleLineUrl
   , hypSrcModuleUrlFormat
   , hypSrcModuleNameUrlFormat
@@ -70,6 +71,12 @@ hypSrcLineUrl line = "line-" ++ show line
 {-# INLINE hypSrcModuleNameUrl #-}
 hypSrcModuleNameUrl :: Module -> Name -> String
 hypSrcModuleNameUrl mdl name = hypSrcModuleUrl mdl ++ "#" ++ hypSrcNameUrl name
+
+{-# INLINE hypSrcModuleNameUrl' #-}
+hypSrcModuleNameUrl' :: Module -> Module -> Name -> String
+hypSrcModuleNameUrl' this_mdl mdl name
+  | this_mdl == mdl = "#" ++ hypSrcNameUrl name
+  | otherwise = hypSrcModuleUrl mdl ++ "#" ++ hypSrcNameUrl name
 
 {-# INLINE hypSrcModuleLineUrl #-}
 hypSrcModuleLineUrl :: Module -> Int -> String
