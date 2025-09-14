@@ -2448,8 +2448,7 @@ hscParsedStmt hsc_env stmt = runInteractiveHsc hsc_env $ do
   -- It's important NOT to have package 'interactive' as thisUnitId
   -- for linking, else we try to link 'main' and can't find it.
   -- Whereas the linker already knows to ignore 'interactive'
-  let src_span = srcLocSpan interactiveSrcLoc
-  (hval,_,_) <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
+  (hval,_,_) <- liftIO $ hscCompileCoreExpr hsc_env interactiveSrcSpan ds_expr
 
   return $ Just (ids, hval, fix_env)
 
@@ -2512,8 +2511,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
       (mkCgInteractiveGuts tidy_cg)
       iNTERACTIVELoc
 
-    let src_span = srcLocSpan interactiveSrcLoc
-    _ <- liftIO $ loadDecls interp hsc_env src_span linkable
+    _ <- liftIO $ loadDecls interp hsc_env interactiveSrcSpan linkable
 
     {- Load static pointer table entries -}
     liftIO $ hscAddSptEntries hsc_env (cg_spt_entries tidy_cg)

@@ -19,8 +19,6 @@ module GHC.Types.SrcLoc (
         leftmostColumn,
 
         noSrcLoc,               -- "I'm sorry, I haven't a clue"
-        generatedSrcLoc,        -- Code generated within the compiler
-        interactiveSrcLoc,      -- Code from an interactive session
 
         advanceSrcLoc,
         advanceBufPos,
@@ -255,10 +253,8 @@ getBufPos (RealSrcLoc _ mbpos) = mbpos
 getBufPos (UnhelpfulLoc _) = Strict.Nothing
 
 -- | Built-in "bad" 'SrcLoc' values for particular locations
-noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
+noSrcLoc :: SrcLoc
 noSrcLoc          = UnhelpfulLoc (fsLit "<no location info>")
-generatedSrcLoc   = UnhelpfulLoc (fsLit "<compiler-generated code>")
-interactiveSrcLoc = UnhelpfulLoc (fsLit "<interactive>")
 
 -- | Creates a "bad" 'SrcLoc' that has no detailed information about its location
 mkGeneralSrcLoc :: FastString -> SrcLoc
