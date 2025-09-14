@@ -133,7 +133,7 @@ availsToGlobalRdrEnv hsc_env mod avails
     imp_spec = ImpSpec { is_decl = decl, is_item = ImpAll}
     decl = ImpDeclSpec { is_mod = mod, is_as = moduleName mod,
                          is_qual = False, is_isboot = NotBoot, is_pkg_qual = NoPkgQual,
-                         is_dloc = srcLocSpan interactiveSrcLoc,
+                         is_dloc = interactiveSrcSpan,
                          is_level = NormalLevel }
 
 getHomeModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
@@ -198,4 +198,3 @@ modInfoSafe = minf_safe
 
 modInfoModBreaks :: ModuleInfo -> Maybe InternalModBreaks
 modInfoModBreaks = minf_modBreaks
-
