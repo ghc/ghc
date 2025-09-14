@@ -308,7 +308,13 @@ rtsPackageArgs = package rts ? do
     libzstdIncludeDir <- staged (buildSetting LibZstdIncludeDir)
     libzstdLibraryDir <- staged (buildSetting LibZstdLibDir)
 
-    x86 <- queryTarget stage (\ tgt -> archOS_arch (tgtArchOs tgt) `elem` [ ArchX86, ArchX86_64 ])
+    -- Figure out if the host (the arch where GHC is running on) is x86
+    cross <- expr $ crossStage stage
+    let stage' = if cross then
+                  predStage stage
+                 else
+                  stage
+    x86Host <- queryTarget stage' (\ tgt -> archOS_arch (tgtArchOs tgt) `elem` [ ArchX86, ArchX86_64 ])
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
@@ -323,11 +329,11 @@ rtsPackageArgs = package rts ? do
             --
             -- In particular, we **do not** pass -mavx when compiling
             -- AutoApply_V16.cmm, as that would lock out targets with SSE2 but not AVX.
-          , inputs ["**/AutoApply_V32.cmm"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/AutoApply_V64.cmm"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/AutoApply_V32.cmm"] ? pure [ "-mavx2"    | x86Host ]
+          , inputs ["**/AutoApply_V64.cmm"] ? pure [ "-mavx512f" | x86Host ]
 
-          , inputs ["**/Jumps_V32.cmm"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/Jumps_V64.cmm"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/Jumps_V32.cmm"] ? pure [ "-mavx2"    | x86Host ]
+          , inputs ["**/Jumps_V64.cmm"] ? pure [ "-mavx512f" | x86Host ]
           , notM (targetSupportsSMP stage)   ? arg "-optc-DNOSMP"
           ]
 
@@ -388,11 +394,11 @@ rtsPackageArgs = package rts ? do
                    , "**/AutoApply_V64.c" ] ? pure ["-fno-PIC", "-static"]
 
             -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
-          , inputs ["**/AutoApply_V32.c"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/AutoApply_V64.c"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/AutoApply_V32.c"] ? pure [ "-mavx2"    | x86Host ]
+          , inputs ["**/AutoApply_V64.c"] ? pure [ "-mavx512f" | x86Host ]
 
-          , inputs ["**/Jumps_V32.c"] ? pure [ "-mavx2"    | x86 ]
-          , inputs ["**/Jumps_V64.c"] ? pure [ "-mavx512f" | x86 ]
+          , inputs ["**/Jumps_V32.c"] ? pure [ "-mavx2"    | x86Host ]
+          , inputs ["**/Jumps_V64.c"] ? pure [ "-mavx512f" | x86Host ]
 
           -- inlining warnings happen in Compact
           , inputs ["**/Compact.c"] ? arg "-Wno-inline"
