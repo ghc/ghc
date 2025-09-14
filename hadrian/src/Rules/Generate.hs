@@ -8,7 +8,7 @@ import Development.Shake.FilePath
 import Base
 import qualified Context
 import Expression
-import Hadrian.Oracles.TextFile (getTargetTarget, lookupStageBuildConfig)
+import Hadrian.Oracles.TextFile (lookupStageBuildConfig)
 import Oracles.Flag hiding (arSupportsAtFile, arSupportsDashL)
 import Oracles.ModuleFiles
 import Oracles.Setting
