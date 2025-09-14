@@ -14,7 +14,7 @@ import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils (emptyNodeInfo, isEvidenceContext)
 import GHC.Types.Name (Name, getOccString, isInternalName, nameModule, nameUnique)
 import GHC.Types.SrcLoc
-import GHC.Types.Unique (getKey)
+import GHC.Types.Unique (showUnique)
 import GHC.Unit.Module (Module, ModuleName, moduleNameString)
 import GHC.Utils.Encoding (utf8DecodeByteString)
 import System.FilePath.Posix ((</>))
@@ -254,7 +254,7 @@ externalAnchorIdent :: Name -> String
 externalAnchorIdent = hypSrcNameUrl
 
 internalAnchorIdent :: Name -> String
-internalAnchorIdent = ("local-" ++) . show . getKey . nameUnique
+internalAnchorIdent = ("l-" ++) . showUnique . nameUnique
 
 -- | Generate the HTML hyperlink for an identifier
 hyperlink :: Module -> SrcMaps -> Identifier -> Html -> Html
