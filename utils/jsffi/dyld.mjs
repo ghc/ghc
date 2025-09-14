@@ -559,21 +559,8 @@ args.rpc.opened.then(() => main(args));
           }[path.extname(p)] || "application/octet-stream"
         );
 
-        const buf = Buffer.from(await fs.promises.readFile(p));
-        const etag = `sha512-${Buffer.from(
-          await crypto.subtle.digest("SHA-512", buf)
-        ).toString("base64")}`;
-
-        res.setHeader("ETag", etag);
-
-        if (req.headers["if-none-match"] === etag) {
-          res.writeHead(304);
-          res.end();
-          return;
-        }
-
         res.writeHead(200);
-        res.end(buf);
+        fs.createReadStream(p).pipe(res);
         return;
       }
 
