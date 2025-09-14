@@ -28,6 +28,7 @@ module GHC.Types.Unique (
         -- ** Constructors, destructors and operations on 'Unique's
         hasKey,
 
+        showUnique,
         pprUniqueAlways,
 
         mkTag,
@@ -61,7 +62,7 @@ import GHC.Utils.Word64 (intToWord64, word64ToInt)
 import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 
 import GHC.Word         ( Word64 )
-import Data.Char        ( chr, ord )
+import Data.Char        ( chr, ord, isPrint )
 
 import Language.Haskell.Syntax.Module.Name
 
@@ -308,8 +309,8 @@ showUnique uniq
     -- Avoid emitting non-printable characters in pretty uniques.
     -- See #25989.
     tagStr
-      | tag < 'A' || tag > 'z' = show (ord tag) ++ "_"
-      | otherwise              = [tag]
+      | not (isPrint tag)  = show (ord tag) ++ "_"
+      | otherwise          = [tag]
 
 pprUniqueAlways :: IsLine doc => Unique -> doc
 -- The "always" means regardless of -dsuppress-uniques
