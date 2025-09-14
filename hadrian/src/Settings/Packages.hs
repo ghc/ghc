@@ -495,31 +495,68 @@ rtsPackageArgs =
     libzstdIncludeDir <- staged (buildSetting LibZstdIncludeDir)
     libzstdLibraryDir <- staged (buildSetting LibZstdLibDir)
 
-    x86 <- queryTarget stage (\tgt -> archOS_arch (tgtArchOs tgt) `elem` [ArchX86, ArchX86_64])
+    -- Figure out if the host (the arch where GHC is running on) is x86
+    cross <- expr $ crossStage stage
+    let stage' = if cross then
+                  predStage stage
+                 else
+                  stage
+    x86Host <- queryTarget stage' (\ tgt -> archOS_arch (tgtArchOs tgt) `elem` [ ArchX86, ArchX86_64 ])
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
-    let ghcArgs =
-          mconcat
-            [ arg "-Irts",
-              arg $ "-I" ++ path,
-              notM (targetSupportsSMP stage) ? arg "-DNOSMP",
-              way
-                `elem` [debug, debugDynamic]
-                  ? pure
-                    [ "-DTICKY_TICKY",
-                      "-optc-DTICKY_TICKY"
-                    ],
-              Profiling `wayUnit` way ? arg "-DPROFILING",
-              Threaded `wayUnit` way ? arg "-DTHREADED_RTS",
-              -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
-              --
-              -- In particular, we **do not** pass -mavx when compiling
-              -- AutoApply_V16.cmm, as that would lock out targets with SSE2 but not AVX.
-              inputs ["**/AutoApply_V32.cmm"] ? pure ["-mavx2" | x86],
-              inputs ["**/AutoApply_V64.cmm"] ? pure ["-mavx512f" | x86],
-              inputs ["**/Jumps_V32.cmm"] ? pure ["-mavx2" | x86],
-              inputs ["**/Jumps_V64.cmm"] ? pure ["-mavx512f" | x86],
-              notM (targetSupportsSMP stage) ? arg "-optc-DNOSMP"
+    let ghcArgs = mconcat
+          [ arg "-Irts"
+          , arg $ "-I" ++ path
+          , notM (targetSupportsSMP stage)   ? arg "-DNOSMP"
+          , way `elem` [debug, debugDynamic] ? pure [ "-DTICKY_TICKY"
+                                                    , "-optc-DTICKY_TICKY"]
+          , Profiling `wayUnit` way          ? arg "-DPROFILING"
+          , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
+            -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
+            --
+            -- In particular, we **do not** pass -mavx when compiling
+            -- AutoApply_V16.cmm, as that would lock out targets with SSE2 but not AVX.
+          , inputs ["**/AutoApply_V32.cmm"] ? pure [ "-mavx2"    | x86Host ]
+          , inputs ["**/AutoApply_V64.cmm"] ? pure [ "-mavx512f" | x86Host ]
+
+          , inputs ["**/Jumps_V32.cmm"] ? pure [ "-mavx2"    | x86Host ]
+          , inputs ["**/Jumps_V64.cmm"] ? pure [ "-mavx512f" | x86Host ]
+          , notM (targetSupportsSMP stage)   ? arg "-optc-DNOSMP"
+          ]
+
+    let cArgs = mconcat
+          [ rtsWarnings
+          , wayCcArgs
+          , arg "-fomit-frame-pointer"
+          -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
+          -- requires that functions are inlined to work as expected. Inlining
+          -- only happens for optimised builds. Otherwise we can assume that
+          -- there is a non-inlined variant to use instead. But RTS does not
+          -- provide non-inlined alternatives and hence needs the function to
+          -- be inlined. See https://github.com/snowleopard/hadrian/issues/90.
+          , arg "-O2"
+
+          , arg "-Irts"
+          , arg $ "-I" ++ path
+
+          , notM (targetSupportsSMP stage)   ? arg "-DNOSMP"
+
+          , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
+                                                    , "-fno-omit-frame-pointer"
+                                                    , "-g3"
+                                                    , "-O0" ]
+          -- Set the namespace for the rts fs functions
+          , arg $ "-DFS_NAMESPACE=rts"
+
+          , arg $ "-DCOMPILING_RTS"
+
+          , inputs ["**/RtsMessages.c", "**/Trace.c"] ?
+            pure
+              [ "-DRtsWay=\"rts_" ++ show way ++ "\""
+              ]
+
+          , input "**/RtsUtils.c" ? pure
+            [ "-DRtsWay=\"rts_" ++ show way ++ "\""
             ]
 
     let cArgs =
