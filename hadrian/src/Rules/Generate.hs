@@ -256,7 +256,8 @@ generateRules = do
         let prefix = root -/- stageString stage -/- "lib"
             go gen file = generate file (semiEmptyTarget (succStage stage)) gen
         (prefix -/- "settings") %> \out -> go (generateSettings out) out
-        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr getTargetTarget) out
+        -- The compiler in `_build/stage1/` is the stage2 compiler, thus we have to query for "stage from path" + 1
+        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (targetStage (succStage stage))) out
 
   where
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
