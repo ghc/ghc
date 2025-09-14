@@ -80,6 +80,7 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
   nc <- freshNameCache
   HieFile
     { hie_hs_file = file
+    , hie_module = thisModule
     , hie_asts = HieASTs asts
     , hie_types = types
     , hie_hs_src = rawSrc
@@ -116,7 +117,7 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
   let tokens = fmap (\tk -> tk{tkSpan = (tkSpan tk){srcSpanFile = srcSpanFile $ nodeSpan fullAst}}) tokens'
 
   -- Produce and write out the hyperlinked sources
-  writeUtf8File path . renderToString pretty . render' fullAst $ tokens
+  writeUtf8File path . renderToString pretty . render' thisModule fullAst $ tokens
   where
     dflags = ifaceDynFlags iface
     sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
@@ -128,7 +129,7 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
         False -- lex Haddocks as comment tokens
         True -- produce comment tokens
         False -- produce position pragmas tokens
-    render' = render (Just srcCssFile) (Just highlightScript) srcs
+    render' thisModule = render thisModule (Just srcCssFile) (Just highlightScript) srcs
     path = srcdir </> hypSrcModuleFile (ifaceMod iface)
 
     emptyHieAst fileFs =
