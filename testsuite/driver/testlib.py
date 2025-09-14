@@ -1548,8 +1548,6 @@ async def test_common_work(name: TestName, opts,
                 all_ways = [WayName('ghci'), WayName('ghci-opt')]
             else:
                 all_ways = []
-            if needsTargetWrapper():
-                opts.skip = True
         elif func in [makefile_test, run_command]:
             # Note [Makefile tests are supposed to be run in all ways]
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2369,9 +2367,9 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
     args = [prog, stats_args, my_rts_flags, extra_run_opts]
-    if opts.target_wrapper is not None:
+    if opts.target_wrapper is not None and not prog.startswith('HC='):
         args = [opts.target_wrapper] + args
-    elif config.target_wrapper is not None:
+    elif config.target_wrapper is not None and not prog.startswith('HC='):
         args = [config.target_wrapper] + args
     cmd = ' '.join(args)
 
