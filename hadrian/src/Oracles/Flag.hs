@@ -78,7 +78,7 @@ buildFlag f st =
             UseLibbfd            -> "use-lib-bfd"
             UseLibpthread        -> "use-lib-pthread"
             NeedLibatomic        -> "need-libatomic"
-            TargetHasLibm        -> "target-has-libm"
+            TargetHasLibm        -> "use-lib-m"
     in parseFlagResult key <$> (tgtConfig st key)
   where
     tgtConfig Stage0 {} = lookupHostBuildConfig
