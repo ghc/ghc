@@ -5,11 +5,10 @@ module Rules.Generate (
     ) where
 
 import Development.Shake.FilePath
-import Data.Char (isSpace)
 import Base
 import qualified Context
 import Expression
-import Hadrian.Oracles.TextFile (getTargetTarget, lookupStageBuildConfig)
+import Hadrian.Oracles.TextFile (lookupStageBuildConfig)
 import Oracles.Flag hiding (arSupportsAtFile, arSupportsDashL)
 import Oracles.ModuleFiles
 import Oracles.Setting
