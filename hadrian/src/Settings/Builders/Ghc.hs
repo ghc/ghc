@@ -32,7 +32,6 @@ toolArgs = do
 compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     ways <- getLibraryWays
-    stage <- getStage
     useColor <- shakeColor <$> expr getShakeOptions
     let hasVanilla = elem vanilla ways
         hasDynamic = elem dynamic ways
