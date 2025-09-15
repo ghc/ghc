@@ -172,7 +172,7 @@ outOfTreeCompilerArgs = do
     os          <- getTestSetting TestHostOS
     arch        <- maybe "unknown" stringEncodeArch . readArch <$> getTestSetting TestTargetARCH
     platform    <- getTestSetting TestTARGETPLATFORM
-    wordsize    <- show . ((8 :: Int) *) . read <$> getTestSetting TestWORDSIZE
+    wordsize    <- show . read @Int <$> getTestSetting TestWORDSIZE
     rtsWay      <- getTestSetting TestRTSWay
     let debugged = "debug" `isInfixOf` rtsWay
 
