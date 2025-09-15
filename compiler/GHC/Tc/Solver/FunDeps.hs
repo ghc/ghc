@@ -438,7 +438,7 @@ tryEqFunDeps :: EqCt -> SolverStage ()
 tryEqFunDeps work_item@(EqCt { eq_lhs = lhs, eq_eq_rel = eq_rel })
   | NomEq <- eq_rel
   , TyFamLHS tc args <- lhs
-  = tryFamEqFunDeps tc args work_item
+  = tryFamEqFunDeps tc args work_item   -- We have F args ~ rhs
   | otherwise
   = nopStage ()
 
@@ -455,7 +455,6 @@ tryFamEqFunDeps fam_tc args work_item@(EqCt { eq_ev = ev, eq_rhs = rhs })
               mkTopBuiltinFamEqFDs fam_tc ops args rhs }
 
   | Injective inj_flags <- tyConInjectivityInfo fam_tc
-  , isWanted ev
   = if isGiven ev
     then nopStage ()  -- See (INJFAM:Given)
     else do { -- Note [Do local fundeps before top-level instances]
@@ -776,8 +775,8 @@ solveFunDeps work_ev fd_eqns
                 nestFunDepsTcS     $
                 do { (_, eqs) <- wrapUnifier work_ev Nominal do_fundeps
                    ; solveSimpleWanteds eqs }
-    -- ToDo: why solveSimpleWanteds?  Answer
-    --     (a) don't rely on eager unifier
+    -- Why solveSimpleWanteds?  Answer
+    --     (a) We don't want to rely on the eager unifier being clever
     --     (b) F Int alpha ~ Maybe Int   where  type instance F Int x = Maybe x
 
        ; return unif_happened }
