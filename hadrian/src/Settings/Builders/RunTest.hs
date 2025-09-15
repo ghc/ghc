@@ -22,8 +22,6 @@ import Settings.Program (programContext)
 import qualified Context.Type
 
 import GHC.Toolchain.Target
-import Text.Read
-import GHC.Platform.ArchOS
 import Debug.Trace
 
 
@@ -166,11 +164,8 @@ outOfTreeCompilerArgs = do
 
     debugAssertions     <- getBooleanSetting TestGhcDebugAssertions
 
-    let readArch :: String -> Maybe Arch
-        readArch = readMaybe
-
     os          <- getTestSetting TestHostOS
-    arch        <- maybe "unknown" stringEncodeArch . readArch <$> getTestSetting TestTargetARCH
+    arch        <- getTestSetting TestTargetARCH
     platform    <- getTestSetting TestTARGETPLATFORM
     wordsize    <- show . read @Int <$> getTestSetting TestWORDSIZE
     rtsWay      <- getTestSetting TestRTSWay
