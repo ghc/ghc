@@ -1,5 +1,0 @@
-
-mod182.hs:6:16: error: [GHC-87491]
-    Found ‘qualified’ in postpositive position. 
-    Suggested fix:
-      Perhaps you intended to use the ‘ImportQualifiedPost’ extension

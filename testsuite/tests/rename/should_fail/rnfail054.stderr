@@ -1,3 +1,0 @@
-
-rnfail054.hs:6:13: error: [GHC-22385]
-    Not in scope: record field ‘foo’

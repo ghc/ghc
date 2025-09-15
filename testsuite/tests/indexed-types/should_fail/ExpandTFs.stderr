@@ -1,6 +1,0 @@
-
-ExpandTFs.hs:9:52: error: [GHC-83865]
-    • Couldn't match kind ‘()’ with ‘Maybe String’
-      Expected kind ‘Maybe (Foo Int)’, but ‘'()’ has kind ‘()’
-    • In the type ‘'()’
-      In the type family declaration for ‘Bar’

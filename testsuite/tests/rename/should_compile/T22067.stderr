@@ -1,6 +1,0 @@
-
-T22067.hs:5:9: warning: [GHC-61367] [-Wunused-pattern-binds (in -Wextra, -Wunused-binds)]
-    This pattern-binding binds no variables: () = ()
-
-T22067.hs:8:9: warning: [GHC-61367] [-Wunused-pattern-binds (in -Wextra, -Wunused-binds)]
-    This pattern-binding binds no variables: (()) = ()

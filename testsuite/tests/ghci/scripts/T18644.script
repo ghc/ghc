@@ -1,3 +1,0 @@
-:set -XDataKinds -XUnboxedTuples
-:kind! '(# #)
-:kind! '()

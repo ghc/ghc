@@ -1,3 +1,0 @@
-
-rnfail050.hs:10:37: error: [GHC-88464]
-    Variable not in scope: f :: [a] -> [a]

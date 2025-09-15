@@ -1,3 +1,0 @@
-type R :: *
-data R = A | ...
-  	-- Defined at <interactive>:3:10

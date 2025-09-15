@@ -1,4 +1,0 @@
-
-T9436.hs:8:4: error: [GHC-76037]
-    Not in scope: data constructor ‘T'’
-    Suggested fix: Perhaps use ‘T’ (line 5)

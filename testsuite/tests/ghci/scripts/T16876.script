@@ -1,3 +1,0 @@
-:load T16876A.hs T16876B.hs
-:m *T16876B
-h == (f + g)

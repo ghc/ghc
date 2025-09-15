@@ -1,3 +1,0 @@
-:set -fprint-explicit-foralls -fprint-explicit-kinds -XTypeApplications -XDataKinds
-import Data.Proxy
-:kind! 'Proxy @_

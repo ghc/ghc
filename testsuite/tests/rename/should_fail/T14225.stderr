@@ -1,4 +1,0 @@
-
-<interactive>:2:1: error: [GHC-76037]
-    Not in scope: ‘M.fromJusr’
-    Suggested fix: Perhaps use ‘M.fromJust’ (imported from Data.Maybe)

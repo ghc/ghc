@@ -1,4 +1,0 @@
-
-T2126.hs:5:1: error: [GHC-05380]
-    A newtype must have exactly one constructor, but ‘X’ has none
-    In the newtype declaration for ‘X’

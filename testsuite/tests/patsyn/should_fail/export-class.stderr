@@ -1,5 +1,0 @@
-
-export-class.hs:3:13: error: [GHC-66775]
-    • Pattern synonyms can be bundled only with datatypes.
-    • In the pattern synonym: P
-      In the export: MyClass(.., P)

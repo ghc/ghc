@@ -1,3 +1,0 @@
-<command line>: Units form a dependency cycle:
-  - p1-0 depends on
-  - p2-0

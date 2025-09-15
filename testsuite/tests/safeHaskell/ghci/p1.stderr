@@ -1,6 +1,0 @@
-
-<no location info>: warning: [GHC-98887]
-    -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
-
-<no location info>: warning: [GHC-98887]
-    -XGeneralizedNewtypeDeriving is not allowed in Safe Haskell; ignoring -XGeneralizedNewtypeDeriving

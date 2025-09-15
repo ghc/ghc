@@ -1,5 +1,0 @@
-
-Linear5.hs:7:20: error: [GHC-18872]
-    • Couldn't match type ‘Many’ with ‘One’
-        arising from multiplicity of ‘n’
-    • In an equation for ‘incorrectEqn’: incorrectEqn False n = 0

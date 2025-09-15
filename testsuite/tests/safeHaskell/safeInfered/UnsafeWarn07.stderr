@@ -1,7 +1,0 @@
-
-UnsafeWarn07.hs:5:17: warning: [-Wunsafe]
-    ‘UnsafeWarn07’ has been inferred as unsafe!
-    Reason:
-        UnsafeWarn07.hs:10:11: warning: [GHC-56147]
-            Rule "f" ignored
-            Defining user rules is disabled under Safe Haskell

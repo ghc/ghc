@@ -1,3 +1,0 @@
-:set -XRecordWildCards
-
-f x = Data.Semigroup.Arg {..}

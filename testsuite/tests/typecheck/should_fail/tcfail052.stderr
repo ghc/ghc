@@ -1,3 +1,0 @@
-
-tcfail052.hs:3:16: error: [GHC-76037]
-    Not in scope: type variable ‘c’

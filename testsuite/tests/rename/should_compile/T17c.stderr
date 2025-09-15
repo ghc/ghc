@@ -1,3 +1,0 @@
-
-T17c.hs:11:11: warning: [GHC-61367] [-Wunused-pattern-binds (in -Wextra, -Wunused-binds)]
-    This pattern-binding binds no variables: True = True

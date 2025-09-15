@@ -1,2 +1,0 @@
-
-rnfail021.hs:5:2: [GHC-28329] Qualified name in binding position: Baz.f

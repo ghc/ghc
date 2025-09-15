@@ -1,3 +1,0 @@
-
-T12170b.hs:5:8: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
-    Variable not in scope: smth :: IO ()

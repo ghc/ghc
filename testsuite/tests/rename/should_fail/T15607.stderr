@@ -1,6 +1,0 @@
-
-T15607.hs:6:10: error: [GHC-88464]
-    Variable not in scope: pure :: t0 -> t
-    Suggested fix:
-      Remove ‘pure’ from the explicit hiding list in the import of
-      ‘Prelude’ (at T15607.hs:4:1-36).

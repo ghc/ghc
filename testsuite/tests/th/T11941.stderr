@@ -1,7 +1,0 @@
-
-T11941.hs:7:30: error: [GHC-22385]
-    Not in scope: record field ‘getFrst’
-    Suggested fix:
-      Perhaps use one of these:
-        record field of First ‘getFirst’ (imported from Data.Monoid),
-        record field of Last ‘getLast’ (imported from Data.Monoid)

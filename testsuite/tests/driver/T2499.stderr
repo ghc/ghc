@@ -1,6 +1,0 @@
-
-T2499.hs:1:13: error: [GHC-04924]
-    Unknown flag in  {-# OPTIONS_GHC #-} pragma: -package
-
-T2499.hs:1:22: error: [GHC-04924]
-    Unknown flag in  {-# OPTIONS_GHC #-} pragma: blargh

@@ -1,2 +1,0 @@
-foo :: (GHC.Internal.Types.Int -> GHC.Internal.Types.Bool) ->
-       GHC.Internal.Types.Bool

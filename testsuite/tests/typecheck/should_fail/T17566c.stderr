@@ -1,6 +1,0 @@
-
-T17566c.hs:11:12: error: [GHC-17370]
-    • Different names for the same type variable:
-        ‘k’ bound at T17566c.hs:10:12
-        ‘k’ bound at T17566c.hs:11:12
-    • In the class declaration for ‘C2’

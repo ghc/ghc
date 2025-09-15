@@ -1,4 +1,0 @@
-type A :: * -> Constraint
-class A a
-  	-- Defined at T19243.hs:3:1
-instance [safe] A Int -- Defined at T19243.hs:4:10

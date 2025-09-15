@@ -1,3 +1,0 @@
-module RecompExports3_M where
-
-data T = Foo | Bar

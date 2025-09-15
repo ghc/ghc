@@ -1,3 +1,0 @@
-module P where
-instance Show (a -> b) where
-    show = undefined

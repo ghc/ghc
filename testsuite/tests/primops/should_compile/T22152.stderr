@@ -1,9 +1,0 @@
-
-==================== Tidy Core ====================
-Result size of Tidy Core
-  = {terms: 9, types: 5, coercions: 0, joins: 0/0}
-
-toHours = \ t -> case t of { I# x -> I# (quotInt# x 3600#) }
-
-
-

@@ -1,4 +1,0 @@
-T24557d.hs:12:4: error: [GHC-11983]
-    Illegal invisible type pattern: @t
-    An invisible type pattern must occur in an argument position.
-

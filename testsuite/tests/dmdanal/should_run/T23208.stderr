@@ -1,7 +1,0 @@
-T23208: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
-
-really important message
-
-HasCallStack backtrace:
-  error, called at T23208_Lib.hs:4:7 in main:T23208_Lib
-

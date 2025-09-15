@@ -1,4 +1,0 @@
-GHC.Prim.byteSwap# :: GHC.Internal.Prim.Word#
-                      -> GHC.Internal.Prim.Word#
-  	-- Identifier defined in ‘GHC.Internal.Prim’
--- |Swap bytes in a word.

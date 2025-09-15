@@ -1,4 +1,0 @@
-
-T17725.hs:9:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In an equation for ‘f’: f (IInt 42) True = ...

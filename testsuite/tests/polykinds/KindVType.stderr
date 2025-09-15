@@ -1,7 +1,0 @@
-
-KindVType.hs:8:8: error: [GHC-83865]
-    • Couldn't match type ‘Int’ with ‘Maybe’
-      Expected: Proxy Maybe
-        Actual: Proxy Int
-    • In the expression: Proxy :: Proxy Int
-      In an equation for ‘foo’: foo = (Proxy :: Proxy Int)

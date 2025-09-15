@@ -1,7 +1,0 @@
-T14817.hs:(7,2)-(8,35): Splicing declarations
-    [d| data family Foo :: Type
-        
-        data instance Foo :: Type |]
-  ======>
-    data family Foo :: Type
-    data instance Foo :: Type

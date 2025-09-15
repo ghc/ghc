@@ -1,4 +1,0 @@
-
-mod10.hs:2:10: error: [GHC-76037]
-    • Not in scope: type constructor or class ‘T’
-    • In the export: T(K1)

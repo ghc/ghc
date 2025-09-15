@@ -1,4 +1,0 @@
-
-cmdFail007.hs:5:7: error: [GHC-03790]
-    Parse error in command:
-      (_ -< _) {a = _ -< _, b = _ -< _, c = _ -< _}

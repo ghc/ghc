@@ -1,9 +1,0 @@
-
-T15558.hs:11:15: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
-    • Inaccessible code in
-        a type expected by the context:
-          (a ~ Bool) => ()
-      Couldn't match type ‘Int’ with ‘Bool’
-    • In the first argument of ‘MkFoo’, namely ‘()’
-      In the expression: MkFoo ()
-      In an equation for ‘f’: f MkT = MkFoo ()

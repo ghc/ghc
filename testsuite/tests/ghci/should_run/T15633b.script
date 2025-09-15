@@ -1,2 +1,0 @@
-:set -fplugin TcPluginGHCi
-:t True

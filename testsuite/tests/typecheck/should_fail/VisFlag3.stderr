@@ -1,6 +1,0 @@
-
-VisFlag3.hs:6:3: error: [GHC-83865]
-    • Expecting one more argument to ‘hk’
-      Expected kind ‘forall k. k -> k’,
-        but ‘hk’ has kind ‘forall k -> k -> k’
-    • In the associated type family declaration for ‘F’

@@ -1,6 +1,0 @@
-
-BadTelescope3.hs:9:1: error: [GHC-87279]
-    • The kind of ‘S’ is ill-scoped
-        Inferred kind: S :: k -> forall k -> k -> *
-      Perhaps try this order instead: k (a :: k) (b :: k)
-    • In the type synonym declaration for ‘S’

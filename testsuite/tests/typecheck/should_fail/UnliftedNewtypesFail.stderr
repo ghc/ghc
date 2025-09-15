@@ -1,6 +1,0 @@
-
-UnliftedNewtypesFail.hs:6:20: error: [GHC-83865]
-    • Expected a type, but ‘Show Int’ is a constraint
-    • In the type ‘(Show Int)’
-      In the definition of data constructor ‘Baz’
-      In the newtype declaration for ‘Baz’

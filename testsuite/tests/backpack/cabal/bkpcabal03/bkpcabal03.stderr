@@ -1,2 +1,0 @@
-
-Mod.hs:4:5: error: [GHC-88464] Variable not in scope: g :: Int

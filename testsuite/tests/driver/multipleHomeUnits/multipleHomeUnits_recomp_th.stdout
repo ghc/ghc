@@ -1,8 +1,0 @@
-GHCi, version 9.7.20230119: https://www.haskell.org/ghc/  :? for help
-[1 of 2] Compiling Dep              ( Dep.hs, interpreted )[dep]
-[2 of 2] Compiling RecompTH         ( RecompTH.hs, interpreted )[recomp]
-Ok, two modules loaded.
-ghci> ghci> ghci> [1 of 2] Compiling Dep              ( Dep.hs, interpreted )[dep] [Source file changed]
-[2 of 2] Compiling RecompTH         ( RecompTH.hs, interpreted )[recomp] [Dep changed (interface)]
-Ok, two modules loaded.
-ghci> Leaving GHCi.

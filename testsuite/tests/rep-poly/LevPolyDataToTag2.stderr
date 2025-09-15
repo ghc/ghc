@@ -1,6 +1,0 @@
-
-LevPolyDataToTag2.hs:13:9: error: [GHC-39999]
-    • No instance for ‘DataToTag (LevPoly lev)’
-        arising from a use of ‘dataToTag#’
-    • In the expression: dataToTag#
-      In an equation for ‘notOK’: notOK = dataToTag#

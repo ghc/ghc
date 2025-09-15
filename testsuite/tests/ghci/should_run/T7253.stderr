@@ -1,8 +1,0 @@
-
-<interactive>:19:1: warning: [GHC-42044] [-Wunrecognised-pragmas (in -Wdefault)]
-    Unrecognised pragma: FOO
-
-<interactive>:61:1: error: [GHC-29178]
-    • Role mismatch on variable b:
-        Annotation says phantom but role representational is required
-    • while checking a role annotation for ‘T1’

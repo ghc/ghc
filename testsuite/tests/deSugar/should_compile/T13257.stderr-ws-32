@@ -1,3 +1,0 @@
-
-T13257.hs:6:11: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
-    Literal -1 is out of the Word range 0..4294967295

@@ -1,6 +1,0 @@
-
-T6018failclosed2.hs:17:10: error: [GHC-83865]
-    • Couldn't match expected type ‘Char’ with actual type ‘Bar a0’
-        The type variable ‘a0’ is ambiguous
-    • In the expression: bar 'c'
-      In an equation for ‘barapp’: barapp = bar 'c'

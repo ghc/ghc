@@ -1,7 +1,0 @@
-
-LinearViewPattern.hs:11:4: error: [GHC-18872]
-    • Couldn't match type ‘Many’ with ‘One’
-        arising from a non-linear pattern ‘not -> True’
-          (view patterns aren't linear)
-    • In the pattern: not -> True
-      In an equation for ‘f’: f (not -> True) = True

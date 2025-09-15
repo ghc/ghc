@@ -1,3 +1,0 @@
-
-overloadedrecfldsfail14.hs:12:18: error: [GHC-22385]
-    Not in scope: record field ‘y’

@@ -1,6 +1,0 @@
-
-T11313.hs:5:12: error: [GHC-83865]
-    • Expected kind ‘* -> *’, but ‘*’ has kind ‘*’
-    • In the type ‘(*)’
-      In the expression: fmap @(*)
-      In an equation for ‘x’: x = fmap @(*)

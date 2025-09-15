@@ -1,5 +1,0 @@
-:set -XRecordWildCards
-
-data Arg = Arg () Bool
-
-f x = Arg {..}

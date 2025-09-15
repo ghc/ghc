@@ -1,3 +1,0 @@
-type T a = a
-:kind! T
-:kind T

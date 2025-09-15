@@ -1,7 +1,0 @@
-
-T15523.hs:5:20: error: [GHC-23517]
-    • A newtype constructor must have exactly one field
-        but ‘Foo’ has none
-      Foo :: Duration
-    • In the definition of data constructor ‘Foo’
-      In the newtype declaration for ‘Duration’

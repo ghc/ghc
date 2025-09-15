@@ -1,5 +1,0 @@
-
-T9975a.hs:6:1: [GHC-29916]
-    Multiple declarations of ‘Test’
-    Declared at: T9975a.hs:5:13
-                 T9975a.hs:6:1

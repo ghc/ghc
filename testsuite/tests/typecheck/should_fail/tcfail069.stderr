@@ -1,7 +1,0 @@
-
-tcfail069.hs:21:7: error: [GHC-83865]
-    • Couldn't match expected type: ([Int], [Int])
-                  with actual type: [a0]
-    • In the pattern: []
-      In a case alternative: [] -> error "foo"
-      In the expression: case (list1, list2) of [] -> error "foo"

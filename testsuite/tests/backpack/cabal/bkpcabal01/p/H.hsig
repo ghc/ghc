@@ -1,2 +1,0 @@
-signature H where
-x :: Bool

@@ -1,4 +1,0 @@
-:seti -XTemplateHaskell
-:load T8831.hs
-$foo
-

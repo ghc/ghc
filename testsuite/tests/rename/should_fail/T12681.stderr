@@ -1,5 +1,0 @@
-
-T12681.hs:4:17: error: [GHC-76037]
-    Not in scope: ‘a’
-    Suggested fix:
-      Perhaps use record field of A ‘T12681a.a’ (imported from T12681a)

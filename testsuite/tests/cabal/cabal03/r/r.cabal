@@ -1,5 +1,0 @@
-name: r
-version: 1.0
-build-depends: p, q
-exposed-modules:
-build-type: Simple

@@ -1,7 +1,0 @@
-UnlGadt1: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
-
-boom
-
-HasCallStack backtrace:
-  error, called at UnlGadt1.hs:20:13 in main:Main
-

@@ -1,5 +1,0 @@
-
-T9161-1.hs:8:14: error: [GHC-70349]
-    • Pattern synonym ‘PATTERN’ cannot be used here
-        (pattern synonyms cannot be promoted)
-    • In the type signature: wrongLift :: PATTERN

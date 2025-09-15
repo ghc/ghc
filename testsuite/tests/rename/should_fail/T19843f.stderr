@@ -1,4 +1,0 @@
-
-T19843f.hs:8:12: error: [GHC-22385]
-    Not in scope: record field ‘mup’
-    Suggested fix: Perhaps use record field of A ‘mop’ (line 5)

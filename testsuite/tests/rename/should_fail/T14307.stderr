@@ -1,3 +1,0 @@
-
-T14307.hs:10:4: error: [GHC-76037]
-    Not in scope: data constructor ‘C’

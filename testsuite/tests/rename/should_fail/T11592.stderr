@@ -1,8 +1,0 @@
-
-T11592.hs:5:14: error: [GHC-76037] Not in scope: type variable ‘a’
-
-T11592.hs:7:16: error: [GHC-76037] Not in scope: type variable ‘a’
-
-T11592.hs:8:18: error: [GHC-76037] Not in scope: type variable ‘a’
-
-T11592.hs:10:20: error: [GHC-76037] Not in scope: type variable ‘a’

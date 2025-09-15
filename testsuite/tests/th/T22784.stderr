@@ -1,6 +1,0 @@
-T22784.hs:(6,2)-(7,18): Splicing declarations
-    [d| f :: (Bool :: Type)
-        f = True |]
-  ======>
-    f :: (Bool :: Type)
-    f = True

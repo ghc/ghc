@@ -1,6 +1,0 @@
-
-T22839.hs:3:1: error: [GHC-58805]
-    Illegal binding of an existing name: []
-
-T22839.hs:5:1: error: [GHC-58805]
-    Illegal binding of an existing name: ->

@@ -1,3 +1,0 @@
-:set -XNoImplicitPrelude
-:show imports
- -- Should produce no output

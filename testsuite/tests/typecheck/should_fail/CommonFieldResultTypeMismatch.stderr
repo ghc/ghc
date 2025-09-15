@@ -1,4 +1,0 @@
-CommonFieldResultTypeMismatch.hs:3:1: [GHC-31004]
-     Constructors A1 and A2 have a common field ‘fld’,
-        but have different result types
-     In the data type declaration for ‘A’

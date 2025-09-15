@@ -1,4 +1,0 @@
-#x :: GHC.Internal.OverloadedLabels.IsLabel "x" a => a
-"hello"
-"hello world"
-"goodbye world"

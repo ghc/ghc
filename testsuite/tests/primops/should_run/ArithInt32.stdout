@@ -1,8 +1,0 @@
-Pass: passing Int32# on the stack
-Pass: negateInt32#
-Pass: plusInt32#
-Pass: subInt32#
-Pass: timesInt32#
-Pass: remInt32#
-Pass: quotInt32#
-Pass: quotRemInt32#

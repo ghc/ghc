@@ -1,3 +1,0 @@
-
-capi_wrapper.hs:4:21: error: [GHC-72744]
-    Wrapper stubs can't be used with CApiFFI.

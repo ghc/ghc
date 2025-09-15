@@ -1,3 +1,0 @@
-:set -hide-all-packages
-
-import Data.Text

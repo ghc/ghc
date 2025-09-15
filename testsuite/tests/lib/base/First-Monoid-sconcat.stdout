@@ -1,3 +1,0 @@
-First {getFirst = Just 1}
-First {getFirst = Just 2}
-First {getFirst = Just 3}

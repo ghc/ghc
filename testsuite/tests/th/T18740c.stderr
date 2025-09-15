@@ -1,6 +1,0 @@
-
-T18740c.hs:9:1: error: [GHC-01928]
-    • Illegal term-level use of the type variable ‘a’
-    • bound at T18740c.hs:9:1
-    • In the expression: a
-      In an equation for ‘f’: f (Proxy :: Proxy a) = a

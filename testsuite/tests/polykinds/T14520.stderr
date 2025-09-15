@@ -1,7 +1,0 @@
-
-T14520.hs:15:24: error: [GHC-83865]
-    • Expected kind ‘bat w w’,
-        but ‘Id’ has kind ‘XXX @a0 @(*) (XXX @a0 @(a0 ~>> *) kat0 b0) b0’
-        The type variables ‘kat0’, ‘b0’ are ambiguous
-    • In the first argument of ‘Sing’, namely ‘(Id :: bat w w)’
-      In the type signature: sId :: Sing w -> Sing (Id :: bat w w)

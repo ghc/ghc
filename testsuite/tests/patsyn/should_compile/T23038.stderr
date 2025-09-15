@@ -1,6 +1,0 @@
-
-T23038.hs:19:9: error: [GHC-55876]
-    • Cannot use record selector ‘fld2’ as a function due to escaped type variables
-    • In the expression: fld2
-      In an equation for ‘test2’: test2 = fld2
-    Suggested fix: Use pattern-matching syntax instead

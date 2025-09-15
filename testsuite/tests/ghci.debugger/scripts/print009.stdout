@@ -1,3 +1,0 @@
-li = (_t2::[Maybe Integer])
-"user value"
-[Just 1,Just 2,Just 3,Just 4]

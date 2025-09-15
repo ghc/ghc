@@ -1,5 +1,0 @@
-unpack_inside_type.hs:3:25: error: [GHC-18932]
-    • Unexpected UNPACK annotation: {-# UNPACK #-}Int
-      UNPACK annotation can only appear on the arguments of a data constructor type
-    • In the definition of data constructor ‘T’
-

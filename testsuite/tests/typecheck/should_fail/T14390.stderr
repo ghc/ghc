@@ -1,4 +1,0 @@
-
-T14390.hs:4:10: error: [GHC-97044]
-    • Class ‘~~’ does not support user-specified instances.
-    • In the instance declaration for ‘(~~) Int Int’

@@ -1,7 +1,0 @@
-
-NFSSuppressed.hs:9:5: error: [GHC-88464]
-    Variable not in scope: foo
-    Suggested fixes:
-      • Perhaps use data constructor ‘Foo’ (line 7)
-      • Notice that ‘foo’ is a field selector belonging to the type ‘Foo’
-        that has been suppressed by NoFieldSelectors.

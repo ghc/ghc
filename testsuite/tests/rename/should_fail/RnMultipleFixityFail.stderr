@@ -1,4 +1,0 @@
-
-RnMultipleFixityFail.hs:6:10: error: [GHC-50419]
-    Multiple fixity declarations for ‘$$’
-    also at  RnMultipleFixityFail.hs:7:1-11

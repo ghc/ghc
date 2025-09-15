@@ -1,5 +1,0 @@
-
-TH_overloaded_no_instance.hs:13:10: error: [GHC-39999]
-    • No instance for ‘Quote NewType’ arising from a quotation bracket
-    • In the expression: [| 5 |]
-      In an equation for ‘quote2’: quote2 = [| 5 |]

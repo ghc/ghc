@@ -1,6 +1,0 @@
-
-T23570.hs:5:6: error: [GHC-76037]
-    Not in scope: type constructor or class ‘C’
-    Suggested fix:
-      Add ‘C’ to the import list in the import of ‘T23570_aux’
-      (at T23570.hs:3:1-25).

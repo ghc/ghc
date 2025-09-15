@@ -1,6 +1,0 @@
-module "Main" {
-  inside "main" {
-    tick "\"World\"" 		[my tag];
-  }
-}
-

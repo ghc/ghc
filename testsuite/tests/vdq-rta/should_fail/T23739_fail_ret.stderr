@@ -1,6 +1,0 @@
-
-T23739_fail_ret.hs:6:9: error: [GHC-01928]
-    • Illegal term-level use of the type variable ‘t’
-    • bound at T23739_fail_ret.hs:6:5
-    • In the expression: t
-      In an equation for ‘bad’: bad t = t

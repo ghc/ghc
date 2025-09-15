@@ -1,6 +1,0 @@
-
-T12102.hs:17:1: error: [GHC-01259]
-    • Illegal constraint in a kind: forall a.
-                                    (IsTypeLit a ~ True) =>
-                                    a -> *
-    • In the data type declaration for ‘T’

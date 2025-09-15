@@ -1,6 +1,0 @@
-qdofail004.hs:10:9: error: [GHC-76037]
-    Not in scope: ‘P.fail’
-    Suggested fix:
-      Remove ‘fail’ from the explicit hiding list in the import of
-      ‘Prelude’ (at qdofail004.hs:3:1-33).
-

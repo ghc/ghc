@@ -1,9 +1,0 @@
-
-T13352_hard.hs:2:29: error: [GHC-69158]
-    Conflicting exports for ‘foo’:
-       ‘S(foo)’ exports ‘T13352_hard_A.foo’
-         imported from ‘T13352_hard_A’ at T13352_hard.hs:3:25-29
-         (and originally defined at T13352_hard_A.hs:3:16-18)
-       ‘T(foo)’ exports ‘T13352_hard_B.foo’
-         imported from ‘T13352_hard_B’ at T13352_hard.hs:4:25-29
-         (and originally defined at T13352_hard_B.hs:3:16-18)

@@ -1,6 +1,0 @@
-
-DataToTagWarnings.hs:15:10: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
-    Defined but not used: data constructor ‘X1’
-
-DataToTagWarnings.hs:15:25: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
-    Defined but not used: data constructor ‘X4’

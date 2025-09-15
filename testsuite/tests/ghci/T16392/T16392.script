@@ -1,7 +1,0 @@
-:set -fobject-code
-import System.Mem
-:load A.hs
-c_two caf
-performMajorGC
-:load A.hs
-c_two caf

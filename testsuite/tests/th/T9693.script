@@ -1,7 +1,0 @@
-System.Directory.copyFile "T9693_initial.hs" "T9693.hs"
-System.IO.hPutStrLn System.IO.stderr "Loading with T9693_initial.hs"
-:load T9693_main.hs
-System.Directory.copyFile "T9693_modified.hs" "T9693.hs"
-System.IO.hPutStrLn System.IO.stderr "Reloading with T9693_modified.hs"
-:reload
-System.Directory.removeFile "T9693.hs"

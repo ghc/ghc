@@ -1,2 +1,0 @@
-($$$) :: [b -> c] -> [b] -> [c] 	-- Defined at <interactive>:1:8
-infixl 9 $$$

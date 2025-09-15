@@ -1,3 +1,0 @@
-
-patFail009.hs:4:3: error: [GHC-04584]
-    Expression syntax in pattern: #a

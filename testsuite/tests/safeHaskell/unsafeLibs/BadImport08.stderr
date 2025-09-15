@@ -1,4 +1,0 @@
-
-BadImport08.hs:6:1: error: [GHC-44360]
-    Control.Monad.ST.Unsafe: Can't be safely imported!
-    The module itself isn't safe.

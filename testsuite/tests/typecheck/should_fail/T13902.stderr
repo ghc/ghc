@@ -1,7 +1,0 @@
-
-T13902.hs:8:5: error: [GHC-83865]
-    • Couldn't match expected type ‘t0 -> Int’ with actual type ‘Int’
-    • The function ‘f’ is applied to two visible arguments,
-        but its type ‘a -> a’ has only one
-      In the expression: f @Int 42 5
-      In an equation for ‘g’: g = f @Int 42 5

@@ -1,8 +1,0 @@
-
-T15264.hs:7:22: error: [GHC-76037] Not in scope: type variable ‘k’
-
-T15264.hs:10:22: error: [GHC-76037]
-    Not in scope: type variable ‘k1’
-
-T15264.hs:10:32: error: [GHC-76037]
-    Not in scope: type variable ‘k2’

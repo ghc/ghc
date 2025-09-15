@@ -1,6 +1,0 @@
-
-RnMultipleMinimalPragmaFail.hs:4:3: error: [GHC-85346]
-    Multiple minimal complete definitions
-    at RnMultipleMinimalPragmaFail.hs:4:3-25
-       RnMultipleMinimalPragmaFail.hs:9:3-25
-    Combine alternative minimal complete definitions with `|'

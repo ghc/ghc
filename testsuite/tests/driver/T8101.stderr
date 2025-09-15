@@ -1,7 +1,0 @@
-
-T8101.hs:7:9: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
-    Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns of type ‘ABC’ not matched:
-            B
-            C

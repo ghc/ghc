@@ -1,1 +1,0 @@
--i c/C.hs -o ./c/C -this-unit-id c

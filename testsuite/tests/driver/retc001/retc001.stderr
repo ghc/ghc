@@ -1,2 +1,0 @@
-
-C.hs:3:11: error: [GHC-61689] Module ‘B’ does not export ‘foo’.

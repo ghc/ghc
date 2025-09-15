@@ -1,6 +1,0 @@
-
-T12229.hs:7:7: warning: [GHC-20125] [-Wmissing-fields (in -Wdefault)]
-    • Fields of ‘MkT’ not initialised:
-        pi :: Float
-    • In the expression: MkT {..}
-      In an equation for ‘f’: f x = MkT {..}

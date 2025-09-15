@@ -1,3 +1,0 @@
-Stopped in Main.main, getargs.hs:3:8-24
-_result :: IO () = _
-["42"]

@@ -1,5 +1,0 @@
-:m + E
-foo
-test (5 :: Int)
-main
-:main

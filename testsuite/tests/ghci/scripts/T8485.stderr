@@ -1,5 +1,0 @@
-
-<interactive>:2:11: error: [GHC-44432]
-    The role annotation for ‘X’ lacks an accompanying binding
-    Suggested fix:
-      Move the role annotation to the declaration site of ‘X’.

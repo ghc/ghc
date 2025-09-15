@@ -1,4 +1,0 @@
-T24837.hs:6:2-37: Splicing declarations
-    [d| f ((x :: Bool) :: Bool) = x |]
-  ======>
-    f ((x :: Bool) :: Bool) = x

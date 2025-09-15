@@ -1,5 +1,0 @@
-
-T9177a.hs:3:8: error: [GHC-88464] Variable not in scope: bar
-
-T9177a.hs:4:8: error: [GHC-88464]
-    Data constructor not in scope: Fun

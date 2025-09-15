@@ -1,8 +1,0 @@
-
-T2414.hs:9:13: error: [GHC-27958]
-    • Couldn't match type ‘b0’ with ‘(Bool, b0)’
-      Expected: b0 -> Maybe (Bool, b0)
-        Actual: b0 -> Maybe b0
-    • In the first argument of ‘unfoldr’, namely ‘Just’
-      In the expression: unfoldr Just
-      In an equation for ‘f’: f = unfoldr Just

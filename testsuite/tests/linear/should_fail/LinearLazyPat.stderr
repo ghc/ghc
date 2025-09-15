@@ -1,7 +1,0 @@
-
-LinearLazyPat.hs:5:3: error: [GHC-18872]
-    • Couldn't match type ‘Many’ with ‘One’
-        arising from a non-linear pattern ‘~(x, y)’
-          (non-variable lazy pattern aren't linear)
-    • In the pattern: ~(x, y)
-      In an equation for ‘f’: f ~(x, y) = (y, x)

@@ -1,6 +1,0 @@
-
-T22326_fail_patsyn.hs:6:17: error: [GHC-70206]
-    • Illegal type pattern.
-      A type pattern must be checked against a visible forall.
-    • In the pattern: type Int
-      In the declaration for pattern synonym ‘MyPat’

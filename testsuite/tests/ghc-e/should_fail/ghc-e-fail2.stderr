@@ -1,5 +1,0 @@
-
-<interactive>:0:1: error: [GHC-97522]
-    Cycle in type synonym declarations:
-      <interactive>:0:1-10: type A = A
-1

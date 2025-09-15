@@ -1,2 +1,0 @@
-ghc: on the commandline: Can't parse -main-is "This could never fail, could it?" as an identifier or module.
-Usage: For basic information, try the `--help' option.

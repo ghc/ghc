@@ -1,5 +1,0 @@
-
-mdofail002.hs:10:9: [GHC-10498]
-    Conflicting definitions for ‘x’
-    Bound at: mdofail002.hs:10:9
-              mdofail002.hs:11:9

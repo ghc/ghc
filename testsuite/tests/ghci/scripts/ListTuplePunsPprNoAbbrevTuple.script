@@ -1,5 +1,0 @@
-
-:set -XNoListTuplePuns
-import Data.Tuple.Experimental (Tuple)
-
-:i Tuple

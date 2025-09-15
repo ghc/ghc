@@ -1,6 +1,0 @@
-
-NoDoAndIfThenElse.hs:7:13: error: [GHC-75254]
-    Unexpected semi-colons in conditional:
-        if True; then return (); else return ()
-    Suggested fix:
-      Perhaps you intended to use the ‘DoAndIfThenElse’ extension

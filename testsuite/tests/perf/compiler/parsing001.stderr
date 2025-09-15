@@ -1,4 +1,0 @@
-
-parsing001.hs:3:1: error: [GHC-87110]
-    Could not find module ‘Wibble’.
-    Use -v to see a list of the files searched for.

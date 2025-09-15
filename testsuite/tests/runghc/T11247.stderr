@@ -1,2 +1,0 @@
-target ‘foo.’ is not a module name or a source file
-target ‘foo.bar’ is not a module name or a source file

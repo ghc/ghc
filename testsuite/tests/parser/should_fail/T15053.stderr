@@ -1,6 +1,0 @@
-
-T15053.hs:1:16: error: [GHC-24342]
-    Error while parsing OPTIONS_GHC pragma.
-    Expecting whitespace-separated list of GHC options.
-      E.g. {-# OPTIONS_GHC -Wall -O2 #-}
-    Input was: " -O1 }\n\"\n  "

@@ -1,4 +1,0 @@
-
-T8912.hs:7:10: error: [GHC-75863]
-    • Illegal implicit parameter ‘?imp::Int’
-    • In the instance declaration for ‘C [a]’

@@ -1,7 +1,0 @@
-
-records-no-uni-update.hs:7:7: error: [GHC-16444]
-    • non-bidirectional pattern synonym ‘Uni’ used in an expression
-    • In a record update at field ‘a’
-      and with pattern synonym ‘Uni’.
-      In the expression: ("a", "b") {a = "b"}
-      In an equation for ‘foo’: foo = ("a", "b") {a = "b"}

@@ -1,7 +1,0 @@
-T7924: Uncaught exception main:Main.Boom:
-
-Boom
-
-HasCallStack backtrace:
-  throwIO, called at T7924.hs:14:30 in main:Main
-

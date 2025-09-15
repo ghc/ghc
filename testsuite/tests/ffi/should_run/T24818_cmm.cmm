@@ -1,5 +1,0 @@
-#include "Cmm.h"
-
-a_number_cmm() {
-    return (37);
-}

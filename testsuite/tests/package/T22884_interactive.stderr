@@ -1,6 +1,0 @@
-
-<no location info>: error: [GHC-87110]
-    Could not load module ‘Data.Text’.
-    It is a member of the hidden package ‘text-2.0.2’.
-    You can run ‘:set -package text’ to expose it.
-    (Note: this unloads all the modules in the current scope.)

@@ -1,5 +1,0 @@
-mod81.hs:3:16: error: [GHC-10237]
-    In the import of ‘Prelude’:
-      a data type called ‘Either’ is exported, but it does not export
-      any constructors called ‘Foo’.
-

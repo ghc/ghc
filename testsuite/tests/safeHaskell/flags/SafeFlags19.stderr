@@ -1,3 +1,0 @@
-
-SafeFlags19.hs:1:17: error: [GHC-04924]
-    Unknown flag in  {-# OPTIONS_GHC #-} pragma: -fno-package-trust

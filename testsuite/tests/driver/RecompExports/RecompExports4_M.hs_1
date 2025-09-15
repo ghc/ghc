@@ -1,6 +1,0 @@
-module RecompExports4_M where
-
-class C a where
-  meth :: a -> String
-
-data T = MkT { fld :: Int }

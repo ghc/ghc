@@ -1,3 +1,0 @@
-
-T13834.hs:5:7: error: [GHC-88464]
-    Variable not in scope: notInScope :: Bool -> t

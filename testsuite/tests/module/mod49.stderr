@@ -1,3 +1,0 @@
-
-mod49.hs:5:3: error: [GHC-54721]
-    ‘y’ is not a (visible) method of class ‘C’

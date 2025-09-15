@@ -1,8 +1,0 @@
-
-mod151.hs:2:20: error: [GHC-87543]
-    Ambiguous occurrence ‘id’.
-    It could refer to
-       either ‘Prelude.id’,
-              imported from ‘Prelude’
-              (and originally defined in ‘GHC.Internal.Base’),
-           or ‘M.id’, defined at mod151.hs:2:30.

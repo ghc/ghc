@@ -1,5 +1,0 @@
-
-T23467.hs:9:1: error: [GHC-18365]
-    • Pattern synonym ‘Con’ has one argument
-        but its type signature has 1 fewer arrows
-    • In the declaration for pattern synonym ‘Con’

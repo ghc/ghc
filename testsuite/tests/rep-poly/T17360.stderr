@@ -1,6 +1,0 @@
-
-T17360.hs:11:1: error: [GHC-55287]
-    The first pattern in the equation for ‘foo’
-    does not have a fixed runtime representation.
-    Its type is:
-      Id a :: TYPE r

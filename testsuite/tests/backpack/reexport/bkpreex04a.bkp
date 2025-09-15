@@ -1,6 +1,0 @@
-unit p where
-    signature B where
-        data T
-    signature A(module A, T) where
-        import B(T)
-

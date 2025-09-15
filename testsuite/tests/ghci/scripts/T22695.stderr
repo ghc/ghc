@@ -1,8 +1,0 @@
-
-<interactive>:1:10: error: [GHC-27346]
-    • The data constructor ‘Just’ should have 1 argument, but has been given none
-    • In the pattern: Just
-      In a stmt of a pattern guard for
-                     an equation for ‘test’:
-        Just <- x
-      In an equation for ‘test’: test x | Just <- x = x

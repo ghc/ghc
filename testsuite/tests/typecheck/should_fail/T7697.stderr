@@ -1,4 +1,0 @@
-
-T7697.hs:3:6: error: [GHC-83865]
-    • Expected a constraint, but ‘Int’ is a type
-    • In the type signature: f :: Int => Int

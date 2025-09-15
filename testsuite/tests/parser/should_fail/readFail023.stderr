@@ -1,6 +1,0 @@
-
-readFail023.hs:9:5: [GHC-46878]
-    The operator ‘**’ [infixl 7] of a section
-        must have lower precedence than that of the operand,
-          namely prefix `-' [infixl 6]
-        in the section: ‘- 3 **’

@@ -1,3 +1,0 @@
-
-mod50.hs:3:22: error: [GHC-76037]
-    Not in scope: type constructor or class ‘Foo’

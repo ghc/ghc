@@ -1,1 +1,0 @@
-T :: forall {k}. forall (a :: k) -> ()

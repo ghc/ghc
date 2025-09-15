@@ -1,4 +1,0 @@
-
-UnsafeInfered03.hs:5:1: error: [GHC-44360]
-    UnsafeInfered03_A: Can't be safely imported!
-    The module itself isn't safe.

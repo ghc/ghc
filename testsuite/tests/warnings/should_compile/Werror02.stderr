@@ -1,3 +1,0 @@
-
-Werror02.hs:5:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
-    Top-level binding with no type signature: foo :: () -> ()

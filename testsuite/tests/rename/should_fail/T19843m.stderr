@@ -1,6 +1,0 @@
-
-T19843m.hs:9:12: error: [GHC-76037]
-    Not in scope: type constructor or class ‘WrongName’
-    Suggested fix:
-      Perhaps use one of these:
-        ‘FongName’ (line 6), data constructor ‘LongName’ (line 5)

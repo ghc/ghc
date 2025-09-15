@@ -1,5 +1,0 @@
-
-T6148c.hs:5:6: error: [GHC-94803]
-    A 65-tuple is too large for GHC
-      (max size is 64)
-      Workaround: use nested tuples or define a data type

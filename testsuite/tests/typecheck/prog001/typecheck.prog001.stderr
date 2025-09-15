@@ -1,5 +1,0 @@
-
-B.hs:7:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
-    • No explicit implementation for
-        ‘row’
-    • In the instance declaration for ‘Matrix Bool Val’

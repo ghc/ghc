@@ -1,7 +1,0 @@
-:add Notfound.hs
-:add NotFound
-:show targets
-:add prog002/A1.hs
-:show targets
-:unadd prog002/A1.hs
-:show targets

@@ -1,4 +1,0 @@
-[1 of 2] Compiling QuasiExpr        ( QuasiExpr.hs, QuasiExpr.o, QuasiExpr.dyn_o )
-[2 of 2] Compiling QuasiQuote       ( QuasiQuote.hs, nothing )
-[1 of 2] Compiling QuasiExpr        ( QuasiExpr.hs, QuasiExpr.o, QuasiExpr.dyn_o ) [Missing dynamic object file]
-[2 of 2] Compiling QuasiQuote       ( QuasiQuote.hs, nothing ) [QuasiExpr[TH] changed]

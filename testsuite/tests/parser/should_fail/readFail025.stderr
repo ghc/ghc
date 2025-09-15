@@ -1,6 +1,0 @@
-
-readFail025.hs:5:8: error: [GHC-77878]
-    Unexpected type ‘String’
-    In the data declaration for ‘T’
-    A data declaration should have form
-      data T a = ...

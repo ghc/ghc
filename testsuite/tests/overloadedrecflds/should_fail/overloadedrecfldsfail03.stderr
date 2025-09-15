@@ -1,5 +1,0 @@
-
-overloadedrecfldsfail03.hs:8:16: [GHC-29916]
-    Multiple declarations of ‘foo’
-    Declared at: overloadedrecfldsfail03.hs:6:1
-                 overloadedrecfldsfail03.hs:8:16

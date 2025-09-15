@@ -1,9 +1,0 @@
-
-UnliftedNewtypesLevityBinder.hs:15:7: error: [GHC-55287]
-    • Unsaturated use of a representation-polymorphic unlifted newtype.
-      The argument of the newtype constructor ‘IdentC’
-      does not have a fixed runtime representation.
-      Its type is:
-        a :: TYPE r
-    • In the expression: IdentC
-      In an equation for ‘bad’: bad = IdentC

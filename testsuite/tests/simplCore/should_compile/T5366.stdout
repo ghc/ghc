@@ -1,1 +1,0 @@
-      case ds of { Bar bx bx1 -> GHC.Internal.Types.I# bx }

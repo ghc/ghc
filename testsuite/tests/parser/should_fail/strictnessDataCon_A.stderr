@@ -1,3 +1,0 @@
-
-strictnessDataCon_A.hs:1:27: error: [GHC-24180]
-    Operator applied to too few arguments: !

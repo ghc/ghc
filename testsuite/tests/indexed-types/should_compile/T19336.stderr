@@ -1,4 +1,0 @@
-
-T19336.hs:43:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
-    Top-level binding with no type signature:
-      oops :: (X a (F a), Poly a) => a -> F a

@@ -1,3 +1,0 @@
-
-proffail001.hs:5:18: error: [GHC-76176]
-    Spaces are not allowed in SCCs

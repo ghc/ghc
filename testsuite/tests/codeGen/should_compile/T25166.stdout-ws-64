@@ -1,9 +1,0 @@
-[section ""data" . Test.foo_closure" {
-     Test.foo_closure:
-         const Test.D_con_info;
-         const GHC.Internal.Types.True_closure+2;
-         const 2 :: W8;
-         const 0 :: W8;
-         const 0 :: W16;
-         const 0 :: W32;
-         const 3;

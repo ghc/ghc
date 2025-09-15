@@ -1,3 +1,0 @@
-fromList
-  :: ghc-internal:GHC.Internal.Classes.Ord k => [(k, a)] -> Map k a
-fromList [(1,"a"),(2,"b")]

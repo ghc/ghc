@@ -1,8 +1,0 @@
-
-T21327.hs:7:11: error: [GHC-18872]
-    • Couldn't match a lifted type with an unlifted type
-      When matching types
-        t0 :: *
-        Int# :: TYPE IntRep
-    • In the expression: ?p :: Int#
-      In an equation for ‘foo’: foo () = (?p :: Int#)

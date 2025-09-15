@@ -1,3 +1,0 @@
-
-mod72.hs:3:7: error: [GHC-88464]
-    Variable not in scope: g :: t1 -> t2

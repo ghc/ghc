@@ -1,5 +1,0 @@
-
-T9371.hs:14:10: error: [GHC-34447]
-    Conflicting family instance declarations:
-      D x -- Defined at T9371.hs:14:10
-      D (x, y) -- Defined at T9371.hs:18:10

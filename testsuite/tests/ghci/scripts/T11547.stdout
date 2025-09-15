@@ -1,5 +1,0 @@
-Ghci1.foo :: t
-Ghci2.foo :: t
-Ghci1.foo :: t
-Foo :: Ghci3.Foo
-Ghci3.Bar :: Ghci3.Foo

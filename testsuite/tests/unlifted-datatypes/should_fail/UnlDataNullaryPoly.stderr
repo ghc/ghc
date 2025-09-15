@@ -1,7 +1,0 @@
-
-UnlDataNullaryPoly.hs:10:10: error: [GHC-31147]
-    • Quantified type's kind mentions quantified type variable
-        type: ‘forall (l :: Levity). T’
-      where the body of the forall has this kind: ‘TYPE (BoxedRep l)’
-    • In the definition of data constructor ‘MkT’
-      In the data type declaration for ‘T’

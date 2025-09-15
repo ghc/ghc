@@ -1,3 +1,0 @@
-
-T3371.hs:10:14: warning: [GHC-40910] [-Wunused-matches (in -Wextra)]
-    Defined but not used: ‘a’

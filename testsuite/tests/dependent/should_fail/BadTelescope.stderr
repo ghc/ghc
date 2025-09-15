@@ -1,7 +1,0 @@
-
-BadTelescope.hs:9:1: error: [GHC-87279]
-    • The kind of ‘X’ is ill-scoped
-        Inferred kind: X :: forall (a :: k) k (b :: k) -> SameKind a b -> *
-      Perhaps try this order instead:
-        k (a :: k) (b :: k) (c :: SameKind a b)
-    • In the data type declaration for ‘X’

@@ -1,4 +1,0 @@
-:set -fdefer-diagnostics
-:set -v1
-:load C.hs
-:reload

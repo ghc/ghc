@@ -1,5 +1,0 @@
-Mod_fasm         ( Mod_fasm.hs, interpreted )
-Mod_fbyte_code   ( Mod_fbyte_code.hs, interpreted )
-Mod_fllvm        ( Mod_fllvm.hs, interpreted )
-Mod_fobject_code ( Mod_fobject_code.hs, Mod_fobject_code.o )
-Mod_top          ( Mod_top.hs, interpreted )

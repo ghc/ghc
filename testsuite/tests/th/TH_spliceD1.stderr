@@ -1,6 +1,0 @@
-
-TH_spliceD1.hs:10:2: error: [GHC-10498]
-    • Conflicting definitions for ‘c’
-      Bound at: TH_spliceD1.hs:10:2-6
-                TH_spliceD1.hs:10:2-6
-    • In an equation for ‘f’

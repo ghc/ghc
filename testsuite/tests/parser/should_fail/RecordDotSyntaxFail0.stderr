@@ -1,3 +1,0 @@
-
-RecordDotSyntaxFail0.hs:3:12: error: [GHC-26832]
-    Use of OverloadedRecordDot '.' not valid ('.' isn't allowed when constructing records or in record patterns)

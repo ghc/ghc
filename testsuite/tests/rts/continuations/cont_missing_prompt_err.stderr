@@ -1,3 +1,0 @@
-cont_missing_prompt_err: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.NoMatchingContinuationPrompt:
-
-GHC.Internal.Exts.control0#: no matching prompt in the current continuation

@@ -1,2 +1,0 @@
-      case dt of dt [Occ=Once] { __DEFAULT -> T14626.MkT dt }
-      case v of { T14626.MkT y [Occ=Once] ->

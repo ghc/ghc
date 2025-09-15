@@ -1,3 +1,0 @@
-
-T21959.hs:6:7: error: [GHC-85524]
-    Duplicate field name ‘fld’ in record update

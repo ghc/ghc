@@ -1,4 +1,0 @@
-:unset +s +t
--- test importing a module from a package
-:l ghci004
-main

@@ -1,9 +1,0 @@
-:load T18828
-:set -XDataKinds -XKindSignatures -XRankNTypes
-import Data.Type.Equality
-:k! ObjectSyn (->)
-:k! forall ob. ObjectSyn ((:~:) :: Cat ob)
-:k! ObjectSyn (:-)
-:k! ObjectFam (->)
-:k! forall ob. ObjectFam ((:~:) :: Cat ob)
-:k! ObjectFam (:-)

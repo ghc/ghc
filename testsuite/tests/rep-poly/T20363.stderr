@@ -1,9 +1,0 @@
-
-T20363.hs:23:10: error: [GHC-55287]
-    • The newtype constructor pattern
-      does not have a fixed runtime representation.
-      Its kind is:
-        TYPE NilRep
-      (Use -fprint-explicit-coercions to see the full type.)
-    • In the pattern: MkNT (##)
-      In an equation for ‘test1b’: test1b (MkNT (##)) = 0

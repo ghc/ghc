@@ -1,5 +1,0 @@
-class T9064.C (a_0 :: *)
-    where {T9064.foo :: a_0 -> GHC.Internal.Base.String;
-           default T9064.foo :: GHC.Internal.Show.Show a_0 =>
-                                a_0 -> GHC.Internal.Base.String}
-instance T9064.C T9064.Bar

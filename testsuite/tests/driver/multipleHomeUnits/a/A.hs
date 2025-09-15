@@ -1,3 +1,0 @@
-module A where
-
-foo = ()

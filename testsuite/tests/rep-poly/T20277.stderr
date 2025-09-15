@@ -1,7 +1,0 @@
-
-T20277.hs:14:9: error: [GHC-55287]
-    • The unboxed sum does not have a fixed runtime representation.
-      Its type is:
-        (# Int# | a #) :: TYPE (SumRep [IntRep, rep])
-    • In the expression: (# 17# | #)
-      In an equation for ‘baz’: baz _ = (# 17# | #)

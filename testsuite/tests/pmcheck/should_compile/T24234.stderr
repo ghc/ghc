@@ -1,8 +1,0 @@
-
-T24234.hs:6:6: warning: [GHC-62161] [-Wincomplete-uni-patterns (in -Wall)]
-    Pattern match(es) are non-exhaustive
-    In an irrefutable pattern: Patterns of type ‘[()]’ not matched: []
-
-T24234.hs:7:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In an equation for ‘foo’: foo _ = ...

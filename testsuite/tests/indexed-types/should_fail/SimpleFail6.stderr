@@ -1,5 +1,0 @@
-
-SimpleFail6.hs:7:11: error: [GHC-10498]
-    Conflicting definitions for ‘a’
-    Bound at: SimpleFail6.hs:7:11
-              SimpleFail6.hs:7:13

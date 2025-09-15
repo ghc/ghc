@@ -1,5 +1,0 @@
-
-ViewPatternsFail.hs:7:6: error: [GHC-22406]
-    Illegal view pattern:  a -> l
-    Suggested fix:
-      Perhaps you intended to use the ‘ViewPatterns’ extension

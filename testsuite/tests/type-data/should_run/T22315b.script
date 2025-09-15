@@ -1,5 +1,0 @@
-:load T22315b.hs
-:type Mk
-:kind Mk
-:type mk
-:kind Mk2

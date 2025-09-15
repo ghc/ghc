@@ -1,6 +1,0 @@
-
-tc231.hs:34:9: error: [GHC-39999]
-    • No instance for ‘Zork s (Z [Char]) b0’
-        arising from a use of ‘huh’
-    • In the expression: huh (s b)
-      In an equation for ‘foo’: foo b = huh (s b)

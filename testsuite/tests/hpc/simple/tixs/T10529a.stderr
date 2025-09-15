@@ -1,7 +1,0 @@
-hpc: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
-
-can not find NonExistingModule in ./.hpc
-
-HasCallStack backtrace:
-  error, called at libraries/hpc/Trace/Hpc/Mix.hs:110:15 in hpc-0.7.0.1-inplace:Trace.Hpc.Mix
-

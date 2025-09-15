@@ -1,3 +1,0 @@
-
-T1344c.hs:3:13: error: [GHC-21231]
-    numeric escape sequence out of range at character '2'

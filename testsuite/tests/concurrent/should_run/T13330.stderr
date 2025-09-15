@@ -1,7 +1,0 @@
-T13330: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
-
-Successful exception
-
-HasCallStack backtrace:
-  error, called at T13330.hs:5:16 in main:Main
-

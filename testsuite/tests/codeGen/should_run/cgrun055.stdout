@@ -1,7 +1,0 @@
-======
-x: Five
-let y = succ x
-y: Six
-y == Six: True
-succ x == Six: True
-isFive x: True

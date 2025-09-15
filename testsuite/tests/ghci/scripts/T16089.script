@@ -1,4 +1,0 @@
-x = [0 .. 100000] :: [Int]
-:sprint x
-x `seq` True
-:sprint x

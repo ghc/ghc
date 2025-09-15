@@ -1,1 +1,0 @@
-import Data.Type.Equality ( (~) )

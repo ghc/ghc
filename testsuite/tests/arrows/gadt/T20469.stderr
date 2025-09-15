@@ -1,6 +1,0 @@
-
-T20469.hs:8:13: error: [GHC-64525]
-    • Proc patterns cannot use existential or GADT data constructors
-    • In the pattern: D
-      In the pattern: (D, x)
-      In the expression: proc (D, x) -> id -< x

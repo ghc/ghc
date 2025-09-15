@@ -1,8 +1,0 @@
-
-T11016.hs:5:19: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
-    • Found extra-constraints wildcard standing for ‘() :: Constraint’
-    • In the type signature: f1 :: (?x :: Int, _) => Int
-
-T11016.hs:8:22: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Int’
-    • In the type signature: f2 :: (?x :: Int) => _

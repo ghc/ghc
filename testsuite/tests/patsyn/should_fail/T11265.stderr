@@ -1,6 +1,0 @@
-
-T11265.hs:6:12: error: [GHC-70349]
-    • Pattern synonym ‘A’ cannot be used here
-        (pattern synonyms cannot be promoted)
-    • In the first argument of ‘F’, namely ‘A’
-      In the instance declaration for ‘F A’

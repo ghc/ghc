@@ -1,4 +1,0 @@
-
-T7943.hs:4:21: error: [GHC-89246]
-    • Record syntax is illegal here: {bar :: String}
-    • In the definition of data constructor ‘B’

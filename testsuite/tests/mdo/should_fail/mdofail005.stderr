@@ -1,5 +1,0 @@
-
-mdofail005.hs:11:14: error: [GHC-58481]
-    parse error on input ‘<-’
-    Suggested fix:
-      Perhaps you intended to use the ‘RecursiveDo’ extension

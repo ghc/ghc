@@ -1,8 +1,0 @@
-
-T2247.hs:7:10: error: [GHC-21572]
-    • Illegal instance declaration for ‘FD a b’:
-        The liberal coverage condition fails in class ‘FD’
-          for functional dependency: ‘a -> b’
-        Reason: lhs type ‘a’ does not determine rhs type ‘b’
-        Un-determined variable: b
-    • In the instance declaration for ‘FD a b’

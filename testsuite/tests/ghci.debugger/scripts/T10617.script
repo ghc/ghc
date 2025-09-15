@@ -1,4 +1,0 @@
-:l T10617.hs
-:break f
-f tmt
-:continue

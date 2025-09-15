@@ -1,6 +1,0 @@
-
-T18036a.hs:14:13: warning: [GHC-30606] [-Wredundant-constraints]
-    • Redundant constraint: Monoid a
-      In the type signature for:
-           fold :: forall a. Monoid a => Identity a -> a
-    • In the instance declaration for ‘Fold Identity’

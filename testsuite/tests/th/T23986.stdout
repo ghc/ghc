@@ -1,7 +1,0 @@
-data Foo_0 deriving (Main.C a_1)
-newtype Foo_0 m_1 a_2
-    = MkFoo_3 (m_1 a_2)
-    deriving (forall r_4 . Control.Monad.Reader.Class.MonadReader r_4)
-class (forall r_0 .
-       Control.Monad.Reader.Class.MonadReader r_0
-                                              m_1) => MonadReaderPlus_2 m_1

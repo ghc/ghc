@@ -1,3 +1,0 @@
-
-T9437.hs:8:18: error: [GHC-70712]
-    You cannot use `..' in a record update

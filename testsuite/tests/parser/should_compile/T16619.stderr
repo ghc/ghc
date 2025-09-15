@@ -1,3 +1,0 @@
-
-T16619.hs:2:13: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
-    -Wmissing-space-after-bang is deprecated: bang patterns can no longer be written with a space

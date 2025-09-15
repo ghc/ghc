@@ -1,5 +1,0 @@
-
-ClosedFam4.hs:5:1: [GHC-60012]
-    You may define an abstract closed type family
-    only in a .hs-boot file
-    In the type family declaration for ‘Foo’

@@ -1,8 +1,0 @@
-
-tcfail216.hs:4:1: error: [GHC-29210]
-    • Potential superclass cycle for ‘A’
-        one of whose superclass constraints is headed by a type variable:
-          ‘cls (A cls)’
-    • In the class declaration for ‘A’
-    Suggested fix:
-      Perhaps you intended to use the ‘UndecidableSuperClasses’ extension

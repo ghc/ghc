@@ -1,3 +1,0 @@
-import Data.ByteString
-import Data.ByteString.Lazy
-:info ByteString

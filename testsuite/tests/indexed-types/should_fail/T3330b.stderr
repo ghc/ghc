@@ -1,5 +1,0 @@
-
-T3330b.hs:14:10: error: [GHC-34447]
-    Conflicting family instance declarations:
-      Res c a b = b -- Defined at T3330b.hs:14:10
-      Res [c] a b = [b] -- Defined at T3330b.hs:18:10

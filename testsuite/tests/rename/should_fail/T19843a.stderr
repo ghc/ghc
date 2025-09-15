@@ -1,3 +1,0 @@
-
-T19843a.hs:5:6: error: [GHC-76037]
-    Not in scope: data constructor ‘Map’

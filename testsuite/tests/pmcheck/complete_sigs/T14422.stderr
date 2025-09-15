@@ -1,8 +1,0 @@
-
-T14422.hs:31:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
-    Pattern match(es) are non-exhaustive
-    In an equation for ‘g’: Patterns of type ‘f a’ not matched: _
-
-T14422.hs:44:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
-    Pattern match(es) are non-exhaustive
-    In an equation for ‘i’: Patterns of type ‘f a’ not matched: _

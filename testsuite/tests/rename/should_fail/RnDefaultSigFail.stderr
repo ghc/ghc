@@ -1,5 +1,0 @@
-
-RnDefaultSigFail.hs:5:3: error: [GHC-40700]
-    Unexpected default signature: default m :: Num a => a
-    Suggested fix:
-      Perhaps you intended to use the ‘DefaultSignatures’ extension

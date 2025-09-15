@@ -1,4 +1,0 @@
-
-T5372.hs:4:11: error: [GHC-76037]
-    Not in scope: data constructor ‘MkS’
-    Suggested fix: Perhaps use ‘T5372a.MkS’ (imported from T5372a)

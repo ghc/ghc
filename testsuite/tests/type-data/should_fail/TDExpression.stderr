@@ -1,6 +1,0 @@
-
-TDExpression.hs:7:5: error: [GHC-01928]
-    • Illegal term-level use of the type constructor ‘Zero’
-    • defined at TDExpression.hs:4:17
-    • In the expression: Zero
-      In an equation for ‘z’: z = Zero

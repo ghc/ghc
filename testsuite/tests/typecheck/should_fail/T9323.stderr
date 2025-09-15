@@ -1,5 +1,0 @@
-
-T9323.hs:4:10: error: [GHC-83865]
-    • Couldn't match expected type ‘[Int]’ with actual type ‘()’
-    • In the expression: ()
-      In an equation for ‘broken’: broken = ()

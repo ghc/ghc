@@ -1,3 +1,0 @@
-module Prelude where
-
-a = ()

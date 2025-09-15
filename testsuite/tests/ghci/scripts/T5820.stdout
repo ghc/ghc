@@ -1,8 +1,0 @@
-type Foo :: *
-data Foo = Foo
-  	-- Defined at T5820.hs:3:1
-instance [safe] Eq Foo -- Defined at T5820.hs:4:10
-type Foo :: *
-data Foo = Foo
-  	-- Defined at T5820.hs:3:1
-instance [safe] Eq Foo -- Defined at T5820.hs:4:10

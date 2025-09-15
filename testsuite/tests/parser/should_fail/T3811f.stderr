@@ -1,3 +1,0 @@
-
-T3811f.hs:4:7: error: [GHC-47568]
-    Malformed head of type or class declaration: !Foo a

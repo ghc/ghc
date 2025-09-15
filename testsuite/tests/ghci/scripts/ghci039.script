@@ -1,3 +1,0 @@
---Basic deriving test
-data T = A | B deriving Show
-show A

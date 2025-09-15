@@ -1,4 +1,0 @@
---Testing type and constructor shadowing
-data T = A | B
-data T = B | C
-:i A

@@ -1,8 +1,0 @@
-TH_foreignInterruptible.hs:8:2-101: Splicing declarations
-    return
-      [ForeignD
-         (ImportF
-            CCall Interruptible "&" (mkName "foo")
-            (AppT (ConT ''Ptr) (ConT ''())))]
-  ======>
-    foreign import ccall interruptible "&" foo :: Ptr ()

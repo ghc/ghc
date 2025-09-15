@@ -1,5 +1,0 @@
-#include "Cmm.h"
-
-hello(W_ n) {
-    return (2*n);
-}

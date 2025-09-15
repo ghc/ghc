@@ -1,3 +1,0 @@
-T9084.hs:5:3: error: [GHC-65904]
-    MINIMAL pragmas not (yet) handled by Template Haskell
-

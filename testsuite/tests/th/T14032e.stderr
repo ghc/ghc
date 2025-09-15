@@ -1,4 +1,0 @@
-
-T14032e.hs:4:2: error: [GHC-50419]
-    Multiple fixity declarations for ‘:*:’
-    also at  T14032e.hs:(4,2)-(6,7)

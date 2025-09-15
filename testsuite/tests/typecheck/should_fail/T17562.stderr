@@ -1,5 +1,0 @@
-
-T17562.hs:7:1: error: [GHC-16220]
-    • Uninferrable type variable k0 in
-      the class context: forall (a :: k -> k0). (a b :: k0) ~ (a c :: k0)
-    • In the class declaration for ‘C’

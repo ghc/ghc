@@ -1,5 +1,0 @@
-
-WerrorFail.hs:6:1: error: [GHC-62161] [-Wincomplete-patterns (in -Wextra), Werror=incomplete-patterns]
-    Pattern match(es) are non-exhaustive
-    In an equation for ‘foo’:
-        Patterns of type ‘Maybe a’ not matched: Just _

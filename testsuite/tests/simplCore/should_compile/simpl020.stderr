@@ -1,5 +1,0 @@
-
-Simpl020_A.hs:26:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
-    • No explicit implementation for
-        ‘toGUIObject’ and ‘cset’
-    • In the instance declaration for ‘GUIObject ()’

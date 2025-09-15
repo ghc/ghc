@@ -1,4 +1,0 @@
-TYPE SIGNATURES
-  bravo :: forall {w}. Num w => w
-Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]

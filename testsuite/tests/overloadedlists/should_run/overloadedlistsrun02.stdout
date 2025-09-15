@@ -1,3 +1,0 @@
-fromList []
-fromList "abc"
-fromList "aceg"

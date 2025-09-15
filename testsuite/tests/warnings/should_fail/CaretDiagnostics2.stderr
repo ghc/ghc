@@ -1,6 +1,0 @@
-
-CaretDiagnostics2.hs:3:1: error: [GHC-21231]
-    lexical error (UTF-8 decoding error)
-  |
-3 | �&l��5k�
-  | ^

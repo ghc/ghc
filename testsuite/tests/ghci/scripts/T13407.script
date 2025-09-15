@@ -1,4 +1,0 @@
-:set -XPolyKinds -XRankNTypes
-import Data.Kind
-data Foo :: (Type -> Type) -> (forall k. k -> Type)
-:info Foo

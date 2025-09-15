@@ -1,6 +1,0 @@
-
-rnfail034.hs:4:11: error: [GHC-28329] Qualified name in binding position: M.y
-
-rnfail034.hs:4:26: error: [GHC-76037]
-    Not in scope: ‘M.y’
-    Suggested fix: Perhaps use ‘M.g’ (line 4)

@@ -1,6 +1,0 @@
-
-T12732.hs:4:10: error: [GHC-88464] Variable not in scope: x
-
-T12732.hs:5:27: error: [GHC-88464] Variable not in scope: x
-
-T12732.hs:6:11: error: [GHC-88464] Variable not in scope: x

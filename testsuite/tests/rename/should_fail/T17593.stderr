@@ -1,7 +1,0 @@
-
-T17593.hs:5:1: error: [GHC-44432]
-    The type signature for ‘<+>’ lacks an accompanying binding
-
-T17593.hs:8:6: error: [GHC-44432]
-    The standalone kind signature for ‘MkT’
-      lacks an accompanying binding

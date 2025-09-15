@@ -1,4 +1,0 @@
-:set -XMultiParamTypeClasses
-class Foo where foo :: Int
-:t foo
-

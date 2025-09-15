@@ -1,4 +1,0 @@
-SI16.hs:10:7: error: [GHC-28914]
-    • Level error: ‘x’ is bound at level 0 but used at level 1
-    • In the Template Haskell quotation: 'x
-

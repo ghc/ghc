@@ -1,5 +1,0 @@
-
-tc175.hs:13:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
-    • No explicit implementation for
-        either ‘showsPrec’ or ‘show’
-    • In the instance declaration for ‘Show (a -> b)’

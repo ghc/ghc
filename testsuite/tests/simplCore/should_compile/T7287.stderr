@@ -1,5 +1,0 @@
-
-T7287.hs:7:3: warning: [GHC-87502] [-Winline-rule-shadowing (in -Wdefault)]
-    Rule "int2Word#/word2Int#" may never fire
-      because rule "word2Int#" for ‘word2Int#’ might fire first
-    Suggested fix: Add phase [n] or [~n] to the competing rule

@@ -1,3 +1,0 @@
-
-readFail022.hs:4:2: error: [GHC-07626]
-    Parse error in pattern: a # b

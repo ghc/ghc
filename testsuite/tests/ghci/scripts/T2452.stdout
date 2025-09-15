@@ -1,2 +1,0 @@
-System.IO.hPutStrLn
-  :: GHC.Internal.IO.Handle.Types.Handle -> String -> IO ()

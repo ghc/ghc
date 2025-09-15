@@ -1,8 +1,0 @@
-T26256.hs:22:15: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Apply :: (* -> *) -> *’
-    • In the type signature: go :: Bool -> _ _
-
-T26256.hs:22:17: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘Maybe :: * -> *’
-    • In the first argument of ‘_’, namely ‘_’
-      In the type signature: go :: Bool -> _ _

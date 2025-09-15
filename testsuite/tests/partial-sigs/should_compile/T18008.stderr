@@ -1,5 +1,0 @@
-
-T18008.hs:5:43: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘String’
-    • In the type signature:
-        f :: (forall a. Show a => a -> String) -> _

@@ -1,5 +1,0 @@
-T15648.hs:17:11: error: [GHC-83865]
-    • Expected a type, but ‘(GHC.Internal.Prim.~#) a b’ is a constraint
-    • In the type ‘(GHC.Internal.Prim.~#) a b’
-      In the definition of data constructor ‘Jank’
-      In the data type declaration for ‘JankyEquality’

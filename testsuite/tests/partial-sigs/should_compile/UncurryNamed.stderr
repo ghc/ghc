@@ -1,4 +1,0 @@
-TYPE SIGNATURES
-  unc :: forall {w1} {w2} {w3}. (w1 -> w2 -> w3) -> (w1, w2) -> w3
-Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]

@@ -1,1 +1,0 @@
-#define B 2

@@ -1,4 +1,0 @@
-
-read044.hs:5:13: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In a case alternative: False -> ...

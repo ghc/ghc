@@ -1,9 +1,0 @@
-
-<interactive>:4:5: error: [GHC-80003]
-    • Non type-variable argument in the constraint: HasField "name" r a
-    • When checking the inferred type
-        foo :: forall {r} {a}. HasField "name" r a => r -> a
-    Suggested fix:
-      Perhaps you intended to use the ‘FlexibleContexts’ extension
-      You may enable this language extension in GHCi with:
-        :set -XFlexibleContexts

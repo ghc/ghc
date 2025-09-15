@@ -1,6 +1,0 @@
-
-T22759.hs:3:15: warning: [GHC-39567] [-Wstar-is-type (in -Wdefault)]
-    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
-    relies on the StarIsType extension, which will become
-    deprecated in the future.
-    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.

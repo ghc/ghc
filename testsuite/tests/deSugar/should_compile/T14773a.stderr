@@ -1,5 +1,0 @@
-
-T14773a.hs:6:12: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
-    Pattern match(es) are non-exhaustive
-    In a multi-way if alternative:
-        Guards do not cover entire pattern space

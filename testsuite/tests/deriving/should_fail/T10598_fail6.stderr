@@ -1,6 +1,0 @@
-
-T10598_fail6.hs:6:41: error: [GHC-86639]
-    • Can't make a derived instance of ‘Functor F’
-        (even with cunning GeneralizedNewtypeDeriving):
-        You need DeriveFunctor to derive an instance for this class
-    • In the newtype declaration for ‘F’

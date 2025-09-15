@@ -1,9 +1,0 @@
-a = O (_t1::a0)
-b = O (_t2::a1)
-()
-_t1 = 'a'
-a :: Opaque = O 'a'
-b :: Opaque = O _
-_t1 :: Char = 'a'
-_t2 :: a1 = _
-it :: () = ()

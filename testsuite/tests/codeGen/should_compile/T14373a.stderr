@@ -1,3 +1,0 @@
-           switch [0 .. 15]
-               case 15 : goto
-               default: {goto

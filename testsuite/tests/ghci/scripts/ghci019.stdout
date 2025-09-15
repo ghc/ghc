@@ -1,4 +1,0 @@
-type Foo :: *
-data Foo = Foo
-  	-- Defined at ghci019.hs:9:1
-instance [safe] Prelude.Eq Foo -- Defined at ghci019.hs:10:10

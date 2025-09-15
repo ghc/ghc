@@ -1,7 +1,0 @@
-
-T4083.hs:14:1: error: [GHC-34611]
-    • Can't make a derived instance of ‘C (F [a])’
-        (even with cunning GeneralizedNewtypeDeriving):
-        the class has associated data types
-    • In the stand-alone deriving instance for
-        ‘C (Maybe a) => C (F [a])’

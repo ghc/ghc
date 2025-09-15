@@ -1,9 +1,0 @@
-
-T10929.hs:4:6: warning: [GHC-10190] [-Wempty-enumerations (in -Wdefault)]
-    Enumeration is empty
-
-T10929.hs:22:6: warning: [GHC-10190] [-Wempty-enumerations (in -Wdefault)]
-    Enumeration is empty
-
-T10929.hs:28:6: warning: [GHC-10190] [-Wempty-enumerations (in -Wdefault)]
-    Enumeration is empty

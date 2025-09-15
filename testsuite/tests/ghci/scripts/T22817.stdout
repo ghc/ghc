@@ -1,9 +1,0 @@
-type BoolKind :: *
-type data BoolKind = FalseType | TrueType
-  	-- Defined at T22817.hs:4:1
-type BoolKind :: *
-type data BoolKind = FalseType | ...
-  	-- Defined at T22817.hs:4:22
-type BoolKind :: *
-type data BoolKind = ... | TrueType
-  	-- Defined at T22817.hs:4:34

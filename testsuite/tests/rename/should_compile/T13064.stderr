@@ -1,3 +1,0 @@
-
-T13064.hs:5:21: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
-    The import of ‘pure’ from module ‘Prelude’ is redundant

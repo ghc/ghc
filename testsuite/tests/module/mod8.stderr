@@ -1,3 +1,0 @@
-
-mod8.hs:2:10: error: [GHC-90973]
-    The export item ‘module N’ is not imported

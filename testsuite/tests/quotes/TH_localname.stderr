@@ -1,8 +1,0 @@
-TH_localname.hs:3:14: error: [GHC-28914]
-    • Level error: ‘y’ is bound at level 0 but used at level 1
-    • Could not be resolved by implicit lifting due to the following error:
-        No instance for: ‘GHC.Internal.TH.Lift.Lift t0’
-    • In the expression: [| y |]
-      In the expression: \ y -> [| y |]
-      In an equation for ‘x’: x = \ y -> [| y |]
-

@@ -1,6 +1,0 @@
-
-T22326_fail_nonlinear.hs:9:9: error: [GHC-10498]
-    • Conflicting definitions for ‘t’
-      Bound at: T22326_fail_nonlinear.hs:9:9
-                T22326_fail_nonlinear.hs:9:18
-    • In an equation for ‘f’

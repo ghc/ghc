@@ -1,4 +1,0 @@
-default-fail08.hs:14:9: error: [GHC-26555]
-    • Illegal named default declaration for non-class ‘CInt’
-    • When checking the class at the head of a named default declaration
-

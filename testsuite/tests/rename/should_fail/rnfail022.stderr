@@ -1,5 +1,0 @@
-
-rnfail022.hs:8:5: error: [GHC-88464]
-    Variable not in scope: intersperse
-    Suggested fix:
-      Perhaps use ‘L.intersperse’ (imported from Data.List)

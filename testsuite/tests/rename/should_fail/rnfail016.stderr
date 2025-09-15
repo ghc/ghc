@@ -1,4 +1,0 @@
-
-rnfail016.hs:6:7: error: [GHC-84077]
-    @-pattern in expression context: x@x
-    Type application syntax requires a space before '@'

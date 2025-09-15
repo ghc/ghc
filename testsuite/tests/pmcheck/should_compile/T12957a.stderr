@@ -1,7 +1,0 @@
-
-T12957a.hs:25:35: warning: [GHC-62161] [-Wincomplete-record-updates (in -Wall)]
-    Pattern match(es) are non-exhaustive
-    In a record update:
-        Patterns of type ‘Fields A’ not matched:
-            AFields
-            EmptyFields

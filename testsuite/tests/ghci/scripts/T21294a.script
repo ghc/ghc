@@ -1,5 +1,0 @@
-type L0 = []
-:i L0
-
-type L1 a = [a]
-:i L1

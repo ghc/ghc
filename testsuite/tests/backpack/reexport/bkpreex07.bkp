@@ -1,3 +1,0 @@
-unit p where
-    signature A(module Prelude) where
-        import Prelude

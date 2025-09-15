@@ -1,3 +1,0 @@
-
-patFail001.hs:3:4: error: [GHC-00482]
-    Illegal lambda-syntax in pattern

@@ -1,4 +1,0 @@
-type role Foo phantom phantom
-type Foo :: (* -> *) -> forall k. k -> *
-data Foo a b
-  	-- Defined at <interactive>:3:1

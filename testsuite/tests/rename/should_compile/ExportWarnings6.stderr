@@ -1,7 +1,0 @@
-
-ExportWarnings6.hs:1:25: warning: [GHC-94721] [-Wincomplete-export-warnings (in -Wall)]
-    ‘x’ will not have its export warned about
-    missing export warning at ExportWarnings6.hs:1:51
-
-ExportWarnings6.hs:1:51: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
-    ‘x’ is exported by ‘x’ and ‘{-# WARNING "warn" #-} x’

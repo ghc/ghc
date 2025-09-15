@@ -1,8 +1,0 @@
-
-T15322.hs:11:6: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
-    • The constraint ‘Typeable (n + 1)’ matches a built-in instance
-      This makes type inference for inner bindings fragile;
-        either use MonoLocalBinds, or simplify it using the instance
-    • In the type signature:
-        f :: forall n. (Typeable (n + 1), KnownNat n) =>
-                       Proxy n -> TypeRep (n + 1)

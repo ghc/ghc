@@ -1,5 +1,0 @@
-T17594b_th.hs:9:6: error: [GHC-78249]
-    Illegal invisible type pattern: @(t)
-    Suggested fix:
-      Perhaps you intended to use the ‘TypeAbstractions’ extension
-

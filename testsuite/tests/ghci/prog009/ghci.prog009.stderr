@@ -1,8 +1,0 @@
-
-A.hs:1:16: error: [GHC-58481] parse error on input ‘where’
-
-<interactive>:25:1: error: [GHC-88464]
-    Variable not in scope: yan
-    Suggested fix: Perhaps use ‘tan’ (imported from Prelude)
-
-A.hs:1:16: error: [GHC-58481] parse error on input ‘where’

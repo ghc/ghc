@@ -1,3 +1,0 @@
-
-T17a.hs:8:1: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
-    Defined but not used: ‘top’

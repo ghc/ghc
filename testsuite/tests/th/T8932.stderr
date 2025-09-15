@@ -1,5 +1,0 @@
-
-T8932.hs:11:1: error: [GHC-29916]
-    Multiple declarations of ‘foo’
-    Declared at: T8932.hs:5:2
-                 T8932.hs:11:1

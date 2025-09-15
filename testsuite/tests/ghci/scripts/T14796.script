@@ -1,3 +1,0 @@
-:set -XGADTs -XConstraintKinds -XTypeApplications
-data ECC ctx f a where ECC :: ctx => f a -> ECC ctx f a
-:t ECC @() @[] @()

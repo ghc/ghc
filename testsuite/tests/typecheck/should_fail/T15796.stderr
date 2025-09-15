@@ -1,6 +1,0 @@
-
-T15796.hs:6:3: error: [GHC-17440]
-    • A newtype constructor must not have a context in its type
-      MkN :: forall a. Show a => a -> N a
-    • In the definition of data constructor ‘MkN’
-      In the newtype declaration for ‘N’

@@ -1,4 +1,0 @@
-ExitSuccess
-ExitFailure 1
-Exc: /non/existent: rawSystem: posix_spawnp: illegal operation (Inappropriate ioctl for device)
-Done

@@ -1,8 +1,0 @@
-
-T12430.hs:7:3: error: [GHC-05175]
-    • Type family equation violates the family's injectivity annotation.
-      Type variable ‘x’ cannot be inferred from the right-hand side.
-      In the type family equation:
-        F x = C x -- Defined at T12430.hs:7:3
-    • In the equations for closed type family ‘F’
-      In the type family declaration for ‘F’

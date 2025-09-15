@@ -1,9 +1,0 @@
-
-T16326_Fail9.hs:11:5: error: [GHC-51580]
-    • Illegal visible, dependent quantification in the type of a term:
-        forall a -> a -> a
-    • In the expression: lol @(forall a -> a -> a) undefined True
-      In an equation for ‘t’:
-          t = lol @(forall a -> a -> a) undefined True
-    Suggested fix:
-      Perhaps you intended to use the ‘RequiredTypeArguments’ extension

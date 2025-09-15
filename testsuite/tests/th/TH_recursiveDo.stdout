@@ -1,7 +1,0 @@
-do {rec {r1_0 <- GHC.Internal.IORef.newIORef r2_1;
-         r2_1 <- GHC.Internal.IORef.newIORef (TH_recursiveDoImport.SelfRef r1_0)};
-    GHC.Internal.IORef.readIORef r2_1}
-True
-mdo {rec {r1_0 <- GHC.Internal.Base.return r2_1;
-          r2_1 <- GHC.Internal.Base.return (GHC.Internal.Base.const 1 r1_0)};
-     GHC.Internal.Base.return r1_0}

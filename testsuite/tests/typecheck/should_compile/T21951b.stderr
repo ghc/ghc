@@ -1,5 +1,0 @@
-
-T21951b.hs:13:10: warning: [GHC-71444] [-Wredundant-strictness-flags]
-    • Lazy flag has no effect on unlifted type ‘U’
-    • In the definition of data constructor ‘T’
-      In the data type declaration for ‘T’

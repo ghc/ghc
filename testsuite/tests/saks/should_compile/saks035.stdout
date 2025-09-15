@@ -1,2 +1,0 @@
-C :: forall {k} (z :: k). Proxy z -> Constraint
-F :: k -> Type

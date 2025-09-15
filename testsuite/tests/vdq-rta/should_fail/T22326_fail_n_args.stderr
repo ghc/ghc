@@ -1,9 +1,0 @@
-
-T22326_fail_n_args.hs:6:1: error: [GHC-25897]
-    • Couldn't match expected type ‘b’ with actual type ‘t0 -> t1’
-      ‘b’ is a rigid type variable bound by
-        the type signature for:
-          f :: a -> forall b -> b
-        at T22326_fail_n_args.hs:6:1-26
-    • The equation for ‘f’ has three visible arguments,
-        but its type ‘a -> forall b -> b’ has only two

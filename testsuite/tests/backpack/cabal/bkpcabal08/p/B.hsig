@@ -1,4 +1,0 @@
-signature B where
-import A
-y :: T
-z :: Bool

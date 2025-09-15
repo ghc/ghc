@@ -1,9 +1,0 @@
--- Test disabled language extensions
-:set -XHaskell2010
-:unset +s
-:set -XSafe
-
-:set -XTemplateHaskell
-
-:set -XGeneralizedNewtypeDeriving
-

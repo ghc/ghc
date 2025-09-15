@@ -1,4 +1,0 @@
-TYPE SIGNATURES
-  foo :: Bool -> Char
-Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]

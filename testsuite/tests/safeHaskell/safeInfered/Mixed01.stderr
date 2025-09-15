@@ -1,5 +1,0 @@
-
-Mixed01.hs:5:1: [GHC-26971]
-    safe import can't be used as Safe Haskell isn't on!
-    Suggested fix:
-      Enable Safe Haskell through either Safe, Trustworthy or Unsafe.

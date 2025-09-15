@@ -1,5 +1,0 @@
-unit p where
-    signature A where
-        data T
-    signature B where
-        data T

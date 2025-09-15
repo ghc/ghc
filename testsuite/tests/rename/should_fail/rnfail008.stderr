@@ -1,3 +1,0 @@
-
-rnfail008.hs:18:9: error: [GHC-54721]
-    ‘op3’ is not a (visible) method of class ‘K’

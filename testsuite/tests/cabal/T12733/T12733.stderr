@@ -1,5 +1,0 @@
-
-Q2.hs:3:10: error: [GHC-59692]
-    Duplicate instance declarations:
-      instance Show (IO a) -- Defined at Q2.hs:3:10
-      instance [safe] Show (IO a) -- Defined in ‘P’

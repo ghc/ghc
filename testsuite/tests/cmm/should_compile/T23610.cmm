@@ -1,3 +1,0 @@
-test(bits64 x) {
-    return (x);
-}

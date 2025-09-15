@@ -1,6 +1,0 @@
-tcfail146.hs:7:22: error: [GHC-83865]
-    • Expected a type, but ‘SClass a’ is a constraint
-    • In the type ‘(SClass a)’
-      In the definition of data constructor ‘SCon’
-      In the data type declaration for ‘SData’
-

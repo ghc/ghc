@@ -1,3 +1,0 @@
-fptrfail01: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
-
-GHC.Internal.ForeignPtr: attempt to mix Haskell and C finalizers in the same ForeignPtr

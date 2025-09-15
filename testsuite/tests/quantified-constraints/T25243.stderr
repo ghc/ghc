@@ -1,6 +1,0 @@
-T25243.hs:8:14: error: [GHC-83865]
-    • Expected an IntRep constraint,
-      but ‘a => b’ is a lifted constraint
-    • In the type ‘a => b’
-      In the type synonym declaration for ‘T’
-

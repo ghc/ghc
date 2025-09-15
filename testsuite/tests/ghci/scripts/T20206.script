@@ -1,3 +1,0 @@
-:set -XRecursiveDo
-rec x <- pure ()
-print x

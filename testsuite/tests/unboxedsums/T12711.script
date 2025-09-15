@@ -1,2 +1,0 @@
-:set -XUnboxedSums -XPartialTypeSignatures -fno-warn-partial-type-signatures
-:kind (# _ | _ #)

@@ -1,5 +1,0 @@
-
-T15881a.hs:8:22: error: [GHC-25897]
-    • Expected a type, but ‘a’ has kind ‘n’
-    • In the kind ‘a -> Type’
-      In the data type declaration for ‘A’

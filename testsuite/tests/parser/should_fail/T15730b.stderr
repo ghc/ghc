@@ -1,3 +1,0 @@
-
-T15730b.hs:8:16: error: [GHC-85314]
-    A pragma is not allowed in this position: {-# SCC a1 #-}

@@ -1,4 +1,0 @@
-
-completesig11.hs:14:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
-    Pattern match(es) are non-exhaustive
-    In an equation for ‘m1’: Patterns of type ‘T’ not matched: B

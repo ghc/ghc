@@ -1,3 +1,0 @@
-:set -ignore-package containers
-
-:l T4806.hs

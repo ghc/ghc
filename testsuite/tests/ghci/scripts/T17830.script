@@ -1,2 +1,0 @@
-:set -ddump-parsed-ast -ddump-rn-ast -ddump-tc-ast
-1

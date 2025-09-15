@@ -1,5 +1,0 @@
-
-T15270A.hs:8:6: error: [GHC-55017]
-    • Illegal data constructor name: ‘id’
-      When splicing a TH expression: GHC.Internal.Base.id
-    • In the untyped splice: $(conE 'id)

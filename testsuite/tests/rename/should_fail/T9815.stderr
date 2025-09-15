@@ -1,5 +1,0 @@
-
-T9815.hs:6:13: error: [GHC-47217]
-    Illegal `{..}' notation for constructor ‘N’
-      Record wildcards may not be used for constructors with unlabelled fields.
-      Possible fix: Remove the `{..}' and add a match for each field of the constructor.

@@ -1,6 +1,0 @@
-
-mod88.hs:5:5: error: [GHC-76037]
-    Not in scope: data constructor ‘Prelude.Left’
-    Suggested fix:
-      Add ‘Left’ to the import list in the import of ‘Prelude’
-      (at mod88.hs:4:1-30).

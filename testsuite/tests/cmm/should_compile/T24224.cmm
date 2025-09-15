@@ -1,3 +1,0 @@
-main () {
-  float64 f1; f1 = (-1.0 :: float64);
-}

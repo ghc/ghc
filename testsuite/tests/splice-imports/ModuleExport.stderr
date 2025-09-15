@@ -1,3 +1,0 @@
-ModuleExport.hs:4:23: error: [GHC-61689]
-    Module ‘ModuleExportA’ does not export ‘a’.
-

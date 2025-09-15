@@ -1,8 +1,0 @@
-
-T22513b.hs:5:1: warning: [GHC-54201] [-Wterm-variable-capture]
-    The type variable ‘id’ is implicitly quantified,
-    even though another variable of the same name is in scope:
-      ‘id’ imported from ‘Prelude’ at T22513b.hs:3:17-18
-           (and originally defined in ‘GHC.Internal.Base’)
-    This is not compatible with the RequiredTypeArguments extension.
-    Suggested fix: Consider renaming the type variable.

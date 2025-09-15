@@ -1,3 +1,0 @@
-fac_0 n_1 = go_2 n_1
-          where {go_2 0 = 1;
-                 go_2 x_3 = x_3 GHC.Internal.Num.* go_2 (x_3 GHC.Internal.Num.- 1)}

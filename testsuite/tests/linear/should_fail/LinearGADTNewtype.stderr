@@ -1,6 +1,0 @@
-
-LinearGADTNewtype.hs:3:4: error: [GHC-38291]
-    • A newtype constructor must be linear
-      A :: Int -> A
-    • In the definition of data constructor ‘A’
-      In the newtype declaration for ‘A’

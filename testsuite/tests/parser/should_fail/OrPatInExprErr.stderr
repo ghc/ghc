@@ -1,3 +1,0 @@
-OrPatInExprErr.hs:5:5: error: [GHC-66718]
-    Or pattern in expression context: (True; False)
-

@@ -1,8 +1,0 @@
-
-T19397E1.hs:1:14: error: [GHC-87543]
-    Ambiguous occurrence ‘main’.
-    It could refer to
-       either ‘T19397S.main’,
-              imported from ‘T19397S’ at T19397E1.hs:2:1-14
-              (and originally defined at T19397S.hs:4:1-4),
-           or ‘Main.main’, defined at T19397E1.hs:5:1.

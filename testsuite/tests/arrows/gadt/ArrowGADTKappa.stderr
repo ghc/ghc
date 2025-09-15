@@ -1,6 +1,0 @@
-
-ArrowGADTKappa.hs:17:26: error: [GHC-64525]
-    • Proc patterns cannot use existential or GADT data constructors
-    • In the pattern: MkG g
-      In an arrow kappa abstraction: \ (MkG g) -> show -< g
-      In the command: (id -< x) `handleG` \ (MkG g) -> show -< g

@@ -1,3 +1,0 @@
-
-tcfail056.hs:10:15: error: [GHC-54721]
-    ‘<=’ is not a (visible) method of class ‘Eq’

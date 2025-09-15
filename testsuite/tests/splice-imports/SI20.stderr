@@ -1,7 +1,0 @@
-SI20.hs:9:7: error: [GHC-28914]
-    • Level error: ‘foo’ is bound at levels {-1, 0} but used at level 1
-    • Available from the imports:
-      • imported from ‘SI19A’ at -1 at SI20.hs:7:1-19
-      • imported from ‘SI19A’ at SI20.hs:6:1-12
-    • In the Template Haskell quotation: 'foo
-

@@ -1,5 +1,0 @@
-As expected, TypeError: T10284.hs:7:5: error: [GHC-83865]
-    • Couldn't match expected type ‘Int’ with actual type ‘Char’
-    • In the expression: 'a'
-      In an equation for ‘a’: a = 'a'
-(deferred type error)

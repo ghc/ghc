@@ -1,8 +1,0 @@
-
-RepPolyApp.hs:11:9: error: [GHC-55287]
-    • The argument ‘(undefined :: a)’ of ‘f’
-      does not have a fixed runtime representation.
-      Its type is:
-        a :: TYPE rep
-    • In the expression: f (undefined :: a)
-      In an equation for ‘foo’: foo f = f (undefined :: a)

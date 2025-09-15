@@ -1,8 +1,0 @@
-
-T15487.hs:7:9: error: [GHC-87543]
-    Ambiguous occurrence ‘null’.
-    It could refer to
-       either ‘Prelude.null’,
-              imported from ‘Prelude’
-              (and originally defined in ‘GHC.Internal.Data.Foldable’),
-           or ‘T15487.null’, defined at T15487.hs:5:1.

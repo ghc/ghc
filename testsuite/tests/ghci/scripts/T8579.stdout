@@ -1,6 +1,0 @@
-type A :: *
-data A = Y
-  	-- Defined at <interactive>:2:1
-type A :: *
-data A = Y
-  	-- Defined at <interactive>:2:1

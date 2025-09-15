@@ -1,6 +1,0 @@
-
-rnfail037.hs:8:7: error: [GHC-76037]
-    Not in scope: data constructor ‘Rn037Help.C’
-    Suggested fix:
-      Remove ‘C’ from the explicit hiding list in the import of
-      ‘Rn037Help’ (at rnfail037.hs:4:1-28).

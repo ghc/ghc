@@ -1,6 +1,0 @@
-
-T11381.hs:7:23: error: [GHC-43991]
-    • Illegal injectivity annotation
-    • In the type family declaration for ‘F’
-    Suggested fix:
-      Perhaps you intended to use the ‘TypeFamilyDependencies’ extension

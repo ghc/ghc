@@ -1,7 +1,0 @@
-
-tcfail013.hs:4:3: error: [GHC-83865]
-    • Couldn't match expected type ‘[a1]’ with actual type ‘Bool’
-    • In the pattern: True
-      In an equation for ‘f’: f True = 2
-    • Relevant bindings include
-        f :: [a1] -> a2 (bound at tcfail013.hs:3:1)

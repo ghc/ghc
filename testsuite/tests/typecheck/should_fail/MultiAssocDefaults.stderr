@@ -1,4 +1,0 @@
-
-MultiAssocDefaults.hs:7:1: error: [GHC-59128]
-    • More than one default declaration for ‘A’
-    • In the class declaration for ‘C’

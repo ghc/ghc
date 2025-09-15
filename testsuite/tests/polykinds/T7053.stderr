@@ -1,6 +1,0 @@
-
-T7053.hs:8:23: error: [GHC-25897]
-    • Expected kind ‘k’, but ‘a’ has kind ‘k -> k’
-    • In the first argument of ‘TypeRep’, namely ‘a’
-      In the type ‘TypeRep a’
-      In the definition of data constructor ‘TyApp’

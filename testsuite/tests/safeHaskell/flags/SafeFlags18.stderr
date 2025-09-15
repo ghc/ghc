@@ -1,3 +1,0 @@
-
-SafeFlags18.hs:1:17: error: [GHC-83552] [-Werror]
-    -fpackage-trust ignored; must be specified with a Safe Haskell flag

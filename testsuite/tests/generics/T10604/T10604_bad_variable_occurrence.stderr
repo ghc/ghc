@@ -1,6 +1,0 @@
-
-T10604_bad_variable_occurrence.hs:9:12: error: [GHC-30367]
-    • Can't make a derived instance of ‘Generic1 Fix’:
-        Constructor ‘In’ applies a type to an argument involving the last parameter
-                         but the applied type is not of kind * -> *
-    • In the newtype declaration for ‘Fix’

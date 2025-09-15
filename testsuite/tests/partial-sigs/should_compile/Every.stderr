@@ -1,4 +1,0 @@
-TYPE SIGNATURES
-  every :: forall {t}. (t -> Bool) -> [t] -> Bool
-Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]

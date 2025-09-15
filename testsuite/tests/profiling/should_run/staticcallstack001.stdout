@@ -1,3 +1,0 @@
-Just (InfoProv {ipName = "D_Main_4_con_info", ipDesc = CONSTR_1_0, ipTyDesc = "D", ipLabel = "main", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack001.hs", ipSrcSpan = "16:13-27"})
-Just (InfoProv {ipName = "D_Main_2_con_info", ipDesc = CONSTR_1_0, ipTyDesc = "D", ipLabel = "caf", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack001.hs", ipSrcSpan = "13:1-9"})
-Just (InfoProv {ipName = "sat_s23z_info", ipDesc = THUNK, ipTyDesc = "D", ipLabel = "main", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack001.hs", ipSrcSpan = "18:23-32"})

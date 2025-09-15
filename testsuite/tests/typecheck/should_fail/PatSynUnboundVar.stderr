@@ -1,4 +1,0 @@
-PatSynUnboundVar.hs:6:15: [GHC-28572]
-    Invalid right-hand side of bidirectional pattern synonym ‘P’:
-      ‘b’ is not bound by the LHS of the pattern synonym
-    RHS pattern: (a, b)

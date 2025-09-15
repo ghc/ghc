@@ -1,8 +1,0 @@
-
-<no location info>: warning: [GHC-32850] [-Wmissing-home-modules]
-    Modules are not listed in options for ‘main’ but needed for compilation:
-        M1 Main
-[1 of 4] Compiling M1               ( src-lib/M1.hs, src-lib/M1.o )
-[2 of 4] Compiling Main             ( src-exe/Main.hs, src-exe/Main.o )
-[3 of 4] Compiling AltMain          ( src-exe/AltMain.hs, src-exe/AltMain.o )
-[4 of 4] Linking src-exe/AltMain

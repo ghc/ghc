@@ -1,4 +1,0 @@
-type D :: forall k. k -> *
-data family D a
-  	-- Defined at T19688.hs:4:1
-data instance D Int = DInt 	-- Defined at T19688.hs:5:15

@@ -1,5 +1,0 @@
-
-<interactive>:3:15: error: [GHC-34447]
-    Conflicting family instance declarations:
-      A Int = () -- Defined at <interactive>:3:15
-      A Int = Bool -- Defined at <interactive>:4:15

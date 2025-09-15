@@ -1,5 +1,0 @@
-
-TDBadConsConstraint.hs:8:3: [GHC-01259]
-     Illegal constraint in a kind: forall a. Show a => Foo a
-     In the definition of data constructor ‘MkFoo3’
-      In the data type declaration for ‘Foo’

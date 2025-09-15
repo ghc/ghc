@@ -1,5 +1,0 @@
-
-T2888.hs:7:1: error: [GHC-55912]
-    • The associated type ‘D’
-      mentions none of the type or kind variables of the class ‘C w’
-    • In the class declaration for ‘C’

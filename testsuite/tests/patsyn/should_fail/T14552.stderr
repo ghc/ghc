@@ -1,8 +1,0 @@
-
-T14552.hs:22:1: error: [GHC-71451]
-    • Cannot generalise type; skolem ‘k’ would escape its scope
-      if I tried to quantify (t0 :: k) in this type:
-        forall k (w :: k --> *). Exp a0 (F @k @(*) w t0)
-      (Indeed, I sometimes struggle even printing this correctly,
-       due to its ill-scoped nature.)
-    • In the declaration for pattern synonym ‘FOO’

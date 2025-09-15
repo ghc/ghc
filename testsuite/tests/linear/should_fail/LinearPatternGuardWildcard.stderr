@@ -1,5 +1,0 @@
-
-LinearPatternGuardWildcard.hs:7:15: error: [GHC-18872]
-    • Couldn't match type ‘Many’ with ‘One’
-        arising from multiplicity of ‘x’
-    • In an equation for ‘unsafeConsume’: unsafeConsume x | _ <- x = ()

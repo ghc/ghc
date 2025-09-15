@@ -1,6 +1,0 @@
-TYPE CONSTRUCTORS
-  class C{1} :: * -> Constraint
-  associated type family F{2} :: forall a. Maybe a -> *
-    roles nominal nominal
-Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]

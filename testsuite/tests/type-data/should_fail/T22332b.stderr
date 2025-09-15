@@ -1,7 +1,0 @@
-
-T22332b.hs:9:5: error: [GHC-83865]
-    • Couldn't match type ‘T’ with ‘'T’
-      Expected: Proxy 'T
-        Actual: Proxy T
-    • In the expression: f :: Proxy 'T
-      In an equation for ‘f’: f = f :: Proxy 'T

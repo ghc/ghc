@@ -1,4 +1,0 @@
-SI18.hs:7:9: error: [GHC-28914]
-    • Level error: ‘a’ is bound at level 0 but used at level 1
-    • In the Template Haskell quotation: 'a
-

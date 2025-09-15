@@ -1,3 +1,0 @@
-
-ExportWarnings4.hs:6:7: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
-    In the use of ‘x’ (imported from ExportWarnings_aux): "warn"

@@ -1,2 +1,0 @@
-:set -XBangPatterns -XRankNTypes  -XTypeFamilies
-let x :: forall a . a ~ Integer => forall b. b ~ Integer => (a, b); !x = (1, 2)

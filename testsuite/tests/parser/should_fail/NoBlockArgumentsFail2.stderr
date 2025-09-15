@@ -1,7 +1,0 @@
-
-NoBlockArgumentsFail2.hs:6:22: error: [GHC-06074]
-    Unexpected lambda expression in function application:
-        \ x -> print x
-    Suggested fixes:
-      • Use parentheses.
-      • Perhaps you intended to use the ‘BlockArguments’ extension

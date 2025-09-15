@@ -1,4 +1,0 @@
-
-T9209.hs:5:11: error: [GHC-08451]
-    Declaration splices are allowed only at the top level:
-      $([d| x = 5 |])

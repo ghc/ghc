@@ -1,5 +1,0 @@
-
-mod4.hs:2:10: error: [GHC-76037]
-    • Not in scope: data constructor ‘K2’
-    • In the export: T(K1, K2)
-    Suggested fix: Perhaps use ‘K1’ (line 3)

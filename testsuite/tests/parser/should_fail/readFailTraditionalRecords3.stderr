@@ -1,5 +1,0 @@
-
-readFailTraditionalRecords3.hs:6:7: error: [GHC-65719]
-    Illegal record syntax: x {i = 3}
-    Suggested fix:
-      Perhaps you intended to use the ‘TraditionalRecordSyntax’ extension

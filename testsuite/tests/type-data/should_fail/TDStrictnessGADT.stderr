@@ -1,3 +1,0 @@
-
-TDStrictnessGADT.hs:5:6: [GHC-67297]
-    Strictness flags are not allowed in type data declarations.

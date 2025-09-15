@@ -1,4 +1,0 @@
-x = ()
-let y = ()
-class Foo a
-:show bindings

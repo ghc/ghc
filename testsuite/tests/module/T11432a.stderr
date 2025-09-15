@@ -1,4 +1,0 @@
-
-T11432a.hs:7:17: error: [GHC-18208]
-    Expecting a type constructor but found a variable, ‘-.->’.
-    If ‘-.->’ is a type constructor then enable ExplicitNamespaces and use the 'type' keyword.

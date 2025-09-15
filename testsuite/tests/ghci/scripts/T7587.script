@@ -1,3 +1,0 @@
-:set -XPolyKinds
-data A x y
-:k A

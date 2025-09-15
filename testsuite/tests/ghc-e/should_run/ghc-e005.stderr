@@ -1,6 +1,0 @@
-ghc-e005-prog: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
-
-foo
-
-HasCallStack backtrace:
-  error, called at ghc-e005.hs:12:10 in main:Main

@@ -1,2 +1,0 @@
-signature B (z) where
-z :: Bool

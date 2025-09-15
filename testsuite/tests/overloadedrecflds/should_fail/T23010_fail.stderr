@@ -1,8 +1,0 @@
-
-T23010_fail.hs-boot:7:1: error: [GHC-87543]
-    Ambiguous occurrence ‘T23010_fail.fld’.
-    It could refer to
-       either the field ‘fld’ of record ‘A’,
-              defined at T23010_fail.hs:6:16,
-           or the field ‘fld’ of record ‘B’,
-              defined at T23010_fail.hs:7:16.

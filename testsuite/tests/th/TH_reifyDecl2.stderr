@@ -1,3 +1,0 @@
-data GHC.Internal.Maybe.Maybe (a_0 :: *)
-    = GHC.Internal.Maybe.Nothing
-    | GHC.Internal.Maybe.Just a_0

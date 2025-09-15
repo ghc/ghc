@@ -1,6 +1,0 @@
-unit p where
-    signature H where
-unit q where
-    module M where
-unit r where
-    dependency p[H=q:M]

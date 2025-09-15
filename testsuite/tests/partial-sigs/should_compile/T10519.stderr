@@ -1,7 +1,0 @@
-
-T10519.hs:5:18: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
-    • Found extra-constraints wildcard standing for ‘Eq a’
-      Where: ‘a’ is a rigid type variable bound by
-               the inferred type of foo :: Eq a => a -> a -> Bool
-               at T10519.hs:5:15
-    • In the type signature: foo :: forall a. _ => a -> a -> Bool

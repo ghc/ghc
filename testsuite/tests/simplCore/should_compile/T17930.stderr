@@ -1,2 +1,0 @@
-$sfoo :: (?b::Bool) => String -> [Char]
-$sfoo

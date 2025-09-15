@@ -1,5 +1,0 @@
-[1 of 5] Compiling Mod_fasm         ( Mod_fasm.hs, Mod_fasm.o )
-[2 of 5] Compiling Mod_fbyte_code   ( Mod_fbyte_code.hs, Mod_fbyte_code.o )
-[3 of 5] Compiling Mod_fllvm        ( Mod_fllvm.hs, Mod_fllvm.o )
-[4 of 5] Compiling Mod_fobject_code ( Mod_fobject_code.hs, Mod_fobject_code.o )
-[5 of 5] Compiling Mod_top          ( Mod_top.hs, Mod_top.o )

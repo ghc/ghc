@@ -1,5 +1,0 @@
-
-Foo.hs:1:1: error: [GHC-28623]
-    File name does not match module name:
-    Saw     : ‘Main’
-    Expected: ‘Foo’

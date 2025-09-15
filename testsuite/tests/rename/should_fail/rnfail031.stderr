@@ -1,6 +1,0 @@
-
-rnfail031.hs:2:21: error: [GHC-76037]
-    Not in scope: ‘Data.List.map’
-    Suggested fix:
-      Add ‘map’ to the import list in the import of ‘Data.List’
-      (at rnfail031.hs:3:1-36).

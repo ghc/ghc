@@ -1,8 +1,0 @@
-
-tcfail001.hs:9:2: error: [GHC-83865]
-    • Couldn't match expected type: [a]
-                  with actual type: [a0] -> [a1]
-    • The equation for ‘op’ has one visible argument,
-        but its type ‘[a]’ has none
-      In the instance declaration for ‘A [a]’
-    • Relevant bindings include op :: [a] (bound at tcfail001.hs:9:2)

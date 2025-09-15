@@ -1,8 +1,0 @@
-
-<no location info>: error: [GHC-38189]
-    Modules are listed as hidden in options for ‘unit-warnings’ but not part of the unit:
-        C
-
-<no location info>: error: [GHC-68286]
-    Modules are listed as reexported in options for ‘unit-warnings’ but can't be found in any dependency:
-        B

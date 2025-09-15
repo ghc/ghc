@@ -1,4 +1,0 @@
-False
-fromList [0,6]
-[(0,"foo"),(6,"foo")]
-fromList [(0,"foo"),(6,"foo")]

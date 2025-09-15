@@ -1,3 +1,0 @@
-
-Dep05.hs:7:1: error: [GHC-44360]
-    GHC.Arr: Can't be safely imported! The module itself isn't safe.

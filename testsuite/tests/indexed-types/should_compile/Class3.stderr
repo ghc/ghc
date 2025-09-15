@@ -1,5 +1,0 @@
-
-Class3.hs:7:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
-    • No explicit implementation for
-        ‘foo’
-    • In the instance declaration for ‘C ()’

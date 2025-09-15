@@ -1,2 +1,0 @@
-ghc: the options -S and -fno-code are incompatible. Please omit -S
-Usage: For basic information, try the `--help' option.

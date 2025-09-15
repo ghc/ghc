@@ -1,7 +1,0 @@
-
-T23740d.hs:5:28: error: [GHC-45510]
-    • Term variable ‘id’ cannot be used here
-        (term variables cannot be promoted)
-    • In the first argument of ‘Maybe’, namely ‘id’
-      In the type ‘Maybe id’
-      In a pattern type signature: Maybe id

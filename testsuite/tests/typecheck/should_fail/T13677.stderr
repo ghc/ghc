@@ -1,4 +1,0 @@
-
-T13677.hs:10:8: error: [GHC-83865]
-    • Expected a constraint, but ‘Dict (Int ~ Int)’ is a type
-    • In the type signature: foo :: Dict (Int ~ Int) => Int

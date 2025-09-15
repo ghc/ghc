@@ -1,7 +1,0 @@
-
-T22717c.hs:9:1: warning: [GHC-90177] [-Worphans (in -Wall)]
-    Orphan family instance:
-      type instance F T = Private -- Defined at T22717c.hs:9:15
-    Suggested fix:
-      Move the instance declaration to the module of the type family or of the type, or
-      wrap the type with a newtype and declare the instance on the new type.

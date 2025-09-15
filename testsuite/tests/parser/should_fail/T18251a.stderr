@@ -1,4 +1,0 @@
-
-T18251a.hs:3:1: error: [GHC-07626]
-    Parse error in pattern: pairs In a function binding for the ‘@’ operator.
-                            Perhaps you meant an as-pattern, which must not be surrounded by whitespace

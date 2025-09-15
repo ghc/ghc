@@ -1,4 +1,0 @@
-T3953.hs:5:8: error: [GHC-76037]
-    • Not in scope: ‘notDefinedHere’
-    • In the quasi-quotation: [notDefinedHere| |]
-

@@ -1,5 +1,0 @@
-:set -XDataKinds
-type T = '[ 'x' ]
-:kind! T
-type T = '( 'x', 'y' )
-:kind! T

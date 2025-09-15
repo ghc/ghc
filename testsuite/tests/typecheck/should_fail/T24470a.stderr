@@ -1,6 +1,0 @@
-
-T24470a.hs:7:24: error: [GHC-84925]
-    • The arity of ‘SynBad’ is insufficiently high to accommodate
-      an implicit binding for the ‘j’ type variable.
-    • Use ‘@j’ on the LHS or ‘forall j.’ on the RHS to bring it into scope.
-    • In the type synonym declaration for ‘SynBad’

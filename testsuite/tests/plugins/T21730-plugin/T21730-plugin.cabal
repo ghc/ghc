@@ -1,9 +1,0 @@
-Name:           T21730-plugin
-Version:        0.1
-Synopsis:       For testing
-Cabal-Version:  >= 1.2
-Build-Type:     Simple
-
-Library
-    Build-Depends: base, ghc
-    Exposed-Modules: T21730_Plugin

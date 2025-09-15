@@ -1,4 +1,0 @@
-:load T15568
-:set -fprint-explicit-foralls
-putStrLn "-- This should print 'forall j k.', not 'forall k j.'"
-:kind F

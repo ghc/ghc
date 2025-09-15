@@ -1,5 +1,0 @@
-annfail06.hs:22:1: error: [GHC-28914]
-    • Level error: instance for ‘Data InstancesInWrongModule’
-      is bound at level 0 but used at level -1
-    • In the annotation: {-# ANN f InstancesInWrongModule #-}
-

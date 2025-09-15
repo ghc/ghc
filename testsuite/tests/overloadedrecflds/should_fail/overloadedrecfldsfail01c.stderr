@@ -1,8 +1,0 @@
-
-overloadedrecfldsfail01c.hs:13:10: error: [GHC-33238]
-    • No data constructor of type constructor ‘U’
-      has all of the fields:
-        ‘w’, ‘x’, ‘y’
-    • In the expression: r {w = True, x = 3, y = True} :: U
-      In an equation for ‘upd3’:
-          upd3 r = r {w = True, x = 3, y = True} :: U

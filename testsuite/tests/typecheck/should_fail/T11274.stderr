@@ -1,5 +1,0 @@
-
-T11274.hs:10:25: error: [GHC-39999]
-    • No instance for ‘Eq Asd’ arising from a use of ‘==’
-    • In the expression: x == y
-      In an equation for ‘missingInstance’: missingInstance x y = x == y

@@ -1,7 +1,0 @@
-
-SuffixAtFail.hs:3:6: error: [GHC-33856]
-    The symbol '@' occurs as a suffix.
-    For an as-pattern, there must not be any whitespace surrounding '@'.
-  |
-3 | foo x@    () = ()
-  |      ^^^^^

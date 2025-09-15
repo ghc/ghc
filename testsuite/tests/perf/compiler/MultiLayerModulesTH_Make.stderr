@@ -1,6 +1,0 @@
-MultiLayerModules.hs:334:8: error: [GHC-87897]
-    • Exception when trying to run compile-time code:
-        deliberate error
-      Code: (error "deliberate error")
-    • In the untyped splice: $(error "deliberate error")
-

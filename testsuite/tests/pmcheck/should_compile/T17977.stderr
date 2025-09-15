@@ -1,8 +1,0 @@
-
-T17977.hs:31:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
-    Pattern match(es) are non-exhaustive
-    In an equation for ‘f’:
-        Patterns of type ‘SNat m’, ‘SNat n’, ‘SNat o’,
-                         ‘R m n o’ not matched:
-            SZ _ _ _
-            (SS _) _ SZ _

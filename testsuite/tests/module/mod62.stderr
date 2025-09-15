@@ -1,6 +1,0 @@
-
-mod62.hs:3:9: error: [GHC-28329] Qualified name in binding position: M.y
-
-mod62.hs:3:22: error: [GHC-76037]
-    Not in scope: ‘M.y’
-    Suggested fix: Perhaps use ‘M.x’ (line 3)

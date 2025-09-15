@@ -1,2 +1,0 @@
-T17697.hs:6:5: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
-    Variable not in scope: threadDelay :: t0 -> IO a0

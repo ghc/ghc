@@ -1,2 +1,0 @@
- RULES: "SPEC $cm @()" [0]
- RULES: "SPEC f @Bool @() @(Maybe Integer)" [0]

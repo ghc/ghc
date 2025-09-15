@@ -1,5 +1,0 @@
-[1 of 4] Compiling T18497_Foo[boot] ( T18497_Foo.hs-boot, nothing )
-[2 of 4] Compiling T18497_Bar[boot] ( T18497_Bar.hs-boot, nothing )
-[3 of 4] Compiling T18497_Foo       ( T18497_Foo.hs, nothing )
-[4 of 4] Compiling T18497_Bar       ( T18497_Bar.hs, nothing )
-import {-# SOURCE #-} T18497_Foo ( X )

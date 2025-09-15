@@ -1,4 +1,0 @@
-
-Roles7.hs:6:15: error: [GHC-09009]
-    Illegal role name ‘repesentational’
-    Suggested fix: Perhaps you meant ‘representational’

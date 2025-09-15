@@ -1,5 +1,0 @@
-
-tcfail161.hs:5:7: error: [GHC-83865]
-    • Expecting one more argument to ‘Maybe’
-      Expected a type, but ‘Maybe’ has kind ‘* -> *’
-    • In the type signature: f :: [Maybe]

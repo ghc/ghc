@@ -1,2 +1,0 @@
-ECC @() @[] @()
-  :: (() :: Constraint) => [()] -> ECC (() :: Constraint) [] ()

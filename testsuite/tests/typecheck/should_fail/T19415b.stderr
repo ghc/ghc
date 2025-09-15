@@ -1,8 +1,0 @@
-
-T19415b.hs:15:8: error: [GHC-18872]
-    • Couldn't match type ‘Int’ with ‘Char’
-        arising from a functional dependency between:
-          constraint ‘Ping (T a0) (T b) Char’ arising from a use of ‘foo’
-          instance ‘Ping (T a) (T b1) Int’ at T19415b.hs:12:10-53
-    • In the expression: foo 'c' MkT
-      In an equation for ‘loop’: loop = foo 'c' MkT

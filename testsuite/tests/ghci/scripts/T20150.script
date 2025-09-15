@@ -1,3 +1,0 @@
-:set +c
-:l T20150.hs
-:all-types

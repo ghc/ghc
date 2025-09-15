@@ -1,7 +1,0 @@
-T16893: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
-
-Prelude.undefined
-
-HasCallStack backtrace:
-  undefined, called at ./Complex.hs:47:28 in main:Complex
-

@@ -1,4 +1,0 @@
-
-T9705-1.hs:3:5: error: [GHC-69248]
-    Pattern synonyms not allowed in class declaration:
-      pattern P = ()

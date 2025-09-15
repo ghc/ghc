@@ -1,3 +1,0 @@
-
-mc14.hs:14:49: error: [GHC-88464]
-    Variable not in scope: f :: [a] -> m (t0 a)

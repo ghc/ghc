@@ -1,7 +1,0 @@
-
-T7085.hs:8:6: warning: [GHC-61367] [-Wunused-pattern-binds (in -Wextra, -Wunused-binds)]
-    This pattern-binding binds no variables: Nothing = Just n
-
-T7085.hs:8:6: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In a pattern binding: Nothing = ...

@@ -1,1 +1,0 @@
-\.section	\.data\.rel\.ro\.RelocRoData_SomeData_closure_tbl,"aw",(?:%|@)progbits

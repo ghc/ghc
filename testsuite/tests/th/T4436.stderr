@@ -1,6 +1,0 @@
-T4436.hs:5:6-57: Splicing expression
-    return (LitE (StringL "hello\ngoodbye\nand then"))
-  ======>
-    "hello
-goodbye
-and then"

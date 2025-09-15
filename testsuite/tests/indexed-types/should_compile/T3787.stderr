@@ -1,3 +1,0 @@
-
-T3787.hs:20:51: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
-    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS

@@ -1,4 +1,0 @@
-
-rnfail058.hs:4:16: error: [GHC-00711]
-    Multiple warning declarations for ‘foo’
-    also at  rnfail058.hs:3:16-18

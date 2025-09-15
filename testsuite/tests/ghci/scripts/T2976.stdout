@@ -1,6 +1,0 @@
-test :: Int = 0
-test = 0
-test :: Int = 0
-test :: String = _
-test = "test"
-test :: String = "test"

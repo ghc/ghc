@@ -1,4 +1,0 @@
-:set -fno-code
-:set -v1
-:l T20217
-:r

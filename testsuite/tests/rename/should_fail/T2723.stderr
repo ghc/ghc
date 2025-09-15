@@ -1,4 +1,0 @@
-
-T2723.hs:15:5: warning: [GHC-63397] [-Wname-shadowing (in -Wall)]
-    This binding for ‘field3’ shadows the existing binding
-      defined at T2723.hs:7:1

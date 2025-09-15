@@ -1,7 +1,0 @@
-
-T23832_invalid.hs:1:1: error: [GHC-45625]
-    Invalid defaulting proposal.
-    The following type variable cannot be defaulted, as it is not an unfilled metavariable:
-      ‘a’
-    Defaulting proposal: [(a, Double)]
-    Wanted constraints: ‘C a’

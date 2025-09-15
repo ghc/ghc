@@ -1,9 +1,0 @@
-
-T22326_fail_match.hs:7:4: error: [GHC-25897]
-    • Couldn't match expected type ‘t’ with actual type ‘Maybe a’
-      ‘t’ is a rigid type variable bound by
-        the type signature for:
-          f :: forall t -> t -> ()
-        at T22326_fail_match.hs:7:1-25
-    • In the pattern: type (Maybe a)
-      In an equation for ‘f’: f (type (Maybe a)) x = ()

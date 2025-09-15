@@ -1,7 +1,0 @@
-
-==================== Tidy Core rules ====================
-"USPEC showsIArray @UA @_"
-    forall (@i) ($dShow :: Show i) ($dIArray :: IArray UA).
-      showsIArray @UA @i $dIArray $dShow
-      = showsIArray_$sshowsIArray @i $dShow
-

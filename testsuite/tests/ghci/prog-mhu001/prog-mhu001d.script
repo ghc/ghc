@@ -1,6 +1,0 @@
--- Nothing added to the context, :main works
-:main
-
-:m + E
--- Module E loaded, :main works
-:main

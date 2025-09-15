@@ -1,3 +1,0 @@
-arr004: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
-
-(Array.!): undefined array element

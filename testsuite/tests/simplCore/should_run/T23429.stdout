@@ -1,3 +1,0 @@
-gen () == C a
-specMaybe () == C (Maybe a)
-specMaybeUnit () == C (Maybe ())

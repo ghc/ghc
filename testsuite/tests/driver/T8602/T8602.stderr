@@ -1,4 +1,0 @@
-A B C
-
-A.hs:1:1: error:
-    `t8602.sh' failed in phase `Haskell pre-processor'. (Exit code: 1)

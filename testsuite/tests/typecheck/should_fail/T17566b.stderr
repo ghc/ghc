@@ -1,4 +1,0 @@
-
-T17566b.hs:7:12: error: [GHC-17370]
-    • Different names for the same type variable: ‘k1’ and ‘k2’
-    • In the class declaration for ‘C’

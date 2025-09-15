@@ -1,5 +1,0 @@
-
-T23570b.hs:5:20: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
-    The import item ‘T23570_aux.T(..)’ suggests that
-    ‘T23570_aux.T’ has (in-scope) constructors or record fields,
-                       but it has none

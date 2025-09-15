@@ -1,3 +1,0 @@
-shell s = System.Process.rawSystem "sh" ["-c", s] >> return ()
-shell "echo \"recomp=()\" >> Dep.hs"
-:r

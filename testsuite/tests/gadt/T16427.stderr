@@ -1,4 +1,0 @@
-
-T16427.hs:5:26: error: [GHC-71492]
-    GADT constructor type signature cannot contain nested ‘forall’s or contexts
-    In the definition of data constructor ‘C’

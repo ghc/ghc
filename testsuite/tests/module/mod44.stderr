@@ -1,5 +1,0 @@
-
-mod44.hs:4:10: error: [GHC-59692]
-    Duplicate instance declarations:
-      instance Eq T -- Defined at mod44.hs:4:10
-      instance Eq T -- Defined at mod44.hs:5:10

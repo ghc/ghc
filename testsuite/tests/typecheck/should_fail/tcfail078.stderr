@@ -1,4 +1,0 @@
-
-tcfail078.hs:5:6: error: [GHC-83865]
-    • Expected kind ‘* -> Constraint’, but ‘Integer’ has kind ‘*’
-    • In the type signature: f :: Integer i => i

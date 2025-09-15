@@ -1,5 +1,0 @@
-
-TH_Promoted1Tuple.hs:7:2: error: [GHC-68567]
-    Illegal type: ‘'MkSolo Int’
-    Suggested fix:
-      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)

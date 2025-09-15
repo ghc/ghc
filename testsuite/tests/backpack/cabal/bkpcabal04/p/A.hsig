@@ -1,1 +1,0 @@
-signature A where

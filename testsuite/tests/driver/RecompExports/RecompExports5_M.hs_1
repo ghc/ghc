@@ -1,4 +1,0 @@
-module RecompExports5_M where
-
-foo :: Int
-foo = 3

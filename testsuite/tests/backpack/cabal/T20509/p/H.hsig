@@ -1,3 +1,0 @@
-signature H where
-    data S1
-    data S2

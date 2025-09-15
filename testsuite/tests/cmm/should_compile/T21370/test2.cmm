@@ -1,5 +1,0 @@
-#include "Cmm.h"
-test2 (W_ r1)
- {
-    return (r1);
- }

@@ -1,5 +1,0 @@
-
-T1357.hs:5:1: warning: [GHC-57989] [-Wdodgy-foreign-imports (in -Wdefault)]
-    • possible missing & in foreign import of FunPtr
-    • When checking declaration:
-        foreign import ccall safe "f" f :: FunPtr (Int -> IO ())

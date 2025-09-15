@@ -1,1 +1,0 @@
-default Num (Integer, Double)

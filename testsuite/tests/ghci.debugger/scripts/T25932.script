@@ -1,8 +1,0 @@
-:load T25932.hs
-:break main
-main
-:steplocal
-:steplocal
-:steplocal
-:steplocal
-:steplocal

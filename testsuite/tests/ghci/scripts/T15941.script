@@ -1,3 +1,0 @@
-:set -XKindSignatures -fprint-explicit-runtime-reps -fprint-explicit-kinds
-type T = (->)
-:info T

@@ -1,2 +1,0 @@
-
-tcfail011.hs:3:25: error: [GHC-88464] Variable not in scope: y

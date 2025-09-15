@@ -1,4 +1,0 @@
-test(bits64 buffer) {
-  return (%zx64(%shrl(bits16[buffer + (128 :: bits64)], (1 :: bits64))) & (65407 :: bits64));
-}
-

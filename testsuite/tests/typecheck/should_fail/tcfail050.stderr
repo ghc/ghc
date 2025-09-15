@@ -1,3 +1,0 @@
-
-tcfail050.hs:3:7: error: [GHC-88464]
-    Data constructor not in scope: B :: t1 -> t2

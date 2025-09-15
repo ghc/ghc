@@ -1,3 +1,0 @@
-
-on the commandline: error: [GHC-93741] [-Wunrecognised-warning-flags, Werror=unrecognised-warning-flags]
-    unrecognised warning flag: -Wfoo

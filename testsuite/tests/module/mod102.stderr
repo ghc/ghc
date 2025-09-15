@@ -1,4 +1,0 @@
-
-mod102.hs:8:5: error: [GHC-88464]
-    Variable not in scope: methB :: Bool -> Bool -> ()
-    Suggested fix: Perhaps use ‘methA’ (imported from Mod102_AuxB)

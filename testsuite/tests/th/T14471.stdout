@@ -1,3 +1,0 @@
-do {x_0 <- System.IO.getLine;
-    y_1 <- System.IO.getLine;
-    GHC.Base.return (x_0, y_1)}

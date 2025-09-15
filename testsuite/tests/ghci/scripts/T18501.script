@@ -1,4 +1,0 @@
-:set -XHaskell2010
-:set -XAllowAmbiguousTypes
-class Foo a where foo :: String
-:t foo

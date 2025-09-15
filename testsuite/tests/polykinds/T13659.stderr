@@ -1,6 +1,0 @@
-
-T13659.hs:14:15: error: [GHC-83865]
-    • Expected kind ‘[*]’, but ‘a’ has kind ‘*’
-    • In the first argument of ‘Format’, namely ‘a’
-      In the type ‘Format a’
-      In the definition of data constructor ‘I’

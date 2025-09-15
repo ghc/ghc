@@ -1,4 +1,0 @@
-
-WildcardInDefault.hs:4:10: error: [GHC-65507]
-    • Wildcard ‘_’ not allowed
-    • In a `default' declaration

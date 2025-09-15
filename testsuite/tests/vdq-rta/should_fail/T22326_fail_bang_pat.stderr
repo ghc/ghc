@@ -1,5 +1,0 @@
-
-T22326_fail_bang_pat.hs:6:3: error: [GHC-88754]
-    • Ill-formed type pattern: !x
-    • In the pattern: !x
-      In an equation for ‘f’: f !x = ()

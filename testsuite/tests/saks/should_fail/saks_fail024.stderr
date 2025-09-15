@@ -1,3 +1,0 @@
-
-saks_fail024.hs:7:6: error: [GHC-73413]
-    Expected an unqualified type constructor: Data.Kind.Type

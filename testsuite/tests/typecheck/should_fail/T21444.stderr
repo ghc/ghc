@@ -1,6 +1,0 @@
-
-T21444.hs:8:10: error: [GHC-99339]
-    • Ambiguous record update with fields ‘foo’, ‘bar’ and ‘baz’
-      These fields appear in both datatypes ‘S’ and ‘T’
-    • In the expression: x {foo = 1, bar = 2, baz = 3}
-      In an equation for ‘blah’: blah x = x {foo = 1, bar = 2, baz = 3}

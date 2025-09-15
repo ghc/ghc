@@ -1,4 +1,0 @@
-
-T18271.hs:7:19: error: [GHC-51580]
-    • Illegal visible, dependent quantification in the type of a term
-    • In a deriving declaration

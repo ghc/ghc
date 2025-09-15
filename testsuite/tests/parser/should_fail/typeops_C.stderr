@@ -1,3 +1,0 @@
-
-typeops_C.hs:1:14: error: [GHC-24180]
-    Operator applied to too few arguments: +

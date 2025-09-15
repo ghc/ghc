@@ -1,7 +1,0 @@
-
-T15862.hs:16:16: error: [GHC-91028]
-    • Expected kind ‘k0’, but ‘MkFoo’ has kind ‘(forall a. a) -> Foo’
-      Cannot instantiate unification variable ‘k0’
-      with a kind involving polytypes: (forall a. a) -> Foo
-    • In the first argument of ‘TypeRep’, namely ‘MkFoo’
-      In the type signature: foo :: TypeRep MkFoo

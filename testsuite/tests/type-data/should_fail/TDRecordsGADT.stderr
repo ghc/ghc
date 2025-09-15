@@ -1,3 +1,0 @@
-
-TDRecordsGADT.hs:6:5: [GHC-67297]
-    Labelled fields are not allowed in type data declarations.

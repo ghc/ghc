@@ -1,4 +1,0 @@
-TYPE SIGNATURES
-  foo :: forall b a. (a, b) -> (a, b)
-Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]

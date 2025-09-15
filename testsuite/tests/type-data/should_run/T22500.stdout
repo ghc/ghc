@@ -1,3 +1,0 @@
-type data Nat_0
-    = Zero_1
-    | Succ_2 Nat_0

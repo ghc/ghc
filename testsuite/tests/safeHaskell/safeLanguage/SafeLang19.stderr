@@ -1,3 +1,0 @@
-
-SafeLang19.hs:2:20: warning: [GHC-98887]
-    -XDerivingVia is not allowed in Safe Haskell; ignoring -XDerivingVia

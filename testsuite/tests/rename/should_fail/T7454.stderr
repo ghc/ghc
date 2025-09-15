@@ -1,3 +1,0 @@
-
-T7454.hs:5:23: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
-    The import of ‘Arrow’ from module ‘Control.Arrow’ is redundant

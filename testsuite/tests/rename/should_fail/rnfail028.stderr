@@ -1,3 +1,0 @@
-
-rnfail028.hs:2:21: error: [GHC-90973]
-    The export item ‘module List’ is not imported

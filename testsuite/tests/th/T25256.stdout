@@ -1,1 +1,0 @@
-f_0 ((a_1 :: [GHC.Internal.Types.Char]) :: GHC.Internal.Base.String) = (a_1 :: [GHC.Internal.Types.Char]) :: GHC.Internal.Base.String

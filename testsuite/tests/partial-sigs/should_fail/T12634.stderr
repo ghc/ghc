@@ -1,9 +1,0 @@
-
-T12634.hs:15:58: error: [GHC-83865]
-    • Expected a type,
-      but ‘'(t, m, m', r)’ has kind
-      ‘(k1 -> k2 -> *, k0, k1, k2)’
-    • In the first argument of ‘Bench’, namely ‘'(t, m, m', r)’
-      In the type signature:
-        bench_twacePow :: forall t m m' r. _ =>
-                                           t m' r -> Bench '(t, m, m', r)

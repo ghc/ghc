@@ -1,4 +1,0 @@
-
-T19915.hs:5:10: error: [GHC-97044]
-    • Class ‘WithDict’ does not support user-specified instances.
-    • In the instance declaration for ‘WithDict a b’

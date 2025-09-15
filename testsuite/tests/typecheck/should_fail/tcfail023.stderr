@@ -1,5 +1,0 @@
-
-tcfail023.hs:10:10: error: [GHC-59692]
-    Duplicate instance declarations:
-      instance A B -- Defined at tcfail023.hs:10:10
-      instance A B -- Defined at tcfail023.hs:13:10

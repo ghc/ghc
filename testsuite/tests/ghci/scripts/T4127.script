@@ -1,3 +1,0 @@
-:set -XTemplateHaskell
-Language.Haskell.TH.runQ [d| instance Monad ((,) a) where { (>>=) = undefined } |]
-

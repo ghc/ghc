@@ -1,5 +1,0 @@
-data A = X
-data A = Y
-:i A
-:m Data.Tuple
-:i A

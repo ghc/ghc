@@ -1,9 +1,0 @@
-
-T17841.hs:10:38: error: [GHC-25897]
-    • Expected a type, but ‘t’ has kind ‘k’
-      ‘k’ is a rigid type variable bound by
-        the class declaration for ‘Foo’
-        at T17841.hs:9:13-27
-    • In the kind ‘t’
-      In the first argument of ‘Proxy’, namely ‘(a :: t)’
-      In the type signature: foo :: Proxy (a :: t)

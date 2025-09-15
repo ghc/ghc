@@ -1,8 +1,0 @@
-
-T22483.hs:1:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
-    Top-level binding with no type signature: main :: IO ()
-
-T22483.hs:4:4: warning: [GHC-62161] [-Wincomplete-uni-patterns (in -Wall)]
-    Pattern match(es) are non-exhaustive
-    In an irrefutable pattern:
-        Patterns of type ‘Maybe ()’ not matched: Nothing

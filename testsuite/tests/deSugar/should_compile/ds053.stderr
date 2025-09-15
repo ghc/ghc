@@ -1,3 +1,0 @@
-
-ds053.hs:5:1: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
-    Defined but not used: ‘f’

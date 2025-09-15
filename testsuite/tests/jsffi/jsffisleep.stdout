@@ -1,4 +1,0 @@
-WouldBlockException "new Promise(res => setTimeout(res, $1 / 1000))"
-zzzzzzz
-i sleep
-Left thread killed

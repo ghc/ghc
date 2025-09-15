@@ -1,3 +1,0 @@
-
-AssocTyDef09.hs:8:10: error: [GHC-54721]
-    ‘OtherType’ is not a (visible) associated type of class ‘Cls’

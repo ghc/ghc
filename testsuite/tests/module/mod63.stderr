@@ -1,5 +1,0 @@
-
-mod63.hs:3:1: error: [GHC-91938]
-    equations for ‘f’ have different numbers of arguments
-      mod63.hs:3:1-8
-      mod63.hs:4:1-11

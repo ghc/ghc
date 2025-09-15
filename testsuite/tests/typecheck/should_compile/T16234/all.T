@@ -1,1 +1,0 @@
-test('T16234', [extra_files(['DataPeano.hs', 'ControlMonadPrimitive.hs', 'ControlMonadClassesCore.hs', 'ControlMonadClassesEffects.hs', 'ControlMonadClassesReader.hs', 'ControlMonadClassesState.hs', 'ControlMonadClasses.hs', 'Main.hs'])], makefile_test, ['T16234'])

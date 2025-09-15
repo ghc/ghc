@@ -1,3 +1,0 @@
-T9579_stackoverflow_rtssome: Stack space overflow: current size NUM bytes.
-T9579_stackoverflow_rtssome: Relink with -rtsopts and use `+RTS -Ksize -RTS' to increase it.
-2

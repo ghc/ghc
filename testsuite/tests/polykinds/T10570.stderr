@@ -1,8 +1,0 @@
-
-T10570.hs:10:10: error: [GHC-21572]
-    • Illegal instance declaration for ‘ConsByIdx2 Int a Proxy cls’:
-        The coverage condition fails in class ‘ConsByIdx2’
-          for functional dependency: ‘x -> m’
-        Reason: lhs type ‘Int’ does not determine rhs type ‘Proxy @{k}’
-        Un-determined variable: k
-    • In the instance declaration for ‘ConsByIdx2 Int a Proxy cls’

@@ -1,4 +1,0 @@
-
-T13290.hs:6:1: warning: [GHC-00828]
-    A constructor, Bar, appears as outermost match in RULE lhs.
-    This rule will be ignored.

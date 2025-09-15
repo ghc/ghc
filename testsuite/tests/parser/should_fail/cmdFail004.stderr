@@ -1,3 +1,0 @@
-
-cmdFail004.hs:4:16: error: [GHC-03790]
-    Parse error in command: _ -> (_ -< _)

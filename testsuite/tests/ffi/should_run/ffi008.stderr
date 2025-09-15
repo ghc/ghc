@@ -1,7 +1,0 @@
-ffi008: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
-
-this is an error
-
-HasCallStack backtrace:
-  error, called at ffi008.hs:12:12 in main:Main
-

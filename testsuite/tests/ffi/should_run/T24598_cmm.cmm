@@ -1,5 +1,0 @@
-#include "Cmm.h"
-
-hello() {
-    return (42);
-}

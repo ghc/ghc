@@ -1,4 +1,0 @@
-TYPE SIGNATURES
-  test3 :: Bool -> Bool
-Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]

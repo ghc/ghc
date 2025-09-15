@@ -1,8 +1,0 @@
-
-rnfail017.hs:5:10: [GHC-88747]
-    Precedence parsing error
-        cannot mix ‘+’ [infixl 6] and prefix `-' [infixl 6] in the same infix expression
-
-rnfail017.hs:6:10: [GHC-88747]
-    Precedence parsing error
-        cannot mix ‘*’ [infixl 7] and prefix `-' [infixl 6] in the same infix expression

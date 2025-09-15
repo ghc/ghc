@@ -1,3 +1,0 @@
-:l T8119
-:t test `asTypeOf` (undefined :: a -> b)
-:t \x -> test x

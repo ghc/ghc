@@ -1,5 +1,0 @@
-
-T21667.hs:46:40: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘"1" :: Symbol’
-    • In the second argument of ‘ExoticTraversal'’, namely ‘_’
-      In the type signature: test :: forall a f. ExoticTraversal' a _ f

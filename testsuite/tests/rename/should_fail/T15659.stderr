@@ -1,6 +1,0 @@
-
-T15659.hs:3:11: error: [GHC-63294]
-    Rule "test":
-      Not in scope: ‘f’
-      in left-hand side: f x
-    LHS must be of form (f e1 .. en) where f is not forall'd

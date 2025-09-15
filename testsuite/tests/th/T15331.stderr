@@ -1,6 +1,0 @@
-T15331.hs:(7,2)-(9,7): Splicing declarations
-    [d| f :: Proxy (Int -> Int)
-        f = Proxy @(Int -> Int) |]
-  ======>
-    f :: Proxy (Int -> Int)
-    f = Proxy @(Int -> Int)

@@ -1,6 +1,0 @@
-type F :: * -> *
-type family F a where
-    F [Int] = Bool
-    F [a] = Double
-    F (a b) = Char
-  	-- Defined at T13420.hs:5:1

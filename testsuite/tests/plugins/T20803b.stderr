@@ -1,4 +1,0 @@
-parsePlugin
-
-<no location info>: error: [GHC-71614]
-    A lambda requires at least one parameter

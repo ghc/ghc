@@ -1,3 +1,0 @@
-
-TH_dataD1.hs:7:6: error: [GHC-65904]
-    Splices within declaration brackets not (yet) handled by Template Haskell

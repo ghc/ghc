@@ -1,3 +1,0 @@
-
-T3696.hs:9:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
-    Top-level binding with no type signature: def :: Int

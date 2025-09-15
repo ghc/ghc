@@ -1,3 +1,0 @@
-
-T9156_DF.hs:10:29: error: [GHC-85524]
-    Duplicate field name ‘f1’ in record declaration

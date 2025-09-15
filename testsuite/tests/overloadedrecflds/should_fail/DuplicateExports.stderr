@@ -1,3 +1,0 @@
-
-DuplicateExports.hs:6:29: error: [GHC-47854] [-Wduplicate-exports (in -Wdefault), Werror=duplicate-exports]
-    ‘foo’ is exported by ‘foo’ and ‘T(foo, bar)’

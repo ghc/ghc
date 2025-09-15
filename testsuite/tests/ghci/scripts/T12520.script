@@ -1,2 +1,0 @@
-:load T12520
-box (wrap "foo" (proxy ()))

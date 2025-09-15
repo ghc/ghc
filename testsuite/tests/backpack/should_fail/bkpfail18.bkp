@@ -1,4 +1,0 @@
-unit p where
-    signature ShouldFail where
-        instance Show Int
-        instance Show Int

@@ -1,3 +1,0 @@
-
-mod89.hs:5:16: error: [GHC-18208]
-    Expecting a type constructor but found a variable, ‘map’.

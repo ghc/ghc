@@ -1,5 +1,0 @@
-
-T22560_fail_c.hs:8:11: error: [GHC-10498]
-    Conflicting definitions for ‘k’
-    Bound at: T22560_fail_c.hs:8:11
-              T22560_fail_c.hs:8:14

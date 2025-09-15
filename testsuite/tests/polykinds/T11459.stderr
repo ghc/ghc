@@ -1,9 +1,0 @@
-
-T11459.hs:9:20: error: [GHC-07525]
-    • A newtype constructor must not have existential type variables
-      Parser :: forall a {k}.
-                (forall (f :: k -> *) (r :: k).
-                 Failure f r -> Success a f r -> f r)
-                -> Parser a
-    • In the definition of data constructor ‘Parser’
-      In the newtype declaration for ‘Parser’

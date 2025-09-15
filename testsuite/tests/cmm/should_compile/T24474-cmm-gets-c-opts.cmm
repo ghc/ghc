@@ -1,5 +1,0 @@
-/* Test that that C-- C pre-processor receives -optc args.  */
-
-#ifndef FOO
-# error "C pre-processor arguments not passed"
-#endif

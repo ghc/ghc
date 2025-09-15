@@ -1,5 +1,0 @@
-
-mod18.hs:3:1: [GHC-29916]
-    Multiple declarations of ‘T’
-    Declared at: mod18.hs:2:1
-                 mod18.hs:3:1

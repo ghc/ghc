@@ -1,6 +1,0 @@
-
-T20426.hs:15:1: error: [GHC-55287]
-    The first pattern in the equations for ‘getInt#’
-    does not have a fixed runtime representation.
-    Its type is:
-      LPGADT l :: TYPE (BoxedRep l)

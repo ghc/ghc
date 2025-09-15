@@ -1,6 +1,0 @@
-
-T10826.hs:7:1: error: [GHC-68934]
-    • Annotations are not compatible with Safe Haskell.
-      See https://gitlab.haskell.org/ghc/ghc/issues/10826
-    • In the annotation:
-        {-# ANN hook (unsafePerformIO (putStrLn "Woops.")) #-}

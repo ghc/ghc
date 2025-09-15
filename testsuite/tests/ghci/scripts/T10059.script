@@ -1,5 +1,0 @@
-:set -XTypeOperators
-:i (~)
-:k (~)
-:set -fprint-equality-relations
-:i (~)

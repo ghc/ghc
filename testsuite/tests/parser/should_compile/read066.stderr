@@ -1,3 +1,0 @@
-
-read066.hs:2:1: warning: [GHC-42044] [-Wunrecognised-pragmas (in -Wdefault)]
-    Unrecognised pragma: OPTIONS_NO_SUCH_PRAGMA

@@ -1,5 +1,0 @@
-
-==================== Tidy Core rules ====================
-"SC:$wf20" [2] forall (sc :: Int#). $wf2 (I# sc) = f2_$s$wf2 sc
-
-

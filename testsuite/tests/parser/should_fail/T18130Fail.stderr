@@ -1,4 +1,0 @@
-
-T18130Fail.hs:11:7: error: [GHC-83865]
-    • Expected kind ‘* -> *’, but ‘(a, b)’ has kind ‘*’
-    • In the newtype declaration for ‘Par’

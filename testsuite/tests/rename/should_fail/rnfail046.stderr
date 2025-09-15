@@ -1,2 +1,0 @@
-
-rnfail046.hs:4:13: [GHC-28329] Qualified name in binding position: Map.Map

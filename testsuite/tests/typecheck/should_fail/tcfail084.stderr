@@ -1,5 +1,0 @@
-
-tcfail084.hs:10:5: [GHC-53822]
-    Constructor ‘F’ does not have field ‘y’
-    In the expression: F {y = 2}
-    In an equation for ‘z’: z = F {y = 2}

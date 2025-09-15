@@ -1,3 +1,0 @@
-
-T9634.hs:3:10: error: [GHC-46574]
-    Cannot parse data constructor in a data/newtype declaration: 1

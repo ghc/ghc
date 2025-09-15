@@ -1,3 +1,0 @@
-
-tcfail210.hs:4:31: error: [GHC-76037]
-    Not in scope: type constructor or class ‘Constraint’

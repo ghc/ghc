@@ -1,4 +1,0 @@
-type Infix :: * -> * -> *
-data Infix a b = a :@: b
-  	-- Defined at <interactive>:2:18
-infixl 4 :@:

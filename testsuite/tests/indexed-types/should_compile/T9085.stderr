@@ -1,4 +1,0 @@
-
-T9085.hs:7:3: warning: [GHC-28129] [-Winaccessible-code (in -Wdefault)]
-    Type family instance equation is overlapped:
-      F Bool = Bool -- Defined at T9085.hs:7:3

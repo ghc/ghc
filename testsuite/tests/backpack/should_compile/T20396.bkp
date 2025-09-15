@@ -1,7 +1,0 @@
-
-{-# OPTIONS_GHC -ddump-simpl -dsuppress-all -dsuppress-uniques #-}
-
-unit unit where
-  module A where
-    f :: Int -> Int
-    f x = x

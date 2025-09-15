@@ -1,4 +1,0 @@
-
-tc254.hs:8:1: warning: [GHC-08585] [-Wmissing-methods (in -Wdefault)]
-    • No explicit associated type or default declaration for ‘Typ’
-    • In the instance declaration for ‘Cls Int’

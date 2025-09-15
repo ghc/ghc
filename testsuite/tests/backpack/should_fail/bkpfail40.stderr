@@ -1,6 +1,0 @@
-[1 of 1] Processing p
-  [1 of 1] Compiling A[sig]           ( p\A.hsig, nothing )
-
-bkpfail40.bkp:3:9: error: [GHC-93006]
-    • Illegal default method in class definition of C in hsig file
-    • In the class declaration for ‘C’

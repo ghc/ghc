@@ -1,6 +1,0 @@
-
-T15334.hs:8:6: error: [GHC-69012]
-    • You can't specify an instance for a tuple constraint
-    • In the quantified constraint ‘forall a. Eq a => (C m a, D m a)’
-      In the type signature:
-        f :: (forall a. Eq a => (C m a, D m a)) => m a

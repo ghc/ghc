@@ -1,7 +1,0 @@
-:r
-:seti -fprint-explicit-foralls
-:set prompt >>>
-:set -Wall
-:t id
-:l abc
-

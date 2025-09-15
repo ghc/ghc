@@ -1,6 +1,0 @@
-
-T19346.hs:6:11: error: [GHC-83865]
-    • Couldn't match expected type ‘Int’ with actual type ‘Bool’
-    • In the first argument of ‘MkT’, namely ‘x’
-      In the expression: MkT x
-      In an equation for ‘f’: f x = MkT x

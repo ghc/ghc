@@ -1,5 +1,0 @@
-
-capi_value_function.hs:8:1: error: [GHC-76251]
-    • `value' imports cannot have function types
-    • When checking declaration:
-        foreign import capi safe "math.h value sqrt" f :: CInt -> CInt

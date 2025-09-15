@@ -1,8 +1,0 @@
-
-T14141_Unsat.hs:26:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match has inaccessible right hand side
-    In an equation for ‘f’: f MkD = ...
-
-T14141_Unsat.hs:41:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In an equation for ‘exhaustive’: exhaustive B = ...

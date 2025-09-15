@@ -1,5 +1,0 @@
-default-fail02.hs:1:1: error: [GHC-55756]
-    Illegal named default declaration ‘default Num (Integer, Double)’
-    Suggested fix:
-      Perhaps you intended to use the ‘NamedDefaults’ extension
-

@@ -1,5 +1,0 @@
-
-T17729.hs:5:17: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
-    Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns of type ‘(Maybe a, ())’ not matched: ((Just _), ())

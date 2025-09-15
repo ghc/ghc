@@ -1,6 +1,0 @@
-
-T9097.hs:10:3: error: [GHC-73138]
-    • Illegal type synonym family application ‘Any’ in instance:
-        Foo Any
-    • In the equations for closed type family ‘Foo’
-      In the type family declaration for ‘Foo’

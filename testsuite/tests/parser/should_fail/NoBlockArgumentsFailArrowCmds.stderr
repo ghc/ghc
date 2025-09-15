@@ -1,7 +1,0 @@
-
-NoBlockArgumentsFailArrowCmds.hs:7:27: error: [GHC-12178]
-    Unexpected lambda command in function application:
-        \ () -> () >- returnA
-    Suggested fixes:
-      • Use parentheses.
-      • Perhaps you intended to use the ‘BlockArguments’ extension

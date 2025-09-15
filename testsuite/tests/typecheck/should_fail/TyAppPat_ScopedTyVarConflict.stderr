@@ -1,8 +1,0 @@
-
-TyAppPat_ScopedTyVarConflict.hs:12:15: error: [GHC-63397] [-Wname-shadowing (in -Wall), Werror=name-shadowing]
-    This binding for ‘a’ shadows the existing binding
-      bound at TyAppPat_ScopedTyVarConflict.hs:11:15
-
-TyAppPat_ScopedTyVarConflict.hs:13:12: error: [GHC-63397] [-Wname-shadowing (in -Wall), Werror=name-shadowing]
-    This binding for ‘a’ shadows the existing binding
-      bound at TyAppPat_ScopedTyVarConflict.hs:11:15

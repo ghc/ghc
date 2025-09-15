@@ -1,4 +1,0 @@
-
-T12387.hs:8:2: error: [GHC-46284]
-    • Class ‘Eq’ does not have a method ‘compare’
-    • In the instance declaration for ‘Eq Foo’

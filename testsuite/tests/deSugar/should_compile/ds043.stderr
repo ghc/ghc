@@ -1,4 +1,0 @@
-
-ds043.hs:10:3: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In a case alternative: B {e = True, f = False} -> ...

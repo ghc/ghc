@@ -1,6 +1,0 @@
-[GblId[DFunId],
- Unf=DFun: \ (@b) ->
-[GblId[DFunId],
- Unf=DFun: \ (@b) ->
-[GblId[DFunId],
- Unf=DFun: \ (@p) (@q) (v :: C p q) ->

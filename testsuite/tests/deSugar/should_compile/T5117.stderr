@@ -1,4 +1,0 @@
-
-T5117.hs:16:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In an equation for ‘f3’: f3 (MyString "a") = ...

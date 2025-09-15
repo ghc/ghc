@@ -1,5 +1,0 @@
-:seti -XUnboxedSums
-:l T20858
-:kind! S1
-:kind! S2
-:kind! S3

@@ -1,6 +1,0 @@
-
-T14066f.hs:8:1: error: [GHC-87279]
-    • The kind of ‘P’ is ill-scoped
-        Inferred kind: P :: k -> forall k -> *
-      Perhaps try this order instead: k (a :: k)
-    • In the type synonym declaration for ‘P’

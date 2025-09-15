@@ -1,7 +1,0 @@
-
-SafeFlags23.hs:2:17: error: [-Wunsafe, Werror=unsafe]
-    ‘SafeFlags22’ has been inferred as unsafe!
-    Reason:
-        SafeFlags23.hs:8:1: error: [GHC-44360]
-            System.IO.Unsafe: Can't be safely imported!
-            The module itself isn't safe.

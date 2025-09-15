@@ -1,8 +1,0 @@
-
-T5971.hs:6:6: error: [GHC-97784]
-    • The Name ‘x’ is not in scope.
-    • In the untyped splice: $(newName "x" >>= varE)
-    Suggested fix:
-      If you bound a unique Template Haskell name (NameU)
-      perhaps via newName,
-      then -ddump-splices might be useful.

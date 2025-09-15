@@ -1,3 +1,0 @@
-T14794b.hs:9:1: warning: [GHC-38417] [-Wmissing-exported-signatures]
-    Top-level binding with no type signature: testExported :: Bool
-

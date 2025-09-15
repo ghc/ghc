@@ -1,2 +1,0 @@
-
-main = print "Hello world"

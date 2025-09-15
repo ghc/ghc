@@ -1,5 +1,0 @@
-unit p where
-    signature ShouldFail where
-        data Booly
-unit q where
-    dependency p[ShouldFail=ghc-internal:Data.Bool]

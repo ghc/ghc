@@ -1,6 +1,0 @@
-{-# LANGUAGE CPP #-}
-module PatchLevel2 where
-
-
-p2 = __GLASGOW_HASKELL_PATCHLEVEL2__
-p1 = __GLASGOW_HASKELL_PATCHLEVEL1__

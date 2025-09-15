@@ -1,3 +1,0 @@
-
-RecordDotSyntaxFail4.hs:7:29: error: [GHC-58481]
-    parse error on input ‘.’

@@ -1,3 +1,0 @@
-
-mod5.hs:2:10: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
-    ‘K1’ is exported by ‘T(K1, K1)’ and ‘T(K1, K1)’

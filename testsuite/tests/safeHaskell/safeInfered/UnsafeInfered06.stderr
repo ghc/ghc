@@ -1,4 +1,0 @@
-
-UnsafeInfered06.hs:5:1: error: [GHC-44360]
-    UnsafeInfered06_A: Can't be safely imported!
-    The module itself isn't safe.

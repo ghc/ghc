@@ -1,5 +1,0 @@
-signature A.Sig where
-
-data A
-
-showA :: A -> String

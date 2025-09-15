@@ -1,3 +1,0 @@
-
-unpack_empty_type.hs:3:34: error: [GHC-58481]
-    parse error on input ‘}’

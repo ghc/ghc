@@ -1,6 +1,0 @@
-
-T12081.hs:9:14: error: [GHC-83865]
-    • Expected a type, but ‘T n’ has kind ‘Nat’
-    • In the kind ‘T n’
-      In the type signature: f :: (a :: T n)
-      In the class declaration for ‘C’

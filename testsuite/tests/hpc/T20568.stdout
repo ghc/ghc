@@ -1,1 +1,0 @@
-IfThenElse (AstBool True) (AstInt 1) (AstInt 2)

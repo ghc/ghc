@@ -1,4 +1,0 @@
-
-T4042.hs:6:1: error: [GHC-25277]
-    Parse error: module header, import declaration
-    or top-level declaration expected.

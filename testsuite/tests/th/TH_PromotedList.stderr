@@ -1,3 +1,0 @@
-TH_PromotedList.hs:11:2: warning: [GHC-39584]
-    '(:) GHC.Internal.Types.Int ('(:) GHC.Internal.Types.Bool '[])
-

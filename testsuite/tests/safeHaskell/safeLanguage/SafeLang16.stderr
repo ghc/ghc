@@ -1,3 +1,0 @@
-
-SafeLang16.hs:2:14: warning: [GHC-98887]
-    -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell

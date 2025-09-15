@@ -1,6 +1,0 @@
-./T24275A.hs-boot: error: [GHC-92213]
-    Module graph contains a cycle:
-                    module ‘main:T24275A’ (./T24275A.hs-boot)
-            imports module ‘main:T24275B’ (T24275B.hs)
-      which imports module ‘main:T24275A’ (./T24275A.hs-boot)
-

@@ -1,3 +1,0 @@
-
-T17b.hs:17:12: warning: [GHC-40910] [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
-    Defined but not used: ‘local’

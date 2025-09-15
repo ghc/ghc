@@ -1,2 +1,0 @@
-signature A where
-f :: Int

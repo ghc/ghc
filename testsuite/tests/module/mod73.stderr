@@ -1,6 +1,0 @@
-mod73.hs:3:7: error: [GHC-76037]
-    • Not in scope: ‘Prelude.meplicate’
-    • Note: The module ‘Prelude’ does not export ‘meplicate’.
-    Suggested fix:
-      Perhaps use ‘Prelude.replicate’ (imported from Prelude)
-

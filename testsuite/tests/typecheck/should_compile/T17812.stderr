@@ -1,3 +1,0 @@
-
-T17812.hs:8:9: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
-    Variable not in scope: outOfScope

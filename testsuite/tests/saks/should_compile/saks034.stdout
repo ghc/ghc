@@ -1,2 +1,0 @@
-C :: k -> Constraint
-T :: forall k -> k -> Type

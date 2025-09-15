@@ -1,5 +1,0 @@
-
-NoNumericUnderscores1.hs:11:3: error: [GHC-62330]
-    Illegal underscores in floating literals
-    Suggested fix:
-      Perhaps you intended to use the ‘NumericUnderscores’ extension

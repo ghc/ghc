@@ -1,3 +1,0 @@
-
-THPutDocExternal.hs:8:1: error: [GHC-67760]
-    Can't add documentation to THPutDocExternalA.f, as it isn't inside the current module.

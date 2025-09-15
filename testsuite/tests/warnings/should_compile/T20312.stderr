@@ -1,3 +1,0 @@
-
-T20312.hs:1:14: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
-    -XTypeInType is deprecated: use -XDataKinds and -XPolyKinds instead

@@ -1,3 +1,0 @@
-T13832: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
-
-user error (setNumCapabilities: Capability count (0) must be positive)

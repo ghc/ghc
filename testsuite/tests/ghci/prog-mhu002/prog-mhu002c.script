@@ -1,5 +1,0 @@
-:m + A B C Main
-putStrLn "=== :seti"
-:seti
-putStrLn "=== :set"
-:set

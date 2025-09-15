@@ -1,4 +1,0 @@
-type (?) :: *
-data (?)
-  	-- Defined at <interactive>:2:1
-infixl 9 ?

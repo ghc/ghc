@@ -1,5 +1,0 @@
-
-T5820.hs:4:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
-    • No explicit implementation for
-        either ‘==’ or ‘/=’
-    • In the instance declaration for ‘Eq Foo’

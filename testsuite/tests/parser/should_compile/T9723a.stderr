@@ -1,4 +1,0 @@
-
-T9723a.hs:8:5: warning: [GHC-94817] [-Wtabs (in -Wdefault)]
-    Tab character found here.
-    Suggested fix: Please use spaces instead.
