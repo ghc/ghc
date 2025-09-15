@@ -1,0 +1,3 @@
+<interactive>:1:1: error: [GHC-58427]
+    attempting to use module ‘main:Prelude’ (./Prelude.hs) which is not loaded
+

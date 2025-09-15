@@ -1,0 +1,17 @@
+:seti -XDataKinds -XTemplateHaskell
+import Language.Haskell.TH
+import Data.Proxy
+
+data (:::) = forall k k' . k ::: k'; infixr 5 :::
+
+intT = ConT ''Int
+stringT = ConT ''String
+boolT = ConT ''Bool
+
+:t Proxy @($(pure $ UInfixT intT '(:::) stringT))
+
+promUInf x y = PromotedUInfixT x (mkName ":::") y
+:t Proxy @($(pure $ (intT `promUInf` stringT) `promUInf` boolT))
+
+promInf x y = PromotedInfixT x (mkName ":::") y
+:t Proxy @($(pure $ (intT `promInf` stringT) `promInf` boolT))

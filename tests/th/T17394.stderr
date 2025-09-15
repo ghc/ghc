@@ -1,0 +1,8 @@
+T17394.hs:10:12-66: Splicing type
+    infixT (conT ''Maybe) ''(:*:) (conT ''Maybe)
+  ======>
+    (:*:) Maybe Maybe
+T17394.hs:9:12-68: Splicing type
+    infixT (promotedT 'Nothing) '(:*:) (promotedT 'Nothing)
+  ======>
+    '(:*:) 'Nothing 'Nothing

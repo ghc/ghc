@@ -1,0 +1,2 @@
+newtype Age = Age Int deriving Show
+newtype Bar = Bar Age deriving Show 

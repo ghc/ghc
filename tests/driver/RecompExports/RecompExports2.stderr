@@ -1,0 +1,7 @@
+RecompExports2_N.hs:9:7: error: [GHC-87543]
+    Ambiguous occurrence ‘bar’.
+    It could refer to
+       either ‘RecompExports2_M.bar’,
+              imported from ‘RecompExports2_M’ at RecompExports2_N.hs:3:1-23,
+           or ‘RecompExports2_N.bar’, defined at RecompExports2_N.hs:6:1.
+

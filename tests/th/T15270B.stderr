@@ -1,0 +1,5 @@
+
+T15270B.hs:8:6: error: [GHC-55017]
+    • Illegal variable name: ‘Just’
+      When splicing a TH expression: GHC.Internal.Maybe.Just
+    • In the untyped splice: $(varE 'Just)

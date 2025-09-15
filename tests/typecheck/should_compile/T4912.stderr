@@ -1,0 +1,12 @@
+
+T4912.hs:10:1: warning: [GHC-90177] [-Worphans (in -Wall)]
+    Orphan class instance: instance Foo TheirData
+    Suggested fix:
+      Move the instance declaration to the module of the class or of the type, or
+      wrap the type with a newtype and declare the instance on the new type.
+
+T4912.hs:13:1: warning: [GHC-90177] [-Worphans (in -Wall)]
+    Orphan class instance: instance Bar OurData
+    Suggested fix:
+      Move the instance declaration to the module of the class or of the type, or
+      wrap the type with a newtype and declare the instance on the new type.

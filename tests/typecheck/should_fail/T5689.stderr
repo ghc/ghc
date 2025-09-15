@@ -1,0 +1,6 @@
+
+T5689.hs:15:23: error: [GHC-39999]
+    • No instance for ‘Num Bool’ arising from the literal ‘1234’
+    • In the first argument of ‘c’, namely ‘1234’
+      In the second argument of ‘($)’, namely ‘c 1234’
+      In a stmt of a 'do' block: print $ c 1234

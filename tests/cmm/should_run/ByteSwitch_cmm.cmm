@@ -1,0 +1,11 @@
+#include "Cmm.h"
+
+byte_switch (bits8 x) {
+    switch [0 .. 255] (x) {
+    case 255: { return (7); }
+    case 254: { return (15); }
+    case   0: { return (5); }
+    case   3: { return (9); }
+    default:  { return (x); }
+    }
+}

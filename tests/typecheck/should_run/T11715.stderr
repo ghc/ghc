@@ -1,0 +1,7 @@
+T11715: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+No more bug!
+
+HasCallStack backtrace:
+  error, called at T11715.hs:8:31 in main:Main
+

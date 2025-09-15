@@ -1,0 +1,30 @@
+Rule fired
+    Rule: bar
+    Module: (RewriteHigherOrderPatterns)
+    Full arity: 1
+    Before: bar \ x y z -> two (two x y) z
+    After:  (\ f -> True) (\ x y -> two (two x y))
+Rule fired
+    Rule: bar
+    Module: (RewriteHigherOrderPatterns)
+    Full arity: 1
+    Before: bar \ x _ z -> two (two x (I# 2#)) z
+    After:  (\ f -> True) (\ x _ -> two (two x (I# 2#)))
+Rule fired
+    Rule: foo
+    Module: (RewriteHigherOrderPatterns)
+    Full arity: 1
+    Before: foo \ x -> two (two x (I# 2#)) x
+    After:  (\ f -> True) (\ x -> two (two x (I# 2#)) x)
+Rule fired
+    Rule: qux
+    Module: (RewriteHigherOrderPatterns)
+    Full arity: 1
+    Before: qux \ x y -> three (two x (I# 1#)) (I# 2#) y
+    After:  (\ f -> True) (\ x -> three (two x (I# 1#)))
+Rule fired
+    Rule: baz
+    Module: (RewriteHigherOrderPatterns)
+    Full arity: 1
+    Before: baz \ x -> three (two x (I# 1#)) (I# 2#) x
+    After:  (\ f -> True) (\ x -> three (two x (I# 1#)) (I# 2#))

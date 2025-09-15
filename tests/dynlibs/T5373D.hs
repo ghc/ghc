@@ -1,0 +1,4 @@
+
+main :: IO ()
+main = return ()
+

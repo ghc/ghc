@@ -1,0 +1,3 @@
+
+T13947.hs:4:16: error: [GHC-76037]
+    Not in scope: type constructor or class ‘:~:’

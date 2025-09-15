@@ -1,0 +1,7 @@
+module RecompExports2_M where
+
+foo :: Int
+foo = 3
+
+quux :: Double
+quux = 7.7

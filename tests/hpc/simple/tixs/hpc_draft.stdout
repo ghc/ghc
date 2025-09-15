@@ -1,0 +1,6 @@
+module "Main" {
+  inside "main" {
+    tick "\"World\"" on line 1;
+  }
+}
+

@@ -1,0 +1,3 @@
+
+rn047.hs:12:11: warning: [GHC-40910] [-Wunused-matches (in -Wextra)]
+    Defined but not used: ‘y’

@@ -1,0 +1,9 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 3, types: 1, coercions: 0, joins: 0/0}
+
+foo = I# 9999#
+
+
+

@@ -1,0 +1,113 @@
+
+==================== Output Cmm ====================
+[M.f_entry() { //  [R2]
+         { info_tbls: [(cAs,
+                        label: block_info
+                        rep: StackRep []
+                        srt: Nothing),
+                       (cAv,
+                        label: M.f_info
+                        rep: HeapRep static { Fun {arity: 1 fun_type: ArgSpec 5} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       _lbl_: // global
+           if ((Sp + -8) < SpLim) (likely: False) goto cAw; else goto cAx;
+       _lbl_: // global
+           R1 = M.f_closure;
+           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;
+       _lbl_: // global
+           I64[Sp - 8] = cAs;
+           R1 = R2;
+           Sp = Sp - 8;
+           if (R1 & 7 != 0) goto cAs; else goto cAt;
+       _lbl_: // global
+           call (I64[R1])(R1) returns to cAs, args: 8, res: 8, upd: 8;
+       _lbl_: // global
+           R1 = P64[R1 + 15];
+           Sp = Sp + 8;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+     }
+ },
+ section ""data" . M.f_closure" {
+     M.f_closure:
+         const M.f_info;
+ }]
+
+
+
+==================== Output Cmm ====================
+[M.MkT_entry() { //  [R3, R2]
+         { info_tbls: [(cAJ,
+                        label: block_info
+                        rep: StackRep [False]
+                        srt: Nothing),
+                       (cAM,
+                        label: M.MkT_info
+                        rep: HeapRep static { Fun {arity: 2 fun_type: ArgSpec 15} }
+                        srt: Nothing),
+                       (cAP,
+                        label: block_info
+                        rep: StackRep [False]
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       _lbl_: // global
+           if ((Sp + -16) < SpLim) (likely: False) goto cAS; else goto cAT;
+       _lbl_: // global
+           R1 = M.MkT_closure;
+           call (stg_gc_fun)(R3, R2, R1) args: 8, res: 0, upd: 8;
+       _lbl_: // global
+           I64[Sp - 16] = cAJ;
+           R1 = R2;
+           P64[Sp - 8] = R3;
+           Sp = Sp - 16;
+           if (R1 & 7 != 0) goto cAJ; else goto cAK;
+       _lbl_: // global
+           call (I64[R1])(R1) returns to cAJ, args: 8, res: 8, upd: 8;
+       _lbl_: // global
+           I64[Sp] = cAP;
+           __locVar_::P64 = R1;
+           R1 = P64[Sp + 8];
+           P64[Sp + 8] = __locVar_::P64;
+           call stg_ap_0_fast(R1) returns to cAP, args: 8, res: 8, upd: 8;
+       _lbl_: // global
+           Hp = Hp + 24;
+           if (Hp > HpLim) (likely: False) goto cAX; else goto cAW;
+       _lbl_: // global
+           HpAlloc = 24;
+           call stg_gc_unpt_r1(R1) returns to cAP, args: 8, res: 8, upd: 8;
+       _lbl_: // global
+           I64[Hp - 16] = M.MkT_con_info;
+           P64[Hp - 8] = P64[Sp + 8];
+           P64[Hp] = R1;
+           R1 = Hp - 15;
+           Sp = Sp + 16;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+     }
+ },
+ section ""data" . M.MkT_closure" {
+     M.MkT_closure:
+         const M.MkT_info;
+ }]
+
+
+
+==================== Output Cmm ====================
+[M.MkT_con_entry() { //  []
+         { info_tbls: [(cB3,
+                        label: M.MkT_con_info
+                        rep: HeapRep 2 ptrs { Con {tag: 0 descr:"main:M.MkT"} }
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       _lbl_: // global
+           R1 = R1 + 1;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+     }
+ }]
+
+

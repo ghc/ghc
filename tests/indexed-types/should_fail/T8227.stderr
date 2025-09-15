@@ -1,0 +1,12 @@
+T8227.hs:24:27: error: [GHC-83865]
+    • Couldn't match expected type: Scalar (V a)
+                  with actual type: Scalar (V p0) -> Scalar (V p0)
+    • In the expression: arcLengthToParam eps eps
+      In an equation for ‘absoluteToParam’:
+          absoluteToParam eps seg = arcLengthToParam eps eps
+    • Relevant bindings include
+        seg :: a (bound at T8227.hs:24:21)
+        eps :: Scalar (V a) (bound at T8227.hs:24:17)
+        absoluteToParam :: Scalar (V a) -> a -> Scalar (V a)
+          (bound at T8227.hs:24:1)
+

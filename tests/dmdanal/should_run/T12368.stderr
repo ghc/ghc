@@ -1,0 +1,7 @@
+T12368: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+This is good!
+
+HasCallStack backtrace:
+  error, called at T12368.hs:23:22 in main:Main
+

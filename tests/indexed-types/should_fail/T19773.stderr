@@ -1,0 +1,23 @@
+[1 of 4] Compiling T19773a          ( T19773a.hs, T19773a.o )
+[2 of 4] Compiling T19773b          ( T19773b.hs, T19773b.o )
+
+T19773b.hs:6:1: warning: [GHC-90177] [-Worphans (in -Wall)]
+    Orphan family instance:
+      data instance DF [a] -- Defined at T19773b.hs:6:15
+    Suggested fix:
+      Move the instance declaration to the module of the data family or of the type, or
+      wrap the type with a newtype and declare the instance on the new type.
+[3 of 4] Compiling T19773c          ( T19773c.hs, T19773c.o )
+
+T19773c.hs:6:1: warning: [GHC-90177] [-Worphans (in -Wall)]
+    Orphan family instance:
+      data instance DF [a] -- Defined at T19773c.hs:6:15
+    Suggested fix:
+      Move the instance declaration to the module of the data family or of the type, or
+      wrap the type with a newtype and declare the instance on the new type.
+[4 of 4] Compiling T19973           ( T19773.hs, T19773.o )
+
+T19773.hs:1:1: error: [GHC-34447]
+    Conflicting family instance declarations:
+      DF [a] -- Defined in module T19773b
+      DF [a] -- Defined in module T19773c

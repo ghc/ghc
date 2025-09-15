@@ -1,0 +1,7 @@
+
+T5513.hs:4:19: error: [GHC-53946]
+    • Illegal head of an instance declaration: ‘lowercase_name a’.
+      Instance heads must be of the form
+        C ty_1 ... ty_n
+      where ‘C’ is a class.
+    • In the stand-alone deriving instance for ‘lowercase_name a’

@@ -1,0 +1,5 @@
+
+UnsatisfiableFail1.hs:12:12: error: [GHC-22250]
+    • Cannot call 'uncallable'.
+    • In the expression: uncallable
+      In an equation for ‘rejected’: rejected = uncallable

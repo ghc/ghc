@@ -1,0 +1,7 @@
+unit p where
+    signature A where
+        data T
+        instance Eq T
+unit q where
+    dependency p[A=<A>]
+    signature A (T) where

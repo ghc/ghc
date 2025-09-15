@@ -1,0 +1,14 @@
+
+T3095.hs:8:12: error: [GHC-25955]
+    Illegal symbol ‘forall’ in type
+    Suggested fix:
+      Use the ‘ExplicitForAll’ extension (implied by ‘RankNTypes’,
+                                                     ‘QuantifiedConstraints’, ‘ScopedTypeVariables’,
+                                                     ‘LiberalTypeSynonyms’ and ‘ExistentialQuantification’)
+      to enable syntax: forall <tvs>. <type>
+
+T3095.hs:8:12: error: [GHC-77878]
+    Unexpected type ‘forall x. x :: Type’
+    In the class declaration for ‘Bla’
+    A class declaration should have form
+      class Bla a where ...

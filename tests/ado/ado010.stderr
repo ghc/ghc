@@ -1,0 +1,18 @@
+
+==================== Renamer ====================
+Test.q1 :: IO ()
+Test.q1
+  = do (a <- pure () | b <- pure ())
+       return $ pureNothing a
+  where
+      pureNothing :: a -> ()
+      pureNothing _ = ()
+Test.q2 :: IO ()
+Test.q2
+  = do (a <- pure () | b <- pure ())
+       doNothing a
+  where
+      doNothing :: a -> IO ()
+      doNothing _ = pure ()
+
+

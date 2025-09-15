@@ -1,0 +1,9 @@
+
+T7019a.hs:11:1: error: [GHC-91510]
+    • Illegal polymorphic type: forall b. Context (Associated a b)
+      A constraint must be a monotype
+    • In the context: forall b. Context (Associated a b)
+      While checking the super-classes of class ‘Class’
+      In the class declaration for ‘Class’
+    Suggested fix:
+      Perhaps you intended to use the ‘QuantifiedConstraints’ extension

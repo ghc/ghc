@@ -1,0 +1,9 @@
+
+T14907b.hs:5:1: error: [GHC-58805]
+    Illegal binding of an existing name: ()
+
+T14907b.hs:6:1: error: [GHC-58805]
+    Illegal binding of an existing name: (,)
+
+T14907b.hs:7:1: error: [GHC-58805]
+    Illegal binding of an existing name: (,,)

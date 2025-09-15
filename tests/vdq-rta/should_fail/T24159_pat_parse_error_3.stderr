@@ -1,0 +1,4 @@
+T24159_pat_parse_error_3.hs:4:4: error: [GHC-32181]
+    Illegal function arrow in pattern: ‘a %1 -> b’
+    Type syntax in patterns isn't supported at the time
+

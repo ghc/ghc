@@ -1,0 +1,13 @@
+-- Printing of lists
+:set -Wno-x-partial
+
+let li = map Just [0::Integer .. 5]
+:p li
+head li
+:p li
+length li
+:p li
+:sp li
+li
+:p li
+:sp li

@@ -1,0 +1,6 @@
+
+T15362.hs:7:2: error: [GHC-88221]
+    • Mismatched type name in type family instance.
+        Expected: +
+          Actual: Maybe
+    • In the type family declaration for ‘+’

@@ -1,0 +1,3 @@
+MkX :: forall {k} b (a :: k). b -> Proxy a -> X a
+MkX @Int :: forall {k} (a :: k). Int -> Proxy a -> X a
+MkX @Int @Maybe :: Int -> Proxy Maybe -> X Maybe

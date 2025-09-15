@@ -1,0 +1,4 @@
+:set -XTemplateHaskell
+import Language.Haskell.TH
+data Option a = Some a | None
+$(reify 'Some >>= stringE . pprint)

@@ -1,0 +1,7 @@
+SafeLang09: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+This curry is poisoned!
+
+HasCallStack backtrace:
+  error, called at ./SafeLang09_B.hs:14:13 in main:SafeLang09_B
+

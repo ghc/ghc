@@ -1,0 +1,20 @@
+T19737.hs:(10,2)-(14,9): Splicing declarations
+    pure
+      [TySynInstD
+         (TySynEqn Nothing (ConT ''T `AppT` ConT ''Char) (ConT ''Char)),
+       TySynInstD
+         (TySynEqn
+            Nothing (ParensT (ConT ''T) `AppT` ConT ''Int) (ConT ''Int)),
+       TySynInstD
+         (TySynEqn
+            Nothing (ParensT (ConT ''T `AppT` ConT ''Bool)) (ConT ''Bool)),
+       TySynInstD
+         (TySynEqn
+            Nothing
+            (ParensT (ParensT (ConT ''T `AppT` ParensT (ConT ''Double))))
+            (ConT ''Double))]
+  ======>
+    type instance T Char = Char
+    type instance (T) Int = Int
+    type instance (T Bool) = Bool
+    type instance ((T (Double))) = Double

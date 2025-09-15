@@ -1,0 +1,11 @@
+
+T15450.hs:7:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘Bool’ not matched:
+            False
+            True
+
+T15450.hs:10:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns of type ‘Bool’ not matched: False

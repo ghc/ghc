@@ -1,0 +1,12 @@
+
+T15076.hs:13:11: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Proxy f’
+      Where: ‘f’, ‘a’ are rigid type variables bound by
+               the type signature for:
+                 foo :: forall a (f :: forall (x :: a). Proxy x -> *). Proxy f -> ()
+               at T15076.hs:(10,1)-(12,20)
+    • In a pattern type signature: _
+      In the pattern: _ :: _
+      In an equation for ‘foo’: foo (_ :: _) = ()
+    • Relevant bindings include
+        foo :: Proxy f -> () (bound at T15076.hs:13:1)

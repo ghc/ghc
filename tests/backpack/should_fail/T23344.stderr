@@ -1,0 +1,51 @@
+[1 of 4] Processing p
+  Instantiating p
+  [1 of 1] Compiling M                ( p\M.hs, T23344.out\p\M.o )
+[2 of 4] Processing q
+  [1 of 2] Compiling H[sig]           ( q\H.hsig, nothing )
+  [2 of 2] Compiling N                ( q\N.hs, nothing )
+[3 of 4] Processing r
+  Instantiating r
+  [1 of 1] Including p
+  [1 of 1] Compiling H                ( r\H.hs, T23344.out\r\H.o )
+[4 of 4] Processing s
+  Instantiating s
+  [1 of 3] Including p
+  [2 of 3] Including r
+  [3 of 3] Including q[H=r:H]
+    Instantiating q[H=r:H]
+    [1 of 1] Including p
+    [1 of 2] Compiling H[sig]           ( q\H.hsig, T23344.out\q\q-EsMFZGC3QiBIz4krwt67aW\H.o )
+
+T23344.bkp:44:5: error: [GHC-15843]
+    • Type constructor ‘T1’ has conflicting definitions in the module
+      and its hsig file.
+      Main module: type T1 :: *
+                   type T1 = S1 (forall a. a -> a)
+        Hsig file: type T1 :: *
+                   data T1
+      Illegal implementation of abstract data:
+        Invalid polymorphic type: forall a. a -> a.
+    • While checking that ‘r:H’ implements signature ‘H’ in ‘q[H=r:H]’.
+
+T23344.bkp:45:5: error: [GHC-15843]
+    • Type constructor ‘T2’ has conflicting definitions in the module
+      and its hsig file.
+      Main module: type T2 :: *
+                   type T2 = S1 (G S2 => S2)
+        Hsig file: type T2 :: *
+                   data T2
+      Illegal implementation of abstract data:
+        Invalid qualified type: G S2 => S2.
+    • While checking that ‘r:H’ implements signature ‘H’ in ‘q[H=r:H]’.
+
+T23344.bkp:49:5: error: [GHC-15843]
+    • Type constructor ‘T3’ has conflicting definitions in the module
+      and its hsig file.
+      Main module: type T3 :: *
+                   type T3 = S1 Y
+        Hsig file: type T3 :: *
+                   data T3
+      Illegal implementation of abstract data:
+        Invalid polymorphic type: forall a. a -> a.
+    • While checking that ‘r:H’ implements signature ‘H’ in ‘q[H=r:H]’.

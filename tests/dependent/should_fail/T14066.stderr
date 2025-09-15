@@ -1,0 +1,15 @@
+
+T14066.hs:15:59: error: [GHC-46956]
+    • Expected kind ‘k0’, but ‘b’ has kind ‘k’
+    • because kind variable ‘k’ would escape its scope
+    This (rigid, skolem) kind variable is bound by
+      an explicit forall k (b :: k)
+      at T14066.hs:15:36-45
+    • In the second argument of ‘SameKind’, namely ‘b’
+      In the type signature: g :: forall k (b :: k). SameKind a b
+      In the expression:
+        let
+          g :: forall k (b :: k). SameKind a b
+          g = undefined
+        in ()
+    • Relevant bindings include x :: Proxy a (bound at T14066.hs:15:4)

@@ -1,0 +1,13 @@
+
+T12648.hs:76:9: error: [GHC-25897]
+    • Couldn't match expected type ‘a’ with actual type ‘()’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall (m :: * -> *) a. MonadBaseUnlift m IO => m a
+        at T12648.hs:71:1-34
+    • In the first argument of ‘return’, namely ‘()’
+      In a stmt of a 'do' block: return ()
+      In the expression:
+        do _ <- askUnliftBase
+           return ()
+    • Relevant bindings include f :: m a (bound at T12648.hs:72:1)

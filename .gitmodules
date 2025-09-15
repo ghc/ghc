@@ -118,3 +118,6 @@
 [submodule "libraries/file-io"]
 	path = libraries/file-io
 	url = https://gitlab.haskell.org/ghc/packages/file-io.git
+[submodule "testsuite"]
+	path = testsuite
+	url = git@gitlab.haskell.org:tdammers/ghc-testsuite-driver

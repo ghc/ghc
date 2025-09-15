@@ -1,0 +1,3 @@
+:set -XHaskell2010
+:l T6068
+:t exists Nothing

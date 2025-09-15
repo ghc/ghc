@@ -1,0 +1,12 @@
+Loaded A and B
+68
+50
+Loaded A, and implicitly B
+68
+50
+Loaded only B
+50
+Unload everything
+Loaded A and B
+68
+50

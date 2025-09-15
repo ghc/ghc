@@ -1,0 +1,9 @@
+unit t23080-unit1 where
+  signature H1 where
+    data T
+unit t23080-unit2 where
+  dependency t23080-unit1[H1=<H2>]
+  module B where
+    data T = MkT
+  signature H2 (T(MkT)) where
+    import B

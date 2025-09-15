@@ -1,0 +1,5 @@
+
+T15539.hs:6:13: error: [GHC-88464]
+    Variable not in scope: baz
+    Suggested fix:
+      Perhaps use one of these: ‘bam’ (line 17), ‘bar’ (line 15)

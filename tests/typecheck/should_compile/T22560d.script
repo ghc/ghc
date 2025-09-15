@@ -1,0 +1,10 @@
+:load T22560d.hs
+:set -fprint-explicit-foralls -XNoStarIsType
+:kind B
+:kind D
+:kind N
+:kind S
+:kind C
+:kind F
+:kind U
+:kind Z

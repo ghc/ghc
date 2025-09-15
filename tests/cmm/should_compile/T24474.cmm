@@ -1,0 +1,2 @@
+/* Test that -optc-g3 does not fail compilation of C-- files.  */
+#define foo 123

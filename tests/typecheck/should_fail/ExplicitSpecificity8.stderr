@@ -1,0 +1,3 @@
+
+ExplicitSpecificity8.hs:9:19: error: [GHC-57342]
+    Inferred type variables are not allowed here

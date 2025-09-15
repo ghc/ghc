@@ -1,0 +1,9 @@
+
+RecordDotSyntaxFail10.hs:40:11: error: [GHC-18872]
+    • Couldn't match type ‘Int’ with ‘[Char]’
+    • In the second argument of ‘($)’, namely ‘a {foo.bar.baz.quux}’
+      In a stmt of a 'do' block: print $ a {foo.bar.baz.quux}
+      In the expression:
+        do let a = ...
+           let quux = "Expecto patronum!"
+           print $ a {foo.bar.baz.quux}

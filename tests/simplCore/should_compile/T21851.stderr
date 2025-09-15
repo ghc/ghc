@@ -1,0 +1,21 @@
+[1 of 2] Compiling T21851a          ( T21851a.hs, T21851a.o )
+[2 of 2] Compiling T21851           ( T21851.hs, T21851.o )
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 7, types: 10, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
+g' :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [0] 30 0}]
+g'
+  = \ (x :: Int) ->
+      case T21851a.$w$sf x of { (# ww, _ [Occ=Dead] #) -> ww }
+
+
+

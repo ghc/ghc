@@ -1,0 +1,25 @@
+[1 of 2] Compiling T25115a          ( T25115a.hs, T25115a.o )
+[2 of 2] Compiling T25115           ( T25115.hs, T25115.o )
+T25115.hs:14:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a \case alternative:
+        Patterns of type ‘Bool’ not matched:
+            False
+            True
+
+T25115.hs:17:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a \case alternative: Patterns of type ‘Bool’ not matched: False
+
+T25115.hs:21:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a \case alternative:
+        Patterns of type ‘Ordering’ not matched:
+            LT
+            GT
+
+T25115.hs:28:8: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a \case alternative:
+        Patterns of type ‘ABC’ not matched: T25115a.Foo
+

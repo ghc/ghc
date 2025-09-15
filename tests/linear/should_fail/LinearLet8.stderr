@@ -1,0 +1,3 @@
+
+LinearLet8.hs:6:12: error: [GHC-76037]
+    Not in scope: type variable ‘p’

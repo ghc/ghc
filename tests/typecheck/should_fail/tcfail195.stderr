@@ -1,0 +1,5 @@
+
+tcfail195.hs:7:3: error: [GHC-91510]
+    • Illegal polymorphic type: forall a. a
+    • In the definition of data constructor ‘Foo’
+      In the data type declaration for ‘Foo’

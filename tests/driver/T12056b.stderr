@@ -1,0 +1,3 @@
+
+on the commandline: warning: [GHC-93741] [-Wunrecognised-warning-flags (in -Wdefault)]
+    unrecognised warning flag: -Wbar

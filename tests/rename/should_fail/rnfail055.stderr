@@ -1,0 +1,147 @@
+RnFail055.hs:2:73: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
+RnFail055.hs-boot:2:73: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
+RnFail055.hs-boot:7:1: error: [GHC-15843]
+    • Type constructor ‘S1’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type S1 :: * -> * -> *
+                   type S1 a b = (a, b)
+        Boot file: type S1 :: * -> * -> * -> *
+                   type S1 a b c = (a, b)
+      The types have different kinds.
+    • In the type synonym declaration for ‘S1’
+
+RnFail055.hs-boot:9:1: error: [GHC-15843]
+    • Type constructor ‘S2’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type S2 :: * -> * -> *
+                   type S2 a b = forall a1. (a1, b)
+        Boot file: type S2 :: * -> * -> *
+                   type S2 a b = forall b1. (a, b1)
+      The roles do not match.
+      Note: Roles on abstract types default to ‘representational’ in hs-boot files.
+    • In the type synonym declaration for ‘S2’
+
+RnFail055.hs-boot:13:1: error: [GHC-15843]
+    • Type constructor ‘T1’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type T1 :: * -> * -> *
+                   data T1 a b = T1 [b] [a]
+        Boot file: type T1 :: * -> * -> *
+                   data T1 a b = T1 [a] [b]
+      The constructors do not match: The types for ‘T1’ differ.
+    • In the data type declaration for ‘T1’
+
+RnFail055.hs-boot:15:1: error: [GHC-15843]
+    • Type constructor ‘T2’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type role T2 representational nominal
+                   type T2 :: * -> * -> *
+                   data Eq b => T2 a b = T2 a
+        Boot file: type role T2 nominal phantom
+                   type T2 :: * -> * -> *
+                   data Eq a => T2 a b = T2 a
+      The roles do not match.
+      Note: Roles on abstract types default to ‘representational’ in hs-boot files.
+      The datatype contexts do not match.
+      The constructors do not match: The types for ‘T2’ differ.
+    • In the data type declaration for ‘T2’
+
+RnFail055.hs-boot:17:1: error: [GHC-15843]
+    • Type constructor ‘T3’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type T3 :: *
+                   data T3 = T3'
+        Boot file: type T3 :: *
+                   data T3 = T3
+      The constructors do not match: The names ‘T3’ and ‘T3'’ differ.
+    • In the data type declaration for ‘T3’
+
+RnFail055.hs-boot:18:1: error: [GHC-15843]
+    • Type constructor ‘T3'’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type T3' :: *
+                   data T3' = T3
+        Boot file: type T3' :: *
+                   data T3' = T3'
+      The constructors do not match: The names ‘T3'’ and ‘T3’ differ.
+    • In the data type declaration for ‘T3'’
+
+RnFail055.hs-boot:22:1: error: [GHC-15843]
+    • Type constructor ‘T5’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type T5 :: * -> *
+                   data T5 a = T5 {field5 :: a}
+        Boot file: type T5 :: * -> *
+                   data T5 a = T5 a
+      The constructors do not match:
+        The record label lists for ‘T5’ differ.
+    • In the data type declaration for ‘T5’
+
+RnFail055.hs-boot:24:1: error: [GHC-15843]
+    • Type constructor ‘T6’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type T6 :: *
+                   data T6 = T6 Int
+        Boot file: type T6 :: *
+                   data T6 = T6 !Int
+      The constructors do not match:
+        The strictness annotations for ‘T6’ differ.
+    • In the data type declaration for ‘T6’
+
+RnFail055.hs-boot:26:1: error: [GHC-15843]
+    • Type constructor ‘T7’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type role T7 phantom
+                   type T7 :: * -> *
+                   data T7 a = forall a1. T7 a1
+        Boot file: type T7 :: * -> *
+                   data T7 a = forall b. T7 a
+      The roles do not match.
+      Note: Roles on abstract types default to ‘representational’ in hs-boot files.
+      The constructors do not match: The types for ‘T7’ differ.
+    • In the data type declaration for ‘T7’
+
+RnFail055.hs-boot:28:1: error: [GHC-15843]
+    • Class ‘C1’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type C1 :: * -> * -> Constraint
+                   class C1 a b
+        Boot file: type C1 :: * -> * -> Constraint
+                   class C1 a b where
+                     RnFail055.m1 :: a -> b
+                     {-# MINIMAL m1 #-}
+      The class methods do not match:
+        The number of class methods differs.
+    • In the class declaration for ‘C1’
+
+RnFail055.hs-boot:29:1: error: [GHC-15843]
+    • Class ‘C2’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type C2 :: * -> * -> Constraint
+                   class C2 a b where
+                     m2 :: a -> b
+                     m2' :: a -> b
+                     {-# MINIMAL m2, m2' #-}
+        Boot file: type C2 :: * -> * -> Constraint
+                   class C2 a b where
+                     m2 :: a -> b
+                     {-# MINIMAL m2 #-}
+      The class methods do not match:
+        The number of class methods differs.
+      The MINIMAL pragmas are not compatible.
+    • In the class declaration for ‘C2’
+
+RnFail055.hs-boot:30:1: error: [GHC-15843]
+    • Class ‘C3’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type C3 :: * -> Constraint
+                   class (Eq a, Ord a) => C3 a
+        Boot file: type C3 :: * -> Constraint
+                   class (Ord a, Eq a) => C3 a
+      The superclass constraints do not match.
+    • In the class declaration for ‘C3’
+

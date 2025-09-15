@@ -1,0 +1,58 @@
+import Language.Haskell.TH
+
+:{
+genFib :: Int -> Q Exp
+genFib n =
+  pure $
+    LamCaseE
+      [ Match (LitP $ IntegerL $ fromIntegral i) (NormalB $ LitE $ IntegerL r) []
+      | (i, r) <- zip [0 .. n] fibs
+      ]
+  where
+    fibs = 0 : 1 : zipWith (+) fibs (drop 1 fibs)
+:}
+
+:set -XTemplateHaskell
+
+:{
+fib :: Int -> Integer
+fib = $(genFib 100)
+:}
+
+fib 100
+
+foreign import javascript "new Promise(res => setTimeout(() => res($2), $1))" foo :: Int -> Int -> IO Int
+
+foo 1024 114514
+
+foreign import javascript "non_existent()" bar :: Int
+
+import Control.Exception
+import GHC.Wasm.Prim
+
+catch (print bar) $ \(_ :: JSException) -> putStrLn "exception caught, life goes on"
+
+newtype JSButton = JSButton JSVal
+
+newtype JSCallback t = JSCallback JSVal
+
+foreign import javascript unsafe "document.createElement('button')" js_button_create :: IO JSButton
+foreign import javascript unsafe "document.body.appendChild($1)" js_button_setup :: JSButton -> IO ()
+
+btn <- js_button_create
+js_button_setup
+
+foreign import javascript unsafe "$1.textContent" js_button_get_text :: JSButton -> IO JSString
+foreign import javascript unsafe "$1.textContent = $2;" js_button_set_text :: JSButton -> JSString -> IO ()
+
+js_button_set_text btn $ toJSString "1919810"
+
+foreign import javascript "wrapper sync" syncCallback :: IO () -> IO (JSCallback (IO ()))
+foreign import javascript unsafe "$1.addEventListener('click', $2)" js_button_on_click :: JSButton -> JSCallback (IO ()) -> IO ()
+
+cb <- syncCallback $ do { lbl <- fromJSString <$> js_button_get_text btn; print lbl }
+js_button_on_click btn cb
+
+foreign import javascript unsafe "$1.click()" js_button_click :: JSButton -> IO ()
+
+js_button_click btn

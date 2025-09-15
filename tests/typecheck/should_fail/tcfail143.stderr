@@ -1,0 +1,8 @@
+
+tcfail143.hs:30:9: error: [GHC-18872]
+    • Couldn't match type ‘S Z’ with ‘Z’
+        arising from a functional dependency between:
+          constraint ‘MinMax (S Z) Z Z Z’ arising from a use of ‘extend’
+          instance ‘MinMax a Z Z a’ at tcfail143.hs:12:10-23
+    • In the expression: n1 `extend` n0
+      In an equation for ‘t2’: t2 = n1 `extend` n0

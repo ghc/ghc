@@ -1,0 +1,4 @@
+
+T19843e.hs:9:6: error: [GHC-76037]
+    Not in scope: data constructor ‘Map’
+    Suggested fix: Perhaps use ‘Mup’ (line 7)

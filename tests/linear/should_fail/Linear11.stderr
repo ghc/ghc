@@ -1,0 +1,13 @@
+
+Linear11.hs:9:23: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘a’
+    • In an equation for ‘incorrectUnrestricted’:
+          incorrectUnrestricted a = Unrestricted a
+
+Linear11.hs:14:43: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘a’
+    • In the pattern: NotUnrestricted a
+      In an equation for ‘incorrectUnrestrictedDup’:
+          incorrectUnrestrictedDup (NotUnrestricted a) = (a, a)

@@ -1,0 +1,3 @@
+
+patFail002.hs:3:4: error: [GHC-78892]
+    (let ... in ...)-syntax in pattern

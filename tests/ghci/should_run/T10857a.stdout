@@ -1,0 +1,4 @@
+base language is: GHC2021
+with the following modifiers:
+  -XNoMonomorphismRestriction
+  -XExtendedDefaultRules

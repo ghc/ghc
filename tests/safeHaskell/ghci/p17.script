@@ -1,0 +1,11 @@
+:set -XHaskell2010
+-- Test bad imports
+:unset +s
+:set -XSafe
+
+-- test trustworthy and package flag
+import Data.ByteString
+
+:set -fpackage-trust
+import Data.ByteString
+

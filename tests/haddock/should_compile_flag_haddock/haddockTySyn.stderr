@@ -1,0 +1,8 @@
+
+==================== Parser ====================
+module HaddockTySyn where
+type T =
+    -- | Comment on type synonym RHS
+    Int
+
+

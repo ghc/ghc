@@ -1,0 +1,20 @@
+-- testing ghci multiline commands :{ .. :}
+-- via stdin
+(1,2,3)
+-- layout rule instead of explicit braces and semicolons works too
+(1,2,3)
+type Maybe :: * -> *
+data Maybe a = Nothing | Just a
+GHC.Internal.Data.Maybe.catMaybes :: [Maybe a] -> [a]
+GHC.Internal.Data.Maybe.fromJust ::
+  GHC.Internal.Stack.Types.HasCallStack => Maybe a -> a
+GHC.Internal.Data.Maybe.fromMaybe :: a -> Maybe a -> a
+GHC.Internal.Data.Maybe.isJust :: Maybe a -> Bool
+GHC.Internal.Data.Maybe.isNothing :: Maybe a -> Bool
+GHC.Internal.Data.Maybe.listToMaybe :: [a] -> Maybe a
+GHC.Internal.Data.Maybe.mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+maybe :: b -> (a -> b) -> Maybe a -> b
+GHC.Internal.Data.Maybe.maybeToList :: Maybe a -> [a]
+-- via readFile
+(True,False)
+id :: a -> a

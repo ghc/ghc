@@ -1,0 +1,7 @@
+T13380e: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
+
+user error (What)
+
+HasCallStack backtrace:
+  throwIO, called at T13380e.hs:8:10 in main:Main
+

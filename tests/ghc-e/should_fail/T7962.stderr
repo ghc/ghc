@@ -1,0 +1,4 @@
+
+<interactive>:0:9: error: [GHC-58481]
+    parse error (possibly incorrect indentation or mismatched brackets)
+1

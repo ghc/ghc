@@ -1,0 +1,3 @@
+:l T7386.hs
+let x = SSucc SZero
+:f x

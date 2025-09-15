@@ -1,0 +1,73 @@
+
+DoExpansion2.hs:13:20: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the first argument of ‘(+)’, namely ‘x’
+      In the first argument of ‘return’, namely ‘(x + 1)’
+      In a stmt of a 'do' block: return (x + 1)
+
+DoExpansion2.hs:16:19: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘[Char]’ with ‘Int’
+      Expected: Int
+        Actual: String
+    • In the first argument of ‘return’, namely ‘x’
+      In a stmt of a 'do' block: return x
+      In the expression:
+        do x <- (getVal 3)
+           return x
+
+DoExpansion2.hs:20:20: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the first argument of ‘(+)’, namely ‘x’
+      In the first argument of ‘return’, namely ‘(x + y)’
+      In a stmt of a 'do' block: return (x + y)
+
+DoExpansion2.hs:20:24: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the second argument of ‘(+)’, namely ‘y’
+      In the first argument of ‘return’, namely ‘(x + y)’
+      In a stmt of a 'do' block: return (x + y)
+
+DoExpansion2.hs:22:12: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Char’ with actual type ‘Maybe Int’
+    • In the pattern: Just x
+      In a stmt of a 'do' block: Just x <- getChar
+      In the expression:
+        do Just x <- getChar
+           return x
+
+DoExpansion2.hs:27:12: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Char’ with actual type ‘Maybe Int’
+    • In the pattern: Just x
+      In a stmt of a 'do' block: Just x <- getChar
+      In the expression:
+        do x <- getChar
+           Just x <- getChar
+           return x
+
+DoExpansion2.hs:31:19: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Int’ with actual type ‘()’
+    • In the first argument of ‘return’, namely ‘()’
+      In a stmt of a 'do' block: return ()
+      In the expression:
+        do _ <- (getVal 1)
+           return ()
+
+DoExpansion2.hs:34:22: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type: t0 -> IO (Maybe Int)
+                  with actual type: IO String
+    • The function ‘getVal’ is applied to two visible arguments,
+        but its type ‘Int -> IO String’ has only one
+      In a stmt of a 'do' block: Just x <- getVal 3 4
+      In the expression:
+        do Just x <- getVal 3 4
+           return x
+
+DoExpansion2.hs:39:19: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘[Char]’ with ‘Int’
+      Expected: Int
+        Actual: String
+    • In the first argument of ‘return’, namely ‘x’
+      In a stmt of a 'do' block: return x
+      In the expression:
+        do x <- getVal 3
+           return x

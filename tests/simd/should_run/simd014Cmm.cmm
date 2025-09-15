@@ -1,0 +1,28 @@
+#include "Cmm.h"
+
+f1
+{
+  // Switch XMM1 and XMM2
+  XMM6 = XMM1 ;
+  XMM1 = XMM2 ;
+  XMM2 = XMM6 ;
+  jump f2 [ XMM1, XMM2, XMM3, XMM4 ];
+}
+
+f2
+{
+  // Switch XMM2 and XMM3
+  XMM6 = XMM2 ;
+  XMM2 = XMM3 ;
+  XMM3 = XMM6 ;
+  jump f3 [ XMM1, XMM2, XMM3, XMM4 ];
+}
+
+f3
+{
+  // Switch XMM1 and XMM2
+  XMM6 = XMM1 ;
+  XMM1 = XMM2 ;
+  XMM2 = XMM6 ;
+  jump %ENTRY_CODE(Sp(0)) [ XMM1, XMM2, XMM3, XMM4 ];
+}

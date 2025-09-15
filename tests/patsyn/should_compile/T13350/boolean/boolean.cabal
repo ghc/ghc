@@ -1,0 +1,7 @@
+name: boolean
+version: 1.0
+build-type: Simple
+
+library
+  build-depends:   base
+  exposed-modules: Boolean

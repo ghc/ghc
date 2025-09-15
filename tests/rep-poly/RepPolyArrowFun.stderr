@@ -1,0 +1,27 @@
+
+RepPolyArrowFun.hs:29:19: error: [GHC-55287]
+    • • The function in the first order arrow application of
+          ‘undefined’
+        to
+          ‘x’
+        does not have a fixed runtime representation.
+        Its type is:
+          arr a a :: TYPE r
+      • The return type of the arrow function
+          ‘first’
+        does not have a fixed runtime representation.
+        Its type is:
+          arr (b, d) (c, d) :: TYPE r
+      • The return type of the arrow function
+          ‘(>>>)’
+        does not have a fixed runtime representation.
+        Its type is:
+          arr a c :: TYPE r
+      • The return type of the arrow function
+          ‘arr’
+        does not have a fixed runtime representation.
+        Its type is:
+          arr b c :: TYPE r
+    • In the command: undefined -< x
+      In the expression: proc x -> undefined -< x
+      In an equation for ‘foo’: foo _ = proc x -> undefined -< x

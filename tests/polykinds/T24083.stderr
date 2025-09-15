@@ -1,0 +1,6 @@
+
+T24083.hs:13:14: error: [GHC-59738]
+    • Scoped type variable only appears non-injectively in declaration header:
+        ‘t’ bound at T24083.hs:13:14
+    • In the class declaration for ‘IsSum’
+    Suggested fix: bind ‘t’ explicitly with ‘@t’

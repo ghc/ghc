@@ -1,0 +1,5 @@
+
+T22326_fail_lam_arg.hs:9:5: error: [GHC-29092]
+    • Ill-formed type argument: \ _ -> _
+    • In the expression: f (\ _ -> _)
+      In an equation for ‘x’: x = f (\ _ -> _)

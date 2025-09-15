@@ -1,0 +1,7 @@
+
+LinearPatSyn.hs:13:4: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from a non-linear pattern ‘_’
+          (pattern synonyms aren't linear)
+    • In the pattern: P y x
+      In an equation for ‘s’: s (P y x) = (y, x)

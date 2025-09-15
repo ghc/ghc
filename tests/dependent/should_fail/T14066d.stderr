@@ -1,0 +1,21 @@
+
+T14066d.hs:11:35: error: [GHC-25897]
+    • Couldn't match type ‘b1’ with ‘b’
+      Expected: (Proxy a, Proxy c, b1)
+        Actual: (Proxy a, Proxy c, b)
+      ‘b1’ is a rigid type variable bound by
+        a type expected by the context:
+          forall c b1 (a :: c). (Proxy a, Proxy c, b1)
+        at T14066d.hs:11:35
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall b. b -> (Proxy Maybe, ())
+        at T14066d.hs:10:1-37
+    • In the first argument of ‘g’, namely ‘y’
+      In the expression: g y
+      In the expression: (fstOf3 y :: Proxy Maybe, g y)
+    • Relevant bindings include
+        y :: forall {k1} {k2} (a :: k1) (c :: k2). (Proxy a, Proxy c, b)
+          (bound at T14066d.hs:15:5)
+        x :: b (bound at T14066d.hs:11:3)
+        f :: b -> (Proxy Maybe, ()) (bound at T14066d.hs:11:1)

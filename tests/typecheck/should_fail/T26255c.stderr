@@ -1,0 +1,11 @@
+T26255c.hs:30:30: error: [GHC-39999]
+    • No instance for ‘NewEra era’
+        arising from a use of ‘eraFamilySize’
+      Possible fix:
+        add (NewEra era) to the context of
+          the type signature for:
+            printEraFamilySize :: forall {k} (era :: k). EraFamily era -> IO ()
+    • In the second argument of ‘(.)’, namely ‘eraFamilySize’
+      In the expression: print . eraFamilySize
+      In an equation for ‘printEraFamilySize’:
+          printEraFamilySize = print . eraFamilySize

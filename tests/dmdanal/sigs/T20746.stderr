@@ -1,0 +1,18 @@
+
+==================== Demand signatures ====================
+Foo.f: <LP(A,L,A)><L>
+Foo.foogle: <L><L>
+
+
+
+==================== Cpr signatures ====================
+Foo.f: 1
+Foo.foogle: 1
+
+
+
+==================== Demand signatures ====================
+Foo.f: <MP(A,1C(1,L),A)><L>
+Foo.foogle: <L><L>
+
+

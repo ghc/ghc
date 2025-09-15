@@ -1,0 +1,12 @@
+T24961.hs:12:12: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from omitted field ‘b’
+    • In the pattern: MkR {a = x}
+      In an equation for ‘bad_named’: bad_named (MkR {a = x}) = x
+
+T24961.hs:18:16: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from an omitted anonymous field
+    • In the pattern: MkT {}
+      In an equation for ‘bad_anonymous’: bad_anonymous (MkT {}) = ()
+

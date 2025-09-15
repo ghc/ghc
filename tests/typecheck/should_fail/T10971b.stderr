@@ -1,0 +1,74 @@
+
+T10971b.hs:4:11: error: [GHC-39999]
+    • Ambiguous type variable ‘t2’ arising from a use of ‘length’
+      prevents the constraint ‘(Foldable t2)’ from being solved.
+      Relevant bindings include
+        x :: t2 a (bound at T10971b.hs:4:6)
+        f :: t2 a -> Int (bound at T10971b.hs:4:1)
+      Probable fix: use a type annotation to specify what ‘t2’ should be.
+      Potentially matching instances:
+        instance Foldable (Either a)
+          -- Defined in ‘GHC.Internal.Data.Foldable’
+        instance Foldable Maybe -- Defined in ‘GHC.Internal.Data.Foldable’
+        ...plus three others
+        ...plus 26 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: length x
+      In the expression: \ x -> length x
+      In an equation for ‘f’: f = \ x -> length x
+
+T10971b.hs:5:13: error: [GHC-39999]
+    • Ambiguous type variable ‘t1’ arising from a use of ‘fmapDefault’
+      prevents the constraint ‘(Traversable t1)’ from being solved.
+      Relevant bindings include
+        x :: t1 a (bound at T10971b.hs:5:8)
+        g :: (a -> b) -> t1 a -> t1 b (bound at T10971b.hs:5:1)
+      Probable fix: use a type annotation to specify what ‘t1’ should be.
+      Potentially matching instances:
+        instance Traversable (Either a)
+          -- Defined in ‘GHC.Internal.Data.Traversable’
+        instance Traversable Maybe
+          -- Defined in ‘GHC.Internal.Data.Traversable’
+        ...plus three others
+        ...plus 28 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: fmapDefault f x
+      In the expression: \ f x -> fmapDefault f x
+      In an equation for ‘g’: g = \ f x -> fmapDefault f x
+
+T10971b.hs:6:14: error: [GHC-39999]
+    • Ambiguous type variable ‘t0’ arising from a use of ‘fmapDefault’
+      prevents the constraint ‘(Traversable t0)’ from being solved.
+      Relevant bindings include
+        x :: t0 a (bound at T10971b.hs:6:8)
+        h :: (a -> b) -> t0 a -> (t0 b, Int) (bound at T10971b.hs:6:1)
+      Probable fix: use a type annotation to specify what ‘t0’ should be.
+      Potentially matching instances:
+        instance Traversable (Either a)
+          -- Defined in ‘GHC.Internal.Data.Traversable’
+        instance Traversable Maybe
+          -- Defined in ‘GHC.Internal.Data.Traversable’
+        ...plus three others
+        ...plus 28 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: fmapDefault f x
+      In the expression: (fmapDefault f x, length x)
+      In the expression: \ f x -> (fmapDefault f x, length x)
+
+T10971b.hs:6:31: error: [GHC-39999]
+    • Ambiguous type variable ‘t0’ arising from a use of ‘length’
+      prevents the constraint ‘(Foldable t0)’ from being solved.
+      Relevant bindings include
+        x :: t0 a (bound at T10971b.hs:6:8)
+        h :: (a -> b) -> t0 a -> (t0 b, Int) (bound at T10971b.hs:6:1)
+      Probable fix: use a type annotation to specify what ‘t0’ should be.
+      Potentially matching instances:
+        instance Foldable (Either a)
+          -- Defined in ‘GHC.Internal.Data.Foldable’
+        instance Foldable Maybe -- Defined in ‘GHC.Internal.Data.Foldable’
+        ...plus three others
+        ...plus 26 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: length x
+      In the expression: (fmapDefault f x, length x)
+      In the expression: \ f x -> (fmapDefault f x, length x)

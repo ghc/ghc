@@ -1,0 +1,24 @@
+T25900_noext.hs:4:17: warning: [GHC-68383] [-Wpattern-namespace-specifier (in -Wcompat)]
+    The ‘pattern’ namespace specifier is deprecated.
+    Suggested fix:
+      Use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
+      and replace ‘pattern’ with ‘data’.
+
+T25900_noext.hs:5:17: warning: [GHC-68383] [-Wpattern-namespace-specifier (in -Wcompat)]
+    The ‘pattern’ namespace specifier is deprecated.
+    Suggested fix:
+      Use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
+      and replace ‘pattern’ with ‘data’.
+
+T25900_noext.hs:6:17: warning: [GHC-68383] [-Wpattern-namespace-specifier (in -Wcompat)]
+    The ‘pattern’ namespace specifier is deprecated.
+    Suggested fix:
+      Use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
+      and replace ‘pattern’ with ‘data’.
+
+T25900_noext.hs:9:28: warning: [GHC-68383] [-Wpattern-namespace-specifier (in -Wcompat)]
+    The ‘pattern’ namespace specifier is deprecated.
+    Suggested fix:
+      Use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
+      and replace ‘pattern’ with ‘data’.
+

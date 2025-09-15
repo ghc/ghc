@@ -1,0 +1,3 @@
+T17820c.hs:8:18: error: [GHC-28914]
+    Level error: ‘meth’ is bound at level 0 but used at level -1
+

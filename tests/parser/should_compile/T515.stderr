@@ -1,0 +1,18 @@
+
+T515.lhs:6:3: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature: a :: Integer
+
+T515.lhs:6:7: warning: [GHC-18042] [-Wtype-defaults (in -Wall)]
+    • Defaulting the type variable ‘a0’ to type ‘Integer’ in the following constraint
+        Num a0 arising from the literal ‘1’
+    • In the expression: 1
+      In an equation for ‘a’: a = 1
+
+T515.lhs:7:3: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature: b :: Integer
+
+T515.lhs:7:7: warning: [GHC-18042] [-Wtype-defaults (in -Wall)]
+    • Defaulting the type variable ‘a0’ to type ‘Integer’ in the following constraint
+        Num a0 arising from the literal ‘2’
+    • In the expression: 2
+      In an equation for ‘b’: b = 2

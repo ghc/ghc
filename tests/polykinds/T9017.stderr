@@ -1,0 +1,18 @@
+
+T9017.hs:8:7: error: [GHC-25897]
+    • Couldn't match kind ‘k1’ with ‘*’
+      When matching types
+        b0 :: *
+        b :: k1
+      Expected: a b (m b)
+        Actual: a0 b0 (m0 b0)
+      ‘k1’ is a rigid type variable bound by
+        the type signature for:
+          foo :: forall {k1} {k2} (a :: k1 -> k2 -> *) (b :: k1)
+                        (m :: k1 -> k2).
+                 a b (m b)
+        at T9017.hs:7:1-16
+    • In the expression: arr return
+      In an equation for ‘foo’: foo = arr return
+    • Relevant bindings include
+        foo :: a b (m b) (bound at T9017.hs:8:1)

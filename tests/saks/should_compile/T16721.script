@@ -1,0 +1,4 @@
+:set -XStandaloneKindSignatures -XNoStarIsType
+import Data.Kind (Type)
+type T :: (Type -> Type) -> Type; data T a
+:info T

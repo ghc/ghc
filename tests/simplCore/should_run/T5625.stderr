@@ -1,0 +1,7 @@
+T5625: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Prelude.undefined
+
+HasCallStack backtrace:
+  undefined, called at T5625.hs:3:31 in main:Main
+

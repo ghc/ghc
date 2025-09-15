@@ -1,0 +1,3 @@
+
+T2478.hs:1:41: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.

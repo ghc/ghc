@@ -1,0 +1,3 @@
+:load T23405.hs
+:! echo -- an extra comment so that the hash changes >> T23405.hs
+:reload

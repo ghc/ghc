@@ -1,0 +1,18 @@
+:set -XPolyKinds
+import GHC.Exts
+
+putStrLn "-fno-print-explicit-runtime-reps"
+:set -fno-print-explicit-runtime-reps
+:type ($)
+:info ($)
+:kind TYPE
+:type error
+:info error
+
+putStrLn "\n-fprint-explicit-runtime-reps"
+:set -fprint-explicit-runtime-reps
+:type ($)
+:info ($)
+:kind TYPE
+:type error
+:info error

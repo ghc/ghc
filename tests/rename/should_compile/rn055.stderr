@@ -1,0 +1,3 @@
+
+rn055.hs:1:1: warning: [GHC-20540] [-Wimplicit-prelude]
+    Module ‘Prelude’ implicitly imported.

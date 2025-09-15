@@ -1,0 +1,27 @@
+
+T15552a.hs:26:9: error: [GHC-22979]
+    • Illegal nested use of type family ‘FirstEntryOfVal’
+        in the arguments of the type-family application ‘GetEntryOfVal
+                                                           (FirstEntryOfVal v kvs)’
+    • In the equations for closed type family ‘FirstEntryOfVal’
+      In the type family declaration for ‘FirstEntryOfVal’
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension
+
+T15552a.hs:26:9: error: [GHC-22979]
+    • Illegal nested use of type family ‘FirstEntryOfVal’
+        in the arguments of the type-family application ‘EntryOfValKey
+                                                           (FirstEntryOfVal v kvs)’
+    • In the equations for closed type family ‘FirstEntryOfVal’
+      In the type family declaration for ‘FirstEntryOfVal’
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension
+
+T15552a.hs:26:9: error: [GHC-22979]
+    • Illegal nested use of type family ‘FirstEntryOfVal’
+        in the arguments of the type-family application ‘EntryOfValKey
+                                                           (FirstEntryOfVal v kvs)’
+    • In the equations for closed type family ‘FirstEntryOfVal’
+      In the type family declaration for ‘FirstEntryOfVal’
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

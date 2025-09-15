@@ -1,0 +1,30 @@
+-- Can't add to context, they are not loaded!
+:m A B
+:reload A B
+-- Now we can add them to the context!
+:m A B
+putStrLn "Loaded A and B"
+baz
+foo
+:reload A
+:m A B
+-- A depends on B, so both are in scope
+putStrLn "Loaded A, and implicitly B"
+baz
+foo
+:reload B
+:m B
+putStrLn "Loaded only B"
+:m + A
+baz
+foo
+:reload none
+putStrLn "Unload everything"
+:m A B
+baz
+foo
+:reload
+:m A B
+putStrLn "Loaded A and B"
+baz
+foo

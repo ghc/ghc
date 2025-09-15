@@ -1,0 +1,26 @@
+Without -fignore-asserts
+[1 of 2] Compiling Main             ( main.hs, main.o )
+[2 of 2] Linking main
+main: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.AssertionFailed:
+
+Assertion failed
+
+HasCallStack backtrace:
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:444:5 in ghc-internal:GHC.Internal.IO.Exception
+  assert, called at main.hs:3:8 in main:Main
+
+With -fignore-asserts
+[1 of 2] Compiling Main             ( main.hs, main.o ) [Optimisation flags changed]
+[2 of 2] Linking main [Objects changed]
+OK
+Without -fignore-asserts
+[1 of 2] Compiling Main             ( main.hs, main.o ) [Optimisation flags changed]
+[2 of 2] Linking main [Objects changed]
+main: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.AssertionFailed:
+
+Assertion failed
+
+HasCallStack backtrace:
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:444:5 in ghc-internal:GHC.Internal.IO.Exception
+  assert, called at main.hs:3:8 in main:Main
+

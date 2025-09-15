@@ -1,0 +1,3 @@
+
+T21843d.hs:3:13: [GHC-31623]
+    Unicode character '’' ('\8217') looks like ''' (Single Quote), but it is not

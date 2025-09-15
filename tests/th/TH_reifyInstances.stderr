@@ -1,0 +1,14 @@
+C1
+
+C2
+instance TH_reifyInstances.C2 GHC.Internal.Types.Int
+T1
+
+T2
+type instance TH_reifyInstances.T2 GHC.Internal.Types.Int = GHC.Internal.Types.Char
+D1
+
+D2
+data instance TH_reifyInstances.D2 GHC.Internal.Types.Int
+    = TH_reifyInstances.DInt
+    | TH_reifyInstances.DInt2

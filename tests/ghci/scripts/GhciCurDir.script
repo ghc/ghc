@@ -1,0 +1,8 @@
+import System.Directory
+import Control.Monad
+
+createDirectory "test"
+createDirectory "test/test1"
+:cd test
+fs <- getDirectoryContents "."
+unless ("test1" `elem` fs) $ putStrLn "Uh oh."

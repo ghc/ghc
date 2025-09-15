@@ -1,0 +1,10 @@
+TH_typed4.hs:7:20-96: Splicing expression
+      unsafeCodeCoerce $ typedBracketE $ litE $ charL 'a' ::
+        Code Q (Code Q Char)
+  ======>
+    [|| 'a' ||]
+TH_typed4.hs:7:16-98: Splicing expression
+    $$(unsafeCodeCoerce $ typedBracketE $ litE $ charL 'a' ::
+         Code Q (Code Q Char))
+  ======>
+    'a'

@@ -1,0 +1,4 @@
+:l T8357.hs
+:t foo
+:t bar
+:t both

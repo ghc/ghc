@@ -1,0 +1,18 @@
+
+hole_constraints_nested.hs:12:16: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: Int
+    • In a case alternative: EqOrd -> _
+      In the expression: case d2 of EqOrd -> _
+      In a case alternative: Refl -> case d2 of EqOrd -> _
+    • Relevant bindings include
+        d2 :: EqOrd a (bound at hole_constraints_nested.hs:9:6)
+        d1 :: a :~: b (bound at hole_constraints_nested.hs:9:3)
+        f :: (a :~: b) -> EqOrd a -> Int
+          (bound at hole_constraints_nested.hs:9:1)
+      Constraints include
+        Eq a (from hole_constraints_nested.hs:12:7-11)
+        Ord a (from hole_constraints_nested.hs:12:7-11)
+        b ~ a (from hole_constraints_nested.hs:11:5-8)
+      Valid hole fits include
+        maxBound :: forall a. Bounded a => a
+        minBound :: forall a. Bounded a => a

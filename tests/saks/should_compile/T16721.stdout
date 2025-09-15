@@ -1,0 +1,4 @@
+type role T phantom
+type T :: (Type -> Type) -> Type
+data T a
+  	-- Defined at <interactive>:3:35

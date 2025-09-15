@@ -1,0 +1,15 @@
+Warning: the following files would be used as linker inputs, but linking is not being done: hsdep/HsDep.o
+
+<no location info>: warning: [-Wmissed-extra-shared-lib]
+    libHShsdep-0.1.so: cannot open shared object file: No such file or directory
+    It's OK if you don't want to use symbols from it directly.
+    (the package DLL is loaded by the system linker
+     which manages dependencies by itself).
+Warning: -rtsopts and -with-rtsopts have no effect with -shared.
+    Call hs_init_ghc() from your main() function to set these options.
+Warning: the following files would be used as linker inputs, but linking is not being done: hsdep/libHShsdep-0.1-ghc8.10.7.so
+
+<no location info>: warning: [-Wmissed-extra-shared-lib]
+    It's OK if you don't want to use symbols from it directly.
+    (the package DLL is loaded by the system linker
+     which manages dependencies by itself).

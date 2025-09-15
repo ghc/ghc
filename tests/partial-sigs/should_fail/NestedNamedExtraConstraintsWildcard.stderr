@@ -1,0 +1,6 @@
+
+NestedNamedExtraConstraintsWildcard.hs:4:23: error: [GHC-65507]
+    • Named wildcard ‘_a’ not allowed in a constraint
+        Extra-constraint wildcards must be anonymous
+          e.g  f :: (Eq a, _) => blah
+    • In the type signature for ‘foo’

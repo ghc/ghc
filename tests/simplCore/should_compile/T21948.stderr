@@ -1,0 +1,181 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 59, types: 65, coercions: 25, joins: 1/3}
+
+-- RHS size: {terms: 42, types: 34, coercions: 0, joins: 1/3}
+T21948.nf'1
+  :: forall {b} {a}.
+     (b -> ())
+     -> (a -> b)
+     -> a
+     -> Int64
+     -> GHC.Prim.State# GHC.Prim.RealWorld
+     -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
+[GblId,
+ Arity=5,
+ Str=<MC(1,A)><MC(1,L)><L><1!P(L)><L>,
+ Cpr=1(, 1),
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=5,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@b_aY7)
+                 (@a_aY8)
+                 (reduce_aBy [Occ=OnceL1!] :: b_aY7 -> ())
+                 (f_aBz [Occ=Once1!] :: a_aY8 -> b_aY7)
+                 (x_aBA [Occ=Once1] :: a_aY8)
+                 (eta_B0 [Occ=Once1] :: Int64)
+                 (eta1_B1 [Occ=Once1, OS=OneShot]
+                    :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 let {
+                   lvl_s111 [Occ=OnceL1] :: b_aY7
+                   [LclId]
+                   lvl_s111 = f_aBz x_aBA } in
+                 joinrec {
+                   go_s10Z [InlPrag=[2], Occ=T[2]]
+                     :: Int64
+                        -> GHC.Prim.State# GHC.Prim.RealWorld
+                        -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
+                   [LclId[JoinId(2)(Just [!])],
+                    Arity=2,
+                    Str=<S!P(L)><L>,
+                    Unf=Unf{Src=InlineStable, TopLvl=False, Value=True, ConLike=True,
+                            WorkFree=True, Expandable=True,
+                            Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
+                            Tmpl= \ (n_s11c [Occ=Once1!] :: Int64)
+                                    (eta2_s11g [Occ=Once1, OS=OneShot]
+                                       :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                                    case n_s11c of { GHC.Int.I64# ww_s11e [Occ=Once1] ->
+                                    jump $wgo_s11i ww_s11e eta2_s11g
+                                    }}]
+                   go_s10Z (n_s11c [Occ=Once1!] :: Int64)
+                           (eta2_s11g [Occ=Once1, OS=OneShot]
+                              :: GHC.Prim.State# GHC.Prim.RealWorld)
+                     = case n_s11c of { GHC.Int.I64# ww_s11e [Occ=Once1] ->
+                       jump $wgo_s11i ww_s11e eta2_s11g
+                       };
+                   $wgo_s11i [InlPrag=[2], Occ=LoopBreakerT[2]]
+                     :: GHC.Prim.Int64#
+                        -> GHC.Prim.State# GHC.Prim.RealWorld
+                        -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
+                   [LclId[JoinId(2)(Nothing)], Arity=2, Str=<L><L>, Unf=OtherCon []]
+                   $wgo_s11i (ww_s11e :: GHC.Prim.Int64#)
+                             (eta2_s11g [Occ=Once2, OS=OneShot]
+                                :: GHC.Prim.State# GHC.Prim.RealWorld)
+                     = case GHC.Prim.leInt64# ww_s11e 0#Int64 of {
+                         __DEFAULT ->
+                           case lvl_s111 of y_aNQ [Occ=Once1] { __DEFAULT ->
+                           case reduce_aBy y_aNQ of { () ->
+                           jump go_s10Z
+                             (GHC.Int.I64# (GHC.Prim.subInt64# ww_s11e 1#Int64)) eta2_s11g
+                           }
+                           };
+                         1# -> (# eta2_s11g, GHC.Tuple.() #)
+                       }; } in
+                 jump go_s10Z eta_B0 eta1_B1}]
+T21948.nf'1
+  = \ (@b_aY7)
+      (@a_aY8)
+      (reduce_aBy :: b_aY7 -> ())
+      (f_aBz [OS=OneShot] :: a_aY8 -> b_aY7)
+      (x_aBA [OS=OneShot] :: a_aY8)
+      (eta_B0 [OS=OneShot] :: Int64)
+      (eta1_B1 [OS=OneShot] :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+      case eta_B0 of { GHC.Int.I64# ww_s11e ->
+      let {
+        lvl_s111 :: b_aY7
+        [LclId]
+        lvl_s111 = f_aBz x_aBA } in
+      let {
+        lvl1_s11A [Dmd=LA] :: ()
+        [LclId]
+        lvl1_s11A = reduce_aBy lvl_s111 } in
+      joinrec {
+        $wgo_s11i [InlPrag=[2], Occ=LoopBreaker, Dmd=SC(S,C(1,!P(L,L)))]
+          :: GHC.Prim.Int64#
+             -> GHC.Prim.State# GHC.Prim.RealWorld
+             -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
+        [LclId[JoinId(2)(Nothing)], Arity=2, Str=<L><L>, Unf=OtherCon []]
+        $wgo_s11i (ww1_X3 :: GHC.Prim.Int64#)
+                  (eta2_s11g [OS=OneShot] :: GHC.Prim.State# GHC.Prim.RealWorld)
+          = case GHC.Prim.leInt64# ww1_X3 0#Int64 of {
+              __DEFAULT ->
+                case lvl_s111 of { __DEFAULT ->
+                case lvl1_s11A of { () ->
+                jump $wgo_s11i (GHC.Prim.subInt64# ww1_X3 1#Int64) eta2_s11g
+                }
+                };
+              1# -> (# eta2_s11g, GHC.Tuple.() #)
+            }; } in
+      jump $wgo_s11i ww_s11e eta1_B1
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 25, joins: 0/0}
+nf' :: forall b a. (b -> ()) -> (a -> b) -> a -> Int64 -> IO ()
+[GblId,
+ Arity=5,
+ Str=<MC(1,A)><MC(1,L)><L><1!P(L)><L>,
+ Cpr=1(, 1),
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+nf'
+  = T21948.nf'1
+    `cast` (forall (b :: <*>_N) (a :: <*>_N).
+            <(b |> <*>_N) -> ()>_R
+            %<'Many>_N ->_R <(a |> <*>_N) -> (b |> <*>_N)>_R
+            %<'Many>_N ->_R <(a |> <*>_N)>_R
+            %<'Many>_N ->_R <Int64>_R
+            %<'Many>_N ->_R Sym (GHC.Types.N:IO[0] <()>_R)
+            :: (forall {b} {a}.
+                ((b |> <*>_N) -> ())
+                -> ((a |> <*>_N) -> (b |> <*>_N))
+                -> (a |> <*>_N)
+                -> Int64
+                -> GHC.Prim.State# GHC.Prim.RealWorld
+                -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #))
+               ~R# (forall {b} {a}.
+                    ((b |> <*>_N) -> ())
+                    -> ((a |> <*>_N) -> (b |> <*>_N))
+                    -> (a |> <*>_N)
+                    -> Int64
+                    -> IO ()))
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T21948.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T21948.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T21948.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T21948.$trModule3 = GHC.Types.TrNameS T21948.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T21948.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T21948.$trModule2 = "T21948"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T21948.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T21948.$trModule1 = GHC.Types.TrNameS T21948.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T21948.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T21948.$trModule
+  = GHC.Types.Module T21948.$trModule3 T21948.$trModule1
+
+
+

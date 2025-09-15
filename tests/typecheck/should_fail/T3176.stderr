@@ -1,0 +1,7 @@
+
+T3176.hs:9:27: error: [GHC-55876]
+    • Cannot use record selector ‘unES’ as a function due to escaped type variables
+    • In the first argument of ‘($)’, namely ‘unES’
+      In the second argument of ‘($)’, namely ‘unES $ f t’
+      In the expression: show $ unES $ f t
+    Suggested fix: Use pattern-matching syntax instead

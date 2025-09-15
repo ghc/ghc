@@ -1,0 +1,8 @@
+
+T9774.hs:5:29: error: [GHC-83865]
+    • Couldn't match type ‘Char’ with ‘[Char]’
+      Expected: String
+        Actual: Char
+    • In the second argument of ‘assert’, namely ‘'a'’
+      In the first argument of ‘putStrLn’, namely ‘(assert True 'a')’
+      In the expression: putStrLn (assert True 'a')

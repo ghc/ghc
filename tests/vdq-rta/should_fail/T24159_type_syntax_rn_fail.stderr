@@ -1,0 +1,100 @@
+T24159_type_syntax_rn_fail.hs:11:13: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:14:13: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:17:13: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:20:13: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:23:13: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:26:13: error: [GHC-31244]
+    Unexpected forall telescope
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:26:23: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:29:13: error: [GHC-31244]
+    Unexpected forall telescope
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:29:25: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:32:15: error: [GHC-31244]
+    Unexpected forall telescope
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:32:25: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:35:13: error: [GHC-31244]
+    Unexpected context arrow (=>)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:35:19: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:38:14: error: [GHC-31244]
+    Unexpected forall telescope
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:38:24: error: [GHC-31244]
+    Unexpected context arrow (=>)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:38:34: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:41:14: error: [GHC-31244]
+    Unexpected forall telescope
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:41:25: error: [GHC-31244]
+    Unexpected forall telescope
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:41:38: error: [GHC-31244]
+    Unexpected context arrow (=>)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+
+T24159_type_syntax_rn_fail.hs:41:63: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+

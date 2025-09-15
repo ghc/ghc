@@ -1,0 +1,6 @@
+T 1
+Breakpoint 0 activated at print025.hs:2:7
+Stopped in Main.f, print025.hs:2:7
+_result :: T Int s = _
+x :: T Int s = T 1
+T 1

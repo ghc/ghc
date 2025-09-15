@@ -1,0 +1,7 @@
+cgrun051: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+OK
+
+HasCallStack backtrace:
+  error, called at cgrun051.hs:7:25 in main:Main
+

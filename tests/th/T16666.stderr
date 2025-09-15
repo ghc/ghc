@@ -1,0 +1,7 @@
+T16666.hs:(9,2)-(11,7): Splicing declarations
+    [d| class (c => d) => Implies c d
+        
+        instance (c => d) => Implies c d |]
+  ======>
+    class (c => d) => Implies c d
+    instance (c => d) => Implies c d

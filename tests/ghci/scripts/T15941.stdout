@@ -1,0 +1,5 @@
+type T :: * -> * -> *
+type T =
+  (->)
+    @{GHC.Internal.Types.LiftedRep} @{GHC.Internal.Types.LiftedRep}
+  	-- Defined at <interactive>:2:1

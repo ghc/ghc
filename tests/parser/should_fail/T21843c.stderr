@@ -1,0 +1,2 @@
+T21843c.hs:3:13: [GHC-31623]
+    Unicode character '”' ('\8221') looks like '"' (Quotation Mark), but it is not

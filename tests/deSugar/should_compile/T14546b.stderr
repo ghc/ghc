@@ -1,0 +1,16 @@
+
+T14546b.hs:5:7: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: ('f' : 'o' : _) -> ...
+
+T14546b.hs:6:7: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: "bar" -> ...
+
+T14546b.hs:10:7: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: "bar" -> ...
+
+T14546b.hs:11:7: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: "baz" -> ...

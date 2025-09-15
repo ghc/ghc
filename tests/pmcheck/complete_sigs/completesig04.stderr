@@ -1,0 +1,12 @@
+
+completesig04.hs:10:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘f’:
+        Patterns of type ‘T’ not matched:
+            B
+            C
+
+completesig04.hs:12:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘g’:
+        Patterns of type ‘Maybe a’ not matched: Nothing

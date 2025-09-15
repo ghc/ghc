@@ -1,0 +1,9 @@
+putStrLn "=== :browse A"
+:browse A
+putStrLn "=== :browse B"
+:browse B
+putStrLn "=== :browse C"
+:browse C
+putStrLn "=== :main"
+:main
+

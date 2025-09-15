@@ -1,0 +1,12 @@
+-- Not-quite-focused test, trying loading, evaluation, unloading.
+:m + A B C Main
+baz
+foobar
+:m - A B C Main
+baz
+foobar
+:m + C
+bar
+foo
+:m + Main
+main

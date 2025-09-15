@@ -1,0 +1,12 @@
+U
+-package-id u1
+-reexported-module "A as B"
+-reexported-module "A1 as B1"
+-reexported-module "A2 as B2"
+-reexported-module "A2 as B3"
+-reexported-module "A1 as B4"
+-reexported-module "A2 as B4"
+-this-unit-id u2
+-working-dir t25139
+-i
+-iu2src

@@ -1,0 +1,14 @@
+// Test whether extra proc-points are generated
+// by a label after a call such as with a heap check.
+
+foo1 () {
+  bits32 p, q;
+  bits32 x, y, z;
+  (p, q) = foreign "C--" bar(1, 2) "safe";
+L:
+  if (Hp < HpLim) {
+    (p, q) = foreign "C--" do_gc() "safe";
+    goto L;
+  }
+  return (p+q+x+y+z);
+}

@@ -1,0 +1,352 @@
+
+==================== Specialise ====================
+Result size of Specialise
+  = {terms: 199, types: 197, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+$dShow_sUi :: Show (Maybe Integer)
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=False, ConLike=True, WorkFree=False, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+$dShow_sUi
+  = GHC.Internal.Show.$fShowMaybe
+      @Integer GHC.Internal.Show.$fShowInteger
+
+Rec {
+-- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+$dC_sUh :: C Bool ()
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 10}]
+$dC_sUh
+  = T17966.C:C @Bool @() ($cm_aJp @() GHC.Internal.Show.$fShowUnit)
+
+-- RHS size: {terms: 30, types: 24, coercions: 0, joins: 0/0}
+$s$cm_sUr [InlPrag=INLINABLE[0]]
+  :: forall c. Show c => Bool -> () -> c -> [Char]
+[LclId, Arity=4]
+$s$cm_sUr
+  = \ (@c_aJt)
+      ($dShow_aJu :: Show c_aJt)
+      (a_aDh :: Bool)
+      (b_aDi :: ())
+      (c_aDj :: c_aJt) ->
+      GHC.Internal.Base.augment
+        @Char
+        (\ (@b_aSL)
+           (c_aSM [OS=OneShot] :: Char -> b_aSL -> b_aSL)
+           (n_aSN [OS=OneShot] :: b_aSL) ->
+           GHC.Internal.Base.foldr
+             @Char
+             @b_aSL
+             c_aSM
+             n_aSN
+             (case a_aDh of {
+                False -> GHC.Internal.Show.$fShowBool4;
+                True -> GHC.Internal.Show.$fShowBool3
+              }))
+        (GHC.Internal.Base.augment
+           @Char
+           (\ (@b_aSL)
+              (c_aSM [OS=OneShot] :: Char -> b_aSL -> b_aSL)
+              (n_aSN [OS=OneShot] :: b_aSL) ->
+              GHC.Internal.Base.foldr
+                @Char
+                @b_aSL
+                c_aSM
+                n_aSN
+                (GHC.Internal.Show.$fShowUnit_$cshow b_aDi))
+           (show @c_aJt $dShow_aJu c_aDj))
+
+-- RHS size: {terms: 28, types: 22, coercions: 0, joins: 0/0}
+$s$cm_sUm [InlPrag=INLINABLE[0]]
+  :: Bool -> () -> Maybe Integer -> [Char]
+[LclId, Arity=3]
+$s$cm_sUm
+  = \ (a_aDh :: Bool) (b_aDi :: ()) (c_aDj :: Maybe Integer) ->
+      GHC.Internal.Base.augment
+        @Char
+        (\ (@b_aSL)
+           (c_aSM [OS=OneShot] :: Char -> b_aSL -> b_aSL)
+           (n_aSN [OS=OneShot] :: b_aSL) ->
+           GHC.Internal.Base.foldr
+             @Char
+             @b_aSL
+             c_aSM
+             n_aSN
+             (case a_aDh of {
+                False -> GHC.Internal.Show.$fShowBool4;
+                True -> GHC.Internal.Show.$fShowBool3
+              }))
+        (GHC.Internal.Base.augment
+           @Char
+           (\ (@b_aSL)
+              (c_aSM [OS=OneShot] :: Char -> b_aSL -> b_aSL)
+              (n_aSN [OS=OneShot] :: b_aSL) ->
+              GHC.Internal.Base.foldr
+                @Char
+                @b_aSL
+                c_aSM
+                n_aSN
+                (GHC.Internal.Show.$fShowUnit_$cshow b_aDi))
+           (GHC.Internal.Show.$fShowMaybe_$cshow
+              @Integer GHC.Internal.Show.$fShowInteger c_aDj))
+
+-- RHS size: {terms: 33, types: 28, coercions: 0, joins: 0/0}
+$cm_aJp [InlPrag=INLINABLE[0]]
+  :: forall b c. (Show b, Show c) => Bool -> b -> c -> String
+[LclId,
+ Arity=5,
+ Unf=Unf{Src=StableUser, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [30 30 30 0 0] 140 0
+         Tmpl= \ (@b_aJm)
+                 ($dShow_aJn [Occ=Once1] :: Show b_aJm)
+                 (@c_aJt)
+                 ($dShow_aJu [Occ=Once1] :: Show c_aJt)
+                 (a_aDh [Occ=Once1!] :: Bool)
+                 (b_aDi [Occ=Once1] :: b_aJm)
+                 (c_aDj [Occ=Once1] :: c_aJt) ->
+                 ++
+                   @Char
+                   (case a_aDh of {
+                      False -> GHC.Internal.Show.$fShowBool4;
+                      True -> GHC.Internal.Show.$fShowBool3
+                    })
+                   (++
+                      @Char
+                      (show @b_aJm $dShow_aJn b_aDi)
+                      (show @c_aJt $dShow_aJu c_aDj))},
+ RULES: "SPEC $cm @()" [0]
+            forall ($dShow_sUq :: Show ()). $cm_aJp @() $dShow_sUq = $s$cm_sUr
+        "SPEC $cm @() @(Maybe Integer)" [0]
+            forall ($dShow_sUk :: Show ())
+                   ($dShow_sUl :: Show (Maybe Integer)).
+              $cm_aJp @() $dShow_sUk @(Maybe Integer) $dShow_sUl
+              = $s$cm_sUm]
+$cm_aJp
+  = \ (@b_aJm)
+      ($dShow_aJn :: Show b_aJm)
+      (@c_aJt)
+      ($dShow_aJu :: Show c_aJt)
+      (a_aDh :: Bool)
+      (b_aDi :: b_aJm)
+      (c_aDj :: c_aJt) ->
+      GHC.Internal.Base.augment
+        @Char
+        (\ (@b_aSL)
+           (c_aSM [OS=OneShot] :: Char -> b_aSL -> b_aSL)
+           (n_aSN [OS=OneShot] :: b_aSL) ->
+           GHC.Internal.Base.foldr
+             @Char
+             @b_aSL
+             c_aSM
+             n_aSN
+             (case a_aDh of {
+                False -> GHC.Internal.Show.$fShowBool4;
+                True -> GHC.Internal.Show.$fShowBool3
+              }))
+        (GHC.Internal.Base.augment
+           @Char
+           (\ (@b_aSL)
+              (c_aSM [OS=OneShot] :: Char -> b_aSL -> b_aSL)
+              (n_aSN [OS=OneShot] :: b_aSL) ->
+              GHC.Internal.Base.foldr
+                @Char @b_aSL c_aSM n_aSN (show @b_aJm $dShow_aJn b_aDi))
+           (show @c_aJt $dShow_aJu c_aDj))
+end Rec }
+
+-- RHS size: {terms: 5, types: 6, coercions: 0, joins: 0/0}
+T17966.$fCBoolb [InlPrag=CONLIKE] :: forall b. Show b => C Bool b
+[LclIdX[DFunId(nt)],
+ Arity=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@b_anX) (v_B1 [Occ=Once1] :: Show b_anX) ->
+                 T17966.C:C @Bool @b_anX ($cm_aJp @b_anX v_B1)}]
+T17966.$fCBoolb
+  = \ (@b_aJm) ($dShow_aJn :: Show b_aJm) ->
+      T17966.C:C @Bool @b_aJm ($cm_aJp @b_aJm $dShow_aJn)
+
+-- RHS size: {terms: 19, types: 16, coercions: 0, joins: 0/0}
+$sf_sUj [InlPrag=INLINABLE[0]]
+  :: Bool -> () -> Maybe Integer -> [Char]
+[LclId, Arity=3]
+$sf_sUj
+  = \ (a_aDr :: Bool) (b_aDs :: ()) (c_aDt :: Maybe Integer) ->
+      GHC.Internal.Base.build
+        @Char
+        (\ (@b_aT4)
+           (c_aT5 [OS=OneShot] :: Char -> b_aT4 -> b_aT4)
+           (n_aT6 [OS=OneShot] :: b_aT4) ->
+           GHC.Internal.Base.foldr
+             @Char
+             @b_aT4
+             c_aT5
+             (GHC.Internal.CString.unpackFoldrCString# @b_aT4 "!"# c_aT5 n_aT6)
+             ($cm_aJp
+                @()
+                GHC.Internal.Show.$fShowUnit
+                @(Maybe Integer)
+                $dShow_sUi
+                a_aDr
+                b_aDs
+                c_aDt))
+
+-- RHS size: {terms: 24, types: 23, coercions: 0, joins: 0/0}
+f [InlPrag=INLINABLE[0]]
+  :: forall a b c. (C a b, Show c) => a -> b -> c -> String
+[LclIdX,
+ Arity=5,
+ Unf=Unf{Src=StableUser, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [0 0 0 0 0] 70 0
+         Tmpl= \ (@a_aFn)
+                 (@b_aFo)
+                 (@c_aFp)
+                 ($dC_aFq [Occ=Once1] :: C a_aFn b_aFo)
+                 ($dShow_aFr [Occ=Once1] :: Show c_aFp)
+                 (a_aDr [Occ=Once1] :: a_aFn)
+                 (b_aDs [Occ=Once1] :: b_aFo)
+                 (c_aDt [Occ=Once1] :: c_aFp) ->
+                 ++
+                   @Char
+                   (m @a_aFn @b_aFo $dC_aFq @c_aFp $dShow_aFr a_aDr b_aDs c_aDt)
+                   (GHC.Internal.CString.unpackCString# "!"#)},
+ RULES: "SPEC f @Bool @() @(Maybe Integer)" [0]
+            forall ($dC_sUh :: C Bool ()) ($dShow_sUi :: Show (Maybe Integer)).
+              f @Bool @() @(Maybe Integer) $dC_sUh $dShow_sUi
+              = $sf_sUj]
+f = \ (@a_aFn)
+      (@b_aFo)
+      (@c_aFp)
+      ($dC_aFq :: C a_aFn b_aFo)
+      ($dShow_aFr :: Show c_aFp)
+      (a_aDr :: a_aFn)
+      (b_aDs :: b_aFo)
+      (c_aDt :: c_aFp) ->
+      GHC.Internal.Base.build
+        @Char
+        (\ (@b_aT4)
+           (c_aT5 [OS=OneShot] :: Char -> b_aT4 -> b_aT4)
+           (n_aT6 [OS=OneShot] :: b_aT4) ->
+           GHC.Internal.Base.foldr
+             @Char
+             @b_aT4
+             c_aT5
+             (GHC.Internal.CString.unpackFoldrCString# @b_aT4 "!"# c_aT5 n_aT6)
+             (m @a_aFn @b_aFo $dC_aFq @c_aFp $dShow_aFr a_aDr b_aDs c_aDt))
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sUb :: GHC.Internal.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+$trModule_sUb = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sUc :: GHC.Internal.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+$trModule_sUc = GHC.Internal.Types.TrNameS $trModule_sUb
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sUd :: GHC.Internal.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
+$trModule_sUd = "T17966"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sUe :: GHC.Internal.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+$trModule_sUe = GHC.Internal.Types.TrNameS $trModule_sUd
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T17966.$trModule :: GHC.Internal.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T17966.$trModule
+  = GHC.Internal.Types.Module $trModule_sUc $trModule_sUe
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_aRV [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+$krep_aRV
+  = GHC.Internal.Types.KindRepFun
+      GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_aRU [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+$krep_aRU
+  = GHC.Internal.Types.KindRepFun GHC.Internal.Types.krep$* $krep_aRV
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tcC_sUf :: GHC.Internal.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+$tcC_sUf = "C"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tcC_sUg :: GHC.Internal.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+$tcC_sUg = GHC.Internal.Types.TrNameS $tcC_sUf
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T17966.$tcC :: GHC.Internal.Types.TyCon
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T17966.$tcC
+  = GHC.Internal.Types.TyCon
+      12503088876068780286#Word64
+      926716241154773768#Word64
+      T17966.$trModule
+      $tcC_sUg
+      0#
+      $krep_aRU
+
+-- RHS size: {terms: 11, types: 9, coercions: 0, joins: 0/0}
+x :: String
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=False,
+         Value=False, ConLike=False, WorkFree=False, Expandable=False,
+         Guidance=IF_ARGS [] 130 0}]
+x = f @Bool
+      @()
+      @(Maybe Integer)
+      (T17966.C:C @Bool @() ($cm_aJp @() GHC.Internal.Show.$fShowUnit))
+      (GHC.Internal.Show.$fShowMaybe
+         @Integer GHC.Internal.Show.$fShowInteger)
+      GHC.Internal.Types.True
+      GHC.Internal.Tuple.()
+      (GHC.Internal.Maybe.Just
+         @Integer (GHC.Internal.Bignum.Integer.IS 42#))
+
+
+

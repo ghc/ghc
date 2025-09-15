@@ -1,0 +1,6 @@
+
+T23740f.hs:7:25: error: [GHC-45510]
+    • Term variable ‘id’ cannot be used here
+        (term variables cannot be promoted)
+    • In the kind ‘id’
+      In the type signature: p :: () -> forall (a :: id). Proxy a

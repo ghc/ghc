@@ -1,0 +1,5 @@
+-- Success case with explicit level imports
+import Language.Haskell.TH
+import splice Data.Function (id)
+
+$(id [| () |])

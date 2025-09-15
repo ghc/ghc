@@ -1,0 +1,4 @@
+T24557a.hs:7:2: error: [GHC-11983]
+    Illegal invisible type pattern: @pat
+    An invisible type pattern must occur in an argument position.
+

@@ -1,0 +1,27 @@
+-- This should throw a warning
+:set -XStaticPointers
+
+:set -XScopedTypeVariables
+:load StaticPtr.hs
+import GHC.StaticPtr
+import Prelude
+
+:{
+let checkKey :: forall a. (Show a, Eq a) => StaticPtr a -> IO ()
+    checkKey x = do
+      allKeys <- staticPtrKeys
+      Just x' <- unsafeLookupStaticPtr (staticKey x) :: IO (Maybe (StaticPtr a))
+      putStrLn $
+        show (deRefStaticPtr x)
+        ++ "    " ++
+        (if deRefStaticPtr x == deRefStaticPtr x'
+            then "good"
+            else "bad")
+:}
+
+checkKey s1
+checkKey s2
+
+-- :m + StaticPtr
+--checkKey topLevelStatic
+--checkKey (fst nestedStatic)

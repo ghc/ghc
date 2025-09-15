@@ -1,0 +1,42 @@
+# This directory contains tests where we annotate functions with expected
+# type signatures, and verify that these actually those found by the compiler
+
+setTestOpts(extra_hc_opts('-ddump-dmd-signatures -ddump-cpr-signatures -dno-typeable-binds'))
+
+# We are testing the result of an optimization, so no use
+# running them in various runtimes
+setTestOpts(only_ways(['optasm']))
+
+test('StrAnalExample', normal, compile, [''])
+test('T8569', normal, compile, [''])
+test('HyperStrUse', normal, compile, [''])
+test('T8598', normal, compile, [''])
+test('FacState', expect_broken(1600), compile, [''])
+test('UnsatFun', normal, compile, [''])
+test('BottomFromInnerLambda', normal, compile, [''])
+test('DmdAnalGADTs', normal, compile, [''])
+test('T12370', normal, compile, [''])
+test('NewtypeArity', normal, compile, [''])
+test('T5075', normal, compile, [''])
+test('T6070', normal, compile, [''])
+test('T17932', normal, compile, [''])
+test('T13380c', expect_broken('!3014'), compile, [''])
+test('T13380f', normal, compile, [''])
+test('T18086', normal, compile, ['-package ghc'])
+test('T18957', normal, compile, [''])
+test('T16197b', [grep_errmsg(r'\$wf')], compile, ['-ddump-simpl -dsuppress-uniques -dsuppress-all'])
+test('T19407', normal, compile, [''])
+test('T19871', normal, compile, [''])
+test('T16859', normal, compile, ['-package ghc'])
+test('T18907', normal, compile, [''])
+test('T13331', normal, compile, [''])
+test('T20746', normal, compile, [''])
+test('T20746b', normal, compile, [''])
+test('T21081', normal, compile, [''])
+test('T21119', normal, compile, [''])
+test('T21717', normal, compile, [''])
+test('T21754', normal, compile, [''])
+test('T21888', normal, compile, [''])
+test('T21888a', normal, compile, [''])
+test('T22241', normal, compile, [''])
+test('T21737', normal, compile, [''])

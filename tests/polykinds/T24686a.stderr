@@ -1,0 +1,8 @@
+
+T24686a.hs:8:34: error: [GHC-25897]
+    • Couldn't match kind ‘a’ with ‘LiftedRep’
+      Expected kind ‘*’, but ‘b’ has kind ‘TYPE a’
+      ‘a’ is a rigid type variable bound by
+        a standalone kind signature for ‘T’
+        at T24686a.hs:8:18
+    • In a standalone kind signature for ‘T’: forall a (b :: TYPE a). b

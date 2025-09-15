@@ -1,0 +1,9 @@
+
+T10806.hs:11:32: error: [GHC-83865]
+    • Couldn't match expected type: Char -> Bool
+                  with actual type: IO ()
+    • The function ‘print’ is applied to two visible arguments,
+        but its type ‘Show a => a -> IO ()’ has only one
+      In the expression: print 'x' 'y'
+      In an equation for ‘triggersLoop’:
+          triggersLoop (Q _ _) (Q _ _) = print 'x' 'y'

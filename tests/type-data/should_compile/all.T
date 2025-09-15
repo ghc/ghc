@@ -1,0 +1,8 @@
+test('TDDataConstructor', normal, compile, [''])
+test('TDExistential', normal, compile, [''])
+test('TDGADT', normal, compile, [''])
+test('TDGoodConsConstraints', normal, compile, [''])
+test('TDVector', normal, compile, [''])
+test('TD_TH_splice', req_th, compile, [''])
+test('T22315a', [extra_files(['T22315a/'])], multimod_compile, ['T22315a.Lib T22315a.Main', '-v0'])
+test('T22948b', normal, compile, [''])

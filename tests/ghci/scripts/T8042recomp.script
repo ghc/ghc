@@ -1,0 +1,7 @@
+:set -v1
+System.IO.writeFile "T8042B.hs" "module T8042B where { fooB = \"T8042B\"; }"
+System.IO.writeFile "T8042A.hs" "module T8042A where { import T8042B; run = putStrLn fooB }"
+:set -fobject-code
+:load T8042A
+:load *T8042A
+:break run

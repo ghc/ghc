@@ -1,0 +1,22 @@
+{-# LANGUAGE RoleAnnotations #-}
+-- Role merging test
+unit p where
+    signature A where
+        type role T nominal representational
+        data T a b
+        newtype S a b = MkS (T a b)
+unit q where
+    signature A where
+        type role T representational nominal
+        data T a b
+        newtype S a b = MkS (T a b)
+unit r where
+    dependency p[A=<A>]
+    dependency q[A=<A>]
+    module M where
+        import A
+        import Data.Coerce
+        f :: (Coercible a1 a2, Coercible b1 b2) => T a1 b1 -> T a2 b2
+        f = coerce
+        g :: (Coercible a1 a2, Coercible b1 b2) => S a1 b1 -> S a2 b2
+        g = coerce

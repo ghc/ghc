@@ -1,0 +1,5 @@
+-- ensure that derived Generics types aren't visible to user
+:set +t
+:set -XDeriveGeneric
+import GHC.Generics
+data Hello = Hello Int deriving (Eq, Generic)

@@ -1,0 +1,6 @@
+
+T4806.hs:1:1: error: [GHC-87110]
+    Could not load module ‘Data.Map’.
+    It is a member of the package ‘containers-0.6.7’
+    which is ignored due to an -ignore-package flag
+    Use -v to see a list of the files searched for.

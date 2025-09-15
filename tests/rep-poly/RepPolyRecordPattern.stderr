@@ -1,0 +1,28 @@
+
+RepPolyRecordPattern.hs:7:35: error: [GHC-55287]
+    • The newtype constructor pattern
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE rep
+    • In the pattern: MkX {fld = fld}
+      In an equation for ‘fld’: fld MkX {fld = fld} = fld
+
+RepPolyRecordPattern.hs:7:35: error: [GHC-55287]
+    The first pattern in the equation for ‘fld’
+    does not have a fixed runtime representation.
+    Its type is:
+      X a :: TYPE rep
+
+RepPolyRecordPattern.hs:13:1: error: [GHC-55287]
+    The first pattern in the equation for ‘upd’
+    does not have a fixed runtime representation.
+    Its type is:
+      X a :: TYPE rep
+
+RepPolyRecordPattern.hs:13:7: error: [GHC-55287]
+    • The newtype constructor pattern
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE rep
+    • In the pattern: MkX bndr_a
+      In an equation for ‘upd’: upd (MkX bndr_a) = bndr_a

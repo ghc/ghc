@@ -1,0 +1,5 @@
+
+tcfail094.hs:7:14: error: [GHC-68567]
+    Illegal type: ‘1’
+    Suggested fix:
+      Perhaps you intended to use the ‘DataKinds’ extension (implied by ‘UnliftedDatatypes’)

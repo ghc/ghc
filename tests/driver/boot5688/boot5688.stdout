@@ -1,0 +1,6 @@
+[1 of 6] Compiling B[boot]          ( B.hs-boot, nothing )
+[2 of 6] Compiling D                ( D.hs, nothing )
+[3 of 6] Compiling B                ( B.hs, nothing )
+[4 of 6] Compiling C                ( C.hs, nothing )
+[5 of 6] Compiling E                ( E.hs, nothing )
+[6 of 6] Compiling A                ( A.hs, nothing )

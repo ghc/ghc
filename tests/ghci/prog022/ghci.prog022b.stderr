@@ -1,0 +1,19 @@
+<interactive>:5:1: error: [GHC-88464]
+    Variable not in scope: g :: t0 -> t
+
+<no location info>: error: [GHC-35235]
+    Could not find module ‘A’.
+    It is not a module in the current program, or in any known package.
+
+<interactive>:10:1: error: [GHC-88464]
+    Variable not in scope: f :: t0 -> t
+
+<interactive>:11:1: error: [GHC-88464]
+    Variable not in scope: g :: t0 -> t
+
+<interactive>:12:1: error: [GHC-88464]
+    Variable not in scope: h :: t0 -> t
+
+<interactive>:17:1: error: [GHC-88464]
+    Variable not in scope: g :: t0 -> t
+

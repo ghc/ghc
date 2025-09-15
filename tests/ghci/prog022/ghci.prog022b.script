@@ -1,0 +1,18 @@
+-- Load all modules
+:reload A B
+:m A B
+f 5
+g 5
+h 5
+-- Unload all modules
+:reload none
+:m A B
+f 5
+g 5
+h 5
+-- No target loads all modules
+:reload
+:m A B
+f 5
+g 5
+h 5

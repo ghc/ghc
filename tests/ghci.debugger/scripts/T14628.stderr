@@ -1,0 +1,9 @@
+
+<interactive>:4:17: error: [GHC-25897]
+    • Couldn't match type ‘m’ with ‘(,) a0’
+      Expected: StateT Int ((,) a0) ()
+        Actual: StateT Int m ()
+      ‘m’ is an interactive-debugger skolem
+    • In the first argument of ‘runStateT’, namely ‘_result’
+      In the second argument of ‘($)’, namely ‘runStateT _result 0’
+      In the expression: snd $ runStateT _result 0

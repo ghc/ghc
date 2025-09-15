@@ -1,0 +1,4 @@
+IORef still alive, and contains 'x'
+caught exception: thread blocked indefinitely in an MVar operation
+IORef still alive, and contains 'x'
+'x'

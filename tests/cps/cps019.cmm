@@ -1,0 +1,12 @@
+// Verify block jumping to continuations works right
+
+foo() {
+  bits32 x, y, z;
+  x = x;
+  (x) = foreign "C--" bar() "safe";
+L:
+  y = y;
+  foreign "C--" baz() "safe";
+  if (y) { z = z; goto L; }
+  else { z = z; goto L; }
+}

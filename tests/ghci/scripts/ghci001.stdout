@@ -1,0 +1,2 @@
+(+) :: Num a => a -> a -> a
+enumFromTo :: Enum a => a -> a -> [a]

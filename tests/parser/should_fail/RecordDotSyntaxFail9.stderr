@@ -1,0 +1,7 @@
+
+RecordDotSyntaxFail9.hs:7:11: error: [GHC-18872]
+    • Couldn't match type ‘Int’ with ‘[Char]’
+        arising from selecting the field ‘foo’
+    • In the expression: a.foo :: String
+      In a pattern binding: _ = a.foo :: String
+      In a stmt of a 'do' block: let _ = a.foo :: String

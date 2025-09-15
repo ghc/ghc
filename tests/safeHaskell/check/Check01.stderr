@@ -1,0 +1,4 @@
+[3 of 3] Compiling Check01          ( Check01.hs, Check01.o )
+
+<no location info>: error: [GHC-08674]
+    The package (base-4.17.0.0) is required to be trusted but it isn't!

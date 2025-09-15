@@ -1,0 +1,15 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 12, types: 4, coercions: 0, joins: 0/0}
+
+a = D# 256.0##
+
+b = D# -256.0##
+
+c = F# 256.0#
+
+d = F# -256.0#
+
+
+

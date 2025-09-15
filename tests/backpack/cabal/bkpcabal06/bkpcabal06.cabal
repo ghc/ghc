@@ -1,0 +1,24 @@
+cabal-version:       2.2
+name:                bkpcabal06
+version:             0.1.0.0
+license:             BSD-3-Clause
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+
+library sig
+  signatures: P
+  reexported-modules: Prelude
+  build-depends: base
+  default-language: Haskell2010
+  hs-source-dirs: sig
+
+library impl
+  exposed-modules: P
+  build-depends: base
+  default-language: Haskell2010
+  hs-source-dirs: impl
+
+library
+  build-depends: sig, impl
+  default-language: Haskell2010

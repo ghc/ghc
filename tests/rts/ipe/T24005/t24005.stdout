@@ -1,0 +1,2 @@
+Just (InfoProv {ipName = "C:Show_Main_1_con_info", ipDesc = CONSTR, ipTyDesc = "Show", ipLabel = "$fShowA", ipUnitId = "main", ipMod = "Main", ipSrcFile = "t24005.hs", ipSrcSpan = "25:10-15"})
+Just (InfoProv {ipName = "C:Show_Main_0_con_info", ipDesc = CONSTR, ipTyDesc = "Show", ipLabel = "$fShowB", ipUnitId = "main", ipMod = "Main", ipSrcFile = "t24005.hs", ipSrcSpan = "29:10-29"})

@@ -1,0 +1,2 @@
+data Main.T
+    = Main.T (# GHC.Internal.Types.Int, GHC.Internal.Types.Int #)

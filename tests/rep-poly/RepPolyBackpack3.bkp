@@ -1,0 +1,20 @@
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE TypeFamilies #-}
+
+unit sig where
+  signature Sig where
+    import GHC.Exts
+    data Rep :: RuntimeRep
+
+unit impl where
+  module Impl where
+    import Data.Kind
+    import GHC.Exts
+    type family T :: RuntimeRep
+    type Rep = T
+
+unit main where
+  dependency sig[Sig=impl:Impl]

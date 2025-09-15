@@ -1,0 +1,18 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 20, types: 16, coercions: 2, joins: 0/0}
+
+testFun
+  = \ @x v ->
+      case v `cast` <Co:2> :: ... of {
+        __DEFAULT -> 47#;
+        C0 ipv -> -3#;
+        C2 -> 13#;
+        C4 ds -> 15#;
+        C5 ds -> case ds of { I# w -> w };
+        C6 -> 12#
+      }
+
+
+

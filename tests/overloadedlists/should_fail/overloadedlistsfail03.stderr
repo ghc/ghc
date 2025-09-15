@@ -1,0 +1,9 @@
+
+overloadedlistsfail03.hs:3:28: error: [GHC-83865]
+    • Couldn't match type ‘[Char]’ with ‘Char’
+      Expected: GHC.Internal.IsList.Item [Char]
+        Actual: String
+    • In the expression: "b"
+      In the first argument of ‘length’, namely ‘(['a', "b"] :: [Char])’
+      In the first argument of ‘print’, namely
+        ‘(length (['a', "b"] :: [Char]))’

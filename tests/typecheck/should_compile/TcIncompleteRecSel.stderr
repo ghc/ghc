@@ -1,0 +1,4 @@
+TcIncompleteRecSel.hs:16:5: warning: [GHC-86894] [-Wincomplete-record-selectors (in -Wall)]
+    Selecting the record field ‘x’ may fail for the following constructors:
+      T2
+

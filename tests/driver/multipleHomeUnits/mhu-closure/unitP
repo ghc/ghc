@@ -1,0 +1,1 @@
+-working-dir p P -i -i. -package-db ../tmp.d -this-unit-id p-0.1.0.0

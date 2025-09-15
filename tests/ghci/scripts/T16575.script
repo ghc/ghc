@@ -1,0 +1,18 @@
+:set +c
+:l T16575.hs
+:all-types
+
+-- data X = A | B
+--     deriving (Show)
+--               ^^^^
+:type-at T16575.hs 4 15 4 19
+-- wrongly outputs:
+--  :: [X] -> ShowS
+
+-- instance Eq X where
+--          ^^^^
+:type-at T16575.hs 6 10 6 14
+-- wrongly outputs:
+-- :: X -> X -> Bool
+
+-- also note how :all-types is inconsistent with :type-at

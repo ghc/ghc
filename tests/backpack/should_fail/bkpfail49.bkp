@@ -1,0 +1,11 @@
+unit p where
+    signature A (module Data.Bool) where
+        import Data.Bool
+
+unit q where
+    dependency signature p[A=<A>]
+    signature A (module Data.Bool) where
+        import Data.Bool ()
+    module M where
+        import qualified A
+        x = A.True -- should not exist!

@@ -1,0 +1,44 @@
+type Num :: * -> Constraint
+class Num a where
+  (+) :: a -> a -> a
+  ...
+  	-- Defined in ‘GHC.Internal.Num’
+infixl 6 +
+type Num :: * -> Constraint
+class Num a where
+  (+) :: a -> a -> a
+  ...
+  	-- Defined in ‘GHC.Internal.Num’
+infixl 6 +
+type Data.Complex.Complex :: * -> *
+data Data.Complex.Complex a = !a Data.Complex.:+ !a
+  	-- Defined in ‘Data.Complex’
+infix 6 Data.Complex.:+
+type Data.Complex.Complex :: * -> *
+data Data.Complex.Complex a = !a Data.Complex.:+ !a
+  	-- Defined in ‘Data.Complex’
+infix 6 Data.Complex.:+
+type RealFloat :: * -> Constraint
+class (RealFrac a, Floating a) => RealFloat a where
+  floatRadix :: a -> Integer
+  floatDigits :: a -> Int
+  floatRange :: a -> (Int, Int)
+  decodeFloat :: a -> (Integer, Int)
+  encodeFloat :: Integer -> Int -> a
+  exponent :: a -> Int
+  significand :: a -> a
+  scaleFloat :: Int -> a -> a
+  isNaN :: a -> Bool
+  isInfinite :: a -> Bool
+  isDenormalized :: a -> Bool
+  isNegativeZero :: a -> Bool
+  isIEEE :: a -> Bool
+  atan2 :: a -> a -> a
+  {-# MINIMAL floatRadix, floatDigits, floatRange, decodeFloat,
+              encodeFloat, isNaN, isInfinite, isDenormalized, isNegativeZero,
+              isIEEE #-}
+  	-- Defined in ‘GHC.Internal.Float’
+instance RealFloat Double -- Defined in ‘GHC.Internal.Float’
+instance RealFloat Float -- Defined in ‘GHC.Internal.Float’
+GHC.Internal.Data.OldList.isPrefixOf :: Eq a => [a] -> [a] -> Bool
+  	-- Defined in ‘GHC.Internal.Data.OldList’

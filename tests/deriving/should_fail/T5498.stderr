@@ -1,0 +1,13 @@
+T5498.hs:30:39: error: [GHC-18872]
+    • Couldn't match representation of type: c a
+                               with that of: c (Down a)
+        arising (via a quantified constraint) from
+          the coercion of derived method ‘intIso’
+      When trying to solve the quantified constraint
+        forall (c :: * -> *).
+        Coercible (c a -> c Int) (c (Down a) -> c Int)
+        arising from the coercion of derived method ‘intIso’
+      Note: We cannot know what roles the parameters to ‘c’ have;
+            we must assume that the role is nominal.
+    • When deriving the instance for (IntIso (Down a))
+

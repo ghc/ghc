@@ -1,0 +1,9 @@
+
+T22326_fail_ado.hs:9:3: error: [GHC-70206]
+    • Illegal type pattern.
+      A type pattern must be checked against a visible forall.
+    • In the pattern: type a
+      In a stmt of a 'do' block: type a <- undefined
+      In the expression:
+        do type a <- undefined
+           return ()

@@ -1,0 +1,7 @@
+SI08.hs:14:25: error: [GHC-28914]
+    • Level error: instance for ‘C X’ is bound at level 0
+      but used at level -1
+    • In the second argument of ‘const’, namely ‘(x vx)’
+      In the expression: const [| x vx |] (x vx)
+      In the untyped splice: $(const [| x vx |] (x vx))
+

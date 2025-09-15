@@ -1,0 +1,9 @@
+:set -XPatternSynonyms -XNoFieldSelectors
+pattern P{x,y} = (x,y)
+:info P
+:info x
+:info y
+pattern V = ()
+:info V
+pattern a `C` b = (a,b)
+:info C

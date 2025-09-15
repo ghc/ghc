@@ -1,0 +1,11 @@
+
+import Control.Monad
+import System.FilePath
+import System.Directory
+
+wd1 <- getCurrentDirectory
+setCurrentDirectory ".."
+wd2 <- getCurrentDirectory
+wd1_parent <- canonicalizePath (wd1 </> "..") 
+wd2'       <- canonicalizePath wd2
+unless (wd1_parent `equalFilePath` wd2') $ mapM_ print [wd1, wd1_parent, wd2, wd2']

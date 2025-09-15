@@ -1,0 +1,9 @@
+<interactive>:6:1: error: [GHC-88464]
+    Variable not in scope: h :: t0 -> t
+
+<interactive>:11:1: error: [GHC-88464]
+    Variable not in scope: h :: t0 -> t
+
+<interactive>:16:1: error: [GHC-88464]
+    Variable not in scope: h :: t0 -> t
+

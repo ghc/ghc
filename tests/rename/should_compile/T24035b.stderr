@@ -1,0 +1,3 @@
+T24035b.hs:4:39: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
+    The import of ‘R2(rb)’ from module ‘T24035_aux’ is redundant
+

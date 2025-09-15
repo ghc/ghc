@@ -1,0 +1,37 @@
+showT :: T -> String
+showT T0_1 = "T0_1"
+showT (T1I i) = "T1I " ++ show i
+showT T0_2 = "T0_2"
+showT (T2BI b i) = "T2BI " ++ (if b then show i else "0")
+showT T0_3 = "T0_3"
+showT (T3CIB c i b) = "T3CIB " ++ show [c] ++ " " ++ (if b then show i else "0")
+showT T0_4 = "T0_4"
+
+showT0_1 = showT T0_1
+showT1I = showT (T1I 909)
+showT0_2 = showT T0_2
+showT2BI = showT (T2BI True 808)
+showT0_3 = showT T0_3
+showT3CIB = showT (T3CIB 'X' 707 True)
+showT0_4 = "T0_4"
+
+inc :: T -> T
+inc T0_1 = T0_2
+inc (T1I i) = T1I (i+1)
+inc T0_2 = T0_3
+inc (T2BI b i) = T2BI b (i+1)
+inc T0_3 = T0_4
+inc (T3CIB c i b) = T3CIB c (i+1) b
+inc T0_4 = T0_1
+
+t 1 = T0_1
+t 2 = T1I 999
+t 3 = T0_2
+t 4 = T2BI True 899
+t 5 = T0_3
+t 6 = T3CIB 'X' 799 True
+t _ = T0_4
+
+show_inc :: Int -> (Int -> T) -> String
+show_inc i f = let r = inc (f i)
+               in showT r

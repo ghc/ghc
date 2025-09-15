@@ -1,0 +1,3 @@
+T7169.hs:11:5: warning: [GHC-82712] [-Wpartial-fields]
+    Definition of partial record field: ‘m2’
+    Record selection and update using this field will be partial.

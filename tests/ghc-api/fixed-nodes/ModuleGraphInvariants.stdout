@@ -1,0 +1,15 @@
+
+Running test: Valid compile nodes
+PASS Test passed
+
+Running test: Valid fixed nodes
+PASS Test passed
+
+Running test: Fixed depending on compile
+PASS Test passed
+
+Running test: Duplicate keys
+PASS Test passed
+
+Running test: Missing dependency
+PASS Test passed

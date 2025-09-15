@@ -1,0 +1,12 @@
+
+T15322a.hs:12:7: error: [GHC-39999]
+    • Could not deduce ‘KnownNat (n + 1)’
+        arising from a use of ‘typeRep’
+      from the context: KnownNat n
+        bound by the type signature for:
+                   f :: forall (n :: GHC.Internal.TypeNats.Nat).
+                        KnownNat n =>
+                        Proxy n -> TypeRep (n + 1)
+        at T15322a.hs:11:1-56
+    • In the expression: typeRep
+      In an equation for ‘f’: f _ = typeRep

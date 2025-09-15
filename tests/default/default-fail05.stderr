@@ -1,0 +1,70 @@
+default-fail05.hs:11:10: error: [GHC-39999]
+    • Ambiguous type variable ‘t0’ arising from a use of ‘toList’
+      prevents the constraint ‘(Foldable t0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘t0’ should be.
+      Potentially matching instances:
+        instance Foldable (Either a)
+          -- Defined in ‘GHC.Internal.Data.Foldable’
+        instance Foldable Maybe -- Defined in ‘GHC.Internal.Data.Foldable’
+        ...plus three others
+        ...plus 26 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the first argument of ‘($)’, namely ‘toList’
+      In the first argument of ‘print’, namely ‘(toList $ pure 21)’
+      In a stmt of a 'do' block: print (toList $ pure 21)
+
+default-fail05.hs:11:19: error: [GHC-39999]
+    • Ambiguous type variable ‘t0’ arising from a use of ‘pure’
+      prevents the constraint ‘(Applicative t0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘t0’ should be.
+      Potentially matching instances:
+        instance Applicative IO -- Defined in ‘GHC.Internal.Base’
+        instance Applicative Maybe -- Defined in ‘GHC.Internal.Base’
+        ...plus six others
+        ...plus 9 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the second argument of ‘($)’, namely ‘pure 21’
+      In the first argument of ‘print’, namely ‘(toList $ pure 21)’
+      In a stmt of a 'do' block: print (toList $ pure 21)
+
+default-fail05.hs:12:3: error: [GHC-39999]
+    • Ambiguous type variable ‘t1’ arising from a use of ‘traverse’
+      prevents the constraint ‘(Traversable t1)’ from being solved.
+      Relevant bindings include
+        main :: IO (t1 ()) (bound at default-fail05.hs:10:1)
+      Probable fix: use a type annotation to specify what ‘t1’ should be.
+      Potentially matching instances:
+        instance Traversable (Either a)
+          -- Defined in ‘GHC.Internal.Data.Traversable’
+        instance Traversable Maybe
+          -- Defined in ‘GHC.Internal.Data.Traversable’
+        ...plus three others
+        ...plus 28 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In a stmt of a 'do' block: traverse print (pure 42)
+      In the expression:
+        do print (toList $ pure 21)
+           traverse print (pure 42)
+      In an equation for ‘main’:
+          main
+            = do print (toList $ pure 21)
+                 traverse print (pure 42)
+
+default-fail05.hs:12:19: error: [GHC-39999]
+    • Ambiguous type variable ‘t1’ arising from a use of ‘pure’
+      prevents the constraint ‘(Applicative t1)’ from being solved.
+      Relevant bindings include
+        main :: IO (t1 ()) (bound at default-fail05.hs:10:1)
+      Probable fix: use a type annotation to specify what ‘t1’ should be.
+      Potentially matching instances:
+        instance Applicative IO -- Defined in ‘GHC.Internal.Base’
+        instance Applicative Maybe -- Defined in ‘GHC.Internal.Base’
+        ...plus six others
+        ...plus 9 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the second argument of ‘traverse’, namely ‘(pure 42)’
+      In a stmt of a 'do' block: traverse print (pure 42)
+      In the expression:
+        do print (toList $ pure 21)
+           traverse print (pure 42)
+

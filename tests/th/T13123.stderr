@@ -1,0 +1,5 @@
+T13123.hs:15:2: warning: [GHC-66582] [-Wuseless-specialisations (in -Wdefault)]
+    Dubious SPECIALISE pragma for ‘id2’.
+    The pragma does not specialise away any class dictionaries,
+    and neither is there any value specialisation.
+

@@ -1,0 +1,4 @@
+
+T17284.hs:6:1: error: [GHC-16675]
+    Overloaded signature conflicts with monomorphism restriction
+      [partial signature] f :: Num a => a -> _

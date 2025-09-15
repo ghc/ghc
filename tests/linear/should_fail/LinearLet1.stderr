@@ -1,0 +1,5 @@
+
+LinearLet1.hs:5:3: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘f’: f x = let y = x in (y, y)

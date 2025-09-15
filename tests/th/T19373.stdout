@@ -1,0 +1,2 @@
+default (GHC.Internal.Types.Int, GHC.Internal.Types.Double)
+Sum {getSum = 12}

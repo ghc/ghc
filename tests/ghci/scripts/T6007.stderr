@@ -1,0 +1,6 @@
+
+<interactive>:1:19: error: [GHC-61689]
+    Module ‘System.IO’ does not export ‘does_not_exist’.
+
+<interactive>:3:20: error: [GHC-61689]
+    Module ‘Data.Maybe’ does not export ‘does_not_exist’.

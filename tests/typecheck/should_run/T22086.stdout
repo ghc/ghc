@@ -1,0 +1,4 @@
+CallStack (from HasCallStack):
+  a do statement, called at T22086.hs:15:5 in main:Main
+CallStack (from HasCallStack):
+  >>, called at T22086.hs:19:11 in main:Main

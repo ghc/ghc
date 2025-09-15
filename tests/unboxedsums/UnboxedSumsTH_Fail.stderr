@@ -1,0 +1,3 @@
+
+UnboxedSumsTH_Fail.hs:13:22: error: [GHC-58481]
+    parse error on input ‘|’

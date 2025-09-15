@@ -1,0 +1,7 @@
+T24296: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+tricky called with at least two args
+
+HasCallStack backtrace:
+  error, called at T24296.hs:12:7 in main:Main
+

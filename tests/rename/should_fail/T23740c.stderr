@@ -1,0 +1,11 @@
+
+T23740c.hs:8:10: error: [GHC-45510]
+    • Term variable ‘a’ cannot be used here
+        (term variables cannot be promoted)
+    • In the type signature: g :: a -> a
+      In an equation for ‘f’:
+          f a
+            = g a
+            where
+                g :: a -> a
+                g = id

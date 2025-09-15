@@ -1,0 +1,12 @@
+{-# OPTIONS_GHC -fno-warn-deprecations #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+module Foo where
+
+-- This example suggested by Yitzchak Gale
+
+import Control.Monad.State
+
+class Game b mv e | b -> mv e where
+    newBoard :: MonadState b m => m ()
+        -- This method is unambiguous, because
+        -- m determines b (via a fundep in MonadState)

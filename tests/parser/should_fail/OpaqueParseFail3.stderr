@@ -1,0 +1,3 @@
+
+OpaqueParseFail3.hs:4:12: error: [GHC-58481]
+    parse error on input ‘CONLIKE’

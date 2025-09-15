@@ -1,0 +1,19 @@
+
+T7558.hs:8:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘f’: f (MkT x y) = ...
+
+T7558.hs:8:4: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
+    • Inaccessible code in
+        a pattern with constructor:
+          MkT :: forall a b. (a ~ Maybe b) => a -> Maybe b -> T a b,
+        in an equation for ‘f’
+      Couldn't match type ‘a’ with ‘Maybe a’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a. T a a -> Bool
+        at T7558.hs:7:1-18
+    • In the pattern: MkT x y
+      In an equation for ‘f’: f (MkT x y) = [x, y] `seq` True
+    • Relevant bindings include
+        f :: T a a -> Bool (bound at T7558.hs:8:1)

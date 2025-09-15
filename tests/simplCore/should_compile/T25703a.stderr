@@ -1,0 +1,6 @@
+Rule fired: SPEC foo @_ @2 @2 (T25703a)
+Rule fired: SPEC foo @_ @1 @2 (T25703a)
+Rule fired: SPEC foo @_ @0 @2 (T25703a)
+Rule fired: SPEC foo @_ @1 @1 (T25703a)
+Rule fired: SPEC foo @_ @0 @1 (T25703a)
+Rule fired: SPEC foo @_ @0 @0 (T25703a)

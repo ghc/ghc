@@ -1,0 +1,2 @@
+f :: P.Num a => a -> a
+g :: (r -> a) -> P.Maybe r -> P.Maybe a

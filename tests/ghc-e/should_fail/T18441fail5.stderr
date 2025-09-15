@@ -1,0 +1,4 @@
+<interactive>: error: [GHCi-81235]
+    Module ‘Abcde’ cannot be found locally
+
+1

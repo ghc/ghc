@@ -1,0 +1,12 @@
+SI27.hs:7:23: error: [GHC-26105]
+    Multiple occurrences of a splice or quote keyword
+
+SI27.hs:8:22: error: [GHC-26105]
+    Multiple occurrences of a splice or quote keyword
+
+SI27.hs:9:23: error: [GHC-26105]
+    Multiple occurrences of a splice or quote keyword
+
+SI27.hs:10:22: error: [GHC-26105]
+    Multiple occurrences of a splice or quote keyword
+

@@ -1,0 +1,9 @@
+name: th
+version: 1.0
+build-type: Simple
+cabal-version: >= 2.0
+
+library
+    build-depends: p, indef, base
+    mixins: p (P as Sig)
+    exposed-modules: TH

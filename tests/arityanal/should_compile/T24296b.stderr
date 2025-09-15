@@ -1,0 +1,26 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 43, types: 29, coercions: 4, joins: 0/0}
+
+-- RHS size: {terms: 2, types: 3, coercions: 0, joins: 0/0}
+g :: (Int -> Int -> Int) -> Int -> Int -> Int
+[GblId, Arity=1, Unf=OtherCon []]
+g = \ (f1 :: Int -> Int -> Int) -> f1
+
+-- RHS size: {terms: 20, types: 3, coercions: 0, joins: 0/0}
+$dIP :: GHC.Internal.Stack.Types.CallStack
+[GblId]
+$dIP = GHC.Internal.Stack.Types.pushCallStack (GHC.CString.unpackCString# "error"#, GHC.Internal.Stack.Types.SrcLoc (GHC.CString.unpackCString# "main"#) (GHC.CString.unpackCString# "T24296b"#) (GHC.CString.unpackCString# "T24296b.hs"#) (GHC.Types.I# 5#) (GHC.Types.I# 7#) (GHC.Types.I# 5#) (GHC.Types.I# 12#)) GHC.Internal.Stack.Types.emptyCallStack
+
+-- RHS size: {terms: 5, types: 4, coercions: 4, joins: 0/0}
+f :: Int -> Int -> Int
+[GblId, Arity=1, Unf=OtherCon []]
+f = \ _ [Occ=Dead] -> error @GHC.Types.LiftedRep @(Int -> Int) ($dIP `cast` (Sym (GHC.Classes.N:IP[0] <"callStack">_N <GHC.Internal.Stack.Types.CallStack>_N) :: GHC.Internal.Stack.Types.CallStack ~R# (?callStack::GHC.Internal.Stack.Types.CallStack))) (GHC.CString.unpackCString# "blah"#)
+
+-- RHS size: {terms: 12, types: 5, coercions: 0, joins: 0/0}
+r [InlPrag=OPAQUE] :: Int -> Int -> Maybe Int
+[GblId, Arity=2, Unf=OtherCon []]
+r = \ (x :: Int) (y :: Int) -> case g f y of { __DEFAULT -> GHC.Internal.Maybe.Just @Int (g f x y) }
+
+
+

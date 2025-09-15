@@ -1,0 +1,4 @@
+T5795.hs:9:7: error: [GHC-28914]
+    • Level error: ‘ty’ is bound at level 0 but used at level -1
+    • In the untyped splice: $ty
+

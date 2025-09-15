@@ -1,0 +1,51 @@
+
+T22065.hs:10:30: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Foo’
+    • In an expression type signature: forall a. _
+      In the expression: Apply f x :: forall a. _
+      In an equation for ‘foo’:
+          foo
+            = Apply f x :: forall a. _
+            where
+                f :: [_] -> Int
+                f = length @[] @_
+                x :: [_]
+                x = mempty @[_]
+    • Relevant bindings include
+        f :: forall {w}. [w] -> Int (bound at T22065.hs:13:3)
+        x :: forall {w}. [w] (bound at T22065.hs:16:3)
+        foo :: Foo (bound at T22065.hs:10:1)
+
+T22065.hs:12:9: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of f :: [w] -> Int
+               at T22065.hs:13:3-19
+    • In the type signature: f :: [_] -> Int
+      In an equation for ‘foo’:
+          foo
+            = Apply f x :: forall a. _
+            where
+                f :: [_] -> Int
+                f = length @[] @_
+                x :: [_]
+                x = mempty @[_]
+    • Relevant bindings include
+        x :: forall {w}. [w] (bound at T22065.hs:16:3)
+        foo :: Foo (bound at T22065.hs:10:1)
+
+T22065.hs:15:9: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of x :: [w]
+               at T22065.hs:16:3-17
+    • In the type signature: x :: [_]
+      In an equation for ‘foo’:
+          foo
+            = Apply f x :: forall a. _
+            where
+                f :: [_] -> Int
+                f = length @[] @_
+                x :: [_]
+                x = mempty @[_]
+    • Relevant bindings include foo :: Foo (bound at T22065.hs:10:1)

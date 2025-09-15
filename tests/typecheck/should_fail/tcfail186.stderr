@@ -1,0 +1,8 @@
+
+tcfail186.hs:7:9: error: [GHC-83865]
+    • Couldn't match type ‘[Char]’ with ‘Int’
+      Expected: PhantomSyn a0
+        Actual: String
+    • In the first argument of ‘f’, namely ‘"hoo"’
+      In the expression: f "hoo"
+      In an equation for ‘foo’: foo = f "hoo"

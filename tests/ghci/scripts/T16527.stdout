@@ -1,0 +1,5 @@
+type T :: *
+data T where
+  MkT1 :: (Int -> Int) -> T
+  MkT2 :: (forall a. Maybe a) -> T
+  	-- Defined at T16527.hs:5:1

@@ -1,0 +1,12 @@
+
+T14607.hs:22:9: error: [GHC-83865]
+    • Expecting one more argument to ‘LamCons a '()’
+      Expected a type, but ‘LamCons a '()’ has kind ‘() -> *’
+    • In the type signature: mk :: LamCons a '()
+      In the instance declaration for ‘Mk a’
+
+T14607.hs:22:19: error: [GHC-83865]
+    • Expected a type, but ‘'()’ has kind ‘()’
+    • In the second argument of ‘LamCons’, namely ‘'()’
+      In the type signature: mk :: LamCons a '()
+      In the instance declaration for ‘Mk a’

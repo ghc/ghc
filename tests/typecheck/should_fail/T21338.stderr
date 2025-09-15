@@ -1,0 +1,10 @@
+
+T21338.hs:39:8: error: [GHC-95781]
+    • Cannot apply expression of type ‘h0 f0 xs0 -> h0 g0 xs0’
+      to a visible type argument ‘flds’
+    • In the expression: hmap undefined @flds
+      In a case alternative: _ -> hmap undefined @flds
+      In the expression:
+        case foo @a of
+          Record np -> hmap id np
+          _ -> hmap undefined @flds

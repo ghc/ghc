@@ -1,0 +1,5 @@
+T25437.hs:9:3: error: [GHC-44432]
+    The class method signature for ‘foo’ lacks an accompanying binding
+
+T25437.hs:16:3: error: [GHC-54721]
+    ‘something’ is not a (visible) method of class ‘C’

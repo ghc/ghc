@@ -1,0 +1,7 @@
+#include "Cmm.h"
+
+test ( W_ buffer ) {
+  bits64 ret;
+  (ret) = prim %bswap64(%neg(%zx64(bits16[buffer + (12 :: W_)])));
+  return (ret);
+}

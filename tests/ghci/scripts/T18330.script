@@ -1,0 +1,5 @@
+:l shell.hs
+:def shell (\s -> do shell s; return "")
+:l T18330.hs
+:shell echo "new line" > T18330.extra
+:r

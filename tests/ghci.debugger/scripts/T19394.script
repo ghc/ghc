@@ -1,0 +1,4 @@
+:set -XMagicHash
+import Data.Coerce
+import GHC.Exts
+:print seq coerce error oneShot xor# seq# lazy realWorld# Word8# Int void#

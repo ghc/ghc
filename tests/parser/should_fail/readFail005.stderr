@@ -1,0 +1,2 @@
+readFail005.hs:4:5: [GHC-21231]
+    lexical error at character '&'

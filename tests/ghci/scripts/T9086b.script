@@ -1,0 +1,2 @@
+let main = do { putStrLn "hello"; return "discarded" }
+:main

@@ -1,0 +1,14 @@
+
+==================== Output Cmm ====================
+[main() { //  []
+         { info_tbls: []
+           stack_info: arg_space: 8
+         }
+     {offset
+       _lbl_:
+           __locVar_::F64 = -1.0 :: W64;
+           goto c2;
+     }
+ }]
+
+

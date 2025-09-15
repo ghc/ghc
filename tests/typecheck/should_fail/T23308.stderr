@@ -1,0 +1,50 @@
+
+T23308.hs:12:14: error: [GHC-23517]
+    • A newtype constructor must have exactly one field
+        but ‘B1’ has two
+      B1 :: C1 -> C1 -> B1
+    • In the definition of data constructor ‘B1’
+      In the newtype declaration for ‘B1’
+
+T23308.hs:17:20: error: [GHC-07525]
+    • A newtype constructor must not have existential type variables
+      B2 :: forall (x :: C2). Proxy x -> B2
+    • In the definition of data constructor ‘B2’
+      In the newtype declaration for ‘B2’
+
+T23308.hs:23:21: error: [GHC-07525]
+    • A newtype constructor must not have existential type variables
+      B2' :: forall (x :: C2'). F2' x -> B2'
+    • In the definition of data constructor ‘B2'’
+      In the newtype declaration for ‘B2'’
+
+T23308.hs:28:20: error: [GHC-45219]
+    • Data constructor ‘B3’ returns type ‘B2’
+        instead of an instance of its parent type ‘B3’
+    • In the definition of data constructor ‘B3’
+      In the newtype declaration for ‘B3’
+
+T23308.hs:33:22: error: [GHC-89498]
+    • A newtype must not be a GADT
+      B4 :: C4 -> B4 Int
+    • In the definition of data constructor ‘B4’
+      In the newtype declaration for ‘B4’
+
+T23308.hs:38:22: error: [GHC-17440]
+    • A newtype constructor must not have a context in its type
+      B5 :: forall a. Num a => B5 (a, a)
+    • In the definition of data constructor ‘B5’
+      In the newtype declaration for ‘B5’
+
+T23308.hs:38:22: error: [GHC-89498]
+    • A newtype must not be a GADT
+      B5 :: forall a. Num a => B5 (a, a)
+    • In the definition of data constructor ‘B5’
+      In the newtype declaration for ‘B5’
+
+T23308.hs:38:22: error: [GHC-23517]
+    • A newtype constructor must have exactly one field
+        but ‘B5’ has none
+      B5 :: forall a. Num a => B5 (a, a)
+    • In the definition of data constructor ‘B5’
+      In the newtype declaration for ‘B5’

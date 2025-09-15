@@ -1,0 +1,7 @@
+RebindableFailA: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Failed with error
+
+HasCallStack backtrace:
+  error, called at RebindableFailA.hs:10:10 in main:Main
+

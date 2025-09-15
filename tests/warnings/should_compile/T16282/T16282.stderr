@@ -1,0 +1,12 @@
+[1 of 2] Compiling T16282A          ( T16282A.hs, T16282A.o )
+[2 of 2] Compiling Main             ( T16282.hs, T16282.o )
+
+T16282.hs: warning: [-Wall-missed-specialisations]
+    Could not specialise imported function ‘T16282A.$wmyMapM_’
+      when specialising ‘myMapM_’
+    Probable fix: add INLINABLE pragma on ‘T16282A.$wmyMapM_’
+
+T16282.hs: warning: [-Wall-missed-specialisations]
+    Could not specialise imported function ‘GHC.Show.$fShow(,)_$cshowList’
+    Probable fix: add INLINABLE pragma on ‘GHC.Show.$fShow(,)_$cshowList’
+

@@ -1,0 +1,4 @@
+
+<interactive>:1:1: error: [GHC-76037]
+    Not in scope: ‘main’
+1

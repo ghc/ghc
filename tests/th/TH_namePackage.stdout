@@ -1,0 +1,9 @@
+"Either"
+"foo"
+"foo"
+Just "GHC.Internal.Data.Either"
+Nothing
+Just "Module"
+Just "ghc-internal"
+Nothing
+Nothing

@@ -1,0 +1,3 @@
+
+T10637.hs:3:23: warning: [GHC-88907] [-Wunused-imports (in -Wextra)]
+    {-# SOURCE #-} unnecessary in import of  ‘A’

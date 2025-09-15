@@ -1,0 +1,10 @@
+
+overloadedlistsfail05.hs:3:24: error: [GHC-83865]
+    • Couldn't match type ‘Char’ with ‘Int’
+      Expected: GHC.Internal.IsList.Item [Int]
+        Actual: Char
+    • In the expression: 'a'
+      In the first argument of ‘length’, namely
+        ‘(['a' .. (10 :: Int)] :: [Int])’
+      In the first argument of ‘print’, namely
+        ‘(length (['a' .. (10 :: Int)] :: [Int]))’

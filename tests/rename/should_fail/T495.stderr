@@ -1,0 +1,8 @@
+
+T495.hs:4:12: error: [GHC-44432]
+    The INLINE pragma for ‘blarg’ lacks an accompanying binding
+
+T495.hs:7:12: error: [GHC-44432]
+    The INLINE pragma for ‘lookup’ lacks an accompanying binding
+    Suggested fix:
+      Move the INLINE pragma to the declaration site of ‘lookup’.

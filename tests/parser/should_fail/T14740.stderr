@@ -1,0 +1,4 @@
+
+T14740.hs:5:7: error: [GHC-83865]
+    • Expected a constraint, but ‘(# #)’ is a type
+    • In the type signature: x :: ((# #)) => ()

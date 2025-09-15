@@ -1,0 +1,4 @@
+
+read043.hs:8:5: warning: [GHC-94817] [-Wtabs (in -Wdefault)]
+    Tab character found here, and in one further location.
+    Suggested fix: Please use spaces instead.

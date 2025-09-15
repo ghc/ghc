@@ -1,0 +1,11 @@
+
+T12373.hs:10:19: error: [GHC-18872]
+    • Couldn't match a lifted type with an unlifted type
+      When matching types
+        a0 :: *
+        MVar# RealWorld a1 :: UnliftedType
+      Expected: (# State# RealWorld, a0 #)
+        Actual: (# State# RealWorld, MVar# RealWorld a1 #)
+    • In the expression: newMVar# rw
+      In the first argument of ‘IO’, namely ‘(\ rw -> newMVar# rw)’
+      In the first argument of ‘(>>)’, namely ‘IO (\ rw -> newMVar# rw)’

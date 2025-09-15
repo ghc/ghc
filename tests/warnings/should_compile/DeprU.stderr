@@ -1,0 +1,10 @@
+[1 of 2] Compiling DeprM            ( DeprM.hs, DeprM.o )
+[2 of 2] Compiling A                ( DeprU.hs, DeprU.o )
+
+DeprU.hs:3:1: warning: [GHC-15328] [-Wdeprecations (in -Wextended-warnings)]
+    Module ‘DeprM’ is deprecated:
+      "Here can be your menacing deprecation warning!"
+
+DeprU.hs:6:5: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘f’ (imported from DeprM):
+    Deprecated: "Here can be your menacing deprecation warning!"

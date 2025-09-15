@@ -1,0 +1,4 @@
+<command line>: User-specified static library could not be loaded (T14708scratch/libadd.a)
+Loading static libraries is not supported in this configuration.
+Try using a dynamic library instead.
+

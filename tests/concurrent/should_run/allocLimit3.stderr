@@ -1,0 +1,3 @@
+allocLimit3: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.SomeAsyncException:
+
+allocation limit exceeded

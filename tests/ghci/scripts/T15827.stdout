@@ -1,0 +1,14 @@
+type F1 :: forall k. k -> *
+type family F1 a
+  	-- Defined at T15827.hs:9:1
+type instance forall k (a :: k). F1 a = Proxy a
+  	-- Defined at T15827.hs:10:34
+type F2 :: forall k. k -> *
+type family F2 a where
+  forall k (a :: k). F2 a = Proxy a
+  	-- Defined at T15827.hs:12:1
+type D :: forall k. k -> *
+data family D a
+  	-- Defined at T15827.hs:15:1
+data instance forall k (a :: k). D a = MkD (Proxy a)
+  	-- Defined at T15827.hs:16:34

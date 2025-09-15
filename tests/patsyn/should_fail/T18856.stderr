@@ -1,0 +1,14 @@
+
+T18856.hs:6:19: error: [GHC-83865]
+    • Couldn't match expected type ‘Bool’ with actual type ‘Int’
+    • In the declaration for pattern synonym ‘P’
+  |
+6 | pattern P p q <- (q, p, [(True,False)])
+  |                   ^
+
+T18856.hs:6:22: error: [GHC-83865]
+    • Couldn't match expected type ‘Int’ with actual type ‘Bool’
+    • In the declaration for pattern synonym ‘P’
+  |
+6 | pattern P p q <- (q, p, [(True,False)])
+  |                      ^

@@ -1,0 +1,9 @@
+Result(Stringify): Int
+Result(Bingify): Int
+Result(Stringify): Bool
+Result(Bingify): Int
+compilation IS NOT required
+Result(Stringify): Bool
+Result(Bingify): Int
+Result(Stringify): Int
+Result(Bingify): Int

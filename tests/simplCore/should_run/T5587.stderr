@@ -1,0 +1,7 @@
+T5587: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+hidden error
+
+HasCallStack backtrace:
+  error, called at T5587.hs:7:15 in main:Main
+

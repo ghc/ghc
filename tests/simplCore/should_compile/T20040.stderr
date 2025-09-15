@@ -1,0 +1,34 @@
+
+==================== Final STG: ====================
+$WNil = Nil! [];
+
+$WCons = \r [conrep conrep1] Cons [conrep conrep1];
+
+unSucc1 = \r [ds] ds;
+
+unSucc = \r [eta] unSucc1 eta;
+
+Rec {
+ifoldl' =
+    \r [f z ds]
+        case ds of wild {
+          Nil -> z;
+          Cons ipv2 ipv3 ->
+              case z of z1 {
+              __DEFAULT ->
+              case f z1 ipv2 of ifoldl'_sat {
+              __DEFAULT -> ifoldl' f ifoldl'_sat ipv3;
+              };
+              };
+        };
+end Rec }
+
+Nil = \r [void] Nil [];
+
+Cons = \r [void eta eta] Cons [eta eta];
+
+Z = Z! [];
+
+S = \r [eta] S [eta];
+
+

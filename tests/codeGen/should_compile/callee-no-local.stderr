@@ -1,0 +1,1 @@
+           call "ccall" arg hints:  []  result hints:  [] foo();

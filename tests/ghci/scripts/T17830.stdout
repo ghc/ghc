@@ -1,0 +1,356 @@
+
+==================== Parser AST ====================
+
+(Just
+ (L
+  (SrcSpanAnn (EpAnnNotUsed) { <interactive>:2:1 })
+  (BodyStmt
+   (NoExtField)
+   (L
+    (SrcSpanAnn (EpAnnNotUsed) { <interactive>:2:1 })
+    (HsOverLit
+     (EpAnn
+      (Anchor
+       { <interactive>:2:1 }
+       (UnchangedAnchor))
+      (NoEpAnns)
+      (EpaComments
+       []))
+     (OverLit
+      (NoExtField)
+      (HsIntegral
+       (IL
+        (SourceText 1)
+        (False)
+        (1))))))
+   (NoExtField)
+   (NoExtField))))
+
+
+
+==================== Renamer ====================
+
+(L
+ (SrcSpanAnn (EpAnnNotUsed) { <interactive>:2:1 })
+ (HsOverLit
+  (EpAnn
+   (Anchor
+    { <interactive>:2:1 }
+    (UnchangedAnchor))
+   (NoEpAnns)
+   (EpaComments
+    []))
+  (OverLit
+   (OverLitRn
+    (False)
+    (L
+     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     {Name: fromInteger}))
+   (HsIntegral
+    (IL
+     (SourceText 1)
+     (False)
+     (1))))))
+
+
+
+==================== Typechecker AST ====================
+
+((,)
+ [{Var: it_azr}]
+ (L
+  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+  (XExpr
+   (WrapExpr
+    (HsWrap
+     (WpLet
+      ({abstract:TcEvBinds}))
+     (HsDo
+      (TyConApp
+       ({abstract:TyCon})
+       [(TyConApp
+         ({abstract:TyCon})
+         [(TyConApp
+           ({abstract:TyCon})
+           [])])])
+      (GhciStmtCtxt)
+      (L
+       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       [(L
+         (SrcSpanAnn (EpAnnNotUsed) { <interactive>:2:1 })
+         (LetStmt
+          (EpAnnNotUsed)
+          (HsValBinds
+           (EpAnnNotUsed)
+           (XValBindsLR
+            (NValBinds
+             [((,)
+               (NonRecursive)
+               {Bag(LocatedA (HsBind Var)):
+                [(L
+                  (SrcSpanAnn (EpAnnNotUsed) { <interactive>:2:1 })
+                  (AbsBinds
+                   (NoExtField)
+                   [{Var: a_aP2[sk:1]}]
+                   [{Var: $dNum_aP5}]
+                   [(ABE
+                     (NoExtField)
+                     {Var: it_azr}
+                     {Var: it_aOZ}
+                     (WpHole)
+                     (SpecPrags
+                      []))]
+                   [({abstract:TcEvBinds})]
+                   {Bag(LocatedA (HsBind Var)):
+                    [(L
+                      (SrcSpanAnn (EpAnnNotUsed) { <interactive>:2:1 })
+                      (FunBind
+                       (WpHole)
+                       (L
+                        (SrcSpanAnn (EpAnnNotUsed) { <interactive>:2:1 })
+                        {Var: it_aOZ})
+                       (MG
+                        (MatchGroupTc
+                         []
+                         (TyVarTy
+                          {Var: a_aP2[tau:1]}))
+                        (L
+                         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                         [(L
+                           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                           (Match
+                            (EpAnnNotUsed)
+                            (FunRhs
+                             (L
+                              (SrcSpanAnn (EpAnnNotUsed) { <interactive>:2:1 })
+                              {Var: it_aOZ})
+                             (Prefix)
+                             (NoSrcStrict))
+                            []
+                            (GRHSs
+                             (EpaComments
+                              [])
+                             [(L
+                               (SrcSpanAnn
+                                (EpAnnNotUsed)
+                                { <no location info> })
+                               (GRHS
+                                (EpAnnNotUsed)
+                                []
+                                (L
+                                 (SrcSpanAnn (EpAnnNotUsed) { <interactive>:2:1 })
+                                 (HsOverLit
+                                  (EpAnnNotUsed)
+                                  (OverLit
+                                   (OverLitTc
+                                    (False)
+                                    (HsApp
+                                     (EpAnnNotUsed)
+                                     (L
+                                      (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                                      (XExpr
+                                       (WrapExpr
+                                        (HsWrap
+                                         (WpCompose
+                                          (WpEvApp
+                                           (EvExpr
+                                            (Var
+                                             {Var: $dNum_aP3})))
+                                          (WpTyApp
+                                           (TyVarTy
+                                            {Var: a_aP2[tau:1]})))
+                                         (HsVar
+                                          (NoExtField)
+                                          (L
+                                           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                                           {Var: fromInteger}))))))
+                                     (L
+                                      (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                                      (HsLit
+                                       (EpAnnNotUsed)
+                                       (HsInteger
+                                        (SourceText 1)
+                                        (1)
+                                        (TyConApp
+                                         ({abstract:TyCon})
+                                         [])))))
+                                    (TyVarTy
+                                     {Var: a_aP2[tau:1]}))
+                                   (HsIntegral
+                                    (IL
+                                     (SourceText 1)
+                                     (False)
+                                     (1))))))))]
+                             (EmptyLocalBinds
+                              (NoExtField)))))])
+                        (FromSource))
+                       []))]}
+                   (False)))]})]
+             [])))))
+       ,(L
+         (SrcSpanAnn (EpAnnNotUsed) { <interactive>:2:1 })
+         (BodyStmt
+          (TyConApp
+           ({abstract:TyCon})
+           [(TyVarTy
+             {Var: a_aPf[tau:0]})])
+          (L
+           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (HsApp
+            (EpAnnNotUsed)
+            (L
+             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (XExpr
+              (WrapExpr
+               (HsWrap
+                (WpCompose
+                 (WpEvApp
+                  (EvExpr
+                   (Var
+                    {Var: $dShow_aPi})))
+                 (WpTyApp
+                  (TyVarTy
+                   {Var: a_aPh[tau:0]})))
+                (HsVar
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                  {Var: print}))))))
+            (L
+             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (XExpr
+              (WrapExpr
+               (HsWrap
+                (WpCompose
+                 (WpEvApp
+                  (EvExpr
+                   (Var
+                    {Var: $dNum_aPk})))
+                 (WpTyApp
+                  (TyVarTy
+                   {Var: a_aPj[tau:0]})))
+                (HsVar
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                  {Var: it_azr}))))))))
+          (SyntaxExprTc
+           (XExpr
+            (WrapExpr
+             (HsWrap
+              (WpCompose
+               (WpTyApp
+                (TyVarTy
+                 {Var: b_aPg[tau:0]}))
+               (WpTyApp
+                (TyVarTy
+                 {Var: a_aPf[tau:0]})))
+              (HsVar
+               (NoExtField)
+               (L
+                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                {Var: GHC.Base.thenIO})))))
+           [(WpHole)
+           ,(WpHole)]
+           (WpHole))
+          (NoSyntaxExprTc)))
+       ,(L
+         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (LastStmt
+          (NoExtField)
+          (L
+           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (HsApp
+            (EpAnn
+             (Anchor
+              { placeholder:-1:-1 }
+              (UnchangedAnchor))
+             (NoEpAnns)
+             (EpaComments
+              []))
+            (L
+             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (XExpr
+              (WrapExpr
+               (HsWrap
+                (WpTyApp
+                 (TyConApp
+                  ({abstract:TyCon})
+                  [(TyConApp
+                    ({abstract:TyCon})
+                    [])]))
+                (HsVar
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                  {Var: GHC.Base.returnIO}))))))
+            (L
+             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (ExplicitList
+              (TyConApp
+               ({abstract:TyCon})
+               [])
+              [(L
+                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                (HsApp
+                 (EpAnn
+                  (Anchor
+                   { placeholder:-1:-1 }
+                   (UnchangedAnchor))
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (L
+                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                  (XExpr
+                   (WrapExpr
+                    (HsWrap
+                     (WpCompose
+                      (WpCompose
+                       (WpCompose
+                        (WpTyApp
+                         (TyConApp
+                          ({abstract:TyCon})
+                          []))
+                        (WpTyApp
+                         (ForAllTy
+                          (Bndr
+                           {Var: a_aP2[sk:1]}
+                           (Invisible
+                            (InferredSpec)))
+                          (FunTy
+                           (InvisArg)
+                           (TyConApp
+                            ({abstract:TyCon})
+                            [])
+                           (TyConApp
+                            ({abstract:TyCon})
+                            [(TyVarTy
+                              {Var: a_aP2[sk:1]})])
+                           (TyVarTy
+                            {Var: a_aP2[sk:1]})))))
+                       (WpTyApp
+                        (TyConApp
+                         ({abstract:TyCon})
+                         [])))
+                      (WpTyApp
+                       (TyConApp
+                        ({abstract:TyCon})
+                        [])))
+                     (HsVar
+                      (NoExtField)
+                      (L
+                       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                       {Var: Unsafe.Coerce.unsafeCoerce#}))))))
+                 (L
+                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                  (HsVar
+                   (NoExtField)
+                   (L
+                    (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                    {Var: it_azr})))))]))))
+          (Nothing)
+          (NoSyntaxExprTc)))])))))))
+
+
+1

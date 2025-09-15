@@ -1,0 +1,3 @@
+
+Dep09.hs:5:1: error: [GHC-44360]
+    GHC.Ptr: Can't be safely imported! The module itself isn't safe.

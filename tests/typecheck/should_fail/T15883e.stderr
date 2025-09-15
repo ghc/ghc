@@ -1,0 +1,26 @@
+T15883e.hs:16:1: error: [GHC-91028]
+    • Couldn't match type ‘d0’ with ‘forall a. a’
+      Expected: d0 -> Foo LiftedRep
+        Actual: (forall a. a) -> Foo LiftedRep
+      Cannot instantiate unification variable ‘d0’
+      with a type involving polytypes: forall a. a
+    • In the first argument of ‘z’, namely ‘MkFoo’
+      In the first argument of ‘k’, namely ‘z MkFoo’
+      In the expression: z MkFoo `k` a1
+      When typechecking the code for ‘GHC.Internal.Data.Data.gfoldl’
+        in a derived instance for ‘Data (Foo LiftedRep)’:
+        To see the code I am typechecking, use -ddump-deriv
+
+T15883e.hs:16:1: error: [GHC-91028]
+    • Couldn't match type ‘b0’ with ‘forall a. a’
+      Expected: b0 -> Foo LiftedRep
+        Actual: (forall a. a) -> Foo LiftedRep
+      Cannot instantiate unification variable ‘b0’
+      with a type involving polytypes: forall a. a
+    • In the first argument of ‘z’, namely ‘MkFoo’
+      In the first argument of ‘k’, namely ‘(z MkFoo)’
+      In the expression: k (z MkFoo)
+      When typechecking the code for ‘GHC.Internal.Data.Data.gunfold’
+        in a derived instance for ‘Data (Foo LiftedRep)’:
+        To see the code I am typechecking, use -ddump-deriv
+

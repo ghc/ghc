@@ -1,0 +1,3 @@
+
+T13414.lhs:3:10: error: [GHC-88464]
+    Variable not in scope: invalid_ident_

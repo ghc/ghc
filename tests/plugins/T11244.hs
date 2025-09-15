@@ -1,0 +1,1 @@
+module ShouldFail where

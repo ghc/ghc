@@ -1,0 +1,4 @@
+[1 of 4] Compiling FatQuote         ( FatQuote.hs, FatQuote.o, interpreted )
+[2 of 4] Compiling FatTH            ( FatTH.hs, FatTH.o, interpreted )
+[3 of 4] Compiling Main             ( FatMain.hs, FatMain.o, interpreted )
+[4 of 4] Linking FatMain

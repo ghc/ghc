@@ -1,0 +1,4 @@
+
+SafeLang03.hs:8:11: warning: [GHC-56147]
+    Rule "f" ignored
+    Defining user rules is disabled under Safe Haskell

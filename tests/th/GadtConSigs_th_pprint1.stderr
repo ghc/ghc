@@ -1,0 +1,7 @@
+data G_0 a_1 where
+    G1_2 :: forall a_3 b_4 . (a_3, b_4) -> G_0 a_3
+    G2_5 :: forall a_6 . forall b_7 . (a_6, b_7) -> G_0 a_6
+    G3_8 :: forall a_9 {b_10} .
+            forall c_11 d_12 .
+            forall e_13 {f_14} g_15 .
+            G_0 (a_9, b_10, c_11, d_12, e_13, f_14, g_15)

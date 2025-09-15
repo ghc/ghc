@@ -1,0 +1,24 @@
+parsePlugin()
+interfacePlugin: Prelude
+interfacePlugin: Language.Haskell.TH
+interfacePlugin: Language.Haskell.TH.Quote
+interfacePlugin: GHC.Internal.Base
+interfacePlugin: GHC.Internal.Data.NonEmpty
+interfacePlugin: GHC.Internal.Float
+interfacePlugin: GHC.Internal.Prim.Ext
+interfacePlugin: GHC.Internal.TH.Quote
+interfacePlugin: GHC.Internal.TH.Syntax
+typeCheckPlugin (rn)
+interfacePlugin: GHC.Internal.TH.Monad
+interfacePlugin: GHC.Internal.Stack.Types
+interfacePlugin: GHC.Internal.Exception.Context
+typeCheckPlugin (tc)
+parsePlugin(a)
+typeCheckPlugin (rn)
+interfacePlugin: GHC.Internal.TH.Lib
+metaPlugin: (return [])
+metaPlugin: quoteExp stringify "x"
+interfacePlugin: GHC.Internal.CString
+typeCheckPlugin (rn)
+typeCheckPlugin (rn)
+typeCheckPlugin (tc)

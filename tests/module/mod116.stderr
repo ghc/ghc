@@ -1,0 +1,3 @@
+
+mod116.hs:2:18: error: [GHC-76037]
+    Not in scope: type constructor or class ‘M2’

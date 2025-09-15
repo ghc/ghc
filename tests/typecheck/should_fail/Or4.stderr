@@ -1,0 +1,18 @@
+
+Or4.hs:11:16: error: [GHC-39999]
+    • No instance for ‘Num a’ arising from the literal ‘3’
+      Possible fix:
+        add (Num a) to the context of
+          the type signature for:
+            bar :: forall a. G a -> a
+    • In the expression: 3
+      In an equation for ‘bar’: bar (G2; G1) = 3
+
+Or4.hs:18:34: error: [GHC-39999]
+    • No instance for ‘Num a’ arising from a use of ‘+’
+      Possible fix:
+        add (Num a) to the context of
+          the type signature for:
+            foo :: forall a. a -> GADT a -> a
+    • In the expression: x + 1
+      In an equation for ‘foo’: foo x (IsInt1 {}; IsInt2 {}) = x + 1

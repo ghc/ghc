@@ -1,0 +1,8 @@
+{-# LANGUAGE MagicHash #-}
+unit p where
+    dependency base
+    signature Int where
+        import GHC.Exts
+        data Int = I# Int#
+unit q where
+    dependency p[Int=base:GHC.Exts]

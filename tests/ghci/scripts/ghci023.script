@@ -1,0 +1,28 @@
+putStrLn "-- testing ghci multiline commands :{ .. :}"
+putStrLn "-- via stdin"
+:{
+  let
+  { f 0 = 1
+  ; f 1 = w
+    where { w = 2 }
+  ; y = 3
+  }
+:}
+print (f 0,f 1,y)
+
+putStrLn "-- layout rule instead of explicit braces and semicolons works too"
+:{
+  let
+   g 0 = 1
+   g 1 = w
+    where w = 2
+   z = 3
+:}
+print (g 0,g 1,z)
+
+:{
+:browse
+  Data.Maybe
+:}
+putStrLn "-- via readFile"
+:cmd readFile "ghci023.ghci"

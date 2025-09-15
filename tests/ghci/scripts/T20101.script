@@ -1,0 +1,4 @@
+:complete repl "let x = y++b"
+:complete repl "let x = y+"
+:complete repl "let x = y ++"
+:complete repl "let x = b"

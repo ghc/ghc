@@ -1,0 +1,17 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 2, types: 3, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+addStuff :: Int -> Int -> Int
+[GblId,
+ Str=<1!P(L)><1!P(L)>,
+ Cpr=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+addStuff = scctick<addStuff> GHC.Internal.Num.$fNumInt_$c+
+
+
+

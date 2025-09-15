@@ -1,0 +1,7 @@
+unit q where
+    signature A (module Data.Bool) where
+        import Data.Bool
+unit p where
+    dependency signature q[A=<A>]
+    signature A (module Data.Bool) where
+        -- This should not work: module is mandatory

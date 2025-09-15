@@ -1,0 +1,2 @@
+T25117a.hs:6:1: error: [GHC-93944]
+    Illegal form of SPECIALISE pragma: let x = 2 in f x

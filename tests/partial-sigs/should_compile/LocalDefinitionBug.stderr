@@ -1,0 +1,4 @@
+TYPE SIGNATURES
+  monoLoc :: forall a. a -> ((a, String), (a, String))
+Dependent modules: []
+Dependent packages: [(normal, base-4.21.0.0)]

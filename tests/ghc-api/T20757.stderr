@@ -1,0 +1,7 @@
+T20757.exe: Uncaught exception ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
+
+could not detect mingw toolchain in the following paths: ["/..//mingw","/..//..//mingw","/..//..//..//mingw"]
+
+HasCallStack backtrace:
+  throwIO, called at compiler/GHC/Utils/Panic.hs:184:23 in ghc-<VERSION>-<HASH>:GHC.Utils.Panic
+

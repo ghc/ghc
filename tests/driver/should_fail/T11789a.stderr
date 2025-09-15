@@ -1,0 +1,5 @@
+ghc: unrecognised flag: -fppr-cols=1000
+did you mean one of:
+  -dppr-cols
+
+Usage: For basic information, try the `--help' option.

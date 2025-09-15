@@ -1,0 +1,9 @@
+module RecompExports5_M where
+
+foo :: Int
+foo = 3
+
+-- Check that adding this orphan instance triggers recompilation downstream,
+-- even in modules with an explicit import list.
+instance Eq (Bool -> Bool) where
+  f1 == f2 = map f1 [False, True] == map f1 [False, True]

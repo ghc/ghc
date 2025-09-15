@@ -1,0 +1,12 @@
+T16183.hs:(7,2)-(11,41): Splicing declarations
+    [d| type F1 = (Maybe :: Type -> Type) Int
+        type F2 = (Int :: Type) -> (Int :: Type)
+        type family F3 a where
+          F3 (a :: Type) = Int
+        newtype F4 = MkF4 (Int :: Type) |]
+  ======>
+    type F1 = (Maybe :: Type -> Type) Int
+    type F2 = (Int :: Type) -> (Int :: Type)
+    type family F3 a where
+      F3 (a :: Type) = Int
+    newtype F4 = MkF4 (Int :: Type)

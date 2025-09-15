@@ -1,0 +1,62 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 127, types: 120, coercions: 0, joins: 0/0}
+
+lvl = I# 3#
+
+lvl1 = I# 4#
+
+lvl2 = I# 1#
+
+f2 = \ c -> case c lvl2 of { __DEFAULT -> c lvl lvl1 }
+
+yes1or2 = f2
+
+lvl3 = I# 42#
+
+lvl4 = I# 2#
+
+f4
+  = \ c ->
+      case c lvl2 lvl4 of { __DEFAULT ->
+      case c lvl lvl1 of { __DEFAULT -> lvl3 }
+      }
+
+no3 = \ c -> f4 (\ x y z -> c x y z)
+
+f6 = \ c -> case c lvl2 of { __DEFAULT -> c lvl4 lvl }
+
+no_tricky = \ c -> f6 (\ x y -> c x y)
+
+f7 = \ c -> Just (case c lvl2 of { __DEFAULT -> c lvl lvl1 })
+
+no_tricky_lazy = \ c -> f7 (\ x y -> c x y)
+
+f5
+  = \ c ->
+      Just
+        (case c lvl2 lvl4 of { I# x ->
+         case c lvl lvl1 of { I# y -> I# (+# x y) }
+         })
+
+yes2_lazy = f5
+
+f3
+  = \ c ->
+      case c lvl2 lvl4 of { I# x ->
+      case c lvl lvl1 of { I# y -> I# (+# x y) }
+      }
+
+yes2 = f3
+
+f1
+  = \ c ->
+      case c lvl2 lvl4 of { I# x ->
+      case c lvl lvl1 of { I# y -> I# (+# x y) }
+      }
+
+yes1 = f1
+
+
+

@@ -1,0 +1,7 @@
+T20815a.hs:23:26: error: [GHC-39999]
+    • No instance for ‘Applicative NotApplicative’
+        arising from a use of ‘<!>’
+    • In the expression: T (NotApplicative 1) <!> T (NotApplicative 2)
+      In an equation for ‘t’:
+          t = T (NotApplicative 1) <!> T (NotApplicative 2)
+

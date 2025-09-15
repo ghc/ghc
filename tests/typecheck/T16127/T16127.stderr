@@ -1,0 +1,14 @@
+[1 of 3] Compiling T16127[boot]     ( T16127.hs-boot, T16127.o-boot )
+[2 of 3] Compiling T16127Helper     ( T16127Helper.hs, T16127Helper.o )
+[3 of 3] Compiling T16127           ( T16127.hs, T16127.o )
+
+T16127.hs-boot:3:1: [GHC-15843]
+     Type constructor ‘E’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type role E phantom
+                   type E :: forall {k}. k -> *
+                   data E a
+        Boot file: type E :: forall {k} {k1}. k -> k1 -> *
+                   data E s a
+      The types have different kinds.
+     In the data type declaration for ‘E’

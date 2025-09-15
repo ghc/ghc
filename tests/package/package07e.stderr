@@ -1,0 +1,23 @@
+
+package07e.hs:2:1: error: [GHC-61948]
+    Could not find module ‘GHC.Hs.MyTypes’.
+    Perhaps you meant
+      GHC.Hs.Type (needs flag -package-id ghc-9.7)
+      GHC.Tc.Types (needs flag -package-id ghc-9.7)
+      GHC.Hs.Syn.Type (needs flag -package-id ghc-9.7)
+    Use -v to see a list of the files searched for.
+
+package07e.hs:3:1: error: [GHC-87110]
+    Could not load module ‘GHC.Hs.Type’.
+    It is a member of the hidden package ‘ghc-9.7’.
+    Use -v to see a list of the files searched for.
+
+package07e.hs:4:1: error: [GHC-87110]
+    Could not load module ‘GHC.Hs.Utils’.
+    It is a member of the hidden package ‘ghc-9.7’.
+    Use -v to see a list of the files searched for.
+
+package07e.hs:5:1: error: [GHC-87110]
+    Could not load module ‘GHC.Types.Unique.FM’.
+    It is a member of the hidden package ‘ghc-9.7’.
+    Use -v to see a list of the files searched for.

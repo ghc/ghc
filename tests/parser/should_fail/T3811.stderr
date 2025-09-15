@@ -1,0 +1,4 @@
+
+T3811.hs:4:1: error: [GHC-94426]
+    Invalid type signature:
+    A type signature should be of form <variables> :: <type>.

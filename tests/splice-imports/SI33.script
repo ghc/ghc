@@ -1,0 +1,8 @@
+-- Test using both normal and splice level imports with Template Haskell
+import Language.Haskell.TH
+-- Using two imports here tests the iiSubsumes function
+import splice Data.Function (id)
+import Data.Function (id)
+
+-- Use the splice-level 'id' in the splice and normal-level 'on' in the quote
+$(id [| id () |])

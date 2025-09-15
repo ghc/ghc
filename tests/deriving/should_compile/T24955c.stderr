@@ -1,0 +1,8 @@
+T24955c.hs:9:1: warning: [GHC-55631] [-Wmissing-deriving-strategies]
+    • No deriving strategy specified. Did you want stock, newtype, or anyclass?
+    • In the stand-alone deriving instance for ‘Eq a => Eq (Foo a)’
+    Suggested fixes:
+      • Use an explicit deriving strategy:
+          deriving stock instance Eq a => Eq (Foo a)
+      • Perhaps you intended to use the ‘DerivingStrategies’ extension (implied by ‘DerivingVia’)
+

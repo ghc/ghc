@@ -1,0 +1,32 @@
+
+LinearLet9.hs:14:16: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘f’
+    • In the pattern: (f, b)
+      In the pattern: !(f, b)
+      In a pattern binding: !(f, b) = ((\ y -> y), b)
+
+LinearLet9.hs:14:19: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘b’
+    • In the pattern: (f, b)
+      In the pattern: !(f, b)
+      In a pattern binding: !(f, b) = ((\ y -> y), b)
+
+LinearLet9.hs:20:3: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘i’: i x = let !(y, z) = x in (z, y)
+
+LinearLet9.hs:28:58: error: [GHC-83865]
+    • Couldn't match expected type ‘Bool’ with actual type ‘Int’
+    • In the expression: f True
+      In the expression: (f (0 :: Int), f True)
+      In the expression:
+        let %Many !(Just f) = Just (\ x -> x) in (f (0 :: Int), f True)
+
+LinearLet9.hs:28:60: error: [GHC-83865]
+    • Couldn't match expected type ‘Int’ with actual type ‘Bool’
+    • In the first argument of ‘f’, namely ‘True’
+      In the expression: f True
+      In the expression: (f (0 :: Int), f True)

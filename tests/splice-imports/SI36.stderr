@@ -1,0 +1,48 @@
+SI36.hs:21:8: error: [GHC-28914]
+    • Level error: instance for ‘C2 "B2"’ is bound at levels {}
+      but used at level 0
+    • In the expression: need @(C2 "B2")
+      In an equation for ‘c2B2’: c2B2 = need @(C2 "B2")
+
+SI36.hs:22:8: error: [GHC-28914]
+    • Level error: instance for ‘C3 "B3"’ is bound at levels {}
+      but used at level 0
+    • In the expression: need @(C3 "B3")
+      In an equation for ‘c3B3’: c3B3 = need @(C3 "B3")
+
+SI36.hs:26:8: error: [GHC-28914]
+    • Level error: instance for ‘C1 "C2"’ is bound at level 1
+      but used at level 0
+    • In the expression: need @(C1 "C2")
+      In an equation for ‘c1C2’: c1C2 = need @(C1 "C2")
+
+SI36.hs:27:8: error: [GHC-28914]
+    • Level error: instance for ‘C1 "C3"’ is bound at level -1
+      but used at level 0
+    • In the expression: need @(C1 "C3")
+      In an equation for ‘c1C3’: c1C3 = need @(C1 "C3")
+
+SI36.hs:31:8: error: [GHC-28914]
+    • Level error: instance for ‘C2 "C2"’ is bound at level 1
+      but used at level 0
+    • In the expression: need @(C2 "C2")
+      In an equation for ‘c2C2’: c2C2 = need @(C2 "C2")
+
+SI36.hs:32:8: error: [GHC-28914]
+    • Level error: instance for ‘C2 "C3"’ is bound at level -1
+      but used at level 0
+    • In the expression: need @(C2 "C3")
+      In an equation for ‘c2C3’: c2C3 = need @(C2 "C3")
+
+SI36.hs:36:8: error: [GHC-28914]
+    • Level error: instance for ‘C3 "C2"’ is bound at level 1
+      but used at level 0
+    • In the expression: need @(C3 "C2")
+      In an equation for ‘c3C2’: c3C2 = need @(C3 "C2")
+
+SI36.hs:37:8: error: [GHC-28914]
+    • Level error: instance for ‘C3 "C3"’ is bound at level -1
+      but used at level 0
+    • In the expression: need @(C3 "C3")
+      In an equation for ‘c3C3’: c3C3 = need @(C3 "C3")
+

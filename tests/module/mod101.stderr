@@ -1,0 +1,4 @@
+
+mod101.hs:8:5: error: [GHC-88464]
+    Data constructor not in scope: ConB :: Bool -> DataA
+    Suggested fix: Perhaps use ‘ConA’ (imported from Mod101_AuxB)

@@ -1,0 +1,8 @@
+
+rnfail053.hs:6:10: error: [GHC-25709]
+    • Data constructor ‘MkT’ has existential type variables, a context, or a specialised result type
+        MkT :: forall a. a -> T
+    • In the definition of data constructor ‘MkT’
+      In the data type declaration for ‘T’
+    Suggested fix:
+      Enable any of the following extensions: ‘ExistentialQuantification’ or ‘GADTs’

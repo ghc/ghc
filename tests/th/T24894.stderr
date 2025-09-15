@@ -1,0 +1,2 @@
+T24894.hs:6:2-34: Splicing declarations
+    [d| pattern P x <- (id -> x) |] ======> pattern P x <- (id -> x)

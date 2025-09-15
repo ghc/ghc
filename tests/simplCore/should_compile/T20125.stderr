@@ -1,0 +1,138 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 67, types: 31, coercions: 0, joins: 0/1}
+
+-- RHS size: {terms: 10, types: 8, coercions: 0, joins: 0/1}
+f :: Int -> (T, (T, T))
+[GblId,
+ Arity=1,
+ Str=<L>,
+ Cpr=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 40 10}]
+f = \ (x :: Int) ->
+      let {
+        y :: T
+        [LclId, Unf=OtherCon []]
+        y = T20125.MkT x x } in
+      (y, (y, y))
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T20125.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T20125.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T20125.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T20125.$trModule3 = GHC.Types.TrNameS T20125.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T20125.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T20125.$trModule2 = "T20125"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T20125.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T20125.$trModule1 = GHC.Types.TrNameS T20125.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T20125.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T20125.$trModule
+  = GHC.Types.Module T20125.$trModule3 T20125.$trModule1
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcInt (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T20125.$tcT2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T20125.$tcT2 = "T"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T20125.$tcT1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T20125.$tcT1 = GHC.Types.TrNameS T20125.$tcT2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T20125.$tcT :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T20125.$tcT
+  = GHC.Types.TyCon
+      2636760236657926773##
+      9933143121152832090##
+      T20125.$trModule
+      T20125.$tcT1
+      0#
+      GHC.Types.krep$*
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep1 :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep1
+  = GHC.Types.KindRepTyConApp
+      T20125.$tcT (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep2 :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep2 = GHC.Types.KindRepFun $krep $krep1
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T20125.$tc'MkT1 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+T20125.$tc'MkT1 = GHC.Types.KindRepFun $krep $krep2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T20125.$tc'MkT3 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T20125.$tc'MkT3 = "'MkT"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T20125.$tc'MkT2 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T20125.$tc'MkT2 = GHC.Types.TrNameS T20125.$tc'MkT3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T20125.$tc'MkT :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T20125.$tc'MkT
+  = GHC.Types.TyCon
+      16774178122498486797##
+      3923705917114679617##
+      T20125.$trModule
+      T20125.$tc'MkT2
+      0#
+      T20125.$tc'MkT1
+
+
+

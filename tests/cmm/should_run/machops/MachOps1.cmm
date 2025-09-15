@@ -1,0 +1,3 @@
+test(bits64 buffer) {
+    return (%modu(%sx64((72 :: bits32)), %modu((-43 :: bits64), (-0x443c70fa3e465120 :: bits64))));
+}

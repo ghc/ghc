@@ -1,0 +1,38 @@
+-- selectors:
+Bar {bar = Baz {baz = Quux {quux = 42}}}
+Baz {baz = Quux {quux = 42}}
+Quux {quux = 42}
+42
+12
+12
+-- selections:
+42
+Quux {quux = 42}
+Baz {baz = Quux {quux = 42}}
+Bar {bar = Baz {baz = Quux {quux = 42}}}
+"hello"
+"hello"
+42
+42
+43
+43
+43
+-- updates:
+Quux {quux = 2}
+Bar {bar = Baz {baz = Quux {quux = 1}}}
+Foo {foo = Bar {bar = Baz {baz = Quux {quux = 44}}}}
+Foo {foo = Bar {bar = Baz {baz = Quux {quux = 45}}}}
+Foo {foo = Bar {bar = Baz {baz = Quux {quux = 46}}}}
+Grault {f = Foo {foo = Bar {bar = Baz {baz = Quux {quux = 3}}}}, g = Foo {foo = Bar {bar = Baz {baz = Quux {quux = 4}}}}}
+-- punned updates:
+Foo {foo = Bar {bar = Baz {baz = Quux {quux = 102}}}}
+Foo {foo = Bar {bar = Baz {baz = Quux {quux = 102}}}}
+Foo {foo = Bar {bar = Baz {baz = Quux {quux = 102}}}}
+Foo {foo = Bar {bar = Baz {baz = Quux {quux = 102}}}}
+Foo {foo = Bar {bar = Baz {baz = Quux {quux = 42}}}}
+Grault {f = Foo {foo = Bar {bar = Baz {baz = Quux {quux = 102}}}}, g = Foo {foo = Bar {bar = Baz {baz = Quux {quux = 4}}}}}
+Grault {f = Foo {foo = Bar {bar = Baz {baz = Quux {quux = 42}}}}, g = Foo {foo = Bar {bar = Baz {baz = Quux {quux = 1}}}}}
+Grault {f = Foo {foo = Bar {bar = Baz {baz = Quux {quux = 42}}}}, g = Foo {foo = Bar {bar = Baz {baz = Quux {quux = 42}}}}}
+Grault {f = Foo {foo = Bar {bar = Baz {baz = Quux {quux = 42}}}}, g = Foo {foo = Bar {bar = Baz {baz = Quux {quux = 4}}}}}
+-- misc:
+me

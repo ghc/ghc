@@ -1,0 +1,2 @@
+($!) :: (a -> b) -> a -> b 	-- Defined in ‘GHC.Internal.Base’
+infixr 0 $!

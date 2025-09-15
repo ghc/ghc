@@ -1,0 +1,5 @@
+li = (_t1::[Maybe Integer])
+Just 1
+li = Just 1 : (_t2::[Maybe Integer])
+*** Exception: Prelude.undefined
+*** Exception: Prelude.undefined

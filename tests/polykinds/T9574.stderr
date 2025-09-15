@@ -1,0 +1,4 @@
+
+T9574.hs:13:5: error: [GHC-53634]
+    Out of scope type variable ‘o’ in the RHS of a family instance.
+      All such variables must be bound on the LHS.

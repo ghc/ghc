@@ -1,0 +1,12 @@
+RecompCompleteFixityB.hs:7:29: error: [GHC-39999]
+    • No instance for ‘Num [Int]’ arising from the literal ‘2’
+    • In the second argument of ‘(:!)’, namely ‘2’
+      In the first argument of ‘(:!)’, namely ‘(1 :: Int) :! 2’
+      In the first argument of ‘(:!)’, namely ‘(1 :: Int) :! 2 :! 3’
+
+RecompCompleteFixityB.hs:7:34: error: [GHC-39999]
+    • No instance for ‘Num [[Int]]’ arising from the literal ‘3’
+    • In the second argument of ‘(:!)’, namely ‘3’
+      In the first argument of ‘(:!)’, namely ‘(1 :: Int) :! 2 :! 3’
+      In the expression: (1 :: Int) :! 2 :! 3 :! []
+

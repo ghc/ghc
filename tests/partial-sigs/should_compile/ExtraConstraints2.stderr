@@ -1,0 +1,4 @@
+TYPE SIGNATURES
+  foo :: String
+Dependent modules: []
+Dependent packages: [(normal, base-4.21.0.0)]

@@ -1,0 +1,19 @@
+
+tcfail076.hs:19:82: error: [GHC-25897]
+    • Couldn't match type ‘res1’ with ‘res’
+      Expected: m res1
+        Actual: m res
+      ‘res1’ is a rigid type variable bound by
+        a type expected by the context:
+          forall res1. (b -> m res1) -> m res1
+        at tcfail076.hs:19:71-88
+      ‘res’ is a rigid type variable bound by
+        a type expected by the context:
+          forall res. (a -> m res) -> m res
+        at tcfail076.hs:19:35-96
+    • In the expression: cont a
+      In the first argument of ‘KContT’, namely ‘(\ cont' -> cont a)’
+      In the expression: KContT (\ cont' -> cont a)
+    • Relevant bindings include
+        cont' :: b -> m res1 (bound at tcfail076.hs:19:73)
+        cont :: a -> m res (bound at tcfail076.hs:19:37)

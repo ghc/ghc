@@ -1,0 +1,7 @@
+
+==================== Parser ====================
+module ShouldCompile where
+<document comment>
+data Bla = Hej
+
+

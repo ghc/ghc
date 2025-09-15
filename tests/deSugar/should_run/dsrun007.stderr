@@ -1,0 +1,10 @@
+dsrun007: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.RecConError:
+
+dsrun007.hs:5:23-25: Missing field in record construction 
+
+
+HasCallStack backtrace:
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
+  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:432:30 in ghc-internal:GHC.Internal.Control.Exception.Base
+

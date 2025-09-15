@@ -1,0 +1,8 @@
+:set -XPatternSynonyms -XGADTs
+data A a where X :: A [x]
+
+pattern X' = X
+
+-- This should render the equality with ~ despite the pattern internally using
+-- GHC.Prim.~#.
+:info X'

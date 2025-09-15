@@ -1,0 +1,15 @@
+T25325.hs:14:20: error: [GHC-39999]
+    • Could not deduce ‘MonadState (Buggy g m) m’
+        arising from a use of ‘demo’
+      from the context: (GhcBug f, GhcBug g)
+        bound by the instance declaration at T25325.hs:12:10-49
+      or from: MonadState (Buggy (f :+: g) m) m
+        bound by the type signature for:
+                   demo :: forall (m :: * -> *).
+                           MonadState (Buggy (f :+: g) m) m =>
+                           (:+:) f g (m Int) -> m Int
+        at T25325.hs:13:5-8
+    • In the expression: demo r
+      In an equation for ‘demo’: demo (Inr r) = demo r
+      In the instance declaration for ‘GhcBug (f :+: g)’
+

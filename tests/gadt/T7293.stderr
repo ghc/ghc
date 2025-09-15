@@ -1,0 +1,12 @@
+
+T7293.hs:26:1: error: [GHC-53633] [-Woverlapping-patterns (in -Wdefault), Werror=overlapping-patterns]
+    Pattern match is redundant
+    In an equation for ‘nth’: nth Nil _ = ...
+
+T7293.hs:26:5: error: [GHC-40564] [-Winaccessible-code (in -Wdefault), Werror=inaccessible-code]
+    • Inaccessible code in
+        a pattern with constructor: Nil :: forall a. Vec a Zero,
+        in an equation for ‘nth’
+      Couldn't match type ‘False’ with ‘True’
+    • In the pattern: Nil
+      In an equation for ‘nth’: nth Nil _ = undefined

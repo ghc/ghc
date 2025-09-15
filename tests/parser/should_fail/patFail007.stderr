@@ -1,0 +1,2 @@
+
+patFail007.hs:3:4: error: [GHC-72516] Parse error in pattern: +1

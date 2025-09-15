@@ -1,0 +1,2 @@
+
+T16999.hs:6:5: error: [GHC-25742] Not a data constructor: ‘->’

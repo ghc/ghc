@@ -1,0 +1,2 @@
+RecordDotSyntaxFail5.hs:17:11: [GHC-65945]
+ RebindableSyntax is required if OverloadedRecordUpdate is enabled.

@@ -1,0 +1,15 @@
+Breakpoint 0 activated at T25109.hs:(6,9)-(7,15)
+Stopped in T25109.foo, T25109.hs:(6,9)-(7,15)
+_result :: IO () = _
+r :: R = _
+Stopped in T25109.foo, T25109.hs:6:14-18
+_result :: Int = _
+r :: R = _
+Stopped in T25109.main, T25109.hs:10:13-15
+_result :: R = _
+Stopped in T25109.fld, T25109.hs:3:14-16
+_result :: Int = _
+fld :: Int = 1
+Stopped in T25109.foo, T25109.hs:7:9-15
+_result :: IO () = _
+i :: Int = 1

@@ -1,0 +1,2 @@
+
+rnfail039.hs:11:15: [GHC-28329] Qualified name in binding position: P.==

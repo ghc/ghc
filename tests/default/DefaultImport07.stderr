@@ -1,0 +1,11 @@
+[1 of 4] Compiling ExportMonoidProduct ( ExportMonoidProduct.hs, ExportMonoidProduct.o )
+[2 of 4] Compiling ExportMonoidSum  ( ExportMonoidSum.hs, ExportMonoidSum.o )
+[3 of 4] Compiling Main             ( DefaultImport07.hs, DefaultImport07.o )
+DefaultImport07.hs:1:1: warning: [GHC-77007] [-Wtype-defaults (in -Wall)]
+    Clashing imported defaults for class ‘Monoid’:
+      (Product Integer) imported from ExportMonoidProduct
+      (Sum Integer) imported from ExportMonoidSum
+    Suggested fix:
+      Consider declaring default Monoid (Product Integer, Sum Integer)
+
+[4 of 4] Linking DefaultImport07

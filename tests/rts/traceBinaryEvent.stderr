@@ -1,0 +1,1 @@
+traceBinaryEvent: Event size exceeds EVENT_PAYLOAD_SIZE_MAX, bail out

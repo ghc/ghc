@@ -1,0 +1,4 @@
+:set -XHaskell2010
+:l T5417
+:browse
+:info C.F

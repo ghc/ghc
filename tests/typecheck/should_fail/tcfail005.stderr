@@ -1,0 +1,6 @@
+
+tcfail005.hs:3:2: error: [GHC-83865]
+    • Couldn't match expected type: (a0, Char)
+                  with actual type: [a]
+    • In the pattern: h : i
+      In a pattern binding: (h : i) = (1, 'a')

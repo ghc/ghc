@@ -1,0 +1,3 @@
+
+T19397E4.hs:1:1: error: [GHC-67120]
+    The main IO action ‘foo’ is not exported by module ‘Main’

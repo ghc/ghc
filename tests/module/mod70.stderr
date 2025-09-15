@@ -1,0 +1,4 @@
+
+mod70.hs:3:9: error: [GHC-27207]
+    Lazy pattern in expression context: ~1
+    Did you mean to add a space after the '~'?

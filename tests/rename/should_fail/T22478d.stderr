@@ -1,0 +1,8 @@
+
+T22478d.hs:13:13: error: [GHC-63397] [-Wname-shadowing (in -Wall), Werror=name-shadowing]
+    This binding for ‘a’ shadows the existing binding
+      bound at T22478d.hs:11:19
+
+T22478d.hs:16:31: error: [GHC-63397] [-Wname-shadowing (in -Wall), Werror=name-shadowing]
+    This binding for ‘a’ shadows the existing binding
+      bound at T22478d.hs:16:19

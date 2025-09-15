@@ -1,0 +1,4 @@
+:set -ddump-stg-cg
+:set -dsuppress-uniques
+
+foo = ()

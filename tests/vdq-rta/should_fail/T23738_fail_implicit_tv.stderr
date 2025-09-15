@@ -1,0 +1,21 @@
+
+T23738_fail_implicit_tv.hs:10:12: error: [GHC-80557]
+    • Illegal implicitly quantified type variable in a required type argument:
+        ‘a’
+    • In the expression: vfun (Nothing :: Maybe a)
+      In an equation for ‘rNothing’: rNothing = vfun (Nothing :: Maybe a)
+    Suggested fix: Use an explicit ‘forall’ to quantify over ‘a’
+
+T23738_fail_implicit_tv.hs:11:9: error: [GHC-80557]
+    • Illegal implicitly quantified type variable in a required type argument:
+        ‘b’
+    • In the expression: vfun (Left :: a -> Either a b)
+      In an equation for ‘rLeft’: rLeft = vfun (Left :: a -> Either a b)
+    Suggested fix: Use an explicit ‘forall’ to quantify over ‘b’
+
+T23738_fail_implicit_tv.hs:11:9: error: [GHC-80557]
+    • Illegal implicitly quantified type variable in a required type argument:
+        ‘a’
+    • In the expression: vfun (Left :: a -> Either a b)
+      In an equation for ‘rLeft’: rLeft = vfun (Left :: a -> Either a b)
+    Suggested fix: Use an explicit ‘forall’ to quantify over ‘a’

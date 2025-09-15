@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+NUMDEP=10000
+NUMMOD=100
+
+seq 1 $NUMDEP | xargs -I{} touch foo{}
+
+cat > T22744.hs << EOF
+module Main where
+EOF
+
+for i in $(seq $NUMMOD); do
+  cat > M$i.hs << EOF
+{-# LANGUAGE TemplateHaskell #-}
+module M$i where
+import Language.Haskell.TH.Syntax
+import Control.Monad
+
+\$(do forM_ [1..$NUMDEP] $ \i -> addDependentFile $ "foo" ++ show i
+     return [])
+EOF
+  echo "import M$i" >> T22744.hs
+done
+
+cat >> T22744.hs << EOF
+main = pure ()
+EOF
+

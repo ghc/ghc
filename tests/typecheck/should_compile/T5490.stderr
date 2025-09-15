@@ -1,0 +1,4 @@
+
+T5490.hs:296:5: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: _ -> ...

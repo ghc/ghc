@@ -1,0 +1,17 @@
+-- Testing :doc command simply
+
+:load ghci065
+
+:doc Data1
+:doc Val2a
+:doc Val2b
+:doc Data3
+:doc Data4
+:doc dupeField
+
+:doc func1
+:doc func2
+:doc func3
+:doc PatSyn
+:doc TyCl
+:doc TyFam

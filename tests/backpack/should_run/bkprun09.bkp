@@ -1,0 +1,22 @@
+unit a where
+    module A where
+        type T = Int
+        y :: Int
+        y = 4
+
+unit p where
+    signature A where
+        data T
+        instance Show T
+        y :: T
+    module P where
+        import A
+        data S = S {-# UNPACK #-} !T
+            deriving (Show)
+        x = S y
+
+unit main where
+    dependency p[A=a:A]
+    module Main where
+        import P
+        main = print x

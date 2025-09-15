@@ -1,0 +1,13 @@
+
+==================== Parser ====================
+module T8944 where
+import Data.Maybe ()
+import Data.Functor ()
+data F
+  = F -- | Comment for the first argument
+      () ()
+
+
+
+T8944.hs:4:1: warning: [GHC-94458] [-Winvalid-haddock]
+    A Haddock comment cannot appear in this position and will be ignored.

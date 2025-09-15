@@ -1,0 +1,17 @@
+Name:           tc-plugin-ghci
+Version:        0.1
+Synopsis:       Testing type-checker plugins in ghci
+Cabal-Version:  >= 1.2
+Build-Type:     Simple
+License:        BSD3
+License-File:   LICENSE
+Author:         Matthew Pickering
+Homepage:       http://blog.omega-prime.co.uk
+
+Library
+    Extensions:     CPP
+    Build-Depends:
+        base,
+        ghc >= 6.11
+    Exposed-Modules:
+        TcPluginGHCi

@@ -1,0 +1,4 @@
+
+T18455.hs:7:37: error: [GHC-71492]
+    SPECIALISE instance type cannot contain nested ‘forall’s or contexts
+    In a SPECIALISE instance pragma

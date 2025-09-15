@@ -1,0 +1,7 @@
+[1 of 3] Compiling ExportWarn       ( ExportWarn.hs, ExportWarn.o )
+[2 of 3] Compiling Main             ( Import06.hs, Import06.o )
+
+Import06.hs:1:1: warning: [GHC-63394] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of class Monoid defaults imported from Main:
+    "Product is also a Monoid"
+[3 of 3] Linking Import06

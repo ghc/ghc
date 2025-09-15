@@ -1,0 +1,9 @@
+TYPE SIGNATURES
+  f :: Int -> ()
+  m :: forall a. C a => a -> ()
+TYPE CONSTRUCTORS
+  class C{1} :: * -> Constraint
+CLASS INSTANCES
+  instance C Int -- Defined at T12763.hs:9:10
+Dependent modules: []
+Dependent packages: [(normal, base-4.21.0.0)]

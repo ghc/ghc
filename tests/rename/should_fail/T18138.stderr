@@ -1,0 +1,4 @@
+
+T18138.hs:4:1: error: [GHC-87866]
+    Misplaced SPECIALISE instance pragma:
+    {-# SPECIALISE instance Eq (T Int) #-}

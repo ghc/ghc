@@ -1,0 +1,15 @@
+-- Warning: this test will stop working when we eliminate orphans from
+-- GHC.Float.  The idea of this test is to import an external package
+-- module which transitively depends on the module defining the orphan
+-- instance.
+:m +GHC.Types
+"NO"
+0.2 :: Float
+
+:m +Prelude
+"YES"
+0.2 :: Float
+
+:m -Prelude
+"NO"
+0.2 :: Float

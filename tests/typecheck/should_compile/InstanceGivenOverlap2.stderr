@@ -1,0 +1,15 @@
+
+InstanceGivenOverlap2.hs:40:1: error:
+    • Could not deduce (P a)
+      from the context: Q (F (Tagged t a))
+        bound by the inferred type for ‘g’:
+                   forall (t :: Bool) a. Q (F (Tagged t a)) => Proxy t -> [a] -> Int
+        at InstanceGivenOverlap2.hs:40:1-31
+    • When checking that the inferred type
+        g :: forall {t :: Bool} {a}.
+             (Q (F (Tagged t a)), P a) =>
+             Proxy t -> [a] -> Int
+      is as general as its (partial) signature
+        g :: forall (t :: Bool) a.
+             Q (F (Tagged t a)) =>
+             Proxy t -> [a] -> Int

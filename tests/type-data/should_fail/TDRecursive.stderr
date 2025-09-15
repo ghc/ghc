@@ -1,0 +1,7 @@
+
+TDRecursive.hs:4:23: error: [GHC-85413]
+    • Type constructor ‘K’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the first argument of ‘f’, namely ‘(K Int)’
+      In the type ‘(f (K Int))’
+      In the definition of data constructor ‘K’

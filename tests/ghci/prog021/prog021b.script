@@ -1,0 +1,16 @@
+:load A B
+putStrLn "Can reload multiple targets"
+:r A B
+f 5
+g 5
+h 5
+:r A
+putStrLn "B is not loaded"
+f 5
+g 5
+h 5
+:r B
+putStrLn "B is loaded"
+f 5
+g 5
+h 5

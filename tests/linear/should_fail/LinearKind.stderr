@@ -1,0 +1,4 @@
+
+LinearKind.hs:4:1: error: [GHC-13218]
+    • Illegal linear function in a kind: * %1 -> *
+    • In the data type declaration for ‘A’

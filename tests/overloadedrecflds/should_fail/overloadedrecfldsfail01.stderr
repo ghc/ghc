@@ -1,0 +1,4 @@
+
+overloadedrecfldsfail01.hs:14:10: error:
+    Invalid record update.
+    No constructor in scope has all of the following fields: ‘z’, ‘y’

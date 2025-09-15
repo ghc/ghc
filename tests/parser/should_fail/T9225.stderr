@@ -1,0 +1,4 @@
+
+T9225.hs:4:8: error: [GHC-21926]
+    Parse error: ‘some-package-0.1.2.3’
+    Version number or non-alphanumeric character in package name

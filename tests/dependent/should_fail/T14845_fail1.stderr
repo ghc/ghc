@@ -1,0 +1,7 @@
+
+T14845_fail1.hs:10:13: error: [GHC-28374]
+    • Data constructor ‘S’ cannot be used here
+        (it has an unpromotable context ‘cls a’)
+    • In the first argument of ‘Foo’, namely ‘(S :: Struct Eq a)’
+      In the type ‘Foo (S :: Struct Eq a)’
+      In the definition of data constructor ‘F’

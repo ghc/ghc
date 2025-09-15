@@ -1,0 +1,8 @@
+
+unidir.hs:4:18: error: [GHC-69317]
+    Invalid right-hand side of bidirectional pattern synonym ‘Head’:
+      Pattern ‘_’ is not invertible
+    RHS pattern: x : _
+    Suggested fix:
+      Instead use an explicitly bidirectional pattern synonym, e.g.
+        pattern Head x <- x : _ where Head x = ...

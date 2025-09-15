@@ -1,0 +1,39 @@
+module RecompExports1_M where
+
+foo :: Int
+foo = 3
+
+data T = Foo | Bar | Quux
+
+data S = S1 | S2
+
+-- Check that adding many new exports that aren't imported downstream doesn't
+-- force recompilation.
+
+-- new value binding
+quux :: Char
+quux = 'q'
+
+-- new type synonym
+type Int2 = Int
+
+-- new data type
+data D = MkD Char
+
+-- new class
+class Cls a where
+  meth :: a -> Int
+
+-- new class instance for local class and type
+instance Cls D where
+  meth (MkD _) = 3
+
+-- new class instance for local class and external type
+instance Cls Int where
+  meth = id
+
+-- new class instance for external class and local type
+instance Show D where
+  show _ = "D"
+
+-- NB: not adding an orphan instance, as those DO cause recompilation downstream

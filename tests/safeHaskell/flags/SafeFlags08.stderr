@@ -1,0 +1,3 @@
+
+SafeFlags08.hs:1:14: error: [GHC-46537]
+    Unsupported extension: SafeLanguage

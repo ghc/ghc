@@ -1,0 +1,5 @@
+T24026b.hs:4:37: error: [GHC-83865]
+    • Couldn't match expected type ‘Int’ with actual type ‘Bool’
+    • In the first argument of ‘f’, namely ‘x’
+      In the expression: f x
+      When checking the rewrite rule "f"

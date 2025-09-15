@@ -1,0 +1,15 @@
+
+gadt13.hs:15:13: error: [GHC-25897]
+    • Could not deduce ‘p ~ (String -> [Char])’
+      from the context: a ~ Int
+        bound by a pattern with constructor: I :: Int -> Term Int,
+                 in an equation for ‘shw’
+        at gadt13.hs:15:6-8
+      ‘p’ is a rigid type variable bound by
+        the inferred type of shw :: Term a -> p
+        at gadt13.hs:15:1-30
+    • In the expression: ("I " ++) . shows t
+      In an equation for ‘shw’: shw (I t) = ("I " ++) . shows t
+    • Relevant bindings include
+        shw :: Term a -> p (bound at gadt13.hs:15:1)
+    Suggested fix: Consider giving ‘shw’ a type signature

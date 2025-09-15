@@ -1,0 +1,4 @@
+
+mod98.hs:3:1: error: [GHC-94426]
+    Invalid qualified name in type signature.
+    Suggested fix: Perhaps you meant to omit the qualifier

@@ -1,0 +1,4 @@
+
+T13990.hs:14:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘absurdFoo’: absurdFoo (Foo x) = ...

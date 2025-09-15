@@ -1,0 +1,23 @@
+cabal-version: 3.0
+name: T20509
+version: 0
+build-type: Simple
+
+common common
+  build-depends: base
+  ghc-options: -Wall
+
+library p
+  import: common
+  hs-source-dirs: p
+  signatures: H
+  exposed-modules: A
+
+library q
+  import: common
+  hs-source-dirs: q
+  build-depends: p
+  signatures: H2
+  exposed-modules: L, B
+  mixins:
+    p (A as A2) requires (H as H2)

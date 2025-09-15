@@ -1,0 +1,15 @@
+Breakpoint 0 activated at T25932.hs:(5,8)-(9,13)
+Stopped in Main.main, T25932.hs:(5,8)-(9,13)
+_result :: IO () = _
+Stopped in Main.main, T25932.hs:6:3-17
+_result :: IO () = _
+Stopped in Main.main, T25932.hs:7:3-12
+_result :: IO () = _
+args :: [String] = []
+Stopped in Main.main, T25932.hs:8:3-16
+_result :: IO () = _
+args :: [String] = []
+y :: String = _
+Stopped in Main.main, T25932.hs:9:3-13
+_result :: IO () = _
+"hi"

@@ -1,0 +1,3 @@
+
+typeopsDataCon_B.hs:1:14: error: [GHC-25742]
+    Not a data constructor: ‘+’

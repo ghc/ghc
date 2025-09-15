@@ -1,0 +1,4 @@
+SI22.hs: error: [GHC-92213]
+    Module graph contains a cycle:
+      module ‘main:SI22’ (SI22.hs) imports itself
+

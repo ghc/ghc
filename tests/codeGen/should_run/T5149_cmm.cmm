@@ -1,0 +1,23 @@
+#include "Cmm.h"
+
+g5149
+{
+    jump %ENTRY_CODE(Sp(0)) [R1];
+}
+
+/* This code is carefully arranged to tickle the bug reported in #5149 */
+f5149 (W_ x, W_ y, D_ z)
+{
+    if (x > y) {
+       goto a; /* this jump is shortcutted to g5149 */
+    }  else {
+       goto b;
+    }
+
+  a:
+    jump g5149 [R1];
+  b:
+    R1 = TO_W_(%f2i32(z));
+    jump %ENTRY_CODE(Sp(0)) [R1];
+}
+

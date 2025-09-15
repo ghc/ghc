@@ -1,0 +1,5 @@
+:l shell.hs
+:def shell (\s -> do shell s; return "")
+:l MultiLayerModules.hs
+:shell find . -name 'Dummy*.hs' -exec sh -c 'echo "" >> {}' \;
+:l MultiLayerModules.hs

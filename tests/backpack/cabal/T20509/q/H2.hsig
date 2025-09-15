@@ -1,0 +1,4 @@
+signature H2 (S1(MkS1),S2, f) where
+    import L(S1(..))
+    data S2
+    f :: S1 -> S1

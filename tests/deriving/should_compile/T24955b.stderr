@@ -1,0 +1,7 @@
+T24955b.hs:11:12: warning: [GHC-55631] [-Wmissing-deriving-strategies]
+    • No deriving strategy specified. Did you want stock, newtype, or anyclass?
+    • In the newtype declaration for ‘N’
+    Suggested fixes:
+      • Use explicit deriving strategies: deriving newtype (C Int)
+      • Perhaps you intended to use the ‘DerivingStrategies’ extension (implied by ‘DerivingVia’)
+

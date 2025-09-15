@@ -1,0 +1,5 @@
+
+<interactive>:3:7: [GHC-47217]
+    Illegal `{..}' notation for constructor ‘Data.Semigroup.Arg’
+      Record wildcards may not be used for constructors with unlabelled fields.
+      Possible fix: Remove the `{..}' and add a match for each field of the constructor.

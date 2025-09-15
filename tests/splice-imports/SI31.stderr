@@ -1,0 +1,6 @@
+<interactive>:2:3: error: [GHC-28914]
+    • Level error: ‘id’ is bound at level 0 but used at level -1
+    • Available from the imports:
+      • imported from ‘Prelude’
+    • In the untyped splice: $(id [| () |])
+

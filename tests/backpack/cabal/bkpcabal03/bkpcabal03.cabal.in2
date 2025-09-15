@@ -1,0 +1,12 @@
+cabal-version:       2.2
+name:                bkpcabal03
+version:             0.1.0.0
+license:             BSD-3-Clause
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+
+library
+  build-depends: asig1, asig2, base
+  exposed-modules: Mod
+  default-language: Haskell2010

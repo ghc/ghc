@@ -1,0 +1,8 @@
+[1 of 3] Compiling ExportBitsInt    ( ExportBitsInt.hs, ExportBitsInt.o )
+[2 of 3] Compiling Main             ( DefaultImportFail06.hs, DefaultImportFail06.o )
+
+DefaultImportFail06.hs:8:6: error: [GHC-76037]
+    Not in scope: type constructor or class ‘Bits’
+    Suggested fix:
+      Add ‘Bits’ to the import list in the import of ‘Data.Bits’
+      (at DefaultImportFail06.hs:4:1-27).

@@ -1,0 +1,2 @@
+((1,True),(1,False),("Hello",True),(1337,True),("Yeah",1,"Baby"))
+(1,True,1,False,"Hello",True,1337,True,"Yeah",1,"Baby")

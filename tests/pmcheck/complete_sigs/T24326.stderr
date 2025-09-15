@@ -1,0 +1,4 @@
+
+T24326.hs:30:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘f1’: Patterns of type ‘D’ not matched: _

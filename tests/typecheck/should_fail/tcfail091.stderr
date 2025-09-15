@@ -1,0 +1,6 @@
+
+tcfail091.hs:8:1:
+    Illegal constraint ?imp::Int
+    In the context: (?imp::Int)
+    While checking the super-classes of class `C'
+    In the class declaration for `C'

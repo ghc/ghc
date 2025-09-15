@@ -1,0 +1,8 @@
+TH_NestedSplicesFail3.hs:4:12: error: [GHC-39999]
+    • No instance for ‘GHC.Internal.TH.Monad.Quote
+                         (GHC.Internal.TH.Monad.Code GHC.Internal.TH.Monad.Q)’
+        arising from a quotation bracket
+    • In the expression: [| 'x' |]
+      In the typed Template Haskell splice: $$([| 'x' |])
+      In the expression: $$([| 'x' |])
+

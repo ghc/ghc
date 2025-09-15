@@ -1,0 +1,2 @@
+
+cmdFail001.hs:4:15: error: [GHC-03790] Parse error in command: _

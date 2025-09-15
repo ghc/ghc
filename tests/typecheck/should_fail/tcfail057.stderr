@@ -1,0 +1,4 @@
+
+tcfail057.hs:5:7: error: [GHC-83865]
+    • Expected a type, but ‘RealFrac a’ is a constraint
+    • In the type signature: f :: (RealFrac a) -> a -> a

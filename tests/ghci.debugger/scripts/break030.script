@@ -1,0 +1,8 @@
+:load InlinedBreakpoint2
+:break InlinedBreakpoint1.inl
+main
+:continue
+:reload
+:break InlinedBreakpoint1.inl
+main
+:continue

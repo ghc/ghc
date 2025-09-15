@@ -1,0 +1,7 @@
+cgrun059: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Error: File not found
+
+HasCallStack backtrace:
+  error, called at cgrun059.hs:12:28 in main:Main
+

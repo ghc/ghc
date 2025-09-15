@@ -1,0 +1,3 @@
+:l T12007
+let f (B x y) = (y,x)
+f (Foo 'c' 'd')

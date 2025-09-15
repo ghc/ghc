@@ -1,0 +1,4 @@
+
+Simple20.hs:9:1:
+    Warning: Dropping loopy given equality `[F a] ~ a'
+    When generalising the type(s) for `foo'

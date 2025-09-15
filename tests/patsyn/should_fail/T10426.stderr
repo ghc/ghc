@@ -1,0 +1,4 @@
+
+T10426.hs:3:9: error: [GHC-13248]
+    pattern synonym 'where' clause cannot be empty
+    In the pattern synonym declaration for:  Id

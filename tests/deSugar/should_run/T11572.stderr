@@ -1,0 +1,7 @@
+T11572: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Prelude.undefined
+
+HasCallStack backtrace:
+  undefined, called at T11572.hs:6:18 in main:Main
+

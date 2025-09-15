@@ -1,0 +1,19 @@
+
+tcfail181.hs:17:9: error: [GHC-39999]
+    • Could not deduce ‘Monad m0’ arising from a use of ‘foo’
+      from the context: Monad m
+        bound by the inferred type of
+                   wog :: Monad m => p -> Something (m Bool) e
+        at tcfail181.hs:17:1-30
+      The type variable ‘m0’ is ambiguous
+      Potentially matching instances:
+        instance Monad IO -- Defined in ‘GHC.Internal.Base’
+        instance Monad Maybe -- Defined in ‘GHC.Internal.Base’
+        ...plus six others
+        ...plus one instance involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: foo
+      In a record update at field ‘bar’,
+      with type constructor ‘Something’
+      and data constructor ‘Something’.
+      In the expression: foo {bar = return True}

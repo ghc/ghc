@@ -1,0 +1,5 @@
+
+T23740a.hs:7:6: error: [GHC-45510]
+    • Term variable ‘a’ cannot be used here
+        (term variables cannot be promoted)
+    • In the type signature: f :: a -> a

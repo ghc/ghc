@@ -1,0 +1,41 @@
+T26176.hs:18:7: error: [GHC-83865]
+    • Couldn't match type ‘FA t’ with ‘5’
+      Expected: SNat 5
+        Actual: SNat (FA t)
+    • In the expression: b
+      In an equation for ‘a’: a = b
+      In an equation for ‘foo’:
+          foo
+            = undefined
+            where
+                a :: SNat 5
+                a = b
+                b :: SNat (FA t)
+                b = undefined
+                ....
+    • Relevant bindings include
+        b :: SNat (FA t) (bound at T26176.hs:21:3)
+        d :: SNat (FB t) (bound at T26176.hs:27:3)
+        x :: p0 t (bound at T26176.hs:29:3)
+        foo :: p t (bound at T26176.hs:15:1)
+
+T26176.hs:24:7: error: [GHC-83865]
+    • Couldn't match type ‘FB t’ with ‘3’
+      Expected: SNat 3
+        Actual: SNat (FB t)
+    • In the expression: d
+      In an equation for ‘c’: c = d
+      In an equation for ‘foo’:
+          foo
+            = undefined
+            where
+                a :: SNat 5
+                a = b
+                b :: SNat (FA t)
+                b = undefined
+                ....
+    • Relevant bindings include
+        d :: SNat (FB t) (bound at T26176.hs:27:3)
+        x :: p0 t (bound at T26176.hs:29:3)
+        foo :: p t (bound at T26176.hs:15:1)
+

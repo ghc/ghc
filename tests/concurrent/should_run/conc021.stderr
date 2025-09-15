@@ -1,0 +1,7 @@
+conc021: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+wurble
+
+HasCallStack backtrace:
+  error, called at conc021.hs:9:9 in main:Main
+

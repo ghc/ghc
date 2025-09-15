@@ -1,0 +1,20 @@
+[1 of 3] Compiling OverloadedRecFldsFail12_A ( OverloadedRecFldsFail12_A.hs, OverloadedRecFldsFail12_A.o )
+[2 of 3] Compiling Main             ( overloadedrecfldsfail12.hs, overloadedrecfldsfail12.o )
+
+overloadedrecfldsfail12.hs:13:5: error: [GHC-87543]
+    Ambiguous occurrence ‘foo’.
+    It could refer to
+       either the field ‘foo’ of record ‘T’,
+              imported from ‘OverloadedRecFldsFail12_A’ at overloadedrecfldsfail12.hs:4:1-32
+              (and originally defined at OverloadedRecFldsFail12_A.hs:5:16-18),
+           or the field ‘foo’ of record ‘S’,
+              defined at overloadedrecfldsfail12.hs:6:16.
+
+overloadedrecfldsfail12.hs:16:5: error: [GHC-87543]
+    Ambiguous occurrence ‘foo’.
+    It could refer to
+       either the field ‘foo’ of record ‘T’,
+              imported from ‘OverloadedRecFldsFail12_A’ at overloadedrecfldsfail12.hs:4:1-32
+              (and originally defined at OverloadedRecFldsFail12_A.hs:5:16-18),
+           or the field ‘foo’ of record ‘S’,
+              defined at overloadedrecfldsfail12.hs:6:16.

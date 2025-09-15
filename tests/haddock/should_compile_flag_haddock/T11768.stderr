@@ -1,0 +1,22 @@
+
+==================== Parser ====================
+module T11768 where
+class C a b
+class D a
+newtype DWrapper a = DWrap a
+instance D (DWrapper a)
+data Foo
+  = Foo
+  deriving -- | Documenting a single type
+           Eq
+data Bar
+  = Bar
+  deriving (-- | Documenting one of multiple types
+            Eq,
+            Ord)
+  deriving anyclass (forall a. C a {-^ Documenting forall type -})
+  deriving D {-^ Documenting deriving via -} via DWrapper Bar
+<document comment>
+deriving instance Read Bar
+
+

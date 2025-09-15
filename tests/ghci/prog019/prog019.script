@@ -1,0 +1,4 @@
+:load A
+bar
+:module C
+foo

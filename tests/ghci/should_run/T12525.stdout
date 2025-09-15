@@ -1,0 +1,4 @@
+x :: () = ()
+y :: () = ()
+type Foo :: forall {k}. k -> Constraint
+class Foo a

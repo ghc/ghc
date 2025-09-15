@@ -1,0 +1,7 @@
+
+T23738_fail_var.hs:11:12: error: [GHC-45510]
+    • Term variable ‘a’ cannot be used here
+        (term variables cannot be promoted)
+    • In the type ‘a’
+      In the expression: vfun a
+      In an equation for ‘f’: f a = vfun a

@@ -1,0 +1,3 @@
+MultilineStringsUnterminated.hs:10:1: error: [GHC-21231]
+    lexical error at end of input
+

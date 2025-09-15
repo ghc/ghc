@@ -1,0 +1,12 @@
+
+ExplicitForAllFams2.hs:34:10: warning: [GHC-40910] [-Wunused-type-patterns]
+    Defined but not used on the right hand side: type variable ‘t’
+
+ExplicitForAllFams2.hs:35:10: warning: [GHC-40910] [-Wunused-type-patterns]
+    Defined but not used on the right hand side: type variable ‘a’
+
+ExplicitForAllFams2.hs:38:6: warning: [GHC-40910] [-Wunused-type-patterns]
+    Defined but not used on the right hand side: type variable ‘t’
+
+ExplicitForAllFams2.hs:39:6: warning: [GHC-40910] [-Wunused-type-patterns]
+    Defined but not used on the right hand side: type variable ‘a’

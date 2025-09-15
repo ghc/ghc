@@ -1,0 +1,6 @@
+  = \ (@t) (wombat1 :: T -> t) (x :: T) ->
+      case x of wild { __DEFAULT -> wombat1 wild }
+  = \ (@t) (wombat2 :: S -> t) (x :: S) ->
+      case x of wild { __DEFAULT -> wombat2 wild }
+  = \ (@t) (wombat3 :: W -> t) (x :: W) ->
+      case x of wild { __DEFAULT -> wombat3 wild }

@@ -1,0 +1,3 @@
+
+<interactive>:1:1: error: [GHC-88464]
+    Variable not in scope: out_of_scope

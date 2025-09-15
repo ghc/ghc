@@ -1,0 +1,6 @@
+:load T18262.hs
+:set -XDataKinds
+-- Should report no instances
+:instances 'A
+-- Should report an instance with no constraints
+:instances 'B

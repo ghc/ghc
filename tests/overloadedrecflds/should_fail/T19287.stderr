@@ -1,0 +1,3 @@
+
+T19287.hs:4:27: error: [GHC-85524]
+    Duplicate field name ‘x’ in record declaration

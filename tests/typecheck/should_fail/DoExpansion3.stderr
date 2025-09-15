@@ -1,0 +1,46 @@
+
+DoExpansion3.hs:15:20: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘[Char]’ with ‘Int’
+      Expected: Int
+        Actual: String
+    • In the first argument of ‘(+)’, namely ‘x’
+      In the first argument of ‘return’, namely ‘(x + 1)’
+      In a stmt of a 'do' block: return (x + 1)
+
+DoExpansion3.hs:18:20: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type: t0 -> t
+                  with actual type: IO Char
+    • The function ‘getChar’ is applied to one visible argument,
+        but its type ‘IO Char’ has none
+      In the expression: getChar 2
+      In an equation for ‘y’: y = getChar 2
+    • Relevant bindings include y :: t (bound at DoExpansion3.hs:18:16)
+
+DoExpansion3.hs:25:20: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the first argument of ‘(+)’, namely ‘x’
+      In the first argument of ‘return’, namely ‘(x + y)’
+      In a stmt of a 'do' block: return (x + y)
+
+DoExpansion3.hs:27:12: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Char’ with actual type ‘Maybe Int’
+    • In the pattern: Just x
+      In a stmt of a 'do' block: Just x <- getChar
+      In the expression:
+        do Just x <- getChar
+           return x
+
+DoExpansion3.hs:33:3: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘()’ with ‘Int’
+      Expected: IO Int
+        Actual: IO ()
+    • In a stmt of a 'do' block: putStrLn $ a + ""
+      In the expression:
+        do let z :: Int = 3
+           let a = 1
+           putStrLn $ a + ""
+      In an equation for ‘gggg5’:
+          gggg5
+            = do let z :: Int = ...
+                 let a = ...
+                 putStrLn $ a + ""

@@ -1,0 +1,17 @@
+cabal-version:       2.2
+name:                bkpcabal04
+version:             0.1.0.0
+license:             BSD-3-Clause
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+
+library p
+  signatures: A
+  build-depends: base
+  hs-source-dirs: p
+
+library q
+  signatures: B
+  build-depends: base, p
+  hs-source-dirs: q

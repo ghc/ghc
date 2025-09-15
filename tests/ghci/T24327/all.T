@@ -1,0 +1,1 @@
+test('T24327', [extra_ways(['ghci-ext-prof']), only_ways(['ghci-ext-prof']), extra_files(['T24327A.hs', 'T24327.hs']), extra_hc_opts('-fno-unoptimized-core-for-interpreter -O')], ghci_script, ['T24327.script'])

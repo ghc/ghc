@@ -1,0 +1,21 @@
+
+DifferentExportWarnings.hs:5:5: error: [GHC-92878]
+    ‘Foo2’ exported with different error messages
+    at DifferentExportWarnings.hs:3:5-37
+
+DifferentExportWarnings.hs:5:5: error: [GHC-92878]
+    ‘Foo’ exported with different error messages
+    at DifferentExportWarnings.hs:3:5-37
+       DifferentExportWarnings.hs:4:5-39
+
+DifferentExportWarnings.hs:7:5: error: [GHC-92878]
+    ‘Bar’ exported with different error messages
+    at DifferentExportWarnings.hs:6:5-49
+
+DifferentExportWarnings.hs:9:5: error: [GHC-92878]
+    ‘y’ exported with different error messages
+    at DifferentExportWarnings.hs:8:5-61
+
+DifferentExportWarnings.hs:10:5: error: [GHC-92878]
+    ‘x’ exported with different error messages
+    at DifferentExportWarnings.hs:8:5-61

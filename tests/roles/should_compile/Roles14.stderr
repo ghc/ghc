@@ -1,0 +1,31 @@
+TYPE SIGNATURES
+  meth2 :: forall a. C2 a => a -> a
+TYPE CONSTRUCTORS
+  class C2{1} :: * -> Constraint
+    roles representational
+Dependent modules: []
+Dependent packages: [(normal, base-4.21.0.0)]
+
+==================== Typechecker ====================
+Roles12.$tcC2
+  = GHC.Internal.Types.TyCon
+      7996680154108933333#Word64 9454227235464419996#Word64
+      Roles12.$trModule (GHC.Internal.Types.TrNameS "C2"#) 0# $krep
+Roles12.$tc'C:C2
+  = GHC.Internal.Types.TyCon
+      7087988437584478859#Word64 11477953550142401435#Word64
+      Roles12.$trModule (GHC.Internal.Types.TrNameS "'C:C2"#) 1# $krep
+$krep [InlPrag=[~]]
+  = GHC.Internal.Types.KindRepTyConApp Roles12.$tcC2 ((:) $krep [])
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]]
+  = GHC.Internal.Types.KindRepFun
+      GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+Roles12.$trModule
+  = GHC.Internal.Types.Module
+      (GHC.Internal.Types.TrNameS "main"#)
+      (GHC.Internal.Types.TrNameS "Roles12"#)
+
+

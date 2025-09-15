@@ -1,0 +1,7 @@
+
+T15694.hs:23:35: error: [GHC-25897]
+    • Expected kind ‘k1 -> k0’, but ‘f a1’ has kind ‘ks’
+      ‘ks’ is a rigid type variable bound by
+        the type signature for ‘ASSO’
+        at T15694.hs:19:30-31
+    • In the first argument of ‘(~~)’, namely ‘f a1 a2’

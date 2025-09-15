@@ -1,0 +1,4 @@
+TYPE SIGNATURES
+  fall :: forall a. a -> a
+Dependent modules: []
+Dependent packages: [(normal, base-4.21.0.0)]

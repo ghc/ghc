@@ -1,0 +1,10 @@
+Breakpoint 0 activated at Test.hs:40:10-17
+Stopped in Test.Test2.poly, Test.hs:40:10-17
+_result :: () = _
+x :: Unary = Unary
+x = Unary
+x :: Unary
+()
+x = Unary
+x :: Unary
+Unary

@@ -1,0 +1,12 @@
+
+T19928.hs:6:9: error: [GHC-37475]
+    Parse error: ‘(%1 ->)’
+    Record constructors in GADTs must use an ordinary, non-linear arrow.
+
+T19928.hs:7:9: error: [GHC-37475]
+    Parse error: ‘(%p ->)’
+    Record constructors in GADTs must use an ordinary, non-linear arrow.
+
+T19928.hs:8:9: error: [GHC-37475]
+    Parse error: ‘(%1 ->)’
+    Record constructors in GADTs must use an ordinary, non-linear arrow.

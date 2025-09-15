@@ -1,0 +1,5 @@
+
+LinearAsPat.hs:6:12: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from a non-linear pattern ‘x@True’
+    • In an equation for ‘shouldFail’: shouldFail x@True = x

@@ -1,0 +1,3 @@
+
+rnfail035.hs:2:21: error: [GHC-76037]
+    Not in scope: type constructor or class ‘C’

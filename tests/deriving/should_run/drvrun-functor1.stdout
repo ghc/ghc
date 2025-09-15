@@ -1,0 +1,8 @@
+normal:  Cons 1 (Cons 1 (Cons 2 (Cons 3 Nil)))
+double:  Cons 2 (Cons 2 (Cons 4 (Cons 6 Nil)))
+normal:  ("something",369)
+reverse: ("gnihtemos",1368)
+normal:  5
+double:  10
+normal:  Compose [[1,2,3],[7,8,9]]
+double:  Compose [[2,4,6],[14,16,18]]

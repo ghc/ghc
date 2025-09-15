@@ -1,0 +1,3 @@
+GHC.Internal.Data.Proxy.Proxy (GHC.Internal.Generics.:*:)
+GHC.Internal.Data.Proxy.Proxy '(GHC.Internal.Generics.:*:)
+GHC.Internal.Data.Proxy.Proxy '(GHC.Internal.Types.:)

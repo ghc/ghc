@@ -1,0 +1,24 @@
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE PolyKinds                  #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeOperators              #-}
+module T8566a where
+
+import Data.Kind (Type)
+
+data Field = forall k. APP k [Field]
+
+data InField (u :: Field) :: Type where
+  A :: AppVars t (ExpandField args) -> InField (APP t args)
+
+type family ExpandField (args :: [Field]) :: [Type]
+type family AppVars (t :: k) (vs :: [Type]) :: Type
+
+-- This function fails to compile, because we discard
+-- 'given' kind equalities.  See comment 7 in #8566
+-- This is really a bug, I claim
+unA :: InField (APP t args) -> AppVars t (ExpandField args)
+unA (A x) = x
+

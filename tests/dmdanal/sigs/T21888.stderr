@@ -1,0 +1,30 @@
+
+==================== Demand signatures ====================
+Data.MemoTrie.$fHasTrieBool:
+Data.MemoTrie.$fHasTrieEither: <LP(SC(S,L))><LP(SC(S,L))>
+Data.MemoTrie.$fHasTrieInteger:
+Data.MemoTrie.$fHasTrieList: <LP(SC(S,L))>
+Data.MemoTrie.$fHasTrieTuple2: <LP(SC(S,L))><LP(SC(S,L))>
+Data.MemoTrie.$fHasTrieUnit:
+
+
+
+==================== Cpr signatures ====================
+Data.MemoTrie.$fHasTrieBool:
+Data.MemoTrie.$fHasTrieEither:
+Data.MemoTrie.$fHasTrieInteger:
+Data.MemoTrie.$fHasTrieList:
+Data.MemoTrie.$fHasTrieTuple2:
+Data.MemoTrie.$fHasTrieUnit:
+
+
+
+==================== Demand signatures ====================
+Data.MemoTrie.$fHasTrieBool:
+Data.MemoTrie.$fHasTrieEither: <LP(SC(S,L))><LP(SC(S,L))>
+Data.MemoTrie.$fHasTrieInteger:
+Data.MemoTrie.$fHasTrieList: <LP(SC(S,L))>
+Data.MemoTrie.$fHasTrieTuple2: <LP(SC(S,L))><LP(SC(S,L))>
+Data.MemoTrie.$fHasTrieUnit:
+
+

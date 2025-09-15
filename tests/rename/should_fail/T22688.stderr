@@ -1,0 +1,7 @@
+T22688.hs:5:10: error: [GHC-53946]
+    • Illegal instance for data type ‘Foo’.
+      Instance heads must be of the form
+        C ty_1 ... ty_n
+      where ‘C’ is a class.
+    • In the instance declaration for ‘Foo m’
+

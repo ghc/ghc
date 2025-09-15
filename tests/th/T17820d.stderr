@@ -1,0 +1,7 @@
+T17820d.hs:6:38: error: [GHC-28914]
+    • Level error: ‘foo’ is bound at level 1 but used at level 0
+    • In the untyped splice: $(const [| 0 |] foo)
+      In the Template Haskell quotation:
+        [d| data D = MkD {foo :: Int}
+            blargh = $(const [| 0 |] foo) |]
+

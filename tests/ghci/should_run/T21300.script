@@ -1,0 +1,4 @@
+:set -XArrows -XBlockArguments
+import Control.Arrow
+:set -ddump-tc -dsuppress-uniques
+(proc 'a' -> (| id \'b' 'c'-> returnA -< 'c' |) 'b' 'c') 'a'

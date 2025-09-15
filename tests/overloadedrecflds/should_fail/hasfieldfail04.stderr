@@ -1,0 +1,12 @@
+
+hasfieldfail04.hs:12:32: error: [GHC-43406]
+    • Illegal instance declaration for ‘HasField a S Int’:
+        ‘S’ has fields, and the type ‘a’
+        could unify with one of the field labels of ‘S’.
+    • In the instance declaration for ‘HasField a S Int’
+
+hasfieldfail04.hs:14:29: error: [GHC-43406]
+    • Illegal instance declaration for ‘HasField a S Int’:
+        ‘S’ has fields, and the type ‘a’
+        could unify with one of the field labels of ‘S’.
+    • In the instance declaration for ‘HasField a S Int’

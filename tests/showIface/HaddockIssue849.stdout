@@ -1,0 +1,75 @@
+docs:
+  Just module header:
+         Nothing
+       export docs:
+         []
+       declaration docs:
+         []
+       arg docs:
+         []
+       documentation structure:
+         re-exported module(s): [Data.Functor.Identity]
+           []
+         re-exported module(s): [Data.Maybe]
+           [GHC.Internal.Data.Maybe.maybe,
+            GHC.Internal.Maybe.Maybe{GHC.Internal.Maybe.Maybe,
+                                     GHC.Internal.Maybe.Just, GHC.Internal.Maybe.Nothing}]
+         re-exported module(s): [Data.Tuple]
+           [GHC.Internal.Data.Tuple.curry, GHC.Internal.Data.Tuple.fst,
+            GHC.Internal.Data.Tuple.snd, GHC.Internal.Data.Tuple.swap,
+            GHC.Internal.Data.Tuple.uncurry]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         ScopedTypeVariables
+         BangPatterns
+         NamedFieldPuns
+         GADTSyntax
+         DoAndIfThenElse
+         ConstraintKinds
+         PolyKinds
+         InstanceSigs
+         StandaloneDeriving
+         DeriveDataTypeable
+         DeriveFunctor
+         DeriveTraversable
+         DeriveFoldable
+         DeriveGeneric
+         DeriveLift
+         TypeSynonymInstances
+         FlexibleContexts
+         FlexibleInstances
+         ConstrainedClassMethods
+         MultiParamTypeClasses
+         ExistentialQuantification
+         EmptyDataDecls
+         KindSignatures
+         GeneralizedNewtypeDeriving
+         PostfixOperators
+         TupleSections
+         PatternGuards
+         RankNTypes
+         TypeOperators
+         ExplicitForAll
+         TraditionalRecordSyntax
+         BinaryLiterals
+         HexFloatLiterals
+         EmptyCase
+         NamedWildCards
+         TypeApplications
+         EmptyDataDeriving
+         NumericUnderscores
+         StarIsType
+         ImportQualifiedPost
+         StandaloneKindSignatures
+         FieldSelectors
+         ListTuplePuns
+         ImplicitStagePersistence
+extensible fields:
+

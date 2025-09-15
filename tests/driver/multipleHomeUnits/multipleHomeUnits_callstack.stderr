@@ -1,0 +1,7 @@
+Main: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+test
+
+HasCallStack backtrace:
+  error, called at callstack/./Main.hs:4:8 in main:Main
+

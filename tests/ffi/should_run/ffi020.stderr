@@ -1,0 +1,4 @@
+ffi020: error: a C finalizer called back into Haskell.
+   This was previously allowed, but is disallowed in GHC 6.10.2 and later.
+   To create finalizers that may call back into Haskell, use
+   Foreign.Concurrent.newForeignPtr instead of Foreign.newForeignPtr.

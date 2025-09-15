@@ -1,0 +1,6 @@
+func(bits64 r2) {
+  foo:
+    if (r2 == 0) { goto bar; } else { goto bar; }
+  bar:
+    return (1);
+}

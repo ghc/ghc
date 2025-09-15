@@ -1,0 +1,13 @@
+
+==================== Parser ====================
+module Foo (
+        <IEDocNamed: chunk1>, <IEDocNamed: chunk2>, foo,
+        <IEDocNamed: chunk3>, bar
+    ) where
+<document comment>
+<document comment>
+<document comment>
+foo = 3
+bar = 7
+
+

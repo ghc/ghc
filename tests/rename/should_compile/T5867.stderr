@@ -1,0 +1,8 @@
+
+T5867.hs:4:7: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘f’ (imported from T5867a):
+    Deprecated: "Don't use f!"
+
+T5867.hs:5:7: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘f’ (imported from T5867a):
+    Deprecated: "Don't use f!"

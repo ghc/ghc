@@ -1,0 +1,11 @@
+
+A.hs:6:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘x’: x _ = ...
+
+B.hs:6:5: error:
+    • Couldn't match type ‘F Int’ with ‘Bool’
+      Expected type: F Int -> Bool
+        Actual type: Bool -> Bool
+    • In the expression: id
+      In an equation for ‘f’: f = id

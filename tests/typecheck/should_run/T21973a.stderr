@@ -1,0 +1,7 @@
+T21973a: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+True
+
+HasCallStack backtrace:
+  error, called at T21973a.hs:42:23 in main:Main
+

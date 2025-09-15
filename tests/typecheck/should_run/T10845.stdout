@@ -1,0 +1,2 @@
+CallStack (from HasCallStack):
+  f1, called at T10845.hs:13:38 in main:Main

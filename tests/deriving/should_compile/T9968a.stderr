@@ -1,0 +1,5 @@
+
+T9968a.hs:8:22: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        either ‘bimap’ or (‘first’ and ‘second’)
+    • In the instance declaration for ‘Bifunctor Blah’

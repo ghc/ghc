@@ -1,0 +1,6 @@
+
+T8258NoGADTs.hs:4:8: error: [GHC-36952]
+    Illegal keyword 'where' in data declaration
+    Suggested fix:
+      Use the ‘GADTSyntax’ extension (implied by ‘GADTs’)
+      to enable syntax: data T where

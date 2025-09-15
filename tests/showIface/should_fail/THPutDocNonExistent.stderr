@@ -1,0 +1,3 @@
+
+THPutDocNonExistent.hs:10:1: error: [GHC-49530]
+    Couldn't find any instances of THPutDocNonExistent.A THPutDocNonExistent.B to add documentation to

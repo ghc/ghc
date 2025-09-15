@@ -1,0 +1,8 @@
+type Foo :: forall k. k -> k
+type family Foo a where
+  forall k (a :: k). Foo a = a
+  	-- Defined at T15341.hs:5:1
+type Foo :: forall k. k -> k
+type family Foo @k a where
+  forall k (a :: k). Foo @k a = a
+  	-- Defined at T15341.hs:5:1

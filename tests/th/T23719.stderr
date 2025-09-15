@@ -1,0 +1,5 @@
+
+T23719.hs:7:2: error: [GHC-55017]
+    • Illegal variable name: ‘forall’
+      When splicing a TH pattern: forall
+    • In the untyped splice: $(TH.varP (TH.mkName "forall"))

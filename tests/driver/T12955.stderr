@@ -1,0 +1,11 @@
+
+T12955.hsig:1:11: error: [GHC-66004]
+    Unexpected signature: ‘T12955’
+    Suggested fix:
+      Try passing -instantiated-with="T12955=<T12955>"
+      replacing <T12955> as necessary.
+
+T12955.hsig:1:11: error: [GHC-66004]
+    Unexpected signature: ‘T12955’
+    Suggested fix:
+      Try adding ‘T12955’ to the ‘signatures’ field in your Cabal file.

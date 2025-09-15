@@ -1,0 +1,9 @@
+
+T7010.hs:53:27: error: [GHC-83865]
+    • Couldn't match type: IO Float
+                     with: Serial (IO Float)
+      Expected: (Float, ValueTuple Vector)
+        Actual: (Float, ValueTuple Float)
+    • In the first argument of ‘withArgs’, namely ‘plug’
+      In the expression: withArgs plug
+      In an equation for ‘filterFormants’: filterFormants = withArgs plug

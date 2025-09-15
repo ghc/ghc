@@ -1,0 +1,4 @@
+
+overloadedrecfldsfail09.hs:9:11: error: [GHC-65904]
+    Ambiguous record updates not (yet) handled by Template Haskell
+      x = 3

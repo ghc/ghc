@@ -1,0 +1,5 @@
+
+annfail05.hs:11:1: error: [GHC-39999]
+    • No instance for ‘GHC.Internal.Data.Data.Data NoInstances’
+        arising from an annotation
+    • In the annotation: {-# ANN f NoInstances #-}

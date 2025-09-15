@@ -1,0 +1,2 @@
+Linking: path = unsigned_reloc_macho_x64.o, symname = _getAnswer
+42

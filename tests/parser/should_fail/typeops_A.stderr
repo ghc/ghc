@@ -1,0 +1,3 @@
+
+typeops_A.hs:2:1: error: [GHC-58481]
+    parse error (possibly incorrect indentation or mismatched brackets)

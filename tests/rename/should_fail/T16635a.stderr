@@ -1,0 +1,3 @@
+
+T16635a.hs:11:17: error: [GHC-76037]
+    Not in scope: type variable ‘a’

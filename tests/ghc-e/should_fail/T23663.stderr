@@ -1,0 +1,5 @@
+<interactive>: error: [GHCi-15670]
+    Unrecognised flag: -XCUSKS
+    Suggested fix: did you mean -XCUSKs
+
+1

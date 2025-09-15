@@ -1,0 +1,3 @@
+test(bits64 buffer) {
+    return (%zx64(%shra(242::bits8, 1)));
+}

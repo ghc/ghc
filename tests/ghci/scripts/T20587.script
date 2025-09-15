@@ -1,0 +1,13 @@
+:l shell.hs
+:def shell (\s -> do shell s; return "")
+
+:set -v1 -i -i. -ib -fhide-source-paths
+
+:shell mkdir b
+:shell echo "module B where b = 0" > b/B.hs
+
+:l B
+
+:shell echo "module B where" > B.hs
+
+:reload

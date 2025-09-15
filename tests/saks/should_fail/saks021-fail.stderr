@@ -1,0 +1,4 @@
+
+saks021-fail.hs:9:8: error: [GHC-17370]
+    • Different names for the same type variable: ‘hk’ and ‘k’
+    • In the data type declaration for ‘T’

@@ -1,0 +1,20 @@
+Breakpoint 0 activated at a/A.hs:(5,8)-(11,12)
+Stopped in A.main, a/A.hs:(5,8)-(11,12)
+_result :: IO () = _
+4  
+        vv
+5  main = do
+6    printFib 0
+7    printFib 1
+8    printFib 2
+9    printFib 3
+10    printFib 4
+11    printFib 5
+                ^^
+12  
+1
+1
+2
+3
+5
+8

@@ -1,0 +1,9 @@
+
+T22326_fail_pat.hs:9:4: error: [GHC-25897]
+    • Couldn't match expected type ‘a’ with actual type ‘Int’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a -> ()
+        at T22326_fail_pat.hs:9:1-17
+    • In the pattern: type Int
+      In an equation for ‘f’: f (type Int) = ()

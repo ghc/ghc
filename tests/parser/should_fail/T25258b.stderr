@@ -1,0 +1,2 @@
+T25258b.hs:7:6: error: [GHC-58481] parse error on input ‘0x80#Int3’
+

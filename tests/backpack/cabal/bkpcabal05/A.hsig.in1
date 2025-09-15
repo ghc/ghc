@@ -1,0 +1,3 @@
+signature A where
+data T
+instance Show T

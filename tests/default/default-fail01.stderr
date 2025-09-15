@@ -1,0 +1,4 @@
+default-fail01.hs:3:9: error: [GHC-26555]
+    • Illegal named default declaration for non-class ‘Integer’
+    • When checking the class at the head of a named default declaration
+

@@ -1,0 +1,12 @@
+:l T17989M
+:complete repl ":break "
+-- all listed names are really breakpoints
+:break B.bar
+:break B.foo
+:break T17989A.bar
+:break T17989A.foo
+:break T17989C.foo
+:break foo
+:break main
+:complete repl ":break B."
+:complete repl ":break f"

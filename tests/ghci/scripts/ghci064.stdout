@@ -1,0 +1,65 @@
+instance Foldable Maybe -- Defined in ‘GHC.Internal.Data.Foldable’
+instance Traversable Maybe
+  -- Defined in ‘GHC.Internal.Data.Traversable’
+instance GHC.Internal.Base.Alternative Maybe
+  -- Defined in ‘GHC.Internal.Base’
+instance Applicative Maybe -- Defined in ‘GHC.Internal.Base’
+instance Functor Maybe -- Defined in ‘GHC.Internal.Base’
+instance MonadFail Maybe
+  -- Defined in ‘GHC.Internal.Control.Monad.Fail’
+instance GHC.Internal.Base.MonadPlus Maybe
+  -- Defined in ‘GHC.Internal.Base’
+instance Monad Maybe -- Defined in ‘GHC.Internal.Base’
+instance GHC.Internal.Generics.SingKind w =>
+         GHC.Internal.Generics.SingKind (Maybe w)
+  -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Generics.Generic (Maybe w)
+  -- Defined in ‘GHC.Internal.Generics’
+instance Semigroup w => Monoid (Maybe w)
+  -- Defined in ‘GHC.Internal.Base’
+instance Read w => Read (Maybe w) -- Defined in ‘GHC.Internal.Read’
+instance Semigroup w => Semigroup (Maybe w)
+  -- Defined in ‘GHC.Internal.Base’
+instance [safe] Ord w => Ord (Maybe w)
+  -- Defined in ‘GHC.Internal.Maybe’
+instance Show w => Show (Maybe w) -- Defined in ‘GHC.Internal.Show’
+instance [safe] Eq w => Eq (Maybe w)
+  -- Defined in ‘GHC.Internal.Maybe’
+instance GHC.Internal.Generics.Generic [w]
+  -- Defined in ‘GHC.Internal.Generics’
+instance Read w => Read [w] -- Defined in ‘GHC.Internal.Read’
+instance Eq w => Eq [w] -- Defined in ‘GHC.Internal.Classes’
+instance Ord w => Ord [w] -- Defined in ‘GHC.Internal.Classes’
+instance Show w => Show [w] -- Defined in ‘GHC.Internal.Show’
+instance Monoid [w] -- Defined in ‘GHC.Internal.Base’
+instance Semigroup [w] -- Defined in ‘GHC.Internal.Base’
+instance [safe] MyShow w => MyShow [w]
+  -- Defined at ghci064.hs:8:10
+instance GHC.Internal.Generics.Generic [T]
+  -- Defined in ‘GHC.Internal.Generics’
+instance Monoid [T] -- Defined in ‘GHC.Internal.Base’
+instance Semigroup [T] -- Defined in ‘GHC.Internal.Base’
+instance [safe] MyShow [T] -- Defined at ghci064.hs:16:10
+instance [safe] MyShow [T] -- Defined at ghci064.hs:8:10
+instance GHC.Internal.Generics.SingKind Bool
+  -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Generics.Generic Bool
+  -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Foreign.Storable.Storable Bool
+  -- Defined in ‘GHC.Internal.Foreign.Storable’
+instance GHC.Internal.Bits.Bits Bool
+  -- Defined in ‘GHC.Internal.Bits’
+instance Bounded Bool -- Defined in ‘GHC.Internal.Enum’
+instance Enum Bool -- Defined in ‘GHC.Internal.Enum’
+instance GHC.Internal.Bits.FiniteBits Bool
+  -- Defined in ‘GHC.Internal.Bits’
+instance GHC.Internal.Ix.Ix Bool -- Defined in ‘GHC.Internal.Ix’
+instance Ord Bool -- Defined in ‘GHC.Internal.Classes’
+instance Read Bool -- Defined in ‘GHC.Internal.Read’
+instance Show Bool -- Defined in ‘GHC.Internal.Show’
+instance Eq Bool -- Defined in ‘GHC.Internal.Classes’
+instance Traversable ((,) Int)
+  -- Defined in ‘GHC.Internal.Data.Traversable’
+instance Foldable ((,) Int)
+  -- Defined in ‘GHC.Internal.Data.Foldable’
+instance Functor ((,) Int) -- Defined in ‘GHC.Internal.Base’

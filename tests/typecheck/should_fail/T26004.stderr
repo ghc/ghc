@@ -1,0 +1,17 @@
+
+T26004.hs:13:21: error: [GHC-25897]
+    • Could not deduce ‘p ~ Bool’
+      from the context: a ~ Bool
+        bound by a pattern with constructor: T1 :: T Bool,
+                 in a case alternative
+        at T26004.hs:13:3-4
+      ‘p’ is a rigid type variable bound by
+        the inferred type of f :: p -> T a -> Bool
+        at T26004.hs:(12,1)-(14,12)
+    • In the first argument of ‘not’, namely ‘w’
+      In the expression: not w
+      In an equation for ‘y’: y = not w
+    • Relevant bindings include
+        w :: p (bound at T26004.hs:12:3)
+        f :: p -> T a -> Bool (bound at T26004.hs:12:1)
+    Suggested fix: Consider giving ‘f’ a type signature

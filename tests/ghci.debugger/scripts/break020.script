@@ -1,0 +1,8 @@
+:l break020.hs
+:set stop :list
+:step main
+:steplocal
+:steplocal
+:steplocal
+:steplocal
+:steplocal

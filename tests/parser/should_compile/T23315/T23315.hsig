@@ -1,0 +1,4 @@
+signature T23315 where
+-- | My unit
+a :: ()
+-- ^ More docs

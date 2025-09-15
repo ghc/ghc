@@ -1,0 +1,6 @@
+:m +Language.Haskell.TH
+let { g1 :: Q Exp -> Q Exp; g1 x = x }
+let { g2 :: Name -> Q Exp; g2 x = return (VarE x) }
+let h x = x::Int
+$(g1 [| h |]) 5
+$(g2 'h) 6

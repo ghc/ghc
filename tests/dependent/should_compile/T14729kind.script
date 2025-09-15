@@ -1,0 +1,6 @@
+:seti -XPolyKinds -XDataKinds -XExplicitForAll -XTypeFamilies
+import Data.Kind
+data P k :: k -> Type
+type family F a
+type instance F Int = Bool
+:kind! forall (x :: Bool). P (F Int) x

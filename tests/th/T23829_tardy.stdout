@@ -1,0 +1,3 @@
+VarT a
+AppTypeE (VarE GHC.Internal.Base.id) (VarT a)
+AppTypeE (VarE GHC.Internal.Base.id) (VarT a)

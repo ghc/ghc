@@ -1,0 +1,1 @@
+LetE [ValD (VarP foo_0) (NormalB (VarE bar_1)) [ValD (VarP bar_1) (NormalB (LitE (IntegerL 3))) []]] (VarE foo_0)

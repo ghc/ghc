@@ -1,0 +1,8 @@
+
+ParserNoForallUnicode.hs:6:8: error: [GHC-25955]
+    Illegal symbol ‘∀’ in type
+    Suggested fix:
+      Use the ‘ExplicitForAll’ extension (implied by ‘RankNTypes’,
+                                                     ‘QuantifiedConstraints’, ‘ScopedTypeVariables’,
+                                                     ‘LiberalTypeSynonyms’ and ‘ExistentialQuantification’)
+      to enable syntax: ∀ <tvs>. <type>

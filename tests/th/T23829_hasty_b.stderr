@@ -1,0 +1,6 @@
+T23829_hasty_b.hs:8:42: error: [GHC-28914]
+    • Level error: ‘ty’ is bound at level 1 but used at level 0
+    • In the untyped splice: $ty
+      In the Template Haskell quotation:
+        [t| forall (ty :: TypeQ). Proxy $ty |]
+

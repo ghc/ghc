@@ -1,0 +1,3 @@
+
+mod79.hs:3:16: error: [GHC-61689]
+    Module ‘Prelude’ does not export ‘C’.

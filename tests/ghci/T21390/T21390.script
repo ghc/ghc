@@ -1,0 +1,4 @@
+:load Test.hs GetTy.hs
+import GetTy
+import Test
+getTy (mkTy 1)

@@ -1,0 +1,13 @@
+
+==================== CodeGenAnal STG: ====================
+Rec {
+(EnforceEpt004.x, <TagDunno>) = {} \u [] EnforceEpt004.x;
+end Rec }
+
+(EnforceEpt004.f, <TagTuple[TagDunno, TagProper]>) =
+    {} \r [(g, <TagDunno>)]
+        case g of (g', <TagProper>) {
+        __DEFAULT -> (#,#) [EnforceEpt004.x g'];
+        };
+
+

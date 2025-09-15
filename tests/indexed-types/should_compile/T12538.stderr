@@ -1,0 +1,14 @@
+
+T12538.hs:37:8: error: [GHC-25897]
+    • Could not deduce ‘a' ~ Tagged Int a’
+      from the context: (TagImpl a a', b ~ DF a')
+        bound by the instance declaration at T12538.hs:36:10-46
+      Expected: Tagged Int a -> b
+        Actual: Tagged Int a -> DF (Tagged Int a)
+      ‘a'’ is a rigid type variable bound by
+        the instance declaration
+        at T12538.hs:36:10-46
+    • In the first argument of ‘(.)’, namely ‘DF’
+      In the expression: DF . tag
+      In an equation for ‘df’: df = DF . tag
+    • Relevant bindings include df :: a -> b (bound at T12538.hs:37:3)

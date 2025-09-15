@@ -1,0 +1,7 @@
+strun002: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Variable not found: (2) hello
+
+HasCallStack backtrace:
+  error, called at strun002.hs:7:11 in main:Main
+

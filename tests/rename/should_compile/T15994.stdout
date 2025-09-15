@@ -1,0 +1,1 @@
+import System.IO ( IOMode(ReadMode) )

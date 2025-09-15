@@ -1,0 +1,17 @@
+T7848.hs:10:24: error: [GHC-25897]
+    • Couldn't match expected type ‘a’ with actual type ‘Char’
+      ‘a’ is a rigid type variable bound by
+        an expression type signature:
+          forall a. a
+        at T7848.hs:10:31
+    • In the expression: (&) :: a
+      In an equation for ‘x’:
+          x (+) ((&)@z) ((:&&) a b) (c :&& d) (e `A` f) (A g h)
+            = y
+            where
+                infixl 3 `y`
+                y _ = (&)
+                {-# INLINE (&) #-}
+                {-# SPECIALIZE (&) :: a #-}
+                (&) = 'c'
+

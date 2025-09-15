@@ -1,0 +1,6 @@
+writeFile "T17549.hs" ""
+:load T17549.hs
+writeFile "T17549.hs" "import"
+:reload
+1
+

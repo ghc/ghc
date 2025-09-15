@@ -1,0 +1,26 @@
+Shape for p
+provides: A -> p(H -> hole:H):A
+               A{A, MkA}
+requires: H -> hole:H
+               T{T}
+==== Package p ====
+[1 of 2] Compiling H[abstract sig]  ( p/H.hsig, nothing )
+[2 of 2] Compiling A                ( p/A.hs, nothing )
+Shape for q
+provides: H -> q():H
+               T{T, T}
+requires:
+==== Package q ====
+[1 of 1] Compiling H                ( q/H.hs, nothing )
+Shape for r
+provides: H -> q():H
+               T{T, T}
+          A -> p(H -> q():H):A
+               A{A, MkA}
+          R -> r():R
+               x
+requires:
+==== Package r ====
+[1 of 3] Including q
+[2 of 3] Including p
+[3 of 3] Compiling R                ( r/R.hs, nothing )

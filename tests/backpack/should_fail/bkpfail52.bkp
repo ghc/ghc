@@ -1,0 +1,11 @@
+unit p where
+    signature H where
+        data T = T Int
+unit q where
+    dependency p[H=<A>]
+    module B where
+        data T = T Bool
+    signature A where
+        import qualified B
+        type T = B.T
+-- signatures don't merge

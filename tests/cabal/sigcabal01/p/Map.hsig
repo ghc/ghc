@@ -1,0 +1,19 @@
+{-# LANGUAGE RoleAnnotations #-}
+module Map where
+
+type role Map nominal representational
+data Map k a
+
+instance (Show k, Show a) => Show (Map k a)
+
+null :: Map k a -> Bool
+size :: Map k a -> Int
+member :: Ord k => k -> Map k a -> Bool
+lookup :: Ord k => k -> Map k a -> Maybe a
+empty :: Map k a
+singleton :: k -> a -> Map k a
+insert :: Ord k => k -> a -> Map k a -> Map k a
+delete :: Ord k => k -> Map k a -> Map k a
+
+toList :: Map k a -> [(k, a)]
+fromList :: Ord k => [(k, a)] -> Map k a

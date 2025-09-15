@@ -1,0 +1,6 @@
+
+records-nofieldselectors.hs:9:12: error: [GHC-88464]
+    Variable not in scope: x :: [a0] -> Int
+    Suggested fix:
+      Notice that ‘x’ is a field selector
+      that has been suppressed by NoFieldSelectors.

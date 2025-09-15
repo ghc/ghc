@@ -1,0 +1,3 @@
+
+overloadedrecfldsfail05.hs:7:16: error: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds), Werror=unused-top-binds]
+    Defined but not used: record field of MkT ‘foo’

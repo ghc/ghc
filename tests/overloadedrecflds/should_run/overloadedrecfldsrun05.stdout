@@ -1,0 +1,4 @@
+MkS {foo = 42}
+MkT {foo = 42}
+MkS {foo = 42}
+MkS {foo = 6}

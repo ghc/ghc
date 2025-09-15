@@ -1,0 +1,5 @@
+
+T22884.hs:3:1: error: [GHC-87110]
+    Could not load module ‘Data.Text’.
+    It is a member of the hidden package ‘text-2.0.2’.
+    Use -v to see a list of the files searched for.

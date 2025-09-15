@@ -1,0 +1,33 @@
+unit p where
+    signature A where
+        instance Show (a -> b)
+        a :: Bool
+    module B where
+        import A
+        f = show (\x -> x)
+    signature H where
+        import A
+unit q where
+    module A where
+        instance Show (a -> b) where
+            show _ = "<function>"
+        a = True
+    module A2 where
+        import A
+        a = False
+unit r1 where
+    dependency p[A=q:A,H=<H>]
+    module C where
+        import B
+        g = show (\x -> x)
+unit r2 where
+    dependency p[A=q:A2,H=<H>]
+    module C where
+        import B
+        g = show (\x -> x)
+unit r3 where
+    dependency p[A=<X>,H=<H>]
+    module D where
+        import X
+        import B
+        g = show (\x -> x)

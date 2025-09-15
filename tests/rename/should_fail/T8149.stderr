@@ -1,0 +1,4 @@
+
+T8149.hs:5:36: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
+    The import of ‘WriterT’
+    from module ‘Control.Monad.Trans.Writer’ is redundant

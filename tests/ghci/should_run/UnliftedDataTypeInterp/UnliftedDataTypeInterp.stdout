@@ -1,0 +1,33 @@
+Obj: T0_1
+Bc: T0_1
+Obj: T1I 909
+Bc: T1I 909
+Obj: T0_2
+Bc: T0_2
+Obj: T2BI 808
+Bc: T2BI 808
+Obj: T0_3
+Bc: T0_3
+Obj: T3CIB "X" 707
+Bc: T3CIB "X" 707
+Obj: T0_4
+Bc: T0_4
+____
+True
+____
+Obj data Bytecode function
+T0_2
+T1I 1000
+T0_3
+T2BI 900
+T0_4
+T3CIB "X" 800
+T0_1
+Bytecode data Object function
+T0_2
+T1I 1000
+T0_3
+T2BI 900
+T0_4
+T3CIB "X" 800
+T0_1

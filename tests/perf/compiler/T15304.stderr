@@ -1,0 +1,10 @@
+
+T15304.hs:675:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘fromRational’ and (either ‘recip’ or ‘/’)
+    • In the instance declaration for ‘Fractional Cl3’
+
+T15304.hs:677:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘asinh’, ‘acosh’, and ‘atanh’
+    • In the instance declaration for ‘Floating Cl3’

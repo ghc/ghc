@@ -1,0 +1,8 @@
+
+T8806.hs:5:6: error: [GHC-83865]
+    • Expected a constraint, but ‘Int’ is a type
+    • In the type signature: f :: Int => Int
+
+T8806.hs:8:7: error: [GHC-83865]
+    • Expected a constraint, but ‘Int’ is a type
+    • In the type signature: g :: (Int => Show a) => Int

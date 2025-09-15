@@ -1,0 +1,5 @@
+
+TDMultiple02.hs:5:18: [GHC-29916]
+    Multiple declarations of ‘P’
+    Declared at: TDMultiple02.hs:4:1
+                 TDMultiple02.hs:5:18

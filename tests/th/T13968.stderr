@@ -1,0 +1,3 @@
+
+T13968.hs:6:2: error: [GHC-58805]
+    Illegal binding of an existing name: succ

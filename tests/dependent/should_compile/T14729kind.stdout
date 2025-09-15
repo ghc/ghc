@@ -1,0 +1,2 @@
+forall (x :: Bool). P (F Int) x :: *
+= P Bool x

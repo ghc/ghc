@@ -1,0 +1,19 @@
+{-# LANGUAGE GADTs #-}
+unit p where
+    signature H1 where
+        data T
+    signature H2 where
+        data T
+    module M where
+        import qualified H1
+        import qualified H2
+
+        -- This is NOT an insoluble given, so we
+        -- should complain a doesn't match b
+        f :: H1.T ~ H2.T => a -> b
+        f x = x
+
+        -- This equality does NOT hold, we should
+        -- complain that H1.T doesn't match H2.T
+        g :: H1.T -> H2.T
+        g x = x

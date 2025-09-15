@@ -1,0 +1,56 @@
+
+==================== Desugared ====================
+let {
+  x :: [GHC.Internal.Types.Int]
+  [LclId]
+  x = let {
+        $dEnum :: GHC.Internal.Enum.Enum GHC.Internal.Types.Int
+        [LclId]
+        $dEnum = GHC.Internal.Enum.$fEnumInt } in
+      letrec {
+        x :: [GHC.Internal.Types.Int]
+        [LclId]
+        x = GHC.Internal.Enum.enumFrom
+              @GHC.Internal.Types.Int $dEnum (GHC.Internal.Types.I# 1#); } in
+      x } in
+GHC.Internal.Base.returnIO
+  @[GHC.Internal.Types.Any]
+  (GHC.Internal.Types.:
+     @GHC.Internal.Types.Any
+     (GHC.Internal.Unsafe.Coerce.unsafeCoerce#
+        @GHC.Internal.Types.LiftedRep
+        @GHC.Internal.Types.LiftedRep
+        @[GHC.Internal.Types.Int]
+        @GHC.Internal.Types.Any
+        x)
+     (GHC.Internal.Types.[] @GHC.Internal.Types.Any))
+
+
+
+==================== Desugared ====================
+let {
+  x :: [GHC.Internal.Types.Int]
+  [LclId]
+  x = let {
+        $dEnum :: GHC.Internal.Enum.Enum GHC.Internal.Types.Int
+        [LclId]
+        $dEnum = GHC.Internal.Enum.$fEnumInt } in
+      letrec {
+        x :: [GHC.Internal.Types.Int]
+        [LclId]
+        x = GHC.Internal.Enum.enumFrom
+              @GHC.Internal.Types.Int $dEnum (GHC.Internal.Types.I# 1#); } in
+      x } in
+GHC.Internal.Base.returnIO
+  @[GHC.Internal.Types.Any]
+  (GHC.Internal.Types.:
+     @GHC.Internal.Types.Any
+     (GHC.Internal.Unsafe.Coerce.unsafeCoerce#
+        @GHC.Internal.Types.LiftedRep
+        @GHC.Internal.Types.LiftedRep
+        @[GHC.Internal.Types.Int]
+        @GHC.Internal.Types.Any
+        x)
+     (GHC.Internal.Types.[] @GHC.Internal.Types.Any))
+
+

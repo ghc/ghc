@@ -1,0 +1,5 @@
+:l Test3
+:b 2
+main
+f
+:q

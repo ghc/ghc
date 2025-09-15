@@ -1,0 +1,7 @@
+
+T14033.hs:5:16: error: [GHC-23517]
+    • A newtype constructor must have exactly one field
+        but ‘Zero’ has none
+      Zero :: Zero
+    • In the definition of data constructor ‘Zero’
+      In the newtype declaration for ‘Zero’

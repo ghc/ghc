@@ -1,0 +1,36 @@
+
+==================== Rule check ====================
+Rule check results:
+--------------------
+Expression: concatMapS @(*) @Int @Int foo1
+Rule "concatMap": all arguments match (considered individually), but rule as a whole does not
+--------------------
+
+
+
+==================== Rule check ====================
+Rule check results:
+--------------------
+Expression: concatMapS @(*) @Int @Int foo1
+Rule "concatMap": all arguments match (considered individually), but rule as a whole does not
+--------------------
+
+
+
+==================== Rule check ====================
+Rule check results:
+--------------------
+Expression: concatMapS @(*) @Int @Int foo1
+Rule "concatMap": all arguments match (considered individually), but rule as a whole does not
+--------------------
+
+
+
+==================== Rule check ====================
+Rule check results:
+--------------------
+Expression: concatMapS @(*) @Int @Int foo1
+Rule "concatMap": all arguments match (considered individually), but rule as a whole does not
+--------------------
+
+

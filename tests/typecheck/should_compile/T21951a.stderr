@@ -1,0 +1,5 @@
+
+T21951a.hs:10:11: warning: [GHC-71444] [-Wredundant-strictness-flags]
+    • Lazy flag has no effect on unlifted type ‘Array# Int’
+    • In the definition of data constructor ‘UA’
+      In the data type declaration for ‘UA’

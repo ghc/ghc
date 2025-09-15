@@ -1,0 +1,13 @@
+let macro _ = putStrLn "I'm a macro" >> return ""
+:def ! macro
+:def type macro
+:def ty macro
+:def! type macro
+:type macro
+:t macro
+::t macro
+::type macro
+:def test macro
+:def test macro
+:def! test macro
+:def

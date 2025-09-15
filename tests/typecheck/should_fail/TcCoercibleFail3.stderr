@@ -1,0 +1,6 @@
+
+TcCoercibleFail3.hs:12:7: error: [GHC-18872]
+    • Couldn't match representation of type ‘NT1’ with that of ‘NT2’
+        arising from a use of ‘coerce’
+    • In the expression: coerce
+      In an equation for ‘foo’: foo = coerce

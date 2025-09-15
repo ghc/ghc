@@ -1,0 +1,25 @@
+T9497a-run: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.TypeError:
+
+T9497a-run.hs:2:8: error: [GHC-88464]
+    • Found hole: _main :: IO ()
+      Or perhaps ‘_main’ is mis-spelled, or not in scope
+    • In an equation for ‘main’: main = _main
+    • Relevant bindings include
+        main :: IO () (bound at T9497a-run.hs:2:1)
+      Valid hole fits include
+        main :: IO () (bound at T9497a-run.hs:2:1)
+        readLn :: forall a. Read a => IO a
+          with readLn @()
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.System.IO’))
+        mempty :: forall a. Monoid a => a
+          with mempty @(IO ())
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Base’))
+(deferred type error)
+
+HasCallStack backtrace:
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
+  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
+

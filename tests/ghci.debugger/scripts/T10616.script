@@ -1,0 +1,4 @@
+:l T10616.hs
+:break f
+f A
+:continue

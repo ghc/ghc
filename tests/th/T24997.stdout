@@ -1,0 +1,10 @@
+(# GHC.Internal.Types.Int
+   |
+   GHC.Internal.Types.Char
+   |
+   GHC.Internal.Types.Bool #)
+(# GHC.Internal.Types.Int,
+   GHC.Internal.Types.Char,
+   GHC.Internal.Types.Bool #)
+(# ,, #) GHC.Internal.Types.Int GHC.Internal.Types.Char
+(# | | #) GHC.Internal.Types.Int GHC.Internal.Types.Char

@@ -1,0 +1,7 @@
+T21694a: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Urkh! But expected!
+
+HasCallStack backtrace:
+  error, called at T21694a.hs:24:33 in main:Main
+

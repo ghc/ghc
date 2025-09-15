@@ -1,0 +1,5 @@
+
+T20187b.hs:11:10: warning: [GHC-55666] [-Wredundant-strictness-flags]
+    • Strictness flag has no effect on unlifted type ‘IntU’
+    • In the definition of data constructor ‘T’
+      In the data type declaration for ‘T’

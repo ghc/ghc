@@ -1,0 +1,3 @@
+T5644: Heap exhausted;
+T5644: Current maximum heap size is 20971520 bytes (20 MB).
+T5644: Use `+RTS -M<size>' to increase it.

@@ -1,0 +1,7 @@
+T11193: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+error here!
+
+HasCallStack backtrace:
+  error, called at T11193.hs:7:16 in main:Main
+

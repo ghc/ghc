@@ -1,0 +1,29 @@
+// Test Michael Adams's optimization for code putatively
+// generated from nested case expression
+//    case (case g x of { True -> f x1 ; False -> f x2 }) of
+//       [] ->  return (x, 0)
+//       _:_ -> return (x, 1)
+
+test (bits32 x, bits32 x1, bits32 x2) {
+  bits32 t1, t2; 
+  (t1) = foreign "C--" g(x) "safe";
+  if (t1 != 0) { 
+     (t2) = foreign "C--" f(x1) "safe";
+  } else { 
+     (t2) = foreign "C--" f(x2) "safe";
+  }
+  R:
+  if (t2 == 0) {
+    Hp = Hp + 8;
+    if (Hp > HpLim) { (t2) = foreign "C--" gc1(l) "safe"; goto R; }
+    bits32[Hp] = x;
+    bits32[Hp+4] = 0;
+    return (Hp-8);
+  } else {
+    Hp = Hp + 8;
+    if (Hp > HpLim) { (t2) = foreign "C--" gc1(l) "safe"; goto R; }
+    bits32[Hp] = x;
+    bits32[Hp+4] = 1;
+    return (Hp-8);
+  }
+}

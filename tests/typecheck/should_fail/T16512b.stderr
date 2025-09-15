@@ -1,0 +1,10 @@
+
+T16512b.hs:6:3: error: [GHC-05175]
+    • Type family equation violates the family's injectivity annotation.
+      Type variable ‘a’ cannot be inferred from the right-hand side.
+      In the type family equation:
+        G [a] = [G a] -- Defined at T16512b.hs:6:3
+    • In the equations for closed type family ‘G’
+      In the type family declaration for ‘G’
+    Suggested fix:
+      Perhaps you intended to use the ‘UndecidableInstances’ extension

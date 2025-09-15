@@ -1,0 +1,5 @@
+SpecMultipleTys.hs:12:20: warning: [GHC-73026] [-Wdeprecated-pragmas (in -Wdefault)]
+    SPECIALISE pragmas with multiple type ascriptions are deprecated, and will be removed in GHC 9.18
+    Suggested fix:
+      Split the SPECIALISE pragma into multiple pragmas, one for each type signature
+

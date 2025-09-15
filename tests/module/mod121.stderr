@@ -1,0 +1,4 @@
+
+mod121.hs:5:5: error: [GHC-88464]
+    Variable not in scope: m2 :: Int -> t
+    Suggested fix: Perhaps use ‘m1’ (imported from Mod121_A)

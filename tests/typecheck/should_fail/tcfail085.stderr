@@ -1,0 +1,6 @@
+
+tcfail085.hs:9:5: error: [GHC-95909]
+    • Constructor ‘F’ does not have the required strict field(s):
+        y :: Int
+    • In the expression: F {x = 2}
+      In an equation for ‘z’: z = F {x = 2}

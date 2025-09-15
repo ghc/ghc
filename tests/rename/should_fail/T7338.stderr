@@ -1,0 +1,6 @@
+
+T7338.hs:4:1: error: [GHC-31744]
+    Duplicate type signatures for ‘a’
+    at T7338.hs:3:1
+       T7338.hs:3:4
+       T7338.hs:4:1

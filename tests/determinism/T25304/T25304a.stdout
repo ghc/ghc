@@ -1,0 +1,8 @@
+       documentation structure:
+         avails:
+           [A.MyType{A.MyType, A.BA, A.BB, A.BC, A.BD, A.BE, A.BF, A.BG, A.BH,
+                     A.BI, A.BJ, A.BK, A.BL, A.BM, A.BN, A.BO, A.BP, A.BQ, A.BR, A.BS,
+                     A.BT, A.BU, A.BV, A.BW, A.BX, A.BY, A.BZ, A.CA, A.AA, A.AB, A.AC,
+                     A.AD, A.AE, A.AF, A.AG, A.AH, A.AI, A.AJ, A.AK, A.AL, A.AM, A.AN,
+                     A.AO, A.AP, A.AQ, A.AR, A.AS, A.AT, A.AU, A.AV, A.AW, A.AX, A.AY,
+                     A.AZ, A.A, A.B, A.C, A.D, A.E, A.F, A.G, A.H, A.I, A.J, A.K, A.L,

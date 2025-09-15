@@ -1,0 +1,20 @@
+
+T17357.hs:22:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘f’: f F True = ...
+
+T17357.hs:23:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘f’: f !_ True = ...
+
+T17357.hs:30:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘f2’: f2 SF True = ...
+
+T17357.hs:31:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘f2’: f2 !_ True = ...
+
+T17357.hs:42:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f3’: f3 !_ = ...

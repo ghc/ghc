@@ -1,0 +1,2 @@
+T :: Constraint
+= Id Eq (Eq Bool)

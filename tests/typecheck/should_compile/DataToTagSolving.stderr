@@ -1,0 +1,4 @@
+
+DataToTagSolving.hs:12:22: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_Void’ standing for ‘GHC.Internal.Base.Void’
+    • In the type signature: voidIsn'tImported :: _Void -> Int#

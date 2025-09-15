@@ -1,0 +1,9 @@
+:! cp B1.hs B.hs
+:load D.hs
+main
+:! cp B2.hs B.hs
+:reload
+main
+:! cp B1.hs B.hs
+:reload
+main

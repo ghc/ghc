@@ -1,0 +1,7 @@
+T16846: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Prelude.undefined
+
+HasCallStack backtrace:
+  undefined, called at T16846.hs:22:3 in main:Main
+

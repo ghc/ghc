@@ -1,0 +1,20 @@
+{-# LANGUAGE DefaultSignatures #-}
+unit p where
+    signature A where
+        class C a where
+            f :: a -> a
+            g :: a -> a
+            {-# MINIMAL f #-}
+unit q where
+    signature A where
+        class C a where
+            f :: a -> a
+            g :: a -> a
+            {-# MINIMAL g #-}
+unit r where
+    dependency p[A=<A>]
+    dependency q[A=<A>]
+    module B where
+        import A
+        instance C Int where
+            -- Warns!

@@ -1,0 +1,23 @@
+unit p where
+    signature H where
+        data T
+        f :: T
+    signature Y where
+        data Y
+    module M where
+        import H
+        x = f
+unit impl where
+    module F where
+        data T = T
+            deriving (Show)
+        f = T
+    module H(T, f) where
+        import F
+unit q where
+    dependency impl
+    dependency p[H=impl:H, Y=<Y>]
+    module X where
+        import M
+        import H
+        main = print (x :: T)

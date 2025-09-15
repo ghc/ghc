@@ -1,0 +1,9 @@
+
+mod41.hs:4:18: error: [GHC-48406]
+    • Illegal instance declaration for ‘Eq (Either a a)’:
+        All instance types must be of the form (T a1 ... an)
+        where a1 ... an are *distinct type variables*,
+        and each type variable appears at most once in the instance head.
+    • In the instance declaration for ‘Eq (Either a a)’
+    Suggested fix:
+      Perhaps you intended to use the ‘FlexibleInstances’ extension

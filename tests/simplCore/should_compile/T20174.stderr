@@ -1,0 +1,15 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 9, types: 4, coercions: 0, joins: 0/0}
+
+foobar1 = "foobar"#
+
+foobar = unpackCString# foobar1
+
+foobar2 = foobar
+
+foobar3 = foobar
+
+
+

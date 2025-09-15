@@ -1,0 +1,4 @@
+extra decls:
+  a = GHC.Internal.Types.C# 'a'#
+  f = GHC.Internal.Types.C# 'f'#
+  t = GHC.Internal.Types.C# 't'#

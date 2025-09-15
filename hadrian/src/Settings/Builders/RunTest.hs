@@ -248,7 +248,7 @@ runTestBuilderArgs = builder Testsuite ? do
     top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
     cmdrootdirs <- expr (testRootDirs <$> userSetting defaultTestArgs)
-    let defaultRootdirs = ("testsuite" -/- "tests") : libTests
+    let defaultRootdirs = "tests" : libTests
         rootdirs | null cmdrootdirs = defaultRootdirs
                  | otherwise        = cmdrootdirs
     root        <- expr buildRoot

@@ -1,0 +1,4 @@
+
+readFail007.hs:6:4: error: [GHC-07626]
+    Parse error in pattern: 2 + 2
+    Suggested fix: Possibly caused by a missing 'do'?

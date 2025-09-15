@@ -1,0 +1,15 @@
+
+LinearLet4.hs:7:7: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘y’
+    • In the expression:
+        let
+          %1 y = x
+          %'Many z = y
+        in (z, z)
+      In an equation for ‘f’:
+          f x
+            = let
+                %1 y = x
+                %'Many z = y
+              in (z, z)

@@ -1,0 +1,5 @@
+module P where
+instance Show (a -> b) where
+    show = undefined
+instance Show (IO a) where
+    show = undefined

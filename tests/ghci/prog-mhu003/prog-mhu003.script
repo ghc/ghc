@@ -1,0 +1,29 @@
+putStrLn "Ambiguous module *Foo"
+:m *Foo
+putStrLn "Ambiguous module Foo"
+:m + Foo
+putStrLn "Ambiguous module `import Foo`"
+import Foo
+
+putStrLn "We can add module A and C"
+:m A
+run
+:m *A
+run
+:m C
+run
+:m *C
+run
+:m
+putStrLn "We can load qualified A and qualified C"
+import qualified A
+import qualified C
+A.run
+C.run
+putStrLn "We can use -XPackageImports to disambiguate"
+:set -XPackageImports
+import qualified "b" Foo as Boo
+Boo.foo
+import qualified "d" Foo as Doo
+Doo.foo
+

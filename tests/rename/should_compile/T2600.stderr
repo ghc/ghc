@@ -1,0 +1,10 @@
+
+T2600.hs:16:1: warning: [GHC-87502] [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "myrule" may never fire
+      because rule "Class op to" for ‘to’ might fire first
+    Suggested fix: Add phase [n] or [~n] to the competing rule
+
+T2600.hs:16:1: warning: [GHC-87502] [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "myrule" may never fire
+      because rule "Class op tmap" for ‘tmap’ might fire first
+    Suggested fix: Add phase [n] or [~n] to the competing rule

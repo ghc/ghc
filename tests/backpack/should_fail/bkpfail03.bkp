@@ -1,0 +1,10 @@
+unit q where
+    module M1 where
+        data M = M
+    signature M2(module M2, M) where
+        import M1
+unit m2 where
+    module M2 where
+        data M = M
+unit p where
+    dependency q[M2=m2:M2]

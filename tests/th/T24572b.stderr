@@ -1,0 +1,4 @@
+T24572b.hs:7:2: error: [GHC-55017]
+    Illegal data constructor name: ‘~’
+    When splicing a TH declaration: data D = (~)
+

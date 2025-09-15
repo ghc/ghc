@@ -1,0 +1,8 @@
+Pass: passing Int8# on the stack
+Pass: negateInt8#
+Pass: plusInt8#
+Pass: subInt8#
+Pass: timesInt8#
+Pass: remInt8#
+Pass: quotInt8#
+Pass: quotRemInt8#

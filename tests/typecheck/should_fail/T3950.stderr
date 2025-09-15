@@ -1,0 +1,16 @@
+
+T3950.hs:16:13: error: [GHC-83865]
+    • Couldn't match type: Id p0 x0
+                     with: Id p
+      Expected: w (Id p)
+        Actual: Sealed (Id p0 x0)
+    • In the first argument of ‘Just’, namely ‘rp'’
+      In the expression: Just rp'
+      In an equation for ‘rp’:
+          rp _
+            = Just rp'
+            where
+                rp' :: Sealed (Id p x)
+                rp' = undefined
+    • Relevant bindings include
+        rp :: Bool -> Maybe (w (Id p)) (bound at T3950.hs:16:1)

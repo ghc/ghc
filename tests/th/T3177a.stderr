@@ -1,0 +1,8 @@
+
+T3177a.hs:8:7: error: [GHC-83865]
+    • Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
+    • In the type signature: f :: (Int Int)
+
+T3177a.hs:11:6: error: [GHC-83865]
+    • Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
+    • In the type signature: g :: Int Int

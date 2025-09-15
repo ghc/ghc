@@ -1,0 +1,7 @@
+:l T25109.hs
+:break foo
+main
+:step
+:step
+:step
+:step

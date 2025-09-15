@@ -1,0 +1,5 @@
+
+LinearKind3.hs:8:1: error: [GHC-13218]
+    • Illegal linear function in a kind: * %1 -> *
+    • In the expansion of type synonym ‘K’
+      In the data type declaration for ‘T’

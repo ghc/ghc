@@ -1,0 +1,59 @@
+T11071.hs:19:12: error: [GHC-76037]
+    Not in scope: ‘NoSuchModule.foo’
+    Note: No module named ‘NoSuchModule’ is imported.
+
+T11071.hs:20:12: error: [GHC-76037]
+    Not in scope: ‘Data.List.foobar’
+    Note: The module ‘Data.List’ does not export ‘foobar’.
+
+T11071.hs:21:12: error: [GHC-76037]
+    Not in scope: ‘M.foobar’
+    Note: Neither ‘Data.IntMap’ nor ‘Data.Map’ export ‘foobar’.
+
+T11071.hs:22:12: error: [GHC-76037]
+    Not in scope: ‘M'.foobar’
+    Note: Neither ‘System.IO’,
+                  ‘Data.IntMap’ nor ‘Data.Map’ export ‘foobar’.
+
+T11071.hs:23:12: error: [GHC-76037]
+    Not in scope: ‘Data.List.sort’
+    Suggested fix:
+      Add ‘sort’ to the import list in the import of ‘Data.List’
+      (at T11071.hs:3:1-24).
+
+T11071.hs:24:12: error: [GHC-76037]
+    Not in scope: ‘Data.List.unlines’
+    Suggested fixes:
+      • Perhaps use ‘Data.List.lines’ (imported from Data.List)
+      • Add ‘unlines’ to the import list in the import of ‘Data.List’
+        (at T11071.hs:3:1-24).
+
+T11071.hs:25:12: error: [GHC-76037]
+    Not in scope: ‘M.size’
+    Suggested fix:
+      Add ‘size’ to one of these import lists:
+        ‘Data.IntMap’ (at T11071.hs:5:1-36)
+        ‘Data.Map’ (at T11071.hs:4:1-33)
+
+T11071.hs:26:12: error: [GHC-76037]
+    Not in scope: ‘M.valid’
+    Suggested fixes:
+      • Perhaps use one of these:
+          ‘M'.valid’ (imported from Data.Map),
+          ‘M'.valid’ (imported from Data.Map)
+      • Add ‘valid’ to the import list in the import of ‘Data.Map’
+        (at T11071.hs:4:1-33).
+
+T11071.hs:27:12: error: [GHC-76037]
+    Not in scope: data constructor ‘Ord.Down’
+    Suggested fix:
+      Remove ‘Down’ from the explicit hiding list in the import of
+      ‘Data.Ord’ (at T11071.hs:8:1-46).
+
+T11071.hs:28:12: error: [GHC-76037]
+    Not in scope: ‘M'.size’
+    Suggested fix:
+      Remove ‘size’ from the hiding clauses in one of these imports:
+        ‘Data.IntMap’ (at T11071.hs:12:1-48)
+        ‘Data.Map’ (at T11071.hs:10:1-53)
+

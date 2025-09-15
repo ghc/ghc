@@ -1,0 +1,11 @@
+
+T17267e.hs:16:14: error: [GHC-40404]
+    • Reduction stack overflow; size = 201
+      When simplifying the following type: Show a
+    • In the expression: show
+      In an equation for ‘pseudoShow’: pseudoShow = show
+    Suggested fix:
+      Use -freduction-depth=0 to disable this check
+      (any upper bound you could choose might fail unpredictably with
+       minor updates to GHC, so disabling the check is recommended if
+       you're sure that type checking should terminate)

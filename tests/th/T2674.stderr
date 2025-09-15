@@ -1,0 +1,4 @@
+
+T2674.hs:9:2: error: [GHC-52078]
+    Function binding for ‘foo’ has no equations
+    When splicing a TH declaration: 

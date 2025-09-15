@@ -1,0 +1,20 @@
+
+==================== Output Cmm ====================
+[func() { //  [D1]
+         { info_tbls: []
+           stack_info: arg_space: 8
+         }
+     {offset
+       c2: // global
+           //tick src<T25771.cmm:(4,18)-(8,1)>
+           //tick src<T25771.cmm:5:5-59>
+           //tick src<T25771.cmm:6:5-59>
+           _c1::F64 = D1;   // CmmAssign
+           _c1::F64 = %MO_F_Add_W64(D1, 12.345 :: W64);   // CmmAssign
+           D1 = %MO_F_Add_W64(_c1::F64,
+                              %MO_FF_Conv_W32_W64(0.6640625 :: W32));   // CmmAssign
+           call (P64[Sp])(D1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+

@@ -1,0 +1,4 @@
+<interactive>: error: [GHCi-21939]
+    Couldn't guess that module name. Does it exist?
+
+1

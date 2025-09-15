@@ -1,0 +1,15 @@
+:l shell.hs
+:def shell (\s -> do shell s; return "")
+
+:set -v1
+System.IO.writeFile "T1914A.hs" "module T1914A where { import T1914B; }"
+System.IO.writeFile "T1914B.hs" "module T1914B where { type T = Int; }"
+:load T1914A
+System.IO.writeFile "T1914A.hs" "module T1914A where { import T1914B; oops }"
+:reload
+-- T1914B should still be loaded
+:module *T1914B
+System.IO.writeFile "T1914A.hs" "module T1914A where { import T1914B; }"
+:shell echo >> T1914A.hs
+:reload
+-- should not have to reload T1914B

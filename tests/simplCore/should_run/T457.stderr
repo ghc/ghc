@@ -1,0 +1,7 @@
+T457: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Correct
+
+HasCallStack backtrace:
+  error, called at T457.hs:5:22 in main:Main
+

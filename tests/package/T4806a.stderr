@@ -1,0 +1,7 @@
+
+T4806a.hs:1:1: error: [GHC-87110]
+    Could not load module ‘Data.Map’.
+    It is a member of the package ‘containers-0.6.7’
+    which is unusable because the -ignore-package flag was used to ignore at least one of its dependencies:
+      deepseq-1.4.8.1 template-haskell-2.20.0.0
+    Use -v to see a list of the files searched for.

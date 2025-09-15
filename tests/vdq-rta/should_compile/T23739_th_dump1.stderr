@@ -1,0 +1,12 @@
+T23739_th_dump1.hs:(6,2)-(8,7): Splicing declarations
+    [d| f :: Integer -> forall a -> Num a => a
+        f n t = fromInteger n :: t |]
+  ======>
+    f :: Integer -> forall a -> Num a => a
+    f n t = fromInteger n :: t
+T23739_th_dump1.hs:(10,2)-(12,7): Splicing declarations
+    [d| x = 42 `f` Double
+        n = f 42 Integer |]
+  ======>
+    x = (42 `f` Double)
+    n = f 42 Integer

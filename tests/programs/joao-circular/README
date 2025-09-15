@@ -1,0 +1,6 @@
+This program went into an infinite loop when compiled with GHC 5.04.
+
+Input is
+
+	./joao-circular inp 40
+

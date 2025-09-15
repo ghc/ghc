@@ -1,0 +1,8 @@
+
+tcfail183.hs:5:30: error: [GHC-25955]
+    Illegal symbol ‘forall’ in type
+    Suggested fix:
+      Use the ‘ExplicitForAll’ extension (implied by ‘RankNTypes’,
+                                                     ‘QuantifiedConstraints’, ‘ScopedTypeVariables’,
+                                                     ‘LiberalTypeSynonyms’ and ‘ExistentialQuantification’)
+      to enable syntax: forall <tvs>. <type>

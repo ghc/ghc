@@ -1,0 +1,16 @@
+unit p where
+    signature A where
+        data T
+        x :: T
+unit q where
+    dependency signature p[A=<A>]
+    signature A (x) where
+    module M where
+        import A
+        y = x
+unit pimpl where
+    module A where
+        -- type T = Bool
+        x = True
+unit r where
+    dependency q[A=pimpl:A]

@@ -1,0 +1,5 @@
+Breakpoint 0 activated at Test6.hs:5:8-11
+Stopped in Main.main, Test6.hs:5:8-11
+_result :: a = _
+Stopped in Main.main, Test6.hs:5:8-11
+_result :: a = _

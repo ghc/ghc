@@ -1,0 +1,11 @@
+-- Breakpoints in do statements
+:l dynbrk007.hs
+:st f
+:st
+:st
+:st
+:st
+:st
+:st
+:st
+:st

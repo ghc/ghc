@@ -1,0 +1,22 @@
+{-# LANGUAGE TypeFamilies #-}
+unit f where
+    module F where
+        type family F a
+unit p where
+    dependency f
+    signature A where
+        data T
+    module P where
+        import F
+        import A
+        type instance F T = Bool
+unit q where
+    dependency p[A=<B>]
+    dependency f
+    module Q where
+        import F
+        import B
+        import P
+        x :: F T
+        x = True
+

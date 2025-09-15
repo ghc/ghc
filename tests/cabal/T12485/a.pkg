@@ -1,0 +1,6 @@
+name: a
+version: 1
+id: a-1-XXX
+key: a-1-XXX
+abi: aaa
+depends:

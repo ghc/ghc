@@ -1,0 +1,13 @@
+unit p where
+    signature A where
+        instance Show (a -> b)
+    module B where
+        import A
+        f = show (\x -> x)
+unit q where
+    module A where
+unit r where
+    dependency p[A=q:A]
+    module C where
+        import B
+        g = show (\x -> x)

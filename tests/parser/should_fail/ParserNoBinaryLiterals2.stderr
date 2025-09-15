@@ -1,0 +1,5 @@
+
+ParserNoBinaryLiterals2.hs:9:4: error: [GHC-27346]
+    • The data constructor ‘W#’ should have 1 argument, but has been given 2
+    • In the pattern: W# 0 b0##
+      In an equation for ‘f’: f (W# 0 b0##) = ()

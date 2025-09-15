@@ -1,0 +1,8 @@
+
+gadtSyntaxFail003.hs:8:5: error: [GHC-25709]
+    • Data constructor ‘C1’ has existential type variables, a context, or a specialised result type
+        C1 :: forall a c b. a -> Int -> c -> Foo b a
+    • In the definition of data constructor ‘C1’
+      In the data type declaration for ‘Foo’
+    Suggested fix:
+      Enable any of the following extensions: ‘ExistentialQuantification’ or ‘GADTs’

@@ -1,0 +1,5 @@
+
+T7906.hs:5:15: error: [GHC-44432]
+    The INLINABLE pragma for ‘foo’ lacks an accompanying binding
+    Suggested fix:
+      Move the INLINABLE pragma to the declaration site of ‘foo’.

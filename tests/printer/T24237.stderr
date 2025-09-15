@@ -1,0 +1,7 @@
+T24237.hs:8:7: error: [GHC-83865]
+    • Couldn't match expected type ‘Proxy '(:)’ with actual type ‘()’
+    • In the expression: ()
+      In an equation for ‘foo’: foo = ()
+    • Relevant bindings include
+        foo :: Proxy '(:) (bound at T24237.hs:8:1)
+

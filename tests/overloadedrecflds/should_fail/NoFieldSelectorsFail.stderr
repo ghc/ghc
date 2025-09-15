@@ -1,0 +1,46 @@
+
+NoFieldSelectorsFail.hs:9:14: error: [GHC-87543]
+    Ambiguous occurrence ‘foo’.
+    It could refer to
+       either the field ‘foo’ of record ‘Foo’,
+              imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
+              (and originally defined at NoFieldSelectorsFailA.hs:5:18-20),
+           or the field ‘foo’ of record ‘Bar’,
+              imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
+              (and originally defined at NoFieldSelectorsFailA.hs:6:18-20).
+
+NoFieldSelectorsFail.hs:12:15: error: [GHC-56428]
+    Ambiguous record field ‘foo’.
+    It could refer to any of the following:
+      • record field ‘foo’ of ‘Foo’,
+        imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
+        (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
+      • record field ‘foo’ of ‘Bar’,
+        imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
+        (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
+    Suggested fix:
+      Perhaps you intended to use the ‘DisambiguateRecordFields’ extension (implied by ‘RecordWildCards’ and ‘DuplicateRecordFields’)
+
+NoFieldSelectorsFail.hs:14:15: error: [GHC-56428]
+    Ambiguous record field ‘foo’.
+    It could refer to any of the following:
+      • record field ‘foo’ of ‘Foo’,
+        imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
+        (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
+      • record field ‘foo’ of ‘Bar’,
+        imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
+        (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
+    Suggested fix:
+      Perhaps you intended to use the ‘DisambiguateRecordFields’ extension (implied by ‘RecordWildCards’ and ‘DuplicateRecordFields’)
+
+NoFieldSelectorsFail.hs:16:15: error: [GHC-56428]
+    Ambiguous record field ‘bar’.
+    It could refer to any of the following:
+      • record field ‘bar’ of ‘Foo’,
+        imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
+        (and originally defined at NoFieldSelectorsFailA.hs:5:30-32)
+      • variable ‘bar’,
+        imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
+        (and originally defined at NoFieldSelectorsFailA.hs:8:1-3)
+    Suggested fix:
+      Perhaps you intended to use the ‘DisambiguateRecordFields’ extension (implied by ‘RecordWildCards’ and ‘DuplicateRecordFields’)

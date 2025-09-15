@@ -1,0 +1,55 @@
+TYPE SIGNATURES
+  foo :: forall a b. C a b => a -> b -> a
+  op :: forall a b. C a b => a -> a
+TYPE CONSTRUCTORS
+  class C{2} :: * -> * -> Constraint
+Dependent modules: []
+Dependent packages: [(normal, base-4.21.0.0)]
+
+==================== Typechecker ====================
+Bug.$tcC
+  = GHC.Internal.Types.TyCon
+      12754692886077552850#Word64 18375870125396612007#Word64
+      Bug.$trModule (GHC.Internal.Types.TrNameS "C"#) 0# $krep
+Bug.$tc'C:C
+  = GHC.Internal.Types.TyCon
+      302756782745842909#Word64 14248103394115774781#Word64 Bug.$trModule
+      (GHC.Internal.Types.TrNameS "'C:C"#) 2# $krep
+$krep [InlPrag=[~]]
+  = GHC.Internal.Types.KindRepTyConApp
+      Bug.$tcC
+      ((:) @GHC.Internal.Types.KindRep
+         $krep
+         ((:) @GHC.Internal.Types.KindRep
+            $krep [] @GHC.Internal.Types.KindRep))
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 1
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]]
+  = GHC.Internal.Types.KindRepFun GHC.Internal.Types.krep$* $krep
+$krep [InlPrag=[~]]
+  = GHC.Internal.Types.KindRepFun
+      GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+Bug.$trModule
+  = GHC.Internal.Types.Module
+      (GHC.Internal.Types.TrNameS "main"#)
+      (GHC.Internal.Types.TrNameS "Bug"#)
+AbsBinds [] []
+  {Exports: [foo <= foo
+               wrap: <>]
+   Exported types: foo :: forall a b. C a b => a -> b -> a
+                   [LclId]
+   Binds: foo x y
+            = blah x
+            where
+                AbsBinds [] []
+                  {Exports: [blah <= blah
+                               wrap: <>]
+                   Exported types: blah :: a -> a
+                                   [LclId]
+                   Binds: blah z = [x, z] `seq` op z
+                   Evidence: [EvBinds{[W] $dC = $dC}]}
+   Evidence: [EvBinds{}]}
+
+

@@ -1,0 +1,11 @@
+
+T16635c.hs:7:21: error: [GHC-47557]
+    • Type variable ‘a’ cannot be used here
+        (type variables bound in a kind signature cannot be used in the type)
+    • In the first argument of ‘Proxy’, namely ‘a’
+      In the type signature: g :: (Proxy a :: forall a. Type)
+      In the expression:
+        let
+          g :: (Proxy a :: forall a. Type)
+          g = Proxy
+        in ()

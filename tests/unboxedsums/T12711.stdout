@@ -1,0 +1,3 @@
+(# _ | _ #) :: TYPE
+                 (GHC.Internal.Types.SumRep
+                    [GHC.Internal.Types.LiftedRep, GHC.Internal.Types.LiftedRep])

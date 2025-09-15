@@ -1,0 +1,35 @@
+T23501_fail.hs:9:14: error: [GHC-65507]
+    • Wildcard binder ‘_’ not allowed in a forall telescope
+    • In the type signature for ‘f1’
+
+T23501_fail.hs:9:16: error: [GHC-65507]
+    • Wildcard binder ‘_’ not allowed in a forall telescope
+    • In the type signature for ‘f1’
+
+T23501_fail.hs:12:15: error: [GHC-65507]
+    • Wildcard binder ‘_’ not allowed in a forall telescope
+    • In the type signature for ‘f2’
+
+T23501_fail.hs:12:17: error: [GHC-65507]
+    • Wildcard binder ‘_’ not allowed in a forall telescope
+    • In the type signature for ‘f2’
+
+T23501_fail.hs:15:14: error: [GHC-65507]
+    • Wildcard binder ‘_’ not allowed in a forall telescope
+    • In the type signature for ‘f3’
+
+T23501_fail.hs:15:18: error: [GHC-65507]
+    • Wildcard binder ‘_’ not allowed in a forall telescope
+    • In the type signature for ‘f3’
+
+T23501_fail.hs:19:17: error: [GHC-65507]
+    • Wildcard binder ‘_’ not allowed in a forall telescope
+    • In a type argument
+
+T23501_fail.hs:19:41: error: [GHC-65507]
+    • Wildcard binder ‘_’ not allowed in a forall telescope
+    • In a type argument
+
+T23501_fail.hs:21:20: error: [GHC-65507]
+    Wildcard binder ‘_’ not allowed in a type family result
+

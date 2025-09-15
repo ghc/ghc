@@ -1,0 +1,7 @@
+T10796b.hs:8:15: error: [GHC-87897]
+    • Exception when trying to run compile-time code:
+        Can't construct a pattern from name Data.Set.Internal.fromList
+      Code: (dataToPatQ (const Nothing) (fromList "test"))
+    • In the untyped splice:
+        $(dataToPatQ (const Nothing) (fromList "test"))
+

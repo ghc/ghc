@@ -1,0 +1,1 @@
+T :: forall {k} {j} (p :: k). j -> Type -> P p -> Type

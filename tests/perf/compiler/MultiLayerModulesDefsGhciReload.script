@@ -1,0 +1,4 @@
+:set -fforce-recomp
+:l MultiLayerModules.hs
+:r
+:r

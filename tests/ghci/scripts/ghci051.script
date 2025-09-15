@@ -1,0 +1,18 @@
+--Testing complex type and constructor shadowing
+data T = A | B
+type T' = T
+let b = B :: T'
+data   T = B | C
+let c = C :: T'
+let c = C
+data     T = C | D
+let d = D
+:i T
+:i T'
+:i A
+:i B
+:i C
+:i D
+:i b
+:i c
+:i d

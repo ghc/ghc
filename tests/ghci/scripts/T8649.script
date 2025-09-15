@@ -1,0 +1,4 @@
+data X = Y Int
+let f (Y i) = i
+data X = Y Int | Z String
+f (Y 3)

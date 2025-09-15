@@ -1,0 +1,9 @@
+
+saks_fail019.hs:9:1: error: [GHC-25897]
+    • Couldn't match kind ‘x’ with ‘*’
+      Expected: x -> *
+        Actual: * -> *
+      ‘x’ is a rigid type variable bound by
+        the data type declaration for ‘T’
+        at saks_fail019.hs:9:8
+    • In the data type declaration for ‘T’

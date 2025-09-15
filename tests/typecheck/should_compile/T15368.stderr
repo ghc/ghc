@@ -1,0 +1,47 @@
+T15368.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: (F a b, F a0 b0)
+      Where: ‘a0’ is an ambiguous type variable
+             ‘b0’ is an ambiguous type variable
+             ‘a’, ‘b’ are rigid type variables bound by
+               the type signature for:
+                 trigger :: forall a b. a -> b -> (F a b, F b a)
+               at T15368.hs:10:1-35
+    • In the first argument of ‘transitive’, namely ‘_’
+      In the expression: _ `transitive` trigger _ _
+      In an equation for ‘trigger’:
+          trigger _ _ = _ `transitive` trigger _ _
+    • Relevant bindings include
+        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)
+
+T15368.hs:11:30: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type: F b0 a0
+                     with: F b a
+      Expected: (F a0 b0, F b a)
+        Actual: (F a0 b0, F b0 a0)
+      Note: ‘F’ is a non-injective type family.
+      The type variables ‘b0’, ‘a0’ are ambiguous
+    • In the second argument of ‘transitive’, namely ‘trigger _ _’
+      In the expression: _ `transitive` trigger _ _
+      In an equation for ‘trigger’:
+          trigger _ _ = _ `transitive` trigger _ _
+    • Relevant bindings include
+        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)
+
+T15368.hs:11:38: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a0
+      Where: ‘a0’ is an ambiguous type variable
+    • In the first argument of ‘trigger’, namely ‘_’
+      In the second argument of ‘transitive’, namely ‘trigger _ _’
+      In the expression: _ `transitive` trigger _ _
+    • Relevant bindings include
+        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)
+
+T15368.hs:11:40: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: b0
+      Where: ‘b0’ is an ambiguous type variable
+    • In the second argument of ‘trigger’, namely ‘_’
+      In the second argument of ‘transitive’, namely ‘trigger _ _’
+      In the expression: _ `transitive` trigger _ _
+    • Relevant bindings include
+        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)
+

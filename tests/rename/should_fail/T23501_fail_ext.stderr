@@ -1,0 +1,10 @@
+T23501_fail_ext.hs:5:1: error: [GHC-12211]
+    Illegal wildcard binder: _
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
+
+T23501_fail_ext.hs:7:1: error: [GHC-12211]
+    Illegal wildcard binder: (_ :: k)
+    Suggested fix:
+      Perhaps you intended to use the ‘TypeAbstractions’ extension
+

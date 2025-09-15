@@ -1,0 +1,4 @@
+
+T11356.hs:3:7: error: [GHC-83865]
+    • Expected kind ‘k0 -> Constraint’, but ‘T p’ has kind ‘Constraint’
+    • In the class declaration for ‘C’

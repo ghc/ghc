@@ -1,0 +1,4 @@
+EmptyParStmt.hs:7:2: error: [GHC-95595]
+    Empty par stmt
+    When splicing a TH declaration: foo = []
+
