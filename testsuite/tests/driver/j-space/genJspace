@@ -9,25 +9,22 @@ DEPTH=8
 WIDTH=40
 echo "module JSpaceTest where" > JSpaceTest.hs
 echo "module W where" > W.hs
-  for j in $(seq -w 1 300); do
-    echo "w$j = 123" >> W.hs;
-  done
+
+awk -v len="10" 'BEGIN {for (i=1;i<=len;i++) print "w"i" = 123"}' >> W.hs
+
 for i in $(seq -w 1 $WIDTH); do
   echo "module W$i where" > W$i.hs;
   echo "import W" >> W$i.hs;
   echo "import W$i" >> JSpaceTest.hs;
-  for j in $(seq -w 1 1000); do
-    echo "w$j = 123" >> W$i.hs;
-  done
+  awk -v len="1000" 'BEGIN {for (i=1;i<=len;i++) print "w"i" = 123"}' >> W$i.hs;
 done
+
 echo "module H0 where" > H0.hs;
 echo "import {-# SOURCE #-} H$DEPTH" >> H0.hs;
 echo "import H$DEPTH" >> JSpaceTest.hs;
 for i in $(seq -w 1 $DEPTH); do
   echo "module H$i where" > H$i.hs;
   echo "import H$((i-1))" >> H$i.hs;
-  for j in $(seq -w 1 100); do
-    echo "h$j = 123" >> H$i.hs;
-  done
+  awk -v len="100" 'BEGIN {for (i=1;i<=len;i++) print "h"i" = 123"}' >> H$i.hs;
 done
 echo "module H$DEPTH where" > H$DEPTH.hs-boot;
