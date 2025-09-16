@@ -1093,16 +1093,64 @@ being updated: in this case, MkR1 and MkR2 have both of the updated fields.
 The TyCon S also has both fields fld1 and fld2, but no single constructor
 has both of those fields, so S is not a valid parent for this record update.
 
-Note that this check is namespace-aware, so that a record update such as
+  (3)
+    (a)
+      If there is at least one possible parent TyCon, succeed. The typechecker
+      might still be able to disambiguate if there remains more than one
+      candidate parent TyCon (see Note [Type-directed record disambiguation]).
+    (b)
+      Otherwise, report an error saying "No constructor has all these fields".
+      This is the job of GHC.Rename.Env.badFieldsUpd. This function tries
+      to report a minimal set of fields, so that in a record update like
+
+        r { fld1 = x1, fld2 = x2, [...], fld99 = x99 }
+
+      we don't report a massive error message saying "No constructor has all
+      the fields fld1, ..., fld99" and instead report e.g. "No constructor
+      has all the fields { fld3, fld17 }".
+
+Wrinkle [Qualified names in record updates]
+
+  Note that we must take into account qualified names in (1), so that a record
+  update such as
 
     import qualified M ( R (fld1, fld2) )
     f r = r { M.fld1 = 3 }
 
-is unambiguous, as only R contains the field fld1 in the M namespace.
-(See however #22122 for issues relating to the usage of exact Names in
-record fields.)
+  is unambiguous: only R contains the field fld1 in the M namespace.
 
-See also Note [Type-directed record disambiguation] in GHC.Tc.Gen.Expr.
+  The function that looks up the GREs for the record update is 'lookupFieldGREs',
+  which uses 'lookupGRE env (LookupRdrName ...)', ensuring that we correctly
+  filter the GREs with the correct module qualification (with 'pickGREs').
+
+  (See however #22122 for issues relating to the usage of exact Names in
+  record fields.)
+
+Wrinkle [Out of scope constructors]
+
+  For (3)(b), we have an invalid record update because no constructor has
+  all of the fields of the record update. The 'badFieldsUpd' then tries to
+  compute a minimal set of fields which are not children of any single
+  constructor. The way this is done is explained in
+  Note [Finding the conflicting fields] in GHC.Rename.Env, but in short that
+  function needs a mapping from ConLike to all of its fields to do its business.
+  (You may remark that we did not need such a mapping for step (2).)
+
+  This means we need to look up each constructor and find its fields; this
+  information is stored in the GREInfo field of a constructor GRE.
+  We need this information even if the constructor itself is not in scope, so
+  we proceed as follows:
+
+    1. First look up the constructor in the GlobalRdrEnv, using lookupGRE_Name.
+       This handles constructors defined in the current module being renamed,
+       as well as in-scope imported constructors.
+    2. If that fails (e.g. the field is imported but the constructor is not),
+       then look up the GREInfo of the constructor in the TypeEnv, using
+       lookupGREInfo. This makes sure we give the right error message even when
+       the constructors are not in scope (#26391).
+
+    Note that we do need (1), as (2) does not handle constructors defined in the
+    current module being renamed (as those have not yet been added to the TypeEnv).
 
 Note [Using PatSyn FreeVars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
