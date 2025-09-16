@@ -145,7 +145,7 @@ import GHC.Parser.String
 $unispace    = \x05 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $nl          = [\n\r\f]
 $space       = [\ $unispace]
-$whitechar   = [$nl \v $space]
+$whitechar   = [$nl \t \v $space]
 $white_no_nl = $whitechar # \n -- TODO #8424
 $tab         = \t
 
@@ -248,7 +248,7 @@ haskell :-
 -- Alex "Rules"
 
 -- everywhere: skip whitespace
-$white_no_nl+ ;
+($white_no_nl # \t)+ ;
 $tab          { warnTab }
 
 -- Everywhere: deal with nested comments.  We explicitly rule out

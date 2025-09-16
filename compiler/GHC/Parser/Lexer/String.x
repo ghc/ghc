@@ -25,7 +25,7 @@ import GHC.Utils.Panic (panic)
 $unispace    = \x05 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $nl          = [\n\r\f]
 $space       = [\ $unispace]
-$whitechar   = [$nl \v $space]
+$whitechar   = [$nl \t \v $space]
 $tab         = \t
 
 $ascdigit  = 0-9
