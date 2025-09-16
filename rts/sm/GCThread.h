@@ -212,8 +212,4 @@ extern uint32_t n_gc_threads;
 
 extern gc_thread **gc_threads;
 
-#if defined(THREADED_RTS) && defined(CC_LLVM_BACKEND)
-extern ThreadLocalKey gctKey;
-#endif
-
 #include "EndPrivate.h"
