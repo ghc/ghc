@@ -27,6 +27,7 @@ test('RecordDotSyntax4', [extra_files(['RecordDotSyntaxA.hs'])], multimod_compil
 test('RecordDotSyntax5', normal, compile_and_run, [''])
 test('ListTuplePunsConstraints', extra_files(['ListTuplePunsConstraints.hs']), ghci_script, ['ListTuplePunsConstraints.script'])
 test('T25937', normal, compile_and_run, [''])
+test('T26415', normal, compile_and_run, [''])
 
 # Multiline strings
 test('MultilineStrings', normal, compile_and_run, [''])
