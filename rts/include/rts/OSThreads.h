@@ -40,7 +40,6 @@ typedef struct {
 } Condition;
 typedef pthread_mutex_t Mutex;
 typedef pthread_t       OSThreadId;
-typedef pthread_key_t   ThreadLocalKey;
 
 #define OSThreadProcAttr /* nothing */
 
@@ -107,7 +106,6 @@ typedef CONDITION_VARIABLE Condition;
 typedef DWORD OSThreadId;
 // don't be tempted to use HANDLE as the OSThreadId: there can be
 // many HANDLES to a given thread, so comparison would not work.
-typedef DWORD ThreadLocalKey;
 
 #define OSThreadProcAttr
 
@@ -168,7 +166,6 @@ typedef SRWLOCK Mutex;
 typedef void* Condition;
 typedef void* Mutex;
 typedef void* OSThreadId;
-typedef void* ThreadLocalKey;
 
 #define OSThreadProcAttr
 
@@ -215,14 +212,6 @@ extern bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout)
 //
 extern void initMutex             ( Mutex* pMut );
 extern void closeMutex            ( Mutex* pMut );
-
-//
-// Thread-local storage
-//
-void  newThreadLocalKey (ThreadLocalKey *key);
-void *getThreadLocalVar (ThreadLocalKey *key);
-void  setThreadLocalVar (ThreadLocalKey *key, void *value);
-void  freeThreadLocalKey (ThreadLocalKey *key);
 
 // Processors and affinity
 void setThreadAffinity (uint32_t n, uint32_t m);
