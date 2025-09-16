@@ -298,13 +298,13 @@ renderSpace :: Int -> String -> Html
 renderSpace !_ "" = Html.noHtml
 renderSpace !line ('\n' : rest) =
   mconcat
-    [ Html.thespan (Html.toHtml '\n')
+    [ Html.toHtml '\n'
     , lineAnchor (line + 1)
     , renderSpace (line + 1) rest
     ]
 renderSpace line space =
   let (hspace, rest) = span (/= '\n') space
-   in (Html.thespan . Html.toHtml) hspace <> renderSpace line rest
+   in Html.toHtml hspace <> renderSpace line rest
 
 lineAnchor :: Int -> Html
 lineAnchor line = Html.thespan Html.noHtml ! [Html.identifier $ hypSrcLineUrl line]

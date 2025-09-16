@@ -8,69 +8,49 @@
   ><pre
     ><span class="hs-pragma"
       >{-# LANGUAGE Haskell2010 #-}</span
-      ><span
       >
-</span
-      ><span id="line-2"
+<span id="line-2"
       ></span
       ><span class="hs-comment"
       >-- Tests that the identifiers/operators are properly linked even when:</span
-      ><span
       >
-</span
-      ><span id="line-3"
+<span id="line-3"
       ></span
       ><span class="hs-comment"
       >--</span
-      ><span
       >
-</span
-      ><span id="line-4"
+<span id="line-4"
       ></span
       ><span class="hs-comment"
       >--   * backquoted, parenthesized, vanilla</span
-      ><span
       >
-</span
-      ><span id="line-5"
+<span id="line-5"
       ></span
       ><span class="hs-comment"
       >--   * qualified, not-qualified</span
-      ><span
       >
-</span
-      ><span id="line-6"
+<span id="line-6"
       ></span
       ><span class="hs-comment"
       >--</span
-      ><span
       >
-</span
-      ><span id="line-7"
+<span id="line-7"
       ></span
       ><span class="hs-keyword"
       >module</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><a href="LinkingIdentifiers.html"
 	><span class="hs-identifier"
 	  >LinkingIdentifiers</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="hs-keyword"
+      > <span class="hs-keyword"
       >where</span
-      ><span
       >
-</span
-      ><span id="line-8"
+<span id="line-8"
       ></span
-      ><span
       >
-</span
-      ><span id="line-9"
+<span id="line-9"
       ></span
       ><span class="annot"
       ><a href="#ident"
@@ -78,40 +58,26 @@
 	  >ident</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >::</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="hs-identifier hs-type"
 	>Int</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >-&gt;</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="hs-identifier hs-type"
 	>Int</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >-&gt;</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="hs-identifier hs-type"
 	>Int</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-10"
+<span id="line-10"
       ></span
       ><span id=""
       ><span class="annot"
@@ -124,9 +90,7 @@
 	    ></a
 	  ></span
 	></span
-      ><span
-      > </span
-      ><span id="ident"
+      > <span id="ident"
       ><span class="annot"
 	><span class="annottext"
 	  >ident :: Int -&gt; Int -&gt; Int
@@ -137,22 +101,16 @@
 	    ></a
 	  ></span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
 	><span class="hs-number"
 	>2</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >=</span
-      ><span
-      > </span
-      ><span class="hs-special"
+      > <span class="hs-special"
       >(</span
       ><span class="annot"
       ><span class="annottext"
@@ -163,9 +121,7 @@
 	  >x</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 </span
@@ -174,9 +130,7 @@
 	  >`ident`</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
@@ -185,9 +139,7 @@
 	></span
       ><span class="hs-special"
       >)</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 forall a. Num a =&gt; a -&gt; a -&gt; a
@@ -195,9 +147,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	><span class="hs-operator hs-var"
 	>+</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-special"
+      > <span class="hs-special"
       >(</span
       ><span class="annot"
       ><span class="annottext"
@@ -208,9 +158,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >x</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 </span
@@ -219,9 +167,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >`LinkingIdentifiers.ident`</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
@@ -230,10 +176,8 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	></span
       ><span class="hs-special"
       >)</span
-      ><span
       >
-</span
-      ><span id="line-11"
+<span id="line-11"
       ></span
       ><span class="annot"
       ><a href="#ident"
@@ -241,9 +185,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >ident</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span id=""
+      > <span id=""
       ><span class="annot"
 	><span class="annottext"
 	  >Int
@@ -254,22 +196,16 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	    ></a
 	  ></span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
 	><span class="hs-number"
 	>2</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >=</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 </span
@@ -278,9 +214,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >ident</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
@@ -289,18 +223,14 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >x</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
 	><span class="hs-number"
 	>2</span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 forall a. Num a =&gt; a -&gt; a -&gt; a
@@ -308,9 +238,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	><span class="hs-operator hs-var"
 	>+</span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 </span
@@ -319,9 +247,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >LinkingIdentifiers.ident</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
@@ -330,24 +256,18 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >x</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
 	><span class="hs-number"
 	>2</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-12"
+<span id="line-12"
       ></span
-      ><span
       >
-</span
-      ><span id="line-13"
+<span id="line-13"
       ></span
       ><span class="annot"
       ><a href="#%2B%2B%3A%2B%2B"
@@ -355,40 +275,26 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >(++:++)</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >::</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="hs-identifier hs-type"
 	>Int</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >-&gt;</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="hs-identifier hs-type"
 	>Int</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >-&gt;</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="hs-identifier hs-type"
 	>Int</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-14"
+<span id="line-14"
       ></span
       ><span id=""
       ><span class="annot"
@@ -401,9 +307,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	    ></a
 	  ></span
 	></span
-      ><span
-      > </span
-      ><span id="%2B%2B%3A%2B%2B"
+      > <span id="%2B%2B%3A%2B%2B"
       ><span class="annot"
 	><span class="annottext"
 	  >++:++ :: Int -&gt; Int -&gt; Int
@@ -414,22 +318,16 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	    ></a
 	  ></span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
 	><span class="hs-number"
 	>2</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >=</span
-      ><span
-      > </span
-      ><span class="hs-special"
+      > <span class="hs-special"
       >(</span
       ><span class="annot"
       ><span class="annottext"
@@ -440,9 +338,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >x</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 </span
@@ -451,9 +347,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >++:++</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
@@ -462,9 +356,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	></span
       ><span class="hs-special"
       >)</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 forall a. Num a =&gt; a -&gt; a -&gt; a
@@ -472,9 +364,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	><span class="hs-operator hs-var"
 	>+</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-special"
+      > <span class="hs-special"
       >(</span
       ><span class="annot"
       ><span class="annottext"
@@ -485,9 +375,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >x</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 </span
@@ -496,9 +384,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >LinkingIdentifiers.++:++</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
@@ -507,10 +393,8 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	></span
       ><span class="hs-special"
       >)</span
-      ><span
       >
-</span
-      ><span id="line-15"
+<span id="line-15"
       ></span
       ><span class="annot"
       ><a href="#%2B%2B%3A%2B%2B"
@@ -518,9 +402,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >(++:++)</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span id=""
+      > <span id=""
       ><span class="annot"
 	><span class="annottext"
 	  >Int
@@ -531,22 +413,16 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	    ></a
 	  ></span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
 	><span class="hs-number"
 	>2</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >=</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 </span
@@ -555,9 +431,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >(++:++)</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
@@ -566,18 +440,14 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >x</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
 	><span class="hs-number"
 	>2</span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 forall a. Num a =&gt; a -&gt; a -&gt; a
@@ -585,9 +455,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	><span class="hs-operator hs-var"
 	>+</span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int -&gt; Int -&gt; Int
 </span
@@ -596,9 +464,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >(LinkingIdentifiers.++:++)</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
@@ -607,19 +473,15 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
 	  >x</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Int
 </span
 	><span class="hs-number"
 	>2</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-16"
+<span id="line-16"
       ></span
       ></pre
     ></body

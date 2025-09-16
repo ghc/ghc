@@ -8,90 +8,62 @@
   ><pre
     ><span class="hs-pragma"
       >{-# LANGUAGE Haskell2010 #-}</span
-      ><span
       >
-</span
-      ><span id="line-2"
+<span id="line-2"
       ></span
       ><span class="hs-keyword"
       >module</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><a href="Quasiquoter.html"
 	><span class="hs-identifier"
 	  >Quasiquoter</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="hs-special"
+      > <span class="hs-special"
       >(</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><a href="#string"
 	><span class="hs-identifier"
 	  >string</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="hs-special"
+      > <span class="hs-special"
       >)</span
-      ><span
-      > </span
-      ><span class="hs-keyword"
+      > <span class="hs-keyword"
       >where</span
-      ><span
       >
-</span
-      ><span id="line-3"
+<span id="line-3"
       ></span
-      ><span
       >
-</span
-      ><span id="line-4"
+<span id="line-4"
       ></span
       ><span class="hs-keyword"
       >import</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="hs-identifier"
 	>Language.Haskell.TH.Quote</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-5"
+<span id="line-5"
       ></span
       ><span class="hs-keyword"
       >import</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="hs-identifier"
 	>Language.Haskell.TH.Syntax</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-6"
+<span id="line-6"
       ></span
-      ><span
       >
-</span
-      ><span id="line-7"
+<span id="line-7"
       ></span
       ><span class="annot"
       ><span class="hs-comment"
 	>-- | Quoter for constructing multiline string literals</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-8"
+<span id="line-8"
       ></span
       ><span class="annot"
       ><a href="#string"
@@ -99,20 +71,14 @@
 	  >string</span
 	  ></a
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >::</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="hs-identifier hs-type"
 	>QuasiQuoter</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-9"
+<span id="line-9"
       ></span
       ><span id="string"
       ><span class="annot"
@@ -125,41 +91,27 @@
 	    ></a
 	  ></span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >=</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="hs-identifier hs-type"
 	>QuasiQuoter</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-10"
+<span id="line-10"
       ></span
-      ><span
-      >  </span
-      ><span class="hs-special"
+      >  <span class="hs-special"
       >{</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>quoteExp :: String -&gt; Q Exp
 </span
 	><span class="hs-identifier hs-var"
 	>quoteExp</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >=</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Exp -&gt; Q Exp
 forall a. a -&gt; Q a
@@ -168,9 +120,7 @@ forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
 	><span class="hs-identifier hs-var"
 	>pure</span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>(Exp -&gt; Q Exp) -&gt; (String -&gt; Exp) -&gt; String -&gt; Q Exp
 forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
@@ -178,18 +128,14 @@ forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
 	><span class="hs-operator hs-var"
 	>.</span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>Lit -&gt; Exp
 </span
 	><span class="hs-identifier hs-var"
 	>LitE</span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>(Lit -&gt; Exp) -&gt; (String -&gt; Lit) -&gt; String -&gt; Exp
 forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
@@ -197,40 +143,28 @@ forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
 	><span class="hs-operator hs-var"
 	>.</span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>String -&gt; Lit
 </span
 	><span class="hs-identifier hs-var"
 	>StringL</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-11"
+<span id="line-11"
       ></span
-      ><span
-      >  </span
-      ><span class="hs-special"
+      >  <span class="hs-special"
       >,</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>quotePat :: String -&gt; Q Pat
 </span
 	><span class="hs-identifier hs-var"
 	>quotePat</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >=</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>String -&gt; Q Pat
 forall a. String -&gt; Q a
@@ -240,31 +174,21 @@ forall a. String -&gt; Q a
 	  >invalidDomain</span
 	  ></a
 	></span
-      ><span
       >
-</span
-      ><span id="line-12"
+<span id="line-12"
       ></span
-      ><span
-      >  </span
-      ><span class="hs-special"
+      >  <span class="hs-special"
       >,</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>quoteType :: String -&gt; Q Type
 </span
 	><span class="hs-identifier hs-var"
 	>quoteType</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >=</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>String -&gt; Q Type
 forall a. String -&gt; Q a
@@ -274,31 +198,21 @@ forall a. String -&gt; Q a
 	  >invalidDomain</span
 	  ></a
 	></span
-      ><span
       >
-</span
-      ><span id="line-13"
+<span id="line-13"
       ></span
-      ><span
-      >  </span
-      ><span class="hs-special"
+      >  <span class="hs-special"
       >,</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>quoteDec :: String -&gt; Q [Dec]
 </span
 	><span class="hs-identifier hs-var"
 	>quoteDec</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >=</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>String -&gt; Q [Dec]
 forall a. String -&gt; Q a
@@ -308,75 +222,49 @@ forall a. String -&gt; Q a
 	  >invalidDomain</span
 	  ></a
 	></span
-      ><span
       >
-</span
-      ><span id="line-14"
+<span id="line-14"
       ></span
-      ><span
-      >  </span
-      ><span class="hs-special"
+      >  <span class="hs-special"
       >}</span
-      ><span
       >
-</span
-      ><span id="line-15"
+<span id="line-15"
       ></span
-      ><span
-      >  </span
-      ><span class="hs-keyword"
+      >  <span class="hs-keyword"
       >where</span
-      ><span
       >
-</span
-      ><span id="line-16"
+<span id="line-16"
       ></span
-      ><span
-      >    </span
-      ><span id=""
+      >    <span id=""
       ><span class="annot"
 	><a href="#"
 	  ><span class="hs-identifier hs-type"
 	    >invalidDomain</span
 	    ></a
 	  ></span
-	><span
-	> </span
-	><span class="hs-glyph"
+	> <span class="hs-glyph"
 	>::</span
-	><span
-	> </span
-	><span class="annot"
+	> <span class="annot"
 	><span class="hs-identifier hs-type"
 	  >String</span
 	  ></span
-	><span
-	> </span
-	><span class="hs-glyph"
+	> <span class="hs-glyph"
 	>-&gt;</span
-	><span
-	> </span
-	><span class="annot"
+	> <span class="annot"
 	><span class="hs-identifier hs-type"
 	  >Q</span
 	  ></span
-	><span
-	> </span
-	><span class="annot"
+	> <span class="annot"
 	><a href="#"
 	  ><span class="hs-identifier hs-type"
 	    >a</span
 	    ></a
 	  ></span
 	></span
-      ><span
       >
-</span
-      ><span id="line-17"
+<span id="line-17"
       ></span
-      ><span
-      >    </span
-      ><span id=""
+      >    <span id=""
       ><span class="annot"
 	><span class="annottext"
 	  >invalidDomain :: forall a. String -&gt; Q a
@@ -387,22 +275,16 @@ forall a. String -&gt; Q a
 	    ></a
 	  ></span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>String
 </span
 	><span class="hs-identifier"
 	>_</span
 	></span
-      ><span
-      > </span
-      ><span class="hs-glyph"
+      > <span class="hs-glyph"
       >=</span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>String -&gt; Q a
 forall a. HasCallStack =&gt; String -&gt; Q a
@@ -413,19 +295,15 @@ String -&gt; m a
 	><span class="hs-identifier hs-var"
 	>fail</span
 	></span
-      ><span
-      > </span
-      ><span class="annot"
+      > <span class="annot"
       ><span class="annottext"
 	>String
 </span
 	><span class="hs-string"
 	>&quot;stringQuoter: only valid in expression context&quot;</span
 	></span
-      ><span
       >
-</span
-      ><span id="line-18"
+<span id="line-18"
       ></span
       ></pre
     ></body
