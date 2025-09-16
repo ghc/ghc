@@ -2040,6 +2040,10 @@ qlUnify ty1 ty2
     go_flexi1 kappa ty2  -- ty2 is zonked
       | -- See Note [QuickLook unification] (UQL1)
         simpleUnifyCheck UC_QuickLook kappa ty2
+      , checkTopShape (metaTyVarInfo kappa) ty2
+          -- NB: don't forget to do a shape check, as we might be dealing
+          -- with an ordinary metavariable (and not a quick-look instantiation variable).
+          -- (Forgetting this led to #25950.)
       = do { co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
                    -- unifyKind: see (UQL2) in Note [QuickLook unification]
                    --            and (MIV2) in Note [Monomorphise instantiation variables]
