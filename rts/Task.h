@@ -265,11 +265,7 @@ extern uint32_t peakWorkerCount;
 // A thread-local-storage key that we can use to get access to the
 // current thread's Task structure.
 #if defined(THREADED_RTS)
-#if CC_SUPPORTS_TLS
 extern __thread Task *my_task;
-#else
-extern ThreadLocalKey currentTaskKey;
-#endif
 #else
 extern Task *my_task;
 #endif
@@ -283,21 +279,13 @@ extern Task *my_task;
 INLINE_HEADER Task *
 myTask (void)
 {
-#if defined(THREADED_RTS) && !CC_SUPPORTS_TLS
-    return (Task*) getThreadLocalVar(&currentTaskKey);
-#else
     return my_task;
-#endif
 }
 
 INLINE_HEADER void
 setMyTask (Task *task)
 {
-#if defined(THREADED_RTS) && !CC_SUPPORTS_TLS
-    setThreadLocalVar(&currentTaskKey,task);
-#else
     my_task = task;
-#endif
 }
 
 // Tasks are identified by their OS thread ID, which can be serialised

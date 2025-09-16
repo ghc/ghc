@@ -326,10 +326,6 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
         }
     }
 
-#if defined(THREADED_RTS) && defined(CC_LLVM_BACKEND) && (CC_SUPPORTS_TLS == 0)
-    newThreadLocalKey(&gctKey);
-#endif
-
     initGcThreads(from, to);
 }
 
@@ -351,9 +347,6 @@ freeStorage (bool free_heap)
     closeMutex(&sm_mutex);
 #endif
     stgFree(nurseries);
-#if defined(THREADED_RTS) && defined(CC_LLVM_BACKEND) && (CC_SUPPORTS_TLS == 0)
-    freeThreadLocalKey(&gctKey);
-#endif
     freeGcThreads();
 }
 
