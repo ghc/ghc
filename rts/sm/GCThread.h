@@ -83,7 +83,7 @@
 // platforms.
 #define GEN_WORKSPACE_ALIGNMENT CACHELINE_SIZE
 
-typedef struct gen_workspace_ {
+typedef struct ATTRIBUTE_ALIGNED(GEN_WORKSPACE_ALIGNMENT) gen_workspace_ {
     generation * gen;           // the gen for this workspace
     struct gc_thread_ * my_gct; // the gc_thread that contains this workspace
 
@@ -109,7 +109,7 @@ typedef struct gen_workspace_ {
     bdescr *     part_list;
     StgWord      n_part_blocks;      // count of above
     StgWord      n_part_words;
-} gen_workspace ATTRIBUTE_ALIGNED(GEN_WORKSPACE_ALIGNMENT);
+} gen_workspace;
 
 /* ----------------------------------------------------------------------------
    GC thread object
