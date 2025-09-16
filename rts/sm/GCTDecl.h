@@ -50,23 +50,10 @@ extern StgWord8 the_gc_thread[];
 
 /* -------------------------------------------------------------------------- */
 
-/* Now, llvm-gcc and some older Clang compilers do not support
-   __thread. So we have to fallback to the extremely slow case,
-   unfortunately.
-
-   Also, the iOS Clang compiler doesn't support __thread either for
-   some bizarre reason, so there's not much we can do about that... */
-#if defined(CC_LLVM_BACKEND) && (CC_SUPPORTS_TLS == 0)
-#define gct ((gc_thread *)(pthread_getspecific(gctKey)))
-#define SET_GCT(to) (pthread_setspecific(gctKey, to))
-#define DECLARE_GCT ThreadLocalKey gctKey;
-
-/* -------------------------------------------------------------------------- */
-
-/* However, if we *are* using an LLVM based compiler with __thread
+/* If we *are* using an LLVM based compiler with __thread
    support, then use that (since LLVM doesn't support global register
    variables.) */
-#elif defined(CC_LLVM_BACKEND) && (CC_SUPPORTS_TLS == 1)
+#if defined(CC_LLVM_BACKEND)
 extern __thread gc_thread* gct;
 #define SET_GCT(to) gct = (to)
 #define DECLARE_GCT __thread gc_thread* gct;
@@ -107,16 +94,11 @@ GCT_REG_DECL(gc_thread*, gct, REG_R1);
 
 /* Finally, as an absolute fallback, if none of the above tests check
    out but we *do* have __thread support, then use that. */
-#elif CC_SUPPORTS_TLS == 1
+#else
 extern __thread gc_thread* gct;
 #define SET_GCT(to) gct = (to)
 #define DECLARE_GCT __thread gc_thread* gct;
 
-/* -------------------------------------------------------------------------- */
-
-/* Impossible! */
-#else
-#error Cannot find a way to declare the thread-local gc variable!
 #endif
 
 #endif // THREADED_RTS
