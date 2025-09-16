@@ -1153,13 +1153,34 @@ Wrinkle [Using IdSig]
 
 Note [Type-directed record disambiguation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-GHC currently supports an additional type-directed disambiguation
-mechanism, which is deprecated and scheduled for removal as part of
-GHC proposal #366 https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0366-no-ambiguous-field-access.rst.
+Deprecation notice:
+  The type-directed disambiguation mechanism for record updates described in
+  this Note is deprecated, as per GHC proposal #366 (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0366-no-ambiguous-field-access.rst).
+  The removal of type-directed disambiguation for record updates is tracked
+  in GHC ticket #19461, but progress towards this goal has stalled.
 
-To perform this disambiguation, when there are multiple possible parents for
-a record update, the renamer defers to the typechecker.
-See GHC.Tc.Gen.Expr.disambiguateRecordBinds, and in particular the auxiliary
+  Why? There are several suggested replacement mechanisms, such as:
+    1. using module qualification to disambiguate,
+    2. using OverloadedRecordUpdate for type-directed disambiguation
+      (as described in Note [Overview of record dot syntax] in GHC.Hs.Expr).
+  However, these solutions do not work in all situations:
+    1. Module qualification doesn't work for fields defined in the current module,
+       nor to disambiguate between constructors of different data family instances
+       of a given parent data family TyCon.
+    2. OverloadedRecordUpdate does not allow for type-changing record update,
+       nor can it deal with fields with existentials or polytypes.
+  There are also some avenues to improve the renamer's ability to disambiguate:
+    - GHC ticket #23032 suggests using as-patterns to disambiguate in the renamer.
+    - GHC proposal https://github.com/ghc-proposals/ghc-proposals/pull/537
+      suggests a syntactic form of type-directed disambiguation that could be
+      carried out in the renamer.
+  Neither of these have been accepted/implemented at the time of writing (Sept 2025).
+  This means that removal of type-directed disambiguation is currently stalled.
+
+GHC tries to disambiguate record updates in the renamer, as described in
+Note [Disambiguating record updates] in GHC.Rename.Pat. However, if the renamer
+is unable to disambiguate, the renamer will defer to the typechecker: see
+GHC.Tc.Gen.Expr.disambiguateRecordBinds, and in particular the auxiliary
 function identifyParentLabels, which picks a parent for the record update
 using the following additional mechanisms:
 
