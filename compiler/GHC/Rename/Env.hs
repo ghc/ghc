@@ -1455,6 +1455,12 @@ lookupFieldGREs env (L loc rdr)
            do { let (env_fld_gres, env_var_gres) =
                       partition isRecFldGRE $
                       lookupGRE env (LookupRdrName rdr (RelevantGREsFOS WantBoth))
+                -- Make sure to use 'LookupRdrName': if a record update contains
+                -- a qualified field name, only look up GREs which are in scope
+                -- with that same qualification.
+                --
+                -- See Wrinkle [Qualified names in record updates]
+                -- in Note [Disambiguating record updates] in GHC.Rename.Pat.
 
               -- Handle implicit qualified imports in GHCi. See T10439.
               ; ghci_gres <- lookupQualifiedNameGHCi WantBoth rdr

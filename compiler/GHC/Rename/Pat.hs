@@ -1089,18 +1089,22 @@ lookupRecUpdFields proceeds as follows:
       the fields fld1, ..., fld99" and instead report e.g. "No constructor
       has all the fields { fld3, fld17 }".
 
+Wrinkle [Qualified names in record updates]
 
-Note that (1) takes into account qualified names, so that a record update such
-as
+  Note that we must take into account qualified names in (1), so that a record
+  update such as
 
     import qualified M ( R (fld1, fld2) )
     f r = r { M.fld1 = 3 }
 
-is unambiguous, as only R contains the field fld1 with the M qualifier.
-(See however #22122 for issues relating to the usage of exact Names in
-record fields.)
+  is unambiguous: only R contains the field fld1 with the M qualifier.
 
-See also Note [Type-directed record disambiguation] in GHC.Tc.Gen.Expr.
+  The function that looks up the GREs for the record update is 'lookupFieldGREs',
+  which uses 'lookupGRE env (LookupRdrName ...)', ensuring that we correctly
+  filter the GREs with the correct module qualification (with 'pickGREs').
+
+  (See however #22122 for issues relating to the usage of exact Names in
+  record fields.)
 
 Wrinkle [Out of scope constructors]
 
