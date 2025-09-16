@@ -24,6 +24,7 @@ import BindistConfig
 
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
+import qualified Data.Set as Set
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -492,9 +493,7 @@ generateSettings settingsFile = do
         -- Hard-coded as Cabal queries these to determine way support and we
         -- need to always advertise all ways when bootstrapping.
         -- The settings file is generated at install time when installing a bindist.
-        , ("RTS ways", return "v p p p_dyn")
-        -- ROMES:TODO: This is what we had previously? Double check we want this hardcoded list.
-        -- , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
+        , ("RTS ways",  unwords . map show . Set.toList <$> getRtsWays)
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)
         ]
