@@ -435,17 +435,9 @@ extern char **environ;
 
 // On most platforms, the garbage collector rewrites references
 //      to small integer and char objects to a set of common, shared ones.
-//
-// We don't do this when compiling to Windows DLLs at the moment because
-//      it doesn't support cross package data references well.
-//
-#if defined(COMPILING_WINDOWS_DLL)
-#define RTS_INTCHAR_SYMBOLS
-#else
 #define RTS_INTCHAR_SYMBOLS                             \
       SymI_HasProto(stg_CHARLIKE_closure)               \
       SymI_HasProto(stg_INTLIKE_closure)
-#endif
 
 #if defined(PROFILING)
 #define RTS_PROF_SYMBOLS                        \
@@ -1027,20 +1019,9 @@ extern char **environ;
 /* entirely bogus claims about types of these symbols */
 #define SymI_NeedsProto(vvv)  extern void vvv(void);
 #define SymI_NeedsDataProto(vvv)  extern StgWord vvv[];
-#if defined(COMPILING_WINDOWS_DLL)
-#define SymE_HasProto(vvv)    SymE_HasProto(vvv);
-#  if defined(x86_64_HOST_ARCH)
-#    define SymE_NeedsProto(vvv)    extern void __imp_ ## vvv (void);
-#    define SymE_NeedsDataProto(vvv) SymE_NeedsProto(vvv)
-#  else
-#    define SymE_NeedsProto(vvv)    extern void _imp__ ## vvv (void);
-#    define SymE_NeedsDataProto(vvv) SymE_NeedsProto(vvv)
-#  endif
-#else
 #define SymE_NeedsProto(vvv)  SymI_NeedsProto(vvv);
 #define SymE_NeedsDataProto(vvv)  SymI_NeedsDataProto(vvv);
 #define SymE_HasProto(vvv)    SymI_HasProto(vvv);
-#endif
 #define SymI_HasProto(vvv) /**/
 #define SymI_HasDataProto(vvv) /**/
 #define SymI_HasProto_redirect(vvv,xxx,strength,ty) /**/

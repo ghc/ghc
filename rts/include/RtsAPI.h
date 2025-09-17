@@ -581,19 +581,11 @@ void rts_done (void);
    These are used by foreign export and foreign import "wrapper" stubs.
    ----------------------------------------------------------------------- */
 
-// When producing Windows DLLs the we need to know which symbols are in the
-//      local package/DLL vs external ones.
-//
 //      Note that RtsAPI.h is also included by foreign export stubs in
 //      the base package itself.
 //
-#if defined(COMPILING_WINDOWS_DLL) && !defined(COMPILING_GHC_INTERNAL_PACKAGE)
-__declspec(dllimport) extern StgClosure ghczminternal_GHCziInternalziTopHandler_runIO_closure;
-__declspec(dllimport) extern StgClosure ghczminternal_GHCziInternalziTopHandler_runNonIO_closure;
-#else
 extern StgClosure ghczminternal_GHCziInternalziTopHandler_runIO_closure;
 extern StgClosure ghczminternal_GHCziInternalziTopHandler_runNonIO_closure;
-#endif
 
 #define runIO_closure     DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTopHandler_runIO_closure)
 #define runNonIO_closure  DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTopHandler_runNonIO_closure)
