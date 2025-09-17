@@ -58,6 +58,7 @@ module GHC.HsToCore.Monad (
 import GHC.Prelude
 
 import GHC.Driver.Env
+import GHC.Driver.Env.KnotVars
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Config.Diagnostic
@@ -117,7 +118,7 @@ import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
 
 import Data.IORef
-import GHC.Driver.Env.KnotVars
+
 import GHC.IO.Unsafe (unsafeInterleaveIO)
 
 {-

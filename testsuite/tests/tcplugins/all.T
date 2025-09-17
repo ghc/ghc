@@ -110,6 +110,19 @@ test('TcPlugin_CtId'
       , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
     )
 
+# Checks that we run type-checker plugins for pattern-match warnings.
+test('T26395'
+    , [ extra_files(
+        [ 'T26395_Plugin.hs'
+        , 'T26395.hs'
+        ])
+      , req_th
+      ]
+    , multimod_compile
+    , [ 'T26395.hs'
+      , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
+    )
+
 test('T11462', [js_broken(22261), req_th, req_plugins], multi_compile,
      [None, [('T11462_Plugin.hs', '-package ghc'), ('T11462.hs', '')],
       '-dynamic' if have_dynamic() else ''])

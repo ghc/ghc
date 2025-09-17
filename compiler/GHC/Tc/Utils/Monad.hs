@@ -31,6 +31,9 @@ module GHC.Tc.Utils.Monad(
   updateEps, updateEps_,
   getHpt, getEpsAndHug,
 
+  -- * Initialising TcM plugins
+  withTcPlugins, withDefaultingPlugins, withHoleFitPlugins,
+
   -- * Arrow scopes
   newArrowScope, escapeArrowScope,
 
@@ -163,6 +166,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types( zonkAnyTyCon )
 
 import GHC.Tc.Errors.Types
+import GHC.Tc.Errors.Hole.Plugin ( HoleFitPluginR (..) )
 import GHC.Tc.Types     -- Re-export all
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
@@ -183,13 +187,17 @@ import GHC.Unit.Module.Warnings
 import GHC.Unit.Home.PackageTable
 
 import GHC.Core.UsageEnv
+
+import GHC.Core.Coercion ( isReflCo )
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Type( mkNumLitTy )
+import GHC.Core.TyCon ( TyCon )
 
 import GHC.Driver.Env
 import GHC.Driver.Env.KnotVars
+import GHC.Driver.Plugins ( Plugin(..), mapPlugins )
 import GHC.Driver.Session
 import GHC.Driver.Config.Diagnostic
 
@@ -226,7 +234,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Ppr
-import GHC.Types.Unique.FM ( emptyUFM )
+import GHC.Types.Unique.FM ( UniqFM, emptyUFM, sequenceUFMList )
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Supply
 import GHC.Types.Annotations
@@ -240,8 +248,6 @@ import Data.IORef
 import Control.Monad
 
 import qualified Data.Map as Map
-import GHC.Core.Coercion (isReflCo)
-
 
 {-
 ************************************************************************
@@ -263,128 +269,138 @@ initTc :: HscEnv
                 -- (error messages should have been printed already)
 
 initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
- = do { keep_var     <- newIORef emptyNameSet ;
-        used_gre_var <- newIORef [] ;
-        th_var       <- newIORef False ;
-        infer_var    <- newIORef True ;
-        infer_reasons_var <- newIORef emptyMessages ;
-        dfun_n_var   <- newIORef emptyOccSet ;
-        zany_n_var   <- newIORef 0 ;
-        let { type_env_var = hsc_type_env_vars hsc_env };
-
-        dependent_files_var <- newIORef [] ;
-        dependent_dirs_var <- newIORef [] ;
-        static_wc_var       <- newIORef emptyWC ;
-        cc_st_var           <- newIORef newCostCentreState ;
-        th_topdecls_var      <- newIORef [] ;
-        th_foreign_files_var <- newIORef [] ;
-        th_topnames_var      <- newIORef emptyNameSet ;
-        th_modfinalizers_var <- newIORef [] ;
-        th_coreplugins_var <- newIORef [] ;
-        th_state_var         <- newIORef Map.empty ;
-        th_remote_state_var  <- newIORef Nothing ;
-        th_docs_var          <- newIORef Map.empty ;
-        th_needed_deps_var   <- newIORef ([], emptyUDFM) ;
-        next_wrapper_num     <- newIORef emptyModuleEnv ;
-        let {
-             -- bangs to avoid leaking the env (#19356)
-             !dflags = hsc_dflags hsc_env ;
-             !mhome_unit = hsc_home_unit_maybe hsc_env;
-             !logger = hsc_logger hsc_env ;
-
-             maybe_rn_syntax :: forall a. a -> Maybe a ;
-             maybe_rn_syntax empty_val
-                | logHasDumpFlag logger Opt_D_dump_rn_ast = Just empty_val
-
-                | gopt Opt_WriteHie dflags       = Just empty_val
-
-                  -- We want to serialize the documentation in the .hi-files,
-                  -- and need to extract it from the renamed syntax first.
-                  -- See 'GHC.HsToCore.Docs.extractDocs'.
-                | gopt Opt_Haddock dflags       = Just empty_val
-
-                | keep_rn_syntax                = Just empty_val
-                | otherwise                     = Nothing ;
-
-             gbl_env = TcGblEnv {
-                tcg_th_topdecls      = th_topdecls_var,
-                tcg_th_foreign_files = th_foreign_files_var,
-                tcg_th_topnames      = th_topnames_var,
-                tcg_th_modfinalizers = th_modfinalizers_var,
-                tcg_th_coreplugins = th_coreplugins_var,
-                tcg_th_state         = th_state_var,
-                tcg_th_remote_state  = th_remote_state_var,
-                tcg_th_docs          = th_docs_var,
-
-                tcg_mod            = mod,
-                tcg_semantic_mod   = homeModuleInstantiation mhome_unit mod,
-                tcg_src            = hsc_src,
-                tcg_rdr_env        = emptyGlobalRdrEnv,
-                tcg_fix_env        = emptyNameEnv,
-                tcg_default        = emptyDefaultEnv,
-                tcg_default_exports = emptyDefaultEnv,
-                tcg_type_env       = emptyNameEnv,
-                tcg_type_env_var   = type_env_var,
-                tcg_inst_env       = emptyInstEnv,
-                tcg_fam_inst_env   = emptyFamInstEnv,
-                tcg_ann_env        = emptyAnnEnv,
-                tcg_complete_match_env = [],
-                tcg_th_used        = th_var,
-                tcg_th_needed_deps = th_needed_deps_var,
-                tcg_exports        = [],
-                tcg_imports        = emptyImportAvails,
-                tcg_import_decls   = [],
-                tcg_used_gres     = used_gre_var,
-                tcg_dus            = emptyDUs,
-
-                tcg_rn_imports     = [],
-                tcg_rn_exports     =
-                    if hsc_src == HsigFile
-                        -- Always retain renamed syntax, so that we can give
-                        -- better errors.  (TODO: how?)
-                        then Just []
-                        else maybe_rn_syntax [],
-                tcg_rn_decls       = maybe_rn_syntax emptyRnGroup,
-                tcg_tr_module      = Nothing,
-                tcg_binds          = emptyLHsBinds,
-                tcg_imp_specs      = [],
-                tcg_sigs           = emptyNameSet,
-                tcg_ksigs          = emptyNameSet,
-                tcg_ev_binds       = emptyBag,
-                tcg_warns          = emptyWarn,
-                tcg_anns           = [],
-                tcg_tcs            = [],
-                tcg_insts          = [],
-                tcg_fam_insts      = [],
-                tcg_rules          = [],
-                tcg_fords          = [],
-                tcg_patsyns        = [],
-                tcg_merged         = [],
-                tcg_dfun_n         = dfun_n_var,
-                tcg_zany_n         = zany_n_var,
-                tcg_keep           = keep_var,
-                tcg_hdr_info        = (Nothing,Nothing),
-                tcg_main           = Nothing,
-                tcg_self_boot      = NoSelfBoot,
-                tcg_safe_infer     = infer_var,
-                tcg_safe_infer_reasons = infer_reasons_var,
-                tcg_dependent_files = dependent_files_var,
-                tcg_dependent_dirs  = dependent_dirs_var,
-                tcg_tc_plugin_solvers   = [],
-                tcg_tc_plugin_rewriters = emptyUFM,
-                tcg_defaulting_plugins  = [],
-                tcg_hf_plugins     = [],
-                tcg_top_loc        = loc,
-                tcg_static_wc      = static_wc_var,
-                tcg_complete_matches = [],
-                tcg_cc_st          = cc_st_var,
-                tcg_next_wrapper_num = next_wrapper_num
-             } ;
-        } ;
+ = do { gbl_env <- initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc
 
         -- OK, here's the business end!
-        initTcWithGbl hsc_env gbl_env loc do_this
+      ;  initTcWithGbl hsc_env gbl_env loc $
+
+          -- Make sure to initialise all TcM plugins from the ambient HscEnv.
+          --
+          -- This ensures that all callers of 'initTc' enable plugins (#26395).
+          withTcPlugins hsc_env $
+          withDefaultingPlugins hsc_env $
+          withHoleFitPlugins hsc_env $
+
+            do_this
     }
+
+-- | Create an empty 'TcGblEnv'.
+initTcGblEnv :: HscEnv -> HscSource -> Bool -> Module -> RealSrcSpan -> IO TcGblEnv
+initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
+  do { keep_var             <- newIORef emptyNameSet
+     ; used_gre_var         <- newIORef []
+     ; th_var               <- newIORef False
+     ; infer_var            <- newIORef True
+     ; infer_reasons_var    <- newIORef emptyMessages
+     ; dfun_n_var           <- newIORef emptyOccSet
+     ; zany_n_var           <- newIORef 0
+     ; dependent_files_var  <- newIORef []
+     ; dependent_dirs_var   <- newIORef []
+     ; static_wc_var        <- newIORef emptyWC
+     ; cc_st_var            <- newIORef newCostCentreState
+     ; th_topdecls_var      <- newIORef []
+     ; th_foreign_files_var <- newIORef []
+     ; th_topnames_var      <- newIORef emptyNameSet
+     ; th_modfinalizers_var <- newIORef []
+     ; th_coreplugins_var   <- newIORef []
+     ; th_state_var         <- newIORef Map.empty
+     ; th_remote_state_var  <- newIORef Nothing
+     ; th_docs_var          <- newIORef Map.empty
+     ; th_needed_deps_var   <- newIORef ([], emptyUDFM)
+     ; next_wrapper_num     <- newIORef emptyModuleEnv
+     ; let
+        -- bangs to avoid leaking the env (#19356)
+        !dflags = hsc_dflags hsc_env
+        !mhome_unit = hsc_home_unit_maybe hsc_env
+        !logger = hsc_logger hsc_env
+
+        maybe_rn_syntax :: forall a. a -> Maybe a ;
+        maybe_rn_syntax empty_val
+           | logHasDumpFlag logger Opt_D_dump_rn_ast = Just empty_val
+
+           | gopt Opt_WriteHie dflags       = Just empty_val
+
+             -- We want to serialize the documentation in the .hi-files,
+             -- and need to extract it from the renamed syntax first.
+             -- See 'GHC.HsToCore.Docs.extractDocs'.
+           | gopt Opt_Haddock dflags       = Just empty_val
+
+           | keep_rn_syntax                = Just empty_val
+           | otherwise                     = Nothing ;
+
+      ; return $ TcGblEnv
+          { tcg_th_topdecls        = th_topdecls_var
+          , tcg_th_foreign_files   = th_foreign_files_var
+          , tcg_th_topnames        = th_topnames_var
+          , tcg_th_modfinalizers   = th_modfinalizers_var
+          , tcg_th_coreplugins     = th_coreplugins_var
+          , tcg_th_state           = th_state_var
+          , tcg_th_remote_state    = th_remote_state_var
+          , tcg_th_docs            = th_docs_var
+
+          , tcg_mod                = mod
+          , tcg_semantic_mod       = homeModuleInstantiation mhome_unit mod
+          , tcg_src                = hsc_src
+          , tcg_rdr_env            = emptyGlobalRdrEnv
+          , tcg_fix_env            = emptyNameEnv
+          , tcg_default            = emptyDefaultEnv
+          , tcg_default_exports    = emptyDefaultEnv
+          , tcg_type_env           = emptyNameEnv
+          , tcg_type_env_var       = hsc_type_env_vars hsc_env
+          , tcg_inst_env           = emptyInstEnv
+          , tcg_fam_inst_env       = emptyFamInstEnv
+          , tcg_ann_env            = emptyAnnEnv
+          , tcg_complete_match_env = []
+          , tcg_th_used            = th_var
+          , tcg_th_needed_deps     = th_needed_deps_var
+          , tcg_exports            = []
+          , tcg_imports            = emptyImportAvails
+          , tcg_import_decls       = []
+          , tcg_used_gres          = used_gre_var
+          , tcg_dus                = emptyDUs
+
+          , tcg_rn_imports = []
+          , tcg_rn_exports = if hsc_src == HsigFile
+                             -- Always retain renamed syntax, so that we can give
+                             -- better errors.  (TODO: how?)
+                             then Just []
+                             else maybe_rn_syntax []
+          , tcg_rn_decls            = maybe_rn_syntax emptyRnGroup
+          , tcg_tr_module           = Nothing
+          , tcg_binds               = emptyLHsBinds
+          , tcg_imp_specs           = []
+          , tcg_sigs                = emptyNameSet
+          , tcg_ksigs               = emptyNameSet
+          , tcg_ev_binds            = emptyBag
+          , tcg_warns               = emptyWarn
+          , tcg_anns                = []
+          , tcg_tcs                 = []
+          , tcg_insts               = []
+          , tcg_fam_insts           = []
+          , tcg_rules               = []
+          , tcg_fords               = []
+          , tcg_patsyns             = []
+          , tcg_merged              = []
+          , tcg_dfun_n              = dfun_n_var
+          , tcg_zany_n              = zany_n_var
+          , tcg_keep                = keep_var
+          , tcg_hdr_info            = (Nothing,Nothing)
+          , tcg_main                = Nothing
+          , tcg_self_boot           = NoSelfBoot
+          , tcg_safe_infer          = infer_var
+          , tcg_safe_infer_reasons  = infer_reasons_var
+          , tcg_dependent_files     = dependent_files_var
+          , tcg_dependent_dirs      = dependent_dirs_var
+          , tcg_tc_plugin_solvers   = []
+          , tcg_tc_plugin_rewriters = emptyUFM
+          , tcg_defaulting_plugins  = []
+          , tcg_hf_plugins          = []
+          , tcg_top_loc             = loc
+          , tcg_static_wc           = static_wc_var
+          , tcg_complete_matches    = []
+          , tcg_cc_st               = cc_st_var
+          , tcg_next_wrapper_num    = next_wrapper_num
+      } }
 
 -- | Run a 'TcM' action in the context of an existing 'GblEnv'.
 initTcWithGbl :: HscEnv
@@ -685,6 +701,83 @@ withIfaceErr ctx do_this = do
               msg   = missingInterfaceErrorDiagnostic opts err
           liftIO $ throwGhcExceptionIO (ProgramError (renderWithContext ctx msg))
         Succeeded result -> return result
+
+{-
+************************************************************************
+*                                                                      *
+                 Initialising plugins for TcM
+*                                                                      *
+************************************************************************
+-}
+
+-- | Initialise typechecker plugins, run the inner action, then stop
+-- the typechecker plugins.
+withTcPlugins :: HscEnv -> TcM a -> TcM a
+withTcPlugins hsc_env m =
+    case catMaybes $ mapPlugins (hsc_plugins hsc_env) tcPlugin of
+       []      -> m  -- Common fast case
+       plugins -> do
+                (solvers, rewriters, stops) <-
+                  unzip3 `fmap` mapM start_plugin plugins
+                let
+                  rewritersUniqFM :: UniqFM TyCon [TcPluginRewriter]
+                  !rewritersUniqFM = sequenceUFMList rewriters
+                -- The following ensures that tcPluginStop is called even if a type
+                -- error occurs during compilation (Fix of #10078)
+                eitherRes <- tryM $
+                  updGblEnv (\e -> e { tcg_tc_plugin_solvers   = solvers
+                                     , tcg_tc_plugin_rewriters = rewritersUniqFM })
+                    m
+                mapM_ runTcPluginM stops
+                case eitherRes of
+                  Left _ -> failM
+                  Right res -> return res
+  where
+  start_plugin (TcPlugin start solve rewrite stop) =
+    do s <- runTcPluginM start
+       return (solve s, rewrite s, stop s)
+
+-- | Initialise defaulting plugins, run the inner action, then stop
+-- the defaulting plugins.
+withDefaultingPlugins :: HscEnv -> TcM a -> TcM a
+withDefaultingPlugins hsc_env m =
+  do case catMaybes $ mapPlugins (hsc_plugins hsc_env) defaultingPlugin of
+       [] -> m  -- Common fast case
+       plugins  -> do (plugins,stops) <- mapAndUnzipM start_plugin plugins
+                      -- This ensures that dePluginStop is called even if a type
+                      -- error occurs during compilation
+                      eitherRes <- tryM $ do
+                        updGblEnv (\e -> e { tcg_defaulting_plugins = plugins })
+                          m
+                      mapM_ runTcPluginM stops
+                      case eitherRes of
+                        Left _ -> failM
+                        Right res -> return res
+  where
+  start_plugin (DefaultingPlugin start fill stop) =
+    do s <- runTcPluginM start
+       return (fill s, stop s)
+
+-- | Initialise hole fit plugins, run the inner action, then stop
+-- the hole fit plugins.
+withHoleFitPlugins :: HscEnv -> TcM a -> TcM a
+withHoleFitPlugins hsc_env m =
+  case catMaybes $ mapPlugins (hsc_plugins hsc_env) holeFitPlugin of
+    [] -> m  -- Common fast case
+    plugins -> do (plugins,stops) <- mapAndUnzipM start_plugin plugins
+                  -- This ensures that hfPluginStop is called even if a type
+                  -- error occurs during compilation.
+                  eitherRes <- tryM $
+                    updGblEnv (\e -> e { tcg_hf_plugins = plugins })
+                      m
+                  sequence_ stops
+                  case eitherRes of
+                    Left _ -> failM
+                    Right res -> return res
+  where
+    start_plugin (HoleFitPluginR init plugin stop) =
+      do ref <- init
+         return (plugin ref, stop ref)
 
 {-
 ************************************************************************

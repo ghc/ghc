@@ -26,6 +26,7 @@ module GHC.Tc.Module (
         runTcInteractive,    -- Used by GHC API clients (#8878)
         withTcPlugins,       -- Used by GHC API clients (#20499)
         withHoleFitPlugins,  -- Used by GHC API clients (#20499)
+        withDefaultingPlugins,
         tcRnLookupName,
         tcRnGetInfo,
         tcRnModule, tcRnModuleTcRnM,
@@ -53,7 +54,6 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Config.Diagnostic
 import GHC.IO.Unsafe ( unsafeInterleaveIO )
 
-import GHC.Tc.Errors.Hole.Plugin ( HoleFitPluginR (..) )
 import GHC.Tc.Errors.Types
 import {-# SOURCE #-} GHC.Tc.Gen.Splice ( finishTH, runRemoteModFinalizers )
 import GHC.Tc.Gen.HsType
@@ -141,7 +141,6 @@ import GHC.Types.Id as Id
 import GHC.Types.Id.Info( IdDetails(..) )
 import GHC.Types.Var.Env
 import GHC.Types.TypeEnv
-import GHC.Types.Unique.FM
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -212,10 +211,6 @@ tcRnModule hsc_env mod_sum save_rn_syntax
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
-          withTcPlugins hsc_env $
-          withDefaultingPlugins hsc_env $
-          withHoleFitPlugins hsc_env $
-
           tcRnModuleTcRnM hsc_env mod_sum parsedModule this_mod
 
   | otherwise
@@ -3182,71 +3177,10 @@ hasTopUserName x
 {-
 ********************************************************************************
 
-Type Checker Plugins
+                         Running plugins
 
 ********************************************************************************
 -}
-
-withTcPlugins :: HscEnv -> TcM a -> TcM a
-withTcPlugins hsc_env m =
-    case catMaybes $ mapPlugins (hsc_plugins hsc_env) tcPlugin of
-       []      -> m  -- Common fast case
-       plugins -> do
-                (solvers, rewriters, stops) <-
-                  unzip3 `fmap` mapM start_plugin plugins
-                let
-                  rewritersUniqFM :: UniqFM TyCon [TcPluginRewriter]
-                  !rewritersUniqFM = sequenceUFMList rewriters
-                -- The following ensures that tcPluginStop is called even if a type
-                -- error occurs during compilation (Fix of #10078)
-                eitherRes <- tryM $
-                  updGblEnv (\e -> e { tcg_tc_plugin_solvers   = solvers
-                                     , tcg_tc_plugin_rewriters = rewritersUniqFM }) m
-                mapM_ runTcPluginM stops
-                case eitherRes of
-                  Left _ -> failM
-                  Right res -> return res
-  where
-  start_plugin (TcPlugin start solve rewrite stop) =
-    do s <- runTcPluginM start
-       return (solve s, rewrite s, stop s)
-
-withDefaultingPlugins :: HscEnv -> TcM a -> TcM a
-withDefaultingPlugins hsc_env m =
-  do case catMaybes $ mapPlugins (hsc_plugins hsc_env) defaultingPlugin of
-       [] -> m  -- Common fast case
-       plugins  -> do (plugins,stops) <- mapAndUnzipM start_plugin plugins
-                      -- This ensures that dePluginStop is called even if a type
-                      -- error occurs during compilation
-                      eitherRes <- tryM $ do
-                        updGblEnv (\e -> e { tcg_defaulting_plugins = plugins }) m
-                      mapM_ runTcPluginM stops
-                      case eitherRes of
-                        Left _ -> failM
-                        Right res -> return res
-  where
-  start_plugin (DefaultingPlugin start fill stop) =
-    do s <- runTcPluginM start
-       return (fill s, stop s)
-
-withHoleFitPlugins :: HscEnv -> TcM a -> TcM a
-withHoleFitPlugins hsc_env m =
-  case catMaybes $ mapPlugins (hsc_plugins hsc_env) holeFitPlugin of
-    [] -> m  -- Common fast case
-    plugins -> do (plugins,stops) <- mapAndUnzipM start_plugin plugins
-                  -- This ensures that hfPluginStop is called even if a type
-                  -- error occurs during compilation.
-                  eitherRes <- tryM $
-                    updGblEnv (\e -> e { tcg_hf_plugins = plugins }) m
-                  sequence_ stops
-                  case eitherRes of
-                    Left _ -> failM
-                    Right res -> return res
-  where
-    start_plugin (HoleFitPluginR init plugin stop) =
-      do ref <- init
-         return (plugin ref, stop ref)
-
 
 runRenamerPlugin :: TcGblEnv
                  -> HsGroup GhcRn
