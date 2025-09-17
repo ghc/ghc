@@ -63,11 +63,7 @@ extern "C" {
 // Symbols that are extern, but private to the RTS, are declared
 // with visibility "hidden" to hide them outside the RTS shared
 // library.
-#if defined(HAS_VISIBILITY_HIDDEN)
 #define RTS_PRIVATE  GNUC3_ATTRIBUTE(visibility("hidden"))
-#else
-#define RTS_PRIVATE  /* disabled: RTS_PRIVATE */
-#endif
 
 #if __GNUC__ >= 4
 #define RTS_UNLIKELY(p) __builtin_expect((p),0)
