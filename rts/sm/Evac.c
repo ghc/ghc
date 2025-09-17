@@ -857,9 +857,6 @@ loop:
   //
   case CONSTR_0_1:
   {
-#if defined(COMPILING_WINDOWS_DLL)
-      copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
-#else
       StgWord w = (StgWord)q->payload[0];
       if (info == Czh_con_info &&
           // unsigned, so always true:  (StgChar)w >= MIN_CHARLIKE &&
@@ -879,7 +876,6 @@ loop:
       else {
           copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
       }
-#endif
       return;
   }
 

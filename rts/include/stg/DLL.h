@@ -13,29 +13,9 @@
 
 #pragma once
 
-#if defined(COMPILING_WINDOWS_DLL)
-#  if defined(x86_64_HOST_ARCH)
-#    define DLL_IMPORT_DATA_REF(x) (__imp_##x)
-#    define DLL_IMPORT_DATA_VARNAME(x) *__imp_##x
-#  else
-#    define DLL_IMPORT_DATA_REF(x) (_imp__##x)
-#    define DLL_IMPORT_DATA_VARNAME(x) *_imp__##x
-#  endif
-#  if __GNUC__ && !defined(__declspec)
-#    define DLLIMPORT
-#  else
-#    define DLLIMPORT __declspec(dllimport)
-#    if defined(x86_64_HOST_ARCH)
-#      define DLLIMPORT_DATA(x) __imp_##x
-#    else
-#      define DLLIMPORT_DATA(x) _imp__##x
-#    endif
-#  endif
-#else
 #  define DLL_IMPORT_DATA_REF(x) (&(x))
 #  define DLL_IMPORT_DATA_VARNAME(x) x
 #  define DLLIMPORT
-#endif
 
 /* The view of the rts/include/ header files differ ever so
    slightly depending on whether the RTS is being compiled
@@ -47,26 +27,9 @@
     using Win32 DLLs. ]
 */
 #if defined(COMPILING_RTS)
-#define DLL_IMPORT DLLIMPORT
 #define DLL_IMPORT_RTS
 #define DLL_IMPORT_DATA_VAR(x) x
 #else
-#define DLL_IMPORT
 #define DLL_IMPORT_RTS DLLIMPORT
-# if defined(COMPILING_WINDOWS_DLL)
-#  if defined(x86_64_HOST_ARCH)
-#   define DLL_IMPORT_DATA_VAR(x) __imp_##x
-#  else
-#   define DLL_IMPORT_DATA_VAR(x) _imp__##x
-#  endif
-# else
-#  define DLL_IMPORT_DATA_VAR(x) x
-# endif
-#endif
-
-
-#if defined(COMPILING_STDLIB)
-#define DLL_IMPORT_STDLIB
-#else
-#define DLL_IMPORT_STDLIB DLLIMPORT
+#define DLL_IMPORT_DATA_VAR(x) x
 #endif
