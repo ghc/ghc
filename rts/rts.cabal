@@ -443,7 +443,6 @@ library
                  RetainerProfile.c
                  RetainerSet.c
                  RtsAPI.c
-                 RtsDllMain.c
                  RtsFlags.c
                  RtsMain.c
                  RtsMessages.c

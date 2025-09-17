@@ -1040,28 +1040,12 @@ CLOSURE(stg_ASYNCIO_LIVE0_closure,stg_ASYNCIO_LIVE0);
    replace them with references to the static objects.
    ------------------------------------------------------------------------- */
 
-#if defined(COMPILING_WINDOWS_DLL)
-/*
- * When sticking the RTS in a Windows DLL, we delay populating the
- * Charlike and Intlike tables until load-time, which is only
- * when we've got the real addresses to the C# and I# closures.
- *
- * -- this is currently broken BL 2009/11/14.
- *    we don't rewrite to static closures at all with Windows DLLs.
- */
-// #warning Is this correct? _imp is a pointer!
-#define Char_hash_con_info _imp__ghczminternal_GHCziInternalziTypes_Czh_con_info
-#define Int_hash_con_info _imp__ghczminternal_GHCziInternalziTypes_Izh_con_info
-#else
 #define Char_hash_con_info ghczminternal_GHCziInternalziTypes_Czh_con_info
 #define Int_hash_con_info ghczminternal_GHCziInternalziTypes_Izh_con_info
-#endif
-
 
 #define CHARLIKE_HDR(n)  CLOSURE(Char_hash_con_info, n)
 #define INTLIKE_HDR(n)   CLOSURE(Int_hash_con_info, n)
 
-#if !(defined(COMPILING_WINDOWS_DLL))
 section "data" {
  stg_CHARLIKE_closure:
     CHARLIKE_HDR(0)
@@ -1598,5 +1582,3 @@ section "data" {
     INTLIKE_HDR(255)    /* MAX_INTLIKE == 255
                          See #16961 for why 255 */
 }
-
-#endif
