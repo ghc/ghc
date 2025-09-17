@@ -14,18 +14,6 @@
 #include "Hash.h"
 #include "RtsUtils.h"
 
-/* This file needs to be compiled with vectorization enabled.  Unfortunately
-   since we compile these things these days with cabal we can no longer
-   specify optimization per file.  So we have to resort to pragmas.  */
-#if defined(__GNUC__) || defined(__GNUG__)
-#if !defined(__clang__)
-#if !defined(DEBUG)
-#pragma GCC push_options
-#pragma GCC optimize ("O3")
-#endif
-#endif
-#endif
-
 #define XXH_INLINE_ALL
 
 #include "xxhash.h"
@@ -570,12 +558,3 @@ int keyCountHashTable (HashTable *table)
 {
     return table->kcount;
 }
-
-
-#if defined(__GNUC__) || defined(__GNUG__)
-#if !defined(__clang__)
-#if !defined(DEBUG)
-#pragma GCC pop_options
-#endif
-#endif
-#endif
