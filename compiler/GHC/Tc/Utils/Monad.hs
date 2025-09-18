@@ -419,6 +419,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_lcl_ctxt   = TcLclCtxt {
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
+                tcl_in_gen_code = False,
                 tcl_err_ctxt   = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topLevel,
@@ -1839,7 +1840,7 @@ mkErrCtxt env ctxts
           ; return (msg : rest) }
      | otherwise
      = go dbg n env ctxts
-   go dbg n env (GeneratedCodeCtxt co : ctxts)
+   go dbg n env (ExpansionCodeCtxt co : ctxts)
      | n < mAX_CONTEXTS -- Too verbose || dbg
      = do { let msg = srcCodeOriginErrCtxMsg co
           ; rest <- go dbg (n+1) env ctxts
