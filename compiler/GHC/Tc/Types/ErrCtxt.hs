@@ -51,13 +51,14 @@ import qualified Data.List.NonEmpty as NE
 -- | Additional context to include in an error message, e.g.
 -- "In the type signature ...", "In the ambiguity check for ...", etc.
 data ErrCtxt = UserCodeCtxt (Bool, TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg))
-        -- Monadic so that we have a chance
-        -- to deal with bound type variables just before error
-        -- message construction
+             -- Monadic so that we have a chance
+             -- to deal with bound type variables just before error
+             -- message construction
 
-        -- Bool:  True <=> this is a landmark context; do not
-        --                 discard it when trimming for display
-             | GeneratedCodeCtxt SrcCodeOrigin
+             -- Bool:  True <=> this is a landmark context; do not
+             --                 discard it when trimming for display
+
+             | ExpansionCodeCtxt SrcCodeOrigin
              -- The payload is a SrcCodeOrigin because it is used to generate
              -- 1. The CtOrigin for CtLoc, and
              -- 2. ErrCtxtMsg in error messages
