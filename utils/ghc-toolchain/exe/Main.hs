@@ -428,16 +428,20 @@ archHasNativeAdjustors = \case
   ArchJavaScript -> True
   _          -> False
 
-
--- | The platforms which we attempt to override ld
+-- | The platforms which we attempt to override ld:
+-- Should we attempt to find a more efficient linker on this platform?
 ldOverrideWhitelist :: ArchOS -> Bool
 ldOverrideWhitelist a =
   case archOS_OS a of
+    -- N.B. On Darwin it is quite important that we use the system linker
+    -- unchanged as it is very easy to run into broken setups (e.g. unholy mixtures
+    -- of Homebrew and the Apple toolchain).
+    --
+    -- See #21712.
+    OSDarwin  -> False
     OSLinux   -> True
     OSMinGW32 -> True
     _ -> False
-
-
 
 mkTarget :: Opts -> M Target
 mkTarget opts = do
@@ -459,7 +463,8 @@ mkTarget opts = do
     cmmCpp <- findCmmCpp (optCmmCpp opts) cc0
     cc <- addPlatformDepCcFlags archOs cc0
     readelf <- optional $ findReadelf (optReadelf opts)
-    ccLink <- findCcLink tgtLlvmTarget (optLd opts) (optCcLink opts) (ldOverrideWhitelist archOs && fromMaybe True (optLdOverride opts)) archOs cc readelf
+    ccLink <- findCcLink tgtLlvmTarget (optLd opts) (optCcLink opts)
+                (ldOverrideWhitelist archOs && fromMaybe True (optLdOverride opts)) archOs cc readelf
 
     ar <- findAr tgtVendor (optAr opts)
     -- TODO: We could have

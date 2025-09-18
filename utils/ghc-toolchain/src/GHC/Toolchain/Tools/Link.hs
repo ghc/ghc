@@ -83,7 +83,7 @@ findCcLink target ld progOpt ldOverride archOs cc readelf = checking "for C comp
 -- | Try to convince @cc@ to use a more efficient linker than @bfd.ld@
 findLinkFlags :: Bool -> Cc -> Program -> M Program
 findLinkFlags enableOverride cc ccLink
-  | enableOverride && doLinkerSearch =
+  | enableOverride =
     oneOf "this can't happen"
         [ -- Annoyingly, gcc silently falls back to vanilla ld (typically bfd
           -- ld) if @-fuse-ld@ is given with a non-existent linker.
@@ -104,20 +104,6 @@ linkSupportsTarget :: ArchOS -> Cc -> String -> Program -> M Program
 linkSupportsTarget archOs cc target link =
     checking "whether cc linker supports --target" $
     supportsTarget archOs (Lens id const) (checkLinkWorks cc) target link
-
--- | Should we attempt to find a more efficient linker on this platform?
---
--- N.B. On Darwin it is quite important that we use the system linker
--- unchanged as it is very easy to run into broken setups (e.g. unholy mixtures
--- of Homebrew and the Apple toolchain).
---
--- See #21712.
-doLinkerSearch :: Bool
-#if defined(linux_HOST_OS)
-doLinkerSearch = True
-#else
-doLinkerSearch = False
-#endif
 
 -- | See Note [No PIE when linking] in GHC.Driver.Session
 checkSupportsNoPie :: Cc -> Program -> M Bool
