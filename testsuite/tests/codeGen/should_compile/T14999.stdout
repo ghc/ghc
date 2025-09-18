@@ -1,6 +1,6 @@
 Dump of assembler code for function stg_catch_frame_info:
- 0x0000000000000010 <+0>:	add $0x18,%rbp
- 0x0000000000000014 <+4>:	jmpq *0x0(%rbp)
+ 0x0000000000000010 <+1>:	add rbp,0x18
+ 0x0000000000000014 <+5>:	jmp QWORD PTR [rbp+0x0]
 End of assembler dump.
 Contents of the .debug_frame section:
 00000000 0000000000000014 ffffffff CIE "" cf=1 df=-8 ra=16
