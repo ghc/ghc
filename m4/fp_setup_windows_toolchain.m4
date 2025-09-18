@@ -146,11 +146,11 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     dnl We override the USER_* flags here since the user delegated
     dnl configuration to the bundled windows toolchain, and these are the
     dnl options required by the bundled windows toolchain.
-    USER_CFLAGS="$CFLAGS"
     USER_CPP_ARGS="$CONF_CPP_OPTS_STAGE2"
-    USER_CXXFLAGS="$CXXFLAGS"
     USER_HS_CPP_ARGS="$HaskellCPPArgs"
-    USER_LDFLAGS="$CONF_GCC_LINKER_OPTS_STAGE2"
+    USER_CONF_CC_OPTS_STAGE2="$CONF_CC_OPTS_STAGE2"
+    USER_CONF_CXX_OPTS_STAGE2="$CONF_CXX_OPTS_STAGE2"
+    USER_CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2"
     USER_JS_CPP_ARGS="$JavaScriptCPPArgs"
     USER_CMM_CPP_ARGS="$CmmCPPArgs"
 ])
