@@ -423,9 +423,10 @@ downsweepFromRootNodes hsc_env old_summaries excl_mods allow_dup_roots mode root
           -> IO ()
         checkDuplicates root_map
            | not allow_dup_roots
-           , dup_root:_ <- dup_roots = liftIO $ multiRootsErr dup_root
+           , dup_root:_ <- dup_roots = liftIO $ multiRootsErr sec dup_root
            | otherwise = pure ()
            where
+             sec = initSourceErrorContext (hsc_dflags hsc_env)
              dup_roots :: [[ModuleNodeInfo]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton $ map rights (M.elems root_map)
 
@@ -655,10 +656,10 @@ loopUnit lcl_hsc_env cache (u:uxs) = do
                  Just us -> loopUnit lcl_hsc_env (loopUnit lcl_hsc_env (Map.insert nk (UnitNode us u) cache) us) uxs
                  Nothing -> pprPanic "loopUnit" (text "Malformed package database, missing " <+> ppr u)
 
-multiRootsErr :: [ModuleNodeInfo] -> IO ()
-multiRootsErr [] = panic "multiRootsErr"
-multiRootsErr summs@(summ1:_)
-  = throwOneError $ fmap GhcDriverMessage $
+multiRootsErr :: SourceErrorContext -> [ModuleNodeInfo] -> IO ()
+multiRootsErr _ [] = panic "multiRootsErr"
+multiRootsErr sec summs@(summ1:_)
+  = throwOneError sec $ fmap GhcDriverMessage $
     mkPlainErrorMsgEnvelope noSrcSpan $ DriverDuplicatedModuleDeclaration mod files
   where
     mod = moduleNodeInfoModule summ1
@@ -1538,7 +1539,8 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
       <- ExceptT $ do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
-          mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
+              sec = initSourceErrorContext pi_local_dflags
+          mimps <- getImports popts sec imp_prelude pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
   let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
   let rn_imps = fmap (\(sp, pk, lmn@(L _ mn)) -> (sp, rn_pkg_qual mn pk, lmn))
