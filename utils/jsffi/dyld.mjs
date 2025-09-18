@@ -308,7 +308,7 @@ if (isNode) {
   } catch {}
 } else {
   wasi = await import(
-    "https://cdn.jsdelivr.net/npm/@bjorn3/browser_wasi_shim@0.4.1/dist/index.js"
+    "https://cdn.jsdelivr.net/npm/@bjorn3/browser_wasi_shim@0.4.2/dist/index.js"
   );
 }
 
