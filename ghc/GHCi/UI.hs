@@ -78,7 +78,7 @@ import GHC.Types.TyThing
 import GHC.Types.TyThing.Ppr
 import GHC.Core.TyCo.Ppr
 import GHC.Types.SafeHaskell ( getSafeMode )
-import GHC.Types.SourceError ( SourceError )
+import GHC.Types.SourceError ( SourceError, initSourceErrorContext )
 import GHC.Types.Name
 import GHC.Types.Var ( varType )
 import GHC.Iface.Syntax ( showToHeader )
@@ -1472,9 +1472,10 @@ runStmt input step = do
   st <- getGHCiState
   let source = progname st
   let line = line_number st
+  let sec = initSourceErrorContext dflags
 
   -- Add any LANGUAGE/OPTIONS_GHC pragmas we find.
-  set_pragmas pflags (supportedLanguagePragmas dflags)
+  set_pragmas pflags sec (supportedLanguagePragmas dflags)
 
   if | GHC.isStmt pflags input -> do
          hsc_env <- GHC.getSession
@@ -1509,9 +1510,9 @@ runStmt input step = do
 
     run_imports imports = mapM_ (addImportToContext . unLoc) imports
 
-    set_pragmas pflags supported =
+    set_pragmas pflags sec supported =
       let stringbuf = stringToStringBuffer input
-          (_msgs, loc_opts) = Header.getOptions pflags supported stringbuf "<interactive>"
+          (_msgs, loc_opts) = Header.getOptions pflags sec  supported stringbuf "<interactive>"
           opts = unLoc <$> loc_opts
       in setOptions opts
 

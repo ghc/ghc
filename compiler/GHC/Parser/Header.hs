@@ -24,6 +24,7 @@ import GHC.Prelude
 
 import GHC.Data.Bag
 
+import GHC.Driver.DynFlags (DynFlags)
 import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw exceptions!
 
 import GHC.Parser.Errors.Types
@@ -66,6 +67,7 @@ import Text.Read (readPrec)
 --
 -- Throws a 'SourceError' if parsing fails.
 getImports :: ParserOpts   -- ^ Parser options
+           -> SourceErrorContext
            -> Bool         -- ^ Implicit Prelude?
            -> StringBuffer -- ^ Parse this.
            -> FilePath     -- ^ Filename the buffer came from.  Used for
@@ -79,7 +81,7 @@ getImports :: ParserOpts   -- ^ Parser options
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
-getImports popts implicit_prelude buf filename source_filename = do
+getImports popts sec implicit_prelude buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
   case unP parseHeader (initParserState popts buf loc) of
     PFailed pst ->
@@ -90,7 +92,7 @@ getImports popts implicit_prelude buf filename source_filename = do
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
       if not (isEmptyMessages errs)
-        then throwErrors (GhcPsMessage <$> errs)
+        then throwErrors sec (GhcPsMessage <$> errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -165,15 +167,16 @@ mkPrelImports this_mod implicit_prelude import_decls
 --
 -- Throws a 'SourceError' if flag parsing fails (including unsupported flags.)
 getOptionsFromFile :: ParserOpts
+                   -> SourceErrorContext
                    -> [String] -- ^ Supported LANGUAGE pragmas
                    -> FilePath            -- ^ Input file
                    -> IO (Messages PsMessage, [Located String]) -- ^ Parsed options, if any.
-getOptionsFromFile opts supported filename
+getOptionsFromFile opts sec supported filename
     = Exception.bracket
               (openBinaryFile filename ReadMode)
               (hClose)
               (\handle -> do
-                  (warns, opts) <- fmap (getOptions' opts supported)
+                  (warns, opts) <- fmap (getOptions' opts sec supported)
                                (lazyGetToks opts' filename handle)
                   seqList opts
                     $ seqList (bagToList $ getMessages warns)
@@ -247,29 +250,31 @@ getToks popts filename buf = lexAll pstate
 --
 -- Throws a 'SourceError' if flag parsing fails (including unsupported flags.)
 getOptions :: ParserOpts
+           -> SourceErrorContext
            -> [String] -- ^ Supported LANGUAGE pragmas
            -> StringBuffer -- ^ Input Buffer
            -> FilePath     -- ^ Source filename.  Used for location info.
            -> (Messages PsMessage,[Located String]) -- ^ warnings and parsed options.
-getOptions opts supported buf filename
-    = getOptions' opts supported (getToks opts filename buf)
+getOptions opts sec supported buf filename
+    = getOptions' opts sec supported (getToks opts filename buf)
 
 -- The token parser is written manually because Happy can't
 -- return a partial result when it encounters a lexer error.
 -- We want to extract options before the buffer is passed through
 -- CPP, so we can't use the same trick as 'getImports'.
 getOptions' :: ParserOpts
+            -> SourceErrorContext
             -> [String]
             -> [Located Token]      -- Input buffer
             -> (Messages PsMessage,[Located String])     -- Options.
-getOptions' opts supported toks
+getOptions' opts sec supported toks
     = parseToks toks
     where
           parseToks (open:close:xs)
               | IToptions_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
               = case toArgs starting_loc str of
-                  Left _err -> optionsParseError str $   -- #15053
+                  Left _err -> optionsParseError sec str $   -- #15053
                                  combineSrcSpans (getLoc open) (getLoc close)
                   Right args -> fmap (args ++) (parseToks xs)
             where
@@ -296,14 +301,14 @@ getOptions' opts supported toks
           parseToks xs = (unionManyMessages $ mapMaybe mkMessage xs ,[])
 
           parseLanguage ((L loc (ITconid fs)):rest)
-              = fmap (checkExtension supported (L loc fs) :) $
+              = fmap (checkExtension sec supported (L loc fs) :) $
                 case rest of
                   (L _loc ITcomma):more -> parseLanguage more
                   (L _loc ITclose_prag):more -> parseToks more
-                  (L loc _):_ -> languagePragParseError loc
+                  (L loc _):_ -> languagePragParseError sec loc
                   [] -> panic "getOptions'.parseLanguage(1) went past eof token"
           parseLanguage (tok:_)
-              = languagePragParseError (getLoc tok)
+              = languagePragParseError sec (getLoc tok)
           parseLanguage []
               = panic "getOptions'.parseLanguage(2) went past eof token"
 
@@ -436,39 +441,39 @@ toArgs starting_loc orig_str
 --
 -- Throws a 'SourceError' if the input list is non-empty claiming that the
 -- input flags are unknown.
-checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
-checkProcessArgsResult flags
+checkProcessArgsResult :: MonadIO m => DynFlags -> [Located String] -> m ()
+checkProcessArgsResult dflags flags
   = when (notNull flags) $
-      liftIO $ throwErrors $ foldMap (singleMessage . mkMsg) flags
+      liftIO $ throwErrors (initSourceErrorContext dflags) $ foldMap (singleMessage . mkMsg) flags
     where mkMsg (L loc flag)
               = mkPlainErrorMsgEnvelope loc $
                 GhcPsMessage $ PsHeaderMessage $ PsErrUnknownOptionsPragma flag
 
 -----------------------------------------------------------------------------
 
-checkExtension :: [String] -> Located FastString -> Located String
-checkExtension supported (L l ext)
+checkExtension :: SourceErrorContext -> [String] -> Located FastString -> Located String
+checkExtension sec supported (L l ext)
 -- Checks if a given extension is valid, and if so returns
 -- its corresponding flag. Otherwise it throws an exception.
   = if ext' `elem` supported
     then L l ("-X"++ext')
-    else unsupportedExtnError supported l ext'
+    else unsupportedExtnError sec supported l ext'
   where
     ext' = unpackFS ext
 
-languagePragParseError :: SrcSpan -> a
-languagePragParseError loc =
-    throwErr loc $ PsErrParseLanguagePragma
+languagePragParseError :: SourceErrorContext -> SrcSpan -> a
+languagePragParseError sec loc =
+    throwErr sec loc $ PsErrParseLanguagePragma
 
-unsupportedExtnError :: [String] -> SrcSpan -> String -> a
-unsupportedExtnError supported loc unsup =
-    throwErr loc $ PsErrUnsupportedExt unsup supported
+unsupportedExtnError :: SourceErrorContext -> [String] -> SrcSpan -> String -> a
+unsupportedExtnError sec supported loc unsup =
+    throwErr sec loc $ PsErrUnsupportedExt unsup supported
 
-optionsParseError :: String -> SrcSpan -> a     -- #15053
-optionsParseError str loc =
-  throwErr loc $ PsErrParseOptionsPragma str
+optionsParseError :: SourceErrorContext -> String -> SrcSpan -> a     -- #15053
+optionsParseError sec str loc =
+  throwErr sec loc $ PsErrParseOptionsPragma str
 
-throwErr :: SrcSpan -> PsHeaderMessage -> a                -- #15053
-throwErr loc ps_msg =
+throwErr :: SourceErrorContext -> SrcSpan -> PsHeaderMessage -> a                -- #15053
+throwErr sec loc ps_msg =
   let msg = mkPlainErrorMsgEnvelope loc $ GhcPsMessage (PsHeaderMessage ps_msg)
-  in throw $ mkSrcErr $ singleMessage msg
+  in throw $ mkSrcErr sec $ singleMessage msg

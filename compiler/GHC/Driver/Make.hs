@@ -155,10 +155,12 @@ depanal :: GhcMonad m =>
         -> Bool          -- ^ allow duplicate roots
         -> m ModuleGraph
 depanal excluded_mods allow_dup_roots = do
+    hsc_env <- getSession
+    let sec = initSourceErrorContext (hsc_dflags hsc_env)
     (errs, mod_graph) <- depanalE mkUnknownDiagnostic Nothing excluded_mods allow_dup_roots
     if isEmptyMessages errs
       then pure mod_graph
-      else throwErrors (fmap GhcDriverMessage errs)
+      else throwErrors sec (fmap GhcDriverMessage errs)
 
 -- | Perform dependency analysis like in 'depanal'.
 -- In case of errors, the errors and an empty module graph are returned.
@@ -439,9 +441,11 @@ loadWithCache cache diag_wrapper how_much = do
     msg <- mkBatchMsg <$> getSession
     (errs, mod_graph) <- depanalE diag_wrapper (Just msg) [] False                        -- #17459
     success <- load' cache how_much diag_wrapper (Just msg) mod_graph
+    hsc_env <- getSession
+    let sec = initSourceErrorContext (hsc_dflags hsc_env)
     if isEmptyMessages errs
       then pure success
-      else throwErrors (fmap GhcDriverMessage errs)
+      else throwErrors sec (fmap GhcDriverMessage errs)
 
 -- Note [Unused packages]
 -- ~~~~~~~~~~~~~~~~~~~~~~
@@ -627,6 +631,7 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
     let interp = hscInterp hsc_env
+    let sec = initSourceErrorContext dflags
 
     -- The "bad" boot modules are the ones for which we have
     -- B.hs-boot in the module graph, but no B.hs
@@ -657,7 +662,7 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
                   mkPlainErrorMsgEnvelope noSrcSpan
                   $ GhcDriverMessage
                   $ DriverModuleNotFound (moduleUnit m) (moduleName m)
-              throwErrors $ mkMessages $ listToBag [mkModuleNotFoundError not_found | not_found <- not_found_mods]
+              throwErrors sec $ mkMessages $ listToBag [mkModuleNotFoundError not_found | not_found <- not_found_mods]
 
     checkHowMuch how_much $ do
 
@@ -1187,6 +1192,7 @@ upsweep n_jobs hsc_env hmi_cache diag_wrapper mHscMessage old_hpt build_plan = d
     (cycle, pipelines, collect_result) <- interpretBuildPlan (hsc_HUG hsc_env) hmi_cache old_hpt build_plan
     runPipelines n_jobs hsc_env diag_wrapper mHscMessage pipelines
     res <- collect_result
+    let sec = initSourceErrorContext (hsc_dflags hsc_env)
 
     let completed = [m | Just (Just m) <- res]
 
@@ -1194,7 +1200,7 @@ upsweep n_jobs hsc_env hmi_cache diag_wrapper mHscMessage old_hpt build_plan = d
     -- of the upsweep.
     case cycle of
         Just mss -> do
-          throwOneError $ cyclicModuleErr mss
+          throwOneError sec $ cyclicModuleErr mss
         Nothing  -> do
           let success_flag = successIf (all isJust res)
           return (success_flag, completed)
@@ -1593,11 +1599,12 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
       wrapAction diag_wrapper hsc_env $ do
         forM_ env_messager $ \hscMessage -> hscMessage hsc_env (k, n) UpToDate (ModuleNode [] (ModuleNodeFixed mod loc))
         read_result <- readIface (hsc_hooks hsc_env) (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule mod) (ml_hi_file loc)
+        let sec = initSourceErrorContext (hsc_dflags hsc_env)
         case read_result of
           M.Failed interface_err ->
             let mn = mnkModuleName mod
                 err = Can'tFindInterface (BadIfaceFile interface_err) (LookingForModule (gwib_mod mn) (gwib_isBoot mn))
-            in throwErrors $ singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan (GhcDriverMessage (DriverInterfaceError err))
+            in throwErrors sec $ singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan (GhcDriverMessage (DriverInterfaceError err))
           M.Succeeded iface -> do
             details <- genModDetails hsc_env iface
             mb_object <- findObjectLinkableMaybe (mi_module iface) loc

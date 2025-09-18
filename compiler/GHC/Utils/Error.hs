@@ -280,11 +280,11 @@ pprLocMsgEnvelopeDefault :: forall e . Diagnostic e => MsgEnvelope e -> SDoc
 pprLocMsgEnvelopeDefault = pprLocMsgEnvelope (defaultDiagnosticOpts @e)
 
 pprLocMsgEnvelope :: Diagnostic e => DiagnosticOpts e -> MsgEnvelope e -> SDoc
-pprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan      = s
-                               , errMsgDiagnostic = e
-                               , errMsgSeverity  = sev
-                               , errMsgContext   = name_ppr_ctx
-                               , errMsgReason    = reason })
+pprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan       = s
+                                    , errMsgDiagnostic = e
+                                    , errMsgSeverity   = sev
+                                    , errMsgContext    = name_ppr_ctx
+                                    , errMsgReason     = reason })
   = withErrStyle name_ppr_ctx $
       mkLocMessage
         (MCDiagnostic sev reason (diagnosticCode e))

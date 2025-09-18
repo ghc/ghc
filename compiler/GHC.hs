@@ -1682,7 +1682,7 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
-    PFailed pst -> throwErrors (GhcPsMessage <$> getPsErrorMessages pst)
+    PFailed pst -> throwErrors (initSourceErrorContext dflags) (GhcPsMessage <$> getPsErrorMessages pst)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1693,7 +1693,7 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
-    PFailed pst -> throwErrors (GhcPsMessage <$> getPsErrorMessages pst)
+    PFailed pst -> throwErrors (initSourceErrorContext dflags) (GhcPsMessage <$> getPsErrorMessages pst)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1756,9 +1756,11 @@ findModule mod_name maybe_pkg = do
 
 findQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
 findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
-  liftIO $ trace_if (hsc_logger hsc_env) (text "findQualifiedModule" <+> ppr mod_name <+> ppr pkgqual)
+  let logger = hsc_logger hsc_env
+  liftIO $ trace_if logger (text "findQualifiedModule" <+> ppr mod_name <+> ppr pkgqual)
   let mhome_unit = hsc_home_unit_maybe hsc_env
-  let dflags    = hsc_dflags hsc_env
+  let dflags = hsc_dflags hsc_env
+  let sec = initSourceErrorContext dflags
   case pkgqual of
     ThisPkg uid -> do
       home <- lookupLoadedHomeModule uid mod_name
@@ -1769,13 +1771,13 @@ findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
            case res of
              Found loc m | notHomeModuleMaybe mhome_unit m -> return m
                          | otherwise -> modNotLoadedError dflags m loc
-             err -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
+             err -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
 
     _ -> liftIO $ do
       res <- findImportedModule hsc_env mod_name pkgqual
       case res of
         Found _ m -> return m
-        err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
+        err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
 
 
 modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
@@ -1811,11 +1813,12 @@ lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
       let fc     = hsc_FC hsc_env
       let units  = hsc_units hsc_env
       let dflags = hsc_dflags hsc_env
+      let sec    = initSourceErrorContext dflags
       let fopts  = initFinderOpts dflags
       res <- findExposedPackageModule fc fopts units mod_name NoPkgQual
       case res of
         Found _ m -> return m
-        err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
+        err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
 lookupQualifiedModule pkgqual mod_name = findQualifiedModule pkgqual mod_name
 
 lookupLoadedHomeModule :: GhcMonad m => UnitId -> ModuleName -> m (Maybe Module)
@@ -1860,11 +1863,12 @@ lookupAllQualifiedModuleNames NoPkgQual mod_name = withSession $ \hsc_env -> do
       let fc     = hsc_FC hsc_env
       let units  = hsc_units hsc_env
       let dflags = hsc_dflags hsc_env
+      let sec    = initSourceErrorContext dflags
       let fopts  = initFinderOpts dflags
       res <- findExposedPackageModule fc fopts units mod_name NoPkgQual
       case res of
         Found _ m -> return [m]
-        err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
+        err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
 lookupAllQualifiedModuleNames pkgqual mod_name = do
   m <- findQualifiedModule pkgqual mod_name
   pure [m]
