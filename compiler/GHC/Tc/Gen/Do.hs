@@ -97,7 +97,7 @@ expand_do_stmts doFlavour (stmt@(L loc (LetStmt _ bs)) : lstmts) =
 --    ------------------------------------------------
 --       let x = e ; stmts ~~> let x = e in stmts'
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
-     let expansion = genHsLet bs (genPopErrCtxtExpr expand_stmts_expr)
+     let expansion = genHsLet bs expand_stmts_expr
      return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 
 expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
@@ -110,9 +110,9 @@ expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
 --    -------------------------------------------------------
 --       pat <- e ; stmts   ~~> (>>=) e f
   = do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
-       failable_expr <- mk_failable_expr doFlavour pat (genPopErrCtxtExpr expand_stmts_expr) fail_op
+       failable_expr <- mk_failable_expr doFlavour pat expand_stmts_expr fail_op
        let expansion = genHsExpApps bind_op  -- (>>=)
-                       [ genPopErrCtxtExpr e
+                       [ e
                        , failable_expr ]
        return $ L loc (mkExpandedStmt stmt doFlavour expansion)
   | otherwise
@@ -126,8 +126,8 @@ expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ e (SyntaxExprRn then_op) _)) 
 --      e ; stmts ~~> (>>) e stmts'
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      let expansion = genHsExpApps then_op  -- (>>)
-                     [ genPopErrCtxtExpr e
-                     , genPopErrCtxtExpr $ expand_stmts_expr ]
+                     [ e
+                     , expand_stmts_expr ]
      return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 
 expand_do_stmts doFlavour
@@ -483,13 +483,6 @@ It stores the original statement (with location) and the expanded expression
   the `match_ctxt` is set to a `StmtCtxt` if `GenOrigin` is a `DoExpansionOrigin`.
 -}
 
-
--- | Wrap a located expression with a `PopErrCtxt`
--- mkPopErrCtxtExpr :: HsExpr GhcRn -> HsExpr GhcRn
--- mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
-
-genPopErrCtxtExpr :: LHsExpr GhcRn -> LHsExpr GhcRn
-genPopErrCtxtExpr x = x
 
 mkExpandedPatRn :: Pat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
 mkExpandedPatRn pat e = XExpr (ExpandedThingRn (OrigPat pat) e)
