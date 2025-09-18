@@ -9,6 +9,7 @@ import System.IO
 import GHC
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Types.SourceError (initSourceErrorContext)
 import GHC.Unit.Types (GenUnit(..), Definite(..))
 import GHC.Utils.Monad
 import GHC.Utils.Outputable

@@ -66,6 +66,7 @@ import GHC.Unit.Finder
 import Data.IORef
 import GHC.Types.Name.Env
 import GHC.Platform.Ways
+import GHC.Runtime.Loader (initializePlugins)
 import GHC.Driver.LlvmConfigCache (readLlvmConfigCache)
 import GHC.CmmToLlvm.Config (LlvmTarget (..), LlvmConfig (..))
 import {-# SOURCE #-} GHC.Driver.Pipeline (compileForeign, compileEmptyStub)
@@ -83,7 +84,7 @@ import GHC.StgToJS.Linker.Linker (embedJsFile)
 
 import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Home.ModInfo
-import GHC.Runtime.Loader (initializePlugins)
+
 
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch) via (ReaderT (Hooks, PhaseHook) IO)
@@ -660,10 +661,11 @@ getFileArgs hsc_env input_fn = do
   let dflags0 = hsc_dflags hsc_env
       logger  = hsc_logger hsc_env
       parser_opts = initParserOpts dflags0
-  (warns0, src_opts) <- getOptionsFromFile parser_opts (supportedLanguagePragmas dflags0) input_fn
+      sec = initSourceErrorContext dflags0
+  (warns0, src_opts) <- getOptionsFromFile parser_opts sec (supportedLanguagePragmas dflags0) input_fn
   (dflags1, unhandled_flags, warns)
     <- parseDynamicFilePragma logger dflags0 src_opts
-  checkProcessArgsResult unhandled_flags
+  checkProcessArgsResult dflags0 unhandled_flags
   return (dflags1, warns0, warns)
 
 runCppPhase :: HscEnv -> FilePath -> FilePath -> IO FilePath
@@ -710,9 +712,10 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
         popts = initParserOpts dflags
         rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
         rn_imps = fmap (\(s, rpk, lmn@(L _ mn)) -> (s, rn_pkg_qual mn rpk, lmn))
-    eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
+        sec = initSourceErrorContext dflags
+    eimps <- getImports popts sec imp_prelude buf input_fn (basename <.> suff)
     case eimps of
-        Left errs -> throwErrors (GhcPsMessage <$> errs)
+        Left errs -> throwErrors sec (GhcPsMessage <$> errs)
         Right (src_imps,imps, L _ mod_name) -> return
               (Just buf, mod_name, rn_imps imps, src_imps)
 

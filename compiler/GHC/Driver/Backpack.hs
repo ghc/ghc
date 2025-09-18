@@ -102,14 +102,16 @@ doBackpack [src_filename] = do
     let dflags1 = dflags0
     let parser_opts1 = initParserOpts dflags1
     logger0 <- getLogger
-    (p_warns, src_opts) <- liftIO $ getOptionsFromFile parser_opts1 (supportedLanguagePragmas dflags1) src_filename
+    let sec0 = initSourceErrorContext dflags0
+
+    (p_warns, src_opts) <- liftIO $ getOptionsFromFile parser_opts1 sec0 (supportedLanguagePragmas dflags1) src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma logger0 dflags1 src_opts
     modifySession (hscSetFlags dflags)
     logger <- getLogger -- Get the logger after having set the session flags,
                         -- so that logger options are correctly set.
                         -- Not doing so caused #20396.
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
-    liftIO $ checkProcessArgsResult unhandled_flags
+    liftIO $ checkProcessArgsResult dflags unhandled_flags
     let print_config = initPrintConfig dflags
     liftIO $ printOrThrowDiagnostics logger print_config (initDiagOpts dflags) (GhcPsMessage <$> p_warns)
     liftIO $ printOrThrowDiagnostics logger print_config (initDiagOpts dflags) (GhcDriverMessage <$> warns)
@@ -117,8 +119,9 @@ doBackpack [src_filename] = do
 
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
+        sec = initSourceErrorContext dflags
     case unP parseBackpack (initParserState (initParserOpts dflags) buf loc) of
-        PFailed pst -> throwErrors (GhcPsMessage <$> getPsErrorMessages pst)
+        PFailed pst -> throwErrors sec (GhcPsMessage <$> getPsErrorMessages pst)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.

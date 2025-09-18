@@ -35,6 +35,9 @@ newtype Hsc a = Hsc (HscEnv -> Messages GhcMessage -> IO (a, Messages GhcMessage
     deriving (Functor, Applicative, Monad, MonadIO)
       via ReaderT HscEnv (StateT (Messages GhcMessage) IO)
 
+instance HasHscEnv ((->) HscEnv) where
+    getHscEnv = id
+
 instance HasHscEnv Hsc where
     getHscEnv = Hsc $ \e w -> return (e, w)
 

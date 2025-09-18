@@ -215,13 +215,13 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps _ _ _ _ _ (CyclicSCC nodes)
+processDeps _ hsc_env _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    throwOneError $ cyclicModuleErr nodes
+    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $ cyclicModuleErr nodes
 
-processDeps _ _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
+processDeps _ hsc_env _ _ _ (AcyclicSCC (InstantiationNode _uid node))
   =     -- There shouldn't be any backpack instantiations; report them as well
-    throwOneError $
+    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $
       mkPlainErrorMsgEnvelope noSrcSpan $
       GhcDriverMessage $ DriverInstantiationNodeInDependencyGeneration node
 
@@ -312,7 +312,9 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
         -> return Nothing
 
     fail ->
-        throwOneError $
+      let sec = initSourceErrorContext (hsc_dflags hsc_env)
+      in
+        throwOneError sec $
           mkPlainErrorMsgEnvelope srcloc $
           GhcDriverMessage $ DriverInterfaceError $
              (Can'tFindInterface (cannotFindModule hsc_env imp fail) (LookingForModule imp is_boot))
