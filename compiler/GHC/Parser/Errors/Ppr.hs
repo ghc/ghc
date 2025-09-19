@@ -273,9 +273,14 @@ instance Diagnostic PsMessage where
                   2 (pprWithCommas ppr vs)
                 , text "See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details."
                 ]
-    PsErrIllegalExplicitNamespace
+    PsErrIllegalExplicitNamespace kw
       -> mkSimpleDecorated $
-           text "Illegal keyword 'type'"
+           text "Illegal keyword" <+> quotes kw_doc
+         where
+           kw_doc = case kw of
+             ExplicitTypeNamespace{} -> text "type"
+             ExplicitDataNamespace{} -> text "data"
+
 
     PsErrUnallowedPragma prag
       -> mkSimpleDecorated $
@@ -619,7 +624,7 @@ instance Diagnostic PsMessage where
     PsErrNoSingleWhereBindInPatSynDecl{}          -> ErrorWithoutFlag
     PsErrDeclSpliceNotAtTopLevel{}                -> ErrorWithoutFlag
     PsErrMultipleNamesInStandaloneKindSignature{} -> ErrorWithoutFlag
-    PsErrIllegalExplicitNamespace                 -> ErrorWithoutFlag
+    PsErrIllegalExplicitNamespace{}               -> ErrorWithoutFlag
     PsErrUnallowedPragma{}                        -> ErrorWithoutFlag
     PsErrImportPostQualified                      -> ErrorWithoutFlag
     PsErrImportQualifiedTwice                     -> ErrorWithoutFlag
@@ -759,7 +764,7 @@ instance Diagnostic PsMessage where
     PsErrNoSingleWhereBindInPatSynDecl{}          -> noHints
     PsErrDeclSpliceNotAtTopLevel{}                -> noHints
     PsErrMultipleNamesInStandaloneKindSignature{} -> noHints
-    PsErrIllegalExplicitNamespace                 -> [suggestExtension LangExt.ExplicitNamespaces]
+    PsErrIllegalExplicitNamespace{}               -> [suggestExtension LangExt.ExplicitNamespaces]
     PsErrUnallowedPragma{}                        -> noHints
     PsErrImportPostQualified                      -> [suggestExtension LangExt.ImportQualifiedPost]
     PsErrImportQualifiedTwice                     -> noHints
