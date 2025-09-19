@@ -175,7 +175,7 @@ pprOptCo co = sdocOption sdocSuppressCoercions $ \case
               False -> parens $ sep [ppr co, dcolon <+> co_type]
     where
       co_type = sdocOption sdocSuppressCoercionTypes $ \case
-          True -> text "..."
+          True  -> ellipsis
           False -> ppr (coercionType co)
 
 ppr_id_occ :: (SDoc -> SDoc) -> Id -> SDoc

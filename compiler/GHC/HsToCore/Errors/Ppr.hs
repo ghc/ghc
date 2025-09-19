@@ -246,7 +246,7 @@ instance Diagnostic DsMessage where
               <+> text "may fail for the following constructors:")
            2
            (hsep $ punctuate comma $
-            map ppr (take maxCons cons) ++ [ text "..." | lengthExceeds cons maxCons ])
+            map ppr (take maxCons cons) ++ [ ellipsis | lengthExceeds cons maxCons ])
 
   diagnosticReason = \case
     DsUnknownMessage m          -> diagnosticReason m
@@ -338,7 +338,7 @@ badMonadBind elt_ty
 -- Print a single clause (for redundant/with-inaccessible-rhs)
 pprEqn :: HsMatchContextRn -> SDoc -> String -> SDoc
 pprEqn ctx q txt = pprContext True ctx (text txt) $ \f ->
-  f (q <+> matchSeparator ctx <+> text "...")
+  f (q <+> matchSeparator ctx <+> ellipsis)
 
 pprContext :: Bool -> HsMatchContextRn -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
 pprContext singular kind msg rest_of_msg_fun
@@ -357,5 +357,5 @@ pprContext singular kind msg rest_of_msg_fun
 
 dots :: Int -> [a] -> SDoc
 dots maxPatterns qs
-    | qs `lengthExceeds` maxPatterns = text "..."
+    | qs `lengthExceeds` maxPatterns = ellipsis
     | otherwise                      = empty

@@ -309,7 +309,7 @@ data SimplPhase
 
 instance Outputable SimplPhase where
   ppr (SimplPhase p) = ppr p
-  ppr (SimplPhaseRange s e) = brackets $ ppr s <> text "..." <> ppr e
+  ppr (SimplPhaseRange s e) = brackets $ ppr s <> ellipsis <> ppr e
 
 -- | Is this activation active in this simplifier phase?
 --

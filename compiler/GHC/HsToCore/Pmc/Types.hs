@@ -217,7 +217,7 @@ instance Outputable p => Outputable (PmGRHS p) where
 
 instance Outputable p => Outputable (PmPatBind p) where
   ppr (PmPatBind PmGRHS { pg_grds = grds, pg_rhs = bind }) =
-    ppr bind <+> ppr grds <+> text "=" <+> text "..."
+    ppr bind <+> ppr grds <+> text "=" <+> ellipsis
 
 instance Outputable PmEmptyCase where
   ppr (PmEmptyCase { pe_var = var }) =

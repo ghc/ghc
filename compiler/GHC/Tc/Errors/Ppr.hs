@@ -1399,7 +1399,7 @@ instance Diagnostic TcRnMessage where
         EmptyCaseForall tvb ->
           vcat [ text "Empty list of alternatives in" <+> pp_ctxt
                , hang (text "checked against a forall-type:")
-                      2 (pprForAll [tvb] <+> text "...")
+                      2 (pprForAll [tvb] <+> ellipsis)
                ]
         where
           pp_ctxt = case ctxt of
@@ -1591,7 +1591,7 @@ instance Diagnostic TcRnMessage where
               <+> text "may fail for the following constructors:")
            2
            (hsep $ punctuate comma $
-            map ppr (take maxCons cons) ++ [ text "..." | lengthExceeds cons maxCons ])
+            map ppr (take maxCons cons) ++ [ ellipsis | lengthExceeds cons maxCons ])
     TcRnBadFieldAnnotation n con reason -> mkSimpleDecorated $
       hang (pprBadFieldAnnotationReason reason)
          2 (text "on the" <+> speakNth n
@@ -3759,7 +3759,7 @@ derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving pprHerald = \cas
   DerivErrNotWellKinded tc cls_kind _
     -> sep [ hang (text "Cannot derive well-kinded instance of form"
                          <+> quotes (pprClassPred cls cls_tys
-                                       <+> parens (ppr tc <+> text "...")))
+                                       <+> parens (ppr tc <+> ellipsis)))
                   2 empty
            , nest 2 (text "Class" <+> quotes (ppr cls)
                          <+> text "expects an argument of kind"
@@ -6819,7 +6819,7 @@ pprInvalidAssocDefault = \case
       ppr_eqn :: SDoc
       ppr_eqn =
         quotes (text "type" <+> ppr (mkTyConApp fam_tc pat_tys)
-                <+> equals <+> text "...")
+                <+> equals <+> ellipsis)
 
       suggestion :: SDoc
       suggestion = text "The arguments to" <+> quotes (ppr fam_tc)

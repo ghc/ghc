@@ -62,7 +62,7 @@ pprRefutableShapes (var, alts)
   = var <+> text "is not one of" <+> format_alts alts
   where
     format_alts = braces . fsep . punctuate comma . shorten . map ppr_alt
-    shorten (a:b:c:_:_)       = a:b:c:[text "..."]
+    shorten (a:b:c:_:_)       = a:b:c:[ellipsis]
     shorten xs                = xs
     ppr_alt (PmAltConLike cl) = ppr cl
     ppr_alt (PmAltLit lit)    = ppr lit

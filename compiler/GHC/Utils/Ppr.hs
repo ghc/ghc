@@ -74,7 +74,7 @@ module GHC.Utils.Ppr (
         int, integer, float, double, rational, hex,
 
         -- ** Simple derived documents
-        semi, comma, colon, space, equals,
+        semi, comma, colon, space, equals, ellipsis,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace,
 
         -- ** Wrapping documents in delimiters
@@ -424,6 +424,7 @@ lbrack :: Doc -- ^ A '[' character
 rbrack :: Doc -- ^ A ']' character
 lbrace :: Doc -- ^ A '{' character
 rbrace :: Doc -- ^ A '}' character
+ellipsis :: Doc -- ^ A '...' ellipsis
 semi   = char ';'
 comma  = char ','
 colon  = char ':'
@@ -435,6 +436,7 @@ lbrack = char '['
 rbrack = char ']'
 lbrace = char '{'
 rbrace = char '}'
+ellipsis = text "..."
 
 spaceText, nlText :: TextDetails
 spaceText = Chr ' '

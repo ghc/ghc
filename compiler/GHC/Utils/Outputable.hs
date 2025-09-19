@@ -46,7 +46,7 @@ module GHC.Utils.Outputable (
         arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lambda,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
-        blankLine, forAllLit, bullet,
+        blankLine, forAllLit, bullet, ellipsis,
         ($+$),
         cat, fcat,
         hang, hangNotEmpty, punctuate, punctuateFinal,
@@ -521,7 +521,7 @@ withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 pprDeeper :: SDoc -> SDoc
 pprDeeper d = SDoc $ \ctx -> case sdocStyle ctx of
   PprUser q depth c ->
-   let deeper 0 = Pretty.text "..."
+   let deeper 0 = Pretty.ellipsis
        deeper n = runSDoc d ctx{sdocStyle = PprUser q (PartWay (n-1)) c}
    in case depth of
          DefaultDepth -> deeper (sdocDefaultDepth ctx)
@@ -551,7 +551,7 @@ pprDeeperList f ds
 
 trim :: Int -> [SDoc] -> [SDoc]
 trim _ []     = []
-trim 0 _      = [text "..."]
+trim 0 _      = [ellipsis]
 trim n (d:ds) = d : trim (n-1) ds
 
 pprSetDepth :: Depth -> SDoc -> SDoc
@@ -773,7 +773,7 @@ quotes d = sdocOption sdocCanUseUnicode $ \case
            | otherwise        -> Pretty.quotes pp_d
 
 blankLine, dcolon, arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt,
-  larrowtt, lambda :: SDoc
+  larrowtt, lambda, ellipsis :: SDoc
 
 blankLine  = docToSDoc Pretty.emptyText
 dcolon     = unicodeSyntax (char '∷') (text "::")
@@ -786,6 +786,7 @@ larrowt    = unicodeSyntax (char '⤙') (text "-<")
 arrowtt    = unicodeSyntax (char '⤜') (text ">>-")
 larrowtt   = unicodeSyntax (char '⤛') (text "-<<")
 lambda     = unicodeSyntax (char 'λ') (char '\\')
+ellipsis   = docToSDoc Pretty.ellipsis
 
 semi, comma, colon, equals, space, underscore, dot, vbar :: IsLine doc => doc
 lparen, rparen, lbrack, rbrack, lbrace, rbrace :: IsLine doc => doc
