@@ -1078,11 +1078,11 @@ qcname_ext_w_wildcard :: { LocatedA ImpExpQcSpec }
         |  '..'                     { sL1a $1 (ImpExpQcWildcard (epTok $1) NoEpTok)  }
 
 qcname_ext :: { LocatedA ImpExpQcSpec }
-        :  qcname                   { sL1a $1 (ImpExpQcName $1) }
-        |  'type' oqtycon           {% do { n <- mkTypeImpExp $2
-                                          ; return $ sLLa $1 $> (ImpExpQcType (epTok $1) n) }}
-        |  'data' qvarcon           {% do { n <- mkDataImpExp $2
-                                          ; return $ sLLa $1 $> (ImpExpQcData (epTok $1) n) }}
+        :  qcname                   { sL1a $1 (mkPlainImpExp $1) }
+        |  'type' oqtycon           {% do { imp_exp <- mkTypeImpExp (epTok $1) $2
+                                          ; return $ sLLa $1 $> imp_exp }}
+        |  'data' qvarcon           {% do { imp_exp <- mkDataImpExp (epTok $1) $2
+                                          ; return $ sLLa $1 $> imp_exp }}
 
 qcname  :: { LocatedN RdrName }  -- Variable or type constructor
         :  qvar                 { $1 } -- Things which look like functions
