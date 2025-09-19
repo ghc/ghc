@@ -963,7 +963,7 @@ extern char **environ;
       RTS_INTCHAR_SYMBOLS
 
 // 64-bit support functions in libgcc.a
-#if defined(__GNUC__) && SIZEOF_VOID_P <= 4 && !defined(_ABIN32)
+#if SIZEOF_VOID_P <= 4 && !defined(_ABIN32)
 #define RTS_LIBGCC_SYMBOLS                             \
       SymI_NeedsProto(__divdi3)                        \
       SymI_NeedsProto(__udivdi3)                       \
@@ -974,7 +974,7 @@ extern char **environ;
       SymI_NeedsProto(__ashrdi3)                       \
       SymI_NeedsProto(__lshrdi3)                       \
       SymI_NeedsProto(__fixunsdfdi)
-#elif defined(__GNUC__) && SIZEOF_VOID_P == 8
+#elif SIZEOF_VOID_P == 8
 #define RTS_LIBGCC_SYMBOLS                             \
       SymI_NeedsProto(__udivti3)                       \
       SymI_NeedsProto(__umodti3)
