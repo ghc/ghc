@@ -78,22 +78,6 @@ AC_DEFUN([PREP_MAYBE_PROGRAM],[
     AC_SUBST([$1MaybeProg])
 ])
 
-# PREP_MAYBE_LIBRARY
-# =========================
-#
-# Introduce a substitution [$1MaybeProg] with
-# * Nothing, if $$1 is empty or "NO"
-# * Just the library otherwise
-AC_DEFUN([PREP_MAYBE_LIBRARY],[
-    if test -z "$$1" || test "$$1" = "NO"; then
-        $1MaybeLibrary=Nothing
-    else
-        PREP_LIST([$2])
-        $1MaybeLibrary="Just (Library { libName = \"$2\", includePath = \"$3\", libraryPath = \"$4\" })"
-    fi
-    AC_SUBST([$1MaybeLibrary])
-])
-
 # PREP_MAYBE_STRING
 # =========================
 #
@@ -109,6 +93,24 @@ AC_DEFUN([PREP_MAYBE_STRING],[
         $1MaybeStr="Just \"$$1\""
     fi
     AC_SUBST([$1MaybeStr])
+])
+
+# PREP_MAYBE_LIBRARY
+# =========================
+#
+# Introduce a substitution [$1MaybeProg] with
+# * Nothing, if $$1 is empty or "NO"
+# * Just the library otherwise
+AC_DEFUN([PREP_MAYBE_LIBRARY],[
+    if test -z "$$1" || test "$$1" = "NO"; then
+        $1MaybeLibrary=Nothing
+    else
+        PREP_LIST([$2])
+        PREP_MAYBE_STRING([$3])
+        PREP_MAYBE_STRING([$4])
+        $1MaybeLibrary="Just Library { libName = \"$2\", includePath = $$3MaybeStr, libraryPath = $$4MaybeStr }"
+    fi
+    AC_SUBST([$1MaybeLibrary])
 ])
 
 # PREP_BOOLEAN
@@ -195,10 +197,7 @@ AC_DEFUN([PREP_TARGET_FILE],[
     PREP_LIST([CONF_CPP_OPTS_STAGE2])
     PREP_LIST([CONF_CXX_OPTS_STAGE2])
     PREP_LIST([CONF_CC_OPTS_STAGE2])
-
-    PREP_MAYBE_STRING([LibdwIncludeDir])
-    PREP_MAYBE_STRING([LibdwLibDir])
-    PREP_MAYBE_LIBRARY([UseLibdw], [dw], [$LibdwIncludeDirMaybeStr], [$LibdwLibDirMaybeStr])
+    PREP_MAYBE_LIBRARY([UseLibdw], [dw], [LibdwIncludeDir], [LibdwLibDir])
 
     dnl Host target
     PREP_BOOLEAN([ArSupportsAtFile_STAGE0])
