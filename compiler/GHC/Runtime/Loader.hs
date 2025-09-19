@@ -317,7 +317,7 @@ getHValueSafely interp hsc_env val_name expected_type = do
 lessUnsafeCoerce :: Logger -> String -> a -> IO b
 lessUnsafeCoerce logger context what = do
     debugTraceMsg logger 3 $
-        (text "Coercing a value in") <+> (text context) <> (text "...")
+        (text "Coercing a value in") <+> text context <> ellipsis
     output <- evaluate (unsafeCoerce what)
     debugTraceMsg logger 3 (text "Successfully evaluated coercion")
     return output

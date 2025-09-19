@@ -199,10 +199,7 @@ ppLlvmFunctionDecls decs = vcat $ map ppLlvmFunctionDecl decs
 -- the function.
 ppLlvmFunctionDecl :: IsDoc doc => LlvmFunctionDecl -> doc
 ppLlvmFunctionDecl (LlvmFunctionDecl n l c r varg p a)
-  = let varg' = case varg of
-                      VarArgs | null p    -> text "..."
-                              | otherwise -> text ", ..."
-                      _otherwise          -> text ""
+  = let varg' = ppVarArgsEllipsis varg p
         align = case a of
                      Just a' -> text " align" <+> int a'
                      Nothing -> empty

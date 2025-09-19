@@ -100,15 +100,17 @@ ppLlvmTypeShort t = case t of
   LMVector l t -> "v" ++ show l ++ ppLlvmTypeShort t
   _ -> pprPanic "ppLlvmTypeShort" (ppLlvmType t)
 
+ppVarArgsEllipsis :: IsLine doc => LlvmParameterListType -> [LlvmParameter] -> doc
+ppVarArgsEllipsis list_type args
+  = case list_type of
+      FixedArgs           -> text ""
+      VarArgs | null args -> text "..."    -- Can't use ellipsis, comma here,
+              | otherwise -> text ", ..."  -- because they aren't methods of IsLine
+
 ppParams :: IsLine doc => LlvmParameterListType -> [LlvmParameter] -> doc
 ppParams varg p
-  = let varg' = case varg of
-          VarArgs | null args -> text "..."
-                  | otherwise -> text ", ..."
-          _otherwise          -> text ""
-        -- by default we don't print param attributes
-        args = map fst p
-    in ppCommaJoin ppLlvmType args <> varg'
+  = ppCommaJoin ppLlvmType (map fst p) <> ppVarArgsEllipsis varg p
+
 {-# SPECIALIZE ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc #-}
 {-# SPECIALIZE ppParams :: LlvmParameterListType -> [LlvmParameter] -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 

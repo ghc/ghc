@@ -227,7 +227,7 @@ instance Outputable GhcHint where
                <+> text "pattern synonym, e.g.")
             2 (hang (text "pattern" <+> pp_name <+> pp_args <+> larrow
                      <+> ppr pat <+> text "where")
-                  2 (pp_name <+> pp_args <+> equals <+> text "..."))
+                  2 (pp_name <+> pp_args <+> equals <+> ellipsis))
          where
            pp_name = ppr name
            pp_args = hsep (map ppr args)

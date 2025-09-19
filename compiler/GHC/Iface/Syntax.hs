@@ -941,7 +941,7 @@ ppr_trim xs
   where
     go (Just doc) (_,     so_far) = (False, doc : so_far)
     go Nothing    (True,  so_far) = (True, so_far)
-    go Nothing    (False, so_far) = (True, text "..." : so_far)
+    go Nothing    (False, so_far) = (True, ellipsis : so_far)
 
 isIfaceDataInstance :: IfaceTyConParent -> Bool
 isIfaceDataInstance IfNoParent = False
