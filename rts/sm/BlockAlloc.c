@@ -274,19 +274,9 @@ STATIC_INLINE uint32_t
 log_2(W_ n)
 {
     ASSERT(n > 0 && n < (1<<NUM_FREE_LISTS));
-#if defined(__GNUC__)
     return CLZW(n) ^ (sizeof(StgWord)*8 - 1);
     // generates good code on x86.  __builtin_clz() compiles to bsr+xor, but
     // we want just bsr, so the xor here cancels out gcc's xor.
-#else
-    W_ i, x;
-    x = n;
-    for (i=0; i < NUM_FREE_LISTS; i++) {
-        x = x >> 1;
-        if (x == 0) return i;
-    }
-    return NUM_FREE_LISTS;
-#endif
 }
 
 // log base 2 (ceiling), needs to support up to (2^NUM_FREE_LISTS)-1
@@ -294,18 +284,8 @@ STATIC_INLINE uint32_t
 log_2_ceil(W_ n)
 {
     ASSERT(n > 0 && n < (1<<NUM_FREE_LISTS));
-#if defined(__GNUC__)
     uint32_t r = log_2(n);
     return (n & (n-1)) ? r+1 : r;
-#else
-    W_ i, x;
-    x = 1;
-    for (i=0; i < MAX_FREE_LIST; i++) {
-        if (x >= n) return i;
-        x = x << 1;
-    }
-    return MAX_FREE_LIST;
-#endif
 }
 
 STATIC_INLINE void
