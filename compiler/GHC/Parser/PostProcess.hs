@@ -79,6 +79,7 @@ module GHC.Parser.PostProcess (
         ImpExpSubSpec(..),
         ImpExpQcSpec(..),
         mkModuleImpExp,
+        mkPlainImpExp,
         mkTypeImpExp,
         mkDataImpExp,
         mkImpExpSubSpec,
@@ -3241,9 +3242,7 @@ data ImpExpSubSpec = ImpExpAbs
                    | ImpExpList [LocatedA ImpExpQcSpec]
                    | ImpExpAllWith [LocatedA ImpExpQcSpec]
 
-data ImpExpQcSpec = ImpExpQcName (LocatedN RdrName)
-                  | ImpExpQcType (EpToken "type") (LocatedN RdrName)
-                  | ImpExpQcData (EpToken "data") (LocatedN RdrName)
+data ImpExpQcSpec = ImpExpQcName (Maybe ExplicitNamespaceKeyword) (LocatedN RdrName)
                   | ImpExpQcWildcard (EpToken "..") (EpToken ",")
 
 mkModuleImpExp :: Maybe (LWarningTxt GhcPs) -> (EpToken "(", EpToken ")") -> LocatedA ImpExpQcSpec
@@ -3287,30 +3286,37 @@ mkModuleImpExp warning (top, tcp) (L l specname) subs = do
                (PsErrVarForTyCon name)
         else return $ ieNameFromSpec specname
 
-    ieNameVal (ImpExpQcName ln)   = unLoc ln
-    ieNameVal (ImpExpQcType _ ln) = unLoc ln
-    ieNameVal (ImpExpQcData _ ln) = unLoc ln
+    ieNameVal (ImpExpQcName _ ln) = unLoc ln
     ieNameVal ImpExpQcWildcard{}  = panic "ieNameVal got wildcard"
 
     ieNameFromSpec :: ImpExpQcSpec -> IEWrappedName GhcPs
-    ieNameFromSpec (ImpExpQcName   (L l n)) = IEName noExtField (L l n)
-    ieNameFromSpec (ImpExpQcType r (L l n)) = IEType r (L l n)
-    ieNameFromSpec (ImpExpQcData r (L l n)) = IEData r (L l n)
-    ieNameFromSpec ImpExpQcWildcard{}       = panic "ieName got wildcard"
+    ieNameFromSpec (ImpExpQcName m_kw name) = case m_kw of
+        Nothing                          -> IEName noExtField name
+        Just (ExplicitTypeNamespace tok) -> IEType tok name
+        Just (ExplicitDataNamespace tok) -> IEData tok name
+    ieNameFromSpec ImpExpQcWildcard{} = panic "ieNameFromSpec got wildcard"
 
     wrapped = map (fmap ieNameFromSpec)
 
-mkTypeImpExp :: LocatedN RdrName   -- TcCls or Var name space
-             -> P (LocatedN RdrName)
-mkTypeImpExp name =
-  do requireExplicitNamespaces (getLocA name)
-     return (fmap (`setRdrNameSpace` tcClsName) name)
+mkPlainImpExp :: LocatedN RdrName -> ImpExpQcSpec
+mkPlainImpExp name = ImpExpQcName Nothing name
 
-mkDataImpExp :: LocatedN RdrName
-             -> P (LocatedN RdrName)
-mkDataImpExp name =
-  do requireExplicitNamespaces (getLocA name)
-     return name
+mkTypeImpExp :: EpToken "type"
+             -> LocatedN RdrName   -- TcCls or Var name space
+             -> P ImpExpQcSpec
+mkTypeImpExp tok name = do
+  let name' = fmap (`setRdrNameSpace` tcClsName) name
+      ns_kw = ExplicitTypeNamespace tok
+  requireExplicitNamespaces ns_kw
+  return (ImpExpQcName (Just ns_kw) name')
+
+mkDataImpExp :: EpToken "data"
+             -> LocatedN RdrName
+             -> P ImpExpQcSpec
+mkDataImpExp tok name = do
+  let ns_kw = ExplicitDataNamespace tok
+  requireExplicitNamespaces ns_kw
+  return (ImpExpQcName (Just ns_kw) name)
 
 checkImportSpec :: LocatedLI [LIE GhcPs] -> P (LocatedLI [LIE GhcPs])
 checkImportSpec ie@(L _ specs) =
@@ -3368,11 +3374,15 @@ failOpFewArgs (L loc op) =
      ; addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
          (PsErrOpFewArgs is_star_type op) }
 
-requireExplicitNamespaces :: MonadP m => SrcSpan -> m ()
-requireExplicitNamespaces l = do
+requireExplicitNamespaces :: MonadP m => ExplicitNamespaceKeyword -> m ()
+requireExplicitNamespaces kw = do
   allowed <- getBit ExplicitNamespacesBit
   unless allowed $
-    addError $ mkPlainErrorMsgEnvelope l PsErrIllegalExplicitNamespace
+    addError $ mkPlainErrorMsgEnvelope loc $ PsErrIllegalExplicitNamespace kw
+  where
+    loc = case kw of
+      ExplicitTypeNamespace tok -> getEpTokenSrcSpan tok
+      ExplicitDataNamespace tok -> getEpTokenSrcSpan tok
 
 warnPatternNamespaceSpecifier :: MonadP m => SrcSpan -> m ()
 warnPatternNamespaceSpecifier l = do

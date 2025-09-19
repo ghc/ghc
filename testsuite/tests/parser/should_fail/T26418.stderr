@@ -1,0 +1,5 @@
+T26418.hs:4:16: error: [GHC-47007]
+    Illegal keyword ‘data’
+    Suggested fix:
+      Perhaps you intended to use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
+

@@ -214,7 +214,7 @@ data PsMessage
    | PsErrImportPostQualified
 
    -- | Explicit namespace keyword without 'ExplicitNamespaces'
-   | PsErrIllegalExplicitNamespace
+   | PsErrIllegalExplicitNamespace !ExplicitNamespaceKeyword
 
    -- | Expecting a type constructor but found a variable
    | PsErrVarForTyCon !RdrName

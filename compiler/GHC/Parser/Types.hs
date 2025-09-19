@@ -8,6 +8,7 @@ module GHC.Parser.Types
    , pprSumOrTuple
    , PatBuilder(..)
    , DataConBuilder(..)
+   , ExplicitNamespaceKeyword(..)
    )
 where
 
@@ -111,3 +112,7 @@ instance Outputable DataConBuilder where
     ppr lhs <+> ppr data_con <+> ppr rhs
 
 type instance Anno [LocatedA (StmtLR GhcPs GhcPs (LocatedA (PatBuilder GhcPs)))] = SrcSpanAnnLW
+
+data ExplicitNamespaceKeyword
+  = ExplicitTypeNamespace !(EpToken "type")
+  | ExplicitDataNamespace !(EpToken "data")
