@@ -125,13 +125,7 @@ void _fpreset(void)
     x86_init_fpu();
 }
 
-#if defined(__GNUC__)
 void __attribute__((alias("_fpreset"))) fpreset(void);
-#else
-void fpreset(void) {
-    _fpreset();
-}
-#endif
 
 /* Set the console's CodePage to UTF-8 if using the new I/O manager and the CP
    is still the default one.  */

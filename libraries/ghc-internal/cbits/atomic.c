@@ -163,7 +163,7 @@ hs_atomic_and64(StgWord x, StgWord64 val)
 #pragma GCC diagnostic push
 #if defined(__clang__)
 #pragma GCC diagnostic ignored "-Wsync-fetch-and-nand-semantics-changed"
-#elif defined(__GNUC__)
+#else
 #pragma GCC diagnostic ignored "-Wsync-nand"
 #endif
 
