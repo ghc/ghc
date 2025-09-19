@@ -739,11 +739,13 @@ class DyLD {
           // anything, if it's required later a GOT.func entry will be
           // created on demand.
           if (this.#gotFunc[k]) {
-            // ghc-prim/ghc-internal may export functions imported by
-            // rts
-            assert(this.#gotFunc[k].__poison);
-            delete this.#gotFunc[k].__poison;
-            this.#table.set(this.#gotFunc[k].value, v);
+            const got = this.#gotFunc[k];
+            if (got.value === DyLD.#poison) {
+              const idx = this.#table.grow(1, v);
+              got.value = idx;
+            } else {
+              this.#table.set(got.value, v);
+            }
           }
           continue;
         }
