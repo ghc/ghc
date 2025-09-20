@@ -241,7 +241,7 @@ instance H.Builder Builder where
             distro_mingw <- lookupStageBuildConfig "settings-use-distro-mingw" st
             -- TODO: Check this is the right stage
             libffi_adjustors <- targetUseLibffiForAdjustors st
-            use_system_ffi <- buildFlag UseSystemFfi st
+            use_system_ffi <- buildFlag UseSystemFfi (succStage st)
 
             return $ [ unlitPath ]
                   ++ [ root -/- mingwStamp | windowsHost, distro_mingw == "NO" ]

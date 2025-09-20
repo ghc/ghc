@@ -87,7 +87,7 @@ libffiContext stage = do
 -- | The name of the library
 libffiName :: Expr String
 libffiName = do
-    useSystemFfi <- staged (buildFlag UseSystemFfi)
+    useSystemFfi <- succStaged (buildFlag UseSystemFfi)
     if useSystemFfi
       then pure "ffi"
       else libffiLocalName Nothing
@@ -159,7 +159,7 @@ libffiRules :: Rules ()
 libffiRules = do
   _ <- addOracleCache $ \ (LibffiDynLibs stage)
                          -> do
-                              jsTarget <- isJsTarget stage
+                              jsTarget <- isJsTarget (succStage stage)
                               if jsTarget
                                 then return []
                                 else readFileLines =<< dynLibManifest stage

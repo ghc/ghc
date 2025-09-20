@@ -55,7 +55,7 @@ rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
     rtsPath <- staged rtsBuildPath
     jsTarget <- staged isJsTarget
-    useSystemFfi <- staged (buildFlag UseSystemFfi)
+    useSystemFfi <- succStaged (buildFlag UseSystemFfi)
 
     let -- headers common to native and JS RTS
         common_headers =
