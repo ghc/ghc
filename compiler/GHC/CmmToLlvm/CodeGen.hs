@@ -1593,6 +1593,14 @@ genMachOp _ op [x] = case op of
     MO_VF_Min     _ _ -> panicOp
     MO_VF_Max     _ _ -> panicOp
 
+    MO_V_And {} -> panicOp
+    MO_V_Or {}  -> panicOp
+    MO_V_Xor {} -> panicOp
+
+    MO_VF_And {} -> panicOp
+    MO_VF_Or {}  -> panicOp
+    MO_VF_Xor {} -> panicOp
+
     where
         negate ty v2 negOp = do
             (vx, stmts, top) <- exprToVar x
@@ -1754,10 +1762,18 @@ genMachOp_slow opt op [x, y] = case op of
     MO_V_Sub l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Sub
     MO_V_Mul l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Mul
 
+    MO_V_And l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_And
+    MO_V_Or  l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Or
+    MO_V_Xor l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Xor
+
     MO_VF_Add  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FAdd
     MO_VF_Sub  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FSub
     MO_VF_Mul  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FMul
     MO_VF_Quot l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FDiv
+
+    MO_VF_And l w  -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_And
+    MO_VF_Or  l w  -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Or
+    MO_VF_Xor l w  -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Xor
 
     MO_Not _       -> panicOp
     MO_S_Neg _     -> panicOp

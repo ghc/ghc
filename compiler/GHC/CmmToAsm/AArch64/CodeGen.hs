@@ -832,6 +832,9 @@ getRegister' config plat expr
         MO_V_Add {} -> notUnary
         MO_V_Sub {} -> notUnary
         MO_V_Mul {} -> notUnary
+        MO_V_And {} -> notUnary
+        MO_V_Or {} -> notUnary
+        MO_V_Xor {} -> notUnary
         MO_VS_Neg {} -> notUnary
         MO_V_Shuffle {} -> notUnary
         MO_VF_Shuffle  {} -> notUnary
@@ -841,6 +844,9 @@ getRegister' config plat expr
         MO_VF_Sub {} -> notUnary
         MO_VF_Mul {} -> notUnary
         MO_VF_Quot {} -> notUnary
+        MO_VF_And {} -> notUnary
+        MO_VF_Or {} -> notUnary
+        MO_VF_Xor {} -> notUnary
         MO_Add {} -> notUnary
         MO_Sub {} -> notUnary
 
@@ -1221,6 +1227,12 @@ getRegister' config plat expr
         MO_V_Add {} -> vectorsNeedLlvm
         MO_V_Sub {} -> vectorsNeedLlvm
         MO_V_Mul {} -> vectorsNeedLlvm
+        MO_V_And {} -> vectorsNeedLlvm
+        MO_V_Or {} -> vectorsNeedLlvm
+        MO_V_Xor {} -> vectorsNeedLlvm
+        MO_VF_And {} -> vectorsNeedLlvm
+        MO_VF_Or {} -> vectorsNeedLlvm
+        MO_VF_Xor {} -> vectorsNeedLlvm
         MO_VS_Neg {} -> vectorsNeedLlvm
         MO_VF_Extract {} -> vectorsNeedLlvm
         MO_VF_Add {} -> vectorsNeedLlvm

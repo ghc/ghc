@@ -737,8 +737,14 @@ pprInstr platform i = case i of
    AND format src dst
       -> pprFormatOpOp (text "and") format src dst
 
+   VAND format src1 src2 dst
+      -> pprFormatOpRegReg (text "vand") format src1 src2 dst
+
    OR  format src dst
       -> pprFormatOpOp (text "or")  format src dst
+
+   VOR format src1 src2 dst
+      -> pprFormatOpRegReg (text "vor") format src1 src2 dst
 
    XOR FF32 src dst
       -> pprOpOp (text "xorps") FF32 src dst
@@ -753,7 +759,7 @@ pprInstr platform i = case i of
       -> pprFormatOpOp (text "xor") format src dst
 
    VXOR fmt src1 src2 dst
-      -> pprVxor fmt src1 src2 dst
+      -> pprVXor fmt src1 src2 dst
 
    POPCNT format src dst
       -> pprOpOp (text "popcnt") format src (OpReg dst)
@@ -1036,13 +1042,17 @@ pprInstr platform i = case i of
    PXOR format src dst
      -> pprPXor (text "pxor") format src dst
    VPXOR format s1 s2 dst
-     -> pprXor (text "vpxor") format s1 s2 dst
+     -> pprVXor format s1 s2 dst
    PAND format src dst
      -> pprOpReg (text "pand") format src dst
+   VPAND format s1 s2 dst
+     -> pprOpRegReg (text "vpand") format s1 s2 dst
    PANDN format src dst
      -> pprOpReg (text "pandn") format src dst
    POR format src dst
      -> pprOpReg (text "por") format src dst
+   VPOR format s1 s2 dst
+     -> pprOpRegReg (text "vpor") format s1 s2 dst
    VEXTRACT format offset from to
      -> pprFormatImmRegOp (text "vextract") format offset from to
    INSERTPS format offset addr dst
@@ -1299,6 +1309,16 @@ pprInstr platform i = case i of
            pprReg platform (archWordFormat (target32Bit platform)) reg
        ]
 
+   pprOpRegReg :: Line doc -> Format -> Operand -> Reg -> Reg -> doc
+   pprOpRegReg name format op1 reg2 reg3
+     = line $ hcat [
+           pprMnemonic_ name,
+           pprOperand platform format op1,
+           comma,
+           pprReg platform (archWordFormat (target32Bit platform)) reg2,
+           comma,
+           pprReg platform (archWordFormat (target32Bit platform)) reg3
+       ]
 
    pprFormatOpReg :: Line doc -> Format -> Operand -> Reg -> doc
    pprFormatOpReg name format op1 reg2
@@ -1397,17 +1417,6 @@ pprInstr platform i = case i of
            pprReg platform vectorFormat dst
        ]
 
-   pprXor :: Line doc -> Format -> Reg -> Reg -> Reg -> doc
-   pprXor name format reg1 reg2 reg3
-     = line $ hcat [
-           pprGenMnemonic name format,
-           pprReg platform format reg1,
-           comma,
-           pprReg platform format reg2,
-           comma,
-           pprReg platform format reg3
-       ]
-
    pprPXor :: Line doc -> Format -> Operand -> Reg -> doc
    pprPXor name format src dst
      = line $ hcat [
@@ -1417,8 +1426,8 @@ pprInstr platform i = case i of
            pprReg platform format dst
        ]
 
-   pprVxor :: Format -> Operand -> Reg -> Reg -> doc
-   pprVxor fmt src1 src2 dst
+   pprVXor :: Format -> Operand -> Reg -> Reg -> doc
+   pprVXor fmt src1 src2 dst
      = line $ hcat [
            pprGenMnemonic mem fmt,
            pprOperand platform fmt src1,
@@ -1433,7 +1442,8 @@ pprInstr platform i = case i of
         FF64 -> text "vxorpd"
         VecFormat _ FmtFloat -> text "vxorps"
         VecFormat _ FmtDouble -> text "vxorpd"
-        _ -> pprPanic "GHC.CmmToAsm.X86.Ppr.pprVxor: element type must be Float or Double"
+        VecFormat _ _ints -> text "vpxor"
+        _ -> pprPanic "GHC.CmmToAsm.X86.Ppr.pprVXor: unexpected format"
               (ppr fmt)
 
    pprInsert :: Line doc -> Format -> Imm -> Operand -> Reg -> doc

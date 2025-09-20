@@ -175,11 +175,13 @@ data Instr
         | AND         Format Operand Operand
         | OR          Format Operand Operand
         | XOR         Format Operand Operand
-        -- | AVX bitwise logical XOR operation
-        | VXOR        Format Operand Reg Reg
         | NOT         Format Operand
         | NEGI        Format Operand         -- NEG instruction (name clash with Cond)
         | BSWAP       Format Reg
+        -- Vector bitwise logical operations
+        | VAND        Format Operand Reg Reg
+        | VOR         Format Operand Reg Reg
+        | VXOR        Format Operand Reg Reg
 
         -- Shifts (amount may be immediate or %cl only)
         | SHL         Format Operand{-amount-} Operand
@@ -318,10 +320,12 @@ data Instr
 
         -- logic operations
         | PXOR        Format Operand Reg
-        | VPXOR       Format Reg Reg Reg
+        | VPXOR       Format Operand Reg Reg
         | PAND        Format Operand Reg
         | PANDN       Format Operand Reg
+        | VPAND       Format Operand Reg Reg
         | POR         Format Operand Reg
+        | VPOR        Format Operand Reg Reg
 
         -- Arithmetic
         | VADD       Format Operand Reg Reg
@@ -444,8 +448,14 @@ regUsageOfInstr platform instr
     IDIV   fmt op -> mkRU (mk fmt eax:mk fmt edx:use_R fmt op []) [mk fmt eax, mk fmt edx]
     ADD_CC fmt src dst    -> usageRM fmt src dst
     SUB_CC fmt src dst    -> usageRM fmt src dst
+
     AND    fmt src dst    -> usageRM fmt src dst
+    VAND   fmt src1 src2 dst
+      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
+
     OR     fmt src dst    -> usageRM fmt src dst
+    VOR    fmt src1 src2 dst
+      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
 
     XOR    fmt (OpReg src) (OpReg dst)
       | src == dst
@@ -500,6 +510,8 @@ regUsageOfInstr platform instr
     LOCATION{}          -> noUsage
     UNWIND{}            -> noUsage
     DELTA   _           -> noUsage
+    LDATA{}             -> noUsage
+    NEWBLOCK{}          -> noUsage
 
     POPCNT fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
     LZCNT  fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
@@ -525,7 +537,7 @@ regUsageOfInstr platform instr
     VPBROADCAST sFmt vFmt src dst -> mkRU (use_R sFmt src []) [mk vFmt dst]
     VEXTRACT     fmt _off src dst -> usageRW fmt (OpReg src) dst
     INSERTPS     fmt (ImmInt off) src dst
-      -> mkRU ((use_R fmt src []) ++ [mk fmt dst | not doesNotReadDst]) [mk fmt dst]
+      -> mkRU (use_R fmt src [mk fmt dst | not doesNotReadDst]) [mk fmt dst]
         where
           -- Compute whether the instruction reads the destination register or not.
           -- Immediate bits: ss_dd_zzzz s = src pos, d = dst pos, z = zeroed components.
@@ -534,7 +546,7 @@ regUsageOfInstr platform instr
             -- are being zeroed.
             where pos = ( off `shiftR` 4 ) .&. 0b11
     INSERTPS fmt _off src dst
-      -> mkRU ((use_R fmt src []) ++ [mk fmt dst]) [mk fmt dst]
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     VINSERTPS fmt _imm src2 src1 dst
       -> mkRU (use_R fmt src2 [mk fmt src1]) [mk fmt dst]
     PINSR sFmt vFmt _off src dst
@@ -550,26 +562,30 @@ regUsageOfInstr platform instr
     VMOVDQU      fmt src dst   -> usageRW fmt src dst
     VMOV_MERGE   fmt src2 src1 dst -> mkRU [mk fmt src1, mk fmt src2] [mk fmt dst]
 
-    PXOR fmt (OpReg src) dst
-      | src == dst
+    PXOR fmt src dst
+      | OpReg src_reg <- src
+      , src_reg == dst
       -> mkRU [] [mk fmt dst]
       | otherwise
-      -> mkRU [mk fmt src, mk fmt dst] [mk fmt dst]
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
     VPXOR        fmt s1 s2 dst
-      | s1 == s2, s1 == dst
+      | OpReg s1_reg <- s1
+      , s1_reg == s2, s1_reg == dst
       -> mkRU [] [mk fmt dst]
       | otherwise
-      -> mkRU [mk fmt s1, mk fmt s2] [mk fmt dst]
+      -> mkRU (use_R fmt s1 [mk fmt s2]) [mk fmt dst]
 
     PAND         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PANDN        fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    VPAND        fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
     POR          fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    VPOR         fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
 
-    VADD         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
-    VSUB         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
-    VMUL         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
-    VDIV         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
+    VADD         fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
+    VSUB         fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
+    VMUL         fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
+    VDIV         fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
     PADD         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PSUB         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PMULL        fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
@@ -651,7 +667,6 @@ regUsageOfInstr platform instr
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     VMINMAX _ _ fmt src1 src2 dst
       -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
-    _other              -> panic "regUsage: unrecognised instr"
  where
 
     -- # Definitions
@@ -779,6 +794,8 @@ patchRegsOfInstr platform instr env
     AND  fmt src dst     -> patch2 (AND  fmt) src dst
     OR   fmt src dst     -> patch2 (OR   fmt) src dst
     XOR  fmt src dst     -> patch2 (XOR  fmt) src dst
+    VAND fmt src1 src2 dst -> VAND fmt (patchOp src1) (env src2) (env dst)
+    VOR fmt src1 src2 dst  -> VOR fmt (patchOp src1) (env src2) (env dst)
     VXOR fmt src1 src2 dst -> VXOR fmt (patchOp src1) (env src2) (env dst)
     NOT  fmt op          -> patch1 (NOT  fmt) op
     BSWAP fmt reg        -> BSWAP fmt (env reg)
@@ -868,11 +885,13 @@ patchRegsOfInstr platform instr env
     VMOVDQU    fmt src dst   -> VMOVDQU fmt (patchOp src) (patchOp dst)
     VMOV_MERGE fmt src2 src1 dst -> VMOV_MERGE fmt (env src2) (env src1) (env dst)
 
-    PXOR       fmt src dst   -> PXOR fmt (patchOp src) (env dst)
-    VPXOR      fmt s1 s2 dst -> VPXOR fmt (env s1) (env s2) (env dst)
-    PAND       fmt src dst   -> PAND fmt (patchOp src) (env dst)
+    PXOR       fmt src dst   -> PXOR  fmt (patchOp src) (env dst)
+    VPXOR      fmt s1 s2 dst -> VPXOR fmt (patchOp s1) (env s2) (env dst)
+    PAND       fmt src dst   -> PAND  fmt (patchOp src) (env dst)
+    VPAND      fmt s1 s2 dst -> VPAND fmt (patchOp s1) (env s2) (env dst)
     PANDN      fmt src dst   -> PANDN fmt (patchOp src) (env dst)
-    POR        fmt src dst   -> POR fmt (patchOp src) (env dst)
+    POR        fmt src dst   -> POR   fmt (patchOp src) (env dst)
+    VPOR       fmt s1 s2 dst -> VPOR  fmt (patchOp s1) (env s2) (env dst)
 
     VADD       fmt s1 s2 dst -> VADD fmt (patchOp s1) (env s2) (env dst)
     VSUB       fmt s1 s2 dst -> VSUB fmt (patchOp s1) (env s2) (env dst)

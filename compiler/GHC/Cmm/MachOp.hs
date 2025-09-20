@@ -196,6 +196,14 @@ data MachOp
   | MO_VF_Min Length Width
   | MO_VF_Max Length Width
 
+  -- Bitwise vector operations
+  | MO_V_And Length Width
+  | MO_V_Or Length Width
+  | MO_V_Xor Length Width
+  | MO_VF_And Length Width
+  | MO_VF_Or Length Width
+  | MO_VF_Xor Length Width
+
   -- | An atomic read with no memory ordering. Address msut
   -- be naturally aligned.
   | MO_RelaxedRead Width
@@ -507,6 +515,14 @@ machOpResultType platform mop tys =
     MO_V_Sub l w        -> cmmVec l (cmmBits w)
     MO_V_Mul l w        -> cmmVec l (cmmBits w)
 
+    MO_V_And l w        -> cmmVec l (cmmBits w)
+    MO_V_Or  l w        -> cmmVec l (cmmBits w)
+    MO_V_Xor l w        -> cmmVec l (cmmBits w)
+
+    MO_VF_And l w        -> cmmVec l (cmmBits w)
+    MO_VF_Or  l w        -> cmmVec l (cmmBits w)
+    MO_VF_Xor l w        -> cmmVec l (cmmBits w)
+
     MO_VS_Neg  l w      -> cmmVec l (cmmBits w)
     MO_VS_Min  l w      -> cmmVec l (cmmBits w)
     MO_VS_Max  l w      -> cmmVec l (cmmBits w)
@@ -635,6 +651,13 @@ machOpArgReps platform op =
     MO_VF_Neg  l w      -> [vecwidth l w]
     MO_VF_Min  l w      -> [vecwidth l w, vecwidth l w]
     MO_VF_Max  l w      -> [vecwidth l w, vecwidth l w]
+
+    MO_V_And  l w       -> [vecwidth l w, vecwidth l w]
+    MO_V_Or   l w       -> [vecwidth l w, vecwidth l w]
+    MO_V_Xor  l w       -> [vecwidth l w, vecwidth l w]
+    MO_VF_And l w       -> [vecwidth l w, vecwidth l w]
+    MO_VF_Or  l w       -> [vecwidth l w, vecwidth l w]
+    MO_VF_Xor l w       -> [vecwidth l w, vecwidth l w]
 
     MO_RelaxedRead _    -> [wordWidth platform]
     MO_AlignmentCheck _ w -> [w]

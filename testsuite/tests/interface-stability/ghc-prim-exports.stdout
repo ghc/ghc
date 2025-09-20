@@ -1423,10 +1423,40 @@ module GHC.Prim where
   addrToAny# :: forall {l :: GHC.Internal.Types.Levity} (a :: TYPE (GHC.Internal.Types.BoxedRep l)). Addr# -> (# a #)
   and# :: Word# -> Word# -> Word#
   and64# :: Word64# -> Word64# -> Word64#
+  andDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2#
+  andDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4#
+  andDoubleX8# :: DoubleX8# -> DoubleX8# -> DoubleX8#
+  andFloatX16# :: FloatX16# -> FloatX16# -> FloatX16#
+  andFloatX4# :: FloatX4# -> FloatX4# -> FloatX4#
+  andFloatX8# :: FloatX8# -> FloatX8# -> FloatX8#
   andI# :: Int# -> Int# -> Int#
+  andInt16X16# :: Int16X16# -> Int16X16# -> Int16X16#
+  andInt16X32# :: Int16X32# -> Int16X32# -> Int16X32#
+  andInt16X8# :: Int16X8# -> Int16X8# -> Int16X8#
+  andInt32X16# :: Int32X16# -> Int32X16# -> Int32X16#
+  andInt32X4# :: Int32X4# -> Int32X4# -> Int32X4#
+  andInt32X8# :: Int32X8# -> Int32X8# -> Int32X8#
+  andInt64X2# :: Int64X2# -> Int64X2# -> Int64X2#
+  andInt64X4# :: Int64X4# -> Int64X4# -> Int64X4#
+  andInt64X8# :: Int64X8# -> Int64X8# -> Int64X8#
+  andInt8X16# :: Int8X16# -> Int8X16# -> Int8X16#
+  andInt8X32# :: Int8X32# -> Int8X32# -> Int8X32#
+  andInt8X64# :: Int8X64# -> Int8X64# -> Int8X64#
   andWord16# :: Word16# -> Word16# -> Word16#
+  andWord16X16# :: Word16X16# -> Word16X16# -> Word16X16#
+  andWord16X32# :: Word16X32# -> Word16X32# -> Word16X32#
+  andWord16X8# :: Word16X8# -> Word16X8# -> Word16X8#
   andWord32# :: Word32# -> Word32# -> Word32#
+  andWord32X16# :: Word32X16# -> Word32X16# -> Word32X16#
+  andWord32X4# :: Word32X4# -> Word32X4# -> Word32X4#
+  andWord32X8# :: Word32X8# -> Word32X8# -> Word32X8#
+  andWord64X2# :: Word64X2# -> Word64X2# -> Word64X2#
+  andWord64X4# :: Word64X4# -> Word64X4# -> Word64X4#
+  andWord64X8# :: Word64X8# -> Word64X8# -> Word64X8#
   andWord8# :: Word8# -> Word8# -> Word8#
+  andWord8X16# :: Word8X16# -> Word8X16# -> Word8X16#
+  andWord8X32# :: Word8X32# -> Word8X32# -> Word8X32#
+  andWord8X64# :: Word8X64# -> Word8X64# -> Word8X64#
   annotateStack# :: forall {q :: GHC.Internal.Types.RuntimeRep} b d (a :: TYPE q). b -> (State# d -> (# State# d, a #)) -> State# d -> (# State# d, a #)
   anyToAddr# :: forall a. a -> State# RealWorld -> (# State# RealWorld, Addr# #)
   asinDouble# :: Double# -> Double#
@@ -2111,10 +2141,40 @@ module GHC.Prim where
   numSparks# :: forall d. State# d -> (# State# d, Int# #)
   or# :: Word# -> Word# -> Word#
   or64# :: Word64# -> Word64# -> Word64#
+  orDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2#
+  orDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4#
+  orDoubleX8# :: DoubleX8# -> DoubleX8# -> DoubleX8#
+  orFloatX16# :: FloatX16# -> FloatX16# -> FloatX16#
+  orFloatX4# :: FloatX4# -> FloatX4# -> FloatX4#
+  orFloatX8# :: FloatX8# -> FloatX8# -> FloatX8#
   orI# :: Int# -> Int# -> Int#
+  orInt16X16# :: Int16X16# -> Int16X16# -> Int16X16#
+  orInt16X32# :: Int16X32# -> Int16X32# -> Int16X32#
+  orInt16X8# :: Int16X8# -> Int16X8# -> Int16X8#
+  orInt32X16# :: Int32X16# -> Int32X16# -> Int32X16#
+  orInt32X4# :: Int32X4# -> Int32X4# -> Int32X4#
+  orInt32X8# :: Int32X8# -> Int32X8# -> Int32X8#
+  orInt64X2# :: Int64X2# -> Int64X2# -> Int64X2#
+  orInt64X4# :: Int64X4# -> Int64X4# -> Int64X4#
+  orInt64X8# :: Int64X8# -> Int64X8# -> Int64X8#
+  orInt8X16# :: Int8X16# -> Int8X16# -> Int8X16#
+  orInt8X32# :: Int8X32# -> Int8X32# -> Int8X32#
+  orInt8X64# :: Int8X64# -> Int8X64# -> Int8X64#
   orWord16# :: Word16# -> Word16# -> Word16#
+  orWord16X16# :: Word16X16# -> Word16X16# -> Word16X16#
+  orWord16X32# :: Word16X32# -> Word16X32# -> Word16X32#
+  orWord16X8# :: Word16X8# -> Word16X8# -> Word16X8#
   orWord32# :: Word32# -> Word32# -> Word32#
+  orWord32X16# :: Word32X16# -> Word32X16# -> Word32X16#
+  orWord32X4# :: Word32X4# -> Word32X4# -> Word32X4#
+  orWord32X8# :: Word32X8# -> Word32X8# -> Word32X8#
+  orWord64X2# :: Word64X2# -> Word64X2# -> Word64X2#
+  orWord64X4# :: Word64X4# -> Word64X4# -> Word64X4#
+  orWord64X8# :: Word64X8# -> Word64X8# -> Word64X8#
   orWord8# :: Word8# -> Word8# -> Word8#
+  orWord8X16# :: Word8X16# -> Word8X16# -> Word8X16#
+  orWord8X32# :: Word8X32# -> Word8X32# -> Word8X32#
+  orWord8X64# :: Word8X64# -> Word8X64# -> Word8X64#
   ord# :: Char# -> Int#
   packDoubleX2# :: (# Double#, Double# #) -> DoubleX2#
   packDoubleX4# :: (# Double#, Double#, Double#, Double# #) -> DoubleX4#
@@ -2886,10 +2946,40 @@ module GHC.Prim where
   writeWordOffAddr# :: forall d. Addr# -> Int# -> Word# -> State# d -> State# d
   xor# :: Word# -> Word# -> Word#
   xor64# :: Word64# -> Word64# -> Word64#
+  xorDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2#
+  xorDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4#
+  xorDoubleX8# :: DoubleX8# -> DoubleX8# -> DoubleX8#
+  xorFloatX16# :: FloatX16# -> FloatX16# -> FloatX16#
+  xorFloatX4# :: FloatX4# -> FloatX4# -> FloatX4#
+  xorFloatX8# :: FloatX8# -> FloatX8# -> FloatX8#
   xorI# :: Int# -> Int# -> Int#
+  xorInt16X16# :: Int16X16# -> Int16X16# -> Int16X16#
+  xorInt16X32# :: Int16X32# -> Int16X32# -> Int16X32#
+  xorInt16X8# :: Int16X8# -> Int16X8# -> Int16X8#
+  xorInt32X16# :: Int32X16# -> Int32X16# -> Int32X16#
+  xorInt32X4# :: Int32X4# -> Int32X4# -> Int32X4#
+  xorInt32X8# :: Int32X8# -> Int32X8# -> Int32X8#
+  xorInt64X2# :: Int64X2# -> Int64X2# -> Int64X2#
+  xorInt64X4# :: Int64X4# -> Int64X4# -> Int64X4#
+  xorInt64X8# :: Int64X8# -> Int64X8# -> Int64X8#
+  xorInt8X16# :: Int8X16# -> Int8X16# -> Int8X16#
+  xorInt8X32# :: Int8X32# -> Int8X32# -> Int8X32#
+  xorInt8X64# :: Int8X64# -> Int8X64# -> Int8X64#
   xorWord16# :: Word16# -> Word16# -> Word16#
+  xorWord16X16# :: Word16X16# -> Word16X16# -> Word16X16#
+  xorWord16X32# :: Word16X32# -> Word16X32# -> Word16X32#
+  xorWord16X8# :: Word16X8# -> Word16X8# -> Word16X8#
   xorWord32# :: Word32# -> Word32# -> Word32#
+  xorWord32X16# :: Word32X16# -> Word32X16# -> Word32X16#
+  xorWord32X4# :: Word32X4# -> Word32X4# -> Word32X4#
+  xorWord32X8# :: Word32X8# -> Word32X8# -> Word32X8#
+  xorWord64X2# :: Word64X2# -> Word64X2# -> Word64X2#
+  xorWord64X4# :: Word64X4# -> Word64X4# -> Word64X4#
+  xorWord64X8# :: Word64X8# -> Word64X8# -> Word64X8#
   xorWord8# :: Word8# -> Word8# -> Word8#
+  xorWord8X16# :: Word8X16# -> Word8X16# -> Word8X16#
+  xorWord8X32# :: Word8X32# -> Word8X32# -> Word8X32#
+  xorWord8X64# :: Word8X64# -> Word8X64# -> Word8X64#
   yield# :: State# RealWorld -> State# RealWorld
 
 module GHC.Prim.Exception where

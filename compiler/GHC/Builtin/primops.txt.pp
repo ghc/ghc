@@ -4391,6 +4391,24 @@ primop VecMaxOp "max#" GenPrimOp
    with
       vector = ALL_VECTOR_TYPES
 
+primop VecAndOp "and#" GenPrimOp
+   VECTOR -> VECTOR -> VECTOR
+   {Bit-wise AND of two vectors.}
+   with
+      vector = ALL_VECTOR_TYPES
+
+primop VecOrOp "or#" GenPrimOp
+   VECTOR -> VECTOR -> VECTOR
+   {Bit-wise OR of two vectors.}
+   with
+      vector = ALL_VECTOR_TYPES
+
+primop VecXorOp "xor#" GenPrimOp
+   VECTOR -> VECTOR -> VECTOR
+   {Bit-wise XOR of two vectors.}
+   with
+      vector = ALL_VECTOR_TYPES
+
 ------------------------------------------------------------------------
 
 section "Prefetch"

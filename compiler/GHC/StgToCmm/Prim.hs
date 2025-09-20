@@ -1558,6 +1558,16 @@ emitPrimOp cfg primop =
     | not allowIntWord64X2MinMax -> opCallish MO_W64X2_Max
   (VecMaxOp  WordVec n w) -> opTranslate (MO_VU_Max  n w)
 
+  -- Vector bitwise instructions
+  -- On floats, ANDPS-like
+  (VecAndOp  FloatVec n w) -> opTranslate (MO_VF_And n w)
+  (VecOrOp   FloatVec n w) -> opTranslate (MO_VF_Or  n w)
+  (VecXorOp  FloatVec n w) -> opTranslate (MO_VF_Xor n w)
+  -- On integer, PAND-like
+  (VecAndOp  _ n w) -> opTranslate (MO_V_And n w)
+  (VecOrOp   _ n w) -> opTranslate (MO_V_Or  n w)
+  (VecXorOp  _ n w) -> opTranslate (MO_V_Xor n w)
+
   -- Vector FMA instructions
   VecFMAdd  _ n w -> fmaOp FMAdd  n w
   VecFMSub  _ n w -> fmaOp FMSub  n w

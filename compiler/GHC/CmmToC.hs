@@ -873,6 +873,31 @@ pprMachOp_for_C platform mop = case mop of
                                 (text "MO_V_Mul")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Mul"
                                       ++ "unsupported by the unregisterised backend")
+        MO_V_And {}       -> pprTrace "offending mop:"
+                                (text "MO_V_And")
+                                (panic $ "PprC.pprMachOp_for_C: MO_V_And"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_V_Or {}       -> pprTrace "offending mop:"
+                                (text "MO_V_Or")
+                                (panic $ "PprC.pprMachOp_for_C: MO_V_Or"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_V_Xor {}       -> pprTrace "offending mop:"
+                                (text "MO_V_Xor")
+                                (panic $ "PprC.pprMachOp_for_C: MO_V_Xor"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VF_And {}      -> pprTrace "offending mop:"
+                                (text "MO_VF_And")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_And"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VF_Or {}      -> pprTrace "offending mop:"
+                                (text "MO_VF_Or")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_Or"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VF_Xor {}      -> pprTrace "offending mop:"
+                                (text "MO_VF_Xor")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_Xor"
+                                      ++ "unsupported by the unregisterised backend")
+
         MO_VS_Neg {}      -> pprTrace "offending mop:"
                                 (text "MO_VS_Neg")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Neg"

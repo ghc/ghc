@@ -1137,6 +1137,13 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_VF_Min {}  -> incorrectOperands
       MO_VF_Max {}  -> incorrectOperands
 
+      MO_V_And {}         -> incorrectOperands
+      MO_V_Or {}          -> incorrectOperands
+      MO_V_Xor {}         -> incorrectOperands
+      MO_VF_And {}         -> incorrectOperands
+      MO_VF_Or {}          -> incorrectOperands
+      MO_VF_Xor {}         -> incorrectOperands
+
       MO_VF_Extract {}    -> incorrectOperands
       MO_VF_Add {}        -> incorrectOperands
       MO_VF_Sub {}        -> incorrectOperands
@@ -1403,6 +1410,20 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
 
       MO_VF_Max l w         | avx       -> vector_float_op_avx (VMINMAX Max FloatMinMax) l w x y
                             | otherwise -> vector_float_op_sse (MINMAX Max FloatMinMax) l w x y
+
+      MO_V_And l w          | avx       -> vector_int_op_avx VPAND l w x y
+                            | otherwise -> vector_int_op_sse PAND l w x y
+      MO_V_Or l w           | avx       -> vector_int_op_avx VPOR l w x y
+                            | otherwise -> vector_int_op_sse POR l w x y
+      MO_V_Xor l w          | avx       -> vector_int_op_avx VPXOR l w x y
+                            | otherwise -> vector_int_op_sse PXOR l w x y
+
+      MO_VF_And l w         | avx       -> vector_float_op_avx VAND l w x y
+                            | otherwise -> vector_float_op_sse (\fmt op2 -> AND fmt op2 . OpReg) l w x y
+      MO_VF_Or l w          | avx       -> vector_float_op_avx VOR l w x y
+                            | otherwise -> vector_float_op_sse (\fmt op2 -> OR fmt op2 . OpReg) l w x y
+      MO_VF_Xor l w         | avx       -> vector_float_op_avx VXOR l w x y
+                            | otherwise -> vector_float_op_sse (\fmt op2 -> XOR fmt op2 . OpReg) l w x y
 
       -- SIMD NCG TODO: 256/512-bit integer vector operations
       MO_V_Shuffle 16 W8 is | not is32Bit -> vector_shuffle_int8x16 sse4_1 x y is
@@ -1680,6 +1701,21 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
 
     -----------------------
     -- Vector operations---
+    vector_int_op_avx :: (Format -> Operand -> Reg -> Reg -> Instr)
+                        -> Length
+                        -> Width
+                        -> CmmExpr
+                        -> CmmExpr
+                        -> NatM Register
+    vector_int_op_avx instr l w = vector_op_avx_reg (\fmt -> instr fmt . OpReg) format
+      where format = case w of
+                       W8 -> VecFormat l FmtInt8
+                       W16 -> VecFormat l FmtInt16
+                       W32 -> VecFormat l FmtInt32
+                       W64 -> VecFormat l FmtInt64
+                       _ -> pprPanic "Integer AVX vector operation not supported at this width"
+                              (text "width:" <+> ppr w)
+
     vector_float_op_avx :: (Format -> Operand -> Reg -> Reg -> Instr)
                         -> Length
                         -> Width
@@ -3157,7 +3193,7 @@ getRegister' platform is32Bit (CmmLit lit) = do
              | avx
              = if float_or_floatvec
                then unitOL (VXOR fmt (OpReg dst) dst dst)
-               else unitOL (VPXOR fmt dst dst dst)
+               else unitOL (VPXOR fmt (OpReg dst) dst dst)
              | otherwise
              = if float_or_floatvec
                then unitOL (XOR fmt (OpReg dst) (OpReg dst))

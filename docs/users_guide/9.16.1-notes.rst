@@ -85,6 +85,8 @@ Cmm
 ``ghc-experimental`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- New SIMD primops for bitwise logical operations on 128-wide vectors.
+
 ``template-haskell`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

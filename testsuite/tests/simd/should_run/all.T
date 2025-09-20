@@ -92,6 +92,15 @@ test('simd014',
         # of the XMM4 register, which may not be mapped to a real machine
         # register on non-x86 architectures.
      compile_and_run, ['simd014Cmm.cmm'])
+test('simd015',
+     [ when(have_llvm(), extra_ways(["optllvm"])) ],
+     compile_and_run, [''])
+test('simd016',
+     [ when(have_llvm(), extra_ways(["optllvm"])) ],
+     compile_and_run, [''])
+test('simd017',
+     [ when(have_llvm(), extra_ways(["optllvm"])) ],
+     compile_and_run, [''])
 
 test('simd_insert', [], compile_and_run, [''])
 test('simd_insert_array', [], compile_and_run, [''])

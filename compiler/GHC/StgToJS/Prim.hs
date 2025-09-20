@@ -1211,6 +1211,9 @@ genPrim prof bound ty op = case op of
   VecShuffleOp _ _ _                -> unhandledPrimop op
   VecMinOp {}                       -> unhandledPrimop op
   VecMaxOp {}                       -> unhandledPrimop op
+  VecAndOp {}                       -> unhandledPrimop op
+  VecOrOp {}                        -> unhandledPrimop op
+  VecXorOp {}                       -> unhandledPrimop op
 
   PrefetchByteArrayOp3              -> noOp
   PrefetchMutableByteArrayOp3       -> noOp
