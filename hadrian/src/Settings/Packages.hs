@@ -485,7 +485,7 @@ rtsPackageArgs =
     way <- getWay
     path <- getBuildPath
     top <- expr topDirectory
-    useSystemFfi <- staged (buildFlag UseSystemFfi)
+    useSystemFfi   <- succStaged (buildFlag UseSystemFfi)
     ffiIncludeDir <- staged (buildSetting FfiIncludeDir)
     ffiLibraryDir <- staged (buildSetting FfiLibDir)
     libdwIncludeDir <- staged (\s -> queryTargetTarget s (Lib.includePath <=< tgtRTSWithLibdw))

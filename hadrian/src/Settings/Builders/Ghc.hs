@@ -107,7 +107,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     context <- getContext
     distPath <- expr (Context.distDynDir context)
 
-    useSystemFfi <- staged (buildFlag UseSystemFfi)
+    useSystemFfi <- succStaged (buildFlag UseSystemFfi)
     buildPath <- getBuildPath
     libffiName' <- libffiName
     debugged <- buildingCompilerStage' . ghcDebugged =<< expr flavour
