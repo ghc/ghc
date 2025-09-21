@@ -156,7 +156,7 @@ libffiRules :: Rules ()
 libffiRules = do
   _ <- addOracleCache $ \ (LibffiDynLibs stage)
                          -> do
-                              jsTarget <- isJsTarget (succStage stage)
+                              jsTarget <- isJsTarget stage
                               if jsTarget
                                 then return []
                                 else readFileLines =<< dynLibManifest stage

@@ -54,7 +54,7 @@ ghcInternalDependencies = do
 rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
     rtsPath <- staged rtsBuildPath
-    jsTarget <- staged isJsTarget
+    jsTarget <- succStaged isJsTarget
     useSystemFfi <- succStaged (buildFlag UseSystemFfi)
 
     let -- headers common to native and JS RTS
