@@ -1321,6 +1321,7 @@ stmtMacros = listToUFM [
   ( fsLit "PROF_HEADER_CREATE",     \[e] -> profHeaderCreate e ),
 
   ( fsLit "PUSH_UPD_FRAME",        \[sp,e] -> emitPushUpdateFrame sp e ),
+  ( fsLit "PUSH_BH_UPD_FRAME",     \[sp,e] -> emitPushBHUpdateFrame sp e ),
   ( fsLit "SET_HDR",               \[ptr,info,ccs] ->
                                         emitSetDynHdr ptr info ccs ),
   ( fsLit "TICK_ALLOC_PRIM",       \[hdr,goods,slop] ->
@@ -1335,6 +1336,10 @@ stmtMacros = listToUFM [
 emitPushUpdateFrame :: CmmExpr -> CmmExpr -> FCode ()
 emitPushUpdateFrame sp e = do
   emitUpdateFrame sp mkUpdInfoLabel e
+
+emitPushBHUpdateFrame :: CmmExpr -> CmmExpr -> FCode ()
+emitPushBHUpdateFrame sp e = do
+  emitUpdateFrame sp mkBHUpdInfoLabel e
 
 pushStackFrame :: [CmmParse CmmExpr] -> CmmParse () -> CmmParse ()
 pushStackFrame fields body = do
