@@ -699,7 +699,7 @@ INFO_TABLE(stg_AP_STACK,/*special layout*/0,0,AP_STACK,"AP_STACK","AP_STACK")
 
   /* ensure there is at least AP_STACK_SPLIM words of headroom available
    * after unpacking the AP_STACK. See bug #1466 */
-  PUSH_UPD_FRAME(Sp - SIZEOF_StgUpdateFrame, R1);
+  PUSH_BH_UPD_FRAME(Sp - SIZEOF_StgUpdateFrame, R1);
   Sp = Sp - SIZEOF_StgUpdateFrame - WDS(Words);
 
   TICK_ENT_AP();
