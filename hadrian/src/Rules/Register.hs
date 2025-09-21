@@ -150,7 +150,7 @@ buildConfFinal rs context@Context {..} _conf = do
 
     -- Special package cases (these should ideally be rolled into Cabal).
     when (package == rts) $ do
-        jsTarget <- isJsTarget stage
+        jsTarget <- isJsTarget (succStage stage)
 
         -- If Cabal knew about "generated-headers", we could read them from the
         -- 'configuredCabal' information, and just "need" them here.
