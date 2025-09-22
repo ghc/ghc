@@ -119,7 +119,7 @@ simplify_loop n limit definitely_redo_implications
                             , int (lengthBag simples) <+> text "simples to solve" ])
        ; traceTcS "simplify_loop: wc =" (ppr wc)
 
-       ; (unif_happened, wc1) <- reportUnifications $  -- See Note [Superclass iteration]
+       ; (unif_happened, wc1) <- reportCoarseGrainUnifications $  -- See Note [Superclass iteration]
                                  solveSimpleWanteds simples
                 -- Any insoluble constraints are in 'simples' and so get rewritten
                 -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
@@ -1125,19 +1125,11 @@ solveSimpleWanteds simples
   where
     do_solve_and_plugins :: IntWithInf -> WantedConstraints -> TcS (Bool,WantedConstraints)
     do_solve_and_plugins max_iter wc
-      = do { wc1 <- run_simple_solver max_iter wc
+      = do { wc1 <- simple_solver wc
            ; (rerun_plugin, simples2) <- runTcPluginsWanted (wc_simple wc1)
            ; return (rerun_plugin, wc1 { wc_simple = simples2 }) }
 
-    run_simple_solver :: IntWithInf -> WantedConstraints -> TcS WantedConstraints
-    -- Run `simple_solver` repeatedly until no more unifications happen
-    -- Try this repeatedly, until no unifications happen
-    -- This is potentially quadratic, because we might solve just one
-    -- constraint in each iteration but that seems inevitable
-    run_simple_solver max_iter
-       =  iterateToFixpoint (max_iter `mulWithInf` 10) simple_solver
-
-    simple_solver :: WantedConstraints -> TcS (Bool, WantedConstraints)
+    simple_solver :: WantedConstraints -> TcS WantedConstraints
     -- Try solving the wc_simple part of these constraints, once
     -- Affects the unification state (of course) but not the inert set
     -- The result is not necessarily zonked
@@ -1145,8 +1137,7 @@ solveSimpleWanteds simples
       | isEmptyBag simples
       = return (False, wc)
       | otherwise
-      = reportUnifications $
-        nestTcS             $
+      = nestTcS $
         do { solveSimples simples
            ; simples1 <- getUnsolvedInerts
                -- Now try to solve any Wanted quantified

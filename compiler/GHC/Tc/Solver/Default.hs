@@ -395,7 +395,7 @@ tryConstraintDefaulting wc
   | isEmptyWC wc
   = return wc
   | otherwise
-  = do { (unif_happened, better_wc) <- reportUnifications (go_wc wc)
+  = do { (unif_happened, better_wc) <- reportCoarseGrainUnifications (go_wc wc)
          -- We may have done unifications; so solve again
        ; solveAgainIf unif_happened better_wc }
   where

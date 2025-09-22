@@ -55,7 +55,7 @@ module GHC.Tc.Solver.Monad (
     newWanted,
     newWantedNC, newWantedEvVarNC,
     newBoundEvVarId,
-    unifyTyVar, reportUnifications,
+    unifyTyVar, reportFineGrainUnifications, reportCoarseGrainUnifications,
     setEvBind, setWantedEq,
     setWantedEvTerm, setEvBindIfWanted,
     newEvVar, newGivenEv, emitNewGivens,
@@ -447,6 +447,17 @@ kickOutRewritable ko_spec new_fr
                  2 (vcat [ text "n-kicked =" <+> int n_kicked
                          , text "kicked_out =" <+> ppr kicked_out
                          , text "Residual inerts =" <+> ppr ics' ]) } }
+
+kickOutAfterUnification :: TcTyVarSet -> TcS ()
+kickOutAfterUnification tv_set
+  | isEmptyVarSet tv_set
+  = return ()
+  | otherwise
+  = do { n_kicked <- kickOutRewritable (KOAfterUnify tv_set) (Given, NomEq)
+                     -- Given because the tv := xi is given; NomEq because
+                     -- only nominal equalities are solved by unification
+       ; traceTcS "kickOutAfterUnification" (ppr tvs $$ text "n_kicked =" <+> ppr n_kicked)
+       ; return n_kicked }
 
 kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
 -- See Wrinkle (URW2) in Note [Unify only if the rewriter set is empty]
@@ -1764,30 +1775,47 @@ unifyTyVar :: TcTyVar -> TcType -> TcS ()
 unifyTyVar tv ty
   = assertPpr (isMetaTyVar tv) (ppr tv) $
     do { liftZonkTcS (TcM.writeMetaTyVar tv ty)  -- Produces a trace message
-       ; uni_ref <- getWhatUnifications
-       ; wrapTcS $ recordUnification uni_ref tv }
+       ; what_uni <- getWhatUnifications
+       ; wrapTcS $ recordUnification what_uni tv }
 
-reportUnifications :: TcS a -> TcS (Bool, a)
+reportFineGrainUnifications :: TcS a -> TcS (TcTyVarSet, a)
+reportFineGrainUnifications (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_unif_lvl = outer_wu }) ->
+    do { (unif_tvs, res) <- report_fine_grain_unifs env thing_inside
+       ; recordUnifications outer_wu unif_tvs
+       ; return (unif_tvs, res) }
+
+reportCoarseGrainUnifications :: TcS a -> TcS (Bool, a)
 -- Record whether any useful unifications are done by thing_inside
 -- Remember to propagate the information to the enclosing context
-reportUnifications (TcS thing_inside)
-  = TcS $ \ env@(TcSEnv { tcs_unif_lvl = outer_ul_var }) ->
-    do { inner_ul_var <- TcM.newTcRef NoUnificationsYet
+reportCoarseGrainUnifications (TcS thing_inside)
+  = TcS $ \ env@(TcSEnv { tcs_unif_lvl = outer_what }) ->
+    case outer_what of
+      WU_Coarse outer_ul_ref
+        -> do { inner_ul_ref <- TcM.newTcRef infiniteTcLevel
+              ; res <- thing_inside (env { tcs_unif_lvl = WU_Coarse inner_ul_ref })
+              ; ambient_lvl <- TcM.getTcLevel
+              ; outer_ul   <- TcM.readTcRef outer_ul_ref
+              ; inner_ul   <- TcM.readTcRef inner_ul_ref
+              ; unless (inner_ul `deeperThanOrSame` outer_ul) $
+                writeTcRef outer_ul_ref inner_ul
+              ; let unif_happened = ambient_lvl `deeperThanOrSame` inner_lvl
+              ; return (unif_happened, res) }
+      WU_Fine outer_tvs
+        -> do { (unif_tvs,res) <- report_fine_grain_unifs env thing_inside
+              ; return (not (isEmptyVarSet unif_tvs), res) }
 
-       ; res <- thing_inside (env { tcs_unif_lvl = inner_ul_var })
+report_fine_grain_unifs :: TcSEnv -> (TcSEnv -> TcM a) -> TcM (TcTyVarSet, a)
+report_fine_grain_unifs env thing_inside
+  = do { unif_tvs_ref <- TcM.newTcRef emptyVarSet
 
-       ; ambient_lvl  <- TcM.getTcLevel
-       ; mb_inner_lvl <- TcM.readTcRef inner_ul_var
+       ; res <- thing_inside (env { tcs_unif_lvl = WU_Fine unif_tvs_ref })
 
-       ; case mb_inner_lvl of
-           UnificationsDone unif_lvl
-             | ambient_lvl `deeperThanOrSame` unif_lvl
-             -> -- Some useful unifications took place
-                do { recordUnificationLevel outer_ul_var unif_lvl
-                   ; return (True, res) }
-
-           _  -> -- No useful unifications
-                 return (False, res) }
+       ; unif_tvs    <- TcM.readTcRef unif_tvs_ref
+       ; ambient_lvl <- TcM.getTcLevel
+       ; let interesting unif_tv = ambient_lvl `deeperThanOrSame` tcTyVarLevel tv
+             interesting_unifs = filterVarSet interesting unif_tvs
+       ; return (unif_tvs, res) }
 
 getWhatUnifications :: TcS (TcRef WhatUnifications)
 getWhatUnifications
@@ -1995,6 +2023,19 @@ emitNewWantedEq loc rewriters role ty1 ty2
        ; updWorkListTcS (extendWorkListEq rewriters (mkNonCanonical $ CtWanted wtd))
        ; return co }
 
+emitChildEqs :: Cts -> TcS ()
+-- Emit a bunch of equalities into the work list
+-- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
+--
+-- All the constraints in `cts` share the same rewriter set so,
+-- rather than looking at it one by one, we pass it to
+-- extendWorkListChildEqs; just a small optimisation.
+emitChildEqs eqs
+  | isEmptyBag eqs
+  = return ()
+  | otherwise
+  = updWorkListTcS (extendWorkListChildEqs ev cts)
+
 -- | Create a new Wanted constraint holding a coercion hole
 -- for an equality between the two types at the given 'Role'.
 newWantedEq :: CtLoc -> RewriterSet -> Role -> TcType -> TcType
@@ -2146,18 +2187,18 @@ uPairsTcM uenv eqns = mapM_ (\(Pair ty1 ty2) -> uType uenv ty1 ty2) eqns
 wrapUnifierAndEmit :: CtEvidence -> Role
                    -> (UnifyEnv -> TcM a)  -- Some calls to uType
                    -> TcS a
--- Like wrapUnifier, but emits any unsolved equalities into the work-list
+-- Like wrapUnifier, but
+--    emits any unsolved equalities into the work-list
+--    kicks out any inert constraints that mention unified variables
 wrapUnifierAndEmit ev role do_unifications
-  = do { (res, cts) <- wrapUnifier ev role do_unifications
+  = do { (unifs, (res, eqs)) <- reportFineGrainUnifications $
+                                wrapUnifier ev role do_unifications
 
        -- Emit the deferred constraints
-       -- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
-       --
-       -- All the constraints in `cts` share the same rewriter set so,
-       -- rather than looking at it one by one, we pass it to
-       -- extendWorkListChildEqs; just a small optimisation.
-       ; unless (isEmptyBag cts) $
-         updWorkListTcS (extendWorkListChildEqs ev cts)
+       ; emitChildEqs eqs
+
+       -- Kick out any inert constraints mentioning the unified variables
+       ; kickOutAfterUnification unifs
 
        ; return res }
 

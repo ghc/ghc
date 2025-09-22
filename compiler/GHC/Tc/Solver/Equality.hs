@@ -543,9 +543,14 @@ can_eq_nc_forall ev eq_rel s1 s2
 
       -- Generate the constraints that live in the body of the implication
       -- See (SF5) in Note [Solving forall equalities]
-      ; (lvl, (all_co, wanteds)) <- pushLevelNoWorkList (ppr skol_info)   $
-                                    wrapUnifier ev (eqRelRole eq_rel) $ \uenv ->
-                                    go uenv skol_tvs init_subst2 bndrs1 bndrs2
+      ; (unifs, (lvl, (all_co, wanteds)))
+             <- reportFindGrainUnifications           $
+                pushLevelNoWorkList (ppr skol_info)   $
+                wrapUnifier ev (eqRelRole eq_rel) $ \uenv ->
+                go uenv skol_tvs init_subst2 bndrs1 bndrs2
+
+      -- Kick out any inerts constraints that mention unified type variables
+      ; kickOutAfterUnification unifs
 
       -- Solve the implication right away, using `trySolveImplication`
       -- See (SF6) in Note [Solving forall equalities]
@@ -1670,31 +1675,36 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
               ; finish emptyRewriterSet (givenCtEvCoercion kind_ev) }
 
       CtWanted {}
-         -> do { (unifs, (kind_co, cts)) <- reportUnifications $
+         -> do { (unifs, (kind_co, eqs)) <- reportFineGrainUnifications $
                                             wrapUnifier ev Nominal $ \uenv ->
                                             let uenv' = updUEnvLoc uenv (mkKindEqLoc xi1 xi2)
                                             in unSwap swapped (uType uenv') ki1 ki2
                       -- mkKindEqLoc: any new constraints, arising from the kind
                       -- unification, say they thay come from unifying xi1~xi2
+                      -- ...AndEmit: emit any unsolved equalities
 
-               -- Emit any unsolved kind equalities
-               ; unless (isEmptyBag cts) $
-                 updWorkListTcS (extendWorkListChildEqs ev cts)
+               -- Kick out any inert constraints mentioning the unified variables
+               ; kickOutAfterUnification unifs
 
-               ; if unifs
+               ; if not (isEmptyVarSet unifs)
                  then -- Unifications happened, so start again to do the zonking
                       -- Otherwise we might put something in the inert set that isn't inert
+                      -- Since we are starting again we can ignore `eqs`, because they will
+                      -- happen again next time round
                       startAgainWith (mkNonCanonical ev)
                  else
 
-            assertPpr (not (isEmptyCts cts)) (ppr ev $$ ppr ki1 $$ ppr ki2) $
-              -- assert: the constraints won't be empty because the two kinds differ,
-              -- and there are no unifications, so we must have emitted one or
-              -- more constraints
-            finish (rewriterSetFromCts cts) kind_co }
-                    -- rewriterSetFromCts: record in the /type/ unification xi1~xi2 that
-                    -- it has been rewritten by any (unsolved) consraints in `cts`; that
-                    -- stops xi1~xi2 from unifying until `cts` are solved. See (EIK2).
+               -- Emit the deferred constraints
+            do { emitChildEqs eqs
+
+               ; assertPpr (not (isEmptyCts cts)) (ppr ev $$ ppr ki1 $$ ppr ki2) $
+                   -- assert: the constraints won't be empty because the two kinds differ,
+                   -- and there are no unifications, so we must have emitted one or
+                   -- more constraints
+                finish (rewriterSetFromCts cts) kind_co }}
+                         -- rewriterSetFromCts: record in the /type/ unification xi1~xi2 that
+                         -- it has been rewritten by any (unsolved) constraints in `cts`; that
+                         -- stops xi1~xi2 from unifying until `cts` are solved. See (EIK2).
   where
     xi1  = canEqLHSType lhs1
     role = eqRelRole eq_rel
@@ -2018,6 +2028,9 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
          -- Ignore 'swapped' because it's Refl!
          ; setEvBindIfWanted new_ev EvCanonical $
            evCoercion (mkNomReflCo final_rhs)
+
+         -- Kick out any constraints that can now be rewritten
+         ; kickOutAfterUnification (unitVarSet tv)
 
          ; return (Stop new_ev (text "Solved by unification")) }
 

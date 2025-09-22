@@ -37,7 +37,7 @@ module GHC.Tc.Utils.Unify (
   makeTypeConcrete,
 
   UnifyEnv(..), updUEnvLoc, setUEnvRole,
-  WhatUnifications(..), recordUnification, recordUnificationLevel,
+  WhatUnifications(..), recordUnification, recordUnifications, minTcTyVarSetLevel,
 
   --------------------------------
   -- Holes
@@ -2316,8 +2316,11 @@ unifyTypeAndEmit t_or_k orig ty1 ty2
 **********************************************************************-}
 
 data WhatUnifications
-  = NoUnificationsYet
-  | UnificationsDone TcLevel
+  = WU_Coarse           -- Track unifications coarsely
+      (TcRef TcLevel)      -- infiniteTcLevel <=> no unifications yet
+
+  | WU_Fine                  -- Track each unification individually
+      (TcRef TcTyVarSet)
 
 {- Note [WhatUnifications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2346,9 +2349,28 @@ Why do all this?
  * See Note [When to iterate the solver: unifications] in GHC.Tc.Solver.Solve
 -}
 
-recordUnification :: TcRef WhatUnifications -> TcTyVar -> TcM ()
-recordUnification what_ref tv = recordUnificationLevel what_ref (tcTyVarLevel tv)
+minTcTyVarSetLevel :: TcTyVarSet -> TcLevel
+minTcTyVarSetLevel tvs
+  = nonDetStrictFoldVarSet (minTcLevel . tcTyVarLevel) infiniteTcLevel tvs
 
+recordUnification :: WhatUnifications -> TcTyVar -> TcM ()
+recordUnification what tv = recordUnifications what (unitVarSet tv)
+
+recordUnifications :: WhatUnifications -> TcTyVarSet -> TcM ()
+recordUnifications (WU_Coarse lvl_ref) tvs
+  = do { unif_lvl <- readTcRef lvl_ref
+       ; let tv_lvl = minTcTyVarSetLevel tvs
+       ; if tv_lvl `deeperThanOrSame` unif_lvl
+         then do { traceTc "set-uni-flag: no-op" $
+                   vcat [ text "lvl" <+> ppr tv_lvl, text "unif_lvl" <+> ppr unif_lvl ]
+                 ; return () }
+         else do { traceTc "set-uni-flag" (ppr tv_lvl)
+                 ; writeTcRef lvl_ref tv_lvl } }
+
+recordUnifications (WU_Fine tvs_ref) tvs
+  = updTcRef tvs_ref (`unionVarSet` tvs)
+
+{-
 recordUnificationLevel :: TcRef WhatUnifications -> TcLevel -> TcM ()
 recordUnificationLevel what_ref tv_lvl
   = do { what <- readTcRef what_ref
@@ -2360,11 +2382,7 @@ recordUnificationLevel what_ref tv_lvl
                    ; return () }
            _ -> do { traceTc "set-uni-flag" (ppr tv_lvl)
                    ; writeTcRef what_ref (UnificationsDone tv_lvl) } }
-
-
-instance Outputable WhatUnifications where
-   ppr NoUnificationsYet      = text "NoUniYet"
-   ppr (UnificationsDone lvl) = text "UniDone" <> braces (ppr lvl)
+-}
 
 {-
 %************************************************************************
@@ -2416,7 +2434,7 @@ data UnifyEnv
 
          -- Which variables are unified;
          -- if Nothing, we don't care
-       , u_what :: Maybe (TcRef WhatUnifications)
+       , u_what :: Maybe WhatUnifications
     }
 
 setUEnvRole :: UnifyEnv -> Role -> UnifyEnv
@@ -2698,7 +2716,7 @@ Deferred unifications are of the form
 or              x ~ ...
 where F is a type function and x is a type variable.
 E.g.
-        id :: x ~ y => x -> y
+       id :: x ~ y => x -> y
         id e = e
 
 involves the unification x = y. It is deferred until we bring into account the

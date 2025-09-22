@@ -45,6 +45,7 @@ module GHC.Tc.Utils.TcType (
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
   strictlyDeeperThan, deeperThanOrSame, sameDepthAs,
   tcTypeLevel, tcTyVarLevel, maxTcLevel, minTcLevel,
+  infiniteTcLevel,
 
   --------------------------------
   -- MetaDetails
@@ -842,6 +843,12 @@ the constraint (C alpha[3]) disobeys WantedInv:
 We can unify alpha:=b in the inner implication, because 'alpha' is
 touchable; but then 'b' has escaped its scope into the outer implication.
 -}
+
+infiniteTcLevel :: TcLevel
+-- It is sometimes helpful to be able to say "infinitely deep"
+-- Particularly as a unit for `minTcLevel`
+-- Happily QLInstVar behaves like infinity :-)
+infiniteTcLevel = QLInstVar
 
 maxTcLevel :: TcLevel -> TcLevel -> TcLevel
 maxTcLevel (TcLevel a) (TcLevel b)

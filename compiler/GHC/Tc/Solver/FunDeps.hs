@@ -198,7 +198,7 @@ The solution is super-simple:
 
   * Better still, we solve the [FunDepEqns] with
       solveFunDeps :: CtEvidence -> [FunDepEqns] -> TcS Bool
-    It uses `reportUnifications` to see if any unification happened at this
+    It uses `reportFineGrainUnifications` to see if any unification happened at this
     level or outside -- that is, it does NOT report unifications to the fresh
     unification variables.  So `solveFunDeps` returns True only if it
     unifies a variable /other than/ the fresh ones.  Bingo.
@@ -770,16 +770,20 @@ solveFunDeps work_ev fd_eqns
   = return False -- Common case no-op
 
   | otherwise
-  = do { (unif_happened, _res)
-             <- reportUnifications $
-                nestFunDepsTcS     $
+  = do { (unifs, _res)
+             <- reportFineGrainUnifications $
+                nestFunDepsTcS              $
                 do { (_, eqs) <- wrapUnifier work_ev Nominal do_fundeps
                    ; solveSimpleWanteds eqs }
     -- Why solveSimpleWanteds?  Answer
     --     (a) We don't want to rely on the eager unifier being clever
     --     (b) F Int alpha ~ Maybe Int   where  type instance F Int x = Maybe x
 
-       ; return unif_happened }
+       -- Kick out any inert constraints that mention variables
+       -- that were unified by the fundep
+       ; kickOutAfterUnification unifs
+
+       ; return (not (isEmptyVarSet unifs)) }
   where
     do_fundeps :: UnifyEnv -> TcM ()
     do_fundeps env = mapM_ (do_one env) fd_eqns
