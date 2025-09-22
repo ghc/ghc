@@ -45,19 +45,19 @@ import Data.Maybe( mapMaybe )
 Here is our plan for dealing with functional dependencies
 
 * When we have failed to solve a Wanted constraint, do this
-  1. Generate any fundep-equalities [FunDepEqn] from that constraint.
-  2. Try to solve that [FunDepEqn]
+  1. Generate any fundep-equalities [FunDepEqns] from that constraint.
+  2. Try to solve that [FunDepEqns]
   3. If any unifications happened, send the constraint back to the
      start of the pipeline
 
-* Step (1) How we generate those [FunDepEqn] varies:
+* Step (1) How we generate those [FunDepEqns] varies:
        - tryDictFunDeps: for class constraints (C t1 .. tn)
          we look at top-level instances and inert Givens
        - tryEqFunDeps: for type-family equalities (F t1 .. tn ~ ty)
          we look at top-level family instances
                     and inert Given family equalities
 
-* Step (2). We use `solveFunDeps` to solve the [FunDepEqn] in a nested
+* Step (2). We use `solveFunDeps` to solve the [FunDepEqns] in a nested
   solver.  Key property:
 
       The ONLY effect of `solveFunDeps` is possibly to perform unifications:
@@ -169,14 +169,14 @@ Why?  Because if we do (YES) we'll think we have made some progress
 (some unification has happened), and hence go round again; but actually all we
 have done is to replace `alpha` with `gamma1`.
 
-These "fresh unification variables" in fundep-equalities are ubituitous.
+These "fresh unification variables" in fundep-equalities are ubiquitous.
 For example
       class C a b | a -> b
       instance .. => C Int [x]
 If we see
       [W] C Int alpha
 we'll generate a fundep-equality   [W] alpha ~ [beta1]
-where `beta1` is one of those "fresh unification variables
+where `beta1` is one of those "fresh unification variables"
 
 This problem shows up in several guises; see (at the bottom)
   * Historical Note [Improvement orientation]
@@ -184,10 +184,10 @@ This problem shows up in several guises; see (at the bottom)
 
 The solution is super-simple:
 
-  * A fundep-equality is described by `FunDepEqn`, whose `fd_qtvs` field explicitly
+  * A fundep-equality is described by `FunDepEqns`, whose `fd_qtvs` field explicitly
     lists the "fresh variables"
 
-  * Function `instantiateFunDepEqn` instantiates a `FunDepEqn`, and CRUCIALLY
+  * Function `instantiateFunDepEqn` instantiates a `FunDepEqns`, and CRUCIALLY
     gives the new unification variables a level one deeper than the current
     level.
 
@@ -196,8 +196,8 @@ The solution is super-simple:
     Note [Deeper level on the left].  That ensures that the fresh `gamma1`
     will be eliminated in favour of `alpha`. Hooray.
 
-  * Better still, we solve the [FunDepEqn] with
-      solveFunDeps :: CtEvidence -> [FunDepEqn] -> TcS Bool
+  * Better still, we solve the [FunDepEqns] with
+      solveFunDeps :: CtEvidence -> [FunDepEqns] -> TcS Bool
     It uses `reportUnifications` to see if any unification happened at this
     level or outside -- that is, it does NOT report unifications to the fresh
     unification variables.  So `solveFunDeps` returns True only if it
@@ -320,7 +320,7 @@ tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
 
        ; traceTcS "tryDictFunDepsLocal {" (ppr dict_ct)
 
-       ; let eqns :: [FunDepEqn]
+       ; let eqns :: [FunDepEqns]
              eqns = foldr ((++) . do_interaction) [] $
                     findDictsByClass (inert_dicts inerts) cls
        ; imp <- solveFunDeps work_ev eqns
@@ -335,7 +335,7 @@ tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
     work_pred     = ctEvPred work_ev
     work_is_given = isGiven work_ev
 
-    do_interaction :: DictCt -> [FunDepEqn]
+    do_interaction :: DictCt -> [FunDepEqns]
     do_interaction (DictCt { di_ev = inert_ev }) -- This can be Given or Wanted
       | work_is_given && isGiven inert_ev
         -- Do not create FDs from Given/Given interactions
@@ -353,7 +353,7 @@ tryDictFunDepsTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
     do { inst_envs <- getInstEnvs
 
        ; traceTcS "tryDictFunDepsTop {" (ppr dict_ct)
-       ; let eqns :: [FunDepEqn]
+       ; let eqns :: [FunDepEqns]
              eqns = improveFromInstEnv inst_envs cls xis
        ; imp <- solveFunDeps ev eqns
        ; traceTcS "tryDictFunDepsTop }" (text "imp =" <+> ppr imp)
@@ -466,7 +466,7 @@ tryFamEqFunDeps fam_tc args work_item@(EqCt { eq_ev = ev, eq_rhs = rhs })
   | otherwise
   = nopStage ()
 
-tryFDEqns :: TyCon -> [TcType] -> EqCt -> TcS [FunDepEqn] -> SolverStage ()
+tryFDEqns :: TyCon -> [TcType] -> EqCt -> TcS [FunDepEqns] -> SolverStage ()
 tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eqns
   = Stage $
     do { fd_eqns <- mk_fd_eqns
@@ -481,7 +481,7 @@ tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eq
 -----------------------------------------
 --  User-defined type families
 -----------------------------------------
-mkTopUserFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqn]
+mkTopUserFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
 -- Implements (INJFAM:Wanted/top)
 mkTopUserFamEqFDs fam_tc inj_flags work_args work_rhs
   = do { fam_envs <- getFamInstEnvs
@@ -499,7 +499,7 @@ mkTopUserFamEqFDs fam_tc inj_flags work_args work_rhs
       | otherwise
       = []
 
-    do_one :: CoAxBranch -> Maybe FunDepEqn
+    do_one :: CoAxBranch -> Maybe FunDepEqns
     do_one branch@(CoAxBranch { cab_tvs = branch_tvs
                               , cab_lhs = branch_lhs_tys
                               , cab_rhs = branch_rhs })
@@ -525,7 +525,7 @@ mkTopUserFamEqFDs fam_tc inj_flags work_args work_rhs
                                    !(subst', tvs') = trim_qtvs subst1 tvs
                                in (subst', tv':tvs')
 
-mkLocalUserFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqn]
+mkLocalUserFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkLocalUserFamEqFDs fam_tc inj_flags work_args work_rhs
   = do { fun_eqs_for_me <- getInertFamEqsFor fam_tc
 
@@ -538,7 +538,7 @@ mkLocalUserFamEqFDs fam_tc inj_flags work_args work_rhs
 
        ; return (eqns_from_inerts ++ eqns_from_self) }
   where
-    do_one :: EqCt -> Maybe FunDepEqn
+    do_one :: EqCt -> Maybe FunDepEqns
     do_one (EqCt { eq_lhs = TyFamLHS _ inert_args, eq_rhs = inert_rhs })
       | work_rhs `tcEqType` inert_rhs = Just (mk_eqn inert_args)
       | otherwise                     = Nothing
@@ -604,24 +604,24 @@ tryGivenBuiltinFamEqFDs fam_tc ops work_args (EqCt { eq_ev = work_ev, eq_rhs = w
 
     do_one _ = return ()
 
-mkTopBuiltinFamEqFDs :: TyCon -> BuiltInSynFamily -> [TcType] -> Xi -> TcS [FunDepEqn]
+mkTopBuiltinFamEqFDs :: TyCon -> BuiltInSynFamily -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
-  = return [FDEqn { fd_qtvs = []
-                  , fd_eqs = map snd $ tryInteractTopFam ops fam_tc work_args work_rhs }]
+  = return [FDEqns { fd_qtvs = []
+                   , fd_eqs = map snd $ tryInteractTopFam ops fam_tc work_args work_rhs }]
 
-mkLocalBuiltinFamEqFDs :: TyCon -> BuiltInSynFamily -> [TcType] -> Xi -> TcS [FunDepEqn]
+mkLocalBuiltinFamEqFDs :: TyCon -> BuiltInSynFamily -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkLocalBuiltinFamEqFDs fam_tc ops work_args work_rhs
   = do { fun_eqs_for_me <- getInertFamEqsFor fam_tc
 
-       ; let do_one :: EqCt -> [FunDepEqn]
+       ; let do_one :: EqCt -> [FunDepEqns]
              do_one (EqCt { eq_lhs = TyFamLHS _ inert_args, eq_rhs = inert_rhs })
                | inert_rhs `tcEqType` work_rhs = [mk_eqn inert_args]
                | otherwise                     = []
              do_one _ = pprPanic "interactFunEq 1" (ppr fam_tc) -- TyVarLHS
 
-             mk_eqn :: [TcType] -> FunDepEqn
-             mk_eqn iargs = FDEqn { fd_qtvs = []
-                                  , fd_eqs = map snd $ tryInteractInertFam ops fam_tc
+             mk_eqn :: [TcType] -> FunDepEqns
+             mk_eqn iargs = FDEqns { fd_qtvs = []
+                                   , fd_eqs = map snd $ tryInteractInertFam ops fam_tc
                                                                      work_args iargs }
 
        ; let eqns_from_inerts = concatMap do_one fun_eqs_for_me
@@ -634,12 +634,12 @@ mkLocalBuiltinFamEqFDs fam_tc ops work_args work_rhs
 mkInjectivityFDEqn :: [Bool]       -- Injectivity flags
                    -> [TcTyVar]    -- Quantify these
                    -> [TcType] -> [TcType]  -- Make these equal
-                   -> FunDepEqn
+                   -> FunDepEqns
 -- When F s1 s2 s3 ~ F t1 t2 t3, and F has injectivity info [True,False,True]
---   return the FDEqn { fd_eqs = [Pair s1 t1, Pair s3 t3] }
+--   return the FDEqns { fd_eqs = [Pair s1 t1, Pair s3 t3] }
 -- The injectivity flags [Bool] will not all be False, but nothing goes wrong if they are
 mkInjectivityFDEqn inj_args qtvs lhs_args rhs_args
-  = FDEqn { fd_qtvs = qtvs, fd_eqs = eqs }
+  = FDEqns { fd_qtvs = qtvs, fd_eqs = eqs }
   where
     eqs = [ Pair lhs_arg rhs_arg
           | (True, lhs_arg, rhs_arg) <- zip3 inj_args lhs_args rhs_args ]
@@ -669,19 +669,19 @@ For /injective/, /user-defined/ type families
 
 * (INJFAM:Wanted/Self) see `mkLocalUserFamEqFDs`
     work item: [W] F s1 s2 ~ F t1 t2
-  We can generate FDEqn (s2 ~ t2)
+  We can generate FunDepEqns: (s2 ~ t2)
 
 * (INJFAM:Wanted/other) see `mkLocalUserFamEqFDs`
     work item: [W]   F s1 s2 ~ rhs   -- Wanted
     inert:     [G/W] F t2 t2 ~ rhs   -- Same `rhs`, Given or Wanted
-  We can generate FDEqn (s2 ~ t2)
+  We can generate FunDepEqns: (s2 ~ t2)
 
 * (INJFAM:Wanted/top) see `mkTopUserFamEqFDs`
     work item: [W] F s1 s2 ~ rhs
     type instance forall a b c. F t1 t2 ~ top_rhs
   and we can /match/ the LHS, so that
      S(top_rhs) = rhs
-  then we can generate the FDEqn  forall a c. s2 ~ S(t2)
+  then we can generate the FunDepEqns:  forall a c. s2 ~ S(t2)
   But see wrinkle (TIF1), (TIF2)
 
 For /built-in/ type families, it's pretty similar, except that
@@ -703,10 +703,10 @@ For /built-in/ type families, it's pretty similar, except that
      [W] F @kappa alpha beta ~ Maybe (Proxy @kappa (delta::kappa))
 
   we match (Proxy @kappa delta) against the template (Proxy k a), succeeding
-  with substitution [k:->kappa, a:->delta].  We want to generate this FunDepEqn
+  with substitution [k:->kappa, a:->delta].  We want to generate this FunDepEqns
     FDEqn { fd_qtvs = [b:kappa], fd_eqs = [ beta ~ Proxy @kappa b ] }
   Notice that
-    * we must quantify the FunDepEqn over `b`, which is not matched; for this
+    * we must quantify the FunDepEqns over `b`, which is not matched; for this
       we will generate a fresh unfication variable in `instantiateFunDepEqn`.
     * we must substitute `k:->kappa` in the kind of `b`.
   This fancy footwork for `fd_qtvs` is done by `trim_qtvs` in
@@ -756,7 +756,7 @@ solving.
 ********************************************************************* -}
 
 solveFunDeps :: CtEvidence  -- The work item
-             -> [FunDepEqn]
+             -> [FunDepEqns]
              -> TcS Bool
 -- Solve a bunch of type-equality equations, generated by functional dependencies
 -- By "solve" we mean: (only) do unifications.  We do not generate evidence, and
@@ -784,12 +784,12 @@ solveFunDeps work_ev fd_eqns
     do_fundeps :: UnifyEnv -> TcM ()
     do_fundeps env = mapM_ (do_one env) fd_eqns
 
-    do_one :: UnifyEnv -> FunDepEqn -> TcM ()
+    do_one :: UnifyEnv -> FunDepEqns -> TcM ()
     do_one uenv eqn = do { eqs <- instantiateFunDepEqn eqn
                          ; uPairsTcM uenv eqs }
 
-instantiateFunDepEqn :: FunDepEqn -> TcM [TypeEqn]
-instantiateFunDepEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs })
+instantiateFunDepEqn :: FunDepEqns -> TcM [TypeEqn]
+instantiateFunDepEqn (FDEqns { fd_qtvs = tvs, fd_eqs = eqs })
   | null tvs
   = return rev_eqs
   | otherwise

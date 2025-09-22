@@ -1227,9 +1227,10 @@ nestFunDepsTcS (TcS thing_inside)
     TcM.pushTcLevelM_  $
          -- pushTcLevelTcM: increase the level so that unification variables
          -- allocated by the fundep-creation itself don't count as useful unifications
+         -- See Note [Partial functional dependencies] in GHC.Tc.Solver.FunDeps
     do { inerts <- TcM.readTcRef inerts_var
        ; let nest_inerts = resetInertCans inerts
-                 -- resetInertCasns: like nestImplicTcS
+                 -- resetInertCans: like nestImplicTcS
        ; new_inert_var <- TcM.newTcRef nest_inerts
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_inerts   = new_inert_var
