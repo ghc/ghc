@@ -396,8 +396,10 @@ tcApp :: HsExpr GhcRn
 tcApp rn_expr exp_res_ty
   = do { -- Step 1: Split the application chain
          (fun@(rn_fun, fun_loc), rn_args) <- splitHsApps rn_expr
+       ; inGenCode <- inGeneratedCode
        ; traceTc "tcApp {" $
-           vcat [ text "rn_expr:" <+> ppr rn_expr
+           vcat [ text "generated? " <+> ppr inGenCode
+                , text "rn_expr:" <+> ppr rn_expr
                 , text "rn_fun:" <+> ppr rn_fun
                 , text "fun_loc:" <+> ppr fun_loc
                 , text "rn_args:" <+> ppr rn_args ]
@@ -580,7 +582,7 @@ tcValArg do_ql _ _ (EWrap (EHsWrap w)) = do { whenQL do_ql $ qlMonoHsWrapper w
   -- qlMonoHsWrapper: see Note [Monomorphise instantiation variables]
 tcValArg _     _ _ (EWrap ew)          = return (EWrap ew)
 
-tcValArg do_ql pos fun (EValArg { ea_loc_span   = ctxt
+tcValArg do_ql pos fun (EValArg { ea_loc_span  = lspan
                             , ea_arg    = larg@(L arg_loc arg)
                             , ea_arg_ty = sc_arg_ty })
   = addArgCtxt pos fun larg $
@@ -597,7 +599,7 @@ tcValArg do_ql pos fun (EValArg { ea_loc_span   = ctxt
               DoQL -> liftZonkM $ zonkScaledTcType sc_arg_ty
               NoQL -> return sc_arg_ty
        ; traceTc "tcValArg {" $
-         vcat [ text "ctxt:" <+> ppr ctxt
+         vcat [ text "lspan:" <+> ppr lspan
               , text "sigma_type" <+> ppr (mkCheckExpType exp_arg_ty)
               , text "arg:" <+> ppr larg
               ]
@@ -608,13 +610,13 @@ tcValArg do_ql pos fun (EValArg { ea_loc_span   = ctxt
                  tcPolyExpr arg (mkCheckExpType exp_arg_ty)
        ; traceTc "tcValArg" $ vcat [ ppr arg'
                                    , text "}" ]
-       ; return (EValArg { ea_loc_span = ctxt
+       ; return (EValArg { ea_loc_span = lspan
                          , ea_arg = L arg_loc arg'
                          , ea_arg_ty = noExtField }) }
 
 tcValArg _ pos fun (EValArgQL {
                         eaql_wanted   = wanted
-                      , eaql_loc_span = ctxt
+                      , eaql_loc_span = lspan
                       , eaql_arg_ty   = sc_arg_ty
                       , eaql_larg     = larg@(L arg_loc rn_expr)
                       , eaql_tc_fun   = tc_head
@@ -659,7 +661,7 @@ tcValArg _ pos fun (EValArgQL {
        ; traceTc "tcEValArgQL }" $
            vcat [ text "app_res_rho:" <+> ppr app_res_rho ]
 
-       ; return (EValArg { ea_loc_span   = ctxt
+       ; return (EValArg { ea_loc_span   = lspan
                          , ea_arg    = L arg_loc (mkHsWrap wrap arg')
                          , ea_arg_ty = noExtField }) }
 
@@ -931,11 +933,12 @@ looks_like_type_arg _ = False
 addArgCtxt :: Int -> HsExpr GhcRn -> LHsExpr GhcRn
            -> TcM a -> TcM a
 -- There are 2 cases:
--- 1. In the normal case, we add an informative context
---          "In the third argument of f, namely blah"
--- 2. If we are deep inside generated code (<=> `isGeneratedCode` is `True`)
---          "In the expression: arg"
---  If the arg is also a generated thing, i.e. `arg_loc` is `generatedSrcSpan`, we would print nothing.
+-- 1. In the normal case, we add an informative context (<=> `isGeneratedCode` is `False`)
+--     "In the third argument of f, namely blah"
+-- 2. If we are inside generated code (<=> `isGeneratedCode` is `True`)
+--    (i)   If arg_loc is generated do nothing to to LclEnv/LclCtxt
+--    (ii)  If arg_loc is Unhelpful UnhelpfulNoLocationInfo set `tcl_in_gen_code` to `True`
+--    (iii) if arg_loc is RealSrcLoc then update tcl_loc and add "In the expression: arg" to ErrCtxtStack
 --  See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 --  See Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
 addArgCtxt arg_no fun (L arg_loc arg) thing_inside
@@ -944,12 +947,24 @@ addArgCtxt arg_no fun (L arg_loc arg) thing_inside
                                     , text "arg: " <+> ppr arg
                                     , text "arg_loc" <+> ppr arg_loc])
        ; if in_generated_code
-         then do setSrcSpanA arg_loc $
-                   addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
+         then updCtxtForArg (locA arg_loc) arg $
                    thing_inside
          else do setSrcSpanA arg_loc                    $
                    addErrCtxt (FunAppCtxt (FunAppCtxtExpr fun arg) arg_no) $
                    thing_inside }
+  where
+    updCtxtForArg :: SrcSpan -> HsExpr GhcRn -> TcRn a -> TcRn a
+    updCtxtForArg l@(RealSrcSpan{}) e thing_inside = -- See 2.iii above
+      do setSrcSpan l $
+           addExprCtxt e $
+           thing_inside
+    updCtxtForArg (UnhelpfulSpan UnhelpfulGenerated) _ thing_inside = -- See 2.i above
+      thing_inside
+    updCtxtForArg (UnhelpfulSpan {}) _ thing_inside = -- See 2.ii above
+      do setInUserCode $
+           thing_inside
+
+
 
 {- *********************************************************************
 *                                                                      *
