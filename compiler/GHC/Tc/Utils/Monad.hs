@@ -63,7 +63,7 @@ module GHC.Tc.Utils.Monad(
   -- * Error management
   getSrcCodeOrigin,
   getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
-  inGeneratedCode, setInGeneratedCode,
+  inGeneratedCode, setInGeneratedCode, setInUserCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
@@ -1085,7 +1085,12 @@ setSrcSpan (UnhelpfulSpan _) thing_inside
   = updLclCtxt setLclCtxtInGenCode thing_inside
 
 getSrcCodeOrigin :: TcRn (Maybe SrcCodeOrigin)
-getSrcCodeOrigin = getLclEnvSrcCodeOrigin <$> getLclEnv
+getSrcCodeOrigin =
+  do inGenCode <- inGeneratedCode
+     if inGenCode
+       then getLclEnvSrcCodeOrigin <$> getLclEnv
+       else return Nothing
+
 
 -- | Mark the inner computation as being done inside generated code.
 --
@@ -1095,6 +1100,9 @@ setInGeneratedCode :: SrcCodeOrigin -> TcRn a -> TcRn a
 setInGeneratedCode sco thing_inside =
   updLclCtxt setLclCtxtInGenCode $
   updLclCtxt (setLclCtxtSrcCodeOrigin sco) thing_inside
+
+setInUserCode :: TcRn a -> TcRn a
+setInUserCode = updLclCtxt setLclCtxtInUserCode
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)

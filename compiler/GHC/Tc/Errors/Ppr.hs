@@ -7529,10 +7529,6 @@ pprTyConInstFlavour
 pprErrCtxtMsg :: ErrCtxtMsg -> SDoc
 pprErrCtxtMsg = \case
   ExprCtxt expr
-    | XExpr (ExpandedThingRn (OrigStmt (L _ stmt) flav) _) <- expr
-    -> hang (text "In a stmt of" <+> pprAStmtContext @(LIdP GhcRn) (HsDoStmt flav) <> colon)
-       2 (ppr_stmt stmt)
-    | otherwise
     -> hang (text "In the expression:")
        2 (ppr (stripParensHsExpr expr))
   ThetaCtxt ctxt theta ->
