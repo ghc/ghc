@@ -1088,7 +1088,7 @@ loadIfaceByteCode hsc_env iface location type_env =
   where
     compile decls = do
       (bcos, fos) <- compileWholeCoreBindings hsc_env type_env decls
-      linkable $ BCOs bcos :| [DotO fo ForeignObject | fo <- fos]
+      linkable $ pure $ BCOs $ (ByteCodeObject (mi_module iface) bcos fos)
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file location)
@@ -2224,7 +2224,7 @@ generateAndWriteByteCode hsc_env cgguts mod_location = do
   let dflags   = hsc_dflags hsc_env
   when (gopt Opt_WriteByteCode dflags) $ do
     let bc_path = ml_bytecode_file mod_location
-    writeBinByteCode hsc_env bc_path comp_bc
+    writeBinByteCode bc_path comp_bc
   return comp_bc
 
 generateAndWriteByteCodeLinkable :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO Linkable
@@ -2239,7 +2239,8 @@ generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
 mkByteCodeObject :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ByteCodeObject
 mkByteCodeObject hsc_env mod mod_location cgguts = do
   bcos <- hscGenerateByteCode hsc_env cgguts mod_location
-  return $! ByteCodeObject mod bcos (cgi_foreign_files cgguts) (cgi_foreign cgguts)
+  objs <- outputAndCompileForeign hsc_env mod (ml_hs_file_ospath $ mod_location) (cgi_foreign_files cgguts) (cgi_foreign cgguts)
+  return $! ByteCodeObject mod bcos objs
 
 generateFreshByteCodeLinkable :: HscEnv
   -> ModuleName
@@ -2865,7 +2866,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
       {- load it -}
       bco_time <- getCurrentTime
       (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
-        Linkable bco_time this_mod $ NE.singleton $ BCOs bcos
+        Linkable bco_time this_mod $ NE.singleton $ BCOs (ByteCodeObject this_mod bcos [])
       {- Get the HValue for the root -}
       return (expectJust $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)
 

@@ -126,3 +126,9 @@ bytecode_object18:
 bytecode_object19:
 	@echo "Testing GHCi with .gbc file removal and reload..."
 	@cat bytecode_object19.script | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs
+
+# Test that bytecode generation works with foreign functions
+bytecode_object25:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c BytecodeForeign.hs -fbyte-code -fwrite-byte-code -fwrite-interface -dynamic
+	@cat bytecode_object25.script | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeForeign.hs
+

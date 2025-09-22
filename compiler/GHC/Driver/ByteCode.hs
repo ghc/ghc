@@ -60,11 +60,9 @@ compile_for_interpreter hsc_env use =
 -- | Write the foreign sources and foreign stubs of a bytecode object to temporary files and compile them.
 loadByteCodeObject :: HscEnv -> ModLocation -> ByteCodeObject
                              -> IO (CompiledByteCode, [FilePath])
-loadByteCodeObject hsc_env location (ByteCodeObject mod cbc foreign_srcs foreign_stubs) = do
-  fos <- outputAndCompileForeign hsc_env mod location foreign_srcs foreign_stubs
-  return (cbc, fos)
+loadByteCodeObject hsc_env location (ByteCodeObject mod cbc foreign_contents) = do
+  return (cbc, foreign_contents)
 
 loadByteCodeObjectLinkable :: HscEnv -> UTCTime -> ModLocation -> ByteCodeObject -> IO Linkable
 loadByteCodeObjectLinkable hsc_env linkable_time location bco = do
-  ~(cbc, fos) <- loadByteCodeObject hsc_env location bco
-  return $! Linkable linkable_time (bco_module bco) (BCOs cbc :| [DotO fo ForeignObject | fo <- fos])
+  return $! Linkable linkable_time (bco_module bco) (pure (BCOs bco))
