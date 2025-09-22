@@ -18,7 +18,7 @@ module GHC.Tc.Gen.Do (expandDoStmts) where
 
 import GHC.Prelude
 
-import GHC.Rename.Utils ( wrapGenSpan, genHsExpApps, genHsApp, genHsLet,
+import GHC.Rename.Utils ( wrapGenSpan, wrapNoSpan, genHsExpApps, genHsApp, genHsLet,
                           genHsLamDoExp, genHsCaseAltDoExp, genWildPat )
 import GHC.Rename.Env   ( irrefutableConLikeRn )
 
@@ -126,7 +126,7 @@ expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ e (SyntaxExprRn then_op) _)) 
 --      e ; stmts ~~> (>>) e stmts'
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      let expansion = genHsExpApps then_op  -- (>>)
-                     [ e
+                     [ e -- Span is set becuase of statement loc
                      , expand_stmts_expr ]
      return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 
