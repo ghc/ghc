@@ -1079,10 +1079,10 @@ inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- See Note [Error contexts in generated code]
 setSrcSpan (RealSrcSpan loc _) thing_inside
-  = updLclCtxt (\env -> env { tcl_loc = loc }) thing_inside
+  = updLclCtxt (\env -> env { tcl_loc = loc, tcl_in_gen_code = False }) thing_inside
 
 setSrcSpan (UnhelpfulSpan _) thing_inside
-  = thing_inside
+  = updLclCtxt setLclCtxtInGenCode thing_inside
 
 getSrcCodeOrigin :: TcRn (Maybe SrcCodeOrigin)
 getSrcCodeOrigin = getLclEnvSrcCodeOrigin <$> getLclEnv
@@ -1093,6 +1093,7 @@ getSrcCodeOrigin = getLclEnvSrcCodeOrigin <$> getLclEnv
 -- See Note [Error Context Stack]
 setInGeneratedCode :: SrcCodeOrigin -> TcRn a -> TcRn a
 setInGeneratedCode sco thing_inside =
+  updLclCtxt setLclCtxtInGenCode $
   updLclCtxt (setLclCtxtSrcCodeOrigin sco) thing_inside
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a

@@ -1109,5 +1109,4 @@ addExprCtxt e thing_inside
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
-      XExpr (ExpandedThingRn o _) -> setInGeneratedCode o thing_inside
       _ -> addErrCtxt (ExprCtxt e) thing_inside -- no op in generated code

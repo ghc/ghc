@@ -25,6 +25,7 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvSrcCodeOrigin
   , setLclCtxtSrcCodeOrigin
   , lclEnvInGeneratedCode
+  , setLclCtxtInGenCode
 
   , addLclEnvErrCtxt
 
@@ -205,6 +206,9 @@ getLclEnvSrcCodeOrigin = get_src_code_origin . tcl_err_ctxt . tcl_lcl_ctxt
 
 setLclEnvSrcCodeOrigin :: SrcCodeOrigin -> TcLclEnv -> TcLclEnv
 setLclEnvSrcCodeOrigin o = modifyLclCtxt (setLclCtxtSrcCodeOrigin o)
+
+setLclCtxtInGenCode :: TcLclCtxt -> TcLclCtxt
+setLclCtxtInGenCode lclCtxt = lclCtxt { tcl_in_gen_code = True }
 
 -- See Note [ErrCtxt Stack Manipulation]
 setLclCtxtSrcCodeOrigin :: SrcCodeOrigin -> TcLclCtxt -> TcLclCtxt
