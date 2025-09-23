@@ -334,7 +334,6 @@ library
                         rts/storage/InfoTables.h
                         rts/storage/MBlock.h
                         rts/storage/TSO.h
-                        stg/DLL.h
                         stg/MachRegs.h
                         stg/MachRegs/arm32.h
                         stg/MachRegs/arm64.h

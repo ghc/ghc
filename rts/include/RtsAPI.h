@@ -587,8 +587,8 @@ void rts_done (void);
 extern StgClosure ghczminternal_GHCziInternalziTopHandler_runIO_closure;
 extern StgClosure ghczminternal_GHCziInternalziTopHandler_runNonIO_closure;
 
-#define runIO_closure     DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTopHandler_runIO_closure)
-#define runNonIO_closure  DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziTopHandler_runNonIO_closure)
+#define runIO_closure     (&(ghczminternal_GHCziInternalziTopHandler_runIO_closure))
+#define runNonIO_closure  (&(ghczminternal_GHCziInternalziTopHandler_runNonIO_closure))
 
 /* ------------------------------------------------------------------------ */
 

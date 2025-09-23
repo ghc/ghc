@@ -1054,9 +1054,9 @@ RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
 #define SymI_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
                     (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)DLL_IMPORT_DATA_REF(vvv), STRENGTH_NORMAL, SYM_TYPE_CODE },
+            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
 #define SymE_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)DLL_IMPORT_DATA_REF(vvv), STRENGTH_NORMAL, SYM_TYPE_DATA },
+            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
 
 #define SymI_NeedsProto(vvv) SymI_HasProto(vvv)
 #define SymI_NeedsDataProto(vvv) SymI_HasDataProto(vvv)

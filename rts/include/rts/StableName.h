@@ -29,4 +29,4 @@ typedef struct {
                          // free
 } snEntry;
 
-extern DLL_IMPORT_RTS snEntry *stable_name_table;
+extern snEntry *stable_name_table;
