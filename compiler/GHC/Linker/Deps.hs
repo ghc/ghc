@@ -207,7 +207,6 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
               DotA fp    -> panic ("adjust_ul DotA " ++ show fp)
               DotDLL fp  -> panic ("adjust_ul DotDLL " ++ show fp)
               BCOs {}    -> pure part
-              LazyBCOs{} -> pure part
               CoreBindings WholeCoreBindings {wcb_module} ->
                 pprPanic "Unhydrated core bindings" (ppr wcb_module)
 

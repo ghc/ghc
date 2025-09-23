@@ -38,10 +38,10 @@ module GHC.Linker.Types
    , linkableLibs
    , linkableFiles
    , linkableBCOs
+   , linkablePartBCOs
    , linkableNativeParts
    , linkablePartitionParts
    , linkablePartPath
-   , linkablePartAllBCOs
    , isNativeCode
    , isNativeLib
    , linkableFilterByteCode
@@ -322,13 +322,6 @@ data LinkablePart
       -- used by some other backend See Note [Interface Files with Core
       -- Definitions]
 
-  | LazyBCOs
-      CompiledByteCode
-      -- ^ Some BCOs generated on-demand when forced. This is used for
-      -- WholeCoreBindings, see Note [Interface Files with Core Definitions]
-      [FilePath]
-      -- ^ Objects containing foreign stubs and files
-
   | BCOs ByteCodeObject
     -- ^ A byte-code object, lives only in memory.
 
@@ -351,7 +344,6 @@ instance Outputable LinkablePart where
   ppr (DotA path)       = text "DotA" <+> text path
   ppr (DotDLL path)     = text "DotDLL" <+> text path
   ppr (BCOs bco)        = text "BCOs" <+> ppr bco
-  ppr (LazyBCOs{})      = text "LazyBCOs"
   ppr (CoreBindings {}) = text "CoreBindings"
 
 -- | Return true if the linkable only consists of native code (no BCO)
@@ -360,7 +352,7 @@ linkableIsNativeCodeOnly l = all isNativeCode (NE.toList (linkableParts l))
 
 -- | List the BCOs parts of a linkable.
 --
--- This excludes the LazyBCOs and the CoreBindings parts
+-- This excludes the CoreBindings parts
 linkableBCOs :: Linkable -> [CompiledByteCode]
 linkableBCOs l = [ bco_compiled_byte_code bco | BCOs bco <- NE.toList (linkableParts l) ]
 
@@ -393,7 +385,6 @@ isNativeCode = \case
   DotA {}         -> True
   DotDLL {}       -> True
   BCOs {}         -> False
-  LazyBCOs{}      -> False
   CoreBindings {} -> False
 
 -- | Is the part a native library? (.so/.dll)
@@ -403,7 +394,6 @@ isNativeLib = \case
   DotA {}         -> True
   DotDLL {}       -> True
   BCOs {}         -> False
-  LazyBCOs{}      -> False
   CoreBindings {} -> False
 
 -- | Get the FilePath of linkable part (if applicable)
@@ -413,7 +403,6 @@ linkablePartPath = \case
   DotA fn         -> Just fn
   DotDLL fn       -> Just fn
   CoreBindings {} -> Nothing
-  LazyBCOs {}     -> Nothing
   BCOs {}         -> Nothing
 
 -- | Return the paths of all object code files (.o, .a, .so) contained in this
@@ -424,7 +413,6 @@ linkablePartNativePaths = \case
   DotA fn         -> [fn]
   DotDLL fn       -> [fn]
   CoreBindings {} -> []
-  LazyBCOs _ fos  -> fos
   BCOs {}         -> []
 
 -- | Return the paths of all object files (.o) contained in this 'LinkablePart'.
@@ -434,16 +422,14 @@ linkablePartObjectPaths = \case
   DotA _ -> []
   DotDLL _ -> []
   CoreBindings {} -> []
-  LazyBCOs _ fos -> fos
   BCOs bco -> bco_foreign_contents bco
 
 -- | Retrieve the compiled byte-code from the linkable part.
 --
 -- Contrary to linkableBCOs, this includes byte-code from LazyBCOs.
-linkablePartAllBCOs :: LinkablePart -> [CompiledByteCode]
-linkablePartAllBCOs = \case
+linkablePartBCOs :: LinkablePart -> [CompiledByteCode]
+linkablePartBCOs = \case
   BCOs bco    -> [bco_compiled_byte_code bco]
-  LazyBCOs bcos _ -> [bcos]
   _           -> []
 
 linkableFilter :: (LinkablePart -> [LinkablePart]) -> Linkable -> Maybe Linkable
@@ -456,30 +442,28 @@ linkablePartNative = \case
   u@DotO {}  -> [u]
   u@DotA {} -> [u]
   u@DotDLL {} -> [u]
-  LazyBCOs _ os -> [DotO f ForeignObject | f <- os]
   BCOs bco -> [DotO f ForeignObject | f <- bco_foreign_contents bco]
   _ -> []
 
 linkablePartByteCode :: LinkablePart -> [LinkablePart]
 linkablePartByteCode = \case
   u@BCOs {}  -> [u]
-  LazyBCOs bcos _ -> [BCOs (ByteCodeObject (error "todo")bcos [])]
   _ -> []
 
 -- | Transform the 'LinkablePart' list in this 'Linkable' to contain only
--- object code files (.o, .a, .so) without 'LazyBCOs'.
+-- object code files (.o, .a, .so) without 'BCOs'.
 -- If no 'LinkablePart' remains, return 'Nothing'.
 linkableFilterNative :: Linkable -> Maybe Linkable
 linkableFilterNative = linkableFilter linkablePartNative
 
 -- | Transform the 'LinkablePart' list in this 'Linkable' to contain only byte
--- code without 'LazyBCOs'.
+-- code
 -- If no 'LinkablePart' remains, return 'Nothing'.
 linkableFilterByteCode :: Linkable -> Maybe Linkable
 linkableFilterByteCode = linkableFilter linkablePartByteCode
 
 -- | Split the 'LinkablePart' lists in each 'Linkable' into only object code
--- files (.o, .a, .so) and only byte code, without 'LazyBCOs', and return two
+-- files (.o, .a, .so) and only byte code, and return two
 -- lists containing the nonempty 'Linkable's for each.
 partitionLinkables :: [Linkable] -> ([Linkable], [Linkable])
 partitionLinkables linkables =

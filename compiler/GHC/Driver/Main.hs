@@ -1107,7 +1107,7 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
   where
     compile decls = do
       ~(bcos, fos) <- unsafeInterleaveIO $ compileWholeCoreBindings hsc_env type_env decls
-      linkable $ NE.singleton (LazyBCOs bcos fos)
+      linkable $ NE.singleton (BCOs (ByteCodeObject (mi_module iface) bcos fos))
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file location)
@@ -1123,7 +1123,7 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
 -- mutable state that would generate bytecode on demand, so we have to call this
 -- function even when we don't know that we'll need the bytecode.
 --
--- In addition, the laziness has to be hidden inside 'LazyBCOs' because
+-- In addition, the laziness has to be hidden inside 'BCOs' because
 -- 'Linkable' is used too generally, so that looking at the constructor to
 -- decide whether to discard it when linking native code would force the thunk
 -- otherwise, incurring a significant performance penalty.
@@ -1150,7 +1150,7 @@ initWholeCoreBindings hsc_env iface details (Linkable utc_time this_mod uls) = d
         add_iface_to_hpt iface details hsc_env
         ~(bco, fos) <- unsafeInterleaveIO $
                        compileWholeCoreBindings hsc_env' type_env wcb
-        pure (LazyBCOs bco fos)
+        pure (BCOs (ByteCodeObject (mi_module iface) bco fos))
       l -> pure l
 
     type_env = md_types details

@@ -113,7 +113,6 @@ import Data.Maybe
 import Data.Either
 import Control.Concurrent.MVar
 import qualified Control.Monad.Catch as MC
-import qualified Data.List.NonEmpty as NE
 
 import System.FilePath
 import System.Directory
@@ -949,11 +948,8 @@ dynLinkBCOs interp pls bcos = do
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
 
-            parts :: [LinkablePart]
-            parts = concatMap (NE.toList . linkableParts) new_bcos
-
             cbcs :: [CompiledByteCode]
-            cbcs = concatMap linkablePartAllBCOs parts
+            cbcs = concatMap linkableBCOs new_bcos
 
 
             le1 = linker_env pls
