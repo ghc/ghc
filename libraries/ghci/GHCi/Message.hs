@@ -525,7 +525,7 @@ instance Binary (FunPtr a) where
   put = put . castFunPtrToPtr
   get = castPtrToFunPtr <$> get
 
-#if MIN_VERSION_ghc_internal(9,1500,0)
+#if MIN_VERSION_GLASGOW_HASKELL(9,12,2,20250919)
 instance Binary Heap.HalfWord where
   put x = put (fromIntegral x :: Word32)
   get = fromIntegral <$> (get :: Get Word32)
