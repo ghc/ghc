@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 -- | This module implements interface renaming, which is
 -- used to rewrite interface files on the fly when we
 -- are doing indefinite typechecking and need instantiations
@@ -431,94 +433,184 @@ rnIfaceDecl' :: Rename (Fingerprint, IfaceDecl)
 rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
 
 rnIfaceDecl :: Rename IfaceDecl
-rnIfaceDecl d@IfaceId{} = do
-            name <- case ifIdDetails d of
-                      IfDFunId -> rnIfaceNeverExported (ifName d)
-                      _ | isDefaultMethodOcc (occName (ifName d))
-                        -> rnIfaceNeverExported (ifName d)
-                      -- Typeable bindings. See Note [Grand plan for Typeable].
-                      _ | isTypeableBindOcc (occName (ifName d))
-                        -> rnIfaceNeverExported (ifName d)
-                        | otherwise -> rnIfaceGlobal (ifName d)
-            ty <- rnIfaceType (ifType d)
-            details <- rnIfaceIdDetails (ifIdDetails d)
-            info <- rnIfaceIdInfo (ifIdInfo d)
-            return d { ifName = name
-                     , ifType = ty
-                     , ifIdDetails = details
-                     , ifIdInfo = info
-                     }
-rnIfaceDecl d@IfaceData{} = do
-            name <- rnIfaceGlobal (ifName d)
-            binders <- mapM rnIfaceTyConBinder (ifBinders d)
-            ctxt <- mapM rnIfaceType (ifCtxt d)
-            cons <- rnIfaceConDecls (ifCons d)
-            res_kind <- rnIfaceType (ifResKind d)
-            parent <- rnIfaceTyConParent (ifParent d)
-            return d { ifName = name
-                     , ifBinders = binders
-                     , ifCtxt = ctxt
-                     , ifCons = cons
-                     , ifResKind = res_kind
-                     , ifParent = parent
-                     }
-rnIfaceDecl d@IfaceSynonym{} = do
-            name <- rnIfaceGlobal (ifName d)
-            binders <- mapM rnIfaceTyConBinder (ifBinders d)
-            syn_kind <- rnIfaceType (ifResKind d)
-            syn_rhs <- rnIfaceType (ifSynRhs d)
-            return d { ifName = name
-                     , ifBinders = binders
-                     , ifResKind = syn_kind
-                     , ifSynRhs = syn_rhs
-                     }
-rnIfaceDecl d@IfaceFamily{} = do
-            name <- rnIfaceGlobal (ifName d)
-            binders <- mapM rnIfaceTyConBinder (ifBinders d)
-            fam_kind <- rnIfaceType (ifResKind d)
-            fam_flav <- rnIfaceFamTyConFlav (ifFamFlav d)
-            return d { ifName = name
-                     , ifBinders = binders
-                     , ifResKind = fam_kind
-                     , ifFamFlav = fam_flav
-                     }
-rnIfaceDecl d@IfaceClass{} = do
-            name <- rnIfaceGlobal (ifName d)
-            binders <- mapM rnIfaceTyConBinder (ifBinders d)
-            body <- rnIfaceClassBody (ifBody d)
-            return d { ifName    = name
-                     , ifBinders = binders
-                     , ifBody    = body
-                     }
-rnIfaceDecl d@IfaceAxiom{} = do
-            name <- rnIfaceNeverExported (ifName d)
-            tycon <- rnIfaceTyCon (ifTyCon d)
-            ax_branches <- mapM rnIfaceAxBranch (ifAxBranches d)
-            return d { ifName = name
-                     , ifTyCon = tycon
-                     , ifAxBranches = ax_branches
-                     }
-rnIfaceDecl d@IfacePatSyn{} =  do
-            name <- rnIfaceGlobal (ifName d)
-            let rnPat (n, b) = (,) <$> rnIfaceGlobal n <*> pure b
-            pat_matcher <- rnPat (ifPatMatcher d)
-            pat_builder <- T.traverse rnPat (ifPatBuilder d)
-            pat_univ_bndrs <- mapM rnIfaceForAllBndr (ifPatUnivBndrs d)
-            pat_ex_bndrs <- mapM rnIfaceForAllBndr (ifPatExBndrs d)
-            pat_prov_ctxt <- mapM rnIfaceType (ifPatProvCtxt d)
-            pat_req_ctxt <- mapM rnIfaceType (ifPatReqCtxt d)
-            pat_args <- mapM rnIfaceType (ifPatArgs d)
-            pat_ty <- rnIfaceType (ifPatTy d)
-            return d { ifName = name
-                     , ifPatMatcher = pat_matcher
-                     , ifPatBuilder = pat_builder
-                     , ifPatUnivBndrs = pat_univ_bndrs
-                     , ifPatExBndrs = pat_ex_bndrs
-                     , ifPatProvCtxt = pat_prov_ctxt
-                     , ifPatReqCtxt = pat_req_ctxt
-                     , ifPatArgs = pat_args
-                     , ifPatTy = pat_ty
-                     }
+rnIfaceDecl = \case
+  IfaceId
+    { ifName      = name0
+    , ifType      = ty0
+    , ifIdDetails = details0
+    , ifIdInfo    = info0
+    } -> do
+    name <-
+      case details0 of
+        IfDFunId -> rnIfaceNeverExported name0
+        _ | isDefaultMethodOcc (occName name0)
+          -> rnIfaceNeverExported name0
+        -- Typeable bindings. See Note [Grand plan for Typeable].
+        _ | isTypeableBindOcc (occName name0)
+          -> rnIfaceNeverExported name0
+          | otherwise -> rnIfaceGlobal name0
+    ty      <- rnIfaceType ty0
+    details <- rnIfaceIdDetails details0
+    info    <- rnIfaceIdInfo info0
+    return $
+      IfaceId
+        { ifName      = name
+        , ifType      = ty
+        , ifIdDetails = details
+        , ifIdInfo    = info
+        }
+  IfaceData
+    { ifName       = name0
+    , ifKind       = kind0
+    , ifBinders    = binders0
+    , ifResKind    = res_kind0
+    , ifCType      = ctype
+    , ifRoles      = roles
+    , ifCtxt       = ctxt0
+    , ifCons       = cons0
+    , ifGadtSyntax = gadt
+    , ifParent     = parent0
+    } -> do
+    name     <- rnIfaceGlobal name0
+    binders  <- mapM rnIfaceTyConBinder binders0
+    ctxt     <- mapM rnIfaceType ctxt0
+    cons     <- rnIfaceConDecls cons0
+    kind     <- rnIfaceType kind0
+    res_kind <- rnIfaceType res_kind0
+    parent   <- rnIfaceTyConParent parent0
+    return $
+      IfaceData
+        { ifName       = name
+        , ifKind       = kind
+        , ifBinders    = binders
+        , ifResKind    = res_kind
+        , ifCType      = ctype
+        , ifRoles      = roles
+        , ifCtxt       = ctxt
+        , ifCons       = cons
+        , ifGadtSyntax = gadt
+        , ifParent     = parent
+        }
+  IfaceSynonym
+    { ifName    = name0
+    , ifBinders = binders0
+    , ifKind    = syn_kind0
+    , ifResKind = syn_reskind0
+    , ifSynRhs  = syn_rhs0
+    , ifRoles   = roles
+    } -> do
+      name        <- rnIfaceGlobal name0
+      binders     <- mapM rnIfaceTyConBinder binders0
+      syn_kind    <- rnIfaceType syn_kind0
+      syn_reskind <- rnIfaceType syn_reskind0
+      syn_rhs     <- rnIfaceType syn_rhs0
+      return $
+        IfaceSynonym
+          { ifName    = name
+          , ifBinders = binders
+          , ifKind    = syn_kind
+          , ifResKind = syn_reskind
+          , ifSynRhs  = syn_rhs
+          , ifRoles   = roles
+          }
+  IfaceFamily
+    { ifName    = name0
+    , ifBinders = binders0
+    , ifKind    = fam_kind0
+    , ifResKind = fam_reskind0
+    , ifFamFlav = fam_flav0
+    , ifResVar  = res_var
+    , ifFamInj  = inj
+    } -> do
+      name        <- rnIfaceGlobal name0
+      binders     <- mapM rnIfaceTyConBinder binders0
+      fam_kind    <- rnIfaceType fam_kind0
+      fam_reskind <- rnIfaceType fam_reskind0
+      fam_flav    <- rnIfaceFamTyConFlav fam_flav0
+      return $
+        IfaceFamily
+          { ifName    = name
+          , ifBinders = binders
+          , ifKind    = fam_kind
+          , ifResKind = fam_reskind
+          , ifFamFlav = fam_flav
+          , ifResVar  = res_var
+          , ifFamInj  = inj
+          }
+  IfaceClass
+    { ifName    = name0
+    , ifBinders = binders0
+    , ifBody    = body0
+    , ifKind    = kind0
+    , ifRoles   = roles
+    , ifFDs     = fds
+    } -> do
+      name    <- rnIfaceGlobal name0
+      binders <- mapM rnIfaceTyConBinder binders0
+      body    <- rnIfaceClassBody body0
+      kind    <- rnIfaceType kind0
+      return $
+        IfaceClass
+          { ifName    = name
+          , ifBinders = binders
+          , ifBody    = body
+          , ifKind    = kind
+          , ifRoles   = roles
+          , ifFDs     = fds
+          }
+  IfaceAxiom
+    { ifName       = name0
+    , ifTyCon      = tycon0
+    , ifAxBranches = ax_branches0
+    , ifRole       = role
+    } -> do
+    name        <- rnIfaceNeverExported name0
+    tycon       <- rnIfaceTyCon tycon0
+    ax_branches <- mapM rnIfaceAxBranch ax_branches0
+    return $
+      IfaceAxiom
+        { ifName       = name
+        , ifTyCon      = tycon
+        , ifAxBranches = ax_branches
+        , ifRole       = role
+        }
+  IfacePatSyn
+    { ifName         = name0
+    , ifPatMatcher   = pat_matcher0
+    , ifPatBuilder   = pat_builder0
+    , ifPatUnivBndrs = pat_univ_bndrs0
+    , ifPatExBndrs   = pat_ex_bndrs0
+    , ifPatProvCtxt  = pat_prov_ctxt0
+    , ifPatReqCtxt   = pat_req_ctxt0
+    , ifPatArgs      = pat_args0
+    , ifPatTy        = pat_ty0
+    , ifPatIsInfix   = is_infix
+    , ifFieldLabels  = field_labels
+    } -> do
+    let rnPat (n, b) = (,) <$> rnIfaceGlobal n <*> pure b
+    name           <- rnIfaceGlobal name0
+    pat_matcher    <- rnPat pat_matcher0
+    pat_builder    <- T.traverse rnPat pat_builder0
+    pat_univ_bndrs <- mapM rnIfaceForAllBndr pat_univ_bndrs0
+    pat_ex_bndrs   <- mapM rnIfaceForAllBndr pat_ex_bndrs0
+    pat_prov_ctxt  <- mapM rnIfaceType pat_prov_ctxt0
+    pat_req_ctxt   <- mapM rnIfaceType pat_req_ctxt0
+    pat_args       <- mapM rnIfaceType pat_args0
+    pat_ty         <- rnIfaceType pat_ty0
+    return $
+      IfacePatSyn
+        { ifName         = name
+        , ifPatMatcher   = pat_matcher
+        , ifPatBuilder   = pat_builder
+        , ifPatUnivBndrs = pat_univ_bndrs
+        , ifPatExBndrs   = pat_ex_bndrs
+        , ifPatProvCtxt  = pat_prov_ctxt
+        , ifPatReqCtxt   = pat_req_ctxt
+        , ifPatArgs      = pat_args
+        , ifPatTy        = pat_ty
+        , ifPatIsInfix   = is_infix
+        , ifFieldLabels  = field_labels
+        }
 
 rnIfaceClassBody :: Rename IfaceClassBody
 rnIfaceClassBody IfAbstractClass = return IfAbstractClass

@@ -34,7 +34,8 @@ import GHC.Core.Type
 import GHC.Core.Unify      ( tcMatchTys )
 import GHC.Data.Pair
 import GHC.Core.TyCon    ( TyCon, FamTyConFlav(..), mkFamilyTyCon, tyConArity
-                         , Injectivity(..), isBuiltInSynFamTyCon_maybe )
+                         , Injectivity(..), isBuiltInSynFamTyCon_maybe
+                         , mkTyConKind )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Compare   ( tcEqType )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
@@ -666,8 +667,8 @@ axLogRewrites
 
 typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon
-  = mkFamilyTyCon name
-      (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
+  = mkFamilyTyCon name (mkTyConKind bndrs orderingKind)
+      bndrs
       orderingKind
       Nothing
       (BuiltInSynFamTyCon ops)
@@ -679,6 +680,7 @@ typeNatCmpTyCon
                   typeNatCmpTyFamNameKey typeNatCmpTyCon
     ops = BuiltInSynFamily { sfMatchFam = axCmpNatRewrites
                            , sfInteract = axCmpNatInjectivity }
+    bndrs = mkTemplateAnonTyConBinders [ naturalTy, naturalTy ]
 
 axCmpNatRewrites :: [BuiltInFamRewrite]
 axCmpNatRewrites
@@ -700,8 +702,8 @@ axCmpNatInjectivity
 
 typeSymbolCmpTyCon :: TyCon
 typeSymbolCmpTyCon =
-  mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [typeSymbolKind, typeSymbolKind])
+  mkFamilyTyCon name (mkTyConKind bndrs orderingKind)
+    bndrs
     orderingKind
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -713,6 +715,7 @@ typeSymbolCmpTyCon =
                 typeSymbolCmpTyFamNameKey typeSymbolCmpTyCon
   ops = BuiltInSynFamily { sfMatchFam = axSymbolCmpRewrites
                          , sfInteract = axSymbolCmpInjectivity }
+  bndrs = mkTemplateAnonTyConBinders [typeSymbolKind, typeSymbolKind]
 
 ss,ts :: TyVar  -- Of kind Symbol
 (ss: ts: _) = mkTemplateTyVars (repeat typeSymbolKind)
@@ -784,8 +787,8 @@ axAppendInjectivity
 
 typeConsSymbolTyCon :: TyCon
 typeConsSymbolTyCon =
-  mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [ charTy, typeSymbolKind ])
+  mkFamilyTyCon name (mkTyConKind bndrs typeSymbolKind)
+    bndrs
     typeSymbolKind
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -796,6 +799,7 @@ typeConsSymbolTyCon =
                   typeConsSymbolTyFamNameKey typeConsSymbolTyCon
   ops = BuiltInSynFamily  { sfMatchFam = axConsRewrites
                           , sfInteract = axConsInjectivity }
+  bndrs = mkTemplateAnonTyConBinders [ charTy, typeSymbolKind ]
 
 axConsRewrites :: [BuiltInFamRewrite]
 axConsRewrites
@@ -827,9 +831,9 @@ axConsInjectivity
 
 typeUnconsSymbolTyCon :: TyCon
 typeUnconsSymbolTyCon =
-  mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [ typeSymbolKind ])
-    (mkMaybeTy charSymbolPairKind)
+  mkFamilyTyCon name (mkTyConKind bndrs res_kind)
+    bndrs
+    res_kind
     Nothing
     (BuiltInSynFamTyCon ops)
     Nothing
@@ -839,6 +843,8 @@ typeUnconsSymbolTyCon =
                   typeUnconsSymbolTyFamNameKey typeUnconsSymbolTyCon
   ops = BuiltInSynFamily { sfMatchFam = axUnconsRewrites
                          , sfInteract = axUnconsInjectivity }
+  bndrs = mkTemplateAnonTyConBinders [ typeSymbolKind ]
+  res_kind = mkMaybeTy charSymbolPairKind
 
 computeUncons :: FastString -> Type
 computeUncons str
@@ -879,8 +885,8 @@ axUnconsInjectivity
 
 typeCharToNatTyCon :: TyCon
 typeCharToNatTyCon =
-  mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [ charTy ])
+  mkFamilyTyCon name (mkTyConKind bndrs naturalTy)
+    bndrs
     naturalTy
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -891,6 +897,7 @@ typeCharToNatTyCon =
                   typeCharToNatTyFamNameKey typeCharToNatTyCon
   ops = BuiltInSynFamily { sfMatchFam = axCharToNatRewrites
                          , sfInteract = axCharToNatInjectivity }
+  bndrs = mkTemplateAnonTyConBinders [ charTy ]
 
 axCharToNatRewrites :: [BuiltInFamRewrite]
 axCharToNatRewrites
@@ -911,8 +918,8 @@ axCharToNatInjectivity
 
 typeNatToCharTyCon :: TyCon
 typeNatToCharTyCon =
-  mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [ naturalTy ])
+  mkFamilyTyCon name (mkTyConKind bndrs charTy)
+    bndrs
     charTy
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -923,6 +930,7 @@ typeNatToCharTyCon =
                   typeNatToCharTyFamNameKey typeNatToCharTyCon
   ops = BuiltInSynFamily { sfMatchFam = axNatToCharRewrites
                          , sfInteract = axNatToCharInjectivity }
+  bndrs = mkTemplateAnonTyConBinders [ naturalTy ]
 
 axNatToCharRewrites :: [BuiltInFamRewrite]
 axNatToCharRewrites
@@ -944,8 +952,8 @@ axNatToCharInjectivity
 
 typeCharCmpTyCon :: TyCon
 typeCharCmpTyCon =
-  mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [ charTy, charTy ])
+  mkFamilyTyCon name (mkTyConKind bndrs orderingKind)
+    bndrs
     orderingKind
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -956,6 +964,7 @@ typeCharCmpTyCon =
                   typeCharCmpTyFamNameKey typeCharCmpTyCon
   ops = BuiltInSynFamily { sfMatchFam = axCharCmpRewrites
                          , sfInteract = axCharCmpInjectivity }
+  bndrs = mkTemplateAnonTyConBinders [ charTy, charTy ]
 
 sc :: TyVar  -- Of kind Char
 (sc: _) = mkTemplateTyVars (repeat charTy)
@@ -1055,35 +1064,41 @@ isOrderingLitTy tc =
 -- Make a unary built-in constructor of kind: Nat -> Nat
 mkTypeNatFunTyCon1 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon1 op tcb =
-  mkFamilyTyCon op
-    (mkTemplateAnonTyConBinders [ naturalTy ])
+  mkFamilyTyCon op (mkTyConKind bndrs naturalTy)
+    bndrs
     naturalTy
     Nothing
     (BuiltInSynFamTyCon tcb)
     Nothing
     NotInjective
+  where
+    bndrs = mkTemplateAnonTyConBinders [ naturalTy ]
 
 -- Make a binary built-in constructor of kind: Nat -> Nat -> Nat
 mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon2 op tcb =
-  mkFamilyTyCon op
-    (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
+  mkFamilyTyCon op (mkTyConKind bndrs naturalTy)
+    bndrs
     naturalTy
     Nothing
     (BuiltInSynFamTyCon tcb)
     Nothing
     NotInjective
+  where
+    bndrs = mkTemplateAnonTyConBinders [ naturalTy, naturalTy ]
 
 -- Make a binary built-in constructor of kind: Symbol -> Symbol -> Symbol
 mkTypeSymbolFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeSymbolFunTyCon2 op tcb =
-  mkFamilyTyCon op
-    (mkTemplateAnonTyConBinders [ typeSymbolKind, typeSymbolKind ])
+  mkFamilyTyCon op (mkTyConKind bndrs typeSymbolKind)
+    bndrs
     typeSymbolKind
     Nothing
     (BuiltInSynFamTyCon tcb)
     Nothing
     NotInjective
+  where
+    bndrs = mkTemplateAnonTyConBinders [ typeSymbolKind, typeSymbolKind ]
 
 same :: Type -> Type -> Maybe ()
 same ty1 ty2 = guard (ty1 `tcEqType` ty2)

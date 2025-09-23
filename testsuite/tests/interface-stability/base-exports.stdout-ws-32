@@ -12156,8 +12156,8 @@ instance GHC.Internal.Data.Type.Equality.TestEquality GHC.Internal.TypeLits.SCha
 instance GHC.Internal.Data.Type.Equality.TestEquality GHC.Internal.TypeLits.SSymbol -- Defined in ‘GHC.Internal.TypeLits’
 instance forall k (a :: k). GHC.Internal.Data.Type.Equality.TestEquality ((GHC.Internal.Data.Type.Equality.:~:) a) -- Defined in ‘GHC.Internal.Data.Type.Equality’
 instance forall k1 k (a :: k1). GHC.Internal.Data.Type.Equality.TestEquality ((GHC.Internal.Data.Type.Equality.:~~:) a) -- Defined in ‘GHC.Internal.Data.Type.Equality’
-instance forall k. GHC.Internal.Data.Type.Equality.TestEquality ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.TypeRep -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal’
-instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1). GHC.Internal.Data.Type.Equality.TestEquality f => GHC.Internal.Data.Type.Equality.TestEquality (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
+instance forall k1. GHC.Internal.Data.Type.Equality.TestEquality ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.TypeRep -- Defined in ‘ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal’
+instance forall k k1 (f :: k -> *) (g :: k1 -> k). GHC.Internal.Data.Type.Equality.TestEquality f => GHC.Internal.Data.Type.Equality.TestEquality (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
 instance forall a k (b :: k). GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Bits.And a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Bits.Iff a) -- Defined in ‘GHC.Internal.Data.Bits’
@@ -12561,12 +12561,12 @@ instance forall a b c d e. GHC.Internal.Generics.Generic1 ((,,,,,) a b c d e) --
 instance forall a b c d e f. GHC.Internal.Generics.Generic1 ((,,,,,,) a b c d e f) -- Defined in ‘GHC.Internal.Generics’
 instance forall a b c d e f g. GHC.Internal.Generics.Generic1 ((,,,,,,,) a b c d e f g) -- Defined in ‘GHC.Internal.Generics’
 instance forall a b c d e f g h. GHC.Internal.Generics.Generic1 ((,,,,,,,,) a b c d e f g h) -- Defined in ‘GHC.Internal.Generics’
-instance forall k a. GHC.Internal.Generics.Generic1 (GHC.Internal.Data.Functor.Const.Const a) -- Defined in ‘GHC.Internal.Data.Functor.Const’
-instance forall (f :: * -> *) k (g :: k -> *). GHC.Internal.Base.Functor f => GHC.Internal.Generics.Generic1 (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
-instance [safe] forall k (f :: k -> *) (g :: k -> *). GHC.Internal.Generics.Generic1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
-instance [safe] forall k (f :: k -> *) (g :: k -> *). GHC.Internal.Generics.Generic1 (Data.Functor.Sum.Sum f g) -- Defined in ‘Data.Functor.Sum’
-instance forall k (f :: k -> *). GHC.Internal.Generics.Generic1 (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
-instance forall k (f :: k -> *). GHC.Internal.Generics.Generic1 (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Monoid’
+instance forall k1 a. GHC.Internal.Generics.Generic1 (GHC.Internal.Data.Functor.Const.Const a) -- Defined in ‘GHC.Internal.Data.Functor.Const’
+instance forall (f :: * -> *) k1 (g :: k1 -> *). GHC.Internal.Base.Functor f => GHC.Internal.Generics.Generic1 (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
+instance [safe] forall k1 (f :: k1 -> *) (g :: k1 -> *). GHC.Internal.Generics.Generic1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
+instance [safe] forall k1 (f :: k1 -> *) (g :: k1 -> *). GHC.Internal.Generics.Generic1 (Data.Functor.Sum.Sum f g) -- Defined in ‘Data.Functor.Sum’
+instance forall k1 (f :: k1 -> *). GHC.Internal.Generics.Generic1 (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
+instance forall k1 (f :: k1 -> *). GHC.Internal.Generics.Generic1 (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall k (f :: k -> *) (g :: k -> *). GHC.Internal.Generics.Generic1 (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *). GHC.Internal.Generics.Generic1 (f GHC.Internal.Generics.:+: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) k (g :: k -> *). GHC.Internal.Base.Functor f => GHC.Internal.Generics.Generic1 (f GHC.Internal.Generics.:.: g) -- Defined in ‘GHC.Internal.Generics’

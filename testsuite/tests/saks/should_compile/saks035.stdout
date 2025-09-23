@@ -1,2 +1,2 @@
-C :: forall {k} (z :: k). Proxy z -> Constraint
+C :: forall {k1} (i :: k1). Proxy i -> Constraint
 F :: k -> Type

@@ -2448,12 +2448,16 @@ kcCheckDeclHeader_cusk name flav
                       ++ mkNamedTyConBinders Specified specified
                       ++ map (mkExplicitTyConBinder mentioned_kv_set) tc_bndrs
 
+             -- The user-written kind, before eta-expansion
+             user_kind :: TcKind
+             user_kind = mkTyConKind all_tcbs res_kind
+
        -- Eta expand if necessary; we are building a PolyTyCon
        ; (eta_tcbs, res_kind) <- maybeEtaExpandAlgTyCon flav skol_info all_tcbs res_kind
 
        ; let all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ binderVars tc_bndrs)
              final_tcbs = all_tcbs `chkAppend` eta_tcbs
-             tycon = mkTcTyCon name final_tcbs res_kind all_tv_prs
+             tycon = mkTcTyCon name user_kind final_tcbs res_kind all_tv_prs
                                True -- Make a PolyTcTyCon, fully generalised
                                flav
 
@@ -2465,8 +2469,9 @@ kcCheckDeclHeader_cusk name flav
          -- doesn't work, we catch it here, before an error cascade
        ; checkTyConTelescope tycon
 
-       ; traceTc "kcCheckDeclHeader_cusk " $
+       ; traceTc "kcCheckDeclHeader_cusk" $
          vcat [ text "name" <+> ppr name
+              , text "user_kind" <+> ppr user_kind
               , text "candidates" <+> ppr candidates
               , text "mentioned_kv_set" <+> ppr mentioned_kv_set
               , text "kv_ns" <+> ppr kv_ns
@@ -2546,14 +2551,21 @@ kcInferDeclHeader name flav
                --     ditto Implicit
                -- See Note [Cloning for type variable binders]
 
-             tycon = mkTcTyCon name tc_binders res_kind all_tv_prs
+             kind = mkTyConKind tc_binders res_kind
+             tycon = mkTcTyCon name kind tc_binders res_kind all_tv_prs
                                False -- Make a MonoTcTyCon
                                flav
 
        ; traceTc "kcInferDeclHeader: not-cusk" $
-         vcat [ ppr name, ppr kv_ns, ppr hs_bndrs
-              , ppr scoped_kvs
-              , ppr tc_tvs, ppr (mkTyConKind tc_binders res_kind) ]
+         vcat [ text "name:" <+> ppr name
+              , text "kind:" <+> ppr kind
+              , text "kv_ns:" <+>  ppr kv_ns
+              , text "hs_bndrs:" <+> ppr hs_bndrs
+              , text "scoped_kvs:" <+> ppr scoped_kvs
+              , text "tc_tvs:" <+> ppr tc_tvs
+              , text "tc_binders:" <+> ppr tc_binders
+              , text "res_kind:" <+> ppr res_kind
+              ]
        ; return tycon }
   where
     ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
@@ -2664,29 +2676,31 @@ kcCheckDeclHeader_sig sig_kind name flav
         -- associated types and methods of a class.
         ; let swizzle_env = mkVarEnv (map swap implicit_prs)
               (subst, swizzled_tcbs) = mapAccumL (swizzleTcb swizzle_env) emptySubst all_tcbs
-              swizzled_kind          = substTy subst tycon_res_kind
+              swizzled_res_kind      = substTy subst tycon_res_kind
               all_tv_prs             = mkTyVarNamePairs (binderVars swizzled_tcbs)
 
         ; traceTc "kcCheckDeclHeader swizzle" $ vcat
-          [ text "sig_tcbs ="       <+> ppr sig_tcbs
-          , text "implicit_prs ="   <+> ppr implicit_prs
-          , text "hs_tv_bndrs ="    <+> ppr hs_tv_bndrs
-          , text "all_tcbs ="       <+> pprTyVars (binderVars all_tcbs)
-          , text "swizzled_tcbs ="  <+> pprTyVars (binderVars swizzled_tcbs)
-          , text "tycon_res_kind =" <+> ppr tycon_res_kind
-          , text "swizzled_kind ="  <+> ppr swizzled_kind ]
+          [ text "sig_kind ="          <+> debugPprType sig_kind
+          , text "sig_tcbs ="          <+> ppr sig_tcbs
+          , text "implicit_prs ="      <+> ppr implicit_prs
+          , text "hs_tv_bndrs ="       <+> ppr hs_tv_bndrs
+          , text "all_tcbs ="          <+> pprTyVars (binderVars all_tcbs)
+          , text "swizzled_tcbs ="     <+> pprTyVars (binderVars swizzled_tcbs)
+          , text "tycon_res_kind ="    <+> ppr tycon_res_kind
+          , text "subst ="             <+> ppr subst
+          , text "swizzled_res_kind =" <+> ppr swizzled_res_kind ]
 
         -- Build the final, generalized PolyTcTyCon
         -- NB: all_tcbs must bind the tyvars in the range of all_tv_prs
         --     because the tv_prs is used when (say) typechecking the RHS of
         --     a type synonym.
-        ; let tc = mkTcTyCon name swizzled_tcbs swizzled_kind all_tv_prs
-                             True -- Make a PolyTcTyCon, fully generalised
-                             flav
+        ; let
+            tc = mkTcTyCon name sig_kind swizzled_tcbs swizzled_res_kind all_tv_prs
+                 True -- Make a PolyTcTyCon, fully generalised
+                 flav
 
         ; traceTc "kcCheckDeclHeader_sig }" $ vcat
-          [ text "tyConName = " <+> ppr (tyConName tc)
-          , text "sig_kind =" <+> debugPprType sig_kind
+          [ text "tyConName =" <+> ppr (tyConName tc)
           , text "tyConKind =" <+> debugPprType (tyConKind tc)
           , text "tyConBinders = " <+> ppr (tyConBinders tc)
           , text "tyConResKind" <+> debugPprType (tyConResKind tc)
@@ -3729,31 +3743,33 @@ When we /must/ clone.
 -- kind-checking and typechecking phases
 --------------------------------------
 
-bindTyClTyVars :: Name -> ([TcTyConBinder] -> TcKind -> TcM a) -> TcM a
+bindTyClTyVars :: Name -> (TcKind -> [TcTyConBinder] -> TcKind -> TcM a) -> TcM a
 -- ^ Bring into scope the binders of a PolyTcTyCon
 -- Used for the type variables of a type or class decl
 -- in the "kind checking" and "type checking" pass,
 -- but not in the initial-kind run.
 bindTyClTyVars tycon_name thing_inside
   = do { tycon <- tcLookupTcTyCon tycon_name     -- The tycon is a PolyTcTyCon
-       ; let res_kind   = tyConResKind tycon
+       ; let kind       = tyConKind tycon
+             res_kind   = tyConResKind tycon
              binders    = tyConBinders tycon
        ; traceTc "bindTyClTyVars" (ppr tycon_name $$ ppr binders)
        ; tcExtendTyVarEnv (binderVars binders) $
-         thing_inside binders res_kind }
+         thing_inside kind binders res_kind }
 
-bindTyClTyVarsAndZonk :: Name -> ([TyConBinder] -> Kind -> TcM a) -> TcM a
+bindTyClTyVarsAndZonk :: Name -> (Kind -> [TyConBinder] -> Kind -> TcM a) -> TcM a
 -- Like bindTyClTyVars, but in addition
 -- zonk the skolem TcTyVars of a PolyTcTyCon to TyVars
 -- We always do this same zonking after a call to bindTyClTyVars, but
 -- here we do it right away because there are no more unifications to come
 bindTyClTyVarsAndZonk tycon_name thing_inside
-  = bindTyClTyVars tycon_name $ \ tc_bndrs tc_kind ->
-    do { (bndrs, kind) <- initZonkEnv NoFlexi $
+  = bindTyClTyVars tycon_name $ \ tc_kind tc_bndrs tc_res_kind ->
+    do { (kind, bndrs, res_kind) <- initZonkEnv NoFlexi $ do
+          kind <- zonkTcTypeToTypeX tc_kind
           runZonkBndrT (zonkTyVarBindersX tc_bndrs) $ \ bndrs ->
-            do { kind <- zonkTcTypeToTypeX tc_kind
-               ; return (bndrs, kind) }
-       ; thing_inside bndrs kind }
+            do { res_kind <- zonkTcTypeToTypeX tc_res_kind
+               ; return (kind, bndrs, res_kind) }
+       ; thing_inside kind bndrs res_kind }
 
 
 {- *********************************************************************

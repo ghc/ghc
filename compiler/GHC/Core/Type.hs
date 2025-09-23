@@ -2267,12 +2267,15 @@ isSatTyFamApp (TyConApp tc tys)
   = Just (tc, tys)
 isSatTyFamApp _ = Nothing
 
-buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
+buildSynTyCon :: Name
+              -> KnotTied Kind
+              -> [KnotTied TyConBinder]
+              -> Kind   -- ^ /result/ kind
               -> [Role] -> KnotTied Type -> TyCon
 -- This function is here because here is where we have
 --   isFamFree and isTauTy
-buildSynTyCon name binders res_kind roles rhs
-  = mkSynonymTyCon name binders res_kind roles rhs
+buildSynTyCon name kind binders res_kind roles rhs
+  = mkSynonymTyCon name kind binders res_kind roles rhs
                    is_tau is_fam_free is_forgetful is_concrete
   where
     qtvs         = mkVarSet (map binderVar binders)
@@ -2868,7 +2871,7 @@ Most pretty-printing is either in GHC.Core.TyCo.Rep or GHC.Iface.Type.
 tyConAppNeedsKindSig
   :: Bool  -- ^ Should specified binders count towards injective positions in
            --   the kind of the TyCon? (If you're using visible kind
-           --   applications, then you want True here.
+           --   applications, then you want True here.)
   -> TyCon
   -> Int   -- ^ The number of args the 'TyCon' is applied to.
   -> Bool  -- ^ Does @T t_1 ... t_n@ need a kind signature? (Where @n@ is the

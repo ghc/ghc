@@ -725,22 +725,25 @@ tc_iface_decl _ ignore_prags (IfaceId {ifName = name, ifType = iface_type,
         ; info <- tcIdInfo ignore_prags TopLevel name ty info
         ; return (AnId (mkGlobalId details name ty info)) }
 
-tc_iface_decl _ _ (IfaceData {ifName = tc_name,
-                          ifCType = cType,
-                          ifBinders = binders,
-                          ifResKind = res_kind,
-                          ifRoles = roles,
-                          ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
-                          ifCons = rdr_cons,
-                          ifParent = mb_parent })
+tc_iface_decl _ _
+  (IfaceData {ifName = tc_name,
+              ifKind = kind,
+              ifCType = cType,
+              ifBinders = binders,
+              ifResKind = res_kind,
+              ifRoles = roles,
+              ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
+              ifCons = rdr_cons,
+              ifParent = mb_parent })
   = bindIfaceTyConBinders_AT binders $ \ binders' -> do
-    { res_kind' <- tcIfaceType res_kind
+    { kind' <- tcIfaceType kind
+    ; res_kind' <- tcIfaceType res_kind
 
     ; tycon <- fixM $ \ tycon -> do
             { stupid_theta <- tcIfaceCtxt ctxt
             ; parent' <- tc_parent tc_name mb_parent
             ; cons <- tcIfaceDataCons tc_name tycon binders' rdr_cons
-            ; return (mkAlgTyCon tc_name binders' res_kind'
+            ; return (mkAlgTyCon tc_name kind' binders' res_kind'
                                  roles cType stupid_theta
                                  cons parent' gadt_syn) }
     ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
@@ -756,32 +759,37 @@ tc_iface_decl _ _ (IfaceData {ifName = tc_name,
            ; lhs_tys <- tcIfaceAppArgs arg_tys
            ; return (DataFamInstTyCon ax fam_tc lhs_tys) }
 
-tc_iface_decl _ _ (IfaceSynonym {ifName = tc_name,
-                                      ifRoles = roles,
-                                      ifSynRhs = rhs_ty,
-                                      ifBinders = binders,
-                                      ifResKind = res_kind })
-   = bindIfaceTyConBinders_AT binders $ \ binders' -> do
-     { res_kind' <- tcIfaceType res_kind     -- Note [Synonym kind loop]
-     ; rhs      <- forkM (mk_doc tc_name) $
-                   tcIfaceType rhs_ty
-     ; let tycon = buildSynTyCon tc_name binders' res_kind' roles rhs
-     ; return (ATyCon tycon) }
+tc_iface_decl _ _
+  (IfaceSynonym {ifName = tc_name,
+                 ifKind = kind,
+                 ifRoles = roles,
+                 ifSynRhs = rhs_ty,
+                 ifBinders = binders,
+                 ifResKind = res_kind })
+   = do { kind' <- tcIfaceType kind
+        ; bindIfaceTyConBinders_AT binders $ \ binders' ->
+     do { res_kind' <- tcIfaceType res_kind     -- Note [Synonym kind loop]
+        ; rhs      <- forkM (mk_doc tc_name) $
+                      tcIfaceType rhs_ty
+        ; let tycon = buildSynTyCon tc_name kind' binders' res_kind' roles rhs
+        ; return (ATyCon tycon) } }
    where
      mk_doc n = text "Type synonym" <+> ppr n
 
 tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
+                                     ifKind = kind,
                                      ifFamFlav = fam_flav,
                                      ifBinders = binders,
                                      ifResKind = res_kind,
                                      ifResVar = res, ifFamInj = inj })
-   = bindIfaceTyConBinders_AT binders $ \ binders' -> do
-     { res_kind' <- tcIfaceType res_kind    -- Note [Synonym kind loop]
-     ; rhs      <- forkM (mk_doc tc_name) $
-                   tc_fam_flav tc_name fam_flav
-     ; res_name <- traverse (newIfaceName . mkTyVarOccFS . ifLclNameFS) res
-     ; let tycon = mkFamilyTyCon tc_name binders' res_kind' res_name rhs parent inj
-     ; return (ATyCon tycon) }
+   = do { kind' <- tcIfaceType kind
+        ; bindIfaceTyConBinders_AT binders $ \ binders' ->
+     do { res_kind' <- tcIfaceType res_kind    -- Note [Synonym kind loop]
+        ; rhs      <- forkM (mk_doc tc_name) $
+                      tc_fam_flav tc_name fam_flav
+        ; res_name <- traverse (newIfaceName . mkTyVarOccFS . ifLclNameFS) res
+        ; let tycon = mkFamilyTyCon tc_name kind' binders' res_kind' res_name rhs parent inj
+        ; return (ATyCon tycon) } }
    where
      mk_doc n = text "Type synonym" <+> ppr n
 
@@ -801,17 +809,20 @@ tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
 
 tc_iface_decl _parent _ignore_prags
             (IfaceClass {ifName = tc_name,
+                         ifKind = kind,
                          ifRoles = roles,
                          ifBinders = binders,
                          ifFDs = rdr_fds,
                          ifBody = IfAbstractClass})
-  = bindIfaceTyConBinders binders $ \ binders' -> do
-    { fds  <- mapM tc_fd rdr_fds
-    ; cls  <- buildAbstractClass tc_name binders' roles fds
-    ; return (ATyCon (classTyCon cls)) }
+  = do { kind' <- tcIfaceType kind
+       ; bindIfaceTyConBinders binders $ \ binders' ->
+    do { fds  <- mapM tc_fd rdr_fds
+       ; cls  <- buildAbstractClass tc_name kind' binders' roles fds
+       ; return (ATyCon (classTyCon cls)) } }
 
 tc_iface_decl _parent ignore_prags
             (IfaceClass {ifName = tc_name,
+                         ifKind = kind,
                          ifRoles = roles,
                          ifBinders = binders,
                          ifFDs = rdr_fds,
@@ -820,19 +831,20 @@ tc_iface_decl _parent ignore_prags
                              ifATs = rdr_ats, ifSigs = rdr_sigs,
                              ifMinDef = if_mindef, ifUnary = unary
                          }})
-  = bindIfaceTyConBinders binders $ \ binders' -> do
-    { traceIf (text "tc-iface-class1" <+> ppr tc_name)
-    ; ctxt <- mapM tc_sc rdr_ctxt
-    ; traceIf (text "tc-iface-class2" <+> ppr tc_name)
-    ; sigs <- mapM tc_sig rdr_sigs
-    ; fds  <- mapM tc_fd rdr_fds
-    ; traceIf (text "tc-iface-class3" <+> ppr tc_name)
-    ; mindef <- tc_boolean_formula if_mindef
-    ; cls  <- fixM $ \ cls -> do
-              { ats  <- mapM (tc_at cls) rdr_ats
-              ; traceIf (text "tc-iface-class4" <+> ppr tc_name)
-              ; buildClass tc_name binders' roles fds ctxt ats sigs mindef unary }
-    ; return (ATyCon (classTyCon cls)) }
+  = do { kind' <- tcIfaceType kind
+       ; bindIfaceTyConBinders binders $ \ binders' ->
+    do { traceIf (text "tc-iface-class1" <+> ppr tc_name)
+       ; ctxt <- mapM tc_sc rdr_ctxt
+       ; traceIf (text "tc-iface-class2" <+> ppr tc_name)
+       ; sigs <- mapM tc_sig rdr_sigs
+       ; fds  <- mapM tc_fd rdr_fds
+       ; traceIf (text "tc-iface-class3" <+> ppr tc_name)
+       ; mindef <- tc_boolean_formula if_mindef
+       ; cls  <- fixM $ \ cls -> do
+                 { ats  <- mapM (tc_at cls) rdr_ats
+                 ; traceIf (text "tc-iface-class4" <+> ppr tc_name)
+                 ; buildClass tc_name kind' binders' roles fds ctxt ats sigs mindef unary }
+       ; return (ATyCon (classTyCon cls)) } }
   where
    tc_sc pred = forkM (mk_sc_doc pred) (tcIfaceType pred)
         -- The *length* of the superclasses is used by buildClass, and hence must

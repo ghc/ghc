@@ -533,13 +533,14 @@ anyTyConName =
 
 anyTyCon :: TyCon
 -- See Note [Any types]
-anyTyCon = mkFamilyTyCon anyTyConName binders res_kind Nothing
+anyTyCon = mkFamilyTyCon anyTyConName kind binders res_kind Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
                          NotInjective
   where
     binders@[kv] = mkTemplateKindTyConBinders [liftedTypeKind]
     res_kind = mkTyVarTy (binderVar kv)
+    kind = mkTyConKind binders res_kind
 
 anyTy :: Type
 anyTy = mkTyConTy anyTyCon
@@ -554,22 +555,23 @@ zonkAnyTyConName =
 zonkAnyTyCon :: TyCon
 -- ZonkAnyTyCon :: forall k. Nat -> k
 -- See Note [Any types]
-zonkAnyTyCon = mkFamilyTyCon zonkAnyTyConName
-                         [ mkNamedTyConBinder Specified kv
-                         , mkAnonTyConBinder nat_kv ]
-                         (mkTyVarTy kv)
+zonkAnyTyCon = mkFamilyTyCon zonkAnyTyConName kind bndrs res_kind
                          Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
                          NotInjective
   where
     [kv,nat_kv] = mkTemplateKindVars [liftedTypeKind, naturalTy]
+    bndrs = [ mkNamedTyConBinder Specified kv
+            , mkAnonTyConBinder nat_kv ]
+    res_kind = mkTyVarTy kv
+    kind = mkTyConKind bndrs res_kind
 
 -- | Make a fake, recovery 'TyCon' from an existing one.
 -- Used when recovering from errors in type declarations
 makeRecoveryTyCon :: TyCon -> TyCon
 makeRecoveryTyCon tc
-  = mkTcTyCon (tyConName tc)
+  = mkTcTyCon (tyConName tc) (mkTyConKind bndrs res_kind)
               bndrs res_kind
               noTcTyConScopedTyVars
               True             -- Fully generalised
@@ -617,15 +619,16 @@ consDataCon_RDR = nameRdrName consDataConName
 -- Representational role, and that there is no kind polymorphism.
 pcTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon name cType tyvars cons
-  = mkAlgTyCon name
-                (mkAnonTyConBinders tyvars)
-                liftedTypeKind
+  = mkAlgTyCon name (mkTyConKind bndrs res_kind) bndrs res_kind
                 (map (const Representational) tyvars)
                 cType
                 []              -- No stupid theta
                 (mkDataTyConRhs cons)
                 (VanillaAlgTyCon (mkPrelTyConRepName name))
                 False           -- Not in GADT syntax
+  where
+    bndrs = mkAnonTyConBinders tyvars
+    res_kind = liftedTypeKind
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 pcDataCon n univs tys
@@ -1531,9 +1534,11 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
 mk_ctuple :: Arity -> (TyCon, DataCon, Array ConTagZ Id)
 mk_ctuple arity = (tycon, tuple_con, sc_sel_ids_arr)
   where
-    tycon = mkClassTyCon tc_name binders roles
+    tycon = mkClassTyCon tc_name kind binders roles
                          rhs klass
                          (mkPrelTyConRepName tc_name)
+
+    kind = mkTyConKind binders constraintKind
 
     klass     = mk_ctuple_class tycon sc_theta sc_sel_ids
     tuple_con = pcDataConConstraint dc_name tvs sc_theta tycon
@@ -1755,7 +1760,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
 (eqTyCon, eqClass, eqDataCon, eqSCSelId)
   = (tycon, klass, datacon, sc_sel_id)
   where
-    tycon     = mkClassTyCon eqTyConName binders roles
+    tycon     = mkClassTyCon eqTyConName kind binders roles
                              rhs klass
                              (mkPrelTyConRepName eqTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
@@ -1763,6 +1768,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
 
     -- Kind: forall k. k -> k -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k,k])
+    kind      = mkTyConKind binders constraintKind
     roles     = [Nominal, Nominal, Nominal]
     rhs       = mkDataTyConRhs [datacon]
                 -- rhs: a DataTyCon, not a UnaryClassTyCon!  Yes it has one
@@ -1776,7 +1782,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
 (heqTyCon, heqClass, heqDataCon, heqSCSelId)
   = (tycon, klass, datacon, sc_sel_id)
   where
-    tycon     = mkClassTyCon heqTyConName binders roles
+    tycon     = mkClassTyCon heqTyConName kind binders roles
                              rhs klass
                              (mkPrelTyConRepName heqTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
@@ -1784,6 +1790,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
 
     -- Kind: forall k1 k2. k1 -> k2 -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
+    kind      = mkTyConKind binders constraintKind
     roles     = [Nominal, Nominal, Nominal, Nominal]
     rhs       = mkDataTyConRhs [datacon]
 
@@ -1794,7 +1801,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
 (coercibleTyCon, coercibleClass, coercibleDataCon, coercibleSCSelId)
   = (tycon, klass, datacon, sc_sel_id)
   where
-    tycon     = mkClassTyCon coercibleTyConName binders roles
+    tycon     = mkClassTyCon coercibleTyConName kind binders roles
                              rhs klass
                              (mkPrelTyConRepName coercibleTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
@@ -1802,6 +1809,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
 
     -- Kind: forall k. k -> k -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k,k])
+    kind      = mkTyConKind binders constraintKind
     roles     = [Nominal, Representational, Representational]
     rhs       = mkDataTyConRhs [datacon]
 
@@ -1864,12 +1872,13 @@ multMulTyConName =
     mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "MultMul") multMulTyConKey multMulTyCon
 
 multMulTyCon :: TyCon
-multMulTyCon = mkFamilyTyCon multMulTyConName binders multiplicityTy Nothing
+multMulTyCon = mkFamilyTyCon multMulTyConName kind binders multiplicityTy Nothing
                          (BuiltInSynFamTyCon trivialBuiltInFamily)
                          Nothing
                          NotInjective
   where
     binders = mkTemplateAnonTyConBinders [multiplicityTy, multiplicityTy]
+    kind = mkTyConKind binders multiplicityTy
 
 ------------------------
 -- type (->) :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
@@ -1877,7 +1886,7 @@ multMulTyCon = mkFamilyTyCon multMulTyConName binders multiplicityTy Nothing
 -- type (->) = FUN 'Many
 unrestrictedFunTyCon :: TyCon
 unrestrictedFunTyCon
-  = buildSynTyCon unrestrictedFunTyConName [] arrowKind []
+  = buildSynTyCon unrestrictedFunTyConName arrowKind [] arrowKind []
                   (TyCoRep.TyConApp fUNTyCon [manyDataConTy])
   where
     arrowKind = mkTyConKind binders liftedTypeKind
@@ -1930,7 +1939,7 @@ constructor in tTYPETyCon and cONSTRAINTTyCon.
 -- type Constraint = CONSTRAINT LiftedRep
 constraintKindTyCon :: TyCon
 constraintKindTyCon
-  = buildSynTyCon constraintKindTyConName [] liftedTypeKind [] rhs
+  = buildSynTyCon constraintKindTyConName liftedTypeKind [] liftedTypeKind [] rhs
   where
     rhs = TyCoRep.TyConApp cONSTRAINTTyCon [liftedRepTy]
 
@@ -1945,7 +1954,7 @@ constraintKind = mkTyConTy constraintKindTyCon
 -- type Type = TYPE LiftedRep
 liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon
-  = buildSynTyCon liftedTypeKindTyConName [] liftedTypeKind [] rhs
+  = buildSynTyCon liftedTypeKindTyConName liftedTypeKind [] liftedTypeKind [] rhs
   where
     rhs = TyCoRep.TyConApp tYPETyCon [liftedRepTy]
 
@@ -1961,7 +1970,7 @@ typeToTypeKind = liftedTypeKind `mkVisFunTyMany` liftedTypeKind
 -- type UnliftedType = TYPE ('BoxedRep 'Unlifted)
 unliftedTypeKindTyCon :: TyCon
 unliftedTypeKindTyCon
-  = buildSynTyCon unliftedTypeKindTyConName [] liftedTypeKind [] rhs
+  = buildSynTyCon unliftedTypeKindTyConName liftedTypeKind [] liftedTypeKind [] rhs
   where
     rhs = TyCoRep.TyConApp tYPETyCon [unliftedRepTy]
 
@@ -2151,7 +2160,7 @@ intRepDataConTy,
 -- | @type ZeroBitRep = 'Tuple '[]
 zeroBitRepTyCon :: TyCon
 zeroBitRepTyCon
-  = buildSynTyCon zeroBitRepTyConName [] runtimeRepTy [] rhs
+  = buildSynTyCon zeroBitRepTyConName runtimeRepTy [] runtimeRepTy [] rhs
   where
     rhs = TyCoRep.TyConApp tupleRepDataConTyCon [mkPromotedListTy runtimeRepTy []]
 
@@ -2166,7 +2175,7 @@ zeroBitRepTy = mkTyConTy zeroBitRepTyCon
 -- @type ZeroBitType = TYPE ZeroBitRep
 zeroBitTypeTyCon :: TyCon
 zeroBitTypeTyCon
-  = buildSynTyCon zeroBitTypeTyConName [] liftedTypeKind [] rhs
+  = buildSynTyCon zeroBitTypeTyConName liftedTypeKind [] liftedTypeKind [] rhs
   where
     rhs = TyCoRep.TyConApp tYPETyCon [zeroBitRepTy]
 
@@ -2181,7 +2190,7 @@ zeroBitTypeKind = mkTyConTy zeroBitTypeTyCon
 -- | @type LiftedRep = 'BoxedRep 'Lifted@
 liftedRepTyCon :: TyCon
 liftedRepTyCon
-  = buildSynTyCon liftedRepTyConName [] runtimeRepTy [] rhs
+  = buildSynTyCon liftedRepTyConName runtimeRepTy [] runtimeRepTy [] rhs
   where
     rhs = TyCoRep.TyConApp boxedRepDataConTyCon [liftedDataConTy]
 
@@ -2196,7 +2205,7 @@ liftedRepTy = mkTyConTy liftedRepTyCon
 -- | @type UnliftedRep = 'BoxedRep 'Unlifted@
 unliftedRepTyCon :: TyCon
 unliftedRepTyCon
-  = buildSynTyCon unliftedRepTyConName [] runtimeRepTy [] rhs
+  = buildSynTyCon unliftedRepTyConName runtimeRepTy [] runtimeRepTy [] rhs
   where
     rhs = TyCoRep.TyConApp boxedRepDataConTyCon [unliftedDataConTy]
 
@@ -2310,7 +2319,7 @@ stringTyCon :: TyCon
 -- We have this wired-in so that Haskell literal strings
 -- get type String (in hsLitType), which in turn influences
 -- inferred types and error messages
-stringTyCon = buildSynTyCon stringTyConName
+stringTyCon = buildSynTyCon stringTyConName liftedTypeKind
                             [] liftedTypeKind []
                             (mkListTy charTy)
 

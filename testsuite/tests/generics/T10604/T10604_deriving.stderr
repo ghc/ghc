@@ -69,7 +69,7 @@ Derived class instances:
             -> T10604_deriving.Prod2 g1 g2
   
   instance GHC.Internal.Generics.Generic1
-             @k (T10604_deriving.SumOfProducts @{k}) where
+             @k1 (T10604_deriving.SumOfProducts @{k1}) where
     GHC.Internal.Generics.from1 x
       = GHC.Internal.Generics.M1
           (case x of
@@ -171,7 +171,7 @@ Derived class instances:
             -> T10604_deriving.Proxy
   
   instance GHC.Internal.Generics.Generic1
-             @k (T10604_deriving.Proxy @k) where
+             @k1 (T10604_deriving.Proxy @k1) where
     GHC.Internal.Generics.from1 x
       = GHC.Internal.Generics.M1
           (case x of
@@ -351,73 +351,74 @@ Derived type family instances:
                                                                    @{*}
                                                                    (T10604_deriving.Proxy @k a))))))
   type GHC.Internal.Generics.Rep1
-         @k (T10604_deriving.SumOfProducts @{k}) = GHC.Internal.Generics.D1
-                                                     @{k}
-                                                     ('GHC.Internal.Generics.MetaData
-                                                        "SumOfProducts"
-                                                        "T10604_deriving"
-                                                        "main"
-                                                        'GHC.Internal.Types.False)
-                                                     ((GHC.Internal.Generics.:+:)
-                                                        @k
-                                                        (GHC.Internal.Generics.C1
-                                                           @{k}
-                                                           ('GHC.Internal.Generics.MetaCons
-                                                              "Prod1"
-                                                              'GHC.Internal.Generics.PrefixI
-                                                              'GHC.Internal.Types.False)
-                                                           ((GHC.Internal.Generics.:*:)
-                                                              @k
-                                                              (GHC.Internal.Generics.S1
-                                                                 @{k}
-                                                                 ('GHC.Internal.Generics.MetaSel
-                                                                    ('GHC.Internal.Maybe.Nothing
-                                                                       @GHC.Internal.Types.Symbol)
-                                                                    'GHC.Internal.Generics.NoSourceUnpackedness
-                                                                    'GHC.Internal.Generics.NoSourceStrictness
-                                                                    'GHC.Internal.Generics.DecidedLazy)
-                                                                 (GHC.Internal.Generics.Rec1
-                                                                    @k (T10604_deriving.Proxy @k)))
-                                                              (GHC.Internal.Generics.S1
-                                                                 @{k}
-                                                                 ('GHC.Internal.Generics.MetaSel
-                                                                    ('GHC.Internal.Maybe.Nothing
-                                                                       @GHC.Internal.Types.Symbol)
-                                                                    'GHC.Internal.Generics.NoSourceUnpackedness
-                                                                    'GHC.Internal.Generics.NoSourceStrictness
-                                                                    'GHC.Internal.Generics.DecidedLazy)
-                                                                 (GHC.Internal.Generics.Rec1
-                                                                    @k
-                                                                    (T10604_deriving.Proxy @k)))))
-                                                        (GHC.Internal.Generics.C1
-                                                           @{k}
-                                                           ('GHC.Internal.Generics.MetaCons
-                                                              "Prod2"
-                                                              'GHC.Internal.Generics.PrefixI
-                                                              'GHC.Internal.Types.False)
-                                                           ((GHC.Internal.Generics.:*:)
-                                                              @k
-                                                              (GHC.Internal.Generics.S1
-                                                                 @{k}
-                                                                 ('GHC.Internal.Generics.MetaSel
-                                                                    ('GHC.Internal.Maybe.Nothing
-                                                                       @GHC.Internal.Types.Symbol)
-                                                                    'GHC.Internal.Generics.NoSourceUnpackedness
-                                                                    'GHC.Internal.Generics.NoSourceStrictness
-                                                                    'GHC.Internal.Generics.DecidedLazy)
-                                                                 (GHC.Internal.Generics.Rec1
-                                                                    @k (T10604_deriving.Proxy @k)))
-                                                              (GHC.Internal.Generics.S1
-                                                                 @{k}
-                                                                 ('GHC.Internal.Generics.MetaSel
-                                                                    ('GHC.Internal.Maybe.Nothing
-                                                                       @GHC.Internal.Types.Symbol)
-                                                                    'GHC.Internal.Generics.NoSourceUnpackedness
-                                                                    'GHC.Internal.Generics.NoSourceStrictness
-                                                                    'GHC.Internal.Generics.DecidedLazy)
-                                                                 (GHC.Internal.Generics.Rec1
-                                                                    @k
-                                                                    (T10604_deriving.Proxy @k))))))
+         @k1
+         (T10604_deriving.SumOfProducts @{k1}) = GHC.Internal.Generics.D1
+                                                   @{k1}
+                                                   ('GHC.Internal.Generics.MetaData
+                                                      "SumOfProducts"
+                                                      "T10604_deriving"
+                                                      "main"
+                                                      'GHC.Internal.Types.False)
+                                                   ((GHC.Internal.Generics.:+:)
+                                                      @k1
+                                                      (GHC.Internal.Generics.C1
+                                                         @{k1}
+                                                         ('GHC.Internal.Generics.MetaCons
+                                                            "Prod1"
+                                                            'GHC.Internal.Generics.PrefixI
+                                                            'GHC.Internal.Types.False)
+                                                         ((GHC.Internal.Generics.:*:)
+                                                            @k1
+                                                            (GHC.Internal.Generics.S1
+                                                               @{k1}
+                                                               ('GHC.Internal.Generics.MetaSel
+                                                                  ('GHC.Internal.Maybe.Nothing
+                                                                     @GHC.Internal.Types.Symbol)
+                                                                  'GHC.Internal.Generics.NoSourceUnpackedness
+                                                                  'GHC.Internal.Generics.NoSourceStrictness
+                                                                  'GHC.Internal.Generics.DecidedLazy)
+                                                               (GHC.Internal.Generics.Rec1
+                                                                  @k1 (T10604_deriving.Proxy @k1)))
+                                                            (GHC.Internal.Generics.S1
+                                                               @{k1}
+                                                               ('GHC.Internal.Generics.MetaSel
+                                                                  ('GHC.Internal.Maybe.Nothing
+                                                                     @GHC.Internal.Types.Symbol)
+                                                                  'GHC.Internal.Generics.NoSourceUnpackedness
+                                                                  'GHC.Internal.Generics.NoSourceStrictness
+                                                                  'GHC.Internal.Generics.DecidedLazy)
+                                                               (GHC.Internal.Generics.Rec1
+                                                                  @k1
+                                                                  (T10604_deriving.Proxy @k1)))))
+                                                      (GHC.Internal.Generics.C1
+                                                         @{k1}
+                                                         ('GHC.Internal.Generics.MetaCons
+                                                            "Prod2"
+                                                            'GHC.Internal.Generics.PrefixI
+                                                            'GHC.Internal.Types.False)
+                                                         ((GHC.Internal.Generics.:*:)
+                                                            @k1
+                                                            (GHC.Internal.Generics.S1
+                                                               @{k1}
+                                                               ('GHC.Internal.Generics.MetaSel
+                                                                  ('GHC.Internal.Maybe.Nothing
+                                                                     @GHC.Internal.Types.Symbol)
+                                                                  'GHC.Internal.Generics.NoSourceUnpackedness
+                                                                  'GHC.Internal.Generics.NoSourceStrictness
+                                                                  'GHC.Internal.Generics.DecidedLazy)
+                                                               (GHC.Internal.Generics.Rec1
+                                                                  @k1 (T10604_deriving.Proxy @k1)))
+                                                            (GHC.Internal.Generics.S1
+                                                               @{k1}
+                                                               ('GHC.Internal.Generics.MetaSel
+                                                                  ('GHC.Internal.Maybe.Nothing
+                                                                     @GHC.Internal.Types.Symbol)
+                                                                  'GHC.Internal.Generics.NoSourceUnpackedness
+                                                                  'GHC.Internal.Generics.NoSourceStrictness
+                                                                  'GHC.Internal.Generics.DecidedLazy)
+                                                               (GHC.Internal.Generics.Rec1
+                                                                  @k1
+                                                                  (T10604_deriving.Proxy @k1))))))
   type GHC.Internal.Generics.Rep
          (T10604_deriving.Wrap2 @k a) = GHC.Internal.Generics.D1
                                           @{*}
@@ -534,20 +535,20 @@ Derived type family instances:
                                                 'GHC.Internal.Types.False)
                                              (GHC.Internal.Generics.U1 @(*)))
   type GHC.Internal.Generics.Rep1
-         @k (T10604_deriving.Proxy @k) = GHC.Internal.Generics.D1
-                                           @{k}
-                                           ('GHC.Internal.Generics.MetaData
-                                              "Proxy"
-                                              "T10604_deriving"
-                                              "main"
-                                              'GHC.Internal.Types.False)
-                                           (GHC.Internal.Generics.C1
-                                              @{k}
-                                              ('GHC.Internal.Generics.MetaCons
-                                                 "Proxy"
-                                                 'GHC.Internal.Generics.PrefixI
-                                                 'GHC.Internal.Types.False)
-                                              (GHC.Internal.Generics.U1 @k))
+         @k1 (T10604_deriving.Proxy @k1) = GHC.Internal.Generics.D1
+                                             @{k1}
+                                             ('GHC.Internal.Generics.MetaData
+                                                "Proxy"
+                                                "T10604_deriving"
+                                                "main"
+                                                'GHC.Internal.Types.False)
+                                             (GHC.Internal.Generics.C1
+                                                @{k1}
+                                                ('GHC.Internal.Generics.MetaCons
+                                                   "Proxy"
+                                                   'GHC.Internal.Generics.PrefixI
+                                                   'GHC.Internal.Types.False)
+                                                (GHC.Internal.Generics.U1 @k1))
   type GHC.Internal.Generics.Rep
          (T10604_deriving.Empty a) = GHC.Internal.Generics.D1
                                        @{*}

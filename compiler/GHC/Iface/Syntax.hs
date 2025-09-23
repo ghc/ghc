@@ -192,6 +192,7 @@ data IfaceDecl
               }
 
   | IfaceData { ifName       :: IfaceTopBndr,   -- Type constructor
+                ifKind       :: IfaceType,
                 ifBinders    :: [IfaceTyConBinder],
                 ifResKind    :: IfaceType,      -- Result kind of type constructor
                 ifCType      :: Maybe CType,    -- C type for CAPI FFI
@@ -205,12 +206,14 @@ data IfaceDecl
     }
 
   | IfaceSynonym { ifName    :: IfaceTopBndr,      -- Type constructor
+                   ifKind    :: IfaceType,
                    ifRoles   :: [Role],            -- Roles
                    ifBinders :: [IfaceTyConBinder],
                    ifResKind :: IfaceKind,         -- Kind of the *result*
                    ifSynRhs  :: IfaceType }
 
   | IfaceFamily  { ifName    :: IfaceTopBndr,      -- Type constructor
+                   ifKind    :: IfaceType,
                    ifResVar  :: Maybe IfLclName,   -- Result variable name, used
                                                    -- only for pretty-printing
                                                    -- with --show-iface
@@ -220,6 +223,7 @@ data IfaceDecl
                    ifFamInj  :: Injectivity }      -- injectivity information
 
   | IfaceClass { ifName    :: IfaceTopBndr,             -- Name of the class TyCon
+                 ifKind    :: IfaceType,
                  ifRoles   :: [Role],                   -- Roles
                  ifBinders :: [IfaceTyConBinder],
                  ifFDs     :: [FunDep IfLclName],       -- Functional dependencies
@@ -907,7 +911,7 @@ showToHeader :: ShowSub
 showToHeader = ShowSub { ss_how_much = ShowHeader $ AltPpr Nothing
                        , ss_forall = ShowForAllWhen }
 
--- | Show declaration and its RHS, including GHc-internal information (e.g.
+-- | Show declaration and its RHS, including GHC-internal information (e.g.
 -- for @--show-iface@).
 showToIface :: ShowSub
 showToIface = ShowSub { ss_how_much = ShowIface
@@ -1177,7 +1181,7 @@ pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
 --     See Note [Pretty printing via Iface syntax] in GHC.Types.TyThing.Ppr
 pprIfaceDecl ss decl@(IfaceData { ifName = tycon, ifCType = ctype,
-                                  ifCtxt = context, ifResKind = kind,
+                                  ifCtxt = context, ifKind = kind, ifResKind = res_kind,
                                   ifRoles = roles, ifCons = condecls,
                                   ifParent = parent,
                                   ifGadtSyntax = gadt,
@@ -1204,8 +1208,8 @@ pprIfaceDecl ss decl@(IfaceData { ifName = tycon, ifCType = ctype,
     cons       = visibleIfConDecls condecls
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
-    pp_kind    = ppUnless (ki_sig_printable || isIfaceLiftedTypeKind kind)
-                          (dcolon <+> ppr kind)
+    pp_kind    = ppUnless (ki_sig_printable || isIfaceLiftedTypeKind res_kind)
+                          (dcolon <+> ppr res_kind)
 
     decl_head = pprIfaceDeclHead decl suppress_bndr_sig context ss tycon binders
 
@@ -1233,7 +1237,7 @@ pprIfaceDecl ss decl@(IfaceData { ifName = tycon, ifCType = ctype,
       not is_data_instance
 
     pp_ki_sig = ppWhen ki_sig_printable $
-                pprStandaloneKindSig name_doc (mkIfaceTyConKind binders kind)
+                pprStandaloneKindSig name_doc kind
 
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig ki_sig_printable
@@ -2259,7 +2263,7 @@ instance Binary IfaceDecl where
         lazyPut bh (ty, details, idinfo)
         -- See Note [Lazy deserialization of IfaceId]
 
-    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
+    put_ bh (IfaceData a1 a10 a2 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 2
         putIfaceTopBndr bh a1
         put_ bh a2
@@ -2270,17 +2274,10 @@ instance Binary IfaceDecl where
         put_ bh a7
         put_ bh a8
         put_ bh a9
+        put_ bh a10
 
-    put_ bh (IfaceSynonym a1 a2 a3 a4 a5) = do
+    put_ bh (IfaceSynonym a1 a6 a2 a3 a4 a5) = do
         putByte bh 3
-        putIfaceTopBndr bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
-        put_ bh a5
-
-    put_ bh (IfaceFamily a1 a2 a3 a4 a5 a6) = do
-        putByte bh 4
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
@@ -2288,9 +2285,20 @@ instance Binary IfaceDecl where
         put_ bh a5
         put_ bh a6
 
+    put_ bh (IfaceFamily a1 a7 a2 a3 a4 a5 a6) = do
+        putByte bh 4
+        putIfaceTopBndr bh a1
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
+        put_ bh a5
+        put_ bh a6
+        put_ bh a7
+
     -- NB: Written in a funny way to avoid an interface change
     put_ bh (IfaceClass {
                 ifName    = a2,
+                ifKind    = a10,
                 ifRoles   = a3,
                 ifBinders = a4,
                 ifFDs     = a5,
@@ -2311,6 +2319,7 @@ instance Binary IfaceDecl where
         put_ bh a7
         put_ bh a8
         put_ bh a9
+        put_ bh a10
 
     put_ bh (IfaceAxiom a1 a2 a3 a4) = do
         putByte bh 6
@@ -2335,6 +2344,7 @@ instance Binary IfaceDecl where
 
     put_ bh (IfaceClass {
                 ifName    = a1,
+                ifKind    = a5,
                 ifRoles   = a2,
                 ifBinders = a3,
                 ifFDs     = a4,
@@ -2344,6 +2354,7 @@ instance Binary IfaceDecl where
         put_ bh a2
         put_ bh a3
         put_ bh a4
+        put_ bh a5
 
     get bh = do
         h <- getByte bh
@@ -2362,20 +2373,23 @@ instance Binary IfaceDecl where
                     a7  <- get bh
                     a8  <- get bh
                     a9  <- get bh
-                    return (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9)
+                    a10 <- get bh
+                    return (IfaceData a1 a10 a2 a3 a4 a5 a6 a7 a8 a9)
             3 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
                     a5 <- get bh
-                    return (IfaceSynonym a1 a2 a3 a4 a5)
+                    a6 <- get bh
+                    return (IfaceSynonym a1 a6 a2 a3 a4 a5)
             4 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
                     a5 <- get bh
                     a6 <- get bh
-                    return (IfaceFamily a1 a2 a3 a4 a5 a6)
+                    a7 <- get bh
+                    return (IfaceFamily a1 a7 a2 a3 a4 a5 a6)
             5 -> do a1 <- get bh
                     a2 <- getIfaceTopBndr bh
                     a3 <- get bh
@@ -2385,8 +2399,10 @@ instance Binary IfaceDecl where
                     a7 <- get bh
                     a8 <- get bh
                     a9 <- get bh
+                    a10 <- get bh
                     return (IfaceClass {
                         ifName    = a2,
+                        ifKind    = a10,
                         ifRoles   = a3,
                         ifBinders = a4,
                         ifFDs     = a5,
@@ -2418,8 +2434,10 @@ instance Binary IfaceDecl where
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
+                    a5 <- get bh
                     return (IfaceClass {
                         ifName    = a1,
+                        ifKind    = a5,
                         ifRoles   = a2,
                         ifBinders = a3,
                         ifFDs     = a4,
@@ -3062,18 +3080,19 @@ instance NFData IfaceDecl where
     IfaceId f1 f2 f3 f4 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
 
-    IfaceData f1 f2 f3 f4 f5 f6 f7 f8 f9 ->
+    IfaceData f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq`
-      rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` rnf f9
+      rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10
 
-    IfaceSynonym f1 f2 f3 f4 f5 ->
-      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
+    IfaceSynonym f1 f2 f3 f4 f5 f6 ->
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
 
-    IfaceFamily f1 f2 f3 f4 f5 f6 ->
-      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq` ()
+    IfaceFamily f1 f2 f3 f4 f5 f6 f7 ->
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
+             `seq` rnf f7
 
-    IfaceClass f1 f2 f3 f4 f5 ->
-      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
+    IfaceClass f1 f2 f3 f4 f5 f6 ->
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
 
     IfaceAxiom nm tycon role ax ->
       rnf nm `seq`

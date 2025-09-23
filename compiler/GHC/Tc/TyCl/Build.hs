@@ -289,6 +289,7 @@ type MethInfo       -- A temporary intermediate, to communicate
          --    for the generic default method, spat out by checkValidClass
 
 buildClass :: Name  -- Name of the class/tycon (they have the same Name)
+           -> Kind
            -> [TyConBinder]                -- Of the tycon
            -> [Role]
            -> [FunDep TyVar]               -- Functional dependencies
@@ -299,7 +300,7 @@ buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> Bool                   -- True <=> is a unary class
            -> TcRnIf m n Class
 
-buildClass tycon_name binders roles fds sc_theta at_items sig_stuff mindef unary_class
+buildClass tycon_name kind binders roles fds sc_theta at_items sig_stuff mindef unary_class
   = fixM  $ \ rec_clas ->       -- Only name generation inside loop
     do  { traceIf (text "buildClass")
 
@@ -356,7 +357,7 @@ buildClass tycon_name binders roles fds sc_theta at_items sig_stuff mindef unary
                   | otherwise
                   = mkDataTyConRhs [dict_con]
 
-              tycon = mkClassTyCon tycon_name binders roles
+              tycon = mkClassTyCon tycon_name kind binders roles
                                    rhs rec_clas tc_rep_name
                 -- A class can be recursive, and in the case of newtypes
                 -- this matters.  For example
@@ -393,18 +394,19 @@ buildClass tycon_name binders roles fds sc_theta at_items sig_stuff mindef unary
            ; return (Just (dm_name, GenericDM dm_ty)) }
 
 buildAbstractClass :: Name
+                   -> Kind
                    -> [TyConBinder]
                    -> [Role]
                    -> [FunDep TyVar]
                    -> TcRnIf m n Class
 
-buildAbstractClass tycon_name binders roles fds
+buildAbstractClass tycon_name kind binders roles fds
   = fixM  $ \ rec_clas ->       -- Only name generation inside loop
     do  { traceIf (text "buildClass")
 
         ; tc_rep_name  <- newTyConRepName tycon_name
         ; let univ_tvs = binderVars binders
-              tycon = mkClassTyCon tycon_name binders roles
+              tycon = mkClassTyCon tycon_name kind binders roles
                                    AbstractTyCon
                                    rec_clas tc_rep_name
               result = mkAbstractClass tycon_name univ_tvs fds tycon

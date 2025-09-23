@@ -745,6 +745,8 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                  -- first, so there is no reason to suppose that the eta_tvs
                  -- (obtained from the pats) are at the end (#11148)
 
+             user_kind = mkTyConKind full_tcbs tc_res_kind
+
        -- Eta-expand the representation tycon until it has result
        -- kind `TYPE r`, for some `r`. If UnliftedNewtypes is not enabled, we
        -- go one step further and ensure that it has kind `TYPE 'LiftedRep`.
@@ -826,7 +828,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
 
                       -- NB: Use the full ty_binders from the pats. See bullet toward
                       -- the end of Note [Data type families] in GHC.Core.TyCon
-                    rep_tc   = mkAlgTyCon rep_tc_name
+                    rep_tc   = mkAlgTyCon rep_tc_name user_kind
                                           ty_binders res_kind
                                           (map (const Nominal) ty_binders)
                                           (fmap unLoc cType) stupid_theta

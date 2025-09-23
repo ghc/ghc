@@ -2,7 +2,7 @@ B :: forall k. k -> forall j. j -> Type
 D :: forall k. k -> Type
 N :: forall k. k -> Type
 S :: forall k. k -> Type
-C :: forall k. k -> Constraint
+C :: forall k1. k1 -> Constraint
 F :: forall k. k -> k
 U :: forall k (a :: k). Type
 Z :: forall k -> forall (a :: k). Type
