@@ -332,7 +332,6 @@ external prototype return neither of these types to workaround #11395.
    Other Stg stuff...
    -------------------------------------------------------------------------- */
 
-#include "stg/DLL.h"
 #include "stg/MachRegsForHost.h"
 #include "stg/Regs.h"
 #include "stg/Ticky.h"

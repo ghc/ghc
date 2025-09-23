@@ -358,7 +358,7 @@ typedef struct _RTS_FLAGS {
 } RTS_FLAGS;
 
 #if defined(COMPILING_RTS_MAIN)
-extern DLLIMPORT RTS_FLAGS RtsFlags;
+extern RTS_FLAGS RtsFlags;
 #elif IN_STG_CODE
 /* Note [RtsFlags is a pointer in STG code]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

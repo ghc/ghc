@@ -25,14 +25,14 @@
 #  define RTS_THUNK_INFO(i) extern const W_(i)[]
 #  define RTS_INFO(i)       extern const W_(i)[]
 #  define RTS_CLOSURE(i)    extern W_(i)[]
-#  define RTS_FUN_DECL(f)   extern DLL_IMPORT_RTS StgFunPtr f(void)
+#  define RTS_FUN_DECL(f)   extern StgFunPtr f(void)
 #else
-#  define RTS_RET_INFO(i)   extern DLL_IMPORT_RTS const StgRetInfoTable i
-#  define RTS_FUN_INFO(i)   extern DLL_IMPORT_RTS const StgFunInfoTable i
-#  define RTS_THUNK_INFO(i) extern DLL_IMPORT_RTS const StgThunkInfoTable i
-#  define RTS_INFO(i)       extern DLL_IMPORT_RTS const StgInfoTable i
-#  define RTS_CLOSURE(i)    extern DLL_IMPORT_RTS StgClosure i
-#  define RTS_FUN_DECL(f)   extern DLL_IMPORT_RTS StgFunPtr f(void)
+#  define RTS_RET_INFO(i)   extern const StgRetInfoTable i
+#  define RTS_FUN_INFO(i)   extern const StgFunInfoTable i
+#  define RTS_THUNK_INFO(i) extern const StgThunkInfoTable i
+#  define RTS_INFO(i)       extern const StgInfoTable i
+#  define RTS_CLOSURE(i)    extern StgClosure i
+#  define RTS_FUN_DECL(f)   extern StgFunPtr f(void)
 #endif
 
 #if defined(TABLES_NEXT_TO_CODE)
@@ -274,11 +274,11 @@ RTS_CLOSURE(stg_NO_TREC_closure);
 RTS_ENTRY(stg_NO_FINALIZER);
 
 #if IN_STG_CODE
-extern DLL_IMPORT_RTS StgWordArray stg_CHARLIKE_closure;
-extern DLL_IMPORT_RTS StgWordArray stg_INTLIKE_closure;
+extern StgWordArray stg_CHARLIKE_closure;
+extern StgWordArray stg_INTLIKE_closure;
 #else
-extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_CHARLIKE_closure[];
-extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_INTLIKE_closure[];
+extern StgIntCharlikeClosure stg_CHARLIKE_closure[];
+extern StgIntCharlikeClosure stg_INTLIKE_closure[];
 #endif
 
 /* StgStartup */

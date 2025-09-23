@@ -265,9 +265,9 @@ void _warnFail(const char *filename, unsigned int linenum);
 #include "rts/LibdwPool.h"
 
 /* Misc stuff without a home */
-DLL_IMPORT_RTS extern char **prog_argv; /* so we can get at these from Haskell */
-DLL_IMPORT_RTS extern int    prog_argc;
-DLL_IMPORT_RTS extern char  *prog_name;
+extern char **prog_argv; /* so we can get at these from Haskell */
+extern int    prog_argc;
+extern char  *prog_name;
 
 void reportStackOverflow(StgTSO* tso);
 void reportHeapOverflow(void);
