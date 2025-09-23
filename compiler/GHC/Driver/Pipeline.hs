@@ -432,7 +432,7 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
         --         * Either store .o files in ByteCodeObject <-- MP thinks this way
         --         * or Store ForeignStubs/ForeignSrcs in Linkable
         -- 3. Store ByteCodeObject in Linkable directly
-        let hackyMPtodo l = [ ByteCodeObject (linkableModule l) cbc [] NoStubs | cbc <- linkableBCOs l ]
+        let hackyMPtodo l = [ ByteCodeObject (linkableModule l) cbc [] | cbc <- linkableBCOs l ]
 
         let linkObjectLinkable action =
               checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink homeMod_object $ \linkables ->
@@ -494,7 +494,7 @@ checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink linkab
         let linkables = checkAllModulesHaveLinkable linkable_selector home_mods
         case linkables of
           -- MP: Use a proper error when not all modules have a linkable
-          Left missing -> pprPanic "checkLinkablesUpToDate" (ppr missing)
+          Left missing -> pprPanic "checkLinkablesUpToDate: todo, need proper error" (ppr missing)
           Right linkables -> do
             -- 2. Check that the linkables are up to date
             linking_needed <- linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
