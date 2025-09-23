@@ -3,6 +3,7 @@
 -- | Dynamic linker
 module GHC.Linker.Dynamic
    ( linkDynLib
+   , DynLinkMode(..)
    -- * Platform-specifics
    , libmLinkOpts
    )
@@ -27,9 +28,16 @@ import GHC.Utils.TmpFs
 
 import Control.Monad (when)
 import System.FilePath
+import GHC.Utils.Outputable
 
-linkDynLib :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
-linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
+data DynLinkMode = LinkingHomePackage -- | Creating a dynamic library for the home package
+                 | LinkingForInterpreter
+                    -- |^ Creating a shared library which will immediately be loaded by the interpreter
+                    -- this will not pass any package dependencies, and presume that the correct libraries are loaded in
+                    -- the correct order using dlopen.
+
+linkDynLib :: DynLinkMode -> Logger -> TmpFs -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
+linkDynLib mode logger tmpfs dflags0 unit_env o_files dep_packages
  = do
     let platform   = ue_platform unit_env
         arch       = platformArch platform
@@ -50,7 +58,9 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
         verbFlags = getVerbFlags dflags
         o_file = outputFile_ dflags
 
-    pkgs_with_rts <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_packages)
+    pkgs_with_rts <- case mode of
+      LinkingHomePackage -> mayThrowUnitErr (preloadUnitsInfo' unit_env dep_packages)
+      LinkingForInterpreter -> return []
 
     let pkg_lib_paths = collectLibraryDirs (ways dflags) pkgs_with_rts
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths

@@ -1168,7 +1168,7 @@ linkDynLibCheck logger tmpfs dflags unit_env o_files dep_units = do
       $ withPprStyle defaultUserStyle
       (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
       text "    Call hs_init_ghc() from your main() function to set these options.")
-  linkDynLib logger tmpfs dflags unit_env o_files dep_units
+  linkDynLib LinkingHomePackage logger tmpfs dflags unit_env o_files dep_units
 
 
 
