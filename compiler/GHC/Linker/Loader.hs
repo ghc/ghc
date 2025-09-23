@@ -926,7 +926,10 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib logger tmpfs dflags2 unit_env objs (loaded_pkg_uid <$> eltsUDFM pkgs_loaded)
+    -- Loading bytecode for mypkg
+    --- -l mypkg
+    -- This thinks we are creating shared library for main but we actually are for mypkg
+    linkDynLib LinkingForInterpreter logger tmpfs dflags2 unit_env objs (pprTraceIt "test" (map loaded_pkg_uid $ eltsUDFM pkgs_loaded))
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]

@@ -432,7 +432,7 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
         --         * Either store .o files in ByteCodeObject <-- MP thinks this way
         --         * or Store ForeignStubs/ForeignSrcs in Linkable
         -- 3. Store ByteCodeObject in Linkable directly
-        let hackyMPtodo l = [ ByteCodeObject (linkableModule l) cbc [] | cbc <- linkableBCOs l ]
+        let hackyMPtodo l = [ cbc | cbc <- linkableByteCodeObjects l ]
 
         let linkObjectLinkable action =
               checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink homeMod_object $ \linkables ->

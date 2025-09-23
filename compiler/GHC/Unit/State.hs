@@ -47,6 +47,7 @@ module GHC.Unit.State (
 
         closeUnitDeps,
         closeUnitDeps',
+        closeUnitDepsInfo,
         mayThrowUnitErr,
 
         -- * Module hole substitution
@@ -2024,6 +2025,11 @@ listVisibleModuleNames :: UnitState -> [ModuleName]
 listVisibleModuleNames state =
     map fst (filter visible (nonDetUniqMapToList (moduleNameProvidersMap state)))
   where visible (_, ms) = anyUniqMap originVisible ms
+
+closeUnitDepsInfo :: UnitState -> [UnitId] -> MaybeErr UnitErr [UnitInfo]
+closeUnitDepsInfo unit_state ids =
+  let res = closeUnitDeps' (unitInfoMap unit_state) [] (zip ids (repeat Nothing))
+  in map (unsafeLookupUnitId unit_state) <$> res
 
 -- | Takes a list of UnitIds (and their "parent" dependency, used for error
 -- messages), and returns the list with dependencies included, in reverse

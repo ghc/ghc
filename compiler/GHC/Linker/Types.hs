@@ -40,6 +40,7 @@ module GHC.Linker.Types
    , linkableFiles
    , linkableBCOs
    , linkablePartBCOs
+   , linkableByteCodeObjects
    , linkableNativeParts
    , linkablePartitionParts
    , linkablePartPath
@@ -360,6 +361,9 @@ linkableIsNativeCodeOnly l = all isNativeCode (NE.toList (linkableParts l))
 -- This excludes the CoreBindings parts
 linkableBCOs :: Linkable -> [CompiledByteCode]
 linkableBCOs l = [ bco_compiled_byte_code bco | BCOs bco <- NE.toList (linkableParts l) ]
+
+linkableByteCodeObjects :: Linkable -> [ByteCodeObject]
+linkableByteCodeObjects l = [ bco | BCOs bco <- NE.toList (linkableParts l) ]
 
 -- | List the native linkable parts (.o/.so/.dll) of a linkable
 linkableNativeParts :: Linkable -> [LinkablePart]
