@@ -607,12 +607,10 @@ library
 -- undefined symbols by default, but Apple's "cctools" linker is not. To appease
 -- that linker we either need to do a blanket `-undefined dynamic_lookup` or
 -- whitelist each such symbol with an additional `-U` (see the man page for more
--- details).
---
--- GHC already does `-undefined dynamic_lookup`, so we just do that for now, but
--- we might try to get more precise with `-U` in the future.
+-- details). In macOS 26, `-undefined dynamic_lookup` stopped working, so now
+-- we simply add the latter in the `rts`'s `.buildinfo` file near the `-u`s.
 --
 -- Note that the RTS also `-u`s some symbols for atomic operations that *are* defined
--- by `ghc-internal`. This is needed when the RTS is compiled when the RTS is
--- compiled with, e.g., the unregisterised backend since the code-generator will
--- reference these symbols when compiling atomic primops in Cmm sources.
+-- by `ghc-internal`. This is needed when the RTS is compiled with, e.g., the
+-- unregisterised backend since the code-generator will reference these symbols
+-- when compiling atomic primops in Cmm sources.
