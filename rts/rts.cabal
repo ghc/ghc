@@ -584,6 +584,18 @@ library
 -- usages in the RTS to definitions in those libraries get the `-u` flag in the
 -- RTS.
 --
+-- `ld-options: -Wl,-u,...` ensures that whichever order the libs are passed in
+-- when linking an executable against the rts (NOT when building the rts
+-- library!!), the symbols the RTS depends on are resolved as soon as the lib
+-- with the definitions is processed by the linker. For instance, if the
+-- executable linking invocation looks like: `-lHSghc-internal -lHSrts`,
+-- references from rts to ghc-internal would be unresolved by default because
+-- ghc-internal is processed first. With:
+-- `-Wl,-u,<known_rts_ref_to_ghc_internal>,... -lHSghc-internal -lHSrts` we
+-- guarantee the "known_rts_ref_to_ghc_internal" symbol is resolved straight
+-- away when processing `libHSghc-internal`, and thus all "reverse"
+-- dependencies are resolved when we get to the `libHSrts`.
+--
 -- The symbols are specified literally, but follow C ABI conventions (as all 3 of
 -- C, C--, and Haskell do currently). Thus, we have to be careful to include a
 -- leading underscore or not based on those conventions for the given platform in
