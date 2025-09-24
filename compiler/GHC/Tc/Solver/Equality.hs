@@ -39,7 +39,7 @@ import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Core
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Types.Var.Set( anyVarSet )
+import GHC.Types.Var.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
 
@@ -544,7 +544,7 @@ can_eq_nc_forall ev eq_rel s1 s2
       -- Generate the constraints that live in the body of the implication
       -- See (SF5) in Note [Solving forall equalities]
       ; (unifs, (lvl, (all_co, wanteds)))
-             <- reportFindGrainUnifications           $
+             <- reportFineGrainUnifications           $
                 pushLevelNoWorkList (ppr skol_info)   $
                 wrapUnifier ev (eqRelRole eq_rel) $ \uenv ->
                 go uenv skol_tvs init_subst2 bndrs1 bndrs2
@@ -1695,13 +1695,13 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
                  else
 
                -- Emit the deferred constraints
-            do { emitChildEqs eqs
+            do { emitChildEqs ev eqs
 
-               ; assertPpr (not (isEmptyCts cts)) (ppr ev $$ ppr ki1 $$ ppr ki2) $
+               ; assertPpr (not (isEmptyCts eqs)) (ppr ev $$ ppr ki1 $$ ppr ki2) $
                    -- assert: the constraints won't be empty because the two kinds differ,
                    -- and there are no unifications, so we must have emitted one or
                    -- more constraints
-                finish (rewriterSetFromCts cts) kind_co }}
+                finish (rewriterSetFromCts eqs) kind_co }}
                          -- rewriterSetFromCts: record in the /type/ unification xi1~xi2 that
                          -- it has been rewritten by any (unsolved) constraints in `cts`; that
                          -- stops xi1~xi2 from unifying until `cts` are solved. See (EIK2).

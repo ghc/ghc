@@ -32,6 +32,7 @@ import GHC.Core.TyCo.Subst( elemSubst )
 import GHC.Builtin.Types.Literals( tryInteractTopFam, tryInteractInertFam )
 
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

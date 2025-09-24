@@ -41,7 +41,7 @@ import GHC.Types.Id(  idType )
 import GHC.Types.Var( EvVar, tyVarKind )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Basic ( IntWithInf, mulWithInf, intGtLimit )
+import GHC.Types.Basic ( IntWithInf, intGtLimit )
 import GHC.Types.Unique.Set( nonDetStrictFoldUniqSet )
 
 import GHC.Data.Bag
@@ -119,24 +119,28 @@ simplify_loop n limit definitely_redo_implications
                             , int (lengthBag simples) <+> text "simples to solve" ])
        ; traceTcS "simplify_loop: wc =" (ppr wc)
 
-       ; (unif_happened, wc1) <- reportCoarseGrainUnifications $  -- See Note [Superclass iteration]
-                                 solveSimpleWanteds simples
+       ; (simple_unif_happened, wc1)
+             <- reportCoarseGrainUnifications $  -- See Note [Superclass iteration]
+                solveSimpleWanteds simples
                 -- Any insoluble constraints are in 'simples' and so get rewritten
                 -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
 
        -- Next, solve implications from wc_impl
-       ; implics' <- if not (definitely_redo_implications  -- See Note [Superclass iteration]
-                            || unif_happened)              -- for this conditional
-                    then return implics
-                    else solveNestedImplications implics
+       ; (impl_unif_happened, implics')
+             <- if not (definitely_redo_implications   -- See Note [Superclass iteration]
+                        || simple_unif_happened)       -- for this conditional
+                then return (False, implics)
+                else reportCoarseGrainUnifications $
+                     solveNestedImplications implics
 
        ; let wc' = wc1 { wc_impl = wc_impl wc1 `unionBags` implics' }
 
-       -- See Note [When to iterate the solver: unifications]
-       ; unif_happened <- getUnificationFlag
-       ; csTraceTcS $ text "unif_happened" <+> ppr unif_happened
+       ; csTraceTcS $ text "unif_happened" <+> ppr impl_unif_happened
 
-       ; maybe_simplify_again (n+1) limit unif_happened wc' }
+         -- We iterate the loop only if the /implications/ did some relevant
+         -- unification.  Even if the /simples/ did unifications we don't need
+         -- to re-do them.
+       ; maybe_simplify_again (n+1) limit impl_unif_happened wc' }
 
 data NextAction
   = NA_Stop                 -- Just return the WantedConstraints
@@ -1115,16 +1119,15 @@ solveSimpleWanteds simples
               , text "Wanteds to solve:" <+> ppr simples ]
 
        ; let wc = emptyWC { wc_simple = simples }
-       ; wc' <- iterateToFixpoint max_iter
-                  (do_solve_and_plugins max_iter) wc
+       ; wc' <- iterateToFixpoint max_iter do_solve_and_plugins wc
 
        ; traceTcS "solveSimpleWanteds end }" $
              vcat [ text "residual =" <+> ppr wc' ]
 
        ; return wc' }
   where
-    do_solve_and_plugins :: IntWithInf -> WantedConstraints -> TcS (Bool,WantedConstraints)
-    do_solve_and_plugins max_iter wc
+    do_solve_and_plugins :: WantedConstraints -> TcS (Bool,WantedConstraints)
+    do_solve_and_plugins wc
       = do { wc1 <- simple_solver wc
            ; (rerun_plugin, simples2) <- runTcPluginsWanted (wc_simple wc1)
            ; return (rerun_plugin, wc1 { wc_simple = simples2 }) }
@@ -1135,7 +1138,7 @@ solveSimpleWanteds simples
     -- The result is not necessarily zonked
     simple_solver wc@(WC { wc_simple = simples, wc_impl = implics })
       | isEmptyBag simples
-      = return (False, wc)
+      = return wc
       | otherwise
       = nestTcS $
         do { solveSimples simples
