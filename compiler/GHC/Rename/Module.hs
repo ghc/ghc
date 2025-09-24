@@ -58,11 +58,10 @@ import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.Basic  ( VisArity, TyConFlavour(..), TypeOrKind(..), RuleName )
+import GHC.Types.Basic  ( TyConFlavour(..), TypeOrKind(..), RuleName )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
 import GHC.Types.Hint (SigLike(..))
 import GHC.Types.Unique.Set
-import Language.Haskell.Textual.Location as SrcLoc
 
 import GHC.Driver.DynFlags
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
@@ -78,6 +77,8 @@ import GHC.Data.Graph.Directed ( SCC, flattenSCC, Node(..)
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.DataCon ( isSrcStrict )
+
+import Language.Haskell.Textual.Location as SrcLoc
 
 import Control.Monad
 import Control.Arrow ( first )

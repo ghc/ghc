@@ -93,7 +93,9 @@ module GHC.Utils.Outputable (
         pprUnhelpfulSpanReason, pprUserRealSpan, pprUserSpan,
 
         pprLocated, pprLocatedAlways,
-        
+
+        pprHsDocString, pprHsDocStrings, pprWithDocString,
+
         -- * Controlling the style in which output is printed
         PprStyle(..), NamePprCtx(..),
         QueryQualifyName, QueryQualifyModule, QueryQualifyPackage, QueryPromotionTick,
@@ -127,8 +129,8 @@ import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 
 import GHC.Prelude.Basic
 
-import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
-import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
+import {-# SOURCE #-} GHC.Unit.Types ( Unit, Module, moduleName )
+import {-# SOURCE #-} GHC.Types.Name.Occurrence( OccName )
 
 import GHC.Utils.BufHandle (BufHandle, bPutChar, bPutStr, bPutFS, bPutFZS)
 import GHC.Data.FastString
@@ -159,7 +161,7 @@ import Text.Printf
 import Numeric (showFFloat)
 import Numeric.Natural (Natural)
 import Data.Graph (SCC(..))
-import Data.List (intersperse)
+import Data.List (intercalate, intersperse)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Semigroup (Arg(..))
 import qualified Data.List.NonEmpty as NEL
@@ -173,8 +175,13 @@ import GHC.Show         ( showMultiLineString )
 import GHC.Utils.Exception
 import GHC.Exts (oneShot)
 
+import Language.Haskell.Syntax.Binds
 import Language.Haskell.Textual.Source (FractionalLit(..), IntegralLit(..), StringLiteral(..))
 import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Documentation
+--import Language.Haskell.Textual.Documentation.String
+--import Language.Haskell.Textual.Documentation.String (printDecorator)
+--import {-# SOURCE #-} Language.Haskell.Textual.Documentation.String (printDecorator)
 import Language.Haskell.Textual.Location
 import Language.Haskell.Textual.UTF8
 
@@ -1219,7 +1226,7 @@ instance (Outputable e) => Outputable (Located e) where
                 -- Print spans without the file name etc
                 whenPprDebug (braces (pprUserSpan False l))
              $$ ppr e
-                
+
 instance (Outputable e) => Outputable (GenLocated RealSrcSpan e) where
   ppr (L l e) = -- GenLocated:
                 -- Print spans without the file name etc
@@ -1952,12 +1959,12 @@ but:
 -}
 
 -- | Represents a single line of output that can be efficiently printed directly
--- to a 'System.IO.Handle' (actually a 'BufHandle').
+-- to a 'System.IHandle' (actually a 'BufHandle').
 -- See Note [SDoc versus HDoc] and Note [HLine versus HDoc] for more details.
 newtype HLine = HLine' { runHLine :: SDocContext -> BufHandle -> IO () }
 
 -- | Represents a (possibly empty) sequence of lines that can be efficiently
--- printed directly to a 'System.IO.Handle' (actually a 'BufHandle').
+-- printed directly to a 'System.IHandle' (actually a 'BufHandle').
 -- See Note [SDoc versus HDoc] and Note [HLine versus HDoc] for more details.
 newtype HDoc = HDoc' { runHDoc :: SDocContext -> BufHandle -> IO () }
 
@@ -2144,3 +2151,87 @@ instance IsDoc HDoc where
   {-# INLINE CONLIKE ($$) #-}
   dualDoc _ h = h
   {-# INLINE CONLIKE dualDoc #-}
+
+{-
+instance Outputable DocStructureItem where
+  ppr = \case
+    DsiSectionHeading level doc -> vcat
+      [ text "section heading, level" <+> ppr level <> colon
+      , nest 2 (pprHsDocDebug doc)
+      ]
+    DsiDocChunk doc -> vcat
+      [ text "documentation chunk:"
+      , nest 2 (pprHsDocDebug doc)
+      ]
+    DsiNamedChunkRef name ->
+      text "reference to named chunk:" <+> text name
+    DsiExports avails ->
+      text "avails:" $$ nest 2 (ppr avails)
+    DsiModExport mod_names avails ->
+      text "re-exported module(s):" <+> ppr mod_names $$ nest 2 (ppr avails)
+
+instance Outputable Docs where
+  ppr docs =
+      vcat
+        [ pprField (pprMaybe pprHsDocDebug) "module header" docs_mod_hdr
+        , pprField (ppr . fmap pprHsDocDebug) "export docs" docs_exports
+        , pprField (ppr . fmap (ppr . map pprHsDocDebug)) "declaration docs" docs_decls
+        , pprField (ppr . fmap (pprIntMap ppr pprHsDocDebug)) "arg docs" docs_args
+        , pprField (vcat . map ppr) "documentation structure" docs_structure
+        , pprField (pprMap (doubleQuotes . text) pprHsDocDebug) "named chunks"
+                   docs_named_chunks
+        , pprField pprMbString "haddock options" docs_haddock_opts
+        , pprField ppr "language" docs_language
+        , pprField (vcat . map ppr . EnumSet.toList) "language extensions"
+                   docs_extensions
+        ]
+    where
+      pprField :: (a -> SDoc) -> String -> (Docs -> a) -> SDoc
+      pprField ppr' heading lbl =
+        text heading <> colon $$ nest 2 (ppr' (lbl docs))
+      pprMap pprKey pprVal m =
+        vcat $ flip map (M.toList m) $ \(k, v) ->
+          pprKey k <> colon $$ nest 2 (pprVal v)
+      pprIntMap pprKey pprVal m =
+        vcat $ flip map (IM.toList m) $ \(k, v) ->
+          pprKey k <> colon $$ nest 2 (pprVal v)
+      pprMbString Nothing = empty
+      pprMbString (Just s) = text s
+      pprMaybe ppr' = \case
+        Nothing -> text "Nothing"
+        Just x -> text "Just" <+> ppr' x
+-}
+instance Outputable HsDocString where
+  ppr = text . renderHsDocString
+
+instance Outputable HsDocStringDecorator where
+  ppr = text . printDecorator
+
+instance Outputable HsDocStringChunk where
+  ppr (HsDocStringChunk utf8) =  text $ decodeUTF8 utf8
+
+instance Outputable a => Outputable (WithHsDocIdentifiers a pass) where
+  ppr (WithHsDocIdentifiers s _ids) = ppr s
+
+instance Outputable CompilerPhase where
+   ppr (Phase n)    = int n
+   ppr InitialPhase = text "initial"
+   ppr FinalPhase   = text "final"
+
+-- | Annotate a pretty printed thing with its doc
+-- The docstring comes after if is 'HsDocStringPrevious'
+-- Otherwise it comes before.
+-- Note - we convert MultiLineDocString HsDocStringPrevious to HsDocStringNext
+-- because we can't control if something else will be pretty printed on the same line
+pprWithDocString :: HsDocString -> SDoc -> SDoc
+pprWithDocString  (MultiLineDocString HsDocStringPrevious ds) sd = pprWithDocString (MultiLineDocString HsDocStringNext ds) sd
+pprWithDocString doc@(NestedDocString HsDocStringPrevious  _) sd = sd <+> pprHsDocString doc
+pprWithDocString doc sd = pprHsDocString doc $+$ sd
+
+-- | Pretty print with decorators, exactly as the user wrote it
+pprHsDocString :: HsDocString -> SDoc
+pprHsDocString = text . exactPrintHsDocString
+
+pprHsDocStrings :: [HsDocString] -> SDoc
+pprHsDocStrings = text . intercalate "\n\n" . map exactPrintHsDocString
+

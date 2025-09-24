@@ -49,11 +49,10 @@ where
 import GHC.Prelude
 
 import GHC.Data.FastString (FastString, mkFastString, unpackFS)
-import GHC.Types.SourceText
+import GHC.Types.SourceText (pprWithSourceTextThen)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Env
 import GHC.Types.Name (Name)
-import Language.Haskell.Textual.Location
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Hs.Doc
@@ -66,6 +65,7 @@ import GHC.Unicode
 
 import Language.Haskell.Syntax.Extension
 import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.Location
 
 import Data.Data
 import Data.List (isPrefixOf)
@@ -122,7 +122,7 @@ the possibility of them being infinite.
 data InWarningCategory
   = InWarningCategory
     { iwc_in :: !(EpToken "in"),
-      iwc_st :: !SourceText,
+      iwc_st :: !Source.CodeSnippet,
       iwc_wc :: (LocatedE WarningCategory)
     } deriving Data
 
@@ -207,11 +207,11 @@ data WarningTxt pass
       (Maybe (LocatedE InWarningCategory))
         -- ^ Warning category attached to this WARNING pragma, if any;
         -- see Note [Warning categories]
-      SourceText
-      [LocatedE (WithHsDocIdentifiers StringLiteral pass)]
+      Source.CodeSnippet
+      [LocatedE (WithHsDocIdentifiers Source.StringLiteral pass)]
    | DeprecatedTxt
-      SourceText
-      [LocatedE (WithHsDocIdentifiers StringLiteral pass)]
+      Source.CodeSnippet
+      [LocatedE (WithHsDocIdentifiers Source.StringLiteral pass)]
   deriving Generic
 
 -- | To which warning category does this WARNING or DEPRECATED pragma belong?
@@ -221,7 +221,7 @@ warningTxtCategory (WarningTxt (Just (L _ (InWarningCategory _  _ (L _ cat)))) _
 warningTxtCategory _ = defaultWarningCategory
 
 -- | The message that the WarningTxt was specified to output
-warningTxtMessage :: WarningTxt p -> [LocatedE (WithHsDocIdentifiers StringLiteral p)]
+warningTxtMessage :: WarningTxt p -> [LocatedE (WithHsDocIdentifiers Source.StringLiteral p)]
 warningTxtMessage (WarningTxt _ _ m) = m
 warningTxtMessage (DeprecatedTxt _ m) = m
 
@@ -232,7 +232,7 @@ warningTxtSame w1 w2
   && literal_message w1 == literal_message w2
   && same_type
   where
-    literal_message :: WarningTxt p -> [StringLiteral]
+    literal_message :: WarningTxt p -> [Source.StringLiteral]
     literal_message = map (hsDocString . unLoc) . warningTxtMessage
     same_type | DeprecatedTxt {} <- w1, DeprecatedTxt {} <- w2 = True
               | WarningTxt {} <- w1, WarningTxt {} <- w2       = True
@@ -259,7 +259,7 @@ instance Outputable (WarningTxt pass) where
     ppr (DeprecatedTxt lsrc  ds)
       = pprWithSourceTextThen lsrc (pp_ws ds) $ pp_ws ds <+> text "#-}"
 
-pp_ws :: [LocatedE (WithHsDocIdentifiers StringLiteral pass)] -> SDoc
+pp_ws :: [LocatedE (WithHsDocIdentifiers Source.StringLiteral pass)] -> SDoc
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws
   = text "["
@@ -269,7 +269,7 @@ pp_ws ws
 
 pprWarningTxtForMsg :: WarningTxt p -> SDoc
 pprWarningTxtForMsg warn =
-  let pprWarn = doubleQuotes . vcat . map (ppr . sl_fs . hsDocString . unLoc)
+  let pprWarn = doubleQuotes . vcat . map (ppr . Source.sl_fs . hsDocString . unLoc)
   in  case warn of
         DeprecatedTxt _ ds -> text "Deprecated:" <+>
                               pprWarn ds

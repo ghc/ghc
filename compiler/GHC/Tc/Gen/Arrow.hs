@@ -15,13 +15,13 @@ module GHC.Tc.Gen.Arrow ( tcProc ) where
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcInferRho, tcSyntaxOp
-                                       , tcCheckPolyExpr )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr ( tcCheckMonoExpr, tcInferRho, tcSyntaxOp
+                                        , tcCheckPolyExpr )
 
 import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Match
-import GHC.Tc.Gen.Head( tcCheckId )
+import GHC.Tc.Gen.Head ( tcCheckId )
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
@@ -34,16 +34,16 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion
-import GHC.Types.Id( mkLocalId )
+import GHC.Types.Id ( mkLocalId )
 import GHC.Tc.Utils.Instantiate
 import GHC.Builtin.Types
 import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
-import GHC.Types.Basic( Arity )
-import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+
+import Language.Haskell.Textual.Location
 
 import Control.Monad
 

@@ -94,7 +94,7 @@ GHC.Hs.Basic
 GHC.Hs.Binds
 GHC.Hs.Decls
 GHC.Hs.Doc
-GHC.Hs.DocString
+Language.Haskell.Textual.Documentation.String
 GHC.Hs.Expr
 GHC.Hs.Extension
 GHC.Hs.ImpExp

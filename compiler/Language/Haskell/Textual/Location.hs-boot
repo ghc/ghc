@@ -14,122 +14,90 @@ module Language.Haskell.Textual.Location (
         -- * SrcLoc
         RealSrcLoc,             -- Abstract
         SrcLoc(..),
-        -- ** Accessors
-        srcSpanFile,
-        srcSpanSLine,
-        srcSpanSCol,
-        srcSpanELine,
-        srcSpanECol,
-
-        -- ** Constructing SrcLoc
-        mkSrcLoc, mkRealSrcLoc, mkGeneralSrcLoc,
-        leftmostColumn,
-
-        noSrcLoc,               -- "I'm sorry, I haven't a clue"
-        generatedSrcLoc,        -- Code generated within the compiler
-        interactiveSrcLoc,      -- Code from an interactive session
-
-        advanceSrcLoc,
-        advanceBufPos,
-
-        -- ** Unsafely deconstructing SrcLoc
-        -- These are dubious exports, because they crash on some inputs
-        srcLocFile,             -- return the file name part
-        srcLocLine,             -- return the line part
-        srcLocCol,              -- return the column part
-
-        -- * SrcSpan
         RealSrcSpan,            -- Abstract
         SrcSpan(..),
         UnhelpfulSpanReason(..),
-
-        -- ** Constructing SrcSpan
-        mkGeneralSrcSpan, mkSrcSpan, mkRealSrcSpan,
-        noSrcSpan, generatedSrcSpan, isGeneratedSrcSpan,
-        wiredInSrcSpan,         -- Something wired into the compiler
-        interactiveSrcSpan,
-        srcLocSpan, realSrcLocSpan,
-        combineSrcSpans,
-        srcSpanFirstCharacter,
-
-        -- ** Deconstructing SrcSpan
-        srcSpanStart, srcSpanEnd,
-        realSrcSpanStart, realSrcSpanEnd,
-        srcSpanFileName_maybe,
-        unhelpfulSpanText,
-        srcSpanToRealSrcSpan,
-
-        -- ** Unsafely deconstructing SrcSpan
-        -- These are dubious exports, because they crash on some inputs
-        srcSpanStartLine, srcSpanEndLine,
-        srcSpanStartCol, srcSpanEndCol,
-
-        -- ** Predicates on SrcSpan
-        isGoodSrcSpan, isOneLineSpan, isOneLineRealSpan,
-        isZeroWidthSpan, containsSpan, isNoSrcSpan, 
-
-        -- ** Predicates on RealSrcSpan
-        isPointRealSpan,
-
-        -- * StringBuffer locations
         BufPos(..),
-        getBufPos,
         BufSpan(..),
-        getBufSpan,
-        removeBufSpan,
-        combineBufSpans,
-
         -- * Located
         Located,
         RealLocated,
         GenLocated(..),
-
-        -- ** Constructing Located
-        noLoc,
-        mkGeneralLocated,
-
-        -- ** Deconstructing Located
-        getLoc, unLoc,
-        unRealSrcSpan, getRealSrcSpan,
-
-        -- ** Combining and comparing Located values
-        eqLocated, cmpLocated, cmpBufSpan,
-        combineLocs, addCLoc,
-        leftmost_smallest, leftmost_largest, rightmost_smallest,
-        spans, isSubspanOf, isRealSubspanOf,
-        sortLocated, sortRealLocated,
-        lookupSrcLoc, lookupSrcSpan,
-
-        -- * Parser locations
-        PsLoc(..),
-        PsSpan(..),
-        PsLocated,
-        advancePsLoc,
-        mkPsSpan,
-        psSpanStart,
-        psSpanEnd,
-        mkSrcSpanPs,
-        combineRealSrcSpans,
-        psLocatedToLocated,
-
-        -- * Exact print locations
-        EpaLocation'(..), NoCommentsLocation, NoComments(..),
-        DeltaPos(..), deltaPos, getDeltaLine,
     ) where
 
 import Prelude
-
-import GHC.Utils.Misc -- TODO Remove later
-
-import Control.DeepSeq
-import Data.Bits
-import Data.Data
-import Data.List (sortBy, intercalate)
-import Data.Function (on)
-import qualified Data.Map as Map
-import qualified Data.Semigroup as S
-
 import Language.Haskell.Textual.UTF8
+
+data GenLocated l e = L l e
+
+type Located = GenLocated SrcSpan
+type RealLocated = GenLocated RealSrcSpan
+
+data SrcSpan =
+    RealSrcSpan !RealSrcSpan !(Maybe BufSpan)  -- See Note [Why Maybe BufPos]
+  | UnhelpfulSpan !UnhelpfulSpanReason
+
+data RealSrcSpan
+  = RealSrcSpan'
+        { srcSpanFile     :: !TextUTF8,
+          srcSpanSLine    :: {-# UNPACK #-} !Int,
+          srcSpanSCol     :: {-# UNPACK #-} !Int,
+          srcSpanELine    :: {-# UNPACK #-} !Int,
+          srcSpanECol     :: {-# UNPACK #-} !Int
+        }
+
+newtype BufPos = BufPos { bufPos :: Int }
+
+data BufSpan =
+  BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
+
+data UnhelpfulSpanReason
+  = UnhelpfulNoLocationInfo
+  | UnhelpfulWiredIn
+  | UnhelpfulInteractive
+  | UnhelpfulGenerated
+  | UnhelpfulOther !TextUTF8
+
+data RealSrcLoc
+  = SrcLoc      TextUTF8           -- A precise location (file name)
+                {-# UNPACK #-} !Int -- line number, begins at 1
+                {-# UNPACK #-} !Int -- column number, begins at 1
+
+data SrcLoc
+  = RealSrcLoc !RealSrcLoc !(Maybe BufPos)  -- See Note [Why Maybe BufPos]
+  | UnhelpfulLoc !TextUTF8     -- Just a general indication
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{-
+
+
+
+
 
 {-
 ************************************************************************
@@ -351,18 +319,6 @@ data RealSrcSpan
           srcSpanECol     :: {-# UNPACK #-} !Int
         }
   deriving Eq
-
-instance Data RealSrcSpan where
-  -- don't traverse?
-  toConstr _   = abstractConstr "RealSrcSpan"
-  gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNoRepType "RealSrcSpan"
-
-instance Data SrcSpan where
-  -- don't traverse?
-  toConstr _   = abstractConstr "SrcSpan"
-  gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNoRepType "SrcSpan"
 
 data BufSpan =
   BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
@@ -665,23 +621,6 @@ unhelpfulSpanText r = case r of
   UnhelpfulInteractive    -> "<interactive>"
   UnhelpfulGenerated      -> "<generated>"
 
-{-
-************************************************************************
-*                                                                      *
-\subsection[Located]{Attaching SrcSpans to things}
-*                                                                      *
-************************************************************************
--}
-
--- | We attach SrcSpans to lots of things, so let's have a datatype for it.
-data GenLocated l e = L l e
-  deriving (Eq, Ord, Show, Data, Functor, Foldable, Traversable)
-instance (NFData l, NFData e) => NFData (GenLocated l e) where
-  rnf (L l e) = rnf l `seq` rnf e
-
-type Located = GenLocated SrcSpan
-type RealLocated = GenLocated RealSrcSpan
-
 unLoc :: GenLocated l e -> e
 unLoc (L _ e) = e
 
@@ -716,7 +655,7 @@ cmpLocated a b = unLoc a `compare` unLoc b
 -- | Compare the 'BufSpan' of two located things.
 --
 -- Precondition: both operands have an associated 'BufSpan'.
-cmpBufSpan :: Located a -> Located a -> Ordering
+cmpBufSpan :: HasDebugCallStack => Located a -> Located a -> Ordering
 cmpBufSpan (L l1 _) (L l2  _)
   | Just a <- getBufSpan l1
   , Just b <- getBufSpan l2
@@ -862,3 +801,5 @@ deltaPos l c = case l of
 getDeltaLine :: DeltaPos -> Int
 getDeltaLine (SameLine _) = 0
 getDeltaLine (DifferentLine r _) = r
+
+-}

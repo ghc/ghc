@@ -45,7 +45,6 @@ import GHC.Iface.Env    ( newGlobalBinder )
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Name.Reader
 import GHC.Types.Fixity
-import GHC.Types.Basic
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set (elemVarSet)
 

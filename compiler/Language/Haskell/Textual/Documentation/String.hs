@@ -3,7 +3,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module GHC.Hs.DocString
+module Language.Haskell.Textual.Documentation.String
   ( LHsDocString
   , HsDocString(..)
   , HsDocStringDecorator(..)
@@ -13,30 +13,26 @@ module GHC.Hs.DocString
   , unpackHDSC
   , mkHsDocStringChunk
   , mkHsDocStringChunkUtf8ByteString
-  , pprHsDocString
-  , pprHsDocStrings
   , mkGeneratedHsDocString
   , docStringChunks
   , renderHsDocString
   , renderHsDocStrings
   , exactPrintHsDocString
-  , pprWithDocString
   , printDecorator
   ) where
 
-import GHC.Prelude
+import Prelude
 
-import GHC.Utils.Binary
-import GHC.Utils.Encoding
-import GHC.Utils.Outputable as Outputable hiding ((<>))
-import Language.Haskell.Textual.Location
 import Control.DeepSeq
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 import Data.Data
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List (intercalate)
+
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 
 type LHsDocString = Located HsDocString
 
@@ -60,45 +56,10 @@ data HsDocString
      -- not form a valid 'NestedDocString'
   deriving (Eq, Data, Show)
 
-instance Outputable HsDocString where
-  ppr = text . renderHsDocString
-
 instance NFData HsDocString where
   rnf (MultiLineDocString a b) = rnf a `seq` rnf b
   rnf (NestedDocString a b) = rnf a `seq` rnf b
   rnf (GeneratedDocString a) = rnf a
-
--- | Annotate a pretty printed thing with its doc
--- The docstring comes after if is 'HsDocStringPrevious'
--- Otherwise it comes before.
--- Note - we convert MultiLineDocString HsDocStringPrevious to HsDocStringNext
--- because we can't control if something else will be pretty printed on the same line
-pprWithDocString :: HsDocString -> SDoc -> SDoc
-pprWithDocString  (MultiLineDocString HsDocStringPrevious ds) sd = pprWithDocString (MultiLineDocString HsDocStringNext ds) sd
-pprWithDocString doc@(NestedDocString HsDocStringPrevious  _) sd = sd <+> pprHsDocString doc
-pprWithDocString doc sd = pprHsDocString doc $+$ sd
-
-
-instance Binary HsDocString where
-  put_ bh x = case x of
-    MultiLineDocString dec xs -> do
-      putByte bh 0
-      put_ bh dec
-      put_ bh $ BinLocated <$> xs
-    NestedDocString dec x -> do
-      putByte bh 1
-      put_ bh dec
-      put_ bh $ BinLocated x
-    GeneratedDocString x -> do
-      putByte bh 2
-      put_ bh x
-  get bh = do
-    tag <- getByte bh
-    case tag of
-      0 -> MultiLineDocString <$> get bh <*> (fmap unBinLocated <$> get bh)
-      1 -> NestedDocString <$> get bh <*> (unBinLocated <$> get bh)
-      2 -> GeneratedDocString <$> get bh
-      t -> fail $ "HsDocString: invalid tag " ++ show t
 
 data HsDocStringDecorator
   = HsDocStringNext -- ^ '|' is the decorator
@@ -106,9 +67,6 @@ data HsDocStringDecorator
   | HsDocStringNamed !String -- ^ '$<string>' is the decorator
   | HsDocStringGroup !Int -- ^ The decorator is the given number of '*'s
   deriving (Eq, Ord, Show, Data)
-
-instance Outputable HsDocStringDecorator where
-  ppr = text . printDecorator
 
 instance NFData HsDocStringDecorator where
   rnf HsDocStringNext = ()
@@ -122,47 +80,25 @@ printDecorator HsDocStringPrevious = "^"
 printDecorator (HsDocStringNamed n) = '$':n
 printDecorator (HsDocStringGroup n) = replicate n '*'
 
-instance Binary HsDocStringDecorator where
-  put_ bh x = case x of
-    HsDocStringNext -> putByte bh 0
-    HsDocStringPrevious -> putByte bh 1
-    HsDocStringNamed n -> putByte bh 2 >> put_ bh n
-    HsDocStringGroup n -> putByte bh 3 >> put_ bh n
-  get bh = do
-    tag <- getByte bh
-    case tag of
-      0 -> pure HsDocStringNext
-      1 -> pure HsDocStringPrevious
-      2 -> HsDocStringNamed <$> get bh
-      3 -> HsDocStringGroup <$> get bh
-      t -> fail $ "HsDocStringDecorator: invalid tag " ++ show t
-
 type LHsDocStringChunk = Located HsDocStringChunk
 
 -- | A contiguous chunk of documentation
-newtype HsDocStringChunk = HsDocStringChunk ByteString
+newtype HsDocStringChunk = HsDocStringChunk TextUTF8
   deriving stock (Eq,Ord,Data, Show)
   deriving newtype (NFData)
 
-instance Binary HsDocStringChunk where
-  put_ bh (HsDocStringChunk bs) = put_ bh bs
-  get bh = HsDocStringChunk <$> get bh
-
-instance Outputable HsDocStringChunk where
-  ppr = text . unpackHDSC
-
 mkHsDocStringChunk :: String -> HsDocStringChunk
-mkHsDocStringChunk s = HsDocStringChunk (utf8EncodeByteString s)
+mkHsDocStringChunk = HsDocStringChunk . encodeUTF8
 
 -- | Create a 'HsDocString' from a UTF8-encoded 'ByteString'.
 mkHsDocStringChunkUtf8ByteString :: ByteString -> HsDocStringChunk
-mkHsDocStringChunkUtf8ByteString = HsDocStringChunk
+mkHsDocStringChunkUtf8ByteString = HsDocStringChunk . unsafeFromShortByteString . SBS.toShort
 
 unpackHDSC :: HsDocStringChunk -> String
-unpackHDSC (HsDocStringChunk bs) = utf8DecodeByteString bs
+unpackHDSC (HsDocStringChunk utf8) = decodeUTF8 utf8
 
 nullHDSC :: HsDocStringChunk -> Bool
-nullHDSC (HsDocStringChunk bs) = BS.null bs
+nullHDSC (HsDocStringChunk utf8) = mempty == utf8
 
 mkGeneratedHsDocString :: String -> HsDocString
 mkGeneratedHsDocString = GeneratedDocString . mkHsDocStringChunk
@@ -176,13 +112,6 @@ docStringChunks :: HsDocString -> [LHsDocStringChunk]
 docStringChunks (MultiLineDocString _ (x:|xs)) = x:xs
 docStringChunks (NestedDocString _ x) = [x]
 docStringChunks (GeneratedDocString x) = [L (UnhelpfulSpan UnhelpfulGenerated) x]
-
--- | Pretty print with decorators, exactly as the user wrote it
-pprHsDocString :: HsDocString -> SDoc
-pprHsDocString = text . exactPrintHsDocString
-
-pprHsDocStrings :: [HsDocString] -> SDoc
-pprHsDocStrings = text . intercalate "\n\n" . map exactPrintHsDocString
 
 -- | Pretty print with decorators, exactly as the user wrote it
 exactPrintHsDocString :: HsDocString -> String

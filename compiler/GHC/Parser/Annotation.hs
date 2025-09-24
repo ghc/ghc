@@ -104,7 +104,7 @@ import Data.List (sortBy)
 import Data.Semigroup
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Types.Name
-import GHC.Hs.DocString
+import Language.Haskell.Textual.Documentation.String
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic

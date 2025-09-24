@@ -22,17 +22,16 @@
 module Language.Haskell.Syntax.Expr where
 
 import Language.Haskell.Syntax.Basic
-import Language.Haskell.Syntax.Decls
-import Language.Haskell.Syntax.Pat
-import Language.Haskell.Syntax.Lit
-import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name (ModuleName)
-import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
+import Language.Haskell.Syntax.Decls
+import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Lit
+import Language.Haskell.Syntax.Module.Name (ModuleName)
+import Language.Haskell.Syntax.Pat
+import Language.Haskell.Syntax.Type
+import Language.Haskell.Textual.Source (StringLiteral)
 
 -- others:
-import GHC.Types.SourceText (StringLiteral)
-
 import GHC.Data.FastString (FastString)
 
 -- libraries:

@@ -46,7 +46,7 @@ import GHC hiding (lookupName)
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 import GHC.Core.ConLike (ConLike (..))
-import GHC.Data.FastString (FastString, bytesFS, unpackFS)
+import GHC.Data.FastString (FastString, fastStringToTextUTF8, unpackFS)
 import qualified GHC.Driver.Config.Parser as Parser
 import qualified GHC.Driver.DynFlags as DynFlags
 import GHC.Driver.Ppr
@@ -57,7 +57,6 @@ import GHC.Types.Avail
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SafeHaskell
-import qualified Language.Haskell.Textual.Location as SrcLoc
 import qualified GHC.Types.Unique.Map as UniqMap
 import GHC.Unit.Module.Deps (dep_orphs)
 import GHC.Unit.Module.ModIface
@@ -74,6 +73,8 @@ import Haddock.Interface.LexParseRn
 import Haddock.Options (Flag (..), modulePackageInfo)
 import Haddock.Types
 import Haddock.Utils (replace)
+
+import qualified Language.Haskell.Textual.Location as SrcLoc
 
 createInterface1
   :: MonadIO m
@@ -360,7 +361,7 @@ parseWarning parserOpts sDocContext w = case w of
     dstToDoc ((IfStringLiteral _ fs), ids) = WithHsDocIdentifiers (fsToDoc fs) (map noLoc ids)
 
     fsToDoc :: FastString -> HsDocString
-    fsToDoc fs = GeneratedDocString $ HsDocStringChunk (bytesFS fs)
+    fsToDoc fs = GeneratedDocString . HsDocStringChunk $ fastStringToTextUTF8 fs
 
     format x bs =
       DocWarning . DocParagraph . DocAppend (DocString x)

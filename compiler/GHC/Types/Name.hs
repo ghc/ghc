@@ -97,8 +97,6 @@ import GHC.Types.Name.Occurrence
 import GHC.Unit.Module
 import GHC.Unit.Home
 import GHC.Types.FieldLabel
-import Language.Haskell.Textual.Location
-import Language.Haskell.Textual.UTF8
 import GHC.Types.Unique
 import GHC.Utils.Misc
 import GHC.Data.Maybe
@@ -111,9 +109,13 @@ import GHC.OldList (intersperse)
 import Control.DeepSeq
 import Data.Data
 import qualified Data.Semigroup as S
-import GHC.Types.Basic (Boxity(Boxed, Unboxed))
 import GHC.Builtin.Uniques ( isTupleTyConUnique, isCTupleTyConUnique,
                              isSumTyConUnique, isTupleDataConLikeUnique )
+
+
+import Language.Haskell.Syntax.Basic (Boxity(Boxed, Unboxed))
+import Language.Haskell.Textual.Location
+import Language.Haskell.Textual.UTF8
 
 {-
 ************************************************************************

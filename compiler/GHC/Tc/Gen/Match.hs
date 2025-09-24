@@ -79,7 +79,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Id
 import Language.Haskell.Textual.Location
-import GHC.Types.Basic( VisArity, isDoExpansionGenerated )
+import GHC.Types.Basic( isDoExpansionGenerated )
 
 import qualified GHC.Data.List.NonEmpty as NE
 

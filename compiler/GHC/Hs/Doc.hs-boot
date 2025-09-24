@@ -1,10 +1,11 @@
 {-# LANGUAGE RoleAnnotations #-}
 module GHC.Hs.Doc where
 
+{-
 -- See #21592 for progress on removing this boot file.
 
 import Language.Haskell.Textual.Location
-import GHC.Hs.DocString
+import Language.Haskell.Textual.Documentation.String
 import Data.Kind
 
 type role WithHsDocIdentifiers representational nominal
@@ -16,4 +17,4 @@ type HsDoc = WithHsDocIdentifiers HsDocString
 
 type LHsDoc :: Type -> Type
 type LHsDoc pass = Located (HsDoc pass)
-
+-}

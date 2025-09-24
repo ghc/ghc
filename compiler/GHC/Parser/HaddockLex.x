@@ -166,9 +166,9 @@ lexHsDoc identParser doc =
 
     plausibleIdents :: LHsDocStringChunk -> [(SrcSpan,ByteString)]
     plausibleIdents (L (RealSrcSpan span _) (HsDocStringChunk s))
-      = [(RealSrcSpan span' Nothing, tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) s]
+      = [(RealSrcSpan span' Nothing, tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) (byteStringUTF8 s) ]
     plausibleIdents (L (UnhelpfulSpan reason) (HsDocStringChunk s))
-      = [(UnhelpfulSpan reason, tok) | (_, tok) <- alexScanTokens fakeLoc s] -- preserve the original reason
+      = [(UnhelpfulSpan reason, tok) | (_, tok) <- alexScanTokens fakeLoc (byteStringUTF8 s)] -- preserve the original reason
 
     fakeLoc = mkRealSrcLoc mempty 0 0
 

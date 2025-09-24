@@ -119,11 +119,6 @@ module GHC.Utils.Binary
 
 import GHC.Prelude
 
-import Language.Haskell.Syntax.Module.Name (ModuleName(..))
-import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
-import qualified Language.Haskell.Textual.Source as Source
-import Language.Haskell.Textual.UTF8
-
 import {-# SOURCE #-} GHC.Types.Name (Name)
 import GHC.Data.FastString
 import GHC.Data.TrieMap
@@ -131,10 +126,17 @@ import GHC.Utils.Panic.Plain
 import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
-import Language.Haskell.Textual.Location
 import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
+
+import Language.Haskell.Syntax.Binds
+import Language.Haskell.Syntax.Module.Name (ModuleName(..))
+import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
+--import Language.Haskell.Textual.Documentation
+import Language.Haskell.Textual.Location
+import qualified Language.Haskell.Textual.Source as Source
+import Language.Haskell.Textual.UTF8
 
 import Control.DeepSeq
 import Control.Monad            ( when, (<$!>), unless, forM_, void )
@@ -2025,4 +2027,132 @@ instance Binary Source.CodeSnippet where
       1 -> do
         s <- get bh
         return (Source.CodeSnippet s)
-      _ -> panic $ "Binary Source.CodeSnippet:" ++ show h
+      _ -> panic $ "Binary CodeSnippet:" ++ show h
+{-
+instance Binary HsDocString where                                                                                                                         
+  put_ bh x = case x of                                                                                                                                   
+    MultiLineDocString dec xs -> do                                                                                                                       
+      putByte bh 0                                                                                                                                        
+      put_ bh dec                                                                                                                                         
+      put_ bh $ BinLocated <$> xs                                                                                                                         
+    NestedDocString dec x -> do                                                                                                                           
+      putByte bh 1                                                                                                                                        
+      put_ bh dec                                                                                                                                         
+      put_ bh $ BinLocated x                                                                                                                              
+    GeneratedDocString x -> do                                                                                                                            
+      putByte bh 2                                                                                                                                        
+      put_ bh x                                                                                                                                           
+  get bh = do                                                                                                                                             
+    tag <- getByte bh                                                                                                                                     
+    case tag of                                                                                                                                           
+      0 -> MultiLineDocString <$> get bh <*> (fmap unBinLocated <$> get bh)                                                                               
+      1 -> NestedDocString <$> get bh <*> (unBinLocated <$> get bh)                                                                                       
+      2 -> GeneratedDocString <$> get bh                                                                                                                  
+      t -> fail $ "HsDocString: invalid tag " ++ show ty
+
+instance Binary HsDocStringDecorator where                                                                                                                
+  put_ bh x = case x of                                                                                                                                   
+    HsDocStringNext -> putByte bh 0                                                                                                                       
+    HsDocStringPrevious -> putByte bh 1                                                                                                                   
+    HsDocStringNamed n -> putByte bh 2 >> put_ bh n                                                                                                       
+    HsDocStringGroup n -> putByte bh 3 >> put_ bh n                                                                                                       
+  get bh = do                                                                                                                                             
+    tag <- getByte bh                                                                                                                                     
+    case tag of                                                                                                                                           
+      0 -> pure HsDocStringNext                                                                                                                           
+      1 -> pure HsDocStringPrevious                                                                                                                       
+      2 -> HsDocStringNamed <$> get bh                                                                                                                    
+      3 -> HsDocStringGroup <$> get bh                                                                                                                    
+      t -> fail $ "HsDocStringDecorator: invalid tag " ++ show t
+
+instance Binary HsDocStringChunk where                                                                                                                    
+  put_ bh (HsDocStringChunk bs) = put_ bh bs                                                                                                              
+  get bh = HsDocStringChunk <$> get bh
+
+instance Binary a => Binary (WithHsDocIdentifiers a GhcRn) where                                                                                           
+  put_ bh (WithHsDocIdentifiers s ids) = do                                                                                                                
+    put_ bh s                                                                                                                                              
+    put_ bh $ BinLocated <$> ids                                                                                                                           
+  get bh =                                                                                                                                                 
+    liftA2 WithHsDocIdentifiers (get bh) (fmap unBinLocated <$> get bh)
+-}
+
+instance Binary Activation where
+    put_ bh NeverActive =
+            putByte bh 0
+    put_ bh FinalActive = do
+            putByte bh 1
+    put_ bh AlwaysActive =
+            putByte bh 2
+    put_ bh (ActiveBefore aa) = do
+            putByte bh 3
+            put_ bh aa
+    put_ bh (ActiveAfter ab) = do
+            putByte bh 4
+            put_ bh ab
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> return NeverActive
+              1 -> return FinalActive
+              2 -> return AlwaysActive
+              3 -> do aa <- get bh
+                      return (ActiveBefore aa)
+              _ -> do ab <- get bh
+                      return (ActiveAfter ab)
+
+instance Binary RuleMatchInfo where
+    put_ bh FunLike = putByte bh 0
+    put_ bh ConLike = putByte bh 1
+    get bh = do
+      h <- getByte bh
+      if h == 1 then return ConLike
+                else return FunLike
+                           
+instance Binary InlineSpec where
+    put_ bh NoUserInlinePrag = putByte bh 0
+    put_ bh (Inline s)       = do putByte bh 1
+                                  put_ bh s
+    put_ bh (Inlinable s)    = do putByte bh 2
+                                  put_ bh s
+    put_ bh (NoInline s)     = do putByte bh 3
+                                  put_ bh s
+    put_ bh (Opaque s)       = do putByte bh 4
+                                  put_ bh s
+
+    get bh = do h <- getByte bh
+                case h of
+                  0 -> return NoUserInlinePrag
+                  1 -> do
+                        s <- get bh
+                        return (Inline s)
+                  2 -> do
+                        s <- get bh
+                        return (Inlinable s)
+                  3 -> do
+                        s <- get bh
+                        return (NoInline s)
+                  _ -> do
+                        s <- get bh
+                        return (Opaque s)
+
+instance Binary InlinePragma where
+    put_ bh (InlinePragma s a b c d) = do
+            put_ bh s
+            put_ bh a
+            put_ bh b
+            put_ bh c
+            put_ bh d
+
+    get bh = do
+           s <- get bh
+           a <- get bh
+           b <- get bh
+           c <- get bh
+           d <- get bh
+           return (InlinePragma s a b c d)
+
+
+
+
+

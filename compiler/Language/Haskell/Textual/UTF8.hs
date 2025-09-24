@@ -13,6 +13,7 @@ module Language.Haskell.Textual.UTF8
    , unsafeFromShortByteString
    -- ** Deconstruction
    , bytesUTF8
+   , byteStringUTF8
    , decodeUTF8
    , headUTF8
    -- ** Transformation
@@ -24,6 +25,7 @@ module Language.Haskell.Textual.UTF8
 import Prelude
 
 import Control.DeepSeq
+import Data.ByteString (StrictByteString)
 import Data.ByteString.Short (ShortByteString(..))
 import qualified Data.ByteString.Short as SBS
 import Data.Data
@@ -59,6 +61,14 @@ instance Show TextUTF8 where
   show (TextUTF8 sbs) = utf8DecodeShortByteString sbs
 
 {- |
+Convert the UTF8 chunk of text to a 'ByteString'.
+
+_Time:_ $\mathcal{O}\left( n \right )$
+-}
+byteStringUTF8 :: TextUTF8 -> StrictByteString
+byteStringUTF8 (TextUTF8 sbs) = SBS.fromShort sbs
+
+{- |
 Decode a UTF8 chunk of text to a 'String'.
 -}
 {-# INLINE decodeUTF8 #-}
@@ -81,7 +91,7 @@ headUTF8 :: TextUTF8 -> Maybe Char
 headUTF8 (TextUTF8 sbs@(SBS ba#))
   | SBS.length sbs == 0 = Nothing
   | otherwise =
-    let (# c#, _ #) = utf8DecodeCharByteArray# ba# 0#
+    let !(# c#, _ #) = utf8DecodeCharByteArray# ba# 0#
     in  Just $ C# c#
 
 {- |

@@ -14,7 +14,7 @@ import Data.String (String)
 import Data.Int (Int)
 
 import Control.DeepSeq
-import {-# SOURCE #-} GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
+import Language.Haskell.Textual.Documentation --  {-# SOURCE #-} GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 
 {-
 ************************************************************************

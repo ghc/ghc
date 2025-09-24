@@ -97,7 +97,7 @@ import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Basic (Role, LexicalFixity)
 import Language.Haskell.Syntax.Specificity (Specificity)
 
-import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName, Activation
+import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName
                        ,TyConFlavour(..), TypeOrData(..), NewOrData(..))
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 

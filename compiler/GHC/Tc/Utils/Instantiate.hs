@@ -56,10 +56,10 @@ import GHC.Core ( isOrphan ) -- For the Coercion constructor
 import GHC.Core.Type
 import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Core.TyCo.Tidy ( tidyType )
-import GHC.Core.Class( Class )
+import GHC.Core.Class ( Class )
 import GHC.Core.Coercion.Axiom
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr ( tcCheckPolyExpr, tcSyntaxOp )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
@@ -72,23 +72,23 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
 import GHC.Tc.Zonk.Monad ( ZonkM )
 
-import GHC.Rename.Utils( mkRnSyntaxExpr )
+import GHC.Rename.Utils ( mkRnSyntaxExpr )
 
-import GHC.Types.Id.Make( mkDictFunId )
-import GHC.Types.Basic ( TypeOrKind(..), Arity, VisArity )
+import GHC.Types.Id.Make ( mkDictFunId )
+import GHC.Types.Basic ( TypeOrKind(..) )
 import GHC.Types.SourceText
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Name.Reader (WithUserRdr(..))
+import GHC.Types.Name.Reader ( WithUserRdr(..) )
 import GHC.Types.Var
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
-import GHC.Utils.Unique (sameUnique)
+import GHC.Utils.Unique ( sameUnique )
 
 import GHC.Unit.State
 import GHC.Unit.External
@@ -99,7 +99,7 @@ import Language.Haskell.Textual.Location as SrcLoc
 
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
-import Control.Monad( when, unless )
+import Control.Monad ( when, unless )
 import Data.Function ( on )
 
 {-

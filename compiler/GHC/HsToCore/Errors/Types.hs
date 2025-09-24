@@ -15,7 +15,6 @@ import GHC.Driver.DynFlags (DynFlags, xopt)
 import GHC.Driver.Flags (WarningFlag)
 import GHC.Hs
 import GHC.HsToCore.Pmc.Solver.Types
-import GHC.Types.Basic (Activation)
 import GHC.Types.Error
 import GHC.Types.ForeignCall
 import GHC.Types.Id

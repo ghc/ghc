@@ -59,23 +59,21 @@ module Language.Haskell.Syntax.Type (
         isHsKindedTyVar
     ) where
 
-import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
-
 import Language.Haskell.Syntax.Basic ( SrcStrictness, SrcUnpackedness )
+import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Specificity
+import Language.Haskell.Textual.Documentation ( LHsDoc )
 
-
-import GHC.Hs.Doc (LHsDoc)
+--import GHC.Hs.Doc (LHsDoc)
 import GHC.Data.FastString (FastString)
-import GHC.Utils.Panic( panic )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
 import Data.Eq
 import Data.Bool
 import Data.Char
-import Prelude (Integer)
+import Prelude (Integer, error)
 import Data.Ord (Ord)
 import Control.DeepSeq
 
@@ -328,7 +326,7 @@ data LHsQTyVars pass   -- See Note [HsType binders]
 
 hsQTvExplicit :: LHsQTyVars pass -> [LHsTyVarBndr (HsBndrVis pass) pass]
 hsQTvExplicit (HsQTvs { hsq_explicit = explicit_tvs }) = explicit_tvs
-hsQTvExplicit (XLHsQTyVars {})                         = panic "hsQTvExplicit"
+hsQTvExplicit (XLHsQTyVars {})                         = error "hsQTvExplicit"
 
 ------------------------------------------------
 --            HsOuterTyVarBndrs

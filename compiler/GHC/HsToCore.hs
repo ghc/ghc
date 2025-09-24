@@ -79,9 +79,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( mkRepPolyIdConcreteTyVars )
 import GHC.Types.ForeignStubs
 import GHC.Types.Avail
-import GHC.Types.Basic
 import GHC.Types.Var.Set
-import Language.Haskell.Textual.Location
 import GHC.Types.SourceFile
 import GHC.Types.TypeEnv
 import GHC.Types.Name
@@ -94,6 +92,8 @@ import GHC.Unit
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
+
+import Language.Haskell.Textual.Location
 
 import Data.List (partition)
 import Data.IORef

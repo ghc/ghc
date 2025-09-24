@@ -1,8 +1,4 @@
 -- | Types and functions for raw and lexed docstrings.
-{-# OPTIONS_GHC -Wno-orphans #-}
-{- Required for these orphan instances:
-
--}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -10,16 +6,18 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-module GHC.Hs.Doc
+module Language.Haskell.Textual.Documentation
   ( HsDoc
   , WithHsDocIdentifiers(..)
-  , hsDocIds
+--  , hsDocIds
   , LHsDoc
+
+  , module Language.Haskell.Textual.Documentation.String
+
+{-
   , pprHsDocDebug
   , pprWithDoc
   , pprMaybeWithDoc
-
-  , module Language.Haskell.Textual.Documentation.String
 
   , ExtractedTHDocs(..)
 
@@ -28,40 +26,40 @@ module GHC.Hs.Doc
 
   , Docs(..)
   , emptyDocs
+-}
   ) where
 
-import GHC.Prelude
+import Prelude (Eq(..), seq)
 
-import GHC.Driver.Flags
+--import GHC.Prelude
+
+--import GHC.Utils.Binary
+--import GHC.Types.Name
 --import GHC.Utils.Outputable as Outputable hiding ((<>))
-import qualified GHC.Data.EnumSet as EnumSet
-import GHC.Data.EnumSet (EnumSet)
-import GHC.LanguageExtensions.Type
-import GHC.Hs.Extension
-import GHC.Types.Avail
-import GHC.Types.Unique.Map
-import GHC.Types.Name
-import GHC.Types.Name.Set
-import GHC.Utils.Binary
-import GHC.Utils.Outputable (($$), (<+>), Outputable(..), SDoc, pprHsDocString, pprWithDocString)
-import qualified GHC.Utils.Outputable as O
+--import qualified GHC.Data.EnumSet as EnumSet
+--import GHC.Data.EnumSet (EnumSet)
+--import GHC.Types.Avail
+--import GHC.Types.Name.Set
+--import GHC.Driver.Flags
 
 import Control.DeepSeq
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
-import Data.Map (Map)
-import qualified Data.Map as Map
-import Data.List.NonEmpty (NonEmpty(..))
-import Data.List (sortBy)
+import Data.Data
+--import Data.IntMap (IntMap)
+--import qualified Data.IntMap as IntMap
+--import Data.Map (Map)
+--import qualified Data.Map as Map
+--import Data.List.NonEmpty (NonEmpty(..))
+--import GHC.LanguageExtensions.Type
+--import qualified GHC.Utils.Outputable as O
+--import GHC.Hs.Extension
+--import GHC.Types.Unique.Map
+--import Data.List (sortBy)
 
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name
-import Language.Haskell.Textual.Documentation
---import {-# SOURCE #-} Language.Haskell.Textual.Documentation.String
+--import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Textual.Documentation.String
 import Language.Haskell.Textual.Location
 
-{-
 -- | A docstring with the (probable) identifiers found in it.
 type HsDoc = WithHsDocIdentifiers HsDocString
 
@@ -84,86 +82,25 @@ deriving instance (Eq (IdP pass), Eq a) => Eq (WithHsDocIdentifiers a pass)
 instance (NFData (IdP pass), NFData a) => NFData (WithHsDocIdentifiers a pass) where
   rnf (WithHsDocIdentifiers d i) = rnf d `seq` rnf i
 
+{-
+
 -- | For compatibility with the existing @-ddump-parsed' output, we only show
 -- the docstring.
 --
 -- Use 'pprHsDoc' to show `HsDoc`'s internals.
 instance Outputable a => Outputable (WithHsDocIdentifiers a pass) where
   ppr (WithHsDocIdentifiers s _ids) = ppr s
--}
-
-instance Binary a => Binary (WithHsDocIdentifiers a GhcRn) where
-  put_ bh (WithHsDocIdentifiers s ids) = do
-    put_ bh s
-    put_ bh $ BinLocated <$> ids
-  get bh =
-    liftA2 WithHsDocIdentifiers (get bh) (fmap unBinLocated <$> get bh)
-
-instance Binary HsDocString where
-  put_ bh x = case x of
-    MultiLineDocString dec xs -> do
-      putByte bh 0
-      put_ bh dec
-      put_ bh $ BinLocated <$> xs
-    NestedDocString dec x -> do
-      putByte bh 1
-      put_ bh dec
-      put_ bh $ BinLocated x
-    GeneratedDocString x -> do
-      putByte bh 2
-      put_ bh x
-  get bh = do
-    tag <- getByte bh
-    case tag of
-      0 -> MultiLineDocString <$> get bh <*> (fmap unBinLocated <$> get bh)
-      1 -> NestedDocString <$> get bh <*> (unBinLocated <$> get bh)
-      2 -> GeneratedDocString <$> get bh
-      t -> fail $ "HsDocString: invalid tag " ++ show t
-
-instance Binary HsDocStringDecorator where
-  put_ bh x = case x of
-    HsDocStringNext -> putByte bh 0
-    HsDocStringPrevious -> putByte bh 1
-    HsDocStringNamed n -> putByte bh 2 >> put_ bh n
-    HsDocStringGroup n -> putByte bh 3 >> put_ bh n
-  get bh = do
-    tag <- getByte bh
-    case tag of
-      0 -> pure HsDocStringNext
-      1 -> pure HsDocStringPrevious
-      2 -> HsDocStringNamed <$> get bh
-      3 -> HsDocStringGroup <$> get bh
-      t -> fail $ "HsDocStringDecorator: invalid tag " ++ show t
-
-instance Binary HsDocStringChunk where
-  put_ bh (HsDocStringChunk bs) = put_ bh bs
-  get bh = HsDocStringChunk <$> get bh
 
 -- | Extract a mapping from the lexed identifiers to the names they may
 -- correspond to.
 hsDocIds :: WithHsDocIdentifiers a GhcRn -> NameSet
 hsDocIds (WithHsDocIdentifiers _ ids) = mkNameSet $ map unLoc ids
 
--- | Pretty print a thing with its doc
--- The docstring will include the comment decorators '-- |', '{-|' etc
--- and will come either before or after depending on how it was written
--- i.e it will come after the thing if it is a '-- ^' or '{-^' and before
--- otherwise.
-pprWithDoc :: LHsDoc name -> SDoc -> SDoc
-pprWithDoc doc = pprWithDocString (hsDocString $ unLoc doc)
+-}
 
--- | See 'pprWithHsDoc'
-pprMaybeWithDoc :: Maybe (LHsDoc name) -> SDoc -> SDoc
-pprMaybeWithDoc Nothing    = id
-pprMaybeWithDoc (Just doc) = pprWithDoc doc
+type LHsDoc pass = Located (HsDoc pass)
 
--- | Print a doc with its identifiers, useful for debugging
-pprHsDocDebug :: (Outputable (IdP name)) => HsDoc name -> SDoc
-pprHsDocDebug (WithHsDocIdentifiers s ids) =
-    O.vcat
-        [ O.text "text:" $$ O.nest 2 (pprHsDocString s)
-        , O.text "identifiers:" $$ O.nest 2 (O.vcat (map O.pprLocatedAlways ids))
-        ]
+{-
 
 -- | A simplified version of 'HsImpExp.IE'.
 data DocStructureItem
@@ -218,20 +155,20 @@ instance Binary DocStructureItem where
 
 instance Outputable DocStructureItem where
   ppr = \case
-    DsiSectionHeading level doc -> O.vcat
-      [ O.text "section heading, level" <+> ppr level O.<> O.colon
-      , O.nest 2 (pprHsDocDebug doc)
+    DsiSectionHeading level doc -> vcat
+      [ text "section heading, level" <+> ppr level O.<> colon
+      , nest 2 (pprHsDocDebug doc)
       ]
-    DsiDocChunk doc -> O.vcat
-      [ O.text "documentation chunk:"
-      , O.nest 2 (pprHsDocDebug doc)
+    DsiDocChunk doc -> vcat
+      [ text "documentation chunk:"
+      , nest 2 (pprHsDocDebug doc)
       ]
     DsiNamedChunkRef name ->
-      O.text "reference to named chunk:" <+> O.text name
+      text "reference to named chunk:" <+> text name
     DsiExports avails ->
-      O.text "avails:" $$ O.nest 2 (ppr avails)
+      text "avails:" $$ nest 2 (ppr avails)
     DsiModExport mod_names avails ->
-      O.text "re-exported module(s):" <+> ppr mod_names $$ O.nest 2 (ppr avails)
+      text "re-exported module(s):" <+> ppr mod_names $$ nest 2 (ppr avails)
 
 instance NFData DocStructureItem where
   rnf = \case
@@ -240,6 +177,7 @@ instance NFData DocStructureItem where
     DsiNamedChunkRef name -> rnf name
     DsiExports avails -> rnf avails
     DsiModExport mod_names avails -> rnf mod_names `seq` rnf avails
+
 
 type DocStructure = [DocStructureItem]
 
@@ -307,34 +245,34 @@ instance Binary Docs where
 
 instance Outputable Docs where
   ppr docs =
-      O.vcat
+      vcat
         [ pprField (pprMaybe pprHsDocDebug) "module header" docs_mod_hdr
         , pprField (ppr . fmap pprHsDocDebug) "export docs" docs_exports
         , pprField (ppr . fmap (ppr . map pprHsDocDebug)) "declaration docs" docs_decls
         , pprField (ppr . fmap (pprIntMap ppr pprHsDocDebug)) "arg docs" docs_args
-        , pprField (O.vcat . map ppr) "documentation structure" docs_structure
-        , pprField (pprMap (O.doubleQuotes . O.text) pprHsDocDebug) "named chunks"
+        , pprField (vcat . map ppr) "documentation structure" docs_structure
+        , pprField (pprMap (doubleQuotes . text) pprHsDocDebug) "named chunks"
                    docs_named_chunks
         , pprField pprMbString "haddock options" docs_haddock_opts
         , pprField ppr "language" docs_language
-        , pprField (O.vcat . map ppr . EnumSet.toList) "language extensions"
+        , pprField (vcat . map ppr . EnumSet.toList) "language extensions"
                    docs_extensions
         ]
     where
       pprField :: (a -> SDoc) -> String -> (Docs -> a) -> SDoc
       pprField ppr' heading lbl =
-        O.text heading O.<> O.colon $$ O.nest 2 (ppr' (lbl docs))
+        text heading O.<> colon $$ nest 2 (ppr' (lbl docs))
       pprMap pprKey pprVal m =
-        O.vcat $ flip map (Map.toList m) $ \(k, v) ->
-          pprKey k O.<> O.colon $$ O.nest 2 (pprVal v)
+        vcat $ flip map (Map.toList m) $ \(k, v) ->
+          pprKey k O.<> colon $$ nest 2 (pprVal v)
       pprIntMap pprKey pprVal m =
-        O.vcat $ flip map (IntMap.toList m) $ \(k, v) ->
-          pprKey k O.<> O.colon $$ O.nest 2 (pprVal v)
-      pprMbString Nothing = O.empty
-      pprMbString (Just s) = O.text s
+        vcat $ flip map (IntMap.toList m) $ \(k, v) ->
+          pprKey k O.<> colon $$ nest 2 (pprVal v)
+      pprMbString Nothing = empty
+      pprMbString (Just s) = text s
       pprMaybe ppr' = \case
-        Nothing -> O.text "Nothing"
-        Just x -> O.text "Just" <+> ppr' x
+        Nothing -> text "Nothing"
+        Just x -> text "Just" <+> ppr' x
 
 emptyDocs :: Docs
 emptyDocs = Docs
@@ -361,3 +299,4 @@ data ExtractedTHDocs =
     , ethd_inst_docs  :: UniqMap Name (HsDoc GhcRn)
       -- ^ The documentation added to class and family instances.
     }
+-}
