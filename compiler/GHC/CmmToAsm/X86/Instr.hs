@@ -252,6 +252,7 @@ data Instr
                       [Maybe JumpDest] -- Targets of the jump table
                       Section   -- Data section jump table should be put in
                       CLabel    -- Label of jump table
+                      !(Maybe CLabel) -- Label used to compute relative offsets. Otherwise we store absolute addresses.
         -- | X86 call instruction
         | CALL        (Either Imm Reg) -- ^ Jump target
                       [RegWithFormat]  -- ^ Arguments (required for register allocation)
@@ -486,7 +487,7 @@ regUsageOfInstr platform instr
     JXX    _ _          -> mkRU [] []
     JXX_GBL _ _         -> mkRU [] []
     JMP     op regs     -> mkRU (use_R addrFmt op regs) []
-    JMP_TBL op _ _ _    -> mkRU (use_R addrFmt op []) []
+    JMP_TBL op _ _ _ _  -> mkRU (use_R addrFmt op []) []
     CALL (Left _)  params   -> mkRU params (map mkFmt $ callClobberedRegs platform)
     CALL (Right reg) params -> mkRU (mk addrFmt reg:params) (map mkFmt $ callClobberedRegs platform)
     CLTD   fmt          -> mkRU [mk fmt eax] [mk fmt edx]
@@ -812,7 +813,7 @@ patchRegsOfInstr platform instr env
     POP  fmt op          -> patch1 (POP  fmt) op
     SETCC cond op        -> patch1 (SETCC cond) op
     JMP op regs          -> JMP (patchOp op) regs
-    JMP_TBL op ids s lbl -> JMP_TBL (patchOp op) ids s lbl
+    JMP_TBL op ids s tl jl -> JMP_TBL (patchOp op) ids s tl jl
 
     FMA3 fmt perm var x1 x2 x3 -> patch3 (FMA3 fmt perm var) x1 x2 x3
 
@@ -1016,9 +1017,9 @@ isJumpishInstr instr
 canFallthroughTo :: Instr -> BlockId -> Bool
 canFallthroughTo insn bid
   = case insn of
-    JXX _ target          -> bid == target
-    JMP_TBL _ targets _ _ -> all isTargetBid targets
-    _                     -> False
+    JXX _ target            -> bid == target
+    JMP_TBL _ targets _ _ _ -> all isTargetBid targets
+    _                       -> False
   where
     isTargetBid target = case target of
       Nothing                      -> True
@@ -1031,9 +1032,9 @@ jumpDestsOfInstr
 
 jumpDestsOfInstr insn
   = case insn of
-        JXX _ id        -> [id]
-        JMP_TBL _ ids _ _ -> [id | Just (DestBlockId id) <- ids]
-        _               -> []
+        JXX _ id            -> [id]
+        JMP_TBL _ ids _ _ _ -> [id | Just (DestBlockId id) <- ids]
+        _                   -> []
 
 
 patchJumpInstr
@@ -1042,8 +1043,8 @@ patchJumpInstr
 patchJumpInstr insn patchF
   = case insn of
         JXX cc id       -> JXX cc (patchF id)
-        JMP_TBL op ids section lbl
-          -> JMP_TBL op (map (fmap (patchJumpDest patchF)) ids) section lbl
+        JMP_TBL op ids section table_lbl rel_lbl
+          -> JMP_TBL op (map (fmap (patchJumpDest patchF)) ids) section table_lbl rel_lbl
         _               -> insn
     where
         patchJumpDest f (DestBlockId id) = DestBlockId (f id)
@@ -1504,14 +1505,14 @@ shortcutJump fn insn = shortcutJump' fn (setEmpty :: LabelSet) insn
             Just (DestBlockId id') -> shortcutJump' fn seen' (JXX cc id')
             Just (DestImm imm)     -> shortcutJump' fn seen' (JXX_GBL cc imm)
         where seen' = setInsert id seen
-    shortcutJump' fn _ (JMP_TBL addr blocks section tblId) =
+    shortcutJump' fn _ (JMP_TBL addr blocks section table_lbl rel_lbl) =
         let updateBlock (Just (DestBlockId bid))  =
                 case fn bid of
                     Nothing   -> Just (DestBlockId bid )
                     Just dest -> Just dest
             updateBlock dest = dest
             blocks' = map updateBlock blocks
-        in  JMP_TBL addr blocks' section tblId
+        in  JMP_TBL addr blocks' section table_lbl rel_lbl
     shortcutJump' _ _ other = other
 
 -- Here because it knows about JumpDest

@@ -376,7 +376,7 @@ stmtToInstrs bid stmt = do
       --We try to arrange blocks such that the likely branch is the fallthrough
       --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
       CmmCondBranch arg true false _ -> genCondBranch bid true false arg
-      CmmSwitch arg ids -> genSwitch arg ids
+      CmmSwitch arg ids -> genSwitch arg ids bid
       CmmCall { cml_target = arg
               , cml_args_regs = gregs } -> genJump arg (jumpRegs platform gregs)
       _ ->
@@ -487,13 +487,6 @@ See also: the documentation for GCC's `-mcmodel=small` flag.
 is32BitInteger :: Integer -> Bool
 is32BitInteger i = i64 <= 0x7fffffff && i64 >= -0x80000000
   where i64 = fromIntegral i :: Int64
-
-
--- | Convert a BlockId to some CmmStatic data
-jumpTableEntry :: NCGConfig -> Maybe BlockId -> CmmStatic
-jumpTableEntry config Nothing = CmmStaticLit (CmmInt 0 (ncgWordWidth config))
-jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = blockLbl blockid
 
 
 -- -----------------------------------------------------------------------------
@@ -5375,11 +5368,52 @@ index (1),
     indexExpr    = UU_Conv(indexOffset); // == 1::I64
 
 See #21186.
+
+Note [Jump tables]
+~~~~~~~~~~~~~~~~~~
+The x86 backend has a virtual JMP_TBL instruction which payload can be used to
+generate both the jump instruction and the jump table contents. `genSwitch` is
+responsible for generating these JMP_TBL instructions.
+
+Depending on `-fPIC` flag and on the architecture, we generate the following
+jump table variants:
+
+  | Variant |  Arch  | Table's contents                       | Reference to the table |
+  |---------|--------|----------------------------------------|------------------------|
+  |     PIC |  Both  | Relative offset: target_lbl - base_lbl | PIC                    |
+  | Non-PIC | 64-bit | Absolute: target_lbl                   | Non-PIC (rip-relative) |
+  | Non-PIC | 32-bit | Absolute: target_lbl                   | Non-PIC (absolute)     |
+
+For the PIC variant, we store relative entries (`target_lbl - base_lbl`) in the
+jump table. Using absolute entries with PIC would require target_lbl symbols to
+be resolved at link time, hence to be global labels (currently they are local
+labels).
+
+We use the block_id of the code containing the jump as `base_lbl`. It ensures
+that target_lbl and base_lbl are close enough to each others, avoiding
+overflows.
+
+Historical note: in the past we used the table label `table_lbl` as base_lbl. It
+allowed the jumping code to only compute one global address (table_lbl) both to
+read the table and to compute the target address. However:
+
+ * the table could be too far from the jump and on Windows which only
+   has 32-bit relative relocations (IMAGE_REL_AMD64_REL64 doesn't exist),
+   `dest_lbl - table_lbl` overflowed (see #24016)
+
+ * Mac OS X/x86-64 linker was unable to handle `.quad L1 - L0`
+   relocations if L0 wasn't preceded by a non-anonymous label in its
+   section (which was the case with table_lbl). Hence we used to put the
+   jump table in the .text section in this case.
+
+
 -}
 
-genSwitch :: CmmExpr -> SwitchTargets -> NatM InstrBlock
-
-genSwitch expr targets = do
+-- | Generate a JMP_TBL instruction
+--
+-- See Note [Jump tables]
+genSwitch :: CmmExpr -> SwitchTargets -> BlockId -> NatM InstrBlock
+genSwitch expr targets bid = do
   config <- getConfig
   let platform = ncgPlatform config
       expr_w = cmmExprWidth platform expr
@@ -5390,79 +5424,76 @@ genSwitch expr targets = do
       indexExpr = CmmMachOp
         (MO_UU_Conv expr_w (platformWordWidth platform))
         [indexExpr0]
-  if ncgPIC config
-  then do
-        (reg,e_code) <- getNonClobberedReg indexExpr
-           -- getNonClobberedReg because it needs to survive across t_code
-        lbl <- getNewLabelNat
-        let is32bit = target32Bit platform
-            os = platformOS platform
-            -- Might want to use .rodata.<function we're in> instead, but as
-            -- long as it's something unique it'll work out since the
-            -- references to the jump table are in the appropriate section.
-            rosection = case os of
-              -- on Mac OS X/x86_64, put the jump table in the text section to
-              -- work around a limitation of the linker.
-              -- ld64 is unable to handle the relocations for
-              --     .quad L1 - L0
-              -- if L0 is not preceded by a non-anonymous label in its section.
-              OSDarwin | not is32bit -> Section Text lbl
-              _ -> Section ReadOnlyData lbl
-        dynRef <- cmmMakeDynamicReference config DataReference lbl
-        (tableReg,t_code) <- getSomeReg $ dynRef
-        let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
-                                       (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0))
 
-        return $ e_code `appOL` t_code `appOL` toOL [
-                                ADD (intFormat (platformWordWidth platform)) op (OpReg tableReg),
-                                JMP_TBL (OpReg tableReg) ids rosection lbl
-                       ]
-  else do
-        (reg,e_code) <- getSomeReg indexExpr
-        lbl <- getNewLabelNat
-        let is32bit = target32Bit platform
-        if is32bit
-          then let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (platformWordSizeInBytes platform)) (ImmCLbl lbl))
-                   jmp_code = JMP_TBL op ids (Section ReadOnlyData lbl) lbl
-               in return $ e_code `appOL` unitOL jmp_code
-          else do
+      (offset, blockIds) = switchTargetsToTable targets
+      ids = map (fmap DestBlockId) blockIds
+
+      is32bit = target32Bit platform
+      fmt = archWordFormat is32bit
+
+  table_lbl <- getNewLabelNat
+  let bid_lbl = blockLbl bid
+  let table_section = Section ReadOnlyData table_lbl
+
+  -- see Note [Jump tables] for a description of the following 3 variants.
+  if
+    | ncgPIC config -> do
+      -- PIC support: store relative offsets in the jump table to allow the code
+      -- to be relocated without updating the table. The table itself and the
+      -- block label used to make the relative labels absolute are read in a PIC
+      -- way (via cmmMakeDynamicReference).
+      (reg,e_code) <- getNonClobberedReg indexExpr -- getNonClobberedReg because it needs to survive across t_code and j_code
+      (tableReg,t_code) <- getNonClobberedReg =<< cmmMakeDynamicReference config DataReference table_lbl
+      (targetReg,j_code) <- getSomeReg =<< cmmMakeDynamicReference config DataReference bid_lbl
+      pure $ e_code `appOL` t_code `appOL` j_code `appOL` toOL
+            [ ADD fmt (OpAddr (AddrBaseIndex (EABaseReg tableReg) (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0)))
+                      (OpReg targetReg)
+            , JMP_TBL (OpReg targetReg) ids table_section table_lbl (Just bid_lbl)
+            ]
+
+    | not is32bit -> do
+      -- 64-bit non-PIC code
+      (reg,e_code) <- getSomeReg indexExpr
+      tableReg <- getNewRegNat (intFormat (platformWordWidth platform))
+      targetReg <- getNewRegNat (intFormat (platformWordWidth platform))
+      pure $ e_code `appOL` toOL
             -- See Note [%rip-relative addressing on x86-64].
-            tableReg <- getNewRegNat (intFormat (platformWordWidth platform))
-            targetReg <- getNewRegNat (intFormat (platformWordWidth platform))
-            let op = OpAddr (AddrBaseIndex (EABaseReg tableReg) (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0))
-                fmt = archWordFormat is32bit
-                code = e_code `appOL` toOL
-                    [ LEA fmt (OpAddr (AddrBaseIndex EABaseRip EAIndexNone (ImmCLbl lbl))) (OpReg tableReg)
-                    , MOV fmt op (OpReg targetReg)
-                    , JMP_TBL (OpReg targetReg) ids (Section ReadOnlyData lbl) lbl
-                    ]
-            return code
-  where
-    (offset, blockIds) = switchTargetsToTable targets
-    ids = map (fmap DestBlockId) blockIds
+            [ LEA fmt (OpAddr (AddrBaseIndex EABaseRip EAIndexNone (ImmCLbl table_lbl))) (OpReg tableReg)
+            , MOV fmt (OpAddr (AddrBaseIndex (EABaseReg tableReg) (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0)))
+                      (OpReg targetReg)
+            , JMP_TBL (OpReg targetReg) ids table_section table_lbl Nothing
+            ]
+
+    | otherwise -> do
+      -- 32-bit non-PIC code is a straightforward jump to &table[entry].
+      (reg,e_code) <- getSomeReg indexExpr
+      pure $ e_code `appOL` unitOL
+            ( JMP_TBL (OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (platformWordSizeInBytes platform)) (ImmCLbl table_lbl)))
+                      ids table_section table_lbl Nothing
+            )
 
 generateJumpTableForInstr :: NCGConfig -> Instr -> Maybe (NatCmmDecl (Alignment, RawCmmStatics) Instr)
-generateJumpTableForInstr config (JMP_TBL _ ids section lbl)
-    = let getBlockId (DestBlockId id) = id
-          getBlockId _ = panic "Non-Label target in Jump Table"
-          blockIds = map (fmap getBlockId) ids
-      in Just (createJumpTable config blockIds section lbl)
-generateJumpTableForInstr _ _ = Nothing
+generateJumpTableForInstr config = \case
+  JMP_TBL _ ids section table_lbl mrel_lbl ->
+    let getBlockId (DestBlockId id) = id
+        getBlockId _ = panic "Non-Label target in Jump Table"
+        block_ids = map (fmap getBlockId) ids
 
-createJumpTable :: NCGConfig -> [Maybe BlockId] -> Section -> CLabel
-                -> GenCmmDecl (Alignment, RawCmmStatics) h g
-createJumpTable config ids section lbl
-    = let jumpTable
-            | ncgPIC config =
-                  let ww = ncgWordWidth config
-                      jumpTableEntryRel Nothing
-                          = CmmStaticLit (CmmInt 0 ww)
-                      jumpTableEntryRel (Just blockid)
-                          = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0 ww)
-                          where blockLabel = blockLbl blockid
-                  in map jumpTableEntryRel ids
-            | otherwise = map (jumpTableEntry config) ids
-      in CmmData section (mkAlignment 1, CmmStaticsRaw lbl jumpTable)
+        jumpTable = case mrel_lbl of
+          Nothing      -> map mk_absolute block_ids           -- absolute entries
+          Just rel_lbl -> map (mk_relative rel_lbl) block_ids -- offsets relative to rel_lbl
+
+        mk_absolute = \case
+          Nothing      -> CmmStaticLit (CmmInt 0 (ncgWordWidth config))
+          Just blockid -> CmmStaticLit (CmmLabel (blockLbl blockid))
+
+        mk_relative rel_lbl = \case
+          Nothing      -> CmmStaticLit (CmmInt 0 (ncgWordWidth config))
+          Just blockid -> CmmStaticLit (CmmLabelDiffOff (blockLbl blockid) rel_lbl 0 (ncgWordWidth config))
+
+    in Just (CmmData section (mkAlignment 1, CmmStaticsRaw table_lbl jumpTable))
+
+  _ -> Nothing
 
 extractUnwindPoints :: [Instr] -> [UnwindPoint]
 extractUnwindPoints instrs =

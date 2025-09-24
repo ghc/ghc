@@ -770,10 +770,9 @@ Options affecting code generation
     :type: dynamic
     :category: codegen
 
-    Generate position-independent code (code that can be put into shared
-    libraries). This currently works on Linux x86 and x86-64. On
-    Windows, position-independent code is never used so the flag is a
-    no-op on that platform.
+    Generate position-independent code (PIC). This code can be put into shared
+    libraries and is sometimes required by operating systems, e.g. systems using
+    Address Space Layout Randomization (ASLR).
 
 .. ghc-flag:: -fexternal-dynamic-refs
     :shortdesc: Generate code for linking against dynamic libraries
@@ -790,9 +789,7 @@ Options affecting code generation
     :category: codegen
 
     Generate code in such a way to be linkable into a position-independent
-    executable This currently works on Linux x86 and x86-64. On Windows,
-    position-independent code is never used so the flag is a no-op on that
-    platform. To link the final executable use :ghc-flag:`-pie`.
+    executable. To link the final executable use :ghc-flag:`-pie`.
 
 .. ghc-flag:: -dynamic
     :shortdesc: Build dynamically-linked object files and executables

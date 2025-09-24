@@ -895,7 +895,7 @@ pprInstr platform i = case i of
    JMP op _
       -> line $ text "\tjmp *" <> pprOperand platform (archWordFormat (target32Bit platform)) op
 
-   JMP_TBL op _ _ _
+   JMP_TBL op _ _ _ _
       -> pprInstr platform (JMP op [])
 
    CALL (Left imm) _
