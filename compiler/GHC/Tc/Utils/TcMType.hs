@@ -1032,18 +1032,6 @@ newMetaTyVarX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 -- an existing TyVar. We substitute kind variables in the kind.
 newMetaTyVarX = new_meta_tv_x TauTv
 
--- | Like 'newMetaTyVarX', but for concrete type variables.
-newConcreteTyVarX :: ConcreteTvOrigin -> Subst -> TyVar -> TcM (Subst, TcTyVar)
-newConcreteTyVarX conc subst tv
-  = do { th_lvl <- getThLevel
-       ; if
-          -- See [Wrinkle: Typed Template Haskell]
-          -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-          | TypedBrack _  <- th_lvl
-          -> new_meta_tv_x TauTv subst tv
-          | otherwise
-          -> new_meta_tv_x (ConcreteTv conc) subst tv }
-
 newMetaTyVarTyVarX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 -- Just like newMetaTyVarX, but make a TyVarTv
 newMetaTyVarTyVarX subst tv = new_meta_tv_x TyVarTv subst tv

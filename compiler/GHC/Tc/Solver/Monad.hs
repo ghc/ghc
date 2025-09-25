@@ -1799,12 +1799,20 @@ reportCoarseGrainUnifications (TcS thing_inside)
               ; unless (inner_ul `deeperThanOrSame` outer_ul) $
                 TcM.writeTcRef outer_ul_ref inner_ul
               ; let unif_happened = ambient_lvl `deeperThanOrSame` inner_ul
+              ; TcM.traceTc "reportCoarse(Coarse)" $
+                vcat [ text "ambient" <+> ppr ambient_lvl
+                     , text "outer_ul" <+> ppr outer_ul
+                     , text "inner_ul" <+> ppr inner_ul
+                     , text "unif_happened" <+> ppr unif_happened ]
               ; return (unif_happened, res) }
       WU_Fine outer_tvs_ref
         -> do { (unif_tvs,res) <- report_fine_grain_unifs env thing_inside
               ; let unif_happened = not (isEmptyVarSet unif_tvs)
               ; when unif_happened $
                 TcM.updTcRef outer_tvs_ref (`unionVarSet` unif_tvs)
+              ; TcM.traceTc "reportCoarse(Fine)" $
+                vcat [ text "unif_tvs" <+> ppr unif_tvs
+                     , text "unif_happened" <+> ppr unif_happened ]
               ; return (unif_happened, res) }
 
 report_fine_grain_unifs :: TcSEnv -> (TcSEnv -> TcM a) -> TcM (TcTyVarSet, a)

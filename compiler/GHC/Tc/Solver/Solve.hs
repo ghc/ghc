@@ -359,7 +359,7 @@ solveNestedImplications :: Bag Implication
 -- to be converted to givens before we go inside a nested implication.
 solveNestedImplications implics
   | isEmptyBag implics
-  = return (emptyBag)
+  = return emptyBag
   | otherwise
   = do { traceTcS "solveNestedImplications starting {" empty
        ; unsolved_implics <- mapBagM solveImplication implics

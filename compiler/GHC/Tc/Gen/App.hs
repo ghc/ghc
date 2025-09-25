@@ -719,7 +719,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
       , let no_tvs   = null tvs
             no_theta = null theta
       , not (no_tvs && no_theta)
-      = do { (_inst_tvs, wrap, fun_rho) <-
+      = do { (wrap, fun_rho) <-
                 -- addHeadCtxt: important for the class constraints
                 -- that may be emitted from instantiating fun_sigma
                 addHeadCtxt fun_ctxt $
@@ -786,7 +786,8 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
         --     not defer in any way, because this is a QL instantiation variable.
         -- It's easier just to do the job directly here.
         do { arg_tys <- zipWithM new_arg_ty (leadingValArgs args) [pos..]
-           ; res_ty  <- newOpenFlexiTyVarTy
+           ; rr_ty   <- newFlexiTyVarTyQL do_ql runtimeRepTy
+           ; res_ty  <- newFlexiTyVarTyQL do_ql (mkTYPEapp rr_ty)
            ; let fun_ty' = mkScaledFunTys arg_tys res_ty
 
            -- Fill in kappa := nu_1 -> .. -> nu_n -> res_nu
@@ -831,7 +832,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
                -- Following matchActualFunTy, we create nu_i :: TYPE kappa_i[conc],
                -- thereby ensuring that the arguments have concrete runtime representations
 
-           ; mult_ty <- newFlexiTyVarTy multiplicityTy
+           ; mult_ty <- newFlexiTyVarTyQL do_ql multiplicityTy
                -- mult_ty: e need variables for argument multiplicities (#18731)
                -- Otherwise, 'undefined x' wouldn't be linear in x
 
@@ -911,6 +912,96 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
            _ -> setSrcSpanA arg_loc $
                   addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
                   thing_inside }
+
+{- *********************************************************************
+*                                                                      *
+              Instantiating fresh type variables
+*                                                                      *
+********************************************************************* -}
+
+getTcLevelQL :: DoQL -> TcM TcLevel
+getTcLevelQL DoQL = return QLInstVar
+getTcLevelQL NoQL = getTcLevel
+
+newFlexiTyVarTyQL :: DoQL -> TcKind -> TcM TcType
+newFlexiTyVarTyQL do_ql kind
+  = do { lvl <- getTcLevelQL do_ql
+       ; newMetaTyVarTyAtLevel lvl kind }
+
+{-
+newArgTyVarQL do_ql frr_ctxt
+  = do { th_lvl <- getThLevel
+       ; rr_ty <- case th_lvl of
+                    TypedBrack {} -> newFlexiTyVarTyQL do_ql runtimeRepTy
+                    _ -> mdo { 
+       ; rr_ty <- 
+       ; newFlexiTyVarTyQL do_ql (mkTYPEapp rr_ty) }
+-}
+
+instantiateSigma :: CtOrigin
+                 -> QLFlag
+                 -> ConcreteTyVars -- ^ concreteness information
+                 -> [TyVar]
+                 -> TcThetaType -> TcSigmaType
+                 -> TcM (HsWrapper, TcSigmaType)
+-- (instantiate orig tvs theta ty)
+-- instantiates the type variables tvs, emits the (instantiated)
+-- constraints theta, and returns the (instantiated) type ty
+instantiateSigma orig do_ql concs tvs theta body_ty
+  = do { tv_lvl <- getTcLevelQL do_ql
+       ; rec (subst, inst_tvs) <- mapAccumLM (new_meta tv_lvl subst) empty_subst tvs
+       ; let inst_theta  = substTheta subst theta
+             inst_body   = substTy subst body_ty
+
+       ; wrap <- instCall orig (mkTyVarTys inst_tvs) inst_theta
+       ; traceTc "Instantiating"
+                 (vcat [ text "origin" <+> pprCtOrigin orig
+                       , text "tvs"   <+> ppr tvs
+                       , text "theta" <+> ppr theta
+                       , text "type" <+> debugPprType body_ty
+                       , text "with" <+> vcat (map debugPprType inst_tv_tys)
+                       , text "theta:" <+> ppr inst_theta ])
+
+      ; return (wrap, inst_body) }
+  where
+    in_scope = mkInScopeSet (tyCoVarsOfType (mkSpecSigmaTy tvs theta body_ty))
+               -- mkSpecSigmaTy: Inferred vs Specified is not important here;
+               --                We just want an accurate free-var set
+    empty_subst = mkEmptySubst in_scope
+
+    new_meta :: TcLevel -> Subst -> Subst -> TyVar -> TcM (Subst, TcTyVar)
+    new_meta tv_lvl final_subst subst tv
+      = do { name <- cloneMetaTyVarName (tyVarName tv)
+           ; ref  <- newMutVar Flexi
+           ; info <- get_info tv
+           ; let details = MetaTv { mtv_info  = info
+                                  , mtv_ref   = ref
+                                  , mtv_tclvl = tv_lvl }
+           ; let substd_kind = substTy subst (tyVarKind tv)
+                 new_tv      = mkTcTyVar name substd_kind details
+                 new_subst   = extendTvSubstWithClone subst tv new_tv
+           ; return (new_subst, new_tv) }
+
+    get_info :: Subst -> TyVar -> TcM MetaInfo
+    get_info concs final_subst tv
+      -- Is this a type variable that must be instantiated to a concrete type?
+      -- If so, create a ConcreteTv metavariable instead of a plain TauTv.
+      -- See Note [Representation-polymorphism checking built-ins]
+      --     in GHC.Tc.Utils.Concrete.
+      --
+      -- But check TH level: see [Wrinkle: Typed Template Haskell]
+      -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
+      | Just conc_orig0 <- lookupNameEnv concs (tyVarName tv)
+      , let conc_orig = substConcreteTvOrigin final_subst body_ty conc_orig0
+                        -- See Note [substConcreteTvOrigin].
+      = do { th_lvl <- getThLevel
+           ; case th_lvl of
+              TypedBrack {} -> return TauTv
+              _             -> return (ConcreteTv conc) }
+
+      -- The vastly common case
+      | otherwise
+      = return TauTv
 
 {- *********************************************************************
 *                                                                      *
