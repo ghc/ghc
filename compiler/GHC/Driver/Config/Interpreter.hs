@@ -41,6 +41,6 @@ initInterpOpts dflags = do
     , interpVerbosity = verbosity dflags
     , interpLdConfig = configureLd dflags
     , interpCcConfig = configureCc dflags
-    , interpExecutableLinkOpts = initExecutableLinkOpts dflags
+    , interpExecutableLinkOpts = initExecutableLinkOpts dflags Dynamic
     }
 

@@ -1,0 +1,9 @@
+name: test
+version: 1.0
+id: test-1.0
+key: test-1.0
+exposed-modules: Test
+import-dirs: ${pkgroot}/test
+library-dirs-static: ${pkgroot}/test
+extra-libraries-static: test-1.0
+exposed: True

@@ -29,11 +29,13 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
+import GHC.Driver.DynFlags (ExecutableLinkMode(..))
 import GHC.Driver.Session
 import GHC.Driver.Config.Linker
 
 import qualified GHC.Data.ShortText as ST
 
+import GHC.Settings (ToolSettings(..))
 import GHC.SysTools
 import GHC.SysTools.Elf
 import GHC.Linker.Config
@@ -78,10 +80,13 @@ data ExecutableLinkOpts = ExecutableLinkOpts
   , leRtsOptsSuggestions :: !Bool
   , leKeepCafs :: !Bool
   , leRtsOpts :: Maybe String
+  , leSupportsVerbatim :: Bool
+  , leExecutableLinkMode :: ExecutableLinkMode
+  , leTargetPlatform :: Platform
   }
 
-initExecutableLinkOpts :: DynFlags -> ExecutableLinkOpts
-initExecutableLinkOpts dflags =
+initExecutableLinkOpts :: DynFlags -> ExecutableLinkMode -> ExecutableLinkOpts
+initExecutableLinkOpts dflags blm =
   let
     platform = targetPlatform dflags
     os = platformOS platform
@@ -114,6 +119,9 @@ initExecutableLinkOpts dflags =
     , leRtsOptsSuggestions = rtsOptsSuggestions dflags
     , leKeepCafs = gopt Opt_KeepCAFs dflags
     , leRtsOpts = rtsOpts dflags
+    , leSupportsVerbatim = toolSettings_ldSupportsVerbatimNamespace (toolSettings dflags)
+    , leExecutableLinkMode = blm
+    , leTargetPlatform = platform
     }
 
 leHaveRtsOptsFlags :: ExecutableLinkOpts -> Bool
@@ -220,11 +228,14 @@ linkExecutable logger tmpfs opts unit_env o_files dep_units = do
         | otherwise
         = ([],[])
 
+    let linkMode = leExecutableLinkMode opts
+
     pkg_link_opts <- do
-        unit_link_opts <- getUnitLinkOpts namever ways_ unit_env dep_units
+        unit_link_opts <- getUnitLinkOpts namever ways_ (Just (linkMode, leSupportsVerbatim opts, leTargetPlatform opts)) unit_env dep_units
         return $ otherFlags unit_link_opts ++ dead_strip
                   ++ pre_hs_libs ++ hsLibs unit_link_opts ++ post_hs_libs
                   ++ extraLibs unit_link_opts
+                  ++ (if linkMode == FullyStatic then ["-static"] else [])
                  -- -Wl,-u,<sym> contained in other_flags
                  -- needs to be put before -l<package>,
                  -- otherwise Solaris linker fails linking
@@ -449,7 +460,7 @@ data LinkInfo = LinkInfo
 -- See Note [LinkInfo section]
 initLinkInfo :: ExecutableLinkOpts -> UnitEnv -> [UnitId] -> IO LinkInfo
 initLinkInfo opts unit_env dep_packages = do
-    package_link_opts <- getUnitLinkOpts (leNameVersion opts) (leWays opts) unit_env dep_packages
+    package_link_opts <- getUnitLinkOpts (leNameVersion opts) (leWays opts) (Just (leExecutableLinkMode opts, leSupportsVerbatim opts, leTargetPlatform opts)) unit_env dep_packages
     pkg_frameworks <- if not (platformUsesFrameworks (ue_platform unit_env))
       then return []
       else do

@@ -15,6 +15,8 @@ import GHC.Toolchain.Prelude
 import GHC.Toolchain.Utils
 import GHC.Toolchain.Program
 import GHC.Toolchain.Tools.Cc
+import GHC.Toolchain.Tools.Ar
+import GHC.Toolchain.Tools.Ranlib
 import GHC.Toolchain.Tools.Readelf
 
 -- | Configuration on how the C compiler can be used to link
@@ -24,6 +26,7 @@ data CcLink = CcLink { ccLinkProgram :: Program
                      , ccLinkSupportsFilelist :: Bool
                      , ccLinkSupportsSingleModule :: Bool
                      , ccLinkIsGnu :: Bool
+                     , ccLinkSupportsVerbatimNamespace :: Bool
                      }
     deriving (Read, Eq, Ord)
 
@@ -37,6 +40,7 @@ instance Show CcLink where
     , ", ccLinkSupportsFilelist = " ++ show ccLinkSupportsFilelist
     , ", ccLinkSupportsSingleModule = " ++ show ccLinkSupportsSingleModule
     , ", ccLinkIsGnu = " ++ show ccLinkIsGnu
+    , ", ccLinkSupportsVerbatimNamespace = " ++ show ccLinkSupportsVerbatimNamespace
     , "}"
     ]
 
@@ -47,8 +51,8 @@ findCcLink :: String -- ^ The llvm target to use if CcLink supports --target
            -> ProgOpt
            -> ProgOpt
            -> Bool   -- ^ Whether we should search for a more efficient linker
-           -> ArchOS -> Cc -> Maybe Readelf -> M CcLink
-findCcLink target ld progOpt ldOverride archOs cc readelf = checking "for C compiler for linking command" $ do
+           -> ArchOS -> Cc -> Maybe Readelf -> Ar -> Ranlib -> M CcLink
+findCcLink target ld progOpt ldOverride archOs cc readelf ar ranlib = checking "for C compiler for linking command" $ do
   -- Use the specified linker or try using the C compiler
   rawCcLink <- findProgram "C compiler for linking" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
   -- See #23857 for why we check to see if LD is set here
@@ -72,9 +76,10 @@ findCcLink target ld progOpt ldOverride archOs cc readelf = checking "for C comp
   ccLinkIsGnu                 <- checkLinkIsGnu archOs ccLinkProgram
   checkBfdCopyBug archOs cc readelf ccLinkProgram
   ccLinkProgram <- addPlatformDepLinkFlags archOs cc ccLinkProgram
+  ccLinkSupportsVerbatimNamespace <- linkSupportsVerbatimNamespace cc ar ranlib ccLinkProgram
   let ccLink = CcLink {ccLinkProgram, ccLinkSupportsNoPie,
                        ccLinkSupportsCompactUnwind, ccLinkSupportsFilelist,
-                       ccLinkSupportsSingleModule, ccLinkIsGnu}
+                       ccLinkSupportsSingleModule, ccLinkIsGnu, ccLinkSupportsVerbatimNamespace}
   ccLink <- linkRequiresNoFixupChains archOs cc ccLink
   ccLink <- linkRequiresNoWarnDuplicateLibraries archOs cc ccLink
   return ccLink
@@ -97,6 +102,46 @@ findLinkFlags enableOverride cc ccLink
         <|> (ccLink <$ checkLinkWorks cc ccLink)
   | otherwise =
     return ccLink
+
+-- | Test whether the linker supports the verbatim '-l:libfoo.a' syntax, allowing
+-- us better control over partial static linking.
+linkSupportsVerbatimNamespace :: Cc -> Ar -> Ranlib -> Program -> M Bool
+linkSupportsVerbatimNamespace cc ar ranlib ccLink = (<|> pure False) $ checking "whether cc linker supports -l:libfoo.a" $ withTempDir $ \tmpDir -> do
+    let test_c  = tmpDir </> "test.c"
+    writeFile test_c testLibrary
+    let test_o  = tmpDir </> "test.o"
+    let test_a  = tmpDir </> "libtest.a"
+
+    let main_c = tmpDir </> "main.c"
+    writeFile main_c testMain
+    let main' = tmpDir </> "main"
+    let err = "linker didn't produce any output"
+
+    callProgram (ccProgram cc) ["-c", test_c, "-o", test_o]
+    callProgram (arMkArchive ar) [test_a, test_o]
+    when (arNeedsRanlib ar) $ callProgram (ranlibProgram ranlib) [test_a]
+
+    callProgram ccLink [main_c, "-o", main', "-L" ++ tmpDir, "-l:libtest.a"]
+    expectFileExists main' err
+      -- Linking in windows might produce an executable with an ".exe" extension
+      <|> expectFileExists (main' <.> "exe") err
+
+    return True
+
+  where
+   testLibrary = mconcat
+     ["void my_func(void) {"
+     ,"/* A simple function to be archived */"
+     , "}"
+     ]
+   testMain = mconcat
+     ["void my_func(void);"
+     ,"int main(void) {"
+     , "  my_func();"
+     , "  return 0;"
+     , "}"
+     ]
+
 
 linkSupportsTarget :: ArchOS -> Cc -> String -> Program -> M Program
 -- Javascript toolchain provided by emsdk just ignores --target flag so

@@ -25,6 +25,8 @@ module GHC.Unit.Info
    , collectLibraryDirs
    , collectFrameworks
    , collectFrameworksDirs
+   , libraryDirsForWay
+   , libraryDirsForWay'
    , unitHsLibs
    )
 where
@@ -139,10 +141,12 @@ pprUnitInfo GenericUnitInfo {..} =
       field "trusted"              (ppr unitIsTrusted),
       field "import-dirs"          (fsep (map (text . ST.unpack) unitImportDirs)),
       field "library-dirs"         (fsep (map (text . ST.unpack) unitLibraryDirs)),
+      field "library-dirs-static"  (fsep (map (text . ST.unpack) unitLibraryDirsStatic)),
       field "dynamic-library-dirs" (fsep (map (text . ST.unpack) unitLibraryDynDirs)),
       field "bytecode-library-dirs" (fsep (map (text . ST.unpack) unitLibraryBytecodeDirs)),
       field "hs-libraries"         (fsep (map (text . ST.unpack) unitLibraries)),
       field "extra-libraries"      (fsep (map (text . ST.unpack) unitExtDepLibsSys)),
+      field "extra-libraries-static" (fsep (map (text . ST.unpack) unitExtDepLibsStaticSys)),
       field "extra-ghci-libraries" (fsep (map (text . ST.unpack) unitExtDepLibsGhc)),
       field "include-dirs"         (fsep (map (text . ST.unpack) unitIncludeDirs)),
       field "includes"             (fsep (map (text . ST.unpack) unitIncludes)),
@@ -201,9 +205,12 @@ collectFrameworksDirs ps = map ST.unpack (ordNub (filter (not . ST.null) (concat
 
 -- | Either the 'unitLibraryDirs' or 'unitLibraryDynDirs' as appropriate for the way.
 libraryDirsForWay :: Ways -> UnitInfo -> [String]
-libraryDirsForWay ws
-  | hasWay ws WayDyn = map ST.unpack . unitLibraryDynDirs
-  | otherwise        = map ST.unpack . unitLibraryDirs
+libraryDirsForWay ws = libraryDirsForWay' (hasWay ws WayDyn)
+
+libraryDirsForWay' :: Bool -> UnitInfo -> [String]
+libraryDirsForWay' is_dyn
+  | is_dyn    = map ST.unpack . unitLibraryDynDirs
+  | otherwise = map ST.unpack . unitLibraryDirsStatic
 
 unitHsLibs :: GhcNameVersion -> Ways -> UnitInfo -> [String]
 unitHsLibs namever ways0 p = map (mkDynName . addSuffix . ST.unpack) (unitLibraries p)

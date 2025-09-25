@@ -55,6 +55,8 @@ class TestConfig:
         # Run tests requiring Haddock
         self.haddock = False
 
+        self.is_musl = None # type: Optional[bool]
+
         # Compiler has native code generator?
         self.have_ncg = False
 

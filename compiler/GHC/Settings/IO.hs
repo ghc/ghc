@@ -172,6 +172,7 @@ initSettings top_dir = do
       , toolSettings_ldSupportsFilelist      = ccLinkSupportsFilelist      $ tgtCCompilerLink target
       , toolSettings_ldSupportsSingleModule  = ccLinkSupportsSingleModule  $ tgtCCompilerLink target
       , toolSettings_ldIsGnuLd               = ccLinkIsGnu                 $ tgtCCompilerLink target
+      , toolSettings_ldSupportsVerbatimNamespace = ccLinkSupportsVerbatimNamespace $ tgtCCompilerLink target
       , toolSettings_ccSupportsNoPie         = ccLinkSupportsNoPie         $ tgtCCompilerLink target
       , toolSettings_mergeObjsSupportsResponseFiles
                                       = maybe False mergeObjsSupportsResponseFiles

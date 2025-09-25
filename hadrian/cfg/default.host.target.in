@@ -27,6 +27,7 @@ Target
 , ccLinkSupportsFilelist = False
 , ccLinkSupportsSingleModule = True
 , ccLinkIsGnu = False
+, ccLinkSupportsVerbatimNamespace = False
 }
 
 , tgtAr = Ar

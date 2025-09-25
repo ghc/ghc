@@ -30,6 +30,9 @@ module GHC.Driver.DynFlags (
         RtsOptsEnabled(..), haveRtsOptsFlags,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
+        isExecutableLink,
+        mostlyStaticExclude,
+        ExecutableLinkMode(..),
         PackageFlag(..), PackageArg(..), ModRenaming(..),
         packageFlagsChanged,
         IgnorePackageFlag(..), TrustFlag(..),
@@ -555,7 +558,7 @@ defaultDynFlags mySettings =
 -- See Note [Updating flag description in the User's Guide]
      DynFlags {
         ghcMode                 = CompManager,
-        ghcLink                 = LinkBinary,
+        ghcLink                 = LinkExecutable Dynamic,
         backend                 = platformDefaultBackend (sTargetPlatform mySettings),
         verbosity               = 0,
         debugLevel              = 0,
@@ -808,7 +811,7 @@ isOneShot _other  = False
 -- | What to do in the link step, if there is one.
 data GhcLink
   = NoLink              -- ^ Don't link at all
-  | LinkBinary          -- ^ Link object code into a binary
+  | LinkExecutable ExecutableLinkMode -- ^ Link object code into an executable
   | LinkInMemory        -- ^ Use the in-memory dynamic linker (works for both
                         --   bytecode and object code).
   | LinkDynLib          -- ^ Link objects into a dynamic lib (DLL on Windows, DSO on ELF platforms)
@@ -816,6 +819,38 @@ data GhcLink
   | LinkStaticLib       -- ^ Link objects into a static lib
   | LinkMergedObj       -- ^ Link objects into a merged "GHCi object"
   deriving (Eq, Show)
+
+isExecutableLink :: GhcLink -> Bool
+isExecutableLink (LinkExecutable _) = True
+isExecutableLink _              = False
+
+-- | How we link the binary.
+--
+-- This mostly deals with how external system dependencies are treated.
+-- The 'Ways' determine how Haskell libraries are linked.
+data ExecutableLinkMode
+  = FullyStatic                    -- ^ fully static binary (incompatible with 'WayDyn')
+  | MostlyStatic (Maybe [String])  -- ^ we link system libraries statically, except the ones provided
+                                   --   if none (Nothing) are provided, then we use a static list depending on the target platform
+  | Dynamic                        -- ^ default
+  deriving (Eq, Show)
+
+-- | Compute the static linking exclusion list.
+--
+-- - if the user passed a list, we use that
+-- - otherwise we use a best effort static list depending on target platform
+mostlyStaticExclude :: Maybe [String] -> Platform -> [String]
+mostlyStaticExclude (Just xs) _ = xs
+mostlyStaticExclude Nothing pf =
+  case platformOS pf of
+    OSMinGW32 -> win
+    _ -> unix
+
+ where
+  win = [ "wsock32", "gdi32", "winmm", "dbghelp", "psapi", "user32", "shell32"
+        , "mingw32", "kernel32", "advapi32", "mingwex", "ws2_32", "shlwapi"
+        , "ole32", "rpcrt4", "ntdll", "ucrt"]
+  unix = ["c", "m", "rt", "dl", "pthread", "stdc++", "c++", "c++abi", "atomic"]
 
 isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True

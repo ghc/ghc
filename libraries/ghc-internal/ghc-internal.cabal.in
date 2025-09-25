@@ -1,4 +1,4 @@
-cabal-version:  3.0
+cabal-version:  3.8
 -- WARNING: ghc-internal.cabal is automatically generated from ghc-internal.cabal.in by
 -- the top-level ./configure script. Make sure you are editing ghc-internal.cabal.in, not ghc-internal.cabal.
 name:           ghc-internal
@@ -472,7 +472,7 @@ Library
     if flag(need-atomic)
         -- for 64-bit atomic ops on armel (#20549)
         extra-libraries: atomic
-
+        extra-libraries-static: atomic
     -- OS Specific
     if os(windows)
         -- Windows requires some extra libraries for linking because the RTS
@@ -493,6 +493,9 @@ Library
         -- user32: provides access to apis to modify user components (UI etc)
         --         on Windows. Required because of mingw32.
         extra-libraries:
+            wsock32, user32, shell32, mingw32, kernel32, advapi32,
+            mingwex, ws2_32, shlwapi, ole32, rpcrt4, ntdll, ucrt
+        extra-libraries-static:
             wsock32, user32, shell32, mingw32, kernel32, advapi32,
             mingwex, ws2_32, shlwapi, ole32, rpcrt4, ntdll, ucrt
         -- Minimum supported Windows version.
@@ -541,6 +544,7 @@ Library
         -- we need libm, but for musl and other's we might need libc, as libm
         -- is just an empty shell.
         extra-libraries: c, m
+        extra-libraries-static: c, m
 
     -- The Ports framework always passes this flag when building software that
     -- uses iconv to make iconv from Ports compatible with iconv from the base system

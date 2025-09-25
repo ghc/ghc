@@ -1444,8 +1444,10 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.unitImportDirs     = map ST.pack $ importDirs pkg,
        GhcPkg.unitLibraries      = map ST.pack $ hsLibraries pkg,
        GhcPkg.unitExtDepLibsSys  = map ST.pack $ extraLibraries pkg,
+       GhcPkg.unitExtDepLibsStaticSys = map ST.pack $ extraLibrariesStatic pkg,
        GhcPkg.unitExtDepLibsGhc  = map ST.pack $ extraGHCiLibraries pkg,
        GhcPkg.unitLibraryDirs    = map ST.pack $ libraryDirs pkg,
+       GhcPkg.unitLibraryDirsStatic = map ST.pack $ libraryDirsStatic pkg,
        GhcPkg.unitLibraryDynDirs = map ST.pack $ libraryDynDirs pkg,
        GhcPkg.unitLibraryBytecodeDirs = [],
        -- TODO: When the Cabal submodule is updated to support "library-bytecode-dirs", use

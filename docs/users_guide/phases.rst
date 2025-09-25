@@ -964,6 +964,58 @@ for example).
     To control the name, use the :ghc-flag:`-o ⟨file⟩` option
     as usual. The default name is ``liba.a``.
 
+.. ghc-flag:: -static-external
+    :shortdesc: Link external C dependencies statically when
+        building an executable.
+    :type: dynamic
+    :category: linking
+
+    Link external system libraries statically when building an executable.
+    By default, this excludes the following libraries on unix:
+    ``c``, ``m``, ``rt``, ``dl``, ``pthread``, ``stdc++``, ``c++``, ``c++abi``, ``atomic``.
+    And the following libraries on windows:
+    ``wsock32``, ``gdi32``, ``winmm``, ``dbghelp``, ``psapi``, ``user32``, ``shell32`` ,
+    ``mingw32``, ``kernel32``, ``advapi32``, ``mingwex``, ``ws2_32``, ``shlwapi`` ,
+    ``ole32``, ``rpcrt4``, ``ntdll``, ``ucrt``.
+    Also see :ghc-flag:`-exclude-static-external ⟨lib1,lib2,...⟩` for more control.
+    It is required that all system dependencies and their
+    static libraries are installed. This does not affect how Haskell libraries
+    are linked. You can combine this with ghc-flag:`-static` to produce binaries
+    that are only dynamically linked against e.g. libc.
+
+    Also note that this option is not terribly portable. It relies on the "verbatim namespace"
+    convention that some linkers support (``-l:foo.a``). On systems where
+    this isn't supported, GHC falls back to trying to look up the absolute path
+    of the static archives, which may not always work.
+
+    To control how Haskell libraries are linked, see :ghc-flag:`-static` and
+    :ghc-flag:`-dynamic`.
+
+.. ghc-flag:: -exclude-static-external ⟨lib1,lib2,...⟩
+    :shortdesc: Don't link the following libraries statically
+    :type: dynamic
+    :category: linking
+
+    When linking system libraries statically, allow to specify a comma separated list
+    of libraries to not link statically (as in: dynamic). Since :ghc-flag:`-static-external`
+    is not meant for fully static linking and gives more control than :ghc-flag:`-fully-static`,
+    this option allows to exclude certain libraries. By default, these are: ``c``, ``m``, ``rt``, ``dl``, ``pthread``, ``stdc++``, ``c++``, ``c++abi``, ``atomic``.
+
+    When this option is specified without arguments, no libraries are excluded.
+
+.. ghc-flag:: -fully-static
+    :shortdesc: Link everything statically when
+        building an executable.
+    :type: dynamic
+    :category: linking
+
+    Link all libraries statically when building an executable. This includes
+    external libraries, Haskell libraries, as well as libc.
+    This requires that all dependencies and their static libraries are installed.
+    Musl is commonly used to provide a static libc.
+
+    This flag is incompatible with :ghc-flag:`-dynamic`.
+
 .. ghc-flag:: -L ⟨dir⟩
     :shortdesc: Add ⟨dir⟩ to the list of directories searched for libraries
     :type: dynamic
@@ -1018,6 +1070,9 @@ for example).
 
     Tell the linker to avoid shared Haskell libraries, if possible. This
     is the default.
+
+    To further control linking behavior, also see :ghc-flag:`-fully-static`
+    and :ghc-flag:`-static-external`.
 
 .. ghc-flag:: -dynamic
     :shortdesc: Build dynamically-linked object files and executables

@@ -1,0 +1,10 @@
+name: test
+version: 1.0
+id: test-1.0
+key: test-1.0
+import-dirs: ${pkgroot}/test
+include-dirs: ${pkgroot}/test
+includes: test.h
+library-dirs-static: ${pkgroot}/test
+extra-libraries-static: test-1.0
+exposed: True

@@ -1,4 +1,4 @@
-cabal-version: 3.0
+cabal-version: 3.8
 name: rts
 version: 1.0.3
 synopsis: The GHC runtime system
@@ -225,10 +225,13 @@ library
          -- that it is ordered correctly with libpthread, since ghc-internal.cabal
          -- also explicitly lists libc. See #19029.
          extra-libraries: c
+         extra-libraries-static: c
       if flag(librt)
          extra-libraries: rt
+         extra-libraries-static: rt
       if flag(use-system-libffi)
          extra-libraries: ffi
+         extra-libraries-static: ffi
       if os(windows)
          extra-libraries:
             -- for the linker
@@ -236,6 +239,10 @@ library
             -- for crash dump
             dbghelp
             -- for process information
+            psapi
+         extra-libraries-static:
+            wsock32 gdi32 winmm
+            dbghelp
             psapi
          -- TODO: Hadrian will use this cabal file, so drop WINVER from Hadrian's configs.
          -- Minimum supported Windows version.
@@ -249,14 +256,18 @@ library
       if flag(need-atomic)
          -- for sub-word-sized atomic operations (#19119)
          extra-libraries: atomic
+         extra-libraries-static: atomic
       if flag(libbfd)
          -- for debugging
          extra-libraries: bfd iberty
+         extra-libraries-static: bfd iberty
       if flag(libdw)
          -- for backtraces
          extra-libraries: elf dw
+         extra-libraries-static: elf dw
       if flag(libnuma)
          extra-libraries: numa
+         extra-libraries-static: numa
       if flag(libzstd)
          if flag(static-libzstd)
             if os(darwin)
@@ -265,6 +276,7 @@ library
                extra-libraries: :libzstd.a
          else
             extra-libraries: zstd
+         extra-libraries-static: zstd
       if !flag(smp)
          cpp-options: -DNOSMP
 

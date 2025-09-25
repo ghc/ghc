@@ -1221,8 +1221,7 @@ loadPackage interp hsc_env pkgs pls
             ld_config = configureLd dflags
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic interp
-            dirs | is_dyn    = [map ST.unpack $ Packages.unitLibraryDynDirs pkg | pkg <- pkgs]
-                 | otherwise = [map ST.unpack $ Packages.unitLibraryDirs pkg | pkg <- pkgs]
+            dirs      = [libraryDirsForWay' is_dyn pkg | pkg <- pkgs]
             -- Directory to find bytecode libraries
             bc_dirs = [map ST.unpack $ Packages.unitLibraryBytecodeDirs pkg | pkg <- pkgs]
 

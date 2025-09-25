@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -364,7 +366,7 @@ link ghcLink hsc_env batch_attempt_linking mHscMessage hpt =
   case linkHook (hsc_hooks hsc_env) of
       Nothing -> case ghcLink of
         NoLink        -> return Succeeded
-        LinkBinary    -> normal_link
+        LinkExecutable _  -> normal_link
         LinkStaticLib -> normal_link
         LinkDynLib    -> normal_link
         LinkMergedObj -> normal_link
@@ -422,6 +424,7 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
                   return Succeeded
           else do
 
+        -- linkObjectLinkable is generic across LinkStaticLib and LinkDynLib
         let linkObjectLinkable action =
               checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink (checkNativeLibraryLinkingNeeded staticLink) homeMod_object $ \linkables ->
                 let obj_files = concatMap linkableObjs linkables
@@ -433,12 +436,20 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
 
         -- Don't showPass in Batch mode; doLink will do that for us.
         case ghcLink dflags of
-          LinkBinary
-            | backendUseJSLinker (backend dflags) ->
-                linkObjectLinkable $ \obj_files -> linkJSBinary logger tmpfs fc dflags unit_env obj_files pkg_deps
-            | otherwise -> do
-                let opts = initExecutableLinkOpts dflags
-                linkObjectLinkable $ \obj_files -> linkExecutable logger tmpfs opts unit_env obj_files pkg_deps
+          LinkExecutable blm ->
+            let opts = initExecutableLinkOpts dflags blm
+                -- this is almost linke 'linkObjectLinkable', except that we need additional
+                -- relinking checks on the executable options
+                linkExecutableLinkable action =
+                  checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink (\l d u ls us -> checkNativeLibraryLinkingNeeded staticLink l d u ls us >>= \case
+                      UpToDate -> checkExecutableRelinkingNeeded l d u us opts
+                      x -> pure x) homeMod_object $ \linkables ->
+                    let obj_files = concatMap linkableObjs linkables
+                    in action obj_files
+            in if | backendUseJSLinker (backend dflags) ->
+                      linkExecutableLinkable $ \obj_files -> linkJSBinary logger tmpfs fc dflags unit_env obj_files pkg_deps
+                  | otherwise ->
+                      linkExecutableLinkable $ \obj_files -> do linkExecutable logger tmpfs opts unit_env obj_files pkg_deps
           LinkStaticLib ->
             linkObjectLinkable $ \obj_files -> linkStaticLib logger dflags unit_env obj_files pkg_deps
           LinkDynLib    ->
@@ -537,7 +548,7 @@ checkBytecodeLibraryLinkingNeeded _logger dflags unit_env linkables _pkg_deps = 
             else return UpToDate
 
 checkNativeLibraryLinkingNeeded :: Bool -> Logger -> DynFlags -> UnitEnv -> [Linkable] -> [UnitId] -> IO RecompileRequired
-checkNativeLibraryLinkingNeeded staticLink logger dflags unit_env linkables pkg_deps = do
+checkNativeLibraryLinkingNeeded staticLink _ dflags unit_env linkables pkg_deps = do
         -- if the modification time on the executable is later than the
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
@@ -579,12 +590,20 @@ checkNativeLibraryLinkingNeeded staticLink logger dflags unit_env linkables pkg_
         (lib_errs,lib_times) <- partitionWithM (tryIO . getModificationUTCTime) (catMaybes pkg_libfiles)
         if not (null lib_errs) || any (t <) lib_times
            then return $ needsRecompileBecause LibraryChanged
-           else do
-            let opts = initExecutableLinkOpts dflags
-            res <- checkLinkInfo logger opts unit_env pkg_deps exe_file
-            if res
-              then return $ needsRecompileBecause FlagsChanged
-              else return UpToDate
+           else return UpToDate
+
+-- | Check if we have new executable linking options and need to recompile.
+-- This only concerns the executable options. For checking whether libraries/objects changed
+-- use 'checkNativeLibraryLinkingNeeded'.
+checkExecutableRelinkingNeeded :: Logger -> DynFlags -> UnitEnv -> [UnitId] -> ExecutableLinkOpts -> IO RecompileRequired
+checkExecutableRelinkingNeeded logger dflags unit_env pkg_deps opts = do
+  let platform = targetPlatform dflags
+      arch_os  = platformArchOS platform
+      exe_file = exeFileName arch_os False (outputFile_ dflags)
+  res <- checkLinkInfo logger opts unit_env pkg_deps exe_file
+  if res
+    then return $ needsRecompileBecause FlagsChanged
+    else return UpToDate
 
 
 findHSLib :: Platform -> Ways -> [String] -> String -> IO (Maybe FilePath)
@@ -652,11 +671,11 @@ doLink hsc_env o_files = do
 
   case ghcLink dflags of
     NoLink        -> return ()
-    LinkBinary
+    LinkExecutable blm
       | backendUseJSLinker (backend dflags)
                   -> linkJSBinary logger tmpfs fc dflags unit_env o_files []
       | otherwise -> do
-          let opts = initExecutableLinkOpts dflags
+          let opts = initExecutableLinkOpts dflags blm
           linkExecutable logger tmpfs opts unit_env o_files []
     LinkStaticLib -> linkStaticLib      logger       dflags unit_env o_files []
     LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []

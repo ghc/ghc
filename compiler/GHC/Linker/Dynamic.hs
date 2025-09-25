@@ -92,11 +92,9 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
          | OSMinGW32 <- os         = pkgs_with_rts
          | gopt Opt_LinkRts dflags = pkgs_with_rts
          | otherwise               = pkgs_without_rts
-        pkg_link_opts = hsLibs unit_link_opts ++ extraLibs unit_link_opts ++ otherFlags unit_link_opts
-          where
-            namever = ghcNameVersion dflags
-            ways_   = ways dflags
-            unit_link_opts = collectLinkOpts namever ways_ pkgs
+    unit_link_opts <- collectLinkOpts (ghcNameVersion dflags) (ways dflags) Nothing pkgs
+    let pkg_link_opts = hsLibs unit_link_opts ++ extraLibs unit_link_opts ++ otherFlags unit_link_opts
+
 
         -- probably _stub.o files
         -- and last temporary shared object file

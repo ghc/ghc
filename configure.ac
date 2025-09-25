@@ -496,6 +496,8 @@ else
 fi
 AC_SUBST([RanlibCmd])
 
+LINKER_SUPPORTS_VERBATIM_LINKING
+
 dnl ** which strip to use?
 dnl --------------------------------------------------------------
 AC_CHECK_TARGET_TOOL([STRIP], [strip])

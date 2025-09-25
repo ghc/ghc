@@ -1124,6 +1124,15 @@ dynamic_flags_deps = [
       (NoArg (setGeneralFlag Opt_SingleLibFolder))
   , make_ord_flag defGhcFlag "pie"            (NoArg (setGeneralFlag Opt_PICExecutable))
   , make_ord_flag defGhcFlag "no-pie"         (NoArg (unSetGeneralFlag Opt_PICExecutable))
+  , make_ord_flag defGhcFlag "static-external" (noArg (\d -> d { ghcLink=LinkExecutable (MostlyStatic Nothing) }))
+  , make_ord_flag defGhcFlag "exclude-static-external"
+      (OptPrefix (\str -> upd $ \d -> case ghcLink d of
+                                        LinkExecutable (MostlyStatic _) ->
+                                          d { ghcLink = LinkExecutable (MostlyStatic $ Just (split ',' str)) }
+                                        _ -> d
+                 )
+      )
+  , make_ord_flag defGhcFlag "fully-static"    (noArg (\d -> d { ghcLink=LinkExecutable FullyStatic }))
 
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.
@@ -3839,11 +3848,14 @@ makeDynFlagsConsistent dflags
 #endif
         addWay' WayDyn dflags
 
- | LinkBinary <- ghcLink dflags
+ | LinkExecutable _ <- ghcLink dflags
  , gopt Opt_ByteCode dflags
     = loop (dflags { ghcLink = NoLink })
            "Byte-code linking does not currently support linking an executable, enabling -no-link"
-
+ | LinkExecutable FullyStatic <- ghcLink dflags
+ , ways dflags `hasWay` WayDyn
+    = let warn = "-dynamic is ignored when using -fully-static"
+      in loop dflags{targetWays_ = removeWay WayDyn (targetWays_ dflags)} warn
  | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , targetWays_ dflags /= hostFullWays
