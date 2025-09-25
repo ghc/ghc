@@ -29,7 +29,7 @@ module GHC.Tc.Utils.TcMType (
   newOpenBoxedTypeKind,
   newMetaKindVar, newMetaKindVars,
   newMetaTyVarTyAtLevel, newConcreteTyVarTyAtLevel, substConcreteTvOrigin,
-  newAnonMetaTyVar, newConcreteTyVar,
+  newAnonMetaTyVar, newConcreteTyVar, mkConcreteInfo,
   cloneMetaTyVar, cloneMetaTyVarWithInfo,
   newCycleBreakerTyVar,
 
@@ -58,7 +58,6 @@ module GHC.Tc.Utils.TcMType (
   newMetaTyVars, newMetaTyVarX, newMetaTyVarsX, newMetaTyVarBndrsX,
   newMetaTyVarTyVarX,
   newTyVarTyVar, cloneTyVarTyVar,
-  newConcreteTyVarX,
   newPatTyVar, newSkolemTyVar, newWildCardX,
 
   --------------------------------
@@ -714,25 +713,28 @@ used for ScopedTypeVariables in patterns, to make sure these type
 variables only refer to other type variables, but this restriction was
 dropped, and ScopedTypeVariables can now refer to full types (GHC
 Proposal 29).
+
+Note [Name of a unification variable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We give unification variables a /System/ Name, which is eagerly elmininated
+the the unifier; see GHC.Tc.Utils.Unify.nicer_to_update_tv1, and
+GHC.Tc.Solver.Equality.canEqTyVarTyVar (nicer_to_update_tv2)
+
+Note [Name of an instantiated type variable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment we give a unification variable a System Name, which
+influences the way it is tidied; see TypeRep.tidyTyVarBndr.
 -}
 
 newMetaTyVarName :: FastString -> TcM Name
--- Makes a /System/ Name, which is eagerly eliminated by
--- the unifier; see GHC.Tc.Utils.Unify.nicer_to_update_tv1, and
--- GHC.Tc.Solver.Equality.canEqTyVarTyVar (nicer_to_update_tv2)
+-- Makes a /System/ Name; see Note [Name of a unification variable]
 newMetaTyVarName str
   = newSysName (mkTyVarOccFS str)
 
 cloneMetaTyVarName :: Name -> TcM Name
+-- See Note [Name of an instantiated type variable]
 cloneMetaTyVarName name
   = newSysName (nameOccName name)
-         -- See Note [Name of an instantiated type variable]
-
-{- Note [Name of an instantiated type variable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-At the moment we give a unification variable a System Name, which
-influences the way it is tidied; see TypeRep.tidyTyVarBndr.
--}
 
 metaInfoToTyVarName :: MetaInfo -> FastString
 metaInfoToTyVarName  meta_info =
@@ -795,17 +797,20 @@ newConcreteTyVar :: HasDebugCallStack => ConcreteTvOrigin
                  -> FastString -> TcKind -> TcM TcTyVar
 newConcreteTyVar reason fs kind
   = assertPpr (isConcreteType kind) assert_msg $
-  do { th_lvl <- getThLevel
-     ; if
-        -- See [Wrinkle: Typed Template Haskell]
-        -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-        | TypedBrack _ <- th_lvl
-        -> newNamedAnonMetaTyVar fs TauTv kind
-
-        | otherwise
-        -> newNamedAnonMetaTyVar fs (ConcreteTv reason) kind }
+  do { info <- mkConcreteInfo reason
+     ; newNamedAnonMetaTyVar fs info kind }
   where
     assert_msg = text "newConcreteTyVar: non-concrete kind" <+> ppr kind
+
+mkConcreteInfo :: ConcreteTvOrigin -> TcM MetaInfo
+-- Usually returns (ConcreteTv origin); but if we are in a typed
+-- Template Haskell bracket, return TauTv
+-- See [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete
+mkConcreteInfo conc_origin
+  = do { th_lvl <- getThLevel
+       ; case th_lvl of
+            TypedBrack {} -> return TauTv
+            _             -> return (ConcreteTv conc_origin) }
 
 newPatTyVar :: Name -> Kind -> TcM TcTyVar
 newPatTyVar name kind
@@ -981,18 +986,13 @@ newOpenFlexiTyVar
 -- in GHC.Tc.Utils.Concrete.
 newOpenFlexiFRRTyVar :: FixedRuntimeRepContext -> TcM TcTyVar
 newOpenFlexiFRRTyVar frr_ctxt
-  = do { th_lvl <- getThLevel
-       ; case th_lvl of
-          { TypedBrack _ -- See [Wrinkle: Typed Template Haskell]
-              -> newOpenFlexiTyVar -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
-          ; _ ->
-   mdo { let conc_orig = ConcreteFRR $
+  = mdo { let conc_orig = ConcreteFRR $
                           FixedRuntimeRepOrigin
                             { frr_context = frr_ctxt
                             , frr_type    = mkTyVarTy tv }
-        ; rr <- mkTyVarTy <$> newConcreteTyVar conc_orig (fsLit "cx") runtimeRepTy
-        ; tv <- newFlexiTyVar (mkTYPEapp rr)
-        ; return tv } } }
+        ; rr_tv <- newConcreteTyVar conc_orig (fsLit "cx") runtimeRepTy
+        ; tv <- newFlexiTyVar (mkTYPEapp (mkTyVarTy rr_tv))
+        ; return tv }
 
 -- | See 'newOpenFlexiFRRTyVar'.
 newOpenFlexiFRRTyVarTy :: FixedRuntimeRepContext -> TcM TcType

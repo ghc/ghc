@@ -80,7 +80,6 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.Name.Env
 import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Types.Var
 import qualified GHC.LanguageExtensions as LangExt
@@ -304,7 +303,7 @@ topInstantiate orig sigma
                        , text "tvs"   <+> ppr tvs
                        , text "theta" <+> ppr theta
                        , text "type" <+> debugPprType body_ty
-                       , text "with" <+> vcat (map debugPprType inst_tv_tys)
+                       , text "with" <+> ppr inst_tvs
                        , text "theta:" <+> ppr inst_theta ])
 
       ; return (wrap2 <.> wrap1, inner_body) }

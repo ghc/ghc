@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -47,7 +48,7 @@ import GHC.Core.TyCo.Subst ( substTyWithInScope )
 import GHC.Core.Type
 import GHC.Core.Coercion
 
-import GHC.Builtin.Types ( multiplicityTy )
+import GHC.Builtin.Types ( multiplicityTy, runtimeRepTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
 
@@ -59,6 +60,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
 
 import GHC.Data.Maybe
+import GHC.Data.FastString
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -395,9 +397,7 @@ tcApp rn_expr exp_res_ty
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
        ; (inst_args, app_res_rho)
-              <- setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
-                                         -- Note [tcApp: typechecking applications]
-                 tcInstFun do_ql inst_final tc_head fun_sigma rn_args
+              <- tcInstFun do_ql inst_final tc_head fun_sigma rn_args
 
        ; case do_ql of
             NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
@@ -430,10 +430,6 @@ tcApp rn_expr exp_res_ty
                                                     app_res_rho exp_res_ty
                          -- Step 5.5: wrap up
                        ; finishApp tc_head tc_args app_res_rho res_wrap } }
-
-setQLInstLevel :: QLFlag -> TcM a -> TcM a
-setQLInstLevel DoQL thing_inside = setTcLevel QLInstVar thing_inside
-setQLInstLevel NoQL thing_inside = thing_inside
 
 quickLookResultType :: TcRhoType -> ExpRhoType -> TcM ()
 -- This function implements the shaded bit of rule APP-Downarrow in
@@ -723,7 +719,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
                 -- addHeadCtxt: important for the class constraints
                 -- that may be emitted from instantiating fun_sigma
                 addHeadCtxt fun_ctxt $
-                instantiateSigma fun_orig fun_conc_tvs tvs theta body2
+                instantiateSigma do_ql fun_orig fun_conc_tvs tvs theta body2
                   -- See Note [Representation-polymorphism checking built-ins]
                   -- in GHC.Tc.Utils.Concrete.
                   -- NB: we are doing this even when "acc" is not empty,
@@ -786,8 +782,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
         --     not defer in any way, because this is a QL instantiation variable.
         -- It's easier just to do the job directly here.
         do { arg_tys <- zipWithM new_arg_ty (leadingValArgs args) [pos..]
-           ; rr_ty   <- newFlexiTyVarTyQL do_ql runtimeRepTy
-           ; res_ty  <- newFlexiTyVarTyQL do_ql (mkTYPEapp rr_ty)
+           ; res_ty  <- newOpenFlexiTyVarTyQL do_ql TauTv
            ; let fun_ty' = mkScaledFunTys arg_tys res_ty
 
            -- Fill in kappa := nu_1 -> .. -> nu_n -> res_nu
@@ -827,12 +822,12 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
     new_arg_ty :: LHsExpr GhcRn -> Int -> TcM (Scaled TcType)
     -- Make a fresh nus for each argument in rule IVAR
     new_arg_ty (L _ arg) i
-      = do { arg_nu <- newOpenFlexiFRRTyVarTy $
+      = do { arg_nu <- newArgTyVarTyQL do_ql $
                        FRRExpectedFunTy (ExpectedFunTyArg (HsExprTcThing tc_fun) arg) i
                -- Following matchActualFunTy, we create nu_i :: TYPE kappa_i[conc],
                -- thereby ensuring that the arguments have concrete runtime representations
 
-           ; mult_ty <- newFlexiTyVarTyQL do_ql multiplicityTy
+            ; mult_ty <- newFlexiTyVarTyQL do_ql (mkTyVarOccFS (fsLit "m")) TauTv multiplicityTy
                -- mult_ty: e need variables for argument multiplicities (#18731)
                -- Otherwise, 'undefined x' wouldn't be linear in x
 
@@ -916,30 +911,55 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
 {- *********************************************************************
 *                                                                      *
               Instantiating fresh type variables
+
+      Functions in here use getTcLevelQL to decide what level
+      to put on fresh unification variables.  If do_ql = DoQL, we
+      ignore the level in the monad, and use QLInstVar instead,
+      thereby giving birth to a Quick Look instantiation varaible
 *                                                                      *
 ********************************************************************* -}
 
-getTcLevelQL :: DoQL -> TcM TcLevel
+getTcLevelQL :: QLFlag -> TcM TcLevel
+-- If Quick Look is on, instantiate all fresh unification variables
+-- at level QLInstVar; they are instantiation variables
 getTcLevelQL DoQL = return QLInstVar
 getTcLevelQL NoQL = getTcLevel
 
-newFlexiTyVarTyQL :: DoQL -> TcKind -> TcM TcType
-newFlexiTyVarTyQL do_ql kind
-  = do { lvl <- getTcLevelQL do_ql
-       ; newMetaTyVarTyAtLevel lvl kind }
+newFlexiTyVarQL :: QLFlag -> OccName -> MetaInfo -> TcKind -> TcM TcTyVar
+newFlexiTyVarQL do_ql occ info kind
+  = do { lvl  <- getTcLevelQL do_ql
+       ; ref  <- newMutVar Flexi
+       ; name <- newSysName occ -- See Note [Name of an unification variable]
+                                -- in GHC.Tc.Utils.TcMType
+       ; let details = MetaTv { mtv_info  = info
+                              , mtv_ref   = ref
+                              , mtv_tclvl = lvl }
+       ; return (mkTcTyVar name kind details) }
 
-{-
-newArgTyVarQL do_ql frr_ctxt
-  = do { th_lvl <- getThLevel
-       ; rr_ty <- case th_lvl of
-                    TypedBrack {} -> newFlexiTyVarTyQL do_ql runtimeRepTy
-                    _ -> mdo { 
-       ; rr_ty <- 
-       ; newFlexiTyVarTyQL do_ql (mkTYPEapp rr_ty) }
--}
+newFlexiTyVarTyQL :: QLFlag -> OccName -> MetaInfo -> TcKind -> TcM TcType
+newFlexiTyVarTyQL do_ql occ info kind
+  = mkTyVarTy <$> newFlexiTyVarQL do_ql occ info kind
 
-instantiateSigma :: CtOrigin
-                 -> QLFlag
+newOpenFlexiTyVarTyQL :: QLFlag -> MetaInfo -> TcM TcType
+newOpenFlexiTyVarTyQL do_ql rr_info
+  = do { let rr_occ = mkTyVarOccFS (fsLit "cx")
+             tv_occ = mkTyVarOccFS (fsLit "q")
+        ; rr_ty  <- newFlexiTyVarTyQL do_ql rr_occ rr_info runtimeRepTy
+        ; arg_nu <- newFlexiTyVarTyQL do_ql tv_occ TauTv   (mkTYPEapp rr_ty)
+        ; return arg_nu }
+
+newArgTyVarTyQL :: QLFlag -> FixedRuntimeRepContext -> TcM TcType
+newArgTyVarTyQL do_ql frr_ctxt
+  = mdo { let conc_orig = ConcreteFRR $
+                          FixedRuntimeRepOrigin
+                            { frr_context = frr_ctxt
+                            , frr_type    = arg_nu }
+        ; rr_info <- mkConcreteInfo conc_orig
+        ; arg_nu  <- newOpenFlexiTyVarTyQL do_ql rr_info
+        ; return arg_nu }
+
+instantiateSigma :: QLFlag
+                 -> CtOrigin
                  -> ConcreteTyVars -- ^ concreteness information
                  -> [TyVar]
                  -> TcThetaType -> TcSigmaType
@@ -947,9 +967,8 @@ instantiateSigma :: CtOrigin
 -- (instantiate orig tvs theta ty)
 -- instantiates the type variables tvs, emits the (instantiated)
 -- constraints theta, and returns the (instantiated) type ty
-instantiateSigma orig do_ql concs tvs theta body_ty
-  = do { tv_lvl <- getTcLevelQL do_ql
-       ; rec (subst, inst_tvs) <- mapAccumLM (new_meta tv_lvl subst) empty_subst tvs
+instantiateSigma do_ql orig concs tvs theta body_ty
+  = do { rec (subst, inst_tvs) <- mapAccumLM (new_meta subst) empty_subst tvs
        ; let inst_theta  = substTheta subst theta
              inst_body   = substTy subst body_ty
 
@@ -959,7 +978,7 @@ instantiateSigma orig do_ql concs tvs theta body_ty
                        , text "tvs"   <+> ppr tvs
                        , text "theta" <+> ppr theta
                        , text "type" <+> debugPprType body_ty
-                       , text "with" <+> vcat (map debugPprType inst_tv_tys)
+                       , text "with" <+> ppr inst_tvs
                        , text "theta:" <+> ppr inst_theta ])
 
       ; return (wrap, inst_body) }
@@ -969,35 +988,26 @@ instantiateSigma orig do_ql concs tvs theta body_ty
                --                We just want an accurate free-var set
     empty_subst = mkEmptySubst in_scope
 
-    new_meta :: TcLevel -> Subst -> Subst -> TyVar -> TcM (Subst, TcTyVar)
-    new_meta tv_lvl final_subst subst tv
-      = do { name <- cloneMetaTyVarName (tyVarName tv)
-           ; ref  <- newMutVar Flexi
-           ; info <- get_info tv
-           ; let details = MetaTv { mtv_info  = info
-                                  , mtv_ref   = ref
-                                  , mtv_tclvl = tv_lvl }
-           ; let substd_kind = substTy subst (tyVarKind tv)
-                 new_tv      = mkTcTyVar name substd_kind details
-                 new_subst   = extendTvSubstWithClone subst tv new_tv
+    new_meta :: Subst -> Subst -> TyVar -> TcM (Subst, TcTyVar)
+    new_meta final_subst subst tv
+      = do { let occ = getOccName tv
+                 substd_kind = substTy subst (tyVarKind tv)
+           ; info   <- get_info final_subst tv
+           ; new_tv <- newFlexiTyVarQL do_ql occ info substd_kind
+           ; let new_subst   = extendTvSubstWithClone subst tv new_tv
            ; return (new_subst, new_tv) }
 
     get_info :: Subst -> TyVar -> TcM MetaInfo
-    get_info concs final_subst tv
+    get_info final_subst tv
       -- Is this a type variable that must be instantiated to a concrete type?
       -- If so, create a ConcreteTv metavariable instead of a plain TauTv.
       -- See Note [Representation-polymorphism checking built-ins]
       --     in GHC.Tc.Utils.Concrete.
-      --
-      -- But check TH level: see [Wrinkle: Typed Template Haskell]
-      -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
+
       | Just conc_orig0 <- lookupNameEnv concs (tyVarName tv)
       , let conc_orig = substConcreteTvOrigin final_subst body_ty conc_orig0
                         -- See Note [substConcreteTvOrigin].
-      = do { th_lvl <- getThLevel
-           ; case th_lvl of
-              TypedBrack {} -> return TauTv
-              _             -> return (ConcreteTv conc) }
+      = mkConcreteInfo conc_orig
 
       -- The vastly common case
       | otherwise
