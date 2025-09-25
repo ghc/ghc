@@ -10,7 +10,7 @@
 	path = libraries/Cabal
 	url = https://github.com/stable-haskell/Cabal.git
 	ignore = untracked
-	branch = wip/andrea/local-store
+	branch = stable-haskell/feature/cross-compile-p1
 [submodule "libraries/containers"]
 	path = libraries/containers
 	url = https://gitlab.haskell.org/ghc/packages/containers.git
@@ -121,9 +121,3 @@
 [submodule "libraries/template-haskell-quasiquoter"]
 	path = libraries/template-haskell-quasiquoter
 	url = https://gitlab.haskell.org/ghc/template-haskell-quasiquoter.git
-[submodule "libraries/libffi-clib"]
-	path = libraries/libffi-clib
-	url = https://github.com/stable-haskell/libffi-clib.git
-[submodule "libraries/libraries/hackage-security"]
-	path = libraries/hackage-security
-	url = https://github.com/haskell/hackage-security
