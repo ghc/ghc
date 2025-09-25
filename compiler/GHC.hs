@@ -35,8 +35,11 @@ module GHC (
         parseDynamicFlags, parseTargetFiles,
         getSessionDynFlags,
         setTopSessionDynFlags,
+        ReloadPkgDb(..),
         setSessionDynFlags,
+        setSessionDynFlagsWithPkgDb,
         setUnitDynFlags,
+        setUnitDynFlagsWithPkgDb,
         getProgramDynFlags, setProgramDynFlags,
         setProgramHUG, setProgramHUG_,
         getInteractiveDynFlags, setInteractiveDynFlags,
@@ -633,18 +636,35 @@ initGhcMonad mb_top_dir = setSession =<< liftIO ( do
 --
 -- 'setSessionDynFlags' sets both @DynFlags@, and 'getSessionDynFlags'
 -- retrieves the program @DynFlags@ (for backwards compatibility).
+--
+-- Neither of these functions
 
--- This is a compatibility function which sets dynflags for the top session
--- as well as the unit.
+-- | This is a compatibility function which sets dynflags for the top session
+-- as well as the unit. Only works if there is exactly one unit.
+--
+-- Note that this does not reload the package db if it is already loaded.
+-- This means that if you change package flags or the location of the package
+-- db before calling this function, these changes may not take effect.
+-- See 'setSessionDynFlagsWithPkgDb' to configure this behavior and force
+-- reloading of the package database.
 setSessionDynFlags :: (HasCallStack, GhcMonad m) => DynFlags -> m ()
-setSessionDynFlags dflags0 = do
+setSessionDynFlags = setSessionDynFlagsWithPkgDb UseCachedPkgDb
+
+
+-- | This is a compatibility function which sets dynflags for the top session
+-- as well as the unit. Only works if there is exactly one unit.
+--
+-- The 'ReloadPkgDb' argument controls if the pacakge database is reload.
+-- Set it to 'ReloadPkgDb' if you change package flags, otherwise 'UseCachedPkgDb'.
+setSessionDynFlagsWithPkgDb :: (HasCallStack, GhcMonad m) => ReloadPkgDb -> DynFlags -> m ()
+setSessionDynFlagsWithPkgDb use_cache dflags0 = do
   hsc_env <- getSession
   logger <- getLogger
   dflags <- checkNewDynFlags logger dflags0
   let all_uids = hsc_all_home_unit_ids hsc_env
   case S.toList all_uids of
     [uid] -> do
-      setUnitDynFlagsNoCheck uid dflags
+      setUnitDynFlagsNoCheck use_cache uid dflags
       modifySession (hscUpdateLoggerFlags . hscSetActiveUnitId (homeUnitId_ dflags))
       dflags' <- getDynFlags
       setTopSessionDynFlags dflags'
@@ -652,19 +672,39 @@ setSessionDynFlags dflags0 = do
     _ -> panic "setSessionDynFlags can only be used with a single home unit"
 
 
+-- | Set the dynflags for a unit.
+--
+-- Note that this does not reload the package db if it is already loaded.
+-- This means that if you change package flags or the location of the package
+-- db before calling this function, these changes may not take effect.
+-- See 'setUnitDynFlagsWithPkgDb' to configure this behavior and force
+-- reloading of the package database.
 setUnitDynFlags :: GhcMonad m => UnitId -> DynFlags -> m ()
-setUnitDynFlags uid dflags0 = do
+setUnitDynFlags = setUnitDynFlagsWithPkgDb UseCachedPkgDb
+
+-- | Set the dynflags for a unit.
+--
+-- The 'ReloadPkgDb' argument controls if the pacakge database is reload.
+-- Set it to 'UseCachedPkgDb' if you change package flags.
+setUnitDynFlagsWithPkgDb :: GhcMonad m => ReloadPkgDb -> UnitId -> DynFlags -> m ()
+setUnitDynFlagsWithPkgDb use_cache uid dflags0 = do
   logger <- getLogger
   dflags1 <- checkNewDynFlags logger dflags0
-  setUnitDynFlagsNoCheck uid dflags1
+  setUnitDynFlagsNoCheck use_cache uid dflags1
 
-setUnitDynFlagsNoCheck :: GhcMonad m => UnitId -> DynFlags -> m ()
-setUnitDynFlagsNoCheck uid dflags1 = do
+data ReloadPkgDb
+  = UseCachedPkgDb -- ^ Use the pkg db cached in the hsc env if it exists
+  | ReloadPkgDb   -- ^ Reload the pkg db based on the dynflags
+
+setUnitDynFlagsNoCheck :: GhcMonad m => ReloadPkgDb -> UnitId -> DynFlags -> m ()
+setUnitDynFlagsNoCheck use_cache uid dflags1 = do
   logger <- getLogger
   hsc_env <- getSession
 
   let old_hue = ue_findHomeUnitEnv uid (hsc_unit_env hsc_env)
-  let cached_unit_dbs = homeUnitEnv_unit_dbs old_hue
+  let cached_unit_dbs = case use_cache of
+        UseCachedPkgDb -> homeUnitEnv_unit_dbs old_hue
+        ReloadPkgDb -> Nothing
   (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 cached_unit_dbs (hsc_all_home_unit_ids hsc_env)
   updated_dflags <- liftIO $ updatePlatformConstants dflags1 mconstants
 
