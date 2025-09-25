@@ -101,6 +101,7 @@ data ToolSettings = ToolSettings
   , toolSettings_ldSupportsSingleModule  :: Bool
   , toolSettings_mergeObjsSupportsResponseFiles :: Bool
   , toolSettings_ldIsGnuLd               :: Bool
+  , toolSettings_ldSupportsVerbatimNamespace :: Bool
   , toolSettings_ccSupportsNoPie         :: Bool
   , toolSettings_useInplaceMinGW         :: Bool
   , toolSettings_arSupportsDashL         :: Bool

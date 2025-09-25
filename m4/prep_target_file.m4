@@ -152,6 +152,7 @@ AC_DEFUN([PREP_TARGET_FILE],[
     PREP_BOOLEAN([LdHasFilelist])
     PREP_BOOLEAN([LdHasSingleModule])
     PREP_BOOLEAN([LdIsGNULd])
+    PREP_BOOLEAN([LdSupportsVerbatimNamespace])
     PREP_BOOLEAN([LdHasNoCompactUnwind])
     PREP_BOOLEAN([TargetHasSubsectionsViaSymbols])
     PREP_BOOLEAN([Unregisterised])

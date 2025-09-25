@@ -1163,8 +1163,7 @@ loadPackage interp hsc_env pkg
         let logger    = hsc_logger hsc_env
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic interp
-            dirs | is_dyn    = map ST.unpack $ Packages.unitLibraryDynDirs pkg
-                 | otherwise = map ST.unpack $ Packages.unitLibraryDirs pkg
+            dirs      = libraryDirsForWay' is_dyn pkg
 
         let hs_libs   = map ST.unpack $ Packages.unitLibraries pkg
             -- The FFI GHCi import lib isn't needed as

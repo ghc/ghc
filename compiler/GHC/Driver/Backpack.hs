@@ -394,9 +394,11 @@ buildUnit session cid insts lunit = do
             -- nope
             unitLibraries = [],
             unitExtDepLibsSys = [],
+            unitExtDepLibsStaticSys = [],
             unitExtDepLibsGhc = [],
             unitLibraryDynDirs = [],
             unitLibraryDirs = [],
+            unitLibraryDirsStatic = [],
             unitExtDepFrameworks = [],
             unitExtDepFrameworkDirs = [],
             unitCcOptions = [],

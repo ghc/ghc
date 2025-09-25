@@ -21,6 +21,7 @@ where
 
 import GHC.Prelude
 import GHC.Platform
+import GHC.Settings
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -180,7 +181,7 @@ mkNoteObjsToLinkIntoBinary logger tmpfs dflags unit_env dep_packages = do
 -- See Note [LinkInfo section]
 getLinkInfo :: DynFlags -> UnitEnv -> [UnitId] -> IO String
 getLinkInfo dflags unit_env dep_packages = do
-    package_link_opts <- getUnitLinkOpts (ghcNameVersion dflags) (ways dflags) unit_env dep_packages
+    package_link_opts <- getUnitLinkOpts (ghcNameVersion dflags) (ways dflags) mBinaryLinkMode unit_env dep_packages
     pkg_frameworks <- if not (platformUsesFrameworks (ue_platform unit_env))
       then return []
       else do
@@ -196,6 +197,10 @@ getLinkInfo dflags unit_env dep_packages = do
              , getOpts dflags opt_l
              )
     return (show link_info)
+ where
+  mBinaryLinkMode = case ghcLink dflags of
+                      LinkBinary blm -> Just (blm, toolSettings_ldSupportsVerbatimNamespace (toolSettings dflags))
+                      _ -> Nothing
 
 platformSupportsSavingLinkOpts :: OS -> Bool
 platformSupportsSavingLinkOpts os

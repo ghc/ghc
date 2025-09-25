@@ -132,6 +132,7 @@ initSettings top_dir = do
   ldSupportsSingleModule  <- getBooleanSetting "ld supports single module"
   mergeObjsSupportsResponseFiles <- getBooleanSetting "Merge objects supports response files"
   ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
+  ldSupportsVerbatimNamespace <- getBooleanSetting "ld supports verbatim namespace"
   arSupportsDashL         <- getBooleanSetting "ar supports -L"
 
 
@@ -211,6 +212,7 @@ initSettings top_dir = do
       , toolSettings_ldSupportsSingleModule  = ldSupportsSingleModule
       , toolSettings_mergeObjsSupportsResponseFiles = mergeObjsSupportsResponseFiles
       , toolSettings_ldIsGnuLd               = ldIsGnuLd
+      , toolSettings_ldSupportsVerbatimNamespace = ldSupportsVerbatimNamespace
       , toolSettings_ccSupportsNoPie         = gccSupportsNoPie
       , toolSettings_useInplaceMinGW         = useInplaceMinGW
       , toolSettings_arSupportsDashL         = arSupportsDashL

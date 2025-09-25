@@ -31,6 +31,8 @@ module GHC.Driver.DynFlags (
         RtsOptsEnabled(..),
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
+        isBinaryLink,
+        BinaryLinkMode(..),
         PackageFlag(..), PackageArg(..), ModRenaming(..),
         packageFlagsChanged,
         IgnorePackageFlag(..), TrustFlag(..),
@@ -547,7 +549,7 @@ defaultDynFlags mySettings =
 -- See Note [Updating flag description in the User's Guide]
      DynFlags {
         ghcMode                 = CompManager,
-        ghcLink                 = LinkBinary,
+        ghcLink                 = LinkBinary Dynamic,
         backend                 = platformDefaultBackend (sTargetPlatform mySettings),
         verbosity               = 0,
         debugLevel              = 0,
@@ -797,13 +799,28 @@ isOneShot _other  = False
 -- | What to do in the link step, if there is one.
 data GhcLink
   = NoLink              -- ^ Don't link at all
-  | LinkBinary          -- ^ Link object code into a binary
+  | LinkBinary BinaryLinkMode -- ^ Link object code into a binary
   | LinkInMemory        -- ^ Use the in-memory dynamic linker (works for both
                         --   bytecode and object code).
   | LinkDynLib          -- ^ Link objects into a dynamic lib (DLL on Windows, DSO on ELF platforms)
   | LinkStaticLib       -- ^ Link objects into a static lib
   | LinkMergedObj       -- ^ Link objects into a merged "GHCi object"
   deriving (Eq, Show)
+
+isBinaryLink :: GhcLink -> Bool
+isBinaryLink (LinkBinary _) = True
+isBinaryLink _              = False
+
+-- | How we link the binary.
+--
+-- This mostly deals with how external system dependencies are treated.
+-- The 'Ways' determine how Haskell libraries are linked.
+data BinaryLinkMode
+  = FullyStatic          -- ^ fully static binary (incompatible with 'WayDyn')
+  | MostlyStatic         -- ^ we link everything except glibc statically
+  | Dynamic              -- ^ default
+  deriving (Eq, Show)
+
 
 isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True

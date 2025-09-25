@@ -360,6 +360,8 @@ FP_PROG_AR_NEEDS_RANLIB
 RanlibCmd="$RANLIB"
 AC_SUBST([RanlibCmd])
 
+LINKER_SUPPORTS_VERBATIM_LINKING
+
 dnl ** Have libdw?
 dnl --------------------------------------------------------------
 dnl Check for a usable version of libdw/elfutils

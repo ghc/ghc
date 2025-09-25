@@ -851,13 +851,16 @@ distrustAllUnits pkgs = map distrust pkgs
 mungeUnitInfo :: FilePath -> FilePath
                    -> UnitInfo -> UnitInfo
 mungeUnitInfo top_dir pkgroot =
-    mungeDynLibFields
+    mungeLibDirFields
   . mungeUnitInfoPaths (ST.pack top_dir) (ST.pack pkgroot)
 
-mungeDynLibFields :: UnitInfo -> UnitInfo
-mungeDynLibFields pkg =
+mungeLibDirFields :: UnitInfo -> UnitInfo
+mungeLibDirFields pkg =
     pkg {
       unitLibraryDynDirs = case unitLibraryDynDirs pkg of
+         [] -> unitLibraryDirs pkg
+         ds -> ds
+      , unitLibraryDirsStatic = case unitLibraryDirsStatic pkg of
          [] -> unitLibraryDirs pkg
          ds -> ds
     }

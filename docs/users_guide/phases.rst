@@ -943,6 +943,40 @@ for example).
     To control the name, use the :ghc-flag:`-o ⟨file⟩` option
     as usual. The default name is ``liba.a``.
 
+.. ghc-flag:: -static-external
+    :shortdesc: Link external C dependencies statically when
+        building an executable.
+    :type: dynamic
+    :category: linking
+
+    Link all external system libraries statically when building an executable.
+    This does not include implicitly linked libraries such as libc.
+    It is required that all system dependencies and their
+    static libraries are installed. This does not affect how Haskell libraries
+    are linked. You can combine this with ghc-flag:`-static` to produce binaries
+    that are only dynamically linked against libc.
+
+    Also note that this option is not terribly portable. It relies on the "verbatim namespace"
+    convention that some linkers support (``-l:foo.a``). On systems where
+    this isn't supported, GHC falls back to trying to look up the absolute path
+    of the static archives, which may not always work.
+
+    To control how Haskell libraries are linked, see :ghc-flag:`-static` and
+    :ghc-flag:`-dynamic`.
+
+.. ghc-flag:: -fully-static
+    :shortdesc: Link everything statically when
+        building an executable.
+    :type: dynamic
+    :category: linking
+
+    Link all libraries statically when building an executable. This includes
+    external libraries, Haskell libraries, as well as libc.
+    This requires that all dependencies and their static libraries are installed.
+    Musl is commonly used to provide a static libc.
+
+    This flag is incompatible with :ghc-flag:`-dynamic`.
+
 .. ghc-flag:: -L ⟨dir⟩
     :shortdesc: Add ⟨dir⟩ to the list of directories searched for libraries
     :type: dynamic
@@ -997,6 +1031,9 @@ for example).
 
     Tell the linker to avoid shared Haskell libraries, if possible. This
     is the default.
+
+    To further control linking behavior, also see :ghc-flag:`-fully-static`
+    and :ghc-flag:`-static-external`.
 
 .. ghc-flag:: -dynamic
     :shortdesc: Build dynamically-linked object files and executables

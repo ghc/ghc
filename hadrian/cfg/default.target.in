@@ -25,6 +25,7 @@ Target
 , ccLinkSupportsFilelist = @LdHasFilelistBool@
 , ccLinkSupportsSingleModule = @LdHasSingleModuleBool@
 , ccLinkIsGnu = @LdIsGNULdBool@
+, ccLinkSupportsVerbatimNamespace = @LdSupportsVerbatimNamespaceBool@
 }
 
 , tgtAr = Ar
