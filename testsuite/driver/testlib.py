@@ -3005,7 +3005,7 @@ def normalise_errmsg(s: str) -> str:
     # Emscripten displays cache info and old emcc doesn't support EMCC_LOGGING=0
     s = re.sub('cache:INFO: .*\n', '', s)
     # Old emcc warns when we export HEAP8 but new one requires it (see #26290)
-    s = s.replace('warning: invalid item in EXPORTED_RUNTIME_METHODS: HEAP8\nemcc: warning: warnings in JS library compilation [-Wjs-compiler]\n','')
+    s = s.replace('warning: invalid item in EXPORTED_RUNTIME_METHODS: HEAP8\nwarning: invalid item in EXPORTED_RUNTIME_METHODS: HEAPU8\nemcc: warning: warnings in JS library compilation [-Wjs-compiler]\n','')
 
     return s
 
