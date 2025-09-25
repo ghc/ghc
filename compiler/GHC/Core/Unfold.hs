@@ -637,6 +637,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
         where
           is_top_arg (Var v) | v `elem` top_args = Just v
           is_top_arg (Cast e _) = is_top_arg e
+          is_top_arg (Tick _t e) = is_top_arg e
           is_top_arg _ = Nothing
 
       where
