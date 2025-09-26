@@ -90,7 +90,7 @@ packageArgs = do
             -- (#14335) and completely untested in CI for cross
             -- backends at the moment, so we might as well disable it
             -- for cross GHC.
-            [ andM [expr (ghcWithInterpreter stage), notCross] `cabalFlag` "internal-interpreter"
+            [ stage1 `cabalFlag` "internal-interpreter"
             , orM [ notM cross, haveCurses ]  `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
             , flag UseLibzstd `cabalFlag` "with-libzstd"

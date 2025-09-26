@@ -214,7 +214,7 @@ data JSInterpConfig = JSInterpConfig
 
 data WasmInterpConfig = WasmInterpConfig
   { wasmInterpDyLD           :: !FilePath  -- ^ Location of dyld.mjs script
-  , wasmInterpLibDir         ::  FilePath  -- ^ wasi-sdk sysroot libdir containing libc.so, etc
+  , wasmInterpLibDir         :: !FilePath  -- ^ wasi-sdk sysroot libdir containing libc.so, etc
   , wasmInterpOpts           :: ![String]  -- ^ Additional command line arguments for iserv
 
   -- wasm ghci browser mode

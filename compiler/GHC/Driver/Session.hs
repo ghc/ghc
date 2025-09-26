@@ -3763,12 +3763,18 @@ makeDynFlagsConsistent dflags
   -- only supports dynamic code
  | LinkInMemory <- ghcLink dflags
  , sTargetRTSLinkerOnlySupportsSharedLibs $ settings dflags
+#if defined(wasm32_HOST_ARCH)
+ , not (ways dflags `hasWay` WayDyn)
+#else
  , not (ways dflags `hasWay` WayDyn && gopt Opt_ExternalInterpreter dflags)
+#endif
     = flip loopNoWarn "Forcing dynamic way because target RTS linker only supports dynamic code" $
         -- See checkOptions, -fexternal-interpreter is
         -- required when using --interactive with a non-standard
         -- way (-prof, -static, or -dynamic).
+#if !defined(wasm32_HOST_ARCH)
         setGeneralFlag' Opt_ExternalInterpreter $
+#endif
         addWay' WayDyn dflags
 
  | LinkInMemory <- ghcLink dflags
