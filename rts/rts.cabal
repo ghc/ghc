@@ -14,12 +14,9 @@ build-type: Configure
 extra-source-files:
     configure
     configure.ac
-    external-symbols.list.in
-    rts.buildinfo.in
 
 extra-tmp-files:
     autom4te.cache
-    rts.buildinfo
     config.log
     config.status
 
@@ -313,6 +310,7 @@ library
                         rts/storage/MBlock.h
                         rts/storage/TSO.h
                         stg/DLL.h
+                        rts/RtsToHsIface.h
                         stg/MachRegs.h
                         stg/MachRegs/arm32.h
                         stg/MachRegs/arm64.h
@@ -332,8 +330,6 @@ library
 
       if os(osx)
         ld-options: "-Wl,-search_paths_first"
-                    -- See Note [Undefined symbols in the RTS]
-                    "-Wl,-undefined,dynamic_lookup"
         if !arch(x86_64) && !arch(aarch64)
            ld-options: -read_only_relocs warning
 
@@ -427,6 +423,7 @@ library
                  RtsStartup.c
                  RtsSymbolInfo.c
                  RtsSymbols.c
+                 RtsToHsIface.c
                  RtsUtils.c
                  STM.c
                  Schedule.c
@@ -561,34 +558,3 @@ library
                     -- ticker/*.c
                     -- We don't want to compile posix/ticker/*.c, these will be #included
                     -- from Ticker.c
-
--- Note [Undefined symbols in the RTS]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- The RTS is built with a number of `-u` flags. This is to handle cyclic
--- dependencies between the RTS and other libraries which we normally think of as
--- downstream from the RTS. "Regular" dependencies from usages in those libraries
--- to definitions in the RTS are handled normally. "Reverse" dependencies from
--- usages in the RTS to definitions in those libraries get the `-u` flag in the
--- RTS.
---
--- The symbols are specified literally, but follow C ABI conventions (as all 3 of
--- C, C--, and Haskell do currently). Thus, we have to be careful to include a
--- leading underscore or not based on those conventions for the given platform in
--- question.
---
--- A tricky part is that different linkers have different policies regarding
--- undefined symbols (not defined in the current binary, or found in a shared
--- library that could be loaded at run time). GNU Binutils' linker is fine with
--- undefined symbols by default, but Apple's "cctools" linker is not. To appease
--- that linker we either need to do a blanket `-undefined dynamic_lookup` or
--- whitelist each such symbol with an additional `-U` (see the man page for more
--- details).
---
--- GHC already does `-undefined dynamic_lookup`, so we just do that for now, but
--- we might try to get more precise with `-U` in the future.
---
--- Note that the RTS also `-u`s some atomics symbols that *are* defined --- and
--- defined within the RTS! It is not immediately clear why this is needed. This
--- dates back to c06e3f46d24ef69f3a3d794f5f604cb8c2a40cbc which mentions a build
--- failure that it was suggested that this fix, but the precise reasoning is not
--- explained.

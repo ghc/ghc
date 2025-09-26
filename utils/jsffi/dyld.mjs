@@ -785,34 +785,19 @@ class DyLD {
         continue;
       }
 
-      const init = () => {
-        // See
-        // https://gitlab.haskell.org/haskell-wasm/llvm-project/-/blob/release/20.x/lld/wasm/Writer.cpp#L1450,
-        // __wasm_apply_data_relocs is now optional so only call it if
-        // it exists (we know for sure it exists for libc.so though).
-        // There's also __wasm_init_memory (not relevant yet, we don't
-        // use passive segments) & __wasm_apply_global_relocs but
-        // those are included in the start function and should have
-        // been called upon instantiation, see
-        // Writer::createStartFunction().
-        if (instance.exports.__wasm_apply_data_relocs) {
+      // See
+      // https://gitlab.haskell.org/haskell-wasm/llvm-project/-/blob/release/21.x/lld/wasm/Writer.cpp#L1451,
+      // __wasm_apply_data_relocs is now optional so only call it if
+      // it exists (we know for sure it exists for libc.so though).
+      // There's also __wasm_init_memory (not relevant yet, we don't
+      // use passive segments) & __wasm_apply_global_relocs but
+      // those are included in the start function and should have
+      // been called upon instantiation, see
+      // Writer::createStartFunction().
+      if (instance.exports.__wasm_apply_data_relocs) {
           instance.exports.__wasm_apply_data_relocs();
-        }
-
-        instance.exports._initialize();
-      };
-
-      // rts init must be deferred until ghc-internal symbols are
-      // exported. We hard code this hack for now.
-      if (/libHSrts-\d+(\.\d+)*/i.test(soname)) {
-        this.rts_init = init;
-        continue;
       }
-      if (/libHSghc-internal-\d+(\.\d+)*/i.test(soname)) {
-        this.rts_init();
-        delete this.rts_init;
-      }
-      init();
+      instance.exports._initialize();
     }
   }
 

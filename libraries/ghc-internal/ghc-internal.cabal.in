@@ -40,6 +40,7 @@ extra-source-files:
     include/md5.h
     include/fs.h
     include/winio_structs.h
+    include/RtsIfaceSymbols.h
     install-sh
 
 source-repository head
@@ -345,6 +346,7 @@ Library
           cbits/sysconf.c
           cbits/fs.c
           cbits/strerror.c
+          cbits/RtsIface.c
 
       cmm-sources:
           cbits/StackCloningDecoding.cmm

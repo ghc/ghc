@@ -364,9 +364,12 @@ external prototype return neither of these types to workaround #11395.
  * StgInfoTable, StgClosure and so on.
  */
 #include "stg/MiscClosures.h"
+/* And this is included for references to ghc_hs_iface */
+#include "rts/Types.h"
+#include "rts/RtsToHsIface.h"
 #endif
 
-#include "stg/Prim.h" /* ghc-prim fallbacks */
+#include "stg/Prim.h"
 #include "stg/SMP.h"
 
 /* -----------------------------------------------------------------------------

@@ -189,14 +189,15 @@ static void initBuiltinGcRoots(void)
      * these closures `Id`s of these can be safely marked as non-CAFFY
      * in the compiler.
      */
-    getStablePtr((StgPtr)runIO_closure);
-    getStablePtr((StgPtr)runNonIO_closure);
+    getStablePtr((StgPtr)ghc_hs_iface->runIO_closure);
+    getStablePtr((StgPtr)ghc_hs_iface->runNonIO_closure);
     getStablePtr((StgPtr)flushStdHandles_closure);
 
     getStablePtr((StgPtr)runFinalizerBatch_closure);
 
     getStablePtr((StgPtr)stackOverflow_closure);
     getStablePtr((StgPtr)heapOverflow_closure);
+    getStablePtr((StgPtr)doubleReadException_closure);
     getStablePtr((StgPtr)unpackCString_closure);
     getStablePtr((StgPtr)blockedIndefinitelyOnMVar_closure);
     getStablePtr((StgPtr)nonTermination_closure);
@@ -241,6 +242,8 @@ hs_init_with_rtsopts(int *argc, char **argv[])
     hs_init_ghc(argc, argv, rts_opts);
 }
 
+void init_ghc_hs_iface(void);
+
 void
 hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 {
@@ -267,6 +270,8 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #endif
 
     setlocale(LC_CTYPE,"");
+
+    init_ghc_hs_iface();
 
     /* Initialise the stats department, phase 0 */
     initStats0();

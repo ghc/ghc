@@ -13,9 +13,6 @@
 
 #pragma once
 
-#include <stddef.h>
-#include <stdbool.h>
-
 // Deprecated, use uint32_t instead.
 typedef unsigned int nat __attribute__((deprecated));  /* uint32_t */
 

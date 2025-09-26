@@ -18,6 +18,7 @@ extern "C" {
 #include "HsFFI.h"
 #include "rts/Time.h"
 #include "rts/Types.h"
+#include "rts/RtsToHsIface.h"
 
 /*
  * Running the scheduler
@@ -586,16 +587,6 @@ void rts_done (void);
 //      Note that RtsAPI.h is also included by foreign export stubs in
 //      the base package itself.
 //
-#if defined(COMPILING_WINDOWS_DLL) && !defined(COMPILING_GHC_INTERNAL_PACKAGE)
-__declspec(dllimport) extern StgWord ghczminternal_GHCziInternalziTopHandler_runIO_closure[];
-__declspec(dllimport) extern StgWord ghczminternal_GHCziInternalziTopHandler_runNonIO_closure[];
-#else
-extern StgWord ghczminternal_GHCziInternalziTopHandler_runIO_closure[];
-extern StgWord ghczminternal_GHCziInternalziTopHandler_runNonIO_closure[];
-#endif
-
-#define runIO_closure     ghczminternal_GHCziInternalziTopHandler_runIO_closure
-#define runNonIO_closure  ghczminternal_GHCziInternalziTopHandler_runNonIO_closure
 
 /* ------------------------------------------------------------------------ */
 

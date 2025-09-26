@@ -29,13 +29,8 @@
 import pthread_mutex_lock;
 import pthread_mutex_unlock;
 #endif
-import CLOSURE ghczminternal_GHCziInternalziControlziExceptionziBase_nestedAtomically_closure;
-import CLOSURE ghczminternal_GHCziInternalziIOziException_heapOverflow_closure;
-import CLOSURE ghczminternal_GHCziInternalziIOziException_blockedIndefinitelyOnMVar_closure;
-import CLOSURE ghczminternal_GHCziInternalziIOPort_doubleReadException_closure;
 import AcquireSRWLockExclusive;
 import ReleaseSRWLockExclusive;
-import CLOSURE ghczmprim_GHCziTypes_False_closure;
 #if defined(PROFILING)
 import CLOSURE CCS_MAIN;
 #endif
@@ -92,6 +87,7 @@ import CLOSURE stg_keepAlive_frame_info;
 import CLOSURE stg_noDuplicate_info;
 import CLOSURE stg_ret_p_info;
 import CLOSURE stg_sel_0_upd_info;
+import CLOSURE ghc_hs_iface;
 #endif
 
 #if defined(DEBUG)
@@ -125,7 +121,7 @@ stg_newByteArrayzh ( W_ n )
     words = BYTES_TO_WDS(SIZEOF_StgArrBytes) + payload_words;
     ("ptr" p) = ccall allocateMightFail(MyCapability() "ptr", words);
     if (p == NULL) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
@@ -154,7 +150,7 @@ stg_newPinnedByteArrayzh ( W_ n )
 
     ("ptr" p) = ccall allocatePinned(MyCapability() "ptr", words, BA_ALIGN, SIZEOF_StgArrBytes);
     if (p == NULL) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
 
@@ -189,7 +185,7 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
 
     ("ptr" p) = ccall allocatePinned(MyCapability() "ptr", words, alignment, SIZEOF_StgArrBytes);
     if (p == NULL) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
 
@@ -415,7 +411,7 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;
     ("ptr" arr) = ccall allocateMightFail(MyCapability() "ptr",words);
     if (arr == NULL) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);
 
@@ -534,7 +530,7 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
     words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;
     ("ptr" arr) = ccall allocateMightFail(MyCapability() "ptr",words);
     if (arr == NULL) (likely: False) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
 
@@ -1419,7 +1415,7 @@ stg_atomicallyzh (P_ stm)
 
     /* Nested transactions are not allowed; raise an exception */
     if (old_trec != NO_TREC) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziControlziExceptionziBase_nestedAtomically_closure);
+        jump stg_raisezh(HsIface_nestedAtomically_closure(W_[ghc_hs_iface]));
     }
 
     code = stm;
@@ -2217,7 +2213,7 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
         if (StgMVar_head(ioport) != stg_END_TSO_QUEUE_closure ||
             StgMVar_tail(ioport) != stg_END_TSO_QUEUE_closure) {
                 unlockClosure(ioport, info);
-                jump stg_raiseIOzh(ghczminternal_GHCziInternalziIOPort_doubleReadException_closure);
+                jump stg_raiseIOzh(HsIface_doubleReadException_closure(W_[ghc_hs_iface]));
         }
 
         if (info == stg_MVAR_CLEAN_info) {
@@ -2257,7 +2253,7 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
     } else {
          //Or another thread has read already: Throw an exception.
         unlockClosure(ioport, info);
-        jump stg_raiseIOzh(ghczminternal_GHCziInternalziIOPort_doubleReadException_closure);
+        jump stg_raiseIOzh(HsIface_doubleReadException_closure(W_[ghc_hs_iface]));
     }
 
     val = StgMVar_value(ioport);
@@ -2279,7 +2275,7 @@ stg_writeIOPortzh ( P_ ioport, /* :: IOPort a */
        write. */
     if (StgMVar_value(ioport) != stg_END_TSO_QUEUE_closure) {
         unlockClosure(ioport, info);
-        jump stg_raiseIOzh(ghczminternal_GHCziInternalziIOPort_doubleReadException_closure);
+        jump stg_raiseIOzh(HsIface_doubleReadException_closure(W_[ghc_hs_iface]));
         return (0);
     }
 
@@ -2521,7 +2517,7 @@ stg_unpackClosurezh ( P_ closure )
     dat_arr_sz = SIZEOF_StgArrBytes + WDS(len);
     ("ptr" dat_arr) = ccall allocateMightFail(MyCapability() "ptr", BYTES_TO_WDS(dat_arr_sz));
     if (dat_arr == NULL) (likely: False) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes, WDS(len), 0);
 
@@ -2785,13 +2781,13 @@ stg_getSparkzh ()
     W_ spark;
 
 #if !defined(THREADED_RTS)
-    return (0,ghczmprim_GHCziTypes_False_closure);
+    return (0,HsIface_False_closure(W_[ghc_hs_iface]));
 #else
     ("ptr" spark) = ccall findSpark(MyCapability() "ptr");
     if (spark != 0) {
         return (1,spark);
     } else {
-        return (0,ghczmprim_GHCziTypes_False_closure);
+        return (0,HsIface_False_closure(W_[ghc_hs_iface]));
     }
 #endif
 }

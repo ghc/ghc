@@ -145,8 +145,6 @@ W_ hs_mulIntMayOflo(W_ a, W_ b);
 
 /* rts/prim/int64x2minmax and rts/prim/vectorQuotRem */
 #if defined(__SSE2__)
-#include <stdint.h>
-#include <string.h>
 #include <emmintrin.h>
 
 __m128i hs_minInt64X2(__m128i, __m128i);

@@ -249,6 +249,7 @@ void _warnFail(const char *filename, unsigned int linenum);
 #include "rts/storage/ClosureTypes.h"
 #include "rts/storage/TSO.h"
 #include "stg/MiscClosures.h" /* InfoTables, closures etc. defined in the RTS */
+
 #include "rts/storage/Block.h"
 #include "rts/storage/ClosureMacros.h"
 #include "rts/storage/MBlock.h"
