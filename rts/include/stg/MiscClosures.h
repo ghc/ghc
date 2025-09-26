@@ -277,8 +277,8 @@ RTS_ENTRY(stg_NO_FINALIZER);
 extern StgWordArray stg_CHARLIKE_closure;
 extern StgWordArray stg_INTLIKE_closure;
 #else
-extern StgIntCharlikeClosure stg_CHARLIKE_closure[];
-extern StgIntCharlikeClosure stg_INTLIKE_closure[];
+extern StgIntCharlikeClosure stg_CHARLIKE_closure[MAX_CHARLIKE - MIN_CHARLIKE + 1];
+extern StgIntCharlikeClosure stg_INTLIKE_closure[MAX_INTLIKE - MIN_INTLIKE + 1];
 #endif
 
 /* StgStartup */
