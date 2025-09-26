@@ -1614,6 +1614,9 @@ gccSearchDirCache = unsafePerformIO $ newIORef []
 -- which dominate a large percentage of startup time on Windows.
 getGccSearchDirectory :: Logger -> DynFlags -> String -> IO [FilePath]
 getGccSearchDirectory logger dflags key = do
+#if defined(wasm32_HOST_ARCH)
+    pure []
+#else
     cache <- readIORef gccSearchDirCache
     case lookup key cache of
       Just x  -> return x
@@ -1640,6 +1643,7 @@ getGccSearchDirectory logger dflags key = do
                               x:_ -> case break (=='=') x of
                                      (_ , [])    -> []
                                      (_, (_:xs)) -> xs
+#endif
 
 -- | Get a list of system search directories, this to alleviate pressure on
 -- the findSysDll function.
