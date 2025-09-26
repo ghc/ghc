@@ -381,6 +381,7 @@ library
                  adjustor/AdjustorPool.c
                  ExecPage.c
                  Arena.c
+                 BuiltinClosures.c
                  Capability.c
                  CheckUnload.c
                  CheckVectorSupport.c
