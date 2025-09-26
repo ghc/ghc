@@ -13,6 +13,7 @@
 #include "sm/Storage.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
+#include "BuiltinClosures.h"
 #include "Prelude.h"
 #include "Printer.h"    /* DEBUG_LoadSymbols */
 #include "Schedule.h"   /* initScheduler */
@@ -367,6 +368,9 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     traceInitEvent(traceWallClockTime);
     traceInitEvent(traceOSProcessInfo);
     flushTrace();
+
+    /* initialize INTLIKE and CHARLIKE closures */
+    initBuiltinClosures();
 
     /* initialize the storage manager */
     initStorage();

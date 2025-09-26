@@ -57,11 +57,12 @@
 #define MAX_SPEC_CONSTR_SIZE   2
 
 /* Range of built-in table of static small int-like and char-like closures.
+ * Range is inclusive of both minimum and maximum.
  *
  *   NB. This corresponds with the number of actual INTLIKE/CHARLIKE
  *   closures defined in rts/StgMiscClosures.cmm.
  */
-#define MAX_INTLIKE             255
+#define MAX_INTLIKE             255 /* See #16961 for why 255 */
 #define MIN_INTLIKE             (-16)
 
 #define MAX_CHARLIKE            255
