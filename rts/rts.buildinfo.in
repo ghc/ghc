@@ -1,3 +1,0 @@
--- External symbols referenced by the RTS
-ld-options:
-#include "external-symbols.flags"
