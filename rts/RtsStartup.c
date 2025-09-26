@@ -183,8 +183,8 @@ static void initBuiltinGcRoots(void)
      * these closures `Id`s of these can be safely marked as non-CAFFY
      * in the compiler.
      */
-    getStablePtr((StgPtr)runIO_closure);
-    getStablePtr((StgPtr)runNonIO_closure);
+    getStablePtr((StgPtr)ghc_hs_iface->runIO_closure);
+    getStablePtr((StgPtr)ghc_hs_iface->runNonIO_closure);
     getStablePtr((StgPtr)flushStdHandles_closure);
 
     getStablePtr((StgPtr)runFinalizerBatch_closure);
@@ -262,6 +262,11 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #endif
 
     setlocale(LC_CTYPE,"");
+
+    if (ghc_hs_iface == NULL) {
+        errorBelch("hs_init_ghc: ghc_hs_iface is uninitialized");
+        stg_exit(1);
+    }
 
     /* Initialise the stats department, phase 0 */
     initStats0();

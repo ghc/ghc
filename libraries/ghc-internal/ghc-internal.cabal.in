@@ -43,6 +43,7 @@ extra-source-files:
     include/winio_structs.h
     include/WordSize.h
     include/HsIntegerGmp.h.in
+    include/RtsIfaceSymbols.h
     install-sh
 
 source-repository head
@@ -431,6 +432,8 @@ Library
 
 
     if !arch(javascript)
+      -- See Note [RTS/ghc-internal interface].
+      ld-options: -uinit_ghc_hs_iface
       c-sources:
           cbits/DarwinUtils.c
           cbits/PrelIOUtils.c
@@ -457,6 +460,7 @@ Library
           cbits/vectorQuotRem.c
           cbits/word2float.c
           cbits/Stack_c.c
+          cbits/RtsIface.c
 
       cmm-sources:
           cbits/StackCloningDecoding.cmm
