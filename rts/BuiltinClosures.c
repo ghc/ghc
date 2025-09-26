@@ -1,5 +1,4 @@
 #include "Rts.h"
-#include "Prelude.h"
 #include "BuiltinClosures.h"
 
 /*
@@ -17,14 +16,14 @@ void initBuiltinClosures() {
     // INTLIKE closures
     for (int i = MIN_INTLIKE; i <= MAX_INTLIKE; i++) {
         StgIntCharlikeClosure *c = &stg_INTLIKE_closure[i - MIN_INTLIKE];
-        SET_HDR((StgClosure* ) c, Izh_con_info, CCS_SYSTEM_OR_NULL);
+        SET_HDR((StgClosure* ) c, ghc_hs_iface->Izh_con_info, CCS_SYSTEM_OR_NULL);
         c->data = i;
     }
 
     // CHARLIKE closures
     for (int i = MIN_CHARLIKE; i <= MAX_CHARLIKE; i++) {
         StgIntCharlikeClosure *c = &stg_CHARLIKE_closure[i - MIN_CHARLIKE];
-        SET_HDR((StgClosure* ) c, Czh_con_info, CCS_SYSTEM_OR_NULL);
+        SET_HDR((StgClosure* ) c, ghc_hs_iface->Czh_con_info, CCS_SYSTEM_OR_NULL);
         c->data = i;
     }
 }

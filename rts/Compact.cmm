@@ -10,9 +10,6 @@
 #include "Cmm.h"
 #include "sm/ShouldCompact.h"
 
-import CLOSURE ghczminternal_GHCziInternalziIOziException_cannotCompactFunction_closure;
-import CLOSURE ghczminternal_GHCziInternalziIOziException_cannotCompactMutable_closure;
-import CLOSURE ghczminternal_GHCziInternalziIOziException_cannotCompactPinned_closure;
 #if !defined(UnregisterisedCompiler)
 import CLOSURE g0;
 import CLOSURE large_alloc_lim;
@@ -124,7 +121,7 @@ eval:
         SMALL_MUT_ARR_PTRS_CLEAN,
         SMALL_MUT_ARR_PTRS_DIRTY,
         COMPACT_NFDATA: {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_cannotCompactMutable_closure);
+        jump stg_raisezh(HsIface_cannotCompactMutable_closure(W_[ghc_hs_iface]));
     }
 
     // We shouldn't see any functions, if this data structure was NFData.
@@ -139,7 +136,7 @@ eval:
         BCO,
         PAP,
         CONTINUATION: {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_cannotCompactFunction_closure);
+        jump stg_raisezh(HsIface_cannotCompactFunction_closure(W_[ghc_hs_iface]));
     }
 
     case ARR_WORDS: {
@@ -147,7 +144,7 @@ eval:
         (should) = ccall shouldCompact(compact "ptr", p "ptr");
         if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = p; return(); }
         if (should == SHOULDCOMPACT_PINNED) {
-            jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_cannotCompactPinned_closure);
+            jump stg_raisezh(HsIface_cannotCompactPinned_closure(W_[ghc_hs_iface]));
         }
 
         CHECK_HASH();

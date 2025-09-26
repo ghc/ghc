@@ -13,10 +13,6 @@
 #include "Cmm.h"
 #include "RaiseAsync.h"
 
-import CLOSURE ghczminternal_GHCziInternalziTypes_True_closure;
-import CLOSURE ghczminternal_GHCziInternalziExceptionziType_divZZeroException_closure;
-import CLOSURE ghczminternal_GHCziInternalziExceptionziType_underflowException_closure;
-import CLOSURE ghczminternal_GHCziInternalziExceptionziType_overflowException_closure;
 #if !defined(UnregisterisedCompiler)
 import CLOSURE CATCHF_PUSHED_ctr;
 import CLOSURE RtsFlags;
@@ -539,7 +535,7 @@ retry_pop_stack:
             Sp(10) = exception;
             Sp(9) = stg_raise_ret_info;
             Sp(8) = exception;
-            Sp(7) = ghczminternal_GHCziInternalziTypes_True_closure; // True <=> an exception
+            Sp(7) = HsIface_True_closure(W_[ghc_hs_iface]); // True <=> an exception
             Sp(6) = stg_ap_ppv_info;
             Sp(5) = 0;
             Sp(4) = stg_ap_n_info;
@@ -650,17 +646,17 @@ stg_raiseIOzh (P_ exception)
 
 stg_raiseDivZZerozh ()
 {
-    jump stg_raisezh(ghczminternal_GHCziInternalziExceptionziType_divZZeroException_closure);
+    jump stg_raisezh(HsIface_divZZeroException_closure(W_[ghc_hs_iface]));
 }
 
 stg_raiseUnderflowzh ()
 {
-    jump stg_raisezh(ghczminternal_GHCziInternalziExceptionziType_underflowException_closure);
+    jump stg_raisezh(HsIface_underflowException_closure(W_[ghc_hs_iface]));
 }
 
 stg_raiseOverflowzh ()
 {
-    jump stg_raisezh(ghczminternal_GHCziInternalziExceptionziType_overflowException_closure);
+    jump stg_raisezh(HsIface_overflowException_closure(W_[ghc_hs_iface]));
 }
 
 /* The FFI doesn't support variadic C functions so we can't directly expose

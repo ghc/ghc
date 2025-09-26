@@ -23,8 +23,8 @@ int __main_argc_argv(int argc, char *argv[]) {
   hs_init_ghc(&argc, &argv, __conf);
   // See Note [threadDelay on wasm] for details.
   rts_JSFFI_flag = HS_BOOL_TRUE;
-  getStablePtr((StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure);
-  rts_threadDelay_impl = getStablePtr((StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure);
+  getStablePtr((StgPtr)ghc_hs_iface->raiseJSException_closure);
+  rts_threadDelay_impl = getStablePtr((StgPtr)ghc_hs_iface->threadDelay_closure);
   return 0;
 }
 
@@ -112,7 +112,7 @@ HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   SET_HDR(w, &stg_WEAK_info, CCS_SYSTEM);
   w->cfinalizers = (StgClosure *)cfin;
   w->key = p;
-  w->value = Unit_closure;
+  w->value = ghc_hs_iface->Z0T_closure;
   w->finalizer = &stg_NO_FINALIZER_closure;
   w->link = cap->weak_ptr_list_hd;
   cap->weak_ptr_list_hd = w;
@@ -123,7 +123,7 @@ HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   p->payload[0] = (HaskellObj)w;
 
   HaskellObj box = (HaskellObj)allocate(cap, CONSTR_sizeW(1, 0));
-  SET_HDR(box, &ghczminternal_GHCziInternalziWasmziPrimziTypes_JSVal_con_info, CCS_SYSTEM);
+  SET_HDR(box, ghc_hs_iface->JSVal_con_info, CCS_SYSTEM);
   box->payload[0] = p;
 
   return TAG_CLOSURE(1, box);
@@ -139,7 +139,7 @@ STATIC_INLINE HsJSVal rts_getJSValzh(HaskellObj p) {
 
 HsJSVal rts_getJSVal(HaskellObj);
 HsJSVal rts_getJSVal(HaskellObj box) {
-  ASSERT(UNTAG_CLOSURE(box)->header.info == &ghczminternal_GHCziInternalziWasmziPrimziTypes_JSVal_con_info);
+  ASSERT(UNTAG_CLOSURE(box)->header.info == ghc_hs_iface->JSVal_con_info);
   return rts_getJSValzh(UNTAG_CLOSURE(box)->payload[0]);
 }
 
@@ -188,7 +188,7 @@ void rts_schedulerLoop(void) {
 __attribute__((export_name("rts_promiseResolveUnit")))
 void rts_promiseResolveUnit(HsStablePtr);
 void rts_promiseResolveUnit(HsStablePtr sp)
-  mk_rtsPromiseCallback(TAG_CLOSURE(1, Unit_closure))
+  mk_rtsPromiseCallback(TAG_CLOSURE(1, ghc_hs_iface->Z0T_closure))
 
 mk_rtsPromiseResolve(JSVal)
 mk_rtsPromiseResolve(Char)
@@ -212,7 +212,7 @@ mk_rtsPromiseResolve(Bool)
 __attribute__((export_name("rts_promiseReject")))
 void rts_promiseReject(HsStablePtr, HsJSVal);
 void rts_promiseReject(HsStablePtr sp, HsJSVal js_err)
-  mk_rtsPromiseCallback(rts_apply(cap, &ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure, rts_mkJSVal(cap, js_err)))
+  mk_rtsPromiseCallback(rts_apply(cap, ghc_hs_iface->raiseJSException_closure, rts_mkJSVal(cap, js_err)))
 
 __attribute__((export_name("rts_promiseThrowTo")))
 void rts_promiseThrowTo(HsStablePtr, HsJSVal);
@@ -229,7 +229,7 @@ void rts_promiseThrowTo(HsStablePtr sp, HsJSVal js_err) {
       cap, tso,
       rts_apply(
           cap,
-          &ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure,
+          ghc_hs_iface->raiseJSException_closure,
           rts_mkJSVal(cap, js_err)));
   tryWakeupThread(cap, tso);
   rts_schedulerLoop();
