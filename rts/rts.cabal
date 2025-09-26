@@ -334,6 +334,7 @@ library
                         rts/storage/InfoTables.h
                         rts/storage/MBlock.h
                         rts/storage/TSO.h
+                        rts/RtsToHsIface.h
                         stg/MachRegs.h
                         stg/MachRegs/arm32.h
                         stg/MachRegs/arm64.h
@@ -449,6 +450,7 @@ library
                  RtsStartup.c
                  RtsSymbolInfo.c
                  RtsSymbols.c
+                 RtsToHsIface.c
                  RtsUtils.c
                  STM.c
                  Schedule.c

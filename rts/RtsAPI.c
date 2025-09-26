@@ -509,7 +509,7 @@ void rts_evalStableIOMain(/* inout */ Capability **cap,
     SchedulerStatus stat;
 
     p = (StgClosure *)deRefStablePtr(s);
-    w = rts_apply(*cap, &ghczminternal_GHCziInternalziTopHandler_runMainIO_closure, p);
+    w = rts_apply(*cap, runMainIO_closure, p);
     tso = createStrictIOThread(*cap, RtsFlags.GcFlags.initialStkSize, w);
     // async exceptions are always blocked by default in the created
     // thread.  See #1048.
@@ -961,7 +961,7 @@ void rts_done (void)
 void hs_try_putmvar (/* in */ int capability,
                      /* in */ HsStablePtr mvar)
 {
-    hs_try_putmvar_with_value(capability, mvar, TAG_CLOSURE(1, Unit_closure));
+    hs_try_putmvar_with_value(capability, mvar, TAG_CLOSURE(1, ghc_hs_iface->Z0T_closure));
 }
 
 void hs_try_putmvar_with_value (/* in */ int capability,

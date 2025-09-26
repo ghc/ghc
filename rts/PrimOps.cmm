@@ -25,12 +25,8 @@
 #include "MachDeps.h"
 #include "SMPClosureOps.h"
 
-import CLOSURE ghczminternal_GHCziInternalziControlziExceptionziBase_nestedAtomically_closure;
-import CLOSURE ghczminternal_GHCziInternalziIOziException_heapOverflow_closure;
-import CLOSURE ghczminternal_GHCziInternalziIOziException_blockedIndefinitelyOnMVar_closure;
 import AcquireSRWLockExclusive;
 import ReleaseSRWLockExclusive;
-import CLOSURE ghczminternal_GHCziInternalziTypes_False_closure;
 #if defined(PROFILING)
 import CLOSURE CCS_MAIN;
 #endif
@@ -118,7 +114,7 @@ stg_newByteArrayzh ( W_ n )
 
     ("ptr" p) = ccall allocateArrBytes(MyCapability() "ptr", n, CCCS);
     if (p == NULL) (likely: False) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     return (p);
 }
@@ -135,7 +131,7 @@ stg_newPinnedByteArrayzh ( W_ n )
     ("ptr" p) = ccall allocateArrBytesPinned(MyCapability() "ptr", n,
                                              BA_ALIGN, CCCS);
     if (p == NULL) (likely: False) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     return (p);
 }
@@ -149,7 +145,7 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     ("ptr" p) = ccall allocateArrBytesPinned(MyCapability() "ptr", n,
                                              alignment, CCCS);
     if (p == NULL) (likely: False) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     return (p);
 }
@@ -364,7 +360,7 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
 
     ("ptr" arr) = ccall allocateMutArrPtrs(MyCapability() "ptr", n, CCCS);
     if (arr == NULL) (likely: False) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
 
     // Initialise all elements of the array with the value init
@@ -474,7 +470,7 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
 
     ("ptr" arr) = ccall allocateSmallMutArrPtrs(MyCapability() "ptr", n, CCCS);
     if (arr == NULL) (likely: False) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
 
     // Initialise all elements of the array with the value init
@@ -1090,7 +1086,7 @@ stg_listThreadszh ()
   ("ptr" arr) = ccall listThreads(MyCapability() "ptr");
 
   if (arr == NULL) (likely: False) {
-    jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+    jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
   }
 
   return (arr);
@@ -1360,7 +1356,7 @@ stg_atomicallyzh (P_ stm)
 
     /* Nested transactions are not allowed; raise an exception */
     if (old_trec != NO_TREC) (likely: False) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziControlziExceptionziBase_nestedAtomically_closure);
+        jump stg_raisezh(HsIface_nestedAtomically_closure(W_[ghc_hs_iface]));
     }
 
     code = stm;
@@ -2231,7 +2227,7 @@ stg_unpackClosurezh ( P_ closure )
     dat_arr_sz = SIZEOF_StgArrBytes + WDS(len);
     ("ptr" dat_arr) = ccall allocateMightFail(MyCapability() "ptr", BYTES_TO_WDS(dat_arr_sz));
     if (dat_arr == NULL) (likely: False) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes, WDS(len), 0);
 
@@ -2251,7 +2247,7 @@ for:
     ("ptr" ptrArray) = foreign "C" heap_view_closurePtrs(MyCapability() "ptr", clos "ptr");
 
     if (ptrArray == NULL) (likely: False) {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
 
     return (info, dat_arr, ptrArray);
@@ -2518,13 +2514,13 @@ stg_getSparkzh ()
     W_ spark;
 
 #if !defined(THREADED_RTS)
-    return (0,ghczminternal_GHCziInternalziTypes_False_closure);
+    return (0,HsIface_False_closure(W_[ghc_hs_iface]));
 #else
     ("ptr" spark) = ccall findSpark(MyCapability() "ptr");
     if (spark != 0) {
         return (1,spark);
     } else {
-        return (0,ghczminternal_GHCziInternalziTypes_False_closure);
+        return (0,HsIface_False_closure(W_[ghc_hs_iface]));
     }
 #endif
 }
