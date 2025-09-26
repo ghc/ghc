@@ -832,7 +832,7 @@ module Data.Data where
   type role (:~~:) nominal nominal
   type (:~~:) :: forall k1 k2. k1 -> k2 -> *
   data (:~~:) a b where
-    HRefl :: forall {k1} (a :: k1). (:~~:) a a
+    HRefl :: forall {k2} (a :: k2). (:~~:) a a
   type ConIndex :: *
   type ConIndex = GHC.Internal.Types.Int
   type Constr :: *
@@ -1759,7 +1759,7 @@ module Data.Type.Equality where
   type role (:~~:) nominal nominal
   type (:~~:) :: forall k1 k2. k1 -> k2 -> *
   data (:~~:) a b where
-    HRefl :: forall {k1} (a :: k1). (:~~:) a a
+    HRefl :: forall {k2} (a :: k2). (:~~:) a a
   type (==) :: forall k. k -> k -> GHC.Internal.Types.Bool
   type family (==) a b where
     forall k1 k2 (f :: k1 -> k2) (a :: k1) (g :: k1 -> k2) (b :: k1). (==) (f a) (g b) = (f == g) GHC.Internal.Data.Type.Bool.&& (a == b)
@@ -1828,7 +1828,7 @@ module Data.Typeable where
   type role (:~~:) nominal nominal
   type (:~~:) :: forall k1 k2. k1 -> k2 -> *
   data (:~~:) a b where
-    HRefl :: forall {k1} (a :: k1). (:~~:) a a
+    HRefl :: forall {k2} (a :: k2). (:~~:) a a
   type role Proxy phantom
   type Proxy :: forall {k}. k -> *
   data Proxy t = Proxy
@@ -11040,7 +11040,7 @@ module Type.Reflection where
   type role (:~~:) nominal nominal
   type (:~~:) :: forall k1 k2. k1 -> k2 -> *
   data (:~~:) a b where
-    HRefl :: forall {k1} (a :: k1). (:~~:) a a
+    HRefl :: forall {k2} (a :: k2). (:~~:) a a
   pattern App :: forall k2 (t :: k2). () => forall k1 (a :: k1 -> k2) (b :: k1). (t ~ a b) => TypeRep a -> TypeRep b -> TypeRep t
   pattern Con :: forall k (a :: k). () => ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.NotApplication a => TyCon -> TypeRep a
   pattern Con' :: forall k (a :: k). () => ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.NotApplication a => TyCon -> [SomeTypeRep] -> TypeRep a

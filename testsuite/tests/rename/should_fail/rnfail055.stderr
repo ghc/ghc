@@ -97,7 +97,7 @@ RnFail055.hs-boot:26:1: error: [GHC-15843]
       and its hs-boot file.
       Main module: type role T7 phantom
                    type T7 :: * -> *
-                   data T7 a = forall a1. T7 a1
+                   data T7 a = forall a2. T7 a2
         Boot file: type T7 :: * -> *
                    data T7 a = forall b. T7 a
       The roles do not match.

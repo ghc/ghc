@@ -44,7 +44,6 @@ import GHC.Utils.Panic.Plain
 
 import GHC.Data.Maybe
 import Data.List ( findIndex, mapAccumL )
-import GHC.Utils.Misc (zipEqual)
 
 {-
 ************************************************************************
@@ -186,7 +185,6 @@ tyConToIfaceDecl env tycon
     if_kind        = tidyToIfaceType emptyTidyEnv $ tyConKind tycon
                      -- emptyTidyEnv: the kind as a whole is not under any binders
     (tc_env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
-    tc_tyvars      = binderVars tc_binders
     if_binders     = toIfaceForAllBndrs tc_binders
                      -- No tidying of the binders; they are already tidy
     if_res_kind    = tidyToIfaceType tc_env1 (tyConResKind tycon)
@@ -230,15 +228,16 @@ tyConToIfaceDecl env tycon
         = IfCon   { ifConName    = dataConName data_con,
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
+                    ifConUnivTvs = map toIfaceBndr univ_tvs',
                     ifConExTCvs  = map toIfaceBndr ex_tvs',
                     ifConUserTvBinders = toIfaceForAllBndrs user_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
-                    ifConCtxt    = tidyToIfaceContext con_env2 theta,
+                    ifConCtxt    = tidyToIfaceContext con_env3 theta,
                     ifConArgTys  =
-                      map (\(Scaled w t) -> (tidyToIfaceType con_env2 w
-                                          , (tidyToIfaceType con_env2 t))) arg_tys,
+                      map (\(Scaled w t) -> (tidyToIfaceType con_env3 w
+                                          , (tidyToIfaceType con_env3 t))) arg_tys,
                     ifConFields  = dataConFieldLabels data_con,
-                    ifConStricts = map (toIfaceBang con_env2)
+                    ifConStricts = map (toIfaceBang con_env1)
                                        (dataConImplBangs data_con),
                     ifConSrcStricts = map toIfaceSrcBang
                                           (dataConSrcBangs data_con)}
@@ -247,30 +246,12 @@ tyConToIfaceDecl env tycon
             = dataConFullSig data_con
           user_bndrs = dataConUserTyVarBinders data_con
 
-          -- Tidy the univ_tvs of the data constructor to be identical
-          -- to the tyConTyVars of the type constructor.  This means
-          -- (a) we don't need to redundantly put them into the interface file
-          -- (b) when pretty-printing an Iface data declaration in H98-style syntax,
-          --     we know that the type variables will line up
-          -- The latter (b) is important because we pretty-print type constructors
-          -- by converting to Iface syntax and pretty-printing that
-          con_env1 = (fst tc_env1, mkVarEnv (zipEqual univ_tvs tc_tyvars))
-                                                     -- A bit grimy, perhaps, but it's simple!
-
-          (con_env2, ex_tvs') = tidyVarBndrs con_env1 ex_tvs
-          user_bndrs' = map (tidyUserForAllTyBinder con_env2) user_bndrs
-          to_eq_spec (tv,ty) = (tidyTyVar con_env2 tv, tidyToIfaceType con_env2 ty)
-
-          -- By this point, we have tidied every universal and existential
-          -- tyvar. Because of the dcUserForAllTyBinders invariant
-          -- (see Note [DataCon user type variable binders]), *every*
-          -- user-written tyvar must be contained in the substitution that
-          -- tidying produced. Therefore, tidying the user-written tyvars is a
-          -- simple matter of looking up each variable in the substitution,
-          -- which tidyTyCoVarOcc accomplishes.
-          tidyUserForAllTyBinder :: TidyEnv -> TyVarBinder -> TyVarBinder
-          tidyUserForAllTyBinder env (Bndr tv vis) =
-            Bndr (tidyTyCoVarOcc env tv) vis
+          -- Start with 'emptyTidyEnv' not 'tc_env1', because the type of the
+          -- data constructor is fully standalone
+          (con_env1, user_bndrs') = tidyForAllTyBinders emptyTidyEnv user_bndrs
+          (con_env2, univ_tvs') = mapAccumL tidyFreeTyCoVarX con_env1 univ_tvs
+          (con_env3, ex_tvs') = mapAccumL tidyFreeTyCoVarX con_env2 ex_tvs
+          to_eq_spec (tv,ty) = (tidyTyVar con_env3 tv, tidyToIfaceType con_env3 ty)
 
 classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas

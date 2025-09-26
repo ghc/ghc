@@ -5,5 +5,5 @@ data A x y
 A :: k1 -> k2 -> *
 type role T phantom
 type T :: forall {k}. k -> *
-data T a = forall a1. MkT a1
+data T a = forall a2. MkT a2
   	-- Defined at <interactive>:6:1

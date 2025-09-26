@@ -58,13 +58,13 @@ mkNewTyConRhs tycon_name tycon con
                              nt_rhs       = rhs_ty,
                              nt_etad_rhs  = (etad_tvs, etad_rhs),
                              nt_co        = nt_ax,
-                             nt_fixed_rep = isFixedRuntimeRepKind res_kind } ) }
+                             nt_fixed_rep = fixed_rep } ) }
                              -- Coreview looks through newtypes with a Nothing
                              -- for nt_co, or uses explicit coercions otherwise
   where
-    tvs      = tyConTyVars tycon
-    roles    = tyConRoles tycon
-    res_kind = tyConResKind tycon
+    tvs       = tyConTyVars tycon
+    roles     = tyConRoles tycon
+    fixed_rep = isFixedRuntimeRepKind $ tyConResKind tycon
     rhs_ty
       -- Only try if the newtype is actually valid (see "otherwise" below).
       | [Scaled _ arg_ty] <- dataConRepArgTys con

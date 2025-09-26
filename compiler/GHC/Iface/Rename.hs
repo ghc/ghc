@@ -646,6 +646,7 @@ rnIfaceConDecls IfAbstractTyCon = pure IfAbstractTyCon
 rnIfaceConDecl :: Rename IfaceConDecl
 rnIfaceConDecl d = do
     con_name <- rnIfaceGlobal (ifConName d)
+    con_univ_tvs <- mapM rnIfaceBndr (ifConUnivTvs d)
     con_ex_tvs <- mapM rnIfaceBndr (ifConExTCvs d)
     con_user_tvbs <- mapM rnIfaceForAllBndr (ifConUserTvBinders d)
     let rnIfConEqSpec (n,t) = (,) n <$> rnIfaceType t
@@ -657,6 +658,7 @@ rnIfaceConDecl d = do
         rnIfaceBang bang = pure bang
     con_stricts <- mapM rnIfaceBang (ifConStricts d)
     return d { ifConName = con_name
+             , ifConUnivTvs = con_univ_tvs
              , ifConExTCvs = con_ex_tvs
              , ifConUserTvBinders = con_user_tvbs
              , ifConEqSpec = con_eq_spec

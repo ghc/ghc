@@ -344,13 +344,11 @@ data IfaceConDecl
         -- but it's not so easy for the original TyCon/DataCon
         -- So this guarantee holds for IfaceConDecl, but *not* for DataCon
 
+        ifConUnivTvs  :: [IfaceBndr],
         ifConExTCvs   :: [IfaceBndr],  -- Existential ty/covars
         ifConUserTvBinders :: [IfaceForAllBndr],
           -- The tyvars, in the order the user wrote them
-          -- INVARIANT: the set of tyvars in ifConUserTvBinders is exactly the
-          --            set of tyvars (*not* covars) of ifConExTCvs, unioned
-          --            with the set of ifBinders (from the parent IfaceDecl)
-          --            whose tyvars do not appear in ifConEqSpec
+          --
           -- See Note [DataCon user type variable binders] in GHC.Core.DataCon
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
@@ -1549,7 +1547,7 @@ pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceConDecl -> SDoc
 pprIfaceConDecl ss gadt_style tycon tc_binders parent
         (IfCon { ifConName = name, ifConInfix = is_infix,
-                 ifConUserTvBinders = user_tvbs,
+                 ifConUnivTvs = univ_tvs, ifConUserTvBinders = user_tvbs,
                  ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys,
                  ifConStricts = stricts, ifConFields = fields })
   | gadt_style = pp_prefix_con <+> dcolon <+> ppr_gadt_ty
@@ -1688,13 +1686,15 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     ppr_tc_app gadt_subst =
       pprPrefixIfDeclBndr how_much (occName tycon)
       <+> pprParendIfaceAppArgs
-            (substIfaceAppArgs gadt_subst (mk_tc_app_args tc_binders))
+            (substIfaceAppArgs gadt_subst (mk_tc_app_args tc_binders univ_tvs))
 
-    mk_tc_app_args :: [IfaceTyConBinder] -> IfaceAppArgs
-    mk_tc_app_args [] = IA_Nil
-    mk_tc_app_args (Bndr bndr vis:tc_bndrs) =
+    mk_tc_app_args :: [IfaceTyConBinder] -> [IfaceBndr] -> IfaceAppArgs
+    mk_tc_app_args [] [] = IA_Nil
+    mk_tc_app_args (Bndr _ vis:tc_bndrs) (bndr:univs) =
       IA_Arg (IfaceTyVar (ifaceBndrName bndr)) (tyConBndrVisForAllTyFlag vis)
-             (mk_tc_app_args tc_bndrs)
+             (mk_tc_app_args tc_bndrs univs)
+    mk_tc_app_args _ _ =
+      panic "pprIfaceConDecl: mismatched universal TyCon and DataCon tvs"
 
 instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
@@ -1753,8 +1753,6 @@ To reconstruct the result types for T1 and T2 that we
 want to pretty print, we substitute the eq-spec
 [p->Int, q->Maybe c] in the arg pattern (p,q) to give
    T (Int, Maybe c)
-Remember that in IfaceSyn, the TyCon and DataCon share the same
-universal type variables.
 
 ----------------------------- Printing IfaceExpr ------------------------------------
 -}
@@ -2029,12 +2027,17 @@ freeNamesIfConDecls (IfNewTyCon    c)  = freeNamesIfConDecl c
 freeNamesIfConDecls _                  = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
-freeNamesIfConDecl (IfCon { ifConExTCvs  = ex_tvs, ifConCtxt = ctxt
+freeNamesIfConDecl (IfCon { ifConUnivTvs = univ_tvs
+                          , ifConExTCvs  = ex_tvs
+                          , ifConUserTvBinders = user_tvs
+                          , ifConCtxt    = ctxt
                           , ifConArgTys  = arg_tys
                           , ifConFields  = flds
                           , ifConEqSpec  = eq_spec
                           , ifConStricts = bangs })
-  = fnList freeNamesIfBndr ex_tvs &&&
+  = fnList freeNamesIfBndr univ_tvs &&&
+    fnList freeNamesIfBndr ex_tvs &&&
+    fnList freeNamesIfVarBndr user_tvs &&&
     freeNamesIfContext ctxt &&&
     fnList freeNamesIfType (map fst arg_tys) &&& -- these are multiplicities, represented as types
     fnList freeNamesIfType (map snd arg_tys) &&&
@@ -2555,7 +2558,7 @@ instance Binary IfaceConDecls where
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
 
 instance Binary IfaceConDecl where
-    put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
+    put_ bh (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a9 a10 a11) = do
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
@@ -2568,6 +2571,7 @@ instance Binary IfaceConDecl where
         mapM_ (put_ bh) a9
         put_ bh a10
         put_ bh a11
+        put_ bh a12
     get bh = do
         a1 <- getIfaceTopBndr bh
         a2 <- get bh
@@ -2581,7 +2585,8 @@ instance Binary IfaceConDecl where
         a9 <- replicateM n_fields (get bh)
         a10 <- get bh
         a11 <- get bh
-        return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11)
+        a12 <- get bh
+        return (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a9 a10 a11)
 
 instance Binary IfaceBang where
     put_ bh IfNoBang        = putByte bh 0
@@ -3138,9 +3143,9 @@ instance NFData IfaceConDecls where
     IfNewTyCon f1 -> rnf f1
 
 instance NFData IfaceConDecl where
-  rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11) =
+  rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12) =
     rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq`
-    rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` rnf f11
+    rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` rnf f11 `seq` rnf f12
 
 instance NFData IfaceSrcBang where
   rnf (IfSrcBang f1 f2) = rnf f1 `seq` rnf f2 `seq` ()

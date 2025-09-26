@@ -735,19 +735,18 @@ tc_iface_decl _ _
               ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
               ifCons = rdr_cons,
               ifParent = mb_parent })
-  = bindIfaceTyConBinders_AT binders $ \ binders' -> do
-    { kind' <- tcIfaceType kind
-    ; res_kind' <- tcIfaceType res_kind
-
-    ; tycon <- fixM $ \ tycon -> do
-            { stupid_theta <- tcIfaceCtxt ctxt
-            ; parent' <- tc_parent tc_name mb_parent
-            ; cons <- tcIfaceDataCons tc_name tycon binders' rdr_cons
-            ; return (mkAlgTyCon tc_name kind' binders' res_kind'
-                                 roles cType stupid_theta
-                                 cons parent' gadt_syn) }
-    ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
-    ; return (ATyCon tycon) }
+  = do { kind' <- tcIfaceType kind
+       ; tycon <- fixM $ \ tycon -> do
+               { cons <- tcIfaceDataCons tc_name tycon rdr_cons
+               ; bindIfaceTyConBinders_AT binders $ \ binders' ->
+            do { res_kind' <- tcIfaceType res_kind
+               ; stupid_theta <- tcIfaceCtxt ctxt
+               ; parent' <- tc_parent tc_name mb_parent
+               ; return (mkAlgTyCon tc_name kind' binders' res_kind'
+                                    roles cType stupid_theta
+                                    cons parent' gadt_syn) } }
+       ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
+       ; return (ATyCon tycon) }
   where
     tc_parent :: Name -> IfaceTyConParent -> IfL AlgTyConFlav
     tc_parent tc_name IfNoParent
@@ -1147,8 +1146,8 @@ tc_ax_branch prev_branches
                           , cab_incomps = map (prev_branches `getNth`) incomps }
     ; return (prev_branches ++ [br]) }
 
-tcIfaceDataCons :: Name -> TyCon -> [TyConBinder] -> IfaceConDecls -> IfL AlgTyConRhs
-tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
+tcIfaceDataCons :: Name -> TyCon -> IfaceConDecls -> IfL AlgTyConRhs
+tcIfaceDataCons tycon_name tycon if_cons
   = case if_cons of
         IfAbstractTyCon
           -> return AbstractTyCon
@@ -1163,13 +1162,12 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
           -> do  { data_con  <- tc_con_decl con
                  ; mkNewTyConRhs tycon_name tycon data_con }
   where
-    univ_tvs :: [TyVar]
-    univ_tvs = binderVars tc_tybinders
 
     tag_map :: NameEnv ConTag
     tag_map = mkTyConTagMap tycon
 
     tc_con_decl (IfCon { ifConInfix = is_infix,
+                         ifConUnivTvs = univ_bndrs,
                          ifConExTCvs = ex_bndrs,
                          ifConUserTvBinders = user_bndrs,
                          ifConName = dc_name,
@@ -1177,24 +1175,10 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                          ifConArgTys = args, ifConFields = lbl_names,
                          ifConStricts = if_stricts,
                          ifConSrcStricts = if_src_stricts})
-     = -- Universally-quantified tyvars are shared with
-       -- parent TyCon, and are already in scope
-       bindIfaceBndrs ex_bndrs    $ \ ex_tvs -> do
-        { traceIf (text "Start interface-file tc_con_decl" <+> ppr dc_name)
-
-          -- By this point, we have bound every universal and existential
-          -- tyvar. Because of the dcUserTyVarBinders invariant
-          -- (see Note [DataCon user type variable binders]), *every* tyvar in
-          -- ifConUserTvBinders has a matching counterpart somewhere in the
-          -- bound universals/existentials. As a result, calling tcIfaceTyVar
-          -- below is always guaranteed to succeed.
-        ; user_tv_bndrs <- mapM (\(Bndr bd vis) ->
-                                   case bd of
-                                     IfaceIdBndr (_, name, _) ->
-                                       Bndr <$> tcIfaceLclId name <*> pure vis
-                                     IfaceTvBndr (name, _) ->
-                                       Bndr <$> tcIfaceTyVar name <*> pure vis)
-                                user_bndrs
+     = bindIfaceForAllBndrs user_bndrs $ \ user_tvs ->
+       bindDataConBinders   univ_bndrs $ \ univ_tvs ->
+       bindDataConBinders   ex_bndrs   $ \ ex_tvs  ->
+     do { traceIf (text "Start interface-file tc_con_decl" <+> ppr dc_name)
 
         -- Read the context and argument types, but lazily for two reasons
         -- (a) to avoid looking tugging on a recursive use of
@@ -1220,7 +1204,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon
                               (substTyCoVars (mkTvSubstPrs (map eqSpecPair eq_spec))
-                                             (binderVars tc_tybinders))
+                                             univ_tvs)
 
         ; prom_rep_name <- newTyConRepName dc_name
 
@@ -1234,7 +1218,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                        dc_name is_infix prom_rep_name
                        (map src_strict if_src_stricts)
                        lbl_names
-                       univ_tvs ex_tvs user_tv_bndrs
+                       univ_tvs ex_tvs user_tvs
                        eq_spec theta
                        arg_tys orig_res_ty tycon tag_map
         ; traceIf (text "Done interface-file tc_con_decl" <+> ppr dc_name)
@@ -1250,6 +1234,21 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
 
     src_strict :: IfaceSrcBang -> HsSrcBang
     src_strict (IfSrcBang unpk bang) = HsSrcBang NoSourceText unpk bang
+
+bindDataConBinders :: [IfaceBndr] -> ([CoreBndr] -> IfL a) -> IfL a
+bindDataConBinders [] thing_inside
+  = thing_inside []
+bindDataConBinders (b : bs) thing_inside
+  = bind_tv            b  $ \b'  ->
+    bindDataConBinders bs $ \bs' ->
+    thing_inside (b':bs')
+  where
+    bind_tv tv thing =
+      do { mb_tv <- lookupIfaceVar tv
+         ; case mb_tv of
+             Just b' -> thing b'
+             Nothing -> bindIfaceBndr tv thing
+         }
 
 tcIfaceEqSpec :: IfaceEqSpec -> IfL [EqSpec]
 tcIfaceEqSpec spec

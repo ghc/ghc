@@ -1,7 +1,6 @@
-
 T11334b.hs:8:14: error: [GHC-79924]
     • Cannot default kind variable ‘a0’
-      of kind: k10
+      of kind: k20
       Perhaps enable PolyKinds or add a kind signature
     • In an expression type signature: Proxy 'Compose
       In the expression: Proxy :: Proxy 'Compose
@@ -9,7 +8,7 @@ T11334b.hs:8:14: error: [GHC-79924]
 
 T11334b.hs:8:14: error: [GHC-79924]
     • Cannot default kind variable ‘g0’
-      of kind: k10 -> k0
+      of kind: k20 -> k10
       Perhaps enable PolyKinds or add a kind signature
     • In an expression type signature: Proxy 'Compose
       In the expression: Proxy :: Proxy 'Compose
@@ -17,7 +16,7 @@ T11334b.hs:8:14: error: [GHC-79924]
 
 T11334b.hs:8:14: error: [GHC-79924]
     • Cannot default kind variable ‘f0’
-      of kind: k0 -> *
+      of kind: k10 -> *
       Perhaps enable PolyKinds or add a kind signature
     • In an expression type signature: Proxy 'Compose
       In the expression: Proxy :: Proxy 'Compose
