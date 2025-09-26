@@ -606,8 +606,12 @@ generateVersionHs = do
 generatePlatformHostHs :: Expr String
 generatePlatformHostHs = do
     trackGenerateHs
-    cHostPlatformArch <- queryHost (archOS_arch . tgtArchOs)
-    cHostPlatformOS   <- queryHost (archOS_OS . tgtArchOs)
+    stage <- getStage
+    let chooseHostQuery = case stage of
+            Stage0 {} -> queryHost
+            _         -> queryTarget
+    cHostPlatformArch <- chooseHostQuery (archOS_arch . tgtArchOs)
+    cHostPlatformOS   <- chooseHostQuery (archOS_OS . tgtArchOs)
     return $ unlines
         [ "module GHC.Platform.Host where"
         , ""
