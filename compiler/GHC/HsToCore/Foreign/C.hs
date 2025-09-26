@@ -517,8 +517,8 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                 text "rts_apply" <> parens (
                     cap
                  <> (if is_IO_res_ty
-                      then text "runIO_closure"
-                      else text "runNonIO_closure")
+                      then text "ghc_hs_iface->runIO_closure"
+                      else text "ghc_hs_iface->runNonIO_closure")
                  <> comma
                  <> expr_to_run
                 ) <+> comma

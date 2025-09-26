@@ -250,6 +250,13 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                       ++ pkg_lib_path_opts
                       ++ extraLinkObj
                       ++ noteLinkObjs
+                      -- See Note [RTS/ghc-internal interface]
+                      -- (-u<sym> must come before -lghc-internal...!)
+                      ++ (if ghcInternalUnitId `elem` map unitId pkgs
+                          then [concat [ "-Wl,-u,"
+                                       , ['_' | platformLeadingUnderscore platform]
+                                       , "init_ghc_hs_iface" ]]
+                          else [])
                       ++ pkg_link_opts
                       ++ pkg_framework_opts
                       ++ (if platformOS platform == OSDarwin

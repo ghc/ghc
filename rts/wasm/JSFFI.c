@@ -11,11 +11,25 @@
 
 extern HsBool rts_JSFFI_flag;
 extern HsStablePtr rts_threadDelay_impl;
-extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure;
-extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure;
 
 __attribute__((__weak__))
 int __main_argc_argv(int argc, char *argv[]);
+
+#if !defined(__PIC__)
+void init_ghc_hs_iface(void);
+
+extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure;
+extern const StgInfoTable ghczminternal_GHCziInternalziWasmziPrimziTypes_JSVal_con_info;
+extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure;
+
+__attribute__((constructor(100)))
+static void __init_ghc_hs_iface_jsffi(void) {
+  init_ghc_hs_iface();
+  ghc_hs_iface->raiseJSException_closure = &ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure;
+  ghc_hs_iface->JSVal_con_info = &ghczminternal_GHCziInternalziWasmziPrimziTypes_JSVal_con_info;
+  ghc_hs_iface->threadDelay_closure = &ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure;
+}
+#endif
 
 // Note [JSFFI initialization]
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -54,7 +68,23 @@ int __main_argc_argv(int argc, char *argv[]);
 // Therefore, on wasm32, we designate priority 101 to ctors generated
 // by the GHC codegen, and priority 102 to the initialization logic
 // here to ensure hs_init_ghc() sees everything it needs to see.
-__attribute__((constructor(102))) static void __ghc_wasm_jsffi_init(void) {
+//
+// It's simpler when it comes to shared libraries: we'll need to load
+// them via dyld written in JS anyway, and hence we always compile the
+// rts shared library with JSVal functionality. The constructors here
+// are only for non-shared objects, so that the user would only need
+// to invoke _initialize for all the RTS initialization logic to be
+// done before invoking user-specified exports; for the shared library
+// case, we explicitly export __ghc_wasm_jsffi_init to be invoked by
+// dyld, after at least rts & ghc-internal has been loaded.
+
+#if defined(__PIC__)
+__attribute__((export_name("__ghc_wasm_jsffi_init"))) void __ghc_wasm_jsffi_init(void);
+#else
+__attribute__((constructor(102))) static void __ghc_wasm_jsffi_init(void);
+#endif
+
+void __ghc_wasm_jsffi_init(void) {
   // If linking static code without -no-hs-main, then the driver
   // emitted main() is in charge of its own RTS initialization, so
   // skip.
@@ -111,20 +141,22 @@ __attribute__((constructor(102))) static void __ghc_wasm_jsffi_init(void) {
   RtsConfig __conf = defaultRtsConfig;
   __conf.rts_opts_enabled = RtsOptsAll;
   __conf.rts_hs_main = false;
+#if defined(__PIC__)
+  __conf.keep_cafs = 1;
+#endif
   hs_init_ghc((int *)&argc, &argv, __conf);
   // See Note [threadDelay on wasm] for details.
   rts_JSFFI_flag = HS_BOOL_TRUE;
   getStablePtr((
-      StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure);
+      StgPtr)ghc_hs_iface->raiseJSException_closure);
   rts_threadDelay_impl = getStablePtr((
-      StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure);
+      StgPtr)ghc_hs_iface->threadDelay_closure);
 }
 
 typedef __externref_t HsJSVal;
 typedef StgInt JSValKey;
 
 extern const StgInfoTable stg_JSVAL_info;
-extern const StgInfoTable ghczminternal_GHCziInternalziWasmziPrimziTypes_JSVal_con_info;
 
 // See Note [JSVal representation for wasm] for detailed explanation.
 
@@ -170,7 +202,7 @@ HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   p->payload[0] = (HaskellObj)w;
 
   HaskellObj box = (HaskellObj)allocate(cap, CONSTR_sizeW(1, 0));
-  SET_HDR(box, &ghczminternal_GHCziInternalziWasmziPrimziTypes_JSVal_con_info, CCS_SYSTEM);
+  SET_HDR(box, ghc_hs_iface->JSVal_con_info, CCS_SYSTEM);
   box->payload[0] = p;
 
   return TAG_CLOSURE(1, box);
@@ -186,7 +218,7 @@ STATIC_INLINE HsJSVal rts_getJSValzh(HaskellObj p) {
 
 HsJSVal rts_getJSVal(HaskellObj);
 HsJSVal rts_getJSVal(HaskellObj box) {
-  ASSERT(UNTAG_CLOSURE(box)->header.info == &ghczminternal_GHCziInternalziWasmziPrimziTypes_JSVal_con_info);
+  ASSERT(UNTAG_CLOSURE(box)->header.info == ghc_hs_iface->JSVal_con_info);
   return rts_getJSValzh(UNTAG_CLOSURE(box)->payload[0]);
 }
 
@@ -259,7 +291,7 @@ mk_rtsPromiseResolve(Bool)
 __attribute__((export_name("rts_promiseReject")))
 void rts_promiseReject(HsStablePtr, HsJSVal);
 void rts_promiseReject(HsStablePtr sp, HsJSVal js_err)
-  mk_rtsPromiseCallback(rts_apply(cap, &ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure, rts_mkJSVal(cap, js_err)))
+  mk_rtsPromiseCallback(rts_apply(cap, ghc_hs_iface->raiseJSException_closure, rts_mkJSVal(cap, js_err)))
 
 __attribute__((export_name("rts_promiseThrowTo")))
 void rts_promiseThrowTo(HsStablePtr, HsJSVal);
@@ -276,7 +308,7 @@ void rts_promiseThrowTo(HsStablePtr sp, HsJSVal js_err) {
       cap, tso,
       rts_apply(
           cap,
-          &ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure,
+          ghc_hs_iface->raiseJSException_closure,
           rts_mkJSVal(cap, js_err)));
   tryWakeupThread(cap, tso);
   rts_schedulerLoop();
