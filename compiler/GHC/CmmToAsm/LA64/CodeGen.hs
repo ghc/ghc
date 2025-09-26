@@ -3,6 +3,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module GHC.CmmToAsm.LA64.CodeGen (
       cmmTopCodeGen
     , generateJumpTableForInstr
@@ -268,8 +269,10 @@ stmtToInstrs stmt = do
   config <- getConfig
   platform <- getPlatform
   case stmt of
-    CmmUnsafeForeignCall target result_regs args
-      -> genCCall target result_regs args
+    CmmUnsafeForeignCall target result_regs args ->
+      case target of
+        PrimTarget primOp       -> genPrim primOp result_regs args
+        ForeignTarget addr conv -> genCCall addr conv result_regs args
 
     CmmComment s   -> return (unitOL (COMMENT (ftext s)))
     CmmTick {}     -> return nilOL
@@ -1631,6 +1634,319 @@ genCondBranch true false expr = do
   b2 <- genBranch false
   return (b1 `appOL` b2)
 
+genPrim
+    :: CallishMachOp      -- MachOp
+    -> [CmmFormal]        -- where to put the result
+    -> [CmmActual]        -- arguments (of mixed type)
+    -> NatM InstrBlock
+
+genPrim MO_F32_Fabs          [dst]   [src]          = genFloatAbs W32 dst src
+genPrim MO_F64_Fabs          [dst]   [src]          = genFloatAbs W64 dst src
+genPrim MO_F32_Sqrt          [dst]   [src]          = genFloatSqrt FF32 dst src
+genPrim MO_F64_Sqrt          [dst]   [src]          = genFloatSqrt FF64 dst src
+genPrim (MO_Clz width)       [dst]   [src]          = genClz width dst src
+genPrim (MO_Ctz width)       [dst]   [src]          = genCtz width dst src
+genPrim (MO_BSwap width)     [dst]   [src]          = genByteSwap width dst src
+genPrim (MO_BRev width)      [dst]   [src]          = genBitRev width dst src
+genPrim MO_AcquireFence      []      []             = return $ unitOL (DBAR HintAcquire)
+genPrim MO_ReleaseFence      []      []             = return $ unitOL (DBAR HintRelease)
+genPrim MO_SeqCstFence       []      []             = return $ unitOL (DBAR HintSeqcst)
+genPrim MO_Touch             []      [_]            = return nilOL
+genPrim (MO_Prefetch_Data _n) []     [_]            = return nilOL
+genPrim (MO_AtomicRead w mo)  [dst]  [addr]         = genAtomicRead w mo dst addr
+genPrim (MO_AtomicWrite w mo) []     [addr,val]     = genAtomicWrite w mo addr val
+
+genPrim mop@(MO_S_Mul2     _w) _         _          = unsupported mop
+genPrim mop@(MO_S_QuotRem  _w) _         _          = unsupported mop
+genPrim mop@(MO_U_QuotRem  _w) _         _          = unsupported mop
+genPrim mop@(MO_U_QuotRem2 _w) _         _          = unsupported mop
+genPrim mop@(MO_Add2       _w) _         _          = unsupported mop
+genPrim mop@(MO_AddWordC   _w) _         _          = unsupported mop
+genPrim mop@(MO_SubWordC   _w) _         _          = unsupported mop
+genPrim mop@(MO_AddIntC    _w) _         _          = unsupported mop
+genPrim mop@(MO_SubIntC    _w) _         _          = unsupported mop
+genPrim mop@(MO_U_Mul2     _w) _         _          = unsupported mop
+genPrim mop@MO_I64X2_Min       _         _          = unsupported mop
+genPrim mop@MO_I64X2_Max       _         _          = unsupported mop
+genPrim mop@MO_W64X2_Min       _         _          = unsupported mop
+genPrim mop@MO_W64X2_Max       _         _          = unsupported mop
+genPrim mop@MO_VS_Quot {}      _         _          = unsupported mop
+genPrim mop@MO_VS_Rem  {}      _         _          = unsupported mop
+genPrim mop@MO_VU_Quot {}      _         _          = unsupported mop
+genPrim mop@MO_VU_Rem  {}      _         _          = unsupported mop
+
+genPrim (MO_PopCnt width)    [dst]   [src]          = genLibCCall (popCntLabel width) [dst] [src]
+genPrim (MO_Pdep width)      [dst]   [src,mask]     = genLibCCall (pdepLabel width) [dst] [src,mask]
+genPrim (MO_Pext width)      [dst]   [src,mask]     = genLibCCall (pextLabel width) [dst] [src,mask]
+genPrim (MO_UF_Conv width)   [dst]   [src]          = genLibCCall (word2FloatLabel width) [dst] [src]
+genPrim (MO_AtomicRMW width amop)    [dst] [addr,n] = genLibCCall (atomicRMWLabel width amop) [dst] [addr,n]
+genPrim (MO_Cmpxchg width)   [dst]   [addr,old,new] = genLibCCall (cmpxchgLabel width) [dst] [addr,old,new]
+genPrim (MO_Xchg width)      [dst]   [addr,val]     = genLibCCall (xchgLabel width) [dst] [addr,val]
+genPrim (MO_Memcpy _align)   []   [dst,src,n]       = genLibCCall (fsLit "memcpy")  [] [dst,src,n]
+genPrim (MO_Memmove _align)  []   [dst,src,n]       = genLibCCall (fsLit "memmove") [] [dst,src,n]
+genPrim (MO_Memcmp _align)   [rst]   [dst,src,n]    = genLibCCall (fsLit "memcmp")  [rst] [dst,src,n]
+genPrim (MO_Memset _align)   []   [dst,cnt,n]       = genLibCCall (fsLit "memset")  [] [dst,cnt,n]
+genPrim MO_F32_Sin           [dst]   [src]          = genLibCCall (fsLit "sinf") [dst] [src]
+genPrim MO_F32_Cos           [dst]   [src]          = genLibCCall (fsLit "cosf") [dst] [src]
+genPrim MO_F32_Tan           [dst]   [src]          = genLibCCall (fsLit "tanf") [dst] [src]
+genPrim MO_F32_Exp           [dst]   [src]          = genLibCCall (fsLit "expf") [dst] [src]
+genPrim MO_F32_ExpM1         [dst]   [src]          = genLibCCall (fsLit "expm1f") [dst] [src]
+genPrim MO_F32_Log           [dst]   [src]          = genLibCCall (fsLit "logf") [dst] [src]
+genPrim MO_F32_Log1P         [dst]   [src]          = genLibCCall (fsLit "log1pf") [dst] [src]
+genPrim MO_F32_Asin          [dst]   [src]          = genLibCCall (fsLit "asinf") [dst] [src]
+genPrim MO_F32_Acos          [dst]   [src]          = genLibCCall (fsLit "acosf") [dst] [src]
+genPrim MO_F32_Atan          [dst]   [src]          = genLibCCall (fsLit "atanf") [dst] [src]
+genPrim MO_F32_Sinh          [dst]   [src]          = genLibCCall (fsLit "sinhf") [dst] [src]
+genPrim MO_F32_Cosh          [dst]   [src]          = genLibCCall (fsLit "coshf") [dst] [src]
+genPrim MO_F32_Tanh          [dst]   [src]          = genLibCCall (fsLit "tanhf") [dst] [src]
+genPrim MO_F32_Pwr           [dst]   [x,y]          = genLibCCall (fsLit "powf")  [dst] [x,y]
+genPrim MO_F32_Asinh         [dst]   [src]          = genLibCCall (fsLit "asinhf") [dst] [src]
+genPrim MO_F32_Acosh         [dst]   [src]          = genLibCCall (fsLit "acoshf") [dst] [src]
+genPrim MO_F32_Atanh         [dst]   [src]          = genLibCCall (fsLit "atanhf") [dst] [src]
+genPrim MO_F64_Sin           [dst]   [src]          = genLibCCall (fsLit "sin") [dst] [src]
+genPrim MO_F64_Cos           [dst]   [src]          = genLibCCall (fsLit "cos") [dst] [src]
+genPrim MO_F64_Tan           [dst]   [src]          = genLibCCall (fsLit "tan") [dst] [src]
+genPrim MO_F64_Exp           [dst]   [src]          = genLibCCall (fsLit "exp") [dst] [src]
+genPrim MO_F64_ExpM1         [dst]   [src]          = genLibCCall (fsLit "expm1") [dst] [src]
+genPrim MO_F64_Log           [dst]   [src]          = genLibCCall (fsLit "log") [dst] [src]
+genPrim MO_F64_Log1P         [dst]   [src]          = genLibCCall (fsLit "log1p") [dst] [src]
+genPrim MO_F64_Asin          [dst]   [src]          = genLibCCall (fsLit "asin") [dst] [src]
+genPrim MO_F64_Acos          [dst]   [src]          = genLibCCall (fsLit "acos") [dst] [src]
+genPrim MO_F64_Atan          [dst]   [src]          = genLibCCall (fsLit "atan") [dst] [src]
+genPrim MO_F64_Sinh          [dst]   [src]          = genLibCCall (fsLit "sinh") [dst] [src]
+genPrim MO_F64_Cosh          [dst]   [src]          = genLibCCall (fsLit "cosh") [dst] [src]
+genPrim MO_F64_Tanh          [dst]   [src]          = genLibCCall (fsLit "tanh") [dst] [src]
+genPrim MO_F64_Pwr           [dst]   [x,y]          = genLibCCall (fsLit "pow")  [dst] [x,y]
+genPrim MO_F64_Asinh         [dst]   [src]          = genLibCCall (fsLit "asinh") [dst] [src]
+genPrim MO_F64_Acosh         [dst]   [src]          = genLibCCall (fsLit "acosh") [dst] [src]
+genPrim MO_F64_Atanh         [dst]   [src]          = genLibCCall (fsLit "atanh") [dst] [src]
+genPrim MO_SuspendThread     [tok]   [rs,i]         = genLibCCall (fsLit "suspendThread") [tok] [rs,i]
+genPrim MO_ResumeThread      [rs]    [tok]          = genLibCCall (fsLit "resumeThread") [rs] [tok]
+genPrim MO_I64_ToI           [dst]   [src]          = genLibCCall (fsLit "hs_int64ToInt") [dst] [src]
+genPrim MO_I64_FromI         [dst]   [src]          = genLibCCall (fsLit "hs_intToInt64") [dst] [src]
+genPrim MO_W64_ToW           [dst]   [src]          = genLibCCall (fsLit "hs_word64ToWord") [dst] [src]
+genPrim MO_W64_FromW         [dst]   [src]          = genLibCCall (fsLit "hs_wordToWord64") [dst] [src]
+genPrim MO_x64_Neg           [dst]   [src]          = genLibCCall (fsLit "hs_neg64") [dst] [src]
+genPrim MO_x64_Add           [dst]   [src]          = genLibCCall (fsLit "hs_add64") [dst] [src]
+genPrim MO_x64_Sub           [dst]   [src]          = genLibCCall (fsLit "hs_sub64") [dst] [src]
+genPrim MO_x64_Mul           [dst]   [src]          = genLibCCall (fsLit "hs_mul64") [dst] [src]
+genPrim MO_I64_Quot          [dst]   [src]          = genLibCCall (fsLit "hs_quotInt64") [dst] [src]
+genPrim MO_I64_Rem           [dst]   [src]          = genLibCCall (fsLit "hs_remInt64") [dst] [src]
+genPrim MO_W64_Quot          [dst]   [src]          = genLibCCall (fsLit "hs_quotWord64") [dst] [src]
+genPrim MO_W64_Rem           [dst]   [src]          = genLibCCall (fsLit "hs_remWord64") [dst] [src]
+genPrim MO_x64_And           [dst]   [src]          = genLibCCall (fsLit "hs_and64") [dst] [src]
+genPrim MO_x64_Or            [dst]   [src]          = genLibCCall (fsLit "hs_or64") [dst] [src]
+genPrim MO_x64_Xor           [dst]   [src]          = genLibCCall (fsLit "hs_xor64") [dst] [src]
+genPrim MO_x64_Not           [dst]   [src]          = genLibCCall (fsLit "hs_not64") [dst] [src]
+genPrim MO_x64_Shl           [dst]   [src]          = genLibCCall (fsLit "hs_uncheckedShiftL64") [dst] [src]
+genPrim MO_I64_Shr           [dst]   [src]          = genLibCCall (fsLit "hs_uncheckedIShiftRA64") [dst] [src]
+genPrim MO_W64_Shr           [dst]   [src]          = genLibCCall (fsLit "hs_uncheckedShiftRL64") [dst] [src]
+genPrim MO_x64_Eq            [dst]   [src]          = genLibCCall (fsLit "hs_eq64") [dst] [src]
+genPrim MO_x64_Ne            [dst]   [src]          = genLibCCall (fsLit "hs_ne64") [dst] [src]
+genPrim MO_I64_Ge            [dst]   [src]          = genLibCCall (fsLit "hs_geInt64") [dst] [src]
+genPrim MO_I64_Gt            [dst]   [src]          = genLibCCall (fsLit "hs_gtInt64") [dst] [src]
+genPrim MO_I64_Le            [dst]   [src]          = genLibCCall (fsLit "hs_leInt64") [dst] [src]
+genPrim MO_I64_Lt            [dst]   [src]          = genLibCCall (fsLit "hs_ltInt64") [dst] [src]
+genPrim MO_W64_Ge            [dst]   [src]          = genLibCCall (fsLit "hs_geWord64") [dst] [src]
+genPrim MO_W64_Gt            [dst]   [src]          = genLibCCall (fsLit "hs_gtWord64") [dst] [src]
+genPrim MO_W64_Le            [dst]   [src]          = genLibCCall (fsLit "hs_leWord64") [dst] [src]
+genPrim MO_W64_Lt            [dst]   [src]          = genLibCCall (fsLit "hs_ltWord64") [dst] [src]
+genPrim op                   dst     args           = do
+  platform <- ncgPlatform <$> getConfig
+  pprPanic "genPrim: unknown primOp" (ppr (pprCallishMachOp op, dst, fmap (pdoc platform) args))
+
+
+genFloatAbs :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
+genFloatAbs w dst src = do
+  platform <- getPlatform
+  (reg_fx, _, code_fx) <- getFloatReg src
+  let dst_reg = getRegisterReg platform (CmmLocal dst)
+  return (code_fx `appOL` toOL
+          [
+            FABS (OpReg w dst_reg) (OpReg w reg_fx)
+          ]
+         )
+
+genFloatSqrt :: Format -> LocalReg -> CmmExpr -> NatM InstrBlock
+genFloatSqrt f dst src = do
+  platform <- getPlatform
+  (reg_fx, _, code_fx) <- getFloatReg src
+  let dst_reg = getRegisterReg platform (CmmLocal dst)
+  return (code_fx `appOL` toOL
+          [
+            FSQRT (OpReg w dst_reg) (OpReg w reg_fx)
+          ]
+         )
+  where
+    w = case f of
+      FF32 -> W32
+      _ -> W64
+
+genClz :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
+genClz w dst src = do
+  platform <- getPlatform
+  (reg_x, _, code_x) <- getSomeReg src
+  let dst_reg = getRegisterReg platform (CmmLocal dst)
+  if w `elem` [W32, W64] then do
+    return (code_x `snocOL` CLZ (OpReg w dst_reg) (OpReg w reg_x))
+  else if w `elem` [W8, W16] then do
+    return (code_x `appOL` toOL
+                 [
+                  MOV (OpReg W64 dst_reg) (OpImm (ImmInt 1)),
+                  SLL (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpImm (ImmInt (31-shift))),
+                  SLL (OpReg W64 reg_x) (OpReg W64 reg_x) (OpImm (ImmInt (32-shift))),
+                  OR (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpReg W64 reg_x),
+                  CLZ (OpReg W64 dst_reg) (OpReg W32 dst_reg)
+                 ]
+           )
+  else do
+    pprPanic "genClz: invalid width: " (ppr w)
+  where
+    shift = widthToInt w
+
+genCtz :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
+genCtz w dst src = do
+  platform <- getPlatform
+  (reg_x, _, code_x) <- getSomeReg src
+  let dst_reg = getRegisterReg platform (CmmLocal dst)
+  if w `elem` [W32, W64] then do
+    return (code_x `snocOL` CTZ (OpReg w dst_reg) (OpReg w reg_x))
+  else if w `elem` [W8, W16] then do
+    return (code_x `appOL` toOL
+                 [
+                  MOV (OpReg W64 dst_reg) (OpImm (ImmInt 1)),
+                  SLL (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpImm (ImmInt shift)),
+                  BSTRPICK II64 (OpReg W64 reg_x) (OpReg W64 reg_x) (OpImm (ImmInt (shift-1))) (OpImm (ImmInt 0)),
+                  OR  (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpReg W64 reg_x),
+                  CTZ (OpReg W64 dst_reg) (OpReg W64 dst_reg)
+                 ]
+           )
+  else do
+    pprPanic "genCtz: invalid width: " (ppr w)
+  where
+    shift = (widthToInt w)
+
+genByteSwap :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
+genByteSwap w dst src = do
+  platform <- getPlatform
+  (reg_x, _, code_x) <- getSomeReg src
+  let dst_reg = getRegisterReg platform (CmmLocal dst)
+  case w of
+    W64 ->
+      return (code_x `appOL` toOL
+              [
+                REVBD (OpReg w dst_reg) (OpReg w reg_x)
+              ]
+             )
+    W32 ->
+      return (code_x `appOL` toOL
+              [
+                REVB2W (OpReg w dst_reg) (OpReg w reg_x)
+              ]
+             )
+    W16 ->
+      return (code_x `appOL` toOL
+              [
+                REVB2H (OpReg w dst_reg) (OpReg w reg_x)
+              ]
+             )
+    _ -> pprPanic "genBSwap: invalid width: " (ppr w)
+
+genBitRev :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
+genBitRev w dst src = do
+  platform <- getPlatform
+  (reg_x, _, code_x) <- getSomeReg src
+  let dst_reg = getRegisterReg platform (CmmLocal dst)
+  case w of
+    W8 ->
+      return (code_x `appOL` toOL
+              [
+                BITREV4B (OpReg W32 reg_x) (OpReg W32 reg_x),
+                AND (OpReg W64 dst_reg) (OpReg W64 reg_x) (OpImm (ImmInt 255))
+              ]
+             )
+    W16 ->
+      return (code_x `appOL` toOL
+              [
+                BITREV (OpReg W64 reg_x) (OpReg W64 reg_x),
+                SRL (OpReg W64 dst_reg) (OpReg W64 reg_x) (OpImm (ImmInt 48))
+              ]
+             )
+    _ -> return ( code_x `snocOL` BITREV (OpReg w dst_reg) (OpReg w reg_x))
+
+-- Generate C call to the given function in libc
+genLibCCall :: FastString -> [CmmFormal] -> [CmmActual] -> NatM InstrBlock
+genLibCCall name dsts args = do
+  config <- getConfig
+  target <-
+    cmmMakeDynamicReference config CallReference
+      $ mkForeignLabel name ForeignLabelInThisPackage IsFunction
+  let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
+  genCCall target cconv dsts args
+
+unsupported :: Show a => a -> b
+unsupported mop = panic ("outOfLineCmmOp: " ++ show mop
+                      ++ " not supported here")
+
+-- AMSWAP_DB* insns implentment a fully functional synchronization barrier, like DBAR 0x0.
+-- This is terrible. And AMSWAPDB only supports ISA version greater than LA64V1_0. So,
+-- implement with DBAR
+genAtomicRead :: Width -> MemoryOrdering -> LocalReg -> CmmExpr -> NatM InstrBlock
+genAtomicRead w mo dst arg = do
+  (addr_p, _, code_p) <- getSomeReg arg
+  platform <- getPlatform
+  let d = getRegisterReg platform (CmmLocal dst)
+  case mo of
+    MemOrderRelaxed ->
+      return (code_p `appOL` toOL
+              [
+                LD (intFormat w) (OpReg w d) (OpAddr $ AddrReg addr_p)
+              ]
+             )
+
+    MemOrderAcquire ->
+      return (code_p `appOL` toOL
+              [
+                LD (intFormat w) (OpReg w d) (OpAddr $ AddrReg addr_p),
+                DBAR HintAcquire
+              ]
+             )
+    MemOrderSeqCst ->
+      return (code_p `appOL` toOL
+              [
+                LD (intFormat w) (OpReg w d) (OpAddr $ AddrReg addr_p),
+                DBAR HintSeqcst
+              ]
+             )
+    _ -> panic $ "Unexpected MemOrderRelease on an AtomicRead: " ++ show mo
+
+genAtomicWrite :: Width -> MemoryOrdering -> CmmExpr -> CmmExpr -> NatM InstrBlock
+genAtomicWrite w mo addr val = do
+  (addr_p, _, code_p) <- getSomeReg addr
+  (val_reg, fmt_val, code_val) <- getSomeReg val
+  case mo of
+    MemOrderRelaxed ->
+      return (code_p `appOL`code_val `appOL` toOL
+              [
+                ST fmt_val (OpReg w val_reg) (OpAddr $ AddrReg addr_p)
+              ]
+             )
+    MemOrderRelease ->
+      return (code_p `appOL`code_val `appOL` toOL
+              [
+                DBAR HintRelease,
+                ST fmt_val (OpReg w val_reg) (OpAddr $ AddrReg addr_p)
+              ]
+             )
+    MemOrderSeqCst ->
+      return (code_p `appOL`code_val `appOL` toOL
+              [
+                DBAR HintSeqcst,
+                ST fmt_val (OpReg w val_reg) (OpAddr $ AddrReg addr_p)
+              ]
+             )
+    _ ->  panic $ "Unexpected MemOrderAcquire on an AtomicWrite" ++ show mo
+
 -- -----------------------------------------------------------------------------
 {-
 Generating C calls
@@ -1664,393 +1980,68 @@ wider than FRLEN may be passed in a GAR.
 -}
 
 genCCall
-    :: ForeignTarget      -- function to call
-    -> [CmmFormal]        -- where to put the result
-    -> [CmmActual]        -- arguments (of mixed type)
-    -> NatM InstrBlock
+  :: CmmExpr            -- address of func call
+  -> ForeignConvention  -- calling convention
+  -> [CmmFormal]        -- results
+  -> [CmmActual]        -- arguments
+  -> NatM InstrBlock
 
--- TODO: Specialize where we can.
--- Generic impl
-genCCall target dest_regs arg_regs = do
-  case target of
-    -- The target :: ForeignTarget call can either
-    -- be a foreign procedure with an address expr
-    -- and a calling convention.
-    ForeignTarget expr _cconv -> do
-      (call_target, call_target_code) <- case expr of
-        -- if this is a label, let's just directly to it.
-        (CmmLit (CmmLabel lbl)) -> pure (TLabel lbl, nilOL)
-        -- if it's not a label, let's compute the expression into a
-        -- register and jump to that.
-        _ -> do
-          (reg, _format, reg_code) <- getSomeReg expr
-          pure (TReg reg, reg_code)
-      -- compute the code and register logic for all arg_regs.
-      -- this will give us the format information to match on.
-      arg_regs' <- mapM getSomeReg arg_regs
 
-      -- Now this is stupid.  Our Cmm expressions doesn't carry the proper sizes
-      -- so while in Cmm we might get W64 incorrectly for an int, that is W32 in
-      -- STG; this thenn breaks packing of stack arguments, if we need to pack
-      -- for the pcs, e.g. darwinpcs.  Option one would be to fix the Int type
-      -- in Cmm proper. Option two, which we choose here is to use extended Hint
-      -- information to contain the size information and use that when packing
-      -- arguments, spilled onto the stack.
-      let (_res_hints, arg_hints) = foreignTargetHints target
-          arg_regs'' = zipWith (\(r, f, c) h -> (r,f,h,c)) arg_regs' arg_hints
+genCCall expr _conv@(ForeignConvention _ argHints _resHints _) dest_regs arg_regs = do
+  (call_target, call_target_code) <- case expr of
+    -- if this is a label, let's just directly to it.
+    (CmmLit (CmmLabel lbl)) -> pure (TLabel lbl, nilOL)
+    -- if it's not a label, let's compute the expression into a
+    -- register and jump to that.
+    _ -> do
+      (reg, _format, reg_code) <- getSomeReg expr
+      pure (TReg reg, reg_code)
+  -- compute the code and register logic for all arg_regs.
+  -- this will give us the format information to match on.
+  arg_regs' <- mapM getSomeReg arg_regs
 
-      (stackSpaceWords, passRegs, passArgumentsCode) <- passArguments allGpArgRegs allFpArgRegs arg_regs'' 0 [] nilOL
+  -- Now this is stupid.  Our Cmm expressions doesn't carry the proper sizes
+  -- so while in Cmm we might get W64 incorrectly for an int, that is W32 in
+  -- STG; this thenn breaks packing of stack arguments, if we need to pack
+  -- for the pcs, e.g. darwinpcs.  Option one would be to fix the Int type
+  -- in Cmm proper. Option two, which we choose here is to use extended Hint
+  -- information to contain the size information and use that when packing
+  -- arguments, spilled onto the stack.
+  let
+      arg_hints = take (length arg_regs) (argHints ++ repeat NoHint)
+      arg_regs'' = zipWith (\(r, f, c) h -> (r,f,h,c)) arg_regs' arg_hints
 
-      readResultsCode <- readResults allGpArgRegs allFpArgRegs dest_regs [] nilOL
+  (stackSpaceWords, passRegs, passArgumentsCode) <- passArguments allGpArgRegs allFpArgRegs arg_regs'' 0 [] nilOL
 
-      let moveStackDown 0 = toOL [ PUSH_STACK_FRAME
-                                 , DELTA (-16)
-                                 ]
-          moveStackDown i | odd i = moveStackDown (i + 1)
-          moveStackDown i = toOL [ PUSH_STACK_FRAME
-                                 , SUB (OpReg W64 (spMachReg)) (OpReg W64 (spMachReg)) (OpImm (ImmInt (8 * i)))
-                                 , DELTA (-8 * i - 16)
-                                 ]
-          moveStackUp 0 = toOL [ POP_STACK_FRAME
-                               , DELTA 0
-                               ]
-          moveStackUp i | odd i = moveStackUp (i + 1)
-          moveStackUp i = toOL [ ADD (OpReg W64 (spMachReg)) (OpReg W64 (spMachReg)) (OpImm (ImmInt (8 * i)))
-                               , POP_STACK_FRAME
-                               , DELTA 0
-                               ]
+  readResultsCode <- readResults allGpArgRegs allFpArgRegs dest_regs [] nilOL
 
-      let code =
-            call_target_code -- compute the label (possibly into a register)
-              `appOL` moveStackDown (stackSpaceWords)
-              `appOL` passArgumentsCode -- put the arguments into x0, ...
-              `snocOL` CALL call_target passRegs -- branch and link (C calls aren't tail calls, but return)
-              `appOL` readResultsCode -- parse the results into registers
-              `appOL` moveStackUp (stackSpaceWords)
-      return code
+  let moveStackDown 0 = toOL [ PUSH_STACK_FRAME
+                             , DELTA (-16)
+                             ]
+      moveStackDown i | odd i = moveStackDown (i + 1)
+      moveStackDown i = toOL [ PUSH_STACK_FRAME
+                             , SUB (OpReg W64 (spMachReg)) (OpReg W64 (spMachReg)) (OpImm (ImmInt (8 * i)))
+                             , DELTA (-8 * i - 16)
+                             ]
+      moveStackUp 0 = toOL [ POP_STACK_FRAME
+                           , DELTA 0
+                           ]
+      moveStackUp i | odd i = moveStackUp (i + 1)
+      moveStackUp i = toOL [ ADD (OpReg W64 (spMachReg)) (OpReg W64 (spMachReg)) (OpImm (ImmInt (8 * i)))
+                           , POP_STACK_FRAME
+                           , DELTA 0
+                           ]
 
-    PrimTarget MO_F32_Fabs
-      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
-        unaryFloatOp W32 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
-      | otherwise -> panic "mal-formed MO_F32_Fabs"
-    PrimTarget MO_F64_Fabs
-      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
-        unaryFloatOp W64 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
-      | otherwise -> panic "mal-formed MO_F64_Fabs"
-
-    PrimTarget MO_F32_Sqrt
-      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
-        unaryFloatOp W32 (\d x -> unitOL $ FSQRT d x) arg_reg dest_reg
-      | otherwise -> panic "mal-formed MO_F32_Sqrt"
-    PrimTarget MO_F64_Sqrt
-      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
-        unaryFloatOp W64 (\d x -> unitOL $ FSQRT d x) arg_reg dest_reg
-      | otherwise -> panic "mal-formed MO_F64_Sqrt"
-
-    PrimTarget (MO_Clz w)
-      | w `elem` [W32, W64],
-      [arg_reg] <- arg_regs,
-      [dest_reg] <- dest_regs -> do
-      platform <- getPlatform
-      (reg_x, _format_x, code_x) <- getSomeReg arg_reg
-      let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
-      return ( code_x `snocOL`
-               CLZ (OpReg w dst_reg) (OpReg w reg_x)
-             )
-      | w `elem` [W8, W16],
-      [arg_reg] <- arg_regs,
-      [dest_reg] <- dest_regs -> do
-        platform <- getPlatform
-        (reg_x, _format_x, code_x) <- getSomeReg arg_reg
-        let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
-        return ( code_x `appOL` toOL
-                 [
-                  MOV (OpReg W64 dst_reg) (OpImm (ImmInt 1)),
-                  SLL (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpImm (ImmInt (31-shift))),
-                  SLL (OpReg W64 reg_x) (OpReg W64 reg_x) (OpImm (ImmInt (32-shift))),
-                  OR (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpReg W64 reg_x),
-                  CLZ (OpReg W64 dst_reg) (OpReg W32 dst_reg)
-                 ]
-               )
-      | otherwise -> unsupported (MO_Clz w)
-      where
-        shift = widthToInt w
-
-    PrimTarget (MO_Ctz w)
-      | w `elem` [W32, W64],
-      [arg_reg] <- arg_regs,
-      [dest_reg] <- dest_regs -> do
-      platform <- getPlatform
-      (reg_x, _format_x, code_x) <- getSomeReg arg_reg
-      let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
-      return ( code_x `snocOL`
-               CTZ (OpReg w dst_reg) (OpReg w reg_x)
-             )
-      | w `elem` [W8, W16],
-      [arg_reg] <- arg_regs,
-      [dest_reg] <- dest_regs -> do
-      platform <- getPlatform
-      (reg_x, _format_x, code_x) <- getSomeReg arg_reg
-      let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
-      return ( code_x `appOL` toOL
-               [
-                MOV (OpReg W64 dst_reg) (OpImm (ImmInt 1)),
-                SLL (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpImm (ImmInt shift)),
-                BSTRPICK II64 (OpReg W64 reg_x) (OpReg W64 reg_x) (OpImm (ImmInt (shift-1))) (OpImm (ImmInt 0)),
-                OR  (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpReg W64 reg_x),
-                CTZ (OpReg W64 dst_reg) (OpReg W64 dst_reg)
-               ]
-             )
-      | otherwise -> unsupported (MO_Ctz w)
-      where
-        shift = (widthToInt w)
-
-    PrimTarget (MO_BSwap w)
-      | w `elem` [W16, W32, W64],
-      [arg_reg] <- arg_regs,
-      [dest_reg] <- dest_regs -> do
-      platform <- getPlatform
-      (reg_x, _, code_x) <- getSomeReg arg_reg
-      let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
-      case w of
-        W64 -> return ( code_x `appOL` toOL
-                      [
-                        REVBD (OpReg w dst_reg) (OpReg w reg_x)
-                      ])
-        W32 -> return ( code_x `appOL` toOL
-                      [
-                        REVB2W (OpReg w dst_reg) (OpReg w reg_x)
-                      ])
-        _ -> return ( code_x `appOL` toOL
-                      [
-                        REVB2H (OpReg w dst_reg) (OpReg w reg_x)
-                      ])
-      | otherwise -> unsupported (MO_BSwap w)
-
-    PrimTarget (MO_BRev w)
-      | w `elem` [W8, W16, W32, W64],
-      [arg_reg] <- arg_regs,
-      [dest_reg] <- dest_regs -> do
-      platform <- getPlatform
-      (reg_x, _, code_x) <- getSomeReg arg_reg
-      let dst_reg = getRegisterReg platform (CmmLocal dest_reg)
-      case w of
-        W8 -> return ( code_x `appOL` toOL
-                     [
-                       BITREV4B (OpReg W32 reg_x) (OpReg W32 reg_x),
-                       AND (OpReg W64 dst_reg) (OpReg W64 reg_x) (OpImm (ImmInt 255))
-                     ])
-        W16 -> return ( code_x `appOL` toOL
-                      [
-                        BITREV (OpReg W64 reg_x) (OpReg W64 reg_x),
-                        SRL (OpReg W64 dst_reg) (OpReg W64 reg_x) (OpImm (ImmInt 48))
-                      ])
-        _ -> return ( code_x `snocOL` BITREV (OpReg w dst_reg) (OpReg w reg_x))
-      | otherwise -> unsupported (MO_BRev w)
-
-    -- mop :: CallishMachOp (see GHC.Cmm.MachOp)
-    PrimTarget mop -> do
-      -- We'll need config to construct forien targets
-      case mop of
-        -- 64 bit float ops
-        MO_F64_Pwr   -> mkCCall "pow"
-
-        MO_F64_Sin   -> mkCCall "sin"
-        MO_F64_Cos   -> mkCCall "cos"
-        MO_F64_Tan   -> mkCCall "tan"
-
-        MO_F64_Sinh  -> mkCCall "sinh"
-        MO_F64_Cosh  -> mkCCall "cosh"
-        MO_F64_Tanh  -> mkCCall "tanh"
-
-        MO_F64_Asin  -> mkCCall "asin"
-        MO_F64_Acos  -> mkCCall "acos"
-        MO_F64_Atan  -> mkCCall "atan"
-
-        MO_F64_Asinh -> mkCCall "asinh"
-        MO_F64_Acosh -> mkCCall "acosh"
-        MO_F64_Atanh -> mkCCall "atanh"
-
-        MO_F64_Log   -> mkCCall "log"
-        MO_F64_Log1P -> mkCCall "log1p"
-        MO_F64_Exp   -> mkCCall "exp"
-        MO_F64_ExpM1 -> mkCCall "expm1"
-
-        -- 32 bit float ops
-        MO_F32_Pwr   -> mkCCall "powf"
-
-        MO_F32_Sin   -> mkCCall "sinf"
-        MO_F32_Cos   -> mkCCall "cosf"
-        MO_F32_Tan   -> mkCCall "tanf"
-        MO_F32_Sinh  -> mkCCall "sinhf"
-        MO_F32_Cosh  -> mkCCall "coshf"
-        MO_F32_Tanh  -> mkCCall "tanhf"
-        MO_F32_Asin  -> mkCCall "asinf"
-        MO_F32_Acos  -> mkCCall "acosf"
-        MO_F32_Atan  -> mkCCall "atanf"
-        MO_F32_Asinh -> mkCCall "asinhf"
-        MO_F32_Acosh -> mkCCall "acoshf"
-        MO_F32_Atanh -> mkCCall "atanhf"
-        MO_F32_Log   -> mkCCall "logf"
-        MO_F32_Log1P -> mkCCall "log1pf"
-        MO_F32_Exp   -> mkCCall "expf"
-        MO_F32_ExpM1 -> mkCCall "expm1f"
-
-        -- 64-bit primops
-        MO_I64_ToI   -> mkCCall "hs_int64ToInt"
-        MO_I64_FromI -> mkCCall "hs_intToInt64"
-        MO_W64_ToW   -> mkCCall "hs_word64ToWord"
-        MO_W64_FromW -> mkCCall "hs_wordToWord64"
-        MO_x64_Neg   -> mkCCall "hs_neg64"
-        MO_x64_Add   -> mkCCall "hs_add64"
-        MO_x64_Sub   -> mkCCall "hs_sub64"
-        MO_x64_Mul   -> mkCCall "hs_mul64"
-        MO_I64_Quot  -> mkCCall "hs_quotInt64"
-        MO_I64_Rem   -> mkCCall "hs_remInt64"
-        MO_W64_Quot  -> mkCCall "hs_quotWord64"
-        MO_W64_Rem   -> mkCCall "hs_remWord64"
-        MO_x64_And   -> mkCCall "hs_and64"
-        MO_x64_Or    -> mkCCall "hs_or64"
-        MO_x64_Xor   -> mkCCall "hs_xor64"
-        MO_x64_Not   -> mkCCall "hs_not64"
-        MO_x64_Shl   -> mkCCall "hs_uncheckedShiftL64"
-        MO_I64_Shr   -> mkCCall "hs_uncheckedIShiftRA64"
-        MO_W64_Shr   -> mkCCall "hs_uncheckedShiftRL64"
-        MO_x64_Eq    -> mkCCall "hs_eq64"
-        MO_x64_Ne    -> mkCCall "hs_ne64"
-        MO_I64_Ge    -> mkCCall "hs_geInt64"
-        MO_I64_Gt    -> mkCCall "hs_gtInt64"
-        MO_I64_Le    -> mkCCall "hs_leInt64"
-        MO_I64_Lt    -> mkCCall "hs_ltInt64"
-        MO_W64_Ge    -> mkCCall "hs_geWord64"
-        MO_W64_Gt    -> mkCCall "hs_gtWord64"
-        MO_W64_Le    -> mkCCall "hs_leWord64"
-        MO_W64_Lt    -> mkCCall "hs_ltWord64"
-
-        -- Conversion
-        MO_UF_Conv w        -> mkCCall (word2FloatLabel w)
-
-        -- Optional MachOps
-        -- These are enabled/disabled by backend flags: GHC.StgToCmm.Config
-        MO_S_Mul2     _w -> unsupported mop
-        MO_S_QuotRem  _w -> unsupported mop
-        MO_U_QuotRem  _w -> unsupported mop
-        MO_U_QuotRem2 _w -> unsupported mop
-        MO_Add2       _w -> unsupported mop
-        MO_AddWordC   _w -> unsupported mop
-        MO_SubWordC   _w -> unsupported mop
-        MO_AddIntC    _w -> unsupported mop
-        MO_SubIntC    _w -> unsupported mop
-        MO_U_Mul2     _w -> unsupported mop
-
-        MO_VS_Quot {} -> unsupported mop
-        MO_VS_Rem {}  -> unsupported mop
-        MO_VU_Quot {} -> unsupported mop
-        MO_VU_Rem {}  -> unsupported mop
-        MO_I64X2_Min -> unsupported mop
-        MO_I64X2_Max -> unsupported mop
-        MO_W64X2_Min -> unsupported mop
-        MO_W64X2_Max -> unsupported mop
-
-        -- Memory Ordering
-        -- Support finer-grained DBAR hints for LA664 and newer uarchs.
-        -- These are treated as DBAR 0 on older uarchs, so we can start
-        -- to unconditionally emit the new hints right away.
-        MO_AcquireFence -> pure (unitOL (DBAR HintAcquire))
-        MO_ReleaseFence -> pure (unitOL (DBAR HintRelease))
-        MO_SeqCstFence  -> pure (unitOL (DBAR HintSeqcst))
-
-        MO_Touch        -> pure nilOL -- Keep variables live (when using interior pointers)
-        -- Prefetch
-        MO_Prefetch_Data _n -> pure nilOL -- Prefetch hint.
-
-        -- Memory copy/set/move/cmp, with alignment for optimization
-
-        -- TODO Optimize and use e.g. quad registers to move memory around instead
-        -- of offloading this to memcpy. For small memcpys we can utilize
-        -- the 128bit quad registers in NEON to move block of bytes around.
-        -- Might also make sense of small memsets? Use xzr? What's the function
-        -- call overhead?
-        MO_Memcpy  _align   -> mkCCall "memcpy"
-        MO_Memset  _align   -> mkCCall "memset"
-        MO_Memmove _align   -> mkCCall "memmove"
-        MO_Memcmp  _align   -> mkCCall "memcmp"
-
-        MO_SuspendThread    -> mkCCall "suspendThread"
-        MO_ResumeThread     -> mkCCall "resumeThread"
-
-        MO_PopCnt w         -> mkCCall (popCntLabel w)
-        MO_Pdep w           -> mkCCall (pdepLabel w)
-        MO_Pext w           -> mkCCall (pextLabel w)
-
-    -- or a possibly side-effecting machine operation
-        mo@(MO_AtomicRead w ord)
-          | [p_reg] <- arg_regs
-          , [dst_reg] <- dest_regs -> do
-              (p, _fmt_p, code_p) <- getSomeReg p_reg
-              platform <- getPlatform
-              let instrs = case ord of
-                      MemOrderRelaxed -> unitOL $ ann moDescr (LD (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p))
-
-                      MemOrderAcquire -> toOL [
-                                                ann moDescr (LD (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)),
-                                                DBAR HintAcquire
-                                              ]
-                      MemOrderSeqCst -> toOL  [
-                                                ann moDescr (LD (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)),
-                                                DBAR HintSeqcst
-                                              ]
-                      _ -> panic $ "Unexpected MemOrderRelease on an AtomicRead: " ++ show mo
-                  dst = getRegisterReg platform (CmmLocal dst_reg)
-                  moDescr = (text . show) mo
-                  code = code_p `appOL` instrs
-              pure code
-          | otherwise -> panic "mal-formed AtomicRead"
-
-        mo@(MO_AtomicWrite w ord)
-          | [p_reg, val_reg] <- arg_regs -> do
-              (p, _fmt_p, code_p) <- getSomeReg p_reg
-              (val, fmt_val, code_val) <- getSomeReg val_reg
-              let instrs = case ord of
-                      MemOrderRelaxed -> unitOL $ ann moDescr (ST fmt_val (OpReg w val) (OpAddr $ AddrReg p))
-                      -- AMSWAP_DB* insns implentment a fully functional synchronization barrier, like DBAR 0x0.
-                      -- This is terrible. And AMSWAPDB only supports ISA version greater than LA64V1_0. So,
-                      -- implement with DBAR
-                      MemOrderRelease -> toOL [
-                                                ann moDescr (DBAR HintRelease),
-                                                ST fmt_val (OpReg w val) (OpAddr $ AddrReg p)
-                                              ]
-                      MemOrderSeqCst  -> toOL [
-                                                ann moDescr (DBAR HintSeqcst),
-                                                ST fmt_val (OpReg w val) (OpAddr $ AddrReg p)
-                                              ]
-                      _ ->  panic $ "Unexpected MemOrderAcquire on an AtomicWrite" ++ show mo
-                  moDescr = (text . show) mo
-                  code =
-                    code_p `appOL`
-                    code_val `appOL`
-                    instrs
-              pure code
-          | otherwise -> panic "mal-formed AtomicWrite"
-
-        MO_AtomicRMW w amop -> mkCCall (atomicRMWLabel w amop)
-        MO_Cmpxchg w        -> mkCCall (cmpxchgLabel w)
-        MO_Xchg w           -> mkCCall (xchgLabel w)
+  let code =
+        call_target_code -- compute the label (possibly into a register)
+          `appOL` moveStackDown (stackSpaceWords)
+          `appOL` passArgumentsCode -- put the arguments into x0, ...
+          `snocOL` CALL call_target passRegs -- branch and link (C calls aren't tail calls, but return)
+          `appOL` readResultsCode -- parse the results into registers
+          `appOL` moveStackUp (stackSpaceWords)
+  return code
 
   where
-    unsupported :: Show a => a -> b
-    unsupported mop = panic ("outOfLineCmmOp: " ++ show mop
-                          ++ " not supported here")
-
-    mkCCall :: FastString -> NatM InstrBlock
-    mkCCall name = do
-      config <- getConfig
-      target <-
-        cmmMakeDynamicReference config CallReference
-          $ mkForeignLabel name ForeignLabelInThisPackage IsFunction
-      let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
-      genCCall (ForeignTarget target cconv) dest_regs arg_regs
-
     -- Implementiation of the LoongArch ABI calling convention.
     -- https://github.com/loongson/la-abi-specs/blob/release/lapcs.adoc#passing-arguments
     passArguments :: [Reg] -> [Reg] -> [(Reg, Format, ForeignHint, InstrBlock)] -> Int -> [Reg] -> InstrBlock -> NatM (Int, [Reg], InstrBlock)
@@ -2129,10 +2120,10 @@ genCCall target dest_regs arg_regs = do
     readResults _ _ [] _ accumCode = return accumCode
     readResults [] _ _ _ _ = do
       platform <- getPlatform
-      pprPanic "genCCall, out of gp registers when reading results" (pdoc platform target)
+      pprPanic "genCCall, out of gp registers when reading results" (pdoc platform expr)
     readResults _ [] _ _ _ = do
       platform <- getPlatform
-      pprPanic "genCCall, out of fp registers when reading results" (pdoc platform target)
+      pprPanic "genCCall, out of fp registers when reading results" (pdoc platform expr)
     readResults (gpReg:gpRegs) (fpReg:fpRegs) (dst:dsts) accumRegs accumCode = do
       -- gp/fp reg -> dst
       platform <- getPlatform
@@ -2149,13 +2140,6 @@ genCCall target dest_regs arg_regs = do
             `appOL`
             -- truncate, otherwise an unexpectedly big value might be used in upfollowing calculations
             truncateReg W64 w r_dst
-
-    unaryFloatOp w op arg_reg dest_reg = do
-      platform <- getPlatform
-      (reg_fx, _format_x, code_fx) <- getFloatReg arg_reg
-      let dst = getRegisterReg platform (CmmLocal dest_reg)
-      let code = code_fx `appOL` op (OpReg w dst) (OpReg w reg_fx)
-      pure code
 
 data BlockInRange = InRange | NotInRange BlockId
 
