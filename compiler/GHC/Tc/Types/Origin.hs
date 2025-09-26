@@ -598,9 +598,10 @@ data CtOrigin
   | ArrowCmdOrigin      -- Arising from an arrow command
   | AnnOrigin           -- An annotation
 
-  | FunDepOrigin        -- A functional dependency. We don't need auxiliary info
-                        -- because fundep constraints never show up in errors
-                        -- See Note [Functional dependencies in type inference]
+  | FunDepOrigin        -- A functional dependency.
+       -- We don't need auxiliary info because fundep constraints
+       -- never show up in errors.  See (SOLVE-FD) in
+       -- Note [Overview of functional dependencies in type inference]
 
   | InjTFOrigin1    -- injective type family equation combining
       PredType CtOrigin RealSrcSpan    -- This constraint arising from ...

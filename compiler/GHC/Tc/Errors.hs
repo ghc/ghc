@@ -778,8 +778,8 @@ Which errors are suppressed?
 
 Historical (SCE2).  Fundep constraints never "escape" into the
    main solver and so never show up in error messages.
-   See Note [Functional dependencies in type inference] inb GHC.Tc.Solver.FunDeps.
-   So this wrinkle is now just a historical note.
+   See (SOLVE-FD) in Note [Overview of functional dependencies in type inference]
+   in GHC.Tc.Solver.FunDeps.  So this wrinkle is now just a historical note.
 
    Errors which arise from the interaction of two Wanted fun-dep constraints.
    Example:

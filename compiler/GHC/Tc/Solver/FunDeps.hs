@@ -41,33 +41,33 @@ import GHC.Data.Pair
 import Data.Maybe( mapMaybe )
 
 
-{- Note [Functional dependencies in type inference]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Overview of functional dependencies in type inference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here is our plan for dealing with functional dependencies
 
 * When we have failed to solve a Wanted constraint, do this
-  1. Generate any fundep-equalities [FunDepEqns] from that constraint.
-  2. Try to solve that [FunDepEqns]
-  3. If any unifications happened, send the constraint back to the
-     start of the pipeline
+  - (GEN-FD) Generate any fundep-equalities [FunDepEqns] from that constraint.
+  - (SOLVE-FD) Try to solve that [FunDepEqns]
+  - (KICK-FD) If any unifications happened,
+       * kick out any inert constraints that mention the unified variables
+       * send the current constraint back to the start of the pipeline;
+         might now be soluble, and it probably isn't inert
 
-* Step (1) How we generate those [FunDepEqns] varies:
+* (GEN-FD) How we generate those [FunDepEqns] varies:
        - tryDictFunDeps: for class constraints (C t1 .. tn)
          we look at top-level instances and inert Givens
        - tryEqFunDeps: for type-family equalities (F t1 .. tn ~ ty)
          we look at top-level family instances
                     and inert Given family equalities
 
-* Step (2). We use `solveFunDeps` to solve the [FunDepEqns] in a nested
+* (SOLVE-FD) We use `solveFunDeps` to solve the [FunDepEqns] in a nested
   solver.  Key property:
 
       The ONLY effect of `solveFunDeps` is possibly to perform unifications:
-
       - It entirely discards any unsolved fundep equalities.
-
       - It entirely discards any evidence arising from solving fundep equalities
 
-* Step (3) if we did any unifications in Step (2), we start again with the
+* (KICK-FD) if we did any unifications in (SOLVE-FD), we start again with the
   current unsolved Wanted.  It might now be soluble!
 
 * For Given constraints, things are different:
@@ -518,7 +518,8 @@ mkTopUserFamEqFDs fam_tc inj_flags work_args work_rhs
     in_scope = mkInScopeSet (tyCoVarsOfType work_rhs)
 
     trim_qtvs :: Subst -> [TcTyVar] -> (Subst,[TcTyVar])
-    -- Tricky stuff: see (TF1) in Note [Fundeps and top-level family instances]
+    -- Tricky stuff: see (TIF1) in
+    -- Note [Type inference for type families with injectivity]
     trim_qtvs subst []       = (subst, [])
     trim_qtvs subst (tv:tvs)
       | tv `elemSubst` subst = trim_qtvs subst tvs
@@ -765,7 +766,7 @@ solveFunDeps :: CtEvidence  -- The work item
 --
 -- The returned Bool is True if some unifications happened
 --
--- See Note [Overview of fundeps]
+-- See (SOLVE-FD) in Note [Overview of functional dependencies in type inference]
 solveFunDeps work_ev fd_eqns
   | null fd_eqns
   = return False -- Common case no-op

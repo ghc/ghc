@@ -716,14 +716,14 @@ Proposal 29).
 
 Note [Name of a unification variable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We give unification variables a /System/ Name, which is eagerly elmininated
-the the unifier; see GHC.Tc.Utils.Unify.nicer_to_update_tv1, and
-GHC.Tc.Solver.Equality.canEqTyVarTyVar (nicer_to_update_tv2)
+We give unification variables a /System/ Name, which is treated specially
+in two ways
 
-Note [Name of an instantiated type variable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-At the moment we give a unification variable a System Name, which
-influences the way it is tidied; see TypeRep.tidyTyVarBndr.
+* It is eagerly elmininated the the unifier; see
+  GHC.Tc.Utils.Unify.nicer_to_update_tv1, and
+  GHC.Tc.Solver.Equality.canEqTyVarTyVar (nicer_to_update_tv2)
+
+* It influences the way it is tidied; see TypeRep.tidyTyVarBndr.
 -}
 
 newMetaTyVarName :: FastString -> TcM Name
@@ -732,7 +732,7 @@ newMetaTyVarName str
   = newSysName (mkTyVarOccFS str)
 
 cloneMetaTyVarName :: Name -> TcM Name
--- See Note [Name of an instantiated type variable]
+-- Makes a /System/ Name; see Note [Name of a unification variable]
 cloneMetaTyVarName name
   = newSysName (nameOccName name)
 

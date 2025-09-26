@@ -1330,7 +1330,7 @@ can't be solved.  But not quite all such constraints; see wrinkles.
 (IW4) Historical note: we used to have equalities arising from
    Wanted/Wanted fundep interactions, which we did not want to treat
    as insoluble.  But now such fundep constraints never escape.
-   See Note [Functional dependencies in type inference]
+   See Note [Overview of functional dependencies in type inference]
 
 Note [Insoluble holes]
 ~~~~~~~~~~~~~~~~~~~~~~

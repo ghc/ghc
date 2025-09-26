@@ -929,7 +929,7 @@ newFlexiTyVarQL :: QLFlag -> OccName -> MetaInfo -> TcKind -> TcM TcTyVar
 newFlexiTyVarQL do_ql occ info kind
   = do { lvl  <- getTcLevelQL do_ql
        ; ref  <- newMutVar Flexi
-       ; name <- newSysName occ -- See Note [Name of an unification variable]
+       ; name <- newSysName occ -- See Note [Name of a unification variable]
                                 -- in GHC.Tc.Utils.TcMType
        ; let details = MetaTv { mtv_info  = info
                               , mtv_ref   = ref
