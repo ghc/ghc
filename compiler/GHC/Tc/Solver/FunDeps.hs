@@ -791,11 +791,11 @@ solveFunDeps work_ev fd_eqns
     do_fundeps env = mapM_ (do_one env) fd_eqns
 
     do_one :: UnifyEnv -> FunDepEqns -> TcM ()
-    do_one uenv eqn = do { eqs <- instantiateFunDepEqn eqn
+    do_one uenv eqn = do { eqs <- instantiateFunDepEqns eqn
                          ; uPairsTcM uenv eqs }
 
-instantiateFunDepEqn :: FunDepEqns -> TcM [TypeEqn]
-instantiateFunDepEqn (FDEqns { fd_qtvs = tvs, fd_eqs = eqs })
+instantiateFunDepEqns :: FunDepEqns -> TcM [TypeEqn]
+instantiateFunDepEqns (FDEqns { fd_qtvs = tvs, fd_eqs = eqs })
   | null tvs
   = return rev_eqs
   | otherwise

@@ -257,7 +257,7 @@ Answer: if any unification of a tyvar at level n takes place
   with it.  (We can't drop kick-out in favour of iteration, because kick-out
   works for skolem-equalities, not just unifications.)
 
-So the monad-global `WhatUnifications` flag, kept in `tcs_unif_lvl` keeps
+So the monad-global `WhatUnifications` flag, kept in `tcs_what` keeps
 track of whether any unifications at all have taken place, and if so, what
 is the outermost level that has seen a unification. Seee GHC.Tc.Utils.Unify
 Note [WhatUnifications].

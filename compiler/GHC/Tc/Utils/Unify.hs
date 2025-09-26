@@ -2315,6 +2315,48 @@ unifyTypeAndEmit t_or_k orig ty1 ty2
 *                                                                      *
 **********************************************************************-}
 
+{- Note [WhatUnifications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We record what unifications have taken plance via the `WhatUnifications` flag:
+
+    data WhatUnifications
+      = WU_Coarse (TcRef TcLevel)
+      | WU_Fine   (TcRef TcTyVarSet)
+
+* For WL_Coarse, the TcLevel records the outermost (smallest) level at which
+  a unification has taken place.   It starts at `infiniteTcLevel`.
+
+* For WL_Fine, the TcTyVarSet records all the unification variables that have
+  been unified. This is a bit more expensive to maintain, but sometimes needed.
+
+The `WhatUnifications` flag is carried by:
+
+* The eager unifier, `uType` in this module.  In its `UnifyEnv` we have
+     u_what :: Maybe WhatUnificaions
+  where Nothing means "don't bother to record anything.
+
+* The `TcS` monad.  In its `TcSEnv` we have
+     tcs_what :: WhatUnifications
+
+Why do all this?  You can tell by looking for calls of
+      reportFineGrainUnifications   :: TcS a -> TcS (TcTyVarSet, a)
+      reportCoarseGrainUnifications :: TcS a -> TcS (Bool, a)
+Notably:
+
+ * Fine-grain: when the solver uses `uType` it must do `kickOutAfterUnifications`
+   on all the tyvars that `uType` unifies.
+   See `GHC.Tc.Solver.Monad.wrapUnifierAndEmit`.
+
+* Fine-grain: similarly after nestedly-solving constraints arising from
+  functional depenencies.  See GHC.Tc.Solver.FunDeps.solveFunDeps
+
+* Coarse-grain: when the solver uses `solveImplications` to look at a tree of
+  implications, it should iterate the current implication if that call did any
+  unifications.  See Note [When to iterate the solver: unifications] in
+  GHC.Tc.Solver.Solve
+-}
+
+
 data WhatUnifications
   = WU_Coarse           -- Track unifications coarsely
       (TcRef TcLevel)      -- infiniteTcLevel <=> no unifications yet
@@ -2322,32 +2364,9 @@ data WhatUnifications
   | WU_Fine                  -- Track each unification individually
       (TcRef TcTyVarSet)
 
-{- Note [WhatUnifications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We record, in mutable variable carried by the monad, the `WhatUnifications` flag.
-
-* In the eager unifier (this module) it is held the
-    u_what :: Maybe (TcRef WhatUnificatons)
-  field of `UnifyEnv`
-
-* In TcS monad, it is held in the
-    tcs_unif_lvl :: IORef WhatUnifications
-  field of `TcSEnv`.
-
-In all cases the idea is this:
-
-    ---------------------------------------
-    `WhatUnifications` records the level of the
-     outermost meta-tyvar that we have unified
-    ----------------------------------------
-
-It starts life as `NoUnificationsYet`.  Then when we unify a tyvar at level j,
-we set the flag to `UnificationsDone j`, unless the flag is /already/ set to
-`UnificationsDone i` where i<=j.
-
-Why do all this?
- * See Note [When to iterate the solver: unifications] in GHC.Tc.Solver.Solve
--}
+instance Outputable WhatUnifications where
+  ppr (WU_Coarse {}) = text "WU_Coarse"
+  ppr (WU_Fine   {}) = text "WU_Fine"
 
 minTcTyVarSetLevel :: TcTyVarSet -> TcLevel
 minTcTyVarSetLevel tvs
@@ -2369,20 +2388,6 @@ recordUnifications (WU_Coarse lvl_ref) tvs
 
 recordUnifications (WU_Fine tvs_ref) tvs
   = updTcRef tvs_ref (`unionVarSet` tvs)
-
-{-
-recordUnificationLevel :: TcRef WhatUnifications -> TcLevel -> TcM ()
-recordUnificationLevel what_ref tv_lvl
-  = do { what <- readTcRef what_ref
-       ; case what of
-           UnificationsDone unif_lvl
-             | tv_lvl `deeperThanOrSame` unif_lvl
-             -> do { traceTc "set-uni-flag: no-op" $
-                     vcat [ text "lvl" <+> ppr tv_lvl, text "unif_lvl" <+> ppr unif_lvl ]
-                   ; return () }
-           _ -> do { traceTc "set-uni-flag" (ppr tv_lvl)
-                   ; writeTcRef what_ref (UnificationsDone tv_lvl) } }
--}
 
 {-
 %************************************************************************
@@ -2850,6 +2855,7 @@ unifyTyVar :: UnifyEnv -> TcTyVar -> TcType -> TcM ()
 -- Actually do the unification, and record it in WhatUnifications
 unifyTyVar (UE { u_what = mb_what_unifications }) tv ty
   = do { liftZonkM $ writeMetaTyVar tv ty
+       ; traceTc "unifyTyVar" (ppr mb_what_unifications $$ ppr tv)
        ; case mb_what_unifications of
            Nothing -> return ()
            Just wu -> recordUnification wu tv }

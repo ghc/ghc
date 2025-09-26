@@ -937,7 +937,7 @@ data TcSEnv
   = TcSEnv {
       tcs_ev_binds  :: EvBindsVar,
 
-      tcs_unif_lvl  :: WhatUnifications,
+      tcs_what  :: WhatUnifications,
          -- Level of the outermost meta-tyvar that we have unified
          -- See Note [WhatUnifications] in GHC.Tc.Utils.Unify
 
@@ -1135,7 +1135,7 @@ runTcSWithEvBinds' mode ev_binds_var thing_inside
        ; wl_var      <- TcM.newTcRef emptyWorkList
        ; unif_lvl_var <- TcM.newTcRef infiniteTcLevel
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
-                          , tcs_unif_lvl = WU_Coarse unif_lvl_var
+                          , tcs_what     = WU_Coarse unif_lvl_var
                           , tcs_count    = step_count
                           , tcs_inerts   = inert_var
                           , tcs_mode     = mode
@@ -1778,8 +1778,10 @@ unifyTyVar tv ty
        ; wrapTcS $ recordUnification what_uni tv }
 
 reportFineGrainUnifications :: TcS a -> TcS (TcTyVarSet, a)
+-- Record what unifications were done by thing_inside
+-- Remember to propagate the information to the enclosing context
 reportFineGrainUnifications (TcS thing_inside)
-  = TcS $ \ env@(TcSEnv { tcs_unif_lvl = outer_wu }) ->
+  = TcS $ \ env@(TcSEnv { tcs_what = outer_wu }) ->
     do { (unif_tvs, res) <- report_fine_grain_unifs env thing_inside
        ; recordUnifications outer_wu unif_tvs
        ; return (unif_tvs, res) }
@@ -1788,11 +1790,11 @@ reportCoarseGrainUnifications :: TcS a -> TcS (Bool, a)
 -- Record whether any useful unifications are done by thing_inside
 -- Remember to propagate the information to the enclosing context
 reportCoarseGrainUnifications (TcS thing_inside)
-  = TcS $ \ env@(TcSEnv { tcs_unif_lvl = outer_what }) ->
+  = TcS $ \ env@(TcSEnv { tcs_what = outer_what }) ->
     case outer_what of
       WU_Coarse outer_ul_ref
         -> do { inner_ul_ref <- TcM.newTcRef infiniteTcLevel
-              ; res <- thing_inside (env { tcs_unif_lvl = WU_Coarse inner_ul_ref })
+              ; res <- thing_inside (env { tcs_what = WU_Coarse inner_ul_ref })
               ; ambient_lvl <- TcM.getTcLevel
               ; outer_ul   <- TcM.readTcRef outer_ul_ref
               ; inner_ul   <- TcM.readTcRef inner_ul_ref
@@ -1819,17 +1821,21 @@ report_fine_grain_unifs :: TcSEnv -> (TcSEnv -> TcM a) -> TcM (TcTyVarSet, a)
 report_fine_grain_unifs env thing_inside
   = do { unif_tvs_ref <- TcM.newTcRef emptyVarSet
 
-       ; res <- thing_inside (env { tcs_unif_lvl = WU_Fine unif_tvs_ref })
+       ; res <- thing_inside (env { tcs_what = WU_Fine unif_tvs_ref })
 
        ; unif_tvs    <- TcM.readTcRef unif_tvs_ref
        ; ambient_lvl <- TcM.getTcLevel
-       ; let is_interesting unif_tv = ambient_lvl `deeperThanOrSame` tcTyVarLevel unif_tv
 
-       ; return (filterVarSet is_interesting unif_tvs, res) }
+       -- Keep only variables from this or outer levels
+       ; let is_interesting unif_tv
+                = ambient_lvl `deeperThanOrSame` tcTyVarLevel unif_tv
+             interesting_tvs = filterVarSet is_interesting unif_tvs
+       ; TcM.traceTc "report_fine" (ppr unif_tvs $$ ppr interesting_tvs)
+       ; return (interesting_tvs, res) }
 
 getWhatUnifications :: TcS WhatUnifications
 getWhatUnifications
-  = TcS $ \env -> return (tcs_unif_lvl env)
+  = TcS $ \env -> return (tcs_what env)
 
 
 {- *********************************************************************
@@ -2190,7 +2196,7 @@ wrapUnifier :: CtEvidence -> Role
 -- also return them
 wrapUnifier ev role do_unifications
   = do { given_eq_lvl <- getInnermostGivenEqLevel
-       ; what_uni_ref <- getWhatUnifications
+       ; what_uni     <- getWhatUnifications
 
        ; wrapTcS $
          do { defer_ref    <- TcM.newTcRef emptyBag
@@ -2199,7 +2205,7 @@ wrapUnifier ev role do_unifications
                            , u_rewriters    = ctEvRewriters ev
                            , u_loc          = ctEvLoc ev
                            , u_defer        = defer_ref
-                           , u_what         = Just what_uni_ref }
+                           , u_what         = Just what_uni }
               -- u_rewriters: the rewriter set and location from
               -- the parent constraint `ev` are inherited in any
               -- new constraints spat out by the unifier
