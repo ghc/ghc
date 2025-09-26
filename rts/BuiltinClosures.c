@@ -1,6 +1,6 @@
 #include "Rts.h"
-#include "Prelude.h"
 #include "BuiltinClosures.h"
+#include "Prelude.h"
 
 /*
  * Note [CHARLIKE and INTLIKE closures]
