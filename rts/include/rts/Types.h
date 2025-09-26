@@ -13,9 +13,6 @@
 
 #pragma once
 
-#include <stddef.h>
-#include <stdbool.h>
-
 typedef struct StgClosure_   StgClosure;
 typedef struct StgInfoTable_ StgInfoTable;
 typedef struct StgTSO_       StgTSO;

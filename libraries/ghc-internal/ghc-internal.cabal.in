@@ -43,6 +43,7 @@ extra-source-files:
     include/winio_structs.h
     include/WordSize.h
     include/HsIntegerGmp.h.in
+    include/RtsIfaceSymbols.h
     install-sh
 
 source-repository head
@@ -444,6 +445,7 @@ Library
           cbits/strerror.c
           cbits/debug.c
           cbits/Stack_c.c
+          cbits/RtsIface.c
 
       cmm-sources:
           cbits/StackCloningDecoding.cmm
