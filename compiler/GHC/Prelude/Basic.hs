@@ -68,9 +68,6 @@ import qualified GHC.Data.List.NonEmpty as NE
 import GHC.Stack.Types (HasCallStack)
 
 import GHC.Bits as Bits hiding (bit, shiftL, shiftR, setBit, clearBit)
-# if defined(DEBUG)
-import qualified GHC.Bits as Bits (shiftL, shiftR)
-# endif
 
 
 {- Note [Default to unsafe shifts inside GHC]
@@ -99,11 +96,29 @@ See also #19618
 -- We always want the Data.Bits method to show up for rules etc.
 {-# INLINE shiftL #-}
 {-# INLINE shiftR #-}
-shiftL, shiftR :: Bits.Bits a => a -> Int -> a
 #if defined(DEBUG)
-shiftL = Bits.shiftL
-shiftR = Bits.shiftR
+-- In debug mode we explicitly check that the shift value is valid for
+-- unsafeShiftL/R. Otherwise we may have bugs only showing up in non-DEBUG
+-- builds.
+shiftL, shiftR :: (HasCallStack, Bits.Bits a) => a -> Int -> a
+shiftL x n
+  | n < 0
+  = error ("shiftL: negative shift value: " ++ show n)
+  | Just s <- bitSizeMaybe x
+  , n >= s
+  = error ("shiftL: shift value greater than bitSize: " ++ show n ++ " >= " ++ show s)
+  | otherwise
+  = Bits.unsafeShiftL x n
+shiftR x n
+  | n < 0
+  = error ("shiftR: negative shift value: " ++ show n)
+  | Just s <- bitSizeMaybe x
+  , n >= s
+  = error ("shiftR: shift value greater than bitSize: " ++ show n ++ " >= " ++ show s)
+  | otherwise
+  = Bits.unsafeShiftR x n
 #else
+shiftL, shiftR :: Bits.Bits a => a -> Int -> a
 shiftL = Bits.unsafeShiftL
 shiftR = Bits.unsafeShiftR
 #endif
