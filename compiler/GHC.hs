@@ -716,17 +716,14 @@ setTopSessionDynFlags dflags = do
 
   -- see Note [Target code interpreter]
   interp <- if
+#if !defined(wasm32_HOST_ARCH)
     -- Wasm dynamic linker
     | ArchWasm32 <- platformArch $ targetPlatform dflags
     -> do
         s <- liftIO $ newMVar InterpPending
         loader <- liftIO Loader.uninitializedLoader
         dyld <- liftIO $ makeAbsolute $ topDir dflags </> "dyld.mjs"
-#if defined(wasm32_HOST_ARCH)
-        let libdir = sorry "cannot spawn child process on wasm"
-#else
         libdir <- liftIO $ last <$> Loader.getGccSearchDirectory logger dflags "libraries"
-#endif
         let profiled = ways dflags `hasWay` WayProf
             way_tag = if profiled then "_p" else ""
         let cfg =
@@ -747,6 +744,7 @@ setTopSessionDynFlags dflags = do
                   wasmInterpUnitState = ue_homeUnitState $ hsc_unit_env hsc_env
                 }
         pure $ Just $ Interp (ExternalInterp $ ExtWasm $ ExtInterpState cfg s) loader lookup_cache
+#endif
 
     -- JavaScript interpreter
     | ArchJavaScript <- platformArch (targetPlatform dflags)
