@@ -8,8 +8,7 @@
 
 #pragma once
 
-extern StgClosure ghczminternal_GHCziInternalziStackziCloneStack_StackSnapshot_closure;
-#define StackSnapshot_constructor_closure (&(ghczminternal_GHCziInternalziStackziCloneStack_StackSnapshot_closure))
+#define StackSnapshot_constructor_closure ghc_hs_iface->StackSnapshot_closure
 
 StgStack* cloneStack(Capability* capability, const StgStack* stack);
 
