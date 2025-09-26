@@ -2599,11 +2599,11 @@ run_BCO:
 #define SIZED_BIN_OP_TY_INT(op,ty)                                      \
 {                                                                       \
     if(sizeof(ty) > sizeof(StgWord)) {                                  \
-        ty r = ((ty) ReadSpW64(0)) op ((ty) ReadSpW(2));                \
+        ty r = ((ty) ReadSpW64(0)) op ((StgInt) ReadSpW(2));                \
         Sp_addW(1);                                                     \
         SpW64(0) = (StgWord64) r;                                       \
     } else {                                                            \
-        ty r = ((ty) ReadSpW(0)) op ((ty) ReadSpW(1));                  \
+        ty r = ((ty) ReadSpW(0)) op ((StgInt) ReadSpW(1));                  \
         Sp_addW(1);                                                     \
         SpW(0) = (StgWord) r;                                           \
     };                                                                  \
