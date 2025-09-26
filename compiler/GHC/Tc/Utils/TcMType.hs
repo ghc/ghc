@@ -25,15 +25,14 @@ module GHC.Tc.Utils.TcMType (
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
   newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
-  newOpenFlexiFRRTyVar, newOpenFlexiFRRTyVarTy,
-  newOpenBoxedTypeKind,
+  newOpenFlexiFRRTyVarTy,
   newMetaKindVar, newMetaKindVars,
   newMetaTyVarTyAtLevel, newConcreteTyVarTyAtLevel, substConcreteTvOrigin,
   newAnonMetaTyVar, newConcreteTyVar, mkConcreteInfo,
   cloneMetaTyVar, cloneMetaTyVarWithInfo,
   newCycleBreakerTyVar,
-
   newMultiplicityVar,
+
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
   newTauTvDetailsAtLevel, newMetaDetails, newMetaTyVarName,
   isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
@@ -43,19 +42,17 @@ module GHC.Tc.Utils.TcMType (
   newEvVar, newEvVars, newDict,
   newWantedWithLoc, newWanted, newWanteds, cloneWanted, cloneWC, cloneWantedCtEv,
   emitWanted, emitWantedEq, emitWantedEvVar,
-  emitWantedEqs,
+  emitWantedEqs, emitNewExprHole,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
-  emitNewExprHole,
 
-  newCoercionHole,
-  fillCoercionHole, isFilledCoercionHole,
+  newCoercionHole, fillCoercionHole, isFilledCoercionHole,
   checkCoercionHole,
 
   newImplication,
 
   --------------------------------
   -- Instantiation
-  newMetaTyVars, newMetaTyVarX, newMetaTyVarsX, newMetaTyVarBndrsX,
+  newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
   newMetaTyVarTyVarX,
   newTyVarTyVar, cloneTyVarTyVar,
   newPatTyVar, newSkolemTyVar, newWildCardX,
@@ -981,30 +978,18 @@ newOpenFlexiTyVar
   = do { kind <- newOpenTypeKind
        ; newFlexiTyVar kind }
 
--- | Like 'newOpenFlexiTyVar', but ensures the type variable has a
+-- | Like 'newOpenFlexiTyVarTy', but ensures the type variable has a
 -- syntactically fixed RuntimeRep in the sense of Note [Fixed RuntimeRep]
 -- in GHC.Tc.Utils.Concrete.
-newOpenFlexiFRRTyVar :: FixedRuntimeRepContext -> TcM TcTyVar
-newOpenFlexiFRRTyVar frr_ctxt
+newOpenFlexiFRRTyVarTy :: FixedRuntimeRepContext -> TcM TcType
+newOpenFlexiFRRTyVarTy frr_ctxt
   = mdo { let conc_orig = ConcreteFRR $
                           FixedRuntimeRepOrigin
                             { frr_context = frr_ctxt
                             , frr_type    = mkTyVarTy tv }
         ; rr_tv <- newConcreteTyVar conc_orig (fsLit "cx") runtimeRepTy
         ; tv <- newFlexiTyVar (mkTYPEapp (mkTyVarTy rr_tv))
-        ; return tv }
-
--- | See 'newOpenFlexiFRRTyVar'.
-newOpenFlexiFRRTyVarTy :: FixedRuntimeRepContext -> TcM TcType
-newOpenFlexiFRRTyVarTy frr_ctxt
-  = do { tv <- newOpenFlexiFRRTyVar frr_ctxt
-       ; return (mkTyVarTy tv) }
-
-newOpenBoxedTypeKind :: TcM TcKind
-newOpenBoxedTypeKind
-  = do { lev <- newFlexiTyVarTy (mkTyConTy levityTyCon)
-       ; let rr = mkTyConApp boxedRepDataConTyCon [lev]
-       ; return (mkTYPEapp rr) }
+        ; return (mkTyVarTy tv) }
 
 newMetaTyVars :: [TyVar] -> TcM (Subst, [TcTyVar])
 -- Instantiate with META type variables
@@ -1020,13 +1005,6 @@ newMetaTyVarsX :: Subst -> [TyVar] -> TcM (Subst, [TcTyVar])
 -- Just like newMetaTyVars, but start with an existing substitution.
 newMetaTyVarsX subst = mapAccumLM newMetaTyVarX subst
 
-newMetaTyVarBndrsX :: Subst -> [VarBndr TyVar vis] -> TcM (Subst, [VarBndr TcTyVar vis])
-newMetaTyVarBndrsX subst bndrs = do
-  (subst, bndrs') <- newMetaTyVarsX subst (binderVars bndrs)
-  pure (subst, zipWith mkForAllTyBinder flags bndrs')
-  where
-    flags = binderFlags bndrs
-
 newMetaTyVarX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from
 -- an existing TyVar. We substitute kind variables in the kind.
@@ -1034,7 +1012,7 @@ newMetaTyVarX = new_meta_tv_x TauTv
 
 newMetaTyVarTyVarX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 -- Just like newMetaTyVarX, but make a TyVarTv
-newMetaTyVarTyVarX subst tv = new_meta_tv_x TyVarTv subst tv
+newMetaTyVarTyVarX = new_meta_tv_x TyVarTv
 
 newWildCardX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 newWildCardX subst tv
