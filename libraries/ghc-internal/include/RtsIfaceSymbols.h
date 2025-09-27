@@ -56,4 +56,12 @@ CLOSURE(GHCziInternalziExceptionziType, overflowException_closure)
 CLOSURE(GHCziInternalziCString, unpackCStringzh_closure)
 INFO_TBL(GHCziInternalziCString, unpackCStringzh_info)
 INFO_TBL(GHCziInternalziCString, unpackCStringUtf8zh_info)
-
+#if defined(wasm32_HOST_ARCH)
+CLOSURE(GHCziInternalziWasmziPrimziImports, raiseJSException_closure)
+CLOSURE(GHCziInternalziWasmziPrim, JSVal_con_info)
+CLOSURE(GHCziInternalziWasmziPrim, threadDelay_closure)
+#else
+UNDEF_CLOSURE(GHCziInternalziWasmziPrimziImports, raiseJSException_closure)
+UNDEF_CLOSURE(GHCziInternalziWasmziPrim, JSVal_con_info)
+UNDEF_CLOSURE(GHCziInternalziWasmziPrim, threadDelay_closure)
+#endif

@@ -59,6 +59,9 @@ typedef struct {
     StgClosure *unpackCStringzh_closure;  // GHC.Internal.CString.unpackCStringzh_closure
     StgInfoTable *unpackCStringzh_info;  // GHC.Internal.CString.unpackCStringzh_info
     StgInfoTable *unpackCStringUtf8zh_info;  // GHC.Internal.CString.unpackCStringUtf8zh_info
+    StgClosure *raiseJSException_closure;  // GHC.Internal.Wasm.Prim.Imports.raiseJSException_closure
+    StgClosure *JSVal_con_info;  // GHC.Internal.Wasm.Prim.JSVal_con_info
+    StgClosure *threadDelay_closure;  // GHC.Internal.Wasm.Prim.threadDelay_closure
 } HsIface;
 
 extern const HsIface *ghc_hs_iface;
