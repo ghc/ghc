@@ -5,6 +5,8 @@
 #include "Threads.h"
 #include "sm/Sanity.h"
 
+#include <sysexits.h>
+
 #if defined(__wasm_reference_types__)
 
 extern HsBool rts_JSFFI_flag;
@@ -12,21 +14,8 @@ extern HsStablePtr rts_threadDelay_impl;
 extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure;
 extern StgClosure ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure;
 
-int __main_void(void);
-
-int __main_argc_argv(int, char*[]);
-
-int __main_argc_argv(int argc, char *argv[]) {
-  RtsConfig __conf = defaultRtsConfig;
-  __conf.rts_opts_enabled = RtsOptsAll;
-  __conf.rts_hs_main = false;
-  hs_init_ghc(&argc, &argv, __conf);
-  // See Note [threadDelay on wasm] for details.
-  rts_JSFFI_flag = HS_BOOL_TRUE;
-  getStablePtr((StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure);
-  rts_threadDelay_impl = getStablePtr((StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure);
-  return 0;
-}
+__attribute__((__weak__))
+int __main_argc_argv(int argc, char *argv[]);
 
 // Note [JSFFI initialization]
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,11 +55,69 @@ int __main_argc_argv(int argc, char *argv[]) {
 // by the GHC codegen, and priority 102 to the initialization logic
 // here to ensure hs_init_ghc() sees everything it needs to see.
 __attribute__((constructor(102))) static void __ghc_wasm_jsffi_init(void) {
-  // See
-  // https://gitlab.haskell.org/ghc/wasi-libc/-/blob/master/libc-bottom-half/sources/__main_void.c
-  // for its definition. It initializes some libc state, then calls
-  // __main_argc_argv defined above.
-  __main_void();
+  // If linking static code without -no-hs-main, then the driver
+  // emitted main() is in charge of its own RTS initialization, so
+  // skip.
+#if !defined(__PIC__)
+  if (__main_argc_argv) {
+    return;
+  }
+#endif
+
+  // Code below is mirrored from
+  // https://gitlab.haskell.org/haskell-wasm/wasi-libc/-/blob/master/libc-bottom-half/sources/__main_void.c,
+  // fetches argc/argv using wasi api
+  __wasi_errno_t err;
+
+  // Get the sizes of the arrays we'll have to create to copy in the args.
+  size_t argv_buf_size;
+  size_t argc;
+  err = __wasi_args_sizes_get(&argc, &argv_buf_size);
+  if (err != __WASI_ERRNO_SUCCESS) {
+    _Exit(EX_OSERR);
+  }
+
+  // Add 1 for the NULL pointer to mark the end, and check for overflow.
+  size_t num_ptrs = argc + 1;
+  if (num_ptrs == 0) {
+    _Exit(EX_SOFTWARE);
+  }
+
+  // Allocate memory for storing the argument chars.
+  char *argv_buf = malloc(argv_buf_size);
+  if (argv_buf == NULL) {
+    _Exit(EX_SOFTWARE);
+  }
+
+  // Allocate memory for the array of pointers. This uses `calloc` both to
+  // handle overflow and to initialize the NULL pointer at the end.
+  char **argv = calloc(num_ptrs, sizeof(char *));
+  if (argv == NULL) {
+    free(argv_buf);
+    _Exit(EX_SOFTWARE);
+  }
+
+  // Fill the argument chars, and the argv array with pointers into those chars.
+  // TODO: Remove the casts on `argv_ptrs` and `argv_buf` once the witx is
+  // updated with char8 support.
+  err = __wasi_args_get((uint8_t **)argv, (uint8_t *)argv_buf);
+  if (err != __WASI_ERRNO_SUCCESS) {
+    free(argv_buf);
+    free(argv);
+    _Exit(EX_OSERR);
+  }
+
+  // Now that we have argc/argv, proceed to initialize the GHC RTS
+  RtsConfig __conf = defaultRtsConfig;
+  __conf.rts_opts_enabled = RtsOptsAll;
+  __conf.rts_hs_main = false;
+  hs_init_ghc((int *)&argc, &argv, __conf);
+  // See Note [threadDelay on wasm] for details.
+  rts_JSFFI_flag = HS_BOOL_TRUE;
+  getStablePtr((
+      StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziImports_raiseJSException_closure);
+  rts_threadDelay_impl = getStablePtr((
+      StgPtr)&ghczminternal_GHCziInternalziWasmziPrimziConcziInternal_threadDelay_closure);
 }
 
 typedef __externref_t HsJSVal;
