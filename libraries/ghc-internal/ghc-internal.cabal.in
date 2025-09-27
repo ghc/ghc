@@ -434,6 +434,8 @@ Library
     if !arch(javascript)
       -- See Note [RTS/ghc-internal interface].
       ld-options: -uinit_ghc_hs_iface
+      -- To maximize usability 
+      cc-options: -fPIC
       c-sources:
           cbits/DarwinUtils.c
           cbits/PrelIOUtils.c
