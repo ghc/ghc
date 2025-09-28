@@ -113,8 +113,7 @@ foreign import javascript unsafe "__ghc_wasm_jsffi_dyld.lookupSymbol($1)"
   js_lookupSymbol :: JSString -> IO (Ptr a)
 
 lookupSymbolInDLL :: Ptr LoadedDLL -> String -> IO (Maybe (Ptr a))
-lookupSymbolInDLL _ sym =
-  throwIO $ ErrorCall $ "lookupSymbolInDLL: unsupported on wasm for " <> sym
+lookupSymbolInDLL _ _ = pure Nothing
 
 resolveObjs :: IO Bool
 resolveObjs = pure True
