@@ -175,6 +175,7 @@ module System.IO
      -- Binary-mode 'Handle's do no newline translation at all.
 
      hSetNewlineMode,
+     hGetNewlineMode,
      Newline(..),
      nativeNewline,
      NewlineMode(..),

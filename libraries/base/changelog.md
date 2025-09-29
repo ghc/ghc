@@ -1,6 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.23.0.0 *TBA*
+  * Add `System.IO.hGetNewlineMode`. ([CLC proposal #370](https://github.com/haskell/core-libraries-committee/issues/370))
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{init,last}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.
     ([CLC proposal #87](https://github.com/haskell/core-libraries-committee/issues/292))
