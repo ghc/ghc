@@ -19,6 +19,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.ConsoleHandler
+#include "RtsIfaceStub.h"
 #if !defined(mingw32_HOST_OS)
         where
 

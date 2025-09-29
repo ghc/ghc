@@ -7,6 +7,7 @@ module GHC.Internal.Heap.Constants
     ) where
 
 #include "MachDeps.h"
+#include "RtsIfaceStub.h"
 
 import GHC.Internal.Data.Bits
 import GHC.Internal.Int

@@ -14,6 +14,7 @@ import GHC.Internal.Real
 #undef MBLOCK_SIZE
 #undef BLOCKS_PER_MBLOCK
 #include "DerivedConstants.h"
+#include "RtsIfaceStub.h"
 
 newtype ByteOffset = ByteOffset { offsetInBytes :: Int }
   deriving newtype (Eq, Show, Integral, Real, Num, Enum, Ord)

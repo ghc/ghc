@@ -8,6 +8,7 @@
 module GHC.Internal.IO.Handle.Lock.Flock where
 
 #include "HsBaseConfig.h"
+#include "RtsIfaceStub.h"
 
 #if !HAVE_FLOCK
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base

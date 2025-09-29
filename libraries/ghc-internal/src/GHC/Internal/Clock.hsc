@@ -15,6 +15,8 @@ import GHC.Internal.Float () -- for Num Double instance
 import GHC.Internal.Num
 #endif
 
+#include "RtsIfaceStub.h"
+
 -- | Return monotonic time in seconds, since some unspecified starting point
 --
 -- @since base-4.11.0.0

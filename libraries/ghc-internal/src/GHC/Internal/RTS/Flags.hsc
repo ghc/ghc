@@ -52,6 +52,7 @@ module GHC.Internal.RTS.Flags
   ) where
 
 #include "Rts.h"
+#include "RtsIfaceStub.h"
 #include "rts/Flags.h"
 
 import GHC.Internal.Data.Functor ((<$>))

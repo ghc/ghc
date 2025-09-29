@@ -45,6 +45,7 @@ import GHC.Internal.Foreign.Storable
 import GHC.Internal.Foreign.Ptr
 
 #include "Rts.h"
+#include "RtsIfaceStub.h"
 
 foreign import ccall "getRTSStats" getRTSStats_ :: Ptr () -> IO ()
 

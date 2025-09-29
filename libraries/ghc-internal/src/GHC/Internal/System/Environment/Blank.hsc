@@ -74,6 +74,7 @@ import qualified GHC.Internal.System.Environment as Environment
 #endif
 
 #include "HsBaseConfig.h"
+#include "RtsIfaceStub.h"
 
 throwInvalidArgument :: String -> IO a
 throwInvalidArgument from =

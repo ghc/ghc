@@ -47,6 +47,7 @@ import GHC.Internal.List ( concatMap, reverse )
 
 #define PROFILING
 #include "Rts.h"
+#include "RtsIfaceStub.h"
 
 -- | A cost-centre stack from GHC's cost-center profiler.
 data CostCentreStack

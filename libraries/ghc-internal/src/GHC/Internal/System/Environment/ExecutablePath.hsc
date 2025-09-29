@@ -104,6 +104,9 @@ import GHC.Internal.Foreign.Storable
 import GHC.Internal.System.Posix.Internals
 #endif
 
+#include "RtsIfaceStub.h"
+
+
 -- The exported function is defined outside any if-guard to make sure
 -- every OS implements it with the same type.
 

@@ -65,3 +65,4 @@ UNDEF_CLOSURE(GHCziInternalziWasmziPrimziImports, raiseJSException_closure)
 UNDEF_CLOSURE(GHCziInternalziWasmziPrim, JSVal_con_info)
 UNDEF_CLOSURE(GHCziInternalziWasmziPrim, threadDelay_closure)
 #endif
+
