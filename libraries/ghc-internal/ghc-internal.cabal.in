@@ -447,7 +447,7 @@ Library
           cbits/sysconf.c
           cbits/fs.c
           cbits/strerror.c
-          cbits/atomic.c
+          -- cbits/atomic.c
           cbits/bswap.c
           cbits/bitrev.c
           cbits/clz.c
