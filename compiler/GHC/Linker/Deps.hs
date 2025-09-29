@@ -84,7 +84,7 @@ data LinkDepsOpts = LinkDepsOpts
 data LinkDeps = LinkDeps
   { ldNeededLinkables :: [Linkable]
   , ldAllLinkables    :: [Linkable]
-  , ldNeededUnits     :: [UnitId]
+  , ldNeededUnits     :: [(UnitId, UnitId)]
   , ldAllUnits        :: UniqDSet UnitId
   }
 
@@ -142,6 +142,7 @@ instance Outputable LinkExternalDetails where
 data LinkExternal =
   LinkExternal {
     le_details :: LinkExternalDetails,
+    le_unit_for_dbs :: !UnitId,
     le_module :: !Module
   }
 
@@ -215,7 +216,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
     -- entire set for oneshot mode.
     separate_home_deps =
       if ldOneShotMode opts
-      then pure ([], LinkExternal LinkAllDeps <$!> noninteractive)
+      then pure ([], LinkExternal LinkAllDeps (ue_currentUnit unit_env) <$!> noninteractive)
       else make_deps
 
     make_deps = do
@@ -239,7 +240,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
             Nothing ->
               let (ModNodeKeyWithUid (GWIB mod_name _) uid) = nk
                   mod = Module (RealUnit (Definite uid)) mod_name
-              in make_deps_loop (LinkExternal LinkAllDeps mod : external, found_mods) nexts
+              in make_deps_loop (LinkExternal LinkAllDeps (moduleUnitId mod) mod : external, found_mods) nexts
             Just trans_deps ->
               let deps = Set.insert (NodeKey_Module nk) (Set.fromList trans_deps)
                   -- See #936 and the ghci.prog007 test for why we have to continue traversing through
@@ -256,7 +257,8 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
       case lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) of
         Just hmi -> do
           let iface = hm_iface hmi
-          pure (LinkExternal (LinkOnlyPackages iface) (mi_module iface), hmi)
+              mod = mi_module iface
+          pure (LinkExternal (LinkOnlyPackages iface) (moduleUnitId mod) mod, hmi)
         Nothing -> throwProgramError opts $
           text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
 
@@ -319,12 +321,16 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 data LinkDep =
   LinkModules !(UniqDFM ModuleName LinkModule)
   |
-  LinkLibrary !UnitId
+  LinkLibrary {
+    home_unit :: !UnitId,
+    library_unit :: !UnitId
+  }
 
 instance Outputable LinkDep where
   ppr = \case
     LinkModules mods -> text "modules:" <+> ppr (eltsUDFM mods)
-    LinkLibrary uid -> text "library:" <+> ppr uid
+    LinkLibrary {home_unit, library_unit} ->
+      text "library:" <+> ppr library_unit <+> parens (ppr home_unit)
 
 data OneshotError =
   NoInterface !MissingInterfaceError
@@ -397,7 +403,7 @@ external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
     already_seen
       | Just (LinkModules mods) <- mod_dep
       = elemUDFM mod_name mods
-      | Just (LinkLibrary _) <- mod_dep
+      | Just (LinkLibrary {}) <- mod_dep
       = True
       | otherwise
       = False
@@ -429,7 +435,7 @@ external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
       = add_library
 
     add_library =
-      pure (addToUDFM acc mod_unit_id (LinkLibrary mod_unit_id), [], Just "library")
+      pure (addToUDFM acc mod_unit_id (LinkLibrary {home_unit = le_unit_for_dbs, library_unit = mod_unit_id}), [], Just "library")
 
     add_module iface lmod action =
       with_deps with_mod iface True action
@@ -437,7 +443,7 @@ external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
         with_mod = alterUDFM (add_package_module lmod) acc mod_unit_id
 
     add_package_module lmod = \case
-      Just (LinkLibrary u) -> Just (LinkLibrary u)
+      Just LinkLibrary {..} -> Just LinkLibrary {..}
       Just (LinkModules old) -> Just (LinkModules (addToUDFM old mod_name lmod))
       Nothing -> Just (LinkModules (unitUDFM mod_name lmod))
 
@@ -449,7 +455,7 @@ external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
 
     local_deps iface =
       [
-        LinkExternal LinkAllDeps (mkModule mod_unit m)
+        LinkExternal LinkAllDeps le_unit_for_dbs (mkModule mod_unit m)
         | (_, GWIB m _) <- Set.toList (dep_direct_mods (mi_deps iface))
       ]
 
@@ -458,9 +464,9 @@ external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
     -- Otherwise, link all package deps as libraries.
     package_deps iface
       | package_bc
-      = ([], [LinkExternal LinkAllDeps usg_mod | UsagePackageModule {usg_mod} <- mi_usages iface])
+      = ([], [LinkExternal LinkAllDeps le_unit_for_dbs usg_mod | UsagePackageModule {usg_mod} <- mi_usages iface])
       | otherwise
-      = ([(u, LinkLibrary u) | u <- Set.toList (dep_direct_pkgs (mi_deps iface))], [])
+      = ([(u, LinkLibrary {home_unit = le_unit_for_dbs, library_unit = u}) | u <- Set.toList (dep_direct_pkgs (mi_deps iface))], [])
 
     load_reason =
       text "need to link module" <+> ppr mod <+>
@@ -500,7 +506,7 @@ classify_deps ::
   LoaderState ->
   [HomeModInfo] ->
   [LinkDep] ->
-  ([Linkable], [LinkModule], UniqDSet UnitId, [UnitId])
+  ([Linkable], [LinkModule], UniqDSet UnitId, [(UnitId, UnitId)])
 classify_deps pls hmis deps =
   (loaded_modules' ++ loaded_modules'', needed_modules' ++ needed_modules'', all_packages, needed_packages)
   where
@@ -509,13 +515,15 @@ classify_deps pls hmis deps =
       partitionWith loaded_or_needed_module (concatMap eltsUDFM modules)
 
     needed_packages =
-      eltsUDFM (getUniqDSet all_packages `minusUDFM` pkgs_loaded pls)
+      eltsUDFM (packages `minusUDFM` pkgs_loaded pls)
 
-    all_packages = mkUniqDSet packages
+    packages = listToUDFM [(u, (hu, u)) | (hu, u) <- packages_with_home_units]
 
-    (modules, packages) = flip partitionWith deps $ \case
+    all_packages = mkUniqDSet (snd <$> packages_with_home_units)
+
+    (modules, packages_with_home_units) = flip partitionWith deps $ \case
       LinkModules mods -> Left mods
-      LinkLibrary lib -> Right lib
+      LinkLibrary {home_unit, library_unit} -> Right (home_unit, library_unit)
 
     loaded_or_needed_home_module lm =
       maybe (Right (LinkHomeModule lm)) Left (loaded_module (mi_module (hm_iface lm)))

@@ -331,7 +331,7 @@ reallyInitLoaderState interp hsc_env = do
 
 
       -- (b) Load packages from the command-line (Note [preload packages])
-      pls <- unitEnv_foldWithKey (\k u env -> k >>= \pls' -> loadPackages' interp (hscSetActiveUnitId u hsc_env) (preloadUnits (homeUnitEnv_units env)) pls') (return pls0) (hsc_HUG hsc_env)
+      pls <- unitEnv_foldWithKey (\k u env -> k >>= \pls' -> loadPackages' interp hsc_env [(u, pre) | pre <- preloadUnits (homeUnitEnv_units env)] pls') (return pls0) (hsc_HUG hsc_env)
 
       -- steps (c), (d) and (e)
       loadCmdLineLibs' interp hsc_env pls
@@ -1102,26 +1102,26 @@ loadPackages interp hsc_env new_pkgs = do
   -- a lock.
   initLoaderState interp hsc_env
   modifyLoaderState_ interp $ \pls ->
-    loadPackages' interp hsc_env new_pkgs pls
+    loadPackages' interp hsc_env [(hscActiveUnitId hsc_env, p) | p <- new_pkgs] pls
 
-loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
-loadPackages' interp hsc_env new_pks pls = do
+loadPackages' :: Interp -> HscEnv -> [(UnitId, UnitId)] -> LoaderState -> IO LoaderState
+loadPackages' interp hsc_env0 new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs'
                   }
   where
-     link :: PkgsLoaded -> [UnitId] -> IO PkgsLoaded
+     link :: PkgsLoaded -> [(UnitId, UnitId)] -> IO PkgsLoaded
      link pkgs new_pkgs =
          foldM link_one pkgs new_pkgs
 
-     link_one pkgs new_pkg
+     link_one pkgs (home_unit, new_pkg)
         | new_pkg `elemUDFM` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
+        | Just pkg_cfg <- lookupUnitId (hsc_units (hscSetActiveUnitId home_unit hsc_env)) new_pkg
         = do { let deps = unitDepends pkg_cfg
                -- Link dependents first
-             ; pkgs' <- link pkgs deps
+             ; pkgs' <- link pkgs [(home_unit, d) | d <- deps]
                 -- Now link the package itself
              ; (hs_cls, extra_cls, loaded_dlls) <- loadPackage interp hsc_env pkg_cfg
              ; let trans_deps = unionManyUniqDSets [ addOneToUniqDSet (loaded_pkg_trans_deps loaded_pkg_info) dep_pkg
@@ -1132,6 +1132,8 @@ loadPackages' interp hsc_env new_pks pls = do
 
         | otherwise
         = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
+        where
+          hsc_env = hscSetActiveUnitId home_unit hsc_env0
 
 
 loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ([LibrarySpec], [LibrarySpec], [RemotePtr LoadedDLL])
