@@ -102,7 +102,6 @@ module GHC.Driver.Main
     , dumpIfaceStats
     , ioMsgMaybe
     , showModuleIndex
-    , hscAddSptEntries
     , writeInterfaceOnlyMode
     , loadByteCode
     , genModDetails
@@ -2515,9 +2514,6 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     let src_span = srcLocSpan interactiveSrcLoc
     _ <- liftIO $ loadDecls interp hsc_env src_span linkable
 
-    {- Load static pointer table entries -}
-    liftIO $ hscAddSptEntries hsc_env (cg_spt_entries tidy_cg)
-
     let tcs = filterOut isImplicitTyCon (mg_tcs simpl_mg)
         patsyns = mg_patsyns simpl_mg
 
@@ -2538,18 +2534,6 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
         new_ictxt    = extendInteractiveContext ictxt new_tythings cls_insts
                                                 fam_insts defaults fix_env
     return (new_tythings, new_ictxt)
-
--- | Load the given static-pointer table entries into the interpreter.
--- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
-hscAddSptEntries :: HscEnv -> [SptEntry] -> IO ()
-hscAddSptEntries hsc_env entries = do
-    let interp = hscInterp hsc_env
-    let add_spt_entry :: SptEntry -> IO ()
-        add_spt_entry (SptEntry n fpr) = do
-            -- These are only names from the current module
-            (val, _, _) <- loadName interp hsc_env n
-            addSptEntry interp fpr val
-    mapM_ add_spt_entry entries
 
 {-
   Note [Fixity declarations in GHCi]
