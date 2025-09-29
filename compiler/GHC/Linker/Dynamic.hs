@@ -144,16 +144,6 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
             -- About the options used for Darwin:
             -- -dynamiclib
             --   Apple's way of saying -shared
-            -- -undefined dynamic_lookup:
-            --   Without these options, we'd have to specify the correct
-            --   dependencies for each of the dylibs. Note that we could
-            --   (and should) do without this for all libraries except
-            --   the RTS; all we need to do is to pass the correct
-            --   HSfoo_dyn.dylib files to the link command.
-            --   This feature requires Mac OS X 10.3 or later; there is
-            --   a similar feature, -flat_namespace -undefined suppress,
-            --   which works on earlier versions, but it has other
-            --   disadvantages.
             -- -single_module
             --   Build the dynamic library as a single "module", i.e. no
             --   dynamic binding nonsense when referring to symbols from
@@ -186,9 +176,6 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                     , FileOption "" output_fn
                     ]
                  ++ map Option o_files
-                 ++ [ Option "-undefined",
-                      Option "dynamic_lookup"
-                    ]
                  ++ (if toolSettings_ldSupportsSingleModule (toolSettings dflags)
                         then [ Option "-single_module" ]
                         else [ ])
