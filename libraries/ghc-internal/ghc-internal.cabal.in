@@ -433,7 +433,11 @@ Library
 
     if !arch(javascript)
       -- See Note [RTS/ghc-internal interface].
-      ld-options: -uinit_ghc_hs_iface
+      if os(darwin)
+        -- Leading underscores on symbols on darwin
+        ld-options: -u_init_ghc_hs_iface
+      else
+        ld-options: -uinit_ghc_hs_iface
       -- To maximize usability 
       cc-options: -fPIC
       c-sources:
@@ -481,6 +485,7 @@ Library
     include-dirs: include
     includes:
         HsBase.h
+        RtsIfaceStub.h
     install-includes:
         HsBase.h
         consUtils.h
