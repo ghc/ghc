@@ -718,6 +718,7 @@ loadDecls interp hsc_env span linkable = do
           let ce2  = extendClosureEnv (closure_env le2) nms_fhvs
               !pls2 = pls { linker_env = le2 { closure_env = ce2 }
                           , linked_breaks = lb2 }
+          mapM_ (linkSptEntry interp ce2) (concatMap bc_spt_entries cbcs)
           return (pls2, (nms_fhvs, links_needed, units_needed))
   where
     cbcs = linkableBCOs linkable
@@ -951,9 +952,27 @@ dynLinkBCOs interp pls bcos = do
         -- Wrap finalizers on the ones we want to keep
         new_binds <- makeForeignNamedHValueRefs interp to_add
 
+
         let ce2 = extendClosureEnv (closure_env le2) new_binds
+
+        -- Add SPT entries
+        mapM_ (linkSptEntry interp ce2) (concatMap bc_spt_entries cbcs)
+
         return $! pls1 { linker_env = le2 { closure_env = ce2 }
                        , linked_breaks = lb2 }
+
+-- | Register SPT entries for this module in the interpreter
+-- Assumes that the name from the SPT has already been loaded into the interpreter.
+linkSptEntry :: Interp -> ClosureEnv -> SptEntry -> IO ()
+linkSptEntry interp ce (SptEntry name fpr) = do
+  case lookupNameEnv ce name of
+    -- The SPT entries only point to locally defined names, which should have already been
+    -- loaded into the interpreter before this function is called.
+    Nothing -> pprPanic "linkSptEntry" (ppr name)
+    Just (_, hval) -> addSptEntry interp fpr hval
+
+
+
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: Interp
