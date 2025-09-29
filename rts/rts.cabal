@@ -528,6 +528,19 @@ library
                  sm/Storage.c
                  sm/Sweep.c
                  fs.c
+                 prim/atomic.c
+                 prim/bitrev.c
+                 prim/bswap.c
+                 prim/clz.c
+                 prim/ctz.c
+                 prim/int64x2minmax.c
+                 prim/longlong.c
+                 prim/mulIntMayOflo.c
+                 prim/pdep.c
+                 prim/pext.c
+                 prim/popcnt.c
+                 prim/vectorQuotRem.c
+                 prim/word2float.c
                  -- I wish we had wildcards..., this would be:
                  -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
 

@@ -278,9 +278,6 @@ ghcInternalArgs = package ghcInternal ? do
 
           , builder (Cabal Flags) ? flag NeedLibatomic `cabalFlag` "need-atomic"
 
-          , builder (Cc CompileC) ? (not <$> flag CcLlvmBackend) ?
-              input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand"
-
           ]
 
 -- | RTS-specific command line arguments.
@@ -404,6 +401,9 @@ rtsPackageArgs = package rts ? do
 
           , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
             arg "-Wno-incompatible-pointer-types"
+
+          , input "**/prim/atomic.c"  ? (not <$> flag CcLlvmBackend) ?
+            arg "-Wno-sync-nand"
           ]
 
     mconcat
