@@ -2282,7 +2282,7 @@ stg_waitReadzh ( W_ fd )
     if (ok != 0::CBool) (likely: True) {
         jump stg_block_noregs();
     } else {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
 }
 
@@ -2295,7 +2295,7 @@ stg_waitWritezh ( W_ fd )
     if (ok != 0::CBool) (likely: True) {
         jump stg_block_noregs();
     } else {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
 }
 
@@ -2319,7 +2319,7 @@ stg_delayzh ( W_ us_delay )
         jump stg_block_noregs();
 #endif
     } else {
-        jump stg_raisezh(ghczminternal_GHCziInternalziIOziException_heapOverflow_closure);
+        jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
 }
 
