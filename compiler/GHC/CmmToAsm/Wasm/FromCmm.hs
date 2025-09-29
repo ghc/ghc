@@ -438,7 +438,7 @@ lower_MO_S_Shr lbl w0 [x, y] = case someWasmTypeFromCmmType (cmmBits w0) of
 lower_MO_S_Shr _ _ _ = panic "lower_MO_S_Shr: unreachable"
 
 -- | Lower a 'MO_MulMayOflo' operation. It's translated to a ccall to
--- @hs_mulIntMayOflo@ function in @ghc-prim/cbits/mulIntMayOflo@,
+-- @hs_mulIntMayOflo@ function in @rts/prim/mulIntMayOflo@,
 -- otherwise it's quite non-trivial to implement as inline assembly.
 lower_MO_MulMayOflo ::
   CLabel -> Width -> [CmmExpr] -> WasmCodeGenM w (SomeWasmExpr w)
