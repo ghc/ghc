@@ -2777,10 +2777,12 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
 
       {- load it -}
       bco_time <- getCurrentTime
-      (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
+      (mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
         Linkable bco_time this_mod $ NE.singleton $ BCOs bcos
+      -- Get the foreign reference to the name we should have just loaded.
+      mhvs <- lookupFromLoadedEnv interp (idName binding_id)
       {- Get the HValue for the root -}
-      return (expectJust $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)
+      return (expectJust mhvs, mods_needed, units_needed)
 
 
 

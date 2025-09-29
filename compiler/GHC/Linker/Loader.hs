@@ -28,6 +28,7 @@ module GHC.Linker.Loader
    , withExtendedLoadedEnv
    , extendLoadedEnv
    , deleteFromLoadedEnv
+   , lookupFromLoadedEnv
    -- * Internals
    , allocateBreakArrays
    , rmDupLinkables
@@ -213,6 +214,15 @@ deleteFromLoadedEnv interp to_remove =
     return $ modifyClosureEnv pls $ \ce ->
       delListFromNameEnv ce to_remove
 
+-- | Have we already loaded a name into the interpreter?
+lookupFromLoadedEnv :: Interp -> Name -> IO (Maybe ForeignHValue)
+lookupFromLoadedEnv interp name = do
+  mstate <- getLoaderState interp
+  return $ do
+    pls <- mstate
+    res <- lookupNameEnv (closure_env (linker_env pls)) name
+    return (snd res)
+
 -- | Load the module containing the given Name and get its associated 'HValue'.
 --
 -- Throws a 'ProgramError' if loading fails or the name cannot be found.
@@ -258,7 +268,7 @@ loadDependencies interp hsc_env pls span needed_mods = do
 
    -- Link the packages and modules required
    pls1 <- loadPackages' interp hsc_env (ldUnits deps) pls
-   (pls2, succ) <- loadModuleLinkables interp hsc_env pls1 (ldNeededLinkables deps)
+   (pls2, succ) <- loadExternalModuleLinkables interp hsc_env pls1 (ldNeededLinkables deps)
    let this_pkgs_loaded = udfmRestrictKeys all_pkgs_loaded $ getUniqDSet trans_pkgs_needed
        all_pkgs_loaded = pkgs_loaded pls2
        trans_pkgs_needed = unionManyUniqDSets (this_pkgs_needed : [ loaded_pkg_trans_deps pkg
@@ -684,42 +694,23 @@ get_reachable_nodes hsc_env mods
 
   ********************************************************************* -}
 
-loadDecls :: Interp -> HscEnv -> SrcSpan -> Linkable -> IO ([(Name, ForeignHValue)], [Linkable], PkgsLoaded)
+-- | Load the dependencies of a linkable, and then load the linkable itself.
+loadDecls :: Interp -> HscEnv -> SrcSpan -> Linkable -> IO ([Linkable], PkgsLoaded)
 loadDecls interp hsc_env span linkable = do
     -- Initialise the linker (if it's not been done already)
     initLoaderState interp hsc_env
 
     -- Take lock for the actual work.
     modifyLoaderState interp $ \pls0 -> do
-      -- Link the foreign objects first; BCOs in linkable are ignored here.
-      (pls1, objs_ok) <- loadObjects interp hsc_env pls0 [linkable]
-      when (failed objs_ok) $ throwGhcExceptionIO $ ProgramError "loadDecls: failed to load foreign objects"
-
       -- Link the packages and modules required
-      (pls, ok, links_needed, units_needed) <- loadDependencies interp hsc_env pls1 span needed_mods
+      (pls, ok, links_needed, units_needed) <- loadDependencies interp hsc_env pls0 span needed_mods
       if failed ok
-        then throwGhcExceptionIO (ProgramError "")
+        then throwGhcExceptionIO (ProgramError "could not load dependencies for decls")
         else do
-          -- Link the expression itself
-          let le  = linker_env pls
-          let lb  = linked_breaks pls
-          le2_itbl_env <- linkITbls interp (itbl_env le) (concat $ map bc_itbls cbcs)
-          le2_addr_env <- foldlM (\env cbc -> allocateTopStrings interp (bc_strs cbc) env) (addr_env le) cbcs
-          le2_breakarray_env <- allocateBreakArrays interp (breakarray_env lb) (catMaybes $ map bc_breaks cbcs)
-          le2_ccs_env        <- allocateCCS         interp (ccs_env lb)        (catMaybes $ map bc_breaks cbcs)
-          let le2 = le { itbl_env = le2_itbl_env
-                       , addr_env = le2_addr_env }
-          let lb2 = lb { breakarray_env = le2_breakarray_env
-                       , ccs_env = le2_ccs_env }
-
-          -- Link the necessary packages and linkables
-          new_bindings <- linkSomeBCOs interp (pkgs_loaded pls) le2 lb2 cbcs
-          nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
-          let ce2  = extendClosureEnv (closure_env le2) nms_fhvs
-              !pls2 = pls { linker_env = le2 { closure_env = ce2 }
-                          , linked_breaks = lb2 }
-          mapM_ (linkSptEntry interp ce2) (concatMap bc_spt_entries cbcs)
-          return (pls2, (nms_fhvs, links_needed, units_needed))
+          (pls2, ok2) <- loadInternalModuleLinkables interp hsc_env pls [linkable]
+          when (failed ok2) $
+            throwGhcExceptionIO (ProgramError "could not load linkable for decls")
+          return (pls2, (links_needed, units_needed))
   where
     cbcs = linkableBCOs linkable
 
@@ -761,8 +752,29 @@ loadModule interp hsc_env mod = do
 
   ********************************************************************* -}
 
-loadModuleLinkables :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO (LoaderState, SuccessFlag)
-loadModuleLinkables interp hsc_env pls linkables
+-- | Which closures from a Linkable to add to the 'ClosureEnv' in the 'LoaderState'
+data KeepModuleLinkableDefinitions = KeepAllDefinitions -- ^ Keep all definitions
+                                   | KeepExternalDefinitions -- ^ Only keep external definitions
+
+-- | Interpret a 'KeepModuleLinkableDefinitions' specification to a predictate on 'Name'
+keepDefinitions :: KeepModuleLinkableDefinitions -> (Name -> Bool)
+keepDefinitions KeepAllDefinitions = const True
+keepDefinitions KeepExternalDefinitions = isExternalName
+
+-- | Load a linkable from a module, and only add externally visible names to the
+-- environment.
+loadExternalModuleLinkables :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO (LoaderState, SuccessFlag)
+loadExternalModuleLinkables interp hsc_env pls linkables =
+  loadModuleLinkables interp hsc_env pls KeepExternalDefinitions linkables
+
+-- | Load a linkable from a module, and add all the names from the linkable into the
+-- closure environment.
+loadInternalModuleLinkables :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO (LoaderState, SuccessFlag)
+loadInternalModuleLinkables interp hsc_env pls linkables  =
+  loadModuleLinkables interp hsc_env pls KeepAllDefinitions linkables
+
+loadModuleLinkables :: Interp -> HscEnv -> LoaderState -> KeepModuleLinkableDefinitions -> [Linkable] -> IO (LoaderState, SuccessFlag)
+loadModuleLinkables interp hsc_env pls keep_spec linkables
   = mask_ $ do  -- don't want to be interrupted by ^C in here
 
         debugTraceMsg (hsc_logger hsc_env) 3 $
@@ -777,7 +789,7 @@ loadModuleLinkables interp hsc_env pls linkables
         if failed ok_flag then
                 return (pls1, Failed)
           else do
-                pls2 <- dynLinkBCOs interp pls1 bcos
+                pls2 <- dynLinkBCOs interp pls1 keep_spec bcos
                 return (pls2, Succeeded)
   where
     (objs, bcos) = partitionLinkables linkables
@@ -920,8 +932,8 @@ rmDupLinkables already ls
   ********************************************************************* -}
 
 
-dynLinkBCOs :: Interp -> LoaderState -> [Linkable] -> IO LoaderState
-dynLinkBCOs interp pls bcos = do
+dynLinkBCOs :: Interp -> LoaderState -> KeepModuleLinkableDefinitions -> [Linkable] -> IO LoaderState
+dynLinkBCOs interp pls keep_spec bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
@@ -945,7 +957,7 @@ dynLinkBCOs interp pls bcos = do
         names_and_refs <- linkSomeBCOs interp (pkgs_loaded pls) le2 lb2 cbcs
 
         -- We only want to add the external ones to the ClosureEnv
-        let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
+        let (to_add, to_drop) = partition (keepDefinitions keep_spec . fst) names_and_refs
 
         -- Immediately release any HValueRefs we're not going to add
         freeHValueRefs interp (map snd to_drop)
