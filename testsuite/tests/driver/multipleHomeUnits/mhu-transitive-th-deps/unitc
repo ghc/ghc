@@ -1,0 +1,1 @@
+-iDepC -this-unit-id unitc -hide-all-packages -package-id unita -package base -package template-haskell C

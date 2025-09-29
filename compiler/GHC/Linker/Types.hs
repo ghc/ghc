@@ -204,6 +204,7 @@ type PkgsLoaded = UniqDFM UnitId LoadedPkgInfo
 data LoadedPkgInfo
   = LoadedPkgInfo
   { loaded_pkg_uid         :: !UnitId
+  , loaded_pkg_parent      :: !(Maybe UnitId)
   , loaded_pkg_hs_objs     :: ![LibrarySpec]
   , loaded_pkg_non_hs_objs :: ![LibrarySpec]
   , loaded_pkg_hs_dlls     :: ![RemotePtr LoadedDLL]
@@ -212,8 +213,9 @@ data LoadedPkgInfo
   }
 
 instance Outputable LoadedPkgInfo where
-  ppr (LoadedPkgInfo uid hs_objs non_hs_objs _ trans_deps) =
-    vcat [ppr uid
+  ppr (LoadedPkgInfo uid parent_uid hs_objs non_hs_objs _ trans_deps) =
+    vcat [ ppr uid
+         , ppr parent_uid
          , ppr hs_objs
          , ppr non_hs_objs
          , ppr trans_deps ]

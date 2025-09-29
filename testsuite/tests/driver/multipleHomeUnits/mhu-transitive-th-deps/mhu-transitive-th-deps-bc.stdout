@@ -1,0 +1,2 @@
+[1 of 2] Compiling A                ( DepA/A.hs, DepA/A.o, interpreted )[unita]
+[2 of 2] Compiling C                ( DepC/C.hs, DepC/C.o, interpreted )[unitc]
