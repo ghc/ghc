@@ -27,7 +27,6 @@ For more information on how the below bit-twiddling functions came to be, see
 page.
 */
 
-extern StgWord hs_bitrev8(StgWord x);
 StgWord
 hs_bitrev8(StgWord x)
 {
@@ -37,7 +36,6 @@ hs_bitrev8(StgWord x)
   return x;
 }
 
-extern StgWord16 hs_bitrev16(StgWord16 x);
 StgWord16
 hs_bitrev16(StgWord16 x)
 {
@@ -48,7 +46,6 @@ hs_bitrev16(StgWord16 x)
   return x;
 }
 
-extern StgWord32 hs_bitrev32(StgWord32 x);
 StgWord32
 hs_bitrev32(StgWord32 x)
 {
@@ -60,7 +57,6 @@ hs_bitrev32(StgWord32 x)
   return x;
 }
 
-extern StgWord64 hs_bitrev64(StgWord64 x);
 StgWord64
 hs_bitrev64(StgWord64 x)
 {
