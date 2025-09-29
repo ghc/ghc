@@ -40,7 +40,7 @@ module GHC.Internal.IO.Handle (
    hIsOpen, hIsClosed, hIsReadable, hIsWritable, hGetBuffering, hIsSeekable,
    hSetEcho, hGetEcho, hIsTerminalDevice,
 
-   hSetNewlineMode, Newline(..), NewlineMode(..), nativeNewline,
+   hSetNewlineMode, hGetNewlineMode, Newline(..), NewlineMode(..), nativeNewline,
    noNewlineTranslation, universalNewlineMode, nativeNewlineMode,
 
    hShow,
@@ -238,7 +238,7 @@ hSetBuffering handle mode =
           return Handle__{ haBufferMode = mode,.. }
 
 -- -----------------------------------------------------------------------------
--- hSetEncoding
+-- Setting and getting the text encoding
 
 -- | The action 'hSetEncoding' @hdl@ @encoding@ changes the text encoding
 -- for the handle @hdl@ to @encoding@.  The default encoding when a 'Handle' is
@@ -624,16 +624,24 @@ hSetBinaryMode handle bin =
                           haOutputNL = outputNL nl, .. }
 
 -- -----------------------------------------------------------------------------
--- hSetNewlineMode
+-- Setting and getting the newline mode
 
--- | Set the 'NewlineMode' on the specified 'Handle'.  All buffered
+-- | Set the 'NewlineMode' for the specified 'Handle'.  All buffered
 -- data is flushed first.
 hSetNewlineMode :: Handle -> NewlineMode -> IO ()
-hSetNewlineMode handle NewlineMode{ inputNL=i, outputNL=o } =
+hSetNewlineMode handle NewlineMode{..} =
   withAllHandles__ "hSetNewlineMode" handle $ \h_@Handle__{} ->
     do
          flushBuffer h_
-         return h_{ haInputNL=i, haOutputNL=o }
+         return h_{ haInputNL = inputNL, haOutputNL = outputNL }
+
+-- | Return the current 'NewlineMode' for the specified 'Handle'.
+--
+-- @since 4.23.0.0
+hGetNewlineMode :: Handle -> IO NewlineMode
+hGetNewlineMode hdl =
+  withHandle_ "hGetNewlineMode" hdl $ \h_@Handle__{..} ->
+    return NewlineMode{ inputNL = haInputNL, outputNL = haOutputNL }
 
 -- -----------------------------------------------------------------------------
 -- Duplicating a Handle

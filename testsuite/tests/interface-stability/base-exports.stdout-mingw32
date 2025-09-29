@@ -10543,6 +10543,7 @@ module System.IO where
   hGetEcho :: Handle -> IO GHC.Internal.Types.Bool
   hGetEncoding :: Handle -> IO (GHC.Internal.Maybe.Maybe TextEncoding)
   hGetLine :: Handle -> IO GHC.Internal.Base.String
+  hGetNewlineMode :: Handle -> IO NewlineMode
   hGetPosn :: Handle -> IO HandlePosn
   hIsClosed :: Handle -> IO GHC.Internal.Types.Bool
   hIsEOF :: Handle -> IO GHC.Internal.Types.Bool
