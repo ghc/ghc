@@ -56,8 +56,6 @@ import GHC.Tc.Utils.Monad  ( initIfaceCheck, concatMapM )
 
 import GHC.Runtime.Interpreter
 import qualified GHC.Linker.Loader as Linker
-import GHC.Linker.Types
-
 
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Pipeline
@@ -71,8 +69,6 @@ import GHC.Driver.Main
 import GHC.Driver.MakeSem
 import GHC.Driver.Downsweep
 import GHC.Driver.MakeAction
-
-import GHC.ByteCode.Types
 
 import GHC.Iface.Load      ( cannotFindModule, readIface )
 import GHC.IfaceToCore     ( typecheckIface )
@@ -1232,30 +1228,8 @@ upsweep_mod :: HscEnv
 upsweep_mod hsc_env mHscMessage old_hmi summary mod_index nmods =  do
   hmi <- compileOne' mHscMessage hsc_env summary
           mod_index nmods (hm_iface <$> old_hmi) (maybe emptyHomeModInfoLinkable hm_linkable old_hmi)
-
-  -- MP: This is a bit janky, because before you add the entries you have to extend the HPT with the module
-  -- you just compiled. Another option, would be delay adding anything until after upsweep has finished, but I
-  -- am unsure if this is sound (wrt running TH splices for example).
-  -- This function only does anything if the linkable produced is a BCO, which
-  -- used to only happen with the bytecode backend, but with
-  -- @-fprefer-byte-code@, @HomeModInfo@ has bytecode even when generating
-  -- object code, see #25230.
   hscInsertHPT hmi hsc_env
-  addSptEntries (hsc_env)
-                (homeModInfoByteCode hmi)
-
   return hmi
-
--- | Add the entries from a BCO linkable to the SPT table, see
--- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
-addSptEntries :: HscEnv -> Maybe Linkable -> IO ()
-addSptEntries hsc_env mlinkable =
-  hscAddSptEntries hsc_env
-     [ spt
-     | linkable <- maybeToList mlinkable
-     , bco <- linkableBCOs linkable
-     , spt <- bc_spt_entries bco
-     ]
 
 
 -- Note [When source is considered modified]
