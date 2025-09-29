@@ -526,6 +526,7 @@ library
                  sm/Storage.c
                  sm/Sweep.c
                  fs.c
+                 prim/atomic.c
                  -- I wish we had wildcards..., this would be:
                  -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
 
