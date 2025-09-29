@@ -10,3 +10,11 @@ test('T26430', [
   extra_hc_opts('-L. -lT26430B')]
 , compile_and_run, ['']
 )
+
+test('T26431', [
+  extra_files(['../../../.gitlab/hello.hs']),
+  extra_hc_opts('-package ghc'),
+  extra_run_opts(f'"{config.libdir}"'),
+  ignore_stderr]
+, compile_and_run, ['']
+)
