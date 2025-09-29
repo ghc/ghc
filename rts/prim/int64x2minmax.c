@@ -1,4 +1,5 @@
 #if defined(__SSE2__)
+#include "Rts.h"
 #include <stdint.h>
 #include <string.h>
 #include <emmintrin.h>
