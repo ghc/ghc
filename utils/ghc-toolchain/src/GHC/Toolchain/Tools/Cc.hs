@@ -11,7 +11,6 @@ module GHC.Toolchain.Tools.Cc
     , compileC
     , compileAsm
     , addPlatformDepCcFlags
-    , checkC99Support
     ) where
 
 import Control.Monad
@@ -51,12 +50,8 @@ findCc archOs llvmTarget progOpt = do
     cc1 <- ignoreUnusedArgs cc0
     cc2 <- ccSupportsTarget archOs llvmTarget cc1
     checking "whether Cc works" $ checkCcWorks cc2
-    cc3 <- oneOf "cc doesn't support C99" $ map checkC99Support
-        [ cc2
-        , cc2 & _ccFlags %++ "-std=gnu99"
-        ]
-    checkCcSupportsExtraViaCFlags cc3
-    return cc3
+    checkCcSupportsExtraViaCFlags cc2
+    return cc2
 
 checkCcWorks :: Cc -> M ()
 checkCcWorks cc = withTempDir $ \dir -> do
@@ -87,17 +82,6 @@ ccSupportsTarget :: ArchOS -> String -> Cc -> M Cc
 ccSupportsTarget archOs target cc =
     checking "whether Cc supports --target" $
     supportsTarget archOs _ccProgram checkCcWorks target cc
-
-checkC99Support :: Cc -> M Cc
-checkC99Support cc = checking "for C99 support" $ withTempDir $ \dir -> do
-    let test_o = dir </> "test.o"
-    compileC cc test_o $ unlines
-        [ "#include <stdio.h>"
-        , "#if !defined __STDC_VERSION__ || __STDC_VERSION__ < 199901L"
-        , "# error \"Compiler does not advertise C99 conformance\""
-        , "#endif"
-        ]
-    return cc
 
 checkCcSupportsExtraViaCFlags :: Cc -> M ()
 checkCcSupportsExtraViaCFlags cc = checking "whether cc supports extra via-c flags" $ withTempDir $ \dir -> do

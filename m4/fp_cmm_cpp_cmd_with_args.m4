@@ -56,27 +56,6 @@ else
   AC_MSG_RESULT([no])
 fi
 
-AC_MSG_CHECKING([the C-- preprocessor for C99 support])
-cat > conftest.c <<EOF
-#include <stdio.h>
-#if !defined __STDC_VERSION__ || __STDC_VERSION__ < 199901L
-# error "Compiler does not advertise C99 conformance"
-#endif
-EOF
-if "$CMM_CPP_CMD" $CMM_CPP_ARGS conftest.c -o conftest -g0 >/dev/null 2>&1; then
-  AC_MSG_RESULT([yes])
-else
-    # Try -std=gnu99
-    if "$CMM_CPP_CMD" -std=gnu99 $CMM_CPP_ARGS conftest.c -o conftest -g0 >/dev/null 2>&1; then
-      $3="-std=gnu99 $$3"
-      AC_MSG_RESULT([needs -std=gnu99])
-    else
-      AC_MSG_ERROR([C99-compatible compiler needed])
-    fi
-fi
-rm -f conftest.c conftest.o conftest
-
-
 $2="$CMM_CPP_CMD"
 $3="$$3 $CMM_CPP_ARGS"
 
@@ -85,4 +64,3 @@ unset CMM_CPP_CMD
 unset CMM_CPP_ARGS
 
 ])
-

@@ -19,7 +19,7 @@ import GHC.Toolchain.Prelude
 import GHC.Toolchain.Program
 
 import GHC.Toolchain.Tools.Cc
-import GHC.Toolchain.Utils (withTempDir, oneOf, expectFileExists)
+import GHC.Toolchain.Utils (withTempDir, expectFileExists)
 
 newtype Cpp = Cpp { cppProgram :: Program
                     }
@@ -160,13 +160,7 @@ findJsCpp progOpt cc = checking "for JavaScript C preprocessor" $ do
 findCmmCpp :: ProgOpt -> Cc -> M CmmCpp
 findCmmCpp progOpt cc = checking "for a Cmm preprocessor" $ do
   -- Use the specified CPP or try to use the c compiler
-  foundCppProg <- findProgram "Cmm preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
-  -- Check whether the C preprocessor needs -std=gnu99 (only very old toolchains need this)
-  Cc cpp <- oneOf "cc doesn't support C99" $ map checkC99Support
-        [ Cc foundCppProg
-        , Cc (foundCppProg & _prgFlags %++ "-std=gnu99")
-        ]
-
+  cpp <- findProgram "Cmm preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
   cmmCppSupportsG0 <- withTempDir $ \dir -> do
     let conftest = dir </> "conftest.c"
     writeFile conftest "int main(void) {}"
@@ -181,14 +175,9 @@ findCmmCpp progOpt cc = checking "for a Cmm preprocessor" $ do
 findCpp :: ProgOpt -> Cc -> M Cpp
 findCpp progOpt cc = checking "for C preprocessor" $ do
   -- Use the specified CPP or try to use the c compiler
-  foundCppProg <- findProgram "C preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
-  -- Check whether the C preprocessor needs -std=gnu99 (only very old toolchains need this)
-  Cc cpp2 <- oneOf "cc doesn't support C99" $ map checkC99Support
-        [ Cc foundCppProg
-        , Cc (foundCppProg & _prgFlags %++ "-std=gnu99")
-        ]
+  cpp <- findProgram "C preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
   -- Always add the -E flag to the CPP, regardless of the user options
-  let cppProgram = addFlagIfNew "-E" cpp2
+  let cppProgram = addFlagIfNew "-E" cpp
   return Cpp{cppProgram}
 
 --------------------------------------------------------------------------------
