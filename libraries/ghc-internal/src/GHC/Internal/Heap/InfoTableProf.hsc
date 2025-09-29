@@ -10,6 +10,7 @@ module GHC.Internal.Heap.InfoTableProf
 -- representation of StgInfoTable_ when hsc2hs runs.
 #define PROFILING
 #include "Rts.h"
+#include "RtsIfaceStub.h"
 
 import GHC.Internal.Base
 import GHC.Internal.Real

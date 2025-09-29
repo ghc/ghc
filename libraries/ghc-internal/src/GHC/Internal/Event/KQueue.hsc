@@ -16,6 +16,7 @@ module GHC.Internal.Event.KQueue
 import qualified GHC.Internal.Event.Internal as E
 
 #include "EventConfig.h"
+#include "RtsIfaceStub.h"
 #if !defined(HAVE_KQUEUE)
 import GHC.Internal.Base
 

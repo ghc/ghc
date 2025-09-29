@@ -21,6 +21,7 @@
 #include "HsFFI.h"
 #include "HsBaseConfig.h"
 #include "rts/Libdw.h"
+#include "RtsIfaceStub.h"
 
 {-# LANGUAGE MultiWayIf #-}
 

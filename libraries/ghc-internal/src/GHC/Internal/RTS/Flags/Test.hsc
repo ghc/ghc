@@ -7,6 +7,8 @@ module GHC.Internal.RTS.Flags.Test
   )
 where
 
+#include "RtsIfaceStub.h"
+
 import GHC.Internal.Base
 
 #if !defined(javascript_HOST_ARCH)

@@ -11,6 +11,7 @@ module GHC.Internal.Event.Poll
     ) where
 
 #include "EventConfig.h"
+#include "RtsIfaceStub.h"
 
 #if !defined(HAVE_POLL_H)
 import GHC.Internal.Base

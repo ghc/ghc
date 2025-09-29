@@ -24,6 +24,7 @@ module GHC.Internal.Event.EPoll
 import qualified GHC.Internal.Event.Internal as E
 
 #include "EventConfig.h"
+#include "RtsIfaceStub.h"
 #if !defined(HAVE_EPOLL)
 import GHC.Internal.Base
 

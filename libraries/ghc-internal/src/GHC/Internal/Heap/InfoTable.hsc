@@ -6,6 +6,7 @@ module GHC.Internal.Heap.InfoTable
     ) where
 
 #include "Rts.h"
+#include "RtsIfaceStub.h"
 
 import GHC.Internal.Base
 import GHC.Internal.Real

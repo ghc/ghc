@@ -8,6 +8,7 @@
 module GHC.Internal.IO.Handle.Lock.Windows where
 
 #include "HsBaseConfig.h"
+#include "RtsIfaceStub.h"
 
 #if !defined(mingw32_HOST_OS)
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base

@@ -8,6 +8,7 @@
 module GHC.Internal.IO.Handle.Lock.LinuxOFD where
 
 #include "HsBaseConfig.h"
+#include "RtsIfaceStub.h"
 
 #if !HAVE_OFD_LOCKING
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base

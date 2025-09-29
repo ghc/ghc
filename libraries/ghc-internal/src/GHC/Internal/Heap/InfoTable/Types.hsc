@@ -10,6 +10,7 @@ module GHC.Internal.Heap.InfoTable.Types
     ) where
 
 #include "Rts.h"
+#include "RtsIfaceStub.h"
 
 import GHC.Internal.Base
 import GHC.Internal.Generics

@@ -5,6 +5,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 #include "Rts.h"
+#include "RtsIfaceStub.h"
 
 module GHC.Internal.InfoProv.Types
     ( InfoProv(..)
