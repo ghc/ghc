@@ -1447,6 +1447,9 @@ data Implication
 
       ic_info  :: SkolemInfoAnon,    -- See Note [Skolems in an implication]
                                      -- See Note [Shadowing in a constraint]
+         -- NB: Mostly ic_info is just there to help with error messages
+         --     but StaticFormSkol has a deeper significance; see (SF3) in
+         --     Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
 
       ic_skols :: [TcTyVar],     -- Introduced skolems; always skolem TcTyVars
                                  -- Their level numbers should be precisely ic_tclvl

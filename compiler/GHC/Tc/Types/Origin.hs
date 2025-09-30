@@ -334,6 +334,11 @@ data SkolemInfoAnon
 
   | UnkSkol CallStack
 
+  | DefaultSkol         -- Used (only) during defaulting
+
+  | StaticFormSkol      -- Attached to an implication constraint that captures
+                        -- the constraints from (static e)
+
 
 -- | Use this when you can't specify a helpful origin for
 -- some skolem type variable.
@@ -393,6 +398,8 @@ pprSkolInfo ReifySkol             = text "the type being reified"
 
 pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
 pprSkolInfo ArrowReboundIfSkol = text "the expected type of a rebound if-then-else command"
+pprSkolInfo StaticFormSkol     = text "a static expression"
+pprSkolInfo DefaultSkol        = text "a constraint being defaulted"
 
 -- unkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
