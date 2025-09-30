@@ -108,7 +108,7 @@ module GHC.Tc.Utils.Monad(
   getTcEvBindsMap, setTcEvBindsMap, updTcEvBinds,
   getTcEvTyCoVars, chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
-  emitConstraints, emitStaticConstraints, emitSimple, emitSimples,
+  emitConstraints, emitSimple, emitSimples,
   emitImplication, emitImplications, ensureReflMultiplicityCo,
   emitDelayedErrors, emitHole, emitHoles, emitNotConcreteError,
   discardConstraints, captureConstraints, tryCaptureConstraints,
@@ -297,7 +297,6 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
      ; zany_n_var           <- newIORef 0
      ; dependent_files_var  <- newIORef []
      ; dependent_dirs_var   <- newIORef []
-     ; static_wc_var        <- newIORef emptyWC
      ; cc_st_var            <- newIORef newCostCentreState
      ; th_topdecls_var      <- newIORef []
      ; th_foreign_files_var <- newIORef []
@@ -397,7 +396,6 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_defaulting_plugins  = []
           , tcg_hf_plugins          = []
           , tcg_top_loc             = loc
-          , tcg_static_wc           = static_wc_var
           , tcg_complete_matches    = []
           , tcg_cc_st               = cc_st_var
           , tcg_next_wrapper_num    = next_wrapper_num
@@ -1984,11 +1982,6 @@ getConstraintVar = do { env <- getLclEnv; return (tcl_lie env) }
 
 setConstraintVar :: TcRef WantedConstraints -> TcM a -> TcM a
 setConstraintVar lie_var = updLclEnv (\ env -> env { tcl_lie = lie_var })
-
-emitStaticConstraints :: WantedConstraints -> TcM ()
-emitStaticConstraints static_lie
-  = do { gbl_env <- getGblEnv
-       ; updTcRef (tcg_static_wc gbl_env) (`andWC` static_lie) }
 
 emitConstraints :: WantedConstraints -> TcM ()
 emitConstraints ct

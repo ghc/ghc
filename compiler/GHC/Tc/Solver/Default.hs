@@ -275,13 +275,13 @@ solveImplicationUsingUnsatGiven :: (EvVar, Type) -> Implication -> TcS Implicati
 solveImplicationUsingUnsatGiven
   unsat_given@(given_ev,_)
   impl@(Implic { ic_wanted = wtd, ic_tclvl = tclvl, ic_binds = ev_binds_var
-               , ic_need_implic = inner })
+               , ic_need_implic = inner, ic_info = skol_info })
   | isCoEvBindsVar ev_binds_var
   -- We can't use Unsatisfiable evidence in kinds.
   -- See Note [Coercion evidence only] in GHC.Tc.Types.Evidence.
   = return impl
   | otherwise
-  = do { wcs <- nestImplicTcS ev_binds_var tclvl $ go_wc wtd
+  = do { wcs <- nestImplicTcS skol_info ev_binds_var tclvl $ go_wc wtd
        ; setImplicationStatus $
          impl { ic_wanted = wcs
               , ic_need_implic = inner `extendEvNeedSet` given_ev } }
@@ -1148,7 +1148,7 @@ disambigProposalSequences orig_wanteds wanteds proposalSequences allConsistent
        ; tclvl             <- TcS.getTcLevel
        -- Step (3) in Note [How type-class constraints are defaulted]
        ; successes <- fmap catMaybes $
-                      nestImplicTcS fake_ev_binds_var (pushTcLevel tclvl) $
+                      nestImplicTcS DefaultSkol fake_ev_binds_var (pushTcLevel tclvl) $
                       mapM firstSuccess proposalSequences
        ; traceTcS "disambigProposalSequences {" (vcat [ ppr wanteds
                                                       , ppr proposalSequences

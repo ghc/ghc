@@ -1670,10 +1670,11 @@ validHoleFits ctxt@(CEC { cec_encl = implics
       = Nothing   -- The ErrorItem was a Given
 
 
--- See Note [Constraints include ...]
 givenConstraints :: SolverReportErrCtxt -> [(Type, RealSrcSpan)]
+-- Returned outermost first
+-- See Note [Constraints include ...]
 givenConstraints ctxt
-  = do { implic@Implic{ ic_given = given } <- cec_encl ctxt
+  = do { implic@Implic{ ic_given = given } <- getUserGivens ctxt
        ; constraint <- given
        ; return (varType constraint, getCtLocEnvLoc (ic_env implic)) }
 

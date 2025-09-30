@@ -1687,7 +1687,6 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
                       -- kind_co :: ki2 ~N ki1
                       -- mkKindEqLoc: any new constraints, arising from the kind
                       -- unification, say they thay come from unifying xi1~xi2
-                      -- ...AndEmit: emit any unsolved equalities
 
                -- Kick out any inert constraints mentioning the unified variables
                ; kickOutAfterUnification unifs
@@ -1703,11 +1702,12 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
                -- Emit the deferred constraints
             do { emitChildEqs ev eqs
 
-               ; assertPpr (not (isEmptyCts eqs)) (ppr ev $$ ppr ki1 $$ ppr ki2) $
+               ; assertPpr (not (isEmptyCts eqs))
+                           (vcat [ppr ev, ppr ki1, ppr ki2, ppr unifs, ppr eqs]) $
                    -- assert: the constraints won't be empty because the two kinds differ,
                    -- and there are no unifications, so we must have emitted one or
                    -- more constraints
-                finish (rewriterSetFromCts eqs) kind_co }}
+                 finish (rewriterSetFromCts eqs) kind_co }}
                          -- rewriterSetFromCts: record in the /type/ unification xi1~xi2 that
                          -- it has been rewritten by any (unsolved) constraints in `cts`; that
                          -- stops xi1~xi2 from unifying until `cts` are solved. See (EIK2).

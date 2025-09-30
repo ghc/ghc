@@ -1515,6 +1515,9 @@ data Implication
 
       ic_info  :: SkolemInfoAnon,    -- See Note [Skolems in an implication]
                                      -- See Note [Shadowing in a constraint]
+         -- NB: Mostly ic_info is just there to help with error messages
+         --     but StaticFormSkol has a deeper significance; see (SF3) in
+         --     Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
 
       ic_skols :: [TcTyVar],     -- Introduced skolems; always skolem TcTyVars
                                  -- Their level numbers should be precisely ic_tclvl
@@ -1628,8 +1631,26 @@ data HasGivenEqs -- See Note [HasGivenEqs]
 type UserGiven = Implication
 
 getUserGivensFromImplics :: [Implication] -> [UserGiven]
+-- The argument [Implication] is innermost first;
+--   the returned [UserGiven] is outermost first
 getUserGivensFromImplics implics
-  = reverse (filterOut (null . ic_given) implics)
+  = get [] implics
+  where
+    get :: [UserGiven] -> [Implication] -> [UserGiven]
+    -- The accumulator is outermost first
+    get acc [] = acc
+
+    get acc (implic : implics)
+      | StaticFormSkol <- ic_info implic
+      = acc  -- For static forms, ignore all outer givens
+             -- See (SF3) in Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
+
+      | null (ic_given implic)   -- No givens, so drop this one
+      = get acc implics
+
+      | otherwise
+      = get (implic:acc) implics
+
 
 {- Note [HasGivenEqs]
 ~~~~~~~~~~~~~~~~~~~~~

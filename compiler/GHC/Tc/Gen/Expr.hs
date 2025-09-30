@@ -566,26 +566,30 @@ tcExpr (HsProc x pat cmd) res_ty
 tcExpr (HsStatic fvs expr) res_ty
   = do  { res_ty          <- expTypeToType res_ty
         ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
-        ; (expr', lie)    <- captureConstraints $
-            addErrCtxt (StaticFormCtxt expr) $
-              tcCheckPolyExprNC expr expr_ty
+        ; (expr', lie) <- captureConstraints $
+                          addErrCtxt (StaticFormCtxt expr) $
+                          tcCheckPolyExprNC expr expr_ty
+
+        -- Emit an implication that captures the constraints of `expr`,
+        -- but with a `ic_info` of StaticFormSkol
+        -- See #13499 for an explanation of why this is the right thing to do:
+        -- the enclosing skolems must be in scope.
+        ; tc_lvl <- getTcLevel  -- No need to bump the level
+        ; (implic, ev_binds) <- buildImplicationFor tc_lvl StaticFormSkol [] [] lie
+        ; emitImplications implic
+        ; let expr'' = mkLHsWrap (mkWpLet ev_binds) expr'
 
         -- Check that the free variables of the static form are closed.
         -- It's OK to use nonDetEltsUniqSet here as the only side effects of
         -- checkClosedInStaticForm are error messages.
+        -- See (SF2) Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
         ; mapM_ checkClosedInStaticForm $ nonDetEltsUniqSet fvs
 
         -- Require the type of the argument to be Typeable.
         ; typeableClass <- tcLookupClass typeableClassName
         ; typeable_ev <- emitWantedEvVar StaticOrigin $
-                  mkTyConApp (classTyCon typeableClass)
-                             [liftedTypeKind, expr_ty]
-
-        -- Insert the constraints of the static form in a global list for later
-        -- validation.  See #13499 for an explanation of why this really isn't the
-        -- right thing to do: the enclosing skolems aren't in scope any more!
-        -- Static forms really aren't well worked out yet.
-        ; emitStaticConstraints lie
+                         mkTyConApp (classTyCon typeableClass)
+                                    [liftedTypeKind, expr_ty]
 
         -- Wrap the static form with the 'fromStaticPtr' call.
         ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName
@@ -593,9 +597,11 @@ tcExpr (HsStatic fvs expr) res_ty
         ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
         ; loc <- getSrcSpanM
         ; static_ptr_ty_con <- tcLookupTyCon staticPtrTyConName
-        ; return $ mkHsWrapCo co $ HsApp noExtField
-                            (L (noAnnSrcSpan loc) $ mkHsWrap wrap fromStaticPtr)
-                            (L (noAnnSrcSpan loc) (HsStatic (fvs, mkTyConApp static_ptr_ty_con [expr_ty]) expr'))
+        ; return $ mkHsWrapCo co $
+          HsApp noExtField
+              (L (noAnnSrcSpan loc) $ mkHsWrap wrap fromStaticPtr)
+              (L (noAnnSrcSpan loc) (HsStatic (fvs, mkTyConApp static_ptr_ty_con [expr_ty])
+                                              expr''))
         }
 
 tcExpr (HsEmbTy _ _)      _ = failWith (TcRnIllegalTypeExpr TypeKeywordSyntax)
