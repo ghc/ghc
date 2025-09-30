@@ -1,0 +1,5 @@
+when making flags consistent: warning: [GHC-74335] [-Winconsistent-flags (in -Wdefault)]
+    -finfo-table-map is incompatible with -fllvm and is disabled (See #26435)
+
+[1 of 2] Compiling Main             ( T26435.hs, T26435.o )
+[2 of 2] Linking T26435

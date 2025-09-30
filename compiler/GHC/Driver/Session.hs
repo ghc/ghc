@@ -3843,6 +3843,11 @@ makeDynFlagsConsistent dflags
                                  hostFullWays
         in dflags_c
 
+ | gopt Opt_InfoTableMap dflags
+ , LlvmCodeOutput <- backendCodeOutput (backend dflags)
+    = loop (gopt_unset dflags Opt_InfoTableMap)
+           "-finfo-table-map is incompatible with -fllvm and is disabled (See #26435)"
+
  | otherwise = (dflags, mempty, mempty)
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
           loop updated_dflags warning
