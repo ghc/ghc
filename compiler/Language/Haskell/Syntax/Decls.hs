@@ -1120,8 +1120,6 @@ or contexts in two parts:
 -- | The arguments in a Haskell98-style data constructor.
 type HsConDeclH98Details pass
    = HsConDetails (HsConDeclField pass) (XRec pass [LHsConDeclRecField pass])
--- The Void argument to HsConDetails here is a reflection of the fact that
--- type applications are not allowed in data constructor declarations.
 
 -- | The arguments in a GADT constructor. Unlike Haskell98-style constructors,
 -- GADT constructors cannot be declared with infix syntax. As a result, we do
