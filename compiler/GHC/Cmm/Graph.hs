@@ -34,7 +34,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Data.FastString
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Data.OrdList
 import GHC.Runtime.Heap.Layout (ByteOff)
 import GHC.Types.Unique.DSM

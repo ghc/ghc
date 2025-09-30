@@ -25,7 +25,7 @@ import GHC.HsToCore.Foreign.Call
 
 import GHC.Types.Id
 import GHC.Types.ForeignStubs
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 
 dsPrimCall :: Id -> Coercion -> ForeignCall
            -> DsM ([(Id, Expr TyVar)], CHeader, CStub)

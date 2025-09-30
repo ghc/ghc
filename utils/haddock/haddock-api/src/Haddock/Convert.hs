@@ -58,6 +58,7 @@ import GHC.Core.TyCo.Compare (eqTypes)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Data.FastString (mkFastStringTextUTF8)
 import GHC.Hs
 import GHC.Types.Basic (DefMethSpec (..), TopLevelFlag (..), TupleSort (..))
 import GHC.Types.Fixity (LexicalFixity (..))
@@ -534,7 +535,11 @@ synifyDataCon use_gadt_syntax dc =
       noLocA $
         HsConDeclRecField
           noExtField
-          [noLocA $ FieldOcc (mkVarUnqual $ field_label $ flLabel fl) (noLocA (flSelector fl))]
+          [ noLocA $
+              FieldOcc
+                (mkVarUnqual . mkFastStringTextUTF8 . field_label $ flLabel fl)
+                (noLocA $ flSelector fl)
+          ]
           synTy
 
     mk_h98_arg_tys :: Either String (HsConDeclH98Details GhcRn)

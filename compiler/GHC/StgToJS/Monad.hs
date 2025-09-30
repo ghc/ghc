@@ -36,7 +36,7 @@ import GHC.Stg.Syntax
 
 import GHC.Types.Id
 import GHC.Types.Unique.FM
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 
 import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Data.FastString

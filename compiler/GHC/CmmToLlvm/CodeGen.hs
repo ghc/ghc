@@ -29,7 +29,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe (expectJust)
 import GHC.Data.OrdList
 
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Unique.DSM
 import GHC.Types.Unique
 

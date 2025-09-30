@@ -82,7 +82,7 @@ import Data.Function (on)
 --import Data.Monoid
 import Data.String (IsString(..))
 import Data.Ratio ((%))
-import Language.Haskell.Textual.Location (NoCommentsLocation)
+import Language.Haskell.Textual.ExactPrint (NoCommentsLocation)
 import Language.Haskell.Textual.UTF8
 
 {-

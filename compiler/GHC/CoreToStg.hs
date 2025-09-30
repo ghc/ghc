@@ -40,7 +40,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Name   ( isExternalName )
 import GHC.Types.Basic  ( Arity, TypeOrConstraint(..) )
 import GHC.Types.Literal
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.IPE
 
 import GHC.Unit.Module

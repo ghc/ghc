@@ -24,7 +24,7 @@ import GHC.StgToJS.Types
 import GHC.StgToJS.Utils
 
 import GHC.Types.RepType
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Unique.Map
 
 import GHC.Stg.Syntax

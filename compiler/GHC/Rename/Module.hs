@@ -54,7 +54,7 @@ import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
 
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
-import GHC.Types.ForeignCall ( CCallTarget(..) )
+import Language.Haskell.Syntax.ForeignCall ( CCallTarget(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -1197,17 +1197,18 @@ rnHsRuleDecl (HsRule { rd_ext   = (_, st)
                      , rd_bndrs = bndrs
                      , rd_lhs   = lhs
                      , rd_rhs   = rhs })
-  = bindRuleBndrs (RuleCtx rule_name) bndrs $ \tm_names bndrs' ->
-    do { (lhs', fv_lhs') <- rnLExpr lhs
-       ; (rhs', fv_rhs') <- rnLExpr rhs
-       ; checkValidRule rule_name tm_names lhs' fv_lhs'
-       ; return (HsRule { rd_ext   = (HsRuleRn fv_lhs' fv_rhs', st)
-                        , rd_name  = lrule_name
-                        , rd_act   = act
-                        , rd_bndrs = bndrs'
-                        , rd_lhs   = lhs'
-                        , rd_rhs   = rhs' }
-                , fv_lhs' `plusFV` fv_rhs') }
+  = let rule_name' = mkFastStringTextUTF8 rule_name
+    in  bindRuleBndrs (RuleCtx rule_name') bndrs $ \tm_names bndrs' ->
+          do { (lhs', fv_lhs') <- rnLExpr lhs
+             ; (rhs', fv_rhs') <- rnLExpr rhs
+             ; checkValidRule rule_name' tm_names lhs' fv_lhs'
+             ; return (HsRule { rd_ext   = (HsRuleRn fv_lhs' fv_rhs', st)
+                              , rd_name  = lrule_name
+                              , rd_act   = act
+                              , rd_bndrs = bndrs'
+                              , rd_lhs   = lhs'
+                              , rd_rhs   = rhs' }
+                      , fv_lhs' `plusFV` fv_rhs') }
 
 {-
 Note [Rule LHS validity checking]

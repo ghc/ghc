@@ -38,7 +38,7 @@ import GHC.Cmm.Info
 import GHC.Cmm.Utils ( cmmTagMask, mkWordCLit, mAX_PTR_TAG )
 import GHC.Core
 import GHC.Core.DataCon
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Id
 import GHC.Builtin.PrimOps
 import GHC.Core.TyCon

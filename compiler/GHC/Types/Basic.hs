@@ -141,8 +141,8 @@ module GHC.Types.Basic (
 
 import GHC.Prelude
 
-import GHC.ForeignSrcLang
 import GHC.Data.FastString
+import GHC.ForeignSrcLang
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Binary
@@ -153,13 +153,12 @@ import Data.Data
 import Data.Maybe
 import qualified Data.Semigroup as Semi
 
-import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag)
+import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag, OverlapMode(..))
 import Language.Haskell.Syntax.Binds
 -- import {-# SOURCE #-} Language.Haskell.Syntax.Type (HsMultAnn(..), PromotionFlag(..), isPromoted, )
 import Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted, )
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (HsDoFlavour)
 import Language.Haskell.Syntax.ImpExp
--- import qualified Language.Haskell.Textual.Source as Source
 
 {-
 ************************************************************************
@@ -464,7 +463,7 @@ instance NFData FunctionOrData where
 type RuleName = FastString
 
 pprRuleName :: RuleName -> SDoc
-pprRuleName rn = doubleQuotes (ftext rn)
+pprRuleName = doubleQuotes . ftext
 
 
 {-
@@ -730,113 +729,11 @@ hasNonCanonicalFlag = \case
   NonCanonical{} -> True
   _              -> False
 
-data OverlapMode  -- See Note [Rules for instance lookup] in GHC.Core.InstEnv
-  = NoOverlap SourceText
-                  -- See Note [Pragma source text]
-    -- ^ This instance must not overlap another `NoOverlap` instance.
-    -- However, it may be overlapped by `Overlapping` instances,
-    -- and it may overlap `Overlappable` instances.
-
-
-  | Overlappable SourceText
-                  -- See Note [Pragma source text]
-    -- ^ Silently ignore this instance if you find a
-    -- more specific one that matches the constraint
-    -- you are trying to resolve
-    --
-    -- Example: constraint (Foo [Int])
-    --   instance                      Foo [Int]
-    --   instance {-# OVERLAPPABLE #-} Foo [a]
-    --
-    -- Since the second instance has the Overlappable flag,
-    -- the first instance will be chosen (otherwise
-    -- its ambiguous which to choose)
-
-
-  | Overlapping SourceText
-                  -- See Note [Pragma source text]
-    -- ^ Silently ignore any more general instances that may be
-    --   used to solve the constraint.
-    --
-    -- Example: constraint (Foo [Int])
-    --   instance {-# OVERLAPPING #-} Foo [Int]
-    --   instance                     Foo [a]
-    --
-    -- Since the first instance has the Overlapping flag,
-    -- the second---more general---instance will be ignored (otherwise
-    -- it is ambiguous which to choose)
-
-
-  | Overlaps SourceText
-                  -- See Note [Pragma source text]
-    -- ^ Equivalent to having both `Overlapping` and `Overlappable` flags.
-
-  | Incoherent SourceText
-                  -- See Note [Pragma source text]
-    -- ^ Behave like Overlappable and Overlapping, and in addition pick
-    -- an arbitrary one if there are multiple matching candidates, and
-    -- don't worry about later instantiation
-    --
-    -- Example: constraint (Foo [b])
-    -- instance {-# INCOHERENT -} Foo [Int]
-    -- instance                   Foo [a]
-    -- Without the Incoherent flag, we'd complain that
-    -- instantiating 'b' would change which instance
-    -- was chosen. See also Note [Incoherent instances] in "GHC.Core.InstEnv"
-
-  | NonCanonical SourceText
-    -- ^ Behave like Incoherent, but the instance choice is observable
-    -- by the program behaviour. See Note [Coherence and specialisation: overview].
-    --
-    -- We don't have surface syntax for the distinction between
-    -- Incoherent and NonCanonical instances; instead, the flag
-    -- `-f{no-}specialise-incoherents` (on by default) controls
-    -- whether `INCOHERENT` instances are regarded as Incoherent or
-    -- NonCanonical.
-
-  deriving (Eq, Data)
-
-
 instance Outputable OverlapFlag where
    ppr flag = ppr (overlapMode flag) <+> pprSafeOverlap (isSafeOverlap flag)
 
 instance NFData OverlapFlag where
   rnf (OverlapFlag mode safe) = rnf mode `seq` rnf safe
-
-instance Outputable OverlapMode where
-   ppr (NoOverlap    _) = empty
-   ppr (Overlappable _) = text "[overlappable]"
-   ppr (Overlapping  _) = text "[overlapping]"
-   ppr (Overlaps     _) = text "[overlap ok]"
-   ppr (Incoherent   _) = text "[incoherent]"
-   ppr (NonCanonical _) = text "[noncanonical]"
-
-instance NFData OverlapMode where
-  rnf (NoOverlap s) = rnf s
-  rnf (Overlappable s) = rnf s
-  rnf (Overlapping s) = rnf s
-  rnf (Overlaps s) = rnf s
-  rnf (Incoherent s) = rnf s
-  rnf (NonCanonical s) = rnf s
-
-instance Binary OverlapMode where
-    put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
-    put_ bh (Overlaps     s) = putByte bh 1 >> put_ bh s
-    put_ bh (Incoherent   s) = putByte bh 2 >> put_ bh s
-    put_ bh (Overlapping  s) = putByte bh 3 >> put_ bh s
-    put_ bh (Overlappable s) = putByte bh 4 >> put_ bh s
-    put_ bh (NonCanonical s) = putByte bh 5 >> put_ bh s
-    get bh = do
-        h <- getByte bh
-        case h of
-            0 -> (get bh) >>= \s -> return $ NoOverlap s
-            1 -> (get bh) >>= \s -> return $ Overlaps s
-            2 -> (get bh) >>= \s -> return $ Incoherent s
-            3 -> (get bh) >>= \s -> return $ Overlapping s
-            4 -> (get bh) >>= \s -> return $ Overlappable s
-            5 -> (get bh) >>= \s -> return $ NonCanonical s
-            _ -> panic ("get OverlapMode" ++ show h)
-
 
 instance Binary OverlapFlag where
     put_ bh flag = do put_ bh (overlapMode flag)

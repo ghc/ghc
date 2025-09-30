@@ -27,22 +27,6 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   ( LHsExpr
   , MatchGroup
   , GRHSs,
-{-
-    RuleMatchInfo(..), isConLike, isFunLike,
-    InlineSpec(..), noUserInlineSpec,
-    InlinePragma(..), defaultInlinePragma, alwaysInlinePragma,
-    neverInlinePragma, dfunInlinePragma,
-    isDefaultInlinePragma,
-    isInlinePragma, isInlinablePragma, isNoInlinePragma, isOpaquePragma,
-    isAnyInlinePragma, alwaysInlineConLikePragma,
-    inlinePragmaSource,
-    inlinePragmaName, inlineSpecSource,
-    inlinePragmaSpec, inlinePragmaSat,
-    inlinePragmaActivation, inlinePragmaRuleMatchInfo,
-    setInlinePragmaActivation, setInlinePragmaRuleMatchInfo
---        pprInline, pprInlineDebug,
--}
-
   )
 
 import Language.Haskell.Syntax.Basic ( Fixity )
@@ -51,16 +35,11 @@ import Language.Haskell.Syntax.Extension
 import {-# SOURCE #-} Language.Haskell.Syntax.Pat( LPat )
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Textual.Source qualified as Source
---import Language.Haskell.Textual.UTF8
-
---import GHC.Types.Basic (InlinePragma)
---import GHC.Types.SourceText (StringLiteral)
 
 import Control.DeepSeq
 import Data.Bool
 import Data.Data (Data)
 import Data.Maybe
---import Data.String (IsString(..))
 
 import Prelude
 

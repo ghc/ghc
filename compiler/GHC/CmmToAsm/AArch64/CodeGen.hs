@@ -55,7 +55,7 @@ import Control.Monad    ( mapAndUnzipM )
 import GHC.Float
 
 import GHC.Types.Basic
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Panic

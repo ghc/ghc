@@ -6,7 +6,7 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module GHC.Types.ForeignCall (
+module Language.Haskell.Syntax.ForeignCall (
         ForeignCall(..), isSafeForeignCall,
         Safety(..), playSafe, playInterruptible,
 

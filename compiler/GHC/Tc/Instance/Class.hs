@@ -1315,7 +1315,7 @@ lookupHasFieldLabel fam_inst_envs rdr_env arg_tys
     -- Use the representation tycon (if data family); it has the fields
   , let r_tc = fstOf3 (tcLookupDataFamInst fam_inst_envs tc args)
     -- x should be a field of r
-  , Just fl <- lookupTyConFieldLabel (FieldLabelString x) r_tc
+  , Just fl <- lookupTyConFieldLabel (FieldLabelString $ fastStringToTextUTF8 x) r_tc
     -- Ensure the field selector is in scope
   , Just gre <- lookupGRE_FieldLabel rdr_env fl
   = Just (flSelector fl, gre, rec_ty, fld_ty)

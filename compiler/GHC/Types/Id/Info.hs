@@ -105,7 +105,7 @@ import GHC.Core.TyCon
 import GHC.Core.Type (mkTyConApp)
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Unit.Module
 import GHC.Types.Demand
 import GHC.Types.Cpr

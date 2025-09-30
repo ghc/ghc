@@ -25,7 +25,7 @@ import GHC.Cmm.Expr
 import GHC.Cmm.Switch
 import GHC.Data.FastString
 import GHC.Data.Pair
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Utils.Outputable
 import GHC.Runtime.Heap.Layout
 import GHC.Types.Tickish (CmmTickish)

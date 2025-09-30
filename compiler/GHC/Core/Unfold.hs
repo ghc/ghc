@@ -49,7 +49,7 @@ import GHC.Types.Literal
 import GHC.Types.Id.Info
 import GHC.Types.RepType ( isZeroBitTy )
 import GHC.Types.Basic  ( Arity, RecFlag )
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Tickish
 
 import GHC.Builtin.PrimOps

@@ -37,7 +37,7 @@ import GHC.Linker.Config
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Var
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 
 import Control.Monad.Trans.State.Strict
 import GHC.Utils.Outputable (Outputable (..), text, SDocContext)

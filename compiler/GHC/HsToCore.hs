@@ -52,7 +52,7 @@ import GHC.Core.SimpleOpt ( simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
 import GHC.Core.Coercion
-import GHC.Core.Predicate( scopedSort, mkNomEqPred )
+import GHC.Core.Predicate ( scopedSort, mkNomEqPred )
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Core.Rules
@@ -63,7 +63,8 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 
-import GHC.Data.Maybe    ( expectJust )
+import GHC.Data.FastString ( mkFastStringTextUTF8 )
+import GHC.Data.Maybe ( expectJust )
 import GHC.Data.OrdList
 import GHC.Data.SizedSeq ( sizeSS )
 
@@ -444,7 +445,7 @@ dsRule (L loc (HsRule { rd_name = name
               fn_name   = idName fn_id
               simpl_opts = initSimpleOpts dflags
               final_rhs = simpleOptExpr simpl_opts rhs''    -- De-crap it
-              rule_name = unLoc name
+              rule_name = mkFastStringTextUTF8 $ unLoc name
               rule = mkRule this_mod False is_local rule_name rule_act
                             fn_name final_bndrs args final_rhs
         ; dsWarnOrphanRule rule

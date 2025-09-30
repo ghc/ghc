@@ -125,24 +125,25 @@ module GHC.Utils.Outputable (
         bPutHDoc
     ) where
 
-import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
-
 import GHC.Prelude.Basic
 
 import {-# SOURCE #-} GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-} GHC.Types.Name.Occurrence( OccName )
 
-import GHC.Utils.BufHandle (BufHandle, bPutChar, bPutStr, bPutFS, bPutFZS)
+import GHC.LanguageExtensions (Extension)
 import GHC.Data.FastString
+import qualified GHC.Data.Word64Set as Word64Set
+import GHC.Serialized
+import GHC.TypeLits (KnownSymbol, symbolVal)
+import GHC.Utils.BufHandle (BufHandle, bPutChar, bPutStr, bPutFS, bPutFZS)
 import qualified GHC.Utils.Ppr as Pretty
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Ppr       ( Doc, Mode(..) )
 import GHC.Utils.Panic.Plain (assert)
-import GHC.Serialized
-import GHC.LanguageExtensions (Extension)
 import GHC.Utils.GlobalVars( unsafeHasPprDebug )
 import GHC.Utils.Misc (lastMaybe, snocView)
 
+import Control.DeepSeq (NFData(rnf))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char
@@ -152,38 +153,38 @@ import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.IntSet as IntSet
-import qualified GHC.Data.Word64Set as Word64Set
-import Data.String
-import Data.Word
-import System.IO        ( Handle )
-import System.FilePath
-import Text.Printf
-import Numeric (showFFloat)
-import Numeric.Natural (Natural)
 import Data.Graph (SCC(..))
 import Data.List (intercalate, intersperse)
 import Data.List.NonEmpty (NonEmpty (..))
-import Data.Semigroup (Arg(..))
 import qualified Data.List.NonEmpty as NEL
+import Data.Proxy (Proxy(..))
+import Data.Semigroup (Arg(..))
+import Data.String
 import Data.Time ( UTCTime )
 import Data.Time.Format.ISO8601
 import Data.Void
-import Control.DeepSeq (NFData(rnf))
+import Data.Word
+import Numeric (showFFloat)
+import Numeric.Natural (Natural)
+import System.FilePath
+import System.IO        ( Handle )
+import Text.Printf
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Utils.Exception
 import GHC.Exts (oneShot)
 
+import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds
+import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 import Language.Haskell.Textual.Source (FractionalLit(..), IntegralLit(..), StringLiteral(..))
-import qualified Language.Haskell.Textual.Source as Source
 import Language.Haskell.Textual.Documentation
---import Language.Haskell.Textual.Documentation.String
---import Language.Haskell.Textual.Documentation.String (printDecorator)
---import {-# SOURCE #-} Language.Haskell.Textual.Documentation.String (printDecorator)
+import Language.Haskell.Textual.ExactPrint
 import Language.Haskell.Textual.Location
+import qualified Language.Haskell.Textual.Source as Source
 import Language.Haskell.Textual.UTF8
+import Language.Haskell.Textual.Warning
 
 {-
 ************************************************************************
@@ -2235,3 +2236,43 @@ pprHsDocString = text . exactPrintHsDocString
 pprHsDocStrings :: [HsDocString] -> SDoc
 pprHsDocStrings = text . intercalate "\n\n" . map exactPrintHsDocString
 
+instance Outputable EpaComment where
+  ppr x = text (show x)
+
+instance KnownSymbol tok => Outputable (EpToken tok) where
+  ppr _ = text (symbolVal (Proxy @tok))
+
+deriving newtype instance Outputable WarningCategory
+
+instance Outputable (GenLocated NoCommentsLocation EpaComment) where
+  ppr (L l c) = text "L" <+> ppr l <+> ppr c
+
+instance (Outputable e) => Outputable (GenLocated EpaLocation e) where
+  ppr = pprLocated
+
+instance Outputable InWarningCategory where
+  ppr (InWarningCategory _ _ wt) = text "in" <+> doubleQuotes (ppr wt)
+
+instance Outputable (WarningTxt pass) where
+    ppr (WarningTxt mcat lsrc ws)
+      = pprWithCodeSnippetThen lsrc (pp_ws ws) $ ctg_doc <+> pp_ws ws <+> text "#-}"
+        where
+          ctg_doc = maybe empty (\ctg -> ppr ctg) mcat
+
+    ppr (DeprecatedTxt lsrc  ds)
+      = pprWithCodeSnippetThen lsrc (pp_ws ds) $ pp_ws ds <+> text "#-}"
+
+pp_ws :: [LocatedE (WithHsDocIdentifiers Source.StringLiteral pass)] -> SDoc
+pp_ws [l] = ppr $ unLoc l
+pp_ws ws
+  = text "["
+    <+> vcat (punctuate comma (map (ppr . unLoc) ws))
+    <+> text "]"
+
+instance Outputable OverlapMode where
+   ppr (NoOverlap    _) = empty
+   ppr (Overlappable _) = text "[overlappable]"
+   ppr (Overlapping  _) = text "[overlapping]"
+   ppr (Overlaps     _) = text "[overlap ok]"
+   ppr (Incoherent   _) = text "[incoherent]"
+   ppr (NonCanonical _) = text "[noncanonical]"

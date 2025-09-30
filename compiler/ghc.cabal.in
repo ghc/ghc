@@ -906,7 +906,6 @@ Library
         GHC.Types.FieldLabel
         GHC.Types.Fixity
         GHC.Types.Fixity.Env
-        GHC.Types.ForeignCall
         GHC.Types.ForeignStubs
         GHC.Types.GREInfo
         GHC.Types.Hint
@@ -1028,6 +1027,7 @@ Library
         Language.Haskell.Syntax.Decls
         Language.Haskell.Syntax.Expr
         Language.Haskell.Syntax.Extension
+        Language.Haskell.Syntax.ForeignCall
         Language.Haskell.Syntax.ImpExp
         Language.Haskell.Syntax.ImpExp.IsBoot
         Language.Haskell.Syntax.Lit
@@ -1035,11 +1035,14 @@ Library
         Language.Haskell.Syntax.Pat
         Language.Haskell.Syntax.Specificity
         Language.Haskell.Syntax.Type
+        
         Language.Haskell.Textual.Documentation
         Language.Haskell.Textual.Documentation.String
+        Language.Haskell.Textual.ExactPrint
         Language.Haskell.Textual.Location
         Language.Haskell.Textual.Source
         Language.Haskell.Textual.UTF8
+        Language.Haskell.Textual.Warning
 
     autogen-modules: GHC.Platform.Constants
                      GHC.Settings.Config

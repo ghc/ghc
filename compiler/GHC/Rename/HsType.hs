@@ -51,6 +51,7 @@ import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName )
 
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCon    ( isKindName )
+import GHC.Data.FastString (mkFastStringTextUTF8)
 import GHC.Hs
 import GHC.Rename.Env
 import GHC.Rename.Doc
@@ -68,7 +69,6 @@ import GHC.Types.Name.Reader
 import GHC.Builtin.Names
 import GHC.Types.Hint ( UntickedPromotedThing(..) )
 import GHC.Types.Name
-import Language.Haskell.Textual.Location
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
 import GHC.Types.Error
@@ -83,6 +83,7 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Textual.Location
 
 import Data.List (nubBy, partition)
 import Control.Monad
@@ -1329,7 +1330,7 @@ rnHsConDeclRecFields ctxt fls fields
    = mapFvRn (rnField fl_env env) fields
   where
     env    = mkTyKiEnv ctxt TypeLevel RnTypeBody
-    fl_env = mkFsEnv [ (field_label $ flLabel fl, fl) | fl <- fls ]
+    fl_env = mkFsEnv [ (mkFastStringTextUTF8 . field_label $ flLabel fl, fl) | fl <- fls ]
 
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LHsConDeclRecField GhcPs
         -> RnM (LHsConDeclRecField GhcRn, FreeVars)

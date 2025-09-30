@@ -74,7 +74,7 @@ import Language.Haskell.Textual.Location
 import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
 import GHC.Types.Fixity
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
 import GHC.Types.PkgQual
@@ -1947,7 +1947,7 @@ rule    :: { LRuleDecl GhcPs }
            runPV (unECP $6) >>= \ $6 ->
            amsA' (sLL $1 $> $ HsRule
                                    { rd_ext =((fst $2, epTok $5), getSTRINGs $1)
-                                   , rd_name = L (noAnnSrcSpan $ gl $1) (mkFastStringTextUTF8 (getSTRING $1))
+                                   , rd_name = L (noAnnSrcSpan $ gl $1) ((getSTRING $1))
                                    , rd_act = snd $2 `orElse` AlwaysActive
                                    , rd_bndrs = ruleBndrsOrDef $3
                                    , rd_lhs = $4, rd_rhs = $6 }) }
@@ -2047,7 +2047,7 @@ maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
 
 warning_category :: { Maybe (LocatedE InWarningCategory) }
         : 'in' STRING                  { Just (reLoc $ sLL $1 $> $ InWarningCategory (epTok $1) (getSTRINGs $2)
-                                                                    (reLoc $ sL1 $2 $ mkWarningCategory (mkFastStringTextUTF8 (getSTRING $2)))) }
+                                                                    (reLoc $ sL1 $2 $ mkWarningCategory (getSTRING $2))) }
         | {- empty -}                  { Nothing }
 
 warnings :: { OrdList (LWarnDecl GhcPs) }
@@ -3709,7 +3709,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = True
-                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOccFS . field_label . unLoc . dfoLabel . unLoc $ final))
+                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOccFS . mkFastStringTextUTF8 . field_label . unLoc . dfoLabel . unLoc $ final))
                             fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun Nothing
                         }
 
@@ -4020,7 +4020,7 @@ qvar    :: { LocatedN RdrName }
 -- *after* we see the close paren.
 
 field :: { LocatedN FieldLabelString  }
-      : varid { fmap (FieldLabelString . occNameFS . rdrNameOcc) $1 }
+      : varid { fmap (FieldLabelString . fastStringToTextUTF8 . occNameFS . rdrNameOcc) $1 }
 
 qvarid :: { LocatedN RdrName }
         : varid               { $1 }

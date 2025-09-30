@@ -201,7 +201,7 @@ import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Avail
 import GHC.Types.Hint (UntickedPromotedThing(..), AssumedDerivingStrategy(..), SigLike)
-import GHC.Types.ForeignCall (CLabelString)
+import Language.Haskell.Syntax.ForeignCall (CLabelString)
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name (NamedThing(..), Name, OccName, getSrcLoc, getSrcSpan)
 import GHC.Types.Name.Env (NameEnv)

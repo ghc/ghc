@@ -100,7 +100,6 @@ import GHC.Data.Bag
 import GHC.IO (catchException)
 import GHC.Utils.Outputable as Outputable
 import qualified GHC.Utils.Ppr.Colour as Col
-import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Hint
 import GHC.Data.FastString (mkFastStringTextUTF8, unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
@@ -110,6 +109,9 @@ import GHC.Unit.Module.Warnings (WarningCategory(..))
 
 import GHC.Utils.Json
 import GHC.Utils.Panic
+
+import Language.Haskell.Textual.Location as SrcLoc
+import Language.Haskell.Textual.UTF8
 
 import GHC.Version (cProjectVersion)
 import Data.Bifunctor
@@ -628,7 +630,7 @@ jsonDiagnostic rendered m = JSObject $ [
               ]
           WarningWithCategory (WarningCategory cat) ->
             Just $ JSObject
-              [ ("category", JSString $ unpackFS cat)
+              [ ("category", JSString $ decodeUTF8 cat)
               ]
 
 instance Show (MsgEnvelope DiagnosticMessage) where

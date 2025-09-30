@@ -154,7 +154,7 @@ import GHC.Types.RepType
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Name
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import Language.Haskell.Textual.Location
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply

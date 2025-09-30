@@ -56,7 +56,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader

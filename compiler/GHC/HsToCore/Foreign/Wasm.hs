@@ -35,7 +35,7 @@ import GHC.Prelude
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.ForeignStubs
 import GHC.Types.Id
 import GHC.Types.Name

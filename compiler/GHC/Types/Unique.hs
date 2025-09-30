@@ -64,7 +64,9 @@ import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 import GHC.Word         ( Word64 )
 import Data.Char        ( chr, ord, isPrint )
 
+import Language.Haskell.Syntax.Basic (FieldLabelString(field_label))
 import Language.Haskell.Syntax.Module.Name
+import Language.Haskell.Textual.UTF8
 
 {-
 ************************************************************************
@@ -201,7 +203,13 @@ hasKey          :: Uniquable a => a -> Unique -> Bool
 x `hasKey` k    = getUnique x == k
 
 instance Uniquable FastString where
- getUnique fs = mkUniqueIntGrimily (uniqueOfFS fs)
+  getUnique fs = mkUniqueIntGrimily (uniqueOfFS fs)
+
+instance Uniquable FieldLabelString where
+  getUnique = getUnique . mkFastStringTextUTF8 . field_label
+
+--instance Uniquable TextUTF8 where
+--  getUnique = mkUniqueGrimily . hashOfUTF8
 
 instance Uniquable Int where
   getUnique i = mkUniqueIntGrimily i

@@ -71,7 +71,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.CostCentre
 import GHC.Types.Literal
 import GHC.Types.Avail
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
 import GHC.Types.Tickish

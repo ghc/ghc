@@ -36,7 +36,7 @@ import GHC.Types.Literal
 import GHC.Types.ForeignStubs
 import GHC.Types.Name
 import GHC.Types.RepType
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Basic
 
 import GHC.Unit.Module

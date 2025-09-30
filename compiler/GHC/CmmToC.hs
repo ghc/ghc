@@ -44,7 +44,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm.InitFini
 
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique

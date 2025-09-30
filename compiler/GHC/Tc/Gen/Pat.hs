@@ -1667,7 +1667,7 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
                 --      f (R { foo = (a,b) }) = a+b
                 -- If foo isn't one of R's fields, we don't want to crash when
                 -- typechecking the "a+b".
-           [] -> failWith (badFieldConErr (getName con_like) (FieldLabelString lbl))
+           [] -> failWith (badFieldConErr (getName con_like) (FieldLabelString (fastStringToTextUTF8 lbl)))
 
                 -- The normal case, when the field comes from the right constructor
            (pat_ty : extras) -> do

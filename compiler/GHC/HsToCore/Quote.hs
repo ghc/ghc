@@ -74,7 +74,7 @@ import qualified GHC.Data.List.NonEmpty as NE
 
 import GHC.Types.Unique
 import GHC.Types.Basic
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.SourceText
@@ -806,7 +806,7 @@ repRuleD (L loc (HsRule { rd_name = n
                         , rd_rhs = rhs }))
   = fmap (locA loc, ) <$>
       repRuleBinders bndrs $ \ ty_bndrs' tm_bndrs' ->
-        do { n'   <- coreStringLit $ unLoc n
+        do { n'   <- coreStringLit . mkFastStringTextUTF8 $ unLoc n
            ; act' <- repPhases act
            ; lhs' <- repLE lhs
            ; rhs' <- repLE rhs
@@ -1716,8 +1716,8 @@ repE e@(HsTypedSplice HsTypedSpliceTop _) = pprPanic "repE: top level splice" (p
 repE (HsStatic _ e)        = repLE e >>= rep2 staticEName . (:[]) . unC
 repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ (FieldLabelString f))))) = do
   e1 <- repLE e
-  repGetField e1 f
-repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel) xs)
+  repGetField e1 $ mkFastStringTextUTF8 f
+repE (HsProjection _ xs) = repProjection (fmap (mkFastStringTextUTF8 . field_label . unLoc . dfoLabel) xs)
 repE (HsEmbTy _ t) = do
   t1 <- repLTy (hswc_body t)
   rep2 typeEName [unC t1]

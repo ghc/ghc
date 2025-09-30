@@ -1121,7 +1121,7 @@ gen_Read_binds get_fixity loc dit@(DerivInstTys{dit_rep_tc = tycon})
         field_stmts  = zipWithEqual read_field labels as_needed
 
         con_arity    = dataConSourceArity data_con
-        labels       = map (field_label . flLabel) $ dataConFieldLabels data_con
+        labels       = map (mkFastStringTextUTF8 . field_label . flLabel) $ dataConFieldLabels data_con
         dc_nm        = getName data_con
         is_infix     = dataConIsInfix data_con
         is_record    = labels `lengthExceeds` 0
@@ -1278,7 +1278,7 @@ gen_Show_binds get_fixity loc dit@(DerivInstTys{ dit_rep_tc = tycon
                 -- labelled fields (and in same order)
              show_record_args = concat $
                                 intersperse [comma_space] $
-                                [ [show_label lbl, arg]
+                                [ [show_label $ mkFastStringTextUTF8 lbl, arg]
                                 | (lbl,arg) <- zipEqual labels show_args ]
 
              show_arg :: RdrName -> Type -> LHsExpr GhcPs
@@ -2221,7 +2221,7 @@ genAuxBindSpecOriginal loc spec
              , nlList  labels                               -- Field labels
              , nlHsVar fixity ]                             -- Fixity
 
-        labels   = map (nlHsLit . mkHsStringFS . field_label . flLabel)
+        labels   = map (nlHsLit . mkHsStringFS . (mkFastStringTextUTF8 . field_label) . flLabel)
                        (dataConFieldLabels dc)
         dc_occ   = getOccName dc
         is_infix = isDataSymOcc dc_occ

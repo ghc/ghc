@@ -111,10 +111,11 @@ module Language.Haskell.Textual.Location (
         mkSrcSpanPs,
         combineRealSrcSpans,
         psLocatedToLocated,
-
+{-
         -- * Exact print locations
         EpaLocation'(..), NoCommentsLocation, NoComments(..),
         DeltaPos(..), deltaPos, getDeltaLine,
+-}
     ) where
 
 import Prelude
@@ -807,6 +808,8 @@ psSpanEnd (PsSpan r b) = PsLoc (realSrcSpanEnd r) (bufSpanEnd b)
 mkSrcSpanPs :: PsSpan -> SrcSpan
 mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Just b)
 
+
+{-
 -- ---------------------------------------------------------------------
 -- The following section contains basic types related to exact printing.
 -- See https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations for
@@ -862,3 +865,4 @@ deltaPos l c = case l of
 getDeltaLine :: DeltaPos -> Int
 getDeltaLine (SameLine _) = 0
 getDeltaLine (DifferentLine r _) = r
+-}

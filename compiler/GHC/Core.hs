@@ -95,7 +95,7 @@ module GHC.Core (
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Types.Var.Env( InScopeSet )
+import GHC.Types.Var.Env ( InScopeSet )
 import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -114,9 +114,9 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Data.Data hiding (TyCon)
+import Data.Data hiding ( TyCon )
 import Data.Int
-import Data.List.NonEmpty (nonEmpty)
+import Data.List.NonEmpty ( nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Word
 
@@ -1253,7 +1253,6 @@ The CoreRule type and its friends are dealt with mainly in GHC.Core.Rules, but
 GHC.Core.FVs, GHC.Core.Subst, GHC.Core.Ppr, GHC.Core.Tidy also inspect the
 representation.
 -}
-
 
 -- | A 'CoreRule' is:
 --

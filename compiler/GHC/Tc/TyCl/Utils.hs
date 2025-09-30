@@ -55,7 +55,6 @@ import GHC.Utils.Misc
 import GHC.Utils.FV as FV
 
 import GHC.Data.Maybe
-import GHC.Data.FastString
 
 import GHC.Unit.Module
 
@@ -78,6 +77,7 @@ import GHC.Types.TyThing
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Textual.UTF8 (byteStringUTF8)
 
 import Control.Monad
 
@@ -982,7 +982,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
         inst_tys = dataConResRepTyArgs dc
 
     unit_rhs = mkLHsTupleExpr [] noExtField
-    msg_lit = HsStringPrim Source.CodeSnippetAbsent (bytesFS (field_label lbl))
+    msg_lit = HsStringPrim Source.CodeSnippetAbsent . byteStringUTF8 $ field_label lbl
 
 {-
 Note [Polymorphic selectors]

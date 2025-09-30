@@ -2044,7 +2044,7 @@ customOrUnrecognisedWarning prefix custom = defHiddenFlag prefix (Prefix action)
       | validWarningCategory cat = custom cat
       | otherwise = unrecognised flag
       where
-        cat = mkWarningCategory (mkFastString flag)
+        cat = mkWarningCategory (encodeUTF8 flag)
 
     unrecognised flag = do
       -- #23402 and #12056

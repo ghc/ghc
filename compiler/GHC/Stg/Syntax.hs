@@ -84,7 +84,7 @@ import GHC.Core.TyCon    ( PrimRep(..), PrimOrVoidRep(..), TyCon )
 import GHC.Core.Type     ( Type )
 import GHC.Core.Ppr( {- instances -} )
 
-import GHC.Types.ForeignCall ( ForeignCall )
+import Language.Haskell.Syntax.ForeignCall ( ForeignCall )
 import GHC.Types.Id
 import GHC.Types.Tickish     ( StgTickish )
 import GHC.Types.Var.Set

@@ -660,7 +660,7 @@ tc_mkRepTy gk get_fixity dit@(DerivInstTys{ dit_rep_tc = tycon
                               then promotedTrueDataCon
                               else promotedFalseDataCon
 
-        selName = mkStrLitTy . field_label . flLabel
+        selName = mkStrLitTy . mkFastStringTextUTF8 . field_label . flLabel
 
         mbSel Nothing  = mkTyConApp promotedNothingDataCon [typeSymbolKind]
         mbSel (Just s) = mkTyConApp promotedJustDataCon

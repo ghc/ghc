@@ -732,7 +732,7 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ (WithUserRdr _ name))) = OccurrenceOf name
-exprCtOrigin (HsGetField _ _ (L _ f)) = GetFieldOrigin (field_label $ unLoc $ dfoLabel f)
+exprCtOrigin (HsGetField _ _ (L _ f)) = GetFieldOrigin (mkFastStringTextUTF8 $ field_label $ unLoc $ dfoLabel f)
 exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin l
 exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip

@@ -50,8 +50,8 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Types.Name
 
+import GHC.Data.FastString (fastStringToTextUTF8)
 import GHC.Data.FastString.Env
-import GHC.Types.Unique (Uniquable(..))
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 
@@ -79,7 +79,7 @@ data FieldLabel = FieldLabel {
 
 -- | User-visible label of a field.
 flLabel :: FieldLabel -> FieldLabelString
-flLabel = FieldLabelString . occNameFS . nameOccName . flSelector
+flLabel = FieldLabelString . fastStringToTextUTF8 . occNameFS . nameOccName . flSelector
 
 instance HasOccName FieldLabel where
   occName = nameOccName . flSelector
@@ -91,9 +91,6 @@ instance Outputable FieldLabel where
 
 instance Outputable FieldLabelString where
   ppr (FieldLabelString l) = ppr l
-
-instance Uniquable FieldLabelString where
-  getUnique (FieldLabelString fs) = getUnique fs
 
 -- | Flag to indicate whether the DuplicateRecordFields extension is enabled.
 data DuplicateRecordFields

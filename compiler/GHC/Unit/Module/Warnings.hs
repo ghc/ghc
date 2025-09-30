@@ -11,6 +11,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- For Anno (WarningTxt (GhcPass pass))
+
 -- | Warnings for a module
 module GHC.Unit.Module.Warnings
    ( WarningCategory(..)
@@ -48,30 +50,18 @@ where
 
 import GHC.Prelude
 
-import GHC.Data.FastString (FastString, mkFastString, unpackFS)
-import GHC.Types.SourceText (pprWithSourceTextThen)
-import GHC.Types.Name.Occurrence
-import GHC.Types.Name.Env
-import GHC.Types.Name (Name)
-import GHC.Types.Unique
-import GHC.Types.Unique.Set
 import GHC.Hs.Doc
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
-
+import GHC.Types.Name (Name)
+import GHC.Types.Name.Env
+import GHC.Types.Name.Occurrence
 import GHC.Utils.Outputable
-import GHC.Utils.Binary
-import GHC.Unicode
 
 import Language.Haskell.Syntax.Extension
 import qualified Language.Haskell.Textual.Source as Source
 import Language.Haskell.Textual.Location
-
-import Data.Data
-import Data.List (isPrefixOf)
-import GHC.Generics ( Generic )
-import Control.DeepSeq
-
+import Language.Haskell.Textual.Warning
 
 {-
 Note [Warning categories]
@@ -119,153 +109,9 @@ the possibility of them being infinite.
 
 -}
 
-data InWarningCategory
-  = InWarningCategory
-    { iwc_in :: !(EpToken "in"),
-      iwc_st :: !Source.CodeSnippet,
-      iwc_wc :: (LocatedE WarningCategory)
-    } deriving Data
-
-fromWarningCategory :: WarningCategory -> InWarningCategory
-fromWarningCategory wc = InWarningCategory noAnn Source.CodeSnippetAbsent (noLocA wc)
-
-
--- See Note [Warning categories]
-newtype WarningCategory = WarningCategory FastString
-  deriving stock Data
-  deriving newtype (Binary, Eq, Outputable, Show, Uniquable, NFData)
-
-mkWarningCategory :: FastString -> WarningCategory
-mkWarningCategory = WarningCategory
-
--- | The @deprecations@ category is used for all DEPRECATED pragmas and for
--- WARNING pragmas that do not specify a category.
-defaultWarningCategory :: WarningCategory
-defaultWarningCategory = mkWarningCategory (mkFastString "deprecations")
-
--- | Is this warning category allowed to appear in user-defined WARNING pragmas?
--- It must either be the known category @deprecations@, or be a custom category
--- that begins with @x-@ and contains only valid characters (letters, numbers,
--- apostrophes and dashes).
-validWarningCategory :: WarningCategory -> Bool
-validWarningCategory cat@(WarningCategory c) =
-    cat == defaultWarningCategory || ("x-" `isPrefixOf` s && all is_allowed s)
-  where
-    s = unpackFS c
-    is_allowed c = isAlphaNum c || c == '\'' || c == '-'
-
-
--- | A finite or infinite set of warning categories.
---
--- Unlike 'WarningFlag', there are (in principle) infinitely many warning
--- categories, so we cannot necessarily enumerate all of them. However the set
--- is constructed by adding or removing categories one at a time, so we can
--- represent it as either a finite set of categories, or a cofinite set (where
--- we store the complement).
-data WarningCategorySet =
-    FiniteWarningCategorySet   (UniqSet WarningCategory)
-      -- ^ The set of warning categories is the given finite set.
-  | CofiniteWarningCategorySet (UniqSet WarningCategory)
-      -- ^ The set of warning categories is infinite, so the constructor stores
-      -- its (finite) complement.
-
--- | The empty set of warning categories.
-emptyWarningCategorySet :: WarningCategorySet
-emptyWarningCategorySet = FiniteWarningCategorySet emptyUniqSet
-
--- | The set consisting of all possible warning categories.
-completeWarningCategorySet :: WarningCategorySet
-completeWarningCategorySet = CofiniteWarningCategorySet emptyUniqSet
-
--- | Is this set empty?
-nullWarningCategorySet :: WarningCategorySet -> Bool
-nullWarningCategorySet (FiniteWarningCategorySet s) = isEmptyUniqSet s
-nullWarningCategorySet CofiniteWarningCategorySet{} = False
-
--- | Does this warning category belong to the set?
-elemWarningCategorySet :: WarningCategory -> WarningCategorySet -> Bool
-elemWarningCategorySet c (FiniteWarningCategorySet   s) =      c `elementOfUniqSet` s
-elemWarningCategorySet c (CofiniteWarningCategorySet s) = not (c `elementOfUniqSet` s)
-
--- | Insert an element into a warning category set.
-insertWarningCategorySet :: WarningCategory -> WarningCategorySet -> WarningCategorySet
-insertWarningCategorySet c (FiniteWarningCategorySet   s) = FiniteWarningCategorySet   (addOneToUniqSet   s c)
-insertWarningCategorySet c (CofiniteWarningCategorySet s) = CofiniteWarningCategorySet (delOneFromUniqSet s c)
-
--- | Delete an element from a warning category set.
-deleteWarningCategorySet :: WarningCategory -> WarningCategorySet -> WarningCategorySet
-deleteWarningCategorySet c (FiniteWarningCategorySet   s) = FiniteWarningCategorySet   (delOneFromUniqSet s c)
-deleteWarningCategorySet c (CofiniteWarningCategorySet s) = CofiniteWarningCategorySet (addOneToUniqSet   s c)
-
 type LWarningTxt pass = XRec pass (WarningTxt pass)
 
--- | Warning Text
---
--- reason/explanation from a WARNING or DEPRECATED pragma
-data WarningTxt pass
-   = WarningTxt
-      (Maybe (LocatedE InWarningCategory))
-        -- ^ Warning category attached to this WARNING pragma, if any;
-        -- see Note [Warning categories]
-      Source.CodeSnippet
-      [LocatedE (WithHsDocIdentifiers Source.StringLiteral pass)]
-   | DeprecatedTxt
-      Source.CodeSnippet
-      [LocatedE (WithHsDocIdentifiers Source.StringLiteral pass)]
-  deriving Generic
-
--- | To which warning category does this WARNING or DEPRECATED pragma belong?
--- See Note [Warning categories].
-warningTxtCategory :: WarningTxt pass -> WarningCategory
-warningTxtCategory (WarningTxt (Just (L _ (InWarningCategory _  _ (L _ cat)))) _ _) = cat
-warningTxtCategory _ = defaultWarningCategory
-
--- | The message that the WarningTxt was specified to output
-warningTxtMessage :: WarningTxt p -> [LocatedE (WithHsDocIdentifiers Source.StringLiteral p)]
-warningTxtMessage (WarningTxt _ _ m) = m
-warningTxtMessage (DeprecatedTxt _ m) = m
-
--- | True if the 2 WarningTxts have the same category and messages
-warningTxtSame :: WarningTxt p1 -> WarningTxt p2 -> Bool
-warningTxtSame w1 w2
-  = warningTxtCategory w1 == warningTxtCategory w2
-  && literal_message w1 == literal_message w2
-  && same_type
-  where
-    literal_message :: WarningTxt p -> [Source.StringLiteral]
-    literal_message = map (hsDocString . unLoc) . warningTxtMessage
-    same_type | DeprecatedTxt {} <- w1, DeprecatedTxt {} <- w2 = True
-              | WarningTxt {} <- w1, WarningTxt {} <- w2       = True
-              | otherwise                                      = False
-
-deriving instance Eq InWarningCategory
-
-deriving instance (Eq (IdP pass)) => Eq (WarningTxt pass)
-deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)
-
 type instance Anno (WarningTxt (GhcPass pass)) = SrcSpanAnnP
-
-instance Outputable InWarningCategory where
-  ppr (InWarningCategory _ _ wt) = text "in" <+> doubleQuotes (ppr wt)
-
-
-instance Outputable (WarningTxt pass) where
-    ppr (WarningTxt mcat lsrc ws)
-      = pprWithSourceTextThen lsrc (pp_ws ws) $ ctg_doc <+> pp_ws ws <+> text "#-}"
-        where
-          ctg_doc = maybe empty (\ctg -> ppr ctg) mcat
-
-
-    ppr (DeprecatedTxt lsrc  ds)
-      = pprWithSourceTextThen lsrc (pp_ws ds) $ pp_ws ds <+> text "#-}"
-
-pp_ws :: [LocatedE (WithHsDocIdentifiers Source.StringLiteral pass)] -> SDoc
-pp_ws [l] = ppr $ unLoc l
-pp_ws ws
-  = text "["
-    <+> vcat (punctuate comma (map (ppr . unLoc) ws))
-    <+> text "]"
-
 
 pprWarningTxtForMsg :: WarningTxt p -> SDoc
 pprWarningTxtForMsg warn =

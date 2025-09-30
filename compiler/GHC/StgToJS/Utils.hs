@@ -70,7 +70,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Unique.FM
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.TyThing
 import GHC.Types.Name
 

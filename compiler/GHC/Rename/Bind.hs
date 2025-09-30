@@ -48,6 +48,7 @@ import GHC.Rename.Utils
 import GHC.Driver.DynFlags
 
 import GHC.Data.BooleanFormula ( bfTraverse )
+import GHC.Data.FastString     ( mkFastStringTextUTF8 )
 import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Data.Maybe          ( orElse, mapMaybe )
 import GHC.Data.OrdList
@@ -61,7 +62,6 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.SourceFile
-import Language.Haskell.Textual.Location as SrcLoc
 import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
 
 import GHC.Types.CompleteMatch
@@ -78,6 +78,7 @@ import GHC.Utils.Panic
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Textual.Location as SrcLoc
 
 import Control.Monad
 import Data.List          ( partition )
@@ -783,7 +784,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                RecCon vars ->
                    do { checkDupRdrNames (map (foLabel . recordPatSynField) vars)
                       ; fls <- lookupConstructorFields $ noUserRdr name
-                      ; let fld_env = mkFsEnv [ (field_label $ flLabel fl, fl) | fl <- fls ]
+                      ; let fld_env = mkFsEnv [ (mkFastStringTextUTF8 . field_label $ flLabel fl, fl) | fl <- fls ]
                       ; let rnRecordPatSynField
                               (RecordPatSynField { recordPatSynField  = visible
                                                  , recordPatSynPatVar = hidden })

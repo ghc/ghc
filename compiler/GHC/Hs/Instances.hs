@@ -36,6 +36,7 @@ import GHC.Parser.Annotation
 import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Data.BooleanFormula (BooleanFormula(..))
 import Language.Haskell.Syntax.Extension (Anno)
+import Language.Haskell.Textual.UTF8
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -249,6 +250,11 @@ deriving instance Data (RuleDecls GhcPs)
 deriving instance Data (RuleDecls GhcRn)
 deriving instance Data (RuleDecls GhcTc)
 
+-- TODO: These three instances  broke during the
+-- Trees-That-Grow isolation of Language.Haskell namespace.
+-- By adding this suprious type instance, everything seems to be fixed...?
+-- This may be a short-term hack, double check that this is the correct instance.
+type instance Anno TextUTF8 = EpAnnCO
 -- deriving instance (DataIdLR p p) => Data (RuleDecl p)
 deriving instance Data (RuleDecl GhcPs)
 deriving instance Data (RuleDecl GhcRn)

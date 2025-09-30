@@ -47,7 +47,7 @@ import GHC.Platform.Reg
 import GHC.Platform.Regs
 import GHC.Prelude hiding (EQ)
 import GHC.Types.Basic
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import Language.Haskell.Textual.Location (srcSpanFile, srcSpanStartCol, srcSpanStartLine)
 import GHC.Types.Tickish (GenTickish (..))
 import GHC.Utils.Constants (debugIsOn)

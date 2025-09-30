@@ -161,12 +161,12 @@ import GHC.Builtin.Uniques
   ( tyConRepNameUnique
   , dataConTyRepNameUnique )
 
+import GHC.Data.FastString (mkFastStringTextUTF8)
 import GHC.Utils.Binary
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Core.Class
 import GHC.Types.Basic
-import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Core.Coercion.Axiom
@@ -183,6 +183,7 @@ import GHC.Unit.Module
 import Control.DeepSeq
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Syntax.ForeignCall
 
 import qualified Data.Data as Data
 
@@ -1978,12 +1979,12 @@ tyConFieldLabelEnv (TyCon { tyConDetails = details })
 
 -- | Look up a field label belonging to this 'TyCon'
 lookupTyConFieldLabel :: FieldLabelString -> TyCon -> Maybe FieldLabel
-lookupTyConFieldLabel lbl tc = lookupDFsEnv (tyConFieldLabelEnv tc) (field_label lbl)
+lookupTyConFieldLabel lbl tc = lookupDFsEnv (tyConFieldLabelEnv tc) . mkFastStringTextUTF8 $ field_label lbl
 
 -- | Make a map from strings to FieldLabels from all the data
 -- constructors of this algebraic tycon
 fieldsOfAlgTcRhs :: AlgTyConRhs -> FieldLabelEnv
-fieldsOfAlgTcRhs rhs = mkDFsEnv [ (field_label $ flLabel fl, fl)
+fieldsOfAlgTcRhs rhs = mkDFsEnv [ (mkFastStringTextUTF8 . field_label $ flLabel fl, fl)
                                 | fl <- dataConsFields (visibleDataCons rhs) ]
   where
     -- Duplicates in this list will be removed by 'mkFsEnv'

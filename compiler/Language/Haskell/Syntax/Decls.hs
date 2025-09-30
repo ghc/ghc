@@ -91,32 +91,32 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   ( HsExpr, HsUntypedSplice )
         -- Because Expr imports Decls via HsBracket
 
+import Language.Haskell.Syntax.Basic (LexicalFixity, OverlapMode, Role)
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.ForeignCall
+           (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 import Language.Haskell.Syntax.Type
-import Language.Haskell.Syntax.Basic (Role, LexicalFixity)
 import Language.Haskell.Syntax.Specificity (Specificity)
+import Language.Haskell.Textual.Documentation (LHsDoc)
+import Language.Haskell.Textual.UTF8 (TextUTF8)
+import Language.Haskell.Textual.Warning (WarningTxt)
 
-import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName
-                       ,TyConFlavour(..), TypeOrData(..), NewOrData(..))
-import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
+import GHC.Types.Basic (TopLevelFlag ,TyConFlavour(..), TypeOrData(..), NewOrData(..))
 
-import GHC.Unit.Module.Warnings (WarningTxt)
 
-import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
-
-import Control.Monad
 import Control.Exception (assert)
+import Control.Monad
+import Data.Bool
 import Data.Data        hiding (TyCon, Fixity, Infix)
+import Data.Eq
+import Data.Foldable
+import Data.Int
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
 import Data.String
-import Data.Eq
-import Data.Int
-import Data.Bool
-import Prelude (Show)
-import Data.Foldable
 import Data.Traversable
-import Data.List.NonEmpty (NonEmpty (..))
+import Prelude (Show)
 
 {-
 ************************************************************************
@@ -1479,8 +1479,7 @@ data RuleDecl pass
   = HsRule -- Source rule
        { rd_ext  :: XHsRule pass
            -- ^ After renamer, free-vars from the LHS and RHS
-       , rd_name :: XRec pass RuleName
-           -- ^ Note [Pragma source text] in "GHC.Types.SourceText"
+       , rd_name :: XRec pass TextUTF8
        , rd_act   :: Activation
        , rd_bndrs :: RuleBndrs pass
        , rd_lhs   :: XRec pass (HsExpr pass)

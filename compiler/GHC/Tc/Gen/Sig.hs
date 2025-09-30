@@ -1205,74 +1205,75 @@ tcRuleDecls (HsRules { rds_ext = src
                            , rds_rules = tc_decls } }
 
 tcRule :: RuleDecl GhcRn -> TcM (Maybe (RuleDecl GhcTc))
-tcRule (HsRule { rd_ext  = ext
-               , rd_name = rname@(L _ name)
-               , rd_act  = act
+tcRule (HsRule { rd_ext   = ext
+               , rd_name  = rname
+               , rd_act   = act
                , rd_bndrs = bndrs
-               , rd_lhs  = lhs
-               , rd_rhs  = rhs })
-  = addErrCtxt (RuleCtxt name)  $
-    do { traceTc "---- Rule ------" (pprFullRuleName (snd ext) rname)
-       ; skol_info <- mkSkolemInfo (RuleSkol name)
-        -- Note [Typechecking rules]
-       ; (tc_lvl, lhs_wanted, stuff)
-              <- tcRuleBndrs skol_info bndrs $
-                 do { (lhs', rule_ty)    <- tcInferRho lhs
-                    ; (rhs', rhs_wanted) <- captureConstraints $
-                                            tcCheckMonoExpr rhs rule_ty
-                    ; return (lhs', rule_ty, rhs', rhs_wanted) }
+               , rd_lhs   = lhs
+               , rd_rhs   = rhs })
+  = let rname'@(L _ name') = mkFastStringTextUTF8 <$> rname
+    in  addErrCtxt (RuleCtxt name') $
+          do { traceTc "---- Rule ------" (pprFullRuleName (snd ext) rname')
+             ; skol_info <- mkSkolemInfo (RuleSkol name')
+              -- Note [Typechecking rules]
+             ; (tc_lvl, lhs_wanted, stuff)
+                    <- tcRuleBndrs skol_info bndrs $
+                       do { (lhs', rule_ty)    <- tcInferRho lhs
+                          ; (rhs', rhs_wanted) <- captureConstraints $
+                                                  tcCheckMonoExpr rhs rule_ty
+                          ; return (lhs', rule_ty, rhs', rhs_wanted) }
 
-       ; let (bndrs', (lhs', rule_ty, rhs', rhs_wanted)) = stuff
+             ; let (bndrs', (lhs', rule_ty, rhs', rhs_wanted)) = stuff
 
-       ; traceTc "tcRule 1" (vcat [ pprFullRuleName (snd ext) rname
-                                  , ppr lhs_wanted
-                                  , ppr rhs_wanted ])
+             ; traceTc "tcRule 1" (vcat [ pprFullRuleName (snd ext) rname'
+                                        , ppr lhs_wanted
+                                        , ppr rhs_wanted ])
 
-       ; (lhs_evs, residual_lhs_wanted, dont_default)
-            <- simplifyRule name tc_lvl lhs_wanted rhs_wanted
+             ; (lhs_evs, residual_lhs_wanted, dont_default)
+                  <- simplifyRule name' tc_lvl lhs_wanted rhs_wanted
 
-       -- SimplifyRule Plan, step 4
-       -- Now figure out what to quantify over
-       -- c.f. GHC.Tc.Solver.simplifyInfer
-       -- We quantify over any tyvars free in *either* the rule
-       --  *or* the bound variables.  The latter is important.  Consider
-       --      ss (x,(y,z)) = (x,z)
-       --      RULE:  forall v. fst (ss v) = fst v
-       -- The type of the rhs of the rule is just a, but v::(a,(b,c))
-       --
-       -- We also need to get the completely-unconstrained tyvars of
-       -- the LHS, lest they otherwise get defaulted to Any; but we do that
-       -- during zonking (see GHC.Tc.Zonk.Type.zonkRule)
+             -- SimplifyRule Plan, step 4
+             -- Now figure out what to quantify over
+             -- c.f. GHC.Tc.Solver.simplifyInfer
+             -- We quantify over any tyvars free in *either* the rule
+             --  *or* the bound variables.  The latter is important.  Consider
+             --      ss (x,(y,z)) = (x,z)
+             --      RULE:  forall v. fst (ss v) = fst v
+             -- The type of the rhs of the rule is just a, but v::(a,(b,c))
+             --
+             -- We also need to get the completely-unconstrained tyvars of
+             -- the LHS, lest they otherwise get defaulted to Any; but we do that
+             -- during zonking (see GHC.Tc.Zonk.Type.zonkRule)
 
-       ; let tpl_ids = lhs_evs ++ filter isId bndrs'
+             ; let tpl_ids = lhs_evs ++ filter isId bndrs'
 
-       -- See Note [Re-quantify type variables in rules]
-       ; dvs <- candidateQTyVarsOfTypes (rule_ty : map idType tpl_ids)
-       ; let weed_out = (`dVarSetMinusVarSet` dont_default)
-             weeded_dvs = weedOutCandidates weed_out dvs
-       ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars weeded_dvs
-       ; traceTc "tcRule" (vcat [ pprFullRuleName (snd ext) rname
-                                , text "dvs:" <+> ppr dvs
-                                , text "weeded_dvs:" <+> ppr weeded_dvs
-                                , text "dont_default:" <+> ppr dont_default
-                                , text "residual_lhs_wanted:" <+> ppr residual_lhs_wanted
-                                , text "qtkvs:" <+> ppr qtkvs
-                                , text "rule_ty:" <+> ppr rule_ty
-                                , text "bndrs:" <+> ppr bndrs
-                                , text "qtkvs ++ tpl_ids:" <+> ppr (qtkvs ++ tpl_ids)
-                                , text "tpl_id info:" <+>
-                                  vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
-                  ])
+             -- See Note [Re-quantify type variables in rules]
+             ; dvs <- candidateQTyVarsOfTypes (rule_ty : map idType tpl_ids)
+             ; let weed_out = (`dVarSetMinusVarSet` dont_default)
+                   weeded_dvs = weedOutCandidates weed_out dvs
+             ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars weeded_dvs
+             ; traceTc "tcRule" (vcat [ pprFullRuleName (snd ext) rname'
+                                      , text "dvs:" <+> ppr dvs
+                                      , text "weeded_dvs:" <+> ppr weeded_dvs
+                                      , text "dont_default:" <+> ppr dont_default
+                                      , text "residual_lhs_wanted:" <+> ppr residual_lhs_wanted
+                                      , text "qtkvs:" <+> ppr qtkvs
+                                      , text "rule_ty:" <+> ppr rule_ty
+                                      , text "bndrs:" <+> ppr bndrs
+                                      , text "qtkvs ++ tpl_ids:" <+> ppr (qtkvs ++ tpl_ids)
+                                      , text "tpl_id info:" <+>
+                                        vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
+                        ])
 
-       -- /Temporarily/ deal with the fact that we previously accepted
-       -- rules that quantify over certain equality constraints.
-       --
-       -- See Note [Quantifying over equalities in RULES].
-       ; case allPreviouslyQuantifiableEqualities residual_lhs_wanted of {
-           Just cts | not (insolubleWC rhs_wanted)
-                    -> do { addDiagnostic $ TcRnRuleLhsEqualities name lhs cts
-                          ; return Nothing } ;
-           _  ->
+             -- /Temporarily/ deal with the fact that we previously accepted
+             -- rules that quantify over certain equality constraints.
+             --
+             -- See Note [Quantifying over equalities in RULES].
+             ; case allPreviouslyQuantifiableEqualities residual_lhs_wanted of {
+                 Just cts | not (insolubleWC rhs_wanted)
+                          -> do { addDiagnostic $ TcRnRuleLhsEqualities name' lhs cts
+                                ; return Nothing } ;
+                 _  ->
 
    do  { -- SimplifyRule Plan, step 5
        -- Simplify the LHS and RHS constraints:

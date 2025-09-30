@@ -1,4 +1,3 @@
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -130,13 +129,14 @@ import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
 
+import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
---import Language.Haskell.Textual.Documentation
 import Language.Haskell.Textual.Location
 import qualified Language.Haskell.Textual.Source as Source
 import Language.Haskell.Textual.UTF8
+import Language.Haskell.Textual.Warning
 
 import Control.DeepSeq
 import Control.Monad            ( when, (<$!>), unless, forM_, void )
@@ -2152,7 +2152,22 @@ instance Binary InlinePragma where
            d <- get bh
            return (InlinePragma s a b c d)
 
+deriving newtype instance Binary WarningCategory
 
-
-
-
+instance Binary OverlapMode where
+    put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
+    put_ bh (Overlaps     s) = putByte bh 1 >> put_ bh s
+    put_ bh (Incoherent   s) = putByte bh 2 >> put_ bh s
+    put_ bh (Overlapping  s) = putByte bh 3 >> put_ bh s
+    put_ bh (Overlappable s) = putByte bh 4 >> put_ bh s
+    put_ bh (NonCanonical s) = putByte bh 5 >> put_ bh s
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> (get bh) >>= \s -> return $ NoOverlap s
+            1 -> (get bh) >>= \s -> return $ Overlaps s
+            2 -> (get bh) >>= \s -> return $ Incoherent s
+            3 -> (get bh) >>= \s -> return $ Overlapping s
+            4 -> (get bh) >>= \s -> return $ Overlappable s
+            5 -> (get bh) >>= \s -> return $ NonCanonical s
+            _ -> panic ("get OverlapMode" ++ show h)

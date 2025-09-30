@@ -40,7 +40,6 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( fUNTyCon )
 import GHC.Types.Basic as Hs
 import GHC.Types.Fixity as Hs
-import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.SourceText
 import GHC.Utils.Lexeme
@@ -53,6 +52,7 @@ import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Syntax.ForeignCall
 import qualified Language.Haskell.Textual.Source as Source
 import Language.Haskell.Textual.Location
 import Language.Haskell.Textual.UTF8 (encodeUTF8)
@@ -942,7 +942,7 @@ cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
        ; rhs'   <- cvtl rhs
        ; rule <- returnLA $
                    HsRule { rd_ext  = (noAnn, quotedSourceText nm)
-                          , rd_name = rd_name'
+                          , rd_name = fastStringToTextUTF8 <$> rd_name'
                           , rd_act  = act
                           , rd_bndrs = RuleBndrs { rb_ext = noAnn, rb_tyvs = ty_bndrs', rb_tmvs = tm_bndrs' }
                           , rd_lhs  = lhs'
@@ -1203,9 +1203,9 @@ cvtl e = wrapLA (cvt e)
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExtField n' }
     cvt (GetFieldE exp f) = do { e' <- cvtl exp
                                ; return $ HsGetField noExtField e'
-                                         (L noSrcSpanA (DotFieldOcc noAnn (L noSrcSpanA (FieldLabelString (fsLit f))))) }
+                                         (L noSrcSpanA (DotFieldOcc noAnn (L noSrcSpanA (FieldLabelString (encodeUTF8 f))))) }
     cvt (ProjectionE xs) = return $ HsProjection noAnn $ fmap
-                                         (DotFieldOcc noAnn . L noSrcSpanA . FieldLabelString  . fsLit) xs
+                                         (DotFieldOcc noAnn . L noSrcSpanA . FieldLabelString . encodeUTF8) xs
     cvt (TypedSpliceE e) = do { e' <- parenthesizeHsExpr appPrec <$> cvtl e
                               ; return $ HsTypedSplice noExtField (HsTypedSpliceExpr noAnn e') }
     cvt (TypedBracketE e) = do { e' <- cvtl e

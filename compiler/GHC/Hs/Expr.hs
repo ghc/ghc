@@ -2716,7 +2716,7 @@ pprPrefixFastString :: FastString -> SDoc
 pprPrefixFastString fs = pprPrefixOcc (mkVarUnqual fs)
 
 instance UnXRec p => Outputable (DotFieldOcc p) where
-  ppr (DotFieldOcc _ s) = (pprPrefixFastString . field_label . unXRec @p) s
+  ppr (DotFieldOcc _ s) = (pprPrefixFastString . mkFastStringTextUTF8 . field_label . unXRec @p) s
   ppr XDotFieldOcc{} = text "XDotFieldOcc"
 
 {-

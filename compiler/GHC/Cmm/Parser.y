@@ -281,7 +281,7 @@ import GHC.Parser.Errors.Ppr
 
 import GHC.Types.Unique.DSM
 import GHC.Types.CostCentre
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Unit.Module
 import GHC.Unit.Home
 import GHC.Types.Literal

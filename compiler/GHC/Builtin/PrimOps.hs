@@ -48,7 +48,7 @@ import GHC.Types.RepType ( tyConPrimRep )
 import GHC.Types.Basic
 import GHC.Types.Fixity  ( Fixity(..), FixityDirection(..) )
 import Language.Haskell.Textual.Location  ( wiredInSrcSpan )
-import GHC.Types.ForeignCall ( CLabelString )
+import Language.Haskell.Syntax.ForeignCall ( CLabelString )
 import GHC.Types.Unique  ( Unique )
 
 import GHC.Unit.Types    ( Unit )

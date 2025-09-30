@@ -43,7 +43,7 @@ import GHC.Platform
 import GHC.Prelude
 import GHC.StgToCmm.CgUtils
 import GHC.Types.Basic
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map

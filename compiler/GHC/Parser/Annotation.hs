@@ -104,13 +104,14 @@ import Data.List (sortBy)
 import Data.Semigroup
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Types.Name
-import Language.Haskell.Textual.Documentation.String
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
-import qualified Language.Haskell.Textual.Source as Source
+
+import Language.Haskell.Textual.ExactPrint
 import Language.Haskell.Textual.Location
+import qualified Language.Haskell.Textual.Source as Source
 import Language.Haskell.Textual.UTF8
 
 {-
@@ -219,17 +220,6 @@ data HasE = HasE | NoE
 
 -- ---------------------------------------------------------------------
 
--- | A token stored in the syntax tree. For example, when parsing a
--- let-expression, we store @EpToken "let"@ and @EpToken "in"@.
--- The locations of those tokens can be used to faithfully reproduce
--- (exactprint) the original program text.
-data EpToken (tok :: Symbol)
-  = NoEpTok
-  | EpTok !EpaLocation
-
-instance KnownSymbol tok => Outputable (EpToken tok) where
-  ppr _ = text (symbolVal (Proxy @tok))
-
 -- | With @UnicodeSyntax@, there might be multiple ways to write the same
 -- token. For example an arrow could be either @->@ or @→@. This choice must be
 -- recorded in order to exactprint such tokens, so instead of @EpToken "->"@ we
@@ -238,9 +228,7 @@ data EpUniToken (tok :: Symbol) (utok :: Symbol)
   = NoEpUniTok
   | EpUniTok !EpaLocation !IsUnicodeSyntax
 
-deriving instance Eq (EpToken tok)
 deriving instance Eq (EpUniToken tok utok)
-deriving instance KnownSymbol tok => Data (EpToken tok)
 deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (EpUniToken tok utok)
 
 instance (KnownSymbol tok, KnownSymbol utok) => Outputable (EpUniToken tok utok) where
@@ -305,37 +293,6 @@ data EpLayout =
     EpNoLayout
 
 deriving instance Data EpLayout
-
--- ---------------------------------------------------------------------
-
-data EpaComment =
-  EpaComment
-    { ac_tok :: EpaCommentTok
-    , ac_prior_tok :: RealSrcSpan
-    -- ^ The location of the prior token, used in exact printing.  The
-    -- 'EpaComment' appears as an 'LEpaComment' containing its
-    -- location.  The difference between the end of the prior token
-    -- and the start of this location is used for the spacing when
-    -- exact printing the comment.
-    }
-    deriving (Eq, Data, Show)
-
-data EpaCommentTok =
-  -- Documentation annotations
-    EpaDocComment      HsDocString -- ^ a docstring that can be pretty printed using pprHsDocString
-  | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
-  | EpaLineComment     String     -- ^ comment starting by "--"
-  | EpaBlockComment    String     -- ^ comment in {- -}
-    deriving (Eq, Data, Show)
--- Note: these are based on the Token versions, but the Token type is
--- defined in GHC.Parser.Lexer and bringing it in here would create a loop
-
-instance Outputable EpaComment where
-  ppr x = text (show x)
-
--- ---------------------------------------------------------------------
-
-type EpaLocation = EpaLocation' [LEpaComment]
 
 epaToNoCommentsLocation :: EpaLocation -> NoCommentsLocation
 epaToNoCommentsLocation (EpaSpan ss) = EpaSpan ss
@@ -456,8 +413,6 @@ type SrcSpanAnnLW = EpAnn (AnnList (EpToken "where"))
 type SrcSpanAnnLI = EpAnn (AnnList (EpToken "hiding", [EpToken ","]))
 type SrcSpanAnnP = EpAnn AnnPragma
 type SrcSpanAnnC = EpAnn AnnContext
-
-type LocatedE = GenLocated EpaLocation
 
 -- | General representation of a 'GenLocated' type carrying a
 -- parameterised annotation type.
@@ -1091,12 +1046,6 @@ instance (Semigroup a) => Semigroup (EpAnn a) where
    -- annotations must follow it. So we combine them which yields the
    -- largest span
 
-instance Semigroup EpaLocation where
-  EpaSpan s1       <> EpaSpan s2        = EpaSpan (combineSrcSpans s1 s2)
-  EpaSpan s1       <> _                 = EpaSpan s1
-  _                <> EpaSpan s2        = EpaSpan s2
-  EpaDelta s1 dp1 cs1 <> EpaDelta s2 _dp2 cs2 = EpaDelta (combineSrcSpans s1 s2) dp1 (cs1<>cs2)
-
 instance Semigroup EpAnnComments where
   EpaComments cs1 <> EpaComments cs2 = EpaComments (cs1 ++ cs2)
   EpaComments cs1 <> EpaCommentsBalanced cs2 as2 = EpaCommentsBalanced (cs1 ++ cs2) as2
@@ -1186,9 +1135,6 @@ instance (Outputable a) => Outputable (EpAnn a) where
 instance Outputable NoEpAnns where
   ppr NoEpAnns = text "NoEpAnns"
 
-instance Outputable (GenLocated NoCommentsLocation EpaComment) where
-  ppr (L l c) = text "L" <+> ppr l <+> ppr c
-
 instance Outputable EpAnnComments where
   ppr (EpaComments cs) = text "EpaComments" <+> ppr cs
   ppr (EpaCommentsBalanced cs ts) = text "EpaCommentsBalanced" <+> ppr cs <+> ppr ts
@@ -1220,10 +1166,6 @@ instance (Outputable a, OutputableBndr e)
      => OutputableBndr (GenLocated (EpAnn a) e) where
   pprInfixOcc = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
-
-instance (Outputable e)
-     => Outputable (GenLocated EpaLocation e) where
-  ppr = pprLocated
 
 instance Outputable AnnParen where
   ppr (AnnParens       o c) = text "AnnParens" <+> ppr o <+> ppr c

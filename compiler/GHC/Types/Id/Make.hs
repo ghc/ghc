@@ -71,7 +71,7 @@ import GHC.Types.RepType ( countFunRepArgs, typePrimRep )
 import GHC.Types.Name.Set
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand

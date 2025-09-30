@@ -39,7 +39,7 @@ import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.MemoFun
 import GHC.Types.RepType
-import GHC.Types.ForeignCall ( isSafeForeignCall )
+import Language.Haskell.Syntax.ForeignCall ( isSafeForeignCall )
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set

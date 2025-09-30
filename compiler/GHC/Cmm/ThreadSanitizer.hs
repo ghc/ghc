@@ -16,7 +16,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Data.FastString
 import GHC.Types.Basic
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import GHC.Cmm.Dataflow.Label

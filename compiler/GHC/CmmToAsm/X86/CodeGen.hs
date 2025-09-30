@@ -75,7 +75,7 @@ import Language.Haskell.Textual.Location  ( srcSpanFile, srcSpanStartLine, srcSp
 
 -- The rest:
 import GHC.Data.Maybe ( expectJust )
-import GHC.Types.ForeignCall ( CCallConv(..) )
+import Language.Haskell.Syntax.ForeignCall ( CCallConv(..) )
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)

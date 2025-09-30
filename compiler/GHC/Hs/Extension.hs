@@ -26,14 +26,15 @@ module GHC.Hs.Extension where
 import GHC.Prelude
 
 import Data.Data hiding ( Fixity )
-import Language.Haskell.Syntax.Extension
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Utils.Outputable hiding ((<>))
-import Language.Haskell.Textual.Location (GenLocated(..), unLoc)
 import GHC.Utils.Panic
 import GHC.Parser.Annotation
+
+import Language.Haskell.Syntax.Extension
+import Language.Haskell.Textual.Location (GenLocated(..), unLoc)
 
 {-
 Note [IsPass]

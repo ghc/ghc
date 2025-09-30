@@ -31,7 +31,7 @@ import GHC.Unit.Module
 import GHC.Core.Coercion
 
 import GHC.Cmm.CLabel
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import Language.Haskell.Textual.Location
 import GHC.Utils.Outputable
 import GHC.Driver.DynFlags

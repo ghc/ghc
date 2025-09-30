@@ -11,6 +11,7 @@ module GHC.Driver.Errors.Ppr (
 
 import GHC.Prelude
 
+import GHC.Data.FastString (mkFastStringTextUTF8)
 import GHC.Driver.Errors.Types
 import GHC.Driver.Flags
 import GHC.Driver.DynFlags
@@ -25,16 +26,17 @@ import GHC.Unit.Module
 import GHC.Unit.Module.Graph
 import GHC.Unit.State
 import GHC.Types.Hint
-import Language.Haskell.Textual.Location
 import Data.Version
 
-import Language.Haskell.Syntax.Decls (RuleDecl(..))
 import GHC.Tc.Errors.Types (TcRnMessage)
 import GHC.HsToCore.Errors.Types (DsMessage)
 import GHC.Iface.Errors.Types
 import GHC.Tc.Errors.Ppr () -- instance Diagnostic TcRnMessage
 import GHC.Iface.Errors.Ppr () -- instance Diagnostic IfaceMessage
 import GHC.CmmToLlvm.Version (llvmVersionStr, supportedLlvmVersionLowerBound, supportedLlvmVersionUpperBound)
+
+import Language.Haskell.Syntax.Decls (RuleDecl(..))
+import Language.Haskell.Textual.Location
 
 --
 -- Suggestions
@@ -173,7 +175,7 @@ instance Diagnostic DriverMessage where
       -> mkSimpleDecorated (text "module" <+> ppr modname <+> text "was not found")
     DriverUserDefinedRuleIgnored (HsRule { rd_name = n })
       -> mkSimpleDecorated $
-            text "Rule \"" <> ftext (unLoc n) <> text "\" ignored" $+$
+            text "Rule \"" <> ftext (unLoc (mkFastStringTextUTF8 <$> n)) <> text "\" ignored" $+$
             text "Defining user rules is disabled under Safe Haskell"
     DriverMixedSafetyImport modName
       -> mkSimpleDecorated $

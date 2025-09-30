@@ -41,7 +41,7 @@ import GHC.Data.FastString
 import GHC.TypeLits
 import GHC.Types.Basic hiding (EP)
 import GHC.Types.Fixity
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Name.Reader
 import GHC.Types.PkgQual
 --import GHC.Types.SourceText

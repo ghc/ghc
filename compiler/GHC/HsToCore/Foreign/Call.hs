@@ -35,7 +35,7 @@ import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 
 import GHC.Types.Id.Make
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Basic
 import GHC.Types.Literal
 import GHC.Types.RepType (typePrimRep1)

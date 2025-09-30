@@ -66,7 +66,7 @@ import GHC.Cmm.Switch
 import {-# SOURCE #-} GHC.StgToCmm.Foreign (emitPrimCall)
 import GHC.StgToCmm.CgUtils
 
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Id.Info
 import GHC.Core.Type
 import GHC.Core.TyCon

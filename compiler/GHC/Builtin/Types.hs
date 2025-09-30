@@ -196,7 +196,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name as Name
 import GHC.Types.Name.Env ( lookupNameEnv_NF, mkNameEnv )
 import GHC.Types.Basic
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Unique.Set
 
 import {-# SOURCE #-} GHC.Tc.Types.Origin

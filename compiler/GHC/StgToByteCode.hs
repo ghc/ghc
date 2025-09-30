@@ -36,7 +36,7 @@ import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Id
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps

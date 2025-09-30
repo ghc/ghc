@@ -16,7 +16,7 @@ import GHC.Driver.Flags (WarningFlag)
 import GHC.Hs
 import GHC.HsToCore.Pmc.Solver.Types
 import GHC.Types.Error
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Id
 import GHC.Types.Name (Name)
 import qualified GHC.LanguageExtensions as LangExt

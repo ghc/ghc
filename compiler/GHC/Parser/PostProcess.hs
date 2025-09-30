@@ -152,7 +152,7 @@ import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, sumDataCon,
                           unrestrictedFunTyCon , listTyCon_RDR, unitDataCon )
-import GHC.Types.ForeignCall
+import Language.Haskell.Syntax.ForeignCall
 import GHC.Types.Unique ( hasKey )
 import GHC.Data.OrdList
 import GHC.Utils.Outputable as Outputable
@@ -3020,7 +3020,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
     recFieldToProjUpdate (L l (HsFieldBind anns (L _ (FieldOcc _ (L loc rdr))) arg pun)) =
         -- The idea here is to convert the label to a singleton [FastString].
         let f = occNameFS . rdrNameOcc $ rdr
-            fl = DotFieldOcc noAnn (L loc (FieldLabelString f))
+            fl = DotFieldOcc noAnn . L loc . FieldLabelString $ fastStringToTextUTF8 f
             lf = locA loc
         in mkRdrProjUpdate l (L lf (L (l2l loc) fl :| [])) (punnedVar f) pun anns
         where

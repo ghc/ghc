@@ -109,11 +109,6 @@ module GHC.Hs.Decls (
 -- friends:
 import GHC.Prelude
 
-import Language.Haskell.Syntax.Decls
-import Language.Haskell.Syntax.Extension
-import qualified Language.Haskell.Textual.Source as Source
-import Language.Haskell.Textual.Location
-
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprUntypedSplice )
         -- Because Expr imports Decls via HsBracket
 
@@ -135,10 +130,16 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SourceText
 import GHC.Core.Type
-import GHC.Types.ForeignCall
 import GHC.Unit.Module.Warnings
-
 import GHC.Data.Maybe
+import GHC.Data.FastString ( mkFastStringTextUTF8 )
+
+import Language.Haskell.Syntax.Decls
+import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.ForeignCall
+import Language.Haskell.Textual.Location
+import qualified Language.Haskell.Textual.Source as Source
+
 import Data.Data (Data)
 import Data.List (concatMap)
 import Data.Foldable (toList)
@@ -1366,7 +1367,7 @@ instance (OutputableBndrId p) => Outputable (RuleDecl (GhcPass p)) where
               , rd_bndrs = bndrs
               , rd_lhs  = lhs
               , rd_rhs  = rhs })
-        = sep [pprFullRuleName st name <+> ppr act,
+        = sep [pprFullRuleName st (mkFastStringTextUTF8 <$> name) <+> ppr act,
                nest 4 (ppr bndrs <+> pprExpr (unLoc lhs)),
                nest 6 (equals <+> pprExpr (unLoc rhs)) ]
         where
@@ -1376,7 +1377,7 @@ instance (OutputableBndrId p) => Outputable (RuleDecl (GhcPass p)) where
                  GhcTc | (_, st) <- ext -> st
 
 pprFullRuleName :: SourceText -> GenLocated a (RuleName) -> SDoc
-pprFullRuleName st (L _ n) = pprWithSourceText st (doubleQuotes $ ftext n)
+pprFullRuleName st (L _ n) = pprWithSourceText st . doubleQuotes $ ftext n
 
 
 {-
