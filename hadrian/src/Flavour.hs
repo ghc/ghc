@@ -8,6 +8,7 @@ module Flavour
   , splitSections
   , enableThreadSanitizer
   , enableLateCCS
+  , enableIfCompressionMax
   , enableHashUnitIds
   , enableDebugInfo, enableTickyGhc
   , viaLlvmBackend
@@ -73,6 +74,7 @@ flavourTransformers = M.fromList
     , "no_self_recomp"   =: disableSelfRecompInfo
     , "hi_core"          =: enableHiCore
     , "late_ccs"         =: enableLateCCS
+    , "if_compression_max" =: enableIfCompressionMax
     , "boot_nonmoving_gc" =: enableBootNonmovingGc
     , "dump_stg"         =: enableDumpStg
     , "hash_unit_ids"    =: enableHashUnitIds
@@ -348,6 +350,11 @@ enableLateCCS = addArgs
   $ notStage0 ? builder (Ghc CompileHs)
   ? ((Profiling `wayUnit`) <$> getWay)
   ? arg "-fprof-late"
+
+enableIfCompressionMax :: Flavour -> Flavour
+enableIfCompressionMax = addArgs
+  $ notStage0 ? builder (Ghc CompileHs)
+  ? arg "-fwrite-if-compression=3"
 
 -- | Enable assertions for the stage2 compiler
 enableAssertions :: Flavour -> Flavour

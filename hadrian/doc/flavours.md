@@ -326,6 +326,10 @@ The supported transformers are listed below:
         <td>Enable <code>-fprof-late</code> in profiled libraries. Enabled in <code>perf</code> and <code>release</code> flavours.</td>
     </tr>
     <tr>
+        <td><code>if_compression_max</code></td>
+        <td>Enable <code>-fwrite-if-compression=3</code> in stage1 interface files for maximum compression.</td>
+    </tr>
+    <tr>
         <td><code>dump_stg</code></td>
         <td>Dump STG of all modules compiled by a stage1 compiler to a file</td>
     </tr>
