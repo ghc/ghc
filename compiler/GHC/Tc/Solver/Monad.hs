@@ -1205,20 +1205,12 @@ setTcLevelTcS :: TcLevel -> TcS a -> TcS a
 setTcLevelTcS lvl (TcS thing_inside)
  = TcS $ \ env -> TcM.setTcLevel lvl (thing_inside env)
 
-nestImplicTcS :: EvBindsVar
+nestImplicTcS :: SkolemInfoAnon -> EvBindsVar
               -> TcLevel -> TcS a
               -> TcS a
-nestImplicTcS ev_binds_var inner_tclvl (TcS thing_inside)
+nestImplicTcS skol_info ev_binds_var inner_tclvl (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = old_inert_var }) ->
-    do { inerts <- TcM.readTcRef old_inert_var
-
-       -- resetInertcans: initialise the inert_cans from the inert_givens of the
-       -- parent so that the child is not polluted with the parent's inert Wanteds
-       -- See Note [trySolveImplication] in GHC.Tc.Solver.Solve
-       -- All other InertSet fields are inherited
-       ; let nest_inert = pushCycleBreakerVarStack $
-                          resetInertCans           $
-                          inerts
+    do { nest_inert <- mk_nested_inert_set skol_info old_inert_var
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
@@ -1236,6 +1228,25 @@ nestImplicTcS ev_binds_var inner_tclvl (TcS thing_inside)
        ; checkForCyclicBinds ev_binds
 #endif
        ; return res }
+  where
+    mk_nested_inert_set skol_info old_inert_var
+      -- For an implication that comes from a static form (static e),
+      -- start with a completely empty inert set; in particular, no Givens
+      -- See (SF3) in Note [Grand plan for static forms]
+      -- in GHC.Iface.Tidy.StaticPtrTable
+      | StaticFormSkol <- skol_info
+      = return (emptyInertSet inner_tclvl)
+
+      | otherwise
+      = do { inerts <- TcM.readTcRef old_inert_var
+
+           -- resetInertCans: initialise the inert_cans from the inert_givens of the
+           -- parent so that the child is not polluted with the parent's inert Wanteds
+           -- See Note [trySolveImplication] in GHC.Tc.Solver.Solve
+           -- All other InertSet fields are inherited
+           ; return (pushCycleBreakerVarStack $
+                     resetInertCans           $
+                     inerts) }
 
 nestFunDepsTcS :: TcS a -> TcS a
 nestFunDepsTcS (TcS thing_inside)

@@ -391,7 +391,7 @@ trySolveImplication (Implic { ic_tclvl  = tclvl
                             , ic_wanted = wanteds
                             , ic_env    = ct_loc_env
                             , ic_info   = info })
-  = nestImplicTcS ev_binds_var tclvl $
+  = nestImplicTcS info ev_binds_var tclvl $
     do { let loc    = mkGivenLoc tclvl info ct_loc_env
              givens = mkGivens loc given_ids
        ; solveSimpleGivens givens
@@ -424,7 +424,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
 
          -- Solve the nested constraints
        ; (has_given_eqs, given_insols, residual_wanted)
-            <- nestImplicTcS ev_binds_var tclvl $
+            <- nestImplicTcS info ev_binds_var tclvl $
                do { let loc    = mkGivenLoc tclvl info ct_loc_env
                         givens = mkGivens loc given_ids
                   ; solveSimpleGivens givens

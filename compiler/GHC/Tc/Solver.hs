@@ -102,17 +102,14 @@ captureTopConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- calling this, so that the reportUnsolved has access to the most
 -- complete GlobalRdrEnv
 captureTopConstraints thing_inside
-  = do { static_wc_var <- TcM.newTcRef emptyWC ;
-       ; (mb_res, lie) <- TcM.updGblEnv (\env -> env { tcg_static_wc = static_wc_var } ) $
-                          TcM.tryCaptureConstraints thing_inside
-       ; stWC <- TcM.readTcRef static_wc_var
+  = do { (mb_res, lie) <- TcM.tryCaptureConstraints thing_inside
 
        -- See GHC.Tc.Utils.Monad Note [Constraints and errors]
        -- If the thing_inside threw an exception, but generated some insoluble
        -- constraints, report the latter before propagating the exception
        -- Otherwise they will be lost altogether
        ; case mb_res of
-           Just res -> return (res, lie `andWC` stWC)
+           Just res -> return (res, lie)
            Nothing  -> do { _ <- simplifyTop lie; failM } }
                 -- This call to simplifyTop is the reason
                 -- this function is here instead of GHC.Tc.Utils.Monad

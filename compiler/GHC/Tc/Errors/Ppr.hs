@@ -5577,10 +5577,14 @@ usefulContext implics pred
   = go implics
   where
     pred_tvs = tyCoVarsOfType pred
+    go :: [Implication] -> [SkolemInfoAnon]
     go [] = []
     go (ic : ics)
-       | implausible ic = rest
-       | otherwise      = ic_info ic : rest
+       | StaticFormSkol <- ic_info ic = []
+         -- Stop at a static form, because all outer Givens are irrelevant
+         -- See (SF3) in Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
+       | implausible ic               = rest
+       | otherwise                    = ic_info ic : rest
        where
           -- Stop when the context binds a variable free in the predicate
           rest | any (`elemVarSet` pred_tvs) (ic_skols ic) = []
