@@ -288,10 +288,11 @@ Wrinkles
 
 (ATF3) What about foralls?   For example, supppose we are unifying
            (forall a. F a) -> (forall a. F a)
-   Those two (F a) types are unrelated, bound by different foralls.
+   against some other type. Those two (F a) types are unrelated, bound by
+   different foralls; we cannot extend the um_fam_env with a binding [F a :-> blah]
 
    So to keep things simple, the entire family-substitution machinery is used
-   only if there are no enclosing foralls (see the (um_foralls env)) check in
+   only if there are no enclosing foralls (see the `under_forall` check in
    `uSatFamApp`).  That's fine, because the apartness business is used only for
    reducing type-family applications, and class instances, and their arguments
    can't have foralls anyway.
@@ -329,12 +330,20 @@ Wrinkles
           instance (Generic1 f, Ord (Rep1 f a))
                 => Ord (Generically1 f a) where ...
               -- The "..." gives rise to [W] Ord (Generically1 f a)
+   where Rep1 is a type family.
+
    We must use the instance decl (recursively) to simplify the [W] constraint;
    we do /not/ want to worry that the `[G] Ord (Rep1 f a)` might be an
    alternative path.  So `noMatchableGivenDicts` must return False;
    so `mightMatchLater` must return False; so when um_bind_fam_fun returns
    `DontBindMe`, the unifier must return `SurelyApart`, not `MaybeApart`.  See
    `go` in `uVarOrFam`
+
+   This looks a bit sketchy, because they aren't SurelyApart, but see
+   Note [What might equal later?] in GHC.Tc.Utils.Unify, esp "Red Herring".
+
+   If we are under a forall, we return `MaybeApart`; that seems more conservative,
+   and class constraints are on tau-types so it doesn't matter.
 
 (ATF6) When /matching/ can we ever have a type-family application on the LHS, in
    the template?  You might think not, because type-class-instance and
@@ -344,12 +353,12 @@ Wrinkles
    But you'd be wrong: even when matching, we can see type families in the LHS template:
    * In `checkValidClass`, in `check_dm` we check that the default method has the
       right type, using matching, both ways.  And that type may have type-family
-      applications in it. Example in test CoOpt_Singletons.
+      applications in it. Examples in test CoOpt_Singletons and T26457.
 
    * In the specialiser: see the call to `tcMatchTy` in
      `GHC.Core.Opt.Specialise.beats_or_same`
 
-   * With -fpolymorphic-specialsation, we might get a specialiation rule like
+   * With -fpolymorphic-specialisation, we might get a specialiation rule like
          RULE forall a (d :: Eq (Maybe (F a))) .
                  f @(Maybe (F a)) d = ...
      See #25965.
@@ -362,7 +371,7 @@ Wrinkles
     type variables/ that makes the match work.  So we simply want to recurse into
     the arguments of the type family.  E.g.
        Template:   forall a.  Maybe (F a)
-       Target:     Mabybe (F Int)
+       Target:     Maybe (F Int)
     We want to succeed with substitution [a :-> Int].  See (ATF9).
 
     Conclusion: where we enter via `tcMatchTy`, `tcMatchTys`, `tc_match_tys`,
@@ -378,10 +387,10 @@ Wrinkles
       type family G6 a = r | r -> a
       type instance G6 [a]  = [G a]
       type instance G6 Bool = Int
-   and suppose we haev a Wanted constraint
+   and suppose we have a Wanted constraint
       [W] G6 alpha ~ [Int]
-.  According to Section 5.2 of "Injective type families for Haskell", we /match/
-   the RHS each type instance [Int].  So we try
+   According to Section 5.2 of "Injective type families for Haskell", we /match/
+   the RHS each of type instance with [Int].  So we try
         Template: [G a]    Target: [Int]
    and we want to succeed with MaybeApart, so that we can generate the improvement
    constraint
@@ -401,15 +410,21 @@ Wrinkles
 
 (ATF9) Decomposition.  Consider unifying
           F a  ~  F Int
-  There is a unifying substitition [a :-> Int], and we want to find it, returning
-  Unifiable. (Remember, this is the Core unifier -- we are not doing type inference.)
-  So we should decompose to get (a ~ Int)
+  when `um_bind_fam_fun` says DontBindMe.  There is a unifying substitition [a :-> Int],
+  and we want to find it, returning Unifiable. Why?
+    - Remember, this is the Core unifier -- we are not doing type inference
+    - When we have two equal types, like  F a ~ F a, it is ridiculous to say that they
+      are MaybeApart.  Example: the two-way tcMatchTy in `checkValidClass` and #26457.
 
-  But consider unifying
+  (ATF9-1) But consider unifying
           F Int ~ F Bool
-  Although Int and Bool are SurelyApart, we must return MaybeApart for the outer
-  unification.  Hence the use of `don'tBeSoSure` in `go_fam_fam`; it leaves Unifiable
-  alone, but weakens `SurelyApart` to `MaybeApart`.
+    Although Int and Bool are SurelyApart, we must return MaybeApart for the outer
+    unification.  Hence the use of `don'tBeSoSure` in `go_fam_fam`; it leaves Unifiable
+    alone, but weakens `SurelyApart` to `MaybeApart`.
+
+  (ATF9-2) We want this decomposition to occur even under a forall (this was #26457).
+    E.g.    (forall a. F Int) -> Int  ~   (forall a. F Int) ~ Int
+
 
 (ATF10) Injectivity.  Consider (AFT9) where F is known to be injective.  Then if we
   are unifying
@@ -1815,6 +1830,9 @@ uVarOrFam env ty1 ty2 kco
 --           , text "fam_env" <+> ppr (um_fam_env substs) ]) $
        ; go NotSwapped substs ty1 ty2 kco }
   where
+    foralld_tvs  = um_foralls env
+    under_forall = not (isEmptyVarSet foralld_tvs)
+
     -- `go` takes two bites at the cherry; if the first one fails
     -- it swaps the arguments and tries again; and then it fails.
     -- The SwapFlag argument tells `go` whether it is on the first
@@ -1889,7 +1907,6 @@ uVarOrFam env ty1 ty2 kco
                         | otherwise
                         = False
 
-        foralld_tvs  = um_foralls env
         occurs_check = um_unif env && uOccursCheck substs foralld_tvs lhs rhs
           -- Occurs check, only when unifying
           -- see Note [Infinitary substitutions]
@@ -1899,14 +1916,11 @@ uVarOrFam env ty1 ty2 kco
     -- LHS is a saturated type-family application
     -- Invariant: ty2 is not a TyVarTy
     go swapped substs lhs@(TyFamLHS tc1 tys1) ty2 kco
-      -- If we are under a forall, just give up and return MaybeApart
-      -- see (ATF3) in Note [Apartness and type families]
-      | not (isEmptyVarSet (um_foralls env))
-      = maybeApart MARTypeFamily
-
-      -- We are not under any foralls, so the RnEnv2 is empty
       -- Check if we have an existing substitution for the LHS; if so, recurse
-      | Just ty1' <- lookupFamEnv (um_fam_env substs) tc1 tys1
+      -- But not under a forall; see (ATF3) in Note [Apartness and type families]
+      -- Hence the RnEnv2 is empty
+      | not under_forall
+      , Just ty1' <- lookupFamEnv (um_fam_env substs) tc1 tys1
       = if | um_unif env                          -> unify_ty env ty1' ty2 kco
            -- Below here we are matching
            -- The return () case deals with:
@@ -1917,11 +1931,19 @@ uVarOrFam env ty1 ty2 kco
            | otherwise                            -> maybeApart MARTypeFamily
 
       -- Check for equality  F tys1 ~ F tys2
+      -- Very important that this can happen under a forall, so that we
+      -- successfully match  (forall a. F a) ~ (forall b. F b)  See (ATF9-2)
       | Just (tc2, tys2) <- isSatTyFamApp ty2
       , tc1 == tc2
       = go_fam_fam substs tc1 tys1 tys2 kco
 
+      -- If we are under a forall, just give up
+      -- see (ATF3) and (ATF5) in Note [Apartness and type families]
+      | under_forall
+      = maybeApart MARTypeFamily
+
       -- Now check if we can bind the (F tys) to the RHS
+      -- Again, not under a forall; see (ATF3)
       -- This can happen even when matching: see (ATF7)
       | BindMe <- um_bind_fam_fun env tc1 tys1 rhs
       = if uOccursCheck substs emptyVarSet lhs rhs
@@ -1935,6 +1957,7 @@ uVarOrFam env ty1 ty2 kco
       -- Maybe um_bind_fam_fun is False of (F a b) but true of (G c d e)
       -- NB: a type family can appear on the template when matching
       --     see (ATF6) in Note [Apartness and type families]
+      -- (Only worth doing this if we are not under a forall.)
       | um_unif env
       , NotSwapped <- swapped
       , Just lhs2 <- canEqLHS_maybe ty2
@@ -1949,7 +1972,6 @@ uVarOrFam env ty1 ty2 kco
     -----------------------------
     -- go_fam_fam: LHS and RHS are both saturated type-family applications,
     --             for the same type-family F
-    -- Precondition: um_foralls is empty
     go_fam_fam substs tc tys1 tys2 kco
        -- Decompose (F tys1 ~ F tys2): (ATF9)
        -- Use injectivity information of F: (ATF10)
@@ -1957,7 +1979,7 @@ uVarOrFam env ty1 ty2 kco
       = do { bind_fam_if_poss                 -- (ATF11)
            ; unify_tys env inj_tys1 inj_tys2  -- (ATF10)
            ; unless (um_inj_tf env) $         -- (ATF12)
-             don'tBeSoSure MARTypeFamily $    -- (ATF9)
+             don'tBeSoSure MARTypeFamily $    -- (ATF9-1)
              unify_tys env noninj_tys1 noninj_tys2 }
      where
        inj = case tyConInjectivityInfo tc of
@@ -1969,6 +1991,8 @@ uVarOrFam env ty1 ty2 kco
 
        bind_fam_if_poss
          | not (um_unif env)  -- Not when matching (ATF11-1)
+         = return ()
+         | under_forall       -- Not under a forall (ATF3)
          = return ()
          | BindMe <- um_bind_fam_fun env tc tys1 rhs1
          = unless (uOccursCheck substs emptyVarSet (TyFamLHS tc tys1) rhs1) $
