@@ -1091,7 +1091,7 @@ loadIfaceByteCode hsc_env iface location type_env =
       linkable $ pure $ DotGBC bco
 
     linkable parts = do
-      if_time <- modificationTimeIfExists (ml_hi_file location)
+      if_time <- modificationTimeIfExists (ml_hi_file_ospath location)
       time <- maybe getCurrentTime pure if_time
       return $! Linkable time (mi_module iface) parts
 
@@ -1112,7 +1112,7 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
       linkable $ NE.singleton (DotGBC bco)
 
     linkable parts = do
-      if_time <- modificationTimeIfExists (ml_hi_file location)
+      if_time <- modificationTimeIfExists (ml_hi_file_ospath location)
       time <- maybe getCurrentTime pure if_time
       return $!Linkable time (mi_module iface) parts
 
@@ -2240,7 +2240,7 @@ generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
   -- Either, get the same time as the .gbc file if it exists, or just the current time.
   -- It's important the time of the linkable matches the time of the .gbc file for recompilation
   -- checking.
-  bco_time <- maybe getCurrentTime pure =<< modificationTimeIfExists (ml_bytecode_file mod_location)
+  bco_time <- maybe getCurrentTime pure =<< modificationTimeIfExists (ml_bytecode_file_ospath mod_location)
   return $ mkModuleByteCodeLinkable bco_time bco_object
 
 mkModuleByteCode :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ModuleByteCode
