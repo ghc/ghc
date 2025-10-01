@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -47,7 +48,7 @@ import GHC.Core.TyCo.Subst ( substTyWithInScope )
 import GHC.Core.Type
 import GHC.Core.Coercion
 
-import GHC.Builtin.Types ( multiplicityTy )
+import GHC.Builtin.Types ( multiplicityTy, runtimeRepTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
 
@@ -59,6 +60,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
 
 import GHC.Data.Maybe
+import GHC.Data.FastString
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -93,6 +95,8 @@ Some notes relative to the paper
   variables.  We keep track of which variables are instantiation variables
   by giving them a TcLevel of QLInstVar, which is like "infinity".
 
+  See Note [QuickLook instantiation variables] in GHC.Tc.Types.TcType.
+
 (QL2) When we learn what an instantiation variable must be, we simply unify
   it with that type; this is done in qlUnify, which is the function mgu_ql(t1,t2)
   of the paper.  This may fill in a (mutable) instantiation variable with
@@ -101,8 +105,7 @@ Some notes relative to the paper
 (QL3) When QL is done, we turn the instantiation variables into ordinary unification
   variables, using qlZonkTcType.  This function fully zonks the type (thereby
   revealing all the polytypes), and updates any instantiation variables with
-  ordinary unification variables.
-  See Note [Instantiation variables are short lived].
+  ordinary unification variables. See Note [Instantiation variables are short lived].
 
 (QL4) We cleverly avoid the quadratic cost of QL, alluded to in the paper.
   See Note [Quick Look at value arguments]
@@ -110,7 +113,7 @@ Some notes relative to the paper
 Note [Instantiation variables are short lived]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * An instantation variable is a mutable meta-type-variable, whose level number
-  is QLInstVar.
+  is QLInstVar.  See Note [QuickLook instantiation variables] in GHC.Tc.Utils.TcType.
 
 * Ordinary unification variables always stand for monotypes; only instantiation
   variables can be unified with a polytype (by `qlUnify`).
@@ -267,16 +270,11 @@ tcApp works like this:
    In tcInstFun we take a quick look at value arguments, using quickLookArg.
    See Note [Quick Look at value arguments].
 
-   (TCAPP1) Crucially, just before `tcApp` calls `tcInstFun`, it sets the
-       ambient TcLevel to QLInstVar, so all unification variables allocated by
-       tcInstFun, and in the quick-looks it does at the arguments, will be
-       instantiation variables.
-
-   Consider (f (g (h x))).`tcApp` instantiates the call to `f`, and in doing
-   so quick-looks at the argument(s), in this case (g (h x)).  But
-   `quickLookArg` on (g (h x)) in turn instantiates `g` and quick-looks at
-   /its/ argument(s), in this case (h x).  And so on recursively.  Key
-   point: all these instantiations make instantiation variables.
+   Crucially, `tcInstFun` ensures that all the unification variables
+   it allocates, notably by instantiating the function at the head of the
+   application, have level QLInstVar, and hence will be "instantiation
+   variables", written using \kappa in the paper.
+   See Note [Instantiating type variables in QuickLook]
 
 Now we split into two cases:
 
@@ -313,16 +311,6 @@ The funcion `finishApp` mainly calls `rebuildHsApps` to rebuild the
 application; but it also does a couple of gruesome final checks:
   * Horrible newtype check
   * Special case for tagToEnum
-
-(TCAPP2) There is a lurking difficulty in the above plan:
-  * Before calling tcInstFun, we set the ambient level in the monad
-    to QLInstVar (Step 2 above).
-  * Then, when kind-checking the visible type args of the application,
-    we may perhaps build an implication constraint.
-  * That means we'll try to add 1 to the ambient level; which is a no-op.
-  * So skolem escape checks won't work right.
-  This is pretty exotic, so I'm just deferring it for now, leaving
-  this note to alert you to the possiblity.
 
 Note [Quick Look for particular Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -398,9 +386,7 @@ tcApp rn_expr exp_res_ty
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
        ; (inst_args, app_res_rho)
-              <- setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
-                                         -- Note [tcApp: typechecking applications]
-                 tcInstFun do_ql inst_final tc_head fun_sigma rn_args
+              <- tcInstFun do_ql inst_final tc_head fun_sigma rn_args
 
        ; case do_ql of
             NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
@@ -433,10 +419,6 @@ tcApp rn_expr exp_res_ty
                                                     app_res_rho exp_res_ty
                          -- Step 5.5: wrap up
                        ; finishApp tc_head tc_args app_res_rho res_wrap } }
-
-setQLInstLevel :: QLFlag -> TcM a -> TcM a
-setQLInstLevel DoQL thing_inside = setTcLevel QLInstVar thing_inside
-setQLInstLevel NoQL thing_inside = thing_inside
 
 quickLookResultType :: TcRhoType -> ExpRhoType -> TcM ()
 -- This function implements the shaded bit of rule APP-Downarrow in
@@ -722,11 +704,11 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
       , let no_tvs   = null tvs
             no_theta = null theta
       , not (no_tvs && no_theta)
-      = do { (_inst_tvs, wrap, fun_rho) <-
+      = do { (wrap, fun_rho) <-
                 -- addHeadCtxt: important for the class constraints
                 -- that may be emitted from instantiating fun_sigma
                 addHeadCtxt fun_ctxt $
-                instantiateSigma fun_orig fun_conc_tvs tvs theta body2
+                instantiateSigmaQL do_ql fun_orig fun_conc_tvs tvs theta body2
                   -- See Note [Representation-polymorphism checking built-ins]
                   -- in GHC.Tc.Utils.Concrete.
                   -- NB: we are doing this even when "acc" is not empty,
@@ -789,7 +771,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
         --     not defer in any way, because this is a QL instantiation variable.
         -- It's easier just to do the job directly here.
         do { arg_tys <- zipWithM new_arg_ty (leadingValArgs args) [pos..]
-           ; res_ty  <- newOpenFlexiTyVarTy
+           ; res_ty  <- newOpenFlexiTyVarTyQL do_ql TauTv
            ; let fun_ty' = mkScaledFunTys arg_tys res_ty
 
            -- Fill in kappa := nu_1 -> .. -> nu_n -> res_nu
@@ -829,12 +811,12 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
     new_arg_ty :: LHsExpr GhcRn -> Int -> TcM (Scaled TcType)
     -- Make a fresh nus for each argument in rule IVAR
     new_arg_ty (L _ arg) i
-      = do { arg_nu <- newOpenFlexiFRRTyVarTy $
+      = do { arg_nu <- newArgTyVarTyQL do_ql $
                        FRRExpectedFunTy (ExpectedFunTyArg (HsExprTcThing tc_fun) arg) i
                -- Following matchActualFunTy, we create nu_i :: TYPE kappa_i[conc],
                -- thereby ensuring that the arguments have concrete runtime representations
 
-           ; mult_ty <- newFlexiTyVarTy multiplicityTy
+            ; mult_ty <- newFlexiTyVarTyQL do_ql (mkTyVarOccFS (fsLit "m")) TauTv multiplicityTy
                -- mult_ty: e need variables for argument multiplicities (#18731)
                -- Otherwise, 'undefined x' wouldn't be linear in x
 
@@ -914,6 +896,138 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
            _ -> setSrcSpanA arg_loc $
                   addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
                   thing_inside }
+
+{- *********************************************************************
+*                                                                      *
+              Instantiating fresh type variables
+
+      Functions in here use getTcLevelQL to decide what level
+      to put on fresh unification variables.  If do_ql = DoQL, we
+      ignore the level in the monad, and use QLInstVar instead,
+      thereby giving birth to a Quick Look instantiation varaible
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Instantiating type variables in QuickLook]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+During QuickLook, when we instantiate a function's type (specifically, in
+`tcInstFun`), we must instantiate it with so-called "instantiation variables".
+See Note [QuickLook instantiation variables] in GHC.Tc.Utils.TcType.
+
+So `tcInstFun` uses a family of specialised functions, defined below, like
+   instantiateSigmaQL
+   newFlexiTyVarTyQL
+   etc
+that create fresh instantiation variables rather than regular unification
+variables.   But only if QuickLook is on!  So they all take a `QLFlag` to
+tell them what to do; that flag is ultimately used in `getTcLevelQL`.
+
+There is some code duplication between these functions and their friends
+in GHC.Tc.Utils.TcMType, but that's just too bad.
+
+Note that `tcInstFun` calls `quickLookArg` which calls `tcInstFun` recursively.
+Consider (f (g (h x))).`tcApp` instantiates the call to `f`, and in doing so
+quick-looks at the argument(s), in this case (g (h x)).  But `quickLookArg` on (g
+(h x)) in turn instantiates `g` and quick-looks at /its/ argument(s), in this
+case (h x).  And so on recursively.  Key point: all these instantiations make
+instantiation variables.
+-}
+
+getTcLevelQL :: QLFlag -> TcM TcLevel
+-- If Quick Look is on, instantiate all fresh unification variables
+-- at level QLInstVar; they are instantiation variables
+-- See Note [Instantiating type variables in QuickLook]
+getTcLevelQL DoQL = return QLInstVar
+getTcLevelQL NoQL = getTcLevel
+
+newFlexiTyVarQL :: QLFlag -> OccName -> MetaInfo -> TcKind -> TcM TcTyVar
+newFlexiTyVarQL do_ql occ info kind
+  = do { lvl  <- getTcLevelQL do_ql
+       ; ref  <- newMutVar Flexi
+       ; name <- newSysName occ -- See Note [Name of a unification variable]
+                                -- in GHC.Tc.Utils.TcMType
+       ; let details = MetaTv { mtv_info  = info
+                              , mtv_ref   = ref
+                              , mtv_tclvl = lvl }
+       ; return (mkTcTyVar name kind details) }
+
+newFlexiTyVarTyQL :: QLFlag -> OccName -> MetaInfo -> TcKind -> TcM TcType
+newFlexiTyVarTyQL do_ql occ info kind
+  = mkTyVarTy <$> newFlexiTyVarQL do_ql occ info kind
+
+newOpenFlexiTyVarTyQL :: QLFlag -> MetaInfo -> TcM TcType
+newOpenFlexiTyVarTyQL do_ql rr_info
+  = do { let rr_occ = mkTyVarOccFS (fsLit "cx")
+             tv_occ = mkTyVarOccFS (fsLit "q")
+        ; rr_ty  <- newFlexiTyVarTyQL do_ql rr_occ rr_info runtimeRepTy
+        ; arg_nu <- newFlexiTyVarTyQL do_ql tv_occ TauTv   (mkTYPEapp rr_ty)
+        ; return arg_nu }
+
+newArgTyVarTyQL :: QLFlag -> FixedRuntimeRepContext -> TcM TcType
+newArgTyVarTyQL do_ql frr_ctxt
+  = mdo { let conc_orig = ConcreteFRR $
+                          FixedRuntimeRepOrigin
+                            { frr_context = frr_ctxt
+                            , frr_type    = arg_nu }
+        ; rr_info <- mkConcreteInfo conc_orig
+        ; arg_nu  <- newOpenFlexiTyVarTyQL do_ql rr_info
+        ; return arg_nu }
+
+instantiateSigmaQL :: QLFlag
+                   -> CtOrigin
+                   -> ConcreteTyVars -- ^ concreteness information
+                   -> [TyVar]
+                   -> TcThetaType -> TcSigmaType
+                   -> TcM (HsWrapper, TcSigmaType)
+-- (instantiateSigmaQL orig tvs theta ty)
+--     instantiates the type variables tvs, emits the (instantiated)
+--     constraints theta, and returns the (instantiated) type ty
+-- See Note [Instantiating type variables in QuickLook]
+instantiateSigmaQL do_ql orig concs tvs theta body_ty
+  = do { rec (subst, inst_tvs) <- mapAccumLM (new_meta subst) empty_subst tvs
+       ; let inst_theta  = substTheta subst theta
+             inst_body   = substTy subst body_ty
+
+       ; wrap <- instCall orig (mkTyVarTys inst_tvs) inst_theta
+       ; traceTc "Instantiating"
+                 (vcat [ text "origin" <+> pprCtOrigin orig
+                       , text "tvs"   <+> ppr tvs
+                       , text "theta" <+> ppr theta
+                       , text "type" <+> debugPprType body_ty
+                       , text "with" <+> ppr inst_tvs
+                       , text "theta:" <+> ppr inst_theta ])
+
+      ; return (wrap, inst_body) }
+  where
+    in_scope = mkInScopeSet (tyCoVarsOfType (mkSpecSigmaTy tvs theta body_ty))
+               -- mkSpecSigmaTy: Inferred vs Specified is not important here;
+               --                We just want an accurate free-var set
+    empty_subst = mkEmptySubst in_scope
+
+    new_meta :: Subst -> Subst -> TyVar -> TcM (Subst, TcTyVar)
+    new_meta final_subst subst tv
+      = do { let occ = getOccName tv
+                 substd_kind = substTy subst (tyVarKind tv)
+           ; info   <- get_info final_subst tv
+           ; new_tv <- newFlexiTyVarQL do_ql occ info substd_kind
+           ; let new_subst   = extendTvSubstWithClone subst tv new_tv
+           ; return (new_subst, new_tv) }
+
+    get_info :: Subst -> TyVar -> TcM MetaInfo
+    get_info final_subst tv
+      -- Is this a type variable that must be instantiated to a concrete type?
+      -- If so, create a ConcreteTv metavariable instead of a plain TauTv.
+      -- See Note [Representation-polymorphism checking built-ins]
+      --     in GHC.Tc.Utils.Concrete.
+
+      | Just conc_orig0 <- lookupNameEnv concs (tyVarName tv)
+      , let conc_orig = substConcreteTvOrigin final_subst body_ty conc_orig0
+                        -- See Note [substConcreteTvOrigin].
+      = mkConcreteInfo conc_orig
+
+      -- The vastly common case
+      | otherwise
+      = return TauTv
 
 {- *********************************************************************
 *                                                                      *
@@ -2100,11 +2214,9 @@ That is the entire point of qlUnify!   Wrinkles:
   discard the constraints and the coercion, and do not update the instantiation
   variable.  But see "Sadly discarded design alternative" below.)
 
-  See also (TCAPP2) in Note [tcApp: typechecking applications].
-
 (UQL3) Instantiation variables don't really have a settled level yet;
-  they have level QLInstVar (see Note [The QLInstVar TcLevel] in GHC.Tc.Utils.TcType.
-  You might worry that we might unify
+  they have level QLInstVar (see Note [QuickLook instantiation variables]
+  in GHC.Tc.Utils.TcType.  You might worry that we might unify
       alpha[1] := Maybe kappa[qlinst]
   and later this kappa turns out to be a level-2 variable, and we have committed
   a skolem-escape error.
