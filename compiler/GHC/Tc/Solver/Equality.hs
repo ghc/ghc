@@ -1616,7 +1616,7 @@ canEqCanLHS ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
 Note [Kind Equality Orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 While in theory [W] x ~ y and [W] y ~ x ought to give us the same behaviour, in
-practice it does not.  See Note [Fundeps with instances, and equality
+practice it does not.  See Historical Note [Fundeps with instances, and equality
 orientation] where this is discussed at length.  As a rule of thumb: we keep
 the newest unification variables on the left of the equality.  See also
 Note [Improvement orientation].
