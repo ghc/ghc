@@ -732,7 +732,7 @@ data TcLevel = TcLevel {-# UNPACK #-} !Int
              | QLInstVar
   -- See Note [TcLevel invariants] for what this Int is
   -- See also Note [TcLevel assignment]
-  -- See also Note [The QLInstVar TcLevel]
+  -- See also Note [QuickLook instantiation variables]
 
 {-
 Note [TcLevel invariants]
@@ -767,7 +767,7 @@ Note [TcLevel invariants]
 The level of a MetaTyVar also governs its untouchability.  See
 Note [Unification preconditions] in GHC.Tc.Utils.Unify.
 
-  -- See also Note [The QLInstVar TcLevel]
+  -- See also Note [QuickLook instantiation variables]
 
 Note [TcLevel assignment]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -778,21 +778,23 @@ We arrange the TcLevels like this
    2          Second-level implication constraints
    ...etc...
    QLInstVar  The level for QuickLook instantiation variables
-              See Note [The QLInstVar TcLevel]
+              See Note [QuickLook instantiation variables]
 
-Note [The QLInstVar TcLevel]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-QuickLook instantiation variables are identified by having a TcLevel
-of QLInstVar.  See Note [Quick Look overview] in GHC.Tc.Gen.App.
+Note [QuickLook instantiation variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A QuickLook instantiation variable is identified precisely by
+    having a TcLevel of QLInstVar
+See (QL1) in Note [Quick Look overview] in GHC.Tc.Gen.App.
 
 The QLInstVar level behaves like infinity: it is greater than any
 other TcLevel.  See `strictlyDeeperThan` and friends in this module.
+
 That ensures that we never unify an ordinary unification variable
 with a QL instantiation variable, e.g.
       alpha[tau:3] := Maybe beta[tau:qlinstvar]
-(This is an immediate consequence of our general rule that we never
+This is an immediate consequence of our general rule that we never
 unify a variable with a type mentioning deeper variables; the skolem
-escape check.)
+escape check.
 
 QL instantation variables are eventually turned into ordinary unificaiton
 variables; see (QL3) in Note [Quick Look overview].
@@ -879,14 +881,14 @@ pushTcLevel (TcLevel us) = TcLevel (us + 1)
 pushTcLevel QLInstVar    = QLInstVar
 
 strictlyDeeperThan :: TcLevel -> TcLevel -> Bool
--- See Note [The QLInstVar TcLevel]
+-- See Note [QuickLook instantiation variables]
 strictlyDeeperThan (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
   = tv_tclvl > ctxt_tclvl
 strictlyDeeperThan QLInstVar (TcLevel {})  = True
 strictlyDeeperThan _ _                     = False
 
 deeperThanOrSame :: TcLevel -> TcLevel -> Bool
--- See Note [The QLInstVar TcLevel]
+-- See Note [QuickLook instantiation variables]
 deeperThanOrSame (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
   = tv_tclvl >= ctxt_tclvl
 deeperThanOrSame (TcLevel {}) QLInstVar  = False
