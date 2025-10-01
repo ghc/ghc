@@ -1050,7 +1050,7 @@ loadIfaceByteCode hsc_env iface location type_env =
       linkable $ BCOs bcos :| [DotO fo ForeignObject | fo <- fos]
 
     linkable parts = do
-      if_time <- modificationTimeIfExists (ml_hi_file location)
+      if_time <- modificationTimeIfExists (ml_hi_file_ospath location)
       time <- maybe getCurrentTime pure if_time
       return $! Linkable time (mi_module iface) parts
 
@@ -1071,7 +1071,7 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
       linkable $ NE.singleton (LazyBCOs bcos fos)
 
     linkable parts = do
-      if_time <- modificationTimeIfExists (ml_hi_file location)
+      if_time <- modificationTimeIfExists (ml_hi_file_ospath location)
       time <- maybe getCurrentTime pure if_time
       return $!Linkable time (mi_module iface) parts
 

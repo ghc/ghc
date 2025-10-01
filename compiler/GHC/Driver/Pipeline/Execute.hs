@@ -722,10 +722,10 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- the object file for one module.)
   -- Note the nasty duplication with the same computation in compileFile above
   location <- mkOneShotModLocation pipe_env dflags src_flavour mod_name
-  let o_file = ml_obj_file location -- The real object file
-      hi_file = ml_hi_file location
-      hie_file = ml_hie_file location
-      dyn_o_file = ml_dyn_obj_file location
+  let o_file = ml_obj_file_ospath location -- The real object file
+      hi_file = ml_hi_file_ospath location
+      hie_file = ml_hie_file_ospath location
+      dyn_o_file = ml_dyn_obj_file_ospath location
 
   src_hash <- getFileHash (basename <.> suff)
   hi_date <- modificationTimeIfExists hi_file
