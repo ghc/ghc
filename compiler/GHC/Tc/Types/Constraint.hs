@@ -1,6 +1,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeApplications #-}
 
 -- | This module defines types and simple operations over constraints, as used
@@ -13,7 +14,7 @@ module GHC.Tc.Types.Constraint (
         isPendingScDictCt, isPendingScDict, pendingScDict_maybe,
         superClassesMightHelp, getPendingWantedScs,
         isWantedCt, isGivenCt,
-        isTopLevelUserTypeError, containsUserTypeError, getUserTypeErrorMsg,
+        userTypeError_maybe, containsUserTypeError,
         isUnsatisfiableCt_maybe,
         ctEvidence, updCtEvidence,
         ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
@@ -59,7 +60,7 @@ module GHC.Tc.Types.Constraint (
         addInsols, dropMisleading, addSimples, addImplics, addHoles,
         addNotConcreteError, addMultiplicityCoercionError, addDelayedErrors,
         tyCoVarsOfWC, tyCoVarsOfWCList,
-        insolubleWantedCt, insolubleCt, insolubleIrredCt,
+        insolubleWantedCt, insolubleCt,
         insolubleImplic, nonDefaultableTyVarsOfWC,
         approximateWCX, approximateWC,
 
@@ -113,6 +114,7 @@ import GHC.Core.Coercion
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr
+import GHC.Core.TyCo.Rep
 
 import GHC.Types.Name
 import GHC.Types.Var
@@ -136,16 +138,13 @@ import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Data.Bag
 
+import Control.Monad ( when )
 import Data.Coerce
-import qualified Data.Semigroup as S
-import Control.Monad ( msum, when )
-import Data.Maybe ( mapMaybe, isJust )
-
--- these are for CheckTyEqResult
-import Data.Word  ( Word8 )
 import Data.List  ( intersperse )
-
-
+import Data.Maybe ( mapMaybe, isJust )
+import GHC.Data.Maybe ( firstJust, firstJusts )
+import qualified Data.Semigroup as S
+import Data.Word  ( Word8 )
 
 {-
 ************************************************************************
@@ -1198,73 +1197,53 @@ insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_errors = errors })
       is_insoluble (DE_Multiplicity {}) = False
 
 insolubleWantedCt :: Ct -> Bool
--- Definitely insoluble, in particular /excluding/ type-hole constraints
--- Namely:
---   a) an insoluble constraint as per 'insolubleIrredCt', i.e. either
---        - an insoluble equality constraint (e.g. Int ~ Bool), or
---        - a custom type error constraint, TypeError msg :: Constraint
---   b) that does not arise from a Given or a Wanted/Wanted fundep interaction
+-- | Is this a definitely insoluble Wanted constraint? Namely:
+--
+--   - a Wanted,
+--   - which is insoluble (as per 'insolubleCt'),
+--   - that does not arise from a Given or a Wanted/Wanted fundep interaction.
+--
 -- See Note [Insoluble Wanteds]
 insolubleWantedCt ct
-  | CIrredCan ir_ct <- ct
-      -- CIrredCan: see (IW1) in Note [Insoluble Wanteds]
-  , IrredCt { ir_ev = ev } <- ir_ct
-  , CtWanted (WantedCt { ctev_loc = loc, ctev_rewriters = rewriters })  <- ev
+  | CtWanted (WantedCt { ctev_loc = loc, ctev_rewriters = rewriters })
+      <- ctEvidence ct
       -- It's a Wanted
-  , insolubleIrredCt ir_ct
+  , insolubleCt ct
       -- It's insoluble
   , isEmptyRewriterSet rewriters
-      -- It has no rewriters; see (IW2) in Note [Insoluble Wanteds]
+      -- It has no rewriters – see (IW1) in Note [Insoluble Wanteds]
   , not (isGivenLoc loc)
-      -- isGivenLoc: see (IW3) in Note [Insoluble Wanteds]
+      -- It doesn't arise from a Given – see (IW2) in Note [Insoluble Wanteds]
   , not (isWantedWantedFunDepOrigin (ctLocOrigin loc))
-      -- origin check: see (IW4) in Note [Insoluble Wanteds]
+      -- It doesn't arise from a W/W fundep interaction – see (IW3) in Note [Insoluble Wanteds]
   = True
 
   | otherwise
   = False
 
--- | Returns True of constraints that are definitely insoluble,
---   as well as TypeError constraints.
+-- | Returns True of constraints that are definitely insoluble, including
+-- constraints that include custom type errors, as per (1)
+-- in Note [Custom type errors in constraints].
+--
 -- Can return 'True' for Given constraints, unlike 'insolubleWantedCt'.
---
--- The function is tuned for application /after/ constraint solving
---       i.e. assuming canonicalisation has been done
--- That's why it looks only for IrredCt; all insoluble constraints
--- are put into CIrredCan
 insolubleCt :: Ct -> Bool
-insolubleCt (CIrredCan ir_ct) = insolubleIrredCt ir_ct
-insolubleCt _                 = False
-
-insolubleIrredCt :: IrredCt -> Bool
--- Returns True of Irred constraints that are /definitely/ insoluble
---
--- This function is critical for accurate pattern-match overlap warnings.
--- See Note [Pattern match warnings with insoluble Givens] in GHC.Tc.Solver
---
--- Note that this does not traverse through the constraint to find
--- nested custom type errors: it only detects @TypeError msg :: Constraint@,
--- and not e.g. @Eq (TypeError msg)@.
-insolubleIrredCt (IrredCt { ir_ev = ev, ir_reason = reason })
-  =  isInsolubleReason reason
-  || isTopLevelUserTypeError (ctEvPred ev)
-  -- NB: 'isTopLevelUserTypeError' detects constraints of the form "TypeError msg"
-  -- and "Unsatisfiable msg". It deliberately does not detect TypeError
-  -- nested in a type (e.g. it does not use "containsUserTypeError"), as that
-  -- would be too eager: the TypeError might appear inside a type family
-  -- application which might later reduce, but we only want to return 'True'
-  -- for constraints that are definitely insoluble.
-  --
-  -- For example: Num (F Int (TypeError "msg")), where F is a type family.
-  --
-  -- Test case: T11503, with the 'Assert' type family:
-  --
-  -- > type Assert :: Bool -> Constraint -> Constraint
-  -- > type family Assert check errMsg where
-  -- >   Assert 'True  _errMsg = ()
-  -- >   Assert _check errMsg  = errMsg
+insolubleCt ct
+  | CIrredCan (IrredCt { ir_reason = reason }) <- ct
+  , isInsolubleReason reason
+  = True
+  | isJust $ isUnsatisfiableCt_maybe pred
+  = True
+  | containsUserTypeError False pred
+      -- False <=> do not look under ty-fam apps, AppTy etc.
+      -- See (UTE1) in Note [Custom type errors in constraints].
+  = True
+  | otherwise
+  = False
+  where
+    pred = ctPred ct
 
 -- | Does this hole represent an "out of scope" error?
+--
 -- See Note [Insoluble holes]
 isOutOfScopeHole :: Hole -> Bool
 isOutOfScopeHole (Hole { hole_occ = occ }) = not (startsWithUnderscore (occName occ))
@@ -1312,12 +1291,7 @@ Note [Insoluble Wanteds]
 insolubleWantedCt returns True of a Wanted constraint that definitely
 can't be solved.  But not quite all such constraints; see wrinkles.
 
-(IW1) insolubleWantedCt is tuned for application /after/ constraint
-   solving i.e. assuming canonicalisation has been done.  That's why
-   it looks only for IrredCt; all insoluble constraints are put into
-   CIrredCan
-
-(IW2) We only treat it as insoluble if it has an empty rewriter set.  (See Note
+(IW1) We only treat it as insoluble if it has an empty rewriter set.  (See Note
    [Wanteds rewrite Wanteds].)  Otherwise #25325 happens: a Wanted constraint A
    that is /not/ insoluble rewrites some other Wanted constraint B, so B has A
    in its rewriter set.  Now B looks insoluble.  The danger is that we'll
@@ -1325,10 +1299,10 @@ can't be solved.  But not quite all such constraints; see wrinkles.
    reporting A because there is an insoluble B lying around.  (This suppression
    happens in GHC.Tc.Errors.mkErrorItem.)  Solution: don't treat B as insoluble.
 
-(IW3) If the Wanted arises from a Given (how can that happen?), don't
+(IW2) If the Wanted arises from a Given (how can that happen?), don't
    treat it as a Wanted insoluble (obviously).
 
-(IW4) If the Wanted came from a  Wanted/Wanted fundep interaction, don't
+(IW3) If the Wanted came from a Wanted/Wanted fundep interaction, don't
    treat the constraint as insoluble. See Note [Suppressing confusing errors]
    in GHC.Tc.Errors
 
@@ -1354,71 +1328,165 @@ Yuk!
 
 {- Note [Custom type errors in constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When GHC reports a type-error about an unsolved-constraint, we check
-to see if the constraint contains any custom-type errors, and if so
-we report them.  Here are some examples of constraints containing type
-errors:
+A custom type error is a type family application 'TypeError msg' where
+'msg :: ErrorMessage', or an Unsatisfiable constraint.
+See Note [Custom type errors] and Note [The Unsatisfiable constraint]
+in GHC.Internal.TypeError.
 
-  TypeError msg           -- The actual constraint is a type error
+There are two ways in which the presence of such custom type errors inside a
+type impact GHC's behaviour:
 
-  TypError msg ~ Int      -- Some type was supposed to be Int, but ended up
-                          -- being a type error instead
+  (UTE1)
+    Constraints that contain a custom type error are considered to be
+    insoluble. This affects pattern-match warnings, as explained in
+    Note [Pattern match warnings with insoluble Givens] in GHC.Tc.Solver.
 
-  Eq (TypeError msg)      -- A class constraint is stuck due to a type error
+    This includes examples such as:
 
-  F (TypeError msg) ~ a   -- A type function failed to evaluate due to a type err
+      TypeError msg           -- The actual constraint is a type error
 
-It is also possible to have constraints where the type error is nested deeper,
-for example see #11990, and also:
+      TypeError msg ~# Int    -- Some type was supposed to be Int, but ended up
+                              -- being a type error instead
 
-  Eq (F (TypeError msg))  -- Here the type error is nested under a type-function
-                          -- call, which failed to evaluate because of it,
-                          -- and so the `Eq` constraint was unsolved.
-                          -- This may happen when one function calls another
-                          -- and the called function produced a custom type error.
+    However, we must be careful about occurrences of custom type errors
+    nested inside the constraint, as they may not make the constraint
+    insoluble. This is explained in Note [When is a constraint insoluble?]
+    in GHC.Tc.Solver. In particular:
 
-A good use-case is described in "Detecting the undetectable"
-   https://blog.csongor.co.uk/report-stuck-families/
-which features
-   type family Assert (err :: Constraint) (break :: Type -> Type) (a :: k) :: k where
-     Assert _ Dummy _ = Any
-     Assert _ _ k = k
-and an unsolved constraint like
-   Assert (TypeError ...) (F ty1) ty1 ~ ty2
-that reports that (F ty1) remains stuck.
+      a. Do not look inside type family applications.
+      b. Do not look inside class constraints.
+      c. Do not look inside AppTy or in arguments of a type family past its arity.
+      d. Only consider 'TypeError msg ~ rhs' to be insoluble if rhs definitely
+         cannot unify with 'TypeError msg', e.g. if 'rhs = Int' the constraint
+         is insoluble, but if 'rhs = k[sk]' then it isn't.
+
+    These subtle cases are tested in T26400b.
+
+    A good use-case for type errors nested under type family applications is
+    described in "Detecting the undetectable" (https://blog.csongor.co.uk/report-stuck-families/)
+    which features:
+       type family Assert (err :: Constraint) (break :: Type -> Type) (a :: k) :: k where
+         Assert _ Dummy _ = Any
+         Assert _ _ k = k
+    and an unsolved constraint like 'Assert (TypeError ...) (F ty1) ty1 ~ ty2'
+    which reports when (F ty1) remains stuck.
+
+  (UTE2)
+    When reporting unsolved constraints, we pull out any custom type errors
+    and report the corresponding message to the user.
+
+    Unlike in (UTE1), we do want to pull out 'TypeError' wherever it occurs
+    inside the type, including inside type-family applications. We tried to
+    solve the constraint, reduce type families etc, but the constraint
+    remained unsolved all the way till the end. Now that we are reporting the
+    error, it makes sense to pull out the 'TypeError' and report the custom
+    error message to the user, as the intention is that this message might
+    be informative.
+
+    Examples:
+
+      Num (TypeError msg)     -- A class constraint is stuck due to a type error
+
+      F (TypeError msg) ~ a   -- A type function failed to evaluate due to a type error
+
+      Eq (F (TypeError msg))  -- Here the type error is nested under a type-function
+                              -- call, which failed to evaluate because of it,
+                              -- and so the `Eq` constraint was unsolved.
+                              -- This may happen when one function calls another
+                              -- and the called function produced a custom type error.
+
+We use a single function, 'userTypeError_maybe', to pull out TypeError according
+to the rules of either (UTE1) or (UTE2), depending on the passed in boolean
+flag to 'userTypeError_maybe': 'False' for (UTE1) and 'True' for (UTE2).
 -}
 
--- | A constraint is considered to be a custom type error, if it contains
--- custom type errors anywhere in it.
--- See Note [Custom type errors in constraints]
-getUserTypeErrorMsg :: PredType -> Maybe ErrorMsgType
-getUserTypeErrorMsg pred = msum $ userTypeError_maybe pred
-                                  : map getUserTypeErrorMsg (subTys pred)
+-- | Does this type contain 'TypeError msg', either at the top-level or
+-- nested within it somewhere?
+--
+-- If so, return the error message.
+--
+-- See Note [Custom type errors in constraints].
+userTypeError_maybe
+  :: Bool -- ^ Look everywhere: inside type-family applications, class constraints, AppTys etc?
+  -> Type
+  -> Maybe ErrorMsgType
+userTypeError_maybe look_everywhere = go
   where
-   -- Richard thinks this function is very broken. What is subTys
-   -- supposed to be doing? Why are exactly-saturated tyconapps special?
-   -- What stops this from accidentally ripping apart a call to TypeError?
-    subTys t = case splitAppTys t of
-                 (t,[]) ->
-                   case splitTyConApp_maybe t of
-                              Nothing     -> []
-                              Just (_,ts) -> ts
-                 (t,ts) -> t : ts
+    go ty
+      | Just ty' <- coreView ty
+      = go ty'
+    go (TyConApp tc tys)
+      | tyConName tc == errorMessageTypeErrorFamName
+      , _kind : msg : _ <- tys
+              -- There may be more than 2 arguments, if the type error is
+              -- used as a type constructor (e.g. at kind `Type -> Type`).
+      = Just msg
 
--- | Is this an user error message type, i.e. either the form @TypeError err@ or
--- @Unsatisfiable err@?
-isTopLevelUserTypeError :: PredType -> Bool
-isTopLevelUserTypeError pred =
-  isJust (userTypeError_maybe pred) || isJust (isUnsatisfiableCt_maybe pred)
+      -- (UTE1.d) TypeError msg ~ a is only insoluble if 'a' cannot be a type error
+      | not look_everywhere
+      , tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
+      , [ ki1, ki2, ty1, ty2 ] <- tys
+      = if | Just msg <- go ki1
+           , isRigidTy ki2
+           -> Just msg
+           | Just msg <- go ki2
+           , isRigidTy ki1
+           -> Just msg
+           | Just msg <- go ty1
+           , isRigidTy ty2
+           -> Just msg
+           | Just msg <- go ty2
+           , isRigidTy ty1
+           -> Just msg
+           | otherwise
+           -> Nothing
+
+      -- (UTE1.a) Don't look under type family applications.
+      | tyConMustBeSaturated tc
+      , not look_everywhere
+      = Nothing
+        -- (UTE1.c) Don't even look in the arguments past the arity of the TyCon.
+
+      -- (UTE1.b) Don't look inside class constraints.
+      | isClassTyCon tc
+      , not look_everywhere
+      = foldr (firstJust . go) Nothing (drop (tyConArity tc) tys)
+      | otherwise
+      = foldr (firstJust . go) Nothing tys
+    go (ForAllTy (Bndr tv _) ty) = go (tyVarKind tv) `firstJust` go ty
+    go (FunTy { ft_mult = mult, ft_arg = arg, ft_res = res })
+      = firstJusts
+          [ go mult
+          , go (typeKind arg)
+          , go (typeKind res)
+          , go arg
+          , go res ]
+    go (AppTy t1 t2)
+      -- (UTE1.c) Don't look inside AppTy.
+      | not look_everywhere
+      = Nothing
+      | otherwise
+      = go t1 `firstJust` go t2
+    go (CastTy ty _co) = go ty
+    go (TyVarTy tv) = go (tyVarKind tv)
+    go (CoercionTy {}) = Nothing
+    go (LitTy {}) = Nothing
 
 -- | Does this constraint contain an user error message?
 --
 -- That is, the type is either of the form @Unsatisfiable err@, or it contains
 -- a type of the form @TypeError msg@, either at the top level or nested inside
 -- the type.
-containsUserTypeError :: PredType -> Bool
-containsUserTypeError pred =
-  isJust (getUserTypeErrorMsg pred) || isJust (isUnsatisfiableCt_maybe pred)
+--
+-- See Note [Custom type errors in constraints].
+containsUserTypeError
+  :: Bool -- ^ look inside type-family applications, 'AppTy', etc?
+  -> PredType
+  -> Bool
+containsUserTypeError look_in_famapps pred =
+  isJust (isUnsatisfiableCt_maybe pred)
+    ||
+  isJust (userTypeError_maybe look_in_famapps pred)
 
 -- | Is this type an unsatisfiable constraint?
 -- If so, return the error message.

@@ -123,6 +123,8 @@ test('T21761', [],  compile, [overlapping_incomplete])
 test('T22964', [], compile, [overlapping_incomplete])
 test('T23445', [], compile, [overlapping_incomplete])
 test('T24234', [], compile, [overlapping_incomplete+'-Wincomplete-uni-patterns'])
+test('T26400', [], compile, [overlapping_incomplete])
+test('T26400b', [], compile, [overlapping_incomplete])
 
 # Series (inspired) by Luke Maranget
 

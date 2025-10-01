@@ -471,7 +471,9 @@ findRedundantGivens (Implic { ic_info = info, ic_need = need, ic_given = givens 
       | otherwise        = filterOut is_minimal givens
 
     -- See #15232
-    is_type_error id = isTopLevelUserTypeError (idType id)
+    is_type_error id = containsUserTypeError False (idType id)
+      -- False <=> do not look under ty-fam apps, AppTy etc.
+      -- See (UTE1) in Note [Custom type errors in constraints].
 
     is_improving pred -- (transSuperClasses p) does not include p
       = any isImprovementPred (pred : transSuperClasses pred)

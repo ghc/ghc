@@ -31,6 +31,7 @@ import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
+import GHC.Tc.Types.Constraint ( userTypeError_maybe )
 import GHC.Tc.Utils.Env (tcLookupId)
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
@@ -282,7 +283,12 @@ checkUserTypeError ctxt ty
   | TySynCtxt {} <- ctxt  -- Do not complain about TypeError on the
   = return ()             -- RHS of type synonyms. See #20181
 
-  | Just msg <- deepUserTypeError_maybe ty
+  | Just msg <- userTypeError_maybe False ty
+      --                            ^^^^^
+      -- Don't look under type-family applications! We only want to pull out
+      -- definite errors.
+      --
+      -- See (UTE1) in Note [Custom type errors in constraints] in GHC.Tc.Types.Constraint.
   = do { env0 <- liftZonkM tcInitTidyEnv
        ; let (env1, tidy_msg) = tidyOpenTypeX env0 msg
        ; failWithTcM (env1, TcRnUserTypeError tidy_msg) }

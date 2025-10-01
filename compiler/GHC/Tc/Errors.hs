@@ -671,11 +671,14 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     non_tv_eq _ _                    = False
 
     -- Catch TypeError and Unsatisfiable.
-    -- Here, we want any nested TypeErrors to bubble up, so we use
-    -- 'containsUserTypeError' and not 'isTopLevelUserTypeError'.
+    -- Here, we want any nested TypeErrors to bubble up, even if they are
+    -- inside type family applications, so we pass 'True' to
+    -- 'containsUserTypeError'.
     --
     -- See also Note [Implementation of Unsatisfiable constraints], point (F).
-    is_user_type_error item _ = containsUserTypeError (errorItemPred item)
+    is_user_type_error item _ = containsUserTypeError True (errorItemPred item)
+      -- True <=> look under ty-fam apps, AppTy etc.
+      -- See (UTE2) in Note [Custom type errors in constraints].
 
     is_implicit_lifting item _ =
       case (errorItemOrigin item) of
@@ -977,6 +980,8 @@ Its implementation consists of the following:
 
      This is the only way that "Unsatisfiable msg" constraints are reported,
      which makes their behaviour much more predictable than TypeError.
+     We don't go looking for Unsatisfiable constraints deeply nested inside
+     a type like we do for TypeError.
 -}
 
 
@@ -1124,12 +1129,21 @@ mkUserTypeErrorReporter ctxt
                         ; maybeReportError ctxt (item :| []) err
                         ; addSolverDeferredBinding err item }
 
+
+
 mkUserTypeError :: ErrorItem -> TcSolverReportMsg
 mkUserTypeError item
-  | Just msg <- getUserTypeErrorMsg pty
-  = UserTypeError msg
   | Just msg <- isUnsatisfiableCt_maybe pty
   = UnsatisfiableError msg
+  | Just msg <- userTypeError_maybe True pty
+      --                            ^^^^
+      -- Look under type-family applications! We are reporting an error,
+      -- so we may as well look to see if there are any custom type errors
+      -- anywhere, as they might be helpful to the user. We gave the type
+      -- family application the chance to reduce, but it didn't.
+      --
+      -- See (UTE2) in Note [Custom type errors in constraints] in GHC.Tc.Types.Constraint.
+  = UserTypeError msg
   | otherwise
   = pprPanic "mkUserTypeError" (ppr item)
   where

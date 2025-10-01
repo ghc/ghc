@@ -172,7 +172,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Constraint
 
-import GHC.Builtin.Names ( unsatisfiableClassNameKey, callStackTyConName, exceptionContextTyConName )
+import GHC.Builtin.Names ( callStackTyConName, exceptionContextTyConName )
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep as Rep
@@ -184,6 +184,10 @@ import GHC.Core.Reduction
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Unify (typesAreApart)
+
+import GHC.LanguageExtensions as LangExt
+import GHC.Rename.Env
+import qualified GHC.Rename.Env as TcM
 
 import GHC.Types.Name
 import GHC.Types.TyThing
@@ -199,8 +203,7 @@ import GHC.Types.ThLevelIndex (thLevelIndexFromImportLevel)
 import GHC.Types.SrcLoc
 
 import GHC.Unit.Module
-import qualified GHC.Rename.Env as TcM
-import GHC.Rename.Env
+import GHC.Unit.Module.Graph
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -220,15 +223,13 @@ import Data.List ( mapAccumL )
 import Data.List.NonEmpty ( nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as S
-import GHC.LanguageExtensions as LangExt
+import qualified Data.Set as Set
 
 #if defined(DEBUG)
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Data.Graph.Directed
 #endif
 
-import qualified Data.Set as Set
-import GHC.Unit.Module.Graph
 
 {- *********************************************************************
 *                                                                      *
@@ -666,9 +667,10 @@ getInnermostGivenEqLevel = do { inert <- getInertCans
 -- This consists of:
 --
 --  - insoluble equalities, such as @Int ~# Bool@;
---  - constraints that are top-level custom type errors, of the form
---    @TypeError msg@, but not constraints such as @Eq (TypeError msg)@
---    in which the type error is nested;
+--  - constraints that are custom type errors, of the form
+--    @TypeError msg@ or @Maybe (TypeError msg)@, but not constraints such as
+--    @F x (TypeError msg)@ in which the type error is nested under
+--    a type family application,
 --  - unsatisfiable constraints, of the form @Unsatisfiable msg@.
 --
 -- The inclusion of Givens is important for pattern match warnings, as we
@@ -676,21 +678,26 @@ getInnermostGivenEqLevel = do { inert <- getInertCans
 -- redundant (see Note [Pattern match warnings with insoluble Givens] in GHC.Tc.Solver).
 getInertInsols :: TcS Cts
 getInertInsols
-  = do { inert <- getInertCans
-       ; let insols = filterBag insolubleIrredCt (inert_irreds inert)
-             unsats = findDictsByTyConKey (inert_dicts inert) unsatisfiableClassNameKey
-       ; return $ fmap CDictCan unsats `unionBags` fmap CIrredCan insols }
+  -- See Note [When is a constraint insoluble?]
+  = do { inert_cts <- getInertCts
+       ; return $ filterBag insolubleCt inert_cts }
+
+getInertCts :: TcS Cts
+getInertCts
+  = do { inerts <- getInertCans
+       ; return $
+          unionManyBags
+            [ fmap CIrredCan $ inert_irreds inerts
+            , foldDicts  (consBag . CDictCan) (inert_dicts  inerts) emptyBag
+            , foldFunEqs (consBag . CEqCan  ) (inert_funeqs inerts) emptyBag
+            , foldTyEqs  (consBag . CEqCan  ) (inert_eqs    inerts) emptyBag
+            ] }
 
 getInertGivens :: TcS [Ct]
 -- Returns the Given constraints in the inert set
 getInertGivens
-  = do { inerts <- getInertCans
-       ; let all_cts = foldIrreds ((:) . CIrredCan) (inert_irreds inerts)
-                     $ foldDicts  ((:) . CDictCan)  (inert_dicts inerts)
-                     $ foldFunEqs ((:) . CEqCan)    (inert_funeqs inerts)
-                     $ foldTyEqs  ((:) . CEqCan)    (inert_eqs inerts)
-                     $ []
-       ; return (filter isGivenCt all_cts) }
+  = do { all_cts <- getInertCts
+       ; return (filter isGivenCt $ bagToList all_cts) }
 
 getPendingGivenScs :: TcS [Ct]
 -- Find all inert Given dictionaries, or quantified constraints, such that

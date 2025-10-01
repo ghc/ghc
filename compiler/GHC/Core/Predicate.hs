@@ -217,7 +217,7 @@ in GHC.Tc.Solver.Dict.
 -- See Note [Types for coercions, predicates, and evidence] in "GHC.Core.TyCo.Rep"
 isEqPred :: PredType -> Bool
 -- True of (s ~# t) (s ~R# t)
--- NB: but NOT true of (s ~ t) or (s ~~ t) or (Coecible s t)
+-- NB: but NOT true of (s ~ t) or (s ~~ t) or (Coercible s t)
 isEqPred ty
   | Just tc <- tyConAppTyCon_maybe ty
   = tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey

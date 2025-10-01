@@ -1,0 +1,8 @@
+T26400.hs:27:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘testFn’: testFn SZ (SS _) SZ = ...
+
+T26400.hs:28:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘testFn’: testFn SZ (SS _) (SS _) = ...
+

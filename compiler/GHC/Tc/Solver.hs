@@ -659,20 +659,70 @@ equality constraint, but it is also important to detect custom type errors:
 
 To see that we can't call `foo (MkT2)`, we must detect that `NotInt Int` is insoluble
 because it is a custom type error.
-Failing to do so proved quite inconvenient for users, as evidence by the
+Failing to do so proved quite inconvenient for users, as evidenced by the
 tickets #11503 #14141 #16377 #20180.
 Test cases: T11503, T14141.
 
-Examples of constraints that tcCheckGivens considers insoluble:
+To do this, tcCheckGivens calls getInertInsols, which returns all Given
+constraints that are definitely insoluble. See Note [When is a constraint insoluble?].
+
+Note [When is a constraint insoluble?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whether a constraint is insoluble matters for accurate pattern-match
+warnings, as explained in Note [Pattern match warnings with insoluble Givens].
+
+We consider a constraint to be insoluble if it definitely cannot be solved,
+no matter what information we might further discover. For example, the following
+constraints are insoluble:
+
   - Int ~ Bool,
   - Coercible Float Word,
-  - TypeError msg.
+  - TypeError msg
+  - TypeError msg ~ Int
+  - Unsatisfiable msg
 
-Non-examples:
-  - constraints which we know aren't satisfied,
-    e.g. Show (Int -> Int) when no such instance is in scope,
-  - Eq (TypeError msg),
-  - C (Int ~ Bool), with @class C (c :: Constraint)@.
+Many constraints that look like they can't be solved are in fact not reported
+as insoluble, as there might still be a possibility (no matter how remote) that
+they can still be solved:
+
+  1: Show (Int -> Int)
+
+  Reason: even though there is no relevant instance in scope, this constraint
+  could later get solved by a new instance.
+
+  2: C (Int ~ Bool), where C :: Constraint -> Constraint
+
+  Reason: even though 'Int ~ Bool' is insoluble, the constraint 'C (Int ~ Bool)'
+  might be soluble, e.g. if 'C' is a class and we have 'instance forall c. C c',
+  or 'C' is a type family and we have 'type instance C c = (() :: Constraint)'.
+
+  3: Nested occurences of TypeError don't always lead to insolubility. For
+     example, none of the following constraints are definitely insoluble:
+
+    (a) F alpha (TypeError msg)    -- 'F' is an arity 2 type family
+    (b) Eq (TypeError msg)
+    (c) c (TypeError msg)          -- 'c' is a metavariable
+    (d) (TC alpha) (TypeError msg) -- 'TC' is an arity 1 type family
+    (e) TypeError msg ~ rhs        -- (depends on rhs)
+
+  None of these constraints are definitely insoluble:
+
+    (a) Can be solved if 'F' reduces, e.g. 'alpha := Int', 'type instance F Int a = (() :: Constraint)'.
+    (b) Can be solved by 'instance forall x. Eq x'.
+    (c) Can be solved if 'c' unifies with 'C', as in example (2).
+    (d) Can be solved if 'TC alpha' reduces to 'C', as in example (2).
+    (e) If 'rhs' is a rigid type such as 'Int' or 'Maybe Char', then this
+        constraint is definitely insoluble. Otherwise, however, the constraint
+        could be soluble:
+          - rhs = G alpha, for an arity 1 type family G
+            G alpha could reduce to TypeError msg.
+          - rhs = k, for a skolem type variable k.
+            We could instantiate k to something else, and then the constraint
+            could become soluble.
+
+  For this reason, we are careful to not pull out certain occurrences of TypeError,
+  e.g. inside type family applications and class constraints.
+  See Note [Custom type errors in constraints].
 -}
 
 tcCheckGivens :: InertSet -> Bag EvVar -> TcM (Maybe InertSet)

@@ -1,4 +1,3 @@
-
 T20241b.hs:16:8: error: [GHC-47403]
     • Boom
     • In the type signature:
@@ -6,11 +5,14 @@ T20241b.hs:16:8: error: [GHC-47403]
                                             -> Type -> Constraint) IO) a =>
                Proxy a -> ()
 
-T20241b.hs:20:8: error: [GHC-47403]
+T20241b.hs:20:8: error: [GHC-64725]
     • Boom
-    • In the type signature:
+    • In the ambiguity check for ‘bar’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      In the type signature:
         bar :: ((c :: Constraint
                       -> Type -> Constraint) (((TypeError (Text "Boom") :: (Type -> Type)
                                                                            -> Type
                                                                               -> Constraint) IO) a)) a =>
                Proxy a -> ()
+
