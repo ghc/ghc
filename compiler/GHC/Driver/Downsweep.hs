@@ -1265,7 +1265,7 @@ checkSummaryHash
   | ms_hs_hash old_summary == src_hash &&
       not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
            -- update the object-file timestamp
-           obj_timestamp <- modificationTimeIfExists (ml_obj_file location)
+           obj_timestamp <- modificationTimeIfExists (ml_obj_file_ospath location)
 
            -- We have to repopulate the Finder's cache for file targets
            -- because the file might not even be on the regular search path
@@ -1277,8 +1277,8 @@ checkSummaryHash
                hsc_src = ms_hsc_src old_summary
            addModuleToFinder fc mod location hsc_src
 
-           hi_timestamp <- modificationTimeIfExists (ml_hi_file location)
-           hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
+           hi_timestamp <- modificationTimeIfExists (ml_hi_file_ospath location)
+           hie_timestamp <- modificationTimeIfExists (ml_hie_file_ospath location)
 
            return $ Right
              ( old_summary
@@ -1482,11 +1482,11 @@ data MakeNewModSummary
 makeNewModSummary :: HscEnv -> MakeNewModSummary -> IO ModSummary
 makeNewModSummary hsc_env MakeNewModSummary{..} = do
   let PreprocessedImports{..} = nms_preimps
-  obj_timestamp <- modificationTimeIfExists (ml_obj_file nms_location)
-  dyn_obj_timestamp <- modificationTimeIfExists (ml_dyn_obj_file nms_location)
-  hi_timestamp <- modificationTimeIfExists (ml_hi_file nms_location)
-  hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
-  bytecode_timestamp <- modificationTimeIfExists (ml_bytecode_file nms_location)
+  obj_timestamp <- modificationTimeIfExists (ml_obj_file_ospath nms_location)
+  dyn_obj_timestamp <- modificationTimeIfExists (ml_dyn_obj_file_ospath nms_location)
+  hi_timestamp <- modificationTimeIfExists (ml_hi_file_ospath nms_location)
+  hie_timestamp <- modificationTimeIfExists (ml_hie_file_ospath nms_location)
+  bytecode_timestamp <- modificationTimeIfExists (ml_bytecode_file_ospath nms_location)
   extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
   (implicit_sigs, _inst_deps) <- implicitRequirementsShallow (hscSetActiveUnitId (moduleUnitId nms_mod) hsc_env) pi_theimps
 
