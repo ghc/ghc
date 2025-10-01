@@ -42,7 +42,7 @@ main = do
         takeMVar started
         readMVar done
         hFlush stderr
-        threadDelay 1000
+        threadDelay 50000
   -- default behaviour:
   -- kill it after the limit is exceeded
   hPutStrLn stderr "default behaviour"
@@ -68,5 +68,5 @@ main = do
   hPutStrLn stderr "kill and log"
   setGlobalAllocationLimitHandler KillOnAllocationLimit (Just $ \_ -> hPutStrLn stderr "allocation limit triggered 3")
   runWorker
-  threadDelay 1000
+  threadDelay 50000
   hPutStrLn stderr "done"
