@@ -13,7 +13,6 @@
 module GHC.Tc.Utils.Instantiate (
      topSkolemise, skolemiseRequired,
      topInstantiate,
-     instantiateSigma,
      instCall, instDFunType, instStupidTheta, instTyVarsWith,
      newWanted, newWanteds,
 
@@ -81,7 +80,6 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.Name.Env
 import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Types.Var
 import qualified GHC.LanguageExtensions as LangExt
@@ -283,62 +281,39 @@ topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- NB: returns a type with no (=>),
 --     and no invisible forall at the top
 topInstantiate orig sigma
-  | (tvs,   body1) <- tcSplitSomeForAllTyVars isInvisibleForAllTyFlag sigma
-  , (theta, body2) <- tcSplitPhiTy body1
+  | (tvs,   phi_ty)  <- tcSplitSomeForAllTyVars isInvisibleForAllTyFlag sigma
+  , (theta, body_ty) <- tcSplitPhiTy phi_ty
   , not (null tvs && null theta)
-  = do { (_, wrap1, body3) <- instantiateSigma orig noConcreteTyVars tvs theta body2
-           -- Why 'noConcreteTyVars' here?
+  = do { (subst, inst_tvs) <- newMetaTyVarsX empty_subst tvs
+           -- No need to worry about concrete tyvars here (c.f. instantiateSigma)
            -- See Note [Representation-polymorphism checking built-ins]
            -- in GHC.Tc.Utils.Concrete.
 
+       ; let inst_theta = substTheta subst theta
+             inst_body  = substTy subst body_ty
+
+       ; wrap1 <- instCall orig (mkTyVarTys inst_tvs) inst_theta
+
        -- Loop, to account for types like
        --       forall a. Num a => forall b. Ord b => ...
-       ; (wrap2, body4) <- topInstantiate orig body3
+       ; (wrap2, inner_body) <- topInstantiate orig inst_body
 
-       ; return (wrap2 <.> wrap1, body4) }
-
-  | otherwise = return (idHsWrapper, sigma)
-
-instantiateSigma :: CtOrigin
-                 -> ConcreteTyVars -- ^ concreteness information
-                 -> [TyVar]
-                 -> TcThetaType -> TcSigmaType
-                 -> TcM ([TcTyVar], HsWrapper, TcSigmaType)
--- (instantiate orig tvs theta ty)
--- instantiates the type variables tvs, emits the (instantiated)
--- constraints theta, and returns the (instantiated) type ty
-instantiateSigma orig concs tvs theta body_ty
-  = do { rec (subst, inst_tvs) <- mapAccumLM (new_meta subst) empty_subst tvs
-       ; let inst_theta  = substTheta subst theta
-             inst_body   = substTy subst body_ty
-             inst_tv_tys = mkTyVarTys inst_tvs
-
-       ; wrap <- instCall orig inst_tv_tys inst_theta
-       ; traceTc "Instantiating"
+       ; traceTc "topInstantiate"
                  (vcat [ text "origin" <+> pprCtOrigin orig
                        , text "tvs"   <+> ppr tvs
                        , text "theta" <+> ppr theta
                        , text "type" <+> debugPprType body_ty
-                       , text "with" <+> vcat (map debugPprType inst_tv_tys)
+                       , text "with" <+> ppr inst_tvs
                        , text "theta:" <+> ppr inst_theta ])
 
-      ; return (inst_tvs, wrap, inst_body) }
+      ; return (wrap2 <.> wrap1, inner_body) }
+
+  | otherwise
+  = return (idHsWrapper, sigma)
+
   where
-    in_scope = mkInScopeSet (tyCoVarsOfType (mkSpecSigmaTy tvs theta body_ty))
-               -- mkSpecSigmaTy: Inferred vs Specified is not important here;
-               --                We just want an accurate free-var set
-    empty_subst = mkEmptySubst in_scope
-    new_meta :: Subst -> Subst -> TyVar -> TcM (Subst, TcTyVar)
-    new_meta final_subst subst tv
-      -- Is this a type variable that must be instantiated to a concrete type?
-      -- If so, create a ConcreteTv metavariable instead of a plain TauTv.
-      -- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Utils.Concrete.
-      | Just conc_orig0 <- lookupNameEnv concs (tyVarName tv)
-      , let conc_orig = substConcreteTvOrigin final_subst body_ty conc_orig0
-      -- See Note [substConcreteTvOrigin].
-      = newConcreteTyVarX conc_orig subst tv
-      | otherwise
-      = newMetaTyVarX subst tv
+    empty_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType sigma))
+
 
 instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM Subst
 -- Use this when you want to instantiate (forall a b c. ty) with
