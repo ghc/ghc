@@ -21,7 +21,7 @@
 //   the constructor to be run, allowing the assertion to succeed in the first place
 //   as keepCAFs will have been set already during initialization of constructors.
 
-
+#if defined(HAVE_INTERNAL_INTERPRETER)
 
 bool keepCAFsForGHCi(void) __attribute__((constructor));
 
@@ -32,4 +32,4 @@ bool keepCAFsForGHCi(void)
     return was_set;
 }
 
-
+#endif
