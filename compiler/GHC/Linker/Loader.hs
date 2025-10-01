@@ -658,8 +658,9 @@ findWholeCoreBindings hsc_env mod = do
 
 findBytecodeLinkableMaybe :: HscEnv -> Module -> ModLocation -> IO (Maybe Linkable)
 findBytecodeLinkableMaybe hsc_env mod locn = do
-  let bytecode_fn = ml_bytecode_file locn
-  maybe_bytecode_time <- modificationTimeIfExists bytecode_fn
+  let bytecode_fn    = ml_bytecode_file locn
+      bytecode_fn_os = ml_bytecode_file_ospath locn
+  maybe_bytecode_time <- modificationTimeIfExists bytecode_fn_os
   case maybe_bytecode_time of
     Nothing -> return Nothing
     Just bytecode_time -> do

@@ -789,8 +789,8 @@ summariseRequirement pn mod_name = do
 
     env <- getBkpEnv
     src_hash <- liftIO $ getFileHash (bkp_filename env)
-    hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
-    hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
+    hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file_ospath location)
+    hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file_ospath location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
     let fc = hsc_FC hsc_env
@@ -875,8 +875,8 @@ hsModuleToModSummary home_keys pn hsc_src modname
                                 HsSrcFile  -> os "hs")
                              hsc_src
     -- This duplicates a pile of logic in GHC.Driver.Make
-    hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
-    hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
+    hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file_ospath location)
+    hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file_ospath location)
 
     -- Also copied from 'getImports'
     let (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
