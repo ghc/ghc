@@ -826,7 +826,7 @@ mkStubPaths fopts mod location = do
 findObjectLinkableMaybe :: Module -> ModLocation -> IO (Maybe Linkable)
 findObjectLinkableMaybe mod locn
    = do let obj_fn = ml_obj_file locn
-        maybe_obj_time <- modificationTimeIfExists obj_fn
+        maybe_obj_time <- modificationTimeIfExists (ml_obj_file_ospath locn)
         case maybe_obj_time of
           Nothing -> return Nothing
           Just obj_time -> liftM Just (findObjectLinkable mod obj_fn obj_time)
