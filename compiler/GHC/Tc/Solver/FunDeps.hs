@@ -51,7 +51,7 @@ Here is our plan for dealing with functional dependencies
   - (KICK-FD) If any unifications happened,
        * kick out any inert constraints that mention the unified variables
        * send the current constraint back to the start of the pipeline;
-         might now be soluble, and it probably isn't inert
+         it might now be soluble, and it probably isn't inert
 
 * (GEN-FD) How we generate those [FunDepEqns] varies:
        - tryDictFunDeps: for class constraints (C t1 .. tn)
@@ -146,8 +146,8 @@ Then it is solvable, but its very hard to detect this on the spot.
 It's exactly the same with implicit parameters, except that the
 "aggressive" approach would be much easier to implement.
 
-Note [Partial functional dependencies]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Deeper TcLevel for partial improvement unification variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this (#12522):
   type family F x = t | t -> x
   type instance F (a, Int) = (Int, G a)
@@ -166,7 +166,7 @@ Now it is crucial that, when solving,
   we unify    gamma1 := alpha    (YES)
   and not     alpha := gamma1    (NO)
 
-Why?  Because if we do (YES) we'll think we have made some progress
+Why?  Because if we do (NO) we'll think we have made some progress
 (some unification has happened), and hence go round again; but actually all we
 have done is to replace `alpha` with `gamma1`.
 
@@ -185,12 +185,12 @@ This problem shows up in several guises; see (at the bottom)
 
 The solution is super-simple:
 
-  * A fundep-equality is described by `FunDepEqns`, whose `fd_qtvs` field explicitly
-    lists the "fresh variables"
+  * A fundep-equality is described by `FunDepEqns`, whose `fd_qtvs` field
+    explicitly lists the "fresh variables"
 
   * Function `instantiateFunDepEqn` instantiates a `FunDepEqns`, and CRUCIALLY
-    gives the new unification variables a level one deeper than the current
-    level.
+    (via `nestFunDepsTcS` gives the new unification variables a level one
+    deeper than the current level.
 
   * Now, given `alpha ~ beta`, all the unification machinery guarantees, to
     unify the variable with the deeper level.  See GHC.Tc.Utils.Unify
@@ -296,7 +296,6 @@ tryDictFunDeps :: DictCt -> SolverStage ()
 --   * Generate the fundeps from interacting the
 --     top-level `inst_envs` with the constraints `cts`
 --   * Do the unifications and return any unsolved constraints
--- See Note [Fundeps with instances, and equality orientation]
 
 -- doLocalFunDeps does StartAgain if there
 -- are any fundeps: see (DFL1) in Note [Do fundeps last]
@@ -364,11 +363,14 @@ tryDictFunDepsTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
 
 {- Note [No Given/Given fundeps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We do not create constraints from:
-* Given/Given interactions via functional dependencies or type family
+For /non-built-in/ type families we do not create constraints from:
+* Given/Given interactions via functional dependencies or type-family
   injectivity annotations.
 * Given/instance fundep interactions via functional dependencies or
   type family injectivity annotations.
+
+NB: for /built-in type families/ we DO create constraints, because
+    we can make evidence for them.
 
 In this Note, all these interactions are called just "fundeps".
 
@@ -383,6 +385,9 @@ We ingore such fundeps for several reasons:
    inaccessible code warnings, but the path forward is far from
    clear. #12466 has further commentary.
 
+   NB: for built-in type families we can do a lot better.
+   See Note [Given/Given fundeps for built-in type families]
+
 2. Furthermore, here is a case where a Given/instance interaction is actively
    harmful (from dependent/should_compile/RaeJobTalk):
 
@@ -393,15 +398,15 @@ We ingore such fundeps for several reasons:
 
        [G] Not (a == b) ~ True
 
-   Reacting this Given with the equations for Not produces
-
+   Reacting this Given with the equations for Not could produce
       [W] a == b ~ False
-
    This is indeed a true consequence, and would make sense as a fresh Given.
    But we don't have a way to produce evidence for fundeps, as a Wanted it
-   is /harmful/: we can't prove it, and so we'll report an error and reject
-   the program. (Previously fundeps gave rise to Deriveds, which
-   carried no evidence, so it didn't matter that they could not be proved.)
+   is /useless/.
+
+   (Historical aside: we used to keep fundep-generate Wanteds around, so
+   this insoluble constraint would generate a (misleading) error message.
+   Nowadays we discard unsolved fundeps. End of historial aside.)
 
 3. #20922 showed a subtle different problem with Given/instance fundeps.
       type family ZipCons (as :: [k]) (bssx :: [[k]]) = (r :: [[k]]) | r -> as bssx where
@@ -414,15 +419,31 @@ We ingore such fundeps for several reasons:
    (The tclevel=4 means that this Given is at level 4.)  The fundep tells us that
    'iss' must be of form (is2 : beta[4]) where beta[4] is a fresh unification
    variable; we don't know what type it stands for. So we would emit
-      [W] iss ~ is2 : beta
+      [W] iss ~ is2 : beta[4]
 
-   Again we can't prove that equality; and worse we'll rewrite iss to
+   Again we can't prove that equality. (Historical aside: in the past
+   we used to keep fundep Wanteds around, and then it'll rewrite `iss` to
    (is2:beta) in deeply nested constraints inside this implication,
    where beta is untouchable (under other equality constraints), leading
-   to other insoluble constraints.
+   to other insoluble constraints.  End of historical aside.)
 
-The bottom line: since we have no evidence for them, we should ignore Given/Given
-and Given/instance fundeps entirely.
+The bottom line: since we have no evidence for them, for user-defined type
+families we should ignore Given/Given and Given/instance fundeps entirely.
+
+Note [Given/Given fundeps for built-in type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For built-in type families we /can/ generate real evidence from Given/Given
+or Given/instance interactions.  For example if we have
+   [G] x+3 ~ 7
+then we can deduce
+   [G] x ~ 4
+Or
+   [G] x++[3] ~ [5,3]
+we can deduce
+   [] x ~ [5]
+
+This new Given evidence is generated by `tryGivenBuiltinFamEqFDs` supported
+by the extensive code in GHC.Builtin.Types.Literals.
 -}
 
 
@@ -551,8 +572,14 @@ mkLocalUserFamEqFDs fam_tc inj_flags work_args work_rhs
 -----------------------------------------
 --  Built-in type families
 -----------------------------------------
+
 tryGivenBuiltinFamEqFDs :: TyCon -> BuiltInSynFamily -> [TcType] -> EqCt -> SolverStage ()
 -- TyCon is definitely a built-in type family
+-- Built-in type families are special becase we can generate
+-- evidence from /Givens/. For example:
+--    from [G] x+4~7 we can deduce [G] x~7
+-- That's important!
+-- See Note [Given/Given fundeps for built-in type families]
 tryGivenBuiltinFamEqFDs fam_tc ops work_args (EqCt { eq_ev = work_ev, eq_rhs = work_rhs })
   = Stage $
     do { traceTcS "tryBuiltinFamEqFDs" $
@@ -594,7 +621,7 @@ tryGivenBuiltinFamEqFDs fam_tc ops work_args (EqCt { eq_ev = work_ev, eq_rhs = w
            ; emitNewGivens (ctEvLoc inert_ev) (map mk_ax_co pairs) }
              -- This CtLoc for the new Givens doesn't reflect the
              -- fact that it's a combination of Givens, but I don't
-             -- this that matters.
+             -- think that matters.
       where
         inert_co = ctEvCoercion inert_ev
         mk_ax_co (ax,_) = (Nominal, mkAxiomCo ax [combined_co])
@@ -667,7 +694,11 @@ in GHC.Core.TyCon):
 
 For /injective/, /user-defined/ type families
 
-* (INJFAM:Given) For Given constraints do nothing at all.
+* (INJFAM:Given) For Given constraints
+  - When F is user-defined, do nothing at all
+    See Note [No Given/Given fundeps]
+  - When F is a built-in type family, we can do better;
+    See Note [Given/Given fundeps for built-in type families]
 
 * (INJFAM:Wanted/Self) see `mkLocalUserFamEqFDs`
     work item: [W] F s1 s2 ~ F t1 t2
@@ -805,7 +836,6 @@ instantiateFunDepEqns (FDEqns { fd_qtvs = tvs, fd_eqs = eqs })
   where
     rev_eqs = reverse eqs
        -- (reverse eqs): See Note [Reverse order of fundep equations]
-       -- ToDo: is this still a problem?
 
     subst_pair subst (Pair ty1 ty2)
        = Pair (substTyUnchecked subst' ty1) ty2
@@ -854,8 +884,8 @@ list in left-to-right order, which requires a few key calls to 'reverse'.
 When this was originally conceived, it was necessary to avoid a loop in T13135.
 That loop is now avoided by continuing with the kind equality (not the type
 equality) in canEqCanLHSHetero (see Note [Equalities with heterogeneous kinds]).
-However, the idea of working left-to-right still seems worthwhile, and so the calls
-to 'reverse' remain.
+However, the idea of working left-to-right still seems worthwhile (less
+kick-out), and so the calls to 'reverse' remain.
 
 This treatment is also used for class-based functional dependencies, although
 we do not have a program yet known to exhibit a loop there. It just seems
@@ -868,18 +898,17 @@ to avoid loops.
 {- *********************************************************************
 *                                                                      *
                  Historical notes
-
-     Here are a bunch of Notes that are rendered obselete by
-          Note [Partial functional dependencies]
-
+     Here are a bunch of Notes that are rendered obsolete by
+  Note [Deeper TcLevel for partial improvement unification variables]
 *                                                                      *
 ********************************************************************* -}
 
 {-
 Historical Note [Improvement orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [Fundeps with instances, and equality orientation], which describes
-the Exact Same Problem, with the same solution, but for functional dependencies.
+See also Historical Note [Fundeps with instances, and equality orientation],
+which describes the Exact Same Problem, with the same solution, but for
+functional dependencies.
 
 A very delicate point is the orientation of equalities
 arising from injectivity improvement (#12522).  Suppose we have
@@ -1056,7 +1085,7 @@ to solve for transitive functional dependencies (test case: T21703)
 
 Historical Note
 ~~~~~~~~~~~~~~~
-This Note (anonymous, but related to dict-solving) is rendered obselete by
+This Note (anonymous, but related to dict-solving) is rendered obsolete by
  - Danger 1: solved by Note [Instance and Given overlap]
  - Danger 2: solved by fundeps being idempotent
 

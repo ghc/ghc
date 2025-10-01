@@ -228,9 +228,6 @@ True, but False in the case where the only reason to iterate is new Wanted
 superclasses.  In that case we check whether the new Wanteds actually led to
 any new unifications, and iterate the implications only if so.
 
-"RAE": Add comment here about fundeps also using this mechanism. And probably
-update name of Note.
-
 Note [When to iterate the solver: unifications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider a deep tree of implication constraints

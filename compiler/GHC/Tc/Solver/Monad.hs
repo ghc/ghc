@@ -1255,7 +1255,8 @@ nestFunDepsTcS (TcS thing_inside)
     TcM.pushTcLevelM_  $
          -- pushTcLevelTcM: increase the level so that unification variables
          -- allocated by the fundep-creation itself don't count as useful unifications
-         -- See Note [Partial functional dependencies] in GHC.Tc.Solver.FunDeps
+         -- See Note [Deeper TcLevel for partial improvement unification variables]
+         --     in GHC.Tc.Solver.FunDeps
     do { inerts <- TcM.readTcRef inerts_var
        ; let nest_inerts = resetInertCans inerts
                  -- resetInertCans: like nestImplicTcS
@@ -2043,7 +2044,7 @@ emitNewWantedEq loc rewriters role ty1 ty2
 
 emitChildEqs :: CtEvidence -> Cts -> TcS ()
 -- Emit a bunch of equalities into the work list
--- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
+-- See Note [Work-list ordering] in GHC.Tc.Solver.Equality
 --
 -- All the constraints in `cts` share the same rewriter set so,
 -- rather than looking at it one by one, we pass it to
