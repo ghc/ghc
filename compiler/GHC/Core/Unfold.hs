@@ -62,7 +62,6 @@ import GHC.Data.Bag
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import GHC.Utils.Panic.Plain (assert)
 
 import qualified Data.ByteString as BS
 import Data.List.NonEmpty (nonEmpty)
@@ -558,7 +557,6 @@ uncondInlineJoin bndrs body
     go_arg (Var f)       = Just $! f `notElem` bndrs
     go_arg _             = Nothing
 
-
 sizeExpr :: UnfoldingOpts
          -> Int             -- Bomb out if it gets bigger than this
          -> [Id]            -- Arguments; we're interested in which of these
@@ -571,44 +569,51 @@ sizeExpr :: UnfoldingOpts
 -- Forcing bOMB_OUT_SIZE early prevents repeated
 -- unboxing of the Int argument.
 sizeExpr opts !bOMB_OUT_SIZE top_args expr
-  = size_up sizeZero expr
+  = size_up 0 expr
   where
     -- (size_up s e) returns `s` plus the size of `e`
-    size_up :: (ExprSize NoDiscount) -> CoreExpr -> ExprSize WithDiscount
-    size_up s (Cast e _)  = size_up s e
-    size_up s (Tick _ e)  = size_up s e
-    size_up s (Type _)    = withDiscount s           -- Types cost nothing
-    size_up s (Coercion _)  = withDiscount s
-    size_up s (Lit lit)  = withDiscount $ s `addSizeN` litSize lit
-    size_up s (Var f)    | isZeroBitId f = withDiscount s
+    size_up :: Int -> CoreExpr -> ExprSize WithDiscount
+    size_up acc_size (Cast e _)  = size_up acc_size e
+    size_up acc_size (Tick _ e)  = size_up acc_size e
+    size_up acc_size (Type _)    = mkSizeDiscount bOMB_OUT_SIZE acc_size emptyBag 0           -- Types cost nothing
+    size_up acc_size (Coercion _)  = mkSizeDiscount bOMB_OUT_SIZE acc_size emptyBag 0
+    size_up acc_size (Lit lit)  = (mkSizeDiscount bOMB_OUT_SIZE acc_size emptyBag 0) `addSizeND` litSize lit
+    size_up acc_size (Var f)    | isZeroBitId f = mkSizeDiscount bOMB_OUT_SIZE acc_size emptyBag 0
                         -- Make sure we get constructor discounts even
                         -- on nullary constructors
-                        | otherwise       = size_up_call s f [] 0
+                        | otherwise       = size_up_call acc_size emptyBag f [] 0
 
-    size_up s (App fun arg)
-      | isTyCoArg arg = size_up s fun
-      | otherwise     =  size_up_app (stripDiscounts $ size_up s arg)
-                                     fun [arg] (if isZeroBitExpr arg then 1 else 0)
+    size_up acc_size (App fun arg)
+      | isTyCoArg arg = size_up acc_size fun
+      | otherwise     = case size_up acc_size arg of
+          TooBig -> TooBig
+          SizeIs acc_size' acc_args' _d -> size_up_app  acc_size' acc_args'
+                                                        fun [arg] (if isZeroBitExpr arg then 1 else 0)
 
-    size_up s (Lam b e)
-      | isId b && not (isZeroBitId b) = lamScrutDiscount opts (size_up (addSizeN s 10) e)
-      | otherwise = size_up s e
+    size_up acc_size (Lam b e)
+      | isId b && not (isZeroBitId b) = lamScrutDiscount opts (size_up (acc_size+10) e)
+      | otherwise = size_up acc_size e
 
-    size_up s (Let (NonRec binder rhs) body)
-      = let rhs_s = size_up_let s (binder, rhs)
-        in size_up (stripDiscounts $ rhs_s) body
+    size_up acc_size (Let (NonRec binder rhs) body)
+      = case size_up_let acc_size emptyBag (binder, rhs) of
+          TooBig -> TooBig
+          SizeIs acc_size' acc_args' _d -> size_up acc_size' body `addSizeB` acc_args'
 
+    size_up acc_size (Let (Rec pairs) body)
+      = do_pairs acc_size emptyBag pairs
+      where
+        do_pairs acc_size acc_args [] = size_up acc_size body `addSizeB` acc_args
+        do_pairs acc_size acc_args (pair:pairs) =
+          case size_up_let acc_size acc_args pair of
+            TooBig -> TooBig
+            SizeIs acc_size' acc_args' _d -> do_pairs acc_size' acc_args' pairs
 
-    size_up s (Let (Rec pairs) body)
-      = size_up ((foldr (flip (size_up_let)) s pairs))
-                body
-
-    size_up s (Case e _ _ alts) = case nonEmpty alts of
-      Nothing -> size_up s e    -- case e of {} never returns, so take size of scrutinee
+    size_up acc_size (Case e _ _ alts) = case nonEmpty alts of
+      Nothing -> size_up acc_size e    -- case e of {} never returns, so take size of scrutinee
       Just alts
         | Just v <- is_top_arg e -> -- We are scrutinising an argument variable
           let
-            alt_sizes = NE.map (size_up_alt s) alts
+            alt_sizes = NE.map (size_up_alt acc_size) alts
 
                   -- alts_size tries to compute a good discount for
                   -- the case when we are scrutinising an argument variable
@@ -630,14 +635,14 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
 
             alts_size tot_size _ = tot_size
           in
-          s `addSizeNSD`  alts_size (foldr1 addAltSize alt_sizes)  -- alts is non-empty
+          mkSizeNoDiscount bOMB_OUT_SIZE acc_size emptyBag `addSizeNSD`  alts_size (foldr1 addAltSize alt_sizes)  -- alts is non-empty
                                     (foldr1 maxSize    alt_sizes)
                 -- Good to inline if an arg is scrutinised, because
                 -- that may eliminate allocation in the caller
                 -- And it eliminates the case itself
 
-        | otherwise -> foldr  (addAltSize . size_up_alt s)
-                              (size_up (s `addSizeN` case_size) e)
+        | otherwise -> foldr  (addAltSize . (size_up_alt acc_size))
+                              (size_up (acc_size + case_size) e)
                               alts
 
         where
@@ -683,35 +688,38 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
               | otherwise
                 = False
 
-    size_up_let :: ExprSize NoDiscount -> (Id, CoreExpr) -> ExprSize NoDiscount
-    size_up_let s (bndr, rhs)
+    size_up_let :: Int -> Bag (Id,Int) -> (Id, CoreExpr) -> ExprSize NoDiscount
+    size_up_let acc_size acc_args (bndr, rhs)
       | JoinPoint join_arity <- idJoinPointHood bndr
         -- Skip arguments to join point
       , (_bndrs, join_rhs) <- collectNBinders join_arity rhs
-      = stripDiscounts $ size_up s join_rhs
+      = (stripDiscounts $ size_up acc_size join_rhs) `addSizeB` acc_args
       | otherwise
-      = stripDiscounts $ size_up (s `addSizeN` size_up_alloc bndr) rhs
+      = (stripDiscounts $ size_up (acc_size + size_up_alloc bndr) rhs) `addSizeB` acc_args
 
     ------------
     -- size_up_app is used when there's ONE OR MORE value args
-    size_up_app :: ExprSize NoDiscount -> CoreExpr -> [CoreExpr] -> Int -> ExprSize WithDiscount
-    size_up_app s (App fun arg) args voids
-        | isTyCoArg arg                  = size_up_app s fun args voids
-        | isZeroBitExpr arg              = size_up_app s fun (arg:args) (voids + 1)
-        | otherwise                      =  let arg_size = stripDiscounts $ size_up s arg
-                                            in size_up_app arg_size fun (arg:args) voids
-    size_up_app s (Var fun)     args voids = size_up_call s fun args voids
-    size_up_app s (Tick _ expr) args voids = size_up_app s expr args voids
-    size_up_app s (Cast expr _) args voids = size_up_app s expr args voids
-    size_up_app s other         args voids = size_up (s `addSizeN` callSize (length args) voids) other
+    size_up_app :: Int -> Bag (Id,Int) -> CoreExpr -> [CoreExpr] -> Int -> ExprSize WithDiscount
+    size_up_app acc_size acc_args (App fun arg) args voids
+        | isTyCoArg arg                  = size_up_app acc_size acc_args fun args voids
+        | isZeroBitExpr arg              = size_up_app acc_size acc_args fun (arg:args) (voids + 1)
+        | otherwise                      =  case size_up acc_size arg of
+                                              TooBig -> TooBig
+                                              SizeIs acc_size' acc_args' _ ->
+                                                  size_up_app acc_size' acc_args' fun (arg:args) voids
+                                                      `addSizeB` acc_args
+    size_up_app acc_size acc_args (Var fun)     args voids = size_up_call acc_size acc_args fun args voids
+    size_up_app acc_size acc_args (Tick _ expr) args voids = size_up_app acc_size acc_args expr args voids
+    size_up_app acc_size acc_args (Cast expr _) args voids = size_up_app acc_size acc_args expr args voids
+    size_up_app acc_size acc_args other         args voids = size_up (acc_size + callSize (length args) voids) other `addSizeB` acc_args
 
        -- if the lhs is not an App or a Var, or an invisible thing like a
        -- Tick or Cast, then we should charge for a complete call plus the
        -- size of the lhs itself.
 
     ------------
-    size_up_call :: ExprSize NoDiscount -> Id -> [CoreExpr] -> Int -> ExprSize WithDiscount
-    size_up_call !s fun val_args voids
+    size_up_call :: Int -> Bag (Id,Int) -> Id -> [CoreExpr] -> Int -> ExprSize WithDiscount
+    size_up_call acc_size acc_args fun val_args voids
        = let !n_args = length val_args
              call_size = case idDetails fun of
                             FCallId _                     -> withDiscount $ sizeN (callSize n_args voids)
@@ -721,18 +729,18 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
                             _ | fun `hasKey` buildIdKey   -> buildSize
                               | fun `hasKey` augmentIdKey -> augmentSize
                               | otherwise                 -> funSize opts top_args fun n_args voids
-          in s `addSizeNSD` call_size
+          in mkSizeNoDiscount bOMB_OUT_SIZE acc_size acc_args `addSizeNSD` call_size
 
     ------------
-    -- size_up_alt returns on the alternatives size, not counting the accumulated
+    -- size_up_alt returns only the alternatives size, not counting the accumulated
     -- size passed in unless we reach TooBig. This is to facility better discount
     -- calculation based on the size of only the alternative.
-    size_up_alt TooBig _ = TooBig
-    size_up_alt (SizeIs {_es_size_is=s}) (Alt _con _bndrs rhs) =
-        size_up (sizeN s) rhs
+    -- size_up_alt acc_size acc_args = TooBig
+    size_up_alt acc_size (Alt _con _bndrs rhs) =
+        size_up acc_size rhs
                 -- Why add and then subtract s?
                 -- If the expression large enough this will ensure we bomb out early.
-                `addSizeND` (10 -s)
+                `addSizeND` (10 -acc_size)
 
         -- Don't charge for args, so that wrappers look cheap
         -- (See comments about wrappers with Case)
@@ -762,6 +770,9 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     addSizeN TooBig          _  = TooBig
     addSizeN (SizeIs n xs _d) m  = mkSizeNoDiscount bOMB_OUT_SIZE (n + m) xs
 
+    addSizeB :: ExprSize a -> Bag (Id,Int) -> ExprSize a
+    addSizeB TooBig _ = TooBig
+    addSizeB (SizeIs sz bg1 dc) bg2 = SizeIs sz (bg1 `unionBags` bg2) dc
         -- addAltSize is used to add the sizes of case alternatives
     addAltSize TooBig            _      = TooBig
     addAltSize _                 TooBig = TooBig
@@ -797,6 +808,8 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     isZeroBitExpr (Var id)   = isZeroBitId id
     isZeroBitExpr (Tick _ e) = isZeroBitExpr e
     isZeroBitExpr _          = False
+
+    mkSizeDiscountB = mkSizeDiscount bOMB_OUT_SIZE
 
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
