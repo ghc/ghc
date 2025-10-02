@@ -3781,7 +3781,7 @@ bindTyClTyVarsAndZonk tycon_name thing_inside
 zonkAndScopedSort :: [TcTyVar] -> TcM [TcTyVar]
 zonkAndScopedSort spec_tkvs
   = do { spec_tkvs <- liftZonkM $ zonkTcTyVarsToTcTyVars spec_tkvs
-         -- Zonk the kinds, to we can do the dependency analysis
+         -- Zonk the kinds, so that we can do the dependency analysis
 
        -- Do a stable topological sort, following
        -- Note [Ordering of implicit variables] in GHC.Rename.HsType

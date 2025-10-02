@@ -409,6 +409,7 @@ rnIfaceClsInst cls_inst = do
                     , ifInstTys = tys
                     , ifDFun = dfun
                     }
+      -- TODO: refactor to avoid record update
 
 rnIfaceDefault :: Rename IfaceDefault
 rnIfaceDefault cls_inst = do
@@ -417,6 +418,7 @@ rnIfaceDefault cls_inst = do
     return cls_inst { ifDefaultCls = n
                     , ifDefaultTys = tys
                     }
+      -- TODO: refactor to avoid record update
 
 rnRoughMatchTyCon :: Rename (Maybe IfaceTyCon)
 rnRoughMatchTyCon Nothing = return Nothing
@@ -428,6 +430,7 @@ rnIfaceFamInst d = do
     tys <- mapM rnRoughMatchTyCon (ifFamInstTys d)
     axiom <- rnIfaceGlobal (ifFamInstAxiom d)
     return d { ifFamInstFam = fam, ifFamInstTys = tys, ifFamInstAxiom = axiom }
+          -- TODO: refactor to avoid record update
 
 rnIfaceDecl' :: Rename (Fingerprint, IfaceDecl)
 rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
@@ -619,6 +622,7 @@ rnIfaceClassBody d@IfConcreteClass{} = do
     ats <- mapM rnIfaceAT (ifATs d)
     sigs <- mapM rnIfaceClassOp (ifSigs d)
     return d { ifClassCtxt = ctxt, ifATs = ats, ifSigs = sigs }
+          -- TODO: refactor to avoid record update
 
 rnIfaceFamTyConFlav :: Rename IfaceFamTyConFlav
 rnIfaceFamTyConFlav (IfaceClosedSynFamilyTyCon (Just (n, axs)))
@@ -644,29 +648,48 @@ rnIfaceConDecls (IfNewTyCon d) = IfNewTyCon <$> rnIfaceConDecl d
 rnIfaceConDecls IfAbstractTyCon = pure IfAbstractTyCon
 
 rnIfaceConDecl :: Rename IfaceConDecl
-rnIfaceConDecl d = do
-    con_name <- rnIfaceGlobal (ifConName d)
-    con_univ_tvs <- mapM rnIfaceBndr (ifConUnivTvs d)
-    con_ex_tvs <- mapM rnIfaceBndr (ifConExTCvs d)
-    con_user_tvbs <- mapM rnIfaceForAllBndr (ifConUserTvBinders d)
+rnIfaceConDecl
+  ( IfCon { ifConName          = con_name0
+          , ifConUnivTvs       = con_univ_tvs0
+          , ifConExTCvs        = con_ex_tvs0
+          , ifConUserTvBinders = con_user_tvbs0
+          , ifConEqSpec        = con_eq_spec0
+          , ifConCtxt          = con_ctxt0
+          , ifConArgTys        = con_arg_tys0
+          , ifConFields        = con_fields0
+          , ifConStricts       = con_stricts0
+          , ifConWrapper       = con_wrapper
+          , ifConInfix         = con_infix
+          , ifConSrcStricts    = con_src_stricts
+          } ) = do
     let rnIfConEqSpec (n,t) = (,) n <$> rnIfaceType t
-    con_eq_spec <- mapM rnIfConEqSpec (ifConEqSpec d)
-    con_ctxt <- mapM rnIfaceType (ifConCtxt d)
-    con_arg_tys <- mapM rnIfaceScaledType (ifConArgTys d)
-    con_fields <- mapM rnFieldLabel (ifConFields d)
-    let rnIfaceBang (IfUnpackCo co) = IfUnpackCo <$> rnIfaceCo co
+        rnIfaceBang (IfUnpackCo co) = IfUnpackCo <$> rnIfaceCo co
         rnIfaceBang bang = pure bang
-    con_stricts <- mapM rnIfaceBang (ifConStricts d)
-    return d { ifConName = con_name
-             , ifConUnivTvs = con_univ_tvs
-             , ifConExTCvs = con_ex_tvs
-             , ifConUserTvBinders = con_user_tvbs
-             , ifConEqSpec = con_eq_spec
-             , ifConCtxt = con_ctxt
-             , ifConArgTys = con_arg_tys
-             , ifConFields = con_fields
-             , ifConStricts = con_stricts
-             }
+
+    con_name      <- rnIfaceGlobal con_name0
+    con_univ_tvs  <- mapM rnIfaceBndr con_univ_tvs0
+    con_ex_tvs    <- mapM rnIfaceBndr con_ex_tvs0
+    con_user_tvbs <- mapM rnIfaceForAllBndr con_user_tvbs0
+    con_eq_spec   <- mapM rnIfConEqSpec con_eq_spec0
+    con_ctxt      <- mapM rnIfaceType con_ctxt0
+    con_arg_tys   <- mapM rnIfaceScaledType con_arg_tys0
+    con_fields    <- mapM rnFieldLabel con_fields0
+    con_stricts   <- mapM rnIfaceBang con_stricts0
+    return $
+      IfCon
+        { ifConName          = con_name
+        , ifConUnivTvs       = con_univ_tvs
+        , ifConExTCvs        = con_ex_tvs
+        , ifConUserTvBinders = con_user_tvbs
+        , ifConEqSpec        = con_eq_spec
+        , ifConCtxt          = con_ctxt
+        , ifConArgTys        = con_arg_tys
+        , ifConFields        = con_fields
+        , ifConStricts       = con_stricts
+        , ifConWrapper       = con_wrapper
+        , ifConInfix         = con_infix
+        , ifConSrcStricts    = con_src_stricts
+        }
 
 rnIfaceClassOp :: Rename IfaceClassOp
 rnIfaceClassOp (IfaceClassOp n ty dm) =
@@ -686,6 +709,7 @@ rnIfaceAxBranch d = do
     return d { ifaxbTyVars = ty_vars
              , ifaxbLHS = lhs
              , ifaxbRHS = rhs }
+      -- TODO: refactor to avoid record update
 
 rnIfaceIdInfo :: Rename IfaceIdInfo
 rnIfaceIdInfo = mapM rnIfaceInfoItem

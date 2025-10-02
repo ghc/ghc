@@ -4208,27 +4208,28 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
 
-       ; tkvs <- kindGeneralizeAll skol_info
+       ; inf_tkvs <- kindGeneralizeAll skol_info
                     (mkForAllTys tvbs         $
                      tcMkPhiTy ctxt           $
                      tcMkScaledFunTys arg_tys $
                      res_ty)
-       ; traceTc "tcConDecl:GADT" (ppr names $$ ppr res_ty $$ ppr tkvs)
-       ; reportUnsolvedEqualities skol_info tkvs tclvl wanted
+       ; traceTc "tcConDecl:GADT" (ppr names $$ ppr res_ty $$ ppr inf_tkvs)
+       ; reportUnsolvedEqualities skol_info inf_tkvs tclvl wanted
 
-       ; let tvbndrs = mkTyVarBinders Inferred tkvs ++ tvbs
+       ; let inf_bndrs = mkTyVarBinders Inferred inf_tkvs
 
        -- Zonk to Types
-       ; (tvbndrs, arg_tys, ctxt, res_ty) <- initZonkEnv NoFlexi $
-         runZonkBndrT (zonkTyVarBindersX tvbndrs) $ \ tvbndrs ->
+       ; (inf_bndrs, tvbs, arg_tys, ctxt, res_ty) <- initZonkEnv NoFlexi $
+         runZonkBndrT (zonkTyVarBindersX inf_bndrs) $ \ inf_bndrs ->
+         runZonkBndrT (zonkTyVarBindersX tvbs) $ \ tvbs ->
            do { arg_tys <- zonkScaledTcTypesToTypesX arg_tys
               ; ctxt    <- zonkTcTypesToTypesX       ctxt
               ; res_ty  <- zonkTcTypeToTypeX         res_ty
-              ; return (tvbndrs, arg_tys, ctxt, res_ty) }
+              ; return (inf_bndrs, tvbs, arg_tys, ctxt, res_ty) }
 
        ; let res_tmpl = mkDDHeaderTy dd_info rep_tycon tc_bndrs
              (univ_tvs, ex_tvs, tvbndrs', eq_preds, arg_subst)
-               = rejigConRes tc_bndrs res_tmpl tvbndrs res_ty
+               = rejigConRes tc_bndrs res_tmpl inf_bndrs tvbs res_ty
              -- See Note [rejigConRes]
 
              ctxt'      = substTys arg_subst ctxt
@@ -4503,7 +4504,8 @@ errors reported in one pass.  See #7175, and #10836.
 rejigConRes :: [KnotTied TyConBinder]  -- Template for result type; e.g.
             -> KnotTied Type           -- data instance T [a] b c ...
                                        --      gives template ([a,b,c], T [a] b c)
-            -> [TyVarBinder]      -- The constructor's type variables (both inferred and user-written)
+            -> [TyVarBinder]      -- Inferred type variables of the constructor
+            -> [TyVarBinder]      -- User-written type variables of the constructor
             -> KnotTied Type      -- res_ty
             -> ([TyVar],          -- Universal
                 [TyVar],          -- Existential (distinct OccNames from univs)
@@ -4514,7 +4516,7 @@ rejigConRes :: [KnotTied TyConBinder]  -- Template for result type; e.g.
         -- We don't check that the TyCon given in the ResTy is
         -- the same as the parent tycon, because checkValidDataCon will do it
 -- NB: All arguments may potentially be knot-tied
-rejigConRes tc_tvbndrs res_tmpl dc_tvbndrs res_ty
+rejigConRes tc_tvbndrs res_tmpl dc_inf_bndrs dc_user_bndrs res_ty
         -- E.g.  data T [a] b c where
         --         MkT :: forall x y z. T [(x,y)] z z
         -- The {a,b,c} are the tc_tvs, and the {x,y,z} are the dc_tvs
@@ -4532,7 +4534,7 @@ rejigConRes tc_tvbndrs res_tmpl dc_tvbndrs res_ty
         --              , [], [x,y,z]
         --              , [a~(x,y),b~z], <arg-subst> )
   | Just subst <- tcMatchTy res_tmpl res_ty
-  = let (univ_tvs, raw_eqs, kind_subst) = mkGADTVars tc_tvs dc_tvs subst
+  = let (univ_tvs, raw_eqs, kind_subst) = mkGADTVars tc_tvs (binderVars dc_inf_bndrs) (binderVars dc_user_bndrs) subst
         raw_ex_tvs = dc_tvs `minusList` univ_tvs
         (arg_subst, substed_ex_tvs) = substTyVarBndrs kind_subst raw_ex_tvs
 
@@ -4542,7 +4544,7 @@ rejigConRes tc_tvbndrs res_tmpl dc_tvbndrs res_ty
         -- substitution has *all* the tyvars in its domain.
         -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
         subst_user_tvs  = mapVarBndrs (substTyVarToTyVar arg_subst)
-        substed_tvbndrs = subst_user_tvs dc_tvbndrs
+        substed_tvbndrs = subst_user_tvs $ dc_inf_bndrs ++ dc_user_bndrs
 
         substed_eqs = [ mkEqSpec (substTyVarToTyVar arg_subst tv)
                                  (substTy arg_subst ty)
@@ -4561,9 +4563,9 @@ rejigConRes tc_tvbndrs res_tmpl dc_tvbndrs res_ty
         -- albeit bogus, relying on checkValidDataCon to check the
         --  bad-result-type error before seeing that the other fields look odd
         -- See Note [rejigConRes]
-  = (tc_tvs, dc_tvs `minusList` tc_tvs, dc_tvbndrs, [], emptySubst)
+  = (tc_tvs, dc_tvs `minusList` tc_tvs, dc_inf_bndrs ++ dc_user_bndrs, [], emptySubst)
   where
-    dc_tvs = binderVars dc_tvbndrs
+    dc_tvs = binderVars $ dc_inf_bndrs ++ dc_user_bndrs
     tc_tvs = binderVars tc_tvbndrs
 
 {- Note [mkGADTVars]
@@ -4707,8 +4709,9 @@ certainly degrade error messages a bit, though.
 -- | From information about a source datacon definition, extract out
 -- what the universal variables and the GADT equalities should be.
 -- See Note [mkGADTVars].
-mkGADTVars :: [TyVar]    -- ^ The tycon vars
-           -> [TyVar]    -- ^ The datacon vars
+mkGADTVars :: [TyVar]    -- ^ The tycon tyvars
+           -> [TyVar]    -- ^ Inferred datacon tyvars
+           -> [TyVar]    -- ^ User-written datacon tyvars
            -> Subst   -- ^ The matching between the template result type
                          -- and the actual result type
            -> ( [TyVar]
@@ -4716,10 +4719,11 @@ mkGADTVars :: [TyVar]    -- ^ The tycon vars
               , Subst ) -- ^ The univ. variables, the GADT equalities,
                            -- and a subst to apply to the GADT equalities
                            -- and existentials.
-mkGADTVars tmpl_tvs dc_tvs subst
+mkGADTVars tmpl_tvs inf_dc_tvs user_dc_tvs subst
   = choose [] [] empty_subst empty_subst tmpl_tvs
   where
-    in_scope = mkInScopeSet (mkVarSet tmpl_tvs `unionVarSet` mkVarSet dc_tvs)
+    inf_tvs = mkVarSet inf_dc_tvs
+    in_scope = mkInScopeSet (mkVarSet tmpl_tvs `unionVarSet` inf_tvs `unionVarSet` mkVarSet user_dc_tvs)
                `unionInScope` substInScopeSet subst
     empty_subst = mkEmptySubst in_scope
 
@@ -4775,7 +4779,8 @@ mkGADTVars tmpl_tvs dc_tvs subst
       -- happen with GHC-generated implicit kind variables.
     choose_tv_name :: TyVar -> TyVar -> Name
     choose_tv_name r_tv t_tv
-      | isSystemName r_tv_name
+      |  r_tv `elemVarSet` inf_tvs -- Prefer TyCon name over inferred (non user-written) DataCon name
+      || isSystemName r_tv_name
       = setNameUnique t_tv_name (getUnique r_tv_name)
 
       | otherwise
@@ -4785,10 +4790,8 @@ mkGADTVars tmpl_tvs dc_tvs subst
         r_tv_name = getName r_tv
         t_tv_name = getName t_tv
 
-{-
-Note [Substitution in template variables kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Substitution in template variables kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 data G (a :: Maybe k) where
   MkG :: G Nothing
 
