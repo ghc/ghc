@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -dumpdir dumps #-}
+{-# LANGUAGE DataKinds #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The AQUA Project, Glasgow University, 1994-1998
@@ -59,6 +62,7 @@ import GHC.Data.Bag
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic.Plain (assert)
 
 import qualified Data.ByteString as BS
 import Data.List.NonEmpty (nonEmpty)
@@ -560,7 +564,7 @@ sizeExpr :: UnfoldingOpts
          -> [Id]            -- Arguments; we're interested in which of these
                             -- get case'd
          -> CoreExpr
-         -> ExprSize
+         -> ExprSize WithDiscount
 
 -- Note [Computing the size of an expression]
 
@@ -569,16 +573,18 @@ sizeExpr :: UnfoldingOpts
 sizeExpr opts !bOMB_OUT_SIZE top_args expr
   = size_up sizeZero expr
   where
-    size_up :: ExprSize -> CoreExpr -> ExprSize
+    -- (size_up s e) returns `s` plus the size of `e`
+    size_up :: ExprSize NoDiscount -> CoreExpr -> ExprSize WithDiscount
     size_up TooBig !_ = TooBig
-    size_up (SizeIs !s _ _) _
-      | s > bOMB_OUT_SIZE = TooBig
+    size_up (SizeIs !s _ d) _
+      | assert (d == 0) $ s > bOMB_OUT_SIZE
+      = TooBig
     size_up s (Cast e _)  = size_up s e
     size_up s (Tick _ e)  = size_up s e
-    size_up s (Type _)    = s           -- Types cost nothing
-    size_up s (Coercion _)  = s
-    size_up s (Lit lit)  = addSizeNSD (sizeN (litSize lit)) s
-    size_up s (Var f)    | isZeroBitId f = s
+    size_up s (Type _)    = withDiscount s           -- Types cost nothing
+    size_up s (Coercion _)  = withDiscount s
+    size_up s (Lit lit)  = withDiscount $ s `addSizeN` litSize lit
+    size_up s (Var f)    | isZeroBitId f = withDiscount s
                         -- Make sure we get constructor discounts even
                         -- on nullary constructors
                         | otherwise       = size_up_call s f [] 0
@@ -598,7 +604,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
 
 
     size_up s (Let (Rec pairs) body)
-      = size_up (stripDiscounts (foldr (flip size_up_let) s pairs))
+      = size_up ((foldr (flip (size_up_let)) s pairs))
                 body
 
     size_up s (Case e _ _ alts) = case nonEmpty alts of
@@ -635,7 +641,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
                 -- And it eliminates the case itself
 
         | otherwise -> foldr  (addAltSize . size_up_alt s)
-                              (stripDiscounts $ size_up (s `addSizeN` case_size) e)
+                              (size_up (s `addSizeN` case_size) e)
                               alts
 
         where
@@ -681,18 +687,18 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
               | otherwise
                 = False
 
-    size_up_let :: ExprSize -> (Id, CoreExpr) -> ExprSize
+    size_up_let :: ExprSize NoDiscount -> (Id, CoreExpr) -> ExprSize NoDiscount
     size_up_let s (bndr, rhs)
       | JoinPoint join_arity <- idJoinPointHood bndr
         -- Skip arguments to join point
-      , (_bndrs, body) <- collectNBinders join_arity rhs
-      = size_up s body
+      , (_bndrs, join_rhs) <- collectNBinders join_arity rhs
+      = stripDiscounts $ size_up s join_rhs
       | otherwise
-      = size_up (s `addSizeN` size_up_alloc bndr) rhs
+      = stripDiscounts $ size_up (s `addSizeN` size_up_alloc bndr) rhs
 
     ------------
     -- size_up_app is used when there's ONE OR MORE value args
-    size_up_app :: ExprSize -> CoreExpr -> [CoreExpr] -> Int -> ExprSize
+    size_up_app :: ExprSize NoDiscount -> CoreExpr -> [CoreExpr] -> Int -> ExprSize WithDiscount
     size_up_app s (App fun arg) args voids
         | isTyCoArg arg                  = size_up_app s fun args voids
         | isZeroBitExpr arg              = size_up_app s fun (arg:args) (voids + 1)
@@ -708,14 +714,14 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
        -- size of the lhs itself.
 
     ------------
-    size_up_call :: ExprSize -> Id -> [CoreExpr] -> Int -> ExprSize
+    size_up_call :: ExprSize NoDiscount -> Id -> [CoreExpr] -> Int -> ExprSize WithDiscount
     size_up_call !s fun val_args voids
        = let !n_args = length val_args
              call_size = case idDetails fun of
-                            FCallId _                     -> sizeN (callSize n_args voids)
+                            FCallId _                     -> withDiscount $ sizeN (callSize n_args voids)
                             DataConWorkId dc              -> conSize    dc n_args
-                            PrimOpId op _                 -> primOpSize op n_args
-                            ClassOpId cls _               -> classOpSize opts cls top_args val_args
+                            PrimOpId op _                 -> withDiscount $ primOpSize op n_args
+                            ClassOpId cls _               -> withDiscount $ classOpSize opts cls top_args val_args
                             _ | fun `hasKey` buildIdKey   -> buildSize
                               | fun `hasKey` augmentIdKey -> augmentSize
                               | otherwise                 -> funSize opts top_args fun n_args voids
@@ -730,7 +736,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
         size_up (sizeN s) rhs
                 -- Why add and then subtract s?
                 -- If the expression large enough this will ensure we bomb out early.
-                `addSizeN` (10 -s)
+                `addSizeND` (10 -s)
 
         -- Don't charge for args, so that wrappers look cheap
         -- (See comments about wrappers with Case)
@@ -752,23 +758,29 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     ------------
         -- These addSize things have to be here because
         -- I don't want to give them bOMB_OUT_SIZE as an argument
+    addSizeND :: ExprSize WithDiscount -> Int -> ExprSize WithDiscount
+    addSizeND TooBig          _  = TooBig
+    addSizeND (SizeIs n xs d) m  = mkSizeDiscount bOMB_OUT_SIZE (n + m) xs d
+
+    addSizeN :: ExprSize NoDiscount -> Int -> ExprSize NoDiscount
     addSizeN TooBig          _  = TooBig
-    addSizeN (SizeIs n xs d) m  = mkSizeIs bOMB_OUT_SIZE (n + m) xs d
+    addSizeN (SizeIs n xs _d) m  = mkSizeNoDiscount bOMB_OUT_SIZE (n + m) xs
 
         -- addAltSize is used to add the sizes of case alternatives
     addAltSize TooBig            _      = TooBig
     addAltSize _                 TooBig = TooBig
     addAltSize (SizeIs n1 xs d1) (SizeIs n2 ys d2)
-        = mkSizeIs bOMB_OUT_SIZE (n1 + n2)
+        = mkSizeDiscount bOMB_OUT_SIZE (n1 + n2)
                                  (xs `unionBags` ys)
                                  (d1 + d2) -- Note [addAltSize result discounts]
 
         -- This variant ignores the result discount from its LEFT argument
         -- It's used when the second argument isn't part of the result
+    addSizeNSD :: ExprSize NoDiscount -> ExprSize WithDiscount -> ExprSize WithDiscount
     addSizeNSD TooBig            _      = TooBig
     addSizeNSD _                 TooBig = TooBig
     addSizeNSD (SizeIs n1 xs _) (SizeIs n2 ys d2)
-        = mkSizeIs bOMB_OUT_SIZE (n1 + n2)
+        = mkSizeDiscount bOMB_OUT_SIZE (n1 + n2)
                                  (xs `unionBags` ys)
                                  d2  -- Ignore d1
 
@@ -777,6 +789,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     -- this benefit for the body.
     -- Why? `x` is visible to `body` either way, so it really should not
     -- affect our inlining decision either way.
+    stripDiscounts :: ExprSize a -> ExprSize NoDiscount
     stripDiscounts TooBig = TooBig
     stripDiscounts (SizeIs n xs _) = (SizeIs n xs 0)
 
@@ -801,7 +814,7 @@ litSize _other = 0    -- Must match size of nullary constructors
                       -- Key point: if  x |-> 4, then x must inline unconditionally
                       --            (eg via case binding)
 
-classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize
+classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize NoDiscount
 -- See Note [Conlike is interesting]
 classOpSize opts cls top_args args
   | isUnaryClass cls
@@ -844,7 +857,7 @@ jumpSize _n_val_args _voids = 0   -- Jumps are small, and we don't want penalise
   -- spectral/puzzle. TODO Perhaps adjusting the default threshold would be a
   -- better solution?
 
-funSize :: UnfoldingOpts -> [Id] -> Id -> Int -> Int -> ExprSize
+funSize :: UnfoldingOpts -> [Id] -> Id -> Int -> Int -> ExprSize WithDiscount
 -- Size for function calls where the function is not a constructor or primops
 -- Note [Function applications]
 funSize opts top_args fun n_val_args voids
@@ -870,14 +883,14 @@ funSize opts top_args fun n_val_args voids
         -- If the function is partially applied, show a result discount
 -- XXX maybe behave like ConSize for eval'd variable
 
-conSize :: DataCon -> Int -> ExprSize
+conSize :: DataCon -> Int -> ExprSize WithDiscount
 conSize dc n_val_args
   | n_val_args == 0 = SizeIs 0 emptyBag 10    -- Like variables
 
 -- See Note [Unboxed tuple size and result discount]
   | isUnboxedTupleDataCon dc = SizeIs 0 emptyBag 10
 
-  | isUnaryClassDataCon dc = sizeZero
+  | isUnaryClassDataCon dc = withDiscount sizeZero
 
 -- See Note [Constructor size and result discount]
   | otherwise = SizeIs 10 emptyBag 10
@@ -974,7 +987,7 @@ that mention a literal Integer, because the float-out pass will float
 all those constants to top level.
 -}
 
-primOpSize :: PrimOp -> Int -> ExprSize
+primOpSize :: PrimOp -> Int -> ExprSize NoDiscount
 primOpSize op n_val_args
  = if primOpOutOfLine op
       then sizeN (op_size + n_val_args)
@@ -983,7 +996,7 @@ primOpSize op n_val_args
    op_size = primOpCodeSize op
 
 
-buildSize :: ExprSize
+buildSize :: ExprSize WithDiscount
 buildSize = SizeIs 0 emptyBag 40
         -- We really want to inline applications of build
         -- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
@@ -992,13 +1005,13 @@ buildSize = SizeIs 0 emptyBag 40
         -- build is saturated (it usually is).  The "-2" discounts for the \c n,
         -- The "4" is rather arbitrary.
 
-augmentSize :: ExprSize
+augmentSize :: ExprSize WithDiscount
 augmentSize = SizeIs 0 emptyBag 40
         -- Ditto (augment t (\cn -> e) ys) should cost only the cost of
         -- e plus ys. The -2 accounts for the \cn
 
 -- When we return a lambda, give a discount if it's used (applied)
-lamScrutDiscount :: UnfoldingOpts -> ExprSize -> ExprSize
+lamScrutDiscount :: UnfoldingOpts -> ExprSize a -> ExprSize WithDiscount
 lamScrutDiscount opts (SizeIs n vs _) = SizeIs n vs (unfoldingFunAppDiscount opts)
 lamScrutDiscount _      TooBig          = TooBig
 
@@ -1071,18 +1084,25 @@ In a function application (f a b)
 Code for manipulating sizes
 -}
 
+-- | Does an ExprSize include an evaluation Discount?
+data HasDiscount = NoDiscount | WithDiscount deriving (Eq)
+
 -- | The size of a candidate expression for unfolding
-data ExprSize
+--
+-- We don't use a separate constructor without a discount field as the
+-- re-allocation here as the resulting re-allocation when converting
+-- between them outweights any benefit.
+data ExprSize (hasDiscount :: HasDiscount)
     = TooBig
     | SizeIs { _es_size_is  :: {-# UNPACK #-} !Int -- ^ Size found
              , _es_args     :: !(Bag (Id,Int))
                -- ^ Arguments cased herein, and discount for each such
              , _es_discount :: {-# UNPACK #-} !Int
                -- ^ Size to subtract if result is scrutinised by a case
-               -- expression
+               -- expression. Must be zero if `hasDiscount == NoDiscount`
              }
 
-instance Outputable ExprSize where
+instance Outputable (ExprSize a) where
   ppr TooBig         = text "TooBig"
   ppr (SizeIs a _ c) = brackets (int a <+> int c)
 
@@ -1091,18 +1111,26 @@ instance Outputable ExprSize where
 --      tup = (a_1, ..., a_99)
 --      x = case tup of ...
 --
-mkSizeIs :: Int -> Int -> Bag (Id, Int) -> Int -> ExprSize
-mkSizeIs max n xs d | (n - d) > max = TooBig
-                    | otherwise     = SizeIs n xs d
+mkSizeDiscount :: Int -> Int -> Bag (Id, Int) -> Int -> ExprSize WithDiscount
+mkSizeDiscount max n xs d | (n - d) > max = TooBig
+                          | otherwise     = SizeIs n xs d
 
-maxSize :: ExprSize -> ExprSize -> ExprSize
+mkSizeNoDiscount :: Int -> Int -> Bag (Id, Int) -> ExprSize NoDiscount
+mkSizeNoDiscount max n xs | n > max   = TooBig
+                          | otherwise = SizeIs n xs 0
+
+maxSize :: ExprSize a -> ExprSize a -> ExprSize a
 maxSize TooBig         _                                  = TooBig
 maxSize _              TooBig                             = TooBig
 maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 > n2   = s1
                                               | otherwise = s2
+withDiscount :: ExprSize NoDiscount -> ExprSize WithDiscount
+withDiscount s = case s of
+  TooBig -> TooBig
+  SizeIs x1 x2 x3 -> SizeIs x1 x2 x3
 
-sizeZero :: ExprSize
-sizeN :: Int -> ExprSize
+sizeZero :: ExprSize NoDiscount
+sizeN :: Int -> ExprSize NoDiscount
 
 sizeZero = SizeIs 0 emptyBag 0
 sizeN n  = SizeIs n emptyBag 0
