@@ -2778,7 +2778,7 @@ the appropriate component of the product, discarding the rest:
     checkPatOf3 (_, _, p) = p  -- interpret as a pattern
 
 We can easily define ambiguities between arbitrary subsets of interpretations.
-For example, when we know ahead of type that only an expression or a command is
+For example, when we know ahead of time that only an expression or a command is
 possible, but not a pattern, we can use a smaller type:
 
     type ExpCmd = (PV (LHsExpr GhcPs), PV (LHsCmd GhcPs))
