@@ -766,10 +766,6 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     addSizeND TooBig          _  = TooBig
     addSizeND (SizeIs n xs d) m  = mkSizeDiscount bOMB_OUT_SIZE (n + m) xs d
 
-    addSizeN :: ExprSize NoDiscount -> Int -> ExprSize NoDiscount
-    addSizeN TooBig          _  = TooBig
-    addSizeN (SizeIs n xs _d) m  = mkSizeNoDiscount bOMB_OUT_SIZE (n + m) xs
-
     addSizeB :: ExprSize a -> Bag (Id,Int) -> ExprSize a
     addSizeB TooBig _ = TooBig
     addSizeB (SizeIs sz bg1 dc) bg2 = SizeIs sz (bg1 `unionBags` bg2) dc
@@ -808,8 +804,6 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     isZeroBitExpr (Var id)   = isZeroBitId id
     isZeroBitExpr (Tick _ e) = isZeroBitExpr e
     isZeroBitExpr _          = False
-
-    mkSizeDiscountB = mkSizeDiscount bOMB_OUT_SIZE
 
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
