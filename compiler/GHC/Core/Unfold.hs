@@ -574,11 +574,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
   = size_up sizeZero expr
   where
     -- (size_up s e) returns `s` plus the size of `e`
-    size_up :: ExprSize NoDiscount -> CoreExpr -> ExprSize WithDiscount
-    size_up TooBig !_ = TooBig
-    size_up (SizeIs !s _ d) _
-      | assert (d == 0) $ s > bOMB_OUT_SIZE
-      = TooBig
+    size_up :: (ExprSize NoDiscount) -> CoreExpr -> ExprSize WithDiscount
     size_up s (Cast e _)  = size_up s e
     size_up s (Tick _ e)  = size_up s e
     size_up s (Type _)    = withDiscount s           -- Types cost nothing
