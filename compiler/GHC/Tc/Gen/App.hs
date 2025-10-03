@@ -934,9 +934,9 @@ looks_like_type_arg _ = False
 addArgCtxt :: Int -> HsExpr GhcRn -> LHsExpr GhcRn
            -> TcM a -> TcM a
 -- There are 2 cases:
--- 1. In the normal case, we add an informative context (<=> `isGeneratedCode` is `False`)
+-- 1. In the normal case, we add an informative context (<=> `inGeneratedCode` is `False`)
 --     "In the third argument of f, namely blah"
--- 2. If we are inside generated code (<=> `isGeneratedCode` is `True`)
+-- 2. If we are inside generated code (<=> `inGeneratedCode` is `True`)
 --    (i)   If arg_loc is generated do nothing to to LclEnv/LclCtxt
 --    (ii)  If arg_loc is Unhelpful UnhelpfulNoLocationInfo set `tcl_in_gen_code` to `True`
 --    (iii) if arg_loc is RealSrcLoc then update tcl_loc and add "In the expression: arg" to ErrCtxtStack
@@ -948,13 +948,13 @@ addArgCtxt arg_no fun (L arg_loc arg) thing_inside
        ; env0 <- liftZonkM tcInitTidyEnv
        ; err_ctx_msg <- mkErrCtxt env0 err_ctx
        ; traceTc "addArgCtxt" (vcat [ text "generated:" <+> ppr in_generated_code
-                                    , text "arg: " <+> ppr arg
+                                    , text "arg: " <+> ppr (arg, arg_no)
                                     , text "arg_loc:" <+> ppr arg_loc
                                     , text "fun:" <+> ppr fun
                                     , text "err_ctx" <+> vcat (fmap (\ (x, y) -> case x of
-                                                                              UserCodeCtxt{} -> text "<USER>" <+> pprErrCtxtMsg y
-                                                                              ExpansionCodeCtxt{} -> text "<EXPN>" <+> pprErrCtxtMsg y)
-                                                               (take 2 (zip err_ctx err_ctx_msg)))
+                                                                        UserCodeCtxt{} -> text "<USER>" <+> pprErrCtxtMsg y
+                                                                        ExpansionCodeCtxt{} -> text "<EXPN>" <+> pprErrCtxtMsg y)
+                                                               (take 4 (zip err_ctx err_ctx_msg)))
                                     ])
        ; if in_generated_code
          then updCtxtForArg (locA arg_loc) arg $
