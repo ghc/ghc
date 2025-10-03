@@ -2238,7 +2238,7 @@ generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
 mkByteCodeObject :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ByteCodeObject
 mkByteCodeObject hsc_env mod mod_location cgguts = do
   bcos <- hscGenerateByteCode hsc_env cgguts mod_location
-  objs <- outputAndCompileForeign hsc_env mod mod_location (cgi_foreign_files cgguts) (cgi_foreign cgguts)
+  objs <- outputAndCompileForeign hsc_env mod (ml_hs_file_ospath $ mod_location) (cgi_foreign_files cgguts) (cgi_foreign cgguts)
   return $! ByteCodeObject mod bcos objs
 
 -- | Generate a fresh 'ByteCodeObject' for a given module but do not write it to disk.

@@ -131,7 +131,7 @@ mkBytecodeLib :: HscEnv
               -> IO BytecodeLib
 mkBytecodeLib hsc_env gbc_files in_mem_bcos = do
   on_disk_bcos <- mapM (readOnDiskByteCodeObject hsc_env) gbc_files
-  in_mem_bcos  <- mapM (encodeOnDiskByteCodeObject hsc_env) in_mem_bcos
+  in_mem_bcos  <- mapM encodeOnDiskByteCodeObject in_mem_bcos
   pure BytecodeLib {
     bytecodeLibFiles = on_disk_bcos ++ in_mem_bcos
   }

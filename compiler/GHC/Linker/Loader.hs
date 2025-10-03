@@ -109,7 +109,7 @@ import qualified Data.Set as Set
 import Data.Char (isSpace)
 import qualified Data.Foldable as Foldable
 import Data.IORef
-import Data.List (intercalate, isPrefixOf, nub, partition)
+import Data.List (intercalate, isPrefixOf, nub, partition, zip4)
 import Data.Maybe
 import Data.Either
 import Control.Concurrent.MVar
@@ -1190,26 +1190,7 @@ loadPackages' interp hsc_env new_pks pls = do
     downsweep
       ([], pkgs_loaded pls)
       new_pks
-  loaded_pkgs_info_list <- loadPackage interp hsc_env pkgs_info_list
-  evaluate $
-    pls
-      { pkgs_loaded =
-          foldl'
-            ( \pkgs (new_pkg_info, (hs_cls, extra_cls, loaded_dlls)) ->
-                adjustUDFM
-                  ( \old_pkg_info ->
-                      old_pkg_info
-                        { loaded_pkg_hs_objs = hs_cls,
-                          loaded_pkg_non_hs_objs = extra_cls,
-                          loaded_pkg_hs_dlls = loaded_dlls
-                        }
-                  )
-                  pkgs
-                  (Packages.unitId new_pkg_info)
-            )
-            pkgs_almost_loaded
-            (zip pkgs_info_list loaded_pkgs_info_list)
-      }
+  loadPackage interp hsc_env pkgs_info_list (pls { pkgs_loaded = pkgs_almost_loaded })
   where
     -- The downsweep process takes an initial 'PkgsLoaded' and uses it
     -- to memoize new packages to load when recursively downsweeping
@@ -1254,34 +1235,9 @@ loadPackages' interp hsc_env new_pks pls = do
           throwGhcExceptionIO
             (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
-loadPackage :: Interp -> HscEnv -> [UnitInfo] -> IO [([LibrarySpec], [LibrarySpec], [RemotePtr LoadedDLL])]
-loadPackage interp hsc_env pkgs
-    pls' <- link pls new_pks
-    return $! pls'
-  where
-     link :: LoaderState -> [UnitId] -> IO LoaderState
-     link pkgs new_pkgs =
-         foldM link_one pkgs new_pkgs
 
-     link_one :: LoaderState -> UnitId -> IO LoaderState
-     link_one pkgs new_pkg
-        | new_pkg `elemUDFM` (pkgs_loaded pkgs)   -- Already linked
-        = return pkgs
-
-        | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
-        = do { let deps = unitDepends pkg_cfg
-               -- Link dependents first
-             ; pkgs' <- link pkgs deps
-                -- Now link the package itself
-             ; loadPackage interp hsc_env pkg_cfg pkgs'
-             }
-
-        | otherwise
-        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
-
-
-loadPackage :: Interp -> HscEnv -> UnitInfo -> LoaderState -> IO LoaderState
-loadPackage interp hsc_env pkg pls
+loadPackage :: Interp -> HscEnv -> [UnitInfo] -> LoaderState -> IO LoaderState
+loadPackage interp hsc_env pkgs pls
    = do
         let dflags    = hsc_dflags hsc_env
         let logger    = hsc_logger hsc_env
@@ -1290,7 +1246,7 @@ loadPackage interp hsc_env pkg pls
             dirs | is_dyn    = [map ST.unpack $ Packages.unitLibraryDynDirs pkg | pkg <- pkgs]
                  | otherwise = [map ST.unpack $ Packages.unitLibraryDirs pkg | pkg <- pkgs]
             -- Directory to find bytecode libraries
-            bc_dirs = map ST.unpack $ Packages.unitLibraryBytecodeDirs pkg
+            bc_dirs = [map ST.unpack $ Packages.unitLibraryBytecodeDirs pkg | pkg <- pkgs]
 
         let hs_libs   = [map ST.unpack $ Packages.unitLibraries pkg | pkg <- pkgs]
             -- The FFI GHCi import lib isn't needed as
@@ -1318,7 +1274,7 @@ loadPackage interp hsc_env pkg pls
         dirs_env <- traverse (addEnvPaths "LIBRARY_PATH") dirs
 
         hs_classifieds
-           <- sequenceA [mapM (locateLib interp hsc_env True bc_dirs  dirs_env_ gcc_paths) hs_libs'_ | (dirs_env_, hs_libs'_) <- zip dirs_env hs_libs' ]
+           <- sequenceA [mapM (locateLib interp hsc_env True bc_dir_  dirs_env_ gcc_paths) hs_libs'_ | (bc_dir_, dirs_env_, hs_libs'_) <- zip3 bc_dirs dirs_env hs_libs' ]
         extra_classifieds
            <- sequenceA [mapM (locateLib interp hsc_env False [] dirs_env_ gcc_paths) extra_libs_ | (dirs_env_, extra_libs_) <- zip dirs_env extra_libs]
         let classifieds = zipWith (++) hs_classifieds extra_classifieds
@@ -1334,7 +1290,7 @@ loadPackage interp hsc_env pkg pls
                                 , obj <- objs]
             archs      = [ arch | classifieds_ <- classifieds, Archive arch <- classifieds_ ]
 
-            bytecodes = [ bc | BytecodeLibrary bc <- classifieds ]
+            bytecodes = [ bc | classifieds_ <- classifieds, BytecodeLibrary bc <- classifieds_ ]
 
         -- Add directories to library search paths
         let dll_paths  = map takeDirectory known_dlls
@@ -1385,7 +1341,9 @@ loadPackage interp hsc_env pkg pls
         if succeeded ok
            then do
              maybePutStrLn logger "done."
-             pure $ zip3 hs_classifieds extra_classifieds loaded_dlls
+             pure $ foldl' (\pls (new_pkg, hs_cls, extra_cls, loaded_dlls) ->
+                               pls { pkgs_loaded = adjustUDFM (\old_pkg_info -> old_pkg_info { loaded_pkg_hs_objs = hs_cls, loaded_pkg_non_hs_objs = extra_cls, loaded_pkg_hs_dlls = loaded_dlls }) (pkgs_loaded pls) (unitId new_pkg) }
+                           ) pls' (zip4 pkgs hs_classifieds extra_classifieds loaded_dlls)
            else let errmsg = text "unable to load units `"
                              <> vcat (map pprUnitInfoForUser pkgs) <> text "'"
                  in throwGhcExceptionIO (InstallationError (showSDoc dflags errmsg))
@@ -1400,8 +1358,8 @@ loadBytecodeLibrary hsc_env interp pls path = do
   -- 1. Read the bytecode library
   (BytecodeLib bcos) <- readBytecodeLib hsc_env path'
   bcos' <- mapM (decodeOnDiskByteCodeObject hsc_env) bcos
-  linkables <- mapM (loadByteCodeObjectLinkable hsc_env mod_time Nothing) bcos'
-  (pls', _) <- loadModuleLinkables interp hsc_env  pls linkables
+  linkables <- mapM (loadByteCodeObjectLinkable mod_time) bcos'
+  (pls', _) <- loadModuleLinkables interp hsc_env pls KeepExternalDefinitions linkables
   return pls'
 
 

@@ -304,7 +304,7 @@ pkg_bytecode :
 	mv Bytecode.hs outdir/
 	cd outdir && $(TEST_HC) -bytecodelib -hisuf=dyn_hi -dynamic -o testpkg-1.2.3.4-XXX.bytecode Bytecode.hs -fbyte-code -fwrite-interface -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX
 	$(LOCAL_GHC_PKG08) register --force bytecode.pkg
-	cat bytecode.script | $(TEST_HC) --interactive -package testpkg -package-db $(PKGCONF08)
+	cat bytecode.script | $(TEST_HC) $(TEST_HC_OPTS_INTERACTIVE) -package testpkg -package-db $(PKGCONF08)
 
 # Test that bytecode generation works with foreign files
 PKGCONF09=bytecode.package.conf
@@ -316,4 +316,4 @@ pkg_bytecode_foreign :
 	mv BytecodeForeign.c outdir/
 	cd outdir && $(TEST_HC) -bytecodelib -hisuf=dyn_hi -dynamic -o testpkg-1.2.3.4-XXX.bytecode BytecodeForeign.hs -fbyte-code -fwrite-interface -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX
 	$(LOCAL_GHC_PKG09) register --force bytecode_foreign.pkg
-	cat bytecode_foreign.script | $(TEST_HC) --interactive -package testpkg -package-db $(PKGCONF09)
+	cat bytecode_foreign.script | $(TEST_HC) $(TEST_HC_OPTS_INTERACTIVE) -package testpkg -package-db $(PKGCONF09)

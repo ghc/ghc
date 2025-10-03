@@ -58,15 +58,3 @@ compile_for_interpreter hsc_env use =
       }
 
     adapt_way want = if want (hscInterp hsc_env) then addWay else removeWay
-<<<<<<< HEAD
-=======
-
--- | Write the foreign sources and foreign stubs of a bytecode object to temporary files and compile them.
-loadByteCodeObject :: ByteCodeObject
-                   -> IO (CompiledByteCode, [FilePath])
-loadByteCodeObject (ByteCodeObject _mod cbc foreign_contents) = do
-  return (cbc, foreign_contents)
-
-loadByteCodeObjectLinkable :: UTCTime -> ByteCodeObject -> IO Linkable
-loadByteCodeObjectLinkable linkable_time bco = do
->>>>>>> 7b4de00e644 (Load bytecode objects into the linker when they are loaded.)

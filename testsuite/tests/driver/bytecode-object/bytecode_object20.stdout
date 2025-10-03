@@ -1,2 +1,2 @@
-[1 of 2] Compiling BytecodeTest     ( BytecodeTest.hs, interpreted )
+[1 of 2] Compiling BytecodeTest     ( BytecodeTest.hs, BytecodeTest.gbc )
 [2 of 2] Linking pkg.bytecode
