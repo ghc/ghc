@@ -63,7 +63,7 @@ module GHC.Tc.Utils.Monad(
   -- * Error management
   getSrcCodeOrigin,
   getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
-  inGeneratedCode, setInGeneratedCode, setInUserCode,
+  inGeneratedCode, setInGeneratedCode, setInUserCode, setLclCtxtInGenCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,

@@ -666,7 +666,8 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
         ; (ds_expr, ds_res_ty, err_msg)
             <- expandRecordUpd record_expr possible_parents rbnds res_ty
         ; addErrCtxt err_msg $
-          setInGeneratedCode (OrigExpr expr) $
+          updLclCtxt setLclCtxtInGenCode $
+          -- setInGeneratedCode (OrigExpr expr) $
           do { -- Typecheck the expanded expression.
                expr' <- tcExpr ds_expr (Check ds_res_ty)
                -- NB: it's important to use ds_res_ty and not res_ty here.
@@ -1483,7 +1484,7 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
              ds_expr = HsLet noExtField let_binds (wrapGenSpan case_expr)
 
              case_expr :: HsExpr GhcRn
-             case_expr = HsCase RecUpd record_expr
+             case_expr = HsCase RecUpd (wrapGenSpan (unLoc record_expr))
                        $ mkMatchGroup (Generated OtherExpansion DoPmc) (wrapGenSpan matches)
              matches :: [LMatch GhcRn (LHsExpr GhcRn)]
              matches = map make_pat (NE.toList relevant_cons)
