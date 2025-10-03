@@ -9,6 +9,8 @@
 -- many /other/ arguments the function has.  Inconsistent unboxing is very
 -- bad for performance, so I increased the limit to allow it to unbox
 -- consistently.
+-- AK: Seems we no longer unbox OccEnv now anyway so it might be redundant.
+
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -37,6 +39,7 @@ import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           mkCastMCo, mkTicks )
 import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
+import GHC.Core.Seq (seqExpr)
 import GHC.Core.Type
 import GHC.Core.TyCo.FVs    ( tyCoVarsOfMCo )
 
@@ -984,7 +987,7 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   = -- Analyse the RHS and /then/ the body
     let -- Analyse the rhs first, generating rhs_uds
         !(rhs_uds_s, bndr', rhs') = occAnalNonRecRhs env lvl ire mb_join bndr rhs
-        rhs_uds = foldr1 orUDs rhs_uds_s   -- NB: orUDs.  See (W4) of
+        rhs_uds = foldl1' orUDs rhs_uds_s   -- NB: orUDs.  See (W4) of
                                            -- Note [Occurrence analysis for join points]
 
         -- Now analyse the body, adding the join point
@@ -1049,6 +1052,7 @@ occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
     -- Match join arity O from mb_join_arity with manifest join arity M as
     -- returned by of occAnalLamTail. It's totally OK for them to mismatch;
     -- hence adjust the UDs from the RHS
+
     WUD adj_rhs_uds final_rhs = adjustNonRecRhs mb_join $
                                 occAnalLamTail rhs_env rhs
     final_bndr_with_rules
@@ -2188,7 +2192,8 @@ occ_anal_lam_tail env expr@(Lam {})
     go env rev_bndrs body
       = addInScope env rev_bndrs $ \env ->
         let !(WUD usage body') = occ_anal_lam_tail env body
-            wrap_lam body bndr = Lam (tagLamBinder usage bndr) body
+            wrap_lam !body !bndr = let !bndr' = (tagLamBinder usage bndr)
+                                   in Lam bndr' body
         in WUD (usage `addLamCoVarOccs` rev_bndrs)
                (foldl' wrap_lam body' rev_bndrs)
 
@@ -2541,7 +2546,7 @@ occAnal env (Case scrut bndr ty alts)
            let alt_env = addBndrSwap scrut' bndr $
                          setTailCtxt env  -- Kill off OccRhs
                WUD alts_usage alts' = do_alts alt_env alts
-               tagged_bndr = tagLamBinder alts_usage bndr
+               !tagged_bndr = tagLamBinder alts_usage bndr
            in WUD alts_usage (tagged_bndr, alts')
 
       total_usage = markAllNonTail scrut_usage `andUDs` alts_usage
@@ -2561,11 +2566,16 @@ occAnal env (Case scrut bndr ty alts)
         let WUD rhs_usage rhs' = occAnal env rhs
             tagged_bndrs = tagLamBinders rhs_usage bndrs
         in                 -- See Note [Binders in case alternatives]
-        WUD rhs_usage (Alt con tagged_bndrs rhs')
+        seqList tagged_bndrs -- avoid retaining the occEnv
+          $ WUD rhs_usage (Alt con tagged_bndrs rhs')
 
 occAnal env (Let bind body)
   = occAnalBind env NotTopLevel noImpRuleEdges bind
-                (\env -> occAnal env body) mkLets
+                (\env -> occAnal env body)
+                -- Without the seqs we construct a `Let` whos body is a
+                -- a thunk retaining the whole OccEnv until forced by the simplifier.
+                (\bndrs body -> (seqExpr body) `seq` (seqList bndrs) `seq` mkLets bndrs body)
+                -- mkLets
 
 occAnalArgs :: OccEnv -> CoreExpr -> [CoreExpr]
             -> [OneShots]  -- Very commonly empty, notably prior to dmd anal
@@ -2644,10 +2654,12 @@ occAnalApp !env (Var fun, args, ticks)
   | fun `hasKey` runRWKey
   , [t1, t2, arg]  <- args
   , WUD usage arg' <- adjustNonRecRhs (JoinPoint 1) $ occAnalLamTail env arg
-  = WUD usage (mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
+  = let app_out = (mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
+    in seq (seqExpr app_out) $ WUD usage app_out
 
 occAnalApp env (Var fun_id, args, ticks)
-  = WUD all_uds (mkTicks ticks app')
+  = let app_out = (mkTicks ticks app')
+    in seqExpr app_out `seq` WUD all_uds app_out
   where
     -- Lots of banged bindings: this is a very heavily bit of code,
     -- so it pays not to make lots of thunks here, all of which
@@ -2692,8 +2704,9 @@ occAnalApp env (Var fun_id, args, ticks)
         -- See Note [Sources of one-shot information], bullet point A']
 
 occAnalApp env (fun, args, ticks)
-  = WUD (markAllNonTail (fun_uds `andUDs` args_uds))
-                     (mkTicks ticks app')
+  = let app_out = (mkTicks ticks app')
+    in seqExpr app_out `seq` WUD (markAllNonTail (fun_uds `andUDs` args_uds)) app_out
+
   where
     !(WUD args_uds app') = occAnalArgs env fun' args []
     !(WUD fun_uds fun')  = occAnal (addAppCtxt env args) fun
@@ -3650,8 +3663,8 @@ data WithTailUsageDetails a = WTUD !TailUsageDetails !a
 -------------------
 -- UsageDetails API
 
-andUDs, orUDs
-        :: UsageDetails -> UsageDetails -> UsageDetails
+andUDs:: UsageDetails -> UsageDetails -> UsageDetails
+orUDs :: UsageDetails -> UsageDetails -> UsageDetails
 andUDs = combineUsageDetailsWith andLocalOcc
 orUDs  = combineUsageDetailsWith orLocalOcc
 
@@ -3759,17 +3772,18 @@ restrictFreeVars bndrs fvs = restrictUniqSetToUFM bndrs fvs
 
 combineUsageDetailsWith :: (LocalOcc -> LocalOcc -> LocalOcc)
                         -> UsageDetails -> UsageDetails -> UsageDetails
-{-# INLINE combineUsageDetailsWith #-}
 combineUsageDetailsWith plus_occ_info
     uds1@(UD { ud_env = env1, ud_z_many = z_many1, ud_z_in_lam = z_in_lam1, ud_z_tail = z_tail1 })
     uds2@(UD { ud_env = env2, ud_z_many = z_many2, ud_z_in_lam = z_in_lam2, ud_z_tail = z_tail2 })
   | isEmptyVarEnv env1 = uds2
   | isEmptyVarEnv env2 = uds1
   | otherwise
-  = UD { ud_env       = plusVarEnv_C plus_occ_info env1 env2
-       , ud_z_many    = plusVarEnv z_many1   z_many2
-       , ud_z_in_lam  = plusVarEnv z_in_lam1 z_in_lam2
-       , ud_z_tail    = plusVarEnv z_tail1   z_tail2 }
+  -- Using strictPlusVarEnv here speeds up the test T26425 by about 10% by avoiding
+  -- intermediate thunks.
+  = UD { ud_env       = strictPlusVarEnv_C plus_occ_info env1 env2
+       , ud_z_many    = strictPlusVarEnv z_many1   z_many2
+       , ud_z_in_lam  = strictPlusVarEnv z_in_lam1 z_in_lam2
+       , ud_z_tail    = strictPlusVarEnv z_tail1   z_tail2 }
 
 lookupLetOccInfo :: UsageDetails -> Id -> OccInfo
 -- Don't use locally-generated occ_info for exported (visible-elsewhere)
