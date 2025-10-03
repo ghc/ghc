@@ -12,7 +12,8 @@ module GHC.Types.Var.Env (
         elemVarEnv, disjointVarEnv, anyVarEnv,
         extendVarEnv, extendVarEnv_C, extendVarEnv_Acc,
         extendVarEnvList,
-        plusVarEnv, plusVarEnv_C, plusVarEnv_CD, plusMaybeVarEnv_C,
+        strictPlusVarEnv, plusVarEnv, plusVarEnv_C, strictPlusVarEnv_C,
+        plusVarEnv_CD, plusMaybeVarEnv_C,
         plusVarEnvList, alterVarEnv,
         delVarEnvList, delVarEnv,
         minusVarEnv,
@@ -511,6 +512,7 @@ extendVarEnv      :: VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_C    :: (a->a->a) -> VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_Acc  :: (a->b->b) -> (a->b) -> VarEnv b -> Var -> a -> VarEnv b
 plusVarEnv        :: VarEnv a -> VarEnv a -> VarEnv a
+strictPlusVarEnv  :: VarEnv a -> VarEnv a -> VarEnv a
 plusVarEnvList    :: [VarEnv a] -> VarEnv a
 extendVarEnvList  :: VarEnv a -> [(Var, a)] -> VarEnv a
 varEnvDomain      :: VarEnv elt -> UnVarSet
@@ -522,6 +524,7 @@ delVarEnvList     :: Foldable f => VarEnv a -> f Var -> VarEnv a
 delVarEnv         :: VarEnv a -> Var -> VarEnv a
 minusVarEnv       :: VarEnv a -> VarEnv b -> VarEnv a
 plusVarEnv_C      :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
+strictPlusVarEnv_C :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
 plusVarEnv_CD     :: (a -> a -> a) -> VarEnv a -> a -> VarEnv a -> a -> VarEnv a
 plusMaybeVarEnv_C :: (a -> a -> Maybe a) -> VarEnv a -> VarEnv a -> VarEnv a
 mapVarEnv         :: (a -> b) -> VarEnv a -> VarEnv b
@@ -548,6 +551,7 @@ extendVarEnv_C   = addToUFM_C
 extendVarEnv_Acc = addToUFM_Acc
 extendVarEnvList = addListToUFM
 plusVarEnv_C     = plusUFM_C
+strictPlusVarEnv_C = strictPlusUFM_C
 plusVarEnv_CD    = plusUFM_CD
 plusMaybeVarEnv_C = plusMaybeUFM_C
 delVarEnvList    = delListFromUFM
@@ -556,6 +560,7 @@ delVarEnvList    = delListFromUFM
 delVarEnv        = delFromUFM
 minusVarEnv      = minusUFM
 plusVarEnv       = plusUFM
+strictPlusVarEnv = strictPlusUFM
 plusVarEnvList   = plusUFMList
 -- lookupVarEnv is very hot (in part due to being called by substTyVar),
 -- if it's not inlined than the mere allocation of the Just constructor causes
