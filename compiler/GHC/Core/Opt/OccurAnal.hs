@@ -9,6 +9,8 @@
 -- many /other/ arguments the function has.  Inconsistent unboxing is very
 -- bad for performance, so I increased the limit to allow it to unbox
 -- consistently.
+-- AK: Seems we no longer unbox OccEnv now anyway so it might be redundant.
+
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -967,6 +969,12 @@ occAnalBind
   -> ([CoreBind] -> r -> r)          -- How to combine the scope with new binds
   -> WithUsageDetails r              -- Of the whole let(rec)
 
+-- AK: While not allocating any less inlining occAnalBind turns calls to the
+-- passed functions into known calls with all the benefits that brings.
+-- On a version of T26425 with 6k alternatives this improved compile
+-- by 10-20% with -O.
+{-# INLINE occAnalBind #-}
+
 occAnalBind env lvl ire (Rec pairs) thing_inside combine
   = addInScopeList env (map fst pairs) $ \env ->
     let WUD body_uds body'  = thing_inside env
@@ -984,7 +992,7 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   = -- Analyse the RHS and /then/ the body
     let -- Analyse the rhs first, generating rhs_uds
         !(rhs_uds_s, bndr', rhs') = occAnalNonRecRhs env lvl ire mb_join bndr rhs
-        rhs_uds = foldr1 orUDs rhs_uds_s   -- NB: orUDs.  See (W4) of
+        rhs_uds = foldl1' orUDs rhs_uds_s   -- NB: orUDs.  See (W4) of
                                            -- Note [Occurrence analysis for join points]
 
         -- Now analyse the body, adding the join point
@@ -1049,6 +1057,7 @@ occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
     -- Match join arity O from mb_join_arity with manifest join arity M as
     -- returned by of occAnalLamTail. It's totally OK for them to mismatch;
     -- hence adjust the UDs from the RHS
+
     WUD adj_rhs_uds final_rhs = adjustNonRecRhs mb_join $
                                 occAnalLamTail rhs_env rhs
     final_bndr_with_rules
@@ -2054,6 +2063,18 @@ So The Plan is this:
    was a loop breaker last time round
 
 Hence the is_lb field of NodeScore
+
+Note [Strictness in the occurrence analyser]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+By carefully making the occurrence analyser strict in some places, we can
+dramatically reduce its memory residency. Among other things we:
+* Evaluate the result of `tagLamBinder` and friends, so that the binder (or its
+  OccInfo) does not retain the entire `UsageDetails`.  Also use `strictMap` in `tagLamBinders`.
+* In `combineUsageDetailsWith`, the fields of the data constructor are strict, and we use
+  `strictPlusVarEnv` on the maps that are bound to be needed later on to avoid thunks being
+  stored in the values.
+
+These measures reduced residency for test T26425 by a factor of at least 5x.
 -}
 
 {- *********************************************************************
@@ -2188,7 +2209,9 @@ occ_anal_lam_tail env expr@(Lam {})
     go env rev_bndrs body
       = addInScope env rev_bndrs $ \env ->
         let !(WUD usage body') = occ_anal_lam_tail env body
-            wrap_lam body bndr = Lam (tagLamBinder usage bndr) body
+            -- See Note [Strictness in the occurrence analyser]
+            wrap_lam !body !bndr = let !bndr' = tagLamBinder usage bndr
+                                   in Lam bndr' body
         in WUD (usage `addLamCoVarOccs` rev_bndrs)
                (foldl' wrap_lam body' rev_bndrs)
 
@@ -2541,7 +2564,8 @@ occAnal env (Case scrut bndr ty alts)
            let alt_env = addBndrSwap scrut' bndr $
                          setTailCtxt env  -- Kill off OccRhs
                WUD alts_usage alts' = do_alts alt_env alts
-               tagged_bndr = tagLamBinder alts_usage bndr
+               !tagged_bndr = tagLamBinder alts_usage bndr
+               -- See Note [Strictness in the occurrence analyser]
            in WUD alts_usage (tagged_bndr, alts')
 
       total_usage = markAllNonTail scrut_usage `andUDs` alts_usage
@@ -2559,11 +2583,13 @@ occAnal env (Case scrut bndr ty alts)
     do_alt !env (Alt con bndrs rhs)
       = addInScopeList env bndrs $ \ env ->
         let WUD rhs_usage rhs' = occAnal env rhs
-            tagged_bndrs = tagLamBinders rhs_usage bndrs
+            !tagged_bndrs = tagLamBinders rhs_usage bndrs
+                           -- See Note [Strictness in the occurrence analyser]
         in                 -- See Note [Binders in case alternatives]
         WUD rhs_usage (Alt con tagged_bndrs rhs')
 
 occAnal env (Let bind body)
+  -- TODO: Would be nice to use a strict version of mkLets here
   = occAnalBind env NotTopLevel noImpRuleEdges bind
                 (\env -> occAnal env body) mkLets
 
@@ -2644,10 +2670,12 @@ occAnalApp !env (Var fun, args, ticks)
   | fun `hasKey` runRWKey
   , [t1, t2, arg]  <- args
   , WUD usage arg' <- adjustNonRecRhs (JoinPoint 1) $ occAnalLamTail env arg
-  = WUD usage (mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
+  = let app_out = mkTicks ticks $ mkApps (Var fun) [t1, t2, arg']
+    in WUD usage app_out
 
 occAnalApp env (Var fun_id, args, ticks)
-  = WUD all_uds (mkTicks ticks app')
+  = let app_out = mkTicks ticks app'
+    in WUD all_uds app_out
   where
     -- Lots of banged bindings: this is a very heavily bit of code,
     -- so it pays not to make lots of thunks here, all of which
@@ -2692,8 +2720,9 @@ occAnalApp env (Var fun_id, args, ticks)
         -- See Note [Sources of one-shot information], bullet point A']
 
 occAnalApp env (fun, args, ticks)
-  = WUD (markAllNonTail (fun_uds `andUDs` args_uds))
-                     (mkTicks ticks app')
+  = let app_out = mkTicks ticks app'
+    in WUD (markAllNonTail (fun_uds `andUDs` args_uds)) app_out
+
   where
     !(WUD args_uds app') = occAnalArgs env fun' args []
     !(WUD fun_uds fun')  = occAnal (addAppCtxt env args) fun
@@ -3650,8 +3679,8 @@ data WithTailUsageDetails a = WTUD !TailUsageDetails !a
 -------------------
 -- UsageDetails API
 
-andUDs, orUDs
-        :: UsageDetails -> UsageDetails -> UsageDetails
+andUDs:: UsageDetails -> UsageDetails -> UsageDetails
+orUDs :: UsageDetails -> UsageDetails -> UsageDetails
 andUDs = combineUsageDetailsWith andLocalOcc
 orUDs  = combineUsageDetailsWith orLocalOcc
 
@@ -3766,10 +3795,13 @@ combineUsageDetailsWith plus_occ_info
   | isEmptyVarEnv env1 = uds2
   | isEmptyVarEnv env2 = uds1
   | otherwise
-  = UD { ud_env       = plusVarEnv_C plus_occ_info env1 env2
-       , ud_z_many    = plusVarEnv z_many1   z_many2
+  -- See Note [Strictness in the occurrence analyser]
+  -- Using strictPlusVarEnv here speeds up the test T26425 by about 10% by avoiding
+  -- intermediate thunks.
+  = UD { ud_env       = strictPlusVarEnv_C plus_occ_info env1 env2
+       , ud_z_many    = strictPlusVarEnv z_many1   z_many2
        , ud_z_in_lam  = plusVarEnv z_in_lam1 z_in_lam2
-       , ud_z_tail    = plusVarEnv z_tail1   z_tail2 }
+       , ud_z_tail    = strictPlusVarEnv z_tail1   z_tail2 }
 
 lookupLetOccInfo :: UsageDetails -> Id -> OccInfo
 -- Don't use locally-generated occ_info for exported (visible-elsewhere)
@@ -3847,7 +3879,8 @@ tagLamBinders :: UsageDetails        -- Of scope
               -> [Id]                -- Binders
               -> [IdWithOccInfo]     -- Tagged binders
 tagLamBinders usage binders
-  = map (tagLamBinder usage) binders
+  -- See Note [Strictness in the occurrence analyser]
+  = strictMap (tagLamBinder usage) binders
 
 tagLamBinder :: UsageDetails       -- Of scope
              -> Id                 -- Binder
@@ -3856,6 +3889,7 @@ tagLamBinder :: UsageDetails       -- Of scope
 -- No-op on TyVars
 -- A lambda binder never has an unfolding, so no need to look for that
 tagLamBinder usage bndr
+  -- See Note [Strictness in the occurrence analyser]
   = setBinderOcc (markNonTail occ) bndr
       -- markNonTail: don't try to make an argument into a join point
   where
