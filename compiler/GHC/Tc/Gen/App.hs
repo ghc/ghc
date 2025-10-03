@@ -32,7 +32,8 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
+import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..), ErrCtxt (..) )
+import GHC.Tc.Errors.Ppr (pprErrCtxtMsg)
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Utils.Concrete( hasFixedRuntimeRep_syntactic )
@@ -943,9 +944,18 @@ addArgCtxt :: Int -> HsExpr GhcRn -> LHsExpr GhcRn
 --  See Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
 addArgCtxt arg_no fun (L arg_loc arg) thing_inside
   = do { in_generated_code <- inGeneratedCode
+       ; err_ctx <- getErrCtxt
+       ; env0 <- liftZonkM tcInitTidyEnv
+       ; err_ctx_msg <- mkErrCtxt env0 err_ctx
        ; traceTc "addArgCtxt" (vcat [ text "generated:" <+> ppr in_generated_code
                                     , text "arg: " <+> ppr arg
-                                    , text "arg_loc" <+> ppr arg_loc])
+                                    , text "arg_loc:" <+> ppr arg_loc
+                                    , text "fun:" <+> ppr fun
+                                    , text "err_ctx" <+> vcat (fmap (\ (x, y) -> case x of
+                                                                              UserCodeCtxt{} -> text "<USER>" <+> pprErrCtxtMsg y
+                                                                              ExpansionCodeCtxt{} -> text "<EXPN>" <+> pprErrCtxtMsg y)
+                                                               (take 2 (zip err_ctx err_ctx_msg)))
+                                    ])
        ; if in_generated_code
          then updCtxtForArg (locA arg_loc) arg $
                    thing_inside
