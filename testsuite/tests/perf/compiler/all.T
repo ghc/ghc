@@ -806,3 +806,8 @@ test('interpreter_steplocal',
      ],
      ghci_script,
      ['interpreter_steplocal.script'])
+
+test ('T26425',
+      [ collect_compiler_stats('all',5) ],
+      compile,
+      ['-O'])
