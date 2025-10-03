@@ -10,6 +10,10 @@
 -- bad for performance, so I increased the limit to allow it to unbox
 -- consistently.
 
+-- {-# OPTIONS_GHC -ddump-simpl -ddump-stg -dumpdir dumps -ddump-to-file #-}
+-- {-# OPTIONS_GHC -fdistinct-constructor-tables -finfo-table-map #-}
+-- {-# OPTIONS_GHC -ticky -ticky-allocd -ticky-LNE #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -984,7 +988,7 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   = -- Analyse the RHS and /then/ the body
     let -- Analyse the rhs first, generating rhs_uds
         !(rhs_uds_s, bndr', rhs') = occAnalNonRecRhs env lvl ire mb_join bndr rhs
-        rhs_uds = foldr1 orUDs rhs_uds_s   -- NB: orUDs.  See (W4) of
+        rhs_uds = foldl1' orUDs rhs_uds_s   -- NB: orUDs.  See (W4) of
                                            -- Note [Occurrence analysis for join points]
 
         -- Now analyse the body, adding the join point
@@ -3650,8 +3654,10 @@ data WithTailUsageDetails a = WTUD !TailUsageDetails !a
 -------------------
 -- UsageDetails API
 
-andUDs, orUDs
-        :: UsageDetails -> UsageDetails -> UsageDetails
+-- {-# NOINLINE andUDs #-}
+-- {-# NOINLINE orUDs #-}
+andUDs:: UsageDetails -> UsageDetails -> UsageDetails
+orUDs :: UsageDetails -> UsageDetails -> UsageDetails
 andUDs = combineUsageDetailsWith andLocalOcc
 orUDs  = combineUsageDetailsWith orLocalOcc
 
@@ -3760,16 +3766,17 @@ restrictFreeVars bndrs fvs = restrictUniqSetToUFM bndrs fvs
 combineUsageDetailsWith :: (LocalOcc -> LocalOcc -> LocalOcc)
                         -> UsageDetails -> UsageDetails -> UsageDetails
 {-# INLINE combineUsageDetailsWith #-}
+{-# SCC combineUsageDetailsWith #-}
 combineUsageDetailsWith plus_occ_info
     uds1@(UD { ud_env = env1, ud_z_many = z_many1, ud_z_in_lam = z_in_lam1, ud_z_tail = z_tail1 })
     uds2@(UD { ud_env = env2, ud_z_many = z_many2, ud_z_in_lam = z_in_lam2, ud_z_tail = z_tail2 })
   | isEmptyVarEnv env1 = uds2
   | isEmptyVarEnv env2 = uds1
   | otherwise
-  = UD { ud_env       = plusVarEnv_C plus_occ_info env1 env2
-       , ud_z_many    = plusVarEnv z_many1   z_many2
-       , ud_z_in_lam  = plusVarEnv z_in_lam1 z_in_lam2
-       , ud_z_tail    = plusVarEnv z_tail1   z_tail2 }
+  = UD { ud_env       = {-# SCC ud_env #-} strictPlusVarEnv_C plus_occ_info env1 env2
+       , ud_z_many    = {-# SCC ud_z_many #-} strictPlusVarEnv z_many1   z_many2
+       , ud_z_in_lam  = {-# SCC ud_z_in_lam #-} strictPlusVarEnv z_in_lam1 z_in_lam2
+       , ud_z_tail    = {-# SCC ud_z_tail #-} strictPlusVarEnv z_tail1   z_tail2 }
 
 lookupLetOccInfo :: UsageDetails -> Id -> OccInfo
 -- Don't use locally-generated occ_info for exported (visible-elsewhere)

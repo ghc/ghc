@@ -3,6 +3,7 @@
 
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -ddump-simpl -ddump-stg-final -ddump-to-file -dumpdir dumps #-}
 
 
 -----------------------------------------------------------------------------
