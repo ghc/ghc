@@ -716,3 +716,8 @@ test ('LookupFusion',
 test('T24471',
      [req_th, collect_compiler_stats('all', 5)],
      multimod_compile, ['T24471', '-v0 -O'])
+
+test ('T26425',
+      [ collect_compiler_stats('all',5) ],
+      compile,
+      ['-O'])
