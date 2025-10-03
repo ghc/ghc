@@ -17,8 +17,8 @@ equal to g, but twice as expensive and large.
 module GHC.Data.Graph.UnVar
     ( UnVarSet
     , emptyUnVarSet, mkUnVarSet, unionUnVarSet, unionUnVarSets
-    , extendUnVarSet, extendUnVarSetList, delUnVarSet, delUnVarSetList
-    , elemUnVarSet, isEmptyUnVarSet
+    , extendUnVarSet, extendUnVarSet_Directly, extendUnVarSetList, delUnVarSet, delUnVarSetList
+    , elemUnVarSet, elemUnVarSet_Directly, isEmptyUnVarSet
     , UnVarGraph
     , emptyUnVarGraph
     , unionUnVarGraph, unionUnVarGraphs
@@ -60,6 +60,9 @@ emptyUnVarSet = UnVarSet S.empty
 elemUnVarSet :: Var -> UnVarSet -> Bool
 elemUnVarSet v (UnVarSet s) = k v `S.member` s
 
+{-# INLINE elemUnVarSet_Directly #-}
+elemUnVarSet_Directly :: Uniquable key => key -> UnVarSet -> Bool
+elemUnVarSet_Directly v (UnVarSet s) = (getKey $ getUnique v) `S.member` s
 
 isEmptyUnVarSet :: UnVarSet -> Bool
 isEmptyUnVarSet (UnVarSet s) = S.null s
@@ -81,6 +84,10 @@ mkUnVarSet vs = UnVarSet $ S.fromList $ map k vs
 
 extendUnVarSet :: Var -> UnVarSet -> UnVarSet
 extendUnVarSet v (UnVarSet s) = UnVarSet $ S.insert (k v) s
+
+{-# INLINE extendUnVarSet_Directly #-}
+extendUnVarSet_Directly :: Uniquable key => key -> UnVarSet -> UnVarSet
+extendUnVarSet_Directly u (UnVarSet s) = UnVarSet $ S.insert (getKey $ getUnique u) s
 
 extendUnVarSetList :: [Var] -> UnVarSet -> UnVarSet
 extendUnVarSetList vs s = s `unionUnVarSet` mkUnVarSet vs
