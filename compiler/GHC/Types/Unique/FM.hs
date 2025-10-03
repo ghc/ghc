@@ -51,7 +51,9 @@ module GHC.Types.Unique.FM (
         delListFromUFM,
         delListFromUFM_Directly,
         plusUFM,
+        strictPlusUFM,
         plusUFM_C,
+        strictPlusUFM_C,
         plusUFM_CD,
         plusUFM_CD2,
         mergeUFM,
@@ -261,15 +263,23 @@ delListFromUFM_Directly = foldl' delFromUFM_Directly
 delFromUFM_Directly :: UniqFM key elt -> Unique -> UniqFM key elt
 delFromUFM_Directly (UFM m) u = UFM (M.delete (getKey u) m)
 
--- Bindings in right argument shadow those in the left
+-- | Bindings in right argument shadow those in the left.
+--
+-- Unlike containers this union is right-biased for historic reasons.
 plusUFM :: UniqFM key elt -> UniqFM key elt -> UniqFM key elt
--- M.union is left-biased, plusUFM should be right-biased.
 plusUFM (UFM x) (UFM y) = UFM (M.union y x)
      -- Note (M.union y x), with arguments flipped
      -- M.union is left-biased, plusUFM should be right-biased.
 
+-- | Right biased
+strictPlusUFM :: UniqFM key elt -> UniqFM key elt -> UniqFM key elt
+strictPlusUFM (UFM x) (UFM y) = UFM (MS.union y x)
+
 plusUFM_C :: (elt -> elt -> elt) -> UniqFM key elt -> UniqFM key elt -> UniqFM key elt
 plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
+
+strictPlusUFM_C :: (elt -> elt -> elt) -> UniqFM key elt -> UniqFM key elt -> UniqFM key elt
+strictPlusUFM_C f (UFM x) (UFM y) = UFM (MS.unionWith f x y)
 
 -- | `plusUFM_CD f m1 d1 m2 d2` merges the maps using `f` as the
 -- combinding function and `d1` resp. `d2` as the default value if
