@@ -2493,9 +2493,11 @@ occAnal env (Tick tickish body)
     WUD usage body' = occAnal env body
 
     usage'
-      | tickish `tickishScopesLike` SoftScope
+      | tickish `tickishScopesLike` SoftScope || isProfTick tickish
       = usage  -- For soft-scoped ticks (including SourceNotes) we don't want
                -- to lose join-point-hood, so we don't mess with `usage` (#24078)
+
+               -- Similarly for cost centres. (#26157)
 
       -- For a non-soft tick scope, we can inline lambdas only, so we
       -- abandon tail calls, and do markAllInsideLam too: usage_lam
