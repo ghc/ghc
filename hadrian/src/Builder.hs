@@ -8,7 +8,7 @@ module Builder (
     -- * Builder properties
     builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilders,
     runBuilder, runBuilderWith, runBuilderWithCmdOptions, getBuilderPath,
-    builderEnvironment
+    builderEnvironment, remBuilderEnvironment
     ) where
 
 import Control.Exception.Extra (Partial)

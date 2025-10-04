@@ -129,6 +129,22 @@ fixLibffiMakefile top =
 
 -- TODO: check code duplication w.r.t. ConfCcArgs
 configureEnvironment :: Stage -> Action [CmdOption]
+configureEnvironment stage@Stage1 = do
+    -- TODO: This case should not exist: Strip and Objdump should be staged!
+    context <- libffiContext stage
+    cFlags  <- interpretInContext context getStagedCCFlags
+    sequence [ builderEnvironment "CC" $ Cc CompileC stage
+             , builderEnvironment "CXX" $ Cc CompileC stage
+             , builderEnvironment "AR" (Ar Unpack stage)
+             -- , builderEnvironment "LD" (Ld stage)
+             , builderEnvironment "NM" (Nm stage)
+             , builderEnvironment "RANLIB" (Ranlib stage)
+             , remBuilderEnvironment "OBJDUMP"
+             , remBuilderEnvironment "STRIP"
+             , remBuilderEnvironment "LD"
+             , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
+             , return . AddEnv "LDFLAGS" $ " -w" ]
+
 configureEnvironment stage = do
     context <- libffiContext stage
     cFlags  <- interpretInContext context getStagedCCFlags
@@ -137,6 +153,8 @@ configureEnvironment stage = do
              , builderEnvironment "AR" $ Ar Unpack stage
              , builderEnvironment "NM" $ Nm stage
              , builderEnvironment "RANLIB" $ Ranlib stage
+             -- TODO: Staged LD for mingw is wrong. Uses clang instead of the
+             -- provided $LD , builderEnvironment "LD" (Ld stage)
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
              , return . AddEnv "LDFLAGS" $ "-w" ]
 

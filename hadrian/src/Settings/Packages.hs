@@ -524,41 +524,6 @@ rtsPackageArgs =
           , notM (targetSupportsSMP stage)   ? arg "-optc-DNOSMP"
           ]
 
-    let cArgs = mconcat
-          [ rtsWarnings
-          , wayCcArgs
-          , arg "-fomit-frame-pointer"
-          -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
-          -- requires that functions are inlined to work as expected. Inlining
-          -- only happens for optimised builds. Otherwise we can assume that
-          -- there is a non-inlined variant to use instead. But RTS does not
-          -- provide non-inlined alternatives and hence needs the function to
-          -- be inlined. See https://github.com/snowleopard/hadrian/issues/90.
-          , arg "-O2"
-
-          , arg "-Irts"
-          , arg $ "-I" ++ path
-
-          , notM (targetSupportsSMP stage)   ? arg "-DNOSMP"
-
-          , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
-                                                    , "-fno-omit-frame-pointer"
-                                                    , "-g3"
-                                                    , "-O0" ]
-          -- Set the namespace for the rts fs functions
-          , arg $ "-DFS_NAMESPACE=rts"
-
-          , arg $ "-DCOMPILING_RTS"
-
-          , inputs ["**/RtsMessages.c", "**/Trace.c"] ?
-            pure
-              [ "-DRtsWay=\"rts_" ++ show way ++ "\""
-              ]
-
-          , input "**/RtsUtils.c" ? pure
-            [ "-DRtsWay=\"rts_" ++ show way ++ "\""
-            ]
-
     let cArgs =
           mconcat
             [ rtsWarnings,
@@ -625,11 +590,6 @@ rtsPackageArgs =
                     "**/AutoApply_V64.c"
                   ]
                 ? pure ["-fno-PIC", "-static"],
-              -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
-              inputs ["**/AutoApply_V32.c"] ? pure ["-mavx2" | x86],
-              inputs ["**/AutoApply_V64.c"] ? pure ["-mavx512f" | x86],
-              inputs ["**/Jumps_V32.c"] ? pure ["-mavx2" | x86],
-              inputs ["**/Jumps_V64.c"] ? pure ["-mavx512f" | x86],
               -- inlining warnings happen in Compact
               inputs ["**/Compact.c"] ? arg "-Wno-inline",
               -- emits warnings about call-clobbered registers on x86_64

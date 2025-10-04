@@ -206,6 +206,7 @@ configureArgs cFlags' ldFlags' = do
         , conf "--with-gmp-libraries"     $ arg =<< staged (buildSetting GmpLibDir)
         , conf "--with-curses-libraries"  $ arg =<< staged (buildSetting CursesLibDir)
         , conf "--host"                   $ arg =<< flip queryTarget targetPlatformTriple  . predStage' =<< getStage
+        , conf "--target"                 $ arg =<< flip queryTarget targetPlatformTriple =<< getStage
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
         , ghcVersionH
         ]
