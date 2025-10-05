@@ -2,6 +2,7 @@ spec:
   inputs:
     release:
       default: "no"
+      description: Release pipeline
       options: [ "yes", "no" ]
 
 ---
@@ -114,6 +115,7 @@ workflow:
 # which versions of GHC to allow bootstrap with
 .bootstrap_matrix : &bootstrap_matrix
   matrix:
+    # If you update this version, be sure to also update 'MinBootGhcVersion' in configure.ac
     - GHC_VERSION: 9.10.1
       DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12-ghc9_10:$DOCKER_REV"
     - GHC_VERSION: 9.12.2
