@@ -13,8 +13,7 @@ AC_DEFUN([FPTOOLS_HAPPY],
 AC_SUBST(HappyCmd,$HAPPY)
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
-[
-if test x"$HappyCmd" != x; then
+[if test x"$HappyCmd" != x; then
    fptools_cv_happy_version=`"$HappyCmd" -v |
               grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'` ;
 else
@@ -24,7 +23,12 @@ changequote([, ])dnl
 ])
 if test ! -f compiler/GHC/Parser.hs || test ! -f compiler/GHC/Cmm/Parser.hs
 then
-    failure_msg="Happy version == 1.20.* || >= 2.0.2 && < 2.2  is required to compile GHC"
+    if test x"$fptools_cv_happy_version" != x; then
+        fptools_cv_happy_version_display="version $fptools_cv_happy_version";
+    else
+        fptools_cv_happy_version_display="none";
+    fi;
+    failure_msg="Happy version == 1.20.* || >= 2.0.2 && < 2.2 is required to compile GHC. (Found: $fptools_cv_happy_version_display)"
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.20.0],
       [AC_MSG_ERROR([$failure_msg])])[]
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-ge],[1.21.0],
@@ -32,7 +36,6 @@ then
         [AC_MSG_ERROR([$failure_msg])])[])[]
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-ge],[2.2.0],
       [AC_MSG_ERROR([$failure_msg])])[]
-
 fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
