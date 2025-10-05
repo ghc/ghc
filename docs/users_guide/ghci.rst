@@ -403,7 +403,7 @@ it can be *instantiated* to ``IO a``. For example
 
 .. code-block:: none
 
-    ghci> return True
+    ghci> pure True
     True
 
 Furthermore, GHCi will print the result of the I/O action if (and only
@@ -419,7 +419,7 @@ For example, remembering that ``putStrLn :: String -> IO ()``:
 
     ghci> putStrLn "hello"
     hello
-    ghci> do { putStrLn "hello"; return "yes" }
+    ghci> do { putStrLn "hello"; pure "yes" }
     hello
     "yes"
 
@@ -443,12 +443,12 @@ prompt must be in the ``IO`` monad.
 
 .. code-block:: none
 
-    ghci> x <- return 42
+    ghci> x <- pure 42
     ghci> print x
     42
     ghci>
 
-The statement ``x <- return 42`` means “execute ``return 42`` in the
+The statement ``x <- pure 42`` means “execute ``pure 42`` in the
 ``IO`` monad, and bind the result to ``x``\ ”. We can then use ``x`` in
 future statements, for example to print it as we did above.
 
@@ -2389,7 +2389,7 @@ commonly used commands.
 
     .. code-block:: none
 
-        ghci> let date _ = Data.Time.getZonedTime >>= print >> return ""
+        ghci> let date _ = Data.Time.getZonedTime >>= print >> pure ""
         ghci> :def date date
         ghci> :date
         2017-04-10 12:34:56.93213581 UTC
@@ -2399,16 +2399,16 @@ commonly used commands.
 
     .. code-block:: none
 
-        ghci> let mycd d = System.Directory.setCurrentDirectory d >> return ""
+        ghci> let mycd d = System.Directory.setCurrentDirectory d >> pure ""
         ghci> :def mycd mycd
         ghci> :mycd ..
 
-    Or I could define a simple way to invoke "``ghc --make Main``"
+    Or we could define a simple way to invoke "``ghc --make Main``"
     in the current directory:
 
     .. code-block:: none
 
-        ghci> :def make (\_ -> return ":! ghc --make Main")
+        ghci> :def make (\_ -> pure ":! ghc --make Main")
 
     We can define a command that reads GHCi input from a file. This
     might be useful for creating a set of bindings that we want to
@@ -2429,6 +2429,15 @@ commonly used commands.
     the old command can still be used by preceding the command name with
     a double colon (eg ``::load``).
     It's not possible to redefine the commands ``:{``, ``:}`` and ``:!``.
+
+    For historical reasons, ``:m`` in ghci is shorthand for ``:module``.
+    If we want to override that to mean ``:main``, in a way that also
+    works when the implicit Prelude is deactivated, we can do it like
+    this using ``:def!``:
+
+    .. code-block:: none
+
+        ghci> :def! m \_ -> Prelude.pure ":main"
 
 .. ghci-cmd:: :delete; * | ⟨num⟩ ...
 
@@ -2912,7 +2921,7 @@ commonly used commands.
 
     .. code-block:: none
 
-        *ghci> :def cond \expr -> return (":cmd if (" ++ expr ++ ") then return \"\" else return \":continue\"")
+        *ghci> :def cond \expr -> pure (":cmd if (" ++ expr ++ ") then pure \"\" else pure \":continue\"")
         *ghci> :set stop 0 :cond (x < 3)
 
     To ignore breakpoints for a specified number of iterations use
