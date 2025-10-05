@@ -136,17 +136,21 @@ configureEnvironment stage@Stage1 = do
                [ cArgs
                , getStagedCCFlags ]
     ldFlags <- interpretInContext context ldArgs
-    sequence [ builderEnvironment "CC" $ Cc CompileC stage
-             , builderEnvironment "CXX" $ Cc CompileC stage
-             , builderEnvironment "AR" (Ar Unpack stage)
-             -- , builderEnvironment "LD" (Ld stage)
-             , builderEnvironment "NM" (Nm stage)
-             , builderEnvironment "RANLIB" (Ranlib stage)
-             , remBuilderEnvironment "OBJDUMP"
-             , remBuilderEnvironment "STRIP"
-             , remBuilderEnvironment "LD"
-             , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
-             , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
+    winTarget <- isWinTarget stage
+    sequence $ [ builderEnvironment "CC" $ Cc CompileC stage
+               , builderEnvironment "CXX" $ Cc CompileC stage
+               , builderEnvironment "AR" (Ar Unpack stage)
+               , builderEnvironment "NM" (Nm stage)
+               , builderEnvironment "RANLIB" (Ranlib stage)
+               , remBuilderEnvironment "OBJDUMP"
+               , remBuilderEnvironment "STRIP"
+               , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
+               , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
+               ++ (if winTarget then
+                    -- TODO: Use staged LD for winTarget. This is only a hack because the wrong staged LD was provided.
+                    [remBuilderEnvironment "LD"]
+                  else
+                    [builderEnvironment "LD" (Ld stage)])
 
 configureEnvironment stage = do
     context <- libffiContext stage
@@ -154,15 +158,19 @@ configureEnvironment stage = do
                [ cArgs
                , getStagedCCFlags ]
     ldFlags <- interpretInContext context ldArgs
-    sequence [ builderEnvironment "CC" $ Cc CompileC stage
-             , builderEnvironment "CXX" $ Cc CompileC stage
-             , builderEnvironment "AR" (Ar Unpack stage)
-             , builderEnvironment "NM" (Nm stage)
-             , builderEnvironment "RANLIB" (Ranlib stage)
-             -- TODO: Staged LD for mingw is wrong. Uses clang instead of the provided $LD
---             , builderEnvironment "LD" (Ld stage)
-             , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
-             , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
+    winTarget <- isWinTarget stage
+    sequence $ [ builderEnvironment "CC" $ Cc CompileC stage
+               , builderEnvironment "CXX" $ Cc CompileC stage
+               , builderEnvironment "AR" (Ar Unpack stage)
+               , builderEnvironment "NM" (Nm stage)
+               , builderEnvironment "RANLIB" (Ranlib stage)
+               , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
+               , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
+               ++ (if winTarget then
+                    -- TODO: We should use the staged LD here. Unfortunately, that differs from what's expected via $LD.
+                    []
+                  else
+                    [builderEnvironment "LD" (Ld stage)])
 
 -- Need the libffi archive and `trackAllow` all files in the build directory.
 -- See [Libffi indicating inputs].

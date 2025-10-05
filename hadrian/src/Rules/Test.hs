@@ -317,8 +317,8 @@ timeoutProgBuilder = do
 needTestsuitePackages :: Stage -> Action ()
 needTestsuitePackages stg = do
   allpkgs <- packages <$> flavour
-  -- We need the libraries of the successor stage
-  libpkgs <- map (Stage1,) . filter isLibrary <$> allpkgs (succStage stg)
+  -- TODO: This used to force the packages to Stage1. Check if the tuple dance is still useful now.
+  libpkgs <- map (stg,) . filter isLibrary <$> allpkgs stg
   -- And the executables of the current stage
   exepkgs <- map (stg,) . filter isProgram <$> allpkgs stg
   -- Don't require lib:ghc or lib:cabal when testing the stage1 compiler
