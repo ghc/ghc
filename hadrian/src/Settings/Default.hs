@@ -53,8 +53,8 @@ import Settings.Builders.Win32Tarballs
 defaultPackages :: Stage -> Action [Package]
 defaultPackages (Stage0 GlobalLibs) = stageBootPackages
 defaultPackages (Stage0 InTreeLibs) = stage0Packages
-defaultPackages Stage1 = stage1Packages
-defaultPackages Stage2 = stage2Packages
+defaultPackages Stage1 = stagedPackages Stage1
+defaultPackages Stage2 = stagedPackages Stage2
 defaultPackages Stage3 = return []
 
 -- | Default bignum backend.
@@ -123,8 +123,8 @@ stage0Packages = do
           ++ [ timeout  | windowsHost                                ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
-stage1Packages :: Action [Package]
-stage1Packages = do
+stagedPackages :: Stage -> Action [Package]
+stagedPackages stage = do
     let good_stage0_package p
           -- we only keep libraries for some reason
           | not (isLibrary p) = False
@@ -138,7 +138,7 @@ stage1Packages = do
 
     libraries0 <- filter good_stage0_package <$> stage0Packages
     cross      <- flag CrossCompiling
-    winTarget  <- isWinTarget Stage1
+    winTarget  <- isWinTarget stage
     haveCurses <- any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
 
     let when c xs = if c then xs else mempty
@@ -193,10 +193,6 @@ stage1Packages = do
           terminfo
         ]
       ]
-
--- | Packages built in 'Stage2' by default. You can change this in "UserSettings".
-stage2Packages :: Action [Package]
-stage2Packages = stage1Packages
 
 -- | Packages that are built only for the testsuite.
 testsuitePackages :: Action [Package]
