@@ -424,22 +424,13 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
                   return Succeeded
           else do
 
-        -- TODO: This is very awkward.
-
-        -- 1. Ban using --make mode to create -bytecodelib, since then you would not need in-memory linkables
-        -- 2. Make Linkable and ByteCodeObject more similar, so that you can translate between them.
-        --         * Either store .o files in ByteCodeObject <-- MP thinks this way
-        --         * or Store ForeignStubs/ForeignSrcs in Linkable
-        -- 3. Store ByteCodeObject in Linkable directly
-        let hackyMPtodo l = [ cbc | cbc <- linkableByteCodeObjects l ]
-
         let linkObjectLinkable action =
               checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink (checkNativeLibraryLinkingNeeded staticLink) homeMod_object $ \linkables ->
                 let obj_files = concatMap linkableObjs linkables
                 in action obj_files
             linkBytecodeLinkable action =
               checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink checkBytecodeLibraryLinkingNeeded homeMod_bytecode $ \linkables ->
-                let bytecode = concatMap hackyMPtodo linkables
+                let bytecode = concatMap linkableByteCodeObjects linkables
                 in action bytecode
 
         -- Don't showPass in Batch mode; doLink will do that for us.
@@ -485,8 +476,8 @@ checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink linkin
         -- 1. Check that all modules have a linkable
         let linkables = checkAllModulesHaveLinkable linkable_selector home_mods
         case linkables of
-          -- MP: Use a proper error when not all modules have a linkable
-          Left missing -> pprPanic "checkLinkablesUpToDate: todo, need proper error" (ppr missing)
+          Left missing -> throwOneError $ fmap GhcDriverMessage $
+            mkPlainErrorMsgEnvelope noSrcSpan $ DriverMissingLinkableForModule missing
           Right linkables -> do
             -- 2. Check that the linkables are up to date
             linking_needed <- linkingNeeded logger dflags unit_env linkables pkg_deps

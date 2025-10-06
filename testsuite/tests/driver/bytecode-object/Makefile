@@ -134,7 +134,7 @@ bytecode_object20:
 
 # Test that -bytecodelib without -fbyte-code results in an error
 bytecode_object21:
-	"$(TEST_HC)" $(TEST_HC_OPTS) --make -bytecodelib -o pkg.bytecode BytecodeTest.hs
+	! "$(TEST_HC)" $(TEST_HC_OPTS) --make -bytecodelib -o pkg.bytecode BytecodeTest.hs
 
 # Test that you can link together .gbc files with -c and -bytecodelib
 bytecode_object22:

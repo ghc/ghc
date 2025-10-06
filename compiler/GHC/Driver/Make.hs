@@ -1840,19 +1840,20 @@ Also closely related are
 -}
 
 executeLinkNode :: HomeUnitGraph -> (Int, Int) -> UnitId -> [NodeKey] -> RunMakeM ()
-executeLinkNode hug kn uid deps = do
+executeLinkNode hug kn@(k, _) uid deps = do
   withCurrentUnit uid $ do
-    MakeEnv{..} <- ask
+    make_env@MakeEnv{..} <- ask
     let dflags = hsc_dflags hsc_env
-    let hsc_env' = setHUG hug hsc_env
         msg' = (\messager -> \recomp -> messager hsc_env kn recomp (LinkNode deps uid)) <$> env_messager
 
-    linkresult <- liftIO $ withAbstractSem compile_sem $ do
-                            link (ghcLink dflags)
-                                hsc_env'
-                                True -- We already decided to link
-                                msg'
-                                (hsc_HPT hsc_env')
+    linkresult <- lift $ MaybeT $ withAbstractSem compile_sem $ withLoggerHsc k make_env $ \lcl_hsc_env -> do
+                             let hsc_env' = setHUG hug lcl_hsc_env
+                             wrapAction diag_wrapper hsc_env' $ do
+                               link (ghcLink dflags)
+                                 hsc_env'
+                                 True -- We already decided to link
+                                 msg'
+                                 (hsc_HPT hsc_env')
     case linkresult of
       Failed -> fail "Link Failed"
       Succeeded -> return ()
