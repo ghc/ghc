@@ -537,6 +537,7 @@ preloadLib
 preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
   maybePutStr logger ("Loading object " ++ showLS lib_spec ++ " ... ")
   case lib_spec of
+    BytecodeLibrary _bco -> panic "TODO: MP preloadLib BytecodeLibrary"
     Objects static_ishs -> do
       (b, pls1) <- preload_statics lib_paths static_ishs
       maybePutStrLn logger (if b  then "done" else "not found")

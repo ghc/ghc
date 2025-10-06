@@ -48,7 +48,6 @@ import GHC.Builtin.Names
 
 import GHC.Platform
 
-import GHC.ByteCode.Serialize
 import GHC.Utils.Monad ( MonadIO(liftIO), mapMaybeM )
 
 import GHC.Driver.Main

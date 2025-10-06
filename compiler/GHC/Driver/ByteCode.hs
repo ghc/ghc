@@ -22,7 +22,6 @@ import {-# SOURCE #-} GHC.Driver.Pipeline
 
 import GHC.Platform.Ways
 
-import GHC.ByteCode.Serialize
 import System.OsPath
 
 -- | Write foreign sources and foreign stubs to temporary files and compile them.

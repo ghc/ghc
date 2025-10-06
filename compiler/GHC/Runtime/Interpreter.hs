@@ -77,9 +77,6 @@ import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
 import GHC.ByteCode.Breakpoints
-import GHC.ByteCode.Serialize
-import GHC.Driver.Env
-import GHC.Driver.ByteCode
 
 import GHC.ByteCode.Types
 import GHC.Linker.Types
@@ -119,7 +116,6 @@ import qualified GHC.InfoProv as InfoProv
 import GHC.Builtin.Names
 import GHC.Types.Name
 import qualified GHC.Unit.Home.Graph as HUG
-import GHC.Utils.Misc
 
 -- Standard libraries
 import GHC.Exts

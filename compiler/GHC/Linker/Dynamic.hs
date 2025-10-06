@@ -28,7 +28,6 @@ import GHC.Utils.TmpFs
 
 import Control.Monad (when)
 import System.FilePath
-import GHC.Utils.Outputable
 
 data DynLinkMode = LinkingHomePackage -- | Creating a dynamic library for the home package
                  | LinkingForInterpreter
