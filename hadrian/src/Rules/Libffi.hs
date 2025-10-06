@@ -150,7 +150,8 @@ configureEnvironment stage@Stage1 = do
                     -- TODO: Use staged LD for winTarget. This is only a hack because the wrong staged LD was provided.
                     [remBuilderEnvironment "LD"]
                   else
-                    [builderEnvironment "LD" (Ld stage)])
+                    [ -- TODO: This should be the staged LD, but that points to GCC and not LD.
+                   ])
 
 configureEnvironment stage = do
     context <- libffiContext stage
@@ -170,7 +171,8 @@ configureEnvironment stage = do
                     -- TODO: We should use the staged LD here. Unfortunately, that differs from what's expected via $LD.
                     []
                   else
-                    [builderEnvironment "LD" (Ld stage)])
+                    [ -- TODO: This should be the staged LD, but that points to GCC and not LD.
+                   ])
 
 -- Need the libffi archive and `trackAllow` all files in the build directory.
 -- See [Libffi indicating inputs].
