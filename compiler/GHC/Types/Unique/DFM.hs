@@ -472,14 +472,12 @@ alterUDFM_L
   -> (Maybe elt, UniqDFM key elt)  -- ^ New element at @key@ and modified 'UniqDFM'
 alterUDFM_L f (UDFM m i) k =
   let
-    -- Force the key Word64 as the thunk is almost never worth it.
-    !key = getKey $ getUnique k
-    (mElt, udfm) = M.alterF (dupe . alterf) key m
+    (mElt, udfm) = M.alterLookupWithKey alterf (getKey $ getUnique k) m
   in
-    (mElt, UDFM udfm (i + 1))
+    (untag mElt, UDFM udfm (i + 1))
   where
-  dupe :: Maybe (TaggedVal elt) -> (Maybe elt, Maybe (TaggedVal elt))
-  dupe mt = (fmap taggedFst mt, mt)
+  untag Nothing = Nothing
+  untag (Just (TaggedVal v _)) = Just v
   alterf :: Maybe (TaggedVal elt) -> (Maybe (TaggedVal elt))
   alterf Nothing = inject $ f Nothing
   alterf (Just (TaggedVal v _)) = inject $ f (Just v)
