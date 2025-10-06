@@ -12,4 +12,4 @@ T17752:
 	# All occurrences of elem should be optimized away.
 	# For strings these should result in loops after inlining foldCString.
 	# For lists it should result in a case expression.
-	echo $$(cat T17752.dump-simpl | grep "elem" -A4 )
+	echo $$(grep -A4 "elem" T17752.dump-simpl)
