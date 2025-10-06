@@ -15,7 +15,6 @@ linkBytecodeLib hsc_env gbcs = do
   -- The .gbc files from the command line
   let bytecodeObjects = [f | FileOption _ f <- ldInputs dflags]
 
-  -- INSERT_YOUR_CODE
   let logger = hsc_logger hsc_env
   let allFiles = (map text bytecodeObjects) ++ [ angleBrackets (text "in-memory" <+>  ppr (bco_module bco)) | bco <- gbcs ]
   debugTraceMsg logger 2 $

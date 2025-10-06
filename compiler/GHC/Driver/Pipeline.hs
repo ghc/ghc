@@ -22,7 +22,7 @@ module GHC.Driver.Pipeline (
    compileForeign, compileEmptyStub,
 
    -- * Linking
-   link, linkingNeeded, checkLinkInfo,
+   link, checkLinkInfo,
 
    -- * PipeEnv
    PipeEnv(..), mkPipeEnv, phaseOutputFilenameNew,
@@ -434,11 +434,11 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
         let hackyMPtodo l = [ cbc | cbc <- linkableByteCodeObjects l ]
 
         let linkObjectLinkable action =
-              checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink homeMod_object $ \linkables ->
+              checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink (checkNativeLibraryLinkingNeeded staticLink) homeMod_object $ \linkables ->
                 let obj_files = concatMap linkableObjs linkables
                 in action obj_files
             linkBytecodeLinkable action =
-              checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink homeMod_bytecode $ \linkables ->
+              checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink checkBytecodeLibraryLinkingNeeded homeMod_bytecode $ \linkables ->
                 let bytecode = concatMap hackyMPtodo linkables
                 in action bytecode
 
@@ -465,27 +465,20 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
 
 -- | Check that the relevant linkables are up-to-date and then apply the given action
 -- to them.
-checkLinkablesUpToDate :: Foldable t => HscEnv
-                       -> t (RecompileRequired -> IO b)
+checkLinkablesUpToDate :: HscEnv
+                       -> Maybe (RecompileRequired -> IO b)
                        -> [HomeModInfo]
                        -> [UnitId]
                        -> Bool
+                       -> (Logger -> DynFlags -> UnitEnv -> [Linkable] -> [UnitId] -> IO RecompileRequired)
                        -> (HomeModLinkable -> Maybe Linkable)
                        -> ([Linkable] -> IO ()) -> IO ()
-checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink linkable_selector action = do
+checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink linkingNeeded linkable_selector action = do
 
         let dflags = hsc_dflags hsc_env
             logger = hsc_logger hsc_env
             unit_env = hsc_unit_env hsc_env
-        let -- The .o files for the home modules
-          --  obj_files = concat (mapMaybe (fmap linkableObjs . homeMod_object) linkables)
-
-            -- The .gbc files for the home modules
-          --  bytecode  = concat (mapMaybe (fmap hackyMPtodo . homeMod_bytecode) linkables)
-
-
-
-            platform  = targetPlatform dflags
+        let platform  = targetPlatform dflags
             arch_os   = platformArchOS platform
             exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)
 
@@ -496,7 +489,7 @@ checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink linkab
           Left missing -> pprPanic "checkLinkablesUpToDate: todo, need proper error" (ppr missing)
           Right linkables -> do
             -- 2. Check that the linkables are up to date
-            linking_needed <- linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
+            linking_needed <- linkingNeeded logger dflags unit_env linkables pkg_deps
             forM_ mHscMessager $ \hscMessage -> hscMessage linking_needed
             if not (gopt Opt_ForceRecomp dflags) && (linking_needed == UpToDate)
               then debugTraceMsg logger 2 (text exe_file <+> text "is up to date, linking not required.")
@@ -535,8 +528,25 @@ linkJSBinary logger tmpfs fc dflags unit_env obj_files pkg_deps = do
   let cfg      = initStgToJSConfig dflags
   jsLinkBinary fc lc_cfg cfg logger tmpfs dflags unit_env obj_files pkg_deps
 
-linkingNeeded :: Logger -> DynFlags -> UnitEnv -> Bool -> [Linkable] -> [UnitId] -> IO RecompileRequired
-linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
+-- | Bytecode libraries are simpler to check for linking needed since they do not
+-- depend on any other libraries.
+checkBytecodeLibraryLinkingNeeded :: Logger -> DynFlags -> UnitEnv -> [Linkable] -> [UnitId] -> IO RecompileRequired
+checkBytecodeLibraryLinkingNeeded _logger dflags unit_env linkables _pkg_deps = do
+  let platform   = ue_platform unit_env
+      arch_os    = platformArchOS platform
+      exe_file   = exeFileName arch_os False (outputFile_ dflags)
+
+  e_bytecode_lib_time <- modificationTimeIfExists exe_file
+  case e_bytecode_lib_time of
+    Nothing  -> return $ NeedsRecompile MustCompile
+    Just t -> do
+        let bytecode_times =  map linkableTime linkables
+        if any (t <) bytecode_times
+            then return $ needsRecompileBecause ObjectsChanged
+            else return UpToDate
+
+checkNativeLibraryLinkingNeeded :: Bool -> Logger -> DynFlags -> UnitEnv -> [Linkable] -> [UnitId] -> IO RecompileRequired
+checkNativeLibraryLinkingNeeded staticLink logger dflags unit_env linkables pkg_deps = do
         -- if the modification time on the executable is later than the
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
@@ -544,10 +554,10 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
       unit_state = ue_homeUnitState unit_env
       arch_os    = platformArchOS platform
       exe_file   = exeFileName arch_os staticLink (outputFile_ dflags)
-  e_exe_time <- tryIO $ getModificationUTCTime exe_file
+  e_exe_time <- modificationTimeIfExists exe_file
   case e_exe_time of
-    Left _  -> return $ NeedsRecompile MustCompile
-    Right t -> do
+    Nothing  -> return $ NeedsRecompile MustCompile
+    Just t -> do
         -- first check object files and extra_ld_inputs
         let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
         (errs,extra_times) <- partitionWithM (tryIO . getModificationUTCTime) extra_ld_inputs
