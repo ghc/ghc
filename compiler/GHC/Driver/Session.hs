@@ -3714,6 +3714,20 @@ makeDynFlagsConsistent dflags
  , ways dflags `hasWay` WayDyn
     = let warn = "-dynamic is ignored when using -staticlib"
       in loop dflags{targetWays_ = removeWay WayDyn (targetWays_ dflags)} warn
+ -- For the wasm target, when ghc is invoked with -dynamic,
+ -- when linking the final .wasm binary we must still ensure
+ -- the static archives are selected. Otherwise wasm-ld would
+ -- fail to find and link the .so library dependencies. wasm-ld
+ -- can link PIC objects into static .wasm binaries fine, so we
+ -- only adjust the ways in the final linking step, and only
+ -- when linking .wasm binary (which is supposed to be fully
+ -- static), not when linking .so shared libraries.
+ | LinkBinary _ <- ghcLink dflags
+ , ArchWasm32 <- arch
+ , ways dflags `hasWay` WayDyn
+    = let warn = "-dynamic is ignored when linking binaries on WASM"
+      in loop dflags{targetWays_ = removeWay WayDyn (targetWays_ dflags)} warn
+
  | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , targetWays_ dflags /= hostFullWays
