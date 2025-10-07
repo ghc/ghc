@@ -29,9 +29,9 @@ import GHC.Utils.TmpFs
 import Control.Monad (when)
 import System.FilePath
 
-data DynLinkMode = LinkingHomePackage -- | Creating a dynamic library for the home package
+data DynLinkMode = LinkingHomePackage -- ^ Creating a dynamic library for the home package
                  | LinkingForInterpreter
-                    -- |^ Creating a shared library which will immediately be loaded by the interpreter
+                    -- ^ Creating a shared library which will immediately be loaded by the interpreter
                     -- this will not pass any package dependencies, and presume that the correct libraries are loaded in
                     -- the correct order using dlopen.
 
