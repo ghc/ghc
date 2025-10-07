@@ -29,6 +29,7 @@ Contents:
    eventlog-formats
    glossary
    editing-guide
+   genindex
 
 
 Indices and tables
