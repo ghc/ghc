@@ -733,6 +733,7 @@ instance Diagnostic PsMessage where
       "<-" | ped_mdo_in_last_100 -> [suggestExtension LangExt.RecursiveDo]
            | otherwise           -> [SuggestMissingDo]
       "="  | ped_do_in_last_100  -> [SuggestLetInDo]                             -- #15849
+      "role"  | ped_roles_enabled  -> [suggestExtension LangExt.RoleAnnotations]
       _    | not ped_pat_syn_enabled
            , ped_pattern_parsed  -> [suggestExtension LangExt.PatternSynonyms]   -- #12429
            | otherwise           -> []

@@ -532,6 +532,8 @@ data PsErrParseDetails
     -- ^ Is 'PatternSynonyms' enabled?
   , ped_pattern_parsed :: !Bool
     -- ^ Did we parse a \"pattern\" keyword?
+  , ped_roles_enabled :: !Bool
+    -- Are role annotations enabled?
   }
 
 data PsInvalidTypeSignature

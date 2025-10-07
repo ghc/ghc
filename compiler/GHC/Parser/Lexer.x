@@ -1068,7 +1068,7 @@ reservedWordsFM = listToUFM $
          ( "mdo",            ITmdo Nothing,   xbit RecursiveDoBit),
              -- See Note [Lexing type pseudo-keywords]
          ( "family",         ITfamily,        0 ),
-         ( "role",           ITrole,          0 ),
+         ( "role",           ITrole,          xbit RoleAnnotationsBit ),
          ( "pattern",        ITpattern,       xbit PatternSynonymsBit),
          ( "static",         ITstatic,        xbit StaticPointersBit ),
          ( "stock",          ITstock,         0 ),
@@ -2790,6 +2790,7 @@ data ExtBits
   | RequiredTypeArgumentsBit
   | MultilineStringsBit
   | LevelImportsBit
+  | RoleAnnotationsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2874,6 +2875,7 @@ mkParserOpts extensionFlags diag_opts
       .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
       .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
+      .|. RoleAnnotationsBit          `xoptBit` LangExt.RoleAnnotations
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
@@ -3122,12 +3124,14 @@ srcParseErr options buf len loc = mkPlainErrorMsgEnvelope loc (PsErrParse token 
    mdoInLast100 = "mdo" `isInfixOf` last100
    th_enabled = ThQuotesBit `xtest` pExtsBitmap options
    ps_enabled = PatternSynonymsBit `xtest` pExtsBitmap options
+   roles_enabled = RoleAnnotationsBit `xtest` pExtsBitmap options
    details = PsErrParseDetails {
        ped_th_enabled      = th_enabled
      , ped_do_in_last_100  = doInLast100
      , ped_mdo_in_last_100 = mdoInLast100
      , ped_pat_syn_enabled = ps_enabled
      , ped_pattern_parsed  = pattern_ == "pattern "
+     , ped_roles_enabled   = roles_enabled
      }
 
 -- Report a parse failure, giving the span of the previous token as
