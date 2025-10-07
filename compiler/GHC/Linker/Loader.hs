@@ -930,7 +930,8 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
     -- Loading bytecode for mypkg
     --- -l mypkg
     -- This thinks we are creating shared library for main but we actually are for mypkg
-    linkDynLib LinkingForInterpreter logger tmpfs dflags2 unit_env objs (pprTraceIt "test" (map loaded_pkg_uid $ eltsUDFM pkgs_loaded))
+    -- MP: LinkingForInterpreter is broken here for tests, recompPluginPackage
+    linkDynLib LinkingHomePackage logger tmpfs dflags2 unit_env objs (map loaded_pkg_uid $ eltsUDFM pkgs_loaded)
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
