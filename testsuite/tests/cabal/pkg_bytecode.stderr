@@ -1,9 +1,1 @@
-testpkg-1.2.3.4: cannot find any of ["libtestpkg-1.2.3.4-XXX.a","libtestpkg-1.2.3.4-XXX_p.a","libtestpkg-1.2.3.4-XXX-ghc9.15.20250811.so","libtestpkg-1.2.3.4-XXX_p-ghc9.15.20250811.so","libtestpkg-1.2.3.4-XXX-ghc9.15.20250811.dylib","libtestpkg-1.2.3.4-XXX_p-ghc9.15.20250811.dylib","testpkg-1.2.3.4-XXX-ghc9.15.20250811.dll","testpkg-1.2.3.4-XXX_p-ghc9.15.20250811.dll"] on library path (ignoring)
-hs_classifieds
-  [BytecodeLibrary ./outdir/testpkg-1.2.3.4-XXX.bytecode]
-hs_classifieds
-  [DLLPath /home/matt/ghc-bytecode/_build/stage1/lib/../lib/x86_64-linux-ghc-9.15.20250811/libHSghc-internal-9.1500.0-inplace-ghc9.15.20250811.so]
-hs_classifieds
-  [DLLPath /home/matt/ghc-bytecode/_build/stage1/lib/../lib/x86_64-linux-ghc-9.15.20250811/libHSghc-prim-0.13.1-inplace-ghc9.15.20250811.so]
-hs_classifieds
-  [DLLPath /home/matt/ghc-bytecode/_build/stage1/lib/../lib/x86_64-linux-ghc-9.15.20250811/libHSbase-4.22.0.0-inplace-ghc9.15.20250811.so]
+testpkg-1.2.3.4: cannot find any of ["libtestpkg-1.2.3.4-XXX.a","libtestpkg-1.2.3.4-XXX_p.a","libtestpkg-1.2.3.4-XXX-ghc9.15.20251003.so","libtestpkg-1.2.3.4-XXX_p-ghc9.15.20251003.so","libtestpkg-1.2.3.4-XXX-ghc9.15.20251003.dylib","libtestpkg-1.2.3.4-XXX_p-ghc9.15.20251003.dylib","testpkg-1.2.3.4-XXX-ghc9.15.20251003.dll","testpkg-1.2.3.4-XXX_p-ghc9.15.20251003.dll"] on library path (ignoring)
