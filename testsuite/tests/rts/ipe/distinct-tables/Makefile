@@ -37,3 +37,11 @@ distinct_tables07:
 distinct_tables08:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -finfo-table-map -fdistinct-constructor-tables -fno-distinct-constructor-tables=BCon,CCon Main.hs
 	./Main
+
+distinct_tables09:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -finfo-table-map -fdistinct-constructor-tables=BCon -fno-distinct-constructor-tables=BCon,CCon Main.hs
+	./Main
+
+distinct_tables10:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -finfo-table-map -fno-distinct-constructor-tables Main.hs
+	./Main

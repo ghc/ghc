@@ -6,8 +6,8 @@
 module GHC.Stg.Debug
   ( StgDebugOpts(..)
   , StgDebugDctConfig(..)
-  , dctConfigPlus
-  , dctConfigMinus
+  , dctConfigOnly
+  , dctConfigExclude
   , collectDebugInformation
   ) where
 
@@ -212,7 +212,6 @@ shouldMakeDistinctTable StgDebugOpts{..} dc =
   case stgDebug_distinctConstructorTables of
     All -> True
     Only these -> Set.member dcStr these
-    AllExcept these -> Set.notMember dcStr these
     None -> False
   where
     dcStr = occNameString . occName $ dataConName dc

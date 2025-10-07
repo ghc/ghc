@@ -1918,9 +1918,15 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "fprof-callers"
          (HasArg setCallerCcFilters)
   , make_ord_flag defGhcFlag "fdistinct-constructor-tables"
-      (OptPrefix setDistinctConstructorTables)
+      (noArg enableDistinctConstructorTables)
   , make_ord_flag defGhcFlag "fno-distinct-constructor-tables"
-      (OptPrefix unSetDistinctConstructorTables)
+      (noArg disableDistinctConstructorTables)
+
+  , make_ord_flag defGhcFlag "fdistinct-constructor-tables-only"
+      (Prefix onlyDistinctConstructorTables)
+  , make_ord_flag defGhcFlag "fdistinct-constructor-tables-exclude"
+      (Prefix excludeDistinctConstructorTables)
+
         ------ Compiler flags -----------------------------------------------
 
   , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend ncgBackend))
@@ -3219,20 +3225,30 @@ setCallerCcFilters arg =
     Right filt -> upd $ \d -> d { callerCcFilters = filt : callerCcFilters d }
     Left err -> addErr err
 
-setDistinctConstructorTables :: String -> DynP ()
-setDistinctConstructorTables arg = do
+enableDistinctConstructorTables :: DynFlags -> DynFlags
+enableDistinctConstructorTables d =
+  d { distinctConstructorTables = All
+    }
+
+disableDistinctConstructorTables :: DynFlags -> DynFlags
+disableDistinctConstructorTables d =
+  d { distinctConstructorTables = None
+    }
+
+onlyDistinctConstructorTables :: String -> DynP ()
+onlyDistinctConstructorTables arg = do
   let cs = parseDistinctConstructorTablesArg arg
   upd $ \d ->
     d { distinctConstructorTables =
-        (distinctConstructorTables d) `dctConfigPlus` cs
+        (distinctConstructorTables d) `dctConfigOnly` cs
       }
 
-unSetDistinctConstructorTables :: String -> DynP ()
-unSetDistinctConstructorTables arg = do
+excludeDistinctConstructorTables :: String -> DynP ()
+excludeDistinctConstructorTables arg = do
   let cs = parseDistinctConstructorTablesArg arg
   upd $ \d ->
     d { distinctConstructorTables =
-        (distinctConstructorTables d) `dctConfigMinus` cs
+        (distinctConstructorTables d) `dctConfigExclude` cs
       }
 
 -- | Parse a string of comma-separated constructor names into a 'Set' of

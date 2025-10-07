@@ -27,21 +27,13 @@ data StgDebugDctConfig =
     -- | Create distinct constructor tables for each usage of only these data
     -- constructors.
     --
-    -- This is the behavior if @-fdistinct-constructor-tables=C1,...,CN@ is
+    -- This is the behavior if @-fdistinct-constructor-tables-only=C1,...,CN@ is
     -- supplied.
   | Only !(Set String)
 
-    -- | Create distinct constructor tables for each usage of any data
-    -- constructor except these ones.
-    --
-    -- This is the behavior if @-fdistinct-constructor-tables@ and
-    -- @-fno-distinct-constructor-tables=C1,...,CN@ is given.
-  | AllExcept !(Set String)
-
     -- | Do not create distinct constructor tables for any data constructor.
     --
-    -- This is the behavior if no @-fdistinct-constructor-tables@ is given (or
-    -- @-fno-distinct-constructor-tables@ is given).
+    -- This is the behavior if @-fno-distinct-constructor-tables@ is given.
   | None
 
 -- | Given a distinct constructor tables configuration and a set of constructor
@@ -51,14 +43,13 @@ data StgDebugDctConfig =
 -- If the given set is empty, that means the user has entered
 -- @-fdistinct-constructor-tables@ with no constructor names specified, and
 -- therefore we consider that an 'All' configuration.
-dctConfigPlus :: StgDebugDctConfig -> Set String -> StgDebugDctConfig
-dctConfigPlus cfg cs
+dctConfigOnly :: StgDebugDctConfig -> Set String -> StgDebugDctConfig
+dctConfigOnly cfg cs
     | Set.null cs = All
     | otherwise =
         case cfg of
-          All -> All
+          All -> Only cs
           Only cs' -> Only $ Set.union cs' cs
-          AllExcept cs' -> AllExcept $ Set.difference cs' cs
           None -> Only cs
 
 -- | Given a distinct constructor tables configuration and a set of constructor
@@ -68,13 +59,12 @@ dctConfigPlus cfg cs
 -- If the given set is empty, that means the user has entered
 -- @-fno-distinct-constructor-tables@ with no constructor names specified, and
 -- therefore we consider that a 'None' configuration.
-dctConfigMinus :: StgDebugDctConfig -> Set String -> StgDebugDctConfig
-dctConfigMinus cfg cs
+dctConfigExclude :: StgDebugDctConfig -> Set String -> StgDebugDctConfig
+dctConfigExclude cfg cs
     | Set.null cs = None
     | otherwise =
         case cfg of
-          All -> AllExcept cs
+          All -> All
           Only cs' -> Only $ Set.difference cs' cs
-          AllExcept cs' -> AllExcept $ Set.union cs' cs
           None -> None
 

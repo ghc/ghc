@@ -229,14 +229,12 @@ instance NFData IfaceDistinctConstructorConfig where
   rnf (IfaceDistinctConstructorConfig cnf) = case cnf of
     All -> ()
     (Only v) -> rnf v
-    (AllExcept v) -> rnf v
     None -> ()
 
 instance Outputable IfaceDistinctConstructorConfig where
   ppr (IfaceDistinctConstructorConfig cnf) = case cnf of
     All -> text "all"
     (Only v) -> text "only" <+> brackets (hcat $ fmap text $ Set.toList v)
-    (AllExcept v) -> text "all except" <+> brackets (hcat $ fmap text $ Set.toList v)
     None -> text "none"
 
 instance Binary IfaceDistinctConstructorConfig where
@@ -245,10 +243,7 @@ instance Binary IfaceDistinctConstructorConfig where
     (Only cs) -> do
       putByte bh 1
       put_ bh cs
-    (AllExcept cs) -> do
-      putByte bh 2
-      put_ bh cs
-    None -> putByte bh 3
+    None -> putByte bh 2
 
   get bh = do
     h <- getByte bh
@@ -256,5 +251,4 @@ instance Binary IfaceDistinctConstructorConfig where
       case h of
         0 -> pure All
         1 -> Only <$> get bh
-        2 -> AllExcept <$> get bh
         _ -> pure None
