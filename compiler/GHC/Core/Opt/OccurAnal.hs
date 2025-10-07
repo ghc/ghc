@@ -2493,7 +2493,7 @@ occAnal env (Tick tickish body)
     WUD usage body' = occAnal env body
 
     usage'
-      | tickish `tickishScopesLike` SoftScope || isProfTick tickish
+      | tickishCanScopeJoin tickish
       = usage  -- For soft-scoped ticks (including SourceNotes) we don't want
                -- to lose join-point-hood, so we don't mess with `usage` (#24078)
 

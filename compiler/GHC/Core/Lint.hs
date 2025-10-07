@@ -899,9 +899,12 @@ lintCoreExpr (Tick tickish expr)
   = do { case tickish of
            Breakpoint _ _ ids -> forM_ ids $ \id -> lintIdOcc id 0
            _                  -> return ()
-       ; markAllJoinsBadIf block_joins $ lintCoreExpr expr }
+       ; expr_l <- lintCoreExpr expr
+       ; r <- markAllJoinsBadIf block_joins $ pure expr_l
+      --  ; when block_joins
+       ; pure r}
   where
-    block_joins = not (tickish `tickishScopesLike` SoftScope)
+    block_joins = not (tickishCanScopeJoin tickish)
       -- TODO Consider whether this is the correct rule. It is consistent with
       -- the simplifier's behaviour - cost-centre-scoped ticks become part of
       -- the continuation, and thus they behave like part of an evaluation

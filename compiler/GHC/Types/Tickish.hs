@@ -15,6 +15,7 @@ module GHC.Types.Tickish (
   tickishScopesLike,
   tickishFloatable,
   tickishCanSplit,
+  tickishCanScopeJoin,
   mkNoCount,
   mkNoScope,
   tickishIsCode,
@@ -323,6 +324,14 @@ tickishCanSplit :: GenTickish pass -> Bool
 tickishCanSplit ProfNote{profNoteScope = True, profNoteCount = True}
                    = True
 tickishCanSplit _  = False
+
+-- | Is @join f x in <tick> jump f x@ valid?
+tickishCanScopeJoin :: GenTickish pass -> Bool
+tickishCanScopeJoin tick = case tick of
+  ProfNote{} -> True
+  HpcTick{} -> False
+  Breakpoint{} -> False
+  SourceNote{} -> True
 
 mkNoCount :: GenTickish pass -> GenTickish pass
 mkNoCount n | not (tickishCounts n)   = n
