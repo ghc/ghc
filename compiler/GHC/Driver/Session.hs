@@ -3710,6 +3710,10 @@ makeDynFlagsConsistent dflags
  , ways dflags `hasWay` WayDyn
     = let warn = "-dynamic is ignored when using -fully-static"
       in loop dflags{targetWays_ = removeWay WayDyn (targetWays_ dflags)} warn
+ | LinkStaticLib <- ghcLink dflags
+ , ways dflags `hasWay` WayDyn
+    = let warn = "-dynamic is ignored when using -staticlib"
+      in loop dflags{targetWays_ = removeWay WayDyn (targetWays_ dflags)} warn
  | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , targetWays_ dflags /= hostFullWays
