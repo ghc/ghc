@@ -1068,7 +1068,7 @@ reservedWordsFM = listToUFM $
          ( "mdo",            ITmdo Nothing,   xbit RecursiveDoBit),
              -- See Note [Lexing type pseudo-keywords]
          ( "family",         ITfamily,        0 ),
-         ( "role",           ITrole,          0 ),
+         ( "role",           ITrole,          xbit RoleAnnotationsBit ),
          ( "pattern",        ITpattern,       xbit PatternSynonymsBit),
          ( "static",         ITstatic,        xbit StaticPointersBit ),
          ( "stock",          ITstock,         0 ),
@@ -2790,6 +2790,7 @@ data ExtBits
   | RequiredTypeArgumentsBit
   | MultilineStringsBit
   | LevelImportsBit
+  | RoleAnnotationsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2874,6 +2875,7 @@ mkParserOpts extensionFlags diag_opts
       .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
       .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
+      .|. RoleAnnotationsBit          `xoptBit` LangExt.RoleAnnotations
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
