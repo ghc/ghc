@@ -181,7 +181,7 @@ mkNoteObjsToLinkIntoBinary logger tmpfs dflags unit_env dep_packages = do
 -- See Note [LinkInfo section]
 getLinkInfo :: DynFlags -> UnitEnv -> [UnitId] -> IO String
 getLinkInfo dflags unit_env dep_packages = do
-    package_link_opts <- getUnitLinkOpts (ghcNameVersion dflags) (ways dflags) mBinaryLinkMode unit_env dep_packages
+    package_link_opts <- getUnitLinkOpts (ghcNameVersion dflags) (ways dflags) mExecutableLinkMode unit_env dep_packages
     pkg_frameworks <- if not (platformUsesFrameworks (ue_platform unit_env))
       then return []
       else do
@@ -198,8 +198,8 @@ getLinkInfo dflags unit_env dep_packages = do
              )
     return (show link_info)
  where
-  mBinaryLinkMode = case ghcLink dflags of
-                      LinkBinary blm -> Just (blm, toolSettings_ldSupportsVerbatimNamespace (toolSettings dflags))
+  mExecutableLinkMode = case ghcLink dflags of
+                      LinkExecutable blm -> Just (blm, toolSettings_ldSupportsVerbatimNamespace (toolSettings dflags))
                       _ -> Nothing
 
 platformSupportsSavingLinkOpts :: OS -> Bool

@@ -21,7 +21,7 @@ import GHC              (parseTargetFiles,  Ghc, GhcMonad(..),
 
 import GHC.Driver.Backend
 import GHC.Driver.CmdLine
-import GHC.Driver.DynFlags (BinaryLinkMode(..))
+import GHC.Driver.DynFlags (ExecutableLinkMode(..))
 import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
@@ -173,11 +173,11 @@ main' postLoadMode units dflags0 args flagWarnings = do
                DoInteractive   -> (CompManager, interpreterBackend,  LinkInMemory)
                DoEval _        -> (CompManager, interpreterBackend,  LinkInMemory)
                DoRun           -> (CompManager, interpreterBackend,  LinkInMemory)
-               DoMake          -> (CompManager, dflt_backend, LinkBinary Dynamic)
-               DoBackpack      -> (CompManager, dflt_backend, LinkBinary Dynamic)
-               DoMkDependHS    -> (MkDepend,    dflt_backend, LinkBinary Dynamic)
-               DoAbiHash       -> (OneShot,     dflt_backend, LinkBinary Dynamic)
-               _               -> (OneShot,     dflt_backend, LinkBinary Dynamic)
+               DoMake          -> (CompManager, dflt_backend, LinkExecutable Dynamic)
+               DoBackpack      -> (CompManager, dflt_backend, LinkExecutable Dynamic)
+               DoMkDependHS    -> (MkDepend,    dflt_backend, LinkExecutable Dynamic)
+               DoAbiHash       -> (OneShot,     dflt_backend, LinkExecutable Dynamic)
+               _               -> (OneShot,     dflt_backend, LinkExecutable Dynamic)
 
   let dflags1 = dflags0{ ghcMode   = mode,
                          backend   = bcknd,

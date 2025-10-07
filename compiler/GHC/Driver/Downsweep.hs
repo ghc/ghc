@@ -709,7 +709,7 @@ linkNodes summaries uid hue =
 
       do_linking =  main_sum || no_hs_main || ghcLink dflags == LinkDynLib || ghcLink dflags == LinkStaticLib
 
-  in if | isBinaryLink (ghcLink dflags) && isJust ofile && not do_linking ->
+  in if | isExecutableLink (ghcLink dflags) && isJust ofile && not do_linking ->
             Just (Left $ singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan (DriverRedirectedNoMain $ mainModuleNameIs dflags))
         -- This should be an error, not a warning (#10895).
         | ghcLink dflags /= NoLink, do_linking -> Just (Right (LinkNode unit_nodes uid))

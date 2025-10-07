@@ -4,7 +4,7 @@ module GHC.Linker.Static
    )
 where
 
-import GHC.Driver.DynFlags (BinaryLinkMode(..))
+import GHC.Driver.DynFlags (ExecutableLinkMode(..))
 import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Ways
@@ -68,10 +68,10 @@ it is supported by both gcc and clang. Anecdotally nvcc supports
 -Xlinker, but not -Wl.
 -}
 
-linkBinary :: Logger -> TmpFs -> DynFlags -> BinaryLinkMode -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkBinary :: Logger -> TmpFs -> DynFlags -> ExecutableLinkMode -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
 linkBinary = linkBinary' False
 
-linkBinary' :: Bool -> Logger -> TmpFs -> DynFlags -> BinaryLinkMode -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkBinary' :: Bool -> Logger -> TmpFs -> DynFlags -> ExecutableLinkMode -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
 linkBinary' staticLink logger tmpfs dflags blm unit_env o_files dep_units = do
     let platform   = ue_platform unit_env
         unit_state = ue_homeUnitState unit_env

@@ -43,13 +43,13 @@ instance Monoid UnitLinkOpts where
 
 -- | Find all the link options in these and the preload packages,
 -- returning (package hs lib options, extra library options, other flags)
-getUnitLinkOpts :: GhcNameVersion -> Ways -> Maybe (BinaryLinkMode, Bool) -> UnitEnv -> [UnitId] -> IO UnitLinkOpts
-getUnitLinkOpts namever ways mBinaryLinkMode unit_env pkgs = do
+getUnitLinkOpts :: GhcNameVersion -> Ways -> Maybe (ExecutableLinkMode, Bool) -> UnitEnv -> [UnitId] -> IO UnitLinkOpts
+getUnitLinkOpts namever ways mExecutableLinkMode unit_env pkgs = do
     ps <- mayThrowUnitErr $ preloadUnitsInfo' unit_env pkgs
-    collectLinkOpts namever ways mBinaryLinkMode ps
+    collectLinkOpts namever ways mExecutableLinkMode ps
 
-collectLinkOpts :: GhcNameVersion -> Ways -> Maybe (BinaryLinkMode, Bool) -> [UnitInfo] -> IO UnitLinkOpts
-collectLinkOpts namever ways mBinaryLinkMode ps = do
+collectLinkOpts :: GhcNameVersion -> Ways -> Maybe (ExecutableLinkMode, Bool) -> [UnitInfo] -> IO UnitLinkOpts
+collectLinkOpts namever ways mExecutableLinkMode ps = do
   fmap mconcat $ forM ps $ \pc -> do
     extraLibs <- getExtraLibs pc
     pure UnitLinkOpts
@@ -64,9 +64,9 @@ collectLinkOpts namever ways mBinaryLinkMode ps = do
   --   * dynamic linking: -lfoo -lbar
   getExtraLibs pc
     -- We don't do anything here for 'FullyStatic', because appending '-static' to the linker is enough.
-    | Just (MostlyStatic, True) <- mBinaryLinkMode
+    | Just (MostlyStatic, True) <- mExecutableLinkMode
     = pure . map (\d -> "-l:lib" ++ d ++ ".a") . map ST.unpack . unitExtDepLibsStaticSys $ pc
-    | Just (MostlyStatic, False) <- mBinaryLinkMode
+    | Just (MostlyStatic, False) <- mExecutableLinkMode
     = do
         fmap mconcat $ forM (map ST.unpack . unitExtDepLibsStaticSys $ pc) $ \l ->
           filterM doesFileExist
@@ -74,7 +74,7 @@ collectLinkOpts namever ways mBinaryLinkMode ps = do
             | searchPath <- (ordNub . filter notNull . map ST.unpack . unitLibraryDirsStatic $ pc)
             ]
 
-    | Just (FullyStatic, _) <- mBinaryLinkMode
+    | Just (FullyStatic, _) <- mExecutableLinkMode
     = pure . map ("-l" ++) . map ST.unpack . unitExtDepLibsStaticSys $ pc
     | otherwise = pure . map ("-l" ++) . map ST.unpack . unitExtDepLibsSys $ pc
 
