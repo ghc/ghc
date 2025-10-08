@@ -671,6 +671,16 @@ labelString :: String -> Cond
 labelString s =
   Cond $ "$CI_MERGE_REQUEST_LABELS =~ /.*" ++ s ++ ".*/"
 
+inputEqString :: String -> String -> Cond
+inputEqString var s =
+  Cond $ "$[[ inputs." ++ var ++ " ]] == \"" ++ s ++ "\""
+
+inputOrLabelString :: String -> Cond
+inputOrLabelString name =
+  or_all [ inputEqString name "yes"
+         , labelString name
+         ]
+
 branchStringExact :: String -> Cond
 branchStringExact =
   varEqString "CI_COMMIT_BRANCH"
@@ -746,22 +756,22 @@ ruleToCond Off Nightly           = varIsNull "NIGHTLY"
 
 
 validateRuleString :: ValidateRule -> Cond
-validateRuleString FullCI       = or_all [ labelString "full-ci"
+validateRuleString FullCI       = or_all [ inputOrLabelString "full-ci"
                                          , labelString "marge_bot_batch_merge_job"
                                          , branchStringExact "master"
                                          , branchStringLike "ghc-[0-9]+\\.[0-9]+"
                                          ]
 validateRuleString FastCI       = true
 
-validateRuleString LLVMBackend  = labelString "LLVM backend"
-validateRuleString JSBackend    = labelString "javascript"
-validateRuleString RiscV        = labelString "RISC-V"
-validateRuleString WasmBackend  = labelString "wasm"
-validateRuleString FreeBSDLabel = labelString "FreeBSD"
-validateRuleString NonmovingGc  = labelString "non-moving GC"
-validateRuleString IpeData      = labelString "IPE"
-validateRuleString TestPrimops  = labelString "test-primops"
-validateRuleString I386Backend  = labelString "i386"
+validateRuleString LLVMBackend  = inputOrLabelString "LLVM backend"
+validateRuleString JSBackend    = inputOrLabelString "javascript"
+validateRuleString RiscV        = inputOrLabelString "RISC-V"
+validateRuleString WasmBackend  = inputOrLabelString "wasm"
+validateRuleString FreeBSDLabel = inputOrLabelString "FreeBSD"
+validateRuleString NonmovingGc  = inputOrLabelString "non-moving GC"
+validateRuleString IpeData      = inputOrLabelString "IPE"
+validateRuleString TestPrimops  = inputOrLabelString "test-primops"
+validateRuleString I386Backend  = inputOrLabelString "i386"
 validateRuleString WinArm64     = and_all
                                     [ labelString "aarch64"
                                     , labelString "Windows"
@@ -771,7 +781,7 @@ validateRuleString WinArm64LLVM = and_all
                                     , labelString "Windows"
                                     , validateRuleString LLVMBackend
                                     ]
-validateRuleString LoongArch64  = labelString "loongarch"
+validateRuleString LoongArch64  = inputOrLabelString "loongarch"
 
 ---------------------------------------------------------------------
 -- The Job type
