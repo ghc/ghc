@@ -673,7 +673,7 @@ labelString s =
 
 inputEqString :: String -> String -> Cond
 inputEqString var s =
-  Cond $ "inputs." ++ var ++ " == \"" ++ s ++ "\""
+  Cond $ "'$[[ inputs." ++ var ++ " ]]' == \"" ++ s ++ "\""
 
 inputOrLabelString :: String -> String -> Cond
 inputOrLabelString input_name label_name =
