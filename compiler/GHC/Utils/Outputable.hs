@@ -167,6 +167,8 @@ import GHC.Show         ( showMultiLineString )
 import GHC.Utils.Exception
 import GHC.Exts (oneShot)
 
+import qualified GHC.Boot.TH.Syntax as TH
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1094,12 +1096,14 @@ instance Outputable a => Outputable (SCC a) where
 instance Outputable Serialized where
     ppr (Serialized the_type bytes) = int (length bytes) <+> text "of type" <+> text (show the_type)
 
+instance Outputable TH.Name where
+    ppr = text . TH.showName
+
 instance Outputable Extension where
     ppr = text . show
 
 instance Outputable ModuleName where
   ppr = pprModuleName
-
 
 pprModuleName :: IsLine doc => ModuleName -> doc
 pprModuleName (ModuleName nm) =
@@ -1249,6 +1253,7 @@ instance (OutputableP env a) => OutputableP env (Set a) where
 
 instance OutputableP env Void where
     pdoc _ = \ case
+
 
 {-
 ************************************************************************

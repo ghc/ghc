@@ -14,6 +14,7 @@ where
 import GHC.Prelude
 
 import GHC.Serialized   ( Serialized )
+import qualified GHC.Boot.TH.Syntax as TH
 
 import GHC.Hs
 import GHC.Utils.Outputable
@@ -26,7 +27,7 @@ data MetaRequest
   | MetaP  (LPat GhcPs      -> MetaResult)
   | MetaT  (LHsType GhcPs   -> MetaResult)
   | MetaD  ([LHsDecl GhcPs] -> MetaResult)
-  | MetaAW (Serialized     -> MetaResult)
+  | MetaAW (([TH.Name], Serialized) -> MetaResult)
 
 -- | data constructors not exported to ensure correct result type
 data MetaResult
@@ -34,7 +35,7 @@ data MetaResult
   | MetaResP  (LPat GhcPs)
   | MetaResT  (LHsType GhcPs)
   | MetaResD  [LHsDecl GhcPs]
-  | MetaResAW Serialized
+  | MetaResAW ([TH.Name], Serialized)
 
 instance Outputable MetaResult where
     ppr (MetaResE e)   = text "MetaResE"  <> braces (ppr e)
@@ -63,7 +64,7 @@ unMetaResD :: MetaResult -> [LHsDecl GhcPs]
 unMetaResD (MetaResD d) = d
 unMetaResD mr           = pprPanic "unMetaResD" (ppr mr)
 
-unMetaResAW :: MetaResult -> Serialized
+unMetaResAW :: MetaResult -> ([TH.Name], Serialized)
 unMetaResAW (MetaResAW aw) = aw
 unMetaResAW mr             = pprPanic "unMetaResAW" (ppr mr)
 
@@ -81,6 +82,6 @@ metaRequestT h = fmap unMetaResT . h (MetaT MetaResT)
 metaRequestD :: Functor f => MetaHook f -> LHsExpr GhcTc -> f [LHsDecl GhcPs]
 metaRequestD h = fmap unMetaResD . h (MetaD MetaResD)
 
-metaRequestAW :: Functor f => MetaHook f -> LHsExpr GhcTc -> f Serialized
+metaRequestAW :: Functor f => MetaHook f -> LHsExpr GhcTc -> f ([TH.Name], Serialized)
 metaRequestAW h = fmap unMetaResAW . h (MetaAW MetaResAW)
 

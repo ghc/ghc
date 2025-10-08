@@ -166,13 +166,15 @@ import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic  ( fromDynamic, toDyn )
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
-import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
-import Data.Data (Data)
+import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep, cast )
+import Data.Data (Data, gmapQ)
 import Data.Proxy    ( Proxy (..) )
 import Data.IORef
 import GHC.Parser.HaddockLex (lexHsDoc)
 import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
+
+import Debug.Trace
 
 {-
 Note [Template Haskell state diagram]
@@ -668,14 +670,12 @@ Example:
 -}
 
 -- None of these functions add constraints to the LIE
-
-tcTypedBracket    :: HsExpr GhcRn -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-tcUntypedBracket  :: HsExpr GhcRn -> HsQuote GhcRn -> [PendingRnSplice] -> ExpRhoType
-                  -> TcM (HsExpr GhcTc)
-tcTypedSplice     :: HsTypedSpliceResult -> HsTypedSplice GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-
-getUntypedSpliceBody :: HsUntypedSpliceResult (HsExpr GhcRn) -> TcM (HsExpr GhcRn)
-runAnnotation        :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
+--
+-- * tcTypedBracket
+-- * tcUntypedBracket
+-- * tcTypedSplice
+-- * getUntypedSpliceBody
+-- * runAnnotation
 
 {-
 ************************************************************************
@@ -686,6 +686,7 @@ runAnnotation        :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 -}
 
 -- See Note [How brackets and nested splices are handled]
+tcTypedBracket :: HsExpr GhcRn -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcTypedBracket rn_expr expr res_ty
   = addErrCtxt (TypedTHBracketCtxt expr) $
     do { cur_lvl <- getThLevel
@@ -728,6 +729,7 @@ tcTypedBracket rn_expr expr res_ty
                        meta_ty res_ty }
 
 -- See Note [Typechecking Overloaded Quotes]
+tcUntypedBracket :: HsExpr GhcRn -> HsQuote GhcRn -> [PendingRnSplice] -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcUntypedBracket rn_expr brack ps res_ty
   = do { traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
 
@@ -929,6 +931,7 @@ tcCodeTy m_ty exp_ty
 -- getUntypedSpliceBody: the renamer has expanded the splice.
 -- Just run the finalizers that it produced, and return
 -- the renamed expression
+getUntypedSpliceBody :: HsUntypedSpliceResult (HsExpr GhcRn) -> TcM (HsExpr GhcRn)
 getUntypedSpliceBody (HsUntypedSpliceTop { utsplice_result_finalizers = mod_finalizers
                                          , utsplice_result = rn_expr })
   = do { addModFinalizersWithLclEnv mod_finalizers
@@ -936,6 +939,7 @@ getUntypedSpliceBody (HsUntypedSpliceTop { utsplice_result_finalizers = mod_fina
 getUntypedSpliceBody (HsUntypedSpliceNested {})
   = panic "tcTopUntypedSplice: invalid nested splice"
 
+tcTypedSplice :: HsTypedSpliceResult -> HsTypedSplice GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcTypedSplice HsTypedSpliceTop ctxt@(HsTypedSpliceExpr _ expr) res_ty
   = addErrCtxt (TypedSpliceCtxt Nothing ctxt) $
     setSrcSpan (getLocA expr)    $
@@ -1082,6 +1086,7 @@ stubNestedSplice = warnPprTrace True "stubNestedSplice" empty $
 ************************************************************************
 -}
 
+runAnnotation :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 runAnnotation target expr = do
     -- Find the classes we want instances for in order to call toAnnotationWrapper
     loc <- getSrcSpanM
@@ -1106,17 +1111,32 @@ runAnnotation target expr = do
                                 specialised_to_annotation_wrapper_expr expr'))
                                 })
 
+    traceM $ "runAnnotation: " ++ showPprUnsafe zonked_wrapped_expr'
+
     -- Run the appropriately wrapped expression to get the value of
     -- the annotation and its dictionaries. The return value is of
     -- type AnnotationWrapper by construction, so this conversion is
     -- safe
-    serialized <- runMetaAW zonked_wrapped_expr'
+    (names, serialized) <- runMetaAW zonked_wrapped_expr'
+    -- See Note [Keeping things alive referenced by TH.Name from annotations]
+    traceM $ "runAnnotation names: " ++ showPprUnsafe names
+
+    forM_ names $ \th_name -> do
+        mb_name <- lookupThName_maybe th_name
+        traceM $ "runAnnotation found: " ++ showPprUnsafe mb_name
+        forM_ mb_name keepAlive -- TODO: do we need to do checks, like isExternalName here?
+
     return Annotation {
                ann_target = target,
                ann_value = serialized
            }
 
-convertAnnotationWrapper :: ForeignHValue -> TcM Serialized
+extractTHNames :: Data a => a -> [TH.Name]
+extractTHNames x = case cast x of
+    Just n -> [n]
+    Nothing -> concat (gmapQ extractTHNames x)
+
+convertAnnotationWrapper :: ForeignHValue -> TcM ([TH.Name], Serialized)
 convertAnnotationWrapper fhv = do
   interp <- tcGetInterp
   case interpInstance interp of
@@ -1133,8 +1153,7 @@ convertAnnotationWrapper fhv = do
                -- annotation are exposed at this point.  This is also why we are
                -- doing all this stuff inside the context of runMeta: it has the
                -- facilities to deal with user error in a meta-level expression
-               rnf serialized `seq` serialized
-
+               (extractTHNames value, rnf serialized `seq` serialized)
 #endif
 
 {-
@@ -1216,7 +1235,7 @@ defaultRunMeta (MetaAW r)
 
 ----------------
 runMetaAW :: LHsExpr GhcTc         -- Of type AnnotationWrapper
-          -> TcM Serialized
+          -> TcM ([TH.Name], Serialized)
 runMetaAW = runMeta metaRequestAW
 
 runMetaE :: LHsExpr GhcTc          -- Of type (Q Exp)

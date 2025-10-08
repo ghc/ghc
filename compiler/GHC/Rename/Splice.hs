@@ -1072,6 +1072,32 @@ a bit hacky.
 For these chaps (which have Internal Names) we don't want to put
 them in the keep-alive set.
 
+Note [Keeping things alive referenced by TH.Name from annotations]
+
+Consider
+
+  {-# ANN module 'f #-}
+
+We stage-check annotations as splices, because we are going to run them,
+and thus similar stage restrictions apply.
+
+That however leads for 'f not being persisted. Consider briefly
+
+  expr = $(  [| f |] )
+
+Here, `f` isn't kept alive by the same mechanism as in
+Note [Keeping things alive for Template Haskell], as there isn't need for that.
+Once the splice is evaluated and spliced, compiler will see
+
+  expr = f
+
+in other words, there will be explicit use of `f`.
+
+Returning back to the ANN example: once the annotation is run,
+we previously had an opaque Serialised blob. There might be a TH Name inside,
+but GHC won't know about it. To work around that we not only serialise
+the annotation value, but also traverse it to extract all TH Names.
+
 Note [Quoting names]
 ~~~~~~~~~~~~~~~~~~~~
 A quoted name 'n is a bit like a quoted expression [| n |], except that we
