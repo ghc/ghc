@@ -655,7 +655,7 @@ type Var = String
 
 varIsSet :: Var -> Cond
 varIsSet var =
-  Cond $ "$" <> var
+  Cond $ "($" <> var <> " != null && $" <> var <> " != \"\")"
 
 -- | A constant evaluating to True because gitlab doesn't support "true" in the
 -- expression language.
