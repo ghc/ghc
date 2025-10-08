@@ -149,6 +149,7 @@ Library
     else
         Build-Depends: unix   >= 2.7 && < 2.9
 
+    -- Hadrian further set some warnings in its Settings.Warnings module.
     GHC-Options: -Wall
                  -Wno-name-shadowing
                  -Wnoncanonical-monad-instances
