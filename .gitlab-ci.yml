@@ -202,6 +202,7 @@ workflow:
     - if: '$RELEASE_JOB == "yes"'
 
 .full-ci: &full-ci
+  - if: '"$[[ inputs.full_ci ]]" == "yes"'
   - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
   - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
   - if: '$CI_COMMIT_BRANCH == "master"'
