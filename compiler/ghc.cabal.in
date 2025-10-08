@@ -140,6 +140,9 @@ Library
       Build-Depends:
         ghc-boot-th-next     == @ProjectVersionMunged@
     else
+      -- There is no easy way to fix those until we raise the boot compiler
+      -- requirements. So just disable it for now.
+      GHC-Options: -Wno-pattern-namespace-specifier
       Build-Depends:
         ghc-boot-th          == @ProjectVersionMunged@,
         ghc-internal         == @ProjectVersionForLib@.0,
