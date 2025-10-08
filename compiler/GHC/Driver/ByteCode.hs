@@ -7,11 +7,7 @@ import GHC.Driver.Session
 import GHC.Driver.CodeOutput
 import GHC.Driver.Env
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Interpreter.Types
-    ( interpreterDynamic, interpreterProfiled )
-import GHC.ByteCode.Types
 
-import GHC.Linker.Types
 import GHC.Tc.Utils.Monad
 
 import GHC.Unit

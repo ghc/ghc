@@ -1360,7 +1360,7 @@ loadBytecodeLibrary hsc_env interp pls path = do
   -- 1. Read the bytecode library
   (BytecodeLib bcos) <- readBytecodeLib hsc_env path'
   bcos' <- mapM (decodeOnDiskByteCodeObject hsc_env) bcos
-  linkables <- mapM (loadByteCodeObjectLinkable mod_time) bcos'
+  let linkables = map (mkByteCodeObjectLinkable mod_time) bcos'
   (pls', _) <- loadModuleLinkables interp hsc_env pls KeepExternalDefinitions linkables
   return pls'
 

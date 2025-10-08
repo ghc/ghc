@@ -88,7 +88,7 @@ bytecode_object14:
 	@echo "Testing recompilation in GHCi after touching .hi file..."
 	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
 
-# Test recompilation by generating .gbc via , then starting GHCi again
+# Test recompilation by generating .gbc via GHCi , then starting GHCi again
 bytecode_object15:
 	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
 	@[ -f BytecodeTest.gbc ] || (echo "ERROR: Expected BytecodeTest.gbc file not found"; echo "Files in current directory:"; ls -la; exit 1)
