@@ -38,7 +38,6 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     stage <- getStage
     hie_path <- getHieBuildPath
     mconcat [ arg "-Wall"
-            , arg "-Wcompat"
             , not useColor ? builder (Ghc CompileHs) ?
               -- N.B. Target.trackArgument ignores this argument from the
               -- input hash to avoid superfluous recompilation, avoiding
