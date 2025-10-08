@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-=======
-GHCi, version 9.15.20251003: https://www.haskell.org/ghc/  :? for help
->>>>>>> 0ece0d09dad (Rebase fixes)
 [1 of 1] Compiling BytecodeTest     ( BytecodeTest.hs, BytecodeTest.gbc )[main]
 Ok, one module loaded.
 Leaving GHCi.
