@@ -4,11 +4,11 @@ spec:
       default: "no"
       description: Release pipeline
       options: [ "yes", "no" ]
-    full-ci:
+    full_ci:
       default: "no"
       description: Run all validation jobs
       options: [ "yes", "no" ]
-    LLVM backend:
+    llvm_backend:
       default: "no"
       description: Run LLVM backend jobs
       options: [ "yes", "no" ]
@@ -16,7 +16,7 @@ spec:
       default: "no"
       description: Run JavaScript backend jobs
       options: [ "yes", "no" ]
-    RISC-V:
+    riscv:
       default: "no"
       description: Run RISC-V jobs
       options: [ "yes", "no" ]
@@ -24,19 +24,19 @@ spec:
       default: "no"
       description: Run WebAssembly backend jobs
       options: [ "yes", "no" ]
-    FreeBSD:
+    freebsd:
       default: "no"
       description: Run FreeBSD jobs
       options: [ "yes", "no" ]
-    non-moving GC:
+    nonmoving_gc:
       default: "no"
       description: Run non-moving GC jobs
       options: [ "yes", "no" ]
-    IPE:
+    ipe:
       default: "no"
       description: Run IPE data jobs
       options: [ "yes", "no" ]
-    test-primops:
+    test_primops:
       default: "no"
       description: Run test-primops jobs
       options: [ "yes", "no" ]
