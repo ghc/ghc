@@ -37,7 +37,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-darwin-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-darwin-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -103,7 +103,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-alpine3_22-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-alpine3_22-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -166,7 +166,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb10-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb10-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -228,7 +228,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -290,7 +290,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-validate\\+llvm(\\s|$).*/)) || (($ONLY_JOBS == null) && (((\"$[[ inputs.llvm_backend ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-validate\\+llvm(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (((\"$[[ inputs.llvm_backend ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -352,7 +352,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || (($CI_MERGE_REQUEST_LABELS =~ /.*aarch64.*/) && ($CI_MERGE_REQUEST_LABELS =~ /.*Windows.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || (($CI_MERGE_REQUEST_LABELS =~ /.*aarch64.*/) && ($CI_MERGE_REQUEST_LABELS =~ /.*Windows.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -433,7 +433,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate\\+llvm(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || (($CI_MERGE_REQUEST_LABELS =~ /.*aarch64.*/) && ($CI_MERGE_REQUEST_LABELS =~ /.*Windows.*/) && ((\"$[[ inputs.llvm_backend ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/)))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate\\+llvm(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || (($CI_MERGE_REQUEST_LABELS =~ /.*aarch64.*/) && ($CI_MERGE_REQUEST_LABELS =~ /.*Windows.*/) && ((\"$[[ inputs.llvm_backend ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/)))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -514,7 +514,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bi386-linux-alpine3_22-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bi386-linux-alpine3_22-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -577,7 +577,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bi386-linux-deb10-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bi386-linux-deb10-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -639,7 +639,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bi386-linux-deb12-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.i386 ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*i386.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bi386-linux-deb12-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.i386 ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*i386.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -3738,7 +3738,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -3806,7 +3806,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -3871,7 +3871,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -3935,7 +3935,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -3999,7 +3999,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4064,7 +4064,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4128,7 +4128,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4192,7 +4192,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4263,7 +4263,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4330,7 +4330,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4395,7 +4395,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4460,7 +4460,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4525,7 +4525,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4589,7 +4589,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4653,7 +4653,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4717,7 +4717,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4781,7 +4781,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4845,7 +4845,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4909,7 +4909,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -4973,7 +4973,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5038,7 +5038,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5102,7 +5102,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5166,7 +5166,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5230,7 +5230,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5294,7 +5294,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5354,7 +5354,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5418,7 +5418,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5486,7 +5486,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-darwin-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.test_primops ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*test-primops.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-darwin-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.test_primops ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*test-primops.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5555,7 +5555,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-freebsd14-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.freebsd ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-freebsd14-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.freebsd ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5620,7 +5620,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_12-int_native-validate\\+fully_static(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_12-int_native-validate\\+fully_static(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5683,7 +5683,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_12-validate\\+fully_static(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_12-validate\\+fully_static(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5746,7 +5746,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_22-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_22-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5809,7 +5809,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_22-wasm-cross_wasm32-wasi-release\\+host_fully_static\\+text_simdutf(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.wasm ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_22-wasm-cross_wasm32-wasi-release\\+host_fully_static\\+text_simdutf(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.wasm ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -5874,7 +5874,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_22-wasm-int_native-cross_wasm32-wasi-release\\+host_fully_static\\+text_simdutf(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.wasm ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_22-wasm-int_native-cross_wasm32-wasi-release\\+host_fully_static\\+text_simdutf(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.wasm ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "manual"
       }
     ],
@@ -5939,7 +5939,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_22-wasm-unreg-cross_wasm32-wasi-release\\+host_fully_static\\+text_simdutf(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.wasm ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-alpine3_22-wasm-unreg-cross_wasm32-wasi-release\\+host_fully_static\\+text_simdutf(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.wasm ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*wasm.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "manual"
       }
     ],
@@ -6003,7 +6003,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb10-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb10-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6065,7 +6065,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb10-validate\\+debug_info(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb10-validate\\+debug_info(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6127,7 +6127,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb11-cross_aarch64-linux-gnu-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb11-cross_aarch64-linux-gnu-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6191,7 +6191,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.javascript ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*javascript.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.javascript ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*javascript.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6256,7 +6256,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb11-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb11-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6318,7 +6318,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-int_native-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-int_native-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6381,7 +6381,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-no_tntc-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-no_tntc-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "manual"
       }
     ],
@@ -6443,7 +6443,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-numa-slow-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-numa-slow-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6506,7 +6506,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-release(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-release(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6568,7 +6568,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.riscv ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*RISC-V.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.riscv ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*RISC-V.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6632,7 +6632,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-unreg-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-unreg-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6694,7 +6694,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.test_primops ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*test-primops.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.test_primops ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*test-primops.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6756,7 +6756,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-validate\\+boot_nonmoving_gc(\\s|$).*/)) || (($ONLY_JOBS == null) && (((\"$[[ inputs.nonmoving_gc ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*non-moving GC.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-validate\\+boot_nonmoving_gc(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (((\"$[[ inputs.nonmoving_gc ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*non-moving GC.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6818,7 +6818,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-validate\\+llvm(\\s|$).*/)) || (($ONLY_JOBS == null) && (((\"$[[ inputs.llvm_backend ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-validate\\+llvm(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (((\"$[[ inputs.llvm_backend ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -6881,7 +6881,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-validate\\+thread_sanitizer_cmm(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-validate\\+thread_sanitizer_cmm(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "manual"
       }
     ],
@@ -6945,7 +6945,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-zstd-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (((\"$[[ inputs.ipe ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*IPE.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-zstd-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (((\"$[[ inputs.ipe ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*IPE.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7007,7 +7007,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb9-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb9-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7069,7 +7069,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-release(\\s|$).*/)) || (($ONLY_JOBS == null) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-release(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7131,7 +7131,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-release(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-release(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7194,7 +7194,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7256,7 +7256,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-validate\\+debug_info(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora42-validate\\+debug_info(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7318,7 +7318,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-rocky8-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-rocky8-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7380,7 +7380,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu18_04-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu18_04-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7442,7 +7442,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu20_04-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu20_04-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7504,7 +7504,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu22_04-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu22_04-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7566,7 +7566,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.loongarch ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*loongarch.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((((\"$[[ inputs.full_ci ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ((\"$[[ inputs.loongarch ]]\" == \"yes\") || ($CI_MERGE_REQUEST_LABELS =~ /.*loongarch.*/))))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7630,7 +7630,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu24_04-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu24_04-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7688,7 +7688,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-windows-int_native-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-windows-int_native-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],
@@ -7750,7 +7750,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-windows-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-windows-validate(\\s|$).*/)) || ((($ONLY_JOBS == null) || ($ONLY_JOBS == \"\")) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && (($NIGHTLY == null) || ($NIGHTLY == \"\"))",
         "when": "on_success"
       }
     ],

@@ -699,7 +699,9 @@ varNeString var s =
 
 varIsNull :: String -> Cond
 varIsNull var =
-  Cond $ "$" ++ var ++ " == null"
+  or_all [ Cond $ "$" ++ var ++ " == null"
+         , Cond $ "$" ++ var ++ " == \"\""
+         ]
 
 ---------------------------------------------------------------------
 -- Our Rules
