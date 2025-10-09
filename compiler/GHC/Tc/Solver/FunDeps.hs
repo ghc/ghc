@@ -369,12 +369,13 @@ For /non-built-in/ type families we do not create constraints from:
 * Given/instance fundep interactions via functional dependencies or
   type family injectivity annotations.
 
-NB: for /built-in type families/ we DO create constraints, because
-    we can make evidence for them.
+NB: for /built-in type families/ we DO create constraints,
+    because we can make evidence for them.
+    See Note [Given/Given fundeps for built-in type families].
 
 In this Note, all these interactions are called just "fundeps".
 
-We ingore such fundeps for several reasons:
+We ignore such fundeps for several reasons:
 
 1. These fundeps will never serve a purpose in accepting more
    programs: Given constraints do not contain metavariables that could
@@ -404,7 +405,7 @@ We ingore such fundeps for several reasons:
    But we don't have a way to produce evidence for fundeps, as a Wanted it
    is /useless/.
 
-   (Historical aside: we used to keep fundep-generate Wanteds around, so
+   (Historical aside: we used to keep fundep-generated Wanteds around, so
    this insoluble constraint would generate a (misleading) error message.
    Nowadays we discard unsolved fundeps. End of historial aside.)
 
@@ -427,8 +428,11 @@ We ingore such fundeps for several reasons:
    where beta is untouchable (under other equality constraints), leading
    to other insoluble constraints.  End of historical aside.)
 
-The bottom line: since we have no evidence for them, for user-defined type
-families we should ignore Given/Given and Given/instance fundeps entirely.
+The bottom line:
+   since we have no evidence for them, we should ignore
+   Given/Given and Given/instance fundeps entirely, for
+     * Type-class fundeps
+     * Fundeps for user-defined type families
 
 Note [Given/Given fundeps for built-in type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
