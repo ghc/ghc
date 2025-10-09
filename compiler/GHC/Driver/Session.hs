@@ -1113,7 +1113,14 @@ dynamic_flags_deps = [
       (NoArg (setGeneralFlag Opt_SingleLibFolder))
   , make_ord_flag defGhcFlag "pie"            (NoArg (setGeneralFlag Opt_PICExecutable))
   , make_ord_flag defGhcFlag "no-pie"         (NoArg (unSetGeneralFlag Opt_PICExecutable))
-  , make_ord_flag defGhcFlag "static-external" (noArg (\d -> d { ghcLink=LinkExecutable MostlyStatic }))
+  , make_ord_flag defGhcFlag "static-external" (noArg (\d -> d { ghcLink=LinkExecutable (MostlyStatic ["c", "m", "rt", "dl", "pthread", "stdc++", "c++", "c++abi", "atomic"]) }))
+  , make_ord_flag defGhcFlag "exclude-static-external"
+      (OptPrefix (\str -> upd $ \d -> case ghcLink d of
+                                        LinkExecutable (MostlyStatic _) ->
+                                          d { ghcLink = LinkExecutable (MostlyStatic (split ',' str)) }
+                                        _ -> d
+                 )
+      )
   , make_ord_flag defGhcFlag "fully-static"    (noArg (\d -> d { ghcLink=LinkExecutable FullyStatic }))
 
         ------- Specific phases  --------------------------------------------

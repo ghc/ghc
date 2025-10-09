@@ -64,16 +64,20 @@ collectLinkOpts namever ways mExecutableLinkMode ps = do
   --   * dynamic linking: -lfoo -lbar
   getExtraLibs pc
     -- We don't do anything here for 'FullyStatic', because appending '-static' to the linker is enough.
-    | Just (MostlyStatic, True) <- mExecutableLinkMode
-    = pure . map (\d -> "-l:lib" ++ d ++ ".a") . map ST.unpack . unitExtDepLibsStaticSys $ pc
-    | Just (MostlyStatic, False) <- mExecutableLinkMode
+    | Just (MostlyStatic exclLibs, supportsVerbatim) <- mExecutableLinkMode
     = do
-        fmap mconcat $ forM (map ST.unpack . unitExtDepLibsStaticSys $ pc) $ \l ->
-          filterM doesFileExist
-            [ searchPath </> ("lib" ++ l ++ ".a")
-            | searchPath <- (ordNub . filter notNull . map ST.unpack . unitLibraryDirsStatic $ pc)
-            ]
-
+        let allLibs = map ST.unpack . unitExtDepLibsStaticSys $ pc
+            staticLibs = filter (`notElem` exclLibs) allLibs
+            dynamicLibs = filter (`elem` exclLibs) allLibs
+            dynamicLinkOpts = map ("-l" ++) dynamicLibs
+        staticLinkOpts <- if supportsVerbatim
+                          then pure (map (\d -> "-l:lib" ++ d ++ ".a") staticLibs)
+                          else do fmap mconcat $ forM staticLibs $ \l ->
+                                   filterM doesFileExist
+                                     [ searchPath </> ("lib" ++ l ++ ".a")
+                                     | searchPath <- (ordNub . filter notNull . map ST.unpack . unitLibraryDirsStatic $ pc)
+                                     ]
+        pure (staticLinkOpts ++ dynamicLinkOpts)
     | Just (FullyStatic, _) <- mExecutableLinkMode
     = pure . map ("-l" ++) . map ST.unpack . unitExtDepLibsStaticSys $ pc
     | otherwise = pure . map ("-l" ++) . map ST.unpack . unitExtDepLibsSys $ pc

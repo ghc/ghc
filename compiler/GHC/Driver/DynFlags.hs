@@ -816,9 +816,9 @@ isExecutableLink _              = False
 -- This mostly deals with how external system dependencies are treated.
 -- The 'Ways' determine how Haskell libraries are linked.
 data ExecutableLinkMode
-  = FullyStatic          -- ^ fully static binary (incompatible with 'WayDyn')
-  | MostlyStatic         -- ^ we link everything except glibc statically
-  | Dynamic              -- ^ default
+  = FullyStatic            -- ^ fully static binary (incompatible with 'WayDyn')
+  | MostlyStatic [String]  -- ^ we link system libraries statically, except the ones provided
+  | Dynamic                -- ^ default
   deriving (Eq, Show)
 
 
