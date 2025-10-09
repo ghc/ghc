@@ -210,11 +210,10 @@ import GHC.Utils.Monad
 
 import GHC.Exts (oneShot)
 
-import GHC.LanguageExtensions as LangExt
-
 import Control.Monad
 import Data.Foldable hiding ( foldr1 )
 import Data.IORef
+import qualified Data.Set as Set
 import Data.Maybe( catMaybes )
 import Data.List ( mapAccumL )
 
