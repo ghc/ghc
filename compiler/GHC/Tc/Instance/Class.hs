@@ -1247,6 +1247,11 @@ matchHasField dflags short_cut clas tys mb_ct_loc
                      -- The selector must not be "naughty" (i.e. the field
                      -- cannot have an existentially quantified type),
                      -- and it must not be higher-rank.
+                     --
+                     -- See also 'GHC.Tc.Errors.hasFieldInfo_maybe', which is
+                     -- responsible for the error messages in cases of unsolved
+                     -- HasField constraints when the field type runs afoul
+                     -- of these conditions.
                    ; if (isNaughtyRecordSelector sel_id) || not (isTauTy sel_ty)
                      then try_user_instances
                      else
@@ -1306,6 +1311,11 @@ lookupHasFieldLabel
 -- A complication is that `T` might be a data family, so we need to
 -- look it up in the `fam_envs` to find its representation tycon.
 lookupHasFieldLabel fam_inst_envs rdr_env arg_tys
+
+  -- NB: if you edit this function, you might also want to update
+  -- GHC.Tc.Errors.hasfieldInfo_maybe which is responsible for error messages
+  -- when GHC /does not/ solve a 'HasField' constraint.
+
   |  -- We are matching HasField {k} {r_rep} {a_rep} x r a...
     (_k : _rec_rep : _fld_rep : x_ty : rec_ty : fld_ty : _) <- arg_tys
     -- x should be a literal string

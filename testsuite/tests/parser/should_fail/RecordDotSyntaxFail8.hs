@@ -28,10 +28,26 @@ data Baz = Baz { baz :: Quux } deriving (Show, Eq)
 instance HasField "baz" Baz Quux where
     hasField r = (\x -> case r of Baz { .. } -> Baz { baz = x, .. }, baz r)
 
--- 'Quux' has a 'quux' field of type 'Int'
-data Quux = Quux { quux :: Int } deriving (Show, Eq)
+-- 'Quux' has 'quux' fields of type 'Wob'
+data Quux = Quux { quux1, quux2, quux3 :: Wob } deriving (Show, Eq)
 -- Forget to write this type's 'HasField' instance
 
+-- 'Wob' has a field of type 'Bool'
+data Wob = Wob { wob :: Bool } deriving (Show, Eq)
+instance HasField "wob" Wob Bool where
+    hasField r = (\x -> case r of Wob { .. } -> Wob { wob = x, .. }, wob r)
+
+myQuux :: Quux
+myQuux = Quux w w w
+  where w = Wob { wob = True }
+
 main = do
-  let a = Foo { foo = Bar{ bar = Baz { baz = Quux { quux = 42 } } } }
-  print $ a.foo.bar.baz.quux
+  let
+    a = Foo { foo = Bar{ bar = Baz { baz = myQuux } } }
+  print @Quux $ a.foo.bar.baz.quux1
+
+  let b = myQuux
+  print @Quux $ b.quux2
+
+  let c = Foo { foo = Bar{ bar = Baz { baz = myQuux } } }
+  print @Bool $ a.foo.bar.baz.quux3.wob

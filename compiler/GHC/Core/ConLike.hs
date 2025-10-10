@@ -26,6 +26,8 @@ module GHC.Core.ConLike (
         , conLikeFieldType
         , conLikeIsInfix
         , conLikeHasBuilder
+
+        , isExistentialRecordField
     ) where
 
 import GHC.Prelude
@@ -35,7 +37,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep (Type, ThetaType)
 import GHC.Core.TyCon (tyConDataCons)
-import GHC.Core.Type(mkTyConApp)
+import GHC.Core.Type(mkTyConApp, tyCoVarsOfType)
 import GHC.Types.Unique
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -43,6 +45,7 @@ import GHC.Types.Basic
 
 import GHC.Types.GREInfo
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 
@@ -239,3 +242,23 @@ conLikeFieldType (RealDataCon dc) label = dataConFieldType dc label
 conLikeIsInfix :: ConLike -> Bool
 conLikeIsInfix (RealDataCon dc) = dataConIsInfix dc
 conLikeIsInfix (PatSynCon ps)   = patSynIsInfix  ps
+
+-- | Is this record field a naughty record field due to the presence of
+-- existential type variables?
+--
+-- Different from 'isNaughtyRecordSelector' because the latter is also true
+-- in the presence of @-XNoFieldSelectors@.
+--
+-- See Note [Naughty record selectors] in GHC.Tc.TyCl.Utils.
+isExistentialRecordField :: Type -> ConLike -> Bool
+isExistentialRecordField field_ty con =
+  case con of
+    RealDataCon {} -> not $ field_ty_tvs `subVarSet` res_ty_tvs
+    PatSynCon {}   -> not $ field_ty_tvs `subVarSet` mkVarSet univ_tvs
+       -- In the PatSynCon case, the selector type is (data_ty -> field_ty), but
+       -- fvs(data_ty) are all universals (see Note [Pattern synonym result type] in
+       -- GHC.Core.PatSyn, so no need to check them.
+  where
+    field_ty_tvs = tyCoVarsOfType field_ty
+    res_ty_tvs   = tyCoVarsOfType data_ty
+    (univ_tvs, _, _, _, _, _, data_ty) = conLikeFullSig con

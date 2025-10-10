@@ -33,6 +33,8 @@ test('hasfieldfail03', normal, compile_fail, [''])
 test('hasfieldfail04', normal, compile_fail, [''])
 test('T14953', [extra_files(['T14953_A.hs', 'T14953_B.hs'])],
      multimod_compile_fail, ['T14953', ''])
+test('T26480', extra_files(['T26480_aux1.hs', 'T26480_aux2.hs']), multimod_compile_fail, ['T26480', '-v0'])
+test('T26480b', normal, compile_fail, [''])
 test('DuplicateExports', normal, compile_fail, [''])
 test('T17420', [extra_files(['T17420A.hs'])], multimod_compile_fail,
      ['T17420', ''])

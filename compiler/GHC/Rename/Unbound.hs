@@ -18,6 +18,7 @@ module GHC.Rename.Unbound
    , unknownNameSuggestionsMessage
    , similarNameSuggestions
    , fieldSelectorSuggestions
+   , anyQualImportSuggestions
    , WhatLooking(..)
    , WhereLooking(..)
    , LookingFor(..)
@@ -215,7 +216,7 @@ unknownNameSuggestions_ looking_for dflags hpt curr_mod global_env local_env
       , map (ImportSuggestion $ rdrNameOcc tried_rdr_name) imp_suggs
       , extensionSuggestions tried_rdr_name
       , fieldSelectorSuggestions global_env tried_rdr_name ]
-    (imp_errs, imp_suggs) = importSuggestions looking_for hpt curr_mod imports tried_rdr_name
+    (imp_errs, imp_suggs) = sameQualImportSuggestions looking_for hpt curr_mod imports tried_rdr_name
 
     if_ne :: (NonEmpty a -> b) -> [a] -> [b]
     if_ne _ []       = []
@@ -242,7 +243,7 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
     all_possibilities :: [(String, SimilarName)]
     all_possibilities = case what_look of
       WL_None -> []
-      _ -> [ (showPpr dflags r, SimilarRdrName r (Just $ LocallyBoundAt loc))
+      _ -> [ (showPpr dflags r, SimilarRdrName r Nothing (Just $ LocallyBoundAt loc))
            | (r,loc) <- local_possibilities local_env ]
         ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
 
@@ -273,7 +274,7 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
 
     global_possibilities :: GlobalRdrEnv -> [(RdrName, SimilarName)]
     global_possibilities global_env
-      | tried_is_qual = [ (rdr_qual, SimilarRdrName rdr_qual (Just how))
+      | tried_is_qual = [ (rdr_qual, SimilarRdrName rdr_qual (Just gre) (Just how))
                         | gre <- globalRdrEnvElts global_env
                         , isGreOk looking_for gre
                         , let occ = greOccName gre
@@ -288,7 +289,7 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
                           rdr_unqual = mkRdrUnqual occ
                     , is_relevant occ
                     , sim <- case (unquals_in_scope gre, quals_only gre) of
-                                (how:_, _)    -> [ SimilarRdrName rdr_unqual (Just how) ]
+                                (how:_, _)    -> [ SimilarRdrName rdr_unqual (Just gre) (Just how) ]
                                 ([],    pr:_) -> [ pr ]  -- See Note [Only-quals]
                                 ([],    [])   -> [] ]
 
@@ -316,78 +317,66 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
     quals_only :: GlobalRdrElt -> [SimilarName]
     -- Ones for which *only* the qualified version is in scope
     quals_only (gre@GRE { gre_imp = is })
-      = [ (SimilarRdrName (mkRdrQual (is_as ispec) (greOccName gre)) (Just $ ImportedBy ispec))
+      = [ (SimilarRdrName (mkRdrQual (is_as ispec) (greOccName gre)) (Just gre) (Just $ ImportedBy ispec))
         | i <- bagToList is, let ispec = is_decl i, is_qual ispec ]
 
+-- | Provide import suggestions, without filtering by module qualification.
+-- Used to suggest imports for 'HasField', which doesn't care about whether a
+-- name is imported qualified or unqualified.
+--
+-- For example:
+--
+--  > import M1 () -- M1 exports fld1
+--  > import qualified M2 hiding ( fld2 )
+--  > x r = r.fld1              -- suggest adding 'fld1' to M1 import
+--  > y r = getField @"fld2" r  -- suggest unhiding 'fld' from M2 import
+anyQualImportSuggestions :: LookingFor -> LookupGRE GREInfo -> TcM [ImportSuggestion]
+anyQualImportSuggestions looking_for lookup_gre =
+  do { imp_info <- getImports
+     ; let interesting_imports = interestingImports imp_info (const True)
+     ; return $
+          importSuggestions_ looking_for interesting_imports lookup_gre
+     }
 
--- | Generate errors and helpful suggestions if a qualified name Mod.foo is not in scope.
-importSuggestions :: LookingFor
-                  -> InteractiveContext -> Module
-                  -> ImportAvails -> RdrName -> ([ImportError], [ImportSuggestion])
-importSuggestions looking_for ic currMod imports rdr_name
-  | WL_LocalOnly <- lf_where looking_for       = ([], [])
-  | WL_LocalTop  <- lf_where looking_for       = ([], [])
+-- | The given 'RdrName' is not in scope. Try to find out why that is by looking
+-- at the import list, to suggest e.g. changing the import list somehow.
+--
+-- For example:
+--
+-- > import qualified M1 hiding ( blah1 )
+-- > x = M1.blah -- suggest unhiding blah1
+-- > y = XX.blah1 -- import error: no imports provide the XX qualification prefix
+sameQualImportSuggestions
+  :: LookingFor
+  -> InteractiveContext
+  -> Module
+  -> ImportAvails
+  -> RdrName
+  -> ([ImportError], [ImportSuggestion])
+sameQualImportSuggestions looking_for ic currMod imports rdr_name
   | not (isQual rdr_name || isUnqual rdr_name) = ([], [])
-  | Just name <- mod_name
-  , show_not_imported_line name
-  = ([MissingModule name], [])
+  | Just rdr_mod_name <- mb_rdr_mod_name
+  , show_not_imported_line rdr_mod_name
+  = ([MissingModule rdr_mod_name], [])
   | is_qualified
-  , null helpful_imports
+  , null import_suggs
   , (mod : mods) <- map fst interesting_imports
   = ([ModulesDoNotExport (mod :| mods) (lf_which looking_for) occ_name], [])
-  | mod : mods <- helpful_imports_non_hiding
-  = ([], [CouldImportFrom (mod :| mods)])
-  | mod : mods <- helpful_imports_hiding
-  = ([], [CouldUnhideFrom (mod :| mods)])
   | otherwise
-  = ([], [])
- where
+  = ([], import_suggs)
+  where
+
+  interesting_imports = interestingImports imports right_qual_import
+
+  import_suggs =
+    importSuggestions_ looking_for interesting_imports $
+      (LookupOccName (rdrNameOcc rdr_name) $ RelevantGREsFOS WantNormal)
+
   is_qualified = isQual rdr_name
-  (mod_name, occ_name) = case rdr_name of
+  (mb_rdr_mod_name, occ_name) = case rdr_name of
     Unqual occ_name        -> (Nothing, occ_name)
     Qual mod_name occ_name -> (Just mod_name, occ_name)
-    _                      -> panic "importSuggestions: dead code"
-
-
-  -- What import statements provide "Mod" at all
-  -- or, if this is an unqualified name, are not qualified imports
-  interesting_imports = [ (mod, imp)
-    | (mod, mod_imports) <- M.toList (imp_mods imports)
-    , Just imp <- return $ pick (importedByUser mod_imports)
-    ]
-
-  -- Choose the imports from the interactive context which might have provided
-  -- a module.
-  interactive_imports =
-    filter pick_interactive (ic_imports ic)
-
-  pick_interactive :: InteractiveImport -> Bool
-  pick_interactive (IIDecl d)   | mod_name == Just (unLoc (ideclName d)) = True
-                                | mod_name == fmap unLoc (ideclAs d) = True
-  pick_interactive (IIModule m) | mod_name == Just (moduleName m) = True
-  pick_interactive _ = False
-
-  -- We want to keep only one for each original module; preferably one with an
-  -- explicit import list (for no particularly good reason)
-  pick :: [ImportedModsVal] -> Maybe ImportedModsVal
-  pick = listToMaybe . sortBy cmp . filter select
-    where select imv = case mod_name of Just name -> imv_name imv == name
-                                        Nothing   -> not (imv_qualified imv)
-          cmp = on compare imv_is_hiding S.<> on SrcLoc.leftmost_smallest imv_span
-
-  -- Which of these would export a 'foo'
-  -- (all of these are restricted imports, because if they were not, we
-  -- wouldn't have an out-of-scope error in the first place)
-  helpful_imports = filter helpful interesting_imports
-    where helpful (_,imv)
-            = any (isGreOk looking_for) $
-              lookupGRE (imv_all_exports imv)
-                (LookupOccName occ_name $ RelevantGREsFOS WantNormal)
-
-  -- Which of these do that because of an explicit hiding list resp. an
-  -- explicit import list
-  (helpful_imports_hiding, helpful_imports_non_hiding)
-    = partition (imv_is_hiding . snd) helpful_imports
+    _                      -> panic "sameQualImportSuggestions: dead code"
 
   -- See Note [When to show/hide the module-not-imported line]
   show_not_imported_line :: ModuleName -> Bool                    -- #15611
@@ -396,6 +385,73 @@ importSuggestions looking_for ic currMod imports rdr_name
       | not (null interesting_imports)        = False -- 1 (normal module import)
       | moduleName currMod == modnam          = False -- 2
       | otherwise                             = True
+
+  -- Choose the imports from the interactive context which might have provided
+  -- a module.
+  interactive_imports =
+    filter pick_interactive (ic_imports ic)
+
+  pick_interactive :: InteractiveImport -> Bool
+  pick_interactive (IIDecl d)   | mb_rdr_mod_name == Just (unLoc (ideclName d)) = True
+                                | mb_rdr_mod_name == fmap unLoc (ideclAs d) = True
+  pick_interactive (IIModule m) | mb_rdr_mod_name == Just (moduleName m) = True
+  pick_interactive _ = False
+
+  right_qual_import imv =
+    case mb_rdr_mod_name of
+      -- Qual RdrName: only want qualified imports with the same module name
+      Just rdr_mod_name -> imv_name imv == rdr_mod_name
+      -- UnQual RdrName: import must be unqualified
+      Nothing           -> not (imv_qualified imv)
+
+-- | What import statements are relevant?
+--
+--   - If we are looking for a qualified name @Mod.blah@, which imports provide @Mod@ at all,
+--   - If we are looking for an unqualified name, which imports are themselves unqualified.
+interestingImports :: ImportAvails -> (ImportedModsVal -> Bool) -> [(Module, ImportedModsVal)]
+interestingImports imports ok_mod_name =
+  [ (mod, imp)
+    | (mod, mod_imports) <- M.toList (imp_mods imports)
+    , Just imp <- return $ pick (importedByUser mod_imports)
+    ]
+
+  where
+  -- We want to keep only one for each original module; preferably one with an
+  -- explicit import list (for no particularly good reason)
+  pick :: [ImportedModsVal] -> Maybe ImportedModsVal
+  pick = listToMaybe . sortBy cmp . filter ok_mod_name
+    where
+      cmp = on compare imv_is_hiding S.<> on SrcLoc.leftmost_smallest imv_span
+
+importSuggestions_
+  :: LookingFor
+  -> [(Module, ImportedModsVal)]
+  -> LookupGRE GREInfo
+  -> [ImportSuggestion]
+importSuggestions_ looking_for interesting_imports lookup_gre
+  | WL_LocalOnly <- lf_where looking_for       = []
+  | WL_LocalTop  <- lf_where looking_for       = []
+  | mod : mods <- helpful_imports_non_hiding
+  = [CouldImportFrom (mod :| mods)]
+  | mod : mods <- helpful_imports_hiding
+  = [CouldUnhideFrom (mod :| mods)]
+  | otherwise
+  = []
+ where
+
+  -- Which of these would export a 'foo'
+  -- (all of these are restricted imports, because if they were not, we
+  -- wouldn't have an out-of-scope error in the first place)
+  helpful_imports = filter helpful interesting_imports
+    where helpful (_,imv)
+            = any (isGreOk looking_for) $
+              lookupGRE (imv_all_exports imv)
+                lookup_gre
+
+  -- Which of these do that because of an explicit hiding list resp. an
+  -- explicit import list
+  (helpful_imports_hiding, helpful_imports_non_hiding)
+    = partition (imv_is_hiding . snd) helpful_imports
 
 extensionSuggestions :: RdrName -> [GhcHint]
 extensionSuggestions rdrName

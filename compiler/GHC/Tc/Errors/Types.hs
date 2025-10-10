@@ -72,7 +72,7 @@ module GHC.Tc.Errors.Types (
   , ExpectedActualInfo(..)
   , TyVarInfo(..), SameOccInfo(..)
   , AmbiguityInfo(..)
-  , CND_Extra(..)
+  , CND_ExpectedActual(..)
   , FitsMbSuppressed(..)
   , ValidHoleFits(..), noValidHoleFits
   , HoleFitDispConfig(..)
@@ -86,6 +86,9 @@ module GHC.Tc.Errors.Types (
   , lookingForSubordinate
   , HoleError(..)
   , CoercibleMsg(..)
+  , NoBuiltinInstanceMsg(..)
+  , HasFieldMsg(..)
+  , TooFancyField(..)
   , PotentialInstances(..)
   , UnsupportedCallConvention(..)
   , ExpectedBackends
@@ -200,7 +203,7 @@ import GHC.Tc.Utils.TcType (TcType, TcSigmaType, TcPredType,
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Avail
-import GHC.Types.Hint (UntickedPromotedThing(..), AssumedDerivingStrategy(..), SigLike)
+import GHC.Types.Hint
 import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name (NamedThing(..), Name, OccName, getSrcLoc, getSrcSpan)
@@ -5615,6 +5618,7 @@ data TcSolverReportMsg
     , cannotResolve_unifiers     :: [ClsInst]
     , cannotResolve_candidates   :: [ClsInst]
     , cannotResolve_relBinds     :: RelevantBindings
+    , cannotResolve_noBuiltinMsg :: Maybe NoBuiltinInstanceMsg
     }
 
   -- | Could not solve a constraint using available instances
@@ -5675,15 +5679,20 @@ data MismatchMsg
   -- Used for messages such as @"No instance for ..."@ and
   -- @"Could not deduce ... from"@.
   | CouldNotDeduce
-     { cnd_user_givens :: [Implication]
+     { cnd_user_givens   :: [Implication]
         -- | The Wanted constraints we couldn't solve.
         --
         -- N.B.: the 'ErrorItem' at the head of the list has been tidied,
         -- perhaps not the others.
-     , cnd_wanted      :: NE.NonEmpty ErrorItem
+     , cnd_wanted        :: NE.NonEmpty ErrorItem
 
-       -- | Some additional info consumed by 'mk_supplementary_ea_msg'.
-     , cnd_extra       :: Maybe CND_Extra
+       -- | Additional "expected/actual" information
+       -- consumed by 'mk_supplementary_ea_msg'.
+     , cnd_ea            :: Maybe CND_ExpectedActual
+
+       -- | Additional message relating to unsolved constraints for
+       -- typeclasses which have built-in instances.
+     , cnd_noBuiltin_msg :: Maybe NoBuiltinInstanceMsg
      }
   deriving Generic
 
@@ -5753,7 +5762,7 @@ mkPlainMismatchMsg msg
 
 -- | Additional information to be given in a 'CouldNotDeduce' message,
 -- which is then passed on to 'mk_supplementary_ea_msg'.
-data CND_Extra = CND_Extra TypeOrKind Type Type
+data CND_ExpectedActual = CND_ExpectedActual TypeOrKind Type Type
 
 -- | A cue to print out information about type variables,
 -- e.g. where they were bound, when there is a mismatch @tv1 ~ ty2@.
@@ -5966,6 +5975,48 @@ data CoercibleMsg
   --
   -- Test cases: TcCoercibleFail.
   | OutOfScopeNewtypeConstructor TyCon DataCon
+
+-- | Explains why GHC wasn't able to provide a built-in instance for
+-- a particular class.
+data NoBuiltinInstanceMsg
+  = NoBuiltinHasFieldMsg HasFieldMsg
+
+  -- Other useful constructors might be:
+  -- NoBuiltinTypeableMsg  -- explains polykinded Typeable restrictions
+  -- NoBuiltinDataToTagMsg -- see conditions in Note [DataToTag overview]
+  -- NoBuiltinWithDictMsg  -- see Note [withDict]
+
+-- | Explains why GHC wasn't able to provide a built-in 'HasField' instance
+-- for the given types.
+data HasFieldMsg
+  -- | The field is not a literal field name, e.g. @HasField x u v@ where @x@
+  -- is a type variable.
+  = NotALiteralFieldName Type
+  -- | The type we are selecting from is not a record type,
+  -- e.g. @HasField "fld" Int fld@.
+  | NotARecordType Type
+  -- | The field is out of scope.
+  | OutOfScopeField TyCon FieldLabel [ImportSuggestion]
+  -- | The field has a type which means that GHC cannot solve
+  -- a 'HasField' constraint for it.
+  | FieldTooFancy TyCon FieldLabelString TooFancyField
+  -- | No such field, but the field is perhaps mis-spelled;
+  -- here are some suggestions.
+  | SuggestSimilarFields
+      (Maybe (TyCon, TyCon)) -- ^ (optional) desired parent (tc and rep_tc)
+      FieldLabelString       -- ^ field name
+      [(TyCon, SimilarName)]         -- ^ suggestions (for this 'TyCon' or other 'TyCon's)
+      [(PatSyn, SimilarName)]       -- ^ pattern synonyms with similarly named fields
+      [ImportSuggestion]     -- ^ import suggestions
+
+  -- | Using -XRebindableSyntax and a different 'HasField'.
+  | CustomHasField TyCon -- ^ the custom HasField TyCon
+
+-- | Why is a record field "too fancy" for GHC to be able to properly
+-- solve a 'HasField' constraint?
+data TooFancyField
+  = FieldHasExistential
+  | FieldHasForAlls
 
 -- | Explain a problem with an import.
 data ImportError

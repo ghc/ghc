@@ -29,7 +29,7 @@ T19843h.hs:24:8: error: [GHC-39999]
     • In the expression: undefined.getAll
       In an equation for ‘quur’: quur = undefined.getAll
     Suggested fixes:
-      • Perhaps use record field of Alt ‘getAlt’ (imported from Data.Monoid)
       • Add ‘getAll’ to the import list in the import of ‘Data.Monoid’
-        (at T19843h.hs:9:1-28).
+        (at T19843h.hs:8:1-46).
+      • Perhaps use record field of Alt ‘getAlt’ (imported from Data.Monoid)
 

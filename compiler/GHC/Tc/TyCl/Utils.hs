@@ -21,7 +21,7 @@ module GHC.Tc.TyCl.Utils(
         addTyConsToGblEnv, mkDefaultMethodType,
 
         -- * Record selectors
-        tcRecSelBinds, mkRecSelBinds, mkOneRecordSelector
+        tcRecSelBinds, mkRecSelBinds, mkOneRecordSelector,
     ) where
 
 import GHC.Prelude
@@ -899,7 +899,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
 
 
     -- Selector type; Note [Polymorphic selectors]
-    (univ_tvs, _, _, _, req_theta, _, data_ty) = conLikeFullSig con1
+    (_, _, _, _, req_theta, _, data_ty) = conLikeFullSig con1
 
     field_ty     = conLikeFieldType con1 lbl
     field_ty_tvs = tyCoVarsOfType field_ty
@@ -909,17 +909,13 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                    conLikeUserTyVarBinders con1
 
     -- is_naughty: see Note [Naughty record selectors]
-    is_naughty = not ok_scoping || no_selectors
-    ok_scoping = case con1 of
-                   RealDataCon {} -> field_ty_tvs `subVarSet` data_ty_tvs
-                   PatSynCon {}   -> field_ty_tvs `subVarSet` mkVarSet univ_tvs
-       -- In the PatSynCon case, the selector type is (data_ty -> field_ty), but
-       -- fvs(data_ty) are all universals (see Note [Pattern synonym result type] in
-       -- GHC.Core.PatSyn, so no need to check them.
+    is_naughty = isExistentialRecordField field_ty con1 || no_selectors
 
-    no_selectors   = has_sel == NoFieldSelectors  -- No field selectors => all are naughty
-                                                  -- thus suppressing making a binding
-                                                  -- A slight hack!
+    no_selectors   = has_sel == NoFieldSelectors
+      -- For PatternSynonyms with -XNoFieldSelectors, pretend the fields
+      -- are naughty record selectors to suppress making a binding.
+      --
+      -- See Note [NoFieldSelectors and naughty record selectors]
 
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
            | otherwise  = mkForAllTys sel_tvbs $

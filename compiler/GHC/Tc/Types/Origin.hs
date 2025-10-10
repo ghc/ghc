@@ -524,7 +524,7 @@ data CtOrigin
   ----------- Below here, all are Origins for Wanted constraints ------------
 
   | OccurrenceOf Name          -- ^ Occurrence of an overloaded identifier
-  | OccurrenceOfRecSel RdrName -- ^ Occurrence of a record selector
+  | OccurrenceOfRecSel (LocatedN RdrName) -- ^ Occurrence of a record selector
   | AppOrigin                  -- ^ An application of some kind
 
   | SpecPragOrigin UserTypeCtxt    -- ^ Specialisation pragma for
@@ -558,7 +558,10 @@ data CtOrigin
                         -- IMPORTANT: These constraints will never cause errors;
                         -- See Note [Constraints to ignore] in GHC.Tc.Errors
   | SectionOrigin
-  | GetFieldOrigin FastString
+  | GetFieldOrigin (LocatedN FastString)
+
+  -- | A overloaded record field projection like @.fld@ or @.fld1.fld2.fld@.
+  | RecordFieldProjectionOrigin (FieldLabelStrings GhcRn)
   | TupleOrigin         -- (..,..)
   | ExprSigOrigin       -- e :: ty
   | PatSigOrigin        -- p :: ty
@@ -566,7 +569,7 @@ data CtOrigin
   | ProvCtxtOrigin      -- The "provided" context of a pattern synonym signature
         (PatSynBind GhcRn GhcRn) -- Information about the pattern synonym, in
                                  -- particular the name and the right-hand side
-  | RecordUpdOrigin
+  | RecordUpdOrigin (LHsRecUpdFields GhcRn)
   | ViewPatOrigin
 
   -- | 'ScOrigin' is used only for the Wanted constraints for the
@@ -737,7 +740,7 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ (WithUserRdr _ name))) = OccurrenceOf name
-exprCtOrigin (HsGetField _ _ (L _ f)) = GetFieldOrigin (field_label $ unLoc $ dfoLabel f)
+exprCtOrigin (HsGetField _ _ (L _ f)) = GetFieldOrigin (fmap field_label $ dfoLabel f)
 exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin l
 exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
@@ -749,9 +752,9 @@ exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
 exprCtOrigin (NegApp _ e _)       = lexprCtOrigin e
 exprCtOrigin (HsPar _ e)          = lexprCtOrigin e
-exprCtOrigin (HsProjection _ _)   = SectionOrigin
-exprCtOrigin (SectionL _ _ _)     = SectionOrigin
-exprCtOrigin (SectionR _ _ _)     = SectionOrigin
+exprCtOrigin (HsProjection _ p)   = RecordFieldProjectionOrigin (FieldLabelStrings $ fmap noLocA p)
+exprCtOrigin (SectionL {})        = SectionOrigin
+exprCtOrigin (SectionR {})        = SectionOrigin
 exprCtOrigin (ExplicitTuple {})   = Shouldn'tHappenOrigin "explicit tuple"
 exprCtOrigin ExplicitSum{}        = Shouldn'tHappenOrigin "explicit sum"
 exprCtOrigin (HsCase _ _ matches) = matchesCtOrigin matches
@@ -760,7 +763,7 @@ exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e
 exprCtOrigin (HsDo {})           = DoOrigin
 exprCtOrigin (RecordCon {})      = Shouldn'tHappenOrigin "record construction"
-exprCtOrigin (RecordUpd {})      = RecordUpdOrigin
+exprCtOrigin (RecordUpd _ _ flds)= RecordUpdOrigin flds
 exprCtOrigin (ExprWithTySig {})  = ExprSigOrigin
 exprCtOrigin (ArithSeq {})       = Shouldn'tHappenOrigin "arithmetic sequence"
 exprCtOrigin (HsPragE _ _ e)     = lexprCtOrigin e
@@ -779,7 +782,7 @@ exprCtOrigin (XExpr (ExpandedThingRn thing _)) | OrigExpr a <- thing = exprCtOri
                                                | OrigStmt _ <- thing = DoOrigin
                                                | OrigPat p  <- thing = DoPatOrigin p
 exprCtOrigin (XExpr (PopErrCtxt {})) = Shouldn'tHappenOrigin "PopErrCtxt"
-exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
+exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
@@ -937,7 +940,7 @@ ppr_br AppOrigin             = text "an application"
 ppr_br (IPOccOrigin name)    = hsep [text "a use of implicit parameter", quotes (ppr name)]
 ppr_br (OverLabelOrigin l)   = hsep [text "the overloaded label"
                                     ,quotes (char '#' <> ppr l)]
-ppr_br RecordUpdOrigin       = text "a record update"
+ppr_br (RecordUpdOrigin {})  = text "a record update"
 ppr_br ExprSigOrigin         = text "an expression type signature"
 ppr_br PatSigOrigin          = text "a pattern type signature"
 ppr_br PatOrigin             = text "a pattern"
@@ -945,6 +948,7 @@ ppr_br ViewPatOrigin         = text "a view pattern"
 ppr_br (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
 ppr_br (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
 ppr_br SectionOrigin         = text "an operator section"
+ppr_br (RecordFieldProjectionOrigin p) = text "the record selector" <+> quotes (ppr p)
 ppr_br (GetFieldOrigin f)    = hsep [text "selecting the field", quotes (ppr f)]
 ppr_br AssocFamPatOrigin     = text "the LHS of a family instance"
 ppr_br TupleOrigin           = text "a tuple"

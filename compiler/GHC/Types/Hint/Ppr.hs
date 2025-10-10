@@ -15,7 +15,7 @@ import GHC.Types.Hint
 
 import GHC.Core.FamInstEnv (FamFlavor(..))
 import GHC.Core.TyCon
-import GHC.Core.TyCo.Rep     ( mkVisFunTyMany )
+import GHC.Hs.Binds (hsSigDoc)
 import GHC.Hs.Expr ()   -- instance Outputable
 import GHC.Types.Id
 import GHC.Types.Name
@@ -25,13 +25,15 @@ import GHC.Unit.Module.Imported (ImportedModsVal(..))
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 
+import qualified GHC.LanguageExtensions as LangExt
+
 import GHC.Driver.Flags
 
+import Language.Haskell.Syntax.Basic (FieldLabelString)
+
+import Data.List (partition)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
-
-import qualified GHC.LanguageExtensions as LangExt
-import GHC.Hs.Binds (hsSigDoc)
 
 instance Outputable GhcHint where
   ppr = \case
@@ -198,7 +200,9 @@ instance Outputable GhcHint where
                               , nest 2 (pprWithCommas pp_item $ NE.toList similar_names) ]
         where
           tried_ns = occNameSpace $ rdrNameOcc tried_rdr_name
-          pp_item = pprSimilarName tried_ns
+          pp_item = pprSimilarName (Just tried_ns)
+    SuggestSimilarSelectors tc rep_tc fld suggs ->
+      pprSimilarFields tc rep_tc fld (NE.toList suggs)
     RemindFieldSelectorSuppressed rdr_name parents
       -> text "Notice that" <+> quotes (ppr rdr_name)
          <+> text "is a field selector" <+> whose
@@ -255,12 +259,6 @@ instance Outputable GhcHint where
     SuggestEtaReduceAbsDataTySyn tc
       -> text "If possible, eta-reduce the type synonym" <+> ppr_tc <+> text "so that it is nullary."
         where ppr_tc = quotes (ppr $ tyConName tc)
-    RemindRecordMissingField x r a ->
-      text "NB: There is no field selector" <+> ppr_sel
-        <+> text "in scope for record type" <+> ppr_r
-      where ppr_sel = quotes (ftext x <+> dcolon <+> ppr_arr_r_a)
-            ppr_arr_r_a = ppr $ mkVisFunTyMany r a
-            ppr_r = quotes $ ppr r
     SuggestBindTyVarOnLhs tv
       -> text "Bind" <+> quotes (ppr tv) <+> text "on the LHS of the type declaration"
     SuggestAnonymousWildcard
@@ -405,10 +403,10 @@ pprImportSuggestion dc_occ (ImportDataCon { ies_suggest_import_from = Just mod
     parens_sp d = parens (space <> d <> space)
 
 -- | Pretty-print a 'SimilarName'.
-pprSimilarName :: NameSpace -> SimilarName -> SDoc
+pprSimilarName :: Maybe NameSpace -> SimilarName -> SDoc
 pprSimilarName _ (SimilarName name)
   = quotes (ppr name) <+> parens (pprDefinedAt name)
-pprSimilarName tried_ns (SimilarRdrName rdr_name how_in_scope)
+pprSimilarName mb_tried_ns (SimilarRdrName rdr_name _gre_info how_in_scope)
   = pp_ns rdr_name <+> quotes (ppr rdr_name) <+> loc
   where
     loc = case how_in_scope of
@@ -421,8 +419,12 @@ pprSimilarName tried_ns (SimilarRdrName rdr_name how_in_scope)
         ImportedBy is ->
           parens (text "imported from" <+> ppr (moduleName $ is_mod is))
     pp_ns :: RdrName -> SDoc
-    pp_ns rdr | ns /= tried_ns = pprNameSpace ns
-              | otherwise      = empty
+    pp_ns rdr
+      | Just tried_ns <- mb_tried_ns
+      , ns /= tried_ns
+      = pprNameSpace ns
+      | otherwise
+      = empty
       where ns = rdrNameSpace rdr
 
 pprImpliedExtensions :: LangExt.Extension -> SDoc
@@ -436,6 +438,34 @@ pprImpliedExtensions extension = case implied of
 pprPrefixUnqual :: Name -> SDoc
 pprPrefixUnqual name =
   pprPrefixOcc (getOccName name)
+
+pprSimilarFields :: TyCon -> TyCon -> FieldLabelString -> [(TyCon, SimilarName)] -> SDoc
+pprSimilarFields _tc rep_tc _fld suggs
+  | null suggs
+  = empty
+  -- There are similarly named fields for the right TyCon: report those first.
+  | same_tc_sugg1 : same_tc_rest <- same_tc
+  = case same_tc_rest of
+      [] ->
+        text "Perhaps use" <+> ppr_same_tc same_tc_sugg1 <> dot
+      _ ->
+        vcat [ text "Perhaps use one of"
+             , nest 2 $ pprWithCommas ppr_same_tc same_tc
+             ]
+  -- Otherwise, report the similarly named fields for other TyCons.
+  | otherwise
+  = vcat [ text "Perhaps use" <+> similar_field <+> text "of another type" <> colon
+         , nest 2 $ pprWithCommas ppr_other_tc others
+         ]
+  where
+    (same_tc, others) = partition ((== rep_tc) . fst) suggs
+    similar_field =
+      case others of
+        _:_:_ -> "one of the similarly named fields"
+        _     -> "the similarly named field"
+    ppr_same_tc (_, nm) = pprSimilarName Nothing nm
+    ppr_other_tc (other_tc, nm) =
+      quotes (ppr other_tc) <> colon <+> pprSimilarName Nothing nm
 
 pprSigLike :: SigLike -> SDoc
 pprSigLike = \case

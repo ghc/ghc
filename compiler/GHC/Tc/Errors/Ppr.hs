@@ -63,7 +63,7 @@ import GHC.Core.InstEnv
 import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
                           pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType, pprForAll)
-import GHC.Core.PatSyn ( patSynName, pprPatSynType )
+import GHC.Core.PatSyn ( patSynName, pprPatSynType, PatSyn )
 import GHC.Core.TyCo.Tidy
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -90,7 +90,7 @@ import GHC.Types.DefaultEnv (ClassDefaults(ClassDefaults, cd_types, cd_provenanc
 import GHC.Types.Error
 import GHC.Types.Error.Codes
 import GHC.Types.Hint
-import GHC.Types.Hint.Ppr ( pprSigLike ) -- & Outputable GhcHint
+import GHC.Types.Hint.Ppr ( pprSigLike )
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RecSelParent(..) )
@@ -129,6 +129,9 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.BooleanFormula (pprBooleanFormulaNice)
 
+import Language.Haskell.Syntax.Basic (field_label, FieldLabelString (..))
+
+import Control.Monad (guard)
 import qualified Data.Semigroup as S
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
@@ -4114,7 +4117,13 @@ pprTcSolverReportMsg ctxt (UnboundImplicitParams (item :| items)) =
             sep [ text "Unbound implicit parameter" <> plural preds
                 , nest 2 (pprParendTheta preds) ]
      else
-        let mismatch = CouldNotDeduce givens (item :| items) Nothing
+        let mismatch =
+              CouldNotDeduce
+                { cnd_user_givens   = givens
+                , cnd_wanted        = item :| items
+                , cnd_ea            = Nothing
+                , cnd_noBuiltin_msg = Nothing
+                }
             invis_bits = mismatchInvisibleBits mismatch
             ppr_msg = pprMismatchMsg ctxt mismatch
         in
@@ -4127,7 +4136,7 @@ pprTcSolverReportMsg _ (AmbiguityPreventsSolvingCt item ambigs) =
   text "prevents the constraint" <+> quotes (pprParendType $ errorItemPred item)
   <+> text "from being solved."
 pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
-  (CannotResolveInstance item unifiers candidates rel_binds)
+  (CannotResolveInstance item unifiers candidates rel_binds mb_HasField_msg)
   = pprWithInvisibleBits invis_bits $
     vcat
       [ no_inst_msg
@@ -4171,10 +4180,10 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
       | lead_with_ambig
       = (Set.empty, pprTcSolverReportMsg ctxt $ AmbiguityPreventsSolvingCt item (ambig_kvs, ambig_tvs))
       | otherwise
-      = let mismatch = CouldNotDeduce useful_givens (item :| []) Nothing
+      = let mismatch = CouldNotDeduce useful_givens (item :| []) Nothing mb_HasField_msg
         in
           ( mismatchInvisibleBits mismatch
-          , pprMismatchMsg ctxt $ CouldNotDeduce useful_givens (item :| []) Nothing
+          , pprMismatchMsg ctxt mismatch
           )
 
     -- Report "potential instances" only when the constraint arises
@@ -4202,6 +4211,9 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
       | otherwise = Nothing
 
     extra_note
+      | Just {} <- mb_HasField_msg
+      = empty
+
       -- Flag up partially applied uses of (->)
       | any isFunTy (filterOutInvisibleTypes (classTyCon clas) tys)
       = text "(maybe you haven't applied a function to enough arguments?)"
@@ -4417,10 +4429,10 @@ mismatchInvisibleBits
                   , teq_mismatch_ty1      = ty1
                   , teq_mismatch_ty2      = ty2 })
   = shouldPprWithInvisibleBits ty1 ty2 (errorItemOrigin item)
-mismatchInvisibleBits (CouldNotDeduce { cnd_extra = mb_extra })
-  = case mb_extra of
+mismatchInvisibleBits (CouldNotDeduce { cnd_ea = mb_ea })
+  = case mb_ea of
       Nothing -> Set.empty
-      Just (CND_Extra _ ty1 ty2) ->
+      Just (CND_ExpectedActual _ ty1 ty2) ->
         mayLookIdentical ty1 ty2
 
 -- | Turn a 'MismatchMsg' into an 'SDoc'.
@@ -4612,9 +4624,14 @@ pprMismatchMsg ctxt
 
     starts_with_vowel (c:_) = c `elem` ("AEIOU" :: String)
     starts_with_vowel []    = False
-
-pprMismatchMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extra)
+pprMismatchMsg ctxt
+  (CouldNotDeduce { cnd_user_givens = useful_givens
+                  , cnd_wanted = item :| others
+                  , cnd_ea = mb_ea
+                  , cnd_noBuiltin_msg = mb_NoBuiltin_msg
+                  })
   = vcat [ main_msg
+         , maybe empty pprNoBuiltinInstanceMsg mb_NoBuiltin_msg
          , pprQCOriginExtra item
          , ea_supplementary ]
   where
@@ -4623,9 +4640,10 @@ pprMismatchMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extra)
       | otherwise          = vcat ( addArising ct_loc no_deduce_msg
                                   : pp_from_givens useful_givens)
 
-    ea_supplementary = case mb_extra of
-      Nothing                        -> empty
-      Just (CND_Extra level ty1 ty2) -> mk_supplementary_ea_msg ctxt level ty1 ty2 orig
+    ea_supplementary = case mb_ea of
+      Nothing -> empty
+      Just (CND_ExpectedActual level ty1 ty2) ->
+        mk_supplementary_ea_msg ctxt level ty1 ty2 orig
 
     ct_loc = errorItemCtLoc item
     orig   = ctLocOrigin ct_loc
@@ -5022,6 +5040,87 @@ pprCoercibleMsg (OutOfScopeNewtypeConstructor tc dc) =
     2 (sep [ text "of newtype" <+> quotes (pprSourceTyCon tc)
            , text "is not in scope" ])
 
+pprNoBuiltinInstanceMsg :: NoBuiltinInstanceMsg -> SDoc
+pprNoBuiltinInstanceMsg = \case
+  NoBuiltinHasFieldMsg msg -> pprHasFieldMsg msg
+
+pprHasFieldMsg :: HasFieldMsg -> SDoc
+pprHasFieldMsg = \case
+  NotALiteralFieldName ty ->
+    text "NB:" <+> quotes (ppr ty) <+> what
+      where
+        what
+          | Just {} <- getCastedTyVar_maybe ty
+          = text "is a type variable, not a string literal."
+          | otherwise
+          = text "is not a string literal."
+  NotARecordType ty ->
+    text "NB:" <+> quotes (ppr ty) <+> text "is not a record type."
+  OutOfScopeField tc fld _import_suggs ->
+    text "NB: the record field" <+> quotes (ppr fld) <+> text "of" <+> quotes (ppr tc) <+> text "is out of scope."
+  FieldTooFancy tc fld rea ->
+    case rea of
+      FieldHasExistential ->
+        text "NB: the record field" <+> quotes (ppr fld) <+> text "of" <+> quotes (ppr tc) <+> text "contains existential variables."
+      FieldHasForAlls ->
+        text "NB: the field type of the record field" <+> quotes (ppr fld) <+> text "of" <+> quotes (ppr tc) <+> text "is not a mono-type."
+  CustomHasField custom_hasField ->
+    text "NB:" <+> quotes (ppr custom_hasField) <+> text "is not the built-in"
+      <+> quotes (ppr hasFieldClassName) <+> text "class."
+  SuggestSimilarFields (Just (tc, rep_tc)) fld suggs pat_syns _imp_suggs ->
+    vcat
+      [   text "NB:" <+> quotes (ppr tc)
+      <+> text "does not have a record field named"
+      <+> quotes (ppr fld) <> dot
+      , pprHasFieldPatSynMsg fld pat_syns
+      , pprSameNameOtherTyCons (mapMaybe same_name_diff_tc suggs)
+        -- NB: The actual suggestions are dealt with by
+        -- GHC.Tc.Errors.hasFieldMsgHints. The logic here just covers
+        -- information for which there is no actionable hint.
+      ]
+    where
+      same_name_diff_tc (rep_tc', fld') = do
+        let occ = case fld' of
+                     SimilarName n -> getOccFS n
+                     SimilarRdrName n _ _ -> occNameFS $ rdrNameOcc n
+        guard $
+          rep_tc' /= rep_tc
+            &&
+          (fld == FieldLabelString occ)
+        return rep_tc'
+  SuggestSimilarFields Nothing fld _suggs pat_syns _imp_suggs ->
+    pprHasFieldPatSynMsg fld pat_syns
+    -- Most of the error message only makes sense when we know the TyCon.
+    -- In this "unknown TyCon" case, we only have:
+    --   - the "PatSyns don't give HasField instances" message
+    --   - the hints, which are handled separately (see 'hasFieldMsgHints').
+
+pprSameNameOtherTyCons :: [TyCon] -> SDoc
+pprSameNameOtherTyCons [] = empty
+pprSameNameOtherTyCons tcs =
+  other_types_have <+> text "a field of this name:"
+    <+> pprWithCommas (quotes . ppr) tcs <> dot
+  where
+    other_types_have :: SDoc
+    other_types_have = case tcs of
+      _:_:_ -> "Other types have"
+      _     -> "Another type has"
+
+pprHasFieldPatSynMsg :: FieldLabelString -> [(PatSyn, SimilarName)] -> SDoc
+pprHasFieldPatSynMsg fld pat_syns =
+  if any same_name pat_syns
+  then
+    text "Pattern synonym record fields do not contribute"
+      <+> quotes (ppr hasFieldClassName) <+> text "instances."
+  else empty
+  where
+    same_name (_,nm) =
+      let occ = case nm of
+                  SimilarName n -> getOccFS n
+                  SimilarRdrName n _ _ -> occNameFS $ rdrNameOcc n
+      in
+        occ == field_label fld
+
 pprWhenMatching :: SolverReportErrCtxt -> WhenMatching -> SDoc
 pprWhenMatching ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
   sdocOption sdocPrintExplicitCoercions $ \printExplicitCoercions ->
@@ -5247,8 +5346,8 @@ tcSolverReportMsgHints ctxt = \case
     -> noHints
   AmbiguityPreventsSolvingCt {}
     -> noHints
-  CannotResolveInstance {}
-    -> noHints
+  CannotResolveInstance { cannotResolve_noBuiltinMsg = mb_noBuiltin }
+    -> maybe noHints noBuiltinInstanceHints mb_noBuiltin
   OverlappingInstances {}
     -> noHints
   UnsafeOverlap {}
@@ -5256,10 +5355,55 @@ tcSolverReportMsgHints ctxt = \case
   MultiplicityCoercionsNotSupported {}
    -> noHints
 
+noBuiltinInstanceHints :: NoBuiltinInstanceMsg -> [GhcHint]
+noBuiltinInstanceHints = \case
+  NoBuiltinHasFieldMsg noHasFieldMsg -> hasFieldMsgHints noHasFieldMsg
+
+hasFieldMsgHints :: HasFieldMsg -> [GhcHint]
+hasFieldMsgHints = \case
+  NotALiteralFieldName {} -> noHints
+  NotARecordType {}       -> noHints
+  FieldTooFancy {}        -> noHints
+  SuggestSimilarFields mb_orig_tc orig_fld suggs _patsyns imp_suggs ->
+    map (ImportSuggestion fld_occ) imp_suggs ++ similar_suggs
+    where
+      fld_occ = mkVarOccFS $ field_label orig_fld
+      similar_suggs =
+        case NE.nonEmpty $ filter different_name suggs of
+          Nothing -> noHints
+          Just neSuggs ->
+            case mb_orig_tc of
+              Just (orig_tc, orig_rep_tc) ->
+                -- We know the parent TyCon
+                [SuggestSimilarSelectors orig_tc orig_rep_tc orig_fld neSuggs]
+              Nothing ->
+                -- We don't know the parent TyCon
+                [ SuggestSimilarNames
+                    (mkRdrUnqual fld_occ)
+                    (fmap snd neSuggs)
+                ]
+      different_name ( _, nm ) =
+        let occ = case nm of
+                    SimilarName n -> getOccFS n
+                    SimilarRdrName n _ _ -> occNameFS $ rdrNameOcc n
+        in
+          orig_fld /= FieldLabelString occ
+  OutOfScopeField _tc fld import_suggs ->
+    map (ImportSuggestion (nameOccName $ flSelector fld)) import_suggs
+  CustomHasField {} -> noHints
+
 mismatchMsgHints :: SolverReportErrCtxt -> MismatchMsg -> [GhcHint]
 mismatchMsgHints ctxt msg =
+  mismatchMsgHasFieldHints msg ++
   maybeToList [ hint | (exp,act) <- mismatchMsg_ExpectedActuals msg
                      , hint <- suggestAddSig ctxt exp act ]
+
+mismatchMsgHasFieldHints :: MismatchMsg -> [GhcHint]
+mismatchMsgHasFieldHints
+  (CouldNotDeduce { cnd_noBuiltin_msg = mb_noBuiltin }) =
+    maybe noHints noBuiltinInstanceHints mb_noBuiltin
+mismatchMsgHasFieldHints (BasicMismatch{}) = []
+mismatchMsgHasFieldHints (TypeEqMismatch{}) = []
 
 mismatchMsg_ExpectedActuals :: MismatchMsg -> Maybe (Type, Type)
 mismatchMsg_ExpectedActuals = \case
@@ -5267,11 +5411,10 @@ mismatchMsg_ExpectedActuals = \case
     Just (exp, act)
   TypeEqMismatch { teq_mismatch_expected = exp, teq_mismatch_actual = act } ->
     Just (exp,act)
-  CouldNotDeduce { cnd_extra = cnd_extra }
-    | Just (CND_Extra _ exp act) <- cnd_extra
-    -> Just (exp, act)
-    | otherwise
-    -> Nothing
+  CouldNotDeduce { cnd_ea = mb_ea } ->
+    case mb_ea of
+      Just (CND_ExpectedActual _ exp act) -> Just (exp, act)
+      Nothing -> Nothing
 
 cannotUnifyVariableHints :: CannotUnifyVariableReason -> [GhcHint]
 cannotUnifyVariableHints = \case

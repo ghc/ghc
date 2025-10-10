@@ -1,0 +1,82 @@
+T26480.hs:29:11: error: [GHC-39999]
+    • No instance for ‘HasField fld_s S Int’
+        arising from a use of ‘getField’
+      NB: ‘fld_s’ is a type variable, not a string literal.
+    • In the expression: getField @fld_s
+      In an equation for ‘test1’: test1 _ = getField @fld_s
+
+T26480.hs:33:9: error: [GHC-39999]
+    • No instance for ‘HasField "int_fld" Int Int’
+        arising from a use of ‘getField’
+      NB: ‘Int’ is not a record type.
+    • In the expression: getField @"int_fld"
+      In an equation for ‘test2’: test2 = getField @"int_fld"
+
+T26480.hs:37:10: error: [GHC-39999]
+    • No instance for ‘HasField "f1" R1 Int’
+        arising from a use of ‘getField’
+      NB: the record field ‘f1’ of ‘R1’ is out of scope.
+    • In the expression: getField @"f1"
+      In an equation for ‘test3a’: test3a = getField @"f1"
+    Suggested fix:
+      Add ‘f1’ to the import list in the import of ‘T26480_aux1’
+      (at T26480.hs:10:1-23).
+
+T26480.hs:41:10: error: [GHC-39999]
+    • No instance for ‘HasField "f2" XXX.R2 Int’
+        arising from a use of ‘getField’
+      NB: the record field ‘f2’ of ‘XXX.R2’ is out of scope.
+    • In the expression: getField @"f2"
+      In an equation for ‘test3b’: test3b = getField @"f2"
+    Suggested fix:
+      Add ‘f2’ to the import list in the import of ‘T26480_aux2’
+      (at T26480.hs:11:1-40).
+
+T26480.hs:45:9: error: [GHC-39999]
+    • No instance for ‘HasField "fld_e" E Int’
+        arising from a use of ‘getField’
+      NB: the record field ‘fld_e’ of ‘E’ contains existential variables.
+    • In the expression: getField @"fld_e"
+      In an equation for ‘test4’: test4 = getField @"fld_e"
+
+T26480.hs:49:9: error: [GHC-39999]
+    • No instance for ‘HasField "fld_q" Q (Bool -> Bool)’
+        arising from a use of ‘getField’
+      NB: the field type of the record field ‘fld_q’ of ‘Q’ is not a mono-type.
+    • In the expression: getField @"fld_q"
+      In an equation for ‘test5’: test5 = getField @"fld_q"
+
+T26480.hs:53:9: error: [GHC-39999]
+    • No instance for ‘HasField "specificFieldTame" T Int’
+        arising from a use of ‘getField’
+      NB: ‘T’ does not have a record field named ‘specificFieldTame’.
+    • In the expression: getField @"specificFieldTame"
+      In an equation for ‘test6’: test6 = getField @"specificFieldTame"
+    Suggested fix: Perhaps use ‘specificFieldName’ (line 20).
+
+T26480.hs:57:9: error: [GHC-39999]
+    • No instance for ‘HasField "xyzzywyzzydyzzy" T Int’
+        arising from a use of ‘getField’
+      NB: ‘T’ does not have a record field named ‘xyzzywyzzydyzzy’.
+      Another type has a field of this name: ‘G’.
+    • In the expression: getField @"xyzzywyzzydyzzy"
+      In an equation for ‘test7’: test7 = getField @"xyzzywyzzydyzzy"
+
+T26480.hs:61:9: error: [GHC-39999]
+    • No instance for ‘HasField "xyzzywyzzyzyzzy" T Int’
+        arising from a use of ‘getField’
+      NB: ‘T’ does not have a record field named ‘xyzzywyzzyzyzzy’.
+    • In the expression: getField @"xyzzywyzzyzyzzy"
+      In an equation for ‘test8’: test8 = getField @"xyzzywyzzyzyzzy"
+    Suggested fix:
+      Perhaps use the similarly named field of another type:
+        ‘G’: ‘xyzzywyzzydyzzy’ (line 22)
+
+T26480.hs:65:9: error: [GHC-39999]
+    • No instance for ‘HasField "patSynField" S Int’
+        arising from a use of ‘getField’
+      NB: ‘S’ does not have a record field named ‘patSynField’.
+      Pattern synonym record fields do not contribute ‘HasField’ instances.
+    • In the expression: getField @"patSynField"
+      In an equation for ‘test9’: test9 = getField @"patSynField"
+

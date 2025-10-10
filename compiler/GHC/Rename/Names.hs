@@ -2453,8 +2453,8 @@ badImportItemErr iface decl_spec ie sub avails = do
           -- Only keep imported items, and set the "HowInScope" to
           -- "Nothing" to avoid printing "imported from..." in the suggestion
           -- error message.
-          imported_item (SimilarRdrName rdr_name (Just (ImportedBy {})))
-            = Just (SimilarRdrName rdr_name Nothing)
+          imported_item (SimilarRdrName rdr_name gre (Just (ImportedBy {})))
+            = Just (SimilarRdrName rdr_name gre Nothing)
           imported_item _ = Nothing
 
     checkIfDataCon = checkIfAvailMatches isDataConName

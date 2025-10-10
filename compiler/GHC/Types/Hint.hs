@@ -42,12 +42,14 @@ import GHC.Core.TyCon (TyCon)
 import GHC.Core.Type (Type)
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name (Name, NameSpace, OccName (occNameFS), isSymOcc, nameOccName)
-import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec)
+import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec, GlobalRdrElt)
 import GHC.Types.SrcLoc (SrcSpan)
 import GHC.Types.Basic (Activation, RuleName)
 import GHC.Parser.Errors.Basic
 import GHC.Utils.Outputable
-import GHC.Data.FastString (fsLit, FastString)
+import GHC.Data.FastString (fsLit)
+
+import Language.Haskell.Syntax.Basic (FieldLabelString)
 
 import Data.Typeable ( Typeable )
 import Data.Map.Strict (Map)
@@ -394,6 +396,12 @@ data GhcHint
   -}
   | SuggestSimilarNames RdrName (NE.NonEmpty SimilarName)
 
+  {-| Suggest a similar record selector that the user might have meant.
+
+      Test case: T26480b.
+  -}
+  | SuggestSimilarSelectors TyCon TyCon FieldLabelString (NE.NonEmpty (TyCon, SimilarName))
+
   {-| Remind the user that the field selector has been suppressed
       because of -XNoFieldSelectors.
 
@@ -464,9 +472,6 @@ data GhcHint
   {-| Suggest eta-reducing a type synonym used in the implementation
       of abstract data. -}
   | SuggestEtaReduceAbsDataTySyn TyCon
-  {-| Remind the user that there is no field of a type and name in the record,
-      constructors are in the usual order $x$, $r$, $a$ -}
-  | RemindRecordMissingField FastString Type Type
   {-| Suggest binding the type variable on the LHS of the type declaration
   -}
   | SuggestBindTyVarOnLhs RdrName
@@ -579,7 +584,7 @@ data HowInScope
 
 data SimilarName
   = SimilarName Name
-  | SimilarRdrName RdrName (Maybe HowInScope)
+  | SimilarRdrName RdrName (Maybe GlobalRdrElt) (Maybe HowInScope)
 
 -- | Some kind of signature, such as a fixity signature, standalone
 -- kind signature, COMPLETE pragma, role annotation, etc.

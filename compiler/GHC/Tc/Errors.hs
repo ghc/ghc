@@ -17,6 +17,8 @@ module GHC.Tc.Errors(
 
 import GHC.Prelude
 
+import GHC.Builtin.Names (hasFieldClassName)
+
 import GHC.Driver.Env (hsc_units)
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
@@ -31,6 +33,7 @@ import GHC.Tc.Errors.Ppr
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Utils.TcMType
+import GHC.Tc.Utils.Env (tcLookupId, tcLookupDataCon)
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.TcType
@@ -43,6 +46,7 @@ import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits, getHoleFitDispConf
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Id
+import GHC.Types.Id.Info (IdDetails(..), RecSelParent (..))
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -50,13 +54,18 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Types.Hint (SimilarName (..))
 import qualified GHC.Types.Unique.Map as UM
+import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
 import GHC.Unit.Module
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate
 import GHC.Core.Type
+import GHC.Core.Class (className)
+import GHC.Core.ConLike (isExistentialRecordField, ConLike (..))
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Ppr     ( pprTyVars )
 import GHC.Core.TyCo.Tidy
@@ -75,13 +84,18 @@ import GHC.Data.List.SetOps ( equivClasses, nubOrdBy )
 import GHC.Data.Maybe
 import qualified GHC.Data.Strict as Strict
 
+
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
 import Control.Monad      ( unless, when, foldM, forM_ )
+import Data.Bifunctor     ( bimap )
 import Data.Foldable      ( toList )
 import Data.Function      ( on )
 import Data.List          ( partition, union, sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord         ( comparing )
+import Data.Either (partitionEithers)
 
 {-
 ************************************************************************
@@ -1470,8 +1484,8 @@ coercion.
 mkIrredErr :: SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
 mkIrredErr ctxt items
   = do { (ctxt, binds, item1) <- relevantBindings True ctxt item1
-       ; let msg = important ctxt $ mkPlainMismatchMsg $
-                   CouldNotDeduce (getUserGivens ctxt) (item1 :| others) Nothing
+       ; couldNotDeduceErr <- mkCouldNotDeduceErr (getUserGivens ctxt) (item1 :| others) Nothing
+       ; let msg = important ctxt $ mkPlainMismatchMsg couldNotDeduceErr
        ; return $ add_relevant_bindings binds msg  }
   where
     item1:|others = tryFilter (not . ei_suppress) items
@@ -1851,6 +1865,7 @@ reportEqErr :: SolverReportErrCtxt
             -> TcM TcSolverReportMsg
 reportEqErr ctxt item ty1 ty2
   = do
+    mismatch <- misMatchOrCND ctxt item ty1 ty2
     mb_coercible_info <- if errorItemEqRel item == ReprEq
                          then coercible_msg ty1 ty2
                          else return Nothing
@@ -1862,7 +1877,6 @@ reportEqErr ctxt item ty1 ty2
                       , mismatchAmbiguityInfo = eqInfos
                       , mismatchCoercibleInfo = mb_coercible_info }
   where
-    mismatch = misMatchOrCND ctxt item ty1 ty2
     eqInfos  = eqInfoMsgs ty1 ty2
 
 coercible_msg :: TcType -> TcType -> TcM (Maybe CoercibleMsg)
@@ -1894,6 +1908,7 @@ mkTyVarEqErr' ctxt item tv1 ty2
   -- try it before anything more complicated.
   | check_eq_result `cterHasProblem` cteImpredicative
   = do
+    headline_msg <- misMatchOrCND ctxt item ty1 ty2
     tyvar_eq_info <- extraTyVarEqInfo (tv1, Nothing) ty2
     let
         poly_msg = CannotUnifyWithPolytype item tv1 ty2 mb_tv_info
@@ -1917,6 +1932,7 @@ mkTyVarEqErr' ctxt item tv1 ty2
     || errorItemEqRel item == ReprEq
      -- The cases below don't really apply to ReprEq (except occurs check)
   = do
+    headline_msg <- misMatchOrCND ctxt item ty1 ty2
     tv_extra <- extraTyVarEqInfo (tv1, Nothing) ty2
     reason <- if errorItemEqRel item == ReprEq
               then RepresentationalEq tv_extra <$> coercible_msg ty1 ty2
@@ -1933,23 +1949,24 @@ mkTyVarEqErr' ctxt item tv1 ty2
     --
     -- Use tyCoVarsOfType because it might have begun as the canonical
     -- constraint (Dual (Dual a)) ~ a, and been swizzled by mkEqnErr_help
-  = let ambiguity_infos = eqInfoMsgs ty1 ty2
+  = do headline_msg <- misMatchOrCND ctxt item ty1 ty2
+       let ambiguity_infos = eqInfoMsgs ty1 ty2
 
-        interesting_tyvars = filter (not . noFreeVarsOfType . tyVarKind) $
-                             filter isTyVar $
-                             fvVarList $
-                             tyCoFVsOfType ty1 `unionFV` tyCoFVsOfType ty2
+           interesting_tyvars = filter (not . noFreeVarsOfType . tyVarKind) $
+                                filter isTyVar $
+                                fvVarList $
+                                tyCoFVsOfType ty1 `unionFV` tyCoFVsOfType ty2
 
-        occurs_err =
-          OccursCheck
-            { occursCheckInterestingTyVars = interesting_tyvars
-            , occursCheckAmbiguityInfos    = ambiguity_infos }
-        main_msg =
-          CannotUnifyVariable
-            { mismatchMsg       = headline_msg
-            , cannotUnifyReason = occurs_err }
+           occurs_err =
+             OccursCheck
+               { occursCheckInterestingTyVars = interesting_tyvars
+               , occursCheckAmbiguityInfos    = ambiguity_infos }
+           main_msg =
+             CannotUnifyVariable
+               { mismatchMsg       = headline_msg
+               , cannotUnifyReason = occurs_err }
 
-    in return main_msg
+       return main_msg
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
@@ -2005,7 +2022,6 @@ mkTyVarEqErr' ctxt item tv1 ty2
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
   where
-    headline_msg = misMatchOrCND ctxt item ty1 ty2
     mismatch_msg = mkMismatchMsg item ty1 ty2
 
     -- The following doesn't use the cterHasProblem mechanism because
@@ -2073,7 +2089,7 @@ eqInfoMsgs ty1 ty2
               = Nothing
 
 misMatchOrCND :: SolverReportErrCtxt -> ErrorItem
-              -> TcType -> TcType -> MismatchMsg
+              -> TcType -> TcType -> TcM MismatchMsg
 -- If oriented then ty1 is actual, ty2 is expected
 misMatchOrCND ctxt item ty1 ty2
   | insoluble_item   -- See Note [Insoluble mis-match]
@@ -2082,10 +2098,10 @@ misMatchOrCND ctxt item ty1 ty2
     || null givens
   = -- If the equality is unconditionally insoluble
     -- or there is no context, don't report the context
-    mkMismatchMsg item ty1 ty2
+    return $ mkMismatchMsg item ty1 ty2
 
   | otherwise
-  = CouldNotDeduce givens (item :| []) (Just $ CND_Extra level ty1 ty2)
+  = mkCouldNotDeduceErr givens (item :| []) (Just $ CND_ExpectedActual level ty1 ty2)
 
   where
     insoluble_item = case ei_m_reason item of
@@ -2275,9 +2291,8 @@ mkQCErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM
 mkQCErr ctxt items
   | item1 :| _ <- tryFilter (not . ei_suppress) items
     -- Ignore multiple qc-errors on the same line
-  = do { let msg = mkPlainMismatchMsg $
-                   CouldNotDeduce (getUserGivens ctxt) (item1 :| []) Nothing
-       ; return $ important ctxt msg }
+  = do { couldNotDeduceErr <- mkCouldNotDeduceErr (getUserGivens ctxt) (item1 :| []) Nothing
+       ; return $ important ctxt $ mkPlainMismatchMsg couldNotDeduceErr }
 
 
 mkDictErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
@@ -2292,16 +2307,9 @@ mkDictErr ctxt orig_items
        -- But we report only one of them (hence 'head') because they all
        -- have the same source-location origin, to try avoid a cascade
        -- of error from one location
-       ; ( err, (imp_errs, hints) ) <-
-           mk_dict_err ctxt (head (no_inst_items ++ overlap_items))
-       ; return $
-           SolverReport
-             { sr_important_msg = SolverReportWithCtxt ctxt err
-             , sr_supplementary = [ SupplementaryImportErrors imps
-                                  | imps <- maybeToList (NE.nonEmpty imp_errs) ]
-             , sr_hints = hints
-             }
-        }
+       ; err <- mk_dict_err ctxt (head (no_inst_items ++ overlap_items))
+       ; return $ important ctxt err
+       }
   where
     items = tryFilter (not . ei_suppress) orig_items
 
@@ -2335,28 +2343,29 @@ mkDictErr ctxt orig_items
 --     matching and unifying instances, and say "The choice depends on the instantion of ...,
 --     and the result of evaluating ...".
 mk_dict_err :: HasCallStack => SolverReportErrCtxt -> (ErrorItem, ClsInstLookupResult)
-            -> TcM ( TcSolverReportMsg, ([ImportError], [GhcHint]) )
+            -> TcM TcSolverReportMsg
 mk_dict_err ctxt (item, (matches, pot_unifiers, unsafe_overlapped))
   = case (NE.nonEmpty matches, NE.nonEmpty unsafe_overlapped) of
   (Nothing, _)  -> do -- No matches but perhaps several unifiers
     { (_, rel_binds, item) <- relevantBindings True ctxt item
     ; candidate_insts <- get_candidate_instances
-    ; (imp_errs, field_suggestions) <- record_field_suggestions item
-    ; return (CannotResolveInstance item unifiers candidate_insts rel_binds, (imp_errs, field_suggestions)) }
+    ; mb_noBuiltinInst_msg <- getNoBuiltinInstMsg item
+    ; return $
+        CannotResolveInstance item unifiers candidate_insts rel_binds mb_noBuiltinInst_msg
+    }
 
   -- Some matches => overlap errors
   (Just matchesNE, Nothing) -> return $
-    ( OverlappingInstances item (NE.map fst matchesNE) unifiers, ([], []))
+    OverlappingInstances item (NE.map fst matchesNE) unifiers
 
   (Just (match :| []), Just unsafe_overlappedNE) -> return $
-    ( UnsafeOverlap item (fst match) (NE.map fst unsafe_overlappedNE), ([], []))
+    UnsafeOverlap item (fst match) (NE.map fst unsafe_overlappedNE)
   (Just matches@(_ :| _), Just overlaps) ->
     pprPanic "mk_dict_err: multiple matches with overlap" $
       vcat [ text "matches:" <+> ppr matches
            , text "overlaps:" <+> ppr overlaps
            ]
   where
-    orig        = errorItemOrigin item
     pred        = errorItemPred item
     (clas, tys) = getClassPredTys pred
     unifiers    = getCoherentUnifiers pot_unifiers
@@ -2380,43 +2389,6 @@ mk_dict_err ctxt (item, (matches, pot_unifiers, unsafe_overlapped))
             same_occ_names = nameOccName n1 == nameOccName n2
         in different_names && same_occ_names
       | otherwise = False
-
-    -- See Note [Out-of-scope fields with -XOverloadedRecordDot]
-    record_field_suggestions :: ErrorItem -> TcM ([ImportError], [GhcHint])
-    record_field_suggestions item = flip (maybe $ return ([], noHints)) record_field $ \name ->
-       do { glb_env <- getGlobalRdrEnv
-          ; lcl_env <- getLocalRdrEnv
-          ; let field_name_hints = report_no_fieldnames item
-          ; (errs, hints) <- if occ_name_in_scope glb_env lcl_env name
-              then return ([], noHints)
-              else unknownNameSuggestions emptyLocalRdrEnv WL_RecField (mkRdrUnqual name)
-          ; pure (errs, hints ++ field_name_hints)
-          }
-
-    -- get type names from instance
-    -- resolve the type - if it's in scope is it a record?
-    -- if it's a record, report an error - the record name + the field that could not be found
-    report_no_fieldnames :: ErrorItem -> [GhcHint]
-    report_no_fieldnames item
-       | Just (EvVarDest evvar) <- ei_evdest item
-       -- we can assume that here we have a `HasField @Symbol x r a` instance
-       -- because of GetFieldOrigin in record_field
-       , Just (_, [_symbol, x, r, a]) <- tcSplitTyConApp_maybe (varType evvar)
-       , Just (r_tycon, _) <- tcSplitTyConApp_maybe r
-       , Just x_name <- isStrLitTy x
-       -- we check that this is a record type by checking whether it has any
-       -- fields (in scope)
-       , not . null $ tyConFieldLabels r_tycon
-       = [RemindRecordMissingField x_name r a]
-       | otherwise = []
-
-    occ_name_in_scope glb_env lcl_env occ_name = not $
-      null (lookupGRE glb_env (LookupOccName occ_name (RelevantGREsFOS WantNormal))) &&
-      isNothing (lookupLocalRdrOcc lcl_env occ_name)
-
-    record_field = case orig of
-      GetFieldOrigin name -> Just (mkVarOccFS name)
-      _                   -> Nothing
 
 {- Note [Report candidate instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2474,6 +2446,245 @@ results in
       Perhaps you want to add ‘getAll’ to the import list
       in the import of ‘Data.Monoid’
 -}
+
+mkCouldNotDeduceErr
+  :: [UserGiven]
+  -> NonEmpty ErrorItem
+  -> Maybe CND_ExpectedActual
+  -> TcM MismatchMsg
+mkCouldNotDeduceErr user_givens items@(item :| _) mb_ea
+  = do { mb_noBuiltinInst_info <- getNoBuiltinInstMsg item
+       ; return $ CouldNotDeduce user_givens items mb_ea mb_noBuiltinInst_info }
+
+getNoBuiltinInstMsg :: ErrorItem -> TcM (Maybe NoBuiltinInstanceMsg)
+getNoBuiltinInstMsg item =
+  do { rdr_env <- getGlobalRdrEnv
+     ; fam_envs <- tcGetFamInstEnvs
+     ; mbNoHasFieldMsg <- hasFieldInfo_maybe rdr_env fam_envs item
+     ; return $ fmap NoBuiltinHasFieldMsg mbNoHasFieldMsg
+     }
+
+{- Note [Error messages for unsolved HasField constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The HasField type-class has special instance solving logic, implemented in
+'GHC.Tc.Instance.Class.{matchHasField,lookupHasFieldLabel}'. This logic is a
+bit complex, so it's useful to explain to the user why GHC might have failed to
+solve a 'HasField' constraint. GHC will emit the following error messages for
+an unsolved constraint of the form 'HasField fld_name rec_ty fld_ty'.
+These come in two flavours
+
+  HF1.
+    Actionable hints: suggest similarly named fields (in case of mis-spelling)
+    or provide import suggestions (e.g. out of scope field).
+    See 'GHC.Tc.Errors.Ppr.hasFieldMsgHints' which takes the returned
+    'HasFieldMsg' and produces the hints we display to the user.
+
+    This depends on whether 'rec_ty' is a known fixed TyCon or not.
+
+    HF1a. If 'rec_ty' is a known record TyCon:
+          - If 'fld_name' is a record field of that TyCon, but it's not in scope,
+            then suggest importing it.
+          - Otherwise, we suggest similarly named fields, prioritising similar
+            name suggestions for record fields from that same TyCon.
+
+    HF1b. If 'rec_ty' is not a fixed TyCon (e.g. it's a metavariable):
+          - If 'fld_name' is an in-scope record field, don't suggest anything.
+          - Otherwise, suggest similar names.
+
+  HF2. Observations. GHC points out a fact to the user which might help them
+       understand the problem:
+
+    HF2a. 'fld_name' is not a string literal.
+          This is useful when the user has forgotten the quotes, e.g. they
+          have written 'getField @myFieldName' instead of 'getField @"myFieldName"'.
+
+    HF2b. 'rec_ty' is a TyCon without any fields, e.g. 'Int' or 'Bool'.
+
+    HF2c. The record field type 'fld_ty' contains existentials variables
+          or foralls. In the former case GHC doesn't generate a field selector
+          at all (it's a naughty record selector), while in the latter GHC
+          doesn't solve the constraint, because class instance arguments
+          can't contain foralls.
+
+    HF2d. The record field is a pattern synonym record field.
+          GHC does not generate 'HasField' instances for pattern synonym fields.
+
+    HF2e. The user is using -XRebindableSyntax, and this is not actually the
+          built-in HasField which GHC has special solving logic for.
+
+          This can happen rather easily, because the current usage of
+          -XOverloadedRecordUpdate requires enabling -XRebindableSyntax and
+          defining a custom 'setField' function.
+-}
+
+-- | Try to produce an explanatory message for why GHC was not able to use
+-- a built-in instance to solve a 'HasField' constraint.
+--
+-- See Note [Error messages for unsolved HasField constraints]
+hasFieldInfo_maybe :: GlobalRdrEnv -> FamInstEnvs -> ErrorItem -> TcM (Maybe HasFieldMsg)
+hasFieldInfo_maybe rdr_env fam_inst_envs item
+  | Just (x_ty, rec_ty, _wanted_field_ty) <- hasField_maybe (errorItemPred item)
+
+  -- This function largely replicates the logic
+  -- of 'GHC.Tc.Instance.Class.{matchHasField,lookupHasFieldLabel}'.
+  --
+  -- When that function fails to return a built-in HasField instance,
+  -- this function should generate an appropriate message which can be
+  -- displayed to the user as a hint.
+
+  = case isStrLitTy x_ty of
+    { Nothing ->
+        -- (HF2a) Field label is not a literal string.
+        return $ Just $ NotALiteralFieldName x_ty
+    ; Just x ->
+ do { dflags <- getDynFlags
+    ; let x_fl = FieldLabelString x
+          looking_for_field = LF WL_RecField WL_Global
+          fld_var_occ = mkVarOccFS x
+          lkup_fld_occ = LookupOccName fld_var_occ (RelevantGREsFOS WantField)
+          similar_names =
+            similarNameSuggestions looking_for_field
+              dflags rdr_env emptyLocalRdrEnv (mkRdrUnqual fld_var_occ)
+    ; (patsyns, suggs) <- partitionEithers <$> mapMaybeM with_parent similar_names
+    ; imp_suggs <- anyQualImportSuggestions looking_for_field lkup_fld_occ
+    ; case splitTyConApp_maybe rec_ty of
+    { Nothing -> do
+        -- (HF1b) Similar name and import suggestions with unknown TyCon.
+        --
+        -- Don't say 'rec is not a record type' if 'rec' is e.g. a type variable.
+        -- That's not really helpful, especially if 'rec' is a metavariable,
+        -- in which case this is most likely an ambiguity issue.
+        let gres = lookupGRE rdr_env lkup_fld_occ
+        case gres of
+          _:_ ->
+            -- If the name was in scope, don't give "similar name" suggestions.
+            return Nothing
+          [] -> do
+            return $ Just $
+              SuggestSimilarFields Nothing x_fl suggs patsyns imp_suggs
+    ; Just (rec_tc, rec_args)
+        | let rec_rep_tc = fstOf3 (tcLookupDataFamInst fam_inst_envs rec_tc rec_args)
+        ->
+      if null $ tyConFieldLabels rec_rep_tc
+      then
+        -- (HF2b) Not a record TyCon
+        return $ Just $ NotARecordType rec_ty
+      else
+      case lookupTyConFieldLabel x_fl rec_rep_tc of
+    { Nothing -> do
+        -- (HF1a) Similar name and import suggestions with known TyCon.
+        return $ Just $
+          SuggestSimilarFields (Just (rec_tc, rec_rep_tc)) x_fl suggs patsyns imp_suggs
+    ; Just fl ->
+        -- The TyCon does have the field, so the issue might be that
+        -- it's not in scope or that the field is existential or higher-rank.
+      case lookupGRE_FieldLabel rdr_env fl of
+    { Nothing -> do
+        -- (HF1a) Not in scope. Try to suggest importing the field.
+        let lookup_gre =
+              LookupExactName
+                { lookupExactName = flSelector fl
+                , lookInAllNameSpaces = False }
+        imp_suggs <- anyQualImportSuggestions looking_for_field lookup_gre
+        return $ Just $ OutOfScopeField rec_tc fl imp_suggs
+    ; Just gre ->
+      let con1_nm =
+            case nonDetEltsUniqSet $ recFieldCons $ fieldGREInfo gre of
+                   n : _ -> n
+                   [] -> pprPanic "record field with no constructors" (ppr fl)
+      in case con1_nm of
+    { PatSynName {} ->
+      -- 'lookupTyConFieldLabel' always returns a DataCon field
+      pprPanic "hasFieldInfo_maybe: PatSyn" $
+        vcat [ text "tc:" <+> ppr rec_tc
+             , text "rep_tc:" <+> ppr rec_rep_tc
+             , text "con1_nm:" <+> ppr con1_nm
+             ]
+    ; DataConName dc1_nm -> do
+      dc1 <- tcLookupDataCon dc1_nm
+      let orig_field_ty = dataConFieldType dc1 (flLabel fl)
+      return $
+        -- (HF2c) Existential or higher-rank field.
+        -- See 'GHC.Tc.Instance.Class.matchHasField', which
+        -- has these same two conditions.
+        if |  isExistentialRecordField orig_field_ty (RealDataCon dc1)
+              -- NB: use 'orig_field_ty' and not 'idType sel_id',
+              -- because the latter is 'unitTy' when there are existentials.
+           -> Just $ FieldTooFancy rec_tc x_fl FieldHasExistential
+           | not $ isTauTy orig_field_ty
+           -> Just $ FieldTooFancy rec_tc x_fl FieldHasForAlls
+           | otherwise
+           -> Nothing
+             -- Not sure what went wrong. Usually not a type error
+             -- in the field type, because the functional dependency
+             -- would cause a genuine equality error.
+  }}}}}}
+
+  -- (HF2e) It's a custom HasField constraint, not the one from GHC.Records.
+  | Just (tc, _) <- splitTyConApp_maybe (errorItemPred item)
+  , getOccString tc == "HasField"
+  , isHasFieldOrigin (errorItemOrigin item)
+  = return $ Just $ CustomHasField tc
+
+  | otherwise
+  = return Nothing
+
+  where
+
+    get_parent_nm :: Name -> TcM (Maybe (Either PatSyn TyCon))
+    get_parent_nm nm =
+      do { fld_id <- tcLookupId nm
+         ; return $
+             case idDetails fld_id of
+               RecSelId { sel_tycon = parent } ->
+                 case parent of
+                  RecSelData tc ->
+                     Just $ Right tc
+                  RecSelPatSyn ps ->
+                    -- (HF2d) PatSyn record fields don't contribute 'HasField'
+                    --        instances, so tell the user about that.
+                    Just $ Left ps
+               _ -> Nothing
+         }
+
+    get_parent :: SimilarName -> TcM (Maybe (Either PatSyn TyCon))
+    get_parent (SimilarName nm) = get_parent_nm nm
+    get_parent (SimilarRdrName _ mb_gre _) =
+      case mb_gre of
+        Nothing -> return Nothing
+        Just gre -> get_parent_nm $ greName gre
+
+    with_parent :: SimilarName
+                -> TcM (Maybe (Either (PatSyn, SimilarName) (TyCon, SimilarName)))
+    with_parent n = fmap (bimap (,n) (,n)) <$> get_parent n
+
+-- | Is this constraint definitely 'HasField'?
+hasField_maybe :: PredType -> Maybe (Type, Type, Type)
+hasField_maybe pred =
+  case classifyPredType pred of
+    ClassPred cls tys
+      | className cls == hasFieldClassName
+      , [ _k, _rec_rep, _fld_rep, x_ty, rec_ty, fld_ty ] <- tys
+      -> Just (x_ty, rec_ty, fld_ty)
+    _ -> Nothing
+  -- NB: we deliberately don't handle rebound 'HasField' (with -XRebindableSyntax),
+  -- as GHC only has built-in instances for the built-in 'HasField' class.
+
+-- | Does this constraint arise from GHC internal mechanisms that desugar to
+-- usage of the 'HasField' typeclass (e.g. OverloadedRecordDot, etc)?
+--
+-- Just used heuristically to decide whether to print an informative message to
+-- the user (see (H2e) in Note [Error messages for unsolved HasField constraints]).
+isHasFieldOrigin :: CtOrigin -> Bool
+isHasFieldOrigin = \case
+  OccurrenceOf n ->
+    -- A heuristic...
+    getOccString n `elem` ["getField", "setField"]
+  OccurrenceOfRecSel {} -> True
+  RecordUpdOrigin {} -> True
+  RecordFieldProjectionOrigin {} -> True
+  GetFieldOrigin {} -> True
+  _ -> False
 
 -----------------------
 -- relevantBindings looks at the value environment and finds values whose
