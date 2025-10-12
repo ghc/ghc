@@ -1,3 +1,0 @@
-:set -package ghc
-:set -Wall
--- :set -fobject-code
