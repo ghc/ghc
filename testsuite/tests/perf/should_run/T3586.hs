@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS -fvia-C -optc-O3 -fexcess-precision -optc-msse3 #-}
+{-# OPTIONS -optc-O3 -fexcess-precision #-}
 
 import Control.Monad.ST
 import Data.Array.ST
