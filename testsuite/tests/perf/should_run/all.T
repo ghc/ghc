@@ -43,6 +43,7 @@ test('T3586',
      [collect_runtime_residency(2),
       collect_stats('bytes allocated', 5),
       only_ways(['normal']),
+      when(have_cpu_feature('pni') or have_cpu_feature('sse3'), extra_hc_opts('-optc-msse3')),
       ],
      compile_and_run,
      ['-O'])
