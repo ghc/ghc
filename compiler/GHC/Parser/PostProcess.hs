@@ -3397,7 +3397,7 @@ mkWholeDataWcImpExp :: SrcSpan
                     -> Maybe (LWarningTxt GhcPs)
                     -> EpToken "data"
                     -> EpToken ".."
-                    -> P (LIE GhcPs)
+                    -> P p (LIE GhcPs)
 mkWholeDataWcImpExp loc warning tk_ns tk_wc = do
   requireExplicitNamespaces (ExplicitDataNamespace tk_ns)
   let ie_spec = mkIEWholeNamespacePs warning (DataNamespaceSpecifier tk_ns) tk_wc

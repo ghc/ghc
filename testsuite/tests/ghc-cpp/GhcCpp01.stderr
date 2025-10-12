@@ -13,7 +13,7 @@
 
 #define MIN_VERSION_Cabal_syntax(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 16 || ( major1 ) == 3 && ( major2 ) == 16 && ( minor ) <= 0 )
 
-#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 915 || ( ( ma ) * 100 + ( mi ) ) == 915 && ( pl1 ) < 20251015 || ( ( ma ) * 100 + ( mi ) ) == 915 && ( pl1 ) == 20251015 && ( pl2 ) <= 0 )
+#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 915 || ( ( ma ) * 100 + ( mi ) ) == 915 && ( pl1 ) < 20251230 || ( ( ma ) * 100 + ( mi ) ) == 915 && ( pl1 ) == 20251230 && ( pl2 ) <= 0 )
 
 #define MIN_VERSION_array(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 5 || ( major1 ) == 0 && ( major2 ) == 5 && ( minor ) <= 8 )
 
@@ -29,7 +29,7 @@
 
 #define MIN_VERSION_directory(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 3 || ( major1 ) == 1 && ( major2 ) == 3 && ( minor ) <= 10 )
 
-#define MIN_VERSION_exceptions(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 10 || ( major1 ) == 0 && ( major2 ) == 10 && ( minor ) <= 9 )
+#define MIN_VERSION_exceptions(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 10 || ( major1 ) == 0 && ( major2 ) == 10 && ( minor ) <= 11 )
 
 #define MIN_VERSION_file_io(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 1 || ( major1 ) == 0 && ( major2 ) == 1 && ( minor ) <= 5 )
 
@@ -69,7 +69,7 @@
 
 #define MIN_VERSION_mtl(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 3 || ( major1 ) == 2 && ( major2 ) == 3 && ( minor ) <= 1 )
 
-#define MIN_VERSION_os_string(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 0 || ( major1 ) == 2 && ( major2 ) == 0 && ( minor ) <= 7 )
+#define MIN_VERSION_os_string(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 0 || ( major1 ) == 2 && ( major2 ) == 0 && ( minor ) <= 8 )
 
 #define MIN_VERSION_parsec(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 1 || ( major1 ) == 3 && ( major2 ) == 1 && ( minor ) <= 18 )
 
@@ -99,9 +99,9 @@
 
 #define MIN_VERSION_transformers(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 6 || ( major1 ) == 0 && ( major2 ) == 6 && ( minor ) <= 1 )
 
-#define MIN_VERSION_unix(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 8 || ( major1 ) == 2 && ( major2 ) == 8 && ( minor ) <= 7 )
+#define MIN_VERSION_unix(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 8 || ( major1 ) == 2 && ( major2 ) == 8 && ( minor ) <= 8 )
 
-#define MIN_VERSION_xhtml(major1,major2,minor) ( ( major1 ) < 3000 || ( major1 ) == 3000 && ( major2 ) < 2 || ( major1 ) == 3000 && ( major2 ) == 2 && ( minor ) <= 2 )
+#define MIN_VERSION_xhtml(major1,major2,minor) ( ( major1 ) < 3000 || ( major1 ) == 3000 && ( major2 ) < 4 || ( major1 ) == 3000 && ( major2 ) == 4 && ( minor ) <= 0 )
 
 #define VERSION_Cabal 3.16.0.0
 
@@ -121,7 +121,7 @@
 
 #define VERSION_directory 1.3.10.0
 
-#define VERSION_exceptions 0.10.9
+#define VERSION_exceptions 0.10.11
 
 #define VERSION_file_io 0.1.5
 
@@ -161,7 +161,7 @@
 
 #define VERSION_mtl 2.3.1
 
-#define VERSION_os_string 2.0.7
+#define VERSION_os_string 2.0.8
 
 #define VERSION_parsec 3.1.18.0
 
@@ -191,14 +191,14 @@
 
 #define VERSION_transformers 0.6.1.2
 
-#define VERSION_unix 2.8.7.0
+#define VERSION_unix 2.8.8.0
 
-#define VERSION_xhtml 3000.2.2.1
+#define VERSION_xhtml 3000.4.0.0
 
 
-#define __GLASGOW_HASKELL_FULL_VERSION__ 9.15.20251015
+#define __GLASGOW_HASKELL_FULL_VERSION__ 9.15.20251230
 
-#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20251015
+#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20251230
 
 #define __GLASGOW_HASKELL_PATCHLEVEL2__ 0
 
