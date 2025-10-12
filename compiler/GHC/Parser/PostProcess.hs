@@ -208,7 +208,7 @@ mkClassDecl :: SrcSpan
             -> OrdList (LHsDecl GhcPs)
             -> EpLayout
             -> AnnClassDecl
-            -> P (LTyClDecl GhcPs)
+            -> P p (LTyClDecl GhcPs)
 
 mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
   = do { (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
@@ -235,7 +235,7 @@ mkTyData :: SrcSpan
          -> [LConDecl GhcPs]
          -> Located (HsDeriving GhcPs)
          -> AnnDataDefn
-         -> P (LTyClDecl GhcPs)
+         -> P p (LTyClDecl GhcPs)
 mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
          ksig data_cons (L _ maybe_deriv) annsIn
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
@@ -256,7 +256,7 @@ mkDataDefn :: Maybe (LocatedP CType)
            -> DataDefnCons (LConDecl GhcPs)
            -> HsDeriving GhcPs
            -> AnnDataDefn
-           -> P (HsDataDefn GhcPs)
+           -> P p (HsDataDefn GhcPs)
 mkDataDefn cType mcxt ksig data_cons maybe_deriv anns
   = do { checkDatatypeContext mcxt
        ; return (HsDataDefn { dd_ext = anns
@@ -271,7 +271,7 @@ mkTySynonym :: SrcSpan
             -> LHsType GhcPs  -- RHS
             -> EpToken "type"
             -> EpToken "="
-            -> P (LTyClDecl GhcPs)
+            -> P p (LTyClDecl GhcPs)
 mkTySynonym loc lhs rhs antype aneq
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; tyvars <- checkTyVars (text "type") equalsDots tc tparams
@@ -287,7 +287,7 @@ mkStandaloneKindSig
   -> Located [LocatedN RdrName]   -- LHS
   -> LHsSigType GhcPs             -- RHS
   -> (EpToken "type", TokDcolon)
-  -> P (LStandaloneKindSig GhcPs)
+  -> P p (LStandaloneKindSig GhcPs)
 mkStandaloneKindSig loc lhs rhs anns =
   do { vs <- mapM check_lhs_name (unLoc lhs)
      ; v <- check_singular_lhs (reverse vs)
@@ -311,7 +311,7 @@ mkTyFamInstEqn :: SrcSpan
                -> LHsType GhcPs
                -> LHsType GhcPs
                -> EpToken "="
-               -> P (LTyFamInstEqn GhcPs)
+               -> P p (LTyFamInstEqn GhcPs)
 mkTyFamInstEqn loc bndrs lhs rhs annEq
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
@@ -332,7 +332,7 @@ mkDataFamInst :: SrcSpan
               -> [LConDecl GhcPs]
               -> Located (HsDeriving GhcPs)
               -> AnnDataDefn
-              -> P (LInstDecl GhcPs)
+              -> P p (LInstDecl GhcPs)
 mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
               ksig data_cons (L _ maybe_deriv) anns
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
@@ -354,7 +354,7 @@ mkTyFamInst :: SrcSpan
             -> TyFamInstEqn GhcPs
             -> EpToken "type"
             -> EpToken "instance"
-            -> P (LInstDecl GhcPs)
+            -> P p (LInstDecl GhcPs)
 mkTyFamInst loc eqn t i = do
   return (L (noAnnSrcSpan loc) (TyFamInstD noExtField
               (TyFamInstDecl (t,i) eqn)))
@@ -366,7 +366,7 @@ mkFamDecl :: SrcSpan
           -> LFamilyResultSig GhcPs          -- Optional result signature
           -> Maybe (LInjectivityAnn GhcPs)   -- Injectivity annotation
           -> AnnFamilyDecl
-          -> P (LTyClDecl GhcPs)
+          -> P p (LTyClDecl GhcPs)
 mkFamDecl loc info topLevel lhs ksig injAnn annsIn
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; tyvars <- checkTyVars (ppr info) equals_or_where tc tparams
@@ -412,7 +412,7 @@ mkRoleAnnotDecl :: SrcSpan
                 -> LocatedN RdrName                -- type being annotated
                 -> [Located (Maybe FastString)]    -- roles
                 -> (EpToken "type", EpToken "role")
-                -> P (LRoleAnnotDecl GhcPs)
+                -> P p (LRoleAnnotDecl GhcPs)
 mkRoleAnnotDecl loc tycon roles anns
   = do { roles' <- mapM parse_role roles
        ; !cs <- getCommentsFor loc
@@ -441,13 +441,13 @@ mkMDo ctxt stmts tok loc
 -- | Converts a list of 'LHsTyVarBndr's annotated with their 'Specificity' to
 -- binders without annotations. Only accepts specified variables, and errors if
 -- any of the provided binders has an 'InferredSpec' annotation.
-fromSpecTyVarBndrs :: [LHsTyVarBndr Specificity GhcPs] -> P [LHsTyVarBndr () GhcPs]
+fromSpecTyVarBndrs :: [LHsTyVarBndr Specificity GhcPs] -> P p [LHsTyVarBndr () GhcPs]
 fromSpecTyVarBndrs = mapM fromSpecTyVarBndr
 
 -- | Converts 'LHsTyVarBndr' annotated with its 'Specificity' to one without
 -- annotations. Only accepts specified variables, and errors if the provided
 -- binder has an 'InferredSpec' annotation.
-fromSpecTyVarBndr :: LHsTyVarBndr Specificity GhcPs -> P (LHsTyVarBndr () GhcPs)
+fromSpecTyVarBndr :: LHsTyVarBndr Specificity GhcPs -> P p (LHsTyVarBndr () GhcPs)
 fromSpecTyVarBndr (L loc (HsTvb xtv flag idp k)) = do
   case flag of
     SpecifiedSpec -> return ()
@@ -516,7 +516,7 @@ cvTopDecls :: OrdList (LHsDecl GhcPs) -> [LHsDecl GhcPs]
 cvTopDecls decls = getMonoBindAll (fromOL decls)
 
 -- Declaration list may only contain value bindings and signatures.
-cvBindGroup :: OrdList (LHsDecl GhcPs) -> P (HsValBinds GhcPs)
+cvBindGroup :: OrdList (LHsDecl GhcPs) -> P p (HsValBinds GhcPs)
 cvBindGroup binding
   = do { (mbs, sigs, fam_ds, tfam_insts
          , dfam_insts, _) <- cvBindsAndSigs binding
@@ -524,7 +524,7 @@ cvBindGroup binding
        ; return $ ValBinds NoAnnSortKey mbs sigs }
 
 cvBindsAndSigs :: OrdList (LHsDecl GhcPs)
-  -> P (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs]
+  -> P p (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs]
           , [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl GhcPs])
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
@@ -722,7 +722,7 @@ tyConToDataCon (L loc tc)
 
 mkPatSynMatchGroup :: LocatedN RdrName
                    -> LocatedLW (OrdList (LHsDecl GhcPs))
-                   -> P (MatchGroup GhcPs (LHsExpr GhcPs))
+                   -> P p (MatchGroup GhcPs (LHsExpr GhcPs))
 mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
     do { matches <- mapM fromDecl (fromOL decls)
        ; when (null matches) (wrongNumberErr (locA loc))
@@ -773,7 +773,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
       addFatalError $ mkPlainErrorMsgEnvelope loc $
         (PsErrEmptyWhereInPatSynDecl patsyn_name)
 
-recordPatSynErr :: SrcSpan -> LPat GhcPs -> P a
+recordPatSynErr :: SrcSpan -> LPat GhcPs -> P p a
 recordPatSynErr loc pat =
     addFatalError $ mkPlainErrorMsgEnvelope loc $
       (PsErrRecordSyntaxInPatSynDecl pat)
@@ -802,7 +802,7 @@ mkGadtDecl :: SrcSpan
            -> NonEmpty (LocatedN RdrName)
            -> TokDcolon
            -> LHsSigType GhcPs
-           -> P (LConDecl GhcPs)
+           -> P p (LConDecl GhcPs)
 mkGadtDecl loc names dcol ty = do
 
   (args, res_ty, (ops, cps), csa) <-
@@ -938,7 +938,7 @@ eitherToP (Left err)    = addFatalError err
 eitherToP (Right thing) = return thing
 
 checkTyVars :: SDoc -> SDoc -> LocatedN RdrName -> [LHsTypeArg GhcPs]
-            -> P (LHsQTyVars GhcPs)  -- the synthesized type variables
+            -> P p (LHsQTyVars GhcPs)  -- the synthesized type variables
 -- ^ Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).
 checkTyVars pp_what equals_or_where tc tparms
@@ -951,7 +951,7 @@ checkTyVars pp_what equals_or_where tc tparms
                             (PsErrMalformedDecl pp_what (unLoc tc))
         -- Keep around an action for adjusting the annotations of extra parens
     chkParens :: [EpaLocation] -> [EpaLocation] -> HsBndrVis GhcPs -> LHsType GhcPs
-              -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
+              -> P p (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
     chkParens ops cps bvis (L l (HsParTy _ (L lt ty)))
       = let
           (o,c) = mkParensLocs (realSrcSpan $ locA l)
@@ -961,7 +961,7 @@ checkTyVars pp_what equals_or_where tc tparms
     chkParens ops cps bvis ty = chk ops cps bvis ty
 
         -- Check that the name space is correct!
-    chk :: [EpaLocation] -> [EpaLocation] -> HsBndrVis GhcPs -> LHsType GhcPs -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
+    chk :: [EpaLocation] -> [EpaLocation] -> HsBndrVis GhcPs -> LHsType GhcPs -> P p (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
     chk ops cps bvis (L l (HsKindSig tok_dc (L annt t) k))
         | Just (ann, bvar) <- match_bndr_var t
             = let
@@ -1000,7 +1000,7 @@ whereDots, equalsDots :: SDoc
 whereDots  = text "where ..."
 equalsDots = text "= ..."
 
-checkDatatypeContext :: Maybe (LHsContext GhcPs) -> P ()
+checkDatatypeContext :: Maybe (LHsContext GhcPs) -> P p ()
 checkDatatypeContext Nothing = return ()
 checkDatatypeContext (Just c)
     = do allowed <- getBit DatatypeContextsBit
@@ -1031,7 +1031,7 @@ mkRuleBndrs ann tvbs tmbs
     cvt_sig Nothing    = HsBndrNoKind noExtField
     cvt_sig (Just sig) = HsBndrKind   noExtField sig
 
-checkRuleTyVarBndrNames :: [LRuleTyTmVar] -> P ()
+checkRuleTyVarBndrNames :: [LRuleTyTmVar] -> P p ()
 -- See Note [Parsing explicit foralls in Rules] in Parser.y
 checkRuleTyVarBndrNames bndrs
    = sequence_ [ check lname | L _ (RuleTyTmVar _ lname _) <- bndrs ]
@@ -1052,7 +1052,7 @@ mkSpecSig :: InlinePragma GhcPs
           -> Maybe (RuleBndrs GhcPs)
           -> LHsExpr GhcPs
           -> Maybe (Located (TokDcolon, OrdList (LHsSigType GhcPs)))
-          -> P (Sig GhcPs)
+          -> P p (Sig GhcPs)
 mkSpecSig inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr
   = case m_sigtypes_ascr of
       Nothing
@@ -1101,7 +1101,7 @@ checkRecordSyntax lr@(L loc r)
 -- | Check if the gadt_constrlist is empty. Only raise parse error for
 -- `data T where` to avoid affecting existing error message, see #8258.
 checkEmptyGADTs :: Located ((EpToken "where", EpToken "{", EpToken "}"), [LConDecl GhcPs])
-                -> P (Located ((EpToken "where", EpToken "{", EpToken "}"), [LConDecl GhcPs]))
+                -> P p (Located ((EpToken "where", EpToken "{", EpToken "}"), [LConDecl GhcPs]))
 checkEmptyGADTs gadts@(L span (_, []))           -- Empty GADT declaration.
     = do gadtSyntax <- getBit GadtSyntaxBit   -- GADTs implies GADTSyntax
          unless gadtSyntax $ addError $ mkPlainErrorMsgEnvelope span $
@@ -1112,12 +1112,12 @@ checkEmptyGADTs gadts = return gadts              -- Ordinary GADT declaration.
 checkTyClHdr :: Bool               -- True  <=> class header
                                    -- False <=> type header
              -> LHsType GhcPs
-             -> P (LocatedN RdrName,     -- the head symbol (type or class name)
-                   [LHsTypeArg GhcPs],   -- parameters of head symbol
-                   LexicalFixity,        -- the declaration is in infix format
-                   [EpToken "("],        -- API Annotation for HsParTy
-                   [EpToken ")"],        -- when stripping parens
-                   EpAnnComments)        -- Accumulated comments from re-arranging
+             -> P p (LocatedN RdrName,     -- the head symbol (type or class name)
+                     [LHsTypeArg GhcPs],   -- parameters of head symbol
+                     LexicalFixity,        -- the declaration is in infix format
+                     [EpToken "("],        -- API Annotation for HsParTy
+                     [EpToken ")"],        -- when stripping parens
+                     EpAnnComments)        -- Accumulated comments from re-arranging
 -- Well-formedness check and decomposition of type and class heads.
 -- Decomposes   T ty1 .. tyn   into    (T, [ty1, ..., tyn])
 --              Int :*: Bool   into    (:*:, [Int, Bool])
@@ -1205,12 +1205,12 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
 --     (Eq a)               -->  [Eq a]
 --     (((Eq a)))           -->  [Eq a]
 -- @
-checkContext :: LHsType GhcPs -> P (LHsContext GhcPs)
+checkContext :: LHsType GhcPs -> P p (LHsContext GhcPs)
 checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   check ([],[],cs) orig_t
  where
   check :: ([EpToken "("],[EpToken ")"],EpAnnComments)
-        -> LHsType GhcPs -> P (LHsContext GhcPs)
+        -> LHsType GhcPs -> P p (LHsContext GhcPs)
   check (oparens,cparens,cs) (L _l (HsTupleTy (AnnParens o c) HsBoxedOrConstraintTuple ts))
     -- (Eq a, Ord b) shows up as a tuple type. Only boxed tuples can
     -- be used as context constraints.
@@ -1236,10 +1236,14 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   -- No need for anns, returning original
   check (_opi,_cpi,_csi) _t = unprocessed
 
+  unprocessed :: P p (LHsContext GhcPs)
   unprocessed =
     return (L (EpAnn l (AnnContext Nothing [] []) emptyComments) [orig_t])
 
 
+  mkCTuple :: ([EpToken "("], [EpToken ")"], EpAnnComments)
+           -> e
+           -> P p (LocatedC e)
   mkCTuple (oparens, cparens, cs) ts =
     -- Append parens so that the original order in the source is maintained
     return (L (EpAnn l (AnnContext Nothing oparens cparens) cs) ts)
@@ -1284,8 +1288,8 @@ checkImportDecl :: Maybe (EpToken "qualified")
                 -> Maybe (EpToken "qualified")
                 -> Maybe EpAnnLevel
                 -> Maybe EpAnnLevel
-                -> P ((Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
-                     , (Maybe EpAnnLevel, ImportDeclLevelStyle))
+                -> P p ((Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
+                       , (Maybe EpAnnLevel, ImportDeclLevelStyle))
 checkImportDecl mPre mPost preLevel postLevel = do
   let whenJust mg f = maybe (pure ()) f mg
       tokenSpan tok = RealSrcSpan (epaLocationRealSrcSpan $ getEpTokenLoc tok) Strict.Nothing
@@ -1315,7 +1319,7 @@ checkImportDecl mPre mPost preLevel postLevel = do
 -- 'Nothing'). This is called from "GHC.Parser".
 importDeclQualifiedStyle :: Maybe (EpToken "qualified")
                          -> Maybe (EpToken "qualified")
-                         -> P (Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
+                         -> P p (Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
 importDeclQualifiedStyle mPre mPost =
   case (mPre, mPost) of
     (Just {}, Just post) -> failImportQualifiedTwice (getEpTokenSrcSpan post)
@@ -1326,7 +1330,7 @@ importDeclQualifiedStyle mPre mPost =
 
 importDeclLevelStyle :: (Maybe EpAnnLevel)
                      -> (Maybe EpAnnLevel)
-                     -> P (Maybe EpAnnLevel, ImportDeclLevelStyle)
+                     -> P p (Maybe EpAnnLevel, ImportDeclLevelStyle)
 importDeclLevelStyle preImportLevel postImportLevel =
   case (preImportLevel, postImportLevel) of
     (Just {}, Just tok) -> failSpliceOrQuoteTwice tok
@@ -1347,10 +1351,10 @@ importDeclLevelStyle preImportLevel postImportLevel =
 -- We parse patterns as expressions and check for valid patterns below,
 -- converting the expression into a pattern at the same time.
 
-checkPattern :: LocatedA (PatBuilder GhcPs) -> P (LPat GhcPs)
+checkPattern :: LocatedA (PatBuilder GhcPs) -> P p (LPat GhcPs)
 checkPattern = runPV . checkLPat
 
-checkPattern_details :: ParseContext -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
+checkPattern_details :: ParseContext -> PV (LocatedA (PatBuilder GhcPs)) -> P p (LPat GhcPs)
 checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkLPat)
 
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
@@ -1464,7 +1468,7 @@ checkValDef :: SrcSpan
             -> LocatedA (PatBuilder GhcPs)
             -> (HsMultAnn GhcPs, Maybe (TokDcolon, LHsType GhcPs))
             -> Located (GRHSs GhcPs (LHsExpr GhcPs))
-            -> P (HsBind GhcPs)
+            -> P p (HsBind GhcPs)
 
 checkValDef loc lhs (mult, Just (sigAnn, sig)) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
@@ -1499,7 +1503,7 @@ checkFunBind :: SrcSpan
              -> LexicalFixity
              -> LocatedE [LocatedA (PatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
-             -> P (HsBind GhcPs)
+             -> P p (HsBind GhcPs)
 checkFunBind locF ann_fun (L lf fun) is_infix (L lp pats) (L _ grhss)
   = do  ps <- runPV_details extraDetails (mapM checkLPat pats)
         let match_span = noAnnSrcSpan $ locF
@@ -1532,7 +1536,7 @@ checkPatBind :: SrcSpan
              -> LPat GhcPs
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> HsMultAnn GhcPs
-             -> P (HsBind GhcPs)
+             -> P p (HsBind GhcPs)
 checkPatBind loc (L _ (BangPat an (L _ (VarPat _ v))))
                         (L _match_span grhss) (HsUnannotated _)
       = return (makeFunBind v (L (noAnnSrcSpan loc)
@@ -1550,7 +1554,7 @@ checkPatBind _loc lhs (L _ grhss) mult = do
   return (PatBind noExtField lhs mult grhss)
 
 
-checkValSigLhs :: LHsExpr GhcPs -> P (LocatedN RdrName)
+checkValSigLhs :: LHsExpr GhcPs -> P p (LocatedN RdrName)
 checkValSigLhs lhs@(L l lhs_expr) =
   case lhs_expr of
     HsVar _ lrdr@(L _ v) -> check_var v lrdr
@@ -1581,7 +1585,7 @@ checkDoAndIfThenElse err guardExpr semiThen thenExpr semiElse elseExpr
   | otherwise = return ()
 
 isFunLhs :: LocatedA (PatBuilder GhcPs)
-      -> P (Maybe (LocatedN RdrName, LexicalFixity,
+      -> P p (Maybe (LocatedN RdrName, LexicalFixity,
                    [LocatedA (PatBuilder GhcPs)],[EpToken "("],[EpToken ")"]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
@@ -2939,7 +2943,7 @@ pattern match on the pattern stored inside 'PatBuilderPat'.
 checkPrecP
         :: Located (SourceText,Int)              -- ^ precedence
         -> Located (OrdList (LocatedN RdrName))  -- ^ operators
-        -> P ()
+        -> P p ()
 checkPrecP (L l (_,i)) (L _ ol)
  | 0 <= i, i <= maxPrecedence = pure ()
  | all specialOp ol = pure ()
@@ -3074,7 +3078,7 @@ mkOpaquePragma src
                  }
 
 checkNewOrData :: SrcSpan -> RdrName -> Bool -> NewOrData -> [LConDecl GhcPs]
-               -> P (DataDefnCons (LConDecl GhcPs))
+               -> P p (DataDefnCons (LConDecl GhcPs))
 checkNewOrData span name is_type_data = curry $ \ case
     (NewType, [a]) -> pure $ NewTypeCon a
     (DataType, as) -> pure $ DataTypeCons is_type_data (handle_type_data as)
@@ -3104,7 +3108,7 @@ mkImport :: Located CCallConv
          -> Located Safety
          -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
          -> (EpToken "import", TokDcolon)
-         -> P (EpToken "foreign" -> HsDecl GhcPs)
+         -> P p (EpToken "foreign" -> HsDecl GhcPs)
 mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td) =
     case unLoc cconv of
       CCallConv          -> returnSpec =<< mkCImport
@@ -3215,7 +3219,7 @@ parseCImport cconv safety nm str sourceText =
 mkExport :: Located CCallConv
          -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
          -> ( EpToken "export", TokDcolon)
-         -> P (EpToken "foreign" -> HsDecl GhcPs)
+         -> P p (EpToken "foreign" -> HsDecl GhcPs)
 mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
  = return $ \tforeign -> ForD noExtField $
    ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
@@ -3250,12 +3254,12 @@ data ImpExpQcSpec = ImpExpQcName (Maybe ExplicitNamespaceKeyword) (LocatedN RdrN
                   | ImpExpQcWildcard (Maybe ExplicitNamespaceKeyword) (EpToken "..") (EpToken ",")
 
 mkModuleImp, mkModuleExp :: Maybe (LWarningTxt GhcPs) -> (EpToken "(", EpToken ")") -> LocatedA ImpExpQcSpec
-                         -> ImpExpSubSpec -> P (IE GhcPs)
+                         -> ImpExpSubSpec -> P p (IE GhcPs)
 mkModuleImp = mkModuleImpExp InImportList
 mkModuleExp = mkModuleImpExp InExportList
 
 mkModuleImpExp :: InExportOrImportList -> Maybe (LWarningTxt GhcPs) -> (EpToken "(", EpToken ")") -> LocatedA ImpExpQcSpec
-               -> ImpExpSubSpec -> P (IE GhcPs)
+               -> ImpExpSubSpec -> P p (IE GhcPs)
 mkModuleImpExp ctx warning (top, tcp) (L l specname) subs = do
   case subs of
     ImpExpAbs
@@ -3333,7 +3337,7 @@ mkPlainImpExp name = ImpExpQcName Nothing name
 
 mkTypeImpExp :: EpToken "type"
              -> LocatedN RdrName   -- TcCls or Var name space
-             -> P ImpExpQcSpec
+             -> P p ImpExpQcSpec
 mkTypeImpExp tok name = do
   let name' = fmap (`setRdrNameSpace` tcClsName) name
       ns_kw = ExplicitTypeNamespace tok
@@ -3342,7 +3346,7 @@ mkTypeImpExp tok name = do
 
 mkDataImpExp :: EpToken "data"
              -> LocatedN RdrName
-             -> P ImpExpQcSpec
+             -> P p ImpExpQcSpec
 mkDataImpExp tok name = do
   let ns_kw = ExplicitDataNamespace tok
   requireExplicitNamespaces ns_kw
@@ -3351,7 +3355,7 @@ mkDataImpExp tok name = do
 mkTypeWcImpExp :: SrcSpan
                -> EpToken "type"
                -> EpToken ".."
-               -> P (LocatedA ImpExpQcSpec)
+               -> P p (LocatedA ImpExpQcSpec)
 mkTypeWcImpExp loc tk_ns tk_wc = do
   let ns_kw = ExplicitTypeNamespace tk_ns
   requireExplicitNamespaces ns_kw
@@ -3361,7 +3365,7 @@ mkTypeWcImpExp loc tk_ns tk_wc = do
 mkDataWcImpExp :: SrcSpan
                -> EpToken "data"
                -> EpToken ".."
-               -> P (LocatedA ImpExpQcSpec)
+               -> P p (LocatedA ImpExpQcSpec)
 mkDataWcImpExp loc tk_ns tk_wc = do
   let ns_kw = ExplicitDataNamespace tk_ns
   requireExplicitNamespaces ns_kw
@@ -3383,7 +3387,7 @@ mkWholeTypeWcImpExp :: SrcSpan
                     -> Maybe (LWarningTxt GhcPs)
                     -> EpToken "type"
                     -> EpToken ".."
-                    -> P (LIE GhcPs)
+                    -> P p (LIE GhcPs)
 mkWholeTypeWcImpExp loc warning tk_ns tk_wc = do
   requireExplicitNamespaces (ExplicitTypeNamespace tk_ns)
   let ie_spec = mkIEWholeNamespacePs warning (TypeNamespaceSpecifier tk_ns) tk_wc
@@ -3401,13 +3405,13 @@ mkWholeDataWcImpExp loc warning tk_ns tk_wc = do
 
 mkPlainWcImpExp :: Maybe (LWarningTxt GhcPs)
                 -> EpToken ".."
-                -> P (LIE GhcPs)
+                -> P p (LIE GhcPs)
 mkPlainWcImpExp warning tk_wc = do
   let ie_spec = mkIEWholeNamespacePs warning NoNamespaceSpecifier tk_wc
   return (L (l2l tk_wc) ie_spec)
 
 -- In the correct order
-mkImpExpSubSpec :: [LocatedA ImpExpQcSpec] -> P ImpExpSubSpec
+mkImpExpSubSpec :: [LocatedA ImpExpQcSpec] -> P p ImpExpSubSpec
 mkImpExpSubSpec [] = return (ImpExpList [])
 mkImpExpSubSpec [L _ (ImpExpQcWildcard m_kw td _tc)] =
   return (ImpExpAll m_kw td)
@@ -3423,19 +3427,19 @@ isImpExpQcWildcard _                  = False
 -----------------------------------------------------------------------------
 -- Warnings and failures
 
-warnPrepositiveQualifiedModule :: SrcSpan -> P ()
+warnPrepositiveQualifiedModule :: SrcSpan -> P p ()
 warnPrepositiveQualifiedModule span =
   addPsMessage span PsWarnImportPreQualified
 
-failNotEnabledImportQualifiedPost :: SrcSpan -> P ()
+failNotEnabledImportQualifiedPost :: SrcSpan -> P p ()
 failNotEnabledImportQualifiedPost loc =
   addError $ mkPlainErrorMsgEnvelope loc $ PsErrImportPostQualified
 
-failImportQualifiedTwice :: SrcSpan -> P ()
+failImportQualifiedTwice :: SrcSpan -> P p ()
 failImportQualifiedTwice loc =
   addError $ mkPlainErrorMsgEnvelope loc $ PsErrImportQualifiedTwice
 
-failSpliceOrQuoteTwice :: EpAnnLevel -> P ()
+failSpliceOrQuoteTwice :: EpAnnLevel -> P p ()
 failSpliceOrQuoteTwice lvl =
   addError $ mkPlainErrorMsgEnvelope loc $ PsErrSpliceOrQuoteTwice
   where
@@ -3443,7 +3447,7 @@ failSpliceOrQuoteTwice lvl =
       EpAnnLevelSplice tok -> getEpTokenSrcSpan tok
       EpAnnLevelQuote tok -> getEpTokenSrcSpan tok
 
-warnStarIsType :: SrcSpan -> P ()
+warnStarIsType :: SrcSpan -> P p ()
 warnStarIsType span = addPsMessage span PsWarnStarIsType
 
 failOpFewArgs :: MonadP m => LocatedN RdrName -> m a
@@ -3529,13 +3533,13 @@ instance Monad PV where
       PV_Ok acc' a -> unPV (f a) ctx acc'
       PV_Failed acc' -> PV_Failed acc'
 
-runPV :: PV a -> P a
+runPV :: PV a -> P p a
 runPV = runPV_details noParseContext
 
 askParseContext :: PV ParseContext
 askParseContext = PV $ \(PV_Context _ details) acc -> PV_Ok acc details
 
-runPV_details :: ParseContext -> PV a -> P a
+runPV_details :: ParseContext -> PV a -> P p a
 runPV_details details m =
   P $ \s ->
     let
@@ -3764,12 +3768,12 @@ mkRdrProjUpdate loc (L l flds) arg isPun anns =
 -----------------------------------------------------------------------------
 -- Tuple and list punning
 
-punsAllowed :: P Bool
+punsAllowed :: P p Bool
 punsAllowed = getBit ListTuplePunsBit
 
 -- | Check whether @ListTuplePuns@ is enabled and return the first arg if it is,
 -- the second arg otherwise.
-punsIfElse :: a -> a -> P a
+punsIfElse :: a -> a -> P p a
 punsIfElse enabled disabled = do
   allowed <- punsAllowed
   pure (if allowed then enabled else disabled)
@@ -3778,7 +3782,7 @@ punsIfElse enabled disabled = do
 -- @end@ if the extension @ListTuplePuns@ is disabled.
 --
 -- This is used in Parser.y to guard rules that require punning.
-requireLTPuns :: PsErrPunDetails -> Located a -> Located b -> P ()
+requireLTPuns :: PsErrPunDetails -> Located a -> Located b -> P p ()
 requireLTPuns err start end =
   unlessM punsAllowed $ do
     addError (mkPlainErrorMsgEnvelope loc (PsErrInvalidPun err))
@@ -3791,8 +3795,8 @@ withCombinedComments ::
   HasLoc l2 =>
   l1 ->
   l2 ->
-  (SrcSpan -> P a) ->
-  P (LocatedA a)
+  (SrcSpan -> P p a) ->
+  P p (LocatedA a)
 withCombinedComments start end use = do
   cs <- getCommentsFor fullSpan
   a <- use fullSpan
@@ -3807,7 +3811,7 @@ withCombinedComments start end use = do
 mkTupleSyntaxTy :: EpToken "("
                 -> [LocatedA (HsType GhcPs)]
                 -> EpToken ")"
-                -> P (HsType GhcPs)
+                -> P p (HsType GhcPs)
 mkTupleSyntaxTy parOpen args parClose =
   punsIfElse enabled disabled
   where
@@ -3823,7 +3827,7 @@ mkTupleSyntaxTy parOpen args parClose =
 -- type or data constructor, based on the extension @ListTuplePuns@.
 -- The case with an explicit promotion quote, @'(,)@, is handled
 -- by the rule @SIMPLEQUOTE sysdcon_nolist@ in @atype@.
-mkTupleSyntaxTycon :: Boxity -> Int -> P RdrName
+mkTupleSyntaxTycon :: Boxity -> Int -> P p RdrName
 mkTupleSyntaxTycon boxity n =
   punsIfElse
     (getRdrName (tupleTyCon boxity n))
@@ -3836,7 +3840,7 @@ mkTupleSyntaxTycon boxity n =
 mkListSyntaxTy0 :: EpToken "["
                 -> EpToken "]"
                 -> SrcSpan
-                -> P (HsType GhcPs)
+                -> P p (HsType GhcPs)
 mkListSyntaxTy0 brkOpen brkClose span =
   punsIfElse enabled disabled
   where
@@ -3859,7 +3863,7 @@ mkListSyntaxTy0 brkOpen brkClose span =
 mkListSyntaxTy1 :: EpToken "["
                 -> LocatedA (HsType GhcPs)
                 -> EpToken "]"
-                -> P (HsType GhcPs)
+                -> P p (HsType GhcPs)
 mkListSyntaxTy1 brkOpen t brkClose =
   punsIfElse enabled disabled
   where

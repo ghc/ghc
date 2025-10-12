@@ -521,6 +521,9 @@ data PsMessage
    | PsWarnPatternNamespaceSpecifier
       !Bool -- ^ Is ExplicitNamespaces on?
 
+   -- | An error originating from processing a GHC_CPP directive
+   | PsErrGhcCpp !SDoc -- AZ:TODO: consider finer granularity
+
    deriving Generic
 
 -- | A position in an import/export list in which we do not support an explicit namespace keyword.

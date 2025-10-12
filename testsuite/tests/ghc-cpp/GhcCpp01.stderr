@@ -1,0 +1,288 @@
+
+==================== After GHC_CPP ====================
+
+------------------------------
+
+
+#define AA 
+
+#define CH_MIN_VERSION_Cabal MIN_VERSION_Cabal
+
+
+#define MIN_VERSION_Cabal(a,b,c) 1
+
+#define MIN_VERSION_Cabal_syntax(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 16 || ( major1 ) == 3 && ( major2 ) == 16 && ( minor ) <= 0 )
+
+#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) ( ( ( ma ) * 100 + ( mi ) ) < 915 || ( ( ma ) * 100 + ( mi ) ) == 915 && ( pl1 ) < 20250915 || ( ( ma ) * 100 + ( mi ) ) == 915 && ( pl1 ) == 20250915 && ( pl2 ) <= 0 )
+
+#define MIN_VERSION_array(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 5 || ( major1 ) == 0 && ( major2 ) == 5 && ( minor ) <= 8 )
+
+#define MIN_VERSION_base(major1,major2,minor) ( ( major1 ) < 4 || ( major1 ) == 4 && ( major2 ) < 22 || ( major1 ) == 4 && ( major2 ) == 22 && ( minor ) <= 0 )
+
+#define MIN_VERSION_binary(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 8 || ( major1 ) == 0 && ( major2 ) == 8 && ( minor ) <= 9 )
+
+#define MIN_VERSION_bytestring(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 12 || ( major1 ) == 0 && ( major2 ) == 12 && ( minor ) <= 2 )
+
+#define MIN_VERSION_containers(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 8 || ( major1 ) == 0 && ( major2 ) == 8 && ( minor ) <= 0 )
+
+#define MIN_VERSION_deepseq(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 5 || ( major1 ) == 1 && ( major2 ) == 5 && ( minor ) <= 1 )
+
+#define MIN_VERSION_directory(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 3 || ( major1 ) == 1 && ( major2 ) == 3 && ( minor ) <= 10 )
+
+#define MIN_VERSION_exceptions(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 10 || ( major1 ) == 0 && ( major2 ) == 10 && ( minor ) <= 9 )
+
+#define MIN_VERSION_file_io(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 1 || ( major1 ) == 0 && ( major2 ) == 1 && ( minor ) <= 5 )
+
+#define MIN_VERSION_filepath(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 5 || ( major1 ) == 1 && ( major2 ) == 5 && ( minor ) <= 4 )
+
+#define MIN_VERSION_ghc_bignum(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 4 || ( major1 ) == 1 && ( major2 ) == 4 && ( minor ) <= 0 )
+
+#define MIN_VERSION_ghc_boot(major1,major2,minor) ( ( major1 ) < 9 || ( major1 ) == 9 && ( major2 ) < 15 || ( major1 ) == 9 && ( major2 ) == 15 && ( minor ) <= 0 )
+
+#define MIN_VERSION_ghc_boot_th(major1,major2,minor) ( ( major1 ) < 9 || ( major1 ) == 9 && ( major2 ) < 15 || ( major1 ) == 9 && ( major2 ) == 15 && ( minor ) <= 0 )
+
+#define MIN_VERSION_ghc_compact(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 1 || ( major1 ) == 0 && ( major2 ) == 1 && ( minor ) <= 0 )
+
+#define MIN_VERSION_ghc_experimental(major1,major2,minor) ( ( major1 ) < 9 || ( major1 ) == 9 && ( major2 ) < 1500 || ( major1 ) == 9 && ( major2 ) == 1500 && ( minor ) <= 0 )
+
+#define MIN_VERSION_ghc_heap(major1,major2,minor) ( ( major1 ) < 9 || ( major1 ) == 9 && ( major2 ) < 15 || ( major1 ) == 9 && ( major2 ) == 15 && ( minor ) <= 0 )
+
+#define MIN_VERSION_ghc_internal(major1,major2,minor) ( ( major1 ) < 9 || ( major1 ) == 9 && ( major2 ) < 1500 || ( major1 ) == 9 && ( major2 ) == 1500 && ( minor ) <= 0 )
+
+#define MIN_VERSION_ghc_platform(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 1 || ( major1 ) == 0 && ( major2 ) == 1 && ( minor ) <= 0 )
+
+#define MIN_VERSION_ghc_prim(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 13 || ( major1 ) == 0 && ( major2 ) == 13 && ( minor ) <= 1 )
+
+#define MIN_VERSION_ghc_toolchain(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 1 || ( major1 ) == 0 && ( major2 ) == 1 && ( minor ) <= 0 )
+
+#define MIN_VERSION_ghci(major1,major2,minor) ( ( major1 ) < 9 || ( major1 ) == 9 && ( major2 ) < 15 || ( major1 ) == 9 && ( major2 ) == 15 && ( minor ) <= 0 )
+
+#define MIN_VERSION_haddock_api(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 30 || ( major1 ) == 2 && ( major2 ) == 30 && ( minor ) <= 0 )
+
+#define MIN_VERSION_haddock_library(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 11 || ( major1 ) == 1 && ( major2 ) == 11 && ( minor ) <= 0 )
+
+#define MIN_VERSION_haskeline(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 8 || ( major1 ) == 0 && ( major2 ) == 8 && ( minor ) <= 3 )
+
+#define MIN_VERSION_hpc(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 7 || ( major1 ) == 0 && ( major2 ) == 7 && ( minor ) <= 0 )
+
+#define MIN_VERSION_integer_gmp(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 1 || ( major1 ) == 1 && ( major2 ) == 1 && ( minor ) <= 0 )
+
+#define MIN_VERSION_mtl(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 3 || ( major1 ) == 2 && ( major2 ) == 3 && ( minor ) <= 1 )
+
+#define MIN_VERSION_os_string(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 0 || ( major1 ) == 2 && ( major2 ) == 0 && ( minor ) <= 7 )
+
+#define MIN_VERSION_parsec(major1,major2,minor) ( ( major1 ) < 3 || ( major1 ) == 3 && ( major2 ) < 1 || ( major1 ) == 3 && ( major2 ) == 1 && ( minor ) <= 18 )
+
+#define MIN_VERSION_pretty(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 1 || ( major1 ) == 1 && ( major2 ) == 1 && ( minor ) <= 3 )
+
+#define MIN_VERSION_process(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 6 || ( major1 ) == 1 && ( major2 ) == 6 && ( minor ) <= 26 )
+
+#define MIN_VERSION_rts(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 0 || ( major1 ) == 1 && ( major2 ) == 0 && ( minor ) <= 3 )
+
+#define MIN_VERSION_semaphore_compat(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 0 || ( major1 ) == 1 && ( major2 ) == 0 && ( minor ) <= 0 )
+
+#define MIN_VERSION_stm(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 5 || ( major1 ) == 2 && ( major2 ) == 5 && ( minor ) <= 3 )
+
+#define MIN_VERSION_system_cxx_std_lib(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 0 || ( major1 ) == 1 && ( major2 ) == 0 && ( minor ) <= 0 )
+
+#define MIN_VERSION_template_haskell(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 24 || ( major1 ) == 2 && ( major2 ) == 24 && ( minor ) <= 0 )
+
+#define MIN_VERSION_terminfo(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 4 || ( major1 ) == 0 && ( major2 ) == 4 && ( minor ) <= 1 )
+
+#define MIN_VERSION_text(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 1 || ( major1 ) == 2 && ( major2 ) == 1 && ( minor ) <= 3 )
+
+#define MIN_VERSION_time(major1,major2,minor) ( ( major1 ) < 1 || ( major1 ) == 1 && ( major2 ) < 15 || ( major1 ) == 1 && ( major2 ) == 15 && ( minor ) <= 0 )
+
+#define MIN_VERSION_transformers(major1,major2,minor) ( ( major1 ) < 0 || ( major1 ) == 0 && ( major2 ) < 6 || ( major1 ) == 0 && ( major2 ) == 6 && ( minor ) <= 1 )
+
+#define MIN_VERSION_unix(major1,major2,minor) ( ( major1 ) < 2 || ( major1 ) == 2 && ( major2 ) < 8 || ( major1 ) == 2 && ( major2 ) == 8 && ( minor ) <= 7 )
+
+#define MIN_VERSION_xhtml(major1,major2,minor) ( ( major1 ) < 3000 || ( major1 ) == 3000 && ( major2 ) < 2 || ( major1 ) == 3000 && ( major2 ) == 2 && ( minor ) <= 2 )
+
+#define VERSION_Cabal 3.16.0.0
+
+#define VERSION_Cabal_syntax 3.16.0.0
+
+#define VERSION_array 0.5.8.0
+
+#define VERSION_base 4.22.0.0
+
+#define VERSION_binary 0.8.9.3
+
+#define VERSION_bytestring 0.12.2.0
+
+#define VERSION_containers 0.8
+
+#define VERSION_deepseq 1.5.1.0
+
+#define VERSION_directory 1.3.10.0
+
+#define VERSION_exceptions 0.10.9
+
+#define VERSION_file_io 0.1.5
+
+#define VERSION_filepath 1.5.4.0
+
+#define VERSION_ghc_bignum 1.4
+
+#define VERSION_ghc_boot 9.15
+
+#define VERSION_ghc_boot_th 9.15
+
+#define VERSION_ghc_compact 0.1.0.0
+
+#define VERSION_ghc_experimental 9.1500.0
+
+#define VERSION_ghc_heap 9.15
+
+#define VERSION_ghc_internal 9.1500.0
+
+#define VERSION_ghc_platform 0.1.0.0
+
+#define VERSION_ghc_prim 0.13.1
+
+#define VERSION_ghc_toolchain 0.1.0.0
+
+#define VERSION_ghci 9.15
+
+#define VERSION_haddock_api 2.30.0
+
+#define VERSION_haddock_library 1.11.0
+
+#define VERSION_haskeline 0.8.3.0
+
+#define VERSION_hpc 0.7.0.2
+
+#define VERSION_integer_gmp 1.1
+
+#define VERSION_mtl 2.3.1
+
+#define VERSION_os_string 2.0.7
+
+#define VERSION_parsec 3.1.18.0
+
+#define VERSION_pretty 1.1.3.6
+
+#define VERSION_process 1.6.26.1
+
+#define VERSION_rts 1.0.3
+
+#define VERSION_semaphore_compat 1.0.0
+
+#define VERSION_stm 2.5.3.1
+
+#define VERSION_system_cxx_std_lib 1.0
+
+#define VERSION_template_haskell 2.24.0.0
+
+#define VERSION_terminfo 0.4.1.7
+
+#define VERSION_text 2.1.3
+
+#define VERSION_time 1.15
+
+#define VERSION_transformers 0.6.1.2
+
+#define VERSION_unix 2.8.7.0
+
+#define VERSION_xhtml 3000.2.2.1
+
+
+#define __GLASGOW_HASKELL_FULL_VERSION__ 9.15.20250915
+
+#define __GLASGOW_HASKELL_PATCHLEVEL1__ 20250915
+
+#define __GLASGOW_HASKELL_PATCHLEVEL2__ 0
+
+#define __GLASGOW_HASKELL__ 915
+------------------------------
+
+- |{-# LANGUAGE GHC_CPP #-}
+- |{-# OPTIONS -ddump-ghc-cpp -dkeep-comments #-}
+  |module GhcCpp01 where
+
+- |-- Check leading whitespace on a directive
+- |#     define FOO(A,B) A + B
+- |#define FOO(A,B,C) A + B + C
+- |#if FOO(1,FOO(3,4)) == 8
+
+- |-- a comment
+  |x = 1
+- |#else
+- |x = 5
+- |#endif
+
+- |#if defined(BAR) || defined FOO
+  |y = 1
+- |#endif
+
+- |#undef FOO
+- |#ifdef FOO /* Check for FOO */
+- |complete junk!
+- |#endif
+
+- |-- nested undef
+- |#define AA
+- |#if /* hard code for now */ 0
+- |#undef AA
+- |#endif
+
+- |#ifdef AA
+  |aa = 1
+- |#endif
+
+- |-- undef and rewrite base name only
+- |#define MIN_VERSION_Cabal(a,b,c) 1
+
+- |#ifdef MIN_VERSION_Cabal
+- |#undef CH_MIN_VERSION_Cabal
+- |#define CH_MIN_VERSION_Cabal MIN_VERSION_Cabal
+- |#endif
+
+- |#if CH_MIN_VERSION_Cabal(1,22,0)
+  |z = 1
+- |#endif
+
+- |{-
+/* multi-line
+   cpp-style comment */
+{- Haskell comment
+   /* ignores cpp comments, so unclosed is fine -}
+-}
+
+- |-- CPP directives in pragmas -----------------
+
+- |-- No directive
+  |{-# RULES
+  |"foldg/Empty"   forall e v o c. foldg e v o c Empty = e
+  |#-}
+  |foldg = undefined
+  |data Empty = Empty
+
+- |-- With directive
+  |{-# RULES
+  |"Lazy Bitstream streamChunks/unstreamChunks fusion"
+  |    forall s. streamChunks s = s
+- |#if 0
+- |"Lazy Bitstream unstreamChunks/streamChunks fusion"
+- |    forall v. unId (unstreamChunks (streamChunks v)) = v
+- |#endif
+  |#-}
+  |unstreamChunks = undefined
+  |streamChunks = undefined
+  |
+------------------------------
+
+
+
+GhcCpp01.hs:58:1: warning: [GHC-95396] [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "foldg/Empty" may never fire
+      because ‘foldg’ might inline first
+    Suggested fix: Add an INLINE[n] or NOINLINE[n] pragma for ‘foldg’
+
+GhcCpp01.hs:65:1: warning: [GHC-95396] [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "Lazy Bitstream streamChunks/unstreamChunks fusion" may never fire
+      because ‘streamChunks’ might inline first
+    Suggested fix:
+      Add an INLINE[n] or NOINLINE[n] pragma for ‘streamChunks’
+

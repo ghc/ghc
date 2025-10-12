@@ -274,6 +274,7 @@ import GHC.Core.Opt.CallerCC
 import GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer (mkParserOpts, initParserState, P(..), ParseResult(..))
 import GHC.Stg.Debug.Types
+import GHC.Parser.PreProcess (initPpState)
 
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
@@ -1055,6 +1056,7 @@ dynamic_flags_deps = [
     make_dep_flag defFlag "n" (NoArg $ return ())
         "The -n flag is deprecated and no longer has any effect"
   , make_ord_flag defFlag "cpp"      (NoArg (setExtensionFlag LangExt.Cpp))
+  , make_ord_flag defFlag "ghc-cpp"  (NoArg (setExtensionFlag LangExt.GhcCpp))
   , make_ord_flag defFlag "F"        (NoArg (setGeneralFlag Opt_Pp))
   , (Deprecated, defFlag "#include"
       (HasArg (\_s ->
@@ -1512,6 +1514,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_parsed)
   , make_ord_flag defGhcFlag "ddump-parsed-ast"
         (setDumpFlag Opt_D_dump_parsed_ast)
+  , make_ord_flag defGhcFlag "ddump-ghc-cpp"
+        (setDumpFlag Opt_D_dump_ghc_cpp)
   , make_ord_flag defGhcFlag "dkeep-comments"
         (NoArg (setGeneralFlag Opt_KeepRawTokenStream))
   , make_ord_flag defGhcFlag "ddump-rn"
@@ -3272,7 +3276,7 @@ setMainIs arg = parse parse_main_f arg
       POk _ (L _ re) -> callback re
 
     -- dummy parser state.
-    p_state str = initParserState
+    p_state str = initParserState initPpState
               (mkParserOpts mempty emptyDiagOpts False False False True)
               (stringToStringBuffer str)
               (mkRealSrcLoc (mkFastString []) 1 1)
@@ -3842,6 +3846,10 @@ makeDynFlagsConsistent dflags
                      $ concatMap (wayUnsetGeneralFlags platform)
                                  hostFullWays
         in dflags_c
+
+ | xopt LangExt.Cpp dflags && xopt LangExt.GhcCpp dflags
+    = loop (xopt_unset dflags LangExt.Cpp)
+         "Disabling CPP, because GHC_CPP is also enabled"
 
  | otherwise = (dflags, mempty, mempty)
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")

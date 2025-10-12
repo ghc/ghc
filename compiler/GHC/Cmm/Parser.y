@@ -1622,7 +1622,7 @@ parseCmmFile cmmpConfig this_mod home_unit filename = do
   buf <- hGetStringBuffer filename
   let
         init_loc = mkRealSrcLoc (mkFastString filename) 1 1
-        init_state = (initParserState (cmmpParserOpts cmmpConfig) buf init_loc) { lex_state = [0] }
+        init_state = (initParserState () (cmmpParserOpts cmmpConfig) buf init_loc) { lex_state = [0] }
                 -- reset the lex_state: the Lexer monad leaves some stuff
                 -- in there we don't want.
         pdConfig = cmmpPDConfig cmmpConfig

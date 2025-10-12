@@ -35,7 +35,7 @@ import GHC.Driver.Errors.Types
 
 import GHC.Parser
 import GHC.Parser.Header
-import GHC.Parser.Lexer
+import GHC.Parser.Lexer hiding (initParserState)
 import GHC.Parser.Annotation
 
 import GHC.Rename.Names
@@ -97,12 +97,14 @@ doBackpack :: [FilePath] -> Ghc ()
 doBackpack [src_filename] = do
     -- Apply options from file to dflags
     dflags0 <- getDynFlags
+    hsc_env <- getSession
     let dflags1 = dflags0
     let parser_opts1 = initParserOpts dflags1
     logger0 <- getLogger
     let sec0 = initSourceErrorContext dflags0
 
-    (p_warns, src_opts) <- liftIO $ getOptionsFromFile parser_opts1 sec0 (supportedLanguagePragmas dflags1) src_filename
+    let unit_env = hsc_unit_env hsc_env
+    (p_warns, src_opts) <- liftIO $ getOptionsFromFile dflags0 unit_env parser_opts1 sec0 (supportedLanguagePragmas dflags1) src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma logger0 dflags1 src_opts
     modifySession (hscSetFlags dflags)
     logger <- getLogger -- Get the logger after having set the session flags,
@@ -118,7 +120,11 @@ doBackpack [src_filename] = do
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
         sec = initSourceErrorContext dflags
-    case unP parseBackpack (initParserState (initParserOpts dflags) buf loc) of
+    hsc <- getSession
+    let unit_env = hsc_unit_env hsc
+    let p_state = (initParserStateWithMacros dflags (Just unit_env) (initParserOpts dflags) buf loc)
+
+    case unP parseBackpack p_state of
         PFailed pst -> throwErrors sec (GhcPsMessage <$> getPsErrorMessages pst)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an

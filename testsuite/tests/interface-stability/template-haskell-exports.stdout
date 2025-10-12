@@ -133,6 +133,7 @@ module Language.Haskell.TH where
   type Extension :: *
   data Extension
     = Cpp
+    | GhcCpp
     | OverlappingInstances
     | UndecidableInstances
     | IncoherentInstances
@@ -742,6 +743,7 @@ module Language.Haskell.TH.LanguageExtensions where
   type Extension :: *
   data Extension
     = Cpp
+    | GhcCpp
     | OverlappingInstances
     | UndecidableInstances
     | IncoherentInstances
@@ -1485,6 +1487,7 @@ module Language.Haskell.TH.Syntax where
   type Extension :: *
   data Extension
     = Cpp
+    | GhcCpp
     | OverlappingInstances
     | UndecidableInstances
     | IncoherentInstances

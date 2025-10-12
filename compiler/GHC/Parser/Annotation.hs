@@ -316,6 +316,8 @@ data EpaCommentTok =
   | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
   | EpaLineComment     String     -- ^ comment starting by "--"
   | EpaBlockComment    String     -- ^ comment in {- -}
+  | EpaCpp             String     -- ^ GHC_CPP token
+  | EpaCppIgnored      String     -- ^ Token ignored by the GHC preprocessor
     deriving (Eq, Data, Show)
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in GHC.Parser.Lexer and bringing it in here would create a loop

@@ -149,6 +149,13 @@ parser and interface file reader.
 
     Include comments in the parser.  Useful in combination with :ghc-flag:`-ddump-parsed-ast`.
 
+.. ghc-flag:: -ddump-ghc-cpp
+    :shortdesc: Dump GHC_CPP output
+    :type: dynamic
+
+    Dump a representation of the output of the preprocessor when using the GHC_CPP option
+    Dump parser output as a syntax tree
+
 
 .. ghc-flag:: -ddump-if-trace
     :shortdesc: Trace interface files

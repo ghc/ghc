@@ -14,9 +14,14 @@ module GHC.Parser.Header
    ( getImports
    , mkPrelImports -- used by the renamer too
    , getOptionsFromFile
+   , lazyGetToks, getOptions'
    , getOptions
    , toArgs
    , checkProcessArgsResult
+   -- TODO: This is here to break an import loop. Is this the right place?
+   , initParserStateWithMacros
+   , initPragStateWithMacros
+   , initParserStateWithMacrosString
    )
 where
 
@@ -29,7 +34,10 @@ import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw e
 
 import GHC.Parser.Errors.Types
 import GHC.Parser           ( parseHeader )
-import GHC.Parser.Lexer
+import GHC.Parser.Lexer hiding (initPragState, initParserState, lexer)
+import GHC.Parser.Lexer qualified as Lexer
+import GHC.Parser.PreProcess   (initPragState, lexer)
+import GHC.Parser.PreProcess.State (PpState (..), initPpState, PpScope (..), PpGroupState (PpNoGroup))
 
 import GHC.Hs
 import GHC.Builtin.Names
@@ -47,6 +55,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Error
 import GHC.Utils.Exception as Exception
 
+import qualified Data.List.NonEmpty as NE
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -60,13 +69,21 @@ import Data.Char (isSpace)
 import Text.ParserCombinators.ReadP (readP_to_S, gather)
 import Text.ParserCombinators.ReadPrec (readPrec_to_P)
 import Text.Read (readPrec)
+import GHC.Driver.Session (DynFlags)
+import GHC.Driver.Config.Parser (predefinedMacros)
+import GHC.Unit.Env (UnitEnv)
+import GHC.SysTools.Cpp (cppMacroDefines)
+import qualified GHC.LanguageExtensions.Type as LangExt
+import GHC.Driver.DynFlags (xopt)
 
 ------------------------------------------------------------------------------
 
 -- | Parse the imports of a source file.
 --
 -- Throws a 'SourceError' if parsing fails.
-getImports :: ParserOpts   -- ^ Parser options
+getImports :: DynFlags
+           -> Maybe UnitEnv
+           -> ParserOpts   -- ^ Parser options
            -> SourceErrorContext
            -> Bool         -- ^ Implicit Prelude?
            -> StringBuffer -- ^ Parse this.
@@ -81,9 +98,9 @@ getImports :: ParserOpts   -- ^ Parser options
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
-getImports popts sec implicit_prelude buf filename source_filename = do
+getImports dflags unit_env popts sec implicit_prelude buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
-  case unP parseHeader (initParserState popts buf loc) of
+  case unP parseHeader (initParserStateWithMacros dflags unit_env popts buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
       return $ Left $ getPsErrorMessages pst
@@ -110,7 +127,37 @@ getImports popts sec implicit_prelude buf filename source_filename = do
                      , map convImport (generated_imports ++ ord_idecls)
                      , reLoc mod)
 
+initParserStateWithMacros
+  :: DynFlags -> Maybe UnitEnv -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initParserStateWithMacros df unit_env opts buf pos
+  = initParserStateWithMacrosString df (fmap cppMacroDefines unit_env) opts buf pos
 
+initParserStateWithMacrosString
+  :: DynFlags -> Maybe String -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initParserStateWithMacrosString df Nothing opts buf pos
+  = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
+                                       , pp_scope = (PpScope True PpNoGroup) NE.:| [] })
+                          opts buf pos
+initParserStateWithMacrosString df (Just macro_defs) opts buf pos = p_state
+  where
+    p_state0 = Lexer.initParserState (initPpState { pp_defines = predefinedMacros df
+                                                  , pp_scope = (PpScope True PpNoGroup) NE.:| [] })
+                                     opts (stringToStringBuffer macro_defs) pos
+    p_state =
+      if xopt LangExt.GhcCpp df
+        then case unP parseHeader p_state0 of
+               PFailed _ -> p_state0 { buffer = buf }
+               POk st _ -> p_state0 { buffer = buf
+                                    , pp = (pp p_state0) { pp_defines = pp_defines (pp st)}}
+        else p_state0 { buffer = buf }
+
+initPragStateWithMacros
+  :: DynFlags -> UnitEnv -> ParserOpts -> StringBuffer -> RealSrcLoc -> PState PpState
+initPragStateWithMacros df unit_env opts buf pos = prag_state
+  where
+    p_state = initParserStateWithMacros df (Just unit_env) opts buf pos
+    prag_state0 = initPragState opts buf pos
+    prag_state = prag_state0 { pp = (pp p_state) { pp_defines = pp_defines (pp p_state) } }
 
 mkPrelImports :: ModuleName
               -> Bool -> [LImportDecl GhcPs]
@@ -166,18 +213,21 @@ mkPrelImports this_mod implicit_prelude import_decls
 -- | Parse OPTIONS and LANGUAGE pragmas of the source file.
 --
 -- Throws a 'SourceError' if flag parsing fails (including unsupported flags.)
-getOptionsFromFile :: ParserOpts
+getOptionsFromFile :: DynFlags
+                   -> UnitEnv
+                   -> ParserOpts
                    -> SourceErrorContext
                    -> [String] -- ^ Supported LANGUAGE pragmas
-                   -> FilePath            -- ^ Input file
+                   -> FilePath -- ^ Input file
                    -> IO (Messages PsMessage, [Located String]) -- ^ Parsed options, if any.
-getOptionsFromFile opts sec supported filename
+getOptionsFromFile df unit_env popts sec supported filename
     = Exception.bracket
               (openBinaryFile filename ReadMode)
               (hClose)
               (\handle -> do
-                  (warns, opts) <- fmap (getOptions' opts sec supported)
-                               (lazyGetToks opts' filename handle)
+                  (warns, opts) <- fmap (getOptions' popts sec supported)
+                               (getPragState df unit_env popts' filename handle
+                               >>= \prag_state -> lazyGetToks prag_state handle)
                   seqList opts
                     $ seqList (bagToList $ getMessages warns)
                     $ return (warns, opts))
@@ -189,21 +239,26 @@ getOptionsFromFile opts sec supported filename
           -- we already have an apparently-complete token.
           -- We therefore just turn Opt_Haddock off when doing the lazy
           -- lex.
-          opts' = disableHaddock opts
+          popts' = disableHaddock popts
 
 blockSize :: Int
 -- blockSize = 17 -- for testing :-)
 blockSize = 1024
 
-lazyGetToks :: ParserOpts -> FilePath -> Handle -> IO [Located Token]
-lazyGetToks popts filename handle = do
+getPragState :: DynFlags -> UnitEnv -> ParserOpts -> FilePath -> Handle -> IO (PState PpState)
+getPragState df unit_env popts filename handle = do
   buf <- hGetStringBufferBlock handle blockSize
-  let prag_state = initPragState popts buf loc
+  let loc  = mkRealSrcLoc (mkFastString filename) 1 1
+  let prag_state = if Lexer.ghcCppEnabled popts
+        then initPragStateWithMacros df unit_env popts buf loc
+        else initPragState popts buf loc
+  return prag_state
+
+lazyGetToks :: PState PpState -> Handle -> IO [Located Token]
+lazyGetToks prag_state handle = do
   unsafeInterleaveIO $ lazyLexBuf handle prag_state False blockSize
  where
-  loc  = mkRealSrcLoc (mkFastString filename) 1 1
-
-  lazyLexBuf :: Handle -> PState -> Bool -> Int -> IO [Located Token]
+  lazyLexBuf :: Handle -> PState PpState -> Bool -> Int -> IO [Located Token]
   lazyLexBuf handle state eof size =
     case unP (lexer False return) state of
       POk state' t -> do
@@ -221,7 +276,7 @@ lazyGetToks popts filename handle = do
         | otherwise -> return [L (mkSrcSpanPs (last_loc state)) ITeof]
                          -- parser assumes an ITeof sentinel at the end
 
-  getMore :: Handle -> PState -> Int -> IO [Located Token]
+  getMore :: Handle -> PState PpState -> Int -> IO [Located Token]
   getMore handle state size = do
      -- pprTrace "getMore" (text (show (buffer state))) (return ())
      let new_size = size * 2
@@ -268,49 +323,72 @@ getOptions' :: ParserOpts
             -> [Located Token]      -- Input buffer
             -> (Messages PsMessage,[Located String])     -- Options.
 getOptions' opts sec supported toks
-    = parseToks toks
+    = parseToks False toks
     where
-          parseToks (open:close:xs)
+          ghcpp = ghcCppEnabled opts
+
+          parseToks False (open:close:xs)
               | IToptions_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
               = case toArgs starting_loc str of
                   Left _err -> optionsParseError sec str $   -- #15053
                                  combineSrcSpans (getLoc open) (getLoc close)
-                  Right args -> fmap (args ++) (parseToks xs)
+                  Right args -> fmap (args ++) (parseToks False xs)
             where
               src_span      = getLoc open
               real_src_span = expectJust (srcSpanToRealSrcSpan src_span)
               starting_loc  = realSrcSpanStart real_src_span
-          parseToks (open:close:xs)
+          parseToks False (open:close:xs)
               | ITinclude_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
               = fmap (map (L (getLoc open)) ["-#include",removeSpaces str] ++)
-                     (parseToks xs)
-          parseToks (open:close:xs)
+                     (parseToks False xs)
+          parseToks False (open:close:xs)
               | ITdocOptions str _ <- unLoc open
               , ITclose_prag       <- unLoc close
               = fmap (map (L (getLoc open)) ["-haddock-opts", removeSpaces str] ++)
-                     (parseToks xs)
-          parseToks (open:xs)
+                     (parseToks False xs)
+          parseToks acpp (open:xs)
               | ITlanguage_prag <- unLoc open
-              = parseLanguage xs
-          parseToks (comment:xs) -- Skip over comments
+              = parseLanguage acpp xs
+          parseToks _acpp (tok:xs) -- Skip over comments
+              | isCpp (unLoc tok)
+              = parseToks True xs
+          parseToks acpp (comment:xs) -- Skip over comments
               | isComment (unLoc comment)
-              = parseToks xs
+              = parseToks acpp xs
           -- At the end of the header, warn about all the misplaced pragmas
-          parseToks xs = (unionManyMessages $ mapMaybe mkMessage xs ,[])
+          parseToks _acpp xs = (unionManyMessages $ mapMaybe mkMessage xs ,[])
 
-          parseLanguage ((L loc (ITconid fs)):rest)
+          parseLanguage :: Bool -> [Located Token] -> (Messages PsMessage,[Located String])
+          parseLanguage acpp@False ((L loc (ITconid fs)):rest)
               = fmap (checkExtension sec supported (L loc fs) :) $
-                case rest of
-                  (L _loc ITcomma):more -> parseLanguage more
-                  (L _loc ITclose_prag):more -> parseToks more
+                parseLanguageRest acpp rest
+
+          parseLanguage True ((L loc (ITconid fs)):rest)
+              | "GHC_CPP" == unpackFS fs = fmap ( L loc ("-XGHC_CPP"):) $
+                parseLanguageRest True rest
+              | otherwise =
+                parseLanguageRest True rest
+
+          -- parseLanguage acpp ((L loc (ITconid fs)):rest)
+          --     = fmap (checkExtension sec supported (L loc fs) :) $
+          --       case rest of
+          --         (L _loc ITcomma):more -> parseLanguage acpp more
+          --         (L _loc ITclose_prag):more -> parseToks acpp more
+          --         (L loc _):_ -> languagePragParseError sec loc
+          --         [] -> panic "getOptions'.parseLanguage(1) went past eof token"
+          parseLanguage _acpp (tok:_)
+              = languagePragParseError sec (getLoc tok)
+          parseLanguage _acpp []
+              = panic "getOptions'.parseLanguage(2) went past eof token"
+
+          parseLanguageRest acpp rest
+              = case rest of
+                  (L _loc ITcomma):more -> parseLanguage acpp more
+                  (L _loc ITclose_prag):more -> parseToks acpp more
                   (L loc _):_ -> languagePragParseError sec loc
                   [] -> panic "getOptions'.parseLanguage(1) went past eof token"
-          parseLanguage (tok:_)
-              = languagePragParseError sec (getLoc tok)
-          parseLanguage []
-              = panic "getOptions'.parseLanguage(2) went past eof token"
 
           -- Warn for all the misplaced pragmas
           mkMessage :: Located Token -> Maybe (Messages PsMessage)
@@ -325,6 +403,12 @@ getOptions' opts sec supported toks
             = Just (singleMessage $ mkPlainMsgEnvelope diag_opts loc (PsWarnMisplacedPragma LanguagePrag))
             | otherwise = Nothing
             where diag_opts = pDiagOpts opts
+
+          isCpp :: Token -> Bool
+          isCpp c =
+            case c of
+              (ITcpp {}) -> ghcpp == False
+              _          -> False
 
           isComment :: Token -> Bool
           isComment c =

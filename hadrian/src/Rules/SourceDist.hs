@@ -187,6 +187,8 @@ prepareTree dest = do
         , (stage0InTree , compiler,      "GHC/Parser/Lexer.x", "GHC/Parser/Lexer.hs")
         , (stage0InTree , compiler,      "GHC/Parser/Lexer/String.x", "GHC/Parser/Lexer/String.hs")
         , (stage0InTree , compiler,      "GHC/Parser/HaddockLex.x", "GHC/Parser/HaddockLex.hs")
+        , (stage0InTree , compiler,      "GHC/Parser/PreProcess/Parser.y", "GHC/Parser/PreProcess/Parser.hs")
+        , (stage0InTree , compiler,      "GHC/Parser/PreProcess/Lexer.x",  "GHC/Parser/PreProcess/Lexer.hs")
         , (stage0InTree , hpcBin,        "src/Trace/Hpc/Parser.y", "src/Trace/Hpc/Parser.hs")
         , (stage0InTree , genprimopcode, "Parser.y",           "Parser.hs")
         , (stage0InTree , genprimopcode, "Lexer.x",            "Lexer.hs")

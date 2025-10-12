@@ -365,7 +365,8 @@ import GHC.Runtime.Context
 import GHCi.RemoteTypes
 
 import qualified GHC.Parser as Parser
-import GHC.Parser.Lexer
+import GHC.Parser.Lexer hiding (initParserState)
+import GHC.Parser.PreProcess   (initPpState)
 import GHC.Parser.Annotation
 import GHC.Parser.Utils
 
@@ -1593,7 +1594,7 @@ getTokenStream :: ModSummary -> IO [Located Token]
 getTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
-  case lexTokenStream (initParserOpts dflags) source startLoc of
+  case lexTokenStream initPpState (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
     PFailed pst -> throwErrors (initSourceErrorContext dflags) (GhcPsMessage <$> getPsErrorMessages pst)
 
@@ -1604,7 +1605,7 @@ getRichTokenStream :: ModSummary -> IO [(Located Token, String)]
 getRichTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
-  case lexTokenStream (initParserOpts dflags) source startLoc of
+  case lexTokenStream initPpState (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
     PFailed pst -> throwErrors (initSourceErrorContext dflags) (GhcPsMessage <$> getPsErrorMessages pst)
 
@@ -1853,7 +1854,7 @@ parser str dflags filename =
        loc  = mkRealSrcLoc (mkFastString filename) 1 1
        buf  = stringToStringBuffer str
    in
-   case unP Parser.parseModule (initParserState (initParserOpts dflags) buf loc) of
+   case unP Parser.parseModule (initParserStateWithMacros dflags Nothing (initParserOpts dflags) buf loc) of
 
      PFailed pst ->
          let (warns,errs) = getPsMessages pst in

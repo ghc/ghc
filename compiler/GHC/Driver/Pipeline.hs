@@ -787,7 +787,15 @@ preprocessPipeline pipe_env hsc_env input_fn = do
       use (T_Unlit pipe_env hsc_env input_fn)
 
 
-  (dflags1, p_warns1, warns1) <- use (T_FileArgs hsc_env unlit_fn)
+  (dflags0, p_warns0, warns0) <- use (T_FileArgs hsc_env unlit_fn)
+
+  -- If GhcCpp is set, we do not need to run Cpp, but do need to
+  -- re-run to extract the correct dflags
+  (dflags1, p_warns1, warns1)
+    <- if xopt LangExt.GhcCpp dflags0
+         then use (T_FileArgs (hscSetFlags dflags0 hsc_env) unlit_fn)
+         else return (dflags0, p_warns0, warns0)
+
   let hsc_env1 = hscSetFlags dflags1 hsc_env
 
   (cpp_fn, hsc_env2)

@@ -366,6 +366,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrSpecExprMultipleTypeAscription"           = 62037
   GhcDiagnosticCode "PsWarnSpecMultipleTypeAscription"              = 73026
   GhcDiagnosticCode "PsWarnPatternNamespaceSpecifier"               = 68383
+  GhcDiagnosticCode "PsErrGhcCpp"                                   = 93098
 
   -- Driver diagnostic codes
   GhcDiagnosticCode "DriverMissingHomeModules"                      = 32850

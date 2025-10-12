@@ -661,6 +661,14 @@ Library
         GHC.Parser.HaddockLex
         GHC.Parser.PostProcess
         GHC.Parser.PostProcess.Haddock
+        GHC.Parser.PreProcess
+        GHC.Parser.PreProcess.Eval
+        GHC.Parser.PreProcess.Lexer
+        GHC.Parser.PreProcess.Macro
+        GHC.Parser.PreProcess.ParsePP
+        GHC.Parser.PreProcess.ParserM
+        GHC.Parser.PreProcess.Parser
+        GHC.Parser.PreProcess.State
         GHC.Parser.String
         GHC.Parser.Types
         GHC.Parser.Utils

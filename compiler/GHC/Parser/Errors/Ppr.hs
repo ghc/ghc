@@ -587,6 +587,9 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
           text "The" <+> quotes (text "pattern") <+> "namespace specifier is deprecated."
 
+    PsErrGhcCpp content
+      -> mkSimpleDecorated content
+
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
@@ -712,6 +715,7 @@ instance Diagnostic PsMessage where
     PsErrSpecExprMultipleTypeAscription{}         -> ErrorWithoutFlag
     PsWarnSpecMultipleTypeAscription{}            -> WarningWithFlag Opt_WarnDeprecatedPragmas
     PsWarnPatternNamespaceSpecifier{}             -> WarningWithFlag Opt_WarnPatternNamespaceSpecifier
+    PsErrGhcCpp{}                                 -> ErrorWithoutFlag -- AZ: Is this correct?
 
   diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -893,6 +897,7 @@ instance Diagnostic PsMessage where
           let info = text "and replace" <+> quotes (text "pattern")
                         <+> text "with" <+> quotes (text "data") <> "."
           in [useExtensionInOrderTo info LangExt.ExplicitNamespaces]
+    PsErrGhcCpp{}                                 -> noHints
 
   diagnosticCode = constructorCode @GHC
 

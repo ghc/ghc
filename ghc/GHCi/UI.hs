@@ -81,7 +81,8 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types( stringTyCon_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName, greName, globalRdrEnvElts)
 import GHC.Types.SrcLoc as SrcLoc
-import qualified GHC.Parser.Lexer as Lexer
+import qualified GHC.Parser.Lexer as Lexer hiding (initParserState)
+import qualified GHC.Parser.PreProcess as Lexer  (initParserState)
 import GHC.Parser.Header ( toArgs )
 import qualified GHC.Parser.Header as Header
 import GHC.Types.PkgQual

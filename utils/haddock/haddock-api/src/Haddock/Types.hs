@@ -59,7 +59,7 @@ import GHC.Core.InstEnv (is_dfun_name)
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName (..))
-import GHC.Types.SrcLoc (srcSpanToRealSrcSpan)
+import GHC.Types.SrcLoc (srcSpanToRealSrcSpan, PsSpan(..))
 import GHC.Types.Var (Specificity)
 import GHC.Utils.Outputable
 
@@ -1074,6 +1074,14 @@ instance NFData EpaCommentTok where
   rnf (EpaDocOptions s) = rnf s
   rnf (EpaLineComment s) = rnf s
   rnf (EpaBlockComment s) = rnf s
+  rnf (EpaCppIgnored s) = rnf s
+  rnf (EpaCpp s) = rnf s
+
+instance NFData PsSpan where
+  rnf (PsSpan _l b) = {- l `deepseq` -} b `deepseq` ()
+
+-- instance NFData SrcSpan where
+--   rnf (RealSrcSpan a b) = a `deepseq` b  ()
 
 
 instance NFData DeltaPos where

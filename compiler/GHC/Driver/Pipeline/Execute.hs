@@ -664,7 +664,8 @@ getFileArgs hsc_env input_fn = do
       logger  = hsc_logger hsc_env
       parser_opts = initParserOpts dflags0
       sec = initSourceErrorContext dflags0
-  (warns0, src_opts) <- getOptionsFromFile parser_opts sec (supportedLanguagePragmas dflags0) input_fn
+      unit_env = hsc_unit_env hsc_env
+  (warns0, src_opts) <- getOptionsFromFile dflags0 unit_env parser_opts sec (supportedLanguagePragmas dflags0) input_fn
   (dflags1, unhandled_flags, warns)
     <- parseDynamicFilePragma logger dflags0 src_opts
   checkProcessArgsResult dflags0 unhandled_flags
@@ -715,7 +716,8 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
         rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
         rn_imps = fmap (\(s, rpk, lmn@(L _ mn)) -> (s, rn_pkg_qual mn rpk, lmn))
         sec = initSourceErrorContext dflags
-    eimps <- getImports popts sec imp_prelude buf input_fn (basename <.> suff)
+    let unit_env = Just (hsc_unit_env hsc_env)
+    eimps <- getImports dflags unit_env popts sec imp_prelude buf input_fn (basename <.> suff)
     case eimps of
         Left errs -> throwErrors sec (GhcPsMessage <$> errs)
         Right (src_imps,imps, L _ mod_name) -> return

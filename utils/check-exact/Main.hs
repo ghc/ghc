@@ -39,7 +39,8 @@ _tt :: IO ()
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
-_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
+-- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
+_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/bisect/_build/stage1/lib"
 
  -- "../../testsuite/tests/ghc-api/exactprint/RenameCase1.hs" (Just changeRenameCase1)
  -- "../../testsuite/tests/ghc-api/exactprint/LayoutLet2.hs" (Just changeLayoutLet2)
@@ -218,7 +219,9 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_buil
  -- "../../testsuite/tests/printer/Test22771.hs" Nothing
  -- "../../testsuite/tests/printer/Test23465.hs" Nothing
  -- "../../testsuite/tests/printer/Test25454.hs" Nothing
- "../../testsuite/tests/printer/Test25467.hs" Nothing
+ -- "../../testsuite/tests/printer/Test25467.hs" Nothing
+ -- "../../testsuite/tests/printer/CppCommentPlacement.hs" Nothing
+ "../check-cpp/Example7.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
@@ -364,9 +367,12 @@ ppAst :: Data a => a -> String
 ppAst ast = showSDocUnsafe $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
 
+useGhcCpp :: Bool
+useGhcCpp = True
+
 parseOneFile :: FilePath -> FilePath -> IO (ParsedSource, [Located Token])
 parseOneFile libdir fileName = do
-  res <- parseModuleEpAnnsWithCpp libdir defaultCppOptions fileName
+  res <- parseModuleEpAnnsWithCpp libdir useGhcCpp defaultCppOptions fileName
   case res of
     Left m -> error (showErrorMessages m)
     Right (injectedComments, _dflags, pmod) -> do
