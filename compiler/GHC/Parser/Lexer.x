@@ -247,7 +247,7 @@ $docsym    = [\| \^ \* \$]
 @negative = \-
 
 -- recognise any of the GhcCPP keywords introduced by a leading #
-@cppkeyword = "define" | "include" | "undef" | "ifdef"
+@cppkeyword = "define" | "undef" | "ifdef"
                  | "ifndef" | "if" | "elif" | "else" | "endif"
                  | "dumpghccpp"
 
