@@ -33,6 +33,7 @@ import qualified GHC.Types.SrcLoc      as GHC
 import qualified GHC.Utils.Error       as GHC
 import qualified GHC.Utils.Fingerprint as GHC
 import qualified GHC.Utils.Outputable  as GHC
+import qualified GHC.Utils.Panic.Plain as GHC
 import GHC.Types.SrcLoc (mkSrcSpan, mkSrcLoc)
 import GHC.Data.FastString (mkFastString)
 
@@ -41,10 +42,7 @@ import Data.Maybe
 import Types
 import Utils
 import qualified Data.Set as Set
-
-
--- import Debug.Trace
---
+import qualified GHC.Data.Strict as Strict
 
 -- ---------------------------------------------------------------------
 
@@ -104,12 +102,13 @@ getCppTokensAsComments cppOptions sourceFile = do
   source <- GHC.liftIO $ GHC.hGetStringBuffer sourceFile
   let startLoc = GHC.mkRealSrcLoc (GHC.mkFastString sourceFile) 1 1
   (_txt,strSrcBuf,flags2') <- getPreprocessedSrcDirectPrim cppOptions sourceFile
+
   let flags2 = GHC.initParserOpts flags2'
   -- hash-ifdef tokens
-  directiveToks <- GHC.liftIO $ getPreprocessorAsComments sourceFile
+  directiveToks <- getPreprocessorAsComments (GHC.enableGhcCpp flags2) source startLoc
   -- Tokens without hash-ifdef
   nonDirectiveToks <- tokeniseOriginalSrc startLoc flags2 source
-  case GHC.lexTokenStream flags2 strSrcBuf startLoc of
+  case GHC.lexTokenStream () flags2 strSrcBuf startLoc of
         GHC.POk _ ts ->
                do
                   let toks = GHC.addSourceToTokens startLoc source ts
@@ -127,9 +126,9 @@ goodComment c = isGoodComment (tokComment c)
     isGoodComment [Comment "" _ _ _] = False
     isGoodComment _                  = True
 
-toRealLocated :: GHC.Located a -> GHC.RealLocated a
-toRealLocated (GHC.L (GHC.RealSrcSpan s _) x) = GHC.L s              x
-toRealLocated (GHC.L _ x)                     = GHC.L badRealSrcSpan x
+toRealLocated :: GHC.Located a -> GHC.PsLocated a
+toRealLocated (GHC.L (GHC.RealSrcSpan s (Strict.Just b)) x) = GHC.L (GHC.PsSpan s b) x
+toRealLocated (GHC.L l _)                     = GHC.panic $ "toRealLocated:" ++ show l
 
 -- ---------------------------------------------------------------------
 
@@ -178,7 +177,7 @@ tokeniseOriginalSrc ::
   -> m [(GHC.Located GHC.Token, String)]
 tokeniseOriginalSrc startLoc flags buf = do
   let src = stripPreprocessorDirectives buf
-  case GHC.lexTokenStream flags src startLoc of
+  case GHC.lexTokenStream () flags src startLoc of
     GHC.POk _ ts -> return $ GHC.addSourceToTokens startLoc src ts
     GHC.PFailed pst -> parseError pst
 
@@ -262,22 +261,21 @@ alterToolSettings f dynFlags = dynFlags { GHC.toolSettings = f (GHC.toolSettings
 
 -- | Get the preprocessor directives as comment tokens from the
 -- source.
-getPreprocessorAsComments :: FilePath -> IO [(GHC.Located GHC.Token, String)]
-getPreprocessorAsComments srcFile = do
-  fcontents <- readFileGhc srcFile
-  let directives = filter (\(_lineNum,line) -> case line of '#' : _ -> True; _ -> False)
-                    $ zip [1..] (lines fcontents)
-
-  let mkTok (lineNum,line) = (GHC.L l (GHC.ITlineComment line (makeBufSpan l)),line)
-       where
-         start = GHC.mkSrcLoc (GHC.mkFastString srcFile) lineNum 1
-         end   = GHC.mkSrcLoc (GHC.mkFastString srcFile) lineNum (length line)
-         l = GHC.mkSrcSpan start end
-
-  let toks = map mkTok directives
-  return toks
+getPreprocessorAsComments :: (GHC.GhcMonad m) => GHC.ParserOpts -> GHC.StringBuffer -> GHC.RealSrcLoc -> m [(GHC.Located GHC.Token, String)]
+getPreprocessorAsComments opts source startLoc = do
+  case GHC.lexTokenStream () opts source startLoc of
+        GHC.POk _ ts ->
+               do
+                  let
+                      isCppTok (GHC.L _ (GHC.ITcpp _ _ _)) = True
+                      isCppTok _                           = False
+                      toks = GHC.addSourceToTokens startLoc source ts
+                      directiveToks = filter (\(t,_) -> isCppTok t) toks
+                  return directiveToks
+        GHC.PFailed pst -> parseError pst
 
 makeBufSpan :: GHC.SrcSpan -> GHC.PsSpan
+makeBufSpan (GHC.RealSrcSpan s (Strict.Just bs)) = GHC.PsSpan s bs
 makeBufSpan ss = pspan
   where
     bl = GHC.BufPos 0
@@ -285,7 +283,7 @@ makeBufSpan ss = pspan
 
 -- ---------------------------------------------------------------------
 
-parseError :: GHC.GhcMonad m => GHC.PState -> m b
+parseError :: GHC.GhcMonad m => GHC.PState p -> m b
 parseError pst = do
   hsc_env <- GHC.getSession
   let sec = GHC.initSourceErrorContext (GHC.hsc_dflags hsc_env)

@@ -20,7 +20,7 @@ import GHC.Prelude
 import GHC.Cmm.Expr
 import GHC.Cmm.Reg (GlobalArgRegs(..))
 
-import GHC.Parser.Lexer
+import GHC.Parser.Lexer hiding (getInput, setInput, AlexInput)
 import GHC.Cmm.Parser.Monad
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
@@ -351,7 +351,7 @@ lexToken = do
   sc <- liftP getLexState
   case alexScan inp sc of
     AlexEOF -> do let span = mkPsSpan loc1 loc1
-                  liftP (setLastToken span 0)
+                  liftP (setLastToken buf span 0)
                   return (L span CmmT_EOF)
     AlexError (loc2,_) ->
       let msg srcLoc = mkPlainErrorMsgEnvelope srcLoc PsErrCmmLexer
@@ -362,7 +362,7 @@ lexToken = do
     AlexToken inp2@(end,_buf2) len t -> do
         setInput inp2
         let span = mkPsSpan loc1 end
-        span `seq` liftP (setLastToken span len)
+        span `seq` liftP (setLastToken buf span len)
         t span buf len
 
 -- -----------------------------------------------------------------------------
