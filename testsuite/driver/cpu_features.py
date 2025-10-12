@@ -8,7 +8,7 @@ SUPPORTED_CPU_FEATURES = {
     # These aren't comprehensive; they are only CPU features that we care about
 
     # x86:
-    'sse', 'sse2', 'sse3', 'ssse3', 'sse4_1', 'sse4_2',
+    'sse', 'sse2', 'sse3', 'pni', 'ssse3', 'sse4_1', 'sse4_2',
     'avx', 'avx2', 'avx512f',
     'fma',
     'popcnt', 'bmi1', 'bmi2'
