@@ -200,13 +200,7 @@ ppLexer queueComments cont =
              in
                 case tk of
                     -- case (trace ("M.ppLexer:tk=" ++ show (unLoc tk)) tk) of
-                    L _ ITeof -> do
-                        mInp <- popIncludeLoc
-                        case mInp of
-                            Nothing -> contInner tk
-                            Just inp -> do
-                                Lexer.setInput inp
-                                ppLexer queueComments cont
+                    L _ ITeof -> contInner tk
                     L l (ITcpp continuation s sp) -> do
                         ghcpp <- ghcCppEnabled
                         -- Only process the directive if GhcCpp is explicitly enabled.
@@ -264,8 +258,6 @@ processCpp loc s = do
         else do
             case directive of
                 Left err -> Lexer.addError $ mkPlainErrorMsgEnvelope loc $ PsErrGhcCpp (text err)
-                Right (CppInclude filename) -> do
-                    ppInclude filename
                 Right (CppDefine name args def) -> ppDefine (MacroName name args) def
                 Right (CppUndef name) -> ppUndef name
                 Right (CppIf cond) -> do
@@ -303,39 +295,7 @@ acceptStateChange ArNowAccepting = do
     _ <- Lexer.stopSkipping
     return ()
 
--- pp_include start -----------------------
-
-getInclude :: String -> PP (Maybe StringBuffer)
-getInclude filename = P $ \s -> POk s (Map.lookup filename (pp_includes (pp s)))
-
-pushIncludeLoc :: Lexer.AlexInput -> PP ()
-pushIncludeLoc pos =
-    P $ \s -> POk s{pp = (pp s){pp_include_stack = pos : pp_include_stack (pp s)}} ()
-
-popIncludeLoc :: PP (Maybe Lexer.AlexInput)
-popIncludeLoc =
-    P $ \s ->
-        let
-            (new_st, r) = case pp_include_stack (pp s) of
-                [] -> ([], Nothing)
-                (h : t) -> (t, Just h)
-         in
-            POk s{pp = (pp s){pp_include_stack = new_st}} r
-
--- pp_include end -------------------------
-
 -- definitions start --------------------
-
-ppInclude :: String -> PP ()
-ppInclude filename = do
-    mSrc <- getInclude filename
-    case mSrc of
-        Nothing -> return ()
-        Just src -> do
-            origInput <- Lexer.getInput
-            pushIncludeLoc origInput
-            let loc = PsLoc (mkRealSrcLoc (mkFastString filename) 1 1) (BufPos 0)
-            Lexer.setInput (Lexer.AI loc src)
 
 -- =====================================================================
 
