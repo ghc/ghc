@@ -619,7 +619,7 @@ generatePlatformHostHs = do
     stage <- getStage
     let chooseHostQuery = case stage of
             Stage0 {} -> queryHost
-            _         -> queryTarget
+            _         -> queryTarget stage
     cHostPlatformArch <- chooseHostQuery (archOS_arch . tgtArchOs)
     cHostPlatformOS   <- chooseHostQuery (archOS_OS . tgtArchOs)
     return $ unlines
