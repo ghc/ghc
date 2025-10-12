@@ -3,23 +3,25 @@ module Settings.Packages (packageArgs) where
 import Data.Version.Extra
 import Expression
 import Flavour
-import GHC.Platform.ArchOS
-import qualified GHC.Toolchain.Library as Lib
-import GHC.Toolchain.Target
+import Oracles.Setting hiding (ghcWithInterpreter)
 import Oracles.Flag
-import Oracles.Setting
 import Packages
 import Settings
 import Settings.Builders.Common (wayCcArgs)
 
+import qualified GHC.Toolchain.Library as Lib
+import GHC.Toolchain.Target
+import GHC.Platform.ArchOS
+import Settings.Program (ghcWithInterpreter)
+
 -- | Package-specific command-line arguments.
 packageArgs :: Args
 packageArgs = do
-  stage <- getStage
-  path <- getBuildPath
-  compilerPath <- expr $ buildPath (vanillaContext stage compiler)
+    stage        <- getStage
+    path         <- getBuildPath
+    compilerPath <- expr $ buildPath (vanillaContext stage compiler)
 
-  let -- Do not bind the result to a Boolean: this forces the configure rule
+    let -- Do not bind the result to a Boolean: this forces the configure rule
       -- immediately and may lead to cyclic dependencies.
       -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
       cross = crossStage stage
@@ -31,18 +33,17 @@ packageArgs = do
 
       compilerStageOption f = buildingCompilerStage' . f =<< expr flavour
 
-  cursesIncludeDir <- staged (buildSetting CursesIncludeDir)
-  cursesLibraryDir <- staged (buildSetting CursesLibDir)
-  ffiIncludeDir  <- staged (buildSetting FfiIncludeDir)
-  ffiLibraryDir  <- staged (buildSetting FfiLibDir)
-  libzstdIncludeDir <- staged (buildSetting LibZstdIncludeDir)
-  libzstdLibraryDir <- staged (buildSetting LibZstdLibDir)
-  stageVersion <- readVersion <$> (expr $ ghcVersionStage stage)
+    cursesIncludeDir <- staged (buildSetting CursesIncludeDir)
+    cursesLibraryDir <- staged (buildSetting CursesLibDir)
+    ffiIncludeDir  <- staged (buildSetting FfiIncludeDir)
+    ffiLibraryDir  <- staged (buildSetting FfiLibDir)
+    libzstdIncludeDir <- staged (buildSetting LibZstdIncludeDir)
+    libzstdLibraryDir <- staged (buildSetting LibZstdLibDir)
+    stageVersion <- readVersion <$> (expr $ ghcVersionStage stage)
 
-  mconcat
-    --------------------------------- base ---------------------------------
-    [ package base
-        ? mconcat
+    mconcat
+        --------------------------------- base ---------------------------------
+        [ package base ? mconcat
           [ -- This fixes the 'unknown symbol stat' issue.
             -- See: https://github.com/snowleopard/hadrian/issues/259.
             builder (Ghc CompileCWithGhc) ? arg "-optc-O2"
@@ -277,7 +278,7 @@ packageArgs = do
           -- backends at the moment, so we might as well disable it
           -- for cross GHC.
           -- TODO: MP
-          [ andM [expr (ghcWithInterpreter stage)] `cabalFlag` "internal-interpreter"
+          [ andM [expr (ghcWithInterpreter stage), orM [notM (expr cross), stage2]] `cabalFlag` "internal-interpreter"
           , orM [ notM cross, haveCurses ]  `cabalFlag` "terminfo"
           , staged (buildFlag UseLibzstd) `cabalFlag` "with-libzstd"
           -- ROMES: While the boot compiler is not updated wrt -this-unit-id
@@ -414,24 +415,22 @@ packageArgs = do
         , package rts ? rtsPackageArgs -- RTS deserves a separate function
 
         -------------------------------- runGhc --------------------------------
-        , package runGhc 
-            ? builder Ghc 
-            ? input "**/Main.hs" 
-            ? (\version -> ["-cpp", "-DVERSION=" ++ show version])
-            <$> getSetting ProjectVersion
+        , package runGhc ?
+          builder Ghc ? input "**/Main.hs" ?
+          (\version -> ["-cpp", "-DVERSION=" ++ show version]) <$> getSetting ProjectVersion
+
         --------------------------------- genprimopcode ------------------------
         , package genprimopcode
-            ? builder (Cabal Flags) 
-            ? arg "-build-tool-depends"
+          ? builder (Cabal Flags) ? arg "-build-tool-depends"
+
         --------------------------------- hpcBin ----------------------------------
         , package hpcBin
-            ? builder (Cabal Flags)
-            ? arg "-build-tool-depends"
+          ? builder (Cabal Flags) ? arg "-build-tool-depends"
+
         ]
 
 ghcInternalArgs :: Args
-ghcInternalArgs =
-  package ghcInternal ? do
+ghcInternalArgs = package ghcInternal ? do
     -- These are only used for non-in-tree builds.
     librariesGmp <- staged (buildSetting GmpLibDir)
     includesGmp <- staged (buildSetting GmpIncludeDir)
@@ -476,20 +475,19 @@ ghcInternalArgs =
 
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
-rtsPackageArgs =
-  package rts ? do
-    stage <- getStage
-    ghcUnreg <- queryTarget stage tgtUnregisterised
-    ghcEnableTNC <- queryTarget stage tgtTablesNextToCode
-    rtsWays <- getRtsWays
-    way <- getWay
-    path <- getBuildPath
-    top <- expr topDirectory
+rtsPackageArgs = package rts ? do
+    stage          <- getStage
+    ghcUnreg       <- queryTarget stage tgtUnregisterised
+    ghcEnableTNC   <- queryTarget stage tgtTablesNextToCode
+    rtsWays        <- getRtsWays
+    way            <- getWay
+    path           <- getBuildPath
+    top            <- expr topDirectory
     useSystemFfi   <- succStaged (buildFlag UseSystemFfi)
-    ffiIncludeDir <- staged (buildSetting FfiIncludeDir)
-    ffiLibraryDir <- staged (buildSetting FfiLibDir)
-    libdwIncludeDir <- staged (\s -> queryTargetTarget s (Lib.includePath <=< tgtRTSWithLibdw))
-    libdwLibraryDir <- staged (\s -> queryTargetTarget s (Lib.libraryPath <=< tgtRTSWithLibdw))
+    ffiIncludeDir  <- staged (buildSetting FfiIncludeDir)
+    ffiLibraryDir  <- staged (buildSetting FfiLibDir)
+    libdwIncludeDir   <- staged (\s -> queryTargetTarget s (Lib.includePath <=< tgtRTSWithLibdw))
+    libdwLibraryDir   <- staged (\s -> queryTargetTarget s (Lib.libraryPath <=< tgtRTSWithLibdw))
     libnumaIncludeDir <- staged (buildSetting LibnumaIncludeDir)
     libnumaLibraryDir <- staged (buildSetting LibnumaLibDir)
     libzstdIncludeDir <- staged (buildSetting LibZstdIncludeDir)
@@ -507,11 +505,12 @@ rtsPackageArgs =
     let ghcArgs = mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
-          , notM (targetSupportsSMP stage)   ? arg "-DNOSMP"
           , way `elem` [debug, debugDynamic] ? pure [ "-DTICKY_TICKY"
                                                     , "-optc-DTICKY_TICKY"]
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
+          , notM (targetSupportsSMP stage)   ? arg "-DNOSMP"
+
             -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
             --
             -- In particular, we **do not** pass -mavx when compiling
@@ -521,7 +520,6 @@ rtsPackageArgs =
 
           , inputs ["**/Jumps_V32.cmm"] ? pure [ "-mavx2"    | x86Host ]
           , inputs ["**/Jumps_V64.cmm"] ? pure [ "-mavx512f" | x86Host ]
-          , notM (targetSupportsSMP stage)   ? arg "-optc-DNOSMP"
           ]
 
     let cArgs =
@@ -689,43 +687,37 @@ rtsPackageArgs =
 -- collect2: ld returned 1 exit status
 speedHack :: Stage -> Action Bool
 speedHack stage = do
-  i386 <- anyTargetArch stage [ArchX86]
+  i386   <- anyTargetArch stage [ArchX86]
   goodOS <- not <$> anyTargetOs stage [OSSolaris2]
   return $ i386 && goodOS
 
 -- See @rts/ghc.mk@.
 rtsWarnings :: Args
-rtsWarnings =
-  mconcat
-    [ arg "-Wall",
-      arg "-Wextra",
-      arg "-Wstrict-prototypes",
-      arg "-Wmissing-prototypes",
-      arg "-Wmissing-declarations",
-      arg "-Winline",
-      arg "-Wpointer-arith",
-      arg "-Wmissing-noreturn",
-      arg "-Wnested-externs",
-      arg "-Wredundant-decls",
-      arg "-Wundef",
-      arg "-fno-strict-aliasing"
-    ]
+rtsWarnings = mconcat
+    [ arg "-Wall"
+    , arg "-Wextra"
+    , arg "-Wstrict-prototypes"
+    , arg "-Wmissing-prototypes"
+    , arg "-Wmissing-declarations"
+    , arg "-Winline"
+    , arg "-Wpointer-arith"
+    , arg "-Wmissing-noreturn"
+    , arg "-Wnested-externs"
+    , arg "-Wredundant-decls"
+    , arg "-Wundef"
+    , arg "-fno-strict-aliasing" ]
 
 -- | Expands to Cabal `--extra-lib-dirs` and `--extra-include-dirs` flags if
 -- the respective paths are not null.
-cabalExtraDirs ::
-  -- | include path
-  FilePath ->
-  -- | libraries path
-  FilePath ->
-  Args
-cabalExtraDirs include lib =
-  mconcat
-    [ extraDirFlag "--extra-lib-dirs" lib,
-      extraDirFlag "--extra-include-dirs" include
+cabalExtraDirs :: FilePath   -- ^ include path
+          -> FilePath   -- ^ libraries path
+          -> Args
+cabalExtraDirs include lib = mconcat
+    [ extraDirFlag "--extra-lib-dirs" lib
+    , extraDirFlag "--extra-include-dirs" include
     ]
   where
     extraDirFlag :: String -> FilePath -> Args
     extraDirFlag flag dir
-      | null dir = mempty
-      | otherwise = arg (flag ++ "=" ++ dir)
+      | null dir  = mempty
+      | otherwise = arg (flag++"="++dir)
