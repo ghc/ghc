@@ -54,7 +54,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
           Outputable.renderWithContext sDocContext $
             text "Hyperlinker parse error:" $$ pprLocMsgEnvelopeDefault err
   where
-    initState = initParserState parserOpts buf start
+    initState = initParserState () parserOpts buf start
     buf = stringBufferFromByteString bs
     start = mkRealSrcLoc (mkFastString fpath) 1 1
     go
@@ -62,7 +62,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
       -- \^ are we currently in a pragma?
       -> [T.Token]
       -- \^ tokens accumulated so far (in reverse)
-      -> P [T.Token]
+      -> P p [T.Token]
     go inPrag toks = do
       (b, _) <- getInput
       if not (atEnd b)
@@ -75,7 +75,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
         else pure toks
 
     -- \| Like 'Lexer.lexer', but slower, with a better API, and filtering out empty tokens
-    wrappedLexer :: P (RealLocated Lexer.Token)
+    wrappedLexer :: P p (RealLocated Lexer.Token)
     wrappedLexer = Lexer.lexer False andThen
       where
         andThen (L (RealSrcSpan s _) t)
@@ -86,7 +86,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
         andThen _ = wrappedLexer
 
     -- \| Try to parse a CPP line (can fail)
-    parseCppLine :: MaybeT P ([T.Token], Bool)
+    parseCppLine :: MaybeT (P p) ([T.Token], Bool)
     parseCppLine = MaybeT $ do
       (b, l) <- getInput
       case tryCppLine l b of
@@ -101,7 +101,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
         _ -> return Nothing
 
     -- \| Try to parse a regular old token (can fail)
-    parsePlainTok :: Bool -> MaybeT P ([T.Token], Bool) -- return list is only ever 0-2 elements
+    parsePlainTok :: Bool -> MaybeT (P p) ([T.Token], Bool) -- return list is only ever 0-2 elements
     parsePlainTok inPrag = do
       (bInit, lInit) <- lift getInput
       L sp tok <- tryP (Lexer.lexer False return)
@@ -156,7 +156,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
           pure (plainTok : [spaceTok | not (BS.null spaceBStr)], inPrag')
 
     -- \| Parse whatever remains of the line as an unknown token (can't fail)
-    unknownLine :: P ([T.Token], Bool)
+    unknownLine :: P p ([T.Token], Bool)
     unknownLine = do
       (b, l) <- getInput
       let (unkBStr, l', b') = spanLine l b
@@ -170,16 +170,16 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
       pure ([unkTok], False)
 
 -- | Get the input
-getInput :: P (StringBuffer, RealSrcLoc)
+getInput :: P p (StringBuffer, RealSrcLoc)
 getInput = P $ \p@PState{buffer = buf, loc = srcLoc} -> POk p (buf, psRealLoc srcLoc)
 
 -- | Set the input
-setInput :: (StringBuffer, RealSrcLoc) -> P ()
+setInput :: (StringBuffer, RealSrcLoc) -> P p ()
 setInput (buf, srcLoc) =
   P $ \p@PState{loc = PsLoc _ buf_loc} ->
     POk (p{buffer = buf, loc = PsLoc srcLoc buf_loc}) ()
 
-tryP :: P a -> MaybeT P a
+tryP :: P p a -> MaybeT (P p) a
 tryP (P f) = MaybeT $ P $ \s -> case f s of
   POk s' a -> POk s' (Just a)
   PFailed _ -> POk s Nothing
@@ -193,6 +193,8 @@ classify tok =
   case tok of
     ITas -> TkKeyword
     ITcase -> TkKeyword
+    ITcpp{} -> TkCpp
+    ITcppIgnored{} -> TkCpp
     ITclass -> TkKeyword
     ITdata -> TkKeyword
     ITdefault -> TkKeyword
