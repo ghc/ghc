@@ -100,8 +100,7 @@ data PpGroupState
 -- ---------------------------------------------------------------------
 
 data CppDirective
-    = CppInclude String
-    | -- | name, optional args, replacement
+    = -- | name, optional args, replacement
       CppDefine String (Maybe [String]) MacroDef
     | CppUndef String
     | CppIfdef String
