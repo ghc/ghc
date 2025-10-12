@@ -7,9 +7,10 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Hs.DocString (docStringChunks)
-import GHC.Parser.Lexer
+import GHC.Parser.Lexer hiding (AlexInput)
 import GHC.Parser.Lexer.Interface (adjustChar)
 import GHC.Parser.Annotation
+import GHC.Parser.PreProcess.State (PpState(..), initPpState)
 import GHC.Types.SrcLoc
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Strict as Strict
@@ -135,7 +136,7 @@ advanceSrcLocBS !loc bs = case utf8UnconsByteString bs of
   Just (c, bs') -> advanceSrcLocBS (advanceSrcLoc loc c) bs'
 
 -- | Lex 'StringLiteral' for warning messages
-lexStringLiteral :: P (LocatedN RdrName) -- ^ A precise identifier parser
+lexStringLiteral :: P PpState (LocatedN RdrName) -- ^ A precise identifier parser
                  -> Located (StringLiteral GhcPs)
                  -> Located (WithHsDocIdentifiers (StringLiteral GhcPs) GhcPs)
 lexStringLiteral identParser (L l sl)
@@ -154,7 +155,7 @@ lexStringLiteral identParser (L l sl)
     fakeLoc = mkRealSrcLoc nilFS 0 0
 
 -- | Lex identifiers from a docstring.
-lexHsDoc :: P (LocatedN RdrName)      -- ^ A precise identifier parser
+lexHsDoc :: P PpState (LocatedN RdrName)      -- ^ A precise identifier parser
          -> HsDocString GhcPs
          -> HsDoc GhcPs
 lexHsDoc identParser doc =
@@ -176,7 +177,7 @@ lexHsDoc identParser doc =
 
     fakeLoc = mkRealSrcLoc nilFS 0 0
 
-validateIdentWith :: P (LocatedN RdrName) -> SrcSpan -> ByteString -> Maybe (LIdP GhcPs)
+validateIdentWith :: P PpState (LocatedN RdrName) -> SrcSpan -> ByteString -> Maybe (LIdP GhcPs)
 validateIdentWith identParser mloc str0 =
   let -- These ParserFlags should be as "inclusive" as possible, allowing
       -- identifiers defined with any language extension.
@@ -190,7 +191,7 @@ validateIdentWith identParser mloc str0 =
         RealSrcSpan loc _ -> realSrcSpanStart loc
         GeneratedSrcSpan{} -> mkRealSrcLoc nilFS 0 0
         UnhelpfulSpan{} -> mkRealSrcLoc nilFS 0 0
-      pstate = initParserState pflags buffer realSrcLc
+      pstate = initParserState initPpState pflags buffer realSrcLc
   in case unP identParser pstate of
     POk _ name -> Just $ case mloc of
        RealSrcSpan _ _ -> name

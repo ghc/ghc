@@ -147,6 +147,7 @@ extensionDeprecatedNames = \case
 extensionName :: LangExt.Extension -> String
 extensionName = \case
   LangExt.Cpp -> "CPP"
+  LangExt.GhcCpp -> "GHC_CPP"
   LangExt.OverlappingInstances -> "OverlappingInstances"
   LangExt.UndecidableInstances -> "UndecidableInstances"
   LangExt.IncoherentInstances -> "IncoherentInstances"
@@ -490,6 +491,7 @@ data DumpFlag
    | Opt_D_dump_occur_anal
    | Opt_D_dump_parsed
    | Opt_D_dump_parsed_ast
+   | Opt_D_dump_ghc_cpp
    | Opt_D_dump_rn
    | Opt_D_dump_rn_ast
    | Opt_D_dump_simpl

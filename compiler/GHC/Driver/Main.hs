@@ -61,6 +61,7 @@ module GHC.Driver.Main
     , CgInteractiveGuts
     , generateAndWriteByteCodeLinkable
     , generateFreshByteCodeLinkable
+    , initParserStateWithMacros
 
     -- * Running passes separately
     , hscRecompStatus
@@ -118,3 +119,4 @@ import GHC.Driver.Main.Interactive
 
 import GHC.Driver.Env
 import GHC.Driver.Messager ( Messager, oneShotMsg, batchMsg, batchMultiMsg, showModuleIndex )
+import GHC.Parser.Header (initParserStateWithMacros)

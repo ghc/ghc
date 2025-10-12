@@ -18,6 +18,7 @@ import GHC.Data.FastString (fsLit)
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer (ParseResult (PFailed, POk), ParserOpts, initParserState, unP)
+import GHC.Parser.PreProcess (initPpState)
 import GHC.Types.Name.Occurrence (occNameString)
 import GHC.Types.Name.Reader (RdrName (..))
 import GHC.Types.SrcLoc (GenLocated (..), mkRealSrcLoc)
@@ -46,7 +47,7 @@ parseIdent parserOpts ns str0 =
     PFailed{} -> Nothing
   where
     realSrcLc = mkRealSrcLoc (fsLit "<unknown file>") 0 0
-    pstate str = initParserState parserOpts (stringToStringBuffer str) realSrcLc
+    pstate str = initParserState initPpState parserOpts (stringToStringBuffer str) realSrcLc
     (wrap, str1) = case str0 of
       '(' : s@(c : _)
         | c /= ','

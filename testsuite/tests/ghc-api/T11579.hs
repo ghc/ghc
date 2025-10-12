@@ -18,7 +18,7 @@ main = do
     hdk_comments <- runGhc (Just libdir) $ do
         dflags <- getSessionDynFlags
         let opts   = initParserOpts (dflags `gopt_set` Opt_Haddock)
-            pstate = initParserState opts stringBuffer loc
+            pstate = initParserState () opts stringBuffer loc
         case unP (lexer False return) pstate of
             POk s (L _ ITeof) -> return (map unLoc (toList (hdk_comments s)))
             _                 -> error "No token"

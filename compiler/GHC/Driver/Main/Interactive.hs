@@ -72,7 +72,9 @@ import GHC.Core.FamInstEnv
 
 import GHC.Parser.Errors.Types
 import GHC.Parser
-import GHC.Parser.Lexer as Lexer
+import GHC.Parser.Header (initParserStateWithMacros)
+import GHC.Parser.Lexer as Lexer hiding (initParserState)
+import GHC.Parser.PreProcess.State (PpState (..))
 
 import GHC.Tc.Module
 import GHC.Tc.Utils.Monad
@@ -537,11 +539,11 @@ hscParseIdentifier hsc_env str =
     runInteractiveHsc hsc_env $ hscParseThing parseIdentifier str
 
 hscParseThing :: (Outputable thing, Data thing)
-              => Lexer.P thing -> String -> Hsc thing
+              => Lexer.P PpState thing -> String -> Hsc thing
 hscParseThing = hscParseThingWithLocation "<interactive>" 1
 
 hscParseThingWithLocation :: (Outputable thing, Data thing) => String -> Int
-                          -> Lexer.P thing -> String -> Hsc thing
+                          -> Lexer.P PpState thing -> String -> Hsc thing
 hscParseThingWithLocation source linenumber parser str = do
     dflags <- getDynFlags
     logger <- getLogger
@@ -552,7 +554,11 @@ hscParseThingWithLocation source linenumber parser str = do
         let buf = stringToStringBuffer str
             loc = mkRealSrcLoc (fsLit source) linenumber 1
 
-        case unP parser (initParserState (initParserOpts dflags) buf loc) of
+        hsc <- getHscEnv
+        let unit_env = hsc_unit_env hsc
+        let p_state = initParserStateWithMacros dflags (Just unit_env) (initParserOpts dflags) buf loc
+
+        case unP parser p_state of
             PFailed pst ->
                 handleWarningsThrowErrors (getPsMessages pst)
             POk pst thing -> do
@@ -562,4 +568,3 @@ hscParseThingWithLocation source linenumber parser str = do
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed_ast "Parser AST"
                             FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations thing)
                 return thing
-

@@ -14047,7 +14047,6 @@ instance [safe] GHC.Internal.Show.Show GHC.Stats.RTSStats -- Defined in ‘GHC.S
 instance [safe] GHC.Internal.Show.Show System.Timeout.Timeout -- Defined in ‘System.Timeout’
 instance [safe] forall a b. GHC.Internal.Show.Show (a -> b) -- Defined in ‘Text.Show.Functions’
 instance GHC.Internal.StaticPtr.IsStatic GHC.Internal.StaticPtr.StaticPtr -- Defined in ‘GHC.Internal.StaticPtr’
-instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Addr# -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
 instance [safe] forall k (a :: k). GHC.Internal.TH.Lift.Lift (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Lift’
@@ -14138,6 +14137,7 @@ instance GHC.Internal.TH.Lift.Lift GHC.Internal.Word.Word16 -- Defined in ‘GHC
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Word.Word32 -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Word.Word64 -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Word.Word8 -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Addr# -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Double# -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Float# -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Int# -- Defined in ‘GHC.Internal.TH.Lift’

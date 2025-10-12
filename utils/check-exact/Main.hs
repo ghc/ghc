@@ -37,7 +37,8 @@ import GHC.Data.FastString
 
 _tt :: IO ()
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
-_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
+_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc.2/_build/stage1/lib/"
+-- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
 
@@ -183,7 +184,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test17519.hs" Nothing
  -- "../../testsuite/tests/printer/InTreeAnnotations1.hs" Nothing
  -- "../../testsuite/tests/printer/Test19798.hs" Nothing
- "../../testsuite/tests/printer/Test10309.hs" Nothing
+ -- "../../testsuite/tests/printer/Test10309.hs" Nothing
 
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs" Nothing
  -- "../../testsuite/tests/typecheck/should_fail/StrictBinds.hs" Nothing
@@ -219,7 +220,9 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test22771.hs" Nothing
  -- "../../testsuite/tests/printer/Test23465.hs" Nothing
  -- "../../testsuite/tests/printer/Test25454.hs" Nothing
- -- "../../testsuite/tests/printer/PprModifiers.hs" Nothing
+ -- "../../testsuite/tests/printer/Test25467.hs" Nothing
+ -- "../../testsuite/tests/printer/CppCommentPlacement.hs" Nothing
+ "../check-cpp/Example7.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
@@ -365,9 +368,12 @@ ppAst :: Data a => a -> String
 ppAst ast = showSDocUnsafe $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
 
+useGhcCpp :: Bool
+useGhcCpp = True
+
 parseOneFile :: FilePath -> FilePath -> IO (ParsedSource, [Located Token])
 parseOneFile libdir fileName = do
-  res <- parseModuleEpAnnsWithCpp libdir defaultCppOptions fileName
+  res <- parseModuleEpAnnsWithCpp libdir useGhcCpp defaultCppOptions fileName
   case res of
     Left m -> error (internalDebugShowMessages m)
     Right (injectedComments, _dflags, pmod) -> do

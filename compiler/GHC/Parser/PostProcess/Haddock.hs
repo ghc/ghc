@@ -168,7 +168,7 @@ we have to use 'flattenBindsAndSigs' to traverse it in the correct order.
 -- to a parsed HsModule.
 --
 -- Reports badly positioned comments when -Winvalid-haddock is enabled.
-addHaddockToModule :: Located (HsModule GhcPs) -> P (Located (HsModule GhcPs))
+addHaddockToModule :: Located (HsModule GhcPs) -> P p (Located (HsModule GhcPs))
 addHaddockToModule lmod = do
   pState <- getPState
   let all_comments = toList (hdk_comments pState)
@@ -180,7 +180,7 @@ addHaddockToModule lmod = do
   mapM_ reportHdkWarning hdk_warnings
   return lmod'
 
-reportHdkWarning :: HdkWarn -> P ()
+reportHdkWarning :: HdkWarn -> P p ()
 reportHdkWarning (HdkWarnInvalidComment (L l _)) =
   addPsMessage (mkSrcSpanPs l) PsWarnHaddockInvalidPos
 reportHdkWarning (HdkWarnExtraComment (L l _)) =

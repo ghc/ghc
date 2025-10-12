@@ -26,6 +26,7 @@ import GHC.Prelude
 
 import GHC.Platform.Ways
 
+import GHC.Driver.Config.Parser
 import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.DynFlags
 import GHC.Driver.Phases
@@ -1552,7 +1553,9 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
   (pi_srcimps', pi_theimps', L pi_mod_name_loc pi_mod_name)
       <- ExceptT $ do
-          mimps <- getImportEdges pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
+          let unit_env = Just (hsc_unit_env hsc_env)
+              popts = initParserOpts pi_local_dflags
+          mimps <- getImportEdges pi_local_dflags unit_env popts pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
   let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
   let rn_imps = fmap (\(sp, pk, lmn@(L _ mn)) -> (sp, rn_pkg_qual mn pk, lmn))

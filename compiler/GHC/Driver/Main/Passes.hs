@@ -114,7 +114,9 @@ import GHC.CoreToStg    ( coreToStg )
 
 import GHC.Parser.Errors.Types
 import GHC.Parser
-import GHC.Parser.Lexer as Lexer
+import GHC.Parser.Header (initParserStateWithMacros)
+import GHC.Parser.Lexer as Lexer hiding (initParserState)
+import GHC.Parser.PreProcess (dumpGhcCpp)
 
 import GHC.Tc.Module
 import GHC.Tc.Utils.Monad
@@ -230,7 +232,11 @@ hscParse' mod_summary
                  = parseSignature
                  | otherwise = parseModule
 
-    case unP parseMod (initParserState (initParserOpts dflags) buf loc) of
+    hsc <- getHscEnv
+    let unit_env = hsc_unit_env hsc
+    let p_state = initParserStateWithMacros dflags (Just unit_env) (initParserOpts dflags) buf loc
+
+    case unP parseMod p_state of
         PFailed pst -> do
             handleWarningsThrowErrors (getPsMessages pst)
         POk pst rdr_module -> do
@@ -240,6 +246,8 @@ hscParse' mod_summary
                         FormatHaskell (showAstData NoBlankSrcSpan
                                                    NoBlankEpAnnotations
                                                    rdr_module)
+            liftIO $ putDumpFileMaybe logger Opt_D_dump_ghc_cpp "After GHC_CPP"
+                        FormatHaskell (dumpGhcCpp dflags p_state)
             liftIO $ putDumpFileMaybe logger Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
 

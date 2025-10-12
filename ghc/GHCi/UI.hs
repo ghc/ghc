@@ -84,7 +84,8 @@ import GHC.Builtin.KnownOccs( ghciStepIoMOcc, stringTyCon_RDR, compose_RDR )
 import GHC.Builtin.KnownKeys( ioTyConOcc )
 import GHC.Types.Name.Reader as RdrName
 import GHC.Types.SrcLoc as SrcLoc
-import qualified GHC.Parser.Lexer as Lexer
+import qualified GHC.Parser.Lexer as Lexer hiding (initParserState)
+import qualified GHC.Parser.PreProcess as Lexer  (initParserState)
 import GHC.Parser.Header ( toArgs )
 import qualified GHC.Parser.Header as Header
 import GHC.Types.PkgQual
