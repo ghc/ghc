@@ -1618,14 +1618,17 @@ canEqCanLHS ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
     k2 = typeKind xi2
 
 
-{-
-Note [Kind Equality Orientation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Historical Note [Kind Equality Orientation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note describes a solution to a problem that no longer exists;
+it used to apply to `canEqCanLHSHetero`.
+
 While in theory [W] x ~ y and [W] y ~ x ought to give us the same behaviour, in
-practice it does not.  See Historical Note [Fundeps with instances, and equality
-orientation] where this is discussed at length.  As a rule of thumb: we keep
-the newest unification variables on the left of the equality.  See also
-Note [Improvement orientation].
+the past it did not.  See Historical Note [Fundeps with instances, and equality
+orientation] in GHC.Tc.Solver.FunDeps, where this is discussed at length.
+
+As a rule of thumb: we keep the newest unification variables on the
+left of the equality.  See also Note [Improvement orientation].
 
 In particular, `canEqCanLHSHetero` produces the following constraint equalities
 
@@ -1657,24 +1660,20 @@ canEqCanLHSHetero :: CtEvidence         -- :: (xi1 :: ki1) ~ (xi2 :: ki2)
                   -> TcS (StopOrContinue (Either IrredCt EqCt))
 canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
 -- See Note [Equalities with heterogeneous kinds]
--- See Note [Kind Equality Orientation]
-
--- NB: preserve left-to-right orientation!! See wrinkle (W2) in
--- Note [Fundeps with instances, and equality orientation] in GHC.Tc.Solver.Dict
 --    NotSwapped:
 --        ev      :: (lhs1:ki1) ~r# (xi2:ki2)
---        kind_co :: k11 ~# ki2               -- Same orientation as ev
---        new_ev  :: lhs1 ~r# (xi2 |> sym kind_co)
+--        kind_co :: ki2 ~# ki1
+--        new_ev  :: lhs1 ~r# (xi2 |> kind_co)
 --    Swapped
 --        ev      :: (xi2:ki2) ~r# (lhs1:ki1)
---        kind_co :: ki2 ~# ki1               -- Same orientation as ev
+--        kind_co :: ki2 ~# ki1
 --        new_ev  :: (xi2 |> kind_co) ~r# lhs1
--- Note that we need the `sym` when we are /not/ swapped; hence `mk_sym_co`
 
   = case ev of
       CtGiven (GivenCt { ctev_evar = evar, ctev_loc = loc })
-        -> do { let kind_co  = mkKindCo (mkCoVarCo evar)
-                    pred_ty  = unSwap swapped mkNomEqPred ki1 ki2
+        -> do { let kind_co  = maybeSymCo (flipSwap swapped) $
+                               mkKindCo (mkCoVarCo evar)
+                    pred_ty  = mkNomEqPred ki2 ki1
                     kind_loc = mkKindEqLoc xi1 xi2 loc
               ; kind_ev <- newGivenEv kind_loc (pred_ty, evCoercion kind_co)
               ; emitWorkNC [CtGiven kind_ev]
@@ -1684,7 +1683,8 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
          -> do { (unifs, (kind_co, eqs)) <- reportFineGrainUnifications $
                                             wrapUnifier ev Nominal $ \uenv ->
                                             let uenv' = updUEnvLoc uenv (mkKindEqLoc xi1 xi2)
-                                            in unSwap swapped (uType uenv') ki1 ki2
+                                            in uType uenv' ki2 ki1
+                      -- kind_co :: ki2 ~N ki1
                       -- mkKindEqLoc: any new constraints, arising from the kind
                       -- unification, say they thay come from unifying xi1~xi2
 
@@ -1728,16 +1728,10 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
            ; canEqCanLHSHomo new_ev eq_rel NotSwapped lhs1 ps_xi1 new_xi2 new_xi2 }
 
       where
-        -- kind_co :: ki1 ~N ki2
+        -- kind_co :: ki2 ~N ki1
         lhs_redn    = mkReflRedn role ps_xi1
-        rhs_redn    = mkGReflRightRedn role xi2 sym_kind_co
-        new_xi2     = mkCastTy ps_xi2 sym_kind_co
-
-        -- Apply mkSymCo when /not/ swapped
-        sym_kind_co = case swapped of
-                         NotSwapped -> mkSymCo kind_co
-                         IsSwapped  -> kind_co
-
+        rhs_redn    = mkGReflRightRedn role xi2 kind_co
+        new_xi2     = mkCastTy ps_xi2 kind_co
 
 canEqCanLHSHomo :: CtEvidence          -- lhs ~ rhs
                                        -- or, if swapped: rhs ~ lhs
