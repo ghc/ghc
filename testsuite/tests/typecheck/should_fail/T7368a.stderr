@@ -1,6 +1,5 @@
-
 T7368a.hs:8:6: error: [GHC-18872]
-    • Couldn't match kind ‘* -> *’ with ‘*’
+    • Couldn't match kind ‘*’ with ‘* -> *’
       When matching types
         w0 :: * -> *
         Bad f :: *
@@ -10,3 +9,4 @@ T7368a.hs:8:6: error: [GHC-18872]
       In an equation for ‘fun’: fun (Bad x) = True
     • Relevant bindings include
         fun :: f (Bad f) -> Bool (bound at T7368a.hs:8:1)
+
