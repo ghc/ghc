@@ -33,6 +33,9 @@ for l in linters:
     l.add_path_filter(lambda path: not path.name == 'core-spec.pdf')
     # Don't lint the linter itself
     l.add_path_filter(lambda path: not path.name == 'check-cpp.py')
+    # Don't lint GHC_CPP test files
+    l.add_path_filter(lambda path: not path.name == 'GhcCpp02.hs')
+    l.add_path_filter(lambda path: not str(path).endswith('/check-cpp/Main.hs'))
 
 if __name__ == '__main__':
     run_linters(linters)

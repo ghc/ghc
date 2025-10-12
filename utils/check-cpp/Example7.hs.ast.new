@@ -1,0 +1,921 @@
+
+(L
+ { 1:1 }
+ (HsModule
+  (XModulePs
+   (EpAnn
+    (EpaSpan { 1:1 })
+    (AnnsModule
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { 7:1-6 }))
+     (EpTok
+      (EpaSpan { 7:71-75 }))
+     ((,,)
+      (EpTok (EpaSpan { 7:16 }))
+      (EpTok (EpaSpan { 7:69 }))
+      [])
+     []
+     []
+     (Just
+      ((,)
+       { 25:1 }
+       { 24:18-19 })))
+    (EpaComments
+     [(L
+       (EpaSpan
+        { 1:1-2 })
+       (EpaComment
+        (EpaLineComment
+         "--")
+        { 1:1 }))
+     ,(L
+       (EpaSpan
+        { 2:1-22 })
+       (EpaComment
+        (EpaLineComment
+         "-- (C) Susumu Katayama")
+        { 1:1-2 }))
+     ,(L
+       (EpaSpan
+        { 3:1-2 })
+       (EpaComment
+        (EpaLineComment
+         "--")
+        { 2:1-22 }))
+     ,(L
+       (EpaSpan
+        { 4:1-67 })
+       (EpaComment
+        (EpaLineComment
+         "-- (Typed)IOPairs\190\229\164\199\165\199\161\188\165\191\164\242\164\200\164\235\161\165ghci\190\229\164\199 :cmd \164\242\187\200\164\164\164\222\164\175\164\235\180\182\164\184\161\165")
+        { 3:1-2 }))
+     ,(L
+       (EpaSpan
+        { 5:1-53 })
+       (EpaComment
+        (EpaBlockComment
+         "{-# LANGUAGE RankNTypes, GHC_CPP, TemplateHaskell #-}")
+        { 4:1-67 }))
+     ,(L
+       (EpaSpan
+        { 6:1-46 })
+       (EpaComment
+        (EpaBlockComment
+         "{-# OPTIONS -ddump-ghc-cpp -dkeep-comments #-}")
+        { 5:1-53 }))]))
+   (EpVirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
+  (Just
+   (L
+    (EpAnn
+     (EpaSpan { 7:8-15 })
+     []
+     (EpaComments
+      []))
+    {ModuleName: Example7}))
+  (Just
+   [(L
+     (EpAnn
+      (EpaSpan { 7:17-31 })
+      [(AddCommaAnn
+        (EpTok
+         (EpaSpan { 7:32 })))]
+      (EpaComments
+       []))
+     (IEModuleContents
+      ((,)
+       (Nothing)
+       (EpTok
+        (EpaSpan { 7:17-22 })))
+      (L
+       (EpAnn
+        (EpaSpan { 7:24-31 })
+        []
+        (EpaComments
+         []))
+       {ModuleName: Example7})))
+   ,(L
+     (EpAnn
+      (EpaSpan { 7:34-68 })
+      []
+      (EpaComments
+       []))
+     (IEModuleContents
+      ((,)
+       (Nothing)
+       (EpTok
+        (EpaSpan { 7:34-39 })))
+      (L
+       (EpAnn
+        (EpaSpan { 7:41-68 })
+        []
+        (EpaComments
+         []))
+       {ModuleName: MagicHaskeller.RunAnalytical})))])
+  [(L
+    (EpAnn
+     (EpaSpan { 9:1-32 })
+     []
+     (EpaComments
+      []))
+    (ImportDecl
+     (XImportDeclPass
+      (EpAnnImportDecl
+       (EpTok
+        (EpaSpan { 9:1-6 }))
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       ((,,,)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        []))
+      (NoSourceText)
+      (False))
+     (L
+      (EpAnn
+       (EpaSpan { 9:8-32 })
+       []
+       (EpaComments
+        []))
+      {ModuleName: MagicHaskeller.Analytical})
+     (NoRawPkgQual)
+     (NotBoot)
+     (NotLevelled)
+     (False)
+     (NotQualified)
+     (Nothing)
+     (Nothing)))
+  ,(L
+    (EpAnn
+     (EpaSpan { 13:1-47 })
+     []
+     (EpaComments
+      [(L
+        (EpaSpan
+         { 10:1-12 })
+        (EpaComment
+         (EpaCpp
+          "#ifdef DEBUG")
+         { 9:8-32 }))
+      ,(L
+        (EpaSpan
+         { 11:1-45 })
+        (EpaComment
+         (EpaCppIgnored
+          "                                 hiding (rev)")
+         { 10:1-12 }))
+      ,(L
+        (EpaSpan
+         { 12:1-6 })
+        (EpaComment
+         (EpaCpp
+          "#endif")
+         { 11:1-45 }))]))
+    (ImportDecl
+     (XImportDeclPass
+      (EpAnnImportDecl
+       (EpTok
+        (EpaSpan { 13:1-6 }))
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       ((,,,)
+        (NoEpTok)
+        (EpTok (EpaSpan { 13:37 }))
+        (EpTok (EpaSpan { 13:47 }))
+        []))
+      (NoSourceText)
+      (False))
+     (L
+      (EpAnn
+       (EpaSpan { 13:8-36 })
+       []
+       (EpaComments
+        []))
+      {ModuleName: MagicHaskeller.Classification})
+     (NoRawPkgQual)
+     (NotBoot)
+     (NotLevelled)
+     (False)
+     (NotQualified)
+     (Nothing)
+     (Just
+      ((,)
+       (Exactly)
+       [(L
+         (EpAnn
+          (EpaSpan { 13:38-46 })
+          []
+          (EpaComments
+           []))
+         (IEThingAbs
+          (Nothing)
+          (L
+           (EpAnn
+            (EpaSpan { 13:38-46 })
+            []
+            (EpaComments
+             []))
+           (IEName
+            (NoExtField)
+            (L
+             (EpAnn
+              (EpaSpan { 13:38-46 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: Filtrable}))))
+          (Nothing)))]))))
+  ,(L
+    (EpAnn
+     (EpaSpan { 14:1-35 })
+     []
+     (EpaComments
+      []))
+    (ImportDecl
+     (XImportDeclPass
+      (EpAnnImportDecl
+       (EpTok
+        (EpaSpan { 14:1-6 }))
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       ((,,,)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        []))
+      (NoSourceText)
+      (False))
+     (L
+      (EpAnn
+       (EpaSpan { 14:8-35 })
+       []
+       (EpaComments
+        []))
+      {ModuleName: MagicHaskeller.RunAnalytical})
+     (NoRawPkgQual)
+     (NotBoot)
+     (NotLevelled)
+     (False)
+     (NotQualified)
+     (Nothing)
+     (Nothing)))
+  ,(L
+    (EpAnn
+     (EpaSpan { 18:1-41 })
+     []
+     (EpaComments
+      [(L
+        (EpaSpan
+         { 15:1-12 })
+        (EpaComment
+         (EpaCpp
+          "#ifdef DEBUG")
+         { 14:8-35 }))
+      ,(L
+        (EpaSpan
+         { 16:1-46 })
+        (EpaComment
+         (EpaCppIgnored
+          "                                 hiding (main)")
+         { 15:1-12 }))
+      ,(L
+        (EpaSpan
+         { 17:1-6 })
+        (EpaComment
+         (EpaCpp
+          "#endif")
+         { 16:1-46 }))]))
+    (ImportDecl
+     (XImportDeclPass
+      (EpAnnImportDecl
+       (EpTok
+        (EpaSpan { 18:1-6 }))
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       ((,,,)
+        (NoEpTok)
+        (EpTok (EpaSpan { 18:30 }))
+        (EpTok (EpaSpan { 18:41 }))
+        []))
+      (NoSourceText)
+      (False))
+     (L
+      (EpAnn
+       (EpaSpan { 18:8-29 })
+       []
+       (EpaComments
+        []))
+      {ModuleName: MagicHaskeller.GetTime})
+     (NoRawPkgQual)
+     (NotBoot)
+     (NotLevelled)
+     (False)
+     (NotQualified)
+     (Nothing)
+     (Just
+      ((,)
+       (Exactly)
+       [(L
+         (EpAnn
+          (EpaSpan { 18:31-40 })
+          []
+          (EpaComments
+           []))
+         (IEVar
+          (Nothing)
+          (L
+           (EpAnn
+            (EpaSpan { 18:31-40 })
+            []
+            (EpaComments
+             []))
+           (IEName
+            (NoExtField)
+            (L
+             (EpAnn
+              (EpaSpan { 18:31-40 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: batchWrite}))))
+          (Nothing)))]))))]
+  [(L
+    (EpAnn
+     (EpaSpan { (20,1)-(22,29) })
+     []
+     (EpaCommentsBalanced
+      []
+      []))
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (EpAnn
+        (EpaSpan { 20:1-4 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: main}))
+      (MG
+       ((,)
+        (FromSource)
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (())
+         []))
+       (L
+        (EpAnn
+         (EpaSpan { (20,1)-(22,29) })
+         []
+         (EpaComments
+          []))
+        [(L
+          (EpAnn
+           (EpaSpan { (20,1)-(22,29) })
+           []
+           (EpaComments
+            []))
+          (Match
+           (NoExtField)
+           (FunRhs
+            (L
+             (EpAnn
+              (EpaSpan { 20:1-4 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: main}))
+            (Prefix)
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
+           (L
+            (EpaSpan { <no location info> })
+            [])
+           (GRHSs
+            (EpaComments
+             [])
+            (:|
+             (L
+              (EpAnn
+               (EpaSpan { (20,6)-(22,29) })
+               (NoEpAnns)
+               (EpaComments
+                []))
+              (GRHS
+               (EpAnn
+                (EpaSpan { (20,6)-(22,29) })
+                (GrhsAnn
+                 (Nothing)
+                 (Left
+                  (EpTok
+                   (EpaSpan { 20:6 }))))
+                (EpaComments
+                 []))
+               []
+               (L
+                (EpAnn
+                 (EpaSpan { (20,8)-(22,29) })
+                 []
+                 (EpaComments
+                  []))
+                (HsDo
+                 (AnnList
+                  (Just
+                   (EpaSpan { (20,11)-(22,29) }))
+                  (ListBraces
+                   (NoEpTok)
+                   (NoEpTok))
+                  []
+                  (EpaSpan { 20:8-9 })
+                  [])
+                 (DoExpr
+                  (Nothing))
+                 (L
+                  (EpAnn
+                   (EpaSpan { (20,11)-(22,29) })
+                   []
+                   (EpaComments
+                    []))
+                  [(L
+                    (EpAnn
+                     (EpaSpan { 20:11-26 })
+                     []
+                     (EpaComments
+                      []))
+                    (BindStmt
+                     (EpUniTok
+                      (EpaSpan { 20:15-16 })
+                      (NormalSyntax))
+                     (L
+                      (EpAnn
+                       (EpaSpan { 20:11-13 })
+                       []
+                       (EpaComments
+                        []))
+                      (VarPat
+                       (NoExtField)
+                       (L
+                        (EpAnn
+                         (EpaSpan { 20:11-13 })
+                         (NameAnnTrailing
+                          [])
+                         (EpaComments
+                          []))
+                        (Unqual
+                         {OccName: iop}))))
+                     (L
+                      (EpAnn
+                       (EpaSpan { 20:18-26 })
+                       []
+                       (EpaComments
+                        []))
+                      (HsApp
+                       (NoExtField)
+                       (L
+                        (EpAnn
+                         (EpaSpan { 20:18-21 })
+                         []
+                         (EpaComments
+                          []))
+                        (HsVar
+                         (NoExtField)
+                         (L
+                          (EpAnn
+                           (EpaSpan { 20:18-21 })
+                           (NameAnnTrailing
+                            [])
+                           (EpaComments
+                            []))
+                          (Unqual
+                           {OccName: runQ}))))
+                       (L
+                        (EpAnn
+                         (EpaSpan { 20:23-26 })
+                         []
+                         (EpaComments
+                          []))
+                        (HsVar
+                         (NoExtField)
+                         (L
+                          (EpAnn
+                           (EpaSpan { 20:23-26 })
+                           (NameAnnTrailing
+                            [])
+                           (EpaComments
+                            []))
+                          (Unqual
+                           {OccName: andL}))))))))
+                  ,(L
+                    (EpAnn
+                     (EpaSpan { 21:11-31 })
+                     []
+                     (EpaComments
+                      []))
+                    (LetStmt
+                     (EpTok
+                      (EpaSpan { 21:11-13 }))
+                     (HsValBinds
+                      (EpAnn
+                       (EpaSpan { 21:15-31 })
+                       (AnnList
+                        (Just
+                         (EpaSpan { 21:15-31 }))
+                        (ListNone)
+                        []
+                        (NoEpTok)
+                        [])
+                       (EpaComments
+                        []))
+                      (ValBinds
+                       (NoExtField)
+                       [(VbBind
+                         (L
+                          (EpAnn
+                           (EpaSpan { 21:15-31 })
+                           []
+                           (EpaComments
+                            []))
+                          (FunBind
+                           (NoExtField)
+                           (L
+                            (EpAnn
+                             (EpaSpan { 21:15 })
+                             (NameAnnTrailing
+                              [])
+                             (EpaComments
+                              []))
+                            (Unqual
+                             {OccName: e}))
+                           (MG
+                            ((,)
+                             (FromSource)
+                             (AnnList
+                              (Nothing)
+                              (ListNone)
+                              []
+                              (())
+                              []))
+                            (L
+                             (EpAnn
+                              (EpaSpan { 21:15-31 })
+                              []
+                              (EpaComments
+                               []))
+                             [(L
+                               (EpAnn
+                                (EpaSpan { 21:15-31 })
+                                []
+                                (EpaComments
+                                 []))
+                               (Match
+                                (NoExtField)
+                                (FunRhs
+                                 (L
+                                  (EpAnn
+                                   (EpaSpan { 21:15 })
+                                   (NameAnnTrailing
+                                    [])
+                                   (EpaComments
+                                    []))
+                                  (Unqual
+                                   {OccName: e}))
+                                 (Prefix)
+                                 (NoSrcStrict)
+                                 (AnnFunRhs
+                                  (NoEpTok)
+                                  []
+                                  []))
+                                (L
+                                 (EpaSpan { <no location info> })
+                                 [])
+                                (GRHSs
+                                 (EpaComments
+                                  [])
+                                 (:|
+                                  (L
+                                   (EpAnn
+                                    (EpaSpan { 21:17-31 })
+                                    (NoEpAnns)
+                                    (EpaComments
+                                     []))
+                                   (GRHS
+                                    (EpAnn
+                                     (EpaSpan { 21:17-31 })
+                                     (GrhsAnn
+                                      (Nothing)
+                                      (Left
+                                       (EpTok
+                                        (EpaSpan { 21:17 }))))
+                                     (EpaComments
+                                      []))
+                                    []
+                                    (L
+                                     (EpAnn
+                                      (EpaSpan { 21:19-31 })
+                                      []
+                                      (EpaComments
+                                       []))
+                                     (HsApp
+                                      (NoExtField)
+                                      (L
+                                       (EpAnn
+                                        (EpaSpan { 21:19-28 })
+                                        []
+                                        (EpaComments
+                                         []))
+                                       (HsApp
+                                        (NoExtField)
+                                        (L
+                                         (EpAnn
+                                          (EpaSpan { 21:19-24 })
+                                          []
+                                          (EpaComments
+                                           []))
+                                         (HsVar
+                                          (NoExtField)
+                                          (L
+                                           (EpAnn
+                                            (EpaSpan { 21:19-24 })
+                                            (NameAnnTrailing
+                                             [])
+                                            (EpaComments
+                                             []))
+                                           (Unqual
+                                            {OccName: getOne}))))
+                                        (L
+                                         (EpAnn
+                                          (EpaSpan { 21:26-28 })
+                                          []
+                                          (EpaComments
+                                           []))
+                                         (HsVar
+                                          (NoExtField)
+                                          (L
+                                           (EpAnn
+                                            (EpaSpan { 21:26-28 })
+                                            (NameAnnTrailing
+                                             [])
+                                            (EpaComments
+                                             []))
+                                           (Unqual
+                                            {OccName: iop}))))))
+                                      (L
+                                       (EpAnn
+                                        (EpaSpan { 21:30-31 })
+                                        []
+                                        (EpaComments
+                                         []))
+                                       (HsVar
+                                        (NoExtField)
+                                        (L
+                                         (EpAnn
+                                          (EpaSpan { 21:30-31 })
+                                          (NameAnnOnly
+                                           (NameSquare
+                                            (EpTok
+                                             (EpaSpan { 21:30 }))
+                                            (EpTok
+                                             (EpaSpan { 21:31 })))
+                                           [])
+                                          (EpaComments
+                                           []))
+                                         (Exact
+                                          {Name: []}))))))))
+                                  [])
+                                 (EmptyLocalBinds
+                                  (NoExtField)))))])))))]))))
+                  ,(L
+                    (EpAnn
+                     (EpaSpan { 22:11-29 })
+                     []
+                     (EpaComments
+                      []))
+                    (BodyStmt
+                     (NoExtField)
+                     (L
+                      (EpAnn
+                       (EpaSpan { 22:11-29 })
+                       []
+                       (EpaComments
+                        []))
+                      (OpApp
+                       (NoExtField)
+                       (L
+                        (EpAnn
+                         (EpaSpan { 22:11-18 })
+                         []
+                         (EpaComments
+                          []))
+                        (HsVar
+                         (NoExtField)
+                         (L
+                          (EpAnn
+                           (EpaSpan { 22:11-18 })
+                           (NameAnnTrailing
+                            [])
+                           (EpaComments
+                            []))
+                          (Unqual
+                           {OccName: putStrLn}))))
+                       (L
+                        (EpAnn
+                         (EpaSpan { 22:20 })
+                         []
+                         (EpaComments
+                          []))
+                        (HsVar
+                         (NoExtField)
+                         (L
+                          (EpAnn
+                           (EpaSpan { 22:20 })
+                           (NameAnnTrailing
+                            [])
+                           (EpaComments
+                            []))
+                          (Unqual
+                           {OccName: $}))))
+                       (L
+                        (EpAnn
+                         (EpaSpan { 22:22-29 })
+                         []
+                         (EpaComments
+                          []))
+                        (HsApp
+                         (NoExtField)
+                         (L
+                          (EpAnn
+                           (EpaSpan { 22:22-27 })
+                           []
+                           (EpaComments
+                            []))
+                          (HsVar
+                           (NoExtField)
+                           (L
+                            (EpAnn
+                             (EpaSpan { 22:22-27 })
+                             (NameAnnTrailing
+                              [])
+                             (EpaComments
+                              []))
+                            (Unqual
+                             {OccName: pprint}))))
+                         (L
+                          (EpAnn
+                           (EpaSpan { 22:29 })
+                           []
+                           (EpaComments
+                            []))
+                          (HsVar
+                           (NoExtField)
+                           (L
+                            (EpAnn
+                             (EpaSpan { 22:29 })
+                             (NameAnnTrailing
+                              [])
+                             (EpaComments
+                              []))
+                            (Unqual
+                             {OccName: e}))))))))
+                     (NoExtField)
+                     (NoExtField)))])))))
+             [])
+            (EmptyLocalBinds
+             (NoExtField)))))])))))
+  ,(L
+    (EpAnn
+     (EpaSpan { 24:1-19 })
+     []
+     (EpaComments
+      []))
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (EpAnn
+        (EpaSpan { 24:1-7 })
+        (NameAnnTrailing
+         [])
+        (EpaComments
+         []))
+       (Unqual
+        {OccName: emptyBK}))
+      (MG
+       ((,)
+        (FromSource)
+        (AnnList
+         (Nothing)
+         (ListNone)
+         []
+         (())
+         []))
+       (L
+        (EpAnn
+         (EpaSpan { 24:1-19 })
+         []
+         (EpaComments
+          []))
+        [(L
+          (EpAnn
+           (EpaSpan { 24:1-19 })
+           []
+           (EpaComments
+            []))
+          (Match
+           (NoExtField)
+           (FunRhs
+            (L
+             (EpAnn
+              (EpaSpan { 24:1-7 })
+              (NameAnnTrailing
+               [])
+              (EpaComments
+               []))
+             (Unqual
+              {OccName: emptyBK}))
+            (Prefix)
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
+           (L
+            (EpaSpan { <no location info> })
+            [])
+           (GRHSs
+            (EpaComments
+             [])
+            (:|
+             (L
+              (EpAnn
+               (EpaSpan { 24:9-19 })
+               (NoEpAnns)
+               (EpaComments
+                []))
+              (GRHS
+               (EpAnn
+                (EpaSpan { 24:9-19 })
+                (GrhsAnn
+                 (Nothing)
+                 (Left
+                  (EpTok
+                   (EpaSpan { 24:9 }))))
+                (EpaComments
+                 []))
+               []
+               (L
+                (EpAnn
+                 (EpaSpan { 24:11-19 })
+                 []
+                 (EpaComments
+                  []))
+                (HsUntypedBracket
+                 (NoExtField)
+                 (DecBrL
+                  ((,,)
+                   (EpTok
+                    (EpaSpan { 24:11-13 }))
+                   (EpUniTok
+                    (EpaSpan { 24:18-19 })
+                    (NormalSyntax))
+                   ((,)
+                    (EpTok (EpaSpan { 24:15 }))
+                    (EpTok (EpaSpan { 24:16 }))))
+                  [])))))
+             [])
+            (EmptyLocalBinds
+             (NoExtField)))))])))))]))
