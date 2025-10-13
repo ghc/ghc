@@ -1,12 +1,3 @@
-ghc: Uncaught exception ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
-
-default output name would overwrite the input file; must specify -o explicitly
+<no location info>: error:
+    default output name would overwrite the input file; must specify -o explicitly
 Usage: For basic information, try the `--help' option.
-
-While handling default output name would overwrite the input file; must specify -o explicitly
-  | Usage: For basic information, try the `--help' option.
-
-HasCallStack backtrace:
-  throwIO, called at libraries/exceptions/src/Control/Monad/Catch.hs:1:1 in <package-id>:Control.Monad.Catch
-  throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:1:1 in <package-id>:Control.Monad.Catch
-  onException, called at compiler/GHC/Driver/MakeAction.hs:1:1 in <package-id>:GHC.Driver.MakeAction
