@@ -402,17 +402,35 @@ fullyStatic flavour =
 -- libraries.
 hostFullyStatic :: Flavour -> Flavour
 hostFullyStatic flavour =
-    addArgs staticExec $ disableDynamicGhcPrograms flavour
+    addArgs staticExec . noDynamicRts $ disableDynamicGhcPrograms flavour
   where
     -- Unlike 'fullyStatic', we need to ensure these flags are only
     -- applied to host code.
     staticExec :: Args
-    staticExec = stage0 ? mconcat
+    staticExec = stage1 ? mconcat
         [
           builder (Ghc CompileHs) ? pure [ "-fPIC", "-static" ]
         , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
         , builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
         ]
+    noDynamicRts :: Flavour -> Flavour
+    noDynamicRts f =
+       f
+         { rtsWays = do
+             ws <- rtsWays f
+             mconcat
+               [ notM stage1 ? pure ws,
+                 stage1
+                   ? pure (ws `Set.difference` Set.fromList [dynamic, profilingDynamic, threadedDynamic, threadedDebugDynamic, threadedProfilingDynamic, threadedDebugProfilingDynamic, debugDynamic, debugProfilingDynamic])
+               ]
+         , libraryWays = do
+             ws <- libraryWays f
+             mconcat
+               [ notM stage1 ? pure ws,
+                 stage1
+                   ? pure (ws `Set.difference` Set.fromList [dynamic, profilingDynamic, threadedDynamic, threadedDebugDynamic, threadedProfilingDynamic, threadedDebugProfilingDynamic, debugDynamic, debugProfilingDynamic ])
+               ]
+         }
 
 -- | Build stage2 dependencies with options to enable collection of compiler
 -- stats.
