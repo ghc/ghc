@@ -96,8 +96,9 @@ allowHaveLLVM = not . (`elem` ["wasm32", "javascript"])
 --
 inTreeCompilerArgs :: Stage -> Action TestCompilerArgs
 inTreeCompilerArgs stg = do
-
+    isCrossStage <- crossStage stg
     let ghcStage = succStage stg
+        pkgCacheStage = if isCrossStage then ghcStage else stg
     (hasDynamicRts, hasThreadedRts) <- do
       ways <- interpretInContext (vanillaContext ghcStage rts) getRtsWays
       return (dynamic `elem` ways, threaded `elem` ways)
@@ -130,7 +131,7 @@ inTreeCompilerArgs stg = do
     top         <- topDirectory
 
     pkgConfCacheFile <- System.FilePath.normalise . (top -/-)
-                    <$> (packageDbPath (PackageDbLoc stg Final) <&> (-/- "package.cache"))
+                    <$> (packageDbPath (PackageDbLoc pkgCacheStage Final) <&> (-/- "package.cache"))
     libdir           <- System.FilePath.normalise . (top -/-)
                     <$> stageLibPath stg
 
