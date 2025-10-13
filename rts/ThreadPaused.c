@@ -321,11 +321,12 @@ threadPaused(Capability *cap, StgTSO *tso)
             if(frame_info == &stg_bh_upd_frame_info) {
                 // eager black hole: we do nothing
 
-                // it should be a black hole that we own
+                // it should be a black hole (but we may not own it, as another
+                // thread could have raced us to claim it)
                 ASSERT(bh_info == &stg_BLACKHOLE_info ||
                        bh_info == &__stg_EAGER_BLACKHOLE_info ||
                        bh_info == &stg_CAF_BLACKHOLE_info);
-                ASSERT(blackHoleOwner(bh) == tso || blackHoleOwner(bh) == NULL);
+
             } else {
                 // lazy black hole
 
@@ -368,13 +369,15 @@ threadPaused(Capability *cap, StgTSO *tso)
                 // The payload of the BLACKHOLE points to the TSO
                 RELEASE_STORE(&((StgInd *)bh)->indirectee, (StgClosure *)tso);
                 SET_INFO_RELEASE(bh,&stg_BLACKHOLE_info);
-
-                // .. and we need a write barrier, since we just mutated the closure:
-                recordClosureMutated(cap,bh);
-
-                // We pretend that bh has just been created.
-                LDV_RECORD_CREATE(bh);
             }
+
+            // We need a write barrier, since the closure was mutated (by
+            // threadPaused for lazy black holes, or the mutator for eager
+            // black holes).
+            recordClosureMutated(cap,bh);
+
+            // We pretend that bh has just been created.
+            LDV_RECORD_CREATE(bh);
 
             frame = (StgClosure *) ((StgUpdateFrame *)frame + 1);
             if (prev_was_update_frame) {
