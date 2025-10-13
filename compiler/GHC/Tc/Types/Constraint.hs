@@ -80,17 +80,19 @@ module GHC.Tc.Types.Constraint (
         ctEvExpr, ctEvTerm,
         ctEvCoercion, givenCtEvCoercion,
         ctEvEvId, wantedCtEvEvId,
-        ctEvRewriters, setWantedCtEvRewriters, ctEvUnique, tcEvDestUnique,
+        ctEvRewriters, ctEvCoHoleSet, setWantedCtEvRewriters,
+        ctEvUnique, tcEvDestUnique,
         ctEvRewriteRole, ctEvRewriteEqRel, setCtEvPredType, setCtEvLoc,
         tyCoVarsOfCtEvList, tyCoVarsOfCtEv, tyCoVarsOfCtEvsList,
 
         -- CtEvidence constructors
         GivenCtEvidence(..), WantedCtEvidence(..),
 
-        -- RewriterSet
-        RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet,
-           -- exported concretely only for zonkRewriterSet
-        addRewriter, unitRewriterSet, unionRewriterSet, rewriterSetFromCts,
+        -- CoHoleSet and CoercionPlusHoles
+        --   CoHoleSet(..) is exported concretely only for zonkCoHoleSet
+        CoHoleSet(..), emptyCoHoleSet, isEmptyCoHoleSet, elemCoHoleSet,
+        addRewriter, unitCoHoleSet, unionCoHoleSet, delCoHoleSet,
+        CoercionPlusHoles(..), rewriterSetFromCts, mkReflCPH,
 
         wrapType,
 
@@ -127,7 +129,6 @@ import GHC.Tc.Types.CtLoc
 import GHC.Builtin.Names
 
 import GHC.Types.Var.Set
-import GHC.Types.Unique.Set
 import GHC.Types.Name.Reader
 
 import GHC.Utils.FV
@@ -139,7 +140,6 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.Bag
 
 import Control.Monad ( when )
-import Data.Coerce
 import Data.List  ( intersperse )
 import Data.Maybe ( mapMaybe, isJust )
 import GHC.Data.Maybe ( firstJust, firstJusts )
@@ -706,7 +706,7 @@ ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (ctEvidence ct)
 
-ctRewriters :: Ct -> RewriterSet
+ctRewriters :: Ct -> CoHoleSet
 ctRewriters = ctEvRewriters . ctEvidence
 
 ctEvId :: HasDebugCallStack => Ct -> EvVar
@@ -1210,7 +1210,7 @@ insolubleWantedCt ct
       -- It's a Wanted
   , insolubleCt ct
       -- It's insoluble
-  , isEmptyRewriterSet rewriters
+  , isEmptyCoHoleSet rewriters
       -- It has no rewriters – see (IW1) in Note [Insoluble Wanteds]
   , not (isGivenLoc loc)
       -- isGivenLoc: see (IW2) in Note [Insoluble Wanteds]
@@ -1291,12 +1291,13 @@ insolubleWantedCt returns True of a Wanted constraint that definitely
 can't be solved.  But not quite all such constraints; see wrinkles.
 
 (IW1) We only treat it as insoluble if it has an empty rewriter set.  (See Note
-   [Wanteds rewrite Wanteds].)  Otherwise #25325 happens: a Wanted constraint A
-   that is /not/ insoluble rewrites some other Wanted constraint B, so B has A
-   in its rewriter set.  Now B looks insoluble.  The danger is that we'll
-   suppress reporting B because of its empty rewriter set; and suppress
-   reporting A because there is an insoluble B lying around.  (This suppression
-   happens in GHC.Tc.Errors.mkErrorItem.)  Solution: don't treat B as insoluble.
+   [Wanteds rewrite Wanteds: rewriter-sets].)  Otherwise #25325 happens: a
+   Wanted constraint A that is /not/ insoluble rewrites some other Wanted
+   constraint B, so B has A in its rewriter set.  Now B looks insoluble.  The
+   danger is that we'll suppress reporting B because of its empty rewriter set;
+   and suppress reporting A because there is an insoluble B lying around.  (This
+   suppression happens in GHC.Tc.Errors.mkErrorItem.)  Solution: don't treat B
+   as insoluble.
 
 (IW2) If the Wanted arises from a Given (how can that happen?), don't
    treat it as a Wanted insoluble (obviously).
@@ -2292,7 +2293,8 @@ For Givens we make new EvVars and bind them immediately. Two main reasons:
       f :: C a b => ....
     Then in f's Givens we have g:(C a b) and the superclass sc(g,0):a~b.
     But that superclass selector can't (yet) appear in a coercion
-    (see evTermCoercion), so the easy thing is to bind it to an Id.
+    (see evTermCoercion), so the easy thing is to bind it to a (coercion) Id.
+    This happens in GHC.Tc.Solver.Dict.solveEqualityDict.
 
 So a Given has EvVar inside it rather than (as previously) an EvTerm.
 
@@ -2337,10 +2339,11 @@ data GivenCtEvidence =
 -- | Evidence for a Wanted constraint
 data WantedCtEvidence =
   WantedCt
-    { ctev_pred      :: TcPredType     -- See Note [Ct/evidence invariant]
-    , ctev_dest      :: TcEvDest       -- See Note [CtEvidence invariants]
+    { ctev_pred      :: TcPredType   -- See Note [Ct/evidence invariant]
+    , ctev_dest      :: TcEvDest     -- See Note [CtEvidence invariants]
     , ctev_loc       :: CtLoc
-    , ctev_rewriters :: RewriterSet }  -- See Note [Wanteds rewrite Wanteds]
+    , ctev_rewriters :: CoHoleSet }  -- See (WRW1) in
+                                     -- Note [Wanteds rewrite Wanteds: rewriter-sets]
 
 ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
@@ -2373,12 +2376,12 @@ ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm ev = EvExpr (ctEvExpr ev)
 
 -- | Extract the set of rewriters from a 'CtEvidence'
--- See Note [Wanteds rewrite Wanteds]
+-- See Note [Wanteds rewrite Wanteds: rewriter-sets]
 -- If the provided CtEvidence is not for a Wanted, just
 -- return an empty set.
-ctEvRewriters :: CtEvidence -> RewriterSet
+ctEvRewriters :: CtEvidence -> CoHoleSet
 ctEvRewriters (CtWanted (WantedCt { ctev_rewriters = rws })) = rws
-ctEvRewriters (CtGiven {})  = emptyRewriterSet
+ctEvRewriters (CtGiven {})  = emptyCoHoleSet
 
 ctHasNoRewriters :: Ct -> Bool
 ctHasNoRewriters ev
@@ -2388,15 +2391,35 @@ ctHasNoRewriters ev
 
 wantedCtHasNoRewriters :: WantedCtEvidence -> Bool
 wantedCtHasNoRewriters (WantedCt { ctev_rewriters = rws })
-  = isEmptyRewriterSet rws
+  = isEmptyCoHoleSet rws
 
 -- | Set the rewriter set of a Wanted constraint.
-setWantedCtEvRewriters :: WantedCtEvidence -> RewriterSet -> WantedCtEvidence
+setWantedCtEvRewriters :: WantedCtEvidence -> CoHoleSet -> WantedCtEvidence
 setWantedCtEvRewriters ev rs = ev { ctev_rewriters = rs }
 
+ctEvCoHoleSet :: CtEvidence -> CoHoleSet
+-- Returns the set of holes (empty or singleton) for the evidence itself
+-- Note the difference from ctEvRewriters!
+ctEvCoHoleSet (CtWanted (WantedCt { ctev_dest = HoleDest hole })) = unitCoHoleSet hole
+ctEvCoHoleSet _                                                   = emptyCoHoleSet
+
+rewriterSetFromCts :: Bag Ct -> CoHoleSet
+-- Take a bag of Wanted equalities, and collect them as a CoHoleSet
+rewriterSetFromCts cts
+  = foldr add emptyCoHoleSet cts
+  where
+    add ct rw_set =
+      case ctEvidence ct of
+        CtWanted (WantedCt { ctev_dest = HoleDest hole }) -> rw_set `addRewriter` hole
+        _                                                 -> rw_set
+
+mkReflCPH :: EqRel -> Type -> CoercionPlusHoles
+mkReflCPH eq_rel ty = CPH { cph_co = mkReflCo (eqRelRole eq_rel) ty
+                          , cph_holes = emptyCoHoleSet }
+
 ctEvExpr :: HasDebugCallStack => CtEvidence -> EvExpr
-ctEvExpr (CtWanted ev@(WantedCt { ctev_dest = HoleDest _ }))
-            = Coercion $ ctEvCoercion (CtWanted ev)
+ctEvExpr (CtWanted (WantedCt { ctev_dest = HoleDest hole }))
+            = Coercion $ mkHoleCo hole
 ctEvExpr ev = evId (ctEvEvId ev)
 
 givenCtEvCoercion :: GivenCtEvidence -> TcCoercion
@@ -2423,16 +2446,19 @@ ctEvEvId (CtWanted wtd)                         = wantedCtEvEvId wtd
 ctEvEvId (CtGiven (GivenCt { ctev_evar = ev })) = ev
 
 wantedCtEvEvId :: WantedCtEvidence -> EvVar
-wantedCtEvEvId (WantedCt { ctev_dest = EvVarDest ev }) = ev
-wantedCtEvEvId (WantedCt { ctev_dest = HoleDest h })   = coHoleCoVar h
+wantedCtEvEvId (WantedCt { ctev_dest = dest }) = tcEvDestVar dest
 
 ctEvUnique :: CtEvidence -> Unique
 ctEvUnique (CtGiven (GivenCt { ctev_evar = ev }))     = varUnique ev
 ctEvUnique (CtWanted (WantedCt { ctev_dest = dest })) = tcEvDestUnique dest
 
+tcEvDestVar :: TcEvDest -> EvVar
+tcEvDestVar (EvVarDest ev_var) = ev_var
+tcEvDestVar (HoleDest co_hole) = coHoleCoVar co_hole
+
 tcEvDestUnique :: TcEvDest -> Unique
-tcEvDestUnique (EvVarDest ev_var) = varUnique ev_var
-tcEvDestUnique (HoleDest co_hole) = varUnique (coHoleCoVar co_hole)
+tcEvDestUnique dest = varUnique (tcEvDestVar dest)
+
 
 setCtEvLoc :: CtEvidence -> CtLoc -> CtEvidence
 setCtEvLoc (CtGiven (GivenCt pred evar _)) loc = CtGiven (GivenCt pred evar loc)
@@ -2476,7 +2502,7 @@ instance Outputable CtEvidence where
              CtWanted ev -> ppr (ctev_dest ev)
 
       rewriters = ctEvRewriters ev
-      pp_rewriters | isEmptyRewriterSet rewriters = empty
+      pp_rewriters | isEmptyCoHoleSet rewriters = empty
                    | otherwise                    = semi <> ppr rewriters
 
 isWanted :: CtEvidence -> Bool
@@ -2486,44 +2512,6 @@ isWanted _ = False
 isGiven :: CtEvidence -> Bool
 isGiven (CtGiven {})  = True
 isGiven _ = False
-
-{-
-************************************************************************
-*                                                                      *
-           RewriterSet
-*                                                                      *
-************************************************************************
--}
-
--- | Stores a set of CoercionHoles that have been used to rewrite a constraint.
--- See Note [Wanteds rewrite Wanteds].
-newtype RewriterSet = RewriterSet (UniqSet CoercionHole)
-  deriving newtype (Outputable, Semigroup, Monoid)
-
-emptyRewriterSet :: RewriterSet
-emptyRewriterSet = RewriterSet emptyUniqSet
-
-unitRewriterSet :: CoercionHole -> RewriterSet
-unitRewriterSet = coerce (unitUniqSet @CoercionHole)
-
-unionRewriterSet :: RewriterSet -> RewriterSet -> RewriterSet
-unionRewriterSet = coerce (unionUniqSets @CoercionHole)
-
-isEmptyRewriterSet :: RewriterSet -> Bool
-isEmptyRewriterSet = coerce (isEmptyUniqSet @CoercionHole)
-
-addRewriter :: RewriterSet -> CoercionHole -> RewriterSet
-addRewriter = coerce (addOneToUniqSet @CoercionHole)
-
-rewriterSetFromCts :: Bag Ct -> RewriterSet
--- Take a bag of Wanted equalities, and collect them as a RewriterSet
-rewriterSetFromCts cts
-  = foldr add emptyRewriterSet cts
-  where
-    add ct rw_set =
-      case ctEvidence ct of
-        CtWanted (WantedCt { ctev_dest = HoleDest hole }) -> rw_set `addRewriter` hole
-        _                                                 -> rw_set
 
 {-
 ************************************************************************
@@ -2582,71 +2570,96 @@ With the solver handling Coercible constraints like equality constraints,
 the rewrite conditions must take role into account, never allowing
 a representational equality to rewrite a nominal one.
 
-Note [Wanteds rewrite Wanteds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Wanteds rewrite Wanteds: rewriter-sets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Should one Wanted constraint be allowed to rewrite another?
 
-This example (along with #8450) suggests not:
-   f :: a -> Bool
-   f x = ( [x,'c'], [x,True] ) `seq` True
-Here we get
-  [W] a ~ Char
-  [W] a ~ Bool
-but we do not want to complain about Bool ~ Char!
+This example (along with #8450) suggests "no":
+       f :: a -> Bool
+       f x = ( [x,'c'], [x,True] ) `seq` True
+    Here we get
+      [W] a ~ Char
+      [W] a ~ Bool
+    but we do not want to complain about Bool ~ Char!
 
-This example suggests yes (indexed-types/should_fail/T4093a):
-  type family Foo a
-  f :: (Foo e ~ Maybe e) => Foo e
-In the ambiguity check, we get
-  [G] g1 :: Foo e ~ Maybe e
-  [W] w1 :: Foo alpha ~ Foo e
-  [W] w2 :: Foo alpha ~ Maybe alpha
-w1 gets rewritten by the Given to become
-  [W] w3 :: Foo alpha ~ Maybe e
-Now, the only way to make progress is to allow Wanteds to rewrite Wanteds.
-Rewriting w3 with w2 gives us
-  [W] w4 :: Maybe alpha ~ Maybe e
-which will soon get us to alpha := e and thence to victory.
-
-TL;DR we want equality saturation.
+This example suggests "yes" (indexed-types/should_fail/T4093a):
+      type family Foo a
+      f :: (Foo e ~ Maybe e) => Foo e
+    In the ambiguity check, we get
+      [G] g1 :: Foo e ~ Maybe e
+      [W] w1 :: Foo alpha ~ Foo e
+      [W] w2 :: Foo alpha ~ Maybe alpha
+    w1 gets rewritten by the Given to become
+      [W] w3 :: Foo alpha ~ Maybe e
+    Now, the only way to make progress is to allow Wanteds to rewrite Wanteds.
+    Rewriting w3 with w2 gives us
+      [W] w4 :: Maybe alpha ~ Maybe e
+    which will soon get us to alpha := e and thence to victory.
+    TL;DR we want equality saturation.
 
 We thus want Wanteds to rewrite Wanteds in order to accept more programs,
 but we don't want Wanteds to rewrite Wanteds because doing so can create
-inscrutable error messages. To solve this dilemma:
+inscrutable error messages. To solve this dilemma
+    * We /do/ allow Wanteds to rewrite Wanteds
+    * We attach a /rewriter-set/ to each Wanted, and use that
+      to control unification and error messages
 
-* We allow Wanteds to rewrite Wanteds, but each Wanted tracks the set of Wanteds
-  it has been rewritten by, in its RewriterSet, stored in the ctev_rewriters
-  field of the CtWanted constructor of CtEvidence.  (Only Wanteds have
-  RewriterSets.)
+The rewriter-set plan
+~~~~~~~~~~~~~~~~~~~~~
+(WRW1) Each unsolved Wanted has its /rewriter-set/
 
-* A RewriterSet is just a set of unfilled CoercionHoles. This is sufficient
-  because only equalities (evidenced by coercion holes) are used for rewriting;
-  other (dictionary) constraints cannot ever rewrite.
+  The rewriter-set of a Wanted is a CoHoleSet that enumerates:
+     ** the set of Wanteds that it has been rewritten by **
 
-* The rewriter (in e.g. GHC.Tc.Solver.Rewrite.rewrite) tracks and returns a RewriterSet,
+  Only Wanteds have a rewriter-set. It is stored in the `ctev_rewriters` field
+  of the CtWanted constructor of CtEvidence.
+
+  Key point: if the rewriter-set is empty, then the constaint has been not been
+  rewritten by any unsolved constraint.
+
+(WRW2) A CoHoleSet is just a set of CoercionHoles. This is sufficient because only
+  equalities (evidenced by coercion holes) are used for rewriting; other
+  (dictionary) constraints cannot ever rewrite.
+
+(WRW3) The rewriter (in e.g. GHC.Tc.Solver.Rewrite.rewrite) tracks and returns a CoHoleSet,
   consisting of the evidence (a CoercionHole) for any Wanted equalities used in
   rewriting.
 
-* Then GHC.Tc.Solver.Solve.rewriteEvidence and GHC.Tc.Solver.Equality.rewriteEqEvidence
-  add this RewriterSet to the rewritten constraint's rewriter set.
+(WRW4) Then GHC.Tc.Solver.Solve.rewriteEvidence and GHC.Tc.Solver.Equality.rewriteEqEvidence
+  add this CoHoleSet to the rewritten constraint's rewriter set.
 
-* We prevent the unifier from unifying any equality with a non-empty rewriter set;
-  unification effectively turns a Wanted into a Given, and we lose all tracking.
-  See (REWRITERS) in Note [Unification preconditions] in GHC.Tc.Utils.Unify and
-  Note [Unify only if the rewriter set is empty] in GHC.Solver.Equality.
+(WRW5) We prevent the unifier from unifying any equality with a non-empty rewriter
+  set; unification effectively turns a Wanted into a Given, and we lose all
+  tracking.  See (REWRITERS) in Note [Unification preconditions] in
+  GHC.Tc.Utils.Unify and Note [Unify only if the rewriter set is empty] in
+  GHC.Solver.Equality.
 
-* In error reporting, we simply suppress any errors that have been rewritten
+(WRW6) Filling a coercion hole.  When filling a coercion hole we store, in the filled
+  hole `ch_ref`, a CoercionPlusHoles, which records (in `cph_holes`) a CoHoleSet that
+  is a superset of the CoercionHoles in the coercion `cph_co`.
+
+  e.g. Suppose we fill a coercion hole
+      co_hole0 := co_hole1 ; Maybe co_hole2
+   Another constraint D may have been written by this constraint, and thus have co_hole0
+   in D's `ctev_rewriters`   When zonking the rewriters of D, we want to record that
+   it has been rewritten by `co_hole1` and `co_hole2
+
+   Why a superset? It's is just possible that we have optimised (sym co ; co) to Refl,
+   thereby dropping the reference to `co`.  I'm not certain whether this actually
+   happens or not.
+
+(WRW7) In error reporting, we simply suppress any errors that have been rewritten
   by /unsolved/ wanteds. This suppression happens in GHC.Tc.Errors.mkErrorItem,
-  which uses `GHC.Tc.Zonk.Type.zonkRewriterSet` to look through any filled
+  which uses `GHC.Tc.Zonk.Type.zonkCoHoleSet` to look through any filled
   coercion holes. The idea is that we wish to report the "root cause" -- the
   error that rewrote all the others.
 
-* In `selectNextWorkItem`, priorities equalities with no rewiters.  See
-  Note [Prioritise Wanteds with empty RewriterSet] in GHC.Tc.Types.Constraint
+(WRW8) In `selectNextWorkItem`, priorities equalities with no rewiters.  See
+  Note [Prioritise Wanteds with empty CoHoleSet] in GHC.Tc.Types.Constraint
   wrinkle (PER1).
 
-* In error reporting, we prioritise Wanteds that have an empty RewriterSet:
-  see Note [Prioritise Wanteds with empty RewriterSet].
+(WRW9) In error reporting, we prioritise Wanteds that have an empty CoHoleSet:
+  see Note [Prioritise Wanteds with empty CoHoleSet].
 
 Let's continue our first example above:
 
@@ -2658,25 +2671,25 @@ Because Wanteds can rewrite Wanteds, w1 will rewrite w2, yielding
   inert: [W] w1 :: a ~ Char
          [W] w2 {w1}:: Char ~ Bool
 
-The {w1} in the second line of output is the RewriterSet of w1.
+The {w1} in the second line of output is the CoHoleSet of w1.
 
 Wrinkles:
 
-(WRW1) When we find a constraint identical to one already in the inert set,
+(WRW10) When we find a constraint identical to one already in the inert set,
    we solve one from the other. Other things being equal, keep the one
    that has fewer (better still no) rewriters.
    See (CE4) in Note [Combining equalities] in GHC.Tc.Solver.Equality.
 
-   To this accurately we should use `zonkRewriterSet` during canonicalisation,
+   To do this accurately we should use `zonkCoHoleSet` during canonicalisation,
    to eliminate rewriters that have now been solved.  Currently we only do so
    during error reporting; but perhaps we should change that.
 
-(WRW2) When zonking a constraint (with `zonkCt` and `zonkCtEvidence`) we take
-   the opportunity to zonk its `RewriterSet`, which eliminates solved ones.
-   This doesn't guarantee that rewriter sets are always up to date -- see
-   (WRW1) -- but it helps, and it de-clutters debug output.
+(WRW11) When zonking a constraint (with `zonkCt` and `zonkCtEvidence`) we take
+   the opportunity to zonk its `CoHoleSet`, which eliminates solved ones.
+   This doesn't guarantee that rewriter sets are always up to date -- c.f.
+   (WRW10) -- but it helps, and it de-clutters debug output.
 
-Note [Prioritise Wanteds with empty RewriterSet]
+Note [Prioritise Wanteds with empty CoHoleSet]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When extending the WorkList, in GHC.Tc.Solver.InertSet.extendWorkListEq,
 we prioritise constraints that have no rewriters. Here's why.
@@ -2723,8 +2736,8 @@ is done in `GHC.Tc.Solver.Monad.selectNextWorkItem`.
 
 Wrinkles
 
-(PER1) When picking the next work item, before checking for an empty RewriterSet
-  in GHC.Tc.Solver.Monad.selectNextWorkItem, we zonk the RewriterSet, because
+(PER1) When picking the next work item, before checking for an empty CoHoleSet
+  in GHC.Tc.Solver.Monad.selectNextWorkItem, we zonk the CoHoleSet, because
   some of those CoercionHoles may have been filled in since we last looked.
 
 (PER2) Despite the prioritisation, it is hard to be /certain/ that we can't end up
@@ -2820,7 +2833,7 @@ eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
 -- Can fr1 actually rewrite fr2?
 -- Very important function!
 -- See Note [eqCanRewrite]
--- See Note [Wanteds rewrite Wanteds]
+-- See Note [Wanteds rewrite Wanteds: rewriter-sets]
 -- See Note [Avoiding rewriting cycles]
 eqCanRewriteFR (Given,  r1)    (_,      r2)     = eqCanRewrite r1 r2
 eqCanRewriteFR (Wanted, NomEq) (Wanted, ReprEq) = False

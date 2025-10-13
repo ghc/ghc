@@ -24,7 +24,7 @@ module GHC.Tc.Solver.InertSet (
     -- * Inert equalities
     InertEqs,
     foldTyEqs, delEq, findEq,
-    partitionInertEqs, partitionFunEqs,
+    partitionInertEqs, partitionFunEqs, transformAndPartitionTyVarEqs,
     filterInertEqs, filterFunEqs,
     foldFunEqs, addEqToCans,
 
@@ -130,7 +130,8 @@ It's very important to process equalities over class constraints:
 Further refinements:
 
 * Among the equalities we prioritise ones with an empty rewriter set;
-  see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint, wrinkle (W1).
+  see Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint,
+  wrinkle (WRW8).
 
 * Among equalities with an empty rewriter set, we prioritise nominal equalities.
    * They have more rewriting power, so doing them first is better.
@@ -171,7 +172,7 @@ data WorkList
        , wl_rw_eqs  :: [Ct]  -- Like wl_eqs, but ones that may have a non-empty
                              -- rewriter set
          -- We prioritise wl_eqs over wl_rw_eqs;
-         -- see Note [Prioritise Wanteds with empty RewriterSet]
+         -- see Note [Prioritise Wanteds with empty CoHoleSet]
          -- in GHC.Tc.Types.Constraint for more details.
 
        , wl_rest :: [Ct]
@@ -200,11 +201,11 @@ workListSize :: WorkList -> Int
 workListSize (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs, wl_rest = rest })
   = length eqs_N + length eqs_X + length rw_eqs + length rest
 
-extendWorkListEq :: RewriterSet -> Ct -> WorkList -> WorkList
+extendWorkListEq :: CoHoleSet -> Ct -> WorkList -> WorkList
 extendWorkListEq rewriters ct
     wl@(WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs })
-  | isEmptyRewriterSet rewriters      -- A wanted that has not been rewritten
-    -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
+  | isEmptyCoHoleSet rewriters      -- A wanted that has not been rewritten
+    -- isEmptyCoHoleSet: see Note [Prioritise Wanteds with empty CoHoleSet]
     --                         in GHC.Tc.Types.Constraint
   = if isNominalEqualityCt ct
     then wl { wl_eqs_N = ct : eqs_N }
@@ -223,8 +224,8 @@ extendWorkListChildEqs :: CtEvidence -> Bag Ct -> WorkList -> WorkList
 -- Precondition: new_eqs is non-empty
 extendWorkListChildEqs parent_ev new_eqs
     wl@(WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs })
-  | isEmptyRewriterSet (ctEvRewriters parent_ev)
-    -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
+  | isEmptyCoHoleSet (ctEvRewriters parent_ev)
+    -- isEmptyCoHoleSet: see Note [Prioritise Wanteds with empty CoHoleSet]
     --                         in GHC.Tc.Types.Constraint
     -- If the rewriter set is empty, add to wl_eqs_X and wl_eqs_N
   = case partitionBag isNominalEqualityCt new_eqs of
@@ -244,7 +245,7 @@ extendWorkListChildEqs parent_ev new_eqs
     push_on_front new_eqs eqs = foldr (:) eqs new_eqs
 
 extendWorkListRewrittenEqs :: [EqCt] -> WorkList -> WorkList
--- Don't bother checking the RewriterSet: just pop them into wl_rw_eqs
+-- Don't bother checking the CoHoleSet: just pop them into wl_rw_eqs
 extendWorkListRewrittenEqs new_eqs wl@(WL { wl_rw_eqs = rw_eqs })
   = wl { wl_rw_eqs = foldr ((:) . CEqCan) rw_eqs new_eqs }
 
@@ -1359,27 +1360,30 @@ findEq icans (TyVarLHS tv) = findTyEqs icans tv
 findEq icans (TyFamLHS fun_tc fun_args)
   = concat @Maybe (findFunEq (inert_funeqs icans) fun_tc fun_args)
 
-{-# INLINE partition_eqs_container #-}
-partition_eqs_container
-  :: forall container
-   . container    -- empty container
-  -> (forall b. (EqCt -> b -> b) ->  container -> b -> b) -- folder
-  -> (EqCt -> container -> container)  -- extender
-  -> (EqCt -> Bool)
-  -> container
-  -> ([EqCt], container)
-partition_eqs_container empty_container fold_container extend_container pred orig_inerts
-  = fold_container folder orig_inerts ([], empty_container)
+transformAndPartitionTyVarEqs
+  :: (EqCt -> Either EqCt EqCt)         -- Left => chuck out, Right => keep
+  -> InertEqs
+  -> ([EqCt], InertEqs)               -- (chuck-out, keep)
+transformAndPartitionTyVarEqs pred orig_inerts
+  = foldTyEqs folder orig_inerts ([], emptyTyEqs)
   where
-    folder :: EqCt -> ([EqCt], container) -> ([EqCt], container)
+    folder :: EqCt -> ([EqCt], InertEqs) -> ([EqCt], InertEqs)
     folder eq_ct (acc_true, acc_false)
-      | pred eq_ct = (eq_ct : acc_true, acc_false)
-      | otherwise  = (acc_true,         extend_container eq_ct acc_false)
+      = case pred eq_ct of
+           Left eq_ct'  -> (eq_ct' : acc_true, acc_false)
+           Right eq_ct' -> (acc_true, addInertEqs eq_ct' acc_false)
 
 partitionInertEqs :: (EqCt -> Bool)   -- EqCt will always have a TyVarLHS
                   -> InertEqs
                   -> ([EqCt], InertEqs)
-partitionInertEqs = partition_eqs_container emptyTyEqs foldTyEqs addInertEqs
+partitionInertEqs pred orig_inerts
+  = foldTyEqs folder orig_inerts ([], emptyTyEqs)
+  where
+    folder :: EqCt -> ([EqCt], InertEqs) -> ([EqCt], InertEqs)
+    folder eq_ct (acc_true, acc_false)
+      = case pred eq_ct of
+           True  -> (eq_ct : acc_true, acc_false)
+           False -> (acc_true, addInertEqs eq_ct acc_false)
 
 addInertEqs :: EqCt -> InertEqs -> InertEqs
 -- Precondition: CanEqLHS is a TyVarLHS
@@ -1412,7 +1416,14 @@ foldFunEqs k fun_eqs z = foldTcAppMap (\eqs z -> foldr k z eqs) fun_eqs z
 partitionFunEqs :: (EqCt -> Bool)    -- EqCt will have a TyFamLHS
                 -> InertFunEqs
                 -> ([EqCt], InertFunEqs)
-partitionFunEqs = partition_eqs_container emptyFunEqs foldFunEqs addFunEqs
+partitionFunEqs pred orig_inerts
+  = foldFunEqs folder orig_inerts ([], emptyFunEqs)
+  where
+    folder :: EqCt -> ([EqCt], InertFunEqs) -> ([EqCt], InertFunEqs)
+    folder eq_ct (acc_true, acc_false)
+      = case pred eq_ct of
+           True  -> (eq_ct : acc_true, acc_false)
+           False -> (acc_true, addFunEqs eq_ct acc_false)
 
 addFunEqs :: EqCt -> InertFunEqs -> InertFunEqs
 -- Precondition: EqCt is a TyFamLHS
@@ -1424,12 +1435,11 @@ addFunEqs other _ = pprPanic "extendFunEqs" (ppr other)
 filterFunEqs :: (EqCt -> Bool) -> InertFunEqs -> InertFunEqs
 filterFunEqs f = mapMaybeTcAppMap g
   where
-    g xs =
-      let filtered = filter f xs
-      in
-        if null filtered
-        then Nothing
-        else Just filtered
+    g xs | null filtered = Nothing
+         | otherwise     = Just filtered
+         where
+           filtered = filter f xs
+
 
 {- *********************************************************************
 *                                                                      *
@@ -1998,7 +2008,7 @@ solveOneFromTheOther ct_i ct_w
         -- If only one has an empty rewriter set, use it
         -- c.f. GHC.Tc.Solver.Equality.inertsCanDischarge, and especially
         --      (CE4) in Note [Combining equalities]
-        | Just res <- better (isEmptyRewriterSet rw_i) (isEmptyRewriterSet rw_w)
+        | Just res <- better (isEmptyCoHoleSet rw_i) (isEmptyCoHoleSet rw_w)
         -> res
 
         -- If only one is a WantedSuperclassOrigin (arising from expanding

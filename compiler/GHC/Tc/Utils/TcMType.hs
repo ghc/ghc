@@ -202,7 +202,7 @@ newWantedWithLoc loc pty
          WantedCt { ctev_dest      = dst
                   , ctev_pred      = pty
                   , ctev_loc       = loc
-                  , ctev_rewriters = emptyRewriterSet }
+                  , ctev_rewriters = emptyCoHoleSet }
 
 -- | Create a new Wanted constraint with the given 'CtOrigin', and
 -- location information taken from the 'TcM' environment.
@@ -278,7 +278,7 @@ emitWantedEq origin t_or_k role ty1 ty2
            WantedCt { ctev_pred      = pty
                     , ctev_dest      = HoleDest hole
                     , ctev_loc       = loc
-                    , ctev_rewriters = emptyRewriterSet }
+                    , ctev_rewriters = emptyCoHoleSet }
        ; return (HoleCo hole) }
   where
     pty = mkEqPredRole role ty1 ty2
@@ -292,7 +292,7 @@ emitWantedEvVar origin ty
        ; let ctev = WantedCt { ctev_pred      = ty
                              , ctev_dest      = EvVarDest new_cv
                              , ctev_loc       = loc
-                             , ctev_rewriters = emptyRewriterSet }
+                             , ctev_rewriters = emptyCoHoleSet }
        ; emitSimple $ mkNonCanonical $ CtWanted ctev
        ; return new_cv }
 
@@ -360,15 +360,14 @@ newCoercionHole pred_ty
        ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
 
 -- | Put a value in a coercion hole
-fillCoercionHole :: CoercionHole -> Coercion -> TcM ()
-fillCoercionHole (CoercionHole { ch_ref = ref, ch_co_var = cv }) co = do
-  when debugIsOn $ do
-    cts <- readTcRef ref
-    whenIsJust cts $ \old_co ->
-      pprPanic "Filling a filled coercion hole" (ppr cv $$ ppr co $$ ppr old_co)
-  traceTc "Filling coercion hole" (ppr cv <+> text ":=" <+> ppr co)
-  writeTcRef ref (Just co)
-
+fillCoercionHole :: CoercionHole -> CoercionPlusHoles -> TcM ()
+fillCoercionHole (CoercionHole { ch_ref = ref, ch_co_var = cv }) co
+  = do { when debugIsOn $
+         do { cts <- readTcRef ref
+            ; whenIsJust cts $ \old_co ->
+              pprPanic "Filling a filled coercion hole" (ppr cv $$ ppr co $$ ppr old_co) }
+       ; traceTc "Filling coercion hole" (ppr cv <+> text ":=" <+> ppr co)
+       ; writeTcRef ref (Just co) }
 
 {- **********************************************************************
 *
@@ -1546,8 +1545,8 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (HoleCo hole)
       = do m_co <- liftZonkM (unpackCoercionHole_maybe hole)
            case m_co of
-             Just co -> go_co dv co
-             Nothing -> go_cv dv (coHoleCoVar hole)
+             Just (CPH { cph_co = co }) -> go_co dv co
+             Nothing                    -> go_cv dv (coHoleCoVar hole)
 
     go_co dv (CoVarCo cv) = go_cv dv cv
 

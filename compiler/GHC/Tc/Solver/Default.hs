@@ -29,7 +29,7 @@ import GHC.Core.Reduction( Reduction, reductionCoercion )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Core.Make
-import GHC.Core.Coercion( isReflCo, mkReflCo, mkSubCo, hasCoercionHole )
+import GHC.Core.Coercion( isReflCo, mkSubCo, hasCoercionHole )
 import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -296,7 +296,7 @@ solveImplicationUsingUnsatGiven
     go_simple ct = case ctEvidence ct of
       CtWanted (WantedCt { ctev_pred = pty, ctev_dest = dest })
         -> do { ev_expr <- unsatisfiableEvExpr unsat_given pty
-              ; setWantedEvTerm dest EvNonCanonical $ EvExpr ev_expr }
+              ; setWantedDict dest EvNonCanonical $ EvExpr ev_expr }
       _ -> return ()
 
 -- | Create an evidence expression for an arbitrary constraint using
@@ -447,7 +447,7 @@ defaultExceptionContext ct
        ; empty_ec_id <- lookupId emptyExceptionContextName
        ; let ev = ctEvidence ct
              ev_tm = EvExpr (evWrapIPE (ctEvPred ev) (Var empty_ec_id))
-       ; setEvBindIfWanted ev EvCanonical ev_tm
+       ; setDictIfWanted ev EvCanonical ev_tm
          -- EvCanonical: see Note [CallStack and ExceptionContext hack]
          --              in GHC.Tc.Solver.Dict
        ; return True }
@@ -541,8 +541,7 @@ defaultEquality encl_eqs ct
           = do { traceTcS "defaultEquality success:" (ppr rhs_ty)
                ; unifyTyVar lhs_tv rhs_ty  -- NB: unifyTyVar adds to the
                                            -- TcS unification counter
-               ; setEvBindIfWanted (ctEvidence ct) EvCanonical $
-                 evCoercion (mkReflCo Nominal rhs_ty)
+               ; setEqIfWanted (ctEvidence ct) (mkReflCPH NomEq rhs_ty)
                ; return True
                }
 
@@ -567,8 +566,8 @@ defaultEquality encl_eqs ct
             -- See Note [Defaulting representational equalities].
            ; if null new_eqs
              then do { traceTcS "defaultEquality ReprEq } (yes)" empty
-                     ; setEvBindIfWanted (ctEvidence ct) EvCanonical $
-                       evCoercion $ mkSubCo co
+                     ; setEqIfWanted (ctEvidence ct) $
+                       CPH { cph_co = mkSubCo co, cph_holes = emptyCoHoleSet }
                      ; return True }
              else do { traceTcS "defaultEquality ReprEq } (no)" empty
                      ; return False } }

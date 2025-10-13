@@ -2297,7 +2297,7 @@ unifyTypeAndEmit t_or_k orig ty1 ty2
            -- /any/ level outside this one as untouchable.  Hence cur_lvl.
        ; let env = UE { u_loc = loc, u_role = Nominal
                       , u_given_eq_lvl = cur_lvl
-                      , u_rewriters = emptyRewriterSet  -- ToDo: check this
+                      , u_rewriters = emptyCoHoleSet  -- ToDo: check this
                       , u_defer = ref, u_what = WU_None }
 
        -- The hard work happens here
@@ -2444,7 +2444,7 @@ A job for the future.
 data UnifyEnv
   = UE { u_role         :: Role
        , u_loc          :: CtLoc
-       , u_rewriters    :: RewriterSet
+       , u_rewriters    :: CoHoleSet
 
        -- `u_given_eq_lvl` is just like the `inert_given_eq_lvl`
        -- field of GHC.Tc.Solver.InertSet.InertCans
@@ -4597,7 +4597,7 @@ makeTypeConcrete occ_fs conc_orig ty =
                          $ WantedCt { ctev_pred      = pty
                                     , ctev_dest      = HoleDest hole
                                     , ctev_loc       = loc
-                                    , ctev_rewriters = emptyRewriterSet }
+                                    , ctev_rewriters = emptyCoHoleSet }
                 ; return (kind_cts S.<> unitBag ct, HoleCo hole)
                 }
 

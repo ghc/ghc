@@ -1481,7 +1481,7 @@ in `getRuleQuantCts`.  Why not?
          do { ev_id <- newEvVar pred
             ; fillCoercionHole hole (mkCoVarCo ev_id)
             ; return ev_id }
-    But that led to new complications becuase of the side effect on the coercion
+    But that led to new complications because of the side effect on the coercion
     hole. Much easier just to side-step the issue entirely by not quantifying over
     equalities.
 

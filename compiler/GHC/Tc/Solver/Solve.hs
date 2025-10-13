@@ -1273,7 +1273,7 @@ solveCt (CEqCan (EqCt { eq_ev = ev, eq_eq_rel = eq_rel
   = solveEquality ev eq_rel (canEqLHSType lhs) rhs
 
 solveCt (CQuantCan qci@(QCI { qci_ev = ev }))
-  = do { ev' <- rewriteEvidence ev
+  = do { ev' <- rewriteDictEvidence ev
          -- It is (much) easier to rewrite and re-classify than to
          -- rewrite the pieces and build a Reduction that will rewrite
          -- the whole constraint
@@ -1284,7 +1284,7 @@ solveCt (CQuantCan qci@(QCI { qci_ev = ev }))
            _ -> pprPanic "SolveCt" (ppr ev) }
 
 solveCt (CDictCan (DictCt { di_ev = ev, di_pend_sc = pend_sc }))
-  = do { ev <- rewriteEvidence ev
+  = do { ev <- rewriteDictEvidence ev
          -- It is easier to rewrite and re-classify than to rewrite
          -- the pieces and build a Reduction that will rewrite the
          -- whole constraint
@@ -1309,7 +1309,7 @@ solveNC ev
         _ ->
 
     -- Do rewriting on the constraint, especially zonking
-    do { ev <- rewriteEvidence ev
+    do { ev <- rewriteDictEvidence ev
 
     -- And then re-classify
        ; case classifyPredType (ctEvPred ev) of
@@ -1582,7 +1582,7 @@ try_inert_qcs (QCI { qci_ev = ev_w }) inerts =
              ; continueWith () }
     ev_i:_ ->
       do { traceTcS "tryInertQCs:KeepInert" (ppr ev_i)
-         ; setEvBindIfWanted ev_w EvCanonical (ctEvTerm ev_i)
+         ; setDictIfWanted ev_w EvCanonical (ctEvTerm ev_i)
          ; stopWith ev_w "Solved Wanted forall-constraint from inert" }
   where
     matching_inert (QCI { qci_ev = ev_i })
@@ -1666,7 +1666,7 @@ solveWantedQCI mode ct@(CQuantCan (QCI { qci_ev =  ev, qci_tvs = tvs
               -- NB: even if it is fully solved we must return it, because it is
               --     carrying a record of which evidence variables are used
               --     See Note [Free vars of EvFun] in GHC.Tc.Types.Evidence
-             do { setWantedEvTerm dest EvCanonical $
+             do { setWantedDict dest EvCanonical $
                   EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
                         , et_binds = TcEvBinds ev_binds_var
                         , et_body = wantedCtEvEvId wanted_ev }
@@ -1689,10 +1689,12 @@ solveWantedQCI _ ct = return (Left ct)
 ************************************************************************
 -}
 
-rewriteEvidence :: CtEvidence -> SolverStage CtEvidence
--- (rewriteEvidence old_ev new_pred co do_next)
+rewriteDictEvidence :: CtEvidence -> SolverStage CtEvidence
+-- (rewriteDictEvidence old_ev new_pred co do_next)
 -- Main purpose: create new evidence for new_pred;
 --                 unless new_pred is cached already
+-- Precondition: new_pred is not an equality: the evidence is a term-level
+--               thing, hence "Dict".
 -- * Calls do_next with (new_ev :: new_pred), with same wanted/given flag as old_ev
 -- * If old_ev was wanted, create a binding for old_ev, in terms of new_ev
 -- * If old_ev was given, AND not cached, create a binding for new_ev, in terms of old_ev
@@ -1723,26 +1725,26 @@ the rewriter set. We check this with an assertion.
  -}
 
 
-rewriteEvidence ev
-  = Stage $ do { traceTcS "rewriteEvidence" (ppr ev)
+rewriteDictEvidence ev
+  = Stage $ do { traceTcS "rewriteDictEvidence" (ppr ev)
                ; (redn, rewriters) <- rewrite ev (ctEvPred ev)
                ; finish_rewrite ev redn rewriters }
 
 finish_rewrite :: CtEvidence   -- ^ old evidence
                -> Reduction    -- ^ new predicate + coercion, of type <type of old evidence> ~ new predicate
-               -> RewriterSet  -- ^ See Note [Wanteds rewrite Wanteds]
+               -> CoHoleSet  -- ^ See Note [Wanteds rewrite Wanteds: rewriter-sets]
                                -- in GHC.Tc.Types.Constraint
                -> TcS (StopOrContinue CtEvidence)
 finish_rewrite old_ev (Reduction co new_pred) rewriters
   | isReflCo co -- See Note [Rewriting with Refl]
-  = assert (isEmptyRewriterSet rewriters) $
+  = assert (isEmptyCoHoleSet rewriters) $
     continueWith (setCtEvPredType old_ev new_pred)
 
 finish_rewrite
   ev@(CtGiven (GivenCt { ctev_evar = old_evar }))
   (Reduction co new_pred)
   rewriters
-  = assert (isEmptyRewriterSet rewriters) $ -- this is a Given, not a wanted
+  = assert (isEmptyCoHoleSet rewriters) $ -- this is a Given, not a wanted
     do { let loc = ctEvLoc ev
              -- mkEvCast optimises ReflCo
              ev_rw_role = ctEvRewriteRole ev
@@ -1761,8 +1763,8 @@ finish_rewrite
              ev_rw_role = ctEvRewriteRole ev
        ; mb_new_ev <- newWanted loc rewriters' new_pred
        ; massert (coercionRole co == ev_rw_role)
-       ; setWantedEvTerm dest EvCanonical $
-         evCast (getEvExpr mb_new_ev)     $
+       ; setWantedDict dest EvCanonical $
+         evCast (getEvExpr mb_new_ev)                $
          downgradeRole Representational ev_rw_role (mkSymCo co)
        ; case mb_new_ev of
             Fresh  new_ev -> continueWith $ CtWanted new_ev
@@ -1826,16 +1828,23 @@ runTcPluginsWanted wanted
                               listToBag unsolved_wanted  `andCts`
                               listToBag insols
 
-       ; mapM_ setEv solved_wanted
+       ; mapM_ setPluginEv solved_wanted
 
        ; traceTcS "Finished plugins }" (ppr new_wanted)
        ; return ( notNull (pluginNewCts p), all_new_wanted ) } }
-  where
-    setEv :: (EvTerm,Ct) -> TcS ()
-    setEv (ev,ct) = case ctEvidence ct of
-      CtWanted (WantedCt { ctev_dest = dest }) -> setWantedEvTerm dest EvCanonical ev
-           -- TODO: plugins should be able to signal non-canonicity
-      _ -> panic "runTcPluginsWanted.setEv: attempt to solve non-wanted!"
+
+setPluginEv :: (EvTerm,Ct) -> TcS ()
+setPluginEv (tm,ct)
+  = case ctEvidence ct of
+      CtWanted (WantedCt { ctev_dest = dest })
+        -> case dest of
+              EvVarDest {} -> setWantedDict dest EvCanonical tm
+                              -- TODO: plugins should be able to signal non-canonicity
+              HoleDest {}  -> setWantedEq dest (CPH { cph_co = evTermCoercion tm
+                                                    , cph_holes = emptyCoHoleSet })
+                              -- TODO: cph_holes: should we try to track rewriters?
+
+      CtGiven {} -> panic "runTcPluginsWanted.setEv: attempt to solve non-wanted!"
 
 -- | A pair of (given, wanted) constraints to pass to plugins
 type SplitCts  = ([Ct], [Ct])

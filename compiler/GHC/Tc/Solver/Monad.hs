@@ -50,13 +50,13 @@ module GHC.Tc.Solver.Monad (
     CanonicalEvidence(..),
 
     newTcEvBinds, newNoTcEvBinds,
-    newWantedEq, emitNewWantedEq,
+    newWantedEq,
     newWanted,
     newWantedNC, newWantedEvVarNC,
     newBoundEvVarId,
     unifyTyVar, reportFineGrainUnifications, reportCoarseGrainUnifications,
-    setEvBind, setWantedEq,
-    setWantedEvTerm, setEvBindIfWanted,
+    setEvBind, setWantedEq, setWantedDict, setEqIfWanted, setDictIfWanted,
+    fillCoercionHole,
     newEvVar, newGivenEv, emitNewGivens,
     emitChildEqs, checkReductionDepth,
 
@@ -190,7 +190,6 @@ import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
-import GHC.Types.Unique.Set( elementOfUniqSet )
 import GHC.Types.Id
 import GHC.Types.Basic (allImportLevels)
 import GHC.Types.ThLevelIndex (thLevelIndexFromImportLevel)
@@ -413,8 +412,41 @@ updInertIrreds irred
 ************************************************************************
 -}
 
+{- Note [Kick out after filling a coercion hole]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we we solve `kco` and have `co` in the inert set whose rewriter-set includes `kco`,
+we should kick out `co` so that we can now unify it, which might unlock other stuff.
+See Note [Unify only if the rewriter set is empty] in GHC.Tc.Solver.Equality for
+why solving `kco` might unlock `co`, especially (URW2).
 
------------------------------------------
+Hence `kickOutAfterFillingCoercionHole`.  It looks at inert constraints that are
+  * Wanted
+  * Of form  alpha ~ rhs, where alpha is a unification variable
+and kicks out any that will have an empty rewriter set after filling the hole.
+
+Wrinkles:
+(KOC1) If co's rewriter-set is {kco, xco}, there is on point in kicking it out,
+       because it still can't be unified.  So we only kick out if the co's
+       rewriter-set becomes empty.
+
+(KOC2) `kco` might itself have a rewriter set.  This is fairly common.  E.g.
+               kco : a[sk] ~ beta[tau]
+       Assuming we can't unify it for some reason, we may swap that over to give
+               kco2 : beta[tau] ~ a[sk]      kco := sym kco2
+       So `kco` is "solved" but the coercion that solves it has free coercion holes!
+       So rather than kick out `co`, we should just change its rewriter-set to depend
+       on `kco2` instead of `kco`.  Hence the `new_holes` passed to
+       `kickOutAfterFillingCoercionHole`
+
+(KOC3) It's possible that this could just go ahead and unify, but could there
+       be occurs-check problems? Seems simpler just to kick out.
+
+(KOC4) Kick-out is undesirable, so it'd be better to solve `kco` before `co`.  So
+       the solver prioritises equalities with an empty rewriter set, to try to
+       avoid unnecessary kick-out.  See GHC.Tc.Types.Constraint
+       Note [Prioritise Wanteds with empty CoHoleSet] esp (PER1)
+-}
+
 kickOutRewritable  :: KickOutSpec -> CtFlavourRole -> TcS ()
 kickOutRewritable ko_spec new_fr
   = do { ics <- getInertCans
@@ -458,13 +490,9 @@ kickOutAfterUnification tv_set
        ; traceTcS "kickOutAfterUnification" (ppr tv_set $$ text "n_kicked =" <+> ppr n_kicked)
        ; return n_kicked }
 
-kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
--- See Wrinkle (URW2) in Note [Unify only if the rewriter set is empty]
--- in GHC.Tc.Solver.Equality
---
--- It's possible that this could just go ahead and unify, but could there
--- be occurs-check problems? Seems simpler just to kick out.
-kickOutAfterFillingCoercionHole hole
+kickOutAfterFillingCoercionHole :: CoercionHole -> CoercionPlusHoles -> TcS ()
+-- See Note [Kick out after filling a coercion hole]
+kickOutAfterFillingCoercionHole hole (CPH { cph_holes = new_holes })
   = do { ics <- getInertCans
        ; let (kicked_out, ics') = kick_out ics
              n_kicked           = length kicked_out
@@ -483,16 +511,22 @@ kickOutAfterFillingCoercionHole hole
     kick_out ics@(IC { inert_eqs = eqs })
       = (eqs_to_kick, ics { inert_eqs = eqs_to_keep })
       where
-        (eqs_to_kick, eqs_to_keep) = partitionInertEqs kick_out_eq eqs
+        (eqs_to_kick, eqs_to_keep) = transformAndPartitionTyVarEqs kick_out_eq eqs
 
-    kick_out_eq :: EqCt -> Bool    -- True: kick out; False: keep.
-    kick_out_eq (EqCt { eq_ev = ev ,eq_lhs = lhs })
-      | CtWanted (WantedCt { ctev_rewriters = RewriterSet rewriters }) <- ev
+    kick_out_eq :: EqCt -> Either EqCt EqCt
+    kick_out_eq eq_ct@(EqCt { eq_ev = ev, eq_lhs = lhs })
+      | CtWanted (wev@(WantedCt { ctev_rewriters = rewriters })) <- ev
       , TyVarLHS tv <- lhs
       , isMetaTyVar tv
-      = hole `elementOfUniqSet` rewriters
+      , hole `elemCoHoleSet` rewriters
+      , let holes' = (rewriters `delCoHoleSet` hole) `mappend` new_holes
+                     -- Adding new_holes and deleting hole: see (KOC2)
+            eq_ct' = eq_ct { eq_ev = CtWanted (wev { ctev_rewriters = holes' }) }
+      = if isEmptyCoHoleSet holes'
+        then Left eq_ct'    -- Kick out, if new rewriter set is empty (KOC1)
+        else Right eq_ct'   -- Keep, but with trimmed holes see (KOC2)
       | otherwise
-      = False
+      = Right eq_ct
 
 --------------
 insertSafeOverlapFailureTcS :: InstanceWhat -> DictCt -> TcS ()
@@ -1723,7 +1757,7 @@ selectNextWorkItem :: TcS (Maybe Ct)
 --
 -- Suppose a constraint c1 is rewritten by another, c2.  When c2
 -- gets solved, c1 has no rewriters, and can be prioritised; see
--- Note [Prioritise Wanteds with empty RewriterSet] in
+-- Note [Prioritise Wanteds with empty CoHoleSet] in
 -- GHC.Tc.Types.Constraint wrinkle (PER1)
 
 -- ToDo: if wl_rw_eqs is long, we'll re-zonk it each time we pick
@@ -1748,7 +1782,7 @@ selectNextWorkItem
              -- try_rws looks through rw_eqs to find one that has an empty
              -- rewriter set, after zonking.  If none such, call try_rest.
              try_rws acc (ct:cts)
-                = do { ct' <- liftZonkTcS (TcM.zonkCtRewriterSet ct)
+                = do { ct' <- liftZonkTcS (TcM.zonkCtCoHoleSet ct)
                      ; if ctHasNoRewriters ct'
                        then pick_me ct' (wl { wl_rw_eqs = cts ++ acc })
                        else try_rws (ct':acc) cts }
@@ -1940,63 +1974,42 @@ setEvBind ev_bind
   = do { evb <- getTcEvBindsVar
        ; wrapTcS $ TcM.addTcEvBind evb ev_bind }
 
--- | Mark variables as used filling a coercion hole
-addUsedCoercion :: TcCoercion -> TcS ()
-addUsedCoercion co
-  = do { ev_binds_var <- getTcEvBindsVar
-       ; wrapTcS (TcM.updTcRef (ebv_tcvs ev_binds_var) (co :)) }
-
--- | Equalities only
-setWantedEq :: HasDebugCallStack => TcEvDest -> TcCoercion -> TcS ()
-setWantedEq (HoleDest hole) co
-  = do { addUsedCoercion co
-       ; fillCoercionHole hole co }
-setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq: EvVarDest" (ppr ev)
-
--- | Good for both equalities and non-equalities
-setWantedEvTerm :: TcEvDest -> CanonicalEvidence -> EvTerm -> TcS ()
-setWantedEvTerm (HoleDest hole) _canonical tm
-  | Just co <- evTermCoercion_maybe tm
-  = do { addUsedCoercion co
-       ; fillCoercionHole hole co }
-  | otherwise
-  = -- See Note [Yukky eq_sel for a HoleDest]
-    do { let co_var = coHoleCoVar hole
-       ; setEvBind (mkWantedEvBind co_var EvCanonical tm)
-       ; fillCoercionHole hole (mkCoVarCo co_var) }
-
-setWantedEvTerm (EvVarDest ev_id) canonical tm
-  = setEvBind (mkWantedEvBind ev_id canonical tm)
-
-{- Note [Yukky eq_sel for a HoleDest]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-How can it be that a Wanted with HoleDest gets evidence that isn't
-just a coercion? i.e. evTermCoercion_maybe returns Nothing.
-
-Consider [G] forall a. blah => a ~ T
-         [W] S ~# T
-
-Then doTopReactEqPred carefully looks up the (boxed) constraint (S ~ T)
-in the quantified constraints, and wraps the (boxed) evidence it
-gets back in an eq_sel to extract the unboxed (S ~# T).  We can't put
-that term into a coercion, so we add a value binding
-    h = eq_sel (...)
-and the coercion variable h to fill the coercion hole.
-We even re-use the CoHole's Id for this binding!
-
-Yuk!
--}
-
-fillCoercionHole :: CoercionHole -> Coercion -> TcS ()
-fillCoercionHole hole co
-  = do { wrapTcS $ TcM.fillCoercionHole hole co
-       ; kickOutAfterFillingCoercionHole hole }
-
-setEvBindIfWanted :: CtEvidence -> CanonicalEvidence -> EvTerm -> TcS ()
-setEvBindIfWanted ev canonical tm
+setEqIfWanted :: CtEvidence -> CoercionPlusHoles -> TcS ()
+setEqIfWanted ev co_plus_holes
   = case ev of
-      CtWanted (WantedCt { ctev_dest = dest }) -> setWantedEvTerm dest canonical tm
-      _                                        -> return ()
+      CtWanted (WantedCt { ctev_dest = dest })
+         -> setWantedEq dest co_plus_holes
+      _  -> return ()
+
+setWantedEq :: HasDebugCallStack => TcEvDest -> CoercionPlusHoles -> TcS ()
+-- ^ Equalities only
+setWantedEq dest co_plus_holes
+  = case dest of
+      HoleDest hole -> fillCoercionHole hole co_plus_holes
+      EvVarDest ev  -> pprPanic "setWantedEq: EvVarDest" (ppr ev)
+
+setDictIfWanted :: CtEvidence -> CanonicalEvidence -> EvTerm -> TcS ()
+setDictIfWanted ev canonical tm
+  = case ev of
+      CtWanted (WantedCt { ctev_dest = dest })
+         -> setWantedDict dest canonical tm
+      _  -> return ()
+
+setWantedDict :: TcEvDest -> CanonicalEvidence -> EvTerm -> TcS ()
+-- ^ Dictionaries only
+setWantedDict dest canonical tm
+  = case dest of
+      EvVarDest ev_id -> setEvBind (mkWantedEvBind ev_id canonical tm)
+      HoleDest h      -> pprPanic "setWantedEq: HoleDest" (ppr h)
+
+fillCoercionHole :: CoercionHole -> CoercionPlusHoles -> TcS ()
+fillCoercionHole hole co_plus_holes@(CPH { cph_co = co })
+  = do { ev_binds_var <- getTcEvBindsVar
+       ; wrapTcS $ do { -- Record usage of the free vars of this coercion
+                        TcM.updTcRef (ebv_tcvs ev_binds_var) (co :)
+                      ; -- Fill the hole
+                        TcM.fillCoercionHole hole co_plus_holes }
+       ; kickOutAfterFillingCoercionHole hole co_plus_holes }
 
 newTcEvBinds :: TcS EvBindsVar
 newTcEvBinds = wrapTcS TcM.newTcEvBinds
@@ -2009,9 +2022,11 @@ newEvVar pred = wrapTcS (TcM.newEvVar pred)
 
 newGivenEv :: CtLoc -> (TcPredType, EvTerm) -> TcS GivenCtEvidence
 -- Make a new variable of the given PredType,
--- immediately bind it to the given term
--- and return its CtEvidence
+-- immediately bind it to the given term, and return its CtEvidence
 -- See Note [Bind new Givens immediately] in GHC.Tc.Types.Constraint
+--
+-- The `pred` can be an /equality predicate/ t1 ~# t2;
+--   see (EQC1) in Note [Solving equality classes] in GHC.Tc.Solver.Dict
 newGivenEv loc (pred, rhs)
   = do { new_ev <- newBoundEvVarId pred rhs
        ; return $ GivenCt { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc } }
@@ -2034,13 +2049,6 @@ emitNewGivens loc pts
                 , not (ty1 `tcEqType` ty2) ] -- Kill reflexive Givens at birth
        ; emitWorkNC (map CtGiven gs) }
 
-emitNewWantedEq :: CtLoc -> RewriterSet -> Role -> TcType -> TcType -> TcS Coercion
--- | Emit a new Wanted equality into the work-list
-emitNewWantedEq loc rewriters role ty1 ty2
-  = do { (wtd, co) <- newWantedEq loc rewriters role ty1 ty2
-       ; updWorkListTcS (extendWorkListEq rewriters (mkNonCanonical $ CtWanted wtd))
-       ; return co }
-
 emitChildEqs :: CtEvidence -> Cts -> TcS ()
 -- Emit a bunch of equalities into the work list
 -- See Note [Work-list ordering] in GHC.Tc.Solver.Equality
@@ -2056,22 +2064,22 @@ emitChildEqs ev eqs
 
 -- | Create a new Wanted constraint holding a coercion hole
 -- for an equality between the two types at the given 'Role'.
-newWantedEq :: CtLoc -> RewriterSet -> Role -> TcType -> TcType
-            -> TcS (WantedCtEvidence, Coercion)
+newWantedEq :: CtLoc -> CoHoleSet -> Role -> TcType -> TcType
+            -> TcS (WantedCtEvidence, CoercionHole)
 newWantedEq loc rewriters role ty1 ty2
   = do { hole <- wrapTcS $ TcM.newCoercionHole pty
        ; let wtd = WantedCt { ctev_pred      = pty
                             , ctev_dest      = HoleDest hole
                             , ctev_loc       = loc
                             , ctev_rewriters = rewriters }
-       ; return (wtd, mkHoleCo hole) }
+       ; return (wtd, hole) }
   where
     pty = mkEqPredRole role ty1 ty2
 
 -- | Create a new Wanted constraint holding an evidence variable.
 --
 -- Don't use this for equality constraints: use 'newWantedEq' instead.
-newWantedEvVarNC :: CtLoc -> RewriterSet
+newWantedEvVarNC :: CtLoc -> CoHoleSet
                  -> TcPredType -> TcS WantedCtEvidence
 -- Don't look up in the solved/inerts; we know it's not there
 newWantedEvVarNC loc rewriters pty
@@ -2095,7 +2103,7 @@ newWantedEvVarNC loc rewriters pty
 --
 -- Don't use this for equality constraints: this function is only for
 -- constraints with 'EvVarDest'.
-newWantedEvVar :: CtLoc -> RewriterSet
+newWantedEvVar :: CtLoc -> CoHoleSet
                -> TcPredType -> TcS MaybeNew
 newWantedEvVar loc rewriters pty
   = case classifyPredType pty of
@@ -2115,7 +2123,7 @@ newWantedEvVar loc rewriters pty
 -- a new one from scratch.
 --
 -- Deals with both equality and non-equality constraints.
-newWanted :: CtLoc -> RewriterSet -> PredType -> TcS MaybeNew
+newWanted :: CtLoc -> CoHoleSet -> PredType -> TcS MaybeNew
 newWanted loc rewriters pty
   | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
   = Fresh . fst <$> newWantedEq loc rewriters role ty1 ty2
@@ -2128,7 +2136,7 @@ newWanted loc rewriters pty
 --
 -- Does not attempt to re-use non-equality constraints that already
 -- exist in the inert set.
-newWantedNC :: CtLoc -> RewriterSet -> PredType -> TcS WantedCtEvidence
+newWantedNC :: CtLoc -> CoHoleSet -> PredType -> TcS WantedCtEvidence
 newWantedNC loc rewriters pty
   | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
   = fst <$> newWantedEq loc rewriters role ty1 ty2
@@ -2203,14 +2211,15 @@ uPairsTcM :: UnifyEnv -> [TypeEqn] -> TcM ()
 uPairsTcM uenv eqns = mapM_ (\(Pair ty1 ty2) -> uType uenv ty1 ty2) eqns
 
 wrapUnifierAndEmit :: CtEvidence -> Role
-                   -> (UnifyEnv -> TcM a)  -- Some calls to uType
-                   -> TcS a
+                   -> (UnifyEnv -> TcM TcCoercion)  -- Some calls to uType
+                   -> TcS CoercionPlusHoles
 -- Like wrapUnifier, but
 --    emits any unsolved equalities into the work-list
 --    kicks out any inert constraints that mention unified variables
+--    returns a CoHoleSet describing the new unsolved goals
 wrapUnifierAndEmit ev role do_unifications
-  = do { (unifs, (res, eqs)) <- reportFineGrainUnifications $
-                                wrapUnifier ev role do_unifications
+  = do { (unifs, (co, eqs)) <- reportFineGrainUnifications $
+                               wrapUnifier ev role do_unifications
 
        -- Emit the deferred constraints
        ; emitChildEqs ev eqs
@@ -2218,7 +2227,7 @@ wrapUnifierAndEmit ev role do_unifications
        -- Kick out any inert constraints mentioning the unified variables
        ; kickOutAfterUnification unifs
 
-       ; return res }
+       ; return (CPH { cph_co = co, cph_holes = rewriterSetFromCts eqs }) }
 
 wrapUnifier :: CtEvidence -> Role
              -> (UnifyEnv -> TcM a)  -- Some calls to uType
@@ -2263,7 +2272,7 @@ wrapUnifier ev role do_unifications
 -}
 
 checkTypeEq :: CtEvidence -> EqRel -> CanEqLHS -> TcType
-            -> TcS (PuResult () Reduction)
+            -> TcS (PuResult Ct Reduction)
 -- Used for general CanEqLHSs, ones that do
 -- not have a touchable type variable on the LHS (i.e. not unifying)
 checkTypeEq ev eq_rel lhs rhs =
@@ -2279,12 +2288,7 @@ checkTypeEq ev eq_rel lhs rhs =
                                   ; emitWork new_givens
                                   ; updInertSet (addCycleBreakerBindings prs)
                                   ; return (pure redn) } }
-    CtWanted {} ->
-      do { check_result <- wrapTcS (checkTyEqRhs wanted_flags rhs)
-         ; case check_result of
-              PuFail reason -> return (PuFail reason)
-              PuOK cts redn -> do { emitWork cts
-                                  ; return (pure redn) } }
+    CtWanted {} -> wrapTcS (checkTyEqRhs wanted_flags rhs)
   where
     wanted_flags :: TyEqFlags TcM Ct
     wanted_flags = notUnifying_TEFTask occ_prob lhs
