@@ -485,13 +485,14 @@ defaultEquality encl_eqs ct
 
            ReprEq -- See Note [Defaulting representational equalities]
 
-                  -- Don't even try this for definitely-insoluble representational
-                  -- equalities such as Int ~R# Bool.
+                  -- Don't even try this for definitely-insoluble
+                  -- representational equalities such as Int ~R# Bool.
                   | CIrredCan (IrredCt { ir_reason }) <- ct
                   , isInsolubleReason ir_reason
                   -> return False
 
                   -- Nor if there are enclosing equalities
+                  -- See (DRE1) in Note [Defaulting representational equalities]
                   | encl_eqs
                   -> return False
 
@@ -697,15 +698,7 @@ Wrinkles:
 
   See #10009, and Note [Limited defaulting in the ambiguity check].
 
-
-Note [Must simplify after defaulting]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We may have a deeply buried constraint
-    (t:*) ~ (a:Open)
-which we couldn't solve because of the kind incompatibility, and 'a' is free.
-Then when we default 'a' we can solve the constraint.  And we want to do
-that before starting in on type classes.  We MUST do it before reporting
-errors, because it isn't an error!  #7967 was due to this.
+(DE7) For representational equalities see Note [Defaulting representational equalities]
 
 Note [Defaulting representational equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -765,6 +758,23 @@ Note that this does not threaten principal types. Recall that the original worry
 in which case unifying alpha := Int would be wrong, as the correct solution is
 alpha := Age. This worry doesn't concern us in top-level defaulting, because
 defaulting takes place after generalisation; it is fully monomorphic.
+
+(DRE1) Suppose we have (see test UnliftedNewtypesCoerceFail)
+         [G] Coercible a b
+         [W] alpha ~R# beta
+  Then we don't want to make alpha:=beta, because we probably should really solve it
+  from the Given Coercible constraint.  So we check first for the absence of enclosing
+  equalities.  This is a bit ad-hoc, but so is all of defaulting really.
+
+Note [Must simplify after defaulting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We may have a deeply buried constraint
+    (t:*) ~ (a:Open)
+which we couldn't solve because of the kind incompatibility, and 'a' is free.
+Then when we default 'a' we can solve the constraint.  And we want to do
+that before starting in on type classes.  We MUST do it before reporting
+errors, because it isn't an error!  #7967 was due to this.
+
 
 *********************************************************************************
 *                                                                               *
