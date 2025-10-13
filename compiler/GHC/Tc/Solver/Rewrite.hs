@@ -80,16 +80,16 @@ liftTcS thing_inside
 
 -- convenient wrapper when you have a CtEvidence describing
 -- the rewriting operation
-runRewriteCtEv :: CtEvidence -> RewriteM a -> TcS (a, RewriterSet)
+runRewriteCtEv :: CtEvidence -> RewriteM a -> TcS (a, CoHoleSet)
 runRewriteCtEv ev
   = runRewrite (ctEvLoc ev) (ctEvFlavour ev) (ctEvRewriteEqRel ev)
 
 -- Run thing_inside (which does the rewriting)
 -- Also returns the set of Wanteds which rewrote a Wanted;
--- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
-runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, RewriterSet)
+-- See Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
+runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, CoHoleSet)
 runRewrite loc flav eq_rel thing_inside
-  = do { rewriters_ref <- newTcRef emptyRewriterSet
+  = do { rewriters_ref <- newTcRef emptyCoHoleSet
        ; let fmode = RE { re_loc       = loc
                         , re_flavour   = flav
                         , re_eq_rel    = eq_rel
@@ -152,7 +152,7 @@ bumpDepth (RewriteM thing_inside)
 
 recordRewriter :: CtEvidence -> RewriteM ()
 -- Record that we have rewritten the target with this (equality) evidence
--- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
+-- See Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
 -- Precondition: the CtEvidence is for an equality constraint
 recordRewriter (CtGiven {})
   = return ()
@@ -224,9 +224,9 @@ a better error message anyway.)
 -- If (xi, co, rewriters) <- rewrite mode ev ty, then co :: xi ~r ty
 -- where r is the role in @ev@.
 -- `rewriters` is the set of coercion holes that have been used to rewrite
--- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
+-- See Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
 rewrite :: CtEvidence -> TcType
-        -> TcS (Reduction, RewriterSet)
+        -> TcS (Reduction, CoHoleSet)
 rewrite ev ty
   = do { traceTcS "rewrite {" (ppr ty)
        ; result@(redn, _) <- runRewriteCtEv ev (rewrite_one ty)
@@ -239,7 +239,7 @@ rewrite ev ty
 -- for error messages. (This was important when we flirted with rewriting
 -- newtypes but perhaps less so now.)
 rewriteForErrors :: CtEvidence -> TcType
-                 -> TcS (Reduction, RewriterSet)
+                 -> TcS (Reduction, CoHoleSet)
 rewriteForErrors ev ty
   = do { traceTcS "rewriteForErrors {" (ppr ty)
        ; result@(redn, rewriters) <-
@@ -251,7 +251,7 @@ rewriteForErrors ev ty
 
 -- See Note [Rewriting]
 rewriteArgsNom :: CtEvidence -> TyCon -> [TcType]
-               -> TcS (Reductions, RewriterSet)
+               -> TcS (Reductions, CoHoleSet)
 -- Externally-callable, hence runRewrite
 -- Rewrite a vector of types all at once; in fact they are
 -- always the arguments of type family or class, so
@@ -261,7 +261,7 @@ rewriteArgsNom :: CtEvidence -> TyCon -> [TcType]
 -- The kind of T args must be constant (i.e. not depend on the args)
 --
 -- Final return value returned which Wanteds rewrote another Wanted
--- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
+-- See Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
 rewriteArgsNom ev tc tys
   = do { traceTcS "rewrite_args {" (vcat (map ppr tys))
        ; (ArgsReductions redns@(Reductions _ tys') kind_co, rewriters)
@@ -1030,7 +1030,8 @@ rewrite_tyvar2 tv fr@(_, eq_rel)
                         vcat [ ppr tv <+> equals <+> ppr rhs_ty
                              , ppr ctev ]
                    ; recordRewriter ctev
-                         -- See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
+                         -- See Note [Wanteds rewrite Wanteds: rewriter-sets]
+                         -- in GHC.Tc.Types.Constraint
 
                    ; let rewriting_co1 = ctEvCoercion ctev
                          rewriting_co  = case (ct_eq_rel, eq_rel) of

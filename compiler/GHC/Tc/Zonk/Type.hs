@@ -63,6 +63,7 @@ import GHC.Core.PatSyn (PatSyn(..))
 import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Core.Type
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep( CoercionPlusHoles(..) )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -489,7 +490,8 @@ zonkCoHole :: CoercionHole -> ZonkTcM Coercion
 zonkCoHole hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
   = do { contents <- readTcRef ref
        ; case contents of
-           Just co -> do { co' <- zonkCoToCo co
+           Just (CPH { cph_co = co })
+                   -> do { co' <- zonkCoToCo co
                          ; lift $ liftZonkM $ checkCoercionHole cv co' }
 
               -- This next case should happen only in the presence of

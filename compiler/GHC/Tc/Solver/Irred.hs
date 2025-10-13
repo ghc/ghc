@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecursiveDo #-}
@@ -14,11 +15,10 @@ import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Types.Evidence
 
-import GHC.Core.Coercion
-
 import GHC.Types.Basic( SwapFlag(..) )
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import GHC.Data.Bag
 
@@ -69,9 +69,9 @@ try_inert_irreds inerts irred_w@(IrredCt { ir_ev = ev_w, ir_reason = reason })
          vcat [ text "wanted:" <+> (ppr ct_w $$ ppr (ctOrigin ct_w))
               , text "inert: " <+> (ppr ct_i $$ ppr (ctOrigin ct_i)) ]
        ; case solveOneFromTheOther ct_i ct_w of
-            KeepInert -> do { setEvBindIfWanted ev_w EvCanonical (swap_me swap ev_i)
+            KeepInert -> do { setIrredIfWanted ev_w swap ev_i
                             ; return (Stop ev_w (text "Irred equal:KeepInert" <+> ppr ct_w)) }
-            KeepWork ->  do { setEvBindIfWanted ev_i EvCanonical (swap_me swap ev_w)
+            KeepWork ->  do { setIrredIfWanted ev_i swap ev_w
                             ; updInertCans (updIrreds (\_ -> others))
                             ; continueWith () } }
 
@@ -81,12 +81,20 @@ try_inert_irreds inerts irred_w@(IrredCt { ir_ev = ev_w, ir_reason = reason })
   where
     ct_w = CIrredCan irred_w
 
-    swap_me :: SwapFlag -> CtEvidence -> EvTerm
-    swap_me swap ev
-      = case swap of
-           NotSwapped -> ctEvTerm ev
-           IsSwapped  -> evCoercion (mkSymCo (evTermCoercion (ctEvTerm ev)))
+setIrredIfWanted :: CtEvidence -> SwapFlag -> CtEvidence -> TcS ()
+-- Irreds can be equalities or dictionaries
+setIrredIfWanted ev_dest swap ev_source
+  | CtWanted (WantedCt { ctev_dest = dest }) <- ev_dest
+  = case dest of
+      HoleDest hole -> setWantedEq dest $
+                       CPH { cph_co    = maybeSymCo swap (ctEvCoercion ev_source)
+                           , cph_holes = unitCoHoleSet hole }
 
+      EvVarDest {} -> assertPpr (swap==NotSwapped) (ppr ev_dest $$ ppr ev_source) $
+                         -- findMatchingIrreds only returns IsSwapped for equalities
+                      setWantedDict dest EvCanonical (ctEvTerm ev_source)
+  | otherwise
+  = return ()
 
 {- Note [Multiple matching irreds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -127,14 +135,12 @@ tryQCsIrredCt :: IrredCt -> SolverStage ()
 -- Try local quantified constraints for
 -- and CIrredCan e.g.  (c a)
 tryQCsIrredCt (IrredCt { ir_ev = ev })
-  | isGiven ev
-  = Stage $ continueWith ()
-
-  | otherwise
-  = Stage $ do { res <- matchLocalInst pred loc
-               ; case res of
-                    OneInst {} -> chooseInstance ev res
-                    _          -> continueWith () }
-  where
-    loc  = ctEvLoc ev
-    pred = ctEvPred ev
+  = Stage $ case ev of
+      CtGiven {}
+        -> continueWith ()
+      CtWanted wev@(WantedCt { ctev_loc = loc, ctev_pred = pred })
+        -> do { res <- matchLocalInst pred loc
+              ; case res of
+                  OneInst {} -> do { chooseInstance wev res
+                                   ; stopWith ev "Irred (solved wanted)" }
+                  _          -> continueWith () }

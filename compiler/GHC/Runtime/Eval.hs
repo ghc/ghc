@@ -1118,7 +1118,7 @@ getDictionaryBindings theta = do
     ctev_pred = varType dict_var,
     ctev_dest = EvVarDest dict_var,
     ctev_loc = loc,
-    ctev_rewriters = emptyRewriterSet
+    ctev_rewriters = emptyCoHoleSet
   }
 
 -- Find instances where the head unifies with the provided type

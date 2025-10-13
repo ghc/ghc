@@ -5451,7 +5451,8 @@ data ErrorItem
        , ei_loc      :: CtLoc
        , ei_m_reason :: Maybe CtIrredReason  -- if this ErrorItem was made from a
                                              -- CtIrred, this stores the reason
-       , ei_suppress :: Bool    -- Suppress because of Note [Wanteds rewrite Wanteds]
+       , ei_suppress :: Bool    -- Suppress because of
+                                -- Note [Wanteds rewrite Wanteds: rewriter-sets]
                                 -- in GHC.Tc.Constraint
        }
 

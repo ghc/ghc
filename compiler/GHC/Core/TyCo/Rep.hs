@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
@@ -37,9 +38,14 @@ module GHC.Core.TyCo.Rep (
         -- * Coercions
         Coercion(..), CoSel(..), FunSel(..),
         UnivCoProvenance(..),
-        CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
+        CoercionHole(..), CoercionPlusHoles(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
         MCoercion(..), MCoercionR, MCoercionN, KindMCoercion,
+
+        -- CoHoleSet
+        --   CoHoleSet(..) is exported concretely only for zonkCoHoleSet
+        CoHoleSet(..), emptyCoHoleSet, isEmptyCoHoleSet, elemCoHoleSet,
+        addRewriter, unitCoHoleSet, unionCoHoleSet, delCoHoleSet,
 
         -- * Functions over types
         mkNakedTyConTy, mkTyVarTy, mkTyVarTys,
@@ -78,6 +84,7 @@ import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstr
 -- friends:
 import GHC.Types.Var
 import GHC.Types.Var.Set( elemVarSet )
+import GHC.Types.Unique.Set
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
@@ -93,6 +100,7 @@ import GHC.Utils.Binary
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
+import Data.Coerce
 import Data.IORef ( IORef )   -- for CoercionHole
 import Control.DeepSeq
 
@@ -1672,7 +1680,7 @@ holes `HoleCo`, which get filled in later.
 
 {- **********************************************************************
 %*                                                                      *
-                Coercion holes
+                Coercion holes and CoHoleSets
 %*                                                                      *
 %********************************************************************* -}
 
@@ -1681,8 +1689,15 @@ data CoercionHole
   = CoercionHole { ch_co_var  :: CoVar
                        -- See Note [CoercionHoles and coercion free variables]
 
-                 , ch_ref :: IORef (Maybe Coercion)
+                 , ch_ref :: IORef (Maybe CoercionPlusHoles)
                  }
+
+data CoercionPlusHoles
+  = CPH { cph_co    :: Coercion
+        , cph_holes :: CoHoleSet }
+   -- INVARIANT: `cph_holes` is (possibly a superset of)
+    --          the free coercion holes of `cph_co`
+   -- See (COH5) in Note [Coercion holes]
 
 coHoleCoVar :: CoercionHole -> CoVar
 coHoleCoVar = ch_co_var
@@ -1699,8 +1714,42 @@ instance Data.Data CoercionHole where
 instance Outputable CoercionHole where
   ppr (CoercionHole { ch_co_var = cv }) = braces (ppr cv)
 
+instance Outputable CoercionPlusHoles where
+  ppr (CPH { cph_co = co, cph_holes = holes })
+     = text "CPH" <> braces (sep $ punctuate comma
+                       [ text "cph_co =" <+> ppr co
+                       , text "cph_holes =" <+> ppr holes ])
+
 instance Uniquable CoercionHole where
   getUnique (CoercionHole { ch_co_var = cv }) = getUnique cv
+
+
+-- | A CoHoleSet stores a set of CoercionHoles that have been used to rewrite
+-- a constraint.  See Note [Wanteds rewrite Wanteds: rewriter-sets]
+-- in GHC.Tc.Types.Constraint
+newtype CoHoleSet = CoHoleSet (UniqSet CoercionHole)
+  deriving newtype (Outputable, Semigroup, Monoid)
+
+emptyCoHoleSet :: CoHoleSet
+emptyCoHoleSet = CoHoleSet emptyUniqSet
+
+unitCoHoleSet :: CoercionHole -> CoHoleSet
+unitCoHoleSet = coerce (unitUniqSet @CoercionHole)
+
+elemCoHoleSet :: CoercionHole -> CoHoleSet -> Bool
+elemCoHoleSet = coerce (elementOfUniqSet @CoercionHole)
+
+delCoHoleSet :: CoHoleSet -> CoercionHole -> CoHoleSet
+delCoHoleSet = coerce (delOneFromUniqSet @CoercionHole)
+
+unionCoHoleSet :: CoHoleSet -> CoHoleSet -> CoHoleSet
+unionCoHoleSet = coerce (unionUniqSets @CoercionHole)
+
+isEmptyCoHoleSet :: CoHoleSet -> Bool
+isEmptyCoHoleSet = coerce (isEmptyUniqSet @CoercionHole)
+
+addRewriter :: CoHoleSet -> CoercionHole -> CoHoleSet
+addRewriter = coerce (addOneToUniqSet @CoercionHole)
 
 {- Note [Coercion holes]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1749,7 +1798,7 @@ the evidence for unboxed equalities:
     always inline types and coercions at every use site and drop the
     binding.
 
-Other notes about HoleCo:
+Other notes about CoercionHole and HoleCo:
 
  * INVARIANT: CoercionHole and HoleCo are used only during type checking,
    and should never appear in Core. Just like unification variables; a Type
@@ -1764,19 +1813,15 @@ Other notes about HoleCo:
    by looking at the types coerced.
 
 
-Note [CoercionHoles and coercion free variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Why does a CoercionHole contain a CoVar, as well as reference to
-fill in?  Because we want to treat that CoVar as a free variable of
-the coercion.  See #14584, and Note [What prevents a
-constraint from floating] in GHC.Tc.Solver, item (4):
+(COH5) A /filled-in/ CoercionHole stores a CoercionPlusHoles, a pair that contains
+       a coercion paired with the free coercion holes of that coercion.
+       Why pair it up?  Because the coercion can be gigantic, if it was made
+       by doing lots of type-family reductions.  The rewriter, which generates
+       such coercions, is careful to collect the CoHoleSet that was used in
+       rewriting, and we are careful to preserve that info in CoercionPlusHoles.
 
-        forall k. [W] co1 :: t1 ~# t2 |> co2
-                  [W] co2 :: k ~# *
-
-Here co2 is a CoercionHole. But we /must/ know that it is free in
-co1, because that's all that stops it floating outside the
-implication.
+       See also Note [Wanteds rewrite Wanteds: rewriter-sets]
+       esp (WRW6), in GHC.Tc.Types.Constraint
 -}
 
 
