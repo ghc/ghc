@@ -190,7 +190,6 @@ import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
-import GHC.Types.Unique.Set( elementOfUniqSet )
 import GHC.Types.Id
 import GHC.Types.Basic (allImportLevels)
 import GHC.Types.ThLevelIndex (thLevelIndexFromImportLevel)
@@ -458,15 +457,16 @@ kickOutAfterUnification tv_set
        ; traceTcS "kickOutAfterUnification" (ppr tv_set $$ text "n_kicked =" <+> ppr n_kicked)
        ; return n_kicked }
 
-kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
+kickOutAfterFillingCoercionHole :: CoercionHole -> Coercion -> TcS ()
 -- See Wrinkle (URW2) in Note [Unify only if the rewriter set is empty]
 -- in GHC.Tc.Solver.Equality
 --
 -- It's possible that this could just go ahead and unify, but could there
 -- be occurs-check problems? Seems simpler just to kick out.
-kickOutAfterFillingCoercionHole hole
+kickOutAfterFillingCoercionHole hole co
   = do { ics <- getInertCans
-       ; let (kicked_out, ics') = kick_out ics
+       ; new_holes <- liftZonkTcS $ TcM.freeHolesOfCoercion co
+       ; let (kicked_out, ics') = kick_out new_holes ics
              n_kicked           = length kicked_out
 
        ; unless (n_kicked == 0) $
@@ -479,20 +479,25 @@ kickOutAfterFillingCoercionHole hole
 
        ; setInertCans ics' }
   where
-    kick_out :: InertCans -> ([EqCt], InertCans)
-    kick_out ics@(IC { inert_eqs = eqs })
+    kick_out :: RewriterSet -> InertCans -> ([EqCt], InertCans)
+    kick_out new_holes ics@(IC { inert_eqs = eqs })
       = (eqs_to_kick, ics { inert_eqs = eqs_to_keep })
       where
-        (eqs_to_kick, eqs_to_keep) = partitionInertEqs kick_out_eq eqs
+        (eqs_to_kick, eqs_to_keep) = transformAndPartitionTyVarEqs (kick_out_eq new_holes) eqs
 
-    kick_out_eq :: EqCt -> Bool    -- True: kick out; False: keep.
-    kick_out_eq (EqCt { eq_ev = ev ,eq_lhs = lhs })
-      | CtWanted (WantedCt { ctev_rewriters = RewriterSet rewriters }) <- ev
+    kick_out_eq :: RewriterSet -> EqCt -> Either EqCt EqCt
+    kick_out_eq new_holes eq_ct@(EqCt { eq_ev = ev, eq_lhs = lhs })
+      | CtWanted (wev@(WantedCt { ctev_rewriters = rewriters })) <- ev
       , TyVarLHS tv <- lhs
       , isMetaTyVar tv
-      = hole `elementOfUniqSet` rewriters
+      , hole `elemRewriterSet` rewriters
+      , let holes' = (rewriters `delRewriterSet` hole) `mappend` new_holes
+            eq_ct' = eq_ct { eq_ev = CtWanted (wev { ctev_rewriters = holes' }) }
+      = if isEmptyRewriterSet holes'
+        then Left eq_ct'    -- Kick out
+        else Right eq_ct'   -- Keep, but with trimmed holes
       | otherwise
-      = False
+      = Right eq_ct
 
 --------------
 insertSafeOverlapFailureTcS :: InstanceWhat -> DictCt -> TcS ()
@@ -1990,7 +1995,7 @@ Yuk!
 fillCoercionHole :: CoercionHole -> Coercion -> TcS ()
 fillCoercionHole hole co
   = do { wrapTcS $ TcM.fillCoercionHole hole co
-       ; kickOutAfterFillingCoercionHole hole }
+       ; kickOutAfterFillingCoercionHole hole co }
 
 setEvBindIfWanted :: CtEvidence -> CanonicalEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev canonical tm

@@ -88,9 +88,10 @@ module GHC.Tc.Types.Constraint (
         GivenCtEvidence(..), WantedCtEvidence(..),
 
         -- RewriterSet
-        RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet,
-           -- exported concretely only for zonkRewriterSet
+        --   RewriterSet(..) is exported concretely only for zonkRewriterSet
+        RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet, elemRewriterSet,
         addRewriter, unitRewriterSet, unionRewriterSet, rewriterSetFromCts,
+        delRewriterSet,
 
         wrapType,
 
@@ -2505,6 +2506,12 @@ emptyRewriterSet = RewriterSet emptyUniqSet
 
 unitRewriterSet :: CoercionHole -> RewriterSet
 unitRewriterSet = coerce (unitUniqSet @CoercionHole)
+
+elemRewriterSet :: CoercionHole -> RewriterSet -> Bool
+elemRewriterSet = coerce (elementOfUniqSet @CoercionHole)
+
+delRewriterSet :: RewriterSet -> CoercionHole -> RewriterSet
+delRewriterSet = coerce (delOneFromUniqSet @CoercionHole)
 
 unionRewriterSet :: RewriterSet -> RewriterSet -> RewriterSet
 unionRewriterSet = coerce (unionUniqSets @CoercionHole)

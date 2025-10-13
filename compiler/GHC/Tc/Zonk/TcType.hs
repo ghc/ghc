@@ -43,6 +43,7 @@ module GHC.Tc.Zonk.TcType
 
     -- * Coercion holes
   , isFilledCoercionHole, unpackCoercionHole, unpackCoercionHole_maybe
+  , freeHolesOfCoercion
 
 
     -- * Tidying
@@ -583,30 +584,33 @@ zonkCtEvRewriterSet ev@(CtWanted wtd)
 -- find all the free un-filled coercion holes in the coercion that fills it
 zonkRewriterSet :: RewriterSet -> ZonkM RewriterSet
 zonkRewriterSet (RewriterSet set)
-  = nonDetStrictFoldUniqSet go (return emptyRewriterSet) set
+  = unUCHM (nonDetStrictFoldUniqSet go mempty set)
      -- This does not introduce non-determinism, because the only
      -- monadic action is to read, and the combining function is
      -- commutative
   where
-    go :: CoercionHole -> ZonkM RewriterSet -> ZonkM RewriterSet
-    go hole m_acc = unionRewriterSet <$> check_hole hole <*> m_acc
+    go :: CoercionHole -> UnfilledCoercionHoleMonoid -> UnfilledCoercionHoleMonoid
+    go hole m_acc = freeHolesOfHole hole `mappend` m_acc
 
-    check_hole :: CoercionHole -> ZonkM RewriterSet
-    check_hole hole
-      = do { m_co <- unpackCoercionHole_maybe hole
-           ; case m_co of
-               Nothing -> return (unitRewriterSet hole)  -- Not filled
-               Just co -> unUCHM (check_co co) }         -- Filled: look inside
+freeHolesOfCoercion :: Coercion -> ZonkM RewriterSet
+freeHolesOfCoercion co = unUCHM (freeHolesOfCo co)
 
-    check_ty :: Type -> UnfilledCoercionHoleMonoid
-    check_co :: Coercion -> UnfilledCoercionHoleMonoid
-    (check_ty, _, check_co, _) = foldTyCo folder ()
+freeHolesOfHole :: CoercionHole -> UnfilledCoercionHoleMonoid
+freeHolesOfHole hole
+  = UCHM $ do { m_co <- unpackCoercionHole_maybe hole
+              ; case m_co of
+                   Nothing -> return (unitRewriterSet hole)  -- Not filled
+                   Just co -> unUCHM (freeHolesOfCo co) }    -- Filled: look inside
 
-    folder :: TyCoFolder () UnfilledCoercionHoleMonoid
-    folder = TyCoFolder { tcf_view  = noView
-                        , tcf_tyvar = \ _ tv -> check_ty (tyVarKind tv)
-                        , tcf_covar = \ _ cv -> check_ty (varType cv)
-                        , tcf_hole  = \ _ -> UCHM . check_hole
+freeHolesOfTy :: Type     -> UnfilledCoercionHoleMonoid
+freeHolesOfCo :: Coercion -> UnfilledCoercionHoleMonoid
+(freeHolesOfTy, _, freeHolesOfCo, _) = foldTyCo freeHolesFolder ()
+
+freeHolesFolder :: TyCoFolder () UnfilledCoercionHoleMonoid
+freeHolesFolder = TyCoFolder { tcf_view  = noView
+                        , tcf_tyvar = \ _ tv -> freeHolesOfTy (tyVarKind tv)
+                        , tcf_covar = \ _ cv -> freeHolesOfTy (varType cv)
+                        , tcf_hole  = \ _ h  -> freeHolesOfHole h
                         , tcf_tycobinder = \ _ _ _ -> () }
 
 newtype UnfilledCoercionHoleMonoid = UCHM { unUCHM :: ZonkM RewriterSet }

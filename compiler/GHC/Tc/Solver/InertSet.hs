@@ -24,7 +24,7 @@ module GHC.Tc.Solver.InertSet (
     -- * Inert equalities
     InertEqs,
     foldTyEqs, delEq, findEq,
-    partitionInertEqs, partitionFunEqs,
+    partitionInertEqs, partitionFunEqs, transformAndPartitionTyVarEqs,
     filterInertEqs, filterFunEqs,
     foldFunEqs, addEqToCans,
 
@@ -1359,27 +1359,30 @@ findEq icans (TyVarLHS tv) = findTyEqs icans tv
 findEq icans (TyFamLHS fun_tc fun_args)
   = concat @Maybe (findFunEq (inert_funeqs icans) fun_tc fun_args)
 
-{-# INLINE partition_eqs_container #-}
-partition_eqs_container
-  :: forall container
-   . container    -- empty container
-  -> (forall b. (EqCt -> b -> b) ->  container -> b -> b) -- folder
-  -> (EqCt -> container -> container)  -- extender
-  -> (EqCt -> Bool)
-  -> container
-  -> ([EqCt], container)
-partition_eqs_container empty_container fold_container extend_container pred orig_inerts
-  = fold_container folder orig_inerts ([], empty_container)
+transformAndPartitionTyVarEqs
+  :: (EqCt -> Either EqCt EqCt)         -- Left => chuck out, Right => keep
+  -> InertEqs
+  -> ([EqCt], InertEqs)               -- (chuck-out, keep)
+transformAndPartitionTyVarEqs pred orig_inerts
+  = foldTyEqs folder orig_inerts ([], emptyTyEqs)
   where
-    folder :: EqCt -> ([EqCt], container) -> ([EqCt], container)
+    folder :: EqCt -> ([EqCt], InertEqs) -> ([EqCt], InertEqs)
     folder eq_ct (acc_true, acc_false)
-      | pred eq_ct = (eq_ct : acc_true, acc_false)
-      | otherwise  = (acc_true,         extend_container eq_ct acc_false)
+      = case pred eq_ct of
+           Left eq_ct'  -> (eq_ct' : acc_true, acc_false)
+           Right eq_ct' -> (acc_true, addInertEqs eq_ct' acc_false)
 
 partitionInertEqs :: (EqCt -> Bool)   -- EqCt will always have a TyVarLHS
                   -> InertEqs
                   -> ([EqCt], InertEqs)
-partitionInertEqs = partition_eqs_container emptyTyEqs foldTyEqs addInertEqs
+partitionInertEqs pred orig_inerts
+  = foldTyEqs folder orig_inerts ([], emptyTyEqs)
+  where
+    folder :: EqCt -> ([EqCt], InertEqs) -> ([EqCt], InertEqs)
+    folder eq_ct (acc_true, acc_false)
+      = case pred eq_ct of
+           True  -> (eq_ct : acc_true, acc_false)
+           False -> (acc_true, addInertEqs eq_ct acc_false)
 
 addInertEqs :: EqCt -> InertEqs -> InertEqs
 -- Precondition: CanEqLHS is a TyVarLHS
@@ -1412,7 +1415,14 @@ foldFunEqs k fun_eqs z = foldTcAppMap (\eqs z -> foldr k z eqs) fun_eqs z
 partitionFunEqs :: (EqCt -> Bool)    -- EqCt will have a TyFamLHS
                 -> InertFunEqs
                 -> ([EqCt], InertFunEqs)
-partitionFunEqs = partition_eqs_container emptyFunEqs foldFunEqs addFunEqs
+partitionFunEqs pred orig_inerts
+  = foldFunEqs folder orig_inerts ([], emptyFunEqs)
+  where
+    folder :: EqCt -> ([EqCt], InertFunEqs) -> ([EqCt], InertFunEqs)
+    folder eq_ct (acc_true, acc_false)
+      = case pred eq_ct of
+           True  -> (eq_ct : acc_true, acc_false)
+           False -> (acc_true, addFunEqs eq_ct acc_false)
 
 addFunEqs :: EqCt -> InertFunEqs -> InertFunEqs
 -- Precondition: EqCt is a TyFamLHS
@@ -1424,12 +1434,11 @@ addFunEqs other _ = pprPanic "extendFunEqs" (ppr other)
 filterFunEqs :: (EqCt -> Bool) -> InertFunEqs -> InertFunEqs
 filterFunEqs f = mapMaybeTcAppMap g
   where
-    g xs =
-      let filtered = filter f xs
-      in
-        if null filtered
-        then Nothing
-        else Just filtered
+    g xs | null filtered = Nothing
+         | otherwise     = Just filtered
+         where
+           filtered = filter f xs
+
 
 {- *********************************************************************
 *                                                                      *
