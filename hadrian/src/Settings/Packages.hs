@@ -275,7 +275,7 @@ ghcInternalArgs = package ghcInternal ? do
                      , staged (buildFlag GmpInTree) ? arg "--configure-option=--with-intree-gmp"
 
                        -- prefer framework over library (on Darwin)
-                     , staged (buildFlag GmpFrameworkPref) 
+                     , staged (buildFlag GmpFrameworkPref)
                         ? arg "--configure-option=--with-gmp-framework-preferred"
 
                        -- Ensure that the ghc-internal package registration includes
