@@ -474,6 +474,10 @@ warnUnusedPackages us dflags mod_graph =
                   ui <- lookupUnit us u
                   -- Which are not explicitly used
                   guard (Set.notMember (unitId ui) used_args)
+                  -- Exclude units with no exposed modules. This covers packages which only
+                  -- provide C object code or link flags (e.g. system-cxx-std-lib).
+                  -- See #24120.
+                  guard (not $ null $ unitExposedModules ui)
                   return (unitId ui, unitPackageName ui, unitPackageVersion ui, flag)
 
         unusedArgs = sortOn (\(u,_,_,_) -> u) $ mapMaybe resolve (explicitUnits us)
