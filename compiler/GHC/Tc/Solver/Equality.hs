@@ -10,7 +10,7 @@ module GHC.Tc.Solver.Equality(
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Tc.Solver.Solve( trySolveImplication )
+import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Tc.Solver.Irred( solveIrred )
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
@@ -485,7 +485,7 @@ can_eq_nc_forall :: CtEvidence -> EqRel
 -- See Note [Solving forall equalities]
 
 can_eq_nc_forall ev eq_rel s1 s2
- | CtWanted (WantedCt { ctev_dest = orig_dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
+ | CtWanted (WantedCt { ctev_dest = orig_dest, ctev_rewriters = rws }) <- ev
  = do { let (bndrs1, phi1, bndrs2, phi2) = split_foralls s1 s2
             flags1 = binderFlags bndrs1
             flags2 = binderFlags bndrs2
@@ -543,7 +543,7 @@ can_eq_nc_forall ev eq_rel s1 s2
 
       -- Generate the constraints that live in the body of the implication
       -- See (SF5) in Note [Solving forall equalities]
-      ; (unifs, (lvl, (all_co, wanteds)))
+      ; (unifs, (tclvl, (all_co, wanteds)))
              <- reportFineGrainUnifications           $
                 pushLevelNoWorkList (ppr skol_info)   $
                 wrapUnifier ev (eqRelRole eq_rel) $ \uenv ->
@@ -552,19 +552,13 @@ can_eq_nc_forall ev eq_rel s1 s2
       -- Kick out any inerts constraints that mention unified type variables
       ; kickOutAfterUnification unifs
 
-      -- Solve the implication right away, using `trySolveImplication`
+      -- Solve the nested wanteds
       -- See (SF6) in Note [Solving forall equalities]
       ; traceTcS "Trying to solve the implication" (ppr s1 $$ ppr s2 $$ ppr wanteds)
       ; ev_binds_var <- newNoTcEvBinds
-      ; solved <- trySolveImplication $
-                  (implicationPrototype (ctLocEnv loc))
-                      { ic_tclvl = lvl
-                      , ic_binds = ev_binds_var
-                      , ic_info  = skol_info_anon
-                      , ic_warn_inaccessible = False
-                      , ic_skols = skol_tvs
-                      , ic_given = []
-                      , ic_wanted = emptyWC { wc_simple = wanteds } }
+      ; solved <- nestImplicTcS skol_info_anon ev_binds_var tclvl $
+                  do { residual_wanted <- solveSimpleWanteds wanteds
+                     ; return (isSolvedWC residual_wanted) }
 
       ; if solved
         then do { -- all_co <- zonkCo all_co
@@ -592,11 +586,12 @@ can_eq_nc_forall ev eq_rel s1 s2
         in (bndr1:bndrs1, phi1, bndr2:bndrs2, phi2)
     split_foralls s1 s2 = ([], s1, [], s2)
 
+
 {- Note [Solving forall equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To solve an equality between foralls
    [W] (forall a. t1) ~ (forall b. t2)
-the basic plan is simple: use `trySolveImplication` to solve the
+the basic plan is simple: behave rather as if we were solving the
 implication constraint
    [W] forall a. { t1 ~ (t2[a/b]) }
 
@@ -643,19 +638,15 @@ There are lots of wrinkles of course:
    because we want to /gather/ the equality constraint (to put in the implication)
    rather than /emit/ them into the monad, as `wrapUnifierAndEmit` does.
 
-(SF6) We solve the implication on the spot, using `trySolveImplication`.  In
-   the past we instead generated an `Implication` to be solved later.  Nice in
-   some ways but it added complexity:
-      - We needed a `wl_implics` field of `WorkList` to collect
-        these emitted implications
-      - The types of `solveSimpleWanteds` and friends were more complicated
-      - Trickily, an `EvFun` had to contain an `EvBindsVar` ref-cell, which made
-        `evVarsOfTerm` harder.  Now an `EvFun` just contains the bindings.
-   The disadvantage of solve-on-the-spot is that if we fail we are simply
-   left with an unsolved (forall a. blah) ~ (forall b. blah), and it may
-   not be clear /why/ we couldn't solve it.  But on balance the error messages
-   improve: it is easier to undertand that
-       (forall a. a->a) ~ (forall b. b->Int)
+(SF6) We solve the nested constraints right away.  In the past we instead generated
+   an `Implication` to be solved later, but we no longer have a convenient place
+   to accumulate such an implication for later solving.  Instead we just try to solve
+   them on the spot, and abandon the attempt if we fail.
+
+   In the latter case we are left with an unsolved (forall a. blah) ~ (forall b. blah),
+   and it may not be clear /why/ we couldn't solve it.  But on balance the error
+   messages improve: it is easier to understand that
+         (forall a. a->a) ~ (forall b. b->Int)
    is insoluble than it is to understand a message about matching `a` with `Int`.
 -}
 
