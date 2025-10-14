@@ -585,7 +585,7 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
     }
 #endif
 
-    const int MAX_ATTEMPTS = 256;
+#define MAX_ATTEMPTS 256
     void *bad_allocs[MAX_ATTEMPTS];
     size_t bad_alloc_lens[MAX_ATTEMPTS];
     memset(bad_allocs, 0, sizeof(void*) * MAX_ATTEMPTS);
