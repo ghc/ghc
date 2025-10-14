@@ -245,7 +245,7 @@ pprStmt platform stmt =
               CmmLit (CmmLabel lbl)
                 | CmmNeverReturns <- ret ->
                     pprCall platform cast_fn cconv hresults hargs <> semi <> text "__builtin_unreachable();"
-                | not (isMathFun lbl) ->
+                | not (isLibcFun lbl) ->
                     pprForeignCall platform (pprCLabel platform lbl) cconv hresults hargs
               _ ->
                     pprCall platform cast_fn cconv hresults hargs <> semi
