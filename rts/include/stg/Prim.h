@@ -16,9 +16,6 @@
 
 #pragma once
 
-// For malloc, et al.
-#include <stdlib.h>
-
 /* rts/prim/atomic.c */
 StgWord hs_atomic_add8(StgWord x, StgWord val);
 StgWord hs_atomic_add16(StgWord x, StgWord val);
@@ -148,32 +145,28 @@ W_ hs_mulIntMayOflo(W_ a, W_ b);
 
 /* rts/prim/int64x2minmax and rts/prim/vectorQuotRem */
 #if defined(__SSE2__)
-#include <stdint.h>
-#include <string.h>
-#include <emmintrin.h>
+typedef char v128 __attribute__((vector_size(16)));
+v128 hs_minInt64X2(v128, v128);
+v128 hs_maxInt64X2(v128, v128);
+v128 hs_minWord64X2(v128, v128);
+v128 hs_maxWord64X2(v128, v128);
 
-__m128i hs_minInt64X2(__m128i, __m128i);
-__m128i hs_maxInt64X2(__m128i, __m128i);
-__m128i hs_minWord64X2(__m128i, __m128i);
-__m128i hs_maxWord64X2(__m128i, __m128i);
-
-__m128i hs_quotInt8X16(__m128i, __m128i);
-__m128i hs_quotInt16X8(__m128i, __m128i);
-__m128i hs_quotInt32X4(__m128i, __m128i);
-__m128i hs_quotInt64X2(__m128i, __m128i);
-__m128i hs_quotWord8X16(__m128i, __m128i);
-__m128i hs_quotWord16X8(__m128i, __m128i);
-__m128i hs_quotWord32X4(__m128i, __m128i);
-__m128i hs_quotWord64X2(__m128i, __m128i);
-__m128i hs_remInt8X16(__m128i, __m128i);
-__m128i hs_remInt16X8(__m128i, __m128i);
-__m128i hs_remInt32X4(__m128i, __m128i);
-__m128i hs_remInt64X2(__m128i, __m128i);
-__m128i hs_remWord8X16(__m128i, __m128i);
-__m128i hs_remWord16X8(__m128i, __m128i);
-__m128i hs_remWord32X4(__m128i, __m128i);
-__m128i hs_remWord64X2(__m128i, __m128i);
-
+v128 hs_quotInt8X16(v128, v128);
+v128 hs_quotInt16X8(v128, v128);
+v128 hs_quotInt32X4(v128, v128);
+v128 hs_quotInt64X2(v128, v128);
+v128 hs_quotWord8X16(v128, v128);
+v128 hs_quotWord16X8(v128, v128);
+v128 hs_quotWord32X4(v128, v128);
+v128 hs_quotWord64X2(v128, v128);
+v128 hs_remInt8X16(v128, v128);
+v128 hs_remInt16X8(v128, v128);
+v128 hs_remInt32X4(v128, v128);
+v128 hs_remInt64X2(v128, v128);
+v128 hs_remWord8X16(v128, v128);
+v128 hs_remWord16X8(v128, v128);
+v128 hs_remWord32X4(v128, v128);
+v128 hs_remWord64X2(v128, v128);
 #endif
 
 /* bitcasts, instead of creating a new C file we static inline these here. We
