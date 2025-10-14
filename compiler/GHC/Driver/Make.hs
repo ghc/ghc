@@ -1236,10 +1236,8 @@ upsweep_mod :: HscEnv
             -> Int  -- total number of modules
             -> IO HomeModInfo
 upsweep_mod hsc_env mHscMessage old_hmi summary mod_index nmods =  do
-  hmi <- compileOne' mHscMessage hsc_env summary
-          mod_index nmods (hm_iface <$> old_hmi) (maybe emptyHomeModInfoLinkable hm_linkable old_hmi)
-  hscInsertHPT hmi hsc_env
-  return hmi
+  compileOne' mHscMessage hsc_env summary
+              mod_index nmods (hm_iface <$> old_hmi) (maybe emptyHomeModInfoLinkable hm_linkable old_hmi)
 
 
 -- Note [When source is considered modified]
