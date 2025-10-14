@@ -7,7 +7,6 @@ module GHC.Tc.Solver.Solve (
      solveWanteds,        -- Solves WantedConstraints
      solveSimpleGivens,   -- Solves [Ct]
      solveSimpleWanteds,  -- Solves Cts
-     trySolveImplication,
 
      setImplicationStatus
   ) where
@@ -368,35 +367,6 @@ solveNestedImplications implics
                   vcat [ text "unsolved_implics =" <+> ppr unsolved_implics ]
 
        ; return unsolved_implics }
-
-{- Note [trySolveImplication]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-`trySolveImplication` may be invoked while solving simple wanteds, notably from
-`solveWantedForAll`.  It returns a Bool to say if solving succeeded or failed.
-
-It uses `nestImplicTcS` to build a nested scope.  One subtle point is that
-`nestImplicTcS` uses the `inert_givens` (not the `inert_cans`) of the current
-inert set to initialse the `InertSet` of the nested scope.  It is super-important not
-to pollute the sub-solving problem with the unsolved Wanteds of the current scope.
-
-Whenever we do `solveSimpleGivens`, we snapshot the `inert_cans` into `inert_givens`.
-(At that moment there should be no Wanteds.)
--}
-
-trySolveImplication :: Implication -> TcS Bool
--- See Note [trySolveImplication]
-trySolveImplication (Implic { ic_tclvl  = tclvl
-                            , ic_binds  = ev_binds_var
-                            , ic_given  = given_ids
-                            , ic_wanted = wanteds
-                            , ic_env    = ct_loc_env
-                            , ic_info   = info })
-  = nestImplicTcS info ev_binds_var tclvl $
-    do { let loc    = mkGivenLoc tclvl info ct_loc_env
-             givens = mkGivens loc given_ids
-       ; solveSimpleGivens givens
-       ; residual_wanted <- solveWanteds wanteds
-       ; return (isSolvedWC residual_wanted) }
 
 solveImplication :: Implication     -- Wanted
                  -> TcS Implication -- Simplified implication
@@ -1091,7 +1061,7 @@ solveSimpleGivens givens
 
        -- Capture the Givens in the inert_givens of the inert set
        -- for use by subsequent calls of nestImplicTcS
-       -- See Note [trySolveImplication]
+       -- See Note [nestImplicTcS] in GHc.Tc.Solver.Monad
        ; updInertSet (\is -> is { inert_givens = inert_cans is })
 
        ; cans <- getInertCans

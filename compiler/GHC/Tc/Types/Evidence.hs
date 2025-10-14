@@ -392,6 +392,8 @@ data EvBindsVar
       --  so that we can report unused given constraints,
       --  in GHC.Tc.Solver.neededEvVars
       -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
+      -- Also: we garbage-collect unused bindings in `neededEvVars`,
+      --       so this matters for correctness too.
     }
 
   | CoEvBindsVar {  -- See Note [Coercion evidence only]
