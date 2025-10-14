@@ -904,8 +904,17 @@ addModFinalizer act = Q (qAddModFinalizer (unQ act))
 addCorePlugin :: String -> Q ()
 addCorePlugin plugin = Q (qAddCorePlugin plugin)
 
--- | Get state from the 'Q' monad. Note that the state is local to the
--- Haskell module in which the Template Haskell expression is executed.
+-- | Get state from the 'Q' monad. The state maintained by 'Q' is isomorphic to
+-- a type-indexed finite map. That is,
+--
+-- @
+-- do putQ @Int 42
+--    putQ @Char 'a'
+--    getQ @Int      -- == (Just 42)
+-- @
+--
+-- Note that the state is local to the Haskell module in which the Template
+-- Haskell expression is executed.
 getQ :: Typeable a => Q (Maybe a)
 getQ = Q qGetQ
 
