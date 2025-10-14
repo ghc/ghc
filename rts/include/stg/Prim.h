@@ -16,6 +16,9 @@
 
 #pragma once
 
+// For malloc, et al.
+#include <stdlib.h>
+
 /* rts/prim/atomic.c */
 StgWord hs_atomic_add8(StgWord x, StgWord val);
 StgWord hs_atomic_add16(StgWord x, StgWord val);
