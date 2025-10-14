@@ -102,7 +102,7 @@ module GHC.Cmm.CLabel (
         needsCDecl,
         maybeLocalBlockLabel,
         externallyVisibleCLabel,
-        isMathFun,
+        isLibcFun,
         isCFunctionLabel,
         isGcPtrLabel,
         labelDynamic,
@@ -1028,7 +1028,7 @@ needsCDecl (CmmLabel pkgId (NeedExternDecl external) _ _)
         -- For other labels we inline one into the HC file directly.
         | otherwise                     = True
 
-needsCDecl l@(ForeignLabel{})           = not (isMathFun l)
+needsCDecl l@(ForeignLabel{})           = not (isLibcFun l)
 needsCDecl (CC_Label _)                 = True
 needsCDecl (CCS_Label _)                = True
 needsCDecl (IPE_Label {})               = True
@@ -1055,15 +1055,19 @@ maybeLocalBlockLabel _                     = Nothing
 
 
 -- | Check whether a label corresponds to a C function that has
---      a prototype in a system header somewhere, or is built-in
---      to the C compiler. For these labels we avoid generating our
---      own C prototypes.
-isMathFun :: CLabel -> Bool
-isMathFun (ForeignLabel fs _ _)       = fs `elementOfUniqSet` math_funs
-isMathFun _ = False
+-- a prototype in a system header somewhere, or is built-in
+-- to the C compiler. For these labels we avoid generating our
+-- own C prototypes.
+isLibcFun :: CLabel -> Bool
+isLibcFun (ForeignLabel fs _ _)  = fs `elementOfUniqSet` libc_funs
+isLibcFun _ = False
 
-math_funs :: UniqSet FastString
-math_funs = mkUniqSet [
+libc_funs :: UniqSet FastString
+libc_funs = mkUniqSet [
+        ---------------------
+        -- Math functions
+        ---------------------
+
         -- _ISOC99_SOURCE
         (fsLit "acos"),         (fsLit "acosf"),        (fsLit "acosh"),
         (fsLit "acoshf"),       (fsLit "acoshl"),       (fsLit "acosl"),
