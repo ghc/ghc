@@ -55,7 +55,7 @@ module GHC.Tc.Solver.Monad (
     newWantedNC, newWantedEvVarNC,
     newBoundEvVarId,
     unifyTyVar, reportFineGrainUnifications, reportCoarseGrainUnifications,
-    setEvBind, setWantedEq,
+    setEvBind, setWantedEq, setWantedDict,
     setWantedEvTerm, setEvBindIfWanted,
     newEvVar, newGivenEv, emitNewGivens,
     emitChildEqs, checkReductionDepth,
@@ -457,16 +457,15 @@ kickOutAfterUnification tv_set
        ; traceTcS "kickOutAfterUnification" (ppr tv_set $$ text "n_kicked =" <+> ppr n_kicked)
        ; return n_kicked }
 
-kickOutAfterFillingCoercionHole :: CoercionHole -> Coercion -> TcS ()
+kickOutAfterFillingCoercionHole :: CoercionHole -> RewriterSet -> TcS ()
 -- See Wrinkle (URW2) in Note [Unify only if the rewriter set is empty]
 -- in GHC.Tc.Solver.Equality
 --
 -- It's possible that this could just go ahead and unify, but could there
 -- be occurs-check problems? Seems simpler just to kick out.
-kickOutAfterFillingCoercionHole hole co
+kickOutAfterFillingCoercionHole hole new_holes
   = do { ics <- getInertCans
-       ; new_holes <- liftZonkTcS $ TcM.freeHolesOfCoercion co
-       ; let (kicked_out, ics') = kick_out new_holes ics
+       ; let (kicked_out, ics') = kick_out ics
              n_kicked           = length kicked_out
 
        ; unless (n_kicked == 0) $
@@ -479,14 +478,14 @@ kickOutAfterFillingCoercionHole hole co
 
        ; setInertCans ics' }
   where
-    kick_out :: RewriterSet -> InertCans -> ([EqCt], InertCans)
-    kick_out new_holes ics@(IC { inert_eqs = eqs })
+    kick_out :: InertCans -> ([EqCt], InertCans)
+    kick_out ics@(IC { inert_eqs = eqs })
       = (eqs_to_kick, ics { inert_eqs = eqs_to_keep })
       where
-        (eqs_to_kick, eqs_to_keep) = transformAndPartitionTyVarEqs (kick_out_eq new_holes) eqs
+        (eqs_to_kick, eqs_to_keep) = transformAndPartitionTyVarEqs kick_out_eq eqs
 
-    kick_out_eq :: RewriterSet -> EqCt -> Either EqCt EqCt
-    kick_out_eq new_holes eq_ct@(EqCt { eq_ev = ev, eq_lhs = lhs })
+    kick_out_eq :: EqCt -> Either EqCt EqCt
+    kick_out_eq eq_ct@(EqCt { eq_ev = ev, eq_lhs = lhs })
       | CtWanted (wev@(WantedCt { ctev_rewriters = rewriters })) <- ev
       , TyVarLHS tv <- lhs
       , isMetaTyVar tv
@@ -1951,27 +1950,32 @@ addUsedCoercion co
   = do { ev_binds_var <- getTcEvBindsVar
        ; wrapTcS (TcM.updTcRef (ebv_tcvs ev_binds_var) (co :)) }
 
--- | Equalities only
-setWantedEq :: HasDebugCallStack => TcEvDest -> TcCoercion -> TcS ()
-setWantedEq (HoleDest hole) co
+setWantedEq :: HasDebugCallStack => TcEvDest -> RewriterSet -> TcCoercion -> TcS ()
+-- ^ Equalities only
+setWantedEq (HoleDest hole) rewriters co
   = do { addUsedCoercion co
-       ; fillCoercionHole hole co }
-setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq: EvVarDest" (ppr ev)
+       ; fillCoercionHole hole rewriters co }
+setWantedEq (EvVarDest ev) _ _ = pprPanic "setWantedEq: EvVarDest" (ppr ev)
 
--- | Good for both equalities and non-equalities
-setWantedEvTerm :: TcEvDest -> CanonicalEvidence -> EvTerm -> TcS ()
-setWantedEvTerm (HoleDest hole) _canonical tm
+setWantedDict :: TcEvDest -> CanonicalEvidence -> EvTerm -> TcS ()
+-- ^ Dictionaries only
+setWantedDict (EvVarDest ev_id) canonical tm
+  = setEvBind (mkWantedEvBind ev_id canonical tm)
+setWantedDict (HoleDest h) _ _ = pprPanic "setWantedEq: HoleDest" (ppr h)
+
+setWantedEvTerm :: TcEvDest -> RewriterSet -> CanonicalEvidence -> EvTerm -> TcS ()
+-- ^ Good for both equalities and non-equalities
+setWantedEvTerm (EvVarDest ev_id) _rewriters canonical tm
+  = setEvBind (mkWantedEvBind ev_id canonical tm)
+setWantedEvTerm (HoleDest hole) rewriters _canonical tm
   | Just co <- evTermCoercion_maybe tm
   = do { addUsedCoercion co
-       ; fillCoercionHole hole co }
+       ; fillCoercionHole hole rewriters co }
   | otherwise
   = -- See Note [Yukky eq_sel for a HoleDest]
     do { let co_var = coHoleCoVar hole
        ; setEvBind (mkWantedEvBind co_var EvCanonical tm)
-       ; fillCoercionHole hole (mkCoVarCo co_var) }
-
-setWantedEvTerm (EvVarDest ev_id) canonical tm
-  = setEvBind (mkWantedEvBind ev_id canonical tm)
+       ; fillCoercionHole hole rewriters (mkCoVarCo co_var) }
 
 {- Note [Yukky eq_sel for a HoleDest]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1992,16 +1996,17 @@ We even re-use the CoHole's Id for this binding!
 Yuk!
 -}
 
-fillCoercionHole :: CoercionHole -> Coercion -> TcS ()
-fillCoercionHole hole co
-  = do { wrapTcS $ TcM.fillCoercionHole hole co
-       ; kickOutAfterFillingCoercionHole hole co }
+fillCoercionHole :: CoercionHole -> RewriterSet -> Coercion -> TcS ()
+fillCoercionHole hole rewriters co
+  = do { wrapTcS $ TcM.fillCoercionHole hole (co, rewriters)
+       ; kickOutAfterFillingCoercionHole hole rewriters }
 
 setEvBindIfWanted :: CtEvidence -> CanonicalEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev canonical tm
   = case ev of
-      CtWanted (WantedCt { ctev_dest = dest }) -> setWantedEvTerm dest canonical tm
-      _                                        -> return ()
+      CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rewriters })
+         -> setWantedEvTerm dest rewriters canonical tm
+      _  -> return ()
 
 newTcEvBinds :: TcS EvBindsVar
 newTcEvBinds = wrapTcS TcM.newTcEvBinds

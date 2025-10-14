@@ -1327,7 +1327,7 @@ addDeferredBinding ctxt supp hints msg (EI { ei_evdest = Just dest
              -> do { -- See Note [Deferred errors for coercion holes]
                      let co_var = coHoleCoVar hole
                    ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var EvNonCanonical err_tm
-                   ; fillCoercionHole hole (mkCoVarCo co_var) } }
+                   ; fillCoercionHole hole (mkCoVarCo co_var, emptyRewriterSet) } }
 addDeferredBinding _ _ _ _ _ = return ()    -- Do not set any evidence for Given
 
 mkSolverErrorTerm :: CtLoc -> Type  -- of the error term

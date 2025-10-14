@@ -476,7 +476,7 @@ solveEqualityDict ev cls tys
        ; co <- wrapUnifierAndEmit ev role $ \uenv ->
                uType uenv t1 t2
          -- Set  d :: (t1~t2) = Eq# co
-       ; setWantedEvTerm dest EvCanonical $
+       ; setWantedDict dest EvCanonical $
          evDictApp cls tys [Coercion co]
        ; stopWith ev "Solved wanted lifted equality" }
 

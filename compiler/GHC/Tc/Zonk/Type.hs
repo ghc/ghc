@@ -488,8 +488,8 @@ zonkCoHole :: CoercionHole -> ZonkTcM Coercion
 zonkCoHole hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
   = do { contents <- readTcRef ref
        ; case contents of
-           Just co -> do { co' <- zonkCoToCo co
-                         ; lift $ liftZonkM $ checkCoercionHole cv co' }
+           Just (co,_) -> do { co' <- zonkCoToCo co
+                             ; lift $ liftZonkM $ checkCoercionHole cv co' }
 
               -- This next case should happen only in the presence of
               -- (undeferred) type errors. Originally, I put in a panic

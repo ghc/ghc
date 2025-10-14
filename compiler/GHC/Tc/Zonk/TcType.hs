@@ -43,8 +43,6 @@ module GHC.Tc.Zonk.TcType
 
     -- * Coercion holes
   , isFilledCoercionHole, unpackCoercionHole, unpackCoercionHole_maybe
-  , freeHolesOfCoercion
-
 
     -- * Tidying
   , tcInitTidyEnv, tcInitOpenTidyEnv
@@ -241,8 +239,8 @@ zonkCo      :: Coercion -> ZonkM Coercion
         hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
           = do { contents <- readTcRef ref
                ; case contents of
-                   Just co -> do { co' <- zonkCo co
-                                 ; checkCoercionHole cv co' }
+                   Just (co,_) -> do { co' <- zonkCo co
+                                     ; checkCoercionHole cv co' }
                    Nothing -> do { cv' <- zonkCoVar cv
                                  ; return $ HoleCo (hole { ch_co_var = cv' }) } }
 
@@ -592,26 +590,12 @@ zonkRewriterSet (RewriterSet set)
     go :: CoercionHole -> UnfilledCoercionHoleMonoid -> UnfilledCoercionHoleMonoid
     go hole m_acc = freeHolesOfHole hole `mappend` m_acc
 
-freeHolesOfCoercion :: Coercion -> ZonkM RewriterSet
-freeHolesOfCoercion co = unUCHM (freeHolesOfCo co)
-
 freeHolesOfHole :: CoercionHole -> UnfilledCoercionHoleMonoid
 freeHolesOfHole hole
   = UCHM $ do { m_co <- unpackCoercionHole_maybe hole
               ; case m_co of
                    Nothing -> return (unitRewriterSet hole)  -- Not filled
-                   Just co -> unUCHM (freeHolesOfCo co) }    -- Filled: look inside
-
-freeHolesOfTy :: Type     -> UnfilledCoercionHoleMonoid
-freeHolesOfCo :: Coercion -> UnfilledCoercionHoleMonoid
-(freeHolesOfTy, _, freeHolesOfCo, _) = foldTyCo freeHolesFolder ()
-
-freeHolesFolder :: TyCoFolder () UnfilledCoercionHoleMonoid
-freeHolesFolder = TyCoFolder { tcf_view  = noView
-                        , tcf_tyvar = \ _ tv -> freeHolesOfTy (tyVarKind tv)
-                        , tcf_covar = \ _ cv -> freeHolesOfTy (varType cv)
-                        , tcf_hole  = \ _ h  -> freeHolesOfHole h
-                        , tcf_tycobinder = \ _ _ _ -> () }
+                   Just (_co,holes) -> zonkRewriterSet holes }
 
 newtype UnfilledCoercionHoleMonoid = UCHM { unUCHM :: ZonkM RewriterSet }
 
@@ -641,11 +625,11 @@ unpackCoercionHole :: CoercionHole -> ZonkM Coercion
 unpackCoercionHole hole
   = do { contents <- unpackCoercionHole_maybe hole
        ; case contents of
-           Just co -> return co
+           Just (co,_) -> return co
            Nothing -> pprPanic "Unfilled coercion hole" (ppr hole) }
 
 -- | Retrieve the contents of a coercion hole, if it is filled
-unpackCoercionHole_maybe :: CoercionHole -> ZonkM (Maybe Coercion)
+unpackCoercionHole_maybe :: CoercionHole -> ZonkM (Maybe (Coercion,RewriterSet))
 unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
 
 

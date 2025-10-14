@@ -485,7 +485,7 @@ can_eq_nc_forall :: CtEvidence -> EqRel
 -- See Note [Solving forall equalities]
 
 can_eq_nc_forall ev eq_rel s1 s2
- | CtWanted (WantedCt { ctev_dest = orig_dest, ctev_loc = loc }) <- ev
+ | CtWanted (WantedCt { ctev_dest = orig_dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
  = do { let (bndrs1, phi1, bndrs2, phi2) = split_foralls s1 s2
             flags1 = binderFlags bndrs1
             flags2 = binderFlags bndrs2
@@ -567,9 +567,9 @@ can_eq_nc_forall ev eq_rel s1 s2
                       , ic_wanted = emptyWC { wc_simple = wanteds } }
 
       ; if solved
-        then do { zonked_all_co <- zonkCo all_co
-                      -- ToDo: explain this zonk
-                ; setWantedEq orig_dest zonked_all_co
+        then do { -- all_co <- zonkCo all_co
+                  --    -- ToDo: explain this zonk
+                  setWantedEq orig_dest rws all_co
                 ; stopWith ev "Polytype equality: solved" }
         else canEqSoftFailure IrredShapeReason ev s1 s2 } }
 
@@ -809,7 +809,7 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
 -- to an irreducible constraint; see typecheck/should_compile/T10494
 -- See Note [Decomposing AppTy equalities]
 can_eq_app ev s1 t1 s2 t2
-  | CtWanted (WantedCt { ctev_dest = dest }) <- ev
+  | CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rws }) <- ev
   = do { traceTcS "can_eq_app" (vcat [ text "s1:" <+> ppr s1, text "t1:" <+> ppr t1
                                      , text "s2:" <+> ppr s2, text "t2:" <+> ppr t2
                                      , text "vis:" <+> ppr (isNextArgVisible s1) ])
@@ -824,7 +824,7 @@ can_eq_app ev s1 t1 s2 t2
                ; co_t <- uType arg_env t1 t2
                ; co_s <- uType uenv s1 s2
                ; return (mkAppCo co_s co_t) }
-       ; setWantedEq dest co
+       ; setWantedEq dest rws co
        ; stopWith ev "Decomposed [W] AppTy" }
 
     -- If there is a ForAll/(->) mismatch, the use of the Left coercion
@@ -1374,7 +1374,7 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
     do { traceTcS "canDecomposableTyConAppOK"
                   (ppr ev $$ ppr eq_rel $$ ppr tc $$ ppr tys1 $$ ppr tys2)
        ; case ev of
-           CtWanted (WantedCt { ctev_dest = dest })
+           CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rws })
              -- new_locs and tc_roles are both infinite, so we are
              -- guaranteed that cos has the same length as tys1 and tys2
              -- See Note [Fast path when decomposing TyConApps]
@@ -1382,7 +1382,7 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
                         do { cos <- zipWith4M (u_arg uenv) new_locs tc_roles tys1 tys2
                                     -- zipWith4M: see Note [Work-list ordering]
                            ; return (mkTyConAppCo role tc cos) }
-                   ; setWantedEq dest co }
+                   ; setWantedEq dest rws co }
 
            CtGiven (GivenCt { ctev_evar = evar })
              | let pred_ty = mkEqPred eq_rel ty1 ty2
@@ -1432,7 +1432,7 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
   = do { traceTcS "canDecomposableFunTy"
                   (ppr ev $$ ppr eq_rel $$ ppr f1 $$ ppr f2)
        ; case ev of
-           CtWanted (WantedCt { ctev_dest = dest })
+           CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rws })
              -> do { co <- wrapUnifierAndEmit ev Nominal $ \ uenv ->
                         do { let mult_env = uenv `updUEnvLoc` toInvisibleLoc InvisibleMultiplicity
                                                  `setUEnvRole` funRole role SelMult
@@ -1443,7 +1443,7 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
                            ; arg  <- uType (uenv `setUEnvRole` funRole role SelArg) a1 a2
                            ; res  <- uType (uenv `setUEnvRole` funRole role SelRes) r1 r2
                            ; return (mkNakedFunCo role af mult arg res) }
-                   ; setWantedEq dest co }
+                   ; setWantedEq dest rws co }
 
            CtGiven (GivenCt { ctev_evar = evar })
              | let pred_ty = mkEqPred eq_rel ty1 ty2
@@ -2652,7 +2652,7 @@ rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reductio
        ; (new_ev, hole_co) <- newWantedEq loc rewriters' (ctEvRewriteRole old_ev) nlhs nrhs
        ; let co = maybeSymCo swapped $
                   lhs_co `mkTransCo` hole_co `mkTransCo` mkSymCo rhs_co
-       ; setWantedEq dest co
+       ; setWantedEq dest rewriters' co
        ; traceTcS "rewriteEqEvidence" (vcat [ ppr old_ev
                                             , ppr nlhs
                                             , ppr nrhs

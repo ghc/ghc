@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
@@ -41,6 +42,11 @@ module GHC.Core.TyCo.Rep (
         CoercionN, CoercionR, CoercionP, KindCoercion,
         MCoercion(..), MCoercionR, MCoercionN, KindMCoercion,
 
+        -- RewriterSet
+        --   RewriterSet(..) is exported concretely only for zonkRewriterSet
+        RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet, elemRewriterSet,
+        addRewriter, unitRewriterSet, unionRewriterSet, delRewriterSet,
+
         -- * Functions over types
         mkNakedTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
@@ -78,6 +84,7 @@ import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstr
 -- friends:
 import GHC.Types.Var
 import GHC.Types.Var.Set( elemVarSet )
+import GHC.Types.Unique.Set
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
@@ -93,6 +100,7 @@ import GHC.Utils.Binary
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
+import Data.Coerce
 import Data.IORef ( IORef )   -- for CoercionHole
 import Control.DeepSeq
 
@@ -1672,7 +1680,7 @@ holes `HoleCo`, which get filled in later.
 
 {- **********************************************************************
 %*                                                                      *
-                Coercion holes
+                Coercion holes and RewriterSets
 %*                                                                      *
 %********************************************************************* -}
 
@@ -1681,7 +1689,7 @@ data CoercionHole
   = CoercionHole { ch_co_var  :: CoVar
                        -- See Note [CoercionHoles and coercion free variables]
 
-                 , ch_ref :: IORef (Maybe Coercion)
+                 , ch_ref :: IORef (Maybe (Coercion, RewriterSet))
                  }
 
 coHoleCoVar :: CoercionHole -> CoVar
@@ -1701,6 +1709,33 @@ instance Outputable CoercionHole where
 
 instance Uniquable CoercionHole where
   getUnique (CoercionHole { ch_co_var = cv }) = getUnique cv
+
+
+-- | A RewriterSet stores a set of CoercionHoles that have been used to rewrite
+-- a constraint.  See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
+newtype RewriterSet = RewriterSet (UniqSet CoercionHole)
+  deriving newtype (Outputable, Semigroup, Monoid)
+
+emptyRewriterSet :: RewriterSet
+emptyRewriterSet = RewriterSet emptyUniqSet
+
+unitRewriterSet :: CoercionHole -> RewriterSet
+unitRewriterSet = coerce (unitUniqSet @CoercionHole)
+
+elemRewriterSet :: CoercionHole -> RewriterSet -> Bool
+elemRewriterSet = coerce (elementOfUniqSet @CoercionHole)
+
+delRewriterSet :: RewriterSet -> CoercionHole -> RewriterSet
+delRewriterSet = coerce (delOneFromUniqSet @CoercionHole)
+
+unionRewriterSet :: RewriterSet -> RewriterSet -> RewriterSet
+unionRewriterSet = coerce (unionUniqSets @CoercionHole)
+
+isEmptyRewriterSet :: RewriterSet -> Bool
+isEmptyRewriterSet = coerce (isEmptyUniqSet @CoercionHole)
+
+addRewriter :: RewriterSet -> CoercionHole -> RewriterSet
+addRewriter = coerce (addOneToUniqSet @CoercionHole)
 
 {- Note [Coercion holes]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1777,6 +1812,15 @@ constraint from floating] in GHC.Tc.Solver, item (4):
 Here co2 is a CoercionHole. But we /must/ know that it is free in
 co1, because that's all that stops it floating outside the
 implication.
+
+Note [CoercionHoles and RewriterSets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A constraint C carries a set of "rewriters", a set of Wanted CoercionHoles that have been
+used to rewrite C; see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
+
+If C is an equality constraint and is solved, we track its RewriterSet in the filled
+CoercionHole, so that it can be inherited by other constraints that have C in /their/
+rewriters.  See zonkRewriterSet.
 -}
 
 

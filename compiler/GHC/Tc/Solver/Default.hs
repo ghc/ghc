@@ -296,7 +296,7 @@ solveImplicationUsingUnsatGiven
     go_simple ct = case ctEvidence ct of
       CtWanted (WantedCt { ctev_pred = pty, ctev_dest = dest })
         -> do { ev_expr <- unsatisfiableEvExpr unsat_given pty
-              ; setWantedEvTerm dest EvNonCanonical $ EvExpr ev_expr }
+              ; setWantedDict dest EvNonCanonical $ EvExpr ev_expr }
       _ -> return ()
 
 -- | Create an evidence expression for an arbitrary constraint using

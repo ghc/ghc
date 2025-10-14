@@ -360,15 +360,14 @@ newCoercionHole pred_ty
        ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
 
 -- | Put a value in a coercion hole
-fillCoercionHole :: CoercionHole -> Coercion -> TcM ()
-fillCoercionHole (CoercionHole { ch_ref = ref, ch_co_var = cv }) co = do
-  when debugIsOn $ do
-    cts <- readTcRef ref
-    whenIsJust cts $ \old_co ->
-      pprPanic "Filling a filled coercion hole" (ppr cv $$ ppr co $$ ppr old_co)
-  traceTc "Filling coercion hole" (ppr cv <+> text ":=" <+> ppr co)
-  writeTcRef ref (Just co)
-
+fillCoercionHole :: CoercionHole -> (Coercion, RewriterSet) -> TcM ()
+fillCoercionHole (CoercionHole { ch_ref = ref, ch_co_var = cv }) co
+  = do { when debugIsOn $
+         do { cts <- readTcRef ref
+            ; whenIsJust cts $ \old_co ->
+              pprPanic "Filling a filled coercion hole" (ppr cv $$ ppr co $$ ppr old_co) }
+       ; traceTc "Filling coercion hole" (ppr cv <+> text ":=" <+> ppr co)
+       ; writeTcRef ref (Just co) }
 
 {- **********************************************************************
 *
@@ -1546,8 +1545,8 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (HoleCo hole)
       = do m_co <- liftZonkM (unpackCoercionHole_maybe hole)
            case m_co of
-             Just co -> go_co dv co
-             Nothing -> go_cv dv (coHoleCoVar hole)
+             Just (co,_) -> go_co dv co
+             Nothing     -> go_cv dv (coHoleCoVar hole)
 
     go_co dv (CoVarCo cv) = go_cv dv cv
 

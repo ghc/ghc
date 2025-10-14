@@ -1666,7 +1666,7 @@ solveWantedQCI mode ct@(CQuantCan (QCI { qci_ev =  ev, qci_tvs = tvs
               -- NB: even if it is fully solved we must return it, because it is
               --     carrying a record of which evidence variables are used
               --     See Note [Free vars of EvFun] in GHC.Tc.Types.Evidence
-             do { setWantedEvTerm dest EvCanonical $
+             do { setWantedDict dest EvCanonical $
                   EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
                         , et_binds = TcEvBinds ev_binds_var
                         , et_body = wantedCtEvEvId wanted_ev }
@@ -1761,7 +1761,7 @@ finish_rewrite
              ev_rw_role = ctEvRewriteRole ev
        ; mb_new_ev <- newWanted loc rewriters' new_pred
        ; massert (coercionRole co == ev_rw_role)
-       ; setWantedEvTerm dest EvCanonical $
+       ; setWantedEvTerm dest rewriters' EvCanonical $
          evCast (getEvExpr mb_new_ev)     $
          downgradeRole Representational ev_rw_role (mkSymCo co)
        ; case mb_new_ev of
@@ -1833,7 +1833,8 @@ runTcPluginsWanted wanted
   where
     setEv :: (EvTerm,Ct) -> TcS ()
     setEv (ev,ct) = case ctEvidence ct of
-      CtWanted (WantedCt { ctev_dest = dest }) -> setWantedEvTerm dest EvCanonical ev
+      CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rewriters })
+        -> setWantedEvTerm dest rewriters EvCanonical ev
            -- TODO: plugins should be able to signal non-canonicity
       _ -> panic "runTcPluginsWanted.setEv: attempt to solve non-wanted!"
 

@@ -90,8 +90,8 @@ module GHC.Tc.Types.Constraint (
         -- RewriterSet
         --   RewriterSet(..) is exported concretely only for zonkRewriterSet
         RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet, elemRewriterSet,
-        addRewriter, unitRewriterSet, unionRewriterSet, rewriterSetFromCts,
-        delRewriterSet,
+        addRewriter, unitRewriterSet, unionRewriterSet, delRewriterSet,
+        rewriterSetFromCts,
 
         wrapType,
 
@@ -128,7 +128,6 @@ import GHC.Tc.Types.CtLoc
 import GHC.Builtin.Names
 
 import GHC.Types.Var.Set
-import GHC.Types.Unique.Set
 import GHC.Types.Name.Reader
 
 import GHC.Utils.FV
@@ -140,7 +139,6 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.Bag
 
 import Control.Monad ( when )
-import Data.Coerce
 import Data.List  ( intersperse )
 import Data.Maybe ( mapMaybe, isJust )
 import GHC.Data.Maybe ( firstJust, firstJusts )
@@ -2395,6 +2393,16 @@ wantedCtHasNoRewriters (WantedCt { ctev_rewriters = rws })
 setWantedCtEvRewriters :: WantedCtEvidence -> RewriterSet -> WantedCtEvidence
 setWantedCtEvRewriters ev rs = ev { ctev_rewriters = rs }
 
+rewriterSetFromCts :: Bag Ct -> RewriterSet
+-- Take a bag of Wanted equalities, and collect them as a RewriterSet
+rewriterSetFromCts cts
+  = foldr add emptyRewriterSet cts
+  where
+    add ct rw_set =
+      case ctEvidence ct of
+        CtWanted (WantedCt { ctev_dest = HoleDest hole }) -> rw_set `addRewriter` hole
+        _                                                 -> rw_set
+
 ctEvExpr :: HasDebugCallStack => CtEvidence -> EvExpr
 ctEvExpr (CtWanted ev@(WantedCt { ctev_dest = HoleDest _ }))
             = Coercion $ ctEvCoercion (CtWanted ev)
@@ -2487,50 +2495,6 @@ isWanted _ = False
 isGiven :: CtEvidence -> Bool
 isGiven (CtGiven {})  = True
 isGiven _ = False
-
-{-
-************************************************************************
-*                                                                      *
-           RewriterSet
-*                                                                      *
-************************************************************************
--}
-
--- | Stores a set of CoercionHoles that have been used to rewrite a constraint.
--- See Note [Wanteds rewrite Wanteds].
-newtype RewriterSet = RewriterSet (UniqSet CoercionHole)
-  deriving newtype (Outputable, Semigroup, Monoid)
-
-emptyRewriterSet :: RewriterSet
-emptyRewriterSet = RewriterSet emptyUniqSet
-
-unitRewriterSet :: CoercionHole -> RewriterSet
-unitRewriterSet = coerce (unitUniqSet @CoercionHole)
-
-elemRewriterSet :: CoercionHole -> RewriterSet -> Bool
-elemRewriterSet = coerce (elementOfUniqSet @CoercionHole)
-
-delRewriterSet :: RewriterSet -> CoercionHole -> RewriterSet
-delRewriterSet = coerce (delOneFromUniqSet @CoercionHole)
-
-unionRewriterSet :: RewriterSet -> RewriterSet -> RewriterSet
-unionRewriterSet = coerce (unionUniqSets @CoercionHole)
-
-isEmptyRewriterSet :: RewriterSet -> Bool
-isEmptyRewriterSet = coerce (isEmptyUniqSet @CoercionHole)
-
-addRewriter :: RewriterSet -> CoercionHole -> RewriterSet
-addRewriter = coerce (addOneToUniqSet @CoercionHole)
-
-rewriterSetFromCts :: Bag Ct -> RewriterSet
--- Take a bag of Wanted equalities, and collect them as a RewriterSet
-rewriterSetFromCts cts
-  = foldr add emptyRewriterSet cts
-  where
-    add ct rw_set =
-      case ctEvidence ct of
-        CtWanted (WantedCt { ctev_dest = HoleDest hole }) -> rw_set `addRewriter` hole
-        _                                                 -> rw_set
 
 {-
 ************************************************************************
