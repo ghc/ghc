@@ -10,7 +10,7 @@ module GHC.Tc.Solver.Equality(
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Tc.Solver.Solve( trySolveImplication )
+import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Tc.Solver.Irred( solveIrred )
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
@@ -544,6 +544,7 @@ can_eq_nc_forall ev eq_rel s1 s2
 
       -- Generate and solve the constraints that live in the body of the implication
       -- See (SF5) and (SF6) in Note [Solving forall equalities]
+      ; nested_ev_binds_var <- newNoTcEvBinds
       ; (unifs, (all_co, solved))
              <- reportFineGrainUnifications $
                 do { -- Generate constraints
@@ -554,23 +555,21 @@ can_eq_nc_forall ev eq_rel s1 s2
 
                    ; traceTcS "Trying to solve the implication" (ppr s1 $$ ppr s2 $$ ppr wanteds)
 
-                   -- Solve the `wanteds` in a nested context
-                   ; ev_binds_var <- newNoTcEvBinds
-                   ; residual_wanted <- nestImplicTcS skol_info_anon ev_binds_var tclvl $
+                   -- Solve the `wanteds` in a nested context.
+                   ; residual_wanted <- nestImplicTcS skol_info_anon nested_ev_binds_var tclvl $
                                         solveSimpleWanteds wanteds
 
                    ; return (all_co, isSolvedWC residual_wanted) }
-
 
       -- Kick out any inerts constraints that mention unified type variables
       ; kickOutAfterUnification unifs
 
       ; if solved
-        then do { all_co <- zonkCo all_co
-                     -- setWantedEq will add `all_co` to the `ebv_tcvs`, to record
-                     -- that `all_co` is used.  But if `all_co` contains filled
-                     -- CoercionHoles, from the nested solve, and we may miss the
-                     -- use of CoVars.  Test T7196 showed this up
+        then do {  -- Record any used used Given coercions (in `evb_tcvs`) so that
+                   -- they are kept alive by `neededEvVars`. Admittedly they are free in `all_co`,
+                   -- but only if we zonk it, which `neededEvVars` does not do (see test T7196).
+                  ev_binds_var <- getTcEvBindsVar
+                ; updTcEvBinds ev_binds_var nested_ev_binds_var
 
                 ; setWantedEq orig_dest (CPH { cph_co = all_co, cph_holes = emptyCoHoleSet })
                      -- emptyCoHoleSet: fully solved, so all_co has no holes
@@ -597,11 +596,12 @@ can_eq_nc_forall ev eq_rel s1 s2
         in (bndr1:bndrs1, phi1, bndr2:bndrs2, phi2)
     split_foralls s1 s2 = ([], s1, [], s2)
 
+
 {- Note [Solving forall equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To solve an equality between foralls
    [W] (forall a. t1) ~ (forall b. t2)
-the basic plan is simple: use `trySolveImplication` to solve the
+the basic plan is simple: behave rather as if we were solving the
 implication constraint
    [W] forall a. { t1 ~ (t2[a/b]) }
 
@@ -648,19 +648,15 @@ There are lots of wrinkles of course:
    because we want to /gather/ the equality constraint (to put in the implication)
    rather than /emit/ them into the monad, as `wrapUnifierAndEmit` does.
 
-(SF6) We solve the implication on the spot, using `trySolveImplication`.  In
-   the past we instead generated an `Implication` to be solved later.  Nice in
-   some ways but it added complexity:
-      - We needed a `wl_implics` field of `WorkList` to collect
-        these emitted implications
-      - The types of `solveSimpleWanteds` and friends were more complicated
-      - Trickily, an `EvFun` had to contain an `EvBindsVar` ref-cell, which made
-        `evVarsOfTerm` harder.  Now an `EvFun` just contains the bindings.
-   The disadvantage of solve-on-the-spot is that if we fail we are simply
-   left with an unsolved (forall a. blah) ~ (forall b. blah), and it may
-   not be clear /why/ we couldn't solve it.  But on balance the error messages
-   improve: it is easier to undertand that
-       (forall a. a->a) ~ (forall b. b->Int)
+(SF6) We solve the nested constraints right away.  In the past we instead generated
+   an `Implication` to be solved later, but we no longer have a convenient place
+   to accumulate such an implication for later solving.  Instead we just try to solve
+   them on the spot, and abandon the attempt if we fail.
+
+   In the latter case we are left with an unsolved (forall a. blah) ~ (forall b. blah),
+   and it may not be clear /why/ we couldn't solve it.  But on balance the error
+   messages improve: it is easier to understand that
+         (forall a. a->a) ~ (forall b. b->Int)
    is insoluble than it is to understand a message about matching `a` with `Int`.
 -}
 
@@ -2944,8 +2940,7 @@ lookup_eq_in_qcis :: CtEvidence -> EqRel -> TcType -> TcType -> SolverStage ()
 --    [W] t1 ~# t2
 -- and a Given quantified contraint like (forall a b. blah => a ~ b)
 -- Why?  See Note [Looking up primitive equalities in quantified constraints]
--- See also GHC.Tc.Solver.Dict
--- Note [Equality superclasses in quantified constraints]
+-- See also GHC.Tc.Solver.Dict Note [Equality superclasses in quantified constraints]
 lookup_eq_in_qcis (CtGiven {}) _ _ _
   = nopStage ()
 
@@ -2961,10 +2956,18 @@ lookup_eq_in_qcis ev@(CtWanted (WantedCt { ctev_dest = dest, ctev_loc = loc })) 
   where
     hole = case dest of
              HoleDest hole -> hole   -- Equality constraints have HoleDest
-             _ -> pprPanic "lookup_eq_in_qcis" (ppr dest) 
+             _ -> pprPanic "lookup_eq_in_qcis" (ppr dest)
 
     try :: SwapFlag -> SolverStage ()
-    try swap -- First try looking for (lhs ~ rhs)
+    -- E.g. We are trying to solve (say)
+    --             [W] g : [Int] ~# b)
+    --      from   [G] forall x. blah => b ~ [x]   -- A quantified constraint
+    -- We can solve it like this
+    --     d::b~[Int] := $df @Int blah        -- Apply the quantified constraint
+    --     g'::b~#[Int] := sc_sel d           -- Binding, extract the coercion from d
+    --     g(co-hole) := sym g'               -- Fill the original coercion hole
+    -- Here g' is a fresh coercion variable.
+    try swap
        | Just (cls, tys) <- unSwap swap (boxEqPred eq_rel) lhs rhs
        = Stage $
          do { let cls_pred = mkClassPred cls tys
@@ -2974,7 +2977,7 @@ lookup_eq_in_qcis ev@(CtWanted (WantedCt { ctev_dest = dest, ctev_loc = loc })) 
                 OneInst {}
                   -> do { dict_ev <- newWantedEvVarNC loc emptyCoHoleSet cls_pred
                         ; chooseInstance dict_ev res
-                        ; let co_var = coHoleCoVar hole
+                        ; co_var <- newEvVar (unSwap swap (mkEqPred eq_rel) lhs rhs)
                         ; setEvBind (mkWantedEvBind co_var EvCanonical (mk_sc_sel cls tys dict_ev))
                         ; fillCoercionHole hole (CPH { cph_co    = maybeSymCo swap (mkCoVarCo co_var)
                                                      , cph_holes = emptyCoHoleSet })

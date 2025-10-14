@@ -20,7 +20,7 @@ module GHC.Tc.Solver.Monad (
     failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS, tryShortCutTcS, nestFunDepsTcS,
-    setEvBindsTcS, setTcLevelTcS,
+    setEvBindsTcS, setTcLevelTcS, updTcEvBinds,
 
     selectNextWorkItem,
     getWorkList,
@@ -1239,12 +1239,28 @@ setTcLevelTcS :: TcLevel -> TcS a -> TcS a
 setTcLevelTcS lvl (TcS thing_inside)
  = TcS $ \ env -> TcM.setTcLevel lvl (thing_inside env)
 
+{- Note [nestImplicTcS]
+~~~~~~~~~~~~~~~~~~~~~~~
+`nestImplicTcS` is used to build a nested scope when we begin solving an implication.
+
+(NI1) One subtle point is that `nestImplicTcS` uses `resetInertCans` to
+    initialise the `InertSet` of the nested scope to the `inert_givens` (/not/
+    the `inert_cans`) of the current inert set.  It is super-important not to
+    pollute the sub-solving problem with the unsolved Wanteds of the current
+    scope.
+
+    Whenever we do `solveSimpleGivens`, we snapshot the `inert_cans` into `inert_givens`.
+    (At that moment there should be no Wanteds.)
+-}
+
 nestImplicTcS :: SkolemInfoAnon -> EvBindsVar
               -> TcLevel -> TcS a
               -> TcS a
+-- See Note [nestImplicTcS]
 nestImplicTcS skol_info ev_binds_var inner_tclvl (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = old_inert_var }) ->
-    do { nest_inert <- mk_nested_inert_set skol_info old_inert_var
+    do { old_inerts <- TcM.readTcRef old_inert_var
+       ; let nest_inert = mk_nested_inerts old_inerts
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = env { tcs_ev_binds = ev_binds_var
@@ -1263,24 +1279,18 @@ nestImplicTcS skol_info ev_binds_var inner_tclvl (TcS thing_inside)
 #endif
        ; return res }
   where
-    mk_nested_inert_set skol_info old_inert_var
+    mk_nested_inerts old_inerts
       -- For an implication that comes from a static form (static e),
       -- start with a completely empty inert set; in particular, no Givens
       -- See (SF3) in Note [Grand plan for static forms]
       -- in GHC.Iface.Tidy.StaticPtrTable
       | StaticFormSkol <- skol_info
-      = return (emptyInertSet inner_tclvl)
+      = emptyInertSet inner_tclvl
 
       | otherwise
-      = do { inerts <- TcM.readTcRef old_inert_var
-
-           -- resetInertCans: initialise the inert_cans from the inert_givens of the
-           -- parent so that the child is not polluted with the parent's inert Wanteds
-           -- See Note [trySolveImplication] in GHC.Tc.Solver.Solve
-           -- All other InertSet fields are inherited
-           ; return (pushCycleBreakerVarStack $
-                     resetInertCans           $
-                     inerts) }
+      = pushCycleBreakerVarStack $
+        resetInertCans           $  -- See (NI1) in Note [nestImplicTcS]
+        old_inerts
 
 nestFunDepsTcS :: TcS a -> TcS a
 nestFunDepsTcS (TcS thing_inside)
@@ -1453,6 +1463,10 @@ getTcEvBindsMap ev_binds_var
 setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcS ()
 setTcEvBindsMap ev_binds_var binds
   = wrapTcS $ TcM.setTcEvBindsMap ev_binds_var binds
+
+updTcEvBinds :: EvBindsVar -> EvBindsVar -> TcS ()
+updTcEvBinds evb nested_evb
+  = wrapTcS $ TcM.updTcEvBinds evb nested_evb
 
 getDefaultInfo ::  TcS (DefaultEnv, Bool)
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
