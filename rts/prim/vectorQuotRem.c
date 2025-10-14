@@ -16,7 +16,7 @@ int8x16_t hs_quotInt8X16(int8x16_t x, int8x16_t y)
 
 */
 
-__m128i hs_quotInt8X16(__m128i xx, __m128i yy)
+v128 hs_quotInt8X16(v128 xx, v128 yy)
 {
   int8_t x[16], y[16];
   memcpy(x, &xx, 16);
@@ -37,10 +37,10 @@ __m128i hs_quotInt8X16(__m128i xx, __m128i yy)
   int8_t z13 = x[13] / y[13];
   int8_t z14 = x[14] / y[14];
   int8_t z15 = x[15] / y[15];
-  return _mm_set_epi8(z15, z14, z13, z12, z11, z10, z9, z8, z7, z6, z5, z4, z3, z2, z1, z0);
+  return (v128) _mm_set_epi8(z15, z14, z13, z12, z11, z10, z9, z8, z7, z6, z5, z4, z3, z2, z1, z0);
 }
 
-__m128i hs_quotInt16X8(__m128i xx, __m128i yy)
+v128 hs_quotInt16X8(v128 xx, v128 yy)
 {
   int16_t x[8], y[8];
   memcpy(x, &xx, 16);
@@ -53,10 +53,10 @@ __m128i hs_quotInt16X8(__m128i xx, __m128i yy)
   int16_t z5 = x[5] / y[5];
   int16_t z6 = x[6] / y[6];
   int16_t z7 = x[7] / y[7];
-  return _mm_set_epi16(z7, z6, z5, z4, z3, z2, z1, z0);
+  return (v128) _mm_set_epi16(z7, z6, z5, z4, z3, z2, z1, z0);
 }
 
-__m128i hs_quotInt32X4(__m128i xx, __m128i yy)
+v128 hs_quotInt32X4(v128 xx, v128 yy)
 {
   int32_t x[4], y[4];
   memcpy(x, &xx, 16);
@@ -65,20 +65,20 @@ __m128i hs_quotInt32X4(__m128i xx, __m128i yy)
   int32_t z1 = x[1] / y[1];
   int32_t z2 = x[2] / y[2];
   int32_t z3 = x[3] / y[3];
-  return _mm_set_epi32(z3, z2, z1, z0);
+  return (v128) _mm_set_epi32(z3, z2, z1, z0);
 }
 
-__m128i hs_quotInt64X2(__m128i xx, __m128i yy)
+v128 hs_quotInt64X2(v128 xx, v128 yy)
 {
   int64_t x[2], y[2];
   memcpy(x, &xx, 16);
   memcpy(y, &yy, 16);
   int64_t z0 = x[0] / y[0];
   int64_t z1 = x[1] / y[1];
-  return _mm_set_epi64x(z1, z0);
+  return (v128) _mm_set_epi64x(z1, z0);
 }
 
-__m128i hs_quotWord8X16(__m128i xx, __m128i yy)
+v128 hs_quotWord8X16(v128 xx, v128 yy)
 {
   uint8_t x[16], y[16];
   memcpy(x, &xx, 16);
@@ -99,10 +99,10 @@ __m128i hs_quotWord8X16(__m128i xx, __m128i yy)
   uint8_t z13 = x[13] / y[13];
   uint8_t z14 = x[14] / y[14];
   uint8_t z15 = x[15] / y[15];
-  return _mm_set_epi8(z15, z14, z13, z12, z11, z10, z9, z8, z7, z6, z5, z4, z3, z2, z1, z0);
+  return (v128) _mm_set_epi8(z15, z14, z13, z12, z11, z10, z9, z8, z7, z6, z5, z4, z3, z2, z1, z0);
 }
 
-__m128i hs_quotWord16X8(__m128i xx, __m128i yy)
+v128 hs_quotWord16X8(v128 xx, v128 yy)
 {
   uint16_t x[8], y[8];
   memcpy(x, &xx, 16);
@@ -115,10 +115,10 @@ __m128i hs_quotWord16X8(__m128i xx, __m128i yy)
   uint16_t z5 = x[5] / y[5];
   uint16_t z6 = x[6] / y[6];
   uint16_t z7 = x[7] / y[7];
-  return _mm_set_epi16(z7, z6, z5, z4, z3, z2, z1, z0);
+  return (v128) _mm_set_epi16(z7, z6, z5, z4, z3, z2, z1, z0);
 }
 
-__m128i hs_quotWord32X4(__m128i xx, __m128i yy)
+v128 hs_quotWord32X4(v128 xx, v128 yy)
 {
   uint32_t x[4], y[4];
   memcpy(x, &xx, 16);
@@ -127,20 +127,20 @@ __m128i hs_quotWord32X4(__m128i xx, __m128i yy)
   uint32_t z1 = x[1] / y[1];
   uint32_t z2 = x[2] / y[2];
   uint32_t z3 = x[3] / y[3];
-  return _mm_set_epi32(z3, z2, z1, z0);
+  return (v128) _mm_set_epi32(z3, z2, z1, z0);
 }
 
-__m128i hs_quotWord64X2(__m128i xx, __m128i yy)
+v128 hs_quotWord64X2(v128 xx, v128 yy)
 {
   uint64_t x[2], y[2];
   memcpy(x, &xx, 16);
   memcpy(y, &yy, 16);
   uint64_t z0 = x[0] / y[0];
   uint64_t z1 = x[1] / y[1];
-  return _mm_set_epi64x(z1, z0);
+  return (v128) _mm_set_epi64x(z1, z0);
 }
 
-__m128i hs_remInt8X16(__m128i xx, __m128i yy)
+v128 hs_remInt8X16(v128 xx, v128 yy)
 {
   int8_t x[16], y[16];
   memcpy(x, &xx, 16);
@@ -161,10 +161,10 @@ __m128i hs_remInt8X16(__m128i xx, __m128i yy)
   int8_t z13 = x[13] % y[13];
   int8_t z14 = x[14] % y[14];
   int8_t z15 = x[15] % y[15];
-  return _mm_set_epi8(z15, z14, z13, z12, z11, z10, z9, z8, z7, z6, z5, z4, z3, z2, z1, z0);
+  return (v128) _mm_set_epi8(z15, z14, z13, z12, z11, z10, z9, z8, z7, z6, z5, z4, z3, z2, z1, z0);
 }
 
-__m128i hs_remInt16X8(__m128i xx, __m128i yy)
+v128 hs_remInt16X8(v128 xx, v128 yy)
 {
   int16_t x[8], y[8];
   memcpy(x, &xx, 16);
@@ -177,10 +177,10 @@ __m128i hs_remInt16X8(__m128i xx, __m128i yy)
   int16_t z5 = x[5] % y[5];
   int16_t z6 = x[6] % y[6];
   int16_t z7 = x[7] % y[7];
-  return _mm_set_epi16(z7, z6, z5, z4, z3, z2, z1, z0);
+  return (v128) _mm_set_epi16(z7, z6, z5, z4, z3, z2, z1, z0);
 }
 
-__m128i hs_remInt32X4(__m128i xx, __m128i yy)
+v128 hs_remInt32X4(v128 xx, v128 yy)
 {
   int32_t x[4], y[4];
   memcpy(x, &xx, 16);
@@ -189,20 +189,20 @@ __m128i hs_remInt32X4(__m128i xx, __m128i yy)
   int32_t z1 = x[1] % y[1];
   int32_t z2 = x[2] % y[2];
   int32_t z3 = x[3] % y[3];
-  return _mm_set_epi32(z3, z2, z1, z0);
+  return (v128) _mm_set_epi32(z3, z2, z1, z0);
 }
 
-__m128i hs_remInt64X2(__m128i xx, __m128i yy)
+v128 hs_remInt64X2(v128 xx, v128 yy)
 {
   int64_t x[2], y[2];
   memcpy(x, &xx, 16);
   memcpy(y, &yy, 16);
   int64_t z0 = x[0] % y[0];
   int64_t z1 = x[1] % y[1];
-  return _mm_set_epi64x(z1, z0);
+  return (v128) _mm_set_epi64x(z1, z0);
 }
 
-__m128i hs_remWord8X16(__m128i xx, __m128i yy)
+v128 hs_remWord8X16(v128 xx, v128 yy)
 {
   uint8_t x[16], y[16];
   memcpy(x, &xx, 16);
@@ -223,10 +223,10 @@ __m128i hs_remWord8X16(__m128i xx, __m128i yy)
   uint8_t z13 = x[13] % y[13];
   uint8_t z14 = x[14] % y[14];
   uint8_t z15 = x[15] % y[15];
-  return _mm_set_epi8(z15, z14, z13, z12, z11, z10, z9, z8, z7, z6, z5, z4, z3, z2, z1, z0);
+  return (v128) _mm_set_epi8(z15, z14, z13, z12, z11, z10, z9, z8, z7, z6, z5, z4, z3, z2, z1, z0);
 }
 
-__m128i hs_remWord16X8(__m128i xx, __m128i yy)
+v128 hs_remWord16X8(v128 xx, v128 yy)
 {
   uint16_t x[8], y[8];
   memcpy(x, &xx, 16);
@@ -239,10 +239,10 @@ __m128i hs_remWord16X8(__m128i xx, __m128i yy)
   uint16_t z5 = x[5] % y[5];
   uint16_t z6 = x[6] % y[6];
   uint16_t z7 = x[7] % y[7];
-  return _mm_set_epi16(z7, z6, z5, z4, z3, z2, z1, z0);
+  return (v128) _mm_set_epi16(z7, z6, z5, z4, z3, z2, z1, z0);
 }
 
-__m128i hs_remWord32X4(__m128i xx, __m128i yy)
+v128 hs_remWord32X4(v128 xx, v128 yy)
 {
   uint32_t x[4], y[4];
   memcpy(x, &xx, 16);
@@ -251,17 +251,17 @@ __m128i hs_remWord32X4(__m128i xx, __m128i yy)
   uint32_t z1 = x[1] % y[1];
   uint32_t z2 = x[2] % y[2];
   uint32_t z3 = x[3] % y[3];
-  return _mm_set_epi32(z3, z2, z1, z0);
+  return (v128) _mm_set_epi32(z3, z2, z1, z0);
 }
 
-__m128i hs_remWord64X2(__m128i xx, __m128i yy)
+v128 hs_remWord64X2(v128 xx, v128 yy)
 {
   uint64_t x[2], y[2];
   memcpy(x, &xx, 16);
   memcpy(y, &yy, 16);
   uint64_t z0 = x[0] % y[0];
   uint64_t z1 = x[1] % y[1];
-  return _mm_set_epi64x(z1, z0);
+  return (v128) _mm_set_epi64x(z1, z0);
 }
 
 #endif
