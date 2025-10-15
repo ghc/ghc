@@ -142,6 +142,7 @@ import GHC.Types.Unique.Set
 import GHC.Types.Basic ( TypeOrKind(..)
                        , NonStandardDefaultingStrategy(..)
                        , DefaultingStrategy(..), defaultNonStandardTyVars )
+import GHC.Types.StringMeta (defaultStrMeta)
 
 import GHC.Data.FastString
 import GHC.Data.Bag
@@ -2381,7 +2382,7 @@ shortCutLit platform val res_ty
             -- is less than 100, which ensures desugaring isn't slow.
 
     go_string src s
-      | isStringTy res_ty = Just (HsLit noExtField (HsString src s))
+      | isStringTy res_ty = Just (HsLit noExtField (HsString (defaultStrMeta src) s))
       | otherwise         = Nothing
 
 mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc

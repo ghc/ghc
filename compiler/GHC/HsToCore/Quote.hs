@@ -83,6 +83,7 @@ import GHC.Types.Fixity
 import GHC.Types.TyThing
 import GHC.Types.Name hiding( varName, tcName )
 import GHC.Types.Name.Env
+import GHC.Types.StringMeta (emptyStrMeta)
 
 import GHC.TypeLits
 import Data.Kind (Constraint)
@@ -3085,7 +3086,6 @@ repLiteral lit
                  HsChar _ _       -> Just charLName
                  HsCharPrim _ _   -> Just charPrimLName
                  HsString _ _     -> Just stringLName
-                 HsMultilineString _ _ -> Just stringLName
                  _                -> Nothing
 
 mk_integer :: Integer -> MetaM (HsLit GhcTc)
@@ -3096,7 +3096,7 @@ mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ XLit $ HsRat r rat_ty
 
 mk_string :: FastString -> MetaM (HsLit GhcRn)
-mk_string s = return $ HsString NoSourceText s
+mk_string s = return $ HsString emptyStrMeta s
 
 mk_char :: Char -> MetaM (HsLit GhcRn)
 mk_char c = return $ HsChar NoSourceText c

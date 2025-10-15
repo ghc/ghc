@@ -72,6 +72,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import GHC.Types.Basic
 import GHC.Types.SourceText
+import GHC.Types.StringMeta (strMetaSrc)
 
 import GHC.Data.FastString ( uniqCompareFS )
 import GHC.Data.List.SetOps( removeDups )
@@ -567,11 +568,11 @@ rnPatAndThen mk (SigPat _ pat sig)
     rnHsPatSigTypeAndThen sig = liftCpsWithCont (rnHsPatSigType AlwaysBind PatCtx sig)
 
 rnPatAndThen mk (LitPat x lit)
-  | HsString src s <- lit
+  | HsString meta s <- lit
   = do { ovlStr <- liftCps (xoptM LangExt.OverloadedStrings)
        ; if ovlStr
          then rnPatAndThen mk
-                           (mkNPat (noLocA (mkHsIsString src s))
+                           (mkNPat (noLocA (mkHsIsString (strMetaSrc meta) s))
                                       Nothing noAnn)
          else normal_lit }
   | otherwise = normal_lit

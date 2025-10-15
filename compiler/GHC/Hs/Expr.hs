@@ -53,6 +53,7 @@ import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
+import GHC.Types.StringMeta (defaultStrMeta)
 import GHC.Types.Tickish (CoreTickish)
 import GHC.Types.Unique.Set (UniqSet)
 import GHC.Types.ThLevelIndex
@@ -132,7 +133,9 @@ data SyntaxExprTc = SyntaxExprTc { syn_expr      :: HsExpr GhcTc
 -- | This is used for rebindable-syntax pieces that are too polymorphic
 -- for tcSyntaxOp (trS_fmap and the mzip in ParStmt)
 noExpr :: HsExpr (GhcPass p)
-noExpr = HsLit noExtField (HsString (SourceText $ fsLit "noExpr") (fsLit "noExpr"))
+noExpr = HsLit noExtField (HsString meta (fsLit "noExpr"))
+  where
+    meta = defaultStrMeta $ SourceText $ fsLit "noExpr"
 
 noSyntaxExpr :: forall p. IsPass p => SyntaxExpr (GhcPass p)
                               -- Before renaming, and sometimes after
