@@ -47,6 +47,7 @@ import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )
 import GHC.Types.Name
 import GHC.Types.Literal
 import GHC.Types.SrcLoc
+import GHC.Types.StringMeta (emptyStrMeta, strMetaSrc)
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types
@@ -117,7 +118,6 @@ dsLit l = do
     HsDoublePrim _ fl -> return (Lit (LitDouble (rationalFromFractionalLit fl)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
-    HsMultilineString _ str -> mkStringExprFS str
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
     XLit x           -> case ghcPass @p of
       GhcTc          -> case x of
@@ -463,7 +463,6 @@ getSimpleIntegralLit (XLit (HsInteger _ i ty))  = Just (i, ty)
 getSimpleIntegralLit HsChar{}           = Nothing
 getSimpleIntegralLit HsCharPrim{}       = Nothing
 getSimpleIntegralLit HsString{}         = Nothing
-getSimpleIntegralLit HsMultilineString{} = Nothing
 getSimpleIntegralLit HsStringPrim{}     = Nothing
 getSimpleIntegralLit (XLit (HsRat{}))   = Nothing
 getSimpleIntegralLit HsFloatPrim{}      = Nothing
@@ -527,10 +526,10 @@ tidyLitPat :: HsLit GhcTc -> Pat GhcTc
 --    HsFloatPrim and HsDoublePrim can't show up in LitPats
 --  * We get rid of HsChar right here
 tidyLitPat (HsChar src c) = unLoc (mkCharLitPat src c)
-tidyLitPat (HsString src s)
+tidyLitPat (HsString meta s)
   | lengthFS s <= 1     -- Short string literals only
   = unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon
-                                             [mkCharLitPat src c, pat] [charTy])
+                                             [mkCharLitPat (strMetaSrc meta) c, pat] [charTy])
                   (mkNilPat charTy) (unpackFS s)
         -- The stringTy is the type of the whole pattern, not
         -- the type to instantiate (:) or [] with!
@@ -556,7 +555,7 @@ tidyNPat (OverLit (OverLitTc False _ ty) val) mb_neg _eq outer_ty
   | not type_change, isWordTy ty,   Just int_lit <- mb_int_lit
                  = mk_con_pat wordDataCon   (HsWordPrim   NoSourceText int_lit)
   | not type_change, isStringTy ty, Just str_lit <- mb_str_lit
-                 = tidyLitPat (HsString NoSourceText str_lit)
+                 = tidyLitPat (HsString emptyStrMeta str_lit)
      -- NB: do /not/ convert Float or Double literals to F# 3.8 or D# 5.3
      -- If we do convert to the constructor form, we'll generate a case
      -- expression on a Float# or Double# and that's not allowed in Core; see

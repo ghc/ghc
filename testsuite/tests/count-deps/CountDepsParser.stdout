@@ -201,6 +201,7 @@ GHC.Types.SafeHaskell
 GHC.Types.SourceFile
 GHC.Types.SourceText
 GHC.Types.SrcLoc
+GHC.Types.StringMeta
 GHC.Types.Target
 GHC.Types.ThLevelIndex
 GHC.Types.Tickish

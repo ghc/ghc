@@ -932,6 +932,7 @@ Library
         GHC.Types.SourceText
         GHC.Types.SptEntry
         GHC.Types.SrcLoc
+        GHC.Types.StringMeta
         GHC.Types.Target
         GHC.Types.Tickish
         GHC.Types.TypeEnv

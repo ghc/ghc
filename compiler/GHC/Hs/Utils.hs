@@ -135,6 +135,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
+import GHC.Types.StringMeta (emptyStrMeta)
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 
@@ -467,10 +468,10 @@ mkHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
 mkHsOpApp e1 op e2 = OpApp noExtField e1 (noLocA (mkHsVar (noLocA op))) e2
 
 mkHsString :: String -> HsLit (GhcPass p)
-mkHsString s = HsString NoSourceText (mkFastString s)
+mkHsString = mkHsStringFS . mkFastString
 
 mkHsStringFS :: FastString -> HsLit (GhcPass p)
-mkHsStringFS s = HsString NoSourceText s
+mkHsStringFS s = HsString emptyStrMeta s
 
 mkHsStringPrimLit :: FastString -> HsLit (GhcPass p)
 mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)

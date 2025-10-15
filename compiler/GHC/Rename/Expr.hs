@@ -56,6 +56,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
+import GHC.Types.StringMeta (StringMeta(..))
 
 import GHC.Utils.Misc
 import qualified GHC.Data.List.NonEmpty as NE
@@ -361,8 +362,7 @@ rnExpr (HsLit x lit) | Just (src, s) <- stringLike lit
             ; return (HsLit x (convertLit lit), emptyFVs) } }
   where
     stringLike = \case
-      HsString src s -> Just (src, s)
-      HsMultilineString src s -> Just (src, s)
+      HsString StringMeta{strMetaSrc = src} s -> Just (src, s)
       _ -> Nothing
 
 rnExpr (HsLit x lit)

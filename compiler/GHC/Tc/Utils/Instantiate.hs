@@ -80,6 +80,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader (WithUserRdr(..))
+import GHC.Types.StringMeta (defaultStrMeta)
 import GHC.Types.Var
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -799,7 +800,7 @@ mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
         ; return (XLit $ HsRat r rat_ty) }
 
-mkOverLit (HsIsString src s) = return (HsString src s)
+mkOverLit (HsIsString src s) = return (HsString (defaultStrMeta src) s)
 
 {-
 ************************************************************************

@@ -45,11 +45,9 @@ data HsLit x
       -- ^ Character
   | HsCharPrim (XHsCharPrim x) {- SourceText -} Char
       -- ^ Unboxed character
-  | HsString (XHsString x) {- SourceText -} FastString
+  | HsString (XHsString x) {- StringMeta -} FastString
       -- ^ String
-  | HsMultilineString (XHsMultilineString x) {- SourceText -} FastString
-      -- ^ String
-  | HsStringPrim (XHsStringPrim x) {- SourceText -} !ByteString
+  | HsStringPrim (XHsStringPrim x) {- StringMeta -} !ByteString
       -- ^ Packed bytes
   | HsInt (XHsInt x)  IntegralLit
       -- ^ Genuinely an Int; arises from
