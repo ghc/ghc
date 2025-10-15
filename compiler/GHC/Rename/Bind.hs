@@ -763,7 +763,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
         ; let scoped_tvs = sig_fn name
 
         ; ((pat', details'), fvs1) <- bindSigTyVarsFV scoped_tvs $
-                                      rnPat PatSyn pat $ \pat' ->
+                                      rnPat PatSynCtx pat $ \pat' ->
          -- We check the 'RdrName's instead of the 'Name's
          -- so that the binding locations are reported
          -- from the left-hand side

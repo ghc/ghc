@@ -136,7 +136,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
        ; let (arg_names, is_infix) = collectPatSynArgInfo details
        ; (tclvl, wanted, ((lpat', args), pat_ty))
             <- pushLevelAndCaptureConstraints      $
-               tcInferPat FRRPatSynArg PatSyn lpat $
+               tcInferPat FRRPatSynArg PatSynCtx lpat $
                mapM tcLookupId arg_names
 
        ; let (ex_tvs, prov_dicts) = tcCollectEx lpat'
@@ -421,7 +421,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
            assertPpr (equalLength arg_names arg_tys) (ppr name $$ ppr arg_names $$ ppr arg_tys) $
            pushLevelAndCaptureConstraints   $
            tcExtendNameTyVarEnv univ_tv_prs $
-           tcCheckPat PatSyn lpat (unrestricted skol_pat_ty)   $
+           tcCheckPat PatSynCtx lpat (unrestricted skol_pat_ty)   $
            do { let in_scope    = mkInScopeSetList skol_univ_tvs
                     empty_subst = mkEmptySubst in_scope
               ; (inst_subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst skol_ex_tvs
@@ -843,7 +843,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              gen = Generated OtherExpansion SkipPmc
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
-                    HsCase PatSyn (nlHsVar scrutinee) $
+                    HsCase PatSynCtx (nlHsVar scrutinee) $
                     MG{ mg_alts = L (l2l $ getLoc lpat) cases
                       , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty gen
                       }

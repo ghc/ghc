@@ -1403,7 +1403,7 @@ data HsMatchContext fn
 
   | ThPatSplice            -- ^A Template Haskell pattern splice
   | ThPatQuote             -- ^A Template Haskell pattern quotation [p| (a,b) |]
-  | PatSyn                 -- ^A pattern synonym declaration
+  | PatSynCtx              -- ^A pattern synonym declaration
   | LazyPatCtx             -- ^An irrefutable pattern
 
 {- Note [mc_fun field of FunRhs]
@@ -1467,8 +1467,8 @@ qualifiedDoModuleName_maybe ctxt = case ctxt of
 isPatSynCtxt :: HsMatchContext fn -> Bool
 isPatSynCtxt ctxt =
   case ctxt of
-    PatSyn -> True
-    _      -> False
+    PatSynCtx -> True
+    _         -> False
 
 isComprehensionContext :: HsStmtContext fn -> Bool
 -- Uses comprehension syntax [ e | quals ]

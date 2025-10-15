@@ -1898,7 +1898,7 @@ matchSeparator PatBindRhs       = text "="
 matchSeparator PatBindGuards    = text "="
 matchSeparator StmtCtxt{}       = text "<-"
 matchSeparator RecUpd           = text "="  -- This can be printed by the pattern
-matchSeparator PatSyn           = text "<-" -- match checker trace
+matchSeparator PatSynCtx        = text "<-" -- match checker trace
 matchSeparator LazyPatCtx       = panic "unused"
 matchSeparator ThPatSplice      = panic "unused"
 matchSeparator ThPatQuote       = panic "unused"
@@ -2494,7 +2494,7 @@ instance Outputable fn => Outputable (HsMatchContext fn) where
   ppr (StmtCtxt _)            = text "StmtCtxt _"
   ppr ThPatSplice             = text "ThPatSplice"
   ppr ThPatQuote              = text "ThPatQuote"
-  ppr PatSyn                  = text "PatSyn"
+  ppr PatSynCtx               = text "PatSynCtx"
   ppr LazyPatCtx              = text "LazyPatCtx"
 
 instance Outputable HsLamVariant where
@@ -2538,7 +2538,7 @@ matchContextErrString RecUpd                        = text "record update"
 matchContextErrString (ArrowMatchCtxt c)            = matchArrowContextErrString c
 matchContextErrString ThPatSplice                   = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString ThPatQuote                    = panic "matchContextErrString"  -- Not used at runtime
-matchContextErrString PatSyn                        = text "pattern synonym"
+matchContextErrString PatSynCtx                     = text "pattern synonym"
 matchContextErrString (StmtCtxt (ParStmtCtxt c))    = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (TransStmtCtxt c))  = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _))       = text "pattern guard"
@@ -2613,7 +2613,7 @@ pprMatchContextNoun PatBindGuards           = text "pattern binding guards"
 pprMatchContextNoun (ArrowMatchCtxt c)      = pprArrowMatchContextNoun c
 pprMatchContextNoun (StmtCtxt ctxt)         = text "pattern binding in"
                                               $$ pprAStmtContext ctxt
-pprMatchContextNoun PatSyn                  = text "pattern synonym declaration"
+pprMatchContextNoun PatSynCtx               = text "pattern synonym declaration"
 pprMatchContextNoun LazyPatCtx              = text "irrefutable pattern"
 
 pprMatchContextNouns :: Outputable fn => HsMatchContext fn -> SDoc
