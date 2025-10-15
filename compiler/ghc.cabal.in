@@ -997,6 +997,7 @@ Library
         GHC.Utils.Containers.Internal.BitUtil
         GHC.Utils.Containers.Internal.StrictPair
         GHC.Utils.Error
+        GHC.Utils.EndoOS
         GHC.Utils.Exception
         GHC.Utils.Fingerprint
         GHC.Utils.FV

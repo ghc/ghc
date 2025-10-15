@@ -234,9 +234,11 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyConKey
                          , listTyCon, constraintKind )
 import GHC.Types.Basic
-import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps ( getNth, findDupsEq )
+
+import GHC.Utils.Misc
+import GHC.Utils.EndoOS
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -1176,11 +1178,11 @@ exactTyCoVarsOfTypes :: [Type] -> TyCoVarSet
 exactTyCoVarsOfType  ty  = runTyCoVars (exact_ty ty)
 exactTyCoVarsOfTypes tys = runTyCoVars (exact_tys tys)
 
-exact_ty  :: Type       -> Endo TyCoVarSet
-exact_tys :: [Type]     -> Endo TyCoVarSet
+exact_ty  :: Type       -> EndoOS TyCoVarSet
+exact_tys :: [Type]     -> EndoOS TyCoVarSet
 (exact_ty, exact_tys, _, _) = foldTyCo exactTcvFolder emptyVarSet
 
-exactTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
+exactTcvFolder :: TyCoFolder TyCoVarSet (EndoOS TyCoVarSet)
 exactTcvFolder = deepTcvFolder { tcf_view = coreView }
                  -- This is the key line
 

@@ -1687,7 +1687,7 @@ holes `HoleCo`, which get filled in later.
 -- | A coercion to be filled in by the type-checker. See Note [Coercion holes]
 data CoercionHole
   = CoercionHole { ch_co_var  :: CoVar
-                       -- See Note [CoercionHoles and coercion free variables]
+                       -- See Note [Coercion holes] wrinkle (COH2)
 
                  , ch_ref :: IORef (Maybe CoercionPlusHoles)
                  }
@@ -1800,18 +1800,22 @@ the evidence for unboxed equalities:
 
 Other notes about CoercionHole and HoleCo:
 
- * INVARIANT: CoercionHole and HoleCo are used only during type checking,
+(COH1) INVARIANT: CoercionHole and HoleCo are used only during type checking,
    and should never appear in Core. Just like unification variables; a Type
    can contain a TcTyVar, but only during type checking. If, one day, we
    use type-level information to separate out forms that can appear during
    type-checking vs forms that can appear in core proper, holes in Core will
    be ruled out.
 
- * See Note [CoercionHoles and coercion free variables]
+(COH2)  Why does a CoercionHole contain a CoVar, as well as reference to fill in?
+  * It really helps for debug pretty-printing.
+  * It carries a type which makes `coercionKind` and `coercionRole` work
+  * It has a Unique, which gives the hole an identity; see calls to `ctEvEvId`
 
- * Coercion holes can be compared for equality like other coercions:
-   by looking at the types coerced.
+(COH3) See Note [CoercionHoles and coercion free variables] in GHC.Core.TyCo.FVs
 
+(COH4) Coercion holes can be compared for equality like other coercions:
+       by looking at the types coerced.
 
 (COH5) A /filled-in/ CoercionHole stores a CoercionPlusHoles, a pair that contains
        a coercion paired with the free coercion holes of that coercion.
