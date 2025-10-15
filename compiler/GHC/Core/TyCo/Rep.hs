@@ -1803,17 +1803,23 @@ Other notes about HoleCo:
 
 Note [CoercionHoles and coercion free variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Why does a CoercionHole contain a CoVar, as well as reference to
-fill in?  Because we want to treat that CoVar as a free variable of
-the coercion.  See #14584, and Note [What prevents a
-constraint from floating] in GHC.Tc.Solver, item (4):
+Why does a CoercionHole contain a CoVar, as well as reference to fill in?
+  * It really helps for debug pretty-printing.
+  * It carries a type which makes `coercionKind` and `coercionRole` work
+  * It has a Unique, which gives the hole an identity; see calls to `ctEvEvId`
+
+(CHFV1) We do not treat a CoercionHole as a free variable of a coercion.
+  In the past we did: See #14584, and Note [What prevents a constraint from floating]
+  in GHC.Tc.Solver, item (4):
 
         forall k. [W] co1 :: t1 ~# t2 |> co2
                   [W] co2 :: k ~# *
 
-Here co2 is a CoercionHole. But we /must/ know that it is free in
-co1, because that's all that stops it floating outside the
-implication.
+   Here co2 is a CoercionHole. But we /must/ know that it is free in
+   co1, because that's all that stops it floating outside the
+   implication.
+
+   But nowadays this is all irrelevant because we don't float constraints.
 
 Note [CoercionHoles and RewriterSets]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
