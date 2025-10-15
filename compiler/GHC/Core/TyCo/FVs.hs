@@ -66,7 +66,10 @@ import GHC.Types.Unique.Set
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+
 import GHC.Utils.Misc
+import GHC.Utils.EndoOS
+
 import GHC.Data.Pair
 
 import Data.Semigroup
@@ -235,6 +238,16 @@ ill-scoped; an alternative we have not explored.
 
 But see `occCheckExpand` in this module for a function that does, selectively,
 expand synonyms to reduce free-var occurences.
+
+Note [CoercionHoles and coercion free variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally, we do not treat a CoercionHole as a free variable of a coercion;
+see `tyCoVarsOfType` and friends.
+
+But there is an exception. When finding the free /coercion/ variables of a type,
+in `coVarsOfType`, we /do/ treat a CoercionHole as a free variable.  Why?
+The sole reason is in Note [Emitting the residual implication in simplifyInfer]
+in GHC.Tc.Solver.  Yuk.  This is not pretty.
 -}
 
 {- *********************************************************************
@@ -285,9 +298,9 @@ done by the Call Arity pass.
 TL;DR: check this regularly!
 -}
 
-runTyCoVars :: Endo TyCoVarSet -> TyCoVarSet
+runTyCoVars :: EndoOS TyCoVarSet -> TyCoVarSet
 {-# INLINE runTyCoVars #-}
-runTyCoVars f = appEndo f emptyVarSet
+runTyCoVars f = appEndoOS f emptyVarSet
 
 {- *********************************************************************
 *                                                                      *
@@ -320,28 +333,36 @@ tyCoVarsOfMCo (MCo co) = tyCoVarsOfCo co
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
 tyCoVarsOfCos cos = runTyCoVars (deep_cos cos)
 
-deep_ty  :: Type       -> Endo TyCoVarSet
-deep_tys :: [Type]     -> Endo TyCoVarSet
-deep_co  :: Coercion   -> Endo TyCoVarSet
-deep_cos :: [Coercion] -> Endo TyCoVarSet
+deep_ty  :: Type       -> EndoOS TyCoVarSet
+deep_tys :: [Type]     -> EndoOS TyCoVarSet
+deep_co  :: Coercion   -> EndoOS TyCoVarSet
+deep_cos :: [Coercion] -> EndoOS TyCoVarSet
 (deep_ty, deep_tys, deep_co, deep_cos) = foldTyCo deepTcvFolder emptyVarSet
 
-deepTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
+deepTcvFolder :: TyCoFolder TyCoVarSet (EndoOS TyCoVarSet)
+-- It's important that we use a one-shot EndoOS, to ensure that all
+-- the free-variable finders are eta-expanded.  Lacking the one-shot-ness
+-- led to some big slow downs.  See Note [The one-shot state monad trick]
+-- in GHC.Utils.Monad
 deepTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                            , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                            , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tcv is v = Endo do_it
+    do_tcv is v = EndoOS do_it
       where
         do_it acc | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
-                  | otherwise          = appEndo (deep_ty (varType v)) $
+                  | otherwise          = appEndoOS (deep_ty (varType v)) $
                                          acc `extendVarSet` v
 
+    do_bndr :: TyCoVarSet -> TyVar -> ForAllTyFlag -> TyCoVarSet
     do_bndr is tcv _ = extendVarSet is tcv
-    do_hole is hole  = do_tcv is (coHoleCoVar hole)
-                       -- See Note [CoercionHoles and coercion free variables]
-                       -- in GHC.Core.TyCo.Rep
+
+    do_hole :: VarSet -> CoercionHole -> EndoOS TyCoVarSet
+    do_hole _is hole = deep_ty (varType (coHoleCoVar hole))
+                     -- We don't collect the CoercionHole itself, but we /do/
+                     -- need to collect the free variables of its /kind/
+                     -- See Note [CoercionHoles and coercion free variables]
 
 {- *********************************************************************
 *                                                                      *
@@ -378,18 +399,18 @@ shallowTyCoVarsOfCoVarEnv cos = shallowTyCoVarsOfCos (nonDetEltsUFM cos)
   -- It's OK to use nonDetEltsUFM here because we immediately
   -- forget the ordering by returning a set
 
-shallow_ty  :: Type       -> Endo TyCoVarSet
-shallow_tys :: [Type]     -> Endo TyCoVarSet
-shallow_co  :: Coercion   -> Endo TyCoVarSet
-shallow_cos :: [Coercion] -> Endo TyCoVarSet
+shallow_ty  :: Type       -> EndoOS TyCoVarSet
+shallow_tys :: [Type]     -> EndoOS TyCoVarSet
+shallow_co  :: Coercion   -> EndoOS TyCoVarSet
+shallow_cos :: [Coercion] -> EndoOS TyCoVarSet
 (shallow_ty, shallow_tys, shallow_co, shallow_cos) = foldTyCo shallowTcvFolder emptyVarSet
 
-shallowTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
+shallowTcvFolder :: TyCoFolder TyCoVarSet (EndoOS TyCoVarSet)
 shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                               , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                               , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tcv is v = Endo do_it
+    do_tcv is v = EndoOS do_it
       where
         do_it acc | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
@@ -411,7 +432,12 @@ shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and sy
 Here we are only interested in the free /coercion/ variables.
 We can achieve this through a slightly different TyCo folder.
 
-Notice that we look deeply, into kinds.
+Notice that
+
+* We look deeply, into kinds.
+
+* We /include/ CoercionHoles. Why?  Specifically because of #14584,
+  Note [Emitting the residual implication in simplifyInfer] in GHC.Tc.Solver
 
 See #14880.
 -}
@@ -427,13 +453,13 @@ coVarsOfTypes tys = runTyCoVars (deep_cv_tys tys)
 coVarsOfCo    co  = runTyCoVars (deep_cv_co co)
 coVarsOfCos   cos = runTyCoVars (deep_cv_cos cos)
 
-deep_cv_ty  :: Type       -> Endo CoVarSet
-deep_cv_tys :: [Type]     -> Endo CoVarSet
-deep_cv_co  :: Coercion   -> Endo CoVarSet
-deep_cv_cos :: [Coercion] -> Endo CoVarSet
+deep_cv_ty  :: Type       -> EndoOS CoVarSet
+deep_cv_tys :: [Type]     -> EndoOS CoVarSet
+deep_cv_co  :: Coercion   -> EndoOS CoVarSet
+deep_cv_cos :: [Coercion] -> EndoOS CoVarSet
 (deep_cv_ty, deep_cv_tys, deep_cv_co, deep_cv_cos) = foldTyCo deepCoVarFolder emptyVarSet
 
-deepCoVarFolder :: TyCoFolder TyCoVarSet (Endo CoVarSet)
+deepCoVarFolder :: TyCoFolder TyCoVarSet (EndoOS CoVarSet)
 deepCoVarFolder = TyCoFolder { tcf_view = noView
                              , tcf_tyvar = do_tyvar, tcf_covar = do_covar
                              , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
@@ -445,17 +471,18 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
       -- the tyvar won't end up in the accumulator, so
       -- we'd look repeatedly.  Blargh.
 
-    do_covar is v = Endo do_it
+    do_bndr is tcv _ = extendVarSet is tcv
+
+    do_covar is v = EndoOS do_it
       where
         do_it acc | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
-                  | otherwise          = appEndo (deep_cv_ty (varType v)) $
+                  | otherwise          = appEndoOS (deep_cv_ty (varType v)) $
                                          acc `extendVarSet` v
 
-    do_bndr is tcv _ = extendVarSet is tcv
     do_hole is hole  = do_covar is (coHoleCoVar hole)
-                       -- See Note [CoercionHoles and coercion free variables]
-                       -- in GHC.Core.TyCo.Rep
+      -- We /do/ treat a CoercionHole as a free variable
+      -- See Note [CoercionHoles and coercion free variables]
 
 ------- Same again, but for DCoVarSet ----------
 --    But this time the free vars are shallow
@@ -480,7 +507,7 @@ closeOverKinds :: TyCoVarSet -> TyCoVarSet
 -- add the deep free variables of its kind
 closeOverKinds vs = nonDetStrictFoldVarSet do_one vs vs
   where
-    do_one v acc = appEndo (deep_ty (varType v)) acc
+    do_one v acc = appEndoOS (deep_ty (varType v)) acc
 
 {- --------------- Alternative version 1 (using FV) ------------
 closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
@@ -661,9 +688,8 @@ tyCoFVsOfCo (FunCo { fco_mult = w, fco_arg = co1, fco_res = co2 }) fv_cand in_sc
   = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2 `unionFV` tyCoFVsOfCo w) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
   = tyCoFVsOfCoVar v fv_cand in_scope acc
-tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
-  = tyCoFVsOfCoVar (coHoleCoVar h) fv_cand in_scope acc
-    -- See Note [CoercionHoles and coercion free variables]
+tyCoFVsOfCo (HoleCo {}) fv_cand in_scope acc = emptyFV fv_cand in_scope acc
+    -- Ignore holes: Note [CoercionHoles and coercion free variables]
 tyCoFVsOfCo (AxiomCo _ cs)    fv_cand in_scope acc = tyCoFVsOfCos cs  fv_cand in_scope acc
 tyCoFVsOfCo (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps}) fv_cand in_scope acc
   = (tyCoFVsOfCos deps `unionFV` tyCoFVsOfType t1

@@ -168,7 +168,7 @@ instance MonadGetUnique USM.UniqSM where
 newtype UniqDSMT m result = UDSMT' (DUniqSupply -> m (result, DUniqSupply))
   deriving (Functor)
 
--- Similar to GHC.Utils.Monad.State.Strict, using Note [The one-shot state monad trick]
+-- Similar to GHC.Utils.Monad, using Note [The one-shot state monad trick]
 -- Using the one-shot trick is necessary for performance.
 -- Using transfomer's strict `StateT` regressed some performance tests in 1-2%.
 -- The one-shot trick here fixes those regressions.
