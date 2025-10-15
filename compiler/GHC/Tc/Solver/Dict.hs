@@ -178,7 +178,7 @@ solveCallStack ev ev_cs
   -- `IP ip CallStack`. See Note [Overview of implicit CallStacks]
   = do { inner_stk <- evCallStack pred ev_cs
        ; let ev_tm = EvExpr (evWrapIPE pred inner_stk)
-       ; setEvBindIfWanted ev EvCanonical ev_tm }
+       ; setDictIfWanted ev EvCanonical ev_tm }
          -- EvCanonical: see Note [CallStack and ExceptionContext hack]
   where
     pred = ctEvPred ev
@@ -394,9 +394,18 @@ There are two more similar "equality classes" like this.  The full list is
   * Coercible   coercibleTyCon
 (See Note [The equality types story] in GHC.Builtin.Types.Prim.)
 
-(EQC1) For Givens, when expanding the superclasses of a equality class,
-  we can /replace/ the constraint with its superclasses (which, remember, are
-  equally powerful) rather than /adding/ them. This can make a huge difference.
+(EQC1) For a Given (boxed) equality like (t1 ~ t2), we /replace/ the constraint
+  with its superclass (which, remember, is equally powerful) rather than /adding/
+  it.  Thus, we turn  [G] d : t1 ~ t2  into
+         [G] g : t1 ~# t2
+         g := sc_sel d       -- Extend the evidence bindings
+
+  We achieve this by
+   (a) not expanding superclasses for equality classes at all;
+       see the `isEqualityClass` test in `mk_strict_superclasses`
+   (b) special logic to solve (t1 ~ t2) in the Given case of `solveEqualityDict`.
+
+  Using replacement rather than adding can make a huge difference.
   Consider T17836, which has a constraint like
       forall b,c. a ~ (b,c) =>
         forall d,e. c ~ (d,e) =>
@@ -410,11 +419,6 @@ There are two more similar "equality classes" like this.  The full list is
   (This can have a /big/ effect: test T17836 involves deeply-nested GADT
   pattern matching. Its compile-time allocation decreased by 40% when
   I added the "replace" rather than "add" semantics.)
-
-  We achieve this by
-   (a) not expanding superclasses for equality classes at all;
-       see the `isEqualityClass` test in `mk_strict_superclasses`
-   (b) special logic to solve (t1 ~ t2) in `solveEqualityDict`.
 
 (EQC2) Faced with [W] t1 ~ t2, it's always OK to reduce it to [W] t1 ~# t2,
   without worrying about Note [Instance and Given overlap].  Why?  Because
@@ -468,26 +472,29 @@ solveEqualityDict :: CtEvidence -> Class -> [Type] -> SolverStage Void
 -- See Note [Solving equality classes]
 -- Precondition: (isEqualityClass cls) True, so cls is (~), (~~), or Coercible
 solveEqualityDict ev cls tys
-  | CtWanted (WantedCt { ctev_dest = dest }) <- ev
-  = Stage $
-    do { let (role, t1, t2) = matchEqualityInst cls tys
-         -- Unify t1~t2, putting anything that can't be solved
-         -- immediately into the work list
-       ; co <- wrapUnifierAndEmit ev role $ \uenv ->
-               uType uenv t1 t2
-         -- Set  d :: (t1~t2) = Eq# co
-       ; setWantedDict dest EvCanonical $
-         evDictApp cls tys [Coercion co]
-       ; stopWith ev "Solved wanted lifted equality" }
-
   | CtGiven (GivenCt { ctev_evar = ev_id }) <- ev
   , [sel_id] <- classSCSelIds cls  -- Equality classes have just one superclass
   = Stage $
     do { let loc = ctEvLoc ev
              sc_pred = classMethodInstTy sel_id tys
              ev_expr = EvExpr $ Var sel_id `mkTyApps` tys `App` evId ev_id
+       -- See (EQC1) in Note [Solving equality classes]
+       -- This call to newGivenEv makes the evidence binding for the (unboxed) coercion
        ; given_ev <- newGivenEv loc (sc_pred, ev_expr)
        ; startAgainWith (mkNonCanonical $ CtGiven given_ev) }
+
+  | CtWanted (WantedCt { ctev_dest = dest }) <- ev
+  = Stage $
+    do { let (role, t1, t2) = matchEqualityInst cls tys
+         -- Unify t1~t2, putting anything that can't be solved
+         -- immediately into the work list
+       ; (co,_rws) <- wrapUnifierAndEmit ev role $ \uenv ->
+                      uType uenv t1 t2
+         -- Set  d :: (t1~t2) = Eq# co
+       ; setWantedDict dest EvCanonical $
+         evDictApp cls tys [Coercion co]
+       ; stopWith ev "Solved wanted lifted equality" }
+
   | otherwise
   = pprPanic "solveEqualityDict" (ppr cls)
 
@@ -730,10 +737,10 @@ try_inert_dicts inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys
             | otherwise -- We can either solve the inert from the work-item or vice-versa.
             -> case solveOneFromTheOther (CDictCan dict_i) (CDictCan dict_w) of
                  KeepInert -> do { traceTcS "lookupInertDict:KeepInert" (ppr dict_w)
-                                 ; setEvBindIfWanted ev_w EvCanonical (ctEvTerm ev_i)
+                                 ; setDictIfWanted ev_w EvCanonical (ctEvTerm ev_i)
                                  ; return $ Stop ev_w (text "Dict equal" <+> ppr dict_w) }
                  KeepWork  -> do { traceTcS "lookupInertDict:KeepWork" (ppr dict_w)
-                                 ; setEvBindIfWanted ev_i EvCanonical (ctEvTerm ev_w)
+                                 ; setDictIfWanted ev_i EvCanonical (ctEvTerm ev_w)
                                  ; updInertCans (updDicts $ delDict dict_w)
                                  ; continueWith () } }
 
@@ -796,7 +803,7 @@ try_instances inerts work_item@(DictCt { di_ev = ev, di_cls = cls
      -- See Note [No Given/Given fundeps]
 
   | Just solved_ev <- lookupSolvedDict inerts cls xis   -- Cached
-  = do { setEvBindIfWanted ev EvCanonical (ctEvTerm solved_ev)
+  = do { setDictIfWanted ev EvCanonical (ctEvTerm solved_ev)
        ; stopWith ev "Dict/Top (cached)" }
 
   | otherwise  -- Wanted, but not cached
@@ -828,7 +835,7 @@ chooseInstance work_item
        ; assertPprM (getTcEvBindsVar >>= return . not . isCoEvBindsVar)
                     (ppr work_item)
        ; evc_vars <- mapM (newWanted deeper_loc (ctEvRewriters work_item)) theta
-       ; setEvBindIfWanted work_item canonical (mk_ev (map getEvExpr evc_vars))
+       ; setDictIfWanted work_item canonical (mk_ev (map getEvExpr evc_vars))
        ; emitWorkNC (map CtWanted $ freshGoals evc_vars)
        ; stopWith work_item "Dict/Top (solved wanted)" }
   where

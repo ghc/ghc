@@ -50,13 +50,12 @@ module GHC.Tc.Solver.Monad (
     CanonicalEvidence(..),
 
     newTcEvBinds, newNoTcEvBinds,
-    newWantedEq, emitNewWantedEq,
+    newWantedEq,
     newWanted,
     newWantedNC, newWantedEvVarNC,
     newBoundEvVarId,
     unifyTyVar, reportFineGrainUnifications, reportCoarseGrainUnifications,
-    setEvBind, setWantedEq, setWantedDict,
-    setWantedEvTerm, setEvBindIfWanted,
+    setEvBind, setWantedEq, setWantedDict, setEqIfWanted, setDictIfWanted,
     newEvVar, newGivenEv, emitNewGivens,
     emitChildEqs, checkReductionDepth,
 
@@ -1960,63 +1959,39 @@ addUsedCoercion co
   = do { ev_binds_var <- getTcEvBindsVar
        ; wrapTcS (TcM.updTcRef (ebv_tcvs ev_binds_var) (co :)) }
 
+setEqIfWanted :: CtEvidence -> RewriterSet -> TcCoercion -> TcS ()
+setEqIfWanted ev rewriters co
+  = case ev of
+      CtWanted (WantedCt { ctev_dest = dest })
+         -> setWantedEq dest rewriters co
+      _  -> return ()
+
 setWantedEq :: HasDebugCallStack => TcEvDest -> RewriterSet -> TcCoercion -> TcS ()
 -- ^ Equalities only
-setWantedEq (HoleDest hole) rewriters co
-  = do { addUsedCoercion co
-       ; fillCoercionHole hole rewriters co }
-setWantedEq (EvVarDest ev) _ _ = pprPanic "setWantedEq: EvVarDest" (ppr ev)
+setWantedEq dest rewriters co
+  = case dest of
+      HoleDest hole -> fillCoercionHole hole rewriters co
+      EvVarDest ev  -> pprPanic "setWantedEq: EvVarDest" (ppr ev)
+
+setDictIfWanted :: CtEvidence -> CanonicalEvidence -> EvTerm -> TcS ()
+setDictIfWanted ev canonical tm
+  = case ev of
+      CtWanted (WantedCt { ctev_dest = dest })
+         -> setWantedDict dest canonical tm
+      _  -> return ()
 
 setWantedDict :: TcEvDest -> CanonicalEvidence -> EvTerm -> TcS ()
 -- ^ Dictionaries only
-setWantedDict (EvVarDest ev_id) canonical tm
-  = setEvBind (mkWantedEvBind ev_id canonical tm)
-setWantedDict (HoleDest h) _ _ = pprPanic "setWantedEq: HoleDest" (ppr h)
-
-setWantedEvTerm :: TcEvDest -> RewriterSet -> CanonicalEvidence -> EvTerm -> TcS ()
--- ^ Good for both equalities and non-equalities
-setWantedEvTerm (EvVarDest ev_id) _rewriters canonical tm
-  = setEvBind (mkWantedEvBind ev_id canonical tm)
-setWantedEvTerm (HoleDest hole) rewriters _canonical tm
-  | Just co <- evTermCoercion_maybe tm
-  = do { addUsedCoercion co
-       ; fillCoercionHole hole rewriters co }
-  | otherwise
-  = -- See Note [Yukky eq_sel for a HoleDest]
-    do { let co_var = coHoleCoVar hole
-       ; setEvBind (mkWantedEvBind co_var EvCanonical tm)
-       ; fillCoercionHole hole rewriters (mkCoVarCo co_var) }
-
-{- Note [Yukky eq_sel for a HoleDest]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-How can it be that a Wanted with HoleDest gets evidence that isn't
-just a coercion? i.e. evTermCoercion_maybe returns Nothing.
-
-Consider [G] forall a. blah => a ~ T
-         [W] S ~# T
-
-Then doTopReactEqPred carefully looks up the (boxed) constraint (S ~ T)
-in the quantified constraints, and wraps the (boxed) evidence it
-gets back in an eq_sel to extract the unboxed (S ~# T).  We can't put
-that term into a coercion, so we add a value binding
-    h = eq_sel (...)
-and the coercion variable h to fill the coercion hole.
-We even re-use the CoHole's Id for this binding!
-
-Yuk!
--}
+setWantedDict dest canonical tm
+  = case dest of
+      EvVarDest ev_id -> setEvBind (mkWantedEvBind ev_id canonical tm)
+      HoleDest h      -> pprPanic "setWantedEq: HoleDest" (ppr h)
 
 fillCoercionHole :: CoercionHole -> RewriterSet -> Coercion -> TcS ()
 fillCoercionHole hole rewriters co
-  = do { wrapTcS $ TcM.fillCoercionHole hole (co, rewriters)
+  = do { addUsedCoercion co
+       ; wrapTcS $ TcM.fillCoercionHole hole (co, rewriters)
        ; kickOutAfterFillingCoercionHole hole rewriters }
-
-setEvBindIfWanted :: CtEvidence -> CanonicalEvidence -> EvTerm -> TcS ()
-setEvBindIfWanted ev canonical tm
-  = case ev of
-      CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rewriters })
-         -> setWantedEvTerm dest rewriters canonical tm
-      _  -> return ()
 
 newTcEvBinds :: TcS EvBindsVar
 newTcEvBinds = wrapTcS TcM.newTcEvBinds
@@ -2029,9 +2004,11 @@ newEvVar pred = wrapTcS (TcM.newEvVar pred)
 
 newGivenEv :: CtLoc -> (TcPredType, EvTerm) -> TcS GivenCtEvidence
 -- Make a new variable of the given PredType,
--- immediately bind it to the given term
--- and return its CtEvidence
+-- immediately bind it to the given term, and return its CtEvidence
 -- See Note [Bind new Givens immediately] in GHC.Tc.Types.Constraint
+--
+-- The `pred` can be an /equality predicate/ t1 ~# t2;
+--   see (EQC1) in Note [Solving equality classes] in GHC.Tc.Solver.Dict
 newGivenEv loc (pred, rhs)
   = do { new_ev <- newBoundEvVarId pred rhs
        ; return $ GivenCt { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc } }
@@ -2054,13 +2031,6 @@ emitNewGivens loc pts
                 , not (ty1 `tcEqType` ty2) ] -- Kill reflexive Givens at birth
        ; emitWorkNC (map CtGiven gs) }
 
-emitNewWantedEq :: CtLoc -> RewriterSet -> Role -> TcType -> TcType -> TcS Coercion
--- | Emit a new Wanted equality into the work-list
-emitNewWantedEq loc rewriters role ty1 ty2
-  = do { (wtd, co) <- newWantedEq loc rewriters role ty1 ty2
-       ; updWorkListTcS (extendWorkListEq rewriters (mkNonCanonical $ CtWanted wtd))
-       ; return co }
-
 emitChildEqs :: CtEvidence -> Cts -> TcS ()
 -- Emit a bunch of equalities into the work list
 -- See Note [Work-list ordering] in GHC.Tc.Solver.Equality
@@ -2077,14 +2047,14 @@ emitChildEqs ev eqs
 -- | Create a new Wanted constraint holding a coercion hole
 -- for an equality between the two types at the given 'Role'.
 newWantedEq :: CtLoc -> RewriterSet -> Role -> TcType -> TcType
-            -> TcS (WantedCtEvidence, Coercion)
+            -> TcS (WantedCtEvidence, CoercionHole)
 newWantedEq loc rewriters role ty1 ty2
   = do { hole <- wrapTcS $ TcM.newCoercionHole pty
        ; let wtd = WantedCt { ctev_pred      = pty
                             , ctev_dest      = HoleDest hole
                             , ctev_loc       = loc
                             , ctev_rewriters = rewriters }
-       ; return (wtd, mkHoleCo hole) }
+       ; return (wtd, hole) }
   where
     pty = mkEqPredRole role ty1 ty2
 
@@ -2224,10 +2194,11 @@ uPairsTcM uenv eqns = mapM_ (\(Pair ty1 ty2) -> uType uenv ty1 ty2) eqns
 
 wrapUnifierAndEmit :: CtEvidence -> Role
                    -> (UnifyEnv -> TcM a)  -- Some calls to uType
-                   -> TcS a
+                   -> TcS (a, RewriterSet)
 -- Like wrapUnifier, but
 --    emits any unsolved equalities into the work-list
 --    kicks out any inert constraints that mention unified variables
+--    returns a RewriterSet describing the new unsolved goals
 wrapUnifierAndEmit ev role do_unifications
   = do { (unifs, (res, eqs)) <- reportFineGrainUnifications $
                                 wrapUnifier ev role do_unifications
@@ -2238,7 +2209,7 @@ wrapUnifierAndEmit ev role do_unifications
        -- Kick out any inert constraints mentioning the unified variables
        ; kickOutAfterUnification unifs
 
-       ; return res }
+       ; return (res, rewriterSetFromCts eqs) }
 
 wrapUnifier :: CtEvidence -> Role
              -> (UnifyEnv -> TcM a)  -- Some calls to uType

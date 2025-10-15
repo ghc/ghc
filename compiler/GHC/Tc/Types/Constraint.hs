@@ -80,7 +80,8 @@ module GHC.Tc.Types.Constraint (
         ctEvExpr, ctEvTerm,
         ctEvCoercion, givenCtEvCoercion,
         ctEvEvId, wantedCtEvEvId,
-        ctEvRewriters, setWantedCtEvRewriters, ctEvUnique, tcEvDestUnique,
+        ctEvRewriters, ctEvRewriterSet, setWantedCtEvRewriters,
+        ctEvUnique, tcEvDestUnique,
         ctEvRewriteRole, ctEvRewriteEqRel, setCtEvPredType, setCtEvLoc,
         tyCoVarsOfCtEvList, tyCoVarsOfCtEv, tyCoVarsOfCtEvsList,
 
@@ -2291,7 +2292,8 @@ For Givens we make new EvVars and bind them immediately. Two main reasons:
       f :: C a b => ....
     Then in f's Givens we have g:(C a b) and the superclass sc(g,0):a~b.
     But that superclass selector can't (yet) appear in a coercion
-    (see evTermCoercion), so the easy thing is to bind it to an Id.
+    (see evTermCoercion), so the easy thing is to bind it to a (coercion) Id.
+    This happens in GHC.Tc.Solver.Dict.solveEqualityDict.
 
 So a Given has EvVar inside it rather than (as previously) an EvTerm.
 
@@ -2393,6 +2395,12 @@ wantedCtHasNoRewriters (WantedCt { ctev_rewriters = rws })
 setWantedCtEvRewriters :: WantedCtEvidence -> RewriterSet -> WantedCtEvidence
 setWantedCtEvRewriters ev rs = ev { ctev_rewriters = rs }
 
+ctEvRewriterSet :: CtEvidence -> RewriterSet
+-- Returns the set of holes (empty or singleton) for the evidence itself
+-- Note the difference from ctEvRewriters!
+ctEvRewriterSet (CtWanted (WantedCt { ctev_dest = HoleDest hole })) = unitRewriterSet hole
+ctEvRewriterSet _                                                   = emptyRewriterSet
+
 rewriterSetFromCts :: Bag Ct -> RewriterSet
 -- Take a bag of Wanted equalities, and collect them as a RewriterSet
 rewriterSetFromCts cts
@@ -2404,8 +2412,8 @@ rewriterSetFromCts cts
         _                                                 -> rw_set
 
 ctEvExpr :: HasDebugCallStack => CtEvidence -> EvExpr
-ctEvExpr (CtWanted ev@(WantedCt { ctev_dest = HoleDest _ }))
-            = Coercion $ ctEvCoercion (CtWanted ev)
+ctEvExpr (CtWanted (WantedCt { ctev_dest = HoleDest hole }))
+            = Coercion $ mkHoleCo hole
 ctEvExpr ev = evId (ctEvEvId ev)
 
 givenCtEvCoercion :: GivenCtEvidence -> TcCoercion

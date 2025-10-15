@@ -447,7 +447,7 @@ defaultExceptionContext ct
        ; empty_ec_id <- lookupId emptyExceptionContextName
        ; let ev = ctEvidence ct
              ev_tm = EvExpr (evWrapIPE (ctEvPred ev) (Var empty_ec_id))
-       ; setEvBindIfWanted ev EvCanonical ev_tm
+       ; setDictIfWanted ev EvCanonical ev_tm
          -- EvCanonical: see Note [CallStack and ExceptionContext hack]
          --              in GHC.Tc.Solver.Dict
        ; return True }
@@ -541,8 +541,7 @@ defaultEquality encl_eqs ct
           = do { traceTcS "defaultEquality success:" (ppr rhs_ty)
                ; unifyTyVar lhs_tv rhs_ty  -- NB: unifyTyVar adds to the
                                            -- TcS unification counter
-               ; setEvBindIfWanted (ctEvidence ct) EvCanonical $
-                 evCoercion (mkReflCo Nominal rhs_ty)
+               ; setEqIfWanted (ctEvidence ct) emptyRewriterSet (mkReflCo Nominal rhs_ty)
                ; return True
                }
 
@@ -567,8 +566,7 @@ defaultEquality encl_eqs ct
             -- See Note [Defaulting representational equalities].
            ; if null new_eqs
              then do { traceTcS "defaultEquality ReprEq } (yes)" empty
-                     ; setEvBindIfWanted (ctEvidence ct) EvCanonical $
-                       evCoercion $ mkSubCo co
+                     ; setEqIfWanted (ctEvidence ct) emptyRewriterSet (mkSubCo co)
                      ; return True }
              else do { traceTcS "defaultEquality ReprEq } (no)" empty
                      ; return False } }

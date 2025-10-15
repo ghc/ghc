@@ -1690,6 +1690,8 @@ data CoercionHole
                        -- See Note [CoercionHoles and coercion free variables]
 
                  , ch_ref :: IORef (Maybe (Coercion, RewriterSet))
+                       -- The RewriterSet is (possibly a superset of)
+                       -- the free coercion holes of the coercion
                  }
 
 coHoleCoVar :: CoercionHole -> CoVar

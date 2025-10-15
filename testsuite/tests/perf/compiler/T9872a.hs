@@ -140,7 +140,8 @@ type Cube2 = Cube W G B W R R
 type Cube3 = Cube G W R B R R
 type Cube4 = Cube B R G G W W
 
-type Cubes = Cons Cube1 (Cons Cube2 (Cons Cube3 (Cons Cube4 Nil)))
+-- type Cubes = Cons Cube1 (Cons Cube2 (Cons Cube3 (Cons Cube4 Nil)))
+type Cubes = Cons Cube1 Nil
 
 type family Compatible c d :: *
 type instance Compatible (Cube u1 f1 r1 b1 l1 d1) (Cube u2 f2 r2 b2 l2 d2) =
