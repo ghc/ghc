@@ -17,6 +17,7 @@
 -- the user to gain more control over what an IPE stack trace looks like.
 --
 -- The main advantages of stack frame annotations over other 'Backtraces':
+--
 -- * Function signatures don't need to be modified to improve stack traces (e.g. via 'HasCallStack').
 -- * Annotation are arbitrary user-defined datatypes, not just source locations.
 -- * Stack frame annotations are always present and do not require recompilation (e.g. @-prof@ or @-g3@).
@@ -39,7 +40,7 @@ module GHC.Stack.Annotation.Experimental (
   annotateCallStackIO,
   -- * Push stack frame annotations in non-'IO' code.
   --
-  -- These variants all evaluate the code to be annotated to WHNF.
+  -- | These variants all evaluate the code to be annotated to WHNF.
   -- Otherwise, the stack annotations will not be shown in stack traces,
   -- as the computation is immediately "evaluated" to a thunk, popping the
   -- annotation frames from the stack.
