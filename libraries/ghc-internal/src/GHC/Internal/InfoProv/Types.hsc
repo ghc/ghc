@@ -20,7 +20,7 @@ module GHC.Internal.InfoProv.Types
 import GHC.Internal.Base
 import GHC.Internal.Enum
 import GHC.Internal.Real (fromIntegral)
-import GHC.Internal.Word (Word32)
+import GHC.Internal.Word (Word32, Word64)
 import GHC.Internal.Show (Show)
 import GHC.Internal.Ptr (Ptr(..), plusPtr)
 import GHC.Internal.Foreign.C.String.Encoding (CString, peekCString)
@@ -32,6 +32,7 @@ import GHC.Internal.ClosureTypes
 import GHC.Internal.Prim (whereFrom##)
 
 data InfoProv = InfoProv {
+  ipProvId :: Word64,
   ipName :: String,
   ipDesc :: ClosureType,
   ipTyDesc :: String,
@@ -73,6 +74,9 @@ ipeProv p = (#ptr InfoProvEnt, prov) p
 peekIpDesc :: Ptr InfoProv -> IO Word32
 peekIpDesc p    =  (# peek InfoProv, closure_desc) p
 
+peekIpProvId :: Ptr InfoProv -> IO Word64
+peekIpProvId p  =  (# peek InfoProv, info_prov_id) p
+
 peekIpName, peekIpLabel, peekIpUnitId, peekIpModule, peekIpSrcFile, peekIpSrcSpan, peekIpTyDesc :: Ptr InfoProv -> IO CString
 peekIpName p    =  (# peek InfoProv, table_name) p
 peekIpLabel p   =  (# peek InfoProv, label) p
@@ -84,6 +88,7 @@ peekIpTyDesc p  =  (# peek InfoProv, ty_desc) p
 
 peekInfoProv :: Ptr InfoProv -> IO InfoProv
 peekInfoProv infop = do
+  provId <- peekIpProvId infop
   name <- peekCString utf8 =<< peekIpName infop
   desc <- peekIpDesc infop
   tyDesc <- peekCString utf8 =<< peekIpTyDesc infop
@@ -93,6 +98,7 @@ peekInfoProv infop = do
   file <- peekCString utf8 =<< peekIpSrcFile infop
   span <- peekCString utf8 =<< peekIpSrcSpan infop
   return InfoProv {
+      ipProvId = provId,
       ipName = name,
       -- The INVALID_OBJECT case should be impossible as we
       -- control the C code generating these values.
