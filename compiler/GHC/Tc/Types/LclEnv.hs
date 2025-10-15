@@ -25,8 +25,6 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvSrcCodeOrigin
   , setLclCtxtSrcCodeOrigin
   , lclEnvInGeneratedCode
-  , setLclCtxtInGenCode
-  , setLclCtxtInUserCode
 
   , addLclEnvErrCtxt
 
@@ -127,7 +125,6 @@ get_src_code_origin _ = Nothing
 data TcLclCtxt
   = TcLclCtxt {
         tcl_loc         :: RealSrcSpan,     -- Source span
-        tcl_in_gen_code :: Bool,
         tcl_err_ctxt    :: ErrCtxtStack,    -- See Note [Error Context Stack]
         tcl_tclvl       :: TcLevel,
         tcl_bndrs       :: TcBinderStack,   -- Used for reporting relevant bindings,
@@ -200,7 +197,7 @@ setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
 addLclEnvErrCtxt (ExpansionCodeCtxt co) = setLclEnvSrcCodeOrigin co
-addLclEnvErrCtxt ec = modifyLclCtxt (\env -> if (tcl_in_gen_code env)
+addLclEnvErrCtxt ec = modifyLclCtxt (\env -> if lclCtxtInGeneratedCode env
                                              then env -- no op if we are in generated code
                                              else env { tcl_err_ctxt =  ec : (tcl_err_ctxt env) })
 
@@ -209,12 +206,6 @@ getLclEnvSrcCodeOrigin = get_src_code_origin . tcl_err_ctxt . tcl_lcl_ctxt
 
 setLclEnvSrcCodeOrigin :: SrcCodeOrigin -> TcLclEnv -> TcLclEnv
 setLclEnvSrcCodeOrigin o = modifyLclCtxt (setLclCtxtSrcCodeOrigin o)
-
-setLclCtxtInGenCode :: TcLclCtxt -> TcLclCtxt
-setLclCtxtInGenCode lclCtxt = lclCtxt { tcl_in_gen_code = True }
-
-setLclCtxtInUserCode :: TcLclCtxt -> TcLclCtxt
-setLclCtxtInUserCode lclCtxt = lclCtxt { tcl_in_gen_code = False }
 
 -- See Note [ErrCtxt Stack Manipulation]
 setLclCtxtSrcCodeOrigin :: SrcCodeOrigin -> TcLclCtxt -> TcLclCtxt
@@ -225,7 +216,11 @@ setLclCtxtSrcCodeOrigin o lclCtxt
   = lclCtxt { tcl_err_ctxt = ExpansionCodeCtxt o : tcl_err_ctxt lclCtxt }
 
 lclCtxtInGeneratedCode :: TcLclCtxt -> Bool
-lclCtxtInGeneratedCode = tcl_in_gen_code
+lclCtxtInGeneratedCode lclCtxt
+  | (ExpansionCodeCtxt _ : _) <- tcl_err_ctxt lclCtxt
+  = True
+  | otherwise
+  = False
 
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
 lclEnvInGeneratedCode =  lclCtxtInGeneratedCode . tcl_lcl_ctxt

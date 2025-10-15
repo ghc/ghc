@@ -968,10 +968,10 @@ addArgCtxt arg_no fun (L arg_loc arg) thing_inside
       do setSrcSpan l $
            addExprCtxt e $
            thing_inside
-    updCtxtForArg (UnhelpfulSpan UnhelpfulGenerated) _ thing_inside = -- See 2.i above
-      thing_inside
+    -- updCtxtForArg (UnhelpfulSpan UnhelpfulGenerated) _ thing_inside = -- See 2.i above
+    --   thing_inside
     updCtxtForArg (UnhelpfulSpan {}) _ thing_inside = -- See 2.ii above
-      do setInUserCode $
+      do -- setInUserCode $
            thing_inside
 
 

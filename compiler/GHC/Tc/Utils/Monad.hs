@@ -63,7 +63,7 @@ module GHC.Tc.Utils.Monad(
   -- * Error management
   getSrcCodeOrigin,
   getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
-  inGeneratedCode, setInGeneratedCode, setInUserCode, setLclCtxtInGenCode,
+  inGeneratedCode, setInGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
@@ -419,7 +419,6 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_lcl_ctxt   = TcLclCtxt {
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
-                tcl_in_gen_code = False,
                 tcl_err_ctxt   = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topLevel,
@@ -1079,10 +1078,10 @@ inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- See Note [Error contexts in generated code]
 setSrcSpan (RealSrcSpan loc _) thing_inside
-  = updLclCtxt (\env -> env { tcl_loc = loc, tcl_in_gen_code = False }) thing_inside
+  = updLclCtxt (\env -> env { tcl_loc = loc }) thing_inside
 
 setSrcSpan (UnhelpfulSpan _) thing_inside
-  = updLclCtxt setLclCtxtInGenCode thing_inside
+  = thing_inside
 
 getSrcCodeOrigin :: TcRn (Maybe SrcCodeOrigin)
 getSrcCodeOrigin =
@@ -1098,11 +1097,8 @@ getSrcCodeOrigin =
 -- See Note [Error Context Stack]
 setInGeneratedCode :: SrcCodeOrigin -> TcRn a -> TcRn a
 setInGeneratedCode sco thing_inside =
-  updLclCtxt setLclCtxtInGenCode $
+  -- updLclCtxt setLclCtxtInGenCode $
   updLclCtxt (setLclCtxtSrcCodeOrigin sco) thing_inside
-
-setInUserCode :: TcRn a -> TcRn a
-setInUserCode = updLclCtxt setLclCtxtInUserCode
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
