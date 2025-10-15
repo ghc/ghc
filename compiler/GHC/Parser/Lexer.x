@@ -615,6 +615,10 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \' @char        \'                                   { tok_char }
   \' @char        \' \# / { ifExtension MagicHashBit } { tok_char }
 
+  -- QualifiedStrings
+  @qual \"\"\"             / { ifExtension QualifiedStringsBit `alexAndPred` ifExtension MultilineStringsBit } { tok_qstrings tok_string_multi }
+  @qual \" @stringchar* \" / { ifExtension QualifiedStringsBit }                                               { tok_qstrings tok_string }
+
   -- Check for smart quotes and throw better errors than a plain lexical error (#21843)
   \'              \\ $unigraphic / { isSmartQuote } { smart_quote_error }
   \" @stringchar* \\ $unigraphic / { isSmartQuote } { smart_quote_error }
@@ -2267,6 +2271,23 @@ tok_quoted_label span buf len _buf2 = do
     -- skip leading '#'
     src = SourceText . mkFastString . drop 1 $ lexemeToString buf len
 
+tok_qstrings :: Action -> Action
+tok_qstrings lex_str span0 buf0 len buf2 = do
+  -- Get everything up to first quote
+  let buf = advancePastMod buf0
+  let span = _ -- FIXME: advance to first quote
+  let modName = ModuleName $ lexemeToFastString buf0 (byteDiff buf0 buf - 1) -- remove trailing '.'
+
+  L _ (ITstring meta s) <- lex_str span buf len buf2
+  pure $ L span0 $ ITstring meta{strMetaQualified = Just modName} s
+  where
+    advancePastMod =
+      let go buf =
+            case nextChar buf of
+              _ | atEnd buf -> panic "tok_qstrings unexpectedly hit EOF"
+              ('"', _) -> buf
+              (_, buf') -> go buf'
+       in go
 
 tok_char :: Action
 tok_char span buf len _buf2 = do
@@ -2791,6 +2812,7 @@ data ExtBits
   | RequiredTypeArgumentsBit
   | MultilineStringsBit
   | LevelImportsBit
+  | QualifiedStringsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2875,6 +2897,7 @@ mkParserOpts extensionFlags diag_opts
       .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
       .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
+      .|. QualifiedStringsBit         `xoptBit` LangExt.QualifiedStrings
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream

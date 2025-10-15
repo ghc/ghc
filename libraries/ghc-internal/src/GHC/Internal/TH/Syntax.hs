@@ -696,6 +696,7 @@ data Lit = CharL Char           -- ^ @\'c\'@
          | StringPrimL [Word8]  -- ^ @"string"#@. A primitive C-style string, type 'Addr#'
          | BytesPrimL Bytes     -- ^ Some raw bytes, type 'Addr#':
          | CharPrimL Char       -- ^ @\'c\'#@
+         | QualStringL ModName String -- ^ @M."string"#@
     deriving( Show, Eq, Ord, Generic )
 
     -- We could add Int, Float, Double etc, as we do in HsLit,
