@@ -15,6 +15,7 @@ module GHC.Internal.InfoProv.Types
     , getIPE
     , StgInfoTable
     , lookupIPE
+    , lookupIpProvId
     ) where
 
 import GHC.Internal.Base
@@ -58,6 +59,13 @@ lookupIPE itbl = allocaBytes (#size InfoProvEnt) $ \p -> do
   res <- c_lookupIPE itbl p
   case res of
     1 -> Just `fmap` peekInfoProv (ipeProv p)
+    _ -> return Nothing
+
+lookupIpProvId :: Ptr StgInfoTable -> IO (Maybe Word64)
+lookupIpProvId itbl = allocaBytes (#size InfoProvEnt) $ \p -> do
+  res <- c_lookupIPE itbl p
+  case res of
+    1 -> Just `fmap` peekIpProvId (ipeProv p)
     _ -> return Nothing
 
 getIPE :: a -> r -> (Ptr InfoProvEnt -> IO r) -> IO r
