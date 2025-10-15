@@ -122,6 +122,7 @@ import GHC.Utils.Misc ( readSignificandExponentPair, readHexSignificandExponentP
 
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
+import GHC.Types.StringMeta (StringMeta(..), defaultStrMeta)
 import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..))
 import GHC.Hs.Doc
 
@@ -916,8 +917,7 @@ data Token
                                          -- Note [Literal source text] in "GHC.Types.SourceText"
 
   | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstringMulti SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstring   StringMeta FastString
   | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITrational FractionalLit
 
@@ -2166,7 +2166,7 @@ tok_string span buf len _buf2 = do
         addError err
       pure $ L span (ITprimstring src (unsafeMkByteString s))
     else
-      pure $ L span (ITstring src (mkFastString s))
+      pure $ L span (ITstring (defaultStrMeta src) (mkFastString s))
   where
     src = SourceText $ lexemeToFastString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
@@ -2210,7 +2210,8 @@ tok_string_multi startSpan startBuf _len _buf2 = do
       lexMultilineString contentLen contentStartBuf
 
   setInput i'
-  pure $ L span $ ITstringMulti src (mkFastString s)
+  let meta = (defaultStrMeta src){strMetaMultiline = True}
+  pure $ L span $ ITstring meta (mkFastString s)
   where
     goContent i0 =
       case Lexer.String.alexScan i0 Lexer.String.string_multi_content of

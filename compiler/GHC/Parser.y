@@ -76,6 +76,7 @@ import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
+import GHC.Types.StringMeta (strMetaSrc)
 import GHC.Types.PkgQual
 
 import GHC.Core.Type    ( Specificity(..) )
@@ -731,7 +732,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
 
  CHAR           { L _ (ITchar   _ _) }
  STRING         { L _ (ITstring _ _) }
- STRING_MULTI   { L _ (ITstringMulti _ _) }
  INTEGER        { L _ (ITinteger _) }
  RATIONAL       { L _ (ITrational _) }
 
@@ -2168,9 +2168,6 @@ fspec :: { Located (TokDcolon
        : STRING var '::' sigtype        { sLL $1 $> (epUniTok $3
                                              ,(L (getLoc $1)
                                                     (getStringLiteral $1), $2, $4)) }
-       | STRING_MULTI var '::' sigtype  { sLL $1 $> (epUniTok $3
-                                             ,(L (getLoc $1)
-                                                    (getStringMultiLiteral $1), $2, $4)) }
        |        var '::' sigtype        { sLL $1 $> (epUniTok $2
                                              ,(noLoc (StringLiteral NoSourceText nilFS Nothing), $1, $3)) }
          -- if the entity string is missing, it defaults to the empty string;
@@ -2393,8 +2390,6 @@ atype :: { LHsType GhcPs }
                                                                         (getCHAR $1) }
         | STRING               { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
                                                                      (getSTRING  $1) }
-        | STRING_MULTI         { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGMULTIs $1)
-                                                                     (getSTRINGMULTI  $1) }
         -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
         -- We let it pass the parser because the renamer can generate a better error message.
         | QVARID                      {% let qname = mkQual tvName (getQVARID $1)
@@ -4118,10 +4113,8 @@ consym :: { LocatedN RdrName }
 
 literal :: { Located (HsLit GhcPs) }
         : CHAR              { sL1 $1 $ HsChar       (getCHARs $1) $ getCHAR $1 }
-        | STRING            { sL1 $1 $ HsString     (getSTRINGs $1)
+        | STRING            { sL1 $1 $ HsString     (getStringMeta $1)
                                                     $ getSTRING $1 }
-        | STRING_MULTI      { sL1 $1 $ HsMultilineString (getSTRINGMULTIs $1)
-                                                    $ getSTRINGMULTI $1 }
         | PRIMINTEGER       { sL1 $1 $ HsIntPrim    (getPRIMINTEGERs $1)
                                                     $ getPRIMINTEGER $1 }
         | PRIMWORD          { sL1 $1 $ HsWordPrim   (getPRIMWORDs $1)
@@ -4227,7 +4220,6 @@ getIPDUPVARID     (L _ (ITdupipvarid   x)) = x
 getLABELVARID     (L _ (ITlabelvarid _ x)) = x
 getCHAR           (L _ (ITchar   _ x)) = x
 getSTRING         (L _ (ITstring _ x)) = x
-getSTRINGMULTI    (L _ (ITstringMulti _ x)) = x
 getINTEGER        (L _ (ITinteger x))  = x
 getRATIONAL       (L _ (ITrational x)) = x
 getPRIMCHAR       (L _ (ITprimchar _ x)) = x
@@ -4252,8 +4244,7 @@ getVOCURLY        (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
 
 getINTEGERs       (L _ (ITinteger (IL src _ _))) = src
 getCHARs          (L _ (ITchar       src _)) = src
-getSTRINGs        (L _ (ITstring     src _)) = src
-getSTRINGMULTIs   (L _ (ITstringMulti src _)) = src
+getSTRINGs        (L _ (ITstring    meta _)) = strMetaSrc meta
 getPRIMCHARs      (L _ (ITprimchar   src _)) = src
 getPRIMSTRINGs    (L _ (ITprimstring src _)) = src
 getPRIMINTEGERs   (L _ (ITprimint    src _)) = src
@@ -4289,8 +4280,8 @@ getOVERLAPS_PRAGs     (L _ (IToverlaps_prag     src)) = src
 getINCOHERENT_PRAGs   (L _ (ITincoherent_prag   src)) = src
 getCTYPEs             (L _ (ITctype             src)) = src
 
+getStringMeta (L _ (ITstring meta _)) = meta
 getStringLiteral l = StringLiteral (getSTRINGs l) (getSTRING l) Nothing
-getStringMultiLiteral l = StringLiteral (getSTRINGMULTIs l) (getSTRINGMULTI l) Nothing
 
 isUnicode :: Located Token -> Bool
 isUnicode (L _ (ITforall         iu)) = iu == UnicodeSyntax

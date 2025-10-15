@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds      #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
@@ -28,6 +29,7 @@ import {-# SOURCE #-} GHC.Hs.Expr( pprExpr )
 import GHC.Data.FastString (unpackFS)
 import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
+import GHC.Types.StringMeta (StringMeta(..))
 import GHC.Types.SourceText
 import GHC.Core.Type
 import GHC.Utils.Misc (split)
@@ -48,8 +50,7 @@ import Language.Haskell.Syntax.Lit
 
 type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
-type instance XHsString     (GhcPass _) = SourceText
-type instance XHsMultilineString (GhcPass _) = SourceText
+type instance XHsString     (GhcPass _) = StringMeta
 type instance XHsStringPrim (GhcPass _) = SourceText
 type instance XHsInt        (GhcPass _) = NoExtField
 type instance XHsIntPrim    (GhcPass _) = SourceText
@@ -151,7 +152,6 @@ hsLitNeedsParens p = go
     go (HsChar {})        = False
     go (HsCharPrim {})    = False
     go (HsString {})      = False
-    go (HsMultilineString {}) = False
     go (HsStringPrim {})  = False
     go (HsInt _ x)        = p > topPrec && il_neg x
     go (HsFloatPrim {})   = False
@@ -180,8 +180,7 @@ hsLitNeedsParens p = go
 convertLit :: XXLit (GhcPass p)~DataConCantHappen => HsLit (GhcPass p) -> HsLit (GhcPass p')
 convertLit (HsChar a x)       = HsChar a x
 convertLit (HsCharPrim a x)   = HsCharPrim a x
-convertLit (HsString a x)     = HsString a x
-convertLit (HsMultilineString a x) = HsMultilineString a x
+convertLit (HsString meta x)  = HsString meta x
 convertLit (HsStringPrim a x) = HsStringPrim a x
 convertLit (HsInt a x)        = HsInt a x
 convertLit (HsIntPrim a x)    = HsIntPrim a x
@@ -216,11 +215,14 @@ Equivalently it's True if
 instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
     ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
-    ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
-    ppr (HsMultilineString st s) =
-      case st of
-        NoSourceText -> pprHsString s
-        SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
+    ppr (HsString StringMeta{..} s)
+      -- multiline strings
+      | strMetaMultiline =
+          case strMetaSrc of
+            NoSourceText -> pprHsString s
+            SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
+      -- normal strings
+      | otherwise = pprWithSourceText strMetaSrc (pprHsString s)
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))
@@ -261,8 +263,7 @@ instance Outputable OverLitVal where
 pmPprHsLit :: forall p. IsPass p => HsLit (GhcPass p) -> SDoc
 pmPprHsLit (HsChar _ c)       = pprHsChar c
 pmPprHsLit (HsCharPrim _ c)   = pprHsChar c
-pmPprHsLit (HsString st s)    = pprWithSourceText st (pprHsString s)
-pmPprHsLit (HsMultilineString st s) = pprWithSourceText st (pprHsString s)
+pmPprHsLit (HsString meta s)  = pprWithSourceText (strMetaSrc meta) (pprHsString s)
 pmPprHsLit (HsStringPrim _ s) = pprHsBytes s
 pmPprHsLit (HsInt _ i)        = integer (il_value i)
 pmPprHsLit (HsIntPrim _ i)    = integer i

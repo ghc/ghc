@@ -119,6 +119,7 @@ import GHC.Types.Var.Env
 import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
+import GHC.Types.StringMeta (strMetaSrc)
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Utils.Misc
@@ -4772,8 +4773,7 @@ promotionErr name err
 
 
 tyLitFromLit :: HsLit GhcRn -> Maybe (HsTyLit GhcRn)
-tyLitFromLit (HsString x str) = Just (HsStrTy x str)
-tyLitFromLit (HsMultilineString x str) = Just (HsStrTy x str)
+tyLitFromLit (HsString meta str) = Just (HsStrTy (strMetaSrc meta) str)
 tyLitFromLit (HsChar x char) = Just (HsCharTy x char)
 tyLitFromLit _ = Nothing
 

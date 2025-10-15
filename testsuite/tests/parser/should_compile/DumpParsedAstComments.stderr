@@ -456,7 +456,9 @@
                   (HsLit
                    (NoExtField)
                    (HsString
+                    (StringMeta
                     (SourceText "hello")
+                     (False))
                     {FastString: "hello"})))))))
              [])
             (EmptyLocalBinds
