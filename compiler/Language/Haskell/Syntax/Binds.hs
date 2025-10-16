@@ -233,7 +233,7 @@ data HsBindLR idL idR
         var_rhs    :: LHsExpr idR    -- ^ Located only for consistency
     }
 
-  -- | Patterns Synonym Binding
+  -- | Pattern Synonym Binding
   | PatSynBind
         (XPatSynBind idL idR)
         (PatSynBind idL idR)

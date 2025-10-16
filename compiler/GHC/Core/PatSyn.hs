@@ -9,7 +9,7 @@
 
 module GHC.Core.PatSyn (
         -- * Main data types
-        PatSyn, PatSynMatcher, PatSynBuilder, mkPatSyn,
+        PatSyn(..), PatSynMatcher, PatSynBuilder, mkPatSyn,
 
         -- ** Type deconstruction
         patSynName, patSynArity, patSynVisArity,

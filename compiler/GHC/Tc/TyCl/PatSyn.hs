@@ -23,7 +23,6 @@ import GHC.Hs
 import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Zonk.Type
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Zonk.TcType
@@ -37,10 +36,10 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.TyCl.Build
 
 import GHC.Core.Multiplicity
-import GHC.Core.Type ( typeKind, isManyTy, mkTYPEapp )
+import GHC.Core.Type ( typeKind, isManyTy, mkTYPEapp, definitelyLiftedType )
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
-import GHC.Core.TyCo.Tidy( tidyForAllTyBinders, tidyTypes, tidyType )
 import GHC.Core.Predicate
+import GHC.Core.TyCo.Tidy
 
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -51,7 +50,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.Var
-import GHC.Types.Var.Env( emptyTidyEnv, mkInScopeSetList )
+import GHC.Types.Var.Env( mkInScopeSetList, emptyTidyEnv )
 import GHC.Types.Id
 import GHC.Types.Id.Info( RecSelParent(..) )
 import GHC.Tc.Gen.Bind
@@ -672,27 +671,31 @@ tc_patsyn_finish lname dir is_infix lpat' prag_fn
                  (ex_tvs,   ex_tys,    prov_theta,   prov_dicts)
                  (args, arg_tys)
                  pat_ty field_labels
-  = do { -- Zonk everything.  We are about to build a final PatSyn
-         -- so there had better be no unification variables in there
+  = do { -- Don't do a final zonk-to-type yet, as the pattern synonym may still
+         -- contain unfilled metavariables.
+         -- See Note [Metavariables in pattern synonyms].
 
-       (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, pat_ty) <-
-         initZonkEnv NoFlexi $
-         runZonkBndrT (zonkTyVarBindersX   univ_tvs) $ \ univ_tvs' ->
-         do { req_theta'  <- zonkTcTypesToTypesX req_theta
-            ; runZonkBndrT (zonkTyVarBindersX ex_tvs) $ \ ex_tvs' ->
-         do { prov_theta' <- zonkTcTypesToTypesX prov_theta
-            ; pat_ty'     <- zonkTcTypeToTypeX   pat_ty
-            ; arg_tys'    <- zonkTcTypesToTypesX arg_tys
+         -- We still need to zonk, however, in order for instantiation to work
+         -- correctly. If we don't zonk, we are at risk of quantifying
+         -- 'alpha -> beta' to 'forall a. a -> beta' even though 'beta := alpha'.
+       ; (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, pat_ty) <-
+         liftZonkM $
+         do { univ_tvs'   <- traverse zonkInvisTVBinder univ_tvs
+            ; req_theta'  <- zonkTcTypes req_theta
+            ; ex_tvs'     <- traverse zonkInvisTVBinder ex_tvs
+            ; prov_theta' <- zonkTcTypes prov_theta
+            ; pat_ty'     <- zonkTcType   pat_ty
+            ; arg_tys'    <- zonkTcTypes arg_tys
 
             ; let (env1, univ_tvs) = tidyForAllTyBinders emptyTidyEnv univ_tvs'
+                  req_theta  = tidyTypes env1 req_theta'
                   (env2, ex_tvs)   = tidyForAllTyBinders env1 ex_tvs'
-                  req_theta  = tidyTypes env2 req_theta'
                   prov_theta = tidyTypes env2 prov_theta'
                   arg_tys    = tidyTypes env2 arg_tys'
                   pat_ty     = tidyType  env2 pat_ty'
 
             ; return (univ_tvs, req_theta,
-                       ex_tvs, prov_theta, arg_tys, pat_ty) } }
+                       ex_tvs, prov_theta, arg_tys, pat_ty) }
 
        ; traceTc "tc_patsyn_finish {" $
            ppr (unLoc lname) $$ ppr (unLoc lpat') $$
@@ -733,6 +736,48 @@ tc_patsyn_finish lname dir is_infix lpat' prag_fn
 
        ; traceTc "tc_patsyn_finish }" empty
        ; return (matcher_bind, tcg_env) }
+
+{- Note [Metavariables in pattern synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unlike data constructors, the types of pattern synonyms are allowed to contain
+metavariables, because of view patterns. Example (from ticket #26465):
+
+  f :: Eq a => a -> Maybe a
+  f = ...
+
+  g = f
+    -- Due to the monomorphism restriction, we infer
+    -- g :: alpha -> Maybe alpha, with [W] Eq alpha
+
+  pattern P x <- (g -> Just x)
+    -- Infer: P :: alpha -> alpha
+
+Note that:
+
+  1. 'g' is a top-level function binding whose inferred type contains metavariables
+     (due to type variable promotion, as described in Note [Deciding quantification] in GHC.Tc.Solver)
+  2. 'P' is a pattern synonym without a type signature which uses 'g' in a view pattern.
+
+In this way, promoted metavariables of top-level functions can sneak their way
+into pattern synonym definitions.
+
+To account for this fact, we do not attempt a final zonk-to-type in
+'GHC.Tc.TyCl.PatSyn.tc_patsyn_finish'. Indeed, GHC may fill in the metavariables
+when typechecking the rest of the module. Following on from the above example,
+we might have a later binding:
+
+  y = g 'c'
+    -- fixes alpha := Char
+
+or
+
+  h (P b) = not b
+    -- fixes alpha := Bool
+
+We instead perform the final zonk-to-type at the very end, in the call
+to 'GHC.Tc.Zonk.Type.zonkPatSyn' in 'GHC.Tc.Zonk.Type.zonkTopDecls'. In this way,
+pattern synonyms are treated the same as top-level function bindings.
+-}
 
 {-
 ************************************************************************
@@ -870,9 +915,11 @@ mkPatSynBuilder dir (L _ name)
   | otherwise
   = do { builder_name <- newImplicitBinder name mkBuilderOcc
        ; let theta          = req_theta ++ prov_theta
-             need_dummy_arg = isUnliftedType pat_ty && null arg_tys && null theta
-                              -- NB: pattern arguments cannot be representation-polymorphic,
-                              -- as checked in 'tcPatSynSig'. So 'isUnliftedType' is OK here.
+             need_dummy_arg = null arg_tys && null theta && not (definitelyLiftedType pat_ty)
+               -- At this point, the representation of 'pat_ty' might still be unknown (see T26465c),
+               -- so use a conservative test that handles an unknown representation.
+               -- Ideally, we'd defer making the builder until the representation is settled,
+               -- but that would be a lot more work.
              builder_sigma  = add_void need_dummy_arg $
                               mkInvisForAllTys univ_bndrs $
                               mkInvisForAllTys ex_bndrs $

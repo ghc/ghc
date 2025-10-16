@@ -1,0 +1,10 @@
+T26465d.hs:20:5: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
+    • No instance for ‘HasP a0’ arising from a use of ‘getP’
+    • In the expression: getP
+      In an equation for ‘g’: g = getP
+
+T26465d.hs:21:5: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
+    • No instance for ‘HasP a0’ arising from a use of ‘mk’
+    • In the expression: mk
+      In an equation for ‘m’: m = mk
+
