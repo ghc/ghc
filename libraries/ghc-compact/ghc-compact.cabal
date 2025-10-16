@@ -40,7 +40,7 @@ library
     CPP
 
   build-depends: base       >= 4.9.0 && < 4.23,
-                 bytestring >= 0.10.6.0 && <0.13
+                 bytestring >= 0.10.6.0 && <0.14
   ghc-options: -Wall
 
   exposed-modules: GHC.Compact
