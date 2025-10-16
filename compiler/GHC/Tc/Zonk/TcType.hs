@@ -39,7 +39,7 @@ module GHC.Tc.Zonk.TcType
   , zonkCt, zonkWC, zonkSimples, zonkImplication
 
     -- * Rewriter sets
-  , zonkRewriterSet, zonkCtRewriterSet, zonkCtEvRewriterSet
+  , zonkCoHoleSet, zonkCtCoHoleSet, zonkCtEvCoHoleSet
 
     -- * Coercion holes
   , isFilledCoercionHole, unpackCoercionHole, unpackCoercionHole_maybe
@@ -507,13 +507,13 @@ zonkCt ct
 
 zonkCtEvidence :: CtEvidence -> ZonkM CtEvidence
 -- Zonks the ctev_pred and the ctev_rewriters; but not ctev_evar
--- For ctev_rewriters, see (WRW2) in Note [Wanteds rewrite Wanteds]
+-- For ctev_rewriters, see (WRW11) in Note [Wanteds rewrite Wanteds]
 zonkCtEvidence (CtGiven (GivenCt { ctev_pred = pred, ctev_evar = var, ctev_loc = loc }))
   = do { pred' <- zonkTcType pred
        ; return (CtGiven (GivenCt { ctev_pred = pred', ctev_evar = var, ctev_loc = loc })) }
 zonkCtEvidence (CtWanted wanted@(WantedCt { ctev_pred = pred, ctev_rewriters = rws }))
   = do { pred' <- zonkTcType pred
-       ; rws'  <- zonkRewriterSet rws
+       ; rws'  <- zonkCoHoleSet rws
        ; return (CtWanted (wanted { ctev_pred = pred', ctev_rewriters = rws' })) }
 
 zonkSkolemInfo :: SkolemInfo -> ZonkM SkolemInfo
@@ -555,33 +555,33 @@ But c.f Note [Sharing when zonking to Type] in GHC.Tc.Zonk.Type.
 ************************************************************************
 -}
 
-zonkCtRewriterSet :: Ct -> ZonkM Ct
-zonkCtRewriterSet ct
+zonkCtCoHoleSet :: Ct -> ZonkM Ct
+zonkCtCoHoleSet ct
   | isGivenCt ct
   = return ct
   | otherwise
   = case ct of
-      CEqCan eq@(EqCt { eq_ev = ev })       -> do { ev' <- zonkCtEvRewriterSet ev
+      CEqCan eq@(EqCt { eq_ev = ev })       -> do { ev' <- zonkCtEvCoHoleSet ev
                                                   ; return (CEqCan (eq { eq_ev = ev' })) }
-      CIrredCan ir@(IrredCt { ir_ev = ev }) -> do { ev' <- zonkCtEvRewriterSet ev
+      CIrredCan ir@(IrredCt { ir_ev = ev }) -> do { ev' <- zonkCtEvCoHoleSet ev
                                                   ; return (CIrredCan (ir { ir_ev = ev' })) }
-      CDictCan di@(DictCt { di_ev = ev })   -> do { ev' <- zonkCtEvRewriterSet ev
+      CDictCan di@(DictCt { di_ev = ev })   -> do { ev' <- zonkCtEvCoHoleSet ev
                                                   ; return (CDictCan (di { di_ev = ev' })) }
       CQuantCan {}     -> return ct
-      CNonCanonical ev -> do { ev' <- zonkCtEvRewriterSet ev
+      CNonCanonical ev -> do { ev' <- zonkCtEvCoHoleSet ev
                              ; return (CNonCanonical ev') }
 
-zonkCtEvRewriterSet :: CtEvidence -> ZonkM CtEvidence
-zonkCtEvRewriterSet ev@(CtGiven {})
+zonkCtEvCoHoleSet :: CtEvidence -> ZonkM CtEvidence
+zonkCtEvCoHoleSet ev@(CtGiven {})
   = return ev
-zonkCtEvRewriterSet ev@(CtWanted wtd)
-  = do { rewriters' <- zonkRewriterSet (ctEvRewriters ev)
+zonkCtEvCoHoleSet ev@(CtWanted wtd)
+  = do { rewriters' <- zonkCoHoleSet (ctEvRewriters ev)
        ; return (CtWanted $ setWantedCtEvRewriters wtd rewriters') }
 
 -- | Zonk a rewriter set; if a coercion hole in the set has been filled,
 -- find all the free un-filled coercion holes in the coercion that fills it
-zonkRewriterSet :: RewriterSet -> ZonkM RewriterSet
-zonkRewriterSet (RewriterSet set)
+zonkCoHoleSet :: CoHoleSet -> ZonkM CoHoleSet
+zonkCoHoleSet (CoHoleSet set)
   = unUCHM (nonDetStrictFoldUniqSet go mempty set)
      -- This does not introduce non-determinism, because the only
      -- monadic action is to read, and the combining function is
@@ -594,16 +594,16 @@ freeHolesOfHole :: CoercionHole -> UnfilledCoercionHoleMonoid
 freeHolesOfHole hole
   = UCHM $ do { m_co <- unpackCoercionHole_maybe hole
               ; case m_co of
-                   Nothing -> return (unitRewriterSet hole)  -- Not filled
-                   Just (_co,holes) -> zonkRewriterSet holes }
+                   Nothing -> return (unitCoHoleSet hole)  -- Not filled
+                   Just (_co,holes) -> zonkCoHoleSet holes }
 
-newtype UnfilledCoercionHoleMonoid = UCHM { unUCHM :: ZonkM RewriterSet }
+newtype UnfilledCoercionHoleMonoid = UCHM { unUCHM :: ZonkM CoHoleSet }
 
 instance Semigroup UnfilledCoercionHoleMonoid where
-  UCHM l <> UCHM r = UCHM (unionRewriterSet <$> l <*> r)
+  UCHM l <> UCHM r = UCHM (unionCoHoleSet <$> l <*> r)
 
 instance Monoid UnfilledCoercionHoleMonoid where
-  mempty = UCHM (return emptyRewriterSet)
+  mempty = UCHM (return emptyCoHoleSet)
 
 
 {-
@@ -629,7 +629,7 @@ unpackCoercionHole hole
            Nothing -> pprPanic "Unfilled coercion hole" (ppr hole) }
 
 -- | Retrieve the contents of a coercion hole, if it is filled
-unpackCoercionHole_maybe :: CoercionHole -> ZonkM (Maybe (Coercion,RewriterSet))
+unpackCoercionHole_maybe :: CoercionHole -> ZonkM (Maybe (Coercion,CoHoleSet))
 unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
 
 

@@ -171,7 +171,7 @@ data WorkList
        , wl_rw_eqs  :: [Ct]  -- Like wl_eqs, but ones that may have a non-empty
                              -- rewriter set
          -- We prioritise wl_eqs over wl_rw_eqs;
-         -- see Note [Prioritise Wanteds with empty RewriterSet]
+         -- see Note [Prioritise Wanteds with empty CoHoleSet]
          -- in GHC.Tc.Types.Constraint for more details.
 
        , wl_rest :: [Ct]
@@ -200,11 +200,11 @@ workListSize :: WorkList -> Int
 workListSize (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs, wl_rest = rest })
   = length eqs_N + length eqs_X + length rw_eqs + length rest
 
-extendWorkListEq :: RewriterSet -> Ct -> WorkList -> WorkList
+extendWorkListEq :: CoHoleSet -> Ct -> WorkList -> WorkList
 extendWorkListEq rewriters ct
     wl@(WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs })
-  | isEmptyRewriterSet rewriters      -- A wanted that has not been rewritten
-    -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
+  | isEmptyCoHoleSet rewriters      -- A wanted that has not been rewritten
+    -- isEmptyCoHoleSet: see Note [Prioritise Wanteds with empty CoHoleSet]
     --                         in GHC.Tc.Types.Constraint
   = if isNominalEqualityCt ct
     then wl { wl_eqs_N = ct : eqs_N }
@@ -223,8 +223,8 @@ extendWorkListChildEqs :: CtEvidence -> Bag Ct -> WorkList -> WorkList
 -- Precondition: new_eqs is non-empty
 extendWorkListChildEqs parent_ev new_eqs
     wl@(WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs })
-  | isEmptyRewriterSet (ctEvRewriters parent_ev)
-    -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
+  | isEmptyCoHoleSet (ctEvRewriters parent_ev)
+    -- isEmptyCoHoleSet: see Note [Prioritise Wanteds with empty CoHoleSet]
     --                         in GHC.Tc.Types.Constraint
     -- If the rewriter set is empty, add to wl_eqs_X and wl_eqs_N
   = case partitionBag isNominalEqualityCt new_eqs of
@@ -244,7 +244,7 @@ extendWorkListChildEqs parent_ev new_eqs
     push_on_front new_eqs eqs = foldr (:) eqs new_eqs
 
 extendWorkListRewrittenEqs :: [EqCt] -> WorkList -> WorkList
--- Don't bother checking the RewriterSet: just pop them into wl_rw_eqs
+-- Don't bother checking the CoHoleSet: just pop them into wl_rw_eqs
 extendWorkListRewrittenEqs new_eqs wl@(WL { wl_rw_eqs = rw_eqs })
   = wl { wl_rw_eqs = foldr ((:) . CEqCan) rw_eqs new_eqs }
 
@@ -2007,7 +2007,7 @@ solveOneFromTheOther ct_i ct_w
         -- If only one has an empty rewriter set, use it
         -- c.f. GHC.Tc.Solver.Equality.inertsCanDischarge, and especially
         --      (CE4) in Note [Combining equalities]
-        | Just res <- better (isEmptyRewriterSet rw_i) (isEmptyRewriterSet rw_w)
+        | Just res <- better (isEmptyCoHoleSet rw_i) (isEmptyCoHoleSet rw_w)
         -> res
 
         -- If only one is a WantedSuperclassOrigin (arising from expanding

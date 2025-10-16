@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecursiveDo #-}
@@ -85,7 +86,7 @@ setIrredIfWanted :: CtEvidence -> SwapFlag -> CtEvidence -> TcS ()
 setIrredIfWanted ev_dest swap ev_source
   | CtWanted (WantedCt { ctev_dest = dest }) <- ev_dest
   = case dest of
-      HoleDest {}  -> setWantedEq dest (ctEvRewriterSet ev_source)
+      HoleDest {}  -> setWantedEq dest (ctEvCoHoleSet ev_source)
                                   (maybeSymCo swap (ctEvCoercion ev_source))
 
       EvVarDest {} -> assertPpr (swap==NotSwapped) (ppr ev_dest $$ ppr ev_source) $
@@ -133,14 +134,12 @@ tryQCsIrredCt :: IrredCt -> SolverStage ()
 -- Try local quantified constraints for
 -- and CIrredCan e.g.  (c a)
 tryQCsIrredCt (IrredCt { ir_ev = ev })
-  | isGiven ev
-  = Stage $ continueWith ()
-
-  | otherwise
-  = Stage $ do { res <- matchLocalInst pred loc
-               ; case res of
-                    OneInst {} -> chooseInstance ev res
-                    _          -> continueWith () }
-  where
-    loc  = ctEvLoc ev
-    pred = ctEvPred ev
+  = Stage $ case ev of
+      CtGiven {}
+        -> continueWith ()
+      CtWanted wev@(WantedCt { ctev_loc = loc, ctev_pred = pred })
+        -> do { res <- matchLocalInst pred loc
+              ; case res of
+                  OneInst {} -> do { chooseInstance wev res
+                                   ; stopWith ev "Irred (solved wanted)" }
+                  _          -> continueWith () }

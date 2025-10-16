@@ -372,7 +372,7 @@ can_eq_nc rewritten rdr_env envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
 -- Literals
 can_eq_nc _rewritten _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
  | l1 == l2
-  = do { setEqIfWanted ev emptyRewriterSet (mkReflCo (eqRelRole eq_rel) ty1)
+  = do { setEqIfWanted ev emptyCoHoleSet (mkReflCo (eqRelRole eq_rel) ty1)
        ; stopWith ev "Equal LitTy" }
 
 -- Decompose FunTy: (s -> t) and (c => t)
@@ -571,8 +571,8 @@ can_eq_nc_forall ev eq_rel s1 s2
                      -- CoercionHoles, from the nested solve, and we may miss the
                      -- use of CoVars.  Test T7196 showed this up
 
-                ; setWantedEq orig_dest emptyRewriterSet all_co
-                     -- emptyRewriterSet: fully solved, so all_co has no holes
+                ; setWantedEq orig_dest emptyCoHoleSet all_co
+                     -- emptyCoHoleSet: fully solved, so all_co has no holes
                 ; stopWith ev "Polytype equality: solved" }
 
         else canEqSoftFailure IrredShapeReason ev s1 s2 } }
@@ -792,7 +792,7 @@ can_eq_newtype_nc rdr_env envs ev swapped ty1 ((gres, co1), ty1') ty2 ps_ty2
 
        ; let redn1 = mkReduction co1 ty1'
 
-       ; new_ev <- rewriteEqEvidence emptyRewriterSet ev' swapped
+       ; new_ev <- rewriteEqEvidence emptyCoHoleSet ev' swapped
                      redn1 (mkReflRedn Representational ps_ty2)
 
        ; can_eq_nc False rdr_env envs new_ev ReprEq ty1' ty1' ty2 ps_ty2 }
@@ -872,7 +872,7 @@ canEqCast rewritten rdr_env envs ev eq_rel swapped ty1 co1 ty2 ps_ty2
   = do { traceTcS "Decomposing cast" (vcat [ ppr ev
                                            , ppr ty1 <+> text "|>" <+> ppr co1
                                            , ppr ps_ty2 ])
-       ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
+       ; new_ev <- rewriteEqEvidence emptyCoHoleSet ev swapped
                       (mkGReflLeftRedn role ty1 co1)
                       (mkReflRedn role ps_ty2)
        ; can_eq_nc rewritten rdr_env envs new_ev eq_rel ty1 ty1 ty2 ps_ty2 }
@@ -1678,7 +1678,7 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
                     kind_loc = mkKindEqLoc xi1 xi2 loc
               ; kind_ev <- newGivenEv kind_loc (pred_ty, evCoercion kind_co)
               ; emitWorkNC [CtGiven kind_ev]
-              ; finish emptyRewriterSet (givenCtEvCoercion kind_ev) }
+              ; finish emptyCoHoleSet (givenCtEvCoercion kind_ev) }
 
       CtWanted {}
          -> do { (unifs, (kind_co, eqs)) <- reportFineGrainUnifications $
@@ -1830,7 +1830,7 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
     finish_with_swapping
       = do { let lhs1_redn = mkGReflRightMRedn role lhs1_ty sym_mco
                  lhs2_redn = mkGReflLeftMRedn  role lhs2_ty mco
-           ; new_ev <-rewriteEqEvidence emptyRewriterSet ev swapped lhs1_redn lhs2_redn
+           ; new_ev <-rewriteEqEvidence emptyCoHoleSet ev swapped lhs1_redn lhs2_redn
            ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
 
     put_tyvar_on_lhs = isWanted ev && eq_rel == NomEq
@@ -1967,7 +1967,7 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
                           -- ContinueWith, to allow using this constraint for
                           -- rewriting (e.g. alpha[2] ~ beta[3]).
                           do { let role = eqRelRole eq_rel
-                             ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
+                             ; new_ev <- rewriteEqEvidence emptyCoHoleSet ev swapped
                                  (mkReflRedn role (canEqLHSType lhs))
                                  (mkReflRedn role rhs)
                              ; continueWith $ Right $
@@ -2010,9 +2010,9 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
            --           co' = <Int>
            new_ev <- if isReflCo (reductionCoercion rhs_redn)
                      then return ev
-                     else rewriteEqEvidence emptyRewriterSet ev swapped
+                     else rewriteEqEvidence emptyCoHoleSet ev swapped
                               (mkReflRedn Nominal (mkTyVarTy tv)) rhs_redn
-                          -- emptyRewriterSet: rhs_redn has no CoercionHoles
+                          -- emptyCoHoleSet: rhs_redn has no CoercionHoles
 
          ; let tv_ty     = mkTyVarTy tv
                final_rhs = reductionReducedType rhs_redn
@@ -2028,7 +2028,7 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
 
          -- Provide Refl evidence for the constraint
          -- Ignore 'swapped' because it's Refl!
-         ; setEqIfWanted new_ev emptyRewriterSet (mkNomReflCo final_rhs)
+         ; setEqIfWanted new_ev emptyCoHoleSet (mkNomReflCo final_rhs)
 
          -- Kick out any constraints that can now be rewritten
          ; kickOutAfterUnification (unitVarSet tv)
@@ -2062,7 +2062,7 @@ canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
 
               | reason `cterHasOnlyProblems` do_not_prevent_rewriting
               -> do { let role = eqRelRole eq_rel
-                    ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
+                    ; new_ev <- rewriteEqEvidence emptyCoHoleSet ev swapped
                         (mkReflRedn role (canEqLHSType lhs))
                         (mkReflRedn role rhs)
                     ; continueWith $ Right $
@@ -2074,7 +2074,7 @@ canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
               -> tryIrredInstead reason ev eq_rel swapped lhs rhs
 
             PuOK _ rhs_redn
-              -> do { new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
+              -> do { new_ev <- rewriteEqEvidence emptyCoHoleSet ev swapped
                                    (mkReflRedn (eqRelRole eq_rel) lhs_ty)
                                    rhs_redn
 
@@ -2108,7 +2108,7 @@ swapAndFinish :: CtEvidence -> EqRel -> SwapFlag
 -- We want to flip it to (F tys ~ a), whereupon it is canonical
 swapAndFinish ev eq_rel swapped lhs_ty can_rhs
   = do { let role = eqRelRole eq_rel
-       ; new_ev <- rewriteEqEvidence emptyRewriterSet ev (flipSwap swapped)
+       ; new_ev <- rewriteEqEvidence emptyCoHoleSet ev (flipSwap swapped)
                        (mkReflRedn role (canEqLHSType can_rhs))
                        (mkReflRedn role lhs_ty)
        ; continueWith $ Right $
@@ -2127,7 +2127,7 @@ tryIrredInstead :: CheckTyEqResult -> CtEvidence
 tryIrredInstead reason ev eq_rel swapped lhs rhs
   = do { traceTcS "cantMakeCanonical" (ppr reason $$ ppr lhs $$ ppr rhs)
        ; let role = eqRelRole eq_rel
-       ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
+       ; new_ev <- rewriteEqEvidence emptyCoHoleSet ev swapped
                        (mkReflRedn role (canEqLHSType lhs))
                        (mkReflRedn role rhs)
        ; finishCanWithIrred (NonCanonicalReason reason) new_ev }
@@ -2148,7 +2148,7 @@ canEqReflexive :: CtEvidence    -- ty ~ ty
                -> TcType        -- ty
                -> TcS (StopOrContinue a)   -- always Stop
 canEqReflexive ev eq_rel ty
-  = do { setEqIfWanted ev emptyRewriterSet (mkReflCo (eqRelRole eq_rel) ty)
+  = do { setEqIfWanted ev emptyCoHoleSet (mkReflCo (eqRelRole eq_rel) ty)
        ; stopWith ev "Solved by reflexivity" }
 
 {- Note [Equalities with heterogeneous kinds]
@@ -2171,7 +2171,7 @@ k2 and use this to cast. To wit, from
 Wrinkles:
 
 (EIK1) When X=Wanted, the new type-level wanted for `co` is effectively rewritten by
-     the kind-level one. We thus include the kind-level wanted in the RewriterSet
+     the kind-level one. We thus include the kind-level wanted in the CoHoleSet
      for the type-level one. See Note [Wanteds rewrite Wanteds] in
      GHC.Tc.Types.Constraint.  This is done in canEqCanLHSHetero.
 
@@ -2199,7 +2199,7 @@ Wrinkles:
        the kind of the parent type-equality.  See the calls to `mkKindEqLoc`
        in `canEqCanLHSHetero`.
 
-     * We /also/ add these unsolved kind equalities to the `RewriterSet` of the
+     * We /also/ add these unsolved kind equalities to the `CoHoleSet` of the
        parent constraint; see the call to `rewriteEqEvidence` in `finish` in
        `canEqCanLHSHetero`.
 
@@ -2611,7 +2611,7 @@ More details:
 **********************************************************************
 -}
 
-rewriteEqEvidence :: RewriterSet        -- New rewriters
+rewriteEqEvidence :: CoHoleSet        -- New rewriters
                                         -- See GHC.Tc.Types.Constraint
                                         -- Note [Wanteds rewrite Wanteds]
                   -> CtEvidence         -- Old evidence :: olhs ~ orhs (not swapped)
@@ -2653,7 +2653,7 @@ rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reductio
        ; let co = maybeSymCo swapped $
                   lhs_co `mkTransCo` mkHoleCo hole `mkTransCo` mkSymCo rhs_co
              -- new_rewriters has all the holes from lhs_co and rhs_co
-       ; setWantedEq dest (new_rewriters `mappend` unitRewriterSet hole) co
+       ; setWantedEq dest (new_rewriters `mappend` unitCoHoleSet hole) co
        ; traceTcS "rewriteEqEvidence" (vcat [ ppr old_ev
                                             , ppr nlhs
                                             , ppr nrhs
@@ -2723,7 +2723,7 @@ But it's not so simple:
    TL;DR: Better to hang on to `g1` (with no rewriters), in preference
    to `g2` (which has a rewriter).
 
-   See (WRW1) in Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
+   See (WRW11) in Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
 -}
 
 tryInertEqs :: EqCt -> SolverStage ()
@@ -2731,7 +2731,7 @@ tryInertEqs work_item@(EqCt { eq_ev = ev, eq_eq_rel = eq_rel })
   = Stage $
     do { inerts <- getInertCans
        ; if | Just (ev_i, swapped) <- inertsEqsCanDischarge inerts work_item
-            -> do { setEqIfWanted ev (ctEvRewriterSet ev_i) $
+            -> do { setEqIfWanted ev (ctEvCoHoleSet ev_i) $
                     maybeSymCo swapped $
                     downgradeRole (eqRelRole eq_rel)
                                   (ctEvRewriteRole ev_i)
@@ -2769,7 +2769,7 @@ inertsEqsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
     loc_w  = ctEvLoc ev_w
     flav_w = ctEvFlavour ev_w
     fr_w   = (flav_w, eq_rel)
-    empty_rw_w = isEmptyRewriterSet (ctEvRewriters ev_w)
+    empty_rw_w = isEmptyCoHoleSet (ctEvRewriters ev_w)
 
     inert_beats_wanted ev_i eq_rel
       = -- eqCanRewriteFR:        see second bullet of Note [Combining equalities]
@@ -2786,7 +2786,7 @@ inertsEqsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
     prefer_wanted ev_i
       =  (loc_w `strictly_more_visible` ctEvLoc ev_i)
              -- strictly_more_visible: see (CE3) in Note [Combining equalities]
-      || (empty_rw_w && not (isEmptyRewriterSet (ctEvRewriters ev_i)))
+      || (empty_rw_w && not (isEmptyCoHoleSet (ctEvRewriters ev_i)))
              -- Prefer the one that has no rewriters
              -- See (CE4) in Note [Combining equalities]
 
@@ -2862,7 +2862,7 @@ Wrinkles:
 
    However the solver prioritises equalities with an empty rewriter
    set, to try to avoid unnecessary kick-out.  See GHC.Tc.Types.Constraint
-   Note [Prioritise Wanteds with empty RewriterSet] esp (PER1)
+   Note [Prioritise Wanteds with empty CoHoleSet] esp (PER1)
 
 Note [Solve by unification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2914,9 +2914,9 @@ See
 
 --------------------
 tryQCsIrredEqCt :: IrredCt -> SolverStage ()
-tryQCsIrredEqCt irred@(IrredCt { ir_ev = ev })
+tryQCsIrredEqCt (IrredCt { ir_ev = ev })
   | EqPred eq_rel t1 t2 <- classifyPredType (ctEvPred ev)
-  = lookup_eq_in_qcis (CIrredCan irred) eq_rel t1 t2
+  = lookup_eq_in_qcis ev eq_rel t1 t2
 
   | otherwise  -- All the calls come from in this module, where we deal only with
                -- equalities, so ctEvPred ev) must be an equality. Indeed, we could
@@ -2926,62 +2926,61 @@ tryQCsIrredEqCt irred@(IrredCt { ir_ev = ev })
 
 --------------------
 tryQCsEqCt :: EqCt -> SolverStage ()
-tryQCsEqCt work_item@(EqCt { eq_lhs = lhs, eq_rhs = rhs, eq_eq_rel = eq_rel })
-  = lookup_eq_in_qcis (CEqCan work_item) eq_rel (canEqLHSType lhs) rhs
+tryQCsEqCt (EqCt { eq_ev = ev, eq_lhs = lhs, eq_rhs = rhs, eq_eq_rel = eq_rel })
+  = lookup_eq_in_qcis ev eq_rel (canEqLHSType lhs) rhs
 
 --------------------
-lookup_eq_in_qcis :: Ct -> EqRel -> TcType -> TcType -> SolverStage ()
+lookup_eq_in_qcis :: CtEvidence -> EqRel -> TcType -> TcType -> SolverStage ()
 -- The "final QCI check" checks to see if we have
 --    [W] t1 ~# t2
 -- and a Given quantified contraint like (forall a b. blah => a ~ b)
 -- Why?  See Note [Looking up primitive equalities in quantified constraints]
 -- See also GHC.Tc.Solver.Dict
 -- Note [Equality superclasses in quantified constraints]
-lookup_eq_in_qcis work_ct eq_rel lhs rhs
-  = Stage $
-    do { ev_binds_var <- getTcEvBindsVar
-       ; ics <- getInertCans
-       ; if isWanted ev                       -- Never look up Givens in quantified constraints
-         && not (null (inert_qcis ics))       -- Shortcut common case
-         && not (isCoEvBindsVar ev_binds_var) -- See Note [Instances in no-evidence implications]
-         then try_for_qci
-         else continueWith () }
+lookup_eq_in_qcis (CtGiven {}) _ _ _
+  = nopStage ()
+
+lookup_eq_in_qcis ev@(CtWanted (WantedCt { ctev_dest = dest, ctev_loc = loc })) eq_rel lhs rhs
+  = do { ev_binds_var <- simpleStage getTcEvBindsVar
+       ; ics          <- simpleStage getInertCans
+       ; if null (inert_qcis ics)
+            || isCoEvBindsVar ev_binds_var -- See Note [Instances in no-evidence implications]
+         then -- Shortcut common case
+              nopStage ()
+         else -- Try looking for both (lhs~rhs) anr (rhs~lhs); see #23333
+              do { try NotSwapped; try IsSwapped } }
   where
-    ev  = ctEvidence work_ct
-    loc = ctEvLoc ev
-    role = eqRelRole eq_rel
+    hole = case dest of
+             HoleDest hole -> hole   -- Equality constraints have HoleDest
+             _ -> pprPanic "lookup_eq_in_qcis" (ppr dest) 
 
-    try_for_qci  -- First try looking for (lhs ~ rhs)
-       | Just (cls, tys) <- boxEqPred eq_rel lhs rhs
-       = do { res <- matchLocalInst (mkClassPred cls tys) loc
-            ; traceTcS "lookup_irred_in_qcis:1" (ppr (mkClassPred cls tys))
+    try :: SwapFlag -> SolverStage ()
+    try swap -- First try looking for (lhs ~ rhs)
+       | Just (cls, tys) <- unSwap swap (boxEqPred eq_rel) lhs rhs
+       = Stage $
+         do { let cls_pred = mkClassPred cls tys
+            ; res <- matchLocalInst cls_pred loc
+            ; traceTcS "lookup_eq_in_qcis:1" (ppr cls_pred)
             ; case res of
-                OneInst { cir_mk_ev = mk_ev }
-                  -> chooseInstance ev (res { cir_mk_ev = mk_eq_ev cls tys mk_ev })
-                _ -> try_swapping }
-       | otherwise
-       = continueWith ()
+                OneInst {}
+                  -> do { dict_ev <- newWantedEvVarNC loc emptyCoHoleSet cls_pred
+                        ; chooseInstance dict_ev res
+                        ; let co_var = coHoleCoVar hole
+                        ; setEvBind (mkWantedEvBind co_var EvCanonical (mk_sc_sel cls tys dict_ev))
+                        ; fillCoercionHole hole emptyCoHoleSet $
+                          maybeSymCo swap (mkCoVarCo co_var)
+                        ; stopWith ev "lookup_eq_in_qcis" }
+                _ -> continueWith () }
 
-    try_swapping  -- Now try looking for (rhs ~ lhs)  (see #23333)
-       | Just (cls, tys) <- boxEqPred eq_rel rhs lhs
-       = do { res <- matchLocalInst (mkClassPred cls tys) loc
-            ; traceTcS "lookup_irred_in_qcis:2" (ppr (mkClassPred cls tys))
-            ; case res of
-                OneInst { cir_mk_ev = mk_ev }
-                  -> do { ev' <- rewriteEqEvidence emptyRewriterSet ev IsSwapped
-                                      (mkReflRedn role rhs) (mkReflRedn role lhs)
-                        ; chooseInstance ev' (res { cir_mk_ev = mk_eq_ev cls tys mk_ev }) }
-                _ -> do { traceTcS "lookup_irred_in_qcis:3" (ppr work_ct)
-                        ; continueWith () }}
        | otherwise
-       = continueWith ()
+       = nopStage ()
 
-    mk_eq_ev cls tys mk_ev evs
-      | sc_id : rest <- classSCSelIds cls  -- Just one superclass for this
-      = assert (null rest) $ case (mk_ev evs) of
-          EvExpr e -> EvExpr (Var sc_id `mkTyApps` tys `App` e)
-          ev       -> pprPanic "mk_eq_ev" (ppr ev)
-      | otherwise = pprPanic "finishEqCt" (ppr work_ct)
+    mk_sc_sel cls tys dict_ev
+      | [sc_id] <- classSCSelIds cls  -- Just one superclass for this
+      = EvExpr (Var sc_id `mkTyApps` tys `App` Var (wantedCtEvEvId dict_ev))
+      | otherwise
+      = pprPanic "looup_eq_in_qcis" (ppr dict_ev)
+
 
 {- Note [Instances in no-evidence implications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

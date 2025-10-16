@@ -202,7 +202,7 @@ newWantedWithLoc loc pty
          WantedCt { ctev_dest      = dst
                   , ctev_pred      = pty
                   , ctev_loc       = loc
-                  , ctev_rewriters = emptyRewriterSet }
+                  , ctev_rewriters = emptyCoHoleSet }
 
 -- | Create a new Wanted constraint with the given 'CtOrigin', and
 -- location information taken from the 'TcM' environment.
@@ -278,7 +278,7 @@ emitWantedEq origin t_or_k role ty1 ty2
            WantedCt { ctev_pred      = pty
                     , ctev_dest      = HoleDest hole
                     , ctev_loc       = loc
-                    , ctev_rewriters = emptyRewriterSet }
+                    , ctev_rewriters = emptyCoHoleSet }
        ; return (HoleCo hole) }
   where
     pty = mkEqPredRole role ty1 ty2
@@ -292,7 +292,7 @@ emitWantedEvVar origin ty
        ; let ctev = WantedCt { ctev_pred      = ty
                              , ctev_dest      = EvVarDest new_cv
                              , ctev_loc       = loc
-                             , ctev_rewriters = emptyRewriterSet }
+                             , ctev_rewriters = emptyCoHoleSet }
        ; emitSimple $ mkNonCanonical $ CtWanted ctev
        ; return new_cv }
 
@@ -360,7 +360,7 @@ newCoercionHole pred_ty
        ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
 
 -- | Put a value in a coercion hole
-fillCoercionHole :: CoercionHole -> (Coercion, RewriterSet) -> TcM ()
+fillCoercionHole :: CoercionHole -> (Coercion, CoHoleSet) -> TcM ()
 fillCoercionHole (CoercionHole { ch_ref = ref, ch_co_var = cv }) co
   = do { when debugIsOn $
          do { cts <- readTcRef ref

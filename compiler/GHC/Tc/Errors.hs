@@ -462,7 +462,7 @@ mkErrorItem ct
                    -- see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
                      CtGiven {} -> (False, Nothing)
                      CtWanted (WantedCt { ctev_rewriters = rws, ctev_dest = dest })
-                                -> (not (isEmptyRewriterSet rws), Just dest)
+                                -> (not (isEmptyCoHoleSet rws), Just dest)
 
        ; let m_reason = case ct of
                 CIrredCan (IrredCt { ir_reason = reason }) -> Just reason
@@ -494,7 +494,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
 
          -- Catch an awkward (and probably rare) case in which /all/ errors are
          -- suppressed: see Wrinkle (PER2) in Note [Prioritise Wanteds with empty
-         -- RewriterSet] in GHC.Tc.Types.Constraint.
+         -- CoHoleSet] in GHC.Tc.Types.Constraint.
          --
          -- Unless we are sure that an error will be reported some other way
          -- (details in the defn of tidy_items) un-suppress the lot. This makes
@@ -1327,7 +1327,7 @@ addDeferredBinding ctxt supp hints msg (EI { ei_evdest = Just dest
              -> do { -- See Note [Deferred errors for coercion holes]
                      let co_var = coHoleCoVar hole
                    ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var EvNonCanonical err_tm
-                   ; fillCoercionHole hole (mkCoVarCo co_var, emptyRewriterSet) } }
+                   ; fillCoercionHole hole (mkCoVarCo co_var, emptyCoHoleSet) } }
 addDeferredBinding _ _ _ _ _ = return ()    -- Do not set any evidence for Given
 
 mkSolverErrorTerm :: CtLoc -> Type  -- of the error term
@@ -1650,7 +1650,7 @@ validHoleFits ctxt@(CEC { cec_encl = implics
           WantedCt { ctev_pred      = pred
                    , ctev_dest      = dest
                    , ctev_loc       = loc
-                   , ctev_rewriters = emptyRewriterSet }
+                   , ctev_rewriters = emptyCoHoleSet }
       | otherwise
       = Nothing   -- The ErrorItem was a Given
 

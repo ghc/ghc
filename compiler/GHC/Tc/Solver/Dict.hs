@@ -796,12 +796,15 @@ tryInstances dict_ct
 
 try_instances :: InertSet -> DictCt -> TcS (StopOrContinue ())
 -- Try to use type-class instance declarations to simplify the constraint
-try_instances inerts work_item@(DictCt { di_ev = ev, di_cls = cls
-                                       , di_tys = xis })
-  | isGiven ev   -- Never use instances for Given constraints
-  = continueWith ()
-     -- See Note [No Given/Given fundeps]
 
+-- Case for Givens
+-- Never use instances for Given constraints
+try_instances _ (DictCt { di_ev = CtGiven {} })
+  = -- See Note [No Given/Given fundeps]
+    continueWith ()
+
+-- Case for Wanteds
+try_instances inerts work_item@(DictCt { di_ev = ev@(CtWanted wev), di_cls = cls, di_tys = xis })
   | Just solved_ev <- lookupSolvedDict inerts cls xis   -- Cached
   = do { setDictIfWanted ev EvCanonical (ctEvTerm solved_ev)
        ; stopWith ev "Dict/Top (cached)" }
@@ -817,14 +820,16 @@ try_instances inerts work_item@(DictCt { di_ev = ev, di_cls = cls
                           then stopWith ev "shortCutSolver worked(2)"
                           else do { insertSafeOverlapFailureTcS what work_item
                                   ; updSolvedDicts what work_item
-                                  ; chooseInstance ev lkup_res } }
+                                  ; chooseInstance wev lkup_res
+                                  ; stopWith ev "Dict/Top (solved wanted)" } }
                _  -> -- NoInstance or NotSure: we didn't solve it
                      continueWith () }
    where
      dict_loc = ctEvLoc ev
 
-chooseInstance :: CtEvidence -> ClsInstResult -> TcS (StopOrContinue a)
-chooseInstance work_item
+chooseInstance :: WantedCtEvidence -> ClsInstResult -> TcS ()
+chooseInstance work_item@(WantedCt { ctev_dest = dest, ctev_rewriters = rws
+                                   , ctev_loc = loc, ctev_pred = pred })
                (OneInst { cir_new_theta   = theta
                         , cir_what        = what
                         , cir_mk_ev       = mk_ev
@@ -834,13 +839,9 @@ chooseInstance work_item
        ; checkReductionDepth deeper_loc pred
        ; assertPprM (getTcEvBindsVar >>= return . not . isCoEvBindsVar)
                     (ppr work_item)
-       ; evc_vars <- mapM (newWanted deeper_loc (ctEvRewriters work_item)) theta
-       ; setDictIfWanted work_item canonical (mk_ev (map getEvExpr evc_vars))
-       ; emitWorkNC (map CtWanted $ freshGoals evc_vars)
-       ; stopWith work_item "Dict/Top (solved wanted)" }
-  where
-     pred = ctEvPred work_item
-     loc  = ctEvLoc work_item
+       ; evc_vars <- mapM (newWanted deeper_loc rws) theta
+       ; setWantedDict dest canonical (mk_ev (map getEvExpr evc_vars))
+       ; emitWorkNC (map CtWanted $ freshGoals evc_vars) }
 
 chooseInstance work_item lookup_res
   = pprPanic "chooseInstance" (ppr work_item $$ ppr lookup_res)

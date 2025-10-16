@@ -56,6 +56,7 @@ module GHC.Tc.Solver.Monad (
     newBoundEvVarId,
     unifyTyVar, reportFineGrainUnifications, reportCoarseGrainUnifications,
     setEvBind, setWantedEq, setWantedDict, setEqIfWanted, setDictIfWanted,
+    fillCoercionHole,
     newEvVar, newGivenEv, emitNewGivens,
     emitChildEqs, checkReductionDepth,
 
@@ -456,7 +457,7 @@ kickOutAfterUnification tv_set
        ; traceTcS "kickOutAfterUnification" (ppr tv_set $$ text "n_kicked =" <+> ppr n_kicked)
        ; return n_kicked }
 
-kickOutAfterFillingCoercionHole :: CoercionHole -> RewriterSet -> TcS ()
+kickOutAfterFillingCoercionHole :: CoercionHole -> CoHoleSet -> TcS ()
 -- See Wrinkle (URW2) in Note [Unify only if the rewriter set is empty]
 -- in GHC.Tc.Solver.Equality
 --
@@ -488,10 +489,10 @@ kickOutAfterFillingCoercionHole hole new_holes
       | CtWanted (wev@(WantedCt { ctev_rewriters = rewriters })) <- ev
       , TyVarLHS tv <- lhs
       , isMetaTyVar tv
-      , hole `elemRewriterSet` rewriters
-      , let holes' = (rewriters `delRewriterSet` hole) `mappend` new_holes
+      , hole `elemCoHoleSet` rewriters
+      , let holes' = (rewriters `delCoHoleSet` hole) `mappend` new_holes
             eq_ct' = eq_ct { eq_ev = CtWanted (wev { ctev_rewriters = holes' }) }
-      = if isEmptyRewriterSet holes'
+      = if isEmptyCoHoleSet holes'
         then Left eq_ct'    -- Kick out
         else Right eq_ct'   -- Keep, but with trimmed holes
       | otherwise
@@ -1736,7 +1737,7 @@ selectNextWorkItem :: TcS (Maybe Ct)
 --
 -- Suppose a constraint c1 is rewritten by another, c2.  When c2
 -- gets solved, c1 has no rewriters, and can be prioritised; see
--- Note [Prioritise Wanteds with empty RewriterSet] in
+-- Note [Prioritise Wanteds with empty CoHoleSet] in
 -- GHC.Tc.Types.Constraint wrinkle (PER1)
 
 -- ToDo: if wl_rw_eqs is long, we'll re-zonk it each time we pick
@@ -1761,7 +1762,7 @@ selectNextWorkItem
              -- try_rws looks through rw_eqs to find one that has an empty
              -- rewriter set, after zonking.  If none such, call try_rest.
              try_rws acc (ct:cts)
-                = do { ct' <- liftZonkTcS (TcM.zonkCtRewriterSet ct)
+                = do { ct' <- liftZonkTcS (TcM.zonkCtCoHoleSet ct)
                      ; if ctHasNoRewriters ct'
                        then pick_me ct' (wl { wl_rw_eqs = cts ++ acc })
                        else try_rws (ct':acc) cts }
@@ -1959,14 +1960,14 @@ addUsedCoercion co
   = do { ev_binds_var <- getTcEvBindsVar
        ; wrapTcS (TcM.updTcRef (ebv_tcvs ev_binds_var) (co :)) }
 
-setEqIfWanted :: CtEvidence -> RewriterSet -> TcCoercion -> TcS ()
+setEqIfWanted :: CtEvidence -> CoHoleSet -> TcCoercion -> TcS ()
 setEqIfWanted ev rewriters co
   = case ev of
       CtWanted (WantedCt { ctev_dest = dest })
          -> setWantedEq dest rewriters co
       _  -> return ()
 
-setWantedEq :: HasDebugCallStack => TcEvDest -> RewriterSet -> TcCoercion -> TcS ()
+setWantedEq :: HasDebugCallStack => TcEvDest -> CoHoleSet -> TcCoercion -> TcS ()
 -- ^ Equalities only
 setWantedEq dest rewriters co
   = case dest of
@@ -1987,7 +1988,7 @@ setWantedDict dest canonical tm
       EvVarDest ev_id -> setEvBind (mkWantedEvBind ev_id canonical tm)
       HoleDest h      -> pprPanic "setWantedEq: HoleDest" (ppr h)
 
-fillCoercionHole :: CoercionHole -> RewriterSet -> Coercion -> TcS ()
+fillCoercionHole :: CoercionHole -> CoHoleSet -> Coercion -> TcS ()
 fillCoercionHole hole rewriters co
   = do { addUsedCoercion co
        ; wrapTcS $ TcM.fillCoercionHole hole (co, rewriters)
@@ -2046,7 +2047,7 @@ emitChildEqs ev eqs
 
 -- | Create a new Wanted constraint holding a coercion hole
 -- for an equality between the two types at the given 'Role'.
-newWantedEq :: CtLoc -> RewriterSet -> Role -> TcType -> TcType
+newWantedEq :: CtLoc -> CoHoleSet -> Role -> TcType -> TcType
             -> TcS (WantedCtEvidence, CoercionHole)
 newWantedEq loc rewriters role ty1 ty2
   = do { hole <- wrapTcS $ TcM.newCoercionHole pty
@@ -2061,7 +2062,7 @@ newWantedEq loc rewriters role ty1 ty2
 -- | Create a new Wanted constraint holding an evidence variable.
 --
 -- Don't use this for equality constraints: use 'newWantedEq' instead.
-newWantedEvVarNC :: CtLoc -> RewriterSet
+newWantedEvVarNC :: CtLoc -> CoHoleSet
                  -> TcPredType -> TcS WantedCtEvidence
 -- Don't look up in the solved/inerts; we know it's not there
 newWantedEvVarNC loc rewriters pty
@@ -2085,7 +2086,7 @@ newWantedEvVarNC loc rewriters pty
 --
 -- Don't use this for equality constraints: this function is only for
 -- constraints with 'EvVarDest'.
-newWantedEvVar :: CtLoc -> RewriterSet
+newWantedEvVar :: CtLoc -> CoHoleSet
                -> TcPredType -> TcS MaybeNew
 newWantedEvVar loc rewriters pty
   = case classifyPredType pty of
@@ -2105,7 +2106,7 @@ newWantedEvVar loc rewriters pty
 -- a new one from scratch.
 --
 -- Deals with both equality and non-equality constraints.
-newWanted :: CtLoc -> RewriterSet -> PredType -> TcS MaybeNew
+newWanted :: CtLoc -> CoHoleSet -> PredType -> TcS MaybeNew
 newWanted loc rewriters pty
   | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
   = Fresh . fst <$> newWantedEq loc rewriters role ty1 ty2
@@ -2118,7 +2119,7 @@ newWanted loc rewriters pty
 --
 -- Does not attempt to re-use non-equality constraints that already
 -- exist in the inert set.
-newWantedNC :: CtLoc -> RewriterSet -> PredType -> TcS WantedCtEvidence
+newWantedNC :: CtLoc -> CoHoleSet -> PredType -> TcS WantedCtEvidence
 newWantedNC loc rewriters pty
   | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
   = fst <$> newWantedEq loc rewriters role ty1 ty2
@@ -2194,11 +2195,11 @@ uPairsTcM uenv eqns = mapM_ (\(Pair ty1 ty2) -> uType uenv ty1 ty2) eqns
 
 wrapUnifierAndEmit :: CtEvidence -> Role
                    -> (UnifyEnv -> TcM a)  -- Some calls to uType
-                   -> TcS (a, RewriterSet)
+                   -> TcS (a, CoHoleSet)
 -- Like wrapUnifier, but
 --    emits any unsolved equalities into the work-list
 --    kicks out any inert constraints that mention unified variables
---    returns a RewriterSet describing the new unsolved goals
+--    returns a CoHoleSet describing the new unsolved goals
 wrapUnifierAndEmit ev role do_unifications
   = do { (unifs, (res, eqs)) <- reportFineGrainUnifications $
                                 wrapUnifier ev role do_unifications

@@ -541,7 +541,7 @@ defaultEquality encl_eqs ct
           = do { traceTcS "defaultEquality success:" (ppr rhs_ty)
                ; unifyTyVar lhs_tv rhs_ty  -- NB: unifyTyVar adds to the
                                            -- TcS unification counter
-               ; setEqIfWanted (ctEvidence ct) emptyRewriterSet (mkReflCo Nominal rhs_ty)
+               ; setEqIfWanted (ctEvidence ct) emptyCoHoleSet (mkReflCo Nominal rhs_ty)
                ; return True
                }
 
@@ -566,7 +566,7 @@ defaultEquality encl_eqs ct
             -- See Note [Defaulting representational equalities].
            ; if null new_eqs
              then do { traceTcS "defaultEquality ReprEq } (yes)" empty
-                     ; setEqIfWanted (ctEvidence ct) emptyRewriterSet (mkSubCo co)
+                     ; setEqIfWanted (ctEvidence ct) emptyCoHoleSet (mkSubCo co)
                      ; return True }
              else do { traceTcS "defaultEquality ReprEq } (no)" empty
                      ; return False } }

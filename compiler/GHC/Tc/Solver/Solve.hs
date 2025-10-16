@@ -1702,19 +1702,19 @@ rewriteDictEvidence ev
 
 finish_rewrite :: CtEvidence   -- ^ old evidence
                -> Reduction    -- ^ new predicate + coercion, of type <type of old evidence> ~ new predicate
-               -> RewriterSet  -- ^ See Note [Wanteds rewrite Wanteds]
+               -> CoHoleSet  -- ^ See Note [Wanteds rewrite Wanteds]
                                -- in GHC.Tc.Types.Constraint
                -> TcS (StopOrContinue CtEvidence)
 finish_rewrite old_ev (Reduction co new_pred) rewriters
   | isReflCo co -- See Note [Rewriting with Refl]
-  = assert (isEmptyRewriterSet rewriters) $
+  = assert (isEmptyCoHoleSet rewriters) $
     continueWith (setCtEvPredType old_ev new_pred)
 
 finish_rewrite
   ev@(CtGiven (GivenCt { ctev_evar = old_evar }))
   (Reduction co new_pred)
   rewriters
-  = assert (isEmptyRewriterSet rewriters) $ -- this is a Given, not a wanted
+  = assert (isEmptyCoHoleSet rewriters) $ -- this is a Given, not a wanted
     do { let loc = ctEvLoc ev
              -- mkEvCast optimises ReflCo
              ev_rw_role = ctEvRewriteRole ev
@@ -1810,7 +1810,7 @@ setPluginEv (tm,ct)
         -> case dest of
               EvVarDest {} -> setWantedDict dest EvCanonical tm
                               -- TODO: plugins should be able to signal non-canonicity
-              HoleDest {}  -> setWantedEq dest emptyRewriterSet (evTermCoercion tm)
+              HoleDest {}  -> setWantedEq dest emptyCoHoleSet (evTermCoercion tm)
                               -- TODO: should we try to track rewriters?
 
       CtGiven {} -> panic "runTcPluginsWanted.setEv: attempt to solve non-wanted!"

@@ -42,10 +42,10 @@ module GHC.Core.TyCo.Rep (
         CoercionN, CoercionR, CoercionP, KindCoercion,
         MCoercion(..), MCoercionR, MCoercionN, KindMCoercion,
 
-        -- RewriterSet
-        --   RewriterSet(..) is exported concretely only for zonkRewriterSet
-        RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet, elemRewriterSet,
-        addRewriter, unitRewriterSet, unionRewriterSet, delRewriterSet,
+        -- CoHoleSet
+        --   CoHoleSet(..) is exported concretely only for zonkCoHoleSet
+        CoHoleSet(..), emptyCoHoleSet, isEmptyCoHoleSet, elemCoHoleSet,
+        addRewriter, unitCoHoleSet, unionCoHoleSet, delCoHoleSet,
 
         -- * Functions over types
         mkNakedTyConTy, mkTyVarTy, mkTyVarTys,
@@ -1680,7 +1680,7 @@ holes `HoleCo`, which get filled in later.
 
 {- **********************************************************************
 %*                                                                      *
-                Coercion holes and RewriterSets
+                Coercion holes and CoHoleSets
 %*                                                                      *
 %********************************************************************* -}
 
@@ -1689,9 +1689,10 @@ data CoercionHole
   = CoercionHole { ch_co_var  :: CoVar
                        -- See Note [CoercionHoles and coercion free variables]
 
-                 , ch_ref :: IORef (Maybe (Coercion, RewriterSet))
-                       -- The RewriterSet is (possibly a superset of)
+                 , ch_ref :: IORef (Maybe (Coercion, CoHoleSet))
+                       -- The CoHoleSet is (possibly a superset of)
                        -- the free coercion holes of the coercion
+                       -- See Note [Want
                  }
 
 coHoleCoVar :: CoercionHole -> CoVar
@@ -1713,30 +1714,30 @@ instance Uniquable CoercionHole where
   getUnique (CoercionHole { ch_co_var = cv }) = getUnique cv
 
 
--- | A RewriterSet stores a set of CoercionHoles that have been used to rewrite
+-- | A CoHoleSet stores a set of CoercionHoles that have been used to rewrite
 -- a constraint.  See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
-newtype RewriterSet = RewriterSet (UniqSet CoercionHole)
+newtype CoHoleSet = CoHoleSet (UniqSet CoercionHole)
   deriving newtype (Outputable, Semigroup, Monoid)
 
-emptyRewriterSet :: RewriterSet
-emptyRewriterSet = RewriterSet emptyUniqSet
+emptyCoHoleSet :: CoHoleSet
+emptyCoHoleSet = CoHoleSet emptyUniqSet
 
-unitRewriterSet :: CoercionHole -> RewriterSet
-unitRewriterSet = coerce (unitUniqSet @CoercionHole)
+unitCoHoleSet :: CoercionHole -> CoHoleSet
+unitCoHoleSet = coerce (unitUniqSet @CoercionHole)
 
-elemRewriterSet :: CoercionHole -> RewriterSet -> Bool
-elemRewriterSet = coerce (elementOfUniqSet @CoercionHole)
+elemCoHoleSet :: CoercionHole -> CoHoleSet -> Bool
+elemCoHoleSet = coerce (elementOfUniqSet @CoercionHole)
 
-delRewriterSet :: RewriterSet -> CoercionHole -> RewriterSet
-delRewriterSet = coerce (delOneFromUniqSet @CoercionHole)
+delCoHoleSet :: CoHoleSet -> CoercionHole -> CoHoleSet
+delCoHoleSet = coerce (delOneFromUniqSet @CoercionHole)
 
-unionRewriterSet :: RewriterSet -> RewriterSet -> RewriterSet
-unionRewriterSet = coerce (unionUniqSets @CoercionHole)
+unionCoHoleSet :: CoHoleSet -> CoHoleSet -> CoHoleSet
+unionCoHoleSet = coerce (unionUniqSets @CoercionHole)
 
-isEmptyRewriterSet :: RewriterSet -> Bool
-isEmptyRewriterSet = coerce (isEmptyUniqSet @CoercionHole)
+isEmptyCoHoleSet :: CoHoleSet -> Bool
+isEmptyCoHoleSet = coerce (isEmptyUniqSet @CoercionHole)
 
-addRewriter :: RewriterSet -> CoercionHole -> RewriterSet
+addRewriter :: CoHoleSet -> CoercionHole -> CoHoleSet
 addRewriter = coerce (addOneToUniqSet @CoercionHole)
 
 {- Note [Coercion holes]
@@ -1821,14 +1822,14 @@ Why does a CoercionHole contain a CoVar, as well as reference to fill in?
 
    But nowadays this is all irrelevant because we don't float constraints.
 
-Note [CoercionHoles and RewriterSets]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [CoercionHoles and CoHoleSets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A constraint C carries a set of "rewriters", a set of Wanted CoercionHoles that have been
 used to rewrite C; see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
 
-If C is an equality constraint and is solved, we track its RewriterSet in the filled
+If C is an equality constraint and is solved, we track its CoHoleSet in the filled
 CoercionHole, so that it can be inherited by other constraints that have C in /their/
-rewriters.  See zonkRewriterSet.
+rewriters.  See zonkCoHoleSet.
 -}
 
 
