@@ -37,9 +37,6 @@ module GHC.Tc.Zonk.Type (
 import GHC.Prelude
 
 import GHC.Builtin.Types
-
-import GHC.Core.TyCo.Ppr ( pprTyVar )
-
 import GHC.Hs
 
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (runTopSplice)
@@ -60,8 +57,11 @@ import GHC.Tc.Zonk.TcType
     , checkCoercionHole
     , zonkCoVar )
 
-import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.ConLike
+import GHC.Core.PatSyn (PatSyn(..))
+import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Core.Type
 import GHC.Core.TyCon
 
 import GHC.Utils.Outputable
@@ -93,6 +93,7 @@ import Control.Monad
 import Control.Monad.Trans.Class ( lift )
 import Data.List.NonEmpty ( NonEmpty )
 import Data.Foldable ( toList )
+import Data.Traversable ( for )
 
 {- Note [What is zonking?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -470,7 +471,7 @@ commitFlexi DefaultFlexi tv zonked_kind
        ; return manyDataConTy }
   | Just (ConcreteFRR origin) <- isConcreteTyVar_maybe tv
   = do { addErr $ TcRnZonkerMessage (ZonkerCannotDefaultConcrete origin)
-       ; return (anyTypeOfKind zonked_kind) }
+       ; newZonkAnyType zonked_kind }
   | otherwise
   = do { traceTc "Defaulting flexi tyvar to ZonkAny:" (pprTyVar tv)
           -- See Note [Any types] in GHC.Builtin.Types, esp wrinkle (Any4)
@@ -647,23 +648,25 @@ zonkTopDecls :: Bag EvBind
              -> LHsBinds GhcTc
              -> [LRuleDecl GhcTc] -> [LTcSpecPrag]
              -> [LForeignDecl GhcTc]
+             -> [PatSyn]
              -> TcM (TypeEnv,
                      Bag EvBind,
                      LHsBinds GhcTc,
                      [LForeignDecl GhcTc],
                      [LTcSpecPrag],
-                     [LRuleDecl    GhcTc])
-zonkTopDecls ev_binds binds rules imp_specs fords
+                     [LRuleDecl    GhcTc],
+                     [PatSyn])
+zonkTopDecls ev_binds binds rules imp_specs fords pat_syns
   = initZonkEnv DefaultFlexi $
     runZonkBndrT (zonkEvBinds ev_binds)   $ \ ev_binds' ->
     runZonkBndrT (zonkRecMonoBinds binds) $ \ binds'    ->
      -- Top level is implicitly recursive
-  do  { rules' <- zonkRules rules
-      ; specs' <- zonkLTcSpecPrags imp_specs
-      ; fords' <- zonkForeignExports fords
-      ; ty_env <- zonkEnvIds <$> getZonkEnv
-      ; return (ty_env, ev_binds', binds', fords', specs', rules') }
-
+  do  { rules'    <- zonkRules rules
+      ; specs'    <- zonkLTcSpecPrags imp_specs
+      ; fords'    <- zonkForeignExports fords
+      ; pat_syns' <- traverse zonkPatSyn pat_syns
+      ; ty_env    <- zonkEnvIds <$> getZonkEnv
+      ; return (ty_env, ev_binds', binds', fords', specs', rules', pat_syns') }
 
 ---------------------------------------------
 zonkLocalBinds :: HsLocalBinds GhcTc
@@ -1549,7 +1552,8 @@ zonk_pat (SumPat tys pat alt arity )
         ; pat' <- zonkPat pat
         ; return (SumPat tys' pat' alt arity) }
 
-zonk_pat p@(ConPat { pat_args = args
+zonk_pat p@(ConPat { pat_con = L con_loc con
+                   , pat_args = args
                    , pat_con_ext = p'@(ConPatTc
                      { cpt_tvs = tyvars
                      , cpt_dicts = evs
@@ -1568,8 +1572,15 @@ zonk_pat p@(ConPat { pat_args = args
         ; new_binds   <- zonkTcEvBinds binds
         ; new_wrapper <- zonkCoFn wrapper
         ; new_args    <- zonkConStuff args
+        ; new_con     <- case con of
+            RealDataCon {} -> return con
+              -- Data constructors never contain metavariables: they are
+              -- fully zonked before we look at any value bindings.
+            PatSynCon ps   -> PatSynCon <$> noBinders (zonkPatSyn ps)
+              -- Pattern synonyms can contain metavariables, see e.g. T26465c.
         ; pure $ p
-                 { pat_args = new_args
+                 { pat_con = L con_loc new_con
+                 , pat_args = new_args
                  , pat_con_ext = p'
                    { cpt_arg_tys = new_tys
                    , cpt_tvs = new_tyvars
@@ -1615,14 +1626,14 @@ zonk_pat (InvisPat ty tp)
        ; return (InvisPat ty' tp) }
 
 zonk_pat (XPat ext) = case ext of
-  { ExpansionPat orig pat->
+  { ExpansionPat orig pat ->
     do { pat' <- zonk_pat pat
        ; return $ XPat $ ExpansionPat orig pat' }
   ; CoPat co_fn pat ty ->
-    do { co_fn' <- zonkCoFn co_fn
-       ; pat'   <- zonkPat (noLocA pat)
-       ; ty'    <- noBinders $ zonkTcTypeToTypeX ty
-       ; return (XPat $ CoPat co_fn' (unLoc pat') ty')
+    do { co_fn'   <- zonkCoFn co_fn
+       ; pat'     <- zonk_pat pat
+       ; ty'      <- noBinders $ zonkTcTypeToTypeX ty
+       ; return (XPat $ CoPat co_fn' pat' ty')
        } }
 
 zonk_pat pat = pprPanic "zonk_pat" (ppr pat)
@@ -1652,6 +1663,45 @@ zonkPats :: Traversable f => f (LPat GhcTc) -> ZonkBndrTcM (f (LPat GhcTc))
 zonkPats = traverse zonkPat
 {-# SPECIALISE zonkPats :: [LPat GhcTc] -> ZonkBndrTcM [LPat GhcTc] #-}
 {-# SPECIALISE zonkPats :: NonEmpty (LPat GhcTc) -> ZonkBndrTcM (NonEmpty (LPat GhcTc)) #-}
+
+---------------------------
+
+-- | Perform a final zonk-to-type for a pattern synonym.
+--
+-- See Note [Metavariables in pattern synonyms] in GHC.Tc.TyCl.PatSyn.
+zonkPatSyn :: PatSyn -> ZonkTcM PatSyn
+zonkPatSyn
+  ps@( MkPatSyn
+     { psArgs       = arg_tys
+     , psUnivTyVars = univ_tvs
+     , psReqTheta   = req_theta
+     , psExTyVars   = ex_tvs
+     , psProvTheta  = prov_theta
+     , psResultTy   = res_ty
+     , psMatcher    = (matcherNm, matcherTy, matcherDummyArg)
+     , psBuilder    = mbBuilder
+     }) =
+  runZonkBndrT (zonkTyVarBindersX univ_tvs) $ \ univ_tvs' ->
+  do { req_theta'  <- zonkTcTypesToTypesX req_theta
+     ; res_ty'     <- zonkTcTypeToTypeX   res_ty
+     ; runZonkBndrT (zonkTyVarBindersX ex_tvs) $ \ ex_tvs' ->
+  do { prov_theta' <- zonkTcTypesToTypesX prov_theta
+     ; arg_tys'    <- zonkTcTypesToTypesX arg_tys
+     ; matcherTy'  <- zonkTcTypeToTypeX   matcherTy
+     ; mbBuilder'  <- for mbBuilder $ \ (builderNm, builderTy, builderDummyArg) ->
+                        do { builderTy' <- zonkTcTypeToTypeX builderTy
+                           ; return (builderNm, builderTy', builderDummyArg) }
+     ; return $
+        ps
+          { psArgs       = arg_tys'
+          , psUnivTyVars = univ_tvs'
+          , psReqTheta   = req_theta'
+          , psExTyVars   = ex_tvs'
+          , psProvTheta  = prov_theta'
+          , psResultTy   = res_ty'
+          , psMatcher    = (matcherNm, matcherTy', matcherDummyArg)
+          , psBuilder    = mbBuilder'
+          } } }
 
 {-
 ************************************************************************

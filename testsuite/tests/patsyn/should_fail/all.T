@@ -35,6 +35,7 @@ test('T12165', normal, compile_fail, [''])
 test('T12819', normal, compile_fail, [''])
 test('UnliftedPSBind', normal, compile_fail, [''])
 test('T15695', normal, compile, [''])   # It has -fdefer-type-errors inside
+test('T26465', normal, compile_fail, [''])
 test('T13349', normal, compile_fail, [''])
 test('T13470', normal, compile_fail, [''])
 test('T14112', normal, compile_fail, [''])

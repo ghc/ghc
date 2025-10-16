@@ -259,12 +259,12 @@ wrapBind new old body   -- NB: this function must deal with term
 seqVar :: Var -> CoreExpr -> CoreExpr
 seqVar var body = mkDefaultCase (Var var) var body
 
-mkCoLetMatchResult :: CoreBind -> MatchResult CoreExpr -> MatchResult CoreExpr
+mkCoLetMatchResult :: HasDebugCallStack => CoreBind -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkCoLetMatchResult bind = fmap (mkCoreLet bind)
 
 -- (mkViewMatchResult var' viewExpr mr) makes the expression
 -- let var' = viewExpr in mr
-mkViewMatchResult :: Id -> CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
+mkViewMatchResult :: HasDebugCallStack => Id -> CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkViewMatchResult var' viewExpr = fmap $ mkCoreLet $ NonRec var' viewExpr
 
 mkEvalMatchResult :: Id -> Type -> MatchResult CoreExpr -> MatchResult CoreExpr

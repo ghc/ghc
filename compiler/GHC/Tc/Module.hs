@@ -579,7 +579,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
         -- Zonk the final code.  This must be done last.
         -- Even simplifyTop may do some unification.
         -- This pass also warns about missing type signatures
-      ; (id_env, ev_binds', binds', fords', imp_specs', rules')
+      ; (id_env, ev_binds', binds', fords', imp_specs', rules', pat_syns')
             <- zonkTcGblEnv new_ev_binds tcg_env
 
       --------- Run finalizers --------------
@@ -597,6 +597,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                                    , tcg_imp_specs = []
                                    , tcg_rules     = []
                                    , tcg_fords     = []
+                                   , tcg_patsyns   = []
                                    , tcg_type_env  = tcg_type_env tcg_env
                                                      `plusTypeEnv` id_env }
       ; (tcg_env, tcl_env) <- setGblEnv init_tcg_env
@@ -628,7 +629,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       -- Zonk the new bindings arising from running the finalisers,
       -- and main. This won't give rise to any more finalisers as you
       -- can't nest finalisers inside finalisers.
-      ; (id_env_mf, ev_binds_mf, binds_mf, fords_mf, imp_specs_mf, rules_mf)
+      ; (id_env_mf, ev_binds_mf, binds_mf, fords_mf, imp_specs_mf, rules_mf, patsyns_mf)
             <- zonkTcGblEnv main_ev_binds tcg_env
 
       ; let { !final_type_env = tcg_type_env tcg_env
@@ -642,24 +643,26 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                           , tcg_ev_binds  = ev_binds' `unionBags` ev_binds_mf
                           , tcg_imp_specs = imp_specs' ++ imp_specs_mf
                           , tcg_rules     = rules'     ++ rules_mf
-                          , tcg_fords     = fords'     ++ fords_mf } } ;
+                          , tcg_fords     = fords'     ++ fords_mf
+                          , tcg_patsyns   = pat_syns'  ++ patsyns_mf } } ;
 
       ; setGlobalTypeEnv tcg_env' final_type_env
    }
 
 zonkTcGblEnv :: Bag EvBind -> TcGblEnv
              -> TcM (TypeEnv, Bag EvBind, LHsBinds GhcTc,
-                       [LForeignDecl GhcTc], [LTcSpecPrag], [LRuleDecl GhcTc])
+                       [LForeignDecl GhcTc], [LTcSpecPrag], [LRuleDecl GhcTc], [PatSyn])
 zonkTcGblEnv ev_binds tcg_env@(TcGblEnv { tcg_binds     = binds
                                         , tcg_ev_binds  = cur_ev_binds
                                         , tcg_imp_specs = imp_specs
                                         , tcg_rules     = rules
-                                        , tcg_fords     = fords })
+                                        , tcg_fords     = fords
+                                        , tcg_patsyns   = pat_syns })
   = {-# SCC "zonkTopDecls" #-}
     setGblEnv tcg_env $ -- This sets the GlobalRdrEnv which is used when rendering
                         --   error messages during zonking (notably levity errors)
     do { let all_ev_binds = cur_ev_binds `unionBags` ev_binds
-       ; zonkTopDecls all_ev_binds binds rules imp_specs fords }
+       ; zonkTopDecls all_ev_binds binds rules imp_specs fords pat_syns }
 
 -- | Runs TH finalizers and renames and typechecks the top-level declarations
 -- that they could introduce.
