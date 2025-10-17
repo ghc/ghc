@@ -35,6 +35,7 @@ module GHC.Linker.Loader
    , modifyLoaderState
    , initLinkDepsOpts
    , getGccSearchDirectory
+   , mkDynLoadLib
    )
 where
 
@@ -865,10 +866,10 @@ loadObjects interp hsc_env pls objs = do
                             return (pls2, Failed)
 
 
--- | Create a shared library containing the given object files and load it.
-dynLoadObjs :: Interp -> HscEnv -> LoaderState -> [FilePath] -> IO LoaderState
-dynLoadObjs _      _       pls                           []   = return pls
-dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
+-- | Create a shared library containing the given object files
+mkDynLoadLib :: HscEnv -> (Ways -> Ways) -> [(FilePath, String)] ->[UnitId] -> [FilePath] -> IO (Maybe (FilePath, FilePath, String))
+mkDynLoadLib      _  _  _ _  []   = return Nothing
+mkDynLoadLib hsc_env modify_ways temp_sos dep_uids objs = do
     let unit_env = hsc_unit_env hsc_env
     let dflags   = hsc_dflags hsc_env
     let logger   = hsc_logger hsc_env
@@ -919,9 +920,7 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
                       -- Likewise if loading if the profiled way then need to
                       -- add WayProf.
                       targetWays_ = let ws = Set.singleton WayDyn
-                                     in if interpreterProfiled interp
-                                        then addWay WayProf ws
-                                        else ws,
+                                     in modify_ways ws,
                       outputFile_ = Just soFile
                   }
     -- link all "loaded packages" so symbols in those can be resolved
@@ -931,16 +930,29 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
     --- -l mypkg
     -- This thinks we are creating shared library for main but we actually are for mypkg
     -- MP: LinkingForInterpreter is broken here for tests, recompPluginPackage
-    linkDynLib LinkingHomePackage logger tmpfs dflags2 unit_env objs (map loaded_pkg_uid $ eltsUDFM pkgs_loaded)
+    linkDynLib LinkingHomePackage logger tmpfs dflags2 unit_env objs dep_uids
 
-    -- if we got this far, extend the lifetime of the library file
-    changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
-    m <- loadDLLs interp [soFile]
-    case m of
-      Right _ -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
-      Left err -> linkFail msg (text err)
+    return (Just (soFile, libPath, libName))
+
+-- | Load a shared library containing the given object files
+dynLoadObjs :: Interp -> HscEnv -> LoaderState -> [FilePath] -> IO LoaderState
+dynLoadObjs interp hsc_env pls objs = do
+  mdynlib <- mkDynLoadLib hsc_env modify_ways (temp_sos pls) (map loaded_pkg_uid $ eltsUDFM (pkgs_loaded pls)) objs
+  case mdynlib of
+     Nothing -> return pls
+     Just (soFile, libPath, libName) -> do
+       -- if we got this far, extend the lifetime of the library file
+       changeTempFilesLifetime (hsc_tmpfs hsc_env) TFL_GhcSession [soFile]
+       m <- loadDLLs interp [soFile]
+       case m of
+         Right _ -> return $! pls { temp_sos = (libPath, libName) : temp_sos pls }
+         Left err -> linkFail msg (text err)
   where
     msg = "GHC.Linker.Loader.dynLoadObjs: Loading temp shared object failed"
+
+    modify_ways = if interpreterProfiled interp
+                        then addWay WayProf
+                        else id
 
 rmDupLinkables :: LinkableSet    -- Already loaded
                -> [Linkable]    -- New linkables
@@ -962,15 +974,18 @@ rmDupLinkables already ls
 
 
 dynLinkBCOs :: Interp -> LoaderState -> KeepModuleLinkableDefinitions -> [Linkable] -> IO LoaderState
-dynLinkBCOs interp pls keep_spec bcos = do
+dynLinkBCOs interp pls keep_spec bcos =
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
 
             cbcs :: [CompiledByteCode]
             cbcs = concatMap linkableBCOs new_bcos
+        in dynLinkCompiledByteCode interp pls1 keep_spec cbcs
 
-
+dynLinkCompiledByteCode :: Interp -> LoaderState -> KeepModuleLinkableDefinitions -> [CompiledByteCode] -> IO LoaderState
+dynLinkCompiledByteCode interp pls keep_spec cbcs = do
+        let
             le1 = linker_env pls
             lb1 = linked_breaks pls
         ie2 <- linkITbls interp (itbl_env le1) (concatMap bc_itbls cbcs)
@@ -996,8 +1011,8 @@ dynLinkBCOs interp pls keep_spec bcos = do
         -- Add SPT entries
         mapM_ (linkSptEntry interp ce2) (concatMap bc_spt_entries cbcs)
 
-        return $! pls1 { linker_env = le2 { closure_env = ce2 }
-                       , linked_breaks = lb2 }
+        return $! pls { linker_env = le2 { closure_env = ce2 }
+                      , linked_breaks = lb2 }
 
 -- | Register SPT entries for this module in the interpreter
 -- Assumes that the name from the SPT has already been loaded into the interpreter.
@@ -1355,13 +1370,17 @@ loadBytecodeLibrary :: HscEnv -> Interp -> LoaderState -> FilePath -> IO LoaderS
 loadBytecodeLibrary hsc_env interp pls path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
   -- 0. Get the modification time of the module
-  mod_time <- expectJust <$> modificationTimeIfExists path'
+  _mod_time <- expectJust <$> modificationTimeIfExists path'
   -- 1. Read the bytecode library
-  (BytecodeLib bcos) <- readBytecodeLib hsc_env path'
-  bcos' <- mapM (decodeOnDiskModuleByteCode hsc_env) bcos
-  let linkables = map (mkModuleByteCodeLinkable mod_time) bcos'
-  (pls', _) <- loadModuleLinkables interp hsc_env pls KeepExternalDefinitions linkables
-  return pls'
+  (BytecodeLib _uid cbcs stubs_so) <- decodeOnDiskBytecodeLib hsc_env =<< readBytecodeLib hsc_env path'
+  pls' <-case stubs_so of
+    Nothing -> return pls
+    Just (SharedObject so_file libdir libname) -> do
+      m <- loadDLLs interp [so_file]
+      case m of
+        Right _ -> return $! pls { temp_sos = (libdir, libname) : temp_sos pls }
+        Left err -> linkFail err (text err)
+  dynLinkCompiledByteCode interp pls' KeepExternalDefinitions cbcs
 
 
 {-

@@ -7,11 +7,15 @@
 -}
 module GHC.ByteCode.Serialize
   ( writeBinByteCode, readBinByteCode, ModuleByteCode(..)
-  , BytecodeLib(..)
+  , BytecodeLibX(..)
+  , BytecodeLib
+  , OnDiskBytecodeLib
+  , SharedObject(..)
+  , SharedObjectContents(..)
   , writeBytecodeLib
   , readBytecodeLib
-  , mkBytecodeLib
   , decodeOnDiskModuleByteCode
+  , decodeOnDiskBytecodeLib
   )
 where
 
@@ -43,6 +47,7 @@ import Data.Traversable
 import GHC.Utils.Logger
 import GHC.Linker.Types
 import System.IO.Unsafe (unsafeInterleaveIO)
+import GHC.Utils.Outputable
 
 {- Note [Overview of persistent bytecode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -93,22 +98,48 @@ data OnDiskModuleByteCode = OnDiskModuleByteCode { odgbc_module :: Module
                                                  , odgbc_foreign :: [ByteString]  -- ^ Contents of object files
                                                  }
 
+type OnDiskBytecodeLib = BytecodeLibX (Maybe SharedObjectContents)
 
--- A bytecode library is just a concatenation of bytecode objects
-data BytecodeLib = BytecodeLib {
-    bytecodeLibFiles :: [OnDiskModuleByteCode]
+instance Outputable a => Outputable (BytecodeLibX a) where
+  ppr (BytecodeLib {..}) = vcat [
+    (text "BytecodeLib" <+> ppr bytecodeLibUnitId),
+    (text "Files" <+> ppr bytecodeLibFiles),
+    (text "Foreign" <+> ppr bytecodeLibForeign) ]
+
+type BytecodeLib = BytecodeLibX (Maybe SharedObject)
+
+-- A bytecode library is a collection of CompiledByteCode objects and a .so file containing the combination of foreign stubs
+data BytecodeLibX a = BytecodeLib {
+    bytecodeLibUnitId :: UnitId,
+    bytecodeLibFiles :: [CompiledByteCode],
+    bytecodeLibForeign :: a -- A .so file containing the combination of foreign stubs.
 }
 
-instance Binary BytecodeLib where
+data SharedObject = SharedObject { getSharedObjectFilePath :: FilePath, getSharedObjectDir :: FilePath, getSharedObjectLibName :: String }
+
+instance Outputable SharedObject where
+  ppr (SharedObject path dir name) = text "SharedObject" <+> text path <+> text dir <+> text name
+
+newtype SharedObjectContents = SharedObjectContents { getSharedObjectContents :: ByteString }
+
+instance Binary SharedObjectContents where
+  get bh = SharedObjectContents <$> get bh
+  put_ bh (SharedObjectContents contents) = put_ bh contents
+
+instance Binary OnDiskBytecodeLib where
   get bh = do
+    bytecodeLibUnitId <- get bh
     bytecodeLibFiles <- get bh
+    bytecodeLibForeign <- get bh
     pure BytecodeLib {..}
 
   put_ bh BytecodeLib {..} = do
+    put_ bh bytecodeLibUnitId
     put_ bh bytecodeLibFiles
+    put_ bh bytecodeLibForeign
 
 
-writeBytecodeLib :: BytecodeLib -> FilePath -> IO ()
+writeBytecodeLib :: OnDiskBytecodeLib -> FilePath -> IO ()
 writeBytecodeLib lib path = do
   createDirectoryIfMissing True (takeDirectory path)
   bh' <- openBinMem (1024 * 1024)
@@ -116,25 +147,12 @@ writeBytecodeLib lib path = do
   putWithUserData QuietBinIFace NormalCompression bh lib
   writeBinMem bh path
 
-readBytecodeLib :: HscEnv -> FilePath -> IO BytecodeLib
+readBytecodeLib :: HscEnv -> FilePath -> IO OnDiskBytecodeLib
 readBytecodeLib hsc_env path = do
   bh' <- readBinMem path
   bh <- addBinNameReader hsc_env bh'
-  getWithUserData (hsc_NC hsc_env) bh
-
--- | Given on-disk and in-memory bytecode objects, create a bytecode library
--- TODO, create without materialising everything into memory
-mkBytecodeLib :: HscEnv
-              -> [FilePath]  -- ^ .gbc files
-              -> [ModuleByteCode]  -- ^ In-memory bytecode objects
-              -> IO BytecodeLib
-mkBytecodeLib hsc_env gbc_files in_mem_bcos = do
-  on_disk_bcos <- mapM (readOnDiskModuleByteCode hsc_env) gbc_files
-  in_mem_bcos  <- mapM encodeOnDiskModuleByteCode in_mem_bcos
-  pure BytecodeLib {
-    bytecodeLibFiles = on_disk_bcos ++ in_mem_bcos
-  }
-
+  res <- getWithUserData (hsc_NC hsc_env) bh
+  pure res
 
 instance Binary OnDiskModuleByteCode where
   get bh = do
@@ -165,6 +183,15 @@ decodeOnDiskModuleByteCode hsc_env odbco = do
     gbc_foreign_files = foreign_files
    }
 
+decodeOnDiskBytecodeLib :: HscEnv -> OnDiskBytecodeLib -> IO BytecodeLib
+decodeOnDiskBytecodeLib hsc_env odbco = do
+  foreign_contents <- traverse (writeSharedObjectFile  (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)))  (bytecodeLibForeign odbco)
+  pure $ BytecodeLib {
+    bytecodeLibUnitId = bytecodeLibUnitId odbco,
+    bytecodeLibFiles = bytecodeLibFiles odbco,
+    bytecodeLibForeign = foreign_contents
+   }
+
 readObjectFile :: FilePath -> IO ByteString
 readObjectFile f = BS.readFile f
 
@@ -178,6 +205,12 @@ writeObjectFiles logger tmpfs tmp_dir files =
     f <- newTempName logger tmpfs tmp_dir TFL_GhcSession "o"
     BS.writeFile f file
     pure f
+
+writeSharedObjectFile :: Logger -> TmpFs -> TempDir -> SharedObjectContents -> IO SharedObject
+writeSharedObjectFile logger tmpfs tmp_dir (SharedObjectContents contents) = do
+  (soFile, libdir, libname)  <- newTempLibName logger tmpfs tmp_dir TFL_GhcSession "so"
+  BS.writeFile soFile contents
+  pure (SharedObject soFile libdir libname)
 
 -- | Prepare an in-memory 'ModuleByteCode' for writing to disk.
 encodeOnDiskModuleByteCode :: ModuleByteCode -> IO OnDiskModuleByteCode
