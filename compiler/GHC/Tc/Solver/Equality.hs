@@ -2935,8 +2935,7 @@ lookup_eq_in_qcis :: CtEvidence -> EqRel -> TcType -> TcType -> SolverStage ()
 --    [W] t1 ~# t2
 -- and a Given quantified contraint like (forall a b. blah => a ~ b)
 -- Why?  See Note [Looking up primitive equalities in quantified constraints]
--- See also GHC.Tc.Solver.Dict
--- Note [Equality superclasses in quantified constraints]
+-- See also GHC.Tc.Solver.Dict Note [Equality superclasses in quantified constraints]
 lookup_eq_in_qcis (CtGiven {}) _ _ _
   = nopStage ()
 
@@ -2952,10 +2951,18 @@ lookup_eq_in_qcis ev@(CtWanted (WantedCt { ctev_dest = dest, ctev_loc = loc })) 
   where
     hole = case dest of
              HoleDest hole -> hole   -- Equality constraints have HoleDest
-             _ -> pprPanic "lookup_eq_in_qcis" (ppr dest) 
+             _ -> pprPanic "lookup_eq_in_qcis" (ppr dest)
 
     try :: SwapFlag -> SolverStage ()
-    try swap -- First try looking for (lhs ~ rhs)
+    -- E.g. We are trying to solve (say)
+    --             [W] g : [Int] ~# b)
+    --      from   [G] forall x. blah => b ~ [x]   -- A quantified constraint
+    -- We can solve it like this
+    --     d::b~[Int] := $df @Int blah        -- Apply the quantified constraint
+    --     g'::b~#[Int] := sc_sel d           -- Binding, extract the coercion from d
+    --     g(co-hole) := sym g'               -- Fill the original coercion hole
+    -- Here g' is a fresh coercion variable.
+    try swap
        | Just (cls, tys) <- unSwap swap (boxEqPred eq_rel) lhs rhs
        = Stage $
          do { let cls_pred = mkClassPred cls tys
@@ -2965,7 +2972,7 @@ lookup_eq_in_qcis ev@(CtWanted (WantedCt { ctev_dest = dest, ctev_loc = loc })) 
                 OneInst {}
                   -> do { dict_ev <- newWantedEvVarNC loc emptyCoHoleSet cls_pred
                         ; chooseInstance dict_ev res
-                        ; let co_var = coHoleCoVar hole
+                        ; co_var <- newEvVar (unSwap swap (mkEqPred eq_rel) lhs rhs)
                         ; setEvBind (mkWantedEvBind co_var EvCanonical (mk_sc_sel cls tys dict_ev))
                         ; fillCoercionHole hole emptyCoHoleSet $
                           maybeSymCo swap (mkCoVarCo co_var)
