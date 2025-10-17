@@ -2568,42 +2568,41 @@ Note [Wanteds rewrite Wanteds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Should one Wanted constraint be allowed to rewrite another?
 
-This example (along with #8450) suggests not:
-   f :: a -> Bool
-   f x = ( [x,'c'], [x,True] ) `seq` True
-Here we get
-  [W] a ~ Char
-  [W] a ~ Bool
-but we do not want to complain about Bool ~ Char!
+This example (along with #8450) suggests "no":
+       f :: a -> Bool
+       f x = ( [x,'c'], [x,True] ) `seq` True
+    Here we get
+      [W] a ~ Char
+      [W] a ~ Bool
+    but we do not want to complain about Bool ~ Char!
 
-This example suggests yes (indexed-types/should_fail/T4093a):
-  type family Foo a
-  f :: (Foo e ~ Maybe e) => Foo e
-In the ambiguity check, we get
-  [G] g1 :: Foo e ~ Maybe e
-  [W] w1 :: Foo alpha ~ Foo e
-  [W] w2 :: Foo alpha ~ Maybe alpha
-w1 gets rewritten by the Given to become
-  [W] w3 :: Foo alpha ~ Maybe e
-Now, the only way to make progress is to allow Wanteds to rewrite Wanteds.
-Rewriting w3 with w2 gives us
-  [W] w4 :: Maybe alpha ~ Maybe e
-which will soon get us to alpha := e and thence to victory.
-
-TL;DR we want equality saturation.
+This example suggests "yes" (indexed-types/should_fail/T4093a):
+      type family Foo a
+      f :: (Foo e ~ Maybe e) => Foo e
+    In the ambiguity check, we get
+      [G] g1 :: Foo e ~ Maybe e
+      [W] w1 :: Foo alpha ~ Foo e
+      [W] w2 :: Foo alpha ~ Maybe alpha
+    w1 gets rewritten by the Given to become
+      [W] w3 :: Foo alpha ~ Maybe e
+    Now, the only way to make progress is to allow Wanteds to rewrite Wanteds.
+    Rewriting w3 with w2 gives us
+      [W] w4 :: Maybe alpha ~ Maybe e
+    which will soon get us to alpha := e and thence to victory.
+    TL;DR we want equality saturation.
 
 We thus want Wanteds to rewrite Wanteds in order to accept more programs,
 but we don't want Wanteds to rewrite Wanteds because doing so can create
 inscrutable error messages. To solve this dilemma:
 
-(WRW1) The rewriters of a Wanted.  We do allow Wanteds to rewrite Wanteds, but each
-  unsolved Wanted tracks
+(WRW1) ctev_rewriters: the rewriters of a Wanted.  We /do/ allow Wanteds to
+  rewrite Wanteds, but each unsolved Wanted tracks
      the set of Wanteds that it has been rewritten by
   in its CoHoleSet, stored in the `ctev_rewriters` field of the CtWanted
   constructor of CtEvidence.  (Only Wanteds have CoHoleSets.)
 
-  If the rewriter set is empty, then the constaint has been not been rewritten
-  by any unsolved constraint.
+  Key point: if the rewriter set is empty, then the constaint has been not been
+  rewritten by any unsolved constraint.
 
 (WRW2) A CoHoleSet is just a set of CoercionHoles. This is sufficient because only
   equalities (evidenced by coercion holes) are used for rewriting; other
