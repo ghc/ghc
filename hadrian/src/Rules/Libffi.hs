@@ -142,15 +142,18 @@ configureEnvironment stage@Stage1 = do
                , builderEnvironment "AR" (Ar Unpack stage)
                , builderEnvironment "NM" (Nm stage)
                , builderEnvironment "RANLIB" (Ranlib stage)
-               , remBuilderEnvironment "OBJDUMP"
-               , remBuilderEnvironment "STRIP"
+               -- , remBuilderEnvironment "OBJDUMP"
+               -- , remBuilderEnvironment "STRIP"
                , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
-               , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
+               , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w"
+               , return . AddEnv "OBJDUMP" $ "objdump"
+               , return . AddEnv "STRIP" $ "strip" ]
                ++ (if winTarget then
                     -- TODO: Use staged LD for winTarget. This is only a hack because the wrong staged LD was provided.
                     [remBuilderEnvironment "LD"]
                   else
-                    [ -- TODO: This should be the staged LD, but that points to GCC and not LD.
+                    [ -- TODO: This should be the staged LD, but that points to gcc and not ld. With the current gcc as linker config, libffi doesn't build shared libs.
+                    remBuilderEnvironment "LD"
                    ])
 
 configureEnvironment stage = do
@@ -172,6 +175,7 @@ configureEnvironment stage = do
                     []
                   else
                     [ -- TODO: This should be the staged LD, but that points to GCC and not LD.
+                    -- builderEnvironment "LD" (Ld stage)
                    ])
 
 -- Need the libffi archive and `trackAllow` all files in the build directory.
