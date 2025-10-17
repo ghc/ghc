@@ -338,9 +338,15 @@ deepTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synon
                   | otherwise          = appEndo (deep_ty (varType v)) $
                                          acc `extendVarSet` v
 
+    do_bndr :: TyCoVarSet -> TyVar -> ForAllTyFlag -> TyCoVarSet
     do_bndr is tcv _ = extendVarSet is tcv
-    do_hole _ _  = mempty  -- See (CHFV1) in Note [CoercionHoles and coercion free variables]
-                           -- in GHC.Core.TyCo.Rep
+
+    do_hole :: VarSet -> CoercionHole -> Endo TyCoVarSet
+    do_hole _ hole = deep_ty (varType (coHoleCoVar hole))
+                     -- We don't collect the CoercionHole itself, but we /do/
+                     -- need to collect the free variables of its /kind/
+                     -- See (CHFV1) in Note [CoercionHoles and coercion free variables]
+                     -- in GHC.Core.TyCo.Rep
 
 {- *********************************************************************
 *                                                                      *
