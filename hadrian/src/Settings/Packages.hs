@@ -3,7 +3,7 @@ module Settings.Packages (packageArgs) where
 import Data.Version.Extra
 import Expression
 import Flavour
-import Oracles.Setting hiding (ghcWithInterpreter)
+import Oracles.Setting
 import Oracles.Flag
 import Packages
 import Settings
@@ -12,7 +12,6 @@ import Settings.Builders.Common (wayCcArgs)
 import qualified GHC.Toolchain.Library as Lib
 import GHC.Toolchain.Target
 import GHC.Platform.ArchOS
-import Settings.Program (ghcWithInterpreter)
 
 -- | Package-specific command-line arguments.
 packageArgs :: Args
@@ -93,7 +92,7 @@ packageArgs = do
             --    load target code, otherwise enable for stage1 since
             --    that runs on the target and can use target's own
             --    ghci object linker
-            [ andM [expr (ghcWithInterpreter stage), orM [notM (expr cross), stage2]] `cabalFlag` "internal-interpreter"
+            [ andM [expr (ghcWithInterpreter stage)] `cabalFlag` "internal-interpreter"
             , orM [ notM cross, haveCurses ]  `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
             , staged (buildFlag UseLibzstd) `cabalFlag` "with-libzstd"
@@ -263,7 +262,7 @@ ghcInternalArgs = package ghcInternal ? do
 
             -- backend specific
           , case backend of
-               "gmp" ->  mconcat
+               "gmp" -> mconcat
                    [ builder (Cabal Setup) ? mconcat
 
                        -- enable GMP backend: configure script will produce
@@ -415,7 +414,7 @@ rtsPackageArgs = package rts ? do
           -- any warnings in the module. See:
           -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
-          , (not <$> (staged (buildFlag CcLlvmBackend))) ?
+          , (not <$> staged (buildFlag CcLlvmBackend)) ?
             inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
 
           , input "**/RetainerProfile.c" ? staged (buildFlag CcLlvmBackend) ?
