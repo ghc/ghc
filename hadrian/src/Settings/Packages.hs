@@ -3,7 +3,7 @@ module Settings.Packages (packageArgs) where
 import Data.Version.Extra
 import Expression
 import Flavour
-import Oracles.Setting hiding (ghcWithInterpreter)
+import Oracles.Setting
 import Oracles.Flag
 import Packages
 import Settings
@@ -12,7 +12,6 @@ import Settings.Builders.Common (wayCcArgs)
 import qualified GHC.Toolchain.Library as Lib
 import GHC.Toolchain.Target
 import GHC.Platform.ArchOS
-import Settings.Program (ghcWithInterpreter)
 
 -- | Package-specific command-line arguments.
 packageArgs :: Args
