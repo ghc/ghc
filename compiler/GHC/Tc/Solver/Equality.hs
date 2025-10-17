@@ -554,24 +554,21 @@ can_eq_nc_forall ev eq_rel s1 s2
                    ; traceTcS "Trying to solve the implication" (ppr s1 $$ ppr s2 $$ ppr wanteds)
 
                    -- Solve the `wanteds` in a nested context
-                   ; ev_binds_var <- newNoTcEvBinds
+                   -- Use the /same/ TcEvBinds var as the context; we do not expect any dict binds
+                   -- but we do want to record any used Given coercions (in `evb_tcvs`) so that
+                   -- they are kept alive by `neededEvVars`. Admittedly they are free in `all_co`,
+                   -- but only if we zonk it, which `neededEvVars` does not do (see test T7196).
+                   ; ev_binds_var <- getTcEvBindsVar
                    ; residual_wanted <- nestImplicTcS skol_info_anon ev_binds_var tclvl $
                                         solveSimpleWanteds wanteds
 
                    ; return (all_co, isSolvedWC residual_wanted) }
 
-
       -- Kick out any inerts constraints that mention unified type variables
       ; kickOutAfterUnification unifs
 
       ; if solved
-        then do { all_co <- zonkCo all_co
-                     -- setWantedEq will add `all_co` to the `ebv_tcvs`, to record
-                     -- that `all_co` is used.  But if `all_co` contains filled
-                     -- CoercionHoles, from the nested solve, and we may miss the
-                     -- use of CoVars.  Test T7196 showed this up
-
-                ; setWantedEq orig_dest emptyCoHoleSet all_co
+        then do { setWantedEq orig_dest emptyCoHoleSet all_co
                      -- emptyCoHoleSet: fully solved, so all_co has no holes
                 ; stopWith ev "Polytype equality: solved" }
 
