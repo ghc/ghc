@@ -1,0 +1,4 @@
+qstrings_multiline_no_ext.hs:4:14: [GHC-47920]
+    Illegal multiline string literal
+    Suggested fix:
+      Perhaps you intended to use the ‘MultilineStrings’ extension

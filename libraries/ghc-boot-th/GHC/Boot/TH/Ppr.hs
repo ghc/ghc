@@ -315,6 +315,7 @@ pprLit _ (CharL c)       = text (show c)
 pprLit _ (CharPrimL c)   = text (show c) <> char '#'
 pprLit _ (StringL s)     = pprString s
 pprLit _ (StringPrimL s) = pprString (bytesToString s) <> char '#'
+pprLit _ (QualStringL modName s) = text (modString modName) <> char '.' <> pprString s
 pprLit _ (BytesPrimL {}) = pprString "<binary data>"
 pprLit i (RationalL rat)
   | withoutFactor 2 (withoutFactor 5 $ denominator rat) /= 1

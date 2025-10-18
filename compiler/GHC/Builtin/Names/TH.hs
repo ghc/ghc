@@ -42,7 +42,7 @@ templateHaskellNames = [
     -- Lit
     charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
     floatPrimLName, doublePrimLName, rationalLName, stringPrimLName,
-    charPrimLName,
+    charPrimLName, qualStringLName,
     -- Pat
     litPName, varPName, tupPName, unboxedTupPName, unboxedSumPName,
     conPName, tildePName, bangPName, infixPName,
@@ -267,7 +267,7 @@ liftTypedName = liftFun (fsLit "liftTyped") liftTypedIdKey
 -- data Lit = ...
 charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
     floatPrimLName, doublePrimLName, rationalLName, stringPrimLName,
-    charPrimLName :: Name
+    charPrimLName, qualStringLName :: Name
 charLName       = libFun (fsLit "charL")       charLIdKey
 stringLName     = libFun (fsLit "stringL")     stringLIdKey
 integerLName    = libFun (fsLit "integerL")    integerLIdKey
@@ -278,6 +278,7 @@ doublePrimLName = libFun (fsLit "doublePrimL") doublePrimLIdKey
 rationalLName   = libFun (fsLit "rationalL")     rationalLIdKey
 stringPrimLName = libFun (fsLit "stringPrimL") stringPrimLIdKey
 charPrimLName   = libFun (fsLit "charPrimL")   charPrimLIdKey
+qualStringLName = libFun (fsLit "qualStringL") qualStringLIdKey
 
 -- data Pat = ...
 litPName, varPName, tupPName, unboxedTupPName, unboxedSumPName, conPName,
@@ -835,7 +836,7 @@ mkNameG_fldIdKey     = mkPreludeMiscIdUnique 218
 -- data Lit = ...
 charLIdKey, stringLIdKey, integerLIdKey, intPrimLIdKey, wordPrimLIdKey,
     floatPrimLIdKey, doublePrimLIdKey, rationalLIdKey, stringPrimLIdKey,
-    charPrimLIdKey:: Unique
+    charPrimLIdKey, liftStringIdKey, qualStringLIdKey :: Unique
 charLIdKey        = mkPreludeMiscIdUnique 220
 stringLIdKey      = mkPreludeMiscIdUnique 221
 integerLIdKey     = mkPreludeMiscIdUnique 222
@@ -846,9 +847,8 @@ doublePrimLIdKey  = mkPreludeMiscIdUnique 226
 rationalLIdKey    = mkPreludeMiscIdUnique 227
 stringPrimLIdKey  = mkPreludeMiscIdUnique 228
 charPrimLIdKey    = mkPreludeMiscIdUnique 229
-
-liftStringIdKey :: Unique
-liftStringIdKey     = mkPreludeMiscIdUnique 230
+liftStringIdKey   = mkPreludeMiscIdUnique 230
+qualStringLIdKey  = mkPreludeMiscIdUnique 231
 
 -- data Pat = ...
 litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, unboxedSumPIdKey, conPIdKey,

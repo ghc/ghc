@@ -39,6 +39,7 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Type
 import GHC.Data.Maybe
 import GHC.Types.SourceText (FractionalLit(..))
+import GHC.Types.StringMeta (StringMeta(..))
 import Control.Monad (zipWithM, replicateM)
 import Data.List (elemIndex)
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -136,6 +137,12 @@ desugarPat x pat = case pat of
                 is_to_list _                       = False
           , is_to_list (unLoc lrhs)
           -> desugarLPat x pat
+
+        -- Desugar qualified string literals the same as RebindableSyntax
+        -- See Note [Implementation of QualifiedStrings]
+        LitPat _ (HsString StringMeta{strMetaQualified = Just _} s)
+          | ViewPat ty _ _ <- expansion
+          -> mkPmLitGrds x $ PmLit ty (PmLitOverString s)
 
         _ -> desugarPat x expansion
 

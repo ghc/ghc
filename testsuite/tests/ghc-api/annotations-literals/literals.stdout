@@ -48,7 +48,7 @@
 
 (LiteralsTest.hs:9:3,ITequal,[=]),
 
-(LiteralsTest.hs:9:5-10,ITstring (StringMeta {strMetaSrc = SourceText "/"/x20/"", strMetaMultiline = False}) " ",["/x20"]),
+(LiteralsTest.hs:9:5-10,ITstring (StringMeta {strMetaSrc = SourceText "/"/x20/"", strMetaMultiline = False, strMetaQualified = Nothing}) " ",["/x20"]),
 
 (LiteralsTest.hs:11:1,ITsemi,[]),
 

@@ -120,6 +120,8 @@ charPrimL   :: Char -> Lit
 charPrimL   = CharPrimL
 stringL     :: String -> Lit
 stringL     = StringL
+qualStringL :: ModName -> String -> Lit
+qualStringL = QualStringL
 stringPrimL :: [Word8] -> Lit
 stringPrimL = StringPrimL
 bytesPrimL :: Bytes -> Lit

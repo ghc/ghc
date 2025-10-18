@@ -353,16 +353,25 @@ rnExpr (HsOverLabel src v)
     hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
                 HsTyLit noExtField (HsStrTy NoSourceText v)
 
-rnExpr (HsLit x lit) | Just (src, s) <- stringLike lit
+rnExpr (HsLit x lit) | Just (meta, s) <- stringLike lit
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings
-       ; if opt_OverloadedStrings then
-            rnExpr (HsOverLit x (mkHsIsString src s))
-         else do {
-            ; rnLit lit
-            ; return (HsLit x (convertLit lit), emptyFVs) } }
+       ; if
+          -- See Note [Implementation of QualifiedStrings]
+          | StringMeta{strMetaQualified = Just modName} <- meta -> do
+              (qualifiedFromString, fvs) <- first genHsVar <$> lookupNameWithQualifier fromStringName modName
+              let hsLit = HsLit x (convertLit lit)
+              let expr = HsApp noExtField (noLocA qualifiedFromString) (noLocA hsLit)
+              return (mkExpandedExpr hsLit expr, fvs)
+          | opt_OverloadedStrings ->
+              rnExpr (HsOverLit x (mkHsIsString (strMetaSrc meta) s))
+          | otherwise -> do {
+              ; rnLit lit
+              ; return (HsLit x (convertLit lit), emptyFVs)
+              }
+       }
   where
     stringLike = \case
-      HsString StringMeta{strMetaSrc = src} s -> Just (src, s)
+      HsString meta s -> Just (meta, s)
       _ -> Nothing
 
 rnExpr (HsLit x lit)

@@ -234,6 +234,8 @@ instance Diagnostic PsMessage where
     PsErrIllegalQualifiedDo qdoDoc
       -> mkSimpleDecorated $
            text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
+    PsErrIllegalMultilineStrings
+      -> mkSimpleDecorated $ text "Illegal multiline string literal"
     PsErrQualifiedDoInCmd m
       -> mkSimpleDecorated $
            hang (text "Parse error in command:") 2 $
@@ -626,6 +628,7 @@ instance Diagnostic PsMessage where
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> ErrorWithoutFlag
     PsErrExplicitForall{}                         -> ErrorWithoutFlag
     PsErrIllegalQualifiedDo{}                     -> ErrorWithoutFlag
+    PsErrIllegalMultilineStrings{}                -> ErrorWithoutFlag
     PsErrQualifiedDoInCmd{}                       -> ErrorWithoutFlag
     PsErrRecordSyntaxInPatSynDecl{}               -> ErrorWithoutFlag
     PsErrEmptyWhereInPatSynDecl{}                 -> ErrorWithoutFlag
@@ -769,6 +772,7 @@ instance Diagnostic PsMessage where
     PsErrExplicitForall is_unicode                -> [useExtensionInOrderTo info LangExt.ExplicitForAll]
       where info = "to enable syntax:" <+> forallSym is_unicode <+> angleBrackets "tvs" <> dot <+> angleBrackets "type"
     PsErrIllegalQualifiedDo{}                     -> [suggestExtension LangExt.QualifiedDo]
+    PsErrIllegalMultilineStrings{}                -> [suggestExtension LangExt.MultilineStrings]
     PsErrQualifiedDoInCmd{}                       -> noHints
     PsErrRecordSyntaxInPatSynDecl{}               -> noHints
     PsErrEmptyWhereInPatSynDecl{}                 -> noHints

@@ -35,6 +35,7 @@ import GHC.Hs.Extension
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
+import Language.Haskell.Syntax.Module.Name (moduleNameString)
 
 {-
 ************************************************************************
@@ -211,14 +212,18 @@ Equivalently it's True if
 instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
     ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
-    ppr (HsString StringMeta{..} s)
-      -- multiline strings
-      | strMetaMultiline =
+    ppr (HsString StringMeta{..} s) =
+      qualifier <> if strMetaMultiline then renderMultiline else renderNormal
+      where
+        qualifier =
+          case strMetaQualified of
+            Nothing -> empty
+            Just modName -> text (moduleNameString modName ++ ".")
+        renderMultiline =
           case strMetaSrc of
             NoSourceText -> pprHsString s
-            SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
-      -- normal strings
-      | otherwise = pprWithSourceText strMetaSrc (pprHsString s)
+            SourceText src -> vcat . map text . split '\n' . unpackFS $ src
+        renderNormal = pprWithSourceText strMetaSrc (pprHsString s)
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))

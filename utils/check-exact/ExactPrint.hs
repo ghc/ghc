@@ -54,6 +54,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.PkgQual
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
+import GHC.Types.StringMeta (strMetaSrc)
 import GHC.Types.Var
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )

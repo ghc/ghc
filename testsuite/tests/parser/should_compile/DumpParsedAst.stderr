@@ -2275,7 +2275,8 @@
                    (HsString
                     (StringMeta
                     (SourceText "hello")
-                     (False))
+                     (False)
+                     (Nothing))
                     {FastString: "hello"})))))))
              [])
             (EmptyLocalBinds

@@ -77,7 +77,7 @@ import GHC.Types.SourceText
 import GHC.Types.TyThing
 import GHC.Types.Name hiding( varName, tcName )
 import GHC.Types.Name.Env
-import GHC.Types.StringMeta (emptyStrMeta)
+import GHC.Types.StringMeta (StringMeta (..), emptyStrMeta)
 
 import GHC.TypeLits
 import Data.Kind (Constraint)
@@ -3055,6 +3055,11 @@ repLiteral (HsStringPrim _ bs)
            w8s_expr = map (\w8 -> mkCoreConApps word8DataCon
                                   [mkWord8Lit (toInteger w8)]) w8s
        rep2_nw stringPrimLName [mkListExpr word8_ty w8s_expr]
+-- See Note [Implementation of QualifiedStrings]
+repLiteral lit@(HsString StringMeta{strMetaQualified = Just modName} _) = do
+  MkC modNameCore <- repModName modName
+  lit_expr <- lift . dsLit $ lit
+  rep2_nw qualStringLName [modNameCore, lit_expr]
 repLiteral lit
   = do lit' <- case lit of
                    HsIntPrim _ i    -> lift . dsLit <$> mk_integer i
@@ -3138,6 +3143,11 @@ repNameQ (MkC mn) (MkC name) = rep2_nw mkNameQName [mn, name]
 
 repGensym :: Core String -> MetaM (Core (M TH.Name))
 repGensym (MkC lit_str) = rep2 newNameName [lit_str]
+
+repModName :: ModuleName -> MetaM (Core TH.ModName)
+repModName modName = do
+  name <- mkStringExprFS (moduleNameFS modName)
+  rep2_nw mkModNameName [name]
 
 repBindM :: Type -> Type        -- a and b
          -> Core (M a) -> Core (a -> M b) -> MetaM (Core (M b))
