@@ -15,6 +15,8 @@ StgStack* cloneStack(Capability* capability, const StgStack* stack);
 
 void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar);
 
+StgArrBytes* decodeClonedStack(Capability *cap, StgStack* stack);
+
 #include "BeginPrivate.h"
 
 #if defined(THREADED_RTS)

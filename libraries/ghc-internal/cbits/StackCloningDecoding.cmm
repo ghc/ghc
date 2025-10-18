@@ -17,3 +17,10 @@ stg_sendCloneStackMessagezh (gcptr threadId, gcptr mVarStablePtr) {
 
     return ();
 }
+
+stg_decodeStackzh (gcptr stgStack) {
+    gcptr stackEntries;
+    ("ptr" stackEntries) = ccall decodeClonedStack(MyCapability() "ptr", stgStack "ptr");
+
+    return (stackEntries);
+}

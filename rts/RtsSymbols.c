@@ -943,6 +943,7 @@ extern char **environ;
       SymI_HasProto(lookupIPE)                                          \
       SymI_HasProto(sendCloneStackMessage)                              \
       SymI_HasProto(cloneStack)                                         \
+      SymI_HasProto(decodeClonedStack)                                  \
       SymI_HasProto(stg_newPromptTagzh)                                 \
       SymI_HasProto(stg_promptzh)                                       \
       SymI_HasProto(stg_control0zh)                                     \
