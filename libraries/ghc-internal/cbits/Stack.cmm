@@ -146,14 +146,14 @@ isArgGenBigRetFunTypezh(P_ stack, W_ offsetWords) {
   return (type);
 }
 
-// (StgInfoTable*, StgInfoTable*) getInfoTableAddrszh(StgStack* stack, StgWord offsetWords)
-getInfoTableAddrszh(P_ stack, W_ offsetWords) {
-  P_ p, info_struct, info_ptr_ipe_key;
+// (StgInfoTable*) getInfoTableAddrzh(StgStack* stack, StgWord offsetWords)
+getInfoTableAddrzh(P_ stack, W_ offsetWords) {
+  P_ p, info;
   p = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
-  info_struct = %GET_STD_INFO(UNTAG(p));
-  info_ptr_ipe_key = %INFO_PTR(UNTAG(p));
-  return (info_struct, info_ptr_ipe_key);
+  info = %GET_STD_INFO(UNTAG(p));
+
+  return (info);
 }
 
 // (StgInfoTable*) getStackInfoTableAddrzh(StgStack* stack)

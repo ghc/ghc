@@ -11,12 +11,11 @@ import GHC.Internal.IORef
 import GHC.Internal.IO.Unsafe (unsafePerformIO)
 import GHC.Internal.Exception.Context
 import GHC.Internal.Ptr
-import GHC.Internal.Data.Maybe (fromMaybe, mapMaybe)
+import GHC.Internal.Data.Maybe (fromMaybe)
 import GHC.Internal.Stack.Types as GHC.Stack (CallStack, HasCallStack)
 import qualified GHC.Internal.Stack as HCS
 import qualified GHC.Internal.ExecutionStack.Internal as ExecStack
 import qualified GHC.Internal.Stack.CloneStack as CloneStack
-import qualified GHC.Internal.Stack.Decode as CloneStack
 import qualified GHC.Internal.Stack.CCS as CCS
 
 -- | How to collect a backtrace when an exception is thrown.
@@ -144,7 +143,7 @@ displayBacktraces bts = concat
     displayExec = unlines . map (indent 2 . flip ExecStack.showLocation "") . fromMaybe [] . ExecStack.stackFrames
     -- The unsafePerformIO here is safe as 'StackSnapshot' makes sure neither the stack frames nor
     -- references closures can be garbage collected.
-    displayIpe  = unlines . mapMaybe (fmap (indent 2) . CloneStack.prettyStackFrameWithIpe) . unsafePerformIO . CloneStack.decodeStackWithIpe
+    displayIpe  = unlines . map (indent 2 . CloneStack.prettyStackEntry) . unsafePerformIO . CloneStack.decode
     displayHsc  = unlines . map (indent 2 . prettyCallSite) . HCS.getCallStack
       where prettyCallSite (f, loc) = f ++ ", called at " ++ HCS.prettySrcLoc loc
 
