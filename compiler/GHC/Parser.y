@@ -76,7 +76,7 @@ import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
-import GHC.Types.StringMeta (strMetaSrc)
+import GHC.Types.StringMeta (StringMeta(..))
 import GHC.Types.PkgQual
 
 import GHC.Core.Type    ( Specificity(..) )
@@ -4113,8 +4113,10 @@ consym :: { LocatedN RdrName }
 
 literal :: { Located (HsLit GhcPs) }
         : CHAR              { sL1 $1 $ HsChar       (getCHARs $1) $ getCHAR $1 }
-        | STRING            { sL1 $1 $ HsString     (getStringMeta $1)
-                                                    $ getSTRING $1 }
+        | STRING            {% do
+                                hintMultilineStrings $1
+                                pure $ sL1 $1 (HsString (getStringMeta $1) (getSTRING $1))
+                            }
         | PRIMINTEGER       { sL1 $1 $ HsIntPrim    (getPRIMINTEGERs $1)
                                                     $ getPRIMINTEGER $1 }
         | PRIMWORD          { sL1 $1 $ HsWordPrim   (getPRIMWORDs $1)
@@ -4495,6 +4497,19 @@ hintQualifiedDo tok = do
       ITdo (Just m) -> Just $ ftext m <> text ".do"
       ITmdo (Just m) -> Just $ ftext m <> text ".mdo"
       t -> Nothing
+
+-- Hint about MultilineStrings
+--
+-- Currently, this only triggers for QualifiedStrings, since a multiline
+-- string lexes as three string literals without -XMultilineStrings.
+hintMultilineStrings :: Located Token -> P ()
+hintMultilineStrings tok = do
+    multilineStrings <- getBit MultilineStringsBit
+    case unLoc tok of
+        ITstring StringMeta{strMetaMultiline = True} _ | not multilineStrings ->
+            addError $ mkPlainErrorMsgEnvelope (getLoc tok) $
+              PsErrIllegalMultilineStrings
+        _ -> return ()
 
 -- When two single quotes don't followed by tyvar or gtycon, we report the
 -- error as empty character literal, or TH quote that missing proper type

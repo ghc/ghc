@@ -267,6 +267,7 @@ module Language.Haskell.TH where
     | MultilineStrings
     | ExplicitLevelImports
     | ImplicitStagePersistence
+    | QualifiedStrings
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FamilyResultSigQ :: *
@@ -306,7 +307,7 @@ module Language.Haskell.TH where
   type KindQ :: *
   type KindQ = Q Kind
   type Lit :: *
-  data Lit = CharL GHC.Internal.Types.Char | StringL GHC.Internal.Base.String | IntegerL GHC.Internal.Bignum.Integer.Integer | RationalL GHC.Internal.Real.Rational | IntPrimL GHC.Internal.Bignum.Integer.Integer | WordPrimL GHC.Internal.Bignum.Integer.Integer | FloatPrimL GHC.Internal.Real.Rational | DoublePrimL GHC.Internal.Real.Rational | StringPrimL [GHC.Internal.Word.Word8] | BytesPrimL GHC.Internal.TH.Syntax.Bytes | CharPrimL GHC.Internal.Types.Char
+  data Lit = CharL GHC.Internal.Types.Char | StringL GHC.Internal.Base.String | IntegerL GHC.Internal.Bignum.Integer.Integer | RationalL GHC.Internal.Real.Rational | IntPrimL GHC.Internal.Bignum.Integer.Integer | WordPrimL GHC.Internal.Bignum.Integer.Integer | FloatPrimL GHC.Internal.Real.Rational | DoublePrimL GHC.Internal.Real.Rational | StringPrimL [GHC.Internal.Word.Word8] | BytesPrimL GHC.Internal.TH.Syntax.Bytes | CharPrimL GHC.Internal.Types.Char | QualStringL GHC.Internal.TH.Syntax.ModName GHC.Internal.Base.String
   type Loc :: *
   data Loc = Loc {loc_filename :: GHC.Internal.Base.String, loc_package :: GHC.Internal.Base.String, loc_module :: GHC.Internal.Base.String, loc_start :: GHC.Internal.TH.Syntax.CharPos, loc_end :: GHC.Internal.TH.Syntax.CharPos}
   type Match :: *
@@ -876,6 +877,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | MultilineStrings
     | ExplicitLevelImports
     | ImplicitStagePersistence
+    | QualifiedStrings
 
 module Language.Haskell.TH.Lib where
   -- Safety: Safe
@@ -1619,6 +1621,7 @@ module Language.Haskell.TH.Syntax where
     | MultilineStrings
     | ExplicitLevelImports
     | ImplicitStagePersistence
+    | QualifiedStrings
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FieldExp :: *
@@ -1654,7 +1657,7 @@ module Language.Haskell.TH.Syntax where
     liftTyped :: forall (m :: * -> *). Quote m => t -> Code m t
     {-# MINIMAL liftTyped #-}
   type Lit :: *
-  data Lit = CharL GHC.Internal.Types.Char | StringL GHC.Internal.Base.String | IntegerL GHC.Internal.Bignum.Integer.Integer | RationalL GHC.Internal.Real.Rational | IntPrimL GHC.Internal.Bignum.Integer.Integer | WordPrimL GHC.Internal.Bignum.Integer.Integer | FloatPrimL GHC.Internal.Real.Rational | DoublePrimL GHC.Internal.Real.Rational | StringPrimL [GHC.Internal.Word.Word8] | BytesPrimL Bytes | CharPrimL GHC.Internal.Types.Char
+  data Lit = CharL GHC.Internal.Types.Char | StringL GHC.Internal.Base.String | IntegerL GHC.Internal.Bignum.Integer.Integer | RationalL GHC.Internal.Real.Rational | IntPrimL GHC.Internal.Bignum.Integer.Integer | WordPrimL GHC.Internal.Bignum.Integer.Integer | FloatPrimL GHC.Internal.Real.Rational | DoublePrimL GHC.Internal.Real.Rational | StringPrimL [GHC.Internal.Word.Word8] | BytesPrimL Bytes | CharPrimL GHC.Internal.Types.Char | QualStringL ModName GHC.Internal.Base.String
   type Loc :: *
   data Loc = Loc {loc_filename :: GHC.Internal.Base.String, loc_package :: GHC.Internal.Base.String, loc_module :: GHC.Internal.Base.String, loc_start :: CharPos, loc_end :: CharPos}
   type Match :: *

@@ -44,7 +44,7 @@ import GHC.Types.Fixity as Hs
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.SourceText
-import GHC.Types.StringMeta (defaultStrMeta)
+import GHC.Types.StringMeta (StringMeta(..), defaultStrMeta)
 import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Data.FastString
@@ -1468,10 +1468,17 @@ cvtLit (BytesPrimL (Bytes fptr off sz)) = do
              BS.packCStringLen (ptr `plusPtr` fromIntegral off, fromIntegral sz)
   force bs
   return $ HsStringPrim NoSourceText bs
-cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
-        -- cvtLit should not be called on IntegerL, RationalL
-        -- That precondition is established right here in
-        -- "GHC.ThToHs", hence panic
+cvtLit (QualStringL modName s) = do
+  let s' = mkFastString s
+      meta = (defaultStrMeta $ quotedSourceText s){strMetaQualified = Just $ mk_mod modName}
+  force s'
+  return $ HsString meta s'
+
+-- cvtLit should not be called on IntegerL, RationalL
+-- That precondition is established right here in
+-- "GHC.ThToHs", hence panic
+cvtLit (IntegerL _) = panic "Convert.cvtLit: Unexpected literal"
+cvtLit (RationalL _) = panic "Convert.cvtLit: Unexpected literal"
 
 quotedSourceText :: String -> SourceText
 quotedSourceText s = SourceText $ fsLit $ "\"" ++ s ++ "\""

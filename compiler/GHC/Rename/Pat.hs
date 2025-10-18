@@ -60,9 +60,11 @@ import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
-                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit, delLocalNames, typeAppErr )
+                           , wrapGenSpan, genLHsApp, genHsApps, genHsVar, genLHsVar
+                           , genHsIntegralLit, delLocalNames, typeAppErr )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
+import GHC.Builtin.Types (trueDataConName)
 
 import GHC.Types.Hint
 import GHC.Types.Fixity (LexicalFixity(..))
@@ -72,7 +74,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import GHC.Types.Basic
 import GHC.Types.SourceText
-import GHC.Types.StringMeta (strMetaSrc)
+import GHC.Types.StringMeta (StringMeta(..))
 
 import GHC.Data.FastString ( uniqCompareFS )
 import GHC.Data.List.SetOps( removeDups )
@@ -569,12 +571,25 @@ rnPatAndThen mk (SigPat _ pat sig)
 
 rnPatAndThen mk (LitPat x lit)
   | HsString meta s <- lit
-  = do { ovlStr <- liftCps (xoptM LangExt.OverloadedStrings)
-       ; if ovlStr
-         then rnPatAndThen mk
-                           (mkNPat (noLocA (mkHsIsString (strMetaSrc meta) s))
-                                      Nothing noAnn)
-         else normal_lit }
+  = do { opt_OverloadedStrings <- liftCps (xoptM LangExt.OverloadedStrings)
+       ; if
+          | StringMeta{strMetaQualified = Just modName} <- meta -> do
+              -- M."asdf" => ((M.fromString "asdf" ==) -> True)
+              eqExpr <- liftCpsFV $ lookupSyntaxExpr eqName
+              fromStringExpr <- fmap genHsVar $ liftCpsFV $ lookupNameWithQualifier fromStringName modName
+              let lit = noLocA $ HsLit noExtField (mkHsStringFS s)
+              let trueExpr = noLocA $
+                    ConPat
+                      noExtField
+                      (noLocA $ noUserRdr trueDataConName)
+                      (PrefixCon [])
+              return $ ViewPat Nothing (genLHsApp eqExpr (genLHsApp fromStringExpr lit)) trueExpr
+          | opt_OverloadedStrings ->
+              rnPatAndThen mk
+                (mkNPat (noLocA (mkHsIsString (strMetaSrc meta) s))
+                  Nothing noAnn)
+          | otherwise -> normal_lit
+       }
   | otherwise = normal_lit
   where
     normal_lit = do { liftCps (rnLit lit); return (LitPat x (convertLit lit)) }

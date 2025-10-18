@@ -448,6 +448,9 @@ data PsMessage
    -- | Found qualified-do without QualifiedDo enabled
    | PsErrIllegalQualifiedDo !SDoc
 
+   -- | Found multiline string without MultilineStrings enabled
+   | PsErrIllegalMultilineStrings
+
    -- | Cmm parser error
    | PsErrCmmParser !CmmParserError
 

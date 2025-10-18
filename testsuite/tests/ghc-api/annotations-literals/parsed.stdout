@@ -1,6 +1,6 @@
 HsIntegral [0003] 3
 HsIntegral [0x04] 4
-HsString [StringMeta {strMetaSrc = SourceText "\"\\x20\"", strMetaMultiline = False}] " "
+HsString [StringMeta {strMetaSrc = SourceText "\"\\x20\"", strMetaMultiline = False, strMetaQualified = Nothing}] " "
 HsChar ['\x20'] ' '
 HsCharPrim ['\x41'#] 'A'
 HsIntPrim [0004#] 4
