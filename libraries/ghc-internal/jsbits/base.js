@@ -1245,21 +1245,9 @@ function h$mkdir(path, path_offset, mode) {
 
 // It is required by Google Closure Compiler to be at least defined if
 // somewhere it is used
-var h$stg_cloneMyStackzh,
-    h$advanceStackFrameLocationzh, h$getStackFieldszh, h$getStackClosurezh,
-    h$getWordzh, h$getStackInfoTableAddrzh, h$getRetFunSmallBitmapzh, h$getRetFunLargeBitmapzh,
-    h$isArgGenBigRetFunTypezh,
-    h$getUnderflowFrameNextChunkzh,
-    h$getInfoTableAddrszh,
-    h$getLargeBitmapzh, h$getSmallBitmapzh, h$getBCOLargeBitmapzh
+var h$stg_cloneMyStackzh, h$stg_decodeStackzh
 h$stg_cloneMyStackzh
-  = h$advanceStackFrameLocationzh
-  = h$getStackFieldszh = h$getStackClosurezh
-  = h$getWordzh, h$getStackInfoTableAddrzh = h$getRetFunSmallBitmapzh = h$getRetFunLargeBitmapzh
-  = h$isArgGenBigRetFunTypezh
-  = h$getUnderflowFrameNextChunkzh
-  = h$getInfoTableAddrszh
-  = h$getLargeBitmapzh = h$getSmallBitmapzh = h$getBCOLargeBitmapzh
+  = h$stg_decodeStackzh
   = function () {
     throw new Error('Stack Cloning Decoding: Not Implemented Yet')
   }

@@ -17,4 +17,3 @@ module GHC.Stack.CloneStack (
   ) where
 
 import GHC.Internal.Stack.CloneStack
-import GHC.Internal.Stack.Decode

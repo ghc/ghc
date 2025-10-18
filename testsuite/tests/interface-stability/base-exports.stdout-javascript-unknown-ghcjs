@@ -14717,7 +14717,7 @@ instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.BigNat.BigNat -- Defined in
 instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bignum.Natural’
 instance GHC.Internal.Classes.Eq GHC.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.RTS.Flags’
 instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.StableName.StableName a) -- Defined in ‘GHC.Internal.StableName’
-instance GHC.Internal.Classes.Eq GHC.Internal.Stack.Decode.StackEntry -- Defined in ‘GHC.Internal.Stack.Decode’
+instance GHC.Internal.Classes.Eq GHC.Internal.Stack.CloneStack.StackEntry -- Defined in ‘GHC.Internal.Stack.CloneStack’
 instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Classes.Eq (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Classes.Eq GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Classes.Eq (GHC.Internal.TypeLits.SChar c) -- Defined in ‘GHC.Internal.TypeLits’
@@ -16229,8 +16229,7 @@ instance GHC.Internal.Show.Show GHC.RTS.Flags.ProfFlags -- Defined in ‘GHC.RTS
 instance GHC.Internal.Show.Show GHC.RTS.Flags.RTSFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.RTS.Flags.TickyFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.RTS.Flags.TraceFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.Stack.Decode.Pointerness -- Defined in ‘GHC.Internal.Stack.Decode’
-instance GHC.Internal.Show.Show GHC.Internal.Stack.Decode.StackEntry -- Defined in ‘GHC.Internal.Stack.Decode’
+instance GHC.Internal.Show.Show GHC.Internal.Stack.CloneStack.StackEntry -- Defined in ‘GHC.Internal.Stack.CloneStack’
 instance GHC.Internal.Show.Show GHC.Internal.StaticPtr.StaticPtrInfo -- Defined in ‘GHC.Internal.StaticPtr’
 instance [safe] GHC.Internal.Show.Show GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
 instance [safe] GHC.Internal.Show.Show GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
