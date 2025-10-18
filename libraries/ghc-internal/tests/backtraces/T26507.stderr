@@ -1,0 +1,8 @@
+T26507: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Throw error
+
+IPE backtrace:
+HasCallStack backtrace:
+  throwIO, called at T26507.hs:7:3 in main:Main
+
