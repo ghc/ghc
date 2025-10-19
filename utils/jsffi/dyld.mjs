@@ -670,7 +670,25 @@ class DyLD {
 
   // Wasm memory & table
   #memory = new WebAssembly.Memory({ initial: 1 });
+
   #table = new WebAssembly.Table({ element: "anyfunc", initial: 1 });
+  // First free slot, might be invalid when it advances to #table.length
+  #tableFree = 1;
+  // See Note [The evil wasm table grower]
+  #tableGrowInstance = new WebAssembly.Instance(
+    new WebAssembly.Module(
+      new Uint8Array([
+        0, 97, 115, 109, 1, 0, 0, 0, 1, 6, 1, 96, 1, 127, 1, 127, 2, 35, 1, 3,
+        101, 110, 118, 25, 95, 95, 105, 110, 100, 105, 114, 101, 99, 116, 95,
+        102, 117, 110, 99, 116, 105, 111, 110, 95, 116, 97, 98, 108, 101, 1,
+        112, 0, 0, 3, 2, 1, 0, 7, 31, 1, 27, 95, 95, 103, 104, 99, 95, 119, 97,
+        115, 109, 95, 106, 115, 102, 102, 105, 95, 116, 97, 98, 108, 101, 95,
+        103, 114, 111, 119, 0, 0, 10, 11, 1, 9, 0, 208, 112, 32, 0, 252, 15, 0,
+        11,
+      ])
+    ),
+    { env: { __indirect_function_table: this.#table } }
+  );
 
   // __stack_pointer
   #sp = new WebAssembly.Global(
@@ -714,6 +732,82 @@ class DyLD {
 
   // Global STG registers
   #regs = {};
+
+  // Note [The evil wasm table grower]
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // We need to grow the wasm table as we load shared libraries in
+  // wasm dyld. We used to directly call the table.grow() JS API,
+  // which works as expected in Firefox/Chrome, but unfortunately,
+  // WebKit's implementation of the table.grow() JS API is broken:
+  // https://bugs.webkit.org/show_bug.cgi?id=290681, which means that
+  // the wasm dyld simply does not work in WebKit-based browsers like
+  // Safari.
+  //
+  // Now, one simple workaround would be to avoid growing the table at
+  // all: just allocate a huge table upfront (current limitation
+  // agreed by all vendors is 10000000). To avoid unnecessary space
+  // waste on non-WebKit platforms, we could additionally check
+  // navigator.userAgent against some regexes and only allocate
+  // fixed-length table when there's no blink/gecko mention. But this
+  // is fragile and gross, and it's better to stick to a uniform code
+  // path for all browsers.
+  //
+  // Fortunately, it turns out the table.grow wasm instruction work as
+  // expected in WebKit! So we can invoke a wasm function that grows
+  // the table for us. But don't open a champagne yet, where would
+  // that wasm function come from? It can't be put into RTS, or even
+  // libc.so, because loading those libraries would require growing
+  // the table in the first place! Or perhaps, reserve a table upfront
+  // that's just large enough to load RTS and then we can access that
+  // function for subsequent table grows? But then we need to
+  // experiment for a reasonable initial size, and add a magic number
+  // here, which is also fragile and gross and not future-proof!
+  //
+  // So this special wasm function needs to live in a single wasm
+  // module, which is loaded before we load anything else. The full
+  // source code for this module is:
+  //
+  // (module
+  //   (type (func (param i32) (result i32)))
+  //   (import "env" "__indirect_function_table" (table 0 funcref))
+  //   (export "__ghc_wasm_jsffi_table_grow" (func 0))
+  //   (func (type 0) (param i32) (result i32)
+  //     ref.null func
+  //     local.get 0
+  //     table.grow 0
+  //   )
+  // )
+  //
+  // This module is 103 bytes so that we can inline its blob in dyld,
+  // and use the usually discouraged synchronous
+  // WebAssembly.Instance/WebAssembly.Module constructors to load it.
+  // On non-WebKit platforms, growing tables this way would introduce
+  // a bit of extra JS/Wasm interop overhead, which can be amplified
+  // as we used to call table.grow(1, foo) for every GOT.func item.
+  // Therefore, unless we're about to exceed the hard limit of table
+  // size, we now grow the table exponentially, and use bump
+  // allocation to calculate the table index to be returned.
+  // Exponential growth is only implemented to minimize the JS/Wasm
+  // interop overhead when calling __ghc_wasm_jsffi_table_grow;
+  // V8/SpiderMonkey/WebKit already do their own exponential growth of
+  // the table's backing buffer in their table growth logic.
+  //
+  // Invariants: n >= 0; when v is non-null, n === 1
+  #tableGrow(n, v) {
+    const prev_free = this.#tableFree;
+    if (prev_free + n > this.#table.length) {
+      const min_delta = prev_free + n - this.#table.length;
+      const delta = Math.max(min_delta, this.#table.length);
+      this.#tableGrowInstance.exports.__ghc_wasm_jsffi_table_grow(
+        this.#table.length + delta <= 10000000 ? delta : min_delta
+      );
+    }
+    if (v) {
+      this.#table.set(prev_free, v);
+    }
+    this.#tableFree += n;
+    return prev_free;
+  }
 
   constructor({ args, rpc }) {
     this.#rpc = rpc;
@@ -878,7 +972,7 @@ class DyLD {
 
       // __memory_base & __table_base, different for each .so
       let memory_base;
-      let table_base = this.#table.grow(tableSize);
+      let table_base = this.#tableGrow(tableSize);
       console.assert(tableP2Align === 0);
 
       // libc.so is always the first one to be ever loaded and has VIP
@@ -982,7 +1076,7 @@ class DyLD {
           if (this.exportFuncs[name]) {
             this.#gotFunc[name] = new WebAssembly.Global(
               { value: "i32", mutable: true },
-              this.#table.grow(1, this.exportFuncs[name])
+              this.#tableGrow(1, this.exportFuncs[name])
             );
             continue;
           }
@@ -1033,7 +1127,7 @@ class DyLD {
           if (this.#gotFunc[k]) {
             const got = this.#gotFunc[k];
             if (got.value === DyLD.#poison) {
-              const idx = this.#table.grow(1, v);
+              const idx = this.#tableGrow(1, v);
               got.value = idx;
             } else {
               this.#table.set(got.value, v);
@@ -1103,7 +1197,7 @@ class DyLD {
     // Not in GOT.func yet, create the entry on demand
     if (this.exportFuncs[sym]) {
       console.assert(!this.#gotFunc[sym]);
-      const addr = this.#table.grow(1, this.exportFuncs[sym]);
+      const addr = this.#tableGrow(1, this.exportFuncs[sym]);
       this.#gotFunc[sym] = new WebAssembly.Global(
         { value: "i32", mutable: true },
         addr
