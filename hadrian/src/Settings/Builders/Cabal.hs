@@ -188,18 +188,16 @@ configureArgs cFlags' ldFlags' = do
             values <- unwords <$> expr
             not (null values) ?
                 arg ("--configure-option=" ++ key ++ "=" ++ values)
-        cFlags   = mconcat [ remove ["-Werror"] cArgs
-                           , getStagedCCFlags
+        cFlags   = mconcat [ getStagedCCFlags
                            -- See https://github.com/snowleopard/hadrian/issues/523
                            , arg $ "-iquote"
 
                            , arg $ top -/- pkgPath pkg
                            , cFlags'
                            ]
-        ldFlags  = ldArgs <> ldFlags'
     mconcat
         [ conf "CFLAGS"   cFlags
-        , conf "LDFLAGS"  ldFlags
+        , conf "LDFLAGS"  ldFlags'
         , conf "--with-iconv-includes"    $ arg =<< getSetting IconvIncludeDir
         , conf "--with-iconv-libraries"   $ arg =<< getSetting IconvLibDir
         , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir

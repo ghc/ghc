@@ -11,7 +11,7 @@ import Target
 import Utilities
 import Hadrian.BuildPath
 import Hadrian.Expression
-import Settings.Builders.Common (cArgs, getStagedCCFlags)
+import Settings.Builders.Common (getStagedCCFlags)
 
 -- | Build in-tree GMP library objects (if GmpInTree flag is set) and return
 -- their paths.
@@ -125,8 +125,7 @@ gmpRules = do
             cFlags <-
                 interpretInContext ctx $
                 mconcat
-                    [ cArgs
-                    , getStagedCCFlags
+                    [ getStagedCCFlags
                     -- gmp symbols are only used by bignum logic in
                     -- ghc-internal and shouldn't be exported by the
                     -- ghc-internal shared library.

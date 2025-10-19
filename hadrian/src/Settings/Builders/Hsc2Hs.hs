@@ -50,7 +50,7 @@ getCFlags = do
     autogen <- expr $ autogenPath context
     let cabalMacros = autogen -/- "cabal_macros.h"
     expr $ need [cabalMacros]
-    mconcat [ remove ["-O"] (cArgs <> getStagedCCFlags)
+    mconcat [ remove ["-O"] getStagedCCFlags
             -- Either "-E" is not part of the configured cpp args, or we can't add those args to invocations of things like this
             -- ROMES:TODO: , prgFlags . cppProgram . tgtCPreprocessor <$> getStagedTargetConfig
             , cIncludeArgs
@@ -64,6 +64,5 @@ getCFlags = do
 getLFlags :: Expr [String]
 getLFlags =
     mconcat [ prgFlags . ccLinkProgram . tgtCCompilerLink <$> getStagedTarget
-            , ldArgs
             , getContextData ldOpts
             , getContextData depLdOpts ]
