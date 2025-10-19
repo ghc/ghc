@@ -139,6 +139,10 @@ configureEnvironment stage = do
              , builderEnvironment "AR" (Ar Unpack stage)
              , builderEnvironment "NM" Nm
              , builderEnvironment "RANLIB" Ranlib
+             , -- Libffi can currently (v3.5.2) not build shared libraries with
+               -- GCC as linker (LD=gcc). Though, we have to pin LD here to
+               -- prevent autoconf to find an arbitrary ld.
+               builderEnvironment "LD" $ MergeObjects stage
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
              , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
 
