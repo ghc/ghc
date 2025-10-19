@@ -130,10 +130,7 @@ fixLibffiMakefile top =
 configureEnvironment :: Stage -> Action [CmdOption]
 configureEnvironment stage = do
     context <- libffiContext stage
-    cFlags  <- interpretInContext context $ mconcat
-               [ cArgs
-               , getStagedCCFlags ]
-    ldFlags <- interpretInContext context ldArgs
+    cFlags  <- interpretInContext context getStagedCCFlags
     sequence [ builderEnvironment "CC" $ Cc CompileC stage
              , builderEnvironment "CXX" $ Cc CompileC stage
              , builderEnvironment "AR" $ Ar Unpack stage
@@ -144,7 +141,7 @@ configureEnvironment stage = do
                -- prevent autoconf to find an arbitrary ld.
                builderEnvironment "LD" $ MergeObjects stage
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
-             , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
+             , return . AddEnv "LDFLAGS" $ "-w" ]
 
 -- Need the libffi archive and `trackAllow` all files in the build directory.
 -- See [Libffi indicating inputs].

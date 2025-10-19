@@ -5,7 +5,7 @@ module Settings.Builders.Common (
     module Oracles.Setting,
     module Settings,
     module UserSettings,
-    cIncludeArgs, ldArgs, cArgs, cppArgs, cWarnings,
+    cIncludeArgs, cWarnings,
     packageDatabaseArgs, bootPackageDatabaseArgs,
     getStagedCCFlags, wayCcArgs
     ) where
@@ -37,15 +37,6 @@ cIncludeArgs = do
             -- with the package.
             , pure [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
             , pure [ "-I" ++       unifyPath dir | dir <- depDirs ] ]
-
-ldArgs :: Args
-ldArgs = mempty
-
-cArgs :: Args
-cArgs = mempty
-
-cppArgs :: Args
-cppArgs = mempty
 
 -- TODO: should be in a different file
 cWarnings :: Args

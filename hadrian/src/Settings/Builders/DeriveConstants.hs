@@ -40,8 +40,7 @@ includeCcArgs :: Args
 includeCcArgs = do
     stage <- getStage
     rtsPath <- expr $ rtsBuildPath stage
-    mconcat [ cArgs
-            , cWarnings
+    mconcat [ cWarnings
             , prgFlags . ccProgram . tgtCCompiler <$> expr (targetStage Stage1)
             , queryTargetTarget tgtUnregisterised ? arg "-DUSE_MINIINTERPRETER"
             , arg "-Irts"
