@@ -136,7 +136,7 @@ configureEnvironment stage = do
     ldFlags <- interpretInContext context ldArgs
     sequence [ builderEnvironment "CC" $ Cc CompileC stage
              , builderEnvironment "CXX" $ Cc CompileC stage
-             , builderEnvironment "AR" (Ar Unpack stage)
+             , builderEnvironment "AR" $ Ar Unpack stage
              , builderEnvironment "NM" Nm
              , builderEnvironment "RANLIB" Ranlib
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
