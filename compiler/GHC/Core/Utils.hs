@@ -3265,8 +3265,8 @@ So:
 * When we make an AbsVars list, we close over the free vars of the unfoldings
   of any tyvars in it.  So if `b{=Maybe a}` is in the list then so is `a`
 
-* `mkCoreAbsLams` forms a lambda abstraction pushing the tyvar bindings
-  into the body:
+* `mkCoreAbsLams` (more generally `mkPolyAbsLams`) forms a lambda abstraction pushing
+   the tyvar bindings into the body:
       mkCoreAbsLams [a, b=[a], x:b] body
          = \a. \(x:[a]). let @b = [a] in body
 
@@ -3307,9 +3307,9 @@ mkPolyAbsLams (getter,setter) bndrs body
       = Lam (setter var1 bndr) (go unf_tvs binds' bndrs)
 
       | isId var, change_ty || change_unf
-      , let binds' | isDeadBinder var = binds
-                   | otherwise        = NonRec bndr (Var id2) : binds
-      = Lam (setter id2 bndr) (go unf_tvs binds' bndrs)
+--      , let binds' | isDeadBinder var = binds
+--                   | otherwise        = NonRec bndr (Var id2) : binds
+      = Lam (setter id2 bndr) (go unf_tvs binds bndrs)
 
       | otherwise
       = Lam bndr  (go unf_tvs binds bndrs)
