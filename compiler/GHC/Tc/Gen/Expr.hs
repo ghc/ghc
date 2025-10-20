@@ -54,6 +54,7 @@ import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic, hasFixedRuntimeRep 
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt ( srcCodeOriginErrCtxMsg )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types hiding (HoleError)
 
@@ -665,8 +666,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
 
         ; (ds_expr, ds_res_ty, err_msg)
             <- expandRecordUpd record_expr possible_parents rbnds res_ty
-        ; addErrCtxt err_msg $
-          setInGeneratedCode (OrigExpr expr) $
+        ; addExpansionErrCtxt (OrigExpr expr) err_msg $
           do { -- Typecheck the expanded expression.
                expr' <- tcExpr ds_expr (Check ds_res_ty)
                -- NB: it's important to use ds_res_ty and not res_ty here.
@@ -721,7 +721,7 @@ tcExpr (HsProjection _ _) _ = panic "GHC.Tc.Gen.Expr: tcExpr: HsProjection: Not 
 -- Here we get rid of it and add the finalizers to the global environment.
 -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
 tcExpr (HsTypedSplice ext splice)   res_ty = tcTypedSplice ext splice res_ty
-tcExpr e@(HsTypedBracket _ext body)    res_ty = tcTypedBracket e body res_ty
+tcExpr e@(HsTypedBracket _ext body) res_ty = tcTypedBracket e body res_ty
 
 tcExpr e@(HsUntypedBracket ps body) res_ty = tcUntypedBracket e body ps res_ty
 tcExpr (HsUntypedSplice splice _)   res_ty
@@ -756,14 +756,8 @@ tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 -}
 
 tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-
-tcXExpr (PopErrCtxt e) res_ty
-  = do popErrCtxt $ -- See Part 3 of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-         addExprCtxt e $
-         tcExpr e res_ty
-
 tcXExpr (ExpandedThingRn o e) res_ty
-   = setInGeneratedCode o $
+   = addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $
      -- e is the expanded expression of o, so we need to set the error ctxt to generated
      -- see Note [Error Context Stack] in `GHC.Tc.Type.LclEnv`
         mkExpandedTc o <$> -- necessary for hpc ticks

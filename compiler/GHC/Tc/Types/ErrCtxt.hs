@@ -4,7 +4,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module GHC.Tc.Types.ErrCtxt
-  ( ErrCtxt (..), ErrCtxtMsg(..), srcCodeOriginErrCtxMsg
+  ( ErrCtxt (..), ErrCtxtMsg(..), ErrCtxtMsgM,  CodeSrcFlag (..), srcCodeOriginErrCtxMsg
   , UserSigType(..), FunAppCtxtFunArg(..)
   , TyConInstFlavour(..)
   )
@@ -48,9 +48,11 @@ import qualified Data.List.NonEmpty as NE
 
 --------------------------------------------------------------------------------
 
+type ErrCtxtMsgM = TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
+
 -- | Additional context to include in an error message, e.g.
 -- "In the type signature ...", "In the ambiguity check for ...", etc.
-data ErrCtxt = UserCodeCtxt (Bool, TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg))
+data ErrCtxt = MkErrCtxt CodeSrcFlag ErrCtxtMsgM
              -- Monadic so that we have a chance
              -- to deal with bound type variables just before error
              -- message construction
@@ -58,11 +60,9 @@ data ErrCtxt = UserCodeCtxt (Bool, TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg))
              -- Bool:  True <=> this is a landmark context; do not
              --                 discard it when trimming for display
 
-             | ExpansionCodeCtxt SrcCodeOrigin
-             -- The payload is a SrcCodeOrigin because it is used to generate
-             -- 1. The CtOrigin for CtLoc, and
-             -- 2. ErrCtxtMsg in error messages
-
+data CodeSrcFlag = VanillaUserSrcCode
+                 | LandmarkUserSrcCode
+                 | ExpansionCodeCtxt SrcCodeOrigin
 
 --------------------------------------------------------------------------------
 -- Error message contexts
@@ -233,3 +233,4 @@ srcCodeOriginErrCtxMsg :: SrcCodeOrigin -> ErrCtxtMsg
 srcCodeOriginErrCtxMsg (OrigExpr e) = ExprCtxt e
 srcCodeOriginErrCtxMsg (OrigStmt s f) = StmtErrCtxt (HsDoStmt f) (unLoc s)
 srcCodeOriginErrCtxMsg (OrigPat  p) = PatCtxt p
+srcCodeOriginErrCtxMsg (PopErrCtxt) = error "Shouldn't happen srcCodeOriginErr"

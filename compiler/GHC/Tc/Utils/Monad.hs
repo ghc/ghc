@@ -63,7 +63,7 @@ module GHC.Tc.Utils.Monad(
   -- * Error management
   getSrcCodeOrigin,
   getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
-  inGeneratedCode, setInGeneratedCode,
+  inGeneratedCode, -- setInGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
@@ -88,6 +88,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
+  addExpansionErrCtxt, addExpansionErrCtxtM,
   addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM, mkCtLocEnv,
 
   -- * Diagnostic message generation (type checker)
@@ -1095,10 +1096,10 @@ getSrcCodeOrigin =
 --
 -- See Note [Error contexts in generated code]
 -- See Note [Error Context Stack]
-setInGeneratedCode :: SrcCodeOrigin -> TcRn a -> TcRn a
-setInGeneratedCode sco thing_inside =
-  -- updLclCtxt setLclCtxtInGenCode $
-  updLclCtxt (setLclCtxtSrcCodeOrigin sco) thing_inside
+-- setInGeneratedCode :: SrcCodeOrigin -> TcRn a -> TcRn a
+-- setInGeneratedCode sco thing_inside =
+--   -- updLclCtxt setLclCtxtInGenCode $
+--   updLclCtxt (setLclCtxtSrcCodeOrigin sco) thing_inside
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
@@ -1346,12 +1347,20 @@ addErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
+addExpansionErrCtxt :: SrcCodeOrigin -> ErrCtxtMsg -> TcM a -> TcM a
+{-# INLINE addExpansionErrCtxt #-}   -- Note [Inlining addErrCtxt]
+addExpansionErrCtxt o msg = addExpansionErrCtxtM o (\env -> return (env, msg))
+
 -- | Add a message to the error context. This message may do tidying.
 --   NB. No op in generated code
 --   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addErrCtxtM ctxt = pushCtxt (UserCodeCtxt (False, ctxt))
+addErrCtxtM ctxt = pushCtxt (MkErrCtxt VanillaUserSrcCode ctxt)
+
+addExpansionErrCtxtM :: SrcCodeOrigin -> (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
+{-# INLINE addExpansionErrCtxtM #-}  -- Note [Inlining addErrCtxt]
+addExpansionErrCtxtM o ctxt = pushCtxt (MkErrCtxt (ExpansionCodeCtxt o) ctxt)
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
@@ -1365,7 +1374,7 @@ addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 -- and tidying.
 addLandmarkErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addLandmarkErrCtxtM ctxt = pushCtxt (UserCodeCtxt (True, ctxt))
+addLandmarkErrCtxtM ctxt = pushCtxt (MkErrCtxt LandmarkUserSrcCode ctxt)
 
 -- | NB. no op in generated code
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
@@ -1837,18 +1846,17 @@ mkErrCtxt env ctxts
  where
    go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
    go _ _ _   [] = return []
-   go dbg n env (UserCodeCtxt (is_landmark, ctxt) : ctxts)
-     | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
+   go dbg n env (MkErrCtxt LandmarkUserSrcCode ctxt : ctxts)
+     | n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg) <- liftZonkM $ ctxt env
-          ; let n' = if is_landmark then n else n+1
-          ; rest <- go dbg n' env' ctxts
+          ; rest <- go dbg n env' ctxts
           ; return (msg : rest) }
      | otherwise
      = go dbg n env ctxts
-   go dbg n env (ExpansionCodeCtxt co : ctxts)
+   go dbg n env (MkErrCtxt _ ctxt : ctxts)
      | n < mAX_CONTEXTS -- Too verbose || dbg
-     = do { let msg = srcCodeOriginErrCtxMsg co
-          ; rest <- go dbg (n+1) env ctxts
+     = do { (env', msg) <- liftZonkM $ ctxt env
+          ; rest <- go dbg (n+1) env' ctxts
           ; return (msg : rest) }
      | otherwise
      = go dbg n env ctxts

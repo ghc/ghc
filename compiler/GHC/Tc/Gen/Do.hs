@@ -81,7 +81,7 @@ expand_do_stmts flav [stmt@(L sloc (LastStmt _ body@(L body_loc _) _ ret_expr))]
 -- See `checkLastStmt` and `Syntax.Expr.StmtLR.LastStmt`
    | NoSyntaxExprRn <- ret_expr
    -- Last statement is just body if we are not in ListComp context. See Syntax.Expr.LastStmt
-   = return $ L sloc (mkExpandedStmt stmt flav (HsPar noExtField body))
+   = return $ L sloc (mkExpandedLastStmt (HsPar noExtField body))
 
    | SyntaxExprRn ret <- ret_expr  -- We have unfortunately lost the location on the return function :(
    --
@@ -89,7 +89,7 @@ expand_do_stmts flav [stmt@(L sloc (LastStmt _ body@(L body_loc _) _ ret_expr))]
    --               return e  ~~> return e
    -- to make T18324 work
    = do let expansion = L body_loc (genHsApp ret body)
-        return $ L sloc (mkExpandedStmt stmt flav (HsPar noExtField expansion))
+        return $ L sloc (mkExpandedLastStmt (HsPar noExtField expansion))
 
 expand_do_stmts doFlavour (stmt@(L loc (LetStmt _ bs)) : lstmts) =
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (3) below
@@ -126,7 +126,7 @@ expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ e (SyntaxExprRn then_op) _)) 
 --      e ; stmts ~~> (>>) e stmts'
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      let expansion = genHsExpApps then_op  -- (>>)
-                     [ wrapNoSpan $ unLoc e -- Span is set because of statement loc
+                     [ e -- Span is set because of statement loc
                      , expand_stmts_expr ]
      return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 

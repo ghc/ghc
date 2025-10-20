@@ -951,10 +951,10 @@ addArgCtxt arg_no fun (L arg_loc arg) thing_inside
                                     , text "arg: " <+> ppr (arg, arg_no)
                                     , text "arg_loc:" <+> ppr arg_loc
                                     , text "fun:" <+> ppr fun
-                                    , text "err_ctx" <+> vcat (fmap (\ (x, y) -> case x of
-                                                                        UserCodeCtxt{} -> text "<USER>" <+> pprErrCtxtMsg y
-                                                                        ExpansionCodeCtxt{} -> text "<EXPN>" <+> pprErrCtxtMsg y)
-                                                               (take 4 (zip err_ctx err_ctx_msg)))
+                                    -- , text "err_ctx" <+> vcat (fmap (\ (x, y) -> case x of
+                                    --                                     UserCodeCtxt{} -> text "<USER>" <+> pprErrCtxtMsg y
+                                    --                                     ExpansionCodeCtxt{} -> text "<EXPN>" <+> pprErrCtxtMsg y)
+                                    --                            (take 4 (zip err_ctx err_ctx_msg)))
                                     ])
        ; if in_generated_code
          then updCtxtForArg (locA arg_loc) arg $

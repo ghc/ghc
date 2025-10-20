@@ -676,21 +676,20 @@ data SrcCodeOrigin
   = OrigExpr (HsExpr GhcRn)                -- ^ The source, user written, expression
   | OrigStmt (ExprLStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
   | OrigPat  (Pat GhcRn)                   -- ^ Used for failable patterns that trigger MonadFail constraints
+  | PopErrCtxt -- A hint for typechecker to pop
+               -- the top of the error context stack
+               -- Does not presist post renaming phase
+               -- See Part 3. of Note [Expanding HsDo with XXExprGhcRn]
+               -- in `GHC.Tc.Gen.Do`
 
 data XXExprGhcRn
   = ExpandedThingRn { xrn_orig     :: SrcCodeOrigin   -- The original source thing to be used for error messages
                     , xrn_expanded :: HsExpr GhcRn    -- The compiler generated, expanded thing
                     }
 
-  | PopErrCtxt                                     -- A hint for typechecker to pop
-    {-# UNPACK #-} !(HsExpr GhcRn)                 -- the top of the error context stack
-                                                   -- Does not presist post renaming phase
-                                                   -- See Part 3. of Note [Expanding HsDo with XXExprGhcRn]
-                                                   -- in `GHC.Tc.Gen.Do`
   | HsRecSelRn  (FieldOcc GhcRn)   -- ^ Variable pointing to record selector
                            -- See Note [Non-overloaded record field selectors] and
                            -- Note [Record selectors in the AST]
-
 
 -- | Build an expression using the extension constructor `XExpr`,
 --   and the two components of the expansion: original expression and
@@ -712,6 +711,12 @@ mkExpandedStmt
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigStmt oStmt flav
                                                          , xrn_expanded = eExpr })
+
+mkExpandedLastStmt
+  :: HsExpr GhcRn         -- ^ expanded expression
+  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedLastStmt eExpr = XExpr (ExpandedThingRn { xrn_orig = PopErrCtxt
+                                                  , xrn_expanded = eExpr })
 
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
@@ -1083,11 +1088,11 @@ instance Outputable SrcCodeOrigin where
         OrigExpr x    -> ppr_builder "<OrigExpr>:" x
         OrigStmt x _  -> ppr_builder "<OrigStmt>:" x
         OrigPat  x    -> ppr_builder "<OrigPat>:" x
+        PopErrCtxt    -> text "<PopErrCtxt>"
     where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
 
 instance Outputable XXExprGhcRn where
   ppr (ExpandedThingRn o e) = ifPprDebug (braces $ vcat [ppr o, text ";;" , ppr e]) (ppr o)
-  ppr (PopErrCtxt e)        = ifPprDebug (braces (text "<PopErrCtxt>" <+> ppr e)) (ppr e)
   ppr (HsRecSelRn f)        = pprPrefixOcc f
 
 instance Outputable XXExprGhcTc where
@@ -1133,7 +1138,6 @@ ppr_infix_expr _ = Nothing
 
 ppr_infix_expr_rn :: XXExprGhcRn -> Maybe SDoc
 ppr_infix_expr_rn (ExpandedThingRn thing _) = ppr_infix_hs_expansion thing
-ppr_infix_expr_rn (PopErrCtxt a)            = ppr_infix_expr a
 ppr_infix_expr_rn (HsRecSelRn f)            = Just (pprInfixOcc f)
 
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
@@ -1233,7 +1237,6 @@ hsExprNeedsParens prec = go
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn thing _ )   = hsExpandedNeedsParens thing
-    go_x_rn (PopErrCtxt a)               = hsExprNeedsParens prec a
     go_x_rn (HsRecSelRn{})               = False
 
     hsExpandedNeedsParens :: SrcCodeOrigin -> Bool
@@ -1286,7 +1289,6 @@ isAtomicHsExpr (XExpr x)
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn thing _)   = isAtomicExpandedThingRn thing
-    go_x_rn (PopErrCtxt a)              = isAtomicHsExpr a
     go_x_rn (HsRecSelRn{})              = True
 
     isAtomicExpandedThingRn :: SrcCodeOrigin -> Bool

@@ -1747,7 +1747,6 @@ repE e@(XExpr (ExpandedThingRn o x))
          else repE e }
   | otherwise
   = notHandled (ThExpressionForm e)
-repE (XExpr (PopErrCtxt e)) = repE e
 repE (XExpr (HsRecSelRn (FieldOcc _ (L _ x)))) = repE (mkHsVar (noLocA x))
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)

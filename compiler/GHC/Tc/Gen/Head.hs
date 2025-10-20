@@ -49,6 +49,7 @@ import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt ( srcCodeOriginErrCtxMsg )
 import GHC.Tc.Types.Constraint( WantedConstraints )
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Types.Evidence
@@ -269,7 +270,6 @@ splitHsApps e = go e noSrcSpan []
                     -- and its hard to say exactly what that is
                : EWrap (EExpand e)
                : args )
-    go (XExpr (PopErrCtxt fun)) lspan args = go fun lspan args
       -- look through PopErrCtxt (cf. T17594f) we do not want to lose the opportunity of calling tcEValArgQL
       -- unlike HsPar, it is okay to forget about the PopErrCtxts as it does not persist over in GhcTc land
 
@@ -471,9 +471,8 @@ tcInferAppHead_maybe fun =
     case fun of
       HsVar _ nm                  -> Just <$> tcInferId nm
       XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
-      XExpr (ExpandedThingRn o e) -> Just <$> (setInGeneratedCode o $ -- We do not want to instantiate c.f. T19167
-                                                tcExprSigma False e)
-      XExpr (PopErrCtxt e)        -> tcInferAppHead_maybe e
+      XExpr (ExpandedThingRn o e) -> Just <$> (addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $ -- We do not want to instantiate c.f. T19167
+                                                    tcExprSigma False e)
       ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit             -> Just <$> tcInferOverLit lit
       _                           -> return Nothing
