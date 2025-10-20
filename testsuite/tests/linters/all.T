@@ -3,7 +3,7 @@ def normalise_nos(s):
 
 setTestOpts(no_deps)  # linters don't need GHC to be built
 
-test('uniques', [extra_files(["checkUniques"])], makefile_test, ['uniques'])
+test('uniques', [extra_files(["checkUniques"]), unless(in_tree_compiler(), skip)], makefile_test, ['uniques'])
 
 test('makefiles', [ req_ls_files
                   , extra_files(["regex-linters"]) ]
