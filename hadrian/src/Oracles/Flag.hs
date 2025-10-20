@@ -96,7 +96,7 @@ platformSupportsSharedLibs = do
     ppc_linux     <- (&&) <$> anyTargetArch [ ArchPPC ] <*> anyTargetOs [ OSLinux ]
     solaris       <- (&&) <$> anyTargetArch [ ArchX86 ] <*> anyTargetOs [ OSSolaris2 ]
     javascript    <- anyTargetArch     [ ArchJavaScript ]
-    return $ not (windows || javascript || ppc_linux || solaris)
+    return $ not (javascript || ppc_linux || solaris)
 
 -- | Does the target support threaded RTS?
 targetSupportsThreadedRts :: Action Bool
