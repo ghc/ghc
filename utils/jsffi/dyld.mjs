@@ -834,6 +834,27 @@ class DyLD {
       );
     }
 
+    // Both wasi implementations we use provide
+    // wasi.initialize(instance) to initialize a wasip1 reactor
+    // module. However, instance does not really need to be a
+    // WebAssembly.Instance object; the wasi implementations only need
+    // to access instance.exports.memory for the wasi syscalls to
+    // work.
+    //
+    // Given we'll reuse the same wasi object across different
+    // WebAssembly.Instance objects anyway and
+    // wasi.initialize(instance) can't be called more than once, we
+    // use this simple trick and pass a fake instance object that
+    // contains just enough info for the wasi implementation to
+    // initialize its internal state. Later when we load each wasm
+    // shared library, we can just manually invoke their
+    // initialization functions.
+    this.#wasi.initialize({
+      exports: {
+        memory: this.#memory,
+      },
+    });
+
     // Keep this in sync with rts/wasm/Wasm.S!
     for (let i = 1; i <= 10; ++i) {
       this.#regs[`__R${i}`] = new WebAssembly.Global({
@@ -1157,22 +1178,6 @@ class DyLD {
         }
 
         throw new Error(`cannot handle export ${k} ${v}`);
-      }
-
-      // We call wasi.initialize when loading libc.so, then reuse the
-      // wasi instance globally. When loading later .so files, just
-      // manually invoke _initialize().
-      if (soname === "libc.so") {
-        instance.exports.__wasm_apply_data_relocs();
-        // wasm-ld forbits --export-memory with --shared, I don't know
-        // why but this is sufficient to make things work
-        this.#wasi.initialize({
-          exports: {
-            memory: this.#memory,
-            _initialize: instance.exports._initialize,
-          },
-        });
-        continue;
       }
 
       // See
