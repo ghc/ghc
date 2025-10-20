@@ -92,11 +92,10 @@ arSupportsAtFile stage = Toolchain.arSupportsAtFile . tgtAr <$> targetStage stag
 platformSupportsSharedLibs :: Action Bool
 -- FIXME: This is querying about the target but is named "platformXXX", targetSupportsSharedLibs would be better
 platformSupportsSharedLibs = do
-    windows       <- isWinTarget
     ppc_linux     <- (&&) <$> anyTargetArch [ ArchPPC ] <*> anyTargetOs [ OSLinux ]
     solaris       <- (&&) <$> anyTargetArch [ ArchX86 ] <*> anyTargetOs [ OSSolaris2 ]
     javascript    <- anyTargetArch     [ ArchJavaScript ]
-    return $ not (windows || javascript || ppc_linux || solaris)
+    return $ not (javascript || ppc_linux || solaris)
 
 -- | Does the target support threaded RTS?
 targetSupportsThreadedRts :: Action Bool
