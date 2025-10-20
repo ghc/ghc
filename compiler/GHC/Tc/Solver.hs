@@ -929,7 +929,7 @@ instance Outputable InferMode where
   ppr EagerDefaulting = text "EagerDefaulting"
   ppr NoRestrictions  = text "NoRestrictions"
 
-simplifyInfer :: TopLevelFlag
+simplifyInfer :: TopLevelFlag          -- Syntactically top-level
               -> TcLevel               -- Used when generating the constraints
               -> InferMode
               -> [TcIdSigInst]         -- Any signatures (possibly partial)

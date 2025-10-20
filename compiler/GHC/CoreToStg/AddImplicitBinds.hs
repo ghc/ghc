@@ -98,7 +98,6 @@ addImplicitBinds pgm_cfg mod_loc tycons binds
 
 mkImplicitBinds :: Bool -> ModLocation -> TyCon -> [CoreBind]
 -- See Note [Data constructor workers]
--- c.f. Note [Injecting implicit bindings] in GHC.Iface.Tidy
 mkImplicitBinds gen_debug_info mod_loc tycon
   = classop_binds ++ datacon_binds
   where

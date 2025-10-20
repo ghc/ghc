@@ -1302,7 +1302,7 @@ nestImplicTcS skol_info ev_binds_var inner_tclvl (TcS thing_inside)
       -- start with a completely empty inert set; in particular, no Givens
       -- See (SF3) in Note [Grand plan for static forms]
       -- in GHC.Iface.Tidy.StaticPtrTable
-      | StaticFormSkol <- skol_info
+      | isStaticSkolInfo skol_info
       = emptyInertSet inner_tclvl
 
       | otherwise

@@ -43,7 +43,60 @@ import Control.Monad (zipWithM, replicateM)
 import Data.List (elemIndex)
 import Data.List.NonEmpty ( NonEmpty(..) )
 
--- import GHC.Driver.Ppr
+{- Note [Desugaring HsExpr during pattern-match checking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+During patterm-match checking, we need do some simple analysis of /expressions/
+not just /patterns/.  Examples in pattern guards
+   let x = I# 3#      -- Now we know what `x` looks like
+   let x = Just 'z'   -- Info can be nested
+
+And we do some simple CSE:
+   let ys = reverse xs
+   let zs = reverse xs
+Here we can spot that ys~zs.   Example of the need for this CSE:
+   safeLast :: [a] -> Maybe a
+   safeLast xs
+     | []    <- reverse xs = Nothing
+     | (x:_) <- reverse xs = Just x
+
+   safeLast2 :: [a] -> Maybe a
+   safeLast2 (reverse -> [])    = Nothing
+   safeLast2 (reverse -> (x:_)) = Just x
+
+To achieve this "simple analysis" we make an auxiliary call the Hs desugarer to
+get the Core of a let-binding or where-clause.  In implementation terms:
+
+ * The "auxiliary desugaring" is done in this module, GHC.HsToCore.Pmc.Desugar,
+   by `desugarPatBind`, `desugarGRHSs` etc
+
+ * They often make a `PmLet` which contains a `CoreExpr`, the desugared version of the
+   `HsExpr`.
+
+ * This `CoreExpr` is ultimately absorbed into the solver by
+   `GHC.HsToCore.Pmc.Solver.addCoreCt`, which
+      - runs `simpleOptExpr` to remove any junk
+      - deals with the CSE stuff in `representCoreExpr`
+      - does simple analysis of the Core expression
+
+Wrinkles
+
+(DPM1) We don't want to run the coverage checker recursively when doint this
+  auxiliary desugaring!  Efficiency is one concern, but also a lack of properly
+  set up long-distance information might trigger warnings that we normally
+  wouldn't emit.
+
+  So the global field `dsl_nablas :: LdiNablas` where
+     data LdiNablas = NoPmc | Ldi Nablas
+  records whether we are in the coverage checker:
+
+  - If dsl_nablas = NoPmc, that means we are in one of these auxiliary calls; so
+    we want to do no pattern-match checking whatsoever.  We won't need to carry
+    any long-distance info around; we are simply degsugaring to Core.
+
+  - If dsl_nablas = Ldi nablas, then we do want to do pattern-match checking,
+    and the long-distance context is given by `nablas`
+-}
+
 
 -- | Smart constructor that eliminates trivial lets
 mkPmLetVar :: Id -> Id -> GrdDag
@@ -374,8 +427,8 @@ sequenceGrdDagMapM f as = sequenceGrdDags <$> traverse f as
 -- recursion, pattern bindings etc.
 -- See Note [Long-distance information for HsLocalBinds].
 desugarLocalBinds :: HsLocalBinds GhcTc -> DsM GrdDag
-desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
-  sequenceGrdDagMapM (sequenceGrdDagMapM go) (map snd binds)
+desugarLocalBinds (HsValBinds _ (XValBindsLR (HsVBG grps _))) =
+  sequenceGrdDagMapM go (hsValBindGroupsBinds grps)
   where
     go :: LHsBind GhcTc -> DsM GrdDag
     go (L _ FunBind{fun_id = L _ x, fun_matches = mg})

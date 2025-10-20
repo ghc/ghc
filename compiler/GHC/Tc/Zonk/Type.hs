@@ -677,13 +677,11 @@ zonkLocalBinds (EmptyLocalBinds x)
 zonkLocalBinds (HsValBinds _ (ValBinds {}))
   = panic "zonkLocalBinds" -- Not in typechecker output
 
-zonkLocalBinds (HsValBinds x (XValBindsLR (NValBinds binds sigs)))
-  = do  { new_binds <- traverse go binds
-        ; return (HsValBinds x (XValBindsLR (NValBinds new_binds sigs))) }
+zonkLocalBinds (HsValBinds x (XValBindsLR (HsVBG binds sigs)))
+  = do  { new_binds <- mapM go binds
+        ; return (HsValBinds x (XValBindsLR (HsVBG new_binds sigs))) }
   where
-    go (r,b)
-      = do { b' <- zonkRecMonoBinds b
-           ; return (r,b') }
+    go (r,b) = do { b' <- zonkRecMonoBinds b; return (r,b') }
 
 zonkLocalBinds (HsIPBinds x (IPBinds dict_binds binds )) = do
     new_binds <- noBinders $ mapM (wrapLocZonkMA zonk_ip_bind) binds
@@ -1080,9 +1078,10 @@ zonkExpr (HsProc x pat body)
         ; return (HsProc x new_pat new_body) }
 
 -- StaticPointers extension
-zonkExpr (HsStatic (fvs, ty) expr)
+zonkExpr (HsStatic (ty, fs) expr)
   = do new_ty <- zonkTcTypeToTypeX ty
-       HsStatic (fvs, new_ty) <$> zonkLExpr expr
+       new_fs <- zonkExpr fs
+       HsStatic (new_ty, new_fs) <$> zonkLExpr expr
 
 zonkExpr (HsEmbTy x _) = dataConCantHappen x
 zonkExpr (HsQual x _ _) = dataConCantHappen x

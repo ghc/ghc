@@ -432,7 +432,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
       --
       -- See Note [Don't attempt to trim data types]
       final_ids  = [ trimId (opt_trim_ids opts) id
-                   | id <- bindersOfBinds tidy_binds
+                   | id <- bindersOfBinds tidy_binds'
                    , isExternalName (idName id)
                    , not (isWiredIn id)
                    ]   -- See Note [Drop wired-in things]
@@ -442,9 +442,6 @@ tidyProgram opts (ModGuts { mg_module           = mod
       tidy_type_env  = typeEnvFromEntities final_ids final_tcs patsyns fam_insts
       tidy_cls_insts = mkFinalClsInsts tidy_type_env $ mkInstEnv cls_insts
       tidy_rules     = tidyRules tidy_env trimmed_rules
-
-      -- See Note [Injecting implicit bindings]
-      all_tidy_binds = tidy_binds'
 
       -- Get the TyCons to generate code for.  Careful!  We must use
       -- the untidied TyCons here, because we need
@@ -458,13 +455,13 @@ tidyProgram opts (ModGuts { mg_module           = mod
 
       local_ccs
         | opt_collect_ccs opts
-              = collectCostCentres mod all_tidy_binds tidy_rules
+              = collectCostCentres mod tidy_binds' tidy_rules
         | otherwise
               = S.empty
 
   return (CgGuts { cg_module        = mod
                  , cg_tycons        = alg_tycons
-                 , cg_binds         = all_tidy_binds
+                 , cg_binds         = tidy_binds'
                  , cg_ccs           = S.toList local_ccs
                  , cg_foreign       = all_foreign_stubs
                  , cg_foreign_files = foreign_files

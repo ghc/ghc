@@ -621,7 +621,8 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
 
     VarPat x (L l name) -> do
       { (wrap, id) <- tcPatBndr penv name scaled_exp_pat_ty
-      ; res <- tcCheckUsage name w_pat $ tcExtendIdEnv1 name id thing_inside
+      ; res <- tcCheckUsage name w_pat $
+               tcExtendIdEnv1 name id thing_inside
       ; pat_ty <- readExpType exp_pat_ty
       ; return (mkHsWrapPat wrap (VarPat x (L l id)) pat_ty, res) }
 

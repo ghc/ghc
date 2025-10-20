@@ -875,24 +875,23 @@ isInfixFunBind (FunBind { fun_matches = MG _ matches })
 isInfixFunBind _ = False
 
 -- |Return the 'SrcSpan' encompassing the contents of any enclosed binds
-spanHsLocaLBinds :: HsLocalBinds (GhcPass p) -> SrcSpan
-spanHsLocaLBinds (EmptyLocalBinds _) = noSrcSpan
-spanHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
-  = foldr combineSrcSpans noSrcSpan (bsSpans ++ sigsSpans)
-  where
-    bsSpans :: [SrcSpan]
-    bsSpans = map getLocA bs
-    sigsSpans :: [SrcSpan]
-    sigsSpans = map getLocA sigs
-spanHsLocaLBinds (HsValBinds _ (XValBindsLR (NValBinds bs sigs)))
-  = foldr combineSrcSpans noSrcSpan (bsSpans ++ sigsSpans)
-  where
-    bsSpans :: [SrcSpan]
-    bsSpans = map getLocA $ concatMap snd bs
-    sigsSpans :: [SrcSpan]
-    sigsSpans = map getLocA sigs
+spanHsLocaLBinds :: forall p. IsPass p => HsLocalBinds (GhcPass p) -> SrcSpan
+spanHsLocaLBinds (EmptyLocalBinds _)
+  = noSrcSpan
 spanHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
-  = foldr combineSrcSpans noSrcSpan (map getLocA bs)
+  = get_bind_spans bs []
+spanHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
+  = get_bind_spans bs sigs
+spanHsLocaLBinds (HsValBinds _ (XValBindsLR (HsVBG bs ss)))
+  = get_bind_spans (hsValBindGroupsBinds @p bs) ss
+
+get_bind_spans :: (HasLoc l) => [GenLocated l a] -> [GenLocated l b] -> SrcSpan
+get_bind_spans binds sigs
+  = foldr combineSrcSpans noSrcSpan (bs_spans ++ sigs_spans)
+  where
+    bs_spans, sigs_spans :: [SrcSpan]
+    bs_spans   = map getLocA binds
+    sigs_spans = map getLocA sigs
 
 ------------
 -- | Convenience function using 'mkFunBind'.
@@ -1064,7 +1063,7 @@ isBangedHsBind (PatBind {pat_lhs = pat})
 isBangedHsBind _
   = False
 
-collectLocalBinders :: CollectPass (GhcPass idL)
+collectLocalBinders :: (IsPass idL, CollectPass (GhcPass idL))
                     => CollectFlag (GhcPass idL)
                     -> HsLocalBindsLR (GhcPass idL) (GhcPass idR)
                     -> [IdP (GhcPass idL)]
@@ -1074,14 +1073,14 @@ collectLocalBinders flag = \case
     HsIPBinds {}       -> []
     EmptyLocalBinds _  -> []
 
-collectHsIdBinders :: CollectPass (GhcPass idL)
+collectHsIdBinders :: (IsPass idL, CollectPass (GhcPass idL))
                    => CollectFlag (GhcPass idL)
                    -> HsValBindsLR (GhcPass idL) (GhcPass idR)
                    -> [IdP (GhcPass idL)]
 -- ^ Collect 'Id' binders only, or 'Id's + pattern synonyms, respectively
 collectHsIdBinders flag = collect_hs_val_binders True flag
 
-collectHsValBinders :: CollectPass (GhcPass idL)
+collectHsValBinders :: (IsPass idL, CollectPass (GhcPass idL))
                     => CollectFlag (GhcPass idL)
                     -> HsValBindsLR (GhcPass idL) idR
                     -> [IdP (GhcPass idL)]
@@ -1107,21 +1106,14 @@ collectHsBindListBinders :: forall p idR. CollectPass p
 -- ^ Same as 'collectHsBindsBinders', but works over a list of bindings
 collectHsBindListBinders flag = foldr (collect_bind False flag . unXRec @p) []
 
-collect_hs_val_binders :: CollectPass (GhcPass idL)
+collect_hs_val_binders :: forall idL idR. (IsPass idL, CollectPass (GhcPass idL))
                        => Bool
                        -> CollectFlag (GhcPass idL)
                        -> HsValBindsLR (GhcPass idL) idR
                        -> [IdP (GhcPass idL)]
 collect_hs_val_binders ps flag = \case
-    ValBinds _ binds _              -> collect_binds ps flag binds []
-    XValBindsLR (NValBinds binds _) -> collect_out_binds ps flag binds
-
-collect_out_binds :: forall p. CollectPass p
-                  => Bool
-                  -> CollectFlag p
-                  -> [(RecFlag, LHsBinds p)]
-                  -> [IdP p]
-collect_out_binds ps flag = foldr (collect_binds ps flag . snd) []
+    ValBinds _ binds _         -> collect_binds ps flag binds []
+    XValBindsLR (HsVBG grps _) -> collect_binds ps flag (hsValBindGroupsBinds @idL grps) []
 
 collect_binds :: forall p idR. CollectPass p
               => Bool
@@ -1530,8 +1522,8 @@ hsPatSynSelectors :: IsPass p => HsValBinds (GhcPass p) -> [FieldOcc (GhcPass p)
 -- ^ Collects record pattern-synonym selectors only; the pattern synonym
 -- names are collected by 'collectHsValBinders'.
 hsPatSynSelectors (ValBinds _ _ _) = panic "hsPatSynSelectors"
-hsPatSynSelectors (XValBindsLR (NValBinds binds _))
-  = foldr addPatSynSelector [] . concat $ map snd binds
+hsPatSynSelectors (XValBindsLR (HsVBG grps _))
+  = foldr addPatSynSelector [] $ hsValBindGroupsBinds grps
 
 addPatSynSelector :: forall p. UnXRec p => LHsBind p -> [FieldOcc p] -> [FieldOcc p]
 addPatSynSelector bind sels
@@ -1539,11 +1531,10 @@ addPatSynSelector bind sels
   = map recordPatSynField as ++ sels
   | otherwise = sels
 
-getPatSynBinds :: forall id. UnXRec id
-               => [(RecFlag, LHsBinds id)] -> [PatSynBind id id]
+getPatSynBinds :: [(RecFlag, LHsBinds GhcRn)] -> [PatSynBind GhcRn GhcRn]
 getPatSynBinds binds
   = [ psb | (_, lbinds) <- binds
-          , (unXRec @id -> (PatSynBind _ psb)) <- lbinds ]
+          , L _ (PatSynBind _ psb) <- lbinds ]
 
 -------------------
 hsLInstDeclBinders :: (IsPass p, OutputableBndrId p)
@@ -1814,8 +1805,8 @@ lStmtsImplicits = hs_lstmts
 
 hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR)
                     -> [(SrcSpan, [ImplicitFieldBinders])]
-hsValBindsImplicits (XValBindsLR (NValBinds binds _))
-  = concatMap (lhsBindsImplicits . snd) binds
+hsValBindsImplicits (XValBindsLR (HsVBG grps _))
+  = lhsBindsImplicits (hsValBindGroupsBinds grps)
 hsValBindsImplicits (ValBinds _ binds _)
   = lhsBindsImplicits binds
 

@@ -675,7 +675,8 @@ tcExprSig expr sig@(TcPartialSig (PSig { psig_name = name, psig_loc = loc }))
                         = NoRestrictions
        ; ((qtvs, givens, ev_binds, _), residual)
            <- captureConstraints $
-              simplifyInfer NotTopLevel tclvl infer_mode [sig_inst] [(name, tau)] wanted
+              simplifyInfer NotTopLevel tclvl infer_mode
+                            [sig_inst] [(name, tau)] wanted
        ; emitConstraints residual
 
        ; tau <- liftZonkM $ zonkTcType tau

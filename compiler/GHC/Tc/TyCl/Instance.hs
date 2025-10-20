@@ -433,7 +433,7 @@ tcInstDeclsDeriv deriv_infos derivds
   = do th_lvl <- getThLevel -- See Note [Deriving inside TH brackets]
        if isBrackLevel th_lvl
        then do { gbl_env <- getGblEnv
-               ; return (gbl_env, bagToList emptyBag, emptyValBindsOut) }
+               ; return (gbl_env, bagToList emptyBag, emptyValBindsRn) }
        else do { (tcg_env, info_bag, valbinds) <- tcDeriving deriv_infos derivds
                ; return (tcg_env, bagToList info_bag, valbinds) }
 

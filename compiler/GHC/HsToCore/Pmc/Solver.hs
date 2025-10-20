@@ -843,6 +843,7 @@ addVarCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } } x y =
 --   * Finally, if we have @let x = e@ and we already have seen @let y = e@, we
 --     want to record @x ~ y@.
 addCoreCt :: Nabla -> Id -> CoreExpr -> MaybeT DsM Nabla
+-- See Note [Desugaring HsExpr during pattern-match checking]
 addCoreCt nabla x e = do
   simpl_opts <- initSimpleOpts <$> getDynFlags
   let e' = simpleOptExpr simpl_opts e

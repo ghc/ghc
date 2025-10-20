@@ -186,11 +186,15 @@ deSugar hsc_env
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
                           ; (ds_fords, foreign_prs) <- dsForeigns fords
                           ; ds_rules <- mapMaybeM dsRule rules
+                          ; static_prs <- getStaticBinds
                           ; let hpc_init
                                   | gopt Opt_Hpc dflags = hpcInitCode (targetPlatform $ hsc_dflags hsc_env) mod ds_hpc_info
                                   | otherwise = mempty
                           ; return ( ds_ev_binds
-                                   , foreign_prs `appOL` core_prs `appOL` spec_prs
+                                   , static_prs
+                                     `appOL` foreign_prs
+                                     `appOL` core_prs
+                                     `appOL` spec_prs
                                    , spec_rules ++ ds_rules
                                    , ds_fords `appendStubC` hpc_init) } }
 

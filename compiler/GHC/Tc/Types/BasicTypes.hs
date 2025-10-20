@@ -14,8 +14,6 @@ module GHC.Tc.Types.BasicTypes (
   -- * TcTyThing
   , TcTyThing(..)
   , IdBindingInfo(..)
-  , IsGroupClosed(..)
-  , RhsNames
   , ClosedTypeId
   , tcTyThingCategory
   , tcTyThingTyCon_maybe
@@ -33,8 +31,6 @@ import GHC.Types.Var
 import GHC.Types.SrcLoc
 import GHC.Types.Name
 import GHC.Types.TyThing
-import GHC.Types.Name.Env
-import GHC.Types.Name.Set
 
 import GHC.Hs.Extension ( GhcRn )
 
@@ -309,7 +305,7 @@ data TcTyThing
 
   | ATcId           -- Ids defined in this module; may not be fully zonked
       { tct_id   :: Id
-      , tct_info :: IdBindingInfo   -- See Note [Meaning of IdBindingInfo]
+      , tct_info :: IdBindingInfo
       }
 
   | ATyVar  Name TcTyVar   -- See Note [Type variables in the type environment]
@@ -346,69 +342,16 @@ instance Outputable TcTyThing where     -- Debugging only
 -- b) to figure out when a nested binding can be generalised,
 --    in 'GHC.Tc.Gen.Bind.decideGeneralisationPlan'.
 --
-data IdBindingInfo -- See Note [Meaning of IdBindingInfo]
-    = NotLetBound
-    | ClosedLet
-    | NonClosedLet
-         RhsNames        -- Used for (static e) checks only
-         ClosedTypeId    -- Used for generalisation checks
-                         -- and for (static e) checks
-
--- | IsGroupClosed describes a group of mutually-recursive bindings
-data IsGroupClosed
-  = IsGroupClosed
-      (NameEnv RhsNames)  -- Free var info for the RHS of each binding in the group
-                          -- Used only for (static e) checks
-
-      ClosedTypeId        -- True <=> all the free vars of the group are
-                          --          imported or ClosedLet or
-                          --          NonClosedLet with ClosedTypeId=True.
-                          --          In particular, no tyvars, no NotLetBound
-
-type RhsNames = NameSet   -- Names of variables, mentioned on the RHS of
-                          -- a definition, that are not Global or ClosedLet
+data IdBindingInfo
+    = NotLetBound              -- Bound by lambda or case
+    | LetBound ClosedTypeId    -- Bound by let, incl top level
 
 type ClosedTypeId = Bool
-  -- See Note [Meaning of IdBindingInfo]
+  -- See Note [Bindings with closed types: ClosedTypeId]
 
-{- Note [Meaning of IdBindingInfo]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-NotLetBound means that
-  the Id is not let-bound (e.g. it is bound in a
-  lambda-abstraction or in a case pattern)
-
-ClosedLet means that
-   - The Id is let-bound,
-   - Any free term variables are also Global or ClosedLet
-   - Its type has no free variables (NB: a top-level binding subject
-     to the MR might have free vars in its type)
-   These ClosedLets can definitely be floated to top level; and we
-   may need to do so for static forms.
-
-   Property:   ClosedLet
-             is equivalent to
-               NonClosedLet emptyNameSet True
-
-(NonClosedLet (fvs::RhsNames) (cl::ClosedTypeId)) means that
-   - The Id is let-bound
-
-   - The fvs::RhsNames contains the free names of the RHS,
-     excluding Global and ClosedLet ones.
-
-   - For the ClosedTypeId field see Note [Bindings with closed types: ClosedTypeId]
-
-For (static e) to be valid, we need for every 'x' free in 'e',
-that x's binding is floatable to the top level.  Specifically:
-   * x's RhsNames must be empty
-   * x's type has no free variables
-See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
-This test is made in GHC.Tc.Gen.Expr.checkClosedInStaticForm.
-Actually knowing x's RhsNames (rather than just its emptiness
-or otherwise) is just so we can produce better error messages
-
-Note [Bindings with closed types: ClosedTypeId]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
+{- Note [Bindings with closed types: ClosedTypeId]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ClosedTypeId is all about generalisation.
 
   f x = let g ys = map not ys
         in ...
@@ -507,10 +450,9 @@ in the type environment.
 -}
 
 instance Outputable IdBindingInfo where
-  ppr NotLetBound = text "NotLetBound"
-  ppr ClosedLet = text "TopLevelLet"
-  ppr (NonClosedLet fvs closed_type) =
-    text "TopLevelLet" <+> ppr fvs <+> ppr closed_type
+  ppr NotLetBound    = text "NotLetBound"
+  ppr (LetBound cls) = text "LetBound"
+                       <> if cls then text "(closed)" else text "(not-closed)"
 
 --------------
 pprTcTyThingCategory :: TcTyThing -> SDoc

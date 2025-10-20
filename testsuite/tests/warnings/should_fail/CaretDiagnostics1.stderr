@@ -1,5 +1,5 @@
 CaretDiagnostics1.hs:7:8-15: error: [GHC-83865]
-    • Couldn't match expected type ‘IO a0’ with actual type ‘Int’
+    • Couldn't match expected type ‘IO a1’ with actual type ‘Int’
     • In the second argument of ‘(+)’, namely ‘(3 :: Int)’
       In a stmt of a 'do' block:
         10000000000000000000000000000000000000 + 2 + (3 :: Int)
@@ -23,9 +23,9 @@ CaretDiagnostics1.hs:8:9-27: error: [GHC-83865]
   |         ^^^^^^^^^^^^^^^^^^^
 
 CaretDiagnostics1.hs:13:7-11: error: [GHC-83865]
-    • Couldn't match type: a1 -> a1
+    • Couldn't match type: a0 -> a0
                      with: [Char]
-      Expected: a1 -> a1
+      Expected: a0 -> a0
         Actual: String
     • In the pattern: "γηξ"
       In a case alternative: "γηξ" -> () '0'

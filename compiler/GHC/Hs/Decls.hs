@@ -110,7 +110,7 @@ import {-# SOURCE #-} GHC.Hs.Expr (pprExpr, pprUntypedSplice)
         -- Because Expr imports Decls via HsBracket
 
 import GHC.Hs.Binds (ActivationAnn(..),
-                     emptyValBindsIn, emptyValBindsOut, isEmptyValBinds,
+                     emptyValBindsIn, emptyValBindsRn, isEmptyValBinds,
                      plusHsValBinds, pprDeclList, pprLHsBindsForUser)
 import GHC.Hs.Type
 import GHC.Hs.Doc
@@ -202,9 +202,11 @@ type instance XCHsGroup (GhcPass _) = NoExtField
 type instance XXHsGroup (GhcPass _) = DataConCantHappen
 
 
-emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup (GhcPass p)
+emptyGroup, emptyRdrGroup :: HsGroup (GhcPass p)
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
-emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
+
+emptyRnGroup :: HsGroup GhcRn
+emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsRn }
 
 emptyGroup = HsGroup { hs_ext = noExtField,
                        hs_tyclds = [],

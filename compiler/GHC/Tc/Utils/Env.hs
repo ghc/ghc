@@ -25,7 +25,7 @@ module GHC.Tc.Utils.Env(
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
         lookupGlobal, lookupGlobal_maybe,
-        addTypecheckedBinds,
+        addTypecheckedBinds, addEvBinds, addTopEvBinds,
         failIllegalTyCon, failIllegalTyVar,
 
         -- Local environment
@@ -88,8 +88,9 @@ import GHC.Iface.Load
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import {-# SOURCE #-} GHC.Tc.Utils.TcMType ( tcCheckUsage )
+import GHC.Tc.Utils.TcMType ( tcCheckUsage )
 import GHC.Tc.Types.LclEnv
+import GHC.Tc.Types.Evidence
 
 import GHC.Core.InstEnv
 import GHC.Core.DataCon ( DataCon, dataConTyCon, flSelector )
@@ -116,7 +117,7 @@ import GHC.Utils.Misc ( HasDebugCallStack )
 
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
-import GHC.Data.Maybe( MaybeErr(..), orElse, maybeToList, fromMaybe )
+import GHC.Data.Maybe( MaybeErr(..), maybeToList, fromMaybe )
 
 import GHC.Types.SrcLoc
 import GHC.Types.TypeEnv
@@ -137,6 +138,8 @@ import GHC.Iface.Errors.Types
 import GHC.Rename.Unbound ( unknownNameSuggestions )
 import GHC.Tc.Errors.Types.PromotionErr
 import {-# SOURCE #-} GHC.Tc.Errors.Hole (getHoleFitDispConfig)
+
+import GHC.Data.Bag
 
 import Control.Monad
 import Data.IORef
@@ -211,6 +214,17 @@ addTypecheckedBinds tcg_env binds
   | otherwise = tcg_env { tcg_binds = foldr (++)
                                             (tcg_binds tcg_env)
                                             binds }
+
+addEvBinds :: TcGblEnv -> Bag EvBind -> TcGblEnv
+addEvBinds tcg_env ev_binds
+  = tcg_env { tcg_ev_binds = tcg_ev_binds tcg_env `unionBags` ev_binds }
+
+addTopEvBinds :: Bag EvBind -> TcM a -> TcM a
+-- Defined here (rather than in GHC.Tc.Utils.Monad)
+-- because it depends on addEvBinds
+addTopEvBinds new_ev_binds thing_inside
+  = updGblEnv (\env -> env `addEvBinds` new_ev_binds) thing_inside
+
 {-
 ************************************************************************
 *                                                                      *
@@ -662,7 +676,8 @@ tcExtendNameTyVarEnv binds thing_inside
 
 isTypeClosedLetBndr :: Id -> Bool
 -- See Note [Bindings with closed types: ClosedTypeId] in GHC.Tc.Types
-isTypeClosedLetBndr = noFreeVarsOfType . idType
+isTypeClosedLetBndr id
+   = noFreeVarsOfType (idType id)
 
 tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
 -- Used for binding the recursive uses of Ids in a binding
@@ -670,13 +685,16 @@ tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
 -- Does not extend the TcBinderStack
 tcExtendRecIds pairs thing_inside
   = tc_extend_local_env NotTopLevel
-          [ (name, ATcId { tct_id   = let_id
-                         , tct_info = NonClosedLet emptyNameSet False })
+          [ (name, ATcId { tct_id   = let_id, tct_info = info  })
           | (name, let_id) <- pairs ] $
     thing_inside
+  where
+    is_closed = False
+    info = LetBound is_closed
 
 tcExtendSigIds :: TopLevelFlag -> [TcId] -> TcM a -> TcM a
 -- Used for binding the Ids that have a complete user type signature
+--   within a single recursive group.
 -- Does not extend the TcBinderStack
 tcExtendSigIds top_lvl sig_ids thing_inside
   = tc_extend_local_env top_lvl
@@ -684,35 +702,32 @@ tcExtendSigIds top_lvl sig_ids thing_inside
                               , tct_info = info })
           | id <- sig_ids
           , let closed = isTypeClosedLetBndr id
-                info   = NonClosedLet emptyNameSet closed ]
+                info   = LetBound closed ]
      thing_inside
 
 
-tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
-                  -> [Scaled TcId] -> TcM a -> TcM a
+tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> ClosedTypeId
+                  -> [Scaled TcId] -> TcM a
+                  -> TcM a
 -- Used for both top-level value bindings and nested let/where-bindings
+-- Used for a single NonRec or a single Rec
 -- Adds to the TcBinderStack too
-tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
-               ids thing_inside
+-- Note (ELE) For Ids that are in `sig_fn` we have /already/ extended the env,
+--    using `tcExtendSigIds`, so no point in doing so again.  Moreover, for
+--    those Ids, we want closed-ness to be driven entirely by the signature,
+--    and not by the free vars (which are embodied in `closed`.
+tcExtendLetEnv top_lvl sig_fn closed ids thing_inside
   = tcExtendBinderStack [TcIdBndr id top_lvl | Scaled _ id <- ids] $
     tc_extend_local_env top_lvl
-          [ (idName id, ATcId { tct_id   = id
-                              , tct_info = mk_tct_info id })
-          | Scaled _ id <- ids ] $
-    foldr check_usage thing_inside scaled_names
+          [ (id_nm, ATcId { tct_id = id, tct_info = LetBound closed })
+          | Scaled _ id <- ids
+          , let id_nm = idName id
+          , not (hasCompleteSig sig_fn id_nm)  -- See (ELE) above
+          ] $
+    foldr check_one_usg thing_inside ids
   where
-    mk_tct_info id
-      | type_closed && isEmptyNameSet rhs_fvs = ClosedLet
-      | otherwise                             = NonClosedLet rhs_fvs type_closed
-      where
-        name        = idName id
-        rhs_fvs     = lookupNameEnv fvs name `orElse` emptyNameSet
-        type_closed = isTypeClosedLetBndr id &&
-                      (fv_type_closed || hasCompleteSig sig_fn name)
-    scaled_names = [Scaled p (idName id) | Scaled p id <- ids ]
-    check_usage :: Scaled Name -> TcM a -> TcM a
-    check_usage (Scaled p id) thing_inside = do
-      tcCheckUsage id p thing_inside
+    check_one_usg (Scaled mult id) thing_inside
+      = tcCheckUsage (idName id) mult thing_inside
 
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
 -- For lambda-bound and case-bound Ids

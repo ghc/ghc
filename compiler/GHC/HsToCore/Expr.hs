@@ -29,6 +29,7 @@ import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Pmc
+import GHC.HsToCore.Types( LdiNablas(..) )
 import GHC.HsToCore.Pmc.Utils
 import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Quote
@@ -44,7 +45,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Instance.Class (lookupHasFieldLabel)
 
 import GHC.Core
-import GHC.Core.FVs( exprsFreeVarsList )
+import GHC.Core.FVs( exprFreeVarsList, exprsFreeVarsList )
 import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
@@ -94,9 +95,9 @@ dsLocalBinds (HsIPBinds _ binds)  body = dsIPBinds  binds body
 -------------------------
 -- caller sets location
 dsValBinds :: HsValBinds GhcTc -> CoreExpr -> DsM CoreExpr
-dsValBinds (XValBindsLR (NValBinds binds _)) body
+dsValBinds (XValBindsLR (HsVBG grps _)) body
   = do { dflags <- getDynFlags
-       ; foldrM (ds_val_bind dflags) body binds }
+       ; foldrM (ds_val_bind dflags) body grps }
 dsValBinds (ValBinds {})       _    = panic "dsValBinds ValBindsIn"
 
 -------------------------
@@ -118,7 +119,9 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
 
 -------------------------
 -- caller sets location
-ds_val_bind :: DynFlags -> (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
+ds_val_bind :: DynFlags
+            -> (RecFlag, LHsBinds GhcTc) -> CoreExpr
+            -> DsM CoreExpr
 -- Special case for bindings which bind unlifted variables
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.
@@ -178,7 +181,8 @@ ds_val_bind dflags (NonRecursive, hsbinds) body
         ; let rhs' = mkOptTickBox rhs_tick rhs_expr
         ; let body_ty = exprType body
         ; let mult = getTcMultAnn mult_ann
-        ; error_expr <- mkErrorAppDs pAT_ERROR_ID body_ty (ppr pat')
+        ; error_expr <- mkErrorAppDs pAT_ERROR_ID body_ty (ppr pat)
+                        -- Show the original user-written `pat` in error msg
         ; matchSimply rhs' PatBindRhs mult pat' body error_expr }
     -- This is the one place where matchSimply is given a non-ManyTy
     -- multiplicity argument.
@@ -191,19 +195,24 @@ ds_val_bind dflags (NonRecursive, hsbinds) body
 -- Ordinary case for bindings; none should be unlifted
 ds_val_bind _ (is_rec, binds) body
   = do  { massert (isRec is_rec || isSingleton binds)
-               -- we should never produce a non-recursive list of multiple binds
+          -- We should never produce a non-recursive list of multiple binds
 
         ; (force_vars,prs) <- dsLHsBinds binds
-        ; let body' = foldr seqVar body force_vars
-        ; assertPpr (not (any (isUnliftedType . idType . fst) prs)) (ppr is_rec $$ ppr binds) $
+
+        ; assertPpr (not (any (isUnliftedType . idType . fst) prs))
+                    (ppr is_rec $$ ppr binds) $
+          return ()
           -- NB: bindings have a fixed RuntimeRep, so it's OK to call isUnliftedType
-          case prs of
+
+        ; case prs of
             [] -> return body
-            _  -> return (mkLets (mk_binds is_rec prs) body') }
+            _  -> return (mkLets (mk_binds is_rec prs) $
+                          foldr seqVar body force_vars )
             -- We can make a non-recursive let because we make sure to return
             -- the bindings in dependency order in dsLHsBinds,
             -- see Note [Return non-recursive bindings in dependency order] in
             -- GHC.HsToCore.Binds
+        }
 
 -- | Helper function. You can use the result of 'mk_binds' with 'mkLets' for
 -- instance.
@@ -458,28 +467,53 @@ dsExpr (ArithSeq expr witness seq)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
 for an overview.
-    g = ... static f ...
-==>
-    g = ... makeStatic loc f ...
+        ... static{from_static_ptr} e ...
+    ==>
+        s = /\abc. makeStatic e
+        ... (from_static_ptr (s @a @b @c)) ...
+
+Here `from_static_ptr` is a suitably-instantiated instantiated version of
+the overloaded function `fromStaticPtr`.
 -}
 
-dsExpr (HsStatic (_, whole_ty) expr@(L loc _))
-  = do { expr_ds <- dsLExpr expr
-       ; let (_, [ty]) = splitTyConApp whole_ty
-       ; makeStaticId <- dsLookupGlobalId makeStaticName
+dsExpr (HsStatic (static_ptr_ty, from_static_fun) expr@(L loc _))
+  = do { dflags <- getDynFlags
 
-       ; dflags <- getDynFlags
-       ;  let platform = targetPlatform dflags
-              (line, col) = case locA loc of
+       ; make_static_id <- dsLookupGlobalId makeStaticName
+       ; expr_ds        <- dsLExpr expr
+       ; from_static_ds <- dsExpr from_static_fun
+
+       -- The static expression can have free type variables,
+       -- which we should quantify.  We can also have free Ids,
+       -- but they will be bound at top level
+       ; let (_, [ty]) = splitTyConApp static_ptr_ty
+
+             static_fvs :: [Var]
+             static_fvs = scopedSort $
+                          filter isTyVar $
+                          exprFreeVarsList expr_ds
+
+             platform = targetPlatform dflags
+             (line, col) = case locA loc of
                   RealSrcSpan r _ -> ( srcLocLine $ realSrcSpanStart r
                                      , srcLocCol  $ realSrcSpanStart r )
                   _               -> (0, 0)
-              srcLoc = mkCoreTup [ mkIntExprInt platform line
-                                 , mkIntExprInt platform col
-                                 ]
+             srcLoc = mkCoreTup [ mkIntExprInt platform line
+                                , mkIntExprInt platform col ]
 
-       ; putSrcSpanDsA loc $ return $
-         mkCoreApps (Var makeStaticId) [ Type ty, srcLoc, expr_ds ] }
+             static_rhs = mkLams static_fvs $
+                          mkCoreApps (Var make_static_id) [ Type ty, srcLoc, expr_ds ]
+
+       ; static_id <- newStaticId (mkSpecForAllTys static_fvs static_ptr_ty)
+
+       -- Emit the static bindings to top level, but NOT when we are in
+       -- the auxiliary desugaring for the pattern-match checking
+       ; ldi_nablas <- getPmNablas
+       ; case ldi_nablas of
+           NoPmc  -> return ()
+           Ldi {} -> emitStaticBinds [(static_id, static_rhs)]
+
+       ; return (App from_static_ds (mkVarApps (Var static_id) static_fvs)) }
 
 {- Note [Desugaring record construction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

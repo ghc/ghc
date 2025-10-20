@@ -6,7 +6,7 @@
   (HsGroup
    (NoExtField)
    (XValBindsLR
-    (NValBinds
+    (HsVBG
      [((,)
        (NonRecursive)
        [(L
