@@ -482,7 +482,7 @@ dsExpr (HsStatic (_, whole_ty) expr@(L loc _))
 
              static_rhs = mkCoreApps (Var make_static_id) [ Type ty, srcLoc, expr_ds ]
 
-       ; emitStaticBinding static_id static_rhs
+       ; emitStaticBind static_id static_rhs
 
        ; return (Var static_id) }
 
