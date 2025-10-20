@@ -300,6 +300,7 @@ Library
         GHC.Internal.Stack.CCS
         GHC.Internal.Stack.CloneStack
         GHC.Internal.Stack.Constants
+        GHC.Internal.Stack.ConstantsProf
         GHC.Internal.Stack.Decode
         GHC.Internal.Stack.Types
         GHC.Internal.Stats
