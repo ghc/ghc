@@ -18,5 +18,6 @@ abi:                  00000000000000000000000000000000
 exposed:              True
 exposed-modules:
 extra-libraries:      @CXX_STD_LIB_LIBS@
+extra-libraries-static: @CXX_STD_LIB_LIBS@
 library-dirs:         @CXX_STD_LIB_LIB_DIRS@
 dynamic-library-dirs: @CXX_STD_LIB_DYN_LIB_DIRS@

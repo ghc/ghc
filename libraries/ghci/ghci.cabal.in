@@ -1,9 +1,10 @@
+cabal-version:  3.8
 -- WARNING: ghci.cabal is automatically generated from ghci.cabal.in by
 -- ../../configure.  Make sure you are editing ghci.cabal.in, not ghci.cabal.
 
 name:           ghci
 version:        @ProjectVersionMunged@
-license:        BSD3
+license:        BSD-3-Clause
 license-file:   LICENSE
 category:       GHC
 maintainer:     ghc-devs@haskell.org
@@ -13,7 +14,6 @@ description:
             This library offers interfaces which mediate interactions between the
             @ghci@ interactive shell and @iserv@, GHC's out-of-process interpreter
             backend.
-cabal-version:  >=1.10
 build-type:     Simple
 extra-source-files: changelog.md
 
