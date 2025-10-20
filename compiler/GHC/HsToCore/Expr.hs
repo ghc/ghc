@@ -465,22 +465,26 @@ for an overview.
 -}
 
 dsExpr (HsStatic (_, whole_ty) expr@(L loc _))
-  = do { expr_ds <- dsLExpr expr
-       ; let (_, [ty]) = splitTyConApp whole_ty
-       ; makeStaticId <- dsLookupGlobalId makeStaticName
+  = do { dflags <- getDynFlags
+       ; static_id <- newStaticId whole_ty
 
-       ; dflags <- getDynFlags
-       ;  let platform = targetPlatform dflags
-              (line, col) = case locA loc of
+       ; make_static_id <- dsLookupGlobalId makeStaticName
+       ; expr_ds        <- dsLExpr expr
+       ; let (_, [ty]) = splitTyConApp whole_ty
+
+             platform = targetPlatform dflags
+             (line, col) = case locA loc of
                   RealSrcSpan r _ -> ( srcLocLine $ realSrcSpanStart r
                                      , srcLocCol  $ realSrcSpanStart r )
                   _               -> (0, 0)
-              srcLoc = mkCoreTup [ mkIntExprInt platform line
-                                 , mkIntExprInt platform col
-                                 ]
+             srcLoc = mkCoreTup [ mkIntExprInt platform line
+                                , mkIntExprInt platform col ]
 
-       ; putSrcSpanDsA loc $ return $
-         mkCoreApps (Var makeStaticId) [ Type ty, srcLoc, expr_ds ] }
+             static_rhs = mkCoreApps (Var make_static_id) [ Type ty, srcLoc, expr_ds ]
+
+       ; emitStaticBinding static_id static_rhs
+
+       ; return (Var static_id) }
 
 {- Note [Desugaring record construction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
