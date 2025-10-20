@@ -37,7 +37,6 @@ import GHC.Tc.Types.Evidence
 import GHC.Types.Id.Info ( RecSelParent )
 import GHC.Types.Name
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.SourceText
@@ -361,9 +360,10 @@ type instance XArithSeq      GhcTc = PostTcExpr
 type instance XProc          (GhcPass _) = (EpToken "proc", TokRarrow)
 
 type instance XStatic        GhcPs = EpToken "static"
-type instance XStatic        GhcRn = NameSet
-type instance XStatic        GhcTc = (NameSet, Type)
-  -- Free variables and type of expression, this is stored for convenience as wiring in
+type instance XStatic        GhcRn = NoExtField
+type instance XStatic        GhcTc = (Type, HsExpr GhcTc)
+  -- Type of expression, and the (fromStaticPtr function)
+  -- These are stored for convenience as the wiring in
   -- StaticPtr is a bit tricky (see #20150)
 
 type instance XEmbTy         GhcPs = EpToken "type"

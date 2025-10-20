@@ -421,7 +421,7 @@ getRealSpan :: SrcSpan -> Maybe Span
 getRealSpan (RealSrcSpan sp _) = Just sp
 getRealSpan _ = Nothing
 
-grhss_span :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p)))) ~ EpAnn NoEpAnns)
+grhss_span :: (IsPass p, Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p)))) ~ EpAnn NoEpAnns)
            => GRHSs (GhcPass p) (LocatedA (body (GhcPass p))) -> SrcSpan
 grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (spanHsLocaLBinds bs) (NE.map getLocA xs)
 
@@ -1428,7 +1428,7 @@ instance HiePass p => ToHie (RScoped (HsLocalBinds (GhcPass p))) where
                       valBinds
         ]
 
-scopeHsLocaLBinds :: HsLocalBinds (GhcPass p) -> Scope
+scopeHsLocaLBinds :: forall p. IsPass p => HsLocalBinds (GhcPass p) -> Scope
 scopeHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
   = foldr combineScopes NoScope (bsScope ++ sigsScope)
   where
@@ -1436,11 +1436,11 @@ scopeHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
     bsScope = map (mkScope . getLoc) bs
     sigsScope :: [Scope]
     sigsScope = map (mkScope . getLocA) sigs
-scopeHsLocaLBinds (HsValBinds _ (XValBindsLR (NValBinds bs sigs)))
+scopeHsLocaLBinds (HsValBinds _ (XValBindsLR (HsVBG grps sigs)))
   = foldr combineScopes NoScope (bsScope ++ sigsScope)
   where
     bsScope :: [Scope]
-    bsScope = map (mkScope . getLoc) $ concatMap snd bs
+    bsScope = map (mkScope . getLoc) (hsValBindGroupsBinds @p grps)
     sigsScope :: [Scope]
     sigsScope = map (mkScope . getLocA) sigs
 
@@ -1464,9 +1464,9 @@ instance HiePass p => ToHie (RScoped (HsValBindsLR (GhcPass p) (GhcPass p))) whe
       ]
     XValBindsLR x -> [ toHie $ RS sc x ]
 
-instance HiePass p => ToHie (RScoped (NHsValBindsLR (GhcPass p))) where
-  toHie (RS sc (NValBinds binds sigs)) = concatM $
-    [ toHie (concatMap (map (BC RegularBind sc) . snd) binds)
+instance HiePass p => ToHie (RScoped (HsValBindGroups p)) where
+  toHie (RS sc (HsVBG binds sigs)) = concatM $
+    [ toHie (map (BC RegularBind sc) (hsValBindGroupsBinds @p binds))
     , toHie $ fmap (SC (SI BindSig Nothing)) sigs
     ]
 

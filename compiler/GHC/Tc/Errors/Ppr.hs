@@ -845,26 +845,11 @@ instance Diagnostic TcRnMessage where
                 = note "Type-directed disambiguation is not supported for pattern synonym record fields"
                 | otherwise
                 = empty
-    TcRnStaticFormNotClosed name reason
+    TcRnStaticFormNotClosed name
       -> mkSimpleDecorated $
-           quotes (ppr name)
-             <+> text "is used in a static form but it is not closed"
-             <+> text "because it"
-             $$ sep (causes reason)
-         where
-          causes :: NotClosedReason -> [SDoc]
-          causes NotLetBoundReason = [text "is not let-bound."]
-          causes (NotTypeClosed vs) =
-            [ text "has a non-closed type because it contains the"
-            , text "type variables:" <+>
-              pprVarSet vs (hsep . punctuate comma . map (quotes . ppr))
-            ]
-          causes (NotClosed n reason) =
-            let msg = text "uses" <+> quotes (ppr n) <+> text "which"
-             in case reason of
-                  NotClosed _ _ -> msg : causes reason
-                  _   -> let (xs0, xs1) = splitAt 1 $ causes reason
-                          in fmap (msg <+>) xs0 ++ xs1
+         hang (quotes (ppr name) <+> text "is used in a static form")
+            2 (text "but it is not defined at top level")
+
     TcRnUselessTypeable
       -> mkSimpleDecorated $
            text "Deriving" <+> quotes (ppr typeableClassName) <+>
@@ -5688,7 +5673,7 @@ usefulContext implics pred
     go :: [Implication] -> [SkolemInfoAnon]
     go [] = []
     go (ic : ics)
-       | StaticFormSkol <- ic_info ic = []
+       | isStaticSkolInfo (ic_info ic) = []
          -- Stop at a static form, because all outer Givens are irrelevant
          -- See (SF3) in Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
        | implausible ic               = rest

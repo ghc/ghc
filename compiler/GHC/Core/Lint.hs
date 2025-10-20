@@ -1075,10 +1075,9 @@ lintIdOcc in_id nargs
 
           -- Check for a nested occurrence of the StaticPtr constructor.
           -- See Note [Checking StaticPtrs].
-        ; lf <- getLintFlags
-        ; when (nargs /= 0 && lf_check_static_ptrs lf /= AllowAnywhere) $
-            checkL (idName in_id /= makeStaticName) $
-              text "Found makeStatic nested in an expression"
+        ; when (nargs /= 0) $
+          checkL (idName in_id /= makeStaticName) $
+          text "Found makeStatic nested in an expression"
 
         ; checkDeadIdOcc in_id
 
@@ -3004,12 +3003,8 @@ data LintFlags
 
 -- See Note [Checking StaticPtrs]
 data StaticPtrCheck
-    = AllowAnywhere
-        -- ^ Allow 'makeStatic' to occur anywhere.
-    | AllowAtTopLevel
-        -- ^ Allow 'makeStatic' calls at the top-level only.
-    | RejectEverywhere
-        -- ^ Reject any 'makeStatic' occurrence.
+    = AllowAtTopLevel  -- ^ Allow 'makeStatic' calls at the top-level only.
+    | RejectEverywhere -- ^ Reject any 'makeStatic' occurrence.
   deriving Eq
 
 newtype LintM a =
@@ -3063,17 +3058,12 @@ Note [Checking StaticPtrs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable for an overview.
 
-Every occurrence of the function 'makeStatic' should be moved to the
-top level by the FloatOut pass.  It's vital that we don't have nested
-'makeStatic' occurrences after CorePrep, because we populate the Static
-Pointer Table from the top-level bindings. See SimplCore Note [Grand
-plan for static forms].
+Every occurrence of the function 'makeStatic' should be at top level.
+It's vital that we don't have nested 'makeStatic' occurrences after
+CorePrep, because we populate the Static Pointer Table from the
+top-level bindings. See SimplCore Note [Grand plan for static forms].
 
-The linter checks that no occurrence is left behind, nested within an
-expression. The check is enabled only after the FloatOut, CorePrep,
-and CoreTidy passes and only if the module uses the StaticPointers
-language extension. Checking more often doesn't help since the condition
-doesn't hold until after the first FloatOut pass.
+The linter checks that no occurrence or `makeStatic` occurs nested.
 
 Note [Type substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -8,9 +8,9 @@ module GHC.Tc.Types.Origin (
   ReportRedundantConstraints(..), reportRedundantConstraints,
   redundantConstraintsSpan,
 
-  -- * SkolemInfo
+  -- * SkolemInfo, SkolemInfoAnon
   SkolemInfo(..), SkolemInfoAnon(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo,
-  unkSkol, unkSkolAnon,
+  unkSkol, unkSkolAnon, isStaticSkolInfo,
 
   -- * CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -267,6 +267,11 @@ data SkolemInfoAnon
        [(Name,TcTyVar)]    -- Maps the original name of the skolemised tyvar
                            -- to its instantiated version
 
+  | InferSkol
+       [(Name,TcType)]  -- We have inferred a type for these (mutually recursive)
+                        -- polymorphic Ids, and are now checking that their RHS
+                        -- constraints are satisfied.
+
   | SigTypeSkol UserTypeCtxt
                  -- like SigSkol, but when we're kind-checking the *type*
                  -- hence, we have less info
@@ -302,11 +307,6 @@ data SkolemInfoAnon
 
   | RuleSkol RuleName   -- The LHS of a RULE
   | SpecESkol Name      -- A SPECIALISE pragma
-
-  | InferSkol [(Name,TcType)]
-                        -- We have inferred a type for these (mutually recursive)
-                        -- polymorphic Ids, and are now checking that their RHS
-                        -- constraints are satisfied.
 
   | BracketSkol         -- Template Haskell bracket
 
@@ -458,6 +458,11 @@ in the right place.  So we proceed as follows:
   that the foral-bound variables of the signature we report line up with
   the instantiated skolems lying  around in other types.
 -}
+
+isStaticSkolInfo :: SkolemInfoAnon -> Bool
+isStaticSkolInfo StaticFormSkol = True
+isStaticSkolInfo _              = False
+
 
 {- *********************************************************************
 *                                                                      *

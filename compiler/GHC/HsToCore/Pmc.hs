@@ -30,6 +30,7 @@
 module GHC.HsToCore.Pmc (
         -- Checking and printing
         pmcPatBind, pmcMatches, pmcGRHSs, pmcRecSel,
+        initNablasMatches,
         isMatchContextPmChecked, isMatchContextPmChecked_SinglePat,
 
         -- See Note [Long-distance information]
@@ -45,6 +46,7 @@ import GHC.HsToCore.Pmc.Utils
 import GHC.HsToCore.Pmc.Desugar
 import GHC.HsToCore.Pmc.Check
 import GHC.HsToCore.Pmc.Solver
+import GHC.HsToCore.Types
 import GHC.Types.Basic (Origin(..), isDoExpansionGenerated)
 import GHC.Core
 import GHC.Driver.DynFlags
@@ -77,26 +79,37 @@ import GHC.Tc.Utils.Monad
 -- capturing long-distance information, or the trivially habitable 'Nablas' if
 -- the former is uninhabited.
 -- See Note [Recovering from unsatisfiable pattern-matching constraints].
-getLdiNablas :: DsM Nablas
+getLdiNablas :: DsM LdiNablas
 getLdiNablas = do
   nablas <- getPmNablas
-  isInhabited nablas >>= \case
-    True  -> pure nablas
-    False -> pure initNablas
+  case nablas of
+    NoPmc      -> pure NoPmc
+    Ldi nablas -> isInhabited nablas >>= \case
+                     True  -> pure (Ldi nablas)
+                     False -> pure (Ldi initNablas)
 
 -- | We need to call the Hs desugarer to get the Core of a let-binding or where
 -- clause. We don't want to run the coverage checker when doing so! Efficiency
 -- is one concern, but also a lack of properly set up long-distance information
 -- might trigger warnings that we normally wouldn't emit.
-noCheckDs :: DsM a -> DsM a
-noCheckDs = updTopFlags (\dflags -> foldl' wopt_unset dflags allPmCheckWarnings)
+-- See (DPM1) in Note [Desugaring HsExpr during pattern-match checking]
+dontDoPmc :: DsM a -> DsM a
+dontDoPmc thing_inside = updPmNablas NoPmc thing_inside
+
+whenDoingPmc :: a -> (Nablas -> DsM a) -> DsM a
+-- See (DPM1) in Note [Desugaring HsExpr during pattern-match checking]
+whenDoingPmc no_pmc thing_inside
+  = do { ldi_nablas <- getLdiNablas
+       ; case ldi_nablas of
+            NoPmc      -> return no_pmc
+            Ldi nablas -> thing_inside nablas }
 
 -- | Check a pattern binding (let, where) for exhaustiveness.
-pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM Nablas
+pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM LdiNablas
 pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
-  = mb_discard_warnings $ do
-      !missing <- getLdiNablas
-      pat_bind <- noCheckDs $ desugarPatBind loc var p
+  = whenDoingPmc NoPmc $ \ !missing ->
+    mb_discard_warnings $ do
+      pat_bind <- dontDoPmc $ desugarPatBind loc var p
       tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
       result <- unCA (checkPatBind pat_bind) missing
       let ldi = ldiGRHS $ ( \ pb -> case pb of PmPatBind grhs -> grhs) $ cr_ret result
@@ -124,21 +137,21 @@ pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
 pmcGRHSs
   :: HsMatchContextRn             -- ^ Match context, for warning messages
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
-  -> DsM (NonEmpty Nablas)        -- ^ Covered 'Nablas' for each RHS, for long
-                                  --   distance info
-pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
-  let combined_loc = foldl1 combineSrcSpans (NE.map getLocA grhss)
-      ctxt = DsMatchContext hs_ctxt combined_loc
-  !missing <- getLdiNablas
-  matches  <- noCheckDs $ desugarGRHSs combined_loc empty guards
-  tracePm "pmcGRHSs" (hang (vcat [ppr ctxt
-                                , text "Guards:"])
-                                2
-                                (pprGRHSs hs_ctxt guards $$ ppr missing))
-  result <- unCA (checkGRHSs matches) missing
-  tracePm "}: " (ppr (cr_uncov result))
-  formatReportWarnings ReportGRHSs ctxt [] result
-  return (ldiGRHSs (cr_ret result))
+  -> DsM (NonEmpty LdiNablas)     -- ^ Covered 'Nablas' for each RHS,
+                                  --   for long distance info
+pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) =
+  whenDoingPmc (NE.map (const NoPmc) grhss) $ \ !missing -> do
+    let combined_loc = foldl1 combineSrcSpans (NE.map getLocA grhss)
+        ctxt = DsMatchContext hs_ctxt combined_loc
+    matches  <- dontDoPmc $ desugarGRHSs combined_loc empty guards
+    tracePm "pmcGRHSs" (hang (vcat [ppr ctxt
+                                  , text "Guards:"])
+                                  2
+                                  (pprGRHSs hs_ctxt guards $$ ppr missing))
+    result <- unCA (checkGRHSs matches) missing
+    tracePm "}: " (ppr (cr_uncov result))
+    formatReportWarnings ReportGRHSs ctxt [] result
+    return (ldiGRHSs (cr_ret result))
 
 -- | Check a list of syntactic 'Match'es (part of case, functions, etc.), each
 -- with a 'Pat' and one or more 'GRHSs':
@@ -160,37 +173,44 @@ pmcMatches
   -> DsMatchContext                  -- ^ Match context, for warnings messages
   -> [Id]                            -- ^ Match variables, i.e. x and y above
   -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
-  -> DsM [(Nablas, NonEmpty Nablas)] -- ^ One covered 'Nablas' per Match and
-                                     --   GRHS, for long distance info.
-pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-} do
-  -- We have to force @missing@ before printing out the trace message,
-  -- otherwise we get interleaved output from the solver. This function
-  -- should be strict in @missing@ anyway!
-  !missing <- getLdiNablas
-  tracePm "pmcMatches {" $
-          hang (vcat [ppr origin, ppr ctxt, ppr vars, text "Matches:"])
-               2
-               ((ppr matches) $$ (text "missing:" <+> ppr missing))
-  case NE.nonEmpty matches of
-    Nothing -> do
-      -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
-      let var = only vars
-      empty_case <- noCheckDs $ desugarEmptyCase var
-      result <- unCA (checkEmptyCase empty_case) missing
-      tracePm "}: " (ppr (cr_uncov result))
-      formatReportWarnings ReportEmptyCase ctxt vars result
-      return []
-    Just matches -> do
-      matches <- {-# SCC "desugarMatches" #-}
-                 noCheckDs $ desugarMatches vars matches
-      tracePm "desugared matches" (ppr matches)
-      result  <- {-# SCC "checkMatchGroup" #-}
-                 unCA (checkMatchGroup matches) missing
-      tracePm "}: " (ppr (cr_uncov result))
-      unless (isDoExpansionGenerated origin) -- Do expansion generated code shouldn't emit overlapping warnings
-        ({-# SCC "formatReportWarnings" #-}
-        formatReportWarnings ReportMatchGroup ctxt vars result)
-      return (NE.toList (ldiMatchGroup (cr_ret result)))
+  -> DsM [(LdiNablas, NonEmpty LdiNablas)] -- ^ One covered 'Nablas' per Match and
+                                           --   GRHS, for long distance info.
+pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-}
+  whenDoingPmc (initNablasMatches NoPmc matches) $ \ !missing -> do
+      -- We have to force @missing@ before printing out the trace message,
+      -- otherwise we get interleaved output from the solver. This function
+      -- should be strict in @missing@ anyway!
+    tracePm "pmcMatches {" $
+            hang (vcat [ppr origin, ppr ctxt, ppr vars, text "Matches:"])
+                 2
+                 ((ppr matches) $$ (text "missing:" <+> ppr missing))
+    case NE.nonEmpty matches of
+      Nothing -> do
+        -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
+        let var = only vars
+        empty_case <- dontDoPmc $ desugarEmptyCase var
+        result <- unCA (checkEmptyCase empty_case) missing
+        tracePm "}: " (ppr (cr_uncov result))
+        formatReportWarnings ReportEmptyCase ctxt vars result
+        return []
+      Just matches -> do
+        matches <- {-# SCC "desugarMatches" #-}
+                   dontDoPmc $ desugarMatches vars matches
+        tracePm "desugared matches" (ppr matches)
+        result  <- {-# SCC "checkMatchGroup" #-}
+                   unCA (checkMatchGroup matches) missing
+        tracePm "}: " (ppr (cr_uncov result))
+        unless (isDoExpansionGenerated origin) -- Do expansion generated code shouldn't emit overlapping warnings
+          ({-# SCC "formatReportWarnings" #-}
+          formatReportWarnings ReportMatchGroup ctxt vars result)
+        return (NE.toList (ldiMatchGroup (cr_ret result)))
+
+initNablasMatches :: LdiNablas -> [LMatch GhcTc b] -> [(LdiNablas, NonEmpty LdiNablas)]
+initNablasMatches ldi_nablas ms
+  = map (\(L _ m) -> (ldi_nablas, initNablasGRHSs ldi_nablas (m_grhss m))) ms
+  where
+    initNablasGRHSs :: LdiNablas -> GRHSs GhcTc b -> NonEmpty LdiNablas
+    initNablasGRHSs ldi_nablas m = NE.map (const ldi_nablas) (grhssGRHSs m)
 
 {-
 Note [Detecting incomplete record selectors]
@@ -361,9 +381,8 @@ pmcRecSel sel_id arg
   | RecSelId{ sel_cons = rec_sel_info } <- idDetails sel_id
   , RSI { rsi_def = cons_w_field, rsi_undef = cons_wo_field } <- rec_sel_info
   , not (null cons_wo_field)
-  = do { !missing <- getLdiNablas
-
-       ; tracePm "pmcRecSel {" (ppr sel_id)
+  = whenDoingPmc () $ \ !missing ->
+    do { tracePm "pmcRecSel {" (ppr sel_id)
        ; CheckResult{ cr_ret = PmRecSel{ pr_arg_var = arg_id }, cr_uncov = uncov_nablas }
            <- unCA (checkRecSel (PmRecSel () arg cons_w_field)) missing
        ; tracePm "}: " $ ppr uncov_nablas
@@ -415,18 +434,18 @@ discardWarningsDs.
 -- * Collecting long-distance information
 --
 
-ldiMatchGroup :: PmMatchGroup Post -> NonEmpty (Nablas, NonEmpty Nablas)
+ldiMatchGroup :: PmMatchGroup Post -> NonEmpty (LdiNablas, NonEmpty LdiNablas)
 ldiMatchGroup (PmMatchGroup matches) = ldiMatch <$> matches
 
-ldiMatch :: PmMatch Post -> (Nablas, NonEmpty Nablas)
+ldiMatch :: PmMatch Post -> (LdiNablas, NonEmpty LdiNablas)
 ldiMatch (PmMatch { pm_pats = red, pm_grhss = grhss }) =
-  (rs_cov red, ldiGRHSs grhss)
+  (Ldi (rs_cov red), ldiGRHSs grhss)
 
-ldiGRHSs :: PmGRHSs Post -> NonEmpty Nablas
+ldiGRHSs :: PmGRHSs Post -> NonEmpty LdiNablas
 ldiGRHSs (PmGRHSs { pgs_grhss = grhss }) = ldiGRHS <$> grhss
 
-ldiGRHS :: PmGRHS Post -> Nablas
-ldiGRHS (PmGRHS { pg_grds = red }) = rs_cov red
+ldiGRHS :: PmGRHS Post -> LdiNablas
+ldiGRHS (PmGRHS { pg_grds = red }) = Ldi (rs_cov red)
 
 --
 -- * Collecting redundancy information
@@ -620,9 +639,11 @@ getNFirstUncovered mode vars n (MkNablas nablas) = go n (bagToList nablas)
 -- with 'unsafeInterleaveM' in order not to do unnecessary work.
 locallyExtendPmNablas :: DsM a -> (Nablas -> DsM Nablas) -> DsM a
 locallyExtendPmNablas k ext = do
-  nablas <- getLdiNablas
-  nablas' <- unsafeInterleaveM $ ext nablas
-  updPmNablas nablas' k
+  ldi_nablas <- getLdiNablas
+  case ldi_nablas of
+     NoPmc      -> k  -- No nablas to extend, easy!
+     Ldi nablas -> do { nablas' <- unsafeInterleaveM $ ext nablas
+                      ; updPmNablas (Ldi nablas') k }
 
 -- | Add in-scope type constraints if the coverage checker might run and then
 -- run the given action.
@@ -670,18 +691,22 @@ Consider
 
 Humans can make the "long-distance connection" between the outer pattern match
 and the nested case pattern match to see that the inner pattern match is
-exhaustive: @c@ can't be @R@ anymore because it was matched in the first clause
-of @f@.
+exhaustive: `c` can't be `R` anymore because it was matched in the first clause
+of `f`.
 
-To achieve similar reasoning in the coverage checker, we keep track of the set
-of values that can reach a particular program point (often loosely referred to
-as "Covered set") in 'GHC.HsToCore.Monad.dsl_nablas'.
-We fill that set with Covered Nablas returned by the exported checking
-functions, which the call sites put into place with
-'GHC.HsToCore.Monad.updPmNablas'.
-Call sites also extend this set with facts from type-constraint dictionaries,
-case scrutinees, etc. with the exported functions 'addTyCs', 'addCoreScrutTmCs'
-and 'addHsScrutTmCs'.
+To achieve similar reasoning in the coverage checker:
+
+* We keep track of the set of values that can reach a particular program point
+  (often loosely refer red to as "Covered set") in 'GHC.HsToCore.Monad.dsl_nablas
+  :: LdiNablas'.
+
+* We fill that set with Covered Nablas returned by the exported checking functions,
+  which the call sites put into place with 'GHC.HsToCore.Monad.updPmNablas'.
+
+* Call sites also extend this set with facts from type-constraint dictionaries,
+  case scrutinees, etc. with the exported functions 'addTyCs', 'addCoreScrutTmCs'
+  and 'addHsScrutTmCs'.
+
 
 Note [Recovering from unsatisfiable pattern-matching constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

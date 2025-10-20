@@ -524,7 +524,7 @@ zonkSkolemInfoAnon :: SkolemInfoAnon -> ZonkM SkolemInfoAnon
 zonkSkolemInfoAnon (SigSkol cx ty tv_prs) = do { ty' <- zonkTcType ty
                                                ; return (SigSkol cx ty' tv_prs) }
 zonkSkolemInfoAnon (InferSkol ntys) = do { ntys' <- mapM do_one ntys
-                                     ; return (InferSkol ntys') }
+                                         ; return (InferSkol ntys') }
   where
     do_one (n, ty) = do { ty' <- zonkTcType ty; return (n, ty') }
 zonkSkolemInfoAnon skol_info = return skol_info

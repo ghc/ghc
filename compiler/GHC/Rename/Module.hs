@@ -178,7 +178,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
-   (rn_val_decls@(XValBindsLR (NValBinds _ sigs')), bind_dus) <- if is_boot
+   (rn_val_decls@(XValBindsLR (HsVBG _ sigs')), bind_dus) <- if is_boot
     -- For an hs-boot, use tc_bndrs (which collects how we're renamed
     -- signatures), since val_bndr_set is empty (there are no x = ...
     -- bindings in an hs-boot.)

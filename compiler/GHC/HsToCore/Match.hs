@@ -39,7 +39,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.HsToCore.Pmc
 import GHC.HsToCore.Pmc.Utils
-import GHC.HsToCore.Pmc.Types ( Nablas )
+import GHC.HsToCore.Types ( LdiNablas )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Binds
 import GHC.HsToCore.GuardedRHSs
@@ -833,7 +833,9 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
         ; return (new_vars, result_expr) }
   where
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
+    mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc)
+                -> (LdiNablas, NonEmpty LdiNablas)
+                -> DsM EquationInfo
     mk_eqn_info (L _ (Match { m_pats = L _ pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
            ; let upats = map (decideBangHood dflags) pats
@@ -849,13 +851,6 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
       if requiresPMC orig
       then id
       else discardWarningsDs
-
-    initNablasMatches :: Nablas -> [LMatch GhcTc b] -> [(Nablas, NonEmpty Nablas)]
-    initNablasMatches ldi_nablas ms
-      = map (\(L _ m) -> (ldi_nablas, initNablasGRHSs ldi_nablas (m_grhss m))) ms
-
-    initNablasGRHSs :: Nablas -> GRHSs GhcTc b -> NonEmpty Nablas
-    initNablasGRHSs ldi_nablas m = ldi_nablas <$ grhssGRHSs m
 
 {- Note [Long-distance information in matchWrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -985,7 +980,7 @@ matchSinglePatVar var mb_scrut ctx pat ty match_result
 
        ; match [var] ty [eqn_info] }
 
-updPmNablasMatchResult :: Nablas -> MatchResult r -> MatchResult r
+updPmNablasMatchResult :: LdiNablas -> MatchResult r -> MatchResult r
 updPmNablasMatchResult nablas = \case
   MR_Infallible body_fn -> MR_Infallible $
     updPmNablas nablas body_fn

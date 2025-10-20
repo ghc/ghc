@@ -72,7 +72,6 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 
@@ -570,7 +569,7 @@ tcExpr (HsProc x pat cmd) res_ty
 -- and wrap (static e) in a call to
 --    fromStaticPtr :: IsStatic p => StaticPtr a -> p a
 
-tcExpr (HsStatic fvs expr) res_ty
+tcExpr (HsStatic _ expr) res_ty
   = do  { res_ty          <- expTypeToType res_ty
         ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
         ; (expr', lie) <- captureConstraints $
@@ -586,12 +585,6 @@ tcExpr (HsStatic fvs expr) res_ty
         ; emitImplications implic
         ; let expr'' = mkLHsWrap (mkWpLet ev_binds) expr'
 
-        -- Check that the free variables of the static form are closed.
-        -- It's OK to use nonDetEltsUniqSet here as the only side effects of
-        -- checkClosedInStaticForm are error messages.
-        -- See (SF2) Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
-        ; mapM_ checkClosedInStaticForm $ nonDetEltsUniqSet fvs
-
         -- Require the type of the argument to be Typeable.
         ; typeableClass <- tcLookupClass typeableClassName
         ; typeable_ev <- emitWantedEvVar StaticOrigin $
@@ -599,16 +592,16 @@ tcExpr (HsStatic fvs expr) res_ty
                                     [liftedTypeKind, expr_ty]
 
         -- Wrap the static form with the 'fromStaticPtr' call.
-        ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName
-                                             [p_ty]
-        ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
-        ; loc <- getSrcSpanM
+        --   fromStaticPtr :: forall p. (IsStatic p) =>
+        --                    forall a. (Typeable a) =>
+        --                    StaticPtr a -> p a
+        ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName [p_ty]
         ; static_ptr_ty_con <- tcLookupTyCon staticPtrTyConName
+        ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
+              static_expr_ty = mkTyConApp static_ptr_ty_con [expr_ty]
         ; return $ mkHsWrapCo co $
-          HsApp noExtField
-              (L (noAnnSrcSpan loc) $ mkHsWrap wrap fromStaticPtr)
-              (L (noAnnSrcSpan loc) (HsStatic (fvs, mkTyConApp static_ptr_ty_con [expr_ty])
-                                              expr''))
+          HsStatic (static_expr_ty, mkHsWrap wrap fromStaticPtr)
+                   expr''
         }
 
 tcExpr (HsEmbTy _ _)      _ = failWith (TcRnIllegalTypeExpr TypeKeywordSyntax)
@@ -1513,7 +1506,7 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
 
              let_binds :: HsLocalBindsLR GhcRn GhcRn
              let_binds = HsValBinds noAnn $ XValBindsLR
-                       $ NValBinds upd_ids_lhs (map mk_idSig upd_ids)
+                       $ HsVBG upd_ids_lhs (map mk_idSig upd_ids)
              upd_ids_lhs :: [(RecFlag, LHsBindsLR GhcRn GhcRn)]
              upd_ids_lhs = [ (NonRecursive, [genSimpleFunBind (idName id) [] rhs])
                            | (_, (id, rhs)) <- upd_ids ]
@@ -1800,137 +1793,3 @@ checkMissingFields con_like rbinds arg_tys
 
     fl `elemField` flds = any (\ fl' -> flSelector fl == fl') flds
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{Static Pointers}
-*                                                                      *
-************************************************************************
--}
-
--- | Checks if the given name is closed and emits an error if not.
---
--- See Note [Not-closed error messages].
-checkClosedInStaticForm :: Name -> TcM ()
-checkClosedInStaticForm name = do
-    type_env <- getLclTypeEnv
-    case checkClosed type_env name of
-      Nothing -> return ()
-      Just reason -> addErrTc $ explain name reason
-  where
-    -- See Note [Checking closedness].
-    checkClosed :: TcTypeEnv -> Name -> Maybe NotClosedReason
-    checkClosed type_env n = checkLoop type_env (unitNameSet n) n
-
-    checkLoop :: TcTypeEnv -> NameSet -> Name -> Maybe NotClosedReason
-    checkLoop type_env visited n =
-      -- The @visited@ set is an accumulating parameter that contains the set of
-      -- visited nodes, so we avoid repeating cycles in the traversal.
-      case lookupNameEnv type_env n of
-        Just (ATcId { tct_id = tcid, tct_info = info }) -> case info of
-          ClosedLet   -> Nothing
-          NotLetBound -> Just NotLetBoundReason
-          NonClosedLet fvs type_closed -> listToMaybe $
-            -- Look for a non-closed variable in fvs
-            [ NotClosed n' reason
-            | n' <- nameSetElemsStable fvs
-            , not (elemNameSet n' visited)
-            , Just reason <- [checkLoop type_env (extendNameSet visited n') n']
-            ] ++
-            if type_closed then
-              []
-            else
-              -- We consider non-let-bound variables easier to figure out than
-              -- non-closed types, so we report non-closed types to the user
-              -- only if we cannot spot the former.
-              [ NotTypeClosed $ tyCoVarsOfType (idType tcid) ]
-        -- The binding is closed.
-        _ -> Nothing
-
-    -- Converts a reason into a human-readable sentence.
-    --
-    -- @explain name reason@ starts with
-    --
-    -- "<name> is used in a static form but it is not closed because it"
-    --
-    -- and then follows a list of causes. For each id in the path, the text
-    --
-    -- "uses <id> which"
-    --
-    -- is appended, yielding something like
-    --
-    -- "uses <id> which uses <id1> which uses <id2> which"
-    --
-    -- until the end of the path is reached, which is reported as either
-    --
-    -- "is not let-bound"
-    --
-    -- when the final node is not let-bound, or
-    --
-    -- "has a non-closed type because it contains the type variables:
-    -- v1, v2, v3"
-    --
-    -- when the final node has a non-closed type.
-    --
-    explain :: Name -> NotClosedReason -> TcRnMessage
-    explain = TcRnStaticFormNotClosed
-
--- Note [Not-closed error messages]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- When variables in a static form are not closed, we go through the trouble
--- of explaining why they aren't.
---
--- Thus, the following program
---
--- > {-# LANGUAGE StaticPointers #-}
--- > module M where
--- >
--- > f x = static g
--- >   where
--- >     g = h
--- >     h = x
---
--- produces the error
---
---    'g' is used in a static form but it is not closed because it
---    uses 'h' which uses 'x' which is not let-bound.
---
--- And a program like
---
--- > {-# LANGUAGE StaticPointers #-}
--- > module M where
--- >
--- > import Data.Typeable
--- > import GHC.StaticPtr
--- >
--- > f :: Typeable a => a -> StaticPtr TypeRep
--- > f x = const (static (g undefined)) (h x)
--- >   where
--- >     g = h
--- >     h = typeOf
---
--- produces the error
---
---    'g' is used in a static form but it is not closed because it
---    uses 'h' which has a non-closed type because it contains the
---    type variables: 'a'
---
-
--- Note [Checking closedness]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- @checkClosed@ checks if a binding is closed and returns a reason if it is
--- not.
---
--- The bindings define a graph where the nodes are ids, and there is an edge
--- from @id1@ to @id2@ if the rhs of @id1@ contains @id2@ among its free
--- variables.
---
--- When @n@ is not closed, it has to exist in the graph some node reachable
--- from @n@ that it is not a let-bound variable or that it has a non-closed
--- type. Thus, the "reason" is a path from @n@ to this offending node.
---
--- When @n@ is not closed, we traverse the graph reachable from @n@ to build
--- the reason.
---

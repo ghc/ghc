@@ -16,7 +16,7 @@ module GHC.HsToCore.Monad (
 
         duplicateLocalDs, newSysLocalDs, newSysLocalsDs,
         newSysLocalMDs, newSysLocalsMDs, newFailLocalMDs,
-        newUniqueId, newPredVarDs,
+        newUniqueId, newPredVarDs, newStaticId,
         getSrcSpanDs, putSrcSpanDs, putSrcSpanDsA,
         mkNamePprCtxDs,
         newUnique,
@@ -27,6 +27,9 @@ module GHC.HsToCore.Monad (
         getCCIndexDsM,
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
+
+        -- Static bindings
+        emitStaticBinds, getStaticBinds,
 
         -- Getting and setting pattern match oracle states
         getPmNablas, updPmNablas,
@@ -62,7 +65,7 @@ import GHC.Hs
 
 import GHC.HsToCore.Types
 import GHC.HsToCore.Errors.Types
-import GHC.HsToCore.Pmc.Solver.Types (Nablas, initNablas)
+import GHC.HsToCore.Pmc.Solver.Types (initNablas)
 
 import GHC.Core.FamInstEnv
 import GHC.Core
@@ -112,6 +115,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( HasDebugCallStack )
 import qualified GHC.Data.Strict as Strict
+import GHC.Data.OrdList
 
 import Data.IORef
 
@@ -254,6 +258,9 @@ mkDsEnvsFromTcGbl :: MonadIO m
                   -> m (DsGblEnv, DsLclEnv)
 mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
   = do { cc_st_var   <- liftIO $ newIORef newCostCentreState
+       ; statics_var <- liftIO $ newIORef nilOL
+           -- ToDo: what becomes of the values put into these ref-cells?
+
        ; eps <- liftIO $ hscEPS hsc_env
        ; let unit_env = hsc_unit_env hsc_env
              this_mod = tcg_mod tcg_env
@@ -278,7 +285,8 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
            traverse (lookupCompleteMatch type_env hsc_env) =<<
              localAndImportedCompleteMatches tcg_comp_env eps
        ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env ptc
-                           msg_var cc_st_var next_wrapper_num_var ds_complete_matches
+                           msg_var cc_st_var statics_var
+                           next_wrapper_num_var ds_complete_matches
        }
 
 -- | We have in hand the `CompleteMatches` for the module, but when
@@ -323,9 +331,10 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
                                    , mg_fam_inst_env = fam_inst_env
                                    , mg_complete_matches = local_complete_matches
                           }) thing_inside
-  = do { cc_st_var   <- newIORef newCostCentreState
+  = do { cc_st_var        <- newIORef newCostCentreState
        ; next_wrapper_num <- newIORef emptyModuleEnv
-       ; msg_var <- newIORef emptyMessages
+       ; msg_var          <- newIORef emptyMessages
+       ; statics_var      <- newIORef nilOL
        ; eps <- liftIO $ hscEPS hsc_env
        ; let unit_env = hsc_unit_env hsc_env
              type_env = typeEnvFromEntities ids tycons patsyns fam_insts
@@ -337,7 +346,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
             localAndImportedCompleteMatches local_complete_matches eps
        ; let
              envs  = mkDsEnvs unit_env this_mod rdr_env type_env
-                              fam_inst_env ptc msg_var cc_st_var
+                              fam_inst_env ptc msg_var cc_st_var statics_var
                               next_wrapper_num ds_complete_matches
        ; runDs hsc_env envs thing_inside
        }
@@ -378,10 +387,11 @@ initTcDsForSolver thing_inside
 mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> PromotionTickContext
          -> IORef (Messages DsMessage) -> IORef CostCentreState
+         -> IORef (OrdList (Id,CoreExpr))
          -> IORef (ModuleEnv Int) -> DsCompleteMatches
          -> (DsGblEnv, DsLclEnv)
 mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
-         next_wrapper_num complete_matches
+         statics_var next_wrapper_num complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs"
   -- Failing tests here are `ghci` and `T11985` if you get this wrong.
   -- this is very very "at a distance" because the reason for this check is that the type_env in interactive
@@ -401,11 +411,12 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
                            , ds_msgs    = msg_var
                            , ds_complete_matches = complete_matches
                            , ds_cc_st   = cc_st_var
+                           , ds_static_binds = statics_var
                            , ds_next_wrapper_num = next_wrapper_num
                            }
         lcl_env = DsLclEnv { dsl_meta        = emptyNameEnv
                            , dsl_loc         = real_span
-                           , dsl_nablas      = initNablas
+                           , dsl_nablas      = Ldi initNablas
                            , dsl_unspecables = Just emptyVarSet
                            }
     in (gbl_env, lcl_env)
@@ -428,6 +439,13 @@ it easier to read debugging output.
 -- Make a new Id with the same print name, but different type, and new unique
 newUniqueId :: Id -> Mult -> Type -> DsM Id
 newUniqueId id = mkSysLocalOrCoVarM (occNameFS (nameOccName (idName id)))
+
+newStaticId :: Type -> DsM Id
+-- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
+newStaticId rhs_ty
+  = do { uniq <- newUnique
+       ; let name = mkSystemVarName uniq (mkFastString "static_ptr")
+       ; return (mkExportedVanillaId name rhs_ty) }
 
 duplicateLocalDs :: Id -> DsM Id
 duplicateLocalDs old_local
@@ -461,12 +479,12 @@ getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
 
 -- | Get the current pattern match oracle state. See 'dsl_nablas'.
-getPmNablas :: DsM Nablas
+getPmNablas :: DsM LdiNablas
 getPmNablas = do { env <- getLclEnv; return (dsl_nablas env) }
 
 -- | Set the pattern match oracle state within the scope of the given action.
 -- See 'dsl_nablas'.
-updPmNablas :: Nablas -> DsM a -> DsM a
+updPmNablas :: LdiNablas -> DsM a -> DsM a
 updPmNablas nablas = updLclEnv (\env -> env { dsl_nablas = nablas })
 
 addUnspecables :: [EvVar] -> DsM a -> DsM a
@@ -620,3 +638,12 @@ pprRuntimeTrace str doc expr = do
 -- | See 'getCCIndexM'.
 getCCIndexDsM :: FastString -> DsM CostCentreIndex
 getCCIndexDsM = getCCIndexM ds_cc_st
+
+emitStaticBinds :: [(Id,CoreExpr)] -> DsM ()
+emitStaticBinds static_binds
+  = do { env <- getGblEnv
+       ; liftIO $ modifyIORef' (ds_static_binds env) (`appOL` toOL static_binds) }
+
+getStaticBinds :: DsM (OrdList (Id,CoreExpr))
+getStaticBinds = do { env <- getGblEnv
+                    ; liftIO $ readIORef (ds_static_binds env) }

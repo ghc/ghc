@@ -336,8 +336,8 @@ hsScopedTvBinders binds
   = concatMap get_scoped_tvs sigs
   where
     sigs = case binds of
-             ValBinds           _ _ sigs  -> sigs
-             XValBindsLR (NValBinds _ sigs) -> sigs
+             ValBinds           _ _ sigs -> sigs
+             XValBindsLR (HsVBG _ sigs)  -> sigs
 
 get_scoped_tvs :: LSig GhcRn -> [Name]
 get_scoped_tvs (L _ signature)
@@ -1982,7 +1982,7 @@ rep_implicit_param_name (HsIPName name) = coreStringLit name
 
 rep_val_binds :: HsValBinds GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 -- Assumes: all the binders of the binding are already in the meta-env
-rep_val_binds (XValBindsLR (NValBinds binds sigs))
+rep_val_binds (XValBindsLR (HsVBG binds sigs))
  = do { core1 <- rep_binds (concatMap snd binds)
       ; core2 <- rep_sigs sigs
       ; return (core1 ++ core2) }

@@ -22,7 +22,7 @@ import GHC.Core.Utils (bindNonRec)
 
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
-import GHC.HsToCore.Pmc.Types ( Nablas )
+import GHC.HsToCore.Types
 import GHC.Core.Type ( Type )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
@@ -44,7 +44,7 @@ producing an expression with a runtime error in the corner case if
 necessary.  The type argument gives the type of the @ei@.
 -}
 
-dsGuarded :: GRHSs GhcTc (LHsExpr GhcTc) -> Type -> NonEmpty Nablas -> DsM CoreExpr
+dsGuarded :: GRHSs GhcTc (LHsExpr GhcTc) -> Type -> NonEmpty LdiNablas -> DsM CoreExpr
 dsGuarded grhss rhs_ty rhss_nablas = do
     match_result <- dsGRHSs PatBindRhs grhss rhs_ty rhss_nablas
     error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty
@@ -56,7 +56,7 @@ dsGuarded grhss rhs_ty rhss_nablas = do
 dsGRHSs :: HsMatchContextRn
         -> GRHSs GhcTc (LHsExpr GhcTc) -- ^ Guarded RHSs
         -> Type                        -- ^ Type of RHS
-        -> NonEmpty Nablas             -- ^ Refined pattern match checking
+        -> NonEmpty LdiNablas          -- ^ Refined pattern match checking
                                        --   models, one for the pattern part and
                                        --   one for each GRHS.
         -> DsM (MatchResult CoreExpr)
@@ -73,11 +73,11 @@ dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty rhss_nablas
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
 
-dsGRHS :: HsMatchContextRn -> Type -> Nablas -> LGRHS GhcTc (LHsExpr GhcTc)
+dsGRHS :: HsMatchContextRn -> Type -> LdiNablas -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM (MatchResult CoreExpr)
 dsGRHS hs_ctx rhs_ty rhs_nablas (L _ (GRHS _ guards rhs))
   = updPmNablas rhs_nablas $
-      matchGuards (map unLoc guards) hs_ctx rhs rhs_ty
+    matchGuards (map unLoc guards) hs_ctx rhs rhs_ty
 
 {-
 ************************************************************************

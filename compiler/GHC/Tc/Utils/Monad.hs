@@ -104,7 +104,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
-  addTcEvCoBind, addTcEvBind, addTopEvBinds,
+  addTcEvCoBind, addTcEvBind,
   getTcEvBindsMap, getTcEvBindsState,
   setTcEvBindsMap, combineTcEvBinds, addNeededEvIds,
   chooseUniqueOccTc,
@@ -1955,13 +1955,6 @@ debugTc thing
 *                                                                      *
 ************************************************************************
 -}
-
-addTopEvBinds :: Bag EvBind -> TcM a -> TcM a
-addTopEvBinds new_ev_binds thing_inside
-  = updGblEnv upd_env thing_inside
-  where
-    upd_env tcg_env = tcg_env { tcg_ev_binds = tcg_ev_binds tcg_env
-                                               `unionBags` new_ev_binds }
 
 newTcEvBinds :: TcM EvBindsVar
 newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindsState

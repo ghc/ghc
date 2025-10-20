@@ -44,7 +44,7 @@ import GHC.Rename.Pat
 import GHC.Driver.DynFlags
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( nilDataConName )
-import GHC.Unit.Module ( getModule, isInteractiveModule )
+import GHC.Unit.Module ( isInteractiveModule )
 
 import GHC.Types.Basic (TypeOrKind (TypeLevel))
 import GHC.Types.FieldLabel
@@ -632,24 +632,39 @@ We also collect the free variables of the term which come from
 this module. See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
 -}
 
-rnExpr e@(HsStatic _ expr) = do
-    -- Normally, you wouldn't be able to construct a static expression without
-    -- first enabling -XStaticPointers in the first place, since that extension
-    -- is what makes the parser treat `static` as a keyword. But this is not a
-    -- sufficient safeguard, as one can construct static expressions by another
-    -- mechanism: Template Haskell (see #14204). To ensure that GHC is
-    -- absolutely prepared to cope with static forms, we check for
-    -- -XStaticPointers here as well.
-    unlessXOptM LangExt.StaticPointers $
-      addErr $ TcRnIllegalStaticExpression e
-    (expr',fvExpr) <- rnLExpr expr
-    level <- getThLevel
-    case level of
-      Splice _ _ -> addErr $ TcRnTHError $ IllegalStaticFormInSplice e
-      _        -> return ()
-    mod <- getModule
-    let fvExpr' = filterNameSet (nameIsLocalOrFrom mod) fvExpr
-    return (HsStatic fvExpr' expr', fvExpr)
+rnExpr e@(HsStatic _ expr)
+  = do { -- Check for -XStaticPointers
+         -- Normally, you wouldn't be able to construct a static expression without
+         -- first enabling -XStaticPointers in the first place, since that extension
+         -- is what makes the parser treat `static` as a keyword. But this is not a
+         -- sufficient safeguard, as one can construct static expressions by another
+         -- mechanism: Template Haskell (see #14204). To ensure that GHC is
+         -- absolutely prepared to cope with static forms, we check for
+         -- -XStaticPointers here as well.
+       ; unlessXOptM LangExt.StaticPointers $
+         addErr $ TcRnIllegalStaticExpression e
+
+       -- Check Template Haskell level
+       ; level <- getThLevel
+       ; case level of
+           Splice _ _ -> addErr $ TcRnTHError $ IllegalStaticFormInSplice e
+           _        -> return ()
+
+       -- Rename the payload
+       ; (expr',fvs) <- rnLExpr expr
+
+       -- Check that the free variables of the static form are top-level defined
+       -- It's OK to use nonDetEltsUniqSet here as the only side effects of
+       -- checkClosedInStaticForm are error messages.
+       -- See (SF2) Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
+       ; mapM_ check_fv (nonDetEltsUniqSet fvs)
+
+       ; return (HsStatic noExtField expr', fvs) }
+  where
+    check_fv :: Name -> RnM ()
+    -- Check for free vars not defined at top level
+    check_fv n = unless (isExternalName n) $
+                 addErrTc (TcRnStaticFormNotClosed n)
 
 {-
 ************************************************************************

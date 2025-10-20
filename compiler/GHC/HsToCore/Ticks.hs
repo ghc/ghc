@@ -1,4 +1,4 @@
-{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE NondecreasingIndentation, DataKinds #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -851,15 +851,12 @@ addTickHsLocalBinds (EmptyLocalBinds x)  = return (EmptyLocalBinds x)
 
 addTickHsValBinds :: HsValBindsLR GhcTc (GhcPass a)
                   -> TM (HsValBindsLR GhcTc (GhcPass b))
-addTickHsValBinds (XValBindsLR (NValBinds binds sigs)) = do
-        b <- liftM2 NValBinds
-                (mapM (\ (rec,binds') ->
-                                liftM2 (,)
-                                        (return rec)
-                                        (addTickLHsBinds binds'))
-                        binds)
-                (return sigs)
-        return $ XValBindsLR b
+addTickHsValBinds (XValBindsLR (HsVBG grps sigs)) = do
+        grps' <- mapM (\ (rec,binds) ->
+                       do { binds' <- addTickLHsBinds binds
+                          ; return (rec,binds') })
+                      grps
+        return $ XValBindsLR (HsVBG grps' sigs)
 addTickHsValBinds _ = panic "addTickHsValBinds"
 
 addTickHsIPBinds :: HsIPBinds GhcTc -> TM (HsIPBinds GhcTc)
@@ -1423,7 +1420,8 @@ instance CollectFldBinders (HsLocalBinds GhcTc) where
   collectFldBinds EmptyLocalBinds{} = emptyVarEnv
 instance CollectFldBinders (HsValBinds GhcTc) where
   collectFldBinds (ValBinds _ bnds _) = collectFldBinds bnds
-  collectFldBinds (XValBindsLR (NValBinds bnds _)) = collectFldBinds (map snd bnds)
+  collectFldBinds (XValBindsLR (HsVBG grps _))
+     = collectFldBinds (hsValBindGroupsBinds @'Typechecked grps)
 instance CollectFldBinders (HsBind GhcTc) where
   collectFldBinds PatBind{ pat_lhs } = collectFldBinds pat_lhs
   collectFldBinds (XHsBindsLR AbsBinds{ abs_exports, abs_binds }) =

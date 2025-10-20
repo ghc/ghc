@@ -64,7 +64,6 @@ import GHC.Types.Var ( Var )
 import GHC.Types.Unique.Supply ( UniqueTag(..) )
 
 import Control.Monad
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module
 
 {-
@@ -143,7 +142,6 @@ getCoreToDo dflags hpt_rule_base extra_vars
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
-    static_ptrs   = xopt LangExt.StaticPointers           dflags
     profiling     = ways dflags `hasWay` WayProf
 
     do_presimplify = do_specialise -- TODO: any other optimizations benefit from pre-simplification?
@@ -182,21 +180,6 @@ getCoreToDo dflags hpt_rule_base extra_vars
                            [simplify "post-worker-wrapper"]
                            ))
 
-    -- Static forms are moved to the top level with the FloatOut pass.
-    -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
-    static_ptrs_float_outwards =
-      runWhen static_ptrs $ CoreDoPasses
-        [ simpl_gently -- Float Out can't handle type lets (sometimes created
-                       -- by simpleOptPgm via mkParallelBindings)
-        , CoreDoFloatOutwards $ FloatOutSwitches
-          { floatOutLambdas   = Just 0
-          , floatOutConstants = True
-          , floatOutOverSatApps = False
-          , floatToTopLevelOnly = True
-          , floatJoinsToTop = False
-          }
-        ]
-
     add_caller_ccs =
         runWhen (profiling && not (null $ callerCcFilters dflags)) CoreAddCallerCcs
 
@@ -222,14 +205,14 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- so that overloaded functions have all their dictionary lambdas manifest
         runWhen do_specialise CoreDoSpecialising,
 
-        if full_laziness then
-           CoreDoFloatOutwards $ FloatOutSwitches
+        runWhen full_laziness
+           (CoreDoFloatOutwards $ FloatOutSwitches
                 { floatOutLambdas     = Just 0
                 , floatOutConstants   = True
                 , floatOutOverSatApps = False
                 , floatToTopLevelOnly = False
                 , floatJoinsToTop     = False  -- Initially, don't float join points at all
-                }
+                }),
                 -- I have no idea why, but not floating constants to
                 -- top level is very bad in some cases.
                 --
@@ -245,11 +228,6 @@ getCoreToDo dflags hpt_rule_base extra_vars
                 -- difference at all to performance if we do it here,
                 -- but maybe we save some unnecessary to-and-fro in
                 -- the simplifier.
-        else
-           -- Even with full laziness turned off, we still need to float static
-           -- forms to the top level. See Note [Grand plan for static forms] in
-           -- GHC.Iface.Tidy.StaticPtrTable.
-           static_ptrs_float_outwards,
 
         -- Run the simplifier phases 2,1,0 to allow rewrite rules to fire
         runWhen do_simpl3

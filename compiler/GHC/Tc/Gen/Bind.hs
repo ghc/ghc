@@ -78,7 +78,6 @@ import GHC.Types.Basic
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Builtin.Names( ipClassName )
-import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -224,9 +223,9 @@ tcLocalBinds (EmptyLocalBinds x) thing_inside
   = do  { thing <- thing_inside
         ; return (EmptyLocalBinds x, thing) }
 
-tcLocalBinds (HsValBinds x (XValBindsLR (NValBinds binds sigs))) thing_inside
-  = do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
-        ; return (HsValBinds x (XValBindsLR (NValBinds binds' sigs)), thing) }
+tcLocalBinds (HsValBinds x (XValBindsLR (HsVBG grps sigs))) thing_inside
+  = do  { (grps', thing) <- tcValBinds NotTopLevel grps sigs thing_inside
+        ; return (HsValBinds x (XValBindsLR (HsVBG grps' sigs)), thing) }
 tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
@@ -258,7 +257,7 @@ tcValBinds :: TopLevelFlag
            -> TcM thing
            -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
 
-tcValBinds top_lvl binds sigs thing_inside
+tcValBinds top_lvl grps sigs thing_inside
   = do  {   -- Typecheck the signatures
             -- It's easier to do so now, once for all the SCCs together
             -- because a single signature  f,g :: <type>
@@ -276,7 +275,7 @@ tcValBinds top_lvl binds sigs thing_inside
         -- only unrestricted variables.
         ; tcExtendSigIds top_lvl poly_ids $
      do { (binds', (extra_binds', thing))
-              <- tcBindGroups top_lvl sig_fn prag_fn binds $
+              <- tcBindGroups top_lvl sig_fn prag_fn grps $
                  do { thing <- thing_inside
                        -- See Note [Pattern synonym builders don't yield dependencies]
                        --     in GHC.Rename.Bind
@@ -286,8 +285,8 @@ tcValBinds top_lvl binds sigs thing_inside
                     ; return (extra_binds, thing) }
         ; return (binds' ++ extra_binds', thing) }}
   where
-    patsyns = getPatSynBinds binds
-    prag_fn = mkPragEnv sigs (concatMap snd binds)
+    patsyns = getPatSynBinds grps
+    prag_fn = mkPragEnv sigs (hsValBindGroupsBinds grps)
 
 ------------------------
 
@@ -305,64 +304,90 @@ tcBindGroups _ _ _ [] thing_inside
         ; return ([], thing) }
 
 tcBindGroups top_lvl sig_fn prag_fn (group : groups) thing_inside
-  = do  { -- See Note [Closed binder groups]
-          type_env <- getLclTypeEnv
-        ; let closed = isClosedBndrGroup type_env (snd group)
-        ; (group', (groups', thing))
-                <- tc_group top_lvl sig_fn prag_fn group closed $
+  = do  { (group', (groups', thing))
+                <- tc_group top_lvl sig_fn prag_fn group $
                    tcBindGroups top_lvl sig_fn prag_fn groups thing_inside
-        ; return (group' ++ groups', thing) }
+        ; return (group' : groups', thing) }
 
--- Note [Closed binder groups]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
---  A mutually recursive group is "closed" if all of the free variables of
---  the bindings are closed. For example
---
--- >  h = \x -> let f = ...g...
--- >                g = ....f...x...
--- >             in ...
---
--- Here @g@ is not closed because it mentions @x@; and hence neither is @f@
--- closed.
---
--- So we need to compute closed-ness on each strongly connected components,
--- before we sub-divide it based on what type signatures it has.
---
+{- Note [Closed binder groups]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ A mutually recursive group is "closed" if all of the free variables of
+ the bindings are closed. For example
+
+     h = \x -> let f = ...g...
+                   g = ....f...x...
+               in ...
+
+ Here `g` is not closed because it mentions `x`; and hence neither
+is `f` closed.
+
+So we need to compute closed-ness on each strongly connected components,
+before we sub-divide it based on what type signatures it has.
+-}
 
 ------------------------
 tc_group :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
-         -> (RecFlag, LHsBinds GhcRn) -> IsGroupClosed -> TcM thing
-         -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
-
+         -> (RecFlag, LHsBinds GhcRn) -> TcM thing
+         -> TcM ((RecFlag, LHsBinds GhcTc), thing)
 -- Typecheck one strongly-connected component of the original program.
--- We get a list of groups back, because there may
--- be specialisations etc as well
+tc_group top_lvl sig_fn prag_fn (rec_flag, binds) thing_inside
+  = case rec_flag of
+       NonRecursive -> tc_nonrec_group top_lvl sig_fn prag_fn binds thing_inside
+       Recursive    -> tc_rec_group    top_lvl sig_fn prag_fn binds thing_inside
 
-tc_group top_lvl sig_fn prag_fn (NonRecursive, binds) closed thing_inside
-        -- A single non-recursive binding
+---------------------
+tc_nonrec_group :: forall thing.
+                   TopLevelFlag -> TcSigFun -> TcPragEnv
+                -> LHsBinds GhcRn -> TcM thing
+                -> TcM ((RecFlag, LHsBinds GhcTc), thing)
+tc_nonrec_group  top_lvl sig_fn prag_fn [lbind] thing_inside
+  | L loc (PatSynBind _ psb) <- lbind
+  = do { (aux_binds, tcg_env) <- tcPatSynDecl (L loc psb) sig_fn prag_fn
+       ; thing <- setGblEnv tcg_env thing_inside
+       ; return ((NonRecursive, aux_binds), thing) }
+
+  | otherwise
+  =     -- A single non-recursive binding
         -- We want to keep non-recursive things non-recursive
         -- so that we desugar unlifted bindings correctly
-  = do { let bind = case binds of
-                 [bind] -> bind
-                 []     -> panic "tc_group: empty list of binds"
-                 _      -> panic "tc_group: NonRecursive binds is not a singleton bag"
-       ; (bind', thing) <- tc_single top_lvl sig_fn prag_fn bind closed
-                             thing_inside
-       ; return ( [(NonRecursive, bind')], thing) }
+    do { type_env <- getLclTypeEnv
+       ; let closed = isClosedBndrGroup type_env [lbind]
+       ; (bind', ids) <- tcPolyBinds top_lvl sig_fn prag_fn
+                                      NonRecursive NonRecursive
+                                      closed
+                                      [lbind]
 
-tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
-  =     -- To maximise polymorphism, we do a new
-        -- strongly-connected-component analysis, this time omitting
-        -- any references to variables with type signatures.
-        -- (This used to be optional, but isn't now.)
-        -- See Note [Polymorphic recursion] in "GHC.Hs.Binds".
+       ; thing <- tcExtendLetEnv top_lvl sig_fn closed ids thing_inside
+
+       ; return ( (NonRecursive, bind'), thing ) }
+
+tc_nonrec_group _ _ _ binds _   -- Non-rec groups should always be a singleton
+  = pprPanic "tc_nonrec_group" (ppr binds)
+
+---------------------
+tc_rec_group :: forall thing.
+                TopLevelFlag -> TcSigFun -> TcPragEnv
+             -> LHsBinds GhcRn -> TcM thing
+             -> TcM ((RecFlag, LHsBinds GhcTc), thing)
+tc_rec_group top_lvl sig_fn prag_fn binds thing_inside
+  = -- For a recursive group, to maximise polymorphism, we do a new
+    -- strongly-connected-component analysis, this time omitting
+    -- any references to variables with type signatures.
+    -- (This used to be optional, but isn't now.)
+    -- See Note [Polymorphic recursion] in "GHC.Hs.Binds".
     do  { traceTc "tc_group rec" (pprLHsBinds binds)
+        ; type_env <- getLclTypeEnv
+        ; let closed = isClosedBndrGroup type_env binds
+
+        -- Rejected a pattern synonym in a recursive group
         ; whenIsJust mbFirstPatSyn $ \lpat_syn ->
             recursivePatSynErr (locA $ getLoc lpat_syn) binds
-        ; (binds1, thing) <- go sccs
-        ; return ([(Recursive, binds1)], thing) }
+
+        -- Typecheck the SCCs in turn
+        ; (binds1, thing) <- go closed sccs
+
+        ; return ((Recursive, binds1), thing) }
                 -- Rec them all together
   where
     mbFirstPatSyn = find (isPatSyn . unLoc) binds
@@ -372,21 +397,22 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     sccs :: [SCC (LHsBind GhcRn)]
     sccs = stronglyConnCompFromEdgedVerticesUniq (mkEdges sig_fn binds)
 
-    go :: [SCC (LHsBind GhcRn)] -> TcM (LHsBinds GhcTc, thing)
-    go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
-                         -- recursive bindings must be unrestricted
-                         -- (the ids added to the environment here are the name of the recursive definitions).
-                        ; (binds2, thing) <-
-                              tcExtendLetEnv top_lvl sig_fn closed ids1
-                              (go sccs)
-                        ; return (binds1 ++ binds2, thing) }
-    go []         = do  { thing <- thing_inside; return ([], thing) }
+    go :: ClosedTypeId -> [SCC (LHsBind GhcRn)] -> TcM (LHsBinds GhcTc, thing)
+    go closed (scc:sccs)
+            = do  { (binds1, ids1) <- tc_scc closed scc
+                   -- recursive bindings must be unrestricted
+                   -- (the ids added to the environment here are
+                   --  the name of the recursive definitions)
+                  ; (binds2, thing) <- tcExtendLetEnv top_lvl sig_fn closed ids1 $
+                                       go closed sccs
+                  ; return (binds1 ++ binds2, thing) }
+    go _ [] = do  { thing <- thing_inside; return ([], thing) }
 
-    tc_scc (AcyclicSCC bind) = tc_sub_group NonRecursive [bind]
-    tc_scc (CyclicSCC binds) = tc_sub_group Recursive    binds
+    tc_scc closed (AcyclicSCC bind) = tc_sub_group NonRecursive closed [bind]
+    tc_scc closed (CyclicSCC binds) = tc_sub_group Recursive    closed binds
 
-    tc_sub_group rec_tc binds = tcPolyBinds top_lvl sig_fn prag_fn
-                                            Recursive rec_tc closed binds
+    tc_sub_group rec_tc closed binds
+      = tcPolyBinds top_lvl sig_fn prag_fn Recursive rec_tc closed binds
 
 recursivePatSynErr
   :: SrcSpan -- ^ The location of the first pattern synonym binding
@@ -396,25 +422,6 @@ recursivePatSynErr
 recursivePatSynErr loc binds
   = failAt loc $ TcRnRecursivePatternSynonym binds
 
-tc_single :: forall thing.
-            TopLevelFlag -> TcSigFun -> TcPragEnv
-          -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
-          -> TcM (LHsBinds GhcTc, thing)
-tc_single _top_lvl sig_fn prag_fn
-          (L loc (PatSynBind _ psb))
-          _ thing_inside
-  = do { (aux_binds, tcg_env) <- tcPatSynDecl (L loc psb) sig_fn prag_fn
-       ; thing <- setGblEnv tcg_env thing_inside
-       ; return (aux_binds, thing)
-       }
-
-tc_single top_lvl sig_fn prag_fn lbind closed thing_inside
-  = do { (binds1, ids) <- tcPolyBinds top_lvl sig_fn prag_fn
-                                      NonRecursive NonRecursive
-                                      closed
-                                      [lbind]
-       ; thing <- tcExtendLetEnv top_lvl sig_fn closed ids thing_inside
-       ; return (binds1, thing) }
 
 ------------------------
 type BKey = Int -- Just number off the bindings
@@ -422,18 +429,15 @@ type BKey = Int -- Just number off the bindings
 mkEdges :: TcSigFun -> LHsBinds GhcRn -> [Node BKey (LHsBind GhcRn)]
 -- See Note [Polymorphic recursion] in "GHC.Hs.Binds".
 mkEdges sig_fn binds
-  = [ DigraphNode bind key [key | n <- nonDetEltsUniqSet (bind_fvs (unLoc bind)),
-                         Just key <- [lookupNameEnv key_map n], no_sig n ]
+  = [ DigraphNode bind key [key | n <- nonDetEltsUniqSet (lHsBindFreeVars bind)
+                                , Just key <- [lookupNameEnv key_map n]
+                                , no_sig n ]
     | (bind, key) <- keyd_binds
     ]
     -- It's OK to use nonDetEltsUFM here as stronglyConnCompFromEdgedVertices
     -- is still deterministic even if the edges are in nondeterministic order
     -- as explained in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
   where
-    bind_fvs (FunBind { fun_ext = fvs }) = fvs
-    bind_fvs (PatBind { pat_ext = fvs }) = fvs
-    bind_fvs _                           = emptyNameSet
-
     no_sig :: Name -> Bool
     no_sig n = not (hasCompleteSig sig_fn n)
 
@@ -448,7 +452,7 @@ tcPolyBinds :: TopLevelFlag -> TcSigFun -> TcPragEnv
             -> RecFlag         -- Whether the group is really recursive
             -> RecFlag         -- Whether it's recursive after breaking
                                -- dependencies based on type signatures
-            -> IsGroupClosed   -- Whether the group is closed
+            -> ClosedTypeId    -- Whether the group is closed
             -> [LHsBind GhcRn]  -- None are PatSynBind
             -> TcM (LHsBinds GhcTc, [Scaled TcId])
 
@@ -474,7 +478,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc closed bind_list
     ; let plan = decideGeneralisationPlan dflags top_lvl closed sig_fn bind_list
     ; traceTc "Generalisation plan" (ppr plan)
     ; result@(_, scaled_poly_ids) <- case plan of
-         NoGen              -> tcPolyNoGen         rec_tc prag_fn sig_fn bind_list
+         NoGen              -> tcPolyNoGen rec_tc prag_fn sig_fn bind_list
          InferGen           -> tcPolyInfer top_lvl rec_tc prag_fn sig_fn bind_list
          CheckGen lbind sig -> tcPolyCheck prag_fn sig lbind
 
@@ -557,8 +561,7 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
 *                                                                      *
 ********************************************************************* -}
 
-tcPolyCheck :: TcPragEnv
-            -> TcCompleteSig
+tcPolyCheck :: TcPragEnv -> TcCompleteSig
             -> LHsBind GhcRn   -- Must be a FunBind
             -> TcM (LHsBinds GhcTc, [Scaled TcId])
 -- There is just one binding,
@@ -709,7 +712,7 @@ To address this we to do a few things
 -}
 
 tcPolyInfer
-  :: TopLevelFlag
+  :: TopLevelFlag  -- Syntactically top-leve
   -> RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
   -> TcPragEnv -> TcSigFun
@@ -735,7 +738,8 @@ tcPolyInfer top_lvl rec_tc prag_fn tc_sig_fn bind_list
 
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
        ; ((qtvs, givens, ev_binds, insoluble), residual)
-            <- captureConstraints $ simplifyInfer top_lvl tclvl infer_mode sigs name_taus wanted
+            <- captureConstraints $
+               simplifyInfer top_lvl tclvl infer_mode sigs name_taus wanted
 
        ; let inferred_theta = map evVarPred givens
        ; scaled_exports <- checkNoErrs $
@@ -1794,29 +1798,32 @@ instance Outputable GeneralisationPlan where
   ppr (CheckGen _ s) = text "CheckGen" <+> ppr s
 
 decideGeneralisationPlan
-   :: DynFlags -> TopLevelFlag -> IsGroupClosed -> TcSigFun
+   :: DynFlags -> TopLevelFlag
+   -> ClosedTypeId   -- True <=> all the free vars have closed types
+   -> TcSigFun
    -> [LHsBind GhcRn] -> GeneralisationPlan
-decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
+decideGeneralisationPlan dflags top_lvl closed_type sig_fn lbinds
   | Just (bind, sig) <- one_funbind_with_sig = CheckGen bind sig
   | generalise_binds                         = InferGen
   | otherwise                                = NoGen
   where
     generalise_binds
-      | isTopLevel top_lvl             = True
+      | null binders = False
+        -- Not if `binders` is empty: there is no binder to generalise, so
+        -- generalising does nothing. And trying to generalise hurts linear
+        -- types (see #25428). So we don't force it.
+        -- See (NVP5) in Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind.
+
+      | isTopLevel top_lvl = True
         -- See Note [Always generalise top-level bindings]
 
       | has_mult_anns_and_pats = False
         -- See (NVP1) and (NVP4) in Note [Non-variable pattern bindings aren't linear]
 
-      | IsGroupClosed _ True <- closed
-      , not (null binders) = True
-        -- The 'True' means that all of the group's
+      | closed_type = True
+        -- The `closed_type` means that all of the group's
         -- free vars have ClosedTypeId=True; so we can ignore
         -- -XMonoLocalBinds, and generalise anyway.
-        -- Except if 'fv' is empty: there is no binder to generalise, so
-        -- generalising does nothing. And trying to generalise hurts linear
-        -- types (see #25428). So we don't force it.
-        -- See (NVP5) in Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind.
 
       | has_partial_sigs = True
         -- See Note [Partial type signatures and generalisation]
@@ -1843,56 +1850,40 @@ decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
     has_mult_ann_and_pat (L _ (PatBind{})) = True
     has_mult_ann_and_pat _ = False
 
-isClosedBndrGroup :: TcTypeEnv -> [(LHsBind GhcRn)] -> IsGroupClosed
+isClosedBndrGroup :: TcTypeEnv -> [LHsBind GhcRn] -> ClosedTypeId
 isClosedBndrGroup type_env binds
-  = IsGroupClosed fv_env type_closed
+  = nameSetAll is_closed_type_id all_fvs
   where
-    type_closed = allUFM (nameSetAll is_closed_type_id) fv_env
-
-    fv_env :: NameEnv NameSet
-    fv_env = mkNameEnv $ concatMap (bindFvs . unLoc) binds
-
-    bindFvs :: HsBindLR GhcRn GhcRn -> [(Name, NameSet)]
-    bindFvs (FunBind { fun_id = L _ f
-                     , fun_ext = fvs })
-       = let open_fvs = get_open_fvs fvs
-         in [(f, open_fvs)]
-    bindFvs (PatBind { pat_lhs = pat, pat_ext = fvs })
-       = let open_fvs = get_open_fvs fvs
-         in [(b, open_fvs) | b <- collectPatBinders CollNoDictBinders pat]
-    bindFvs _
-       = []
-
-    get_open_fvs fvs = filterNameSet (not . is_closed) fvs
-
-    is_closed :: Name -> ClosedTypeId
-    is_closed name
-      | Just thing <- lookupNameEnv type_env name
-      = case thing of
-          AGlobal {}                     -> True
-          ATcId { tct_info = ClosedLet } -> True
-          _                              -> False
-
-      | otherwise
-      = True  -- The free-var set for a top level binding mentions
-
+    all_fvs = foldr (unionNameSet . bind_fvs . unLoc) emptyNameSet binds
+    bind_fvs :: HsBindLR GhcRn GhcRn -> NameSet
+    bind_fvs (FunBind { fun_ext = fvs }) = fvs
+    bind_fvs (PatBind { pat_ext = fvs }) = fvs
+    bind_fvs _                           = emptyNameSet
 
     is_closed_type_id :: Name -> Bool
-    -- We're already removed Global and ClosedLet Ids
     is_closed_type_id name
       | Just thing <- lookupNameEnv type_env name
       = case thing of
-          ATcId { tct_info = NonClosedLet _ cl } -> cl
-          ATcId { tct_info = NotLetBound }       -> False
-          ATyVar {}                              -> False
-               -- In-scope type variables are not closed!
+          AGlobal {} -> True
+          ATyVar {}  -> False  -- In-scope type variables are not closed!
+          ATcId { tct_info = info}
+            -> case info of
+                   LetBound closed -> closed
+                   NotLetBound     -> False
           _ -> pprPanic "is_closed_id" (ppr name)
 
       | otherwise
       = True   -- The free-var set for a top level binding mentions
-               -- imported things too, so that we can report unused imports
-               -- These won't be in the local type env.
-               -- Ditto class method etc from the current module
+               --  - imported things so that we can report unused imports
+               --  - class method etc from the current module
+               --  - the Ids from the current Rec group
+               -- None of these will be in the type envt
+
+lHsBindFreeVars :: LHsBind GhcRn -> NameSet
+lHsBindFreeVars (L _ (FunBind { fun_ext = fvs })) = fvs
+lHsBindFreeVars (L _ (PatBind { pat_ext = fvs })) = fvs
+lHsBindFreeVars _                                 = emptyNameSet
+
 
 {- Note [Always generalise top-level bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1901,9 +1892,10 @@ It is very confusing to apply NoGen to a top level binding. Consider (#20123):
      x = 5
      f y = (x, y)
 
-The MR means that x=5 is not generalise, so f's binding is no Closed.  So we'd
-be tempted to use NoGen. But that leads to f :: Any -> (Integer, Any), which
-is plain stupid.
+The MR means that x=5 is not generalised, so f's binding has a free variable
+that is not ClosedTypeId. So we'd be tempted to use NoGen. But that leads to
+   f :: Any -> (Integer, Any)
+which is plain stupid.
 
 NoGen is good when we have call sites, but not at top level, where the
 function may be exported.  And it's easier to grok "MonoLocalBinds" as
