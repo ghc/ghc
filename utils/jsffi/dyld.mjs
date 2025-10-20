@@ -930,10 +930,15 @@ class DyLD {
   async loadDLLs(packed) {
     // Normalize input to an array of strings. When called from Haskell
     // we pass a single JSString containing NUL-separated paths.
-    const paths = (typeof packed === "string"
-      ? (packed.length === 0 ? [] : packed.split("\0"))
-      : [packed] // tolerate an accidental single path object
-    ).filter((s) => s.length > 0).reverse();
+    const paths = (
+      typeof packed === "string"
+        ? packed.length === 0
+          ? []
+          : packed.split("\0")
+        : [packed]
+    ) // tolerate an accidental single path object
+      .filter((s) => s.length > 0)
+      .reverse();
 
     // Compute a single downsweep plan for the whole batch.
     // Note: #downsweep mutates #loadedSos to break cycles and dedup.
@@ -1180,7 +1185,7 @@ class DyLD {
       // been called upon instantiation, see
       // Writer::createStartFunction().
       if (instance.exports.__wasm_apply_data_relocs) {
-          instance.exports.__wasm_apply_data_relocs();
+        instance.exports.__wasm_apply_data_relocs();
       }
 
       instance.exports._initialize();
