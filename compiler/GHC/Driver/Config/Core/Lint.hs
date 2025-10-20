@@ -9,8 +9,6 @@ module GHC.Driver.Config.Core.Lint
 
 import GHC.Prelude
 
-import qualified GHC.LanguageExtensions as LangExt
-
 import GHC.Driver.Env
 import GHC.Driver.DynFlags
 import GHC.Driver.Config.Diagnostic
@@ -140,12 +138,10 @@ perPassFlags dflags pass
                       _              -> True
 
     -- See Note [Checking StaticPtrs]
-    check_static_ptrs | not (xopt LangExt.StaticPointers dflags) = AllowAnywhere
-                      | otherwise = case pass of
-                          CoreDoFloatOutwards _ -> AllowAtTopLevel
-                          CoreTidy              -> RejectEverywhere
-                          CorePrep              -> AllowAtTopLevel
-                          _                     -> AllowAnywhere
+    check_static_ptrs = case pass of
+                          CoreTidy -> RejectEverywhere
+                          CorePrep -> RejectEverywhere
+                          _        -> AllowAtTopLevel
 
     -- See Note [Linting linearity]
     check_linearity = gopt Opt_DoLinearCoreLinting dflags || (
@@ -169,7 +165,7 @@ initLintConfig dflags vars =LintConfig
 defaultLintFlags :: DynFlags -> LintFlags
 defaultLintFlags dflags = LF { lf_check_global_ids = False
                              , lf_check_inline_loop_breakers = True
-                             , lf_check_static_ptrs = AllowAnywhere
+                             , lf_check_static_ptrs = AllowAtTopLevel
                              , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
                              , lf_report_unsat_syns = True
                              , lf_check_fixed_rep = True

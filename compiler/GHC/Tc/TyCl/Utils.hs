@@ -843,8 +843,8 @@ tcRecSelBinds sel_bind_prs
   = tcExtendGlobalValEnv [sel_id | (L _ (XSig (IdSig sel_id))) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings $
                                        -- See Note [Impredicative record selectors]
-                                       setXOptM LangExt.ImpredicativeTypes $
-                                       tcValBinds TopLevel binds sigs getGblEnv
+                                     setXOptM LangExt.ImpredicativeTypes $
+                                     tcValBinds TopLevel binds sigs getGblEnv
        ; return (tcg_env `addTypecheckedBinds` map snd rec_sel_binds) }
   where
     sigs = [ L (noAnnSrcSpan loc) (XSig $ IdSig sel_id)

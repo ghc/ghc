@@ -225,7 +225,7 @@ rnTopBindsBoot :: NameSet -> HsValBindsLR GhcRn GhcPs
 -- Return a single HsBindGroup with empty binds and renamed signatures
 rnTopBindsBoot bound_names (ValBinds _ _ sigs)
   = do  { (sigs', fvs) <- renameSigs (HsBootCtxt bound_names) sigs
-        ; return (XValBindsLR (NValBinds [] sigs'), usesOnly fvs) }
+        ; return (XValBindsLR (HsVBG [] sigs'), usesOnly fvs) }
 rnTopBindsBoot _ b = pprPanic "rnTopBindsBoot" (ppr b)
 
 {-
@@ -356,7 +356,7 @@ rnValBindsRHS ctxt (ValBinds _ mbinds sigs)
                             -- so that the binders are removed from
                             -- the uses in the sigs
 
-        ; return (XValBindsLR (NValBinds anal_binds sigs'), valbind'_dus) } }
+        ; return (XValBindsLR (HsVBG anal_binds sigs'), valbind'_dus) } }
 
 rnValBindsRHS _ b = pprPanic "rnValBindsRHS" (ppr b)
 

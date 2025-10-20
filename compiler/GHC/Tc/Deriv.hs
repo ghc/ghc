@@ -196,7 +196,7 @@ tcDeriving  :: [DerivInfo]       -- All `deriving` clauses
             -> TcM (TcGblEnv, Bag (InstInfo GhcRn), HsValBinds GhcRn)
 tcDeriving deriv_infos deriv_decls
   = recoverM (do { g <- getGblEnv
-                 ; return (g, emptyBag, emptyValBindsOut)}) $
+                 ; return (g, emptyBag, emptyValBindsRn)}) $
     do  { -- Fish the "deriving"-related information out of the GHC.Tc.Utils.Env
           -- And make the necessary "equations".
           early_specs <- makeDerivSpecs deriv_infos deriv_decls

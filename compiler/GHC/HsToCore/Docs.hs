@@ -525,12 +525,12 @@ ungroup (HsGroup {..}) =
   mkDecls (ValD noExtField)   (valbinds hs_valds)
   where
     typesigs :: HsValBinds GhcRn -> [LSig GhcRn]
-    typesigs (XValBindsLR (NValBinds _ sig)) = filter (isUserSig . unLoc) sig
+    typesigs (XValBindsLR (HsVBG _ sig)) = filter (isUserSig . unLoc) sig
     typesigs ValBinds{} = error "expected XValBindsLR"
 
     valbinds :: HsValBinds GhcRn -> [LHsBind GhcRn]
-    valbinds (XValBindsLR (NValBinds binds _)) =
-      concat . snd . unzip $ binds
+    valbinds (XValBindsLR (HsVBG grps _)) =
+      concat . snd . unzip $ grps
     valbinds ValBinds{} = error "expected XValBindsLR"
 
 -- | Collect docs and attach them to the right declarations.

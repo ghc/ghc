@@ -790,7 +790,7 @@ tcRnHsBootDecls boot_or_sig decls
                             , hs_defds  = def_decls
                             , hs_ruleds = rule_decls
                             , hs_annds  = _
-                            , hs_valds  = XValBindsLR (NValBinds val_binds val_sigs) })
+                            , hs_valds  = XValBindsLR (HsVBG val_binds val_sigs) })
               <- rnTopSrcDecls first_group
 
         ; (gbl_env, lie) <- setGblEnv tcg_env $ captureTopConstraints $ do {
@@ -1706,7 +1706,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                          hs_annds  = annotation_decls,
                          hs_ruleds = rule_decls,
                          hs_valds  = hs_val_binds@(XValBindsLR
-                                              (NValBinds val_binds val_sigs)) })
+                                              (HsVBG val_binds val_sigs)) })
  = do {         -- Type-check the type and class decls, and all imported decls
                 -- The latter come in via tycl_decls
         traceTc "Tc2 (src)" empty ;
@@ -1715,7 +1715,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
         (tcg_env, inst_infos, th_bndrs,
-         XValBindsLR (NValBinds deriv_binds deriv_sigs))
+         XValBindsLR (HsVBG deriv_binds deriv_sigs))
             <- tcTyClsInstDecls tycl_decls deriv_decls default_decls val_binds ;
 
         updLclCtxt (\tcl_env -> tcl_env { tcl_th_bndrs = th_bndrs `plusNameEnv` tcl_th_bndrs tcl_env }) $
@@ -2315,7 +2315,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
               -- [let it = expr]
               let_stmt  = L loc $ LetStmt noAnn $ HsValBinds noAnn
                            $ XValBindsLR
-                               (NValBinds [(NonRecursive,[the_bind])] [])
+                               (HsVBG [(NonRecursive,[the_bind])] [])
 
               -- [it <- e]
               bind_stmt = L loc $ BindStmt

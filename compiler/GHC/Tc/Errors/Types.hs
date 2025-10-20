@@ -23,7 +23,6 @@ module GHC.Tc.Errors.Types (
   , SuggestUnliftedTypes(..)
   , DataSort(..), ppDataSort
   , AllowedDataResKind(..)
-  , NotClosedReason(..)
   , SuggestPartialTypeSignatures(..)
   , suggestPartialTypeSignatures
   , DeriveInstanceErrReason(..)
@@ -1829,7 +1828,7 @@ data TcRnMessage where
     Test cases: rename/should_fail/RnStaticPointersFail01
                 rename/should_fail/RnStaticPointersFail03
   -}
-  TcRnStaticFormNotClosed :: Name -> NotClosedReason -> TcRnMessage
+  TcRnStaticFormNotClosed :: Name -> TcRnMessage
 
   {-| TcRnUselessTypeable is a warning (controlled by -Wderiving-typeable) that
       occurs when trying to derive an instance of the 'Typeable' class. Deriving
@@ -4626,12 +4625,6 @@ data AllowedDataResKind
   = AnyTYPEKind
   | AnyBoxedKind
   | LiftedKind
-
--- | A data type to describe why a variable is not closed.
--- See Note [Not-closed error messages] in GHC.Tc.Gen.Expr
-data NotClosedReason = NotLetBoundReason
-                     | NotTypeClosed VarSet
-                     | NotClosed Name NotClosedReason
 
 data SuggestPartialTypeSignatures
   = YesSuggestPartialTypeSignatures

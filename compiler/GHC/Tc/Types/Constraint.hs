@@ -1633,7 +1633,7 @@ getGivensFromImplics implics
     get acc [] = acc
 
     get acc (implic : implics)
-      | StaticFormSkol <- ic_info implic
+      | isStaticSkolInfo (ic_info implic)
       = acc  -- For static forms, ignore all outer givens
              -- See (SF3) in Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
 
@@ -2136,7 +2136,9 @@ checkSkolInfoAnon :: SkolemInfoAnon   -- From the implication
 -- So it doesn't matter much if its's incomplete
 checkSkolInfoAnon sk1 sk2 = go sk1 sk2
   where
-    go (SigSkol c1 t1 s1)   (SigSkol c2 t2 s2)   = c1==c2 && t1 `tcEqType` t2 && s1==s2
+    go (SigSkol c1 t1 s1) (SigSkol c2 t2 s2)     = c1==c2 && t1 `tcEqType` t2 && s1==s2
+    go (InferSkol ids1)   (InferSkol ids2)       = equalLength ids1 ids2 &&
+                                                   and (zipWith eq_pr ids1 ids2)
     go (SigTypeSkol cx1)    (SigTypeSkol cx2)    = cx1==cx2
 
     go (ForAllSkol _)       (ForAllSkol _)       = True
@@ -2153,8 +2155,6 @@ checkSkolInfoAnon sk1 sk2 = go sk1 sk2
     go (SpecESkol n1)       (SpecESkol n2)       = n1==n2
     go (PatSkol c1 _)       (PatSkol c2 _)       = getName c1 == getName c2
        -- Too tedious to compare the HsMatchContexts
-    go (InferSkol ids1)     (InferSkol ids2)     = equalLength ids1 ids2 &&
-                                                   and (zipWith eq_pr ids1 ids2)
     go (UnifyForAllSkol t1) (UnifyForAllSkol t2) = t1 `tcEqType` t2
     go ReifySkol            ReifySkol            = True
     go RuntimeUnkSkol       RuntimeUnkSkol       = True
