@@ -67,12 +67,19 @@ data DsGblEnv
   , ds_msgs    :: IORef (Messages DsMessage) -- Diagnostic messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                           -- possibly-imported things
+
   , ds_complete_matches :: DsCompleteMatches
      -- Additional complete pattern matches
+
   , ds_cc_st   :: IORef CostCentreState
      -- Tracking indices for cost centre annotations
+
   , ds_next_wrapper_num :: IORef (ModuleEnv Int)
     -- ^ See Note [Generating fresh names for FFI wrappers]
+
+  , ds_static_binds :: IORef (OrdList (Id,CoreExpr))
+    -- ^ Static bindings
+    -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
   }
 
 instance ContainsModule DsGblEnv where
