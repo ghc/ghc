@@ -42,6 +42,7 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import GHC.Platform
 import Data.List (intercalate, isInfixOf)
+import qualified Data.List.NonEmpty as NE
 import GHC.Unit.Env
 import GHC.Utils.Error
 import Data.Maybe
@@ -69,6 +70,7 @@ import GHC.Platform.Ways
 import GHC.Runtime.Loader (initializePlugins)
 import GHC.Driver.LlvmConfigCache (readLlvmConfigCache)
 import GHC.CmmToLlvm.Config (LlvmTarget (..), LlvmConfig (..))
+import GHC.CmmToLlvm.Version.Type (LlvmVersion (..))
 import {-# SOURCE #-} GHC.Driver.Pipeline (compileForeign, compileEmptyStub)
 import GHC.Settings
 import System.IO
@@ -229,8 +231,9 @@ runLlvmLlcPhase pipe_env hsc_env input_fn = do
           1 -> "-O1"
           _ -> "-O2"
 
-        defaultOptions = map GHC.SysTools.Option . concatMap words . snd
-                         $ unzip (llvmOptions llvm_config dflags)
+    llvm_version <- figureLlvmVersion logger dflags
+    let defaultOptions = map GHC.SysTools.Option . concatMap words . snd
+                         $ unzip (llvmOptions llvm_config llvm_version dflags)
         optFlag = if null (getOpts dflags opt_lc)
                   then map GHC.SysTools.Option $ words llvmOpts
                   else []
@@ -265,8 +268,9 @@ runLlvmOptPhase pipe_env hsc_env input_fn = do
                     Nothing -> panic ("runPhase LlvmOpt: llvm-passes file "
                                       ++ "is missing passes for level "
                                       ++ show optIdx)
-        defaultOptions = map GHC.SysTools.Option . concat . fmap words . fst
-                         $ unzip (llvmOptions llvm_config dflags)
+    llvm_version <- figureLlvmVersion logger dflags
+    let defaultOptions = map GHC.SysTools.Option . concat . fmap words . fst
+                         $ unzip (llvmOptions llvm_config llvm_version dflags)
 
         -- don't specify anything if user has specified commands. We do this
         -- for opt but not llc since opt is very specifically for optimisation
@@ -964,9 +968,10 @@ getOutputFilename logger tmpfs stop_phase output basename dflags next_phase mayb
 -- | LLVM Options. These are flags to be passed to opt and llc, to ensure
 -- consistency we list them in pairs, so that they form groups.
 llvmOptions :: LlvmConfig
+            -> Maybe LlvmVersion
             -> DynFlags
             -> [(String, String)]  -- ^ pairs of (opt, llc) arguments
-llvmOptions llvm_config dflags =
+llvmOptions llvm_config llvm_version dflags =
        [("-relocation-model=" ++ rmodel
         ,"-relocation-model=" ++ rmodel) | not (null rmodel)]
 
@@ -1006,6 +1011,10 @@ llvmOptions llvm_config dflags =
               ++ ["+sse2"    | isSse2Enabled platform   ]
               ++ ["+sse"     | isSseEnabled platform    ]
               ++ ["+avx512f" | isAvx512fEnabled dflags  ]
+              ++ ["+evex512" | isAvx512fEnabled dflags
+                             , maybe False (>= LlvmVersion (18 NE.:| [])) llvm_version ]
+                   -- +evex512 is recognized by LLVM 18 or newer and needed on macOS (#26410).
+                   -- It may become deprecated in a future LLVM version, though.
               ++ ["+avx2"    | isAvx2Enabled dflags     ]
               ++ ["+avx"     | isAvxEnabled dflags      ]
               ++ ["+avx512cd"| isAvx512cdEnabled dflags ]

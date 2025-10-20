@@ -164,3 +164,19 @@ test('T25062_V64'
 test('T25169', [], compile_and_run, [''])
 test('T25455', [], compile_and_run, [''])
 test('T25486', [], compile_and_run, [''])
+
+test('T26410_ffi'
+    , [ only_ways(llvm_ways) # SIMD NCG TODO: support 512-bit wide vectors
+      , unless(arch('x86_64') and have_cpu_feature('avx512f'), skip)
+      , extra_hc_opts('-mavx512f -optc -mavx512f -optlc -mcpu=penryn')
+      ]
+    , compile_and_run if have_cpu_feature('avx512f') else compile
+    , ['T26410_ffi_c.c'])
+
+test('T26410_prim'
+    , [ only_ways(llvm_ways) # SIMD NCG TODO: support 512-bit wide vectors
+      , unless(arch('x86_64') and have_cpu_feature('avx512f'), skip)
+      , extra_hc_opts('-mavx512f -optlc -mcpu=penryn')
+      ]
+    , compile_and_run if have_cpu_feature('avx512f') else compile
+    , [''])
