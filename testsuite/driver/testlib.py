@@ -38,6 +38,8 @@ from my_typing import *
 from threading import Timer
 from collections import OrderedDict
 
+from _elffile import ELFFile
+
 import asyncio
 import contextvars
 
@@ -1040,6 +1042,17 @@ def have_llvm( ) -> bool:
 def have_dynamic( ) -> bool:
     ''' Were libraries built in the dynamic way? '''
     return config.have_dynamic
+
+def is_musl( ) -> bool:
+    ''' Whether we're on a musl system '''
+    try:
+        with open(sys.executable, "rb") as f:
+            ld = ELFFile(f).interpreter
+    except (OSError, TypeError, ValueError):
+        return False
+    if ld is None or "musl" not in ld:
+        return False
+    return True
 
 def have_dynamic_prof( ) -> bool:
     ''' Were libraries built in the profiled dynamic way? '''
