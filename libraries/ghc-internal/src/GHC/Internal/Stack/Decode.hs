@@ -54,9 +54,18 @@ import GHC.Internal.Heap.Closures
     GenStackField(..)
   )
 import GHC.Internal.Heap.Constants (wORD_SIZE_IN_BITS)
-import GHC.Internal.Heap.InfoTable
 import GHC.Internal.Stack.Annotation
+#if defined(PROFILING)
+import GHC.Internal.Stack.Constants ()
+import GHC.Internal.Stack.ConstantsProf
+import GHC.Internal.Heap.InfoTable ()
+import GHC.Internal.Heap.InfoTableProf
+#else
+import GHC.Internal.Heap.InfoTable
+import GHC.Internal.Heap.InfoTableProf ()
 import GHC.Internal.Stack.Constants
+import GHC.Internal.Stack.ConstantsProf ()
+#endif
 import GHC.Internal.Stack.CloneStack
 import GHC.Internal.InfoProv.Types (InfoProv (..), ipLoc, lookupIPE)
 
