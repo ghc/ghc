@@ -598,9 +598,8 @@ callArityBind boring_vars ae_body int (NonRec v rhs)
 
 -- Recursive let. See Note [Recursion and fixpointing]
 callArityBind boring_vars ae_body int b@(Rec binds)
-  = -- (if length binds > 300 then
-    -- pprTrace "callArityBind:Rec"
-    --           (vcat [ppr (Rec binds'), ppr ae_body, ppr int, ppr ae_rhs]) else id) $
+  = -- pprTrace "callArityBind:Rec"
+    --          (vcat [ppr (map fst binds), ppr ae_body, ppr int, ppr ae_rhs]) $
     (final_ae, Rec binds')
   where
     -- See Note [Taking boring variables into account]
@@ -614,7 +613,9 @@ callArityBind boring_vars ae_body int b@(Rec binds)
 
     fix :: [(Id, Maybe (Bool, Arity, CallArityRes), CoreExpr)] -> (CallArityRes, [(Id, CoreExpr)])
     fix ann_binds
-        | -- pprTrace "callArityBind:fix" (vcat [ppr ann_binds, ppr any_change, ppr ae]) $
+        | -- pprTrace "callArityBind:fix" (vcat
+          --    [ text "binds" <+> vcat [ppr (id,stuff) | (id,stuff,_rhs) <- ann_binds]
+          --   , ppr any_change, ppr ae]) $
           any_change
         = fix ann_binds'
         | otherwise
@@ -650,7 +651,12 @@ callArityBind boring_vars ae_body int b@(Rec binds)
                           | safe_arity == 0 = ae_rhs -- If it is not a function, its body is evaluated only once
                           | otherwise       = calledMultipleTimes ae_rhs
 
-                  i' = i `setIdCallArity` trimmed_arity
+                  i' = -- (if trimmed_arity == new_arity then id else
+                       --    pprTrace "trimming"
+                       --       (vcat [ ppr i <+> ppr new_arity <+> ppr trimmed_arity
+                       --             , text "safe" <+> ppr safe_arity
+                       --             , text "is_thunk" <+> ppr is_thunk ])) $
+                       i `setIdCallArity` trimmed_arity
 
               in (True, (i', Just (called_once, new_arity, ae_rhs'), rhs'))
           where
