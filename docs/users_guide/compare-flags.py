@@ -35,7 +35,7 @@ def expected_undocumented(flag: str) -> bool:
 
     return False
 
-def read_documented_flags(doc_flags) -> Set[str]:
+def read_documented_flags(doc_flags: Path) -> Set[str]:
     # Map characters that mark the end of a flag
     # to whitespace.
     trans = str.maketrans({
@@ -44,10 +44,10 @@ def read_documented_flags(doc_flags) -> Set[str]:
         '⟨': ' ',
     })
     return {line.translate(trans).split()[0]
-            for line in doc_flags.read().split('\n')
+            for line in doc_flags.read_text(encoding="UTF-8").split('\n')
             if line != ''}
 
-def read_ghc_flags(ghc_path: str) -> Set[str]:
+def read_ghc_flags(ghc_path: Path) -> Set[str]:
     ghc_output = subprocess.check_output([ghc_path, '--show-options'])
     ghci_output = subprocess.check_output([ghc_path, '--interactive', '--show-options'])
 
@@ -63,16 +63,16 @@ def error(s: str):
 def main() -> None:
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ghc', type=argparse.FileType('r'),
+    parser.add_argument('--ghc', type=Path,
                         help='path of GHC executable',
                         required=True)
-    parser.add_argument('--doc-flags', type=argparse.FileType(mode='r', encoding='UTF-8'),
+    parser.add_argument('--doc-flags', type=Path,
                         help='path of ghc-flags.txt output from Sphinx',
                         required=True)
     args = parser.parse_args()
 
     doc_flags = read_documented_flags(args.doc_flags)
-    ghc_flags = read_ghc_flags(args.ghc.name)
+    ghc_flags = read_ghc_flags(args.ghc)
 
     failed = False
 

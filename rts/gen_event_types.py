@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from pathlib import Path
 from typing import List, Union, Dict
 from collections import namedtuple
 
@@ -198,17 +199,17 @@ def generate_event_types_defines() -> str:
 def main() -> None:
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--event-types-array', type=argparse.FileType('w'), metavar='FILE')
-    parser.add_argument('--event-types-defines', type=argparse.FileType('w'), metavar='FILE')
+    parser.add_argument('--event-types-array', type=Path, metavar='FILE')
+    parser.add_argument('--event-types-defines', type=Path, metavar='FILE')
     args = parser.parse_args()
 
     check_events()
 
     if args.event_types_array:
-        args.event_types_array.write(generate_event_types_array())
+        args.event_types_array.write_text(generate_event_types_array())
 
     if args.event_types_defines:
-        args.event_types_defines.write(generate_event_types_defines())
+        args.event_types_defines.write_text(generate_event_types_defines())
 
 if __name__ == '__main__':
     main()
