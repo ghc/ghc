@@ -1,4 +1,4 @@
-cabal-version: 3.0
+cabal-version: 3.8
 name: rts
 version: 1.0.3
 synopsis: The GHC runtime system
@@ -150,18 +150,6 @@ library
                         stg/Types.h
 
     else
-      -- If we are using an in-tree libffi then we must declare it as a bundled
-      -- library to ensure that Cabal installs it.
-      if !flag(use-system-libffi)
-        if os(windows)
-          extra-bundled-libraries: Cffi-6
-        else
-          extra-bundled-libraries: Cffi
-
-        install-includes: ffi.h ffitarget.h
-        -- ^ see Note [Packaging libffi headers] in
-        -- GHC.Driver.CodeOutput.
-
       -- Here we declare several flavours to be available when passing the
       -- suitable (combination of) flag(s) when configuring the RTS from hadrian,
       -- using Cabal.
@@ -210,6 +198,9 @@ library
          extra-libraries: rt
       if flag(use-system-libffi)
          extra-libraries: ffi
+         extra-libraries-static: ffi
+      else
+         build-depends: libffi-clib
       if os(windows)
          extra-libraries:
             -- for the linker

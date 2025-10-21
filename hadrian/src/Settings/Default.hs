@@ -142,6 +142,7 @@ stage1Packages = do
     cross      <- flag CrossCompiling
     winTarget  <- isWinTarget
     haveCurses <- any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
+    useSystemFfi <- flag UseSystemFfi
 
     let when c xs = if c then xs else mempty
 
@@ -194,6 +195,10 @@ stage1Packages = do
       , when (cross && haveCurses)
         [
           terminfo
+        ]
+      , when (not useSystemFfi)
+        [
+          libffi
         ]
       ]
 

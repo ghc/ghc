@@ -124,3 +124,6 @@
 [submodule "libraries/template-haskell-quasiquoter"]
 	path = libraries/template-haskell-quasiquoter
 	url = https://gitlab.haskell.org/ghc/template-haskell-quasiquoter.git
+[submodule "libraries/libffi-clib"]
+	path = libraries/libffi-clib
+	url = https://github.com/stable-haskell/libffi-clib.git

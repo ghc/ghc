@@ -435,6 +435,13 @@ GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerThreadedDefault], [threaded],
 GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerThreadedDefault], [threaded],
                                 [winio], [IOMGR_DEFAULT_THREADED_WINIO])
 
+dnl ** FFI
+dnl --------------------------------------------------------------
+
+FP_FIND_LIBFFI
+AC_SUBST(FFILibDir)
+AC_SUBST(FFIIncludeDir)
+
 dnl ######################################################################
 dnl Generate build-info
 dnl ######################################################################

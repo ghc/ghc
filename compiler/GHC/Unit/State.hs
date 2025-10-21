@@ -371,7 +371,7 @@ initUnitConfig dflags cached_dbs home_units =
          -- Since "base" is not wired in, then the unit-id is discovered
          -- from the settings file by default, but can be overriden by power-users
          -- by specifying `-base-unit-id` flag.
-         | otherwise = filter (hu_id /=) [baseUnitId dflags, ghcInternalUnitId, rtsUnitId]
+         | otherwise = filter (hu_id /=) (baseUnitId dflags:wiredInUnitIds)
 
        -- if the home unit is indefinite, it means we are type-checking it only
        -- (not producing any code). Hence we can use virtual units instantiated

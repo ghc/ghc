@@ -474,7 +474,7 @@ opsysVariables _ (Windows {}) = mconcat
   , "LANG" =: "en_US.UTF-8"
   , "CABAL_INSTALL_VERSION" =: "3.10.2.0"
   , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
-  , "FETCH_GHC_VERSION" =: "9.10.1"
+  , "FETCH_GHC_VERSION" =: "9.10.3"
   ]
 opsysVariables _ _ = mempty
 

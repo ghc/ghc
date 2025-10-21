@@ -139,7 +139,7 @@ buildConfFinal :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildConfFinal rs context@Context {..} _conf = do
     depPkgIds <- cabalDependencies context
     ensureConfigured context
-    ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)
+    ways <- interpretInContext context (getLibraryWays <> if package `elem` [rts, libffi] then getRtsWays else mempty)
     stamps <- mapM pkgStampFile [ context { way = w } | w <- Set.toList ways ]
     confs <- mapM (\pkgId -> packageDbPath (PackageDbLoc stage Final) <&> (-/- pkgId <.> "conf")) depPkgIds
     -- Important to need these together to avoid introducing a linearisation. This is not the most critical place
@@ -287,14 +287,6 @@ parseCabalName s = bimap show id (Cabal.runParsecParser parser "<parseCabalName>
       where
         component = CabalCharParsing.munch1 (\c ->  Char.isAlphaNum c || c == '.')
 
-
-
--- | Return extra library targets.
-extraTargets :: Context -> Action [FilePath]
-extraTargets context
-    | package context == rts  = needRtsLibffiTargets (Context.stage context)
-    | otherwise               = return []
-
 -- | Given a library 'Package' this action computes all of its targets. Needing
 -- all the targets should build the library such that it is ready to be
 -- registered into the package database.
@@ -308,7 +300,5 @@ libraryTargets includeGhciLib context@Context {..} = do
     ghci     <- if ghciObjsSupported && includeGhciLib && not (wayUnit Dynamic way)
                 then interpretInContext context $ getContextData buildGhciLib
                 else return False
-    extra    <- extraTargets context
     return $ [ libFile ]
           ++ [ ghciLib | ghci ]
-          ++ extra
