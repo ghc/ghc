@@ -1,6 +1,5 @@
 extra-libraries: @EXTRA_LIBS@
 extra-libraries-static: @EXTRA_LIBS@
 include-dirs: @FFIIncludeDir@
-library-dirs: @FFILibDir@
-library-dirs-static: @FFILibDir@
-dynamic-library-dirs: @FFILibDir@
+extra-lib-dirs: @FFILibDir@
+extra-lib-dirs-static: @FFILibDir@

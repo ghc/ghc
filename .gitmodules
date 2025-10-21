@@ -99,10 +99,6 @@
 	path = utils/hsc2hs
 	url = https://gitlab.haskell.org/ghc/hsc2hs.git
 	ignore = untracked
-[submodule "libffi-tarballs"]
-	path = libffi-tarballs
-	url = https://gitlab.haskell.org/ghc/libffi-tarballs.git
-	ignore = untracked
 [submodule "gmp-tarballs"]
 	path = libraries/ghc-internal/gmp/gmp-tarballs
 	url = https://gitlab.haskell.org/ghc/gmp-tarballs.git
@@ -124,3 +120,6 @@
 [submodule "libraries/template-haskell-quasiquoter"]
 	path = libraries/template-haskell-quasiquoter
 	url = https://gitlab.haskell.org/ghc/template-haskell-quasiquoter.git
+[submodule "libraries/libffi-clib"]
+	path = libraries/libffi-clib
+	url = https://github.com/stable-haskell/libffi-clib.git

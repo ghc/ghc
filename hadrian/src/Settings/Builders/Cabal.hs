@@ -184,7 +184,8 @@ configureArgs cFlags' ldFlags' = do
                            , arg $ top -/- pkgPath pkg
                            , cFlags'
                            ]
-    mconcat
+    useSystemFfi <- getFlag UseSystemFfi
+    mconcat $
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags'
         , conf "--with-iconv-includes"    $ arg =<< getSetting IconvIncludeDir
@@ -198,7 +199,7 @@ configureArgs cFlags' ldFlags' = do
         , conf "--host"                   $ arg =<< getSetting TargetPlatformFull
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
         , ghcVersionH
-        ]
+        ] ++ if useSystemFfi then [arg "--configure-option=--with-system-libffi"] else []
 
 bootPackageConstraints :: Args
 bootPackageConstraints = (stage0InTree ==) <$> getStage ? do

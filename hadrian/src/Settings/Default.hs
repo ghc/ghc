@@ -141,7 +141,9 @@ stage1Packages = do
     libraries0 <- filter good_stage0_package <$> stage0Packages
     cross      <- flag CrossCompiling
     winTarget  <- isWinTarget
+    jsTarget   <- isJsTarget
     haveCurses <- any (/= "") <$> traverse setting [ CursesIncludeDir, CursesLibDir ]
+    useSystemFfi <- flag UseSystemFfi
 
     let when c xs = if c then xs else mempty
 
@@ -193,6 +195,10 @@ stage1Packages = do
       , when (cross && haveCurses)
         [
           terminfo
+        ]
+      , when (not jsTarget && not useSystemFfi)
+        [
+          libffi
         ]
       ]
 

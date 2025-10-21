@@ -232,6 +232,9 @@ buildSphinxHtml path = do
 
 ------------------------------------ Haddock -----------------------------------
 
+haddockExclude :: [FilePath]
+haddockExclude = ["rts", "libffi-clib"]
+
 -- | Build the haddocks for GHC's libraries.
 buildLibraryDocumentation :: Rules ()
 buildLibraryDocumentation = do
@@ -241,11 +244,11 @@ buildLibraryDocumentation = do
     root -/- htmlRoot -/- "libraries/index.html" %> \file -> do
         need [ "libraries/prologue.txt" ]
 
-        -- We want Haddocks for everything except `rts` to be built, but we
+        -- We want Haddocks for everything except `rts` and `libffi-clib` to be built, but we
         -- don't want the index to be polluted by stuff from `ghc`-the-library
         -- (there will be a separate top-level link to those Haddocks).
         haddocks <- allHaddocks
-        let neededDocs = filter (\x -> takeFileName x /= "rts.haddock") haddocks
+        let neededDocs = filter (\x -> takeFileName x `notElem` ((<.> "haddock") <$> haddockExclude)) haddocks
             libDocs = filter (\x -> takeFileName x /= "ghc.haddock") neededDocs
 
         need neededDocs
@@ -255,7 +258,7 @@ allHaddocks :: Action [FilePath]
 allHaddocks = do
     pkgs <- stagePackages Stage1
     sequence [ pkgHaddockFile $ vanillaContext Stage1 pkg
-             | pkg <- pkgs, isLibrary pkg, pkgName pkg /= "rts" ]
+             | pkg <- pkgs, isLibrary pkg, pkgName pkg `notElem` haddockExclude ]
 
 -- Note: this build rule creates plenty of files, not just the .haddock one.
 -- All of them go into the 'docRoot' subdirectory. Pedantically tracking all
@@ -427,4 +430,4 @@ haddockDependencies :: Context -> Action [(Package, FilePath)]
 haddockDependencies context = do
     depNames <- interpretInContext context (getContextData depNames)
     sequence [ (,) <$> pure depPkg <*> (pkgHaddockFile $ vanillaContext Stage1 depPkg)
-             | Just depPkg <- map findPackageByName depNames, depPkg /= rts ]
+             | Just depPkg <- map findPackageByName depNames, (pkgName depPkg) `notElem` haddockExclude ]
