@@ -229,6 +229,7 @@ packageArgs = do
 
         ---------------------------------- rts ---------------------------------
         , package rts ? rtsPackageArgs -- RTS deserves a separate function
+        , package libffi ? libffiPackageArgs
 
         -------------------------------- runGhc --------------------------------
         , package runGhc ?
@@ -289,6 +290,19 @@ ghcInternalArgs = package ghcInternal ? do
 
           ]
 
+-- libffi and rts have to have the same flavour configuration
+libffiPackageArgs :: Args
+libffiPackageArgs = package libffi ? do
+    rtsWays <- getRtsWays
+    mconcat
+        [ builder (Cabal Flags) ? mconcat
+          [ any (wayUnit Profiling) rtsWays `cabalFlag` "profiling"
+          , any (wayUnit Debug) rtsWays     `cabalFlag` "debug"
+          , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
+          , any (wayUnit Threaded) rtsWays  `cabalFlag` "threaded"
+          ]
+        ]
+
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
@@ -299,8 +313,6 @@ rtsPackageArgs = package rts ? do
     path           <- getBuildPath
     top            <- expr topDirectory
     useSystemFfi   <- getFlag UseSystemFfi
-    ffiIncludeDir  <- getSetting FfiIncludeDir
-    ffiLibraryDir  <- getSetting FfiLibDir
     libdwIncludeDir   <- queryTarget (Lib.includePath <=< tgtRTSWithLibdw)
     libdwLibraryDir   <- queryTarget (Lib.libraryPath <=< tgtRTSWithLibdw)
     libnumaIncludeDir <- getSetting LibnumaIncludeDir
@@ -442,7 +454,6 @@ rtsPackageArgs = package rts ? do
               [ useLibdw ? cabalExtraDirs (fromMaybe "" libdwIncludeDir) (fromMaybe "" libdwLibraryDir)
               , cabalExtraDirs libnumaIncludeDir libnumaLibraryDir
               , cabalExtraDirs libzstdIncludeDir libzstdLibraryDir
-              , useSystemFfi ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
               ]
         , builder (Cc (FindCDependencies CDep)) ? cArgs
         , builder (Cc (FindCDependencies  CxxDep)) ? cArgs

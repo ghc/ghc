@@ -99,6 +99,7 @@ import GHC.Linker.Deps
 import GHC.Linker.MacOS
 import GHC.Linker.Dynamic
 import GHC.Linker.Types
+import GHC.Linker.Unit
 
 -- Standard libraries
 import Control.Monad
@@ -179,14 +180,15 @@ getLoaderState :: Interp -> IO (Maybe LoaderState)
 getLoaderState interp = readMVar (loader_state (interpLoader interp))
 
 
-emptyLoaderState :: LoaderState
-emptyLoaderState = LoaderState
+emptyLoaderState :: UnitEnv -> LoaderState
+emptyLoaderState unit_env =
+  LoaderState
    { linker_env = LinkerEnv
      { closure_env = emptyNameEnv
      , itbl_env    = emptyNameEnv
      , addr_env    = emptyNameEnv
      }
-   , pkgs_loaded = init_pkgs
+   , pkgs_loaded = init_pkgs deps
    , bcos_loaded = emptyModuleEnv
    , objs_loaded = emptyModuleEnv
    , temp_sos = []
@@ -200,7 +202,13 @@ emptyLoaderState = LoaderState
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = unitUDFM rtsUnitId (LoadedPkgInfo rtsUnitId [] [] [] emptyUniqDSet)
+  where
+    deps = getUnitDepends unit_env rtsUnitId
+    pkg_to_dfm unit_id = (unit_id, (LoadedPkgInfo unit_id [] [] [] emptyUniqDSet))
+    init_pkgs deps = let addToUDFM' (k, v) m = addToUDFM m k v
+                     in foldr addToUDFM' emptyUDFM $ [
+                       pkg_to_dfm rtsUnitId
+                     ] ++ fmap pkg_to_dfm deps
 
 extendLoadedEnv :: Interp -> [(Name,ForeignHValue)] -> IO ()
 extendLoadedEnv interp new_bindings =
@@ -349,7 +357,7 @@ initLoaderState interp hsc_env = do
 reallyInitLoaderState :: Interp -> HscEnv -> IO LoaderState
 reallyInitLoaderState interp hsc_env = do
   -- Initialise the linker state
-  let pls0 = emptyLoaderState
+  let pls0 = emptyLoaderState (hsc_unit_env hsc_env)
 
   case platformArch (targetPlatform (hsc_dflags hsc_env)) of
     -- FIXME: we don't initialize anything with the JS interpreter.
@@ -1260,12 +1268,6 @@ loadPackage interp hsc_env pkgs
                  | otherwise = [map ST.unpack $ Packages.unitLibraryDirs pkg | pkg <- pkgs]
 
         let hs_libs   = [map ST.unpack $ Packages.unitLibraries pkg | pkg <- pkgs]
-            -- The FFI GHCi import lib isn't needed as
-            -- GHC.Linker.Loader + rts/Linker.c link the
-            -- interpreted references to FFI to the compiled FFI.
-            -- We therefore filter it out so that we don't get
-            -- duplicate symbol errors.
-            hs_libs'  =  filter ("HSffi" /=) <$> hs_libs
 
         -- Because of slight differences between the GHC dynamic linker and
         -- the native system linker some packages have to link with a
@@ -1285,7 +1287,7 @@ loadPackage interp hsc_env pkgs
         dirs_env <- traverse (addEnvPaths "LIBRARY_PATH") dirs
 
         hs_classifieds
-           <- sequenceA [mapM (locateLib interp hsc_env True  dirs_env_ gcc_paths) hs_libs'_ | (dirs_env_, hs_libs'_) <- zip dirs_env hs_libs' ]
+           <- sequenceA [mapM (locateLib interp hsc_env True  dirs_env_ gcc_paths) hs_libs'_ | (dirs_env_, hs_libs'_) <- zip dirs_env hs_libs ]
         extra_classifieds
            <- sequenceA [mapM (locateLib interp hsc_env False dirs_env_ gcc_paths) extra_libs_ | (dirs_env_, extra_libs_) <- zip dirs_env extra_libs]
         let classifieds = zipWith (++) hs_classifieds extra_classifieds
