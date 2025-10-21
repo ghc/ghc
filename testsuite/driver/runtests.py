@@ -83,7 +83,7 @@ parser.add_argument("--way", action="append", help="just this way")
 parser.add_argument("--skipway", action="append", help="skip this way")
 parser.add_argument("--threads", type=int, help="threads to run simultaneously")
 parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
-parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
+parser.add_argument("--junit", type=Path, help="output testsuite summary in JUnit format")
 parser.add_argument("--broken-test", action="append", default=[], help="a test name to mark as broken for this run")
 parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
 parser.add_argument("--perf-baseline", type=GitRef, metavar='COMMIT', help="Baseline commit for performance comparsons.")
@@ -91,7 +91,7 @@ perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip per
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
 parser.add_argument("--ignore-perf-failures", choices=['increases','decreases','all'],
                         help="Do not fail due to out-of-tolerance perf tests")
-parser.add_argument("--only-report-hadrian-deps", type=argparse.FileType('w'),
+parser.add_argument("--only-report-hadrian-deps", type=Path,
                         help="Dry run the testsuite and report all extra hadrian dependencies needed on the given file")
 
 args = parser.parse_args()
@@ -615,14 +615,14 @@ else:
             summary(t, f)
 
     if args.junit:
-        junit(t).write(args.junit)
-        args.junit.close()
+        with args.junit.open("wb") as f:
+            junit(t).write(f)
 
     if config.only_report_hadrian_deps:
       print("WARNING - skipping all tests and only reporting required hadrian dependencies:", config.hadrian_deps)
-      for d in config.hadrian_deps:
-        print(d,file=config.only_report_hadrian_deps)
-      config.only_report_hadrian_deps.close()
+      with config.only_report_hadrian_deps.open("w") as f:
+          for d in config.hadrian_deps:
+            print(d, file=f)
 
 if len(t.unexpected_failures) > 0 or \
    len(t.unexpected_stat_failures) > 0 or \
