@@ -3,13 +3,10 @@
 module GHC.Unit.Home.ModInfo
    (
      HomeModInfo (..)
-   , HomeModLinkable(..)
+   , HomeModLinkable (..)
    , homeModInfoObject
    , homeModInfoByteCode
    , emptyHomeModInfoLinkable
-   , justBytecode
-   , justObjects
-   , bytecodeAndObjects
    )
 where
 
@@ -18,11 +15,9 @@ import GHC.Prelude
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 
-import GHC.Linker.Types ( Linkable(..), linkableIsNativeCodeOnly )
+import GHC.Linker.Types ( Linkable )
 
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
-
 
 -- | Information about modules in the package being compiled
 data HomeModInfo = HomeModInfo
@@ -67,22 +62,6 @@ data HomeModLinkable = HomeModLinkable { homeMod_bytecode :: !(Maybe Linkable)
 
 instance Outputable HomeModLinkable where
   ppr (HomeModLinkable l1 l2) = ppr l1 $$ ppr l2
-
-justBytecode :: Linkable -> HomeModLinkable
-justBytecode lm =
-  assertPpr (not (linkableIsNativeCodeOnly lm)) (ppr lm)
-   $ emptyHomeModInfoLinkable { homeMod_bytecode = Just lm }
-
-justObjects :: Linkable -> HomeModLinkable
-justObjects lm =
-  assertPpr (linkableIsNativeCodeOnly lm) (ppr lm)
-   $ emptyHomeModInfoLinkable { homeMod_object = Just lm }
-
-bytecodeAndObjects :: Linkable -> Linkable -> HomeModLinkable
-bytecodeAndObjects bc o =
-  assertPpr (not (linkableIsNativeCodeOnly bc) && linkableIsNativeCodeOnly o) (ppr bc $$ ppr o)
-    (HomeModLinkable (Just bc) (Just o))
-
 
 {-
 Note [Home module build products]
