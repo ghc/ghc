@@ -529,7 +529,7 @@ Here are the moving parts:
     IdDetails:  RepPolyId [ r :-> ConcreteFRR (FixedRuntimeRepOrigin b (..)) ]
 
 * When instantiating the type of an Id at a call site, at the call to
-  GHC.Tc.Utils.Instantiate.instantiateSigma in GHC.Tc.Gen.App.tcInstFun,
+  GHC.Tc.Utils.Instantiate.instantiateSigmaQL in GHC.Tc.Gen.App.tcInstFun,
   create ConcreteTv metavariables (instead of TauTvs) based on the
   ConcreteTyVars stored in the IdDetails of the Id.
 

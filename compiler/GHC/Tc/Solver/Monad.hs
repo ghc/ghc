@@ -414,18 +414,18 @@ updInertIrreds irred
 
 {- Note [Kick out after filling a coercion hole]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we we solve `kco` and have `co` in the inert set whose rewriter-set includes `kco`,
+If we solve `kco` and have `co` in the inert set whose rewriter-set includes `kco`,
 we should kick out `co` so that we can now unify it, which might unlock other stuff.
 See Note [Unify only if the rewriter set is empty] in GHC.Tc.Solver.Equality for
 why solving `kco` might unlock `co`, especially (URW2).
 
 Hence `kickOutAfterFillingCoercionHole`.  It looks at inert constraints that are
   * Wanted
-  * Of form  alpha ~ rhs, where alpha is a unification variable
+  * Of the form  alpha ~ rhs, where alpha is a unification variable
 and kicks out any that will have an empty rewriter set after filling the hole.
 
 Wrinkles:
-(KOC1) If co's rewriter-set is {kco, xco}, there is on point in kicking it out,
+(KOC1) If co's rewriter-set is {kco, xco}, there is no point in kicking it out,
        because it still can't be unified.  So we only kick out if the co's
        rewriter-set becomes empty.
 
