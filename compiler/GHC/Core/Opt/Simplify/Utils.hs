@@ -1441,7 +1441,7 @@ spectral/mandel/Mandel.hs, where the mandelset function gets a useful
 let-float if you inline windowToViewport
 
 However, as usual for Gentle mode, do not inline things that are
-inactive in the initial stages.  See Note [Gentle mode].
+inactive in the initial stages.
 
 Note [Stable unfoldings and preInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
