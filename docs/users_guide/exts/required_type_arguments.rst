@@ -341,7 +341,9 @@ longer compile: ::
   f :: a -> a    -- RequiredTypeArguments: the top-level `a` is captured
 
 Because of that, merely enabling :extension:`RequiredTypeArguments` might lead
-to type errors of this form::
+to type errors of this form:
+
+.. code-block:: none
 
   Term variable ‘a’ cannot be used here
     (term variables cannot be promoted)
@@ -356,7 +358,9 @@ If you are converting a large codebase to be compatible with
 :extension:`RequiredTypeArguments`, consider using
 :ghc-flag:`-Wterm-variable-capture` during the migration. It is a warning that
 detects instances of implicit quantification incompatible with
-:extension:`RequiredTypeArguments`: ::
+:extension:`RequiredTypeArguments`:
+
+.. code-block:: none
 
   The type variable ‘a’ is implicitly quantified,
   even though another variable of the same name is in scope:

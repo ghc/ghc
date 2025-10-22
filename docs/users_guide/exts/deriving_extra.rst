@@ -298,9 +298,9 @@ Here are the differences between the generated code for ``Functor`` and
 ``Foldable``:
 
 #. When a bare type variable ``a`` is encountered, :extension:`DeriveFunctor`
-would generate ``f a`` for an ``fmap`` definition. :extension:`DeriveFoldable`
-would generate ``f a z`` for ``foldr``, ``f a`` for ``foldMap``, and ``False``
-for ``null``.
+   would generate ``f a`` for an ``fmap`` definition. :extension:`DeriveFoldable`
+   would generate ``f a z`` for ``foldr``, ``f a`` for ``foldMap``, and ``False``
+   for ``null``.
 
 #. When a type that is not syntactically equivalent to ``a``, but which does
    contain ``a``, is encountered, :extension:`DeriveFunctor` recursively calls

@@ -166,9 +166,9 @@ Strict functions are your dear friends:
 
     ::
 
-        f (Wibble x y) =  ... # strict
+        f (Wibble x y) =  ... -- strict
 
-        f arg = let { (Wibble x y) = arg } in ... # lazy
+        f arg = let { (Wibble x y) = arg } in ... -- lazy
 
     The former will result in far better code.
 
@@ -206,7 +206,7 @@ Newtypes are better than datatypes:
     strictness of its components. So, if the argument is a pair, and it
     says ``U(AU(LSS))``, that means “the first component of the pair
     isn't used; the second component is itself unpackable, with three
-    components (lazy in the first, strict in the second \\& third).”
+    components (lazy in the first, strict in the second \& third).”
 
     If the function isn't exported, just compile with the extra flag
     :ghc-flag:`-ddump-simpl`; next to the signature for any binder, it will
@@ -493,9 +493,11 @@ currently.
   is not enabled (off by default) the function **won't** be specialised, otherwise
 * if the specialization was requested through a pragma GHC **will** try to create a specialization, otherwise
 * if the function is imported and:
+
   + if the unfolding is not available the function **can't** be specialized, otherwise
   + if :ghc-flag:`-fcross-module-specialise` is not enabled (enabled by `-O`) the function **won't** be specialised, otherwise
   + if the flag is enabled, and the function has no INLINABLE/INLINE pragma it **won't** be specialised, otherwise
+
 * if :ghc-flag:`-fspecialise-aggressively` is enabled GHC **will** try to create a specialization, otherwise
 * if the overloaded function is defined in the current module, and all type class instances
   are statically known it **will** be specialized, otherwise

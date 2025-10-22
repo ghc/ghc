@@ -52,7 +52,7 @@ the next paragraph for an example.)
 We use the convention (but it is only a convention) that primitive
 types, values, and operations have a ``#`` suffix (see
 :ref:`magic-hash`). For some primitive types we have special syntax for
-literals, also described in the `same section <#magic-hash>`__.
+literals, also described in the :ref:`same section <magic-hash>`.
 
 Primitive values are often represented by a simple bit-pattern, such as
 ``Int#``, ``Float#``, ``Double#``. But this is not necessarily the case:
@@ -89,8 +89,8 @@ specifies their runtime representation. For example, the type ``Int#`` has kind
 that the runtime representation of an ``Int#`` is a machine integer, and the
 runtime representation of a ``Double#`` is a machine double-precision floating
 point. In contrast, the kind ``Type`` is actually just a synonym for ``TYPE
-LiftedRep``. More details of the ``TYPE`` mechanisms appear in the `section
-on runtime representation polymorphism <#runtime-rep>`__.
+LiftedRep``. More details of the ``TYPE`` mechanisms appear in the :ref:`section
+on runtime representation polymorphism <runtime-rep>`.
 
 Given that ``Int#``'s kind is not ``Type``, then it follows that ``Maybe
 Int#`` is disallowed. Similarly, because type variables tend to be of kind
@@ -222,7 +222,7 @@ Unboxed sums
     Enable the use of unboxed sum syntax.
     Implied by :extension:`UnboxedTuples`.
 
-`-XUnboxedSums` enables new syntax for anonymous, unboxed sum types. The syntax
+``-XUnboxedSums`` enables new syntax for anonymous, unboxed sum types. The syntax
 for an unboxed sum type with N alternatives is ::
 
     (# t_1 | t_2 | ... | t_N #)
@@ -234,7 +234,7 @@ Unboxed tuples can be used for multi-arity alternatives. For example: ::
 
     (# (# Int, String #) | Bool #)
 
-The term level syntax is similar. Leading and preceding bars (`|`) indicate which
+The term level syntax is similar. Leading and preceding bars (using the ``|`` character) indicate which
 alternative it is. Here are two terms of the type shown above: ::
 
     (# (# 1, "foo" #) | #) -- first alternative
@@ -332,8 +332,8 @@ is accepted when this extension is enabled. This creates a type
 ``A :: TYPE IntRep`` and a data constructor ``MkA :: Int# -> A``.
 Although the kind of ``A`` is inferred by GHC, there is nothing visually
 distinctive about this type that indicated that is it not of kind ``Type``
-like newtypes typically are. `GADTSyntax <#gadt-style>`__ can be used to
-provide a kind signature for additional clarity ::
+like newtypes typically are. :ref:`GADTSyntax <gadt-style>` can be used to
+provide a kind signature for additional clarity::
 
     newtype A :: TYPE IntRep where
       MkA :: Int# -> A
@@ -343,7 +343,7 @@ lifted types. In either of the equivalent formulations of ``A`` given above,
 users would additionally have access to a coercion between ``A`` and ``Int#``.
 
 As a consequence of the
-`representation-polymorphic binder restriction <#representation-polymorphism-restrictions>`__,
+:ref:`representation-polymorphic binder restriction <representation-polymorphism-restrictions>`,
 representation-polymorphic fields are disallowed in data constructors
 of data types declared using ``data``. However, since ``newtype`` data
 constructor application is implemented as a coercion instead of as function
@@ -382,7 +382,7 @@ and ``BarTypeWorkRepC`` above.
 
 This extension impacts the determination of whether or not a newtype has
 a Complete User-Supplied Kind (CUSK). The exact impact is specified
-`the section on CUSKs <#complete-kind-signatures>`__.
+:ref:`the section on CUSKs <complete-kind-signatures>`.
 
 Unlifted Datatypes
 ------------------
@@ -438,7 +438,7 @@ You may even declare levity-polymorphic data types: ::
 While ``f`` above could reasonably be levity-polymorphic (as it evaluates its
 argument either way), GHC currently disallows the more general type
 ``PEither @l Int Bool -> Bool``. This is a consequence of the
-`representation-polymorphic binder restriction <#representation-polymorphism-restrictions>`__.
+:ref:`representation-polymorphic binder restriction <representation-polymorphism-restrictions>`.
 
 Pattern matching against an unlifted data type work just like that for lifted
 types; but see :ref:`recursive-and-polymorphic-let-bindings` for the semantics of

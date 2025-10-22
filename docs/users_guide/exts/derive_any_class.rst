@@ -14,9 +14,9 @@ With :extension:`DeriveAnyClass` you can derive any other class. The compiler
 will simply generate an instance declaration with no explicitly-defined
 methods.
 This is
-mostly useful in classes whose `minimal set <#minimal-pragma>`__ is
+mostly useful in classes whose :ref:`minimal set <minimal-pragma>` is
 empty, and especially when writing
-`generic functions <#generic-programming>`__.
+:ref:`generic functions <generic-programming>`.
 
 As an example, consider a simple pretty-printer class ``SPretty``, which outputs
 pretty strings: ::

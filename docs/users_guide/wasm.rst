@@ -134,7 +134,7 @@ To start GHCi with the browser mode, use the following GHC flag:
 
     Enable wasm ghci browser mode, see :ref:`wasm-ghci`.
 
-::
+.. code:: none
 
    $ wasm32-wasi-ghc --interactive -fghci-browser
    GHCi, version 9.13.20250320: https://www.haskell.org/ghc/  :? for help
@@ -633,7 +633,7 @@ When linking a wasm module that makes use of JSFFI, correct link-time
 arguments must be passed to GHC and this needs to be adjusted on a
 per-project basis:
 
-.. code:: haskell
+.. code:: none
 
    ghc -no-hs-main -optl-mexec-model=reactor -optl-Wl,--export=my_func
 

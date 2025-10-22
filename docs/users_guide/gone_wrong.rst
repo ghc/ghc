@@ -32,7 +32,7 @@ When the compiler “does the wrong thing”
     please report it as a bug.
 
 "What about this warning from the C compiler?"
-    For example: ``…warning: \`Foo' declared \`static' but never
+    For example: ``…warning: `Foo' declared `static' but never
     defined.`` Unsightly, but shouldn't be a problem.
 
 Sensitivity to ``.hi`` interface files
@@ -45,7 +45,7 @@ Sensitivity to ``.hi`` interface files
 
 "I think GHC is producing incorrect code"
     Unlikely :-) A useful be-more-paranoid option to give to GHC is
-    ``-dcore-lint``-dcore-lint option; this causes a “lint” pass to
+    :ghc-flag:`-dcore-lint` option; this causes a “lint” pass to
     check for errors (notably type errors) after each Core-to-Core
     transformation pass. We run with ``-dcore-lint`` on all the time; it
     costs about 5% in compile time.
@@ -114,7 +114,7 @@ see :ref:`sooner-faster-quicker`).
     So, before you report a bug because of a core dump, you should
     probably:
 
-    ::
+    .. code-block:: none
 
         % rm *.o        # scrub your object files
         % make my_prog  # re-make your program; use -ddump-hi-diffs to highlight changes;

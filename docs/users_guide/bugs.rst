@@ -94,7 +94,9 @@ Lexical syntax
    for the precise rules.
 
 - Haskell Report allows any Unicode Decimal Number in decimal literals.
-  However, GHC accepts only ASCII numbers::
+  However, GHC accepts only ASCII numbers:
+
+  .. code-block:: none
 
      ascDigit    →   0 | 1 | … | 9
      decimal     →   ascDigit {ascDigit}
@@ -104,7 +106,9 @@ Lexical syntax
   therefore variable identifiers can begin with them.
   Digit class contains all Unicode numbers instead of just Decimal Numbers.
   Modifier Letters and Non-Spacing Marks can appear in the tail
-  of the identifiers.::
+  of the identifiers:
+
+  .. code-block:: none
 
      uniSmall    →   any Unicode Lowercase Letter or Other Letter
      uniDigit    →   any Unicode Decimal Number, Letter Number or Other Number
@@ -116,8 +120,8 @@ Lexical syntax
      conid       →   large {idchar}
 
 - GHC allows redundant parantheses around the function name in the `funlhs` part of declarations.
-  That is GHC will succeed in parsing a declaration like `((f)) x = <rhs>` for any number
-  of parantheses around `f`.
+  That is, GHC will succeed in parsing a declaration like ``((f)) x = <rhs>`` for any number
+  of parantheses around ``f``.
 
 .. _infelicities-syntax:
 
@@ -132,7 +136,7 @@ Context-free syntax
    enclosing context, if the nested context is a ``do`` expression.
 
    For example, the following code, in which a ``do`` context is nested
-   within a case context, and the statement `feed animal` is indented by
+   within a case context, and the statement ``feed animal`` is indented by
    the same amount as the case alt, is accepted by GHC: ::
 
        main = case animal of
@@ -295,8 +299,8 @@ Default Module headers with -main-is
 The Haskell2010 Report specifies in <https://www.haskell.org/onlinereport/haskell2010/haskellch5.html#x11-990005.1> that
 
     "An abbreviated form of module, consisting only of the module body,
-     is permitted. If this is used, the header is assumed to be
-     `module Main(main) where`."
+    is permitted. If this is used, the header is assumed to be
+    ``module Main(main) where``."
 
 GHC's ``-main-is`` option can be used to change the name of the top-level entry
 point from ``main`` to any other variable.  When compiling the main module and

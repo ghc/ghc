@@ -93,7 +93,7 @@ number of important ways:
    The one exception to this rule is :extension:`DeriveAnyClass`, since
    deriving an instance via :extension:`DeriveAnyClass` simply generates
    an empty instance declaration, which does not require the use of any
-   constructors. See the `deriving any class <#derive-any-class>`__ section
+   constructors. See the :ref:`deriving any class <derive-any-class>` section
    for more details.
 
 In other ways, however, a standalone deriving obeys the same rules as

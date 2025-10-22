@@ -756,7 +756,7 @@ The GHC Jobserver Protocol was specified in `GHC Proposal #540 <https://github.c
 
 This protocol allows
 a server to dynamically invoke many instances of a client process,
-while restricting all of those instances to use no more than <n> capabilities.
+while restricting all of those instances to use no more than ⟨n⟩ capabilities.
 This is achieved by coordination over a system semaphore (either a POSIX
 semaphore in the case of Linux and Darwin, or a Win32 semaphore
 in the case of Windows platforms).
@@ -863,7 +863,7 @@ units easier.
     cabal file resides. Thus, all paths used in the compiler are assumed to be relative
     to this directory. When there are multiple home units the compiler is often
     not operating in the standard directory and instead where the cabal.project
-    file is located. In this case the `-working-dir` option can be passed which specifies
+    file is located. In this case the ``-working-dir`` option can be passed which specifies
     the path from the current directory to the directory the unit assumes to be its root,
     normally the directory which contains the cabal file.
 
@@ -910,12 +910,16 @@ units easier.
     units will see this module as if it was defined in this unit.
 
     The simple form of the flag allows the reexport of a single module at the
-    same name::
+    same name:
+
+    .. code-block:: none
 
       -reexported-module A
 
-    the complicated version of the flag allows the module to be renamed when
-    reexported::
+    The complicated version of the flag allows the module to be renamed when
+    reexported:
+
+    .. code-block:: none
 
       -reexported-module "A as B"
 

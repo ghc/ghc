@@ -179,7 +179,7 @@ GHC's intermediate language, Core. Plugins are suitable for experimental
 analysis or optimization, and require no changes to GHC's source code to
 use.
 
-Plugins cannot optimize/inspect C-\\-, nor can they implement things like
+Plugins cannot optimize/inspect C-\-, nor can they implement things like
 parser/front-end modifications like GCC, apart from limited changes to
 the constraint solver. If you feel strongly that any of these
 restrictions are too onerous,
@@ -304,7 +304,7 @@ Alternatively, core plugins can be specified with Template Haskell.
 
    addCorePlugin "Foo.Plugin"
 
-This inserts the plugin as a core-to-core pass. Unlike `-fplugin=(module)`,
+This inserts the plugin as a core-to-core pass. Unlike :ghc-flag:`-fplugin=⟨module⟩`,
 the plugin module can't reside in the same package as the module calling
 :th-ref:`Language.Haskell.TH.Syntax.addCorePlugin`. This way, the
 implementation can expect the plugin to be built by the time
@@ -786,7 +786,7 @@ Here
 
 For soundness, it is very important to include the ``gcvs``; otherwise
 GHC may transform the program into a form that seg-faults.
-See #23923 for a long dicussion.
+See :ghc-ticket:`23923` for a long dicussion.
 
 Evidence is required also when creating new Given constraints, which are
 usually implied by old ones. It is not uncommon that the evidence of a new

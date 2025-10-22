@@ -210,7 +210,9 @@ also sets :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
    ``F (Maybe z) (Maybe z)`` to bring the type variable ``z`` into scope so
    that it can be used on the right-hand side of the definition with
    :ref:`visible-type-application`. However, GHC will reject the pattern type
-   signature in ``g2``: ::
+   signature in ``g2``:
+   
+   .. code-block:: none
 
        • Couldn't match type ‘a’ with ‘Maybe z’
          Expected: F a a

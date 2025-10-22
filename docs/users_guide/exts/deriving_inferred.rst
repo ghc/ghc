@@ -26,7 +26,7 @@ third. The rule is this: each constraint in the inferred instance
 context must consist only of type variables, with no repetitions.
 
 This rule is applied regardless of flags. If you want a more exotic
-context, you can write it yourself, using the `standalone deriving
-mechanism <#stand-alone-deriving>`__.
+context, you can write it yourself, using the :ref:`standalone deriving
+mechanism <stand-alone-deriving>`.
 
 

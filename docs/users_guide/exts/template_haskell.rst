@@ -214,7 +214,7 @@ characterized by having their body at a negative level.
 * Top-level declarations introduce variables at level 1.
 * Imports introduce variables at level 1.
 * Local variables are introduced at the level of their expression. For example,
-  the ``x`` in [| let x = 0 in ... |] is at level 2.
+  the ``x`` in ``[| let x = 0 in ... |]`` is at level 2.
 
 
 Cross-Stage Persistence
@@ -635,7 +635,7 @@ the ``makeLenses`` splice. Even though only ``makeLenses`` is actually used in
 the splice, GHC must assume that any imported identifier might be needed.
 
 If you use :extension:`ExplicitLevelImports`, you can be more precise about which
-modules are needed at which level. For example, ::
+modules are needed at which level. For example:
 
 .. code-block:: haskell
 

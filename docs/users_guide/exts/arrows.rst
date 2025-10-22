@@ -40,7 +40,7 @@ more details, see
    source code).
 
 -  The arrows web page at
-   ``https://www.haskell.org/arrows/`` <https://www.haskell.org/arrows/>`__.
+   https://www.haskell.org/arrows/.
 
 With the :extension:`Arrows` extension, GHC supports the arrow notation described in
 the second of these papers, translating it using combinators from the

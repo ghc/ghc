@@ -78,7 +78,7 @@ bidirectional and explicitly bidirectional. The examples given so far are
 examples of bidirectional pattern synonyms. A bidirectional synonym
 behaves the same as an ordinary data constructor. We can use it in a pattern
 context to deconstruct values and in an expression context to construct values.
-For example, we can construct the value `intEndo` using the pattern synonyms
+For example, we can construct the value ``intEndo`` using the pattern synonyms
 `Arrow` and `Int` as defined previously. ::
 
       intEndo :: Type

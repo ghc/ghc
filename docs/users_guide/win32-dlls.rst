@@ -17,11 +17,11 @@ spaces to be escaped using quotes:
 
 .. code-block:: none
 
-    c:\ghc\bin\ghci "c:\\Program Files\\Haskell\\Project.hs"
+    c:\ghc\bin\ghci "c:\Program Files\Haskell\Project.hs"
 
 If the quotes are left off in the above command, ``ghci`` will interpret
-the filename as two, ``c:\\\\Program`` and
-``Files\\\\Haskell\\\\Project.hs``.
+the filename as two, ``c:\Program`` and
+``Files\Haskell\Project.hs``.
 
 .. _ghci-windows:
 
@@ -124,7 +124,7 @@ Since GHC 8.6.1, the Haskell I/O manager automatically promotes paths in the leg
 format to Win32 file namespace. By default the I/O manager will do two things to
 your paths:
 
-  - replace ``\`` with ``\\``
+  - replace ``/`` with ``\``
   - expand relative paths to absolute paths
 
 If you want to opt out of all preprocessing just explicitly use namespaces in
@@ -166,7 +166,7 @@ compiling your Haskell sources (even if you call it from cygwin's bash),
 but what matters here is that - just like any other normal windows
 program - neither GHC nor the executables it produces are aware of
 Cygwin's pretended unix hierarchy. GHC will happily accept either ``/`` or
-``\\`` as path separators, but it won't know where to find ``/home/joe/Main.hs``
+``\`` as path separators, but it won't know where to find ``/home/joe/Main.hs``
 or ``/bin/bash`` or the like. This causes all kinds of fun when GHC is used from
 within Cygwin's bash, or in make-sessions running under Cygwin.
 
@@ -186,7 +186,7 @@ Things to do
    provides a tool called ``cygpath`` that can convert Cygwin's
    Unix-style paths to their actual Windows-style counterparts. Many
    Cygwin tools actually accept absolute Windows-style paths (remember,
-   though, that you either need to escape ``\\`` or convert ``\\`` to ``/``),
+   though, that you either need to escape ``\`` or convert ``\`` to ``/``),
    so you should be fine just using those everywhere. If you need to use
    tools that do some kind of path-mangling that depends on unix-style
    paths (one fun example is trying to interpret ``:`` as a separator in
@@ -203,7 +203,7 @@ Things to do
    view of the file system that GHC depends on (which will differ
    depending on whether GHC is compiled with cygwin's gcc or mingw's gcc
    or on a real Unix system..) - that little program can also deal with
-   escaping ``\\`` in paths. Apart from the banner and the startup time,
+   escaping ``\`` in paths. Apart from the banner and the startup time,
    something like this would also do:
 
    .. code-block:: none

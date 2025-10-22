@@ -45,9 +45,9 @@ Enabling :extension:`OverloadedStrings` extends Haskell's defaulting mechanism
     classes *or* ``IsString``; and at least one is a numeric class
     *or* ``IsString``.
 
-  - `String` is added to the end of the standard list of types which are tried
-     when doing type defaulting, and ``default`` declarations are extended to
-     allow any type that is an instance of ``IsString``.
+  - ``String`` is added to the end of the standard list of types which are tried
+    when doing type defaulting, and ``default`` declarations are extended to
+    allow any type that is an instance of ``IsString``.
 
 So, for example, the expression ``length "foo"`` will give rise to an
 ambiguous use of ``IsString a0`` which, because of the above rules, will

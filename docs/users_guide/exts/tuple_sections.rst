@@ -31,7 +31,7 @@ which translates to ::
 
       \a b c d -> (a, "I", b, c, "Love", d, 1337)
 
-If you have `unboxed tuples <#unboxed-tuples>`__ enabled, tuple sections
+If you have :ref:`unboxed tuples <unboxed-tuples>` enabled, tuple sections
 will also be available for them, like so ::
 
       (# , True #)

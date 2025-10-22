@@ -287,9 +287,9 @@ declaration; see :ref:`explicit-foralls`). For example: ::
         op xs = reverse (head (xs :: [[b]]))
 
 While :extension:`ScopedTypeVariables` is required for type variables from the
-top of a class or instance declaration to scope over the /bodies/ of the
-methods, it is not required for the type variables to scope over the /type
-signatures/ of the methods. For example, the following will be accepted without
+top of a class or instance declaration to scope over the *bodies* of the
+methods, it is not required for the type variables to scope over the *type
+signatures* of the methods. For example, the following will be accepted without
 explicitly enabling :extension:`ScopedTypeVariables`: ::
 
       class D a where

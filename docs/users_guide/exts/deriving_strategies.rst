@@ -56,12 +56,11 @@ Currently, the deriving strategies are:
 - ``stock``: Have GHC implement a "standard" instance for a data type,
   if possible (e.g., ``Eq``, ``Ord``, ``Generic``, ``Data``, ``Functor``, etc.)
 
-- ``anyclass``: Use :extension:`DeriveAnyClass` (see :ref:`derive-any-class`)
+- ``anyclass``: Use :extension:`DeriveAnyClass`
 
 - ``newtype``: Use :extension:`GeneralizedNewtypeDeriving`
-               (see :ref:`newtype-deriving`)
 
-- ``via``: Use :extension:`DerivingVia` (see :ref:`deriving-via`)
+- ``via``: Use :extension:`DerivingVia`
 
 .. _default-deriving-strategy:
 

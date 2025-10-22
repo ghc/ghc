@@ -40,11 +40,11 @@ given compilation phase:
     Use ⟨cmd⟩ as the JavaScript C pre-processor (only for javascript-backend).
 
 .. ghc-flag:: -pgmCmmP ⟨cmd⟩
-    :shortdesc: Use ⟨cmd⟩ as the C-- C pre-processor
+    :shortdesc: Use ⟨cmd⟩ as the C-\- C pre-processor
     :type: dynamic
     :category: phase-programs
 
-    Use ⟨cmd⟩ as the C-- C pre-processor.
+    Use ⟨cmd⟩ as the C-\- C pre-processor.
 
 .. ghc-flag:: -pgmc ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the C compiler
@@ -124,7 +124,7 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the program to inspect mach-o dynamic libraries and
     executables to read the dynamic library dependencies.  We will compute
-    the necessary ``runpath``s to embed for the dependencies based on the
+    the necessary ``runpath``\s to embed for the dependencies based on the
     result of the ``otool`` call.
 
 .. ghc-flag:: -pgminstall_name_tool ⟨cmd⟩
@@ -132,7 +132,7 @@ given compilation phase:
     :type: dynamic
     :category: phase-programs
 
-    Use ⟨cmd⟩ as the program to inject ``runpath``s into mach-o dynamic
+    Use ⟨cmd⟩ as the program to inject ``runpath``\s into mach-o dynamic
     libraries and executables.  As detected by the ``otool`` call.
 
 .. ghc-flag:: -pgmwindres ⟨cmd⟩
@@ -192,14 +192,14 @@ the following flags:
     Pass ⟨option⟩ to JavaScript C pre-processor (only for javascript-backend).
 
 .. ghc-flag:: -optCmmP ⟨option⟩
-    :shortdesc: pass ⟨option⟩ to the C-- C pre-processor.
+    :shortdesc: pass ⟨option⟩ to the C-\- C pre-processor.
     :type: dynamic
     :category: phase-options
 
-    Pass ⟨option⟩ to the C-- C pre-processor.
+    Pass ⟨option⟩ to the C-\- C pre-processor.
 
-    The C-- C pre-processor also receives C compiler flags.  Those flags will
-    come _before_ the flags added by this option.  As a result, the net effect
+    The C-\- C pre-processor also receives C compiler flags.  Those flags will
+    come *before* the flags added by this option.  As a result, the net effect
     of the following pair of flags is zero: :code:`-optCmmP-UFOO -optc-DFOO`.
 
 .. ghc-flag:: -optF ⟨option⟩
@@ -215,7 +215,7 @@ the following flags:
     :type: dynamic
     :category: phase-options
 
-    Pass ⟨option⟩ to the C compiler and, for compatibility, C-- pre-processor.
+    Pass ⟨option⟩ to the C compiler and, for compatibility, C-\- pre-processor.
 
 .. ghc-flag:: -pgmc-supports-no-pie
     :shortdesc: *(deprecated)*

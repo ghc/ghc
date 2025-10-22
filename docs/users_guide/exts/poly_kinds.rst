@@ -705,7 +705,7 @@ a class instance declaration into the instance declaration head.
 This lack of kind inference is simply an engineering problem within GHC,
 but getting it to work would make a substantial change to the inference
 infrastructure, and it's not clear the payoff is worth it. If you want
-to restrict ``b``\ 's kind in the instance above, just use a kind
+to restrict ``b``'s kind in the instance above, just use a kind
 signature in the instance head.
 
 Kind inference in type synonyms and type family instances

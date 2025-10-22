@@ -72,7 +72,7 @@ not the Prelude versions:
    flux; if you want to use this, ask!
 
 -  List notation, such as ``[x,y]`` or ``[m..n]`` can also be treated
-   via rebindable syntax if you use `-XOverloadedLists`;
+   via rebindable syntax if you use ``-XOverloadedLists``;
    see :ref:`overloaded-lists`.
 
 -  An overloaded label "``#foo``" means "``fromLabel @"foo"``", rather than

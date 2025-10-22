@@ -52,8 +52,8 @@ The following types are supported in this way:
   constructed in JavaScript using macros such as ``RETURN_UBX_TUP2(x, y)``.
 
 As in the C FFI, types in the JavaScript FFI can't be type checked against the foreign code, so
-the following example would compile successfully - despite `5` not being a valid JavaScript value
-for the Haskell `Bool` type:
+the following example would compile successfully - despite ``5`` not being a valid JavaScript value
+for the Haskell ``Bool`` type:
 
 .. code-block:: haskell
 
@@ -71,7 +71,7 @@ A foreign import can be declared with the `interruptible` calling convention:
     foo :: Int -> IO Int
 
 In this case the javascript function will be passed one additional argument in
-the final position (noted `cont` in the example): it is a continuation
+the final position (noted ``cont`` in the example): it is a continuation
 function that must be called from JavaScript to return a value from the foreign
 call and to resume the execution of the Haskell code.
 
@@ -80,7 +80,7 @@ JSVal
 
 The JavaScript backend has a concept of an untyped 'plain' JavaScript
 value, under the guise of the type ``JSVal``. Values having this type
-are mostly opaque to Haskell codes: you can think of `JSVal` as a data type whose
+are mostly opaque to Haskell codes: you can think of ``JSVal`` as a data type whose
 data constructors aren't exposed. Its main use case is to pass opaque
 JavaScript values from one FFI call to another.
 
@@ -193,7 +193,7 @@ interactive HTML elements. This would look like:
 
 .. code-block:: html
 
-  <button onClick="globalF('Button pressed!")>Example</button>
+  <button onClick="globalF('Button pressed!')">Example</button>
 
 We have to make sure not to use ``releaseCallback`` on any functions that
 are to be available in HTML, because we want these functions to be in
@@ -453,46 +453,46 @@ EMCC pragmas
 
 By default the EMCC linker drops code considered dead and it has no way to know
 which code is alive due to some call from Haskell or from a JavaScript wrapper.
-As such, you must explicitly add some pragmas at the top of one of your `.js`
+As such, you must explicitly add some pragmas at the top of one of your ``.js``
 files to indicate which functions are alive:
 
-```
-//#OPTIONS:EMCC:EXPORTED_RUNTIME_METHODS=foo,bar
-```
+.. code-block:: javascript
 
-Enable methods `foo` and `bar` from the Emscripten runtime system. This is used
-for methods such as `ccall`, `cwrap`, `addFunction`, `removeFunction`... that
+  //#OPTIONS:EMCC:EXPORTED_RUNTIME_METHODS=foo,bar
+
+Enable methods ``foo`` and ``bar`` from the Emscripten runtime system. This is used
+for methods such as ``ccall``, ``cwrap``, ``addFunction``, ``removeFunction``... that
 are described in Emscripten documentation.
 
-```
-//#OPTIONS:EMCC:EXPORTED_FUNCTIONS=_foo,_bar
-```
+.. code-block:: javascript
 
-Enable C functions `foo` and `bar` to be exported respectively as `_foo` and
-`_bar` (`_` prepended). This is used for C library functions (e.g. `_malloc`,
-`_free`, etc.) and for the C code compiled with your project (e.g.
-`_sqlite3_open` and others for the `sqlite` C library).
+  //#OPTIONS:EMCC:EXPORTED_FUNCTIONS=_foo,_bar
+
+Enable C functions ``foo`` and ``bar`` to be exported respectively as ``_foo`` and
+``_bar`` (``_`` prepended). This is used for C library functions (e.g. ``_malloc``,
+``_free``, etc.) and for the C code compiled with your project (e.g.
+``_sqlite3_open`` and others for the ``sqlite`` C library).
 
 You can use both pragmas as many times as you want. Ultimately all the entries
 end up in sets of functions passed to the Emscripten linker via
-`-sEXPORTED_RUNTIME_METHODS` and `-sEXPORTED_FUNCTIONS` (which can only be
+``-sEXPORTED_RUNTIME_METHODS`` and ``-sEXPORTED_FUNCTIONS`` (which can only be
 passed once; the latter argument overrides the former ones).
 
 
-```
-//#OPTIONS:EMCC:EXTRA=-foo,-bar
-```
+.. code-block:: javascript
+
+  //#OPTIONS:EMCC:EXTRA=-foo,-bar
 
 This pragma allows additional options to be passed to Emscripten if need be. We
 already pass:
 
-- `-sSINGLE_FILE=1`: required to create a single `.js` file as artefact
-  (otherwise `.wasm` files corresponding to C codes need to be present in the
-  current working directory when invoking the resulting `.js` file).
+- ``-sSINGLE_FILE=1``: required to create a single ``.js`` file as artefact
+  (otherwise ``.wasm`` files corresponding to C codes need to be present in the
+  current working directory when invoking the resulting ``.js`` file).
 
-- `-sALLOW_TABLE_GROWTH`: required to support `addFunction`
+- ``-sALLOW_TABLE_GROWTH``: required to support ``addFunction``
 
-- `-sEXPORTED_RUNTIME_METHODS` and `-sEXPORTED_FUNCTIONS`: see above.
+- ``-sEXPORTED_RUNTIME_METHODS`` and ``-sEXPORTED_FUNCTIONS``: see above.
 
 Be careful because some extra arguments may break the build in unsuspected ways.
 
@@ -500,16 +500,14 @@ Wrappers
 ^^^^^^^^
 
 The JavaScript backend doesn't generate wrappers for foreign imports to call
-directly into the compiled C code. I.e. given the following foreign import:
+directly into the compiled C code. I.e. given the following foreign import::
 
-```haskell
-foreign import ccall "foo" foo :: ...
-```
+  foreign import ccall "foo" foo :: ...
 
-The JavaScript backend will replace calls to `foo` with calls to the JavaScript
-function `h$foo`. It's still up to the programmer to call `_foo` or not from `h$foo`
-on a case by case basis. If `h$foo` calls the generated from C function
-`_foo`, then we say that `h$foo` is a wrapper function. These wrapper functions
+The JavaScript backend will replace calls to ``foo`` with calls to the JavaScript
+function ``h$foo``. It's still up to the programmer to call ``_foo`` or not from ``h$foo``
+on a case by case basis. If ``h$foo`` calls the generated from C function
+``_foo``, then we say that ``h$foo`` is a wrapper function. These wrapper functions
 are used to marshal arguments and returned values between the JS heap and the
 Emscripten heap.
 
@@ -519,16 +517,16 @@ engine). On the other hand, Emscripten's C heap consists in a single array of
 bytes. To call C functions converted to JavaScript that have pointer arguments,
 wrapper functions have to:
 
-1. allocate some buffer in the Emscripten heap (using `_malloc`) to get a valid
+1. allocate some buffer in the Emscripten heap (using ``_malloc``) to get a valid
    Emscripten pointer
 2. copy the bytes from the JS object to the buffer in the Emscripten heap
 3. use the Emscripten pointer to make the call to the C function
 4. optionally copy back the bytes from the Emscripten heap if the call may have
    changed the contents of the buffer
-5. free the Emscripten buffer (with `_free`)
+5. free the Emscripten buffer (with ``_free``)
 
-GHC's JavaScript rts provides helper functions for this in `rts/js/mem.js`. See
-`h$copyFromHeap`, `h$copyToHeap`, `h$initHeapBuffer`, etc.
+GHC's JavaScript rts provides helper functions for this in ``rts/js/mem.js``. See
+``h$copyFromHeap``, ``h$copyToHeap``, ``h$initHeapBuffer``, etc.
 
 Callbacks
 ^^^^^^^^^
@@ -538,17 +536,17 @@ supported by the JavaScript backend but requires some work from the wrapper
 functions.
 
 1. On the Haskell side it is possible to create a pointer to an Haskell function
-   (a `FunPtr`) by using a "wrapper" foreign import. See the documentation of
-   `base:Foreign.Ptr.FunPtr`.
-2. This `FunPtr` can be passed to a JavaScript wrapper function. However it's
-   implemented as a `StablePtr` and needs to be converted into a function
+   (a ``FunPtr``) by using a "wrapper" foreign import. See the documentation of
+   :base-ref:`Foreign.Ptr.FunPtr`.
+2. This ``FunPtr`` can be passed to a JavaScript wrapper function. However it's
+   implemented as a ``StablePtr`` and needs to be converted into a function
    pointer that Emscripten understands. This can be done with
-   `h$registerFunPtrOnHeap`.
+   ``h$registerFunPtrOnHeap``.
 3. When a callback is no longer needed, it can be freed with
-   `h$unregisterFunPtrFromHeap`.
+   ``h$unregisterFunPtrFromHeap``.
 
 Note that in some circumstances you may not want to register an Haskell function
 directly as a callback. It is perfectly possible to register/free regular JavaScript
-function as Emscripten functions using `Module.addFunction` and `Module.removeFunction`.
+function as Emscripten functions using ``Module.addFunction`` and ``Module.removeFunction``.
 That's what the helper functions mentioned above do.
 

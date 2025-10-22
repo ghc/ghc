@@ -96,11 +96,11 @@ restriction that the label must be a valid identifier has also been lifted.
 
 Examples of newly allowed syntax:
 
-- Leading capital letters: `#Foo` equivalant to `getLabel @"Foo"`
+- Leading capital letters: ``#Foo`` equivalant to ``getLabel @"Foo"``
 
-- Numeric characters: `#3.14` equivalent to `getLabel @"3.14"`
+- Numeric characters: ``#3.14`` equivalent to ``getLabel @"3.14"``
 
-- Arbitrary strings: `#"Hello, World!"` equivalent to `getLabel @"Hello, World!"`
+- Arbitrary strings: ``#"Hello, World!"`` equivalent to ``getLabel @"Hello, World!"``
 
 Here is an example of the more permissive use of this extension, available since
 GHC 9.6:

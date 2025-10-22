@@ -1214,7 +1214,7 @@ to ``hs-boot`` files, but with some slight changes:
   abstract data declaration can be anything (in which case it probably
   will be implemented using a type synonym.)  This can be used
   to allow compile-time representation polymorphism (as opposed to
-  `run-time representation polymorphism <#runtime-rep>`__),
+  :ref:`run-time representation polymorphism <runtime-rep>`),
   as in this example::
 
         signature Number where

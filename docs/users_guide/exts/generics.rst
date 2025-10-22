@@ -141,8 +141,8 @@ representation: ::
       to (M1 (R1 (M1 U1)))                                      = Leaf
 
 This representation is generated automatically if a ``deriving Generic``
-clause is attached to the datatype. `Standalone
-deriving <#stand-alone-deriving>`__ can also be used.
+clause is attached to the datatype. :ref:`Standalone
+deriving <stand-alone-deriving>` can also be used.
 
 Writing generic functions
 -------------------------
@@ -244,7 +244,7 @@ exposed to the user: ::
       default put :: (Generic a, GSerialize (Rep a)) => a -> [Bin]
       put = gput . from
 
-Here we use a `default signature <#class-default-signatures>`__ to
+Here we use a :ref:`default signature <class-default-signatures>` to
 specify that the user does not have to provide an implementation for
 ``put``, as long as there is a ``Generic`` instance for the type to
 instantiate. For the ``UserTree`` type, for instance, the user can just

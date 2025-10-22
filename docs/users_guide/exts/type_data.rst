@@ -46,7 +46,7 @@ Because ``type data`` declarations introduce type constructors, they do
 not permit constructors with the same names as types, so the following
 declaration is invalid: ::
 
-    type data T = T     // Invalid
+    type data T = T     -- Invalid
 
 The compiler will reject this declaration, because the type constructor
 ``T`` is defined twice (as the datatype being defined and as a type
@@ -57,4 +57,4 @@ recursively, as in the ``Nat`` example above, but its constructors may not
 be used in types within the same mutually recursive group of declarations,
 so the following is forbidden: ::
 
-    type data T f = K (f (K Int))  // Invalid
+    type data T f = K (f (K Int))  -- Invalid

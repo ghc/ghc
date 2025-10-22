@@ -219,7 +219,7 @@ types. For example: ::
 
 Within the case match, GHC creates a fresh metavariable ``beta`` for the return
 type, but this metavariable is "stuck" inside the equality constraint
-introduced by the GADT pattern match:
+introduced by the GADT pattern match::
 
   forall a. a ~ Bool => beta ~ Bool
 
@@ -246,7 +246,7 @@ equality constraints. For example: ::
 
 In this case, when instantiating ``f`` in the body of ``g``, GHC will create
 a fresh metavariable ``alpha`` for the outer forall of ``f``, which again
-appears in an implication below another equality constraint:
+appears in an implication below another equality constraint::
 
   forall t. (F t ~ Int) => alpha ~ Int
 
