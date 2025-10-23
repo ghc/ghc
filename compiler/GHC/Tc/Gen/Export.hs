@@ -22,7 +22,7 @@ import GHC.Rename.Doc
 import GHC.Rename.Module
 import GHC.Rename.Names
 import GHC.Rename.Env
-import GHC.Rename.Unbound ( reportUnboundName )
+import GHC.Rename.Unbound ( mkUnboundNameRdr )
 import GHC.Rename.Splice
 import GHC.Unit.Module
 import GHC.Unit.Module.Imported
@@ -30,13 +30,13 @@ import GHC.Unit.Module.Warnings
 import GHC.Core.TyCon
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Misc (fuzzyLookup)
 import GHC.Core.ConLike
 import GHC.Core.PatSyn
 import GHC.Data.Maybe
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Env
 import GHC.Driver.DynFlags
-import GHC.Parser.PostProcess ( setRdrNameSpace )
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Types.Unique.Map
@@ -50,6 +50,7 @@ import GHC.Types.SourceFile
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name.Reader
+import GHC.Types.Hint
 
 import Control.Arrow ( first )
 import Control.Monad ( when )
@@ -590,8 +591,9 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     lookup_ie_kids_with :: GlobalRdrElt -> [LIEWrappedName GhcPs]
                    -> RnM ([LIEWrappedName GhcRn], [GlobalRdrElt])
     lookup_ie_kids_with gre sub_rdrs =
-      do { kids <- lookupChildrenExport gre sub_rdrs
-         ; return (map fst kids, map snd kids) }
+      do { let child_gres = findChildren kids_env (greName gre)
+         ; kids <- lookupChildrenExport gre child_gres sub_rdrs
+         ; return (unzip kids) }
 
     lookup_ie_kids_all :: IE GhcPs -> LIEWrappedName GhcPs -> GlobalRdrElt
                   -> RnM [GlobalRdrElt]
@@ -782,9 +784,10 @@ If the module has NO main function:
 
 
 lookupChildrenExport :: GlobalRdrElt
+                     -> [GlobalRdrElt]
                      -> [LIEWrappedName GhcPs]
                      -> RnM ([(LIEWrappedName GhcRn, GlobalRdrElt)])
-lookupChildrenExport parent_gre rdr_items = mapAndReportM doOne rdr_items
+lookupChildrenExport parent_gre child_gres rdr_items = mapAndReportM doOne rdr_items
     where
         spec_parent = greName parent_gre
         -- Process an individual child
@@ -792,24 +795,23 @@ lookupChildrenExport parent_gre rdr_items = mapAndReportM doOne rdr_items
               -> RnM (LIEWrappedName GhcRn, GlobalRdrElt)
         doOne n = do
 
-          let bareName = (ieWrappedName . unLoc) n
+          let all_ns = case unLoc n of
+                IEName{} -> True    -- Ignore the namespace iff the name is unadorned
+                _        -> False
+          let bareName = lieWrappedName n
                 -- Do not report export list declaration deprecations
-          name <-  lookupSubBndrOcc_helper False ExportDeprecationWarnings
+          name <-  lookupSubBndrOcc_helper False all_ns ExportDeprecationWarnings
                         (ParentGRE spec_parent (greInfo parent_gre)) bareName
           traceRn "lookupChildrenExport" (ppr name)
-          -- Default to data constructors for slightly better error
-          -- messages
-          let unboundName :: RdrName
-              unboundName = if rdrNameSpace bareName == varName
-                            then bareName
-                            else setRdrNameSpace bareName dataName
 
           case name of
             NameNotFound ->
-              do { ub <- reportUnboundName (lookingForSubordinate parent_gre) unboundName
-                 ; let l = getLoc n
+              do { let err = mkBadExportSubordinate child_gres n
+                       similar_names = subordinateExportSimilarNames bareName child_gres
+                 ; addDiagnosticTc (TcRnExportedSubordinateNotFound parent_gre err similar_names)
+                 ; let ub  = mkUnboundNameRdr bareName
                        gre = mkLocalGRE UnboundGRE NoParent ub
-                 ; return (L l (IEName noExtField (L (l2l l) ub)), gre)}
+                 ; return (replaceLWrappedName n ub, gre)}
             FoundChild child@(GRE { gre_name = child_nm, gre_par = par }) ->
               do { checkPatSynParent spec_parent par child_nm
                  ; checkThLocalNameNoLift (ieLWrappedUserRdrName n child_nm)
@@ -817,6 +819,22 @@ lookupChildrenExport parent_gre rdr_items = mapAndReportM doOne rdr_items
                  }
             IncorrectParent p c gs -> failWithDcErr (parentGRE_name p) (greName c) gs
 
+subordinateExportSimilarNames :: RdrName -> [GlobalRdrElt] -> [GhcHint]
+subordinateExportSimilarNames rdr_name child_gres =
+  -- At the moment, we only suggest other children of the same parent.
+  -- One possible improvement would be to suggest bundling pattern synonyms with
+  -- data types, but not with classes or type data.
+  case NE.nonEmpty similar_names of
+    Nothing  -> []
+    Just nms -> [SuggestSimilarNames rdr_name (fmap SimilarName nms)]
+  where
+    occ_name = rdrNameOcc rdr_name
+    similar_names =
+      fuzzyLookup (occNameString occ_name)
+                  [(occNameString child_occ_name, greName gre)
+                    | gre <- child_gres
+                    , let child_occ_name = greOccName gre
+                    , occNameFS occ_name /= occNameFS child_occ_name ]
 
 -- Note [Typing Pattern Synonym Exports]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1182,8 +1182,12 @@ data LookupGRE info where
 
   -- | Look up children 'GlobalRdrElt's with a given 'Parent'.
   LookupChildren
-    :: ParentGRE        -- ^ the parent
-    -> OccName          -- ^ the child 'OccName' to look up
+    :: { lookupParentGRE :: ParentGRE     -- ^ the parent
+       , lookupChildOccName :: OccName    -- ^ the child 'OccName' to look up
+       , lookupChildrenInAllNameSpaces :: Bool
+          -- ^ whether to look in *all* 'NameSpace's, or just
+          -- in the 'NameSpace' of the 'OccName'
+       }
     -> LookupGRE GREInfo
 
 -- | How should we look up in a 'GlobalRdrEnv'?
@@ -1420,10 +1424,15 @@ lookupGRE env = \case
       occ = nameOccName nm
       lkup | all_ns    = concat $ lookupOccEnv_AllNameSpaces env occ
            | otherwise = fromMaybe [] $ lookupOccEnv env occ
-  LookupChildren parent child_occ ->
-    let ns = occNameSpace child_occ
-        all_gres = concat $ lookupOccEnv_AllNameSpaces env child_occ
-    in highestPriorityGREs (childGREPriority parent ns) all_gres
+  LookupChildren { lookupParentGRE = parent
+                 , lookupChildOccName = child_occ
+                 , lookupChildrenInAllNameSpaces = all_ns } ->
+      highestPriorityGREs (childGREPriority parent ns) $
+      concat $ lkup env child_occ
+    where
+      ns = occNameSpace child_occ
+      lkup | all_ns    = lookupOccEnv_AllNameSpaces
+           | otherwise = lookupOccEnv_WithFields
 
 -- | Collect the 'GlobalRdrElt's with the highest priority according
 -- to the given function (lower value <=> higher priority).

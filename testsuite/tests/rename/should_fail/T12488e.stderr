@@ -1,0 +1,12 @@
+T12488e.hs:4:5: error: [GHC-11592]
+    • The class ‘C’ defines a child named ‘A’,
+      but it is not in the data namespace.
+    • In the export: C(data A)
+    Suggested fix: Remove the ‘data’ keyword
+
+T12488e.hs:5:5: error: [GHC-11592]
+    • The class ‘D’ defines a child named ‘+++’,
+      but it is not in the data namespace.
+    • In the export: D(data (+++))
+    Suggested fix: Remove the ‘data’ keyword
+

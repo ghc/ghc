@@ -679,19 +679,20 @@ lookupGlobalOccRn will find it.
 -}
 
 -- | Used in export lists to lookup the children.
-lookupSubBndrOcc_helper :: Bool
+lookupSubBndrOcc_helper :: Bool          -- ^ must have a parent
+                        -> Bool          -- ^ look up in all namespaces
                         -> DeprecationWarnings
                         -> ParentGRE     -- ^ parent
                         -> RdrName       -- ^ thing we are looking up
                         -> RnM ChildLookupResult
-lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent_gre rdr_name
+lookupSubBndrOcc_helper must_have_parent all_ns warn_if_deprec parent_gre rdr_name
   | isUnboundName (parentGRE_name parent_gre)
     -- Avoid an error cascade
   = return (FoundChild (mkUnboundGRERdr rdr_name))
 
   | otherwise = do
   gre_env <- getGlobalRdrEnv
-  let original_gres = lookupGRE gre_env (LookupChildren parent_gre (rdrNameOcc rdr_name))
+  let original_gres = lookupGRE gre_env (LookupChildren parent_gre (rdrNameOcc rdr_name) all_ns)
       picked_gres = pick_gres original_gres
   -- The remaining GREs are things that we *could* export here.
   -- Note that this includes things which have `NoParent`;
@@ -844,7 +845,7 @@ lookupSubBndrOcc :: DeprecationWarnings
 lookupSubBndrOcc warn_if_deprec the_parent what_subordinate rdr_name =
   lookupExactOrOrig rdr_name (Right . greName) $
     -- This happens for built-in classes, see mod052 for example
-    do { child <- lookupSubBndrOcc_helper True warn_if_deprec the_parent rdr_name
+    do { child <- lookupSubBndrOcc_helper True True warn_if_deprec the_parent rdr_name
        ; return $ case child of
            FoundChild g       -> Right (greName g)
            NameNotFound       -> Left unknown_sub

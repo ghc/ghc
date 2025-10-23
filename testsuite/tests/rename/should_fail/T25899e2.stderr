@@ -1,4 +1,6 @@
-T25899e2.hs:5:5: error: [GHC-76037]
-    • Not in scope: data constructor ‘MkT’
+T25899e2.hs:5:5: error: [GHC-11592]
+    • The data type ‘T’ defines a child named ‘MkT’,
+      but it is not in the data namespace.
     • In the export: type T(data MkT)
+    Suggested fix: Remove the ‘data’ keyword
 

@@ -23,6 +23,7 @@ module GHC.Rename.Names (
         checkConName,
         mkChildEnv,
         findChildren,
+        mkBadExportSubordinate,
         findImportUsage,
         getMinimalImports,
         printMinimalImports,
@@ -1422,6 +1423,15 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
           = DeprecatedExport name <$> mi_export_warn_fn iface name
           where
             name = greName gre
+
+-- | Assuming a subordinate item could not be found, do another lookup for a
+-- more specific error message.
+mkBadExportSubordinate :: [GlobalRdrElt] -> LIEWrappedName GhcPs -> BadExportSubordinate
+mkBadExportSubordinate child_gres n =
+  case lookupChildren child_gres [n] of
+    (LookupChildNonType {lce_nontype_item = g} : _, _) -> BadExportSubordinateNonType g
+    (LookupChildNonData {lce_nondata_item = g} : _, _) -> BadExportSubordinateNonData g
+    _ -> BadExportSubordinateNotFound n
 
 type IELookupM = MaybeErr IELookupError
 

@@ -1,5 +1,6 @@
-
-mod4.hs:2:10: error: [GHC-76037]
-    • Not in scope: data constructor ‘K2’
+mod4.hs:2:10: error: [GHC-11592]
+    • The data type ‘T’ does not define a child named ‘K2’,
+      nor is there a pattern synonym of that name in scope.
     • In the export: T(K1, K2)
-    Suggested fix: Perhaps use ‘K1’ (line 3)
+    Suggested fix: Perhaps use ‘K1’ (Defined at mod4.hs:3:10)
+
