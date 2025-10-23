@@ -66,7 +66,6 @@ import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
 import Data.List (mapAccumL)
-import Data.List.NonEmpty (NonEmpty (..))
 
 {-
 ************************************************************************
@@ -660,18 +659,35 @@ through A, so it should have ManyOcc.  Bear this case in mind!
 * In occ_env, the new (occ_join_points :: IdEnv OccInfoEnv) maps
   each in-scope non-recursive join point, such as `j` above, to
   a "zeroed form" of its RHS's usage details. The "zeroed form"
+    * has only occ_nested_lets in its domain  (see (W4) below)
     * deletes ManyOccs
     * maps a OneOcc to OneOcc{ occ_n_br = 0 }
-  In our example, occ_join_points will be extended with
+  In our example, assuming `v` is locally-let-bound, occ_join_points will
+  be extended with
       [j :-> [v :-> OneOcc{occ_n_br=0}]]
-  See addJoinPoint.
+  See `addJoinPoint` and (W4) below.
 
 * At an occurrence of a join point, we do everything as normal, but add in the
   UsageDetails from the occ_join_points.  See mkOneOcc.
 
-* Crucially, at the NonRec binding of the join point, in `occAnalBind`, we use
-  `orUDs`, not `andUDs` to combine the usage from the RHS with the usage from
-  the body.
+* Crucially, at the NonRec binding of a join point `j`, in `occAnalBind`,
+  we use `combineJoinPointUDs`, not `andUDs` to combine the usage from the
+  RHS with the usage from the body.  `combineJoinPointUDs` behaves like this:
+
+   * For all variables than `occ_nested_lets`, use `andUDs`, just like for
+     any normal let-binding.
+
+   * But for a variable `v` in `occ_nested_lets`, use `orUDs`:
+     - If `v` occurs `ManyOcc` in the join-point RHS, the variable won't be in
+       `occ_join_points`; but we'll get `ManyOcc` anyway.
+     - If `v` occurs `OneOcc` in the join-point RHS, the variable will be in
+       `occ_join_points` and we'll thereby get a `OneOcc{occ_n_br=0}` from
+       each of j's tail calls.  We can `or` that with the `OncOcc{occ_n_br=n}`
+       from j's RHS.
+
+  The only reason for `occ_nested_lets` is to reduce the size of the info
+  duplicate at each tail call; see (W4). It would sound to put *all* variables
+  into `occ_nested_lets`.
 
 Here are the consequences
 
@@ -682,13 +698,14 @@ Here are the consequences
   There are two lexical occurrences of `v`!
   (NB: `orUDs` adds occ_n_br together, so occ_n_br=1 is impossible, too.)
 
-* In the tricky (P3) we'll get an `andUDs` of
-    * OneOcc{occ_n_br=0} from the occurrences of `j`)
+* In the tricky (P3), when analysing `case (f v) of ...`, we'll get
+  an `andUDs` of
+    * OneOcc{occ_n_br=0} from the occurrences of `j`
     * OneOcc{occ_n_br=1} from the (f v)
   These are `andUDs` together in `addOccInfo`, and hence
   `v` gets ManyOccs, just as it should.  Clever!
 
-There are a couple of tricky wrinkles
+There are, of course, some tricky wrinkles
 
 (W1) Consider this example which shadows `j`:
           join j = rhs in
@@ -718,6 +735,8 @@ There are a couple of tricky wrinkles
      * In `postprcess_uds`, we add the chucked-out join points to the
        returned UsageDetails, with `andUDs`.
 
+Wrinkles (W1) and (W2) are very similar to Note [Binder swap] (BS3).
+
 (W3) Consider this example, which shadows `j`, but this time in an argument
               join j = rhs
               in f (case x of { K j -> ...; ... })
@@ -732,12 +751,36 @@ There are a couple of tricky wrinkles
      NB: this is just about efficiency: it is always safe /not/ to zap the
      occ_join_points.
 
-(W4) What if the join point binding has a stable unfolding, or RULES?
-     They are just alternative right-hand sides, and at each call site we
-     will use only one of them. So again, we can use `orUDs` to combine
-     usage info from all these alternatives RHSs.
+(W4) Other things being equal, we want keep the OccInfoEnv stored in
+  `occ_join_points` as small as possible, because it is /duplicated/ at
+  /every occurrence/ of the join point.  We really only want to include
+  OccInfo for
+       * Local, non-recursive let-bound Ids
+       * that occur just once in the RHS of the join point
+  particularly including
+       * thunks (that's the original point) and
+       * join points (so that the trick works recursively).
+  We call these the "tracked Ids of j".
 
-Wrinkles (W1) and (W2) are very similar to Note [Binder swap] (BS3).
+  Including lambda binders is pointless, and slows down the occurrence analyser.
+
+  e.g.    \x. let y = x+1 in
+              join j v = ..x..y..(f z z)..
+              in ...
+  In the `occ_join_points` binding for `j`, we want to track `y`, but
+  not `x` (lambda bound) nor `z` (occurs many times).
+
+  To exploit this:
+     * `occ_nested_lets` tracks which Ids are
+              nested (not-top-level), non-recursive lets
+     * `addJoinPoint` only populates j's entry with occ-info for the "tracked Ids"
+       of `j`; that is, that are (a) in occ_nested_lets and (b) have OneOcc.
+     * `combineJoinPointUDs` uses
+          orLocalOcc  for local-let Ids
+          andLocalOcc for non-local-let Ids
+
+  This fancy footwork can matter in extreme cases: it gave a 25% reduction in
+  total compiler allocation in #26425..
 
 Note [Finding join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -759,45 +802,45 @@ rest of 'OccInfo' until it goes on the binder.
 
 Note [Join arity prediction based on joinRhsArity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In general, the join arity from tail occurrences of a join point (O) may be
-higher or lower than the manifest join arity of the join body (M). E.g.,
+In general, the join arity from tail occurrences of a join point (OAr) may be
+higher or lower than the manifest join arity of the join body (MAr). E.g.,
 
-  -- M > O:
-  let f x y = x + y              -- M = 2
-  in if b then f 1 else f 2      -- O = 1
+  -- MAr > Oar:
+  let f x y = x + y              -- MAr = 2
+  in if b then f 1 else f 2      -- OAr = 1
   ==> { Contify for join arity 1 }
   join f x = \y -> x + y
   in if b then jump f 1 else jump f 2
 
-  -- M < O
-  let f = id                     -- M = 0
-  in if ... then f 12 else f 13  -- O = 1
+  -- MAr < Oar
+  let f = id                     -- MAr = 0
+  in if ... then f 12 else f 13  -- OAr = 1
   ==> { Contify for join arity 1, eta-expand f }
   join f x = id x
   in if b then jump f 12 else jump f 13
 
-But for *recursive* let, it is crucial that both arities match up, consider
+But for *recursive* let, it is crucial MAr=OAr.  Consider:
 
   letrec f x y = if ... then f x else True
   in f 42
 
-Here, M=2 but O=1. If we settled for a joinrec arity of 1, the recursive jump
+Here, MAr=2 but OAr=1. If we settled for a joinrec arity of 1, the recursive jump
 would not happen in a tail context! Contification is invalid here.
-So indeed it is crucial to demand that M=O.
+So indeed it is crucial to demand that MAr=OAr.
 
-(Side note: Actually, we could be more specific: Let O1 be the join arity of
-occurrences from the letrec RHS and O2 the join arity from the let body. Then
-we need M=O1 and M<=O2 and could simply eta-expand the RHS to match O2 later.
-M=O is the specific case where we don't want to eta-expand. Neither the join
+(Side note: Actually, we could be more specific: Let OAr1 be the join arity of
+occurrences from the letrec RHS and OAr2 the join arity from the let body. Then
+we need MAr=OAr1 and MAr<=OAr2 and could simply eta-expand the RHS to match OAr2 later.
+MAr=OAr is the specific case where we don't want to eta-expand. Neither the join
 points paper nor GHC does this at the moment.)
 
 We can capitalise on this observation and conclude that *if* f could become a
-joinrec (without eta-expansion), it will have join arity M.
-Now, M is just the result of 'joinRhsArity', a rather simple, local analysis.
+joinrec (without eta-expansion), it will have join arity MAr.
+Now, MAr is just the result of 'joinRhsArity', a rather simple, local analysis.
 It is also the join arity inside the 'TailUsageDetails' returned by
 'occAnalLamTail', so we can predict join arity without doing any fixed-point
 iteration or really doing any deep traversal of let body or RHS at all.
-We check for M in the 'adjustTailUsage' call inside 'tagRecBinders'.
+We check for MAr in the 'adjustTailUsage' call inside 'tagRecBinders'.
 
 All this is quite apparent if you look at the contification transformation in
 Fig. 5 of "Compiling without Continuations" (which does not account for
@@ -807,14 +850,14 @@ eta-expansion at all, mind you). The letrec case looks like this
     ... and a bunch of conditions establishing that f only occurs
         in app heads of join arity (len as + len xs) inside us and es ...
 
-The syntactic form `/\as.\xs. L[us]` forces M=O iff `f` occurs in `us`. However,
+The syntactic form `/\as.\xs. L[us]` forces MAr=OAr iff `f` occurs in `us`. However,
 for non-recursive functions, this is the definition of contification from the
 paper:
 
   let f = /\as.\xs.u in L[es]     ... conditions ...
 
-Note that u could be a lambda itself, as we have seen. No relationship between M
-and O to exploit here.
+Note that u could be a lambda itself, as we have seen. No relationship between MAr
+and OAr to exploit here.
 
 Note [Join points and unfoldings/rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -954,6 +997,22 @@ of both functions, serving as a specification:
      Cyclic Recursive case:   'tagRecBinders'
      Acyclic Recursive case:  'adjustNonRecRhs'
      Non-recursive case:      'adjustNonRecRhs'
+
+Note [Unfoldings and RULES]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For let-bindings we treat (stable) unfoldings and RULES as "alternative right hand
+sides".  That is, it's as if we had
+  f = case <hiatus> of
+         1 -> <the-rhs>
+         2 -> <the-stable-unfolding>
+         3 -> <rhs of rule1>
+         4 -> <rhs of rule2>
+So we combine all these with `orUDs` (#26567).  But actually it makes
+very little difference whether we use `andUDs` or `orUDs` because of
+Note [Occurrences in stable unfoldings and RULES]: occurrences in an unfolding
+or RULE are treated as ManyOcc anyway.
+
+But NB that tail-call info is preserved so that we don't thereby lose join points.
 -}
 
 ------------------------------------------------------------------
@@ -991,24 +1050,24 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   | mb_join@(JoinPoint {}) <- idJoinPointHood bndr
   = -- Analyse the RHS and /then/ the body
     let -- Analyse the rhs first, generating rhs_uds
-        !(rhs_uds_s, bndr', rhs') = occAnalNonRecRhs env lvl ire mb_join bndr rhs
-        rhs_uds = foldl1' orUDs rhs_uds_s   -- NB: orUDs.  See (W4) of
-                                           -- Note [Occurrence analysis for join points]
+        !(rhs_uds, bndr', rhs') = occAnalNonRecRhs env lvl ire mb_join bndr rhs
 
         -- Now analyse the body, adding the join point
         -- into the environment with addJoinPoint
-        !(WUD body_uds (occ, body)) = occAnalNonRecBody env bndr' $ \env ->
+        env_body = addLocalLet env lvl bndr
+        !(WUD body_uds (occ, body)) = occAnalNonRecBody env_body bndr' $ \env ->
                                       thing_inside (addJoinPoint env bndr' rhs_uds)
     in
     if isDeadOcc occ     -- Drop dead code; see Note [Dead code]
     then WUD body_uds body
-    else WUD (rhs_uds `orUDs` body_uds)    -- Note `orUDs`
+    else WUD (combineJoinPointUDs env rhs_uds body_uds)    -- Note `orUDs`
              (combine [NonRec (fst (tagNonRecBinder lvl occ bndr')) rhs']
                       body)
 
   -- The normal case, including newly-discovered join points
   -- Analyse the body and /then/ the RHS
-  | WUD body_uds (occ,body) <- occAnalNonRecBody env bndr thing_inside
+  | let env_body = addLocalLet env lvl bndr
+  , WUD body_uds (occ,body) <- occAnalNonRecBody env_body bndr thing_inside
   = if isDeadOcc occ   -- Drop dead code; see Note [Dead code]
     then WUD body_uds body
     else let
@@ -1017,8 +1076,8 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
         -- => join arity O of Note [Join arity prediction based on joinRhsArity]
         (tagged_bndr, mb_join) = tagNonRecBinder lvl occ bndr
 
-        !(rhs_uds_s, final_bndr, rhs') = occAnalNonRecRhs env lvl ire mb_join tagged_bndr rhs
-    in WUD (foldr andUDs body_uds rhs_uds_s)      -- Note `andUDs`
+        !(rhs_uds, final_bndr, rhs') = occAnalNonRecRhs env lvl ire mb_join tagged_bndr rhs
+    in WUD (rhs_uds `andUDs` body_uds)      -- Note `andUDs`
            (combine [NonRec final_bndr rhs'] body)
 
 -----------------
@@ -1033,15 +1092,21 @@ occAnalNonRecBody env bndr thing_inside
 
 -----------------
 occAnalNonRecRhs :: OccEnv -> TopLevelFlag -> ImpRuleEdges
-                -> JoinPointHood -> Id -> CoreExpr
-                 -> (NonEmpty UsageDetails, Id, CoreExpr)
+                 -> JoinPointHood -> Id -> CoreExpr
+                 -> (UsageDetails, Id, CoreExpr)
 occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
   | null rules, null imp_rule_infos
   =  -- Fast path for common case of no rules. This is only worth
      -- 0.1% perf on average, but it's also only a line or two of code
-    ( adj_rhs_uds :| adj_unf_uds : [], final_bndr_no_rules, final_rhs )
+    ( adj_rhs_uds `orUDs` adj_unf_uds
+    , final_bndr_no_rules, final_rhs )
+
   | otherwise
-  = ( adj_rhs_uds :| adj_unf_uds : adj_rule_uds, final_bndr_with_rules, final_rhs )
+  = ( foldl' orUDs (adj_rhs_uds `orUDs` adj_unf_uds) adj_rule_uds
+    , final_bndr_with_rules, final_rhs )
+
+    -- orUDs: Combine the RHS, (stable) unfolding, and RULES with orUDs
+    --        See Note [Unfoldings and RULES]
   where
     --------- Right hand side ---------
     -- For join points, set occ_encl to OccVanilla, via setTailCtxt.  If we have
@@ -1054,7 +1119,7 @@ occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
     rhs_ctxt = mkNonRecRhsCtxt lvl bndr unf
 
     -- See Note [Join arity prediction based on joinRhsArity]
-    -- Match join arity O from mb_join_arity with manifest join arity M as
+    -- Match join arity OAr from mb_join_arity with manifest join arity MAr as
     -- returned by of occAnalLamTail. It's totally OK for them to mismatch;
     -- hence adjust the UDs from the RHS
 
@@ -1764,7 +1829,7 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
                                -- here because that is what we are setting!
     WTUD unf_tuds unf' = occAnalUnfolding rhs_env unf
     adj_unf_uds = adjustTailArity (JoinPoint rhs_ja) unf_tuds
-      -- `rhs_ja` is `joinRhsArity rhs` and is the prediction for source M
+      -- `rhs_ja` is `joinRhsArity rhs` and is the prediction for source MAr
       -- of Note [Join arity prediction based on joinRhsArity]
 
     --------- IMP-RULES --------
@@ -1775,7 +1840,7 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
 
     --------- All rules --------
     -- See Note [Join points and unfoldings/rules]
-    -- `rhs_ja` is `joinRhsArity rhs'` and is the prediction for source M
+    -- `rhs_ja` is `joinRhsArity rhs'` and is the prediction for source MAr
     -- of Note [Join arity prediction based on joinRhsArity]
     rules_w_uds :: [(CoreRule, UsageDetails, UsageDetails)]
     rules_w_uds = [ (r,l,adjustTailArity (JoinPoint rhs_ja) rhs_wuds)
@@ -2177,7 +2242,9 @@ occAnalLamTail :: OccEnv -> CoreExpr -> WithTailUsageDetails CoreExpr
 -- See Note [Adjusting right-hand sides]
 occAnalLamTail env expr
   = let !(WUD usage expr') = occ_anal_lam_tail env expr
-    in WTUD (TUD (joinRhsArity expr) usage) expr'
+    in WTUD (TUD (joinRhsArity expr') usage) expr'
+       -- If expr looks like (\x. let dead = e in \y. blah), where `dead` is dead
+       -- then joinRhsArity expr' might exceed joinRhsArity expr
 
 occ_anal_lam_tail :: OccEnv -> CoreExpr -> WithUsageDetails CoreExpr
 -- Does not markInsideLam etc for the outmost batch of lambdas
@@ -2281,7 +2348,7 @@ occAnalUnfolding !env unf
               WTUD (TUD rhs_ja uds) rhs' = occAnalLamTail env rhs
               unf' = unf { uf_tmpl = rhs' }
             in WTUD (TUD rhs_ja (markAllMany uds)) unf'
-              -- markAllMany: see Note [Occurrences in stable unfoldings]
+              -- markAllMany: see Note [Occurrences in stable unfoldings and RULES]
 
         | otherwise -> WTUD (TUD 0 emptyDetails) unf
               -- For non-Stable unfoldings we leave them undisturbed, but
@@ -2319,12 +2386,13 @@ occAnalRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
                           -- Note [Rules are extra RHSs]
                           -- Note [Rule dependency info]
     rhs_uds' = markAllMany rhs_uds
+               -- markAllMany: Note [Occurrences in stable unfoldings and RULES]
     rhs_ja = length args -- See Note [Join points and unfoldings/rules]
 
 occAnalRule _ other_rule = (other_rule, emptyDetails, TUD 0 emptyDetails)
 
-{- Note [Occurrences in stable unfoldings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Occurrences in stable unfoldings and RULES]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
     f p = BIG
     {-# INLINE g #-}
@@ -2338,7 +2406,7 @@ preinlineUnconditionally here!
 
 The INLINE pragma says "inline exactly this RHS"; perhaps the
 programmer wants to expose that 'not', say. If we inline f that will make
-the Stable unfoldign big, and that wasn't what the programmer wanted.
+the Stable unfolding big, and that wasn't what the programmer wanted.
 
 Another way to think about it: if we inlined g as-is into multiple
 call sites, now there's be multiple calls to f.
@@ -2346,6 +2414,8 @@ call sites, now there's be multiple calls to f.
 Bottom line: treat all occurrences in a stable unfolding as "Many".
 We still leave tail call information intact, though, as to not spoil
 potential join points.
+
+The same goes for RULES.
 
 Note [Unfoldings and rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2874,7 +2944,11 @@ data OccEnv
              -- Invariant: no Id maps to an empty OccInfoEnv
              -- See Note [Occurrence analysis for join points]
            , occ_join_points :: !JoinPointInfo
-    }
+
+           , occ_nested_lets :: IdSet    -- Non-top-level, non-rec-bound lets
+                -- I tried making this field strict, but doing so increased
+                -- compile-time allocation very slightly: 0.1% on average
+           }
 
 type JoinPointInfo = IdEnv OccInfoEnv
 
@@ -2925,7 +2999,8 @@ initOccEnv
 
            , occ_join_points = emptyVarEnv
            , occ_bs_env = emptyVarEnv
-           , occ_bs_rng = emptyVarSet }
+           , occ_bs_rng = emptyVarSet
+           , occ_nested_lets = emptyVarSet }
 
 noBinderSwaps :: OccEnv -> Bool
 noBinderSwaps (OccEnv { occ_bs_env = bs_env }) = isEmptyVarEnv bs_env
@@ -3165,23 +3240,26 @@ postprocess_uds bndrs bad_joins uds
       | uniq `elemVarEnvByKey` env = plusVarEnv_C andLocalOcc env join_env
       | otherwise                  = env
 
+addLocalLet :: OccEnv -> TopLevelFlag -> Id -> OccEnv
+addLocalLet env@(OccEnv { occ_nested_lets = ids }) top_lvl id
+  | isTopLevel top_lvl = env
+  | otherwise          = env { occ_nested_lets = ids `extendVarSet` id }
+
 addJoinPoint :: OccEnv -> Id -> UsageDetails -> OccEnv
-addJoinPoint env bndr rhs_uds
+addJoinPoint env@(OccEnv { occ_join_points = join_points, occ_nested_lets = nested_lets })
+             join_bndr (UD { ud_env = rhs_occs })
   | isEmptyVarEnv zeroed_form
   = env
   | otherwise
-  = env { occ_join_points = extendVarEnv (occ_join_points env) bndr zeroed_form }
+  = env { occ_join_points = extendVarEnv join_points join_bndr zeroed_form }
   where
-    zeroed_form = mkZeroedForm rhs_uds
+    zeroed_form = mapMaybeUniqSetToUFM do_one nested_lets
+     -- See Note [Occurrence analysis for join points] for "zeroed form"
 
-mkZeroedForm :: UsageDetails -> OccInfoEnv
--- See Note [Occurrence analysis for join points] for "zeroed form"
-mkZeroedForm (UD { ud_env = rhs_occs })
-  = mapMaybeUFM do_one rhs_occs
-  where
-    do_one :: LocalOcc -> Maybe LocalOcc
-    do_one (ManyOccL {})    = Nothing
-    do_one occ@(OneOccL {}) = Just (occ { lo_n_br = 0 })
+    do_one :: Var -> Maybe LocalOcc
+    do_one bndr = case lookupVarEnv rhs_occs bndr of
+                    Just occ@(OneOccL {}) -> Just (occ { lo_n_br = 0 })
+                    _                     -> Nothing
 
 --------------------
 transClosureFV :: VarEnv VarSet -> VarEnv VarSet
@@ -3639,7 +3717,14 @@ data LocalOcc  -- See Note [LocalOcc]
                    -- Combining (AlwaysTailCalled 2) and (AlwaysTailCalled 3)
                    -- gives NoTailCallInfo
               , lo_int_cxt :: !InterestingCxt }
+
     | ManyOccL !TailCallInfo
+       -- Why do we need TailCallInfo on ManyOccL?
+       -- Answer 1: recursive bindings are entered many times:
+       --    rec { j x = ...j x'... } in j y
+       -- See the uses of `andUDs` in `tagRecBinders`
+       -- Answer 2: occurrences in stable unfoldings are many-ified
+       --           See Note [Occurrences in stable unfoldings and RULES]
 
 instance Outputable LocalOcc where
   ppr (OneOccL { lo_n_br = n, lo_tail = tci })
@@ -3662,10 +3747,13 @@ data UsageDetails
 
 instance Outputable UsageDetails where
   ppr ud@(UD { ud_env = env, ud_z_tail = z_tail })
-    = text "UD" <+> (braces $ fsep $ punctuate comma $
-      [ ppr uq <+> text ":->" <+> ppr (lookupOccInfoByUnique ud uq)
-      | (uq, _) <- nonDetStrictFoldVarEnv_Directly do_one [] env ])
-      $$ nest 2 (text "ud_z_tail" <+> ppr z_tail)
+    = text "UD" <> (braces (vcat
+         [ -- `final` shows the result of a proper lookupOccInfo, returning OccInfo
+           --         after accounting for `ud_z_tail` etc.
+           text "final =" <+> (fsep $ punctuate comma $
+                 [ ppr uq <+> text ":->" <+> ppr (lookupOccInfoByUnique ud uq)
+                 | (uq, _) <- nonDetStrictFoldVarEnv_Directly do_one [] env ])
+         , text "ud_z_tail" <+> ppr z_tail ] ))
     where
       do_one :: Unique -> LocalOcc -> [(Unique,LocalOcc)] -> [(Unique,LocalOcc)]
       do_one uniq occ occs = (uniq, occ) : occs
@@ -3674,7 +3762,7 @@ instance Outputable UsageDetails where
 -- | TailUsageDetails captures the result of applying 'occAnalLamTail'
 --   to a function `\xyz.body`. The TailUsageDetails pairs together
 --   * the number of lambdas (including type lambdas: a JoinArity)
---   * UsageDetails for the `body` of the lambda, unadjusted by `adjustTailUsage`.
+--   * UsageDetails for the `body` of the lambda, /unadjusted/ by `adjustTailUsage`.
 -- If the binding turns out to be a join point with the indicated join
 -- arity, this unadjusted usage details is just what we need; otherwise we
 -- need to discard tail calls. That's what `adjustTailUsage` does.
@@ -3692,8 +3780,17 @@ data WithTailUsageDetails a = WTUD !TailUsageDetails !a
 
 andUDs:: UsageDetails -> UsageDetails -> UsageDetails
 orUDs :: UsageDetails -> UsageDetails -> UsageDetails
-andUDs = combineUsageDetailsWith andLocalOcc
-orUDs  = combineUsageDetailsWith orLocalOcc
+andUDs = combineUsageDetailsWith (\_uniq -> andLocalOcc)
+orUDs  = combineUsageDetailsWith (\_uniq -> orLocalOcc)
+
+combineJoinPointUDs :: OccEnv -> UsageDetails -> UsageDetails -> UsageDetails
+-- See (W4) in Note [Occurrence analysis for join points]
+combineJoinPointUDs (OccEnv { occ_nested_lets = nested_lets }) uds1 uds2
+  = combineUsageDetailsWith combine uds1 uds2
+  where
+    combine uniq occ1 occ2
+      | uniq `elemVarSetByKey` nested_lets = orLocalOcc  occ1 occ2
+      | otherwise                          = andLocalOcc occ1 occ2
 
 mkOneOcc :: OccEnv -> Id -> InterestingCxt -> JoinArity -> UsageDetails
 mkOneOcc !env id int_cxt arity
@@ -3710,7 +3807,8 @@ mkOneOcc !env id int_cxt arity
   = mkSimpleDetails (unitVarEnv id occ)
 
   where
-    occ = OneOccL { lo_n_br = 1, lo_int_cxt = int_cxt
+    occ = OneOccL { lo_n_br = 1
+                  , lo_int_cxt = int_cxt
                   , lo_tail = AlwaysTailCalled arity }
 
 -- Add several occurrences, assumed not to be tail calls
@@ -3797,7 +3895,7 @@ restrictFreeVars bndrs fvs = restrictUniqSetToUFM bndrs fvs
 -------------------
 -- Auxiliary functions for UsageDetails implementation
 
-combineUsageDetailsWith :: (LocalOcc -> LocalOcc -> LocalOcc)
+combineUsageDetailsWith :: (Unique -> LocalOcc -> LocalOcc -> LocalOcc)
                         -> UsageDetails -> UsageDetails -> UsageDetails
 {-# INLINE combineUsageDetailsWith #-}
 combineUsageDetailsWith plus_occ_info
@@ -3807,9 +3905,9 @@ combineUsageDetailsWith plus_occ_info
   | isEmptyVarEnv env2 = uds1
   | otherwise
   -- See Note [Strictness in the occurrence analyser]
-  -- Using strictPlusVarEnv here speeds up the test T26425 by about 10% by avoiding
-  -- intermediate thunks.
-  = UD { ud_env       = strictPlusVarEnv_C plus_occ_info env1 env2
+  -- Using strictPlusVarEnv here speeds up the test T26425
+  -- by about 10% by avoiding intermediate thunks.
+  = UD { ud_env       = strictPlusVarEnv_C_Directly plus_occ_info env1 env2
        , ud_z_many    = strictPlusVarEnv z_many1   z_many2
        , ud_z_in_lam  = plusVarEnv z_in_lam1 z_in_lam2
        , ud_z_tail    = strictPlusVarEnv z_tail1   z_tail2 }
@@ -3853,8 +3951,6 @@ lookupOccInfoByUnique (UD { ud_env       = env
         | uniq `elemVarEnvByKey` z_tail = NoTailCallInfo
         | otherwise                     = ti
 
-
-
 -------------------
 -- See Note [Adjusting right-hand sides]
 
@@ -3864,21 +3960,22 @@ adjustNonRecRhs :: JoinPointHood
 -- ^ This function concentrates shared logic between occAnalNonRecBind and the
 -- AcyclicSCC case of occAnalRec.
 -- It returns the adjusted rhs UsageDetails combined with the body usage
-adjustNonRecRhs mb_join_arity rhs_wuds@(WTUD _ rhs)
-  = WUD (adjustTailUsage mb_join_arity rhs_wuds) rhs
+adjustNonRecRhs mb_join_arity (WTUD (TUD rhs_ja uds) rhs)
+  = WUD (adjustTailUsage exact_join rhs uds) rhs
+  where
+    exact_join = mb_join_arity == JoinPoint rhs_ja
 
-
-adjustTailUsage :: JoinPointHood
-                -> WithTailUsageDetails CoreExpr    -- Rhs usage, AFTER occAnalLamTail
+adjustTailUsage :: Bool        -- True <=> Exactly-matching join point; don't do markNonTail
+                -> CoreExpr    -- Rhs usage, AFTER occAnalLamTail
                 -> UsageDetails
-adjustTailUsage mb_join_arity (WTUD (TUD rhs_ja uds) rhs)
+                -> UsageDetails
+adjustTailUsage exact_join rhs uds
   = -- c.f. occAnal (Lam {})
     markAllInsideLamIf (not one_shot) $
     markAllNonTailIf (not exact_join) $
     uds
   where
     one_shot   = isOneShotFun rhs
-    exact_join = mb_join_arity == JoinPoint rhs_ja
 
 adjustTailArity :: JoinPointHood -> TailUsageDetails -> UsageDetails
 adjustTailArity mb_rhs_ja (TUD ja usage)
@@ -3925,8 +4022,9 @@ tagNonRecBinder lvl occ bndr
 tagRecBinders :: TopLevelFlag           -- At top level?
               -> UsageDetails           -- Of body of let ONLY
               -> [NodeDetails]
-              -> WithUsageDetails       -- Adjusted details for whole scope,
-                                        -- with binders removed
+              -> WithUsageDetails       -- Adjusted details for whole scope
+                                        -- still including the binders;
+                                        -- (they are removed by `addInScope`)
                   [IdWithOccInfo]       -- Tagged binders
 -- Substantially more complicated than non-recursive case. Need to adjust RHS
 -- details *before* tagging binders (because the tags depend on the RHSes).
@@ -3936,32 +4034,21 @@ tagRecBinders lvl body_uds details_s
 
      -- 1. See Note [Join arity prediction based on joinRhsArity]
      --    Determine possible join-point-hood of whole group, by testing for
-     --    manifest join arity M.
-     --    This (re-)asserts that makeNode had made tuds for that same arity M!
+     --    manifest join arity MAr.
+     --    This (re-)asserts that makeNode had made tuds for that same arity MAr!
      unadj_uds = foldr (andUDs . test_manifest_arity) body_uds details_s
-     test_manifest_arity ND{nd_rhs = WTUD tuds rhs}
-       = adjustTailArity (JoinPoint (joinRhsArity rhs)) tuds
+     test_manifest_arity ND{nd_rhs = WTUD (TUD rhs_ja uds) rhs}
+       = assertPpr (rhs_ja == joinRhsArity rhs) (ppr rhs_ja $$ ppr uds $$ ppr rhs) $
+         uds
 
+     will_be_joins :: Bool
      will_be_joins = decideRecJoinPointHood lvl unadj_uds bndrs
-
-     mb_join_arity :: Id -> JoinPointHood
-     -- mb_join_arity: See Note [Join arity prediction based on joinRhsArity]
-     -- This is the source O
-     mb_join_arity bndr
-         -- Can't use willBeJoinId_maybe here because we haven't tagged
-         -- the binder yet (the tag depends on these adjustments!)
-       | will_be_joins
-       , AlwaysTailCalled arity <- lookupTailCallInfo unadj_uds bndr
-       = JoinPoint arity
-       | otherwise
-       = assert (not will_be_joins) -- Should be AlwaysTailCalled if
-         NotJoinPoint               -- we are making join points!
 
      -- 2. Adjust usage details of each RHS, taking into account the
      --    join-point-hood decision
-     rhs_udss' = [ adjustTailUsage (mb_join_arity bndr) rhs_wuds
+     rhs_udss' = [ adjustTailUsage will_be_joins rhs rhs_uds
                      -- Matching occAnalLamTail in makeNode
-                 | ND { nd_bndr = bndr, nd_rhs = rhs_wuds } <- details_s ]
+                 | ND { nd_rhs = WTUD (TUD _ rhs_uds) rhs } <- details_s ]
 
      -- 3. Compute final usage details from adjusted RHS details
      adj_uds = foldr andUDs body_uds rhs_udss'
@@ -3980,9 +4067,9 @@ setBinderOcc occ_info bndr
   | otherwise                  = setIdOccInfo bndr occ_info
 
 -- | Decide whether some bindings should be made into join points or not, based
--- on its occurrences. This is
+-- on its occurrences.
 -- Returns `False` if they can't be join points. Note that it's an
--- all-or-nothing decision, as if multiple binders are given, they're
+-- all-or-nothing decision: if multiple binders are given, they are
 -- assumed to be mutually recursive.
 --
 -- It must, however, be a final decision. If we say `True` for 'f',

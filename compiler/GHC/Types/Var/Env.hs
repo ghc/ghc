@@ -12,7 +12,8 @@ module GHC.Types.Var.Env (
         elemVarEnv, disjointVarEnv, anyVarEnv,
         extendVarEnv, extendVarEnv_C, extendVarEnv_Acc,
         extendVarEnvList,
-        strictPlusVarEnv, plusVarEnv, plusVarEnv_C, strictPlusVarEnv_C,
+        strictPlusVarEnv, plusVarEnv, plusVarEnv_C,
+        strictPlusVarEnv_C, strictPlusVarEnv_C_Directly,
         plusVarEnv_CD, plusMaybeVarEnv_C,
         plusVarEnvList, alterVarEnv,
         delVarEnvList, delVarEnv,
@@ -525,6 +526,7 @@ delVarEnv         :: VarEnv a -> Var -> VarEnv a
 minusVarEnv       :: VarEnv a -> VarEnv b -> VarEnv a
 plusVarEnv_C      :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
 strictPlusVarEnv_C :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
+strictPlusVarEnv_C_Directly :: (Unique -> a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
 plusVarEnv_CD     :: (a -> a -> a) -> VarEnv a -> a -> VarEnv a -> a -> VarEnv a
 plusMaybeVarEnv_C :: (a -> a -> Maybe a) -> VarEnv a -> VarEnv a -> VarEnv a
 mapVarEnv         :: (a -> b) -> VarEnv a -> VarEnv b
@@ -552,6 +554,7 @@ extendVarEnv_Acc = addToUFM_Acc
 extendVarEnvList = addListToUFM
 plusVarEnv_C     = plusUFM_C
 strictPlusVarEnv_C = strictPlusUFM_C
+strictPlusVarEnv_C_Directly = strictPlusUFM_C_Directly
 plusVarEnv_CD    = plusUFM_CD
 plusMaybeVarEnv_C = plusMaybeUFM_C
 delVarEnvList    = delListFromUFM

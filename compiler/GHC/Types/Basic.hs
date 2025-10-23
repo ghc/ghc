@@ -1333,7 +1333,7 @@ zapFragileOcc occ         = zapOccTailCallInfo occ
 
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07
-  ppr (ManyOccs tails)     = pprShortTailCallInfo tails
+  ppr (ManyOccs tails)     = text "Many" <> parens (pprShortTailCallInfo tails)
   ppr IAmDead              = text "Dead"
   ppr (IAmALoopBreaker rule_only tails)
         = text "LoopBreaker" <> pp_ro <> pprShortTailCallInfo tails

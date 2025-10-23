@@ -40,6 +40,7 @@ module GHC.Types.Unique.Set (
         lookupUniqSet_Directly,
         partitionUniqSet,
         mapUniqSet,
+        mapUniqSetToUFM, mapMaybeUniqSetToUFM,
         unsafeUFMToUniqSet,
         nonDetEltsUniqSet,
         nonDetKeysUniqSet,
@@ -210,6 +211,14 @@ mapUniqSet f = mkUniqSet . map f . nonDetEltsUniqSet
 -- does not change the 'Unique'.
 mapMaybeUniqSet_sameUnique :: (a -> Maybe b) -> UniqSet a -> UniqSet b
 mapMaybeUniqSet_sameUnique f (UniqSet a) = UniqSet $ mapMaybeUFM_sameUnique f a
+
+mapUniqSetToUFM :: (a -> b) -> UniqSet a -> UniqFM a b
+-- Same keys, new values
+mapUniqSetToUFM f (UniqSet ufm) = mapUFM f ufm
+
+mapMaybeUniqSetToUFM :: (a -> Maybe b) -> UniqSet a -> UniqFM a b
+-- Same keys, new values
+mapMaybeUniqSetToUFM f (UniqSet ufm) = mapMaybeUFM f ufm
 
 -- Two 'UniqSet's are considered equal if they contain the same
 -- uniques.
