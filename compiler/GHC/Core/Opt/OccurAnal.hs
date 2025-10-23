@@ -992,8 +992,9 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
   = -- Analyse the RHS and /then/ the body
     let -- Analyse the rhs first, generating rhs_uds
         !(rhs_uds_s, bndr', rhs') = occAnalNonRecRhs env lvl ire mb_join bndr rhs
-        rhs_uds = foldl1' orUDs rhs_uds_s   -- NB: orUDs.  See (W4) of
-                                           -- Note [Occurrence analysis for join points]
+        rhs_uds = foldl1' (combineJoinPointUDs env)
+                          rhs_uds_s   -- NB: combineJoinPointUDs.  See (W4) of
+                                      -- Note [Occurrence analysis for join points]
 
         -- Now analyse the body, adding the join point
         -- into the environment with addJoinPoint
@@ -1002,13 +1003,17 @@ occAnalBind !env lvl ire (NonRec bndr rhs) thing_inside combine
     in
     if isDeadOcc occ     -- Drop dead code; see Note [Dead code]
     then WUD body_uds body
-    else WUD (rhs_uds `orUDs` body_uds)    -- Note `orUDs`
+    else -- pprTrace "occAnal-nonrec" (vcat [ ppr bndr <+> ppr occ
+         --                                , text "rhs_uds" <+> ppr rhs_uds
+         --                                , text "body_uds" <+> ppr body_uds ]) $
+         WUD (combineJoinPointUDs env rhs_uds body_uds)    -- Note `orUDs`
              (combine [NonRec (fst (tagNonRecBinder lvl occ bndr')) rhs']
                       body)
 
   -- The normal case, including newly-discovered join points
   -- Analyse the body and /then/ the RHS
-  | WUD body_uds (occ,body) <- occAnalNonRecBody env bndr thing_inside
+  | WUD body_uds (occ,body) <- occAnalNonRecBody (addLocalLet env lvl bndr)
+                                                 bndr thing_inside
   = if isDeadOcc occ   -- Drop dead code; see Note [Dead code]
     then WUD body_uds body
     else let
@@ -2863,7 +2868,9 @@ data OccEnv
              -- Invariant: no Id maps to an empty OccInfoEnv
              -- See Note [Occurrence analysis for join points]
            , occ_join_points :: !JoinPointInfo
-    }
+
+           , occ_local_lets :: IdSet    -- Non-top-level non-rec-bound lets
+           }
 
 type JoinPointInfo = IdEnv OccInfoEnv
 
@@ -2914,7 +2921,8 @@ initOccEnv
 
            , occ_join_points = emptyVarEnv
            , occ_bs_env = emptyVarEnv
-           , occ_bs_rng = emptyVarSet }
+           , occ_bs_rng = emptyVarSet
+           , occ_local_lets = emptyVarSet }
 
 noBinderSwaps :: OccEnv -> Bool
 noBinderSwaps (OccEnv { occ_bs_env = bs_env }) = isEmptyVarEnv bs_env
@@ -3154,23 +3162,30 @@ postprocess_uds bndrs bad_joins uds
       | uniq `elemVarEnvByKey` env = plusVarEnv_C andLocalOcc env join_env
       | otherwise                  = env
 
+addLocalLet :: OccEnv -> TopLevelFlag -> Id -> OccEnv
+addLocalLet env@(OccEnv { occ_local_lets = ids }) top_lvl id
+  | isTopLevel top_lvl = env
+  | otherwise          = env { occ_local_lets = ids `extendVarSet` id }
+
 addJoinPoint :: OccEnv -> Id -> UsageDetails -> OccEnv
-addJoinPoint env bndr rhs_uds
+addJoinPoint env@(OccEnv { occ_join_points = join_points, occ_local_lets = local_lets })
+             join_bndr rhs_uds
   | isEmptyVarEnv zeroed_form
   = env
   | otherwise
-  = env { occ_join_points = extendVarEnv (occ_join_points env) bndr zeroed_form }
+  = env { occ_join_points = extendVarEnv join_points join_bndr zeroed_form }
   where
-    zeroed_form = mkZeroedForm rhs_uds
+    zeroed_form = mkZeroedForm local_lets rhs_uds
 
-mkZeroedForm :: UsageDetails -> OccInfoEnv
+mkZeroedForm :: IdSet -> UsageDetails -> OccInfoEnv
 -- See Note [Occurrence analysis for join points] for "zeroed form"
-mkZeroedForm (UD { ud_env = rhs_occs })
-  = mapMaybeUFM do_one rhs_occs
+mkZeroedForm local_lets (UD { ud_env = rhs_occs })
+  = mapMaybeUniqSetToUFM do_one local_lets
   where
-    do_one :: LocalOcc -> Maybe LocalOcc
-    do_one (ManyOccL {})    = Nothing
-    do_one occ@(OneOccL {}) = Just (occ { lo_n_br = 0 })
+    do_one :: Var -> Maybe LocalOcc
+    do_one bndr = case lookupVarEnv rhs_occs bndr of
+                    Just occ@(OneOccL {}) -> Just (occ { lo_n_br = 0 })
+                    _                     -> Nothing
 
 --------------------
 transClosureFV :: VarEnv VarSet -> VarEnv VarSet
@@ -3684,6 +3699,14 @@ orUDs :: UsageDetails -> UsageDetails -> UsageDetails
 andUDs = combineUsageDetailsWith andLocalOcc
 orUDs  = combineUsageDetailsWith orLocalOcc
 
+combineJoinPointUDs :: OccEnv -> UsageDetails -> UsageDetails -> UsageDetails
+combineJoinPointUDs (OccEnv { occ_local_lets = local_lets }) uds1 uds2
+  = combineUsageDetailsWith combine uds1 uds2
+  where
+    combine uniq occ1 occ2
+      | uniq `elemVarSetByKey` local_lets = orLocalOcc  occ1 occ2
+      | otherwise                         = andLocalOcc occ1 occ2
+
 mkOneOcc :: OccEnv -> Id -> InterestingCxt -> JoinArity -> UsageDetails
 mkOneOcc !env id int_cxt arity
   | not (isLocalId id)
@@ -3786,7 +3809,7 @@ restrictFreeVars bndrs fvs = restrictUniqSetToUFM bndrs fvs
 -------------------
 -- Auxiliary functions for UsageDetails implementation
 
-combineUsageDetailsWith :: (LocalOcc -> LocalOcc -> LocalOcc)
+combineUsageDetailsWith :: (Unique -> LocalOcc -> LocalOcc -> LocalOcc)
                         -> UsageDetails -> UsageDetails -> UsageDetails
 {-# INLINE combineUsageDetailsWith #-}
 combineUsageDetailsWith plus_occ_info
@@ -3796,9 +3819,9 @@ combineUsageDetailsWith plus_occ_info
   | isEmptyVarEnv env2 = uds1
   | otherwise
   -- See Note [Strictness in the occurrence analyser]
-  -- Using strictPlusVarEnv here speeds up the test T26425 by about 10% by avoiding
-  -- intermediate thunks.
-  = UD { ud_env       = strictPlusVarEnv_C plus_occ_info env1 env2
+  -- Using strictPlusVarEnv here speeds up the test T26425
+  -- by about 10% by avoiding intermediate thunks.
+  = UD { ud_env       = strictPlusVarEnv_C_Directly plus_occ_info env1 env2
        , ud_z_many    = strictPlusVarEnv z_many1   z_many2
        , ud_z_in_lam  = plusVarEnv z_in_lam1 z_in_lam2
        , ud_z_tail    = strictPlusVarEnv z_tail1   z_tail2 }
@@ -4087,21 +4110,21 @@ markNonTail :: OccInfo -> OccInfo
 markNonTail IAmDead = IAmDead
 markNonTail occ     = occ { occ_tail = NoTailCallInfo }
 
-andLocalOcc :: LocalOcc -> LocalOcc -> LocalOcc
-andLocalOcc occ1 occ2 = ManyOccL (tci1 `andTailCallInfo` tci2)
+andLocalOcc :: Unique -> LocalOcc -> LocalOcc -> LocalOcc
+andLocalOcc _ occ1 occ2 = ManyOccL (tci1 `andTailCallInfo` tci2)
   where
     !tci1 = localTailCallInfo occ1
     !tci2 = localTailCallInfo occ2
 
-orLocalOcc :: LocalOcc -> LocalOcc -> LocalOcc
+orLocalOcc :: Unique -> LocalOcc -> LocalOcc -> LocalOcc
 -- (orLocalOcc occ1 occ2) is used
 -- when combining occurrence info from branches of a case
-orLocalOcc (OneOccL { lo_n_br = nbr1, lo_int_cxt = int_cxt1, lo_tail = tci1 })
-           (OneOccL { lo_n_br = nbr2, lo_int_cxt = int_cxt2, lo_tail = tci2 })
+orLocalOcc _ (OneOccL { lo_n_br = nbr1, lo_int_cxt = int_cxt1, lo_tail = tci1 })
+             (OneOccL { lo_n_br = nbr2, lo_int_cxt = int_cxt2, lo_tail = tci2 })
   = OneOccL { lo_n_br    = nbr1 + nbr2
             , lo_int_cxt = int_cxt1 `mappend` int_cxt2
             , lo_tail    = tci1 `andTailCallInfo` tci2 }
-orLocalOcc occ1 occ2 = andLocalOcc occ1 occ2
+orLocalOcc uniq occ1 occ2 = andLocalOcc uniq occ1 occ2
 
 andTailCallInfo :: TailCallInfo -> TailCallInfo -> TailCallInfo
 andTailCallInfo info@(AlwaysTailCalled arity1) (AlwaysTailCalled arity2)

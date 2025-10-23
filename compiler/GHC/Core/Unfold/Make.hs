@@ -354,6 +354,12 @@ mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
                 -> Maybe UnfoldingCache -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr precomputed_cache guidance
+  | UnfNever <- guidance
+  , not top_lvl
+  = -- For large, non-top-level bindings, don't keep an unfolding at all if it is large
+    -- Keep top-level ones in case of -fexpose-all-unfoldings
+    -- Just an attempt to keep residency under control in deeply-nested let bindings
+  | otherwise
   = CoreUnfolding { uf_tmpl = cache `seq`
                               occurAnalyseExpr expr
       -- occAnalyseExpr: see Note [OccInfo in unfoldings and rules] in GHC.Core
