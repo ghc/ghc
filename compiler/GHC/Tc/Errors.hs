@@ -557,9 +557,9 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
             -- if there's a *given* insoluble here (= inaccessible code)
 
          -- If there are no other errors to report, report suppressed errors.
-         -- See Note [Suppressing confusing errors].  NB: with -fdefer-type-errors
-         -- we might have reported warnings only from `reportable_items`, but we
-         -- still want to suppress the `suppressed_items`.
+         -- See (SCE3) in Note [Suppressing confusing errors].
+         -- NB: with -fdefer-type-errors we might have reported warnings only from
+         -- reportable_items`, but we still want to suppress the `suppressed_items`.
        ; when (null reportable_items) $
          do { (_, more_leftovers) <- tryReporters ctxt_for_insols (report1++report2)
                                                   suppressed_items
@@ -762,7 +762,7 @@ isTyFun_maybe ty = case tcSplitTyConApp_maybe ty of
 Certain errors we might encounter are potentially confusing to users.
 If there are any other errors to report, at all, we want to suppress these.
 
-Which errors are suppressed?
+Which errors should be suppressed?
 
 (SCE1) Superclasses of Wanteds.  These are generated only in case they trigger functional
    dependencies.  If such a constraint is unsolved, then its "parent" constraint must
@@ -776,9 +776,6 @@ Which errors are suppressed?
         [W] d2 : MinVersion <= F era  -- Superclass of d1
    We definitely want to report d1 and not d2!  Happily it's easy to filter out those
    superclass-Wanteds, becuase their Origin betrays them.
-
-   See test T18851 for an example of how it is (just, barely) possible for the /only/
-   errors to be superclass-of-Wanted constraints.
 
 (SCE2) Errors which arise from the interaction of two Wanted fun-dep constraints.
    Example:
@@ -810,9 +807,15 @@ Which errors are suppressed?
 
 Mechanism:
 
-We use the `suppress` function within reportWanteds to filter out these two
-cases, then report all other errors. Lastly, we return to these suppressed
-ones and report them only if there have been no errors so far.
+We use the `suppress` function within reportWanteds to filter out these
+"suppress" cases, then report all other errors. After doing so, we return to these
+suppressed ones and report them only if there have been no errors so far.
+
+(SCE3) How can it happen that there are /only/ suppressed errors?  See test T18851
+   for an example of how it is (just, barely) possible for the /only/ errors to
+   be superclass-of-Wanted constraints.
+
+
 
 Note [Constraints to ignore]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
