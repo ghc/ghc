@@ -359,6 +359,8 @@ mkCoreUnfolding src top_lvl expr precomputed_cache guidance
   = -- For large, non-top-level bindings, don't keep an unfolding at all if it is large
     -- Keep top-level ones in case of -fexpose-all-unfoldings
     -- Just an attempt to keep residency under control in deeply-nested let bindings
+    NoUnfolding
+
   | otherwise
   = CoreUnfolding { uf_tmpl = cache `seq`
                               occurAnalyseExpr expr
