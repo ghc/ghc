@@ -416,13 +416,12 @@ schedule (Capability *initialCapability, Task *task)
     }
 #endif
 
-    /* context switches are initiated by the timer signal, unless
-     * the user specified "context switch as often as possible", with
-     * +RTS -C0
-     */
-    if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0 &&
-        (!emptyRunQueue(cap) ||
-          anyPendingTimeoutsOrIO(cap->iomgr))) {
+    // Context switches are normally initiated by the timer signal. If however
+    // the user specified "context switch as often as possible", with +RTS -C0
+    // then we now arrange for an early context switch. Context switching very
+    // often is expensive, so as an optimisation if there's no other threads
+    // to run then we don't arrange a context switch.
+    if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0 && !emptyRunQueue(cap)) {
         RELAXED_STORE(&cap->context_switch, 1);
     }
 
