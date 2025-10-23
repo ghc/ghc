@@ -7,6 +7,7 @@ module GHC.Types.Hint (
   , LanguageExtensionHint(..)
   , ImportItemSuggestion(..)
   , ImportSuggestion(..)
+  , ExportItemSuggestion(..)
   , HowInScope(..)
   , SimilarName(..)
   , StarIsType(..)
@@ -419,6 +420,12 @@ data GhcHint
   -}
   | ImportSuggestion OccName ImportSuggestion
 
+  {-| Suggest to change an export item, e.g. to remove a namespace specifier.
+
+      Test cases: T12488a, T12488a_foo, T12488e, T12488g, T25899e2
+  -}
+  | SuggestChangeExportItem ExportItemSuggestion
+
   {-| Found a pragma in the body of a module, suggest placing it in the header.
   -}
   | SuggestPlacePragmaInHeader
@@ -555,6 +562,11 @@ data ImportItemSuggestion =
   | ImportItemAddType
     -- Why no 'ImportItemAddData'?  Because the suggestion to add 'data' is
     -- represented by the 'ImportDataCon' constructor of 'ImportSuggestion'.
+
+-- | Suggest to change an export item.
+data ExportItemSuggestion =
+    ExportItemRemoveSubordinateType
+  | ExportItemRemoveSubordinateData
 
 -- | Suggest how to fix an import.
 data ImportSuggestion

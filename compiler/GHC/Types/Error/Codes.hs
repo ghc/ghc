@@ -510,6 +510,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnDuplicateExport"                           = 47854
   GhcDiagnosticCode "TcRnDuplicateNamedDefaultExport"               = 31584
   GhcDiagnosticCode "TcRnExportedParentChildMismatch"               = 88993
+  GhcDiagnosticCode "TcRnExportedSubordinateNotFound"               = 11592
   GhcDiagnosticCode "TcRnConflictingExports"                        = 69158
   GhcDiagnosticCode "TcRnDuplicateFieldExport"                      = 97219
   GhcDiagnosticCode "TcRnAmbiguousFieldInUpdate"                    = 56428

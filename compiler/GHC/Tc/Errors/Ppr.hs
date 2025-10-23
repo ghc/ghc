@@ -675,6 +675,43 @@ instance Diagnostic TcRnMessage where
         what_is = pp_category ty_thing
         thing = ppr $ nameOccName child
         parents = map ppr parent_names
+    TcRnExportedSubordinateNotFound parent_gre k _ ->
+      mkSimpleDecorated $
+      case k of
+        BadExportSubordinateNotFound wname ->
+          let child_name      = lieWrappedName wname
+              child_name_fs   = occNameFS (rdrNameOcc child_name)
+              suggest_patsyn  = allow_patsyn && could_be_patsyn
+              could_be_patsyn =
+                case unLoc wname of
+                  IEName{} -> isLexCon child_name_fs
+                  IEData{} -> isLexCon child_name_fs
+                  IEPattern{} -> True
+                  IEType{}    -> False
+                  IEDefault{} -> False
+              basic_msg =
+                what_parent <+> quotes (ppr parent_name)
+                <+> "does not define a child named" <+> quotes (ppr child_name)
+              patsyn_msg =
+                text "nor is there a pattern synonym of that name in scope"
+              combined_msg
+                | suggest_patsyn = basic_msg <> comma $$ patsyn_msg <> dot
+                | otherwise      = basic_msg <> dot
+          in combined_msg
+        BadExportSubordinateNonType gre ->
+          let child_name = greName gre
+          in what_parent <+> quotes (ppr parent_name) <+> "defines a child named" <+> quotes (ppr child_name) <> comma
+             $$ text "but it is not in the type namespace."
+        BadExportSubordinateNonData gre ->
+          let child_name = greName gre
+          in what_parent <+> quotes (ppr parent_name) <+> "defines a child named" <+> quotes (ppr child_name) <> comma
+             $$ text "but it is not in the data namespace."
+      where
+        parent_name = greName parent_gre
+        (what_parent, allow_patsyn) = case greInfo parent_gre of
+          IAmTyCon ClassFlavour -> (text "The class", False)
+          IAmTyCon _            -> (text "The data type", True)
+          _                     -> (text "The item", False)
     TcRnConflictingExports occ child_gre1 ie1 child_gre2 ie2
       -> mkSimpleDecorated $
            vcat [ text "Conflicting exports for" <+> quotes (ppr occ) <> colon
@@ -2204,6 +2241,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnDuplicateExports
     TcRnExportedParentChildMismatch{}
       -> ErrorWithoutFlag
+    TcRnExportedSubordinateNotFound{}
+      -> ErrorWithoutFlag
     TcRnConflictingExports{}
       -> ErrorWithoutFlag
     TcRnDuplicateFieldExport {}
@@ -2875,6 +2914,13 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnExportedParentChildMismatch{}
       -> noHints
+    TcRnExportedSubordinateNotFound _ k similar_names
+      -> ns_spec_hints ++ similar_names
+      where
+        ns_spec_hints = case k of
+          BadExportSubordinateNotFound{} -> noHints
+          BadExportSubordinateNonType{}  -> [SuggestChangeExportItem ExportItemRemoveSubordinateType]
+          BadExportSubordinateNonData{}  -> [SuggestChangeExportItem ExportItemRemoveSubordinateData]
     TcRnConflictingExports{}
       -> noHints
     TcRnDuplicateFieldExport {}

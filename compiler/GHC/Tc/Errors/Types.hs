@@ -83,7 +83,6 @@ module GHC.Tc.Errors.Types (
   , Subordinate(..), pprSubordinate
   , ImportError(..)
   , WhatLooking(..)
-  , lookingForSubordinate
   , HoleError(..)
   , CoercibleMsg(..)
   , NoBuiltinInstanceMsg(..)
@@ -117,6 +116,7 @@ module GHC.Tc.Errors.Types (
   , HsTyVarBndrExistentialFlag(..)
   , TySynCycleTyCons
   , BadImportKind(..)
+  , BadExportSubordinate(..)
   , DodgyImportsReason (..)
   , ImportLookupExtensions (..)
   , ImportLookupReason (..)
@@ -1663,6 +1663,26 @@ data TcRnMessage where
                                   -> TyThing
                                   -> Name -- ^ child
                                   -> [Name] -> TcRnMessage
+
+  {-| TcRnExportedSubordinateNotFound is an error that occurs when the name of a
+      subordinate export item is not in scope.
+
+      Example:
+        module M (T(X)) where  -- X is not in scope
+        data T = Y
+
+      Test cases: module/mod4
+                  rename/should_fail/T12488a
+                  rename/should_fail/T12488a_foo
+                  rename/should_fail/T12488e
+                  rename/should_fail/T12488g
+                  rename/should_fail/T25899e2
+  -}
+  TcRnExportedSubordinateNotFound
+    :: GlobalRdrElt                  -- ^ parent
+    -> BadExportSubordinate
+    -> [GhcHint]                     -- ^ similar name suggestions
+    -> TcRnMessage
 
   {-| TcRnConflictingExports is an error that occurs when different identifiers that
       have the same name are being exported by a module.
@@ -5829,6 +5849,11 @@ data BadImportKind
   | BadImportAvailVar
   deriving Generic
 
+data BadExportSubordinate
+  = BadExportSubordinateNotFound !(LIEWrappedName GhcPs)
+  | BadExportSubordinateNonType  !GlobalRdrElt
+  | BadExportSubordinateNonData  !GlobalRdrElt
+
 {- Note [Reasons for BadImportAvailTyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 BadImportAvailTyCon means a name is available in the TcCls namespace
@@ -6064,15 +6089,6 @@ data WhatLooking = WL_Anything
                      -- This is is used for rebindable syntax, where there
                      -- is no point in suggesting alternative spellings
                  deriving (Eq, Show)
-
--- | In what namespaces should we look for a subordinate
--- of the given 'GlobalRdrElt'.
-lookingForSubordinate :: GlobalRdrElt -> WhatLooking
-lookingForSubordinate parent_gre =
-  case greInfo parent_gre of
-    IAmTyCon ClassFlavour
-      -> WL_TyCon_or_TermVar
-    _ -> WL_Term
 
 -- | This datatype collates instances that match or unifier,
 -- in order to report an error message for an unsolved typeclass constraint.

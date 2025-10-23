@@ -214,6 +214,10 @@ instance Outputable GhcHint where
                                  <+> pprQuotedList parents
     ImportSuggestion occ_name import_suggestion
       -> pprImportSuggestion occ_name import_suggestion
+    SuggestChangeExportItem export_item_suggestion
+      -> case export_item_suggestion of
+           ExportItemRemoveSubordinateType -> text "Remove the" <+> quotes (text "type") <+> text "keyword"
+           ExportItemRemoveSubordinateData -> text "Remove the" <+> quotes (text "data") <+> text "keyword"
     SuggestPlacePragmaInHeader
       -> text "Perhaps you meant to place it in the module header?"
       $$ text "The module header is the section at the top of the file, before the" <+> quotes (text "module") <+> text "keyword"

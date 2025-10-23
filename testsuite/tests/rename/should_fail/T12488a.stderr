@@ -1,0 +1,12 @@
+T12488a.hs:3:5: error: [GHC-11592]
+    • The data type ‘T’ defines a child named ‘A’,
+      but it is not in the type namespace.
+    • In the export: T(type A)
+    Suggested fix: Remove the ‘type’ keyword
+
+T12488a.hs:4:5: error: [GHC-11592]
+    • The data type ‘:!’ defines a child named ‘:/’,
+      but it is not in the type namespace.
+    • In the export: (:!)(type (:/))
+    Suggested fix: Remove the ‘type’ keyword
+

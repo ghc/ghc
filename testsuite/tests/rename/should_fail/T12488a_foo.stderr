@@ -1,0 +1,6 @@
+T12488a_foo.hs:3:22: error: [GHC-11592]
+    • The data type ‘T’ defines a child named ‘A’,
+      but it is not in the type namespace.
+    • In the export: T(type A)
+    Suggested fix: Remove the ‘type’ keyword
+
