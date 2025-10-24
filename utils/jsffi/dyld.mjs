@@ -285,7 +285,7 @@ function originFromServerAddress({ address, family, port }) {
 }
 
 // Browser/node portable code stays above this watermark.
-const isNode = Boolean(globalThis?.process?.versions?.node);
+const isNode = Boolean(globalThis?.process?.versions?.node && !globalThis.Deno);
 
 // Too cumbersome to only import at use sites. Too troublesome to
 // factor out browser-only/node-only logic into different modules. For
@@ -307,27 +307,27 @@ if (isNode) {
     ws = require("ws");
   } catch {}
 } else {
-  wasi = await import(
-    "https://cdn.jsdelivr.net/npm/@bjorn3/browser_wasi_shim@0.4.2/dist/index.js"
-  );
+  wasi = await import("https://esm.sh/gh/haskell-wasm/browser_wasi_shim");
 }
 
 // A subset of dyld logic that can only be run in the host node
 // process and has full access to local filesystem
-class DyLDHost {
+export class DyLDHost {
   // Deduped absolute paths of directories where we lookup .so files
   #rpaths = new Set();
 
-  constructor() {
-    // Inherited pipe file descriptors from GHC
-    const out_fd = Number.parseInt(process.argv[4]),
-      in_fd = Number.parseInt(process.argv[5]);
-
+  constructor({ outFd, inFd }) {
+    // When running a non-iserv shared library with node, the DyLDHost
+    // instance is created without a pair of fds, so skip creation of
+    // readStream/writeStream, they won't be used anyway
+    if (!(typeof outFd === "number" && typeof inFd === "number")) {
+      return;
+    }
     this.readStream = stream.Readable.toWeb(
-      fs.createReadStream(undefined, { fd: in_fd })
+      fs.createReadStream(undefined, { fd: inFd })
     );
     this.writeStream = stream.Writable.toWeb(
-      fs.createWriteStream(undefined, { fd: out_fd })
+      fs.createWriteStream(undefined, { fd: outFd })
     );
   }
 
@@ -374,6 +374,72 @@ class DyLDHost {
     return new Response(stream.Readable.toWeb(fs.createReadStream(p)), {
       headers: { "Content-Type": "application/wasm" },
     });
+  }
+}
+
+// Runs in the browser and uses the in-memory vfs, doesn't do any RPC
+// calls
+export class DyLDBrowserHost {
+  // Deduped absolute paths of directories where we lookup .so files
+  #rpaths = new Set();
+  // The PreopenDirectory object of the root filesystem
+  rootfs;
+  // Continuations to output a single line to stdout/stderr
+  stdout;
+  stderr;
+
+  // Given canonicalized absolute file path, returns the File object,
+  // or null if absent
+  #readFile(p) {
+    const { ret, entry } = this.rootfs.dir.get_entry_for_path({
+      parts: p.split("/").filter((tok) => tok !== ""),
+      is_dir: false,
+    });
+    return ret === 0 ? entry : null;
+  }
+
+  constructor({ rootfs, stdout, stderr }) {
+    this.rootfs = rootfs
+      ? rootfs
+      : new wasi.PreopenDirectory("/", [["tmp", new wasi.Directory([])]]);
+    this.stdout = stdout ? stdout : (msg) => console.info(msg);
+    this.stderr = stderr ? stderr : (msg) => console.warn(msg);
+  }
+
+  // p must be canonicalized absolute path
+  async addLibrarySearchPath(p) {
+    this.#rpaths.add(p);
+    return null;
+  }
+
+  async findSystemLibrary(f) {
+    if (f.startsWith("/")) {
+      if (this.#readFile(f)) {
+        return f;
+      }
+      throw new Error(`findSystemLibrary(${f}): not found in /`);
+    }
+
+    for (const rpath of this.#rpaths) {
+      const r = `${rpath}/${f}`;
+      if (this.#readFile(r)) {
+        return r;
+      }
+    }
+
+    throw new Error(
+      `findSystemLibrary(${f}): not found in ${[...this.#rpaths]}`
+    );
+  }
+
+  async fetchWasm(p) {
+    const entry = this.#readFile(p);
+    const r = new Response(entry.data, {
+      headers: { "Content-Type": "application/wasm" },
+    });
+    // It's only fetched once, take the chance to prune it in vfs to save memory
+    entry.data = new Uint8Array();
+    return r;
   }
 }
 
@@ -494,7 +560,7 @@ export class DyLDRPC {
 
 // Actual implementation of endpoints used by DyLDRPC
 class DyLDRPCServer {
-  #dyldHost = new DyLDHost();
+  #dyldHost;
   #server;
   #wss;
 
@@ -502,11 +568,15 @@ class DyLDRPCServer {
     host,
     port,
     dyldPath,
-    libdir,
-    ghciSoPath,
+    searchDirs,
+    mainSoPath,
+    outFd,
+    inFd,
     args,
     redirectWasiConsole,
   }) {
+    this.#dyldHost = new DyLDHost({ outFd, inFd });
+
     this.#server = http.createServer(async (req, res) => {
       const origin = originFromServerAddress(await this.listening);
 
@@ -540,7 +610,7 @@ class DyLDRPCServer {
         res.end(
           `
 import { DyLDRPC, main } from "./fs${dyldPath}";
-const args = ${JSON.stringify({ libdir, ghciSoPath, args })};
+const args = ${JSON.stringify({ searchDirs, mainSoPath, args, isIserv: true })};
 args.rpc = new DyLDRPC({origin: "${origin}", redirectWasiConsole: ${redirectWasiConsole}});
 args.rpc.opened.then(() => main(args));
 `
@@ -829,6 +899,11 @@ class DyLD {
           ),
           wasi.ConsoleStdout.lineBuffered((msg) => this.#rpc.stdout(msg)),
           wasi.ConsoleStdout.lineBuffered((msg) => this.#rpc.stderr(msg)),
+          // for ghci browser mode, default to an empty rootfs with
+          // /tmp
+          this.#rpc instanceof DyLDBrowserHost
+            ? this.#rpc.rootfs
+            : new wasi.PreopenDirectory("/", [["tmp", new wasi.Directory([])]]),
         ],
         { debug: false }
       );
@@ -1218,15 +1293,38 @@ class DyLD {
   }
 }
 
-export async function main({ rpc, libdir, ghciSoPath, args }) {
+// The main entry point of dyld that may be run on node/browser, and
+// may run either iserv defaultMain from the ghci library or an
+// alternative entry point from another shared library
+export async function main({
+  rpc, // Handle the side effects of DyLD
+  searchDirs, // Initial library search directories
+  mainSoPath, // Could also be another shared library that's actually not ghci
+  args, // WASI argv starting with the executable name. +RTS etc will be respected
+  isIserv, // set to true when running iserv defaultServer
+}) {
   try {
     const dyld = new DyLD({
-      args: ["dyld.so", ...args],
+      args,
       rpc,
     });
-    await dyld.addLibrarySearchPath(libdir);
-    await dyld.loadDLLs(ghciSoPath);
+    for (const libdir of searchDirs) {
+      await dyld.addLibrarySearchPath(libdir);
+    }
+    await dyld.loadDLLs(mainSoPath);
 
+    // At this point, rts/ghc-internal are loaded, perform wasm shared
+    // library specific RTS startup logic, see Note [JSFFI initialization]
+    dyld.exportFuncs.__ghc_wasm_jsffi_init();
+
+    // We're not running iserv, just return the dyld instance so user
+    // could use it to invoke their exported functions, and don't
+    // perform cleanup (see finally block)
+    if (!isIserv) {
+      return dyld;
+    }
+
+    // iserv-specific logic follows
     const reader = rpc.readStream.getReader();
     const writer = rpc.writeStream.getWriter();
 
@@ -1245,31 +1343,25 @@ export async function main({ rpc, libdir, ghciSoPath, args }) {
       writer.write(new Uint8Array(buf));
     };
 
-    dyld.exportFuncs.__ghc_wasm_jsffi_init();
-    await dyld.exportFuncs.defaultServer(cb_sig, cb_recv, cb_send);
+    return await dyld.exportFuncs.defaultServer(cb_sig, cb_recv, cb_send);
   } finally {
-    rpc.close();
+    if (isIserv) {
+      rpc.close();
+    }
   }
 }
 
-(async () => {
-  if (!isNode) {
-    return;
-  }
-
-  const libdir = process.argv[2];
-  const ghciSoPath = process.argv[3];
-  const args = process.argv.slice(6);
-
+// node-specific iserv-specific logic
+async function nodeMain({ searchDirs, mainSoPath, outFd, inFd, args }) {
   if (!process.env.GHCI_BROWSER) {
-    const rpc = new DyLDHost();
-    await main({
+    const rpc = new DyLDHost({ outFd, inFd });
+    return await main({
       rpc,
-      libdir,
-      ghciSoPath,
+      searchDirs,
+      mainSoPath,
       args,
+      isIserv: true,
     });
-    return;
   }
 
   if (!ws) {
@@ -1282,8 +1374,10 @@ export async function main({ rpc, libdir, ghciSoPath, args }) {
     host: process.env.GHCI_BROWSER_HOST || "127.0.0.1",
     port: process.env.GHCI_BROWSER_PORT || 0,
     dyldPath: import.meta.filename,
-    libdir,
-    ghciSoPath,
+    searchDirs,
+    mainSoPath,
+    outFd,
+    inFd,
     args,
     redirectWasiConsole:
       process.env.GHCI_BROWSER_PUPPETEER_LAUNCH_OPTS ||
@@ -1372,6 +1466,20 @@ export async function main({ rpc, libdir, ghciSoPath, args }) {
   }
 
   console.log(
-    `Open ${origin}/main.html or import ${origin}/main.js to boot ghci`
+    `Open ${origin}/main.html or import("${origin}/main.js") to boot ghci`
   );
-})();
+}
+
+const isNodeMain = isNode && import.meta.filename === process.argv[1];
+
+// node iserv as invoked by
+// GHC.Runtime.Interpreter.Wasm.spawnWasmInterp
+if (isNodeMain) {
+  const clibdir = process.argv[2];
+  const mainSoPath = process.argv[3];
+  const outFd = Number.parseInt(process.argv[4]),
+    inFd = Number.parseInt(process.argv[5]);
+  const args = ["dyld.so", ...process.argv.slice(6)];
+
+  await nodeMain({ searchDirs: [clibdir], mainSoPath, outFd, inFd, args });
+}
