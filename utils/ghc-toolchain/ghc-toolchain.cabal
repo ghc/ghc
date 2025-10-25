@@ -21,6 +21,7 @@ library
                       GHC.Toolchain.NormaliseTriple,
                       GHC.Toolchain.CheckArm,
                       GHC.Toolchain.Target,
+                      GHC.Toolchain.CheckPower
                       GHC.Toolchain.Tools.Ar,
                       GHC.Toolchain.Tools.Cc,
                       GHC.Toolchain.Tools.Cxx,

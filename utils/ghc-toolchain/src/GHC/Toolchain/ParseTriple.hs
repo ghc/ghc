@@ -6,6 +6,7 @@ import GHC.Platform.ArchOS
 
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.CheckArm
+import GHC.Toolchain.CheckPower
 import GHC.Toolchain.Tools.Cc
 
 -- | Parse a triple `arch-vendor-os` into an 'ArchOS' and a vendor name 'String'
@@ -40,7 +41,7 @@ parseArch cc arch =
       "x86_64" -> pure ArchX86_64
       "amd64" -> pure ArchX86_64
       "powerpc" -> pure ArchPPC
-      "powerpc64" -> pure (ArchPPC_64 ELF_V1)
+      "powerpc64" -> checkPowerAbi cc
       "powerpc64le" -> pure (ArchPPC_64 ELF_V2)
       "s390x" -> pure ArchS390X
       "arm" -> findArmIsa cc
