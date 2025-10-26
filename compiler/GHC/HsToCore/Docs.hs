@@ -127,6 +127,7 @@ mkExportsDocs = foldMap f
     ieExportDoc (IEThingAll _ _ doc) = doc
     ieExportDoc (IEThingWith _ _ _ _ doc) = doc
     ieExportDoc (IEModuleContents _ _) = Nothing
+    ieExportDoc (IEWholeNamespace _) = Nothing
     ieExportDoc (IEGroup _ _ _) = Nothing
     ieExportDoc (IEDoc _ _) = Nothing
     ieExportDoc (IEDocNamed _ _) = Nothing

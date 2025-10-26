@@ -152,6 +152,9 @@ data ExportAccum        -- The type of the accumulating parameter of
          expacc_mods :: UniqMap ModuleName [Name],
            -- ^ Tracks (re-)exported module names
            --   and the names they re-export
+         expacc_wildcards :: ExportAccumWildcards,
+           -- ^ Tracks namespace-specified wildcard exports,
+           --   e.g. @type ..@ or @data ..@.
          expacc_warn_spans :: ExportWarnSpanNames,
            -- ^ Information about warnings for names
          expacc_dont_warn :: DontWarnExportNames
@@ -159,15 +162,27 @@ data ExportAccum        -- The type of the accumulating parameter of
            --   (because they are exported without a warning)
      }
 
+data ExportAccumWildcards
+  = ExportAccumWildcards { eaw_type, eaw_data :: Maybe [Name] }
+
+emptyExportAccumWildcards :: ExportAccumWildcards
+emptyExportAccumWildcards = ExportAccumWildcards Nothing Nothing
+
+get_export_accum_wcs :: NamespaceSpecifier -> ExportAccumWildcards -> Maybe [Name]
+get_export_accum_wcs ns_spec ExportAccumWildcards{eaw_type, eaw_data} =
+  case ns_spec of
+    NoNamespaceSpecifier{}   -> panic "get_export_accum_wcs: NoNamespaceSpecifier"  -- see PsErrPlainWildcardExport
+    TypeNamespaceSpecifier{} -> eaw_type
+    DataNamespaceSpecifier{} -> eaw_data
 
 emptyExportAccum :: ExportAccum
-emptyExportAccum = ExportAccum emptyOccEnv emptyNameEnv emptyUniqMap [] emptyNameEnv
+emptyExportAccum = ExportAccum emptyOccEnv emptyNameEnv emptyUniqMap emptyExportAccumWildcards [] emptyNameEnv
 
 accumExports :: (ExportAccum -> x -> TcRn (ExportAccum, Maybe y))
              -> [x]
              -> TcRn ([y], DefaultEnv, ExportWarnSpanNames, DontWarnExportNames)
 accumExports f xs = do
-  (ExportAccum _ dflts _ export_warn_spans dont_warn_export, ys)
+  (ExportAccum _ dflts _ _ export_warn_spans dont_warn_export, ys)
     <- mapAccumLM f' emptyExportAccum xs
   return ( catMaybes ys
          , fmap fst dflts
@@ -365,6 +380,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                         expacc_exp_occs   = occs,
                         expacc_exp_dflts  = exp_dflts,
                         expacc_mods       = earlier_mods,
+                        expacc_wildcards  = wcs,
                         expacc_warn_spans = export_warn_spans,
                         expacc_dont_warn  = dont_warn_export
                       } (L loc ie@(IEModuleContents (warn_txt_ps, _) lmod@(L _ mod)))
@@ -397,7 +413,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                  }
 
             ; checkErr exportValid (TcRnExportedModNotImported mod)
-            ; warnIf (exportValid && null gre_prs) (TcRnNullExportedModule mod)
+            ; warnIf (exportValid && null gre_prs) $
+                TcRnDodgyExports (DodgyExportsNullModule  mod)
 
             ; traceRn "efa" (ppr mod $$ ppr all_gres)
             ; addUsedGREs ExportDeprecationWarnings all_gres
@@ -422,9 +439,82 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             ; return ( ExportAccum { expacc_exp_occs   = occs'
                                    , expacc_exp_dflts  = exp_dflts -- IEModuleContents does not re-export defaults
                                    , expacc_mods       = mods
+                                   , expacc_wildcards  = wcs
                                    , expacc_warn_spans = export_warn_spans'
                                    , expacc_dont_warn  = dont_warn_export' }
                      , Just (L loc (IEModuleContents warn_txt_rn lmod), new_exports) ) }
+
+    exports_from_item expacc@ExportAccum{
+                        expacc_exp_occs   = occs,
+                        expacc_exp_dflts  = exp_dflts,
+                        expacc_mods       = mods,
+                        expacc_wildcards  = earlier_wcs,
+                        expacc_warn_spans = export_warn_spans,
+                        expacc_dont_warn  = dont_warn_export
+                      } (L loc ie@(IEWholeNamespace x@(IEWholeNamespaceExt { iewn_warning = warn_txt_ps
+                                                                           , iewn_ns_spec = ns_spec })))
+      | Just exported_names <- get_export_accum_wcs ns_spec earlier_wcs  -- Duplicate export of a namespace
+      = do { addDiagnostic (TcRnDupeWildcardExport (moduleName this_mod) ns_spec)
+           ; (export_warn_spans', dont_warn_export', _) <-
+                process_warning export_warn_spans
+                                dont_warn_export
+                                exported_names
+                                warn_txt_ps
+                                (locA loc)
+                   -- Checks if all the names are exported with the same warning message
+                   -- or if they should not be warned about
+           ; return ( expacc{ expacc_warn_spans = export_warn_spans'
+                            , expacc_dont_warn  = dont_warn_export' }
+                    , Nothing ) }
+      | otherwise
+      = do { let { mod            = moduleName this_mod
+                 ; gre_prs        = pickGREsModExp mod (globalRdrEnvElts rdr_env)
+                                    -- NB: this filters out non level 0 exports
+                 ; new_gres       = [ gre'
+                                    | (gre, _) <- gre_prs
+                                    , gre' <- expand_tyty_gre gre
+                                    , coveredByNamespaceSpecifier ns_spec (greNameSpace gre') ]
+                 ; new_exports    = map availFromGRE new_gres
+                 ; all_gres       = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
+                 ; exported_names = map greName new_gres
+                 ; wcs            = case ns_spec of
+                    NoNamespaceSpecifier     -> panic "exports_from_item: NoNamespaceSpecifier"  -- see PsErrPlainWildcardExport
+                    TypeNamespaceSpecifier{} -> earlier_wcs { eaw_type = Just exported_names }
+                    DataNamespaceSpecifier{} -> earlier_wcs { eaw_data = Just exported_names }
+                 }
+
+            ; warnIf (null gre_prs) $
+                TcRnDodgyExports (DodgyExportsWildcard mod ns_spec)
+
+            ; traceRn "efa" (ppr mod $$ ppr all_gres)
+            ; addUsedGREs ExportDeprecationWarnings all_gres
+
+            ; occs' <- check_occs occs ie new_gres
+                          -- This check_occs not only finds conflicts
+                          -- between this item and others, but also
+                          -- internally within this item.  That is, if
+                          -- 'M.x' is in scope in several ways, we'll have
+                          -- several members of mod_avails with the same
+                          -- OccName.
+            ; (export_warn_spans', dont_warn_export', warn_txt_rn) <-
+                process_warning export_warn_spans
+                                dont_warn_export
+                                exported_names
+                                warn_txt_ps
+                                (locA loc)
+
+            ; traceRn "export_mod"
+                      (vcat [ ppr mod
+                            , ppr new_exports ])
+            ; return ( ExportAccum { expacc_exp_occs   = occs'
+                                   , expacc_exp_dflts  = exp_dflts -- IEWholeNamespace does not re-export defaults
+                                   , expacc_mods       = mods
+                                   , expacc_wildcards  = wcs
+                                   , expacc_warn_spans = export_warn_spans'
+                                   , expacc_dont_warn  = dont_warn_export' }
+                     , Just (L loc (IEWholeNamespace x{ iewn_warning = warn_txt_rn
+                                                      , iewn_names = exported_names })
+                            , new_exports) ) }
 
     exports_from_item acc lie = do
         m_doc_ie <- lookup_doc_ie lie
@@ -603,7 +693,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
          -- We only choose level 0 exports when filling in part of an export list implicitly.
          ; let kids_0 = mapMaybe pickLevelZeroGRE gres
          ; addUsedKids (ieWrappedName rdr) kids_0
-         ; when (null kids_0) $ addTcRnDiagnostic (TcRnDodgyExports gre)
+         ; when (null kids_0) $ addTcRnDiagnostic (TcRnDodgyExports (DodgyExportsEmptyParent gre))
          ; return kids_0 }
 
     -------------
@@ -1013,6 +1103,7 @@ dupExport_ok child ie1 ie2
         || (explicit_in ie1 && explicit_in ie2) )
   where
     explicit_in (IEModuleContents {}) = False                   -- module M
+    explicit_in (IEWholeNamespace {}) = False                   -- `type ..` or `data ..`
     explicit_in (IEThingAll _ r _)
       = occName child == rdrNameOcc (ieWrappedName $ unLoc r)  -- T(..)
     explicit_in _              = True

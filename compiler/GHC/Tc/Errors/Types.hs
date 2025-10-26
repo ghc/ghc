@@ -118,6 +118,7 @@ module GHC.Tc.Errors.Types (
   , BadImportKind(..)
   , BadExportSubordinate(..)
   , DodgyImportsReason (..)
+  , DodgyExportsReason (..)
   , ImportLookupExtensions (..)
   , ImportLookupReason (..)
   , UnusedImportReason (..)
@@ -501,24 +502,11 @@ data TcRnMessage where
       See 'DodgyImportsReason' for the different warnings.
   -}
   TcRnDodgyImports :: !DodgyImportsReason -> TcRnMessage
-  {-| TcRnDodgyExports is a warning (controlled by -Wdodgy-exports) that occurs when
-      an export of the form 'T(..)' for a type constructor 'T' does not actually export anything
-      beside 'T' itself.
+  {-| TcRnDodgyExports is a group of warnings (controlled with -Wdodgy-exports).
 
-     Example:
-       module Foo (
-           T(..)  -- Warning: T is a type synonym
-         , A(..)  -- Warning: A is a type family
-         , C(..)  -- Warning: C is a data family
-         ) where
-
-       type T = Int
-       type family A :: * -> *
-       data family C :: * -> *
-
-     Test cases: warnings/should_compile/DodgyExports01
+      See 'DodgyExportsReason' for the different warnings.
   -}
-  TcRnDodgyExports :: GlobalRdrElt -> TcRnMessage
+  TcRnDodgyExports :: !DodgyExportsReason -> TcRnMessage
   {-| TcRnMissingImportList is a warning (controlled by -Wmissing-import-lists) that occurs when
       an import declaration does not explicitly list all the names brought into scope.
 
@@ -1574,6 +1562,17 @@ data TcRnMessage where
   -}
   TcRnDupeModuleExport :: ModuleName -> TcRnMessage
 
+  {-| TcRnDupeWildcardExport is a warning controlled by @-Wduplicate-exports@ that
+      occurs when a namespace-specified wildcard @type ..@ or @data ..@ appears
+      more than once in an export list.
+
+      Example(s):
+      module Foo (type .., type ..)
+
+     Text cases: None
+  -}
+  TcRnDupeWildcardExport :: ModuleName -> NamespaceSpecifier -> TcRnMessage
+
   {-| TcRnExportedModNotImported is an error that occurs when an export list
       contains a module that is not imported.
 
@@ -1585,18 +1584,6 @@ data TcRnMessage where
                  backpack/should_fail/bkpfail48
   -}
   TcRnExportedModNotImported :: ModuleName -> TcRnMessage
-
-  {-| TcRnNullExportedModule is a warning controlled by -Wdodgy-exports that occurs
-      when an export list contains a module that has no exports.
-
-      Example(s):
-        module Foo (module Bar) where
-        import Bar ()
-
-      Test cases:
-        EmptyModExport
-  -}
-  TcRnNullExportedModule :: ModuleName -> TcRnMessage
 
   {-| TcRnMissingExportList is a warning controlled by -Wmissing-export-lists that
       occurs when a module does not have an explicit export list.
@@ -6447,6 +6434,57 @@ data DodgyImportsReason =
       DodgyImports_hiding
   -}
   DodgyImportsHiding !ImportLookupReason
+  |
+  {-| A namespace-specified wildcard @type ..@ or @data ..@ does not match
+      any names in the imported module.
+
+      Test cases:
+        T25901_imp_dodgy_1
+        T25901_imp_dodgy_2
+  -}
+  DodgyImportsWildcard !ModuleName !NamespaceSpecifier
+  deriving (Generic)
+
+-- | Different types of warnings for dodgy exports.
+data DodgyExportsReason =
+  {-| An export of the form 'T(..)' for a type constructor 'T' does not actually export anything
+      beside 'T' itself.
+
+      Example:
+        module Foo (
+            T(..)  -- Warning: T is a type synonym
+          , A(..)  -- Warning: A is a type family
+          , C(..)  -- Warning: C is a data family
+          ) where
+
+        type T = Int
+        type family A :: * -> *
+        data family C :: * -> *
+
+      Test cases: warnings/should_compile/DodgyExports01
+  -}
+  DodgyExportsEmptyParent !GlobalRdrElt
+  |
+  {-| An export list contains a module that has no exports.
+
+      Example(s):
+        module Foo (module Bar) where
+        import Bar ()
+
+      Test cases:
+        EmptyModExport
+  -}
+  DodgyExportsNullModule !ModuleName
+  |
+  {-| A namespace-specified wildcard in an export list does not match any names.
+
+      Example(s):
+        module Foo (type ..) where
+        x = 42   -- no types defined in this module
+
+      Test cases: None
+  -}
+  DodgyExportsWildcard !ModuleName !NamespaceSpecifier
   deriving (Generic)
 
 -- | What extensions were enabled at import site.
@@ -6500,6 +6538,7 @@ data ImportLookupReason where
 data UnusedImportName where
   UnusedImportNameRecField :: !Parent -> !OccName -> UnusedImportName
   UnusedImportNameRegular :: !Name -> UnusedImportName
+  UnusedImportWildcard :: !NamespaceSpecifier -> UnusedImportName
 
 -- | Different types of errors for unused imports.
 data UnusedImportReason where

@@ -1,0 +1,6 @@
+T25901_exp_plain_wc.hs:1:29: error: [GHC-96822]
+    Illegal plain wildcard (..) in a module export
+    Suggested fix:
+      To export all names defined in the current module,
+      use a named module export of the form ‘module M (module M) where’
+

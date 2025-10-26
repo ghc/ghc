@@ -280,8 +280,12 @@ instance Diagnostic PsMessage where
            kw_doc = case kw of
              ExplicitTypeNamespace{} -> text "type"
              ExplicitDataNamespace{} -> text "data"
-
-
+    PsErrPlainWildcardImport
+      -> mkSimpleDecorated $
+           text "Illegal plain wildcard (..) in a module import"
+    PsErrPlainWildcardExport
+      -> mkSimpleDecorated $
+           text "Illegal plain wildcard (..) in a module export"
     PsErrUnallowedPragma prag
       -> mkSimpleDecorated $
            hang (text "A pragma is not allowed in this position:") 2
@@ -625,6 +629,8 @@ instance Diagnostic PsMessage where
     PsErrDeclSpliceNotAtTopLevel{}                -> ErrorWithoutFlag
     PsErrMultipleNamesInStandaloneKindSignature{} -> ErrorWithoutFlag
     PsErrIllegalExplicitNamespace{}               -> ErrorWithoutFlag
+    PsErrPlainWildcardImport{}                    -> ErrorWithoutFlag
+    PsErrPlainWildcardExport{}                    -> ErrorWithoutFlag
     PsErrUnallowedPragma{}                        -> ErrorWithoutFlag
     PsErrImportPostQualified                      -> ErrorWithoutFlag
     PsErrImportQualifiedTwice                     -> ErrorWithoutFlag
@@ -765,6 +771,8 @@ instance Diagnostic PsMessage where
     PsErrDeclSpliceNotAtTopLevel{}                -> noHints
     PsErrMultipleNamesInStandaloneKindSignature{} -> noHints
     PsErrIllegalExplicitNamespace{}               -> [suggestExtension LangExt.ExplicitNamespaces]
+    PsErrPlainWildcardImport{}                    -> [SuggestRemoveImportList]
+    PsErrPlainWildcardExport{}                    -> [SuggestNamedModuleSelfExport]
     PsErrUnallowedPragma{}                        -> noHints
     PsErrImportPostQualified                      -> [suggestExtension LangExt.ImportQualifiedPost]
     PsErrImportQualifiedTwice                     -> noHints

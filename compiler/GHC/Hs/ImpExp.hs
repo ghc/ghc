@@ -35,6 +35,7 @@ import GHC.Types.Name
 import GHC.Types.PkgQual
 
 import GHC.Parser.Annotation
+import GHC.Hs.Basic
 import GHC.Hs.Extension
 
 import GHC.Utils.Outputable
@@ -267,6 +268,18 @@ type instance XIEModuleContents  GhcPs = (Maybe (LWarningTxt GhcPs), EpToken "mo
 type instance XIEModuleContents  GhcRn = Maybe (LWarningTxt GhcRn)
 type instance XIEModuleContents  GhcTc = NoExtField
 
+data IEWholeNamespaceExt pass =
+  IEWholeNamespaceExt {
+    iewn_warning :: Maybe (LWarningTxt pass),
+    iewn_ns_spec :: NamespaceSpecifier,
+    iewn_tok_wc  :: EpToken "..",
+    iewn_names   :: [IdP pass]
+      -- ^ The list @[Name]@ stores the names that the @..@ expands to;
+      -- it determines whether to emit @-Wunused-imports@ and/or @-Wdodgy-imports@
+  }
+
+type instance XIEWholeNamespace  (GhcPass p) = IEWholeNamespaceExt (GhcPass p)
+
 type instance XIEGroup           (GhcPass _) = NoExtField
 type instance XIEDoc             (GhcPass _) = NoExtField
 type instance XIEDocNamed        (GhcPass _) = NoExtField
@@ -289,6 +302,7 @@ ieNames (IEVar       _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingAbs  _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingAll  _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingWith _ (L _ n) _ ns _) = ieWrappedName n : map (ieWrappedName . unLoc) ns
+ieNames (IEWholeNamespace x)           = iewn_names x
 ieNames (IEModuleContents {})     = []
 ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
@@ -372,6 +386,7 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
                 in bs ++ [text ".."] ++ as
     ppr ie@(IEModuleContents _ mod')
         = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "module" <+> ppr mod']
+    ppr (IEWholeNamespace x)      = ppr (iewn_ns_spec x) <+> text ".."
     ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")
     ppr (IEDoc _ doc)             = ppr doc
     ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")

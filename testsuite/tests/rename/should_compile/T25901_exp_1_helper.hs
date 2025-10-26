@@ -1,0 +1,19 @@
+{-# LANGUAGE ExplicitNamespaces, TypeFamilies, TypeData #-}
+
+module T25901_exp_1_helper
+    ( type ..     -- exports C, D, T, K, K1
+    ) where
+
+class C a where
+  data D a
+  m :: a
+
+instance C Int where
+  data D Int = E { f, f2 :: Int }
+  m = 42
+
+data T = D | D2
+
+type data K = K1
+
+v = ()

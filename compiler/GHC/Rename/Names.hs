@@ -1262,8 +1262,8 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
         where
 
             -- Warn when importing T(..) and no children are brought in scope
-            warning_msg (DodgyImport n) =
-              pure (TcRnDodgyImports (DodgyImportsEmptyParent n))
+            warning_msg (DodgyImport reason) =
+              pure (TcRnDodgyImports reason)
             warning_msg MissingImportList =
               pure (TcRnMissingImportList ieRdr)
             warning_msg (BadImportW ie sub) = do
@@ -1328,7 +1328,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
                   | null child_gres
                   -- e.g. f(..) or T(..) where T is a type synonym
-                  = [DodgyImport gre]
+                  = [DodgyImport (DodgyImportsEmptyParent gre)]
 
                   -- e.g. import M( T(..) )
                   | not (is_qual decl_spec)
@@ -1396,6 +1396,21 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                      ,gres)]
                   , bad_import_warns ++ export_depr_warns)
 
+        IEWholeNamespace x -> do
+          let ns_spec    = iewn_ns_spec x
+              mod_name   = moduleName import_mod
+              names      = map greName gres
+              renamed_ie = IEWholeNamespace x { iewn_warning  = Nothing
+                                              , iewn_names    = names }
+              gres = filter (coveredByNamespaceSpecifier ns_spec . greNameSpace) $
+                     gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)
+              imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
+              dodgy_warn
+                | null gres = [DodgyImport (DodgyImportsWildcard mod_name ns_spec)]
+                | otherwise = []
+          return ([(renamed_ie, gres)],
+                  dodgy_warn)
+
         _other -> failLookupWith IllegalImport
         -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed...
         -- all of those constitute errors.
@@ -1438,7 +1453,7 @@ type IELookupM = MaybeErr IELookupError
 data IELookupWarning
   = BadImportW (IE GhcPs) IsSubordinateError
   | MissingImportList
-  | DodgyImport GlobalRdrElt
+  | DodgyImport DodgyImportsReason
   | DeprecatedExport Name (WarningTxt GhcRn)
 
 -- | Is this import/export item a subordinate or not?
@@ -1601,6 +1616,7 @@ gresFromIE decl_spec (L loc ie, gres)
   where
     is_explicit = case ie of
                     IEThingAll _ name _ -> \n -> n == lieWrappedName name
+                    IEWholeNamespace _  -> \_ -> False
                     _                   -> \_ -> True
     prov_fn name
       = ImpSpec { is_decl = decl_spec, is_item = item_spec }
@@ -1614,13 +1630,7 @@ parentOfImplicitlyImportedGRE :: Outputable info => GlobalRdrEltX info -> Maybe 
 parentOfImplicitlyImportedGRE gre =
   if any (explicit_import . is_item) $ gre_imp gre
   then Nothing
-  else
-    case greParent gre of
-      NoParent ->
-        pprPanic "parentOfImplicitlyImportedGRE" $
-           (text "implicitly imported GRE with no parent" <+> ppr gre)
-      ParentIs par ->
-        Just par
+  else greParent_maybe gre
   where
     explicit_import :: ImpItemSpec -> Bool
     explicit_import (ImpAll {}) =
@@ -1927,7 +1937,8 @@ See also Note [Choosing the best import declaration] in GHC.Types.Name.Reader
 type ImportDeclUsage
    = ( LImportDecl GhcRn   -- The import declaration
      , [GlobalRdrElt]      -- What *is* used (normalised)
-     , [Name] )            -- What is imported but *not* used
+     , [Name]              -- What is imported but *not* used
+     , [NamespaceSpecifier] )  -- Unused wildcards
 
 warnUnusedImportDecls :: TcGblEnv -> HscSource -> RnM ()
 warnUnusedImportDecls gbl_env hsc_src
@@ -1964,21 +1975,23 @@ findImportUsage imports used_gres
     import_usage :: ImportMap
     import_usage = mkImportMap used_gres
 
-    unused_decl :: LImportDecl GhcRn -> (LImportDecl GhcRn, [GlobalRdrElt], [Name])
+    unused_decl :: LImportDecl GhcRn -> ImportDeclUsage
     unused_decl decl@(L _ (ImportDecl { ideclImportList = imps }))
-      = (decl, used_gres, nameSetElemsStable unused_imps)
+      = (decl, used_gres, unused_names, unused_wcs)
       where
         used_gres = lookupImportMap decl import_usage
 
         used_gre_env = mkGlobalRdrEnv used_gres
         used_parents = mkNameSet (mapMaybe greParent_maybe used_gres)
 
-        unused_imps   -- Not trivial; see eg #7454
+        (unused_names, unused_wcs)   -- Not trivial; see eg #7454
           = case imps of
               Just (Exactly, L _ imp_ies) ->
-                let unused = foldr (add_unused . unLoc) (UnusedNames emptyNameSet emptyFsEnv) imp_ies
-                in  collectUnusedNames unused
-              _other -> emptyNameSet -- No explicit import list => no unused-name list
+                let unused = foldr (add_unused . unLoc) emptyUnusedNames imp_ies
+                    nms = nameSetElemsStable (collectUnusedNames unused)
+                    wcs = collectUnusedWildcards unused
+                in (nms, wcs)
+              _other -> ([], []) -- No explicit import list => no unused-name list
 
         add_unused :: IE GhcRn -> UnusedNames -> UnusedNames
         add_unused (IEVar _ n _)      acc = add_unused_name (lieWrappedName n) True acc
@@ -1990,10 +2003,11 @@ findImportUsage imports used_gres
                 add_wc_all = case wc of
                             NoIEWildcard -> id
                             IEWildcard _ -> add_unused_all pn
+        add_unused (IEWholeNamespace x) acc = add_unused_wildcard (iewn_ns_spec x) (iewn_names x) acc
         add_unused _ acc = acc
 
         add_unused_name :: Name -> Bool -> UnusedNames -> UnusedNames
-        add_unused_name n is_ie_var acc@(UnusedNames acc_ns acc_fs)
+        add_unused_name n is_ie_var acc@(UnusedNames acc_ns acc_wcs acc_fs)
           | is_ie_var
           , isFieldName n
           -- See Note [Reporting unused imported duplicate record fields]
@@ -2001,29 +2015,38 @@ findImportUsage imports used_gres
               fs = getOccFS n
               (flds, flds_used) = lookupFsEnv acc_fs fs `orElse` (emptyNameSet, Any False)
               acc_fs' = extendFsEnv acc_fs fs (extendNameSet flds n, Any used S.<> flds_used)
-            in UnusedNames acc_ns acc_fs'
+            in UnusedNames acc_ns acc_wcs acc_fs'
           | used
           = acc
           | otherwise
-          = UnusedNames (acc_ns `extendNameSet` n) acc_fs
+          = UnusedNames (acc_ns `extendNameSet` n) acc_wcs acc_fs
           where
             used = isJust $ lookupGRE_Name used_gre_env n
 
         add_unused_all :: Name -> UnusedNames -> UnusedNames
-        add_unused_all n (UnusedNames acc_ns acc_fs)
-          | Just {} <- lookupGRE_Name used_gre_env n = UnusedNames acc_ns acc_fs
-          | n `elemNameSet` used_parents             = UnusedNames acc_ns acc_fs
-          | otherwise                                = UnusedNames (acc_ns `extendNameSet` n) acc_fs
+        add_unused_all n acc@(UnusedNames acc_ns acc_wcs acc_fs)
+          | Just {} <- lookupGRE_Name used_gre_env n = acc
+          | n `elemNameSet` used_parents             = acc
+          | otherwise                                = UnusedNames (acc_ns `extendNameSet` n) acc_wcs acc_fs
 
         add_unused_with :: Name -> [Name] -> UnusedNames -> UnusedNames
         add_unused_with p ns acc
           | all (`elemNameSet` acc1_ns) ns = add_unused_name p False acc1
           | otherwise                      = acc1
           where
-            acc1@(UnusedNames acc1_ns _acc1_fs) = foldr (\n acc' -> add_unused_name n False acc') acc ns
+            acc1@(UnusedNames acc1_ns _ _) = foldr (\n acc' -> add_unused_name n False acc') acc ns
         -- If you use 'signum' from Num, then the user may well have
         -- imported Num(signum).  We don't want to complain that
         -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
+
+        add_unused_wildcard :: NamespaceSpecifier -> [Name] -> UnusedNames -> UnusedNames
+        add_unused_wildcard ns_spec names acc@(UnusedNames acc_ns acc_wcs acc_fs)
+          | any_used  = acc
+          | otherwise = UnusedNames acc_ns (ns_spec : acc_wcs) acc_fs
+          where
+            -- A wildcard `type ..` or `data ..` is used if at least one of
+            -- the names it expands to is used
+            any_used = any (isJust . lookupGRE_Name used_gre_env) names
 
 
 -- | An accumulator for unused names in an import list.
@@ -2033,17 +2056,24 @@ data UnusedNames =
   UnusedNames
     { unused_names :: NameSet
        -- ^ Unused 'Name's in an import list, not including record fields
-       -- that are plain 'IEVar' imports
+       -- that are plain 'IEVar' imports (tracked by 'rec_fld_uses')
+       -- or wildcard imports (tracked by 'unused_wildcards').
+    , unused_wildcards :: [NamespaceSpecifier]
+       -- ^ Unused wildcards @type ..@ or @data ..@ in an import list.
     , rec_fld_uses :: FastStringEnv (NameSet, Any)
       -- ^ Record fields imported without a parent (i.e. an 'IEVar' import).
       --
       -- The 'Any' value records whether any of the record fields
       -- sharing the same underlying 'FastString' have been used.
     }
+
+emptyUnusedNames :: UnusedNames
+emptyUnusedNames = UnusedNames emptyNameSet [] emptyFsEnv
+
 instance Outputable UnusedNames where
-  ppr (UnusedNames nms flds) =
+  ppr (UnusedNames nms wcs flds) =
     text "UnusedNames" <+>
-      braces (ppr nms <+> ppr (fmap (second getAny) flds))
+      braces (ppr nms <+> ppr wcs <+> ppr (fmap (second getAny) flds))
 
 -- | Collect all unused names from a 'UnusedNames' value.
 collectUnusedNames :: UnusedNames -> NameSet
@@ -2055,6 +2085,9 @@ collectUnusedNames (UnusedNames { unused_names = nms, rec_fld_uses = flds })
     collect_unused (nms, Any at_least_one_name_is_used) acc
       | at_least_one_name_is_used = acc
       | otherwise                 = unionNameSet nms acc
+
+collectUnusedWildcards :: UnusedNames -> [NamespaceSpecifier]
+collectUnusedWildcards = unused_wildcards
 
 {- Note [Reporting unused imported duplicate record fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2155,7 +2188,7 @@ lookupImportMap (L srcSpan ImportDecl{ideclName = L _ modName}) importMap =
       _ -> Nothing
 
 warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
-warnUnusedImport rdr_env (L loc decl, used, unused)
+warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
 
   -- Do not warn for 'import M()'
   | Just (Exactly, L _ []) <- ideclImportList decl
@@ -2172,7 +2205,7 @@ warnUnusedImport rdr_env (L loc decl, used, unused)
   = addDiagnosticAt (locA loc) (TcRnUnusedImport decl UnusedImportNone)
 
   -- Everything imported is used; nop
-  | null unused
+  | null unused && null unused_wcs
   = return ()
 
   -- Some imports are unused: make the `SrcSpan` cover only the unused
@@ -2203,8 +2236,9 @@ warnUnusedImport rdr_env (L loc decl, used, unused)
 
     -- Print unused names in a deterministic (lexicographic) order
     sort_unused :: [UnusedImportName]
-    sort_unused = fmap possible_field $
-                  sortBy (comparing nameOccName) unused
+    sort_unused =
+      [ UnusedImportWildcard wc | wc <- unused_wcs ] ++
+      [ possible_field nm | nm <- sortBy (comparing nameOccName) unused ]
 
 {-
 Note [Do not warn about Prelude hiding]
@@ -2236,8 +2270,8 @@ getMinimalImports ie_decls
   = do { rdr_env <- getGlobalRdrEnv
        ; fmap combine $ mapM (mk_minimal rdr_env) ie_decls }
   where
-    mk_minimal rdr_env (L l decl, used_gres, unused)
-      | null unused
+    mk_minimal rdr_env (L l decl, used_gres, unused, unused_wcs)
+      | null unused && null unused_wcs
       , Just (Exactly, _) <- ideclImportList decl
       = return (L l decl)
       | otherwise

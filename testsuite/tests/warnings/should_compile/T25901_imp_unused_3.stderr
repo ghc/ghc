@@ -1,0 +1,20 @@
+T25901_imp_unused_3.hs:19:1: warning: [GHC-66111] [-Wunused-imports (in -Wextra)]
+    The qualified import of ‘T25901_helper_3’ is redundant
+      except perhaps to import instances from ‘T25901_helper_3’
+    To import instances alone, use: import T25901_helper_3()
+
+T25901_imp_unused_3.hs:21:1: warning: [GHC-66111] [-Wunused-imports (in -Wextra)]
+    The qualified import of ‘T25901_helper_3’ is redundant
+      except perhaps to import instances from ‘T25901_helper_3’
+    To import instances alone, use: import T25901_helper_3()
+
+T25901_imp_unused_3.hs:23:1: warning: [GHC-66111] [-Wunused-imports (in -Wextra)]
+    The qualified import of ‘T25901_helper_3’ is redundant
+      except perhaps to import instances from ‘T25901_helper_3’
+    To import instances alone, use: import T25901_helper_3()
+
+T25901_imp_unused_3.hs:25:1: warning: [GHC-66111] [-Wunused-imports (in -Wextra)]
+    The qualified import of ‘T25901_helper_3’ is redundant
+      except perhaps to import instances from ‘T25901_helper_3’
+    To import instances alone, use: import T25901_helper_3()
+

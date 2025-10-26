@@ -1,0 +1,7 @@
+T25901_imp_sq_fail_2.hs:8:6: error: [GHC-76037]
+    Not in scope: type constructor or class ‘Proxy’
+    Suggested fix:
+      Perhaps use one of these:
+        ‘T.Proxy’ (imported from Data.Proxy),
+        ‘T.KProxy’ (imported from Data.Proxy)
+

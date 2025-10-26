@@ -1,0 +1,6 @@
+T25901_imp_dodgy_1.hs:5:25: warning: [GHC-52986] [-Wdodgy-imports (in -Wextra)]
+    • The wildcard import ‘data ..’ does not bring any names into scope
+    • The module ‘T25901_helper_1’ does not export any
+      data constructors, functions, constants, field selectors,
+      pattern synonyms, or other names in the data namespace
+
