@@ -26,7 +26,7 @@ module GHC.Tc.Gen.Head
        , nonBidirectionalErr
 
        , pprArgInst
-       , addExprCtxt, addFunResCtxt ) where
+       , addExprCtxt, addLExprCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
@@ -1108,6 +1108,17 @@ addExprCtxt e thing_inside
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
-      XExpr{} -> thing_inside -- the err ctxt management done is done by setInGeneratedCode
-      HsPar{} -> thing_inside -- the err ctxt management done is done by setInGeneratedCode
+      HsPar{} -> thing_inside
+      -- We don't want to say 'In the expression (e)',
+      -- we just want to say 'In the expression, 'e'
+      -- which will be handeled by the recursive call in thing_inside
+      XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) thing_inside
       _ -> addErrCtxt (ExprCtxt e) thing_inside -- no op in generated code
+
+
+addLExprCtxt :: LHsExpr GhcRn -> TcRn a -> TcRn a
+addLExprCtxt (L lspan e) thing_inside
+  | (RealSrcSpan{}) <- locA lspan
+  = addExprCtxt e thing_inside
+  | otherwise
+  = thing_inside

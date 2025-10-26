@@ -32,7 +32,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..), ErrCtxt (..) )
+import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..), ErrCtxt (..),  CodeSrcFlag (..))
 import GHC.Tc.Errors.Ppr (pprErrCtxtMsg)
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
@@ -951,28 +951,23 @@ addArgCtxt arg_no fun (L arg_loc arg) thing_inside
                                     , text "arg: " <+> ppr (arg, arg_no)
                                     , text "arg_loc:" <+> ppr arg_loc
                                     , text "fun:" <+> ppr fun
-                                    -- , text "err_ctx" <+> vcat (fmap (\ (x, y) -> case x of
-                                    --                                     UserCodeCtxt{} -> text "<USER>" <+> pprErrCtxtMsg y
-                                    --                                     ExpansionCodeCtxt{} -> text "<EXPN>" <+> pprErrCtxtMsg y)
-                                    --                            (take 4 (zip err_ctx err_ctx_msg)))
+                                    , text "err_ctx" <+> vcat (fmap (\ (x, y) -> case x of
+                                                                        MkErrCtxt (ExpansionCodeCtxt{}) _ -> text "<EXPN>" <+> pprErrCtxtMsg y
+                                                                        _ -> text "<USER>" <+> pprErrCtxtMsg y)
+                                                               (take 4 (zip err_ctx err_ctx_msg)))
                                     ])
        ; if in_generated_code
-         then updCtxtForArg (locA arg_loc) arg $
+         then updCtxtForArg (L arg_loc arg) $
                    thing_inside
          else do setSrcSpanA arg_loc                    $
                    addErrCtxt (FunAppCtxt (FunAppCtxtExpr fun arg) arg_no) $
                    thing_inside }
   where
-    updCtxtForArg :: SrcSpan -> HsExpr GhcRn -> TcRn a -> TcRn a
-    updCtxtForArg l@(RealSrcSpan{}) e thing_inside = -- See 2.iii above
-      do setSrcSpan l $
-           addExprCtxt e $
-           thing_inside
-    -- updCtxtForArg (UnhelpfulSpan UnhelpfulGenerated) _ thing_inside = -- See 2.i above
-    --   thing_inside
-    updCtxtForArg (UnhelpfulSpan {}) _ thing_inside = -- See 2.ii above
-      do -- setInUserCode $
-           thing_inside
+    updCtxtForArg :: LHsExpr GhcRn -> TcRn a -> TcRn a
+    updCtxtForArg e@(L lspan _) thing_inside
+      = do setSrcSpan (locA lspan) $
+             addLExprCtxt e $ -- addLExpr is no op for non-user located exprs
+             thing_inside
 
 
 

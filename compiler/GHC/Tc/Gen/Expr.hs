@@ -54,7 +54,6 @@ import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic, hasFixedRuntimeRep 
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.ErrCtxt ( srcCodeOriginErrCtxMsg )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types hiding (HoleError)
 
@@ -125,7 +124,7 @@ tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
 
 tcPolyLExpr (L loc expr) res_ty
   = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+    addLExprCtxt (L loc expr) $  -- Note [Error contexts in generated code]
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
@@ -244,7 +243,7 @@ tcInferRhoNC = tcInferExprNC IIF_DeepRho
 tcInferExpr, tcInferExprNC :: InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
 tcInferExpr iif (L loc expr)
   = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+    addLExprCtxt (L loc expr) $  -- Note [Error contexts in generated code]
     do { (expr', rho) <- runInfer iif IFRR_Any (tcExpr expr)
        ; return (L loc expr', rho) }
 
@@ -271,7 +270,7 @@ tcMonoLExpr, tcMonoLExprNC
 
 tcMonoLExpr (L loc expr) res_ty
   = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+    addLExprCtxt (L loc expr) $  -- Note [Error contexts in generated code]
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 
@@ -757,11 +756,8 @@ tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 
 tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcXExpr (ExpandedThingRn o e) res_ty
-   = addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $
-     -- e is the expanded expression of o, so we need to set the error ctxt to generated
-     -- see Note [Error Context Stack] in `GHC.Tc.Type.LclEnv`
-        mkExpandedTc o <$> -- necessary for hpc ticks
-          tcExpr e res_ty
+   = mkExpandedTc o <$> -- necessary for hpc ticks
+         tcExpr e res_ty
 
 -- For record selection, same as HsVar case
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty

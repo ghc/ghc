@@ -681,6 +681,7 @@ data SrcCodeOrigin
                -- Does not presist post renaming phase
                -- See Part 3. of Note [Expanding HsDo with XXExprGhcRn]
                -- in `GHC.Tc.Gen.Do`
+               -- INVARIANT: SHOULD NEVER APPEAR IN A ExpansionCodeCtxt in CodeSrcFlag ErrCtxt on stack
 
 data XXExprGhcRn
   = ExpandedThingRn { xrn_orig     :: SrcCodeOrigin   -- The original source thing to be used for error messages

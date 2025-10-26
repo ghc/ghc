@@ -837,7 +837,7 @@ exprCtOrigin e@(HsProjection _ _) = ExpansionOrigin (OrigExpr e)
 exprCtOrigin e@(RecordUpd{})      = ExpansionOrigin (OrigExpr e)
 exprCtOrigin e@(HsGetField{})     = ExpansionOrigin (OrigExpr e)
 exprCtOrigin (XExpr (ExpandedThingRn o _)) = ExpansionOrigin o
-exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel (foExt f)
+exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 
 srcCodeOriginCtOrigin :: HsExpr GhcRn -> Maybe SrcCodeOrigin -> CtOrigin
 srcCodeOriginCtOrigin e Nothing = exprCtOrigin e

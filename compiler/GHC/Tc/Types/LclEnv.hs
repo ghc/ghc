@@ -196,10 +196,7 @@ setLclEnvErrCtxt :: ErrCtxtStack -> TcLclEnv -> TcLclEnv
 setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
-addLclEnvErrCtxt ec@(MkErrCtxt (ExpansionCodeCtxt _) _) = setLclEnvSrcCodeOrigin ec
-addLclEnvErrCtxt ec = modifyLclCtxt (\env -> if lclCtxtInGeneratedCode env
-                                             then env -- no op if we are in generated code
-                                             else env { tcl_err_ctxt =  ec : (tcl_err_ctxt env) })
+addLclEnvErrCtxt ec = setLclEnvSrcCodeOrigin ec
 
 getLclEnvSrcCodeOrigin :: TcLclEnv -> Maybe SrcCodeOrigin
 getLclEnvSrcCodeOrigin = get_src_code_origin . tcl_err_ctxt . tcl_lcl_ctxt

@@ -63,6 +63,7 @@ data ErrCtxt = MkErrCtxt CodeSrcFlag ErrCtxtMsgM
 data CodeSrcFlag = VanillaUserSrcCode
                  | LandmarkUserSrcCode
                  | ExpansionCodeCtxt SrcCodeOrigin
+                   -- INVARIANT: SHOULD NEVER APPEAR IN A ExpansionCodeCtxt in CodeSrcFlag ErrCtxt on stack
 
 --------------------------------------------------------------------------------
 -- Error message contexts
