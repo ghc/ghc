@@ -753,6 +753,7 @@ type family XIEThingAbs        x
 type family XIEThingAll        x
 type family XIEThingWith       x
 type family XIEModuleContents  x
+type family XIEWholeNamespace  x
 type family XIEGroup           x
 type family XIEDoc             x
 type family XIEDocNamed        x

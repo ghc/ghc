@@ -201,8 +201,30 @@ instance Diagnostic TcRnMessage where
     TcRnDodgyImports (DodgyImportsHiding reason)
       -> mkSimpleDecorated $
          pprImportLookup reason
-    TcRnDodgyExports gre
+    TcRnDodgyImports (DodgyImportsWildcard mod_name ns_spec)
+      -> mkDecorated
+          [ text "The wildcard import" <+> quotes ppr_wc <+> text "does not bring any names into scope"
+          , let hdr = text "The module" <+> quotes (ppr mod_name) <+> text "does not export any"
+            in fsep $ hdr : pprNamespaceItems ns_spec
+          ]
+      where
+        ppr_wc = ppr ns_spec <+> text ".."
+
+    TcRnDodgyExports (DodgyExportsEmptyParent gre)
       -> mkDecorated [dodgy_msg (text "export") gre (dodgy_msg_insert gre)]
+    TcRnDodgyExports (DodgyExportsNullModule mod)
+      -> mkSimpleDecorated
+       $ formatExportItemError
+           (text "module" <+> ppr mod)
+           "exports nothing"
+    TcRnDodgyExports (DodgyExportsWildcard mod ns_spec)
+      -> mkDecorated
+          [ text "The wildcard export" <+> quotes ppr_wc <+> text "does not match any names"
+          , let hdr = text "The module" <+> quotes (ppr mod) <+> text "does not define any"
+            in fsep $ hdr : pprNamespaceItems ns_spec
+          ]
+      where
+        ppr_wc = ppr ns_spec <+> text ".."
     TcRnMissingImportList ie
       -> mkDecorated [ text "The import item" <+> quotes (ppr ie) <+>
                        text "does not have an explicit import list"
@@ -621,16 +643,15 @@ instance Diagnostic TcRnMessage where
            hsep [ text "Duplicate"
                 , quotes (text "module" <+> ppr mod)
                 , text "in export list" ]
+    TcRnDupeWildcardExport mod ns
+      -> mkSimpleDecorated $
+           text "Duplicate wildcard" <+> quotes (ppr ns <+> text "..")
+           $$ text "in the export list of module" <+> quotes (ppr mod)
     TcRnExportedModNotImported mod
       -> mkSimpleDecorated
        $ formatExportItemError
            (text "module" <+> ppr mod)
            "is not imported"
-    TcRnNullExportedModule mod
-      -> mkSimpleDecorated
-       $ formatExportItemError
-           (text "module" <+> ppr mod)
-           "exports nothing"
     TcRnMissingExportList mod
       -> mkSimpleDecorated
        $ formatExportItemError
@@ -2220,10 +2241,10 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnDupeModuleExport{}
       -> WarningWithFlag Opt_WarnDuplicateExports
+    TcRnDupeWildcardExport{}
+      -> WarningWithFlag Opt_WarnDuplicateExports
     TcRnExportedModNotImported{}
       -> ErrorWithoutFlag
-    TcRnNullExportedModule{}
-      -> WarningWithFlag Opt_WarnDodgyExports
     TcRnMissingExportList{}
       -> WarningWithFlag Opt_WarnMissingExportList
     TcRnExportHiddenDefault{}
@@ -2891,9 +2912,9 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnDupeModuleExport{}
       -> noHints
-    TcRnExportedModNotImported{}
+    TcRnDupeWildcardExport{}
       -> noHints
-    TcRnNullExportedModule{}
+    TcRnExportedModNotImported{}
       -> noHints
     TcRnMissingExportList{}
       -> noHints
@@ -3693,6 +3714,17 @@ dodgy_msg_insert :: GlobalRdrElt -> IE GhcRn
 dodgy_msg_insert tc_gre = IEThingAll (Nothing, noAnn) ii Nothing
   where
     ii = noLocA (IEName noExtField $ noLocA $ greName tc_gre)
+
+pprNamespaceItems :: NamespaceSpecifier -> [SDoc]
+pprNamespaceItems ns_spec = case ns_spec of
+  NoNamespaceSpecifier -> [text "names"]
+  TypeNamespaceSpecifier{} ->
+    [text "types,", text "classes,",
+     text "or other names", text "in the type namespace"]
+  DataNamespaceSpecifier{} ->
+    [text "data constructors,", text "functions,", text "constants,",
+     text "field selectors,", text "pattern synonyms,",
+     text "or other names", text "in the data namespace"]
 
 pprTypeDoesNotHaveFixedRuntimeRep :: Type -> FixedRuntimeRepProvenance -> SDoc
 pprTypeDoesNotHaveFixedRuntimeRep ty prov =

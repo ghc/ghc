@@ -292,6 +292,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrDeclSpliceNotAtTopLevel"                  = 08451
   GhcDiagnosticCode "PsErrMultipleNamesInStandaloneKindSignature"   = 42569
   GhcDiagnosticCode "PsErrIllegalExplicitNamespace"                 = 47007
+  GhcDiagnosticCode "PsErrPlainWildcardImport"                      = 96821
+  GhcDiagnosticCode "PsErrPlainWildcardExport"                      = 96822
   GhcDiagnosticCode "PsErrUnallowedPragma"                          = 85314
   GhcDiagnosticCode "PsErrImportPostQualified"                      = 87491
   GhcDiagnosticCode "PsErrImportQualifiedTwice"                     = 05661
@@ -439,7 +441,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnTypeDoesNotHaveFixedRuntimeRep"            = 18478
   GhcDiagnosticCode "TcRnImplicitLift"                              = 00846
   GhcDiagnosticCode "TcRnUnusedPatternBinds"                        = 61367
-  GhcDiagnosticCode "TcRnDodgyExports"                              = 75356
   GhcDiagnosticCode "TcRnMissingImportList"                         = 77037
   GhcDiagnosticCode "TcRnUnsafeDueToPlugin"                         = 01687
   GhcDiagnosticCode "TcRnModMissingRealSrcSpan"                     = 84170
@@ -502,8 +503,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnPatSynBundledWithNonDataCon"               = 66775
   GhcDiagnosticCode "TcRnPatSynBundledWithWrongType"                = 66025
   GhcDiagnosticCode "TcRnDupeModuleExport"                          = 51876
+  GhcDiagnosticCode "TcRnDupeWildcardExport"                        = 34992
   GhcDiagnosticCode "TcRnExportedModNotImported"                    = 90973
-  GhcDiagnosticCode "TcRnNullExportedModule"                        = 64649
   GhcDiagnosticCode "TcRnMissingExportList"                         = 85401
   GhcDiagnosticCode "TcRnExportHiddenComponents"                    = Outdated 94558
   GhcDiagnosticCode "TcRnExportHiddenDefault"                       = 74775
@@ -795,6 +796,12 @@ type family GhcDiagnosticCode c = n | n -> c where
 
   -- TcRnDodgyImports/DodgyImportsReason
   GhcDiagnosticCode "DodgyImportsEmptyParent"                       = 99623
+  GhcDiagnosticCode "DodgyImportsWildcard"                          = 52986
+
+  -- TcRnDodgyExports/DodgyExportsReason
+  GhcDiagnosticCode "DodgyExportsEmptyParent"                       = 75356
+  GhcDiagnosticCode "DodgyExportsNullModule"                        = 64649
+  GhcDiagnosticCode "DodgyExportsWildcard"                          = 09224
 
   -- TcRnImportLookup/ImportLookupReason
   GhcDiagnosticCode "ImportLookupQualified"                         = 48795
@@ -1091,6 +1098,7 @@ type family ConRecursInto con where
   ConRecursInto "TcRnClassExtensionDisabled" = 'Just DisabledClassExtension
   ConRecursInto "TcRnTyFamsDisabled"       = 'Just TyFamsDisabledReason
   ConRecursInto "TcRnDodgyImports"         = 'Just DodgyImportsReason
+  ConRecursInto "TcRnDodgyExports"         = 'Just DodgyExportsReason
   ConRecursInto "DodgyImportsHiding"       = 'Just ImportLookupReason
   ConRecursInto "TcRnImportLookup"         = 'Just ImportLookupReason
   ConRecursInto "TcRnUnusedImport"         = 'Just UnusedImportReason

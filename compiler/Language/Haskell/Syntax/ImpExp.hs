@@ -129,6 +129,14 @@ data IE pass
         -- @
         -- module Mod ( module Mod2 )
         -- @
+  | IEWholeNamespace (XIEWholeNamespace pass)
+        -- ^ Import or export of an entire namespace of the current module.
+        --
+        -- @
+        -- module Mod ( type .., data .. )
+        -- import Mod ( type .. ) as T       -- type constructors (incl. classes and associated types)
+        -- import Mod ( data .. ) as D       -- data constructors and terms (incl. operators and field selectors)
+        -- @
   | IEGroup (XIEGroup pass) Int (LHsDoc pass)
         -- ^ A Haddock section in an export list.
         --

@@ -1262,8 +1262,8 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
         where
 
             -- Warn when importing T(..) and no children are brought in scope
-            warning_msg (DodgyImport n) =
-              pure (TcRnDodgyImports (DodgyImportsEmptyParent n))
+            warning_msg (DodgyImport reason) =
+              pure (TcRnDodgyImports reason)
             warning_msg MissingImportList =
               pure (TcRnMissingImportList ieRdr)
             warning_msg (BadImportW ie sub) = do
@@ -1328,7 +1328,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
                   | null child_gres
                   -- e.g. f(..) or T(..) where T is a type synonym
-                  = [DodgyImport gre]
+                  = [DodgyImport (DodgyImportsEmptyParent gre)]
 
                   -- e.g. import M( T(..) )
                   | not (is_qual decl_spec)
@@ -1396,6 +1396,19 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                      ,gres)]
                   , bad_import_warns ++ export_depr_warns)
 
+        IEWholeNamespace (_, ns_spec, _) -> do
+          let mod_name   = moduleName import_mod
+              names      = map greName gres
+              renamed_ie = IEWholeNamespace (Nothing, ns_spec, names)
+              gres = filter (coveredByNamespaceSpecifier ns_spec . greNameSpace) $
+                     gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)
+              imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
+              dodgy_warn
+                | null gres = [DodgyImport (DodgyImportsWildcard mod_name ns_spec)]
+                | otherwise = []
+          return ([(renamed_ie, gres)],
+                  dodgy_warn)
+
         _other -> failLookupWith IllegalImport
         -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed...
         -- all of those constitute errors.
@@ -1438,7 +1451,7 @@ type IELookupM = MaybeErr IELookupError
 data IELookupWarning
   = BadImportW (IE GhcPs) IsSubordinateError
   | MissingImportList
-  | DodgyImport GlobalRdrElt
+  | DodgyImport DodgyImportsReason
   | DeprecatedExport Name (WarningTxt GhcRn)
 
 -- | Is this import/export item a subordinate or not?
@@ -1990,6 +2003,7 @@ findImportUsage imports used_gres
                 add_wc_all = case wc of
                             NoIEWildcard -> id
                             IEWildcard _ -> add_unused_all pn
+        add_unused (IEWholeNamespace (_, _, names)) acc = add_unused_wildcard names acc
         add_unused _ acc = acc
 
         add_unused_name :: Name -> Bool -> UnusedNames -> UnusedNames
@@ -2024,6 +2038,15 @@ findImportUsage imports used_gres
         -- If you use 'signum' from Num, then the user may well have
         -- imported Num(signum).  We don't want to complain that
         -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
+
+        add_unused_wildcard :: [Name] -> UnusedNames -> UnusedNames
+        add_unused_wildcard names acc@(UnusedNames acc_ns acc_fs)
+          | any_used = acc
+          | otherwise = UnusedNames (acc_ns `extendNameSetList` names) acc_fs
+          where
+            -- A wildcard `type ..` or `data ..` is used if at least one of
+            -- the names it expands to is used
+            any_used = any (isJust . lookupGRE_Name used_gre_env) names
 
 
 -- | An accumulator for unused names in an import list.

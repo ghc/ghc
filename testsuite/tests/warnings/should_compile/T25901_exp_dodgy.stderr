@@ -1,0 +1,11 @@
+T25901_exp_dodgy.hs:3:26: warning: [GHC-09224] [-Wdodgy-exports (in -Wextra)]
+    • The wildcard export ‘type ..’ does not match any names
+    • The module ‘T25901_exp_dodgy’ does not define any types, classes,
+      or other names in the type namespace
+
+T25901_exp_dodgy.hs:3:35: warning: [GHC-09224] [-Wdodgy-exports (in -Wextra)]
+    • The wildcard export ‘data ..’ does not match any names
+    • The module ‘T25901_exp_dodgy’ does not define any
+      data constructors, functions, constants, field selectors,
+      pattern synonyms, or other names in the data namespace
+
