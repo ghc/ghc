@@ -8,6 +8,7 @@ module GHC.Toolchain.Utils
     , oneOf
     , oneOf'
     , isSuccess
+    , lastLine
     ) where
 
 import Control.Exception
@@ -65,3 +66,6 @@ isSuccess = \case
   ExitSuccess -> True
   ExitFailure _ -> False
 
+lastLine :: String -> String
+lastLine "" = ""
+lastLine s  = last $ lines s
