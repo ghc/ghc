@@ -1048,6 +1048,16 @@ export  :: { LIE GhcPs }
         | maybe_warning_pragma 'default' qtycon          {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
                                                           ; locImpExp <- return (sL span (IEThingAbs $1 (sLLa $2 $> (IEDefault (epTok $2) $3)) Nothing))
                                                           ; return $ reLoc $ locImpExp } }
+        | maybe_warning_pragma 'type' '..'               {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
+                                                          ; locImpExp <- mkWholeTypeWcImpExp span $1 (epTok $2) (epTok $3)
+                                                          ; return $ reLoc locImpExp } }
+        | maybe_warning_pragma 'data' '..'               {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
+                                                          ; locImpExp <- mkWholeDataWcImpExp span $1 (epTok $2) (epTok $3)
+                                                          ; return $ reLoc locImpExp } }
+        | maybe_warning_pragma '..'                      {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
+                                                          ; addError $ mkPlainErrorMsgEnvelope (comb2 $1 $2) PsErrPlainWildcardExport
+                                                          ; locImpExp <- mkPlainWcImpExp $1 (epTok $2)
+                                                          ; return $ reLoc locImpExp } }
 
 
 export_subspec :: { Located ((EpToken "(", EpToken ")"), ImpExpSubSpec) }
@@ -1227,6 +1237,11 @@ import  :: { OrdList (LIE GhcPs) }
         | 'module' modid            {% fmap (unitOL . reLoc) $ return (sLL $1 $> (IEModuleContents (Nothing, (epTok $1)) $2)) }
         | 'pattern' qcon            {% do { warnPatternNamespaceSpecifier (getLoc $1)
                                           ; return $ unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (epTok $1) $2)) Nothing } }
+        | 'type' '..'               {% fmap (unitOL . reLoc) $ mkWholeTypeWcImpExp (comb2 $1 $>) Nothing (epTok $1) (epTok $2) }
+        | 'data' '..'               {% fmap (unitOL . reLoc) $ mkWholeDataWcImpExp (comb2 $1 $>) Nothing (epTok $1) (epTok $2) }
+        | '..'                      {% do { addError $ mkPlainErrorMsgEnvelope (gl $1) PsErrPlainWildcardImport
+                                          ; lie <- mkPlainWcImpExp Nothing (epTok $1)
+                                          ; return $ unitOL (reLoc lie) } }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations

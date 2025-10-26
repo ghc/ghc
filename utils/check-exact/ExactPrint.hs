@@ -4593,6 +4593,12 @@ instance ExactPrint (IE GhcPs) where
     m' <- markAnnotated m
     return (IEModuleContents (depr', an0) m')
 
+  exact (IEWholeNamespace (depr, ns_spec, tk_wc)) = do
+    depr' <- markAnnotated depr
+    ns_spec' <- markAnnotated ns_spec
+    tk_wc' <- markEpToken tk_wc
+    return (IEWholeNamespace (depr', ns_spec', tk_wc'))
+
   -- These three exist to not error out, but are no-ops The contents
   -- appear as "normal" comments too, which we process instead.
   exact (IEGroup x lev doc) = do

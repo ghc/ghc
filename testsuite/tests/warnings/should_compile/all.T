@@ -54,6 +54,9 @@ test('T19564d', normal, compile, [''])
 # Also, suppress uniques as one of the warnings is unstable in CI, otherwise.
 test('T19296', normal, compile, ['-fdiagnostics-show-caret -Wredundant-constraints -dsuppress-uniques'])
 test('DodgyExports01', normal, compile, ['-Wdodgy-exports'])
+test('T25901_exp_dodgy', normal, compile, ['-Wdodgy-exports'])
+test('T25901_exp_dup_wc_1', normal, compile, ['-Wduplicate-exports'])
+test('T25901_exp_dup_wc_2', normal, compile, ['-Wduplicate-exports'])
 test('DerivingTypeable', normal, compile, ['-Wderiving-typeable'])
 test('T18862a', normal, compile, [''])
 test('T18862b', normal, compile, [''])
@@ -74,3 +77,7 @@ test('T24396', [extra_files(["T24396a.hs", "T24396b.hs"])], multimod_compile, ['
 test('SpecMultipleTys', normal, compile, ['']) # compile_fail from GHC 9.18
 test('DuplicateModExport', normal, compile, ['-Wduplicate-exports'])
 test('EmptyModExport', normal, compile, ['-Wdodgy-exports'])
+test('T25901_imp_unused_1', normal, compile, ['-Wunused-imports'])
+test('T25901_imp_unused_2', normal, compile, ['-Wunused-imports'])
+test('T25901_imp_dodgy_1', [extra_files(['T25901_dodgy_helper_1.hs'])], multimod_compile, ['T25901_imp_dodgy_1', '-v0 -Wdodgy-imports'])
+test('T25901_imp_dodgy_2', [extra_files(['T25901_dodgy_helper_2.hs'])], multimod_compile, ['T25901_imp_dodgy_2', '-v0 -Wdodgy-imports'])

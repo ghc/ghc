@@ -2286,6 +2286,7 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
       IEModuleContents _ n ->
         [ toHie $ IEC c n
         ]
+      IEWholeNamespace _ -> []
       IEGroup _ _ d -> [toHie d]
       IEDoc _ d -> [toHie d]
       IEDocNamed _ _ -> []

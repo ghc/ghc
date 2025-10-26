@@ -35,6 +35,7 @@ import GHC.Types.Name
 import GHC.Types.PkgQual
 
 import GHC.Parser.Annotation
+import GHC.Hs.Basic
 import GHC.Hs.Extension
 
 import GHC.Utils.Outputable
@@ -267,6 +268,12 @@ type instance XIEModuleContents  GhcPs = (Maybe (LWarningTxt GhcPs), EpToken "mo
 type instance XIEModuleContents  GhcRn = Maybe (LWarningTxt GhcRn)
 type instance XIEModuleContents  GhcTc = NoExtField
 
+type instance XIEWholeNamespace  GhcPs = (Maybe (LWarningTxt GhcPs), NamespaceSpecifier, EpToken "..")
+type instance XIEWholeNamespace  GhcRn = (Maybe (LWarningTxt GhcRn), NamespaceSpecifier, [Name])
+  -- The list [Name] stores the names that the `..` expands to;
+  -- it determines whether to emit -Wunused-imports and/or -Wdodgy-imports
+type instance XIEWholeNamespace  GhcTc = NamespaceSpecifier
+
 type instance XIEGroup           (GhcPass _) = NoExtField
 type instance XIEDoc             (GhcPass _) = NoExtField
 type instance XIEDocNamed        (GhcPass _) = NoExtField
@@ -284,11 +291,16 @@ ieLIEWrappedName _ = panic "ieLIEWrappedName failed pattern match!"
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)
 ieName = lieWrappedName . ieLIEWrappedName
 
-ieNames :: IE (GhcPass p) -> [IdP (GhcPass p)]
+ieNames :: forall p. IsPass p => IE (GhcPass p) -> [IdP (GhcPass p)]
 ieNames (IEVar       _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingAbs  _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingAll  _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingWith _ (L _ n) _ ns _) = ieWrappedName n : map (ieWrappedName . unLoc) ns
+ieNames (IEWholeNamespace x) =
+  case ghcPass @p of
+    GhcPs -> []
+    GhcRn -> let (_, _, names) = x in names
+    GhcTc -> []
 ieNames (IEModuleContents {})     = []
 ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
@@ -372,6 +384,13 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
                 in bs ++ [text ".."] ++ as
     ppr ie@(IEModuleContents _ mod')
         = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "module" <+> ppr mod']
+    ppr (IEWholeNamespace x) = ppr ns_spec <+> text ".."
+      where
+        ns_spec :: NamespaceSpecifier
+        ns_spec = case ghcPass @p of
+          GhcPs -> let (_, ns, _) = x in ns
+          GhcRn -> let (_, ns, _) = x in ns
+          GhcTc -> x
     ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")
     ppr (IEDoc _ doc)             = ppr doc
     ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")

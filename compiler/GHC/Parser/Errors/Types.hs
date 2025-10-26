@@ -215,6 +215,12 @@ data PsMessage
    -- | Explicit namespace keyword without 'ExplicitNamespaces'
    | PsErrIllegalExplicitNamespace !ExplicitNamespaceKeyword
 
+   -- | Plain top-level wildcard in an import list, e.g. @import Data.Proxy (..)@
+   | PsErrPlainWildcardImport
+
+   -- | Plain top-level wildcard in an export list, e.g. @module M (..) where@
+   | PsErrPlainWildcardExport
+
    -- | Expecting a type constructor but found a variable
    | PsErrVarForTyCon !RdrName
 

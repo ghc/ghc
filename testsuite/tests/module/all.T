@@ -292,3 +292,5 @@ test('T21752', [extra_files(['T21752A.hs', 'T21752.hs'])], multimod_compile, ['T
 test('TupleTyConUserSyntax', [extra_files(['TupleTyConUserSyntaxA.hs', 'TupleTyConUserSyntax.hs'])], multimod_compile, ['TupleTyConUserSyntax', '-v0'])
 test('T21826', normal, compile_fail, [''])
 test('T20007', normal, compile_fail, [''])
+test('T25901_imp_plain_wc', normal, compile_fail, [''])
+test('T25901_exp_plain_wc', normal, compile_fail, [''])

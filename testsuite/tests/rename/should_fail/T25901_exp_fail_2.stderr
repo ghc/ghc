@@ -1,0 +1,40 @@
+T25901_exp_fail_2.hs:5:34: error: [GHC-61689]
+    Module ‘T25901_exp_fail_2_helper’ does not export ‘data m’.
+
+T25901_exp_fail_2.hs:5:42: error: [GHC-61689]
+    Module ‘T25901_exp_fail_2_helper’ does not export ‘data E’.
+
+T25901_exp_fail_2.hs:5:50: error: [GHC-61689]
+    Module ‘T25901_exp_fail_2_helper’ does not export ‘data f’.
+
+T25901_exp_fail_2.hs:5:58: error: [GHC-61689]
+    Module ‘T25901_exp_fail_2_helper’ does not export ‘data f2’.
+
+T25901_exp_fail_2.hs:6:34: error: [GHC-56449]
+    In the import of ‘T25901_exp_fail_2_helper’:
+      an item called ‘D’ is exported, but it is a type.
+    Suggested fix:
+      Remove the ‘data’ keyword from the import statement:
+        import T25901_exp_fail_2_helper ( D )
+
+T25901_exp_fail_2.hs:6:42: error: [GHC-61689]
+    Module ‘T25901_exp_fail_2_helper’ does not export ‘data D2’.
+    Suggested fix: Perhaps use type constructor or class ‘D’
+
+T25901_exp_fail_2.hs:6:51: error: [GHC-61689]
+    Module ‘T25901_exp_fail_2_helper’ does not export ‘data v’.
+
+T25901_exp_fail_2.hs:6:59: error: [GHC-56449]
+    In the import of ‘T25901_exp_fail_2_helper’:
+      an item called ‘K’ is exported, but it is a type.
+    Suggested fix:
+      Remove the ‘data’ keyword from the import statement:
+        import T25901_exp_fail_2_helper ( K )
+
+T25901_exp_fail_2.hs:6:67: error: [GHC-56449]
+    In the import of ‘T25901_exp_fail_2_helper’:
+      an item called ‘K1’ is exported, but it is a type.
+    Suggested fix:
+      Remove the ‘data’ keyword from the import statement:
+        import T25901_exp_fail_2_helper ( K1 )
+

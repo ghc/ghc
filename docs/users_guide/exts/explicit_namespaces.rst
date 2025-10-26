@@ -118,6 +118,36 @@ The ``pattern`` keyword does the same, with only a few differences:
 The ``data`` keyword is preferred over ``pattern`` in import/export lists unless
 there is a need to support older GHC versions.
 
+Wildcards in import/export lists
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Since:** GHC 9.16
+
+Namespace-specified wildcards ``type ..`` and ``data ..`` may be used to import
+all names in the corresponding namespace from a module: ::
+
+  import M (type ..) -- imports all type and class constructors from M
+  import M (data ..) -- imports all data constructors and terms from M
+
+The primary intended use of this feature is in combination with module aliases,
+allowing namespace disambiguation: ::
+
+  import Data.Proxy as T (type ..)  -- T.Proxy is unambiguously the type constructor
+  import Data.Proxy as D (data ..)  -- D.Proxy is unambiguously the data constructor
+
+Using both wildcards ``import M (type .., data ..)`` is legal but redundant, as
+it is equivalent to ``import M`` with no import list.
+
+Similarly, one may use wildcards in the export list of a module: ::
+
+  module M (type .., f) where
+    -- exports all type and class constructors defined in M,
+    -- plus the function 'f'
+
+Using both wildcards ``module M (type .., data ..)`` is legal but redundant, as
+it is equivalent to a whole module reexport ``module M (module M)``.
+
+
 Explicit namespaces in fixity declarations and warning/deprecation pragmas
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

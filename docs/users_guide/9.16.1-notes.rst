@@ -16,6 +16,9 @@ Language
   result, you may need to enable :extension:`DataKinds` in code that did not
   previously require it.
 
+- The extension :extension:`ExplicitNamespaces` now allows namespace-specified
+  wildcards ``type ..`` and ``data ..`` in import and export lists.
+
 Compiler
 ~~~~~~~~
 

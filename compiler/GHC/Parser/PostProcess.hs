@@ -82,6 +82,9 @@ module GHC.Parser.PostProcess (
         mkPlainImpExp,
         mkTypeImpExp,
         mkDataImpExp,
+        mkWholeTypeWcImpExp,
+        mkWholeDataWcImpExp,
+        mkPlainWcImpExp,
         mkImpExpSubSpec,
         checkImportSpec,
         warnPatternNamespaceSpecifier,
@@ -3315,6 +3318,33 @@ mkDataImpExp tok name = do
   let ns_kw = ExplicitDataNamespace tok
   requireExplicitNamespaces ns_kw
   return (ImpExpQcName (Just ns_kw) name)
+
+mkWholeTypeWcImpExp :: SrcSpan
+                    -> Maybe (LWarningTxt GhcPs)
+                    -> EpToken "type"
+                    -> EpToken ".."
+                    -> P (LIE GhcPs)
+mkWholeTypeWcImpExp loc warning tk_ns tk_wc = do
+  requireExplicitNamespaces (ExplicitTypeNamespace tk_ns)
+  let ie_spec = IEWholeNamespace (warning, TypeNamespaceSpecifier tk_ns, tk_wc)
+  return (L (noAnnSrcSpan loc) ie_spec)
+
+mkWholeDataWcImpExp :: SrcSpan
+                    -> Maybe (LWarningTxt GhcPs)
+                    -> EpToken "data"
+                    -> EpToken ".."
+                    -> P (LIE GhcPs)
+mkWholeDataWcImpExp loc warning tk_ns tk_wc = do
+  requireExplicitNamespaces (ExplicitDataNamespace tk_ns)
+  let ie_spec = IEWholeNamespace (warning, DataNamespaceSpecifier tk_ns, tk_wc)
+  return (L (noAnnSrcSpan loc) ie_spec)
+
+mkPlainWcImpExp :: Maybe (LWarningTxt GhcPs)
+                -> EpToken ".."
+                -> P (LIE GhcPs)
+mkPlainWcImpExp warning tk_wc = do
+  let ie_spec = IEWholeNamespace (warning, NoNamespaceSpecifier, tk_wc)
+  return (L (l2l tk_wc) ie_spec)
 
 checkImportSpec :: LocatedLI [LIE GhcPs] -> P (LocatedLI [LIE GhcPs])
 checkImportSpec ie@(L _ specs) =

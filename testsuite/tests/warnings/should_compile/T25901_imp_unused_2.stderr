@@ -1,0 +1,4 @@
+T25901_imp_unused_2.hs:6:32: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
+    The import of ‘KProxy, Proxy, asProxyTypeOf’
+    from module ‘Data.Proxy’ is redundant
+
