@@ -35,13 +35,11 @@ module ExactPrint
 
 import GHC
 import GHC.Base (NonEmpty(..))
-import GHC.Core.Coercion.Axiom (Role(..))
 import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.TypeLits
 import GHC.Types.Basic hiding (EP)
-import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.Name.Reader
 import GHC.Types.PkgQual
@@ -52,8 +50,6 @@ import GHC.Unit.Module.Warnings
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad (forM, when, unless)
 import Control.Monad.Identity (Identity(..))

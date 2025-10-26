@@ -129,8 +129,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.BooleanFormula (pprBooleanFormulaNice)
 
-import Language.Haskell.Syntax.Basic (field_label, FieldLabelString (..))
-
 import Control.Monad (guard)
 import qualified Data.Semigroup as S
 import Data.List.NonEmpty (NonEmpty(..))

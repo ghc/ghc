@@ -72,7 +72,6 @@ import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
-import GHC.Types.Fixity
 import GHC.Types.Id
 import GHC.Types.SourceFile
 import GHC.Types.SourceText

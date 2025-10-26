@@ -79,7 +79,6 @@ import GHC.Types.ForeignCall
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.SourceText
-import GHC.Types.Fixity
 import GHC.Types.TyThing
 import GHC.Types.Name hiding( varName, tcName )
 import GHC.Types.Name.Env
@@ -88,8 +87,6 @@ import GHC.TypeLits
 import Data.Kind (Constraint)
 
 import qualified GHC.LanguageExtensions as LangExt
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.ByteString ( unpack )
 import Control.Monad

@@ -81,8 +81,6 @@ import GHC.Utils.Panic
 
 import GHC.Data.List.SetOps
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import Control.Monad
 import Data.Foldable
 import Data.Function

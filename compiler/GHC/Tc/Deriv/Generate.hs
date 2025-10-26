@@ -91,8 +91,6 @@ import GHC.Data.Bag
 import GHC.Data.Maybe ( expectJust )
 import GHC.Unit.Module
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import Data.List  ( find, partition, intersperse )
 
 -- | A declarative description of an auxiliary binding that should be

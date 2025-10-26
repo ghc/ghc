@@ -85,8 +85,6 @@ import GHC.Utils.Misc( HasDebugCallStack, nTimes )
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import qualified Data.Kind as Hs
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (isNothing)

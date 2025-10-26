@@ -44,7 +44,6 @@ import GHC.Iface.Env    ( newGlobalBinder )
 
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Name.Reader
-import GHC.Types.Fixity
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
@@ -61,8 +60,6 @@ import GHC.Utils.Misc
 
 import GHC.Driver.DynFlags
 import GHC.Data.FastString
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad (mplus)
 import Data.List (zip4, partition)
