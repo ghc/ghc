@@ -1,0 +1,3 @@
+T25901_imp_unused_2.hs:6:1: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
+    The import of ‘data ..’ from module ‘Data.Proxy’ is redundant
+

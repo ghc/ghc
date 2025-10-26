@@ -1,0 +1,5 @@
+T25901_imp_unused_1.hs:5:1: warning: [GHC-66111] [-Wunused-imports (in -Wextra)]
+    The import of ‘Data.Proxy’ is redundant
+      except perhaps to import instances from ‘Data.Proxy’
+    To import instances alone, use: import Data.Proxy()
+

@@ -1,0 +1,12 @@
+T25901_imp_sq_fail_3.hs:9:5: error: [GHC-01928]
+    • Data constructor out of scope: ‘T.Proxy’.
+      NB: the type constructor ‘T.Proxy’ cannot appear in this position.
+    • In the expression: T.Proxy
+      In an equation for ‘h’: h = T.Proxy
+    Suggested fixes:
+      • Perhaps use one of these:
+          ‘D.Proxy’ (imported from Data.Proxy),
+          ‘D.KProxy’ (imported from Data.Proxy)
+      • Add ‘Proxy’ to the import list in the import of ‘Data.Proxy’
+        (at T25901_imp_sq_fail_3.hs:5:1-42).
+

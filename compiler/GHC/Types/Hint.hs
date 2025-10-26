@@ -420,11 +420,21 @@ data GhcHint
   -}
   | ImportSuggestion OccName ImportSuggestion
 
+  {-| Suggest to remove an explicit import list, i.e. to use @import M@
+      as opposed to @import M (a, b)@.
+  -}
+  | SuggestRemoveImportList
+
   {-| Suggest to change an export item, e.g. to remove a namespace specifier.
 
       Test cases: T12488a, T12488a_foo, T12488e, T12488g, T25899e2
   -}
   | SuggestChangeExportItem ExportItemSuggestion
+
+  {-| Suggest to use a named module self-export of the form
+      @module M (module M) where@.
+  -}
+  | SuggestNamedModuleSelfExport
 
   {-| Found a pragma in the body of a module, suggest placing it in the header.
   -}

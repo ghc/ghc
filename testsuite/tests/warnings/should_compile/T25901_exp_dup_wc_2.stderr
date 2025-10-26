@@ -1,0 +1,4 @@
+T25901_exp_dup_wc_2.hs:3:38: warning: [GHC-34992] [-Wduplicate-exports (in -Wdefault)]
+    Duplicate wildcard ‘data ..’
+    in the export list of module ‘T25901_exp_dup_wc_2’
+

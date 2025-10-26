@@ -1,0 +1,6 @@
+T25901_exp_dup_wc_3.hs:4:34: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
+    ‘D1’ is exported by ‘type ..’ and ‘D1’
+
+T25901_exp_dup_wc_3.hs:4:43: warning: [GHC-47854] [-Wduplicate-exports (in -Wdefault)]
+    ‘D2’ is exported by ‘D2’ and ‘type ..’
+

@@ -27,6 +27,9 @@ Language
 
   which was previously rejected with "Conflicting family instance declarations".
 
+- The extension :extension:`ExplicitNamespaces` now allows namespace-specified
+  wildcards ``type ..`` and ``data ..`` in import and export lists.
+
 Compiler
 ~~~~~~~~
 

@@ -1,0 +1,6 @@
+T25901_imp_plain_wc.hs:3:20: error: [GHC-96821]
+    Illegal plain wildcard (..) in a module import
+    Suggested fix:
+      To import all available names from a module,
+      omit the explicit import list entirely
+

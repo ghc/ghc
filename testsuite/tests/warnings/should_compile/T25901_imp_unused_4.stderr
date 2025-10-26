@@ -1,0 +1,4 @@
+T25901_imp_unused_4.hs:7:41: warning: [GHC-38856] [-Wunused-imports (in -Wextra)]
+    The import of ‘type .., asProxyTypeOf’
+    from module ‘Data.Proxy’ is redundant
+
