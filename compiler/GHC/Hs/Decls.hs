@@ -121,11 +121,11 @@ import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Core.Coercion
 
+import GHC.Hs.Basic
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Fixity
 
 -- others:
 import GHC.Utils.Misc (count)

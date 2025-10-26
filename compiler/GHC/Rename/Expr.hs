@@ -75,8 +75,6 @@ import GHC.Data.Maybe
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import Control.Monad
 import qualified Data.Foldable as Partial (maximum)
 import Data.List (unzip4)

@@ -45,7 +45,6 @@ import GHC.Types.Var
 import GHC.Unit
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import Language.Haskell.Syntax.Basic
 
 data Synchronicity = Sync | Async
   deriving (Eq)

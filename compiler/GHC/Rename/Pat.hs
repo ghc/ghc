@@ -65,7 +65,6 @@ import GHC.Rename.HsType
 import GHC.Builtin.Names
 
 import GHC.Types.Hint
-import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader

@@ -6,7 +6,6 @@ module GHC.Parser.Errors.Types where
 
 import GHC.Prelude
 
-import GHC.Core.TyCon (Role)
 import GHC.Data.FastString
 import GHC.Hs
 import GHC.Parser.Types

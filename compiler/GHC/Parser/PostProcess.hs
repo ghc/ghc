@@ -134,7 +134,7 @@ import GHC.Hs           -- Lots of it
 import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import GHC.Core.DataCon        ( DataCon, dataConTyCon, dataConName )
 import GHC.Core.ConLike        ( ConLike(..) )
-import GHC.Core.Coercion.Axiom ( Role, fsFromRole )
+import GHC.Core.Coercion.Axiom ( fsFromRole )
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Basic
@@ -169,8 +169,6 @@ import qualified Data.Semigroup as Semi
 import GHC.Unit.Module.Warnings
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP

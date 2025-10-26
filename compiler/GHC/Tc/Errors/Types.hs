@@ -234,7 +234,7 @@ import GHC.Core.FamInstEnv (FamInst)
 import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst, DFunId)
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
-import GHC.Core.TyCon (TyCon, Role, FamTyConFlav, AlgTyConRhs)
+import GHC.Core.TyCon (TyCon, FamTyConFlav, AlgTyConRhs)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType, ForAllTyFlag, ForAllTyBinder)
 
 import GHC.Driver.Backend (Backend)
@@ -247,8 +247,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString (FastString)
 import GHC.Data.Pair
 import GHC.Exception.Type (SomeException)
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
