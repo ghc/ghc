@@ -8,6 +8,7 @@ import System.Process
 import GHC.Platform.ArchOS
 
 import GHC.Toolchain.Prelude
+import GHC.Toolchain.Utils (lastLine)
 import GHC.Toolchain.Tools.Cc
 
 -- | Awkwardly, ARM triples sometimes contain insufficient information about
@@ -74,10 +75,6 @@ findArmIsa cc = do
           "True" -> return True
           "False" -> return False
           _ -> throwE $ "unexpected output from test program: " ++ out
-
-lastLine :: String -> String
-lastLine "" = ""
-lastLine s  = last $ lines s
 
 -- | Raspbian unfortunately makes some extremely questionable packaging
 -- decisions, configuring gcc to compile for ARMv6 despite the fact that the

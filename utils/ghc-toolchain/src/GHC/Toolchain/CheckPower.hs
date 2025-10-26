@@ -3,6 +3,7 @@ module GHC.Toolchain.CheckPower ( checkPowerAbi ) where
 import GHC.Platform.ArchOS
 
 import GHC.Toolchain.Prelude
+import GHC.Toolchain.Utils (lastLine)
 import GHC.Toolchain.Tools.Cc
 
 -- 64-Bit ELF V2 ABI Specification, Power Architecture, Revision 1.5 says:
@@ -26,8 +27,3 @@ checkPowerAbi cc = do
       "ELFv1" -> pure $ ArchPPC_64 ELF_V1
       "ELFv2" -> pure $ ArchPPC_64 ELF_V2
       _       -> throwE $ "unexpected output from test program: " ++ out
-
--- TODO: move lastLine to a common location
-lastLine :: String -> String
-lastLine "" = ""
-lastLine s  = last $ lines s
