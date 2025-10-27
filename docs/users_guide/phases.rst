@@ -951,7 +951,7 @@ for example).
 
     Link external system libraries statically when building an executable.
     By default, this excludes the following libraries: ``c``, ``m``, ``rt``, ``dl``, ``pthread``.
-    Also see :ghc-flag:`-exclude-static-external` for more control.
+    Also see :ghc-flag:`-exclude-static-external ⟨lib1,lib2,...⟩` for more control.
     It is required that all system dependencies and their
     static libraries are installed. This does not affect how Haskell libraries
     are linked. You can combine this with ghc-flag:`-static` to produce binaries
@@ -965,7 +965,7 @@ for example).
     To control how Haskell libraries are linked, see :ghc-flag:`-static` and
     :ghc-flag:`-dynamic`.
 
-.. ghc-flag:: -exclude-static-external <lib1,lib2,...>
+.. ghc-flag:: -exclude-static-external ⟨lib1,lib2,...⟩
     :shortdesc: Don't link the following libraries statically
     :type: dynamic
     :category: linking
