@@ -13,7 +13,11 @@ module GHC.SysTools.Tasks
   , runSourceCodePreprocessor
   , runPp
   , runCc
+  , configureCc
+  , CcConfig (..)
+  , configureLd
   , askLd
+  , LdConfig(..)
   , runAs
   , runLlvmOpt
   , runLlvmLlc
@@ -22,10 +26,20 @@ module GHC.SysTools.Tasks
   , figureLlvmVersion
   , runMergeObjects
   , runAr
+  , ArConfig (..)
+  , configureAr
   , askOtool
+  , configureOtool
+  , OtoolConfig (..)
   , runInstallNameTool
+  , InstallNameConfig (..)
+  , configureInstallName
   , runRanlib
+  , RanlibConfig (..)
+  , configureRanlib
   , runWindres
+  , WindresConfig (..)
+  , configureWindres
   ) where
 
 import GHC.Prelude
@@ -207,15 +221,32 @@ runPp logger dflags args = traceSystoolCommand logger "pp" $ do
       opts = map Option (getOpts dflags opt_F)
   runSomething logger "Haskell pre-processor" prog (args ++ opts)
 
+data CcConfig = CcConfig
+  { ccProg :: String
+  , cxxProg :: String
+  , ccOpts :: [String]
+  , cxxOpts :: [String]
+  , ccPicOpts :: [String]
+  }
+
+configureCc :: DynFlags -> CcConfig
+configureCc dflags = CcConfig
+  { ccProg = pgm_c dflags
+  , cxxProg = pgm_cxx dflags
+  , ccOpts = getOpts dflags opt_c
+  , cxxOpts = getOpts dflags opt_cxx
+  , ccPicOpts = picCCOpts dflags
+  }
+
 -- | Run compiler of C-like languages and raw objects (such as gcc or clang).
-runCc :: Maybe ForeignSrcLang -> Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
-runCc mLanguage logger tmpfs dflags args = traceSystoolCommand logger "cc" $ do
+runCc :: Maybe ForeignSrcLang -> Logger -> TmpFs -> TempDir -> CcConfig -> [Option] -> IO ()
+runCc mLanguage logger tmpfs tmpdir opts args = traceSystoolCommand logger "cc" $ do
   let args1 = map Option userOpts
       args2 = languageOptions ++ args ++ args1
       -- We take care to pass -optc flags in args1 last to ensure that the
       -- user can override flags passed by GHC. See #14452.
   mb_env <- getGccEnv args2
-  runSomethingResponseFile logger tmpfs (tmpDir dflags) cc_filter dbgstring prog args2
+  runSomethingResponseFile logger tmpfs tmpdir cc_filter dbgstring prog args2
                            mb_env
  where
   -- force the C compiler to interpret this file as C when
@@ -223,38 +254,49 @@ runCc mLanguage logger tmpfs dflags args = traceSystoolCommand logger "cc" $ do
   -- Also useful for plain .c files, just in case GHC saw a
   -- -x c option.
   (languageOptions, userOpts, prog, dbgstring) = case mLanguage of
-    Nothing -> ([], userOpts_c, pgm_c dflags, "C Compiler")
-    Just language -> ([Option "-x", Option languageName], opts, prog, dbgstr)
+    Nothing -> ([], ccOpts opts, ccProg opts, "C Compiler")
+    Just language -> ([Option "-x", Option languageName], copts, prog, dbgstr)
       where
-        (languageName, opts, prog, dbgstr) = case language of
-          LangC      -> ("c",             userOpts_c
-                        ,pgm_c dflags,    "C Compiler")
-          LangCxx    -> ("c++",           userOpts_cxx
-                        ,pgm_cxx dflags , "C++ Compiler")
-          LangObjc   -> ("objective-c",   userOpts_c
-                        ,pgm_c dflags   , "Objective C Compiler")
-          LangObjcxx -> ("objective-c++", userOpts_cxx
-                        ,pgm_cxx dflags,  "Objective C++ Compiler")
+        (languageName, copts, prog, dbgstr) = case language of
+          LangC      -> ("c",             ccOpts opts
+                        ,ccProg opts,    "C Compiler")
+          LangCxx    -> ("c++",           cxxOpts opts
+                        ,cxxProg opts, "C++ Compiler")
+          LangObjc   -> ("objective-c",   ccOpts opts
+                        ,ccProg opts, "Objective C Compiler")
+          LangObjcxx -> ("objective-c++", cxxOpts opts
+                        ,cxxProg opts,  "Objective C++ Compiler")
           LangAsm    -> ("assembler",     []
-                        ,pgm_c dflags,    "Asm Compiler")
+                        ,ccProg opts,    "Asm Compiler")
           RawObject  -> ("c",             []
-                        ,pgm_c dflags,    "C Compiler") -- claim C for lack of a better idea
+                        ,ccProg opts,    "C Compiler") -- claim C for lack of a better idea
           --JS backend shouldn't reach here, so we just pass
           -- strings to satisfy the totality checker
           LangJs     -> ("js",            []
-                        ,pgm_c dflags,    "JS Backend Compiler")
-  userOpts_c   = getOpts dflags opt_c
-  userOpts_cxx = getOpts dflags opt_cxx
+                        ,ccProg opts,    "JS Backend Compiler")
 
 isContainedIn :: String -> String -> Bool
 xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 
--- | Run the linker with some arguments and return the output
-askLd :: Logger -> DynFlags -> [Option] -> IO String
-askLd logger dflags args = traceSystoolCommand logger "linker" $ do
+data LdConfig = LdConfig
+  { ldProg :: String    -- ^ LD program path
+  , ldOpts :: [Option]  -- ^ LD program arguments
+  }
+
+configureLd :: DynFlags -> LdConfig
+configureLd dflags =
   let (p,args0) = pgm_l dflags
       args1     = map Option (getOpts dflags opt_l)
-      args2     = args0 ++ args1 ++ args
+  in LdConfig
+        { ldProg = p
+        , ldOpts = args0 ++ args1
+        }
+
+-- | Run the linker with some arguments and return the output
+askLd :: Logger -> LdConfig -> [Option] -> IO String
+askLd logger ld_config args = traceSystoolCommand logger "linker" $ do
+  let p     = ldProg ld_config
+      args2 = ldOpts ld_config ++ args
   mb_env <- getGccEnv args2
   runSomethingWith logger "gcc" p args2 $ \real_args ->
     readCreateProcessWithExitCode' (proc p real_args){ env = mb_env }
@@ -373,31 +415,80 @@ runMergeObjects logger tmpfs dflags args =
       else do
         runSomething logger "Merge objects" p args2
 
-runAr :: Logger -> DynFlags -> Maybe FilePath -> [Option] -> IO ()
-runAr logger dflags cwd args = traceSystoolCommand logger "ar" $ do
-  let ar = pgm_ar dflags
+newtype ArConfig = ArConfig
+  { arProg :: String
+  }
+
+configureAr :: DynFlags -> ArConfig
+configureAr dflags = ArConfig
+  { arProg = pgm_ar dflags
+  }
+
+runAr :: Logger -> ArConfig -> Maybe FilePath -> [Option] -> IO ()
+runAr logger opts cwd args = traceSystoolCommand logger "ar" $ do
+  let ar = arProg opts
   runSomethingFiltered logger id "Ar" ar args cwd Nothing
 
-askOtool :: Logger -> ToolSettings -> Maybe FilePath -> [Option] -> IO String
-askOtool logger toolSettings mb_cwd args = do
-  let otool = toolSettings_pgm_otool toolSettings
+newtype OtoolConfig = OtoolConfig
+  { otoolProg :: String
+  }
+
+configureOtool :: DynFlags -> OtoolConfig
+configureOtool dflags = OtoolConfig
+  { otoolProg = toolSettings_pgm_otool (toolSettings dflags)
+  }
+
+askOtool :: Logger -> OtoolConfig -> Maybe FilePath -> [Option] -> IO String
+askOtool logger opts mb_cwd args = do
+  let otool = otoolProg opts
   runSomethingWith logger "otool" otool args $ \real_args ->
     readCreateProcessWithExitCode' (proc otool real_args){ cwd = mb_cwd }
 
-runInstallNameTool :: Logger -> ToolSettings -> [Option] -> IO ()
-runInstallNameTool logger toolSettings args = do
-  let tool = toolSettings_pgm_install_name_tool toolSettings
+newtype InstallNameConfig = InstallNameConfig
+  { installNameProg :: String
+  }
+
+configureInstallName :: DynFlags -> InstallNameConfig
+configureInstallName dflags = InstallNameConfig
+  { installNameProg = toolSettings_pgm_install_name_tool (toolSettings dflags)
+  }
+
+runInstallNameTool :: Logger -> InstallNameConfig -> [Option] -> IO ()
+runInstallNameTool logger opts args = do
+  let tool = installNameProg opts
   runSomethingFiltered logger id "Install Name Tool" tool args Nothing Nothing
 
-runRanlib :: Logger -> DynFlags -> [Option] -> IO ()
-runRanlib logger dflags args = traceSystoolCommand logger "ranlib" $ do
-  let ranlib = pgm_ranlib dflags
+newtype RanlibConfig = RanlibConfig
+  { ranlibProg :: String
+  }
+
+configureRanlib :: DynFlags -> RanlibConfig
+configureRanlib dflags = RanlibConfig
+  { ranlibProg = pgm_ranlib dflags
+  }
+
+runRanlib :: Logger -> RanlibConfig -> [Option] -> IO ()
+runRanlib logger opts args = traceSystoolCommand logger "ranlib" $ do
+  let ranlib = ranlibProg opts
   runSomethingFiltered logger id "Ranlib" ranlib args Nothing Nothing
 
-runWindres :: Logger -> DynFlags -> [Option] -> IO ()
-runWindres logger dflags args = traceSystoolCommand logger "windres" $ do
-  let cc_args = map Option (sOpt_c (settings dflags))
-      windres = pgm_windres dflags
-      opts = map Option (getOpts dflags opt_windres)
+data WindresConfig = WindresConfig
+  { windresProg :: String
+  , windresOpts :: [Option]
+  , windresCOpts :: [Option]
+  }
+
+configureWindres :: DynFlags -> WindresConfig
+configureWindres dflags = WindresConfig
+  { windresProg = pgm_windres dflags
+  , windresOpts = map Option (getOpts dflags opt_windres)
+  , windresCOpts = map Option (sOpt_c (settings dflags))
+  }
+
+runWindres :: Logger -> WindresConfig -> [Option] -> IO ()
+runWindres logger opts args = traceSystoolCommand logger "windres" $ do
+  let cc_args = windresCOpts opts
+      windres = windresProg opts
+      wopts = windresOpts opts
   mb_env <- getGccEnv cc_args
-  runSomethingFiltered logger id "Windres" windres (opts ++ args) Nothing mb_env
+  runSomethingFiltered logger id "Windres" windres (wopts ++ args) Nothing mb_env
