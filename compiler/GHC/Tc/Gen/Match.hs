@@ -331,6 +331,7 @@ tcMatch tc_body pat_tys rhs_ty match
         add_match_ctxt thing_inside = case ctxt of
             LamAlt LamSingle -> thing_inside
             StmtCtxt (HsDoStmt{}) -> thing_inside -- this is an expanded do stmt
+            RecUpd -> thing_inside -- record update is Expanded out so ignore it
             _          -> addErrCtxt (MatchInCtxt match) thing_inside
 
 -------------
