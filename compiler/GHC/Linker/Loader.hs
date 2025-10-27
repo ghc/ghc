@@ -393,6 +393,7 @@ loadCmdLineLibs'' interp hsc_env pls =
                            , libraryPaths = lib_paths_base})
             = hsc_dflags hsc_env
       let logger = hsc_logger hsc_env
+      let ld_config = configureLd dflags
 
       -- (c) Link libraries from the command-line
       let minus_ls_1 = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
@@ -408,7 +409,7 @@ loadCmdLineLibs'' interp hsc_env pls =
                        OSMinGW32 -> "pthread" : minus_ls_1
                        _         -> minus_ls_1
       -- See Note [Fork/Exec Windows]
-      gcc_paths <- getGCCPaths logger dflags os
+      gcc_paths <- getGCCPaths logger platform ld_config
 
       lib_paths_env <- addEnvPaths "LIBRARY_PATH" lib_paths_base
 
@@ -1161,6 +1162,7 @@ loadPackage interp hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
         let logger    = hsc_logger hsc_env
+            ld_config = configureLd dflags
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic interp
             dirs      = libraryDirsForWay' is_dyn pkg
@@ -1187,7 +1189,7 @@ loadPackage interp hsc_env pkg
             extra_libs = extdeplibs ++ linkerlibs
 
         -- See Note [Fork/Exec Windows]
-        gcc_paths <- getGCCPaths logger dflags (platformOS platform)
+        gcc_paths <- getGCCPaths logger platform ld_config
         dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
 
         hs_classifieds
@@ -1404,6 +1406,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
      dflags = hsc_dflags hsc_env
      logger = hsc_logger hsc_env
      diag_opts = initDiagOpts dflags
+     ld_config = configureLd dflags
      dirs   = lib_dirs ++ gcc_dirs
      gcc    = False
      user   = True
@@ -1467,7 +1470,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
      findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $
                         findSystemLibrary interp so_name
 #endif
-     tryGcc        = let search   = searchForLibUsingGcc logger dflags
+     tryGcc        = let search   = searchForLibUsingGcc logger ld_config
 #if defined(CAN_LOAD_DLL)
                          dllpath  = liftM (fmap DLLPath)
                          short    = dllpath $ search so_name lib_dirs
@@ -1522,11 +1525,11 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib0
 #endif
      os = platformOS platform
 
-searchForLibUsingGcc :: Logger -> DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
-searchForLibUsingGcc logger dflags so dirs = do
+searchForLibUsingGcc :: Logger -> LdConfig -> String -> [FilePath] -> IO (Maybe FilePath)
+searchForLibUsingGcc logger ld_config so dirs = do
    -- GCC does not seem to extend the library search path (using -L) when using
    -- --print-file-name. So instead pass it a new base location.
-   str <- askLd logger dflags (map (FileOption "-B") dirs
+   str <- askLd logger ld_config (map (FileOption "-B") dirs
                           ++ [Option "--print-file-name", Option so])
    let file = case lines str of
                 []  -> ""
@@ -1538,10 +1541,10 @@ searchForLibUsingGcc logger dflags so dirs = do
 
 -- | Retrieve the list of search directory GCC and the System use to find
 --   libraries and components. See Note [Fork/Exec Windows].
-getGCCPaths :: Logger -> DynFlags -> OS -> IO [FilePath]
-getGCCPaths logger dflags os
-  | os == OSMinGW32 || platformArch (targetPlatform dflags) == ArchWasm32 =
-        do gcc_dirs <- getGccSearchDirectory logger dflags "libraries"
+getGCCPaths :: Logger -> Platform -> LdConfig -> IO [FilePath]
+getGCCPaths logger platform ld_config
+  | platformOS platform == OSMinGW32 || platformArch platform == ArchWasm32 =
+        do gcc_dirs <- getGccSearchDirectory logger ld_config "libraries"
            sys_dirs <- getSystemDirectories
            return $ nub $ gcc_dirs ++ sys_dirs
   | otherwise = return []
@@ -1561,13 +1564,13 @@ gccSearchDirCache = unsafePerformIO $ newIORef []
 -- which hopefully is written in an optimized manner to take advantage of
 -- caching. At the very least we remove the overhead of the fork/exec and waits
 -- which dominate a large percentage of startup time on Windows.
-getGccSearchDirectory :: Logger -> DynFlags -> String -> IO [FilePath]
-getGccSearchDirectory logger dflags key = do
+getGccSearchDirectory :: Logger -> LdConfig -> String -> IO [FilePath]
+getGccSearchDirectory logger ld_config key = do
     cache <- readIORef gccSearchDirCache
     case lookup key cache of
       Just x  -> return x
       Nothing -> do
-        str <- askLd logger dflags [Option "--print-search-dirs"]
+        str <- askLd logger ld_config [Option "--print-search-dirs"]
         let line = dropWhile isSpace str
             name = key ++ ": ="
         if null line

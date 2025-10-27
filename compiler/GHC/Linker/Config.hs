@@ -18,10 +18,13 @@ data FrameworkOpts = FrameworkOpts
 
 -- | External linker configuration
 data LinkerConfig = LinkerConfig
-  { linkerProgram     :: String           -- ^ Linker program
+  { linkerC           :: String           -- ^ C Linker program
+  , linkerCXX         :: String           -- ^ C++ Linker program
   , linkerOptionsPre  :: [Option]         -- ^ Linker options (before user options)
   , linkerOptionsPost :: [Option]         -- ^ Linker options (after user options)
   , linkerTempDir     :: TempDir          -- ^ Temporary directory to use
   , linkerFilter      :: [String] -> [String] -- ^ Output filter
+  , linkerSupportsCompactUnwind :: !Bool  -- ^ Does the linker support compact unwind
+  , linkerIsGnuLd     :: !Bool            -- ^ Is it GNU LD (used for gc-sections support)
   }
 

@@ -340,7 +340,7 @@ jsLink lc_cfg cfg logger tmpfs ar_cache out link_plan = do
 
       when link_c_sources $ do
 
-        runLink logger tmpfs (csLinkerConfig cfg) $
+        runLink logger tmpfs (csLinkerConfig cfg) False $
           [ Option "-o"
           , FileOption "" (out </> "clibs.js")
           -- Embed wasm files into a single .js file

@@ -34,7 +34,7 @@ initStgToJSConfig dflags = StgToJSConfig
   , csRuntimeAssert   = False
   -- settings
   , csContext         = initSDocContext dflags defaultDumpStyle
-  , csLinkerConfig    = initLinkerConfig dflags False -- no C++ linking
+  , csLinkerConfig    = initLinkerConfig dflags
   }
 
 -- | Default linker configuration

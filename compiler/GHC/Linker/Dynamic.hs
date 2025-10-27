@@ -12,6 +12,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Ways
 import GHC.Settings (ToolSettings(toolSettings_ldSupportsSingleModule))
+import GHC.SysTools.Tasks
 
 import GHC.Driver.Config.Linker
 import GHC.Driver.Session
@@ -104,8 +105,8 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
     pkg_framework_opts <- getUnitFrameworkOpts unit_env (map unitId pkgs)
     let framework_opts = getFrameworkOpts (initFrameworkOpts dflags) platform
 
+    let linker_config = initLinkerConfig dflags
     let require_cxx = any ((==) (PackageName (fsLit "system-cxx-std-lib")) . unitPackageName) pkgs
-    let linker_config = initLinkerConfig dflags require_cxx
 
     case os of
         OSMinGW32 -> do
@@ -116,7 +117,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                             Just s -> s
                             Nothing -> "HSdll.dll"
 
-            runLink logger tmpfs linker_config (
+            runLink logger tmpfs linker_config require_cxx (
                     map Option verbFlags
                  ++ [ Option "-o"
                     , FileOption "" output_fn
@@ -175,7 +176,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
             instName <- case dylibInstallName dflags of
                 Just n -> return n
                 Nothing -> return $ "@rpath" `combine` (takeFileName output_fn)
-            runLink logger tmpfs linker_config (
+            runLink logger tmpfs linker_config require_cxx (
                     map Option verbFlags
                  ++ [ Option "-dynamiclib"
                     , Option "-o"
@@ -207,8 +208,10 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                  ++ [ Option "-Wl,-dead_strip_dylibs", Option "-Wl,-headerpad,8000" ]
               )
             -- Make sure to honour -fno-use-rpaths if set on darwin as well; see #20004
-            when (gopt Opt_RPath dflags) $
-              runInjectRPaths logger (toolSettings dflags) pkg_lib_paths output_fn
+            when (gopt Opt_RPath dflags) $ do
+              let otool_opts = configureOtool dflags
+              let install_name_opts = configureInstallName dflags
+              runInjectRPaths logger otool_opts install_name_opts pkg_lib_paths output_fn
         _ -> do
             -------------------------------------------------------------------
             -- Making a DSO
@@ -224,7 +227,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                                 -- wasm-ld accepts --Bsymbolic instead
                                 ["-Wl,-Bsymbolic" | not unregisterised && arch /= ArchWasm32 ]
 
-            runLink logger tmpfs linker_config (
+            runLink logger tmpfs linker_config require_cxx (
                     map Option verbFlags
                  ++ libmLinkOpts platform
                  ++ [ Option "-o"

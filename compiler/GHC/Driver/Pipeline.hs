@@ -71,7 +71,7 @@ import GHC.SysTools
 import GHC.SysTools.Cpp
 import GHC.Utils.TmpFs
 
-import GHC.Linker.ExtraObj
+import GHC.Linker.Executable
 import GHC.Linker.Static
 import GHC.Linker.Static.Utils
 import GHC.Linker.Types
@@ -441,9 +441,11 @@ link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessager hpt
 
         -- Don't showPass in Batch mode; doLink will do that for us.
         case ghcLink dflags of
-          LinkExecutable blm
+          LinkExecutable _
             | backendUseJSLinker (backend dflags) -> linkJSBinary logger tmpfs fc dflags unit_env obj_files pkg_deps
-            | otherwise -> linkBinary logger tmpfs dflags blm unit_env obj_files pkg_deps
+            | otherwise -> do
+              let opts = initExecutableLinkOpts dflags
+              linkExecutable logger tmpfs opts unit_env obj_files pkg_deps
           LinkStaticLib -> linkStaticLib logger dflags unit_env obj_files pkg_deps
           LinkDynLib    -> linkDynLibCheck logger tmpfs dflags unit_env obj_files pkg_deps
           other         -> panicBadLink other
@@ -510,7 +512,8 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         if not (null lib_errs) || any (t <) lib_times
            then return $ needsRecompileBecause LibraryChanged
            else do
-            res <- checkLinkInfo logger dflags unit_env pkg_deps exe_file
+            let opts = initExecutableLinkOpts dflags
+            res <- checkLinkInfo logger opts unit_env pkg_deps exe_file
             if res
               then return $ needsRecompileBecause FlagsChanged
               else return UpToDate
@@ -581,10 +584,12 @@ doLink hsc_env o_files = do
 
   case ghcLink dflags of
     NoLink        -> return ()
-    LinkExecutable blm
+    LinkExecutable _
       | backendUseJSLinker (backend dflags)
                   -> linkJSBinary logger tmpfs fc dflags unit_env o_files []
-      | otherwise -> linkBinary logger tmpfs dflags blm unit_env o_files []
+      | otherwise -> do
+          let opts = initExecutableLinkOpts dflags
+          linkExecutable logger tmpfs opts unit_env o_files []
     LinkStaticLib -> linkStaticLib      logger       dflags unit_env o_files []
     LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []
     LinkMergedObj
