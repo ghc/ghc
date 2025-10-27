@@ -626,8 +626,12 @@ hasFixedRuntimeRep :: HasDebugCallStack
                         -- @ki@ is concrete, and @co :: ty ~# ty'@.
                         -- That is, @ty'@ has a syntactically fixed RuntimeRep
                         -- in the sense of Note [Fixed RuntimeRep].
-hasFixedRuntimeRep frr_ctxt ty =
-  checkFRR_with (fmap (fmap coToMCo) . unifyConcrete_kind (fsLit "cx") . ConcreteFRR) frr_ctxt ty
+hasFixedRuntimeRep frr_ctxt ty
+  = checkFRR_with unify_conc frr_ctxt ty
+  where
+    unify_conc frr_orig ki
+      = do { co <- unifyConcrete_kind (fsLit "cx") (ConcreteFRR frr_orig) ki
+           ; return (coToMCo co) }
 
 -- | Like 'hasFixedRuntimeRep', but we perform an eager syntactic check.
 --
