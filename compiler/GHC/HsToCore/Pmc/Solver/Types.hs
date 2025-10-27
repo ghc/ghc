@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 -- | Domain types used in "GHC.HsToCore.Pmc.Solver".
 -- The ultimate goal is to define 'Nabla', which models normalised refinement
@@ -32,7 +33,7 @@ module GHC.HsToCore.Pmc.Solver.Types (
         PmEquality(..), eqPmAltCon,
 
         -- *** Operations on 'PmLit'
-        literalToPmLit, negatePmLit, overloadPmLit,
+        literalToPmLit, negatePmLit,
         pmLitAsStringLit, coreExprAsPmLit
 
     ) where
@@ -51,13 +52,12 @@ import GHC.Core.ConLike
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc (lastMaybe)
-import GHC.Data.List.SetOps (unionLists)
 import GHC.Data.Maybe
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Types.Literal
 import GHC.Core
-import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCo.Compare( eqType, nonDetCmpType )
 import GHC.Core.Map.Expr
 import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names
@@ -69,15 +69,14 @@ import GHC.Types.CompleteMatch
 import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
                             , fractionalLitFromRational
                             , FractionalExponentBase(..))
+
 import Numeric (fromRat)
-import Data.Foldable (find)
 import Data.Ratio
+import Data.List( find )
+import qualified Data.Map as FM
 import GHC.Real (Ratio(..))
-import qualified Data.Semigroup as Semi
+import qualified Data.Semigroup as S
 
--- import GHC.Driver.Ppr
-
---
 -- * Normalised refinement types
 --
 
@@ -358,6 +357,13 @@ lookupSolution nabla x = case vi_pos (lookupVarInfo (nabla_tm_st nabla) x) of
     | Just sol <- find isDataConSolution pos -> Just sol
     | otherwise                              -> Just x
 
+
+{- *********************************************************************
+*                                                                      *
+                 PmLit and PmLitValue
+*                                                                      *
+********************************************************************* -}
+
 --------------------------------------------------------------------------------
 -- The rest is just providing an IR for (overloaded!) literals and AltCons that
 -- sits between Hs and Core. We need a reliable way to detect and determine
@@ -376,12 +382,63 @@ data PmLitValue
   = PmLitInt Integer
   | PmLitRat Rational
   | PmLitChar Char
-  -- We won't actually see PmLitString in the oracle since we desugar strings to
-  -- lists
   | PmLitString FastString
+       -- We won't actually see PmLitString in the oracle
+       -- since we desugar strings to lists
+
+  -- Overloaded literals
   | PmLitOverInt Int {- How often Negated? -} Integer
   | PmLitOverRat Int {- How often Negated? -} FractionalLit
   | PmLitOverString FastString
+
+-- | Syntactic equality.
+-- We want (Ord PmLit) so that we can use (Map PmLit x) in `PmAltConSet`
+instance Eq PmLit where
+  a == b = (a `compare` b) == EQ
+instance Ord PmLit where
+  compare = cmpPmLit
+
+cmpPmLit :: PmLit -> PmLit -> Ordering
+-- This function does "syntactic comparison":
+--   For overloaded literals, compare the type and value
+--   For non-overloaded literals, just compare the values
+-- But it treats (say)
+--    (PmLit Bool (PmLitOverInt 1))
+--    (PmLit Bool (PmLitOverInt 2))
+-- as un-equal, even through (fromInteger @Bool 1)
+-- could be the same as (fromInteger @Bool 2)
+cmpPmLit (PmLit { pm_lit_ty = t1, pm_lit_val = val1 })
+         (PmLit { pm_lit_ty = t2, pm_lit_val = val2 })
+  = case (val1,val2) of
+      (PmLitInt i1, PmLitInt i2) -> i1 `compare` i2
+      (PmLitRat r1, PmLitRat r2) -> r1 `compare` r2
+      (PmLitChar c1, PmLitChar c2) -> c1 `compare` c2
+      (PmLitString s1, PmLitString s2) -> s1 `uniqCompareFS` s2
+      (PmLitOverInt n1 i1, PmLitOverInt n2 i2) -> (n1 `compare` n2) S.<>
+                                                  (i1 `compare` i2) S.<>
+                                                  (t1 `nonDetCmpType` t2)
+      (PmLitOverRat n1 r1, PmLitOverRat n2 r2) -> (n1 `compare` n2) S.<>
+                                                  (r1 `compare` r2) S.<>
+                                                  (t1 `nonDetCmpType` t2)
+      (PmLitOverString s1, PmLitOverString s2) -> (s1 `uniqCompareFS` s2) S.<>
+                                                  (t1 `nonDetCmpType` t2)
+      (PmLitInt {},    _) -> LT
+      (PmLitRat {},    PmLitInt {})  -> GT
+      (PmLitRat {},    _)            -> LT
+      (PmLitChar {},   PmLitInt {})  -> GT
+      (PmLitChar {},   PmLitRat {})  -> GT
+      (PmLitChar {},   _)            -> LT
+      (PmLitString {}, PmLitInt {})  -> GT
+      (PmLitString {}, PmLitRat {})  -> GT
+      (PmLitString {}, PmLitChar {}) -> GT
+      (PmLitString {}, _)            -> LT
+
+      (PmLitOverString {}, _)                 -> GT
+      (PmLitOverRat {},    PmLitOverString{}) -> LT
+      (PmLitOverRat {},    _)                 -> GT
+      (PmLitOverInt {},    PmLitOverString{}) -> LT
+      (PmLitOverInt {},    PmLitOverRat{})    -> LT
+      (PmLitOverInt {},    _)                 -> GT
 
 -- | Undecidable semantic equality result.
 -- See Note [Undecidable Equality for PmAltCons]
@@ -406,7 +463,10 @@ eqPmLit :: PmLit -> PmLit -> PmEquality
 eqPmLit (PmLit t1 v1) (PmLit t2 v2)
   -- no haddock | pprTrace "eqPmLit" (ppr t1 <+> ppr v1 $$ ppr t2 <+> ppr v2) False = undefined
   | not (t1 `eqType` t2) = Disjoint
-  | otherwise            = go v1 v2
+  | otherwise            = eqPmLitValue v1 v2
+
+eqPmLitValue :: PmLitValue -> PmLitValue -> PmEquality
+eqPmLitValue v1 v2 = go v1 v2
   where
     go (PmLitInt i1)        (PmLitInt i2)        = decEquality (i1 == i2)
     go (PmLitRat r1)        (PmLitRat r2)        = decEquality (r1 == r2)
@@ -419,10 +479,6 @@ eqPmLit (PmLit t1 v1) (PmLit t2 v2)
     go (PmLitOverString s1) (PmLitOverString s2)
       | s1 == s2                                 = Equal
     go _                    _                    = PossiblyOverlap
-
--- | Syntactic equality.
-instance Eq PmLit where
-  a == b = eqPmLit a b == Equal
 
 -- | Type of a 'PmLit'
 pmLitType :: PmLit -> Type
@@ -445,34 +501,47 @@ eqConLike (PatSynCon psc1)  (PatSynCon psc2)
   = Equal
 eqConLike _                 _                 = PossiblyOverlap
 
+
+{- *********************************************************************
+*                                                                      *
+                 PmAltCon and PmAltConSet
+*                                                                      *
+********************************************************************* -}
+
 -- | Represents the head of a match against a 'ConLike' or literal.
 -- Really similar to 'GHC.Core.AltCon'.
 data PmAltCon = PmAltConLike ConLike
               | PmAltLit     PmLit
 
-data PmAltConSet = PACS !(UniqDSet ConLike) ![PmLit]
+data PmAltConSet = PACS !(UniqDSet ConLike)
+                        !(FM.Map PmLit PmLit)
+-- We use a (FM.Map PmLit PmLit) here, at the cost of requiring an Ord
+-- instance for PmLit, because in extreme cases the set of PmLits can be
+-- very large.  See #26514.
 
 emptyPmAltConSet :: PmAltConSet
-emptyPmAltConSet = PACS emptyUniqDSet []
+emptyPmAltConSet = PACS emptyUniqDSet FM.empty
 
 isEmptyPmAltConSet :: PmAltConSet -> Bool
-isEmptyPmAltConSet (PACS cls lits) = isEmptyUniqDSet cls && null lits
+isEmptyPmAltConSet (PACS cls lits)
+  = isEmptyUniqDSet cls && FM.null lits
 
 -- | Whether there is a 'PmAltCon' in the 'PmAltConSet' that compares 'Equal' to
 -- the given 'PmAltCon' according to 'eqPmAltCon'.
 elemPmAltConSet :: PmAltCon -> PmAltConSet -> Bool
 elemPmAltConSet (PmAltConLike cl) (PACS cls _   ) = elementOfUniqDSet cl cls
-elemPmAltConSet (PmAltLit lit)    (PACS _   lits) = elem lit lits
+elemPmAltConSet (PmAltLit lit)    (PACS _   lits) = isJust (FM.lookup lit lits)
 
 extendPmAltConSet :: PmAltConSet -> PmAltCon -> PmAltConSet
 extendPmAltConSet (PACS cls lits) (PmAltConLike cl)
   = PACS (addOneToUniqDSet cls cl) lits
 extendPmAltConSet (PACS cls lits) (PmAltLit lit)
-  = PACS cls (unionLists lits [lit])
+  = PACS cls (FM.insert lit lit lits)
 
 pmAltConSetElems :: PmAltConSet -> [PmAltCon]
 pmAltConSetElems (PACS cls lits)
-  = map PmAltConLike (uniqDSetToList cls) ++ map PmAltLit lits
+  = map PmAltConLike (uniqDSetToList cls) ++
+    FM.foldr ((:) . PmAltLit) [] lits
 
 instance Outputable PmAltConSet where
   ppr = ppr . pmAltConSetElems

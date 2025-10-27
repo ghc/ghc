@@ -1,4 +1,3 @@
-
 pmcOrPats.hs:10:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘g’: Patterns of type ‘T’, ‘U’ not matched: A W
@@ -18,7 +17,7 @@ pmcOrPats.hs:15:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
 pmcOrPats.hs:17:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘z’:
-        Patterns of type ‘a’ not matched: p where p is not one of {3, 1, 2}
+        Patterns of type ‘a’ not matched: p where p is not one of {1, 2, 3}
 
 pmcOrPats.hs:19:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
@@ -43,3 +42,4 @@ pmcOrPats.hs:21:1: warning: [GHC-61505]
       • Patterns reported as unmatched might actually be matched
     Suggested fix:
       Increase the limit or resolve the warnings to suppress this message.
+

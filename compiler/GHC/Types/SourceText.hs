@@ -188,6 +188,7 @@ data FractionalLit = FL
     }
     deriving (Data, Show)
   -- The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on
+  -- Eq and Ord instances are done explicitly
 
 -- See Note [FractionalLit representation] in GHC.HsToCore.Match.Literal
 data FractionalExponentBase
