@@ -864,12 +864,13 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
                                    , ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
         do { let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
-           ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
+           ; (arg_co, arg_ty_frr) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
+           ; let arg_sty_frr = Scaled mult arg_ty_frr
            ; (wrap_res, result) <- check (n_req - 1)
-                                         (mkCheckExpFunPatTy (Scaled mult arg_ty) : rev_pat_tys)
+                                         (mkCheckExpFunPatTy arg_sty_frr : rev_pat_tys)
                                          res_ty
            ; let wrap_arg = mkWpCastN arg_co
-                 fun_wrap = mkWpFun wrap_arg wrap_res (Scaled mult arg_ty) res_ty
+                 fun_wrap = mkWpFun wrap_arg wrap_res arg_sty_frr res_ty
                  -- mkWpFun: see Note [Smart contructor for WpFun] in GHC.Tc.Types.Evidence
            ; return (fun_wrap, result) }
 
@@ -1457,7 +1458,7 @@ tcSubTypeSigma :: CtOrigin       -- where did the actual type arise / why are we
                -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- External entry point, but no ExpTypes on either side
 -- Checks that actual <= expected
--- Returns HsWrapper :: actual ~ expected
+-- Returns HsWrapper :: actual ~> expected
 tcSubTypeSigma orig ctxt ty_actual ty_expected
   = tc_sub_type (unifyType Nothing) orig ctxt ty_actual ty_expected
 
@@ -1766,48 +1767,48 @@ to get:
 
 Then fun_wrap = mkWpFun arg_wrap res_wrap.
 
-Wrinkle [Representation-polymorphism checking during subtyping]
+Note [Representation-polymorphism checking during subtyping]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When doing deep subsumption in `tc_subtype_deep`, looking under function arrows,
+we would usually build a `WpFun` HsWrapper.  When desugared, we get eta-expansion:
 
-  Inserting a WpFun HsWrapper amounts to impedance matching in deep subsumption
-  via eta-expansion:
+  f  ==>  \(x :: exp_arg). res_wrap [ f (arg_wrap [x]) ]
 
-    f  ==>  \ (x :: exp_arg) -> res_wrap [ f (arg_wrap [x]) ]
+Since we produce a lambda, we must enforce the representation polymorphism
+invariants described in Note [Representation polymorphism invariants] in GHC.Core.
+That is, we must ensure that both
+   - x (the lambda binder), and
+   - (arg_wrap [x]) (the function argument)
+have a fixed runtime representation.
 
-  As we produce a lambda, we must enforce the representation polymorphism
-  invariants described in Note [Representation polymorphism invariants] in GHC.Core.
-  That is, we must ensure that both x (the lambda binder) and (arg_wrap [x]) (the function argument)
-  have a fixed runtime representation.
+But we don't /always/ need to produce a `WpFun`: if both argument and result wrappers
+are merely coercions, we can produce a `WpCast co` instead of a `WpFun`.  In that
+case there is no eta-expansion, and hence no need for FRR checks.
 
-  Note however that desugaring mkWpFun does not always introduce a lambda: if
-  both the argument and result HsWrappers are casts, then a FunCo cast suffices,
-  in which case we should not perform representation-polymorphism checking.
+Here's a contrived example (there are undoubtedly more natural examples)
+(see testsuite/tests/rep-poly/NoEtaRequired):
 
-  This means that, in the FunTy/FunTy case of tc_sub_type_deep, we can skip
-  the representation-polymorphism checks if the produced argument and result
-  wrappers are identities or casts.
-  It is important to do so, otherwise we reject valid programs.
+    type Id :: k -> k
+    type family Id a where
 
-    Here's a contrived example (there are undoubtedly more natural examples)
-    (see testsuite/tests/rep-poly/NoEtaRequired):
+    type T :: TYPE r -> TYPE (Id r)
+    type family T a where
 
-      type Id :: k -> k
-      type family Id a where
+    test :: forall r (a :: TYPE r). a :~~: T a -> ()
+    test HRefl =
+      let
+        f :: (a -> a) -> ()
+        f _ = ()
+        g :: T a -> T a
+        g = undefined
+      in f g
 
-      type T :: TYPE r -> TYPE (Id r)
-      type family T a where
+We don't need to eta-expand `g` to make `f g` typecheck; a cast
+suffices.  Hence we should not perform representation-polymorphism
+checks; they would fail here.
 
-      test :: forall r (a :: TYPE r). a :~~: T a -> ()
-      test HRefl =
-        let
-          f :: (a -> a) -> ()
-          f _ = ()
-          g :: T a -> T a
-          g = undefined
-        in f g
-
-    We don't need to eta-expand `g` to make `f g` typecheck; a cast suffices.
-    Hence we should not perform representation-polymorphism checks; they would
-    fail here.
+All this is done by `mkWpFun_FRR`, which checks for the cast/cast case and
+returns a `FunCo` if so.
 
 Note [Setting the argument context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2068,15 +2069,26 @@ mkWpFun_FRR
   -> FunTyFlag -> Type -> TcType -> Type -- expected FunTy
   -> HsWrapper -- ^ exp_arg ~> act_arg
   -> HsWrapper -- ^ act_res ~> exp_res
-  -> TcM HsWrapper -- ^ act_funTy ~> exp_funTy
+  -> TcM HsWrapper -- ^ (act_arg->act_res) ~> (exp_arg->exp_res)
 mkWpFun_FRR unify pos act_af act_mult act_arg act_res exp_af exp_mult exp_arg exp_res arg_wrap res_wrap
-  = do { ((exp_arg_co, exp_arg_frr), (act_arg_co, _act_arg_frr)) <-
-            if needs_frr_checks
-              -- See Wrinkle [Representation-polymorphism checking during subtyping]
-            then do { exp_frr_wrap <- hasFixedRuntimeRep (frr_ctxt True ) exp_arg
-                    ; act_frr_wrap <- hasFixedRuntimeRep (frr_ctxt False) act_arg
-                    ; return (exp_frr_wrap, act_frr_wrap) }
-            else return ((mkNomReflCo exp_arg, exp_arg), (mkNomReflCo act_arg, act_arg))
+  | Just arg_co <- getWpCo_maybe arg_wrap act_arg   -- arg_co :: exp_arg ~R# act_arg
+  , Just res_co <- getWpCo_maybe res_wrap act_res   -- res_co :: act_res ~R# exp_res
+  = -- The argument and result wrappers are both hole or cast;
+    -- so we can make do with a FunCo
+    -- See Note [Representation-polymorphism checking during subtyping]
+    do { mult_co <- unify act_mult exp_mult
+       ; let the_co = mkFunCo2 Representational act_af exp_af mult_co (mkSymCo arg_co) res_co
+       ; return (mkWpCastR the_co) }
+
+  | otherwise
+  = -- We need a full WpFun, with the eta-expansion that it entails
+    -- And hence we must add fixed-runtime-rep checks so that the eta-expansion is OK
+    -- See Note [Representation-polymorphism checking during subtyping]
+    do { (exp_arg_co, exp_arg_frr)  <- hasFixedRuntimeRep (frr_ctxt True ) exp_arg
+       ; (act_arg_co, _act_arg_frr) <- hasFixedRuntimeRep (frr_ctxt False) act_arg
+       -- exp_arg_frr, act_arg_frr :: Type   have fixed runtime-reps
+       -- exp_arg_co :: exp_arg ~ exp_arg_frr      Usually Refl
+       -- act_arg_co :: act_arg ~ act_arg_frr      Usually Refl
 
          -- Enforce equality of multiplicities (not the more natural sub-multiplicity).
          -- See Note [Multiplicity in deep subsumption]
@@ -2085,46 +2097,36 @@ mkWpFun_FRR unify pos act_af act_mult act_arg act_res exp_af exp_mult exp_arg ex
            -- equality to be Refl, but it might well not be (#26332).
 
        ; let
-            exp_arg_fun_co =
+            exp_arg_fun_co =  -- (exp_arg_frr -> exp_res) ~ (exp_arg -> exp_res)
               mkFunCo Nominal exp_af
-                 (mkReflCo Nominal exp_mult)
+                 (mkNomReflCo exp_mult)
                  (mkSymCo exp_arg_co)
-                 (mkReflCo Nominal exp_res)
-            act_arg_fun_co =
+                 (mkNomReflCo exp_res)
+            act_arg_fun_co =  -- (act_arg -> act_res) ~ (act_arg_frr -> act_res)
               mkFunCo Nominal act_af
                  act_arg_mult_co
                  act_arg_co
-                 (mkReflCo Nominal act_res)
-            arg_wrap_frr =
+                 (mkNomReflCo act_res)
+            arg_wrap_frr =    -- exp_arg_frr ~> act_arg_frr
               mkWpCastN (mkSymCo exp_arg_co) <.> arg_wrap <.> mkWpCastN act_arg_co
-               --  exp_arg_co :: exp_arg ~> exp_arg_frr
-               --  act_arg_co :: act_arg ~> act_arg_frr
-               --  arg_wrap :: exp_arg ~> act_arg
-               --  arg_wrap_frr :: exp_arg_frr ~> act_arg_frr
 
-       ; return $
-            mkWpCastN exp_arg_fun_co
+       ; return $   -- Whole thing :: (act_arg->act_res) ~> (exp_arg->exp_ress)
+            mkWpCastN exp_arg_fun_co   -- (exp_ar_frr->exp_res) ~> (exp_arg->exp_res)
               <.>
             mkWpFun arg_wrap_frr res_wrap (Scaled exp_mult exp_arg_frr) exp_res
-              <.>
-            mkWpCastN act_arg_fun_co
+              <.>                       -- (act_arg_frr->act_res) ~> (exp_arg_frr->exp_res)
+            mkWpCastN act_arg_fun_co    -- (act_arg->act_res) ~> (act_arg_frr->act_res)
        }
   where
-    needs_frr_checks :: Bool
-    needs_frr_checks =
-      not (hole_or_cast arg_wrap)
-        ||
-      not (hole_or_cast res_wrap)
-    hole_or_cast :: HsWrapper -> Bool
-    hole_or_cast WpHole = True
-    hole_or_cast (WpCast {}) = True
-    hole_or_cast _ = False
+    getWpCo_maybe :: HsWrapper -> Type -> Maybe CoercionR
+    -- See if a HsWrapper is just a coercion
+    getWpCo_maybe WpHole      ty = Just (mkRepReflCo ty)
+    getWpCo_maybe (WpCast co) _  = Just co
+    getWpCo_maybe _           _  = Nothing
+
     frr_ctxt :: Bool -> FixedRuntimeRepContext
-    frr_ctxt is_exp_ty =
-      FRRDeepSubsumption
-        { frrDSExpected = is_exp_ty
-        , frrDSPosition = pos
-        }
+    frr_ctxt is_exp_ty = FRRDeepSubsumption { frrDSExpected = is_exp_ty
+                                            , frrDSPosition = pos }
 
 -----------------------
 deeplySkolemise :: SkolemInfo -> TcSigmaType
