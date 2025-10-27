@@ -285,7 +285,7 @@ topInstantiate orig sigma
   , (theta, body_ty) <- tcSplitPhiTy phi_ty
   , not (null tvs && null theta)
   = do { (subst, inst_tvs) <- newMetaTyVarsX empty_subst tvs
-           -- No need to worry about concrete tyvars here (c.f. instantiateSigma)
+           -- No need to worry about concrete tyvars here (c.f. instantiateSigmaQL)
            -- See Note [Representation-polymorphism checking built-ins]
            -- in GHC.Tc.Utils.Concrete.
 

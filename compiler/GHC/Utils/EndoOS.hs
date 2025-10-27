@@ -4,7 +4,7 @@
 --   Mostly for backwards compatibility.
 
 -- One-shot endomorphisms
--- Like GHC.Internal.Data.Semigroup.Internal.Endo, but uting
+-- Like GHC.Internal.Data.Semigroup.Internal.Endo, but using
 -- the one-shot trick from
 --    Note [The one-shot state monad trick] in  GHC.Utils.Monad.
 

@@ -648,16 +648,22 @@ There are lots of wrinkles of course:
    because we want to /gather/ the equality constraint (to put in the implication)
    rather than /emit/ them into the monad, as `wrapUnifierAndEmit` does.
 
-(SF6) We solve the nested constraints right away.  In the past we instead generated
-   an `Implication` to be solved later, but we no longer have a convenient place
-   to accumulate such an implication for later solving.  Instead we just try to solve
-   them on the spot, and abandon the attempt if we fail.
+(SF6) We solve the nested constraints right away.  In a type-correct program,
+   this attempt will usually succeed.  But if we don't completely solve it, we
+   abandon the attempt and keep the origin forall-equality.
 
-   In the latter case we are left with an unsolved (forall a. blah) ~ (forall b. blah),
-   and it may not be clear /why/ we couldn't solve it.  But on balance the error
-   messages improve: it is easier to understand that
-         (forall a. a->a) ~ (forall b. b->Int)
-   is insoluble than it is to understand a message about matching `a` with `Int`.
+   In the abandon-the-attempt case, we are left with an unsolved
+      (forall a. blah) ~ (forall b. blah)
+
+   and it may not be immediately apparent /why/ we couldn't solve it.  But actually
+   such errors messages can be /better/.  For example, it is easier to understand
+   that (forall a. a->a) ~ (forall b. b->Int) is insoluble than it is to understand a
+   message about matching `a` with `Int`, because `a` is a skolem.
+
+   Historical note: In the past we instead generated an `Implication`, storing it in
+   a dedicated field `wl_implics` in the work-list to be solved later. But that
+   plumbing was tiresome, and now we just try to solve them on the spot, and abandon
+   the attempt if we fail.
 -}
 
 {- Note [Unwrap newtypes first]
@@ -2942,15 +2948,14 @@ lookup_eq_in_qcis :: CtEvidence -> EqRel -> TcType -> TcType -> SolverStage ()
 -- Why?  See Note [Looking up primitive equalities in quantified constraints]
 -- See also GHC.Tc.Solver.Dict Note [Equality superclasses in quantified constraints]
 lookup_eq_in_qcis (CtGiven {}) _ _ _
-  = nopStage ()
+  = nopStage ()  -- Never look up Givens in quantified constraints
 
 lookup_eq_in_qcis ev@(CtWanted (WantedCt { ctev_dest = dest, ctev_loc = loc })) eq_rel lhs rhs
   = do { ev_binds_var <- simpleStage getTcEvBindsVar
        ; ics          <- simpleStage getInertCans
-       ; if null (inert_qcis ics)
+       ; if null (inert_qcis ics)          -- Shortcut common case
             || isCoEvBindsVar ev_binds_var -- See Note [Instances in no-evidence implications]
-         then -- Shortcut common case
-              nopStage ()
+         then nopStage ()
          else -- Try looking for both (lhs~rhs) anr (rhs~lhs); see #23333
               do { try NotSwapped; try IsSwapped } }
   where

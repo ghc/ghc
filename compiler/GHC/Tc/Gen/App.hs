@@ -127,7 +127,7 @@ Note [Instantiation variables are short lived]
 
   TL;DR: instantiation variables are short-lived. So it is fine for them
          to have an infinite level (=QLInstVar) because they are monomorphised
-         before do anything like skolem-escape checks.
+         before we do anything like skolem-escape checks.
 
 * The constraint solver never sees an instantiation variable
   [not quite true; see below]

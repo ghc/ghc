@@ -1084,7 +1084,7 @@ When we instantiate 'coerce' in the previous example, we obtain a substitution
 
 which we need to apply to the 'frr_type' field in order for the type variables
 in the error message to match up.
-This is done by the call to 'substConcreteTvOrigin' in 'instantiateSigma'.
+This is done by the call to 'substConcreteTvOrigin' in 'instantiateSigmaQL'.
 
 Wrinkle [Extending the substitution]
 
@@ -1094,7 +1094,7 @@ Wrinkle [Extending the substitution]
     bad2 :: forall {s} (z :: TYPE s). z -> z
     bad2 = coerce @z
 
-  Then 'instantiateSigma' will only instantiate the inferred type variable 'r'
+  Then 'instantiateSigmaQL' will only instantiate the inferred type variable 'r'
   of 'coerce', as it needs to leave 'a' un-instantiated so that the visible
   type application '@z' makes sense. In this case, we end up with a substitution
 
