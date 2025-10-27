@@ -1,5 +1,7 @@
 module GHC.Linker.Windows
-   ( maybeCreateManifest
+   ( ManifestOpts (..)
+   , initManifestOpts
+   , maybeCreateManifest
    )
 where
 
@@ -12,13 +14,28 @@ import GHC.Utils.Logger
 import System.FilePath
 import System.Directory
 
+data ManifestOpts = ManifestOpts
+  { manifestEmbed :: !Bool    -- ^ Should the manifest be embedded in the binary with Windres
+  , manifestTempdir :: TempDir
+  , manifestWindresConfig :: WindresConfig
+  , manifestObjectSuf :: String
+  }
+
+initManifestOpts :: DynFlags -> ManifestOpts
+initManifestOpts dflags = ManifestOpts
+  { manifestEmbed = gopt Opt_EmbedManifest dflags
+  , manifestTempdir = tmpDir dflags
+  , manifestWindresConfig = configureWindres dflags
+  , manifestObjectSuf = objectSuf dflags
+  }
+
 maybeCreateManifest
    :: Logger
    -> TmpFs
-   -> DynFlags
+   -> ManifestOpts
    -> FilePath      -- ^ filename of executable
    -> IO [FilePath] -- ^ extra objects to embed, maybe
-maybeCreateManifest logger tmpfs dflags exe_filename = do
+maybeCreateManifest logger tmpfs opts exe_filename = do
    let manifest_filename = exe_filename <.> "manifest"
        manifest =
          "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
@@ -42,18 +59,18 @@ maybeCreateManifest logger tmpfs dflags exe_filename = do
    -- foo.exe.manifest. However, for extra robustness, and so that
    -- we can move the binary around, we can embed the manifest in
    -- the binary itself using windres:
-   if not (gopt Opt_EmbedManifest dflags)
+   if not (manifestEmbed opts)
       then return []
       else do
-         rc_filename <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "rc"
+         rc_filename <- newTempName logger tmpfs (manifestTempdir opts) TFL_CurrentModule "rc"
          rc_obj_filename <-
-           newTempName logger tmpfs (tmpDir dflags) TFL_GhcSession (objectSuf dflags)
+           newTempName logger tmpfs (manifestTempdir opts) TFL_GhcSession (manifestObjectSuf opts)
 
          writeFile rc_filename $
              "1 24 MOVEABLE PURE \"" ++ manifest_filename ++ "\"\n"
                -- magic numbers :-)
 
-         runWindres logger dflags $ map GHC.SysTools.Option $
+         runWindres logger (manifestWindresConfig opts) $ map GHC.SysTools.Option $
                ["--input="++rc_filename,
                 "--output="++rc_obj_filename,
                 "--output-format=coff"]
