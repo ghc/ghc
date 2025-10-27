@@ -32,7 +32,7 @@ module GHC.HsToCore.Pmc.Solver.Types (
         PmEquality(..), eqPmAltCon,
 
         -- *** Operations on 'PmLit'
-        literalToPmLit, negatePmLit, overloadPmLit,
+        literalToPmLit, negatePmLit,
         pmLitAsStringLit, coreExprAsPmLit
 
     ) where
