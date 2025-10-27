@@ -197,44 +197,35 @@ that it is a no-op.  Here's our solution:
     * we /must/ optimise subtype-HsWrappers (that's the point of this Note!)
     * there is little point in attempting to optimise any other HsWrappers
 
-Note [Smart contructor for WpFun]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In `matchExpectedFunTys` (and the moribund `matchActualFunTys`) we use the smart
-constructor `mkWpFun` to optimise away a `WpFun`.  This is important (T1753b, T15105).
-Suppose we have `type instance F Int = Type`, and we are typechecking this:
-    (\x. True) :: (a :: F Int) -> a
-We cannot desugar this to
-    \(x::a::F Int). True
-because then `x` does not have a fixed runtime representation.
-See Note [Representation polymorphism invariants] in GHC.Core.
+Note [WpFun-RR-INVARIANT]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Given
+  wrap = WpFun wrap1 wrap2 sty1 ty2
+  where:  wrap1 :: exp_arg ~~> act_arg
+          wrap2 :: act_res ~~> exp_res
+          wrap  :: (act_arg -> act_res) ~~> (exp_arg -> exp_res)
+we have
+  WpFun-RR-INVARIANT:
+      the input (exp_arg) and output (act_arg) types of `wrap1`
+      both have a fixed runtime-rep
 
-So we must cast the entire lambda first.  We want to end up with
-   (\(x::(a |> kco). x) |> (FunCo co <Bool>)
-where
-  kco :: F Int ~ Type    =  ... -- From the type instance
-  co  :: (a |> kco) ~ a  =  GRefl a kco
-Note that we /cast/ the lambda with a /coercion/.  We must not
-/wrap/ it in a /WpFun/ because the latter generates a lambda that won't obey
-the runtime-rep rules.
+Reason: We desugar wrap[e] into
+    \(x:exp_arg). wrap2[ e wrap1[x] ]
+And then, because of Note [Representation polymorphism invariants], we need:
 
-The check is done by  the `hasFixedRuntimeRep` magic in `matchExpectedFunTys`.
+  * `exp_arg` must have a fixed runtime rep,
+    so that lambda obeys the the FRR rules
 
-QUESTIONS:
+  * `act_arg` must have a fixed runtime rep,
+    so the that application (e wrap1[x]) obeys the FRR tules
 
-* What happens if we can't build a cast? What error is produced, and how?
-
-* What about mkWpFun (WpCast co) (WpTyLam ...), which might arise from
-      (a :: F Int -> forall b. b->b)
-  Will we generate a cast and then a WpFun. Surely we should?
-  Test case?
-
-* I think it's really only matchExpectedFunTys that is implicated here.
-  (Apart from matchActualFunTys.)  Anything else?
+Hence WpFun-INVARIANT.
 -}
 
--- We write    wrap :: t1 ~> t2
--- if       wrap[ e::t1 ] :: t2
 data HsWrapper
+  -- NOTATION (~~>):
+  --    We write          wrap :: t1 ~~> t2
+  --    if       wrap[ e::t1 ] :: t2
   = WpHole                      -- The identity coercion
 
   | WpSubType HsWrapper
@@ -247,24 +238,25 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
        --
-       -- If wrap1 :: t2 ~> t3
-       --    wrap2 :: t1 ~> t2
-       --- Then (wrap1 `WpCompose` wrap2) :: t1 ~> t3
+       -- If wrap1 :: t2 ~~> t3
+       --    wrap2 :: t1 ~~> t2
+       --- Then (wrap1 `WpCompose` wrap2) :: t1 ~~> t3
 
   | WpFun HsWrapper HsWrapper (Scaled TcTypeFRR) TcType
        -- (WpFun wrap1 wrap2 (w, t1) t2)[e] = \(x:_w exp_arg). wrap2[ e wrap1[x] ]
-       -- So note that if  e     :: act_arg -> act_res
-       --                  wrap1 :: exp_arg ~> act_arg
-       --                  wrap2 :: act_res ~> exp_res
-       --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) ~> (exp_arg -> exp_res)
+       --
+       -- INVARIANT: both input and output types of `wrap1` have a fixed runtime-rep
+       --            See Note [WpFun-RR-INVARIANT]
+       --
+       -- Typing rules:
+       -- If    e     :: act_arg -> act_res
+       --       wrap1 :: exp_arg ~~> act_arg
+       --       wrap2 :: act_res ~~> exp_res
+       -- then   WpFun wrap1 wrap2 :: (act_arg -> act_res) ~~> (exp_arg -> exp_res)
        -- This isn't the same as for mkFunCo, but it has to be this way
        -- because we can't use 'sym' to flip around these HsWrappers
-       -- The TcType is the "from" type of the first wrapper;
-       --     it always a Type, not a Constraint
        --
-       -- NB: a WpFun is always for a (->) function arrow
-       --
-       -- Use 'mkWpFun' to construct such a wrapper.
+       -- NB: a WpFun is always for a (->) function arrow, never (=>)
 
   | WpCast TcCoercionR        -- A cast:  [] `cast` co
                               -- Guaranteed not the identity coercion
@@ -314,7 +306,7 @@ WpCast c1 <.> WpCast c2 = WpCast (c2 `mkTransCo` c1)
   --
   -- NB: <.> behaves like function composition:
   --
-  --   WpCast c1 <.> WpCast c2 :: coercionLKind c2 ~> coercionRKind c1
+  --   WpCast c1 <.> WpCast c2 :: coercionLKind c2 ~~> coercionRKind c1
   --
   -- This is thus the same as WpCast (c2 ; c1) and not WpCast (c1 ; c2).
 c1        <.> c2        = c1 `WpCompose` c2
@@ -324,25 +316,12 @@ mkWpFun :: HsWrapper -> HsWrapper
         -> TcType           -- ^ Either "from" type or "to" type of the second wrapper
                             --   (used only when the second wrapper is the identity)
         -> HsWrapper
--- ^ Smart constructor to create a 'WpFun' 'HsWrapper'
--- See Note [Smart contructor for WpFun] for why we need a smart constructor
+-- ^ Smart constructor for `WpFun`
+-- Just removes clutter and optimises some common cases.
 --
--- PRECONDITION: either:
+-- PRECONDITION: same as Note [WpFun-RR-INVARIANT]
 --
---     1. Both of the 'HsWrapper's are WpHole or WpCast.
---        In this we optimise away the WpFun entirely
--- OR
---     2. Both the "from" and "to" types of the first wrapper have a syntactically
---        fixed RuntimeRep (see Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete).
---        If we retain the WpFun (i.e. not case 1), it will desugar to a lambda
---            \x. w_res[ e w_arg[x] ]
---        To satisfy Note [Representation polymorphism invariants] in GHC.Core,
---        it must be the case that both the lambda bound variable x and the function
---        argument w_arg[x] have a fixed runtime representation, i.e. that both the
---        "from" and "to" types of the first wrapper "w_arg" have a fixed runtime
---        representation.
---
--- Unfortunately, we can't check precondition (2) with an assertion here, because of
+-- Unfortunately, we can't check PRECONDITION with an assertion here, because of
 -- [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
 mkWpFun w1 w2 st1@(Scaled m1 t1) t2
   = case (w1,w2) of
