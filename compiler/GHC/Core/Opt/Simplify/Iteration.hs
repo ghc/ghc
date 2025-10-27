@@ -4598,13 +4598,21 @@ mkLetUnfolding :: SimplEnv -> TopLevelFlag -> UnfoldingSource
                -> InId -> Bool    -- True <=> this is a join point
                -> OutExpr -> SimplM Unfolding
 mkLetUnfolding env top_lvl src id is_join new_rhs
-  = return (mkUnfolding uf_opts src is_top_lvl is_bottoming is_join new_rhs Nothing)
-            -- We make an  unfolding *even for loop-breakers*.
-            -- Reason: (a) It might be useful to know that they are WHNF
-            --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
-            --             expose the unfolding then indeed we *have* an unfolding
-            --             to expose.  (We could instead use the RHS, but currently
-            --             we don't.)  The simple thing is always to have one.
+  | is_join
+  , UnfNever <- guidance
+  = -- For large join points, don't keep an unfolding at all if it is large
+    -- This is just an attempt to keep residency under control in
+    -- deeply-nested join-point such as those arising in #26425
+    return NoUnfolding
+
+  | otherwise
+  = return (mkCoreUnfolding src is_top_lvl new_rhs Nothing guidance)
+    -- We make an  unfolding *even for loop-breakers*.
+    -- Reason: (a) It might be useful to know that they are WHNF
+    --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
+    --             expose the unfolding then indeed we *have* an unfolding
+    --             to expose.  (We could instead use the RHS, but currently
+    --             we don't.)  The simple thing is always to have one.
   where
     -- !opts: otherwise, we end up retaining all the SimpleEnv
     !uf_opts = seUnfoldingOpts env
@@ -4614,6 +4622,9 @@ mkLetUnfolding env top_lvl src id is_join new_rhs
     !is_top_lvl   = isTopLevel top_lvl
     -- See Note [Force bottoming field]
     !is_bottoming = isDeadEndId id
+
+    is_top_bottoming = is_top_lvl && is_bottoming
+    guidance         = calcUnfoldingGuidance uf_opts is_top_bottoming is_join new_rhs
 
 -------------------
 simplStableUnfolding :: SimplEnv -> BindContext
