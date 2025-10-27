@@ -28,7 +28,7 @@ module GHC.Driver.DynFlags (
         ParMakeCount(..),
         ways,
         HasDynFlags(..), ContainsDynFlags(..),
-        RtsOptsEnabled(..),
+        RtsOptsEnabled(..), haveRtsOptsFlags,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
         PackageFlag(..), PackageArg(..), ModRenaming(..),
@@ -901,6 +901,13 @@ data RtsOptsEnabled
   = RtsOptsNone | RtsOptsIgnore | RtsOptsIgnoreAll | RtsOptsSafeOnly
   | RtsOptsAll
   deriving (Show)
+
+haveRtsOptsFlags :: DynFlags -> Bool
+haveRtsOptsFlags dflags =
+        isJust (rtsOpts dflags) || case rtsOptsEnabled dflags of
+                                       RtsOptsSafeOnly -> False
+                                       _ -> True
+
 
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?
 positionIndependent :: DynFlags -> Bool

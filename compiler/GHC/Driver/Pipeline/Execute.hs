@@ -15,6 +15,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch
 import GHC.Driver.Hooks
+import GHC.Driver.DynFlags
 import Control.Monad.Trans.Reader
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Pipeline.Phases
@@ -74,7 +75,6 @@ import GHC.CmmToLlvm.Version.Type (LlvmVersion (..))
 import {-# SOURCE #-} GHC.Driver.Pipeline (compileForeign, compileEmptyStub)
 import GHC.Settings
 import System.IO
-import GHC.Linker.ExtraObj
 import GHC.Linker.Dynamic
 import GHC.Utils.Panic
 import GHC.Utils.Touch
@@ -416,6 +416,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
   let unit_env  = hsc_unit_env hsc_env
   let home_unit = hsc_home_unit_maybe hsc_env
   let tmpfs     = hsc_tmpfs hsc_env
+  let tmpdir    = tmpDir dflags
   let platform  = ue_platform unit_env
   let hcc       = cc_phase `eqPhase` HCc
 
@@ -437,7 +438,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
   let include_paths = include_paths_quote ++ include_paths_global
 
   let gcc_extra_viac_flags = extraGccViaCFlags dflags
-  let pic_c_flags = picCCOpts dflags
+  let cc_config = configureCc dflags
 
   let verbFlags = getVerbFlags dflags
 
@@ -486,14 +487,14 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
   ghcVersionH <- getGhcVersionIncludeFlags dflags unit_env
 
   withAtomicRename output_fn $ \temp_outputFilename ->
-    GHC.SysTools.runCc (phaseForeignLanguage cc_phase) logger tmpfs dflags (
+    GHC.SysTools.runCc (phaseForeignLanguage cc_phase) logger tmpfs tmpdir cc_config (
                   [ GHC.SysTools.Option "-c"
                   , GHC.SysTools.FileOption "" input_fn
                   , GHC.SysTools.Option "-o"
                   , GHC.SysTools.FileOption "" temp_outputFilename
                   ]
                  ++ map GHC.SysTools.Option (
-                    pic_c_flags
+                    (ccPicOpts cc_config)
 
                  -- See Note [Produce big objects on Windows]
                  ++ [ "-Wa,-mbig-obj"
@@ -1149,7 +1150,8 @@ joinObjectFiles hsc_env o_files output_fn
 
   | otherwise = do
   withAtomicRename output_fn $ \tmp_ar ->
-      liftIO $ runAr logger dflags Nothing $ map Option $ ["qc" ++ dashL, tmp_ar] ++ o_files
+      let ar_opts = configureAr dflags
+      in liftIO $ runAr logger ar_opts Nothing $ map Option $ ["qc" ++ dashL, tmp_ar] ++ o_files
   where
     dashLSupported = sArSupportsDashL (settings dflags)
     dashL = if dashLSupported then "L" else ""

@@ -337,7 +337,6 @@ module GHC (
 import GHC.Prelude hiding (init)
 
 import GHC.Platform
-import GHC.Platform.Ways
 
 import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
                            , isSourceFilename, startPhase )
@@ -351,7 +350,6 @@ import GHC.Driver.Backend
 import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Logger (initLogFlags)
-import GHC.Driver.Config.StgToJS (initStgToJSConfig)
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Main
 import GHC.Driver.Make
@@ -360,10 +358,11 @@ import GHC.Driver.Monad
 import GHC.Driver.Ppr
 
 import GHC.ByteCode.Types
-import qualified GHC.Linker.Loader as Loader
 import GHC.Runtime.Loader
 import GHC.Runtime.Eval
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Interpreter.Init
+import GHC.Driver.Config.Interpreter
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
 
@@ -439,10 +438,8 @@ import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
 import qualified GHC.Unit.Home.Graph as HUG
-import GHC.Settings
 
 import Control.Applicative ((<|>))
-import Control.Concurrent
 import Control.Monad
 import Control.Monad.Catch as MC
 import Data.Foldable
@@ -715,98 +712,16 @@ setTopSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setTopSessionDynFlags dflags = do
   hsc_env <- getSession
   logger  <- getLogger
-  lookup_cache  <- liftIO $ mkInterpSymbolCache
+  let platform = targetPlatform dflags
+  let unit_env = hsc_unit_env hsc_env
+  let tmpfs = hsc_tmpfs hsc_env
+  let finder_cache = hsc_FC hsc_env
+  interp_opts' <- liftIO $ initInterpOpts dflags
+  let interp_opts = interp_opts'
+                      { interpCreateProcess = createIservProcessHook (hsc_hooks hsc_env)
+                      }
 
-  -- see Note [Target code interpreter]
-  interp <- if
-#if !defined(wasm32_HOST_ARCH)
-    -- Wasm dynamic linker
-    | ArchWasm32 <- platformArch $ targetPlatform dflags
-    -> do
-        s <- liftIO $ newMVar InterpPending
-        loader <- liftIO Loader.uninitializedLoader
-        dyld <- liftIO $ makeAbsolute $ topDir dflags </> "dyld.mjs"
-        libdir <- liftIO $ last <$> Loader.getGccSearchDirectory logger dflags "libraries"
-        let profiled = ways dflags `hasWay` WayProf
-            way_tag = if profiled then "_p" else ""
-        let cfg =
-              WasmInterpConfig
-                { wasmInterpDyLD = dyld,
-                  wasmInterpLibDir = libdir,
-                  wasmInterpOpts = getOpts dflags opt_i,
-                  wasmInterpBrowser = gopt Opt_GhciBrowser dflags,
-                  wasmInterpBrowserHost = ghciBrowserHost dflags,
-                  wasmInterpBrowserPort = ghciBrowserPort dflags,
-                  wasmInterpBrowserRedirectWasiConsole = gopt Opt_GhciBrowserRedirectWasiConsole dflags,
-                  wasmInterpBrowserPuppeteerLaunchOpts = ghciBrowserPuppeteerLaunchOpts dflags,
-                  wasmInterpBrowserPlaywrightBrowserType = ghciBrowserPlaywrightBrowserType dflags,
-                  wasmInterpBrowserPlaywrightLaunchOpts = ghciBrowserPlaywrightLaunchOpts dflags,
-                  wasmInterpTargetPlatform = targetPlatform dflags,
-                  wasmInterpProfiled = profiled,
-                  wasmInterpHsSoSuffix = way_tag ++ dynLibSuffix (ghcNameVersion dflags),
-                  wasmInterpUnitState = ue_homeUnitState $ hsc_unit_env hsc_env
-                }
-        pure $ Just $ Interp (ExternalInterp $ ExtWasm $ ExtInterpState cfg s) loader lookup_cache
-#endif
-
-    -- JavaScript interpreter
-    | ArchJavaScript <- platformArch (targetPlatform dflags)
-    -> do
-         s <- liftIO $ newMVar InterpPending
-         loader <- liftIO Loader.uninitializedLoader
-         let cfg = JSInterpConfig
-              { jsInterpNodeConfig  = defaultNodeJsSettings
-              , jsInterpScript      = topDir dflags </> "ghc-interp.js"
-              , jsInterpTmpFs       = hsc_tmpfs hsc_env
-              , jsInterpTmpDir      = tmpDir dflags
-              , jsInterpLogger      = hsc_logger hsc_env
-              , jsInterpCodegenCfg  = initStgToJSConfig dflags
-              , jsInterpUnitEnv     = hsc_unit_env hsc_env
-              , jsInterpFinderOpts  = initFinderOpts dflags
-              , jsInterpFinderCache = hsc_FC hsc_env
-              }
-         return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader lookup_cache))
-
-    -- external interpreter
-    | gopt Opt_ExternalInterpreter dflags
-    -> do
-         let
-           prog = pgm_i dflags ++ flavour
-           profiled = ways dflags `hasWay` WayProf
-           dynamic  = ways dflags `hasWay` WayDyn
-           flavour
-             | profiled && dynamic = "-prof-dyn"
-             | profiled  = "-prof"
-             | dynamic   = "-dyn"
-             | otherwise = ""
-           msg = text "Starting " <> text prog
-         tr <- if verbosity dflags >= 3
-                then return (logInfo logger $ withPprStyle defaultDumpStyle msg)
-                else return (pure ())
-         let
-          conf = IServConfig
-            { iservConfProgram  = prog
-            , iservConfOpts     = getOpts dflags opt_i
-            , iservConfProfiled = profiled
-            , iservConfDynamic  = dynamic
-            , iservConfHook     = createIservProcessHook (hsc_hooks hsc_env)
-            , iservConfTrace    = tr
-            }
-         s <- liftIO $ newMVar InterpPending
-         loader <- liftIO Loader.uninitializedLoader
-         return (Just (Interp (ExternalInterp (ExtIServ (ExtInterpState conf s))) loader lookup_cache))
-
-    -- Internal interpreter
-    | otherwise
-    ->
-#if defined(HAVE_INTERNAL_INTERPRETER)
-     do
-      loader <- liftIO Loader.uninitializedLoader
-      return (Just (Interp InternalInterp loader lookup_cache))
-#else
-      return Nothing
-#endif
-
+  interp <- liftIO $ initInterpreter tmpfs logger platform finder_cache unit_env interp_opts
 
   modifySession $ \h -> hscSetFlags dflags
                         h{ hsc_IC = (hsc_IC h){ ic_dflags = dflags }
