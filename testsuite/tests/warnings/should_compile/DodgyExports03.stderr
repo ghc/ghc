@@ -1,0 +1,4 @@
+DodgyExports03.hs:4:5: warning: [GHC-75356] [-Wdodgy-exports (in -Wextra)]
+    The export item ‘MkR(..)’ suggests that
+    ‘MkR’ has children, but it is not a type constructor or a class
+

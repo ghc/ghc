@@ -1608,15 +1608,6 @@ data TcRnMessage where
   -}
   TcRnMissingExportList :: ModuleName -> TcRnMessage
 
-  {-| TcRnExportHiddenComponents is an error that occurs when an export contains
-      constructor or class methods that are not visible.
-
-      Example(s): None
-
-     Test cases: None
-  -}
-  TcRnExportHiddenComponents :: IE GhcPs -> TcRnMessage
-
   {-| TcRnExportHiddenDefault is an error that occurs when an export contains
       a class default (with language extension NamedDefaults) that is not visible.
 
