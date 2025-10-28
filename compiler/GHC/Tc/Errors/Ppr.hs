@@ -619,7 +619,7 @@ instance Diagnostic TcRnMessage where
     TcRnDupeModuleExport mod
       -> mkSimpleDecorated $
            hsep [ text "Duplicate"
-                , quotes (text "Module" <+> ppr mod)
+                , quotes (text "module" <+> ppr mod)
                 , text "in export list" ]
     TcRnExportedModNotImported mod
       -> mkSimpleDecorated

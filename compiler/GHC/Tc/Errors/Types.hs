@@ -1567,10 +1567,11 @@ data TcRnMessage where
       occurs when a module appears more than once in an export list.
 
       Example(s):
-      module Foo (module Bar, module Bar)
-      import Bar
+        module Foo (module Bar, module Bar) where
+        import Bar
 
-     Text cases: None
+      Text cases:
+        DuplicateModExport
   -}
   TcRnDupeModuleExport :: ModuleName -> TcRnMessage
 
@@ -1590,10 +1591,11 @@ data TcRnMessage where
       when an export list contains a module that has no exports.
 
       Example(s):
-      module Foo (module Bar) where
-      import Bar ()
+        module Foo (module Bar) where
+        import Bar ()
 
-     Test cases: None
+      Test cases:
+        EmptyModExport
   -}
   TcRnNullExportedModule :: ModuleName -> TcRnMessage
 

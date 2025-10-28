@@ -50,8 +50,6 @@
 [GHC-17268] is untested (constructor = TcRnCharLiteralOutOfRange)
 [GHC-36495] is untested (constructor = TcRnTagToEnumMissingValArg)
 [GHC-55868] is untested (constructor = TcRnArrowIfThenElsePredDependsOnResultTy)
-[GHC-51876] is untested (constructor = TcRnDupeModuleExport)
-[GHC-64649] is untested (constructor = TcRnNullExportedModule)
 [GHC-94558] is untested (constructor = TcRnExportHiddenComponents)
 [GHC-63055] is untested (constructor = TcRnFieldUpdateInvalidType)
 [GHC-26133] is untested (constructor = TcRnForeignImportPrimSafeAnn)
