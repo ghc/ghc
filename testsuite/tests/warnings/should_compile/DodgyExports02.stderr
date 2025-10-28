@@ -1,0 +1,10 @@
+DodgyExports02.hs:2:5: warning: [GHC-75356] [-Wdodgy-exports (in -Wextra)]
+    The export item ‘Identity(..)’ suggests that
+    ‘Identity’ has (in-scope) constructors or record fields,
+                   but it has none
+
+DodgyExports02.hs:3:5: warning: [GHC-75356] [-Wdodgy-exports (in -Wextra)]
+    The export item ‘Void(..)’ suggests that
+    ‘Void’ has (in-scope) constructors or record fields,
+               but it has none
+

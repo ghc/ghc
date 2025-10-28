@@ -526,7 +526,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
           } (L loc ie@(IEThingAll (warn_txt_ps, ann) l doc))
         = do mb_gre <- lookupGreAvailRn (ieLWrappedNameWhatLooking l) $ lieWrappedName l
              for mb_gre $ \ par -> do
-               all_kids <- lookup_ie_kids_all ie l par
+               all_kids <- lookup_ie_kids_all l par
                let name = greName par
                    all_gres = par : all_kids
                    all_names = map greName all_gres
@@ -562,7 +562,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                wc_kids <-
                  case wc of
                    NoIEWildcard -> return []
-                   IEWildcard _ -> lookup_ie_kids_all ie l par
+                   IEWildcard _ -> lookup_ie_kids_all l par
 
                let name = greName par
                    all_kids = with_kids ++ wc_kids
@@ -595,20 +595,15 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
          ; kids <- lookupChildrenExport gre child_gres sub_rdrs
          ; return (unzip kids) }
 
-    lookup_ie_kids_all :: IE GhcPs -> LIEWrappedName GhcPs -> GlobalRdrElt
+    lookup_ie_kids_all :: LIEWrappedName GhcPs -> GlobalRdrElt
                   -> RnM [GlobalRdrElt]
-    lookup_ie_kids_all ie (L _loc rdr) gre =
+    lookup_ie_kids_all (L _loc rdr) gre =
       do { let name = greName gre
                gres = findChildren kids_env name
          -- We only choose level 0 exports when filling in part of an export list implicitly.
          ; let kids_0 = mapMaybe pickLevelZeroGRE gres
          ; addUsedKids (ieWrappedName rdr) kids_0
-         ; when (null kids_0) $
-            if isTyConName name
-            then addTcRnDiagnostic (TcRnDodgyExports gre)
-            else -- This occurs when you export T(..), but
-                 -- only import T abstractly, or T is a synonym.
-                 addErr (TcRnExportHiddenComponents ie)
+         ; when (null kids_0) $ addTcRnDiagnostic (TcRnDodgyExports gre)
          ; return kids_0 }
 
     -------------
