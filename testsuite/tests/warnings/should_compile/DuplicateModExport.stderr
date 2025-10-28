@@ -1,0 +1,3 @@
+DuplicateModExport.hs:1:38: warning: [GHC-51876] [-Wduplicate-exports (in -Wdefault)]
+    Duplicate ‘module L’ in export list
+

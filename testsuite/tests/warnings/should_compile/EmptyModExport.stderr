@@ -1,0 +1,3 @@
+EmptyModExport.hs:1:24: warning: [GHC-64649] [-Wdodgy-exports (in -Wextra)]
+    The export item ‘module L’ exports nothing
+
