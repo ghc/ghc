@@ -24,5 +24,4 @@ testForeign = do
 pureFunction :: Int -> Int -> Int
 pureFunction x y = x + y
 
-$(addForeignFilePath LangC "BytecodeForeign.c" >> return [])
 

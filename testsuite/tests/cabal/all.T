@@ -43,6 +43,14 @@ test('pkg_bytecode_foreign', [extra_files(['bytecode_foreign.pkg', "BytecodeFore
                              , normalise_errmsg_fun(normaliseDynlibNames, ignore_warnings)
                              , copy_files], makefile_test, [])
 
+test('pkg_bytecode_with_o', [extra_files(['bytecode_foreign.pkg', "BytecodeForeign.hs", "BytecodeForeign.c", "bytecode_foreign.script"])
+                               , normalise_errmsg_fun(normaliseDynlibNames, ignore_warnings)
+                               , copy_files], makefile_test, [])
+
+test('pkg_bytecode_with_gbc', [extra_files(['bytecode_foreign.pkg', "BytecodeForeign.hs", "BytecodeForeign.c", "bytecode_foreign.script"])
+                               , normalise_errmsg_fun(normaliseDynlibNames, ignore_warnings)
+                               , copy_files], makefile_test, [])
+
 # Test that we *can* compile a module that also belongs to a package
 # (this was disallowed in GHC 6.4 and earlier)
 test('pkg01', normal, compile, [''])

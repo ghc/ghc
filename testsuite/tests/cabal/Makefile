@@ -313,7 +313,38 @@ pkg_bytecode_foreign :
 	$(LOCAL_GHC_PKG08) init $(PKGCONF08)
 	mkdir outdir
 	mv BytecodeForeign.hs outdir/
+	echo '$$(addForeignFilePath LangC "BytecodeForeign.c" >> return [])' >> outdir/BytecodeForeign.hs
 	mv BytecodeForeign.c outdir/
 	cd outdir && $(TEST_HC) -bytecodelib -hisuf=dyn_hi -dynamic -o testpkg-1.2.3.4-XXX.bytecode BytecodeForeign.hs -fbyte-code -fwrite-interface -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX
 	$(LOCAL_GHC_PKG09) register --force bytecode_foreign.pkg
 	cat bytecode_foreign.script | $(TEST_HC) $(TEST_HC_OPTS_INTERACTIVE) -package testpkg -package-db $(PKGCONF09)
+
+# Test that bytecode generation works by first compiling C to .o, then passing .o to GHC
+PKGCONF10=bytecode_with_o.package.conf
+LOCAL_GHC_PKG10 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF10)
+pkg_bytecode_with_o :
+	$(LOCAL_GHC_PKG10) init $(PKGCONF10)
+	mkdir outdir
+	mv BytecodeForeign.hs outdir/
+	mv BytecodeForeign.c outdir/
+	cd outdir && $(TEST_HC) -c BytecodeForeign.c
+	cd outdir && $(TEST_HC) -bytecodelib -hisuf=dyn_hi -dynamic -o testpkg-1.2.3.4-XXX.bytecode BytecodeForeign.hs BytecodeForeign.o -fbyte-code -fwrite-interface -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX
+	$(LOCAL_GHC_PKG10) register --force bytecode_foreign.pkg
+	cat bytecode_foreign.script | $(TEST_HC) $(TEST_HC_OPTS_INTERACTIVE) -package testpkg -package-db $(PKGCONF10)
+
+# Test that bytecode generation works by first compiling C to .o and Haskell to .gbc independently
+PKGCONF11=bytecode_with_gbc.package.conf
+LOCAL_GHC_PKG11 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF11)
+pkg_bytecode_with_gbc :
+	$(LOCAL_GHC_PKG11) init $(PKGCONF11)
+	mkdir outdir
+	mv BytecodeForeign.hs outdir/
+	mv BytecodeForeign.c outdir/
+	cd outdir && $(TEST_HC) -c BytecodeForeign.c
+	cd outdir && $(TEST_HC) BytecodeForeign.hs -fbyte-code -fwrite-interface -hisuf=dyn_hi -dynamic -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX -o BytecodeForeign.gbc
+	cd outdir && $(TEST_HC) -bytecodelib -hisuf=dyn_hi -dynamic -o testpkg-1.2.3.4-XXX.bytecode BytecodeForeign.gbc BytecodeForeign.o
+	$(LOCAL_GHC_PKG11) register --force bytecode_foreign.pkg
+	cat bytecode_foreign.script | $(TEST_HC) $(TEST_HC_OPTS_INTERACTIVE) -package testpkg -package-db $(PKGCONF11)
+
+
+

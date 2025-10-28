@@ -1,0 +1,4 @@
+when making flags consistent: warning: [GHC-74335] [-Winconsistent-flags]
+    Byte-code linking does not currently support linking an executable, enabling -no-link
+
+testpkg-1.2.3.4: cannot find any of ["libtestpkg-1.2.3.4-XXX.a","libtestpkg-1.2.3.4-XXX_p.a","libtestpkg-1.2.3.4-XXX-ghc9.15.20251010.so","libtestpkg-1.2.3.4-XXX_p-ghc9.15.20251010.so","libtestpkg-1.2.3.4-XXX-ghc9.15.20251010.dylib","libtestpkg-1.2.3.4-XXX_p-ghc9.15.20251010.dylib","testpkg-1.2.3.4-XXX-ghc9.15.20251010.dll","testpkg-1.2.3.4-XXX_p-ghc9.15.20251010.dll"] on library path (ignoring)

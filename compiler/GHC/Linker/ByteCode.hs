@@ -9,13 +9,17 @@ import GHC.Driver.Env
 import GHC.Utils.Outputable
 import GHC.Linker.Loader
 import qualified Data.ByteString as BS
+import Data.List (partition)
+import GHC.Driver.Phases (isObjectFilename)
 
 
 linkBytecodeLib :: HscEnv -> [ModuleByteCode] -> IO ()
 linkBytecodeLib hsc_env gbcs = do
   let dflags = hsc_dflags hsc_env
   -- The .gbc files from the command line
-  let bytecodeObjects = [f | FileOption _ f <- ldInputs dflags]
+  let fileArguments = [f | FileOption _ f <- ldInputs dflags]
+
+  let (objectFiles, bytecodeObjects) = partition (isObjectFilename (targetPlatform dflags)) fileArguments
 
   let logger = hsc_logger hsc_env
   let allFiles = (map text bytecodeObjects) ++ [ angleBrackets (text "in-memory" <+>  ppr (gbc_module bco)) | bco <- gbcs ]
@@ -28,7 +32,7 @@ linkBytecodeLib hsc_env gbcs = do
 
   let (all_cbcs, foreign_stubs) = unzip [ (bs, fs) | ModuleByteCode _m bs fs <- on_disk_bcos ++ gbcs]
 
-  foreign_stub_lib <- mkDynLoadLib hsc_env id [] [{-TODO-}] (concat foreign_stubs)
+  foreign_stub_lib <- mkDynLoadLib hsc_env id [] [{-TODO-}] (concat foreign_stubs ++ objectFiles)
 
   fc <- case foreign_stub_lib of
     Just (fp, _, _) -> do
