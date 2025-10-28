@@ -636,11 +636,6 @@ instance Diagnostic TcRnMessage where
        $ formatExportItemError
            (text "module" <+> ppr mod)
            "is missing an export list"
-    TcRnExportHiddenComponents export_item
-      -> mkSimpleDecorated
-       $ formatExportItemError
-           (ppr export_item)
-           "attempts to export constructors or class methods that are not visible here"
     TcRnExportHiddenDefault export_item
       -> mkSimpleDecorated
        $ formatExportItemError
@@ -2231,8 +2226,6 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnDodgyExports
     TcRnMissingExportList{}
       -> WarningWithFlag Opt_WarnMissingExportList
-    TcRnExportHiddenComponents{}
-      -> ErrorWithoutFlag
     TcRnExportHiddenDefault{}
       -> ErrorWithoutFlag
     TcRnDuplicateExport{}
@@ -2903,8 +2896,6 @@ instance Diagnostic TcRnMessage where
     TcRnNullExportedModule{}
       -> noHints
     TcRnMissingExportList{}
-      -> noHints
-    TcRnExportHiddenComponents{}
       -> noHints
     TcRnExportHiddenDefault{}
       -> noHints
