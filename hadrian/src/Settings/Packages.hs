@@ -108,6 +108,12 @@ packageArgs = do
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
 
+        , package ghc_stack_profiler ? mconcat
+          [ builder (Cabal Flags) ? mconcat
+            [ arg "-use-ghc-trace-events"
+            ]
+          ]
+
         ---------------------------------- ghc ---------------------------------
         , package ghc ? mconcat
           [ builder Ghc ? mconcat
@@ -116,6 +122,7 @@ packageArgs = do
 
           , builder (Cabal Flags) ? mconcat
             [ (expr (ghcWithInterpreter stage)) `cabalFlag` "internal-interpreter"
+            , notStage0 `cabalFlag` "sampleTracer"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.

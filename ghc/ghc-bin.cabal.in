@@ -27,6 +27,11 @@ Flag threaded
     Default: True
     Manual: True
 
+Flag sampleTracer
+    Description: Whether we instrument the ghc binary with sample tracer when the eventlog is enabled
+    Default: False
+    Manual: True
+
 Executable ghc
     Default-Language: GHC2021
 
@@ -44,6 +49,10 @@ Executable ghc
                    transformers >= 0.5 && < 0.7,
                    ghc-boot      == @ProjectVersionMunged@,
                    ghc           == @ProjectVersionMunged@
+
+    if flag(sampleTracer)
+        build-depends: ghc-stack-profiler
+        CPP-OPTIONS: -DSAMPLE_TRACER
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.15
