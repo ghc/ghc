@@ -17,12 +17,14 @@ import GHC.Unit.Info
 import GHC.Unit.State
 import GHC.Unit.Env
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import qualified GHC.Data.ShortText as ST
 
 import GHC.Settings
 
 import Control.Monad
+import Data.List (nub)
 import Data.Semigroup ( Semigroup(..) )
 import System.Directory
 import System.FilePath
@@ -72,11 +74,15 @@ collectLinkOpts namever ways mExecutableLinkMode ps = do
             dynamicLinkOpts = map ("-l" ++) dynamicLibs
         staticLinkOpts <- if supportsVerbatim
                           then pure (map (\d -> "-l:lib" ++ d ++ ".a") staticLibs)
-                          else do fmap mconcat $ forM staticLibs $ \l ->
-                                   filterM doesFileExist
+                          else do forM staticLibs $ \l -> do
+                                   archives <- filterM doesFileExist
                                      [ searchPath </> ("lib" ++ l ++ ".a")
-                                     | searchPath <- (ordNub . filter notNull . map ST.unpack . unitLibraryDirsStatic $ pc)
+                                     | searchPath <- (nub . filter notNull . map ST.unpack . unitLibraryDirsStatic $ pc)
                                      ]
+                                   case archives of
+                                     [] -> throwGhcExceptionIO (ProgramError $ "Failed to find static archive of " ++ show l)
+                                     -- prefer the "last" as is the canonical way for linker options
+                                     xs -> pure $ last xs
         pure (staticLinkOpts ++ dynamicLinkOpts)
     | Just (FullyStatic, _) <- mExecutableLinkMode
     = pure . map ("-l" ++) . map ST.unpack . unitExtDepLibsStaticSys $ pc
