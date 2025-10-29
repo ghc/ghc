@@ -80,6 +80,7 @@ import GHC.Iface.Errors.Ppr
 import GHC.Driver.Session.Mode
 import GHC.Driver.Session.Lint
 import GHC.Driver.Session.Units
+import GHC.Driver.Monad
 
 -- Standard Haskell libraries
 import System.IO
@@ -91,6 +92,17 @@ import Control.Monad.Trans.Except (throwE, runExceptT)
 import Data.List ( isPrefixOf, partition, intercalate )
 import Prelude
 import qualified Data.List.NonEmpty as NE
+#if defined(SAMPLE_TRACER)
+import qualified Sampler
+#endif
+
+runWithSampleProfiler :: IO () -> IO ()
+runWithSampleProfiler =
+#if defined(SAMPLE_TRACER)
+  Sampler.withSampleProfiler 10000 {- Every 10 ms -}
+#else
+  id
+#endif
 
 -----------------------------------------------------------------------------
 -- ToDo:
@@ -153,7 +165,8 @@ main = do
                             ShowGhciUsage          -> showGhciUsage dflags
                             PrintWithDynFlags f    -> putStrLn (f dflags)
                 Right postLoadMode ->
-                    main' postLoadMode units dflags argv3 flagWarnings
+                  reifyGhc $ \session -> runWithSampleProfiler $
+                      reflectGhc (main' postLoadMode units dflags argv3 flagWarnings) session
 
 main' :: PostLoadMode -> [String] -> DynFlags -> [Located String] -> [Warn]
       -> Ghc ()

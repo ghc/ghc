@@ -124,3 +124,6 @@
 [submodule "libraries/template-haskell-quasiquoter"]
 	path = libraries/template-haskell-quasiquoter
 	url = https://gitlab.haskell.org/ghc/template-haskell-quasiquoter.git
+[submodule "eventlog-live-profiling-prototype"]
+	path = eventlog-live-profiling-prototype
+	url = git@gitlab.well-typed.com:well-typed/eventlog-live-profiling-prototype.git

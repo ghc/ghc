@@ -13,6 +13,7 @@ module Packages (
     transformers, unlit, unix, win32, xhtml,
     lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
     ghcPackages, isGhcPackage,
+    ghc_sampler_eventlog,
 
     -- * Package information
     crossPrefix, programName, nonHsMainPackage, programPath, timeoutPath,
@@ -43,7 +44,8 @@ ghcPackages =
     , terminfo, text, time, transformers, unlit, unix, win32, xhtml, fileio
     , timeout
     , lintersCommon
-    , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace ]
+    , ghc_sampler_eventlog
+    ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -135,6 +137,7 @@ unlit               = util "unlit"
 unix                = lib  "unix"
 win32               = lib  "Win32"
 xhtml               = lib  "xhtml"
+ghc_sampler_eventlog = lib "ghc-sampler-eventlog" `setPath` "eventlog-live-profiling-prototype/sampler"
 
 lintersCommon       = lib     "linters-common"      `setPath` "linters/linters-common"
 lintNotes           = linter  "lint-notes"

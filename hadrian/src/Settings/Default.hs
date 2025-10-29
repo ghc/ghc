@@ -180,6 +180,7 @@ stage1Packages = do
         , unlit
         , xhtml
         , if winTarget then win32 else unix
+        , ghc_sampler_eventlog
         ]
       , when (not cross)
         [ hpcBin
