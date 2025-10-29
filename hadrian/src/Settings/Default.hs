@@ -192,6 +192,11 @@ stagedPackages stage = do
         , hpcBin
         , if winTarget then win32 else unix
         , runGhc
+        , ghc_stack_profiler
+        , ghc_stack_profiler_core
+        , async
+        , hashable
+        , unorderedContainers
         ]
       , when (winTarget && not cross)
         [ -- See Note [Hadrian's ghci-wrapper package]

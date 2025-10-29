@@ -37,6 +37,11 @@ Flag threaded
     Default: True
     Manual: True
 
+Flag ghc-stack-profiler
+    Description: Build with support for ghc-stack-profiler
+    Default: False
+    Manual: True
+
 Executable ghc
     Default-Language: GHC2024
 
@@ -101,6 +106,10 @@ Executable ghc
     if flag(eventlog-socket)
         build-depends: eventlog-socket
         CPP-OPTIONS: -DEVENTLOG_SOCKET
+
+    if flag(ghc-stack-profiler)
+        build-depends: ghc-stack-profiler
+        CPP-OPTIONS: -DGHC_STACK_PROFILER
 
     Other-Extensions:
         CPP

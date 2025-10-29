@@ -97,11 +97,22 @@ import qualified Data.List.NonEmpty as NE
 import qualified GHC.Eventlog.Socket
 #endif
 
+#if defined(GHC_STACK_PROFILER)
+import qualified GHC.Stack.Profiler
+#endif
+
 startEventlogSocketFromEnv :: IO ()
 #if defined(EVENTLOG_SOCKET)
 startEventlogSocketFromEnv = GHC.Eventlog.Socket.startFromEnv
 #else
 startEventlogSocketFromEnv = pure ()
+#endif
+
+startGhcStackProfilerFromEnv :: IO () -> IO ()
+#if defined(GHC_STACK_PROFILER)
+startGhcStackProfilerFromEnv act = GHC.Stack.Profiler.withProfilerFromEnv (const act)
+#else
+startGhcStackProfilerFromEnv = id
 #endif
 
 -----------------------------------------------------------------------------
@@ -117,7 +128,7 @@ startEventlogSocketFromEnv = pure ()
 -- GHC's command-line interface
 
 main :: IO ()
-main = do
+main = startGhcStackProfilerFromEnv $ do
    startEventlogSocketFromEnv
 
    hSetBuffering stdout LineBuffering
