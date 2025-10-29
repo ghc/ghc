@@ -1123,6 +1123,25 @@ freeReg REG_D5    = False
 freeReg REG_D6    = False
 # endif
 
+# if defined(REG_XMM1)
+freeReg REG_XMM1  = False
+# endif
+# if defined(REG_XMM2)
+freeReg REG_XMM2  = False
+# endif
+# if defined(REG_XMM3)
+freeReg REG_XMM3  = False
+# endif
+# if defined(REG_XMM4)
+freeReg REG_XMM4  = False
+# endif
+# if defined(REG_XMM5)
+freeReg REG_XMM5  = False
+# endif
+# if defined(REG_XMM6)
+freeReg REG_XMM6  = False
+# endif
+
 freeReg _ = True
 
 #elif defined(MACHREGS_riscv64)

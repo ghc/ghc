@@ -136,9 +136,9 @@ allocatableRegs arch rc =
         -- 32 - Base - Sp - Hp - R1..R6 - SpLim - IP0 - SP - LR - FP - X18
         -- -> 32 - 15 = 17
         -- (one stack pointer for Haskell, one for C)
-      Unified.RcFloatOrVector -> 24
-        -- 32 - F1 .. F4, D1..D4 - it's odd but see Note [AArch64 Register assignments] for our reg use.
-        -- Seems we reserve different registers for D1..D4 and F1 .. F4 somehow, we should fix this.
+      Unified.RcFloatOrVector -> 22
+        -- 32 - F1..F4, D1..D4, XMM1..XMM2 - it's odd but see Note [AArch64 Register assignments] for our reg use.
+        -- Seems we reserve different registers for F1..F4, D1..D4 and XMM1..XMM2 somehow, we should fix this.
     ArchAlpha     -> panic "trivColorable ArchAlpha"
     ArchMipseb    -> panic "trivColorable ArchMipseb"
     ArchMipsel    -> panic "trivColorable ArchMipsel"

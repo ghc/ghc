@@ -114,6 +114,9 @@ See :ghc-ticket:`25345`.
   ``-0 + 0 = 0``, where ``-0`` is the IEEE-754 negative zero floating point
   constant. Instead, it is ``x + -0`` that is constant-folded to ``x``.
 
+- SIMD support has been added to the AArch64 Native Code Generator.
+  Currently, 128-bit wide vectors are supported via ASIMD (also known as NEON).
+
 GHCi
 ~~~~
 

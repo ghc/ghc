@@ -1,8 +1,9 @@
 setTestOpts(
   # Currently, the only GHC backends to support SIMD are:
   #   - the X86 NCG
+  #   - the AArch64 NCG
   #   - LLVM (any architecture)
-  [ unless(arch('x86_64'), only_ways(llvm_ways))
+  [ unless(arch('x86_64') or arch('aarch64'), only_ways(llvm_ways))
 
   # Architectures which support at least 128 bit wide SIMD vectors:
   #  - X86 with SSE2
@@ -91,7 +92,7 @@ test('simd011', [ unless(have_cpu_feature('fma'), skip)
 test('simd012', [], compile_and_run, [''])
 test('simd013',
      [ req_c
-     , unless(arch('x86_64'), skip) # because the C file uses Intel intrinsics
+     , unless(arch('x86_64') or arch('aarch64'), skip) # because the C file uses Intel or NEON intrinsics
      , extra_ways(["optasm"]) # #26526 demonstrated a bug in the optasm way
      ],
      compile_and_run, ['simd013C.c'])
@@ -125,10 +126,10 @@ test('floatx4_arith', [], compile_and_run, [''])
 test('doublex2_arith', [], compile_and_run, [''])
 test('floatx4_shuffle', [], compile_and_run, [''])
 test('doublex2_shuffle', [], compile_and_run, [''])
-test('floatx4_fma', [ unless(have_cpu_feature('fma'), skip)
+test('floatx4_fma', [ unless(have_cpu_feature('fma') or arch('aarch64'), skip)
                     , extra_hc_opts('-mfma')
                     ], compile_and_run, [''])
-test('doublex2_fma', [ unless(have_cpu_feature('fma'), skip)
+test('doublex2_fma', [ unless(have_cpu_feature('fma') or arch('aarch64'), skip)
                      , extra_hc_opts('-mfma')
                      ], compile_and_run, [''])
 test('int8x16_arith', [], compile_and_run, [''])

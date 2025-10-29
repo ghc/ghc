@@ -144,7 +144,7 @@ W_ hs_mulIntMayOflo(W_ a, W_ b);
 
 
 /* rts/prim/int64x2minmax and rts/prim/vectorQuotRem */
-#if defined(__SSE2__)
+#if defined(__SSE2__) || defined(__aarch64__)
 typedef char v128 __attribute__((vector_size(16)));
 v128 hs_minInt64X2(v128, v128);
 v128 hs_maxInt64X2(v128, v128);

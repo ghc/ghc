@@ -134,11 +134,12 @@ realRegSqueeze cls rr
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
-   | not (isFloatFormat format) = VirtualRegI u
+   | isIntFormat format = VirtualRegI u
    | otherwise
    = case format of
         FF32    -> VirtualRegD u
         FF64    -> VirtualRegD u
+        VecFormat {} -> VirtualRegV128 u
         _       -> panic "AArch64.mkVirtualReg"
 
 {-# INLINE classOfRealReg      #-}

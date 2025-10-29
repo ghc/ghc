@@ -81,7 +81,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
 
   , stgToCmmAllowIntMul2Instr         = (ncg && (x86ish || aarch64)) || llvm
   , stgToCmmAllowWordMul2Instr        = (ncg && (x86ish || ppc || aarch64)) || llvm
-  , stgToCmmAllowIntWord64X2MinMax    = (ncg && x86ish && isSse4_2Enabled dflags) || llvm
+  , stgToCmmAllowIntWord64X2MinMax    = (ncg && ((x86ish && isSse4_2Enabled dflags) || aarch64)) || llvm
   -- SIMD flags
   , stgToCmmVecInstrsErr  = vec_err
   , stgToCmmAvx           = isAvxEnabled                   dflags

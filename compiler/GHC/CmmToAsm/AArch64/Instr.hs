@@ -37,7 +37,10 @@ import GHC.Stack
 stackFrameHeaderSize :: Int
 stackFrameHeaderSize = 2 * 8
 
--- | All registers are 8 byte wide.
+-- | All non-vector registers are 8 byte wide.
+--
+-- 128-bit vector registers use two slots;
+-- see GHC.CmmToAsm.Reg.Linear.StackMap.getStackSlotFor.
 spillSlotSize :: Int
 spillSlotSize = 8
 
@@ -76,21 +79,22 @@ regUsageOfInstr platform instr = case instr of
   MULTILINE_COMMENT{}      -> usage ([], [])
   PUSH_STACK_FRAME         -> usage ([], [])
   POP_STACK_FRAME          -> usage ([], [])
+  LDATA{}                  -> usage ([], [])
   DELTA{}                  -> usage ([], [])
 
   -- 1. Arithmetic Instructions ------------------------------------------------
-  ADD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
+  ADD _fmt dst src1 src2   -> usage (regOp src1 ++ regOp src2, regOp dst)
   CMP l r                  -> usage (regOp l ++ regOp r, [])
   CMN l r                  -> usage (regOp l ++ regOp r, [])
   MSUB dst src1 src2 src3  -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
-  MUL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  NEG dst src              -> usage (regOp src, regOp dst)
+  MUL _fmt dst src1 src2   -> usage (regOp src1 ++ regOp src2, regOp dst)
+  NEG _fmt dst src         -> usage (regOp src, regOp dst)
   SMULH dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
   SMULL dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
   UMULH dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
   UMULL dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SDIV dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SUB dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SDIV _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SUB _fmt dst src1 src2   -> usage (regOp src1 ++ regOp src2, regOp dst)
   UDIV dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
 
   -- 2. Bit Manipulation Instructions ------------------------------------------
@@ -105,25 +109,26 @@ regUsageOfInstr platform instr = case instr of
   CLZ  dst src             -> usage (regOp src, regOp dst)
   RBIT dst src             -> usage (regOp src, regOp dst)
   REV   dst src            -> usage (regOp src, regOp dst)
-  -- REV32 dst src            -> usage (regOp src, regOp dst)
-  REV16 dst src            -> usage (regOp src, regOp dst)
+  REV16 _fmt dst src       -> usage (regOp src, regOp dst)
+  REV32 _fmt dst src       -> usage (regOp src, regOp dst)
+  REV64 _fmt dst src       -> usage (regOp src, regOp dst)
   -- 3. Logical and Move Instructions ------------------------------------------
-  AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
+  AND _fmt dst src1 src2   -> usage (regOp src1 ++ regOp src2, regOp dst)
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  EOR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
+  EOR _fmt dst src1 src2   -> usage (regOp src1 ++ regOp src2, regOp dst)
   LSL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   LSR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   MOV dst src              -> usage (regOp src, regOp dst)
   MOVK dst src             -> usage (regOp src, regOp dst)
   MOVZ dst src             -> usage (regOp src, regOp dst)
   MVN dst src              -> usage (regOp src, regOp dst)
-  ORR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
+  ORR _fmt dst src1 src2   -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- 4. Branch Instructions ----------------------------------------------------
   J t                      -> usage (regTarget t, [])
-  J_TBL _ _ t              -> usage ([t], [])
+  J_TBL _ _ t              -> usage ([(t, W64)], [])
   B t                      -> usage (regTarget t, [])
   BCOND _ t                -> usage (regTarget t, [])
-  BL t ps                  -> usage (regTarget t ++ ps, callerSavedRegisters)
+  BL t ps                  -> usage (regTarget t ++ map withMaxWidth ps, map withMaxWidth callerSavedRegisters)
 
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
@@ -144,12 +149,34 @@ regUsageOfInstr platform instr = case instr of
   FCVT dst src             -> usage (regOp src, regOp dst)
   SCVTF dst src            -> usage (regOp src, regOp dst)
   FCVTZS dst src           -> usage (regOp src, regOp dst)
-  FABS dst src             -> usage (regOp src, regOp dst)
-  FSQRT dst src            -> usage (regOp src, regOp dst)
-  FMIN dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  FMAX dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
+  FABS _fmt dst src        -> usage (regOp src, regOp dst)
+  FSQRT _fmt dst src       -> usage (regOp src, regOp dst)
+  FMIN _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  FMAX _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
+
+  -- 10. Vector Instructions
+  UMOV dst src             -> usage (regOp src, regOp dst)
+  DUP _fmt dst src         -> usage (regOp src, regOp dst)
+  INS _fmt dst src         -> usage (regOp src ++ regOp dst, regOp dst)
+  ABS _fmt dst src         -> usage (regOp src, regOp dst)
+  SMIN _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SMAX _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  UMIN _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  UMAX _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  CMGT _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  CMHI _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  BSL dst src1 src2        -> usage (regOp dst ++ regOp src1 ++ regOp src2, regOp dst)
+  FMLA _fmt dst src1 src2  -> usage (regOp dst ++ regOp src1 ++ regOp src2, regOp dst)
+  FMLS _fmt dst src1 src2  -> usage (regOp dst ++ regOp src1 ++ regOp src2, regOp dst)
+  EXT dst src1 src2 _index -> usage (regOp src1 ++ regOp src2, regOp dst)
+  ZIP1 _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  ZIP2 _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  UZP1 _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  UZP2 _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  TRN1 _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  TRN2 _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
 
   LOCATION{} -> panic $ "regUsageOfInstr: " ++ instrCon instr
   NEWBLOCK{} -> panic $ "regUsageOfInstr: " ++ instrCon instr
@@ -160,34 +187,45 @@ regUsageOfInstr platform instr = case instr of
         -- registers as well, as they show up.
         usage (src, dst) = RU (map mkFmt $ filter (interesting platform) src)
                               (map mkFmt $ filter (interesting platform) dst)
-          -- SIMD NCG TODO: the format here is used for register spilling/unspilling.
-          -- As the AArch64 NCG does not currently support SIMD registers,
-          -- this simple logic is OK.
-        mkFmt r = RegWithFormat r fmt
+        mkFmt (r, w) = RegWithFormat r fmt
           where fmt = case targetClassOfReg platform r of
                         RcInteger -> II64
-                        RcFloatOrVector -> FF64
+                        RcFloatOrVector ->
+                          if w == W128
+                            then VecFormat 2 FmtDouble
+                            else FF64
 
-        regAddr :: AddrMode -> [Reg]
-        regAddr (AddrRegReg r1 r2) = [r1, r2]
-        regAddr (AddrRegImm r1 _)  = [r1]
-        regAddr (AddrReg r1)       = [r1]
-        regOp :: Operand -> [Reg]
-        regOp (OpReg _ r1) = [r1]
-        regOp (OpRegExt _ r1 _ _) = [r1]
-        regOp (OpRegShift _ r1 _ _) = [r1]
+        withMaxWidth r@(RegVirtual v) = (r, w)
+          where w = case v of
+                      VirtualRegV128 {} -> W128
+                      _ -> W64
+        withMaxWidth r@(RegReal rr) = (r, w)
+          where w = case classOfRealReg rr of
+                      RcInteger -> W64
+                      RcFloatOrVector -> W128
+
+        regAddr :: AddrMode -> [(Reg, Width)]
+        regAddr (AddrRegReg r1 r2) = [(r1, W64), (r2, W64)]
+        regAddr (AddrRegImm r1 _)  = [(r1, W64)]
+        regAddr (AddrReg r1)       = [(r1, W64)]
+        regOp :: Operand -> [(Reg, Width)]
+        regOp (OpReg w r1) = [(r1, w)]
+        regOp (OpRegExt w r1 _ _) = [(r1, w)]
+        regOp (OpRegShift w r1 _ _) = [(r1, w)]
         regOp (OpAddr a) = regAddr a
         regOp (OpImm _) = []
         regOp (OpImmShift _ _ _) = []
-        regTarget :: Target -> [Reg]
+        regOp (OpVecLane _ r _) = [(r, W128)]
+        regOp (OpScalarAsVec w r) = [(r, w)]
+        regTarget :: Target -> [(Reg, Width)]
         regTarget (TBlock _) = []
         regTarget (TLabel _) = []
-        regTarget (TReg r1)  = [r1]
+        regTarget (TReg r1)  = [(r1, W64)]
 
         -- Is this register interesting for the register allocator?
-        interesting :: Platform -> Reg -> Bool
-        interesting _        (RegVirtual _)                 = True
-        interesting platform (RegReal (RealRegSingle i))    = freeReg platform i
+        interesting :: Platform -> (Reg, Width) -> Bool
+        interesting _        (RegVirtual _, _)              = True
+        interesting platform (RegReal (RealRegSingle i), _) = freeReg platform i
 
 -- Note [AArch64 Register assignments]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -209,7 +247,7 @@ regUsageOfInstr platform instr = case instr of
 -- | <------ free registers --------------------------------------------------------------------> | BR | Sp | Hp | R1 | R2 | R3 | R4 | R5 | R6 | SL | -- | -- | -- |
 -- |== SIMD/FP Registers ==========================================================================================================================================|
 -- | <---- argument passing -------------> | <-- callee saved (lower 64 bits) ---> | <--------------------------------------- caller saved ----------------------> |
--- | <------ free registers -------------> | F1 | F2 | F3 | F4 | D1 | D2 | D3 | D4 | <------ free registers -----------------------------------------------------> |
+-- | <- free registers |XMM1|XMM2|-------> | F1 | F2 | F3 | F4 | D1 | D2 | D3 | D4 | <------ free registers -----------------------------------------------------> |
 -- '---------------------------------------------------------------------------------------------------------------------------------------------------------------'
 -- IR: Indirect result location register, IP: Intra-procedure register, PL: Platform register (See Note [Aarch64 Register x18 at Darwin and Windows]), FP: Frame pointer, LR: Link register, SP: Stack pointer
 -- BR: Base, SL: SpLim
@@ -231,20 +269,21 @@ patchRegsOfInstr instr env = case instr of
     MULTILINE_COMMENT{} -> instr
     PUSH_STACK_FRAME    -> instr
     POP_STACK_FRAME     -> instr
+    LDATA{}             -> instr
     DELTA{}             -> instr
     -- 1. Arithmetic Instructions ----------------------------------------------
-    ADD o1 o2 o3   -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
+    ADD fmt o1 o2 o3 -> ADD fmt (patchOp o1) (patchOp o2) (patchOp o3)
     CMP o1 o2      -> CMP (patchOp o1) (patchOp o2)
     CMN o1 o2      -> CMN (patchOp o1) (patchOp o2)
     MSUB o1 o2 o3 o4 -> MSUB (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
-    MUL o1 o2 o3   -> MUL (patchOp o1) (patchOp o2) (patchOp o3)
-    NEG o1 o2      -> NEG (patchOp o1) (patchOp o2)
+    MUL fmt o1 o2 o3 -> MUL fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    NEG fmt o1 o2    -> NEG fmt (patchOp o1) (patchOp o2)
     SMULH o1 o2 o3 -> SMULH (patchOp o1) (patchOp o2)  (patchOp o3)
     SMULL o1 o2 o3 -> SMULL (patchOp o1) (patchOp o2)  (patchOp o3)
     UMULH o1 o2 o3 -> UMULH (patchOp o1) (patchOp o2)  (patchOp o3)
     UMULL o1 o2 o3 -> UMULL (patchOp o1) (patchOp o2)  (patchOp o3)
-    SDIV o1 o2 o3  -> SDIV (patchOp o1) (patchOp o2) (patchOp o3)
-    SUB o1 o2 o3   -> SUB  (patchOp o1) (patchOp o2) (patchOp o3)
+    SDIV fmt o1 o2 o3 -> SDIV fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    SUB fmt o1 o2 o3  -> SUB  fmt (patchOp o1) (patchOp o2) (patchOp o3)
     UDIV o1 o2 o3  -> UDIV (patchOp o1) (patchOp o2) (patchOp o3)
 
     -- 2. Bit Manipulation Instructions ----------------------------------------
@@ -259,21 +298,22 @@ patchRegsOfInstr instr env = case instr of
     CLZ o1 o2        -> CLZ  (patchOp o1) (patchOp o2)
     RBIT o1 o2       -> RBIT (patchOp o1) (patchOp o2)
     REV   o1 o2      -> REV  (patchOp o1) (patchOp o2)
-    -- REV32 o1 o2      -> REV32 (patchOp o1) (patchOp o2)
-    REV16 o1 o2      -> REV16 (patchOp o1) (patchOp o2)
+    REV16 fmt o1 o2  -> REV16 fmt (patchOp o1) (patchOp o2)
+    REV32 fmt o1 o2  -> REV32 fmt (patchOp o1) (patchOp o2)
+    REV64 fmt o1 o2  -> REV64 fmt (patchOp o1) (patchOp o2)
 
 
     -- 3. Logical and Move Instructions ----------------------------------------
-    AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
+    AND fmt o1 o2 o3 -> AND fmt (patchOp o1) (patchOp o2) (patchOp o3)
     ASR o1 o2 o3   -> ASR  (patchOp o1) (patchOp o2) (patchOp o3)
-    EOR o1 o2 o3   -> EOR  (patchOp o1) (patchOp o2) (patchOp o3)
+    EOR fmt o1 o2 o3 -> EOR fmt (patchOp o1) (patchOp o2) (patchOp o3)
     LSL o1 o2 o3   -> LSL  (patchOp o1) (patchOp o2) (patchOp o3)
     LSR o1 o2 o3   -> LSR  (patchOp o1) (patchOp o2) (patchOp o3)
     MOV o1 o2      -> MOV  (patchOp o1) (patchOp o2)
     MOVK o1 o2     -> MOVK (patchOp o1) (patchOp o2)
     MOVZ o1 o2     -> MOVZ (patchOp o1) (patchOp o2)
     MVN o1 o2      -> MVN  (patchOp o1) (patchOp o2)
-    ORR o1 o2 o3   -> ORR  (patchOp o1) (patchOp o2) (patchOp o3)
+    ORR fmt o1 o2 o3 -> ORR fmt (patchOp o1) (patchOp o2) (patchOp o3)
 
     -- 4. Branch Instructions --------------------------------------------------
     J t               -> J (patchTarget t)
@@ -301,12 +341,34 @@ patchRegsOfInstr instr env = case instr of
     FCVT o1 o2     -> FCVT (patchOp o1) (patchOp o2)
     SCVTF o1 o2    -> SCVTF (patchOp o1) (patchOp o2)
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
-    FABS o1 o2     -> FABS (patchOp o1) (patchOp o2)
-    FSQRT o1 o2    -> FSQRT (patchOp o1) (patchOp o2)
-    FMIN o1 o2 o3  -> FMIN (patchOp o1) (patchOp o2) (patchOp o3)
-    FMAX o1 o2 o3  -> FMAX (patchOp o1) (patchOp o2) (patchOp o3)
+    FABS fmt o1 o2    -> FABS fmt (patchOp o1) (patchOp o2)
+    FSQRT fmt o1 o2   -> FSQRT fmt (patchOp o1) (patchOp o2)
+    FMIN fmt o1 o2 o3 -> FMIN fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    FMAX fmt o1 o2 o3 -> FMAX fmt (patchOp o1) (patchOp o2) (patchOp o3)
     FMA s o1 o2 o3 o4 ->
       FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
+
+    -- 10. Vector Instructions
+    UMOV o1 o2 -> UMOV (patchOp o1) (patchOp o2)
+    DUP fmt o1 o2 -> DUP fmt (patchOp o1) (patchOp o2)
+    INS fmt o1 o2 -> INS fmt (patchOp o1) (patchOp o2)
+    ABS fmt o1 o2 -> ABS fmt (patchOp o1) (patchOp o2)
+    SMIN fmt o1 o2 o3 -> SMIN fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    SMAX fmt o1 o2 o3 -> SMAX fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    UMIN fmt o1 o2 o3 -> UMIN fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    UMAX fmt o1 o2 o3 -> UMAX fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    CMGT fmt o1 o2 o3 -> CMGT fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    CMHI fmt o1 o2 o3 -> CMHI fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    BSL o1 o2 o3 -> BSL (patchOp o1) (patchOp o2) (patchOp o3)
+    FMLA fmt o1 o2 o3 -> FMLA fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    FMLS fmt o1 o2 o3 -> FMLS fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    EXT o1 o2 o3 i -> EXT (patchOp o1) (patchOp o2) (patchOp o3) i
+    ZIP1 fmt o1 o2 o3 -> ZIP1 fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    ZIP2 fmt o1 o2 o3 -> ZIP2 fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    UZP1 fmt o1 o2 o3 -> UZP1 fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    UZP2 fmt o1 o2 o3 -> UZP2 fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    TRN1 fmt o1 o2 o3 -> TRN1 fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    TRN2 fmt o1 o2 o3 -> TRN2 fmt (patchOp o1) (patchOp o2) (patchOp o3)
 
     NEWBLOCK{}     -> panic $ "patchRegsOfInstr: " ++ instrCon instr
     LOCATION{}     -> panic $ "patchRegsOfInstr: " ++ instrCon instr
@@ -316,6 +378,8 @@ patchRegsOfInstr instr env = case instr of
         patchOp (OpRegExt w r x s) = OpRegExt w (env r) x s
         patchOp (OpRegShift w r m s) = OpRegShift w (env r) m s
         patchOp (OpAddr a) = OpAddr (patchAddr a)
+        patchOp (OpVecLane w r i) = OpVecLane w (env r) i
+        patchOp (OpScalarAsVec w r) = OpScalarAsVec w (env r)
         patchOp op = op
         patchTarget :: Target -> Target
         patchTarget (TReg r) = TReg (env r)
@@ -386,7 +450,8 @@ patchJumpInstr instr patchF
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
 -- We reserve @RESERVED_C_STACK_BYTES@ on the C stack for spilling and reloading
 -- registers.  AArch64s maximum displacement for SP relative spills and reloads
--- is essentially [-256,255], or [0, 0xFFF]*8 = [0, 32760] for 64bits.
+-- is essentially [-256,255], [0, 0xFFF]*8 = [0, 32760] for 64bits,
+-- or [0, 0xFFF]*16 = [0, 65520] for 128bits.
 --
 -- The @RESERVED_C_STACK_BYTES@ is 16k, so we can't address any location in a
 -- single instruction.  The idea is to use the Inter Procedure 0 (ip0) register
@@ -408,22 +473,36 @@ mkSpillInstr
 
 mkSpillInstr config (RegWithFormat reg fmt) delta slot =
   case off - delta of
-    imm | -256 <= imm && imm <= 255                               -> [ mkStrSp imm ]
-    imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkStrSp imm ]
-    imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkIp0SpillAddr (imm .&~. 0xfff)
-                                                                     , mkStrIp0 (imm .&.  0xfff)
-                                                                     ]
+    imm | -256 <= imm && imm <= 255                                      -> [ mkStrSp imm ]
+    imm | width <= W64, imm > 0, imm .&. 0x7 == 0x0, imm <= 0xfff        -> [ mkStrSp imm ]
+    imm | width <= W64, imm > 0xfff, imm <= 0xffffff, imm .&. 0x7 == 0x0 -> [ mkIp0SpillAddr (imm .&~. 0xfff)
+                                                                            , mkStrIp0 (imm .&. 0xfff)
+                                                                            ]
+    imm | width == W128, imm >= 0, imm .&. 0xf == 0x0, imm <= 0xfff0     -> [ mkStrSp imm ]
+    imm | width == W128, imm >= 0, imm .&. 0xf == 0x0, imm <= 0xffffff   -> [ mkIp0SpillAddr (imm .&~. 0xfff)
+                                                                            , mkStrIp0 (imm .&. 0xfff)
+                                                                            ]
+    -- If the width is W128, the immediate for STR must be a multiple of 16 unless it can be encoded by STUR
+    imm | width == W128, imm >= 0, imm <= 0xffff                         -> [ mkIp0SpillAddr (imm .&. 0xfff)
+                                                                            , mkStrIp0 (imm .&~. 0xfff)
+                                                                            ]
+    imm | width == W128, imm > 0xffff, imm <= 0xffffff                   -> [ mkIp0SpillAddr (imm .&. 0xfff)
+                                                                            , addIp0SpillAddr (imm .&~. 0xfff)
+                                                                            , mkStrIp0 0
+                                                                            ]
     imm -> pprPanic "mkSpillInstr" (text "Unable to spill register into" <+> int imm)
     where
         a .&~. b = a .&. (complement b)
 
-        -- SIMD NCG TODO: emit the correct instructions to spill a vector register.
-        -- You can take inspiration from the X86_64 backend.
-        mkIp0SpillAddr imm = ANN (text "Spill: IP0 <- SP + " <> int imm) $ ADD ip0 sp (OpImm (ImmInt imm))
-        mkStrSp imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt imm)))
-        mkStrIp0 imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 16) (ImmInt imm)))
+        mkIp0SpillAddr imm = ANN (text "Spill: IP0 <- SP + " <> int imm) $ ADD II64 ip0 sp (OpImm (ImmInt imm))
+        mkStrSp imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg width reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt imm)))
+        mkStrIp0 imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg width reg) (OpAddr (AddrRegImm (regSingle 16) (ImmInt imm)))
+        addIp0SpillAddr imm = ANN (text "Spill: IP0 <- IP0 + " <> int imm) $ ADD II64 ip0 ip0 (OpImm (ImmInt imm))
 
         off = spillSlotToOffset config slot
+        width = if isVecFormat fmt
+                then formatToWidth fmt
+                else W64
 
 mkLoadInstr
    :: NCGConfig
@@ -433,22 +512,36 @@ mkLoadInstr
    -> [Instr]
 mkLoadInstr config (RegWithFormat reg fmt) delta slot =
   case off - delta of
-    imm | -256 <= imm && imm <= 255                               -> [ mkLdrSp imm ]
-    imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkLdrSp imm ]
-    imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkIp0SpillAddr (imm .&~. 0xfff)
-                                                                     , mkLdrIp0 (imm .&.  0xfff)
-                                                                     ]
+    imm | -256 <= imm && imm <= 255                                   -> [ mkLdrSp imm ]
+    imm | width <= W64, imm > 0, imm .&. 0x7 == 0x0, imm <= 0xfff     -> [ mkLdrSp imm ]
+    imm | width <= W64, imm <= 0xffffff && imm .&. 0x7 == 0x0         -> [ mkIp0SpillAddr (imm .&~. 0xfff)
+                                                                         , mkLdrIp0 (imm .&.  0xfff)
+                                                                         ]
+    imm | width == W128, imm >= 0, imm .&. 0xf == 0x0, imm <= 0xfff0  -> [ mkLdrSp imm ]
+    imm | width == W128, imm > 0, imm .&. 0xf == 0x0, imm <= 0xffffff -> [ mkIp0SpillAddr (imm .&~. 0xfff)
+                                                                         , mkLdrIp0 (imm .&. 0xfff)
+                                                                         ]
+    -- If the width is W128, the immediate for LDR must be a multiple of 16 unless it can be encoded by LDUR
+    imm | width == W128, imm >= 0, imm <= 0xffff                      -> [ mkIp0SpillAddr (imm .&. 0xfff)
+                                                                         , mkLdrIp0 (imm .&~. 0xfff)
+                                                                         ]
+    imm | width == W128, imm > 0xffff, imm <= 0xffffff                -> [ mkIp0SpillAddr (imm .&. 0xfff)
+                                                                         , addIp0SpillAddr (imm .&~. 0xfff)
+                                                                         , mkLdrIp0 0
+                                                                         ]
     imm -> pprPanic "mkLoadInstr" (text "Unable to load spilled register at" <+> int imm)
     where
         a .&~. b = a .&. (complement b)
 
-        -- SIMD NCG TODO: emit the correct instructions to load a vector register.
-        -- You can take inspiration from the X86_64 backend.
-        mkIp0SpillAddr imm = ANN (text "Reload: IP0 <- SP + " <> int imm) $ ADD ip0 sp (OpImm (ImmInt imm))
-        mkLdrSp imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt imm)))
-        mkLdrIp0 imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 16) (ImmInt imm)))
+        mkIp0SpillAddr imm = ANN (text "Reload: IP0 <- SP + " <> int imm) $ ADD II64 ip0 sp (OpImm (ImmInt imm))
+        mkLdrSp imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg width reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt imm)))
+        mkLdrIp0 imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg width reg) (OpAddr (AddrRegImm (regSingle 16) (ImmInt imm)))
+        addIp0SpillAddr imm = ANN (text "Reload: IP0 <- IP0 + " <> int imm) $ ADD II64 ip0 ip0 (OpImm (ImmInt imm))
 
         off = spillSlotToOffset config slot
+        width = if isVecFormat fmt
+                then formatToWidth fmt
+                else W64
 
 --------------------------------------------------------------------------------
 -- | See if this instruction is telling us the current C stack delta
@@ -465,6 +558,7 @@ isMetaInstr instr
     COMMENT{}   -> True
     MULTILINE_COMMENT{} -> True
     LOCATION{}  -> True
+    LDATA{}     -> True
     NEWBLOCK{}  -> True
     DELTA{}     -> True
     PUSH_STACK_FRAME -> True
@@ -474,9 +568,11 @@ isMetaInstr instr
 -- | Copy the value in a register to another one.
 -- Must work for all register classes.
 mkRegRegMoveInstr :: Format -> Reg -> Reg -> Instr
-mkRegRegMoveInstr _fmt src dst
+mkRegRegMoveInstr fmt src dst
+  | VecFormat {} <- fmt, formatToWidth fmt == W128
+  = ANN (text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst) $ MOV (OpReg W128 dst) (OpReg W128 src)
+  | otherwise
   = ANN (text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
-  -- SIMD NCG TODO: incorrect for vector formats
 
 -- | Take the source and destination registers from a move instruction of same
 -- register class (`RegClass`).
@@ -503,15 +599,15 @@ mkJumpInstr id = [B (TBlock id)]
 mkStackAllocInstr :: Platform -> Int -> [Instr]
 mkStackAllocInstr platform n
     | n == 0 = []
-    | n > 0 && n < 4096 = [ ANN (text "Alloc More Stack") $ SUB sp sp (OpImm (ImmInt n)) ]
-    | n > 0 =  ANN (text "Alloc More Stack") (SUB sp sp (OpImm (ImmInt 4095))) : mkStackAllocInstr platform (n - 4095)
+    | n > 0 && n < 4096 = [ ANN (text "Alloc More Stack") $ SUB II64 sp sp (OpImm (ImmInt n)) ]
+    | n > 0 =  ANN (text "Alloc More Stack") (SUB II64 sp sp (OpImm (ImmInt 4095))) : mkStackAllocInstr platform (n - 4095)
 mkStackAllocInstr _platform n = pprPanic "mkStackAllocInstr" (int n)
 
 mkStackDeallocInstr :: Platform -> Int -> [Instr]
 mkStackDeallocInstr platform n
     | n == 0 = []
-    | n > 0 && n < 4096 = [ ANN (text "Dealloc More Stack") $ ADD sp sp (OpImm (ImmInt n)) ]
-    | n > 0 =  ANN (text "Dealloc More Stack") (ADD sp sp (OpImm (ImmInt 4095))) : mkStackDeallocInstr platform (n - 4095)
+    | n > 0 && n < 4096 = [ ANN (text "Dealloc More Stack") $ ADD II64 sp sp (OpImm (ImmInt n)) ]
+    | n > 0 =  ANN (text "Dealloc More Stack") (ADD II64 sp sp (OpImm (ImmInt 4095))) : mkStackDeallocInstr platform (n - 4095)
 mkStackDeallocInstr _platform n = pprPanic "mkStackDeallocInstr" (int n)
 
 --
@@ -579,6 +675,11 @@ data Instr
     -- location pseudo-op (file, line, col, name)
     | LOCATION Int Int Int String
 
+    -- some static data spat out during code
+    -- generation.  Will be extracted before
+    -- pretty-printing.
+    | LDATA Section RawCmmStatics
+
     -- start a new basic block.  Useful during
     -- codegen, removed later.  Preceding
     -- instruction should be a jump, as per the
@@ -601,7 +702,7 @@ data Instr
     -- 1. Arithmetic Instructions ----------------------------------------------
     -- | ADC Operand Operand Operand -- rd = rn + rm + C
     -- | ADCS ...
-    | ADD Operand Operand Operand -- rd = rn + rm
+    | ADD Format Operand Operand Operand -- rd = rn + rm
     -- | ADDS Operand Operand Operand -- rd = rn + rm
     -- | ADR ...
     -- | ADRP ...
@@ -610,20 +711,20 @@ data Instr
     -- | MADD ...
     -- | MNEG ...
     | MSUB Operand Operand Operand Operand -- rd = ra - rn × rm
-    | MUL Operand Operand Operand -- rd = rn × rm
-    | NEG Operand Operand -- rd = -op2
+    | MUL Format Operand Operand Operand -- rd = rn × rm
+    | NEG Format Operand Operand -- rd = -op2
     -- | NEGS ...
     -- | NGC ...
     -- | NGCS ...
     -- | SBC ...
     -- | SBCS ...
-    | SDIV Operand Operand Operand -- rd = rn ÷ rm
+    | SDIV Format Operand Operand Operand -- rd = rn ÷ rm
     -- | SMADDL ...
     -- | SMNEGL ...
     -- | SMSUBL ...
     | SMULH Operand Operand Operand
     | SMULL Operand Operand Operand
-    | SUB Operand Operand Operand -- rd = rn - op2
+    | SUB Format Operand Operand Operand -- rd = rn - op2
     -- | SUBS ...
     | UDIV Operand Operand Operand -- rd = rn ÷ rm
     -- | UMADDL ...  -- Xd = Xa + Wn × Wm
@@ -647,15 +748,16 @@ data Instr
     | RBIT Operand Operand -- rd = reverseBits(rn)
     | REV Operand Operand   -- rd = reverseBytes(rn): (for 32 & 64 bit operands)
                             -- 0xAABBCCDD -> 0xDDCCBBAA
-    | REV16 Operand Operand -- rd = reverseBytes16(rn)
-                            -- 0xAABB_CCDD -> xBBAA_DDCC
-    -- | REV32 Operand Operand -- rd = reverseBytes32(rn) - 64bit operands only!
-    --                         -- 0xAABBCCDD_EEFFGGHH -> 0XDDCCBBAA_HHGGFFEE
+    | REV16 Format Operand Operand -- rd = reverseBytes16(rn)
+                                   -- 0xAABB_CCDD -> 0xBBAA_DDCC
+    | REV32 Format Operand Operand -- rd = reverseBytes32(rn) - 64bit operands only!
+                                   -- 0xAABBCCDD_EEFFGGHH -> 0xDDCCBBAA_HHGGFFEE
+    | REV64 Format Operand Operand
 
     -- 3. Logical and Move Instructions ----------------------------------------
-    | AND Operand Operand Operand -- rd = rn & op2
+    | AND Format Operand Operand Operand -- rd = rn & op2
     | ASR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
-    | EOR Operand Operand Operand -- rd = rn ⊕ op2
+    | EOR Format Operand Operand Operand -- rd = rn ⊕ op2
     | LSL Operand Operand Operand -- rd = rn ≪ rm  or rd = rn ≪ #i, i is 6 bits
     | LSR Operand Operand Operand -- rd = rn ≫ rm  or rd = rn ≫ #i, i is 6 bits
     | MOV Operand Operand -- rd = rn  or  rd = #i
@@ -663,7 +765,7 @@ data Instr
     -- | MOVN Operand Operand
     | MOVZ Operand Operand
     | MVN Operand Operand -- rd = ~rn
-    | ORR Operand Operand Operand -- rd = rn | op2
+    | ORR Format Operand Operand Operand -- rd = rn | op2
     -- Load and stores.
     -- TODO STR/LDR might want to change to STP/LDP with XZR for the second register.
     | STR Format Operand Operand -- str Xn, address-mode // Xn -> *addr
@@ -695,21 +797,43 @@ data Instr
     -- Float ConVerT to Zero Signed
     | FCVTZS Operand Operand
     -- Float ABSolute value
-    | FABS Operand Operand
+    | FABS Format Operand Operand
     -- Float minimum
-    | FMIN Operand Operand Operand
+    | FMIN Format Operand Operand Operand
     -- Float maximum
-    | FMAX Operand Operand Operand
+    | FMAX Format Operand Operand Operand
     -- Float SQuare RooT
-    | FSQRT Operand Operand
+    | FSQRT Format Operand Operand
 
-    -- | Floating-point fused multiply-add instructions
+    -- | Floating-point fused multiply-add instructions (scalar only)
     --
     -- - fmadd : d =   r1 * r2 + r3
     -- - fnmsub: d =   r1 * r2 - r3
     -- - fmsub : d = - r1 * r2 + r3
     -- - fnmadd: d = - r1 * r2 - r3
     | FMA FMASign Operand Operand Operand Operand
+
+    -- 10. Vector Instructions
+    | UMOV Operand Operand
+    | DUP Format Operand Operand
+    | INS Format Operand Operand
+    | ABS Format Operand Operand
+    | SMIN Format Operand Operand Operand
+    | SMAX Format Operand Operand Operand
+    | UMIN Format Operand Operand Operand
+    | UMAX Format Operand Operand Operand
+    | CMGT Format Operand Operand Operand
+    | CMHI Format Operand Operand Operand
+    | BSL Operand Operand Operand
+    | FMLA Format Operand Operand Operand
+    | FMLS Format Operand Operand Operand
+    | EXT Operand Operand Operand Int
+    | ZIP1 Format Operand Operand Operand
+    | ZIP2 Format Operand Operand Operand
+    | UZP1 Format Operand Operand Operand
+    | UZP2 Format Operand Operand Operand
+    | TRN1 Format Operand Operand Operand
+    | TRN2 Format Operand Operand Operand
 
 data DMBISHFlags = DmbLoad | DmbLoadStore
   deriving (Eq, Show)
@@ -721,6 +845,7 @@ instrCon i =
       MULTILINE_COMMENT{} -> "COMMENT"
       ANN{} -> "ANN"
       LOCATION{} -> "LOCATION"
+      LDATA{} -> "LDATA"
       NEWBLOCK{} -> "NEWBLOCK"
       DELTA{} -> "DELTA"
       SXTB{} -> "SXTB"
@@ -750,7 +875,8 @@ instrCon i =
       RBIT{} -> "RBIT"
       REV{} -> "REV"
       REV16{} -> "REV16"
-      -- REV32{} -> "REV32"
+      REV32{} -> "REV32"
+      REV64{} -> "REV64"
       AND{} -> "AND"
       ASR{} -> "ASR"
       EOR{} -> "EOR"
@@ -788,6 +914,26 @@ instrCon i =
           FMSub  -> "FMSUB"
           FNMAdd -> "FNMADD"
           FNMSub -> "FNMSUB"
+      UMOV {} -> "UMOV"
+      DUP {} -> "DUP"
+      INS {} -> "INS"
+      ABS {} -> "ABS"
+      SMIN {} -> "SMIN"
+      SMAX {} -> "SMAX"
+      UMIN {} -> "UMIN"
+      UMAX {} -> "UMAX"
+      CMGT {} -> "CMGT"
+      CMHI {} -> "CMHI"
+      BSL {} -> "BSL"
+      FMLA {} -> "FMLA"
+      FMLS {} -> "FMLS"
+      EXT {} -> "EXT"
+      ZIP1 {} -> "ZIP1"
+      ZIP2 {} -> "ZIP2"
+      UZP1 {} -> "UZP1"
+      UZP2 {} -> "UZP2"
+      TRN1 {} -> "TRN1"
+      TRN2 {} -> "TRN2"
 
 data Target
     = TBlock BlockId
@@ -821,6 +967,8 @@ data Operand
         | OpImm Imm            -- immediate value
         | OpImmShift Imm ShiftMode RegShift
         | OpAddr AddrMode       -- memory reference
+        | OpVecLane Width Reg Int -- vector lane: <vn>.<width>[<index>]
+        | OpScalarAsVec Width Reg -- scalar as a vector lane: <vn>.<width>[0]
         deriving (Eq, Show)
 
 -- Smart constructors
