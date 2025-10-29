@@ -13,6 +13,7 @@ module Packages (
     transformers, unlit, unix, win32, xhtml,
     lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
     ghcPackages, isGhcPackage,
+    ghc_stack_profiler, ghc_stack_profiler_core,
 
     -- * Package information
     crossPrefix, programName, nonHsMainPackage, programPath, timeoutPath,
@@ -43,7 +44,10 @@ ghcPackages =
     , terminfo, text, time, transformers, unlit, unix, win32, xhtml, fileio
     , timeout
     , lintersCommon
-    , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace ]
+    , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace
+    , ghc_stack_profiler_core
+    , ghc_stack_profiler
+    ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -135,6 +139,8 @@ unlit               = util "unlit"
 unix                = lib  "unix"
 win32               = lib  "Win32"
 xhtml               = lib  "xhtml"
+ghc_stack_profiler = lib "ghc-stack-profiler" `setPath` "ghc-stack-profiler/ghc-stack-profiler"
+ghc_stack_profiler_core = lib "ghc-stack-profiler-core" `setPath` "ghc-stack-profiler/ghc-stack-profiler-core"
 
 lintersCommon       = lib     "linters-common"      `setPath` "linters/linters-common"
 lintNotes           = linter  "lint-notes"

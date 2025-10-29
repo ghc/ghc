@@ -180,6 +180,8 @@ stage1Packages = do
         , unlit
         , xhtml
         , if winTarget then win32 else unix
+        , ghc_stack_profiler
+        , ghc_stack_profiler_core
         ]
       , when (not cross)
         [ hpcBin

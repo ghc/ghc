@@ -124,3 +124,6 @@
 [submodule "libraries/template-haskell-quasiquoter"]
 	path = libraries/template-haskell-quasiquoter
 	url = https://gitlab.haskell.org/ghc/template-haskell-quasiquoter.git
+[submodule "ghc-stack-profiler"]
+	path = ghc-stack-profiler
+	url = https://github.com/well-typed/ghc-stack-profiler
