@@ -126,3 +126,15 @@
 [submodule "eventlog-socket"]
 	path = eventlog-socket
 	url = https://github.com/well-typed/eventlog-socket.git
+[submodule "ghc-stack-profiler"]
+	path = ghc-stack-profiler
+	url = https://github.com/well-typed/ghc-stack-profiler
+[submodule "libraries/async"]
+	path = libraries/async
+	url = https://github.com/fendor/async.git
+[submodule "libraries/unordered-containers"]
+	path = libraries/unordered-containers
+	url = https://github.com/fendor/unordered-containers.git
+[submodule "libraries/hashable"]
+	path = libraries/hashable
+	url = https://github.com/fendor/hashable
