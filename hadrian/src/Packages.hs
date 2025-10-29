@@ -14,6 +14,7 @@ module Packages (
     lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
     eventlogSocket, eventlogSocketControl,
     ghcPackages, isGhcPackage,
+    async, hashable, unorderedContainers, ghc_stack_profiler, ghc_stack_profiler_core,
 
     -- * Package information
     crossPrefix, programName, nonHsMainPackage, programPath, timeoutPath,
@@ -45,7 +46,9 @@ ghcPackages =
     , timeout
     , eventlogSocketControl, eventlogSocket
     , lintersCommon
-    , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace ]
+    , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace
+    , async, hashable, unorderedContainers, ghc_stack_profiler_core, ghc_stack_profiler
+    ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -139,6 +142,11 @@ win32               = lib  "Win32"
 xhtml               = lib  "xhtml"
 eventlogSocket      = lib "eventlog-socket" `setPath` "eventlog-socket/eventlog-socket"
 eventlogSocketControl = lib "eventlog-socket-control" `setPath` "eventlog-socket/eventlog-socket-control"
+async               = lib "async"
+hashable            = lib "hashable"
+unorderedContainers = lib "unordered-containers"
+ghc_stack_profiler = lib "ghc-stack-profiler" `setPath` "ghc-stack-profiler/ghc-stack-profiler"
+ghc_stack_profiler_core = lib "ghc-stack-profiler-core" `setPath` "ghc-stack-profiler/ghc-stack-profiler-core"
 
 lintersCommon       = lib     "linters-common"      `setPath` "linters/linters-common"
 lintNotes           = linter  "lint-notes"

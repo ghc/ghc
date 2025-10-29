@@ -79,6 +79,7 @@ import GHC.Iface.Errors.Ppr
 import GHC.Driver.Session.Mode
 import GHC.Driver.Session.Lint
 import GHC.Driver.Session.Units
+import GHC.Driver.Monad
 
 -- Standard Haskell libraries
 import System.IO
@@ -90,9 +91,22 @@ import Control.Monad.Trans.Except (throwE, runExceptT)
 import Data.List ( isPrefixOf, partition, intercalate )
 import Prelude
 import qualified Data.List.NonEmpty as NE
+#if defined(SAMPLE_TRACER)
+import qualified GHC.Stack.Profiler as Profiler
+#endif
 
 #if defined(EVENTLOG_SOCKET)
 import GHC.Eventlog.Socket
+#endif
+
+runWithStackProfiler :: IO () -> IO ()
+runWithStackProfiler act =
+#if defined(SAMPLE_TRACER)
+  Profiler.withRootStackProfiler True $ \manager -> do
+    Profiler.withStackProfiler manager (Profiler.SampleIntervalMs 10) $ do
+      act
+#else
+  act
 #endif
 
 -----------------------------------------------------------------------------
@@ -166,7 +180,8 @@ main = do
                             ShowGhciUsage          -> showGhciUsage dflags
                             PrintWithDynFlags f    -> putStrLn (f dflags)
                 Right postLoadMode ->
-                    main' postLoadMode units dflags argv3 flagWarnings
+                  reifyGhc $ \session -> runWithStackProfiler $
+                      reflectGhc (main' postLoadMode units dflags argv3 flagWarnings) session
 
 main' :: PostLoadMode -> [String] -> DynFlags -> [Located String] -> [Warn]
       -> Ghc ()

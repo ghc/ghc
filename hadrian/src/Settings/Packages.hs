@@ -132,6 +132,7 @@ packageArgs = do
           , builder (Cabal Flags) ? mconcat
             [ (expr (ghcWithInterpreter stage)) `cabalFlag` "internal-interpreter"
             , notStage0 `cabalFlag` "eventlog-socket"
+            , notStage0 `cabalFlag` "sampleTracer"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.
