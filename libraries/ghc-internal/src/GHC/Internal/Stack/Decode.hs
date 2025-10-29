@@ -25,6 +25,10 @@ module GHC.Internal.Stack.Decode (
   -- * Pretty printing
   prettyStackEntry,
   prettyStackFrameWithIpe,
+  -- * Low level decoding functions
+  StackFrameLocation(..),
+  unpackStackFrameTo,
+  getStackFields,
   )
 where
 
@@ -69,6 +73,7 @@ import GHC.Internal.Stack.ConstantsProf ()
 #endif
 import GHC.Internal.Stack.CloneStack
 import GHC.Internal.InfoProv.Types (InfoProv (..), ipLoc, lookupIPE)
+import qualified GHC.Internal.InfoProv.Types as IPE
 
 {- Note [Decoding the stack]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -186,11 +191,11 @@ foreign import prim "getStackInfoTableAddrzh" getStackInfoTableAddr# :: StackSna
 
 -- | Get the 'StgInfoTable' of the stack frame.
 -- Additionally, provides 'InfoProv' for the 'StgInfoTable' if there is any.
-getInfoTableOnStack :: StackSnapshot# -> WordOffset -> IO (StgInfoTable, Maybe InfoProv)
+getInfoTableOnStack :: StackSnapshot# -> WordOffset -> IO (StgInfoTable, Ptr IPE.StgInfoTable)
 getInfoTableOnStack stackSnapshot# index =
   let !(# itbl_struct#, itbl_ptr_ipe_key# #) = getInfoTableAddrs# stackSnapshot# (wordOffsetToWord# index)
    in
-    (,) <$> peekItbl (Ptr itbl_struct#) <*> lookupIPE (Ptr itbl_ptr_ipe_key#)
+    (,) <$> peekItbl (Ptr itbl_struct#) <*> pure (Ptr itbl_ptr_ipe_key#)
 
 getInfoTableForStack :: StackSnapshot# -> IO StgInfoTable
 getInfoTableForStack stackSnapshot# =
@@ -324,8 +329,9 @@ unpackStackFrame stackFrameLoc = do
 unpackStackFrameWithIpe :: StackFrameLocation -> IO [(StackFrame, Maybe InfoProv)]
 unpackStackFrameWithIpe stackFrameLoc = do
   unpackStackFrameTo stackFrameLoc
-    (\ info mIpe nextChunk@(StackSnapshot stack#) -> do
+    (\ info infoKey nextChunk@(StackSnapshot stack#) -> do
       framesWithIpe <- decodeStackWithIpe nextChunk
+      mIpe <- lookupIPE infoKey
       pure
         [ ( UnderflowFrame
             { info_tbl = info,
@@ -340,22 +346,26 @@ unpackStackFrameWithIpe stackFrameLoc = do
           )
         ]
     )
-    (\ frame mIpe -> pure [(frame, mIpe)])
+    (\ frame infoKey -> do
+      mIpe <- lookupIPE infoKey
+      pure [(frame, mIpe)])
 
 unpackStackFrameTo ::
   forall a .
   StackFrameLocation ->
   -- ^ Decode the given 'StackFrame'.
-  (StgInfoTable -> Maybe InfoProv -> StackSnapshot -> IO a) ->
+  (StgInfoTable -> Ptr IPE.StgInfoTable -> StackSnapshot -> IO a) ->
   -- ^ How to handle 'UNDERFLOW_FRAME's.
-  (StackFrame -> Maybe InfoProv -> IO a) ->
+  -- The pointer is the key for the 'lookupIPE'.
+  (StackFrame -> Ptr IPE.StgInfoTable -> IO a) ->
   -- ^ How to handle all other 'StackFrame' values.
+  -- The pointer is the key for the 'lookupIPE'.
   IO a
 unpackStackFrameTo (StackSnapshot stackSnapshot#, index) unpackUnderflowFrame finaliseStackFrame = do
-  (info, m_info_prov) <- getInfoTableOnStack stackSnapshot# index
+  (info, infoTablePtr) <- getInfoTableOnStack stackSnapshot# index
   unpackStackFrame' info
-    (unpackUnderflowFrame info m_info_prov)
-    (`finaliseStackFrame` m_info_prov)
+    (unpackUnderflowFrame info infoTablePtr)
+    (`finaliseStackFrame` infoTablePtr)
   where
     unpackStackFrame' ::
       StgInfoTable ->
