@@ -708,12 +708,12 @@ removeFromQueues(Capability *cap, StgTSO *tso)
   case BlockedOnWrite:
   case BlockedOnDoProc:
       // These blocking reasons are only used by some I/O managers
-      syncIOCancel(cap, tso);
+      syncIOCancel(cap->iomgr, tso);
       goto done;
 
   case BlockedOnDelay:
       // This blocking reasons is only used by some I/O managers
-      syncDelayCancel(cap, tso);
+      syncDelayCancel(cap->iomgr, tso);
       goto done;
 
   default:
