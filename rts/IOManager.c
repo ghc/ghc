@@ -23,6 +23,7 @@
 #include "Prelude.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
+#include "ThreadLabels.h"
 #include "sm/Evac.h"
 
 #include "IOManagerInternals.h"
@@ -436,7 +437,7 @@ void initIOManager(void)
 /* Called from forkProcess in the child process on the surviving capability.
  */
 void
-initIOManagerAfterFork(Capability **pcap)
+initIOManagerAfterFork(Capability *cap)
 {
 
     switch (iomgr_type) {
@@ -452,7 +453,7 @@ initIOManagerAfterFork(Capability **pcap)
              * contexts where it is called (forkProcess), there is only a
              * single cap available.
              */
-            ioManagerStartCap(pcap);
+            ioManagerStartCap(cap);
             break;
 #endif
         /* The IO_MANAGER_SELECT needs no initialisation */
@@ -467,13 +468,21 @@ initIOManagerAfterFork(Capability **pcap)
 
 /* Called from setNumCapabilities.
  */
-void notifyIOManagerCapabilitiesChanged(Capability **pcap)
+void notifyIOManagerCapabilitiesChanged(Capability *cap)
 {
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_MIO_POSIX)
         case IO_MANAGER_MIO_POSIX:
-            rts_evalIO(pcap, ioManagerCapabilitiesChanged_closure, NULL);
+        {
+            /* Notify asynchronously. See getSystemEventManager for how this
+             * race is handled
+             */
+            StgTSO *tso = createIOThread(cap, RtsFlags.GcFlags.initialStkSize,
+                                         ioManagerCapabilitiesChanged_closure);
+            setThreadLabel(cap, tso, "I/O manager setNumCapabilities");
+            scheduleThread(cap, tso);
             break;
+        }
 #endif
         default:
             break;

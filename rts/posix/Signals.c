@@ -220,9 +220,14 @@ ioManagerDie (void)
 }
 
 void
-ioManagerStartCap (Capability **cap)
+ioManagerStartCap (Capability *cap)
 {
-    rts_evalIO(cap,ensureIOManagerIsRunning_closure,NULL);
+    Capability *cap2 = cap;
+    rts_evalIO(&cap2,ensureIOManagerIsRunning_closure,NULL);
+    /* In principle rts_evalIO allows the cap to change, but in this
+     * circumstance we know that it cannot because this is a new thread
+     * on a new capability. */
+    ASSERT(cap2 == cap);
 }
 
 void
@@ -232,7 +237,7 @@ ioManagerStart (void)
     Capability *cap;
     if (SEQ_CST_LOAD(&timer_manager_control_wr_fd) < 0 || SEQ_CST_LOAD(&io_manager_wakeup_fd) < 0) {
         cap = rts_lock();
-        ioManagerStartCap(&cap);
+        ioManagerStartCap(cap);
         rts_unlock(cap);
     }
 }

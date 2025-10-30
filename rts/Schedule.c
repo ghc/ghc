@@ -2232,7 +2232,7 @@ forkProcess(HsStablePtr *entry
         // like startup event, capabilities, process info etc
         traceTaskCreate(task, cap);
 
-        initIOManagerAfterFork(&cap);
+        initIOManagerAfterFork(cap);
 
         // start timer after the IOManager is initialized
         // (the idle GC may wake up the IOManager)
@@ -2392,7 +2392,7 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
     }
 
     // Notify IO manager that the number of capabilities has changed.
-    notifyIOManagerCapabilitiesChanged(&cap);
+    notifyIOManagerCapabilitiesChanged(cap);
 
     startTimer();
 

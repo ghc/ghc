@@ -242,11 +242,8 @@ void initIOManager(void);
 
 /* Init hook: called from forkProcess in the child process on the surviving
  * capability.
- *
- * Note that this is synchronous and can run Haskell code, so can change the
- * given cap.
  */
-void initIOManagerAfterFork(/* inout */ Capability **pcap);
+void initIOManagerAfterFork(Capability *cap);
 
 /* TODO: rationalise initIOManager and initIOManagerAfterFork into a single
          per-capability init function.
@@ -255,7 +252,7 @@ void initIOManagerAfterFork(/* inout */ Capability **pcap);
 
 /* Called from setNumCapabilities.
  */
-void notifyIOManagerCapabilitiesChanged(Capability **pcap);
+void notifyIOManagerCapabilitiesChanged(Capability *cap);
 
 
 /* Shutdown hooks: called from hs_exit_ before and after the scheduler exits.
