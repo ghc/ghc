@@ -188,11 +188,36 @@ that it is a no-op.  Here's our solution
 
 (DSST3) When desugaring, try eta-reduction on the payload of a WpSubType.
   This is done in `GHC.HsToCore.Binds.dsHsWrapper` by the call to `optSubTypeHsWrapper`.
+
+Note [WpFun-RR-INVARIANT]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Given
+  wrap = WpFun wrap1 wrap2 sty1 ty2
+  where:  wrap1 :: exp_arg ~~> act_arg
+          wrap2 :: act_res ~~> exp_res
+          wrap  :: (act_arg -> act_res) ~~> (exp_arg -> exp_res)
+we have
+  WpFun-RR-INVARIANT:
+      the input (exp_arg) and output (act_arg) types of `wrap1`
+      both have a fixed runtime-rep
+
+Reason: We desugar wrap[e] into
+    \(x:act_arg). wrap2[ e wrap1[x] ]
+And then, because of Note [Representation polymorphism invariants], we need:
+
+  * `act`_arg must have a fixed runtime rep,
+    so that lambda obeys the the FRR rules
+
+  * `act-res` must have a fixed runtime rep,
+    so the that application (e wrap1[x]) obeys the FRR tules
+
+Hence WpFun-INVARIANT.
 -}
 
--- We write    wrap :: t1 ~> t2
--- if       wrap[ e::t1 ] :: t2
 data HsWrapper
+  -- NOTATION (~~>):
+  --    We write          wrap :: t1 ~~> t2
+  --    if       wrap[ e::t1 ] :: t2
   = WpHole                      -- The identity coercion
 
   | WpSubType HsWrapper   -- (WpSubType wp) Means the same as `wp`
@@ -204,28 +229,25 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
        --
-       -- If wrap1 :: t2 ~> t3
-       --    wrap2 :: t1 ~> t2
-       --- Then (wrap1 `WpCompose` wrap2) :: t1 ~> t3
+       -- If wrap1 :: t2 ~~> t3
+       --    wrap2 :: t1 ~~> t2
+       --- Then (wrap1 `WpCompose` wrap2) :: t1 ~~> t3
 
   | WpFun HsWrapper HsWrapper (Scaled TcTypeFRR) TcType
        -- (WpFun wrap1 wrap2 (w, t1) t2)[e] = \(x:_w exp_arg). wrap2[ e wrap1[x] ]
        --
-       -- INVARIANT: both input and output types of `wrap1` have
-       --            a fixed runtime-rep, so that we can safely
-       --            desugar WpFun into a lambda.
+       -- INVARIANT: both input and output types of `wrap1` have a fixed runtime-rep
+       --            See Note [WpFun-RR-INVARIANT]
        --
-       -- INVARIANT: t1 is the "from-type" of wrap1
-       --            t2 is the "to-type"   of wrap2
-
-       -- So note that if    e     :: act_arg -> act_res
-       --                    wrap1 :: exp_arg ~> act_arg
-       --                    wrap2 :: act_res ~> exp_res
-       -- then   WpFun wrap1 wrap2 :: (act_arg -> act_res) ~> (exp_arg -> exp_res)
+       -- Typing rules:
+       -- If    e     :: act_arg -> act_res
+       --       wrap1 :: exp_arg ~~> act_arg
+       --       wrap2 :: act_res ~~> exp_res
+       -- then   WpFun wrap1 wrap2 :: (act_arg -> act_res) ~~> (exp_arg -> exp_res)
        -- This isn't the same as for mkFunCo, but it has to be this way
        -- because we can't use 'sym' to flip around these HsWrappers
        --
-       -- NB: a WpFun is always for a (->) function arrow
+       -- NB: a WpFun is always for a (->) function arrow, never (=>)
 
   | WpCast TcCoercionR        -- A cast:  [] `cast` co
                               -- Guaranteed not the identity coercion
@@ -275,7 +297,7 @@ WpCast c1 <.> WpCast c2 = WpCast (c2 `mkTransCo` c1)
   --
   -- NB: <.> behaves like function composition:
   --
-  --   WpCast c1 <.> WpCast c2 :: coercionLKind c2 ~> coercionRKind c1
+  --   WpCast c1 <.> WpCast c2 :: coercionLKind c2 ~~> coercionRKind c1
   --
   -- This is thus the same as WpCast (c2 ; c1) and not WpCast (c1 ; c2).
 c1        <.> c2        = c1 `WpCompose` c2
@@ -285,19 +307,10 @@ mkWpFun :: HsWrapper -> HsWrapper
         -> TcType           -- ^ Either "from" type or "to" type of the second wrapper
                             --   (used only when the second wrapper is the identity)
         -> HsWrapper
--- ^ Smart constructor to create a 'WpFun' 'HsWrapper'
+-- ^ Smart constructor for `WpFun`
 -- Just removes clutter and optimises some common cases.
 --
--- PRECONDITION:
---    Both the "from" and "to" types of the first wrapper have a syntactically
---    fixed RuntimeRep (see Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete).
---    If we retain the WpFun (i.e. not case 1), it will desugar to a lambda
---        \x. w_res[ e w_arg[x] ]
---    To satisfy Note [Representation polymorphism invariants] in GHC.Core,
---    it must be the case that both the lambda bound variable x and the function
---    argument w_arg[x] have a fixed runtime representation, i.e. that both the
---    "from" and "to" types of the first wrapper "w_arg" have a fixed runtime
---    representation.
+-- PRECONDITION: same as Note [WpFun-RR-INVARIANT]
 --
 -- Unfortunately, we can't check PRECONDITION with an assertion here, because of
 -- [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
