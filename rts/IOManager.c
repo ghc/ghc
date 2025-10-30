@@ -39,7 +39,7 @@
 #endif
 
 #if defined(IOMGR_ENABLED_MIO_POSIX)
-#include "posix/Signals.h"
+#include "posix/MIO.h"
 #include "Prelude.h"
 #endif
 

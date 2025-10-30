@@ -583,6 +583,7 @@ library
                     posix/OSMem.c
                     posix/OSThreads.c
                     posix/FdWakeup.c
+                    posix/MIO.c
                     posix/Poll.c
                     posix/Select.c
                     posix/Signals.c
