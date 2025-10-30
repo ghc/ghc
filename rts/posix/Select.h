@@ -15,7 +15,7 @@ typedef StgWord LowResTime;
 
 LowResTime getDelayTarget (HsInt us);
 
-void awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait);
+void awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait);
 
 #include "EndPrivate.h"
 
