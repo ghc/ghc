@@ -174,6 +174,10 @@ static void deleteAllThreads (void);
 static void deleteThread_(StgTSO *tso);
 #endif
 
+static void removeFromRunQueue (Capability *cap, StgTSO *tso);
+static void truncateRunQueue(Capability *cap);
+static StgTSO *popRunQueue (Capability *cap);
+
 /* ---------------------------------------------------------------------------
    Main scheduling loop.
 
@@ -589,38 +593,6 @@ run_thread:
       scheduleDoGC(&cap,task,false,ready_to_gc,false,false);
     }
   } /* end of while() */
-}
-
-/* -----------------------------------------------------------------------------
- * Run queue operations
- * -------------------------------------------------------------------------- */
-
-static void
-removeFromRunQueue (Capability *cap, StgTSO *tso)
-{
-    if (tso->block_info.prev == END_TSO_QUEUE) {
-        ASSERT(cap->run_queue_hd == tso);
-        cap->run_queue_hd = tso->_link;
-    } else {
-        setTSOLink(cap, tso->block_info.prev, tso->_link);
-    }
-    if (tso->_link == END_TSO_QUEUE) {
-        ASSERT(cap->run_queue_tl == tso);
-        cap->run_queue_tl = tso->block_info.prev;
-    } else {
-        setTSOPrev(cap, tso->_link, tso->block_info.prev);
-    }
-    tso->_link = tso->block_info.prev = END_TSO_QUEUE;
-    cap->n_run_queue--;
-
-    IF_DEBUG(sanity, checkRunQueue(cap));
-}
-
-void
-promoteInRunQueue (Capability *cap, StgTSO *tso)
-{
-    removeFromRunQueue(cap, tso);
-    pushOnRunQueue(cap, tso);
 }
 
 /* -----------------------------------------------------------------------------
@@ -2191,7 +2163,6 @@ forkProcess(HsStablePtr *entry
             // bound threads for which the corresponding Task does not
             // exist.
             truncateRunQueue(cap);
-            cap->n_run_queue = 0;
 
             // Any suspended C-calling Tasks are no more, their OS threads
             // don't exist now:
@@ -2997,7 +2968,7 @@ pushOnRunQueue (Capability *cap, StgTSO *tso)
     cap->n_run_queue++;
 }
 
-StgTSO *popRunQueue (Capability *cap)
+static StgTSO *popRunQueue (Capability *cap)
 {
     ASSERT(cap->n_run_queue > 0);
     StgTSO *t = cap->run_queue_hd;
@@ -3015,6 +2986,43 @@ StgTSO *popRunQueue (Capability *cap)
     }
     cap->n_run_queue--;
     return t;
+}
+
+static void truncateRunQueue(Capability *cap)
+{
+    // Can only be called by the task owning the capability.
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->run_queue_hd, "truncateRunQueue");
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->run_queue_tl, "truncateRunQueue");
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->n_run_queue, "truncateRunQueue");
+    cap->run_queue_hd = END_TSO_QUEUE;
+    cap->run_queue_tl = END_TSO_QUEUE;
+    cap->n_run_queue = 0;
+}
+
+static void removeFromRunQueue (Capability *cap, StgTSO *tso)
+{
+    if (tso->block_info.prev == END_TSO_QUEUE) {
+        ASSERT(cap->run_queue_hd == tso);
+        cap->run_queue_hd = tso->_link;
+    } else {
+        setTSOLink(cap, tso->block_info.prev, tso->_link);
+    }
+    if (tso->_link == END_TSO_QUEUE) {
+        ASSERT(cap->run_queue_tl == tso);
+        cap->run_queue_tl = tso->block_info.prev;
+    } else {
+        setTSOPrev(cap, tso->_link, tso->block_info.prev);
+    }
+    tso->_link = tso->block_info.prev = END_TSO_QUEUE;
+    cap->n_run_queue--;
+
+    IF_DEBUG(sanity, checkRunQueue(cap));
+}
+
+void promoteInRunQueue (Capability *cap, StgTSO *tso)
+{
+    removeFromRunQueue(cap, tso);
+    pushOnRunQueue(cap, tso);
 }
 
 
