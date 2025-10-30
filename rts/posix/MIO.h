@@ -8,23 +8,23 @@
 
 #pragma once
 
+#include "IOManager.h"
+
 #if defined(HAVE_SIGNAL_H)
 # include <signal.h>
 #endif
 
-#include "Ticker.h"
-
 #include "BeginPrivate.h"
 
-bool anyUserHandlers(void);
+/* Communicating with the IO manager thread (see GHC.Conc).
+ */
+void ioManagerWakeup (void);
+#if defined(THREADED_RTS)
+void ioManagerDie (void);
+void ioManagerStart (void);
+void ioManagerStartCap (/* inout */ Capability **cap);
 
-#if !defined(THREADED_RTS) && defined(RTS_USER_SIGNALS)
-extern siginfo_t pending_handler_buf[];
-extern siginfo_t *next_pending_handler;
-#define signals_pending() (next_pending_handler != pending_handler_buf)
-void startSignalHandlers(Capability *cap);
+void timerManagerNotifySignal(int sig, siginfo_t *info);
 #endif
-
-extern StgInt *signal_handlers;
 
 #include "EndPrivate.h"
