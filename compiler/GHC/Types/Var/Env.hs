@@ -13,7 +13,7 @@ module GHC.Types.Var.Env (
         extendVarEnv, extendVarEnv_C, extendVarEnv_Acc,
         extendVarEnvList,
         strictPlusVarEnv, plusVarEnv, plusVarEnv_C,
-        strictPlusVarEnv_C, strictPlusVarEnv_C_Directly
+        strictPlusVarEnv_C, strictPlusVarEnv_C_Directly,
         plusVarEnv_CD, plusMaybeVarEnv_C,
         plusVarEnvList, alterVarEnv,
         delVarEnvList, delVarEnv,

@@ -3696,8 +3696,8 @@ data WithTailUsageDetails a = WTUD !TailUsageDetails !a
 
 andUDs:: UsageDetails -> UsageDetails -> UsageDetails
 orUDs :: UsageDetails -> UsageDetails -> UsageDetails
-andUDs = combineUsageDetailsWith andLocalOcc
-orUDs  = combineUsageDetailsWith orLocalOcc
+andUDs = combineUsageDetailsWith (\_uniq -> andLocalOcc)
+orUDs  = combineUsageDetailsWith (\_uniq -> orLocalOcc)
 
 combineJoinPointUDs :: OccEnv -> UsageDetails -> UsageDetails -> UsageDetails
 combineJoinPointUDs (OccEnv { occ_local_lets = local_lets }) uds1 uds2
@@ -4110,21 +4110,21 @@ markNonTail :: OccInfo -> OccInfo
 markNonTail IAmDead = IAmDead
 markNonTail occ     = occ { occ_tail = NoTailCallInfo }
 
-andLocalOcc :: Unique -> LocalOcc -> LocalOcc -> LocalOcc
-andLocalOcc _ occ1 occ2 = ManyOccL (tci1 `andTailCallInfo` tci2)
+andLocalOcc :: LocalOcc -> LocalOcc -> LocalOcc
+andLocalOcc occ1 occ2 = ManyOccL (tci1 `andTailCallInfo` tci2)
   where
     !tci1 = localTailCallInfo occ1
     !tci2 = localTailCallInfo occ2
 
-orLocalOcc :: Unique -> LocalOcc -> LocalOcc -> LocalOcc
+orLocalOcc :: LocalOcc -> LocalOcc -> LocalOcc
 -- (orLocalOcc occ1 occ2) is used
 -- when combining occurrence info from branches of a case
-orLocalOcc _ (OneOccL { lo_n_br = nbr1, lo_int_cxt = int_cxt1, lo_tail = tci1 })
-             (OneOccL { lo_n_br = nbr2, lo_int_cxt = int_cxt2, lo_tail = tci2 })
+orLocalOcc (OneOccL { lo_n_br = nbr1, lo_int_cxt = int_cxt1, lo_tail = tci1 })
+           (OneOccL { lo_n_br = nbr2, lo_int_cxt = int_cxt2, lo_tail = tci2 })
   = OneOccL { lo_n_br    = nbr1 + nbr2
             , lo_int_cxt = int_cxt1 `mappend` int_cxt2
             , lo_tail    = tci1 `andTailCallInfo` tci2 }
-orLocalOcc uniq occ1 occ2 = andLocalOcc uniq occ1 occ2
+orLocalOcc occ1 occ2 = andLocalOcc occ1 occ2
 
 andTailCallInfo :: TailCallInfo -> TailCallInfo -> TailCallInfo
 andTailCallInfo info@(AlwaysTailCalled arity1) (AlwaysTailCalled arity2)
