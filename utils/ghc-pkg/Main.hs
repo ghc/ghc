@@ -2056,7 +2056,8 @@ checkHSLib _verbosity dirs lib = do
                    "lib" ++ lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dylib",
                    "lib" ++ lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dylib",
                    lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll",
-                   lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll"
+                   lib ++ "_p" ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll",
+                   lib ++ ".bytecode"
                   ]
   b <- liftIO $ doesFileExistOnPath filenames dirs
   when (not b) $
