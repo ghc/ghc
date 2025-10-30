@@ -175,7 +175,7 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
                , eaql_larg    :: LHsExpr GhcRn       -- Original application, for
                                                      -- location and error msgs
                , eaql_rn_fun  :: HsExpr GhcRn  -- Head of the argument if it is an application
-               , eaql_tc_fun  :: (HsExpr GhcTc, SrcSpan) -- Typechecked head
+               , eaql_tc_fun  :: (HsExpr GhcTc, SrcSpan) -- Typechecked head and its location span
                , eaql_fun_ue  :: UsageEnv -- Usage environment of the typechecked head (QLA5)
                , eaql_args    :: [HsExprArg 'TcpInst]    -- Args: instantiated, not typechecked
                , eaql_wanted  :: WantedConstraints
@@ -456,8 +456,8 @@ tcInferAppHead :: (HsExpr GhcRn, SrcSpan)
 --     cases are dealt with by splitHsApps.
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
-tcInferAppHead (fun,fun_loc)
-  = setSrcSpan fun_loc $
+tcInferAppHead (fun,fun_lspan)
+  = setSrcSpan fun_lspan $
     do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
@@ -471,7 +471,8 @@ tcInferAppHead_maybe fun =
     case fun of
       HsVar _ nm                  -> Just <$> tcInferId nm
       XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
-      XExpr (ExpandedThingRn o e) -> Just <$> (addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $ -- We do not want to instantiate c.f. T19167
+      XExpr (ExpandedThingRn o e) -> Just <$> (addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $
+                                              -- We do not want to instantiate c.f. T19167
                                                     tcExprSigma False e)
       ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit             -> Just <$> tcInferOverLit lit
