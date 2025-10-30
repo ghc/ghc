@@ -197,7 +197,7 @@ static inline void postBuf(EventsBuf *eb, const StgWord8 *buf, uint32_t size)
 static inline void postStringLen(EventsBuf *eb, const char *buf, StgWord len)
 {
     if (buf) {
-        ASSERT(eb->begin + eb->size > eb->pos + len + 1);
+        ASSERT(eb->pos + len + 1 <= eb->begin + eb->size);
         memcpy(eb->pos, buf, len);
         eb->pos += len;
     }
