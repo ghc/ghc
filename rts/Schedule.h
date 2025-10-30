@@ -164,10 +164,6 @@ void appendToRunQueue (Capability *cap, StgTSO *tso);
  */
 void pushOnRunQueue (Capability *cap, StgTSO *tso);
 
-/* Pop the first thread off the runnable queue.
- */
-StgTSO *popRunQueue (Capability *cap);
-
 INLINE_HEADER StgTSO *
 peekRunQueue (Capability *cap)
 {
@@ -182,18 +178,6 @@ emptyRunQueue(Capability *cap)
     // Can only be called by the task owning the capability.
     TSAN_ANNOTATE_BENIGN_RACE(&cap->n_run_queue, "emptyRunQueue");
     return cap->n_run_queue == 0;
-}
-
-INLINE_HEADER void
-truncateRunQueue(Capability *cap)
-{
-    // Can only be called by the task owning the capability.
-    TSAN_ANNOTATE_BENIGN_RACE(&cap->run_queue_hd, "truncateRunQueue");
-    TSAN_ANNOTATE_BENIGN_RACE(&cap->run_queue_tl, "truncateRunQueue");
-    TSAN_ANNOTATE_BENIGN_RACE(&cap->n_run_queue, "truncateRunQueue");
-    cap->run_queue_hd = END_TSO_QUEUE;
-    cap->run_queue_tl = END_TSO_QUEUE;
-    cap->n_run_queue = 0;
 }
 
 #endif /* !IN_STG_CODE */
