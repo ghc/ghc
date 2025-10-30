@@ -120,9 +120,9 @@ also allows the signal mask to be adjusted, but we do not make use of this.
 ******************************************************************************/
 
 /* Forward declarations */
-static bool enlargeTables(Capability *cap, CapIOManager *iomgr);
-static void notifyIOCompletion(Capability *cap, StgAsyncIOOp *aiop);
-static void ioCancel(Capability *cap, StgAsyncIOOp *aiop);
+static bool enlargeTables(CapIOManager *iomgr);
+static void notifyIOCompletion(CapIOManager *iomgr, StgAsyncIOOp *aiop);
+static void ioCancel(CapIOManager *iomgr, StgAsyncIOOp *aiop);
 static void reportPollError(int res, nfds_t nfds) STG_NORETURN;
 
 
@@ -136,32 +136,31 @@ void initCapabilityIOManagerPoll(CapIOManager *iomgr)
 
 /* Used to implement syncIOWaitReady.
  * Result is true on success, or false on allocation failure. */
-bool syncIOWaitReadyPoll(Capability *cap, StgTSO *tso,
+bool syncIOWaitReadyPoll(CapIOManager *iomgr, StgTSO *tso,
                          IOReadOrWrite rw, HsInt fd)
 {
     StgAsyncIOOp *aiop;
-    aiop = (StgAsyncIOOp *)allocateMightFail(cap, sizeofW(StgAsyncIOOp));
+    aiop = (StgAsyncIOOp *)allocateMightFail(iomgr->cap, sizeofW(StgAsyncIOOp));
     if (RTS_UNLIKELY(aiop == NULL)) return false;
-    SET_HDR(aiop, &stg_ASYNCIOOP_info, cap->r.rCCCS);
+    SET_HDR(aiop, &stg_ASYNCIOOP_info, iomgr->cap->r.rCCCS);
     aiop->notify.tso     = tso;
     aiop->notify_type    = NotifyTSO;
     aiop->live           = &stg_ASYNCIO_LIVE0_closure;
     tso->why_blocked     = rw == IORead ? BlockedOnRead : BlockedOnWrite;
     tso->block_info.aiop = aiop;
-    return asyncIOWaitReadyPoll(cap, aiop, rw, fd);
+    return asyncIOWaitReadyPoll(iomgr, aiop, rw, fd);
 }
 
 /* Result is true on success, or false on allocation failure. */
-bool asyncIOWaitReadyPoll(Capability *cap, StgAsyncIOOp *aiop,
+bool asyncIOWaitReadyPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop,
                          IOReadOrWrite rw, int fd)
 {
-    CapIOManager *iomgr = cap->iomgr;
     if (RTS_UNLIKELY(isFullClosureTable(&iomgr->aiop_table))) {
-        bool ok = enlargeTables(cap, iomgr);
+        bool ok = enlargeTables(iomgr);
         if (RTS_UNLIKELY(!ok)) return false;
     }
 
-    int ix = insertClosureTable(cap, &iomgr->aiop_table, aiop);
+    int ix = insertClosureTable(iomgr->cap, &iomgr->aiop_table, aiop);
 
     /* We use the aiop_table and aiop_poll_table densely. */
     ASSERT(ix == sizeClosureTable(&iomgr->aiop_table) - 1);
@@ -169,7 +168,7 @@ bool asyncIOWaitReadyPoll(Capability *cap, StgAsyncIOOp *aiop,
     /* The syncIO wrapper or CMM primop filled in the notify and live fields,
      * we fill the rest.
      */
-    aiop->capno   = cap->no;
+    aiop->capno   = iomgr->cap->no;
     aiop->index   = ix;
     aiop->outcome = IOOpOutcomeInFlight;
 
@@ -183,12 +182,12 @@ bool asyncIOWaitReadyPoll(Capability *cap, StgAsyncIOOp *aiop,
 }
 
 
-void syncIOCancelPoll(Capability *cap, StgTSO *tso)
+void syncIOCancelPoll(CapIOManager *iomgr, StgTSO *tso)
 {
     StgAsyncIOOp *aiop  = tso->block_info.aiop;
     ASSERT(aiop->notify_type == NotifyTSO);
-    ASSERT(indexClosureTable(&cap->iomgr->aiop_table, aiop->index) == aiop);
-    ioCancel(cap, aiop);
+    ASSERT(indexClosureTable(&iomgr->aiop_table, aiop->index) == aiop);
+    ioCancel(iomgr, aiop);
     /* We cannot use the normal notifyIOCompletion here. We are in the context
      * of throwTo, interrupting a thread blocked on IO via an async exception.
      * We don't put the TSO back on the run queue or change the why_blocked
@@ -198,7 +197,7 @@ void syncIOCancelPoll(Capability *cap, StgTSO *tso)
 }
 
 
-void asyncIOCancelPoll(Capability *cap, StgAsyncIOOp *aiop)
+void asyncIOCancelPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop)
 {
     /* We can reliably determine if the aiop is still in progress by checking
      * if the aiop_table still points to this aiop object. This is reliable
@@ -206,20 +205,18 @@ void asyncIOCancelPoll(Capability *cap, StgAsyncIOOp *aiop)
      * is no longer retained by the application.
      */
     ASSERT(aiop->notify_type != NotifyTSO);
-    if (indexClosureTable(&cap->iomgr->aiop_table, aiop->index) == aiop) {
-        ioCancel(cap, aiop);
-        notifyIOCompletion(cap, aiop);
+    if (indexClosureTable(&iomgr->aiop_table, aiop->index) == aiop) {
+        ioCancel(iomgr, aiop);
+        notifyIOCompletion(iomgr, aiop);
     }
 }
 
 
-static void ioCancel(Capability *cap, StgAsyncIOOp *aiop)
+static void ioCancel(CapIOManager *iomgr, StgAsyncIOOp *aiop)
 {
-    CapIOManager *iomgr = cap->iomgr;
-
     int ix = aiop->index;
     int ix_from; int ix_to;
-    removeCompactClosureTable(cap, &iomgr->aiop_table, ix,
+    removeCompactClosureTable(iomgr->cap, &iomgr->aiop_table, ix,
                               &ix_from, &ix_to);
     if (ix_to != ix_from) {
         StgAsyncIOOp *aiop_to = indexClosureTable(&iomgr->aiop_table, ix_to);
@@ -237,7 +234,7 @@ bool anyPendingTimeoutsOrIOPoll(CapIOManager *iomgr)
 }
 
 
-static void notifyIOCompletion(Capability *cap, StgAsyncIOOp *aiop)
+static void notifyIOCompletion(CapIOManager *iomgr, StgAsyncIOOp *aiop)
 {
     ASSERT(aiop->outcome != IOOpOutcomeInFlight);
     switch (aiop->notify_type) {
@@ -251,7 +248,8 @@ static void notifyIOCompletion(Capability *cap, StgAsyncIOOp *aiop)
                 debugTrace(DEBUG_iomanager,
                            "Raising exception in thread %" FMT_StgThreadID
                            " blocked on an invalid fd", tso->id);
-                raiseAsync(cap, tso, (StgClosure *)blockedOnBadFD_closure,
+                raiseAsync(iomgr->cap, tso,
+                           (StgClosure *)blockedOnBadFD_closure,
                            false, NULL);
                 break;
             } else {
@@ -262,7 +260,7 @@ static void notifyIOCompletion(Capability *cap, StgAsyncIOOp *aiop)
                 StgTSO *tso      = aiop->notify.tso;
                 tso->why_blocked = NotBlocked;
                 tso->_link       = END_TSO_QUEUE;
-                pushOnRunQueue(cap, tso);
+                pushOnRunQueue(iomgr->cap, tso);
             }
             break;
         }
@@ -277,8 +275,7 @@ static void notifyIOCompletion(Capability *cap, StgAsyncIOOp *aiop)
 }
 
 
-static void processIOCompletions(Capability *cap, CapIOManager *iomgr,
-                                 int ncompletions)
+static void processIOCompletions(CapIOManager *iomgr, int ncompletions)
 {
     /* The scheme we use with poll is that we have a dense poll table, and a
      * corresponding table that maps to the closure table index. The poll
@@ -320,7 +317,7 @@ static void processIOCompletions(Capability *cap, CapIOManager *iomgr,
              * apply the same compacting to the aiop_poll_table.
              */
             int ix_from; int ix_to;
-            removeCompactClosureTable(cap, &iomgr->aiop_table, i,
+            removeCompactClosureTable(iomgr->cap, &iomgr->aiop_table, i,
                                       &ix_from, &ix_to);
             if (ix_to != ix_from) {
                 StgAsyncIOOp *aiop_to;
@@ -329,7 +326,7 @@ static void processIOCompletions(Capability *cap, CapIOManager *iomgr,
                 aiop_poll_table[ix_to] = aiop_poll_table[ix_from];
             }
 
-            notifyIOCompletion(cap, aiop);
+            notifyIOCompletion(iomgr, aiop);
             n--;
         } else {
             /* You'd expect incrementing the poll table index to be
@@ -343,13 +340,11 @@ static void processIOCompletions(Capability *cap, CapIOManager *iomgr,
 }
 
 
-void pollCompletedTimeoutsOrIOPoll(Capability *cap)
+void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 {
-    CapIOManager *iomgr = cap->iomgr;
-
     if (!isEmptyTimeoutQueue(iomgr->timeout_queue)) {
         Time now = getProcessElapsedTime();
-        processTimeoutCompletions(cap, now);
+        processTimeoutCompletions(iomgr, now);
     }
 
     if (!isEmptyClosureTable(&iomgr->aiop_table)) {
@@ -379,7 +374,7 @@ void pollCompletedTimeoutsOrIOPoll(Capability *cap)
         } else if (res > 0) {
             int ncompletions = res;
             ASSERT(ncompletions <= (int)nfds);
-            processIOCompletions(cap, iomgr, ncompletions);
+            processIOCompletions(iomgr, ncompletions);
 
         } else if (errno == EINTR) {
           /* We got interrupted by a signal. This is unlikely since we asked
@@ -393,10 +388,8 @@ void pollCompletedTimeoutsOrIOPoll(Capability *cap)
 }
 
 
-void awaitCompletedTimeoutsOrIOPoll(Capability *cap)
+void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 {
-    CapIOManager *iomgr = cap->iomgr;
-
     /* Loop until we've woken up some threads. This loop is needed because the
      * poll() timing isn't accurate, we sometimes sleep for a while but not
      * long enough to wake up a thread in a threadDelay. Or we may need to
@@ -409,14 +402,14 @@ void awaitCompletedTimeoutsOrIOPoll(Capability *cap)
                !isEmptyClosureTable(&iomgr->aiop_table));
 
         Time now = getProcessElapsedTime();
-        processTimeoutCompletions(cap, now);
+        processTimeoutCompletions(iomgr, now);
 
         /* If we didn't wake any threads due to expiring timeouts, then we need
          * to wait on I/O. Or to put it another way, even if we did wake some
          * threads, we'll still poll (but not wait) for I/O. This is to ensure
          * we avoid starving threads blocked on I/O.
          */
-        bool wait = emptyRunQueue(cap);
+        bool wait = emptyRunQueue(iomgr->cap);
 
         /* Decide if we are going to wait if no I/O is ready, either:
          * poll only, wait indefinitely, or wait until a timeout.
@@ -461,7 +454,7 @@ void awaitCompletedTimeoutsOrIOPoll(Capability *cap)
         } else if (res > 0) {
             int ncompletions = res;
             ASSERT(ncompletions <= (int)nfds);
-            processIOCompletions(cap, iomgr, ncompletions);
+            processIOCompletions(iomgr, ncompletions);
 
         } else if (errno == EINTR) {
             /* We got interrupted by a signal. In the non-threaded RTS, if the
@@ -471,7 +464,7 @@ void awaitCompletedTimeoutsOrIOPoll(Capability *cap)
              * signal is serviced.
              */
 #if defined(RTS_USER_SIGNALS)
-            if (startPendingSignalHandlers(cap)) break;
+            if (startPendingSignalHandlers(iomgr->cap)) break;
 #endif
 
             /* We can also be interrupted by the shutdown signal handler, which
@@ -485,7 +478,7 @@ void awaitCompletedTimeoutsOrIOPoll(Capability *cap)
             reportPollError(res, nfds);
         }
 
-    } while (emptyRunQueue(cap)
+    } while (emptyRunQueue(iomgr->cap)
          && (getSchedState() == SCHED_RUNNING));
 }
 
@@ -507,12 +500,12 @@ static void reportPollError(int res, nfds_t nfds)
 
 /* Helper function to double the size of the aiop_table and aiop_poll_table.
  */
-static bool enlargeTables(Capability *cap, CapIOManager *iomgr)
+static bool enlargeTables(CapIOManager *iomgr)
 {
     int oldcapacity = capacityClosureTable(&iomgr->aiop_table);
     int newcapacity = (oldcapacity == 0) ? 1 : (oldcapacity * 2);
 
-    bool ok = enlargeClosureTable(cap, &iomgr->aiop_table, newcapacity);
+    bool ok = enlargeClosureTable(iomgr->cap, &iomgr->aiop_table, newcapacity);
     if (RTS_UNLIKELY(!ok)) return false;
 
     /* Update the auxiliary aiop_poll_table to match */
