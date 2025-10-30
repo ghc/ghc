@@ -2279,7 +2279,8 @@ stg_waitReadzh ( W_ fd )
 {
     CBool ok; /* Ok, or heap alloc failure. */
 
-    (ok) = ccall syncIOWaitReady(MyCapability() "ptr", CurrentTSO "ptr",
+    (ok) = ccall syncIOWaitReady(Capability_iomgr(MyCapability()) "ptr",
+                                 CurrentTSO "ptr",
                                  /* IORead */ 0::I32, fd);
     if (ok != 0::CBool) (likely: True) {
         jump stg_block_noregs();
@@ -2292,7 +2293,8 @@ stg_waitWritezh ( W_ fd )
 {
     CBool ok; /* Ok, or heap alloc failure. */
 
-    (ok) = ccall syncIOWaitReady(MyCapability() "ptr", CurrentTSO "ptr",
+    (ok) = ccall syncIOWaitReady(Capability_iomgr(MyCapability()) "ptr",
+                                 CurrentTSO "ptr",
                                  /* IOWrite */ 1::I32, fd);
     if (ok != 0::CBool) (likely: True) {
         jump stg_block_noregs();
@@ -2305,7 +2307,8 @@ stg_delayzh ( W_ us_delay )
 {
     CBool ok; /* Ok, or heap alloc failure. */
 
-    (ok) = ccall syncDelay(MyCapability() "ptr", CurrentTSO "ptr", us_delay);
+    (ok) = ccall syncDelay(Capability_iomgr(MyCapability()) "ptr",
+                           CurrentTSO "ptr", us_delay);
 
     if (ok != 0::CBool) (likely: True) {
         /* Annoyingly, we cannot be consistent with how we wait and resume the

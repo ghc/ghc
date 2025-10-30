@@ -93,9 +93,8 @@ LowResTime getDelayTarget (HsInt us)
  * if this is true, then our time has expired.
  * (idea due to Andy Gill).
  */
-static bool wakeUpSleepingThreads (Capability *cap, LowResTime now)
+static bool wakeUpSleepingThreads (CapIOManager *iomgr, LowResTime now)
 {
-    CapIOManager *iomgr = cap->iomgr;
     StgTSO *tso;
     bool flag = false;
 
@@ -109,7 +108,7 @@ static bool wakeUpSleepingThreads (Capability *cap, LowResTime now)
         tso->_link = END_TSO_QUEUE;
         IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %"
                                        FMT_StgThreadID "\n", tso->id));
-        pushOnRunQueue(cap,tso);
+        pushOnRunQueue(iomgr->cap,tso);
         flag = true;
     }
     return flag;
@@ -217,9 +216,8 @@ static enum FdState fdPollWriteState (int fd)
  *
  */
 void
-awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
+awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
 {
-    CapIOManager *iomgr = cap->iomgr;
     StgTSO *tso, *prev, *next;
     fd_set rfd,wfd;
     int numFound;
@@ -244,7 +242,7 @@ awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
     do {
 
       now = getLowResTimeOfDay();
-      if (wakeUpSleepingThreads(cap, now)) {
+      if (wakeUpSleepingThreads(iomgr, now)) {
           return;
       }
 
@@ -355,7 +353,7 @@ awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
            */
 #if defined(RTS_USER_SIGNALS)
           if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
-              startSignalHandlers(cap);
+              startSignalHandlers(iomgr->cap);
               return; /* still hold the lock */
           }
 #endif
@@ -368,12 +366,12 @@ awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
 
           /* check for threads that need waking up
            */
-          wakeUpSleepingThreads(cap, getLowResTimeOfDay());
+          wakeUpSleepingThreads(iomgr, getLowResTimeOfDay());
 
           /* If new runnable threads have arrived, stop waiting for
            * I/O and run them.
            */
-          if (!emptyRunQueue(cap)) {
+          if (!emptyRunQueue(iomgr->cap)) {
               return; /* still hold the lock */
           }
       }
@@ -429,7 +427,7 @@ awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
                   IF_DEBUG(scheduler,
                       debugBelch("Killing blocked thread %" FMT_StgThreadID
                                  " on bad fd=%i\n", tso->id, fd));
-                  raiseAsync(cap, tso,
+                  raiseAsync(iomgr->cap, tso,
                       (StgClosure *)blockedOnBadFD_closure, false, NULL);
                   break;
               case RTS_FD_IS_READY:
@@ -438,13 +436,13 @@ awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
                                  tso->id));
                   tso->why_blocked = NotBlocked;
                   tso->_link = END_TSO_QUEUE;
-                  pushOnRunQueue(cap,tso);
+                  pushOnRunQueue(iomgr->cap,tso);
                   break;
               case RTS_FD_IS_BLOCKING:
                   if (prev == NULL)
                       iomgr->blocked_queue_hd = tso;
                   else
-                      setTSOLink(cap, prev, tso);
+                      setTSOLink(iomgr->cap, prev, tso);
                   prev = tso;
                   break;
               }
@@ -460,7 +458,7 @@ awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
       }
 
     } while (wait && getSchedState() == SCHED_RUNNING
-                  && emptyRunQueue(cap));
+                  && emptyRunQueue(iomgr->cap));
 }
 
 #endif /* IOMGR_ENABLED_SELECT */

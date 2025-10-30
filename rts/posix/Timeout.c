@@ -26,7 +26,7 @@
  */
 #if defined(IOMGR_ENABLED_POLL)
 
-bool syncDelayTimeout(Capability *cap, StgTSO *tso, HsInt us_delay)
+bool syncDelayTimeout(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay)
 {
     Time now = getProcessElapsedTime();
     Time target;
@@ -42,16 +42,16 @@ bool syncDelayTimeout(Capability *cap, StgTSO *tso, HsInt us_delay)
 
     /* fill in a new timeout queue entry */
     StgTimeout *timeout;
-    timeout = (StgTimeout *)allocateMightFail(cap, sizeofW(StgTimeout));
+    timeout = (StgTimeout *)allocateMightFail(iomgr->cap, sizeofW(StgTimeout));
     if (RTS_UNLIKELY(timeout == NULL)) { return false; }
     union NotifyCompletion notify = { .tso = tso };
-    initElemTimeoutQueue(timeout, notify, NotifyTSO, cap->r.rCCCS);
+    initElemTimeoutQueue(timeout, notify, NotifyTSO, iomgr->cap->r.rCCCS);
 
     ASSERT(tso->why_blocked == NotBlocked);
     tso->why_blocked = BlockedOnDelay;
     tso->block_info.timeout = timeout;
 
-    insertTimeoutQueue(&cap->iomgr->timeout_queue, timeout, target);
+    insertTimeoutQueue(&iomgr->timeout_queue, timeout, target);
 
     debugTrace(DEBUG_iomanager,
                "timer for delay of %lld usec installed at time %lld ns",
@@ -60,18 +60,18 @@ bool syncDelayTimeout(Capability *cap, StgTSO *tso, HsInt us_delay)
 }
 
 
-void syncDelayCancelTimeout(Capability *cap, StgTSO *tso)
+void syncDelayCancelTimeout(CapIOManager *iomgr, StgTSO *tso)
 {
     ASSERT(tso->why_blocked == BlockedOnDelay);
     StgTimeoutQueue *timeout = tso->block_info.timeout;
 
-    deleteTimeoutQueue(&cap->iomgr->timeout_queue, timeout);
+    deleteTimeoutQueue(&iomgr->timeout_queue, timeout);
 
     tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
 
     /* the timeout is no longer accessible from anywhere (except here) */
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
-        updateRemembSetPushClosure(cap, (StgClosure *)timeout);
+        updateRemembSetPushClosure(iomgr->cap, (StgClosure *)timeout);
     }
 
     /* We don't put the TSO back on the run queue or change the why_blocked
@@ -79,7 +79,7 @@ void syncDelayCancelTimeout(Capability *cap, StgTSO *tso)
      */
 }
 
-static void notifyTimeoutCompletion(Capability *cap, StgTimeout *timeout);
+static void notifyTimeoutCompletion(CapIOManager *iomgr, StgTimeout *timeout);
 
 /* We use the 64bit Time type from rts/Time.h so our max time (in nanosecond
  * precision) is over 290 years from the epoch of the monotonic clock.
@@ -90,10 +90,8 @@ static void notifyTimeoutCompletion(Capability *cap, StgTimeout *timeout);
  * With 64bit Time we do not need to worry about clock wraparound and can just
  * use the simple formula.
  */
-void processTimeoutCompletions(Capability *cap, Time now)
+void processTimeoutCompletions(CapIOManager *iomgr, Time now)
 {
-    CapIOManager *iomgr = cap->iomgr;
-
     /* Pop entries from the front of the sleeping queue that are past their
      * wake time, and unblock the corresponding MVars.
      */
@@ -105,17 +103,17 @@ void processTimeoutCompletions(Capability *cap, Time now)
         debugTrace(DEBUG_iomanager,"timer expired at %lld ns", waketime);
         StgTimeout *timeout;
         deleteMinTimeoutQueue(&iomgr->timeout_queue, &timeout);
-        notifyTimeoutCompletion(cap, timeout);
+        notifyTimeoutCompletion(iomgr, timeout);
 
         /* the timeout is no longer accessible from anywhere (except here) */
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
-            updateRemembSetPushClosure(cap, (StgClosure *)timeout);
+            updateRemembSetPushClosure(iomgr->cap, (StgClosure *)timeout);
         }
     }
 }
 
 
-static void notifyTimeoutCompletion(Capability *cap, StgTimeout *timeout)
+static void notifyTimeoutCompletion(CapIOManager *iomgr, StgTimeout *timeout)
 {
     switch (timeout->notify_type) {
         case NotifyTSO:
@@ -123,11 +121,11 @@ static void notifyTimeoutCompletion(Capability *cap, StgTimeout *timeout)
             StgTSO *tso      = timeout->notify.tso;
             tso->why_blocked = NotBlocked;
             tso->_link       = END_TSO_QUEUE;
-            pushOnRunQueue(cap, tso);
+            pushOnRunQueue(iomgr->cap, tso);
             break;
         }
         case NotifyMVar:
-            performTryPutMVar(cap, timeout->notify.mvar, Unit_closure);
+            performTryPutMVar(iomgr->cap, timeout->notify.mvar, Unit_closure);
             break;
 
         case NotifyTVar:

@@ -409,7 +409,7 @@ schedule (Capability *initialCapability, Task *task)
      */
     if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0 &&
         (!emptyRunQueue(cap) ||
-          anyPendingTimeoutsOrIO(cap))) {
+          anyPendingTimeoutsOrIO(cap->iomgr))) {
         RELAXED_STORE(&cap->context_switch, 1);
     }
 
@@ -923,14 +923,14 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
      * awaitCompletedTimeoutsOrIO below for the case of !defined(THREADED_RTS)
      * && defined(mingw32_HOST_OS).
      */
-    if (anyPendingTimeoutsOrIO(cap))
+    if (anyPendingTimeoutsOrIO(cap->iomgr))
     {
         if (emptyRunQueue(cap)) {
             // block and wait
-            awaitCompletedTimeoutsOrIO(cap);
+            awaitCompletedTimeoutsOrIO(cap->iomgr);
         } else {
             // poll but do not wait
-            pollCompletedTimeoutsOrIO(cap);
+            pollCompletedTimeoutsOrIO(cap->iomgr);
         }
     }
 #endif
@@ -950,7 +950,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
      * other tasks are waiting for work, we must have a deadlock of
      * some description.
      */
-    if ( emptyRunQueue(cap) && !anyPendingTimeoutsOrIO(cap) )
+    if ( emptyRunQueue(cap) && !anyPendingTimeoutsOrIO(cap->iomgr) )
     {
 #if defined(THREADED_RTS)
         /*
@@ -2232,7 +2232,7 @@ forkProcess(HsStablePtr *entry
         // like startup event, capabilities, process info etc
         traceTaskCreate(task, cap);
 
-        initIOManagerAfterFork(&cap);
+        initIOManagerAfterFork(cap->iomgr, &cap);
 
         // start timer after the IOManager is initialized
         // (the idle GC may wake up the IOManager)
@@ -2392,7 +2392,7 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
     }
 
     // Notify IO manager that the number of capabilities has changed.
-    notifyIOManagerCapabilitiesChanged(&cap);
+    notifyIOManagerCapabilitiesChanged(cap->iomgr, &cap);
 
     startTimer();
 

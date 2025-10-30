@@ -12,9 +12,9 @@
 
 #include "BeginPrivate.h"
 
-bool syncDelayTimeout(Capability *cap, StgTSO *tso, HsInt us_delay);
+bool syncDelayTimeout(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay);
 
-void syncDelayCancelTimeout(Capability *cap, StgTSO *tso);
+void syncDelayCancelTimeout(CapIOManager *iomgr, StgTSO *tso);
 
 /* Process the completion of any timeouts that have expired: this means
  * notifying whatever is waiting on the timeout, a thread, an MVar or TVar.
@@ -24,7 +24,7 @@ void syncDelayCancelTimeout(Capability *cap, StgTSO *tso);
  * No result is returned: callers can check if there are now any runnable
  * threads by consulting the scheduler's run queue.
  */
-void processTimeoutCompletions(Capability *cap, Time now);
+void processTimeoutCompletions(CapIOManager *iomgr, Time now);
 
 /* Utility to compute the timeout wait time (in milliseconds) between now and
  * the next timer expiry (if any), or no waiting (if !wait).

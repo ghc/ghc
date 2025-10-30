@@ -286,7 +286,8 @@ initCapability (Capability *cap, uint32_t i)
 #endif
     cap->total_allocated        = 0;
 
-    initCapabilityIOManager(cap); /* initialises cap->iomgr */
+    cap->iomgr = allocCapabilityIOManager(cap);
+    initCapabilityIOManager(cap->iomgr);
 
     cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;
     cap->f.stgGCEnter1     = (StgFunPtr)__stg_gc_enter_1;
@@ -1344,7 +1345,7 @@ markCapability (evac_fn evac, void *user, Capability *cap,
     }
 #endif
 
-    markCapabilityIOManager(evac, user, cap);
+    markCapabilityIOManager(evac, user, cap->iomgr);
 
     // Free STM structures for this Capability
     stmPreGCHook(cap);

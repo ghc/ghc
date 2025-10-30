@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "Capability.h"
 #include "sm/GC.h" // for evac_fn
 
 #include "BeginPrivate.h"
@@ -227,11 +228,19 @@ enum IOOpOutcome {
 void selectIOManager(void);
 
 
-/* Allocate and initialise the per-capability CapIOManager that lives in each
- * Capability. Called from initCapability(), which is done in the RTS startup
- * in initCapabilities(), and later at runtime via setNumCapabilities().
+/* Allocate a CapIOManager for a given Capability. Having this helps us keep
+ * struct CapIOManager opaque from most of the rest of the RTS.
  */
-void initCapabilityIOManager(Capability *cap);
+CapIOManager *allocCapabilityIOManager(Capability *cap);
+
+/* Initialise the per-capability CapIOManager that lives in each Capability.
+ * Called from initCapability(), which is done in the RTS startup in
+ * initCapabilities(), and later at runtime via setNumCapabilities().
+ *
+ * This is separate from allocCapabilityIOManager so that we can re-initialise
+ * I/O managers after forkProcess.
+ */
+void initCapabilityIOManager(CapIOManager *iomgr);
 
 
 /* Init hook: called from hs_init_ghc, very late in the startup after almost
@@ -243,10 +252,11 @@ void initIOManager(void);
 /* Init hook: called from forkProcess in the child process on the surviving
  * capability.
  *
- * Note that this is synchronous and can run Haskell code, so can change the
- * given cap.
+ * This is synchronous and can run Haskell code, so can change the given cap.
+ * TODO: it would make for a cleaner API here if this were made asynchronous.
  */
-void initIOManagerAfterFork(/* inout */ Capability **pcap);
+void initIOManagerAfterFork(CapIOManager *iomgr,
+                /* inout */ Capability  **pcap);
 
 /* TODO: rationalise initIOManager and initIOManagerAfterFork into a single
          per-capability init function.
@@ -254,8 +264,12 @@ void initIOManagerAfterFork(/* inout */ Capability **pcap);
 
 
 /* Called from setNumCapabilities.
+ *
+ * This is synchronous and can run Haskell code, so can change the given cap.
+ * TODO: it would make for a cleaner API here if this were made asynchronous.
  */
-void notifyIOManagerCapabilitiesChanged(Capability **pcap);
+void notifyIOManagerCapabilitiesChanged(CapIOManager *iomgr,
+                            /* inout */ Capability  **pcap);
 
 
 /* Shutdown hooks: called from hs_exit_ before and after the scheduler exits.
@@ -288,7 +302,7 @@ void wakeupIOManager(void);
 
 /* GC hook: mark any per-capability GC roots the I/O manager uses.
  */
-void markCapabilityIOManager(evac_fn evac, void *user, Capability *cap);
+void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr);
 
 
 /* GC hook: scavenge I/O related tso->block_info. Used by scavengeTSO.
@@ -305,21 +319,20 @@ typedef enum { IORead, IOWrite } IOReadOrWrite;
  * necessarily operate on threads. The thread is suspended until the operation
  * completes.
  *
- * These are called from CMM primops. The ones returing int can perform heap
- * allocation, which might fail. They return 0 on success, or n > 0 on heap
- * allocation failure, needing n words. The CMM primops should invoke the
- * GC to free up at least n words and then retry the operation.
+ * Some of these are called from CMM primops. The primops returing bool can
+ * perform heap allocation, which might fail. They return true on success, or
+ * false on heap allocation failure.
  */
 
-/* Result is true on success, or false on allocation failure. */
-bool syncIOWaitReady(Capability *cap, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
+/* Called from CMM primop */
+bool syncIOWaitReady(CapIOManager *iomgr, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
 
-void syncIOCancel(Capability *cap, StgTSO *tso);
+void syncIOCancel(CapIOManager *iomgr, StgTSO *tso);
 
-/* Result is true on success, or false on allocation failure. */
-bool syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay);
+/* Called from CMM primop */
+bool syncDelay(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay);
 
-void syncDelayCancel(Capability *cap, StgTSO *tso);
+void syncDelayCancel(CapIOManager *iomgr, StgTSO *tso);
 
 #if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_WIN32_LEGACY)
 /* Add a thread to the end of the queue of threads blocked on I/O.
@@ -327,7 +340,7 @@ void syncDelayCancel(Capability *cap, StgTSO *tso);
  * This is used by the select() and the Windows MIO non-threaded I/O manager
  * implementation. Called from CMM code.
  */
-void appendToIOBlockedQueue(Capability *cap, StgTSO *tso);
+void appendToIOBlockedQueue(CapIOManager *iomgr, StgTSO *tso);
 #endif
 
 /* Check to see if there are any pending timeouts or I/O operations
@@ -336,7 +349,7 @@ void appendToIOBlockedQueue(Capability *cap, StgTSO *tso);
  * This is used by the scheduler as part of deadlock-detection, and the
  * "context switch as often as possible" test.
  */
-bool anyPendingTimeoutsOrIO(Capability *cap);
+bool anyPendingTimeoutsOrIO(CapIOManager *iomgr);
 
 /* If there are any completed I/O operations or expired timers, process the
  * completions as appropriate (which will typically unblock some waiting
@@ -344,7 +357,7 @@ bool anyPendingTimeoutsOrIO(Capability *cap);
  *
  * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
  */
-void pollCompletedTimeoutsOrIO(Capability *cap);
+void pollCompletedTimeoutsOrIO(CapIOManager *iomgr);
 
  /* If there are any completed I/O operations or expired timers, process the
  * completions as appropriate. If there are none, wait until I/O or a timer
@@ -360,6 +373,6 @@ void pollCompletedTimeoutsOrIO(Capability *cap);
  *
  * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
  */
-void awaitCompletedTimeoutsOrIO(Capability *cap);
+void awaitCompletedTimeoutsOrIO(CapIOManager *iomgr);
 
 #include "EndPrivate.h"
