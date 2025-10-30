@@ -24,7 +24,8 @@
 
 /* The per-capability data structures belonging to the I/O manager.
  *
- * It can be accessed as cap->iomgr.
+ * It can be accessed as cap->iomgr. Or given just the iomgr, you can access
+ * the owning cap as iomgr->cap.
  *
  * The content of the structure is defined conditionally so it is different for
  * each I/O manager implementation.
@@ -32,6 +33,9 @@
  * Here is where we actually define the representation.
  */
 struct _CapIOManager {
+
+   /* Back reference to the containing capability */
+    Capability *cap;
 
 #if defined(IOMGR_ENABLED_SELECT)
     /* Thread queue for threads blocked on I/O completion. */
