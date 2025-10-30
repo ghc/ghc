@@ -11,6 +11,7 @@
 module GHC.Linker.Deps
   ( LinkDepsOpts (..)
   , LinkDeps (..)
+  , LibraryUnits (..)
   , getLinkDeps
   )
 where
@@ -83,8 +84,14 @@ data LinkDepsOpts = LinkDepsOpts
 data LinkDeps = LinkDeps
   { ldNeededLinkables :: [Linkable]
   , ldAllLinkables    :: [Linkable]
-  , ldNeededUnits     :: [UnitId]
+  , ldNeededUnits     :: [LibraryUnits]
   , ldAllUnits        :: UniqDSet UnitId
+  }
+
+data LibraryUnits
+  = LibraryUnits
+  { home_unit :: !UnitId
+  , library_unit :: !UnitId
   }
 
 -- | Find all the packages and linkables that a set of modules depends on
@@ -155,10 +162,10 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         link_mods =
           listToUDFM [(moduleName (mi_module (hm_iface m)), m) | m <- mmods]
         link_libs =
-          uniqDSetToList (unionManyUniqDSets (init_pkg_set : pkgs))
+          eltsUDFM (foldl' plusUDFM emptyUDFM (init_pkg_set : pkgs))
       pure $
         LinkModules (LinkHomeModule <$> link_mods) :
-        (LinkLibrary <$> link_libs)
+        link_libs
 
     -- This code is used in `--make` mode to calculate the home package and unit dependencies
     -- for a set of modules.
@@ -168,7 +175,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
     -- It is also a matter of correctness to use the module graph so that dependencies between home units
     -- is resolved correctly.
-    make_deps_loop :: (UniqDSet UnitId, Set.Set NodeKey) -> [ModNodeKeyWithUid] -> (UniqDSet UnitId, Set.Set NodeKey)
+    make_deps_loop :: (UniqDFM UnitId LinkDep, Set.Set NodeKey) -> [ModNodeKeyWithUid] -> (UniqDFM UnitId LinkDep, Set.Set NodeKey)
     make_deps_loop found [] = found
     make_deps_loop found@(found_units, found_mods) (nk:nexts)
       | NodeKey_Module nk `Set.member` found_mods = make_deps_loop found nexts
@@ -176,7 +183,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         case fmap mkNodeKey <$> mgReachable mod_graph (NodeKey_Module nk) of
           Nothing ->
               let (ModNodeKeyWithUid _ uid) = nk
-              in make_deps_loop (addOneToUniqDSet found_units uid, found_mods) nexts
+              in make_deps_loop (addToUDFM found_units uid (LinkLibrary LibraryUnits {library_unit = uid, home_unit = (ue_current_unit (ldUnitEnv opts))}), found_mods) nexts
           Just trans_deps ->
             let deps = Set.insert (NodeKey_Module nk) (Set.fromList trans_deps)
                 -- See #936 and the ghci.prog007 test for why we have to continue traversing through
@@ -185,7 +192,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
             in make_deps_loop (found_units, deps `Set.union` found_mods) (todo_boot_mods ++ nexts)
 
     mkNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m)
-    (init_pkg_set, all_deps) = make_deps_loop (emptyUniqDSet, Set.empty) $ map mkNk (filterOut isInteractiveModule mods)
+    (init_pkg_set, all_deps) = make_deps_loop (emptyUDFM, Set.empty) $ map mkNk (filterOut isInteractiveModule mods)
 
     all_home_mods = [with_uid | NodeKey_Module with_uid <- Set.toList all_deps]
 
@@ -195,7 +202,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
           let iface = hm_iface hmi
           case mi_hsc_src iface of
             HsBootFile -> throwProgramError opts $ link_boot_mod_error (mi_module iface)
-            _ -> pure (mkUniqDSet $ Set.toList $ dep_direct_pkgs (mi_deps iface), hmi)
+            _ -> pure (listToUDFM [(u, LinkLibrary LibraryUnits {library_unit = u, home_unit = (moduleUnitId (mi_module iface))}) | u <- Set.toList $ dep_direct_pkgs (mi_deps iface)], hmi)
         Nothing -> throwProgramError opts $
           text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
 
@@ -279,12 +286,13 @@ instance Outputable LinkModule where
 data LinkDep =
   LinkModules (UniqDFM ModuleName LinkModule)
   |
-  LinkLibrary UnitId
+  LinkLibrary LibraryUnits
 
 instance Outputable LinkDep where
   ppr = \case
     LinkModules mods -> text "modules:" <+> ppr (eltsUDFM mods)
-    LinkLibrary uid -> text "library:" <+> ppr uid
+    LinkLibrary (LibraryUnits {home_unit, library_unit}) ->
+      text "library:" <+> ppr library_unit <+> parens (ppr home_unit)
 
 data OneshotError =
   NoLocation Module
@@ -337,7 +345,7 @@ oneshot_deps_loop opts (mod : mods) acc = do
     already_seen
       | Just (LinkModules mods) <- mod_dep
       = elemUDFM mod_name mods
-      | Just (LinkLibrary _) <- mod_dep
+      | Just (LinkLibrary {}) <- mod_dep
       = True
       | otherwise
       = False
@@ -362,7 +370,7 @@ oneshot_deps_loop opts (mod : mods) acc = do
       | otherwise
       = add_library
 
-    add_library = pure (addToUDFM acc mod_unit_id (LinkLibrary mod_unit_id), [])
+    add_library = pure (addToUDFM acc mod_unit_id (LinkLibrary LibraryUnits {library_unit = mod_unit_id, home_unit}), [])
 
     add_module iface lmod =
       (addListToUDFM with_mod (direct_pkgs iface), new_deps iface)
@@ -378,7 +386,7 @@ oneshot_deps_loop opts (mod : mods) acc = do
       | bytecode
       = []
       | otherwise
-      = [(u, LinkLibrary u) | u <- Set.toList (dep_direct_pkgs (mi_deps iface))]
+      = [(u, LinkLibrary LibraryUnits {library_unit = u, home_unit}) | u <- Set.toList (dep_direct_pkgs (mi_deps iface))]
 
     new_deps iface
       | bytecode
@@ -418,6 +426,7 @@ oneshot_deps_loop opts (mod : mods) acc = do
       text "due to use of Template Haskell"
 
     bytecode = ldUseByteCode opts
+    home_unit = homeUnitId (expectJust "oneshot_deps" mb_home)
     mb_home = ue_homeUnit (ldUnitEnv opts)
 
 link_boot_mod_error :: Module -> SDoc
@@ -428,7 +437,7 @@ link_boot_mod_error mod =
 classify_deps ::
   LoaderState ->
   [LinkDep] ->
-  ([Linkable], [LinkModule], UniqDSet UnitId, [UnitId])
+  ([Linkable], [LinkModule], UniqDSet UnitId, [LibraryUnits])
 classify_deps pls deps =
   (loaded_modules, needed_modules, all_packages, needed_packages)
   where
@@ -436,13 +445,15 @@ classify_deps pls deps =
       partitionWith loaded_or_needed (concatMap eltsUDFM modules)
 
     needed_packages =
-      eltsUDFM (getUniqDSet all_packages `minusUDFM` pkgs_loaded pls)
+      eltsUDFM (packages `minusUDFM` pkgs_loaded pls)
 
-    all_packages = mkUniqDSet packages
+    packages = listToUDFM [(library_unit p, p) | p <- packages_with_home_units]
 
-    (modules, packages) = flip partitionWith deps $ \case
+    all_packages = mkUniqDSet (map library_unit packages_with_home_units)
+
+    (modules, packages_with_home_units) = flip partitionWith deps $ \case
       LinkModules mods -> Left mods
-      LinkLibrary lib -> Right lib
+      LinkLibrary units -> Right units
 
     loaded_or_needed lm =
       maybe (Right lm) Left (loaded_linkable (mi_module (link_module_iface lm)))

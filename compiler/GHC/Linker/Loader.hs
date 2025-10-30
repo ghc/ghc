@@ -93,8 +93,9 @@ import Control.Monad
 
 import qualified Data.Set as Set
 import Data.Char (isSpace)
+import Data.Foldable (for_)
 import Data.IORef
-import Data.List (intercalate, isPrefixOf, nub, partition)
+import Data.List (intercalate, isPrefixOf, nub, partition, sortOn)
 import Data.Maybe
 import Control.Concurrent.MVar
 import qualified Control.Monad.Catch as MC
@@ -109,6 +110,7 @@ import System.Win32.Info (getSystemDirectory)
 #endif
 
 import GHC.Utils.Exception
+import qualified Data.List.NonEmpty as NE
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -173,7 +175,7 @@ emptyLoaderState = LoaderState
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = unitUDFM rtsUnitId (LoadedPkgInfo rtsUnitId [] [] [] emptyUniqDSet)
+  where init_pkgs = unitUDFM rtsUnitId (LoadedPkgInfo rtsUnitId Nothing [] [] [] emptyUniqDSet)
 
 extendLoadedEnv :: Interp -> [(Name,ForeignHValue)] -> IO ()
 extendLoadedEnv interp new_bindings =
@@ -325,9 +327,8 @@ reallyInitLoaderState interp hsc_env = do
       -- (a) initialise the C dynamic linker
       initObjLinker interp
 
-
       -- (b) Load packages from the command-line (Note [preload packages])
-      pls <- unitEnv_foldWithKey (\k u env -> k >>= \pls' -> loadPackages' interp (hscSetActiveUnitId u hsc_env) (preloadUnits (homeUnitEnv_units env)) pls') (return pls0) (hsc_HUG hsc_env)
+      pls <- unitEnv_foldWithKey (\k u env -> k >>= \pls' -> loadPackages' interp hsc_env [LibraryUnits {home_unit = u, library_unit = pre} | pre <- preloadUnits (homeUnitEnv_units env)] pls') (return pls0) (hsc_HUG hsc_env)
 
       -- steps (c), (d) and (e)
       loadCmdLineLibs' interp hsc_env pls
@@ -855,7 +856,13 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib logger tmpfs dflags2 unit_env objs (loaded_pkg_uid <$> eltsUDFM pkgs_loaded)
+    do
+      let groupedLoadedPackageInfos = groupLoadedPackageInfosByParent pkgs_loaded
+      for_ groupedLoadedPackageInfos $ \(mParent, loaded_pkg_uids) -> do
+        let unit_env' = case mParent of
+              Nothing -> unit_env
+              Just parent -> ue_setActiveUnit parent unit_env
+        linkDynLib logger tmpfs dflags2 unit_env' objs loaded_pkg_uids
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
@@ -865,6 +872,19 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
       Left err -> linkFail msg err
   where
     msg = "GHC.Linker.Loader.dynLoadObjs: Loading temp shared object failed"
+
+    groupOn :: Eq k => (a -> k) -> [a] -> [NE.NonEmpty a]
+    groupOn f = NE.groupBy ((==) `on2` f)
+        -- redefine on so we avoid duplicate computation for most values.
+        where (.*.) `on2` f = \x -> let fx = f x in \y -> fx .*. f y
+
+    groupLoadedPackageInfosByParent :: PkgsLoaded -> [(Maybe UnitId, [UnitId])]
+    groupLoadedPackageInfosByParent pkgs =
+      map (\l -> (loaded_pkg_parent (NE.head l), NE.toList $ NE.map loaded_pkg_uid l))
+        $ groupOn loaded_pkg_parent
+        $ sortOn loaded_pkg_parent
+        $ eltsUDFM pkgs
+
 
 rmDupLinkables :: LinkableSet    -- Already loaded
                -> [Linkable]    -- New linkables
@@ -1075,36 +1095,39 @@ loadPackages interp hsc_env new_pkgs = do
   -- a lock.
   initLoaderState interp hsc_env
   modifyLoaderState_ interp $ \pls ->
-    loadPackages' interp hsc_env new_pkgs pls
+    loadPackages' interp hsc_env [LibraryUnits {home_unit = hscActiveUnitId hsc_env, library_unit} | library_unit <- new_pkgs] pls
 
-loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
-loadPackages' interp hsc_env new_pks pls = do
+loadPackages' :: Interp -> HscEnv -> [LibraryUnits] -> LoaderState -> IO LoaderState
+loadPackages' interp hsc_env0 new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs'
                   }
   where
-     link :: PkgsLoaded -> [UnitId] -> IO PkgsLoaded
+     link :: PkgsLoaded -> [LibraryUnits] -> IO PkgsLoaded
      link pkgs new_pkgs =
          foldM link_one pkgs new_pkgs
 
-     link_one pkgs new_pkg
-        | new_pkg `elemUDFM` pkgs   -- Already linked
+     link_one pkgs (LibraryUnits {home_unit, library_unit})
+        | library_unit `elemUDFM` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
+        | Just pkg_cfg <- lookupUnitId (hsc_units (hscSetActiveUnitId home_unit hsc_env)) library_unit
         = do { let deps = unitDepends pkg_cfg
                -- Link dependents first
-             ; pkgs' <- link pkgs deps
+             ; pkgs' <- link pkgs [LibraryUnits {home_unit, library_unit} | library_unit <- deps]
+
                 -- Now link the package itself
              ; (hs_cls, extra_cls, loaded_dlls) <- loadPackage interp hsc_env pkg_cfg
              ; let trans_deps = unionManyUniqDSets [ addOneToUniqDSet (loaded_pkg_trans_deps loaded_pkg_info) dep_pkg
                                                    | dep_pkg <- deps
                                                    , Just loaded_pkg_info <- pure (lookupUDFM pkgs' dep_pkg)
                                                    ]
-             ; return (addToUDFM pkgs' new_pkg (LoadedPkgInfo new_pkg hs_cls extra_cls loaded_dlls trans_deps)) }
+             ; return (addToUDFM pkgs' library_unit (LoadedPkgInfo library_unit (Just home_unit) hs_cls extra_cls loaded_dlls trans_deps)) }
 
         | otherwise
-        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
+        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS library_unit)))
+        where
+          hsc_env = hscSetActiveUnitId home_unit hsc_env0
 
 
 loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ([LibrarySpec], [LibrarySpec], [RemotePtr LoadedDLL])
