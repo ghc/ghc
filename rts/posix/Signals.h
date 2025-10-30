@@ -36,7 +36,7 @@ void ioManagerWakeup (void);
 #if defined(THREADED_RTS)
 void ioManagerDie (void);
 void ioManagerStart (void);
-void ioManagerStartCap (/* inout */ Capability **cap);
+void ioManagerStartCap (Capability *cap);
 #endif
 
 extern StgInt *signal_handlers;

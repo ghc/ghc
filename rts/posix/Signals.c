@@ -220,9 +220,13 @@ ioManagerDie (void)
 }
 
 void
-ioManagerStartCap (Capability **cap)
+ioManagerStartCap (Capability *cap)
 {
-    rts_evalIO(cap,ensureIOManagerIsRunning_closure,NULL);
+    /* Start I/O manager asynchronously. */
+    StgTSO *tso = createIOThread(cap, RtsFlags.GcFlags.initialStkSize,
+		                 ensureIOManagerIsRunning_closure);
+    setThreadLabel(cap, tso, "I/O manager start");
+    scheduleThread(cap, tso);
 }
 
 void
@@ -232,7 +236,7 @@ ioManagerStart (void)
     Capability *cap;
     if (SEQ_CST_LOAD(&timer_manager_control_wr_fd) < 0 || SEQ_CST_LOAD(&io_manager_wakeup_fd) < 0) {
         cap = rts_lock();
-        ioManagerStartCap(&cap);
+        ioManagerStartCap(cap);
         rts_unlock(cap);
     }
 }
