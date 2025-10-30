@@ -977,7 +977,13 @@ dynLinkBCOs interp pls keep_spec bcos =
           bco_state <- dynLinkCompiledByteCode interp (pkgs_loaded pls) (bco_loader_state pls) traverseHomePackageBytecodeState keep_spec cbcs
           return $! pls1 { bco_loader_state = bco_state }
 
-dynLinkCompiledByteCode :: Interp -> PkgsLoaded -> BytecodeLoaderState -> BytecodeLoaderStateTraverser IO -> KeepModuleLinkableDefinitions -> [CompiledByteCode] -> IO BytecodeLoaderState
+dynLinkCompiledByteCode :: Interp
+                        -> PkgsLoaded
+                        -> BytecodeLoaderState
+                        -> BytecodeLoaderStateTraverser IO  -- ^ The traverser tells us to update home package bytecode state or external package bytecode state
+                        -> KeepModuleLinkableDefinitions
+                        -> [CompiledByteCode]
+                        -> IO BytecodeLoaderState
 dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecode_state keep_spec cbcs = do
         st1 <- traverse_bytecode_state whole_bytecode_state $ \bytecode_state -> do
           let
@@ -991,6 +997,8 @@ dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecod
           let lb2 = lb1 { breakarray_env = be2, ccs_env = ce2 }
           return $! bytecode_state { bco_linker_env = le2, bco_linked_breaks = lb2 }
 
+        -- NB: Important to pass the whole bytecode loader state to linkSomeBCOs so that you can find Names in local
+        -- and external packages.
         names_and_refs <- linkSomeBCOs interp pkgs_loaded st1 cbcs
 
         -- We only want to add the external ones to the ClosureEnv
@@ -1003,10 +1011,8 @@ dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecod
 
         traverse_bytecode_state st1 $ \bytecode_state -> do
           let ce2 = extendClosureEnv (closure_env (bco_linker_env bytecode_state)) new_binds
-
           -- Add SPT entries
           mapM_ (linkSptEntry interp ce2) (concatMap bc_spt_entries cbcs)
-
           return $! bytecode_state { bco_linker_env = (bco_linker_env bytecode_state) { closure_env = ce2 } }
 
 -- | Register SPT entries for this module in the interpreter
@@ -1332,9 +1338,9 @@ loadBytecodeLibrary hsc_env interp pls path = do
   _mod_time <- expectJust <$> modificationTimeIfExists path'
   -- 1. Read the bytecode library
   (BytecodeLib uid cbcs stubs_so) <- decodeOnDiskBytecodeLib hsc_env =<< readBytecodeLib hsc_env path'
-  -- debugTraceMsg (hsc_logger hsc_env) 3 $ text "loadBytecodeLibrary: " $$ vcat [ text "uid: " <+> ppr uid
-                                                                              , text "cbcs: " <+> ppr cbcs
-                                                                              , text "stubs_so: " <+> ppr stubs_so ]
+  debugTraceMsg (hsc_logger hsc_env) 3 $ text "loadBytecodeLibrary: " $$ vcat [ text "uid: " <+> ppr uid
+                                                                             , text "cbcs: " <+> ppr (length cbcs)
+                                                                             , text "stubs_so: " <+> ppr stubs_so ]
   pls' <- case stubs_so of
     Nothing -> return pls
     Just (SharedObject so_file libdir libname) -> do
