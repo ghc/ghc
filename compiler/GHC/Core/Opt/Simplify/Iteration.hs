@@ -4598,12 +4598,12 @@ mkLetUnfolding :: SimplEnv -> TopLevelFlag -> UnfoldingSource
                -> InId -> Bool    -- True <=> this is a join point
                -> OutExpr -> SimplM Unfolding
 mkLetUnfolding env top_lvl src id is_join new_rhs
-  | is_join
-  , UnfNever <- guidance
-  = -- For large join points, don't keep an unfolding at all if it is large
-    -- This is just an attempt to keep residency under control in
-    -- deeply-nested join-point such as those arising in #26425
-    return NoUnfolding
+--  | is_join
+--  , UnfNever <- guidance
+--  = -- For large join points, don't keep an unfolding at all if it is large
+--    -- This is just an attempt to keep residency under control in
+--    -- deeply-nested join-point such as those arising in #26425
+--    return NoUnfolding
 
   | otherwise
   = return (mkCoreUnfolding src is_top_lvl new_rhs Nothing guidance)
