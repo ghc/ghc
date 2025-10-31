@@ -209,6 +209,9 @@ Runtime system
   flag is not passed, preserving previous behavior.
 
 
+- Reorganise how certain symbols are linked to avoid a bootstrapping failure
+  with the linker shipping newer macOS versions (:ghc-ticket:`26166`)
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
