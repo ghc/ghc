@@ -132,15 +132,18 @@ configureEnvironment :: Stage -> Action [CmdOption]
 configureEnvironment stage = do
     context <- libffiContext stage
     cFlags  <- interpretInContext context getStagedCCFlags
-    sequence [ builderEnvironment "CC" $ Cc CompileC stage
+    isCross <- flag CrossCompiling
+    sequence $ [ builderEnvironment "CC" $ Cc CompileC stage
              , builderEnvironment "CXX" $ Cc CompileC stage
              , builderEnvironment "AR" $ Ar Unpack stage
              , builderEnvironment "NM" $ Nm stage
              , builderEnvironment "RANLIB" $ Ranlib stage
-             -- TODO: Staged LD for mingw is wrong. Uses clang instead of the
-             -- provided $LD , builderEnvironment "LD" (Ld stage)
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
-             , return . AddEnv "LDFLAGS" $ "-w" ]
+             , return . AddEnv "LDFLAGS" $ "-w" ] ++
+             -- When we're building a cross-compiler, we have to be careful
+             -- which environment variables are propagated for the non-target
+             -- stages.
+             (if isHostStage stage && isCross then [remBuilderEnvironment "LD"] else [])
 
 -- Need the libffi archive and `trackAllow` all files in the build directory.
 -- See [Libffi indicating inputs].

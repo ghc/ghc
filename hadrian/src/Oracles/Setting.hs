@@ -7,7 +7,7 @@ module Oracles.Setting (
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, targetSupportsRPaths, topDirectory,
     libsuf, ghcVersionStage, bashPath, targetStage, crossStage, queryTarget, queryTargetTarget,
-    ghcWithInterpreter,
+    ghcWithInterpreter, isHostStage,
 
     -- ** Target platform things
     anyTargetOs, anyTargetArch, anyHostOs,
@@ -247,10 +247,12 @@ libsuf st way
 -- Build libraries for this stage targetting this Target
 -- For example, we want to build RTS with stage1 for the host target as we produce a host executable with stage1  (which cross-compiles to stage2)
 targetStage :: Stage -> Action Target
-targetStage (Stage0 {}) = getHostTarget
-targetStage (Stage1 {}) = getHostTarget
-targetStage (Stage2 {}) = getTargetTarget
-targetStage (Stage3 {}) = getTargetTarget
+targetStage stage | isHostStage stage = getHostTarget
+targetStage _ = getTargetTarget
+
+isHostStage :: Stage -> Bool
+isHostStage stage | stage <= Stage1 = True
+isHostStage _ = False
 
 queryTarget :: Stage -> (Target -> a) -> (Expr c b a)
 queryTarget s f = expr (f <$> targetStage s)
@@ -264,4 +266,3 @@ crossStage st = do
   st_target <- targetStage (succStage st)
   st_host   <- targetStage st
   return (targetPlatformTriple st_target /= targetPlatformTriple st_host)
-
