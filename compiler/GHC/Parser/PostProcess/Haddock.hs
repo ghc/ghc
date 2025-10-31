@@ -1115,7 +1115,6 @@ runHdkA (HdkA _ m) = unHdkM m mempty
 -- To take it into account, we must register its location using registerLocHdkA
 -- or registerHdkA.
 --
--- See Note [Register keyword location].
 -- See Note [Adding Haddock comments to the syntax tree].
 registerLocHdkA :: SrcSpan -> HdkA ()
 registerLocHdkA l = HdkA (getBufSpan l) (pure ())
@@ -1543,19 +1542,4 @@ that GHC could parse successfully:
     g :: a -> Int
 
 This declaration was accepted by ghc but rejected by ghc -haddock.
--}
-
-{- Note [Register keyword location]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-At the moment, 'addHaddock' erroneously associates some comments with
-constructs that are separated by a keyword. For example:
-
-    data Foo -- | Comment for MkFoo
-      where MkFoo :: Foo
-
-We could use EPA (exactprint annotations) to fix this, but not without
-modification. For example, EpaLocation contains RealSrcSpan but not BufSpan.
-Also, the fix would be more straightforward after #19623.
-
-For examples, see tests/haddock/should_compile_flag_haddock/T17544_kw.hs
 -}

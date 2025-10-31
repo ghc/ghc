@@ -2,8 +2,6 @@
 {-# OPTIONS -haddock -ddump-parsed-ast #-}
 
 -- Haddock comments in this test case are all rejected.
---
--- See Note [Register keyword location] in GHC.Parser.PostProcess.Haddock
 
 module
   -- | Bad comment for the module
