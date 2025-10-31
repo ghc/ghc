@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ghc-in-browser</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/modern-normalize/modern-normalize.min.css"
+    />
+    <style>
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: #0f172a;
+        color: #e5e7eb;
+      }
+      .app {
+        height: 100vh;
+        display: grid;
+        gap: 0.5rem;
+        padding: 0.5rem;
+      }
+      @media (min-width: 800px) {
+        .app {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      @media (max-width: 799.98px) {
+        .app {
+          grid-template-rows: 1fr 1fr;
+        }
+      }
+      .pane {
+        background: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      header {
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid #1f2937;
+        font-weight: 600;
+      }
+      #editor {
+        flex: 1;
+        min-height: 0;
+      }
+      .right {
+        padding: 0.6rem;
+        gap: 0.6rem;
+      }
+      .controls {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.4rem;
+      }
+      .controls input[type="text"] {
+        flex: 1;
+        min-width: 200px;
+        background: #0b1020;
+        color: #e5e7eb;
+        border: 1px solid #223;
+        border-radius: 8px;
+        padding: 0.55rem;
+      }
+      .controls button {
+        background: #22c55e;
+        border: none;
+        border-radius: 8px;
+        padding: 0.55rem 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .outputs {
+        display: block;
+      }
+      .outputs .label {
+        font-size: 0.85rem;
+        opacity: 0.8;
+        margin: 0.35rem 0;
+      }
+      .outputs textarea {
+        display: block;
+        width: 100%;
+        min-height: 30vh;
+        background: #0b1020;
+        color: #d1fae5;
+        border: 1px solid #223;
+        border-radius: 8px;
+        padding: 0.6rem;
+        resize: vertical;
+      }
+      .stderr {
+        color: #fee2e2;
+      }
+    </style>
+
+    <script async type="module">
+      import * as monaco from "https://cdn.jsdelivr.net/npm/monaco-editor/+esm";
+      import {
+        ConsoleStdout,
+        File,
+        OpenFile,
+        PreopenDirectory,
+        WASI,
+      } from "https://esm.sh/gh/haskell-wasm/browser_wasi_shim";
+      import { DyLDBrowserHost, main } from "./dyld.mjs";
+
+      const rootfs = new PreopenDirectory("/", []);
+
+      const bsdtar_wasi = new WASI(
+        ["bsdtar.wasm", "-x"],
+        [],
+        [
+          new OpenFile(new File(new Uint8Array(), { readonly: true })),
+          ConsoleStdout.lineBuffered((msg) => console.info(msg)),
+          ConsoleStdout.lineBuffered((msg) => console.warn(msg)),
+          rootfs,
+        ],
+        { debug: false }
+      );
+
+      const [{ instance }, rootfs_bytes] = await Promise.all([
+        WebAssembly.instantiateStreaming(
+          fetch("https://haskell-wasm.github.io/bsdtar-wasm/bsdtar.wasm"),
+          { wasi_snapshot_preview1: bsdtar_wasi.wasiImport }
+        ),
+        fetch("./rootfs.tar.zst").then((r) => r.bytes()),
+      ]);
+
+      bsdtar_wasi.fds[0] = new OpenFile(
+        new File(rootfs_bytes, { readonly: true })
+      );
+      bsdtar_wasi.start(instance);
+
+      if (document.readyState === "loading") {
+        await new Promise((res) =>
+          document.addEventListener("DOMContentLoaded", res, { once: true })
+        );
+      }
+
+      window.editor = monaco.editor.create(document.getElementById("editor"), {
+        value: 'main :: IO ()\nmain = putStrLn "Hello, Haskell!"\n',
+        language: "haskell",
+        automaticLayout: true,
+        minimap: { enabled: false },
+        theme: "vs-dark",
+        fontSize: 14,
+      });
+
+      const dyld = await main({
+        rpc: new DyLDBrowserHost({
+          rootfs,
+          stdout: (msg) => {
+            document.getElementById("stdout").value += `${msg}\n`;
+          },
+          stderr: (msg) => {
+            document.getElementById("stderr").value += `${msg}\n`;
+          },
+        }),
+        searchDirs: [
+          "/tmp/clib",
+          "/tmp/hslib/lib/wasm32-wasi-ghc-9.15.20251024",
+        ],
+        mainSoPath: "/tmp/libplayground001.so",
+        args: ["libplayground001.so", "+RTS", "-c", "-RTS"],
+        isIserv: false,
+      });
+      const main_func = await dyld.exportFuncs.myMain("/tmp/hslib/lib");
+
+      document.getElementById("runBtn").addEventListener("click", async () => {
+        document.getElementById("runBtn").disabled = true;
+
+        try {
+          document.getElementById("stdout").value = "";
+          document.getElementById("stderr").value = "";
+
+          await main_func(
+            document.getElementById("ghcArgs").value,
+            editor.getValue()
+          );
+        } finally {
+          document.getElementById("runBtn").disabled = false;
+        }
+      });
+
+      document.getElementById("runBtn").disabled = false;
+    </script>
+  </head>
+  <body>
+    <div class="app">
+      <section class="pane">
+        <header>Haskell Source</header>
+        <div id="editor"></div>
+      </section>
+
+      <section class="pane right">
+        <header>Controls / Output</header>
+        <div class="controls">
+          <input
+            id="ghcArgs"
+            type="text"
+            placeholder="GHC args"
+            style="font-family: ui-monospace, Menlo, Consolas, monospace"
+          />
+          <button id="runBtn" disabled="true">Run</button>
+        </div>
+        <div class="outputs">
+          <div class="label">stdout</div>
+          <textarea
+            id="stdout"
+            readonly
+            style="font-family: ui-monospace, Menlo, Consolas, monospace"
+          ></textarea>
+          <div class="label">stderr</div>
+          <textarea
+            id="stderr"
+            class="stderr"
+            readonly
+            style="font-family: ui-monospace, Menlo, Consolas, monospace"
+          ></textarea>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
