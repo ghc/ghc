@@ -7,5 +7,6 @@ While handling default output name would overwrite the input file; must specify 
   | Usage: For basic information, try the `--help' option.
 
 HasCallStack backtrace:
-  bracket, called at compiler/GHC/Driver/MakeAction.hs:2955:3 in ghc-9.13-inplace:GHC.Driver.MakeAction
-
+  throwIO, called at libraries/exceptions/src/Control/Monad/Catch.hs:1:1 in <package-id>:Control.Monad.Catch
+  throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:1:1 in <package-id>:Control.Monad.Catch
+  onException, called at compiler/GHC/Driver/MakeAction.hs:1:1 in <package-id>:GHC.Driver.MakeAction
