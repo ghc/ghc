@@ -194,3 +194,6 @@ test('T26410_prim'
       ]
     , compile_and_run if have_cpu_feature('avx512f') else compile
     , [''])
+
+test('FloatConstant', [], compile_and_run, [''])
+test('IntConstant', [], compile_and_run, [''])

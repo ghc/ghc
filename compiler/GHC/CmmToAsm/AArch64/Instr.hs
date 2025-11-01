@@ -145,7 +145,7 @@ regUsageOfInstr platform instr = case instr of
   DMBISH _                 -> usage ([], [])
 
   -- 9. Floating Point Instructions --------------------------------------------
-  FMOV dst src             -> usage (regOp src, regOp dst)
+  FMOV _fmt dst src        -> usage (regOp src, regOp dst)
   FCVT dst src             -> usage (regOp src, regOp dst)
   SCVTF dst src            -> usage (regOp src, regOp dst)
   FCVTZS dst src           -> usage (regOp src, regOp dst)
@@ -177,6 +177,8 @@ regUsageOfInstr platform instr = case instr of
   UZP2 _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
   TRN1 _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
   TRN2 _fmt dst src1 src2  -> usage (regOp src1 ++ regOp src2, regOp dst)
+  MOVI _fmt dst src        -> usage (regOp src, regOp dst)
+  MVNI _fmt dst src        -> usage (regOp src, regOp dst)
 
   LOCATION{} -> panic $ "regUsageOfInstr: " ++ instrCon instr
   NEWBLOCK{} -> panic $ "regUsageOfInstr: " ++ instrCon instr
@@ -337,7 +339,7 @@ patchRegsOfInstr instr env = case instr of
     DMBISH c       -> DMBISH c
 
     -- 9. Floating Point Instructions ------------------------------------------
-    FMOV o1 o2     -> FMOV (patchOp o1) (patchOp o2)
+    FMOV fmt o1 o2 -> FMOV fmt (patchOp o1) (patchOp o2)
     FCVT o1 o2     -> FCVT (patchOp o1) (patchOp o2)
     SCVTF o1 o2    -> SCVTF (patchOp o1) (patchOp o2)
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
@@ -369,6 +371,8 @@ patchRegsOfInstr instr env = case instr of
     UZP2 fmt o1 o2 o3 -> UZP2 fmt (patchOp o1) (patchOp o2) (patchOp o3)
     TRN1 fmt o1 o2 o3 -> TRN1 fmt (patchOp o1) (patchOp o2) (patchOp o3)
     TRN2 fmt o1 o2 o3 -> TRN2 fmt (patchOp o1) (patchOp o2) (patchOp o3)
+    MOVI fmt o1 o2 -> MOVI fmt (patchOp o1) (patchOp o2)
+    MVNI fmt o1 o2 -> MVNI fmt (patchOp o1) (patchOp o2)
 
     NEWBLOCK{}     -> panic $ "patchRegsOfInstr: " ++ instrCon instr
     LOCATION{}     -> panic $ "patchRegsOfInstr: " ++ instrCon instr
@@ -789,7 +793,7 @@ data Instr
     | DMBISH DMBISHFlags
     -- 9. Floating Point Instructions
     -- move to/from general purpose <-> floating, or floating to floating
-    | FMOV Operand Operand
+    | FMOV Format Operand Operand
     -- Float ConVerT
     | FCVT Operand Operand
     -- Signed ConVerT Float
@@ -834,6 +838,8 @@ data Instr
     | UZP2 Format Operand Operand Operand
     | TRN1 Format Operand Operand Operand
     | TRN2 Format Operand Operand Operand
+    | MOVI Format Operand Operand
+    | MVNI Format Operand Operand
 
 data DMBISHFlags = DmbLoad | DmbLoadStore
   deriving (Eq, Show)
@@ -934,6 +940,8 @@ instrCon i =
       UZP2 {} -> "UZP2"
       TRN1 {} -> "TRN1"
       TRN2 {} -> "TRN2"
+      MOVI {} -> "MOVI"
+      MVNI {} -> "MVNI"
 
 data Target
     = TBlock BlockId
@@ -950,7 +958,7 @@ data ExtMode
     deriving (Eq, Show)
 
 data ShiftMode
-    = SLSL | SLSR | SASR | SROR
+    = SLSL | SLSR | SASR | SROR | SMSL
     deriving (Eq, Show)
 
 

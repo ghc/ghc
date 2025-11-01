@@ -499,7 +499,110 @@ isOffsetImm off w
   where
     byte_width = widthInBytes w
 
+-- | Check if a floating-point constant can be embedded in FMOV (immediate).
+--
+-- FMOV (immediate) can embed an 8-bit floating-point number:
+--   x = (-1)^s * m/16 * 2^e, where 16 <= m <= 31, -3 <= e <= 4
+--
+-- Additionally, +0.0 can be represented by a move from the zero register.
+isFmovImm :: RealFloat a => a -> Bool
+isFmovImm x
+  | x == 0.0 = not (isNegativeZero x)
+  | isNaN x || isInfinite x = False
+  | otherwise =
+    let (m, n) = decodeFloat x
+        e = n + floatDigits x -- exponent x
+        m_mask = bit (floatDigits x - 5) - 1
+    in -2 <= e && e <= 5 && m .&. m_mask == 0
+{-# INLINE [0] isFmovImm #-}
+{-# RULES
+"isFmovImm/Float" isFmovImm = isFmovImmFloat
+"isFmovImm/Double" isFmovImm = isFmovImmDouble
+  #-}
 
+isFmovImmFloat :: Float -> Bool
+isFmovImmFloat x = w == 0 || (0x3E00_0000 <= e && e <= 0x4180_0000 && w .&. 0x0007_FFFF == 0)
+  where w = castFloatToWord32 x
+        e = w .&. 0x7F80_0000
+
+isFmovImmDouble :: Double -> Bool
+isFmovImmDouble x = w == 0 || (0x3FC0_0000_0000_0000 <= e && e <= 0x4030_0000_0000_0000 && w .&. 0x0000_FFFF_FFFF_FFFF == 0)
+  where w = castDoubleToWord64 x
+        e = w .&. 0x7FF0_0000_0000_0000
+
+-- | MOVI/MVNI (16-bit)
+--
+-- MOVI.8H can embed integer constants of one of the following forms:
+--
+--   * 0x00HH
+--   * 0xHH00
+--
+-- MVNI.{8H,4S} can embed integer constants of one of the following forms:
+--
+--   * 0xFFHH
+--   * 0xHHFF
+getMoviImm16 :: Word16 -> Maybe (Operand -> Operand -> Instr, Operand)
+getMoviImm16 w
+  | w .&. 0xFF00 == 0 = Just (MOVI fmt16, OpImm (ImmInt $ fromIntegral w))
+  | w .&. 0x00FF == 0 = Just (MOVI fmt16, OpImmShift (ImmInt $ fromIntegral $ w `shiftR` 8) SLSL 8)
+  | w .&. 0xFF00 == 0xFF00 = Just (MVNI fmt16, OpImm (ImmInt $ fromIntegral $ complement w .&. 0xFF))
+  | w .&. 0x00FF == 0x00FF = Just (MVNI fmt16, OpImmShift (ImmInt $ fromIntegral $ complement w `shiftR` 8) SLSL 8)
+  | (w `xor` (w `shiftR` 8)) .&. 0xFF == 0 = Just (MOVI fmt8, OpImm (ImmInt $ fromIntegral $ w .&. 0xFF))
+  | otherwise = Nothing
+  where fmt16 = VecFormat 8 FmtInt16
+        fmt8 = VecFormat 16 FmtInt8
+
+-- | MOVI/MVNI (32-bit)
+--
+-- MOVI.4S can embed integer constants of one of the following forms:
+--
+--   * 0x0000_00HH
+--   * 0x0000_HH00
+--   * 0x00HH_0000
+--   * 0xHH00_0000
+--   * 0x0000_HHFF
+--   * 0x00HH_FFFF
+--
+-- MVNI.4S can embed integer constants of one of the following forms:
+--
+--   * 0xFFFF_FFHH
+--   * 0xFFFF_HHFF
+--   * 0xFFHH_FFFF
+--   * 0xHHFF_FFFF
+--   * 0xFFFF_HH00
+--   * 0xFFHH_0000
+getMoviImm32 :: Word32 -> Maybe (Operand -> Operand -> Instr, Operand)
+getMoviImm32 w
+  | w .&. 0xFFFFFF00 == 0 = Just (MOVI fmt32, OpImm (ImmInt $ fromIntegral w))
+  | w .&. 0xFFFF00FF == 0 = Just (MOVI fmt32, OpImmShift (ImmInt $ fromIntegral $ w `shiftR` 8) SLSL 8)
+  | w .&. 0xFF00FFFF == 0 = Just (MOVI fmt32, OpImmShift (ImmInt $ fromIntegral $ w `shiftR` 16) SLSL 16)
+  | w .&. 0x00FFFFFF == 0 = Just (MOVI fmt32, OpImmShift (ImmInt $ fromIntegral $ w `shiftR` 24) SLSL 24)
+  | w .&. 0xFFFF00FF == 0x000000FF = Just (MOVI fmt32, OpImmShift (ImmInt $ fromIntegral $ w `shiftR` 8) SMSL 8)
+  | w .&. 0xFF00FFFF == 0x0000FFFF = Just (MOVI fmt32, OpImmShift (ImmInt $ fromIntegral $ w `shiftR` 16) SMSL 16)
+  | w .&. 0xFFFFFF00 == 0xFFFFFF00 = Just (MVNI fmt32, OpImm (ImmInt $ fromIntegral $ complement w))
+  | w .&. 0xFFFF00FF == 0xFFFF00FF = Just (MVNI fmt32, OpImmShift (ImmInt $ fromIntegral $ complement w `shiftR` 8) SLSL 8)
+  | w .&. 0xFF00FFFF == 0xFF00FFFF = Just (MVNI fmt32, OpImmShift (ImmInt $ fromIntegral $ complement w `shiftR` 16) SLSL 16)
+  | w .&. 0x00FFFFFF == 0x00FFFFFF = Just (MVNI fmt32, OpImmShift (ImmInt $ fromIntegral $ complement w `shiftR` 24) SLSL 24)
+  | w .&. 0xFFFF00FF == 0xFFFF0000 = Just (MVNI fmt32, OpImmShift (ImmInt $ fromIntegral $ (complement w `shiftR` 8) .&. 0xFF) SMSL 8)
+  | w .&. 0xFF00FFFF == 0xFF000000 = Just (MVNI fmt32, OpImmShift (ImmInt $ fromIntegral $ (complement w `shiftR` 16) .&. 0xFF) SMSL 16)
+  -- A repetition of 16-bit pattern
+  | (w `xor` (w `shiftR` 16)) .&. 0x0000FFFF == 0 = getMoviImm16 (fromIntegral w)
+  | otherwise = Nothing
+  where fmt32 = VecFormat 4 FmtInt32
+
+-- | MOVI (64-bit)
+--
+-- MOVI.64 can embed integer constants of one of the following forms:
+--
+--   * 0xHHIIJJKK_LLMMNNOO, where HH,II,JJ,KK,LL,MM,NN,OO `elem` [0,0xFF]
+getMoviImm64 :: Word64 -> Maybe (Operand -> Operand -> Instr, Operand)
+getMoviImm64 w
+  -- For w=0b{a63}...{a7}{a6}{a5}{a4}{a3}{a2}{a1}{a0}: Test if a[i] == a[i+1] for 8*n <= i <= 8*n+6
+  | (w `xor` (w `shiftR` 1)) .&. 0x7F7F7F7F_7F7F7F7F == 0 = Just (MOVI fmt64, OpImm $ ImmInteger $ toInteger w)
+  -- A repetition of 32-bit pattern
+  | (w `xor` (w `shiftR` 32)) .&. 0xFFFFFFFF == 0 = getMoviImm32 (fromIntegral w)
+  | otherwise = Nothing
+  where fmt64 = VecFormat 2 FmtInt64
 
 
 -- TODO OPT: we might be able give getRegister
@@ -685,50 +788,85 @@ getRegister' config plat expr
           return (Any (intFormat rep) (\dst -> imm_code `snocOL` annExpr expr (MOV (OpReg rep dst) op)))
 
         -- floatToBytes (fromRational f)
-        CmmFloat f fty | isPositiveZeroLF f -> do
-          let w = litFloatingTypeWidth fty
-          (op, imm_code) <- litToImm' lit
-          return (Any (floatFormat w) (\dst -> imm_code `snocOL` annExpr expr (MOV (OpReg w dst) op)))
-
         CmmFloat f LitFloat -> do
-          let word = castFloatToWord32 (litFloatingToHostFloat f) :: Word32
-              half0 = fromIntegral (fromIntegral word :: Word16)
-              half1 = fromIntegral (fromIntegral (word `shiftR` 16) :: Word16)
-          tmp <- getNewRegNat (intFormat W32)
-          return (Any (floatFormat W32) (\dst -> toOL [ annExpr expr
-                                                      $ MOV (OpReg W32 tmp) (OpImm (ImmInt half0))
-                                                      , MOVK (OpReg W32 tmp) (OpImmShift (ImmInt half1) SLSL 16)
-                                                      , MOV (OpReg W32 dst) (OpReg W32 tmp)
-                                                      ]))
+          let f' = litFloatingToHostFloat f
+          if isFmovImm f'
+            then return $ Any FF32 $ \dst -> unitOL (annExpr expr $ FMOV FF32 (OpReg W32 dst) (OpImm $ ImmFloat f'))
+            else do
+              let word = castFloatToWord32 f' :: Word32
+                  half0 = fromIntegral (fromIntegral word :: Word16)
+                  half1 = fromIntegral (fromIntegral (word `shiftR` 16) :: Word16)
+              tmp <- getNewRegNat (intFormat W32)
+              return (Any (floatFormat W32) (\dst -> toOL [ annExpr expr
+                                                          $ MOV (OpReg W32 tmp) (OpImm (ImmInt half0))
+                                                          , MOVK (OpReg W32 tmp) (OpImmShift (ImmInt half1) SLSL 16)
+                                                          , MOV (OpReg W32 dst) (OpReg W32 tmp)
+                                                          ]))
         CmmFloat f LitDouble -> do
-          let word = castDoubleToWord64 (litFloatingToHostDouble f) :: Word64
-              half0 = fromIntegral (fromIntegral word :: Word16)
-              half1 = fromIntegral (fromIntegral (word `shiftR` 16) :: Word16)
-              half2 = fromIntegral (fromIntegral (word `shiftR` 32) :: Word16)
-              half3 = fromIntegral (fromIntegral (word `shiftR` 48) :: Word16)
-          tmp <- getNewRegNat (intFormat W64)
-          return (Any (floatFormat W64) (\dst -> toOL [ annExpr expr
-                                                      $ MOV (OpReg W64 tmp) (OpImm (ImmInt half0))
-                                                      , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half1) SLSL 16)
-                                                      , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half2) SLSL 32)
-                                                      , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half3) SLSL 48)
-                                                      , MOV (OpReg W64 dst) (OpReg W64 tmp)
-                                                      ]))
-        CmmVec _ -> do
-          -- SIMD NCG TODO: Use MOVI/MVNI/FMOV if possible
-          lbl <- getNewLabelNat
-          let sectionType = case platformOS (ncgPlatform config) of
-                -- AArch64 Windows platform requires LLVM 20 to support .rodata
-                OSMinGW32 -> Text
-                _         -> ReadOnlyData
+          let f' = litFloatingToHostDouble f
+          if isFmovImm f'
+            then return $ Any FF64 $ \dst -> unitOL (annExpr expr $ FMOV FF64 (OpReg W64 dst) (OpImm $ ImmDouble f'))
+            else do
+              let word = castDoubleToWord64 f' :: Word64
+                  half0 = fromIntegral (fromIntegral word :: Word16)
+                  half1 = fromIntegral (fromIntegral (word `shiftR` 16) :: Word16)
+                  half2 = fromIntegral (fromIntegral (word `shiftR` 32) :: Word16)
+                  half3 = fromIntegral (fromIntegral (word `shiftR` 48) :: Word16)
+              tmp <- getNewRegNat (intFormat W64)
+              return (Any (floatFormat W64) (\dst -> toOL [ annExpr expr
+                                                          $ MOV (OpReg W64 tmp) (OpImm (ImmInt half0))
+                                                          , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half1) SLSL 16)
+                                                          , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half2) SLSL 32)
+                                                          , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half3) SLSL 48)
+                                                          , MOV (OpReg W64 dst) (OpReg W64 tmp)
+                                                          ]))
+
+        CmmVec lits -> do
           let rep = cmmLitType plat lit
               format = cmmTypeFormat rep
-          Amode addr addr_code <- getAmode plat W128 (CmmLit (CmmLabel lbl))
-          return $ Any format $ \dst -> addr_code `appOL` toOL
-            [ LDATA (Section sectionType lbl)
-                    (CmmStaticsRaw lbl [CmmStaticLit lit])
-            , LDR format (OpReg W128 dst) (OpAddr addr)
-            ]
+          let broadcast = case lits of
+                l0:ls | all (== l0) ls -> Just l0
+                _ -> Nothing
+          case broadcast of
+            Just (CmmFloat f LitFloat) | let v = litFloatingToHostFloat f, isFmovImm v ->
+              let imm = OpImm (ImmFloat v)
+                  code dst = unitOL $ annExpr expr $
+                    if v == 0.0
+                    then DUP format (OpReg W128 dst) imm -- pprIm prints 0.0 as wzr
+                    else FMOV format (OpReg W128 dst) imm
+              in return $ Any format code
+            Just (CmmFloat f LitDouble) | let v = litFloatingToHostDouble f, isFmovImm v ->
+              let imm = OpImm (ImmDouble v)
+                  code dst = unitOL $ annExpr expr $
+                    if v == 0.0
+                    then DUP format (OpReg W128 dst) imm -- pprIm prints 0.0 as xzr
+                    else FMOV format (OpReg W128 dst) imm
+              in return $ Any format code
+            Just (CmmInt x W8) ->
+              let imm = OpImm $ ImmInt $ fromIntegral (fromInteger x :: Word8)
+                  code dst = unitOL $ annExpr expr $ MOVI format (OpReg W128 dst) imm
+              in return $ Any format code
+            Just (CmmInt x W16) | Just (mvi, imm) <- getMoviImm16 (fromInteger x) ->
+              let code dst = unitOL $ annExpr expr $ mvi (OpReg W128 dst) imm
+              in return $ Any format code
+            Just (CmmInt x W32) | Just (mvi, imm) <- getMoviImm32 (fromInteger x) ->
+              let code dst = unitOL $ annExpr expr $ mvi (OpReg W128 dst) imm
+              in return $ Any format code
+            Just (CmmInt x W64) | Just (mvi, imm) <- getMoviImm64 (fromInteger x) ->
+              let code dst = unitOL $ annExpr expr $ mvi (OpReg W128 dst) imm
+              in return $ Any format code
+            _ -> do
+              lbl <- getNewLabelNat
+              let sectionType = case platformOS (ncgPlatform config) of
+                    -- AArch64 Windows platform requires LLVM 20 to support .rodata
+                    OSMinGW32 -> Text
+                    _         -> ReadOnlyData
+              Amode addr addr_code <- getAmode plat W128 (CmmLit (CmmLabel lbl))
+              return $ Any format $ \dst -> addr_code `appOL` toOL
+                [ LDATA (Section sectionType lbl)
+                        (CmmStaticsRaw lbl [CmmStaticLit lit])
+                , LDR format (OpReg W128 dst) (OpAddr addr)
+                ]
 
         CmmLabel _lbl -> do
           (op, imm_code) <- litToImm' lit
@@ -799,8 +937,10 @@ getRegister' config plat expr
         MO_UU_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` UBFM (OpReg (max from to) dst) (OpReg (max from to) reg) (OpImm (ImmInt 0)) (toImm (min from to)))
         MO_SS_Conv from to -> ss_conv from to reg code
         MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` FCVT (OpReg to dst) (OpReg from reg))
-        MO_WF_Bitcast w    -> return $ Any (floatFormat w)  (\dst -> code `snocOL` FMOV (OpReg w dst) (OpReg w reg))
-        MO_FW_Bitcast w    -> return $ Any (intFormat w)    (\dst -> code `snocOL` FMOV (OpReg w dst) (OpReg w reg))
+        MO_WF_Bitcast w    -> return $ Any fmt (\dst -> code `snocOL` FMOV fmt (OpReg w dst) (OpReg w reg))
+          where fmt = floatFormat w
+        MO_FW_Bitcast w    -> return $ Any fmt (\dst -> code `snocOL` FMOV fmt (OpReg w dst) (OpReg w reg))
+          where fmt = intFormat w
 
         -- Conversions
         MO_XX_Conv _from to -> swizzleRegisterRep (intFormat to) <$> getRegister e

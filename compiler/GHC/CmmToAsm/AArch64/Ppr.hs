@@ -253,10 +253,10 @@ pprImm _ (ImmLit s)     = ftext s
 
 -- TODO: See pprIm below for why this is a bad idea!
 pprImm _ (ImmFloat f)
-  | f == 0 && not (isNegativeZero f) = text "wzr"
+  | isPositiveZero f = text "wzr"
   | otherwise = float f
 pprImm _ (ImmDouble d)
-  | d == 0 && not (isNegativeZero d) = text "xzr"
+  | isPositiveZero d = text "xzr"
   | otherwise = double d
 
 pprImm p (ImmConstantSum a b) = pprImm p a <> char '+' <> pprImm p b
@@ -315,6 +315,7 @@ pprShift SLSL = text "lsl"
 pprShift SLSR = text "lsr"
 pprShift SASR = text "asr"
 pprShift SROR = text "ror"
+pprShift SMSL = text "msl"
 
 pprOp :: IsLine doc => Platform -> Operand -> doc
 pprOp plat op = case op of
@@ -632,7 +633,7 @@ pprInstr platform instr = case instr of
   DMBISH DmbLoad -> line $ text "\tdmb ishld"
 
   -- 9. Floating Point Instructions --------------------------------------------
-  FMOV o1 o2 -> op2 (text "\tfmov") o1 o2
+  FMOV fmt o1 o2 -> op2fmt (text "\tfmov") fmt o1 o2
   FCVT o1 o2 -> op2 (text "\tfcvt") o1 o2
   SCVTF o1 o2 -> op2 (text "\tscvtf") o1 o2
   FCVTZS o1 o2 -> op2 (text "\tfcvtzs") o1 o2
@@ -669,6 +670,8 @@ pprInstr platform instr = case instr of
   UZP2 fmt o1 o2 o3 -> op3fmt (text "\tuzp2") fmt o1 o2 o3
   TRN1 fmt o1 o2 o3 -> op3fmt (text "\ttrn1") fmt o1 o2 o3
   TRN2 fmt o1 o2 o3 -> op3fmt (text "\ttrn2") fmt o1 o2 o3
+  MOVI fmt o1 o2 -> op2fmt (text "\tmovi") fmt o1 o2
+  MVNI fmt o1 o2 -> op2fmt (text "\tmvni") fmt o1 o2
  where op2 op o1 o2        = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
        op3 op o1 o2 o3     = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
        op4 op o1 o2 o3 o4  = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
