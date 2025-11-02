@@ -964,12 +964,13 @@ addArgCtxt arg_no (fun, fun_lspan) (L arg_loc arg) thing_inside
                                                            _ -> text "<USER>" <+> pprErrCtxtMsg y)
                                                                    (take 4 (zip err_ctx err_ctx_msg)))
                                     ])
-       ; if in_generated_code && isGeneratedSrcSpan fun_lspan
-         then updCtxtForArg (L arg_loc arg) $
-                   thing_inside
-         else do setSrcSpanA arg_loc                    $
-                   addErrCtxt (FunAppCtxt (FunAppCtxtExpr fun arg) arg_no) $
-                   thing_inside }
+       ; if not (isGeneratedSrcSpan fun_lspan)
+         then setSrcSpanA arg_loc                    $
+                 addErrCtxt (FunAppCtxt (FunAppCtxtExpr fun arg) arg_no) $
+                 thing_inside
+         else updCtxtForArg (L arg_loc arg) $
+                 thing_inside
+ }
   where
     updCtxtForArg :: LHsExpr GhcRn -> TcRn a -> TcRn a
     updCtxtForArg e@(L lspan _) thing_inside
