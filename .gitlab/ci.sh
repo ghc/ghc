@@ -599,6 +599,20 @@ function install_bindist() {
     *)
       read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
 
+      if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
+          # We suppose that host target = build target.
+          # By the fact above it is clearly turning out which host value is
+          # for currently built compiler.
+          # The fix for #21970 will probably remove this if-branch.
+          local -r CROSS_HOST_GUESS=$($SHELL ./config.guess)
+          args+=( "--target=$CROSS_TARGET" "--host=$CROSS_HOST_GUESS" )
+
+      # FIXME: The bindist configure script shouldn't need to be reminded of
+      # the target platform. See #21970.
+      elif [ -n "${CROSS_TARGET:-}" ]; then
+          args+=( "--target=$CROSS_TARGET" "--host=$CROSS_TARGET" )
+      fi
+
       run ${CONFIGURE_WRAPPER:-} ./configure \
           --prefix="$instdir" \
           "${args[@]+"${args[@]}"}" || fail "bindist configure failed"
@@ -636,8 +650,28 @@ function test_hadrian() {
   if [[ "${CROSS_EMULATOR:-}" == "NOT_SET" ]]; then
     info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
     return
-  # If we have set CROSS_EMULATOR, then can't test using normal testsuite.
-  elif [ -n "${CROSS_EMULATOR:-}" ] && [[ "${CROSS_TARGET:-}" != *"wasm"* ]]; then
+    # special case for JS backend
+  elif [ -n "${CROSS_TARGET:-}" ] && [ "${CROSS_EMULATOR:-}" == "js-emulator" ]; then
+    # The JS backend doesn't support CROSS_EMULATOR logic yet
+    unset CROSS_EMULATOR
+    # run "hadrian test" directly, not using the bindist, even though it did get installed.
+    # This is a temporary solution, See !9515 for the status of hadrian support.
+    run_hadrian \
+      test \
+      --summary-junit=./junit.xml \
+      --test-have-intree-files    \
+      --docs=none                 \
+      "runtest.opts+=${RUNTEST_ARGS:-}" \
+      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
+      || fail "cross-compiled hadrian main testsuite"
+  elif [[ -n "${CROSS_TARGET:-}" ]] && [[ "${CROSS_TARGET:-}" == *"wasm"* ]]; then
+    run_hadrian \
+      test \
+      --summary-junit=./junit.xml \
+      "runtest.opts+=${RUNTEST_ARGS:-}" \
+      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
+      || fail "hadrian main testsuite targetting $CROSS_TARGET"
+  elif [ -n "${CROSS_TARGET:-}" ]; then
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
     install_bindist _build/bindist/ghc-*/ "$instdir"
@@ -702,18 +736,11 @@ function test_hadrian() {
       rm proftest.hs
     fi
 
-    # The check-exact check-ppr programs etc can not be built when testing a cross compiler.
-    if [ -z "${CROSS_TARGET:-}" ]; then
-      TEST_HAVE_INTREE="--test-have-intree-files"
-    else
-      TEST_HAVE_INTREE=""
-    fi
-
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
+      --test-have-intree-files \
       --test-compiler="${test_compiler}" \
-      $TEST_HAVE_INTREE \
       "runtest.opts+=${RUNTEST_ARGS:-}" \
       "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
       || fail "hadrian main testsuite"

@@ -1730,6 +1730,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "wasm32-wasi",
       "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_22-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
       "XZ_OPT": "-9"
@@ -1795,6 +1796,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "wasm32-wasi",
       "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_22-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
       "XZ_OPT": "-9"
@@ -1860,6 +1862,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "wasm32-wasi",
       "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_22-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
       "XZ_OPT": "-9"
@@ -2115,6 +2118,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CONFIGURE_WRAPPER": "emconfigure",
+      "CROSS_EMULATOR": "js-emulator",
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
@@ -5839,6 +5843,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "wasm32-wasi",
       "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_22-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
     }
@@ -5904,6 +5909,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "wasm32-wasi",
       "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_22-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
     }
@@ -5969,6 +5975,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "wasm32-wasi",
       "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
+      "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_22-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
     }
@@ -6220,6 +6227,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CONFIGURE_WRAPPER": "emconfigure",
+      "CROSS_EMULATOR": "js-emulator",
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
