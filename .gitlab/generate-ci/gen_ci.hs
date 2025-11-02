@@ -173,7 +173,7 @@ configureArgsStr :: BuildConfig -> String
 configureArgsStr bc = unwords $
      ["--enable-unregisterised"| unregisterised bc ]
   ++ ["--disable-tables-next-to-code" | not (tablesNextToCode bc) ]
-  ++ ["--with-intree-gmp" | Just _ <- [crossTarget bc] ]
+  ++ ["--with-intree-gmp" | Just _ <- pure (crossTarget bc) ]
   ++ ["--with-system-libffi" | crossTarget bc == Just "wasm32-wasi" ]
   ++ ["--enable-ipe-data-compression" | withZstd bc ]
   ++ ["--enable-strict-ghc-toolchain-check"]
@@ -1333,6 +1333,7 @@ cross_jobs = [
       modifyJobs
         ( -- See Note [Testing wasm ghci browser mode]
           setVariable "FIREFOX_LAUNCH_OPTS" "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}"
+            . setVariable "HADRIAN_ARGS" "--docs=no-sphinx-pdfs --docs=no-sphinx-man"
             . delVariable "INSTALL_CONFIGURE_ARGS"
         )
         $ addValidateRule WasmBackend $ validateBuilds Amd64 (Linux AlpineWasm) cfg
