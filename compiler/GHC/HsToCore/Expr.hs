@@ -45,7 +45,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Instance.Class (lookupHasFieldLabel)
 
 import GHC.Core
-import GHC.Core.FVs( exprsFreeVarsList )
+import GHC.Core.FVs( exprFreeVarsList, exprsFreeVarsList )
 import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
@@ -459,18 +459,27 @@ dsExpr (ArithSeq expr witness seq)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
 for an overview.
-    g = ... static f ...
+    g = ... static e ...
 ==>
-    g = ... makeStatic loc f ...
+    s = /\abc. e
+    g = ... (s @a @b @c) ...
 -}
 
 dsExpr (HsStatic (_, whole_ty) expr@(L loc _))
   = do { dflags <- getDynFlags
-       ; static_id <- newStaticId whole_ty
 
        ; make_static_id <- dsLookupGlobalId makeStaticName
        ; expr_ds        <- dsLExpr expr
+
+       -- The static expression can have free type variables,
+       -- which we should quantify.  We can also have free Ids,
+       -- but they will be bound at top level
        ; let (_, [ty]) = splitTyConApp whole_ty
+
+             static_fvs :: [Var]
+             static_fvs = scopedSort $
+                          filter isTyVar $
+                          exprFreeVarsList expr_ds
 
              platform = targetPlatform dflags
              (line, col) = case locA loc of
@@ -480,11 +489,14 @@ dsExpr (HsStatic (_, whole_ty) expr@(L loc _))
              srcLoc = mkCoreTup [ mkIntExprInt platform line
                                 , mkIntExprInt platform col ]
 
-             static_rhs = mkCoreApps (Var make_static_id) [ Type ty, srcLoc, expr_ds ]
+             static_rhs = mkLams static_fvs $
+                          mkCoreApps (Var make_static_id) [ Type ty, srcLoc, expr_ds ]
+
+       ; static_id <- newStaticId (mkSpecForAllTys static_fvs whole_ty)
 
        ; emitStaticBind static_id static_rhs
 
-       ; return (Var static_id) }
+       ; return (mkVarApps (Var static_id) static_fvs) }
 
 {- Note [Desugaring record construction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
