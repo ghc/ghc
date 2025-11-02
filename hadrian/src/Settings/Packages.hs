@@ -323,7 +323,7 @@ rtsPackageArgs = package rts ? do
                                                     , "-optc-DTICKY_TICKY"]
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
-          , notM (targetSupportsSMP stage)   ? arg "-DNOSMP"
+          , notM (targetSupportsSMP stage)   ? arg "-optc-DNOSMP"
 
             -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
             --
