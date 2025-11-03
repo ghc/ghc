@@ -17,6 +17,7 @@
 #if defined(IOMGR_ENABLED_POLL)
 
 void initCapabilityIOManagerPoll(CapIOManager *iomgr);
+void freeCapabilityIOManagerPoll(CapIOManager *iomgr);
 
 /* Synchronous I/O and timer operations */
 bool syncIOWaitReadyPoll(CapIOManager *iomgr, StgTSO *tso,
