@@ -121,8 +121,7 @@ tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
                            -> TcM (LHsExpr GhcTc)
 
 tcPolyLExpr (L loc expr) res_ty
-  = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addLExprCtxt (L loc expr) $  -- Note [Error contexts in generated code]
+  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
@@ -240,8 +239,7 @@ tcInferRhoNC = tcInferExprNC IIF_DeepRho
 
 tcInferExpr, tcInferExprNC :: InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
 tcInferExpr iif (L loc expr)
-  = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addLExprCtxt (L loc expr) $  -- Note [Error contexts in generated code]
+  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
     do { (expr', rho) <- runInfer iif IFRR_Any (tcExpr expr)
        ; return (L loc expr', rho) }
 
@@ -267,8 +265,7 @@ tcMonoLExpr, tcMonoLExprNC
     -> TcM (LHsExpr GhcTc)
 
 tcMonoLExpr (L loc expr) res_ty
-  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addLExprCtxt (L loc expr) $  -- Note [Error contexts in generated code]
+  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 

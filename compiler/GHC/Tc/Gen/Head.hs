@@ -26,7 +26,7 @@ module GHC.Tc.Gen.Head
        , nonBidirectionalErr
 
        , pprArgInst
-       , addExprCtxt, addLExprCtxt, addFunResCtxt ) where
+       , addLExprCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
@@ -1101,8 +1101,9 @@ mis-match in the number of value arguments.
 *                                                                      *
 ********************************************************************* -}
 
-addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
-addExprCtxt e thing_inside
+-- | !Caution!: Users should not call add_expr_ctxt, they ought to use addLExprCtxt
+add_expr_ctxt :: HsExpr GhcRn -> TcRn a -> TcRn a
+add_expr_ctxt e thing_inside
   = case e of
       HsHole _ -> thing_inside
    -- The HsHole special case addresses situations like
@@ -1117,12 +1118,12 @@ addExprCtxt e thing_inside
       _ -> addErrCtxt (ExprCtxt e) thing_inside -- no op in generated code
 
 
-addLExprCtxt :: LHsExpr GhcRn -> TcRn a -> TcRn a
-addLExprCtxt (L lspan e) thing_inside
-  | (RealSrcSpan{}) <- locA lspan
+addLExprCtxt :: SrcSpan -> HsExpr GhcRn -> TcRn a -> TcRn a
+addLExprCtxt lspan e thing_inside
+  | isGoodSrcSpan lspan
   , (HsPar _ e') <- e
-  = addExprCtxt (unLoc e') thing_inside
-  | (RealSrcSpan{}) <- locA lspan
-  = addExprCtxt e thing_inside
+  = setSrcSpan lspan $ add_expr_ctxt (unLoc e') thing_inside
+  | isGoodSrcSpan lspan
+  = setSrcSpan lspan $ add_expr_ctxt e thing_inside
   | otherwise
   = thing_inside

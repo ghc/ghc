@@ -32,8 +32,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..), ErrCtxt (..),  CodeSrcFlag (..))
-import GHC.Tc.Errors.Ppr (pprErrCtxtMsg)
+import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Utils.Concrete( hasFixedRuntimeRep_syntactic )
@@ -939,43 +938,22 @@ looks_like_type_arg _ = False
 addArgCtxt :: Int -> (HsExpr GhcRn, SrcSpan) -> LHsExpr GhcRn
            -> TcM a -> TcM a
 -- There are 2 cases:
--- 1. In the normal case, we add an informative context (<=> `inGeneratedCode` is `False`)
+-- 1. In the normal case, we add an informative context
+--     (<=> location span of f or head of application chain is user located)
 --     "In the third argument of f, namely blah"
--- 2. If we are inside generated code (<=> `inGeneratedCode` is `True`)
---    (i)   If arg_loc is generated do nothing to to LclEnv/LclCtxt
---    (ii)  If arg_loc is Unhelpful UnhelpfulNoLocationInfo set `tcl_in_gen_code` to `True`
---    (iii) if arg_loc is RealSrcLoc then update tcl_loc and add "In the expression: arg" to ErrCtxtStack
+-- 2. If head of the application chain is generated
+--    "In the expression: arg"
+
 --  See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 --  See Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
-addArgCtxt arg_no (fun, fun_lspan) (L arg_loc arg) thing_inside
-  = do { in_generated_code <- inGeneratedCode
-       ; err_ctx <- getErrCtxt
-       ; env0 <- liftZonkM tcInitTidyEnv
-       ; err_ctx_msg <- mkErrCtxt env0 err_ctx
-       ; traceTc "addArgCtxt" (vcat [ text "generated:" <+> ppr in_generated_code
-                                    , text "arg: " <+> ppr (arg, arg_no)
-                                    , text "arg_loc:" <+> ppr arg_loc
-                                    , text "fun:" <+> ppr fun
-                                    , text "fun_lspan" <+> ppr fun_lspan
-                                    , text "err_ctx" <+> vcat (fmap (\ (x, y) ->
-                                                         case x of
-                                                           MkErrCtxt (ExpansionCodeCtxt{}) _ -> text "<EXPN>" <+> pprErrCtxtMsg y
-                                                           _ -> text "<USER>" <+> pprErrCtxtMsg y)
-                                                                   (take 4 (zip err_ctx err_ctx_msg)))
-                                    ])
-       ; if not (isGeneratedSrcSpan fun_lspan)
-         then setSrcSpanA arg_loc                    $
-                 addErrCtxt (FunAppCtxt (FunAppCtxtExpr fun arg) arg_no) $
-                 thing_inside
-         else updCtxtForArg (L arg_loc arg) $
-                 thing_inside
- }
-  where
-    updCtxtForArg :: LHsExpr GhcRn -> TcRn a -> TcRn a
-    updCtxtForArg e@(L lspan _) thing_inside
-      = do setSrcSpan (locA lspan) $
-             addLExprCtxt e $ -- addLExpr is no op for non-user located exprs
-             thing_inside
+addArgCtxt arg_no (app_head, app_head_lspan) (L arg_loc arg) thing_inside
+  | isGoodSrcSpan app_head_lspan
+  = setSrcSpanA arg_loc $
+      addErrCtxt (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
+      thing_inside
+  | otherwise
+  = addLExprCtxt (locA arg_loc) arg $
+      thing_inside
 
 
 
