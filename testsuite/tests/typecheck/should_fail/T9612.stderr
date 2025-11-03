@@ -3,9 +3,9 @@ T9612.hs:16:9: error: [GHC-18872]
                      with: (Int, a)
         arising from a functional dependency between:
           constraint ‘MonadWriter (Int, a) (WriterT [(Int, a)] Identity)’
-            arising from a use of ‘tell’
+            arising from a do statement
           instance ‘MonadWriter w (WriterT w m)’ at T9612.hs:20:10-59
-    • In the expression: tell (n, x)
+    • In a stmt of a 'do' block: tell (n, x)
       In the expression:
         do tell (n, x)
            return (1, y)
