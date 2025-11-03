@@ -389,7 +389,7 @@
       "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
       "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
       "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
@@ -471,7 +471,7 @@
       "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
       "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
       "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
@@ -1060,7 +1060,7 @@
       "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
       "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
       "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
@@ -1143,7 +1143,7 @@
       "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
       "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
       "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
@@ -2055,7 +2055,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "aarch64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate",
       "XZ_OPT": "-9"
     }
@@ -2119,9 +2119,10 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
+      "CROSS_STAGE": "2",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "TEST_ENV": "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate",
       "XZ_OPT": "-9"
     }
@@ -2503,7 +2504,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate",
       "XZ_OPT": "-9"
     }
@@ -3582,7 +3583,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "loongarch64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "TEST_ENV": "x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate",
       "XZ_OPT": "-9"
     }
@@ -6229,7 +6230,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "aarch64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
     }
   },
@@ -6292,9 +6293,10 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
+      "CROSS_STAGE": "2",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "TEST_ENV": "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate"
     }
   },
@@ -6671,7 +6673,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate"
     }
   },
@@ -7734,7 +7736,7 @@
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "loongarch64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
+      "RUNTEST_ARGS": "-e config.timeout=900",
       "TEST_ENV": "x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate"
     }
   },
