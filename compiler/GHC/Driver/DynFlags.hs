@@ -1315,6 +1315,8 @@ default_PIC platform =
                                          -- #10597 for more
                                          -- information.
     (OSLinux,   ArchLoongArch64) -> [Opt_PIC, Opt_ExternalDynamicRefs]
+    (OSLinux,   ArchX86_64)      -> [Opt_PIC] -- PIC should be the default now, see #26390
+    (OSFreeBSD, ArchX86_64)      -> [Opt_PIC]
     _                      -> []
 
 -- | The language extensions implied by the various language variants.
