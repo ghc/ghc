@@ -3471,6 +3471,8 @@ simpleUnifyCheck :: UnifyCheckCaller -> TcLevel -> TcTyVar -> TcType -> SimpleUn
 -- * Rejects type families unless fam_ok=True
 -- * Does a level-check for type variables, to avoid skolem escape
 --
+-- See also (UQL6) in Note [QuickLook unification]
+--
 -- This function is pretty heavily used, so it's optimised not to allocate
 simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
   | not $ touchabilityTest given_eq_lvl lhs_tv
@@ -3531,9 +3533,11 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
 
 
 mkOccFolders :: Name -> (TcType -> Bool, TcCoercion -> Bool)
--- These functions return True
---   * if lhs_tv occurs (incl deeply, in the kind of variable)
---   * if there is a coercion hole
+-- These functions are used when doing an occurs check.
+-- They return True if lhs_tv occurs in the type, or coercion resp,
+-- including deeply,
+--    - in the kind of type variable
+--    - in the kind of a coercion hole
 -- No expansion of type synonyms
 mkOccFolders lhs_tv = (getAny . check_ty, getAny . check_co)
   where
@@ -3547,7 +3551,10 @@ mkOccFolders lhs_tv = (getAny . check_ty, getAny . check_co)
                   `mappend` check_ty (varType v)
 
     do_bndr is tcv _faf = extendVarSet is tcv
-    do_hole _is _hole = DM.Any True  -- Reject coercion holes
+
+    do_hole _is hole = check_ty (varType (coHoleCoVar hole))
+       -- For coercion holes, look in the kind of the hole
+       -- See Note [CorecionHoles and their free variables] in GHC.Core.TyCo.FVs
 
 {- *********************************************************************
 *                                                                      *
@@ -4182,8 +4189,10 @@ checkCo flags co =
                 else PuFail reason }
 
         -- Occurs check (no promotion)
+        -- See Note [CorecionHoles and their free variables] in GHC.Core.TyCo.FVs
         | OC_Check lhs_tv occ_prob <- occ
-        , nameUnique lhs_tv `elemVarSetByKey` tyCoVarsOfCo co
+        , let (_, check_co) = mkOccFolders lhs_tv
+        , check_co co
         -> return $ PuFail (cteProblem occ_prob)
 
         | otherwise

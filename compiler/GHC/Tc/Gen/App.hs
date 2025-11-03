@@ -2220,7 +2220,9 @@ qlUnify ty1 ty2
               -- Here we are in the TcM monad, which does not track enclosing
               -- Given equalities; so for quick-look unification we conservatively
               -- treat /any/ level outside this one as untouchable. Hence cur_lvl.
+
            ; case simpleUnifyCheck UC_QuickLook cur_lvl kappa ty2 of
+              -- simpleUnifyCheck: see (UQL6) in Note [QuickLook unification]
               SUC_CanUnify ->
                 do { co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
                            -- unifyKind: see (UQL2) in Note [QuickLook unification]
@@ -2317,6 +2319,22 @@ That is the entire point of qlUnify!   Wrinkles:
   The general principle is: treat linear arrows %1 -> similar to foralls and
   constraint arrows =>, so that (UQL4) applies to them as well.
   See Note [Multiplicity in deep subsumption].
+
+(UQL6) We call `simpleUnifyCheck` for the occurs-check etc; see (UQL1). Usually it's fine
+  for `simpleUnifyCheck` to bale out saying `SUC_NotSure`, because usually we'll just generate
+  an equality we solve later. But in QuickLook, baling out may mean we don't find a good
+  type for an instantiation variable, which in turn may make the program fail to typecheck.
+  So `simpleUnifyCheck` is more than just an efficiency thing.
+
+  Coercion holes are a tricky point. Example (#26543): at one stage we got
+           qlUnify( (Eq (alpha |> {co}) => beta) -> Int
+                  , kappa1                       -> Int )
+  where `{co}` was a coercion hole. We want to unify
+           kappa1 := Eq (alpha |> {co}) => beta
+  Failing to do so rejects the program.
+
+  In fact test T26543 no longer has a coercion hole in the type, but the possibility
+  remains a worry.
 
 Sadly discarded design alternative
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

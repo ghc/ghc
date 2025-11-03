@@ -239,13 +239,41 @@ ill-scoped; an alternative we have not explored.
 But see `occCheckExpand` in this module for a function that does, selectively,
 expand synonyms to reduce free-var occurences.
 
-Note [CoercionHoles and coercion free variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Generally, we do not treat a CoercionHole as a free variable of a coercion;
-see `tyCoVarsOfType` and friends.
+Note [CoercionHoles and their free variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Supoose we are finding the free variables of
+   Maybe (a |> {ch})
+where `ch` is a CoercionHole.  Clearly `a` is free, but what about `ch`?
+Generally:
+  * we do /not/ treat a CoercionHole as a free variable of a coercion, but
+  * we /do/ treat the free variables of its kind as free
 
-But there is an exception. When finding the free /coercion/ variables of a type,
-in `coVarsOfType`, we /do/ treat a CoercionHole as a free variable.  Why?
+Why do we look in the kind. Well, consider (t |> {ch}).  The kind of this
+comes from coercionRKind {ch}, and the free vars of a type should surely
+include the free vars of its kind.
+
+This choice shows up in a number of places:
+ * `deepTcvFolder`, which supports `tyCoVarsOfType` and friends
+ * `atfFolder`, which supports `anyFreeVarsOfType` and friends
+ * `GHC.Tc.Utils.Unify.mkOccFolders` which handles occurs checks
+ * `GHC.Tc.Utils.Unify.checkCo` also handles occurs checks (via `tyCoVarOfCo`)
+ * `tyCoFVsOfCo` (the CoercionHole case)
+
+See also (UQL6) in Note [QuickLook unification].
+
+This whole thing seems a bit wobbly. In particular:
+* What if we unify b := a |> {ch}, and then later fill in `ch` with
+  a coercion that mentions `b`, thereby building an infinite structure?
+
+At one stage (e.g. GHC 9.12) we made the occurs check fire (preventing
+unification if there was any free coercion hole, but the treatment was
+inconsistent.  It would be possible to do that, but this time
+consistently. This a problem for another day. But whatever we do
+should be consistent in the above cases.
+
+Finally there is a gruesome exception:
+  * In `coVarsOfType` we are finding the free /coercion/ variables of a type.
+    Here /do/ treat a CoercionHole as a free variable.  Why?
 The sole reason is in Note [Emitting the residual implication in simplifyInfer]
 in GHC.Tc.Solver.  Yuk.  This is not pretty.
 -}
@@ -354,15 +382,19 @@ deepTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synon
                   | v `elemVarSet` acc = acc
                   | otherwise          = appEndoOS (deep_ty (varType v)) $
                                          acc `extendVarSet` v
+        -- NB: that call to deep_ty on the kind starts again with the
+        --     empty in-scope set; see Note [Closing over free variable kinds]
 
     do_bndr :: TyCoVarSet -> TyVar -> ForAllTyFlag -> TyCoVarSet
     do_bndr is tcv _ = extendVarSet is tcv
 
     do_hole :: VarSet -> CoercionHole -> EndoOS TyCoVarSet
     do_hole _is hole = deep_ty (varType (coHoleCoVar hole))
-                     -- We don't collect the CoercionHole itself, but we /do/
-                     -- need to collect the free variables of its /kind/
-                     -- See Note [CoercionHoles and coercion free variables]
+        -- We don't collect the CoercionHole itself, but we /do/
+        -- need to collect the free variables of its /kind/
+        -- See Note [CoercionHoles and their free variables]
+        -- NB: that call to deep_ty on the kind starts again with the
+        --     empty in-scope set; see Note [Closing over free variable kinds]
 
 {- *********************************************************************
 *                                                                      *
@@ -482,7 +514,7 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
 
     do_hole is hole  = do_covar is (coHoleCoVar hole)
       -- We /do/ treat a CoercionHole as a free variable
-      -- See Note [CoercionHoles and coercion free variables]
+      -- See Note [CoercionHoles and their free variables]
 
 ------- Same again, but for DCoVarSet ----------
 --    But this time the free vars are shallow
@@ -624,13 +656,7 @@ tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 -- See Note [FV eta expansion] in "GHC.Utils.FV" for explanation.
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
-tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
-  | not (f v) = (acc_list, acc_set)
-  | v `elemVarSet` bound_vars = (acc_list, acc_set)
-  | v `elemVarSet` acc_set = (acc_list, acc_set)
-  | otherwise = tyCoFVsOfType (tyVarKind v) f
-                               emptyVarSet   -- See Note [Closing over free variable kinds]
-                               (v:acc_list, extendVarSet acc_set v)
+tyCoFVsOfType (TyVarTy v)        f bound_vars acc = tyCoFVsOfVar v f bound_vars acc
 tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
                                                     -- See Note [Free vars and synonyms]
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
@@ -641,6 +667,15 @@ tyCoFVsOfType (FunTy _ w arg res)  f bound_vars acc =
 tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
 tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
+
+tyCoFVsOfVar :: TyCoVar -> FV
+tyCoFVsOfVar v f bound_vars (acc_list, acc_set)
+  | not (f v) = (acc_list, acc_set)
+  | v `elemVarSet` bound_vars = (acc_list, acc_set)
+  | v `elemVarSet` acc_set = (acc_list, acc_set)
+  | otherwise = tyCoFVsOfType (varType v) f
+                              emptyVarSet   -- See Note [Closing over free variable kinds]
+                              (v:acc_list, extendVarSet acc_set v)
 
 tyCoFVsBndr :: ForAllTyBinder -> FV -> FV
 -- Free vars of (forall b. <thing with fvs>)
@@ -689,9 +724,11 @@ tyCoFVsOfCo (ForAllCo { fco_tcv = tv, fco_kind = kind_co, fco_body = co }) fv_ca
 tyCoFVsOfCo (FunCo { fco_mult = w, fco_arg = co1, fco_res = co2 }) fv_cand in_scope acc
   = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2 `unionFV` tyCoFVsOfCo w) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
-  = tyCoFVsOfCoVar v fv_cand in_scope acc
-tyCoFVsOfCo (HoleCo {}) fv_cand in_scope acc = emptyFV fv_cand in_scope acc
-    -- Ignore holes: Note [CoercionHoles and coercion free variables]
+  = tyCoFVsOfVar v fv_cand in_scope acc
+tyCoFVsOfCo (HoleCo ch) fv_cand _in_scope acc
+  = tyCoFVsOfType (varType $ coHoleCoVar ch) fv_cand emptyVarSet acc
+    -- Look in the kind
+    -- See Note [CoercionHoles and their free variables]
 tyCoFVsOfCo (AxiomCo _ cs)    fv_cand in_scope acc = tyCoFVsOfCos cs  fv_cand in_scope acc
 tyCoFVsOfCo (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps}) fv_cand in_scope acc
   = (tyCoFVsOfCos deps `unionFV` tyCoFVsOfType t1
@@ -703,10 +740,6 @@ tyCoFVsOfCo (LRCo _ co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in
 tyCoFVsOfCo (InstCo co arg)     fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
 tyCoFVsOfCo (KindCo co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (SubCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
-
-tyCoFVsOfCoVar :: CoVar -> FV
-tyCoFVsOfCoVar v fv_cand in_scope acc
-  = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
 
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
@@ -990,9 +1023,12 @@ afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and 
                                 , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                                 , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tcv is tv = Any (not (tv `elemVarSet` is) && check_fv tv)
-    do_hole _ _  = Any False    -- I'm unsure; probably never happens
+    do_tcv is tv    = Any (not (tv `elemVarSet` is) && check_fv tv)
     do_bndr is tv _ = is `extendVarSet` tv
+    do_hole _ hole  = Any (anyFreeVarsOfType check_fv (varType (coHoleCoVar hole)))
+      -- See Note [CoercionHoles and their variables]
+      -- NB: that call to `anyFreeVarsOfType` on the kind starts again with the
+      --     empty in-scope set; see Note [Closing over free variable kinds]
 
 anyFreeVarsOfType :: (TyCoVar -> Bool) -> Type -> Bool
 anyFreeVarsOfType check_fv ty = DM.getAny (f ty)
@@ -1007,16 +1043,18 @@ anyFreeVarsOfCo check_fv co = DM.getAny (f co)
   where (_, _, f, _) = foldTyCo (afvFolder check_fv) emptyVarSet
 
 noFreeVarsOfType :: Type -> Bool
-noFreeVarsOfType ty = not $ DM.getAny (f ty)
-  where (f, _, _, _) = foldTyCo (afvFolder (const True)) emptyVarSet
+noFreeVarsOfType ty = not $ DM.getAny (nfv_ty ty)
 
 noFreeVarsOfTypes :: [Type] -> Bool
-noFreeVarsOfTypes tys = not $ DM.getAny (f tys)
-  where (_, f, _, _) = foldTyCo (afvFolder (const True)) emptyVarSet
+noFreeVarsOfTypes tys = not $ DM.getAny (nfv_tys tys)
 
 noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo co = not $ DM.getAny (f co)
-  where (_, _, f, _) = foldTyCo (afvFolder (const True)) emptyVarSet
+noFreeVarsOfCo co = not $ DM.getAny (nfv_co co)
+
+nfv_ty  :: Type -> Any
+nfv_tys :: [Type] -> Any
+nfv_co  :: Coercion -> Any
+(nfv_ty, nfv_tys, nfv_co, _) = foldTyCo (afvFolder (const True)) emptyVarSet
 
 
 {-
