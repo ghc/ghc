@@ -179,37 +179,6 @@ modifyLoaderState interp f =
 getLoaderState :: Interp -> IO (Maybe LoaderState)
 getLoaderState interp = readMVar (loader_state (interpLoader interp))
 
-
-emptyLoaderState :: UnitEnv -> LoaderState
-emptyLoaderState unit_env =
-  LoaderState
-   { linker_env = LinkerEnv
-     { closure_env = emptyNameEnv
-     , itbl_env    = emptyNameEnv
-     , addr_env    = emptyNameEnv
-     }
-   , pkgs_loaded = init_pkgs deps
-   , bcos_loaded = emptyModuleEnv
-   , objs_loaded = emptyModuleEnv
-   , temp_sos = []
-   , linked_breaks = LinkedBreaks
-     { breakarray_env = emptyModuleEnv
-     , ccs_env        = emptyModuleEnv
-     }
-   }
-  -- Packages that don't need loading, because the compiler
-  -- shares them with the interpreted program.
-  --
-  -- The linker's symbol table is populated with RTS symbols using an
-  -- explicit list.  See rts/Linker.c for details.
-  where
-    deps = getUnitDepends unit_env rtsUnitId
-    pkg_to_dfm unit_id = (unit_id, (LoadedPkgInfo unit_id [] [] [] emptyUniqDSet))
-    init_pkgs deps = let addToUDFM' (k, v) m = addToUDFM m k v
-                     in foldr addToUDFM' emptyUDFM $ [
-                       pkg_to_dfm rtsUnitId
-                     ] ++ fmap pkg_to_dfm deps
-
 extendLoadedEnv :: Interp -> [(Name,ForeignHValue)] -> IO ()
 extendLoadedEnv interp new_bindings =
   modifyLoaderState_ interp $ \pls -> do
@@ -357,7 +326,32 @@ initLoaderState interp hsc_env = do
 reallyInitLoaderState :: Interp -> HscEnv -> IO LoaderState
 reallyInitLoaderState interp hsc_env = do
   -- Initialise the linker state
-  let pls0 = emptyLoaderState (hsc_unit_env hsc_env)
+  let pls0 = let deps = getUnitDepends (hsc_unit_env hsc_env) rtsUnitId
+                 pkg_to_dfm unit_id = (unit_id, (LoadedPkgInfo unit_id [] [] [] emptyUniqDSet))
+                 -- Packages that don't need loading, because the compiler
+                 -- shares them with the interpreted program.
+                 --
+                 -- The linker's symbol table is populated with RTS symbols using an
+                 -- explicit list.  See rts/Linker.c for details.
+                 init_pkgs deps = let addToUDFM' (k, v) m = addToUDFM m k v
+                                  in foldr addToUDFM' emptyUDFM $ [
+                                    pkg_to_dfm rtsUnitId
+                                  ] ++ fmap pkg_to_dfm deps
+             in LoaderState
+                  { linker_env = LinkerEnv
+                    { closure_env = emptyNameEnv
+                    , itbl_env    = emptyNameEnv
+                    , addr_env    = emptyNameEnv
+                    }
+                  , pkgs_loaded = init_pkgs deps
+                  , bcos_loaded = emptyModuleEnv
+                  , objs_loaded = emptyModuleEnv
+                  , temp_sos = []
+                  , linked_breaks = LinkedBreaks
+                    { breakarray_env = emptyModuleEnv
+                    , ccs_env        = emptyModuleEnv
+                    }
+                  }
 
   case platformArch (targetPlatform (hsc_dflags hsc_env)) of
     -- FIXME: we don't initialize anything with the JS interpreter.
