@@ -28,6 +28,8 @@
 // Here's the pipe into which we will send our signals
 static int io_manager_wakeup_fd = -1;
 static int timer_manager_control_wr_fd = -1;
+// TODO: Eliminate these globals. Put then into the CapIOManager, but the
+// problem is these are shared across all caps, not per cap.
 
 #define IO_MANAGER_WAKEUP 0xff
 #define IO_MANAGER_DIE    0xfe
