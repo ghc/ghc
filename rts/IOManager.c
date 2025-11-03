@@ -373,6 +373,20 @@ void initCapabilityIOManager(CapIOManager *iomgr)
 }
 
 
+void freeCapabilityIOManager(CapIOManager *iomgr, bool after_fork)
+{
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_POLL)
+        case IO_MANAGER_POLL:
+            freeCapabilityIOManagerPoll(iomgr, after_fork);
+            break;
+#endif
+        default:
+            break;
+    }
+}
+
+
 /* Called late in the RTS initialisation
  */
 void startIOManager(void)

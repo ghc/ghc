@@ -2164,6 +2164,15 @@ forkProcess(HsStablePtr *entry
             // exist.
             truncateRunQueue(cap);
 
+            // Reset and re-initialise the capability's I/O manager,
+            // to get the I/O manager ready again.
+            //
+            // Any threads waiting on I/O or timers should have been
+            // removed from I/O manager queues by deleteThread_ above.
+            // TODO: but we could assert that here.
+            freeCapabilityIOManager(cap->iomgr, true /* yes after fork */);
+            initCapabilityIOManager(cap->iomgr);
+
             // Any suspended C-calling Tasks are no more, their OS threads
             // don't exist now:
             cap->suspended_ccalls = NULL;
@@ -2307,6 +2316,10 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
         // This approach is much easier than trying to actually remove
         // the capability; we don't have to worry about GC data
         // structures, the nursery, etc.
+        //
+        // This approach also handles threads blocked on I/O. Such threads
+        // remain blocked, and when I/O completes and threads become runnable
+        // then they are migrated away.
         //
         for (n = new_n_capabilities; n < enabled_capabilities; n++) {
             getCapability(n)->disabled = true;
