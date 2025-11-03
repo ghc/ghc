@@ -246,13 +246,13 @@ void initCapabilityIOManager(CapIOManager *iomgr);
 /* Init hook: called from hs_init_ghc, very late in the startup after almost
  * everything else is done.
  */
-void initIOManager(void);
+void startIOManager(void);
 
 
 /* Init hook: called from forkProcess in the child process on the surviving
  * capability.
  */
-void initIOManagerAfterFork(CapIOManager *iomgr);
+void restartIOManager(CapIOManager *iomgr);
 
 /* TODO: rationalise initIOManager and initIOManagerAfterFork into a single
          per-capability init function.
