@@ -246,7 +246,7 @@ void initCapabilityIOManager(CapIOManager *iomgr);
 /* Init hook: called from hs_init_ghc, very late in the startup after almost
  * everything else is done.
  */
-void initIOManager(void);
+void startIOManager(void);
 
 
 /* Init hook: called from forkProcess in the child process on the surviving
@@ -255,8 +255,8 @@ void initIOManager(void);
  * This is synchronous and can run Haskell code, so can change the given cap.
  * TODO: it would make for a cleaner API here if this were made asynchronous.
  */
-void initIOManagerAfterFork(CapIOManager *iomgr,
-                /* inout */ Capability  **pcap);
+void restartIOManager(CapIOManager *iomgr,
+          /* inout */ Capability  **pcap);
 
 /* TODO: rationalise initIOManager and initIOManagerAfterFork into a single
          per-capability init function.
