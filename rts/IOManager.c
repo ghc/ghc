@@ -375,9 +375,9 @@ void initCapabilityIOManager(CapIOManager *iomgr)
 
 /* Called late in the RTS initialisation
  */
-void initIOManager(void)
+void startIOManager(void)
 {
-    debugTrace(DEBUG_iomanager, "initialising %s I/O manager", showIOManager());
+    debugTrace(DEBUG_iomanager, "starting %s I/O manager", showIOManager());
 
     switch (iomgr_type) {
 
@@ -441,7 +441,7 @@ void initIOManager(void)
 /* Called from forkProcess in the child process on the surviving capability.
  */
 void
-initIOManagerAfterFork(CapIOManager *iomgr, Capability **pcap)
+restartIOManager(CapIOManager *iomgr, Capability **pcap)
 {
 
     switch (iomgr_type) {

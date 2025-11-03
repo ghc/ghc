@@ -427,7 +427,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     }
 #endif
 
-    initIOManager();
+    startIOManager();
 
     x86_init_fpu();
 
