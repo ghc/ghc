@@ -1120,6 +1120,9 @@ addExprCtxt e thing_inside
 addLExprCtxt :: LHsExpr GhcRn -> TcRn a -> TcRn a
 addLExprCtxt (L lspan e) thing_inside
   | (RealSrcSpan{}) <- locA lspan
+  , (HsPar _ e') <- e
+  = addExprCtxt (unLoc e') thing_inside
+  | (RealSrcSpan{}) <- locA lspan
   = addExprCtxt e thing_inside
   | otherwise
   = thing_inside
