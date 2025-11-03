@@ -20,6 +20,7 @@ import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.Set as S
 import System.Environment
 import Data.List
+import Data.Char (isSpace)
 
 {-
 Note [Generating the CI pipeline]
@@ -885,13 +886,23 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
           Emulator s       -> "CROSS_EMULATOR" =: s
           NoEmulatorNeeded -> mempty
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
-      , let runtestArgs =
+      , let testTimeoutArg =
+                case crossEmulator buildConfig of
+                  -- Emulators are naturally slower than native machines.
+                  -- Triple the default of 300.
+                  Emulator _ -> "-e config.timeout=900" :: String
+                  _ -> mempty
+            runtestArgs =
+                testTimeoutArg :
                 [ "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity"
                 | validateNonmovingGc buildConfig
                 ]
-        in "RUNTEST_ARGS" =: unwords runtestArgs
+        in "RUNTEST_ARGS" =: (trim . unwords) runtestArgs
       , if testsuiteUsePerf buildConfig then "RUNTEST_ARGS" =: "--config perf_path=perf" else mempty
       ]
+
+    trim :: String -> String
+    trim = dropWhileEnd isSpace . dropWhile isSpace
 
     jobArtifacts = Artifacts
       { junitReport = "junit.xml"
