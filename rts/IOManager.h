@@ -242,6 +242,34 @@ CapIOManager *allocCapabilityIOManager(Capability *cap);
  */
 void initCapabilityIOManager(CapIOManager *iomgr);
 
+/* When shutting down a capability, or after forkProcess, free the resources
+ * held by a CapIOManager to put it back into a state in which either it can be
+ * re-initialised using initCapabilityIOManager, or the whole structure freed.
+ *
+ * Note that this does not free the CapIOManager structure itself, just the
+ * contents.
+ *
+ * This is used during capability shutdown, during RTS shutdown. It is not used
+ * when reducing the number of capabilities. Capabilities are disabled rather
+ * than freed entirely: the I/O manager keeps running but threads that become
+ * runnable are migrated away.
+ *
+ * It is also used after forkProcess.
+ *
+ * The after_fork flag specifies whether this is being invoked after a fork, or
+ * for shutdown. This information is required to correctly handle FDs marked as
+ * close-on-exec (O_CLOEXEC). After a fork, such handles will have been closed
+ * automagically and must not be closed manually. In other cases, the FDs must
+ * be closed manually.
+ */
+void freeCapabilityIOManager(CapIOManager *iomgr, bool after_fork);
+
+/* CapIOManager life cycle:
+ *
+ * alloc -> init -> free -> free struct (!after_fork)
+ *           ^        |
+ *           +--------+ (after_fork)
+ */
 
 /* Init hook: called from hs_init_ghc, very late in the startup after almost
  * everything else is done.
