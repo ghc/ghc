@@ -1280,6 +1280,7 @@ shutdownCapabilities(Task *task, bool safe)
 static void
 freeCapability (Capability *cap)
 {
+    freeCapabilityIOManager(cap->iomgr);
     stgFree(cap->mut_lists);
     stgFree(cap->saved_mut_lists);
     if (cap->current_segments) {

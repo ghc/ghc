@@ -134,6 +134,14 @@ void initCapabilityIOManagerPoll(CapIOManager *iomgr)
 }
 
 
+void freeCapabilityIOManagerPoll(CapIOManager *iomgr)
+{
+    if (iomgr->aiop_poll_table) {
+        stgFree(iomgr->aiop_poll_table);
+    }
+}
+
+
 /* Used to implement syncIOWaitReady.
  * Result is true on success, or false on allocation failure. */
 bool syncIOWaitReadyPoll(CapIOManager *iomgr, StgTSO *tso,
