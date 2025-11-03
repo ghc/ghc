@@ -2179,7 +2179,7 @@ forkProcess(HsStablePtr *entry
             cap->n_returning_tasks = 0;
 #endif
 
-            // Release all caps except 0, we'll use that for starting
+            // Release all caps except 0, we'll use that for restarting
             // the IO manager and running the client action below.
             if (cap->no != 0) {
                 task->cap = cap;
@@ -2203,7 +2203,7 @@ forkProcess(HsStablePtr *entry
         // like startup event, capabilities, process info etc
         traceTaskCreate(task, cap);
 
-        initIOManagerAfterFork(cap->iomgr);
+        restartIOManager(cap->iomgr);
 
         // start timer after the IOManager is initialized
         // (the idle GC may wake up the IOManager)
