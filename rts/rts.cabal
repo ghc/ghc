@@ -548,6 +548,7 @@ library
                    wasm/OSThreads.c
                    wasm/JSFFI.c
                    wasm/JSFFIGlobals.c
+                   posix/FdWakeup.c
                    posix/Select.c
                    posix/Poll.c
                    posix/Timeout.c
@@ -560,6 +561,7 @@ library
                     posix/Ticker.c
                     posix/OSMem.c
                     posix/OSThreads.c
+                    posix/FdWakeup.c
                     posix/MIO.c
                     posix/Poll.c
                     posix/Select.c
