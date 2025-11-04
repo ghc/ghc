@@ -609,3 +609,5 @@ test('T4081', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-a
 test('T27261', [extra_files(['T27261_aux.hs'])], multimod_compile, ['T27261', '-v0 -O'])
 test('T27296', [], makefile_test, ['T27296'])
 test('T27296b', [], makefile_test, ['T27296b'])
+test('T26548', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
+
