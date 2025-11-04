@@ -1005,7 +1005,7 @@ interestingCallContext env cont
         -- in GHC.Core.Unfold
 
     interesting (StrictArg { sc_fun = fun }) = strictArgContext fun
-    interesting (StrictBind {})              = BoringCtxt
+    interesting (StrictBind {})              = RhsCtxt NonRecursive
     interesting (Stop _ cci _)               = cci
     interesting (TickIt _ k)                 = interesting k
     interesting (ApplyToTy { sc_cont = k })  = interesting k
@@ -1090,13 +1090,21 @@ Wrinkles:
 
 (IA2) OtherCon.
    interestingArg returns
-      (a) NonTrivArg for an arg with an OtherCon [] unfolding
+      (a) TrivArg for an arg with an OtherCon [] unfolding
       (b) ValueArg for an arg with an OtherCon [c1,c2..] unfolding.
 
-   Reason for (a): I found (in the GHC.Internal.Bignum.Integer module) that I was
-   inlining a pretty big function when all we knew was that its arguments
-   were evaluated, nothing more.  That in turn make the enclosing function
-   too big to inline elsewhere.
+   Reason for (a): knowing only that an argument is evaluated, but not which
+   constructor it is, rarely makes inlining worthwhile.  For example, in test
+   T18140 we have
+      data D = D !(Maybe Bool) ... !(Maybe Bool)
+      maMB :: Maybe Bool -> Maybe Bool -> Maybe Bool
+      maD (D x1 ... x18) (D y1 ... y18) = D (maMB x1 y1) ... (maMB x18 y18)
+   The xi and yi come from strict fields, so they have OtherCon [] unfoldings.
+   If that made them interesting we would inline maMB 18 times, to no benefit,
+   just bloating maD.  (Similarly, in GHC.Internal.Bignum.Integer I found that
+   I was inlining a pretty big function when all we knew was that its
+   arguments were evaluated.  That in turn made the enclosing function too big
+   to inline elsewhere.)
 
    Reason for (b): we want to inline integerCompare here
      integerLt# :: Integer -> Integer -> Bool#
@@ -1129,6 +1137,25 @@ Wrinkles:
    Conclusion: `interestingArg` should give some encouragement (NonTrivArg) to `f`
    when the argument is expandable. Hence `uf_expandable` in the `Var` case.
 
+(IA5) We are keen to inline a higher-order function applied to lambda, e.g.
+             f (\x. blah)
+  where
+    f h = ...(h xs)...
+  Doing so specialises `f` to the particular argument which can make a
+  big difference.  Note, however, that we don't want to be defeated if
+  the lambda is let-bound:
+      let h = (\x.blah)
+      in ...f h...
+  So we need to look through h's unfolding.
+
+  This makes parser combinators, which are usually applied to functions,
+  rather keen to inline, so whether they do so is mostly decided by their
+  size.  Test T17516 is a delicate example: if `max` on positions inlines
+  into the combinators in T17516A, the combinators are too big to inline into
+  the client module T17516; if not (because max's arguments are merely
+  evaluated, see (IA2)), they are small and do inline, making T17516 itself
+  slower to compile.  But inlining makes the code better too, with fewer
+  unknown calls.
 -}
 
 interestingArg :: SimplEnv -> StaticEnv -> CoreExpr -> ArgSummary
@@ -1157,7 +1184,7 @@ interestingArg env se e
     go env n (Lam v e)
        | isTyVar v             = go env n e
        | n>0                   = NonTrivArg     -- (\x.b) e   is NonTriv
-       | otherwise             = ValueArg
+       | otherwise             = ValueArg       -- (\x.b)     is Value: see (IA5)
     go _ _ (Case {})           = NonTrivArg
     go env n (Let b e)         = case go env' n e of
                                    ValueArg -> ValueArg
@@ -1167,17 +1194,16 @@ interestingArg env se e
 
     go_var n v
        | isConLikeId v = ValueArg   -- Experimenting with 'conlike' rather that
-                                    --    data constructors here
-                                    -- DFuns are con-like;
+                                    --    data constructors here (includes DFuns)
                                     --    see (IA1) in Note [Interesting arguments]
-       | idArity v > n = ValueArg   -- Catches (eg) primops with arity but no unfolding
+       | idArity v > n = ValueArg   -- See (IA5) in Note [Interesting arguments]
        | n > 0         = NonTrivArg -- Saturated or unknown call
        | otherwise  -- n==0, no value arguments; look for an interesting unfolding
        = case idUnfolding v of
-           OtherCon [] -> NonTrivArg   -- It's evaluated, but that's all we know
+           OtherCon [] -> TrivArg      -- It's evaluated, but that's all we know
            OtherCon _  -> ValueArg     -- Evaluated and we know it isn't these constructors
-              -- See (IA2) in Note [Interesting arguments]
-           DFunUnfolding {} -> ValueArg   -- We konw that idArity=0
+                                       -- See (IA2) in Note [Interesting arguments]
+           DFunUnfolding {} -> ValueArg   -- We know that idArity=0
            CoreUnfolding{ uf_cache = cache }
              | uf_is_conlike cache -> ValueArg    -- Includes constructor applications
              | uf_expandable cache -> NonTrivArg  -- See (IA4)

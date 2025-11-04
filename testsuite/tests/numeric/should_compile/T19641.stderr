@@ -13,9 +13,9 @@ natural_to_word
 integer_to_int
   = \ eta ->
       case eta of {
-        IS ipv -> Just (I# ipv);
+        IS x2 -> Just (I# x2);
         IP x -> Nothing;
-        IN ds2 -> Nothing
+        IN ds -> Nothing
       }
 
 

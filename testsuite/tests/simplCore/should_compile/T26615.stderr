@@ -2,7 +2,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 1,229, types: 1,163, coercions: 18, joins: 17/29}
+  = {terms: 1,220, types: 1,160, coercions: 18, joins: 17/29}
 
 -- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
 unArray :: forall a. Array a -> SmallArray# a
@@ -107,7 +107,7 @@ T26615a.$tcLeaf
       T26615a.$trModule
       $tcLeaf2
       0#
-      GHC.Internal.Types.krep$*->*->*
+      krepStarArrStarArr
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 $krep7 :: [GHC.Internal.Types.KindRep]
@@ -181,7 +181,7 @@ T26615a.$tcArray
       T26615a.$trModule
       $tcArray2
       0#
-      GHC.Internal.Types.krep$*Arr*
+      krepStarArr
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $krep12 :: GHC.Internal.Types.KindRep
@@ -251,7 +251,7 @@ T26615a.$tcHashMap
       T26615a.$trModule
       $tcHashMap2
       0#
-      GHC.Internal.Types.krep$*->*->*
+      krepStarArrStarArr
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $krep16 :: GHC.Internal.Types.KindRep
@@ -612,7 +612,7 @@ lvl1
   = GHC.Internal.Control.Exception.Base.patError @LiftedRep @() lvl
 
 Rec {
--- RHS size: {terms: 136, types: 130, coercions: 0, joins: 1/2}
+-- RHS size: {terms: 133, types: 129, coercions: 0, joins: 1/2}
 T26615a.disjointSubtrees_$s$wdisjointSubtrees [InlPrag=INLINABLE[2],
                                                Occ=LoopBreaker]
   :: forall k a b.
@@ -635,7 +635,6 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
         Empty -> GHC.Internal.Types.True;
         Leaf bx ds ->
           case ds of { L kB ds1 ->
-          case kB of k0 { __DEFAULT ->
           case eqWord# bx sc2 of {
             __DEFAULT -> GHC.Internal.Types.True;
             1# ->
@@ -668,8 +667,7 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
                     }
                     }; } in
               jump $wlookupInArrayCont_
-                sc k0 sc3 0# (sizeofSmallArray# @Lifted @(Leaf k a) sc3)
-          }
+                sc kB sc3 0# (sizeofSmallArray# @Lifted @(Leaf k a) sc3)
           }
           };
         Collision bx bx1 ->
@@ -710,7 +708,7 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
 end Rec }
 
 Rec {
--- RHS size: {terms: 719, types: 748, coercions: 18, joins: 13/23}
+-- RHS size: {terms: 713, types: 746, coercions: 18, joins: 13/23}
 T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
   :: forall k a b. Eq k => Int# -> HashMap k a -> HashMap k b -> Bool
 [GblId[StrictWorker([~, ~, !])],
@@ -740,7 +738,6 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                          Empty -> GHC.Internal.Types.True;
                          Leaf bx [Occ=Once1] ds2 [Occ=Once1!] ->
                            case ds2 of { L kB [Occ=Once1] _ [Occ=Dead] ->
-                           case kB of k0 [Occ=Once1] { __DEFAULT ->
                            joinrec {
                              lookupCont_ [Occ=LoopBreakerT[5]]
                                :: Eq k => Word -> k -> Int -> HashMap k a -> Bool
@@ -868,8 +865,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                  }
                                  }; } in
                            jump lookupCont_
-                             $dEq (GHC.Internal.Types.W# bx) k0 (GHC.Internal.Types.I# ww) ds
-                           }
+                             $dEq (GHC.Internal.Types.W# bx) kB (GHC.Internal.Types.I# ww) ds
                            };
                          Collision _ [Occ=Dead] _ [Occ=Dead] ->
                            T26615a.$wdisjointSubtrees @k @b @a $dEq ww wild ds
@@ -880,7 +876,6 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                      case ds1 of { L kA [Occ=Once2] _ [Occ=Dead] ->
                      case _b of wild2 [Occ=Once1] {
                        __DEFAULT ->
-                         case kA of k0 [Occ=Once1] { __DEFAULT ->
                          joinrec {
                            lookupCont_ [Occ=LoopBreakerT[5]]
                              :: Eq k => Word -> k -> Int -> HashMap k b -> Bool
@@ -1004,8 +999,11 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                }
                                }; } in
                          jump lookupCont_
-                           $dEq (GHC.Internal.Types.W# bx) k0 (GHC.Internal.Types.I# ww) wild2
-                         };
+                           $dEq
+                           (GHC.Internal.Types.W# bx)
+                           kA
+                           (GHC.Internal.Types.I# ww)
+                           wild2;
                        Leaf bx1 [Occ=Once1] ds3 [Occ=Once1!] ->
                          case ds3 of { L kB [Occ=Once1] _ [Occ=Dead] ->
                          case GHC.Internal.Classes.neWord
@@ -1091,13 +1089,14 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                    [LclId[JoinId(1)(Nothing)], Arity=1, Str=<L>, Unf=OtherCon []]
                                    go (ds1 [Occ=Once1!] :: Word)
                                      = case ds1 of { W# ds2 [Occ=Once1!] ->
-                                       case ds2 of ds3 {
+                                       case ds2 of wild5 {
                                          __DEFAULT ->
                                            let {
                                              m :: Word#
                                              [LclId]
                                              m = and#
-                                                   ds3 (int2Word# (negateInt# (word2Int# ds3))) } in
+                                                   wild5
+                                                   (int2Word# (negateInt# (word2Int# wild5))) } in
                                            case indexSmallArray#
                                                   @Lifted
                                                   @(HashMap k a)
@@ -1118,7 +1117,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                            of {
                                              False -> GHC.Internal.Types.False;
                                              True ->
-                                               jump go (GHC.Internal.Types.W# (and# ds3 (not# m)))
+                                               jump go (GHC.Internal.Types.W# (and# wild5 (not# m)))
                                            }
                                            }
                                            };
@@ -1137,12 +1136,12 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                            [LclId[JoinId(1)(Nothing)], Arity=1, Str=<L>, Unf=OtherCon []]
                            go (ds1 [Occ=Once1!] :: Word)
                              = case ds1 of { W# ds2 [Occ=Once1!] ->
-                               case ds2 of ds3 {
+                               case ds2 of wild3 {
                                  __DEFAULT ->
                                    let {
                                      m :: Word#
                                      [LclId]
-                                     m = and# ds3 (int2Word# (negateInt# (word2Int# ds3))) } in
+                                     m = and# wild3 (int2Word# (negateInt# (word2Int# wild3))) } in
                                    case indexSmallArray#
                                           @Lifted
                                           @(HashMap k a)
@@ -1161,7 +1160,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                    case T26615a.$wdisjointSubtrees @k @a @b $dEq (+# ww 5#) ipv ipv1
                                    of {
                                      False -> GHC.Internal.Types.False;
-                                     True -> jump go (GHC.Internal.Types.W# (and# ds3 (not# m)))
+                                     True -> jump go (GHC.Internal.Types.W# (and# wild3 (not# m)))
                                    }
                                    }
                                    };
@@ -1179,12 +1178,12 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                            [LclId[JoinId(1)(Nothing)], Arity=1, Str=<L>, Unf=OtherCon []]
                            go (ds1 [Occ=Once1!] :: Word)
                              = case ds1 of { W# ds2 [Occ=Once1!] ->
-                               case ds2 of ds3 {
+                               case ds2 of wild3 {
                                  __DEFAULT ->
                                    let {
                                      m :: Word#
                                      [LclId]
-                                     m = and# ds3 (int2Word# (negateInt# (word2Int# ds3))) } in
+                                     m = and# wild3 (int2Word# (negateInt# (word2Int# wild3))) } in
                                    case indexSmallArray#
                                           @Lifted
                                           @(HashMap k a)
@@ -1203,7 +1202,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                    case T26615a.$wdisjointSubtrees @k @a @b $dEq (+# ww 5#) ipv ipv1
                                    of {
                                      False -> GHC.Internal.Types.False;
-                                     True -> jump go (GHC.Internal.Types.W# (and# ds3 (not# m)))
+                                     True -> jump go (GHC.Internal.Types.W# (and# wild3 (not# m)))
                                    }
                                    }
                                    };
@@ -1277,7 +1276,6 @@ T26615a.$wdisjointSubtrees
               Empty -> GHC.Internal.Types.True;
               Leaf bx ds2 ->
                 case ds2 of { L kB ds3 ->
-                case kB of k0 { __DEFAULT ->
                 join {
                   exit [Dmd=LC(S,C(1,C(1,C(1,L))))]
                     :: Word# -> k -> Word# -> Leaf k a -> Bool
@@ -1392,8 +1390,7 @@ T26615a.$wdisjointSubtrees
                           }
                       }
                       }; } in
-                jump $wlookupCont_ $dEq bx k0 ww ds
-                }
+                jump $wlookupCont_ $dEq bx kB ww ds
                 };
               Collision bx bx1 ->
                 T26615a.disjointSubtrees_$s$wdisjointSubtrees
@@ -1405,7 +1402,6 @@ T26615a.$wdisjointSubtrees
           case ds1 of { L kA ds2 ->
           case _b of wild2 {
             __DEFAULT ->
-              case kA of k0 { __DEFAULT ->
               join {
                 exit [Dmd=LC(S,C(1,C(1,C(1,L))))]
                   :: Word# -> k -> Word# -> Leaf k b -> Bool
@@ -1519,8 +1515,7 @@ T26615a.$wdisjointSubtrees
                         }
                     }
                     }; } in
-              jump $wlookupCont_ $dEq bx k0 ww wild2
-              };
+              jump $wlookupCont_ $dEq bx kA ww wild2;
             Leaf bx1 ds3 ->
               case ds3 of { L kB ds4 ->
               case neWord# bx bx1 of {
@@ -1604,12 +1599,12 @@ T26615a.$wdisjointSubtrees
                         $wgo [InlPrag=[2], Occ=LoopBreaker, Dmd=SC(S,L)] :: Word# -> Bool
                         [LclId[JoinId(1)(Nothing)], Arity=1, Str=<1L>, Unf=OtherCon []]
                         $wgo (ww1 :: Word#)
-                          = case ww1 of ds1 {
+                          = case ww1 of wild4 {
                               __DEFAULT ->
                                 let {
                                   m :: Word#
                                   [LclId]
-                                  m = and# ds1 (int2Word# (negateInt# (word2Int# ds1))) } in
+                                  m = and# wild4 (int2Word# (negateInt# (word2Int# wild4))) } in
                                 case indexSmallArray#
                                        @Lifted
                                        @(HashMap k a)
@@ -1626,7 +1621,7 @@ T26615a.$wdisjointSubtrees
                                 { (# ipv1 #) ->
                                 case T26615a.$wdisjointSubtrees @k @a @b $dEq lvl2 ipv ipv1 of {
                                   False -> GHC.Internal.Types.False;
-                                  True -> jump $wgo (and# ds1 (not# m))
+                                  True -> jump $wgo (and# wild4 (not# m))
                                 }
                                 }
                                 };
@@ -1647,12 +1642,12 @@ T26615a.$wdisjointSubtrees
                 $wgo [InlPrag=[2], Occ=LoopBreaker, Dmd=SC(S,L)] :: Word# -> Bool
                 [LclId[JoinId(1)(Nothing)], Arity=1, Str=<1L>, Unf=OtherCon []]
                 $wgo (ww1 :: Word#)
-                  = case ww1 of ds1 {
+                  = case ww1 of wild2 {
                       __DEFAULT ->
                         let {
                           m :: Word#
                           [LclId]
-                          m = and# ds1 (int2Word# (negateInt# (word2Int# ds1))) } in
+                          m = and# wild2 (int2Word# (negateInt# (word2Int# wild2))) } in
                         case indexSmallArray#
                                @Lifted
                                @(HashMap k a)
@@ -1669,7 +1664,7 @@ T26615a.$wdisjointSubtrees
                         { (# ipv1 #) ->
                         case T26615a.$wdisjointSubtrees @k @a @b $dEq lvl2 ipv ipv1 of {
                           False -> GHC.Internal.Types.False;
-                          True -> jump $wgo (and# ds1 (not# m))
+                          True -> jump $wgo (and# wild2 (not# m))
                         }
                         }
                         };
@@ -1689,12 +1684,12 @@ T26615a.$wdisjointSubtrees
                 $wgo [InlPrag=[2], Occ=LoopBreaker, Dmd=SC(S,L)] :: Word# -> Bool
                 [LclId[JoinId(1)(Nothing)], Arity=1, Str=<1L>, Unf=OtherCon []]
                 $wgo (ww1 :: Word#)
-                  = case ww1 of ds1 {
+                  = case ww1 of wild2 {
                       __DEFAULT ->
                         let {
                           m :: Word#
                           [LclId]
-                          m = and# ds1 (int2Word# (negateInt# (word2Int# ds1))) } in
+                          m = and# wild2 (int2Word# (negateInt# (word2Int# wild2))) } in
                         case indexSmallArray#
                                @Lifted
                                @(HashMap k a)
@@ -1711,7 +1706,7 @@ T26615a.$wdisjointSubtrees
                         { (# ipv1 #) ->
                         case T26615a.$wdisjointSubtrees @k @a @b $dEq lvl2 ipv ipv1 of {
                           False -> GHC.Internal.Types.False;
-                          True -> jump $wgo (and# ds1 (not# m))
+                          True -> jump $wgo (and# wild2 (not# m))
                         }
                         }
                         };
@@ -1845,32 +1840,7 @@ disjointSubtrees
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 622, types: 674, coercions: 18, joins: 8/14}
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$trModule1 :: GHC.Internal.Prim.Addr#
-[GblId, Unf=OtherCon []]
-$trModule1 = "T26615"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$trModule2 :: GHC.Internal.Types.TrName
-[GblId, Unf=OtherCon []]
-$trModule2 = GHC.Internal.Types.TrNameS $trModule1
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$trModule3 :: GHC.Internal.Prim.Addr#
-[GblId, Unf=OtherCon []]
-$trModule3 = "main"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$trModule4 :: GHC.Internal.Types.TrName
-[GblId, Unf=OtherCon []]
-$trModule4 = GHC.Internal.Types.TrNameS $trModule3
-
--- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T26615.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
-[GblId, Unf=OtherCon []]
-T26615.$trModule = GHC.Internal.Types.Module $trModule4 $trModule2
+  = {terms: 603, types: 666, coercions: 18, joins: 8/14}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 lvl :: GHC.Internal.Prim.Addr#
@@ -2029,7 +1999,7 @@ $wpoly_lookupCont_
 end Rec }
 
 Rec {
--- RHS size: {terms: 450, types: 507, coercions: 18, joins: 8/13}
+-- RHS size: {terms: 445, types: 504, coercions: 18, joins: 8/13}
 T26615.$s$wdisjointSubtrees [InlPrag=[~], Occ=LoopBreaker]
   :: forall a b.
      GHC.Internal.Prim.Int#
@@ -2067,11 +2037,7 @@ T26615.$s$wdisjointSubtrees
             T26615a.Leaf bx1 ds3 ->
               case ds3 of { T26615a.L kB ds4 ->
               case GHC.Internal.Prim.neWord# bx bx1 of {
-                __DEFAULT ->
-                  case GHC.Internal.Classes.$fEqList_$s$c==1 kA kB of {
-                    False -> GHC.Internal.Types.True;
-                    True -> GHC.Internal.Types.False
-                  };
+                __DEFAULT -> GHC.Internal.Classes.$fEqList_$s$c/=1 kA kB;
                 1# -> GHC.Internal.Types.True
               }
               }
@@ -2094,14 +2060,14 @@ T26615.$s$wdisjointSubtrees
                     $s$wfoldr_ [InlPrag=[2],
                                 Occ=LoopBreaker,
                                 Dmd=SC(S,C(1,C(1,C(1,L))))]
-                      :: GHC.Internal.Prim.SmallArray# (T26615a.Leaf [Char] a)
+                      :: GHC.Internal.Prim.SmallArray# (T26615a.Leaf String a)
                          -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> Bool -> Bool
                     [LclId[JoinId(4)(Nothing)],
                      Arity=4,
                      Str=<L><L><L><L>,
                      Unf=OtherCon []]
                     $s$wfoldr_ (sc
-                                  :: GHC.Internal.Prim.SmallArray# (T26615a.Leaf [Char] a))
+                                  :: GHC.Internal.Prim.SmallArray# (T26615a.Leaf String a))
                                (sc1 :: GHC.Internal.Prim.Int#)
                                (sc2 :: GHC.Internal.Prim.Int#)
                                (sc3 :: Bool)
@@ -2243,16 +2209,16 @@ T26615.$s$wdisjointSubtrees
                           :: GHC.Internal.Prim.Word# -> Bool
                         [LclId[JoinId(1)(Nothing)], Arity=1, Str=<1L>, Unf=OtherCon []]
                         $wgo (ww1 :: GHC.Internal.Prim.Word#)
-                          = case ww1 of ds3 {
+                          = case ww1 of wild5 {
                               __DEFAULT ->
                                 let {
                                   m :: GHC.Internal.Prim.Word#
                                   [LclId]
                                   m = GHC.Internal.Prim.and#
-                                        ds3
+                                        wild5
                                         (GHC.Internal.Prim.int2Word#
                                            (GHC.Internal.Prim.negateInt#
-                                              (GHC.Internal.Prim.word2Int# ds3))) } in
+                                              (GHC.Internal.Prim.word2Int# wild5))) } in
                                 case GHC.Internal.Prim.indexSmallArray#
                                        @GHC.Internal.Types.Lifted
                                        @(HashMap String a)
@@ -2279,7 +2245,7 @@ T26615.$s$wdisjointSubtrees
                                   False -> GHC.Internal.Types.False;
                                   True ->
                                     jump $wgo
-                                      (GHC.Internal.Prim.and# ds3 (GHC.Internal.Prim.not# m))
+                                      (GHC.Internal.Prim.and# wild5 (GHC.Internal.Prim.not# m))
                                 }
                                 }
                                 };
@@ -2297,16 +2263,16 @@ T26615.$s$wdisjointSubtrees
                   :: GHC.Internal.Prim.Word# -> Bool
                 [LclId[JoinId(1)(Nothing)], Arity=1, Str=<1L>, Unf=OtherCon []]
                 $wgo (ww1 :: GHC.Internal.Prim.Word#)
-                  = case ww1 of ds3 {
+                  = case ww1 of wild3 {
                       __DEFAULT ->
                         let {
                           m :: GHC.Internal.Prim.Word#
                           [LclId]
                           m = GHC.Internal.Prim.and#
-                                ds3
+                                wild3
                                 (GHC.Internal.Prim.int2Word#
                                    (GHC.Internal.Prim.negateInt#
-                                      (GHC.Internal.Prim.word2Int# ds3))) } in
+                                      (GHC.Internal.Prim.word2Int# wild3))) } in
                         case GHC.Internal.Prim.indexSmallArray#
                                @GHC.Internal.Types.Lifted
                                @(HashMap String a)
@@ -2332,7 +2298,7 @@ T26615.$s$wdisjointSubtrees
                         of {
                           False -> GHC.Internal.Types.False;
                           True ->
-                            jump $wgo (GHC.Internal.Prim.and# ds3 (GHC.Internal.Prim.not# m))
+                            jump $wgo (GHC.Internal.Prim.and# wild3 (GHC.Internal.Prim.not# m))
                         }
                         }
                         };
@@ -2349,16 +2315,16 @@ T26615.$s$wdisjointSubtrees
                   :: GHC.Internal.Prim.Word# -> Bool
                 [LclId[JoinId(1)(Nothing)], Arity=1, Str=<1L>, Unf=OtherCon []]
                 $wgo (ww1 :: GHC.Internal.Prim.Word#)
-                  = case ww1 of ds3 {
+                  = case ww1 of wild3 {
                       __DEFAULT ->
                         let {
                           m :: GHC.Internal.Prim.Word#
                           [LclId]
                           m = GHC.Internal.Prim.and#
-                                ds3
+                                wild3
                                 (GHC.Internal.Prim.int2Word#
                                    (GHC.Internal.Prim.negateInt#
-                                      (GHC.Internal.Prim.word2Int# ds3))) } in
+                                      (GHC.Internal.Prim.word2Int# wild3))) } in
                         case GHC.Internal.Prim.indexSmallArray#
                                @GHC.Internal.Types.Lifted
                                @(HashMap String a)
@@ -2384,7 +2350,7 @@ T26615.$s$wdisjointSubtrees
                         of {
                           False -> GHC.Internal.Types.False;
                           True ->
-                            jump $wgo (GHC.Internal.Prim.and# ds3 (GHC.Internal.Prim.not# m))
+                            jump $wgo (GHC.Internal.Prim.and# wild3 (GHC.Internal.Prim.not# m))
                         }
                         }
                         };

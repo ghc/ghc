@@ -602,6 +602,7 @@ test('T26615',  [grep_errmsg(r'fEqList')], multimod_compile, ['T26615', '-O -fsp
 # T26722: there should be no reboxing in $wg
 test('T26722', [grep_errmsg(r'SPEC')], compile, ['-O -dno-typeable-binds'])
 
+test('T26548', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
 test('T26805', [grep_errmsg(r'fromInteger')], compile, ['-O -dno-typeable-binds -ddump-simpl -dsuppress-uniques'])
 test('T26826', normal, compile, ['-O'])
 test('T26903', [grep_errmsg(r'reverse')], compile, ['-O -dno-typeable-binds -ddump-simpl -dsuppress-uniques -dsuppress-all'])
@@ -632,3 +633,4 @@ test('T27910', grep_errmsg(r'KnownBranch'), compile, ['-O -dno-typeable-binds -d
 test('T27892', grep_errmsg(r'^f = g$'), compile, ['-O -ddump-cse -dsuppress-all -dsuppress-uniques'])
 test('T28095a', grep_errmsg(r'^f = g$'), compile, ['-O -ddump-cse -dsuppress-all -dsuppress-uniques'])
 test('T27212', normal, compile, ['-O'])
+
