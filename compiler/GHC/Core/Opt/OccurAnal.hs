@@ -2598,7 +2598,7 @@ occAnalArgs :: OccEnv -> CoreExpr -> [CoreExpr]
             -> WithUsageDetails CoreExpr
 -- The `fun` argument is just an accumulating parameter,
 -- the base for building the application we return
-occAnalArgs !env fun args !one_shots
+occAnalArgs env fun args one_shots
   = go emptyDetails fun args one_shots
   where
     env_args = setNonTailCtxt encl env
@@ -2657,8 +2657,19 @@ Constructors are rather like lambdas in this way.
 occAnalApp :: OccEnv
            -> (Expr CoreBndr, [Arg CoreBndr], [CoreTickish])
            -> WithUsageDetails (Expr CoreBndr)
--- Naked variables (not applied) end up here too
-occAnalApp !env (Var fun, args, ticks)
+occAnalApp !env (Var fun_id, [], ticks)
+  = -- Naked variables (not applied) end up here too, and it's worth giving
+    -- this common case special treatment, because there is so much less to do.
+    -- This is just a specialised copy of the (Var fun_id) case below
+    WUD fun_uds (mkTicks ticks fun')
+  where
+    !(fun', fun_id')  = lookupBndrSwap env fun_id
+    !fun_uds = mkOneOcc env fun_id' int_cxt 0
+    !int_cxt = case occ_encl env of
+                   OccScrut -> IsInteresting
+                   _other   -> NotInteresting
+
+occAnalApp env (Var fun, args, ticks)
   -- Account for join arity of runRW# continuation
   -- See Note [Simplification of runRW#]
   --
