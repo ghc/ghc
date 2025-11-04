@@ -1032,8 +1032,8 @@ interestingArg env e = go env 0 e
        | n > 0         = NonTrivArg -- Saturated or unknown call
        | otherwise  -- n==0, no value arguments; look for an interesting unfolding
        = case idUnfolding v of
-           OtherCon [] -> NonTrivArg   -- It's evaluated, but that's all we know
-           OtherCon _  -> ValueArg     -- Evaluated and we know it isn't these constructors
+           OtherCon [] -> TrivArg      -- It's evaluated, but that's all we know
+           OtherCon _  -> NonTrivArg   -- Evaluated and we know it isn't these constructors
               -- See Note [OtherCon and interestingArg]
            DFunUnfolding {} -> ValueArg   -- We konw that idArity=0
            CoreUnfolding{ uf_cache = cache }
