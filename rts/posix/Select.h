@@ -15,6 +15,10 @@ typedef StgWord LowResTime;
 
 LowResTime getDelayTarget (HsInt us);
 
+void initCapabilityIOManagerSelect(CapIOManager *iomgr);
+void freeCapabilityIOManagerSelect(CapIOManager *iomgr, bool after_fork);
+void wakeupIOManagerSelect(CapIOManager *iomgr);
+
 void awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait);
 
 #include "EndPrivate.h"
