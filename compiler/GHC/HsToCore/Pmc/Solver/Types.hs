@@ -51,7 +51,6 @@ import GHC.Core.ConLike
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc (lastMaybe)
-import GHC.Data.List.SetOps (unionLists)
 import GHC.Data.Maybe
 import GHC.Core.Type
 import GHC.Core.TyCon
@@ -71,6 +70,7 @@ import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
                             , FractionalExponentBase(..))
 import Numeric (fromRat)
 import Data.Foldable (find)
+import Data.List( nub )
 import Data.Ratio
 import GHC.Real (Ratio(..))
 import qualified Data.Semigroup as Semi
@@ -450,7 +450,20 @@ eqConLike _                 _                 = PossiblyOverlap
 data PmAltCon = PmAltConLike ConLike
               | PmAltLit     PmLit
 
-data PmAltConSet = PACS !(UniqDSet ConLike) ![PmLit]
+data PmAltConSet
+  = PACS !(UniqDSet ConLike)
+         [PmLit]  -- Note [PmLits in PmAltConSet]
+
+{- Note [PmLits in PmAltConSet]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The [PmLit] in `PmAltConSet` may have duplicates:
+* It grows by cons'ing (extendPmAltConSet)
+* The dups are removed by the `nub` in `pmAltConSetElems`
+
+Removing the duplicates only in `pmAltConSetElems` can make things a lot
+faster (#26514).  I saw a 30% drop mutator time when doing the `nub` later,
+rather than aggressively on insertion, in the N=5000 repro case of #26435.
+-}
 
 emptyPmAltConSet :: PmAltConSet
 emptyPmAltConSet = PACS emptyUniqDSet []
@@ -468,11 +481,13 @@ extendPmAltConSet :: PmAltConSet -> PmAltCon -> PmAltConSet
 extendPmAltConSet (PACS cls lits) (PmAltConLike cl)
   = PACS (addOneToUniqDSet cls cl) lits
 extendPmAltConSet (PACS cls lits) (PmAltLit lit)
-  = PACS cls (unionLists lits [lit])
+  = PACS cls (lit:lits)
+    -- Plain cons: see Note [PmLits in PmAltConSet]
 
 pmAltConSetElems :: PmAltConSet -> [PmAltCon]
 pmAltConSetElems (PACS cls lits)
-  = map PmAltConLike (uniqDSetToList cls) ++ map PmAltLit lits
+  = map PmAltConLike (uniqDSetToList cls) ++ map PmAltLit (nub lits)
+    -- nub: see Note [PmLits in PmAltConSet]
 
 instance Outputable PmAltConSet where
   ppr = ppr . pmAltConSetElems
