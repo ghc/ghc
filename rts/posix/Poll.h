@@ -18,6 +18,7 @@
 
 void initCapabilityIOManagerPoll(CapIOManager *iomgr);
 void freeCapabilityIOManagerPoll(CapIOManager *iomgr);
+void wakeupIOManagerPoll(CapIOManager *iomgr);
 
 /* Synchronous I/O and timer operations */
 bool syncIOWaitReadyPoll(CapIOManager *iomgr, StgTSO *tso,

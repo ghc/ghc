@@ -46,7 +46,7 @@ struct _CapIOManager {
     StgTSO *sleeping_queue;
 #endif
 
-#if defined(IOMGR_ENABLED_SELECT)
+#if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_POLL)
     /* FDs for waking up the I/O manager when it is blocked waiting */
     int wakeup_fd_r, wakeup_fd_w;
 #endif
@@ -58,8 +58,11 @@ struct _CapIOManager {
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
-    /* Auxiliary table with size and indexes matching the aiop_table */
-    struct pollfd *aiop_poll_table;
+    /* Auxiliary table with size and indexes matching the aiop_table. This is
+     * aliased to the tail of the full poll table, which has a head entry for
+     * the wakeup_fd_r above, so we can also poll that fd.
+     */
+    struct pollfd *aiop_poll_table, *full_poll_table;
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
