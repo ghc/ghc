@@ -178,14 +178,17 @@ Note [Instantiation variables are short lived]
 -- take in the rn_expr and its location to pass into tcValArgs
 tcExprSigma :: Bool -> HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
 tcExprSigma inst rn_expr
-  = do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
+  = do { (fun@(rn_fun,fun_lspan), rn_args) <- splitHsApps rn_expr
        ; do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; code_orig <- getSrcCodeOrigin
-       ; let fun_orig = srcCodeOriginCtOrigin rn_expr code_orig
-       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (fun_orig, rn_fun, fun_ctxt) tc_fun fun_sigma rn_args
-       ; tc_args <- tcValArgs do_ql (rn_fun, generatedSrcSpan) inst_args
-       ; let tc_expr = rebuildHsApps (tc_fun, fun_ctxt) tc_args
+       ; let fun_orig | isGoodSrcSpan fun_lspan
+                      = exprCtOrigin rn_fun
+                      | otherwise
+                      = srcCodeOriginCtOrigin rn_fun code_orig
+       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigma rn_args
+       ; tc_args <- tcValArgs do_ql (rn_fun, fun_lspan) inst_args
+       ; let tc_expr = rebuildHsApps (tc_fun, fun_lspan) tc_args
        ; return (tc_expr, app_res_sigma) }
 
 
@@ -2239,7 +2242,7 @@ tcTagToEnum :: (HsExpr GhcTc, SrcSpan) -> [HsExprArg 'TcpTc]
             -> TcM (HsExpr GhcTc)
 -- tagToEnum# :: forall a. Int# -> a
 -- See Note [tagToEnum#]   Urgh!
-tcTagToEnum (tc_fun, fun_ctxt) tc_args res_ty
+tcTagToEnum (tc_fun, fun_lspan) tc_args res_ty
   | [val_arg] <- dropWhile (not . isHsValArg) tc_args
   = do { res_ty <- liftZonkM $ zonkTcType res_ty
 
@@ -2261,14 +2264,14 @@ tcTagToEnum (tc_fun, fun_ctxt) tc_args res_ty
        ; let rep_ty  = mkTyConApp rep_tc rep_args
              tc_fun' = mkHsWrap (WpTyApp rep_ty) tc_fun
              df_wrap = mkWpCastR (mkSymCo coi)
-             tc_expr = rebuildHsApps (tc_fun', fun_ctxt) [val_arg]
+             tc_expr = rebuildHsApps (tc_fun', fun_lspan) [val_arg]
        ; return (mkHsWrap df_wrap tc_expr) }}}}}
 
   | otherwise
   = failWithTc TcRnTagToEnumMissingValArg
 
   where
-    vanilla_result = return (rebuildHsApps (tc_fun, fun_ctxt) tc_args)
+    vanilla_result = return (rebuildHsApps (tc_fun, fun_lspan) tc_args)
 
     check_enumeration ty' tc
       | -- isTypeDataTyCon: see wrinkle (W1) in

@@ -457,7 +457,7 @@ tcInferAppHead :: (HsExpr GhcRn, SrcSpan)
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
 tcInferAppHead (fun,fun_lspan)
-  = addLExprCtxt fun_lspan fun $
+  = setSrcSpan fun_lspan $
     do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
@@ -471,10 +471,10 @@ tcInferAppHead_maybe fun =
     case fun of
       HsVar _ nm                  -> Just <$> tcInferId nm
       XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
-      XExpr (ExpandedThingRn _ e) -> Just <$> -- (addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $
+      XExpr (ExpandedThingRn o e) -> Just <$> (addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $
                                               -- We do not want to instantiate c.f. T19167
                                               tcExprSigma False e
-                                              -- )
+                                              )
       ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit             -> Just <$> tcInferOverLit lit
       _                           -> return Nothing
