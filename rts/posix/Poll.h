@@ -32,7 +32,8 @@ void asyncIOCancelPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop);
 /* Scheduler operations */
 bool anyPendingTimeoutsOrIOPoll(CapIOManager *iomgr);
 void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr);
-void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr);
+bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr);
+void interruptIOManagerPoll(CapIOManager *iomgr);
 
 #endif /* IOMGR_ENABLED_POLL */
 
