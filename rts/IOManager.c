@@ -745,7 +745,7 @@ bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr)
 
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
-          awaitCompletedTimeoutsOrIOPoll(iomgr);
+          completed = awaitCompletedTimeoutsOrIOPoll(iomgr);
           break;
 #endif
 
@@ -781,6 +781,12 @@ void interruptIOManager(CapIOManager *iomgr)
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
             interruptIOManagerSelect(iomgr);
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_POLL)
+        case IO_MANAGER_POLL:
+            interruptIOManagerPoll(iomgr);
             break;
 #endif
 

@@ -41,6 +41,7 @@
 
 #include "IOManagerInternals.h"
 #include "Timeout.h"
+#include "FdWakeup.h"
 
 /******************************************************************************
 
@@ -107,8 +108,9 @@ timeout (if any) as the poll() timeout parameter.
 The CapIOManager structure for this I/O manager contains:
 
     ClosureTable     aiop_table;
-    struct pollfd   *aiop_poll_table;
+    struct pollfd   *aiop_poll_table, *full_poll_table;
     StgTimeoutQueue *timeout_queue;
+    int interrupt_fd_r, interrupt_fd_w;
 
 We also support the Linux-specific ppoll API which supports higher resolution
 time delays -- nanoseconds rather than milliseconds as in classic poll(). It
@@ -116,6 +118,15 @@ also allows the signal mask to be adjusted, but we do not make use of this.
 
    int ppoll(struct pollfd *fds, nfds_t nfds,
            const struct timespec *tmo_p, const sigset_t *sigmask);
+
+We have both aiop_poll_table and full_poll_table. This is to cope with needing
+to wait on the special extra file descriptor interrupt_fd_r. This fd is used to
+support waking the I/O manager when we are blocked in a poll call. This
+requires waiting on an extra fd that has no corresponding entry in the
+aiop_table. To manage this quirk, we alias the aiop_poll_table to be the tail
+of the full_poll_table and have the first entry of the full_poll_table be the
+interrupt_fd_r. This means the aiop_poll_table indicies match up exactly with
+the aiop_table, but still allows the full_poll_table to have an extra entry.
 
 ******************************************************************************/
 
@@ -129,16 +140,34 @@ static void reportPollError(int res, nfds_t nfds) STG_NORETURN;
 void initCapabilityIOManagerPoll(CapIOManager *iomgr)
 {
     initClosureTable(&iomgr->aiop_table, ClosureTableCompact);
-    iomgr->aiop_poll_table = NULL;
     iomgr->timeout_queue = emptyTimeoutQueue();
+
+#if defined(HAVE_PREEMPTION)
+    newFdWakeup(&iomgr->interrupt_fd_r, &iomgr->interrupt_fd_w);
+#endif
+
+    iomgr->full_poll_table = stgMallocBytes(sizeof(struct pollfd) /* size 1 */,
+                                            "initCapabilityIOManagerPoll");
+    iomgr->full_poll_table[0] = (struct pollfd) {
+#if defined(HAVE_PREEMPTION)
+                                  .fd      = iomgr->interrupt_fd_r,
+                                  .events  = POLLIN,
+#else
+                                  .fd      = -1, // unused
+                                  .events  = 0,  // unused
+#endif
+                                  .revents = 0
+                                };
+    iomgr->aiop_poll_table = iomgr->full_poll_table+1; /* hence empty */
 }
 
 
 void freeCapabilityIOManagerPoll(CapIOManager *iomgr)
 {
-    if (iomgr->aiop_poll_table) {
-        stgFree(iomgr->aiop_poll_table);
-    }
+    stgFree(iomgr->full_poll_table);
+#if defined(HAVE_PREEMPTION)
+    closeFdWakeup(iomgr->interrupt_fd_r, iomgr->interrupt_fd_w);
+#endif
 }
 
 
@@ -295,7 +324,7 @@ static void notifyIOCompletion(CapIOManager *iomgr, StgAsyncIOOp *aiop)
 }
 
 
-static void processIOCompletions(CapIOManager *iomgr, int ncompletions)
+static bool processIOCompletions(CapIOManager *iomgr, int ncompletions)
 {
     /* The scheme we use with poll is that we have a dense poll table, and a
      * corresponding table that maps to the closure table index. The poll
@@ -305,6 +334,19 @@ static void processIOCompletions(CapIOManager *iomgr, int ncompletions)
      */
     debugTrace(DEBUG_iomanager, "processIOCompletions(ncompletions = %d)",
                                 ncompletions);
+
+    bool interrupt = false;
+#if defined(HAVE_PREEMPTION)
+    /* If the interrupt_fd_r is ready, collect it */
+    if (iomgr->full_poll_table[0].revents) {
+        ASSERT(iomgr->full_poll_table[0].fd == iomgr->interrupt_fd_r);
+        collectFdWakeup(iomgr->interrupt_fd_r);
+        ncompletions--;
+        interrupt = true;
+        debugTrace(DEBUG_iomanager, "Received interrupt in poll I/O manager");
+    }
+#endif
+
     struct pollfd *aiop_poll_table = iomgr->aiop_poll_table;
     int n = ncompletions;
     int i = 0;
@@ -357,11 +399,14 @@ static void processIOCompletions(CapIOManager *iomgr, int ncompletions)
             i++;
         }
     }
+    return interrupt;
 }
 
 
 void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 {
+    ASSERT(iomgr->aiop_poll_table == iomgr->full_poll_table+1);
+
     if (!isEmptyTimeoutQueue(iomgr->timeout_queue)) {
         Time now = getProcessElapsedTime();
         processTimeoutCompletions(iomgr, now);
@@ -369,20 +414,28 @@ void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 
     if (!isEmptyClosureTable(&iomgr->aiop_table)) {
 
-        nfds_t nfds = sizeClosureTable(&iomgr->aiop_table);
+        nfds_t nfds = sizeClosureTable(&iomgr->aiop_table) + 1;
+
+#if defined(HAVE_PREEMPTION)
+        /* the full_poll_table includes interrupt_fd_r */
+        struct pollfd *poll_table = iomgr->full_poll_table;
+#else
+        /* the aiop_poll_table does not include interrupt_fd_r */
+        struct pollfd *poll_table = iomgr->aiop_poll_table;
+#endif
 
         /* Poll for I/O readiness, without waiting. */
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
         /* We could use poll here, since we use no timeout, but for
            consistency we use the same syscall as at the other call site. */
         struct timespec tv = (struct timespec) { .tv_sec = 0, .tv_nsec = 0 };
-        int res = ppoll(iomgr->aiop_poll_table, nfds, &tv, NULL);
+        int res = ppoll(poll_table, nfds, &tv, NULL);
 
         debugTrace(DEBUG_iomanager,
                    "ppoll(nfds = %d, timeout.sec = 0, timeout.nsec = 0) = %d",
                    nfds, res);
 #else
-        int res = poll(iomgr->aiop_poll_table, nfds, 0);
+        int res = poll(poll_table, nfds, 0);
 
         debugTrace(DEBUG_iomanager,
                    "poll(nfds = %d, timeout_ms = 0) = %d",
@@ -408,8 +461,12 @@ void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 }
 
 
-void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
+bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 {
+    bool interrupt = false; /* got woken up via interruptIOManager */
+
+    ASSERT(iomgr->aiop_poll_table == iomgr->full_poll_table+1);
+
     /* Loop until we've woken up some threads. This loop is needed because the
      * poll() timing isn't accurate, we sometimes sleep for a while but not
      * long enough to wake up a thread in a threadDelay. Or we may need to
@@ -431,6 +488,14 @@ void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
          */
         bool wait = emptyRunQueue(iomgr->cap);
 
+#if defined(HAVE_PREEMPTION)
+        /* the full_poll_table includes interrupt_fd_r */
+        struct pollfd *poll_table = iomgr->full_poll_table;
+#else
+        /* the aiop_poll_table does not include interrupt_fd_r */
+        struct pollfd *poll_table = iomgr->aiop_poll_table;
+#endif
+
         /* Decide if we are going to wait if no I/O is ready, either:
          * poll only, wait indefinitely, or wait until a timeout.
          */
@@ -442,9 +507,9 @@ void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 #endif
 
         /* Check for I/O readiness, possibly waiting. */
-        nfds_t nfds = sizeClosureTable(&iomgr->aiop_table);
+        nfds_t nfds = sizeClosureTable(&iomgr->aiop_table) + 1;
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
-        int res = ppoll(iomgr->aiop_poll_table, nfds, timeout_ns, NULL);
+        int res = ppoll(poll_table, nfds, timeout_ns, NULL);
 
         debugTrace(DEBUG_iomanager,
                    "ppoll(nfds = %d, timeout.sec = %d, timeout.nsec = %d) = %d",
@@ -452,7 +517,7 @@ void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
                          timeout_ns == NULL ?  0 : timeout_ns->tv_nsec,
                    res);
 #else
-        int res = poll(iomgr->aiop_poll_table, nfds, timeout_ms);
+        int res = poll(poll_table, nfds, timeout_ms);
 
         debugTrace(DEBUG_iomanager,
                    "poll(nfds = %d, timeout_ms = %d) = %d",
@@ -474,7 +539,7 @@ void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
         } else if (res > 0) {
             int ncompletions = res;
             ASSERT(ncompletions <= (int)nfds);
-            processIOCompletions(iomgr, ncompletions);
+            interrupt = processIOCompletions(iomgr, ncompletions);
             // FIXME: do we also need to check for timeout completions now?
             // we have a non-empty queue, but if !wait then we have also moved
             // on and so we sould check for timeouts.
@@ -502,7 +567,9 @@ void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
         }
 
     } while (emptyRunQueue(iomgr->cap)
+         && !interrupt
          && (getSchedState() == SCHED_RUNNING));
+    return !interrupt;
 }
 
 static void reportPollError(int res, nfds_t nfds)
@@ -521,6 +588,14 @@ static void reportPollError(int res, nfds_t nfds)
 }
 
 
+void interruptIOManagerPoll(CapIOManager *iomgr)
+{
+#if defined(HAVE_PREEMPTION)
+    sendFdWakeup(iomgr->interrupt_fd_w);
+#endif
+}
+
+
 /* Helper function to double the size of the aiop_table and aiop_poll_table.
  */
 static bool enlargeTables(CapIOManager *iomgr)
@@ -531,13 +606,17 @@ static bool enlargeTables(CapIOManager *iomgr)
     bool ok = enlargeClosureTable(iomgr->cap, &iomgr->aiop_table, newcapacity);
     if (RTS_UNLIKELY(!ok)) return false;
 
-    /* Update the auxiliary aiop_poll_table to match */
-    struct pollfd *aiop_poll_table;
-    aiop_poll_table = stgReallocBytes(iomgr->aiop_poll_table,
-                                      sizeof(struct pollfd) * newcapacity,
-                                      "Poll.c: enlargeTables");
-    iomgr->aiop_poll_table = aiop_poll_table;
+    /* Update the auxiliary aiop_poll_table to match. The full_poll_table is
+     * one bigger than the aiop_poll_table, since it has an extra entry at the
+     * front for interrupt_fd_r, with no corresponding aiop. */
+    iomgr->full_poll_table =
+        stgReallocBytes(iomgr->full_poll_table,
+                        sizeof(struct pollfd) * (newcapacity+1),
+                        "Poll.c: enlargeTables");
+    iomgr->aiop_poll_table = iomgr->full_poll_table+1;
+
     /* Initialise the new part of the aiop_poll_table */
+    struct pollfd *aiop_poll_table = iomgr->aiop_poll_table;
     for (int i = oldcapacity; i < newcapacity; i++) {
         aiop_poll_table[i] = (struct pollfd) {
                                .fd      = -1,
