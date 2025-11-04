@@ -582,6 +582,12 @@ void wakeupIOManager(void)
             break;
 #endif
 
+#if defined(IOMGR_ENABLED_POLL)
+        case IO_MANAGER_POLL:
+            wakeupIOManagerPoll(MainCapability.iomgr);
+            break;
+#endif
+
 #if defined(IOMGR_ENABLED_MIO_POSIX)
         case IO_MANAGER_MIO_POSIX:
             /* MIO Posix implementation in posix/Signals.c */
