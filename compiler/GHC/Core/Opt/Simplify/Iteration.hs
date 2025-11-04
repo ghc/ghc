@@ -3569,9 +3569,9 @@ adjustFieldsIdInfo scrut case_bndr bndr_swap con vs
   -- This case is quite allocation sensitive to T9233 which has a large record
   -- with strict fields. Hence we try not to update vs twice!
 adjustFieldsIdInfo _scrut case_bndr bndr_swap con vs
-  | Nothing <- dataConWrapId_maybe con
-      -- A common fast path; no need to allocate the_strs when they are all lazy
-      -- anyway! It shaves off 2% in T9675
+  | isLazyDataConRep con
+      -- A common fast path; no need to allocate `the_strs` when
+      -- they are all lazy anyway! It shaves off 2% in T9675
   = map (adjustFieldOccInfo case_bndr bndr_swap) vs
   | otherwise
   = go vs the_strs
