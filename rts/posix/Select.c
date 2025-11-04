@@ -22,6 +22,7 @@
 #include "IOManagerInternals.h"
 #include "Stats.h"
 #include "GetTime.h"
+#include "FdWakeup.h"
 
 # if defined(HAVE_SYS_SELECT_H)
 #  include <sys/select.h>
@@ -53,6 +54,25 @@
 #define TimeToLowResTimeRoundDown(t) (t)
 #define TimeToLowResTimeRoundUp(t)   (t)
 #endif
+
+void initCapabilityIOManagerSelect(CapIOManager *iomgr)
+{
+    iomgr->blocked_queue_hd = END_TSO_QUEUE;
+    iomgr->blocked_queue_tl = END_TSO_QUEUE;
+    iomgr->sleeping_queue   = END_TSO_QUEUE;
+
+    newFdWakeup(&iomgr->interrupt_fd_r, &iomgr->interrupt_fd_w);
+}
+
+void freeCapabilityIOManagerSelect(CapIOManager *iomgr)
+{
+    closeFdWakeup(iomgr->interrupt_fd_r, iomgr->interrupt_fd_w);
+}
+
+void interruptIOManagerSelect(CapIOManager *iomgr)
+{
+    sendFdWakeup(iomgr->interrupt_fd_w);
+}
 
 /*
  * Return the time since the program started, in LowResTime,
@@ -215,7 +235,7 @@ static enum FdState fdPollWriteState (int fd)
  * not write handles.
  *
  */
-void
+bool
 awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
 {
     StgTSO *tso, *prev, *next;
@@ -225,6 +245,7 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
     bool seen_bad_fd = false;
     struct timeval tv, *ptv;
     LowResTime now;
+    bool interrupt = false; /* got interrupted up via interruptIOManager */
 
     IF_DEBUG(scheduler,
              debugBelch("scheduler: checking for threads blocked on I/O");
@@ -243,7 +264,7 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
 
       now = getLowResTimeOfDay();
       if (wakeUpSleepingThreads(iomgr, now)) {
-          return;
+          return true;
       }
 
       /*
@@ -251,6 +272,13 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
        */
       FD_ZERO(&rfd);
       FD_ZERO(&wfd);
+
+      /* We're always interested in our interrupt fd */
+      {
+          int fd = iomgr->interrupt_fd_r;
+          maxfd = (fd > maxfd) ? fd : maxfd;
+          FD_SET(fd, &rfd);
+      }
 
       for(tso = iomgr->blocked_queue_hd;
           tso != END_TSO_QUEUE;
@@ -354,14 +382,14 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
 #if defined(RTS_USER_SIGNALS)
           if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
               startSignalHandlers(iomgr->cap);
-              return; /* still hold the lock */
+              return true; /* still hold the lock */
           }
 #endif
 
           /* we were interrupted, return to the scheduler immediately.
            */
           if (getSchedState() >= SCHED_INTERRUPTING) {
-              return; /* still hold the lock */
+              return true; /* still hold the lock */
           }
 
           /* check for threads that need waking up
@@ -372,8 +400,15 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
            * I/O and run them.
            */
           if (!emptyRunQueue(iomgr->cap)) {
-              return; /* still hold the lock */
+              return true; /* still hold the lock */
           }
+      }
+
+      /* If the interrupt_fd_r is ready, collect it */
+      if (FD_ISSET(iomgr->interrupt_fd_r, &rfd)) {
+          collectFdWakeup(iomgr->interrupt_fd_r);
+          interrupt = true;
+          debugTrace(DEBUG_iomanager, "Received interrupt in select I/O manager");
       }
 
       /* Step through the waiting queue, unblocking every thread that now has
@@ -458,7 +493,9 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
       }
 
     } while (wait && getSchedState() == SCHED_RUNNING
-                  && emptyRunQueue(iomgr->cap));
+                  && emptyRunQueue(iomgr->cap)
+                  && !interrupt);
+    return !interrupt;
 }
 
 #endif /* IOMGR_ENABLED_SELECT */
