@@ -1813,7 +1813,7 @@ lStmtsImplicits = hs_lstmts
 
 hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR)
                     -> [(SrcSpan, [ImplicitFieldBinders])]
-hsValBindsImplicits (XValBindsLR (NValBinds binds _))
+hsValBindsImplicits (XValBindsLR (NvbRn binds _))
   = concatMap (lhsBindsImplicits . snd) binds
 hsValBindsImplicits (ValBinds _ binds _)
   = lhsBindsImplicits binds

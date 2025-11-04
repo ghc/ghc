@@ -311,43 +311,42 @@ tcBindGroups _ _ _ [] thing_inside
 
 tcBindGroups top_lvl sig_fn prag_fn (group : groups) thing_inside
   = do  { -- See Note [Closed binder groups]
-          type_env <- getLclTypeEnv
-        ; let closed = isClosedBndrGroup type_env (snd group)
         ; (group', (groups', thing))
                 <- tc_group top_lvl sig_fn prag_fn group closed $
                    tcBindGroups top_lvl sig_fn prag_fn groups thing_inside
         ; return (group' : groups', thing) }
 
--- Note [Closed binder groups]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
---  A mutually recursive group is "closed" if all of the free variables of
---  the bindings are closed. For example
---
--- >  h = \x -> let f = ...g...
--- >                g = ....f...x...
--- >             in ...
---
--- Here @g@ is not closed because it mentions @x@; and hence neither is @f@
--- closed.
---
--- So we need to compute closed-ness on each strongly connected components,
--- before we sub-divide it based on what type signatures it has.
---
+{- Note [Closed binder groups]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ A mutually recursive group is "closed" if all of the free variables of
+ the bindings are closed. For example
+
+     h = \x -> let f = ...g...
+                   g = ....f...x...
+               in ...
+
+ Here `g` is not closed because it mentions `x`; and hence neither
+is `f` closed.
+
+So we need to compute closed-ness on each strongly connected components,
+before we sub-divide it based on what type signatures it has.
+-}
 
 ------------------------
 tc_group :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
-         -> (RecFlag, LHsBinds GhcRn) -> IsGroupClosed -> TcM thing
-         -> TcM ((RecFlag, LHsBinds GhcTc), thing)
+         -> (RecFlag, LHsBinds GhcRn) -> TcM thing
+         -> TcM ((RecFlag, LHsBinds GhcTc, Bool), thing)
 
 -- Typecheck one strongly-connected component of the original program.
 
-tc_group top_lvl sig_fn prag_fn (NonRecursive, binds) closed thing_inside
+tc_group top_lvl sig_fn prag_fn (NonRecursive, binds) thing_inside
         -- A single non-recursive binding
         -- We want to keep non-recursive things non-recursive
         -- so that we desugar unlifted bindings correctly
-  = do { let bind = case binds of
+  = do { type_env <- getLclTypeEnv
+       ; let closed = isClosedBndrGroup type_env binds
+             bind = case binds of
                  [bind] -> bind
                  []     -> panic "tc_group: empty list of binds"
                  _      -> panic "tc_group: NonRecursive binds is not a singleton bag"
@@ -362,9 +361,16 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
         -- (This used to be optional, but isn't now.)
         -- See Note [Polymorphic recursion] in "GHC.Hs.Binds".
     do  { traceTc "tc_group rec" (pprLHsBinds binds)
+        ; type_env <- getLclTypeEnv
+        ; let closed = isClosedBndrGroup type_env binds
+
+        -- Rejected a pattern synonym in a recursive group
         ; whenIsJust mbFirstPatSyn $ \lpat_syn ->
             recursivePatSynErr (locA $ getLoc lpat_syn) binds
-        ; (binds1, thing) <- go sccs
+
+        -- Typecheck the SCCs in turn
+        ; (binds1, thing) <- go closed sccs
+
         ; return ((Recursive, binds1), thing) }
                 -- Rec them all together
   where
@@ -375,15 +381,16 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     sccs :: [SCC (LHsBind GhcRn)]
     sccs = stronglyConnCompFromEdgedVerticesUniq (mkEdges sig_fn binds)
 
-    go :: [SCC (LHsBind GhcRn)] -> TcM (LHsBinds GhcTc, thing)
-    go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
-                         -- recursive bindings must be unrestricted
-                         -- (the ids added to the environment here are the name of the recursive definitions).
-                        ; (binds2, thing) <-
-                              tcExtendLetEnv top_lvl sig_fn closed ids1
-                              (go sccs)
-                        ; return (binds1 ++ binds2, thing) }
-    go []         = do  { thing <- thing_inside; return ([], thing) }
+    go :: IsGroupClosed -> [SCC (LHsBind GhcRn)] -> TcM (LHsBinds GhcTc, thing)
+    go closed (scc:sccs)
+            = do  { (binds1, ids1) <- tc_scc scc
+                   -- recursive bindings must be unrestricted
+                   -- (the ids added to the environment here are
+                   --  the name of the recursive definitions)
+                  ; (binds2, thing) <- tcExtendLetEnv top_lvl sig_fn closed ids1 $
+                                       go closed sccs
+                  ; return (binds1 ++ binds2, thing) }
+    go _ [] = do  { thing <- thing_inside; return ([], thing) }
 
     tc_scc (AcyclicSCC bind) = tc_sub_group NonRecursive [bind]
     tc_scc (CyclicSCC binds) = tc_sub_group Recursive    binds
@@ -1846,7 +1853,7 @@ decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
     has_mult_ann_and_pat (L _ (PatBind{})) = True
     has_mult_ann_and_pat _ = False
 
-isClosedBndrGroup :: TcTypeEnv -> [(LHsBind GhcRn)] -> IsGroupClosed
+isClosedBndrGroup :: TcTypeEnv -> [LHsBind GhcRn] -> IsGroupClosed
 isClosedBndrGroup type_env binds
   = IsGroupClosed fv_env type_closed
   where

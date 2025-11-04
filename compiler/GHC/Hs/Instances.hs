@@ -56,9 +56,9 @@ deriving instance Data (HsValBindsLR GhcRn GhcRn)
 deriving instance Data (HsValBindsLR GhcTc GhcTc)
 
 -- deriving instance (DataIdLR pL pL) => Data (NHsValBindsLR pL)
-deriving instance Data (NHsValBindsLR GhcPs)
-deriving instance Data (NHsValBindsLR GhcRn)
-deriving instance Data (NHsValBindsLR GhcTc)
+deriving instance Data (NHsValBindsLR 'Parsed)
+deriving instance Data (NHsValBindsLR 'Renamed)
+deriving instance Data (NHsValBindsLR 'Typechecked)
 
 -- deriving instance (DataIdLR pL pR) => Data (HsBindLR pL pR)
 deriving instance Data (HsBindLR GhcPs GhcPs)

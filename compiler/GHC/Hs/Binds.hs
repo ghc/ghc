@@ -79,17 +79,13 @@ type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = DataConCantHappen
 
 -- ---------------------------------------------------------------------
--- Deal with ValBindsOut
-
--- TODO: make this the only type for ValBinds
-data NHsValBindsLR idL
-  = NValBinds
-      [(RecFlag, LHsBinds idL)]
-      [LSig GhcRn]
-
 type instance XValBinds    (GhcPass pL) (GhcPass pR) = AnnSortKey BindTag
-type instance XXValBindsLR (GhcPass pL) pR
-            = NHsValBindsLR (GhcPass pL)
+type instance XXValBindsLR (GhcPass pL) pR = NHsValBindsLR pL
+
+data NHsValBindsLR (p :: Pass) where
+  NvbPs :: NHsValBindsLR 'Parsed
+  NvbRn :: [(RecFlag, LHsBinds GhcRn)]       -> [LSig GhcRn] -> NHsValBindsLR 'Renamed
+  NvbTc :: [(RecFlag, LHsBinds GhcRn, Bool)] -> [LSig GhcRn] -> NHsValBindsLR 'Typechecked
 
 -- ---------------------------------------------------------------------
 
@@ -431,11 +427,12 @@ c) Deciding whether the binding can be used in static forms
      GHC.Tc.Gen.Bind.isClosedBndrGroup).
 
 Specifically,
-
   * it includes all free vars that are defined in this module
     (including top-level things and lexically scoped type variables)
 
   * it excludes imported vars; this is just to keep the set smaller
+
+  * in a recursive group, it /includes/ variables bound in the same group
 
   * Before renaming, and after typechecking, the field is unused;
     it's just an error thunk
@@ -452,15 +449,22 @@ instance (OutputableBndrId pl, OutputableBndrId pr)
   ppr (ValBinds _ binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
-  ppr (XValBindsLR (NValBinds sccs sigs))
-    = getPprDebug $ \case
-        -- Print with sccs showing
-        True  -> vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
-        False -> pprDeclList (pprLHsBindsForUser (concat (map snd sccs)) sigs)
-   where
-     ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
-     pp_rec Recursive    = text "rec"
-     pp_rec NonRecursive = text "nonrec"
+  ppr (XValBindsLR nvbs)
+    = case nvbs of
+        NvbPs               -> empty
+        NvbRn prs     sigs -> ppr_vb prs sigs
+        NvbTc triples sigs -> ppr_vb [(a,b) | (a,b,_)<-triples] sigs
+                              -- Discard closed-flag for now
+    where
+      ppr_vb prs sigs
+        = getPprDebug $ \case
+            False -> pprDeclList (pprLHsBindsForUser (concat (map snd prs)) sigs)
+            True  -> -- Print with sccs showing
+                     vcat (map ppr sigs) $$ vcat (map ppr_scc prs)
+
+      ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
+      pp_rec Recursive    = text "rec"
+      pp_rec NonRecursive = text "nonrec"
 
 pprLHsBinds :: (OutputableBndrId idL, OutputableBndrId idR)
             => LHsBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
@@ -509,11 +513,14 @@ eqEmptyLocalBinds _                   = False
 
 isEmptyValBinds :: HsValBindsLR (GhcPass a) (GhcPass b) -> Bool
 isEmptyValBinds (ValBinds _ ds sigs)  = isEmptyLHsBinds ds && null sigs
-isEmptyValBinds (XValBindsLR (NValBinds ds sigs)) = null ds && null sigs
+isEmptyValBinds (XValBindsLR NvbPs) = True
+isEmptyValBinds (XValBindsLR (NvbRn ds sigs)) = null ds && null sigs
+isEmptyValBinds (XValBindsLR (NvbTc ds sigs)) = null ds && null sigs
 
-emptyValBindsIn, emptyValBindsOut :: HsValBindsLR (GhcPass a) (GhcPass b)
+emptyValBindsIn :: HsValBindsLR (GhcPass a) (GhcPass b)
 emptyValBindsIn  = ValBinds NoAnnSortKey [] []
-emptyValBindsOut = XValBindsLR (NValBinds [] [])
+emptyValBindsRn :: HsValBindsLR GhcRn GhcRn
+emptyValBindsRn  = XValBindsLR (NvbRn [] [])
 
 emptyLHsBinds :: LHsBindsLR (GhcPass idL) idR
 emptyLHsBinds = []
@@ -526,9 +533,14 @@ plusHsValBinds :: HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
                -> HsValBinds(GhcPass a)
 plusHsValBinds (ValBinds _ ds1 sigs1) (ValBinds _ ds2 sigs2)
   = ValBinds NoAnnSortKey (ds1 ++ ds2) (sigs1 ++ sigs2)
-plusHsValBinds (XValBindsLR (NValBinds ds1 sigs1))
-               (XValBindsLR (NValBinds ds2 sigs2))
-  = XValBindsLR (NValBinds (ds1 ++ ds2) (sigs1 ++ sigs2))
+plusHsValBinds (XValBindsLR nvbs1) (XValBindsLR nvbs2)
+  = XValBindsLR (nvbs1 `plus` nvbs2)
+  where
+    plus :: NHsValBindsLR p -> NHsValBindsLR p -> NHsValBindsLR p
+    NvbPs             `plus` NvbPs             = NvbPs
+    (NvbRn ds1 sigs1) `plus` (NvbRn ds2 sigs2) = NvbRn (ds1 ++ ds2) (sigs1 ++ sigs2)
+    (NvbTc ds1 sigs1) `plus` (NvbTc ds2 sigs2) = NvbTc (ds1 ++ ds2) (sigs1 ++ sigs2)
+
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
 

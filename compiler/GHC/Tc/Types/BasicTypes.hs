@@ -348,17 +348,27 @@ instance Outputable TcTyThing where     -- Debugging only
 --
 data IdBindingInfo -- See Note [Meaning of IdBindingInfo]
     = NotLetBound
-    | ClosedLet
+
+    | ClosedLet    -- Can definitely be moved to top level
+
     | NonClosedLet
-         RhsNames        -- Used for (static e) checks only
-         ClosedTypeId    -- Used for generalisation checks
-                         -- and for (static e) checks
+         RhsNames        -- Free vars of RHS of this Id's binding that are
+                         --   neither Global nor ClosedLet
+                         -- Used only to help with error-messages
+                         --    in `checkClosedInStaticForm`
+
+         ClosedTypeId    -- True <=> This Id has a closed type
+
+    -- Generalisation of some other binding (f x = e) is OK if
+    -- all free vars of `e` are ClosedTypeIds, or ClosedLet
 
 -- | IsGroupClosed describes a group of mutually-recursive bindings
 data IsGroupClosed
   = IsGroupClosed
       (NameEnv RhsNames)  -- Free var info for the RHS of each binding in the group
-                          -- Used only for (static e) checks
+                          --   (includes free vars of RHS bound in the same group)
+                          -- Used only to help with error-messages
+                          --    in `checkClosedInStaticForm`
 
       ClosedTypeId        -- True <=> all the free vars of the group are
                           --          imported or ClosedLet or
@@ -373,27 +383,29 @@ type ClosedTypeId = Bool
 
 {- Note [Meaning of IdBindingInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-NotLetBound means that
-  the Id is not let-bound (e.g. it is bound in a
-  lambda-abstraction or in a case pattern)
+* NotLetBound means that
+   - the Id is not let-bound (e.g. it is bound in a
+     lambda-abstraction or in a case pattern)
 
-ClosedLet means that
+* ClosedLet means that
    - The Id is let-bound,
    - Any free term variables are also Global or ClosedLet
    - Its type has no free variables (NB: a top-level binding subject
      to the MR might have free vars in its type)
-   These ClosedLets can definitely be floated to top level; and we
-   may need to do so for static forms.
+   - Its type is lifted
+
+   These ClosedLets can definitely be floated to top level. In a static
+   form (static e), the free vars of `e` must all be ClosedLet
 
    Property:   ClosedLet
              is equivalent to
                NonClosedLet emptyNameSet True
 
-(NonClosedLet (fvs::RhsNames) (cl::ClosedTypeId)) means that
+* (NonClosedLet (fvs::RhsNames) (cl::ClosedTypeId)) means that
    - The Id is let-bound
 
    - The fvs::RhsNames contains the free names of the RHS,
-     excluding Global and ClosedLet ones.
+       /excluding/ Global and ClosedLet ones.
 
    - For the ClosedTypeId field see Note [Bindings with closed types: ClosedTypeId]
 
@@ -408,7 +420,7 @@ or otherwise) is just so we can produce better error messages
 
 Note [Bindings with closed types: ClosedTypeId]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
+ClosedTypeId is all about generalisation.
 
   f x = let g ys = map not ys
         in ...

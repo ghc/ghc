@@ -708,11 +708,11 @@ tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
   where
     closed_let = all can_float_to_top ids
     can_float_to_top (Scaled _ id)
-      = noFreeVarsOfType id_ty     &&
-        definitelyLiftedType id_ty &&
-        case lookupNameEnv fvs (idName id) of
-          Nothing  -> True
-          Just env -> isEmptyNameSet env
+      = noFreeVarsOfType id_ty
+        && definitelyLiftedType id_ty
+        && case lookupNameEnv fvs (idName id) of
+              Nothing  -> True
+              Just env -> isEmptyNameSet env
        where
          id_ty = idType id
 
