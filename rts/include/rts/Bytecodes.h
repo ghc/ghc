@@ -23,6 +23,11 @@
    I hope that's clear :-)
 */
 
+/*
+   Make sure to update jumptable in rts/Interpreter.c when modifying
+   bytecodes! See Note [Instruction dispatch in the bytecode interpreter]
+   for details.
+*/
 #define bci_STKCHECK                    1
 #define bci_PUSH_L                      2
 #define bci_PUSH_LL                     3
