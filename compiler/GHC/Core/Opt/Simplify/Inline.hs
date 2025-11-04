@@ -390,7 +390,7 @@ tryUnfolding env logger id lone_variable arg_infos
            -- be *something* interesting about some argument, or the
            -- result context, to make it worth inlining
     calc_some_benefit :: Arity -> Bool -> Bool   -- The Arity is the number of args
-                                         -- expected by the unfolding
+                                                 -- expected by the unfolding
     calc_some_benefit uf_arity is_inline
        | not saturated = interesting_args       -- Under-saturated
                                         -- Note [Unsaturated applications]
