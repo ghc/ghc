@@ -695,6 +695,7 @@ tcExtendSigIds top_lvl sig_ids thing_inside
 tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
                   -> [Scaled TcId] -> TcM a -> TcM a
 -- Used for both top-level value bindings and nested let/where-bindings
+-- Used for a single NonRec or a single Rec
 -- Adds to the TcBinderStack too
 tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
                ids thing_inside
@@ -705,15 +706,27 @@ tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
           | Scaled _ id <- ids ] $
     foldr check_usage thing_inside scaled_names
   where
+    closed_let = all can_float_to_top ids
+    can_float_to_top (Scaled _ id)
+      = noFreeVarsOfType id_ty     &&
+        definitelyLiftedType id_ty &&
+        case lookupNameEnv fvs (idName id) of
+          Nothing  -> True
+          Just env -> isEmptyNameSet env
+       where
+         id_ty = idType id
+
     mk_tct_info id
-      | type_closed && isEmptyNameSet rhs_fvs = ClosedLet
-      | otherwise                             = NonClosedLet rhs_fvs type_closed
+      | closed_let = ClosedLet
+      | otherwise  = NonClosedLet rhs_fvs type_closed
       where
         name        = idName id
         rhs_fvs     = lookupNameEnv fvs name `orElse` emptyNameSet
         type_closed = isTypeClosedLetBndr id &&
                       (fv_type_closed || hasCompleteSig sig_fn name)
+
     scaled_names = [Scaled p (idName id) | Scaled p id <- ids ]
+
     check_usage :: Scaled Name -> TcM a -> TcM a
     check_usage (Scaled p id) thing_inside = do
       tcCheckUsage id p thing_inside

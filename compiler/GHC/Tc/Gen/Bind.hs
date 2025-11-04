@@ -316,7 +316,7 @@ tcBindGroups top_lvl sig_fn prag_fn (group : groups) thing_inside
         ; (group', (groups', thing))
                 <- tc_group top_lvl sig_fn prag_fn group closed $
                    tcBindGroups top_lvl sig_fn prag_fn groups thing_inside
-        ; return (group' ++ groups', thing) }
+        ; return (group' : groups', thing) }
 
 -- Note [Closed binder groups]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -339,11 +339,9 @@ tcBindGroups top_lvl sig_fn prag_fn (group : groups) thing_inside
 tc_group :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
          -> (RecFlag, LHsBinds GhcRn) -> IsGroupClosed -> TcM thing
-         -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
+         -> TcM ((RecFlag, LHsBinds GhcTc), thing)
 
 -- Typecheck one strongly-connected component of the original program.
--- We get a list of groups back, because there may
--- be specialisations etc as well
 
 tc_group top_lvl sig_fn prag_fn (NonRecursive, binds) closed thing_inside
         -- A single non-recursive binding
@@ -355,7 +353,7 @@ tc_group top_lvl sig_fn prag_fn (NonRecursive, binds) closed thing_inside
                  _      -> panic "tc_group: NonRecursive binds is not a singleton bag"
        ; (bind', thing) <- tc_single top_lvl sig_fn prag_fn bind closed
                              thing_inside
-       ; return ( [(NonRecursive, bind')], thing) }
+       ; return ( (NonRecursive, bind'), thing) }
 
 tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
   =     -- To maximise polymorphism, we do a new
@@ -367,7 +365,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
         ; whenIsJust mbFirstPatSyn $ \lpat_syn ->
             recursivePatSynErr (locA $ getLoc lpat_syn) binds
         ; (binds1, thing) <- go sccs
-        ; return ([(Recursive, binds1)], thing) }
+        ; return ((Recursive, binds1), thing) }
                 -- Rec them all together
   where
     mbFirstPatSyn = find (isPatSyn . unLoc) binds

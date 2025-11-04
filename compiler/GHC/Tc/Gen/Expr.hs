@@ -1830,14 +1830,17 @@ checkClosedInStaticForm name = do
             , not (elemNameSet n' visited)
             , Just reason <- [checkLoop type_env (extendNameSet visited n') n']
             ] ++
-            if type_closed then
+            if type_closed && definitelyLiftedType id_ty then
               []
             else
               -- We consider non-let-bound variables easier to figure out than
               -- non-closed types, so we report non-closed types to the user
               -- only if we cannot spot the former.
-              [ NotTypeClosed $ tyCoVarsOfType (idType tcid) ]
-        -- The binding is closed.
+              [ NotTypeClosed $ tyCoVarsOfType id_ty ]
+            where
+              id_ty = idType tcid
+
+        -- Globals and imported things
         _ -> Nothing
 
     -- Converts a reason into a human-readable sentence.
