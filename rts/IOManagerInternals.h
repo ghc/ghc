@@ -46,6 +46,11 @@ struct _CapIOManager {
     StgTSO *sleeping_queue;
 #endif
 
+#if defined(IOMGR_ENABLED_SELECT)
+    /* FDs for interrupting up the I/O manager when it is blocked waiting */
+    int interrupt_fd_r, interrupt_fd_w;
+#endif
+
 #if defined(IOMGR_ENABLED_POLL)
     /* AIOP and timeout collections shared by several I/O manager impls */
     ClosureTable     aiop_table;

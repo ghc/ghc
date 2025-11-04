@@ -343,9 +343,7 @@ void initCapabilityIOManager(CapIOManager *iomgr)
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
-            iomgr->blocked_queue_hd = END_TSO_QUEUE;
-            iomgr->blocked_queue_tl = END_TSO_QUEUE;
-            iomgr->sleeping_queue   = END_TSO_QUEUE;
+            initCapabilityIOManagerSelect(iomgr);
             break;
 #endif
 
@@ -376,6 +374,12 @@ void initCapabilityIOManager(CapIOManager *iomgr)
 void freeCapabilityIOManager(CapIOManager *iomgr)
 {
     switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+            freeCapabilityIOManagerSelect(iomgr);
+            break;
+#endif
+
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
             freeCapabilityIOManagerPoll(iomgr);
@@ -735,7 +739,7 @@ bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr)
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
-          awaitCompletedTimeoutsOrIOSelect(iomgr, true);
+          completed = awaitCompletedTimeoutsOrIOSelect(iomgr, true);
           break;
 #endif
 
@@ -773,6 +777,12 @@ void interruptIOManager(CapIOManager *iomgr)
 {
     debugTrace(DEBUG_iomanager, "Interrupting the I/O manager...");
     switch (iomgr_type) {
+
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+            interruptIOManagerSelect(iomgr);
+            break;
+#endif
 
         default:
             break;
