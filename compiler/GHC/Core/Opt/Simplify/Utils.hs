@@ -911,7 +911,7 @@ interestingCallContext env cont
         -- in GHC.Core.Unfold
 
     interesting (StrictArg { sc_fun = fun }) = strictArgContext fun
-    interesting (StrictBind {})              = BoringCtxt
+    interesting (StrictBind {})              = RhsCtxt NonRecursive
     interesting (Stop _ cci _)               = cci
     interesting (TickIt _ k)                 = interesting k
     interesting (ApplyToTy { sc_cont = k })  = interesting k
@@ -994,7 +994,7 @@ Wrinkles:
      a) we give a discount for being an argument of a class-op (eg (*) d)
      b) we say that a con-like argument (eg (df d)) is interesting
 
-(IA2) OtherCon.
+(IA2) OtherCon.    *** TODO: fix me ***
    interestingArg returns
       (a) NonTrivArg for an arg with an OtherCon [] unfolding
       (b) ValueArg for an arg with an OtherCon [c1,c2..] unfolding.
@@ -1060,7 +1060,7 @@ interestingArg env e = go env 0 e
     go env n (Lam v e)
        | isTyVar v             = go env n e
        | n>0                   = NonTrivArg     -- (\x.b) e   is NonTriv
-       | otherwise             = ValueArg
+       | otherwise             = NonTrivArg
     go _ _ (Case {})           = NonTrivArg
     go env n (Let b e)         = case go env' n e of
                                    ValueArg -> ValueArg
@@ -1071,14 +1071,14 @@ interestingArg env e = go env 0 e
     go_var n v
        | isConLikeId v = ValueArg   -- Experimenting with 'conlike' rather that
                                     --    data constructors here
-                                    -- DFuns are con-like;
+                                    -- DFuns are con-like; see Note [Conlike is interesting]
                                     --    see (IA1) in Note [Interesting arguments]
-       | idArity v > n = ValueArg   -- Catches (eg) primops with arity but no unfolding
+       | idArity v > n = NonTrivArg   -- Catches (eg) primops with arity but no unfolding
        | n > 0         = NonTrivArg -- Saturated or unknown call
        | otherwise  -- n==0, no value arguments; look for an interesting unfolding
        = case idUnfolding v of
-           OtherCon [] -> NonTrivArg   -- It's evaluated, but that's all we know
-           OtherCon _  -> ValueArg     -- Evaluated and we know it isn't these constructors
+           OtherCon [] -> TrivArg      -- It's evaluated, but that's all we know
+           OtherCon _  -> NonTrivArg   -- Evaluated and we know it isn't these constructors
               -- See (IA2) in Note [Interesting arguments]
            DFunUnfolding {} -> ValueArg   -- We konw that idArity=0
            CoreUnfolding{ uf_cache = cache }
