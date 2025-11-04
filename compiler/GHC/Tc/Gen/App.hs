@@ -183,7 +183,7 @@ tcExprSigma inst rn_expr
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; code_orig <- getSrcCodeOrigin
        ; let fun_orig = srcCodeOriginCtOrigin rn_expr code_orig
-       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst fun_orig (tc_fun, rn_fun, fun_ctxt) fun_sigma rn_args
+       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (fun_orig, rn_fun, fun_ctxt) tc_fun fun_sigma rn_args
        ; tc_args <- tcValArgs do_ql (rn_fun, generatedSrcSpan) inst_args
        ; let tc_expr = rebuildHsApps (tc_fun, fun_ctxt) tc_args
        ; return (tc_expr, app_res_sigma) }
@@ -424,14 +424,17 @@ tcApp rn_expr exp_res_ty
 
        -- Setp 3.2 Set the correct origin to blame for the error message
        -- What should be the origin for this function call?
-       -- If we are in generated code, blame it on the
+       -- If the head of the function is user written
+       -- then it can be used in the error message
+       -- If it is generated code location span, blame it on the
        -- source code origin stored in the lclEnv.
-       -- If not, the head of the function is user written
-       -- and can be used in the error message
        -- See Note [Error contexts in generated code]
        -- See Note [Error Context Stack]
        ; code_orig <- getSrcCodeOrigin
-       ; let fun_orig = srcCodeOriginCtOrigin rn_fun code_orig
+       ; let fun_orig | isGoodSrcSpan fun_lspan
+                      = exprCtOrigin rn_fun
+                      | otherwise
+                      = srcCodeOriginCtOrigin rn_fun code_orig
 
        ; traceTc "tcApp:inferAppHead" $
          vcat [ text "tc_fun:" <+> ppr tc_fun
@@ -439,7 +442,7 @@ tcApp rn_expr exp_res_ty
               , text "fun_origin" <+> ppr fun_orig
               , text "do_ql:" <+> ppr do_ql]
        ; (inst_args, app_res_rho)
-              <- tcInstFun do_ql inst_final fun_orig (tc_fun, rn_fun, fun_lspan) fun_sigma rn_args
+              <- tcInstFun do_ql inst_final (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigma rn_args
          -- See (TCAPP1) and (TCAPP2) in
          -- Note [tcApp: typechecking applications]
 
@@ -699,15 +702,15 @@ tcInstFun :: QLFlag
                     --           always return a rho-type (but not a deep-rho type)
                     -- Generally speaking we pass in True; in Fig 5 of the paper
                     --    |-inst returns a rho-type
-          -> CtOrigin
-          -> (HsExpr GhcTc, HsExpr GhcRn, SrcSpan) -- ANI: TODO, move HsExpr GhcRn, SrcSpan to CtOrigin
+          -> (CtOrigin, HsExpr GhcRn, SrcSpan)
+          -> HsExpr GhcTc -- ANI: TODO, move HsExpr GhcRn, SrcSpan to CtOrigin
           -> TcSigmaType -> [HsExprArg 'TcpRn]
           -> TcM ( [HsExprArg 'TcpInst]
                  , TcSigmaType )   -- Does not instantiate trailing invisible foralls
 -- This crucial function implements the |-inst judgement in Fig 4, plus the
 -- modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
-tcInstFun do_ql inst_final fun_orig (tc_fun, rn_fun, fun_lspan) fun_sigma rn_args
+tcInstFun do_ql inst_final (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigma rn_args
   = do { traceTc "tcInstFun" (vcat [ text "origin" <+> ppr fun_orig
                                    , text "tc_fun" <+> ppr tc_fun
                                    , text "fun_sigma" <+> ppr fun_sigma
@@ -1819,7 +1822,7 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L _ arg) sc_arg_ty@(Scaled _ 
        ; do_ql <- wantQuickLook rn_fun
        ; ((inst_args, app_res_rho), wanted)
              <- captureConstraints $
-                tcInstFun do_ql True (exprCtOrigin arg) (tc_fun, rn_fun, fun_lspan) fun_sigma rn_args
+                tcInstFun do_ql True (exprCtOrigin arg, rn_fun, fun_lspan) tc_fun fun_sigma rn_args
                 -- We must capture type-class and equality constraints here, but
                 -- not equality constraints.  See (QLA6) in Note [Quick Look at
                 -- value arguments]
