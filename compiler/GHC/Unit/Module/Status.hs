@@ -62,7 +62,7 @@ data RecompLinkables = RecompLinkables { recompLinkables_bytecode :: !RecompByte
 
 data RecompBytecodeLinkable
   = NormalLinkable !(Maybe Linkable)
-  | WholeCoreBindingsLinkable !(Maybe WholeCoreBindingsLinkable)
+  | WholeCoreBindingsLinkable !WholeCoreBindingsLinkable
 
 instance Outputable HscRecompStatus where
   ppr HscUpToDate{} = text "HscUpToDate"
@@ -90,7 +90,7 @@ justBytecode = \case
   Left lm ->
     assertPpr (not (linkableIsNativeCodeOnly lm)) (ppr lm)
       $ emptyRecompLinkables { recompLinkables_bytecode = NormalLinkable (Just lm) }
-  Right lm -> emptyRecompLinkables { recompLinkables_bytecode = WholeCoreBindingsLinkable (Just lm) }
+  Right lm -> emptyRecompLinkables { recompLinkables_bytecode = WholeCoreBindingsLinkable lm }
 
 justObjects :: Linkable -> RecompLinkables
 justObjects lm =
@@ -104,4 +104,4 @@ bytecodeAndObjects either_bc o = case either_bc of
       $ RecompLinkables (NormalLinkable (Just bc)) (Just o)
   Right bc ->
     assertPpr (linkableIsNativeCodeOnly o) (ppr o)
-      $ RecompLinkables (WholeCoreBindingsLinkable (Just bc)) (Just o)
+      $ RecompLinkables (WholeCoreBindingsLinkable bc) (Just o)

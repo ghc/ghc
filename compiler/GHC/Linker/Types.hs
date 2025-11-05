@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 -----------------------------------------------------------------------------
 --
@@ -267,7 +268,7 @@ data LinkableWith parts = Linkable
 
   , linkableParts :: parts
     -- ^ Files and chunks of code to link.
- }
+ } deriving (Functor, Traversable, Foldable)
 
 type Linkable = LinkableWith (NonEmpty LinkablePart)
 
