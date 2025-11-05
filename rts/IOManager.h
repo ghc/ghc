@@ -303,19 +303,13 @@ void stopIOManager(void);
 void exitIOManager(bool wait_threads);
 
 
-/* Wakeup hook: called from the scheduler's wakeUpRts (currently only in
- * threaded mode).
+/* Wakeup hook: called from the scheduler's wakeUpRts().
  *
  * The I/O manager can be blocked waiting on I/O or timers. Sometimes there are
  * other external events where we need to wake up the I/O manager and return
- * to the schedulr.
+ * to the scheduler.
  *
- * At the moment, all the non-threaded I/O managers will do this automagically
- * since a signal will interrupt any waiting system calls, so at the moment
- * the implementation for the non-threaded I/O managers does nothing.
- *
- * For the I/O managers in threaded mode, this arranges to unblock the I/O
- * manager if it waa blocked waiting.
+ * This arranges to unblock the I/O manager if it was blocked waiting.
  */
 void wakeupIOManager(void);
 
