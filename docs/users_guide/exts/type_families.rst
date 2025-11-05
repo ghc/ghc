@@ -680,7 +680,7 @@ thus: ::
 When doing so, we (optionally) may drop the "``family``" keyword.
 
 The type parameters must all be type variables, of course, and some (but
-not necessarily all) of then can be the class parameters. Each class
+not necessarily all) of them can be the class parameters. Each class
 parameter may only be used at most once per associated type, but some
 may be omitted and they may be in an order other than in the class head.
 Hence, the following contrived example is admissible: ::
