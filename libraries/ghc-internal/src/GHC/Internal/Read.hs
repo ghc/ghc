@@ -65,6 +65,7 @@ import GHC.Internal.Text.ParserCombinators.ReadPrec
 import GHC.Internal.Data.Maybe
 
 import GHC.Internal.Unicode
+import GHC.Internal.ByteOrder
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Float
@@ -430,6 +431,9 @@ readSymField fieldName readVal = do
 
 -- | @since base-2.01
 deriving instance Read GeneralCategory
+
+-- | @since base-4.11.0.0
+deriving instance Read ByteOrder
 
 -- | @since base-2.01
 instance Read Char where
