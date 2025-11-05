@@ -612,6 +612,11 @@ void wakeupIOManager(void)
 #endif
             break;
 #endif
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+            abandonRequestWait();
+            break;
+#endif
         default:
             break;
     }
