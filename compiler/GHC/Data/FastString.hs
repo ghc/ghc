@@ -209,11 +209,33 @@ comparison.
 It is also associated with a lazy reference to the Z-encoding
 of this string which is used by the compiler internally.
 -}
-data FastString = FastString {
+data FastStringPayload = FastString {
       uniq    :: {-# UNPACK #-} !Int, -- unique id
       n_chars :: {-# UNPACK #-} !Int, -- number of chars
       fs_sbs  :: {-# UNPACK #-} !ShortByteString
   }
+
+data FastString = FastStringId {-# UNPACK #-} !Word64
+
+fs_sbs :: FastString -> ShortByteString
+fs_sbs (FastStringId w)
+  | w .&. 0xf8000000_00000000 == 0xf8000000_00000000
+  = let bs_len = (w .&. 0x07000000_00000000) `unsafeShiftR` 56
+        w8_64 x = wordToWord8# (word64ToWord# x)
+        go 0 _ = []
+        go n cur = wordToWord8# (word64ToWord# cur) : go (n-1) (cur `uncheckedShiftRL64#` 8#)
+    in case bs_len of
+         0 -> SBS.empty
+         1 -> SBS.singleton $ wordToWord8# (word64ToWord# w)
+         2 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 8#) , w8_64 w]
+         3 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 16#), w8_64 (w `uncheckedShiftRL64#` 8#), w8_64 w)]
+         4 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 24#), w8_64 (w `uncheckedShiftRL64#` 16#), w8_64 (w `uncheckedShiftRL64#` 8#), w8_64 w)]
+         5 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 32#), w8_64 (w `uncheckedShiftRL64#` 24#), w8_64 (w `uncheckedShiftRL64#` 16#), w8_64 (w `uncheckedShiftRL64#` 8#), w8_64 w)]
+         6 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 40#), w8_64 (w `uncheckedShiftRL64#` 32#), w8_64 (w `uncheckedShiftRL64#` 24#), w8_64 (w `uncheckedShiftRL64#` 16#), w8_64 (w `uncheckedShiftRL64#` 8#), w8_64 w)]
+         7 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 48#), w8_64 (w `uncheckedShiftRL64#` 40#), w8_64 (w `uncheckedShiftRL64#` 32#), w8_64 (w `uncheckedShiftRL64#` 24#), w8_64 (w `uncheckedShiftRL64#` 16#), w8_64 (w `uncheckedShiftRL64#` 8#), w8_64 w)]
+  | otherwise
+n_chars :: FastString -> Int
+uniq :: FastString -> Int
 
 instance Eq FastString where
   f1 == f2  =  uniq f1 == uniq f2
@@ -557,7 +579,8 @@ mkFastStringWith mk_fs sbs = do
 bucket_match :: [FastString] -> ShortByteString -> Maybe FastString
 bucket_match fs sbs = go fs
   where go [] = Nothing
-        go (fs@(FastString {fs_sbs=fs_sbs}) : ls)
+        go (fs@(FastString {n_chars = n_chars, fs_sbs=fs_sbs}) : ls)
+          | length fs_sbs /= SBS.length fs_sbs
           | fs_sbs == sbs = Just fs
           | otherwise     = go ls
 -- bucket_match used to inline before changes to instance Eq ShortByteString
