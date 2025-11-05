@@ -221,8 +221,12 @@ shutdownAsyncIO(bool wait_threads)
  * requests to make further progress. In the latter scenario,
  * awaitRequests() will simply block waiting for worker threads
  * to complete if the 'completedTable' is empty.
+ *
+ * The result reports if the wait completed successfully (typically with some
+ * work available), or was interrupted by abandonRequestWait(), with true
+ * meaning completed, and false meaning interrupted.
  */
-int
+bool
 awaitRequests(bool wait)
 {
 #if !defined(THREADED_RTS)
@@ -246,7 +250,7 @@ start:
 #endif
         ) {
         OS_RELEASE_LOCK(&queue_lock);
-        return 0;
+        return true;
     }
     if (completed_hw == 0) {
         // empty table, drop lock and wait
@@ -259,22 +263,24 @@ start:
                 // a request was completed
                 break;
             case WAIT_OBJECT_0 + 1:
+                // abandon_req_wait signaled, by abandonRequestWait()
+                return false;
             case WAIT_TIMEOUT:
                 // timeout (unlikely) or told to abandon waiting
-                return 0;
+                return true;
             case WAIT_FAILED: {
                 DWORD dw = GetLastError();
                 fprintf(stderr, "awaitRequests: wait failed -- "
                                 "error code: %lu\n", dw); fflush(stderr);
-                return 0;
+                return true;
             }
             default:
                 fprintf(stderr, "awaitRequests: unexpected wait return "
                                 "code %lu\n", dwRes); fflush(stderr);
-                return 0;
+                return true;
             }
         } else {
-            return 0;
+            return true;
         }
         goto start;
     } else {
@@ -352,7 +358,7 @@ start:
         completed_hw = 0;
         ResetEvent(completed_req_event);
         OS_RELEASE_LOCK(&queue_lock);
-        return 1;
+        return true;
     }
 #endif /* !THREADED_RTS */
 }
@@ -381,12 +387,6 @@ abandonRequestWait( void )
      */
     SetEvent(abandon_req_wait);
     interruptIOManagerEvent ();
-}
-
-void
-resetAbandonRequestWait( void )
-{
-    ResetEvent(abandon_req_wait);
 }
 
 #endif /* !defined(THREADED_RTS) */
