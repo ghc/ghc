@@ -619,7 +619,7 @@ void wakeupIOManager(void)
             break;
 #endif
         default:
-            break;
+            barf("wakeupIOManager not implemented");
     }
 }
 
@@ -828,7 +828,9 @@ void awaitCompletedTimeoutsOrIO(CapIOManager *iomgr)
         default:
             barf("pollCompletedTimeoutsOrIO not implemented");
     }
-    ASSERT(!emptyRunQueue(iomgr->cap) || getSchedState() != SCHED_RUNNING);
+    // FIXME: the post condition is now more complicated. Await can now simply
+    // be interrupted by wakeupIOManager.
+    // ASSERT(!emptyRunQueue(iomgr->cap) || getSchedState() != SCHED_RUNNING);
 }
 
 
