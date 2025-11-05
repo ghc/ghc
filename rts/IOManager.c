@@ -757,7 +757,7 @@ bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr)
 #if defined(IOMGR_ENABLED_WINIO)
         case IO_MANAGER_WINIO:
 #endif
-          awaitCompletedTimeoutsOrIOWin32(iomgr->cap, true);
+          completed = awaitCompletedTimeoutsOrIOWin32(iomgr->cap, true);
           break;
 #endif
         default:
@@ -787,6 +787,12 @@ void interruptIOManager(CapIOManager *iomgr)
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
             interruptIOManagerPoll(iomgr);
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+            abandonRequestWait();
             break;
 #endif
 
