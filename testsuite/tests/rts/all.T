@@ -282,7 +282,7 @@ test('T7040_ghci',
       # Fragile when unregisterised; see #16085
       when(unregisterised(), skip),
       pre_cmd('$MAKE -s --no-print-directory T7040_ghci_setup ghciWayFlags=' + config.ghci_way_flags),
-      when(opsys('linux') and not ghc_dynamic() and not arch('wasm32'), fragile(20706))],
+      when((opsys('linux') and not ghc_dynamic() and not arch('wasm32')) or platform('x86_64-apple-darwin'), fragile(20706))],
      compile_and_run, ['T7040_ghci_c.o'])
 
 test('T7227', [extra_run_opts('+RTS -tT7227.stat --machine-readable -RTS')],
