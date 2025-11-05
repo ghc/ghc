@@ -1,3 +1,5 @@
-import Test
+foreign import ccall "my_func" c_my_func :: IO Int
 
-main = print test
+main = do
+    x <- c_my_func
+    print x

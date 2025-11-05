@@ -1113,7 +1113,7 @@ dynamic_flags_deps = [
       (NoArg (setGeneralFlag Opt_SingleLibFolder))
   , make_ord_flag defGhcFlag "pie"            (NoArg (setGeneralFlag Opt_PICExecutable))
   , make_ord_flag defGhcFlag "no-pie"         (NoArg (unSetGeneralFlag Opt_PICExecutable))
-  , make_ord_flag defGhcFlag "static-external" (noArg (\d -> d { ghcLink=LinkExecutable (MostlyStatic ["c", "m", "rt", "dl", "pthread", "stdc++", "c++", "c++abi", "atomic"]) }))
+  , make_ord_flag defGhcFlag "static-external" (noArg (\d -> d { ghcLink=LinkExecutable (MostlyStatic ["c", "m", "rt", "dl", "pthread", "stdc++", "c++", "c++abi", "atomic", "wsock32", "gdi32", "winmm", "dbghelp", "psapi", "user32", "shell32", "mingw32", "kernel32", "advapi32", "mingwex", "ws2_32", "shlwapi", "ole32", "rpcrt4", "ntdll", "ucrt"]) }))
   , make_ord_flag defGhcFlag "exclude-static-external"
       (OptPrefix (\str -> upd $ \d -> case ghcLink d of
                                         LinkExecutable (MostlyStatic _) ->
