@@ -12,14 +12,14 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
--- Target byte ordering.
+-- Host byte ordering.
 --
 -- @since base-4.11.0.0
 -----------------------------------------------------------------------------
 
 module GHC.Internal.ByteOrder
   ( ByteOrder(..)
-  , targetByteOrder
+  , hostByteOrder
   ) where
 
 -- Required for WORDS_BIGENDIAN
@@ -40,10 +40,13 @@ data ByteOrder
              , Show    -- ^ @since base-4.11.0.0
              )
 
--- | The byte ordering of the target machine.
-targetByteOrder :: ByteOrder
+-- | The byte ordering of the host machine, i.e. the machine on which
+-- the code examining the @hostByteOrder@ predicate is being executed.
+--
+-- @since base-4.23.0.0
+hostByteOrder :: ByteOrder
 #if defined(WORDS_BIGENDIAN)
-targetByteOrder = BigEndian
+hostByteOrder = BigEndian
 #else
-targetByteOrder = LittleEndian
+hostByteOrder = LittleEndian
 #endif

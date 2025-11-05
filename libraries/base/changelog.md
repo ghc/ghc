@@ -2,6 +2,10 @@
 
 ## 4.23.0.0 *TBA*
   * Remove deprecated, unstable heap representation details from `GHC.Exts` ([CLC proposal #212](https://github.com/haskell/core-libraries-committee/issues/212))
+  * Deprecate `GHC.ByteOrder.targetByteOrder` in favor of the
+    more-accurately-named `GHC.ByteOrder.hostByteOrder`. (CLC proposal TBW)
+  * Re-export `hostByteOrder` and the `ByteOrder` type from `System.Info`.
+    (CLC proposal TBW)
   * Add `Data.List.NonEmpty.mapMaybe`. ([CLC proposal #337](https://github.com/haskell/core-libraries-committee/issues/337))
   * Fix issues with toRational for types capable to represent infinite and not-a-number values ([CLC proposal #338](https://github.com/haskell/core-libraries-committee/issues/338))
   * Ensure that `rationalToFloat` and `rationalToDouble` always inline in the end. ([CLC proposal #356](https://github.com/haskell/core-libraries-committee/issues/356))
