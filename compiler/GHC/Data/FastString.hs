@@ -104,6 +104,8 @@ module GHC.Data.FastString
         getFastStringTable,
         getFastZStringTable,
         getFastStringZEncCounter,
+        lookupPayloadByIndex,
+        FastStringPayload(..),
 
         -- * PtrStrings
         PtrString (..),
@@ -130,8 +132,10 @@ import GHC.Data.FastMutInt
 import Control.Concurrent.MVar
 import Control.DeepSeq
 import Control.Monad
+import Data.Bits
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)
+import Data.Word
 import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Char8    as BSC
 import qualified Data.ByteString.Unsafe   as BS
@@ -171,9 +175,6 @@ fastZStringToByteString (FastZString bs) = bs
 unsafeMkByteString :: String -> ByteString
 unsafeMkByteString = BSC.pack
 
-hashFastString :: FastString -> Int
-hashFastString fs = hashStr $ fs_sbs fs
-
 -- -----------------------------------------------------------------------------
 
 newtype FastZString = FastZString ByteString
@@ -206,36 +207,98 @@ mkFastZStringString str = FastZString (BSC.pack str)
 All 'FastString's are stored in a global hashtable to support fast O(1)
 comparison.
 
-It is also associated with a lazy reference to the Z-encoding
-of this string which is used by the compiler internally.
 -}
+-- | Payload for table-referenced FastStrings
 data FastStringPayload = FastString {
-      uniq    :: {-# UNPACK #-} !Int, -- unique id
-      n_chars :: {-# UNPACK #-} !Int, -- number of chars
-      fs_sbs  :: {-# UNPACK #-} !ShortByteString
+      payload_sbs :: {-# UNPACK #-} !ShortByteString
   }
 
+{- Note [FastString Encoding]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   A FastString is uniformly represented as a single Word64 which serves as both
+   the unique identifier and the string representation (for short strings).
+
+   Inline strings (strings ≤ 7 bytes):
+   - Top 5 bits are always 11111 (0x1F at bit position 59-63)
+   - Next 3 bits encode the byte length (0-7)
+   - Remaining 56 bits contain the actual string bytes
+   - Top byte ranges: 0xF8-0xFF (248-255)
+   - "a" (0x61): 0xF900000000000061
+
+   Table-referenced strings (strings > 7 bytes):
+   - Top 16 bits encode the UTF-8 character count (2-63487, 0x0002-0xF7FF)
+   - Lower 48 bits encode an index into the FastStringPayload table
+   - Top byte ranges: 0x00-0xF7 (0-247)
+   - Top byte < 0xF8 to prevent ambiguity with inline encoding
+   - Maximum character count: 63487 (0xF7FF)
+   - Example: 10-char string at index 42: 0x000A00000000002A
+
+   Top byte value determines encoding type:
+   - 0xF8-0xFF: Inline string
+   - 0x00-0xF7: Table reference
+-}
 data FastString = FastStringId {-# UNPACK #-} !Word64
+
+encodeInline :: ShortByteString -> Word64
+encodeInline sbs =
+  let !len = SBS.length sbs
+      !lenBits = (0xf8 .|. fromIntegral len) `unsafeShiftL` 56
+      w8 :: Int -> Word64
+      w8 shift = fromIntegral (SBS.index sbs (shift `unsafeShiftR` 3)) `unsafeShiftL` shift
+  in case len of
+       0 -> lenBits
+       1 -> lenBits .|. w8 0
+       2 -> lenBits .|. w8 8 .|. w8 0
+       3 -> lenBits .|. w8 16 .|. w8 8 .|. w8 0
+       4 -> lenBits .|. w8 24 .|. w8 16 .|. w8 8 .|. w8 0
+       5 -> lenBits .|. w8 32 .|. w8 24 .|. w8 16 .|. w8 8 .|. w8 0
+       6 -> lenBits .|. w8 40 .|. w8 32 .|. w8 24 .|. w8 16 .|. w8 8 .|. w8 0
+       7 -> lenBits .|. w8 48 .|. w8 40 .|. w8 32 .|. w8 24 .|. w8 16 .|. w8 8 .|. w8 0
+       _ -> panic "encodeInline: string too long"
+
+encodeTableRef :: Int -> Int -> Word64
+encodeTableRef n_chars idx
+  | n_chars < 2 = panic "encodeTableRef: character count too small (< 2)"
+  | n_chars > 0xf7ff = panic "encodeTableRef: character count too large (> 63487)"
+  | otherwise =
+      let charBits = fromIntegral n_chars `Data.Bits.shiftL` 48
+          idxBits = fromIntegral idx .&. 0x0000ffffffffffff -- mask to 48 bits
+      in charBits .|. idxBits
+
 
 fs_sbs :: FastString -> ShortByteString
 fs_sbs (FastStringId w)
   | w .&. 0xf8000000_00000000 == 0xf8000000_00000000
   = let bs_len = (w .&. 0x07000000_00000000) `unsafeShiftR` 56
-        w8_64 x = wordToWord8# (word64ToWord# x)
-        go 0 _ = []
-        go n cur = wordToWord8# (word64ToWord# cur) : go (n-1) (cur `uncheckedShiftRL64#` 8#)
+        w8 :: Int -> Word8
+        w8 shift = fromIntegral ((w `unsafeShiftR` shift) .&. 0xFF)
     in case bs_len of
          0 -> SBS.empty
-         1 -> SBS.singleton $ wordToWord8# (word64ToWord# w)
-         2 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 8#) , w8_64 w]
-         3 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 16#), w8_64 (w `uncheckedShiftRL64#` 8#), w8_64 w)]
-         4 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 24#), w8_64 (w `uncheckedShiftRL64#` 16#), w8_64 (w `uncheckedShiftRL64#` 8#), w8_64 w)]
-         5 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 32#), w8_64 (w `uncheckedShiftRL64#` 24#), w8_64 (w `uncheckedShiftRL64#` 16#), w8_64 (w `uncheckedShiftRL64#` 8#), w8_64 w)]
-         6 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 40#), w8_64 (w `uncheckedShiftRL64#` 32#), w8_64 (w `uncheckedShiftRL64#` 24#), w8_64 (w `uncheckedShiftRL64#` 16#), w8_64 (w `uncheckedShiftRL64#` 8#), w8_64 w)]
-         7 -> SBS.pack [ w8_64 (w `uncheckedShiftRL64#` 48#), w8_64 (w `uncheckedShiftRL64#` 40#), w8_64 (w `uncheckedShiftRL64#` 32#), w8_64 (w `uncheckedShiftRL64#` 24#), w8_64 (w `uncheckedShiftRL64#` 16#), w8_64 (w `uncheckedShiftRL64#` 8#), w8_64 w)]
-  | otherwise
+         1 -> SBS.singleton $ w8 0
+         2 -> SBS.pack [ w8 0, w8 8 ]
+         3 -> SBS.pack [ w8 0, w8 8, w8 16 ]
+         4 -> SBS.pack [ w8 0, w8 8, w8 16, w8 24 ]
+         5 -> SBS.pack [ w8 0, w8 8, w8 16, w8 24, w8 32 ]
+         6 -> SBS.pack [ w8 0, w8 8, w8 16, w8 24, w8 32, w8 40 ]
+         7 -> SBS.pack [ w8 0, w8 8, w8 16, w8 24, w8 32, w8 40, w8 48 ]
+         _ -> panic "fs_sbs: invalid inline string length"
+  | otherwise =
+    let idx = fromIntegral (w .&. 0x0000FFFFFFFFFFFF) :: Int
+        payload = lookupPayloadByIndex idx
+    in payload_sbs payload
+
 n_chars :: FastString -> Int
+n_chars (FastStringId w)
+  | w .&. 0xf8000000_00000000 == 0xf8000000_00000000 =
+    -- Inline string: count UTF-8 characters
+    utf8CountCharsShortByteString (fs_sbs (FastStringId w))
+  | otherwise =
+    -- Table reference: extract character count from top 16 bits
+    fromIntegral (w `unsafeShiftR` 48)
+
 uniq :: FastString -> Int
+uniq (FastStringId w) = fromIntegral w
 
 instance Eq FastString where
   f1 == f2  =  uniq f1 == uniq f2
@@ -326,23 +389,119 @@ and updates to multiple buckets with low synchronization overhead.
 
 See Note [Updating the FastString table] on how it's updated.
 -}
+-- | A segment of the payload array
+data PayloadSegment = PayloadSegment
+  (MutableArray# RealWorld FastStringPayload)
+
+-- | Boxed wrapper for Array# to allow storage in IORef
+data SegmentArray = SegmentArray (Array# (IORef PayloadSegment))
+
+-- | Append-only array of FastStringPayload for O(1) lookup by index
+data PayloadArray = PayloadArray
+  {-# UNPACK #-} !FastMutInt  -- ^ Next free index
+  {-# UNPACK #-} !(IORef SegmentArray)  -- ^ Growable segmented array
+  {-# UNPACK #-} !(MVar ())  -- ^ Lock for growing the array
+
+-- Number of payloads per segment
+payloadSegmentSize :: Int
+payloadSegmentSize = 1024
+
+payloadSegmentBits :: Int
+payloadSegmentBits = 10  -- 2^10 = 1024
+
+initialPayloadSegments :: Int
+initialPayloadSegments = 256
+
+-- | Ensure a payload segment exists, growing the array if necessary
+-- Returns the segment IORef for the given segment index
+ensurePayloadSegment :: Int -> IO (IORef PayloadSegment)
+ensurePayloadSegment segmentIdx = do
+  let !(FastStringTable _ (PayloadArray _ segmentsRef growLock)) = stringTable
+      !(I# segmentIdx#) = segmentIdx
+  SegmentArray segments# <- readIORef segmentsRef
+  let currentSize# = sizeofArray# segments#
+
+  if isTrue# (segmentIdx# <# currentSize#)
+    then do
+      -- Segment exists, return it
+      let (# segmentRef #) = indexArray# segments# segmentIdx#
+      return segmentRef
+    else do
+      -- Need to grow the array
+      withMVar growLock $ \_ -> do
+        -- recheck after acquiring lock (another thread might have grown it)
+        SegmentArray segments'# <- readIORef segmentsRef
+        let currentSize'# = sizeofArray# segments'#
+        if isTrue# (segmentIdx# <# currentSize'#)
+          then do
+            let (# segmentRef #) = indexArray# segments'# segmentIdx#
+            return segmentRef
+          else do
+            -- grow: double the size
+            let newSize# = currentSize'# *# 2#
+                !(I# payloadSegmentSize#) = payloadSegmentSize
+            SegmentArray newSegments# <- IO $ \s1# ->
+              case newArray# newSize# (panic "unallocated_segment") s1# of
+                (# s2#, arr# #) ->
+                  case copyArray# segments'# 0# arr# 0# currentSize'# s2# of
+                    s3# ->
+                      -- Allocate new segments
+                      let allocLoop i# s#
+                            | isTrue# (i# ==# newSize#) = s#
+                            | otherwise =
+                                case newArray# payloadSegmentSize# (panic "uninitialized payload") s# of
+                                  (# s'#, seg# #) -> case newIORef (PayloadSegment seg#) `unIO` s'# of
+                                    (# s''#, segRef #) -> case writeArray# arr# i# segRef s''# of
+                                      s'''# -> allocLoop (i# +# 1#) s'''#
+                      in case allocLoop currentSize'# s3# of
+                           s4# -> case unsafeFreezeArray# arr# s4# of
+                             (# s5#, frozen# #) -> (# s5#, SegmentArray frozen# #)
+            writeIORef segmentsRef (SegmentArray newSegments#)
+            let (# segmentRef #) = indexArray# newSegments# segmentIdx#
+            return segmentRef
+
+-- | Allocate a payload in the global payload array and return its index
+allocatePayload :: FastStringPayload -> IO Int
+allocatePayload payload = do
+  let !(FastStringTable _ (PayloadArray nextIdx _ _)) = stringTable
+  idx <- atomicFetchAddFastMut nextIdx 1
+  let !(I# idx#) = idx
+      !(I# payloadSegmentBits#) = payloadSegmentBits
+      !(I# payloadSegmentSize#) = payloadSegmentSize
+      segmentIdx = I# (idx# `uncheckedIShiftRL#` payloadSegmentBits#)
+      offsetInSegment# = idx# `andI#` (payloadSegmentSize# -# 1#)
+  segmentRef <- ensurePayloadSegment segmentIdx
+  PayloadSegment segment# <- readIORef segmentRef
+  IO $ \s# ->
+    case writeArray# segment# offsetInSegment# payload s# of
+      s'# -> (# s'#, () #)
+  return idx
+
+-- | Look up a FastStringPayload by its index
+-- The segment is guaranteed to exist because indices only come from allocatePayload
+lookupPayloadByIndex :: Int -> FastStringPayload
+lookupPayloadByIndex idx = inlinePerformIO $ do
+  let !(FastStringTable _ (PayloadArray _ segmentsRef _)) = stringTable
+      !(I# idx#) = idx
+      !(I# payloadSegmentBits#) = payloadSegmentBits
+      !(I# payloadSegmentSize#) = payloadSegmentSize
+      segmentIdx# = idx# `uncheckedIShiftRL#` payloadSegmentBits#
+      offsetInSegment# = idx# `andI#` (payloadSegmentSize# -# 1#)
+  SegmentArray segments# <- readIORef segmentsRef
+  let (# segmentRef #) = indexArray# segments# segmentIdx#
+  PayloadSegment segment# <- readIORef segmentRef
+  IO $ readArray# segment# offsetInSegment#
+
 data FastStringTable = FastStringTable
-  {-# UNPACK #-} !FastMutInt
-  -- ^ The unique ID counter shared with all buckets
-  --
-  -- We unpack the 'FastMutInt' counter as it is always consumed strictly.
-  -- We mark this as 'NOUNPACK' as this 'FastMutInt' is retained by a thunk
-  -- in 'mkFastStringWith' and needs to be boxed any way.
-  -- If this is unpacked, then we box this single 'FastMutInt' once for each
-  -- allocated FastString.
   (Array# (IORef FastStringTableSegment)) -- ^  concurrent segments
+  !PayloadArray  -- ^ Global payload array
 
 data TableSegment a = TableSegment
   {-# UNPACK #-} !(MVar ())  -- the lock for write in each segment
   {-# UNPACK #-} !FastMutInt -- the number of elements
   (MutableArray# RealWorld [a]) -- buckets in this segment
 
-type FastStringTableSegment = TableSegment FastString
+type FastStringTableSegment = TableSegment Int -- ^ index into payload array
 
 data FastZStringTable = FastZStringTable
   {-# UNPACK #-} !FastMutInt
@@ -415,6 +574,9 @@ stringTable :: FastStringTable
 stringTable = unsafePerformIO $ do
   let !(I# numSegments#) = numSegments
       !(I# initialNumBuckets#) = initialNumBuckets
+      !(I# payloadSegmentSize#) = payloadSegmentSize
+      !(I# numPayloadSegments#) = initialPayloadSegments
+
       loop a# i# s1#
         | isTrue# (i# ==# numSegments#) = s1#
         | otherwise = case newMVar () `unIO` s1# of
@@ -424,13 +586,33 @@ stringTable = unsafePerformIO $ do
                     (TableSegment lock counter buckets#) `unIO` s4# of
                   (# s5#, segment #) -> case writeArray# a# i# segment s5# of
                     s6# -> loop a# (i# +# 1#) s6#
-  uid <- newFastMutInt 603979776 -- ord '$' * 0x01000000
+
+      -- Initialize payload array segments
+      payloadLoop a# i# s1#
+        | isTrue# (i# ==# numPayloadSegments#) = s1#
+        | otherwise = case newArray# payloadSegmentSize#
+                           (panic "uninitialized payload") s1# of
+            (# s2#, segment# #) -> case newIORef (PayloadSegment segment#) `unIO` s2# of
+              (# s3#, segmentRef #) -> case writeArray# a# i# segmentRef s3# of
+                s4# -> payloadLoop a# (i# +# 1#) s4#
+
+  nextPayloadIdx <- newFastMutInt 0
+  payloadGrowLock <- newMVar ()
+
+  payloadArray <- IO $ \s1# ->
+    case newArray# numPayloadSegments# (panic "payload_array") s1# of
+      (# s2#, arr# #) -> case payloadLoop arr# 0# s2# of
+        s3# -> case unsafeFreezeArray# arr# s3# of
+          (# s4#, segments# #) -> case newIORef (SegmentArray segments#) `unIO` s4# of
+            (# s5#, segmentsRef #) ->
+              (# s5#, PayloadArray nextPayloadIdx segmentsRef payloadGrowLock #)
+
   tab <- IO $ \s1# ->
     case newArray# numSegments# (panic "string_table") s1# of
       (# s2#, arr# #) -> case loop arr# 0# s2# of
         s3# -> case unsafeFreezeArray# arr# s3# of
           (# s4#, segments# #) ->
-            (# s4#, FastStringTable uid segments# #)
+            (# s4#, FastStringTable segments# payloadArray #)
 
   -- use the support wired into the RTS to share this CAF among all images of
   -- libHSghc
@@ -540,49 +722,69 @@ The procedure goes like this:
    * Otherwise, insert and return the string we created.
 -}
 
-mkFastStringWith
-    :: (Int -> IO FastString) -> ShortByteString -> IO FastString
-mkFastStringWith mk_fs sbs = do
-  TableSegment lock _ buckets# <- readIORef segmentRef
-  let idx# = hashToIndex# buckets# hash#
-  bucket <- IO $ readArray# buckets# idx#
-  case bucket_match bucket sbs of
-    Just found -> return found
-    Nothing -> do
-      -- The withMVar below is not dupable. It can lead to deadlock if it is
-      -- only run partially and putMVar is not called after takeMVar.
-      noDuplicate
-      n <- get_uid
-      new_fs <- mk_fs n
-      withMVar lock $ \_ -> insert new_fs
-  where
-    !(FastStringTable uid segments#) = stringTable
-    get_uid = atomicFetchAddFastMut uid 1
-
-    !(I# hash#) = hashStr sbs
-    (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
-    insert fs = do
-      TableSegment _ counter buckets# <- maybeResizeSegment hashFastString segmentRef
+mkFastStringWith :: ShortByteString -> IO FastString
+mkFastStringWith sbs = do
+  let len = SBS.length sbs
+  if len <= 7
+    then do
+      -- Inline strings: encode directly, no table lookup needed
+      return $ FastStringId (encodeInline sbs)
+    else do
+      -- Table strings: check for existing index, or create new one
+      let chars = utf8CountCharsShortByteString sbs
+      TableSegment lock _ buckets# <- readIORef segmentRef
       let idx# = hashToIndex# buckets# hash#
       bucket <- IO $ readArray# buckets# idx#
       case bucket_match bucket sbs of
-        -- The FastString was added by another thread after previous read and
-        -- before we acquired the write lock.
-        Just found -> return found
+        Just payloadIdx -> do
+          -- Found existing payload index, convert to FastString reference
+          return $ FastStringId (encodeTableRef chars payloadIdx)
         Nothing -> do
+          -- Create new payload and insert into table
+          noDuplicate
+          withMVar lock $ \_ -> insert
+  where
+    !(FastStringTable segments# _) = stringTable
+
+    !(I# hash#) = hashStr sbs
+    (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
+
+    -- Helper to hash an index for table operations
+    hashIndex :: Int -> Int
+    hashIndex idx = hashStr (payload_sbs (lookupPayloadByIndex idx))
+
+    insert :: IO FastString
+    insert = do
+      let chars = utf8CountCharsShortByteString sbs
+          payload = FastString { payload_sbs = sbs }
+      -- Allocate payload in global array and get its index
+      payloadIdx <- allocatePayload payload
+      TableSegment _ counter buckets# <- maybeResizeSegment hashIndex segmentRef
+      let idx# = hashToIndex# buckets# hash#
+      bucket <- IO $ readArray# buckets# idx#
+      case bucket_match bucket sbs of
+        -- The payload was added by another thread after previous read and
+        -- before we acquired the write lock.
+        Just existingIdx -> do
+          return $ FastStringId (encodeTableRef chars existingIdx)
+        Nothing -> do
+          -- Insert the payload index into the hash table
           IO $ \s1# ->
-            case writeArray# buckets# idx# (fs : bucket) s1# of
+            case writeArray# buckets# idx# (payloadIdx : bucket) s1# of
               s2# -> (# s2#, () #)
           _ <- atomicFetchAddFastMut counter 1
-          return fs
+          return $ FastStringId (encodeTableRef chars payloadIdx)
 
-bucket_match :: [FastString] -> ShortByteString -> Maybe FastString
-bucket_match fs sbs = go fs
+-- | Match a ShortByteString against a bucket of payload indices
+-- Returns the matching index if found
+bucket_match :: [Int] -> ShortByteString -> Maybe Int
+bucket_match indices sbs = go indices
   where go [] = Nothing
-        go (fs@(FastString {n_chars = n_chars, fs_sbs=fs_sbs}) : ls)
-          | length fs_sbs /= SBS.length fs_sbs
-          | fs_sbs == sbs = Just fs
-          | otherwise     = go ls
+        go (idx : rest) =
+          let payload = lookupPayloadByIndex idx
+          in if payload_sbs payload == sbs
+             then Just idx
+             else go rest
 -- bucket_match used to inline before changes to instance Eq ShortByteString
 -- in bytestring-0.12, which made it slightly larger than inlining threshold.
 -- Non-inlining causes a small, but measurable performance regression, so let's force it.
@@ -592,7 +794,8 @@ bucket_match fs sbs = go fs
 {-# INLINE mkNewFastZString #-}
 
 mkNewFastZString :: FastString -> IO FastZString
-mkNewFastZString (FastString uniq _ sbs) = do
+mkNewFastZString fs = do
+  let sbs = fs_sbs fs
   TableSegment lock _ buckets# <- readIORef segmentRef
   let idx# = hashToIndex# buckets# hash#
   bucket <- IO $ readArray# buckets# idx#
@@ -611,7 +814,7 @@ mkNewFastZString (FastString uniq _ sbs) = do
 
     -- FastString uniques are sequential, pass them through a linear
     -- congruential generator to randomise
-    !(I# hash#) = uniq*6364136223846793005 + 1
+    !(I# hash#) = uniq fs * 6364136223846793005 + 1
     (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
     insert n fs = do
       TableSegment _ counter buckets# <- maybeResizeSegment zStringHash segmentRef
@@ -642,7 +845,7 @@ mkFastStringBytes !ptr !len =
     -- idempotent.
     unsafeDupablePerformIO $ do
         sbs <- newSBSFromPtr ptr len
-        mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+        mkFastStringWith sbs
 
 newSBSFromPtr :: Ptr a -> Int -> IO ShortByteString
 newSBSFromPtr (Ptr src#) (I# len#) =
@@ -656,14 +859,13 @@ newSBSFromPtr (Ptr src#) (I# len#) =
 mkFastStringByteString :: ByteString -> FastString
 mkFastStringByteString bs =
   let sbs = SBS.toShort bs in
-  inlinePerformIO $
-      mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+  inlinePerformIO $ mkFastStringWith sbs
 
 -- | Create a 'FastString' from an existing 'ShortByteString' without
 -- copying.
 mkFastStringShortByteString :: ShortByteString -> FastString
 mkFastStringShortByteString sbs =
-  inlinePerformIO $ mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+  inlinePerformIO $ mkFastStringWith sbs
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
@@ -671,7 +873,7 @@ mkFastString :: String -> FastString
 mkFastString str =
   inlinePerformIO $ do
     let !sbs = utf8EncodeShortByteString str
-    mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+    mkFastStringWith sbs
 
 -- The following rule is used to avoid polluting the non-reclaimable FastString
 -- table with transient strings when we only want their encoding.
@@ -686,11 +888,6 @@ mkFastStringByteList str = mkFastStringShortByteString (SBS.pack str)
 -- account the number of forced z-strings into the passed 'FastMutInt'.
 mkZFastString :: ShortByteString -> FastZString
 mkZFastString sbs = mkFastZStringString (zEncodeString (utf8DecodeShortByteString sbs))
-
-mkNewFastStringShortByteString :: ShortByteString -> Int -> IO FastString
-mkNewFastStringShortByteString sbs uid = do
-  let chars = utf8CountCharsShortByteString sbs
-  return (FastString uid chars sbs)
 
 hashStr  :: ShortByteString -> Int
  -- produce a hash value between 0 & m (inclusive)
@@ -719,7 +916,7 @@ lengthFS fs = n_chars fs
 
 -- | Returns @True@ if the 'FastString' is empty
 nullFS :: FastString -> Bool
-nullFS fs = SBS.null $ fs_sbs fs
+nullFS (FastStringId w) = w == 0xF800000000000000
 
 -- | Lazily unpacks and decodes the FastString
 unpackFS :: FastString -> String
@@ -755,12 +952,14 @@ uniqueOfFS :: FastString -> Int
 uniqueOfFS fs = uniq fs
 
 nilFS :: FastString
-nilFS = mkFastString ""
+nilFS = FastStringId 0xF800000000000000  -- Empty inline string
 
 -- -----------------------------------------------------------------------------
 -- Stats
 
-getFastStringTable :: IO [[[FastString]]]
+-- | Get all FastString payloads from the table (for debugging/stats)
+-- Returns indices organized by segment and bucket
+getFastStringTable :: IO [[[Int]]]
 getFastStringTable =
   forM [0 .. numSegments - 1] $ \(I# i#) -> do
     let (# segmentRef #) = indexArray# segments# i#
@@ -769,7 +968,7 @@ getFastStringTable =
     forM [0 .. bucketSize - 1] $ \(I# j#) ->
       IO $ readArray# buckets# j#
   where
-    !(FastStringTable _ segments#) = stringTable
+    !(FastStringTable segments# _) = stringTable
 
 getFastZStringTable :: IO [[[FastZString]]]
 getFastZStringTable =

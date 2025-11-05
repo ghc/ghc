@@ -413,7 +413,7 @@ dumpFinalStats logger = do
     fzss <- getFastZStringTable
     let ppr_table         = fmap ppr_segment (fss `zip` [0..])
         ppr_segment (s,n) = hang (text "Segment" <+> int n) 2 (vcat (fmap ppr_bucket (s `zip` [0..])))
-        ppr_bucket  (b,n) = hang (text "Bucket" <+> int n) 2 (vcat (fmap ftext b))
+        ppr_bucket  (b,n) = hang (text "Bucket" <+> int n) 2 (vcat (fmap (ftext . mkFastStringShortByteString . payload_sbs . lookupPayloadByIndex) b))
     putDumpFileMaybe logger Opt_D_dump_faststrings "FastStrings" FormatText (vcat ppr_table)
     let ppr_table'         = fmap ppr_segment' (fzss `zip` [0..])
         ppr_segment' (s,n) = hang (text "Segment" <+> int n) 2 (vcat (fmap ppr_bucket' (s `zip` [0..])))
