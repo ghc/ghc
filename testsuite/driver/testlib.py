@@ -352,6 +352,9 @@ def req_plugins( name, opts ):
     """
     req_interp(name, opts)
 
+    # Plugins aren't supported with the external interpreter (#14335)
+    expect_broken_for(14335,['ext-interp'])(name,opts)
+
     if config.cross:
         opts.skip = True
 
