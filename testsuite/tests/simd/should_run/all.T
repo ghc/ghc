@@ -51,6 +51,11 @@ test('int64x2_shuffle_baseline', [], compile_and_run, [''])
 test('T25658', [], compile_and_run, ['']) # #25658 is a bug with SSE2 code generation
 test('T25659', [], compile_and_run, [''])
 
+# This test case uses SIMD instructions, even though the bug isn't in any way
+# tied to SIMD registers. It's useful to include it in this file so that
+# we re-use the logic for which architectures to run the test on.
+test('T26550', [], compile_and_run, ['-O1 -fno-worker-wrapper'])
+
 # Ensure we set the CPU features we have available.
 #
 # This is especially important with the LLVM backend, as LLVM can otherwise

@@ -504,8 +504,8 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
   platform <- getPlatform
   case regUsageOfInstr platform instr of { RU read written ->
     do
-    let real_written = [ rr                      | RegWithFormat {regWithFormat_reg = RegReal rr} <- written ]
-    let virt_written = [ VirtualRegWithFormat vr fmt | RegWithFormat (RegVirtual vr) fmt         <- written ]
+    let real_written = [ rr                          | RegWithFormat {regWithFormat_reg = RegReal rr} <- written ]
+    let virt_written = [ VirtualRegWithFormat vr fmt | RegWithFormat (RegVirtual vr) fmt              <- written ]
 
     -- we don't need to do anything with real registers that are
     -- only read by this instr.  (the list is typically ~2 elements,
