@@ -380,8 +380,8 @@ sequenceGrdDagMapM f as = sequenceGrdDags <$> traverse f as
 -- recursion, pattern bindings etc.
 -- See Note [Long-distance information for HsLocalBinds].
 desugarLocalBinds :: HsLocalBinds GhcTc -> DsM GrdDag
-desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
-  sequenceGrdDagMapM (sequenceGrdDagMapM go) (map snd binds)
+desugarLocalBinds (HsValBinds _ (XValBindsLR (HsVBG grps _))) =
+  sequenceGrdDagMapM go (hsValBindGroupsBinds grps)
   where
     go :: LHsBind GhcTc -> DsM GrdDag
     go (L _ FunBind{fun_id = L _ x, fun_matches = mg})

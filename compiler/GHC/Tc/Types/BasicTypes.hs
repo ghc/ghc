@@ -349,31 +349,33 @@ instance Outputable TcTyThing where     -- Debugging only
 data IdBindingInfo -- See Note [Meaning of IdBindingInfo]
     = NotLetBound
 
-    | ClosedLet    -- Can definitely be moved to top level
+    | LetBound
+        { lb_top :: TopLevelFlag
+             -- TopLevel <=> this binding may safely be moved to top level
+             -- E.g   f x = let ys = reverse [1,2]
+             --                 zs = reverse ys
+             --             in ...
+             -- Both ys and zs count as TopLevel
 
-    | NonClosedLet
-         RhsNames        -- Free vars of RHS of this Id's binding that are
-                         --   neither Global nor ClosedLet
-                         -- Used only to help with error-messages
-                         --    in `checkClosedInStaticForm`
+        , lb_fvs :: RhsNames
+             -- Free vars of the RHS that are NotLetBound, or LetBound NotTopLevel
+             -- Used to help with error messages in  `checkClosedInStaticForm`
+             -- Domain = binders of this recursive group
 
-         ClosedTypeId    -- True <=> This Id has a closed type
+        , lb_closed :: ClosedTypeId
+             -- True <=> this Id has a closed type
+             -- Generalisation of some other binding (f x = e) is OK if
+             -- all free vars of `e` have lb_clos=ClosedTypeId
+        }
 
-    -- Generalisation of some other binding (f x = e) is OK if
-    -- all free vars of `e` are ClosedTypeIds, or ClosedLet
-
--- | IsGroupClosed describes a group of mutually-recursive bindings
+-- | IsGroupClosed describes a group of
+--   mutually-recursive /renamed/ (but not yet typechecked) bindings
 data IsGroupClosed
   = IsGroupClosed
-      (NameEnv RhsNames)  -- Free var info for the RHS of each binding in the group
+      TopLevelFlag        -- TopLevel <=> all free vars are themselves TopLevel
+      (NameEnv RhsNames)  -- Frees for the RHS of each binding in the group
                           --   (includes free vars of RHS bound in the same group)
-                          -- Used only to help with error-messages
-                          --    in `checkClosedInStaticForm`
-
-      ClosedTypeId        -- True <=> all the free vars of the group are
-                          --          imported or ClosedLet or
-                          --          NonClosedLet with ClosedTypeId=True.
-                          --          In particular, no tyvars, no NotLetBound
+      ClosedTypeId        -- True <=> all the free vars of the group have closed types
 
 type RhsNames = NameSet   -- Names of variables, mentioned on the RHS of
                           -- a definition, that are not Global or ClosedLet
@@ -520,9 +522,9 @@ in the type environment.
 
 instance Outputable IdBindingInfo where
   ppr NotLetBound = text "NotLetBound"
-  ppr ClosedLet = text "TopLevelLet"
-  ppr (NonClosedLet fvs closed_type) =
-    text "TopLevelLet" <+> ppr fvs <+> ppr closed_type
+  ppr (LetBound { lb_top = top_lvl, lb_fvs = fvs, lb_closed = cls })
+    = text "LetBound" <> braces (sep [ ppr top_lvl, text "closed-type=" <+> ppr cls
+                                     , ppr fvs ])
 
 --------------
 pprTcTyThingCategory :: TcTyThing -> SDoc

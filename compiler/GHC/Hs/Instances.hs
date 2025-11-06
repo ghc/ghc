@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -56,9 +57,9 @@ deriving instance Data (HsValBindsLR GhcRn GhcRn)
 deriving instance Data (HsValBindsLR GhcTc GhcTc)
 
 -- deriving instance (DataIdLR pL pL) => Data (NHsValBindsLR pL)
-deriving instance Data (NHsValBindsLR 'Parsed)
-deriving instance Data (NHsValBindsLR 'Renamed)
-deriving instance Data (NHsValBindsLR 'Typechecked)
+deriving instance Data (HsValBindGroups 'Parsed)
+deriving instance Data (HsValBindGroups 'Renamed)
+deriving instance Data (HsValBindGroups 'Typechecked)
 
 -- deriving instance (DataIdLR pL pR) => Data (HsBindLR pL pR)
 deriving instance Data (HsBindLR GhcPs GhcPs)

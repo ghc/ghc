@@ -54,7 +54,7 @@ import GHC.Types.Name
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc ((<||>))
+import GHC.Utils.Misc
 
 import Data.Function
 import Data.List (sortBy)
@@ -80,12 +80,16 @@ type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = DataConCantHappen
 
 -- ---------------------------------------------------------------------
 type instance XValBinds    (GhcPass pL) (GhcPass pR) = AnnSortKey BindTag
-type instance XXValBindsLR (GhcPass pL) pR = NHsValBindsLR pL
 
-data NHsValBindsLR (p :: Pass) where
-  NvbPs :: NHsValBindsLR 'Parsed
-  NvbRn :: [(RecFlag, LHsBinds GhcRn)]       -> [LSig GhcRn] -> NHsValBindsLR 'Renamed
-  NvbTc :: [(RecFlag, LHsBinds GhcRn, Bool)] -> [LSig GhcRn] -> NHsValBindsLR 'Typechecked
+type instance XXValBindsLR (GhcPass pL) _ = HsValBindGroups pL
+
+data HsValBindGroups p   -- Divided into strongly connected components
+  = HsVBG [HsValBindGroup (GhcPass p)] [LSig GhcRn]
+
+type family HsValBindGroup p
+type instance HsValBindGroup GhcPs = ()
+type instance HsValBindGroup GhcRn = (RecFlag, LHsBinds GhcRn)
+type instance HsValBindGroup GhcTc = (RecFlag, LHsBinds GhcTc, TopLevelFlag)
 
 -- ---------------------------------------------------------------------
 
@@ -449,18 +453,17 @@ instance (OutputableBndrId pl, OutputableBndrId pr)
   ppr (ValBinds _ binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
-  ppr (XValBindsLR nvbs)
-    = case nvbs of
-        NvbPs               -> empty
-        NvbRn prs     sigs -> ppr_vb prs sigs
-        NvbTc triples sigs -> ppr_vb [(a,b) | (a,b,_)<-triples] sigs
-                              -- Discard closed-flag for now
+  ppr (XValBindsLR (HsVBG bs sigs))
+    = getPprDebug $ \case
+        False -> pprDeclList (pprLHsBindsForUser (concat (map snd prs)) sigs)
+        True  -> -- Print with sccs showing
+                 vcat (map ppr sigs) $$ vcat (map ppr_scc prs)
     where
-      ppr_vb prs sigs
-        = getPprDebug $ \case
-            False -> pprDeclList (pprLHsBindsForUser (concat (map snd prs)) sigs)
-            True  -> -- Print with sccs showing
-                     vcat (map ppr sigs) $$ vcat (map ppr_scc prs)
+      prs :: [(RecFlag, LHsBinds (GhcPass pl))]
+      prs = case ghcPass @pl of
+              GhcPs -> []
+              GhcRn -> bs
+              GhcTc -> [(a,b)|(a,b,_)<-bs]   -- Discard closed-flag for now
 
       ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
       pp_rec Recursive    = text "rec"
@@ -513,14 +516,12 @@ eqEmptyLocalBinds _                   = False
 
 isEmptyValBinds :: HsValBindsLR (GhcPass a) (GhcPass b) -> Bool
 isEmptyValBinds (ValBinds _ ds sigs)  = isEmptyLHsBinds ds && null sigs
-isEmptyValBinds (XValBindsLR NvbPs) = True
-isEmptyValBinds (XValBindsLR (NvbRn ds sigs)) = null ds && null sigs
-isEmptyValBinds (XValBindsLR (NvbTc ds sigs)) = null ds && null sigs
+isEmptyValBinds (XValBindsLR (HsVBG ds sigs)) = null ds && null sigs
 
 emptyValBindsIn :: HsValBindsLR (GhcPass a) (GhcPass b)
 emptyValBindsIn  = ValBinds NoAnnSortKey [] []
 emptyValBindsRn :: HsValBindsLR GhcRn GhcRn
-emptyValBindsRn  = XValBindsLR (NvbRn [] [])
+emptyValBindsRn  = XValBindsLR (HsVBG [] [])
 
 emptyLHsBinds :: LHsBindsLR (GhcPass idL) idR
 emptyLHsBinds = []
@@ -528,19 +529,21 @@ emptyLHsBinds = []
 isEmptyLHsBinds :: LHsBindsLR (GhcPass idL) idR -> Bool
 isEmptyLHsBinds = null
 
+hsValBindGroupsBinds :: forall p. IsPass p
+                     => [HsValBindGroup (GhcPass p)] -> [LHsBind (GhcPass p)]
+hsValBindGroupsBinds binds
+  = case ghcPass @p of
+              GhcPs -> []
+              GhcRn -> concatMap snd    binds
+              GhcTc -> concatMap sndOf3 binds
+
 ------------
 plusHsValBinds :: HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
                -> HsValBinds(GhcPass a)
 plusHsValBinds (ValBinds _ ds1 sigs1) (ValBinds _ ds2 sigs2)
   = ValBinds NoAnnSortKey (ds1 ++ ds2) (sigs1 ++ sigs2)
-plusHsValBinds (XValBindsLR nvbs1) (XValBindsLR nvbs2)
-  = XValBindsLR (nvbs1 `plus` nvbs2)
-  where
-    plus :: NHsValBindsLR p -> NHsValBindsLR p -> NHsValBindsLR p
-    NvbPs             `plus` NvbPs             = NvbPs
-    (NvbRn ds1 sigs1) `plus` (NvbRn ds2 sigs2) = NvbRn (ds1 ++ ds2) (sigs1 ++ sigs2)
-    (NvbTc ds1 sigs1) `plus` (NvbTc ds2 sigs2) = NvbTc (ds1 ++ ds2) (sigs1 ++ sigs2)
-
+plusHsValBinds (XValBindsLR (HsVBG ds1 ss1)) (XValBindsLR (HsVBG ds2 ss2))
+  = XValBindsLR (HsVBG (ds1++ds2) (ss1++ss2))
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
 

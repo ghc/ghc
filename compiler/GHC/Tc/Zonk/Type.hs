@@ -679,13 +679,11 @@ zonkLocalBinds (EmptyLocalBinds x)
 zonkLocalBinds (HsValBinds _ (ValBinds {}))
   = panic "zonkLocalBinds" -- Not in typechecker output
 
-zonkLocalBinds (HsValBinds x (XValBindsLR (NValBinds binds sigs)))
-  = do  { new_binds <- traverse go binds
-        ; return (HsValBinds x (XValBindsLR (NValBinds new_binds sigs))) }
+zonkLocalBinds (HsValBinds x (XValBindsLR (HsVBG binds sigs)))
+  = do  { new_binds <- mapM go binds
+        ; return (HsValBinds x (XValBindsLR (HsVBG new_binds sigs))) }
   where
-    go (r,b)
-      = do { b' <- zonkRecMonoBinds b
-           ; return (r,b') }
+    go (r,b,s) = do { b' <- zonkRecMonoBinds b; return (r,b',s) }
 
 zonkLocalBinds (HsIPBinds x (IPBinds dict_binds binds )) = do
     new_binds <- noBinders $ mapM (wrapLocZonkMA zonk_ip_bind) binds
