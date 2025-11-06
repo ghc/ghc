@@ -277,6 +277,7 @@ import Data.Data hiding (Fixity, TyCon)
 import Data.Functor ((<&>))
 import Data.List ( nub, isPrefixOf, partition )
 import qualified Data.List.NonEmpty as NE
+import Data.Traversable (for)
 import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
@@ -850,11 +851,11 @@ hscRecompStatus
         if | not (backendGeneratesCode (backend lcl_dflags)) -> do
                -- No need for a linkable, we're good to go
                msg UpToDate
-               return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
+               return $ HscUpToDate checked_iface emptyRecompLinkables
            | not (backendGeneratesCodeForHsBoot (backend lcl_dflags))
            , IsBoot <- isBootSummary mod_summary -> do
                msg UpToDate
-               return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
+               return $ HscUpToDate checked_iface emptyRecompLinkables
 
            -- Always recompile with the JS backend when TH is enabled until
            -- #23013 is fixed.
@@ -883,7 +884,7 @@ hscRecompStatus
                let just_o = justObjects <$> obj_linkable
 
                    bytecode_or_object_code
-                      | gopt Opt_WriteByteCode lcl_dflags = justBytecode <$> definitely_bc
+                      | gopt Opt_WriteByteCode lcl_dflags = justBytecode . Left <$> definitely_bc
                       | otherwise = (justBytecode <$> maybe_bc) `choose` just_o
 
 
@@ -900,13 +901,13 @@ hscRecompStatus
                    definitely_bc = bc_obj_linkable `prefer` bc_in_memory_linkable
 
                    -- If not -fwrite-byte-code, then we could use core bindings or object code if that's available.
-                   maybe_bc = bc_in_memory_linkable `choose`
-                              bc_obj_linkable `choose`
-                              bc_core_linkable
+                   maybe_bc = (Left <$> bc_in_memory_linkable) `choose`
+                              (Left <$> bc_obj_linkable) `choose`
+                              (Right <$> bc_core_linkable)
 
                    bc_result = if gopt Opt_WriteByteCode lcl_dflags
                                 -- If the byte-code artifact needs to be produced, then we certainly need bytecode.
-                                then definitely_bc
+                                then Left <$> definitely_bc
                                 else maybe_bc
 
                trace_if (hsc_logger hsc_env)
@@ -1021,14 +1022,13 @@ checkByteCodeFromObject hsc_env mod_sum = do
 
 -- | Attempt to load bytecode from whole core bindings in the interface if they exist.
 -- This is a legacy code-path, these days it should be preferred to use the bytecode object linkable.
-checkByteCodeFromIfaceCoreBindings :: HscEnv -> ModIface -> ModSummary -> IO (MaybeValidated Linkable)
+checkByteCodeFromIfaceCoreBindings :: HscEnv -> ModIface -> ModSummary -> IO (MaybeValidated WholeCoreBindingsLinkable)
 checkByteCodeFromIfaceCoreBindings _hsc_env iface mod_sum = do
     let
       this_mod   = ms_mod mod_sum
       if_date    = fromJust $ ms_iface_date mod_sum
     case iface_core_bindings iface (ms_location mod_sum) of
-      Just fi -> do
-          return (UpToDateItem (Linkable if_date this_mod (NE.singleton (CoreBindings fi))))
+      Just fi -> return $ UpToDateItem (Linkable if_date this_mod fi)
       _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 --------------------------------------------------------------
@@ -1142,20 +1142,22 @@ initWholeCoreBindings ::
   HscEnv ->
   ModIface ->
   ModDetails ->
-  Linkable ->
-  IO Linkable
-initWholeCoreBindings hsc_env iface details (Linkable utc_time this_mod uls) = do
-  Linkable utc_time this_mod <$> mapM (go hsc_env) uls
+  RecompLinkables ->
+  IO HomeModLinkable
+initWholeCoreBindings hsc_env iface details (RecompLinkables bc o) = do
+  bc' <- go bc
+  pure $ HomeModLinkable bc' o
   where
-    go hsc_env' = \case
-      CoreBindings wcb -> do
+    type_env = md_types details
+
+    go :: RecompBytecodeLinkable -> IO (Maybe Linkable)
+    go (NormalLinkable l) = pure l
+    go (WholeCoreBindingsLinkable wcbl) =
+      fmap Just $ for wcbl $ \wcb -> do
         add_iface_to_hpt iface details hsc_env
         bco <- unsafeInterleaveIO $
-                       compileWholeCoreBindings hsc_env' type_env wcb
-        pure (DotGBC bco)
-      l -> pure l
-
-    type_env = md_types details
+                       compileWholeCoreBindings hsc_env type_env wcb
+        pure $ NE.singleton (DotGBC bco)
 
 -- | Hydrate interface Core bindings and compile them to bytecode.
 --

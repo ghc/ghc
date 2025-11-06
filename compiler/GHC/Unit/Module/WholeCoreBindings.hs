@@ -130,6 +130,9 @@ data WholeCoreBindings = WholeCoreBindings
             , wcb_foreign :: IfaceForeign
             }
 
+instance Outputable WholeCoreBindings where
+  ppr (WholeCoreBindings {}) = text "WholeCoreBindings"
+
 {-
 Note [Foreign stubs and TH bytecode linking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
