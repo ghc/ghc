@@ -502,6 +502,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
     let real_written    = [ rr  | (RegReal     rr) <- written ] :: [RealReg]
     let virt_written    = [ vr  | (RegVirtual  vr) <- written ]
 
+
     -- we don't need to do anything with real registers that are
     -- only read by this instr.  (the list is typically ~2 elements,
     -- so using nub isn't a problem).

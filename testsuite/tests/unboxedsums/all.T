@@ -66,3 +66,10 @@ test('ManyUbxSums',
      ['ManyUbxSums',
         [('ManyUbxSums_Addr.hs','')]
         , '-v0 -dstg-lint -dcmm-lint'])
+
+test('T26542', [only_ways(llvm_ways),
+                unless(arch('x86_64') or arch('aarch64'), skip)]
+             , compile_and_run, [''])
+test('T26550', [only_ways(llvm_ways),
+                unless(arch('x86_64') or arch('aarch64'), skip)]
+             , compile_and_run, [''])
