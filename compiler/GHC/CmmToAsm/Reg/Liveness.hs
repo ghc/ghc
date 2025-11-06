@@ -48,6 +48,7 @@ import GHC.Cmm
 import GHC.CmmToAsm.Reg.Target
 
 import GHC.Data.Graph.Directed
+import GHC.Data.OrdList
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -562,30 +563,26 @@ stripLiveBlock config (BasicBlock i lis)
  =      BasicBlock i instrs'
 
  where  (instrs', _)
-                = runState (spillNat [] lis) 0
+                = runState (spillNat nilOL lis) 0
 
-        -- spillNat :: [instr] -> [LiveInstr instr] -> State Int [instr]
-        spillNat :: Instruction instr => [instr] -> [LiveInstr instr] -> State Int [instr]
+        spillNat :: Instruction instr => OrdList instr -> [LiveInstr instr] -> State Int [instr]
         spillNat acc []
-         =      return (reverse acc)
+         =      return (fromOL acc)
 
-        -- The SPILL/RELOAD cases do not appear to be exercised by our codegens
-        --
         spillNat acc (LiveInstr (SPILL reg slot) _ : instrs)
          = do   delta   <- get
-                spillNat (mkSpillInstr config reg delta slot ++ acc) instrs
+                spillNat (acc `appOL` toOL (mkSpillInstr config reg delta slot)) instrs
 
         spillNat acc (LiveInstr (RELOAD slot reg) _ : instrs)
          = do   delta   <- get
-                spillNat (mkLoadInstr config reg delta slot ++ acc) instrs
+                spillNat (acc `appOL` toOL (mkLoadInstr config reg delta slot)) instrs
 
         spillNat acc (LiveInstr (Instr instr) _ : instrs)
          | Just i <- takeDeltaInstr instr
          = do   put i
                 spillNat acc instrs
-
-        spillNat acc (LiveInstr (Instr instr) _ : instrs)
-         =      spillNat (instr : acc) instrs
+         | otherwise
+         =      spillNat (acc `snocOL` instr) instrs
 
 
 -- | Erase Delta instructions.
