@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 -----------------------------------------------------------------------------
 --
@@ -30,7 +31,9 @@ module GHC.Linker.Types
    , PkgsLoaded
 
    -- * Linkable
-   , Linkable(..)
+   , Linkable
+   , WholeCoreBindingsLinkable
+   , LinkableWith(..)
    , mkModuleByteCodeLinkable
    , LinkablePart(..)
    , LinkableObjectSort (..)
@@ -254,7 +257,7 @@ instance Outputable LoadedPkgInfo where
 
 
 -- | Information we can use to dynamically link modules into the compiler
-data Linkable = Linkable
+data LinkableWith parts = Linkable
   { linkableTime     :: !UTCTime
       -- ^ Time at which this linkable was built
       -- (i.e. when the bytecodes were produced,
@@ -263,9 +266,13 @@ data Linkable = Linkable
   , linkableModule   :: !Module
       -- ^ The linkable module itself
 
-  , linkableParts :: NonEmpty LinkablePart
+  , linkableParts :: parts
     -- ^ Files and chunks of code to link.
- }
+ } deriving (Functor, Traversable, Foldable)
+
+type Linkable = LinkableWith (NonEmpty LinkablePart)
+
+type WholeCoreBindingsLinkable = LinkableWith WholeCoreBindings
 
 type LinkableSet = ModuleEnv Linkable
 
@@ -282,7 +289,7 @@ unionLinkableSet = plusModuleEnv_C go
       | linkableTime l1 > linkableTime l2 = l1
       | otherwise = l2
 
-instance Outputable Linkable where
+instance Outputable a => Outputable (LinkableWith a) where
   ppr (Linkable when_made mod parts)
      = (text "Linkable" <+> parens (text (show when_made)) <+> ppr mod)
        $$ nest 3 (ppr parts)
@@ -318,11 +325,6 @@ data LinkablePart
   | DotDLL FilePath
       -- ^ Dynamically linked library file (.so, .dll, .dylib)
 
-  | CoreBindings WholeCoreBindings
-      -- ^ Serialised core which we can turn into BCOs (or object files), or
-      -- used by some other backend See Note [Interface Files with Core
-      -- Definitions]
-
   | DotGBC ModuleByteCode
     -- ^ A byte-code object, lives only in memory.
 
@@ -350,7 +352,6 @@ instance Outputable LinkablePart where
   ppr (DotA path)       = text "DotA" <+> text path
   ppr (DotDLL path)     = text "DotDLL" <+> text path
   ppr (DotGBC bco)      = text "DotGBC" <+> ppr bco
-  ppr (CoreBindings {}) = text "CoreBindings"
 
 -- | Return true if the linkable only consists of native code (no BCO)
 linkableIsNativeCodeOnly :: Linkable -> Bool
@@ -391,7 +392,6 @@ isNativeCode = \case
   DotA {}         -> True
   DotDLL {}       -> True
   DotGBC {}       -> False
-  CoreBindings {} -> False
 
 -- | Is the part a native library? (.so/.dll)
 isNativeLib :: LinkablePart -> Bool
@@ -400,7 +400,6 @@ isNativeLib = \case
   DotA {}         -> True
   DotDLL {}       -> True
   DotGBC {}       -> False
-  CoreBindings {} -> False
 
 -- | Get the FilePath of linkable part (if applicable)
 linkablePartPath :: LinkablePart -> Maybe FilePath
@@ -408,7 +407,6 @@ linkablePartPath = \case
   DotO fn _       -> Just fn
   DotA fn         -> Just fn
   DotDLL fn       -> Just fn
-  CoreBindings {} -> Nothing
   DotGBC {}       -> Nothing
 
 -- | Return the paths of all object code files (.o, .a, .so) contained in this
@@ -418,7 +416,6 @@ linkablePartNativePaths = \case
   DotO fn _       -> [fn]
   DotA fn         -> [fn]
   DotDLL fn       -> [fn]
-  CoreBindings {} -> []
   DotGBC {}       -> []
 
 -- | Return the paths of all object files (.o) contained in this 'LinkablePart'.
@@ -427,7 +424,6 @@ linkablePartObjectPaths = \case
   DotO fn _ -> [fn]
   DotA _ -> []
   DotDLL _ -> []
-  CoreBindings {} -> []
   DotGBC bco -> gbc_foreign_files bco
 
 -- | Retrieve the compiled byte-code from the linkable part.
@@ -444,12 +440,11 @@ linkableFilter f linkable = do
   Just linkable {linkableParts = new}
 
 linkablePartNative :: LinkablePart -> [LinkablePart]
-linkablePartNative = \case
-  u@DotO {}  -> [u]
-  u@DotA {} -> [u]
-  u@DotDLL {} -> [u]
+linkablePartNative u = case u of
+  DotO {}  -> [u]
+  DotA {} -> [u]
+  DotDLL {} -> [u]
   DotGBC bco -> [DotO f ForeignObject | f <- gbc_foreign_files bco]
-  _ -> []
 
 linkablePartByteCode :: LinkablePart -> [LinkablePart]
 linkablePartByteCode = \case
