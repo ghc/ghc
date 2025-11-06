@@ -195,7 +195,7 @@ For example: ::
   g3c :: Int -> forall x y. y -> x -> x
 
   f4 :: (Int -> forall a. (Eq a, Show a) => a -> a) -> Bool
-  g4 ::  Int -> forall x. (Show x, Eq x) => x -> x) -> Bool
+  g4 ::  Int -> forall x. (Show x, Eq x) => x -> x
 
 Then the application ``f3 g3a`` is well-typed, because ``g3a`` has a type that matches the type
 expected by ``f3``.  But ``f3 g3b`` is not well typed, because the foralls are in different places.
