@@ -66,7 +66,6 @@ module GHC.Tc.Utils.Unify (
 import GHC.Prelude
 
 import GHC.Hs
-
 import GHC.Tc.Errors.Types ( ErrCtxtMsg(..) )
 import GHC.Tc.Errors.Ppr   ( pprErrCtxtMsg )
 import GHC.Tc.Utils.Concrete
@@ -256,24 +255,24 @@ matchActualFunTys :: ExpectedFunTyOrigin -- ^ See Note [Herald for matchExpected
 --       and res_ty is a RhoType
 -- NB: the returned type is top-instantiated; it's a RhoType
 matchActualFunTys herald ct_orig n_val_args_wanted top_ty
-  = go n_val_args_wanted [] top_ty
+  = go n_val_args_wanted top_ty
   where
-    go n so_far fun_ty
+    go n fun_ty
       | not (isRhoTy fun_ty)
       = do { (wrap1, rho) <- topInstantiate ct_orig fun_ty
-           ; (wrap2, arg_tys, res_ty) <- go n so_far rho
+           ; (wrap2, arg_tys, res_ty) <- go n rho
            ; return (wrap2 <.> wrap1, arg_tys, res_ty) }
 
-    go 0 _ fun_ty = return (idHsWrapper, [], fun_ty)
+    go 0 fun_ty = return (idHsWrapper, [], fun_ty)
 
-    go n so_far fun_ty
-      = do { (co1, arg_ty1, res_ty1) <- matchActualFunTy herald Nothing
-                                           (n_val_args_wanted, top_ty) fun_ty
-           ; (wrap_res, arg_tys, res_ty) <- go (n-1) (arg_ty1:so_far) res_ty1
-           ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res arg_ty1 res_ty
-           -- NB: arg_ty1 comes from matchActualFunTy, so it has
-           -- a syntactically fixed RuntimeRep
-           ; return (wrap_fun2 <.> mkWpCastN co1, arg_ty1:arg_tys, res_ty) }
+    go n fun_ty
+      = do { (co1, arg1_ty_frr, res_ty1) <-
+                matchActualFunTy herald Nothing (n_val_args_wanted, top_ty) fun_ty
+           ; (wrap_res, arg_tys, res_ty) <- go (n-1) res_ty1
+           ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res arg1_ty_frr res_ty
+              -- This call to mkWpFun satisfies WpFun-FRR-INVARIANT:
+              -- 'arg1_ty_frr' comes from matchActualFunTy, so is FRR.
+           ; return (wrap_fun2 <.> mkWpCastN co1, arg1_ty_frr:arg_tys, res_ty) }
 
 {-
 ************************************************************************
@@ -866,12 +865,30 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
       = assert (isVisibleFunArg af) $
         do { let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
            ; (arg_co, arg_ty_frr) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
-           ; let arg_sty_frr = Scaled mult arg_ty_frr
-           ; (wrap_res, result) <- check (n_req - 1)
-                                         (mkCheckExpFunPatTy arg_sty_frr : rev_pat_tys)
+           ; let scaled_arg_ty_frr = Scaled mult arg_ty_frr
+           ; (res_wrap, result) <- check (n_req - 1)
+                                         (mkCheckExpFunPatTy scaled_arg_ty_frr : rev_pat_tys)
                                          res_ty
-           ; let wrap_arg = mkWpCastN arg_co
-                 fun_wrap = mkWpFun wrap_arg wrap_res arg_sty_frr res_ty
+
+            -- arg_co :: arg_ty ~ arg_ty_frr
+            -- res_wrap :: act_res_ty ~~> res_ty
+           ; let fun_wrap1 -- :: (arg_ty_frr -> act_res_ty) ~~> (arg_ty_frr -> res_ty)
+                   = mkWpFun idHsWrapper res_wrap scaled_arg_ty_frr res_ty
+                       -- Satisfies WpFun-FRR-INVARIANT because arg_sty_frr is FRR
+
+                 fun_wrap2 -- :: (arg_ty_frr -> res_ty) ~~> (arg_ty -> res_ty)
+                   = mkWpCastN (mkFunCo Nominal af (mkNomReflCo mult) (mkSymCo arg_co) (mkNomReflCo res_ty))
+
+                 fun_wrap -- :: (arg_ty_frr -> act_res_ty) ~~> (arg_ty -> res_ty)
+                   = fun_wrap2 <.> fun_wrap1
+
+-- NB: in the common case, 'arg_ty' is already FRR (in the sense of
+--     Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete), hence 'arg_co' is 'Refl'.
+--     Then 'fun_wrap' will collapse down to 'fun_wrap1'. This applies recursively;
+--     as 'mkWpFun WpHole WpHole' is 'WpHole', this means that 'fun_wrap' will
+--     typically just be 'WpHole'; no clutter.
+--     This is important because 'matchExpectedFunTys' is called a lot.
+
            ; return (fun_wrap, result) }
 
     ----------------------------
@@ -1404,7 +1421,7 @@ tcSubTypeMono rn_expr act_ty exp_ty
 
 ------------------------
 tcSubTypePat :: CtOrigin -> UserTypeCtxt
-            -> ExpSigmaType -> TcSigmaType -> TcM HsWrapper
+             -> ExpSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Used in patterns; polarity is backwards compared
 --   to tcSubType
 -- If wrap = tc_sub_type_et t1 t2

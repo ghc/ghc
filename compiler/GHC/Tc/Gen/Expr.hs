@@ -957,7 +957,7 @@ tcSynArgE :: CtOrigin
           -> SyntaxOpType                -- ^ shape it is expected to have
           -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a) -- ^ check the arguments
           -> TcM (a, HsWrapper)
-           -- ^ returns a wrapper :: (type of right shape) "->" (type passed in)
+           -- ^ returns a wrapper :: (type of right shape) ~~> (type passed in)
 tcSynArgE orig op sigma_ty syn_ty thing_inside
   = do { (skol_wrap, (result, ty_wrapper))
            <- tcSkolemise Shallow GenSigCtxt sigma_ty $ \rho_ty ->
@@ -978,10 +978,10 @@ tcSynArgE orig op sigma_ty syn_ty thing_inside
            ; return (result, mkWpCastN list_co) }
 
     go rho_ty (SynFun arg_shape res_shape)
-      = do { ( match_wrapper                         -- :: (arg_ty -> res_ty) "->" rho_ty
+      = do { ( match_wrapper                         -- :: (arg_ty -> res_ty) ~~> rho_ty
              , ( ( (result, arg_ty, res_ty, op_mult)
-                 , res_wrapper )                     -- :: res_ty_out "->" res_ty
-               , arg_wrapper1, [], arg_wrapper2 ) )  -- :: arg_ty "->" arg_ty_out
+                 , res_wrapper )                     -- :: res_ty_out ~~> res_ty
+               , arg_wrapper1, [], arg_wrapper2 ) )  -- :: arg_ty ~~> arg_ty_out
                <- matchExpectedFunTys herald GenSigCtxt 1 (mkCheckExpType rho_ty) $
                   \ [ExpFunPatTy arg_ty] res_ty ->
                   do { arg_tc_ty <- expTypeToType (scaledThing arg_ty)
@@ -1031,7 +1031,7 @@ tcSynArgA :: CtOrigin
 tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
   = do { (match_wrapper, arg_tys, res_ty)
            <- matchActualFunTys herald orig (length arg_shapes) sigma_ty
-              -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
+              -- match_wrapper :: sigma_ty ~~> (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
            <- tc_syn_args_e (map scaledThing arg_tys) arg_shapes $ \ arg_results arg_res_mults ->
               tc_syn_arg    res_ty  res_shape  $ \ res_results ->
@@ -1061,12 +1061,12 @@ tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
            ; return (result, idHsWrapper) }
     tc_syn_arg res_ty SynRho thing_inside
       = do { (inst_wrap, rho_ty) <- topInstantiate orig res_ty
-               -- inst_wrap :: res_ty "->" rho_ty
+               -- inst_wrap :: res_ty ~~> rho_ty
            ; result <- thing_inside [rho_ty]
            ; return (result, inst_wrap) }
     tc_syn_arg res_ty SynList thing_inside
       = do { (inst_wrap, rho_ty) <- topInstantiate orig res_ty
-               -- inst_wrap :: res_ty "->" rho_ty
+               -- inst_wrap :: res_ty ~~> rho_ty
            ; (list_co, elt_ty)   <- matchExpectedListTy rho_ty
                -- list_co :: [elt_ty] ~N rho_ty
            ; result <- thing_inside [elt_ty]

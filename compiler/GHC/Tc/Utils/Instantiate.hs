@@ -277,7 +277,7 @@ skolemiseRequired skolem_info n_req sigma
 topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- Instantiate outer invisible binders (both Inferred and Specified)
 -- If    top_instantiate ty = (wrap, inner_ty)
--- then  wrap :: inner_ty "->" ty
+-- then  wrap :: inner_ty ~~> ty
 -- NB: returns a type with no (=>),
 --     and no invisible forall at the top
 topInstantiate orig sigma

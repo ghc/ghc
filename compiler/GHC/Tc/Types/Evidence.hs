@@ -197,29 +197,29 @@ that it is a no-op.  Here's our solution:
     * we /must/ optimise subtype-HsWrappers (that's the point of this Note!)
     * there is little point in attempting to optimise any other HsWrappers
 
-Note [WpFun-RR-INVARIANT]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [WpFun-FRR-INVARIANT]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given
   wrap = WpFun wrap1 wrap2 sty1 ty2
   where:  wrap1 :: exp_arg ~~> act_arg
           wrap2 :: act_res ~~> exp_res
           wrap  :: (act_arg -> act_res) ~~> (exp_arg -> exp_res)
 we have
-  WpFun-RR-INVARIANT:
+  WpFun-FRR-INVARIANT:
       the input (exp_arg) and output (act_arg) types of `wrap1`
       both have a fixed runtime-rep
 
 Reason: We desugar wrap[e] into
     \(x:exp_arg). wrap2[ e wrap1[x] ]
-And then, because of Note [Representation polymorphism invariants], we need:
+And then, because of Note [Representation polymorphism invariants]:
 
   * `exp_arg` must have a fixed runtime rep,
     so that lambda obeys the the FRR rules
 
   * `act_arg` must have a fixed runtime rep,
-    so the that application (e wrap1[x]) obeys the FRR tules
+    so that the application (e wrap1[x]) obeys the FRR rules
 
-Hence WpFun-INVARIANT.
+Hence WpFun-FRR-INVARIANT.
 -}
 
 data HsWrapper
@@ -246,7 +246,7 @@ data HsWrapper
        -- (WpFun wrap1 wrap2 (w, t1) t2)[e] = \(x:_w exp_arg). wrap2[ e wrap1[x] ]
        --
        -- INVARIANT: both input and output types of `wrap1` have a fixed runtime-rep
-       --            See Note [WpFun-RR-INVARIANT]
+       --            See Note [WpFun-FRR-INVARIANT]
        --
        -- Typing rules:
        -- If    e     :: act_arg -> act_res
@@ -319,7 +319,7 @@ mkWpFun :: HsWrapper -> HsWrapper
 -- ^ Smart constructor for `WpFun`
 -- Just removes clutter and optimises some common cases.
 --
--- PRECONDITION: same as Note [WpFun-RR-INVARIANT]
+-- PRECONDITION: same as Note [WpFun-FRR-INVARIANT]
 --
 -- Unfortunately, we can't check PRECONDITION with an assertion here, because of
 -- [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
