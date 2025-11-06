@@ -144,6 +144,7 @@ test('T22187', [],compile,[''])
 test('T22187_run', [],compile_and_run,[''])
 test('T25062_V16', [], compile_and_run, [''])
 test('T25561', [], compile_and_run, [''])
+test('T26542', [], compile_and_run, [''])
 
 # Even if the CPU we run on doesn't support *executing* those tests we should try to
 # compile them.
