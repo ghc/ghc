@@ -102,28 +102,53 @@ solveDict dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
        ; stopWithStage (dictCtEvidence dict_ct) "Kept inert DictCt" }
 
 updInertDicts :: DictCt -> TcS ()
-updInertDicts dict_ct@(DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
-  = do { traceTcS "Adding inert dict" (ppr dict_ct $$ ppr cls  <+> ppr tys)
+updInertDicts dict_ct
+  = do { traceTcS "Adding inert dict" (ppr dict_ct)
 
-       ; if | isGiven ev, Just (str_ty, _) <- isIPPred_maybe cls tys
-            -> -- See (SIP1) and (SIP2) in Note [Shadowing of implicit parameters]
-               -- Update /both/ inert_cans /and/ inert_solved_dicts.
-               updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
-               inerts { inert_cans         = updDicts (filterDicts (does_not_mention_ip_for str_ty)) ics
-                      , inert_solved_dicts = filterDicts (does_not_mention_ip_for str_ty) solved }
-            | otherwise
-            -> return ()
+       -- For Given implicit parameters (only), delete any existing
+       -- Givens for the same implicit parameter.
+       -- See Note [Shadowing of implicit parameters]
+       ; deleteGivenIPs dict_ct
 
        -- Add the new constraint to the inert set
        ; updInertCans (updDicts (addDict dict_ct)) }
+
+deleteGivenIPs :: DictCt -> TcS ()
+-- Special magic when adding a Given implicit parameter to the inert set
+-- For [G] ?x::ty, remove any existing /Givens/ mentioning ?x,
+--    from /both/ inert_cans /and/ inert_solved_dicts (#23761)
+-- See Note [Shadowing of implicit parameters]
+deleteGivenIPs (DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
+  | isGiven ev
+  , Just (str_ty, _) <- isIPPred_maybe cls tys
+  = updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
+    inerts { inert_cans         = updDicts (filterDicts (keep_can str_ty)) ics
+           , inert_solved_dicts = filterDicts (keep_solved str_ty) solved }
+  | otherwise
+  = return ()
   where
-    -- Does this class constraint or any of its superclasses mention
-    -- an implicit parameter (?str :: ty) for the given 'str' and any type 'ty'?
-    does_not_mention_ip_for :: Type -> DictCt -> Bool
-    does_not_mention_ip_for str_ty (DictCt { di_cls = cls, di_tys = tys })
-      = not $ mentionsIP (not . typesAreApart str_ty) (const True) cls tys
-        -- See Note [Using typesAreApart when calling mentionsIP]
-        -- in GHC.Core.Predicate
+    keep_can, keep_solved :: Type -> DictCt -> Bool
+    -- keep_can: we keep an inert dictionary UNLESS
+    --   (1) it is a Given
+    --   (2) it binds an implicit parameter (?str :: ty) for the given 'str'
+    --       regardless of 'ty', possibly via its superclasses
+    -- The test is a bit conservative, hence `mentionsIP` and `typesAreApart`
+    -- See Note [Using typesAreApart when calling mentionsIP]
+    -- in GHC.Core.Predicate
+    --
+    -- keep_solved: same as keep_can, but for /all/ constraints not just Givens
+    --
+    -- Why two functions?  See (SIP3) in Note [Shadowing of implicit parameters]
+    keep_can str (DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
+      = not (isGiven ev                -- (1)
+          && mentions_ip str cls tys)  -- (2)
+    keep_solved str (DictCt { di_cls = cls, di_tys = tys })
+      = not (mentions_ip str cls tys)
+
+    -- mentions_ip: the inert constraint might provide evidence
+    -- for an implicit parameter (?str :: ty) for the given 'str'
+    mentions_ip str cls tys
+      = mentionsIP (not . typesAreApart str) (const True) cls tys
 
 canDictCt :: CtEvidence -> Class -> [Type] -> SolverStage DictCt
 -- Once-only processing of Dict constraints:
@@ -220,7 +245,9 @@ in two places:
 * In `updInertDicts`, in this module, when adding [G] (?x :: ty), remove any
   existing [G] (?x :: ty'), regardless of ty'.
 
-* Wrinkle (SIP1): we must be careful of superclasses.  Consider
+There are wrinkles:
+
+* Wrinkle (SIP1): we must be careful of superclasses (#14218).  Consider
      f,g :: (?x::Int, C a) => a -> a
      f v = let ?x = 4 in g v
 
@@ -228,24 +255,31 @@ in two places:
   We must /not/ solve this from the Given (?x::Int, C a), because of
   the intervening binding for (?x::Int).  #14218.
 
-  We deal with this by arranging that when we add [G] (?x::ty) we delete
+  We deal with this by arranging that when we add [G] (?x::ty) we /delete/
   * from the inert_cans, and
   * from the inert_solved_dicts
   any existing [G] (?x::ty) /and/ any [G] D tys, where (D tys) has a superclass
   with (?x::ty).  See Note [Local implicit parameters] in GHC.Core.Predicate.
 
-  An important special case is constraint tuples like [G] (% ?x::ty, Eq a %).
-  But it could happen for `class xx => D xx where ...` and the constraint D
-  (?x :: int).  This corner (constraint-kinded variables instantiated with
-  implicit parameter constraints) is not well explored.
+  An very important special case is constraint tuples like [G] (% ?x::ty, Eq a %).
 
-  Example in #14218, and #23761
+  But it could also happen for `class xx => D xx where ...` and the constraint
+  D (?x :: int); again see Note [Local implicit parameters].  This corner
+  (constraint-kinded variables instantiated with implicit parameter constraints)
+  is not well explored.
+
+  You might worry about whether deleting an /entire/ constraint just because
+  a distant superclass has an implicit parameter might make another Wanted for
+  that constraint un-solvable.  Indeed so. But for constraint tuples it doesn't
+  matter -- their entire payload is their superclasses.  And the other case is
+  the ill-explored corner above.
 
   The code that accounts for (SIP1) is in updInertDicts; in particular the call to
   GHC.Core.Predicate.mentionsIP.
 
 * Wrinkle (SIP2): we must apply this update semantics for `inert_solved_dicts`
-  as well as `inert_cans`.
+  as well as `inert_cans` (#23761).
+
   You might think that wouldn't be necessary, because an element of
   `inert_solved_dicts` is never an implicit parameter (see
   Note [Solved dictionaries] in GHC.Tc.Solver.InertSet).
@@ -257,6 +291,19 @@ in two places:
 
   Now (C (?x::Int)) has a superclass (?x::Int). This may look exotic, but it
   happens particularly for constraint tuples, like `(% ?x::Int, Eq a %)`.
+
+* Wrinkle (SIP3)
+  - Note that for the inert dictionaries, `inert_cans`, we must /only/ delete
+    existing /Givens/!  Deleting an existing Wanted led to #26451; we just never
+    solved it!
+
+  - In contrast, the solved dictionaries, `inert_solved_dicts`, are really like
+    Givens; they may be "inherited" from outer scopes, so we must delete any
+    solved dictionaries for this implicit parameter for /both/ Givens /and/
+    Wanteds.
+
+    Otherwise the new Given doesn't properly shadow those inherited solved
+    dictionaries. Test T23761 showed this up.
 
 Example 1:
 
