@@ -377,28 +377,53 @@ in GHC.Tc.Solver.Dict.
 -}
 
 updInertDicts :: DictCt -> TcS ()
-updInertDicts dict_ct@(DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
-  = do { traceTcS "Adding inert dict" (ppr dict_ct $$ ppr cls  <+> ppr tys)
+updInertDicts dict_ct
+  = do { traceTcS "Adding inert dict" (ppr dict_ct)
 
-       ; if | isGiven ev, Just (str_ty, _) <- isIPPred_maybe cls tys
-            -> -- For [G] ?x::ty, remove any dicts mentioning ?x,
-              --    from /both/ inert_cans /and/ inert_solved_dicts (#23761)
-               -- See (SIP1) and (SIP2) in Note [Shadowing of implicit parameters]
-               updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
-               inerts { inert_cans         = updDicts (filterDicts (does_not_mention_ip_for str_ty)) ics
-                      , inert_solved_dicts = filterDicts (does_not_mention_ip_for str_ty) solved }
-            | otherwise
-            -> return ()
+       -- For Given implicit parameters (only), delete any existing
+       -- Givens for the same implicit parameter.
+       -- See Note [Shadowing of implicit parameters]
+       ; deleteGivenIPs dict_ct
+
        -- Add the new constraint to the inert set
        ; updInertCans (updDicts (addDict dict_ct)) }
+
+deleteGivenIPs :: DictCt -> TcS ()
+-- Special magic when adding a Given implicit parameter to the inert set
+-- For [G] ?x::ty, remove any existing /Givens/ mentioning ?x,
+--    from /both/ inert_cans /and/ inert_solved_dicts (#23761)
+-- See Note [Shadowing of implicit parameters]
+deleteGivenIPs (DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
+  | isGiven ev
+  , Just (str_ty, _) <- isIPPred_maybe cls tys
+  = updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
+    inerts { inert_cans         = updDicts (filterDicts (keep_can str_ty)) ics
+           , inert_solved_dicts = filterDicts (keep_solved str_ty) solved }
+  | otherwise
+  = return ()
   where
-    -- Does this class constraint or any of its superclasses mention
-    -- an implicit parameter (?str :: ty) for the given 'str' and any type 'ty'?
-    does_not_mention_ip_for :: Type -> DictCt -> Bool
-    does_not_mention_ip_for str_ty (DictCt { di_cls = cls, di_tys = tys })
-      = not $ mightMentionIP (not . typesAreApart str_ty) (const True) cls tys
-        -- See Note [Using typesAreApart when calling mightMentionIP]
-        -- in GHC.Core.Predicate
+    keep_can, keep_solved :: Type -> DictCt -> Bool
+    -- keep_can: we keep an inert dictionary UNLESS
+    --   (1) it is a Given
+    --   (2) it binds an implicit parameter (?str :: ty) for the given 'str'
+    --       regardless of 'ty', possibly via its superclasses
+    -- The test is a bit conservative, hence `mightMentionIP` and `typesAreApart`
+    -- See Note [Using typesAreApart when calling mightMentionIP]
+    -- in GHC.Core.Predicate
+    --
+    -- keep_solved: same as keep_can, but for /all/ constraints not just Givens
+    --
+    -- Why two functions?  See (SIP3) in Note [Shadowing of implicit parameters]
+    keep_can str (DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
+      = not (isGiven ev                -- (1)
+          && mentions_ip str cls tys)  -- (2)
+    keep_solved str (DictCt { di_cls = cls, di_tys = tys })
+      = not (mentions_ip str cls tys)
+
+    -- mentions_ip: the inert constraint might provide evidence
+    -- for an implicit parameter (?str :: ty) for the given 'str'
+    mentions_ip str cls tys
+      = mightMentionIP (not . typesAreApart str) (const True) cls tys
 
 updInertIrreds :: IrredCt -> TcS ()
 updInertIrreds irred
