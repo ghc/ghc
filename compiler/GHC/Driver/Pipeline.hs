@@ -109,6 +109,7 @@ import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Status
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 
@@ -249,8 +250,8 @@ compileOne' mHscMessage
    (iface, linkable) <- runPipeline (hsc_hooks plugin_hsc_env) pipeline
    -- See Note [ModDetails and --make mode]
    details <- initModDetails plugin_hsc_env iface
-   linkable' <- traverse (initWholeCoreBindings plugin_hsc_env iface details) (homeMod_bytecode linkable)
-   return $! HomeModInfo iface details (linkable { homeMod_bytecode = linkable' })
+   linkable' <- initWholeCoreBindings plugin_hsc_env iface details linkable
+   return $! HomeModInfo iface details linkable'
 
  where lcl_dflags  = ms_hspp_opts summary
        location    = ms_location summary
@@ -759,7 +760,7 @@ preprocessPipeline pipe_env hsc_env input_fn = do
            $ phaseIfFlag hsc_env flag def action
 
 -- | The complete compilation pipeline, from start to finish
-fullPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> HscSource -> m (ModIface, HomeModLinkable)
+fullPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> HscSource -> m (ModIface, RecompLinkables)
 fullPipeline pipe_env hsc_env pp_fn src_flavour = do
   (dflags, input_fn) <- preprocessPipeline pipe_env hsc_env pp_fn
   let hsc_env' = hscSetFlags dflags hsc_env
@@ -768,7 +769,7 @@ fullPipeline pipe_env hsc_env pp_fn src_flavour = do
   hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status)
 
 -- | Everything after preprocess
-hscPipeline :: P m => PipeEnv ->  ((HscEnv, ModSummary, HscRecompStatus)) -> m (ModIface, HomeModLinkable)
+hscPipeline :: P m => PipeEnv -> (HscEnv, ModSummary, HscRecompStatus) -> m (ModIface, RecompLinkables)
 hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
   case hsc_recomp_status of
     HscUpToDate iface mb_linkable -> return (iface, mb_linkable)
@@ -777,7 +778,7 @@ hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
       hscBackendAction <- use (T_HscPostTc hsc_env_with_plugins mod_sum tc_result warnings mb_old_hash )
       hscBackendPipeline pipe_env hsc_env_with_plugins mod_sum hscBackendAction
 
-hscBackendPipeline :: P m => PipeEnv -> HscEnv -> ModSummary -> HscBackendAction -> m (ModIface, HomeModLinkable)
+hscBackendPipeline :: P m => PipeEnv -> HscEnv -> ModSummary -> HscBackendAction -> m (ModIface, RecompLinkables)
 hscBackendPipeline pipe_env hsc_env mod_sum result =
   if backendGeneratesCode (backend (hsc_dflags hsc_env)) then
     do
@@ -796,15 +797,15 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
       return res
   else
     case result of
-      HscUpdate iface ->  return (iface, emptyHomeModInfoLinkable)
-      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing Nothing NoStubs []) <*> pure emptyHomeModInfoLinkable
+      HscUpdate iface ->  return (iface, emptyRecompLinkables)
+      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing Nothing NoStubs []) <*> pure emptyRecompLinkables
 
 hscGenBackendPipeline :: P m
   => PipeEnv
   -> HscEnv
   -> ModSummary
   -> HscBackendAction
-  -> m (ModIface, HomeModLinkable)
+  -> m (ModIface, RecompLinkables)
 hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
   let mod_name = moduleName (ms_mod mod_sum)
       src_flavour = (ms_hsc_src mod_sum)
@@ -812,7 +813,7 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
   (fos, miface, mlinkable, o_file) <- use (T_HscBackend pipe_env hsc_env mod_name src_flavour location result)
   final_fp <- hscPostBackendPipeline pipe_env hsc_env (ms_hsc_src mod_sum) (backend (hsc_dflags hsc_env)) (Just location) o_file
   final_linkable <-
-    case final_fp of
+    safeCastHomeModLinkable <$> case final_fp of
       -- No object file produced, bytecode or NoBackend
       Nothing -> return mlinkable
       Just o_fp -> do
@@ -936,7 +937,7 @@ pipelineStart pipe_env hsc_env input_fn mb_phase =
    as :: P m => Bool -> m (Maybe FilePath)
    as use_cpp = asPipeline use_cpp pipe_env hsc_env Nothing input_fn
 
-   objFromLinkable (_, homeMod_object -> Just (Linkable _ _ (DotO lnk _ :| []))) = Just lnk
+   objFromLinkable (_, recompLinkables_object -> Just (Linkable _ _ (DotO lnk _ :| []))) = Just lnk
    objFromLinkable _ = Nothing
 
    fromPhase :: P m => Phase -> m (Maybe FilePath)
