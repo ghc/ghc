@@ -939,35 +939,39 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr fmt
 
                         -- we have a temporary that is in both register and mem,
                         -- just free up its register for use.
-                        | (temp, (RealRegUsage my_reg _old_fmt), slot) : _ <- candidates_inBoth
-                        = do    spills' <- loadTemp r spill_loc my_reg spills
+                        | (temp, (RealRegUsage cand_reg _old_fmt), slot) : _ <- candidates_inBoth
+                        = do    spills' <- loadTemp r spill_loc cand_reg spills
                                 let assig1  = addToUFM_Directly assig temp (InMem slot)
-                                let assig2  = addToUFM assig1 vr $! newLocation spill_loc (RealRegUsage my_reg fmt)
+                                let assig2  = addToUFM assig1 vr $! newLocation spill_loc (RealRegUsage cand_reg fmt)
 
                                 setAssigR $ toRegMap assig2
-                                allocateRegsAndSpill reading keep spills' (my_reg:alloc) rs
+                                allocateRegsAndSpill reading keep spills' (cand_reg:alloc) rs
 
                         -- otherwise, we need to spill a temporary that currently
                         -- resides in a register.
-                        | (temp_to_push_out, RealRegUsage my_reg fmt) : _
+                        | (temp_to_push_out, RealRegUsage cand_reg old_reg_fmt) : _
                                         <- candidates_inReg
                         = do
-                                (spill_store, slot) <- spillR (RegWithFormat (RegReal my_reg) fmt) temp_to_push_out
+                                -- Spill what's currently in the register, with the format of what's in the register.
+                                (spill_store, slot) <- spillR (RegWithFormat (RegReal cand_reg) old_reg_fmt) temp_to_push_out
 
                                 -- record that this temp was spilled
                                 recordSpill (SpillAlloc temp_to_push_out)
 
-                                -- update the register assignment
+                                -- Update the register assignment:
+                                --  - the old data is now only in memory,
+                                --  - the new data is now allocated to this register;
+                                --    make sure to use the new format (#26542)
                                 let assig1  = addToUFM_Directly assig temp_to_push_out (InMem slot)
-                                let assig2  = addToUFM assig1 vr $! newLocation spill_loc (RealRegUsage my_reg fmt)
+                                let assig2  = addToUFM assig1 vr $! newLocation spill_loc (RealRegUsage cand_reg fmt)
                                 setAssigR $ toRegMap assig2
 
                                 -- if need be, load up a spilled temp into the reg we've just freed up.
-                                spills' <- loadTemp r spill_loc my_reg spills
+                                spills' <- loadTemp r spill_loc cand_reg spills
 
                                 allocateRegsAndSpill reading keep
                                         (spill_store ++ spills')
-                                        (my_reg:alloc) rs
+                                        (cand_reg:alloc) rs
 
 
                         -- there wasn't anything to spill, so we're screwed.
