@@ -166,7 +166,7 @@ findHsDependencies = builder (Ghc FindHsDependencies) ? do
             , arg "-include-pkg-deps"
             , arg "-dep-makefile", arg =<< getOutput
             , pure $ concat [ ["-dep-suffix", wayPrefix w] | w <- Set.toList ways ]
-            , getInputs ]
+            ]
 
 haddockGhcArgs :: Args
 haddockGhcArgs = mconcat [ commonGhcArgs
