@@ -846,7 +846,7 @@ tcRecSelBinds sel_bind_prs
                                        -- See Note [Impredicative record selectors]
                                        setXOptM LangExt.ImpredicativeTypes $
                                        tcValBinds TopLevel binds sigs getGblEnv
-       ; return (tcg_env `addTypecheckedBinds` map snd rec_sel_binds) }
+       ; return (tcg_env `addTypecheckedBinds` map sndOf3 rec_sel_binds) }
   where
     sigs = [ L (noAnnSrcSpan loc) (XSig $ IdSig sel_id)
                                              | (sel_id, _) <- sel_bind_prs

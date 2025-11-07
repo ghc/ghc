@@ -37,6 +37,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 
 import GHC.Hs.Extension ( GhcRn )
+import GHC.Hs.Binds ( StaticFlag )
 
 import Language.Haskell.Syntax.Type ( LHsSigWcType )
 
@@ -309,7 +310,7 @@ data TcTyThing
 
   | ATcId           -- Ids defined in this module; may not be fully zonked
       { tct_id   :: Id
-      , tct_info :: IdBindingInfo   -- See Note [Meaning of IdBindingInfo]
+      , tct_info :: IdBindingInfo
       }
 
   | ATyVar  Name TcTyVar   -- See Note [Type variables in the type environment]
@@ -346,16 +347,16 @@ instance Outputable TcTyThing where     -- Debugging only
 -- b) to figure out when a nested binding can be generalised,
 --    in 'GHC.Tc.Gen.Bind.decideGeneralisationPlan'.
 --
-data IdBindingInfo -- See Note [Meaning of IdBindingInfo]
+data IdBindingInfo
     = NotLetBound
 
     | LetBound
-        { lb_top :: TopLevelFlag
-             -- TopLevel <=> this binding may safely be moved to top level
+        { lb_top :: StaticFlag
+             -- IsStatic <=> this binding may safely be moved to top level
              -- E.g   f x = let ys = reverse [1,2]
              --                 zs = reverse ys
              --             in ...
-             -- Both ys and zs count as TopLevel
+             -- Both ys and zs count as IsStatic
 
         , lb_fvs :: RhsNames
              -- Free vars of the RHS that are NotLetBound, or LetBound NotTopLevel
@@ -372,7 +373,7 @@ data IdBindingInfo -- See Note [Meaning of IdBindingInfo]
 --   mutually-recursive /renamed/ (but not yet typechecked) bindings
 data IsGroupClosed
   = IsGroupClosed
-      TopLevelFlag        -- TopLevel <=> all free vars are themselves TopLevel
+      StaticFlag          -- IsStatic <=> all free vars of the group are top-level or static
       (NameEnv RhsNames)  -- Frees for the RHS of each binding in the group
                           --   (includes free vars of RHS bound in the same group)
       ClosedTypeId        -- True <=> all the free vars of the group have closed types
@@ -383,8 +384,21 @@ type RhsNames = NameSet   -- Names of variables, mentioned on the RHS of
 type ClosedTypeId = Bool
   -- See Note [Meaning of IdBindingInfo]
 
-{- Note [Meaning of IdBindingInfo]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Static bindings and StaticFlag]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A (possibly-recursive) binding is /static/ iff
+   * It is syntactically top-level
+OR
+   * It is not a PatBind
+   * Its free variables are all static
+   * It has a lifted type
+
+Static bindings are important for static forms (static e):
+  * The free vars of `e` must all be static
+  * All static bindings are immediately floated to top level by the desugarer
+  * The desugarer also floats `e` to top level, and replaces (static e)
+Static bindings can all float to top level, and the de
+
 * NotLetBound means that
    - the Id is not let-bound (e.g. it is bound in a
      lambda-abstraction or in a case pattern)

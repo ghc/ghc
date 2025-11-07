@@ -260,7 +260,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
 tcValBinds :: TopLevelFlag
            -> [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]
            -> TcM thing
-           -> TcM ([(RecFlag, LHsBinds GhcTc, TopLevelFlag)], thing)
+           -> TcM ([(RecFlag, LHsBinds GhcTc, StaticFlag)], thing)
 
 tcValBinds top_lvl grps sigs thing_inside
   = do  {   -- Typecheck the signatures
@@ -285,7 +285,7 @@ tcValBinds top_lvl grps sigs thing_inside
                        -- See Note [Pattern synonym builders don't yield dependencies]
                        --     in GHC.Rename.Bind
                     ; patsyn_builders <- mapM (tcPatSynBuilderBind prag_fn) patsyns
-                    ; let extra_binds = [ (NonRecursive, builder, TopLevel)
+                    ; let extra_binds = [ (NonRecursive, builder, IsStatic)
                                         | builder <- patsyn_builders ]
                     ; return (extra_binds, thing) }
         ; return (binds' ++ extra_binds', thing) }}
@@ -297,7 +297,7 @@ tcValBinds top_lvl grps sigs thing_inside
 
 tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv
              -> [(RecFlag, LHsBinds GhcRn)] -> TcM thing
-             -> TcM ([(RecFlag, LHsBinds GhcTc, TopLevelFlag)], thing)
+             -> TcM ([(RecFlag, LHsBinds GhcTc, StaticFlag)], thing)
 -- Typecheck a whole lot of value bindings,
 -- one strongly-connected component at a time
 -- Here a "strongly connected component" has the straightforward
@@ -334,7 +334,7 @@ before we sub-divide it based on what type signatures it has.
 tc_group :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
          -> (RecFlag, LHsBinds GhcRn) -> TcM thing
-         -> TcM ((RecFlag, LHsBinds GhcTc, TopLevelFlag), thing)
+         -> TcM ((RecFlag, LHsBinds GhcTc, StaticFlag), thing)
 -- Typecheck one strongly-connected component of the original program.
 tc_group top_lvl sig_fn prag_fn (rec_flag, binds) thing_inside
   = case rec_flag of
@@ -345,12 +345,12 @@ tc_group top_lvl sig_fn prag_fn (rec_flag, binds) thing_inside
 tc_nonrec_group :: forall thing.
                    TopLevelFlag -> TcSigFun -> TcPragEnv
                 -> LHsBinds GhcRn -> TcM thing
-                -> TcM ((RecFlag, LHsBinds GhcTc, TopLevelFlag), thing)
+                -> TcM ((RecFlag, LHsBinds GhcTc, StaticFlag), thing)
 tc_nonrec_group  top_lvl sig_fn prag_fn [lbind] thing_inside
   | L loc (PatSynBind _ psb) <- lbind
   = do { (aux_binds, tcg_env) <- tcPatSynDecl (L loc psb) sig_fn prag_fn
        ; thing <- setGblEnv tcg_env thing_inside
-       ; return ((NonRecursive, aux_binds, TopLevel), thing) }
+       ; return ((NonRecursive, aux_binds, IsStatic), thing) }
 
   | otherwise
   =     -- A single non-recursive binding
@@ -375,7 +375,7 @@ tc_nonrec_group _ _ _ binds _   -- Non-rec groups should always be a singleton
 tc_rec_group :: forall thing.
                 TopLevelFlag -> TcSigFun -> TcPragEnv
              -> LHsBinds GhcRn -> TcM thing
-             -> TcM ((RecFlag, LHsBinds GhcTc, TopLevelFlag), thing)
+             -> TcM ((RecFlag, LHsBinds GhcTc, StaticFlag), thing)
 tc_rec_group top_lvl sig_fn prag_fn binds thing_inside
   = -- For a recursive group, to maximise polymorphism, we do a new
     -- strongly-connected-component analysis, this time omitting
@@ -1855,7 +1855,7 @@ decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
 
 isClosedBndrGroup :: TcTypeEnv -> [LHsBind GhcRn] -> IsGroupClosed
 isClosedBndrGroup type_env binds
-  = IsGroupClosed is_top fv_env type_closed
+  = IsGroupClosed is_static fv_env type_closed
   where
     fv_env :: NameEnv NameSet
     fv_env = mkNameEnv $ [ (b,fvs) | (bs,fvs) <- bind_fvs, b <-bs ]
@@ -1875,16 +1875,20 @@ isClosedBndrGroup type_env binds
                 `delListFromNameSet` all_bndrs
                 -- all_fvs does not include the binders of this group
 
-    is_top | nameSetAll id_is_top all_fvs = TopLevel
-           | otherwise                 = NotTopLevel
+    is_static | not (any (is_pat_bind . unLoc) binds)
+              , nameSetAll id_is_static all_fvs = IsStatic
+              | otherwise                       = NotStatic
 
-    id_is_top :: Name -> Bool
-    id_is_top name
+    is_pat_bind (PatBind {}) = True
+    is_pat_bind _            = False
+
+    id_is_static :: Name -> Bool
+    id_is_static name
       | Just thing <- lookupNameEnv type_env name
       = case thing of
-          AGlobal {}                                     -> True
-          ATcId { tct_info = LetBound { lb_top = top } } -> isTopLevel top
-          _                                              -> False
+          AGlobal {}                                          -> True
+          ATcId { tct_info = LetBound { lb_top = IsStatic } } -> True
+          _                                                   -> False
 
       | otherwise  -- Imported Ids
       = True
@@ -1897,10 +1901,12 @@ isClosedBndrGroup type_env binds
     is_closed_type_id name
       | Just thing <- lookupNameEnv type_env name
       = case thing of
-          AGlobal {}                -> True
-          ATcId { tct_info = info } -> lb_closed info
-          ATyVar {}                 -> False
-               -- In-scope type variables are not closed!
+          AGlobal {} -> True
+          ATyVar {}  -> False  -- In-scope type variables are not closed!
+          ATcId { tct_info = info}
+            -> case info of
+                   LetBound { lb_closed = closed } -> closed
+                   NotLetBound                     -> False
           _ -> pprPanic "is_closed_id" (ppr name)
 
       | otherwise
@@ -1911,13 +1917,13 @@ isClosedBndrGroup type_env binds
 
 adjustClosedForUnlifted :: IsGroupClosed -> [Scaled TcId] -> IsGroupClosed
 adjustClosedForUnlifted closed@(IsGroupClosed top_lvl fv_env type_closed) ids
-  | TopLevel <- top_lvl
+  | IsStatic <- top_lvl
   , all definitely_lifted ids = closed
-  | otherwise                 = IsGroupClosed NotTopLevel fv_env type_closed
+  | otherwise                 = IsGroupClosed NotStatic fv_env type_closed
   where
     definitely_lifted (Scaled _ id) = definitelyLiftedType (idType id)
 
-sendToTopLevel :: IsGroupClosed -> TopLevelFlag
+sendToTopLevel :: IsGroupClosed -> StaticFlag
 sendToTopLevel (IsGroupClosed top _ _) = top
 
 lHsBindFreeVars :: LHsBind GhcRn -> NameSet

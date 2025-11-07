@@ -34,7 +34,7 @@ module GHC.HsToCore.Monad (
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
         -- Static bindings
-        emitStaticBind, getStaticBinds,
+        emitStaticBinds, getStaticBinds,
 
         -- Getting and setting pattern match oracle states
         getPmNablas, updPmNablas,
@@ -643,10 +643,10 @@ pprRuntimeTrace str doc expr = do
 getCCIndexDsM :: FastString -> DsM CostCentreIndex
 getCCIndexDsM = getCCIndexM ds_cc_st
 
-emitStaticBind :: Id -> CoreExpr -> DsM ()
-emitStaticBind static_id rhs
+emitStaticBinds :: [(Id,CoreExpr)] -> DsM ()
+emitStaticBinds static_binds
   = do { env <- getGblEnv
-       ; liftIO $ modifyIORef' (ds_static_binds env) (`snocOL` (static_id,rhs)) }
+       ; liftIO $ modifyIORef' (ds_static_binds env) (`appOL` toOL static_binds) }
 
 getStaticBinds :: DsM (OrdList (Id,CoreExpr))
 getStaticBinds = do { env <- getGblEnv

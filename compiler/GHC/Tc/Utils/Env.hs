@@ -675,7 +675,7 @@ tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
 tcExtendRecIds pairs thing_inside
   = tc_extend_local_env NotTopLevel
           [ (name, ATcId { tct_id   = let_id
-                         , tct_info = LetBound { lb_top = NotTopLevel
+                         , tct_info = LetBound { lb_top = NotStatic
                                                , lb_fvs = emptyNameSet
                                                , lb_closed = False } })
           | (name, let_id) <- pairs ] $
@@ -691,7 +691,7 @@ tcExtendSigIds top_lvl sig_ids thing_inside
                               , tct_info = info })
           | id <- sig_ids
           , let closed = isTypeClosedLetBndr id
-                info   = LetBound { lb_top = NotTopLevel
+                info   = LetBound { lb_top = NotStatic
                                   , lb_fvs = emptyNameSet
                                   , lb_closed = closed } ]
      thing_inside
@@ -703,7 +703,7 @@ tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
 -- Used for both top-level value bindings and nested let/where-bindings
 -- Used for a single NonRec or a single Rec
 -- Adds to the TcBinderStack too
-tcExtendLetEnv top_lvl _sig_fn (IsGroupClosed group_top fv_env _)
+tcExtendLetEnv top_lvl _sig_fn (IsGroupClosed group_static fv_env _)
                ids thing_inside
   = tcExtendBinderStack [TcIdBndr id top_lvl | Scaled _ id <- ids] $
     tc_extend_local_env top_lvl
@@ -713,7 +713,7 @@ tcExtendLetEnv top_lvl _sig_fn (IsGroupClosed group_top fv_env _)
     foldr check_usage thing_inside scaled_names
   where
     mk_tct_info id
-      = LetBound { lb_top = group_top
+      = LetBound { lb_top = group_static
                  , lb_fvs = lookupNameEnv fv_env (idName id) `orElse` emptyNameSet
                  , lb_closed = isTypeClosedLetBndr id }
 

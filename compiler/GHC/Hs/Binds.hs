@@ -38,19 +38,24 @@ import Language.Haskell.Syntax.Expr( LHsExpr )
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprLExpr, pprFunBind, pprPatBind )
 import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 
-import GHC.Data.BooleanFormula ( LBooleanFormula, pprBooleanFormulaNormal )
-import GHC.Types.Tickish
 import GHC.Hs.Extension
-import GHC.Parser.Annotation
 import GHC.Hs.Type
+
 import GHC.Tc.Types.Evidence
+
 import GHC.Core.Type
+
+import GHC.Parser.Annotation
+
+import GHC.Types.Tickish
 import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var
 import GHC.Types.Name
+
+import GHC.Data.BooleanFormula ( LBooleanFormula, pprBooleanFormulaNormal )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -89,7 +94,18 @@ data HsValBindGroups p   -- Divided into strongly connected components
 type family HsValBindGroup p
 type instance HsValBindGroup GhcPs = ()
 type instance HsValBindGroup GhcRn = (RecFlag, LHsBinds GhcRn)
-type instance HsValBindGroup GhcTc = (RecFlag, LHsBinds GhcTc, TopLevelFlag)
+type instance HsValBindGroup GhcTc = (RecFlag, LHsBinds GhcTc, StaticFlag)
+
+data StaticFlag
+  = IsStatic | NotStatic
+  deriving( Data )
+  -- IsStatic <=> this binding consists only code; all free
+  --              vars are top level (or themselves static).
+  --              So it can be moved to top level
+
+instance Outputable StaticFlag where
+  ppr IsStatic  = text "static"
+  ppr NotStatic = text "not-static"
 
 -- ---------------------------------------------------------------------
 

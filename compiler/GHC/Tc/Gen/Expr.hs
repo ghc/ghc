@@ -1506,7 +1506,7 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
 
              let_binds :: HsLocalBindsLR GhcRn GhcRn
              let_binds = HsValBinds noAnn $ XValBindsLR
-                       $ NValBinds upd_ids_lhs (map mk_idSig upd_ids)
+                       $ HsVBG upd_ids_lhs (map mk_idSig upd_ids)
              upd_ids_lhs :: [(RecFlag, LHsBindsLR GhcRn GhcRn)]
              upd_ids_lhs = [ (NonRecursive, [genSimpleFunBind (idName id) [] rhs])
                            | (_, (id, rhs)) <- upd_ids ]
@@ -1821,9 +1821,8 @@ checkClosedInStaticForm name = do
       -- visited nodes, so we avoid repeating cycles in the traversal.
       case lookupNameEnv type_env n of
         Just (ATcId { tct_id = tcid, tct_info = info }) -> case info of
-          ClosedLet   -> Nothing
           NotLetBound -> Just NotLetBoundReason
-          NonClosedLet fvs type_closed -> listToMaybe $
+          LetBound { lb_fvs = fvs, lb_closed = type_closed } -> listToMaybe $
             -- Look for a non-closed variable in fvs
             [ NotClosed n' reason
             | n' <- nameSetElemsStable fvs

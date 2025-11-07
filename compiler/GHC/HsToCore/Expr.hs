@@ -95,9 +95,9 @@ dsLocalBinds (HsIPBinds _ binds)  body = dsIPBinds  binds body
 -------------------------
 -- caller sets location
 dsValBinds :: HsValBinds GhcTc -> CoreExpr -> DsM CoreExpr
-dsValBinds (XValBindsLR (NValBinds binds _)) body
+dsValBinds (XValBindsLR (HsVBG grps _)) body
   = do { dflags <- getDynFlags
-       ; foldrM (ds_val_bind dflags) body binds }
+       ; foldrM (ds_val_bind dflags) body grps }
 dsValBinds (ValBinds {})       _    = panic "dsValBinds ValBindsIn"
 
 -------------------------
@@ -119,12 +119,14 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
 
 -------------------------
 -- caller sets location
-ds_val_bind :: DynFlags -> (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
+ds_val_bind :: DynFlags
+            -> (RecFlag, LHsBinds GhcTc, StaticFlag) -> CoreExpr
+            -> DsM CoreExpr
 -- Special case for bindings which bind unlifted variables
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.
 -- Silently ignore INLINE and SPECIALISE pragmas...
-ds_val_bind _ (NonRecursive, hsbinds) body
+ds_val_bind _ (NonRecursive, hsbinds, _) body
   | [L loc bind] <- hsbinds
         -- Non-recursive, non-overloaded bindings only come in ones
         -- ToDo: in some bizarre case it's conceivable that there
@@ -158,7 +160,7 @@ ds_val_bind _ (NonRecursive, hsbinds) body
     is_polymorphic _ = False
 
 
-ds_val_bind _ (is_rec, binds) _body
+ds_val_bind _ (is_rec, binds, _) _body
   | any (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in GHC.HsToCore.Binds
   = assert (isRec is_rec )
     errDsCoreExpr $ DsRecBindsNotAllowedForUnliftedTys binds
@@ -168,7 +170,7 @@ ds_val_bind _ (is_rec, binds) _body
 -- linear, but selectors as used in the general case aren't. So the general case
 -- would transform a linear definition into a non-linear one. See Wrinkle 2
 -- Note [Desugar Strict binds] in GHC.HsToCore.Binds.
-ds_val_bind dflags (NonRecursive, hsbinds) body
+ds_val_bind dflags (NonRecursive, hsbinds, _) body
   | [L _loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_ann
                      , pat_ext = (ty, (rhs_tick, _var_ticks))})] <- hsbinds
         -- Non-recursive, non-overloaded bindings only come in ones
@@ -190,21 +192,26 @@ ds_val_bind dflags (NonRecursive, hsbinds) body
     -- problem?
 
 -- Ordinary case for bindings; none should be unlifted
-ds_val_bind _ (is_rec, binds) body
+ds_val_bind _ (is_rec, binds, static_flag) body
   = do  { massert (isRec is_rec || isSingleton binds)
-               -- we should never produce a non-recursive list of multiple binds
+          -- We should never produce a non-recursive list of multiple binds
 
         ; (force_vars,prs) <- dsLHsBinds binds
-        ; let body' = foldr seqVar body force_vars
+
         ; assertPpr (not (any (isUnliftedType . idType . fst) prs)) (ppr is_rec $$ ppr binds) $
           -- NB: bindings have a fixed RuntimeRep, so it's OK to call isUnliftedType
           case prs of
             [] -> return body
-            _  -> return (mkLets (mk_binds is_rec prs) body') }
+            _  -> case static_flag of
+                    NotStatic -> return (mkLets (mk_binds is_rec prs) body')
+                    IsStatic  -> do { emitStaticBinds prs; return body' }
+                where
+                   body' = foldr seqVar body force_vars
             -- We can make a non-recursive let because we make sure to return
             -- the bindings in dependency order in dsLHsBinds,
             -- see Note [Return non-recursive bindings in dependency order] in
             -- GHC.HsToCore.Binds
+        }
 
 -- | Helper function. You can use the result of 'mk_binds' with 'mkLets' for
 -- instance.
@@ -494,7 +501,7 @@ dsExpr (HsStatic (_, whole_ty) expr@(L loc _))
 
        ; static_id <- newStaticId (mkSpecForAllTys static_fvs whole_ty)
 
-       ; emitStaticBind static_id static_rhs
+       ; emitStaticBinds [(static_id, static_rhs)]
 
        ; return (mkVarApps (Var static_id) static_fvs) }
 
