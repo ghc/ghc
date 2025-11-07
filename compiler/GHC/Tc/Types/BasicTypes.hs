@@ -351,7 +351,7 @@ data IdBindingInfo
     = NotLetBound
 
     | LetBound
-        { lb_top :: StaticFlag
+        { lb_static :: StaticFlag
              -- IsStatic <=> this binding may safely be moved to top level
              -- E.g   f x = let ys = reverse [1,2]
              --                 zs = reverse ys
@@ -369,14 +369,17 @@ data IdBindingInfo
              -- all free vars of `e` have lb_clos=ClosedTypeId
         }
 
--- | IsGroupClosed describes a group of
---   mutually-recursive /renamed/ (but not yet typechecked) bindings
+-- | IsGroupClosed describes a group of mutually-recursive /renamed/
+--                           (but not yet typechecked) bindings
 data IsGroupClosed
   = IsGroupClosed
-      StaticFlag          -- IsStatic <=> all free vars of the group are top-level or static
-      (NameEnv RhsNames)  -- Frees for the RHS of each binding in the group
-                          --   (includes free vars of RHS bound in the same group)
-      ClosedTypeId        -- True <=> all the free vars of the group have closed types
+      { gc_static :: StaticFlag    -- IsStatic <=> all free vars of the group are top-level or static
+
+      , gc_fvs :: NameEnv RhsNames -- Free vars for the RHS of each binding in the group
+                                   --   (includes free vars of RHS bound in the same group)
+
+      , gc_closed :: ClosedTypeId  -- True <=> all the free vars of the group have closed types
+      }
 
 type RhsNames = NameSet   -- Names of variables, mentioned on the RHS of
                           -- a definition, that are not Global or ClosedLet
@@ -536,7 +539,7 @@ in the type environment.
 
 instance Outputable IdBindingInfo where
   ppr NotLetBound = text "NotLetBound"
-  ppr (LetBound { lb_top = top_lvl, lb_fvs = fvs, lb_closed = cls })
+  ppr (LetBound { lb_static = top_lvl, lb_fvs = fvs, lb_closed = cls })
     = text "LetBound" <> braces (sep [ ppr top_lvl, text "closed-type=" <+> ppr cls
                                      , ppr fvs ])
 

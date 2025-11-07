@@ -622,7 +622,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
   VarPat x (L l name) -> do
         { (wrap, id) <- tcPatBndr penv name pat_ty
-        ; res <- tcCheckUsage name (scaledMult pat_ty) $
+        ; res <- tcCheckUsage (Scaled (scaledMult pat_ty) id) $
                               tcExtendIdEnv1 name id thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat wrap (VarPat x (L l id)) pat_ty, res) }

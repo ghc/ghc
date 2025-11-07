@@ -204,7 +204,7 @@ tcPolyExprCheck expr res_ty
       = do { (wrap, expr') <- tcSkolemiseExpectedType ty thing_inside
            ; return (mkHsWrap wrap expr') }
     outer_skolemise (Right sig) thing_inside
-      = do { (wrap, expr') <- tcSkolemiseCompleteSig sig thing_inside
+      = do { (wrap, expr') <- tcSkolemiseCompleteSig sig NotStatic thing_inside
            ; return (mkHsWrap wrap expr') }
 
     -- inner_skolemise is used when we do not have a lambda

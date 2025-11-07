@@ -2121,7 +2121,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                                    , sig_ctxt = ctxt
                                    , sig_loc  = getLocA hs_sig_ty }
 
-       ; (tc_bind, [Scaled _ inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
+       ; (tc_bind, [Scaled _ inner_id]) <- tcPolyCheck NotStatic no_prag_fn inner_meth_sig meth_bind
 
        ; let export = ABE { abe_poly  = local_meth_id
                           , abe_mono  = inner_id
@@ -2146,7 +2146,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
               --      instance C [c] where { op = <rhs> }
               -- In <rhs>, 'c' is scope but 'b' is not!
 
-       ; (tc_bind, _) <- tcPolyCheck no_prag_fn tc_sig meth_bind
+       ; (tc_bind, _) <- tcPolyCheck NotStatic no_prag_fn tc_sig meth_bind
        ; return tc_bind }
 
   where

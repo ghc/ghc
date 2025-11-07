@@ -421,6 +421,7 @@ Some examples:
 
 tcSkolemiseGeneral
   :: DeepSubsumptionFlag
+  -> StaticFlag
   -> UserTypeCtxt
   -> TcType -> TcType   -- top_ty and expected_ty
         -- Here, top_ty      is the type we started to skolemise; used only in SigSkol
@@ -429,11 +430,11 @@ tcSkolemiseGeneral
         -- keeping the same top_ty, but successively smaller expected_tys
   -> ([(Name, TcInvisTVBinder)] -> TcType -> TcM result)
   -> TcM (HsWrapper, result)
-tcSkolemiseGeneral ds_flag ctxt top_ty expected_ty thing_inside
+tcSkolemiseGeneral ds_flag static_flag ctxt top_ty expected_ty thing_inside
   | isRhoTyDS ds_flag expected_ty
     -- Fast path for a very very common case: no skolemisation to do
     -- But still call checkConstraints in case we need an implication regardless
-  = do { let sig_skol = SigSkol ctxt top_ty []
+  = do { let sig_skol = SigSkol static_flag ctxt top_ty []
        ; (ev_binds, result) <- checkConstraints sig_skol [] [] $
                                thing_inside [] expected_ty
        ; return (mkWpLet ev_binds, result) }
@@ -444,7 +445,7 @@ tcSkolemiseGeneral ds_flag ctxt top_ty expected_ty thing_inside
        ; rec { (wrap, tv_prs, given, rho_ty) <- case ds_flag of
                     Deep    -> deeplySkolemise skol_info expected_ty
                     Shallow -> topSkolemise skol_info expected_ty
-             ; let sig_skol = SigSkol ctxt top_ty (map (fmap binderVar) tv_prs)
+             ; let sig_skol = SigSkol static_flag ctxt top_ty (map (fmap binderVar) tv_prs)
              ; skol_info <- mkSkolemInfo sig_skol }
 
        ; let skol_tvs = map (binderVar . snd) tv_prs
@@ -457,6 +458,7 @@ tcSkolemiseGeneral ds_flag ctxt top_ty expected_ty thing_inside
          -- often empty, in which case mkWpLet is a no-op
 
 tcSkolemiseCompleteSig :: TcCompleteSig
+                       -> StaticFlag
                        -> ([ExpPatType] -> TcRhoType -> TcM result)
                        -> TcM (HsWrapper, result)
 -- ^ The wrapper has type: spec_ty ~> expected_ty
@@ -464,11 +466,11 @@ tcSkolemiseCompleteSig :: TcCompleteSig
 -- tcSkolemiseCompleteSig and tcTopSkolemise
 
 tcSkolemiseCompleteSig (CSig { sig_bndr = poly_id, sig_ctxt = ctxt, sig_loc = loc })
-                       thing_inside
+                       static_flag thing_inside
   = do { cur_loc <- getSrcSpanM
        ; let poly_ty = idType poly_id
        ; setSrcSpan loc $   -- Sets the location for the implication constraint
-         tcSkolemiseGeneral Shallow ctxt poly_ty poly_ty $ \tv_prs rho_ty ->
+         tcSkolemiseGeneral Shallow static_flag ctxt poly_ty poly_ty $ \tv_prs rho_ty ->
          setSrcSpan cur_loc $ -- Revert to the original location
          tcExtendNameTyVarEnv (map (fmap binderVar) tv_prs) $
          thing_inside (map (mkInvisExpPatType . snd) tv_prs) rho_ty }
@@ -482,14 +484,14 @@ tcSkolemiseExpectedType :: TcSigmaType
 --     In the call (f e) we will call tcSkolemiseExpectedType on (forall a.blah)
 --     before typececking `e`
 tcSkolemiseExpectedType exp_ty thing_inside
-  = tcSkolemiseGeneral Shallow GenSigCtxt exp_ty exp_ty $ \tv_prs rho_ty ->
+  = tcSkolemiseGeneral Shallow NotStatic GenSigCtxt exp_ty exp_ty $ \tv_prs rho_ty ->
     thing_inside (map (mkInvisExpPatType . snd) tv_prs) rho_ty
 
 tcSkolemise :: DeepSubsumptionFlag -> UserTypeCtxt -> TcSigmaType
             -> (TcRhoType -> TcM result)
             -> TcM (HsWrapper, result)
 tcSkolemise ds_flag ctxt expected_ty thing_inside
-  = tcSkolemiseGeneral ds_flag ctxt expected_ty expected_ty $ \_ rho_ty ->
+  = tcSkolemiseGeneral ds_flag NotStatic ctxt expected_ty expected_ty $ \_ rho_ty ->
     thing_inside rho_ty
 
 checkConstraints :: SkolemInfoAnon
@@ -584,6 +586,7 @@ implicationNeeded skol_info skol_tvs given
 
 alwaysBuildImplication :: SkolemInfoAnon -> Bool
 -- See Note [When to build an implication]
+alwaysBuildImplication (SigSkol IsStatic _ _ _) = True
 alwaysBuildImplication _ = False
 
 {-  Commmented out for now while I figure out about error messages.
@@ -829,7 +832,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
       | isSigmaTy ty                     -- An invisible quantifier at the top
         || (n_req > 0 && isForAllTy ty)  -- A visible quantifier at top, and we need it
       = do { rec { (n_req', wrap_gen, tv_nms, bndrs, given, inner_ty) <- skolemiseRequired skol_info n_req ty
-                 ; let sig_skol = SigSkol ctx top_ty (tv_nms `zip` skol_tvs)
+                 ; let sig_skol = SigSkol NotStatic ctx top_ty (tv_nms `zip` skol_tvs)
                        skol_tvs = binderVars bndrs
                  ; skol_info <- mkSkolemInfo sig_skol }
              -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
@@ -854,7 +857,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
            ; case ds_flag of
                Shallow -> do { res <- thing_inside pat_tys (mkCheckExpType rho_ty)
                              ; return (idHsWrapper, res) }
-               Deep    -> tcSkolemiseGeneral Deep ctx top_ty rho_ty $ \_ rho_ty ->
+               Deep    -> tcSkolemiseGeneral Deep NotStatic ctx top_ty rho_ty $ \_ rho_ty ->
                           -- "_" drop the /deeply/-skolemise binders
                           -- They do not line up with binders in the Match
                           thing_inside pat_tys (mkCheckExpType rho_ty) }
@@ -2054,7 +2057,7 @@ tc_sub_type_deep pos unify inst_orig ctxt ty_actual ty_expected
                arg_wrap res_wrap
            }
       where
-        given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
+        given_orig = GivenOrigin (SigSkol NotStatic GenSigCtxt exp_arg [])
 
 -- | Like 'mkWpFun', except that it performs the necessary
 -- representation-polymorphism checks on the argument type in the case that

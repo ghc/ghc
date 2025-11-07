@@ -412,7 +412,7 @@ warnRedundantConstraints ctxt env info redundant_evs
  | null redundant_evs
  = return ()
 
- | SigSkol user_ctxt _ _ <- info
+ | SigSkol _ user_ctxt _ _ <- info
  -- When dealing with a user-written type signature,
  -- we want to add "In the type signature for f".
  = report_redundant_msg True (setCtLocEnvLoc env (redundantConstraintsSpan user_ctxt))

@@ -533,7 +533,7 @@ findRedundantGivens (Implic { ic_info = info, ic_need = need, ic_given = givens 
       = any isImprovementPred (pred : transSuperClasses pred)
 
 warnRedundantGivens :: SkolemInfoAnon -> Bool
-warnRedundantGivens (SigSkol ctxt _ _)
+warnRedundantGivens (SigSkol _ ctxt _ _)
   = case ctxt of
        FunSigCtxt _ rrc -> reportRedundantConstraints rrc
        ExprSigCtxt rrc  -> reportRedundantConstraints rrc

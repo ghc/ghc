@@ -521,10 +521,10 @@ zonkSkolemInfo :: SkolemInfo -> ZonkM SkolemInfo
 zonkSkolemInfo (SkolemInfo u sk) = SkolemInfo u <$> zonkSkolemInfoAnon sk
 
 zonkSkolemInfoAnon :: SkolemInfoAnon -> ZonkM SkolemInfoAnon
-zonkSkolemInfoAnon (SigSkol cx ty tv_prs) = do { ty' <- zonkTcType ty
-                                               ; return (SigSkol cx ty' tv_prs) }
-zonkSkolemInfoAnon (InferSkol ntys) = do { ntys' <- mapM do_one ntys
-                                     ; return (InferSkol ntys') }
+zonkSkolemInfoAnon (SigSkol st cx ty tv_prs) = do { ty' <- zonkTcType ty
+                                                  ; return (SigSkol st cx ty' tv_prs) }
+zonkSkolemInfoAnon (InferSkol st ntys) = do { ntys' <- mapM do_one ntys
+                                            ; return (InferSkol st ntys') }
   where
     do_one (n, ty) = do { ty' <- zonkTcType ty; return (n, ty') }
 zonkSkolemInfoAnon skol_info = return skol_info

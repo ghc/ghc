@@ -5481,7 +5481,7 @@ suggestAddSig ctxt ty1 _ty2
     find [] _ _ = []
     find (implic:implics) seen_eqs tv
        | tv `elem` ic_skols implic
-       , InferSkol prs <- ic_info implic
+       , InferSkol _ prs <- ic_info implic
        , seen_eqs
        = map fst prs
        | otherwise
@@ -5555,7 +5555,7 @@ ctxtFixes has_ambig_tvs pred implics
   , isTyVarClassPred pred   -- Don't suggest adding (Eq T) to the context, say
   , (skol:skols) <- usefulContext implics pred
   , let what | null skols
-             , SigSkol (PatSynCtxt {}) _ _ <- skol
+             , SigSkol _ (PatSynCtxt {}) _ _ <- skol
              = text "\"required\""
              | otherwise
              = empty
@@ -5580,7 +5580,7 @@ usefulContext implics pred
     go :: [Implication] -> [SkolemInfoAnon]
     go [] = []
     go (ic : ics)
-       | StaticFormSkol <- ic_info ic = []
+       | isStaticSkolInfo (ic_info ic) = []
          -- Stop at a static form, because all outer Givens are irrelevant
          -- See (SF3) in Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
        | implausible ic               = rest
@@ -5595,7 +5595,7 @@ usefulContext implics pred
       | implausible_info (ic_info ic) = True
       | otherwise                     = False
 
-    implausible_info (SigSkol (InfSigCtxt {}) _ _) = True
+    implausible_info (SigSkol _ (InfSigCtxt {}) _ _) = True
     implausible_info _                             = False
     -- Do not suggest adding constraints to an *inferred* type signature
 
@@ -5690,17 +5690,17 @@ tidySkolemInfo env (SkolemInfo u sk_anon) = SkolemInfo u (tidySkolemInfoAnon env
 ----------------
 tidySkolemInfoAnon :: TidyEnv -> SkolemInfoAnon -> SkolemInfoAnon
 tidySkolemInfoAnon env (DerivSkol ty)         = DerivSkol (tidyType env ty)
-tidySkolemInfoAnon env (SigSkol cx ty tv_prs) = tidySigSkol env cx ty tv_prs
-tidySkolemInfoAnon env (InferSkol ids)        = InferSkol (mapSnd (tidyType env) ids)
+tidySkolemInfoAnon env (SigSkol st cx ty tv_prs) = tidySigSkol env st cx ty tv_prs
+tidySkolemInfoAnon env (InferSkol st ids)     = InferSkol st (mapSnd (tidyType env) ids)
 tidySkolemInfoAnon env (UnifyForAllSkol ty)   = UnifyForAllSkol (tidyType env ty)
 tidySkolemInfoAnon _   info                   = info
 
-tidySigSkol :: TidyEnv -> UserTypeCtxt
+tidySigSkol :: TidyEnv -> StaticFlag -> UserTypeCtxt
             -> TcType -> [(Name,TcTyVar)] -> SkolemInfoAnon
 -- We need to take special care when tidying SigSkol
 -- See Note [SigSkol SkolemInfo] in "GHC.Tc.Types.Origin"
-tidySigSkol env cx ty tv_prs
-  = SigSkol cx (tidy_ty env ty) tv_prs'
+tidySigSkol env st cx ty tv_prs
+  = SigSkol st cx (tidy_ty env ty) tv_prs'
   where
     tv_prs' = mapSnd (tidyTyCoVarOcc env) tv_prs
     inst_env = mkNameEnv tv_prs'

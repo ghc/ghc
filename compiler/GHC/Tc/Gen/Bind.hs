@@ -366,6 +366,7 @@ tc_nonrec_group  top_lvl sig_fn prag_fn [lbind] thing_inside
        ; let final_closed = adjustClosedForUnlifted closed ids
 
        ; thing <- tcExtendLetEnv top_lvl sig_fn final_closed ids thing_inside
+
        ; return ( (NonRecursive, bind', sendToTopLevel final_closed), thing ) }
 
 tc_nonrec_group _ _ _ binds _   -- Non-rec groups should always be a singleton
@@ -473,7 +474,9 @@ tcPolyBinds :: TopLevelFlag -> TcSigFun -> TcPragEnv
 -- Knows nothing about the scope of the bindings
 -- None of the bindings are pattern synonyms
 
-tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc closed bind_list
+tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc
+            closed@(IsGroupClosed {gc_static = static_flag})
+            bind_list
   = setSrcSpan loc                              $
     recoverM (recoveryCode binder_names sig_fn) $ do
         -- Set up main recover; take advantage of any type sigs
@@ -481,12 +484,12 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc closed bind_list
     { traceTc "------------------------------------------------" Outputable.empty
     ; traceTc "Bindings for {" (ppr binder_names)
     ; dflags   <- getDynFlags
-    ; let plan = decideGeneralisationPlan dflags top_lvl closed sig_fn bind_list
+    ; let plan = decideGeneralisationPlan dflags closed sig_fn bind_list
     ; traceTc "Generalisation plan" (ppr plan)
     ; result@(_, scaled_poly_ids) <- case plan of
-         NoGen              -> tcPolyNoGen         rec_tc prag_fn sig_fn bind_list
-         InferGen           -> tcPolyInfer top_lvl rec_tc prag_fn sig_fn bind_list
-         CheckGen lbind sig -> tcPolyCheck prag_fn sig lbind
+         NoGen              -> tcPolyNoGen rec_tc prag_fn sig_fn bind_list
+         InferGen           -> tcPolyInfer top_lvl static_flag rec_tc prag_fn sig_fn bind_list
+         CheckGen lbind sig -> tcPolyCheck static_flag prag_fn sig lbind
 
     ; let poly_ids = map scaledThing scaled_poly_ids
 
@@ -567,14 +570,13 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
 *                                                                      *
 ********************************************************************* -}
 
-tcPolyCheck :: TcPragEnv
-            -> TcCompleteSig
+tcPolyCheck :: StaticFlag -> TcPragEnv -> TcCompleteSig
             -> LHsBind GhcRn   -- Must be a FunBind
             -> TcM (LHsBinds GhcTc, [Scaled TcId])
 -- There is just one binding,
 --   it is a FunBind
 --   it has a complete type signature,
-tcPolyCheck prag_fn
+tcPolyCheck static_flag prag_fn
             sig@(CSig { sig_bndr = poly_id, sig_ctxt = ctxt })
             (L bind_loc (FunBind { fun_id = L nm_loc name
                                  , fun_matches = matches }))
@@ -589,7 +591,7 @@ tcPolyCheck prag_fn
 
        ; mult <- newMultiplicityVar
        ; (wrap_gen, (wrap_res, matches'))
-             <- tcSkolemiseCompleteSig sig $ \invis_pat_tys rho_ty ->
+             <- tcSkolemiseCompleteSig sig static_flag $ \invis_pat_tys rho_ty ->
 
                 let mono_id = mkLocalId mono_name (idMult poly_id) rho_ty in
                 tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
@@ -632,7 +634,7 @@ tcPolyCheck prag_fn
 
        ; return ([abs_bind], [Scaled mult poly_id]) }
 
-tcPolyCheck _prag_fn sig bind
+tcPolyCheck _static _prag_fn sig bind
   = pprPanic "tcPolyCheck" (ppr sig $$ ppr bind)
 
 funBindTicks :: SrcSpan -> TcId -> Module -> [LSig GhcRn]
@@ -719,13 +721,14 @@ To address this we to do a few things
 -}
 
 tcPolyInfer
-  :: TopLevelFlag
+  :: TopLevelFlag  -- Syntactically top-leve
+  -> StaticFlag    -- Static (morally top level)
   -> RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
   -> TcPragEnv -> TcSigFun
   -> [LHsBind GhcRn]
   -> TcM (LHsBinds GhcTc, [Scaled TcId])
-tcPolyInfer top_lvl rec_tc prag_fn tc_sig_fn bind_list
+tcPolyInfer top_lvl static_flag rec_tc prag_fn tc_sig_fn bind_list
   = do { (tclvl, wanted, (binds', mono_infos))
              <- pushLevelAndCaptureConstraints  $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
@@ -745,7 +748,8 @@ tcPolyInfer top_lvl rec_tc prag_fn tc_sig_fn bind_list
 
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
        ; ((qtvs, givens, ev_binds, insoluble), residual)
-            <- captureConstraints $ simplifyInfer top_lvl tclvl infer_mode sigs name_taus wanted
+            <- captureConstraints $
+               simplifyInfer top_lvl static_flag tclvl infer_mode sigs name_taus wanted
 
        ; let inferred_theta = map evVarPred givens
        ; scaled_exports <- checkNoErrs $
@@ -1804,29 +1808,32 @@ instance Outputable GeneralisationPlan where
   ppr (CheckGen _ s) = text "CheckGen" <+> ppr s
 
 decideGeneralisationPlan
-   :: DynFlags -> TopLevelFlag -> IsGroupClosed -> TcSigFun
+   :: DynFlags -> IsGroupClosed -> TcSigFun
    -> [LHsBind GhcRn] -> GeneralisationPlan
-decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
+decideGeneralisationPlan dflags (IsGroupClosed { gc_static = static_flag
+                                               , gc_closed = closed_type })
+                         sig_fn lbinds
   | Just (bind, sig) <- one_funbind_with_sig = CheckGen bind sig
   | generalise_binds                         = InferGen
   | otherwise                                = NoGen
   where
     generalise_binds
-      | isTopLevel top_lvl             = True
-        -- See Note [Always generalise top-level bindings]
+      | null binders = False
+        -- Not if `binders` is empty: there is no binder to generalise, so
+        -- generalising does nothing. And trying to generalise hurts linear
+        -- types (see #25428). So we don't force it.
+        -- See (NVP5) in Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind.
+
+      | IsStatic <- static_flag = True
+        -- See Note [Always generalise syntactically top-level bindings]
 
       | has_mult_anns_and_pats = False
         -- See (NVP1) and (NVP4) in Note [Non-variable pattern bindings aren't linear]
 
-      | IsGroupClosed _ _ True <- closed
-      , not (null binders) = True
-        -- The 'True' means that all of the group's
+      | closed_type = True
+        -- The `closed_type` means that all of the group's
         -- free vars have ClosedTypeId=True; so we can ignore
         -- -XMonoLocalBinds, and generalise anyway.
-        -- Except if 'fv' is empty: there is no binder to generalise, so
-        -- generalising does nothing. And trying to generalise hurts linear
-        -- types (see #25428). So we don't force it.
-        -- See (NVP5) in Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind.
 
       | has_partial_sigs = True
         -- See Note [Partial type signatures and generalisation]
@@ -1855,7 +1862,9 @@ decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
 
 isClosedBndrGroup :: TcTypeEnv -> [LHsBind GhcRn] -> IsGroupClosed
 isClosedBndrGroup type_env binds
-  = IsGroupClosed is_static fv_env type_closed
+  = IsGroupClosed { gc_static = is_static
+                  , gc_fvs = fv_env
+                  , gc_closed = type_closed }
   where
     fv_env :: NameEnv NameSet
     fv_env = mkNameEnv $ [ (b,fvs) | (bs,fvs) <- bind_fvs, b <-bs ]
@@ -1886,9 +1895,9 @@ isClosedBndrGroup type_env binds
     id_is_static name
       | Just thing <- lookupNameEnv type_env name
       = case thing of
-          AGlobal {}                                          -> True
-          ATcId { tct_info = LetBound { lb_top = IsStatic } } -> True
-          _                                                   -> False
+          AGlobal {}                                             -> True
+          ATcId { tct_info = LetBound { lb_static = IsStatic } } -> True
+          _                                                      -> False
 
       | otherwise  -- Imported Ids
       = True
@@ -1916,15 +1925,20 @@ isClosedBndrGroup type_env binds
                -- Ditto class method etc from the current module
 
 adjustClosedForUnlifted :: IsGroupClosed -> [Scaled TcId] -> IsGroupClosed
-adjustClosedForUnlifted closed@(IsGroupClosed top_lvl fv_env type_closed) ids
-  | IsStatic <- top_lvl
-  , all definitely_lifted ids = closed
-  | otherwise                 = IsGroupClosed NotStatic fv_env type_closed
+adjustClosedForUnlifted closed ids
+  | IsGroupClosed { gc_static = IsStatic } <- closed
+  , not (all closed_and_lifted ids)
+  = closed { gc_static = NotStatic }
+  | otherwise
+  = closed
   where
-    definitely_lifted (Scaled _ id) = definitelyLiftedType (idType id)
+    closed_and_lifted (Scaled _ id) = noFreeVarsOfType ty
+                                      && definitelyLiftedType ty
+      where
+        ty = idType id
 
 sendToTopLevel :: IsGroupClosed -> StaticFlag
-sendToTopLevel (IsGroupClosed top _ _) = top
+sendToTopLevel (IsGroupClosed { gc_static = is_static }) = is_static
 
 lHsBindFreeVars :: LHsBind GhcRn -> NameSet
 lHsBindFreeVars (L _ (FunBind { fun_ext = fvs })) = fvs
@@ -1932,16 +1946,17 @@ lHsBindFreeVars (L _ (PatBind { pat_ext = fvs })) = fvs
 lHsBindFreeVars _                                 = emptyNameSet
 
 
-{- Note [Always generalise top-level bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Always generalise syntactically top-level bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is very confusing to apply NoGen to a top level binding. Consider (#20123):
    module M where
      x = 5
      f y = (x, y)
 
-The MR means that x=5 is not generalise, so f's binding is no Closed.  So we'd
-be tempted to use NoGen. But that leads to f :: Any -> (Integer, Any), which
-is plain stupid.
+The MR means that x=5 is not generalised, so f's binding has a free variable
+that is not ClosedTypeId. So we'd be tempted to use NoGen. But that leads to
+   f :: Any -> (Integer, Any)
+which is plain stupid.
 
 NoGen is good when we have call sites, but not at top level, where the
 function may be exported.  And it's easier to grok "MonoLocalBinds" as

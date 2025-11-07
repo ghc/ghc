@@ -98,7 +98,7 @@ type instance HsValBindGroup GhcTc = (RecFlag, LHsBinds GhcTc, StaticFlag)
 
 data StaticFlag
   = IsStatic | NotStatic
-  deriving( Data )
+  deriving( Eq, Data )
   -- IsStatic <=> this binding consists only code; all free
   --              vars are top level (or themselves static).
   --              So it can be moved to top level

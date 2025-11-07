@@ -2227,13 +2227,15 @@ a \/\a in the final result but all the occurrences of a will be zonked to ()
 -- | @tcCheckUsage name mult thing_inside@ runs @thing_inside@, checks that the
 -- usage of @name@ is a submultiplicity of @mult@, and removes @name@ from the
 -- usage environment.
-tcCheckUsage :: Name -> Mult -> TcM a -> TcM a
-tcCheckUsage name id_mult thing_inside
+tcCheckUsage :: Scaled TcId -> TcM a -> TcM a
+tcCheckUsage (Scaled id_mult id) thing_inside
   = do { (local_usage, result) <- tcCollectingUsage thing_inside
        ; check_usage (lookupUE local_usage name)
        ; tcEmitBindingUsage (deleteUE local_usage name)
        ; return result }
     where
+    name = idName id
+
     check_usage :: Usage -> TcM ()
     -- Checks that the usage of the newly introduced binder is compatible with
     -- its multiplicity.

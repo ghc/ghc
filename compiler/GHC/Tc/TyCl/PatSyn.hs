@@ -153,7 +153,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
 
        ; ((univ_tvs, req_dicts, ev_binds, _), residual)
                <- captureConstraints $
-                  simplifyInfer TopLevel tclvl NoRestrictions [] named_taus wanted
+                  simplifyInfer TopLevel IsStatic tclvl NoRestrictions [] named_taus wanted
        ; top_ev_binds <- checkNoErrs (simplifyTop residual)
        ; addTopEvBinds top_ev_binds $
 
@@ -392,7 +392,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; checkTc (all (isManyTy . scaledMult) arg_tys) $
            TcRnLinearPatSyn sig_body_ty
 
-       ; skol_info <- mkSkolemInfo (SigSkol (PatSynCtxt name) pat_ty [])
+       ; skol_info <- mkSkolemInfo (SigSkol IsStatic (PatSynCtxt name) pat_ty [])
                          -- The type here is a bit bogus, but we do not print
                          -- the type for PatSynCtxt, so it doesn't matter
                          -- See Note [Skolem info for pattern synonyms] in "GHC.Tc.Types.Origin"
@@ -980,7 +980,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
        ; traceTc "tcPatSynBuilderBind {" $
          vcat [ ppr patsyn
               , ppr builder_id <+> dcolon <+> ppr (idType builder_id) ]
-       ; (builder_binds, _) <- tcPolyCheck emptyPragEnv sig (noLocA bind)
+       ; (builder_binds, _) <- tcPolyCheck IsStatic emptyPragEnv sig (noLocA bind)
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
        ; return builder_binds } } }
 

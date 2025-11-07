@@ -15,9 +15,9 @@ module GHC.Tc.Types.Origin (
   ReportRedundantConstraints(..), reportRedundantConstraints,
   redundantConstraintsSpan,
 
-  -- * SkolemInfo
+  -- * SkolemInfo, SkolemInfoAnon
   SkolemInfo(..), SkolemInfoAnon(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo,
-  unkSkol, unkSkolAnon,
+  unkSkol, unkSkolAnon, isStaticSkolInfo,
 
   -- * CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -270,10 +270,17 @@ data SkolemInfoAnon
             -- a programmer-supplied type signature
             -- Location of the binding site is on the TyVar
             -- See Note [SigSkol SkolemInfo]
+       StaticFlag
        UserTypeCtxt        -- What sort of signature
        TcType              -- Original type signature (before skolemisation)
        [(Name,TcTyVar)]    -- Maps the original name of the skolemised tyvar
                            -- to its instantiated version
+
+  | InferSkol
+       StaticFlag
+       [(Name,TcType)]  -- We have inferred a type for these (mutually recursive)
+                        -- polymorphic Ids, and are now checking that their RHS
+                        -- constraints are satisfied.
 
   | SigTypeSkol UserTypeCtxt
                  -- like SigSkol, but when we're kind-checking the *type*
@@ -310,11 +317,6 @@ data SkolemInfoAnon
 
   | RuleSkol RuleName   -- The LHS of a RULE
   | SpecESkol Name      -- A SPECIALISE pragma
-
-  | InferSkol [(Name,TcType)]
-                        -- We have inferred a type for these (mutually recursive)
-                        -- polymorphic Ids, and are now checking that their RHS
-                        -- constraints are satisfied.
 
   | BracketSkol         -- Template Haskell bracket
 
@@ -370,7 +372,7 @@ instance Outputable SkolemInfoAnon where
 
 pprSkolInfo :: SkolemInfoAnon -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
-pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
+pprSkolInfo (SigSkol _ cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
 pprSkolInfo (ForAllSkol tvs)  = text "an explicit forall" <+> ppr tvs
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
@@ -388,7 +390,7 @@ pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name
 pprSkolInfo (SpecESkol name)  = text "a SPECIALISE pragma for" <+> quotes (ppr name)
 pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
                                     , text "in" <+> pprMatchContext mc ]
-pprSkolInfo (InferSkol ids)   = hang (text "the inferred type" <> plural ids <+> text "of")
+pprSkolInfo (InferSkol _ ids) = hang (text "the inferred type" <> plural ids <+> text "of")
                                    2 (vcat [ ppr name <+> dcolon <+> ppr ty
                                            | (name,ty) <- ids ])
 pprSkolInfo (UnifyForAllSkol ty)  = text "the type" <+> ppr ty
@@ -466,6 +468,13 @@ in the right place.  So we proceed as follows:
   that the foral-bound variables of the signature we report line up with
   the instantiated skolems lying  around in other types.
 -}
+
+isStaticSkolInfo :: SkolemInfoAnon -> Bool
+isStaticSkolInfo StaticFormSkol           = True
+isStaticSkolInfo (SigSkol IsStatic _ _ _) = True
+isStaticSkolInfo (InferSkol IsStatic  _)  = True
+isStaticSkolInfo _                        = False
+
 
 {- *********************************************************************
 *                                                                      *

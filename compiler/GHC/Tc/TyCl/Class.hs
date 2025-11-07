@@ -299,7 +299,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
        ; (ev_binds, (tc_bind, _))
                <- checkConstraints skol_info tyvars [this_dict] $
-                  tcPolyCheck no_prag_fn local_dm_sig
+                  tcPolyCheck NotStatic no_prag_fn local_dm_sig
                               (L bind_loc lm_bind)
 
        ; let export = ABE { abe_poly  = global_dm_id

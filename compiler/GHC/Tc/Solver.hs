@@ -46,6 +46,8 @@ import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 
+import GHC.Hs.Binds ( StaticFlag )
+
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Ppr
@@ -908,7 +910,8 @@ instance Outputable InferMode where
   ppr EagerDefaulting = text "EagerDefaulting"
   ppr NoRestrictions  = text "NoRestrictions"
 
-simplifyInfer :: TopLevelFlag
+simplifyInfer :: TopLevelFlag          -- Syntactically top-level
+              -> StaticFlag            -- Static (morally top level)
               -> TcLevel               -- Used when generating the constraints
               -> InferMode
               -> [TcIdSigInst]         -- Any signatures (possibly partial)
@@ -920,7 +923,7 @@ simplifyInfer :: TopLevelFlag
                       TcEvBinds,    -- ... binding these evidence variables
                       Bool)         -- True <=> the residual constraints are insoluble
 
-simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
+simplifyInfer top_lvl static_flag rhs_tclvl infer_mode sigs name_taus wanteds
   | isEmptyWC wanteds
    = do { -- When quantifying, we want to preserve any order of variables as they
           -- appear in partial signatures. cf. decideQuantifiedTyVars
@@ -931,7 +934,7 @@ simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
 
        ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
 
-       ; skol_info <- mkSkolemInfo (InferSkol name_taus)
+       ; skol_info <- mkSkolemInfo (InferSkol static_flag name_taus)
        ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, False) }
@@ -992,7 +995,8 @@ simplifyInfer top_lvl rhs_tclvl infer_mode sigs name_taus wanteds
              ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
 
              ; let full_theta = map idType bound_theta_vars
-                   skol_info  = InferSkol [ (name, mkPhiTy full_theta ty)
+                   skol_info  = InferSkol static_flag
+                                          [ (name, mkPhiTy full_theta ty)
                                           | (name, ty) <- name_taus ]
                  -- mkPhiTy: we don't add the quantified variables here, because
                  -- they are also bound in ic_skols and we want them to be tidied

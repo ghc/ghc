@@ -1979,7 +1979,7 @@ setMainCtxt main_name io_ty thing_inside
     checkConstraints skol_info [] []  $  -- Builds an implication if necessary
     thing_inside                         -- e.g. with -fdefer-type-errors
   where
-    skol_info = SigSkol (FunSigCtxt main_name NoRRC) io_ty []
+    skol_info = SigSkol IsStatic (FunSigCtxt main_name NoRRC) io_ty []
 
 {- Note [Dealing with main]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2635,7 +2635,7 @@ tcRnExpr hsc_env mode rdr_expr
     let { fresh_it = itName uniq (getLocA rdr_expr) } ;
     ((qtvs, dicts, _, _), residual)
          <- captureConstraints $
-            simplifyInfer TopLevel tclvl infer_mode
+            simplifyInfer TopLevel IsStatic tclvl infer_mode
                           []    {- No sig vars -}
                           [(fresh_it, res_ty)]
                           lie ;

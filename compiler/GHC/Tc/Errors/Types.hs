@@ -5530,8 +5530,8 @@ discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
   | otherwise
   = givens
   where
-    discard n (Implic { ic_info = SigSkol (PatSynCtxt n') _ _ }) = n == n'
-    discard _ _                                                  = False
+    discard n (Implic { ic_info = SigSkol _ (PatSynCtxt n') _ _ }) = n == n'
+    discard _ _                                                    = False
 
 
 -- | An error reported after constraint solving.

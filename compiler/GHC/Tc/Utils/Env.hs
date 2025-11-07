@@ -91,7 +91,7 @@ import GHC.Iface.Load
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import {-# SOURCE #-} GHC.Tc.Utils.TcMType ( tcCheckUsage )
+import GHC.Tc.Utils.TcMType ( tcCheckUsage )
 import GHC.Tc.Types.LclEnv
 
 import GHC.Core.InstEnv
@@ -675,7 +675,7 @@ tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
 tcExtendRecIds pairs thing_inside
   = tc_extend_local_env NotTopLevel
           [ (name, ATcId { tct_id   = let_id
-                         , tct_info = LetBound { lb_top = NotStatic
+                         , tct_info = LetBound { lb_static = NotStatic
                                                , lb_fvs = emptyNameSet
                                                , lb_closed = False } })
           | (name, let_id) <- pairs ] $
@@ -691,7 +691,7 @@ tcExtendSigIds top_lvl sig_ids thing_inside
                               , tct_info = info })
           | id <- sig_ids
           , let closed = isTypeClosedLetBndr id
-                info   = LetBound { lb_top = NotStatic
+                info   = LetBound { lb_static = NotStatic
                                   , lb_fvs = emptyNameSet
                                   , lb_closed = closed } ]
      thing_inside
@@ -703,24 +703,20 @@ tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
 -- Used for both top-level value bindings and nested let/where-bindings
 -- Used for a single NonRec or a single Rec
 -- Adds to the TcBinderStack too
-tcExtendLetEnv top_lvl _sig_fn (IsGroupClosed group_static fv_env _)
+tcExtendLetEnv top_lvl _sig_fn
+               (IsGroupClosed {gc_static = group_static, gc_fvs = fv_env})
                ids thing_inside
   = tcExtendBinderStack [TcIdBndr id top_lvl | Scaled _ id <- ids] $
     tc_extend_local_env top_lvl
           [ (idName id, ATcId { tct_id   = id
                               , tct_info = mk_tct_info id })
           | Scaled _ id <- ids ] $
-    foldr check_usage thing_inside scaled_names
+    foldr tcCheckUsage thing_inside ids
   where
     mk_tct_info id
-      = LetBound { lb_top = group_static
+      = LetBound { lb_static = group_static
                  , lb_fvs = lookupNameEnv fv_env (idName id) `orElse` emptyNameSet
                  , lb_closed = isTypeClosedLetBndr id }
-
-    scaled_names = [Scaled p (idName id) | Scaled p id <- ids ]
-
-    check_usage :: Scaled Name -> TcM a -> TcM a
-    check_usage (Scaled p id) thing_inside = tcCheckUsage id p thing_inside
 
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
 -- For lambda-bound and case-bound Ids
