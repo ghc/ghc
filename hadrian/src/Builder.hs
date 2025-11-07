@@ -361,6 +361,9 @@ instance H.Builder Builder where
 
                 Haddock BuildPackage -> runHaddock path buildArgs buildInputs
 
+                Ghc FindHsDependencies _ -> do
+                  runGhcWithResponse path buildArgs buildInputs
+
                 HsCpp    -> captureStdout
 
                 Make dir -> cmd' buildOptions path ["-C", dir] buildArgs
@@ -402,6 +405,15 @@ runHaddock :: FilePath    -- ^ path to @haddock@
 runHaddock haddockPath flagArgs fileInputs = withTempFile $ \tmp -> do
     writeFile' tmp $ escapeArgs fileInputs
     cmd [haddockPath] flagArgs ('@' : tmp)
+
+runGhcWithResponse :: FilePath -> [String] -> [FilePath] -> Action ()
+runGhcWithResponse ghcPath flagArgs fileInputs = withTempFile $ \tmp -> do
+
+    writeFile' tmp $ escapeArgs fileInputs
+
+    -- Cannot put everything into a response file due to #26560
+    cmd [ghcPath] flagArgs ('@' : tmp)
+
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- 'Objdump' is only required on OpenBSD and AIX. Add support for platform
