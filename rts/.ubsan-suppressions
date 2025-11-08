@@ -1,0 +1,8 @@
+# libraries/text/cbits/measure_off.c:50:39: runtime left shift of 1 by 31 places cannot be represented in type 'int'
+shift-base:libraries/text/cbits/measure_off.c
+
+# "runtime call to function foo through pointer to incorrect function
+# type" is unfortunately pretty common (e.g. evac_fn in rts) and
+# impact the signal to noise ratio of UBSan warnings. gcc doesn't
+# implement this instrumentation though.
+function:*
