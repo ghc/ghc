@@ -13,7 +13,7 @@ type G :: Type -> RuntimeRep -> Type
 type family G a where
   G (a b) = a
 
--- Should be rejected
+-- Now (Nov 2025) accepted
 foo :: (F (G Constraint)) -> Bool
 foo x = x
 
@@ -22,10 +22,10 @@ type family H a b where
   H a a = Int
   H a b = Bool
 
--- Should be rejected
-bar1 :: H TYPE CONSTRAINT -> Int
+-- Now (Nov 2025) accepted
+bar1 :: H TYPE CONSTRAINT -> Bool
 bar1 x = x
 
--- Should be rejected
-bar2 :: H Type Constraint -> Int
+-- Now (Nov 2025) accepted
+bar2 :: H Type Constraint -> Bool
 bar2 x = x

@@ -718,7 +718,7 @@ test('T24064', normal, compile_fail, [''])
 test('T24090a', normal, compile_fail, [''])
 test('T24090b', normal, compile, ['']) # scheduled to become an actual error in GHC 9.16
 test('T24298', normal, compile_fail, [''])
-test('T24279', normal, compile_fail, [''])
+test('T24279', normal, compile, [''])  # Now accepted (Nov 2025)
 test('T24318', normal, compile_fail, [''])
 
 # all the various do expansion fail messages

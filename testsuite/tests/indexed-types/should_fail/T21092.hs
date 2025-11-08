@@ -7,3 +7,5 @@ type family F a
 
 type instance F Type = Int
 type instance F Constraint = Bool
+
+-- Nov 2025: Type and Constraint are now Apart (#24279)

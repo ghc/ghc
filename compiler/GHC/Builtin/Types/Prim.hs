@@ -752,8 +752,9 @@ Specifically  (a ~# b) :: CONSTRAINT (TupleRep [])
 
 Wrinkles
 
-(W1) Type and Constraint are considered distinct throughout GHC. But they
-     are not /apart/: see Note [Type and Constraint are not apart]
+(W1) Type and Constraint are considered distinct throughout GHC.
+     That wasn't always the case:
+          see Historical Note [Type and Constraint are not apart]
 
 (W2) We need two absent-error Ids, aBSENT_ERROR_ID for types of kind Type, and
      aBSENT_CONSTRAINT_ERROR_ID for types of kind Constraint.
@@ -768,8 +769,24 @@ Wrinkles
      of type TYPE rr. See (CPR2) in Note [Which types are unboxed?] in
      GHC.Core.Opt.WorkWrap.Utils.
 
-Note [Type and Constraint are not apart]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------------------------------------
+Historical Note [Type and Constraint are not apart]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Nov 2025:
+  In the past, Type and Constraint were carefully coonsiderd to be
+  not /apart/.  But the necessity for that vanished with unary classes
+  (see Note [Unary class magic]), done in
+
+     commit 9bd7fcc518111a1549c98720c222cdbabd32ed46
+     Author: Simon Peyton Jones <simon.peytonjones@gmail.com>
+     Date:   Tue Apr 15 17:43:46 2025 +0100
+     Implement unary classes
+
+  So now Type and Constraint are simply distinct type constructors, just as
+  much as Int and Bool.
+
+  The rest of this Note is preserved for historical interest.
+
 Type and Constraint are not equal (eqType) but they are not /apart/
 either. Reason (c.f. #7451):
 
@@ -840,6 +857,9 @@ Wrinkles
          a proof Type ~N Constraint, which we do not want
      So in GHC.Tc.Instance.Class.matchTypeable, Type and Constraint are
      treated as separate TyCons; i.e. given no special treatment.
+
+End of Historical Note
+-------------------------------------------------------------
 
 Note [RuntimeRep polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

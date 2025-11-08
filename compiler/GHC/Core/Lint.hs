@@ -2891,13 +2891,9 @@ lint_branch ax_tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
          hang (text "Inhomogeneous axiom")
             2 (text "lhs:" <+> ppr lhs <+> dcolon <+> ppr lhs_kind $$
                text "rhs:" <+> ppr rhs <+> dcolon <+> ppr rhs_kind) }
-         -- Type and Constraint are not Apart, so this test allows
-         -- the newtype axiom for a single-method class.  Indeed the
-         -- whole reason Type and Constraint are not Apart is to allow
-         -- such axioms!
 
--- these checks do not apply to newtype axioms
 lint_family_branch :: TyCon -> CoAxBranch -> LintM ()
+-- These checks do not apply to newtype axioms
 lint_family_branch fam_tc br@(CoAxBranch { cab_tvs     = tvs
                                          , cab_eta_tvs = eta_tvs
                                          , cab_cvs     = cvs

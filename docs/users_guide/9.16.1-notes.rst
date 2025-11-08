@@ -16,6 +16,17 @@ Language
   result, you may need to enable :extension:`DataKinds` in code that did not
   previously require it.
 
+- ``Type`` and ``Constraint`` are now (at last) completely distinct types, just as much
+  as ``Int`` and ``Bool``.  For example, you can now
+  write::
+
+    type family F a
+
+    type instance F Type = Int
+    type instance F Constraint = Bool
+
+  which was previously rejected with "Conflicting family instance declarations".
+
 Compiler
 ~~~~~~~~
 

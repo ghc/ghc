@@ -1421,8 +1421,6 @@ piResultTy ty arg = case piResultTy_maybe ty arg of
                       Nothing  -> pprPanic "piResultTy" (ppr ty $$ ppr arg)
 
 piResultTy_maybe :: Type -> Type -> Maybe Type
--- We don't need a 'tc' version, because
--- this function behaves the same for Type and Constraint
 piResultTy_maybe ty arg = case coreFullView ty of
   FunTy { ft_res = res } -> Just res
 

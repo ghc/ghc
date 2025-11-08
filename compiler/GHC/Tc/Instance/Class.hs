@@ -963,11 +963,6 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | k `eqType` naturalTy      = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind = doTyLit knownSymbolClassName      t
   | k `eqType` charTy         = doTyLit knownCharClassName        t
-
-  -- TyCon applied to its kind args
-  -- No special treatment of Type and Constraint; they get distinct TypeReps
-  -- see wrinkle (W4) of Note [Type and Constraint are not apart]
-  --     in GHC.Builtin.Types.Prim.
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
 

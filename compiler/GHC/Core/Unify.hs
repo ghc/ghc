@@ -27,7 +27,6 @@ import GHC.Prelude
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Builtin.Names( tYPETyConKey, cONSTRAINTTyConKey )
 import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
 import GHC.Core.Predicate( scopedSort )
@@ -98,8 +97,6 @@ of ways.  Here we summarise, but see Note [Specification of unification].
          See Note [Apartness and type families]
     * MARInfinite (occurs check):
          See Note [Infinitary substitutions]
-    * MARTypeVsConstraint:
-         See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
     * MARCast (obscure):
          See (KCU2) in Note [Kind coercions in Unify]
 
@@ -997,15 +994,11 @@ data UnifyResultM a = Unifiable a        -- the subst that unifies the types
 
 -- | Why are two types 'MaybeApart'? 'MARInfinite' takes precedence:
 -- This is used (only) in Note [Infinitary substitution in lookup] in GHC.Core.InstEnv
--- As of Feb 2022, we never differentiate between MARTypeFamily and MARTypeVsConstraint;
--- it's really only MARInfinite that's interesting here.
+-- It's really only MARInfinite that's interesting here.
 data MaybeApartReason
   = MARTypeFamily   -- ^ matching e.g. F Int ~? Bool
 
   | MARInfinite     -- ^ matching e.g. a ~? Maybe a
-
-  | MARTypeVsConstraint  -- ^ matching Type ~? Constraint or the arrow types
-    -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
 
   | MARCast         -- ^ Very obscure.
     -- See (KCU2) in Note [Kind coercions in Unify]
@@ -1015,13 +1008,11 @@ combineMAR :: MaybeApartReason -> MaybeApartReason -> MaybeApartReason
 -- See (UR1) in Note [Unification result] for why MARInfinite wins
 combineMAR MARInfinite         _ = MARInfinite   -- MARInfinite wins
 combineMAR MARTypeFamily       r = r             -- Otherwise it doesn't really matter
-combineMAR MARTypeVsConstraint r = r
 combineMAR MARCast             r = r
 
 instance Outputable MaybeApartReason where
   ppr MARTypeFamily       = text "MARTypeFamily"
   ppr MARInfinite         = text "MARInfinite"
-  ppr MARTypeVsConstraint = text "MARTypeVsConstraint"
   ppr MARCast             = text "MARCast"
 
 instance Semigroup MaybeApartReason where
@@ -1728,30 +1719,6 @@ unify_ty env ty1 ty2 kco
   = do { massertPpr (isInjectiveTyCon tc1 Nominal) (ppr tc1)
        ; unify_tc_app env tc1 tys1 tys2
        }
-
-  -- TYPE and CONSTRAINT are not Apart
-  -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
-  -- NB: at this point we know that the two TyCons do not match
-  | Just (tc1,_) <- mb_tc_app1, let u1 = tyConUnique tc1
-  , Just (tc2,_) <- mb_tc_app2, let u2 = tyConUnique tc2
-  , (u1 == tYPETyConKey && u2 == cONSTRAINTTyConKey) ||
-    (u2 == tYPETyConKey && u1 == cONSTRAINTTyConKey)
-  = maybeApart MARTypeVsConstraint
-    -- We don't bother to look inside; wrinkle (W3) in GHC.Builtin.Types.Prim
-    -- Note [Type and Constraint are not apart]
-
-  -- The arrow types are not Apart
-  -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
-  --     wrinkle (W2)
-  -- NB1: at this point we know that the two TyCons do not match
-  -- NB2: In the common FunTy/FunTy case you might wonder if we want to go via
-  --      splitTyConApp_maybe.  But yes we do: we need to look at those implied
-  --      kind argument in order to satisfy (Unification Kind Invariant)
-  | FunTy {} <- ty1
-  , FunTy {} <- ty2
-  = maybeApart MARTypeVsConstraint
-    -- We don't bother to look inside; wrinkle (W3) in GHC.Builtin.Types.Prim
-    -- Note [Type and Constraint are not apart]
 
   where
     mb_tc_app1 = splitTyConApp_maybe ty1
