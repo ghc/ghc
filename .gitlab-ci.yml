@@ -11,7 +11,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: a97d5c67d803c6b3811c6cccdf33dc8e9d7eafe3
+  DOCKER_REV: 71454506c0c2e215953306b04572092cb89a6c2a
 
   # Sequential version number of all cached things.
   # Bump to invalidate GitLab CI cache.
@@ -444,14 +444,14 @@ hadrian-ghc-in-ghci:
 hadrian-multi:
   stage: testing
   needs:
-    - job: x86_64-linux-fedora42-release
+    - job: x86_64-linux-fedora43-release
       optional: true
-    - job: nightly-x86_64-linux-fedora42-release
+    - job: nightly-x86_64-linux-fedora43-release
       optional: true
-    - job: release-x86_64-linux-fedora42-release
+    - job: release-x86_64-linux-fedora43-release
       optional: true
   dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -471,7 +471,7 @@ hadrian-multi:
     - ls
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-linux-fedora42-release.tar.xz -C tmp
+      tar -xf ghc-x86_64-linux-fedora43-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
@@ -533,17 +533,17 @@ test-cabal-reinstall-x86_64-linux-deb10:
 abi-test-nightly:
   stage: full-build
   needs:
-    - job: nightly-x86_64-linux-fedora42-release-hackage
-    - job: nightly-x86_64-linux-fedora42-release
+    - job: nightly-x86_64-linux-fedora43-release-hackage
+    - job: nightly-x86_64-linux-fedora43-release
   tags:
     - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV"
   dependencies: null
   before_script:
     - mkdir -p normal
     - mkdir -p hackage
-    - tar -xf ghc-x86_64-linux-fedora42-release.tar.xz -C normal/
-    - tar -xf ghc-x86_64-linux-fedora42-release-hackage_docs.tar.xz -C hackage/
+    - tar -xf ghc-x86_64-linux-fedora43-release.tar.xz -C normal/
+    - tar -xf ghc-x86_64-linux-fedora43-release-hackage_docs.tar.xz -C hackage/
   script:
     - .gitlab/ci.sh compare_interfaces_of "normal/ghc-*" "hackage/ghc-*"
   artifacts:
@@ -620,9 +620,9 @@ doc-tarball:
 hackage-doc-tarball:
   stage: packaging
   needs:
-    - job: nightly-x86_64-linux-fedora42-release-hackage
+    - job: nightly-x86_64-linux-fedora43-release-hackage
       optional: true
-    - job: release-x86_64-linux-fedora42-release-hackage
+    - job: release-x86_64-linux-fedora43-release-hackage
       optional: true
     - job: source-tarball
   tags:
@@ -639,7 +639,7 @@ hackage-doc-tarball:
       - hackage_docs
   before_script:
     - tar -xf ghc-*[0-9]-src.tar.xz
-    - tar -xf ghc-x86_64-linux-fedora42-release.tar.xz -C ghc*/
+    - tar -xf ghc-x86_64-linux-fedora43-release.tar.xz -C ghc*/
   script:
     - cd ghc*/
     - mv .gitlab/rel_eng/upload_ghc_libs.py .
@@ -765,7 +765,7 @@ test-bootstrap:
 # Triggering jobs in the ghc/head.hackage project requires that we have a job
 # token for that repository. Furthermore the head.hackage CI job must have
 # access to an unprivileged access token with the ability to query the ghc/ghc
-# project such that it can find the job ID of the fedora42 job for the current
+# project such that it can find the job ID of the fedora43 job for the current
 # pipeline.
 #
 # hackage-lint: Can be triggered on any MR, normal validate pipeline or nightly build.
@@ -852,7 +852,7 @@ nightly-hackage-lint:
 
 nightly-hackage-perf:
   needs:
-    - job: nightly-x86_64-linux-fedora42-release
+    - job: nightly-x86_64-linux-fedora43-release
       optional: true
       artifacts: false
     - job: nightly-aarch64-linux-deb12-validate
@@ -871,7 +871,7 @@ nightly-hackage-perf:
 
 release-hackage-lint:
   needs:
-    - job: release-x86_64-linux-fedora42-release
+    - job: release-x86_64-linux-fedora43-release
       optional: true
       artifacts: false
     - job: release-aarch64-linux-deb12-release+no_split_sections
@@ -957,13 +957,13 @@ perf-nofib:
   allow_failure: true
   stage: testing
   needs:
-    - job: x86_64-linux-fedora42-release
+    - job: x86_64-linux-fedora43-release
       optional: true
-    - job: nightly-x86_64-linux-fedora42-release
+    - job: nightly-x86_64-linux-fedora43-release
       optional: true
-    - job: release-x86_64-linux-fedora42-release
+    - job: release-x86_64-linux-fedora43-release
       optional: true
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV"
   rules:
     - when: never
     - *full-ci
@@ -976,7 +976,7 @@ perf-nofib:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ../ghc-x86_64-linux-fedora42-release.tar.xz -C tmp
+      tar -xf ../ghc-x86_64-linux-fedora43-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
@@ -1000,14 +1000,14 @@ perf-nofib:
 perf:
   stage: testing
   needs:
-    - job: x86_64-linux-fedora42-release
+    - job: x86_64-linux-fedora43-release
       optional: true
-    - job: nightly-x86_64-linux-fedora42-release
+    - job: nightly-x86_64-linux-fedora43-release
       optional: true
-    - job: release-x86_64-linux-fedora42-release
+    - job: release-x86_64-linux-fedora43-release
       optional: true
   dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV"
   tags:
     - x86_64-linux-perf
   before_script:
@@ -1017,7 +1017,7 @@ perf:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-linux-fedora42-release.tar.xz -C tmp
+      tar -xf ghc-x86_64-linux-fedora43-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
@@ -1041,14 +1041,14 @@ perf:
 abi-test:
   stage: testing
   needs:
-    - job: x86_64-linux-fedora42-release
+    - job: x86_64-linux-fedora43-release
       optional: true
-    - job: nightly-x86_64-linux-fedora42-release
+    - job: nightly-x86_64-linux-fedora43-release
       optional: true
-    - job: release-x86_64-linux-fedora42-release
+    - job: release-x86_64-linux-fedora43-release
       optional: true
   dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV"
   rules:
     - if: $CI_MERGE_REQUEST_ID
     - if: '$CI_COMMIT_BRANCH == "master"'
@@ -1059,7 +1059,7 @@ abi-test:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-linux-fedora42-release.tar.xz -C tmp
+      tar -xf ghc-x86_64-linux-fedora43-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
@@ -1094,29 +1094,29 @@ abi-test:
 ghc-wasm-meta-gmp:
   extends: .ghc-wasm-meta
   needs:
-    - job: x86_64-linux-alpine3_22-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+    - job: x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf
       artifacts: false
   variables:
     UPSTREAM_GHC_FLAVOUR: gmp
-    UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_22-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+    UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf
 
 ghc-wasm-meta-native:
   extends: .ghc-wasm-meta
   needs:
-    - job: x86_64-linux-alpine3_22-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+    - job: x86_64-linux-alpine3_23-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf
       artifacts: false
   variables:
     UPSTREAM_GHC_FLAVOUR: native
-    UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_22-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+    UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_23-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf
 
 ghc-wasm-meta-unreg:
   extends: .ghc-wasm-meta
   needs:
-    - job: x86_64-linux-alpine3_22-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+    - job: x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
       artifacts: false
   variables:
     UPSTREAM_GHC_FLAVOUR: unreg
-    UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_22-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
+    UPSTREAM_GHC_JOB_NAME: x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf
 
 ############################################################
 # Documentation deployment via GitLab Pages
@@ -1218,7 +1218,7 @@ ghcup-metadata-nightly:
   extends: .ghcup-metadata
   # Explicit needs for validate pipeline because we only need certain bindists
   needs:
-    - job: nightly-x86_64-linux-fedora42-release
+    - job: nightly-x86_64-linux-fedora43-release
       artifacts: false
     - job: nightly-x86_64-linux-ubuntu24_04-validate
       artifacts: false
@@ -1236,7 +1236,7 @@ ghcup-metadata-nightly:
       artifacts: false
     - job: nightly-x86_64-windows-validate
       artifacts: false
-    - job: nightly-x86_64-linux-alpine3_22-validate
+    - job: nightly-x86_64-linux-alpine3_23-validate
       artifacts: false
     - job: nightly-x86_64-linux-deb9-validate
       artifacts: false
@@ -1244,7 +1244,7 @@ ghcup-metadata-nightly:
       artifacts: false
     - job: nightly-i386-linux-deb12-validate
       artifacts: false
-    - job: nightly-i386-linux-alpine3_22-validate
+    - job: nightly-i386-linux-alpine3_23-validate
       artifacts: false
     - job: nightly-x86_64-linux-deb10-validate
       artifacts: false
@@ -1256,7 +1256,7 @@ ghcup-metadata-nightly:
       artifacts: false
     - job: nightly-aarch64-linux-deb12-validate
       artifacts: false
-    - job: nightly-aarch64-linux-alpine3_22-validate
+    - job: nightly-aarch64-linux-alpine3_23-validate
       artifacts: false
     - job: source-tarball
       artifacts: false
@@ -1269,7 +1269,7 @@ ghcup-metadata-nightly:
 # Update the ghcup metadata with information about this nightly pipeline
 ghcup-metadata-nightly-push:
   stage: deploy
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora42:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV"
   dependencies: null
   tags:
     - x86_64-linux

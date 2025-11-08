@@ -200,13 +200,13 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     ubuntu2204 = mk(ubuntu("22_04"))
     ubuntu2404 = mk(ubuntu("24_04"))
     rocky8 = mk(rocky("8"))
-    fedora42 = mk(fedora(42))
+    fedora43 = mk(fedora(43))
     darwin_x86 = mk(darwin("x86_64"))
     darwin_arm64 = mk(darwin("aarch64"))
     windows = mk(windowsArtifact)
-    alpine3_22 = mk(alpine("3_22"))
-    alpine3_22_arm64 = mk(alpine("3_22", arch='aarch64'))
-    alpine3_22_i386 = mk(alpine("3_22", arch='i386'))
+    alpine3_23 = mk(alpine("3_23"))
+    alpine3_23_arm64 = mk(alpine("3_23", arch='aarch64'))
+    alpine3_23_i386 = mk(alpine("3_23", arch='i386'))
     deb9 = mk(debian(9, "x86_64"))
     deb10 = mk(debian(10, "x86_64"))
     deb11 = mk(debian(11, "x86_64"))
@@ -239,13 +239,13 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
                              , "unknown_versioning": ubuntu2004 }
           , "Linux_CentOS"  : { "( >= 8 && < 9 )" : rocky8
                               , "unknown_versioning" : rocky8  }
-          , "Linux_Fedora"  : { ">= 42": fedora42
+          , "Linux_Fedora"  : { ">= 43": fedora43
                               , "unknown_versioning": rocky8 }
           , "Linux_RedHat"  : { "unknown_versioning": rocky8 }
           , "Linux_UnknownLinux" : { "unknown_versioning": rocky8 }
           , "Darwin" : { "unknown_versioning" : darwin_x86 }
           , "Windows" : { "unknown_versioning" :  windows }
-          , "Linux_Alpine" : { "unknown_versioning": alpine3_22 }
+          , "Linux_Alpine" : { "unknown_versioning": alpine3_23 }
           }
 
     a32 = { "Linux_Debian": { "( >= 10 && < 12 )": deb10_i386
@@ -253,12 +253,12 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
                             , "unknown_versioning": deb10_i386 }
           , "Linux_Ubuntu": { "unknown_versioning": deb10_i386 }
           , "Linux_Mint" : { "unknown_versioning": deb10_i386 }
-          , "Linux_Alpine" : { "unknown_versioning": alpine3_22_i386 }
+          , "Linux_Alpine" : { "unknown_versioning": alpine3_23_i386 }
           , "Linux_UnknownLinux" : { "unknown_versioning": deb10_i386 }
           }
 
     arm64 = { "Linux_UnknownLinux": { "unknown_versioning": deb10_arm64 }
-            , "Linux_Alpine" : { "unknown_versioning": alpine3_22_arm64 }
+            , "Linux_Alpine" : { "unknown_versioning": alpine3_23_arm64 }
             , "Linux_Debian": { "( >= 10 && < 12 )": deb10_arm64
                               , "( >= 12 )": deb12_arm64
                               , "unknown_versioning": deb10_arm64

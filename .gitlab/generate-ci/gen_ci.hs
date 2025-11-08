@@ -82,7 +82,7 @@ The generated names for the jobs is important as there are a few downstream cons
 of the jobs artifacts. Therefore some care should be taken if changing the generated
 names of jobs to update these other places.
 
-1. fedora42 jobs are required by head.hackage
+1. fedora43 jobs are required by head.hackage
 2. The fetch-gitlab release utility pulls release artifacts from the
 3. The ghc-head-from script downloads release artifacts based on a pipeline change.
 4. Some subsequent CI jobs have explicit dependencies (for example docs-tarball, perf, perf-nofib)
@@ -118,14 +118,14 @@ data LinuxDistro
   | Debian11Js
   | Debian10
   | Debian9
-  | Fedora42
+  | Fedora43
   | Ubuntu2404LoongArch64
   | Ubuntu2404
   | Ubuntu2204
   | Ubuntu2004
   | Ubuntu1804
   | Alpine312
-  | Alpine322
+  | Alpine323
   | AlpineWasm
   | Rocky8
   deriving (Eq)
@@ -161,6 +161,7 @@ data BuildConfig
                 , hostFullyStatic :: Bool
                 , tablesNextToCode :: Bool
                 , threadSanitiser :: Bool
+                , ubsan :: Bool
                 , noSplitSections :: Bool
                 , validateNonmovingGc :: Bool
                 , textWithSIMDUTF :: Bool
@@ -186,6 +187,7 @@ mkJobFlavour BuildConfig{..} = Flavour buildFlavour opts
            [FullyStatic | fullyStatic] ++
            [HostFullyStatic | hostFullyStatic] ++
            [ThreadSanitiser | threadSanitiser] ++
+           [UBSan | ubsan] ++
            [NoSplitSections | noSplitSections, buildFlavour == Release ] ++
            [BootNonmovingGc | validateNonmovingGc ] ++
            [TextWithSIMDUTF | textWithSIMDUTF]
@@ -198,6 +200,7 @@ data FlavourTrans =
     | FullyStatic
     | HostFullyStatic
     | ThreadSanitiser
+    | UBSan
     | NoSplitSections
     | BootNonmovingGc
     | TextWithSIMDUTF
@@ -226,6 +229,7 @@ vanilla = BuildConfig
   , hostFullyStatic = False
   , tablesNextToCode = True
   , threadSanitiser = False
+  , ubsan = False
   , noSplitSections = False
   , validateNonmovingGc = False
   , textWithSIMDUTF = False
@@ -279,6 +283,9 @@ llvm = vanilla { llvmBootstrap = True }
 tsan :: BuildConfig
 tsan = vanilla { threadSanitiser = True }
 
+enableUBSan :: BuildConfig
+enableUBSan = vanilla { withDwarf = True, ubsan = True }
+
 noTntc :: BuildConfig
 noTntc = vanilla { tablesNextToCode = False }
 
@@ -318,15 +325,15 @@ distroName Debian12Riscv = "deb12-riscv"
 distroName Debian12Wine  = "deb12-wine"
 distroName Debian10      = "deb10"
 distroName Debian9       = "deb9"
-distroName Fedora42      = "fedora42"
+distroName Fedora43      = "fedora43"
 distroName Ubuntu2404LoongArch64 = "ubuntu24_04-loongarch"
 distroName Ubuntu1804    = "ubuntu18_04"
 distroName Ubuntu2004    = "ubuntu20_04"
 distroName Ubuntu2204    = "ubuntu22_04"
 distroName Ubuntu2404    = "ubuntu24_04"
 distroName Alpine312     = "alpine3_12"
-distroName Alpine322     = "alpine3_22"
-distroName AlpineWasm    = "alpine3_22-wasm"
+distroName Alpine323     = "alpine3_23"
+distroName AlpineWasm    = "alpine3_23-wasm"
 distroName Rocky8        = "rocky8"
 
 opsysName :: Opsys -> String
@@ -373,6 +380,7 @@ flavourString (Flavour base trans) = base_string base ++ concatMap (("+" ++) . f
     flavour_string FullyStatic = "fully_static"
     flavour_string HostFullyStatic = "host_fully_static"
     flavour_string ThreadSanitiser = "thread_sanitizer_cmm"
+    flavour_string UBSan = "ubsan"
     flavour_string NoSplitSections = "no_split_sections"
     flavour_string BootNonmovingGc = "boot_nonmoving_gc"
     flavour_string TextWithSIMDUTF = "text_simdutf"
@@ -497,7 +505,7 @@ alpineVariables arch = mconcat $
 
 distroVariables :: Arch -> LinuxDistro -> Variables
 distroVariables arch Alpine312 = alpineVariables arch
-distroVariables arch Alpine322 = alpineVariables arch
+distroVariables arch Alpine323 = alpineVariables arch
 distroVariables _ _ = mempty
 
 -----------------------------------------------------------------------------
@@ -1198,13 +1206,22 @@ rhel_x86 =
 
 fedora_x86 :: [JobGroup Job]
 fedora_x86 =
-  [ -- Fedora42 job is always built with perf so there's one job in the normal
+  [ -- Fedora43 job is always built with perf so there's one job in the normal
     -- validate pipeline which is built with perf.
-    fastCI (standardBuildsWithConfig Amd64 (Linux Fedora42) releaseConfig)
+    fastCI (standardBuildsWithConfig Amd64 (Linux Fedora43) releaseConfig)
     -- This job is only for generating head.hackage docs
-  , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora42) releaseConfig))
-  , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora42) dwarf)
-  , disableValidate (standardBuilds Amd64 (Linux Fedora42))
+  , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora43) releaseConfig))
+  , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora43) dwarf)
+  , disableValidate (standardBuilds Amd64 (Linux Fedora43))
+    -- For UBSan jobs, only enable for validate/nightly pipelines.
+    -- Also disable docs since it's not the point for UBSan jobs.
+  , modifyJobs
+      ( setVariable "HADRIAN_ARGS" "--docs=none"
+          . addVariable
+            "UBSAN_OPTIONS"
+            "suppressions=$CI_PROJECT_DIR/rts/.ubsan-suppressions"
+      )
+      $ validateBuilds Amd64 (Linux Fedora43) enableUBSan
   ]
   where
     hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-for-hackage")
@@ -1232,8 +1249,8 @@ alpine_x86 =
     fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken static))
   , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
     -- Dynamically linked build, suitable for building your own static executables on alpine
-  , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine322) (splitSectionsBroken vanilla))
-  , allowFailureGroup (standardBuildsWithConfig I386 (Linux Alpine322) (splitSectionsBroken vanilla))
+  , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine323) (splitSectionsBroken vanilla))
+  , allowFailureGroup (standardBuildsWithConfig I386 (Linux Alpine323) (splitSectionsBroken vanilla))
   ]
   where
     -- ghcilink002 broken due to #17869
@@ -1244,7 +1261,7 @@ alpine_x86 =
 
 alpine_aarch64 :: [JobGroup Job]
 alpine_aarch64 = [
-  disableValidate (standardBuildsWithConfig AArch64 (Linux Alpine322) (splitSectionsBroken vanilla))
+  disableValidate (standardBuildsWithConfig AArch64 (Linux Alpine323) (splitSectionsBroken vanilla))
   ]
 
 cross_jobs :: [JobGroup Job]
@@ -1366,28 +1383,28 @@ platform_mapping = Map.map go combined_result
                 , "x86_64-linux-deb11-validate"
                 , "x86_64-linux-deb12-validate"
                 , "x86_64-linux-deb10-validate+debug_info"
-                , "x86_64-linux-fedora42-release"
+                , "x86_64-linux-fedora43-release"
                 , "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
                 , "x86_64-windows-validate"
                 , "aarch64-linux-deb12-validate"
                 , "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
-                , "nightly-x86_64-linux-alpine3_22-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
+                , "nightly-x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
                 , "nightly-x86_64-linux-deb11-validate"
                 , "nightly-x86_64-linux-deb12-validate"
-                , "x86_64-linux-alpine3_22-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
+                , "x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
                 , "x86_64-linux-deb12-validate+thread_sanitizer_cmm"
                 , "nightly-aarch64-linux-deb10-validate"
                 , "nightly-aarch64-linux-deb12-validate"
                 , "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
                 , "nightly-x86_64-linux-alpine3_12-validate+fully_static"
                 , "nightly-x86_64-linux-deb10-validate"
-                , "nightly-x86_64-linux-fedora42-release"
+                , "nightly-x86_64-linux-fedora43-release"
                 , "nightly-x86_64-windows-validate"
                 , "release-x86_64-linux-alpine3_12-release+fully_static+no_split_sections"
                 , "release-x86_64-linux-deb10-release"
                 , "release-x86_64-linux-deb11-release"
                 , "release-x86_64-linux-deb12-release"
-                , "release-x86_64-linux-fedora42-release"
+                , "release-x86_64-linux-fedora43-release"
                 , "release-x86_64-windows-release"
                 ]
 
