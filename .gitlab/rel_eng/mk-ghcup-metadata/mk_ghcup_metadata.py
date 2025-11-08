@@ -200,7 +200,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     ubuntu2204 = mk(ubuntu("22_04"))
     ubuntu2404 = mk(ubuntu("24_04"))
     rocky8 = mk(rocky("8"))
-    fedora42 = mk(fedora(42))
+    fedora43 = mk(fedora(43))
     darwin_x86 = mk(darwin("x86_64"))
     darwin_arm64 = mk(darwin("aarch64"))
     windows = mk(windowsArtifact)
@@ -239,7 +239,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
                              , "unknown_versioning": ubuntu2004 }
           , "Linux_CentOS"  : { "( >= 8 && < 9 )" : rocky8
                               , "unknown_versioning" : rocky8  }
-          , "Linux_Fedora"  : { ">= 42": fedora42
+          , "Linux_Fedora"  : { ">= 43": fedora43
                               , "unknown_versioning": rocky8 }
           , "Linux_RedHat"  : { "unknown_versioning": rocky8 }
           , "Linux_UnknownLinux" : { "unknown_versioning": rocky8 }
