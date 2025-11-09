@@ -399,7 +399,7 @@ rewriteExpr (StgTick t e)             = StgTick t <$!> rewriteExpr e
 rewriteExpr e@(StgConApp {})          = rewriteConApp e
 rewriteExpr e@(StgApp {})             = rewriteApp e
 rewriteExpr (StgLit lit)              = return $! (StgLit lit)
-rewriteExpr e@(StgOpApp op args res_ty) = rewriteOpApp e
+rewriteExpr e@(StgOpApp _op _args _res_ty) = rewriteOpApp e
 
 
 rewriteCase :: InferStgExpr -> RM TgStgExpr
