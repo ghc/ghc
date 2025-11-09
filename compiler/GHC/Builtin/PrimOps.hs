@@ -9,7 +9,7 @@
 
 module GHC.Builtin.PrimOps (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
-        primOpType, primOpSig, primOpResultType,
+        primOpType, primOpSig, primOpResultType, primOpCbv,
         primOpTag, maxPrimOpTag, primOpOcc,
         primOpWrapperId,
         pprPrimOp,
@@ -145,6 +145,22 @@ primOpStrictness :: PrimOp -> Arity -> DmdSig
         -- The arity should be the arity of the primop; that's why
         -- this function isn't exported.
 #include "primop-strictness.hs-incl"
+
+{-
+************************************************************************
+*                                                                      *
+\subsubsection{Call by value info}
+*                                                                      *
+************************************************************************
+
+Some primops require us to only pass evaluated and properly tagged
+pointers for boxed arguments.
+
+See Note [Evaluated and Properly Tagged]
+-}
+
+primOpCbv :: PrimOp -> [CbvMark]
+#include "primop-cbv.hs-incl"
 
 {-
 ************************************************************************

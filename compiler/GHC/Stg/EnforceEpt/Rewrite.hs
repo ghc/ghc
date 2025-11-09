@@ -12,7 +12,7 @@ where
 
 import GHC.Prelude
 
-import GHC.Builtin.PrimOps ( PrimOp(..) )
+import GHC.Builtin.PrimOps ( PrimOp(..), primOpCbv )
 import GHC.Types.Basic     ( CbvMark (..), isMarkedCbv
                            , TopLevelFlag(..), isTopLevel )
 import GHC.Types.Id
@@ -399,8 +399,7 @@ rewriteExpr (StgTick t e)             = StgTick t <$!> rewriteExpr e
 rewriteExpr e@(StgConApp {})          = rewriteConApp e
 rewriteExpr e@(StgApp {})             = rewriteApp e
 rewriteExpr (StgLit lit)              = return $! (StgLit lit)
-rewriteExpr (StgOpApp op args res_ty) = (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
-
+rewriteExpr (StgOpApp op args res_ty) = rewriteOpApp (StgOpApp op args res_ty)
 
 rewriteCase :: InferStgExpr -> RM TgStgExpr
 rewriteCase (StgCase scrut bndr alt_type alts) =
@@ -452,6 +451,21 @@ rewriteConApp (StgConApp con cn args tys) = do
 
 rewriteConApp _ = panic "Impossible"
 
+{-# INLINE eptArgs #-}
+-- Evaluate the relevant arguments, and construct an expression with the ids substituted
+-- for their evaluated parts.
+eptArgs :: [CbvMark] -> [StgArg] -> ([StgArg] -> TgStgExpr) -> RM TgStgExpr
+eptArgs relevant_marks args mkExpr = do
+    argTags <- mapM isArgTagged args
+    let argInfo = zipWith3 ((,,)) args (relevant_marks++repeat NotMarkedCbv)  argTags :: [(StgArg, CbvMark, Bool)]
+
+        -- untagged cbv arguments
+        cbvArgs = map fstOf3 . filter (\x -> sndOf3 x == MarkedCbv && thdOf3 x == False) $ argInfo
+        -- We only need to force ids
+        cbvArgIds = [x | StgVarArg x <- cbvArgs] :: [Id]
+    mkSeqs args cbvArgIds mkExpr
+
+
 -- Special case: Atomic binders, usually in a case context like `case f of ...`.
 rewriteApp :: InferStgExpr -> RM TgStgExpr
 rewriteApp (StgApp f []) = do
@@ -464,19 +478,8 @@ rewriteApp (StgApp f args)
     , relevant_marks <- dropWhileEndLE (not . isMarkedCbv) marks
     , any isMarkedCbv relevant_marks
     = assertPpr (length relevant_marks <= length args) (ppr f $$ ppr args $$ ppr relevant_marks)
-      unliftArg relevant_marks
-
-    where
-      -- If the function expects any argument to be call-by-value ensure the argument is already
-      -- evaluated.
-      unliftArg relevant_marks = do
-        argTags <- mapM isArgTagged args
-        let argInfo = zipWith3 ((,,)) args (relevant_marks++repeat NotMarkedCbv)  argTags :: [(StgArg, CbvMark, Bool)]
-
-            -- untagged cbv argument positions
-            cbvArgInfo = filter (\x -> sndOf3 x == MarkedCbv && thdOf3 x == False) argInfo
-            cbvArgIds = [x | StgVarArg x <- map fstOf3 cbvArgInfo] :: [Id]
-        mkSeqs args cbvArgIds (\cbv_args -> StgApp f cbv_args)
+      -- Enforce relevant args are evaluated and tagged.
+      eptArgs relevant_marks args (\cbv_args -> StgApp f cbv_args)
 
 rewriteApp (StgApp f args) = return $ StgApp f args
 rewriteApp _ = panic "Impossible"
@@ -500,10 +503,14 @@ So for these we should call `rewriteArgs`.
 
 rewriteOpApp :: InferStgExpr -> RM TgStgExpr
 rewriteOpApp (StgOpApp op args res_ty) = case op of
+  -- Should we just use cbv marks for DataToTag?
   op@(StgPrimOp primOp)
     | primOp == DataToTagSmallOp || primOp == DataToTagLargeOp
     -- see Note [Rewriting primop arguments]
     -> (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
+    | marks <- primOpCbv primOp
+    , not (null marks)
+    -> eptArgs marks args (\tagged_args -> (StgOpApp op tagged_args res_ty))
   _ -> pure $! StgOpApp op args res_ty
 rewriteOpApp _ = panic "Impossible"
 

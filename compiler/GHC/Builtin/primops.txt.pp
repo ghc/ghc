@@ -150,6 +150,7 @@ defaults
    div_like         = False   -- Second argument expected to be non zero - used for tests
    shift_like       = False   -- Second argument expected to be atmost first argument's word size -1 - used for tests
    defined_bits     = Nothing -- The number of bits the operation is defined for (if not all bits)
+   cbv_marks        = []
 
 -- Note [When do out-of-line primops go in primops.txt.pp]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1621,6 +1622,28 @@ primop  ReadArrayOp "readArray#" GenPrimOp
    effect = ReadWriteEffect
    can_fail_warning = YesWarnCanFail
 
+primop  ReadStrictArrayOp "unsafeReadStrictArray#" GenPrimOp
+   MutableArray# s a -> Int# -> State# s -> (# State# s, a #)
+   {Read from specified index of mutable array. Result is evaluated.
+
+    GHC will assume the value at the given index has been written
+    by writeStrictArray#. This can allow GHC to elid an eval check when using the
+    read value. Potentially given a performance benefit.
+
+    WARNING: Behaviour is undefined if the value read
+    was not written using writeStrictArray#.
+
+    At runtime "strict" arrays and regular arrays have the same representation.
+    The only difference is in the read/write operations.
+
+    The strict write operations ensure stored values are evaluated and properly
+    tagged. Strict reads assume this fact, allowing GHC to sometimes avoid
+    checking for thunks when using the read value.
+   }
+   with
+   effect = ReadWriteEffect
+   can_fail_warning = YesWarnCanFail
+
 primop  WriteArrayOp "writeArray#" GenPrimOp
    MutableArray# s a_levpoly -> Int# -> a_levpoly -> State# s -> State# s
    {Write to specified index of mutable array.}
@@ -1629,6 +1652,15 @@ primop  WriteArrayOp "writeArray#" GenPrimOp
    can_fail_warning = YesWarnCanFail
    code_size = 2 -- card update too
 
+primop  WriteStrictArrayOp "writeStrictArray#" GenPrimOp
+   MutableArray# s a_levpoly -> Int# -> a_levpoly -> State# s -> State# s
+   {Write to specified index of mutable array. Evaluates the argument before writing it.}
+   with
+   effect = ReadWriteEffect
+   can_fail_warning = YesWarnCanFail
+   code_size = 2 -- card update too
+   cbv_marks = [!,!,!]
+
 primop  SizeofArrayOp "sizeofArray#" GenPrimOp
    Array# a_levpoly -> Int#
    {Return the number of elements in the array.}
@@ -1636,6 +1668,23 @@ primop  SizeofArrayOp "sizeofArray#" GenPrimOp
 primop  SizeofMutableArrayOp "sizeofMutableArray#" GenPrimOp
    MutableArray# s a_levpoly -> Int#
    {Return the number of elements in the array.}
+
+primop  IndexStrictArrayOp "unsafeIndexStrictArray#" GenPrimOp
+   Array# a_levpoly -> Int# -> (# a_levpoly #)
+   {Read from the specified index of an immutable array. The result is packaged
+    into an unboxed unary tuple; the result itself is evaluated.
+    Pattern matching on the tuple forces the indexing of the
+    array to happen.
+
+    GHC will assume the value at the given index has been written
+    by writeStrictArray#. This can allow GHC to elid an eval check when using the
+    read value. Potentially given a performance benefit.
+
+    WARNING: Behaviour is undefined if the value read
+    was not written using writeStrictArray#.
+   }
+   with
+   effect = CanFail
 
 primop  IndexArrayOp "indexArray#" GenPrimOp
    Array# a_levpoly -> Int# -> (# a_levpoly #)
@@ -1838,12 +1887,43 @@ primop  ReadSmallArrayOp "readSmallArray#" GenPrimOp
    effect = ReadWriteEffect
    can_fail_warning = YesWarnCanFail
 
+primop  ReadSmallStrictArrayOp "unsafeReadSmallStrictArray#" GenPrimOp
+   SmallMutableArray# s a -> Int# -> State# s -> (# State# s, a #)
+   {Read from specified index of mutable array.
+
+    GHC will assume the value at the given index has been evaluted *and tagged*
+    by writeStrictArray#. This can allow GHC to elid an eval check when using the
+    read value. Potentially given a performance benefit.
+
+    WARNING: Behaviour is undefined if the value read
+    was not written using writeStrictArray#.
+
+    At runtime "strict" arrays and regular arrays have the same representation.
+    The only difference is in the read/write operations.
+
+    The strict write operations ensure stored values are evaluated and properly
+    tagged. Strict reads assume this fact, allowing GHC to sometimes avoid
+    checking for thunks when using the read value.}
+   with
+   effect = ReadWriteEffect
+   can_fail_warning = YesWarnCanFail
+
 primop  WriteSmallArrayOp "writeSmallArray#" GenPrimOp
    SmallMutableArray# s a_levpoly -> Int# -> a_levpoly -> State# s -> State# s
    {Write to specified index of mutable array.}
    with
    effect = ReadWriteEffect
    can_fail_warning = YesWarnCanFail
+
+primop  WriteSmallStrictArrayOp "writeSmallStrictArray#" GenPrimOp
+   SmallMutableArray# s a_levpoly -> Int# -> a_levpoly -> State# s -> State# s
+   {Write to specified index of mutable array.
+
+   Evaluates the argument before storing it.}
+   with
+   effect = ReadWriteEffect
+   can_fail_warning = YesWarnCanFail
+   cbv_marks = [!,!,!]
 
 primop  SizeofSmallArrayOp "sizeofSmallArray#" GenPrimOp
    SmallArray# a_levpoly -> Int#
@@ -1867,6 +1947,20 @@ primop  IndexSmallArrayOp "indexSmallArray#" GenPrimOp
    SmallArray# a_levpoly -> Int# -> (# a_levpoly #)
    {Read from specified index of immutable array. Result is packaged into
     an unboxed singleton; the result itself is not yet evaluated.}
+   with
+   effect = CanFail
+
+primop  IndexSmallStrictArrayOp "unsafeIndexSmallStrictArray#" GenPrimOp
+   SmallArray# a -> Int# -> (# a #)
+   {Read from specified index of immutable array. Result is packaged into
+    an unboxed singleton;
+
+    GHC will assume the value at the given index has been written
+    by writeSmallStrictArray#. This can allow GHC to elid an eval check when using the
+    read value. Potentially given a performance benefit.
+
+    WARNING: Behaviour is undefined if the value read
+    was not written using writeSmallStrictArray#}
    with
    effect = CanFail
 

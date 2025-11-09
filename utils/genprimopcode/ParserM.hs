@@ -75,6 +75,8 @@ init_state = St {
 
 data Token = TEOF
            | TArrow
+           | TBang
+           | TTilde
            | TDArrow
            | TEquals
            | TComma
@@ -122,6 +124,7 @@ data Token = TEOF
            | TWarnIfEffectIsCanFail
            | TYesWarnCanFail
            | TVector
+           | TCbv_marks
            | TSCALAR
            | TVECTOR
            | TVECTUPLE

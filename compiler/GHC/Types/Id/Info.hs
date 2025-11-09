@@ -395,7 +395,7 @@ pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
    pp VanillaId               = panic "pprIdDetails"
-   pp (WorkerLikeId dmds)     = text "StrictWorker" <> parens (ppr dmds)
+   pp (WorkerLikeId dmds)     = text "StrictWorker" <> pp_marks dmds
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"
    pp (ClassOpId {})          = text "ClassOp"
@@ -409,6 +409,9 @@ pprIdDetails other     = brackets (pp other)
                                            ppWhen is_naughty (text "(naughty)")
    pp CoVarId                 = text "CoVarId"
    pp (JoinId arity marks)    = text "JoinId" <> parens (int arity) <> parens (ppr marks)
+
+   pp_marks [] = empty
+   pp_marks xs = ppr xs
 
 {-
 ************************************************************************

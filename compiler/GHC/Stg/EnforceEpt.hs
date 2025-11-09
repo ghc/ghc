@@ -9,6 +9,7 @@ module GHC.Stg.EnforceEpt ( enforceEpt ) where
 
 import GHC.Prelude hiding (id)
 
+import qualified GHC.Builtin.PrimOps as PrimOps
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Types.Id
@@ -354,6 +355,16 @@ inferTags for_bytecode binds =
   -- pprTrace "Binds" (pprGenStgTopBindings shortStgPprOpts $ binds) $
   snd (mapAccumL inferTagTopBind (initEnv for_bytecode) binds)
 
+inferPrimAppResult :: PrimOps.PrimOp -> TagInfo
+inferPrimAppResult op =
+  case op of
+    PrimOps.ReadSmallStrictArrayOp -> TagTuple [TagProper]
+    PrimOps.ReadStrictArrayOp -> TagTuple [TagProper]
+    PrimOps.IndexSmallStrictArrayOp -> TagTuple [TagProper]
+    PrimOps.IndexStrictArrayOp -> TagTuple [TagProper]
+    _ -> TagDunno
+
+
 -----------------------
 inferTagTopBind :: TagEnv 'CodeGen -> GenStgTopBinding 'CodeGen
                 -> (TagEnv 'CodeGen, GenStgTopBinding 'InferTaggedBinders)
@@ -409,11 +420,14 @@ inferTagExpr env (StgTick tick body)
   where
     (info, body') = inferTagExpr env body
 
-inferTagExpr _ (StgOpApp op args ty)
+inferTagExpr _ (StgOpApp op args ty) =
   -- Which primops guarantee to return a properly tagged value?
   -- Probably none, and that is the conservative assumption anyway.
   -- (And foreign calls definitely need not make promises.)
-  = (TagDunno, StgOpApp op args ty)
+  case op of
+      StgPrimOp prim_op -> (inferPrimAppResult prim_op, StgOpApp op args ty)
+      StgPrimCallOp {} -> (TagDunno, StgOpApp op args ty)
+      StgFCallOp {} -> (TagDunno, StgOpApp op args ty)
 
 inferTagExpr env (StgLet ext bind body)
   = (info, StgLet ext bind' body')

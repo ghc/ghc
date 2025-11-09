@@ -380,16 +380,28 @@ emitPrimOp cfg primop =
 
   ReadArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->
     doReadPtrArrayOp res obj ix
+  ReadStrictArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->
+    doReadPtrArrayOp res obj ix
   IndexArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->
     doReadPtrArrayOp res obj ix
+  IndexStrictArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->
+    doReadPtrArrayOp res obj ix
   WriteArrayOp -> \[obj, ix, v] -> opIntoRegs $ \[] ->
+    doWritePtrArrayOp obj ix v
+  WriteStrictArrayOp -> \[obj, ix, v] -> opIntoRegs $ \[] ->
     doWritePtrArrayOp obj ix v
 
   ReadSmallArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->
     doReadSmallPtrArrayOp res obj ix
+  ReadSmallStrictArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->
+    doReadSmallPtrArrayOp res obj ix
   IndexSmallArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->
     doReadSmallPtrArrayOp res obj ix
+  IndexSmallStrictArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->
+    doReadSmallPtrArrayOp res obj ix
   WriteSmallArrayOp -> \[obj,ix,v] -> opIntoRegs $ \[] ->
+    doWriteSmallPtrArrayOp obj ix v
+  WriteSmallStrictArrayOp -> \[obj,ix,v] -> opIntoRegs $ \[] ->
     doWriteSmallPtrArrayOp obj ix v
 
 -- Getting the size of pointer arrays

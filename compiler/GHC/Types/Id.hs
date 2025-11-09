@@ -513,8 +513,8 @@ isDFunId id = case Var.idDetails id of
                         _         -> False
 
 isPrimOpId_maybe id = case Var.idDetails id of
-                        PrimOpId op _ -> Just op
-                        _             -> Nothing
+                        PrimOpId op _   -> Just op
+                        _               -> Nothing
 
 isFCallId id = case Var.idDetails id of
                         FCallId _ -> True
@@ -845,7 +845,7 @@ setIdCbvMarks id marks
 
 idCbvMarks_maybe :: Id -> Maybe [CbvMark]
 idCbvMarks_maybe id = case idDetails id of
-  WorkerLikeId marks -> Just marks
+  WorkerLikeId marks   -> Just marks
   JoinId _arity marks  -> marks
   _                    -> Nothing
 

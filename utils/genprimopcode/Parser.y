@@ -30,6 +30,8 @@ import AccessOps
     ']'             { TCloseBracket }
     '<'             { TOpenAngle }
     '>'             { TCloseAngle }
+    '!'             { TBang }
+    '~'             { TTilde }
     section         { TSection }
     primop          { TPrimop }
     pseudoop        { TPseudoop }
@@ -56,6 +58,7 @@ import AccessOps
     WarnIfEffectIsCanFail { TWarnIfEffectIsCanFail }
     YesWarnCanFail  { TYesWarnCanFail }
     vector          { TVector }
+    cbv_marks       { TCbv_marks }
     SCALAR          { TSCALAR }
     VECTOR          { TVECTOR }
     VECTUPLE        { TVECTUPLE }
@@ -87,6 +90,7 @@ pOption : lowerName        '=' false                  { OptionFalse   $1     }
         | lowerName        '=' pStuffBetweenBraces    { OptionString  $1  $3 }
         | lowerName        '=' integer                { OptionInteger $1  $3 }
         | vector           '=' pVectorTemplate        { OptionVector      $3 }
+        | cbv_marks        '=' pCbvMarks              { OptionCbvMarks    $3 }
         | fixity           '=' pInfix                 { OptionFixity      $3 }
         | effect           '=' pEffect                { OptionEffect      $3 }
         | defined_bits     '=' pGoodBits              { OptionDefinedBits $3 }
@@ -174,6 +178,18 @@ pInsides : pInside pInsides { $1 ++ $2 }
 pInside :: { String }
 pInside : '{' pInsides '}' { "{" ++ $2 ++ "}" }
         | noBraces         { $1 }
+
+pCbvMarks :: { [Bool] }
+pCbvMarks : '[' pMarks ']' { $2 }
+
+pMarks :: { [Bool] }
+pMarks : pMark ',' pMarks { [$1] ++ $3 }
+       | pMark              { [$1] }
+       | {- empty -}          { [] }
+
+pMark :: { Bool }
+pMark : '!'  { True }
+      | '~'  { False }
 
 pVectorTemplate :: { [(String, String, Int)] }
 pVectorTemplate : '[' pVectors ']' { $2 }
