@@ -1,0 +1,6 @@
+T26099.hs:6:12: error: [GHC-28914]
+    • Level error: ‘T’ is bound at level 0 but used at level -1
+    • In an expression type signature: T
+      In the expression: 3 :: T
+      In the untyped splice: $(3 :: T)
+

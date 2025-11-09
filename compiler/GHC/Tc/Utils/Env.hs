@@ -8,6 +8,7 @@
                                       -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module GHC.Tc.Utils.Env(
         TyThing(..), TcTyThing(..), TcId,
@@ -1213,6 +1214,20 @@ pprBinders bndrs  = pprWithCommas ppr bndrs
 notFound :: Name -> TcM TyThing
 notFound name
   = do { lcl_env <- getLclEnv
+       ; lvls <- getCurrentAndBindLevel name
+       ; if    -- See Note [Out of scope might be a staging error]
+           | isUnboundName name -> failM  -- If the name really isn't in scope
+                                          -- don't report it again (#11941)
+                                          -- the
+                                          -- the 'Nothing' case of 'getCurrentAndBindLevel'
+                                          -- currently means 'isUnboundName' but to avoid
+                                          -- introducing bugs after a refactoring of that
+                                          -- function, we check this completely independently
+                                          -- before scrutinizing lvls
+           | Just (_top_lvl_flag, bind_lvls, lvl@Splice {}) <- lvls
+               -> failWithTc (TcRnBadlyLevelled (LevelCheckSplice name Nothing) bind_lvls (thLevelIndex lvl) Nothing ErrorWithoutFlag)
+           | otherwise  -> pure ()
+
        ; if isTermVarOrFieldNameSpace (nameNameSpace name)
            then
                -- This code path is only reachable with RequiredTypeArguments enabled
@@ -1243,14 +1258,23 @@ wrongThingErr expected thing name =
 {- Note [Out of scope might be a staging error]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
-  x = 3
-  data T = MkT $(foo x)
+  type T = Int
+  foo = $(1 :: T)
 
-where 'foo' is imported from somewhere.
+GHC currently leaves the user some liberty when it comes to using
+types in a manner that is theoretically not well-staged.
+E.g. if `T` here were to be a value, we would reject the program with
+a staging error. Since it is a type though, we allow it for backwards
+compatibility reasons.
 
-This is really a staging error, because we can't run code involving 'x'.
-But in fact the type checker processes types first, so 'x' won't even be
-in the type envt when we look for it in $(foo x).  So inside splices we
-report something missing from the type env as a staging error.
-See #5752 and #5795.
+However, in this case, we're just in the process of renaming a splice
+when trying to type check an expression involving a type, that hasn't
+even been added to the (type checking) environment yet. That is, why
+it is out of scope.
+
+The reason why we cannot recognise this issue earlier is, that if we
+are not actually type checking the splice, i.e. if we're only using the
+name of the type (e.g. ''T), the program should be accepted.
+
+We stop and report a staging error.
 -}
