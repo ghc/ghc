@@ -36,6 +36,8 @@ words :-
     <0>         "]"                 { mkT TCloseBracket }
     <0>         "<"                 { mkT TOpenAngle }
     <0>         ">"                 { mkT TCloseAngle }
+    <0>         "!"                 { mkT TBang }
+    <0>         "~"                 { mkT TTilde }
     <0>         "section"           { mkT TSection }
     <0>         "primop"            { mkT TPrimop }
     <0>         "pseudoop"          { mkT TPseudoop }
@@ -62,6 +64,7 @@ words :-
     <0>         "WarnIfEffectIsCanFail" { mkT TWarnIfEffectIsCanFail }
     <0>         "YesWarnCanFail"    { mkT TYesWarnCanFail }
     <0>         "vector"            { mkT TVector }
+    <0>         "cbv_marks"         { mkT TCbv_marks }
     <0>         "bytearray_access_ops" { mkT TByteArrayAccessOps }
     <0>         "addr_access_ops"   { mkT TAddrAccessOps }
     <0>         "thats_all_folks"   { mkT TThatsAllFolks }

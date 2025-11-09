@@ -559,7 +559,9 @@ genPrim prof bound ty op = case op of
 
   NewArrayOp           -> \[r] [l,e]   -> pure $ PrimInline $ r |= app hdNewArrayStr [l,e]
   ReadArrayOp          -> \[r] [a,i]   -> pure $ PrimInline $ bnd_arr bound a i (r |= a .! i)
+  ReadStrictArrayOp    -> \[r] [a,i]   -> pure $ PrimInline $ bnd_arr bound a i (r |= a .! i)
   WriteArrayOp         -> \[]  [a,i,v] -> pure $ PrimInline $ bnd_arr bound a i (a .! i |= v)
+  WriteStrictArrayOp   -> \[]  [a,i,v] -> pure $ PrimInline $ bnd_arr bound a i (a .! i |= v)
   SizeofArrayOp        -> \[r] [a]     -> pure $ PrimInline $ r |= a .^ lngth
   SizeofMutableArrayOp -> \[r] [a]     -> pure $ PrimInline $ r |= a .^ lngth
   IndexArrayOp         -> \[r] [a,i]   -> pure $ PrimInline $ bnd_arr bound a i (r |= a .! i)
@@ -623,7 +625,9 @@ genPrim prof bound ty op = case op of
 
   NewSmallArrayOp            -> \[a]   [n,e]         -> pure $ PrimInline $ a |= app hdNewArrayStr [n,e]
   ReadSmallArrayOp           -> \[r]   [a,i]         -> pure $ PrimInline $ bnd_arr bound a i (r |= a .! i)
+  ReadSmallStrictArrayOp           -> \[r]   [a,i]         -> pure $ PrimInline $ bnd_arr bound a i (r |= a .! i)
   WriteSmallArrayOp          -> \[]    [a,i,e]       -> pure $ PrimInline $ bnd_arr bound a i (a .! i |= e)
+  WriteSmallStrictArrayOp    -> \[]    [a,i,e]       -> pure $ PrimInline $ bnd_arr bound a i (a .! i |= e) -- todo check-tags?
   SizeofSmallArrayOp         -> \[r]   [a]           -> pure $ PrimInline $ r |= a .^ lngth
   SizeofSmallMutableArrayOp  -> \[r]   [a]           -> pure $ PrimInline $ r |= a .^ lngth
   IndexSmallArrayOp          -> \[r]   [a,i]         -> pure $ PrimInline $ bnd_arr bound a i (r |= a .! i)

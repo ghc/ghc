@@ -47,6 +47,7 @@ primopIncls =
     , ("primop-commutable.hs-incl"        , "--commutable")
     , ("primop-code-size.hs-incl"         , "--code-size")
     , ("primop-strictness.hs-incl"        , "--strictness")
+    , ("primop-cbv.hs-incl"               , "--cbv")
     , ("primop-is-work-free.hs-incl"      , "--is-work-free")
     , ("primop-is-cheap.hs-incl"          , "--is-cheap")
     , ("primop-fixity.hs-incl"            , "--fixity")

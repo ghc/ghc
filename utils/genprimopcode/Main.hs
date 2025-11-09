@@ -170,6 +170,11 @@ main = getArgs >>= \args ->
                                        "strictness"
                                        "primOpStrictness" p_o_specs)
 
+                      "--cbv"
+                         -> putStr (gen_switch_from_attribs
+                                       "cbv_marks"
+                                       "primOpCbv" p_o_specs)
+
                       "--fixity"
                          -> putStr (gen_switch_from_attribs
                                        "fixity"
@@ -228,6 +233,7 @@ known_args
        "--is-work-free",
        "--is-cheap",
        "--strictness",
+       "--cbv",
        "--fixity",
        "--primop-effects",
        "--primop-primop-info",
@@ -318,6 +324,7 @@ gen_hs_source (Info defaults entries) =
            opt (OptionInteger n v) = n ++ " = " ++ show v
            opt (OptionVector _)    = ""
            opt (OptionFixity mf) = "fixity = " ++ show mf
+           opt (OptionCbvMarks marks) = "cbv_marks = " ++ show marks
            opt (OptionEffect eff) = "effect = " ++ show eff
            opt (OptionDefinedBits bc) = "defined_bits = " ++ show bc
            opt (OptionCanFailWarnFlag wf) = "can_fail_warning = " ++ show wf
@@ -645,6 +652,11 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
          getAltRhs (OptionString _ s) = s
          getAltRhs (OptionVector _) = "True"
          getAltRhs (OptionFixity mf) = show mf
+         getAltRhs (OptionCbvMarks marks) =
+            "[" ++ concat (intersperse "," (map showMark marks)) ++ "]"
+            where
+               showMark True = "MarkedCbv"
+               showMark False = "NotMarkedCbv"
          getAltRhs (OptionEffect eff) = show eff
          getAltRhs (OptionDefinedBits bc) = show bc
          getAltRhs (OptionCanFailWarnFlag wf) = show wf
