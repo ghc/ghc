@@ -1491,7 +1491,7 @@ generaliseTcTyCon (tc, tc_kind, skol_info, scoped_prs, tc_res_kind)
        -- Step 6: Make the result TcTyCon
        ; let final_tcbs = all_tcbs `chkAppend` eta_tcbs
              tycon = mkTcTyCon (tyConName tc) user_kind
-                               final_tcbs tc_res_kind
+                               final_tcbs (length eta_tcbs) tc_res_kind
                                (mkTyVarNamePairs (sorted_spec_tvs ++ req_tvs))
                                True {- it's generalised now -}
                                flav
@@ -3061,7 +3061,7 @@ tcClassDecl1 :: RolesInfo -> Name -> Maybe (LHsContext GhcRn)
              -> TcM Class
 tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
   = fixM $ \ clas -> -- We need the knot because 'clas' is passed into tcClassATs
-    bindTyClTyVars class_name $ \ kind tc_bndrs res_kind ->
+    bindTyClTyVars class_name $ \ kind tc_bndrs _nb_eta res_kind ->
     do { checkClassKindSig res_kind
        ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr tc_bndrs)
        ; let tycon_name = class_name        -- We use the same name
@@ -3379,7 +3379,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
-  = bindTyClTyVarsAndZonk tc_name $ \ kind tc_bndrs res_kind -> do
+  = bindTyClTyVarsAndZonk tc_name $ \ kind tc_bndrs nb_eta res_kind -> do
   { traceTc "tcFamDecl1 data family:" (ppr tc_name)
   ; checkFamFlag tc_name
 
@@ -3397,7 +3397,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   ; checkDataKindSig DataFamilySort res_kind
   ; tc_rep_name <- newTyConRepName tc_name
   ; let inj   = Injective $ replicate (length tc_bndrs) True
-        tycon = mkFamilyTyCon tc_name kind tc_bndrs
+        tycon = mkFamilyTyCon tc_name kind tc_bndrs nb_eta
                               res_kind
                               (resultVariableName sig)
                               (DataFamilyTyCon tc_rep_name)
@@ -3405,12 +3405,12 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   ; return (tycon, []) }
 
   | OpenTypeFamily <- fam_info
-  = bindTyClTyVarsAndZonk tc_name $ \ kind tc_bndrs res_kind -> do
+  = bindTyClTyVarsAndZonk tc_name $ \ kind tc_bndrs _nb_eta res_kind -> do
   { traceTc "tcFamDecl1 open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
   ; inj' <- tcInjectivity tc_bndrs inj
   ; checkResultSigFlag tc_name sig  -- check after injectivity for better errors
-  ; let tycon = mkFamilyTyCon tc_name kind tc_bndrs res_kind
+  ; let tycon = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind
                                (resultVariableName sig) OpenSynFamilyTyCon
                                parent inj'
   ; return (tycon, []) }
@@ -3422,7 +3422,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
          -- the variables in the header scope only over the injectivity
          -- declaration but this is not involved here
        ; (inj', kind, tc_bndrs, res_kind)
-            <- bindTyClTyVarsAndZonk tc_name $ \ kind tc_bndrs res_kind ->
+            <- bindTyClTyVarsAndZonk tc_name $ \ kind tc_bndrs _nb_eta res_kind ->
                do { inj' <- tcInjectivity tc_bndrs inj
                   ; return (inj', kind, tc_bndrs, res_kind) }
 
@@ -3433,7 +3433,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
          -- but eqns might be empty in the Just case as well
        ; case mb_eqns of
            Nothing   ->
-              let tc = mkFamilyTyCon tc_name kind tc_bndrs res_kind
+              let tc = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind
                                      (resultVariableName sig)
                                      AbstractClosedSynFamilyTyCon parent
                                      inj'
@@ -3441,7 +3441,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
            Just eqns -> do {
 
          -- Process the equations, creating CoAxBranches
-       ; let tc_fam_tc = mkTcTyCon tc_name kind tc_bndrs res_kind
+       ; let tc_fam_tc = mkTcTyCon tc_name kind tc_bndrs 0 res_kind
                                    noTcTyConScopedTyVars
                                    False {- this doesn't matter here -}
                                    ClosedTypeFamilyFlavour
@@ -3461,7 +3461,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
               | null eqns = Nothing   -- mkBranchedCoAxiom fails on empty list
               | otherwise = Just (mkBranchedCoAxiom co_ax_name fam_tc branches)
 
-             fam_tc = mkFamilyTyCon tc_name kind tc_bndrs res_kind (resultVariableName sig)
+             fam_tc = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind (resultVariableName sig)
                       (ClosedSynFamilyTyCon mb_co_ax) parent inj'
 
          -- We check for instance validity later, when doing validity
@@ -3518,7 +3518,7 @@ tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
 tcTySynRhs :: RolesInfo -> Name
            -> LHsType GhcRn -> TcM TyCon
 tcTySynRhs roles_info tc_name hs_ty
-  = bindTyClTyVars tc_name $ \ kind tc_bndrs res_kind ->
+  = bindTyClTyVars tc_name $ \ kind tc_bndrs _nb_eta res_kind ->
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (getLclEnvRdrEnv env))
        ; rhs_ty <- pushLevelAndSolveEqualities skol_info tc_bndrs $
@@ -3553,7 +3553,7 @@ tcDataDefn err_ctxt roles_info tc_name
                                                -- via inferInitialKinds
                        , dd_cons = cons
                        , dd_derivs = derivs })
-  = bindTyClTyVars tc_name $ \ kind tc_bndrs res_kind ->
+  = bindTyClTyVars tc_name $ \ kind tc_bndrs nb_eta res_kind ->
        -- The TyCon tyvars must scope over
        --    - the stupid theta (dd_ctxt)
        --    - for H98 constructors only, the ConDecl
@@ -3601,7 +3601,7 @@ tcDataDefn err_ctxt roles_info tc_name
              ; tc_rep_nm <- newTyConRepName tc_name
 
              ; return (mkAlgTyCon tc_name kind
-                                  bndrs
+                                  bndrs nb_eta
                                   res_kind
                                   (roles_info tc_name)
                                   (fmap unLoc cType)

@@ -829,7 +829,8 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                       -- NB: Use the full ty_binders from the pats. See bullet toward
                       -- the end of Note [Data type families] in GHC.Core.TyCon
                     rep_tc   = mkAlgTyCon rep_tc_name user_kind
-                                          ty_binders res_kind
+                                          ty_binders (length extra_tcbs)
+                                          res_kind
                                           (map (const Nominal) ty_binders)
                                           (fmap unLoc cType) stupid_theta
                                           tc_rhs parent

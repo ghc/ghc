@@ -146,6 +146,7 @@ tyConToIfaceDecl env tycon
                     ifResVar  = mkIfLclName <$> if_res_var,
                     ifFamFlav = to_if_fam_flav fam_flav,
                     ifBinders = if_binders,
+                    ifNbEtaBinders = tyConEtaBinders tycon,
                     ifResKind = if_res_kind,
                     ifFamInj  = tyConInjectivityInfo tycon
                   })
@@ -155,6 +156,7 @@ tyConToIfaceDecl env tycon
     , IfaceData { ifName    = getName tycon,
                   ifKind    = if_kind,
                   ifBinders = if_binders,
+                  ifNbEtaBinders = tyConEtaBinders tycon,
                   ifResKind = if_res_kind,
                   ifCType   = tyConCType_maybe tycon,
                   ifRoles   = tyConRoles tycon,
@@ -171,6 +173,7 @@ tyConToIfaceDecl env tycon
     , IfaceData { ifName       = getName tycon,
                   ifKind       = if_kind,
                   ifBinders    = if_binders,
+                  ifNbEtaBinders = tyConEtaBinders tycon,
                   ifResKind    = if_res_kind,
                   ifCType      = Nothing,
                   ifRoles      = tyConRoles tycon,

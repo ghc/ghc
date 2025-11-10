@@ -1208,7 +1208,7 @@ module Data.Functor.Classes where
 module Data.Functor.Compose where
   -- Safety: Trustworthy
   type role Compose representational nominal nominal
-  type Compose :: forall {k} {k1}. (k -> *) -> (k1 -> k) -> k1 -> *
+  type Compose :: forall {k1} {k2}. (k1 -> *) -> (k2 -> k1) -> k2 -> *
   newtype Compose f g a = Compose {getCompose :: f (g a)}
 
 module Data.Functor.Const where

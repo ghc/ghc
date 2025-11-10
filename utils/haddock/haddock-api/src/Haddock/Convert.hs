@@ -76,7 +76,7 @@ import GHC.Utils.Misc
   , dropList
   , equalLength
   , filterByList
-  , filterOut
+  , filterOut, dropTail
   )
 import GHC.Utils.Panic.Plain (assert)
 
@@ -270,13 +270,17 @@ synifyTyCon prr _coax tc
           , tcdDataDefn =
               HsDataDefn
                 { dd_ext = noAnn
-                , dd_cons = DataTypeCons False [] -- No constructors; arbitrary lie, they are neither
+                -- No constructors; arbitrary lie, they are neither
                 -- algebraic data nor newtype:
+                , dd_cons = DataTypeCons False []
                 , dd_ctxt = Nothing
                 , dd_cType = Nothing
-                , dd_kindSig = synifyDataTyConReturnKind tc
-                , -- we have their kind accurately:
-                  dd_derivs = []
+                , dd_kindSig =
+                    let res_kind = tyConResKind tc
+                    in if isLiftedTypeKind res_kind
+                       then Nothing -- Don't bother displaying :: *
+                       else Just $ synifyKindSig res_kind
+                , dd_derivs = []
                 }
           , tcdDExt = DataDeclRn False emptyNameSet
           }
@@ -313,6 +317,8 @@ synifyTyCon _prr _coax tc
   where
     resultVar = tyConFamilyResVar_maybe tc
     mkFamDecl i =
+      let (tvs, resultSig) = synifyFamilyResultSig resultVar tc
+      in
       return $
         FamDecl noExtField $
           FamilyDecl
@@ -320,9 +326,9 @@ synifyTyCon _prr _coax tc
             , fdInfo = i
             , fdTopLevel = TopLevel
             , fdLName = synifyNameN tc
-            , fdTyVars = synifyTyVars (tyConVisibleTyVars tc)
+            , fdTyVars = tvs
             , fdFixity = synifyFixity tc
-            , fdResultSig = synifyFamilyResultSig resultVar (tyConResKind tc)
+            , fdResultSig = resultSig
             , fdInjectivityAnn =
                 synifyInjectivityAnn
                   resultVar
@@ -355,16 +361,8 @@ synifyTyCon _prr coax tc
           Just a -> synifyNameN a
           _ -> synifyNameN tc
 
-        -- For a data declaration:
-        --   data Vec :: Nat -> Type -> Type where
-        -- GHC will still report visible tyvars with default names 'a' and 'b'.
-        -- Since 'Nat' is not inhabited by lifted types, 'a' will be given a kind
-        -- signature (due to the logic in 'synify_ty_var'). Similarly, 'Vec'
-        -- constructs lifted types and will therefore not be given a result kind
-        -- signature. Thus, the generated documentation for 'Vec' will look like:
-        -- data Vec (a :: Nat) b where
-        tyvars = synifyTyVars (tyConVisibleTyVars tc)
-        kindSig = synifyDataTyConReturnKind tc
+        -- The kind signature.
+        (tyvars, kindSig) = synifyTyConKindSig tc
 
         -- The data constructors.
         --
@@ -417,26 +415,75 @@ synifyTyCon _prr coax tc
           , tcdDExt = DataDeclRn False emptyNameSet
           }
 
--- | In this module, every TyCon being considered has come from an interface
--- file. This means that when considering a data type constructor such as:
+-- | Compute type variable binders & inline kind signature for the TyCon of a
+-- data declaration.
 --
--- > data Foo (w :: *) (m :: * -> *) (a :: *)
---
--- Then its tyConKind will be (* -> (* -> *) -> * -> *). But beware! We are
--- also rendering the type variables of Foo, so if we synify the tyConKind of
--- Foo in full, we will end up displaying this in Haddock:
---
--- > data Foo (w :: *) (m :: * -> *) (a :: *)
--- >   :: * -> (* -> *) -> * -> *
---
--- Which is entirely wrong (#548). We only want to display the /return/ kind,
--- which this function obtains.
-synifyDataTyConReturnKind :: TyCon -> Maybe (LHsKind GhcRn)
-synifyDataTyConReturnKind tc
-  | isLiftedTypeKind ret_kind = Nothing -- Don't bother displaying :: *
-  | otherwise = Just (synifyKindSig ret_kind)
-  where
-    ret_kind = tyConResKind tc
+-- This is only subtle when using GADT syntax;
+-- see Note [Inline kind signatures with GADTSyntax].
+synifyTyConKindSig :: TyCon -> (LHsQTyVars GhcRn, Maybe (LHsKind GhcRn))
+synifyTyConKindSig tc
+  | not $ isGadtSyntaxTyCon tc
+  = let res_ki = tyConResKind tc
+    in
+      ( synifyTyVars (tyConVisibleTyVars tc)
+      , if isLiftedTypeKind res_ki
+        then Nothing
+        else Just $ synifyKindSig res_ki
+      )
+  | otherwise
+  = let
+      -- Compute the prefix of user-written binders, including
+      -- intervening non-user-written invisible binders.
+      -- (1) in Note [Inline kind signatures with GADTSyntax]
+      user_tvs = dropTail (tyConEtaBinders tc) (tyConBinders tc)
+      user_vis_tvs = [ tv | Bndr tv vis <- user_tvs, isVisibleTcbVis vis ]
+
+      -- (2) in Note [Inline kind signatures with GADTSyntax]
+      user_ki = piResultTys (tyConKind tc) (map binderType user_tvs)
+
+    in ( synifyTyVars user_vis_tvs
+       , if isLiftedTypeKind user_ki
+         then Nothing
+         else Just $ synifyKindSig user_ki
+       )
+
+{- Note [Inline kind signatures with GADTSyntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose the user writes a declaration using GADT syntax, such as
+
+  (G1) data Vec :: Nat -> Type -> Type where {..} -- arity 2
+
+or
+
+  (G2) data State s :: Effect where {..} -- arity 3
+  with type synonym 'type Effect = (Type -> Type) -> Type -> Type'
+
+The issue is that when kind-checking these declarations, GHC will invent
+internal variable names (see GHC.Tc.Gen.HsType.splitTyConKind) so that there are
+as many binders as the arity of the data declaration, i.e. we get
+
+  (G1) data Vec a b where {..}
+       tyConBinders = [a,b]
+       tyConKind = Nat -> Type -> Type
+
+  (G2) data State s a b where {..}
+       tyConBinders = [s,a,b]
+       tyConKind = Type -> Effect
+
+So we do some fancy footwork in order to preserve the user-written kinds in
+the generated Haddocks:
+
+ (1) Filter out system names generated by GHC, e.g. 'a' and 'b' above.
+     This is the purpose of the 'tyConEtaBinders' field of 'TyCon', letting us
+     know how many binders were introduced by eta-expansion.
+
+ (2) Add the return kind, but dropping one argument type for each
+     user-written argument.
+     For example, for (G2) we have 'State :: Type -> Effect'.
+     As we have one user-written binder, we drop the initial 'Type'
+     and return the inline kind signature 'Effect'.
+     This is achieved using 'piResultTys'.
+-}
 
 synifyInjectivityAnn
   :: Maybe Name
@@ -448,19 +495,31 @@ synifyInjectivityAnn (Just lhs) tvs (Injective inj) =
    in Just $ noLocA $ InjectivityAnn noAnn (noLocA lhs) rhs
 synifyInjectivityAnn _ _ _ = Nothing
 
-synifyFamilyResultSig :: Maybe Name -> Kind -> LFamilyResultSig GhcRn
-synifyFamilyResultSig Nothing kind
-  | isLiftedTypeKind kind =
-      noLocA $ NoSig noExtField
-  | otherwise =
-      noLocA $ KindSig noExtField (synifyKindSig kind)
-synifyFamilyResultSig (Just name) kind =
-      noLocA $ TyVarSig noExtField (noLocA tvb)
+synifyFamilyResultSig :: Maybe Name -> TyCon -> (LHsQTyVars GhcRn, LFamilyResultSig GhcRn)
+synifyFamilyResultSig mbResVar tc = (tvs, resSig)
   where
-      tvb = HsTvb { tvb_ext  = noAnn
+    -- Use 'synifyTyConKindSig' as per Note [Inline kind signatures with GADTSyntax]
+    (tvs, mbResKind) = synifyTyConKindSig tc
+    resSig =
+      case mbResVar of
+        Nothing ->
+          case mbResKind of
+            Nothing -> noLocA $ NoSig noExtField
+            Just ki -> noLocA $ KindSig noExtField ki
+
+        -- There's a result type variable (injectivity annotation),
+        -- e.g. 'type family F a b = (r :: k)'
+        Just resVar ->
+          let tvb =
+                HsTvb
+                  { tvb_ext  = noAnn
                   , tvb_flag = ()
-                  , tvb_var  = HsBndrVar noExtField (noLocA name)
-                  , tvb_kind = HsBndrKind noExtField (synifyKindSig kind) }
+                  , tvb_var  = HsBndrVar noExtField (noLocA resVar)
+                  , tvb_kind =
+                      case mbResKind of
+                        Nothing -> HsBndrNoKind noExtField
+                        Just ki -> HsBndrKind noExtField ki }
+          in noLocA $ TyVarSig noExtField (noLocA tvb)
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax) for any
 -- constructor that would be misrepresented by omitting its result-type. But you

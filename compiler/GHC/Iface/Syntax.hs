@@ -194,6 +194,7 @@ data IfaceDecl
   | IfaceData { ifName       :: IfaceTopBndr,   -- Type constructor
                 ifKind       :: IfaceType,
                 ifBinders    :: [IfaceTyConBinder],
+                ifNbEtaBinders :: Int, -- ^ number of binders introduced by eta-expansion
                 ifResKind    :: IfaceType,      -- Result kind of type constructor
                 ifCType      :: Maybe CType,    -- C type for CAPI FFI
                 ifRoles      :: [Role],         -- Roles
@@ -218,6 +219,7 @@ data IfaceDecl
                                                    -- only for pretty-printing
                                                    -- with --show-iface
                    ifBinders :: [IfaceTyConBinder],
+                   ifNbEtaBinders :: Int, -- ^ number of binders introduced by eta-expansion
                    ifResKind :: IfaceKind,         -- Kind of the *tycon*
                    ifFamFlav :: IfaceFamTyConFlav,
                    ifFamInj  :: Injectivity }      -- injectivity information
@@ -2266,7 +2268,7 @@ instance Binary IfaceDecl where
         lazyPut bh (ty, details, idinfo)
         -- See Note [Lazy deserialization of IfaceId]
 
-    put_ bh (IfaceData a1 a10 a2 a3 a4 a5 a6 a7 a8 a9) = do
+    put_ bh (IfaceData a1 a10 a2 a11 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 2
         putIfaceTopBndr bh a1
         put_ bh a2
@@ -2278,6 +2280,7 @@ instance Binary IfaceDecl where
         put_ bh a8
         put_ bh a9
         put_ bh a10
+        put_ bh a11
 
     put_ bh (IfaceSynonym a1 a6 a2 a3 a4 a5) = do
         putByte bh 3
@@ -2288,7 +2291,7 @@ instance Binary IfaceDecl where
         put_ bh a5
         put_ bh a6
 
-    put_ bh (IfaceFamily a1 a7 a2 a3 a4 a5 a6) = do
+    put_ bh (IfaceFamily a1 a7 a2 a3 a8 a4 a5 a6) = do
         putByte bh 4
         putIfaceTopBndr bh a1
         put_ bh a2
@@ -2297,6 +2300,7 @@ instance Binary IfaceDecl where
         put_ bh a5
         put_ bh a6
         put_ bh a7
+        put_ bh a8
 
     -- NB: Written in a funny way to avoid an interface change
     put_ bh (IfaceClass {
@@ -2377,7 +2381,8 @@ instance Binary IfaceDecl where
                     a8  <- get bh
                     a9  <- get bh
                     a10 <- get bh
-                    return (IfaceData a1 a10 a2 a3 a4 a5 a6 a7 a8 a9)
+                    a11 <- get bh
+                    return (IfaceData a1 a10 a2 a11 a3 a4 a5 a6 a7 a8 a9)
             3 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
@@ -2392,7 +2397,8 @@ instance Binary IfaceDecl where
                     a5 <- get bh
                     a6 <- get bh
                     a7 <- get bh
-                    return (IfaceFamily a1 a7 a2 a3 a4 a5 a6)
+                    a8 <- get bh
+                    return (IfaceFamily a1 a7 a2 a3 a8 a4 a5 a6)
             5 -> do a1 <- get bh
                     a2 <- getIfaceTopBndr bh
                     a3 <- get bh
@@ -3085,16 +3091,16 @@ instance NFData IfaceDecl where
     IfaceId f1 f2 f3 f4 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
 
-    IfaceData f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 ->
+    IfaceData f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq`
-      rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10
+      rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` rnf f11
 
     IfaceSynonym f1 f2 f3 f4 f5 f6 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
 
-    IfaceFamily f1 f2 f3 f4 f5 f6 f7 ->
+    IfaceFamily f1 f2 f3 f4 f5 f6 f7 f8 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6
-             `seq` rnf f7
+             `seq` rnf f7 `seq` rnf f8
 
     IfaceClass f1 f2 f3 f4 f5 f6 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6

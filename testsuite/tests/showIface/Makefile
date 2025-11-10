@@ -42,6 +42,10 @@ HaddockIssue849:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -haddock HaddockIssue849.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface HaddockIssue849.hi | grep -A 200 'docs:'
 
+T26246a:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -v0 -dno-typeable-binds T26246a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T26246a.hi | grep -E '\b(Eff|Effect|State|Env)\b'
+
 HaddockSpanIssueT24378:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -haddock HaddockSpanIssueT24378.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface HaddockSpanIssueT24378.hi | grep -A 200 'docs:'

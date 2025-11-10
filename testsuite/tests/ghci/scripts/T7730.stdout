@@ -1,5 +1,5 @@
 type role A phantom phantom
-type A :: forall {k} {k1}. k -> k1 -> *
+type A :: forall {k1} {k2}. k1 -> k2 -> *
 data A x y
   	-- Defined at <interactive>:2:1
 A :: k1 -> k2 -> *

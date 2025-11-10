@@ -1,0 +1,19 @@
+  Eff
+  Effect
+  Env
+  State{Get Put State StateM}
+  type role Eff phantom representational
+  type Eff :: [Effect] -> * -> *
+  newtype Eff es a = Eff (Env es -> GHC.Internal.Types.IO a)
+  type Effect :: *
+  type Effect = (* -> *) -> * -> *
+  type role Env phantom
+  type Env :: [Effect] -> *
+  data Env es = Env
+  type role State nominal representational nominal
+  type State :: * -> Effect
+  data State s a b where
+    Get :: State s m s
+    Put :: s -> State s m ()
+    State :: (s -> (a, s)) -> State s m a
+    StateM :: (s -> m (a, s)) -> State s m a

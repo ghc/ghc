@@ -533,7 +533,7 @@ anyTyConName =
 
 anyTyCon :: TyCon
 -- See Note [Any types]
-anyTyCon = mkFamilyTyCon anyTyConName kind binders res_kind Nothing
+anyTyCon = mkFamilyTyCon anyTyConName kind binders 0 res_kind Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
                          NotInjective
@@ -555,7 +555,7 @@ zonkAnyTyConName =
 zonkAnyTyCon :: TyCon
 -- ZonkAnyTyCon :: forall k. Nat -> k
 -- See Note [Any types]
-zonkAnyTyCon = mkFamilyTyCon zonkAnyTyConName kind bndrs res_kind
+zonkAnyTyCon = mkFamilyTyCon zonkAnyTyConName kind bndrs 0 res_kind
                          Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
@@ -572,7 +572,7 @@ zonkAnyTyCon = mkFamilyTyCon zonkAnyTyConName kind bndrs res_kind
 makeRecoveryTyCon :: TyCon -> TyCon
 makeRecoveryTyCon tc
   = mkTcTyCon (tyConName tc) (mkTyConKind bndrs res_kind)
-              bndrs res_kind
+              bndrs 0 res_kind
               noTcTyConScopedTyVars
               True             -- Fully generalised
               flavour          -- Keep old flavour
@@ -619,7 +619,7 @@ consDataCon_RDR = nameRdrName consDataConName
 -- Representational role, and that there is no kind polymorphism.
 pcTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon name cType tyvars cons
-  = mkAlgTyCon name (mkTyConKind bndrs res_kind) bndrs res_kind
+  = mkAlgTyCon name (mkTyConKind bndrs res_kind) bndrs 0 res_kind
                 (map (const Representational) tyvars)
                 cType
                 []              -- No stupid theta
@@ -1872,7 +1872,7 @@ multMulTyConName =
     mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "MultMul") multMulTyConKey multMulTyCon
 
 multMulTyCon :: TyCon
-multMulTyCon = mkFamilyTyCon multMulTyConName kind binders multiplicityTy Nothing
+multMulTyCon = mkFamilyTyCon multMulTyConName kind binders 0 multiplicityTy Nothing
                          (BuiltInSynFamTyCon trivialBuiltInFamily)
                          Nothing
                          NotInjective

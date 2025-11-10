@@ -67,7 +67,7 @@ data D1 where
   MkD :: b -> D1
   	-- Defined at <interactive>:90:1
 type role D2 phantom
-type D2 :: forall {k} {k1} (a :: k) b. * -> forall (d :: k1). *
+type D2 :: forall {k1} {k2} (a :: k1) b. * -> forall (d :: k2). *
 data D2 @a @b c = MkD2_1 | MkD2_2 Int b
   	-- Defined at <interactive>:95:1
 type F1 :: forall k1 k2.
@@ -224,7 +224,7 @@ data D1 @{k} @a where
   MkD :: b -> D1 @{*} @b
   	-- Defined at <interactive>:90:1
 type role D2 nominal nominal nominal nominal phantom nominal
-type D2 :: forall {k} {k1} (a :: k) b. * -> forall (d :: k1). *
+type D2 :: forall {k1} {k2} (a :: k1) b. * -> forall (d :: k2). *
 data D2 @{k} @{k1} @a @b c @d = MkD2_1 | MkD2_2 Int b
   	-- Defined at <interactive>:95:1
 type F1 :: forall k1 k2.

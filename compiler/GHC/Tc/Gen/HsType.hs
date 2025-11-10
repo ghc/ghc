@@ -2457,7 +2457,7 @@ kcCheckDeclHeader_cusk name flav
 
        ; let all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ binderVars tc_bndrs)
              final_tcbs = all_tcbs `chkAppend` eta_tcbs
-             tycon = mkTcTyCon name user_kind final_tcbs res_kind all_tv_prs
+             tycon = mkTcTyCon name user_kind final_tcbs (length eta_tcbs) res_kind all_tv_prs
                                True -- Make a PolyTcTyCon, fully generalised
                                flav
 
@@ -2552,7 +2552,7 @@ kcInferDeclHeader name flav
                -- See Note [Cloning for type variable binders]
 
              kind = mkTyConKind tc_binders res_kind
-             tycon = mkTcTyCon name kind tc_binders res_kind all_tv_prs
+             tycon = mkTcTyCon name kind tc_binders 0 res_kind all_tv_prs
                                False -- Make a MonoTcTyCon
                                flav
 
@@ -2695,7 +2695,7 @@ kcCheckDeclHeader_sig sig_kind name flav
         --     because the tv_prs is used when (say) typechecking the RHS of
         --     a type synonym.
         ; let
-            tc = mkTcTyCon name sig_kind swizzled_tcbs swizzled_res_kind all_tv_prs
+            tc = mkTcTyCon name sig_kind swizzled_tcbs (length extra_tcbs) swizzled_res_kind all_tv_prs
                  True -- Make a PolyTcTyCon, fully generalised
                  flav
 
@@ -3743,7 +3743,7 @@ When we /must/ clone.
 -- kind-checking and typechecking phases
 --------------------------------------
 
-bindTyClTyVars :: Name -> (TcKind -> [TcTyConBinder] -> TcKind -> TcM a) -> TcM a
+bindTyClTyVars :: Name -> (TcKind -> [TcTyConBinder] -> Int -> TcKind -> TcM a) -> TcM a
 -- ^ Bring into scope the binders of a PolyTcTyCon
 -- Used for the type variables of a type or class decl
 -- in the "kind checking" and "type checking" pass,
@@ -3753,23 +3753,24 @@ bindTyClTyVars tycon_name thing_inside
        ; let kind       = tyConKind tycon
              res_kind   = tyConResKind tycon
              binders    = tyConBinders tycon
+             nb_eta     = tyConEtaBinders tycon
        ; traceTc "bindTyClTyVars" (ppr tycon_name $$ ppr binders)
        ; tcExtendTyVarEnv (binderVars binders) $
-         thing_inside kind binders res_kind }
+         thing_inside kind binders nb_eta res_kind }
 
-bindTyClTyVarsAndZonk :: Name -> (Kind -> [TyConBinder] -> Kind -> TcM a) -> TcM a
+bindTyClTyVarsAndZonk :: Name -> (Kind -> [TyConBinder] -> Int -> Kind -> TcM a) -> TcM a
 -- Like bindTyClTyVars, but in addition
 -- zonk the skolem TcTyVars of a PolyTcTyCon to TyVars
 -- We always do this same zonking after a call to bindTyClTyVars, but
 -- here we do it right away because there are no more unifications to come
 bindTyClTyVarsAndZonk tycon_name thing_inside
-  = bindTyClTyVars tycon_name $ \ tc_kind tc_bndrs tc_res_kind ->
+  = bindTyClTyVars tycon_name $ \ tc_kind tc_bndrs nb_eta tc_res_kind ->
     do { (kind, bndrs, res_kind) <- initZonkEnv NoFlexi $ do
           kind <- zonkTcTypeToTypeX tc_kind
           runZonkBndrT (zonkTyVarBindersX tc_bndrs) $ \ bndrs ->
             do { res_kind <- zonkTcTypeToTypeX tc_res_kind
                ; return (kind, bndrs, res_kind) }
-       ; thing_inside kind bndrs res_kind }
+       ; thing_inside kind bndrs nb_eta res_kind }
 
 
 {- *********************************************************************
@@ -3962,7 +3963,7 @@ splitTyConKind :: SkolemInfo
                -> [OccName]  -- Avoid these OccNames
                -> Kind       -- Must be zonked
                -> TcM ([TcTyConBinder], TcKind)
--- GADT decls can have a (perhaps partial) kind signature
+-- ^ GADT decls can have a (perhaps partial) kind signature
 --      e.g.  data T a :: * -> * -> * where ...
 -- This function makes up suitable (kinded) TyConBinders for the
 -- argument kinds.  E.g. in this case it might return

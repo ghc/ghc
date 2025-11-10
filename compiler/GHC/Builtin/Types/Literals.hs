@@ -668,7 +668,7 @@ axLogRewrites
 typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon
   = mkFamilyTyCon name (mkTyConKind bndrs orderingKind)
-      bndrs
+      bndrs 0
       orderingKind
       Nothing
       (BuiltInSynFamTyCon ops)
@@ -703,7 +703,7 @@ axCmpNatInjectivity
 typeSymbolCmpTyCon :: TyCon
 typeSymbolCmpTyCon =
   mkFamilyTyCon name (mkTyConKind bndrs orderingKind)
-    bndrs
+    bndrs 0
     orderingKind
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -788,7 +788,7 @@ axAppendInjectivity
 typeConsSymbolTyCon :: TyCon
 typeConsSymbolTyCon =
   mkFamilyTyCon name (mkTyConKind bndrs typeSymbolKind)
-    bndrs
+    bndrs 0
     typeSymbolKind
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -832,7 +832,7 @@ axConsInjectivity
 typeUnconsSymbolTyCon :: TyCon
 typeUnconsSymbolTyCon =
   mkFamilyTyCon name (mkTyConKind bndrs res_kind)
-    bndrs
+    bndrs 0
     res_kind
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -886,7 +886,7 @@ axUnconsInjectivity
 typeCharToNatTyCon :: TyCon
 typeCharToNatTyCon =
   mkFamilyTyCon name (mkTyConKind bndrs naturalTy)
-    bndrs
+    bndrs 0
     naturalTy
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -919,7 +919,7 @@ axCharToNatInjectivity
 typeNatToCharTyCon :: TyCon
 typeNatToCharTyCon =
   mkFamilyTyCon name (mkTyConKind bndrs charTy)
-    bndrs
+    bndrs 0
     charTy
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -953,7 +953,7 @@ axNatToCharInjectivity
 typeCharCmpTyCon :: TyCon
 typeCharCmpTyCon =
   mkFamilyTyCon name (mkTyConKind bndrs orderingKind)
-    bndrs
+    bndrs 0
     orderingKind
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -1065,7 +1065,7 @@ isOrderingLitTy tc =
 mkTypeNatFunTyCon1 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon1 op tcb =
   mkFamilyTyCon op (mkTyConKind bndrs naturalTy)
-    bndrs
+    bndrs 0
     naturalTy
     Nothing
     (BuiltInSynFamTyCon tcb)
@@ -1078,7 +1078,7 @@ mkTypeNatFunTyCon1 op tcb =
 mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon2 op tcb =
   mkFamilyTyCon op (mkTyConKind bndrs naturalTy)
-    bndrs
+    bndrs 0
     naturalTy
     Nothing
     (BuiltInSynFamTyCon tcb)
@@ -1091,7 +1091,7 @@ mkTypeNatFunTyCon2 op tcb =
 mkTypeSymbolFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeSymbolFunTyCon2 op tcb =
   mkFamilyTyCon op (mkTyConKind bndrs typeSymbolKind)
-    bndrs
+    bndrs 0
     typeSymbolKind
     Nothing
     (BuiltInSynFamTyCon tcb)

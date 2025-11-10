@@ -105,6 +105,7 @@ module GHC.Core.TyCon(
         algTcFields,
         tyConPromDataConInfo,
         tyConBinders, tyConResKind, tyConInvisTVBinders,
+        tyConEtaBinders,
         tcTyConScopedTyVars, isMonoTcTyCon,
         tyConHasClosedResKind,
         mkTyConTagMap,
@@ -784,6 +785,11 @@ data TyCon = TyCon {
           -- Equal to @mkTyConKind tyConBinders tyConResKind@ only up to
           -- type synonym expansion, see Note [Preserve user-written TyCon kind]
         tyConHasClosedResKind :: Bool,
+        tyConEtaBinders :: Int,
+          -- ^ How many of the binders were introduced by eta expansion?
+          -- (see Note [splitTyConKind] in GHC.Tc.Gen.HsType)
+          --
+          -- Used only for pretty-printing
 
         -- Cached values
         tyConTyVars    :: [TyVar],       -- ^ TyVar binders
@@ -2017,17 +2023,19 @@ So we compromise, and move their Kind calculation to the call site.
 mkTyCon :: Name
         -> Kind -- ^ kind of the TyCon
         -> [TyConBinder]
+        -> Int -- ^ number of binders introduced by eta-expansion
         -> Kind -- ^ result kind of the TyCon
         -> [Role]
         -> TyConDetails
         -> TyCon
-mkTyCon name kind binders res_kind roles details
+mkTyCon name kind binders nb_eta_bndrs res_kind roles details
   = tc
   where
     -- Recursive binding because of tyConNullaryTy
     tc = TyCon { tyConName             = name
                , tyConUnique           = nameUnique name
                , tyConBinders          = binders
+               , tyConEtaBinders       = nb_eta_bndrs
                , tyConResKind          = res_kind
                , tyConRoles            = roles
                , tyConDetails          = details
@@ -2064,6 +2072,7 @@ well be different from 'mkTyConKind binders res_kind'.
 mkAlgTyCon :: Name
            -> Kind              -- ^ TyCon kind
            -> [TyConBinder]     -- ^ Binders of the 'TyCon'
+           -> Int               -- ^ Number of binders introduced by eta expansion
            -> Kind              -- ^ Result kind
            -> [Role]            -- ^ The roles for each TyVar
            -> Maybe CType       -- ^ The C type this type corresponds to
@@ -2074,8 +2083,8 @@ mkAlgTyCon :: Name
                                 -- (e.g. vanilla, type family)
            -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
-mkAlgTyCon name kind binders res_kind roles cType stupid rhs parent gadt_syn
-  = mkTyCon name kind binders res_kind roles $
+mkAlgTyCon name kind binders nb_eta_bndrs res_kind roles cType stupid rhs parent gadt_syn
+  = mkTyCon name kind binders nb_eta_bndrs res_kind roles $
     AlgTyCon { tyConCType       = cType
              , algTcStupidTheta = stupid
              , algTcRhs         = rhs
@@ -2093,7 +2102,7 @@ mkClassTyCon :: Name
              -> Class
              -> Name -> TyCon
 mkClassTyCon name kind binders roles rhs clas tc_rep_name
-  = mkAlgTyCon name kind binders constraintKind roles Nothing [] rhs
+  = mkAlgTyCon name kind binders 0 constraintKind roles Nothing [] rhs
                (ClassTyCon clas tc_rep_name)
                False
 
@@ -2105,7 +2114,7 @@ mkTupleTyCon :: Name
              -> AlgTyConFlav
              -> TyCon
 mkTupleTyCon name binders res_kind con sort parent
-  = mkTyCon name (mkTyConKind binders res_kind) binders res_kind
+  = mkTyCon name (mkTyConKind binders res_kind) binders 0 res_kind
             (constRoles binders Representational) $
     AlgTyCon { tyConCType       = Nothing
              , algTcGadtSyntax  = False
@@ -2125,7 +2134,7 @@ mkSumTyCon :: Name
            -> AlgTyConFlav
            -> TyCon
 mkSumTyCon name binders res_kind cons parent
-  = mkTyCon name (mkTyConKind binders res_kind) binders res_kind
+  = mkTyCon name (mkTyConKind binders res_kind) binders 0 res_kind
             (constRoles binders Representational) $
     AlgTyCon { tyConCType       = Nothing
              , algTcGadtSyntax  = False
@@ -2143,13 +2152,14 @@ mkSumTyCon name binders res_kind cons parent
 mkTcTyCon :: Name
           -> Kind -- ^ TyCon kind
           -> [TyConBinder]
+          -> Int -- ^ number of binders introduced by eta expansion
           -> Kind                -- ^ /result/ kind only
           -> [(Name,TcTyVar)]    -- ^ Scoped type variables;
           -> Bool                -- ^ Is this TcTyCon generalised already?
           -> TyConFlavour TyCon  -- ^ What sort of 'TyCon' this represents
           -> TyCon
-mkTcTyCon name kind binders res_kind scoped_tvs poly flav
-  = mkTyCon name kind binders res_kind (constRoles binders Nominal) $
+mkTcTyCon name kind binders nb_eta_bndrs res_kind scoped_tvs poly flav
+  = mkTyCon name kind binders nb_eta_bndrs res_kind (constRoles binders Nominal) $
     TcTyCon { tctc_scoped_tvs = scoped_tvs
             , tctc_is_poly    = poly
             , tctc_flavour    = flav }
@@ -2170,7 +2180,7 @@ mkPrimTyCon :: Name
             -> [Role]
             -> TyCon
 mkPrimTyCon name binders res_kind roles
-  = mkTyCon name (mkTyConKind binders res_kind) binders res_kind roles $
+  = mkTyCon name (mkTyConKind binders res_kind) binders 0 res_kind roles $
     PrimTyCon { primRepName  = mkPrelTyConRepName name }
 
 -- | Create a type synonym 'TyCon'
@@ -2184,22 +2194,23 @@ mkSynonymTyCon :: Name
                -> TyCon
 mkSynonymTyCon name kind binders res_kind roles rhs is_tau
                is_fam_free is_forgetful is_concrete
-  = mkTyCon name kind binders res_kind roles $
+  = mkTyCon name kind binders 0 res_kind roles $
     SynonymTyCon { synTcRhs       = rhs
                  , synIsTau       = is_tau
                  , synIsFamFree   = is_fam_free
                  , synIsForgetful = is_forgetful
                  , synIsConcrete  = is_concrete }
 
--- | Create a type family 'TyCon'
+-- | Create a type family or data family 'TyCon'
 mkFamilyTyCon :: Name
               -> Kind -- ^ TyCon kind
               -> [TyConBinder]
+              -> Int -- ^ number of tvs introduced by eta expansion
               -> Kind  -- ^ /result/ kind
               -> Maybe Name -> FamTyConFlav
               -> Maybe Class -> Injectivity -> TyCon
-mkFamilyTyCon name kind binders res_kind resVar flav parent inj
-  = mkTyCon name kind binders res_kind (constRoles binders Nominal) $
+mkFamilyTyCon name kind binders nb_eta res_kind resVar flav parent inj
+  = mkTyCon name kind binders nb_eta res_kind (constRoles binders Nominal) $
     FamilyTyCon { famTcResVar  = resVar
                 , famTcFlav    = flav
                 , famTcParent  = classTyCon <$> parent
@@ -2213,7 +2224,7 @@ mkPromotedDataCon :: DataCon -> Name -> TyConRepName
                   -> [TyConBinder] -> Kind -> [Role]
                   -> PromDataConInfo -> TyCon
 mkPromotedDataCon con name rep_name binders res_kind roles rep_info
-  = mkTyCon name (mkTyConKind binders res_kind) binders res_kind roles $
+  = mkTyCon name (mkTyConKind binders res_kind) binders 0 res_kind roles $
     PromotedDataCon { dataCon    = con
                     , tcRepName  = rep_name
                     , promDcInfo = rep_info }
