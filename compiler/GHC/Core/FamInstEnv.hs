@@ -1193,7 +1193,7 @@ reduceTyFamApp_maybe envs role tc tys
   = let co = mkUnbranchedAxInstCo role ax inst_tys inst_cos
     in Just $ coercionRedn co
 
-  | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe tc
+  | Just ax <- isClosedFamilyTyCon_maybe tc
   , Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
   = let co = mkAxInstCo role (BranchedAxiom ax ind) inst_tys inst_cos
     in Just $ coercionRedn co
