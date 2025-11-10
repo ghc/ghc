@@ -69,12 +69,3 @@ stackFrameSize tgt f =
                 (tgt |= mask8 tag + 1)       -- else set to mask'd tag + 1
               ]
           ))
-
-  --------------------------------------------------------------------------------
--- Register utilities
---------------------------------------------------------------------------------
-
--- | Perform the computation 'f', on the range of registers bounded by 'start'
--- and 'end'.
-withRegs :: StgReg -> StgReg -> (StgReg -> JStgStat) -> JStgStat
-withRegs start end f = mconcat $ fmap f [start..end]

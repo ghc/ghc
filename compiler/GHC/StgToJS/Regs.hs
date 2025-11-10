@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module GHC.StgToJS.Regs
   ( StgReg (..)
@@ -6,17 +7,25 @@ module GHC.StgToJS.Regs
   , sp
   , stack
   , r1, r2, r3, r4
+  , pattern R1, pattern R2, pattern R3, pattern R4
   , regsFromR1
   , regsFromR2
+  , regsFromTo
+  , jsRegsFrom
   , jsRegsFromR1
   , jsRegsFromR2
   , StgRet (..)
-  , jsRegToInt
-  , intToJSReg
+  , regNumber
   , jsReg
+  , highReg
+  , highReg_expr
   , maxReg
+  , maxLowReg
   , minReg
+  , minHighReg
   , lowRegs
+  , lowRegsCount
+  , lowRegsIdents
   , retRegs
   , register
   , foreignRegister
@@ -32,6 +41,7 @@ import GHC.JS.Make
 import GHC.StgToJS.Symbols
 
 import GHC.Data.FastString
+import GHC.Utils.Panic.Plain
 
 import Data.Array
 import qualified Data.ByteString.Char8 as BSC
@@ -39,26 +49,15 @@ import Data.Char
 import Data.Semigroup ((<>))
 
 -- | General purpose "registers"
---
--- The JS backend arbitrarily supports 128 registers
-data StgReg
-  = R1  | R2  | R3  | R4  | R5  | R6  | R7  | R8
-  | R9  | R10 | R11 | R12 | R13 | R14 | R15 | R16
-  | R17 | R18 | R19 | R20 | R21 | R22 | R23 | R24
-  | R25 | R26 | R27 | R28 | R29 | R30 | R31 | R32
-  | R33 | R34 | R35 | R36 | R37 | R38 | R39 | R40
-  | R41 | R42 | R43 | R44 | R45 | R46 | R47 | R48
-  | R49 | R50 | R51 | R52 | R53 | R54 | R55 | R56
-  | R57 | R58 | R59 | R60 | R61 | R62 | R63 | R64
-  | R65 | R66 | R67 | R68 | R69 | R70 | R71 | R72
-  | R73 | R74 | R75 | R76 | R77 | R78 | R79 | R80
-  | R81 | R82 | R83 | R84 | R85 | R86 | R87 | R88
-  | R89 | R90 | R91 | R92 | R93 | R94 | R95 | R96
-  | R97  | R98  | R99  | R100 | R101 | R102 | R103 | R104
-  | R105 | R106 | R107 | R108 | R109 | R110 | R111 | R112
-  | R113 | R114 | R115 | R116 | R117 | R118 | R119 | R120
-  | R121 | R122 | R123 | R124 | R125 | R126 | R127 | R128
-  deriving (Eq, Ord, Show, Enum, Bounded, Ix)
+newtype StgReg
+  = StgReg Int
+  deriving (Eq,Ord,Ix)
+
+pattern R1, R2, R3, R4 :: StgReg
+pattern R1 = StgReg 0
+pattern R2 = StgReg 1
+pattern R3 = StgReg 2
+pattern R4 = StgReg 3
 
 -- | Stack registers
 data Special
@@ -78,7 +77,7 @@ instance ToJExpr Special where
   toJExpr Sp     = hdStackPtr
 
 instance ToJExpr StgReg where
-  toJExpr r = registers ! r
+  toJExpr r = register r
 
 instance ToJExpr StgRet where
   toJExpr r = rets ! r
@@ -99,25 +98,42 @@ r2 = toJExpr R2
 r3 = toJExpr R3
 r4 = toJExpr R4
 
+-- | 1-indexed register number (R1 has index 1)
+regNumber :: StgReg -> Int
+regNumber (StgReg r) = r+1
 
-jsRegToInt :: StgReg -> Int
-jsRegToInt = (+1) . fromEnum
+-- | StgReg from 1-indexed number
+regFromNumber :: Int -> StgReg
+regFromNumber r = assert (r >= 1) $ StgReg (r-1)
 
-intToJSReg :: Int -> StgReg
-intToJSReg r = toEnum (r - 1)
+regsFromTo :: StgReg -> StgReg -> [StgReg]
+regsFromTo (StgReg x) (StgReg y) = map StgReg [x .. y]
 
+-- | Register expression from its 1-indexed index
 jsReg :: Int -> JStgExpr
-jsReg r = toJExpr (intToJSReg r)
+jsReg r = toJExpr (regFromNumber r)
 
-maxReg :: Int
-maxReg = jsRegToInt maxBound
+minReg :: StgReg
+minReg = R1
 
-minReg :: Int
-minReg = jsRegToInt minBound
+maxReg :: StgReg
+maxReg = regFromNumber maxBound
+
+lowRegsCount :: Int
+lowRegsCount = 31
+
+maxLowReg :: StgReg
+maxLowReg = regFromNumber lowRegsCount
+
+-- | First register stored in h$regs array instead of having its own top-level
+-- variable
+minHighReg :: StgReg
+minHighReg = case maxLowReg of
+  StgReg r -> StgReg (r+1)
 
 -- | List of registers, starting from R1
 regsFromR1 :: [StgReg]
-regsFromR1 = enumFrom R1
+regsFromR1 = regsFromTo R1 maxReg ++ repeat (panic "StgToJS: code requires too many registers")
 
 -- | List of registers, starting from R2
 regsFromR2 :: [StgReg]
@@ -131,24 +147,35 @@ jsRegsFromR1 = fmap toJExpr regsFromR1
 jsRegsFromR2 :: [JStgExpr]
 jsRegsFromR2 = tail jsRegsFromR1
 
+-- | List of registers, starting from given reg as JExpr
+jsRegsFrom :: StgReg -> [JStgExpr]
+jsRegsFrom (StgReg n) = drop n jsRegsFromR1
+
+-- | High register
+highReg :: Int -> JStgExpr
+highReg r = assert (r >= regNumber minHighReg) $ IdxExpr hdRegs (toJExpr (r - regNumber minHighReg))
+
+-- | High register indexing with a JS expression
+highReg_expr :: JStgExpr -> JStgExpr
+highReg_expr r = IdxExpr hdRegs (r - toJExpr (regNumber minHighReg))
+
+
 ---------------------------------------------------
 -- caches
 ---------------------------------------------------
 
-lowRegs :: [Ident]
-lowRegs = map reg_to_ident [R1 .. R31]
-  where reg_to_ident = name . mkFastString . (unpackFS hdStr ++) . map toLower . show
+lowRegs :: [StgReg]
+lowRegs = regsFromTo minReg maxLowReg
+
+lowRegsIdents :: [Ident]
+lowRegsIdents = map reg_to_ident lowRegs
+  where
+    -- low regs are named h$r1, h$r2, etc.
+    reg_to_ident r = name (mkFastString (unpackFS hdStr ++ "r" ++ show (regNumber r)))
 
 retRegs :: [Ident]
 retRegs = [name . mkFastStringByteString
            $ hdB <> BSC.pack (map toLower $ show n) | n <- enumFrom Ret1]
-
--- cache JExpr representing StgReg
-registers :: Array StgReg JStgExpr
-registers = listArray (minBound, maxBound) (map (global . identFS) lowRegs ++ map regN [R32 .. R128])
-  where
-    regN :: StgReg -> JStgExpr
-    regN r = IdxExpr hdRegs (toJExpr (fromEnum r - 31)) -- registers are 0-indexed (R32 has index 31, not 32)
 
 -- cache JExpr representing StgRet
 rets :: Array StgRet JStgExpr
@@ -157,9 +184,22 @@ rets = listArray (minBound, maxBound) (map retN (enumFrom Ret1))
     retN = global . mkFastString . (unpackFS hdStr ++) . map toLower . show
 
 -- | Given a register, return the JS syntax object representing that register
-register :: StgReg -> JStgExpr
-register i = registers ! i
-
--- | Given a register, return the JS syntax object representing that register
 foreignRegister :: StgRet -> JStgExpr
 foreignRegister i = rets ! i
+
+-- | Given a register, return the JS syntax object representing that register
+register :: StgReg -> JStgExpr
+register i
+  | i <= maxCachedReg = register_cache ! i -- Expressions of common registers are cached.
+  | otherwise         = make_high_reg i    -- Expression of higher registers are made on the fly
+
+maxCachedReg :: StgReg
+maxCachedReg = regFromNumber 128
+
+-- cache JExpr representing StgReg
+register_cache :: Array StgReg JStgExpr
+register_cache = listArray (minReg, maxCachedReg) (map (global . identFS) lowRegsIdents ++ map make_high_reg (regsFromTo minHighReg maxCachedReg))
+
+-- | Make h$regs[XXX] expression for the register
+make_high_reg :: StgReg -> JStgExpr
+make_high_reg r = highReg (regNumber r)
