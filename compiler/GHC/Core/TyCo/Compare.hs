@@ -303,8 +303,9 @@ The type equality predicates in Type are hit pretty hard by GHC.  Consequently
 we take pains to ensure that these paths are compiled to efficient,
 minimally-allocating code.  Plan:
 
-* The main workhorse is `inline_generic_eq_type_x`.  It is /non-recursive/
-  and is marked INLINE.
+* The main workhorse is `inline_generic_eq_type_x`.  It is itself /non-recursive/,
+  and is marked INLINE.  It does one level of case-analysis before calling
+  `generic_eq_type`.
 
 * `inline_generic_eq_type_x` has various parameters that control what it does:
   * syn_flag::SynFlag            whether type synonyms are expanded or kept.
@@ -366,10 +367,9 @@ eq_type_keep_respect_x env   = inline_generic_eq_type_x KeepSynonyms   RespectMu
 -- See Note [Specialising type equality].
 generic_eq_type_x, inline_generic_eq_type_x
   :: SynFlag -> MultiplicityFlag -> Maybe RnEnv2 -> Type -> Type -> Bool
-
 {-# NOINLINE generic_eq_type_x #-}
+-- NOINLINE because we have a bunch of RULEs for it
 generic_eq_type_x = inline_generic_eq_type_x
--- See Note [Computing equality on types] in Type
 
 {-# INLINE inline_generic_eq_type_x #-}
 -- This non-recursive function can inline at its (few) call sites.  The

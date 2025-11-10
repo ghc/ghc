@@ -4019,12 +4019,12 @@ combineUsageDetailsWith plus_occ_info
   | isEmptyDetails uds2 = uds1
   | otherwise
   -- See Note [Strictness in the occurrence analyser]
-  -- Using strictPlusVarEnv here speeds up the test T26425
-  -- by about 10% by avoiding intermediate thunks.
-  = UD { ud_env       = strictPlusVarEnv_C_Directly plus_occ_info env1 env2
-       , ud_z_many    = strictPlusVarEnv z_many1   z_many2
-       , ud_z_in_lam  = plusVarEnv z_in_lam1 z_in_lam2
-       , ud_z_tail    = strictPlusVarEnv z_tail1   z_tail2
+  -- Using strictPlusVarEnv here speeds up the test T26425 by about 10% by avoiding
+  -- intermediate thunks.
+  = UD { ud_id_env   = strictPlusVarEnv_C_Directly plus_occ_info env1 env2
+       , ud_z_many   = strictPlusVarEnv z_many1   z_many2
+       , ud_z_in_lam = plusVarEnv z_in_lam1 z_in_lam2
+       , ud_z_tail   = strictPlusVarEnv z_tail1   z_tail2
        , ud_tyco_env = plusTyCoOccEnv tyco_env1 tyco_env2
        , ud_z_tyco   = plusVarEnv z_tyco1 z_tyco2 }
 

@@ -53,7 +53,7 @@ import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
-import GHC.Core.TyCo.Compare ( eqType, eqTypes, eqTypeIgnoringMultiplicity, eqForAllVis )
+import GHC.Core.TyCo.Compare
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
@@ -1043,8 +1043,8 @@ lintCoreExpr e@(App _ _)
              -- TODO: Look through ticks?
 
        ; runrw_pr <- lintApp (text "runRW# expression")
-                               lintTyArg lint_rw_cont
-                               (idType fun) [ty_arg1,ty_arg2,cont_arg] zeroUE
+                             lintTyArg lint_rw_cont
+                             (idType fun) [ty_arg1,ty_arg2,cont_arg] zeroUE
        ; lintCoreArgs runrw_pr rest }
 
   | otherwise
@@ -1496,10 +1496,18 @@ subtype of the required type, as one would expect.
 -- e.g. f :: Int -> Bool -> Int would return `Int` as result type.
 lintCoreArgs  :: (OutType, UsageEnv) -> [InExpr] -> LintM (OutType, UsageEnv)
 lintCoreArgs (fun_ty, fun_ue) args
-  = lintApp (text "expression") lintTyArg lintValArg fun_ty args fun_ue
+  = lintApp (text "expression") lintForAllArg lintValArg fun_ty args fun_ue
+
+lintForAllArg :: InExpr -> LintM OutType
+-- A (forall (cv::t1 ~# t2). ty) can be appplied to a coercion
+lintForAllArg (Coercion co)
+  = do { lintCoercion co
+       ; co' <- substCoM co
+       ; return (CoercionTy co') }
+lintForAllArg arg
+  = lintTyArg arg
 
 lintTyArg :: InExpr -> LintM OutType
-
 -- Type argument
 lintTyArg (Type arg_ty)
   = do { checkL (not (isCoercionTy arg_ty))
@@ -2162,8 +2170,10 @@ lint_tyco_app :: SDoc -> OutKind -> [InType] -> LintM ()
 lint_tyco_app msg fun_kind arg_tys
     -- See Note [Avoiding compiler perf traps when constructing error messages.]
   = do { _ <- lintApp msg (\ty     -> do { lintType ty; substTyM ty })
-                            (\ty _ _ -> do { lintType ty; ki <- substTyM (typeKind ty); return (ki,()) })
-                            fun_kind arg_tys ()
+                          (\ty _ _ -> do { lintType ty
+                                         ; ki <- substTyM (typeKind ty)
+                                         ; return (ki,()) })
+                          fun_kind arg_tys ()
        ; return () }
 
 ----------------
@@ -2206,14 +2216,14 @@ lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
                go subst fun_ty acc []
                  = return (substTy subst fun_ty, acc)
 
-               go subst (ForAllTy (Bndr tv _vis) body_ty) acc (arg:args)
+               go subst (ForAllTy (Bndr tcv _vis) body_ty) acc (arg:args)
                  = do { arg' <- lint_forall_arg arg
-                      ; let tv_kind = substTy subst (varType tv)
-                            karg'   = typeKind arg'
-                            subst'  = extendTCvSubst subst tv arg'
-                      ; ensureEqTys karg' tv_kind $
+                      ; let tcv_kind = substTy subst (varType tcv)
+                            karg'    = typeKind arg'
+                            subst'   = extendTCvSubst subst tcv arg'
+                      ; ensureEqTys karg' tcv_kind $
                         lint_app_fail_msg msg orig_fun_ty all_args
-                            (hang (text "Forall:" <+> (ppr tv $$ ppr tv_kind))
+                            (hang (text "Forall:" <+> (ppr tcv $$ ppr tcv_kind))
                                 2 (ppr arg' <+> dcolon <+> ppr karg'))
                       ; go subst' body_ty acc args }
 
@@ -3650,6 +3660,13 @@ substTyM ty
   = do { subst <- getSubst
        ; return (substTy subst ty) }
 
+substCoM :: HasDebugCallStack => InCoercion -> LintM OutCoercion
+-- Apply the substitution to the type
+-- The substitution is often empty, in which case it is a no-op
+substCoM co
+  = do { subst <- getSubst
+       ; return (substCo subst co) }
+
 getUEAliases :: LintM (NameEnv UsageEnv)
 getUEAliases = LintM (\ env errs -> fromBoxedLResult (Just (le_ue_aliases env), errs))
 
@@ -3702,7 +3719,8 @@ checkBndrOccCompatibility in_bndr v_occ
          bndr_occ_mismatch (text "LocalVar") (text "GlobalVar")
 
        -- Check that binder and occurrence have same type
-       ;  ensureEqTys occ_ty in_bndr_ty $  -- Compares InTypes
+       -- See Note [Occurrence should have the same type as binder]
+       ;  checkL (pickyEqType occ_ty in_bndr_ty) $  -- Compares InTypes
           hang (text "Mismatch in type between binder and occurrence")
              2 extra_info
 
@@ -3737,6 +3755,19 @@ sameUnfolding v_bndr v_occ
       (Just bndr_unf, Just occ_unf) -> do { flags    <- getLintFlags
                                           ; return (eq_type flags bndr_unf occ_unf) }
       _                             -> return False
+
+{- Note [Occurrence should have the same type as binder]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Is this OK?
+  type S a = Int
+   ex1 = \(x::Int). (x::S a)
+   ex2 = \(x::Int). let @a = Bool in (x::S a)
+Here the /occurrence/ of x, namely (x::S a) has a syntactically different type to
+the binder.  After expanding the synonym it's the same, but it's still very
+dodgy for two reasons:
+
+ * The (deep) free vars of 
+-}
 
 lookupJoinId :: Id -> LintM JoinPointHood
 -- Look up an Id which should be a join point, valid here

@@ -474,7 +474,7 @@ and similarly for coercions.
 Wrinkles:
 
 (TCL1) In a type let (Let @a = TYPE ty in body), we do /not/ insist that
-  the binder `a` has a TyVarUnfolding.  But it it does not, then `body`
+  the binder `a` has a TyVarUnfolding.  But if it does not, then `body`
   must be well-typed without paying atention to the binding. More precisely,
        let @a = TYPE ty in body
   where `a` has no TyVarUnfolding, is well-typed iff
