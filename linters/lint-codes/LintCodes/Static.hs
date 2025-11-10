@@ -40,7 +40,7 @@ import GHC.Core.Coercion.Axiom
   ( CoAxBranch(..), coAxiomBranches, fromBranches )
 import GHC.Core.TyCon
   ( TyCon, tyConName
-  , isClosedSynFamilyTyConWithAxiom_maybe
+  , isClosedFamilyTyCon_maybe
   )
 import qualified GHC.Core.TyCo.Rep as GHC
   ( Type )
@@ -109,7 +109,7 @@ outdated _ = Nothing
 getFamEqnCodes :: Maybe LibDir -> IO ( Map DiagnosticCode ( FamEqnIndex, String, Use ) )
 getFamEqnCodes mb_libDir =
   do { tc <- ghcDiagnosticCodeTyCon mb_libDir
-     ; return $ case isClosedSynFamilyTyConWithAxiom_maybe tc of
+     ; return $ case isClosedFamilyTyCon_maybe tc of
      { Nothing -> error "can't find equations for 'GhcDiagnosticCode'"
      ; Just ax -> Map.fromList
                 $ zipWith parseBranch [1..]

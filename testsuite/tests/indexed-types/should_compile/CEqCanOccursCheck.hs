@@ -8,10 +8,13 @@ type family F a where
 type family G a b where
   G a a = a
 
-{-
+{- Ambiguity check for foo
+[G] F a ~ a
+[G] F a ~ b
+
 [W] F alpha ~ alpha
 [W] F alpha ~ beta
-[W] G alpha beta ~ Int
+[W] G alpha beta ~ G a b
 -}
 
 foo :: (F a ~ a, F a ~ b) => G a b -> ()
