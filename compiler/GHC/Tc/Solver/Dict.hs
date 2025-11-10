@@ -4,7 +4,6 @@
 -- | Solving Class constraints CDictCan
 module GHC.Tc.Solver.Dict (
   solveDict, solveDictNC, solveCallStack,
-  checkInstanceOK,
   matchLocalInst, chooseInstance,
   makeSuperClasses, mkStrictSuperClasses
   ) where
@@ -857,8 +856,22 @@ chooseInstance work_item@(WantedCt { ctev_dest = dest, ctev_rewriters = rws
                         , cir_mk_ev       = mk_ev
                         , cir_canonical   = canonical })
   = do { traceTcS "doTopReact/found instance for" $ ppr work_item
-       ; deeper_loc <- checkInstanceOK loc what pred
-       ; checkReductionDepth deeper_loc pred
+
+      -- Check that the dfun is well-staged in the Template Haskell sense
+       ; checkWellLevelledDFun loc what pred
+
+       -- zapped_loc: after applying an instance we can set ScOrigin to
+       -- NotNakedSc, so that prohibitedSuperClassSolve never fires
+       -- See Note [Solving superclass constraints] in
+       -- GHC.Tc.TyCl.Instance, (sc1).
+       ; let zapped_loc | ScOrigin what _ <- ctLocOrigin loc
+                        = setCtLocOrigin loc (ScOrigin what NotNakedSc)
+                        | otherwise
+                        = loc
+
+       -- Deeper location for new constraints
+       ; deeper_loc <- bumpReductionDepth zapped_loc pred
+
        ; assertPprM (getTcEvBindsVar >>= return . not . isCoEvBindsVar)
                     (ppr work_item)
        ; evc_vars <- mapM (newWanted deeper_loc rws) theta
@@ -867,27 +880,6 @@ chooseInstance work_item@(WantedCt { ctev_dest = dest, ctev_rewriters = rws
 
 chooseInstance work_item lookup_res
   = pprPanic "chooseInstance" (ppr work_item $$ ppr lookup_res)
-
-checkInstanceOK :: CtLoc -> InstanceWhat -> TcPredType -> TcS CtLoc
--- Check that it's OK to use this instance:
---    (a) the use is well staged in the Template Haskell sense
--- Returns the CtLoc to used for sub-goals
--- Probably also want to call checkReductionDepth
-checkInstanceOK loc what pred
-  = do { checkWellLevelledDFun loc what pred
-       ; return deeper_loc }
-  where
-     deeper_loc = zap_origin (bumpCtLocDepth loc)
-     origin     = ctLocOrigin loc
-
-     zap_origin loc  -- After applying an instance we can set ScOrigin to
-                     -- NotNakedSc, so that prohibitedSuperClassSolve never fires
-                     -- See Note [Solving superclass constraints] in
-                     -- GHC.Tc.TyCl.Instance, (sc1).
-       | ScOrigin what _ <- origin
-       = setCtLocOrigin loc (ScOrigin what NotNakedSc)
-       | otherwise
-       = loc
 
 matchClassInst :: DynFlags -> InertSet
                -> Class -> [Type]

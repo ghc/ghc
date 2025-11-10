@@ -1068,7 +1068,7 @@ findInferredDiff annotated_theta inferred_theta
   | null annotated_theta   -- Short cut the common case when the user didn't
   = return inferred_theta  -- write any constraints in the partial signature
   | otherwise
-  = pushTcLevelM_ $
+  = TcM.pushTcLevelM_ $
     do { lcl_env   <- TcM.getLclEnv
        ; given_ids <- mapM TcM.newEvVar annotated_theta
        ; wanteds   <- newWanteds AnnOrigin inferred_theta

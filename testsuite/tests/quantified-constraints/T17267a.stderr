@@ -1,7 +1,6 @@
-
 T17267a.hs:18:12: error: [GHC-40404]
     • Reduction stack overflow; size = 201
-      When simplifying the following type: C a b
+      When simplifying the following constraint: C a b
     • In the expression: op x
       In an equation for ‘oops’: oops x = op x
       In an equation for ‘uc’:
@@ -15,3 +14,4 @@ T17267a.hs:18:12: error: [GHC-40404]
       (any upper bound you could choose might fail unpredictably with
        minor updates to GHC, so disabling the check is recommended if
        you're sure that type checking should terminate)
+

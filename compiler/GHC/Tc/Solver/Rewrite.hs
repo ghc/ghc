@@ -11,7 +11,7 @@ import GHC.Tc.Types ( TcGblEnv(tcg_tc_plugin_rewriters),
                       RewriteEnv(..),
                       runTcPluginM )
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.CtLoc( CtLoc, bumpCtLocDepth )
+import GHC.Tc.Types.CtLoc( CtLoc, resetCtLocDepth )
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
@@ -90,7 +90,8 @@ runRewriteCtEv ev
 runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, CoHoleSet)
 runRewrite loc flav eq_rel thing_inside
   = do { rewriters_ref <- newTcRef emptyCoHoleSet
-       ; let fmode = RE { re_loc       = loc
+       ; let fmode = RE { re_loc       = resetCtLocDepth loc
+                            -- Start reducing from zero
                         , re_flavour   = flav
                         , re_eq_rel    = eq_rel
                         , re_rewriters = rewriters_ref }
@@ -125,14 +126,6 @@ getFlavourRole
        ; eq_rel <- getEqRel
        ; return (flavour, eq_rel) }
 
-getLoc :: RewriteM CtLoc
-getLoc = getRewriteEnvField re_loc
-
-checkStackDepth :: Type -> RewriteM ()
-checkStackDepth ty
-  = do { loc <- getLoc
-       ; liftTcS $ checkReductionDepth loc ty }
-
 -- | Change the 'EqRel' in a 'RewriteM'.
 setEqRel :: EqRel -> RewriteM a -> RewriteM a
 setEqRel new_eq_rel thing_inside
@@ -142,12 +135,13 @@ setEqRel new_eq_rel thing_inside
     else runRewriteM thing_inside (env { re_eq_rel = new_eq_rel })
 {-# INLINE setEqRel #-}
 
-bumpDepth :: RewriteM a -> RewriteM a
-bumpDepth (RewriteM thing_inside)
+bumpReductionDepthRM :: Type -> RewriteM a -> RewriteM a
+bumpReductionDepthRM ty (RewriteM thing_inside)
   = mkRewriteM $ \env -> do
-      -- bumpDepth can be called a lot during rewriting so we force the
-      -- new env to avoid accumulating thunks.
-      { let !env' = env { re_loc = bumpCtLocDepth (re_loc env) }
+      { loc' <- TcS.bumpReductionDepth (re_loc env) ty
+      ; let !env' = env { re_loc = loc' }
+            -- !env: bumpReductionDepth can be called a lot during rewriting
+            -- so we force the new env to avoid accumulating thunks
       ; thing_inside env' }
 
 recordRewriter :: CtEvidence -> RewriteM ()
@@ -584,7 +578,7 @@ rewrite_co co = liftTcS $ zonkCo co
 -- | Rewrite a reduction, composing the resulting coercions.
 rewrite_reduction :: Reduction -> RewriteM Reduction
 rewrite_reduction (Reduction co xi)
-  = do { redn <- bumpDepth $ rewrite_one xi
+  = do { redn <- rewrite_one xi
        ; return $ co `mkTransRedn` redn }
 
 -- rewrite (nested) AppTys
@@ -799,10 +793,8 @@ rewrite_fam_app tc tys  -- Can be over-saturated
 -- See Note [How to normalise a family application]
 rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM Reduction
 rewrite_exact_fam_app tc tys
-  = do { checkStackDepth (mkTyConApp tc tys)
-
-       -- Query the typechecking plugins for all their rewriting functions
-       -- which apply to a type family application headed by the TyCon 'tc'.
+  = do { -- Query the typechecking plugins for all their rewriting functions
+         -- which apply to a type family application headed by the TyCon 'tc'.
        ; tc_rewriters <- getTcPluginRewritersForTyCon tc
 
        -- STEP 1. Try to reduce without reducing arguments first.
@@ -884,7 +876,8 @@ rewrite_exact_fam_app tc tys
            -> Reduction -> RewriteM Reduction
     finish use_cache redn
       = do { -- rewrite the result: FINISH 1
-             final_redn <- rewrite_reduction redn
+             final_redn <- bumpReductionDepthRM (mkTyConApp tc tys) $
+                           rewrite_reduction redn
            ; eq_rel <- getEqRel
 
              -- extend the cache: FINISH 2

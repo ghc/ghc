@@ -62,7 +62,7 @@ module GHC.Core.TyCon(
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isOpenFamilyTyCon,
         isTypeFamilyTyCon, isDataFamilyTyCon,
-        isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
+        isOpenTypeFamilyTyCon, isClosedFamilyTyCon_maybe,
         tyConInjectivityInfo,
         isBuiltInSynFamTyCon_maybe,
         isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon,
@@ -2507,10 +2507,11 @@ isOpenTypeFamilyTyCon (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcFlav = OpenSynFamilyTyCon } <- details = True
   | otherwise                                                = False
 
--- | Is this a non-empty closed type family? Returns 'Nothing' for
--- abstract or empty closed families.
-isClosedSynFamilyTyConWithAxiom_maybe :: TyCon -> Maybe (CoAxiom Branched)
-isClosedSynFamilyTyConWithAxiom_maybe (TyCon { tyConDetails = details })
+-- | Is this a /non-empty/ closed type family?
+--   Returns 'Nothing' for closed type family with no equations, as well
+--      as for open families, data famlilies, abstract families
+isClosedFamilyTyCon_maybe :: TyCon -> Maybe (CoAxiom Branched)
+isClosedFamilyTyCon_maybe (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon mb} <- details = mb
   | otherwise                                                    = Nothing
 

@@ -10,11 +10,11 @@ module GHC.Core.Unify (
 
         -- Side-effect free unification
         tcUnifyTy, tcUnifyTys, tcUnifyFunDeps, tcUnifyDebugger,
-        tcUnifyTysFG, tcUnifyTyForInjectivity,
+        tcUnifyTysFG, tcUnifyTysForInjectivity,
         BindTvFun, BindFamFun, BindFlag(..),
         matchBindTv, alwaysBindTv, alwaysBindFam, dontCareBindFam,
         UnifyResult, UnifyResultM(..), MaybeApartReason(..),
-        typesCantMatch, typesAreApart,
+        typesCantMatch, typesAreApart, typeListsAreApart,
 
         -- Matching a type against a lifted type (coercion)
         liftCoMatch
@@ -376,7 +376,7 @@ Wrinkles
 
 (ATF7) There is one other, very special case of matching where we /do/ want to
    bind type families in `um_fam_env`, namely in GHC.Tc.Solver.Equality, the call
-   to `tcUnifyTyForInjectivity False` in `improve_injective_wanted_top`.
+   to `tcUnifyTysForInjectivity False` in `improve_injective_wanted_top`.
    Consider
    of a match. Consider
       type family G6 a = r | r -> a
@@ -761,9 +761,14 @@ typesCantMatch :: [(Type,Type)] -> Bool
 typesCantMatch prs = any (uncurry typesAreApart) prs
 
 typesAreApart :: Type -> Type -> Bool
-typesAreApart t1 t2 = case tcUnifyTysFG alwaysBindFam alwaysBindTv [t1] [t2] of
-                        SurelyApart -> True
-                        _           -> False
+typesAreApart ty1 ty2 = typeListsAreApart [ty1] [ty2]
+
+typeListsAreApart :: [Type] -> [Type] -> Bool
+typeListsAreApart tys1 tys2
+  = case tcUnifyTysFG alwaysBindFam alwaysBindTv tys1 tys2 of
+       SurelyApart -> True
+       _           -> False
+
 {-
 ************************************************************************
 *                                                                      *
@@ -804,25 +809,24 @@ tcUnifyFunDeps qtvs tys1 tys2
 
 -- | Unify or match a type-family RHS with a type (possibly another type-family RHS)
 -- Precondition: kinds are the same
-tcUnifyTyForInjectivity
+tcUnifyTysForInjectivity
     :: AmIUnifying  -- ^ True <=> do two-way unification;
                     --   False <=> do one-way matching.
                     --   See end of sec 5.2 from the paper
-    -> InScopeSet     -- Should include the free tyvars of both Type args
-    -> Type -> Type   -- Types to unify
+    -> [Type] -> [Type]   -- Types to unify
     -> Maybe Subst
 -- This algorithm is an implementation of the "Algorithm U" presented in
 -- the paper "Injective type families for Haskell", Figures 2 and 3.
 -- The code is incorporated with the standard unifier for convenience, but
 -- its operation should match the specification in the paper.
-tcUnifyTyForInjectivity unif in_scope t1 t2
+tcUnifyTysForInjectivity unif tys1 tys2
   = case tc_unify_tys alwaysBindFam alwaysBindTv
                        unif   -- Am I unifying?
                        True   -- Do injectivity checks
                        False  -- Don't check outermost kinds
                        RespectMultiplicities
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
-                       [t1] [t2] of
+                       tys1 tys2 of
       Unifiable          (tv_subst, _cv_subst) -> Just $ maybe_fix tv_subst
       MaybeApart _reason (tv_subst, _cv_subst) -> Just $ maybe_fix tv_subst
                  -- We want to *succeed* in questionable cases.
@@ -830,10 +834,15 @@ tcUnifyTyForInjectivity unif in_scope t1 t2
       SurelyApart      -> Nothing
   where
     rn_env   = mkRnEnv2 in_scope
+    in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
+               -- The types we are unifying never contain foralls, so the
+               -- in-scope set is never looked at, so this free-var stuff
+               -- should never actually be done
 
-    maybe_fix | unif      = niFixSubst in_scope
-              | otherwise = mkTvSubst in_scope -- when matching, don't confuse
-                                               -- domain with range
+    maybe_fix tv_subst
+      | unif      = niFixSubst in_scope tv_subst
+      | otherwise = mkTvSubst  in_scope tv_subst
+      -- When matching, don't confuse domain with range; no fixpoint!
 
 -----------------
 tcUnifyTys :: BindTvFun
@@ -1106,10 +1115,10 @@ So, we work as follows:
        , rest :-> rest :: G b (z :: b) ]
     Note that rest now has the right kind
 
- 7. Apply this extended substitution (once) to the range of
-    the /original/ substitution.  (Note that we do the
-    extended substitution would go on forever if you tried
-    to find its fixpoint, because it maps z to z.)
+ 7. Apply this extended substitution (once) to the range of the
+    /original/ substitution.  (Note that the extended substitution
+    would go on forever if you tried to find its fixpoint, because it
+    maps z to z.)
 
  8. And go back to step 1
 
@@ -1128,8 +1137,10 @@ niFixSubst :: InScopeSet -> TvSubstEnv -> Subst
 -- ToDo: use laziness instead of iteration?
 niFixSubst in_scope tenv
   | not_fixpoint = niFixSubst in_scope (mapVarEnv (substTy subst) tenv)
-  | otherwise    = subst
+  | otherwise    = tenv_subst
   where
+    tenv_subst = mkTvSubst in_scope tenv   -- This is our starting point
+
     range_fvs :: FV
     range_fvs = tyCoFVsOfTypes (nonDetEltsUFM tenv)
           -- It's OK to use nonDetEltsUFM here because the
@@ -1144,9 +1155,7 @@ niFixSubst in_scope tenv
     free_tvs = scopedSort (filterOut in_domain range_tvs)
 
     -- See Note [Finding the substitution fixpoint], Step 6
-    subst = foldl' add_free_tv
-                  (mkTvSubst in_scope tenv)
-                  free_tvs
+    subst = foldl' add_free_tv tenv_subst free_tvs
 
     add_free_tv :: Subst -> TyVar -> Subst
     add_free_tv subst tv
