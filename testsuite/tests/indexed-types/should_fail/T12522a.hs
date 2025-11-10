@@ -21,3 +21,9 @@ def = undefined
 
 -- test :: Uncurried [Int, String] String
 test = def $ \n s -> I $ show n ++ s
+
+{-
+Arg to `def` has type (alpha -> String -> String)
+So we get
+  [W] Curry as0 b0 ~ (alpha -> String -> String)
+-}

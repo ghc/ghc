@@ -3,7 +3,8 @@ module GHC.Tc.Types.CtLoc (
   -- * CtLoc
   CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
   ctLocTypeOrKind_maybe, toInvisibleLoc,
-  ctLocDepth, bumpCtLocDepth, isGivenLoc, mkGivenLoc, mkKindEqLoc,
+  ctLocDepth, bumpCtLocDepth, resetCtLocDepth,
+  isGivenLoc, mkGivenLoc, mkKindEqLoc,
   setCtLocOrigin, updateCtLocOrigin, setCtLocEnv, setCtLocSpan,
   pprCtLoc, adjustCtLoc, adjustCtLocTyConBinder,
 
@@ -195,6 +196,9 @@ setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc = setCtLocEnv ctl (setCtLocRealLo
 
 bumpCtLocDepth :: CtLoc -> CtLoc
 bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth d }
+
+resetCtLocDepth :: CtLoc -> CtLoc
+resetCtLocDepth loc = loc { ctl_depth = initialSubGoalDepth }
 
 setCtLocOrigin :: CtLoc -> CtOrigin -> CtLoc
 setCtLocOrigin ctl orig = ctl { ctl_origin = orig }

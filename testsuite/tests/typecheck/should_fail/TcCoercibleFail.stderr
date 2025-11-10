@@ -49,7 +49,8 @@ TcCoercibleFail.hs:30:9: error: [GHC-18872]
 
 TcCoercibleFail.hs:35:8: error: [GHC-40404]
     • Reduction stack overflow; size = 201
-      When simplifying the following type: Fix (Either Age)
+      When simplifying the following constraint:
+        Coercible (Either Int (Fix (Either Int))) (Fix (Either Age))
     • In the expression: coerce :: Fix (Either Int) -> Fix (Either Age)
       In an equation for ‘foo6’:
           foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
