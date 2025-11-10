@@ -234,4 +234,3 @@ srcCodeOriginErrCtxMsg :: SrcCodeOrigin -> ErrCtxtMsg
 srcCodeOriginErrCtxMsg (OrigExpr e) = ExprCtxt e
 srcCodeOriginErrCtxMsg (OrigStmt s f) = StmtErrCtxt (HsDoStmt f) (unLoc s)
 srcCodeOriginErrCtxMsg (OrigPat  p) = PatCtxt p
-srcCodeOriginErrCtxMsg (PopErrCtxt) = error "Shouldn't happen srcCodeOriginErr"

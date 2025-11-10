@@ -676,12 +676,6 @@ data SrcCodeOrigin
   = OrigExpr (HsExpr GhcRn)                -- ^ The source, user written, expression
   | OrigStmt (ExprLStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
   | OrigPat  (Pat GhcRn)                   -- ^ Used for failable patterns that trigger MonadFail constraints
-  | PopErrCtxt -- A hint for typechecker to pop
-               -- the top of the error context stack
-               -- Does not presist post renaming phase
-               -- See Part 3. of Note [Expanding HsDo with XXExprGhcRn]
-               -- in `GHC.Tc.Gen.Do`
-               -- INVARIANT: SHOULD NEVER APPEAR IN A ExpansionCodeCtxt in CodeSrcFlag ErrCtxt on stack
 
 data XXExprGhcRn
   = ExpandedThingRn { xrn_orig     :: SrcCodeOrigin   -- The original source thing to be used for error messages
@@ -712,12 +706,6 @@ mkExpandedStmt
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigStmt oStmt flav
                                                          , xrn_expanded = eExpr })
-
-mkExpandedLastStmt
-  :: HsExpr GhcRn         -- ^ expanded expression
-  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedLastStmt eExpr = XExpr (ExpandedThingRn { xrn_orig = PopErrCtxt
-                                                  , xrn_expanded = eExpr })
 
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
@@ -1089,7 +1077,6 @@ instance Outputable SrcCodeOrigin where
         OrigExpr x    -> ppr_builder "<OrigExpr>:" x
         OrigStmt x _  -> ppr_builder "<OrigStmt>:" x
         OrigPat  x    -> ppr_builder "<OrigPat>:" x
-        PopErrCtxt    -> text "<PopErrCtxt>"
     where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
 
 instance Outputable XXExprGhcRn where

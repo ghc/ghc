@@ -174,11 +174,12 @@ Note [Instantiation variables are short lived]
 -- cf. T19167. the head is an expanded expression applied to a type
 -- TODO: Use runInfer for tcExprSigma?
 -- Caution: Currently we assume that the expression is compiler generated/expanded
--- Becuase that is that T19167 testcase generates. This function can possibly
+-- Because that is that T19167 testcase generates. This function can possibly
 -- take in the rn_expr and its location to pass into tcValArgs
 tcExprSigma :: Bool -> HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
 tcExprSigma inst rn_expr
-  = do { (fun@(rn_fun,fun_lspan), rn_args) <- splitHsApps rn_expr
+  = do { traceTc "tcExprSigma" (ppr rn_expr)
+       ; (fun@(rn_fun,fun_lspan), rn_args) <- splitHsApps rn_expr
        ; do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; code_orig <- getSrcCodeOrigin
@@ -611,6 +612,7 @@ tcValArg do_ql pos (fun, fun_lspan) (EValArg { ea_loc_span  = lspan
               , text "fun_lspan" <+> ppr fun_lspan
               , text "sigma_type" <+> ppr (mkCheckExpType exp_arg_ty)
               , text "arg:" <+> ppr larg
+              , text "arg_loc:" <+> ppr arg_loc
               ]
 
 
@@ -954,12 +956,16 @@ addArgCtxt :: Int -> (HsExpr GhcRn, SrcSpan) -> LHsExpr GhcRn
 --  See Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
 addArgCtxt arg_no (app_head, app_head_lspan) (L arg_loc arg) thing_inside
   | isGoodSrcSpan app_head_lspan
-  = setSrcSpanA arg_loc $
-      addErrCtxt (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
-      thing_inside
+  = do { traceTc "addArgCtxt" (vcat [text "goodSrcSpan", ppr app_head, ppr app_head_lspan, ppr arg_loc, ppr arg, ppr arg_no])
+       ; setSrcSpanA arg_loc $
+           addErrCtxt (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
+           thing_inside
+       }
   | otherwise
-  = addLExprCtxt (locA arg_loc) arg $
-      thing_inside
+  = do { traceTc "addArgCtxt" (vcat [text "generatedHead", ppr app_head, ppr app_head_lspan, ppr arg_loc, ppr arg])
+       ; addLExprCtxt (locA arg_loc) arg $
+          thing_inside
+       }
 
 
 
@@ -1823,9 +1829,14 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L _ arg) sc_arg_ty@(Scaled _ 
        -- step 2: use |-inst to instantiate the head applied to the arguments
     do { let tc_head = (tc_fun, fun_lspan)
        ; do_ql <- wantQuickLook rn_fun
+       ; code_orig <- getSrcCodeOrigin
+       ; let arg_orig | isGoodSrcSpan fun_lspan
+                      = exprCtOrigin fun
+                      | otherwise
+                      = srcCodeOriginCtOrigin fun code_orig
        ; ((inst_args, app_res_rho), wanted)
              <- captureConstraints $
-                tcInstFun do_ql True (exprCtOrigin arg, rn_fun, fun_lspan) tc_fun fun_sigma rn_args
+                tcInstFun do_ql True (arg_orig, rn_fun, fun_lspan) tc_fun fun_sigma rn_args
                 -- We must capture type-class and equality constraints here, but
                 -- not equality constraints.  See (QLA6) in Note [Quick Look at
                 -- value arguments]

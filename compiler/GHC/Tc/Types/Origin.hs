@@ -888,7 +888,6 @@ pprCtOrigin (ExpansionOrigin o)
         OrigExpr (ExplicitList{}) -> text "an overloaded list"
         OrigExpr (HsIf{}) -> text "an if-then-else expression"
         OrigExpr e -> text "the expression" <+> (ppr e)
-        PopErrCtxt -> text "Shouldn't Happen PopErrCtxt"
 
 pprCtOrigin (GivenSCOrigin sk d blk)
   = vcat [ ctoHerald <+> pprSkolInfo sk
@@ -1121,7 +1120,6 @@ ppr_br (ExpansionOrigin (OrigExpr (HsIf{}))) = text "an if-then-else expression"
 ppr_br (ExpansionOrigin (OrigExpr e)) = text "an expression" <+> ppr e
 ppr_br (ExpansionOrigin (OrigStmt{})) = text "a do statement"
 ppr_br (ExpansionOrigin (OrigPat{})) = text "a do statement"
-ppr_br (ExpansionOrigin PopErrCtxt) = text "SHOULDN'T HAPPEN POPERRORCTXT"
 ppr_br (ExpectedTySyntax o _) = ppr_br o
 ppr_br (ExpectedFunTySyntaxOp{}) = text "a rebindable syntax operator"
 ppr_br (ExpectedFunTyViewPat{}) = text "a view pattern"
