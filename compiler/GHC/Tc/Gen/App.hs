@@ -955,14 +955,23 @@ addArgCtxt :: Int -> (HsExpr GhcRn, SrcSpan) -> LHsExpr GhcRn
 --  See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 --  See Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
 addArgCtxt arg_no (app_head, app_head_lspan) (L arg_loc arg) thing_inside
-  | isGoodSrcSpan app_head_lspan
-  = do { traceTc "addArgCtxt" (vcat [text "goodSrcSpan", ppr app_head, ppr app_head_lspan, ppr arg_loc, ppr arg, ppr arg_no])
+  | not (isGeneratedSrcSpan app_head_lspan)
+  = do { traceTc "addArgCtxt" (vcat [text "not generated Head"
+                                    , ppr app_head
+                                    , ppr app_head_lspan
+                                    , ppr arg_loc
+                                    , ppr arg
+                                    , ppr arg_no])
        ; setSrcSpanA arg_loc $
            addErrCtxt (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
            thing_inside
        }
   | otherwise
-  = do { traceTc "addArgCtxt" (vcat [text "generatedHead", ppr app_head, ppr app_head_lspan, ppr arg_loc, ppr arg])
+  = do { traceTc "addArgCtxt" (vcat [text "generated Head"
+                                    , ppr app_head
+                                    , ppr app_head_lspan
+                                    , ppr arg_loc
+                                    , ppr arg])
        ; addLExprCtxt (locA arg_loc) arg $
           thing_inside
        }

@@ -1121,10 +1121,10 @@ add_expr_ctxt e thing_inside
 
 addLExprCtxt :: SrcSpan -> HsExpr GhcRn -> TcRn a -> TcRn a
 addLExprCtxt lspan e thing_inside
-  | isGoodSrcSpan lspan
+  | not (isGeneratedSrcSpan lspan)
   , (HsPar _ e') <- e
   = setSrcSpan lspan $ add_expr_ctxt (unLoc e') thing_inside
-  | isGoodSrcSpan lspan
+  | not (isGeneratedSrcSpan lspan)
   = setSrcSpan lspan $ add_expr_ctxt e thing_inside
   | otherwise
   = thing_inside
