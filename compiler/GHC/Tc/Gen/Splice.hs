@@ -2263,8 +2263,7 @@ reifyTyCon tc
                  ; instances <- reifyFamilyInstances tc
                                   (familyInstances fam_envs tc)
                  ; return (TH.FamilyI (TH.OpenTypeFamilyD tfHead) instances) }
-         else do { eqns <-
-                     case isClosedSynFamilyTyConWithAxiom_maybe tc of
+         else do { eqns <- case isClosedFamilyTyCon_maybe tc of
                        Just ax -> mapM (reifyAxBranch tc) $
                                   fromBranches $ coAxiomBranches ax
                        Nothing -> return []

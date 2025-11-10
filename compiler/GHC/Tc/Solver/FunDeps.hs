@@ -25,7 +25,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.Predicate( EqRel(..) )
 import GHC.Core.TyCon
-import GHC.Core.Unify( tcUnifyTyForInjectivity )
+import GHC.Core.Unify( tcUnifyTyForInjectivity, typeListsAreApart, typesAreApart, tcUnifyTy )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Subst( elemSubst )
 
@@ -38,7 +38,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Data.Pair
-import Data.Maybe( mapMaybe )
+import Data.Maybe( mapMaybe, isJust )
 
 
 {- Note [Overview of functional dependencies in type inference]
@@ -259,6 +259,8 @@ Consider T4254b:
     [W] FD Int Bool
   We solve this from the top level instance before even trying fundeps.
   If we did try fundeps, we'd generate [W] b ~ Bool, which fails.
+  That doesn't matter -- failing fundep equalties are discarded -- but it's
+  a waste of effort.
 
   (DFL2) is achieved by trying fundeps only on /unsolved/ Wanteds.
 
@@ -480,16 +482,36 @@ tryFamEqFunDeps fam_tc args work_item@(EqCt { eq_ev = ev, eq_rhs = rhs })
             ; tryFDEqns fam_tc args work_item $
               mkTopBuiltinFamEqFDs fam_tc ops args rhs }
 
-  | Injective inj_flags <- tyConInjectivityInfo fam_tc
-  = if isGiven ev
-    then nopStage ()  -- See (INJFAM:Given)
-    else do { -- Note [Do local fundeps before top-level instances]
-              tryFDEqns fam_tc args work_item $
-              mkLocalUserFamEqFDs fam_tc inj_flags args rhs
-            ; tryFDEqns fam_tc args work_item $
-              mkTopUserFamEqFDs   fam_tc inj_flags args rhs }
+  | isGiven ev    -- See (INJFAM:Given)
+  = nopStage ()
 
-  | otherwise
+  -- Only Wanted constraints below here
+
+  | isOpenTypeFamilyTyCon fam_tc
+  , Injective inj_flags <- tyConInjectivityInfo fam_tc
+  = -- Open, injective type families
+    do { -- Note [Do local fundeps before top-level instances]
+         tryFDEqns fam_tc args work_item $
+         mkLocalUserFamEqFDs fam_tc inj_flags args rhs
+
+       ; tryFDEqns fam_tc args work_item $
+         mkTopOpenFamEqFDs fam_tc inj_flags args rhs }
+
+  | Just ax <- isClosedFamilyTyCon_maybe fam_tc
+  = -- Closed type families
+    do { -- Note [Do local fundeps before top-level instances]
+         case tyConInjectivityInfo fam_tc of
+           NotInjective  -> nopStage()
+           Injective inj -> tryFDEqns fam_tc args work_item $
+                            mkLocalUserFamEqFDs fam_tc inj args rhs
+
+       -- Now look at the top-level axioms; we effectively infer injectivity,
+       -- so we don't need tyConInjectivtyInfo.  This works fine for closed
+       -- type families without injectivity info
+       ; tryFDEqns fam_tc args work_item $
+         mkTopClosedFamEqFDs ax args rhs }
+
+  | otherwise -- Data families, abstract families
   = nopStage ()
 
 tryFDEqns :: TyCon -> [TcType] -> EqCt -> TcS [FunDepEqns] -> SolverStage ()
@@ -507,24 +529,38 @@ tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eq
 -----------------------------------------
 --  User-defined type families
 -----------------------------------------
-mkTopUserFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
--- Implements (INJFAM:Wanted/top)
-mkTopUserFamEqFDs fam_tc inj_flags work_args work_rhs
-  = do { fam_envs <- getFamInstEnvs
-       ; return (mapMaybe do_one (mk_branches fam_envs)) }
+mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> Xi -> TcS [FunDepEqns]
+mkTopClosedFamEqFDs ax work_args work_rhs
+  = return (go (fromBranches (coAxiomBranches ax)))
   where
-    mk_branches ::  (FamInstEnv, FamInstEnv) -> [CoAxBranch]
-    mk_branches fam_envs
-      | isOpenTypeFamilyTyCon fam_tc
-      , let fam_insts = lookupFamInstEnvByTyCon fam_envs fam_tc
-      = concatMap (fromBranches . coAxiomBranches . fi_axiom) fam_insts
+    go :: [CoAxBranch] -> [FunDepEqns]
+    go [] = []
 
-      | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
-      = fromBranches (coAxiomBranches ax)
+    go (branch : later_branches)
+      | CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys
+                   , cab_rhs = rhs_ty, cab_incomps = incomps } <- branch
+      , not (work_args `typeListsAreApart` lhs_tys)
+      , isJust (tcUnifyTy work_rhs rhs_ty)
+      = if all ok incomps && all ok later_branches
+        then [FDEqns { fd_qtvs = qtvs, fd_eqs = zipWith Pair lhs_tys work_args }]
+        else []
 
       | otherwise
-      = []
+      = go later_branches
 
+    ok (CoAxBranch { cab_lhs = lhs_tys, cab_rhs = rhs_ty })
+      = work_args `typeListsAreApart` lhs_tys ||
+        work_rhs  `typesAreApart`     rhs_ty
+
+mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
+-- Implements (INJFAM:Wanted/top)
+mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
+  = do { fam_envs <- getFamInstEnvs
+       ; let branches :: [CoAxBranch]
+             branches = concatMap (fromBranches . coAxiomBranches . fi_axiom) $
+                        lookupFamInstEnvByTyCon fam_envs fam_tc
+       ; return (mapMaybe do_one branches) }
+  where
     do_one :: CoAxBranch -> Maybe FunDepEqns
     do_one branch@(CoAxBranch { cab_tvs = branch_tvs
                               , cab_lhs = branch_lhs_tys

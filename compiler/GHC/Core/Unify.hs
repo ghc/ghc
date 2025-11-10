@@ -16,7 +16,7 @@ module GHC.Core.Unify (
         BindTvFun, BindFamFun, BindFlag(..),
         matchBindTv, alwaysBindTv, alwaysBindFam, dontCareBindFam,
         UnifyResult, UnifyResultM(..), MaybeApartReason(..),
-        typesCantMatch, typesAreApart,
+        typesCantMatch, typesAreApart, typeListsAreApart,
 
         -- Matching a type against a lifted type (coercion)
         liftCoMatch
@@ -766,9 +766,14 @@ typesCantMatch :: [(Type,Type)] -> Bool
 typesCantMatch prs = any (uncurry typesAreApart) prs
 
 typesAreApart :: Type -> Type -> Bool
-typesAreApart t1 t2 = case tcUnifyTysFG alwaysBindFam alwaysBindTv [t1] [t2] of
-                        SurelyApart -> True
-                        _           -> False
+typesAreApart ty1 ty2 = typeListsAreApart [ty1] [ty2]
+
+typeListsAreApart :: [Type] -> [Type] -> Bool
+typeListsAreApart tys1 tys2
+  = case tcUnifyTysFG alwaysBindFam alwaysBindTv tys1 tys2 of
+       SurelyApart -> True
+       _           -> False
+
 {-
 ************************************************************************
 *                                                                      *

@@ -223,8 +223,8 @@ implicitTyConThings tc
 implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc
   | Just co <- newTyConCo_maybe tc = [ACoAxiom $ toBranchedAxiom co]
-  | Just co <- isClosedSynFamilyTyConWithAxiom_maybe tc
-                                   = [ACoAxiom co]
+  | Just ax <- isClosedFamilyTyCon_maybe tc
+                                   = [ACoAxiom ax]
   | otherwise                      = []
 
 -- | Returns @True@ if there should be no interface-file declaration
