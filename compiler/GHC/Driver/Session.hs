@@ -255,6 +255,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
 import GHC.Types.Basic ( treatZeroAsInf )
 import GHC.Data.FastString
+import qualified GHC.Data.OsPath as OsPath
 import GHC.Utils.TmpFs
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
@@ -1962,7 +1963,7 @@ package_flags_deps :: [(Deprecation, Flag (CmdLineP DynFlags))]
 package_flags_deps = [
         ------- Packages ----------------------------------------------------
     make_ord_flag defFlag "package-db"
-      (HasArg (addPkgDbRef . PkgDbPath))
+      (HasArg (addPkgDbRef . PkgDbPath . OsPath.unsafeEncodeUtf))
   , make_ord_flag defFlag "clear-package-db"      (NoArg clearPkgDb)
   , make_ord_flag defFlag "no-global-package-db"  (NoArg removeGlobalPkgDb)
   , make_ord_flag defFlag "no-user-package-db"    (NoArg removeUserPkgDb)
@@ -1972,7 +1973,7 @@ package_flags_deps = [
       (NoArg (addPkgDbRef UserPkgDb))
     -- backwards compat with GHC<=7.4 :
   , make_dep_flag defFlag "package-conf"
-      (HasArg $ addPkgDbRef . PkgDbPath) "Use -package-db instead"
+      (HasArg $ addPkgDbRef . PkgDbPath . OsPath.unsafeEncodeUtf) "Use -package-db instead"
   , make_dep_flag defFlag "no-user-package-conf"
       (NoArg removeUserPkgDb)              "Use -no-user-package-db instead"
   , make_ord_flag defGhcFlag "package-name"       (HasArg $ \name ->
@@ -3377,7 +3378,7 @@ parseEnvFile :: FilePath -> String -> DynP ()
 parseEnvFile envfile = mapM_ parseEntry . lines
   where
     parseEntry str = case words str of
-      ("package-db": _)     -> addPkgDbRef (PkgDbPath (envdir </> db))
+      ("package-db": _)     -> addPkgDbRef (PkgDbPath (OsPath.unsafeEncodeUtf (envdir </> db)))
         -- relative package dbs are interpreted relative to the env file
         where envdir = takeDirectory envfile
               db     = drop 11 str
