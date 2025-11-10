@@ -588,10 +588,12 @@ cpeBind top_lvl env (NonRec bndr rhs)
                  emptyFloats,
                  Just (NonRec bndr2 rhs1)) }
 
-  | isTyVar bndr
-  , let float = Float bind LetBound TopLvlFloatable
-  = -- A type binding
-    return (env, unitFloat float, Nothing)
+  | Type ty <- rhs  -- A type binding
+  = assertPpr (isTyVar bndr) (ppr bndr $$ ppr rhs) $
+    do { (env', bndr') <- cpCloneBndr env bndr
+       ; let bind' = NonRec bndr' (Type (cpSubstTy env ty))
+             float = Float bind' LetBound TopLvlFloatable
+       ; return (env', unitFloat float, Nothing) }
 
   | otherwise
   = do { (env1, bndr1) <- cpCloneBndr env bndr
