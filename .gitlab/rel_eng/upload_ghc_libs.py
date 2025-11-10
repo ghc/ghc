@@ -122,6 +122,7 @@ PACKAGES = {
         Package('ghc-compact', Path("libraries/ghc-compact"), no_prep),
         Package('ghc', Path("compiler"), prep_ghc),
         Package('ghci', Path("libraries/ghci"), no_prep),
+        Package('hpc', Path("libraries/hpc"), no_prep),
     ]
 }
 # Dict[str, Package]
