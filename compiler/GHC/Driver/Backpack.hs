@@ -399,6 +399,7 @@ buildUnit session cid insts lunit = do
             unitExtDepLibsSys = [],
             unitExtDepLibsGhc = [],
             unitLibraryDynDirs = [],
+            unitLibraryBytecodeDirs = [],
             unitLibraryDirs = [],
             unitExtDepFrameworks = [],
             unitExtDepFrameworkDirs = [],

@@ -13,14 +13,32 @@ module GHC.Linker.Types
    ( Loader (..)
    , LoaderState (..)
    , uninitializedLoader
+
+   -- * Bytecode Loader State
+   , BytecodeLoaderState(..)
+   , BytecodeState(..)
+   , emptyBytecodeLoaderState
+   , emptyBytecodeState
+   , modifyHomePackageBytecodeState
+   , modifyExternalPackageBytecodeState
+   , modifyBytecodeLoaderState
+   , lookupNameBytecodeState
+   , lookupBreakArrayBytecodeState
+   , lookupInfoTableBytecodeState
+   , lookupAddressBytecodeState
+   , lookupCCSBytecodeState
+   , BytecodeLoaderStateModifier
+   , BytecodeLoaderStateTraverser
+   , traverseHomePackageBytecodeState
+   , traverseExternalPackageBytecodeState
    , modifyClosureEnv
    , LinkerEnv(..)
-   , filterLinkerEnv
+   , emptyLinkerEnv
    , ClosureEnv
    , emptyClosureEnv
    , extendClosureEnv
    , LinkedBreaks(..)
-   , filterLinkedBreaks
+   , emptyLinkedBreaks
    , LinkableSet
    , mkLinkableSet
    , unionLinkableSet
@@ -65,7 +83,7 @@ import GHCi.RemoteTypes
 import GHCi.Message            ( LoadedDLL )
 
 import GHC.Stack.CCS
-import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, filterNameEnv )
+import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, lookupNameEnv )
 import GHC.Types.Name          ( Name )
 import GHC.Types.SptEntry
 
@@ -81,6 +99,8 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.Maybe (mapMaybe)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
+import Control.Applicative ((<|>))
+import Data.Functor.Identity
 
 
 {- **********************************************************************
@@ -152,8 +172,9 @@ and be able to lookup symbols specifically in them too (similarly to
 newtype Loader = Loader { loader_state :: MVar (Maybe LoaderState) }
 
 data LoaderState = LoaderState
-    { linker_env :: !LinkerEnv
-        -- ^ Current global mapping from Names to their true values
+    { bco_loader_state :: !BytecodeLoaderState
+        -- ^ Information about bytecode objects we have loaded into the
+        -- interpreter.
 
     , bcos_loaded :: !LinkableSet
         -- ^ The currently loaded interpreted modules (home package)
@@ -162,26 +183,118 @@ data LoaderState = LoaderState
         -- ^ And the currently-loaded compiled modules (home package)
 
     , pkgs_loaded :: !PkgsLoaded
-        -- ^ The currently-loaded packages; always object code
+        -- ^ The currently-loaded packages;
         -- haskell libraries, system libraries, transitive dependencies
 
     , temp_sos :: ![(FilePath, String)]
         -- ^ We need to remember the name of previous temporary DLL/.so
         -- libraries so we can link them (see #10322)
-
-    , linked_breaks :: !LinkedBreaks
-        -- ^ Mapping from loaded modules to their breakpoint arrays
     }
+
+data BytecodeState = BytecodeState
+        { bco_linker_env :: !LinkerEnv
+        -- ^ Current global mapping from Names to their true values
+        , bco_linked_breaks :: !LinkedBreaks
+        -- ^ Mapping from loaded modules to their breakpoint arrays
+        }
+
+-- | The 'BytecodeLoaderState' captures all the information about bytecode loaded
+-- into the interpreter.
+-- It is separated into two parts. One for bytecode objects loaded by the home package and
+-- one for bytecode objects loaded from bytecode libraries for external packages.
+-- Much like the HPT/EPS split, the home package state can be unloaded by calling 'unload'.
+data BytecodeLoaderState = BytecodeLoaderState
+       { homePackage_loaded :: BytecodeState
+       -- ^ Information about bytecode objects from the home package we have loaded into the interpreter.
+       , externalPackage_loaded :: BytecodeState
+       -- ^ Information about bytecode objects from external packages we have loaded into the interpreter.
+       }
+
+
+-- | Find a name loaded from bytecode
+lookupNameBytecodeState :: BytecodeLoaderState -> Name -> Maybe (Name, ForeignHValue)
+lookupNameBytecodeState (BytecodeLoaderState home_package external_package) name = do
+      lookupNameEnv (closure_env (bco_linker_env home_package)) name
+  <|> lookupNameEnv (closure_env (bco_linker_env external_package)) name
+
+-- | Look up a break array in the bytecode loader state.
+lookupBreakArrayBytecodeState :: BytecodeLoaderState -> Module -> Maybe (ForeignRef BreakArray)
+lookupBreakArrayBytecodeState (BytecodeLoaderState home_package external_package) break_mod = do
+  lookupModuleEnv (breakarray_env (bco_linked_breaks home_package)) break_mod
+  <|> lookupModuleEnv (breakarray_env (bco_linked_breaks external_package)) break_mod
+
+-- | Look up an info table in the bytecode loader state.
+lookupInfoTableBytecodeState :: BytecodeLoaderState -> Name -> Maybe (Name, ItblPtr)
+lookupInfoTableBytecodeState (BytecodeLoaderState home_package external_package) info_mod = do
+  lookupNameEnv (itbl_env (bco_linker_env home_package)) info_mod
+  <|> lookupNameEnv (itbl_env (bco_linker_env external_package)) info_mod
+
+-- | Look up an address in the bytecode loader state.
+lookupAddressBytecodeState :: BytecodeLoaderState -> Name -> Maybe (Name, AddrPtr)
+lookupAddressBytecodeState (BytecodeLoaderState home_package external_package) addr_mod = do
+  lookupNameEnv (addr_env (bco_linker_env home_package)) addr_mod
+  <|> lookupNameEnv (addr_env (bco_linker_env external_package)) addr_mod
+
+-- | Look up a cost centre stack in the bytecode loader state.
+lookupCCSBytecodeState :: BytecodeLoaderState -> Module -> Maybe (Array BreakTickIndex (RemotePtr CostCentre))
+lookupCCSBytecodeState (BytecodeLoaderState home_package external_package) ccs_mod = do
+  lookupModuleEnv (ccs_env (bco_linked_breaks home_package)) ccs_mod
+  <|> lookupModuleEnv (ccs_env (bco_linked_breaks external_package)) ccs_mod
+
+emptyBytecodeLoaderState :: BytecodeLoaderState
+emptyBytecodeLoaderState = BytecodeLoaderState
+    { homePackage_loaded = emptyBytecodeState
+    , externalPackage_loaded = emptyBytecodeState
+    }
+
+emptyBytecodeState :: BytecodeState
+emptyBytecodeState = BytecodeState
+    { bco_linker_env = emptyLinkerEnv
+    , bco_linked_breaks = emptyLinkedBreaks
+    }
+
+
+-- Some parts of the compiler can be used to load bytecode into either the home package or
+-- external package state. They are parameterised by a 'BytecodeLoaderStateModifier' or
+-- 'BytecodeLoaderStateTraverser' so they know which part of the state to update.
+
+type BytecodeLoaderStateModifier = BytecodeLoaderState -> (BytecodeState -> BytecodeState) -> BytecodeLoaderState
+type BytecodeLoaderStateTraverser m = BytecodeLoaderState -> (BytecodeState -> m BytecodeState) -> m BytecodeLoaderState
+
+-- | Only update the home package bytecode state.
+modifyHomePackageBytecodeState :: BytecodeLoaderState -> (BytecodeState -> BytecodeState) -> BytecodeLoaderState
+modifyHomePackageBytecodeState bls f = runIdentity $ traverseHomePackageBytecodeState bls (return . f)
+
+-- | Only update the external package bytecode state.
+modifyExternalPackageBytecodeState :: BytecodeLoaderState -> (BytecodeState -> BytecodeState) -> BytecodeLoaderState
+modifyExternalPackageBytecodeState bls f = runIdentity $ traverseExternalPackageBytecodeState bls (return . f)
+
+-- | Effectfully update the home package bytecode state.
+traverseHomePackageBytecodeState :: Monad m => BytecodeLoaderState -> (BytecodeState -> m BytecodeState) -> m BytecodeLoaderState
+traverseHomePackageBytecodeState bls f = do
+  home_package <- f (homePackage_loaded bls)
+  return bls { homePackage_loaded = home_package }
+
+-- | Effectfully update the external package bytecode state.
+traverseExternalPackageBytecodeState :: Monad m => BytecodeLoaderState -> (BytecodeState -> m BytecodeState) -> m BytecodeLoaderState
+traverseExternalPackageBytecodeState bls f = do
+  external_package <- f (externalPackage_loaded bls)
+  return bls { externalPackage_loaded = external_package }
+
+
+modifyBytecodeLoaderState :: BytecodeLoaderStateModifier -> LoaderState -> (BytecodeState -> BytecodeState) -> LoaderState
+modifyBytecodeLoaderState modify_bytecode_loader_state pls f = pls { bco_loader_state = modify_bytecode_loader_state (bco_loader_state pls) f }
 
 uninitializedLoader :: IO Loader
 uninitializedLoader = Loader <$> newMVar Nothing
 
-modifyClosureEnv :: LoaderState -> (ClosureEnv -> ClosureEnv) -> LoaderState
+modifyClosureEnv :: BytecodeState -> (ClosureEnv -> ClosureEnv) -> BytecodeState
 modifyClosureEnv pls f =
-    let le = linker_env pls
+    let le = bco_linker_env pls
         ce = closure_env le
-    in pls { linker_env = le { closure_env = f ce } }
+    in pls { bco_linker_env = le { closure_env = f ce } }
 
+-- | Information about loaded bytecode
 data LinkerEnv = LinkerEnv
   { closure_env :: !ClosureEnv
       -- ^ Current global mapping from closure Names to their true values
@@ -198,11 +311,11 @@ data LinkerEnv = LinkerEnv
       -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode.
   }
 
-filterLinkerEnv :: (Name -> Bool) -> LinkerEnv -> LinkerEnv
-filterLinkerEnv f (LinkerEnv closure_e itbl_e addr_e) = LinkerEnv
-  { closure_env = filterNameEnv (f . fst) closure_e
-  , itbl_env    = filterNameEnv (f . fst) itbl_e
-  , addr_env    = filterNameEnv (f . fst) addr_e
+emptyLinkerEnv :: LinkerEnv
+emptyLinkerEnv = LinkerEnv
+  { closure_env = emptyNameEnv
+  , itbl_env    = emptyNameEnv
+  , addr_env    = emptyNameEnv
   }
 
 type ClosureEnv = NameEnv (Name, ForeignHValue)
@@ -231,10 +344,10 @@ data LinkedBreaks
       -- Untouched when not profiling.
   }
 
-filterLinkedBreaks :: (Module -> Bool) -> LinkedBreaks -> LinkedBreaks
-filterLinkedBreaks f (LinkedBreaks ba_e ccs_e) = LinkedBreaks
-  { breakarray_env = filterModuleEnv (\m _ -> f m) ba_e
-  , ccs_env        = filterModuleEnv (\m _ -> f m) ccs_e
+emptyLinkedBreaks :: LinkedBreaks
+emptyLinkedBreaks = LinkedBreaks
+  { breakarray_env = emptyModuleEnv
+  , ccs_env        = emptyModuleEnv
   }
 
 type PkgsLoaded = UniqDFM UnitId LoadedPkgInfo
@@ -504,9 +617,13 @@ data LibrarySpec
 
    | Framework String   -- Only used for darwin, but does no harm
 
+   | BytecodeLibrary FilePath
+      -- ^ A bytecode library file (.bytecodelib)
+
 instance Outputable LibrarySpec where
   ppr (Objects objs) = text "Objects" <+> ppr (map (text @SDoc) objs)
   ppr (Archive a) = text "Archive" <+> text a
   ppr (DLL s) = text "DLL" <+> text s
   ppr (DLLPath f) = text "DLLPath" <+> text f
   ppr (Framework s) = text "Framework" <+> text s
+  ppr (BytecodeLibrary f) = text "BytecodeLibrary" <+> text f

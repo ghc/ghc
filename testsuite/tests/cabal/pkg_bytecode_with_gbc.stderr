@@ -1,0 +1,4 @@
+when making flags consistent: warning: [GHC-74335] [-Winconsistent-flags]
+    Byte-code linking does not currently support linking an executable, enabling -no-link
+
+testpkg-1.2.3.4: Warning: .:19:1: Unknown field: "bytecode-library-dirs"
