@@ -54,7 +54,12 @@ import qualified Data.Bits          as Bits
 -- | The garbageCollector resets registers and result variables.
 garbageCollector :: JSM JStgStat
 garbageCollector = jBlock
-    [ jFunction' hdResetRegisters  (return $ mconcat $ map resetRegister [minBound..maxBound])
+    [ jFunction' hdResetRegisters  $ return $ mconcat
+        [ -- reset low registers explicitly
+          mconcat (map resetRegister lowRegs)
+          -- reset the whole h$regs array with h$regs.fill(null)
+        , toStat $ ApplExpr (hdRegs .^ "fill") [null_]
+        ]
     , jFunction' hdResetResultVars (return $ mconcat $ map resetResultVar [minBound..maxBound])
     ]
 
@@ -249,7 +254,7 @@ declRegs = do
     loaders         <- loadRegs
     return $
       mconcat [ hdRegsStr ||= toJExpr (JList [])
-              , mconcat (map declReg lowRegs)
+              , mconcat (map declReg lowRegsIdents)
               , getters_setters
               , loaders
               ]
@@ -259,15 +264,15 @@ declRegs = do
 -- | JS payload to define getters and setters on the registers.
 regGettersSetters :: JSM JStgStat
 regGettersSetters =
-  do setters <- jFunction (name hdGetRegStr) (\(MkSolo n) -> return $ SwitchStat n getRegCases mempty)
-     getters <- jFunction (name hdSetRegStr) (\(n,v)      -> return $ SwitchStat n (setRegCases v) mempty)
+  do getters <- jFunction (name hdGetRegStr) (\(MkSolo n) -> return $ SwitchStat n getRegCases (defaultGetRegCase n))
+     setters <- jFunction (name hdSetRegStr) (\(n,v)      -> return $ SwitchStat n (setRegCases v) (defaultSetRegCase n v))
      return $ setters <> getters
   where
-    getRegCases =
-      map (\r -> (toJExpr (jsRegToInt r) , returnS (toJExpr r))) regsFromR1
-    setRegCases :: JStgExpr -> [(JStgExpr,JStgStat)]
-    setRegCases v =
-      map (\r -> (toJExpr (jsRegToInt r), (toJExpr r |= toJExpr v) <> returnS undefined_)) regsFromR1
+    getRegCases         = map (\r -> (toJExpr (regNumber r) , returnS (toJExpr r))) lowRegs
+    defaultGetRegCase n = returnS (highReg_expr n)
+
+    setRegCases v         = map (\r -> (toJExpr (regNumber r), (toJExpr r |= v) <> BreakStat Nothing)) lowRegs
+    defaultSetRegCase n v = highReg_expr n |= v
 
 -- | JS payload that defines the functions to load each register
 loadRegs :: JSM JStgStat

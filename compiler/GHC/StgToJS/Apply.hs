@@ -185,7 +185,7 @@ genApp ctx i args
       as'      <- concatMapM genArg args
       ei       <- varForEntryId i
       let ra = mconcat . reverse $
-                 zipWith (\r a -> toJExpr r |= a) [R1 ..] as'
+                 zipWith (\r a -> toJExpr r |= a) regsFromR1 as'
       p <- pushLneFrame n ctx
       a <- adjSp 1 -- for the header (which will only be written when the thread is suspended)
       return (ra <> p <> a <> returnS ei, ExprCont)
@@ -464,42 +464,31 @@ specTag spec = Bits.shiftL (specVars spec) 8 Bits..|. specArgs spec
 specTagExpr :: ApplySpec -> JStgExpr
 specTagExpr = toJExpr . specTag
 
--- | Build arrays to quickly lookup apply functions
+-- | Build functions to quickly lookup apply functions
 --
---  h$apply[r << 8 | n] = function application for r regs, n args
---  h$paps[r]           = partial application for r registers (number of args is in the object)
+--  h$apply(r << 8 | n) = function application for r regs, n args
+--  h$paps(r)           = partial application for r registers (number of args is in the object)
 mkApplyArr :: JSM JStgStat
 mkApplyArr =
-  do mk_ap_gens  <- jFor (|= zero_) (.<. Int 65536) preIncrS
-                    \j -> hdApply .! j |= hdApGen
-     mk_pap_gens <- jFor (|= zero_) (.<. Int 128) preIncrS
-                    \j -> hdPaps .! j |=  hdPapGen
+  do paps_fun <- jFunction (name hdPapsStr) \(MkSolo i) -> pure $ SwitchStat i (map case_pap specPap) (returnS hdPapGen)
+     apply_fun <- jFunction (name hdApplyStr) \(MkSolo i) -> pure $ SwitchStat i (mapMaybe' case_apply applySpec) (returnS hdApGen)
      return $ mconcat
-       [ name hdApplyStr ||= toJExpr (JList [])
-       , name hdPapsStr  ||= toJExpr (JList [])
-       , ApplStat (hdInitStatic .^ "push")
-         [ jLam' $
-           mconcat
-           [ mk_ap_gens
-           , mk_pap_gens
-           , mconcat (map assignSpec applySpec)
-           , mconcat (map assignPap specPap)
-           ]
-         ]
+       [ paps_fun
+       , apply_fun
        ]
   where
-    assignSpec :: ApplySpec -> JStgStat
-    assignSpec spec = case specConv spec of
+    case_apply :: ApplySpec -> Maybe (JStgExpr,JStgStat)
+    case_apply spec = case specConv spec of
       -- both fast/slow (regs/stack) specialized apply functions have the same
       -- tags. We store the stack ones in the array because they are used as
       -- continuation stack frames.
-      StackConv -> hdApply .! specTagExpr spec |= specApplyExpr spec
-      RegsConv  -> mempty
+      StackConv -> Just (specTagExpr spec, returnS (specApplyExpr spec))
+      RegsConv  -> Nothing
 
     hdPap_ = unpackFS hdPapStr_
 
-    assignPap :: Int -> JStgStat
-    assignPap p = hdPaps .! toJExpr p |= global (mkFastString (hdPap_ ++ show p))
+    case_pap :: Int -> (JStgExpr, JStgStat)
+    case_pap p = (toJExpr p,  returnS $ global (mkFastString (hdPap_ ++ show p)))
 
 -- | Push a continuation on the stack
 --
@@ -619,7 +608,7 @@ genericStackApply cfg = closure info body
                          -- compute new tag with consumed register values and args removed
                          , newTag |= ((given_regs-needed_regs).<<.8) .|. (given_args - needed_args)
                          -- find application function for the remaining regs/args
-                         , newAp |= hdApply .! newTag
+                         , newAp |= ApplExpr hdApply [newTag]
                          , traceRts cfg (jString "h$ap_gen: next: " + (newAp .^ "n"))
 
                          -- Drop used registers from the stack.
@@ -643,7 +632,7 @@ genericStackApply cfg = closure info body
                          -----------------------------
                          [ traceRts cfg (jString "h$ap_gen: undersat")
                          -- find PAP entry function corresponding to given_regs count
-                         , p      |= hdPaps .! given_regs
+                         , p      |= ApplExpr hdPaps [given_regs]
 
                          -- build PAP payload: R1 + tag + given register values
                          , newTag |= ((needed_regs-given_regs) .<<. 8) .|. (needed_args-given_args)
@@ -716,7 +705,7 @@ genericFastApply s =
              do push_all_regs <- pushAllRegs tag
                 return $ mconcat $
                   [ push_all_regs
-                  , ap |= hdApply .! tag
+                  , ap |= ApplExpr hdApply [tag]
                   , ifS (ap .===. hdApGen)
                     ((sp |= sp + 2) <> (stack .! (sp-1) |= tag))
                     (sp |= sp + 1)
@@ -750,7 +739,7 @@ genericFastApply s =
                 , traceRts s (jString "h$ap_gen_fast: oversat " + sp)
                 , push_args
                 , newTag |= ((myRegs-( arity.>>.8)).<<.8).|.myAr-ar
-                , newAp |= hdApply .! newTag
+                , newAp |= ApplExpr hdApply [newTag]
                 , ifS (newAp .===. hdApGen)
                   ((sp |= sp + 2) <> (stack .! (sp - 1) |= newTag))
                   (sp |= sp + 1)
@@ -761,7 +750,7 @@ genericFastApply s =
                -- else
                 [traceRts s (jString "h$ap_gen_fast: undersat: " + myRegs + jString " " + tag)
                 , jwhenS (tag .!=. 0) $ mconcat
-                  [ p |= hdPaps .! myRegs
+                  [ p |= ApplExpr hdPaps [myRegs]
                   , dat |= toJExpr [r1, ((arity .>>. 8)-myRegs)*256+ar-myAr]
                   , get_regs
                   , r1 |= initClosure s p dat jCurrentCCS
@@ -773,14 +762,24 @@ genericFastApply s =
     pushAllRegs :: JStgExpr -> JSM JStgStat
     pushAllRegs tag =
       jVar \regs ->
-             return $ mconcat $
-             [ regs |= tag .>>. 8
-             , sp |= sp + regs
-             , SwitchStat regs (map pushReg [65,64..2]) mempty
-             ]
-      where
-        pushReg :: Int -> (JStgExpr, JStgStat)
-        pushReg r = (toJExpr (r-1),  stack .! (sp - toJExpr (r - 2)) |= jsReg r)
+             let max_low_reg = regNumber maxLowReg
+                 low_regs = [max_low_reg, max_low_reg-1..2] -- R1 isn't used for arguments
+                 pushReg :: Int -> (JStgExpr, JStgStat)
+                 pushReg r = (toJExpr r,  stack .! (sp - toJExpr (r - 2)) |= jsReg r)
+             in return $ mconcat $
+                  [ regs |= tag .>>. 8
+                  , sp |= sp + regs
+                    -- increment the number of regs by 1, so that it matches register
+                    -- numbers (R1 is not used for args)
+                  , postIncrS regs
+                    -- copy high registers with a loop
+                  , WhileStat False (regs .>. toJExpr max_low_reg) $ mconcat
+                      -- rN stored in stack[sp - N - 2] so that r2 is stored in stack[sp], etc.
+                      [ stack .! (sp - regs - 2) |= highReg_expr regs
+                      , postDecrS regs
+                      ]
+                  , SwitchStat regs (map pushReg low_regs) mempty
+                  ]
 
     pushArgs :: JStgExpr -> JStgExpr -> JSM JStgStat
     pushArgs start end =
@@ -906,7 +905,7 @@ stackApply s fun_name nargs nvars =
              [ rs |= (arity .>>. 8)
              , loadRegs rs
              , sp |= sp - rs
-             , newAp |= (hdApply .! ((toJExpr nargs-arity0).|.((toJExpr nvars-rs).<<.8)))
+             , newAp |= ApplExpr hdApply [(toJExpr nargs-arity0).|.((toJExpr nvars-rs).<<.8)]
              , stack .! sp |= newAp
              , profStat s pushRestoreCCS
              , traceRts s (toJExpr (fun_name <> ": new stack frame: ") + (newAp .^ "n"))
@@ -989,7 +988,7 @@ fastApply s fun_name nargs nvars = if nargs == 0 && nvars == 0
                               + rsRemain)
                 , saveRegs rs
                 , sp |= sp + rsRemain + 1
-                , stack .! sp |= hdApply .! ((rsRemain.<<.8).|. (toJExpr nargs - mask8 arity))
+                , stack .! sp |= ApplExpr hdApply [(rsRemain.<<.8).|. (toJExpr nargs - mask8 arity)]
                 , profStat s pushRestoreCCS
                 , returnS c
                 ]
@@ -1238,14 +1237,30 @@ pap s r = closure (ClosureInfo
              , profStat s (enterCostCentreFun currentCCS)
              , extra |= (funOrPapArity c (Just f) .>>. 8) - toJExpr r
              , traceRts s (toJExpr (funcName <> ": pap extra args moving: ") + extra)
-             , moveBy extra
+             , case r of
+                0 -> mempty -- in pap_0 we don't shift any register
+                _ -> moveBy extra
              , loadOwnArgs d
              , r1 |= c
              , returnS f
              ]
-    moveBy extra = SwitchStat extra
-                   (reverse $ map moveCase [1..maxReg-r-1]) mempty
-    moveCase m = (toJExpr m, jsReg (m+r+1) |= jsReg (m+1))
+    moveBy extra =
+      let max_low_reg = regNumber maxLowReg
+          low_regs = [max_low_reg, max_low_reg-1..2] -- R1 isn't used for arguments
+          move_case m = (toJExpr m, jsReg (m+r) |= jsReg m)
+      in mconcat
+          [ -- increment the number of args by 1, so that it matches register
+            -- numbers (R1 is not used for args)
+            postIncrS extra
+            -- copy high registers with a loop
+          ,  WhileStat False (extra .>. toJExpr max_low_reg) $ mconcat
+              [ highReg_expr (extra + toJExpr r) |= highReg_expr extra
+              , postDecrS extra
+              ]
+            -- then copy low registers with a case
+          , SwitchStat extra (map move_case low_regs) mempty
+          ]
+
     loadOwnArgs d = mconcat $ map (\r ->
         jsReg (r+1) |= dField d (r+2)) [1..r]
     dField d n = SelExpr d (name . mkFastString $ ('d':show (n-1)))
@@ -1274,7 +1289,9 @@ papGen cfg =
                 (jString "h$pap_gen: expected function or pap")
               , profStat cfg (enterCostCentreFun currentCCS)
               , traceRts cfg (jString "h$pap_gen: generic pap extra args moving: " + or)
+                -- shift newly applied arguments into appropriate registers
               , appS hdMoveRegs2 [or, r]
+                -- load stored arguments into lowest argument registers (i.e. starting from R2)
               , loadOwnArgs d r
               , r1 |= c
               , returnS f
@@ -1285,9 +1302,22 @@ papGen cfg =
     funcIdent = name funcName
     funcName = hdPapGenStr
     loadOwnArgs d r =
-      let prop n = d .^ ("d" <> mkFastString (show $ n+1))
-          loadOwnArg n = (toJExpr n, jsReg (n+1) |= prop n)
-      in  SwitchStat r (map loadOwnArg [127,126..1]) mempty
+      let prop n = d .^ (mkFastString ("d" ++ show n))
+          loadOwnArg n = (toJExpr n, jsReg n |= prop n)
+          max_low_reg = regNumber maxLowReg
+          low_regs = [max_low_reg, max_low_reg-1..2] -- R1 isn't used for arguments
+      in  mconcat
+            [ -- increment the number of args by 1, so that it matches register
+              -- numbers (R1 is not used for args) and PAP fields (starting from d2)
+              postIncrS r
+              -- copy high registers with a loop
+            ,  WhileStat False (r .>. toJExpr max_low_reg) $ mconcat
+                [ highReg_expr r |= (d .! (jString (fsLit "d") + r))
+                , postDecrS r
+                ]
+              -- then copy low registers with a case.
+            , SwitchStat r (map loadOwnArg low_regs) mempty
+            ]
 
 -- general utilities
 -- move the first n registers, starting at R2, m places up (do not use with negative m)
@@ -1301,7 +1331,7 @@ moveRegs2 = jFunction (name hdMoveRegs2) moveSwitch
     switchCase n m = (toJExpr $
                       (n `Bits.shiftL` 8) Bits..|. m
                      , mconcat (map (`moveRegFast` m) [n+1,n..2])
-                       <> BreakStat Nothing {-[j| break; |]-})
+                       <> BreakStat Nothing)
     moveRegFast n m = jsReg (n+m) |= jsReg n
     -- fallback
     defaultCase n m =

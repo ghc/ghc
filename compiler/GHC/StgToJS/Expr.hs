@@ -312,7 +312,7 @@ genBody ctx startReg args e typ = do
   -- load arguments into local variables
   la <- do
     args' <- concatMapM genIdArgI args
-    return (declAssignAll args' (fmap toJExpr [startReg..]))
+    return (declAssignAll args' (jsRegsFrom startReg))
 
   -- assert that arguments have valid runtime reps
   lav <- verifyRuntimeReps args
@@ -665,7 +665,7 @@ genCase ctx bnd e at alts l
   | otherwise = do
       rj       <- genRet ctx bnd at alts l
       let ctx' = ctxSetTop bnd
-                  $ ctxSetTarget (assocIdExprs bnd (map toJExpr [R1 ..]))
+                  $ ctxSetTarget (assocIdExprs bnd jsRegsFromR1)
                   $ ctx
       (ej, _r) <- genExpr ctx' e
       return (rj <> ej, ExprCont)
@@ -730,7 +730,7 @@ genRet ctx e at as l = freshIdent >>= f
 
     fun free = resetSlots $ do
       decs          <- declVarsForId e
-      load          <- flip assignAll (map toJExpr [R1 ..]) . map toJExpr <$> identsForId e
+      load          <- flip assignAll jsRegsFromR1 . map toJExpr <$> identsForId e
       loadv         <- verifyRuntimeReps [e]
       ras           <- loadRetArgs free
       rasv          <- verifyRuntimeReps (map (\(x,_,_)->x) free)
