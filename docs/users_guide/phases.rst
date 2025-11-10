@@ -846,8 +846,11 @@ Options affecting code generation
     :type: dynamic
     :category: codegen
 
-    If a home package module has byte-code available then use that instead of
+    If a module has byte-code available then use that instead of
     an object file (if that's available) to evaluate and run TH splices.
+
+    This also prefers to load bytecode libraries when trying to find the library
+    to satisfy a package dependency.
 
     This is useful with flags such as :ghc-flag:`-fbyte-code-and-object-code`, which
     tells the compiler to generate byte-code, and :ghc-flag:`-fwrite-if-simplified-core` which

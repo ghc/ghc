@@ -1,0 +1,5 @@
+[1 of 2] Compiling BytecodeForeign  ( BytecodeForeign.hs, BytecodeForeign.gbc )
+[2 of 2] Linking testpkg-1.2.3.4-XXX.bytecodelib
+Reading package info from "bytecode_foreign.pkg" ... done.
+8
+42
