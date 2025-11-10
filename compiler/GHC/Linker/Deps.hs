@@ -53,8 +53,6 @@ import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 
 import qualified Data.Set as Set
-import qualified Data.Map as M
-import Data.List (isSuffixOf)
 
 import System.FilePath
 import System.Directory
