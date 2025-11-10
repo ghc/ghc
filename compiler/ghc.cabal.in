@@ -115,6 +115,7 @@ Library
                    containers >= 0.6.2.1 && < 0.8,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.6,
+                   os-string  >= 2.0.1 && < 2.1,
                    template-haskell == 2.22.*,
                    hpc        >= 0.6 && < 0.8,
                    transformers >= 0.5 && < 0.7,
@@ -430,6 +431,7 @@ Library
         GHC.Data.List.SetOps
         GHC.Data.Maybe
         GHC.Data.OrdList
+        GHC.Data.OsPath
         GHC.Data.Pair
         GHC.Data.SmallArray
         GHC.Data.Stream

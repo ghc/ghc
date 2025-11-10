@@ -76,6 +76,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Maybe
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
+import qualified GHC.Data.OsPath as OsPath
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.Data.ShortText as ST
 
@@ -432,7 +433,7 @@ addUnit u = do
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
          let newdb = UnitDatabase
-               { unitDatabasePath  = "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
+               { unitDatabasePath  = OsPath.unsafeEncodeUtf $ "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
                , unitDatabaseUnits = [u]
                }
          in return (dbs ++ [newdb]) -- added at the end because ordering matters
