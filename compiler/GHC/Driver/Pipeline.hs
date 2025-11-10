@@ -395,11 +395,10 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
    | batch_attempt_linking
    = do
         let dflags = hsc_dflags hsc_env
-        let logger = hsc_logger hsc_env
-        let tmpfs = hsc_tmpfs hsc_env
-        let fc = hsc_FC hsc_env
-        let unit_env = hsc_unit_env hsc_env
-        let
+            logger = hsc_logger hsc_env
+            tmpfs = hsc_tmpfs hsc_env
+            fc = hsc_FC hsc_env
+            unit_env = hsc_unit_env hsc_env
             staticLink = case ghcLink dflags of
                           LinkStaticLib -> True
                           _ -> False

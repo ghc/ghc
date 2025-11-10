@@ -310,7 +310,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
       let
         final_ic = extendInteractiveContextWithIds (hsc_IC hsc_env) final_ids
         final_names = map getName final_ids
-      liftIO $ Loader.extendLoadedEnv interp (zip final_names hvals)
+      liftIO $ Loader.extendLoadedEnv interp modifyHomePackageBytecodeState (zip final_names hvals)
       hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
       setSession hsc_env'
       return (ExecComplete (Right final_names) allocs)
@@ -433,7 +433,7 @@ resumeExec step mbCnt
                             , not (n `elem` old_names) ]
             interp    = hscInterp hsc_env
             dflags    = hsc_dflags hsc_env
-        liftIO $ Loader.deleteFromLoadedEnv interp new_names
+        liftIO $ Loader.deleteFromLoadedHomeEnv interp new_names
 
         case r of
           Resume { resumeStmt = expr
@@ -474,18 +474,18 @@ setupBreakpoint interp ibi cnt = do
 
 getBreakArray :: Interp -> InternalBreakpointId -> InternalModBreaks -> IO (ForeignRef BreakArray)
 getBreakArray interp InternalBreakpointId{ibi_info_mod} imbs = do
-  breaks0 <- linked_breaks . fromMaybe (panic "Loader not initialised") <$> getLoaderState interp
+  breaks0 <- bco_linked_breaks . homePackage_loaded . bco_loader_state . fromMaybe (panic "Loader not initialised") <$> getLoaderState interp
   case lookupModuleEnv (breakarray_env breaks0) ibi_info_mod of
     Just ba -> return ba
     Nothing -> do
       modifyLoaderState interp $ \ld_st -> do
-        let lb = linked_breaks ld_st
+        let lb = bco_linked_breaks . homePackage_loaded . bco_loader_state $ ld_st
 
         -- Recall that BreakArrays are allocated only at BCO link time, so if we
         -- haven't linked the BCOs we intend to break at yet, we allocate the arrays here.
         ba_env <- allocateBreakArrays interp (breakarray_env lb) [imbs]
 
-        let ld_st' = ld_st { linked_breaks = lb{breakarray_env = ba_env} }
+        let ld_st' = modifyBytecodeLoaderState modifyHomePackageBytecodeState ld_st $ \bco_state -> bco_state { bco_linked_breaks = (bco_linked_breaks bco_state) { breakarray_env = ba_env } }
         let ba = expectJust {- just computed -} $ lookupModuleEnv ba_env ibi_info_mod
 
         return
@@ -575,7 +575,7 @@ bindLocalsAtBreakpoint hsc_env apStack span Nothing = do
        ictxt1 = extendInteractiveContextWithIds ictxt0 [exn_id]
        interp = hscInterp hsc_env
    --
-   Loader.extendLoadedEnv interp [(exn_name, apStack)]
+   Loader.extendLoadedEnv interp modifyHomePackageBytecodeState [(exn_name, apStack)]
    return (hsc_env{ hsc_IC = ictxt1 }, [exn_name])
 
 -- Just case: we stopped at a breakpoint, we have information about the location
@@ -634,8 +634,8 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi) = do
        names  = map idName new_ids
 
    let fhvs = catMaybes mb_hValues
-   Loader.extendLoadedEnv interp (zip names fhvs)
-   when result_ok $ Loader.extendLoadedEnv interp [(result_name, apStack_fhv)]
+   Loader.extendLoadedEnv interp modifyHomePackageBytecodeState (zip names fhvs)
+   when result_ok $ Loader.extendLoadedEnv interp modifyHomePackageBytecodeState [(result_name, apStack_fhv)]
    hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
    return (hsc_env1, if result_ok then result_name:names else names)
   where
