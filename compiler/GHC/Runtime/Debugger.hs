@@ -56,6 +56,7 @@ import Data.List ( partition )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.IORef
+import GHC.Linker.Types
 
 -------------------------------------
 -- | The :print & friends commands
@@ -161,7 +162,7 @@ bindSuspensions t = do
                 | (name,ty) <- zip names tys]
           new_ic = extendInteractiveContextWithIds ictxt ids
           interp = hscInterp hsc_env
-      liftIO $ extendLoadedEnv interp (zip names fhvs)
+      liftIO $ extendLoadedEnv interp modifyHomePackageBytecodeState (zip names fhvs)
       setSession hsc_env {hsc_IC = new_ic }
       return t'
      where

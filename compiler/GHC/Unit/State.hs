@@ -854,13 +854,23 @@ distrustAllUnits pkgs = map distrust pkgs
 mungeUnitInfo :: OsPath -> OsPath
                    -> UnitInfo -> UnitInfo
 mungeUnitInfo top_dir pkgroot =
-    mungeDynLibFields
+    mungeBytecodeLibFields
+  . mungeDynLibFields
   . mungeUnitInfoPaths (ST.pack (OsPath.unsafeDecodeUtf top_dir)) (ST.pack (OsPath.unsafeDecodeUtf pkgroot))
 
 mungeDynLibFields :: UnitInfo -> UnitInfo
 mungeDynLibFields pkg =
     pkg {
       unitLibraryDynDirs = case unitLibraryDynDirs pkg of
+         [] -> unitLibraryDirs pkg
+         ds -> ds
+    }
+
+-- | Default to using library-dirs if bytecode library dirs is not explicitly set.
+mungeBytecodeLibFields :: UnitInfo -> UnitInfo
+mungeBytecodeLibFields pkg =
+    pkg {
+      unitLibraryBytecodeDirs = case unitLibraryBytecodeDirs pkg of
          [] -> unitLibraryDirs pkg
          ds -> ds
     }

@@ -28,7 +28,6 @@ import GHCi.ResolvedBCO
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 
-import GHC.Unit.Module.Env
 import GHC.Unit.Types
 
 import GHC.Data.FastString
@@ -57,17 +56,16 @@ import GHC.Exts
 linkBCO
   :: Interp
   -> PkgsLoaded
-  -> LinkerEnv
-  -> LinkedBreaks
+  -> BytecodeLoaderState
   -> NameEnv Int
   -> UnlinkedBCO
   -> IO ResolvedBCO
-linkBCO interp pkgs_loaded le lb bco_ix
+linkBCO interp pkgs_loaded bytecode_state bco_ix
            (UnlinkedBCO _ arity insns bitmap lits0 ptrs0) = do
   -- fromIntegral Word -> Word64 should be a no op if Word is Word64
   -- otherwise it will result in a cast to longlong on 32bit systems.
-  (lits :: [Word]) <- mapM (fmap fromIntegral . lookupLiteral interp pkgs_loaded le lb) (elemsFlatBag lits0)
-  ptrs <- mapM (resolvePtr interp pkgs_loaded le lb bco_ix) (elemsFlatBag ptrs0)
+  (lits :: [Word]) <- mapM (fmap fromIntegral . lookupLiteral interp pkgs_loaded bytecode_state) (elemsFlatBag lits0)
+  ptrs <- mapM (resolvePtr interp pkgs_loaded bytecode_state bco_ix) (elemsFlatBag ptrs0)
   let lits' = listArray (0 :: Int, fromIntegral (sizeFlatBag lits0)-1) lits
   return $ ResolvedBCO { resolvedBCOIsLE   = isLittleEndian
                        , resolvedBCOArity  = arity
@@ -77,17 +75,17 @@ linkBCO interp pkgs_loaded le lb bco_ix
                        , resolvedBCOPtrs   = addListToSS emptySS ptrs
                        }
 
-lookupLiteral :: Interp -> PkgsLoaded -> LinkerEnv -> LinkedBreaks -> BCONPtr -> IO Word
-lookupLiteral interp pkgs_loaded le lb ptr = case ptr of
+lookupLiteral :: Interp -> PkgsLoaded -> BytecodeLoaderState -> BCONPtr -> IO Word
+lookupLiteral interp pkgs_loaded bytecode_state ptr = case ptr of
   BCONPtrWord lit -> return lit
   BCONPtrLbl  sym -> do
     Ptr a# <- lookupStaticPtr interp sym
     return (W# (int2Word# (addr2Int# a#)))
   BCONPtrItbl nm -> do
-    Ptr a# <- lookupIE interp pkgs_loaded (itbl_env le) nm
+    Ptr a# <- lookupIE interp pkgs_loaded bytecode_state nm
     return (W# (int2Word# (addr2Int# a#)))
   BCONPtrAddr nm -> do
-    Ptr a# <- lookupAddr interp pkgs_loaded (addr_env le) nm
+    Ptr a# <- lookupAddr interp pkgs_loaded bytecode_state nm
     return (W# (int2Word# (addr2Int# a#)))
   BCONPtrStr bs -> do
     RemotePtr p <- fmap head $ interpCmd interp $ MallocStrings [bs]
@@ -100,7 +98,7 @@ lookupLiteral interp pkgs_loaded le lb ptr = case ptr of
     pure $ fromIntegral p
   BCONPtrCostCentre InternalBreakpointId{..}
     | interpreterProfiled interp -> do
-        case expectJust (lookupModuleEnv (ccs_env lb) ibi_info_mod) ! ibi_info_index of
+        case expectJust (lookupCCSBytecodeState bytecode_state ibi_info_mod) ! ibi_info_index of
           RemotePtr p -> pure $ fromIntegral p
     | otherwise ->
         case toRemotePtr nullPtr of
@@ -114,9 +112,9 @@ lookupStaticPtr interp addr_of_label_string = do
     Nothing  -> linkFail "GHC.ByteCode.Linker: can't find label"
                   (ppr addr_of_label_string)
 
-lookupIE :: Interp -> PkgsLoaded -> ItblEnv -> Name -> IO (Ptr ())
-lookupIE interp pkgs_loaded ie con_nm =
-  case lookupNameEnv ie con_nm of
+lookupIE :: Interp -> PkgsLoaded -> BytecodeLoaderState -> Name -> IO (Ptr ())
+lookupIE interp pkgs_loaded bytecode_state con_nm =
+  case lookupInfoTableBytecodeState bytecode_state con_nm of
     Just (_, ItblPtr a) -> return (fromRemotePtr (castRemotePtr a))
     Nothing -> do -- try looking up in the object files.
        let sym_to_find1 = IConInfoSymbol con_nm
@@ -134,9 +132,9 @@ lookupIE interp pkgs_loaded ie con_nm =
                                        ppr sym_to_find2)
 
 -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode
-lookupAddr :: Interp -> PkgsLoaded -> AddrEnv -> Name -> IO (Ptr ())
-lookupAddr interp pkgs_loaded ae addr_nm = do
-  case lookupNameEnv ae addr_nm of
+lookupAddr :: Interp -> PkgsLoaded -> BytecodeLoaderState -> Name -> IO (Ptr ())
+lookupAddr interp pkgs_loaded bytecode_state addr_nm = do
+  case lookupAddressBytecodeState bytecode_state addr_nm of
     Just (_, AddrPtr ptr) -> return (fromRemotePtr ptr)
     Nothing -> do -- try looking up in the object files.
       let sym_to_find = IBytesSymbol addr_nm
@@ -158,17 +156,16 @@ lookupPrimOp interp pkgs_loaded primop = do
 resolvePtr
   :: Interp
   -> PkgsLoaded
-  -> LinkerEnv
-  -> LinkedBreaks
+  -> BytecodeLoaderState
   -> NameEnv Int
   -> BCOPtr
   -> IO ResolvedBCOPtr
-resolvePtr interp pkgs_loaded le lb bco_ix ptr = case ptr of
+resolvePtr interp pkgs_loaded bco_loader_state bco_ix ptr = case ptr of
   BCOPtrName nm
     | Just ix <- lookupNameEnv bco_ix nm
     -> return (ResolvedBCORef ix) -- ref to another BCO in this group
 
-    | Just (_, rhv) <- lookupNameEnv (closure_env le) nm
+    | Just (_, rhv) <- lookupNameBytecodeState bco_loader_state nm
     -> return (ResolvedBCOPtr (unsafeForeignRefToRemoteRef rhv))
 
     | otherwise
@@ -184,10 +181,10 @@ resolvePtr interp pkgs_loaded le lb bco_ix ptr = case ptr of
     -> ResolvedBCOStaticPtr <$> lookupPrimOp interp pkgs_loaded op
 
   BCOPtrBCO bco
-    -> ResolvedBCOPtrBCO <$> linkBCO interp pkgs_loaded le lb bco_ix bco
+    -> ResolvedBCOPtrBCO <$> linkBCO interp pkgs_loaded bco_loader_state bco_ix bco
 
   BCOPtrBreakArray tick_mod ->
-    withForeignRef (expectJust (lookupModuleEnv (breakarray_env lb) tick_mod)) $
+    withForeignRef (expectJust (lookupBreakArrayBytecodeState bco_loader_state tick_mod)) $
       \ba -> pure $ ResolvedBCOPtrBreakArray ba
 
 -- | Look up the address of a Haskell symbol in the currently

@@ -73,8 +73,8 @@ LOCAL_GHC_PKG04 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF04)
 ghcpkg04 :
 	rm -rf $(PKGCONF04)
 	$(LOCAL_GHC_PKG04) init $(PKGCONF04)
-	$(LOCAL_GHC_PKG04) register --force test.pkg >/dev/null 2>&1 
-	$(LOCAL_GHC_PKG04) update --force test5.pkg >/dev/null 2>&1 
+	$(LOCAL_GHC_PKG04) register --force test.pkg >/dev/null 2>&1
+	$(LOCAL_GHC_PKG04) update --force test5.pkg >/dev/null 2>&1
 	$(LOCAL_GHC_PKG04) expose testpkg-1.2.3.4  >/dev/null 2>&1
 	@: # testpkg-1.2.3.4 and newtestpkg-2.0 are both exposed now
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONF04) -c ghcpkg04.hs || true
@@ -89,8 +89,8 @@ ghcpkg05 :
 	rm -rf $(PKGCONF05a) $(PKGCONF05b)
 	$(LOCAL_GHC_PKG05a) init $(PKGCONF05a)
 	$(LOCAL_GHC_PKG05b) init $(PKGCONF05b)
-	$(LOCAL_GHC_PKG05a) register --force test2.pkg >/dev/null 2>&1 
-	$(LOCAL_GHC_PKG05b) register --force test3.pkg >/dev/null 2>&1 
+	$(LOCAL_GHC_PKG05a) register --force test2.pkg >/dev/null 2>&1
+	$(LOCAL_GHC_PKG05b) register --force test3.pkg >/dev/null 2>&1
 	$(LOCAL_GHC_PKG05b) check || true
 	$(LOCAL_GHC_PKG05b) list
 	$(LOCAL_GHC_PKG05b) expose testpkg-2.0
@@ -106,7 +106,7 @@ LOCAL_GHC_PKG06 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF06)
 ghcpkg06 :
 	rm -rf $(PKGCONF06)
 	$(LOCAL_GHC_PKG06) init $(PKGCONF06)
-	$(LOCAL_GHC_PKG06) register --force test.pkg >/dev/null 2>&1 
+	$(LOCAL_GHC_PKG06) register --force test.pkg >/dev/null 2>&1
 	if $(LOCAL_GHC_PKG06) register testdup.pkg; then false else true; fi
 	$(LOCAL_GHC_PKG06) register --force testdup.pkg
 
@@ -295,3 +295,56 @@ T13703:
 	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf register --force test13703b.pkg 2>/dev/null
 	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf field z-p-z-q lib-name
 	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf field z-p-z-r lib-name
+
+PKGCONF08=bytecode.package.conf
+LOCAL_GHC_PKG08 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF08)
+pkg_bytecode :
+	$(LOCAL_GHC_PKG08) init $(PKGCONF08)
+	mkdir outdir
+	mv Bytecode.hs outdir/
+	cd outdir && $(TEST_HC) -bytecodelib -hisuf=$(ghciWayExt) $(ghciWayFlags) -o testpkg-1.2.3.4-XXX.bytecodelib Bytecode.hs -fbyte-code -fwrite-interface -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX
+	$(LOCAL_GHC_PKG08) register --force bytecode.pkg
+	cat bytecode.script | $(TEST_HC) $(TEST_HC_OPTS_INTERACTIVE) -package testpkg -package-db $(PKGCONF08)
+
+# Test that bytecode generation works with foreign files
+PKGCONF09=bytecode.package.conf
+LOCAL_GHC_PKG09 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF09)
+pkg_bytecode_foreign :
+	$(LOCAL_GHC_PKG08) init $(PKGCONF08)
+	mkdir outdir
+	mv BytecodeForeign.hs outdir/
+	echo '$$(addForeignFilePath LangC "BytecodeForeign.c" >> return [])' >> outdir/BytecodeForeign.hs
+	mv BytecodeForeign.c outdir/
+	cd outdir && $(TEST_HC) -bytecodelib -hisuf=$(ghciWayExt) $(ghciWayFlags) -o testpkg-1.2.3.4-XXX.bytecodelib BytecodeForeign.hs -fbyte-code -fwrite-interface -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX
+	$(LOCAL_GHC_PKG09) register --force bytecode_foreign.pkg
+	cat bytecode_foreign.script | $(TEST_HC) $(TEST_HC_OPTS_INTERACTIVE) -package testpkg -package-db $(PKGCONF09)
+
+# Test that bytecode generation works by first compiling C to .o, then passing .o to GHC
+PKGCONF10=bytecode_with_o.package.conf
+LOCAL_GHC_PKG10 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF10)
+pkg_bytecode_with_o :
+	$(LOCAL_GHC_PKG10) init $(PKGCONF10)
+	mkdir outdir
+	mv BytecodeForeign.hs outdir/
+	mv BytecodeForeign.c outdir/
+	cd outdir && $(TEST_HC) -c BytecodeForeign.c
+	cd outdir && $(TEST_HC) -bytecodelib -hisuf=$(ghciWayExt) $(ghciWayFlags) -o testpkg-1.2.3.4-XXX.bytecodelib BytecodeForeign.hs BytecodeForeign.o -fbyte-code -fwrite-interface -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX
+	$(LOCAL_GHC_PKG10) register --force bytecode_foreign.pkg
+	cat bytecode_foreign.script | $(TEST_HC) $(TEST_HC_OPTS_INTERACTIVE) -package testpkg -package-db $(PKGCONF10)
+
+# Test that bytecode generation works by first compiling C to .o and Haskell to .gbc independently
+PKGCONF11=bytecode_with_gbc.package.conf
+LOCAL_GHC_PKG11 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF11)
+pkg_bytecode_with_gbc :
+	$(LOCAL_GHC_PKG11) init $(PKGCONF11)
+	mkdir outdir
+	mv BytecodeForeign.hs outdir/
+	mv BytecodeForeign.c outdir/
+	cd outdir && $(TEST_HC) -c BytecodeForeign.c
+	cd outdir && $(TEST_HC) BytecodeForeign.hs -fbyte-code -fwrite-interface -hisuf=$(ghciWayExt) $(ghciWayFlags) -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX -o BytecodeForeign.gbc
+	cd outdir && $(TEST_HC) -bytecodelib -hisuf=$(ghciWayExt) $(ghciWayFlags) -o testpkg-1.2.3.4-XXX.bytecodelib BytecodeForeign.gbc BytecodeForeign.o
+	$(LOCAL_GHC_PKG11) register --force bytecode_foreign.pkg
+	cat bytecode_foreign.script | $(TEST_HC) $(TEST_HC_OPTS_INTERACTIVE) -package testpkg -package-db $(PKGCONF11)
+
+
+
