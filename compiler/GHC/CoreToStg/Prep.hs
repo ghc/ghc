@@ -574,11 +574,13 @@ cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
                    Floats,         -- Floating value bindings
                    Maybe CoreBind) -- Just bind' <=> returned new bind; no float
                                    -- Nothing <=> added bind' to floats instead
-cpeBind top_lvl env bind@(NonRec bndr rhs)
-  | isTyVar bndr
-  , let float = Float bind LetBound TopLvlFloatable
-  = -- A type binding
-    return (env, unitFloat float, Nothing)
+cpeBind top_lvl env (NonRec bndr rhs)
+  | Type ty <- rhs  -- A type binding
+  = assertPpr (isTyVar bndr) (ppr bndr $$ ppr rhs) $
+    do { (env', bndr') <- cpCloneBndr env bndr
+       ; let bind' = NonRec bndr' (Type (cpSubstTy env ty))
+             float = Float bind' LetBound TopLvlFloatable
+       ; return (env', unitFloat float, Nothing) }
 
   | not (isJoinId bndr)
   = do { (env1, bndr1) <- cpCloneBndr env bndr
