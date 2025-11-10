@@ -101,6 +101,8 @@ import GHC.Data.Maybe
 
 import System.Environment ( getEnv )
 import GHC.Data.FastString
+import GHC.Data.OsPath ( OsPath )
+import qualified GHC.Data.OsPath as OsPath
 import qualified GHC.Data.ShortText as ST
 import GHC.Utils.Logger
 import GHC.Utils.Error
@@ -111,7 +113,7 @@ import System.FilePath as FilePath
 import Control.Monad
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
-import Data.List ( intersperse, partition, sortBy, isSuffixOf, sortOn )
+import Data.List ( intersperse, partition, sortBy, sortOn )
 import Data.Set (Set)
 import Data.Monoid (First(..))
 import qualified Data.Semigroup as Semigroup
@@ -407,7 +409,7 @@ initUnitConfig dflags cached_dbs home_units =
 
   where
     offsetPackageDb :: Maybe FilePath -> PackageDBFlag -> PackageDBFlag
-    offsetPackageDb (Just offset) (PackageDB (PkgDbPath p)) | isRelative p = PackageDB (PkgDbPath (offset </> p))
+    offsetPackageDb (Just offset) (PackageDB (PkgDbPath p)) | OsPath.isRelative p = PackageDB (PkgDbPath (OsPath.unsafeEncodeUtf offset OsPath.</> p))
     offsetPackageDb _ p = p
 
 
@@ -502,12 +504,12 @@ emptyUnitState = UnitState {
 
 -- | Unit database
 data UnitDatabase unit = UnitDatabase
-   { unitDatabasePath  :: FilePath
+   { unitDatabasePath  :: OsPath
    , unitDatabaseUnits :: [GenUnitInfo unit]
    }
 
 instance Outputable u => Outputable (UnitDatabase u) where
-  ppr (UnitDatabase fp _u) = text "DB:" <+> text fp
+  ppr (UnitDatabase fp _u) = text "DB:" <+> ppr fp
 
 type UnitInfoMap = UniqMap UnitId UnitInfo
 
@@ -722,9 +724,9 @@ getUnitDbRefs cfg = do
         Left _ -> system_conf_refs
         Right path
          | Just (xs, x) <- snocView path, isSearchPathSeparator x
-         -> map PkgDbPath (splitSearchPath xs) ++ system_conf_refs
+         -> map PkgDbPath (OsPath.splitSearchPath (OsPath.unsafeEncodeUtf xs)) ++ system_conf_refs
          | otherwise
-         -> map PkgDbPath (splitSearchPath path)
+         -> map PkgDbPath (OsPath.splitSearchPath (OsPath.unsafeEncodeUtf path))
 
   -- Apply the package DB-related flags from the command line to get the
   -- final list of package DBs.
@@ -753,24 +755,24 @@ getUnitDbRefs cfg = do
 -- NB: This logic is reimplemented in Cabal, so if you change it,
 -- make sure you update Cabal. (Or, better yet, dump it in the
 -- compiler info so Cabal can use the info.)
-resolveUnitDatabase :: UnitConfig -> PkgDbRef -> IO (Maybe FilePath)
-resolveUnitDatabase cfg GlobalPkgDb = return $ Just (unitConfigGlobalDB cfg)
+resolveUnitDatabase :: UnitConfig -> PkgDbRef -> IO (Maybe OsPath)
+resolveUnitDatabase cfg GlobalPkgDb = return $ Just $ OsPath.unsafeEncodeUtf $ unitConfigGlobalDB cfg
 resolveUnitDatabase cfg UserPkgDb = runMaybeT $ do
   dir <- versionedAppDir (unitConfigProgramName cfg) (unitConfigPlatformArchOS cfg)
   let pkgconf = dir </> unitConfigDBName cfg
   exist <- tryMaybeT $ doesDirectoryExist pkgconf
-  if exist then return pkgconf else mzero
+  if exist then return (OsPath.unsafeEncodeUtf pkgconf) else mzero
 resolveUnitDatabase _ (PkgDbPath name) = return $ Just name
 
-readUnitDatabase :: Logger -> UnitConfig -> FilePath -> IO (UnitDatabase UnitId)
+readUnitDatabase :: Logger -> UnitConfig -> OsPath -> IO (UnitDatabase UnitId)
 readUnitDatabase logger cfg conf_file = do
-  isdir <- doesDirectoryExist conf_file
+  isdir <- OsPath.doesDirectoryExist conf_file
 
   proto_pkg_configs <-
     if isdir
        then readDirStyleUnitInfo conf_file
        else do
-            isfile <- doesFileExist conf_file
+            isfile <- OsPath.doesFileExist conf_file
             if isfile
                then do
                  mpkgs <- tryReadOldFileStyleUnitInfo
@@ -778,48 +780,49 @@ readUnitDatabase logger cfg conf_file = do
                    Just pkgs -> return pkgs
                    Nothing   -> throwGhcExceptionIO $ InstallationError $
                       "ghc no longer supports single-file style package " ++
-                      "databases (" ++ conf_file ++
+                      "databases (" ++ show conf_file ++
                       ") use 'ghc-pkg init' to create the database with " ++
                       "the correct format."
                else throwGhcExceptionIO $ InstallationError $
-                      "can't find a package database at " ++ conf_file
+                      "can't find a package database at " ++ show conf_file
 
   let
       -- Fix #16360: remove trailing slash from conf_file before calculating pkgroot
-      conf_file' = dropTrailingPathSeparator conf_file
-      top_dir = unitConfigGHCDir cfg
-      pkgroot = takeDirectory conf_file'
+      conf_file' = OsPath.dropTrailingPathSeparator conf_file
+      top_dir = OsPath.unsafeEncodeUtf (unitConfigGHCDir cfg)
+      pkgroot = OsPath.takeDirectory conf_file'
       pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) . mkUnitKeyInfo)
                          proto_pkg_configs
   --
   return $ UnitDatabase conf_file' pkg_configs1
   where
+    readDirStyleUnitInfo :: OsPath -> IO [DbUnitInfo]
     readDirStyleUnitInfo conf_dir = do
-      let filename = conf_dir </> "package.cache"
-      cache_exists <- doesFileExist filename
+      let filename = conf_dir OsPath.</> (OsPath.unsafeEncodeUtf "package.cache")
+      cache_exists <- OsPath.doesFileExist filename
       if cache_exists
         then do
-          debugTraceMsg logger 2 $ text "Using binary package database:" <+> text filename
-          readPackageDbForGhc filename
+          debugTraceMsg logger 2 $ text "Using binary package database:" <+> ppr filename
+          readPackageDbForGhc (OsPath.unsafeDecodeUtf filename)
         else do
           -- If there is no package.cache file, we check if the database is not
           -- empty by inspecting if the directory contains any .conf file. If it
           -- does, something is wrong and we fail. Otherwise we assume that the
           -- database is empty.
           debugTraceMsg logger 2 $ text "There is no package.cache in"
-                      <+> text conf_dir
+                      <+> ppr conf_dir
                        <> text ", checking if the database is empty"
-          db_empty <- all (not . isSuffixOf ".conf")
-                   <$> getDirectoryContents conf_dir
+          db_empty <- all (not . OsPath.isSuffixOf (OsPath.unsafeEncodeUtf ".conf"))
+                   <$> OsPath.getDirectoryContents conf_dir
           if db_empty
             then do
               debugTraceMsg logger 3 $ text "There are no .conf files in"
-                          <+> text conf_dir <> text ", treating"
+                          <+> ppr conf_dir <> text ", treating"
                           <+> text "package database as empty"
               return []
             else
               throwGhcExceptionIO $ InstallationError $
-                "there is no package.cache in " ++ conf_dir ++
+                "there is no package.cache in " ++ show conf_dir ++
                 " even though package database is not empty"
 
 
@@ -832,13 +835,13 @@ readUnitDatabase logger cfg conf_file = do
     -- assumes it's a file and tries to overwrite with 'writeFile'.
     -- ghc-pkg also cooperates with this workaround.
     tryReadOldFileStyleUnitInfo = do
-      content <- readFile conf_file `catchIO` \_ -> return ""
+      content <- readFile (OsPath.unsafeDecodeUtf conf_file) `catchIO` \_ -> return ""
       if take 2 content == "[]"
         then do
-          let conf_dir = conf_file <.> "d"
-          direxists <- doesDirectoryExist conf_dir
+          let conf_dir = conf_file OsPath.<.> OsPath.unsafeEncodeUtf "d"
+          direxists <- OsPath.doesDirectoryExist conf_dir
           if direxists
-             then do debugTraceMsg logger 2 (text "Ignoring old file-style db and trying:" <+> text conf_dir)
+             then do debugTraceMsg logger 2 (text "Ignoring old file-style db and trying:" <+> ppr conf_dir)
                      liftM Just (readDirStyleUnitInfo conf_dir)
              else return (Just []) -- ghc-pkg will create it when it's updated
         else return Nothing
@@ -848,11 +851,11 @@ distrustAllUnits pkgs = map distrust pkgs
   where
     distrust pkg = pkg{ unitIsTrusted = False }
 
-mungeUnitInfo :: FilePath -> FilePath
+mungeUnitInfo :: OsPath -> OsPath
                    -> UnitInfo -> UnitInfo
 mungeUnitInfo top_dir pkgroot =
     mungeDynLibFields
-  . mungeUnitInfoPaths (ST.pack top_dir) (ST.pack pkgroot)
+  . mungeUnitInfoPaths (ST.pack (OsPath.unsafeDecodeUtf top_dir)) (ST.pack (OsPath.unsafeDecodeUtf pkgroot))
 
 mungeDynLibFields :: UnitInfo -> UnitInfo
 mungeDynLibFields pkg =
@@ -1373,7 +1376,7 @@ mergeDatabases logger = foldM merge (emptyUniqMap, emptyUniqMap) . zip [1..]
   where
     merge (pkg_map, prec_map) (i, UnitDatabase db_path db) = do
       debugTraceMsg logger 2 $
-          text "loading package database" <+> text db_path
+          text "loading package database" <+> ppr db_path
       forM_ (Set.toList override_set) $ \pkg ->
           debugTraceMsg logger 2 $
               text "package" <+> ppr pkg <+>
