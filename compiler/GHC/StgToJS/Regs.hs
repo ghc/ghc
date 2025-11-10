@@ -148,7 +148,7 @@ registers :: Array StgReg JStgExpr
 registers = listArray (minBound, maxBound) (map (global . identFS) lowRegs ++ map regN [R32 .. R128])
   where
     regN :: StgReg -> JStgExpr
-    regN r = IdxExpr hdRegs (toJExpr (fromEnum r - 32))
+    regN r = IdxExpr hdRegs (toJExpr (fromEnum r - 31)) -- registers are 0-indexed (R32 has index 31, not 32)
 
 -- cache JExpr representing StgRet
 rets :: Array StgRet JStgExpr
