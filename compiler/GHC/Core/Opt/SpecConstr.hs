@@ -1970,7 +1970,7 @@ spec_one :: ScEnv
 
 spec_one env fn arg_bndrs body (call_pat, rule_number)
   | CP { cp_qvars = qvars, cp_args = pats, cp_strict_args = cbv_args } <- call_pat
-  = do  { -- pprTraceM "spec_one {" (ppr fn <+> ppr pats)
+  = do  { pprTraceM "spec_one {" (ppr fn <+> (ppr qvars $$ ppr pats))
 
         ; spec_uniq <- getUniqueM
         ; let env1 = extendScSubstList (extendScInScope env qvars)
@@ -2646,13 +2646,10 @@ callToPat env bndr_occs call@(Call fn args con_env)
                 -- See Note [Shadowing in SpecConstr] at the top
 
               (qktvs, qids) = partition isTyVar qvars
-              qvars'        = scopedSort qktvs ++ map sanitise qids
+              qvars'        = scopedSort qktvs ++ qids
                 -- Order into kind variables, type variables, term variables
                 -- The kind of a type variable may mention a kind variable
                 -- and the type of a term variable may mention a type variable
-
-              sanitise id = updateIdTypeAndMult expandTypeSynonyms id
-                -- See Note [Free type variables of the qvar types]
 
         -- Check for bad coercion variables: see Note [SpecConstr and casts]
         ; let bad_covars = filter isCoVar qids
@@ -2755,7 +2752,7 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
              con_str = dataConRepStrictness dc
              all_str = match_vals con_str args
 
-             -- `arg_occs` corresponnds 1-1 with the binders of a data con
+             -- `arg_occs` corresponds 1-1 with the binders of a data con
              -- pattern, which omits the universal tyvars. We extend with
              -- `UnkOcc` for the universals to get `all_arg_occs`
              all_arg_occs :: [ArgOcc]
@@ -2868,7 +2865,8 @@ mkTyPat :: InScopeSet -> Type -> Type
 -- Here we are silently relying on non-shadowing; it's no good if a
 -- /different/ `b` is in scope at the definition site!
 mkTyPat in_scope ty
-  = expandSomeTyVarUnfoldings not_in_scope ty
+  = expandSomeTyVarUnfoldings not_in_scope (expandTypeSynonyms ty)
+        -- See Note [Free type variables of the qvar types]
   where
     not_in_scope tv = not (tv `elemInScopeSet` in_scope)
 

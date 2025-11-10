@@ -3268,7 +3268,9 @@ So:
 * `mkCoreAbsLams` (more generally `mkPolyAbsLams`) forms a lambda abstraction pushing
    the tyvar bindings into the body:
       mkCoreAbsLams [a, b=[a], x:b] body
-         = \a. \(x:[a]). let @b = [a] in body
+         = \a. \(x:[a]). let @b = [a] in
+                         let x:b = x in   -- See (AFV1)
+                         body
 
    It pushes the let inwards to try to keep the lambas together; this
    matters for join points, where the lambdas are supposed to be adjacent.
@@ -3276,6 +3278,21 @@ So:
 * `mkAbsVarApps` forms an application, droppping those tyvars-with-unfoldings
       mkAbsVarApps fun [a, b=[a], x:b]
          = fun @a x
+
+Wrinkles
+
+(AFV1) In the above we have (when body is `reverse x`):
+      mkCoreAbsLams [a, b=[a], x:b] (reverse x)
+         = \a. \(x:[a]). let @b = [a] in
+                         let x:b = x in   -- See (AFV1)
+                         reverse x
+  Why do we need that funny (non-recursive!) `x:b = x` binding?
+  Answer: without it we'd have this:
+         = \a. \(x:[a]). let @b = [a] in
+                         reverse (x:b)
+  where the /occurrence/ Var (x:b) has a different type to the /binding/ x:[a].
+  Worse
+
 -}
 
 type AbsVar        = Var
@@ -3304,12 +3321,13 @@ mkPolyAbsLams (getter,setter) bndrs body
       | isTyVar var, change_ty
       , let binds' | isDeadBinder var = binds
                    | otherwise        = NonRec bndr (Type (mkTyVarTy var1)) : binds
+            -- Why this let-binding? 
       = Lam (setter var1 bndr) (go unf_tvs binds' bndrs)
 
       | isId var, change_ty || change_unf
---      , let binds' | isDeadBinder var = binds
---                   | otherwise        = NonRec bndr (Var id2) : binds
-      = Lam (setter id2 bndr) (go unf_tvs binds bndrs)
+      , let binds' | isDeadBinder var = binds
+                   | otherwise        = NonRec bndr (Var id2) : binds
+      = Lam (setter id2 bndr) (go unf_tvs binds' bndrs)
 
       | otherwise
       = Lam bndr  (go unf_tvs binds bndrs)
