@@ -161,9 +161,11 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ pprSolverReportWithCtxt msg
     TcRnSolverDepthError ty depth -> mkSimpleDecorated msg
       where
+        pp_type_or_constraint | isConstraintLikeKind (typeKind ty) = text "constraint"
+                              | otherwise                          = text "type"
         msg =
           vcat [ text "Reduction stack overflow; size =" <+> ppr depth
-               , hang (text "When simplifying the following type:")
+               , hang (text "When simplifying the following" <+> pp_type_or_constraint <> colon)
                     2 (ppr ty) ]
     TcRnRedundantConstraints redundants (info, show_info)
       -> mkSimpleDecorated $

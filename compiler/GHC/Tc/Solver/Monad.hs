@@ -20,7 +20,7 @@ module GHC.Tc.Solver.Monad (
     selectNextWorkItem,
     getWorkList,
     updWorkListTcS,
-    pushLevelNoWorkList,
+    pushLevelNoWorkList, pushTcLevelM_,
 
     runTcPluginTcS, recordUsedGREs,
     matchGlobalInst, TcM.ClsInstResult(..),
@@ -53,7 +53,7 @@ module GHC.Tc.Solver.Monad (
     setEvBind, setWantedEq, setWantedDict, setEqIfWanted, setDictIfWanted,
     fillCoercionHole,
     newEvVar, newGivenEv, emitNewGivens,
-    emitChildEqs, checkReductionDepth,
+    emitChildEqs, bumpReductionDepth,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
@@ -243,7 +243,7 @@ solveEquality ev eq_rel ty1 ty2
                                 ; stopWithStage (eqCtEvidence eq_ct) ".." }}}
 
 Each sub-stage can elect to
-  (a) ContinueWith: continue to the next stasge
+  (a) ContinueWith: continue to the next stage
   (b) StartAgain:   start again at the beginning of the pipeline
   (c) Stop:         stop altogether; constraint is solved
 
@@ -1315,11 +1315,6 @@ nestImplicTcS skol_info ev_binds_var inner_tclvl (TcS thing_inside)
 nestFunDepsTcS :: TcS a -> TcS a
 nestFunDepsTcS (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
-    TcM.pushTcLevelM_  $
-         -- pushTcLevelTcM: increase the level so that unification variables
-         -- allocated by the fundep-creation itself don't count as useful unifications
-         -- See Note [Deeper TcLevel for partial improvement unification variables]
-         --     in GHC.Tc.Solver.FunDeps
     do { inerts <- TcM.readTcRef inerts_var
        ; let nest_inerts = resetInertCans inerts
                  -- resetInertCans: like nestImplicTcS
@@ -1808,8 +1803,6 @@ selectNextWorkItem
              pick_me ct new_wl
                = do { writeTcRef wl_var new_wl
                     ; return (Just ct) }
-                 -- NB: no need for checkReductionDepth (ctLoc ct) (ctPred ct)
-                 -- This is done by GHC.Tc.Solver.Dict.chooseInstance
 
              -- try_rws looks through rw_eqs to find one that has an empty
              -- rewriter set, after zonking.  If none such, call try_rest.
@@ -1826,6 +1819,10 @@ selectNextWorkItem
                | otherwise            = return Nothing
      } }
 
+
+pushTcLevelM_ :: TcS a -> TcS a
+pushTcLevelM_ (TcS thing_inside)
+  = TcS (\env -> TcM.pushTcLevelM_ (thing_inside env))
 
 pushLevelNoWorkList :: SDoc -> TcS a -> TcS (TcLevel, a)
 -- Push the level and run thing_inside
@@ -2178,12 +2175,14 @@ newWantedNC loc rewriters pty
 
 -- | Checks if the depth of the given location is too much. Fails if
 -- it's too big, with an appropriate error message.
-checkReductionDepth :: CtLoc -> TcType   -- ^ type being reduced
-                    -> TcS ()
-checkReductionDepth loc ty
+bumpReductionDepth :: CtLoc
+                   -> TcType   -- ^ type or constraint being reduced
+                   -> TcS CtLoc
+bumpReductionDepth loc ty
   = do { dflags <- getDynFlags
        ; when (subGoalDepthExceeded (reductionDepth dflags) (ctLocDepth loc)) $
-         wrapErrTcS $ solverDepthError loc ty }
+         wrapErrTcS $ solverDepthError loc ty
+       ; return (bumpCtLocDepth loc) }
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe ReductionN)
 matchFam tycon args = wrapTcS $ matchFamTcM tycon args
@@ -2252,7 +2251,8 @@ wrapUnifierAndEmit :: CtEvidence -> Role
 --    returns a CoHoleSet describing the new unsolved goals
 wrapUnifierAndEmit ev role do_unifications
   = do { (unifs, (co, eqs)) <- reportFineGrainUnifications $
-                               wrapUnifier ev role do_unifications
+                               wrapUnifier (ctEvRewriters ev) (ctEvLoc ev) role $
+                               do_unifications
 
        -- Emit the deferred constraints
        ; emitChildEqs ev eqs
@@ -2262,7 +2262,7 @@ wrapUnifierAndEmit ev role do_unifications
 
        ; return (CPH { cph_co = co, cph_holes = rewriterSetFromCts eqs }) }
 
-wrapUnifier :: CtEvidence -> Role
+wrapUnifier :: CoHoleSet -> CtLoc -> Role
              -> (UnifyEnv -> TcM a)  -- Some calls to uType
              -> TcS (a, Bag Ct)
 -- Invokes the do_unifications argument, with a suitable UnifyEnv.
@@ -2270,7 +2270,7 @@ wrapUnifier :: CtEvidence -> Role
 --    See Note [wrapUnifier]
 -- The (Bag Ct) are the deferred constraints; we emit them but
 -- also return them
-wrapUnifier ev role do_unifications
+wrapUnifier rws loc role do_unifications
   = do { given_eq_lvl <- getInnermostGivenEqLevel
        ; what_uni     <- getWhatUnifications
 
@@ -2278,8 +2278,8 @@ wrapUnifier ev role do_unifications
          do { defer_ref    <- TcM.newTcRef emptyBag
             ; let env = UE { u_role         = role
                            , u_given_eq_lvl = given_eq_lvl
-                           , u_rewriters    = ctEvRewriters ev
-                           , u_loc          = ctEvLoc ev
+                           , u_rewriters    = rws
+                           , u_loc          = loc
                            , u_defer        = defer_ref
                            , u_what         = what_uni }
               -- u_rewriters: the rewriter set and location from

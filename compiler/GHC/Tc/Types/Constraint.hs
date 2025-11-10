@@ -488,6 +488,10 @@ data CtIrredReason
     -- ^ A typechecker plugin returned this in the pluginBadCts field
     -- of TcPluginProgress
 
+  | InsolubleFunDepReason
+    -- ^ This constraint generated a functional dependency that is
+    -- insoluble -- so we can regard this constraint too as insoluble
+
 instance Outputable CtIrredReason where
   ppr IrredShapeReason          = text "(irred)"
   ppr (NonCanonicalReason cter) = ppr cter
@@ -495,6 +499,7 @@ instance Outputable CtIrredReason where
   ppr ShapeMismatchReason       = text "(shape)"
   ppr AbstractTyConReason       = text "(abstc)"
   ppr PluginReason              = text "(plugin)"
+  ppr InsolubleFunDepReason     = text "(fundep)"
 
 -- | Are we sure that more solving will never solve this constraint?
 isInsolubleReason :: CtIrredReason -> Bool
@@ -504,6 +509,7 @@ isInsolubleReason ReprEqReason              = False
 isInsolubleReason ShapeMismatchReason       = True
 isInsolubleReason AbstractTyConReason       = True
 isInsolubleReason PluginReason              = True
+isInsolubleReason InsolubleFunDepReason     = True
 
 ------------------------------------------------------------------------------
 --

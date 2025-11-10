@@ -45,6 +45,12 @@ Compiler
 - Pattern synonyms can now be suggested as valid hole fits (except, of course,
   if they are unidirectional).
 
+- GHC uses the information from the definition of a *closed* type family to
+  generate some extra functional dependencies for type equalities involving
+  that type family. As a consequence:
+
+  * typechecking will succeed a bit more often (see :ghc-ticket:`23162`)
+
 - When multiple ``-msse*`` flags are given, the maximum version takes effect.
   For example, ``-msse4.2 -msse2`` is now equivalent to ``-msse4.2``.
   Previously, only the last flag took effect.

@@ -2598,7 +2598,7 @@ The eager unifier, `uType`, is called by
     via the wrappers `unifyType`, `unifyKind` etc
 
   * The constraint solver (e.g. in GHC.Tc.Solver.Equality),
-    via `GHC.Tc.Solver.Monad.wrapUnifie`.
+    via `GHC.Tc.Solver.Monad.wrapUnifier`.
 
 `uType` runs in the TcM monad, but it carries a UnifyEnv that tells it
 what to do when unifying a variable or deferring a constraint. Specifically,

@@ -1,0 +1,24 @@
+T23162b.hs:27:36: error: [GHC-83865]
+    • Couldn't match expected type: LV a0 Bool
+                  with actual type: LV a0 Char
+      The type variable ‘a0’ is ambiguous
+    • In the second argument of ‘eq’, namely ‘(foo y 'c')’
+      In the expression: eq (foo y True) (foo y 'c')
+      In the first argument of ‘bar’, namely
+        ‘(\ y -> eq (foo y True) (foo y 'c'))’
+    • Relevant bindings include
+        y :: Proxy a0 (bound at T23162b.hs:27:14)
+
+T23162b.hs:31:49: error: [GHC-83865]
+    • Couldn't match type: LV as0 Bool
+                     with: Int -> LV as0 Char
+      Expected: LV as0 Bool
+        Actual: LV (Int : as0) Char
+      The type variable ‘as0’ is ambiguous
+    • In the expression: foo y 'c'
+      In the second argument of ‘eq’, namely
+        ‘(\ (z :: Int) -> foo y 'c')’
+      In the expression: eq (foo y True) (\ (z :: Int) -> foo y 'c')
+    • Relevant bindings include
+        y :: Proxy (Int : as0) (bound at T23162b.hs:31:14)
+

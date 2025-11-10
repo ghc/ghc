@@ -237,7 +237,7 @@ synifyAxiom ax@(CoAxiom{co_ax_tc = tc})
         InstD noExtField $
           TyFamInstD noExtField $
             TyFamInstDecl{tfid_xtn = noAnn, tfid_eqn = synifyAxBranch tc branch}
-  | Just ax' <- isClosedSynFamilyTyConWithAxiom_maybe tc
+  | Just ax' <- isClosedFamilyTyCon_maybe tc
   , getUnique ax' == getUnique ax -- without the getUniques, type error
     =
       synifyTyCon ShowRuntimeRep (Just ax) tc >>= return . TyClD noExtField

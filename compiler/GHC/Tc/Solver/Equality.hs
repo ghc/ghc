@@ -348,11 +348,11 @@ can_eq_nc True _rdr_env _envs ev ReprEq ty1 _ ty2 _
 can_eq_nc _rewritten rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   | ReprEq <- eq_rel
   , Just stuff1 <- tcTopNormaliseNewTypeTF_maybe envs rdr_env ty1
-  = can_eq_newtype_nc rdr_env envs ev NotSwapped ty1 stuff1 ty2 ps_ty2
+  = can_eq_newtype_nc rdr_env envs ev NotSwapped stuff1 ty2 ps_ty2
 
   | ReprEq <- eq_rel
   , Just stuff2 <- tcTopNormaliseNewTypeTF_maybe envs rdr_env ty2
-  = can_eq_newtype_nc rdr_env envs ev IsSwapped ty2 stuff2 ty1 ps_ty1
+  = can_eq_newtype_nc rdr_env envs ev IsSwapped stuff2 ty1 ps_ty1
 
 -- Then, get rid of casts
 can_eq_nc rewritten rdr_env envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
@@ -485,7 +485,7 @@ can_eq_nc_forall :: CtEvidence -> EqRel
 -- See Note [Solving forall equalities]
 
 can_eq_nc_forall ev eq_rel s1 s2
- | CtWanted (WantedCt { ctev_dest = orig_dest }) <- ev
+ | CtWanted (WantedCt { ctev_dest = orig_dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
  = do { let (bndrs1, phi1, bndrs2, phi2) = split_foralls s1 s2
             flags1 = binderFlags bndrs1
             flags2 = binderFlags bndrs2
@@ -549,7 +549,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                 do { -- Generate constraints
                      (tclvl, (all_co, wanteds))
                           <- pushLevelNoWorkList (ppr skol_info) $
-                             wrapUnifier ev (eqRelRole eq_rel)   $ \uenv ->
+                             wrapUnifier rws loc (eqRelRole eq_rel)   $ \uenv ->
                              go uenv skol_tvs init_subst2 bndrs1 bndrs2
 
                    ; traceTcS "Trying to solve the implication" (ppr s1 $$ ppr s2 $$ ppr wanteds)
@@ -776,20 +776,18 @@ though, because we check our depth in `can_eq_newtype_nc`.
 can_eq_newtype_nc :: GlobalRdrEnv -> FamInstEnvs
                   -> CtEvidence           -- ^ :: ty1 ~ ty2
                   -> SwapFlag
-                  -> TcType                                    -- ^ ty1
                   -> ((Bag GlobalRdrElt, TcCoercion), TcType)  -- ^ :: ty1 ~ ty1'
                   -> TcType               -- ^ ty2
                   -> TcType               -- ^ ty2, with type synonyms
                   -> TcS (StopOrContinue (Either IrredCt EqCt))
-can_eq_newtype_nc rdr_env envs ev swapped ty1 ((gres, co1), ty1') ty2 ps_ty2
+can_eq_newtype_nc rdr_env envs ev swapped ((gres, co1), ty1') ty2 ps_ty2
   = do { traceTcS "can_eq_newtype_nc" $
          vcat [ ppr ev, ppr swapped, ppr co1, ppr gres, ppr ty1', ppr ty2 ]
 
          -- Check for blowing our stack, and increase the depth
          -- See Note [Newtypes can blow the stack]
-       ; let loc = ctEvLoc ev
-             ev' = ev `setCtEvLoc` bumpCtLocDepth loc
-       ; checkReductionDepth loc ty1
+       ; loc' <- bumpReductionDepth (ctEvLoc ev) (ctEvPred ev)
+       ; let ev' = ev `setCtEvLoc` loc'
 
          -- Next, we record uses of newtype constructors, since coercing
          -- through newtypes is tantamount to using their constructors.
@@ -1688,9 +1686,9 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
               ; emitWorkNC [CtGiven kind_ev]
               ; finish emptyCoHoleSet (givenCtEvCoercion kind_ev) }
 
-      CtWanted {}
+      CtWanted (WantedCt { ctev_loc = loc, ctev_rewriters = rws })
          -> do { (unifs, (kind_co, eqs)) <- reportFineGrainUnifications $
-                                            wrapUnifier ev Nominal $ \uenv ->
+                                            wrapUnifier rws loc Nominal $ \uenv ->
                                             let uenv' = updUEnvLoc uenv (mkKindEqLoc xi1 xi2)
                                             in uType uenv' ki2 ki1
                       -- kind_co :: ki2 ~N ki1
