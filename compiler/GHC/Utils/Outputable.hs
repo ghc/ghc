@@ -149,6 +149,7 @@ import Data.String
 import Data.Word
 import System.IO        ( Handle )
 import System.FilePath
+import System.OsPath (OsPath, decodeUtf)
 import Text.Printf
 import Numeric (showFFloat)
 import Numeric.Natural (Natural)
@@ -1101,6 +1102,8 @@ instance Outputable Extension where
 instance Outputable ModuleName where
   ppr = pprModuleName
 
+instance Outputable OsPath where
+  ppr p = text $ either show id (decodeUtf p)
 
 pprModuleName :: IsLine doc => ModuleName -> doc
 pprModuleName (ModuleName nm) =

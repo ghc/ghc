@@ -38,7 +38,7 @@ import GHC.Driver.LlvmConfigCache  (LlvmConfigCache)
 import GHC.Driver.Ppr
 import GHC.Driver.Backend
 
-import GHC.Data.OsPath
+import GHC.Data.OsPath qualified as OsPath
 import qualified GHC.Data.ShortText as ST
 import GHC.Data.Stream           ( liftIO )
 import qualified GHC.Data.Stream as Stream
@@ -61,8 +61,6 @@ import GHC.Types.ForeignStubs
 import GHC.Types.Unique.DSM
 import GHC.Types.Unique.Supply ( UniqueTag(..) )
 
-import System.Directory
-import System.FilePath
 import System.IO
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -321,10 +319,9 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
         stub_h_file_exists <-
           case mkStubPaths (initFinderOpts dflags) (moduleName mod) location of
             Nothing -> pure False
-            Just path -> do
-              let stub_h = unsafeDecodeUtf path
-              createDirectoryIfMissing True (takeDirectory stub_h)
-              outputForeignStubs_help stub_h stub_h_output_w
+            Just stub_h -> do
+              OsPath.createDirectoryIfMissing True (OsPath.takeDirectory stub_h)
+              outputForeignStubs_help (OsPath.unsafeDecodeUtf stub_h) stub_h_output_w
                     ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
 
         putDumpFileMaybe logger Opt_D_dump_foreign

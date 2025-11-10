@@ -63,7 +63,6 @@ import GHC.Types.SourceFile
 
 import GHC.Fingerprint
 import Data.IORef
-import System.Directory.OsPath
 import Control.Applicative ((<|>))
 import Control.Monad
 import Data.Time
